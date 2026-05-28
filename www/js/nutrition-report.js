@@ -343,7 +343,11 @@ function injectReportStyles(){
   const style = document.createElement('style');
   style.id = 'mbkNutritionReportStyle';
   style.textContent = `
+    /* ===============================
+       Base
+    =============================== */
     html{scroll-behavior:smooth}
+
     .report-tabs{
       position:sticky;
       top:0;
@@ -352,11 +356,12 @@ function injectReportStyles(){
       gap:8px;
       overflow:auto;
       padding:10px 0;
-      margin-bottom:10px;
+      margin-bottom:12px;
       background:rgba(248,250,252,.96);
       backdrop-filter:blur(8px);
       border-bottom:1px solid #e2e8f0;
     }
+
     .report-tabs a{
       flex:0 0 auto;
       text-decoration:none;
@@ -369,70 +374,232 @@ function injectReportStyles(){
       font-weight:950;
       white-space:nowrap;
     }
+
     .report-tabs a.main{
       background:#0f5d35;
       color:#fff;
       border-color:#0f5d35;
     }
-    .executive-hero{
-      display:grid;
-      grid-template-columns:1.15fr .85fr;
-      gap:12px;
-      align-items:stretch;
+
+    .small-note{
+      font-size:12px;
+      font-weight:850;
+      color:#64748b;
+      line-height:1.8;
     }
-    .hero-main{
+
+    /* ===============================
+       Report cover
+    =============================== */
+    .report-cover{
+      position:relative;
+      overflow:hidden;
       border:1px solid #dfe9e2;
-      background:linear-gradient(135deg,#f0fbf4,#fff);
-      border-radius:22px;
-      padding:16px;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(20,120,74,.10), transparent 26%),
+        linear-gradient(135deg,#f4fbf6 0%,#ffffff 64%,#eef8f1 100%);
+      border-radius:28px;
+      padding:26px;
+      margin-bottom:16px;
+      box-shadow:0 14px 35px rgba(15,93,53,.08);
     }
-    .hero-title{
-      font-size:24px;
+
+    .report-cover:after{
+      content:"";
+      position:absolute;
+      width:230px;
+      height:230px;
+      border-radius:50%;
+      background:rgba(15,93,53,.06);
+      left:-70px;
+      bottom:-95px;
+    }
+
+    .report-cover-head{
+      position:relative;
+      z-index:1;
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:16px;
+      align-items:start;
+    }
+
+    .report-kicker{
+      font-size:13px;
+      font-weight:950;
+      color:#0f7a45;
+      margin-bottom:8px;
+    }
+
+    .report-main-title{
+      margin:0;
+      max-width:760px;
+      font-size:34px;
       font-weight:950;
       color:#123d2a;
-      line-height:1.35;
-      margin:0 0 8px;
+      line-height:1.25;
+      letter-spacing:-.5px;
     }
-    .hero-desc{
-      font-size:13px;
+
+    .report-main-subtitle{
+      max-width:780px;
+      margin-top:10px;
+      font-size:14px;
       font-weight:850;
-      color:#475569;
+      color:#64748b;
       line-height:1.9;
     }
-    .hero-side{
-      display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:8px;
+
+    .report-logo-box{
+      min-width:120px;
+      text-align:center;
+      border:1px solid #dfe9e2;
+      background:rgba(255,255,255,.82);
+      border-radius:22px;
+      padding:12px;
     }
-    .status-chip{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      border-radius:999px;
-      padding:5px 10px;
+
+    .report-logo-box img{
+      width:54px;
+      height:54px;
+      object-fit:contain;
+      opacity:.9;
+    }
+
+    .report-logo-box div{
+      margin-top:6px;
       font-size:11px;
       font-weight:950;
-      border:1px solid #bbf7d0;
-      background:#ecfdf3;
-      color:#166534;
-      white-space:nowrap;
-      vertical-align:middle;
+      color:#14532d;
     }
-    .status-chip.warn{
-      background:#fff7ed;
-      color:#c2410c;
-      border-color:#fed7aa;
+
+    /* ===============================
+       Executive summary
+    =============================== */
+    .executive-panel{
+      display:grid;
+      grid-template-columns:1.2fr .8fr;
+      gap:14px;
+      margin-bottom:16px;
     }
-    .status-chip.danger{
-      background:#fff1f2;
-      color:#b91c1c;
-      border-color:#fecdd3;
+
+    .executive-reading{
+      border:1px solid #dfe9e2;
+      background:#fff;
+      border-radius:24px;
+      padding:18px;
+      box-shadow:0 10px 26px rgba(15,93,53,.06);
     }
-    .status-chip.muted{
-      background:#f1f5f9;
+
+    .executive-reading h2{
+      margin:0 0 8px;
+      color:#123d2a;
+      font-size:22px;
+      font-weight:950;
+    }
+
+    .executive-reading p{
+      margin:0;
       color:#475569;
-      border-color:#e2e8f0;
+      font-size:13px;
+      font-weight:850;
+      line-height:1.9;
     }
+
+    .executive-badges{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:12px;
+    }
+
+    .executive-score-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+
+    .executive-score{
+      border:1px solid #e1ece4;
+      background:#fbfdfb;
+      border-radius:20px;
+      padding:14px;
+      text-align:center;
+    }
+
+    .executive-score b{
+      display:block;
+      font-size:28px;
+      font-weight:950;
+      color:#0f7a45;
+      line-height:1;
+    }
+
+    .executive-score span{
+      display:block;
+      margin-top:8px;
+      font-size:12px;
+      font-weight:950;
+      color:#475569;
+    }
+
+    /* ===============================
+       Sections and cards
+    =============================== */
+    .report-section-head{
+      border:1px solid #dfe9e2;
+      background:linear-gradient(135deg,#ffffff,#f5fbf7);
+      border-radius:24px;
+      padding:18px;
+      margin:18px 0 12px;
+    }
+
+    .report-section-head .section-title{
+      margin:0;
+      padding:0;
+      border:0;
+      font-size:22px;
+    }
+
+    .report-section-head .small-note{
+      margin-top:6px;
+    }
+
+    .ration-block{
+      break-inside:auto;
+      page-break-inside:auto;
+      scroll-margin-top:90px;
+    }
+
+    .ration-break{
+      break-before:page;
+      page-break-before:always;
+    }
+
+    .ration-block > .print-analysis > .card:first-child{
+      border-top:4px solid #0f7a45;
+    }
+
+    .ration-head-grid{
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:10px;
+      align-items:start;
+    }
+
+    .compact-grid{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:8px;
+    }
+
+    .analysis-subtitle{
+      font-weight:950;
+      color:#123d2a;
+      margin:14px 0 8px;
+      font-size:14px;
+    }
+
     .decision-box{
       border:1px solid #dfe9e2;
       background:#fbfdfb;
@@ -440,6 +607,7 @@ function injectReportStyles(){
       padding:14px;
       margin-bottom:12px;
     }
+
     .decision-head{
       display:flex;
       gap:8px;
@@ -448,17 +616,20 @@ function injectReportStyles(){
       flex-wrap:wrap;
       margin-bottom:8px;
     }
+
     .decision-title{
       font-size:16px;
       font-weight:950;
       color:#123d2a;
     }
+
     .decision-text{
       font-size:15px;
       font-weight:950;
       color:#0f172a;
       line-height:1.8;
     }
+
     .decision-note{
       margin-top:6px;
       color:#475569;
@@ -466,12 +637,58 @@ function injectReportStyles(){
       font-weight:850;
       line-height:1.85;
     }
+
+    /* ===============================
+       Buttons
+    =============================== */
+    .screen-actions-row,
+    .ration-print-actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+
+    .screen-actions-row a,
+    .screen-actions-row button,
+    .ration-print-actions button,
+    .section-print-actions button{
+      text-decoration:none;
+      border:1px solid #dfe9e2;
+      border-radius:12px;
+      padding:9px 12px;
+      font-weight:950;
+      font-size:12px;
+      cursor:pointer;
+    }
+
+    .screen-actions-row a,
+    .screen-actions-row button,
+    .ration-print-actions button.secondary{
+      color:#134e2f;
+      background:#eef7f0;
+    }
+
+    .ration-print-actions button,
+    .section-print-actions button{
+      background:#0f5d35;
+      color:#fff;
+    }
+
+    .section-print-actions{
+      margin:10px 0 12px;
+    }
+
+    /* ===============================
+       Tables
+    =============================== */
     .metric-table{
       width:100%;
       min-width:0;
       border-collapse:collapse;
       border-spacing:0;
     }
+
     .metric-table th,
     .metric-table td{
       border:1px solid #e1ece4 !important;
@@ -483,566 +700,258 @@ function injectReportStyles(){
       line-height:1.55;
       vertical-align:middle;
     }
+
     .metric-table th{
       background:#eef7f0 !important;
       color:#143d2b;
       font-weight:950;
     }
+
     .metric-name{
       font-weight:950 !important;
       color:#173126;
     }
-    .small-note{
-      font-size:12px;
-      font-weight:850;
-      color:#64748b;
-      line-height:1.8;
-    }
-    .ration-block{
-      break-inside:auto;
-      page-break-inside:auto;
-      scroll-margin-top:90px;
-    }
-    .ration-break{
-      break-before:page;
-      page-break-before:always;
-    }
-    .priority-list{
-      margin:0;
-      padding-inline-start:22px;
-      color:#334155;
-      font-weight:900;
-      line-height:1.95;
-      font-size:13px;
-    }
-    .screen-actions-row{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-      margin-top:10px;
-    }
-    .screen-actions-row a,
-    .screen-actions-row button{
-      text-decoration:none;
-      border-radius:12px;
-      padding:9px 12px;
+
+    /* ===============================
+       Status chips
+    =============================== */
+    .status-chip{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid #bbf7d0;
+      border-radius:999px;
+      background:#ecfdf3;
+      color:#166534;
+      padding:5px 10px;
+      font-size:11px;
       font-weight:950;
-      font-size:12px;
-      border:1px solid #dfe9e2;
-      color:#134e2f;
-      background:#eef7f0;
-      cursor:pointer;
+      white-space:nowrap;
+      vertical-align:middle;
     }
-    .ration-head-grid{
-      display:grid;
-      grid-template-columns:1fr auto;
-      gap:10px;
-      align-items:start;
+
+    .status-chip.warn{
+      background:#fff7ed;
+      color:#c2410c;
+      border-color:#fed7aa;
     }
-    .compact-grid{
-      display:grid;
-      grid-template-columns:repeat(4,minmax(0,1fr));
-      gap:8px;
+
+    .status-chip.danger{
+      background:#fff1f2;
+      color:#b91c1c;
+      border-color:#fecdd3;
     }
-    .analysis-subtitle{
-      font-weight:950;
-      color:#123d2a;
-      margin:14px 0 8px;
-      font-size:14px;
+
+    .status-chip.muted{
+      background:#f1f5f9;
+      color:#475569;
+      border-color:#e2e8f0;
     }
-    .print-tools-grid{
-  display:grid;
-  grid-template-columns:repeat(5,minmax(0,1fr));
-  gap:8px;
-  align-items:end;
-}
-.print-tools-grid button,
-.print-tools-grid select{
-  width:100%;
-  border:1px solid #dfe9e2;
-  border-radius:12px;
-  background:#fff;
-  color:#134e2f;
-  font-weight:950;
-  padding:10px;
-  font-size:12px;
-}
-.print-tools-grid button{
-  background:#0f5d35;
-  color:#fff;
-  cursor:pointer;
-}
-.print-tools-grid label span{
-  display:block;
-  font-size:11px;
-  font-weight:950;
-  color:#64748b;
-  margin-bottom:4px;
-}
-.ration-print-actions{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  margin-top:10px;
-}
-.ration-print-actions button{
-  border:1px solid #dfe9e2;
-  background:#0f5d35;
-  color:#fff;
-  border-radius:12px;
-  padding:9px 12px;
-  font-weight:950;
-  font-size:12px;
-  cursor:pointer;
-}
-.ration-print-actions button.secondary{
-  background:#eef7f0;
-  color:#134e2f;
-}
-.section-print-actions{
-  margin-top:10px;
-}
-.section-print-actions button{
-  border:1px solid #dfe9e2;
-  background:#0f5d35;
-  color:#fff;
-  border-radius:12px;
-  padding:9px 12px;
-  font-weight:950;
-  font-size:12px;
-  cursor:pointer;
-}
-.report-cover{
-  position:relative;
-  overflow:hidden;
-  border:1px solid #dfe9e2;
-  background:
-    radial-gradient(circle at 12% 18%, rgba(20,120,74,.10), transparent 26%),
-    linear-gradient(135deg,#f4fbf6 0%,#ffffff 62%,#eef8f1 100%);
-  border-radius:28px;
-  padding:26px;
-  margin-bottom:16px;
-  box-shadow:0 14px 35px rgba(15,93,53,.08);
-}
 
-.report-cover:after{
-  content:"";
-  position:absolute;
-  width:230px;
-  height:230px;
-  border-radius:50%;
-  background:rgba(15,93,53,.06);
-  left:-70px;
-  bottom:-95px;
-}
-
-.report-cover-head{
-  position:relative;
-  z-index:1;
-  display:grid;
-  grid-template-columns:1fr auto;
-  gap:16px;
-  align-items:start;
-}
-
-.report-kicker{
-  font-size:13px;
-  font-weight:950;
-  color:#0f7a45;
-  margin-bottom:8px;
-}
-
-.report-main-title{
-  font-size:34px;
-  font-weight:950;
-  color:#123d2a;
-  line-height:1.25;
-  margin:0;
-  letter-spacing:-.5px;
-}
-
-.report-main-subtitle{
-  margin-top:10px;
-  font-size:14px;
-  font-weight:850;
-  color:#64748b;
-  line-height:1.9;
-}
-
-.report-logo-box{
-  min-width:120px;
-  text-align:center;
-  border:1px solid #dfe9e2;
-  background:rgba(255,255,255,.82);
-  border-radius:22px;
-  padding:12px;
-}
-
-.report-logo-box img{
-  width:54px;
-  height:54px;
-  object-fit:contain;
-  opacity:.9;
-}
-
-.report-logo-box div{
-  margin-top:6px;
-  font-size:11px;
-  font-weight:950;
-  color:#14532d;
-}
-
-.report-meta-strip{
-  position:relative;
-  z-index:1;
-  display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:10px;
-  margin-top:20px;
-}
-
-.report-meta-item{
-  background:#fff;
-  border:1px solid #e1ece4;
-  border-radius:16px;
-  padding:11px 12px;
-}
-
-.report-meta-item span{
-  display:block;
-  color:#64748b;
-  font-size:11px;
-  font-weight:900;
-  margin-bottom:4px;
-}
-
-.report-meta-item b{
-  display:block;
-  color:#102a1f;
-  font-size:14px;
-  font-weight:950;
-}
-
-.executive-panel{
-  display:grid;
-  grid-template-columns:1.2fr .8fr;
-  gap:14px;
-  margin-bottom:16px;
-}
-
-.executive-reading{
-  border:1px solid #dfe9e2;
-  background:#fff;
-  border-radius:24px;
-  padding:18px;
-  box-shadow:0 10px 26px rgba(15,93,53,.06);
-}
-
-.executive-reading h2{
-  margin:0 0 8px;
-  color:#123d2a;
-  font-size:22px;
-  font-weight:950;
-}
-
-.executive-reading p{
-  margin:0;
-  color:#475569;
-  font-size:13px;
-  font-weight:850;
-  line-height:1.9;
-}
-
-.executive-badges{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin-top:12px;
-}
-
-.executive-score-grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px;
-}
-
-.executive-score{
-  border:1px solid #e1ece4;
-  background:#fbfdfb;
-  border-radius:20px;
-  padding:14px;
-  text-align:center;
-}
-
-.executive-score b{
-  display:block;
-  font-size:28px;
-  font-weight:950;
-  color:#0f7a45;
-  line-height:1;
-}
-
-.executive-score span{
-  display:block;
-  margin-top:8px;
-  font-size:12px;
-  font-weight:950;
-  color:#475569;
-}
-
-.report-section-head{
-  border:1px solid #dfe9e2;
-  background:linear-gradient(135deg,#ffffff,#f5fbf7);
-  border-radius:24px;
-  padding:18px;
-  margin:18px 0 12px;
-}
-
-.report-section-head .section-title{
-  margin:0;
-  padding:0;
-  border:0;
-  font-size:22px;
-}
-
-.report-section-head .small-note{
-  margin-top:6px;
-}
-
-.ration-block > .print-analysis > .card:first-child{
-  border-top:4px solid #0f7a45;
-}
-
-@media print{
-  .report-cover{
-    border-radius:0 !important;
-    box-shadow:none !important;
-    break-inside:avoid;
-    page-break-inside:avoid;
-  }
-
-  .report-main-title{
-    font-size:25pt !important;
-  }
-
-  .executive-panel{
-    break-inside:avoid;
-    page-break-inside:avoid;
-  }
-}
+    /* ===============================
+       Mobile
+    =============================== */
     @media(max-width:760px){
-      .executive-hero{grid-template-columns:1fr}
-      .hero-side{grid-template-columns:repeat(2,minmax(0,1fr))}
-      .compact-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .report-cover{
+        padding:14px !important;
+        border-radius:18px !important;
+        margin:8px 0 12px !important;
+        box-shadow:0 6px 16px rgba(15,93,53,.06) !important;
+      }
+
+      .report-cover:after{
+        width:120px !important;
+        height:120px !important;
+        left:-45px !important;
+        bottom:-55px !important;
+      }
+
+      .report-cover-head{
+        display:block !important;
+      }
+
+      .report-logo-box{
+        display:none !important;
+      }
+
+      .report-kicker{
+        font-size:11px !important;
+        margin-bottom:4px !important;
+      }
+
+      .report-main-title{
+        max-width:100% !important;
+        font-size:22px !important;
+        line-height:1.35 !important;
+        letter-spacing:0 !important;
+        word-break:normal !important;
+        overflow-wrap:normal !important;
+      }
+
+      .report-main-subtitle{
+        font-size:11px !important;
+        line-height:1.7 !important;
+        margin-top:6px !important;
+      }
+
+      .executive-panel{
+        grid-template-columns:1fr !important;
+        gap:10px !important;
+      }
+
+      .executive-reading{
+        padding:14px !important;
+        border-radius:18px !important;
+      }
+
+      .executive-reading h2{
+        font-size:18px !important;
+      }
+
+      .executive-reading p{
+        font-size:12px !important;
+      }
+
+      .executive-score-grid,
+      .compact-grid{
+        grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+      }
+
+      .executive-score{
+        padding:10px !important;
+        border-radius:16px !important;
+      }
+
+      .executive-score b{
+        font-size:22px !important;
+      }
+
       .metric-table{min-width:760px}
       .ration-head-grid{grid-template-columns:1fr}
     }
 
+    /* ===============================
+       Print modes
+    =============================== */
+    body.print-scope-one .stage-section{
+      display:none !important;
+    }
 
-body.print-scope-one .stage-section{
-  display:none !important;
-}
+    body.print-scope-one .stage-section.print-stage-selected{
+      display:block !important;
+    }
 
-body.print-scope-one .stage-section.print-stage-selected{
-  display:block !important;
-}
+    body.print-scope-one .ration-block{
+      display:none !important;
+    }
 
-body.print-scope-one .ration-block{
-  display:none !important;
-}
+    body.print-scope-one .ration-block.print-selected{
+      display:block !important;
+    }
 
-body.print-scope-one .ration-block.print-selected{
-  display:block !important;
-}
+    body.print-scope-lactating .stage-section:not([data-stage="lactating"]){
+      display:none !important;
+    }
 
-body.print-scope-lactating .stage-section:not([data-stage="lactating"]){
-  display:none !important;
-}
+    body.print-mode-operational *{
+      visibility:hidden !important;
+    }
 
-body.print-mode-operational *{
-  visibility:hidden !important;
-}
+    body.print-mode-operational .ration-block.print-selected .print-operation,
+    body.print-mode-operational .ration-block.print-selected .print-operation *{
+      visibility:visible !important;
+    }
 
-body.print-mode-operational .ration-block.print-selected .print-operation,
-body.print-mode-operational .ration-block.print-selected .print-operation *{
-  visibility:visible !important;
-}
+    body.print-mode-operational .ration-block.print-selected .print-operation{
+      display:block !important;
+      position:absolute !important;
+      top:0 !important;
+      right:0 !important;
+      left:0 !important;
+      width:100% !important;
+      margin:0 !important;
+      padding:0 !important;
+    }
 
-body.print-mode-operational .ration-block.print-selected .print-operation{
-  display:block !important;
-  position:absolute !important;
-  top:0 !important;
-  right:0 !important;
-  left:0 !important;
-  width:100% !important;
-  margin:0 !important;
-  padding:0 !important;
-}
+    body.print-mode-operational .ration-break{
+      break-before:auto !important;
+      page-break-before:auto !important;
+    }
 
-body.print-mode-operational .ration-break{
-  break-before:auto !important;
-  page-break-before:auto !important;
-}
     @media print{
-    .no-print,
-.print-tools{
-  display:none !important;
-}
-    @page{
-  size:A4 landscape;
-  margin:8mm;
-}
+      @page{
+        size:A4 landscape;
+        margin:8mm;
+      }
 
-html, body{
-  width:auto !important;
-  overflow:visible !important;
-}
+      html, body{
+        width:auto !important;
+        overflow:visible !important;
+      }
 
-.table-wrap{
-  overflow:visible !important;
-  width:100% !important;
-}
-
-.metric-table{
-  width:100% !important;
-  min-width:0 !important;
-  table-layout:fixed !important;
-}
-
-.metric-table th,
-.metric-table td{
-  white-space:normal !important;
-  word-break:break-word !important;
-  overflow-wrap:anywhere !important;
-  font-size:7.2pt !important;
-  padding:1.6mm !important;
-  line-height:1.35 !important;
-}
+      .no-print,
       .report-tabs,
-      .screen-actions-row{display:none !important}
-      .executive-hero{grid-template-columns:1.1fr .9fr}
-      .hero-main,
+      .screen-actions-row,
+      .ration-print-actions,
+      .section-print-actions{
+        display:none !important;
+      }
+
+      .report-cover,
+      .executive-panel{
+        break-inside:avoid;
+        page-break-inside:avoid;
+      }
+
+      .report-cover{
+        border-radius:0 !important;
+        box-shadow:none !important;
+      }
+
+      .report-main-title{
+        font-size:25pt !important;
+      }
+
+      .table-wrap{
+        overflow:visible !important;
+        width:100% !important;
+      }
+
+      .metric-table{
+        width:100% !important;
+        min-width:0 !important;
+        table-layout:fixed !important;
+      }
+
+      .metric-table th,
+      .metric-table td{
+        white-space:normal !important;
+        word-break:break-word !important;
+        overflow-wrap:anywhere !important;
+        font-size:8pt !important;
+        padding:2mm !important;
+        line-height:1.35 !important;
+      }
+
       .decision-box{
         border-radius:0;
         box-shadow:none;
       }
-      .hero-title{font-size:20pt}
-      .status-chip{border-radius:0}
-      .ration-break{
-        break-before:page;
-        page-break-before:always;
-      }
-      .metric-table th,
-      .metric-table td{
-        font-size:8.7pt;
-        padding:2.4mm;
-      }
+
       .decision-text{font-size:11pt}
       .decision-note{font-size:9pt}
+      .status-chip{border-radius:0}
       .card{break-inside:auto;page-break-inside:auto}
     }
   `;
-   const mobileFix = document.createElement('style');
-mobileFix.id = 'mbkNutritionReportMobileFix';
-mobileFix.textContent = `
-@media(max-width:760px){
-  .report-cover{
-    padding:14px !important;
-    border-radius:18px !important;
-    margin:8px 0 12px !important;
-    box-shadow:0 6px 16px rgba(15,93,53,.06) !important;
-  }
 
-  .report-cover:after{
-    width:120px !important;
-    height:120px !important;
-    left:-45px !important;
-    bottom:-55px !important;
-  }
-
-  .report-cover-head{
-    display:block !important;
-  }
-
-  .report-logo-box{
-    display:none !important;
-  }
-
-  .report-kicker{
-    font-size:11px !important;
-    margin-bottom:4px !important;
-  }
-
-  .report-main-title{
-    font-size:22px !important;
-    line-height:1.35 !important;
-    letter-spacing:0 !important;
-    max-width:100% !important;
-    word-break:normal !important;
-    overflow-wrap:normal !important;
-  }
-
-  .report-main-subtitle{
-    font-size:11px !important;
-    line-height:1.7 !important;
-    margin-top:6px !important;
-  }
-
-  .report-meta-strip{
-    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-    gap:6px !important;
-    margin-top:10px !important;
-  }
-
-  .report-meta-item{
-    padding:8px !important;
-    border-radius:12px !important;
-  }
-
-  .report-meta-item span{
-    font-size:10px !important;
-  }
-
-  .report-meta-item b{
-    font-size:12px !important;
-  }
-
-  .executive-panel{
-    grid-template-columns:1fr !important;
-    gap:10px !important;
-  }
-
-  .executive-reading{
-    padding:14px !important;
-    border-radius:18px !important;
-  }
-
-  .executive-reading h2{
-    font-size:18px !important;
-  }
-
-  .executive-reading p{
-    font-size:12px !important;
-  }
-
-  .executive-score-grid{
-    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-  }
-
-  .executive-score{
-    padding:10px !important;
-    border-radius:16px !important;
-  }
-
-  .executive-score b{
-    font-size:22px !important;
-  }
-}
-`;
-document.head.appendChild(mobileFix);
   document.head.appendChild(style);
 }
 
+
+
+/* ============================================================
+   HTML blocks
 /* ============================================================
    HTML blocks
 ============================================================ */
@@ -1130,6 +1039,7 @@ function hideOldReportHeader(){
   const box = title ? title.closest('.card, .hero, .report-head, section, header') : null;
   if(box) box.style.display = 'none';
 }
+
 function clearPrintMode(){
   document.body.classList.remove(
     'print-scope-one',
@@ -1140,38 +1050,24 @@ function clearPrintMode(){
   document.querySelectorAll('.ration-block.print-selected').forEach(el => {
     el.classList.remove('print-selected');
   });
-   document.querySelectorAll('.stage-section.print-stage-selected').forEach(el => {
-  el.classList.remove('print-stage-selected');
-});
+
+  document.querySelectorAll('.stage-section.print-stage-selected').forEach(el => {
+    el.classList.remove('print-stage-selected');
+  });
 }
 
-function selectedPrintRationId(){
-  const sel = document.getElementById('printRationSelect');
-  return sel ? String(sel.value || '') : '';
-}
+function markRationForPrint(el){
+  document.body.classList.add('print-scope-one');
+  el.classList.add('print-selected');
 
-function runPrint(scope){
-  clearPrintMode();
-
-  if(scope === 'one' || scope === 'operational'){
-    const id = selectedPrintRationId();
-    const el = id ? document.getElementById(id) : null;
-
-    if(!el){
-      alert('اختر العليقة المطلوب طباعتها أولًا');
-      return;
-    }
-
-    document.body.classList.add('print-scope-one');
-    el.classList.add('print-selected');
-    const stageBox = el.closest('.stage-section');
-if(stageBox){
-  stageBox.classList.add('print-stage-selected');
-}
-    if(scope === 'operational'){
-      document.body.classList.add('print-mode-operational');
-    }
+  const stageBox = el.closest('.stage-section');
+  if(stageBox){
+    stageBox.classList.add('print-stage-selected');
   }
+}
+
+function runPrint(scope = 'full'){
+  clearPrintMode();
 
   if(scope === 'lactating'){
     document.body.classList.add('print-scope-lactating');
@@ -1179,9 +1075,6 @@ if(stageBox){
 
   setTimeout(() => window.print(), 80);
 }
-
-window.addEventListener('afterprint', clearPrintMode);
-window.runPrint = runPrint;
 
 function printRationById(id, operational = false){
   clearPrintMode();
@@ -1192,12 +1085,8 @@ function printRationById(id, operational = false){
     return;
   }
 
-  document.body.classList.add('print-scope-one');
-  el.classList.add('print-selected');
-const stageBox = el.closest('.stage-section');
-if(stageBox){
-  stageBox.classList.add('print-stage-selected');
-}
+  markRationForPrint(el);
+
   if(operational){
     document.body.classList.add('print-mode-operational');
   }
@@ -1205,38 +1094,10 @@ if(stageBox){
   setTimeout(() => window.print(), 80);
 }
 
+window.addEventListener('afterprint', clearPrintMode);
+window.runPrint = runPrint;
 window.printRationById = printRationById;
-function renderPrintTools(items = []){
-  const clean = Array.isArray(items) ? items.filter(x => x && x.id) : [];
-  const options = clean.map(x => `
-    <option value="${esc(x.id)}">${esc(x.label || 'عليقة')} — ${esc(x.stageLabel || '')}</option>
-  `).join('');
 
-  return `
-    <section class="card print-tools no-print">
-      <div class="section-title">نطاق الطباعة</div>
-
-      <div class="print-tools-grid">
-        <button type="button" onclick="runPrint('full')">طباعة التقرير كاملًا</button>
-
-        <label>
-          <span>اختيار عليقة</span>
-          <select id="printRationSelect">
-            ${options || '<option value="">لا توجد علائق</option>'}
-          </select>
-        </label>
-
-        <button type="button" onclick="runPrint('one')">طباعة عليقة واحدة</button>
-        <button type="button" onclick="runPrint('lactating')">طباعة علائق الحلاب فقط</button>
-        <button type="button" onclick="runPrint('operational')">نسخة تشغيل العليقة</button>
-      </div>
-
-      <div class="small-note" style="margin-top:8px">
-        نسخة التشغيل تطبع تركيب العليقة للتنفيذ فقط، بدون تحليل أو قرارات أو مقارنات.
-      </div>
-    </section>
-  `;
-}
 /* ============================================================
    ملخص الحلاب
 ============================================================ */
@@ -1960,28 +1821,24 @@ function renderGroup(data){
   const e = data.event || {};
   const groupName = data.groupName || groupNameFromEvent(e);
   const stage = data.stage || eventStage(e);
+  const rationId = `ration-${slug(groupName)}`;
 
   $('reportTitle').textContent = `تقرير تغذية: ${groupName}`;
   $('reportSub').textContent = `${stageLabel(stage, e?.nutrition?.context || {})} — تاريخ التحليل: ${safe(e.eventDate || e.date)} — تقرير عليقة منفردة`;
   $('statusBox').style.display = 'none';
-const rationId = `ration-${slug(groupName)}`;
-const printItems = [{
-  id: rationId,
-  label: groupName,
-  stage,
-  stageLabel: stageLabel(stage, e?.nutrition?.context || {})
-}];
-$('content').innerHTML = `
-  <div id="top"></div>
-  <nav class="report-tabs">
-      <a class="main" href="#${esc(`ration-${slug(groupName)}`)}">العليقة</a>
+
+  $('content').innerHTML = `
+    <div id="top"></div>
+    <nav class="report-tabs no-print">
+      <a class="main" href="#${esc(rationId)}">العليقة</a>
       <a href="nutrition-report.html?scope=all&type=${encodeURIComponent(qp.get('type') || '')}">كل العلائق</a>
     </nav>
-    ${renderOneRation(e, { groupName, stage, pageBreak:false })}
+    ${renderOneRation(e, { groupName, stage, id: rationId, pageBreak:false })}
   `;
 }
 
 /* ============================================================
+   التقرير الشامل/* ============================================================
    التقرير الشامل scope=all
 ============================================================ */
 function renderExecutiveAll(report = {}, type = ''){
@@ -1993,17 +1850,10 @@ function renderExecutiveAll(report = {}, type = ''){
   const first = ex.firstPriority || {};
   const highCost = ex.highestCost || {};
   const weak = ex.weakestMargin || {};
-
   const total = Number(ex.totalRations || report.count || 0) || 0;
   const danger = Number(ex.dangerCount || 0) || 0;
   const warn = Number(ex.warningCount || 0) || 0;
   const ok = Number(ex.okCount || 0) || 0;
-
-  const today = new Date().toLocaleDateString('ar-EG', {
-    year:'numeric',
-    month:'long',
-    day:'numeric'
-  });
 
   return `
     <section class="report-cover">
@@ -2012,32 +1862,13 @@ function renderExecutiveAll(report = {}, type = ''){
           <div class="report-kicker">مُرَبِّيك لإدارة مزارع الألبان</div>
           <h1 class="report-main-title">تقرير مُرَبِّيك الشامل للتغذية — ${esc(typeLabel)}</h1>
           <div class="report-main-subtitle">
-            تقرير تحليلي منظم لعلائق القطيع حسب مرحلة التغذية، يعرض الملخص التنفيذي، فهرس العلائق، المقارنة المختصرة، ثم تفاصيل كل عليقة.
+            تقرير تحليلي منظم لعلائق القطيع حسب مرحلة التغذية: ملخص تنفيذي، فهرس العلائق، مقارنة مختصرة، ثم تفاصيل كل عليقة.
           </div>
         </div>
 
         <div class="report-logo-box">
           <img src="/images/logo.png" alt="Murabbik">
           <div>تقرير تغذية</div>
-        </div>
-      </div>
-
-      <div class="report-meta-strip">
-        <div class="report-meta-item">
-          <span>نوع التقرير</span>
-          <b>تحليل علائق محفوظة</b>
-        </div>
-        <div class="report-meta-item">
-          <span>النوع</span>
-          <b>${esc(typeLabel)}</b>
-        </div>
-        <div class="report-meta-item">
-          <span>عدد العلائق</span>
-          <b>${nf(total,0)}</b>
-        </div>
-        <div class="report-meta-item">
-          <span>تاريخ الطباعة</span>
-          <b>${esc(today)}</b>
         </div>
       </div>
     </section>
@@ -2078,6 +1909,8 @@ function renderExecutiveAll(report = {}, type = ''){
     </section>
   `;
 }
+
+
 function renderRationIndex(report = {}, type = ''){
   const index = Array.isArray(report.index) ? report.index : [];
 
@@ -2136,14 +1969,15 @@ function renderTabs(report = {}){
 function renderAll(data){
   const report = data.report || {};
   const type = data.type || qp.get('type') || '';
-  const typeLabel = String(type).toLowerCase().includes('buffalo') ? 'جاموس' : (String(type).toLowerCase().includes('cows') ? 'أبقار' : 'كل الأنواع');
+  const typeLabel = String(type).toLowerCase().includes('buffalo')
+    ? 'جاموس'
+    : (String(type).toLowerCase().includes('cows') ? 'أبقار' : 'كل الأنواع');
 
- $('reportTitle').textContent = `تقرير مُرَبِّيك الشامل للتغذية`;
- $('reportSub').textContent = `${typeLabel} — تقرير مقسم حسب مرحلة التغذية`;
+  $('reportTitle').textContent = 'تقرير مُرَبِّيك الشامل للتغذية';
+  $('reportSub').textContent = `${typeLabel} — تقرير مقسم حسب مرحلة التغذية`;
   $('statusBox').style.display = 'none';
 
-  if (Array.isArray(report.sections) && report.sections.length) {
-    const printItems = []; 
+  if(Array.isArray(report.sections) && report.sections.length){
     const html = report.sections.map((sec, si) => {
       const secReport = sec.report || {};
       const events = Array.isArray(secReport.events) ? secReport.events : [];
@@ -2155,90 +1989,84 @@ function renderAll(data){
         count: secReport.count || events.length
       };
 
- const rationReports = events.map((ev, i) => {
-  const groupName = groupNameFromEvent(ev);
-  const rationId = `ration-${slug((sec.stage || 'stage') + '-' + (groupName || `r${i}`))}`;
+      const rationReports = events.map((ev, i) => {
+        const groupName = groupNameFromEvent(ev);
+        const stage = eventStage(ev) || sec.stage || '';
+        const rationId = `ration-${slug((sec.stage || 'stage') + '-' + (groupName || `r${i}`))}`;
 
-  printItems.push({
-    id: rationId,
-    label: groupName,
-    stage: sec.stage || eventStage(ev),
-    stageLabel: stageLabel(eventStage(ev), ev?.nutrition?.context || {})
-  });
+        return renderOneRation(ev, {
+          groupName,
+          stage,
+          id: rationId,
+          pageBreak: true
+        });
+      }).join('');
 
-  return renderOneRation(ev, {
-    groupName,
-    stage: eventStage(ev),
-    id: rationId,
-    pageBreak: true
-  });
-}).join('');
+      const stageName = String(sec.stage || '').toLowerCase();
+      const isLactatingSection = stageName === 'lactating';
 
-return `
+      return `
         <div class="stage-section" data-stage="${esc(sec.stage || '')}">
-<section class="report-section-head ${si ? 'ration-break' : ''}">
-  <div class="section-title">${esc(sec.title || 'قسم تغذية')}</div>
-  <div class="small-note">عدد العلائق في هذا القسم: ${nf(sec.count || events.length,0)}</div>
-  ${String(sec.stage || '').toLowerCase() === 'lactating' ? `
-    <div class="section-print-actions no-print">
-      <button type="button" onclick="runPrint('lactating')">طباعة علائق الحلاب فقط</button>
-    </div>
-  ` : ''}
-</section>
+          ${sec.showMilkEconomics ? renderExecutiveAll(displayReport, type) : ''}
+          ${sec.showMilkEconomics ? `<div id="ration-index-${esc(sec.stage || si)}">${renderRationIndex(displayReport, type)}</div>` : ''}
+          ${sec.showMilkEconomics ? `<div id="comparison-${esc(sec.stage || si)}">${renderAllComparison(displayReport)}</div>` : ''}
 
-        ${sec.showMilkEconomics ? renderExecutiveAll(displayReport, type) : ''}
-        ${sec.showMilkEconomics ? `<div id="ration-index-${esc(sec.stage || si)}">${renderRationIndex(displayReport, type)}</div>` : ''}
-        ${sec.showMilkEconomics ? `<div id="comparison-${esc(sec.stage || si)}">${renderAllComparison(displayReport)}</div>` : ''}
+          <section class="report-section-head ${si ? 'ration-break' : ''}">
+            <div class="section-title">${esc(sec.title || 'قسم تغذية')}</div>
+            <div class="small-note">عدد العلائق في هذا القسم: ${nf(sec.count || events.length,0)}</div>
+            ${isLactatingSection ? `
+              <div class="section-print-actions no-print">
+                <button type="button" onclick="runPrint('lactating')">طباعة علائق الحلاب فقط</button>
+              </div>
+            ` : ''}
+          </section>
 
-        ${rationReports}
-      </div>
+          ${rationReports}
+        </div>
       `;
     }).join('');
 
-$('content').innerHTML = `
-  <div id="top"></div>
-  ${html}
-`;
+    $('content').innerHTML = `
+      <div id="top"></div>
+      ${html}
+    `;
     return;
   }
 
   const events = Array.isArray(report.events) ? report.events : [];
+
   const displayReport = {
     ...report,
     index: Array.isArray(report.index) ? report.index : [],
     executive: report.executive || {},
     count: report.count || (Array.isArray(report.index) ? report.index.length : events.length)
   };
-  const printItems = [];
-const rationReports = events.map((ev, i) => {
-  const groupName = groupNameFromEvent(ev);
-  const rationId = `ration-${slug(groupName || `r${i}`)}`;
 
-  printItems.push({
-    id: rationId,
-    label: groupName,
-    stage: eventStage(ev),
-    stageLabel: stageLabel(eventStage(ev), ev?.nutrition?.context || {})
-  });
+  const rationReports = events.map((ev, i) => {
+    const groupName = groupNameFromEvent(ev);
+    const stage = eventStage(ev);
+    const rationId = `ration-${slug(groupName || `r${i}`)}`;
 
-  return renderOneRation(ev, {
-    groupName,
-    stage: eventStage(ev),
-    id: rationId,
-    pageBreak: true
-  });
-}).join('');
+    return renderOneRation(ev, {
+      groupName,
+      stage,
+      id: rationId,
+      pageBreak: true
+    });
+  }).join('');
 
-$('content').innerHTML = `
-  <div id="top"></div>
-  ${renderTabs(displayReport)}
+  $('content').innerHTML = `
+    <div id="top"></div>
+    ${renderTabs(displayReport)}
     ${renderExecutiveAll(displayReport, type)}
     <div id="ration-index">${renderRationIndex(displayReport, type)}</div>
     <div id="comparison">${renderAllComparison(displayReport)}</div>
     ${rationReports}
   `;
 }
+
 /* ============================================================
+   تشغيل/* ============================================================
    تشغيل
 ============================================================ */
 async function main(){
