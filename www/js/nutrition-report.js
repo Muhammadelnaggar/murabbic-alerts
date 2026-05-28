@@ -942,6 +942,104 @@ html, body{
       .card{break-inside:auto;page-break-inside:auto}
     }
   `;
+   const mobileFix = document.createElement('style');
+mobileFix.id = 'mbkNutritionReportMobileFix';
+mobileFix.textContent = `
+@media(max-width:760px){
+  .report-cover{
+    padding:14px !important;
+    border-radius:18px !important;
+    margin:8px 0 12px !important;
+    box-shadow:0 6px 16px rgba(15,93,53,.06) !important;
+  }
+
+  .report-cover:after{
+    width:120px !important;
+    height:120px !important;
+    left:-45px !important;
+    bottom:-55px !important;
+  }
+
+  .report-cover-head{
+    display:block !important;
+  }
+
+  .report-logo-box{
+    display:none !important;
+  }
+
+  .report-kicker{
+    font-size:11px !important;
+    margin-bottom:4px !important;
+  }
+
+  .report-main-title{
+    font-size:22px !important;
+    line-height:1.35 !important;
+    letter-spacing:0 !important;
+    max-width:100% !important;
+    word-break:normal !important;
+    overflow-wrap:normal !important;
+  }
+
+  .report-main-subtitle{
+    font-size:11px !important;
+    line-height:1.7 !important;
+    margin-top:6px !important;
+  }
+
+  .report-meta-strip{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:6px !important;
+    margin-top:10px !important;
+  }
+
+  .report-meta-item{
+    padding:8px !important;
+    border-radius:12px !important;
+  }
+
+  .report-meta-item span{
+    font-size:10px !important;
+  }
+
+  .report-meta-item b{
+    font-size:12px !important;
+  }
+
+  .executive-panel{
+    grid-template-columns:1fr !important;
+    gap:10px !important;
+  }
+
+  .executive-reading{
+    padding:14px !important;
+    border-radius:18px !important;
+  }
+
+  .executive-reading h2{
+    font-size:18px !important;
+  }
+
+  .executive-reading p{
+    font-size:12px !important;
+  }
+
+  .executive-score-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+
+  .executive-score{
+    padding:10px !important;
+    border-radius:16px !important;
+  }
+
+  .executive-score b{
+    font-size:22px !important;
+  }
+}
+`;
+document.head.appendChild(mobileFix);
   document.head.appendChild(style);
 }
 
