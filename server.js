@@ -4266,18 +4266,27 @@ function reportRowDangerSrv(row = {}){
 
 function buildNutritionFinalDecisionSrv(e = {}, rows = []){
   const stage = nutritionStageFromEvent(e);
+
   const rumen = reportRowByKeySrv(rows, 'rumen');
   const nel = reportRowByKeySrv(rows, 'nel');
   const mp = reportRowByKeySrv(rows, 'mp');
   const dcad = reportRowByKeySrv(rows, 'dcad');
   const iofc = reportRowByKeySrv(rows, 'iofc');
 
+  const mineralVitaminBad = (Array.isArray(rows) ? rows : []).find(r => {
+    const sec = String(r?.section || '').trim();
+    return (
+      (sec === 'المعادن الكبرى' || sec === 'المعادن الصغرى' || sec === 'الفيتامينات') &&
+      reportRowBadSrv(r)
+    );
+  });
+
   if (reportRowDangerSrv(rumen)) {
     return cleanObj({
-      title: 'العليقة غير آمنة على صحة الكرش.',
+      title: 'تنبيه صحة الكرش.',
       action: rumen.note || 'راجع الألياف الفعالة وتوازن الخشن والحبوب قبل اعتماد العليقة.',
       status: 'danger',
-      statusText: reportStatusTextSrv('danger'),
+      statusText: 'تنبيه صحة الكرش',
       sourceKey: 'rumen',
       sourceSection: rumen.section || 'صحة الكرش'
     });
@@ -4285,10 +4294,10 @@ function buildNutritionFinalDecisionSrv(e = {}, rows = []){
 
   if (reportRowBadSrv(nel)) {
     return cleanObj({
-      title: 'العليقة تحتاج متابعة في الطاقة.',
+      title: 'متابعة الطاقة.',
       action: nel.note || 'راجع اتزان الطاقة مع الحفاظ على صحة الكرش.',
       status: 'warn',
-      statusText: reportStatusTextSrv('warn'),
+      statusText: 'متابعة الطاقة',
       sourceKey: 'nel',
       sourceSection: nel.section || 'الاحتياجات الأساسية'
     });
@@ -4296,10 +4305,10 @@ function buildNutritionFinalDecisionSrv(e = {}, rows = []){
 
   if (reportRowBadSrv(mp)) {
     return cleanObj({
-      title: 'العليقة تحتاج متابعة في البروتين الممثل.',
-      action: mp.note || 'راجع مصدر البروتين الحقيقي وجودته قبل رفع البروتين الخام.',
+      title: 'متابعة البروتين الممثل.',
+      action: mp.note || 'راجع مصدر البروتين الحقيقي وجودته وتكلفته قبل رفع البروتين الخام.',
       status: 'warn',
-      statusText: reportStatusTextSrv('warn'),
+      statusText: 'متابعة البروتين الممثل',
       sourceKey: 'mp',
       sourceSection: mp.section || 'الاحتياجات الأساسية'
     });
@@ -4307,21 +4316,32 @@ function buildNutritionFinalDecisionSrv(e = {}, rows = []){
 
   if (stage === 'close_up' && reportRowBadSrv(dcad)) {
     return cleanObj({
-      title: 'عليقة انتظار الولادة تحتاج متابعة في DCAD.',
+      title: 'متابعة DCAD.',
       action: dcad.note || 'راجع أملاح الأنيون والكالسيوم والماغنسيوم قبل الاعتماد.',
       status: 'warn',
-      statusText: reportStatusTextSrv('warn'),
+      statusText: 'متابعة DCAD',
       sourceKey: 'dcad',
       sourceSection: dcad.section || 'المعادن الكبرى'
     });
   }
 
+  if (mineralVitaminBad) {
+    return cleanObj({
+      title: 'متابعة المعادن والفيتامينات.',
+      action: mineralVitaminBad.note || 'راجع الإضافة المعدنية/الفيتامينية ومعدل استخدامها قبل اعتماد العليقة.',
+      status: 'warn',
+      statusText: 'متابعة المعادن والفيتامينات',
+      sourceKey: mineralVitaminBad.key || 'minerals_vitamins',
+      sourceSection: mineralVitaminBad.section || 'المعادن والفيتامينات'
+    });
+  }
+
   if (reportRowDangerSrv(iofc)) {
     return cleanObj({
-      title: 'العليقة تحتاج متابعة اقتصادية.',
+      title: 'متابعة الاقتصاد.',
       action: iofc.note || 'راجع تكلفة الخامات أو إنتاج اللبن قبل اعتماد العليقة.',
       status: 'warn',
-      statusText: reportStatusTextSrv('warn'),
+      statusText: 'متابعة الاقتصاد',
       sourceKey: 'iofc',
       sourceSection: iofc.section || 'الاقتصاد'
     });
@@ -4329,9 +4349,9 @@ function buildNutritionFinalDecisionSrv(e = {}, rows = []){
 
   return cleanObj({
     title: 'العليقة متزنة في الأساسيات وقابلة للتنفيذ.',
-    action: 'راجع التفاصيل داخل التقرير لتحسين المعادن أو الفيتامينات عند الحاجة، دون اعتبار ذلك فشلًا للعليقة.',
+    action: 'راجع التفاصيل داخل التقرير لتحسين أي بند ثانوي عند الحاجة.',
     status: 'good',
-    statusText: reportStatusTextSrv('good'),
+    statusText: 'متزن',
     sourceKey: 'core_balance',
     sourceSection: 'الاحتياجات الأساسية'
   });
