@@ -2420,23 +2420,20 @@ const ndfState =
               : `مربيك: المادة الجافة المقدمة/المأكولة قريبة من المتوقع (${dmRatioPct}%). الحكم الغذائي يكون من الطاقة والبروتين وأمان الكرش.`
         )
       : 'مربيك: المادة الجافة المتوقعة مرجع تشغيل للشهية والتقديم، وليست Target تغذية للحكم بنقص أو زيادة.';
-
- let nelHint =
+const nelDiffText = reportUnitBalanceTextSrv(nelActual, nelTarget, 2, 'ميجاكالوري/يوم');
+const mpDiffText = reportUnitBalanceTextSrv(mpActual, mpTarget, 0, 'جم/يوم');
+let nelHint =
   nelState === 'good'
-    ? `مربيك: الطاقة متزنة${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. استمر على نفس مستوى الطاقة مع متابعة إنتاج اللبن وحالة الجسم؛ لا ترفع كثافة العليقة بدون سبب واضح.`
+    ? `مربيك: الطاقة متزنة. فرق الاتزان ${nelDiffText}. استمر على نفس مستوى الطاقة مع متابعة إنتاج اللبن وحالة الجسم؛ لا ترفع كثافة العليقة بدون سبب واضح.`
     : Number(nelActual) < Number(nelTarget)
-      ? `مربيك: الطاقة أقل من المطلوب${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. راجع أولًا كمية المادة الجافة المقدمة والمأكولة، ثم حسّن كثافة الطاقة بمصدر آمن مع الحفاظ على أمان الكرش وعدم رفع النشا بشكل مفاجئ.`
-      : Number(nelRatioPct) > 115
-        ? `مربيك: الطاقة أعلى من اللازم${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. راجع تكلفة العليقة وقلّل مصادر الطاقة الزائدة تدريجيًا إذا لم يظهر مقابلها إنتاج أو تحسن واضح في حالة الجسم.`
-        : `مربيك: الطاقة أعلى قليلًا من المطلوب${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. راجع التكلفة فقط، واترك الزيادة إذا كانت مرتبطة بإنتاج أعلى أو حالة جسم تحتاج دعمًا.`;
- let mpHint =
+      ? `مربيك: الطاقة أقل من المطلوب. فرق الاتزان ${nelDiffText}. راجع أولًا كمية المادة الجافة المقدمة والمأكولة، ثم حسّن كثافة الطاقة بمصدر آمن مع الحفاظ على أمان الكرش.`
+      : `مربيك: الطاقة أعلى من المطلوب. فرق الاتزان ${nelDiffText}. راجع التكلفة ومصادر الطاقة الزائدة حسب الإنتاج وحالة الجسم.`;
+let mpHint =
   mpState === 'good'
-    ? `مربيك: البروتين الممثل متزن${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. لا تزود البروتين الخام بدون سبب؛ حافظ على جودة مصدر البروتين وتوازن العليقة.`
+    ? `مربيك: البروتين الممثل متزن. فرق الاتزان ${mpDiffText}. لا تزود البروتين الخام بدون سبب؛ حافظ على جودة مصدر البروتين وتوازن العليقة.`
     : Number(mpActual) < Number(mpTarget)
-      ? `مربيك: البروتين الممثل منخفض${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. لا تزود البروتين الخام عشوائيًا؛ الأفضل تحسين مصدر البروتين المفيد للحيوان. راجع إضافة أو استبدال جزء من البروتين بمصدر عالي الجودة والهضم مثل صويا معاملة، جلوتين ذرة، DDGS جيد، كانولا معالج، أو بروتين bypass حسب المتاح والسعر.`
-      : Number(mpRatioPct) > 115
-        ? `مربيك: البروتين الممثل أعلى من اللازم${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. راجع كمية أو نوع مصدر البروتين لتقليل التكلفة والهدر بدون التأثير على إنتاج اللبن.`
-        : `مربيك: البروتين الممثل أعلى قليلًا من المطلوب${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. لا ترفع البروتين أكثر؛ راجع التكلفة واترك الزيادة فقط إذا كانت مرتبطة بإنتاج أعلى أو حالة تحتاج دعمًا.`;
+      ? `مربيك: البروتين الممثل أقل من المطلوب. فرق الاتزان ${mpDiffText}. لا تزود البروتين الخام عشوائيًا؛ الأفضل تحسين مصدر البروتين المفيد للحيوان.`
+      : `مربيك: البروتين الممثل أعلى من المطلوب. فرق الاتزان ${mpDiffText}. راجع كمية أو نوع مصدر البروتين لتقليل التكلفة والهدر.`;
  
  ndfHint =
   ndfState === 'danger'
@@ -2514,21 +2511,17 @@ if (isDryOrCloseUpDm) {
 
 nelHint =
   nelState === 'good'
-    ? `مربيك: الطاقة متزنة للجاموس${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. استمر على نفس مستوى الطاقة مع متابعة اللبن وحالة الجسم، ولا تزود الحبوب بدون سبب واضح.`
+    ? `مربيك: الطاقة متزنة للجاموس. فرق الاتزان ${nelDiffText}. استمر على نفس مستوى الطاقة مع متابعة اللبن وحالة الجسم، ولا تزود الحبوب بدون سبب واضح.`
     : Number(nelActual) < Number(nelTarget)
-      ? `مربيك: الطاقة أقل من المطلوب للجاموس${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. راجع كمية المادة الجافة أولًا، ثم حسّن كثافة الطاقة بدون تجاوز حد النشا أو خفض الألياف الفعالة.`
-      : Number(nelRatioPct) > 115
-        ? `مربيك: الطاقة أعلى من اللازم للجاموس${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. راجع التكلفة وقلّل مصادر الطاقة الزائدة تدريجيًا إذا لم يظهر مقابلها إنتاج أو تحسن واضح في حالة الجسم.`
-        : `مربيك: الطاقة أعلى قليلًا من المطلوب للجاموس${Number.isFinite(Number(nelRatioPct)) ? ` (${nelRatioPct}%)` : ''}. راجع التكلفة فقط، ولا تزود الحبوب إلا إذا كان لها عائد واضح.`;
+      ? `مربيك: الطاقة أقل من المطلوب للجاموس. فرق الاتزان ${nelDiffText}. راجع كمية المادة الجافة أولًا، ثم حسّن كثافة الطاقة بدون تجاوز حد النشا أو خفض الألياف الفعالة.`
+      : `مربيك: الطاقة أعلى من المطلوب للجاموس. فرق الاتزان ${nelDiffText}. راجع التكلفة وقلّل مصادر الطاقة الزائدة تدريجيًا إذا لم يظهر مقابلها إنتاج أو تحسن واضح في حالة الجسم.`;
 
 mpHint =
   mpState === 'good'
-    ? `مربيك: البروتين الممثل متزن للجاموس${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. لا تزود البروتين الخام بدون سبب؛ حافظ على جودة مصدر البروتين وتوازن العليقة.`
+    ? `مربيك: البروتين الممثل متزن للجاموس. فرق الاتزان ${mpDiffText}. لا تزود البروتين الخام بدون سبب؛ حافظ على جودة مصدر البروتين وتوازن العليقة.`
     : Number(mpActual) < Number(mpTarget)
-      ? `مربيك: البروتين الممثل منخفض للجاموس${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. لا تزود البروتين الخام عشوائيًا؛ الأفضل تحسين مصدر البروتين المفيد للحيوان. راجع إضافة أو استبدال جزء من البروتين بمصدر عالي الجودة والهضم مثل صويا معاملة، جلوتين ذرة، DDGS جيد، كانولا معالج، أو بروتين bypass حسب المتاح والسعر.`
-      : Number(mpRatioPct) > 115
-        ? `مربيك: البروتين الممثل أعلى من اللازم للجاموس${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. راجع كمية أو نوع مصدر البروتين لتقليل التكلفة والهدر بدون التأثير على إنتاج اللبن.`
-        : `مربيك: البروتين الممثل أعلى قليلًا من المطلوب للجاموس${Number.isFinite(Number(mpRatioPct)) ? ` (${mpRatioPct}%)` : ''}. لا ترفع البروتين أكثر؛ راجع التكلفة واترك الزيادة فقط إذا كانت مرتبطة بإنتاج أعلى أو حالة تحتاج دعمًا.`;
+      ? `مربيك: البروتين الممثل أقل من المطلوب للجاموس. فرق الاتزان ${mpDiffText}. راجع مصدر البروتين المفيد للحيوان بدل رفع البروتين الخام عشوائيًا.`
+      : `مربيك: البروتين الممثل أعلى من المطلوب للجاموس. فرق الاتزان ${mpDiffText}. راجع كمية أو نوع مصدر البروتين لتقليل التكلفة والهدر.`;
 
 
 ndfHint =
@@ -3869,6 +3862,14 @@ function reportCoverageBalanceTextSrv(cover){
 
   return `${sign}${diffPct.toFixed(1)}%`;
 }
+function reportUnitBalanceTextSrv(actual, target, decimals = 2, suffix = ''){
+  if (!finiteSrv(actual) || !finiteSrv(target)) return '—';
+
+  const diff = Number(actual) - Number(target);
+  const sign = diff > 0 ? '+' : '';
+
+  return `${sign}${fmtSrv(diff, decimals, suffix)}`;
+}
 function reportRatioBalanceTextSrv(actual, target){
   if (!finiteSrv(actual) || !finiteSrv(target) || Number(target) === 0) return '—';
 
@@ -4393,7 +4394,7 @@ const nelReportLabel = isDryReport ? 'الطاقة الصافية' : 'الطاق
    nelReportLabel,
     fmtSrv(t.nelTarget, 2, 'ميجاكالوري/يوم'),
     fmtSrv(n.nelActual, 2, 'ميجاكالوري/يوم'),
-    reportRatioBalanceTextSrv(n.nelActual, t.nelTarget),
+    reportUnitBalanceTextSrv(n.nelActual, t.nelTarget, 2, 'ميجاكالوري/يوم'),
     status,
     guidanceSrv('nel', status, nelBal),
     reportBalanceStateTextSrv(status, nelBal)
@@ -4409,7 +4410,7 @@ const nelReportLabel = isDryReport ? 'الطاقة الصافية' : 'الطاق
     'البروتين الممثل',
     fmtSrv(t.mpTargetG, 0, 'جم/يوم'),
     fmtSrv(n.mpSupplyG, 0, 'جم/يوم'),
-    reportRatioBalanceTextSrv(n.mpSupplyG, t.mpTargetG),
+    reportUnitBalanceTextSrv(n.mpSupplyG, t.mpTargetG, 0, 'جم/يوم'),
     status,
     guidanceSrv('mp', status, mpBal),
     reportBalanceStateTextSrv(status, mpBal)
