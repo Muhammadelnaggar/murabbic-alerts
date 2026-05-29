@@ -3748,12 +3748,9 @@ function pickPriorityCardSrv(e = {}) {
 }
 
 function reportStatusFromEventSrv(e = {}) {
-  const decision = pickDecisionCardSrv(e);
-  const priority = pickPriorityCardSrv(e);
-
   const status = String(
-    decision?.status ||
-    priority?.status ||
+    e?.nutrition?.reportStatus ||
+    e?.nutrition?.reportDecision?.status ||
     e?.nutrition?.analysis?.nutrition?.rumenStatus ||
     ''
   ).toLowerCase();
@@ -3762,7 +3759,7 @@ function reportStatusFromEventSrv(e = {}) {
   if (status.includes('warn') || status.includes('watch')) return 'warn';
   if (status.includes('good') || status.includes('ok')) return 'good';
 
-  return 'unknown';
+  return 'muted';
 }
 function reportEconomicsMetricsSrv(e = {}){
   const ec = e?.nutrition?.analysis?.economics || {};
@@ -3788,9 +3785,8 @@ function buildNutritionReportIndexItem(e = {}) {
   const ecoReport = reportEconomicsMetricsSrv(e);
   const stage = nutritionStageFromEvent(e);
   const species = nutritionSpeciesKeyFromEvent(e);
-  const decision = pickDecisionCardSrv(e);
-  const priority = pickPriorityCardSrv(e);
-
+  const reportDecision = e?.nutrition?.reportDecision || {};
+  const finalStatus = e?.nutrition?.reportStatus || reportDecision.status || reportStatusFromEventSrv(e);
   const headCount =
     Number(e.groupSize || ctx.headCount || 0) || null;
 
@@ -3823,9 +3819,10 @@ function buildNutritionReportIndexItem(e = {}) {
     feedCostPctOfMilkIncome: ecoReport.feedCostPctOfMilkIncome,
     iofcPctOfMilkIncome: ecoReport.iofcPctOfMilkIncome,
     rumenStatus: a?.nutrition?.rumenStatus || null,
-    reportStatus: reportStatusFromEventSrv(e),
-    decisionText: decision?.value || null,
-    priorityText: priority?.value || priority?.targetText || null
+    reportStatus: finalStatus,
+    reportStatusText: reportDecision.statusText || reportStatusTextSrv(finalStatus),
+    decisionText: reportDecision.title || null,
+    priorityText: reportDecision.action || null
   });
 }
 function finiteSrv(v){
@@ -3893,7 +3890,7 @@ function reportMaxStatusSrv(actual, max){
 function reportStatusTextSrv(status = ''){
   const s = String(status || '').toLowerCase();
   if (s.includes('danger')) return 'تنبيه';
-  if (s.includes('warn') || s.includes('watch')) return 'يحتاج ضبط';
+  if (s.includes('warn') || s.includes('watch')) return 'متابعة';
   if (s.includes('good') || s.includes('ok')) return 'متزن';
   return 'معلومة';
 }
@@ -4249,45 +4246,98 @@ function pickMainReportRowSrv(rows = []){
 
   return [...arr].sort((a, b) => reportRowPriorityWeightSrv(b) - reportRowPriorityWeightSrv(a))[0] || null;
 }
+function reportRowByKeySrv(rows = [], key = ''){
+  const k = String(key || '').toLowerCase();
+  return (Array.isArray(rows) ? rows : []).find(r =>
+    String(r?.key || '').toLowerCase() === k
+  ) || null;
+}
 
-function buildNutritionReportDecisionSrv(e = {}, preparedRows = null){
-  const rows = Array.isArray(preparedRows) ? preparedRows : buildNutritionReportRowsSrv(e);
-  const main = pickMainReportRowSrv(rows);
+function reportRowBadSrv(row = {}){
+  const s = String(row?.status || '').toLowerCase();
+  return s.includes('danger') || s.includes('warn') || s.includes('watch');
+}
 
-  if (!main) {
+function reportRowDangerSrv(row = {}){
+  const s = String(row?.status || '').toLowerCase();
+  return s.includes('danger');
+}
+
+function buildNutritionFinalDecisionSrv(e = {}, rows = []){
+  const stage = nutritionStageFromEvent(e);
+  const rumen = reportRowByKeySrv(rows, 'rumen');
+  const nel = reportRowByKeySrv(rows, 'nel');
+  const mp = reportRowByKeySrv(rows, 'mp');
+  const dcad = reportRowByKeySrv(rows, 'dcad');
+  const iofc = reportRowByKeySrv(rows, 'iofc');
+
+  if (reportRowDangerSrv(rumen)) {
     return cleanObj({
-      title: 'قراءة مُرَبِّيك غير مكتملة.',
-      action: 'راجع بيانات العليقة واللبن والتكلفة قبل اعتماد التقرير.',
-      status: 'muted',
-      statusText: reportStatusTextSrv('muted')
+      title: 'العليقة غير آمنة على صحة الكرش.',
+      action: rumen.note || 'راجع الألياف الفعالة وتوازن الخشن والحبوب قبل اعتماد العليقة.',
+      status: 'danger',
+      statusText: reportStatusTextSrv('danger'),
+      sourceKey: 'rumen',
+      sourceSection: rumen.section || 'صحة الكرش'
     });
   }
 
-const label = String(main.label || 'البند الرئيسي').trim();
-const actual = String(main.actualText || '').trim();
-const balance = String(main.balanceText || '').trim();
-const status = main.status || 'muted';
-const section = String(main.section || '').trim();
+  if (reportRowBadSrv(nel)) {
+    return cleanObj({
+      title: 'العليقة تحتاج متابعة في الطاقة.',
+      action: nel.note || 'راجع اتزان الطاقة مع الحفاظ على صحة الكرش.',
+      status: 'warn',
+      statusText: reportStatusTextSrv('warn'),
+      sourceKey: 'nel',
+      sourceSection: nel.section || 'الاحتياجات الأساسية'
+    });
+  }
 
-let title = '';
-let action = String(main.note || '').trim() || 'راجع هذا البند قبل اعتماد العليقة.';
+  if (reportRowBadSrv(mp)) {
+    return cleanObj({
+      title: 'العليقة تحتاج متابعة في البروتين الممثل.',
+      action: mp.note || 'راجع مصدر البروتين الحقيقي وجودته قبل رفع البروتين الخام.',
+      status: 'warn',
+      statusText: reportStatusTextSrv('warn'),
+      sourceKey: 'mp',
+      sourceSection: mp.section || 'الاحتياجات الأساسية'
+    });
+  }
 
-if (section === 'الاقتصاد') {
-  title = `قراءة مُرَبِّيك الاقتصادية: ${label}${actual && actual !== '—' ? ` = ${actual}` : ''}`;
-} else if (section === 'المعادن الكبرى' || section === 'المعادن الصغرى' || section === 'الفيتامينات') {
-  const direction = balance.startsWith('-') ? 'نقص' : (balance.startsWith('+') ? 'زيادة' : 'اتزان');
-  title = `قراءة مُرَبِّيك: ${direction} ${label}${balance && balance !== '—' ? ` (${balance})` : ''}`;
-} else {
-  title = `قراءة مُرَبِّيك: ${label}${actual && actual !== '—' ? ` = ${actual}` : ''}`;
-}
+  if (stage === 'close_up' && reportRowBadSrv(dcad)) {
+    return cleanObj({
+      title: 'عليقة انتظار الولادة تحتاج متابعة في DCAD.',
+      action: dcad.note || 'راجع أملاح الأنيون والكالسيوم والماغنسيوم قبل الاعتماد.',
+      status: 'warn',
+      statusText: reportStatusTextSrv('warn'),
+      sourceKey: 'dcad',
+      sourceSection: dcad.section || 'المعادن الكبرى'
+    });
+  }
+
+  if (reportRowDangerSrv(iofc)) {
+    return cleanObj({
+      title: 'العليقة تحتاج متابعة اقتصادية.',
+      action: iofc.note || 'راجع تكلفة الخامات أو إنتاج اللبن قبل اعتماد العليقة.',
+      status: 'warn',
+      statusText: reportStatusTextSrv('warn'),
+      sourceKey: 'iofc',
+      sourceSection: iofc.section || 'الاقتصاد'
+    });
+  }
+
   return cleanObj({
-    title,
-    action,
-    status,
-    statusText: reportStatusTextSrv(status),
-    sourceKey: main.key || null,
-    sourceSection: main.section || null
+    title: 'العليقة متزنة في الأساسيات وقابلة للتنفيذ.',
+    action: 'راجع التفاصيل داخل التقرير لتحسين المعادن أو الفيتامينات عند الحاجة، دون اعتبار ذلك فشلًا للعليقة.',
+    status: 'good',
+    statusText: reportStatusTextSrv('good'),
+    sourceKey: 'core_balance',
+    sourceSection: 'الاحتياجات الأساسية'
   });
+}
+function buildNutritionReportDecisionSrv(e = {}, preparedRows = null){
+  const rows = Array.isArray(preparedRows) ? preparedRows : buildNutritionReportRowsSrv(e);
+  return buildNutritionFinalDecisionSrv(e, rows);
 }
 function buildNutritionReportRowsSrv(e = {}){
 const a = e?.nutrition?.analysis || {};
