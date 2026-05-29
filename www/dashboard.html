@@ -1058,16 +1058,19 @@ const heatDetectionRatePct =
     const cullProdPct   = Number(stats.cullProdPct ?? 0);
     const cullReproPct  = Number(stats.cullReproPct ?? 0);
     const cullHealthPct = Number(stats.cullHealthPct ?? 0);
-    const feedEfficiency= Number(stats.feedEfficiency ?? 0);
+    const feedBands = stats.feedBands || {};
+    const overallFeedBand = feedBands.overall || {};
+
+    const feedEfficiency = Number(stats.feedEfficiency ?? overallFeedBand.feedEfficiency ?? 0);
     const dmiAvg        = Number(stats.dmiAvg ?? 0);
-    const iofc          = Number(stats.iofc ?? 0);
+    const iofc          = Number(stats.iofc ?? overallFeedBand.iofc ?? 0);
     const fecesScore    = Number(stats.fecesScore ?? 0);
     const bcsCamera     = Number(stats.bcsCamera ?? 0);
     const cullTotalCount = Number(stats.cullTotal ?? 0);
     const cullTotalPct   = Number(stats.cullTotalPct ?? 0);
 
-    const feedCostPerLiter = Number(stats.feedCostPerLiter ?? 0);
-    const feedCostPerHeadPerDay = Number(stats.feedCostPerHeadPerDay ?? 0);
+    const feedCostPerLiter = Number(stats.feedCostPerLiter ?? overallFeedBand.feedCostPerLiter ?? 0);
+    const feedCostPerHeadPerDay = Number(stats.feedCostPerHeadPerDay ?? overallFeedBand.feedCostPerHeadPerDay ?? 0);
 
 
  const avgHead7Days = Number(stats.avgHead7Days ?? 0);
