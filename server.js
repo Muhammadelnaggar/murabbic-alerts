@@ -721,10 +721,14 @@ function emptyFeedBand() {
   return {
     headCount: 0,
     avgMilkKg: 0,
+    totalMilkKg: 0,
     feedCostPerLiter: 0,
     feedEfficiency: 0,
     feedCostPerHeadPerDay: 0,
+    totalFeedCost: 0,
+    totalMilkRevenue: 0,
     iofc: 0,
+    totalMargin: 0,
     eventDate: null
   };
 }
@@ -732,6 +736,7 @@ function emptyFeedBand() {
 function feedBandKey(raw = '') {
   const s = String(raw || '').trim().toLowerCase();
 
+  if (/fresh|حديث الولادة|فريش|ولادة حديثة/.test(s)) return 'fresh';
   if (/high|عالي/.test(s)) return 'high';
   if (/medium|med|متوسط/.test(s)) return 'medium';
   if (/low|منخفض/.test(s)) return 'low';
@@ -744,25 +749,57 @@ function buildFeedBandFromEvent(e = {}) {
   const ctx = e?.nutrition?.context || {};
   const economics = a?.economics || {};
   const totals = a?.totals || {};
+  const inputs = a?.inputs || {};
+
+  const headCount = Number(
+    e?.groupSize ??
+    ctx?.headCount ??
+    (Array.isArray(ctx?.groupNumbers) ? ctx.groupNumbers.length : null) ??
+    1
+  ) || 1;
+
+  const avgMilkKg = Number(
+    ctx?.avgMilkKg ??
+    ctx?.observedAvgMilkKg ??
+    0
+  ) || 0;
+
+  const feedCostPerHeadPerDay = Number(totals?.totCost || 0) || 0;
+
+  const milkRevenuePerHead = Number.isFinite(Number(economics?.milkRevenue))
+    ? Number(economics.milkRevenue)
+    : (
+        Number.isFinite(Number(inputs?.milkPriceUsed)) && avgMilkKg > 0
+          ? Number(inputs.milkPriceUsed) * avgMilkKg
+          : 0
+      );
+
+  const marginPerHead = Number.isFinite(Number(economics?.milkMargin))
+    ? Number(economics.milkMargin)
+    : (milkRevenuePerHead - feedCostPerHeadPerDay);
+
+  const totalMilkKg = +(headCount * avgMilkKg).toFixed(2);
+  const totalFeedCost = +(headCount * feedCostPerHeadPerDay).toFixed(2);
+  const totalMilkRevenue = +(headCount * milkRevenuePerHead).toFixed(2);
+  const totalMargin = +(headCount * marginPerHead).toFixed(2);
 
   const dmPerKgMilk = Number(economics?.dmPerKgMilk || 0);
   const feedEfficiency =
     dmPerKgMilk > 0 ? +(1 / dmPerKgMilk).toFixed(2) : 0;
 
   return {
-    headCount: Number(e?.groupSize || 1) || 1,
-    avgMilkKg: Number(ctx?.avgMilkKg || 0) || 0,
-    feedCostPerLiter: Number(economics?.costPerKgMilk || 0) || 0,
+    headCount,
+    avgMilkKg: +avgMilkKg.toFixed(2),
+    totalMilkKg,
+    feedCostPerLiter: Number.isFinite(Number(economics?.costPerKgMilk))
+      ? Number(economics.costPerKgMilk)
+      : (totalMilkKg > 0 ? +(totalFeedCost / totalMilkKg).toFixed(2) : 0),
     feedEfficiency,
-    feedCostPerHeadPerDay: Number(totals?.totCost || 0) || 0,
-   iofc: Number.isFinite(Number(economics?.milkMargin))
-  ? Number(economics.milkMargin)
-  : (
-      Number.isFinite(Number(economics?.milkRevenue)) &&
-      Number.isFinite(Number(totals?.totCost))
-        ? +(Number(economics.milkRevenue) - Number(totals.totCost)).toFixed(2)
-        : 0
-    ),
+    feedCostPerHeadPerDay: +feedCostPerHeadPerDay.toFixed(2),
+    totalFeedCost,
+    totalMilkRevenue,
+    iofc: +marginPerHead.toFixed(2),
+    totalMargin,
     eventDate: e?.eventDate || e?.date || null
   };
 }
@@ -774,6 +811,11 @@ function weightedFeedBands(cards = []) {
   const totalHeads = valid.reduce((s, x) => s + Number(x.headCount || 0), 0) || 0;
   if (!totalHeads) return emptyFeedBand();
 
+  const totalMilkKg = valid.reduce((s, x) => s + Number(x.totalMilkKg || 0), 0);
+  const totalFeedCost = valid.reduce((s, x) => s + Number(x.totalFeedCost || 0), 0);
+  const totalMilkRevenue = valid.reduce((s, x) => s + Number(x.totalMilkRevenue || 0), 0);
+  const totalMargin = valid.reduce((s, x) => s + Number(x.totalMargin || 0), 0);
+
   const wavg = (key) => {
     const sum = valid.reduce((s, x) => s + (Number(x[key] || 0) * Number(x.headCount || 0)), 0);
     return +(sum / totalHeads).toFixed(2);
@@ -781,11 +823,15 @@ function weightedFeedBands(cards = []) {
 
   return {
     headCount: totalHeads,
-    avgMilkKg: wavg('avgMilkKg'),
-    feedCostPerLiter: wavg('feedCostPerLiter'),
+    avgMilkKg: totalHeads ? +(totalMilkKg / totalHeads).toFixed(2) : 0,
+    totalMilkKg: +totalMilkKg.toFixed(2),
+    feedCostPerLiter: totalMilkKg > 0 ? +(totalFeedCost / totalMilkKg).toFixed(2) : 0,
     feedEfficiency: wavg('feedEfficiency'),
-    feedCostPerHeadPerDay: wavg('feedCostPerHeadPerDay'),
-    iofc: wavg('iofc'),
+    feedCostPerHeadPerDay: totalHeads ? +(totalFeedCost / totalHeads).toFixed(2) : 0,
+    totalFeedCost: +totalFeedCost.toFixed(2),
+    totalMilkRevenue: +totalMilkRevenue.toFixed(2),
+    iofc: totalHeads ? +(totalMargin / totalHeads).toFixed(2) : 0,
+    totalMargin: +totalMargin.toFixed(2),
     eventDate: null
   };
 }
@@ -5904,12 +5950,13 @@ extraFertility = { scPlus, hdr21, cr21, pr21, firstServicePct };
     // --------------------------------------
     // 🔥 5.5) التغذية — إجمالي + عالي/متوسط/منخفض
     // --------------------------------------
-    let feedBands = {
-      overall: emptyFeedBand(),
-      high: emptyFeedBand(),
-      medium: emptyFeedBand(),
-      low: emptyFeedBand()
-    };
+let feedBands = {
+  overall: emptyFeedBand(),
+  high: emptyFeedBand(),
+  medium: emptyFeedBand(),
+  low: emptyFeedBand(),
+  fresh: emptyFeedBand()
+};
 
     try {
       const evSnapNut = await db.collection("events")
@@ -6014,16 +6061,15 @@ const nutritionEvents = evNutAll
       if (latestByBand.has('low')) {
         feedBands.low = buildFeedBandFromEvent(latestByBand.get('low'));
       }
-
-if (latestByBand.has('overall')) {
-  feedBands.overall = buildFeedBandFromEvent(latestByBand.get('overall'));
-} else {
-  feedBands.overall = weightedFeedBands([
-    feedBands.high,
-    feedBands.medium,
-    feedBands.low
-  ]);
+if (latestByBand.has('fresh')) {
+  feedBands.fresh = buildFeedBandFromEvent(latestByBand.get('fresh'));
 }
+feedBands.overall = weightedFeedBands([
+  feedBands.high,
+  feedBands.medium,
+  feedBands.low,
+  feedBands.fresh
+]);
     } catch (e) {
       console.error("FEED BANDS ERROR:", e.message || e);
     }
