@@ -257,12 +257,55 @@ function displayStatusFromAnalysis(e = {}){
   const n = a.nutrition || {};
   const t = a.targets || {};
   const ec = a.economics || {};
+  const cards = e?.nutrition?.panels?.analysisCards || [];
+
+  const cardByKey = (key) =>
+    cards.find(c => String(c?.key || '').toLowerCase() === key) || null;
+
+  const starchCard = cardByKey('starch');
+  const fatCard = cardByKey('fat');
+
+  const starchOkByServer =
+    starchCard && String(starchCard.status || '').toLowerCase() === 'good';
+
+  const fatOkByServer =
+    fatCard && String(fatCard.status || '').toLowerCase() === 'good';
 
   if(String(n.rumenStatus || '').toLowerCase().includes('danger')) return 'danger';
+
   if(finite(n.mpBalanceG) && Number(n.mpBalanceG) < -50) return 'danger';
-  if(finite(n.nelActual) && finite(t.nelTarget) && Number(n.nelActual) < Number(t.nelTarget) - 0.5) return 'warn';
-  if(finite(n.starchPctActual) && finite(t.starchMax) && Number(n.starchPctActual) > Number(t.starchMax)) return 'warn';
-  if(finite(n.peNDFPctActual) && finite(t.peNDFMin) && Number(n.peNDFPctActual) < Number(t.peNDFMin)) return 'warn';
+
+  if(
+    finite(n.nelActual) &&
+    finite(t.nelTarget) &&
+    Number(t.nelTarget) > 0 &&
+    ((Number(n.nelActual) - Number(t.nelTarget)) / Number(t.nelTarget)) * 100 < -5
+  ){
+    return 'warn';
+  }
+
+  if(
+    finite(n.starchPctActual) &&
+    finite(t.starchMax) &&
+    Number(n.starchPctActual) > Number(t.starchMax) &&
+    !starchOkByServer
+  ){
+    return 'warn';
+  }
+
+  if(
+    finite(n.fatPctActual) &&
+    finite(t.fatTarget) &&
+    Number(n.fatPctActual) > Number(t.fatTarget) &&
+    !fatOkByServer
+  ){
+    return 'warn';
+  }
+
+  if(finite(n.peNDFPctActual) && finite(t.peNDFMin) && Number(n.peNDFPctActual) < Number(t.peNDFMin)){
+    return 'warn';
+  }
+
   if(finite(ec.milkMargin) && Number(ec.milkMargin) < 0) return 'warn';
 
   return 'good';
@@ -1438,8 +1481,46 @@ function vitaminRows(balance = {}){
       );
     });
 }
-function renderServerReportRows(reportRows = []){
+function renderServerReportRows(reportRows = [], event = {}){
   const rows = Array.isArray(reportRows) ? reportRows : [];
+
+  const panels = event?.nutrition?.panels?.analysisCards || [];
+  const cardByKey = (key) =>
+    panels.find(c => String(c?.key || '').toLowerCase() === key) || null;
+
+  const normalizeReportRowForDisplay = (r = {}) => {
+    const key = String(r.key || '').toLowerCase();
+    const label = String(r.label || r.name || '');
+
+    const isStarch = key === 'starch' || label.includes('النشا');
+    const isFat = key === 'fat' || label.includes('دهن');
+
+    if (isStarch) {
+      const card = cardByKey('starch');
+      if (card && String(card.status || '').toLowerCase() === 'good') {
+        return {
+          ...r,
+          status: 'good',
+          statusText: 'كافية',
+          note: card.targetText || r.note || 'النشا يُقرأ مع صحة الكرش.'
+        };
+      }
+    }
+
+    if (isFat) {
+      const card = cardByKey('fat');
+      if (card && String(card.status || '').toLowerCase() === 'good') {
+        return {
+          ...r,
+          status: 'good',
+          statusText: 'داخل الحد',
+          note: card.targetText || r.note || 'دهن العليقة مقبول حسب نموذج الدهون.'
+        };
+      }
+    }
+
+    return r;
+  };
 
   if(!rows.length){
     return section(
@@ -1450,7 +1531,8 @@ function renderServerReportRows(reportRows = []){
 
   const groups = new Map();
 
-  for(const r of rows){
+ for(const raw of rows){
+  const r = normalizeReportRowForDisplay(raw);
     const sec = r.section || 'تحليل العليقة';
     if(!groups.has(sec)) groups.set(sec, []);
     groups.get(sec).push(r);
@@ -1836,7 +1918,7 @@ function renderOneRation(event = {}, opts = {}){
 </div>
       `)}
 
-      ${renderServerReportRows(nDoc.reportRows || [])}
+      ${renderServerReportRows(nDoc.reportRows || [], event)}
     </div>
 
     <div class="print-operation">
@@ -2023,12 +2105,12 @@ function renderAll(data){
         const stage = eventStage(ev) || sec.stage || '';
         const rationId = `ration-${slug((sec.stage || 'stage') + '-' + (groupName || `r${i}`))}`;
 
-        return renderOneRation(ev, {
-          groupName,
-          stage,
-          id: rationId,
-          pageBreak: true
-        });
+return renderOneRation(ev, {
+  groupName,
+  stage,
+  id: rationId,
+  pageBreak: i > 0
+});
       }).join('');
 
       const stageName = String(sec.stage || '').toLowerCase();
@@ -2040,7 +2122,7 @@ function renderAll(data){
           ${sec.showMilkEconomics ? `<div id="ration-index-${esc(sec.stage || si)}">${renderRationIndex(displayReport, type)}</div>` : ''}
           ${sec.showMilkEconomics ? `<div id="comparison-${esc(sec.stage || si)}">${renderAllComparison(displayReport)}</div>` : ''}
 
-          <section class="report-section-head ${si ? 'ration-break' : ''}">
+          <section class="report-section-head">
             <div class="section-title">${esc(sec.title || 'قسم تغذية')}</div>
             <div class="small-note">عدد العلائق في هذا القسم: ${nf(sec.count || events.length,0)}</div>
             ${isLactatingSection ? `
