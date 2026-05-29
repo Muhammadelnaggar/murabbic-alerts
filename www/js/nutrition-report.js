@@ -90,7 +90,7 @@ function statusText(state){
   if(s.includes('deficit')) return 'نقص';
   if(s.includes('excess')) return 'زيادة';
   if(s.includes('danger')) return 'تنبيه';
-  if(s.includes('warn') || s.includes('watch')) return 'يحتاج ضبط';
+  if(s.includes('warn') || s.includes('watch')) return 'متابعة';
   if(s.includes('good') || s.includes('ok')) return 'متزن';
   return 'معلومة';
 }
@@ -1502,44 +1502,6 @@ function vitaminRows(balance = {}){
 function renderServerReportRows(reportRows = [], event = {}){
   const rows = Array.isArray(reportRows) ? reportRows : [];
 
-  const panels = event?.nutrition?.panels?.analysisCards || [];
-  const cardByKey = (key) =>
-    panels.find(c => String(c?.key || '').toLowerCase() === key) || null;
-
-  const normalizeReportRowForDisplay = (r = {}) => {
-    const key = String(r.key || '').toLowerCase();
-    const label = String(r.label || r.name || '');
-
-    const isStarch = key === 'starch' || label.includes('النشا');
-    const isFat = key === 'fat' || label.includes('دهن');
-
-    if (isStarch) {
-      const card = cardByKey('starch');
-      if (card && String(card.status || '').toLowerCase() === 'good') {
-        return {
-          ...r,
-          status: 'good',
-          statusText: 'كافية',
-          note: card.targetText || r.note || 'النشا يُقرأ مع صحة الكرش.'
-        };
-      }
-    }
-
-    if (isFat) {
-      const card = cardByKey('fat');
-      if (card && String(card.status || '').toLowerCase() === 'good') {
-        return {
-          ...r,
-          status: 'good',
-          statusText: 'داخل الحد',
-          note: card.targetText || r.note || 'دهن العليقة مقبول حسب نموذج الدهون.'
-        };
-      }
-    }
-
-    return r;
-  };
-
   if(!rows.length){
     return section(
       'تحليل العليقة الكامل',
@@ -1549,8 +1511,7 @@ function renderServerReportRows(reportRows = [], event = {}){
 
   const groups = new Map();
 
- for(const raw of rows){
-  const r = normalizeReportRowForDisplay(raw);
+for(const r of rows){
     const sec = r.section || 'تحليل العليقة';
     if(!groups.has(sec)) groups.set(sec, []);
     groups.get(sec).push(r);
@@ -2040,7 +2001,7 @@ function renderExecutiveAll(report = {}, type = ''){
         </div>
         <div class="executive-score">
           <b>${nf(warn,0)}</b>
-          <span>تحتاج ضبط</span>
+          <span>تحتاج متابعة</span>
         </div>
         <div class="executive-score">
           <b>${nf(danger,0)}</b>
@@ -2064,7 +2025,7 @@ function renderRationIndex(report = {}, type = ''){
       <td>${esc(x.speciesLabel || '—')}</td>
       <td>${nf(x.headCount,0)}</td>
       <td>${finite(x.milkTargetKg) ? kg(x.milkTargetKg,1) : '—'}</td>
-      <td>${x.reportStatus ? badge(statusText(x.reportStatus), x.reportStatus) : badge('متابعة','muted')}</td>
+      <td>${x.reportStatus ? badge(x.reportStatusText || statusText(x.reportStatus), x.reportStatus) : badge('متابعة','muted')}</td>
       <td>${esc(x.priorityText || x.decisionText || 'متابعة دورية')}</td>
     </tr>`;
   });
@@ -2089,7 +2050,7 @@ function renderAllComparison(report = {}){
     <td>${pct(x.ndfPctActual,1)}</td>
     <td>${pct(x.starchPctActual,1)}</td>
     <td>${money(x.costPerKgMilk)}</td>
-    <td>${x.reportStatus ? badge(statusText(x.reportStatus), x.reportStatus) : badge('متابعة','muted')}</td>
+    <td>${x.reportStatus ? badge(x.reportStatusText || statusText(x.reportStatus), x.reportStatus) : badge('متابعة','muted')}</td>
   </tr>`);
 
   return section('مقارنة مختصرة بين العلائق', table(
