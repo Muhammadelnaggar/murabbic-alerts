@@ -555,7 +555,25 @@ function injectReportStyles(){
       gap:8px;
       margin-top:12px;
     }
+    .executive-soft-notes{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:12px;
+}
 
+.executive-soft-notes span{
+  display:inline-flex;
+  align-items:center;
+  border:1px solid #e2e8f0;
+  background:#f8fafc;
+  color:#475569;
+  border-radius:999px;
+  padding:6px 11px;
+  font-size:11.5px;
+  font-weight:850;
+  line-height:1.4;
+}
     .executive-score-grid{
       display:grid;
       grid-template-columns:repeat(2,minmax(0,1fr));
@@ -1992,11 +2010,23 @@ function renderExecutiveAll(report = {}, type = ''){
           التفاصيل العلمية والتشغيلية موجودة داخل كل عليقة على حدة.
         </p>
 
-        <div class="executive-badges">
-          ${first.groupName ? badge(`أولوية المراجعة: ${first.groupName}`, first.reportStatus) : badge('لا توجد أولوية حرجة','good')}
-          ${highCost.groupName ? badge(`أعلى تكلفة: ${highCost.groupName}`, 'warn') : ''}
-          ${weak.groupName ? badge(`أضعف هامش: ${weak.groupName}`, weak.reportStatus || 'warn') : ''}
-        </div>
+ <div class="executive-soft-notes">
+  ${
+    first.groupName
+      ? `<span>مراجعة مقترحة أولًا: ${esc(first.groupName)}</span>`
+      : `<span>لا توجد أولوية حرجة في الملخص.</span>`
+  }
+  ${
+    highCost.groupName
+      ? `<span>راجع تكلفة: ${esc(highCost.groupName)}</span>`
+      : ''
+  }
+  ${
+    weak.groupName
+      ? `<span>راجع الهامش: ${esc(weak.groupName)}</span>`
+      : ''
+  }
+</div>
       </div>
 
       <div class="executive-score-grid">
