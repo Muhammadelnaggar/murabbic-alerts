@@ -5544,7 +5544,47 @@ const active = animalsByType.filter(a => {
   return !["dead","died","sold","archived","inactive","nafaq","نافق"].includes(st);
 });
 
-const total = active.length;
+let total = active.length;
+let officialInMilkCount = null;
+
+try {
+  const groupPrefix = herdType === 'buffalo' ? 'buffalo_' : 'cow_';
+
+  const getOfficialGroupCount = async (baseKey) => {
+    const groupId = `${groupPrefix}${baseKey}`;
+    const doc = await db.collection('groups').doc(`${uid}_${groupId}`).get();
+    if (!doc.exists) return null;
+
+    const data = doc.data() || {};
+
+    if (Array.isArray(data.animalNumbers)) {
+      return data.animalNumbers.map(x => String(x || '').trim()).filter(Boolean).length;
+    }
+
+    const n = Number(data.animalsCount ?? data.headCount ?? data.count);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const allOfficial = await getOfficialGroupCount('all');
+  const freshOfficial = await getOfficialGroupCount('fresh');
+  const highOfficial = await getOfficialGroupCount('high');
+  const medOfficial = await getOfficialGroupCount('med');
+  const lowOfficial = await getOfficialGroupCount('low');
+
+  if (Number.isFinite(Number(allOfficial))) {
+    total = Number(allOfficial);
+  }
+
+  const milkParts = [freshOfficial, highOfficial, medOfficial, lowOfficial]
+    .map(Number)
+    .filter(Number.isFinite);
+
+  if (milkParts.length) {
+    officialInMilkCount = milkParts.reduce((a, b) => a + b, 0);
+  }
+} catch (e) {
+  console.error('HERD-STATS official groups count failed:', e.message || e);
+}
 
    // --------------------------------------
 // 🔥 2) خصوبة + تعداد + صحة من الوثيقة
@@ -5693,6 +5733,7 @@ for (const e of inseminationEvents) {
   console.error("BREED INTERVAL ERROR", e);
 }
 const pregPct = total ? Math.round((preg * 100) / total) : 0;
+if (officialInMilkCount !== null) inMilkCount = officialInMilkCount;
 const inMilkPct = total ? Math.round((inMilkCount * 100) / total) : 0;
 const openPct = total ? Math.round((openCount * 100) / total) : 0;
 const bredPct = total ? Math.round((bredCount * 100) / total) : 0;
