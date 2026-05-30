@@ -4741,22 +4741,107 @@ if (isDryReport) {
   ));
 }  return rows.filter(r => r && (r.actualText !== '—' || r.targetText !== '—'));
 }
+function buildNutritionOperationalBatchSrv(e = {}, options = {}) {
+  const n = e?.nutrition || {};
+  const ctx = n?.context || {};
+  const rows = Array.isArray(n?.rows) ? n.rows : [];
 
-function attachNutritionReportPayloadSrv(e = {}){
+  const headCount = Number(
+    e?.groupSize ??
+    ctx?.headCount ??
+    (Array.isArray(ctx?.groupNumbers) ? ctx.groupNumbers.length : null)
+  );
+
+  const distributionsPerDay = Math.max(
+    1,
+    Math.min(12, Math.round(Number(options?.distributionsPerDay || 2) || 2))
+  );
+
+  if (!Number.isFinite(headCount) || headCount <= 0 || !rows.length) {
+    return cleanObj({
+      available: false,
+      reason: 'batch_context_missing',
+      headCount: Number.isFinite(headCount) ? headCount : null,
+      distributionsPerDay,
+      rows: [],
+      totals: null
+    });
+  }
+
+  const batchRows = rows.map((r = {}) => {
+    const asFedKgPerHead = Number(r.asFedKg ?? r.kg ?? r.amount ?? 0) || 0;
+    const dmPct = Number(r.dmPct ?? r.dm ?? 0) || 0;
+    const pricePerTon = Number(r.pricePerTon ?? r.pTon ?? r.price ?? r.pTonRaw ?? 0) || 0;
+
+    const dmKgPerHead = asFedKgPerHead * (dmPct / 100);
+    const asFedKgGroupDay = asFedKgPerHead * headCount;
+    const dmKgGroupDay = dmKgPerHead * headCount;
+    const asFedKgPerDistribution = asFedKgGroupDay / distributionsPerDay;
+    const costGroupDay = (asFedKgGroupDay / 1000) * pricePerTon;
+
+    return cleanObj({
+      id: r.id || r.feedId || null,
+      name: r.name || r.nameAr || r.feedName || r.id || 'خامة',
+      category: r.cat || r.category || null,
+
+      asFedKgPerHead: round2(asFedKgPerHead),
+      dmKgPerHead: round2(dmKgPerHead),
+      asFedKgGroupDay: round2(asFedKgGroupDay),
+      dmKgGroupDay: round2(dmKgGroupDay),
+      distributionsPerDay,
+      asFedKgPerDistribution: round2(asFedKgPerDistribution),
+      costGroupDay: round2(costGroupDay)
+    });
+  });
+
+  const totals = batchRows.reduce((acc, r) => {
+    acc.asFedKgPerHead += Number(r.asFedKgPerHead || 0);
+    acc.dmKgPerHead += Number(r.dmKgPerHead || 0);
+    acc.asFedKgGroupDay += Number(r.asFedKgGroupDay || 0);
+    acc.dmKgGroupDay += Number(r.dmKgGroupDay || 0);
+    acc.asFedKgPerDistribution += Number(r.asFedKgPerDistribution || 0);
+    acc.costGroupDay += Number(r.costGroupDay || 0);
+    return acc;
+  }, {
+    asFedKgPerHead: 0,
+    dmKgPerHead: 0,
+    asFedKgGroupDay: 0,
+    dmKgGroupDay: 0,
+    asFedKgPerDistribution: 0,
+    costGroupDay: 0
+  });
+
+  Object.keys(totals).forEach(k => {
+    totals[k] = round2(totals[k]);
+  });
+
+  return cleanObj({
+    available: true,
+    headCount,
+    distributionsPerDay,
+    unit: 'kg_as_fed',
+    note: 'تقرير تشغيلي يحول عليقة الرأس الواحد إلى باتش جماعي حسب عدد الرؤوس وعدد النقلات اليومية. لا يغير احتياجات الحيوان.',
+    rows: batchRows,
+    totals
+  });
+}
+function attachNutritionReportPayloadSrv(e = {}, options = {}){
   const reportRows = buildNutritionReportRowsSrv(e);
   const reportDecision = buildNutritionReportDecisionSrv(e, reportRows);
-
+  const operationalBatch = buildNutritionOperationalBatchSrv(e, options);
+  
   return cleanObj({
     ...e,
     nutrition: {
       ...(e.nutrition || {}),
       reportDecision,
       reportStatus: reportDecision.status || reportStatusFromEventSrv(e),
-      reportRows
+     reportRows,
+     operationalBatch
     }
   });
 }
-function buildAllNutritionReport(events = []) {
+function buildAllNutritionReport(events = [], options = {}) {
   const latestByKey = new Map();
 
   for (const e of events || []) {
@@ -4779,7 +4864,7 @@ function buildAllNutritionReport(events = []) {
     return eventCreatedMs(b) - eventCreatedMs(a);
   });
 
-  const reportEvents = latestEvents.map(attachNutritionReportPayloadSrv);
+  const reportEvents = latestEvents.map(e => attachNutritionReportPayloadSrv(e, options));
   const index = reportEvents.map(buildNutritionReportIndexItem);
 
   const danger = index.filter(x => x.reportStatus === 'danger');
@@ -4854,7 +4939,7 @@ function buildStageSeparatedNutritionReport(events = []) {
   const sections = [...buckets.values()]
     .sort((a, b) => (order[a.stage] || 9) - (order[b.stage] || 9))
     .map(sec => {
-      const report = buildAllNutritionReport(sec.events);
+      const report = buildAllNutritionReport(sec.events, options);
       return cleanObj({
         stage: sec.stage,
         species: sec.species,
@@ -5164,12 +5249,17 @@ app.get('/api/nutrition/report/latest', requireUserId, async (req, res) => {
     const type = String(req.query.type || '').trim();
     const stage = String(req.query.stage || '').trim();
     const groupName = String(req.query.groupName || req.query.group || '').trim();
+    const distributionsPerDay = Math.max(
+  1,
+  Math.min(12, Math.round(Number(req.query.distributionsPerDay || 2) || 2))
+);
 
+const reportOptions = { distributionsPerDay };
     const events = await fetchNutritionReportEvents(tenant);
     const filtered = filterNutritionReportEvents(events, { type, stage, groupName });
 
     if (scope === 'all') {
-const report = buildStageSeparatedNutritionReport(filtered);
+const report = buildStageSeparatedNutritionReport(filtered, reportOptions);
 
 if (!report.count) {
   return res.status(404).json({
@@ -5215,7 +5305,7 @@ return res.json({
       type: type || null,
       stage: nutritionStageFromEvent(event),
       groupName: nutritionGroupNameFromEvent(event) || null,
-      event
+      event: attachNutritionReportPayloadSrv(event, reportOptions)
     });
   } catch (e) {
     console.error('nutrition.report.latest error:', e);
