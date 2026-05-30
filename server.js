@@ -795,9 +795,18 @@ const headCount = Number.isFinite(Number(officialHeadCount)) && Number(officialH
   const totalMilkRevenue = +(headCount * milkRevenuePerHead).toFixed(2);
   const totalMargin = +(headCount * marginPerHead).toFixed(2);
 
-  const dmPerKgMilk = Number(economics?.dmPerKgMilk || 0);
-  const feedEfficiency =
-    dmPerKgMilk > 0 ? +(1 / dmPerKgMilk).toFixed(2) : 0;
+const feedEfficiencyECM = Number(economics?.feedEfficiencyECM);
+const feedEfficiencyFPCM = Number(economics?.feedEfficiencyFPCM);
+const dmPerKgMilk = Number(economics?.dmPerKgMilk || 0);
+
+const feedEfficiency =
+  Number.isFinite(feedEfficiencyECM) && feedEfficiencyECM > 0
+    ? +feedEfficiencyECM.toFixed(2)
+    : (
+        Number.isFinite(feedEfficiencyFPCM) && feedEfficiencyFPCM > 0
+          ? +feedEfficiencyFPCM.toFixed(2)
+          : (dmPerKgMilk > 0 ? +(1 / dmPerKgMilk).toFixed(2) : 0)
+      );
 
   return {
     headCount,
@@ -870,19 +879,27 @@ function buildDashboardFeedAdviceSrv(overall = {}) {
     return 'بيانات التغذية غير مكتملة؛ احفظ علائق الحلاب بسعر اللبن لتظهر قراءة مُرَبِّيك.';
   }
 
-  if (iofcPct >= 60 && fe >= 1.45) {
-    return 'اقتصاد التغذية جيد؛ كفاءة التحويل مقبولة و IOFC قوي. لا تخفض تكلفة العليقة إذا كان ذلك سيكسر الطاقة أو البروتين أو أمان الكرش.';
+  if (fe > 1.8) {
+    return 'كفاءة تحويل المادة الجافة مرتفعة جدًا؛ راجع حالة الجسم واحتمال الاعتماد على مخزون الجسم، واقرأها مع IOFC قبل أي قرار.';
   }
 
-  if (iofcPct >= 50) {
-    return 'اقتصاد التغذية مقبول؛ راجع المجموعة الأعلى تكلفة من تقرير التغذية قبل أي تعديل في العليقة.';
+  if (fe < 1.3 && iofcPct < 40) {
+    return 'كفاءة التحويل و IOFC ضعيفان؛ التغذية تضغط اقتصاد اللبن. افتح تقرير التغذية وابدأ بالمجموعة الأعلى تكلفة أو الأقل كفاءة.';
+  }
+
+  if (iofcPct >= 60 && fe >= 1.4 && fe <= 1.8) {
+    return 'اقتصاد التغذية قوي؛ كفاءة التحويل داخل النطاق العلمي و IOFC قوي. حافظ على الاتزان ولا تخفض تكلفة العليقة إذا كان ذلك سيكسر الطاقة أو البروتين أو أمان الكرش.';
+  }
+
+  if (iofcPct >= 50 && fe >= 1.3) {
+    return 'اقتصاد التغذية مقبول؛ راجع المجموعة الأعلى تكلفة أو الأقل كفاءة من تقرير التغذية قبل تعديل الخلطة.';
   }
 
   if (costPct > 60 || iofcPct < 40) {
     return 'تكلفة التغذية تضغط هامش اللبن. افتح تقرير التغذية وابدأ بالمجموعة الأعلى تكلفة قبل تغيير الخلطة.';
   }
 
-  return 'تحتاج مؤشرات التغذية إلى متابعة؛ راجع كفاءة التحويل و IOFC في تقرير التغذية.';
+  return 'تحتاج مؤشرات التغذية إلى متابعة؛ راجع كفاءة تحويل المادة الجافة و IOFC في تقرير التغذية.';
 }
 function normalizeNutritionRows(rows = []) {
   if (!Array.isArray(rows)) return [];
