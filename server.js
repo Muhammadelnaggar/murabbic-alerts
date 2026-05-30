@@ -4913,7 +4913,7 @@ function nutritionStageLabelSrv(stage = '') {
   return 'علائق غير مصنفة';
 }
 
-function buildStageSeparatedNutritionReport(events = []) {
+function buildStageSeparatedNutritionReport(events = [], options = {}) {
   const buckets = new Map();
 
   for (const e of events || []) {
