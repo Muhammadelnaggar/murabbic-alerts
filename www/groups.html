@@ -1130,10 +1130,32 @@ function isMatureOpenNonLactating(an, sp){
 }
 
 /* ============= تنسيق بيانات الحيوان ============= */
+function normalizeAnimalNumberForGroups(v){
+  const map = {
+    '٠':'0','١':'1','٢':'2','٣':'3','٤':'4',
+    '٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+    '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4',
+    '۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
+  };
+  return String(v ?? '')
+    .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
+    .replace(/\s+/g, '')
+    .trim();
+}
+
 function normalize(an){
   const n={...an};
-  if(!n.number && n.animalNumber) n.number=n.animalNumber;
-  if(!n.animalNumber && n.number) n.animalNumber=n.number;
+
+  const canonicalNumber = normalizeAnimalNumberForGroups(
+    n.animalNumber ?? n.number ?? n.calfNumber ?? n.id
+  );
+
+  if(canonicalNumber){
+    n.animalNumber = canonicalNumber;
+    n.number = canonicalNumber;
+    if(n.isCalf && !n.calfNumber) n.calfNumber = canonicalNumber;
+  }
+
   if(n.kind){
     const k=String(n.kind).toLowerCase();
     if(k.includes('buff')) n.kind='جاموس';
@@ -1143,6 +1165,36 @@ function normalize(an){
     n.animaltype = speciesOf(n);
   }
   return n;
+}
+
+function dedupeAnimalsForGroups(list = []){
+  const byKey = new Map();
+
+  for (const raw of list) {
+    const an = normalize(raw);
+    const key = normalizeAnimalNumberForGroups(
+      an.animalNumber ?? an.number ?? an.calfNumber ?? an.id
+    );
+
+    if (!key) continue;
+
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, an);
+      continue;
+    }
+
+    // عند وجود نفس الرقم في animals و calves نُفضل سجل الحيوان الأساسي
+    if (prev.isCalf && !an.isCalf) {
+      byKey.set(key, { ...prev, ...an, animalNumber:key, number:key });
+    } else if (!prev.isCalf && an.isCalf) {
+      byKey.set(key, { ...an, ...prev, animalNumber:key, number:key });
+    } else {
+      byKey.set(key, { ...prev, ...an, animalNumber:key, number:key });
+    }
+  }
+
+  return [...byKey.values()];
 }
 
 /* ============= عرض الحظيرة + بطاقة مختصرة ============= */
@@ -1832,7 +1884,7 @@ async function loadAnimals(){
       }))
       .filter(shouldAppearInGroups);
 
-    state.animals = [...animals, ...calves];
+    state.animals = dedupeAnimalsForGroups([...animals, ...calves]);
 await enrichLifecycleFromEvents(state.animals);
 state.groupsCache = null;
   } catch (e) {
