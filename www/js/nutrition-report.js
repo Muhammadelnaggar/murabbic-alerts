@@ -931,7 +931,14 @@ body.print-mode-operational .stage-section{
 }
 
 body.print-mode-operational .stage-section.print-stage-selected{
-body.print-mode-operational .ration-block.print-selected{
+  display:block !important;
+}
+
+body.print-mode-operational .stage-section.print-stage-selected > *{
+  display:none !important;
+}
+
+body.print-mode-operational .stage-section.print-stage-selected > .ration-block.print-selected{
   display:block !important;
   break-before:auto !important;
   page-break-before:auto !important;
@@ -1054,6 +1061,60 @@ body.print-scope-one .ration-block.print-selected .card:first-child{
       .status-chip{border-radius:0}
       .card{break-inside:auto;page-break-inside:auto}
     }
+    /* ===== FINAL OVERRIDE: operational print ONLY ===== */
+@media print{
+  body.print-mode-operational .report-cover,
+  body.print-mode-operational .executive-panel,
+  body.print-mode-operational .report-tabs,
+  body.print-mode-operational .screen-actions-row,
+  body.print-mode-operational .ration-print-actions,
+  body.print-mode-operational .section-print-actions,
+  body.print-mode-operational .print-footer{
+    display:none !important;
+  }
+
+  body.print-mode-operational #content > *{
+    display:none !important;
+  }
+
+  body.print-mode-operational #content .stage-section.print-stage-selected{
+    display:block !important;
+  }
+
+  body.print-mode-operational #content .stage-section.print-stage-selected > *{
+    display:none !important;
+  }
+
+  body.print-mode-operational #content .stage-section.print-stage-selected .ration-block.print-selected{
+    display:block !important;
+    break-before:auto !important;
+    page-break-before:auto !important;
+  }
+
+  body.print-mode-operational #content .stage-section.print-stage-selected .ration-block.print-selected > *{
+    display:none !important;
+  }
+
+  body.print-mode-operational #content .stage-section.print-stage-selected .ration-block.print-selected .print-operation{
+    display:block !important;
+    position:static !important;
+    width:100% !important;
+    margin:0 !important;
+    padding:0 !important;
+    break-before:auto !important;
+    page-break-before:auto !important;
+  }
+
+  body.print-mode-operational #content .stage-section.print-stage-selected .ration-block.print-selected .print-operation,
+  body.print-mode-operational #content .stage-section.print-stage-selected .ration-block.print-selected .print-operation *{
+    visibility:visible !important;
+  }
+
+  body.print-mode-operational .ration-break{
+    break-before:auto !important;
+    page-break-before:auto !important;
+  }
+}
   `;
 
   document.head.appendChild(style);
