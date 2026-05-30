@@ -5451,7 +5451,58 @@ app.get("/api/herd-stats", async (req, res) => {
       .where("userId", "==", uid)
       .get();
 
-const animalsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+const rawAnimalsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+const normalizeAnimalNumberForStats = (v) => String(v ?? '')
+  .replace(/[٠-٩]/g, d => ({'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'}[d] || d))
+  .replace(/[۰-۹]/g, d => ({'۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'}[d] || d))
+  .replace(/\s+/g, '')
+  .trim();
+
+const animalsSeenForStats = new Map();
+
+for (const a of rawAnimalsAll) {
+  const numKey = normalizeAnimalNumberForStats(
+    a.animalNumber ??
+    a.number ??
+    a.calfNumber ??
+    a.id
+  );
+
+  const key = numKey || String(a.id || '').trim();
+  if (!key) continue;
+
+  const patched = {
+    ...a,
+    animalNumber: numKey || a.animalNumber,
+    number: numKey || a.number
+  };
+
+  const prev = animalsSeenForStats.get(key);
+
+  // لو فيه تكرار بين رقم عربي/إنجليزي، نفضل السجل الأساسي/الأغنى
+  if (!prev) {
+    animalsSeenForStats.set(key, patched);
+  } else {
+    const prevScore =
+      (prev.lastCalvingDate ? 3 : 0) +
+      (prev.lactationNumber ? 2 : 0) +
+      (prev.dailyMilk || prev.lastMilkKg ? 2 : 0) +
+      (prev.animaltype || prev.animalTypeAr ? 1 : 0);
+
+    const newScore =
+      (patched.lastCalvingDate ? 3 : 0) +
+      (patched.lactationNumber ? 2 : 0) +
+      (patched.dailyMilk || patched.lastMilkKg ? 2 : 0) +
+      (patched.animaltype || patched.animalTypeAr ? 1 : 0);
+
+    if (newScore > prevScore) {
+      animalsSeenForStats.set(key, patched);
+    }
+  }
+}
+
+const animalsAll = [...animalsSeenForStats.values()];
 
 const hasCows = animalsAll.some(a => {
   const at = String(a.animaltype || '').trim().toLowerCase();
