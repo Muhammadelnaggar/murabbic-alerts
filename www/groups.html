@@ -679,7 +679,7 @@ header{
       <div class="row" style="margin-top:8px">
         <button class="btn primary" id="saveSettings">حفظ الإعدادات</button>
       </div>
-      <div class="hint" style="margin-top:6px">الرضيع يدخل تلقائيًا إلى مجموعة الرضيع، ولا يخرج منها إلا بعد تسجيل حدث فطام بواسطة المستخدم.</div>
+      <div class="hint" style="margin-top:6px">حديث الولادة يدخل تلقائيًا بعد حدث الولادة لمدة 21 يوم، ثم ينتقل تلقائيًا حسب عتبة اللبن. الرضيع يبقى رضيعًا حتى تسجيل حدث فطام.</div>
     </section>
 
  
@@ -716,10 +716,11 @@ const normTxt = v => String(v ?? '').trim().toLowerCase();
 const GROUP_DEFS = [
   { id:'cow_males',        species:'cow',     baseKey:'males',       label:'ذكور أبقار',               feedingEligible:true  },
   { id:'cow_all',          species:'cow',     baseKey:'all',         label:'كل الأبقار',               feedingEligible:false },
+  { id:'cow_fresh',        species:'cow',     baseKey:'fresh',       label:'حديث الولادة أبقار',       feedingEligible:true  },
   { id:'cow_high',         species:'cow',     baseKey:'high',        label:'عالي الإدرار أبقار',       feedingEligible:true  },
   { id:'cow_med',          species:'cow',     baseKey:'med',         label:'متوسط الإدرار أبقار',      feedingEligible:true  },
   { id:'cow_low',          species:'cow',     baseKey:'low',         label:'منخفض الإدرار أبقار',      feedingEligible:true  },
-  { id:'cow_dry',          species:'cow',     baseKey:'dry',         label:'جاف أبقار',                feedingEligible:true  },
+  { id:'cow_dry',          species:'cow',     baseKey:'dry',         label:'جاف بعيد أبقار',           feedingEligible:true  },
   { id:'cow_closeup',      species:'cow',     baseKey:'closeup',     label:'انتظار ولادة أبقار',       feedingEligible:true  },
   { id:'cow_suckling',     species:'cow',     baseKey:'suckling',    label:'رضيع أبقار',               feedingEligible:true  },
   { id:'cow_weaned',       species:'cow',     baseKey:'weaned',      label:'فطام أبقار',               feedingEligible:true  },
@@ -730,10 +731,11 @@ const GROUP_DEFS = [
 
   { id:'buffalo_males',       species:'buffalo', baseKey:'males',       label:'ذكور جاموس',              feedingEligible:true  },
   { id:'buffalo_all',         species:'buffalo', baseKey:'all',         label:'كل الجاموس',              feedingEligible:false },
+  { id:'buffalo_fresh',       species:'buffalo', baseKey:'fresh',       label:'حديث الولادة جاموس',      feedingEligible:true  },
   { id:'buffalo_high',        species:'buffalo', baseKey:'high',        label:'عالي الإدرار جاموس',      feedingEligible:true  },
   { id:'buffalo_med',         species:'buffalo', baseKey:'med',         label:'متوسط الإدرار جاموس',     feedingEligible:true  },
   { id:'buffalo_low',         species:'buffalo', baseKey:'low',         label:'منخفض الإدرار جاموس',     feedingEligible:true  },
-  { id:'buffalo_dry',         species:'buffalo', baseKey:'dry',         label:'جاف جاموس',               feedingEligible:true  },
+  { id:'buffalo_dry',         species:'buffalo', baseKey:'dry',         label:'جاف بعيد جاموس',          feedingEligible:true  },
   { id:'buffalo_closeup',     species:'buffalo', baseKey:'closeup',     label:'انتظار ولادة جاموس',      feedingEligible:true  },
   { id:'buffalo_suckling',    species:'buffalo', baseKey:'suckling',    label:'رضيع جاموس',              feedingEligible:true  },
   { id:'buffalo_weaned',      species:'buffalo', baseKey:'weaned',      label:'فطام جاموس',              feedingEligible:true  },
@@ -1056,7 +1058,7 @@ function isCloseUp(an, sp){
   return !!an?._hasCloseUpEvent;
 }
 
-const FRESH_FROM = 1, FRESH_TO = 45;
+const FRESH_FROM = 1, FRESH_TO = 21;
 function isFresh(an){
   const d = getDIM(an);
   return d>=FRESH_FROM && d<=FRESH_TO && !isDry(an) && hasCalvedBefore(an);
@@ -1364,7 +1366,7 @@ bufRow.innerHTML = `
   const hint = document.createElement('div');
   hint.className = 'hint';
   hint.style.marginTop = '6px';
- hint.textContent = 'كل المجموعات هنا مفصولة أبقار/جاموس. الذكور في مجموعة مستقلة، والرضيع يظل رضيعًا حتى تسجيل حدث فطام، ثم تُطبّق الرينجات العمرية والحالة التناسلية.';
+ hint.textContent = 'كل المجموعات هنا مفصولة أبقار/جاموس. حديث الولادة مجموعة رسمية مؤقتة 21 يوم، ثم يُوزّع الحيوان تلقائيًا حسب اللبن. الذكور في مجموعة مستقلة، والرضيع يظل رضيعًا حتى تسجيل حدث فطام.';
   $('#settings')?.appendChild(hint);
 }
 
@@ -1465,6 +1467,11 @@ function splitGroups(applyQuery = true){
 
 if (isMale(an)) {
   g[pref+'males'].push(an);
+  continue;
+}
+
+if (isFresh(an)) {
+  g[pref+'fresh'].push(an);
   continue;
 }
 
