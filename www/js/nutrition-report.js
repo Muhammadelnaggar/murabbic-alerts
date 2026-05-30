@@ -1973,7 +1973,6 @@ function renderOneRation(event = {}, opts = {}){
 
 <div class="print-operation">
   ${renderOperationalBatch(nDoc.operationalBatch || {})}
-  ${renderRows(rows)}
 </div>
 
   </div>`;
