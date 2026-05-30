@@ -908,17 +908,23 @@ function iofcBox(totalValue, pctValue){
       <div class="kpi-label">IOFC — هامش اللبن بعد العلف</div>
       <div class="kpi-value">${Number.isFinite(pct) ? `${pct.toFixed(1)}%` : '--'}</div>
 
-      <div class="metric-scale">
-        <div class="metric-scale-track">
-          <div class="metric-scale-segs">
-            <div class="metric-scale-seg danger"></div>
-            <div class="metric-scale-seg warn"></div>
-            <div class="metric-scale-seg ok"></div>
-            <div class="metric-scale-seg elite"></div>
-          </div>
-          <div class="metric-scale-dot" style="left:${metricScalePositionDirect(pct, 40, 70)}%"></div>
-        </div>
-      </div>
+<div class="metric-scale">
+  <div class="metric-scale-track">
+    <div class="metric-scale-segs">
+      <div class="metric-scale-seg danger"></div>
+      <div class="metric-scale-seg warn"></div>
+      <div class="metric-scale-seg ok"></div>
+      <div class="metric-scale-seg elite"></div>
+    </div>
+    <div class="metric-scale-dot" style="left:${metricScalePositionDirect(pct, 40, 70)}%"></div>
+  </div>
+  <div class="metric-scale-labels">
+    <span>&lt;40%</span>
+    <span>40–49%</span>
+    <span>50–59%</span>
+    <span>≥60%</span>
+  </div>
+</div>
 
       <div class="kpi-sub">
         ${Number.isFinite(total) ? `${total.toFixed(2)} جنيه / يوم` : 'إجمالي اليوم غير متاح'}
@@ -928,12 +934,34 @@ function iofcBox(totalValue, pctValue){
 }
 function feBox(value){
   const v = Number(value);
-  return scaleMetricBox(
-    'كفاءة التحويل مادة جافة / لبن',
-    Number.isFinite(v) ? v.toFixed(1) : '--',
-    metricScalePositionDirect(v, 1.20, 1.85),
-    'feed'
-  );
+  const pos = Number.isFinite(v) ? metricScalePositionDirect(v, 1.0, 1.9) : 0;
+
+  return `
+    <div class="kpi feed">
+      <div class="kpi-label">كفاءة تحويل المادة الجافة إلى لبن</div>
+      <div class="kpi-value">${Number.isFinite(v) ? v.toFixed(2) : '--'}</div>
+
+      <div class="metric-scale">
+        <div class="metric-scale-track">
+          <div class="metric-scale-segs">
+            <div class="metric-scale-seg danger"></div>
+            <div class="metric-scale-seg warn"></div>
+            <div class="metric-scale-seg ok"></div>
+            <div class="metric-scale-seg elite"></div>
+          </div>
+          <div class="metric-scale-dot" style="left:${pos}%"></div>
+        </div>
+        <div class="metric-scale-labels">
+          <span>&lt;1.30</span>
+          <span>1.30–1.39</span>
+          <span>1.40–1.80</span>
+          <span>&gt;1.80</span>
+        </div>
+      </div>
+
+      <div class="kpi-sub">ECM / كجم مادة جافة</div>
+    </div>
+  `;
 }
 function feedBandCard(title, band = {}) {
   const headCount = Number(band?.headCount || 0);
