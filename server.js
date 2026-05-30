@@ -832,7 +832,11 @@ function weightedFeedBands(cards = []) {
     const sum = valid.reduce((s, x) => s + (Number(x[key] || 0) * Number(x.headCount || 0)), 0);
     return +(sum / totalHeads).toFixed(2);
   };
+ const feedCostPctOfMilkIncome =
+  totalMilkRevenue > 0 ? +(totalFeedCost / totalMilkRevenue * 100).toFixed(2) : 0;
 
+const iofcPctOfMilkIncome =
+  totalMilkRevenue > 0 ? +(totalMargin / totalMilkRevenue * 100).toFixed(2) : 0;
   return {
     headCount: totalHeads,
     avgMilkKg: totalHeads ? +(totalMilkKg / totalHeads).toFixed(2) : 0,
@@ -841,11 +845,44 @@ function weightedFeedBands(cards = []) {
     feedEfficiency: wavg('feedEfficiency'),
     feedCostPerHeadPerDay: totalHeads ? +(totalFeedCost / totalHeads).toFixed(2) : 0,
     totalFeedCost: +totalFeedCost.toFixed(2),
+    totalFeedCostPerDay: +totalFeedCost.toFixed(2),
+
     totalMilkRevenue: +totalMilkRevenue.toFixed(2),
+    totalMilkRevenuePerDay: +totalMilkRevenue.toFixed(2),
+
     iofc: totalHeads ? +(totalMargin / totalHeads).toFixed(2) : 0,
     totalMargin: +totalMargin.toFixed(2),
+    totalIofc: +totalMargin.toFixed(2),
+    totalMilkFeedMarginPerDay: +totalMargin.toFixed(2),
+
+    feedCostPctOfMilkIncome,
+    iofcPctOfMilkIncome,
+
     eventDate: null
   };
+}
+function buildDashboardFeedAdviceSrv(overall = {}) {
+  const fe = Number(overall.feedEfficiency || 0);
+  const iofcPct = Number(overall.iofcPctOfMilkIncome || 0);
+  const costPct = Number(overall.feedCostPctOfMilkIncome || 0);
+
+  if (!Number.isFinite(fe) || !Number.isFinite(iofcPct) || iofcPct <= 0) {
+    return 'بيانات التغذية غير مكتملة؛ احفظ علائق الحلاب بسعر اللبن لتظهر قراءة مُرَبِّيك.';
+  }
+
+  if (iofcPct >= 60 && fe >= 1.45) {
+    return 'اقتصاد التغذية جيد؛ كفاءة التحويل مقبولة و IOFC قوي. لا تخفض تكلفة العليقة إذا كان ذلك سيكسر الطاقة أو البروتين أو أمان الكرش.';
+  }
+
+  if (iofcPct >= 50) {
+    return 'اقتصاد التغذية مقبول؛ راجع المجموعة الأعلى تكلفة من تقرير التغذية قبل أي تعديل في العليقة.';
+  }
+
+  if (costPct > 60 || iofcPct < 40) {
+    return 'تكلفة التغذية تضغط هامش اللبن. افتح تقرير التغذية وابدأ بالمجموعة الأعلى تكلفة قبل تغيير الخلطة.';
+  }
+
+  return 'تحتاج مؤشرات التغذية إلى متابعة؛ راجع كفاءة التحويل و IOFC في تقرير التغذية.';
 }
 function normalizeNutritionRows(rows = []) {
   if (!Array.isArray(rows)) return [];
@@ -6338,13 +6375,20 @@ firstServiceConceptionPct: extraFertility.firstServicePct,
     health: cullHealthPct
   },
 
-  // ===== التغذية: إجمالي + شرائح الإنتاج =====
-  feedCostPerLiter: feedBands.overall.feedCostPerLiter,
-  feedEfficiency: feedBands.overall.feedEfficiency,
-  feedCostPerHeadPerDay: feedBands.overall.feedCostPerHeadPerDay,
-  iofc: feedBands.overall.iofc,
+// ===== التغذية: إجمالي + شرائح الإنتاج =====
+feedCostPerLiter: feedBands.overall.feedCostPerLiter,
+feedEfficiency: feedBands.overall.feedEfficiency,
+feedCostPerHeadPerDay: feedBands.overall.feedCostPerHeadPerDay,
+iofc: feedBands.overall.iofc,
 
- feedBands,
+totalFeedCostPerDay: feedBands.overall.totalFeedCostPerDay ?? feedBands.overall.totalFeedCost ?? 0,
+totalMilkFeedMarginPerDay: feedBands.overall.totalMilkFeedMarginPerDay ?? feedBands.overall.totalMargin ?? 0,
+totalIofcPerDay: feedBands.overall.totalIofc ?? feedBands.overall.totalMargin ?? 0,
+iofcPctOfMilkIncome: feedBands.overall.iofcPctOfMilkIncome ?? 0,
+feedCostPctOfMilkIncome: feedBands.overall.feedCostPctOfMilkIncome ?? 0,
+feedAdvice: buildDashboardFeedAdviceSrv(feedBands.overall),
+
+feedBands,
 
 dailyMilkTotal,
 avgHeadToday,
