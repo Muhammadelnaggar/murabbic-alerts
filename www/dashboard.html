@@ -133,6 +133,22 @@
 .kpi.repro::before{ background:linear-gradient(90deg,#7c3aed,#b79cff); }
 .kpi.cull::before{ background:linear-gradient(90deg,#ea580c,#fdba74); }
 .kpi.feed::before{ background:linear-gradient(90deg,#ca8a04,#f5d76e); }
+    .feed-advice-card{
+  grid-column:span 2;
+  min-height:54px;
+  padding:10px 12px;
+}
+
+.feed-advice-card .kpi-label{
+  font-size:12px;
+  margin-top:0;
+}
+
+.feed-advice-card .kpi-sub{
+  font-size:11px;
+  line-height:1.55;
+  color:#4b5f55;
+}
 .kpi.health::before{ background:linear-gradient(90deg,#dc2626,#f7a6a6); }
 .kpi:hover{
   transform:translateY(-2px);
@@ -883,7 +899,33 @@ function cullTotalBox(count, pct){
     'cull'
   );
 }
+function iofcBox(totalValue, pctValue){
+  const pct = Number(pctValue);
+  const total = Number(totalValue);
 
+  return `
+    <div class="kpi feed">
+      <div class="kpi-label">IOFC — هامش اللبن بعد العلف</div>
+      <div class="kpi-value">${Number.isFinite(pct) ? `${pct.toFixed(1)}%` : '--'}</div>
+
+      <div class="metric-scale">
+        <div class="metric-scale-track">
+          <div class="metric-scale-segs">
+            <div class="metric-scale-seg danger"></div>
+            <div class="metric-scale-seg warn"></div>
+            <div class="metric-scale-seg ok"></div>
+            <div class="metric-scale-seg elite"></div>
+          </div>
+          <div class="metric-scale-dot" style="left:${metricScalePositionDirect(pct, 40, 70)}%"></div>
+        </div>
+      </div>
+
+      <div class="kpi-sub">
+        ${Number.isFinite(total) ? `${total.toFixed(2)} جنيه / يوم` : 'إجمالي اليوم غير متاح'}
+      </div>
+    </div>
+  `;
+}
 function feBox(value){
   const v = Number(value);
   return scaleMetricBox(
@@ -1071,6 +1113,35 @@ const heatDetectionRatePct =
 
     const feedCostPerLiter = Number(stats.feedCostPerLiter ?? overallFeedBand.feedCostPerLiter ?? 0);
     const feedCostPerHeadPerDay = Number(stats.feedCostPerHeadPerDay ?? overallFeedBand.feedCostPerHeadPerDay ?? 0);
+    const totalFeedCostPerDay = Number(
+  stats.totalFeedCostPerDay ??
+  overallFeedBand.totalFeedCostPerDay ??
+  overallFeedBand.totalFeedCost ??
+  0
+);
+
+const totalMilkFeedMarginPerDay = Number(
+  stats.totalMilkFeedMarginPerDay ??
+  stats.totalIofcPerDay ??
+  overallFeedBand.totalMilkFeedMarginPerDay ??
+  overallFeedBand.totalIofc ??
+  overallFeedBand.totalMargin ??
+  0
+);
+
+const iofcPctOfMilkIncome = Number(
+  stats.iofcPctOfMilkIncome ??
+  overallFeedBand.iofcPctOfMilkIncome ??
+  overallFeedBand.iofcPct ??
+  0
+);
+
+const feedAdvice =
+  stats.feedAdvice ||
+  stats.feedGuidance ||
+  stats.nutritionAdvice ||
+  stats.nutritionGuidance ||
+  '';
 
 
  const avgHead7Days = Number(stats.avgHead7Days ?? 0);
@@ -1190,18 +1261,26 @@ cullGrid.innerHTML =
       box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من الاستبعاد ${cullReproPct}%`, 'g_cullRepro', 'cull') +
       box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من الاستبعاد ${cullHealthPct}%`, 'g_cullHealth', 'cull');
 feedGrid.innerHTML =
-  `<div onclick="location.href='nutrition-report.html?view=cost_liter&type=${currentType || 'cows'}'">
-    ${box('تكلفة لتر لبن / يوم من التغذية', feedCostPerLiter, '', 'g_feedCostLiter', 'feed')}
-  </div>` +
   `<div onclick="location.href='nutrition-report.html?view=feed_efficiency&type=${currentType || 'cows'}'">
     ${feBox(feedEfficiency)}
   </div>` +
-  `<div onclick="location.href='nutrition-report.html?view=head_cost&type=${currentType || 'cows'}'">
-    ${box('تكلفة رأس / يوم من التغذية', feedCostPerHeadPerDay, '', 'g_feedHeadDay', 'feed')}
-  </div>` +
   `<div onclick="location.href='nutrition-report.html?view=iofc&type=${currentType || 'cows'}'">
-    ${box('صافي عائد اللبن بعد العلف / رأس / يوم', iofc, '', 'g_iofc', 'feed')}
-  </div>`;
+    ${iofcBox(totalMilkFeedMarginPerDay, iofcPctOfMilkIncome)}
+  </div>` +
+  `<div onclick="location.href='nutrition-report.html?view=cost_liter&type=${currentType || 'cows'}'">
+    ${box('تكلفة كجم اللبن من التغذية', feedCostPerLiter, 'جنيه / كجم لبن', null, 'feed')}
+  </div>` +
+  `<div onclick="location.href='nutrition-report.html?view=total_feed_cost&type=${currentType || 'cows'}'">
+    ${box('إجمالي تكاليف التغذية / يوم', totalFeedCostPerDay, 'جنيه / يوم', null, 'feed')}
+  </div>` +
+  (
+    feedAdvice
+      ? `<div class="kpi feed feed-advice-card" onclick="location.href='nutrition-report.html?type=${currentType || 'cows'}'">
+          <div class="kpi-label">توجيه مُرَبِّيك</div>
+          <div class="kpi-sub">${feedAdvice}</div>
+        </div>`
+      : ''
+  );
 
 healthGrid.innerHTML =
       mastitisBox(mastitisCount, mastitisPct) +
@@ -1223,9 +1302,6 @@ renderMiniGauge("g_bred", bredPct);
 renderMiniGauge("g_cullProd", cullProdPct);
 renderMiniGauge("g_cullRepro", cullReproPct);
 renderMiniGauge("g_cullHealth", cullHealthPct);
-renderMiniGauge("g_feedCostLiter", feedCostPerLiter);
-renderMiniGauge("g_feedHeadDay", feedCostPerHeadPerDay);
-renderMiniGauge("g_iofc", iofc);
 renderMiniGauge("g_feces", fecesScore);
 renderMiniGauge("g_bcs", bcsCamera);
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
