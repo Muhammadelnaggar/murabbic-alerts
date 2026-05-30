@@ -752,19 +752,23 @@ function feedBandKey(raw = '') {
   return 'overall';
 }
 
-function buildFeedBandFromEvent(e = {}) {
+function buildFeedBandFromEvent(e = {}, officialHeadCount = null) {
   const a = e?.nutrition?.analysis || {};
   const ctx = e?.nutrition?.context || {};
   const economics = a?.economics || {};
   const totals = a?.totals || {};
   const inputs = a?.inputs || {};
 
-  const headCount = Number(
-    e?.groupSize ??
-    ctx?.headCount ??
-    (Array.isArray(ctx?.groupNumbers) ? ctx.groupNumbers.length : null) ??
-    1
-  ) || 1;
+const headCount = Number.isFinite(Number(officialHeadCount)) && Number(officialHeadCount) > 0
+  ? Number(officialHeadCount)
+  : (
+      Number(
+        e?.groupSize ??
+        ctx?.headCount ??
+        (Array.isArray(ctx?.groupNumbers) ? ctx.groupNumbers.length : null) ??
+        1
+      ) || 1
+    );
 
   const avgMilkKg = Number(
     ctx?.avgMilkKg ??
@@ -5546,6 +5550,7 @@ const active = animalsByType.filter(a => {
 
 let total = active.length;
 let officialInMilkCount = null;
+let officialFeedBandCounts = null;
 
 try {
   const groupPrefix = herdType === 'buffalo' ? 'buffalo_' : 'cow_';
@@ -5582,6 +5587,12 @@ try {
   if (milkParts.length) {
     officialInMilkCount = milkParts.reduce((a, b) => a + b, 0);
   }
+  officialFeedBandCounts = {
+  fresh: Number(freshOfficial) || 0,
+  high: Number(highOfficial) || 0,
+  medium: Number(medOfficial) || 0,
+  low: Number(lowOfficial) || 0
+};
 } catch (e) {
   console.error('HERD-STATS official groups count failed:', e.message || e);
 }
@@ -6157,17 +6168,17 @@ const nutritionEvents = evNutAll
       }
 
       if (latestByBand.has('high')) {
-        feedBands.high = buildFeedBandFromEvent(latestByBand.get('high'));
+        feedBands.high = buildFeedBandFromEvent(latestByBand.get('high'), officialFeedBandCounts?.high);
       }
       if (latestByBand.has('medium')) {
-        feedBands.medium = buildFeedBandFromEvent(latestByBand.get('medium'));
+        feedBands.medium = buildFeedBandFromEvent(latestByBand.get('medium'), officialFeedBandCounts?.medium);
       }
       if (latestByBand.has('low')) {
-        feedBands.low = buildFeedBandFromEvent(latestByBand.get('low'));
+        feedBands.low = buildFeedBandFromEvent(latestByBand.get('low'), officialFeedBandCounts?.low);
       }
-if (latestByBand.has('fresh')) {
-  feedBands.fresh = buildFeedBandFromEvent(latestByBand.get('fresh'));
-}
+      if (latestByBand.has('fresh')) {
+        feedBands.fresh = buildFeedBandFromEvent(latestByBand.get('fresh'), officialFeedBandCounts?.fresh);
+      }
 feedBands.overall = weightedFeedBands([
   feedBands.high,
   feedBands.medium,
