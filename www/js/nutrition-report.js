@@ -6,7 +6,10 @@ const API_BASE = window.API_BASE || 'https://murabbic-alerts.onrender.com';
 
 const $ = (id) => document.getElementById(id);
 const qp = new URLSearchParams(location.search);
-
+const reportDistributionsPerDay = Math.max(
+  1,
+  Math.min(12, Math.round(Number(qp.get('distributionsPerDay') || 2) || 2))
+);
 /* ============================================================
    أدوات عامة
 ============================================================ */
@@ -1068,7 +1071,26 @@ function mini(title, value, note = '', state = ''){
     ${note ? `<div class="note">${esc(note)}</div>` : ''}
   </div>`;
 }
+function renderDistributionSelector(){
+  const opts = [1,2,3,4,5,6].map(n =>
+    `<option value="${n}" ${Number(reportDistributionsPerDay) === n ? 'selected' : ''}>${n}</option>`
+  ).join('');
 
+  return `
+    <div class="kpi no-print">
+      <b>
+        <select onchange="
+          const p = new URLSearchParams(location.search);
+          p.set('distributionsPerDay', this.value);
+          location.search = p.toString();
+        " style="font-weight:950;padding:6px 10px;border-radius:10px;border:1px solid #dfe9e2">
+          ${opts}
+        </select>
+      </b>
+      <span>عدد النقلات / اليوم</span>
+    </div>
+  `;
+}
 function table(headers, rows, empty = 'لا توجد بيانات.'){
   const head = headers.map(h => `<th>${esc(h)}</th>`).join('');
   const body = rows && rows.length
@@ -1114,7 +1136,7 @@ function buildPath(){
   if(qp.get('stage')) p.set('stage', qp.get('stage'));
   if(qp.get('groupName')) p.set('groupName', qp.get('groupName'));
   if(qp.get('group')) p.set('group', qp.get('group'));
-
+  p.set('distributionsPerDay', String(reportDistributionsPerDay));
   return `/api/nutrition/report/latest?${p.toString()}`;
 }
 function hideOldReportHeader(){
@@ -1832,6 +1854,55 @@ function renderEconomicAnalysis(a = {}, stage = '', ctx = {}, panels = {}){
     'لا توجد بيانات اقتصادية محفوظة.'
   ));
 }
+function renderOperationalBatch(batch = {}){
+  const b = batch || {};
+  const rows = Array.isArray(b.rows) ? b.rows : [];
+  const totals = b.totals || {};
+  const distributions = Number(b.distributionsPerDay || reportDistributionsPerDay || 2) || 2;
+
+  if(!rows.length){
+    return section('تقرير التشغيل والخلط الجماعي', `
+      <div class="small-note">لا توجد بيانات كافية لبناء جدول الخلط الجماعي لهذه العليقة.</div>
+    `);
+  }
+
+  const body = rows.map(r => `<tr>
+    <td class="metric-name">${esc(r.name || 'خامة')}</td>
+    <td>${kg(r.asFedKgPerHead,2)}</td>
+    <td>${kg(r.asFedKgGroupDay,2)}</td>
+    <td>${nf(distributions,0)}</td>
+    <td>${kg(r.asFedKgPerDistribution,2)}</td>
+    <td>${money(r.costGroupDay)}</td>
+  </tr>`);
+
+  body.push(`<tr>
+    <td class="metric-name">الإجمالي</td>
+    <td>${kg(totals.asFedKgPerHead,2)}</td>
+    <td>${kg(totals.asFedKgGroupDay,2)}</td>
+    <td>${nf(distributions,0)}</td>
+    <td>${kg(totals.asFedKgPerDistribution,2)}</td>
+    <td>${money(totals.costGroupDay)}</td>
+  </tr>`);
+
+  return section('تقرير التشغيل والخلط الجماعي', `
+    <div class="compact-grid" style="margin-bottom:10px">
+      ${kpi('عدد الرؤوس', finite(b.headCount) ? nf(b.headCount,0) : '—')}
+      ${renderDistributionSelector()}
+      ${kpi('إجمالي الخلطة / يوم', kg(totals.asFedKgGroupDay,2))}
+      ${kpi('إجمالي كل نقلة', kg(totals.asFedKgPerDistribution,2))}
+    </div>
+
+    <div class="small-note" style="margin-bottom:8px">
+      اختر عدد النقلات قبل الطباعة. الحساب يتم من السيرفر، والواجهة تعرض الناتج فقط.
+    </div>
+
+    ${table(
+      ['الخامة','كجم/رأس/يوم','إجمالي المجموعة/يوم','عدد النقلات','كجم/كل نقلة','تكلفة المجموعة/يوم'],
+      body,
+      'لا توجد بيانات تشغيل.'
+    )}
+  `);
+}
 function renderRows(rows = []){
   const body = (Array.isArray(rows) ? rows : []).map(r => {
     const asFed = num(r.asFedKg ?? r.kg ?? r.amount);
@@ -1900,9 +1971,10 @@ function renderOneRation(event = {}, opts = {}){
       ${renderServerReportRows(nDoc.reportRows || [], event)}
     </div>
 
-    <div class="print-operation">
-      ${renderRows(rows)}
-    </div>
+<div class="print-operation">
+  ${renderOperationalBatch(nDoc.operationalBatch || {})}
+  ${renderRows(rows)}
+</div>
 
   </div>`;
 }
