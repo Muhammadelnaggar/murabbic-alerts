@@ -931,13 +931,6 @@ body.print-mode-operational .stage-section{
 }
 
 body.print-mode-operational .stage-section.print-stage-selected{
-  display:block !important;
-}
-
-body.print-mode-operational .ration-block{
-  display:none !important;
-}
-
 body.print-mode-operational .ration-block.print-selected{
   display:block !important;
   break-before:auto !important;
