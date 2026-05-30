@@ -917,30 +917,55 @@ function injectReportStyles(){
       display:none !important;
     }
 
-    body.print-mode-operational *{
-      visibility:hidden !important;
-    }
+body.print-mode-operational .report-cover,
+body.print-mode-operational .executive-panel,
+body.print-mode-operational .report-tabs,
+body.print-mode-operational .screen-actions-row,
+body.print-mode-operational .stage-section > .report-section-head,
+body.print-mode-operational .print-footer{
+  display:none !important;
+}
 
-    body.print-mode-operational .ration-block.print-selected .print-operation,
-    body.print-mode-operational .ration-block.print-selected .print-operation *{
-      visibility:visible !important;
-    }
+body.print-mode-operational .stage-section{
+  display:none !important;
+}
 
-    body.print-mode-operational .ration-block.print-selected .print-operation{
-      display:block !important;
-      position:absolute !important;
-      top:0 !important;
-      right:0 !important;
-      left:0 !important;
-      width:100% !important;
-      margin:0 !important;
-      padding:0 !important;
-    }
+body.print-mode-operational .stage-section.print-stage-selected{
+  display:block !important;
+}
 
-    body.print-mode-operational .ration-break{
-      break-before:auto !important;
-      page-break-before:auto !important;
-    }
+body.print-mode-operational .ration-block{
+  display:none !important;
+}
+
+body.print-mode-operational .ration-block.print-selected{
+  display:block !important;
+  break-before:auto !important;
+  page-break-before:auto !important;
+}
+
+body.print-mode-operational .ration-block.print-selected > *{
+  display:none !important;
+}
+
+body.print-mode-operational .ration-block.print-selected .print-operation{
+  display:block !important;
+  position:static !important;
+  width:100% !important;
+  margin:0 !important;
+  padding:0 !important;
+  break-before:auto !important;
+  page-break-before:auto !important;
+}
+
+body.print-mode-operational .ration-block.print-selected .print-operation *{
+  visibility:visible !important;
+}
+
+body.print-mode-operational .ration-break{
+  break-before:auto !important;
+  page-break-before:auto !important;
+}
 
     @media print{
     body.print-scope-one .report-cover,
