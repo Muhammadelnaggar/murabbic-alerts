@@ -6595,12 +6595,24 @@ const nutritionEvents = evNutAll
       if (latestByBand.has('fresh')) {
         feedBands.fresh = buildFeedBandFromEvent(latestByBand.get('fresh'), officialFeedBandCounts?.fresh);
       }
-feedBands.overall = weightedFeedBands([
-  feedBands.high,
-  feedBands.medium,
-  feedBands.low,
-  feedBands.fresh
-]);
+
+      // ✅ لو فيه عليقة عامة محفوظة بدون تقسيم عالي/متوسط/منخفض
+      // لا نمسحها بصفر
+      if (latestByBand.has('overall')) {
+        feedBands.overall = buildFeedBandFromEvent(latestByBand.get('overall'));
+      }
+
+      // ✅ نجمع الشرائح فقط لو فيه شرائح فعلًا
+      const feedSegmentCards = [
+        feedBands.high,
+        feedBands.medium,
+        feedBands.low,
+        feedBands.fresh
+      ].filter(x => x && Number(x.headCount || 0) > 0);
+
+      if (feedSegmentCards.length) {
+        feedBands.overall = weightedFeedBands(feedSegmentCards);
+      }
     } catch (e) {
       console.error("FEED BANDS ERROR:", e.message || e);
     }
