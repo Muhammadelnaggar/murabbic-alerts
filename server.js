@@ -6499,12 +6499,21 @@ const nutritionEvents = evNutAll
       if (latestByBand.has('fresh')) {
         feedBands.fresh = buildFeedBandFromEvent(latestByBand.get('fresh'), officialFeedBandCounts?.fresh);
       }
-feedBands.overall = weightedFeedBands([
-  feedBands.high,
-  feedBands.medium,
-  feedBands.low,
-  feedBands.fresh
-]);
+
+      const feedSegmentCards = [
+        feedBands.high,
+        feedBands.medium,
+        feedBands.low,
+        feedBands.fresh
+      ].filter(x => x && Number(x.headCount || 0) > 0);
+
+      if (feedSegmentCards.length) {
+        feedBands.overall = weightedFeedBands(feedSegmentCards);
+      } else if (latestByBand.has('overall')) {
+        feedBands.overall = buildFeedBandFromEvent(latestByBand.get('overall'));
+      } else {
+        feedBands.overall = emptyFeedBand();
+      }
     } catch (e) {
       console.error("FEED BANDS ERROR:", e.message || e);
     }
