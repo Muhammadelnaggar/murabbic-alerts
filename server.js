@@ -797,6 +797,7 @@ const headCount = Number.isFinite(Number(officialHeadCount)) && Number(officialH
 
 const feedEfficiencyECM = Number(economics?.feedEfficiencyECM);
 const feedEfficiencyFPCM = Number(economics?.feedEfficiencyFPCM);
+const dmPerKgMilk = Number(economics?.dmPerKgMilk || 0);
 
 const feedEfficiency =
   Number.isFinite(feedEfficiencyECM) && feedEfficiencyECM > 0
@@ -804,7 +805,7 @@ const feedEfficiency =
     : (
         Number.isFinite(feedEfficiencyFPCM) && feedEfficiencyFPCM > 0
           ? +feedEfficiencyFPCM.toFixed(2)
-          : 0
+          : (dmPerKgMilk > 0 ? +(1 / dmPerKgMilk).toFixed(2) : 0)
       );
 
   return {
@@ -1082,91 +1083,6 @@ function pickFeedIdFromRowSrv(r = {}){
   ).trim();
 }
 
-
-
-const CUSTOM_FEED_TYPES = new Set([
-  'mineral_vitamin_premix',
-  'mineral_premix',
-  'vitamin_premix',
-  'rumen_support_additive',
-  'full_custom_additive'
-]);
-
-const CUSTOM_FEED_NUMERIC_FIELDS = [
-  'dmPct','cpPct','ndfPct','adfPct','starchPct','wscPct','fatPct','crudeFatPct','faPct','ashPct','ligninPct',
-  'baseDEMcalPerKgDM','nelMcalPerKgDM','mpGPerKgDM',
-  'caPct','pPct','mgPct','naPct','kPct','clPct','sPct',
-  'znMgKgDM','cuMgKgDM','mnMgKgDM','seMgKgDM','iMgKgDM','coMgKgDM','feMgKgDM',
-  'vitAIUPerKgDM','vitDIUPerKgDM','vitEIUPerKgDM','biotinMgKgDM','niacinMgKgDM','cholineMgKgDM',
-  'caAbsorptionCoeff','pAbsorptionCoeff','mgAbsorptionCoeff','naAbsorptionCoeff','kAbsorptionCoeff','clAbsorptionCoeff','sAbsorptionCoeff',
-  'znAbsorptionCoeff','cuAbsorptionCoeff','mnAbsorptionCoeff','seAbsorptionCoeff','iAbsorptionCoeff','coAbsorptionCoeff','feAbsorptionCoeff'
-];
-
-function cleanCustomFeedPayload(body = {}, tenant = '') {
-  const customType = CUSTOM_FEED_TYPES.has(String(body.customType || '').trim())
-    ? String(body.customType).trim()
-    : 'mineral_vitamin_premix';
-
-  const nameAr = String(body.nameAr || '').trim() || 'بريمكس مزرعتي';
-  const userLabel = String(body.userLabel || '').trim() || null;
-
-  const out = {
-    ownerUserId: tenant,
-    userId: tenant,
-    farmId: String(body.farmId || '').trim() || null,
-    scope: 'farm_private',
-    source: 'user_custom',
-    customType,
-    userLabel,
-    nameAr,
-    nameEn: String(body.nameEn || '').trim() || null,
-    cat: 'add',
-    category: 'Vitamin/Mineral',
-    type: 'Concentrate',
-    enabled: true,
-
-    dmPct: 100,
-    cpPct: 0,
-    ndfPct: 0,
-    adfPct: 0,
-    starchPct: 0,
-    wscPct: 0,
-    fatPct: 0,
-    crudeFatPct: 0,
-    faPct: 0,
-    ashPct: 0,
-    ligninPct: 0,
-    baseDEMcalPerKgDM: 0,
-    nelMcalPerKgDM: 0,
-    mpGPerKgDM: 0,
-
-    caAbsorptionCoeff: 0.5,
-    pAbsorptionCoeff: 0.68,
-    mgAbsorptionCoeff: 0.23,
-    naAbsorptionCoeff: 1,
-    kAbsorptionCoeff: 1,
-    clAbsorptionCoeff: 0.92,
-    sAbsorptionCoeff: 0,
-    znAbsorptionCoeff: 0.2,
-    cuAbsorptionCoeff: 0.05,
-    mnAbsorptionCoeff: 0.005,
-    seAbsorptionCoeff: 0,
-    iAbsorptionCoeff: 0,
-    coAbsorptionCoeff: 0,
-    feAbsorptionCoeff: 0.1
-  };
-
-  for (const k of CUSTOM_FEED_NUMERIC_FIELDS) {
-    if (body[k] === '' || body[k] === null || body[k] === undefined) continue;
-    const n = Number(body[k]);
-    if (Number.isFinite(n) && n >= 0) out[k] = n;
-  }
-
-  out.dmPct = 100;
-
-  return cleanObj(out);
-}
-
 async function enrichNutritionRowsFromFeedItems(tenant, rawRows = []) {
   if (!db || !Array.isArray(rawRows) || !rawRows.length) return rawRows;
 
@@ -1192,34 +1108,6 @@ async function enrichNutritionRowsFromFeedItems(tenant, rawRows = []) {
         d.nameAr,
         d.name,
         d.sourceFeedName,
-        doc.id
-      ].forEach(x => {
-        const k = feedKeySrv(x);
-        if (k && !byName.has(k)) byName.set(k, feed);
-      });
-    });
-
-
-
-    const customSnap = await db.collection('custom_feed_items')
-      .where('ownerUserId', '==', tenant)
-      .where('enabled', '==', true)
-      .get();
-
-    customSnap.forEach(doc => {
-      const d = doc.data() || {};
-      const feed = {
-        id: doc.id,
-        feedId: doc.id,
-        ...d
-      };
-
-      byId.set(doc.id, feed);
-
-      [
-        d.nameAr,
-        d.name,
-        d.userLabel,
         doc.id
       ].forEach(x => {
         const k = feedKeySrv(x);
@@ -3499,64 +3387,6 @@ return res.json({
     });
   }
 });
-
-
-// ============================================================
-//             API: NUTRITION CUSTOM FEEDS / PREMIX
-// ============================================================
-app.get('/api/nutrition/custom-feeds', requireUserId, async (req, res) => {
-  try {
-    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
-
-    const snap = await db.collection('custom_feed_items')
-      .where('ownerUserId', '==', req.userId)
-      .where('enabled', '==', true)
-      .get();
-
-    const feeds = [];
-    snap.forEach(doc => {
-      feeds.push(cleanObj({ id: doc.id, feedId: doc.id, ...(doc.data() || {}) }));
-    });
-
-    feeds.sort((a, b) => String(a.nameAr || '').localeCompare(String(b.nameAr || ''), 'ar'));
-
-    return res.json({ ok:true, feeds });
-  } catch (e) {
-    console.error('nutrition.custom-feeds error:', e.message || e);
-    return res.status(500).json({ ok:false, error:'custom_feeds_failed', message:e.message || String(e) });
-  }
-});
-
-app.post('/api/nutrition/custom-feed', requireUserId, async (req, res) => {
-  try {
-    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
-
-    const payload = cleanCustomFeedPayload(req.body || {}, req.userId);
-
-    const numericKeys = [
-      'caPct','pPct','mgPct','naPct','kPct','clPct','sPct',
-      'znMgKgDM','cuMgKgDM','mnMgKgDM','seMgKgDM','iMgKgDM','coMgKgDM','feMgKgDM',
-      'vitAIUPerKgDM','vitDIUPerKgDM','vitEIUPerKgDM','biotinMgKgDM','niacinMgKgDM','cholineMgKgDM'
-    ];
-    const hasAnyValue = numericKeys.some(k => Number(payload[k] || 0) > 0);
-    if (!hasAnyValue) {
-      return res.status(400).json({ ok:false, error:'custom_feed_empty', message:'أدخل قيمة واحدة على الأقل من تحليل البريمكس.' });
-    }
-
-    const ref = await db.collection('custom_feed_items').add({
-      ...payload,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    const saved = { id: ref.id, feedId: ref.id, ...payload };
-    return res.json({ ok:true, id: ref.id, feed: saved });
-  } catch (e) {
-    console.error('nutrition.custom-feed save error:', e.message || e);
-    return res.status(500).json({ ok:false, error:'custom_feed_save_failed', message:e.message || String(e) });
-  }
-});
-
 // ============================================================
 //                  API: NUTRITION SAVE (CENTRAL)
 // ============================================================
@@ -6493,21 +6323,12 @@ const nutritionEvents = evNutAll
       if (latestByBand.has('fresh')) {
         feedBands.fresh = buildFeedBandFromEvent(latestByBand.get('fresh'), officialFeedBandCounts?.fresh);
       }
-
-      const feedSegmentCards = [
-        feedBands.high,
-        feedBands.medium,
-        feedBands.low,
-        feedBands.fresh
-      ].filter(x => x && Number(x.headCount || 0) > 0);
-
-      if (feedSegmentCards.length) {
-        feedBands.overall = weightedFeedBands(feedSegmentCards);
-      } else if (latestByBand.has('overall')) {
-        feedBands.overall = buildFeedBandFromEvent(latestByBand.get('overall'));
-      } else {
-        feedBands.overall = emptyFeedBand();
-      }
+feedBands.overall = weightedFeedBands([
+  feedBands.high,
+  feedBands.medium,
+  feedBands.low,
+  feedBands.fresh
+]);
     } catch (e) {
       console.error("FEED BANDS ERROR:", e.message || e);
     }
