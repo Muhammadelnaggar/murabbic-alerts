@@ -1104,29 +1104,63 @@ const CUSTOM_FEED_NUMERIC_FIELDS = [
 ];
 
 function cleanCustomFeedPayload(body = {}, tenant = '') {
-  const customType = CUSTOM_FEED_TYPES.has(String(body.customType || '').trim())
-    ? String(body.customType).trim()
+  // يدعم وصول البيانات مباشرة أو مغلفة من الواجهة
+  // الملكية لا تؤخذ من body أبدًا، فقط من req.userId القادم من X-User-Id
+  const src =
+    (body && typeof body.feed === 'object' && body.feed) ||
+    (body && typeof body.customFeed === 'object' && body.customFeed) ||
+    (body && typeof body.payload === 'object' && body.payload) ||
+    body ||
+    {};
+
+  const customTypeRaw = String(src.customType || src.typeKey || '').trim();
+
+  const customType = CUSTOM_FEED_TYPES.has(customTypeRaw)
+    ? customTypeRaw
     : 'mineral_vitamin_premix';
 
-  const nameAr = String(body.nameAr || '').trim() || 'بريمكس مزرعتي';
-  const userLabel = String(body.userLabel || '').trim() || null;
+  const typeLabelMap = {
+    mineral_vitamin_premix: 'بريمكس معادن وفيتامينات',
+    mineral_premix: 'بريمكس معادن',
+    vitamin_premix: 'بريمكس فيتامينات',
+    rumen_support_additive: 'إضافة داعمة للكرش',
+    full_custom_additive: 'إضافة مخصصة'
+  };
+
+  const defaultName = `${typeLabelMap[customType] || 'بريمكس'} — مزرعتي`;
+
+  const nameAr = String(src.nameAr || src.displayName || src.name || '').trim() || defaultName;
+  const userLabel = String(src.userLabel || '').trim() || null;
 
   const out = {
+    // ✅ ملكية خاصة بالمستخدم الحالي فقط
     ownerUserId: tenant,
     userId: tenant,
-    farmId: String(body.farmId || '').trim() || null,
+
+    // farmId اختياري للتوسع، لكنه لا يحدد الملكية
+    farmId: String(src.farmId || '').trim() || null,
+
     scope: 'farm_private',
     source: 'user_custom',
     customType,
     userLabel,
+
+    id: null,
+    feedId: null,
+
     nameAr,
-    nameEn: String(body.nameEn || '').trim() || null,
+    name: nameAr,
+    nameEn: String(src.nameEn || '').trim() || null,
+
     cat: 'add',
     category: 'Vitamin/Mineral',
     type: 'Concentrate',
     enabled: true,
 
+    // البريمكس/الإضافة المخصصة مادة جافة عمليًا
     dmPct: 100,
+
+    // لا يلوّث الطاقة أو البروتين أو الألياف
     cpPct: 0,
     ndfPct: 0,
     adfPct: 0,
@@ -1141,6 +1175,7 @@ function cleanCustomFeedPayload(body = {}, tenant = '') {
     nelMcalPerKgDM: 0,
     mpGPerKgDM: 0,
 
+    // معاملات امتصاص افتراضية مثل لغة مكتبة مُرَبِّيك
     caAbsorptionCoeff: 0.5,
     pAbsorptionCoeff: 0.68,
     mgAbsorptionCoeff: 0.23,
@@ -1148,6 +1183,7 @@ function cleanCustomFeedPayload(body = {}, tenant = '') {
     kAbsorptionCoeff: 1,
     clAbsorptionCoeff: 0.92,
     sAbsorptionCoeff: 0,
+
     znAbsorptionCoeff: 0.2,
     cuAbsorptionCoeff: 0.05,
     mnAbsorptionCoeff: 0.005,
@@ -1158,16 +1194,19 @@ function cleanCustomFeedPayload(body = {}, tenant = '') {
   };
 
   for (const k of CUSTOM_FEED_NUMERIC_FIELDS) {
-    if (body[k] === '' || body[k] === null || body[k] === undefined) continue;
-    const n = Number(body[k]);
-    if (Number.isFinite(n) && n >= 0) out[k] = n;
+    if (src[k] === '' || src[k] === null || src[k] === undefined) continue;
+
+    const n = Number(src[k]);
+    if (Number.isFinite(n) && n >= 0) {
+      out[k] = n;
+    }
   }
 
+  // تثبيت نهائي
   out.dmPct = 100;
 
   return cleanObj(out);
 }
-
 async function enrichNutritionRowsFromFeedItems(tenant, rawRows = []) {
   if (!db || !Array.isArray(rawRows) || !rawRows.length) return rawRows;
 
@@ -3530,34 +3569,96 @@ app.get('/api/nutrition/custom-feeds', requireUserId, async (req, res) => {
 
 app.post('/api/nutrition/custom-feed', requireUserId, async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: 'firestore_disabled'
+      });
+    }
 
-    const payload = cleanCustomFeedPayload(req.body || {}, req.userId);
+    // الملكية من req.userId فقط، وreq.userId جاي من requireUserId
+    const tenant = req.userId;
+    const rawBody = req.body || {};
+
+    const payload = cleanCustomFeedPayload(rawBody, tenant);
 
     const numericKeys = [
       'caPct','pPct','mgPct','naPct','kPct','clPct','sPct',
       'znMgKgDM','cuMgKgDM','mnMgKgDM','seMgKgDM','iMgKgDM','coMgKgDM','feMgKgDM',
-      'vitAIUPerKgDM','vitDIUPerKgDM','vitEIUPerKgDM','biotinMgKgDM','niacinMgKgDM','cholineMgKgDM'
+      'vitAIUPerKgDM','vitDIUPerKgDM','vitEIUPerKgDM',
+      'biotinMgKgDM','niacinMgKgDM','cholineMgKgDM'
     ];
+
     const hasAnyValue = numericKeys.some(k => Number(payload[k] || 0) > 0);
+
     if (!hasAnyValue) {
-      return res.status(400).json({ ok:false, error:'custom_feed_empty', message:'أدخل قيمة واحدة على الأقل من تحليل البريمكس.' });
+      console.warn('NUTRITION CUSTOM FEED rejected: empty analysis', {
+        userId: tenant,
+        bodyKeys: Object.keys(rawBody || {}),
+        nestedFeedKeys: rawBody?.feed && typeof rawBody.feed === 'object' ? Object.keys(rawBody.feed) : [],
+        nestedPayloadKeys: rawBody?.payload && typeof rawBody.payload === 'object' ? Object.keys(rawBody.payload) : [],
+        nestedCustomFeedKeys: rawBody?.customFeed && typeof rawBody.customFeed === 'object' ? Object.keys(rawBody.customFeed) : []
+      });
+
+      return res.status(400).json({
+        ok: false,
+        error: 'custom_feed_empty',
+        message: 'أدخل قيمة واحدة على الأقل من تحليل البريمكس.',
+        debug: {
+          bodyKeys: Object.keys(rawBody || {}),
+          nestedFeedKeys: rawBody?.feed && typeof rawBody.feed === 'object' ? Object.keys(rawBody.feed) : [],
+          nestedPayloadKeys: rawBody?.payload && typeof rawBody.payload === 'object' ? Object.keys(rawBody.payload) : [],
+          nestedCustomFeedKeys: rawBody?.customFeed && typeof rawBody.customFeed === 'object' ? Object.keys(rawBody.customFeed) : []
+        }
+      });
     }
+
+    console.log('NUTRITION CUSTOM FEED save request', {
+      userId: tenant,
+      nameAr: payload.nameAr,
+      customType: payload.customType
+    });
 
     const ref = await db.collection('custom_feed_items').add({
       ...payload,
+      id: null,
+      feedId: null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    const saved = { id: ref.id, feedId: ref.id, ...payload };
-    return res.json({ ok:true, id: ref.id, feed: saved });
+    await ref.set({
+      id: ref.id,
+      feedId: ref.id
+    }, { merge: true });
+
+    const saved = {
+      id: ref.id,
+      feedId: ref.id,
+      ...payload
+    };
+
+    console.log('NUTRITION CUSTOM FEED saved', {
+      userId: tenant,
+      id: ref.id,
+      nameAr: saved.nameAr
+    });
+
+    return res.json({
+      ok: true,
+      id: ref.id,
+      feed: saved
+    });
+
   } catch (e) {
-    console.error('nutrition.custom-feed save error:', e.message || e);
-    return res.status(500).json({ ok:false, error:'custom_feed_save_failed', message:e.message || String(e) });
+    console.error('nutrition.custom-feed save error:', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'custom_feed_save_failed',
+      message: e.message || String(e)
+    });
   }
 });
-
 // ============================================================
 //                  API: NUTRITION SAVE (CENTRAL)
 // ============================================================
