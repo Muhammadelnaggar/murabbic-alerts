@@ -149,114 +149,6 @@
   line-height:1.55;
   color:#4b5f55;
 }
-
-/* ===== Feed Dashboard Hero Cards ===== */
-.feed-hero-card{
-  min-height:132px;
-  padding:14px;
-  border-radius:24px;
-  background:
-    radial-gradient(circle at 18% 18%, rgba(245,215,110,.28), transparent 34%),
-    linear-gradient(180deg,#ffffff 0%,#fffdf4 100%);
-  border:1px solid #f1e3b6;
-  box-shadow:
-    0 14px 32px rgba(202,138,4,.10),
-    0 4px 10px rgba(15,23,42,.04);
-}
-.feed-hero-card::before{
-  height:5px;
-  background:linear-gradient(90deg,#ca8a04,#facc15,#0ea05a);
-}
-.feed-hero-top{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-}
-.feed-hero-label{
-  font-size:12px;
-  font-weight:900;
-  color:#5f4510;
-  line-height:1.35;
-}
-.feed-ring{
-  --p:0deg;
-  --ring:#0ea05a;
-  width:76px;
-  height:76px;
-  border-radius:50%;
-  flex:0 0 auto;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:
-    radial-gradient(closest-side,#fff 61%,transparent 62% 100%),
-    conic-gradient(var(--ring) var(--p), #f1ead7 0deg);
-  border:1px solid #efe3bd;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.9), 0 8px 18px rgba(15,23,42,.08);
-}
-.feed-ring span{
-  font-size:17px;
-  font-weight:1000;
-  color:#0f172a;
-  letter-spacing:-.4px;
-}
-.feed-hero-value{
-  margin-top:8px;
-  font-size:20px;
-  font-weight:1000;
-  color:#0b7f47;
-  line-height:1.1;
-}
-.feed-hero-sub{
-  margin-top:6px;
-  font-size:11px;
-  font-weight:800;
-  color:#6b5b2a;
-  line-height:1.45;
-}
-.feed-mini-row{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:6px;
-  margin-top:10px;
-}
-.feed-mini-pill{
-  border-radius:14px;
-  background:rgba(255,255,255,.78);
-  border:1px solid rgba(202,138,4,.16);
-  padding:7px 8px;
-}
-.feed-mini-pill b{
-  display:block;
-  font-size:12px;
-  color:#134e2f;
-}
-.feed-mini-pill span{
-  display:block;
-  margin-top:2px;
-  font-size:9px;
-  font-weight:800;
-  color:#64748b;
-}
-.feed-ring.good{--ring:#0ea05a}
-.feed-ring.warn{--ring:#f59e0b}
-.feed-ring.bad{--ring:#dc2626}
-.feed-ring.elite{--ring:#06b6d4}
-#feedGrid > div{
-  display:flex;
-  width:100%;
-}
-#feedGrid > div > .kpi{
-  width:100%;
-  height:100%;
-}
-#feedGrid .feed-hero-card{
-  min-height:164px;
-}
-#feedGrid .kpi.feed:not(.feed-hero-card):not(.feed-advice-card){
-  min-height:112px;
-}
 .kpi.health::before{ background:linear-gradient(90deg,#dc2626,#f7a6a6); }
 .kpi:hover{
   transform:translateY(-2px);
@@ -1007,104 +899,70 @@ function cullTotalBox(count, pct){
     'cull'
   );
 }
-function feedRingStateDirect(v, warn, good, elite){
-  const n = Number(v);
-  if (!Number.isFinite(n)) return { cls:'bad', pct:0, label:'غير متاح' };
-
-  if (n >= elite) return { cls:'elite', pct:100, label:'ممتاز' };
-  if (n >= good)  return { cls:'good',  pct:78,  label:'جيد' };
-  if (n >= warn)  return { cls:'warn',  pct:52,  label:'متابعة' };
-  return { cls:'bad', pct:28, label:'ضغط' };
-}
-
 function iofcBox(totalValue, pctValue){
   const pct = Number(pctValue);
   const total = Number(totalValue);
-  const st = feedRingStateDirect(pct, 40, 50, 60);
 
   return `
-    <div class="kpi feed feed-hero-card">
-      <div class="feed-hero-top">
-        <div>
-          <div class="feed-hero-label">IOFC — هامش اللبن بعد العلف</div>
-          <div class="feed-hero-value">${Number.isFinite(pct) ? `${pct.toFixed(1)}%` : '--'}</div>
-          <div class="feed-hero-sub">${st.label} — قراءة اقتصاد التغذية</div>
-        </div>
+    <div class="kpi feed">
+      <div class="kpi-label">IOFC — هامش اللبن بعد العلف</div>
+      <div class="kpi-value">${Number.isFinite(pct) ? `${pct.toFixed(1)}%` : '--'}</div>
 
-        <div class="feed-ring ${st.cls}" style="--p:${st.pct * 3.6}deg">
-          <span>${Number.isFinite(pct) ? `${Math.round(pct)}%` : '--'}</span>
-        </div>
-      </div>
+<div class="metric-scale">
+  <div class="metric-scale-track">
+    <div class="metric-scale-segs">
+      <div class="metric-scale-seg danger"></div>
+      <div class="metric-scale-seg warn"></div>
+      <div class="metric-scale-seg ok"></div>
+      <div class="metric-scale-seg elite"></div>
+    </div>
+    <div class="metric-scale-dot" style="left:${metricScalePositionDirect(pct, 40, 70)}%"></div>
+  </div>
+  <div class="metric-scale-labels">
+    <span>&lt;40%</span>
+    <span>40–49%</span>
+    <span>50–59%</span>
+    <span>≥60%</span>
+  </div>
+</div>
 
-      <div class="feed-mini-row">
-        <div class="feed-mini-pill">
-          <b>${Number.isFinite(total) ? total.toFixed(0) : '--'}</b>
-          <span>جنيه / يوم</span>
-        </div>
-        <div class="feed-mini-pill">
-          <b>${Number.isFinite(pct) ? st.label : '--'}</b>
-          <span>حالة المؤشر</span>
-        </div>
+      <div class="kpi-sub">
+        ${Number.isFinite(total) ? `${total.toFixed(2)} جنيه / يوم` : 'إجمالي اليوم غير متاح'}
       </div>
     </div>
   `;
 }
-
-function feedRingStateFE(v){
-  const n = Number(v);
-  if (!Number.isFinite(n)) return { cls:'bad', pct:0, label:'غير متاح' };
-
-  if (n > 1.80) return { cls:'elite', pct:100, label:'مرتفع جدًا' };
-  if (n >= 1.40) return { cls:'good', pct:78, label:'جيد' };
-  if (n >= 1.30) return { cls:'warn', pct:52, label:'متابعة' };
-  return { cls:'bad', pct:28, label:'ضعيف' };
-}
-
 function feBox(value){
   const v = Number(value);
-  const st = feedRingStateFE(v);
+  const pos = Number.isFinite(v) ? metricScalePositionDirect(v, 1.0, 1.9) : 0;
 
   return `
-    <div class="kpi feed feed-hero-card">
-      <div class="feed-hero-top">
-        <div>
-          <div class="feed-hero-label">كفاءة تحويل المادة الجافة إلى لبن</div>
-          <div class="feed-hero-value">${Number.isFinite(v) ? v.toFixed(2) : '--'}</div>
-          <div class="feed-hero-sub">${st.label} — ECM / كجم مادة جافة</div>
-        </div>
+    <div class="kpi feed">
+      <div class="kpi-label">كفاءة تحويل المادة الجافة إلى لبن</div>
+      <div class="kpi-value">${Number.isFinite(v) ? v.toFixed(2) : '--'}</div>
 
-        <div class="feed-ring ${st.cls}" style="--p:${st.pct * 3.6}deg">
-          <span>${Number.isFinite(v) ? v.toFixed(2) : '--'}</span>
+      <div class="metric-scale">
+        <div class="metric-scale-track">
+          <div class="metric-scale-segs">
+            <div class="metric-scale-seg danger"></div>
+            <div class="metric-scale-seg warn"></div>
+            <div class="metric-scale-seg ok"></div>
+            <div class="metric-scale-seg elite"></div>
+          </div>
+          <div class="metric-scale-dot" style="left:${pos}%"></div>
+        </div>
+        <div class="metric-scale-labels">
+          <span>&lt;1.30</span>
+          <span>1.30–1.39</span>
+          <span>1.40–1.80</span>
+          <span>&gt;1.80</span>
         </div>
       </div>
 
-      <div class="feed-mini-row">
-        <div class="feed-mini-pill">
-          <b>${Number.isFinite(v) ? v.toFixed(2) : '--'}</b>
-          <span>ECM / كجم DM</span>
-        </div>
-        <div class="feed-mini-pill">
-          <b>${st.label}</b>
-          <span>حالة المؤشر</span>
-        </div>
-      </div>
+      <div class="kpi-sub">ECM / كجم مادة جافة</div>
     </div>
   `;
 }
-function pickFeedMetric(...vals){
-  for (const v of vals) {
-    const n = Number(v);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-
-  for (const v of vals) {
-    const n = Number(v);
-    if (Number.isFinite(n)) return n;
-  }
-
-  return 0;
-}
-
 function feedBandCard(title, band = {}) {
   const headCount = Number(band?.headCount || 0);
   const avgMilkKg = Number(band?.avgMilkKg || 0);
@@ -1273,52 +1131,37 @@ const heatDetectionRatePct =
     const feedBands = stats.feedBands || {};
     const overallFeedBand = feedBands.overall || {};
 
-    const feedEfficiency = pickFeedMetric(
-      overallFeedBand.feedEfficiency,
-      stats.feedEfficiency
-    );
-
-    const dmiAvg = pickFeedMetric(
-      overallFeedBand.dmPerKgMilk,
-      stats.dmiAvg
-    );
-
-    const iofc = pickFeedMetric(
-      overallFeedBand.iofc,
-      stats.iofc
-    );
+    const feedEfficiency = Number(stats.feedEfficiency ?? overallFeedBand.feedEfficiency ?? 0);
+    const dmiAvg        = Number(stats.dmiAvg ?? 0);
+    const iofc          = Number(stats.iofc ?? overallFeedBand.iofc ?? 0);
     const fecesScore    = Number(stats.fecesScore ?? 0);
     const bcsCamera     = Number(stats.bcsCamera ?? 0);
     const cullTotalCount = Number(stats.cullTotal ?? 0);
     const cullTotalPct   = Number(stats.cullTotalPct ?? 0);
 
-    const feedCostPerLiter = pickFeedMetric(
-      overallFeedBand.feedCostPerLiter,
-      stats.feedCostPerLiter
-    );
-
-    const feedCostPerHeadPerDay = pickFeedMetric(
-      overallFeedBand.feedCostPerHeadPerDay,
-      stats.feedCostPerHeadPerDay
-    );
-    const totalFeedCostPerDay = pickFeedMetric(
-  overallFeedBand.totalFeedCostPerDay,
-  overallFeedBand.totalFeedCost,
-  stats.totalFeedCostPerDay
+    const feedCostPerLiter = Number(stats.feedCostPerLiter ?? overallFeedBand.feedCostPerLiter ?? 0);
+    const feedCostPerHeadPerDay = Number(stats.feedCostPerHeadPerDay ?? overallFeedBand.feedCostPerHeadPerDay ?? 0);
+    const totalFeedCostPerDay = Number(
+  stats.totalFeedCostPerDay ??
+  overallFeedBand.totalFeedCostPerDay ??
+  overallFeedBand.totalFeedCost ??
+  0
 );
 
-const totalMilkFeedMarginPerDay = pickFeedMetric(
-  overallFeedBand.totalMilkFeedMarginPerDay,
-  overallFeedBand.totalIofc,
-  overallFeedBand.totalMargin,
-  stats.totalMilkFeedMarginPerDay,
-  stats.totalIofcPerDay
+const totalMilkFeedMarginPerDay = Number(
+  stats.totalMilkFeedMarginPerDay ??
+  stats.totalIofcPerDay ??
+  overallFeedBand.totalMilkFeedMarginPerDay ??
+  overallFeedBand.totalIofc ??
+  overallFeedBand.totalMargin ??
+  0
 );
 
-const iofcPctOfMilkIncome = pickFeedMetric(
-  overallFeedBand.iofcPctOfMilkIncome,
-  overallFeedBand.iofcPct,
-  stats.iofcPctOfMilkIncome
+const iofcPctOfMilkIncome = Number(
+  stats.iofcPctOfMilkIncome ??
+  overallFeedBand.iofcPctOfMilkIncome ??
+  overallFeedBand.iofcPct ??
+  0
 );
 
 const feedAdvice =
@@ -1720,7 +1563,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
-
 
 
 
