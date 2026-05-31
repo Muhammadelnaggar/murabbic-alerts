@@ -2396,6 +2396,42 @@ if (o.mpGPerKgDM != null) f.mp = Number(o.mpGPerKgDM);
     }
   }
 }
+
+
+  // ✅ بريمكسات/إضافات مزرعتي الخاصة بالمستخدم
+  try {
+    const API_BASE = window.API_BASE || '';
+    const r = await fetch(`${API_BASE}/api/nutrition/custom-feeds`, {
+      cache: 'no-store',
+      headers: { 'X-User-Id': uid }
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j?.ok && Array.isArray(j.feeds)) {
+      j.feeds.forEach(d => {
+        if (!d || d.enabled === false) return;
+        const name = String(d.nameAr || d.name || '').trim();
+        if (!name) return;
+        list.push({
+          id: d.id,
+          feedId: d.id,
+          name,
+          cat: String(d.cat || 'add').trim() || 'add',
+          dm: Number(d.dmPct ?? 100),
+          cp: Number(d.cpPct ?? 0),
+          nel: Number(d.nelMcalPerKgDM ?? 0),
+          ndf: Number(d.ndfPct ?? 0),
+          fat: Number(d.fatPct ?? 0),
+          starch: Number(d.starchPct ?? 0),
+          mp: Number(d.mpGPerKgDM ?? 0),
+          source: 'user_custom',
+          scope: d.scope || 'farm_private'
+        });
+      });
+    }
+  } catch (e) {
+    console.warn('custom feeds read failed:', e.message || e);
+  }
+
    // شيل الخامات اللي المستخدم مخفيها
 // ترتيب عربي
 const list2 = list.filter(x => !x._hiddenByUser);
@@ -2471,7 +2507,7 @@ rebuildFeedUI();
   function addRow(feed={}){
     const tr = document.createElement('tr');
     const catVal = feed?.cat || guessCat(feed?.name);
-    tr.appendChild(td('الخامة', `<input class="name" value="${feed?.name||''}" list="feedlist" placeholder="اكتب اسم الخامة" style="width:200px">`, 'name'));
+    tr.appendChild(td('الخامة', `<input class="name" value="${feed?.name||''}" data-feed-id="${feed?.feedId || feed?.id || ''}" list="feedlist" placeholder="اكتب اسم الخامة" style="width:200px">`, 'name'));
     tr.appendChild(td('الفئة', `<select class="cat">
   <option value="rough" ${catVal==='rough'?'selected':''}>خشن</option>
   <option value="conc" ${catVal==='conc'?'selected':''}>مركز</option>
@@ -2571,7 +2607,10 @@ function focusEditable(tr){
 
   // اكتب اسم الخامة
   const nameEl = tr.querySelector('.name');
-  if(nameEl) nameEl.value = (feed?.name || '') || '';
+  if(nameEl) {
+    nameEl.value = (feed?.name || '') || '';
+    nameEl.dataset.feedId = feed?.feedId || feed?.id || '';
+  }
 
   // اكتب النوع
   const catEl = tr.querySelector('.cat');
@@ -3203,7 +3242,193 @@ async function initSavedNutritionRationsDropdown(){
     }
   });
 }
+
+
+function premixNum(id){
+  const el = document.getElementById(id);
+  const raw = String(el?.value ?? '').trim();
+  if (raw === '') return 0;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+const CUSTOM_PREMIX_LABELS = {
+  mineral_vitamin_premix: 'بريمكس معادن وفيتامينات',
+  mineral_premix: 'بريمكس معادن',
+  vitamin_premix: 'بريمكس فيتامينات',
+  rumen_support_additive: 'إضافة داعمة للكرش',
+  full_custom_additive: 'إضافة مخصصة'
+};
+
+function buildCustomPremixPayload(){
+  const customType = document.getElementById('customPremixType')?.value || 'mineral_vitamin_premix';
+  const baseLabel = CUSTOM_PREMIX_LABELS[customType] || 'بريمكس مخصص';
+  const userLabel = String(document.getElementById('customPremixUserLabel')?.value || '').trim();
+
+  return {
+    customType,
+    userLabel,
+    nameAr: userLabel || `${baseLabel} — مزرعتي`,
+    cat: 'add',
+    category: 'Vitamin/Mineral',
+    type: 'Concentrate',
+    dmPct: 100,
+
+    caPct: premixNum('premix_caPct'),
+    pPct: premixNum('premix_pPct'),
+    mgPct: premixNum('premix_mgPct'),
+    naPct: premixNum('premix_naPct'),
+    kPct: premixNum('premix_kPct'),
+    clPct: premixNum('premix_clPct'),
+    sPct: premixNum('premix_sPct'),
+
+    znMgKgDM: premixNum('premix_znMgKgDM'),
+    cuMgKgDM: premixNum('premix_cuMgKgDM'),
+    mnMgKgDM: premixNum('premix_mnMgKgDM'),
+    seMgKgDM: premixNum('premix_seMgKgDM'),
+    iMgKgDM: premixNum('premix_iMgKgDM'),
+    coMgKgDM: premixNum('premix_coMgKgDM'),
+    feMgKgDM: premixNum('premix_feMgKgDM'),
+
+    vitAIUPerKgDM: premixNum('premix_vitAIUPerKgDM'),
+    vitDIUPerKgDM: premixNum('premix_vitDIUPerKgDM'),
+    vitEIUPerKgDM: premixNum('premix_vitEIUPerKgDM'),
+    biotinMgKgDM: premixNum('premix_biotinMgKgDM'),
+    niacinMgKgDM: premixNum('premix_niacinMgKgDM'),
+    cholineMgKgDM: premixNum('premix_cholineMgKgDM')
+  };
+}
+
+function closeCustomPremixModal(){
+  const modal = document.getElementById('customPremixModal');
+  if (modal) {
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function openCustomPremixModal(){
+  const modal = document.getElementById('customPremixModal');
+  if (modal) {
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => document.getElementById('customPremixType')?.focus(), 50);
+  }
+}
+
+function upsertCustomFeedInMemory(feed){
+  if (!feed?.id) return;
+  const f = {
+    id: feed.id,
+    feedId: feed.id,
+    name: String(feed.nameAr || feed.name || '').trim(),
+    cat: String(feed.cat || 'add').trim() || 'add',
+    dm: Number(feed.dmPct ?? 100),
+    cp: Number(feed.cpPct ?? 0),
+    nel: Number(feed.nelMcalPerKgDM ?? 0),
+    ndf: Number(feed.ndfPct ?? 0),
+    fat: Number(feed.fatPct ?? 0),
+    starch: Number(feed.starchPct ?? 0),
+    mp: Number(feed.mpGPerKgDM ?? 0),
+    source: 'user_custom',
+    scope: feed.scope || 'farm_private'
+  };
+  if (!f.name) return;
+  const oldIdx = FEEDS.findIndex(x => x.id === f.id);
+  if (oldIdx >= 0) FEEDS[oldIdx] = f;
+  else FEEDS.push(f);
+  FEEDS.sort((a,b)=> a.name.localeCompare(b.name, 'ar'));
+  FEEDS_BY_ID.clear();
+  FEEDS_BY_NAME.clear();
+  FEEDS.forEach(x=>{
+    FEEDS_BY_ID.set(x.id, x);
+    FEEDS_BY_NAME.set(normName(x.name), x);
+  });
+  rebuildFeedUI();
+}
+
+async function saveCustomPremix(){
+  try {
+    const payload = buildCustomPremixPayload();
+    const hasAnyValue = [
+      'caPct','pPct','mgPct','naPct','kPct','clPct','sPct',
+      'znMgKgDM','cuMgKgDM','mnMgKgDM','seMgKgDM','iMgKgDM','coMgKgDM','feMgKgDM',
+      'vitAIUPerKgDM','vitDIUPerKgDM','vitEIUPerKgDM','biotinMgKgDM','niacinMgKgDM','cholineMgKgDM'
+    ].some(k => Number(payload[k]) > 0);
+
+    if (!hasAnyValue) {
+      showCentralMsg('⚠️ أدخل قيمة واحدة على الأقل من تحليل البريمكس.', 'error');
+      return;
+    }
+
+    const uid = auth?.currentUser?.uid;
+    if (!uid) throw new Error('NO_AUTH');
+
+    const btn = document.getElementById('saveCustomPremix');
+    if (btn) btn.disabled = true;
+
+    const API_BASE = window.API_BASE || '';
+    const res = await fetch(`${API_BASE}/api/nutrition/custom-feed`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': uid
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.ok === false) {
+      throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+    }
+
+    upsertCustomFeedInMemory(data.feed);
+    closeCustomPremixModal();
+
+    const typeSel = document.getElementById('feedTypeFilter');
+    if (typeSel) typeSel.value = 'add';
+    try { filterFeeds(); } catch(_) {}
+
+    const savedId = data.feed?.id;
+    if (savedId && presetSel) presetSel.value = savedId;
+
+    showCentralMsg('✅ تم حفظ بريمكس مزرعتي وإضافته إلى قائمة الخامات.', 'success');
+  } catch (e) {
+    console.error(e);
+    showCentralMsg('⚠️ تعذر حفظ بريمكس مزرعتي: ' + (e.message || e), 'error');
+  } finally {
+    const btn = document.getElementById('saveCustomPremix');
+    if (btn) btn.disabled = false;
+  }
+}
+
+function bindCustomPremixModal(){
+  const openBtn = document.getElementById('openCustomPremix');
+  const closeBtn = document.getElementById('closeCustomPremix');
+  const saveBtn = document.getElementById('saveCustomPremix');
+  const modal = document.getElementById('customPremixModal');
+
+  if (openBtn && openBtn.dataset.bound !== '1') {
+    openBtn.dataset.bound = '1';
+    openBtn.addEventListener('click', openCustomPremixModal);
+  }
+  if (closeBtn && closeBtn.dataset.bound !== '1') {
+    closeBtn.dataset.bound = '1';
+    closeBtn.addEventListener('click', closeCustomPremixModal);
+  }
+  if (saveBtn && saveBtn.dataset.bound !== '1') {
+    saveBtn.dataset.bound = '1';
+    saveBtn.addEventListener('click', saveCustomPremix);
+  }
+  if (modal && modal.dataset.bound !== '1') {
+    modal.dataset.bound = '1';
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeCustomPremixModal();
+    });
+  }
+}
+
   // init
+  bindCustomPremixModal();
   ensureEditableForMode();
   recalc();
   // ✅ تحميل مكتبة الخامات من Firestore
@@ -3302,9 +3527,11 @@ if(!pRaw || pRaw <= 0){
 const idx = rationItems.findIndex(x=>x.name===name && x.cat===cat);
 const pTonRaw = parseFloat(tr.querySelector('.pTon')?.value)||0;
 
-const feedMeta = FEEDS_BY_NAME.get(normName(name)) || null;
+const explicitFeedId = tr.querySelector('.name')?.dataset?.feedId || '';
+const feedMeta = (explicitFeedId && FEEDS_BY_ID.get(explicitFeedId)) || FEEDS_BY_NAME.get(normName(name)) || null;
 
 const item = {
+  feedId: feedMeta?.id || explicitFeedId || null,
   name,
   cat,
   dm,
@@ -3323,6 +3550,7 @@ const item = {
 if(idx>=0) rationItems[idx]=item; else rationItems.push(item);
  // نظّف سطر الإدخال لخامة جديدة
 tr.querySelector('.name').value='';
+tr.querySelector('.name').dataset.feedId='';
 tr.querySelector('.kg').value='';
 tr.querySelector('.pct').value='';
 tr.querySelector('.dm').value='';
@@ -3489,7 +3717,10 @@ function collectRows(){
   document.querySelectorAll('#tbl tbody tr').forEach(tr=>{
     const get = sel => (tr.querySelector(sel)?.value ?? '').toString().trim();
     const name = get('.name'); if (!name) return;
+    const explicitFeedId = tr.querySelector('.name')?.dataset?.feedId || '';
+    const feedMeta = (explicitFeedId && FEEDS_BY_ID.get(explicitFeedId)) || FEEDS_BY_NAME.get(normName(name)) || null;
     rows.push({
+      feedId: feedMeta?.id || explicitFeedId || null,
       name,
       cat : (tr.querySelector('.cat')?.value)||'conc',
       dm  : parseFloat(get('.dm'))||0,
