@@ -797,16 +797,21 @@ const headCount = Number.isFinite(Number(officialHeadCount)) && Number(officialH
 
 const feedEfficiencyECM = Number(economics?.feedEfficiencyECM);
 const feedEfficiencyFPCM = Number(economics?.feedEfficiencyFPCM);
-const dmPerKgMilk = Number(economics?.dmPerKgMilk || 0);
+
+const saneDashboardFeedEfficiency = (v) => {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+
+  // حماية الداشبورد من أرقام شاذة مثل 4.17
+  if (n < 0.8 || n > 2.2) return 0;
+
+  return +n.toFixed(2);
+};
 
 const feedEfficiency =
-  Number.isFinite(feedEfficiencyECM) && feedEfficiencyECM > 0
-    ? +feedEfficiencyECM.toFixed(2)
-    : (
-        Number.isFinite(feedEfficiencyFPCM) && feedEfficiencyFPCM > 0
-          ? +feedEfficiencyFPCM.toFixed(2)
-          : (dmPerKgMilk > 0 ? +(1 / dmPerKgMilk).toFixed(2) : 0)
-      );
+  saneDashboardFeedEfficiency(feedEfficiencyECM) ||
+  saneDashboardFeedEfficiency(feedEfficiencyFPCM) ||
+  0;  
 
   return {
     headCount,
