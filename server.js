@@ -1087,13 +1087,10 @@ async function enrichNutritionRowsFromFeedItems(tenant, rawRows = []) {
   if (!db || !Array.isArray(rawRows) || !rawRows.length) return rawRows;
 
   try {
-    const snap = await db.collection('feed_items').get();
-
     const byId = new Map();
     const byName = new Map();
 
-    snap.forEach(doc => {
-      const d = doc.data() || {};
+    const addFeedToMaps = (doc, d = {}) => {
       if (d.enabled === false) return;
 
       const feed = {
@@ -1113,7 +1110,26 @@ async function enrichNutritionRowsFromFeedItems(tenant, rawRows = []) {
         const k = feedKeySrv(x);
         if (k && !byName.has(k)) byName.set(k, feed);
       });
-    });
+    };
+
+    const snap = await db.collection('feed_items').get();
+    snap.forEach(doc => addFeedToMaps(doc, doc.data() || {}));
+
+    if (tenant) {
+      try {
+        const customSnap = await db.collection('custom_feed_items')
+          .where('userId', '==', tenant)
+          .get();
+
+        customSnap.forEach(doc => addFeedToMaps(doc, {
+          ...(doc.data() || {}),
+          source: 'user_custom',
+          scope: 'farm_private'
+        }));
+      } catch (e) {
+        console.warn('nutrition custom_feed_items merge failed:', e.message || e);
+      }
+    }
 
     return rawRows.map(r => {
       const row = r || {};
@@ -3330,6 +3346,155 @@ return res.json({
     });
   }
 });
+
+const CUSTOM_FEED_TYPES = {
+  mineral_vitamin_premix: 'بريمكس معادن وفيتامينات',
+  mineral_premix: 'بريمكس معادن',
+  vitamin_premix: 'بريمكس فيتامينات',
+  rumen_support_additive: 'إضافة داعمة للكرش',
+  full_custom_additive: 'إضافة مخصصة'
+};
+
+const CUSTOM_FEED_NUMERIC_FIELDS = [
+  'dmPct','ashPct',
+  'caPct','pPct','mgPct','naPct','kPct','clPct','sPct',
+  'znMgKgDM','cuMgKgDM','mnMgKgDM','seMgKgDM','iMgKgDM','coMgKgDM','feMgKgDM',
+  'vitAIUPerKgDM','vitDIUPerKgDM','vitEIUPerKgDM'
+];
+
+function cleanCustomFeedPayload(body = {}, tenant = '') {
+  const customType = String(body.customType || '').trim();
+  if (!CUSTOM_FEED_TYPES[customType]) {
+    const err = new Error('custom_feed_type_required');
+    err.statusCode = 400;
+    err.publicMessage = 'اختر نوع الإضافة أولًا.';
+    throw err;
+  }
+
+  const nameAr = String(
+    body.nameAr ||
+    body.name ||
+    `${CUSTOM_FEED_TYPES[customType]} — مزرعتي`
+  ).trim();
+
+  if (!nameAr) {
+    const err = new Error('custom_feed_name_required');
+    err.statusCode = 400;
+    err.publicMessage = 'اسم البريمكس غير واضح.';
+    throw err;
+  }
+
+  const out = {
+    nameAr,
+    name: nameAr,
+    cat: 'add',
+    category: 'add',
+    type: 'additive',
+    customType,
+    customTypeLabel: CUSTOM_FEED_TYPES[customType],
+    alias: String(body.alias || '').trim() || null,
+    userId: tenant,
+    ownerUid: tenant,
+    farmId: String(body.farmId || '').trim() || null,
+    scope: 'farm_private',
+    source: 'user_custom',
+    sourceStatus: 'USER_CUSTOM_ANALYSIS',
+    enabled: true
+  };
+
+  let hasAnalysis = false;
+  for (const k of CUSTOM_FEED_NUMERIC_FIELDS) {
+    const n = toNumOrNull(body[k]);
+    if (n !== null) {
+      out[k] = n;
+      hasAnalysis = true;
+    }
+  }
+
+  if (!hasAnalysis) {
+    const err = new Error('custom_feed_analysis_required');
+    err.statusCode = 400;
+    err.publicMessage = 'أدخل قيمة تحليل واحدة على الأقل من المكتوب على العبوة.';
+    throw err;
+  }
+
+  return cleanObj(out);
+}
+
+app.get('/api/nutrition/custom-feeds', requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.json({ ok: true, feeds: [] });
+    }
+
+    const snap = await db.collection('custom_feed_items')
+      .where('userId', '==', req.userId)
+      .get();
+
+    const feeds = [];
+    snap.forEach(doc => {
+      const d = doc.data() || {};
+      if (d.enabled === false) return;
+      feeds.push(cleanObj({
+        id: doc.id,
+        feedId: doc.id,
+        ...d
+      }));
+    });
+
+    feeds.sort((a, b) => String(a.nameAr || a.name || '').localeCompare(String(b.nameAr || b.name || ''), 'ar'));
+
+    return res.json({ ok: true, feeds });
+  } catch (e) {
+    console.error('nutrition.custom-feeds error:', e.message || e);
+    return res.status(500).json({
+      ok: false,
+      error: 'custom_feeds_failed',
+      message: e.message || String(e)
+    });
+  }
+});
+
+app.post('/api/nutrition/custom-feed', requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: 'firestore_unavailable',
+        message: 'قاعدة البيانات غير متاحة الآن.'
+      });
+    }
+
+    const payload = cleanCustomFeedPayload(req.body || {}, req.userId);
+    const id = `custom__${req.userId}__${Date.now()}`;
+    const now = admin.firestore.Timestamp.now();
+
+    const feed = cleanObj({
+      id,
+      feedId: id,
+      ...payload,
+      createdAt: now,
+      updatedAt: now
+    });
+
+    await db.collection('custom_feed_items').doc(id).set(feed, { merge: true });
+
+    return res.json({
+      ok: true,
+      saved: true,
+      feed
+    });
+  } catch (e) {
+    console.error('nutrition.custom-feed error:', e.message || e);
+    const status = e.statusCode || 500;
+    return res.status(status).json({
+      ok: false,
+      error: e.message || 'custom_feed_save_failed',
+      message: e.publicMessage || e.message || String(e)
+    });
+  }
+});
+
 app.post('/api/nutrition/analyze-ration', requireUserId, async (req, res) => {
   try {
     const body = req.body || {};
