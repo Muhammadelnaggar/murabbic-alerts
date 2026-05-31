@@ -3632,11 +3632,11 @@ app.post('/api/nutrition/custom-feed', requireUserId, async (req, res) => {
       feedId: ref.id
     }, { merge: true });
 
-    const saved = {
-      id: ref.id,
-      feedId: ref.id,
-      ...payload
-    };
+const saved = {
+  ...payload,
+  id: ref.id,
+  feedId: ref.id
+};
 
     console.log('NUTRITION CUSTOM FEED saved', {
       userId: tenant,
