@@ -500,6 +500,56 @@ padding: 6px 0;
 #nutritionKPIs .kpi.rumen-feature .kpi-meter{
   margin-top:10px;
 }    
+
+
+/* ===== Murabbik Custom Premix Modal ===== */
+.mbk-premix-btn{
+  width:100%;
+  min-height:44px;
+  border-radius:12px;
+  border:1px solid rgba(14,160,90,.35);
+  background:#f3fbf5;
+  color:#0b7f47;
+  font-weight:900;
+}
+.mbk-modal-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background:rgba(15,23,42,.42);
+  display:none;
+  align-items:flex-end;
+  justify-content:center;
+  padding:12px;
+}
+.mbk-modal-backdrop.show{display:flex}
+.mbk-modal{
+  width:min(760px,100%);
+  max-height:88vh;
+  overflow:auto;
+  background:#fff;
+  border-radius:20px;
+  border:1px solid #e5e7eb;
+  box-shadow:0 20px 60px rgba(15,23,42,.24);
+  padding:14px;
+}
+.mbk-modal-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-bottom:10px;
+}
+.mbk-modal-title{font-weight:900;color:#0b7f47;font-size:17px}
+.mbk-modal-close{background:#fff;border:1px solid #e5e7eb;color:#334155;min-height:38px;padding:6px 10px}
+.mbk-premix-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.mbk-premix-grid .full{grid-column:1/-1}
+.mbk-field label{display:block;font-size:12px;font-weight:900;color:#334155;margin:0 0 4px}
+.mbk-field input,.mbk-field select{width:100%;background:#f9fdfb;font-weight:800}
+.mbk-premix-note{font-size:12px;font-weight:800;line-height:1.6;color:#475569;background:#f8fafc;border:1px solid #eef2f7;border-radius:14px;padding:9px;margin:8px 0}
+.mbk-premix-section{font-weight:900;color:#0b7f47;margin:12px 0 6px;border-top:1px dashed #d7e7dd;padding-top:10px}
+@media (max-width:640px){.mbk-premix-grid{grid-template-columns:1fr}.mbk-modal{border-radius:18px}}
+
 </style>
 </head>
 <body>
@@ -601,6 +651,12 @@ padding: 6px 0;
   <div class="controls-box">
     <div class="row stack controls">
 
+
+      <!-- بريمكس مزرعتي — قبل طريقة الإدخال -->
+      <div class="grow" style="flex:1 1 100%">
+        <button id="openCustomPremix" class="mbk-premix-btn" type="button">➕ إضافة بريمكس مزرعتي</button>
+      </div>
+
       <!-- 1) طريقة الإدخال -->
       <div class="grow">
         <select id="mode" style="width:100%">
@@ -694,6 +750,75 @@ padding: 6px 0;
       <span class="pill">الإجمالي — تكلفة/رأس: <b id="totalCostAll">—</b></span>
     </div>
   </div>
+
+
+
+<!-- ===== نموذج بريمكس مزرعتي ===== -->
+<div id="customPremixModal" class="mbk-modal-backdrop" aria-hidden="true">
+  <div class="mbk-modal" role="dialog" aria-modal="true" aria-labelledby="customPremixTitle">
+    <div class="mbk-modal-head">
+      <div id="customPremixTitle" class="mbk-modal-title">إضافة بريمكس مزرعتي</div>
+      <button id="closeCustomPremix" class="mbk-modal-close" type="button">إغلاق</button>
+    </div>
+
+    <div class="mbk-premix-note">
+      أدخل التحليل بنفس لغة مكتبة مُرَبِّيك. البريمكس يُعامل كمادة جافة عمليًا، والقيم غير الموجودة على العبوة اتركها فارغة.
+    </div>
+
+    <div class="mbk-premix-grid">
+      <div class="mbk-field full">
+        <label>نوع الإضافة</label>
+        <select id="customPremixType">
+          <option value="mineral_vitamin_premix">بريمكس معادن وفيتامينات</option>
+          <option value="mineral_premix">بريمكس معادن</option>
+          <option value="vitamin_premix">بريمكس فيتامينات</option>
+          <option value="rumen_support_additive">إضافة داعمة للكرش بتحليل واضح</option>
+          <option value="full_custom_additive">إضافة مخصصة بتحليل كامل</option>
+        </select>
+      </div>
+      <div class="mbk-field full">
+        <label>اسم داخلي اختياري</label>
+        <input id="customPremixUserLabel" type="text" placeholder="مثال: بريمكس حلاب 1 — اختياري">
+      </div>
+    </div>
+
+    <div class="mbk-premix-section">المعادن الكبرى — % من المادة الجافة</div>
+    <div class="mbk-premix-grid">
+      <div class="mbk-field"><label>كالسيوم %</label><input id="premix_caPct" type="number" inputmode="decimal" step="0.001" min="0"></div>
+      <div class="mbk-field"><label>فوسفور %</label><input id="premix_pPct" type="number" inputmode="decimal" step="0.001" min="0"></div>
+      <div class="mbk-field"><label>ماغنسيوم %</label><input id="premix_mgPct" type="number" inputmode="decimal" step="0.001" min="0"></div>
+      <div class="mbk-field"><label>صوديوم %</label><input id="premix_naPct" type="number" inputmode="decimal" step="0.001" min="0"></div>
+      <div class="mbk-field"><label>بوتاسيوم %</label><input id="premix_kPct" type="number" inputmode="decimal" step="0.001" min="0"></div>
+      <div class="mbk-field"><label>كلور %</label><input id="premix_clPct" type="number" inputmode="decimal" step="0.001" min="0"></div>
+      <div class="mbk-field"><label>كبريت %</label><input id="premix_sPct" type="number" inputmode="decimal" step="0.001" min="0"></div>
+    </div>
+
+    <div class="mbk-premix-section">العناصر النادرة — mg/kg DM</div>
+    <div class="mbk-premix-grid">
+      <div class="mbk-field"><label>زنك mg/kg</label><input id="premix_znMgKgDM" type="number" inputmode="decimal" step="0.01" min="0"></div>
+      <div class="mbk-field"><label>نحاس mg/kg</label><input id="premix_cuMgKgDM" type="number" inputmode="decimal" step="0.01" min="0"></div>
+      <div class="mbk-field"><label>منجنيز mg/kg</label><input id="premix_mnMgKgDM" type="number" inputmode="decimal" step="0.01" min="0"></div>
+      <div class="mbk-field"><label>سيلينيوم mg/kg</label><input id="premix_seMgKgDM" type="number" inputmode="decimal" step="0.001" min="0"></div>
+      <div class="mbk-field"><label>يود mg/kg</label><input id="premix_iMgKgDM" type="number" inputmode="decimal" step="0.01" min="0"></div>
+      <div class="mbk-field"><label>كوبالت mg/kg</label><input id="premix_coMgKgDM" type="number" inputmode="decimal" step="0.01" min="0"></div>
+      <div class="mbk-field"><label>حديد mg/kg</label><input id="premix_feMgKgDM" type="number" inputmode="decimal" step="0.01" min="0"></div>
+    </div>
+
+    <div class="mbk-premix-section">الفيتامينات — حسب وحدة مكتبة مُرَبِّيك</div>
+    <div class="mbk-premix-grid">
+      <div class="mbk-field"><label>فيتامين A IU/kg DM</label><input id="premix_vitAIUPerKgDM" type="number" inputmode="decimal" step="1" min="0"></div>
+      <div class="mbk-field"><label>فيتامين D IU/kg DM</label><input id="premix_vitDIUPerKgDM" type="number" inputmode="decimal" step="1" min="0"></div>
+      <div class="mbk-field"><label>فيتامين E IU/kg DM</label><input id="premix_vitEIUPerKgDM" type="number" inputmode="decimal" step="1" min="0"></div>
+      <div class="mbk-field"><label>بيوتين mg/kg DM</label><input id="premix_biotinMgKgDM" type="number" inputmode="decimal" step="0.01" min="0"></div>
+      <div class="mbk-field"><label>نياسين mg/kg DM</label><input id="premix_niacinMgKgDM" type="number" inputmode="decimal" step="0.01" min="0"></div>
+      <div class="mbk-field"><label>كولين mg/kg DM</label><input id="premix_cholineMgKgDM" type="number" inputmode="decimal" step="0.01" min="0"></div>
+    </div>
+
+    <div class="mini-actions" style="justify-content:flex-end;margin-top:14px">
+      <button id="saveCustomPremix" class="btn-primary" type="button">حفظ وإضافته للقائمة</button>
+    </div>
+  </div>
+</div>
 
   <!-- مخارج حسابات (مخفية) لتغذية كروت التحليل -->
   <div style="display:none">
