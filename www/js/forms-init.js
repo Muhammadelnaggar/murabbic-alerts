@@ -1845,6 +1845,105 @@ const formData = collectFormData(form);
 formData.eventDate = String(getFieldEl(form, "eventDate")?.value || "").trim();
 formData.documentData = form.__mbkDoc || null;
 if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
+// ======================================================
+// Murabbik — Calving server-only save
+// لا validateEvent ولا mbk:valid للولادة هنا
+// السيرفر هو الذي يتحقق ويحفظ ويحدث الحيوان وينشئ العجول
+// ======================================================
+if (eventName === "ولادة") {
+  const uid = await getUid();
+
+  const apiBase = String(
+    window.API_BASE ||
+    localStorage.getItem("API_BASE") ||
+    ""
+  ).replace(/\/$/, "");
+
+  const url = apiBase ? `${apiBase}/api/calving/save` : "/api/calving/save";
+
+  const submitBtn =
+    form.querySelector('button[type="submit"]') ||
+    document.querySelector(`[form="${form.id}"][type="submit"]`) ||
+    document.getElementById("saveBtn");
+
+  try {
+    if (submitBtn) submitBtn.disabled = true;
+
+    showMsg(bar, "جارِ حفظ الولادة…", "info");
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(formData)
+    });
+
+    const data = await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+
+    if (!data.ok) {
+      clearFieldErrors(form);
+
+      if (data.fieldErrors && typeof data.fieldErrors === "object") {
+        for (const [fname, msg] of Object.entries(data.fieldErrors)) {
+          placeFieldError(form, fname, msg);
+        }
+        scrollToFirstFieldError(form);
+      }
+
+      const actions = Array.isArray(data.actions)
+        ? data.actions.map((a) => ({
+            label: a.label || "إجراء",
+            primary: !!a.primary,
+            onClick: () => {
+              if (a.url) {
+                location.href = a.url;
+                return;
+              }
+              if (a.focus) {
+                getFieldEl(form, a.focus)?.focus?.();
+              }
+            }
+          }))
+        : [];
+
+      showMsg(bar, data.message || "تعذّر حفظ الولادة.", "error", actions);
+      return;
+    }
+
+    showMsg(bar, data.message || "تم حفظ الولادة وتسجيل العجول بنجاح ✅", "success", Array.isArray(data.actions)
+      ? data.actions.map((a) => ({
+          label: a.label || "فتح",
+          primary: !!a.primary,
+          onClick: () => {
+            if (a.url) location.href = a.url;
+          }
+        }))
+      : []
+    );
+
+    form.dispatchEvent(
+      new CustomEvent("mbk:saved", {
+        bubbles: true,
+        detail: { response: data, eventName, form }
+      })
+    );
+
+    return;
+
+  } catch (err) {
+    console.error("calving server save failed:", err);
+    showMsg(bar, "تعذّر الاتصال بالسيرفر أثناء حفظ الولادة.", "error");
+    return;
+
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
 const v = validateEvent(eventName, formData);
 
 if (!v || v.ok === false) {
