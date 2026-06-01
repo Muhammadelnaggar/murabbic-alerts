@@ -3391,7 +3391,7 @@ app.get('/api/nutrition/custom-feeds', requireUserId, async (req, res) => {
   try {
     if (!db) return res.status(503).json({ ok:false, error:'firestore_unavailable' });
 
-    const snap = await db.collection('feed_items')
+    const snap = await db.collection('custom_feed_items')
       .where('userId', '==', req.userId)
       .get();
 
@@ -3472,7 +3472,7 @@ app.post('/api/nutrition/custom-feed', requireUserId, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    const ref = db.collection('feed_items').doc();
+    const ref = db.collection('custom_feed_items').doc();
     await ref.set(feed, { merge:true });
 
     return res.json({
