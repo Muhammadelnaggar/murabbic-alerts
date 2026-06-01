@@ -149,6 +149,89 @@
   line-height:1.55;
   color:#4b5f55;
 }
+    /* ===== Nutrition Professional Gauges ===== */
+.feed-gauge-card{
+  min-height:190px;
+  align-items:center;
+  text-align:center;
+  cursor:pointer;
+  justify-content:center;
+}
+
+.feed-gauge-card .feed-gauge-title{
+  min-height:34px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  font-size:12px;
+  font-weight:900;
+  color:#1f5136;
+  line-height:1.35;
+}
+
+.feed-gauge{
+  --p:0deg;
+  --gauge-color:#0ea05a;
+  width:118px;
+  height:118px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:4px auto 4px;
+  background:
+    radial-gradient(closest-side,#ffffff 64%,transparent 65% 100%),
+    conic-gradient(var(--gauge-color) var(--p),#e8eee9 0deg);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.95),
+    0 10px 22px rgba(15,23,42,.08);
+  border:1px solid #e3ece6;
+}
+
+.feed-gauge-value{
+  font-size:24px;
+  font-weight:900;
+  color:#0b7f47;
+  line-height:1;
+}
+
+.feed-gauge-sub{
+  font-size:10px;
+  font-weight:800;
+  color:#64748b;
+  line-height:1.45;
+  min-height:30px;
+}
+
+.feed-info-card{
+  min-height:126px;
+  cursor:pointer;
+}
+
+.feed-info-card .kpi-value{
+  font-size:24px;
+}
+
+.feed-info-card .kpi-sub{
+  font-size:11px;
+  line-height:1.5;
+}
+
+@media (max-width:420px){
+  .feed-gauge{
+    width:106px;
+    height:106px;
+  }
+
+  .feed-gauge-value{
+    font-size:21px;
+  }
+
+  .feed-gauge-card{
+    min-height:176px;
+  }
+}
 .kpi.health::before{ background:linear-gradient(90deg,#dc2626,#f7a6a6); }
 .kpi:hover{
   transform:translateY(-2px);
@@ -963,6 +1046,68 @@ function feBox(value){
     </div>
   `;
 }
+ function feedGaugeColor(type, value){
+  const v = Number(value);
+  if (!Number.isFinite(v)) return '#94a3b8';
+
+  if (type === 'iofc') {
+    if (v >= 60) return '#0ea05a';
+    if (v >= 50) return '#84cc16';
+    if (v >= 40) return '#f59e0b';
+    return '#dc2626';
+  }
+
+  if (type === 'fe') {
+    if (v > 1.8) return '#06b6d4';
+    if (v >= 1.4) return '#0ea05a';
+    if (v >= 1.3) return '#f59e0b';
+    return '#dc2626';
+  }
+
+  return '#0ea05a';
+}
+
+function feedGaugeBox({ title, value, type = 'iofc', suffix = '', sub = '', max = 100, href = '' } = {}){
+  const n = Number(value);
+  const safe = Number.isFinite(n) ? n : 0;
+  const cap = Number(max || 100);
+  const pct = cap > 0 ? Math.max(0, Math.min(100, (safe / cap) * 100)) : 0;
+  const deg = pct * 3.6;
+  const color = feedGaugeColor(type, safe);
+
+  const display = Number.isFinite(n)
+    ? (suffix === '%' ? `${n.toFixed(1)}%` : n.toFixed(2))
+    : '--';
+
+  const go = href ? `onclick="location.href='${href}'"` : '';
+
+  return `
+    <div class="kpi feed feed-gauge-card" ${go}>
+      <div class="feed-gauge-title">${title}</div>
+      <div class="feed-gauge" style="--p:${deg}deg;--gauge-color:${color}">
+        <div class="feed-gauge-value" style="color:${color}">${display}</div>
+      </div>
+      <div class="feed-gauge-sub">${sub || ''}</div>
+    </div>
+  `;
+}
+
+function feedInfoBox({ title, value, unit = '', sub = '', href = '' } = {}){
+  const n = Number(value);
+  const display = Number.isFinite(n)
+    ? n.toLocaleString('ar-EG', { maximumFractionDigits: 2 })
+    : '--';
+
+  const go = href ? `onclick="location.href='${href}'"` : '';
+
+  return `
+    <div class="kpi feed feed-info-card" ${go}>
+      <div class="kpi-label">${title}</div>
+      <div class="kpi-value">${display}</div>
+      <div class="kpi-sub">${unit}${sub ? '<br>' + sub : ''}</div>
+    </div>
+  `;
+} 
 function feedBandCard(title, band = {}) {
   const headCount = Number(band?.headCount || 0);
   const avgMilkKg = Number(band?.avgMilkKg || 0);
@@ -1289,18 +1434,39 @@ cullGrid.innerHTML =
       box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من الاستبعاد ${cullReproPct}%`, 'g_cullRepro', 'cull') +
       box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من الاستبعاد ${cullHealthPct}%`, 'g_cullHealth', 'cull');
 feedGrid.innerHTML =
-  `<div onclick="location.href='nutrition-report.html?view=feed_efficiency&type=${currentType || 'cows'}'">
-    ${feBox(feedEfficiency)}
-  </div>` +
-  `<div onclick="location.href='nutrition-report.html?view=iofc&type=${currentType || 'cows'}'">
-    ${iofcBox(totalMilkFeedMarginPerDay, iofcPctOfMilkIncome)}
-  </div>` +
-  `<div onclick="location.href='nutrition-report.html?view=cost_liter&type=${currentType || 'cows'}'">
-    ${box('تكلفة كجم اللبن من التغذية', feedCostPerLiter, 'جنيه / كجم لبن', null, 'feed')}
-  </div>` +
-  `<div onclick="location.href='nutrition-report.html?view=total_feed_cost&type=${currentType || 'cows'}'">
-    ${box('إجمالي تكاليف التغذية / يوم', totalFeedCostPerDay, 'جنيه / يوم', null, 'feed')}
-  </div>` +
+  feedGaugeBox({
+    title: 'IOFC — هامش اللبن بعد العلف',
+    value: iofcPctOfMilkIncome,
+    type: 'iofc',
+    suffix: '%',
+    max: 80,
+    sub: Number.isFinite(totalMilkFeedMarginPerDay)
+      ? `${totalMilkFeedMarginPerDay.toLocaleString('ar-EG', { maximumFractionDigits: 2 })} جنيه / يوم`
+      : 'إجمالي اليوم غير متاح',
+    href: `nutrition-report.html?view=iofc&type=${currentType || 'cows'}`
+  }) +
+  feedGaugeBox({
+    title: 'كفاءة تحويل المادة الجافة إلى لبن',
+    value: feedEfficiency,
+    type: 'fe',
+    max: 2,
+    sub: 'ECM / كجم مادة جافة — تُقرأ مع IOFC',
+    href: `nutrition-report.html?view=feed_efficiency&type=${currentType || 'cows'}`
+  }) +
+  feedInfoBox({
+    title: 'تكلفة كجم اللبن من التغذية',
+    value: feedCostPerLiter,
+    unit: 'جنيه / كجم لبن',
+    sub: 'رقم تشغيلي داعم يُقرأ مع IOFC وسعر اللبن.',
+    href: `nutrition-report.html?view=cost_liter&type=${currentType || 'cows'}`
+  }) +
+  feedInfoBox({
+    title: 'إجمالي تكاليف التغذية / يوم',
+    value: totalFeedCostPerDay,
+    unit: 'جنيه / يوم',
+   sub: 'إجمالي تكلفة التغذية اليومية للمزرعة/القطيع.',
+    href: `nutrition-report.html?view=total_feed_cost&type=${currentType || 'cows'}`
+  }) +
   (
     feedAdvice
       ? `<div class="kpi feed feed-advice-card" onclick="location.href='nutrition-report.html?type=${currentType || 'cows'}'">
