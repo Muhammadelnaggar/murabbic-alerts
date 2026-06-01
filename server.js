@@ -3336,7 +3336,9 @@ async function syncAnimalGroupFieldsSrv(tenant, groups = []) {
       : [];
 
     for (const n of nums) {
-      desired.set(String(n), {
+      const animalNumberKey = String(n);
+
+      const incomingPatch = {
         group: groupName || null,
         groupId: groupId || null,
         groupKey: groupKey || null,
@@ -3345,7 +3347,29 @@ async function syncAnimalGroupFieldsSrv(tenant, groups = []) {
         groupAvgMilkKg: avgMilkKg,
         groupAvgDim: avgDim,
         groupUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      };
+
+      const currentPatch = desired.get(animalNumberKey);
+
+      const incomingIsAll =
+        groupKey === "all" ||
+        groupId === "cow_all" ||
+        groupId === "buffalo_all";
+
+      const currentIsOperational =
+        currentPatch &&
+        currentPatch.groupKey &&
+        currentPatch.groupKey !== "all" &&
+        currentPatch.groupId !== "cow_all" &&
+        currentPatch.groupId !== "buffalo_all";
+
+      // لا تجعل جروب "كل الأبقار/كل الجاموس" يغطي الجروب التشغيلي
+      // مثل حديث الولادة / عالي / متوسط / منخفض / جاف / انتظار ولادة
+      if (incomingIsAll && currentIsOperational) {
+        continue;
+      }
+
+      desired.set(animalNumberKey, incomingPatch);
     }
   }
 
