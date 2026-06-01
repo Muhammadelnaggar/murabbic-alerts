@@ -3387,6 +3387,125 @@ return res.json({
     });
   }
 });
+app.get('/api/nutrition/custom-feeds', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_unavailable' });
+
+    const snap = await db.collection('feed_items')
+      .where('userId', '==', req.userId)
+      .get();
+
+    const feeds = [];
+    snap.forEach(doc => {
+      const d = doc.data() || {};
+      if (d.enabled === false) return;
+      if (d.source !== 'user_custom' && d.scope !== 'farm_private') return;
+
+      feeds.push({
+        id: doc.id,
+        ...d
+      });
+    });
+
+    return res.json({ ok:true, feeds });
+  } catch (e) {
+    console.error('custom feeds list failed:', e.message || e);
+    return res.status(500).json({ ok:false, error:'custom_feeds_list_failed' });
+  }
+});
+
+app.post('/api/nutrition/custom-feed', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_unavailable' });
+
+    const body = req.body || {};
+    const pricePerTon = toNumOrNull(body.pricePerTon ?? body.pTon ?? body.price);
+
+    if (!Number.isFinite(Number(pricePerTon)) || Number(pricePerTon) <= 0) {
+      return res.status(400).json({
+        ok:false,
+        error:'feed_price_required',
+        message:'سعر الطن إجباري لأي بريمكس أو خامة مخصصة.'
+      });
+    }
+
+    const customType = String(body.customType || 'mineral_vitamin_premix').trim();
+    const userLabel = String(body.userLabel || '').trim();
+
+    const nameAr = String(
+      body.nameAr ||
+      userLabel ||
+      'بريمكس مزرعتي'
+    ).trim();
+
+    const feed = cleanObj({
+      userId: req.userId,
+      ownerUid: req.userId,
+      scope: 'farm_private',
+      source: 'user_custom',
+      sourceStatus: 'USER_ENTERED',
+      enabled: true,
+
+      customType,
+      userLabel,
+      nameAr,
+
+      cat: 'add',
+      category: body.category || 'Vitamin/Mineral',
+      type: body.type || 'Concentrate',
+      dmPct: 100,
+      cpPct: toNumOrNull(body.cpPct) || 0,
+
+      pricePerTon: Number(pricePerTon),
+      pTon: Number(pricePerTon),
+      price: Number(pricePerTon),
+
+      caPct: toNumOrNull(body.caPct),
+      pPct: toNumOrNull(body.pPct),
+      mgPct: toNumOrNull(body.mgPct),
+      naPct: toNumOrNull(body.naPct),
+      kPct: toNumOrNull(body.kPct),
+      clPct: toNumOrNull(body.clPct),
+      sPct: toNumOrNull(body.sPct),
+
+      znMgKgDM: toNumOrNull(body.znMgKgDM),
+      cuMgKgDM: toNumOrNull(body.cuMgKgDM),
+      mnMgKgDM: toNumOrNull(body.mnMgKgDM),
+      seMgKgDM: toNumOrNull(body.seMgKgDM),
+      iMgKgDM: toNumOrNull(body.iMgKgDM),
+      coMgKgDM: toNumOrNull(body.coMgKgDM),
+      feMgKgDM: toNumOrNull(body.feMgKgDM),
+
+      vitAIUPerKgDM: toNumOrNull(body.vitAIUPerKgDM),
+      vitDIUPerKgDM: toNumOrNull(body.vitDIUPerKgDM),
+      vitEIUPerKgDM: toNumOrNull(body.vitEIUPerKgDM),
+      biotinMgKgDM: toNumOrNull(body.biotinMgKgDM),
+      niacinMgKgDM: toNumOrNull(body.niacinMgKgDM),
+      cholineMgKgDM: toNumOrNull(body.cholineMgKgDM),
+
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    const ref = db.collection('feed_items').doc();
+    await ref.set(feed, { merge:true });
+
+    return res.json({
+      ok:true,
+      feed: {
+        id: ref.id,
+        ...feed
+      }
+    });
+  } catch (e) {
+    console.error('custom feed save failed:', e.message || e);
+    return res.status(500).json({
+      ok:false,
+      error:'custom_feed_save_failed',
+      message:'تعذر حفظ البريمكس المخصص.'
+    });
+  }
+});
 // ============================================================
 //                  API: NUTRITION SAVE (CENTRAL)
 // ============================================================
