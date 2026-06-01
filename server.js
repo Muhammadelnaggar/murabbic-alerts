@@ -6416,7 +6416,11 @@ app.post("/api/calving/save", requireUserId, async (req, res) => {
         await db.collection("calves").add(calf);
       }
     }
-
+        // ✅ بعد الولادة: أعد بناء الجروبات تلقائيًا
+    // الولادة تنقل الحيوان من الجاف/انتظار الولادة إلى حديث الولادة Fresh
+    if (typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "calving_save");
+    }
     return res.json({
       ok: true,
       message: "تم حفظ الولادة وتسجيل العجول بنجاح ✅",
