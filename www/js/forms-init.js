@@ -1168,62 +1168,94 @@ showMsg(bar, "✅ تم التحقق — أكمل تسجيل الشياع.", "suc
     }
 
 if (eventName === "ولادة") {
-      if (typeof guards?.calvingDecision !== "function") {
-        showMsg(bar, "❌ تعذّر تحميل قواعد التحقق (calvingDecision). حدّث الصفحة أو راجع form-rules.js", "error");
-        lockForm(true);
-        return false;
-      }
+  const uid = await getUid();
 
-      const uid = await getUid();
-      const sig = await fetchCalvingSignalsFromEvents(uid, n);
+  const doc = form.__mbkDoc || {};
+  const docSpecies = String(
+    doc.species ||
+    doc.animalTypeAr ||
+    doc.animalType ||
+    doc.animaltype ||
+    doc.type ||
+    ""
+  ).trim();
 
-      const doc = form.__mbkDoc || {};
-      const docSpecies = String(doc.species || doc.animalTypeAr || "").trim();
+  const sp = String(getFieldEl(form, "species")?.value || "").trim() || docSpecies;
 
-      let sp = String(getFieldEl(form, "species")?.value || "").trim() || docSpecies;
-      if (/cow|بقر/i.test(sp)) sp = "أبقار";
-      if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+  const apiBase = String(
+    window.API_BASE ||
+    localStorage.getItem("API_BASE") ||
+    ""
+  ).replace(/\/$/, "");
 
-      const reproFromEvents = String(sig.reproStatusFromEvents || "").trim();
-      const reproFromDoc = String(doc.reproductiveStatus || "").trim();
-      const repro = reproFromEvents || reproFromDoc || "";
+  const url = apiBase ? `${apiBase}/api/calving/gate` : "/api/calving/gate";
 
-      const lastAI = String(doc.lastInseminationDate || "").trim();
+  let data = null;
 
-      const gateData = {
+  try {
+    showMsg(bar, "جارِ التحقق من أهلية الولادة…", "info");
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify({
         animalNumber: n,
         eventDate: d,
-        animalId: form.__mbkAnimalId || "",
-        species: sp,
-        documentData: doc,
-        reproductiveStatus: repro,
-        reproStatusFromEvents: reproFromEvents,
-        lastInseminationDate: lastAI,
-        lastBoundary: String(sig.lastBoundary || "").trim(),
-        lastBoundaryType: String(sig.lastBoundaryType || "").trim()
-      };
+        species: sp
+      })
+    });
 
-      const g = guards.calvingDecision(gateData);
+    data = await r.json().catch(() => null);
 
-      if (g) {
-        const errs = [String(g)];
-        const cleaned = errs.map((e) => String(e || "").replace(/^OFFER_ABORT\|/, ""));
-        const hasAbortHint = errs.some((e) => String(e || "").startsWith("OFFER_ABORT|"));
+  } catch (err) {
+    console.error("calving gate server failed:", err);
+    showMsg(bar, "❌ تعذّر التحقق من أهلية الولادة الآن.", "error");
+    lockForm(true);
+    return false;
+  }
 
-        if (hasAbortHint) {
-          const url = `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
-          showMsg(bar, cleaned, "error", [
-            { label: "نعم — تسجيل إجهاض", primary: true, onClick: () => (location.href = url) },
-            { label: "لا — تعديل التاريخ", onClick: () => getFieldEl(form, "eventDate")?.focus?.() }
-          ]);
-        } else {
-          showMsg(bar, cleaned, "error");
-        }
+  if (!data || data.ok !== true || data.allowed !== true) {
+    const msg = data?.message || "❌ تعذّر التحقق من أهلية الولادة الآن.";
 
-        lockForm(true);
-        return false;
-      }
-    }
+    const actions = Array.isArray(data?.actions)
+      ? data.actions.map((a) => ({
+          label: a.label || "إجراء",
+          primary: !!a.primary,
+          onClick: () => {
+            if (a.url) {
+              location.href = a.url;
+              return;
+            }
+            if (a.focus) {
+              getFieldEl(form, a.focus)?.focus?.();
+            }
+          }
+        }))
+      : [];
+
+    showMsg(bar, msg, "error", actions);
+    lockForm(true);
+    return false;
+  }
+
+  const animalIdEl = getFieldEl(form, "animalId");
+  if (animalIdEl && data.animalId) animalIdEl.value = data.animalId;
+
+  const speciesEl = getFieldEl(form, "species");
+  if (speciesEl && data.species) speciesEl.value = data.species;
+
+  const lastAIEl = getFieldEl(form, "lastInseminationDate");
+  if (lastAIEl && data.lastInseminationDate && !lastAIEl.value) {
+    lastAIEl.value = data.lastInseminationDate;
+  }
+
+  showMsg(bar, data.message || "✅ تم التحقق — أكمل تسجيل الولادة.", "success");
+  lockForm(false);
+  return true;
+}
        // ✅ Gate خاص لحدث "إجهاض" (لا يفتح النموذج إلا إذا كانت عِشار فعلاً)
     if (eventName === "إجهاض") {
       if (typeof guards?.abortionDecision !== "function") {
