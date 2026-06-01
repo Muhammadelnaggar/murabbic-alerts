@@ -149,59 +149,125 @@
   line-height:1.55;
   color:#4b5f55;
 }
-    /* ===== Nutrition Professional Gauges ===== */
-.feed-gauge-card{
-  min-height:190px;
-  align-items:center;
-  text-align:center;
+/* ===== Nutrition Smart Decision Gauges ===== */
+.feed-smart-card{
+  min-height:196px;
   cursor:pointer;
-  justify-content:center;
+  justify-content:flex-start;
+  gap:8px;
 }
 
-.feed-gauge-card .feed-gauge-title{
-  min-height:34px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+.feed-smart-head{
   width:100%;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:8px;
+}
+
+.feed-smart-title{
   font-size:12px;
   font-weight:900;
   color:#1f5136;
   line-height:1.35;
+  text-align:right;
 }
 
-.feed-gauge{
-  --p:0deg;
-  --gauge-color:#0ea05a;
-  width:118px;
-  height:118px;
-  border-radius:50%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  margin:4px auto 4px;
-  background:
-    radial-gradient(closest-side,#ffffff 64%,transparent 65% 100%),
-    conic-gradient(var(--gauge-color) var(--p),#e8eee9 0deg);
-  box-shadow:
-    inset 0 0 0 1px rgba(255,255,255,.95),
-    0 10px 22px rgba(15,23,42,.08);
-  border:1px solid #e3ece6;
-}
-
-.feed-gauge-value{
-  font-size:24px;
-  font-weight:900;
+.feed-smart-value{
+  font-size:27px;
+  font-weight:950;
   color:#0b7f47;
   line-height:1;
+  white-space:nowrap;
 }
 
-.feed-gauge-sub{
+.feed-smart-state{
+  align-self:flex-start;
+  padding:5px 9px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:900;
+  line-height:1;
+  background:#eef2f7;
+  color:#475569;
+  border:1px solid #dbe3ec;
+}
+
+.feed-smart-state.good,
+.feed-smart-state.ok{
+  background:#e7f7ee;
+  color:#0b7f47;
+  border-color:#bfe3cb;
+}
+
+.feed-smart-state.warn,
+.feed-smart-state.watch{
+  background:#fff4df;
+  color:#b45309;
+  border-color:#f6d29b;
+}
+
+.feed-smart-state.danger{
+  background:#ffe8e8;
+  color:#dc2626;
+  border-color:#efb4b4;
+}
+
+.feed-smart-scale{
+  width:100%;
+  margin-top:4px;
+}
+
+.feed-smart-track{
+  position:relative;
+  height:12px;
+  border-radius:999px;
+  overflow:visible;
+  background:linear-gradient(90deg,#dc2626 0%,#f59e0b 38%,#84cc16 66%,#0ea05a 100%);
+  box-shadow:inset 0 1px 2px rgba(15,23,42,.12);
+  direction:ltr;
+}
+
+.feed-smart-pointer{
+  position:absolute;
+  top:50%;
+  left:0%;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#fff;
+  border:4px solid #0f172a;
+  transform:translate(-50%,-50%);
+  box-shadow:0 3px 8px rgba(15,23,42,.22);
+}
+
+.feed-smart-scale-text{
+  margin-top:7px;
   font-size:10px;
   font-weight:800;
   color:#64748b;
-  line-height:1.45;
-  min-height:30px;
+  line-height:1.35;
+}
+
+.feed-smart-message{
+  width:100%;
+  margin-top:2px;
+  padding:8px 9px;
+  border-radius:14px;
+  background:#f8fbf9;
+  border:1px solid #edf3ee;
+  font-size:11px;
+  font-weight:800;
+  line-height:1.5;
+  color:#315f49;
+}
+
+.feed-smart-sub{
+  width:100%;
+  font-size:10px;
+  font-weight:900;
+  color:#64748b;
+  line-height:1.35;
 }
 
 .feed-info-card{
@@ -219,17 +285,16 @@
 }
 
 @media (max-width:420px){
-  .feed-gauge{
-    width:106px;
-    height:106px;
+  .feed-smart-card{
+    min-height:190px;
   }
 
-  .feed-gauge-value{
-    font-size:21px;
+  .feed-smart-value{
+    font-size:24px;
   }
 
-  .feed-gauge-card{
-    min-height:176px;
+  .feed-smart-message{
+    font-size:10.5px;
   }
 }
 .kpi.health::before{ background:linear-gradient(90deg,#dc2626,#f7a6a6); }
@@ -1046,52 +1111,38 @@ function feBox(value){
     </div>
   `;
 }
- function feedGaugeColor(type, value){
-  const v = Number(value);
-  if (!Number.isFinite(v)) return '#94a3b8';
+function feedSmartGaugeCard(card = {}, href = ''){
+  const pointer = Number(card.pointerPct);
+  const safePointer = Number.isFinite(pointer)
+    ? Math.max(0, Math.min(100, pointer))
+    : 0;
 
-  if (type === 'iofc') {
-    if (v >= 60) return '#0ea05a';
-    if (v >= 50) return '#84cc16';
-    if (v >= 40) return '#f59e0b';
-    return '#dc2626';
-  }
-
-  if (type === 'fe') {
-    if (v > 1.8) return '#06b6d4';
-    if (v >= 1.4) return '#0ea05a';
-    if (v >= 1.3) return '#f59e0b';
-    return '#dc2626';
-  }
-
-  return '#0ea05a';
-}
-
-function feedGaugeBox({ title, value, type = 'iofc', suffix = '', sub = '', max = 100, href = '' } = {}){
-  const n = Number(value);
-  const safe = Number.isFinite(n) ? n : 0;
-  const cap = Number(max || 100);
-  const pct = cap > 0 ? Math.max(0, Math.min(100, (safe / cap) * 100)) : 0;
-  const deg = pct * 3.6;
-  const color = feedGaugeColor(type, safe);
-
-  const display = Number.isFinite(n)
-    ? (suffix === '%' ? `${n.toFixed(1)}%` : n.toFixed(2))
-    : '--';
-
+  const state = String(card.state || 'neutral');
   const go = href ? `onclick="location.href='${href}'"` : '';
 
   return `
-    <div class="kpi feed feed-gauge-card" ${go}>
-      <div class="feed-gauge-title">${title}</div>
-      <div class="feed-gauge" style="--p:${deg}deg;--gauge-color:${color}">
-        <div class="feed-gauge-value" style="color:${color}">${display}</div>
+    <div class="kpi feed feed-smart-card" ${go}>
+      <div class="feed-smart-head">
+        <div class="feed-smart-title">${card.title || 'مؤشر التغذية'}</div>
+        <div class="feed-smart-value">${card.valueText || '—'}</div>
       </div>
-      <div class="feed-gauge-sub">${sub || ''}</div>
+
+      <div class="feed-smart-state ${state}">
+        ${card.stateLabel || 'غير مكتمل'}
+      </div>
+
+      <div class="feed-smart-scale">
+        <div class="feed-smart-track">
+          <div class="feed-smart-pointer" style="left:${safePointer}%"></div>
+        </div>
+        <div class="feed-smart-scale-text">${card.scaleText || ''}</div>
+      </div>
+
+      <div class="feed-smart-message">${card.message || ''}</div>
+      <div class="feed-smart-sub">${card.subText || ''}</div>
     </div>
   `;
 }
-
 function feedInfoBox({ title, value, unit = '', sub = '', href = '' } = {}){
   const n = Number(value);
   const display = Number.isFinite(n)
@@ -1315,7 +1366,7 @@ const feedAdvice =
   stats.nutritionAdvice ||
   stats.nutritionGuidance ||
   '';
-
+const feedGaugeCards = stats.feedGaugeCards || {};
 
  const avgHead7Days = Number(stats.avgHead7Days ?? 0);
 const totalDailyMilk = Number(stats.dailyMilkTotal ?? 0);
@@ -1434,25 +1485,14 @@ cullGrid.innerHTML =
       box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من الاستبعاد ${cullReproPct}%`, 'g_cullRepro', 'cull') +
       box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من الاستبعاد ${cullHealthPct}%`, 'g_cullHealth', 'cull');
 feedGrid.innerHTML =
-  feedGaugeBox({
-    title: 'IOFC — هامش اللبن بعد العلف',
-    value: iofcPctOfMilkIncome,
-    type: 'iofc',
-    suffix: '%',
-    max: 80,
-    sub: Number.isFinite(totalMilkFeedMarginPerDay)
-      ? `${totalMilkFeedMarginPerDay.toLocaleString('ar-EG', { maximumFractionDigits: 2 })} جنيه / يوم`
-      : 'إجمالي اليوم غير متاح',
-    href: `nutrition-report.html?view=iofc&type=${currentType || 'cows'}`
-  }) +
-  feedGaugeBox({
-    title: 'كفاءة تحويل المادة الجافة إلى لبن',
-    value: feedEfficiency,
-    type: 'fe',
-    max: 2,
-    sub: 'ECM / كجم مادة جافة — تُقرأ مع IOFC',
-    href: `nutrition-report.html?view=feed_efficiency&type=${currentType || 'cows'}`
-  }) +
+  feedSmartGaugeCard(
+    feedGaugeCards.iofc,
+    `nutrition-report.html?view=iofc&type=${currentType || 'cows'}`
+  ) +
+  feedSmartGaugeCard(
+    feedGaugeCards.feedEfficiency,
+    `nutrition-report.html?view=feed_efficiency&type=${currentType || 'cows'}`
+  ) +
   feedInfoBox({
     title: 'تكلفة كجم اللبن من التغذية',
     value: feedCostPerLiter,
