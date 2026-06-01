@@ -3300,7 +3300,37 @@ function buildCustomPremixPayload(){
     cholineMgKgDM: premixNum('premix_cholineMgKgDM')
   };
 }
+function resetCustomPremixForm(){
+  [
+    'customPremixUserLabel',
+    'premix_caPct',
+    'premix_pPct',
+    'premix_mgPct',
+    'premix_naPct',
+    'premix_kPct',
+    'premix_clPct',
+    'premix_sPct',
+    'premix_znMgKgDM',
+    'premix_cuMgKgDM',
+    'premix_mnMgKgDM',
+    'premix_seMgKgDM',
+    'premix_iMgKgDM',
+    'premix_coMgKgDM',
+    'premix_feMgKgDM',
+    'premix_vitAIUPerKgDM',
+    'premix_vitDIUPerKgDM',
+    'premix_vitEIUPerKgDM',
+    'premix_biotinMgKgDM',
+    'premix_niacinMgKgDM',
+    'premix_cholineMgKgDM'
+  ].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
 
+  const typeEl = document.getElementById('customPremixType');
+  if (typeEl) typeEl.value = 'mineral_vitamin_premix';
+}
 function closeCustomPremixModal(){
   const modal = document.getElementById('customPremixModal');
   if (modal) {
@@ -3312,6 +3342,7 @@ function closeCustomPremixModal(){
 function openCustomPremixModal(){
   const modal = document.getElementById('customPremixModal');
   if (modal) {
+    resetCustomPremixForm();
     modal.classList.add('show');
     modal.setAttribute('aria-hidden', 'false');
     setTimeout(() => document.getElementById('customPremixType')?.focus(), 50);
@@ -3390,10 +3421,26 @@ async function saveCustomPremix(){
     if (typeSel) typeSel.value = 'add';
     try { filterFeeds(); } catch(_) {}
 
-    const savedId = data.feed?.id;
-    if (savedId && presetSel) presetSel.value = savedId;
+const savedId = data.feed?.id;
+if (savedId && presetSel) {
+  presetSel.value = savedId;
 
-    showCentralMsg('✅ تم حفظ بريمكس مزرعتي وإضافته إلى قائمة الخامات.', 'success');
+  const f = FEEDS_BY_ID.get(savedId);
+  if (f) {
+    fillCurrentRowWithFeed(f, f.cat || 'add');
+    showFeedUI();
+    recalc();
+
+    try {
+      document.getElementById('feedInputBox')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    } catch(_) {}
+  }
+}
+
+showCentralMsg('✅ تم حفظ بريمكس مزرعتي وإضافته إلى قائمة الخامات.', 'success');
   } catch (e) {
     console.error(e);
     showCentralMsg('⚠️ تعذر حفظ بريمكس مزرعتي: ' + (e.message || e), 'error');
