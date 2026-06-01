@@ -1087,12 +1087,10 @@ async function enrichNutritionRowsFromFeedItems(tenant, rawRows = []) {
   if (!db || !Array.isArray(rawRows) || !rawRows.length) return rawRows;
 
   try {
-    const snap = await db.collection('feed_items').get();
-
     const byId = new Map();
     const byName = new Map();
 
-    snap.forEach(doc => {
+    const addFeedDoc = (doc) => {
       const d = doc.data() || {};
       if (d.enabled === false) return;
 
@@ -1107,13 +1105,25 @@ async function enrichNutritionRowsFromFeedItems(tenant, rawRows = []) {
       [
         d.nameAr,
         d.name,
+        d.userLabel,
         d.sourceFeedName,
         doc.id
       ].forEach(x => {
         const k = feedKeySrv(x);
         if (k && !byName.has(k)) byName.set(k, feed);
       });
-    });
+    };
+
+    const publicSnap = await db.collection('feed_items').get();
+    publicSnap.forEach(addFeedDoc);
+
+    if (tenant) {
+      const customSnap = await db.collection('custom_feed_items')
+        .where('userId', '==', tenant)
+        .get();
+
+      customSnap.forEach(addFeedDoc);
+    }
 
     return rawRows.map(r => {
       const row = r || {};
@@ -1121,7 +1131,7 @@ async function enrichNutritionRowsFromFeedItems(tenant, rawRows = []) {
 
       const feed =
         (explicitId && byId.get(explicitId)) ||
-        byName.get(feedKeySrv(row.name || row.feedName || row.nameAr)) ||
+        byName.get(feedKeySrv(row.name || row.feedName || row.nameAr || row.userLabel)) ||
         null;
 
       if (!feed) return row;
@@ -1145,7 +1155,7 @@ async function enrichNutritionRowsFromFeedItems(tenant, rawRows = []) {
 
         id: feed.id || explicitId || row.id || null,
         feedId: feed.id || explicitId || row.feedId || null,
-        name: row.name || feed.nameAr || feed.name || null,
+        name: row.name || feed.nameAr || feed.userLabel || feed.name || null,
         nameAr: feed.nameAr || row.nameAr || row.name || null,
         cat: row.cat || feed.cat || feed.category || null,
 
@@ -1156,7 +1166,7 @@ async function enrichNutritionRowsFromFeedItems(tenant, rawRows = []) {
       });
     });
   } catch (e) {
-    console.error('nutrition feed_items merge failed:', e.message || e);
+    console.error('nutrition feed_items/custom_feed_items merge failed:', e.message || e);
     return rawRows;
   }
 }
