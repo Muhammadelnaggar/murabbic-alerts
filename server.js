@@ -3419,16 +3419,6 @@ app.post('/api/nutrition/custom-feed', requireUserId, async (req, res) => {
     if (!db) return res.status(503).json({ ok:false, error:'firestore_unavailable' });
 
     const body = req.body || {};
-    const pricePerTon = toNumOrNull(body.pricePerTon ?? body.pTon ?? body.price);
-
-    if (!Number.isFinite(Number(pricePerTon)) || Number(pricePerTon) <= 0) {
-      return res.status(400).json({
-        ok:false,
-        error:'feed_price_required',
-        message:'سعر الطن إجباري لأي بريمكس أو خامة مخصصة.'
-      });
-    }
-
     const customType = String(body.customType || 'mineral_vitamin_premix').trim();
     const userLabel = String(body.userLabel || '').trim();
 
@@ -3455,11 +3445,6 @@ app.post('/api/nutrition/custom-feed', requireUserId, async (req, res) => {
       type: body.type || 'Concentrate',
       dmPct: 100,
       cpPct: toNumOrNull(body.cpPct) || 0,
-
-      pricePerTon: Number(pricePerTon),
-      pTon: Number(pricePerTon),
-      price: Number(pricePerTon),
-
       caPct: toNumOrNull(body.caPct),
       pPct: toNumOrNull(body.pPct),
       mgPct: toNumOrNull(body.mgPct),
