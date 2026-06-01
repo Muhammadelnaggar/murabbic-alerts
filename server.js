@@ -901,6 +901,94 @@ function buildDashboardFeedAdviceSrv(overall = {}) {
 
   return 'تحتاج مؤشرات التغذية إلى متابعة؛ راجع كفاءة تحويل المادة الجافة و IOFC في تقرير التغذية.';
 }
+function buildDashboardFeedGaugeCardsSrv(overall = {}) {
+  const fe = Number(overall.feedEfficiency || 0);
+  const iofcPct = Number(overall.iofcPctOfMilkIncome || 0);
+  const marginDay = Number(overall.totalMilkFeedMarginPerDay ?? overall.totalMargin ?? 0);
+
+  const hasEconomicData =
+    Number.isFinite(iofcPct) &&
+    iofcPct > 0 &&
+    Number.isFinite(marginDay);
+
+  let iofcCard = {
+    title: 'IOFC — هامش اللبن بعد العلف',
+    metric: 'iofc',
+    value: Number.isFinite(iofcPct) ? +iofcPct.toFixed(1) : null,
+    valueText: Number.isFinite(iofcPct) && iofcPct > 0 ? `${iofcPct.toFixed(1)}%` : '—',
+    state: 'neutral',
+    stateLabel: 'غير مكتمل',
+    message: 'احفظ علائق الحلاب بسعر اللبن لتظهر قراءة الاقتصاد.',
+    subText: 'يعرض المتبقي من دخل اللبن بعد تكلفة العلف.',
+    scaleText: 'المقياس: IOFC من دخل اللبن',
+    pointerPct: 0,
+    reference: 'IOFC = Milk income − Feed cost'
+  };
+
+  if (hasEconomicData) {
+    if (iofcPct >= 60) {
+      iofcCard.state = 'good';
+      iofcCard.stateLabel = 'اقتصاد قوي';
+      iofcCard.message = 'الهامش بعد العلف قوي؛ حافظ على الاتزان ولا تخفض جودة العليقة.';
+    } else if (iofcPct >= 50) {
+      iofcCard.state = 'ok';
+      iofcCard.stateLabel = 'اقتصاد مقبول';
+      iofcCard.message = 'قريب من المستوى القوي؛ راجع أعلى مجموعة تكلفة قبل تعديل الخلطة.';
+    } else if (iofcPct >= 40) {
+      iofcCard.state = 'warn';
+      iofcCard.stateLabel = 'يحتاج متابعة';
+      iofcCard.message = 'الهامش تحت الضغط؛ راجع تكلفة العليقة وسعر اللبن في التقرير.';
+    } else {
+      iofcCard.state = 'danger';
+      iofcCard.stateLabel = 'خطر اقتصادي';
+      iofcCard.message = 'هامش اللبن بعد العلف ضعيف؛ افتح تقرير التغذية قبل الاعتماد.';
+    }
+
+    iofcCard.subText = `${marginDay.toLocaleString('ar-EG', { maximumFractionDigits: 2 })} جنيه / يوم`;
+    iofcCard.pointerPct = Math.max(0, Math.min(100, (iofcPct / 80) * 100));
+  }
+
+  let feCard = {
+    title: 'كفاءة تحويل المادة الجافة إلى لبن',
+    metric: 'feedEfficiency',
+    value: Number.isFinite(fe) ? +fe.toFixed(2) : null,
+    valueText: Number.isFinite(fe) && fe > 0 ? fe.toFixed(2) : '—',
+    state: 'neutral',
+    stateLabel: 'غير مكتمل',
+    message: 'احفظ علائق الحلاب مع المادة الجافة واللبن لتظهر قراءة الكفاءة.',
+    subText: 'ECM / كجم مادة جافة',
+    scaleText: 'المقياس: ECM ÷ DMI',
+    pointerPct: 0,
+    reference: 'Feed efficiency = ECM / DMI'
+  };
+
+  if (Number.isFinite(fe) && fe > 0) {
+    if (fe > 1.8) {
+      feCard.state = 'watch';
+      feCard.stateLabel = 'مرتفع جدًا';
+      feCard.message = 'الكفاءة مرتفعة جدًا؛ اقرأها مع IOFC وحالة الجسم لاحتمال السحب من الجسم.';
+    } else if (fe >= 1.45) {
+      feCard.state = 'good';
+      feCard.stateLabel = 'كفاءة مناسبة';
+      feCard.message = 'كفاءة التحويل داخل النطاق العملي؛ حافظ على الاتزان واقرأها مع IOFC.';
+    } else if (fe >= 1.30) {
+      feCard.state = 'warn';
+      feCard.stateLabel = 'تحتاج متابعة';
+      feCard.message = 'الكفاءة أقل من النطاق العملي؛ راجع المادة الجافة والإنتاج قبل تعديل الخلطة.';
+    } else {
+      feCard.state = 'danger';
+      feCard.stateLabel = 'كفاءة منخفضة';
+      feCard.message = 'التحويل ضعيف؛ افتح تقرير التغذية وراجع DMI والإنتاج والتكلفة.';
+    }
+
+    feCard.pointerPct = Math.max(0, Math.min(100, ((fe - 1.0) / (2.0 - 1.0)) * 100));
+  }
+
+  return {
+    iofc: iofcCard,
+    feedEfficiency: feCard
+  };
+}
 function normalizeNutritionRows(rows = []) {
   if (!Array.isArray(rows)) return [];
   return rows.map((r) => cleanObj({
@@ -6518,6 +6606,7 @@ totalIofcPerDay: feedBands.overall.totalIofc ?? feedBands.overall.totalMargin ??
 iofcPctOfMilkIncome: feedBands.overall.iofcPctOfMilkIncome ?? 0,
 feedCostPctOfMilkIncome: feedBands.overall.feedCostPctOfMilkIncome ?? 0,
 feedAdvice: buildDashboardFeedAdviceSrv(feedBands.overall),
+feedGaugeCards: buildDashboardFeedGaugeCardsSrv(feedBands.overall),
 
 feedBands,
 
