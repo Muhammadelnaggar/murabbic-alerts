@@ -5572,6 +5572,886 @@ return res.json({
     });
   }
 });
+// ============================================================
+//                 CALVING RULES — moved from frontend rules
+//                 نقل كما هو من form-rules.js
+// ============================================================
+
+const CALVING_THRESHOLDS_SRV = {
+  "أبقار": { minGestationDays: 255 },
+  "جاموس": { minGestationDays: 285 },
+};
+
+function calvingToDateSrv(v) {
+  return (v instanceof Date ? v : (v ? new Date(v) : null));
+}
+
+function calvingDaysBetweenSrv(a, b) {
+  const d1 = calvingToDateSrv(a), d2 = calvingToDateSrv(b);
+  if (!d1 || !d2) return NaN;
+  d1.setHours(0, 0, 0, 0);
+  d2.setHours(0, 0, 0, 0);
+  return Math.round((d2 - d1) / 86400000);
+}
+
+function calvingIsDateSrv(v) {
+  return !Number.isNaN(calvingToDateSrv(v)?.getTime());
+}
+
+function calvingStripArSrv(s) {
+  return String(s || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[ًٌٍَُِّْ]/g, "");
+}
+
+function calvingNormalizeSpeciesSrv(spRaw) {
+  let sp = String(spRaw || "").trim();
+  if (/cow|بقر/i.test(sp)) return "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) return "جاموس";
+  return sp;
+}
+
+function calvingNormDigitsOnlySrv(s) {
+  const map = {
+    '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+    '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
+  };
+  return String(s || '')
+    .trim()
+    .replace(/[^\d٠-٩۰-۹]/g, '')
+    .replace(/[٠-٩۰-۹]/g, d => map[d]);
+}
+
+function calvingIsOddSrv(n) {
+  return Number(n) % 2 === 1;
+}
+
+function calvingIsEvenSrv(n) {
+  return Number(n) % 2 === 0;
+}
+
+function calvingDecisionSrv(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر العثور على الحيوان — تحقق من الرقم.";
+
+  // ✅ خارج القطيع
+  const st = String(doc.status ?? "").trim().toLowerCase();
+  if (st === "inactive") return "❌ لا يمكن تسجيل ولادة — الحيوان خارج القطيع.";
+
+  // ✅ تحديد النوع (Normalize)
+  let sp = String(fd.species || doc.species || doc.animalTypeAr || doc.animalType || "").trim();
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+  const th = CALVING_THRESHOLDS_SRV[sp]?.minGestationDays;
+  if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
+
+  // ✅ الحالة التناسلية: events أولًا ثم الوثيقة
+  const rsRaw = String(
+    fd.reproStatusFromEvents ||
+    doc.reproductiveStatus ||
+    doc.reproStatus ||
+    ""
+  ).trim();
+
+  const rsNorm = rsRaw.replace(/\s+/g, "").replace(/[ًٌٍَُِّْ]/g, "");
+
+  // ✅ تسمية الحيوان لغويًا
+  const animalWord = (sp === "جاموس") ? "جاموسة" : "بقرة";
+
+  // ✅ عرض الحالة الفعلية للمستخدم
+  const shownStatus = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+
+  // ✅ رسائل أدق حسب الحالة
+  if (!rsNorm.includes("عشار")) {
+
+    // ملقحة
+    if (rsNorm.includes("ملقح")) {
+      return `❌ لا يمكن تسجيل ولادة لـ${animalWord} ${shownStatus}.`;
+    }
+
+    // مفتوحة/فارغة
+    if (rsNorm.includes("مفتوح") || rsNorm.includes("فارغ")) {
+      return `❌ لا يمكن تسجيل ولادة لـ${animalWord} ${shownStatus}.`;
+    }
+
+    // حديثة الولادة (لو عندك هذا النص في النظام)
+    if (rsNorm.includes("حديث") || rsNorm.includes("ولاد")) {
+      return `❌ لا يمكن تسجيل ولادة لـ${animalWord} ${shownStatus}.`;
+    }
+
+    // أي حالة أخرى
+    return `❌ لا يمكن تسجيل ولادة لـ${animalWord} — الحالة التناسلية الحالية: ${shownStatus}.`;
+  }
+
+  // ✅ آخر تلقيح مُخصِّب: events أولًا ثم الوثيقة
+  const lf =
+    fd.lastInseminationDate ||
+    doc.lastInseminationDate ||
+    doc.lastAI ||
+    doc.lastInsemination ||
+    doc.lastServiceDate ||
+    "";
+
+  if (!calvingIsDateSrv(lf)) return '❌ لا يمكن تسجيل ولادة — لا يوجد "آخر تلقيح".';
+
+  if (!calvingIsDateSrv(fd.eventDate)) return "❌ تاريخ الولادة غير صالح.";
+
+  // ✅ Boundary: لو في (ولادة/إجهاض) أحدث من التلقيح → يلغي الحمل
+  const boundary = String(fd.lastBoundary || "").trim();
+  if (boundary && calvingIsDateSrv(boundary)) {
+    const b = new Date(boundary); b.setHours(0,0,0,0);
+    const l = new Date(lf);       l.setHours(0,0,0,0);
+    if (b.getTime() >= l.getTime()) {
+      return `❌ لا يُسمح بتسجيل الولادة: آخر حدث (${boundary}) يلغي أي حمل حالي.`;
+    }
+  }
+
+  const gDays = calvingDaysBetweenSrv(lf, fd.eventDate);
+  if (Number.isNaN(gDays)) return "تعذّر حساب عمر الحمل.";
+
+  if (gDays < th) {
+    // ✅ Prefix خاص عشان forms-init يعرف يعرض زر “تسجيل إجهاض”
+    return `OFFER_ABORT|لا يُسمح بتسجيل الولادة: عمر الحمل ${gDays} يوم أقل من الحد الأدنى ${th} يوم للـ${sp}.`;
+  }
+
+  return null;
+}
+
+function calvingRequiredFieldsSrv(fd) {
+  // 1) نوع الولادة لازم موجود
+  const kind = String(fd.calvingKind || "").trim();
+  if (!kind) return "❌ نوع الولادة مطلوب.";
+
+  // 2) آخر تلقيح مُخصِّب لازم موجود وصالح
+  const lf = String(fd.lastInseminationDate || "").trim();
+  if (!calvingIsDateSrv(lf)) return '❌ "آخر تلقيح مُخصِّب" مطلوب (تاريخ صحيح).';
+
+  // 3) لو الولادة "نافقة" → لا نطلب أي بيانات عجول
+  if (kind === "نافقة") return null;
+
+  // 4) غير نافقة → بيانات العجول إجبارية
+  // 4) غير نافقة → بيانات العجول إجبارية
+  const count = Number(String(fd.calfCount || "").trim());
+  if (!(count === 1 || count === 2 || count === 3)) {
+    return { field: "calfCount", msg: "❌ عدد المواليد مطلوب (1 أو 2 أو 3)." };
+  }
+
+  // المولود 1
+  if (!String(fd.calf1Sex || "").trim()) {
+    return { field: "calf1Sex", msg: "❌ جنس المولود (1) مطلوب." };
+  }
+  if (!String(fd.calfId || "").trim()) {
+    return { field: "calfId", msg: "❌ رقم العجل (1) مطلوب." };
+  }
+
+  // مصير العجل
+  // مصير العجل/العجول حسب العدد
+  if (!String(fd.calf1Fate || "").trim()) {
+    return { field: "calf1Fate", msg: "❌ مصير العجل (1) مطلوب." };
+  }
+  if (count >= 2 && !String(fd.calf2Fate || "").trim()) {
+    return { field: "calf2Fate", msg: "❌ مصير العجل (2) مطلوب." };
+  }
+  if (count >= 3 && !String(fd.calf3Fate || "").trim()) {
+    return { field: "calf3Fate", msg: "❌ مصير العجل (3) مطلوب." };
+  }
+
+  // المولود 2
+  if (count >= 2) {
+    if (!String(fd.calf2Sex || "").trim()) {
+      return { field: "calf2Sex", msg: "❌ جنس المولود (2) مطلوب." };
+    }
+    if (!String(fd.calf2Id || "").trim()) {
+      return { field: "calf2Id", msg: "❌ رقم العجل (2) مطلوب." };
+    }
+  }
+
+  // المولود 3
+  if (count >= 3) {
+    if (!String(fd.calf3Sex || "").trim()) {
+      return { field: "calf3Sex", msg: "❌ جنس المولود (3) مطلوب." };
+    }
+    if (!String(fd.calf3Id || "").trim()) {
+      return { field: "calf3Id", msg: "❌ رقم العجل (3) مطلوب." };
+    }
+  }
+
+  // 5) قواعد أرقام العجول: الذكر فردي، الأنثى زوجي + منع تكرار داخل الولادة
+  const nums = [];
+  const checkOne = (sexKey, idKey, label) => {
+    const sex = String(fd[sexKey] || "").trim();
+    const id  = calvingNormDigitsOnlySrv(fd[idKey]);
+    if (!sex || !id) return null;
+
+    nums.push(id);
+
+    const n = Number(id);
+    if (!Number.isFinite(n)) return { field: idKey, msg: `❌ رقم العجل (${label}) غير صالح.` };
+
+    if (sex === "ذكر" && !calvingIsOddSrv(n)) {
+      return { field: idKey, msg: `❌ رقم العجل الذكر يجب أن يكون فردي. (${id})` };
+    }
+    if (sex === "أنثى" && !calvingIsEvenSrv(n)) {
+      return { field: idKey, msg: `❌ رقم العجل الأنثى يجب أن يكون زوجي. (${id})` };
+    }
+    return null;
+  };
+
+  let e;
+  e = checkOne("calf1Sex", "calfId", "1");   if (e) return e;
+  if (count >= 2) { e = checkOne("calf2Sex", "calf2Id", "2"); if (e) return e; }
+  if (count >= 3) { e = checkOne("calf3Sex", "calf3Id", "3"); if (e) return e; }
+
+  const s2 = new Set(nums);
+  if (s2.size !== nums.length) {
+    return { field: "calfId", msg: "❌ لا يجوز تكرار رقم العجل داخل نفس الولادة." };
+  }
+
+  return null;
+}
+// ============================================================
+//                 CALVING SIGNALS — moved from forms-init.js
+//                 نقل كما هو من fetchCalvingSignalsFromEvents
+// ============================================================
+
+async function fetchCalvingSignalsFromEventsSrv(uid, number) {
+  const num = String(calvingNormDigitsOnlySrv(number || "")).trim();
+
+  if (!uid || !num) {
+    return {
+      reproStatusFromEvents: "",
+      lastBoundary: "",
+      lastBoundaryType: "",
+      lastInseminationDateFromEvents: ""
+    };
+  }
+
+  const snap = await db.collection("events")
+    .where("userId", "==", uid)
+    .where("animalNumber", "==", num)
+    .limit(60)
+    .get();
+
+  const arr = snap.docs
+    .map((d) => d.data() || {})
+    .filter((ev) => ev.eventDate)
+    .sort((a, b) => String(b.eventDate).localeCompare(String(a.eventDate)));
+
+  let reproStatusFromEvents = "";
+  let lastBoundary = "";
+  let lastBoundaryType = "";
+  let lastInseminationDateFromEvents = "";
+
+  for (const ev of arr) {
+    const type = String(ev.eventType || ev.type || "").trim();
+    const res  = String(ev.result || ev.status || "").trim();
+    const dt   = String(ev.eventDate || "").trim();
+
+    if ((type === "ولادة" || type === "إجهاض") && !lastBoundary) {
+      lastBoundary = dt;
+      lastBoundaryType = type;
+      if (!reproStatusFromEvents) reproStatusFromEvents = "مفتوحة";
+      continue;
+    }
+
+    // ✅ آخر تلقيح من الأحداث (حتى لو وثيقة الحيوان لم تتحدث بعد)
+    if ((type === "تلقيح" || type === "insemination") && !lastInseminationDateFromEvents) {
+      lastInseminationDateFromEvents = dt;
+    }
+
+    if (type === "تشخيص حمل") {
+      const r = calvingStripArSrv(res);
+      if (!reproStatusFromEvents) {
+        if (r.includes("عشار")) reproStatusFromEvents = "عشار";
+        if (r.includes("فارغه") || r.includes("فارغة")) reproStatusFromEvents = "مفتوحة";
+      }
+    }
+
+    if (reproStatusFromEvents && lastBoundary) break;
+  }
+
+  return {
+    reproStatusFromEvents,
+    lastBoundary,
+    lastBoundaryType,
+    lastInseminationDateFromEvents
+  };
+}
+// ============================================================
+//                 CALVING CALF UNIQUE CHECK — moved from form-rules.js
+//                 نقل كما هو من uniqueCalfNumbers
+// ============================================================
+
+async function uniqueCalfNumbersSrv(ctx) {
+  const userId = String(ctx.userId || "").trim();
+  const nums = Array.isArray(ctx.calfNumbers) ? ctx.calfNumbers : [];
+
+  const cleaned = nums
+    .map(calvingNormDigitsOnlySrv)
+    .filter(Boolean);
+
+  if (!userId || cleaned.length === 0) return { ok: true };
+
+  // منع تكرار داخل نفس الطلب
+  const s = new Set();
+  for (const n of cleaned){
+    if (s.has(n)) return { ok:false, msg:`⚠️ رقم العجل "${n}" مكرر داخل نفس الولادة.` };
+    s.add(n);
+  }
+
+  // شيك قاعدة البيانات
+  for (const n of cleaned){
+    const snap = await db.collection("calves")
+      .where("userId", "==", userId)
+      .where("calfNumber", "==", n)
+      .limit(1)
+      .get();
+
+    if (!snap.empty){
+      return { ok:false, msg:`⚠️ رقم العجل "${n}" موجود بالفعل في حسابك — اختر رقمًا آخر.` };
+    }
+  }
+
+  return { ok:true };
+}
+// ============================================================
+//                 API: CALVING GATE — moved from forms-init.js
+//                 نقل Gate الولادة كما هو: تحقق فقط بدون حفظ
+// ============================================================
+
+async function fetchAnimalByNumberForCalvingGateSrv(uid, number) {
+  const num = calvingNormDigitsOnlySrv(number);
+  if (!uid || !num) return null;
+
+  async function findInCollection(colName) {
+    try {
+      const key = `${uid}#${num}`;
+      const s1 = await db.collection(colName)
+        .where("userId_number", "==", key)
+        .limit(1)
+        .get();
+
+      if (!s1.empty) {
+        const d = s1.docs[0];
+        return { id: d.id, data: d.data() || {}, _collection: colName };
+      }
+    } catch (_) {}
+
+    const tries = [
+      ["number", num],
+      ["animalNumber", num],
+      ["animalNumber", Number(num)],
+      ["calfNumber", num],
+      ["calfNumber", Number(num)]
+    ].filter((t) => !(typeof t[1] === "number" && Number.isNaN(t[1])));
+
+    for (const [field, val] of tries) {
+      for (const ownerField of ["userId", "ownerUid"]) {
+        try {
+          const s2 = await db.collection(colName)
+            .where(ownerField, "==", uid)
+            .where(field, "==", val)
+            .limit(1)
+            .get();
+
+          if (!s2.empty) {
+            const d = s2.docs[0];
+            return { id: d.id, data: d.data() || {}, _collection: colName };
+          }
+        } catch (_) {}
+      }
+    }
+
+    return null;
+  }
+
+  const animalDoc = await findInCollection("animals");
+  if (animalDoc) return animalDoc;
+
+  const calfDoc = await findInCollection("calves");
+  if (calfDoc) return calfDoc;
+
+  return null;
+}
+
+app.post("/api/calving/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:"firestore_disabled" });
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const n = calvingNormDigitsOnlySrv(body.animalNumber || body.number || "");
+    const d = String(body.eventDate || body.date || "").trim().slice(0,10);
+
+    if (!n || !d) {
+      return res.json({
+        ok: true,
+        allowed: false,
+        silent: true
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, n);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        allowed: false,
+        message: "❌ رقم الحيوان غير موجود في حسابك. اكتب الرقم الصحيح أولًا."
+      });
+    }
+
+    const doc = animal.data || {};
+
+    const st = String(doc.status ?? "").trim().toLowerCase();
+    if (st === "inactive") {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: "❌ هذا الحيوان خارج القطيع (بيع/نفوق/استبعاد) — لا يمكن تسجيل أحداث له."
+      });
+    }
+
+    const sig = await fetchCalvingSignalsFromEventsSrv(uid, n);
+
+    const docSpecies = String(doc.species || doc.animalTypeAr || "").trim();
+
+    let sp = String(body.species || "").trim() || docSpecies;
+    if (/cow|بقر/i.test(sp)) sp = "أبقار";
+    if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+    const reproFromEvents = String(sig.reproStatusFromEvents || "").trim();
+    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+    const repro = reproFromEvents || reproFromDoc || "";
+
+    const lastAI = String(doc.lastInseminationDate || "").trim();
+
+    const gateData = {
+      animalNumber: n,
+      eventDate: d,
+      animalId: animal.id || "",
+      species: sp,
+      documentData: doc,
+      reproductiveStatus: repro,
+      reproStatusFromEvents: reproFromEvents,
+      lastInseminationDate: lastAI,
+      lastBoundary: String(sig.lastBoundary || "").trim(),
+      lastBoundaryType: String(sig.lastBoundaryType || "").trim()
+    };
+
+    const g = calvingDecisionSrv(gateData);
+
+    if (g) {
+      const raw = String(g || "");
+      const cleaned = raw.replace(/^OFFER_ABORT\|/, "");
+      const hasAbortHint = raw.startsWith("OFFER_ABORT|");
+
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: cleaned,
+        guardError: raw,
+        offerAbort: hasAbortHint,
+        actions: hasAbortHint ? [
+          {
+            key: "open_abortion",
+            label: "نعم — تسجيل إجهاض",
+            primary: true,
+            url: `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`
+          },
+          {
+            key: "focus_date",
+            label: "لا — تعديل التاريخ",
+            focus: "eventDate"
+          }
+        ] : []
+      });
+    }
+
+    return res.json({
+      ok: true,
+      allowed: true,
+      message: "✅ تم التحقق — أكمل تسجيل الولادة.",
+      animalId: animal.id || "",
+      species: sp,
+      lastInseminationDate: lastAI,
+      signals: sig
+    });
+
+  } catch (e) {
+    console.error("calving-gate", e);
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      error: "calving_gate_failed",
+      message: "❌ تعذّر التحقق من أهلية الولادة الآن."
+    });
+  }
+});
+// ============================================================
+//                 CALVING SAME-DAY CHECK — moved from calving.html
+//                 نقل كما هو من existsCalvingSameDay
+// ============================================================
+
+async function existsCalvingSameDaySrv(uid, number, dateISO) {
+  const num = String(number || '').trim();
+
+  const snap = await db.collection('events')
+    .where('userId', '==', uid)
+    .where('animalNumber', '==', num)
+    .where('eventType', '==', 'ولادة')
+    .where('eventDate', '==', dateISO)
+    .limit(1)
+    .get();
+
+  return !snap.empty;
+}
+// ============================================================
+//                 CALVING ANIMAL UPDATE — moved from animal-update.js
+//                 نقل جزء type === "calving" كما هو
+// ============================================================
+
+async function updateAnimalByCalvingSrv(ev) {
+  const tenant = String(ev.userId || "").trim();
+  const num = calvingNormDigitsOnlySrv(
+    String(
+      ev.animalNumber ||
+      ev.number ||
+      ev.animalId ||
+      ""
+    ).trim()
+  );
+
+  if (!tenant || !num) {
+    console.warn("⛔ updateAnimalByCalvingSrv: missing tenant or number", { tenant, num, ev });
+    return;
+  }
+
+  const date = String(ev.eventDate || "").trim();
+
+  const upd = {
+    lastCalvingDate: date,
+    reproductiveStatus: "حديث الولادة",
+    productionStatus: "fresh",
+    daysInMilk: 0,
+    status: "active"
+  };
+
+  let wantIncLactation = false;
+
+  if (ev.lactationNumber != null) {
+    upd.lactationNumber = Number(ev.lactationNumber) || undefined;
+  } else {
+    wantIncLactation = true;
+  }
+
+  // ------------------------------------------------------
+  // البحث عن الحيوان — نفس منطق animal-update.js:
+  // userId + number string ثم userId + animalNumber Number
+  // ------------------------------------------------------
+  let snap = await db.collection("animals")
+    .where("userId", "==", tenant)
+    .where("number", "==", String(num))
+    .limit(5)
+    .get();
+
+  if (snap.empty) {
+    snap = await db.collection("animals")
+      .where("userId", "==", tenant)
+      .where("animalNumber", "==", Number(num))
+      .limit(5)
+      .get();
+  }
+
+  if (snap.empty) {
+    console.warn("⛔ animal not found for calving update:", { tenant, num, ev });
+    return;
+  }
+
+  for (const d of snap.docs) {
+    const cur = d.data() || {};
+    const updFinal = { ...upd };
+
+    if (wantIncLactation) {
+      const curL = Number(cur.lactationNumber || 0);
+      updFinal.lactationNumber = (Number.isFinite(curL) ? curL : 0) + 1;
+    }
+
+    await d.ref.set(updFinal, { merge: true });
+    console.log("🔥 animal updated by calving:", d.id, updFinal);
+  }
+}
+// ============================================================
+//                 API: CALVING SAVE — moved from calving.html
+//                 نقل حفظ الولادة كما هو إلى السيرفر
+// ============================================================
+
+app.post("/api/calving/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات."
+      });
+    }
+
+    const uid = req.userId;
+    const formData = req.body || {};
+
+    const _animalNumber = calvingNormDigitsOnlySrv(formData.animalNumber || formData.number || "");
+    const _eventDate = String(formData.eventDate || formData.date || "").trim().slice(0, 10);
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, _animalNumber);
+
+    const doc = animal?.data || null;
+    const sig = animal
+      ? await fetchCalvingSignalsFromEventsSrv(uid, _animalNumber)
+      : {
+          reproStatusFromEvents: "",
+          lastBoundary: "",
+          lastBoundaryType: "",
+          lastInseminationDateFromEvents: ""
+        };
+
+    const docSpecies = String(doc?.species || doc?.animalTypeAr || "").trim();
+
+    let sp = String(formData.species || "").trim() || docSpecies;
+    if (/cow|بقر/i.test(sp)) sp = "أبقار";
+    if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+    const reproFromEvents = String(sig.reproStatusFromEvents || "").trim();
+    const reproFromDoc = String(doc?.reproductiveStatus || "").trim();
+    const repro = reproFromEvents || reproFromDoc || "";
+
+    const lastAI = String(
+      formData.lastInseminationDate ||
+      sig.lastInseminationDateFromEvents ||
+      doc?.lastInseminationDate ||
+      ""
+    ).trim();
+
+    const payload = {
+      userId: uid,
+      type: "ولادة",
+      eventType: "ولادة",
+      eventDate: _eventDate,
+      animalNumber: _animalNumber,
+      animalId: String(formData.animalId || animal?.id || "").trim(),
+      species: sp || "",
+      reproStatus: String(formData.reproStatus || "عشار").trim(),
+      lastInseminationDate: lastAI,
+      lastFertileInseminationDate: lastAI, // توافق قديم
+
+      calvingKind: formData.calvingKind || "",
+      calfCount: formData.calfCount || "",
+      calf1Sex: formData.calf1Sex || "",
+      calfId: formData.calfId || "",
+      calf2Sex: formData.calf2Sex || "",
+      calf2Id: formData.calf2Id || "",
+      calf3Sex: formData.calf3Sex || "",
+      calf3Id: formData.calf3Id || "",
+
+      calf1Fate: formData.calf1Fate || "",
+      calf2Fate: formData.calf2Fate || "",
+      calf3Fate: formData.calf3Fate || "",
+
+      notes: formData.notes || "",
+      idempotencyKey: `${_animalNumber}-ولادة-${_eventDate}`,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const gateData = {
+      animalNumber: _animalNumber,
+      eventDate: _eventDate,
+      animalId: animal?.id || "",
+      species: sp,
+      documentData: doc,
+      reproductiveStatus: repro,
+      reproStatusFromEvents: reproFromEvents,
+      lastInseminationDate: lastAI,
+      lastBoundary: String(sig.lastBoundary || "").trim(),
+      lastBoundaryType: String(sig.lastBoundaryType || "").trim()
+    };
+
+    const gateErr = calvingDecisionSrv(gateData);
+    if (gateErr) {
+      const raw = String(gateErr || "");
+      const cleaned = raw.replace(/^OFFER_ABORT\|/, "");
+      const hasAbortHint = raw.startsWith("OFFER_ABORT|");
+
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: cleaned,
+        guardError: raw,
+        offerAbort: hasAbortHint,
+        actions: hasAbortHint ? [
+          {
+            key: "open_abortion",
+            label: "نعم — تسجيل إجهاض",
+            primary: true,
+            url: `/abortion.html?number=${encodeURIComponent(_animalNumber)}&date=${encodeURIComponent(_eventDate)}`
+          },
+          {
+            key: "focus_date",
+            label: "لا — تعديل التاريخ",
+            focus: "eventDate"
+          }
+        ] : []
+      });
+    }
+
+    const requiredErr = calvingRequiredFieldsSrv({
+      ...payload,
+      documentData: doc
+    });
+
+    if (requiredErr) {
+      if (typeof requiredErr === "string") {
+        return res.status(400).json({
+          ok: false,
+          message: requiredErr,
+          errors: [requiredErr],
+          fieldErrors: {}
+        });
+      }
+
+      return res.status(400).json({
+        ok: false,
+        message: requiredErr.msg || "بيانات الولادة غير مكتملة.",
+        errors: [requiredErr.msg || "بيانات الولادة غير مكتملة."],
+        fieldErrors: requiredErr.field ? { [requiredErr.field]: requiredErr.msg } : {}
+      });
+    }
+
+    const isDead = String(payload.calvingKind || "").trim() === "نافقة";
+
+    if (!isDead) {
+      const count = parseInt(payload.calfCount || "1", 10) || 1;
+
+      const calfNums = [
+        payload.calfId || "",
+        count >= 2 ? payload.calf2Id || "" : "",
+        count >= 3 ? payload.calf3Id || "" : ""
+      ].filter(Boolean);
+
+      const uniqueCheck = await uniqueCalfNumbersSrv({
+        userId: uid,
+        calfNumbers: calfNums
+      });
+
+      if (!uniqueCheck || uniqueCheck.ok === false) {
+        return res.status(400).json({
+          ok: false,
+          message: uniqueCheck?.msg || "⚠️ رقم عجل مكرر في حسابك.",
+          errors: [uniqueCheck?.msg || "⚠️ رقم عجل مكرر في حسابك."],
+          fieldErrors: {}
+        });
+      }
+    }
+
+    const alreadyExists = await existsCalvingSameDaySrv(
+      uid,
+      payload.animalNumber,
+      payload.eventDate
+    );
+
+    if (alreadyExists) {
+      return res.status(400).json({
+        ok: false,
+        message: "⚠️ تم تسجيل ولادة لهذا الحيوان في نفس التاريخ من قبل.",
+        errors: ["⚠️ تم تسجيل ولادة لهذا الحيوان في نفس التاريخ من قبل."],
+        fieldErrors: {}
+      });
+    }
+
+    // حفظ حدث الولادة
+    const eventRef = await db.collection("events").add(payload);
+
+    // تحديث وثيقة الحيوان
+    await updateAnimalByCalvingSrv({
+      ...payload,
+      type: "calving",
+      eventType: "calving"
+    });
+
+    // حفظ العجول في calves (لو مش نافقة)
+    if (!isDead) {
+      const damId = payload.animalId;
+      const damNumber = payload.animalNumber;
+      const birthDate = payload.eventDate;
+      const species = payload.species;
+
+      const calvesToSave = [];
+      const count = parseInt(payload.calfCount || "1", 10) || 1;
+
+      const pushCalf = (calfIdField, calfSexField, calfFateField) => {
+        const id = String(formData[calfIdField] || "").trim();
+        const sex = String(formData[calfSexField] || "").trim();
+        const fate = String(formData[calfFateField] || "").trim();
+        if (!id || !sex) return;
+
+        calvesToSave.push({
+          userId: uid,
+          damId,
+          damNumber,
+          birthDate,
+          calfNumber: id,
+          sex,
+          fate,
+          species,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      };
+
+      pushCalf("calfId", "calf1Sex", "calf1Fate");
+      if (count >= 2) pushCalf("calf2Id", "calf2Sex", "calf2Fate");
+      if (count >= 3) pushCalf("calf3Id", "calf3Sex", "calf3Fate");
+
+      for (const calf of calvesToSave) {
+        await db.collection("calves").add(calf);
+      }
+    }
+
+    return res.json({
+      ok: true,
+      message: "تم حفظ الولادة وتسجيل العجول بنجاح ✅",
+      id: eventRef.id,
+      eventId: eventRef.id,
+      animalNumber: payload.animalNumber,
+      animalId: payload.animalId,
+      saved: {
+        ...payload,
+        createdAt: undefined
+      },
+      actions: [
+        {
+          key: "event_list",
+          label: "فتح قائمة الأحداث",
+          primary: true,
+          url: `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`
+        },
+        {
+          key: "cow_card",
+          label: "فتح بطاقة الحيوان",
+          url: `/cow-card.html?number=${encodeURIComponent(payload.animalNumber)}`
+        }
+      ]
+    });
+
+  } catch (err) {
+    console.error("calving-save", err);
+    return res.status(500).json({
+      ok: false,
+      error: "calving_save_failed",
+      message: "تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات."
+    });
+  }
+});
 app.post('/api/events', requireUserId, async (req, res) => {
   try {
     const event = req.body || {};
