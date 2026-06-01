@@ -2423,7 +2423,6 @@ if (o.mpGPerKgDM != null) f.mp = Number(o.mpGPerKgDM);
           fat: Number(d.fatPct ?? 0),
           starch: Number(d.starchPct ?? 0),
           mp: Number(d.mpGPerKgDM ?? 0),
-          price: Number(d.pricePerTon ?? d.pTon ?? d.price ?? 0),
           source: 'user_custom',
           scope: d.scope || 'farm_private'
         });
@@ -2566,8 +2565,8 @@ function priceKgFromTon(pTon){
       const cpEl = tr.querySelector('.cp');
       const pEl  = tr.querySelector('.pTon');
      if(dmEl && (dmEl.value==='' || dmEl.value==null)) dmEl.value = (f.dm ?? '');
-if(cpEl && (cpEl.value==='' || cpEl.value==null)) cpEl.value = (f.cp ?? '');
-      if(pEl  && (pEl.value==='' ||pEl.value==null) && (f.price!=null)) pEl.value = f.price;
+     if(cpEl && (cpEl.value==='' || cpEl.value==null)) cpEl.value = (f.cp ?? '');
+      
     }
   }
     const kg   = tr.querySelector('.kg')?.value;
@@ -2633,10 +2632,7 @@ const costEl = tr.querySelector('.cost');
 
 if(kgEl) kgEl.value = '';
 if(pctEl) pctEl.value = '';
-if(pTonEl) {
-  const savedPrice = Number(feed?.price ?? feed?.pricePerTon ?? feed?.pTon ?? 0);
-  pTonEl.value = Number.isFinite(savedPrice) && savedPrice > 0 ? savedPrice : '';
-}
+if(pTonEl) pTonEl.value = '';
 
 if(pTonDMEl) pTonDMEl.textContent = '—';
 if(kgDMEl) kgDMEl.textContent = '—';
@@ -3268,7 +3264,7 @@ function buildCustomPremixPayload(){
   const customType = document.getElementById('customPremixType')?.value || 'mineral_vitamin_premix';
   const baseLabel = CUSTOM_PREMIX_LABELS[customType] || 'بريمكس مخصص';
   const userLabel = String(document.getElementById('customPremixUserLabel')?.value || '').trim();
-  const pricePerTon = premixNum('customPremixPricePerTon');
+ 
   return {
     customType,
     userLabel,
@@ -3277,9 +3273,6 @@ function buildCustomPremixPayload(){
     category: 'Vitamin/Mineral',
     type: 'Concentrate',
     dmPct: 100,
-    pricePerTon,
-    pTon: pricePerTon,
-    price: pricePerTon,
     source: 'user_custom',
     scope: 'farm_private',
     enabled: true,
@@ -3339,7 +3332,6 @@ function upsertCustomFeedInMemory(feed){
     fat: Number(feed.fatPct ?? 0),
     starch: Number(feed.starchPct ?? 0),
     mp: Number(feed.mpGPerKgDM ?? 0),
-    price: Number(feed.pricePerTon ?? feed.pTon ?? feed.price ?? 0),
     source: 'user_custom',
     scope: feed.scope || 'farm_private'
   };
@@ -3360,12 +3352,6 @@ function upsertCustomFeedInMemory(feed){
 async function saveCustomPremix(){
   try {
     const payload = buildCustomPremixPayload();
-    const price = Number(payload.pricePerTon || 0);
-if (!Number.isFinite(price) || price <= 0) {
-  showCentralMsg('⚠️ سعر الطن إجباري للبريمكس لأنه يدخل في اقتصاد العليقة.', 'error');
-  document.getElementById('customPremixPricePerTon')?.focus();
-  return;
-}
     const hasAnyValue = [
       'caPct','pPct','mgPct','naPct','kPct','clPct','sPct',
       'znMgKgDM','cuMgKgDM','mnMgKgDM','seMgKgDM','iMgKgDM','coMgKgDM','feMgKgDM',
