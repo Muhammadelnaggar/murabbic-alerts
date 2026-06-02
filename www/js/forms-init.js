@@ -1256,50 +1256,119 @@ if (eventName === "ولادة") {
   lockForm(false);
   return true;
 }
-       // ✅ Gate خاص لحدث "إجهاض" (لا يفتح النموذج إلا إذا كانت عِشار فعلاً)
-    if (eventName === "إجهاض") {
-      if (typeof guards?.abortionDecision !== "function") {
-        showMsg(bar, "❌ تعذّر تحميل قواعد التحقق (abortionDecision). حدّث الصفحة أو راجع form-rules.js", "error");
-        lockForm(true);
-        return false;
-      }
+// ======================================================
+// Murabbik — Abortion server-only gate
+// لا guards.abortionDecision هنا
+// السيرفر هو الذي يتحقق ويحسب عمر الإجهاض والسبب
+// ======================================================
+if (eventName === "إجهاض") {
+  const uid = await getUid();
 
-      const uid = await getUid();
-      const sig = await fetchCalvingSignalsFromEvents(uid, n);
+  const doc = form.__mbkDoc || {};
+  const docSpecies = String(
+    doc.species ||
+    doc.animalTypeAr ||
+    doc.animalType ||
+    doc.animaltype ||
+    doc.type ||
+    ""
+  ).trim();
 
-      const doc = form.__mbkDoc || {};
-      const docSpecies = String(doc.species || doc.animalTypeAr || "").trim();
+  const sp = String(getFieldEl(form, "species")?.value || "").trim() || docSpecies;
 
-      let sp = String(getFieldEl(form, "species")?.value || "").trim() || docSpecies;
-      if (/cow|بقر/i.test(sp)) sp = "أبقار";
-      if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+  const apiBase = String(
+    window.API_BASE ||
+    localStorage.getItem("API_BASE") ||
+    ""
+  ).replace(/\/$/, "");
 
-      const reproFromEvents = String(sig.reproStatusFromEvents || "").trim();
-      const reproFromDoc = String(doc.reproductiveStatus || "").trim();
-      const repro = reproFromEvents || reproFromDoc || "";
+  const url = apiBase ? `${apiBase}/api/abortion/gate` : "/api/abortion/gate";
 
-      const lastAI = String(doc.lastInseminationDate || "").trim();
+  let data = null;
 
-      const gateData = {
+  try {
+    showMsg(bar, "جارِ التحقق من أهلية الإجهاض…", "info");
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify({
         animalNumber: n,
         eventDate: d,
-        animalId: form.__mbkAnimalId || "",
-        species: sp,
-        documentData: doc,
-        reproductiveStatus: repro,
-        reproStatusFromEvents: reproFromEvents,
-        lastInseminationDate: lastAI,
-        lastBoundary: String(sig.lastBoundary || "").trim(),
-        lastBoundaryType: String(sig.lastBoundaryType || "").trim()
-      };
+        species: sp
+      })
+    });
 
-      const g = guards.abortionDecision(gateData);
-      if (g) {
-        showMsg(bar, [String(g)], "error");
-        lockForm(true);
-        return false;
-      }
-    }
+    data = await r.json().catch(() => null);
+
+  } catch (err) {
+    console.error("abortion gate server failed:", err);
+    showMsg(bar, "❌ تعذّر التحقق من أهلية الإجهاض الآن.", "error");
+    lockForm(true);
+    return false;
+  }
+
+  if (!data || data.ok !== true || data.allowed !== true) {
+    const msg = data?.message || "❌ تعذّر التحقق من أهلية الإجهاض الآن.";
+
+    const actions = Array.isArray(data?.actions)
+      ? data.actions.map((a) => ({
+          label: a.label || "إجراء",
+          primary: !!a.primary,
+          onClick: () => {
+            if (a.url) {
+              location.href = a.url;
+              return;
+            }
+            if (a.focus) {
+              getFieldEl(form, a.focus)?.focus?.();
+            }
+          }
+        }))
+      : [];
+
+    showMsg(bar, msg, "error", actions);
+    lockForm(true);
+    return false;
+  }
+
+  const animalIdEl = getFieldEl(form, "animalId");
+  if (animalIdEl && data.animalId) animalIdEl.value = data.animalId;
+
+  const speciesEl = getFieldEl(form, "species");
+  if (speciesEl && data.species) speciesEl.value = data.species;
+
+  const lastAIEl =
+    getFieldEl(form, "lastInseminationDate") ||
+    document.getElementById("lastInseminationDate");
+
+  if (lastAIEl && data.lastInseminationDate) {
+    lastAIEl.value = data.lastInseminationDate;
+  }
+
+  const ageEl =
+    getFieldEl(form, "abortionAgeMonths") ||
+    document.getElementById("abortionAgeMonths");
+
+  if (ageEl && data.abortionAgeMonths !== undefined && data.abortionAgeMonths !== null) {
+    ageEl.value = String(data.abortionAgeMonths);
+  }
+
+  const causeEl =
+    getFieldEl(form, "probableCause") ||
+    document.getElementById("probableCause");
+
+  if (causeEl && data.probableCause) {
+    causeEl.value = data.probableCause;
+  }
+
+  showMsg(bar, data.message || "✅ تم التحقق — أكمل تسجيل الإجهاض.", "success");
+  lockForm(false);
+  return true;
+}
         // ✅ Gate خاص لحدث "تلقيح" قبل فتح النموذج (60 يوم بعد آخر ولادة)
     if (eventName === "تلقيح") {
       if (typeof guards?.inseminationDecision !== "function") {
@@ -1473,37 +1542,6 @@ if (eventName === "لبن يومي") {
     formData.documentData = form.__mbkDoc || null;
     if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
     
-        // ✅ Auto-calc للإجهاض: يحسب عمر الإجهاض + السبب من آخر تلقيح (من الوثيقة)
-    if (eventName === "إجهاض") {
-      const doc = formData.documentData || {};
-      const lastAI = String(formData.lastInseminationDate || doc.lastInseminationDate || "").slice(0,10);
-      const evDate = String(formData.eventDate || "").slice(0,10);
-
-      formData.lastInseminationDate = lastAI;
-      if (!formData.species) formData.species = String(doc.species || doc.animalTypeAr || "").trim();
-
-      let months = "";
-      let cause = "";
-
-      if (lastAI && evDate) {
-        const d1 = new Date(lastAI);
-        const d2 = new Date(evDate);
-        if (!Number.isNaN(d1.getTime()) && !Number.isNaN(d2.getTime())) {
-          const m = Math.max(0, (d2 - d1) / (1000*60*60*24*30.44));
-          months = Number.isFinite(m) ? Number(m.toFixed(1)) : "";
-          cause = (months !== "" && months >= 6) ? "احتمال بروسيلا (≥6 شهور)" : "احتمال BVD (<6 شهور)";
-        }
-      }
-
-      formData.abortionAgeMonths = months;
-      formData.probableCause = cause;
-
-      // ✅ اكتبهم في الحقول (بدون ما يعتمد على سكربت الصفحة)
-      const ageEl = document.getElementById("abortionAgeMonths");
-      const causeEl = document.getElementById("probableCause");
-      if (ageEl) ageEl.value = months === "" ? "" : String(months);
-      if (causeEl) causeEl.value = cause || "";
-    }
 
     if (eventName === "ولادة") {
       const uid = await getUid();
@@ -1739,7 +1777,134 @@ if (eventName === "فطام") {
   lockForm(false);
   return true;
 }   
-    // ✅ 1) Validation المركزي لكل الأحداث (إجهاض/تلقيح/تشخيص/…)
+    
+// ======================================================
+// Murabbik — Abortion server-only save
+// لا validateEvent ولا mbk:valid للإجهاض هنا
+// السيرفر هو الذي يتحقق ويحفظ ويحدث الحيوان
+// ======================================================
+if (eventName === "إجهاض") {
+  const uid = await getUid();
+
+  const apiBase = String(
+    window.API_BASE ||
+    localStorage.getItem("API_BASE") ||
+    ""
+  ).replace(/\/$/, "");
+
+  const url = apiBase ? `${apiBase}/api/abortion/save` : "/api/abortion/save";
+
+  const submitBtn =
+    form.querySelector('button[type="submit"]') ||
+    document.querySelector(`[form="${form.id}"][type="submit"]`) ||
+    document.getElementById("saveBtn");
+
+  try {
+    if (submitBtn) submitBtn.disabled = true;
+
+    showMsg(bar, "جارِ حفظ الإجهاض…", "info");
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(formData)
+    });
+
+    const data = await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+
+    if (!data.ok) {
+      clearFieldErrors(form);
+
+      if (data.fieldErrors && typeof data.fieldErrors === "object") {
+        for (const [fname, msg] of Object.entries(data.fieldErrors)) {
+          placeFieldError(form, fname, msg);
+        }
+        scrollToFirstFieldError(form);
+      }
+
+      const actions = Array.isArray(data.actions)
+        ? data.actions.map((a) => ({
+            label: a.label || "إجراء",
+            primary: !!a.primary,
+            onClick: () => {
+              if (a.url) {
+                location.href = a.url;
+                return;
+              }
+              if (a.focus) {
+                getFieldEl(form, a.focus)?.focus?.();
+              }
+            }
+          }))
+        : [];
+
+      showMsg(bar, data.message || "تعذّر حفظ الإجهاض.", "error", actions);
+      return;
+    }
+
+    const lastAIEl =
+      getFieldEl(form, "lastInseminationDate") ||
+      document.getElementById("lastInseminationDate");
+
+    if (lastAIEl && data.lastInseminationDate) {
+      lastAIEl.value = data.lastInseminationDate;
+    }
+
+    const ageEl =
+      getFieldEl(form, "abortionAgeMonths") ||
+      document.getElementById("abortionAgeMonths");
+
+    if (ageEl && data.abortionAgeMonths !== undefined && data.abortionAgeMonths !== null) {
+      ageEl.value = String(data.abortionAgeMonths);
+    }
+
+    const causeEl =
+      getFieldEl(form, "probableCause") ||
+      document.getElementById("probableCause");
+
+    if (causeEl && data.probableCause) {
+      causeEl.value = data.probableCause;
+    }
+
+    showMsg(
+      bar,
+      data.message || "تم حفظ الإجهاض بنجاح ✅",
+      "success",
+      Array.isArray(data.actions)
+        ? data.actions.map((a) => ({
+            label: a.label || "فتح",
+            primary: !!a.primary,
+            onClick: () => {
+              if (a.url) location.href = a.url;
+            }
+          }))
+        : []
+    );
+
+    form.dispatchEvent(
+      new CustomEvent("mbk:saved", {
+        bubbles: true,
+        detail: { response: data, eventName, form }
+      })
+    );
+
+    return;
+
+  } catch (err) {
+    console.error("abortion server save failed:", err);
+    showMsg(bar, "تعذّر الاتصال بالسيرفر أثناء حفظ الإجهاض.", "error");
+    return;
+
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
     const v = validateEvent(eventName, formData);
 
     if (!v || v.ok === false) {
