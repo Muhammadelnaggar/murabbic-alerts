@@ -151,6 +151,41 @@ function serverSaveSuccessMessage(eventName) {
 
   return `✅ تم حفظ ${name} بنجاح`;
 }
+// ======================================================
+// Murabbik — Auto navigation after successful event save
+// بعد حفظ أي حدث بنجاح: رسالة نجاح قصيرة ثم فتح قائمة أحداث الحيوان
+// ======================================================
+function goToEventListAfterSave(detail = {}) {
+  const form = detail.form || document.querySelector("form");
+  const res = detail.response || {};
+
+  const rawNumber =
+    res.animalNumber ||
+    res.number ||
+    form?.querySelector('[data-field="animalNumber"]')?.value ||
+    "";
+
+  const animalNumber = normalizeDigits(rawNumber);
+
+  if (!animalNumber) return;
+
+  // لا نعمل إعادة توجيه لو المستخدم أصلًا في قائمة الأحداث
+  if (String(location.pathname || "").includes("event-list.html")) return;
+
+  // منع التكرار لو أكثر من listener أو حفظ سريع
+  if (form) {
+    if (form.dataset.mbkRedirectingAfterSave === "1") return;
+    form.dataset.mbkRedirectingAfterSave = "1";
+  }
+
+  setTimeout(() => {
+    location.href = `event-list.html?number=${encodeURIComponent(animalNumber)}`;
+  }, 1100);
+}
+
+document.addEventListener("mbk:saved", (ev) => {
+  goToEventListAfterSave(ev.detail || {});
+});
 // ✅ expose for other pages (ovsynch.html uses it)
 window.showMsg = showMsg;
 window.ensureInfoBar = ensureInfoBar;
