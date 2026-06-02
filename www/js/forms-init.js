@@ -142,6 +142,15 @@ okBtn?.addEventListener("click", () => {
     bar.appendChild(wrap);
   }
 }
+function serverSaveSuccessMessage(eventName) {
+  const name = String(eventName || "الحدث").trim();
+
+  if (name === "ولادة") {
+    return "✅ تم حفظ الولادة وتسجيل العجول بنجاح";
+  }
+
+  return `✅ تم حفظ ${name} بنجاح`;
+}
 // ✅ expose for other pages (ovsynch.html uses it)
 window.showMsg = showMsg;
 window.ensureInfoBar = ensureInfoBar;
@@ -2004,16 +2013,7 @@ if (eventName === "ولادة") {
       return;
     }
 
-    showMsg(bar, data.message || "تم حفظ الولادة وتسجيل العجول بنجاح ✅", "success", Array.isArray(data.actions)
-      ? data.actions.map((a) => ({
-          label: a.label || "فتح",
-          primary: !!a.primary,
-          onClick: () => {
-            if (a.url) location.href = a.url;
-          }
-        }))
-      : []
-    );
+   showMsg(bar, serverSaveSuccessMessage(eventName), "success");
 
     form.dispatchEvent(
       new CustomEvent("mbk:saved", {
@@ -2103,16 +2103,7 @@ if (eventName === "تلقيح") {
       return;
     }
 
-    showMsg(bar, data.message || "✅ تم حفظ التلقيح بنجاح", "success", Array.isArray(data.actions)
-      ? data.actions.map((a) => ({
-          label: a.label || "فتح",
-          primary: !!a.primary,
-          onClick: () => {
-            if (a.url) location.href = a.url;
-          }
-        }))
-      : []
-    );
+   showMsg(bar, serverSaveSuccessMessage(eventName), "success");
 
     form.dispatchEvent(
       new CustomEvent("mbk:saved", {
@@ -2226,11 +2217,7 @@ if (eventName === "إجهاض") {
       causeEl.value = data.probableCause;
     }
 
-showMsg(
-  bar,
-  data.message || "تم حفظ الإجهاض بنجاح ✅",
-  "success"
-);
+showMsg(bar, serverSaveSuccessMessage(eventName), "success");
 
     form.dispatchEvent(
       new CustomEvent("mbk:saved", {
