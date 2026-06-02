@@ -245,87 +245,42 @@
   <script src="/js/app-core.js"></script>
 
   <!-- منطق الحفظ بعد الفاليديشن -->
-  <script type="module">
-  import { db } from "/js/firebase-config.js";
-  import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { updateAnimalByEvent } from "/js/animal-update.js";
-  const formEl = document.getElementById("eventForm");
-const bar = window.ensureInfoBar ? window.ensureInfoBar(formEl) : document.getElementById("sysbar");
-
-function showBar(msg, type = "success") {
-  if (!bar) return;
-  // استخدم نفس Renderer المركزي لضمان نفس الشكل على الموبايل
-  if (window.showMsg) {
-    window.showMsg(bar, msg, type);
-    return;
-  }
-  // (احتياطي نادر) لو showMsg غير متاح لأي سبب
-  bar.style.display = "block";
-  bar.className = "infobar mbk-infobar show " + (type === "error" ? "error" : "success");
-  bar.textContent = msg;
-  try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
-}
-  const p = new URLSearchParams(location.search);
-  document.querySelector('[data-field="animalNumber"]').value = p.get("number") || "";
-  document.querySelector('[data-field="eventDate"]').value = p.get("eventDate") || p.get("date") || "";
-
-  document.addEventListener("mbk:valid", async (e) => {
-   if (e.detail?.eventName !== "تلقيح") return;
-
-    const d = e.detail.formData;
-
-    const payload = {
-      userId: localStorage.getItem("userId"),
-      eventType: "insemination",
-      type: "insemination",
-      animalNumber: d.animalNumber,
-      eventDate: d.eventDate,
-      inseminationMethod: d.inseminationMethod,
-      semenCode: d.semenCode,
-      inseminator: d.inseminator,
-      inseminationTime: d.inseminationTime,
-      heatStatus: d.heatStatus,
-      notes: d.notes || null,
-      createdAt: serverTimestamp(),
-      source: location.pathname
-    };
-
-    try {
-  const ref = await addDoc(collection(db, "events"), payload);
-
- await updateAnimalByEvent({
-  userId: localStorage.getItem("userId"),
-  animalNumber: d.animalNumber,
-  eventType: "insemination",
-  eventDate: d.eventDate,
-  servicesCount: Number(e.detail?.animalDoc?.servicesCount || 0) + 1
-});
-
-  showBar("✅ تم حفظ التلقيح بنجاح", "success");
-  setTimeout(() => location.href = `add-event.html?number=${d.animalNumber}`, 1200);
-} catch (err) {
-  console.error(err);
-  showBar("❌ فشل الحفظ", "error");
-}
-  });
-  </script>
+<!-- تهيئة الصفحة فقط — الحفظ والتحديث أصبحا في السيرفر عبر forms-init.js -->
 <script>
-  // ✅ Make "حسنًا" button close the sysbar (page-only)
-  (function () {
-    document.addEventListener("click", function (e) {
-      const ok = e.target.closest("#sysbar .okbtn");
-      if (!ok) return;
+  const p = new URLSearchParams(location.search);
 
-      const bar = document.getElementById("sysbar");
-      if (!bar) return;
+  const animalEl = document.querySelector('[data-field="animalNumber"]');
+  const dateEl = document.querySelector('[data-field="eventDate"]');
 
-      bar.classList.remove("show", "error", "success", "warn", "warning", "info", "ok");
-      bar.style.display = "none";
-      bar.innerHTML = "";
-    }, true);
-  })();
-</script>
-  
+  if (animalEl) {
+    animalEl.value = p.get("number") || "";
+  }
+
+  if (dateEl) {
+    dateEl.value = p.get("eventDate") || p.get("date") || "";
+  }
+
+  const openBtn = document.getElementById("openCowCardBtn");
+  if (openBtn) {
+    openBtn.addEventListener("click", () => {
+      const n = String(animalEl?.value || "").trim();
+
+      if (!n) {
+        const bar = window.ensureInfoBar
+          ? window.ensureInfoBar(document.getElementById("eventForm"))
+          : document.getElementById("sysbar");
+
+        if (window.showMsg && bar) {
+          window.showMsg(bar, "اكتب رقم الحيوان أولًا.", "error");
+        }
+
+        return;
+      }
+
+      location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
+    });
+  }
+</script>  
 </body>
 </html>
 
