@@ -6112,19 +6112,39 @@ function calcAbortionAgeAndCauseSrv(lastAI, eventDate) {
 
   const probableCauses = matches.map(x => x.labelAr);
 
-  let probableCause = "";
+let stageLabel = "إجهاض";
+if (gDays < 90) {
+  stageLabel = "إجهاض مبكر";
+} else if (gDays < 180) {
+  stageLabel = "إجهاض متوسط";
+} else {
+  stageLabel = "إجهاض متأخر";
+}
 
-  if (matches.length) {
-    probableCause =
-      `احتمالات معدية حسب عمر الحمل ${gDays} يوم: ` +
-      probableCauses.join(" / ");
-  } else {
-    probableCause =
-      `عمر الحمل ${gDays} يوم خارج نطاق الأسباب المعدية الرئيسية في مصفوفة DCC؛ يلزم تقييم بيطري ومعملي.`;
-  }
+let probableCause = "";
 
+if (matches.length) {
+  const causeNames = matches
+    .map(x => String(x.labelAr || x.name || "").trim())
+    .filter(Boolean)
+    .join("، ");
+
+  const hasZoonotic = matches.some(x => x.zoonotic === true);
+  const hasRegulatory = matches.some(x => x.regulatory === true);
+
+  const safetyText = (hasZoonotic || hasRegulatory)
+    ? " تعامل بحذر مع الجنين والمشيمة، ويحتاج تأكيدًا معمليًا."
+    : " يحتاج تأكيدًا معمليًا.";
+
+  probableCause =
+    `${stageLabel} — احتمالات مهمة حسب عمر الحمل ${gDays} يوم: ${causeNames}.${safetyText}`;
+
+} else {
+  probableCause =
+    `${stageLabel} — عمر الحمل ${gDays} يوم؛ لا توجد مطابقة واضحة ضمن الأسباب المعدية الرئيسية، ويحتاج تأكيدًا معمليًا.`;
+}
   const zoonoticHits = matches.filter(x => x.zoonotic).map(x => x.labelAr);
-  const regulatoryHits = matches.filter(x => x.regulatory).map(x => x.labelAr);
+const regulatoryHits = matches.filter(x => x.regulatory).map(x => x.labelAr);
 
   const abortionDiagnosticNote = [
     "النتيجة احتمالية حسب DCC وليست تشخيصًا نهائيًا.",
