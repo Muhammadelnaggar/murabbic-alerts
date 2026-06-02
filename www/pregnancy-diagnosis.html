@@ -185,12 +185,12 @@
   <div class="card">
     <h1>تشخيص الحمل</h1>
 
-    <form id="diagnosisForm" autocomplete="off">
-      <label for="animalId">رقم الحيوان</label>
-      <input type="text" id="animalId" name="animalId" required>
+   <form id="diagnosisForm" data-event="تشخيص حمل" autocomplete="off">
+      <label for="animalNumber">رقم الحيوان</label>
+      <input type="text" id="animalNumber" name="animalNumber" data-field="animalNumber" required>
 
-      <label for="diagnosisDate">تاريخ التشخيص</label>
-      <input type="date" id="diagnosisDate" name="diagnosisDate" required>
+      <label for="eventDate">تاريخ التشخيص</label>
+      <input type="date" id="eventDate" name="eventDate" data-field="eventDate" required>
 
       <fieldset>
         <legend>تشخيص الحمل</legend>
@@ -199,300 +199,56 @@
           <div>
             <div class="sub-title">طريقة التشخيص</div>
             <div class="radio-group" id="methodGroup">
-              <label><input type="radio" name="method" value="ultrasound" required> سونار</label>
-              <label><input type="radio" name="method" value="manual"> يدوي</label>
+             <label><input type="radio" name="method" data-field="method" value="ultrasound" required> سونار</label>
+             <label><input type="radio" name="method" data-field="method" value="manual"> يدوي</label>
             </div>
           </div>
 
           <div>
             <div class="sub-title">النتيجة</div>
             <div class="radio-group" id="resultGroup">
-              <label><input type="radio" name="result" value="عشار" required> عشار</label>
-              <label><input type="radio" name="result" value="فارغة"> فارغة</label>
+              <label><input type="radio" name="result" data-field="result" value="عشار" required> عشار</label>
+              <label><input type="radio" name="result" data-field="result" value="فارغة"> فارغة</label>
             </div>
           </div>
         </div>
       </fieldset>
 
       <label for="vet">اسم الطبيب البيطري (اختياري)</label>
-      <input type="text" id="vet" name="vet">
+      <input type="text" id="vet" name="vet" data-field="vet">
 
       <button type="submit" id="saveBtn">تسجيل التشخيص</button>
     </form>
   </div>
-
-  <!-- صندوق قائمة الدفعة يوضع تحت الكارت -->
-  <div id="batchContainer" class="batch-box">
-    <div class="batch-title">قائمة أرقام الحيوانات في هذه الدفعة:</div>
-    <div class="batch-hint">
-      اكتب رقم الحيوان في الحقل بالأعلى واضغط Enter لإضافته للقائمة،
-      ثم اضغط «تسجيل التشخيص» لتشخيص وتسجيل كل الأرقام في الدفعة.
-    </div>
-    <ul id="batchList"></ul>
-  </div>
 </div>
 
 <script type="module">
-  // ====== بوب-أب موحّد ======
-  function showPopup(msg, kind = "err"){
-    const p = document.getElementById("mbkPopup");
-    p.textContent = msg;
+  // MURABBIK_STATUS: UI_ONLY | pregnancy-diagnosis.html | server-side gate/save pending via forms-init
 
-    if (kind === "ok"){
-      p.style.background = "#e8f5e9";
-      p.style.color = "#1b5e20";
-    } else {
-      p.style.background = "#ffebee";
-      p.style.color = "#b71c1c";
-    }
+  const qp = new URLSearchParams(location.search);
 
-    p.style.top = "18px";
-    setTimeout(()=>{ p.style.top = "-120px"; }, 3500);
+  const animalFromURL =
+    qp.get("animalNumber") ||
+    qp.get("number") ||
+    qp.get("animalId") ||
+    localStorage.getItem("lastAnimalId") ||
+    "";
+
+  const dateFromURL =
+    qp.get("date") ||
+    localStorage.getItem("lastEventDate") ||
+    "";
+
+  const animalEl = document.getElementById("animalNumber");
+  const dateEl = document.getElementById("eventDate");
+
+  if (animalEl) {
+    animalEl.value = String(animalFromURL || "").trim();
   }
 
-  import { db, auth, ensureAuth } from "/js/firebase-config.js";
-  import {
-    collection, query, where, getDocs, addDoc, serverTimestamp,
-    doc, updateDoc, limit
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { validateEvent } from "/js/form-rules.js";
-  import { updateAnimalByEvent } from "/js/animal-update.js";
-
-  // تتبّع خفيف
-  try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({event:'page_view', page: location.pathname}); } catch {}
-  try { if (window.t?.event) t.event('page_view', {page: location.pathname}); } catch {}
-
-  const $       = (s)=>document.querySelector(s);
-  const form    = $("#diagnosisForm");
-  const saveBtn = $("#saveBtn");
-  const batchUl = $("#batchList");
-
-  const batch = []; // عناصر { number, li }
-
-  // تهيئة الحقول من URL/localStorage
-  const qp          = new URLSearchParams(location.search);
-  const animalFromURL = qp.get("animalId") || qp.get("number") || qp.get("animalNumber") || localStorage.getItem("lastAnimalId") || "";
-  const dateFromURL   = qp.get("date") || localStorage.getItem("lastEventDate") || "";
-  $("#animalId").value      = (animalFromURL||"").toString().trim();
-  $("#diagnosisDate").value = dateFromURL || new Date().toISOString().slice(0,10);
-
-  await ensureAuth("/login.html");
-
-  // ===== أدوات مساعدة =====
-  const mapDigits = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
-                     '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-  const normalizeNumber = (s)=> String(s||'').trim()
-      .replace(/[^\d٠-٩۰-۹]/g,'')
-      .replace(/[٠-٩۰-۹]/g,d=>mapDigits[d]);
-
-  async function fetchAnimalDocByNumber(number){
-    const num = normalizeNumber(number);
-    if (!num) return null;
-
-    const tries = [
-      ['animalNumber','==',num], ['number','==',num],
-      ['animalId','==',num], ['tag','==',num], ['earTag','==',num],
-    ];
-    for (const [field,op,val] of tries){
-      const q1 = query(collection(db,'animals'), where(field,op,val), limit(1));
-      const snap = await getDocs(q1);
-      if (!snap.empty) return { id: snap.docs[0].id, data: snap.docs[0].data()||{} };
-    }
-    return null;
+  if (dateEl) {
+    dateEl.value = dateFromURL || new Date().toISOString().slice(0, 10);
   }
-
-  // إضافة رقم للدفعة
-  function addNumberToBatch(){
-    const raw = $("#animalId").value.trim();
-    const num = normalizeNumber(raw);
-
-    if (!num){
-      showPopup("اكتب رقم الحيوان ثم اضغط Enter لإضافته للقائمة.");
-      return;
-    }
-
-    if (batch.some(item => item.number === num)){
-      showPopup(`رقم ${num} مضاف بالفعل في هذه الدفعة.`);
-      $("#animalId").value = "";
-      $("#animalId").focus();
-      return;
-    }
-
-    const li = document.createElement("li");
-    li.textContent = `رقم ${num} — في الانتظار…`;
-    batchUl.appendChild(li);
-
-    batch.push({ number:num, li });
-
-    $("#animalId").value = "";
-    $("#animalId").focus();
-  }
-
-  // Enter في خانة رقم الحيوان
-  $("#animalId").addEventListener("keydown",(e)=>{
-    if (e.key === "Enter"){
-      e.preventDefault();
-      addNumberToBatch();
-    }
-  });
-
-  // ===== الحفظ الجماعي =====
-  form.addEventListener("submit", async (e)=>{
-    e.preventDefault();
-
-    const eventDate = $("#diagnosisDate").value;
-    const methodEl  = document.querySelector('input[name="method"]:checked');
-    const resultEl  = document.querySelector('input[name="result"]:checked');
-
-    if (!eventDate){
-      showPopup("اختر تاريخ التشخيص.");
-      $("#diagnosisDate").focus();
-      return;
-    }
-    if (!methodEl){
-      showPopup("اختر طريقة التشخيص.");
-      return;
-    }
-    if (!resultEl){
-      showPopup("اختر نتيجة التشخيص.");
-      return;
-    }
-
-    // لو في رقم في الخانة ولم يُضغط Enter
-    const currentRaw = $("#animalId").value.trim();
-    if (currentRaw){
-      addNumberToBatch();
-    }
-
-    if (batch.length === 0){
-      showPopup("أضف أرقام الحيوانات أولًا (اكتب الرقم ثم Enter لكل حيوان).");
-      return;
-    }
-
-    const methodForRules = (methodEl.value === "ultrasound") ? "سونار" : "جس يدوي";
-    const resultValue    = resultEl.value;
-    const vetValue       = $("#vet").value || "";
-
-    saveBtn.disabled = true;
-
-    let okCount = 0;
-    let errCount = 0;
-    let lastOkAnimal = null;
-
-    for (const item of batch){
-      const num = item.number;
-      const li  = item.li;
-      li.textContent = `رقم ${num} — جارٍ الفحص...`;
-
-      try {
-        const a = await fetchAnimalDocByNumber(num);
-        if (!a || !a.data){
-          li.textContent = `رقم ${num} — ❌ الحيوان غير موجود في قاعدة البيانات.`;
-          errCount++;
-          continue;
-        }
-
-        const v = validateEvent("تشخيص حمل", {
-          animalId: num,
-          eventDate,
-          documentData: a.data,
-          method: methodForRules,
-          result: resultValue,
-        });
-
-        if (!v.ok){
-          const doc = a.data || {};
-          const species = String(doc.species || "");
-          let animalWord = "الحيوان";
-          if (species.includes("بقر"))   animalWord = "البقرة";
-          else if (species.includes("جاموس")) animalWord = "الجاموسة";
-
-          const status = String(doc.reproductiveStatus || "").trim();
-          let reason;
-          if (status === "عشار"){
-            reason = `${animalWord} عشار بالفعل`;
-          } else if (
-            status === "مفتوحة" ||
-            status === "فارغة"  ||
-            status === "غير عشار"
-          ){
-            reason = `${animalWord} غير ملقحة`;
-          } else if (!status){
-            reason = "لا توجد حالة تناسلية مسجَّلة";
-          } else {
-            reason = `الحالة التناسلية الحالية (${status}) لا تسمح بالتشخيص`;
-          }
-
-          li.textContent = `رقم ${num} — ❌ لا يمكن تشخيص الحمل (${reason}).`;
-          errCount++;
-          continue;
-        }
-
-        const payload = {
-          userId: auth.currentUser.uid,
-          animalId: num,
-          animalNumber: num,
-          eventDate,
-          type: "تشخيص حمل",
-          eventType: "تشخيص حمل",
-          method: methodForRules,
-          result: resultValue,
-          vet: vetValue,
-          source: location.pathname,
-          createdAt: serverTimestamp()
-        };
-
-        try { if (window.t?.event) t.event('pregnancy_diagnosis_save_click', {animal:num}); } catch {}
-
-        await addDoc(collection(db,"events"), payload);
-        await updateAnimalByEvent(payload);
-
-        // تحديث وثيقة الحيوان
-        try {
-          const animalsRef = collection(db,"animals");
-          const q1 = query(animalsRef, where("userId","==", auth.currentUser.uid));
-          const snap = await getDocs(q1);
-          const match = snap.docs.find(d=>{
-            const ad = d.data() || {};
-            const candidates = [ad.animalId, ad.number, ad.animalNumber, ad.tag, ad.earTag]
-              .filter(v=>v!=null).map(v=>String(v).trim());
-            return candidates.includes(String(num));
-          });
-          if (match){
-            const updates = { lastDiagnosis:"تشخيص حمل", lastDiagnosisDate:eventDate };
-            if (payload.result === "عشار")  updates.reproductiveStatus = "عشار";
-            if (payload.result === "فارغة") updates.reproductiveStatus = "مفتوحة";
-            await updateDoc(doc(db,"animals",match.id), updates);
-          }
-        } catch {}
-
-        try { if (window.t?.event) t.event('pregnancy_diagnosis_save_done', {animal:num}); } catch {}
-
-        li.textContent = `رقم ${num} — ✅ تم تسجيل التشخيص (${resultValue}).`;
-        okCount++;
-        lastOkAnimal = num;
-
-      } catch (err){
-        console.error("Firestore save error (batch PD):", err);
-        try { if (window.t?.event) t.event('pregnancy_diagnosis_save_error', {message:String(err?.message||err), animal:num}); } catch {}
-        li.textContent = `رقم ${num} — ❌ خطأ أثناء التسجيل.`;
-        errCount++;
-      }
-    }
-
-    saveBtn.disabled = false;
-
-    if (lastOkAnimal){
-      localStorage.setItem("lastAnimalId", lastOkAnimal);
-      localStorage.setItem("lastEventDate", eventDate);
-    }
-
-    if (okCount > 0){
-      showPopup(`تم تسجيل تشخيص الحمل لـ ${okCount} حيوان. توجد مشاكل في ${errCount} رقم (راجع القائمة).`,"ok");
-    } else {
-      showPopup("لا يمكن تشخيص الحمل لأي رقم في هذه الدفعة — كل الأرقام بها مشاكل، راجع القائمة.");
-    }
-  });
 </script>
 
 </body>
