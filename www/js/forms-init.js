@@ -1979,6 +1979,108 @@ formData.eventDate = String(getFieldEl(form, "eventDate")?.value || "").trim();
 formData.documentData = form.__mbkDoc || null;
 if (!formData.animalId && form.__mbkAnimalId) formData.animalId = form.__mbkAnimalId;
 // ======================================================
+// Murabbik — Pregnancy Diagnosis server-only save
+// تشخيص الحمل: السيرفر فقط هو الذي يتحقق ويحفظ ويحدث الحيوان
+// لا validateEvent ولا mbk:valid هنا
+// ======================================================
+if (eventName === "تشخيص حمل") {
+  const uid = await getUid();
+
+  const apiBase = String(
+    window.API_BASE ||
+    localStorage.getItem("API_BASE") ||
+    ""
+  ).replace(/\/$/, "");
+
+  const url = apiBase
+    ? `${apiBase}/api/pregnancy-diagnosis/save`
+    : "/api/pregnancy-diagnosis/save";
+
+  const submitBtn =
+    form.querySelector('button[type="submit"]') ||
+    document.querySelector(`[form="${form.id}"][type="submit"]`) ||
+    document.getElementById("saveBtn");
+
+  try {
+    if (submitBtn) submitBtn.disabled = true;
+
+    showMsg(bar, "جارِ حفظ تشخيص الحمل…", "info");
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(formData)
+    });
+
+    const data = await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+
+    if (!data.ok) {
+      clearFieldErrors(form);
+
+      if (data.fieldErrors && typeof data.fieldErrors === "object") {
+        for (const [fname, msg] of Object.entries(data.fieldErrors)) {
+          if (msg) placeFieldError(form, fname, msg);
+        }
+        scrollToFirstFieldError(form);
+      }
+
+      const actions = Array.isArray(data.actions)
+        ? data.actions.map((a) => ({
+            label: a.label || "إجراء",
+            primary: !!a.primary,
+            onClick: () => {
+              if (a.url) {
+                location.href = a.url;
+                return;
+              }
+              if (a.focus) {
+                getFieldEl(form, a.focus)?.focus?.();
+              }
+            }
+          }))
+        : [];
+
+      showMsg(bar, data.message || "تعذّر حفظ تشخيص الحمل.", "error", actions);
+      return;
+    }
+
+    showMsg(bar, serverSaveSuccessMessage(eventName), "success");
+
+    try {
+      localStorage.setItem("lastAnimalId", data.animalNumber || formData.animalNumber || "");
+      localStorage.setItem("lastEventDate", data.eventDate || formData.eventDate || "");
+    } catch (_) {}
+
+    form.dispatchEvent(
+      new CustomEvent("mbk:saved", {
+        bubbles: true,
+        detail: {
+          formData,
+          eventName,
+          form,
+          response: data
+        }
+      })
+    );
+
+    return;
+
+  } catch (err) {
+    console.error("pregnancy diagnosis server save failed:", err);
+    showMsg(bar, "❌ تعذّر حفظ تشخيص الحمل الآن.", "error");
+    return;
+
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+// ======================================================
 // Murabbik — Calving server-only save
 // لا validateEvent ولا mbk:valid للولادة هنا
 // السيرفر هو الذي يتحقق ويحفظ ويحدث الحيوان وينشئ العجول
