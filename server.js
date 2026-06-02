@@ -6533,6 +6533,52 @@ async function existsAbortionSameDaySrv(uid, number, dateISO) {
   return !snap.empty;
 }
 // ============================================================
+//                 API: INSEMINATION OPTIONS
+//                 جلب اختيارات التلقيح المحفوظة للمستخدم
+// ============================================================
+
+app.get("/api/insemination/options", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        message: "تعذّر تحميل اختيارات التلقيح — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+
+    const snap = await db.collection("user_event_options").doc(uid).get();
+    const data = snap.exists ? (snap.data() || {}) : {};
+
+    const semenCodes = Array.isArray(data.inseminationSemenCodes)
+      ? data.inseminationSemenCodes
+          .map(x => String(x || "").trim())
+          .filter(Boolean)
+      : [];
+
+    const inseminators = Array.isArray(data.inseminators)
+      ? data.inseminators
+          .map(x => String(x || "").trim())
+          .filter(Boolean)
+      : [];
+
+    return res.json({
+      ok: true,
+      semenCodes,
+      inseminators
+    });
+
+  } catch (e) {
+    console.error("insemination-options", e);
+
+    return res.status(500).json({
+      ok: false,
+      message: "تعذّر تحميل اختيارات التلقيح الآن."
+    });
+  }
+});
+// ============================================================
 //                 API: INSEMINATION GATE
 //                 تحقق التلقيح من السيرفر فقط — بدون حفظ
 // ============================================================
