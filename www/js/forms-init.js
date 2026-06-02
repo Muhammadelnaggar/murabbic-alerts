@@ -26,24 +26,25 @@ import {
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 function ensureInfoBar(form) {
-  // 1) لو موجود sysbar أو infobar بالفعل (داخل الفورم أو خارجه) استخدمه
+  // ======================================================
+  // Murabbik Official Infobar System
+  // النظام الرسمي المركزي لرسائل مُرَبِّيك
+  // يفرض mbk-infobar على الصفحات الجديدة والقديمة
+  // ======================================================
+
   let bar =
+    document.getElementById("mbk-infobar") ||
+    form.querySelector("#mbk-infobar") ||
     document.getElementById("sysbar") ||
     form.querySelector("#sysbar") ||
+    form.querySelector(".mbk-infobar") ||
+    document.querySelector(".mbk-infobar") ||
     form.querySelector(".infobar") ||
     document.querySelector(".infobar");
 
-  // 2) لو مش موجود: أنشئ واحد “قياسي” لمُرَبِّيك
   if (!bar) {
     bar = document.createElement("div");
-    bar.id = "sysbar";
-    bar.className = "infobar mbk-infobar";
-    bar.setAttribute("role", "status");
-    bar.setAttribute("aria-live", "polite");
 
-    // 3) حطه في مكان ثابت قدر الإمكان:
-    // - لو فيه header: ضعه بعده مباشرة
-    // - وإلا ضعه أعلى الفورم
     const header = document.querySelector("header");
     if (header && header.parentNode) {
       header.insertAdjacentElement("afterend", bar);
@@ -52,9 +53,14 @@ function ensureInfoBar(form) {
     }
   }
 
+  // ✅ فرض الاسم والشكل الرسمي على أي شريط قديم
+  bar.id = "mbk-infobar";
+  bar.classList.add("infobar", "mbk-infobar");
+  bar.setAttribute("role", "status");
+  bar.setAttribute("aria-live", "polite");
+
   return bar;
 }
-
 
 function _escapeHtml(s){
   return String(s ?? "")
@@ -73,8 +79,9 @@ function showMsg(bar, msgs, type = "error", actions = []) {
   (type === "error") ? "error" :
   (type === "ok" || type === "success") ? "success" :
   (type === "warn" || type === "warning") ? "warning" :
+  (type === "smart-track") ? "smart-track" :
+  (type === "smart-alert") ? "smart-alert" :
   "info";
-
 bar.className = "infobar mbk-infobar show " + cls;
 
   const isErr = (type === "error");
@@ -2077,20 +2084,11 @@ if (eventName === "إجهاض") {
       causeEl.value = data.probableCause;
     }
 
-    showMsg(
-      bar,
-      data.message || "تم حفظ الإجهاض بنجاح ✅",
-      "success",
-      Array.isArray(data.actions)
-        ? data.actions.map((a) => ({
-            label: a.label || "فتح",
-            primary: !!a.primary,
-            onClick: () => {
-              if (a.url) location.href = a.url;
-            }
-          }))
-        : []
-    );
+showMsg(
+  bar,
+  data.message || "تم حفظ الإجهاض بنجاح ✅",
+  "success"
+);
 
     form.dispatchEvent(
       new CustomEvent("mbk:saved", {
