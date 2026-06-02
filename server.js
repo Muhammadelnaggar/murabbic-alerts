@@ -6673,41 +6673,27 @@ async function updateAnimalByAbortionSrv(ev) {
   const wantIncLactationFromAbortion = Number.isFinite(m) && m >= 5;
 
   // ------------------------------------------------------
-  // البحث عن الحيوان — نفس منهج updateAnimalByCalvingSrv
-  // userId + number string ثم userId + animalNumber Number
+  // البحث المركزي عن وثيقة الحيوان
+  // يستخدم userId/ownerUid + number/animalNumber
   // ------------------------------------------------------
-  let snap = await db.collection("animals")
-    .where("userId", "==", tenant)
-    .where("number", "==", String(num))
-    .limit(5)
-    .get();
+  const animal = await findAnimalDocByNumberSrv(tenant, num);
 
-  if (snap.empty) {
-    snap = await db.collection("animals")
-      .where("userId", "==", tenant)
-      .where("animalNumber", "==", Number(num))
-      .limit(5)
-      .get();
-  }
-
-  if (snap.empty) {
+  if (!animal || !animal.id) {
     console.warn("⛔ animal not found for abortion update:", { tenant, num, ev });
     return;
   }
 
-  for (const d of snap.docs) {
-    const cur = d.data() || {};
-    const updFinal = { ...upd };
+  const cur = animal || {};
+  const updFinal = { ...upd };
 
-    // ✅ زيادة lactationNumber عند الإجهاض المتأخر (>=5 شهور)
-    if (wantIncLactationFromAbortion) {
-      const curL = Number(cur.lactationNumber || 0);
-      updFinal.lactationNumber = (Number.isFinite(curL) ? curL : 0) + 1;
-    }
-
-    await d.ref.set(updFinal, { merge: true });
-    console.log("🔥 animal updated by abortion:", d.id, updFinal);
+  // ✅ زيادة lactationNumber عند الإجهاض المتأخر (>=5 شهور)
+  if (wantIncLactationFromAbortion) {
+    const curL = Number(cur.lactationNumber || 0);
+    updFinal.lactationNumber = (Number.isFinite(curL) ? curL : 0) + 1;
   }
+
+  await db.collection("animals").doc(animal.id).set(updFinal, { merge: true });
+  console.log("🔥 animal updated by abortion:", animal.id, updFinal);
 }
 // ============================================================
 //                 API: CALVING SAVE — moved from calving.html
