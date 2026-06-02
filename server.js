@@ -6820,6 +6820,8 @@ const animalRef = db.collection(animalCol).doc(animal.id);
 
 const batch = db.batch();
 
+const batch = db.batch();
+
 batch.set(eventRef, payload);
 
 batch.set(animalRef, {
@@ -6828,6 +6830,32 @@ batch.set(animalRef, {
   servicesCount: nextServices,
   updatedAt: admin.firestore.FieldValue.serverTimestamp()
 }, { merge: true });
+
+// ✅ حفظ اختيارات التلقيح المستخدمة داخل حساب المستخدم
+// تُستخدم لاحقًا في صفحة التلقيح للاختيار بدل الكتابة كل مرة
+const semenOption = String(formData.semenCode || "").trim();
+const inseminatorOption = String(formData.inseminator || "").trim();
+
+if (semenOption || inseminatorOption) {
+  const optionsRef = db.collection("user_event_options").doc(uid);
+
+  const optionsPatch = {
+    userId: uid,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  };
+
+  if (semenOption) {
+    optionsPatch.inseminationSemenCodes =
+      admin.firestore.FieldValue.arrayUnion(semenOption);
+  }
+
+  if (inseminatorOption) {
+    optionsPatch.inseminators =
+      admin.firestore.FieldValue.arrayUnion(inseminatorOption);
+  }
+
+  batch.set(optionsRef, optionsPatch, { merge: true });
+}
 
 await batch.commit();
     if (typeof scheduleGroupsRebuildSrv === "function") {
