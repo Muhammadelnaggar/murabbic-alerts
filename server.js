@@ -8563,8 +8563,17 @@ function getAgeMonthsSrv(an = {}) {
 }
 
 function getDimSrv(an = {}) {
+  const explicitDim = Number(an?.daysInMilk);
+
+  // بعد الحفظ السيرفري للولادة نكتب daysInMilk = 0 صراحة.
+  // لذلك نحترمه فورًا بدل إعادة الحساب من التاريخ وتداخل التوقيت.
+  if (Number.isFinite(explicitDim) && explicitDim >= 0) {
+    return Math.floor(explicitDim);
+  }
+
   const calv = toDate(an?.lastCalvingDate) || toDate(an?.calvingDate) || toDate(an?.calvedAt);
-  if (!calv || Number.isNaN(calv.getTime())) return Number(an?.daysInMilk) || 0;
+  if (!calv || Number.isNaN(calv.getTime())) return 0;
+
   return Math.max(0, Math.floor((new Date() - calv) / 86400000));
 }
 
