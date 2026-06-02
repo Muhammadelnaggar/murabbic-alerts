@@ -1264,6 +1264,100 @@ if (eventName === "ولادة") {
   return true;
 }
 // ======================================================
+// Murabbik — Insemination server-only gate
+// لا guards.inseminationDecision هنا
+// السيرفر هو الذي يتحقق من أهلية التلقيح
+// ======================================================
+if (eventName === "تلقيح") {
+  const uid = await getUid();
+
+  const doc = form.__mbkDoc || {};
+  const docSpecies = String(
+    doc.species ||
+    doc.animalTypeAr ||
+    doc.animalType ||
+    doc.animaltype ||
+    doc.type ||
+    ""
+  ).trim();
+
+  const sp = String(getFieldEl(form, "species")?.value || "").trim() || docSpecies;
+
+  const apiBase = String(
+    window.API_BASE ||
+    localStorage.getItem("API_BASE") ||
+    ""
+  ).replace(/\/$/, "");
+
+  const url = apiBase ? `${apiBase}/api/insemination/gate` : "/api/insemination/gate";
+
+  let data = null;
+
+  try {
+    showMsg(bar, "جارِ التحقق من أهلية التلقيح…", "info");
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify({
+        animalNumber: n,
+        eventDate: d,
+        species: sp
+      })
+    });
+
+    data = await r.json().catch(() => null);
+
+  } catch (err) {
+    console.error("insemination gate server failed:", err);
+    showMsg(bar, "❌ تعذّر التحقق من أهلية التلقيح الآن.", "error");
+    lockForm(true);
+    return false;
+  }
+
+  if (!data || data.ok !== true || data.allowed !== true) {
+    const msg = data?.message || "❌ تعذّر التحقق من أهلية التلقيح الآن.";
+
+    const actions = Array.isArray(data?.actions)
+      ? data.actions.map((a) => ({
+          label: a.label || "إجراء",
+          primary: !!a.primary,
+          onClick: () => {
+            if (a.url) {
+              location.href = a.url;
+              return;
+            }
+            if (a.focus) {
+              getFieldEl(form, a.focus)?.focus?.();
+            }
+          }
+        }))
+      : [];
+
+    showMsg(bar, msg, "error", actions);
+    lockForm(true);
+    return false;
+  }
+
+  const animalIdEl = getFieldEl(form, "animalId");
+  if (animalIdEl && data.animalId) animalIdEl.value = data.animalId;
+
+  const speciesEl = getFieldEl(form, "species");
+  if (speciesEl && data.species) speciesEl.value = data.species;
+
+  const lastAIEl = getFieldEl(form, "lastInseminationDate");
+  if (lastAIEl && data.lastInseminationDate && !lastAIEl.value) {
+    lastAIEl.value = data.lastInseminationDate;
+  }
+
+  showMsg(bar, data.message || "✅ تم التحقق — أكمل تسجيل التلقيح.", "success");
+  lockForm(false);
+  return true;
+}    
+// ======================================================
 // Murabbik — Abortion server-only gate
 // لا guards.abortionDecision هنا
 // السيرفر هو الذي يتحقق ويحسب عمر الإجهاض والسبب
@@ -1376,52 +1470,7 @@ if (eventName === "إجهاض") {
   lockForm(false);
   return true;
 }
-        // ✅ Gate خاص لحدث "تلقيح" قبل فتح النموذج (60 يوم بعد آخر ولادة)
-    if (eventName === "تلقيح") {
-      if (typeof guards?.inseminationDecision !== "function") {
-        showMsg(bar, "❌ تعذّر تحميل قواعد التحقق (inseminationDecision).", "error");
-        lockForm(true);
-        return false;
-      }
 
-      const uid2 = await getUid();
-      const sig2 = await fetchCalvingSignalsFromEvents(uid2, n);
-
-      const doc2 = form.__mbkDoc || {};
-      const docSpecies2 = String(doc2.species || doc2.animalTypeAr || doc2.animalType || doc2.animaltype || doc2.type || "").trim();
-
-
-      let sp2 = String(getFieldEl(form, "species")?.value || "").trim() || docSpecies2;
-      if (/cow|بقر/i.test(sp2)) sp2 = "أبقار";
-      if (/buffalo|جاموس/i.test(sp2)) sp2 = "جاموس";
-
-      const gateData2 = {
-        animalNumber: n,
-        eventDate: d,
-        species: sp2,
-        documentData: doc2,
-        lastInseminationDate: String(sig2.lastInseminationDateFromEvents || "").trim(),
-
-        reproStatusFromEvents: String(sig2.reproStatusFromEvents || "").trim(),
-        lastBoundary: String(sig2.lastBoundary || "").trim(),
-        lastBoundaryType: String(sig2.lastBoundaryType || "").trim()
-      };
-
-      const g2 = guards.inseminationDecision(gateData2);
-
-      // لو رجع تحذير/منع
-    if (g2) {
-  const s = String(g2);
-  if (s.startsWith("WARN|")) {
-    showMsg(bar, [s.replace(/^WARN\|/, "")], "info");
-    lockForm(false);
-    return true;
-  }
-  showMsg(bar, [s], "error");
-  lockForm(true);
-  return false;
-}
-}
         // ✅ Gate خاص لحدث "تحضير للولادة" قبل فتح النموذج
     if (eventName === "تحضير للولادة") {
       if (typeof guards?.closeupDecision !== "function") {
@@ -1608,12 +1657,6 @@ if (eventName === "شياع" && isHeatBulk) {
 // ✅ Dry-Off: Gate فقط — لا تعمل validateEvent هنا
 if (eventName === "تجفيف") {
   showMsg(bar, "✅ تم التحقق — أكمل إدخال البيانات ثم اضغط حفظ.", "success");
-  lockForm(false);
-  return true;
-}
-    // ✅ Insemination: Gate فقط — لا تعمل validateEvent قبل الحفظ
-if (eventName === "تلقيح") {
-  showMsg(bar, "✅ تم التحقق — أكمل إدخال بيانات التلقيح ثم اضغط حفظ.", "success");
   lockForm(false);
   return true;
 }
@@ -1984,6 +2027,105 @@ if (eventName === "ولادة") {
   } catch (err) {
     console.error("calving server save failed:", err);
     showMsg(bar, "تعذّر الاتصال بالسيرفر أثناء حفظ الولادة.", "error");
+    return;
+
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+    // ======================================================
+// Murabbik — Insemination server-only save
+// لا validateEvent ولا mbk:valid للتلقيح هنا
+// السيرفر هو الذي يتحقق ويحفظ ويحدث الحيوان
+// ======================================================
+if (eventName === "تلقيح") {
+  const uid = await getUid();
+
+  const apiBase = String(
+    window.API_BASE ||
+    localStorage.getItem("API_BASE") ||
+    ""
+  ).replace(/\/$/, "");
+
+  const url = apiBase ? `${apiBase}/api/insemination/save` : "/api/insemination/save";
+
+  const submitBtn =
+    form.querySelector('button[type="submit"]') ||
+    document.querySelector(`[form="${form.id}"][type="submit"]`) ||
+    document.getElementById("saveBtn");
+
+  try {
+    if (submitBtn) submitBtn.disabled = true;
+
+    showMsg(bar, "جارِ حفظ التلقيح…", "info");
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(formData)
+    });
+
+    const data = await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+
+    if (!data.ok) {
+      clearFieldErrors(form);
+
+      if (data.fieldErrors && typeof data.fieldErrors === "object") {
+        for (const [fname, msg] of Object.entries(data.fieldErrors)) {
+          placeFieldError(form, fname, msg);
+        }
+        scrollToFirstFieldError(form);
+      }
+
+      const actions = Array.isArray(data.actions)
+        ? data.actions.map((a) => ({
+            label: a.label || "إجراء",
+            primary: !!a.primary,
+            onClick: () => {
+              if (a.url) {
+                location.href = a.url;
+                return;
+              }
+              if (a.focus) {
+                getFieldEl(form, a.focus)?.focus?.();
+              }
+            }
+          }))
+        : [];
+
+      showMsg(bar, data.message || "تعذّر حفظ التلقيح.", "error", actions);
+      return;
+    }
+
+    showMsg(bar, data.message || "✅ تم حفظ التلقيح بنجاح", "success", Array.isArray(data.actions)
+      ? data.actions.map((a) => ({
+          label: a.label || "فتح",
+          primary: !!a.primary,
+          onClick: () => {
+            if (a.url) location.href = a.url;
+          }
+        }))
+      : []
+    );
+
+    form.dispatchEvent(
+      new CustomEvent("mbk:saved", {
+        bubbles: true,
+        detail: { response: data, eventName, form }
+      })
+    );
+
+    return;
+
+  } catch (err) {
+    console.error("insemination server save failed:", err);
+    showMsg(bar, "تعذّر الاتصال بالسيرفر أثناء حفظ التلقيح.", "error");
     return;
 
   } finally {
