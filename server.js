@@ -5987,7 +5987,10 @@ function calcAbortionAgeAndCauseSrv(lastAI, eventDate) {
     return {
       gestationDays: null,
       abortionAgeMonths: null,
-      probableCause: ""
+      probableCause: "",
+      probableCauses: [],
+      abortionDiagnosticMatrix: [],
+      abortionDiagnosticNote: ""
     };
   }
 
@@ -5997,22 +6000,145 @@ function calcAbortionAgeAndCauseSrv(lastAI, eventDate) {
     return {
       gestationDays: null,
       abortionAgeMonths: null,
-      probableCause: ""
+      probableCause: "",
+      probableCauses: [],
+      abortionDiagnosticMatrix: [],
+      abortionDiagnosticNote: ""
     };
   }
 
   const monthsRaw = Math.max(0, gDays / 30.44);
   const months = Number.isFinite(monthsRaw) ? Number(monthsRaw.toFixed(1)) : null;
 
-  const cause =
-    (months !== null && months >= 6)
-      ? "احتمال بروسيلا (≥6 شهور)"
-      : "احتمال BVD (<6 شهور)";
+  // ======================================================
+  // Murabbik — Abortion Diagnostic Matrix by DCC
+  // ملاحظة: هذه احتمالات وبائية/تشخيصية حسب عمر الحمل
+  // وليست تشخيصًا نهائيًا بدون معمل
+  // ======================================================
+  const matrix = [
+    {
+      key: "bvdv",
+      name: "BVDV",
+      labelAr: "فيروس الإسهال الفيروسي البقري BVD",
+      minDcc: 45,
+      maxDcc: 125,
+      zoonotic: false,
+      regulatory: false,
+      shortNote: "إجهاض مبكر إلى متوسط؛ قد يسبب موت جنيني/تحنط، وتشوهات إذا حدثت العدوى تقريبًا بين 100–150 يوم.",
+      tests: [
+        "PCR من طحال/رئة/غدة زعترية للجنين",
+        "IHC على الجلد أو عينة أذن",
+        "Serology للجنين إذا تجاوز 120 يومًا"
+      ]
+    },
+    {
+      key: "neospora_caninum",
+      name: "Neospora caninum",
+      labelAr: "نيوسبورا",
+      minDcc: 90,
+      maxDcc: 180,
+      zoonotic: false,
+      regulatory: false,
+      shortNote: "إجهاض متوسط؛ يرتبط بآفات في المخ والقلب مثل encephalitis و myocarditis.",
+      tests: [
+        "Histopathology لمخ الجنين",
+        "IHC للمخ/القلب",
+        "ELISA لمصل الأم كدليل تعرض"
+      ]
+    },
+    {
+      key: "bhv1_ibr",
+      name: "BHV-1 / IBR",
+      labelAr: "IBR / BHV-1",
+      minDcc: 120,
+      maxDcc: 260,
+      zoonotic: false,
+      regulatory: false,
+      shortNote: "إجهاض متأخر غالبًا؛ قد يظهر autolysis وبؤر نخرية بيضاء بالكبد والطحال.",
+      tests: [
+        "FAT على كبد/كلية الجنين",
+        "PCR أو عزل فيروسي من رئة/كبد الجنين",
+        "Histopathology للمشيمة"
+      ]
+    },
+    {
+      key: "leptospira",
+      name: "Leptospira spp.",
+      labelAr: "ليبتوسبيرا",
+      minDcc: 181,
+      maxDcc: 260,
+      zoonotic: true,
+      regulatory: false,
+      shortNote: "إجهاض متأخر؛ قد يصاحبه autolysis، يرقان، التهاب بريتوني، وتضخم كلى.",
+      tests: [
+        "PCR من بول الجنين أو نسيج الكلى",
+        "FAT على الكلى",
+        "MAT لمصل الأم"
+      ]
+    },
+    {
+      key: "brucella_abortus",
+      name: "Brucella abortus",
+      labelAr: "بروسيلا",
+      minDcc: 180,
+      maxDcc: 260,
+      zoonotic: true,
+      regulatory: true,
+      shortNote: "إجهاض متأخر؛ خطر حيواني-إنساني عالٍ، مع آفات مشيمية جلدية/سميكة وقد يظهر التهاب رئوي جنيني.",
+      tests: [
+        "Culture/PCR من محتوى معدة الجنين أو الرئة أو سوائل الرحم",
+        "RBPT لمصل الأم",
+        "Milk Ring Test عند الحاجة"
+      ]
+    },
+    {
+      key: "mycotic_abortion",
+      name: "Mycotic abortion",
+      labelAr: "إجهاض فطري",
+      minDcc: 180,
+      maxDcc: 999,
+      zoonotic: false,
+      regulatory: false,
+      shortNote: "غالبًا متأخر إلى قرب الولادة؛ يرتبط بأعلاف/سيلاج متعفن، ومشيمة جلدية سميكة وآفات جلدية فطرية بالجنين.",
+      tests: [
+        "فحص ميكروسكوبي مباشر لمسحات cotyledons",
+        "Histopathology للمشيمة لإظهار hyphae",
+        "Culture من محتوى معدة الجنين"
+      ]
+    }
+  ];
+
+  const matches = matrix.filter(x => gDays >= x.minDcc && gDays <= x.maxDcc);
+
+  const probableCauses = matches.map(x => x.labelAr);
+
+  let probableCause = "";
+
+  if (matches.length) {
+    probableCause =
+      `احتمالات معدية حسب عمر الحمل ${gDays} يوم: ` +
+      probableCauses.join(" / ");
+  } else {
+    probableCause =
+      `عمر الحمل ${gDays} يوم خارج نطاق الأسباب المعدية الرئيسية في مصفوفة DCC؛ يلزم تقييم بيطري ومعملي.`;
+  }
+
+  const zoonoticHits = matches.filter(x => x.zoonotic).map(x => x.labelAr);
+  const regulatoryHits = matches.filter(x => x.regulatory).map(x => x.labelAr);
+
+  const abortionDiagnosticNote = [
+    "النتيجة احتمالية حسب DCC وليست تشخيصًا نهائيًا.",
+    zoonoticHits.length ? `⚠️ احتمال مرض مشترك: ${zoonoticHits.join(" / ")}.` : "",
+    regulatoryHits.length ? `🚨 احتمال مرض واجب الإبلاغ/التعامل الرسمي: ${regulatoryHits.join(" / ")}.` : ""
+  ].filter(Boolean).join(" ");
 
   return {
     gestationDays: gDays,
     abortionAgeMonths: months,
-    probableCause: cause
+    probableCause,
+    probableCauses,
+    abortionDiagnosticMatrix: matches,
+    abortionDiagnosticNote
   };
 }
 // ============================================================
@@ -6366,8 +6492,11 @@ app.post("/api/abortion/gate", requireUserId, async (req, res) => {
       species,
       lastInseminationDate,
       abortionAgeMonths: derived.abortionAgeMonths,
-      probableCause: derived.probableCause,
-      gestationDays: derived.gestationDays,
+probableCause: derived.probableCause,
+probableCauses: derived.probableCauses || [],
+abortionDiagnosticMatrix: derived.abortionDiagnosticMatrix || [],
+abortionDiagnosticNote: derived.abortionDiagnosticNote || "",
+gestationDays: derived.gestationDays,
       signals
     });
 
@@ -6511,6 +6640,9 @@ app.post("/api/abortion/save", requireUserId, async (req, res) => {
       gestationDays: derived.gestationDays,
       abortionAgeMonths: derived.abortionAgeMonths,
       probableCause: derived.probableCause,
+probableCauses: derived.probableCauses || [],
+abortionDiagnosticMatrix: derived.abortionDiagnosticMatrix || [],
+abortionDiagnosticNote: derived.abortionDiagnosticNote || "",
 
       notes: String(formData.notes || "").trim(),
 
@@ -6537,6 +6669,9 @@ app.post("/api/abortion/save", requireUserId, async (req, res) => {
       gestationDays: derived.gestationDays,
       abortionAgeMonths: derived.abortionAgeMonths,
       probableCause: derived.probableCause,
+      probableCauses: derived.probableCauses || [],
+      abortionDiagnosticMatrix: derived.abortionDiagnosticMatrix || [],
+      abortionDiagnosticNote: derived.abortionDiagnosticNote || "",
 
       actions: [
         {
