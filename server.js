@@ -6947,6 +6947,503 @@ await batch.commit();
   }
 });
 // ============================================================
+//                 PREGNANCY DIAGNOSIS — server-side only
+//                 نقل قرار/حفظ تشخيص الحمل للسيرفر فقط
+// ============================================================
+
+function validatePregnancyDiagnosisFieldsSrv(fd = {}) {
+  const fieldErrors = {};
+
+  if (!String(fd.animalNumber || "").trim()) {
+    fieldErrors.animalNumber = "رقم الحيوان مطلوب.";
+  }
+
+  if (!String(fd.eventDate || "").trim() || !calvingIsDateSrv(fd.eventDate)) {
+    fieldErrors.eventDate = "تاريخ التشخيص غير صالح.";
+  }
+
+  if (!fd.documentData) {
+    fieldErrors.documentData = "تعذّر العثور على الحيوان.";
+  }
+
+  if (!String(fd.method || "").trim()) {
+    fieldErrors.method = "طريقة التشخيص مطلوبة.";
+  }
+
+  if (!String(fd.result || "").trim()) {
+    fieldErrors.result = "نتيجة التشخيص مطلوبة.";
+  }
+
+  return fieldErrors;
+}
+
+function normalizePregnancyMethodSrv(v) {
+  const s = String(v || "").trim();
+
+  if (s === "ultrasound" || s === "سونار") return "سونار";
+  if (s === "manual" || s === "جس يدوي" || s === "يدوي") return "جس يدوي";
+
+  return s;
+}
+
+function normalizePregnancyResultSrv(v) {
+  const s = String(v || "").trim();
+
+  if (s.includes("عشار") || s.toLowerCase() === "positive" || s.toLowerCase() === "pregnant") {
+    return "عشار";
+  }
+
+  if (s.includes("فارغة") || s.includes("فارغه") || s.toLowerCase() === "negative" || s.toLowerCase() === "open") {
+    return "فارغة";
+  }
+
+  return s;
+}
+
+function pregnancyDiagnosisDecisionSrv(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+
+  const st = String(doc.status ?? "").trim().toLowerCase();
+  if (st === "inactive") {
+    return "❌ لا يمكن تسجيل تشخيص حمل — الحيوان خارج القطيع.";
+  }
+
+  // الحالة التناسلية: من الأحداث أولًا ثم الوثيقة
+  const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
+  const rsNorm = calvingStripArSrv(rsRaw);
+
+  // لازم تكون ملقحة فقط
+  if (!rsNorm.includes("ملقح")) {
+    const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+    return `❌ لا يمكن تشخيص الحمل — الحالة التناسلية يجب أن تكون «ملقحة» فقط.\nالحالة الحالية: ${shown}.`;
+  }
+
+  const method = normalizePregnancyMethodSrv(fd.method);
+  const isSono = method === "سونار";
+  const isManual = method === "جس يدوي";
+
+  if (!isSono && !isManual) {
+    return "❌ طريقة التشخيص غير معروفة.";
+  }
+
+  const minDays = isSono ? 26 : 40;
+
+  const lastAI = String(
+    fd.lastInseminationDate ||
+    doc.lastInseminationDate ||
+    doc.lastAI ||
+    doc.lastInsemination ||
+    ""
+  ).trim();
+
+  if (!calvingIsDateSrv(lastAI)) {
+    return '❌ لا يمكن تشخيص الحمل — لا يوجد "آخر تلقيح" صحيح.';
+  }
+
+  if (!calvingIsDateSrv(fd.eventDate)) {
+    return "❌ تاريخ التشخيص غير صالح.";
+  }
+
+  const diff = calvingDaysBetweenSrv(lastAI, fd.eventDate);
+  if (!Number.isFinite(diff)) {
+    return "❌ تعذّر حساب الأيام منذ آخر تلقيح.";
+  }
+
+  if (diff < minDays) {
+    return `❌ لا يمكن تشخيص الحمل الآن — مرّ ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لطريقة «${method}» هو ${minDays} يوم.`;
+  }
+
+  return null;
+}
+
+async function updateAnimalByPregnancyDiagnosisSrv(ev = {}) {
+  const uid = String(ev.userId || "").trim();
+  const animalNumber = calvingNormDigitsOnlySrv(
+    ev.animalNumber ||
+    ev.number ||
+    ev.animalId ||
+    ""
+  );
+
+  if (!uid || !animalNumber) {
+    console.warn("⛔ updateAnimalByPregnancyDiagnosisSrv: missing uid/animalNumber", { uid, animalNumber, ev });
+    return;
+  }
+
+  const animal = await findAnimalDocByNumberSrv(uid, animalNumber);
+
+  if (!animal || !animal.id) {
+    console.warn("⛔ animal not found for pregnancy diagnosis update:", { uid, animalNumber });
+    return;
+  }
+
+  const result = normalizePregnancyResultSrv(ev.result);
+  const eventDate = String(ev.eventDate || "").trim().slice(0, 10);
+
+  const patch = {
+    lastDiagnosis: "تشخيص حمل",
+    lastDiagnosisDate: eventDate,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    status: "active"
+  };
+
+  if (result === "عشار") {
+    patch.reproductiveStatus = "عشار";
+  }
+
+  if (result === "فارغة") {
+    patch.reproductiveStatus = "مفتوحة";
+  }
+
+  await db.collection("animals").doc(animal.id).set(patch, { merge: true });
+
+  console.log("🔥 animal updated by pregnancy diagnosis:", animal.id, patch);
+}
+
+// ============================================================
+//                 API: PREGNANCY DIAGNOSIS GATE
+//                 تحقق تشخيص الحمل من السيرفر فقط — بدون حفظ
+// ============================================================
+
+app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        allowed: false,
+        error: "firestore_disabled",
+        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const animalNumber = calvingNormDigitsOnlySrv(
+      body.animalNumber ||
+      body.number ||
+      ""
+    );
+
+    const eventDate = String(
+      body.eventDate ||
+      body.date ||
+      ""
+    ).trim().slice(0, 10);
+
+    if (!animalNumber || !eventDate) {
+      return res.json({
+        ok: true,
+        allowed: false,
+        silent: true
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        allowed: false,
+        message: "❌ رقم الحيوان غير موجود في حسابك. اكتب الرقم الصحيح أولًا."
+      });
+    }
+
+    const doc = animal.data || {};
+    const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+
+    let species = String(
+      body.species ||
+      doc.species ||
+      doc.animalTypeAr ||
+      doc.animalType ||
+      doc.animaltype ||
+      doc.type ||
+      ""
+    ).trim();
+
+    if (/cow|بقر/i.test(species)) species = "أبقار";
+    if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+
+    const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+    const reproStatus = reproFromEvents || reproFromDoc || "";
+
+    const lastInseminationDate = String(
+      signals.lastInseminationDateFromEvents ||
+      doc.lastInseminationDate ||
+      ""
+    ).trim();
+
+    const gateData = {
+      animalNumber,
+      eventDate,
+      animalId: animal.id || "",
+      species,
+      documentData: doc,
+      reproductiveStatus: reproStatus,
+      reproStatusFromEvents: reproFromEvents,
+      lastInseminationDate,
+      method: normalizePregnancyMethodSrv(body.method),
+      result: normalizePregnancyResultSrv(body.result),
+      lastBoundary: String(signals.lastBoundary || "").trim(),
+      lastBoundaryType: String(signals.lastBoundaryType || "").trim()
+    };
+
+    const errMsg = pregnancyDiagnosisDecisionSrv(gateData);
+
+    if (errMsg) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: String(errMsg)
+      });
+    }
+
+    return res.json({
+      ok: true,
+      allowed: true,
+      message: "✅ تم التحقق — أكمل تسجيل تشخيص الحمل.",
+      animalId: animal.id || "",
+      animalNumber,
+      species,
+      reproductiveStatus: reproStatus,
+      lastInseminationDate,
+      method: gateData.method,
+      result: gateData.result,
+      signals
+    });
+
+  } catch (e) {
+    console.error("pregnancy-diagnosis-gate", e);
+
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      error: "pregnancy_diagnosis_gate_failed",
+      message: "❌ تعذّر التحقق من أهلية تشخيص الحمل الآن."
+    });
+  }
+});
+
+// ============================================================
+//                 API: PREGNANCY DIAGNOSIS SAVE
+//                 حفظ تشخيص الحمل وتحديث الحيوان من السيرفر فقط
+// ============================================================
+
+app.post("/api/pregnancy-diagnosis/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر حفظ تشخيص الحمل – قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const formData = req.body || {};
+
+    const animalNumber = calvingNormDigitsOnlySrv(
+      formData.animalNumber ||
+      formData.number ||
+      ""
+    );
+
+    const eventDate = String(
+      formData.eventDate ||
+      formData.date ||
+      ""
+    ).trim().slice(0, 10);
+
+    const method = normalizePregnancyMethodSrv(formData.method);
+    const result = normalizePregnancyResultSrv(formData.result);
+
+    if (!animalNumber || !eventDate) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ رقم الحيوان وتاريخ التشخيص مطلوبان.",
+        fieldErrors: {
+          animalNumber: !animalNumber ? "رقم الحيوان مطلوب." : undefined,
+          eventDate: !eventDate ? "تاريخ التشخيص غير صالح." : undefined
+        }
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        message: "❌ رقم الحيوان غير موجود في حسابك. اكتب الرقم الصحيح أولًا.",
+        fieldErrors: {
+          animalNumber: "تعذّر العثور على الحيوان."
+        }
+      });
+    }
+
+    const doc = animal.data || {};
+    const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+
+    let species = String(
+      formData.species ||
+      doc.species ||
+      doc.animalTypeAr ||
+      doc.animalType ||
+      doc.animaltype ||
+      doc.type ||
+      ""
+    ).trim();
+
+    if (/cow|بقر/i.test(species)) species = "أبقار";
+    if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+
+    const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+    const reproStatus = reproFromEvents || reproFromDoc || "";
+
+    const lastInseminationDate = String(
+      signals.lastInseminationDateFromEvents ||
+      doc.lastInseminationDate ||
+      ""
+    ).trim();
+
+    const gateData = {
+      ...formData,
+      animalNumber,
+      eventDate,
+      animalId: animal.id || "",
+      species,
+      documentData: doc,
+      reproductiveStatus: reproStatus,
+      reproStatusFromEvents: reproFromEvents,
+      lastInseminationDate,
+      method,
+      result,
+      lastBoundary: String(signals.lastBoundary || "").trim(),
+      lastBoundaryType: String(signals.lastBoundaryType || "").trim()
+    };
+
+    const fieldErrors = validatePregnancyDiagnosisFieldsSrv(gateData);
+
+    const cleanFieldErrors = {};
+    for (const [k, v] of Object.entries(fieldErrors || {})) {
+      if (v !== undefined && v !== null && String(v).trim() !== "") {
+        cleanFieldErrors[k] = v;
+      }
+    }
+
+    if (Object.keys(cleanFieldErrors).length) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ راجع بيانات تشخيص الحمل المطلوبة.",
+        fieldErrors: cleanFieldErrors
+      });
+    }
+
+    const decision = pregnancyDiagnosisDecisionSrv(gateData);
+
+    if (decision) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: String(decision)
+      });
+    }
+
+    const eventRef = db.collection("events").doc();
+
+    const payload = {
+      userId: uid,
+
+      animalId: animal.id || "",
+      animalNumber,
+      eventDate,
+
+      type: "تشخيص حمل",
+      eventType: "تشخيص حمل",
+      eventTypeNorm: "pregnancy_diagnosis",
+
+      method,
+      result,
+      vet: String(formData.vet || "").trim() || null,
+
+      species,
+      reproductiveStatusBefore: reproStatus || "",
+      lastInseminationDate,
+
+      source: "server:/api/pregnancy-diagnosis/save",
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const batch = db.batch();
+
+    batch.set(eventRef, payload);
+
+    const animalPatch = {
+      lastDiagnosis: "تشخيص حمل",
+      lastDiagnosisDate: eventDate,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: "active"
+    };
+
+    if (result === "عشار") {
+      animalPatch.reproductiveStatus = "عشار";
+    }
+
+    if (result === "فارغة") {
+      animalPatch.reproductiveStatus = "مفتوحة";
+    }
+
+    batch.set(db.collection("animals").doc(animal.id), animalPatch, { merge: true });
+
+    await batch.commit();
+
+    if (typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "pregnancy_diagnosis_save");
+    }
+
+    return res.json({
+      ok: true,
+      message: "✅ تم حفظ تشخيص الحمل بنجاح",
+      id: eventRef.id,
+      eventId: eventRef.id,
+
+      animalId: animal.id || "",
+      animalNumber,
+      eventDate,
+      method,
+      result,
+
+      reproductiveStatus: animalPatch.reproductiveStatus || reproStatus || "",
+
+      actions: [
+        {
+          key: "event_list",
+          label: "فتح قائمة الأحداث",
+          primary: true,
+          url: `/event-list.html?number=${encodeURIComponent(animalNumber)}`
+        },
+        {
+          key: "cow_card",
+          label: "فتح بطاقة الحيوان",
+          url: `/cow-card.html?number=${encodeURIComponent(animalNumber)}`
+        }
+      ]
+    });
+
+  } catch (e) {
+    console.error("pregnancy-diagnosis-save", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "pregnancy_diagnosis_save_failed",
+      message: "❌ تعذّر حفظ تشخيص الحمل الآن."
+    });
+  }
+});
+// ============================================================
 //                 API: ABORTION GATE
 //                 تحقق الإجهاض من السيرفر فقط — بدون حفظ
 // ============================================================
