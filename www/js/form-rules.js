@@ -232,7 +232,8 @@ export const eventSchemas = {
     inseminationTime: { required: true, msg: "وقت التلقيح مطلوب." },
     heatStatus: { required: true, msg: "حالة الشياع مطلوبة." }
   },
-  guards: ["inseminationDecision"]
+   // ✅ التلقيح server-side فقط: gate/save/decision في server.js
+  guards: []
 },
 
 
