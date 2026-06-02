@@ -6811,19 +6811,25 @@ app.post("/api/insemination/save", requireUserId, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
 
-    const eventRef = await db.collection("events").add(payload);
+const prevServices = Number(doc.servicesCount || 0);
+const nextServices = Number.isFinite(prevServices) ? prevServices + 1 : 1;
 
-    const prevServices = Number(doc.servicesCount || 0);
-    const nextServices = Number.isFinite(prevServices) ? prevServices + 1 : 1;
+const animalCol = animal._collection || "animals";
+const eventRef = db.collection("events").doc();
+const animalRef = db.collection(animalCol).doc(animal.id);
 
-    const animalCol = animal._collection || "animals";
+const batch = db.batch();
 
-    await db.collection(animalCol).doc(animal.id).set({
-      reproductiveStatus: "ملقحة",
-      lastInseminationDate: eventDate,
-      servicesCount: nextServices,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+batch.set(eventRef, payload);
+
+batch.set(animalRef, {
+  reproductiveStatus: "ملقحة",
+  lastInseminationDate: eventDate,
+  servicesCount: nextServices,
+  updatedAt: admin.firestore.FieldValue.serverTimestamp()
 }, { merge: true });
+
+await batch.commit();
     if (typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "insemination_save");
     }
