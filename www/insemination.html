@@ -205,11 +205,13 @@
         <option>اصطناعي</option>
       </select>
 
-      <label>كود السائل المنوي *</label>
-      <input data-field="semenCode" />
+     <label>كود السائل المنوي *</label>
+     <input data-field="semenCode" list="semenCodeOptions" autocomplete="off" />
+     <datalist id="semenCodeOptions"></datalist>
 
-      <label>اسم الملقّح *</label>
-      <input data-field="inseminator" />
+     <label>اسم الملقّح *</label>
+     <input data-field="inseminator" list="inseminatorOptions" autocomplete="off" />
+     <datalist id="inseminatorOptions"></datalist>
 
       <label>وقت التلقيح *</label>
       <div class="radio-group">
@@ -280,6 +282,47 @@
       location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
     });
   }
+    async function loadInseminationSavedOptions() {
+    const uid =
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("ownerUid") ||
+      "";
+
+    if (!uid) return;
+
+    try {
+      const r = await fetch("/api/insemination/options", {
+        headers: { "X-User-Id": uid }
+      });
+
+      const data = await r.json().catch(() => null);
+      if (!data || data.ok !== true) return;
+
+      const semenList = document.getElementById("semenCodeOptions");
+      const inseminatorList = document.getElementById("inseminatorOptions");
+
+      if (semenList) {
+        semenList.innerHTML = "";
+        (data.semenCodes || []).forEach(v => {
+          const opt = document.createElement("option");
+          opt.value = v;
+          semenList.appendChild(opt);
+        });
+      }
+
+      if (inseminatorList) {
+        inseminatorList.innerHTML = "";
+        (data.inseminators || []).forEach(v => {
+          const opt = document.createElement("option");
+          opt.value = v;
+          inseminatorList.appendChild(opt);
+        });
+      }
+    } catch (_) {}
+  }
+
+  loadInseminationSavedOptions();
 </script>  
 </body>
 </html>
