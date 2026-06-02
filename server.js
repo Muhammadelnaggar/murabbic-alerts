@@ -6820,8 +6820,6 @@ const animalRef = db.collection(animalCol).doc(animal.id);
 
 const batch = db.batch();
 
-const batch = db.batch();
-
 batch.set(eventRef, payload);
 
 batch.set(animalRef, {
