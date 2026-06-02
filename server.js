@@ -6816,13 +6816,14 @@ app.post("/api/insemination/save", requireUserId, async (req, res) => {
     const prevServices = Number(doc.servicesCount || 0);
     const nextServices = Number.isFinite(prevServices) ? prevServices + 1 : 1;
 
-    await animal.ref.set({
+    const animalCol = animal._collection || "animals";
+
+    await db.collection(animalCol).doc(animal.id).set({
       reproductiveStatus: "ملقحة",
       lastInseminationDate: eventDate,
       servicesCount: nextServices,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
+}, { merge: true });
     if (typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "insemination_save");
     }
