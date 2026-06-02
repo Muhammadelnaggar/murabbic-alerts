@@ -259,7 +259,8 @@ export const eventSchemas = {
     lastInseminationDate: { required: false, type: "date" },
     species: { required: false },
   },
-  guards: ["abortionDecision"],
+  // ✅ الإجهاض server-side فقط: gate/save/decision في server.js
+  guards: [],
 },
 
 
