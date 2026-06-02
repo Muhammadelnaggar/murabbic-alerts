@@ -5904,6 +5904,128 @@ async function fetchCalvingSignalsFromEventsSrv(uid, number) {
   };
 }
 // ============================================================
+//                 INSEMINATION VALIDATION + DECISION
+//                 نقل فاليديشن وقرار التلقيح كما هو للسيرفر
+// ============================================================
+
+function inseminationReqSrv(v) {
+  return !(v === undefined || v === null || String(v).trim() === "");
+}
+
+function inseminationIsDateSrv(v) {
+  const d = v instanceof Date ? v : (v ? new Date(v) : null);
+  return !Number.isNaN(d?.getTime());
+}
+
+function inseminationDaysBetweenSrv(a, b) {
+  const d1 = a instanceof Date ? a : (a ? new Date(a) : null);
+  const d2 = b instanceof Date ? b : (b ? new Date(b) : null);
+  if (!d1 || !d2) return NaN;
+  d1.setHours(0, 0, 0, 0);
+  d2.setHours(0, 0, 0, 0);
+  return Math.round((d2 - d1) / 86400000);
+}
+
+function validateInseminationFieldsSrv(fd = {}) {
+  const fieldErrors = {};
+
+  if (!inseminationReqSrv(fd.animalNumber)) {
+    fieldErrors.animalNumber = "رقم الحيوان مطلوب.";
+  }
+
+  if (!inseminationReqSrv(fd.eventDate) || !inseminationIsDateSrv(fd.eventDate)) {
+    fieldErrors.eventDate = "تاريخ التلقيح غير صالح.";
+  }
+
+  if (!fd.documentData) {
+    fieldErrors.documentData = "تعذّر العثور على الحيوان.";
+  }
+
+  if (!inseminationReqSrv(fd.species)) {
+    fieldErrors.species = "نوع الحيوان غير محدد.";
+  }
+
+  if (!inseminationReqSrv(fd.inseminationMethod)) {
+    fieldErrors.inseminationMethod = "طريقة التلقيح مطلوبة.";
+  }
+
+  if (!inseminationReqSrv(fd.semenCode)) {
+    fieldErrors.semenCode = "كود السائل المنوي مطلوب.";
+  }
+
+  if (!inseminationReqSrv(fd.inseminator)) {
+    fieldErrors.inseminator = "اسم الملقّح مطلوب.";
+  }
+
+  if (!inseminationReqSrv(fd.inseminationTime)) {
+    fieldErrors.inseminationTime = "وقت التلقيح مطلوب.";
+  }
+
+  if (!inseminationReqSrv(fd.heatStatus)) {
+    fieldErrors.heatStatus = "حالة الشياع مطلوبة.";
+  }
+
+  return fieldErrors;
+}
+
+function inseminationDecisionSrv(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+
+  // ❌ خارج القطيع
+  const st = String(doc.status ?? "").trim().toLowerCase();
+  if (st === "inactive") return "❌ لا يمكن تسجيل تلقيح — الحيوان خارج القطيع.";
+
+  // ✅ تحديد النوع
+  let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+  const minPostCalving = { "أبقار": 60, "جاموس": 45 };
+
+  // ❌ عشار
+  const repro = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
+  if (repro.includes("عشار")) {
+    return "❌ الحيوان مسجل عِشار — لا يمكن تلقيحه.";
+  }
+
+  // ❌ لازم تاريخ ولادة
+  const lastCalving =
+    String(doc.lastCalvingDate || "").trim() ||
+    (String(fd.lastBoundaryType || "").trim() === "ولادة" ? String(fd.lastBoundary || "").trim() : "");
+
+  if (!lastCalving) return "❌ لا يوجد تاريخ آخر ولادة.";
+
+  const gapCalving = inseminationDaysBetweenSrv(lastCalving, fd.eventDate);
+
+  if (!Number.isFinite(gapCalving)) {
+    return "❌ تعذّر حساب الأيام منذ آخر ولادة.";
+  }
+
+  if (gapCalving < minPostCalving[sp]) {
+    return `❌ لا يمكن التلقيح الآن — مرّ ${gapCalving} يوم فقط بعد آخر ولادة.\nالحد الأدنى: ${minPostCalving[sp]} يوم.`;
+  }
+
+  // ✅ آخر تلقيح: من الأحداث أولًا ثم الوثيقة
+  const lastAI = String(fd.lastInseminationDate || doc.lastInseminationDate || "").trim();
+
+  if (lastAI) {
+    const gapAI = inseminationDaysBetweenSrv(lastAI, fd.eventDate);
+
+    // ❌ منع تكرار نفس اليوم
+    if (gapAI === 0) {
+      return "❌ لا يمكن تسجيل تلقيح مرتين في نفس اليوم.";
+    }
+
+    // ⚠️ تحذير لو أقل من 11 يوم
+    if (gapAI < 11) {
+      return `WARN|⚠️ تنبيه: آخر تلقيح منذ ${gapAI} يوم فقط (أقل من 11 يوم).`;
+    }
+  }
+
+  return null;
+}
+// ============================================================
 //                 ABORTION DECISION — moved from form-rules.js
 //                 نقل قرار الإجهاض للسيرفر فقط
 // ============================================================
@@ -6410,6 +6532,334 @@ async function existsAbortionSameDaySrv(uid, number, dateISO) {
 
   return !snap.empty;
 }
+// ============================================================
+//                 API: INSEMINATION GATE
+//                 تحقق التلقيح من السيرفر فقط — بدون حفظ
+// ============================================================
+
+app.post("/api/insemination/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        allowed: false,
+        error: "firestore_disabled",
+        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const animalNumber = calvingNormDigitsOnlySrv(
+      body.animalNumber ||
+      body.number ||
+      ""
+    );
+
+    const eventDate = String(
+      body.eventDate ||
+      body.date ||
+      ""
+    ).trim().slice(0, 10);
+
+    if (!animalNumber || !eventDate) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: "❌ رقم الحيوان وتاريخ التلقيح مطلوبان."
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        allowed: false,
+        message: "❌ تعذّر العثور على الحيوان — تحقق من الرقم."
+      });
+    }
+
+    const doc = animal || {};
+
+    const species = normalizeSpeciesInseminationSrv(
+      body.species ||
+      doc.species ||
+      doc.animalTypeAr ||
+      doc.animalType ||
+      doc.animaltype ||
+      doc.type ||
+      ""
+    );
+
+   const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+
+    const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+    const reproStatus = reproFromEvents || reproFromDoc || "";
+
+    const lastInseminationDate = String(
+      signals.lastInseminationDateFromEvents ||
+      doc.lastInseminationDate ||
+      ""
+    ).trim();
+
+    const gateData = {
+      animalNumber,
+      eventDate,
+      animalId: animal.id || "",
+      species,
+      documentData: doc,
+      reproductiveStatus: reproStatus,
+      reproStatusFromEvents: reproFromEvents,
+      lastInseminationDate,
+      lastBoundary: String(signals.lastBoundary || "").trim(),
+      lastBoundaryType: String(signals.lastBoundaryType || "").trim()
+    };
+
+    const errMsg = inseminationDecisionSrv(gateData);
+
+    if (errMsg) {
+      const raw = String(errMsg || "");
+      const isWarn = raw.startsWith("WARN|");
+      const message = isWarn ? raw.replace(/^WARN\|/, "") : raw;
+
+      return res.status(isWarn ? 200 : 400).json({
+        ok: isWarn ? true : false,
+        allowed: isWarn ? true : false,
+        warning: isWarn,
+        message
+      });
+    }
+
+    return res.json({
+      ok: true,
+      allowed: true,
+      message: "✅ تم التحقق — أكمل تسجيل التلقيح.",
+      animalId: animal.id || "",
+      animalNumber,
+      species,
+      reproductiveStatus: reproStatus,
+      lastInseminationDate,
+      lastBoundary: String(signals.lastBoundary || "").trim(),
+      lastBoundaryType: String(signals.lastBoundaryType || "").trim(),
+      signals
+    });
+
+  } catch (e) {
+    console.error("insemination-gate", e);
+
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      error: "insemination_gate_failed",
+      message: "❌ تعذّر التحقق من أهلية التلقيح الآن."
+    });
+  }
+});
+// ============================================================
+//                 API: INSEMINATION SAVE
+//                 حفظ التلقيح وتحديث الحيوان من السيرفر فقط
+// ============================================================
+
+app.post("/api/insemination/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر حفظ التلقيح – قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const formData = req.body || {};
+
+    const animalNumber = calvingNormDigitsOnlySrv(
+      formData.animalNumber ||
+      formData.number ||
+      ""
+    );
+
+    const eventDate = String(
+      formData.eventDate ||
+      formData.date ||
+      ""
+    ).trim().slice(0, 10);
+
+    if (!animalNumber || !eventDate) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ رقم الحيوان وتاريخ التلقيح مطلوبان.",
+        fieldErrors: {
+          animalNumber: !animalNumber ? "رقم الحيوان مطلوب." : undefined,
+          eventDate: !eventDate ? "تاريخ التلقيح غير صالح." : undefined
+        }
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        message: "❌ رقم الحيوان غير موجود في حسابك. اكتب الرقم الصحيح أولًا.",
+        fieldErrors: {
+          animalNumber: "تعذّر العثور على الحيوان."
+        }
+      });
+    }
+
+    const doc = animal.data || {};
+
+    const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+
+    let species = String(
+      formData.species ||
+      doc.species ||
+      doc.animalTypeAr ||
+      doc.animalType ||
+      doc.animaltype ||
+      doc.type ||
+      ""
+    ).trim();
+
+    if (/cow|بقر/i.test(species)) species = "أبقار";
+    if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+
+    const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+    const reproStatus = reproFromEvents || reproFromDoc || "";
+
+    const lastInseminationDate = String(
+      signals.lastInseminationDateFromEvents ||
+      doc.lastInseminationDate ||
+      ""
+    ).trim();
+
+    const gateData = {
+      ...formData,
+      animalNumber,
+      eventDate,
+      animalId: animal.id || "",
+      species,
+      documentData: doc,
+      reproductiveStatus: reproStatus,
+      reproStatusFromEvents: reproFromEvents,
+      lastInseminationDate,
+      lastBoundary: String(signals.lastBoundary || "").trim(),
+      lastBoundaryType: String(signals.lastBoundaryType || "").trim()
+    };
+
+    const fieldErrors = validateInseminationFieldsSrv(gateData);
+
+    const cleanFieldErrors = {};
+    for (const [k, v] of Object.entries(fieldErrors || {})) {
+      if (v !== undefined && v !== null && String(v).trim() !== "") {
+        cleanFieldErrors[k] = v;
+      }
+    }
+
+    if (Object.keys(cleanFieldErrors).length) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ راجع بيانات التلقيح المطلوبة.",
+        fieldErrors: cleanFieldErrors
+      });
+    }
+
+    const decision = inseminationDecisionSrv(gateData);
+
+    if (decision) {
+      const raw = String(decision || "");
+      const isWarn = raw.startsWith("WARN|");
+      const message = isWarn ? raw.replace(/^WARN\|/, "") : raw;
+
+      if (!isWarn) {
+        return res.status(400).json({
+          ok: false,
+          message
+        });
+      }
+
+      // التحذير لا يمنع الحفظ — مطابق للمنطق القديم
+    }
+
+    const payload = {
+      userId: uid,
+      animalId: animal.id || "",
+      animalNumber,
+      eventDate,
+
+      eventType: "insemination",
+      type: "insemination",
+      eventTypeNorm: "insemination",
+
+      inseminationMethod: String(formData.inseminationMethod || "").trim(),
+      semenCode: String(formData.semenCode || "").trim(),
+      inseminator: String(formData.inseminator || "").trim(),
+      inseminationTime: String(formData.inseminationTime || "").trim(),
+      heatStatus: String(formData.heatStatus || "").trim(),
+      notes: String(formData.notes || "").trim() || null,
+
+      species,
+      source: "server:/api/insemination/save",
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const eventRef = await db.collection("events").add(payload);
+
+    const prevServices = Number(doc.servicesCount || 0);
+    const nextServices = Number.isFinite(prevServices) ? prevServices + 1 : 1;
+
+    await animal.ref.set({
+      reproductiveStatus: "ملقحة",
+      lastInseminationDate: eventDate,
+      servicesCount: nextServices,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    if (typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "insemination_save");
+    }
+
+    return res.json({
+      ok: true,
+      message: "✅ تم حفظ التلقيح بنجاح",
+      id: eventRef.id,
+      eventId: eventRef.id,
+      animalId: animal.id || "",
+      animalNumber,
+      eventDate,
+      reproductiveStatus: "ملقحة",
+      lastInseminationDate: eventDate,
+      servicesCount: nextServices,
+      actions: [
+        {
+          key: "event_list",
+          label: "فتح قائمة الأحداث",
+          primary: true,
+          url: `/event-list.html?number=${encodeURIComponent(animalNumber)}`
+        },
+        {
+          key: "cow_card",
+          label: "فتح بطاقة الحيوان",
+          url: `/cow-card.html?number=${encodeURIComponent(animalNumber)}`
+        }
+      ]
+    });
+
+  } catch (e) {
+    console.error("insemination-save", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "insemination_save_failed",
+      message: "❌ تعذّر حفظ التلقيح الآن."
+    });
+  }
+});
 // ============================================================
 //                 API: ABORTION GATE
 //                 تحقق الإجهاض من السيرفر فقط — بدون حفظ
