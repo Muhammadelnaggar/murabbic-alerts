@@ -6581,17 +6581,20 @@ app.post("/api/insemination/gate", requireUserId, async (req, res) => {
       });
     }
 
-    const doc = animal || {};
+   const doc = animal.data || {};
 
-    const species = normalizeSpeciesInseminationSrv(
-      body.species ||
-      doc.species ||
-      doc.animalTypeAr ||
-      doc.animalType ||
-      doc.animaltype ||
-      doc.type ||
-      ""
-    );
+let species = String(
+  body.species ||
+  doc.species ||
+  doc.animalTypeAr ||
+  doc.animalType ||
+  doc.animaltype ||
+  doc.type ||
+  ""
+).trim();
+
+if (/cow|بقر/i.test(species)) species = "أبقار";
+if (/buffalo|جاموس/i.test(species)) species = "جاموس";
 
    const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
 
