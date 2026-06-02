@@ -1778,133 +1778,7 @@ if (eventName === "فطام") {
   return true;
 }   
     
-// ======================================================
-// Murabbik — Abortion server-only save
-// لا validateEvent ولا mbk:valid للإجهاض هنا
-// السيرفر هو الذي يتحقق ويحفظ ويحدث الحيوان
-// ======================================================
-if (eventName === "إجهاض") {
-  const uid = await getUid();
 
-  const apiBase = String(
-    window.API_BASE ||
-    localStorage.getItem("API_BASE") ||
-    ""
-  ).replace(/\/$/, "");
-
-  const url = apiBase ? `${apiBase}/api/abortion/save` : "/api/abortion/save";
-
-  const submitBtn =
-    form.querySelector('button[type="submit"]') ||
-    document.querySelector(`[form="${form.id}"][type="submit"]`) ||
-    document.getElementById("saveBtn");
-
-  try {
-    if (submitBtn) submitBtn.disabled = true;
-
-    showMsg(bar, "جارِ حفظ الإجهاض…", "info");
-
-    const r = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": uid
-      },
-      body: JSON.stringify(formData)
-    });
-
-    const data = await r.json().catch(() => ({
-      ok: false,
-      message: "تعذّر قراءة رد السيرفر."
-    }));
-
-    if (!data.ok) {
-      clearFieldErrors(form);
-
-      if (data.fieldErrors && typeof data.fieldErrors === "object") {
-        for (const [fname, msg] of Object.entries(data.fieldErrors)) {
-          placeFieldError(form, fname, msg);
-        }
-        scrollToFirstFieldError(form);
-      }
-
-      const actions = Array.isArray(data.actions)
-        ? data.actions.map((a) => ({
-            label: a.label || "إجراء",
-            primary: !!a.primary,
-            onClick: () => {
-              if (a.url) {
-                location.href = a.url;
-                return;
-              }
-              if (a.focus) {
-                getFieldEl(form, a.focus)?.focus?.();
-              }
-            }
-          }))
-        : [];
-
-      showMsg(bar, data.message || "تعذّر حفظ الإجهاض.", "error", actions);
-      return;
-    }
-
-    const lastAIEl =
-      getFieldEl(form, "lastInseminationDate") ||
-      document.getElementById("lastInseminationDate");
-
-    if (lastAIEl && data.lastInseminationDate) {
-      lastAIEl.value = data.lastInseminationDate;
-    }
-
-    const ageEl =
-      getFieldEl(form, "abortionAgeMonths") ||
-      document.getElementById("abortionAgeMonths");
-
-    if (ageEl && data.abortionAgeMonths !== undefined && data.abortionAgeMonths !== null) {
-      ageEl.value = String(data.abortionAgeMonths);
-    }
-
-    const causeEl =
-      getFieldEl(form, "probableCause") ||
-      document.getElementById("probableCause");
-
-    if (causeEl && data.probableCause) {
-      causeEl.value = data.probableCause;
-    }
-
-    showMsg(
-      bar,
-      data.message || "تم حفظ الإجهاض بنجاح ✅",
-      "success",
-      Array.isArray(data.actions)
-        ? data.actions.map((a) => ({
-            label: a.label || "فتح",
-            primary: !!a.primary,
-            onClick: () => {
-              if (a.url) location.href = a.url;
-            }
-          }))
-        : []
-    );
-
-    form.dispatchEvent(
-      new CustomEvent("mbk:saved", {
-        bubbles: true,
-        detail: { response: data, eventName, form }
-      })
-    );
-
-    return;
-
-  } catch (err) {
-    console.error("abortion server save failed:", err);
-    showMsg(bar, "تعذّر الاتصال بالسيرفر أثناء حفظ الإجهاض.", "error");
-    return;
-
-  } finally {
-    if (submitBtn) submitBtn.disabled = false;
-  }
-}
     const v = validateEvent(eventName, formData);
 
     if (!v || v.ok === false) {
@@ -2109,6 +1983,133 @@ if (eventName === "ولادة") {
     if (submitBtn) submitBtn.disabled = false;
   }
 }
+// ======================================================
+// Murabbik — Abortion server-only save
+// لا validateEvent ولا mbk:valid للإجهاض هنا
+// السيرفر هو الذي يتحقق ويحفظ ويحدث الحيوان
+// ======================================================
+if (eventName === "إجهاض") {
+  const uid = await getUid();
+
+  const apiBase = String(
+    window.API_BASE ||
+    localStorage.getItem("API_BASE") ||
+    ""
+  ).replace(/\/$/, "");
+
+  const url = apiBase ? `${apiBase}/api/abortion/save` : "/api/abortion/save";
+
+  const submitBtn =
+    form.querySelector('button[type="submit"]') ||
+    document.querySelector(`[form="${form.id}"][type="submit"]`) ||
+    document.getElementById("saveBtn");
+
+  try {
+    if (submitBtn) submitBtn.disabled = true;
+
+    showMsg(bar, "جارِ حفظ الإجهاض…", "info");
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(formData)
+    });
+
+    const data = await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+
+    if (!data.ok) {
+      clearFieldErrors(form);
+
+      if (data.fieldErrors && typeof data.fieldErrors === "object") {
+        for (const [fname, msg] of Object.entries(data.fieldErrors)) {
+          placeFieldError(form, fname, msg);
+        }
+        scrollToFirstFieldError(form);
+      }
+
+      const actions = Array.isArray(data.actions)
+        ? data.actions.map((a) => ({
+            label: a.label || "إجراء",
+            primary: !!a.primary,
+            onClick: () => {
+              if (a.url) {
+                location.href = a.url;
+                return;
+              }
+              if (a.focus) {
+                getFieldEl(form, a.focus)?.focus?.();
+              }
+            }
+          }))
+        : [];
+
+      showMsg(bar, data.message || "تعذّر حفظ الإجهاض.", "error", actions);
+      return;
+    }
+
+    const lastAIEl =
+      getFieldEl(form, "lastInseminationDate") ||
+      document.getElementById("lastInseminationDate");
+
+    if (lastAIEl && data.lastInseminationDate) {
+      lastAIEl.value = data.lastInseminationDate;
+    }
+
+    const ageEl =
+      getFieldEl(form, "abortionAgeMonths") ||
+      document.getElementById("abortionAgeMonths");
+
+    if (ageEl && data.abortionAgeMonths !== undefined && data.abortionAgeMonths !== null) {
+      ageEl.value = String(data.abortionAgeMonths);
+    }
+
+    const causeEl =
+      getFieldEl(form, "probableCause") ||
+      document.getElementById("probableCause");
+
+    if (causeEl && data.probableCause) {
+      causeEl.value = data.probableCause;
+    }
+
+    showMsg(
+      bar,
+      data.message || "تم حفظ الإجهاض بنجاح ✅",
+      "success",
+      Array.isArray(data.actions)
+        ? data.actions.map((a) => ({
+            label: a.label || "فتح",
+            primary: !!a.primary,
+            onClick: () => {
+              if (a.url) location.href = a.url;
+            }
+          }))
+        : []
+    );
+
+    form.dispatchEvent(
+      new CustomEvent("mbk:saved", {
+        bubbles: true,
+        detail: { response: data, eventName, form }
+      })
+    );
+
+    return;
+
+  } catch (err) {
+    console.error("abortion server save failed:", err);
+    showMsg(bar, "تعذّر الاتصال بالسيرفر أثناء حفظ الإجهاض.", "error");
+    return;
+
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}    
 const v = validateEvent(eventName, formData);
 
 if (!v || v.ok === false) {
