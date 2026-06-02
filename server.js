@@ -5904,6 +5904,118 @@ async function fetchCalvingSignalsFromEventsSrv(uid, number) {
   };
 }
 // ============================================================
+//                 ABORTION DECISION — moved from form-rules.js
+//                 نقل قرار الإجهاض للسيرفر فقط
+// ============================================================
+
+function abortionDecisionSrv(fd) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+
+  // ✅ خارج القطيع
+  const st = String(doc?.status ?? "").trim().toLowerCase();
+  if (st === "inactive") {
+    return "❌ لا يمكن تسجيل إجهاض — الحيوان خارج القطيع.";
+  }
+
+  // ✅ تاريخ صالح
+  if (!calvingIsDateSrv(fd.eventDate)) {
+    return "❌ تاريخ الإجهاض غير صالح.";
+  }
+
+  // ✅ تحديد النوع
+  let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+  const th = CALVING_THRESHOLDS_SRV[sp]?.minGestationDays;
+  if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
+
+  // ✅ لازم يكون عشار
+  const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
+  const rsNorm = calvingStripArSrv(rsRaw);
+
+  if (!rsNorm.includes("عشار")) {
+    const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+    return `❌ الحيوان ليس عِشار — الحالة التناسلية الحالية: ${shown}.`;
+  }
+
+  // ✅ لازم آخر تلقيح
+  const lf =
+    fd.lastInseminationDate ||
+    doc.lastInseminationDate ||
+    doc.lastAI ||
+    doc.lastInsemination ||
+    doc.lastServiceDate ||
+    "";
+
+  if (!calvingIsDateSrv(lf)) {
+    return '❌ لا يمكن تسجيل إجهاض — لا يوجد "آخر تلقيح".';
+  }
+
+  // ✅ لو في ولادة/إجهاض بعد آخر تلقيح يبقى الحمل انتهى
+  const boundary = String(fd.lastBoundary || "").trim();
+  if (boundary && calvingIsDateSrv(boundary)) {
+    const b = new Date(boundary); b.setHours(0,0,0,0);
+    const l = new Date(lf);       l.setHours(0,0,0,0);
+
+    if (b.getTime() >= l.getTime()) {
+      return `❌ لا يُسمح بتسجيل الإجهاض: آخر حدث (${boundary}) يلغي أي حمل حالي.`;
+    }
+  }
+
+  // ✅ عمر الحمل أقل من حد الولادة
+  const gDays = calvingDaysBetweenSrv(lf, fd.eventDate);
+  if (Number.isNaN(gDays)) {
+    return "تعذّر حساب عمر الحمل.";
+  }
+
+  if (gDays >= th) {
+    return `❌ عمر الحمل ${gDays} يوم — هذا أقرب لولادة وليس إجهاض (الحد الأدنى للولادة ${th} يوم).`;
+  }
+
+  return null;
+}
+
+// ============================================================
+//                 ABORTION DERIVED FIELDS — moved from abortion.html
+//                 حساب عمر الإجهاض والسبب في السيرفر فقط
+// ============================================================
+
+function calcAbortionAgeAndCauseSrv(lastAI, eventDate) {
+  if (!calvingIsDateSrv(lastAI) || !calvingIsDateSrv(eventDate)) {
+    return {
+      gestationDays: null,
+      abortionAgeMonths: null,
+      probableCause: ""
+    };
+  }
+
+  const gDays = calvingDaysBetweenSrv(lastAI, eventDate);
+
+  if (!Number.isFinite(gDays)) {
+    return {
+      gestationDays: null,
+      abortionAgeMonths: null,
+      probableCause: ""
+    };
+  }
+
+  const monthsRaw = Math.max(0, gDays / 30.44);
+  const months = Number.isFinite(monthsRaw) ? Number(monthsRaw.toFixed(1)) : null;
+
+  const cause =
+    (months !== null && months >= 6)
+      ? "احتمال بروسيلا (≥6 شهور)"
+      : "احتمال BVD (<6 شهور)";
+
+  return {
+    gestationDays: gDays,
+    abortionAgeMonths: months,
+    probableCause: cause
+  };
+}
+// ============================================================
 //                 CALVING CALF UNIQUE CHECK — moved from form-rules.js
 //                 نقل كما هو من uniqueCalfNumbers
 // ============================================================
@@ -6134,6 +6246,324 @@ async function existsCalvingSameDaySrv(uid, number, dateISO) {
   return !snap.empty;
 }
 // ============================================================
+//                 ABORTION SAME-DAY CHECK — server-side
+//                 منع تكرار تسجيل إجهاض لنفس الحيوان في نفس اليوم
+// ============================================================
+
+async function existsAbortionSameDaySrv(uid, number, dateISO) {
+  const num = String(calvingNormDigitsOnlySrv(number || "")).trim();
+
+  const snap = await db.collection("events")
+    .where("userId", "==", uid)
+    .where("animalNumber", "==", num)
+    .where("eventType", "==", "إجهاض")
+    .where("eventDate", "==", dateISO)
+    .limit(1)
+    .get();
+
+  return !snap.empty;
+}
+// ============================================================
+//                 API: ABORTION GATE
+//                 تحقق الإجهاض من السيرفر فقط — بدون حفظ
+// ============================================================
+
+app.post("/api/abortion/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        allowed: false,
+        error: "firestore_disabled",
+        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const animalNumber = calvingNormDigitsOnlySrv(body.animalNumber || body.number || "");
+    const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
+
+    if (!animalNumber || !eventDate) {
+      return res.json({
+        ok: true,
+        allowed: false,
+        silent: true
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        allowed: false,
+        message: "❌ رقم الحيوان غير موجود في حسابك. اكتب الرقم الصحيح أولًا."
+      });
+    }
+
+    const doc = animal.data || {};
+
+    const st = String(doc.status ?? "").trim().toLowerCase();
+    if (st === "inactive") {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: "❌ هذا الحيوان خارج القطيع (بيع/نفوق/استبعاد) — لا يمكن تسجيل أحداث له."
+      });
+    }
+
+    const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+
+    const docSpecies = String(doc.species || doc.animalTypeAr || "").trim();
+
+    let species = String(body.species || "").trim() || docSpecies;
+    if (/cow|بقر/i.test(species)) species = "أبقار";
+    if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+
+    const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+    const reproStatus = reproFromEvents || reproFromDoc || "";
+
+    const lastInseminationDate = String(
+      signals.lastInseminationDateFromEvents ||
+      doc.lastInseminationDate ||
+      ""
+    ).trim();
+
+    const gateData = {
+      animalNumber,
+      eventDate,
+      animalId: animal.id || "",
+      species,
+      documentData: doc,
+      reproductiveStatus: reproStatus,
+      reproStatusFromEvents: reproFromEvents,
+      lastInseminationDate,
+      lastBoundary: String(signals.lastBoundary || "").trim(),
+      lastBoundaryType: String(signals.lastBoundaryType || "").trim()
+    };
+
+    const errMsg = abortionDecisionSrv(gateData);
+
+    if (errMsg) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: String(errMsg)
+      });
+    }
+
+    const derived = calcAbortionAgeAndCauseSrv(lastInseminationDate, eventDate);
+
+    return res.json({
+      ok: true,
+      allowed: true,
+      message: "✅ تم التحقق — أكمل تسجيل الإجهاض.",
+      animalId: animal.id || "",
+      animalNumber,
+      species,
+      lastInseminationDate,
+      abortionAgeMonths: derived.abortionAgeMonths,
+      probableCause: derived.probableCause,
+      gestationDays: derived.gestationDays,
+      signals
+    });
+
+  } catch (e) {
+    console.error("abortion-gate", e);
+
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      error: "abortion_gate_failed",
+      message: "❌ تعذّر التحقق من أهلية الإجهاض الآن."
+    });
+  }
+});
+// ============================================================
+//                 API: ABORTION SAVE
+//                 حفظ الإجهاض وتحديث الحيوان من السيرفر فقط
+// ============================================================
+
+app.post("/api/abortion/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات."
+      });
+    }
+
+    const uid = req.userId;
+    const formData = req.body || {};
+
+    const animalNumber = calvingNormDigitsOnlySrv(
+      formData.animalNumber ||
+      formData.number ||
+      ""
+    );
+
+    const eventDate = String(
+      formData.eventDate ||
+      formData.date ||
+      ""
+    ).trim().slice(0, 10);
+
+    if (!animalNumber || !eventDate) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ رقم الحيوان وتاريخ الإجهاض مطلوبان."
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        message: "❌ رقم الحيوان غير موجود في حسابك. اكتب الرقم الصحيح أولًا."
+      });
+    }
+
+    const doc = animal.data || {};
+
+    const st = String(doc.status ?? "").trim().toLowerCase();
+    if (st === "inactive") {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ هذا الحيوان خارج القطيع (بيع/نفوق/استبعاد) — لا يمكن تسجيل أحداث له."
+      });
+    }
+
+    const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+
+    const docSpecies = String(doc.species || doc.animalTypeAr || "").trim();
+
+    let species = String(formData.species || "").trim() || docSpecies;
+    if (/cow|بقر/i.test(species)) species = "أبقار";
+    if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+
+    const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+    const reproStatus = reproFromEvents || reproFromDoc || "";
+
+    const lastInseminationDate = String(
+      formData.lastInseminationDate ||
+      signals.lastInseminationDateFromEvents ||
+      doc.lastInseminationDate ||
+      ""
+    ).trim();
+
+    const gateData = {
+      animalNumber,
+      eventDate,
+      animalId: animal.id || "",
+      species,
+      documentData: doc,
+      reproductiveStatus: reproStatus,
+      reproStatusFromEvents: reproFromEvents,
+      lastInseminationDate,
+      lastBoundary: String(signals.lastBoundary || "").trim(),
+      lastBoundaryType: String(signals.lastBoundaryType || "").trim()
+    };
+
+    const errMsg = abortionDecisionSrv(gateData);
+
+    if (errMsg) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: String(errMsg)
+      });
+    }
+
+    const duplicated = await existsAbortionSameDaySrv(uid, animalNumber, eventDate);
+
+    if (duplicated) {
+      return res.status(409).json({
+        ok: false,
+        message: `❌ تم تسجيل إجهاض لهذا الحيوان في نفس اليوم (${eventDate}) من قبل.`
+      });
+    }
+
+    const derived = calcAbortionAgeAndCauseSrv(lastInseminationDate, eventDate);
+
+    const payload = {
+      userId: uid,
+
+      type: "إجهاض",
+      eventType: "إجهاض",
+      eventTypeNorm: "abortion",
+
+      eventDate,
+      animalNumber,
+      animalId: String(formData.animalId || animal.id || "").trim(),
+
+      species: species || "",
+      reproductiveStatusBefore: reproStatus || "",
+
+      lastInseminationDate,
+      lastFertileInseminationDate: lastInseminationDate,
+
+      gestationDays: derived.gestationDays,
+      abortionAgeMonths: derived.abortionAgeMonths,
+      probableCause: derived.probableCause,
+
+      notes: String(formData.notes || "").trim(),
+
+      idempotencyKey: `${uid}|${animalNumber}|abortion|${eventDate}`,
+
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      source: "server-abortion-save"
+    };
+
+    const evRef = await db.collection("events").add(payload);
+
+    await updateAnimalByAbortionSrv(payload);
+
+    return res.json({
+      ok: true,
+      message: "تم حفظ الإجهاض بنجاح ✅",
+      eventId: evRef.id,
+
+      animalNumber,
+      animalId: payload.animalId,
+      eventDate,
+
+      lastInseminationDate,
+      gestationDays: derived.gestationDays,
+      abortionAgeMonths: derived.abortionAgeMonths,
+      probableCause: derived.probableCause,
+
+      actions: [
+        {
+          key: "event_list",
+          label: "فتح قائمة الأحداث",
+          primary: true,
+          url: `/event-list.html?number=${encodeURIComponent(animalNumber)}`
+        },
+        {
+          key: "cow_card",
+          label: "فتح بطاقة الحيوان",
+          url: `/cow-card.html?number=${encodeURIComponent(animalNumber)}`
+        }
+      ]
+    });
+
+  } catch (e) {
+    console.error("abortion-save", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "abortion_save_failed",
+      message: "تعذّر حفظ الإجهاض – تحقّق من الاتصال والصلاحيات."
+    });
+  }
+});
+// ============================================================
 //                 CALVING ANIMAL UPDATE — moved from animal-update.js
 //                 نقل جزء type === "calving" كما هو
 // ============================================================
@@ -6206,6 +6636,77 @@ async function updateAnimalByCalvingSrv(ev) {
 
     await d.ref.set(updFinal, { merge: true });
     console.log("🔥 animal updated by calving:", d.id, updFinal);
+  }
+}
+// ============================================================
+//                 ABORTION ANIMAL UPDATE — moved from animal-update.js
+//                 نقل تحديث الحيوان بعد الإجهاض للسيرفر فقط
+// ============================================================
+
+async function updateAnimalByAbortionSrv(ev) {
+  const tenant = String(ev.userId || "").trim();
+  const num = calvingNormDigitsOnlySrv(
+    String(
+      ev.animalNumber ||
+      ev.number ||
+      ev.animalId ||
+      ""
+    ).trim()
+  );
+
+  if (!tenant || !num) {
+    console.warn("⛔ updateAnimalByAbortionSrv: missing tenant or number", { tenant, num, ev });
+    return;
+  }
+
+  const date = String(ev.eventDate || "").trim();
+  const m = Number(ev.abortionAgeMonths);
+
+  const upd = {
+    lastAbortionDate: date,
+    abortionAgeMonths: Number.isFinite(m) ? Number(m) : null,
+    reproductiveStatus: "مفتوحة",
+    lastPregnancyLossClass: (Number.isFinite(m) && m >= 5) ? "late" : "early",
+    status: "active"
+  };
+
+  const wantIncLactationFromAbortion = Number.isFinite(m) && m >= 5;
+
+  // ------------------------------------------------------
+  // البحث عن الحيوان — نفس منهج updateAnimalByCalvingSrv
+  // userId + number string ثم userId + animalNumber Number
+  // ------------------------------------------------------
+  let snap = await db.collection("animals")
+    .where("userId", "==", tenant)
+    .where("number", "==", String(num))
+    .limit(5)
+    .get();
+
+  if (snap.empty) {
+    snap = await db.collection("animals")
+      .where("userId", "==", tenant)
+      .where("animalNumber", "==", Number(num))
+      .limit(5)
+      .get();
+  }
+
+  if (snap.empty) {
+    console.warn("⛔ animal not found for abortion update:", { tenant, num, ev });
+    return;
+  }
+
+  for (const d of snap.docs) {
+    const cur = d.data() || {};
+    const updFinal = { ...upd };
+
+    // ✅ زيادة lactationNumber عند الإجهاض المتأخر (>=5 شهور)
+    if (wantIncLactationFromAbortion) {
+      const curL = Number(cur.lactationNumber || 0);
+      updFinal.lactationNumber = (Number.isFinite(curL) ? curL : 0) + 1;
+    }
+
+    await d.ref.set(updFinal, { merge: true });
+    console.log("🔥 animal updated by abortion:", d.id, updFinal);
   }
 }
 // ============================================================
