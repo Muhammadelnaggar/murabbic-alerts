@@ -190,6 +190,7 @@
     <a class="mbk-back" href="add-event.html">رجوع</a>
   </div>
 </header>
+  <div id="gateBox" class="infobar mbk-infobar" style="display:none; max-width:430px; margin:10px auto 12px;"></div>
 <main class="mbk-form">
   <section class="mbk-card">
    <form id="diagnosisForm" data-event="تشخيص حمل" autocomplete="off">
@@ -198,7 +199,7 @@
 
       <label for="eventDate">تاريخ التشخيص</label>
       <input type="date" id="eventDate" name="eventDate" data-field="eventDate">
-      <div id="gateBox" class="infobar mbk-infobar" style="display:none; margin:10px 0 12px;"></div>
+     
       <fieldset>
         <legend>تشخيص الحمل</legend>
 
@@ -391,18 +392,31 @@ function applyAcceptedNumbers(data, originalNums) {
   }
 }
 function renderGateResult(data, nums) {
-  const rejectedLines = Array.isArray(data?.rejected) && data.rejected.length
-    ? "\n\n" + data.rejected.slice(0, 8).map(x =>
-        `${x.animalNumber || ""}: ${String(x.reason || "").trim()}`
-      ).join("\n")
-    : "";
-
   const msg = String(data?.message || data?.error || "").trim();
+  const msgClean = compactReason(msg);
 
-  if (msg || rejectedLines) {
+  const rejectedItems = Array.isArray(data?.rejected) ? data.rejected : [];
+
+  const rejectedLines = rejectedItems
+    .slice(0, 8)
+    .map(x => {
+      const n = String(x.animalNumber || "").trim();
+      const reason = compactReason(x.reason || "");
+      if (!reason) return "";
+      if (reason === msgClean) return "";
+      return `${n}: ${reason}`;
+    })
+    .filter(Boolean);
+
+  const fullMsg = [
+    msg,
+    rejectedLines.length ? rejectedLines.join("\n") : ""
+  ].filter(Boolean).join("\n\n");
+
+  if (fullMsg) {
     showGate(
-      `${msg}${rejectedLines}`,
-      data?.allowed || data?.ok ? "success" : "error"
+      fullMsg,
+     data?.allowed ? "success" : "error"
     );
   }
 
@@ -504,13 +518,23 @@ const data = await r.json().catch(() => ({
   message: ""
 }));
 
+const mainMsg = String(data.message || data.error || "").trim();
+const mainClean = compactReason(mainMsg);
+
 const rejectedLines = Array.isArray(data.rejected) && data.rejected.length
-  ? "\n\n" + data.rejected.slice(0, 8).map(x =>
-      `${x.animalNumber || ""}: ${String(x.reason || "").trim()}`
-    ).join("\n")
+  ? data.rejected.slice(0, 8).map(x => {
+      const n = String(x.animalNumber || "").trim();
+      const reason = compactReason(x.reason || "");
+      if (!reason) return "";
+      if (reason === mainClean) return "";
+      return `${n}: ${reason}`;
+    }).filter(Boolean).join("\n")
   : "";
 
-const serverMessage = `${String(data.message || data.error || "").trim()}${rejectedLines}`;
+const serverMessage = [
+  mainMsg,
+  rejectedLines
+].filter(Boolean).join("\n\n");
 
 if (serverMessage.trim()) {
   showMsg(
