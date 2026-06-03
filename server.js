@@ -7012,11 +7012,25 @@ function pregnancyDiagnosisDecisionSrv(fd) {
   // الحالة التناسلية: من الأحداث أولًا ثم الوثيقة
   const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
   const rsNorm = calvingStripArSrv(rsRaw);
+  const speciesRaw = String(
+  fd.species ||
+  doc.species ||
+  doc.animalTypeAr ||
+  doc.animalType ||
+  doc.animaltype ||
+  doc.type ||
+  ""
+).trim();
 
+let species = speciesRaw;
+if (/cow|بقر/i.test(species)) species = "أبقار";
+if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+
+const animalLabel = species === "جاموس" ? "الجاموسة" : "البقرة";
   // لازم تكون ملقحة فقط
   if (!rsNorm.includes("ملقح")) {
     const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
-    return `❌ لا يمكن تشخيص الحمل — الحالة التناسلية يجب أن تكون «ملقحة» فقط.\nالحالة الحالية: ${shown}.`;
+    return `❌ لا يمكن تشخيص الحمل — ${animalLabel} ${shown}.`;
   }
 
   const method = normalizePregnancyMethodSrv(fd.method);
@@ -7051,7 +7065,7 @@ function pregnancyDiagnosisDecisionSrv(fd) {
   }
 
   if (diff < minDays) {
-    return `❌ لا يمكن تشخيص الحمل الآن — مرّ ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لطريقة «${method}» هو ${minDays} يوم.`;
+return `❌ لا يمكن تشخيص الحمل — ${animalLabel} مرّ عليها ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لتشخيص الحمل: 26 يوم للسونار و40 يوم لليدوي.`;
   }
 
   return null;
@@ -7216,6 +7230,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
 
       if (/cow|بقر/i.test(species)) species = "أبقار";
       if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+      const animalLabel = species === "جاموس" ? "الجاموسة" : "البقرة";
 
       const st = String(doc.status ?? "").trim().toLowerCase();
 
@@ -7238,7 +7253,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
         rejected.push({
           animalNumber,
           animalId: animal.id || "",
-          reason: `❌ لا يمكن تشخيص الحمل — الحالة التناسلية يجب أن تكون «ملقحة» فقط.\nالحالة الحالية: ${shown}.`
+          reason: `❌ لا يمكن تشخيص الحمل — ${animalLabel} ${shown}.`
         });
         continue;
       }
@@ -7270,11 +7285,11 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
         });
         continue;
       }
-      if (!hasMethod && diff < 26) {
-         rejected.push({
-         animalNumber,
-         animalId: animal.id || "",
-         reason: `❌ لا يمكن تشخيص الحمل الآن — مرّ ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لتشخيص الحمل بالسونار هو 26 يوم.`
+if (!hasMethod && diff < 26) {
+  rejected.push({
+    animalNumber,
+    animalId: animal.id || "",
+    reason: `❌ لا يمكن تشخيص الحمل — ${animalLabel} مرّ عليها ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لتشخيص الحمل: 26 يوم للسونار و40 يوم لليدوي.`
   });
   continue;
 }
@@ -7298,7 +7313,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
           rejected.push({
             animalNumber,
             animalId: animal.id || "",
-            reason: `❌ لا يمكن تشخيص الحمل الآن — مرّ ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لطريقة «${method}» هو ${minDays} يوم.`
+            reason: `❌ لا يمكن تشخيص الحمل — ${animalLabel} مرّ عليها ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لتشخيص الحمل: 26 يوم للسونار و40 يوم لليدوي.`
           });
           continue;
         }
