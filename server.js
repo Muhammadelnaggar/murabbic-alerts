@@ -7335,9 +7335,9 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
         ok: true,
         allowed: true,
         stage: hasMethod ? "method_gate" : "pre_gate",
-        message: hasMethod
-          ? "✅ تم التحقق — الحيوان مؤهل للتسجيل."
-          : "✅ الحيوان مؤهل مبدئيًا — اختر طريقة التشخيص لاستكمال التحقق.",
+       message: hasMethod
+         ? "✅ تم التحقق — الحيوان مؤهل للتسجيل."
+         : "✅ تم فحص الشروط الأساسية — اختر طريقة التشخيص لاستكمال تحقق الأهلية.",
         animalId: a0.animalId || "",
         animalNumber: a0.animalNumber || "",
         species: a0.species || "",
@@ -7357,13 +7357,13 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
       ok: true,
       allowed: acceptedCount > 0,
       stage: hasMethod ? "method_gate" : "pre_gate",
-      message: acceptedCount
-        ? (
-            hasMethod
-              ? `✅ تم التحقق — المؤهل للتسجيل: ${acceptedCount}، المرفوض: ${rejectedCount}.`
-              : `✅ تنقية مبدئية مكتملة — المؤهل مبدئيًا: ${acceptedCount}، المرفوض: ${rejectedCount}.`
-          )
-        : "❌ لا يوجد أي رقم مؤهل لتشخيص الحمل.",
+     message: acceptedCount
+  ? (
+      hasMethod
+        ? `✅ تم التحقق — المؤهل: ${acceptedCount}، غير المؤهل: ${rejectedCount}.`
+        : `✅ تم فحص الشروط الأساسية للقائمة — المتبقي لاستكمال تحقق الأهلية: ${acceptedCount}، المرفوض: ${rejectedCount}.`
+    )
+  : "❌ لا يوجد أي رقم صالح لاستكمال تحقق تشخيص الحمل.",
       acceptedCount,
       rejectedCount,
       accepted,
