@@ -638,14 +638,31 @@ if (isDailyMilkImport){
 const isOvsynch = /ovysynch/i.test(String(targetPage||'')) || /ovsynch/i.test(String(targetPage||''));
 const isHeat = /heat\.html/i.test(String(targetPage||''));
 const isNutrition = /nutrition\.html/i.test(String(targetPage||''));
+
 if (isNutrition && blockNutritionIfOutOfLaunchCore(list)) {
   updateCowCardNav(list.length === 1 ? list[0] : '', list.length > 1);
   return null;
 }
+
 const isWeaning = /weaning\.html/i.test(String(targetPage||''));
 const isExtraTeats = /supernumerary-teat-removal\.html/i.test(String(targetPage||''));
 const isDailyMilk = /daily-milk\.html/i.test(String(targetPage||''));
-const isGroupAllowed = isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isDailyMilk;
+
+// ✅ أحداث جماعية سيرفرية — صفحة الأحداث تمرر الأرقام فقط
+const isInsemination = /insemination\.html/i.test(String(targetPage||''));
+const isPregnancyDiagnosis = /pregnancy-diagnosis\.html/i.test(String(targetPage||''));
+const isVaccination = /vaccination\.html/i.test(String(targetPage||''));
+
+const isGroupAllowed =
+  isOvsynch ||
+  isHeat ||
+  isNutrition ||
+  isWeaning ||
+  isExtraTeats ||
+  isDailyMilk ||
+  isInsemination ||
+  isPregnancyDiagnosis ||
+  isVaccination;
 // ✅ لو أكتر من رقم:
         if (list.length > 1){
           // بطاقة الحيوان مقفولة
@@ -679,19 +696,34 @@ const isExtraTeats = /supernumerary-teat-removal\.html/i.test(String(page));
 const isColostrum = /colostrum-feeding\.html/i.test(String(page));
 const isDailyMilk = /daily-milk\.html/i.test(String(page));
 const isDailyMilkImport = /daily-milk-import\.html/i.test(String(page));
-        if (isDailyMilkImport) {
+
+// ✅ أحداث جماعية سيرفرية — صفحة الأحداث تمرر الأرقام فقط
+const isInsemination = /insemination\.html/i.test(String(page));
+const isPregnancyDiagnosis = /pregnancy-diagnosis\.html/i.test(String(page));
+const isVaccination = /vaccination\.html/i.test(String(page));
+if (isDailyMilkImport) {
   u.searchParams.set('mode', 'import');
   u.searchParams.set('source', 'batch');
+}
+else if ((isInsemination || isPregnancyDiagnosis || isVaccination) && ctx.mode === 'group') {
+  // ✅ تمرير الأرقام فقط — الحفظ/الفلترة/التحديث في السيرفر
+  u.searchParams.set('mode', 'bulk');
+  u.searchParams.set('number', ctx.bulk);   // مهم لأن بعض الصفحات تقرأ number
+  u.searchParams.set('numbers', ctx.bulk);  // للربط السيرفري
+  u.searchParams.set('bulk', ctx.bulk);     // احتياطي واضح
+  if (ctx.groupName) u.searchParams.set('group', ctx.groupName);
 }
 else if ((isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isColostrum) && ctx.mode === 'group'){
   u.searchParams.set('mbkMode', 'group');
   u.searchParams.set('bulk', ctx.bulk);
   if (ctx.groupName) u.searchParams.set('group', ctx.groupName);
-} else if (isDailyMilk && ctx.mode === 'group') {
+}
+else if (isDailyMilk && ctx.mode === 'group') {
   u.searchParams.set('mode', 'bulk');
   u.searchParams.set('numbers', ctx.bulk);
   if (ctx.groupName) u.searchParams.set('group', ctx.groupName);
-} else {
+}
+else {
   u.searchParams.set('number', ctx.number);
 }
         u.searchParams.set('date', ctx.date);
