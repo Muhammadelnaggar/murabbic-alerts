@@ -1307,15 +1307,100 @@ if (eventName === "ولادة") {
   lockForm(false);
   return true;
 }
- // ======================================================
-// Murabbik — Insemination: no client gate
-// التلقيح مثل تشخيص الحمل: السيرفر يتحقق ويحفظ عند الضغط على حفظ
+// ======================================================
+// Murabbik — Insemination server-only gate
+// لا guards.inseminationDecision هنا
+// السيرفر هو الذي يتحقق من أهلية التلقيح
 // ======================================================
 if (eventName === "تلقيح") {
-  bar.style.display = "none";
+  const uid = await getUid();
+
+  const doc = form.__mbkDoc || {};
+  const docSpecies = String(
+    doc.species ||
+    doc.animalTypeAr ||
+    doc.animalType ||
+    doc.animaltype ||
+    doc.type ||
+    ""
+  ).trim();
+
+  const sp = String(getFieldEl(form, "species")?.value || "").trim() || docSpecies;
+
+  const apiBase = String(
+    window.API_BASE ||
+    localStorage.getItem("API_BASE") ||
+    ""
+  ).replace(/\/$/, "");
+
+  const url = apiBase ? `${apiBase}/api/insemination/gate` : "/api/insemination/gate";
+
+  let data = null;
+
+  try {
+    showMsg(bar, "جارِ التحقق من أهلية التلقيح…", "info");
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify({
+        animalNumber: n,
+        eventDate: d,
+        species: sp
+      })
+    });
+
+    data = await r.json().catch(() => null);
+
+  } catch (err) {
+    console.error("insemination gate server failed:", err);
+    showMsg(bar, "❌ تعذّر التحقق من أهلية التلقيح الآن.", "error");
+    lockForm(true);
+    return false;
+  }
+
+  if (!data || data.ok !== true || data.allowed !== true) {
+    const msg = data?.message || "❌ تعذّر التحقق من أهلية التلقيح الآن.";
+
+    const actions = Array.isArray(data?.actions)
+      ? data.actions.map((a) => ({
+          label: a.label || "إجراء",
+          primary: !!a.primary,
+          onClick: () => {
+            if (a.url) {
+              location.href = a.url;
+              return;
+            }
+            if (a.focus) {
+              getFieldEl(form, a.focus)?.focus?.();
+            }
+          }
+        }))
+      : [];
+
+    showMsg(bar, msg, "error", actions);
+    lockForm(true);
+    return false;
+  }
+
+  const animalIdEl = getFieldEl(form, "animalId");
+  if (animalIdEl && data.animalId) animalIdEl.value = data.animalId;
+
+  const speciesEl = getFieldEl(form, "species");
+  if (speciesEl && data.species) speciesEl.value = data.species;
+
+  const lastAIEl = getFieldEl(form, "lastInseminationDate");
+  if (lastAIEl && data.lastInseminationDate && !lastAIEl.value) {
+    lastAIEl.value = data.lastInseminationDate;
+  }
+
+  showMsg(bar, data.message || "✅ تم التحقق — أكمل تسجيل التلقيح.", "success");
   lockForm(false);
   return true;
-}  
+}    
 // ======================================================
 // Murabbik — Abortion server-only gate
 // لا guards.abortionDecision هنا
