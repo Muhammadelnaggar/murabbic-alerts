@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+ 
 
   <style>
     :root{
@@ -249,6 +249,188 @@
   if (dateEl) {
     dateEl.value = dateFromURL || new Date().toISOString().slice(0, 10);
   }
+  function getUid() {
+  return String(
+    localStorage.getItem("userId") ||
+    localStorage.getItem("uid") ||
+    localStorage.getItem("tenantId") ||
+    ""
+  ).trim();
+}
+
+function apiBase() {
+  return String(
+    window.API_BASE ||
+    localStorage.getItem("API_BASE") ||
+    ""
+  ).replace(/\/$/, "");
+}
+
+function parseNumbers(raw) {
+  const map = {
+    "٠": "0","١": "1","٢": "2","٣": "3","٤": "4","٥": "5","٦": "6","٧": "7","٨": "8","٩": "9",
+    "۰": "0","۱": "1","۲": "2","۳": "3","۴": "4","۵": "5","۶": "6","۷": "7","۸": "8","۹": "9"
+  };
+
+  const s = String(raw || "").replace(/[٠-٩۰-۹]/g, d => map[d] || d);
+  return [...new Set((s.match(/\d+/g) || []).map(x => x.trim()).filter(Boolean))];
+}
+
+function showMsg(msg, type = "info") {
+  let bar =
+    document.getElementById("mbk-infobar") ||
+    document.getElementById("sysbar");
+
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "mbk-infobar";
+    bar.className = "infobar mbk-infobar";
+    const form = document.getElementById("diagnosisForm");
+    form?.prepend(bar);
+  }
+
+  bar.style.display = "block";
+  bar.className = "infobar mbk-infobar show " + (
+    type === "error" ? "error" :
+    type === "success" ? "success" :
+    "info"
+  );
+
+  bar.innerHTML = `
+    <div style="white-space:pre-line;font-weight:900;font-size:17px;line-height:1.7;text-align:center">
+      ${String(msg || "").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+    </div>
+  `;
+
+  try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+}
+
+function readRadio(form, name) {
+  return String(form.querySelector(`input[name="${name}"]:checked`)?.value || "").trim();
+}
+
+function collectPayload(form) {
+  const animalNumber = String(document.getElementById("animalNumber")?.value || "").trim();
+  const eventDate = String(document.getElementById("eventDate")?.value || "").trim();
+  const vet = String(document.getElementById("vet")?.value || "").trim();
+
+  return {
+    animalNumber,
+    animalNumbers: animalNumber,
+    number: animalNumber,
+    numbers: animalNumber,
+    eventDate,
+    method: readRadio(form, "method"),
+    result: readRadio(form, "result"),
+    vet
+  };
+}
+
+document.getElementById("diagnosisForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const form = e.currentTarget;
+  const uid = getUid();
+
+  if (!uid) {
+    showMsg("سجّل الدخول أولًا.", "error");
+    return;
+  }
+
+  const payload = collectPayload(form);
+  const nums = parseNumbers(payload.animalNumber);
+
+  if (!nums.length) {
+    showMsg("❌ أدخل رقم الحيوان أولًا.", "error");
+    return;
+  }
+
+  if (!payload.eventDate) {
+    showMsg("❌ تاريخ التشخيص مطلوب.", "error");
+    return;
+  }
+
+  if (!payload.method) {
+    showMsg("❌ طريقة التشخيص مطلوبة.", "error");
+    return;
+  }
+
+  if (!payload.result) {
+    showMsg("❌ نتيجة التشخيص مطلوبة.", "error");
+    return;
+  }
+
+  const isBulk =
+    new URLSearchParams(location.search).get("mode") === "bulk" ||
+    nums.length > 1;
+
+  const endpoint = isBulk
+    ? "/api/pregnancy-diagnosis/bulk-save"
+    : "/api/pregnancy-diagnosis/save";
+
+  const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
+
+  const btn = document.getElementById("saveBtn");
+
+  try {
+    if (btn) btn.disabled = true;
+
+    showMsg(isBulk ? "جارِ حفظ تشخيص الحمل الجماعي في السيرفر…" : "جارِ حفظ تشخيص الحمل في السيرفر…", "info");
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+
+    if (!data.ok) {
+      showMsg(data.message || "❌ تعذّر حفظ تشخيص الحمل.", "error");
+      return;
+    }
+
+    if (isBulk) {
+      const saved = Number(data.savedCount || 0);
+      const rejected = Number(data.rejectedCount || 0);
+
+      const rejectedLines = Array.isArray(data.rejected) && data.rejected.length
+        ? "\n\nالمرفوض:\n" + data.rejected.slice(0, 8).map(x =>
+            `${x.animalNumber || ""}: ${String(x.reason || "").replace(/^❌\s*/, "")}`
+          ).join("\n")
+        : "";
+
+      showMsg(
+        `✅ تم حفظ تشخيص الحمل الجماعي\nالمقبول: ${saved}\nالمرفوض: ${rejected}${rejectedLines}`,
+        saved ? "success" : "error"
+      );
+
+      return;
+    }
+
+    showMsg(data.message || "✅ تم حفظ تشخيص الحمل بنجاح", "success");
+
+    const n = data.animalNumber || nums[0] || "";
+    if (n) {
+      setTimeout(() => {
+        location.href = `event-list.html?number=${encodeURIComponent(n)}`;
+      }, 1100);
+    }
+
+  } catch (err) {
+    console.error("pregnancy diagnosis save failed", err);
+    showMsg("❌ تعذّر الاتصال بالسيرفر أثناء حفظ تشخيص الحمل.", "error");
+
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
 </script>
 
 </body>
