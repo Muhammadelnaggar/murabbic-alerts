@@ -6,7 +6,7 @@
 
   <!-- ستايل ونظام الفورم المركزي -->
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+  
   <style>
   /* Fix infobar layout on mobile (page-only) */
   #sysbar{
@@ -180,11 +180,11 @@
       <a class="mbk-back" href="add-event.html">رجوع</a>
     </div>
   </header>
-
+<div id="gateBox" class="infobar mbk-infobar" style="display:none; max-width:430px; margin:10px auto 12px;"></div>
   <script>window.dataLayer = window.dataLayer || [];</script>
 
   <main class="mbk-form">
-<div id="sysbar" class="infobar mbk-infobar" style="display:none;"></div>
+
     <form id="eventForm"
           data-validate="true"
           data-event="تلقيح"
@@ -242,53 +242,333 @@
   </main>
 
   <!-- Firebase & النظام -->
-  <script type="module" src="/js/firebase-config.js"></script>
+  
   <script src="/js/tenant-bootstrap.js"></script>
   <script src="/js/app-core.js"></script>
 
   <!-- منطق الحفظ بعد الفاليديشن -->
 <!-- تهيئة الصفحة فقط — الحفظ والتحديث أصبحا في السيرفر عبر forms-init.js -->
 <script>
-  const p = new URLSearchParams(location.search);
+  const qp = new URLSearchParams(location.search);
 
+  const form = document.getElementById("eventForm");
   const animalEl = document.querySelector('[data-field="animalNumber"]');
   const dateEl = document.querySelector('[data-field="eventDate"]');
+  const gateBox = document.getElementById("gateBox");
 
   if (animalEl) {
-    animalEl.value = p.get("number") || "";
+    animalEl.value =
+      qp.get("animalNumber") ||
+      qp.get("number") ||
+      qp.get("animalId") ||
+      localStorage.getItem("lastAnimalId") ||
+      "";
   }
 
   if (dateEl) {
-    dateEl.value = p.get("eventDate") || p.get("date") || "";
+    dateEl.value =
+      qp.get("eventDate") ||
+      qp.get("date") ||
+      localStorage.getItem("lastEventDate") ||
+      new Date().toISOString().slice(0, 10);
   }
 
-  const openBtn = document.getElementById("openCowCardBtn");
-  if (openBtn) {
-    openBtn.addEventListener("click", () => {
-      const n = String(animalEl?.value || "").trim();
-
-      if (!n) {
-        const bar = window.ensureInfoBar
-          ? window.ensureInfoBar(document.getElementById("eventForm"))
-          : document.getElementById("sysbar");
-
-        if (window.showMsg && bar) {
-          window.showMsg(bar, "اكتب رقم الحيوان أولًا.", "error");
-        }
-
-        return;
-      }
-
-      location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
-    });
-  }
-    async function loadInseminationSavedOptions() {
-    const uid =
+  function getUid() {
+    return String(
       localStorage.getItem("userId") ||
       localStorage.getItem("uid") ||
+      localStorage.getItem("tenantId") ||
       localStorage.getItem("ownerUid") ||
-      "";
+      ""
+    ).trim();
+  }
 
+  function apiBase() {
+    return String(
+      window.API_BASE ||
+      localStorage.getItem("API_BASE") ||
+      ""
+    ).replace(/\/$/, "");
+  }
+
+  function parseNumbers(raw) {
+    const map = {
+      "٠": "0","١": "1","٢": "2","٣": "3","٤": "4","٥": "5","٦": "6","٧": "7","٨": "8","٩": "9",
+      "۰": "0","۱": "1","۲": "2","۳": "3","۴": "4","۵": "5","۶": "6","۷": "7","۸": "8","۹": "9"
+    };
+
+    const s = String(raw || "").replace(/[٠-٩۰-۹]/g, d => map[d] || d);
+    return [...new Set((s.match(/\d+/g) || []).map(x => x.trim()).filter(Boolean))];
+  }
+
+  function readRadio(form, name) {
+    return String(form.querySelector(`input[name="${name}"]:checked`)?.value || "").trim();
+  }
+
+  function compactReason(reason) {
+    return String(reason || "")
+      .replace(/^❌\s*/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function showGate(msg, type = "info") {
+    const box = gateBox;
+    if (!box) return;
+
+    box.style.display = "block";
+    box.className = "infobar mbk-infobar show " + (
+      type === "error" ? "error" :
+      type === "success" ? "success" :
+      type === "warn" ? "warning" :
+      "info"
+    );
+
+    box.innerHTML = `
+      <div style="display:grid;gap:10px;text-align:center">
+        <div style="white-space:pre-line;font-weight:900;font-size:15px;line-height:1.7">
+          ${String(msg || "").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+        </div>
+
+        <button type="button" id="gateOkBtn"
+          style="width:auto;min-width:110px;margin:0 auto;padding:8px 16px;border-radius:999px;border:2px solid #0b7f47;background:#fff;color:#0b7f47;font-weight:900;cursor:pointer">
+          حسنًا
+        </button>
+      </div>
+    `;
+
+    box.querySelector("#gateOkBtn")?.addEventListener("click", () => {
+      box.style.display = "none";
+    });
+
+    try { box.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+  }
+
+  function collectPayload() {
+    const animalNumber = String(animalEl?.value || "").trim();
+    const eventDate = String(dateEl?.value || "").trim();
+
+    return {
+      animalNumber,
+      animalNumbers: animalNumber,
+      number: animalNumber,
+      numbers: animalNumber,
+      eventDate,
+      inseminationMethod: String(form.querySelector('[data-field="inseminationMethod"]')?.value || "").trim(),
+      semenCode: String(form.querySelector('[data-field="semenCode"]')?.value || "").trim(),
+      inseminator: String(form.querySelector('[data-field="inseminator"]')?.value || "").trim(),
+      inseminationTime: readRadio(form, "inseminationTime"),
+      heatStatus: readRadio(form, "heatStatus"),
+      notes: String(form.querySelector('[data-field="notes"]')?.value || "").trim()
+    };
+  }
+
+  function setDetailsDisabled(disabled) {
+    form.querySelectorAll("[data-field], button[type='submit']").forEach((el) => {
+      const key = el.getAttribute("data-field") || "";
+      if (key === "animalNumber" || key === "eventDate") return;
+      el.disabled = !!disabled;
+    });
+  }
+
+  function applyAcceptedNumbers(data) {
+    const acceptedNums = Array.isArray(data.accepted)
+      ? data.accepted.map(x => String(x.animalNumber || "").trim()).filter(Boolean)
+      : [];
+
+    if (!acceptedNums.length) return;
+
+    const current = parseNumbers(animalEl?.value || "");
+    const same =
+      current.length === acceptedNums.length &&
+      current.every((x, i) => x === acceptedNums[i]);
+
+    if (same) return;
+
+    animalEl.value = acceptedNums.join(",");
+  }
+
+  function renderGateResult(data) {
+    const msg = String(data?.message || data?.error || "").trim();
+    const msgClean = compactReason(msg);
+
+    const rejectedItems = Array.isArray(data?.rejected) ? data.rejected : [];
+
+    const rejectedLines = rejectedItems
+      .slice(0, 8)
+      .map(x => {
+        const n = String(x.animalNumber || "").trim();
+        const reason = compactReason(x.reason || "");
+        if (!reason) return "";
+        if (reason === msgClean) return "";
+        return `${n}: ${reason}`;
+      })
+      .filter(Boolean);
+
+    const fullMsg = [
+      msg,
+      rejectedLines.length ? rejectedLines.join("\n") : ""
+    ].filter(Boolean).join("\n\n");
+
+    if (fullMsg) {
+      showGate(fullMsg, data?.allowed ? "success" : "error");
+    }
+
+    if (data?.allowed) {
+      applyAcceptedNumbers(data);
+      setDetailsDisabled(false);
+    } else {
+      setDetailsDisabled(true);
+    }
+  }
+
+  let gateTimer = null;
+  let lastGateKey = "";
+
+  async function runGateNow() {
+    if (!form) return;
+
+    const uid = getUid();
+    const payload = collectPayload();
+    const nums = parseNumbers(payload.animalNumber);
+
+    const gateKey = JSON.stringify({
+      n: nums.join(","),
+      d: payload.eventDate
+    });
+
+    if (gateKey === lastGateKey) return;
+    lastGateKey = gateKey;
+
+    if (!uid || !nums.length || !payload.eventDate) {
+      setDetailsDisabled(true);
+      if (gateBox) gateBox.style.display = "none";
+      return;
+    }
+
+    const endpoint = "/api/insemination/gate";
+    const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
+
+    try {
+      setDetailsDisabled(true);
+      showGate("جارِ التحقق من أهلية التلقيح…", "info");
+
+      const r = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await r.json().catch(() => ({
+        ok: false,
+        allowed: false,
+        message: ""
+      }));
+
+      renderGateResult(data);
+
+    } catch (err) {
+      console.error("insemination gate failed", err);
+      showGate("❌ تعذّر التحقق من أهلية التلقيح الآن.", "error");
+      setDetailsDisabled(true);
+    }
+  }
+
+  function scheduleGate() {
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(runGateNow, 350);
+  }
+
+  animalEl?.addEventListener("input", scheduleGate);
+  animalEl?.addEventListener("change", scheduleGate);
+  dateEl?.addEventListener("change", scheduleGate);
+
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const uid = getUid();
+    const payload = collectPayload();
+    const nums = parseNumbers(payload.animalNumber);
+    const isBulk =
+      new URLSearchParams(location.search).get("mode") === "bulk" ||
+      nums.length > 1;
+
+    const endpoint = isBulk
+      ? "/api/insemination/bulk-save"
+      : "/api/insemination/save";
+
+    const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
+    const btn = form.querySelector('button[type="submit"]');
+
+    try {
+      if (btn) btn.disabled = true;
+
+      const r = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await r.json().catch(() => ({
+        ok: false,
+        message: ""
+      }));
+
+      const mainMsg = String(data.message || data.error || "").trim();
+      const mainClean = compactReason(mainMsg);
+
+      const rejectedLines = Array.isArray(data.rejected) && data.rejected.length
+        ? data.rejected.slice(0, 8).map(x => {
+            const n = String(x.animalNumber || "").trim();
+            const reason = compactReason(x.reason || "");
+            if (!reason) return "";
+            if (reason === mainClean) return "";
+            return `${n}: ${reason}`;
+          }).filter(Boolean).join("\n")
+        : "";
+
+      const serverMessage = [
+        mainMsg,
+        rejectedLines
+      ].filter(Boolean).join("\n\n");
+
+      if (serverMessage.trim()) {
+        showGate(serverMessage, data.ok ? "success" : "error");
+      }
+
+      if (data.ok && data.redirectUrl) {
+        setTimeout(() => {
+          location.href = data.redirectUrl;
+        }, 1100);
+      }
+
+    } catch (err) {
+      console.error("insemination save failed", err);
+      showGate("❌ تعذّر حفظ التلقيح الآن.", "error");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+
+  const openBtn = document.getElementById("openCowCardBtn");
+  openBtn?.addEventListener("click", () => {
+    const n = String(animalEl?.value || "").trim();
+    if (!n) {
+      showGate("اكتب رقم الحيوان أولًا.", "error");
+      return;
+    }
+
+    location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
+  });
+
+  async function loadInseminationSavedOptions() {
+    const uid = getUid();
     if (!uid) return;
 
     try {
@@ -322,8 +602,10 @@
     } catch (_) {}
   }
 
+  setDetailsDisabled(true);
   loadInseminationSavedOptions();
-</script>  
+  scheduleGate();
+</script>
 </body>
 </html>
 
