@@ -6,7 +6,7 @@
 
   <!-- ستايل ونظام الفورم المركزي -->
   <link rel="stylesheet" href="css/forms.css">
- 
+  <script type="module" src="js/forms-init.js"></script>
   <style>
   /* Fix infobar layout on mobile (page-only) */
   #sysbar{
@@ -242,17 +242,15 @@
   </main>
 
   <!-- Firebase & النظام -->
- 
+  <script type="module" src="/js/firebase-config.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
   <script src="/js/app-core.js"></script>
 
   <!-- منطق الحفظ بعد الفاليديشن -->
-<!-- تهيئة الصفحة فقط — الحفظ والتحقق والتحديث من السيرفر مباشرة -->
+<!-- تهيئة الصفحة فقط — الحفظ والتحديث أصبحا في السيرفر عبر forms-init.js -->
 <script>
   const p = new URLSearchParams(location.search);
 
-  const form = document.getElementById("eventForm");
-  const bar = document.getElementById("sysbar");
   const animalEl = document.querySelector('[data-field="animalNumber"]');
   const dateEl = document.querySelector('[data-field="eventDate"]');
 
@@ -264,127 +262,33 @@
     dateEl.value = p.get("eventDate") || p.get("date") || "";
   }
 
-  function getUid() {
-    return String(
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("ownerUid") ||
-      ""
-    ).trim();
-  }
-
-  function showServerMessage(message, type = "info") {
-    if (!bar) return;
-
-    bar.style.display = "block";
-    bar.className = "infobar mbk-infobar show " + type;
-    bar.textContent = String(message || "");
-    try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
-  }
-function setDetailsDisabled(disabled) {
-  form.querySelectorAll("[data-field], button[type='submit']").forEach((el) => {
-    const key = el.getAttribute("data-field") || "";
-    if (key === "animalNumber" || key === "eventDate") return;
-    el.disabled = !!disabled;
-  });
-}
-
-async function runInseminationGate() {
-  const uid = getUid();
-  const animalNumber = String(animalEl?.value || "").trim();
-  const eventDate = String(dateEl?.value || "").trim();
-
-  if (!uid || !animalNumber || !eventDate) {
-    setDetailsDisabled(true);
-    if (bar) bar.style.display = "none";
-    return false;
-  }
-
-  try {
-    setDetailsDisabled(true);
-    showServerMessage("جارِ التحقق من أهلية التلقيح…", "info");
-
-    const r = await fetch("/api/insemination/gate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": uid
-      },
-      body: JSON.stringify({
-        animalNumber,
-        eventDate
-      })
-    });
-
-    const data = await r.json().catch(() => null);
-
-    if (!data || data.ok !== true || data.allowed !== true) {
-      showServerMessage(data?.message || "❌ لا يوجد أرقام مؤهلة للتلقيح.", "error");
-      setDetailsDisabled(true);
-      return false;
-    }
-
-    if (Array.isArray(data.accepted) && data.accepted.length) {
-      animalEl.value = data.accepted
-        .map(x => String(x.animalNumber || "").trim())
-        .filter(Boolean)
-        .join(",");
-    }
-
-    let msg = data.message || "✅ تم التحقق — أكمل تسجيل التلقيح.";
-
-    if (Array.isArray(data.rejected) && data.rejected.length) {
-      msg += "\n";
-      msg += data.rejected
-        .slice(0, 6)
-        .map(x => `${x.animalNumber || ""}: ${x.reason || "غير مؤهل"}`)
-        .join("\n");
-    }
-
-    showServerMessage(msg, "success");
-    setDetailsDisabled(false);
-    return true;
-
-  } catch (err) {
-    console.error("insemination gate failed", err);
-    showServerMessage("❌ تعذّر التحقق من أهلية التلقيح الآن.", "error");
-    setDetailsDisabled(true);
-    return false;
-  }
-}
-  function collectRawFormData() {
-    const data = {};
-
-    form.querySelectorAll("[data-field]").forEach((el) => {
-      const key = el.getAttribute("data-field");
-      if (!key) return;
-
-      const type = String(el.getAttribute("type") || "").toLowerCase();
-
-      if (type === "radio") {
-        if (key in data) return;
-        const checked = form.querySelector(`input[type="radio"][name="${el.name}"]:checked`);
-        data[key] = checked ? String(checked.value || "").trim() : "";
-        return;
-      }
-
-      data[key] = String(el.value || "").trim();
-    });
-
-    return data;
-  }
-
   const openBtn = document.getElementById("openCowCardBtn");
   if (openBtn) {
     openBtn.addEventListener("click", () => {
       const n = String(animalEl?.value || "").trim();
-      if (!n) return;
+
+      if (!n) {
+        const bar = window.ensureInfoBar
+          ? window.ensureInfoBar(document.getElementById("eventForm"))
+          : document.getElementById("sysbar");
+
+        if (window.showMsg && bar) {
+          window.showMsg(bar, "اكتب رقم الحيوان أولًا.", "error");
+        }
+
+        return;
+      }
+
       location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
     });
   }
+    async function loadInseminationSavedOptions() {
+    const uid =
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("ownerUid") ||
+      "";
 
-  async function loadInseminationSavedOptions() {
-    const uid = getUid();
     if (!uid) return;
 
     try {
@@ -418,76 +322,10 @@ async function runInseminationGate() {
     } catch (_) {}
   }
 
-  if (form) {
-    form.addEventListener("submit", async (ev) => {
-      ev.preventDefault();
-
-      const uid = getUid();
-      if (!uid) {
-        showServerMessage("❌ سجّل الدخول أولًا.", "error");
-        return;
-      }
-
-      const btn = form.querySelector('button[type="submit"]');
-      if (btn) btn.disabled = true;
-
-      try {
-        const payload = collectRawFormData();
-
-        showServerMessage("جارِ حفظ التلقيح…", "info");
-
-        const r = await fetch("/api/insemination/save", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-User-Id": uid
-          },
-          body: JSON.stringify(payload)
-        });
-
-        const data = await r.json().catch(() => null);
-
-        if (!data || data.ok !== true) {
-          showServerMessage(data?.message || "❌ تعذّر حفظ التلقيح.", "error");
-          return;
-        }
-
-        showServerMessage(data.message || "✅ تم حفظ التلقيح بنجاح", "success");
-
-        if (data.redirectUrl) {
-          setTimeout(() => {
-            location.href = data.redirectUrl;
-          }, 1200);
-        }
-
-      } catch (err) {
-        console.error("insemination save failed", err);
-        showServerMessage("❌ تعذّر الاتصال بالسيرفر الآن.", "error");
-      } finally {
-        if (btn) btn.disabled = false;
-      }
-    });
-  }
-
- setDetailsDisabled(true);
-
-let gateTimer = null;
-
-function scheduleInseminationGate() {
-  clearTimeout(gateTimer);
-  gateTimer = setTimeout(runInseminationGate, 350);
-}
-
-animalEl?.addEventListener("input", scheduleInseminationGate);
-animalEl?.addEventListener("change", scheduleInseminationGate);
-dateEl?.addEventListener("change", scheduleInseminationGate);
-
-loadInseminationSavedOptions();
-runInseminationGate();
-</script>
+  loadInseminationSavedOptions();
+</script>  
 </body>
 </html>
-
 
 
 
