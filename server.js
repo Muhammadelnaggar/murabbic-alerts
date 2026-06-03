@@ -7289,7 +7289,7 @@ if (!hasMethod && diff < 26) {
   rejected.push({
     animalNumber,
     animalId: animal.id || "",
-    reason: `❌ لا يمكن تشخيص الحمل — ${animalLabel} مرّ عليها ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لتشخيص الحمل: 26 يوم للسونار و40 يوم لليدوي.`
+   reason: `❌ لا يمكن تشخيص الحمل — ${animalLabel} ملقحة منذ ${diff} يوم فقط.`
   });
   continue;
 }
@@ -7313,7 +7313,7 @@ if (!hasMethod && diff < 26) {
           rejected.push({
             animalNumber,
             animalId: animal.id || "",
-            reason: `❌ لا يمكن تشخيص الحمل — ${animalLabel} مرّ عليها ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لتشخيص الحمل: 26 يوم للسونار و40 يوم لليدوي.`
+            reason: `❌ لا يمكن تشخيص الحمل — ${animalLabel} ملقحة منذ ${diff} يوم فقط.`
           });
           continue;
         }
