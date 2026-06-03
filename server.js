@@ -7106,6 +7106,13 @@ async function updateAnimalByPregnancyDiagnosisSrv(ev = {}) {
 //                 تحقق تشخيص الحمل من السيرفر فقط — فردي/جماعي — بدون حفظ
 // ============================================================
 
+// ============================================================
+//                 API: PREGNANCY DIAGNOSIS GATE
+//                 تحقق تشخيص الحمل من السيرفر فقط — فردي/جماعي — بدون حفظ
+//                 المرحلة الأولى: تنقية القائمة فور وصولها
+//                 المرحلة الثانية: تطبيق حد الأيام بعد اختيار طريقة التشخيص
+// ============================================================
+
 app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -7138,13 +7145,15 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
     ).trim().slice(0, 10);
 
     const method = normalizePregnancyMethodSrv(body.method);
-    const result = normalizePregnancyResultSrv(body.result);
+    const hasMethod = !!String(method || "").trim();
 
     if (!numbers.length || !eventDate) {
       return res.json({
         ok: true,
         allowed: false,
         silent: true,
+        stage: "missing_basic",
+        message: "أدخل رقم الحيوان والتاريخ لبدء التحقق.",
         acceptedCount: 0,
         rejectedCount: 0,
         accepted: [],
@@ -7156,6 +7165,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         allowed: false,
+        stage: "invalid_date",
         message: "❌ تاريخ التشخيص غير صالح.",
         acceptedCount: 0,
         rejectedCount: numbers.length,
@@ -7163,36 +7173,6 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
         rejected: numbers.map(n => ({
           animalNumber: String(n || ""),
           reason: "تاريخ التشخيص غير صالح."
-        }))
-      });
-    }
-
-    if (!method) {
-      return res.status(400).json({
-        ok: false,
-        allowed: false,
-        message: "❌ طريقة التشخيص مطلوبة.",
-        acceptedCount: 0,
-        rejectedCount: numbers.length,
-        accepted: [],
-        rejected: numbers.map(n => ({
-          animalNumber: String(n || ""),
-          reason: "طريقة التشخيص مطلوبة."
-        }))
-      });
-    }
-
-    if (!result) {
-      return res.status(400).json({
-        ok: false,
-        allowed: false,
-        message: "❌ نتيجة التشخيص مطلوبة.",
-        acceptedCount: 0,
-        rejectedCount: numbers.length,
-        accepted: [],
-        rejected: numbers.map(n => ({
-          animalNumber: String(n || ""),
-          reason: "نتيجة التشخيص مطلوبة."
         }))
       });
     }
@@ -7237,55 +7217,84 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
       if (/cow|بقر/i.test(species)) species = "أبقار";
       if (/buffalo|جاموس/i.test(species)) species = "جاموس";
 
-      const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
-      const reproFromDoc = String(doc.reproductiveStatus || "").trim();
-      const reproStatus = reproFromEvents || reproFromDoc || "";
+      const st = String(doc.status ?? "").trim().toLowerCase();
 
-      const lastInseminationDate = String(
-        signals.lastInseminationDateFromEvents ||
-        doc.lastInseminationDate ||
-        ""
-      ).trim();
-
-      const gateData = {
-        animalNumber,
-        eventDate,
-        animalId: animal.id || "",
-        species,
-        documentData: doc,
-        reproductiveStatus: reproStatus,
-        reproStatusFromEvents: reproFromEvents,
-        lastInseminationDate,
-        method,
-        result,
-        lastBoundary: String(signals.lastBoundary || "").trim(),
-        lastBoundaryType: String(signals.lastBoundaryType || "").trim()
-      };
-
-      const fieldErrors = validatePregnancyDiagnosisFieldsSrv(gateData);
-      const hasFieldErrors = Object.values(fieldErrors || {}).some(v =>
-        String(v || "").trim()
-      );
-
-      if (hasFieldErrors) {
+      if (st === "inactive") {
         rejected.push({
           animalNumber,
           animalId: animal.id || "",
-          reason: "بيانات التشخيص غير مكتملة لهذا الحيوان.",
-          fieldErrors
+          reason: "❌ لا يمكن تسجيل تشخيص حمل — الحيوان خارج القطيع."
         });
         continue;
       }
 
-      const decision = pregnancyDiagnosisDecisionSrv(gateData);
+      const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+      const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+      const reproStatus = reproFromEvents || reproFromDoc || "";
+      const reproNorm = calvingStripArSrv(reproStatus);
 
-      if (decision) {
+      if (!reproNorm.includes("ملقح")) {
+        const shown = reproStatus ? `«${reproStatus}»` : "غير معروفة";
         rejected.push({
           animalNumber,
           animalId: animal.id || "",
-          reason: String(decision)
+          reason: `❌ لا يمكن تشخيص الحمل — الحالة التناسلية يجب أن تكون «ملقحة» فقط.\nالحالة الحالية: ${shown}.`
         });
         continue;
+      }
+
+      const lastInseminationDate = String(
+        signals.lastInseminationDateFromEvents ||
+        doc.lastInseminationDate ||
+        doc.lastAI ||
+        doc.lastInsemination ||
+        ""
+      ).trim();
+
+      if (!calvingIsDateSrv(lastInseminationDate)) {
+        rejected.push({
+          animalNumber,
+          animalId: animal.id || "",
+          reason: '❌ لا يمكن تشخيص الحمل — لا يوجد "آخر تلقيح" صحيح.'
+        });
+        continue;
+      }
+
+      const diff = calvingDaysBetweenSrv(lastInseminationDate, eventDate);
+
+      if (!Number.isFinite(diff)) {
+        rejected.push({
+          animalNumber,
+          animalId: animal.id || "",
+          reason: "❌ تعذّر حساب الأيام منذ آخر تلقيح."
+        });
+        continue;
+      }
+
+      // ✅ المرحلة الثانية فقط: لو المستخدم اختار الطريقة، نطبّق حد الأيام
+      if (hasMethod) {
+        const isSono = method === "سونار";
+        const isManual = method === "جس يدوي";
+
+        if (!isSono && !isManual) {
+          rejected.push({
+            animalNumber,
+            animalId: animal.id || "",
+            reason: "❌ طريقة التشخيص غير معروفة."
+          });
+          continue;
+        }
+
+        const minDays = isSono ? 26 : 40;
+
+        if (diff < minDays) {
+          rejected.push({
+            animalNumber,
+            animalId: animal.id || "",
+            reason: `❌ لا يمكن تشخيص الحمل الآن — مرّ ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لطريقة «${method}» هو ${minDays} يوم.`
+          });
+          continue;
+        }
       }
 
       accepted.push({
@@ -7294,8 +7303,9 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
         species,
         reproductiveStatus: reproStatus || "",
         lastInseminationDate,
-        method,
-        result
+        daysSinceInsemination: diff,
+        method: hasMethod ? method : "",
+        stage: hasMethod ? "method_gate" : "pre_gate"
       });
     }
 
@@ -7303,13 +7313,14 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
     const rejectedCount = rejected.length;
     const isBulk = numbers.length > 1;
 
-    // ✅ رد فردي بنفس روح الراوت القديم
+    // ✅ رد فردي
     if (!isBulk) {
       if (!acceptedCount) {
         const r0 = rejected[0] || {};
         return res.status(400).json({
           ok: false,
           allowed: false,
+          stage: hasMethod ? "method_gate" : "pre_gate",
           message: r0.reason || "❌ لا يمكن تسجيل تشخيص الحمل لهذا الحيوان.",
           acceptedCount,
           rejectedCount,
@@ -7323,14 +7334,17 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
       return res.json({
         ok: true,
         allowed: true,
-        message: "✅ تم التحقق — أكمل تسجيل تشخيص الحمل.",
+        stage: hasMethod ? "method_gate" : "pre_gate",
+        message: hasMethod
+          ? "✅ تم التحقق — الحيوان مؤهل للتسجيل."
+          : "✅ الحيوان مؤهل مبدئيًا — اختر طريقة التشخيص لاستكمال التحقق.",
         animalId: a0.animalId || "",
         animalNumber: a0.animalNumber || "",
         species: a0.species || "",
         reproductiveStatus: a0.reproductiveStatus || "",
         lastInseminationDate: a0.lastInseminationDate || "",
+        daysSinceInsemination: a0.daysSinceInsemination,
         method: a0.method || "",
-        result: a0.result || "",
         acceptedCount,
         rejectedCount,
         accepted,
@@ -7342,8 +7356,13 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
     return res.json({
       ok: true,
       allowed: acceptedCount > 0,
+      stage: hasMethod ? "method_gate" : "pre_gate",
       message: acceptedCount
-        ? `✅ تم التحقق — المؤهل للتسجيل: ${acceptedCount}، المرفوض: ${rejectedCount}.`
+        ? (
+            hasMethod
+              ? `✅ تم التحقق — المؤهل للتسجيل: ${acceptedCount}، المرفوض: ${rejectedCount}.`
+              : `✅ تنقية مبدئية مكتملة — المؤهل مبدئيًا: ${acceptedCount}، المرفوض: ${rejectedCount}.`
+          )
         : "❌ لا يوجد أي رقم مؤهل لتشخيص الحمل.",
       acceptedCount,
       rejectedCount,
@@ -7361,8 +7380,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
       message: "❌ تعذّر التحقق من أهلية تشخيص الحمل الآن."
     });
   }
-});
-// ============================================================
+});// ============================================================
 //                 API: PREGNANCY DIAGNOSIS SAVE
 //                 حفظ تشخيص الحمل وتحديث الحيوان من السيرفر فقط
 // ============================================================
