@@ -7324,17 +7324,27 @@ app.post("/api/insemination/bulk-save", requireUserId, async (req, res) => {
       scheduleGroupsRebuildSrv(uid, "insemination_bulk_save");
     }
 
-    return res.json({
-      ok: true,
-      message: saved.length
-        ? `✅ تم حفظ التلقيح لعدد ${saved.length} حيوان.`
-        : "❌ لم يتم حفظ أي تلقيح — كل الأرقام غير مؤهلة.",
-      redirectUrl: saved.length ? "/dashboard.html" : "",
-      savedCount: saved.length,
-      rejectedCount: rejected.length,
-      saved,
-      rejected
-    });
+   if (!saved.length) {
+  return res.status(400).json({
+    ok: false,
+    message: "❌ لم يتم حفظ أي تلقيح — كل الأرقام غير مؤهلة أو بيانات التلقيح غير مكتملة.",
+    redirectUrl: "",
+    savedCount: 0,
+    rejectedCount: rejected.length,
+    saved,
+    rejected
+  });
+}
+
+return res.json({
+  ok: true,
+  message: `✅ تم حفظ التلقيح لعدد ${saved.length} حيوان.`,
+  redirectUrl: "/event-list.html",
+  savedCount: saved.length,
+  rejectedCount: rejected.length,
+  saved,
+  rejected
+});
 
   } catch (e) {
     console.error("insemination-bulk-save", e);
