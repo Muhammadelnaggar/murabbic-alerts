@@ -353,7 +353,25 @@ function compactReason(reason) {
     .replace(/\s+/g, " ")
     .trim();
 }
+function applyAcceptedNumbers(data, originalNums) {
+  const acceptedNums = Array.isArray(data.accepted)
+    ? data.accepted.map(x => String(x.animalNumber || "").trim()).filter(Boolean)
+    : [];
 
+  if (!acceptedNums.length) return;
+
+  const current = parseNumbers(document.getElementById("animalNumber")?.value || "");
+  const same =
+    current.length === acceptedNums.length &&
+    current.every((x, i) => x === acceptedNums[i]);
+
+  if (same) return;
+
+  const animalEl = document.getElementById("animalNumber");
+  if (animalEl) {
+    animalEl.value = acceptedNums.join(",");
+  }
+}
 function renderGateResult(data, nums) {
   const accepted = Number(data.acceptedCount || 0);
   const rejected = Number(data.rejectedCount || 0);
@@ -396,6 +414,9 @@ function renderGateResult(data, nums) {
       "error"
     );
   }
+ if (data.stage === "pre_gate" && Array.isArray(data.accepted) && data.accepted.length) {
+  applyAcceptedNumbers(data, nums);
+} 
 }
 
 async function runGateNow() {
@@ -421,17 +442,11 @@ async function runGateNow() {
     return;
   }
 
-  if (!payload.method || !payload.result) {
-    showGate("اختر طريقة التشخيص والنتيجة لبدء التحقق.", "info");
-    return;
-  }
-
-  const gateKey = JSON.stringify({
-    n: nums.join(","),
-    d: payload.eventDate,
-    m: payload.method,
-    r: payload.result
-  });
+const gateKey = JSON.stringify({
+  n: nums.join(","),
+  d: payload.eventDate,
+  m: payload.method || ""
+});
 
   if (gateKey === lastGateKey) return;
   lastGateKey = gateKey;
