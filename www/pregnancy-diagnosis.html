@@ -340,11 +340,22 @@ function showGate(msg, type = "info") {
     "info"
   );
 
-  box.innerHTML = `
-    <div style="white-space:pre-line;font-weight:900;font-size:15px;line-height:1.7;text-align:center">
+box.innerHTML = `
+  <div style="display:grid;gap:10px;text-align:center">
+    <div style="white-space:pre-line;font-weight:900;font-size:15px;line-height:1.7">
       ${String(msg || "").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
     </div>
-  `;
+
+    <button type="button" id="gateOkBtn"
+      style="width:auto;min-width:110px;margin:0 auto;padding:8px 16px;border-radius:999px;border:2px solid #0b7f47;background:#fff;color:#0b7f47;font-weight:900;cursor:pointer">
+      حسنًا
+    </button>
+  </div>
+`;
+
+box.querySelector("#gateOkBtn")?.addEventListener("click", () => {
+  box.style.display = "none";
+});
 }
 
 function compactReason(reason) {
