@@ -7270,7 +7270,14 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
         });
         continue;
       }
-
+      if (!hasMethod && diff < 26) {
+         rejected.push({
+         animalNumber,
+         animalId: animal.id || "",
+         reason: `❌ لا يمكن تشخيص الحمل الآن — مرّ ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لتشخيص الحمل بالسونار هو 26 يوم.`
+  });
+  continue;
+}
       // ✅ المرحلة الثانية فقط: لو المستخدم اختار الطريقة، نطبّق حد الأيام
       if (hasMethod) {
         const isSono = method === "سونار";
