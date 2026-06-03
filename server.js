@@ -6580,9 +6580,8 @@ app.get("/api/insemination/options", requireUserId, async (req, res) => {
 });
 // ============================================================
 //                 API: INSEMINATION GATE
-//                 تحقق التلقيح من السيرفر فقط — بدون حفظ
+//                 تحقق التلقيح من السيرفر فقط — فردي/جماعي — بدون حفظ
 // ============================================================
-
 app.post("/api/insemination/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -6597,11 +6596,25 @@ app.post("/api/insemination/gate", requireUserId, async (req, res) => {
     const uid = req.userId;
     const body = req.body || {};
 
-    const animalNumber = calvingNormDigitsOnlySrv(
+    const rawNumbers =
+      body.animalNumbers ||
+      body.numbers ||
+      body.selectedNumbers ||
+      body.groupNumbers ||
+      body.animals ||
       body.animalNumber ||
       body.number ||
-      ""
-    );
+      "";
+
+    const numberList = Array.isArray(rawNumbers)
+      ? rawNumbers
+      : String(rawNumbers || "").split(/[\s,،;\n\r]+/);
+
+    const numbers = [...new Set(
+      numberList
+        .map(v => calvingNormDigitsOnlySrv(v))
+        .filter(Boolean)
+    )];
 
     const eventDate = String(
       body.eventDate ||
@@ -6609,91 +6622,138 @@ app.post("/api/insemination/gate", requireUserId, async (req, res) => {
       ""
     ).trim().slice(0, 10);
 
-    if (!animalNumber || !eventDate) {
-      return res.status(400).json({
-        ok: false,
+    if (!numbers.length || !eventDate) {
+      return res.json({
+        ok: true,
         allowed: false,
-        message: "❌ رقم الحيوان وتاريخ التلقيح مطلوبان."
+        silent: true,
+        message: "أدخل رقم الحيوان والتاريخ لبدء التحقق.",
+        acceptedCount: 0,
+        rejectedCount: 0,
+        accepted: [],
+        rejected: []
       });
     }
 
-    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+    const accepted = [];
+    const rejected = [];
 
-    if (!animal) {
-      return res.status(404).json({
-        ok: false,
-        allowed: false,
-        message: "❌ تعذّر العثور على الحيوان — تحقق من الرقم."
-      });
+    for (const animalNumber of numbers) {
+      try {
+        const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+        if (!animal) {
+          rejected.push({
+            animalNumber,
+            reason: "الحيوان غير موجود في حسابك."
+          });
+          continue;
+        }
+
+        const doc = animal.data || {};
+
+        const st = String(doc.status ?? "").trim().toLowerCase();
+        if (st === "inactive") {
+          rejected.push({
+            animalNumber,
+            reason: "هذا الحيوان خارج القطيع (بيع/نفوق/استبعاد)."
+          });
+          continue;
+        }
+
+        let species = String(
+          body.species ||
+          doc.species ||
+          doc.animalTypeAr ||
+          doc.animalType ||
+          doc.animaltype ||
+          doc.type ||
+          ""
+        ).trim();
+
+        if (/cow|بقر/i.test(species)) species = "أبقار";
+        if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+
+        const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+
+        const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+        const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+        const reproStatus = reproFromEvents || reproFromDoc || "";
+
+        const lastInseminationDate = String(
+          signals.lastInseminationDateFromEvents ||
+          doc.lastInseminationDate ||
+          ""
+        ).trim();
+
+        const gateData = {
+          animalNumber,
+          eventDate,
+          animalId: animal.id || "",
+          species,
+          documentData: doc,
+          reproductiveStatus: reproStatus,
+          reproStatusFromEvents: reproFromEvents,
+          lastInseminationDate,
+          lastBoundary: String(signals.lastBoundary || "").trim(),
+          lastBoundaryType: String(signals.lastBoundaryType || "").trim()
+        };
+
+        const errMsg = inseminationDecisionSrv(gateData);
+
+        if (errMsg) {
+          const raw = String(errMsg || "");
+          const isWarn = raw.startsWith("WARN|");
+          const message = isWarn ? raw.replace(/^WARN\|/, "") : raw;
+
+          if (!isWarn) {
+            rejected.push({
+              animalNumber,
+              reason: message
+            });
+            continue;
+          }
+
+          accepted.push({
+            animalNumber,
+            animalId: animal.id || "",
+            species,
+            reproductiveStatus: reproStatus,
+            warning: true,
+            message
+          });
+          continue;
+        }
+
+        accepted.push({
+          animalNumber,
+          animalId: animal.id || "",
+          species,
+          reproductiveStatus: reproStatus
+        });
+
+      } catch (oneErr) {
+        console.error("insemination-gate-one", animalNumber, oneErr);
+
+        rejected.push({
+          animalNumber,
+          reason: "تعذّر التحقق من هذا الحيوان الآن."
+        });
+      }
     }
 
-   const doc = animal.data || {};
-
-let species = String(
-  body.species ||
-  doc.species ||
-  doc.animalTypeAr ||
-  doc.animalType ||
-  doc.animaltype ||
-  doc.type ||
-  ""
-).trim();
-
-if (/cow|بقر/i.test(species)) species = "أبقار";
-if (/buffalo|جاموس/i.test(species)) species = "جاموس";
-
-   const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
-
-    const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
-    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
-    const reproStatus = reproFromEvents || reproFromDoc || "";
-
-    const lastInseminationDate = String(
-      signals.lastInseminationDateFromEvents ||
-      doc.lastInseminationDate ||
-      ""
-    ).trim();
-
-    const gateData = {
-      animalNumber,
-      eventDate,
-      animalId: animal.id || "",
-      species,
-      documentData: doc,
-      reproductiveStatus: reproStatus,
-      reproStatusFromEvents: reproFromEvents,
-      lastInseminationDate,
-      lastBoundary: String(signals.lastBoundary || "").trim(),
-      lastBoundaryType: String(signals.lastBoundaryType || "").trim()
-    };
-
-    const errMsg = inseminationDecisionSrv(gateData);
-
-    if (errMsg) {
-      const raw = String(errMsg || "");
-      const isWarn = raw.startsWith("WARN|");
-      const message = isWarn ? raw.replace(/^WARN\|/, "") : raw;
-
-      return res.status(isWarn ? 200 : 400).json({
-        ok: isWarn ? true : false,
-        allowed: isWarn ? true : false,
-        warning: isWarn,
-        message
-      });
-    }
+    const allowed = accepted.length > 0;
 
     return res.json({
       ok: true,
-      allowed: true,
-      message: "✅ تم التحقق — أكمل تسجيل التلقيح.",
-      animalId: animal.id || "",
-      animalNumber,
-      species,
-      reproductiveStatus: reproStatus,
-      lastInseminationDate,
-      lastBoundary: String(signals.lastBoundary || "").trim(),
-      lastBoundaryType: String(signals.lastBoundaryType || "").trim(),
-      signals
+      allowed,
+      message: allowed
+        ? `✅ تم التحقق — المؤهل للتلقيح: ${accepted.length}${rejected.length ? `، غير المؤهل: ${rejected.length}` : ""}.`
+        : "❌ لا يوجد أي رقم مؤهل للتلقيح حاليًا.",
+      acceptedCount: accepted.length,
+      rejectedCount: rejected.length,
+      accepted,
+      rejected
     });
 
   } catch (e) {
