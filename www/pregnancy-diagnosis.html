@@ -187,10 +187,10 @@
 
    <form id="diagnosisForm" data-event="تشخيص حمل" autocomplete="off">
       <label for="animalNumber">رقم الحيوان</label>
-      <input type="text" id="animalNumber" name="animalNumber" data-field="animalNumber" required>
+     <input type="text" id="animalNumber" name="animalNumber" data-field="animalNumber">
 
       <label for="eventDate">تاريخ التشخيص</label>
-      <input type="date" id="eventDate" name="eventDate" data-field="eventDate" required>
+      <input type="date" id="eventDate" name="eventDate" data-field="eventDate">
       <div id="gateBox" class="infobar mbk-infobar" style="display:none; margin:10px 0 12px;"></div>
       <fieldset>
         <legend>تشخيص الحمل</legend>
@@ -199,7 +199,7 @@
           <div>
             <div class="sub-title">طريقة التشخيص</div>
             <div class="radio-group" id="methodGroup">
-             <label><input type="radio" name="method" data-field="method" value="ultrasound" required> سونار</label>
+           <label><input type="radio" name="method" data-field="method" value="ultrasound"> سونار</label>
              <label><input type="radio" name="method" data-field="method" value="manual"> يدوي</label>
             </div>
           </div>
@@ -207,7 +207,7 @@
           <div>
             <div class="sub-title">النتيجة</div>
             <div class="radio-group" id="resultGroup">
-              <label><input type="radio" name="result" data-field="result" value="عشار" required> عشار</label>
+             <label><input type="radio" name="result" data-field="result" value="عشار"> عشار</label>
               <label><input type="radio" name="result" data-field="result" value="فارغة"> فارغة</label>
             </div>
           </div>
@@ -384,26 +384,22 @@ function applyAcceptedNumbers(data, originalNums) {
   }
 }
 function renderGateResult(data, nums) {
-  if (!data || typeof data !== "object") {
-    showGate("تعذّر قراءة نتيجة التحقق من السيرفر.", "error");
-    return;
-  }
-
-  const rejectedLines = Array.isArray(data.rejected) && data.rejected.length
+  const rejectedLines = Array.isArray(data?.rejected) && data.rejected.length
     ? "\n\n" + data.rejected.slice(0, 8).map(x =>
-        `${x.animalNumber || ""}: ${compactReason(x.reason)}`
+        `${x.animalNumber || ""}: ${String(x.reason || "").trim()}`
       ).join("\n")
     : "";
 
-  const msg = String(data.message || "").trim();
+  const msg = String(data?.message || data?.error || "").trim();
 
-  showGate(
-    `${msg}${rejectedLines}`,
-    data.allowed ? "success" : "error"
-  );
+  if (msg || rejectedLines) {
+    showGate(
+      `${msg}${rejectedLines}`,
+      data?.allowed || data?.ok ? "success" : "error"
+    );
+  }
 
-  // الواجهة لا تقرر. فقط تنفذ قائمة المقبول التي أرسلها السيرفر في مرحلة التنقية.
-  if (data.stage === "pre_gate" && Array.isArray(data.accepted) && data.accepted.length) {
+  if (data?.stage === "pre_gate" && Array.isArray(data.accepted) && data.accepted.length) {
     applyAcceptedNumbers(data, nums);
   }
 }
@@ -412,23 +408,8 @@ async function runGateNow() {
   if (!form) return;
 
   const uid = getUid();
-  if (!uid) {
-    showGate("سجّل الدخول أولًا.", "error");
-    return;
-  }
-
   const payload = collectPayload(form);
   const nums = parseNumbers(payload.animalNumber);
-
-  if (!nums.length) {
-    showGate("أدخل رقم الحيوان أولًا.", "info");
-    return;
-  }
-
-  if (!payload.eventDate) {
-    showGate("اختر تاريخ التشخيص لبدء التحقق.", "info");
-    return;
-  }
 
 const gateKey = JSON.stringify({
   n: nums.join(","),
@@ -443,7 +424,7 @@ const gateKey = JSON.stringify({
   const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
 
   try {
-    showGate("جارِ التحقق من السيرفر…", "info");
+    
 
     const r = await fetch(url, {
       method: "POST",
@@ -454,17 +435,16 @@ const gateKey = JSON.stringify({
       body: JSON.stringify(payload)
     });
 
-    const data = await r.json().catch(() => ({
-      ok: false,
-      message: "تعذّر قراءة رد السيرفر."
-    }));
+const data = await r.json().catch(() => ({
+  ok: false,
+  message: ""
+}));
 
     renderGateResult(data, nums);
 
-  } catch (err) {
-    console.error("pregnancy diagnosis gate failed", err);
-    showGate("❌ تعذّر الاتصال بالسيرفر أثناء التحقق.", "error");
-  }
+} catch (err) {
+  console.error("pregnancy diagnosis gate failed", err);
+}
 }
 
 function scheduleGate() {
@@ -486,34 +466,8 @@ document.getElementById("diagnosisForm")?.addEventListener("submit", async (e) =
   const form = e.currentTarget;
   const uid = getUid();
 
-  if (!uid) {
-    showMsg("سجّل الدخول أولًا.", "error");
-    return;
-  }
-
-  const payload = collectPayload(form);
-  const nums = parseNumbers(payload.animalNumber);
-
-  if (!nums.length) {
-    showMsg("❌ أدخل رقم الحيوان أولًا.", "error");
-    return;
-  }
-
-  if (!payload.eventDate) {
-    showMsg("❌ تاريخ التشخيص مطلوب.", "error");
-    return;
-  }
-
-  if (!payload.method) {
-    showMsg("❌ طريقة التشخيص مطلوبة.", "error");
-    return;
-  }
-
-  if (!payload.result) {
-    showMsg("❌ نتيجة التشخيص مطلوبة.", "error");
-    return;
-  }
-
+const payload = collectPayload(form);
+const nums = parseNumbers(payload.animalNumber);
   const isBulk =
     new URLSearchParams(location.search).get("mode") === "bulk" ||
     nums.length > 1;
@@ -529,8 +483,6 @@ document.getElementById("diagnosisForm")?.addEventListener("submit", async (e) =
   try {
     if (btn) btn.disabled = true;
 
-    showMsg(isBulk ? "جارِ حفظ تشخيص الحمل الجماعي في السيرفر…" : "جارِ حفظ تشخيص الحمل في السيرفر…", "info");
-
     const r = await fetch(url, {
       method: "POST",
       headers: {
@@ -540,48 +492,40 @@ document.getElementById("diagnosisForm")?.addEventListener("submit", async (e) =
       body: JSON.stringify(payload)
     });
 
-    const data = await r.json().catch(() => ({
-      ok: false,
-      message: "تعذّر قراءة رد السيرفر."
-    }));
+const data = await r.json().catch(() => ({
+  ok: false,
+  message: ""
+}));
 
-    if (!data.ok) {
-      showMsg(data.message || "❌ تعذّر حفظ تشخيص الحمل.", "error");
-      return;
-    }
+const rejectedLines = Array.isArray(data.rejected) && data.rejected.length
+  ? "\n\n" + data.rejected.slice(0, 8).map(x =>
+      `${x.animalNumber || ""}: ${String(x.reason || "").trim()}`
+    ).join("\n")
+  : "";
 
-    if (isBulk) {
-      const saved = Number(data.savedCount || 0);
-      const rejected = Number(data.rejectedCount || 0);
+const serverMessage = `${String(data.message || data.error || "").trim()}${rejectedLines}`;
 
-      const rejectedLines = Array.isArray(data.rejected) && data.rejected.length
-        ? "\n\nالمرفوض:\n" + data.rejected.slice(0, 8).map(x =>
-            `${x.animalNumber || ""}: ${String(x.reason || "").replace(/^❌\s*/, "")}`
-          ).join("\n")
-        : "";
+if (serverMessage.trim()) {
+  showMsg(
+    serverMessage,
+    data.ok ? "success" : "error"
+  );
+}
 
-      showMsg(
-        `✅ تم حفظ تشخيص الحمل الجماعي\nالمقبول: ${saved}\nالمرفوض: ${rejected}${rejectedLines}`,
-        saved ? "success" : "error"
-      );
+if (data.ok && !isBulk) {
+  const n = data.animalNumber || nums[0] || "";
+  if (n) {
+    setTimeout(() => {
+      location.href = `event-list.html?number=${encodeURIComponent(n)}`;
+    }, 1100);
+  }
+}
 
-      return;
-    }
+return;
+} catch (err) {
+  console.error("pregnancy diagnosis save failed", err);
 
-    showMsg(data.message || "✅ تم حفظ تشخيص الحمل بنجاح", "success");
-
-    const n = data.animalNumber || nums[0] || "";
-    if (n) {
-      setTimeout(() => {
-        location.href = `event-list.html?number=${encodeURIComponent(n)}`;
-      }, 1100);
-    }
-
-  } catch (err) {
-    console.error("pregnancy diagnosis save failed", err);
-    showMsg("❌ تعذّر الاتصال بالسيرفر أثناء حفظ تشخيص الحمل.", "error");
-
-  } finally {
+} finally {
     if (btn) btn.disabled = false;
   }
 });
