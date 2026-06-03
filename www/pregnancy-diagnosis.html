@@ -191,7 +191,7 @@
 
       <label for="eventDate">تاريخ التشخيص</label>
       <input type="date" id="eventDate" name="eventDate" data-field="eventDate" required>
-
+      <div id="gateBox" class="infobar mbk-infobar" style="display:none; margin:10px 0 12px;"></div>
       <fieldset>
         <legend>تشخيص الحمل</legend>
 
@@ -325,7 +325,158 @@ function collectPayload(form) {
     vet
   };
 }
+let gateTimer = null;
+let lastGateKey = "";
 
+function showGate(msg, type = "info") {
+  const box = document.getElementById("gateBox");
+  if (!box) return;
+
+  box.style.display = "block";
+  box.className = "infobar mbk-infobar show " + (
+    type === "error" ? "error" :
+    type === "success" ? "success" :
+    type === "warn" ? "warning" :
+    "info"
+  );
+
+  box.innerHTML = `
+    <div style="white-space:pre-line;font-weight:900;font-size:15px;line-height:1.7;text-align:center">
+      ${String(msg || "").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+    </div>
+  `;
+}
+
+function compactReason(reason) {
+  return String(reason || "")
+    .replace(/^❌\s*/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function renderGateResult(data, nums) {
+  const accepted = Number(data.acceptedCount || 0);
+  const rejected = Number(data.rejectedCount || 0);
+  const isBulk = nums.length > 1;
+
+  if (!data.ok && !data.silent) {
+    showGate(data.message || "❌ تعذّر التحقق من تشخيص الحمل.", "error");
+    return;
+  }
+
+  if (data.silent) {
+    showGate("اختر رقم الحيوان والتاريخ وطريقة التشخيص والنتيجة لبدء التحقق.", "info");
+    return;
+  }
+
+  if (!isBulk) {
+    if (data.allowed) {
+      showGate(data.message || "✅ تم التحقق — الحيوان مؤهل للتسجيل.", "success");
+    } else {
+      const r0 = Array.isArray(data.rejected) ? data.rejected[0] : null;
+      showGate(r0?.reason || data.message || "❌ الحيوان غير مؤهل للتسجيل.", "error");
+    }
+    return;
+  }
+
+  const rejectedLines = Array.isArray(data.rejected) && data.rejected.length
+    ? "\n\nالمرفوض:\n" + data.rejected.slice(0, 8).map(x =>
+        `${x.animalNumber || ""}: ${compactReason(x.reason)}`
+      ).join("\n")
+    : "";
+
+  if (accepted > 0) {
+    showGate(
+      `✅ تحقق جماعي مكتمل\nالمؤهل للتسجيل: ${accepted}\nالمرفوض: ${rejected}${rejectedLines}`,
+      rejected ? "warn" : "success"
+    );
+  } else {
+    showGate(
+      `❌ لا يوجد أي رقم مؤهل لتشخيص الحمل\nالمرفوض: ${rejected}${rejectedLines}`,
+      "error"
+    );
+  }
+}
+
+async function runGateNow() {
+  const form = document.getElementById("diagnosisForm");
+  if (!form) return;
+
+  const uid = getUid();
+  if (!uid) {
+    showGate("سجّل الدخول أولًا.", "error");
+    return;
+  }
+
+  const payload = collectPayload(form);
+  const nums = parseNumbers(payload.animalNumber);
+
+  if (!nums.length) {
+    showGate("أدخل رقم الحيوان أولًا.", "info");
+    return;
+  }
+
+  if (!payload.eventDate) {
+    showGate("اختر تاريخ التشخيص لبدء التحقق.", "info");
+    return;
+  }
+
+  if (!payload.method || !payload.result) {
+    showGate("اختر طريقة التشخيص والنتيجة لبدء التحقق.", "info");
+    return;
+  }
+
+  const gateKey = JSON.stringify({
+    n: nums.join(","),
+    d: payload.eventDate,
+    m: payload.method,
+    r: payload.result
+  });
+
+  if (gateKey === lastGateKey) return;
+  lastGateKey = gateKey;
+
+  const endpoint = "/api/pregnancy-diagnosis/gate";
+  const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
+
+  try {
+    showGate("جارِ التحقق من السيرفر…", "info");
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+
+    renderGateResult(data, nums);
+
+  } catch (err) {
+    console.error("pregnancy diagnosis gate failed", err);
+    showGate("❌ تعذّر الاتصال بالسيرفر أثناء التحقق.", "error");
+  }
+}
+
+function scheduleGate() {
+  clearTimeout(gateTimer);
+  gateTimer = setTimeout(runGateNow, 350);
+}
+  document.getElementById("animalNumber")?.addEventListener("input", scheduleGate);
+document.getElementById("eventDate")?.addEventListener("change", scheduleGate);
+
+document.querySelectorAll('input[name="method"], input[name="result"]').forEach(el => {
+  el.addEventListener("change", scheduleGate);
+});
+
+// أول رسالة تحقق عند فتح الصفحة
+scheduleGate();
 document.getElementById("diagnosisForm")?.addEventListener("submit", async (e) => {
   e.preventDefault();
 
