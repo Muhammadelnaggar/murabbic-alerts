@@ -281,7 +281,77 @@
     bar.textContent = String(message || "");
     try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
   }
+function setDetailsDisabled(disabled) {
+  form.querySelectorAll("[data-field], button[type='submit']").forEach((el) => {
+    const key = el.getAttribute("data-field") || "";
+    if (key === "animalNumber" || key === "eventDate") return;
+    el.disabled = !!disabled;
+  });
+}
 
+async function runInseminationGate() {
+  const uid = getUid();
+  const animalNumber = String(animalEl?.value || "").trim();
+  const eventDate = String(dateEl?.value || "").trim();
+
+  if (!uid || !animalNumber || !eventDate) {
+    setDetailsDisabled(true);
+    if (bar) bar.style.display = "none";
+    return false;
+  }
+
+  try {
+    setDetailsDisabled(true);
+    showServerMessage("جارِ التحقق من أهلية التلقيح…", "info");
+
+    const r = await fetch("/api/insemination/gate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify({
+        animalNumber,
+        eventDate
+      })
+    });
+
+    const data = await r.json().catch(() => null);
+
+    if (!data || data.ok !== true || data.allowed !== true) {
+      showServerMessage(data?.message || "❌ لا يوجد أرقام مؤهلة للتلقيح.", "error");
+      setDetailsDisabled(true);
+      return false;
+    }
+
+    if (Array.isArray(data.accepted) && data.accepted.length) {
+      animalEl.value = data.accepted
+        .map(x => String(x.animalNumber || "").trim())
+        .filter(Boolean)
+        .join(",");
+    }
+
+    let msg = data.message || "✅ تم التحقق — أكمل تسجيل التلقيح.";
+
+    if (Array.isArray(data.rejected) && data.rejected.length) {
+      msg += "\n";
+      msg += data.rejected
+        .slice(0, 6)
+        .map(x => `${x.animalNumber || ""}: ${x.reason || "غير مؤهل"}`)
+        .join("\n");
+    }
+
+    showServerMessage(msg, "success");
+    setDetailsDisabled(false);
+    return true;
+
+  } catch (err) {
+    console.error("insemination gate failed", err);
+    showServerMessage("❌ تعذّر التحقق من أهلية التلقيح الآن.", "error");
+    setDetailsDisabled(true);
+    return false;
+  }
+}
   function collectRawFormData() {
     const data = {};
 
@@ -399,7 +469,21 @@
     });
   }
 
-  loadInseminationSavedOptions();
+ setDetailsDisabled(true);
+
+let gateTimer = null;
+
+function scheduleInseminationGate() {
+  clearTimeout(gateTimer);
+  gateTimer = setTimeout(runInseminationGate, 350);
+}
+
+animalEl?.addEventListener("input", scheduleInseminationGate);
+animalEl?.addEventListener("change", scheduleInseminationGate);
+dateEl?.addEventListener("change", scheduleInseminationGate);
+
+loadInseminationSavedOptions();
+runInseminationGate();
 </script>
 </body>
 </html>
