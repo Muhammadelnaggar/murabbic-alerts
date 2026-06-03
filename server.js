@@ -12,7 +12,7 @@ const EVENT_SYNONYMS = {
   pregnancy_diagnosis: ['pregnancy diagnosis', 'pregnancy_diagnosis', 'تشخيص حمل', 'سونار', 'جس'],
   calving: ['calving', 'birth', 'ولادة'],
   dry_off: ['dry_off', 'dry-off', 'تجفيف', 'dry', 'جاف'],
-  close_up: ['close-up', 'close_up', 'تحضير ولادة', 'تحضير'],
+  close_up: ['close-up', 'close_up', 'تحضير ولادة', 'تحضير'], 
   daily_milk: ['daily milk', 'daily_milk', 'لبن يومي', 'اللبن اليومي', 'لبن'],
   nutrition: ['nutrition', 'تغذية', 'عليقة'],
   weaning: ['weaning', 'فطام'],
