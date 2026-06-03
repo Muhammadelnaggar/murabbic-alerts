@@ -512,13 +512,10 @@ if (serverMessage.trim()) {
   );
 }
 
-if (data.ok && !isBulk) {
-  const n = data.animalNumber || nums[0] || "";
-  if (n) {
-    setTimeout(() => {
-      location.href = `event-list.html?number=${encodeURIComponent(n)}`;
-    }, 1100);
-  }
+if (data.ok && data.redirectUrl) {
+  setTimeout(() => {
+    location.href = data.redirectUrl;
+  }, 1100);
 }
 
 return;
