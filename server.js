@@ -7584,7 +7584,7 @@ app.post("/api/pregnancy-diagnosis/save", requireUserId, async (req, res) => {
       message: "✅ تم حفظ تشخيص الحمل بنجاح",
       id: eventRef.id,
       eventId: eventRef.id,
-
+      redirectUrl: `/event-list.html?number=${encodeURIComponent(animalNumber)}`,
       animalId: animal.id || "",
       animalNumber,
       eventDate,
@@ -7867,16 +7867,17 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
       scheduleGroupsRebuildSrv(uid, "pregnancy_diagnosis_bulk_save");
     }
 
-    return res.json({
-      ok: true,
-      message: saved.length
-        ? `✅ تم حفظ تشخيص الحمل لعدد ${saved.length} حيوان.`
-        : "❌ لم يتم حفظ أي تشخيص حمل — كل الأرقام غير مؤهلة.",
-      savedCount: saved.length,
-      rejectedCount: rejected.length,
-      saved,
-      rejected
-    });
+return res.json({
+  ok: true,
+  message: saved.length
+    ? `✅ تم حفظ تشخيص الحمل لعدد ${saved.length} حيوان.`
+    : "❌ لم يتم حفظ أي تشخيص حمل — كل الأرقام غير مؤهلة.",
+  redirectUrl: saved.length ? "/dashboard.html" : "",
+  savedCount: saved.length,
+  rejectedCount: rejected.length,
+  saved,
+  rejected
+});
 
   } catch (e) {
     console.error("pregnancy-diagnosis-bulk-save", e);
