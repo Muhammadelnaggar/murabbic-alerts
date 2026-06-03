@@ -384,52 +384,29 @@ function applyAcceptedNumbers(data, originalNums) {
   }
 }
 function renderGateResult(data, nums) {
-  const accepted = Number(data.acceptedCount || 0);
-  const rejected = Number(data.rejectedCount || 0);
-  const isBulk = nums.length > 1;
-
-  if (!data.ok && !data.silent) {
-    showGate(data.message || "❌ تعذّر التحقق من تشخيص الحمل.", "error");
-    return;
-  }
-
-  if (data.silent) {
-    showGate("اختر رقم الحيوان والتاريخ وطريقة التشخيص والنتيجة لبدء التحقق.", "info");
-    return;
-  }
-
-  if (!isBulk) {
-    if (data.allowed) {
-      showGate(data.message || "✅ تم التحقق — الحيوان مؤهل للتسجيل.", "success");
-    } else {
-      const r0 = Array.isArray(data.rejected) ? data.rejected[0] : null;
-      showGate(r0?.reason || data.message || "❌ الحيوان غير مؤهل للتسجيل.", "error");
-    }
+  if (!data || typeof data !== "object") {
+    showGate("تعذّر قراءة نتيجة التحقق من السيرفر.", "error");
     return;
   }
 
   const rejectedLines = Array.isArray(data.rejected) && data.rejected.length
-    ? "\n\nالمرفوض:\n" + data.rejected.slice(0, 8).map(x =>
+    ? "\n\n" + data.rejected.slice(0, 8).map(x =>
         `${x.animalNumber || ""}: ${compactReason(x.reason)}`
       ).join("\n")
     : "";
 
-  if (accepted > 0) {
-    showGate(
-      `✅ تحقق جماعي مكتمل\nالمؤهل للتسجيل: ${accepted}\nالمرفوض: ${rejected}${rejectedLines}`,
-      rejected ? "warn" : "success"
-    );
-  } else {
-    showGate(
-      `❌ لا يوجد أي رقم مؤهل لتشخيص الحمل\nالمرفوض: ${rejected}${rejectedLines}`,
-      "error"
-    );
-  }
- if (data.stage === "pre_gate" && Array.isArray(data.accepted) && data.accepted.length) {
-  applyAcceptedNumbers(data, nums);
-} 
-}
+  const msg = String(data.message || "").trim();
 
+  showGate(
+    `${msg}${rejectedLines}`,
+    data.allowed ? "success" : "error"
+  );
+
+  // الواجهة لا تقرر. فقط تنفذ قائمة المقبول التي أرسلها السيرفر في مرحلة التنقية.
+  if (data.stage === "pre_gate" && Array.isArray(data.accepted) && data.accepted.length) {
+    applyAcceptedNumbers(data, nums);
+  }
+}
 async function runGateNow() {
   const form = document.getElementById("diagnosisForm");
   if (!form) return;
