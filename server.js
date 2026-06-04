@@ -8572,38 +8572,24 @@ abortionDiagnosticNote: derived.abortionDiagnosticNote || "",
 
     await updateAnimalByAbortionSrv(payload);
 
-    return res.json({
-      ok: true,
-      message: "تم حفظ الإجهاض بنجاح ✅",
-      eventId: evRef.id,
+return res.json({
+  ok: true,
+  message: "✅ تم حفظ الإجهاض بنجاح",
+  redirectUrl: `/event-list.html?number=${encodeURIComponent(animalNumber)}`,
+  eventId: evRef.id,
 
-      animalNumber,
-      animalId: payload.animalId,
-      eventDate,
+  animalNumber,
+  animalId: payload.animalId,
+  eventDate,
 
-      lastInseminationDate,
-      gestationDays: derived.gestationDays,
-      abortionAgeMonths: derived.abortionAgeMonths,
-      probableCause: derived.probableCause,
-      probableCauses: derived.probableCauses || [],
-      abortionDiagnosticMatrix: derived.abortionDiagnosticMatrix || [],
-      abortionDiagnosticNote: derived.abortionDiagnosticNote || "",
-
-      actions: [
-        {
-          key: "event_list",
-          label: "فتح قائمة الأحداث",
-          primary: true,
-          url: `/event-list.html?number=${encodeURIComponent(animalNumber)}`
-        },
-        {
-          key: "cow_card",
-          label: "فتح بطاقة الحيوان",
-          url: `/cow-card.html?number=${encodeURIComponent(animalNumber)}`
-        }
-      ]
-    });
-
+  lastInseminationDate,
+  gestationDays: derived.gestationDays,
+  abortionAgeMonths: derived.abortionAgeMonths,
+  probableCause: derived.probableCause,
+  probableCauses: derived.probableCauses || [],
+  abortionDiagnosticMatrix: derived.abortionDiagnosticMatrix || [],
+  abortionDiagnosticNote: derived.abortionDiagnosticNote || ""
+});
   } catch (e) {
     console.error("abortion-save", e);
 
