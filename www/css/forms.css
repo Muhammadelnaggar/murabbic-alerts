@@ -479,3 +479,270 @@ legend{
   min-height:auto;
   margin:0;
 }
+/* =========================================================
+   Murabbik Unified Event Pages — shared layout
+   مصدر مركزي للعناصر المشتركة في صفحات الأحداث
+   ========================================================= */
+
+/* عرض صفحات الأحداث الواسعة مثل الولادة */
+main{
+  max-width:920px;
+  margin:20px auto;
+  padding:16px;
+  padding-bottom:110px;
+}
+
+/* كارت الفورم العام */
+.card{
+  background:#fff;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:16px;
+  padding:20px;
+  box-shadow:0 2px 6px rgba(0,0,0,.05);
+}
+
+/* Grid عام */
+.grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:16px;
+}
+
+/* صفوف الحقول */
+.row{
+  display:grid;
+  gap:14px;
+  min-width:0;
+}
+
+@media(min-width:720px){
+  .row{
+    grid-template-columns:repeat(2,1fr);
+  }
+}
+
+/* عنوان الحقول */
+label{
+  font-weight:700;
+  font-size:15px;
+  color:#0f172a;
+  display:block;
+  margin-bottom:6px;
+}
+
+/* الحقول */
+input,
+select,
+textarea{
+  width:100%;
+  padding:12px;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  background:#fff;
+  font-size:16px;
+  color:#0f172a;
+}
+
+/* الراديو */
+.radio-group{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  padding:6px 0;
+}
+
+.radio-group label{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin:0;
+  font-weight:700;
+  font-size:14px;
+  background:#f1f5f9;
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  padding:6px 10px;
+  cursor:pointer;
+}
+
+.radio-group input{
+  width:auto;
+  min-height:auto;
+  margin:0;
+}
+
+/* الشريط السفلي للأزرار */
+.actions-bar{
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  background:#fff;
+  border-top:1px solid var(--border, #e2e8f0);
+  box-shadow:0 -2px 6px rgba(0,0,0,.08);
+  display:flex;
+  gap:10px;
+  padding:12px;
+  z-index:20;
+}
+
+.actions-bar button{
+  flex:1;
+  padding:14px;
+  font-size:16px;
+  font-weight:800;
+  border-radius:12px;
+  cursor:pointer;
+  border:0;
+}
+
+.actions-bar .save{
+  background:var(--brand, #0ea05a);
+  color:#fff;
+}
+
+.actions-bar .ghost{
+  background:#eef2f7;
+  color:#0f172a;
+}
+
+/* Header موحد */
+.mbk-head{
+  max-width:920px;
+  margin:0 auto;
+  padding:12px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  background:#fff;
+}
+
+.mbk-logo{
+  height:56px;
+  width:auto;
+  object-fit:contain;
+  opacity:.70;
+}
+
+.mbk-center{
+  flex:1;
+  text-align:center;
+  line-height:1.15;
+}
+
+.mbk-page-title{
+  font-weight:900;
+  color:var(--brand-600, #0b7f47);
+  font-size:18px;
+}
+
+.mbk-app-name{
+  font-weight:800;
+  font-size:13px;
+  opacity:.85;
+  margin-top:4px;
+}
+
+.mbk-back{
+  width:44px;
+  height:44px;
+  border-radius:999px;
+  background:#f1f5f9;
+  border:1px solid #cbd5e1;
+  color:#0f172a;
+  text-decoration:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:900;
+  font-size:12px;
+}
+
+/* رسائل النظام تحت الهيدر */
+#sysbar{
+  display:none;
+  max-width:920px;
+  margin:10px auto 0;
+}
+
+#sysbar.show{
+  display:block;
+}
+
+.infobar{
+  display:none;
+  margin-top:14px;
+  padding:12px;
+  border-radius:10px;
+  font-size:14px;
+  font-weight:800;
+  text-align:center;
+  margin-inline:auto;
+  max-width:560px;
+}
+
+.infobar.show{
+  display:block;
+}
+
+.infobar.error{
+  background:#fff1f2;
+  border:1px solid #fecaca;
+  color:#b91c1c;
+}
+
+.infobar.success{
+  background:#ecfdf5;
+  border:1px solid #bbf7d0;
+  color:#065f46;
+}
+
+.infobar.info{
+  background:#eff6ff;
+  border:1px solid #bfdbfe;
+  color:#1e40af;
+}
+
+.infobar.warning,
+.infobar.warn{
+  background:#fffbeb;
+  border:1px solid #fde68a;
+  color:#92400e;
+}
+
+/* أزرار داخل رسائل السيرفر عند الحاجة فقط */
+.infobar .sys-actions{
+  margin-top:10px;
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+
+.infobar .sys-btn{
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid #cbd5e1;
+  background:#fff;
+  cursor:pointer;
+  font-weight:800;
+  font-size:14px;
+  color:#0f172a;
+  min-width:140px;
+}
+
+.infobar .sys-btn.primary{
+  border:0;
+  background:var(--brand, #0ea05a);
+  color:#fff;
+}
+
+.infobar.error .sys-btn.primary{
+  background:#dc2626;
+}
+
+/* خاص بالمجموعات المتكررة مثل مواليد الولادة */
+.offspring-group{
+  padding-top:4px;
+}
