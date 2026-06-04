@@ -492,12 +492,13 @@
         })
       });
 
-      if (data?.silent) return;
+     if (data?.silent) return;
 
-      showWarn(data.message || "");
-
+     clearWarn();
+     showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
     } catch (err) {
-      showWarn(err?.message || "❌ تعذّر فحص أهلية أرقام التزامن الآن.");
+     clearWarn();
+     showInfoMessage(err?.message || "❌ تعذّر فحص أهلية أرقام التزامن الآن.", "err");
     }
   }
 
