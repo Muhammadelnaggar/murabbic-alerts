@@ -8750,8 +8750,8 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
     const missing = {};
     if (!numbers.length) missing.animalNumbers = "أرقام الحيوانات غير متاحة من صفحة الأحداث.";
     if (!eventDate || !calvingIsDateSrv(eventDate)) missing.eventDate = "تاريخ بدء البروتوكول غير متاح أو غير صالح.";
-    if (!program) missing.program = "برنامج التزامن غير متاح.";
-    if (!steps.length) missing.steps = "خطوات البروتوكول غير متاحة.";
+    if (!program) missing.program = "اختر نوع برنامج التزامن.";
+    if (!steps.length) missing.steps = "اختر البرنامج ليظهر جدول الخطوات.";
 
     if (Object.keys(missing).length) {
       return res.status(400).json({
@@ -8835,7 +8835,7 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
       if (!doc) return "تعذّر قراءة بيانات الحيوان.";
 
       const st = String(doc.status ?? "").trim().toLowerCase();
-      if (st === "inactive") return "❌ الحيوان خارج القطيع.";
+    if (st === "inactive") return "❌ الحيوان غير موجود في القطيع/حسابك.";
 
       const reproDocRaw = String(doc.reproductiveStatus || "").trim();
       const reproDocCat = ovsynchReproCategoryForSave(reproDocRaw);
@@ -8865,7 +8865,7 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
       }
 
       if (cat !== "open") {
-        return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — المسموح فقط للحيوانات المفتوحة.\nالحالة الحالية: ${shownStatus}.`;
+        return `❌ لا يمكن بدء بروتوكول التزامن — الحالة التناسلية الحالية: ${shownStatus}.`;
       }
 
       if (!calvingIsDateSrv(fd.eventDate)) {
@@ -8883,7 +8883,7 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
           sinceCalving >= 0 &&
           sinceCalving < minAfterCalving
         ) {
-          return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — حديثة الولادة (منذ ${sinceCalving} يوم).`;
+         return `❌ لا يمكن بدء بروتوكول التزامن لحيوان حديث الولادة منذ ${sinceCalving} يوم.`;
         }
       }
 
@@ -9045,8 +9045,16 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
         saved: [],
         rejected,
         message: rejected.length
-          ? rejected.slice(0, 8).map(x => compactOvsynchReasonForSave(x.reason)).join("\n")
-          : "❌ لا يوجد أي رقم مؤهل لتسجيل بروتوكول التزامن."
+  ? (
+      numbers.length === 1
+        ? compactOvsynchReasonForSave(rejected[0]?.reason || "❌ الحيوان غير مؤهل لتسجيل بروتوكول التزامن.")
+        : rejected.slice(0, 8).map(x => compactOvsynchReasonForSave(x.reason)).join("\n")
+    )
+  : (
+      numbers.length === 1
+        ? "❌ الحيوان غير مؤهل لتسجيل بروتوكول التزامن."
+        : "❌ لا يوجد أي رقم مؤهل لتسجيل بروتوكول التزامن."
+    )
       });
     }
 
@@ -9121,12 +9129,16 @@ if (alreadyCount) {
 }
 
 if (rejected.length) {
-  const prev = rejected
-    .slice(0, 6)
-    .map(x => x.reason)
-    .join("\n");
+  if (numbers.length === 1) {
+    message += `\n${compactOvsynchReasonForSave(rejected[0]?.reason || "❌ الحيوان غير مؤهل لتسجيل بروتوكول التزامن.")}`;
+  } else {
+    const prev = rejected
+      .slice(0, 6)
+      .map(x => x.reason)
+      .join("\n");
 
-  message += `\n\n🚫 مستبعد: ${rejected.length} رقم\n${prev}${rejected.length > 6 ? "\n…" : ""}`;
+    message += `\n\n🚫 مستبعد: ${rejected.length} رقم\n${prev}${rejected.length > 6 ? "\n…" : ""}`;
+  }
 }
     return res.json({
       ok: true,
@@ -9243,8 +9255,10 @@ app.get("/api/ovsynch/step-targets", requireUserId, async (req, res) => {
       });
     }
 
-    const stepName = String(meta?.stepName || "");
-    const message = `خطوات اليوم — ${stepName || ("الخطوة رقم " + stepIndex)} — ${animalNumbers.length} حيوان`;
+    const stepName = String(meta?.stepName || ("الخطوة رقم " + stepIndex));
+const message = animalNumbers.length === 1
+  ? `اليوم خطوة بروتوكول: ${stepName} للحيوان رقم ${animalNumbers[0]}`
+  : `اليوم خطوة بروتوكول: ${stepName} للحيوانات أرقام: ${animalNumbers.join("، ")}`;
 
     return res.json({
       ok: true,
@@ -9469,8 +9483,8 @@ app.post("/api/ovsynch/confirm-step", requireUserId, async (req, res) => {
     return res.json({
       ok: true,
       message: doneCount
-        ? `✅ تم تأكيد تنفيذ الخطوة لعدد ${doneCount} حيوان.`
-        : "❌ لم يتم تأكيد أي خطوة.",
+  ? `✅ تم تأكيد تنفيذ الخطوة لـ ${doneCount} حيوان.`
+  : "❌ لم يتم تأكيد أي خطوة.",
       doneCount,
       rejectedCount: rejected.length,
       saved,
