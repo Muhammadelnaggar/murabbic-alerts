@@ -8740,14 +8740,18 @@ return res.json({
   ok: true,
   allowed: true,
   stage: "eligible",
-  message:
-    `✅ مؤهل: ${acceptedCount}\n` +
-    `🚫 غير مؤهل: ${rejectedCount}` +
-    (
-      rejectedCount
-        ? "\n\n" + rejected.map(r => compactOvsynchReason(r.reason)).join("\n")
-        : ""
-    ),
+message:
+  `✅ مؤهل: ${acceptedCount}\n` +
+  `🚫 غير مؤهل: ${rejectedCount}` +
+  (
+    rejectedCount
+      ? "\n\n" + rejected.map(r => {
+          const n = String(r.animalNumber || "").trim();
+          const reason = compactOvsynchReason(r.reason).replace(/^❌\s*/, "");
+          return n ? `❌ الحيوان رقم ${n}: ${reason}` : `❌ ${reason}`;
+        }).join("\n")
+      : ""
+  ),
   acceptedCount,
   rejectedCount,
   accepted,
