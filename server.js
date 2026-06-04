@@ -6449,33 +6449,40 @@ app.post("/api/calving/gate", requireUserId, async (req, res) => {
 
     const g = calvingDecisionSrv(gateData);
 
-    if (g) {
-      const raw = String(g || "");
-      const cleaned = raw.replace(/^OFFER_ABORT\|/, "");
-      const hasAbortHint = raw.startsWith("OFFER_ABORT|");
+if (g) {
+  const raw = String(g || "");
+  const hasAbortHint = raw.startsWith("OFFER_ABORT|");
 
-      return res.status(400).json({
-        ok: false,
-        allowed: false,
-        message: cleaned,
-        guardError: raw,
-        offerAbort: hasAbortHint,
-        actions: hasAbortHint ? [
-          {
-            key: "open_abortion",
-            label: "نعم — تسجيل إجهاض",
-            primary: true,
-            url: `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`
-          },
-          {
-            key: "focus_date",
-            label: "لا — تعديل التاريخ",
-            focus: "eventDate"
-          }
-        ] : []
-      });
-    }
+  let cleaned = raw.replace(/^OFFER_ABORT\|/, "");
 
+  if (hasAbortHint) {
+    const ageMatch = cleaned.match(/عمر الحمل\s+(\d+)\s+يوم/);
+    const ageText = ageMatch ? ` — عمر الحمل ${ageMatch[1]} يوم فقط` : "";
+
+    cleaned = `❌ التاريخ مبكر للولادة${ageText}.\nعدّل التاريخ أو سجّل الحالة كإجهاض.`;
+  }
+
+  return res.status(400).json({
+    ok: false,
+    allowed: false,
+    message: cleaned,
+    guardError: raw,
+    offerAbort: hasAbortHint,
+    actions: hasAbortHint ? [
+      {
+        key: "focus_date",
+        label: "تعديل التاريخ",
+        focus: "eventDate"
+      },
+      {
+        key: "open_abortion",
+        label: "تسجيل إجهاض",
+        primary: true,
+        url: `/abortion.html?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`
+      }
+    ] : []
+  });
+}
     return res.json({
       ok: true,
       allowed: true,
@@ -8833,32 +8840,40 @@ app.post("/api/calving/save", requireUserId, async (req, res) => {
     };
 
     const gateErr = calvingDecisionSrv(gateData);
-    if (gateErr) {
-      const raw = String(gateErr || "");
-      const cleaned = raw.replace(/^OFFER_ABORT\|/, "");
-      const hasAbortHint = raw.startsWith("OFFER_ABORT|");
+if (gateErr) {
+  const raw = String(gateErr || "");
+  const hasAbortHint = raw.startsWith("OFFER_ABORT|");
 
-      return res.status(400).json({
-        ok: false,
-        allowed: false,
-        message: cleaned,
-        guardError: raw,
-        offerAbort: hasAbortHint,
-        actions: hasAbortHint ? [
-          {
-            key: "open_abortion",
-            label: "نعم — تسجيل إجهاض",
-            primary: true,
-            url: `/abortion.html?number=${encodeURIComponent(_animalNumber)}&date=${encodeURIComponent(_eventDate)}`
-          },
-          {
-            key: "focus_date",
-            label: "لا — تعديل التاريخ",
-            focus: "eventDate"
-          }
-        ] : []
-      });
-    }
+  let cleaned = raw.replace(/^OFFER_ABORT\|/, "");
+
+  if (hasAbortHint) {
+    const ageMatch = cleaned.match(/عمر الحمل\s+(\d+)\s+يوم/);
+    const ageText = ageMatch ? ` — عمر الحمل ${ageMatch[1]} يوم فقط` : "";
+
+    cleaned = `❌ التاريخ مبكر للولادة${ageText}.\nعدّل التاريخ أو سجّل الحالة كإجهاض.`;
+  }
+
+  return res.status(400).json({
+    ok: false,
+    allowed: false,
+    message: cleaned,
+    guardError: raw,
+    offerAbort: hasAbortHint,
+    actions: hasAbortHint ? [
+      {
+        key: "focus_date",
+        label: "تعديل التاريخ",
+        focus: "eventDate"
+      },
+      {
+        key: "open_abortion",
+        label: "تسجيل إجهاض",
+        primary: true,
+        url: `/abortion.html?number=${encodeURIComponent(_animalNumber)}&date=${encodeURIComponent(_eventDate)}`
+      }
+    ] : []
+  });
+}
 
     const requiredErr = calvingRequiredFieldsSrv({
       ...payload,
