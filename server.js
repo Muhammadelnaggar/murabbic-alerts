@@ -9086,31 +9086,8 @@ if (activeProtocolMsg) return activeProtocolMsg;
         continue;
       }
 
-      const doc = animal.data || {};
-      const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
-
-      const species = normalizeOvsynchSpeciesForSave(doc, body.species);
-      const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
-
-      const decision = ovsynchEligibilityDecisionForSave({
-        animalNumber,
-        eventDate,
-        animalId: animal.id || "",
-        species,
-        documentData: doc,
-        reproStatusFromEvents: reproFromEvents,
-        lastBoundary: String(signals.lastBoundary || "").trim(),
-        lastBoundaryType: String(signals.lastBoundaryType || "").trim()
-      });
-
-      if (decision) {
-        rejected.push({
-          animalNumber,
-          reason: String(decision)
-        });
-        continue;
-      }
-
+      // تم فحص الأهلية مسبقًا في /api/ovsynch/gate.
+// الحفظ لا يعيد قرار الأهلية؛ يراجع فقط وجود الحيوان والتكرار القريب قبل الكتابة.
       const last = await getLastOvsynchEventForSave(animalNumber);
 
       if (last?.eventDate && String(last.program || "").trim() === "ovsynch") {
