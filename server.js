@@ -8991,32 +8991,20 @@ if (gateErr) {
     if (typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "calving_save");
     }
-    return res.json({
-      ok: true,
-      message: "تم حفظ الولادة وتسجيل العجول بنجاح ✅",
-      id: eventRef.id,
-      eventId: eventRef.id,
-      animalNumber: payload.animalNumber,
-      animalId: payload.animalId,
-      saved: {
-        ...payload,
-        createdAt: undefined
-      },
-      actions: [
-        {
-          key: "event_list",
-          label: "فتح قائمة الأحداث",
-          primary: true,
-          url: `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`
-        },
-        {
-          key: "cow_card",
-          label: "فتح بطاقة الحيوان",
-          url: `/cow-card.html?number=${encodeURIComponent(payload.animalNumber)}`
-        }
-      ]
-    });
-
+   
+return res.json({
+  ok: true,
+  message: "✅ تم حفظ الولادة وتسجيل العجول بنجاح",
+  redirectUrl: `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`,
+  id: eventRef.id,
+  eventId: eventRef.id,
+  animalNumber: payload.animalNumber,
+  animalId: payload.animalId,
+  saved: {
+    ...payload,
+    createdAt: undefined
+  }
+});
   } catch (err) {
     console.error("calving-save", err);
     return res.status(500).json({
