@@ -8306,6 +8306,68 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
   }
 });
 // ============================================================
+//                 OVSYNCH PROTOCOL DURATION HELPERS
+//                 إنهاء/تجاهل البروتوكول النشط حسب مدة البرنامج
+// ============================================================
+
+function ovsynchProgramDurationDaysSrv(program) {
+  const p = String(program || "").trim().toLowerCase();
+
+  if (p === "ovsynch") return 10;
+  if (p === "cosynch72") return 10;
+  if (p === "presynch_ovsynch") return 38;
+
+  // لو البرنامج القديم غير محفوظ في وثيقة الحيوان، نستخدم أطول مدة آمنة.
+  return 38;
+}
+
+function addDaysToIsoDateSrv(iso, days) {
+  if (!calvingIsDateSrv(iso)) return "";
+  const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + Number(days || 0));
+  return dt.toISOString().slice(0, 10);
+}
+
+function resolveOvsynchProgramFromAnimalSrv(doc = {}) {
+  return String(
+    doc.currentProtocolProgram ||
+    doc.protocolProgram ||
+    doc.program ||
+    ""
+  ).trim();
+}
+
+function ovsynchActiveProtocolBlockMessageSrv(doc = {}, eventDate = "") {
+  const curProto = String(doc.currentProtocol || "").trim().toLowerCase();
+  const protoStatus = String(doc.protocolStatus || "").trim().toLowerCase();
+  const protoStart = String(doc.protocolStartDate || "").trim().slice(0, 10);
+
+  if (curProto !== "ovsynch" || protoStatus !== "active") {
+    return null;
+  }
+
+  if (!calvingIsDateSrv(protoStart) || !calvingIsDateSrv(eventDate)) {
+    return "❌ لا يمكن بدء بروتوكول جديد — الحيوان داخل بروتوكول تزامن نشط.";
+  }
+
+  const program = resolveOvsynchProgramFromAnimalSrv(doc);
+  const durationDays = ovsynchProgramDurationDaysSrv(program);
+  const activeDays = calvingDaysBetweenSrv(protoStart, eventDate);
+
+  if (!Number.isFinite(activeDays)) {
+    return "❌ لا يمكن بدء بروتوكول جديد — الحيوان داخل بروتوكول تزامن نشط.";
+  }
+
+  // لو لم تنته مدة البرنامج بعد، يمنع.
+  if (activeDays >= 0 && activeDays <= durationDays) {
+    return "❌ لا يمكن بدء بروتوكول جديد — الحيوان داخل بروتوكول تزامن نشط.";
+  }
+
+  // لو تعدى مدة البرنامج، لا يمنع؛ يعتبر منتهيًا منطقيًا.
+  return null;
+}
+// ============================================================
 //                 API: OVSYNCH GATE
 //                 أهلية أرقام التزامن فقط — بدون حفظ وبدون Tasks
 // ============================================================
@@ -8481,14 +8543,8 @@ const numbers = parseOvsynchNumbers(rawNumbers);
         return "❌ الحيوان مستبعد (لا تُلقّح مرة أخرى).";
       }
 
-      const curProto = String(doc.currentProtocol || "").trim().toLowerCase();
-      const protoStatus = String(doc.protocolStatus || "").trim().toLowerCase();
-      const protoStart = String(doc.protocolStartDate || "").trim();
-
-      if (curProto === "ovsynch" && protoStatus === "active") {
-        const d = protoStart || "غير معروف";
-        return `❌ لا يمكن بدء بروتوكول جديد — الحيوان بالفعل داخل بروتوكول تزامن نشط (بدأ ${d}).`;
-      }
+     const activeProtocolMsg = ovsynchActiveProtocolBlockMessageSrv(doc, fd.eventDate);
+if (activeProtocolMsg) return activeProtocolMsg;
 
       const sp = normalizeOvsynchSpecies(doc, fd.species);
       const w = ovsynchAnimalWord(sp);
@@ -8637,7 +8693,11 @@ if (!isBulk) {
       ok: false,
       allowed: false,
       stage: "no_eligible_animals",
-      message: compactOvsynchReason(r0.reason || "❌ الحيوان غير مؤهل لبدء برنامج التزامن."),
+      message: (() => {
+  const n = String(r0.animalNumber || "").trim();
+  const reason = compactOvsynchReason(r0.reason || "❌ الحيوان غير مؤهل لبدء برنامج التزامن.").replace(/^❌\s*/, "");
+  return n ? `❌ الحيوان رقم ${n}: ${reason}` : `❌ ${reason}`;
+})(),
       acceptedCount,
       rejectedCount,
       accepted,
@@ -8662,9 +8722,13 @@ if (!acceptedCount) {
     ok: false,
     allowed: false,
     stage: "no_eligible_animals",
-    message:
-      "لا يوجد أرقام مؤهلة لبدء برنامج التزامن حاليًا.\n\n" +
-      rejected.map(r => compactOvsynchReason(r.reason)).join("\n"),
+message:
+  "لا يوجد أرقام مؤهلة لبدء برنامج التزامن حاليًا.\n\n" +
+  rejected.map(r => {
+    const n = String(r.animalNumber || "").trim();
+    const reason = compactOvsynchReason(r.reason).replace(/^❌\s*/, "");
+    return n ? `❌ الحيوان رقم ${n}: ${reason}` : `❌ ${reason}`;
+  }).join("\n"),
     acceptedCount,
     rejectedCount,
     accepted,
@@ -8877,14 +8941,8 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
         return "❌ الحيوان مستبعد (لا تُلقّح مرة أخرى).";
       }
 
-      const curProto = String(doc.currentProtocol || "").trim().toLowerCase();
-      const protoStatus = String(doc.protocolStatus || "").trim().toLowerCase();
-      const protoStart = String(doc.protocolStartDate || "").trim();
-
-      if (curProto === "ovsynch" && protoStatus === "active") {
-        const d = protoStart || "غير معروف";
-        return `❌ لا يمكن بدء بروتوكول جديد — الحيوان بالفعل داخل بروتوكول تزامن نشط (بدأ ${d}).`;
-      }
+     const activeProtocolMsg = ovsynchActiveProtocolBlockMessageSrv(doc, fd.eventDate);
+if (activeProtocolMsg) return activeProtocolMsg;
 
       const sp = normalizeOvsynchSpeciesForSave(doc, fd.species);
       const w = ovsynchAnimalWordForSave(sp);
@@ -9079,9 +9137,22 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
         rejected,
         message: rejected.length
   ? (
-      numbers.length === 1
-        ? compactOvsynchReasonForSave(rejected[0]?.reason || "❌ الحيوان غير مؤهل لتسجيل بروتوكول التزامن.")
-        : rejected.slice(0, 8).map(x => compactOvsynchReasonForSave(x.reason)).join("\n")
+     numbers.length === 1
+  ? (() => {
+      const x = rejected[0] || {};
+      const n = String(x.animalNumber || "").trim();
+      const reason = compactOvsynchReasonForSave(
+        x.reason || "❌ الحيوان غير مؤهل لتسجيل بروتوكول التزامن."
+      ).replace(/^❌\s*/, "");
+
+      return n ? `❌ الحيوان رقم ${n}: ${reason}` : `❌ ${reason}`;
+    })()
+  : rejected.slice(0, 8).map(x => {
+      const n = String(x.animalNumber || "").trim();
+      const reason = compactOvsynchReasonForSave(x.reason).replace(/^❌\s*/, "");
+
+      return n ? `❌ الحيوان رقم ${n}: ${reason}` : `❌ ${reason}`;
+    }).join("\n")
     )
   : (
       numbers.length === 1
@@ -9132,13 +9203,18 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
 
       ops += await upsertOvsynchTasksForSave(batch, animalNumber, eventDate, program, steps);
 
-      batch.set(db.collection(animal._collection || "animals").doc(animal.id), {
-        currentProtocol: "ovsynch",
-        protocolStatus: "active",
-        protocolStartDate: eventDate,
-        status: "active",
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
+     const protocolDurationDays = ovsynchProgramDurationDaysSrv(program);
+
+batch.set(db.collection(animal._collection || "animals").doc(animal.id), {
+  currentProtocol: "ovsynch",
+  currentProtocolProgram: program,
+  protocolProgram: program,
+  protocolStatus: "active",
+  protocolStartDate: eventDate,
+  protocolExpectedEndDate: addDaysToIsoDateSrv(eventDate, protocolDurationDays),
+  status: "active",
+  updatedAt: admin.firestore.FieldValue.serverTimestamp()
+}, { merge: true });
       ops++;
 
       savedCount++;
@@ -9167,7 +9243,11 @@ if (rejected.length) {
   } else {
     const prev = rejected
       .slice(0, 6)
-      .map(x => x.reason)
+      .map(x => {
+  const n = String(x.animalNumber || "").trim();
+  const reason = compactOvsynchReasonForSave(x.reason).replace(/^❌\s*/, "");
+  return n ? `❌ الحيوان رقم ${n}: ${reason}` : `❌ ${reason}`;
+})
       .join("\n");
 
     message += `\n\n🚫 مستبعد: ${rejected.length} رقم\n${prev}${rejected.length > 6 ? "\n…" : ""}`;
