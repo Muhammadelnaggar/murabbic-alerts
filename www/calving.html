@@ -4,8 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
-  
 
   <title>تسجيل ولادة — مُرَبِّيك</title>
 
@@ -190,8 +188,7 @@
   <div id="sysbar" class="infobar" role="status" aria-live="polite"></div>
 
   <main>
-    <form id="calving-form" class="card grid" autocomplete="off" novalidate
-          data-validate="true" data-event="ولادة">
+   <form id="calving-form" class="card grid" autocomplete="off" novalidate data-event="ولادة">
 
       <input type="hidden" data-field="animalId" id="animalId">
       <input type="hidden" data-field="species" id="species">
@@ -336,137 +333,439 @@
     <button class="ghost" id="toCardBtn" type="button">فتح بطاقة الحيوان</button>
   </div>
 
-  <script src="/js/app-core.js"></script>
+<script>
+  const qp = new URLSearchParams(location.search);
 
-  <script>
-    /* ملء الرقم والتاريخ من add-event */
-    (function(){
-      const qs = new URLSearchParams(location.search);
-      const $  = (id)=> document.getElementById(id);
-      function toISO(s){
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-        const d = new Date(s); if (isNaN(d)) return '';
-        return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
-      }
-      document.addEventListener('DOMContentLoaded', ()=>{
-        const num  = qs.get('number') || qs.get('animalNumber') || '';
-        const date = qs.get('date')   || qs.get('dt') || qs.get('eventDate') || '';
-        if (num && $('animalNumber')) {
-          $('animalNumber').value = String(num).replace(/[^\d٠-٩۰-۹]/g,'');
-          $('animalNumber').dispatchEvent(new Event('input', { bubbles:true }));
-          $('animalNumber').dispatchEvent(new Event('change', { bubbles:true }));
-        }
-        if (date && $('eventDate')) {
-          $('eventDate').value = toISO(date);
-          $('eventDate').dispatchEvent(new Event('input', { bubbles:true }));
-          $('eventDate').dispatchEvent(new Event('change', { bubbles:true }));
-        }
-      });
-    })();
-  </script>
-<script type="module">
-  import { initEventShell } from "/js/event-shell.js";
-  initEventShell({ pageId: "calving", title: "تسجيل ولادة", logoSrc: "/images/logo.png", backHref: "add-event.html" });
-</script>
+  const form = document.getElementById("calving-form");
+  const sysbar = document.getElementById("sysbar");
 
- <script type="module">
+  const animalEl = document.getElementById("animalNumber");
+  const dateEl = document.getElementById("eventDate");
+  const kindEl = document.getElementById("calvingKind");
+  const lastAiEl = document.getElementById("lastInseminationDate");
+  const animalIdEl = document.getElementById("animalId");
+  const speciesEl = document.getElementById("species");
+  const saveBtn = document.getElementById("saveBtn");
 
-    const form   = document.querySelector('#calving-form');
-    const sysbar = document.getElementById('sysbar');
-    const numEl  = document.getElementById('animalNumber');
-    const kindEl = document.getElementById('calvingKind');
+  function getUid() {
+    return String(
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("tenantId") ||
+      localStorage.getItem("ownerUid") ||
+      ""
+    ).trim();
+  }
 
-    function scrollToSysbar(){
-      try{ sysbar?.scrollIntoView({ behavior:'smooth', block:'start' }); }catch(_){}
-    }
+  function apiBase() {
+    return String(
+      window.API_BASE ||
+      localStorage.getItem("API_BASE") ||
+      ""
+    ).replace(/\/$/, "");
+  }
 
-    function showSysbar(msg, { error=false, actions=[] } = {}){
-      sysbar.style.display = 'block';
-      sysbar.classList.add('show');
-      sysbar.classList.toggle('error', !!error);
+  function toISO(s) {
+    const v = String(s || "").trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return "";
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 10);
+  }
 
-      const safeMsg = String(msg || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      sysbar.innerHTML = `<div class="sys-msg">${safeMsg}</div>`;
+  function normalizeDigits(raw) {
+    const map = {
+      "٠": "0","١": "1","٢": "2","٣": "3","٤": "4","٥": "5","٦": "6","٧": "7","٨": "8","٩": "9",
+      "۰": "0","۱": "1","۲": "2","۳": "3","۴": "4","۵": "5","۶": "6","۷": "7","۸": "8","۹": "9"
+    };
 
-      if (Array.isArray(actions) && actions.length){
-        const wrap = document.createElement('div');
-        wrap.className = 'sys-actions';
+    return String(raw || "")
+      .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
+      .replace(/[^\d]/g, "")
+      .trim();
+  }
 
-        actions.forEach((a)=>{
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'sys-btn' + (a.primary ? ' primary' : '');
-          btn.textContent = a.label || 'إجراء';
-          btn.addEventListener('click', ()=>{ try{ a.onClick && a.onClick(); }catch(_){ } });
-          wrap.appendChild(btn);
+  function readRadio(name) {
+    return String(form.querySelector(`input[name="${name}"]:checked`)?.value || "").trim();
+  }
+
+  function escapeHtml(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function compactReason(reason) {
+    return String(reason || "")
+      .replace(/^❌\s*/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function showSysbar(msg, type = "info", actions = []) {
+    if (!sysbar) return;
+
+    sysbar.style.display = "block";
+    sysbar.className = "infobar show " + (
+      type === "error" ? "error" :
+      type === "success" ? "success" :
+      "info"
+    );
+
+    sysbar.innerHTML = `
+      <div style="display:grid;gap:10px;text-align:center">
+        <div style="white-space:pre-line;font-weight:900;font-size:15px;line-height:1.7">
+          ${escapeHtml(msg)}
+        </div>
+
+        <button type="button" id="gateOkBtn"
+          style="width:auto;min-width:110px;margin:0 auto;padding:8px 16px;border-radius:999px;border:2px solid #0b7f47;background:#fff;color:#0b7f47;font-weight:900;cursor:pointer">
+          حسنًا
+        </button>
+      </div>
+    `;
+
+    const okBtn = sysbar.querySelector("#gateOkBtn");
+    okBtn?.addEventListener("click", () => {
+      sysbar.style.display = "none";
+    });
+
+    if (Array.isArray(actions) && actions.length) {
+      const wrap = document.createElement("div");
+      wrap.className = "sys-actions";
+
+      actions.forEach((a) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "sys-btn" + (a.primary ? " primary" : "");
+        btn.textContent = a.label || "إجراء";
+
+        btn.addEventListener("click", () => {
+          if (a.url) {
+            location.href = a.url;
+            return;
+          }
+
+          if (a.focus) {
+            document.querySelector(`[data-field="${a.focus}"]`)?.focus?.();
+            document.getElementById(a.focus)?.focus?.();
+          }
         });
 
-        sysbar.appendChild(wrap);
-      }
+        wrap.appendChild(btn);
+      });
 
-      scrollToSysbar();
+      sysbar.appendChild(wrap);
     }
 
-    /* مزامنة مجموعات العجول (UI فقط) */
-    function syncCalfGroups(){
-      const isDead = (kindEl.value === 'نافقة');
-      const count = parseInt(
-        form.querySelector('input[name="calfCount"]:checked')?.value || '1',
-        10
-      );
+    try { sysbar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+  }
 
-      document.querySelectorAll('.live-only').forEach(el=>{
-        el.style.display = isDead ? 'none' : '';
-      });
-
-      const enableLive = !isDead;
-
-      // required/checked للعدد
-      const calfCountRadios = form.querySelectorAll('input[name="calfCount"]');
-      calfCountRadios.forEach((r, i)=>{
-        if (enableLive) r.required = (i === 0);
-        else { r.required = false; r.checked = false; }
-      });
-
-      // مولود (1)
-      const calfId1 = document.getElementById('calfId');
-      const calf1SexRadios  = form.querySelectorAll('input[name="calf1Sex"]');
-      const calf1FateRadios = form.querySelectorAll('input[name="calf1Fate"]');
-
-      if (calfId1){ calfId1.required = enableLive; if (!enableLive) calfId1.value=''; }
-      calf1SexRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
-      calf1FateRadios.forEach((r,i)=>{ r.required = enableLive && i===0; if (!enableLive) r.checked=false; });
-
-      // مولود (2) و(3)
-      [['offspring2',2], ['offspring3',3]].forEach(([id,idx])=>{
-        const group = document.getElementById(id);
-        const vis = enableLive && count >= idx;
-        if (group) group.style.display = vis ? '' : 'none';
-
-        const idEl   = document.getElementById(`calf${idx}Id`);
-        const sexRad = form.querySelectorAll(`input[name="calf${idx}Sex"]`);
-        const fateRad= form.querySelectorAll(`input[name="calf${idx}Fate"]`);
-
-        if (idEl){ idEl.required = vis; if (!vis) idEl.value=''; }
-        sexRad.forEach((r,i)=>{ r.required = vis && i===0; if (!vis) r.checked=false; });
-        fateRad.forEach((r,i)=>{ r.required = vis && i===0; if (!vis) r.checked=false; });
-      });
-    }
-
-    kindEl?.addEventListener('change', syncCalfGroups);
-    form.querySelectorAll('input[name="calfCount"]').forEach(r=> r.addEventListener('change', syncCalfGroups));
-    document.addEventListener('DOMContentLoaded', syncCalfGroups);
-
-
-    document.getElementById('toCardBtn')?.addEventListener('click', ()=>{
-      const num = (numEl?.value || '').trim();
-      if (!num){
-        showSysbar('أدخل رقم الحيوان أولًا قبل فتح البطاقة.', { error:true });
-        return;
-      }
-      location.href = `/cow-card.html?number=${encodeURIComponent(num)}`;
+  function setDetailsDisabled(disabled) {
+    form.querySelectorAll("[data-field], button[type='submit']").forEach((el) => {
+      const key = el.getAttribute("data-field") || "";
+      if (key === "animalNumber" || key === "eventDate") return;
+      el.disabled = !!disabled;
     });
-  </script>
+
+    if (saveBtn) saveBtn.disabled = !!disabled;
+  }
+
+  function collectPayload() {
+    return {
+      animalNumber: normalizeDigits(animalEl?.value || ""),
+      number: normalizeDigits(animalEl?.value || ""),
+      eventDate: String(dateEl?.value || "").trim(),
+      date: String(dateEl?.value || "").trim(),
+
+      animalId: String(animalIdEl?.value || "").trim(),
+      species: String(speciesEl?.value || "").trim(),
+      reproStatus: "عشار",
+
+      calvingKind: String(kindEl?.value || "").trim(),
+      calfCount: readRadio("calfCount"),
+
+      calf1Sex: readRadio("calf1Sex"),
+      calfId: String(document.getElementById("calfId")?.value || "").trim(),
+      calf1Fate: readRadio("calf1Fate"),
+
+      calf2Sex: readRadio("calf2Sex"),
+      calf2Id: String(document.getElementById("calf2Id")?.value || "").trim(),
+      calf2Fate: readRadio("calf2Fate"),
+
+      calf3Sex: readRadio("calf3Sex"),
+      calf3Id: String(document.getElementById("calf3Id")?.value || "").trim(),
+      calf3Fate: readRadio("calf3Fate"),
+
+      lastInseminationDate: String(lastAiEl?.value || "").trim(),
+      notes: String(document.getElementById("notes")?.value || "").trim()
+    };
+  }
+
+  function renderServerMessage(data, fallback, successByAllowed = false) {
+    const msg = String(data?.message || data?.error || fallback || "").trim();
+    const msgClean = compactReason(msg);
+
+    const rejectedItems = Array.isArray(data?.rejected) ? data.rejected : [];
+
+    const rejectedLines = rejectedItems
+      .slice(0, 8)
+      .map(x => {
+        const n = String(x.animalNumber || "").trim();
+        const reason = compactReason(x.reason || "");
+        if (!reason) return "";
+        if (reason === msgClean) return "";
+        return `${n}: ${reason}`;
+      })
+      .filter(Boolean);
+
+    const fullMsg = [
+      msg,
+      rejectedLines.length ? rejectedLines.join("\n") : ""
+    ].filter(Boolean).join("\n\n");
+
+    const isSuccess = successByAllowed ? !!data?.allowed : !!data?.ok;
+
+    showSysbar(
+      fullMsg || fallback || "تعذّر تنفيذ الطلب.",
+      isSuccess ? "success" : "error",
+      Array.isArray(data?.actions) ? data.actions : []
+    );
+  }
+
+  function applyGateData(data) {
+    if (animalIdEl && data?.animalId) {
+      animalIdEl.value = String(data.animalId || "");
+    }
+
+    if (speciesEl && data?.species) {
+      speciesEl.value = String(data.species || "");
+    }
+
+    if (lastAiEl && data?.lastInseminationDate) {
+      lastAiEl.value = String(data.lastInseminationDate || "").slice(0, 10);
+    }
+  }
+
+  function syncCalfGroups() {
+    const isDead = (kindEl?.value === "نافقة");
+    const count = parseInt(
+      form.querySelector('input[name="calfCount"]:checked')?.value || "1",
+      10
+    );
+
+    document.querySelectorAll(".live-only").forEach(el => {
+      el.style.display = isDead ? "none" : "";
+    });
+
+    const enableLive = !isDead;
+
+    const calfCountRadios = form.querySelectorAll('input[name="calfCount"]');
+    calfCountRadios.forEach((r, i) => {
+      if (enableLive) {
+        r.required = (i === 0);
+      } else {
+        r.required = false;
+        r.checked = false;
+      }
+    });
+
+    const calfId1 = document.getElementById("calfId");
+    const calf1SexRadios = form.querySelectorAll('input[name="calf1Sex"]');
+    const calf1FateRadios = form.querySelectorAll('input[name="calf1Fate"]');
+
+    if (calfId1) {
+      calfId1.required = enableLive;
+      if (!enableLive) calfId1.value = "";
+    }
+
+    calf1SexRadios.forEach((r, i) => {
+      r.required = enableLive && i === 0;
+      if (!enableLive) r.checked = false;
+    });
+
+    calf1FateRadios.forEach((r, i) => {
+      r.required = enableLive && i === 0;
+      if (!enableLive) r.checked = false;
+    });
+
+    [["offspring2", 2], ["offspring3", 3]].forEach(([id, idx]) => {
+      const group = document.getElementById(id);
+      const visible = enableLive && count >= idx;
+
+      if (group) group.style.display = visible ? "" : "none";
+
+      const idEl = document.getElementById(`calf${idx}Id`);
+      const sexRadios = form.querySelectorAll(`input[name="calf${idx}Sex"]`);
+      const fateRadios = form.querySelectorAll(`input[name="calf${idx}Fate"]`);
+
+      if (idEl) {
+        idEl.required = visible;
+        if (!visible) idEl.value = "";
+      }
+
+      sexRadios.forEach((r, i) => {
+        r.required = visible && i === 0;
+        if (!visible) r.checked = false;
+      });
+
+      fateRadios.forEach((r, i) => {
+        r.required = visible && i === 0;
+        if (!visible) r.checked = false;
+      });
+    });
+  }
+
+  let gateTimer = null;
+  let lastGateKey = "";
+
+  async function runGateNow() {
+    const uid = getUid();
+    const payload = collectPayload();
+
+    const gateKey = JSON.stringify({
+      n: payload.animalNumber,
+      d: payload.eventDate
+    });
+
+    if (gateKey === lastGateKey) return;
+    lastGateKey = gateKey;
+
+    if (!uid || !payload.animalNumber || !payload.eventDate) {
+      setDetailsDisabled(true);
+      if (sysbar) sysbar.style.display = "none";
+      return;
+    }
+
+    const endpoint = "/api/calving/gate";
+    const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
+
+    try {
+      setDetailsDisabled(true);
+      showSysbar("جارِ التحقق من أهلية الولادة…", "info");
+
+      const r = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await r.json().catch(() => ({
+        ok: false,
+        allowed: false,
+        message: "تعذّر قراءة رد السيرفر."
+      }));
+
+      renderServerMessage(data, "تعذّر التحقق من أهلية الولادة.", true);
+
+      if (data?.allowed) {
+        applyGateData(data);
+        setDetailsDisabled(false);
+        syncCalfGroups();
+      } else {
+        setDetailsDisabled(true);
+      }
+
+    } catch (err) {
+      console.error("calving gate failed", err);
+      showSysbar("❌ تعذّر التحقق من أهلية الولادة الآن.", "error");
+      setDetailsDisabled(true);
+    }
+  }
+
+  function scheduleGate() {
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(runGateNow, 350);
+  }
+
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const uid = getUid();
+    const payload = collectPayload();
+
+    const endpoint = "/api/calving/save";
+    const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
+
+    try {
+      if (saveBtn) saveBtn.disabled = true;
+
+      showSysbar("جارِ حفظ الولادة…", "info");
+
+      const r = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await r.json().catch(() => ({
+        ok: false,
+        message: "تعذّر قراءة رد السيرفر."
+      }));
+
+      renderServerMessage(data, "تعذّر حفظ الولادة.", false);
+
+      if (data?.ok) {
+        try {
+          localStorage.setItem("lastAnimalId", data.animalNumber || payload.animalNumber || "");
+          localStorage.setItem("lastEventDate", data.eventDate || payload.eventDate || "");
+        } catch (_) {}
+
+        if (data.redirectUrl) {
+          setTimeout(() => {
+            location.href = data.redirectUrl;
+          }, 1100);
+        }
+      }
+
+    } catch (err) {
+      console.error("calving save failed", err);
+      showSysbar("❌ تعذّر حفظ الولادة الآن.", "error");
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  });
+
+  kindEl?.addEventListener("change", syncCalfGroups);
+  form?.querySelectorAll('input[name="calfCount"]').forEach(r => {
+    r.addEventListener("change", syncCalfGroups);
+  });
+
+  animalEl?.addEventListener("input", scheduleGate);
+  animalEl?.addEventListener("change", scheduleGate);
+  dateEl?.addEventListener("change", scheduleGate);
+
+  document.getElementById("toCardBtn")?.addEventListener("click", () => {
+    const n = normalizeDigits(animalEl?.value || "");
+    if (!n) {
+      showSysbar("أدخل رقم الحيوان أولًا قبل فتح البطاقة.", "error");
+      return;
+    }
+
+    location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const n = qp.get("animalNumber") || qp.get("number") || qp.get("animalId") || localStorage.getItem("lastAnimalId") || "";
+    const d = qp.get("eventDate") || qp.get("date") || qp.get("dt") || localStorage.getItem("lastEventDate") || "";
+
+    if (animalEl) animalEl.value = normalizeDigits(n);
+    if (dateEl) dateEl.value = toISO(d) || new Date().toISOString().slice(0, 10);
+
+    setDetailsDisabled(true);
+    syncCalfGroups();
+    scheduleGate();
+  });
+</script>
 </body>
 </html>
 
