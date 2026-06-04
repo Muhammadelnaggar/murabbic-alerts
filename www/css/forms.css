@@ -746,3 +746,120 @@ textarea{
 .offspring-group{
   padding-top:4px;
 }
+/* =========================================================
+   Murabbik Unified Gate Box + Compact Radios
+   ========================================================= */
+
+#gateBox{
+  box-sizing:border-box;
+  width:min(520px, calc(100% - 24px));
+  max-width:520px;
+  margin:10px auto 12px;
+  height:auto !important;
+  min-height:0 !important;
+  padding:10px 12px;
+  line-height:1.5;
+  white-space:normal;
+  position:relative;
+  z-index:50;
+  pointer-events:auto;
+}
+
+#gateBox.show{
+  display:block !important;
+}
+
+#gateBox *{
+  pointer-events:auto;
+}
+
+#gateBox button,
+#gateBox a{
+  pointer-events:auto;
+  cursor:pointer;
+}
+
+.gate-box,
+.validation-info,
+.form-gate{
+  padding:12px !important;
+  min-height:auto !important;
+}
+
+.infobar .msgrow{
+  flex-wrap:wrap !important;
+  align-items:flex-start !important;
+}
+
+.infobar .msgrow > div{
+  min-width:0 !important;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+.infobar .okbtn{
+  white-space:nowrap;
+}
+
+@media (max-width:420px){
+  .infobar .okbtn{
+    width:100% !important;
+    display:block !important;
+    margin-top:8px !important;
+  }
+}
+
+/* Compact Murabbik radio buttons */
+.radio-group input[type="radio"]{
+  appearance:none;
+  -webkit-appearance:none;
+  width:14px;
+  height:14px;
+  margin:0;
+  border:1.6px solid #bfd3c2;
+  border-radius:50%;
+  background:#fff;
+  display:inline-grid;
+  place-items:center;
+  position:relative;
+  transition:.15s ease;
+}
+
+.radio-group input[type="radio"]::before{
+  content:"";
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  transform:scale(0);
+  transition:.15s ease;
+  background:#0ea05a;
+}
+
+.radio-group input[type="radio"]:checked{
+  border-color:#0ea05a;
+}
+
+.radio-group input[type="radio"]:checked::before{
+  transform:scale(1);
+}
+
+.radio-group label:has(input[type="radio"]:checked){
+  border-color:#0ea05a;
+  background:#f6fbf7;
+  color:#0b7f47;
+  box-shadow:0 0 0 2px rgba(14,160,90,.08);
+}
+
+@media (max-width:520px){
+  .radio-group{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+
+  .radio-group label{
+    justify-content:center;
+    padding:10px 12px;
+    font-size:13px;
+  }
+}
