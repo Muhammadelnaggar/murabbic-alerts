@@ -4,14 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 
-  <!-- (هنرجع لملاحظة animal-update.js لاحقًا كما اتفقنا) -->
-  <script type="module">
-    import { updateAnimalByEvent } from "/js/animal-update.js";
-    window.updateAnimalByEvent = updateAnimalByEvent;
-  </script>
+  
 
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+ 
 
   <title>بروتوكول تزامن التبويض والتلقيح الإجباري — مُرَبِّيك</title>
 
@@ -162,15 +158,14 @@
   <div class="wrap">
     <div id="sysbar" class="infobar"></div>
     <div class="mbk-card">
-      <form id="ovForm" autocomplete="off" data-validate="true" data-event="بروتوكول تزامن">
+     <form id="ovForm" autocomplete="off">
         <!-- ✅ حقول ربط للمسار المركزي -->
-        <input type="hidden" id="animalNumber" data-field="animalNumber" value="">
-        <input type="hidden" id="animalNumbers" data-field="animalNumbers" value="">
-        <input type="hidden" id="eventDate" data-field="eventDate" value="">
-        <input type="hidden" id="species" data-field="species" value="">
-        <input type="hidden" id="steps" data-field="steps" value="">
-        <input type="hidden" id="animalId" data-field="animalId" value="">
-
+ <input type="hidden" id="animalNumber" value="">
+<input type="hidden" id="animalNumbers" value="">
+<input type="hidden" id="eventDate" value="">
+<input type="hidden" id="species" value="">
+<input type="hidden" id="steps" value="">
+<input type="hidden" id="animalId" value="">
         <!-- ✅ اختيار وضع التسجيل: فردي / مجموعة -->
         <div class="field" style="margin-bottom:12px">
           <div style="display:flex;gap:12px;align-items:center;font-weight:900">
@@ -252,15 +247,8 @@
     <button id="openCowCard" class="open-card" type="button">بطاقة الحيوان</button>
   </div>
 
-<script type="module">
-import { db as fbDb, auth as fbAuth } from "/js/firebase-config.js";
-import {
-  collection, serverTimestamp, doc, setDoc, getDoc,
-  query, where, getDocs, orderBy, limit
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-(async () => {
+<script>
+(() => {
   const form        = document.getElementById('ovForm');
   const animalUI    = document.getElementById('animalNumberUI');
   const startDateEl = document.getElementById('startDate');
@@ -284,47 +272,247 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
   const animalHidden = document.getElementById("animalNumber");
   const eventHidden  = document.getElementById("eventDate");
   const stepsHidden  = document.getElementById("steps");
+  const animalNumbersHidden = document.getElementById("animalNumbers");
 
-  const applyBulkBtn = document.getElementById('applyBulk');
+  let stepsState = [];
+  let bulkList = [];
+  let gateTimer = null;
 
-  let stepsState = [], bulkList = [];
-  let fbReady = !!fbDb && !!fbAuth;
-
-  /* ========= Helpers ========= */
   function todayISO(){
-    const d=new Date();
-    d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().slice(0,10);
   }
-  function showWarn(t){ warnEl.textContent=t||""; }
-  function clearWarn(){ warnEl.textContent=""; }
+
+  function getUserId(){
+    return String(
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("ownerUid") ||
+      ""
+    ).trim();
+  }
+
+  async function mbkApi(path, options = {}){
+    const uid = getUserId();
+
+    if (!uid) {
+      const err = new Error("⚠️ سجّل الدخول أولًا.");
+      err.code = "login_required";
+      throw err;
+    }
+
+    const headers = {
+      "Content-Type": "application/json",
+      "X-User-Id": uid,
+      ...(options.headers || {})
+    };
+
+    const res = await fetch(path, {
+      ...options,
+      headers
+    });
+
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+
+    if (!res.ok) {
+      const err = new Error(data?.message || "تعذّر الاتصال بالسيرفر.");
+      err.data = data;
+      throw err;
+    }
+
+    return data;
+  }
+
+  function showWarn(t){
+    warnEl.textContent = t || "";
+  }
+
+  function clearWarn(){
+    warnEl.textContent = "";
+  }
+
+  function showInfoMessage(msg, cls = "ok"){
+    const text = String(msg || "");
+    infoEl.style.display = "block";
+    infoEl.className = `infobar show ${cls}`;
+    infoEl.textContent = text;
+  }
+
   function parseBulk(){
-    const raw=(bulkEl?.value||"").trim();
-    if(!raw){ bulkList=[]; return []; }
-    const arr=raw.split(/\n|,|;/g).map(x=>x.trim()).filter(Boolean);
-    bulkList=[...new Set(arr)];
+    const raw = (bulkEl?.value || "").trim();
+    if (!raw) {
+      bulkList = [];
+      return [];
+    }
+
+    const arr = raw
+      .split(/\n|,|;|،|\s+/g)
+      .map(x => String(x || "").trim())
+      .filter(Boolean);
+
+    bulkList = [...new Set(arr)];
     return bulkList;
   }
 
-  function getMode(){ return (modeGroup.checked ? "group" : "single"); }
+  function getMode(){
+    return modeGroup.checked ? "group" : "single";
+  }
+
+  function getCurrentNumbers(){
+    const mode = getMode();
+
+    if (mode === "group") {
+      return parseBulk().map(x => String(x).trim()).filter(Boolean);
+    }
+
+    return [String(animalUI.value || "").trim()].filter(Boolean);
+  }
+
   function setMode(m){
     const isGroup = (m === "group");
     modeGroup.checked = isGroup;
     modeSingle.checked = !isGroup;
     modeBulkBox.hidden = !isGroup;
     modeSingleBox.hidden = isGroup;
-    try{ localStorage.setItem("mbk_ov_mode", isGroup ? "group" : "single"); }catch{}
+
+    try {
+      localStorage.setItem("mbk_ov_mode", isGroup ? "group" : "single");
+    } catch {}
+
     clearWarn();
+    syncCentral();
+    scheduleGatePreview();
   }
 
-  // ===================== Step Mode (تنفيذ خطوة من التنبيه) =====================
   const qp = new URLSearchParams(location.search);
   const stepParam = (qp.get("step") || qp.get("stepIndex") || "").trim();
   const STEP_MODE = !!stepParam;
   const STEP_INDEX = STEP_MODE ? Math.max(0, parseInt(stepParam, 10) || 0) : -1;
 
+  const PROGRAMS = {
+    ovsynch: [
+      { day: 0,  name: "GnRH (اليوم 0)" },
+      { day: 7,  name: "PGF2α (اليوم 7)" },
+      { day: 9,  name: "GnRH (اليوم 9)" },
+      { day: 10, name: "تلقيح مُوقّت TAI (اليوم 10)" }
+    ],
+    cosynch72: [
+      { day: 0,  name: "GnRH (اليوم 0)" },
+      { day: 7,  name: "PGF2α (اليوم 7)" },
+      { day: 10, name: "GnRH + تلقيح مُوقّت TAI (Cosynch-72) (اليوم 10)" }
+    ],
+    presynch_ovsynch: [
+      { day: 0,  name: "PGF2α (Presynch 1) (اليوم 0)" },
+      { day: 14, name: "PGF2α (Presynch 2) (اليوم 14)" },
+      { day: 28, name: "GnRH (Ovsynch) (اليوم 28)" },
+      { day: 35, name: "PGF2α (Ovsynch) (اليوم 35)" },
+      { day: 37, name: "GnRH (Ovsynch) (اليوم 37)" },
+      { day: 38, name: "تلقيح مُوقّت TAI (Ovsynch) (اليوم 38)" }
+    ]
+  };
+
+  function syncCentral(){
+    const list = getCurrentNumbers();
+
+    animalHidden.value = list[0] || "";
+    if (animalNumbersHidden) {
+      animalNumbersHidden.value = JSON.stringify(list);
+    }
+
+    eventHidden.value = (startDateEl.value || "").trim();
+    stepsHidden.value = JSON.stringify(stepsState || []);
+  }
+
+  function updateSteps(){
+    stepsBox.innerHTML = "";
+
+    const start = startDateEl.value;
+    const program = programEl.value;
+
+    if (!start || !program) {
+      stepsState = [];
+      syncCentral();
+      return;
+    }
+
+    stepsState = (PROGRAMS[program] || []).map(s => {
+      const d = new Date(start + "T" + (startTimeEl.value || "08:00"));
+      d.setDate(d.getDate() + s.day);
+
+      return {
+        day: s.day,
+        name: s.name,
+        date: d.toISOString().slice(0,16),
+        done: false
+      };
+    });
+
+    for (let i = 0; i < stepsState.length; i++) {
+      const st = stepsState[i];
+      const row = document.createElement("div");
+      row.className = "step";
+
+      row.innerHTML = `
+        <div>
+          <div class="name">${st.name}</div>
+          <div class="date">📅 ${new Date(st.date).toLocaleString('ar-EG')}</div>
+        </div>
+        <label class="chk">
+          <input type="checkbox" data-i="${i}">
+          تم
+        </label>`;
+
+      stepsBox.appendChild(row);
+    }
+
+    syncCentral();
+  }
+
+  async function runGatePreview(){
+    if (STEP_MODE) return;
+
+    const list = getCurrentNumbers();
+    const eventDate = (startDateEl.value || "").trim();
+
+    if (!list.length || !eventDate) {
+      clearWarn();
+      return;
+    }
+
+    try {
+      const data = await mbkApi("/api/ovsynch/gate", {
+        method: "POST",
+        body: JSON.stringify({
+          animalNumbers: list,
+          animalNumber: list[0] || "",
+          eventDate,
+          startDate: eventDate
+        })
+      });
+
+      if (data?.silent) return;
+
+      showWarn(data.message || "");
+
+    } catch (err) {
+      showWarn(err?.message || "❌ تعذّر فحص أهلية أرقام التزامن الآن.");
+    }
+  }
+
+  function scheduleGatePreview(){
+    if (STEP_MODE) return;
+
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(() => {
+      runGatePreview();
+    }, 350);
+  }
+
   async function loadStepTargets(){
     if (!STEP_MODE) return;
+
     setMode("group");
     modeSingle.disabled = true;
     modeGroup.disabled = true;
@@ -332,160 +520,159 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
     saveBtn.textContent = "تأكيد تنفيذ الخطوة";
     openCowCard.textContent = "رجوع للداشبورد";
 
-    const u = await waitUser();
-    if (!u) { showWarn("⚠️ سجّل الدخول أولًا."); return; }
+    try {
+      const due = todayISO();
 
-    const due = todayISO();
+      const data = await mbkApi(
+        `/api/ovsynch/step-targets?stepIndex=${encodeURIComponent(STEP_INDEX)}&dueDate=${encodeURIComponent(due)}`,
+        { method: "GET" }
+      );
 
-    const qAll = query(
-      collection(fbDb, "tasks"),
-      where("userId", "==", u.uid),
-      where("dueDate", "==", due),
-      where("status", "==", "pending"),
-      limit(500)
-    );
+      const nums = Array.isArray(data.animalNumbers) ? data.animalNumbers : [];
 
-    const snap = await getDocs(qAll);
-
-    const nums = [];
-    let meta = null;
-
-    snap.forEach(d=>{
-      const t = d.data() || {};
-      if (t.type !== "ovsynch_step") return;
-      if (Number(t.stepIndex) !== STEP_INDEX) return;
-      nums.push(String(t.animalNumber||"").trim());
-      if (!meta) meta = t;
-    });
-
-    const uniq = [...new Set(nums)].filter(Boolean);
-
-    if (!uniq.length){
-      showWarn("✅ لا يوجد حيوانات مطلوبة لهذه الخطوة اليوم.");
-      try{ bulkEl.value = ""; }catch{}
-      try{ bulkHintEl.textContent = ""; }catch{}
-      return;
-    }
-
-    const stepName = String(meta?.stepName || "");
-    showWarn(`خطوات اليوم — ${stepName || ("الخطوة رقم " + STEP_INDEX)} — ${uniq.length} حيوان`);
-
-    if (meta?.protocolProgram) programEl.value = String(meta.protocolProgram);
-    if (meta?.protocolStartDate) startDateEl.value = String(meta.protocolStartDate).slice(0,10);
-
-    programEl.disabled = true;
-    startDateEl.disabled = true;
-    startTimeEl.disabled = true;
-
-    updateSteps();
-
-    bulkEl.value = uniq.join("\n");
-    try{ bulkHintEl.textContent = `تم تحميل ${uniq.length} رقم تلقائيًا من مهام اليوم — يمكنك حذف/إضافة أرقام قبل التأكيد.`; }catch{}
-
-    const boxes = stepsBox.querySelectorAll('input[type="checkbox"][data-i]');
-    boxes.forEach(b=>{
-      const i = parseInt(b.dataset.i||"-1",10);
-      if (i !== STEP_INDEX){
-        b.disabled = true;
-        b.closest('.step')?.classList.add("disabled");
-      } else {
-        b.disabled = false;
+      if (!nums.length) {
+        showWarn(data.message || "✅ لا يوجد حيوانات مطلوبة لهذه الخطوة اليوم.");
+        try { bulkEl.value = ""; } catch {}
+        try { bulkHintEl.textContent = ""; } catch {}
+        return;
       }
-    });
 
-    const targetBox = stepsBox.querySelector(`input[type="checkbox"][data-i="${STEP_INDEX}"]`);
-    targetBox?.closest(".step")?.scrollIntoView({ behavior:"smooth", block:"center" });
+      showWarn(data.message || `خطوات اليوم — الخطوة رقم ${STEP_INDEX} — ${nums.length} حيوان`);
+
+      const meta = data.meta || {};
+
+      if (meta.program || meta.protocolProgram) {
+        programEl.value = String(meta.program || meta.protocolProgram || "");
+      }
+
+      if (meta.protocolStartDate) {
+        startDateEl.value = String(meta.protocolStartDate).slice(0,10);
+      }
+
+      programEl.disabled = true;
+      startDateEl.disabled = true;
+      startTimeEl.disabled = true;
+
+      updateSteps();
+
+      bulkEl.value = nums.join("\n");
+
+      try {
+        bulkHintEl.textContent = `تم تحميل ${nums.length} رقم تلقائيًا من مهام اليوم — يمكنك حذف/إضافة أرقام قبل التأكيد.`;
+      } catch {}
+
+      syncCentral();
+
+      const boxes = stepsBox.querySelectorAll('input[type="checkbox"][data-i]');
+      boxes.forEach(b => {
+        const i = parseInt(b.dataset.i || "-1", 10);
+
+        if (i !== STEP_INDEX) {
+          b.disabled = true;
+          b.closest('.step')?.classList.add("disabled");
+        } else {
+          b.disabled = false;
+        }
+      });
+
+      const targetBox = stepsBox.querySelector(`input[type="checkbox"][data-i="${STEP_INDEX}"]`);
+      targetBox?.closest(".step")?.scrollIntoView({ behavior:"smooth", block:"center" });
+
+    } catch (err) {
+      showWarn(err?.message || "❌ تعذّر تحميل مهام خطوة التزامن الآن.");
+    }
   }
 
   async function confirmStepExecution(){
     if (!STEP_MODE) return;
 
     clearWarn();
-    const u = await waitUser();
-    if (!u) { showWarn("⚠️ سجّل الدخول أولًا."); return; }
 
-    const list = parseBulk().map(x=>String(x).trim()).filter(Boolean);
-    if (!list.length){ showWarn("⚠️ القائمة فارغة."); return; }
+    const list = parseBulk().map(x => String(x).trim()).filter(Boolean);
+    if (!list.length) {
+      showWarn("⚠️ القائمة فارغة.");
+      return;
+    }
 
     const st = stepsState[STEP_INDEX] || {};
     const program = (programEl.value || "").trim();
     const startISO = (startDateEl.value || "").trim() || todayISO();
 
-    let done = 0;
+    try {
+      const data = await mbkApi("/api/ovsynch/confirm-step", {
+        method: "POST",
+        body: JSON.stringify({
+          animalNumbers: list,
+          animalNumber: list[0] || "",
+          program,
+          protocolProgram: program,
+          protocolStartDate: startISO,
+          date: todayISO(),
+          stepIndex: STEP_INDEX,
+          stepDay: Number(st.day ?? 0),
+          stepName: String(st.name || "")
+        })
+      });
 
-    for (const animal of list){
-      const baseId = ["ovsynch", animal, program, startISO].join("__");
-      const taskId = `${baseId}__step_${STEP_INDEX}`;
-      const stepEventId = `${baseId}__step_event_${STEP_INDEX}`;
+      showWarn(data.message || `✅ تم تأكيد تنفيذ الخطوة لـ ${data.doneCount || 0} حيوان.`);
 
-      await setDoc(doc(fbDb, "events", stepEventId), {
-        userId: u.uid,
-        ownerUid: u.uid,
-        type: "ovsynch_step",
-        eventType: "خطوة تزامن",
-        eventDate: todayISO(),
-        animalNumber: String(animal),
-        protocolType: "ovsynch",
-        protocolProgram: String(program || ""),
-        protocolStartDate: String(startISO).slice(0,10),
-        stepIndex: STEP_INDEX,
-        stepDay: Number(st.day ?? 0),
-        stepName: String(st.name || ""),
-        source: location.pathname,
-        updatedAt: serverTimestamp(),
-        createdAt: serverTimestamp()
-      }, { merge: true });
+      try {
+        setTimeout(() => {
+          location.href = "/dashboard.html";
+        }, 700);
+      } catch {}
 
-      await setDoc(doc(fbDb, "tasks", taskId), {
-        status: "done",
-        done: true,
-        doneAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      done++;
+    } catch (err) {
+      showWarn(err?.message || "❌ تعذّر تأكيد خطوة بروتوكول التزامن الآن.");
     }
-
-    showWarn(`✅ تم تأكيد تنفيذ الخطوة لـ ${done} حيوان.`);
-    try{ setTimeout(()=>{ location.href = "/dashboard.html"; }, 700); }catch{}
   }
 
-  function syncCentral(){
-    const mode = getMode();
-    const list = (mode === "group")
-      ? parseBulk().map(x => String(x).trim()).filter(Boolean)
-      : [String(animalUI.value || "").trim()].filter(Boolean);
-
-    animalHidden.value = (list[0] || "");
-
-    try{ animalHidden.dispatchEvent(new Event('input',  { bubbles:true })); }catch{}
-    try{ animalHidden.dispatchEvent(new Event('change', { bubbles:true })); }catch{}
-
-    const animalNumbersHidden = document.getElementById("animalNumbers");
-    if (animalNumbersHidden) animalNumbersHidden.value = JSON.stringify(list);
-
-    eventHidden.value = (startDateEl.value || "").trim();
-    stepsHidden.value = JSON.stringify(stepsState || []);
-  }
-
-  openCowCard.addEventListener("click", () => {
-    if (STEP_MODE){
-      location.href = "/dashboard.html";
+  async function saveProtocol(){
+    if (STEP_MODE) {
+      await confirmStepExecution();
       return;
     }
-    const num = (getMode()==="group" ? (parseBulk()[0]||"") : (animalUI.value||"")).trim();
-    if (!num) { showWarn("⚠️ اكتب رقم الحيوان أولًا."); return; }
-    location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
-  });
 
-  if (!startDateEl.value) startDateEl.value = todayISO();
+    clearWarn();
 
-  // ✅ قراءة باراميتر الوضع + الرقم/التاريخ (بدون أي تحقق)
-  (function hydrateFromURL(){
+    const start = (startDateEl.value || "").trim() || todayISO();
+    if (!startDateEl.value) {
+      startDateEl.value = start;
+    }
+
+    const program = (programEl.value || "").trim();
+
+    syncCentral();
+
+    const list = getCurrentNumbers();
+
+    try {
+      const data = await mbkApi("/api/ovsynch/save", {
+        method: "POST",
+        body: JSON.stringify({
+          animalNumbers: list,
+          animalNumber: list[0] || "",
+          eventDate: start,
+          startDate: start,
+          program,
+          steps: stepsState
+        })
+      });
+
+      showInfoMessage(data.message || "✅ تم التسجيل بنجاح", "ok");
+      clearWarn();
+      syncCentral();
+
+    } catch (err) {
+      const data = err?.data || {};
+      showInfoMessage(data?.message || err?.message || "❌ تعذّر حفظ بروتوكول التزامن الآن.", "err");
+    }
+  }
+
+  function hydrateFromURL(){
     const qp = new URLSearchParams(location.search);
 
-    // Step mode سبق وبيفرض group فوق — لا نكسره هنا
-    if (STEP_MODE){
+    if (STEP_MODE) {
       setMode("group");
       syncCentral();
       return;
@@ -498,297 +685,164 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
     const numRaw  = (qp.get("number") || qp.get("animalNumber") || "").trim();
     const dt      = (qp.get("date") || qp.get("eventDate") || "").trim();
 
-    // ✅ 1) لو جاي bulk: group (أعلى أولوية)
-    if (bulkRaw){
+    if (bulkRaw) {
       setMode("group");
-      try{ localStorage.setItem("mbk_ov_mode","group"); }catch{}
+      try { localStorage.setItem("mbk_ov_mode", "group"); } catch {}
 
-      if (bulkEl){
-        const cleaned = bulkRaw
-          .replace(/[،;,]+/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-        const arr = cleaned ? cleaned.split(" ").filter(Boolean) : [];
-        bulkEl.value = arr.join("\n");
-      }
+      const cleaned = bulkRaw
+        .replace(/[،;,]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 
-      // في حالة bulk لا نملأ الفردي
-      animalUI.value = "";
-    }
-    // ✅ 2) لو جاي number واحد: single (حتى لو saved=group)
-    else if (numRaw && !/[\s،,;\n]/.test(numRaw)){
-      setMode("single");
-      try{ localStorage.setItem("mbk_ov_mode","single"); }catch{}
-      animalUI.value = numRaw;
-      if (bulkEl) bulkEl.value = "";
-    }
-    // ✅ 3) لو جاي number متعدد (ملصوق): group
-    else if (numRaw && /[\s،,;\n]/.test(numRaw)){
-      setMode("group");
-      try{ localStorage.setItem("mbk_ov_mode","group"); }catch{}
-      const cleaned = numRaw.replace(/[،,;]+/g," ").replace(/\s+/g," ").trim();
       const arr = cleaned ? cleaned.split(" ").filter(Boolean) : [];
-      if (bulkEl) bulkEl.value = arr.join("\n");
+      bulkEl.value = arr.join("\n");
       animalUI.value = "";
     }
-    // ✅ 4) لو mbkMode موجود صراحةً: احترمه
-    else if (m === "group" || m === "single"){
+
+    else if (numRaw && !/[\s،,;\n]/.test(numRaw)) {
+      setMode("single");
+      try { localStorage.setItem("mbk_ov_mode", "single"); } catch {}
+      animalUI.value = numRaw;
+      bulkEl.value = "";
+    }
+
+    else if (numRaw && /[\s،,;\n]/.test(numRaw)) {
+      setMode("group");
+      try { localStorage.setItem("mbk_ov_mode", "group"); } catch {}
+
+      const cleaned = numRaw
+        .replace(/[،,;]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      const arr = cleaned ? cleaned.split(" ").filter(Boolean) : [];
+      bulkEl.value = arr.join("\n");
+      animalUI.value = "";
+    }
+
+    else if (m === "group" || m === "single") {
       setMode(m);
     }
-    // ✅ 5) fallback: آخر وضع محفوظ
+
     else {
       setMode(saved === "group" ? "group" : "single");
     }
 
-    if (dt) startDateEl.value = dt || todayISO();
-
-    syncCentral();
-  })();
-
-  modeSingle.addEventListener("change", ()=>setMode("single"));
-  modeGroup.addEventListener("change", ()=>setMode("group"));
-
-  animalUI.addEventListener("input",syncCentral);
-  bulkEl?.addEventListener("input",syncCentral);
-  startDateEl.addEventListener("input",syncCentral);
-  programEl?.addEventListener("change", syncCentral);
-  startTimeEl?.addEventListener("change", syncCentral);
-
-  /* ========= Programs ========= */
-  const PROGRAMS = {
-    ovsynch: [
-      { day: 0,  name: "GnRH (اليوم 0)" },
-      { day: 7,  name: "PGF2α (اليوم 7)" },
-      { day: 9,  name: "GnRH (اليوم 9)" },
-      { day: 10, name: "تلقيح مُوقّت TAI (اليوم 10)" },
-    ],
-    cosynch72: [
-      { day: 0,  name: "GnRH (اليوم 0)" },
-      { day: 7,  name: "PGF2α (اليوم 7)" },
-      { day: 10, name: "GnRH + تلقيح مُوقّت TAI (Cosynch-72) (اليوم 10)" },
-    ],
-    presynch_ovsynch: [
-      { day: 0,  name: "PGF2α (Presynch 1) (اليوم 0)" },
-      { day: 14, name: "PGF2α (Presynch 2) (اليوم 14)" },
-      { day: 28, name: "GnRH (Ovsynch) (اليوم 28)" },
-      { day: 35, name: "PGF2α (Ovsynch) (اليوم 35)" },
-      { day: 37, name: "GnRH (Ovsynch) (اليوم 37)" },
-      { day: 38, name: "تلقيح مُوقّت TAI (Ovsynch) (اليوم 38)" },
-    ],
-  };
-
-  function updateSteps(){
-    stepsBox.innerHTML='';
-    const start=startDateEl.value, program=programEl.value;
-    if(!start||!program) { stepsState=[]; syncCentral(); return; }
-
-    stepsState=(PROGRAMS[program]||[]).map(s=>{
-      const d=new Date(start+"T"+(startTimeEl.value||"08:00"));
-      d.setDate(d.getDate()+s.day);
-      return { day:s.day, name:s.name, date:d.toISOString().slice(0,16), done:false };
-    });
-
-    for (let i=0;i<stepsState.length;i++){
-      const st = stepsState[i];
-      const row=document.createElement("div");
-      row.className="step";
-      row.innerHTML=`
-        <div>
-          <div class="name">${st.name}</div>
-          <div class="date">📅 ${new Date(st.date).toLocaleString('ar-EG')}</div>
-        </div>
-        <label class="chk">
-          <input type="checkbox" data-i="${i}">
-          تم
-        </label>`;
-      stepsBox.appendChild(row);
+    if (dt) {
+      startDateEl.value = dt || todayISO();
     }
+
     syncCentral();
+    scheduleGatePreview();
   }
 
-  stepsBox.addEventListener("change", async (e)=>{
+  openCowCard.addEventListener("click", () => {
+    if (STEP_MODE) {
+      location.href = "/dashboard.html";
+      return;
+    }
+
+    const num = (getMode() === "group" ? (parseBulk()[0] || "") : (animalUI.value || "")).trim();
+
+    if (!num) {
+      showWarn("⚠️ اكتب رقم الحيوان أولًا.");
+      return;
+    }
+
+    location.href = `cow-card.html?number=${encodeURIComponent(num)}`;
+  });
+
+  modeSingle.addEventListener("change", () => setMode("single"));
+  modeGroup.addEventListener("change", () => setMode("group"));
+
+  animalUI.addEventListener("input", () => {
+    syncCentral();
+    scheduleGatePreview();
+  });
+
+  bulkEl?.addEventListener("input", () => {
+    syncCentral();
+    scheduleGatePreview();
+  });
+
+  applyBulk?.addEventListener("click", () => {
+    setMode("group");
+    parseBulk();
+    syncCentral();
+    scheduleGatePreview();
+
+    try {
+      bulkHintEl.textContent = parseBulk().length
+        ? `تم تطبيق ${parseBulk().length} رقم.`
+        : "";
+    } catch {}
+  });
+
+  startDateEl.addEventListener("input", () => {
+    syncCentral();
+    scheduleGatePreview();
+  });
+
+  programEl.addEventListener("change", () => {
+    updateSteps();
+    syncCentral();
+  });
+
+  startDateEl.addEventListener("change", () => {
+    updateSteps();
+    syncCentral();
+    scheduleGatePreview();
+  });
+
+  startTimeEl.addEventListener("change", () => {
+    updateSteps();
+    syncCentral();
+  });
+
+  stepsBox.addEventListener("change", async (e) => {
     const i = e.target?.dataset?.i;
     if (i === undefined) return;
 
     const idx = parseInt(i, 10);
 
-    if (STEP_MODE){
-      if (idx !== STEP_INDEX){
+    if (STEP_MODE) {
+      if (idx !== STEP_INDEX) {
         e.target.checked = false;
         return;
       }
-      if (!!e.target.checked){
+
+      if (!!e.target.checked) {
         await confirmStepExecution();
       } else {
         e.target.checked = true;
       }
+
       return;
     }
 
-    stepsState[idx].done = !!e.target.checked;
+    if (stepsState[idx]) {
+      stepsState[idx].done = !!e.target.checked;
+    }
+
     syncCentral();
   });
 
-  programEl.addEventListener("change",updateSteps);
-  startDateEl.addEventListener("change",updateSteps);
-  startTimeEl.addEventListener("change",updateSteps);
+  saveBtn.addEventListener("click", saveProtocol);
 
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    saveProtocol();
+  });
+
+  if (!startDateEl.value) {
+    startDateEl.value = todayISO();
+  }
+
+  hydrateFromURL();
+  updateSteps();
   loadStepTargets();
-
-  /* ========= Firebase (Robust) ========= */
-  async function waitUser(ms=1500){
-    return await new Promise(res=>{
-      const t=setTimeout(()=>res(fbAuth?.currentUser||null),ms);
-      onAuthStateChanged(fbAuth,u=>{ clearTimeout(t); res(u||null); });
-    });
-  }
-
-  async function refreshGroups(){ return; }
-
-  const u0 = await waitUser();
-  if (u0) await refreshGroups(u0.uid);
-
-  /* ========= Tasks: Ovsynch ========= */
-  async function upsertOvsynchTasks(uid, animalNumber, protocolStartISO, programKey, stepsArr){
-    try{
-      if (!uid || !animalNumber || !protocolStartISO || !Array.isArray(stepsArr) || !stepsArr.length) return;
-
-      const startDay = String(protocolStartISO).slice(0,10);
-
-      for (let i=0;i<stepsArr.length;i++){
-        const st = stepsArr[i] || {};
-        const stepDay  = (typeof st.day === "number") ? st.day : i;
-        const stepName = st.name || `Step ${i}`;
-        const stepDT   = (st.date || "").toString();
-        const dueDate  = (stepDT.slice(0,10) || startDay);
-
-        const taskId = `task__${animalNumber}__ovsynch__${startDay}__d${stepDay}`;
-        const ref = doc(fbDb, "tasks", taskId);
-
-        const snap = await getDoc(ref);
-        if (snap.exists()){
-          const cur = snap.data() || {};
-          const stt = (cur.status || "").toLowerCase();
-          if (stt === "done" || stt === "cancelled") continue;
-        }
-
-        const isDone = !!st.done;
-
-        const payload = {
-          userId: uid,
-          animalNumber: String(animalNumber),
-          type: "protocol_step",
-          protocol: "ovsynch",
-          program: programKey || "ovsynch",
-          protocolStartDate: startDay,
-          stepIndex: i,
-          stepDay,
-          stepKey: `ovsynch_d${stepDay}`,
-          stepName,
-          dueDate,
-          plannedDate: dueDate,
-          plannedTime: (stepDT && stepDT.length >= 16) ? stepDT.slice(11,16) : "08:00",
-          plannedDateTime: stepDT || (dueDate + "T08:00"),
-
-          status: isDone ? "done" : "pending",
-          done: isDone ? true : false,
-          doneAt: isDone ? serverTimestamp() : null,
-
-          updatedAt: serverTimestamp(),
-        };
-
-        if (!snap.exists()) payload.createdAt = serverTimestamp();
-
-        // ✅ (Fix) setDoc مرة واحدة فقط
-        await setDoc(ref, payload, { merge: true });
-      }
-    }catch(err){
-      console.error("upsertOvsynchTasks failed:", err);
-      throw err;
-    }
-  }
-
-  /* ========= Save ========= */
-  saveBtn.addEventListener("click", async ()=>{
-    if (STEP_MODE){
-      await confirmStepExecution();
-      return;
-    }
-    syncCentral();
-    form.requestSubmit();
-  });
-
-  form.addEventListener("mbk:valid", async (ev)=> {
-    const start = (startDateEl.value || "").trim() || todayISO();
-    if (!startDateEl.value) startDateEl.value = start;
-
-    const program = (programEl.value || "").trim();
-    if (!fbReady || !fbDb || !fbAuth) return;
-
-    const u = await waitUser();
-    if (!u) return;
-
-    const fd = ev?.detail?.formData || null;
-    if (!fd || !Array.isArray(fd.animalNumbers)) return;
-
-    const finalList = fd.animalNumbers;
-    const rejected  = Array.isArray(fd.rejected) ? fd.rejected : [];
-
-    const payloadBase = {
-      type: "ovsynch",
-      eventType: "بروتوكول تزامن",
-      eventDate: start,
-      program,
-      steps: stepsState,
-      userId: u.uid,
-      createdAt: serverTimestamp()
-    };
-
-    let saved = 0;
-    let already = 0;
-
-    for (const animal of finalList){
-      const id = ["ovsynch", animal, program, start].join("__");
-      const ref = doc(fbDb, "events", id);
-
-      const ex = await getDoc(ref);
-      if (ex.exists()){
-        already++;
-        continue;
-      }
-
-      const payload = Object.assign({}, payloadBase, { animalNumber: animal });
-      await setDoc(ref, payload);
-      await upsertOvsynchTasks(u.uid, animal, start, program, stepsState);
-
-      if (typeof window.updateAnimalByEvent === "function"){
-        try{ await window.updateAnimalByEvent(payload); }catch{}
-      }
-
-      saved++;
-    }
-
-    let msg = `✅ تم التسجيل بنجاح: ${saved} رقم`;
-    if (already) msg += `\n⛔ مسجل مسبقًا: ${already} رقم`;
-    if (rejected.length){
-      const prev = rejected.slice(0,6).map(x=>x.reason).join("\n");
-      msg += `\n\n🚫 مستبعد: ${rejected.length} رقم\n${prev}${rejected.length>6 ? "\n…" : ""}`;
-    }
-
-    if (typeof window.showMsg === "function") {
-      window.showMsg(infoEl, msg.split("\n"), "ok");
-    } else {
-      infoEl.style.display="block";
-      infoEl.textContent = msg;
-    }
-
-    clearWarn();
-    syncCentral();
-  });
-
   syncCentral();
 })();
 </script>
-
 </body>
 </html>
