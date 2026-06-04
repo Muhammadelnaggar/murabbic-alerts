@@ -505,10 +505,31 @@ function showInfoMessage(msg, cls = "ok"){
         })
       });
 
-     if (data?.silent) return;
+if (data?.silent) return;
 
-     clearWarn();
-     showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
+/* عند الإدخال الجماعي: السيرفر هو مصدر الفلترة.
+   نُبقي في الصندوق الأرقام المؤهلة فقط. */
+if (getMode() === "group" && Array.isArray(data.accepted)) {
+  const acceptedNums = data.accepted
+    .map(x => {
+      if (typeof x === "string" || typeof x === "number") return String(x).trim();
+      return String(x?.animalNumber || x?.number || "").trim();
+    })
+    .filter(Boolean);
+
+  if (acceptedNums.length) {
+    bulkEl.value = acceptedNums.join("\n");
+
+    try {
+      bulkHintEl.textContent = `تم تطبيق ${acceptedNums.length} رقم مؤهل فقط.`;
+    } catch {}
+
+    syncCentral();
+  }
+}
+
+clearWarn();
+showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
     } catch (err) {
      clearWarn();
      showInfoMessage(err?.message || "❌ تعذّر فحص أهلية أرقام التزامن الآن.", "err");
