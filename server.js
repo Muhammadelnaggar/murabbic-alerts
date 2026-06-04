@@ -8626,36 +8626,69 @@ const numbers = parseOvsynchNumbers(rawNumbers);
 
     const allowed = accepted.length > 0;
 
-    if (!allowed) {
-      return res.json({
-        ok: true,
-        allowed: false,
-        stage: "no_eligible_animals",
-        message:
-          "🔎 تم فحص القائمة\n" +
-          "لا يوجد أرقام مؤهلة لبدء برنامج التزامن حاليًا.\n\n" +
-          rejected.map(r => compactOvsynchReason(r.reason)).join("\n"),
-        acceptedCount: 0,
-        rejectedCount: rejected.length,
-        accepted: [],
-        rejected
-      });
-    }
+   const acceptedCount = accepted.length;
+const rejectedCount = rejected.length;
+const isBulk = numbers.length > 1;
 
-    return res.json({
-      ok: true,
-      allowed: true,
-      stage: "eligible",
-      message:
-        "🔎 تم فحص القائمة\n" +
-        `✅ مقبول: ${accepted.length}\n` +
-        `🚫 مرفوض: ${rejected.length}`,
-      acceptedCount: accepted.length,
-      rejectedCount: rejected.length,
+if (!isBulk) {
+  if (!acceptedCount) {
+    const r0 = rejected[0] || {};
+    return res.status(400).json({
+      ok: false,
+      allowed: false,
+      stage: "no_eligible_animals",
+      message: compactOvsynchReason(r0.reason || "❌ الحيوان غير مؤهل لبدء برنامج التزامن."),
+      acceptedCount,
+      rejectedCount,
       accepted,
       rejected
     });
+  }
 
+  return res.json({
+    ok: true,
+    allowed: true,
+    stage: "eligible",
+    message: "✅ الحيوان مؤهل لبدء برنامج التزامن.",
+    acceptedCount,
+    rejectedCount,
+    accepted,
+    rejected
+  });
+}
+
+if (!acceptedCount) {
+  return res.status(400).json({
+    ok: false,
+    allowed: false,
+    stage: "no_eligible_animals",
+    message:
+      "لا يوجد أرقام مؤهلة لبدء برنامج التزامن حاليًا.\n\n" +
+      rejected.map(r => compactOvsynchReason(r.reason)).join("\n"),
+    acceptedCount,
+    rejectedCount,
+    accepted,
+    rejected
+  });
+}
+
+return res.json({
+  ok: true,
+  allowed: true,
+  stage: "eligible",
+  message:
+    `✅ مؤهل: ${acceptedCount}\n` +
+    `🚫 غير مؤهل: ${rejectedCount}` +
+    (
+      rejectedCount
+        ? "\n\n" + rejected.map(r => compactOvsynchReason(r.reason)).join("\n")
+        : ""
+    ),
+  acceptedCount,
+  rejectedCount,
+  accepted,
+  rejected
+});
   } catch (e) {
     console.error("ovsynch-gate", e);
 
