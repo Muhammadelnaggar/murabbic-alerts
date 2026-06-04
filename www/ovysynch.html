@@ -333,12 +333,25 @@
     warnEl.textContent = "";
   }
 
-  function showInfoMessage(msg, cls = "ok"){
-    const text = String(msg || "");
-    infoEl.style.display = "block";
-    infoEl.className = `infobar show ${cls}`;
-    infoEl.textContent = text;
-  }
+function showInfoMessage(msg, cls = "ok"){
+  const lines = Array.isArray(msg)
+    ? msg
+    : String(msg || "").split("\n").filter(Boolean);
+
+  const safeLines = lines.map(x =>
+    String(x || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+  );
+
+  infoEl.style.display = "block";
+  infoEl.className = `infobar mbk-infobar show ${cls}`;
+
+  infoEl.innerHTML = safeLines
+    .map(line => `<div>${line}</div>`)
+    .join("");
+}
 
   function parseBulk(){
     const raw = (bulkEl?.value || "").trim();
