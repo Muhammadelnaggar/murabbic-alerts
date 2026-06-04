@@ -4,130 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+ 
  
 
   <title>تسجيل إجهاض — مُرَبِّيك</title>
 
-  <style>
-    :root{
-      --green:#0ea05a;--green-600:#0b7f47;--bg:#f7faf7;--text:#0f172a;
-      --muted:#64748b;--card:#ffffff
-    }
-    *{box-sizing:border-box}
-    html,body{max-width:100%;overflow-x:hidden}
-    body{
-      margin:0;
-      font-family:'Cairo',Tahoma,Arial,sans-serif;
-      background:var(--bg);
-      color:var(--text);
-    }
-    header{
-      position:sticky;top:0;z-index:10;
-      background:#fff;
-      border-bottom:1px solid #e2e8f0;
-      box-shadow:0 2px 4px rgba(0,0,0,.05)
-    }
-    main{
-      max-width:920px;
-      margin:20px auto;
-      padding:16px;
-      padding-bottom:110px
-    }
-    .card{
-      background:var(--card);
-      border:1px solid #e2e8f0;
-      border-radius:16px;
-      padding:20px;
-      box-shadow:0 2px 6px rgba(0,0,0,.05)
-    }
-    .grid{display:grid;grid-template-columns:1fr;gap:16px}
-    .row{display:grid;gap:14px;min-width:0}
-    @media(min-width:720px){.row{grid-template-columns:repeat(2,1fr)}}
-    label{
-      font-weight:600;font-size:15px;
-      color:#0f172a;
-      display:block;margin-bottom:6px
-    }
-    input,textarea{
-      width:100%;padding:12px;
-      border:1px solid #cbd5e1;
-      border-radius:10px;
-      background:#fff;font-size:16px
-    }
-    textarea{min-height:84px;resize:vertical}
-
-    .actions-bar{
-      position:fixed;bottom:0;left:0;right:0;
-      background:#fff;
-      border-top:1px solid #e2e8f0;
-      box-shadow:0 -2px 6px rgba(0,0,0,.08);
-      display:flex;gap:10px;
-      padding:12px;z-index:20
-    }
-    .actions-bar button{
-      flex:1;padding:14px;
-      font-size:16px;font-weight:700;
-      border-radius:12px;cursor:pointer;border:0
-    }
-    .actions-bar .save{background:var(--green);color:#fff}
-    .actions-bar .ghost{background:#eef2f7;color:#0f172a}
-
-    /* ===== Header (Standard) ===== */
-    .mbk-head{
-      max-width:920px;margin:0 auto;
-      padding:12px 16px;
-      display:flex;align-items:center;justify-content:space-between;
-      gap:12px;
-    }
-    .mbk-logo{height:56px;width:auto;object-fit:contain;opacity:.70}
-    .mbk-center{flex:1;text-align:center;line-height:1.15}
-    .mbk-page-title{font-weight:900;color:var(--green-600);font-size:18px}
-    .mbk-app-name{font-weight:800;font-size:13px;opacity:.85;margin-top:4px}
-    .mbk-back{
-      width:44px;height:44px;border-radius:999px;
-      background:#f1f5f9;border:1px solid #cbd5e1;
-      color:#0f172a;text-decoration:none;
-      display:flex;align-items:center;justify-content:center;
-      font-weight:900;font-size:12px;
-    }
-
-    /* sysbar ثابت تحت الهيدر */
-    #sysbar{
-      display:none;
-      max-width:920px;
-      margin:10px auto 0;
-    }
-    #sysbar.show{display:block}
-
-    /* أزرار داخل sysbar */
-    .infobar .sys-actions{
-      margin-top:10px;
-      display:flex;
-      gap:10px;
-      justify-content:center;
-      flex-wrap:wrap;
-    }
-    .infobar .sys-btn{
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid #cbd5e1;
-      background:#fff;
-      cursor:pointer;
-      font-weight:800;
-      font-size:14px;
-      color:#0f172a;
-      min-width:140px;
-    }
-    .infobar .sys-btn.primary{
-      border:0;
-      background:var(--green);
-      color:#fff;
-    }
-    .infobar.error .sys-btn.primary{
-      background:#dc2626;
-    }
-  </style>
+ 
 </head>
 
 <body>
@@ -149,8 +31,7 @@
   <div id="sysbar" class="infobar" role="status" aria-live="polite"></div>
 
   <main>
-    <form id="abortion-form" class="card grid" autocomplete="off" novalidate
-          data-validate="true" data-event="إجهاض">
+   <form id="abortion-form" class="card grid" autocomplete="off" novalidate data-event="إجهاض">
 
       <!-- قياسي -->
       <input type="hidden" data-field="animalId" id="animalId">
@@ -197,54 +78,369 @@
     <button class="save" id="saveBtn" type="submit" form="abortion-form">حفظ الإجهاض ✅</button>
     <button class="ghost" id="toCardBtn" type="button">فتح بطاقة الحيوان</button>
   </div>
+<script>
+  const qp = new URLSearchParams(location.search);
 
-  <script src="/js/app-core.js"></script>
+  const form = document.getElementById("abortion-form");
+  const sysbar = document.getElementById("sysbar");
 
-  <!-- Prefill من add-event (number/date) -->
-  <script>
-    (function(){
-      const qs = new URLSearchParams(location.search);
-      const $  = (id)=> document.getElementById(id);
+  const animalEl = document.getElementById("animalNumber");
+  const dateEl = document.getElementById("eventDate");
+  const animalIdEl = document.getElementById("animalId");
+  const speciesEl = document.getElementById("species");
+  const lastAiEl = document.getElementById("lastInseminationDate");
+  const ageEl = document.getElementById("abortionAgeMonths");
+  const causeEl = document.getElementById("probableCause");
+  const notesEl = document.getElementById("notes");
+  const saveBtn = document.getElementById("saveBtn");
 
-      function toISO(s){
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-        const d = new Date(s); if (isNaN(d)) return '';
-        return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
-      }
+  function getUid() {
+    return String(
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("tenantId") ||
+      localStorage.getItem("ownerUid") ||
+      ""
+    ).trim();
+  }
 
-      document.addEventListener('DOMContentLoaded', ()=>{
-        const num  = qs.get('number') || qs.get('animalNumber') || '';
-        const date = qs.get('date')   || qs.get('dt') || qs.get('eventDate') || '';
-        if (num && $('animalNumber')) {
-          $('animalNumber').value = String(num).replace(/[^\d٠-٩۰-۹]/g,'');
-          $('animalNumber').dispatchEvent(new Event('input', { bubbles:true }));
-          $('animalNumber').dispatchEvent(new Event('change', { bubbles:true }));
-        }
-        if (date && $('eventDate')) {
-          $('eventDate').value = toISO(date);
-          $('eventDate').dispatchEvent(new Event('input', { bubbles:true }));
-          $('eventDate').dispatchEvent(new Event('change', { bubbles:true }));
-        }
+  function apiBase() {
+    return String(
+      window.API_BASE ||
+      localStorage.getItem("API_BASE") ||
+      ""
+    ).replace(/\/$/, "");
+  }
+
+  function normalizeDigits(raw) {
+    const map = {
+      "٠": "0","١": "1","٢": "2","٣": "3","٤": "4","٥": "5","٦": "6","٧": "7","٨": "8","٩": "9",
+      "۰": "0","۱": "1","۲": "2","۳": "3","۴": "4","۵": "5","۶": "6","۷": "7","۸": "8","۹": "9"
+    };
+
+    return String(raw || "")
+      .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
+      .replace(/[^\d]/g, "")
+      .trim();
+  }
+
+  function toISO(s) {
+    const v = String(s || "").trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return "";
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 10);
+  }
+
+  function escapeHtml(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function compactReason(reason) {
+    return String(reason || "")
+      .replace(/^❌\s*/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function showSysbar(msg, type = "info", actions = []) {
+    if (!sysbar) return;
+
+    sysbar.style.display = "block";
+    sysbar.className = "infobar show " + (
+      type === "error" ? "error" :
+      type === "success" ? "success" :
+      type === "warn" ? "warning" :
+      "info"
+    );
+
+    sysbar.innerHTML = `
+      <div style="display:grid;gap:10px;text-align:center">
+        <div style="white-space:pre-line;font-weight:900;font-size:15px;line-height:1.7">
+          ${escapeHtml(msg)}
+        </div>
+
+        <button type="button" id="gateOkBtn"
+          style="width:auto;min-width:110px;margin:0 auto;padding:8px 16px;border-radius:999px;border:2px solid #0b7f47;background:#fff;color:#0b7f47;font-weight:900;cursor:pointer">
+          حسنًا
+        </button>
+      </div>
+    `;
+
+    sysbar.querySelector("#gateOkBtn")?.addEventListener("click", () => {
+      sysbar.style.display = "none";
+    });
+
+    if (Array.isArray(actions) && actions.length) {
+      const wrap = document.createElement("div");
+      wrap.className = "sys-actions";
+
+      actions.forEach((a) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "sys-btn" + (a.primary ? " primary" : "");
+        btn.textContent = a.label || "إجراء";
+
+        btn.addEventListener("click", () => {
+          if (a.url) {
+            location.href = a.url;
+            return;
+          }
+
+          if (a.focus) {
+            document.querySelector(`[data-field="${a.focus}"]`)?.focus?.();
+            document.getElementById(a.focus)?.focus?.();
+          }
+        });
+
+        wrap.appendChild(btn);
       });
-    })();
-  </script>
- <script type="module">
-  import { initEventShell } from "/js/event-shell.js";
-  initEventShell({ pageId: "abortion", title: "تسجيل إجهاض", logoSrc: "/images/logo.png", backHref: "add-event.html" });
-</script>
 
-<script type="module">
-  const numEl = document.getElementById("animalNumber");
+      sysbar.appendChild(wrap);
+    }
 
-  document.getElementById("toCardBtn")?.addEventListener("click", () => {
-    const n = String(numEl?.value || "").trim();
-    if (!n) {
-      numEl?.focus?.();
+    try { sysbar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+  }
+
+  function setDetailsDisabled(disabled) {
+    form.querySelectorAll("[data-field], button[type='submit']").forEach((el) => {
+      const key = el.getAttribute("data-field") || "";
+      if (key === "animalNumber" || key === "eventDate") return;
+      el.disabled = !!disabled;
+    });
+
+    if (saveBtn) saveBtn.disabled = !!disabled;
+  }
+
+  function collectPayload() {
+    return {
+      animalNumber: normalizeDigits(animalEl?.value || ""),
+      number: normalizeDigits(animalEl?.value || ""),
+      eventDate: String(dateEl?.value || "").trim(),
+      date: String(dateEl?.value || "").trim(),
+
+      animalId: String(animalIdEl?.value || "").trim(),
+      species: String(speciesEl?.value || "").trim(),
+      lastInseminationDate: String(lastAiEl?.value || "").trim(),
+      abortionAgeMonths: String(ageEl?.value || "").trim(),
+      probableCause: String(causeEl?.value || "").trim(),
+      notes: String(notesEl?.value || "").trim()
+    };
+  }
+
+  function renderServerMessage(data, fallback, successByAllowed = false) {
+    const msg = String(data?.message || data?.error || fallback || "").trim();
+    const msgClean = compactReason(msg);
+
+    const rejectedItems = Array.isArray(data?.rejected) ? data.rejected : [];
+
+    const rejectedLines = rejectedItems
+      .slice(0, 8)
+      .map(x => {
+        const n = String(x.animalNumber || "").trim();
+        const reason = compactReason(x.reason || "");
+        if (!reason) return "";
+        if (reason === msgClean) return "";
+        return `${n}: ${reason}`;
+      })
+      .filter(Boolean);
+
+    const fullMsg = [
+      msg,
+      rejectedLines.length ? rejectedLines.join("\n") : ""
+    ].filter(Boolean).join("\n\n");
+
+    const isSuccess = successByAllowed ? !!data?.allowed : !!data?.ok;
+
+    showSysbar(
+      fullMsg || fallback || "تعذّر تنفيذ الطلب.",
+      isSuccess ? "success" : "error",
+      Array.isArray(data?.actions) ? data.actions : []
+    );
+  }
+
+  function applyGateData(data) {
+    if (animalIdEl && data?.animalId) {
+      animalIdEl.value = String(data.animalId || "");
+    }
+
+    if (speciesEl && data?.species) {
+      speciesEl.value = String(data.species || "");
+    }
+
+    if (lastAiEl && data?.lastInseminationDate) {
+      lastAiEl.value = String(data.lastInseminationDate || "").slice(0, 10);
+    }
+
+    if (ageEl && data?.abortionAgeMonths !== undefined && data?.abortionAgeMonths !== null) {
+      ageEl.value = String(data.abortionAgeMonths);
+    }
+
+    if (causeEl) {
+      causeEl.value = String(data?.probableCause || "");
+    }
+  }
+
+  let gateTimer = null;
+  let lastGateKey = "";
+
+  async function runGateNow() {
+    const uid = getUid();
+    const payload = collectPayload();
+
+    const gateKey = JSON.stringify({
+      n: payload.animalNumber,
+      d: payload.eventDate
+    });
+
+    if (gateKey === lastGateKey) return;
+    lastGateKey = gateKey;
+
+    if (!uid || !payload.animalNumber || !payload.eventDate) {
+      setDetailsDisabled(true);
+      if (sysbar) sysbar.style.display = "none";
       return;
     }
+
+    const endpoint = "/api/abortion/gate";
+    const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
+
+    try {
+      setDetailsDisabled(true);
+      showSysbar("جارِ التحقق من أهلية الإجهاض…", "info");
+
+      const r = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await r.json().catch(() => ({
+        ok: false,
+        allowed: false,
+        message: "تعذّر قراءة رد السيرفر."
+      }));
+
+      renderServerMessage(data, "تعذّر التحقق من أهلية الإجهاض.", true);
+
+      if (data?.allowed) {
+        applyGateData(data);
+        setDetailsDisabled(false);
+      } else {
+        setDetailsDisabled(true);
+      }
+
+    } catch (err) {
+      console.error("abortion gate failed", err);
+      showSysbar("❌ تعذّر التحقق من أهلية الإجهاض الآن.", "error");
+      setDetailsDisabled(true);
+    }
+  }
+
+  function scheduleGate() {
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(runGateNow, 350);
+  }
+
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const uid = getUid();
+    const payload = collectPayload();
+
+    const endpoint = "/api/abortion/save";
+    const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
+
+    try {
+      if (saveBtn) saveBtn.disabled = true;
+
+      showSysbar("جارِ حفظ الإجهاض…", "info");
+
+      const r = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await r.json().catch(() => ({
+        ok: false,
+        message: "تعذّر قراءة رد السيرفر."
+      }));
+
+      renderServerMessage(data, "تعذّر حفظ الإجهاض.", false);
+
+      if (data?.ok) {
+        try {
+          localStorage.setItem("lastAnimalId", data.animalNumber || payload.animalNumber || "");
+          localStorage.setItem("lastEventDate", data.eventDate || payload.eventDate || "");
+        } catch (_) {}
+
+        if (data.redirectUrl) {
+          setTimeout(() => {
+            location.href = data.redirectUrl;
+          }, 1100);
+        }
+      }
+
+    } catch (err) {
+      console.error("abortion save failed", err);
+      showSysbar("❌ تعذّر حفظ الإجهاض الآن.", "error");
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  });
+
+  animalEl?.addEventListener("input", scheduleGate);
+  animalEl?.addEventListener("change", scheduleGate);
+  dateEl?.addEventListener("change", scheduleGate);
+
+  document.getElementById("toCardBtn")?.addEventListener("click", () => {
+    const n = normalizeDigits(animalEl?.value || "");
+    if (!n) {
+      showSysbar("أدخل رقم الحيوان أولًا قبل فتح البطاقة.", "error");
+      return;
+    }
+
     location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
   });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const n =
+      qp.get("animalNumber") ||
+      qp.get("number") ||
+      qp.get("animalId") ||
+      localStorage.getItem("lastAnimalId") ||
+      "";
+
+    const d =
+      qp.get("eventDate") ||
+      qp.get("date") ||
+      qp.get("dt") ||
+      localStorage.getItem("lastEventDate") ||
+      "";
+
+    if (animalEl) animalEl.value = normalizeDigits(n);
+    if (dateEl) dateEl.value = toISO(d) || new Date().toISOString().slice(0, 10);
+
+    setDetailsDisabled(true);
+    scheduleGate();
+  });
 </script>
+
+
+ 
+
 
 <!-- MURABBIK_STATUS: OPERATIONALLY_CLOSED | abortion.html | server-side gate/save | UI-only | CSS central pass pending -->
 </body>
