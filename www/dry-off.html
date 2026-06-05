@@ -11,187 +11,7 @@
   
 
 
-  <style>
-    /* ✅ Header (Murabbik standard) */
-    header{
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      background: #fff;
-      border-bottom: 1px solid var(--border, #e2e8f0);
-    }
-    .mbk-head{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      padding:10px 12px;
-    }
-    .mbk-logo{
-      width:auto;
-      height:48px;
-      object-fit:contain;
-      opacity:.95;
-      flex-shrink:0;
-    }
-    .mbk-center{
-      flex:1;
-      text-align:center;
-      line-height:1.2;
-    }
-    .mbk-page-title{
-      font-size:18px;
-      font-weight:900;
-      color: var(--ink, #0f172a);
-    }
-    .mbk-app-name{
-      font-size:13px;
-      font-weight:800;
-      color: var(--brand-600, #0b7f47);
-      opacity:.9;
-    }
-    .mbk-back{
-      width:42px;
-      height:42px;
-      border-radius:50%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      text-decoration:none;
-      font-weight:900;
-      color: var(--brand-600, #0b7f47);
-      border:2px solid var(--brand-600, #0b7f47);
-      background:#fff;
-      flex-shrink:0;
-    }
-
-    /* ✅ Page layout uses forms.css tokens */
-    .wrap{
-      max-width:520px;
-      margin:12px auto 24px;
-      padding:0 12px;
-    }
-    .mbk-card{
-      background:#fff;
-      border:1px solid var(--border, #e2e8f0);
-      border-radius:16px;
-      padding:14px;
-      box-shadow:0 1px 0 rgba(15,23,42,.04);
-    }
-    .field{ margin-bottom:12px; }
-
-    /* ✅ option-group chips (Murabbik style) */
-    .option-group{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-top:8px;
-      margin-bottom:8px;
-    }
-    .option-group label{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid var(--border, #e2e8f0);
-      background:#fff;
-      cursor:pointer;
-      font-weight:800;
-      font-size:14px;
-    }
-/* ✅ RADIO / OPTION GROUP — واضح ومتناسق (بدون :has) */
-.option-group{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  justify-content:center;
-  align-items:center;
-}
-
-.option-group label{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:8px 10px;
-  border:none;
-  background:none;
-  cursor:pointer;
-  font-weight:800;
-  font-size:14px;
-}
-.radio-container{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  background:#f8fafc;
-  border-radius:14px;
-  padding:10px 8px;
-  margin-top:8px;
-  margin-bottom:10px;
-}
-/* نخفي الراديو الافتراضي ونرسم دائرة واضحة */
-.option-group input[type="radio"]{
-  appearance:none;
-  -webkit-appearance:none;
-  width:12px;
-  height:12px;
-  border-radius:50%;
-  border:1.8px solid #cbd5e1;
-  background:#fff;
-  position:relative;
-  cursor:pointer;
-}
-.option-group input[type="radio"]:checked{
-  border-color:#0ea05a;
-}
-
-.option-group input[type="radio"]:checked::after{
-  content:"";
-  position:absolute;
-  inset:2.5px;
-  border-radius:50%;
-  background:#0ea05a;
-}
-
-.option-group label:active{ transform:scale(.99); }
-
-    /* ✅ Bottom actions (Murabbik style) */
-    .btn-row{
-      position: sticky;
-      bottom: 10px;
-      background: #fff;
-      padding: 10px;
-      border: 1px solid var(--border, #e2e8f0);
-      border-radius: 16px;
-      display:flex;
-      gap:10px;
-      margin-top:14px;
-    }
-    .btn-row .save-btn,
-    .btn-row .open-card{
-      flex:1;
-      width:auto;
-      border-radius:14px;
-      padding:12px 14px;
-      font-weight:900;
-      font-size:16px;
-      cursor:pointer;
-    }
-    .btn-row .save-btn{
-      background: var(--brand, #0ea05a);
-      color:#fff;
-      border:0;
-    }
-    .btn-row .open-card{
-      background:#fff !important;
-      color: var(--brand-600, #0b7f47) !important;
-      border:2px solid var(--brand-600, #0b7f47) !important;
-    }
-
-    /* ✅ keep infobar clean */
-    #info.infobar{ display:none; }
-  </style>
+ 
 </head>
 
 <body>
@@ -209,7 +29,7 @@
     </div>
   </header>
 
- <div class="wrap">
+ <main class="mbk-form">
   <!-- ✅ Infobar (سيستخدمه showMsg) -->
   <div id="info" class="infobar"></div>
 
@@ -238,32 +58,29 @@
 
     <div class="field">
       <label>تأكيد الحمل</label>
-      <div class="radio-container"> 
-        <div class="option-group"> 
+      <div class="radio-group">
         <label><input type="radio" data-field="pregnancyStatus" name="pregnancyStatus" value="عشار" required /> عشار</label>
         <label><input type="radio" data-field="pregnancyStatus" name="pregnancyStatus" value="فارغة" required /> فارغة</label>
       </div>
     </div>
-  </div>
+  
 
     <div class="field">
       <label>تم استخدام محاقن التجفيف؟</label>
-      <div class="radio-container"> 
-        <div class="option-group">   
+     <div class="radio-group"> 
         <label><input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="نعم" required /> نعم</label>
         <label><input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="لا" required /> لا</label>
       </div>
     </div>
-  </div>
+ 
 
     <!-- ✅ Bottom actions -->
-    <div class="btn-row">
-      <button class="save-btn" type="submit">حفظ التجفيف</button>
-      <button class="open-card" id="openCowCard" type="button">فتح بطاقة الحيوان</button>
-    </div>
-
-  </form>
+    <div class="actions-bar">
+  <button class="save" type="submit">حفظ التجفيف</button>
+  <button class="ghost" id="openCowCard" type="button">فتح بطاقة الحيوان</button>
 </div>
+  </form>
+</main>
 
  <script>
   const form = document.getElementById("dryOffForm");
