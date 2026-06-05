@@ -9212,27 +9212,18 @@ batch.set(db.collection(animal._collection || "animals").doc(animal.id), {
       scheduleGroupsRebuildSrv(uid, "ovsynch_save");
     }
 
-   let message = `✅ تم التسجيل بنجاح: ${savedCount} رقم`;
+const savedNumbers = saved
+  .map(x => String(x.animalNumber || "").trim())
+  .filter(Boolean);
 
-if (alreadyCount) {
-  message += `\n⛔ مسجل مسبقًا: ${alreadyCount} رقم`;
-}
+let message = "";
 
-if (rejected.length) {
-  if (numbers.length === 1) {
-    message += `\n${compactOvsynchReasonForSave(rejected[0]?.reason || "❌ الحيوان غير مؤهل لتسجيل بروتوكول التزامن.")}`;
-  } else {
-    const prev = rejected
-      .slice(0, 6)
-      .map(x => {
-  const n = String(x.animalNumber || "").trim();
-  const reason = compactOvsynchReasonForSave(x.reason).replace(/^❌\s*/, "");
-  return n ? `❌ الحيوان رقم ${n}: ${reason}` : `❌ ${reason}`;
-})
-      .join("\n");
-
-    message += `\n\n🚫 مستبعد: ${rejected.length} رقم\n${prev}${rejected.length > 6 ? "\n…" : ""}`;
-  }
+if (savedNumbers.length === 1) {
+  message = `✅ تم تسجيل بروتوكول التزامن للحيوان رقم ${savedNumbers[0]}`;
+} else if (savedNumbers.length > 1) {
+  message = `✅ تم تسجيل بروتوكول التزامن للحيوانات أرقام: ${savedNumbers.join("، ")}`;
+} else {
+  message = "❌ لم يتم تسجيل بروتوكول التزامن.";
 }
     return res.json({
       ok: true,
