@@ -7,9 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
   <meta name="theme-color" content="#2e7d32" />
   <link rel="stylesheet" href="css/forms.css" />
-  <script type="module" src="js/forms-init.js"></script>
-
-
+  
 </head>
 
 <body>
@@ -65,227 +63,120 @@
       </form>
   </main>
 
-  <script type="module">
-    import { db, auth, ensureAuth } from "/js/firebase-config.js";
-    import { updateAnimalByEvent } from "/js/animal-update.js";
-   import {
-  collection, addDoc, serverTimestamp,
-  getDocs, query, where, orderBy, limit,
-  doc, getDoc
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<script>
+  const $ = (id) => document.getElementById(id);
 
-    const $ = (id) => document.getElementById(id);
-    const info = $("info");
+  const p = new URLSearchParams(location.search);
+  const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
+  const dt  = p.get("date") || p.get("eventDate") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
 
-  function msg(t, ok=false){
-  const bar = document.getElementById("sysbar") || document.getElementById("info");
-  if (!bar) { console.warn("[msg] no infobar on page"); return; }
+  $("animalNumber").value = String(num || "");
+  $("eventDate").value = dt;
 
-  if (window.showMsg) {
-    window.showMsg(bar, t, ok ? "success" : "error");
-    return;
+  function getUid() {
+    return String(
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("tenantId") ||
+      ""
+    ).trim();
   }
 
-  bar.className = "infobar mbk-infobar show " + (ok ? "success" : "error");
-  bar.style.display = "block";
-  bar.textContent = t;
-}
-    const p = new URLSearchParams(location.search);
-    const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
-    const dt  = p.get("date") || p.get("eventDate") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
+  function msg(t, ok = false) {
+    const bar = document.getElementById("sysbar");
+    if (!bar) return;
 
-    $("animalNumber").value = String(num || "");
-    $("eventDate").value = dt;
-    const cardBtn = $("cardBtn");
-if (cardBtn) {
-  cardBtn.onclick = () => {
-    const n = String(num || "").trim();
+    bar.className = "infobar mbk-infobar show " + (ok ? "success" : "error");
+    bar.style.display = "block";
+    bar.textContent = t;
+
+    try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+  }
+
+  function currentSaleReason() {
+    const preset = String($("saleReasonPreset")?.value || "").trim();
+    const custom = String($("saleReasonCustom")?.value || "").trim();
+
+    if (preset === "أخرى") return custom;
+    return preset;
+  }
+
+  function applySaleReasonUI() {
+    const preset = String($("saleReasonPreset")?.value || "").trim();
+    const custom = $("saleReasonCustom");
+
+    if (!custom) return;
+
+    if (preset === "أخرى") {
+      custom.style.display = "";
+      custom.focus();
+    } else {
+      custom.style.display = "none";
+      custom.value = "";
+    }
+  }
+
+  $("saleReasonPreset")?.addEventListener("change", applySaleReasonUI);
+  applySaleReasonUI();
+
+  $("cardBtn")?.addEventListener("click", () => {
+    const n = String($("animalNumber")?.value || "").trim();
     if (n) location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
-  };
-}
+  });
 
-    let lastCullAutoReason = ""; // آخر سبب استبعاد (لو موجود)
+  $("saleForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-    async function prefillLastCullReason(){
-      try{
-        await ensureAuth();
-        const uid = auth.currentUser?.uid;
-        if (!uid) return;
+    const uid = getUid();
 
-        const n = String(num || "").trim();
-        if (!n) return;
+    const payload = {
+      animalNumber: String($("animalNumber")?.value || "").trim(),
+      eventDate: String($("eventDate")?.value || "").trim(),
+      archiveReason: "sale",
+      price: Number($("price")?.value || 0) || null,
+      saleReason: currentSaleReason(),
+      season: Number($("season")?.value || 0) || null,
+      notes: String($("notes")?.value || "").trim()
+    };
 
-        // ✅ تصحيح مهم: بياناتك تستخدم animalNumber/animalId وليس number
-        const evRef = collection(db, "events");
-      const qy = query(
-  collection(db, "events"),
-  where("userId", "==", uid),
-  where("animalNumber", "==", n),
-  where("type", "==", "استبعاد"),
-  orderBy("eventDate", "desc"),
-  limit(1)
-);
-
-        const snap = await getDocs(qy);
-        if (snap.empty) return;
-
-        const lastCull = snap.docs[0].data() || {};
-        const autoReason =
-          (String(lastCull.reason || "").trim()) ||
-          `${String(lastCull.cullMain||"").trim()} — ${String(lastCull.cullDetail||"").trim()}`.trim();
-
-        lastCullAutoReason = String(autoReason || "").trim();
-
-      }catch(e){
-        console.warn("[sale] prefillLastCullReason failed", e);
+    try {
+      if (!uid) {
+        msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.");
+        return;
       }
-    }
-async function prefillSeason(){
-  try{
-    await ensureAuth();
-    const uid = auth.currentUser?.uid;
-    if(!uid) return;
 
-      const n = String(num || "").trim();
-    const nNum = Number(n);
-    if(!n || !Number.isFinite(nNum)) return;
+      msg("جارِ أرشفة الحيوان بعد البيع...");
 
-    const seasonInput = document.getElementById("season");
-    if(!seasonInput) return;
+      const r = await fetch("/api/animals/archive", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify(payload)
+      });
 
-    const aq = query(
-      collection(db, "animals"),
-      where("ownerUid", "==", uid),
-      where("animalNumber", "==", nNum),
-      limit(1)
-    );
+      const data = await r.json().catch(() => null);
 
-    const snap = await getDocs(aq);
-    if(snap.empty) return;
-
-    const a = snap.docs[0].data() || {};
-    const s = Number(a.lactationNumber);
-    if(Number.isFinite(s) && s > 0){
-      seasonInput.value = String(s);
-    }
-
-  }catch(e){
-    console.warn("[sale] prefillSeason failed", e);
-  }
-}
-function addOptionIfMissing(val){
-  val = String(val || "").trim();
-  if(!val) return;
-  const sel = $("saleReasonPreset");
-  const exists = Array.from(sel.options).some(o => String(o.value).trim() === val);
-  if(exists) return;
-  const opt = document.createElement("option");
-  opt.value = val;
-  opt.textContent = val;
-  const other = Array.from(sel.options).find(o => o.value === "أخرى");
-  sel.insertBefore(opt, other || null);
-}
-
-function applyPresetToSaleReason(){
-  const preset = String($("saleReasonPreset").value || "").trim();
-  const saleReason = $("saleReason");         // مخفي دائمًا (إلا استبعاد)
-  const hint = $("cullHint");
-  const custom = $("saleReasonCustom");       // يظهر فقط عند "أخرى"
-
-  // reset
-  if (hint){ hint.style.display = "none"; hint.textContent = ""; }
-  if (custom){ custom.style.display = "none"; }
-
-  if (preset === "استبعاد"){
-    // ✅ يظهر saleReason فقط هنا (لإظهار السبب المسحوب)
-    const val = (lastCullAutoReason || "استبعاد").trim();
-    saleReason.value = val;
-    saleReason.readOnly = true;
-    saleReason.style.display = "";
-
-    if (hint){
-      hint.style.display = "block";
-      hint.textContent = lastCullAutoReason
-        ? "تم سحب سبب الاستبعاد تلقائيًا من آخر استبعاد مسجل."
-        : "لا يوجد استبعاد سابق — تم ضبط السبب على: استبعاد.";
-    }
-    return;
-  }
-
-  if (preset === "أخرى"){
-    // ✅ نخفي saleReason ونظهر حقل كتابة
-    saleReason.value = "";
-    saleReason.style.display = "none";
-    saleReason.readOnly = true;
-
-    custom.style.display = "";
-    custom.value = "";
-    custom.focus();
-    return;
-  }
-
-  // ✅ باقي الاختيارات: saleReason مخفي ويتسجل بالقيمة المختارة
-  saleReason.value = preset;
-  saleReason.readOnly = true;
-  saleReason.style.display = "none";
-}
-    // ابدأ بالسحب ثم طبّق القيمة الافتراضية
-    await prefillLastCullReason();
-    applyPresetToSaleReason();
-    await prefillSeason();
-    $("saleReasonPreset").addEventListener("change", applyPresetToSaleReason);
-    $("saleReasonCustom")?.addEventListener("blur", () => {
-  const typed = String($("saleReasonCustom").value || "").trim();
-  if(!typed) return;
-
-  // أضف السبب للدروب داون واختره
-  addOptionIfMissing(typed);
-  $("saleReasonPreset").value = typed;
-
-  // خزّن القيمة الرسمية في saleReason (المخفي)
-  const saleReason = $("saleReason");
-  saleReason.value = typed;
-  saleReason.style.display = "none";
-});
-    // ✅ حفظ فقط بعد نجاح التحقق المركزي
-    window.addEventListener("mbk:valid", async (ev) => {
-      try{
-        await ensureAuth();
-        const uid = auth.currentUser?.uid;
-        if (!uid) throw new Error("NO_AUTH");
-
-        const formData = (ev && ev.detail && ev.detail.formData) ? ev.detail.formData : {};
-
-        const payload = {
-          animalNumber: String(formData.animalNumber || num || ""),
-          season: Number(formData.season) || null,
-          animalId: String(formData.animalNumber || num || ""),
-          type: "بيع",
-          eventType: "بيع",
-          eventDate: String(formData.eventDate || dt || ""),
-          price: Number(formData.price) || null,
-          saleReason: String(formData.saleReason || "").trim(),
-          notes: String(formData.notes || "").trim(),
-          userId: uid,
-          source: "/sale.html",
-          createdAt: serverTimestamp()
-        };
-
-        await addDoc(collection(db, "events"), payload);
-        await updateAnimalByEvent(payload);
-
-        msg("تم تسجيل البيع بنجاح ✅", true);
-        localStorage.setItem("lastAnimalNumber", String(payload.animalNumber));
-        localStorage.setItem("lastEventDate", String(payload.eventDate));
-
-        setTimeout(()=>location.href=`cow-card.html?number=${encodeURIComponent(payload.animalNumber)}`, 900);
-
-      }catch(e){
-        console.error(e);
-        msg("❌ فشل في الحفظ.", false);
+      if (!r.ok || data?.ok !== true) {
+        msg(data?.message || "❌ فشل أرشفة الحيوان بعد البيع.");
+        return;
       }
-    }, { passive: true });
 
-  </script>
+      msg(data.message || "✅ تم أرشفة الحيوان وأحداثه بعد البيع.", true);
+
+      localStorage.setItem("lastAnimalNumber", String(payload.animalNumber));
+      localStorage.setItem("lastEventDate", String(payload.eventDate));
+
+      setTimeout(() => {
+        location.href = "add-event.html";
+      }, 900);
+
+    } catch (err) {
+      console.error(err);
+      msg("❌ فشل الاتصال بالسيرفر أثناء أرشفة البيع.");
+    }
+  });
+</script>
 </body>
 </html>
