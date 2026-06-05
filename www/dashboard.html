@@ -759,9 +759,8 @@
 <script src="/js/tenant-bootstrap.js"></script>
 <script type="module" src="/js/api.js"></script>
 <script type="module" src="/js/app-core.js"></script>
-  <script src="/js/smart-checks.js"></script>
-  <script src="/js/alerts-ui.js"></script>
-  <script type="module" src="/js/repro-auto.js"></script>
+<script src="/js/alerts-ui.js"></script>
+<script type="module" src="/js/repro-auto.js"></script>
 
 
 
@@ -1783,17 +1782,50 @@ function renderMiniGauge(id, percent){
   el.style.color = gaugeColor;
   el.textContent = gaugeDisplayValue(id, n);
 }
+  async function loadOvsynchDashboardAlerts(){
+  try{
+    const uid = getTenantId();
+    if (!uid) return;
+
+    const r = await fetch(API_BASE + '/api/ovsynch/dashboard-alerts', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'X-User-Id': uid
+      },
+      cache: 'no-store'
+    });
+
+    const data = await r.json().catch(() => null);
+    const alerts = Array.isArray(data?.alerts) ? data.alerts : [];
+    if (!alerts.length) return;
+
+    alerts.forEach(a => {
+      if (!a?.message) return;
+
+      window.mbk?.alertsUI?.show?.({
+        ruleId: 'ovsynch_dashboard_step',
+        severity: a.level === 'warn' ? 'warn' : 'info',
+        title: a.title || 'تنبيه بروتوكول التزامن',
+        message: a.message,
+        actionText: a.actionText || 'فتح صفحة التزامن',
+        actionUrl: a.actionUrl || 'ovysynch.html',
+        animalNumbers: a.animalNumbers || [],
+        count: a.count || 0
+      });
+    });
+
+  }catch(e){
+    console.warn('ovsynch dashboard alerts failed', e);
+  }
+}
   // ============ تشغيل ============
 document.addEventListener('DOMContentLoaded', () => {
   loadWeatherTHI();
   loadHerdKPIs();
 
-  try{
-    window.smart?.startAlertsWatcher({
-      userId: getTenantId(),
-      onAlert: (p)=> window.mbk?.alertsUI?.show && window.mbk.alertsUI.show(p)
-    });
-  }catch(e){}
+ loadOvsynchDashboardAlerts();
+setInterval(loadOvsynchDashboardAlerts, 10 * 60 * 1000);
 });
 
 </script>
