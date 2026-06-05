@@ -387,41 +387,53 @@
     reasonEl.value = "";
   }
 
-  function renderGateResult(data) {
-    acceptedRows = Array.isArray(data?.accepted) ? data.accepted : [];
-    rejectedRows = Array.isArray(data?.rejected) ? data.rejected : [];
-    gateOk = acceptedRows.length > 0;
+function renderGateResult(data) {
+  acceptedRows = Array.isArray(data?.accepted) ? data.accepted : [];
+  rejectedRows = Array.isArray(data?.rejected) ? data.rejected : [];
+  gateOk = acceptedRows.length > 0;
 
-    if (acceptedRows.length === 1) {
-      const row = acceptedRows[0];
-      gestEl.value = row.gestationDays ?? "";
-      reasonEl.value = row.reason || "";
-    }
-
-    if (acceptedRows.length > 1) {
-      gestEl.value = "";
-      reasonEl.value = "تجفيف جماعي";
-    }
-
-    let msg = data?.message || "";
-
-    if (acceptedRows.length) {
-      msg += "\n\nالمؤهل:";
-      msg += "\n" + acceptedRows
-        .map(r => `✅ ${r.animalNumber} — ${r.reason} — ${r.gestationDays} يوم`)
-        .join("\n");
-    }
-
-    if (rejectedRows.length) {
-      msg += "\n\nغير المؤهل:";
-      msg += "\n" + rejectedRows
-        .map(r => `❌ ${r.animalNumber || "-"} — ${r.reason || "غير مؤهل"}`)
-        .join("\n");
-    }
-
-    showMsg(msg, gateOk ? "success" : "error");
+  if (acceptedRows.length === 1) {
+    const row = acceptedRows[0];
+    gestEl.value = row.gestationDays ?? "";
+    reasonEl.value = row.reason || "";
+  } else if (acceptedRows.length > 1) {
+    gestEl.value = "";
+    reasonEl.value = "تجفيف جماعي";
+  } else {
+    gestEl.value = "";
+    reasonEl.value = "";
   }
 
+  if (!acceptedRows.length && rejectedRows.length === 1) {
+    const r = rejectedRows[0] || {};
+    showMsg(r.reason || data?.message || "❌ الحيوان غير مؤهل لتسجيل التجفيف.", "error");
+    return;
+  }
+
+  if (acceptedRows.length === 1 && !rejectedRows.length) {
+    const row = acceptedRows[0];
+    showMsg(`✅ الحيوان مؤهل لتسجيل التجفيف.\n${row.animalNumber} — ${row.reason} — ${row.gestationDays} يوم`, "success");
+    return;
+  }
+
+  let msg = `نتيجة التحقق:\nالمؤهل: ${acceptedRows.length}\nغير المؤهل: ${rejectedRows.length}`;
+
+  if (acceptedRows.length) {
+    msg += "\n\n✅ المؤهل:";
+    msg += "\n" + acceptedRows
+      .map(r => `${r.animalNumber} — ${r.reason} — ${r.gestationDays} يوم`)
+      .join("\n");
+  }
+
+  if (rejectedRows.length) {
+    msg += "\n\n❌ غير المؤهل:";
+    msg += "\n" + rejectedRows
+      .map(r => `${r.animalNumber || "-"} — ${r.reason || "غير مؤهل"}`)
+      .join("\n");
+  }
+
+  showMsg(msg, gateOk ? "success" : "error");
+}
   async function runDryOffGate({ silent = false } = {}) {
     const uid = getUid();
     const animalNumbers = animalEl.value.trim();
