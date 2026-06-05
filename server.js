@@ -9758,6 +9758,602 @@ app.post("/api/ovsynch/confirm-step", requireUserId, async (req, res) => {
   }
 });
 // ============================================================
+//                 API: DRY-OFF GATE ONLY
+//                 أهلية + حساب + تعبئة فقط — بدون حفظ
+// ============================================================
+
+function dryOffParseNumbersSrv(raw) {
+  let arr = [];
+
+  if (Array.isArray(raw)) {
+    arr = raw;
+  } else {
+    const txt = String(raw || "").trim();
+    if (!txt) return [];
+    arr = txt.split(/\n|,|;|،|\s+/g);
+  }
+
+  return [...new Set(
+    arr
+      .map(x => calvingNormDigitsOnlySrv(x))
+      .filter(Boolean)
+  )];
+}
+
+function dryOffIsBlockedSrv(doc = {}) {
+  const reproDoc = String(doc.reproductiveStatus || "").trim();
+  const reproNorm = calvingStripArSrv(reproDoc);
+
+  return (
+    doc.breedingBlocked === true ||
+    reproDoc.includes("لا تُلقّح") ||
+    reproDoc.includes("لا تلقح") ||
+    reproDoc.includes("مستبعد") ||
+    reproNorm.includes("لاتلقح")
+  );
+}
+
+function dryOffReasonFromDaysSrv({ doc = {}, gestationDays }) {
+  if (dryOffIsBlockedSrv(doc)) {
+    return "تجفيف للبيع";
+  }
+
+  const g = Number(gestationDays);
+  const months = g / 30;
+
+  if (months >= 6.5 && months <= 7.5) return "تجفيف طبيعي";
+  if (months < 6.5) return "تجفيف اضطراري";
+  return "تجفيف متأخر";
+}
+
+function dryOffGateEligibilitySrv(fd = {}) {
+  const doc = fd.documentData;
+  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+
+  const eventDate = String(fd.eventDate || "").trim().slice(0, 10);
+  if (!calvingIsDateSrv(eventDate)) {
+    return "❌ تاريخ التجفيف غير صالح.";
+  }
+
+  // خارج القطيع
+  const st = String(doc.status ?? "").trim().toLowerCase();
+  if (st === "inactive") {
+    return "❌ لا يمكن تسجيل تجفيف — الحيوان خارج القطيع.";
+  }
+
+  // جاف بالفعل
+  const ps = String(doc.productionStatus ?? "").trim().toLowerCase();
+  if (ps === "dry" || ps === "جاف") {
+    return "❌ لا يمكن تسجيل تجفيف — الحيوان مُسجّل بالفعل كـ «جاف».";
+  }
+
+  // منع تكرار التجفيف قبل الولادة
+  const lastDry = String(doc.lastDryOffDate ?? "").slice(0, 10);
+  const lastCalv = String(doc.lastCalvingDate ?? "").slice(0, 10);
+
+  if (calvingIsDateSrv(lastDry)) {
+    if (!calvingIsDateSrv(lastCalv) || lastCalv <= lastDry) {
+      return `❌ لا يمكن تسجيل تجفيف مرة أخرى قبل الولادة.\nآخر تجفيف مسجّل: ${lastDry}.`;
+    }
+  }
+
+  // المستبعد التناسلي مسموح له بالتجفيف للبيع فقط
+  if (dryOffIsBlockedSrv(doc)) {
+    const reason = String(fd.reason || "").trim();
+    if (reason !== "تجفيف للبيع") {
+      return "❌ الحيوان مستبعد تناسليًا — مسموح فقط بـ «تجفيف للبيع» (يتحدد تلقائيًا).";
+    }
+    return null;
+  }
+
+  // غير المستبعد لازم يكون عشار
+  const rsRaw = String(
+    fd.reproStatusFromEvents ||
+    doc.reproductiveStatus ||
+    ""
+  ).trim();
+
+  const rsNorm = calvingStripArSrv(rsRaw);
+
+  if (!rsNorm.includes("عشار")) {
+    return "❌ لا يمكن تسجيل تجفيف — الحيوان ليس «عِشار».";
+  }
+
+  const g = Number(fd.gestationDays);
+  if (!Number.isFinite(g) || g < 0) {
+    return "❌ تعذّر حساب أيام الحمل — راجع تاريخ التجفيف.";
+  }
+
+  const reason = String(fd.reason || "").trim();
+
+  if (g < 198 && reason !== "تجفيف اضطراري") {
+    return "❌ أقل من 6.5 شهر ⇒ «تجفيف اضطراري».";
+  }
+
+  if (g >= 198 && g <= 228 && reason !== "تجفيف طبيعي") {
+    return "❌ من 6.5 إلى 7.5 شهر ⇒ «تجفيف طبيعي».";
+  }
+
+  if (g > 228 && reason !== "تجفيف متأخر") {
+    return "❌ أكثر من 7.5 شهر ⇒ «تجفيف متأخر».";
+  }
+
+  return null;
+}
+
+app.post("/api/dry-off/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        allowed: false,
+        stage: "firestore_disabled",
+        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة.",
+        acceptedCount: 0,
+        rejectedCount: 0,
+        accepted: [],
+        rejected: []
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const rawNumbers =
+      body.animalNumbers ||
+      body.numbers ||
+      body.animalNumber ||
+      body.number ||
+      "";
+
+    const eventDate = String(
+      body.eventDate ||
+      body.date ||
+      ""
+    ).trim().slice(0, 10);
+
+    const numbers = dryOffParseNumbersSrv(rawNumbers);
+
+    if (!numbers.length || !eventDate) {
+      return res.json({
+        ok: true,
+        allowed: false,
+        silent: true,
+        stage: "missing_basic",
+        message: "أدخل رقم الحيوان وتاريخ التجفيف لبدء التحقق.",
+        acceptedCount: 0,
+        rejectedCount: 0,
+        accepted: [],
+        rejected: []
+      });
+    }
+
+    if (!calvingIsDateSrv(eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        stage: "invalid_date",
+        message: "❌ تاريخ التجفيف غير صالح.",
+        acceptedCount: 0,
+        rejectedCount: numbers.length,
+        accepted: [],
+        rejected: numbers.map(n => ({
+          animalNumber: String(n || ""),
+          reason: "تاريخ التجفيف غير صالح."
+        }))
+      });
+    }
+
+    const accepted = [];
+    const rejected = [];
+
+    for (const rawNum of numbers) {
+      const animalNumber = calvingNormDigitsOnlySrv(rawNum);
+
+      if (!animalNumber) {
+        rejected.push({
+          animalNumber: String(rawNum || ""),
+          reason: "رقم غير صالح."
+        });
+        continue;
+      }
+
+      const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+      if (!animal) {
+        rejected.push({
+          animalNumber,
+          reason: "الحيوان غير موجود في حسابك."
+        });
+        continue;
+      }
+
+      const doc = animal.data || {};
+      const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+
+      const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+      const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+      const blocked = dryOffIsBlockedSrv(doc);
+
+      let lastInseminationDate = String(
+        signals.lastInseminationDateFromEvents ||
+        doc.lastInseminationDate ||
+        doc.lastAI ||
+        doc.lastInsemination ||
+        doc.lastServiceDate ||
+        ""
+      ).trim();
+
+      let gestationDays = null;
+
+      if (blocked) {
+        gestationDays = 0;
+      } else {
+        const reproStatus = reproFromEvents || reproFromDoc || "";
+        const reproNorm = calvingStripArSrv(reproStatus);
+
+        if (!reproNorm.includes("عشار")) {
+          rejected.push({
+            animalNumber,
+            reason: "❌ لا يمكن تسجيل تجفيف — الحيوان ليس «عِشار»."
+          });
+          continue;
+        }
+
+        if (!lastInseminationDate) {
+          rejected.push({
+            animalNumber,
+            reason: '❌ لا يمكن حساب أيام الحمل — لا يوجد "آخر تلقيح" لهذا الحيوان.'
+          });
+          continue;
+        }
+
+        gestationDays = calvingDaysBetweenSrv(lastInseminationDate, eventDate);
+
+        if (!Number.isFinite(gestationDays) || gestationDays < 0) {
+          rejected.push({
+            animalNumber,
+            reason: "❌ تعذّر حساب أيام الحمل — راجع تاريخ التجفيف."
+          });
+          continue;
+        }
+      }
+
+      const reason = dryOffReasonFromDaysSrv({
+        doc,
+        gestationDays
+      });
+
+      const decision = dryOffGateEligibilitySrv({
+        animalNumber,
+        eventDate,
+        animalId: animal.id || "",
+        documentData: doc,
+        reproStatusFromEvents: reproFromEvents,
+        lastInseminationDate,
+        gestationDays,
+        reason
+      });
+
+      if (decision) {
+        rejected.push({
+          animalNumber,
+          reason: String(decision)
+        });
+        continue;
+      }
+
+      accepted.push({
+        animalNumber,
+        animalId: animal.id || "",
+        eventDate,
+        gestationDays,
+        reason,
+        lastInseminationDate,
+        reproductiveStatus: reproFromEvents || reproFromDoc || ""
+      });
+    }
+
+    const allowed = accepted.length > 0;
+    const acceptedCount = accepted.length;
+    const rejectedCount = rejected.length;
+    const isBulk = numbers.length > 1;
+
+    if (!isBulk) {
+      if (!acceptedCount) {
+        const r0 = rejected[0] || {};
+        return res.status(400).json({
+          ok: false,
+          allowed: false,
+          stage: "not_eligible",
+          message: r0.reason || "❌ الحيوان غير مؤهل لتسجيل التجفيف.",
+          acceptedCount,
+          rejectedCount,
+          accepted,
+          rejected
+        });
+      }
+
+      const a0 = accepted[0] || {};
+      return res.json({
+        ok: true,
+        allowed: true,
+        stage: "eligible",
+        message: "✅ الحيوان مؤهل لتسجيل التجفيف.",
+        acceptedCount,
+        rejectedCount,
+        accepted,
+        rejected,
+
+        // توافق مع الصفحة الفردية
+        animalNumber: a0.animalNumber || "",
+        animalId: a0.animalId || "",
+        eventDate: a0.eventDate || "",
+        gestationDays: a0.gestationDays ?? "",
+        reason: a0.reason || "",
+        lastInseminationDate: a0.lastInseminationDate || "",
+        reproductiveStatus: a0.reproductiveStatus || ""
+      });
+    }
+
+    return res.json({
+      ok: true,
+      allowed,
+      stage: allowed ? "bulk_has_eligible" : "bulk_no_eligible",
+      message: allowed
+        ? `✅ تم التحقق — المؤهل: ${acceptedCount}، غير المؤهل: ${rejectedCount}.`
+        : "❌ لا يوجد أي رقم مؤهل لتسجيل التجفيف.",
+      acceptedCount,
+      rejectedCount,
+      accepted,
+      rejected
+    });
+
+  } catch (e) {
+    console.error("dry-off-gate", e);
+
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      stage: "dry_off_gate_failed",
+      error: "dry_off_gate_failed",
+      message: "❌ تعذّر التحقق من أهلية التجفيف الآن.",
+      acceptedCount: 0,
+      rejectedCount: 0,
+      accepted: [],
+      rejected: []
+    });
+  }
+});
+// ============================================================
+//                 API: DRY-OFF SAVE ONLY
+//                 حفظ فقط — بدون إعادة فحص أهلية
+// ============================================================
+
+function dryOffSaveRowsFromBodySrv(body = {}) {
+  if (Array.isArray(body.accepted) && body.accepted.length) return body.accepted;
+  if (Array.isArray(body.rows) && body.rows.length) return body.rows;
+
+  const animalNumber = calvingNormDigitsOnlySrv(body.animalNumber || body.number || "");
+  if (!animalNumber) return [];
+
+  return [{
+    animalNumber,
+    animalId: body.animalId || "",
+    eventDate: body.eventDate || body.date || "",
+    reason: body.reason || "",
+    gestationDays: body.gestationDays,
+    lastInseminationDate: body.lastInseminationDate || "",
+    reproductiveStatus: body.reproductiveStatus || ""
+  }];
+}
+
+function dryOffSaveRequiredSrv(v) {
+  return !(v === undefined || v === null || String(v).trim() === "");
+}
+
+async function updateAnimalAfterDryOffSaveSrv(ev = {}) {
+  const uid = String(ev.userId || "").trim();
+  const animalNumber = calvingNormDigitsOnlySrv(ev.animalNumber || "");
+  let animalId = String(ev.animalId || "").trim();
+
+  if (!animalId) {
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+    animalId = String(animal?.id || "").trim();
+  }
+
+  if (!uid || !animalNumber || !animalId) {
+    console.warn("⛔ dry-off animal update skipped:", { uid, animalNumber, animalId });
+    return;
+  }
+
+  await db.collection("animals").doc(animalId).set({
+    lastDryOffDate: String(ev.eventDate || ev.dryOffDate || "").slice(0, 10),
+    productionStatus: "dry",
+    inMilk: false,
+
+    dryOffReason: String(ev.reason || "").trim(),
+    lastDryOffReason: String(ev.reason || "").trim(),
+    pregnancyStatusAtDryOff: String(ev.pregnancyStatus || "").trim(),
+    usedDryingAntibiotics: String(ev.usedDryingAntibiotics || "").trim(),
+
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+}
+
+app.post("/api/dry-off/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر حفظ التجفيف – قاعدة البيانات غير متاحة.",
+        savedCount: 0,
+        rejectedCount: 0,
+        saved: [],
+        rejected: []
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
+    const pregnancyStatus = String(body.pregnancyStatus || "").trim();
+    const usedDryingAntibiotics = String(body.usedDryingAntibiotics || "").trim();
+    const notes = String(body.notes || "").trim();
+
+    const rows = dryOffSaveRowsFromBodySrv(body);
+
+    if (!rows.length) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ رقم الحيوان/الأرقام مطلوبة.",
+        savedCount: 0,
+        rejectedCount: 0,
+        saved: [],
+        rejected: []
+      });
+    }
+
+    if (!calvingIsDateSrv(eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ تاريخ التجفيف غير صالح.",
+        savedCount: 0,
+        rejectedCount: rows.length,
+        saved: [],
+        rejected: rows.map(r => ({
+          animalNumber: calvingNormDigitsOnlySrv(r?.animalNumber || r?.number || ""),
+          reason: "❌ تاريخ التجفيف غير صالح."
+        }))
+      });
+    }
+
+    if (!dryOffSaveRequiredSrv(pregnancyStatus)) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ تأكيد الحمل مطلوب.",
+        savedCount: 0,
+        rejectedCount: rows.length,
+        saved: [],
+        rejected: rows.map(r => ({
+          animalNumber: calvingNormDigitsOnlySrv(r?.animalNumber || r?.number || ""),
+          reason: "❌ تأكيد الحمل مطلوب."
+        }))
+      });
+    }
+
+    if (!dryOffSaveRequiredSrv(usedDryingAntibiotics)) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ حدد هل تم استخدام محاقن التجفيف.",
+        savedCount: 0,
+        rejectedCount: rows.length,
+        saved: [],
+        rejected: rows.map(r => ({
+          animalNumber: calvingNormDigitsOnlySrv(r?.animalNumber || r?.number || ""),
+          reason: "❌ حدد هل تم استخدام محاقن التجفيف."
+        }))
+      });
+    }
+
+    const saved = [];
+    const rejected = [];
+
+    for (const rawRow of rows) {
+      const row = rawRow || {};
+
+      const animalNumber = calvingNormDigitsOnlySrv(row.animalNumber || row.number || "");
+      const animalId = String(row.animalId || body.animalId || "").trim();
+      const reason = String(row.reason || body.reason || "").trim();
+      const gestationDays = Number(row.gestationDays ?? body.gestationDays);
+      const lastInseminationDate = String(row.lastInseminationDate || body.lastInseminationDate || "").trim();
+
+      if (!animalNumber) {
+        rejected.push({ animalNumber: "", reason: "❌ رقم الحيوان مطلوب." });
+        continue;
+      }
+
+      if (!dryOffSaveRequiredSrv(reason)) {
+        rejected.push({ animalNumber, reason: "❌ سبب التجفيف مطلوب." });
+        continue;
+      }
+
+      if (!Number.isFinite(gestationDays)) {
+        rejected.push({ animalNumber, reason: "❌ أيام الحمل مطلوبة." });
+        continue;
+      }
+
+      const payload = {
+        userId: uid,
+
+        animalNumber,
+        animalId,
+
+        eventDate,
+        dryOffDate: eventDate,
+
+        reason,
+        pregnancyStatus,
+        usedDryingAntibiotics,
+        gestationDays,
+
+        lastInseminationDate,
+
+        type: "تجفيف",
+        eventType: "dry_off",
+        eventTypeNorm: "dry_off",
+
+        notes: notes || null,
+
+        tz: String(body.tz || "").trim() || "UTC",
+        source: "server:/api/dry-off/save",
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      const eventRef = await db.collection("events").add(payload);
+      await updateAnimalAfterDryOffSaveSrv(payload);
+
+      saved.push({
+        animalNumber,
+        animalId,
+        eventId: eventRef.id,
+        eventDate,
+        reason,
+        gestationDays
+      });
+    }
+
+    return res.json({
+      ok: saved.length > 0,
+      message: saved.length
+        ? `✅ تم حفظ التجفيف بنجاح لعدد ${saved.length}.`
+        : "❌ لم يتم حفظ أي تجفيف.",
+      savedCount: saved.length,
+      rejectedCount: rejected.length,
+      saved,
+      rejected,
+      redirectUrl: saved.length === 1
+        ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
+        : ""
+    });
+
+  } catch (e) {
+    console.error("dry-off-save", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "dry_off_save_failed",
+      message: "تعذّر حفظ التجفيف – تحقّق من الاتصال والصلاحيات.",
+      savedCount: 0,
+      rejectedCount: 0,
+      saved: [],
+      rejected: []
+    });
+  }
+});
+// ============================================================
 //                 API: ABORTION GATE
 //                 تحقق الإجهاض من السيرفر فقط — بدون حفظ
 // ============================================================
