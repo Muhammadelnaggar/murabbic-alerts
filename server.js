@@ -14268,6 +14268,239 @@ app.get('/api/calves', requireUserId, async (req, res) => {
     return res.status(500).json({ ok:false, error:'calves_failed' });
   }
 });
+// ============================================================
+//                 API: ARCHIVE ANIMAL
+//                 animals -> archived_animals
+//                 events  -> archived_events
+// ============================================================
+
+function archiveNormNumberSrv(v) {
+  const map = {
+    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+  };
+
+  return String(v || "")
+    .trim()
+    .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
+    .replace(/[^\d]/g, "");
+}
+
+async function archiveFindAnimalSrv(uid, animalNumber) {
+  const n = archiveNormNumberSrv(animalNumber);
+  if (!db || !uid || !n) return null;
+
+  const vals = [n];
+  const nNum = Number(n);
+  if (Number.isFinite(nNum)) vals.push(nNum);
+
+  const found = new Map();
+
+  for (const val of vals) {
+    for (const ownerField of ["userId", "ownerUid"]) {
+      for (const numField of ["number", "animalNumber"]) {
+        try {
+          const snap = await db.collection("animals")
+            .where(ownerField, "==", uid)
+            .where(numField, "==", val)
+            .limit(3)
+            .get();
+
+          snap.forEach(d => found.set(d.id, d));
+        } catch (_) {}
+      }
+    }
+  }
+
+  if (!found.size) return null;
+
+  const d = [...found.values()][0];
+
+  return {
+    id: d.id,
+    ref: d.ref,
+    data: d.data() || {}
+  };
+}
+
+async function archiveFetchEventsSrv(uid, animalNumber, animalDocId) {
+  const n = archiveNormNumberSrv(animalNumber);
+  const keys = [...new Set([
+    n,
+    String(animalNumber || "").trim(),
+    String(animalDocId || "").trim()
+  ].filter(Boolean))];
+
+  const found = new Map();
+
+  for (const key of keys) {
+    for (const field of ["animalNumber", "animalId", "number"]) {
+      try {
+        const snap = await db.collection("events")
+          .where("userId", "==", uid)
+          .where(field, "==", key)
+          .limit(5000)
+          .get();
+
+        snap.forEach(d => found.set(d.id, d));
+      } catch (_) {}
+    }
+  }
+
+  return [...found.values()];
+}
+
+async function archiveCommitOpsSrv(ops = []) {
+  let batch = db.batch();
+  let n = 0;
+
+  for (const op of ops) {
+    if (op.type === "set") batch.set(op.ref, op.data, op.options || {});
+    if (op.type === "delete") batch.delete(op.ref);
+
+    n++;
+
+    if (n >= 450) {
+      await batch.commit();
+      batch = db.batch();
+      n = 0;
+    }
+  }
+
+  if (n > 0) await batch.commit();
+}
+
+app.post("/api/animals/archive", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const animalNumber = archiveNormNumberSrv(body.animalNumber || body.number || "");
+    const archiveReason = String(body.archiveReason || "").trim();
+
+    if (!animalNumber) {
+      return res.status(400).json({
+        ok: false,
+        message: "رقم الحيوان مطلوب."
+      });
+    }
+
+    if (!["sale", "death"].includes(archiveReason)) {
+      return res.status(400).json({
+        ok: false,
+        message: "سبب الأرشفة غير صالح."
+      });
+    }
+
+    const animal = await archiveFindAnimalSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        message: "تعذّر العثور على الحيوان في القطيع."
+      });
+    }
+
+    const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
+    const archiveId = `${uid}__${animalNumber}__${archiveReason}__${Date.now()}`;
+    const archivedAt = admin.firestore.FieldValue.serverTimestamp();
+
+    const events = await archiveFetchEventsSrv(uid, animalNumber, animal.id);
+
+    const ops = [];
+    const archivedAnimalRef = db.collection("archived_animals").doc(archiveId);
+
+    ops.push({
+      type: "set",
+      ref: archivedAnimalRef,
+      data: {
+        ...animal.data,
+
+        userId: uid,
+        animalNumber,
+        number: String(animal.data?.number || animalNumber),
+
+        archivedAt,
+        archiveDate: eventDate || null,
+        archiveReason,
+        archiveReasonLabel: archiveReason === "sale" ? "بيع" : "نفوق",
+
+        originalAnimalDocId: animal.id,
+        originalAnimalPath: animal.ref.path,
+
+        salePrice: archiveReason === "sale" ? (Number(body.price) || null) : null,
+        saleReason: archiveReason === "sale" ? String(body.saleReason || "").trim() : null,
+
+        deathReason: archiveReason === "death" ? String(body.reason || "").trim() : null,
+
+        season: Number(body.season) || null,
+        notes: String(body.notes || "").trim() || null
+      },
+      options: { merge: true }
+    });
+
+    for (const evDoc of events) {
+      const ev = evDoc.data() || {};
+
+      ops.push({
+        type: "set",
+        ref: db.collection("archived_events").doc(evDoc.id),
+        data: {
+          ...ev,
+          userId: uid,
+          animalNumber,
+
+          archivedAt,
+          archiveDate: eventDate || null,
+          archiveReason,
+          archiveReasonLabel: archiveReason === "sale" ? "بيع" : "نفوق",
+
+          originalEventId: evDoc.id,
+          originalEventPath: evDoc.ref.path,
+          originalAnimalDocId: animal.id,
+          archivedAnimalId: archiveId
+        },
+        options: { merge: true }
+      });
+    }
+
+    for (const evDoc of events) {
+      ops.push({ type: "delete", ref: evDoc.ref });
+    }
+
+    ops.push({ type: "delete", ref: animal.ref });
+
+    await archiveCommitOpsSrv(ops);
+
+    if (typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "animal_archived");
+    }
+
+    return res.json({
+      ok: true,
+      animalNumber,
+      archivedAnimalId: archiveId,
+      archivedEventsCount: events.length,
+      message: archiveReason === "sale"
+        ? "✅ تم أرشفة الحيوان وأحداثه بعد البيع."
+        : "✅ تم أرشفة الحيوان وأحداثه بعد النفوق."
+    });
+
+  } catch (e) {
+    console.error("animals.archive", e);
+    return res.status(500).json({
+      ok: false,
+      message: "فشل أرشفة الحيوان وأحداثه."
+    });
+  }
+});
 // Static last
 app.use(express.static(path.join(__dirname, 'www')));
 // ✅ DIM job
