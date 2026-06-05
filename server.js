@@ -14398,7 +14398,27 @@ app.post("/api/animals/archive", requireUserId, async (req, res) => {
         message: "سبب الأرشفة غير صالح."
       });
     }
+const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
 
+if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+  return res.status(400).json({
+    ok: false,
+    message: archiveReason === "sale"
+      ? "تاريخ البيع غير صالح."
+      : "تاريخ النفوق غير صالح."
+  });
+}
+
+if (archiveReason === "sale") {
+  const saleReason = String(body.saleReason || "").trim();
+
+  if (!saleReason) {
+    return res.status(400).json({
+      ok: false,
+      message: "سبب البيع مطلوب."
+    });
+  }
+}
     const animal = await archiveFindAnimalSrv(uid, animalNumber);
 
     if (!animal) {
@@ -14408,7 +14428,7 @@ app.post("/api/animals/archive", requireUserId, async (req, res) => {
       });
     }
 
-    const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
+   
     const archiveId = `${uid}__${animalNumber}__${archiveReason}__${Date.now()}`;
     const archivedAt = admin.firestore.FieldValue.serverTimestamp();
 
