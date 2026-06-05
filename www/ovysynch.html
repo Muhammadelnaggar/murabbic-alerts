@@ -38,47 +38,24 @@
 <input type="hidden" id="species" value="">
 <input type="hidden" id="steps" value="">
 <input type="hidden" id="animalId" value="">
-        <!-- ✅ اختيار وضع التسجيل: فردي / مجموعة -->
-        <div class="field">
-         <div class="radio-group">
-            <label>
-              <input type="radio" name="mbkMode" id="modeSingle" value="single" checked>
-              ⬤ تسجيل لحيوان واحد
-            </label>
+        <!-- ✅ الأرقام تأتي من صفحة الأحداث أو تنبيه الداشبورد — عرض فقط -->
+        <input type="radio" name="mbkMode" id="modeSingle" value="single" hidden>
+        <input type="radio" name="mbkMode" id="modeGroup" value="group" checked hidden>
+        <input id="animalNumberUI" type="hidden" value="">
 
-           <label>
-              <input type="radio" name="mbkMode" id="modeGroup" value="group">
-              ⬤ تسجيل لمجموعة حيوانات
-            </label>
-          </div>
-         <div class="form-hint" id="modeHint">اختر الوضع… والصفحة ستُظهر لك الحقول المناسبة تلقائيًا.</div>
-        </div>
-
-        <!-- ✅ وضع المجموعة -->
-        <div id="modeBulkBox" hidden>
-         <div class="row">
+        <div id="modeBulkBox">
+          <div class="row">
             <div class="field">
-              <label for="bulkAnimals">إدخال جماعي (كل رقم في سطر)</label>
-              <textarea id="bulkAnimals" rows="4" placeholder="مثال:
-105
-106
-110"></textarea>
-              <div class="form-hint">لو كتبت هنا: سيتم تسجيل نفس البروتوكول لكل الأرقام.</div>
+              <label for="bulkAnimals">الحيوانات المطلوبة للبروتوكول</label>
+              <textarea id="bulkAnimals" rows="4" readonly placeholder="سيتم تحميل الأرقام تلقائيًا"></textarea>
+              <div class="form-hint">يتم تحميل الأرقام تلقائيًا من صفحة الأحداث أو تنبيه الداشبورد.</div>
             </div>
 
-<button id="applyBulk" type="button" class="secondary-btn">تطبيق القائمة</button>
-           <div class="form-hint" id="bulkHint"></div>
+            <div class="form-hint" id="bulkHint"></div>
           </div>
         </div>
 
-        <!-- ✅ وضع الفردي -->
-        <div id="modeSingleBox">
-          <div class="field">
-            <label for="animalNumberUI">رقم الحيوان</label>
-            <input id="animalNumberUI" type="text" placeholder="مثال: 105" />
-          </div>
-        </div>
-
+        <div id="modeSingleBox" hidden></div>
        <div class="row row-2">
           <div class="field">
             <label for="startDate">تاريخ بدء البروتوكول (اليوم 0)</label>
@@ -242,25 +219,19 @@ function showInfoMessage(msg, cls = "ok"){
   }
 
   function getMode(){
-    return modeGroup.checked ? "group" : "single";
+    return "group";
   }
 
   function getCurrentNumbers(){
-    const mode = getMode();
-
-    if (mode === "group") {
-      return parseBulk().map(x => String(x).trim()).filter(Boolean);
-    }
-
-    return [String(animalUI.value || "").trim()].filter(Boolean);
+    return parseBulk().map(x => String(x).trim()).filter(Boolean);
   }
 
   function setMode(m){
-    const isGroup = (m === "group");
-    modeGroup.checked = isGroup;
-    modeSingle.checked = !isGroup;
-    modeBulkBox.hidden = !isGroup;
-    modeSingleBox.hidden = isGroup;
+    const isGroup = true;
+    modeGroup.checked = true;
+    modeSingle.checked = false;
+    modeBulkBox.hidden = false;
+    modeSingleBox.hidden = true;
 
     try {
       localStorage.setItem("mbk_ov_mode", isGroup ? "group" : "single");
@@ -607,10 +578,10 @@ showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
     }
 
     else if (numRaw && !/[\s،,;\n]/.test(numRaw)) {
-      setMode("single");
-      try { localStorage.setItem("mbk_ov_mode", "single"); } catch {}
-      animalUI.value = numRaw;
-      bulkEl.value = "";
+      setMode("group");
+      try { localStorage.setItem("mbk_ov_mode", "group"); } catch {}
+      bulkEl.value = numRaw;
+      animalUI.value = "";
     }
 
     else if (numRaw && /[\s،,;\n]/.test(numRaw)) {
@@ -649,7 +620,7 @@ showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
       return;
     }
 
-    const num = (getMode() === "group" ? (parseBulk()[0] || "") : (animalUI.value || "")).trim();
+        const num = String(parseBulk()[0] || "").trim();
 
     if (!num) {
       showWarn("⚠️ اكتب رقم الحيوان أولًا.");
