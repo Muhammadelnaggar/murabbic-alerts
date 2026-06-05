@@ -72,7 +72,68 @@
 
   $("animalNumber").value = String(num || "");
   $("eventDate").value = dt;
+  let saleGateAllowed = false;
 
+async function runSaleGate() {
+  const uid = getUid();
+  const animalNumber = String($("animalNumber")?.value || "").trim();
+
+  $("saveBtn").disabled = true;
+
+  if (!uid) {
+    msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.");
+    return false;
+  }
+
+  if (!animalNumber) {
+    msg("❌ رقم الحيوان مطلوب.");
+    return false;
+  }
+
+  try {
+    msg("جارِ التحقق من الحيوان...");
+
+    const r = await fetch("/api/animals/archive/gate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify({
+        animalNumber,
+        archiveReason: "sale"
+      })
+    });
+
+    const data = await r.json().catch(() => null);
+
+    if (!r.ok || data?.allowed !== true) {
+      saleGateAllowed = false;
+      $("saveBtn").disabled = true;
+      msg(data?.message || "❌ لا يمكن تسجيل بيع لهذا الحيوان.");
+      return false;
+    }
+
+    saleGateAllowed = true;
+    $("saveBtn").disabled = false;
+
+    if ($("season") && data?.animal?.lactationNumber) {
+      $("season").value = String(data.animal.lactationNumber);
+    }
+
+    msg(data.message || "✅ الحيوان مؤهل لتسجيل البيع.", true);
+    return true;
+
+  } catch (err) {
+    console.error(err);
+    saleGateAllowed = false;
+    $("saveBtn").disabled = true;
+    msg("❌ فشل الاتصال بالسيرفر أثناء التحقق من الحيوان.");
+    return false;
+  }
+}
+
+runSaleGate();
   function getUid() {
     return String(
       localStorage.getItem("userId") ||
@@ -124,11 +185,15 @@
     if (n) location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
   });
 
-  $("saleForm")?.addEventListener("submit", async (e) => {
+ $("saleForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const uid = getUid();
+    if (!saleGateAllowed) {
+      msg("❌ لا يمكن الحفظ قبل نجاح التحقق من الحيوان.");
+      return;
+    }
 
+    const uid = getUid();
     const payload = {
       animalNumber: String($("animalNumber")?.value || "").trim(),
       eventDate: String($("eventDate")?.value || "").trim(),
