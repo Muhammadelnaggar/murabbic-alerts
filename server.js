@@ -14369,7 +14369,93 @@ async function archiveCommitOpsSrv(ops = []) {
 
   if (n > 0) await batch.commit();
 }
+// ============================================================
+//                 API: ARCHIVE GATE — SALE / DEATH
+//                 تحقق فتح صفحة البيع/النفوق فقط
+// ============================================================
 
+app.post("/api/animals/archive/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        allowed: false,
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const animalNumber = archiveNormNumberSrv(body.animalNumber || body.number || "");
+    const archiveReason = String(body.archiveReason || "").trim();
+
+    if (!animalNumber) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: "رقم الحيوان مطلوب."
+      });
+    }
+
+    if (!["sale", "death"].includes(archiveReason)) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: "سبب الأرشفة غير صالح."
+      });
+    }
+
+    const animal = await archiveFindAnimalSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        allowed: false,
+        message: "❌ الحيوان غير موجود في القطيع."
+      });
+    }
+
+    const doc = animal.data || {};
+    const st = String(doc.status || "active").trim().toLowerCase();
+
+    if (st !== "active") {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: "❌ الحيوان غير موجود في القطيع."
+      });
+    }
+
+    return res.json({
+      ok: true,
+      allowed: true,
+      message: archiveReason === "sale"
+        ? "✅ الحيوان مؤهل لتسجيل البيع."
+        : "✅ الحيوان مؤهل لتسجيل النفوق.",
+      animal: {
+        id: animal.id,
+        animalNumber,
+        number: String(doc.number || animalNumber),
+        lactationNumber: Number(doc.lactationNumber || 0) || null,
+        animalType: doc.animalType || doc.animaltype || null,
+        animalTypeAr: doc.animalTypeAr || null,
+        species: doc.species || doc.animalTypeAr || doc.animalType || doc.animaltype || null,
+        breed: doc.breed || null,
+        productionStatus: doc.productionStatus || null,
+        reproductiveStatus: doc.reproductiveStatus || null
+      }
+    });
+
+  } catch (e) {
+    console.error("animals.archive.gate", e);
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      message: "فشل التحقق من الحيوان."
+    });
+  }
+});
 app.post("/api/animals/archive", requireUserId, async (req, res) => {
   try {
     if (!db) {
