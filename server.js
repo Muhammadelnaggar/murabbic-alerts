@@ -9246,6 +9246,174 @@ if (savedNumbers.length === 1) {
   }
 });
 // ============================================================
+//                 API: OVSYNCH DASHBOARD ALERTS
+//                 تنبيهات الداشبورد الذكية من tasks — عرض فقط
+// ============================================================
+
+app.get("/api/ovsynch/dashboard-alerts", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        alerts: [],
+        message: "تعذّر تحميل تنبيهات بروتوكول التزامن — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+
+    function addDaysISOForOvsynchAlerts(iso, days) {
+      const s = String(iso || "").trim().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+      const [y, m, d] = s.split("-").map(Number);
+      const dt = new Date(Date.UTC(y, m - 1, d));
+      dt.setUTCDate(dt.getUTCDate() + Number(days || 0));
+      return dt.toISOString().slice(0, 10);
+    }
+
+    function normTaskNumberForOvsynchAlerts(v) {
+      if (typeof calvingNormDigitsOnlySrv === "function") {
+        return calvingNormDigitsOnlySrv(v);
+      }
+      return String(v || "").replace(/[^\d]/g, "").trim();
+    }
+
+    const today = cairoTodayISO();
+    const tomorrow = addDaysISOForOvsynchAlerts(today, 1);
+
+    const snap = await db.collection("tasks")
+      .where("userId", "==", uid)
+      .where("status", "==", "pending")
+      .limit(500)
+      .get();
+
+    const groups = new Map();
+
+    snap.forEach(docSnap => {
+      const t = docSnap.data() || {};
+
+      const isOvsynchTask =
+        String(t.taskType || "").trim() === "ovsynch_step" ||
+        String(t.type || "").trim() === "ovsynch_step" ||
+        (
+          String(t.type || "").trim() === "protocol_step" &&
+          String(t.protocol || "").trim() === "ovsynch"
+        );
+
+      if (!isOvsynchTask) return;
+
+      const dueDate = String(t.dueDate || t.plannedDate || "").trim().slice(0, 10);
+      if (dueDate !== today && dueDate !== tomorrow) return;
+
+      const animalNumber = normTaskNumberForOvsynchAlerts(t.animalNumber || t.number || "");
+      if (!animalNumber) return;
+
+      const stepIndex = Number(t.stepIndex ?? 0) || 0;
+      const stepDay = Number(t.stepDay ?? 0) || 0;
+      const stepName = String(t.stepName || t.title || "خطوة بروتوكول").trim();
+      const plannedTime = String(t.plannedTime || "08:00").trim();
+      const program = String(t.program || t.protocolProgram || "ovsynch").trim();
+      const protocolStartDate = String(t.protocolStartDate || "").trim().slice(0, 10);
+
+      const key = [
+        dueDate,
+        plannedTime,
+        program,
+        protocolStartDate,
+        stepIndex,
+        stepDay,
+        stepName
+      ].join("__");
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          dueDate,
+          plannedTime,
+          program,
+          protocolStartDate,
+          stepIndex,
+          stepDay,
+          stepName,
+          animalNumbers: []
+        });
+      }
+
+      groups.get(key).animalNumbers.push(animalNumber);
+    });
+
+    const alerts = [];
+
+    for (const g of groups.values()) {
+      const nums = [...new Set(g.animalNumbers)].filter(Boolean).sort((a, b) => Number(a) - Number(b));
+      if (!nums.length) continue;
+
+      const isToday = g.dueDate === today;
+      const title = isToday
+        ? "خطوة بروتوكول التزامن اليوم"
+        : "خطوة بروتوكول التزامن غدًا";
+
+      const prefix = isToday ? "⏰ اليوم" : "📌 غدًا";
+
+      const message =
+        `${prefix} خطوة بروتوكول التزامن: ${g.stepName}\n` +
+        `للحيوانات أرقام: ${nums.join("، ")}\n` +
+        `الموعد: ${g.plannedTime}`;
+
+      const actionUrl =
+        `ovysynch.html?mode=step` +
+        `&date=${encodeURIComponent(g.dueDate)}` +
+        `&dueDate=${encodeURIComponent(g.dueDate)}` +
+        `&stepIndex=${encodeURIComponent(g.stepIndex)}` +
+        `&program=${encodeURIComponent(g.program)}` +
+        `&protocolStartDate=${encodeURIComponent(g.protocolStartDate || "")}`;
+
+      alerts.push({
+        id: `ovsynch_${g.dueDate}_${g.stepIndex}_${g.protocolStartDate || "no_start"}`,
+        source: "server:/api/ovsynch/dashboard-alerts",
+        type: "ovsynch_step",
+        level: isToday ? "warn" : "info",
+        title,
+        message,
+        actionText: "فتح صفحة التزامن",
+        actionUrl,
+        dueDate: g.dueDate,
+        plannedTime: g.plannedTime,
+        program: g.program,
+        protocolStartDate: g.protocolStartDate,
+        stepIndex: g.stepIndex,
+        stepDay: g.stepDay,
+        stepName: g.stepName,
+        animalNumbers: nums,
+        count: nums.length
+      });
+    }
+
+    alerts.sort((a, b) => {
+      const da = String(a.dueDate || "");
+      const dbb = String(b.dueDate || "");
+      if (da !== dbb) return da.localeCompare(dbb);
+      return String(a.plannedTime || "").localeCompare(String(b.plannedTime || ""));
+    });
+
+    return res.json({
+      ok: true,
+      today,
+      tomorrow,
+      count: alerts.length,
+      alerts
+    });
+
+  } catch (e) {
+    console.error("ovsynch-dashboard-alerts", e);
+
+    return res.status(500).json({
+      ok: false,
+      alerts: [],
+      message: "❌ تعذّر تحميل تنبيهات بروتوكول التزامن الآن."
+    });
+  }
+});
+// ============================================================
 //                 API: OVSYNCH STEP TARGETS
 //                 تحميل حيوانات خطوة اليوم من tasks — بدون حفظ وبدون تأكيد
 // ============================================================
