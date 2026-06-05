@@ -34,7 +34,7 @@
     <input id="eventDate" data-field="eventDate" type="date" required />
    <label>الموسم</label>
 <input id="season" data-field="season" type="number" inputmode="numeric" placeholder="مثال: 3" />
-<div class="field-hint">يتم تحميل رقم الموسم تلقائيًا من بيانات الحيوان.</div>
+<div class="form-hint">يتم تحميل رقم الموسم تلقائيًا من بيانات الحيوان.</div>
 
     <label>سعر البيع (اختياري)</label>
     <input id="price" data-field="price" type="number" inputmode="decimal" placeholder="مثال: 85000" />
@@ -56,9 +56,9 @@
     <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
 </section>
     <!-- ✅ زر يطلب التحقق المركزي فقط -->
-   <div class="btn-row">
-  <button class="save-btn" id="saveBtn" type="submit" data-validate="true">تسجيل الحدث</button>
-  <button class="open-card" id="cardBtn" type="button">بطاقة الحيوان</button>
+<div class="actions-bar">
+  <button class="save" id="saveBtn" type="submit">تسجيل الحدث</button>
+  <button class="ghost" id="cardBtn" type="button">بطاقة الحيوان</button>
 </div>
       </form>
   </main>
