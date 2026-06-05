@@ -652,6 +652,7 @@ const isDailyMilk = /daily-milk\.html/i.test(String(targetPage||''));
 const isInsemination = /insemination\.html/i.test(String(targetPage||''));
 const isPregnancyDiagnosis = /pregnancy-diagnosis\.html/i.test(String(targetPage||''));
 const isVaccination = /vaccination\.html/i.test(String(targetPage||''));
+const isDryOff = /dry-off\.html/i.test(String(targetPage||''));
 
 const isGroupAllowed =
   isOvsynch ||
@@ -662,7 +663,8 @@ const isGroupAllowed =
   isDailyMilk ||
   isInsemination ||
   isPregnancyDiagnosis ||
-  isVaccination;
+  isVaccination ||
+  isDryOff;
 // ✅ لو أكتر من رقم:
         if (list.length > 1){
           // بطاقة الحيوان مقفولة
@@ -701,11 +703,12 @@ const isDailyMilkImport = /daily-milk-import\.html/i.test(String(page));
 const isInsemination = /insemination\.html/i.test(String(page));
 const isPregnancyDiagnosis = /pregnancy-diagnosis\.html/i.test(String(page));
 const isVaccination = /vaccination\.html/i.test(String(page));
+const isDryOff = /dry-off\.html/i.test(String(page));
 if (isDailyMilkImport) {
   u.searchParams.set('mode', 'import');
   u.searchParams.set('source', 'batch');
 }
-else if ((isInsemination || isPregnancyDiagnosis || isVaccination) && ctx.mode === 'group') {
+else if ((isInsemination || isPregnancyDiagnosis || isVaccination || isDryOff) && ctx.mode === 'group') {
   // ✅ تمرير الأرقام فقط — الحفظ/الفلترة/التحديث في السيرفر
   u.searchParams.set('mode', 'bulk');
   u.searchParams.set('number', ctx.bulk);   // مهم لأن بعض الصفحات تقرأ number
