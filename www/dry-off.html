@@ -8,7 +8,7 @@
 
   <!-- ✅ Murabbik global styles + central validation/gate -->
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+  
 
 
   <style>
@@ -213,7 +213,7 @@
   <!-- ✅ Infobar (سيستخدمه showMsg) -->
   <div id="info" class="infobar"></div>
 
-  <form id="dryOffForm" class="mbk-card" data-validate="true" data-event="تجفيف">
+  <form id="dryOffForm" class="mbk-card" data-event="تجفيف">
 
     <div class="field">
       <label for="animalNumber">رقم الحيوان</label>
@@ -265,149 +265,354 @@
   </form>
 </div>
 
-  <script type="module">
-    import { db, auth, requireAuth } from "/js/firebase-config.js";
-    import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { updateAnimalByEvent } from "/js/animal-update.js";
-    const form  = document.getElementById("dryOffForm");
-   const idEl  = document.getElementById("animalNumber");
-const dateEl= document.getElementById("eventDate");
+ <script>
+  const form = document.getElementById("dryOffForm");
 
-    const info  = document.getElementById("info");
-    const openCardBtn = document.getElementById("openCowCard");
-       const gestEl = document.getElementById("gestationDays");
-function calculateDryReason() {
-  const days = Number(gestEl.value || 0);
+  const animalEl = document.getElementById("animalNumber");
+  const dateEl = document.getElementById("eventDate");
+  const gestEl = document.getElementById("gestationDays");
   const reasonEl = document.getElementById("reason");
+  const info = document.getElementById("info");
+  const openCardBtn = document.getElementById("openCowCard");
 
-  // لو الحيوان مستبعد تناسليًا → بيع
-  const repro = String(form.__mbkDoc?.reproductiveStatus || "").trim();
-  const blocked = form.__mbkDoc?.breedingBlocked === true;
+  let acceptedRows = [];
+  let rejectedRows = [];
+  let gateOk = false;
+  let gateTimer = null;
 
-  if (blocked || repro.includes("لا تُلقّح")) {
-    reasonEl.value = "تجفيف للبيع";
-    return;
+  function getUid() {
+    try {
+      return String(
+        localStorage.getItem("userId") ||
+        localStorage.getItem("uid") ||
+        localStorage.getItem("tenantId") ||
+        ""
+      ).trim();
+    } catch (_) {
+      return "";
+    }
   }
 
-  const months = days / 30;
-
-  if (months >= 6.5 && months <= 7.5) {
-    reasonEl.value = "تجفيف طبيعي";
-  } else if (months < 6.5) {
-    reasonEl.value = "تجفيف اضطراري";
-  } else {
-    reasonEl.value = "تجفيف متأخر";
+  function apiBase() {
+    try {
+      return String(
+        window.API_BASE ||
+        localStorage.getItem("API_BASE") ||
+        ""
+      ).replace(/\/$/, "");
+    } catch (_) {
+      return "";
+    }
   }
-}
-gestEl.addEventListener("input", calculateDryReason);
 
-document.querySelectorAll('input[name="saleMode"]').forEach(r=>{
-  r.addEventListener("change", calculateDryReason);
-});    
-// ✅ تلوين اختيارات الراديو بدون :has (متوافق مع كل المتصفحات)
-document.querySelectorAll('.option-group input[type="radio"]').forEach(r => {
-  const paint = () => {
-    const name = r.name;
-    document.querySelectorAll(`.option-group input[name="${name}"]`).forEach(x=>{
-      const lab = x.closest("label");
-      if (!lab) return;
-      lab.classList.toggle("is-checked", x.checked);
-    });
-  };
-  r.addEventListener("change", paint);
-  paint();
-});
+  function apiUrl(path) {
+    const base = apiBase();
+    return base ? `${base}${path}` : path;
+  }
 
+  function todayYYYYMMDD() {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${d.getFullYear()}-${m}-${day}`;
+  }
 
-    // ✅ الصفحة لا تعمل submit — تنتظر mbk:valid فقط
-   
-    function showMsg(txt, isErr=false){
-      if(!info) return;
-      info.style.display = "block";
-      info.className = "infobar " + (isErr ? "error" : "show");
-      info.textContent = txt;
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
 
-      // ✅ اختفاء تلقائي للرسائل (احترافي)
-      setTimeout(()=>{ info.style.display = "none"; }, 3500);
+  function showMsg(msg, type = "info") {
+    if (!info) return;
 
-      try{ info.scrollIntoView({behavior:"smooth", block:"start"}); }catch{}
+    const cls =
+      type === "error" ? "error" :
+      type === "success" ? "success" :
+      type === "warning" ? "warning" :
+      "info";
+
+    info.style.display = "block";
+    info.className = `infobar mbk-infobar show ${cls}`;
+    info.innerHTML = `
+      <div style="white-space:pre-line;font-weight:900;font-size:16px;line-height:1.7">
+        ${escapeHtml(msg)}
+      </div>
+    `;
+
+    try {
+      info.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (_) {}
+  }
+
+  function normalizeDigits(s) {
+    const map = {
+      "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+      "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+    };
+
+    return String(s || "")
+      .replace(/[٠-٩۰-۹]/g, d => map[d] || d);
+  }
+
+  function splitNumbers(raw) {
+    return [...new Set(
+      normalizeDigits(raw)
+        .split(/[\s,،;]+/g)
+        .map(x => x.trim())
+        .filter(Boolean)
+    )];
+  }
+
+  function selectedRadio(name) {
+    return form.querySelector(`input[name="${name}"]:checked`)?.value || "";
+  }
+
+  function setButtonLoading(isLoading) {
+    const btn = form.querySelector('button[type="submit"]');
+    if (!btn) return;
+
+    btn.disabled = !!isLoading;
+    btn.textContent = isLoading ? "جارِ الحفظ..." : "حفظ التجفيف";
+  }
+
+  function resetGateResult() {
+    acceptedRows = [];
+    rejectedRows = [];
+    gateOk = false;
+    gestEl.value = "";
+    reasonEl.value = "";
+  }
+
+  function renderGateResult(data) {
+    acceptedRows = Array.isArray(data?.accepted) ? data.accepted : [];
+    rejectedRows = Array.isArray(data?.rejected) ? data.rejected : [];
+    gateOk = acceptedRows.length > 0;
+
+    if (acceptedRows.length === 1) {
+      const row = acceptedRows[0];
+      gestEl.value = row.gestationDays ?? "";
+      reasonEl.value = row.reason || "";
     }
 
-    function todayYYYYMMDD(){
-      const d = new Date();
-      const m = String(d.getMonth()+1).padStart(2,'0');
-      const day = String(d.getDate()).padStart(2,'0');
-      return `${d.getFullYear()}-${m}-${day}`;
+    if (acceptedRows.length > 1) {
+      gestEl.value = "";
+      reasonEl.value = "تجفيف جماعي";
     }
 
-    window.onload = function () {
-      const qp = new URLSearchParams(location.search);
-      const qpId = qp.get('animalId') || qp.get('number') || qp.get('animalNumber') || "";
-      const storedAnimalId = localStorage.getItem("lastAnimalId") || "";
-      const id = qpId || storedAnimalId;
+    let msg = data?.message || "";
 
-      if (id) {
-        idEl.value = id;
-        idEl.readOnly = true;
-      } else {
-        showMsg("❗ لم يتم تحديد الحيوان — سيتم تحويلك لتسجيل حيوان جديد", true);
-        setTimeout(()=>{ window.location.href = "add-animal.html"; }, 900);
+    if (acceptedRows.length) {
+      msg += "\n\nالمؤهل:";
+      msg += "\n" + acceptedRows
+        .map(r => `✅ ${r.animalNumber} — ${r.reason} — ${r.gestationDays} يوم`)
+        .join("\n");
+    }
+
+    if (rejectedRows.length) {
+      msg += "\n\nغير المؤهل:";
+      msg += "\n" + rejectedRows
+        .map(r => `❌ ${r.animalNumber || "-"} — ${r.reason || "غير مؤهل"}`)
+        .join("\n");
+    }
+
+    showMsg(msg, gateOk ? "success" : "error");
+  }
+
+  async function runDryOffGate({ silent = false } = {}) {
+    const uid = getUid();
+    const animalNumbers = animalEl.value.trim();
+    const eventDate = dateEl.value;
+
+    resetGateResult();
+
+    if (!uid) {
+      if (!silent) showMsg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
+      return false;
+    }
+
+    if (!animalNumbers || !eventDate) {
+      if (!silent) showMsg("أدخل رقم الحيوان وتاريخ التجفيف أولًا.", "warning");
+      return false;
+    }
+
+    try {
+      if (!silent) showMsg("جارِ التحقق من أهلية التجفيف...", "info");
+
+      const r = await fetch(apiUrl("/api/dry-off/gate"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify({
+          animalNumbers,
+          eventDate
+        })
+      });
+
+      const data = await r.json().catch(() => null);
+
+      if (!data || data.ok !== true || data.allowed !== true) {
+        renderGateResult(data || {
+          message: "❌ الحيوان غير مؤهل لتسجيل التجفيف.",
+          accepted: [],
+          rejected: []
+        });
+        return false;
+      }
+
+      renderGateResult(data);
+      return true;
+
+    } catch (err) {
+      console.error("dry-off gate failed:", err);
+      showMsg("❌ تعذّر التحقق من أهلية التجفيف الآن.", "error");
+      return false;
+    }
+  }
+
+  function scheduleGate() {
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(() => {
+      runDryOffGate({ silent: true });
+    }, 450);
+  }
+
+  async function saveDryOff() {
+    const uid = getUid();
+    const eventDate = dateEl.value;
+    const pregnancyStatus = selectedRadio("pregnancyStatus");
+    const usedDryingAntibiotics = selectedRadio("usedDryingAntibiotics");
+
+    if (!uid) {
+      showMsg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
+      return;
+    }
+
+    if (!eventDate) {
+      showMsg("❌ تاريخ التجفيف مطلوب.", "error");
+      return;
+    }
+
+    if (!pregnancyStatus) {
+      showMsg("❌ تأكيد الحمل مطلوب.", "error");
+      return;
+    }
+
+    if (!usedDryingAntibiotics) {
+      showMsg("❌ حدد هل تم استخدام محاقن التجفيف.", "error");
+      return;
+    }
+
+    if (!gateOk || !acceptedRows.length) {
+      const ok = await runDryOffGate({ silent: false });
+      if (!ok) return;
+    }
+
+    try {
+      setButtonLoading(true);
+      showMsg("جارِ حفظ التجفيف...", "info");
+
+      const r = await fetch(apiUrl("/api/dry-off/save"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify({
+          eventDate,
+          pregnancyStatus,
+          usedDryingAntibiotics,
+          accepted: acceptedRows,
+          tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+        })
+      });
+
+      const data = await r.json().catch(() => null);
+
+      if (!data || data.ok !== true) {
+        const msg = data?.message || "❌ لم يتم حفظ التجفيف.";
+        const rejected = Array.isArray(data?.rejected) && data.rejected.length
+          ? "\n\n" + data.rejected.map(x => `❌ ${x.animalNumber || "-"} — ${x.reason || ""}`).join("\n")
+          : "";
+
+        showMsg(msg + rejected, "error");
+        setButtonLoading(false);
         return;
       }
 
-      if (qpId) { try { localStorage.setItem("lastAnimalId", qpId); } catch {} }
-      if (!dateEl.value) dateEl.value = todayYYYYMMDD();
-    };
+      let msg = data.message || "✅ تم حفظ التجفيف بنجاح.";
 
-    // ✅ فتح بطاقة الحيوان
-    openCardBtn?.addEventListener("click", ()=>{
-      const n = (idEl.value || "").trim();
-      if (!n) return;
-      location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
-    });
-form.addEventListener("mbk:valid", async (e) => {
-  const fd = e?.detail?.formData || {};
+      if (Array.isArray(data.rejected) && data.rejected.length) {
+        msg += "\n\nلم تُحفظ:";
+        msg += "\n" + data.rejected.map(x => `❌ ${x.animalNumber || "-"} — ${x.reason || ""}`).join("\n");
+      }
 
- const data = {
-  animalNumber: String(fd.animalNumber || "").trim(),
-  eventDate: String(fd.eventDate || "").trim(),
-  dryOffDate: String(fd.eventDate || "").trim(),   // ✅ نفس تاريخ الحدث
-  reason: String(fd.reason || "").trim(),
-  pregnancyStatus: String(fd.pregnancyStatus || "").trim(),
-  usedDryingAntibiotics: String(fd.usedDryingAntibiotics || "").trim(),
-  gestationDays: Number(fd.gestationDays),
+      showMsg(msg, "success");
 
-  type: "تجفيف",
-  eventType: "dry_off",
+      try {
+        const first = data?.saved?.[0]?.animalNumber || acceptedRows?.[0]?.animalNumber || "";
+        if (first) localStorage.setItem("lastAnimalId", first);
+      } catch (_) {}
 
-  tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-  source: location.href,
-  userId: auth.currentUser?.uid || null,
-  createdAt: serverTimestamp()
-};
+      setTimeout(() => {
+        if (data.redirectUrl) {
+          location.href = data.redirectUrl;
+          return;
+        }
 
+        const first = data?.saved?.[0]?.animalNumber || acceptedRows?.[0]?.animalNumber || "";
+        if (first) {
+          location.href = `event-list.html?number=${encodeURIComponent(first)}`;
+        } else {
+          location.href = "dashboard.html";
+        }
+      }, 900);
 
-  try {
-    const btn = form.querySelector('button[type="submit"]');
-    if (btn) btn.disabled = true;
-
-    await addDoc(collection(db, "events"), data);
-  await updateAnimalByEvent(data);
-
-
-    try { localStorage.setItem("lastAnimalId", data.animalNumber); } catch {}
-    showMsg("✅ تم حفظ التجفيف بنجاح");
-    setTimeout(()=>{ window.location.href = "dashboard.html"; }, 900);
-
-  } catch (err) {
-    console.error(err);
-    showMsg("فشل الاتصال أو الصلاحيات. تأكد من الاتصال وقواعد فايرستور.", true);
-    const btn = form.querySelector('button[type="submit"]');
-    if (btn) btn.disabled = false;
+    } catch (err) {
+      console.error("dry-off save failed:", err);
+      showMsg("❌ فشل الاتصال بالسيرفر أثناء حفظ التجفيف.", "error");
+      setButtonLoading(false);
+    }
   }
-});
 
-  </script>
+  window.addEventListener("load", () => {
+    const qp = new URLSearchParams(location.search);
+    const qpNum = qp.get("number") || qp.get("animalNumber") || qp.get("animalId") || "";
+    const stored = localStorage.getItem("lastAnimalId") || "";
+
+    const startNumber = qpNum || stored || "";
+    if (startNumber) {
+      animalEl.value = startNumber;
+    }
+
+    if (!dateEl.value) {
+      dateEl.value = todayYYYYMMDD();
+    }
+
+    if (animalEl.value && dateEl.value) {
+      runDryOffGate({ silent: true });
+    }
+  });
+
+  animalEl.addEventListener("input", scheduleGate);
+  dateEl.addEventListener("change", scheduleGate);
+
+  openCardBtn?.addEventListener("click", () => {
+    const first = splitNumbers(animalEl.value)[0] || "";
+    if (!first) return;
+    location.href = `/cow-card.html?number=${encodeURIComponent(first)}`;
+  });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    saveDryOff();
+  });
+</script>
 </body>
 </html>
 
