@@ -9969,6 +9969,15 @@ app.post("/api/dry-off/gate", requireUserId, async (req, res) => {
       }
 
       const doc = animal.data || {};
+      const animalStatus = String(doc.status || "active").trim().toLowerCase();
+
+if (animalStatus !== "active") {
+  rejected.push({
+    animalNumber,
+    reason: "❌ لا يمكن تسجيل تجفيف — الحيوان غير موجود بالقطيع."
+  });
+  continue;
+}
       const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
 
       const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
