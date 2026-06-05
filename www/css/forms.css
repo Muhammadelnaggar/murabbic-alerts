@@ -573,4 +573,96 @@ textarea{
     margin-top:8px !important;
   }
 }
+/* =========================================================
+   Murabbik Shared Form Utilities
+   أدوات مركزية مشتركة لصفحات النماذج
+   ========================================================= */
 
+.form-hint{
+  font-size:12px;
+  color:var(--muted, #64748b);
+  line-height:1.45;
+  margin-top:6px;
+}
+
+.form-warn{
+  margin-top:10px;
+  min-height:18px;
+  color:#b91c1c;
+  font-weight:800;
+  text-align:center;
+  line-height:1.5;
+}
+
+.row-2{
+  grid-template-columns:1fr;
+}
+
+@media(min-width:640px){
+  .row-2{
+    grid-template-columns:repeat(2,1fr);
+  }
+}
+
+/* زر ثانوي عام داخل النماذج */
+.secondary-btn{
+  width:100%;
+  border-radius:14px;
+  padding:12px 14px;
+  font-weight:900;
+  font-size:16px;
+  cursor:pointer;
+  background:#fff;
+  color:var(--brand-600, #0b7f47);
+  border:2px solid var(--brand-600, #0b7f47);
+}
+
+/* قائمة خطوات عامة قابلة لإعادة الاستخدام */
+.steps-list{
+  margin-top:12px;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:14px;
+  background:#fff;
+  overflow:hidden;
+}
+
+.step-item{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:10px;
+  align-items:center;
+  padding:12px;
+  border-bottom:1px dashed var(--border, #e2e8f0);
+}
+
+.step-item:last-child{
+  border-bottom:none;
+}
+
+.step-item .name{
+  font-weight:900;
+}
+
+.step-item .date{
+  font-size:13px;
+  color:var(--muted, #64748b);
+  white-space:nowrap;
+}
+
+.step-item .chk{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  justify-content:flex-start;
+}
+
+.step-item input[type="checkbox"]{
+  width:18px;
+  min-height:auto;
+  height:18px;
+  margin:0;
+}
+
+.step-item.disabled{
+  opacity:.55;
+}
