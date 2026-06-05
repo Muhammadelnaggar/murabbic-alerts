@@ -11,134 +11,6 @@
 
   <title>بروتوكول تزامن التبويض والتلقيح الإجباري — مُرَبِّيك</title>
 
-  <style>
-    body{
-      margin:0;padding:0;
-      background: var(--bg, #f7faf7);
-      color: var(--text, #0f172a);
-      font-family:'Cairo',Tahoma,Arial,sans-serif;
-      direction: rtl;
-    }
-
-    header{
-      position: sticky; top: 0; z-index: 20;
-      background: #fff;
-      border-bottom: 1px solid var(--border, #e2e8f0);
-    }
-    .mbk-head{
-      display:flex; align-items:center; justify-content:space-between;
-      gap:12px; padding:10px 12px;
-    }
-    .mbk-logo{ height:48px; width:auto; object-fit:contain; opacity:.95; flex-shrink:0; }
-    .mbk-center{ flex:1; text-align:center; line-height:1.2; }
-    .mbk-page-title{ font-size:18px; font-weight:900; color: var(--ink, #0f172a); }
-    .mbk-app-name{ font-size:13px; font-weight:800; color: var(--brand-600, #0b7f47); opacity:.9; }
-    .mbk-back{
-      width:42px; height:42px; border-radius:50%;
-      display:flex; align-items:center; justify-content:center;
-      text-decoration:none; font-weight:900;
-      color: var(--brand-600, #0b7f47);
-      border:2px solid var(--brand-600, #0b7f47);
-      background:#fff; flex-shrink:0;
-    }
-
-    .wrap{ max-width:520px; margin:12px auto 24px; padding:0 12px; }
-    .mbk-card{
-      background:#fff;
-      border:1px solid var(--border, #e2e8f0);
-      border-radius:16px;
-      padding:14px;
-      box-shadow:0 1px 0 rgba(15,23,42,.04);
-    }
-
-    .row{ display:grid; grid-template-columns:1fr; gap:12px; }
-    @media(min-width:640px){ .row-2{ grid-template-columns:1fr 1fr; } }
-
-    .hint{ font-size:12px; opacity:.65; line-height:1.4; }
-
-    .steps{
-      margin-top:12px;
-      border:1px solid var(--border, #e2e8f0);
-      border-radius:14px;
-      background:#fff;
-      overflow:hidden;
-    }
-    .step{
-      display:grid;
-      grid-template-columns: 1fr auto;
-      gap:10px;
-      align-items:center;
-      padding:12px;
-      border-bottom:1px dashed var(--border, #e2e8f0);
-    }
-    .step:last-child{ border-bottom:none; }
-    .step .name{ font-weight:900; }
-    .step .date{ font-size:13px; opacity:.85; white-space:nowrap; }
-    .step .chk{ display:flex; align-items:center; gap:8px; justify-content:flex-start; }
-    .step input[type="checkbox"]{ width:18px; height:18px; }
-
-    #warn{ margin-top:10px; color:#b91c1c; font-weight:800; min-height:18px; }
-
-    #sysbar.infobar{
-      display:block;
-      position: sticky;
-      top: 72px;
-      z-index: 19;
-      margin: 10px 0 10px;
-    }
-    #sysbar .msgrow{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:10px;
-    }
-    #sysbar .okbtn{
-      flex-shrink:0;
-      border-radius:12px;
-      padding:8px 12px;
-      font-weight:900;
-      border:2px solid var(--brand-600, #0b7f47);
-      background:#fff;
-      color: var(--brand-600, #0b7f47);
-      cursor:pointer;
-    }
-
-    .btn-row{
-      position: sticky;
-      bottom: 10px;
-      background: #fff;
-      padding: 10px;
-      border: 1px solid var(--border, #e2e8f0);
-      border-radius: 16px;
-      display:flex;
-      gap:10px;
-      margin:14px 12px 18px;
-      max-width:520px;
-      margin-left:auto; margin-right:auto;
-    }
-    .btn-row .save-btn,
-    .btn-row .open-card{
-      flex:1; width:auto;
-      border-radius:14px;
-      padding:12px 14px;
-      font-weight:900;
-      font-size:16px;
-      cursor:pointer;
-    }
-    .btn-row .save-btn{
-      background: var(--brand, #0ea05a);
-      color:#fff; border:0;
-    }
-    .btn-row .open-card{
-      background:#fff !important;
-      color: var(--brand-600, #0b7f47) !important;
-      border:2px solid var(--brand-600, #0b7f47) !important;
-    }
-
-    /* ✅ إخفاء/إظهار وضع */
-    #modeBulkBox[hidden],
-    #modeSingleBox[hidden]{ display:none !important; }
-  </style>
 </head>
 
 <body>
@@ -155,7 +27,7 @@
     </div>
   </header>
 
-  <div class="wrap">
+ <main class="mbk-form">
     <div id="sysbar" class="infobar"></div>
     <div class="mbk-card">
      <form id="ovForm" autocomplete="off">
@@ -167,35 +39,35 @@
 <input type="hidden" id="steps" value="">
 <input type="hidden" id="animalId" value="">
         <!-- ✅ اختيار وضع التسجيل: فردي / مجموعة -->
-        <div class="field" style="margin-bottom:12px">
-          <div style="display:flex;gap:12px;align-items:center;font-weight:900">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <div class="field">
+         <div class="radio-group">
+            <label>
               <input type="radio" name="mbkMode" id="modeSingle" value="single" checked>
               ⬤ تسجيل لحيوان واحد
             </label>
 
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+           <label>
               <input type="radio" name="mbkMode" id="modeGroup" value="group">
               ⬤ تسجيل لمجموعة حيوانات
             </label>
           </div>
-          <div class="hint" id="modeHint" style="margin-top:6px">اختر الوضع… والصفحة ستُظهر لك الحقول المناسبة تلقائيًا.</div>
+         <div class="form-hint" id="modeHint">اختر الوضع… والصفحة ستُظهر لك الحقول المناسبة تلقائيًا.</div>
         </div>
 
         <!-- ✅ وضع المجموعة -->
         <div id="modeBulkBox" hidden>
-          <div class="row" style="margin-bottom:12px">
+         <div class="row">
             <div class="field">
               <label for="bulkAnimals">إدخال جماعي (كل رقم في سطر)</label>
               <textarea id="bulkAnimals" rows="4" placeholder="مثال:
 105
 106
 110"></textarea>
-              <div class="hint">لو كتبت هنا: سيتم تسجيل نفس البروتوكول لكل الأرقام.</div>
+              <div class="form-hint">لو كتبت هنا: سيتم تسجيل نفس البروتوكول لكل الأرقام.</div>
             </div>
 
-            <button id="applyBulk" type="button" class="open-card" style="width:100%;margin-top:6px">تطبيق القائمة</button>
-            <div class="hint" id="bulkHint" style="margin-top:6px;opacity:.75"></div>
+<button id="applyBulk" type="button" class="secondary-btn">تطبيق القائمة</button>
+           <div class="form-hint" id="bulkHint"></div>
           </div>
         </div>
 
@@ -207,7 +79,7 @@
           </div>
         </div>
 
-        <div class="row row-2" style="margin-top:12px">
+       <div class="row row-2">
           <div class="field">
             <label for="startDate">تاريخ بدء البروتوكول (اليوم 0)</label>
             <input id="startDate" type="date" />
@@ -216,11 +88,11 @@
           <div class="field">
             <label for="startTime">ساعة بدء البروتوكول</label>
             <input id="startTime" type="time" value="08:00" />
-            <div class="hint">مثال: 08:00 صباحًا — باقي المواعيد تُحسب تلقائيًا</div>
+            <div class="form-hint">مثال: 08:00 صباحًا — باقي المواعيد تُحسب تلقائيًا</div>
           </div>
         </div>
 
-        <div class="row" style="margin-top:12px">
+       <div class="row">
           <div class="field">
             <label for="program">نوع البرنامج</label>
             <select id="program" data-field="program">
@@ -229,22 +101,22 @@
               <option value="cosynch72">Cosynch-72</option>
               <option value="presynch_ovsynch">Presynch + Ovsynch</option>
             </select>
-            <div class="muted hint">ضع علامة ✓ عند تنفيذ كل خطوة.</div>
+           <div class="form-hint">ضع علامة ✓ عند تنفيذ كل خطوة.</div>
           </div>
         </div>
 
-        <div id="stepsBox" class="steps" aria-live="polite"></div>
-        <div id="warn"></div>
+        <div id="stepsBox" class="steps-list" aria-live="polite"></div>
+        <div id="warn" class="form-warn"></div>
 
         <!-- مهم للمسار المركزي -->
         <button type="submit" id="hiddenSubmit" style="display:none"></button>
       </form>
     </div>
-  </div>
+ </main>
 
-  <div class="btn-row">
-    <button id="saveBtn" class="save-btn" type="button">تسجيل البروتوكول</button>
-    <button id="openCowCard" class="open-card" type="button">بطاقة الحيوان</button>
+  <div class="actions-bar">
+    <button id="saveBtn" class="save" type="button">تسجيل البروتوكول</button>
+    <button id="openCowCard" class="ghost" type="button">بطاقة الحيوان</button>
   </div>
 
 <script>
@@ -465,7 +337,7 @@ function showInfoMessage(msg, cls = "ok"){
     for (let i = 0; i < stepsState.length; i++) {
       const st = stepsState[i];
       const row = document.createElement("div");
-      row.className = "step";
+      row.className = "step-item";
 
       row.innerHTML = `
         <div>
@@ -604,14 +476,14 @@ showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
 
         if (i !== STEP_INDEX) {
           b.disabled = true;
-          b.closest('.step')?.classList.add("disabled");
+         b.closest('.step-item')?.classList.add("disabled");
         } else {
           b.disabled = false;
         }
       });
 
       const targetBox = stepsBox.querySelector(`input[type="checkbox"][data-i="${STEP_INDEX}"]`);
-      targetBox?.closest(".step")?.scrollIntoView({ behavior:"smooth", block:"center" });
+     targetBox?.closest(".step-item")?.scrollIntoView({ behavior:"smooth", block:"center" });
 
     } catch (err) {
       showWarn(err?.message || "❌ تعذّر تحميل مهام خطوة التزامن الآن.");
