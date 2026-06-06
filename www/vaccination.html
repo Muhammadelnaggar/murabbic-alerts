@@ -661,51 +661,36 @@ async function runServerGate(reason = "page_load") {
     updateContext();
   }
 
-  function renderBulkList(filterText = "") {
-    if (!bulkList) return;
+function renderBulkList(filterText = "") {
+  if (!bulkList) return;
 
-    const f = normalizeDigits(filterText).trim();
-    const list = f
-      ? bulkAllNumbers.filter(n => String(n).includes(f))
-      : bulkAllNumbers;
+  const f = normalizeDigits(filterText).trim();
 
-    bulkList.innerHTML = "";
+  const selectedNums = [...bulkSelected].map(String).filter(Boolean);
 
-    for (const num of list) {
-      const row = document.createElement("div");
-      row.className = "bulk-item";
-      row.setAttribute("role", "option");
+  const sourceList = selectedNums.length
+    ? selectedNums
+    : bulkAllNumbers;
 
-      const left = document.createElement("div");
-      left.className = "bulk-num";
-      left.textContent = num;
+  const list = f
+    ? sourceList.filter(n => String(n).includes(f))
+    : sourceList;
 
-      const chk = document.createElement("input");
-      chk.type = "checkbox";
-      chk.checked = bulkSelected.has(num);
+  bulkList.innerHTML = "";
 
-      row.addEventListener("click", (e) => {
-        if (e.target === chk) return;
-        chk.checked = !chk.checked;
-        chk.dispatchEvent(new Event("change"));
-      });
+  for (const num of list) {
+    const row = document.createElement("div");
+    row.className = "bulk-item";
+    row.setAttribute("role", "option");
 
-      chk.addEventListener("change", () => {
-        if (chk.checked) {
-          bulkSelected.add(num);
-        } else {
-          bulkSelected.delete(num);
-        }
-      updateContext();
-runServerGate("bulk_selection_change");
-      });
+    const left = document.createElement("div");
+    left.className = "bulk-num";
+    left.textContent = num;
 
-      row.appendChild(left);
-      row.appendChild(chk);
-      bulkList.appendChild(row);
-    }
+    row.appendChild(left);
+    bulkList.appendChild(row);
   }
-
+}
   async function loadMyAnimalsToBulk() {
     const uid = getUid();
 
@@ -769,20 +754,30 @@ runServerGate("bulk_selection_change");
   function hydrate() {
     const qp = new URLSearchParams(location.search);
 
-    const numberFromUrl =
-      qp.get("number") ||
-      qp.get("animalNumber") ||
-      qp.get("animalId") ||
-      localStorage.getItem("lastAnimalId") ||
-      "";
+const rawNumberParam =
+  qp.get("number") ||
+  qp.get("animalNumber") ||
+  qp.get("animalId") ||
+  "";
 
-    const numbersFromUrl =
-      qp.get("numbers") ||
-      qp.get("animalNumbers") ||
-      "";
+const dt = qp.get("date") || qp.get("eventDate") || todayLocal();
 
-    const dt = qp.get("date") || qp.get("eventDate") || todayLocal();
-    const entryMode = String(qp.get("entryMode") || "").toLowerCase();
+const entryMode = String(
+  qp.get("entryMode") ||
+  qp.get("mode") ||
+  ""
+).toLowerCase();
+
+const numbersFromUrl =
+  qp.get("numbers") ||
+  qp.get("animalNumbers") ||
+  (entryMode === "bulk" ? rawNumberParam : "") ||
+  "";
+
+const numberFromUrl =
+  numbersFromUrl
+    ? ""
+    : (rawNumberParam || localStorage.getItem("lastAnimalId") || "");
     const vaccine = String(qp.get("vaccine") || "").trim();
     const doseType = String(qp.get("doseType") || "").toLowerCase();
 
