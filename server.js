@@ -14370,6 +14370,83 @@ async function archiveCommitOpsSrv(ops = []) {
   if (n > 0) await batch.commit();
 }
 // ============================================================
+//                 API: DEATH REASONS OPTIONS
+//                 تحميل/حفظ أسباب النفوق من السيرفر فقط
+// ============================================================
+
+function archiveDeathReasonKeySrv(uid, label) {
+  const clean = String(label || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[\/\\#?\[\]]/g, "_")
+    .slice(0, 100);
+
+  return `${uid}__${clean}`;
+}
+
+async function archiveSaveDeathReasonOptionSrv(uid, label) {
+  try {
+    const clean = String(label || "").trim();
+    if (!db || !uid || !clean) return false;
+
+    const key = archiveDeathReasonKeySrv(uid, clean);
+
+    await db.collection("death_reasons").doc(key).set({
+      userId: uid,
+      label: clean,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    return true;
+  } catch (e) {
+    console.error("death-reason option save failed", e);
+    return false;
+  }
+}
+
+app.get("/api/death-reasons/options", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        reasons: [],
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+
+    const snap = await db.collection("death_reasons")
+      .where("userId", "==", uid)
+      .limit(200)
+      .get();
+
+    const reasons = [];
+
+    snap.forEach(d => {
+      const x = d.data() || {};
+      const label = String(x.label || "").trim();
+      if (label) reasons.push(label);
+    });
+
+    reasons.sort((a, b) => a.localeCompare(b, "ar"));
+
+    return res.json({
+      ok: true,
+      reasons
+    });
+
+  } catch (e) {
+    console.error("death-reasons options", e);
+    return res.status(500).json({
+      ok: false,
+      reasons: [],
+      message: "تعذّر تحميل أسباب النفوق الآن."
+    });
+  }
+});
+// ============================================================
 //                 API: ARCHIVE GATE — SALE / DEATH
 //                 تحقق فتح صفحة البيع/النفوق فقط
 // ============================================================
@@ -14505,6 +14582,16 @@ if (archiveReason === "sale") {
     });
   }
 }
+    if (archiveReason === "death") {
+  const deathReason = String(body.reason || body.deathReason || "").trim();
+
+  if (!deathReason) {
+    return res.status(400).json({
+      ok: false,
+      message: "سبب النفوق مطلوب."
+    });
+  }
+}
     const animal = await archiveFindAnimalSrv(uid, animalNumber);
 
     if (!animal) {
@@ -14544,7 +14631,9 @@ if (archiveReason === "sale") {
         salePrice: archiveReason === "sale" ? (Number(body.price) || null) : null,
         saleReason: archiveReason === "sale" ? String(body.saleReason || "").trim() : null,
 
-        deathReason: archiveReason === "death" ? String(body.reason || "").trim() : null,
+        deathReason: archiveReason === "death"
+  ? String(body.reason || body.deathReason || "").trim()
+  : null,
 
         season: Number(body.season) || null,
         notes: String(body.notes || "").trim() || null
@@ -14583,9 +14672,16 @@ if (archiveReason === "sale") {
 
     ops.push({ type: "delete", ref: animal.ref });
 
-    await archiveCommitOpsSrv(ops);
+await archiveCommitOpsSrv(ops);
 
-    if (typeof scheduleGroupsRebuildSrv === "function") {
+if (archiveReason === "death") {
+  await archiveSaveDeathReasonOptionSrv(
+    uid,
+    String(body.reason || body.deathReason || "").trim()
+  );
+}
+
+if (typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "animal_archived");
     }
 
