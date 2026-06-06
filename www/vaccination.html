@@ -3,13 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <script type="module">
-    import { updateAnimalByEvent } from "/js/animal-update.js";
-    window.updateAnimalByEvent = updateAnimalByEvent;
-  </script>
 
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
   <title>تسجيل التحصين</title>
   <style>
   /* ===== Header Style (ONE VERSION) ===== */
@@ -313,501 +308,551 @@
     </div>
   </div>
 
-  <script type="module">
-    import { db, auth } from "/js/firebase-config.js";
-  import { collection, addDoc, doc, setDoc, serverTimestamp, getDocs, query, where, orderBy, limit }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-   import { vaccinationTasksFromEvent } from "/js/form-rules.js";
-    // عناصر
-    const ctxAnimal  = document.getElementById("ctxAnimal");
-    const ctxDate    = document.getElementById("ctxDate");
-    const form       = document.getElementById("vaccinationForm");
-    const animalNumberEl = document.getElementById("animalNumber");  // (قد تكون null لو الصفحة المخدومة قديمة)
-    const eventDateEl = document.getElementById("eventDate");
-    const vaccineEl  = document.getElementById("vaccine");
-    const saveBtn    = document.getElementById("saveBtn");
-    const dashBtn    = document.getElementById("dashBtn");
-    const warn       = document.getElementById("warn");
+ <script>
+  // ============================================================
+  // Murabbik Vaccination — Server-only page
+  // لا Firebase — لا forms-init — لا form-rules — لا حفظ من المتصفح
+  // ============================================================
 
-    // Bulk UI
-    const bulkBox       = document.getElementById("bulkBox");
-    const bulkList      = document.getElementById("bulkList");
-    const bulkSearch    = document.getElementById("bulkSearch");
-    const bulkSelectAll = document.getElementById("bulkSelectAll");
-    const bulkClearAll  = document.getElementById("bulkClearAll");
+  const ctxAnimal  = document.getElementById("ctxAnimal");
+  const ctxDate    = document.getElementById("ctxDate");
+  const form       = document.getElementById("vaccinationForm");
+  const animalNumberEl = document.getElementById("animalNumber");
+  const eventDateEl = document.getElementById("eventDate");
+  const vaccineEl  = document.getElementById("vaccine");
+  const saveBtn    = document.getElementById("saveBtn");
+  const dashBtn    = document.getElementById("dashBtn");
+  const warn       = document.getElementById("warn");
 
-    const bulkSelected = new Set();   // الأرقام المختارة
-    let bulkAllNumbers = [];          // كل أرقام القطيع (مفلترة)
-    let bulkHasData = false;   // ✅ true فقط لما فعلاً نجيب أرقام
-let bulkLoading = false;   // ✅ لمنع تكرار طلبات متزامنة
+  const bulkBox       = document.getElementById("bulkBox");
+  const bulkList      = document.getElementById("bulkList");
+  const bulkSearch    = document.getElementById("bulkSearch");
+  const bulkSelectAll = document.getElementById("bulkSelectAll");
+  const bulkClearAll  = document.getElementById("bulkClearAll");
 
-    dashBtn?.addEventListener("click", () => (location.href = "dashboard.html"));
+  const bulkSelected = new Set();
+  let bulkAllNumbers = [];
+  let bulkHasData = false;
+  let bulkLoading = false;
 
-    // ✅ Infobar: استخدم المركزي لو موجود (forms-init) وإلا fallback بسيط
-    function getBar(){
-      try{
-        if (window.ensureInfoBar) return window.ensureInfoBar(form);
-      }catch(_){}
-      // fallback
-      let bar = document.getElementById("sysbar") || document.getElementById("infobar") || document.querySelector(".infobar");
-      if (!bar){
-        bar = document.createElement("div");
-        bar.id = "infobar";
-        bar.className = "infobar";
-        bar.style.display = "none";
-        const main = document.querySelector(".mbk-main");
-        (main || document.body).insertBefore(bar, (main || document.body).firstChild);
+  function getUid() {
+    try {
+      return String(
+        localStorage.getItem("userId") ||
+        localStorage.getItem("uid") ||
+        localStorage.getItem("tenantId") ||
+        ""
+      ).trim();
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function apiBase() {
+    try {
+      return String(
+        window.API_BASE ||
+        localStorage.getItem("API_BASE") ||
+        ""
+      ).replace(/\/$/, "");
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function apiUrl(path) {
+    const base = apiBase();
+    return base ? `${base}${path}` : path;
+  }
+
+  function msg(text, type = "warning") {
+    let bar =
+      document.getElementById("mbk-infobar") ||
+      document.getElementById("sysbar") ||
+      document.getElementById("infobar") ||
+      document.querySelector(".infobar");
+
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "mbk-infobar";
+      bar.className = "infobar mbk-infobar";
+      bar.style.display = "none";
+
+      const main = document.querySelector(".mbk-main");
+      if (main) {
+        main.insertBefore(bar, main.firstChild);
+      } else {
+        document.body.insertBefore(bar, document.body.firstChild);
       }
-      return bar;
-    }
-   function msg(text, type="warning"){
-  const bar = getBar();
-  if (!bar) return;
-
-  // لو forms-init موفّر showMsg استخدمه
-  try{
-    if (window.showMsg) return window.showMsg(bar, text, type);
-  }catch(_){}
-
-  // ✅ مهم: ثبّت الكلاسات عشان الـCSS يمسك
-  const cls = (type === "success") ? "success" : (type === "error" ? "error" : "warning");
-  bar.className = `infobar mbk-infobar show ${cls}`;
-  bar.style.display = "block";
-  bar.textContent = String(text || "");
-}
-
-    function todayLocal(){
-      const d = new Date();
-      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
-    }
-    function showWarn(t){ if (warn) warn.textContent = t; }
-    function clearWarn(){ if (warn) warn.textContent = ""; }
-
-    // =========================================================
-    // ✅ Murabbik: Save happens ONLY after Central Validation (mbk:valid)
-    // - no local form submit handler
-    // - vaccination bulk/single handled here safely
-    // =========================================================
-    function parseNumbers(raw){
-      const s = String(raw||"");
-      const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
-                   '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-      const latin = s.replace(/[٠-٩۰-۹]/g, ch => map[ch] || ch);
-      const arr = latin.match(/\d+/g) || [];
-      return [...new Set(arr.map(x=>String(x).replace(/\D/g,'')).filter(Boolean))];
     }
 
-    function addDays(ymd, days){
-      const d = new Date(String(ymd||"").slice(0,10));
-      if (Number.isNaN(d.getTime())) return "";
-      d.setDate(d.getDate() + Number(days||0));
-      const x = new Date(d.getTime());
-      x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
-      return x.toISOString().slice(0,10);
-    }
-async function createVaccinationTasks(uid, animalNumber, eventDate, vaccine, doseType, campaignId){
-  const num = String(animalNumber || "").trim();
-  const dt  = String(eventDate || "").slice(0,10);
-  const vx  = String(vaccine || "").trim();
-  const dose = String(doseType || "").trim();
+    const cls =
+      type === "success" ? "success" :
+      type === "error" ? "error" :
+      type === "info" ? "info" :
+      "warning";
 
-  if (!uid || !num || !dt || !vx) return;
+    bar.className = `infobar mbk-infobar show ${cls}`;
+    bar.style.display = "block";
+    bar.textContent = String(text || "");
 
-  // ✅ المصدر الوحيد للحقيقة: المولّد المركزي
-  const tasks = vaccinationTasksFromEvent({
-    vaccine: vx,
-    doseType: dose,
-    eventDate: dt,
-    campaignId
-  }) || [];
+    try {
+      bar.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (_) {}
+  }
 
-  if (!tasks.length) return;
+  function showWarn(t) {
+    if (warn) warn.textContent = String(t || "");
+  }
 
-  // ✅ اكتب Tasks بصيغة واحدة ثابتة (taskType=vaccination) عشان الداش/التنبيهات ما تتلخبطش
-  for (const t of tasks){
-    const dueDate = String(t.dueDate || "").slice(0,10);
-    if (!dueDate) continue;
+  function clearWarn() {
+    if (warn) warn.textContent = "";
+  }
 
-    // taskId ثابت (زي سكة التزامن) لمنع التكرار
-    const keySafe = String(t.vaccineKey || vx).replace(/\s+/g,'_');
-    const taskId  = `vax__${num}__${keySafe}__${dueDate}__${String(t.doseType || dose || '').replace(/\s+/g,'_')}`;
+  function todayLocal() {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
+  }
 
-    const payload = {
-      userId: uid,
-      animalNumber: num,
-
-      // ✅ تصنيف واضح
-      type: "task",
-      taskType: "vaccination",
-
-      // ✅ مفاتيح التحصين
-      vaccineKey: String(t.vaccineKey || vx),
-      dueDate,
-      windowStart: String(t.windowStart || dueDate),
-      windowEnd: String(t.windowEnd || dueDate),
-
-      // ✅ ميتاداتا
-      doseType: String(t.doseType || dose || ""),
-      campaignId: campaignId || (t.campaignId || ""),
-      status: "pending",
-      done: false,
-
-      createdAt: serverTimestamp(),
-      source: "vaccination.html"
+  function normalizeDigits(raw) {
+    const map = {
+      "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+      "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
     };
 
-    await setDoc(doc(db, "tasks", taskId), payload, { merge: true });
+    return String(raw || "")
+      .trim()
+      .replace(/[٠-٩۰-۹]/g, d => map[d] || d);
   }
-}   async function saveFromCentral(fd){
-      const uid = auth?.currentUser?.uid;
-      if (!uid){
-        msg("سجّل الدخول أولًا.", "error");
-        return;
-      }
 
-      const vaccine = String(fd.vaccine || vaccineEl?.value || "").trim();
-      const doseType = String(fd.doseType || "").trim();
-      const dt = String(fd.eventDate || eventDateEl?.value || "").slice(0,10);
+  function parseNumbers(raw) {
+    const s = normalizeDigits(raw);
+    const arr = s.match(/\d+/g) || [];
+    return [...new Set(
+      arr.map(x => String(x || "").replace(/\D/g, "")).filter(Boolean)
+    )];
+  }
 
-      // targets: من bulkSelected لو المستخدم اختار (جماعي)، وإلا من الحقل
-      let targets = [];
-      const mode = document.getElementById("modeBulk")?.checked ? "bulk" : "single";
-      if (mode === "bulk" && bulkSelected.size){
-        targets = [...bulkSelected].map(String);
-      } else {
-        targets = parseNumbers(fd.animalNumber || fd.animalId || "");
-      }
-      targets = [...new Set(targets.filter(Boolean))];
+  function getDoseType() {
+    return document.querySelector('input[name="doseType"]:checked')?.value || "";
+  }
 
-      if (!targets.length){
-        msg("اكتب رقم الحيوان (أو اختر من القائمة).", "error");
-        return;
-      }
-      if (!dt){
-        msg("اختر تاريخ التحصين.", "error");
-        return;
-      }
-      if (!vaccine){
-        msg("اختر نوع التحصين.", "error");
-        return;
-      }
-      if (!doseType){
-        msg("اختر نوع الجرعة.", "error");
-        return;
-      }
+  function getMode() {
+    return document.querySelector('input[name="entryMode"]:checked')?.value || "single";
+  }
 
-      saveBtn.disabled = true;
-      let ok = 0;
-      const skipped = [];
-
-      for (const animalNumber of targets){
-        
-        // 3) احفظ الحدث (مستبعد تناسليًا مسموح)
-        const payload = {
-          animalId: String(animalNumber),
-          animalNumber: String(animalNumber),
-          userId: uid,
-          eventType: "تحصين",
-          type: "vaccination",
-          vaccine,
-          doseType,
-          eventDate: dt,
-          date: dt,
-          source: "vaccination.html",
-          createdAt: serverTimestamp(),
-        };
-
-        await addDoc(collection(db,"events"), payload);
-        if (window.updateAnimalByEvent) {
-          try{ await window.updateAnimalByEvent(payload); }catch(_){}
-        }
-
-        // 4) ذكاء التحصين: Tasks
-      try{
-  await createVaccinationTasks(uid, animalNumber, dt, vaccine, doseType);
-}catch(err){
-  const reason = (err && (err.code || err.message)) ? ` (${err.code || err.message})` : "";
-  skipped.push(`${animalNumber}: تم تسجيل التحصين لكن تعذّر إنشاء التذكيرات (Tasks)${reason}.`);
-}
-
-        ok++;
-      }
-
-      saveBtn.disabled = false;
-
-      if (!ok){
-        const lines = [
-          "🔎 لم يتم تسجيل أي تحصين.",
-          ...(skipped.length ? ["\nالأسباب:", ...skipped] : [])
-        ];
-        msg(lines.join("\n"), "error");
-        return;
-      }
-
-      const lines = [
-        `✅ تم تسجيل التحصين لعدد: ${ok}`,
-      ];
-      if (skipped.length){
-        lines.push(`🚫 تم تخطي: ${skipped.length}`);
-        // اعرض أول 8 أسباب فقط لتجنب رسالة طويلة
-        lines.push(...skipped.slice(0,8));
-        if (skipped.length > 8) lines.push("…");
-      }
-      msg(lines.join("\n"), "success");
+  function getSelectedNumbers() {
+    if (getMode() === "bulk") {
+      return [...bulkSelected].map(String).filter(Boolean);
     }
 
+    return parseNumbers(animalNumberEl?.value || "");
+  }
 
-    // ✅ استقبال الإشارة المركزية بعد نجاح البوابة + الفاليديشن
-    form.addEventListener("mbk:valid", (e)=>{
-      const fd = e?.detail?.formData || {};
-      saveFromCentral(fd);
+  function updateContext() {
+    const nums = getSelectedNumbers();
+    const first = nums[0] || animalNumberEl?.value || "";
+    const dt = String(eventDateEl?.value || "").trim();
+
+    if (ctxAnimal) {
+      ctxAnimal.textContent =
+        getMode() === "bulk"
+          ? `الحيوانات: ${nums.length || 0}`
+          : `الحيوان: ${String(first || "").trim() || "غير محدد"}`;
+    }
+
+    if (ctxDate) {
+      try {
+        ctxDate.textContent = dt
+          ? `التاريخ: ${new Date(dt).toLocaleDateString("ar-EG")}`
+          : "التاريخ: —";
+      } catch (_) {
+        ctxDate.textContent = `التاريخ: ${dt || "—"}`;
+      }
+    }
+  }
+
+  async function postJson(path, body) {
+    const uid = getUid();
+
+    if (!uid) {
+      return {
+        ok: false,
+        message: "سجّل الدخول أولًا."
+      };
+    }
+
+    const r = await fetch(apiUrl(path), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(body || {})
     });
 
-    // ✅ لا تسمح لأي كراش في hydrate (اللي كان حاصل عندك)
-    function hydrate(){
-      const qp = new URLSearchParams(location.search);
+    const data = await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
 
-      const id =
-        qp.get("animalId") ||
-        qp.get("animalIdd") ||
-        qp.get("number") ||
-        localStorage.getItem("lastAnimalId") ||
+    if (!r.ok && data.ok !== true) {
+      data.ok = false;
+    }
+
+    return data;
+  }
+
+  function collectPayload() {
+    const numbers = getSelectedNumbers();
+    const eventDate = String(eventDateEl?.value || "").trim().slice(0, 10);
+    const vaccine = String(vaccineEl?.value || "").trim();
+    const doseType = getDoseType();
+
+    return {
+      animalNumbers: numbers,
+      animalNumber: numbers.join(","),
+      eventDate,
+      date: eventDate,
+      vaccine,
+      doseType
+    };
+  }
+
+  function validateBasic(payload) {
+    if (!payload.animalNumbers.length) {
+      return "اكتب رقم الحيوان أو اختر من القائمة.";
+    }
+
+    if (!payload.eventDate) {
+      return "اختر تاريخ التحصين.";
+    }
+
+    if (!payload.vaccine) {
+      return "اختر نوع التحصين.";
+    }
+
+    if (!payload.doseType) {
+      return "اختر نوع الجرعة.";
+    }
+
+    return "";
+  }
+
+  function summarizeRejected(rejected = []) {
+    if (!Array.isArray(rejected) || !rejected.length) return "";
+
+    const preview = rejected
+      .slice(0, 5)
+      .map(x => `${x.animalNumber || ""}: ${x.reason || "غير مؤهل"}`)
+      .join(" — ");
+
+    return preview + (rejected.length > 5 ? " …" : "");
+  }
+
+  async function submitVaccination(ev) {
+    ev.preventDefault();
+    clearWarn();
+
+    const payload = collectPayload();
+    const basicError = validateBasic(payload);
+
+    if (basicError) {
+      msg(basicError, "error");
+      return;
+    }
+
+    const uid = getUid();
+    if (!uid) {
+      msg("سجّل الدخول أولًا.", "error");
+      return;
+    }
+
+    try {
+      saveBtn.disabled = true;
+      msg("جارِ التحقق من التحصين…", "info");
+
+      const gate = await postJson("/api/vaccination/gate", payload);
+
+      if (!gate.ok || !gate.allowed) {
+        const extra = summarizeRejected(gate.rejected || []);
+        msg(gate.message || extra || "❌ لا يوجد أي رقم صالح لتسجيل التحصين.", "error");
+        if (extra) showWarn(extra);
+        return;
+      }
+
+      const acceptedNumbers = Array.isArray(gate.accepted)
+        ? gate.accepted.map(x => String(x.animalNumber || "").trim()).filter(Boolean)
+        : [];
+
+      if (!acceptedNumbers.length) {
+        msg("❌ لا يوجد أي رقم صالح لتسجيل التحصين.", "error");
+        return;
+      }
+
+      const savePayload = {
+        ...payload,
+        animalNumbers: acceptedNumbers,
+        accepted: gate.accepted || []
+      };
+
+      msg("جارِ حفظ التحصين…", "info");
+
+      const saved = await postJson("/api/vaccination/save", savePayload);
+
+      if (!saved.ok) {
+        const extra = summarizeRejected(saved.rejected || []);
+        msg(saved.message || extra || "تعذّر حفظ التحصين.", "error");
+        if (extra) showWarn(extra);
+        return;
+      }
+
+      const rejectedText = summarizeRejected(saved.rejected || []);
+      const successMsg =
+        saved.message ||
+        `✅ تم حفظ التحصين بنجاح لعدد ${saved.savedCount || acceptedNumbers.length}.`;
+
+      msg(successMsg, "success");
+
+      if (rejectedText) {
+        showWarn(`تم استبعاد: ${rejectedText}`);
+      }
+
+      const firstNumber =
+        saved?.saved?.[0]?.animalNumber ||
+        acceptedNumbers[0] ||
         "";
 
-      const dt = qp.get("date") || todayLocal();
-
-      // entryMode from URL
-      const entryMode = (qp.get("entryMode") || "").toLowerCase();
-      if (entryMode === "bulk"){
-        const r = document.getElementById("modeBulk");
-        if (r) r.checked = true;
-      } else if (entryMode === "single"){
-        const r = document.getElementById("modeSingle");
-        if (r) r.checked = true;
+      if (firstNumber && acceptedNumbers.length === 1) {
+        setTimeout(() => {
+          location.href = `event-list.html?number=${encodeURIComponent(firstNumber)}`;
+        }, 900);
       }
 
-      // doseType from URL
-      const dose = (qp.get("doseType") || "").toLowerCase();
-      if (dose ==="prime" || dose === "periodic"){
-        const r = document.querySelector(`input[name="doseType"][value="${dose}"]`);
-        if (r) r.checked = true;
-      }
-
-      if (animalNumberEl){
-        animalNumberEl.value = id;
-        if (id) animalNumberEl.readOnly = true;
-      }
-
-      if (eventDateEl) eventDateEl.value = dt;
-
-      if (ctxAnimal) ctxAnimal.textContent = `الحيوان: ${id || "غير محدد"}`;
-      try{
-        if (ctxDate) ctxDate.textContent = `التاريخ: ${new Date(dt).toLocaleDateString("ar-EG")}`;
-      }catch(_){
-        if (ctxDate) ctxDate.textContent = `التاريخ: ${dt}`;
-      }
-
-      // apply mode UI now
-      applyModeUI();
+    } catch (err) {
+      console.error("vaccination server-only save failed:", err);
+      msg("تعذّر الاتصال بالسيرفر أثناء حفظ التحصين.", "error");
+    } finally {
+      saveBtn.disabled = false;
     }
-
-    function getDoseType(){
-      const el = document.querySelector('input[name="doseType"]:checked');
-      return el ? el.value : null;
-    }
-    function getMode(){
-      return document.querySelector('input[name="entryMode"]:checked')?.value || "single";
-    }
-
-    function applyModeUI(){
-      const isBulk = (getMode() === "bulk");
-      if (bulkBox) bulkBox.style.display = isBulk ? "block" : "none";
-      if (animalNumberEl) animalNumberEl.disabled = isBulk;
-
-    if (isBulk){
-  // ✅ لو مفيش بيانات فعلية لسه… حمّل
-  if (auth?.currentUser?.uid && !bulkHasData && !bulkLoading){
-    loadMyAnimalsToBulk();
   }
-  renderBulkList(bulkSearch?.value || "");
-}
+
+  function applyModeUI() {
+    const isBulk = getMode() === "bulk";
+
+    if (bulkBox) bulkBox.style.display = isBulk ? "block" : "none";
+    if (animalNumberEl) {
+      animalNumberEl.disabled = isBulk;
+      animalNumberEl.readOnly = false;
     }
 
-    hydrate();
-
-    // listeners UI context
-    animalNumberEl?.addEventListener("input", ()=>{
-      if (ctxAnimal) ctxAnimal.textContent = `الحيوان: ${animalNumberEl.value.trim() || "غير محدد"}`;
-    });
-    eventDateEl?.addEventListener("input", ()=>{
-      try{
-        if (ctxDate) ctxDate.textContent = `التاريخ: ${new Date(eventDateEl.value).toLocaleDateString("ar-EG")}`;
-      }catch(_){
-        if (ctxDate) ctxDate.textContent = `التاريخ: ${eventDateEl.value}`;
-      }
-    });
-
-    // Mode toggle
-    document.querySelectorAll('input[name="entryMode"]').forEach(r=>{
-      r.addEventListener("change", applyModeUI);
-    });
-
-    // Bulk rendering
-    function renderBulkList(filterText=""){
-      if (!bulkList) return;
-      const f = String(filterText||"").trim();
-      const list = f ? bulkAllNumbers.filter(n => n.includes(f)) : bulkAllNumbers;
-
-      bulkList.innerHTML = "";
-      for (const num of list){
-        const row = document.createElement("div");
-        row.className = "bulk-item";
-        row.setAttribute("role","option");
-
-        const left = document.createElement("div");
-        left.className = "bulk-num";
-        left.textContent = num;
-
-        const chk = document.createElement("input");
-        chk.type = "checkbox";
-        chk.checked = bulkSelected.has(num);
-
-        row.addEventListener("click", (e)=>{
-          if (e.target === chk) return;
-          chk.checked = !chk.checked;
-          chk.dispatchEvent(new Event("change"));
-        });
-
-        chk.addEventListener("change", ()=>{
-          if (chk.checked) bulkSelected.add(num);
-          else bulkSelected.delete(num);
-        });
-
-        row.appendChild(left);
-        row.appendChild(chk);
-        bulkList.appendChild(row);
-      }
+    if (isBulk && !bulkHasData && !bulkLoading) {
+      loadMyAnimalsToBulk();
     }
 
-    bulkSearch?.addEventListener("input", ()=> renderBulkList(bulkSearch.value));
-
-    bulkSelectAll?.addEventListener("click", ()=>{
-      for (const n of bulkAllNumbers) bulkSelected.add(n);
-      renderBulkList(bulkSearch?.value || "");
-    });
-
-    bulkClearAll?.addEventListener("click", ()=>{
-      bulkSelected.clear();
-      renderBulkList(bulkSearch?.value || "");
-    });
-    async function fetchAnimalsFromApi(uid){
-  try{
-    const res = await fetch(`/api/animals?limit=800`, {
-      headers: { "X-User-Id": uid }
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const arr = Array.isArray(data) ? data : (Array.isArray(data?.animals) ? data.animals : []);
-    const nums = [];
-    for (const a of arr){
-      const n = a?.animalNumber ?? a?.number ?? a?.animalNo ?? a?.id;
-      if (n !== undefined && n !== null && String(n).trim()){
-        nums.push(String(n).trim());
-      }
-    }
-    return nums;
-  }catch(_){
-    return [];
+    renderBulkList(bulkSearch?.value || "");
+    updateContext();
   }
-}
-    async function loadMyAnimalsToBulk(){
-      if (!db){ msg("❌ قاعدة البيانات غير جاهزة.", "error"); return; }
 
-      const uid = auth?.currentUser?.uid;
-      if (!uid){ msg("⚠️ يجب تسجيل الدخول أولاً.", "warning"); return; }
-      if (bulkLoading) return;
-bulkLoading = true;
+  function renderBulkList(filterText = "") {
+    if (!bulkList) return;
 
-      try{
-        let snap;
-        try{
-          const q = query(
-            collection(db,"animals"),
-            where("userId","==",uid),
-            orderBy("animalNumber","asc")
-          );
-          snap = await getDocs(q);
-        }catch(_){
-          const q = query(collection(db,"animals"), where("userId","==",uid));
-          snap = await getDocs(q);
+    const f = normalizeDigits(filterText).trim();
+    const list = f
+      ? bulkAllNumbers.filter(n => String(n).includes(f))
+      : bulkAllNumbers;
+
+    bulkList.innerHTML = "";
+
+    for (const num of list) {
+      const row = document.createElement("div");
+      row.className = "bulk-item";
+      row.setAttribute("role", "option");
+
+      const left = document.createElement("div");
+      left.className = "bulk-num";
+      left.textContent = num;
+
+      const chk = document.createElement("input");
+      chk.type = "checkbox";
+      chk.checked = bulkSelected.has(num);
+
+      row.addEventListener("click", (e) => {
+        if (e.target === chk) return;
+        chk.checked = !chk.checked;
+        chk.dispatchEvent(new Event("change"));
+      });
+
+      chk.addEventListener("change", () => {
+        if (chk.checked) {
+          bulkSelected.add(num);
+        } else {
+          bulkSelected.delete(num);
         }
-// ✅ Fallback حقيقي: لو Firestore رجّع 0 (أو rules مانعة)، هات من /api/animals
-if (!snap || snap.size === 0){
-  const apiNums = await fetchAnimalsFromApi(uid);
-  const nums = apiNums;
+        updateContext();
+      });
 
-  nums.sort((x,y)=>(Number(x)||0)-(Number(y)||0));
-  bulkAllNumbers = nums;
-  bulkHasData = nums.length > 0;
-
-  if (!bulkHasData){
-    msg("⚠️ لم يتم العثور على أرقام للقطيع (لا من Firestore ولا من /api).", "warning");
+      row.appendChild(left);
+      row.appendChild(chk);
+      bulkList.appendChild(row);
+    }
   }
 
-  renderBulkList(bulkSearch?.value || "");
-  bulkLoading = false;
-  return;
-}
-       const nums = [];
-snap.forEach(d=>{
-  const a = d.data() || {};
-  const status = (a.status || "active");
+  async function loadMyAnimalsToBulk() {
+    const uid = getUid();
 
-  const n =
-    a.number ??
-    a.animalNumber ??
-    a.animalNo ??
-    a.animalId ??
-    a.id;
+    if (!uid) {
+      msg("سجّل الدخول أولًا.", "error");
+      return;
+    }
 
-  if (status === "active" && n !== undefined && n !== null && String(n).trim()){
-    nums.push(String(n).trim());
-  }
-});
+    if (bulkLoading) return;
 
-        nums.sort((x,y)=>(Number(x)||0)-(Number(y)||0));
-        bulkAllNumbers = nums;
-        bulkHasData = nums.length > 0;
-if (!bulkHasData){
-  msg("⚠️ لم يتم العثور على أرقام قطيع للعرض (راجع ملكية animals/userId).", "warning");
-}
-        renderBulkList(bulkSearch?.value || "");
-      }catch(e){
-        console.error(e);
-        msg("❌ تعذّر تحميل أرقام الحيوانات من حسابك.", "error");
+    bulkLoading = true;
+
+    try {
+      const r = await fetch(apiUrl("/api/animals?limit=800"), {
+        headers: {
+          "X-User-Id": uid
+        }
+      });
+
+      const data = await r.json().catch(() => null);
+      const arr = Array.isArray(data)
+        ? data
+        : (Array.isArray(data?.animals) ? data.animals : []);
+
+      const nums = [];
+
+      for (const a of arr) {
+        const status = String(a?.status || "active").trim().toLowerCase();
+        if (status === "inactive" || status === "archived") continue;
+
+        const n =
+          a?.animalNumber ??
+          a?.number ??
+          a?.animalNo ??
+          a?.id;
+
+        const clean = parseNumbers(n)[0] || "";
+        if (clean) nums.push(clean);
       }
+
+      nums.sort((x, y) => (Number(x) || 0) - (Number(y) || 0));
+
+      bulkAllNumbers = [...new Set(nums)];
+      bulkHasData = bulkAllNumbers.length > 0;
+
+      if (!bulkHasData) {
+        msg("⚠️ لم يتم العثور على أرقام قطيع للعرض.", "warning");
+      }
+
+      renderBulkList(bulkSearch?.value || "");
+      updateContext();
+
+    } catch (err) {
+      console.error("load animals for vaccination failed:", err);
+      msg("تعذّر تحميل أرقام الحيوانات من السيرفر.", "error");
+    } finally {
       bulkLoading = false;
     }
-
-   onAuthStateChanged(auth, (user)=>{
-  if (!user) return;
-  // ✅ لو المستخدم فاتح جماعي ولسه مفيش بيانات فعلية… حمّل
-  if (getMode() === "bulk" && !bulkHasData && !bulkLoading){
-    loadMyAnimalsToBulk();
   }
-});
 
-    // Back button
-    const backBtn = document.getElementById("backToEventsBtn");
-    backBtn?.addEventListener("click", ()=>{
-      const qp = new URLSearchParams(location.search);
-      const id = String(animalNumberEl?.value || "").trim() || qp.get("number") || localStorage.getItem("lastAnimalId") || "";
-      const dt = String(eventDateEl?.value || "").trim() || qp.get("date") || todayLocal();
-      location.href = `add-event.html?number=${encodeURIComponent(id)}&date=${encodeURIComponent(dt)}`;
-    });
-  </script>
+  function hydrate() {
+    const qp = new URLSearchParams(location.search);
+
+    const numberFromUrl =
+      qp.get("number") ||
+      qp.get("animalNumber") ||
+      qp.get("animalId") ||
+      localStorage.getItem("lastAnimalId") ||
+      "";
+
+    const numbersFromUrl =
+      qp.get("numbers") ||
+      qp.get("animalNumbers") ||
+      "";
+
+    const dt = qp.get("date") || qp.get("eventDate") || todayLocal();
+    const entryMode = String(qp.get("entryMode") || "").toLowerCase();
+    const vaccine = String(qp.get("vaccine") || "").trim();
+    const doseType = String(qp.get("doseType") || "").toLowerCase();
+
+    if (entryMode === "bulk" || numbersFromUrl) {
+      const r = document.getElementById("modeBulk");
+      if (r) r.checked = true;
+    } else {
+      const r = document.getElementById("modeSingle");
+      if (r) r.checked = true;
+    }
+
+    if (eventDateEl) eventDateEl.value = dt;
+
+    if (vaccineEl && vaccine) {
+      const found = [...vaccineEl.options].some(o => o.value === vaccine);
+      if (found) vaccineEl.value = vaccine;
+    }
+
+    if (doseType === "prime" || doseType === "periodic") {
+      const r = document.querySelector(`input[name="doseType"][value="${doseType}"]`);
+      if (r) r.checked = true;
+    }
+
+    if (numbersFromUrl) {
+      for (const n of parseNumbers(numbersFromUrl)) {
+        bulkSelected.add(n);
+      }
+    }
+
+    if (animalNumberEl && !numbersFromUrl) {
+      animalNumberEl.value = parseNumbers(numberFromUrl)[0] || "";
+    }
+
+    applyModeUI();
+    updateContext();
+  }
+
+  dashBtn?.addEventListener("click", () => {
+    location.href = "dashboard.html";
+  });
+
+  form?.addEventListener("submit", submitVaccination);
+
+  animalNumberEl?.addEventListener("input", updateContext);
+
+  eventDateEl?.addEventListener("input", updateContext);
+
+  document.querySelectorAll('input[name="entryMode"]').forEach(r => {
+    r.addEventListener("change", applyModeUI);
+  });
+
+  bulkSearch?.addEventListener("input", () => {
+    renderBulkList(bulkSearch.value);
+  });
+
+  bulkSelectAll?.addEventListener("click", () => {
+    for (const n of bulkAllNumbers) bulkSelected.add(n);
+    renderBulkList(bulkSearch?.value || "");
+    updateContext();
+  });
+
+  bulkClearAll?.addEventListener("click", () => {
+    bulkSelected.clear();
+    renderBulkList(bulkSearch?.value || "");
+    updateContext();
+  });
+
+  const backBtn = document.getElementById("backToEventsBtn");
+  backBtn?.addEventListener("click", () => {
+    const nums = getSelectedNumbers();
+    const id = nums[0] || "";
+    const dt = String(eventDateEl?.value || "").trim() || todayLocal();
+    location.href = `add-event.html?number=${encodeURIComponent(id)}&date=${encodeURIComponent(dt)}`;
+  });
+
+  hydrate();
+</script>
 </body>
 </html>
 
