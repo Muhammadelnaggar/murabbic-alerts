@@ -502,17 +502,37 @@ async function postJson(path, body) {
       doseType
     };
   }
-  function summarizeRejected(rejected = []) {
-    if (!Array.isArray(rejected) || !rejected.length) return "";
+function renderServerResult(result = {}) {
+  const accepted = Array.isArray(result.accepted)
+    ? result.accepted
+    : (Array.isArray(result.saved) ? result.saved : []);
 
-    const preview = rejected
-      .slice(0, 5)
-      .map(x => `${x.animalNumber || ""}: ${x.reason || "غير مؤهل"}`)
-      .join(" — ");
+  const rejected = Array.isArray(result.rejected) ? result.rejected : [];
 
-    return preview + (rejected.length > 5 ? " …" : "");
+  const acceptedNums = accepted
+    .map(x => String(x.animalNumber || "").trim())
+    .filter(Boolean);
+
+  const rejectedRows = rejected
+    .map(x => {
+      const n = String(x.animalNumber || "").trim();
+      const reason = String(x.reason || "مرفوض").trim();
+      return n ? `${n} — ${reason}` : reason;
+    })
+    .filter(Boolean);
+
+  const lines = [];
+
+  if (acceptedNums.length) {
+    lines.push(`✅ المقبول (${acceptedNums.length}): ${acceptedNums.join("، ")}`);
   }
 
+  if (rejectedRows.length) {
+    lines.push(`❌ المرفوض (${rejectedRows.length}):\n${rejectedRows.join("\n")}`);
+  }
+
+  showWarn(lines.join("\n\n"));
+}
   async function submitVaccination(ev) {
     ev.preventDefault();
     clearWarn();
@@ -526,20 +546,19 @@ async function postJson(path, body) {
 
       const gate = await postJson("/api/vaccination/gate", payload);
 
-   if (!gate.ok || !gate.allowed) {
-  const extra = summarizeRejected(gate.rejected || []);
-  const text = extra || gate.message || "❌ لا يوجد أي رقم صالح لتسجيل التحصين.";
-
+if (!gate.ok || !gate.allowed) {
   lastGateAllowed = false;
-  msg(text, "error");
-  if (extra) showWarn(extra);
+
+  msg(gate.message || "تعذّر عرض رد السيرفر.", "error");
+  renderServerResult(gate);
+
   if (saveBtn) saveBtn.disabled = true;
   return;
 }
       const acceptedNumbers = Array.isArray(gate.accepted)
         ? gate.accepted.map(x => String(x.animalNumber || "").trim()).filter(Boolean)
         : [];
-
+      renderServerResult(gate);
       if (!acceptedNumbers.length) {
         msg("❌ لا يوجد أي رقم صالح لتسجيل التحصين.", "error");
         return;
@@ -555,24 +574,18 @@ async function postJson(path, body) {
 
       const saved = await postJson("/api/vaccination/save", savePayload);
 
-      if (!saved.ok) {
-        const extra = summarizeRejected(saved.rejected || []);
-        msg(saved.message || extra || "تعذّر حفظ التحصين.", "error");
-        if (extra) showWarn(extra);
-        return;
-      }
+if (!saved.ok) {
+  msg(saved.message || "تعذّر حفظ التحصين.", "error");
+  renderServerResult(saved);
+  return;
+}
 
-      const rejectedText = summarizeRejected(saved.rejected || []);
       const successMsg =
-        saved.message ||
-        `✅ تم حفظ التحصين بنجاح لعدد ${saved.savedCount || acceptedNumbers.length}.`;
+  saved.message ||
+  `✅ تم حفظ التحصين بنجاح لعدد ${saved.savedCount || acceptedNumbers.length}.`;
 
-      msg(successMsg, "success");
-
-      if (rejectedText) {
-        showWarn(`تم استبعاد: ${rejectedText}`);
-      }
-
+msg(successMsg, "success");
+renderServerResult(saved);
       const firstNumber =
         saved?.saved?.[0]?.animalNumber ||
         acceptedNumbers[0] ||
@@ -610,21 +623,21 @@ async function runServerGate(reason = "page_load") {
 
     const gate = await postJson("/api/vaccination/gate", payload);
 
-    if (!gate.ok || !gate.allowed) {
-      const extra = summarizeRejected(gate.rejected || []);
-      const text = extra || gate.message || "❌ غير مسموح بتسجيل التحصين.";
+   if (!gate.ok || !gate.allowed) {
+  lastGateAllowed = false;
 
-      lastGateAllowed = false;
-      msg(text, "error");
-      if (extra) showWarn(extra);
-      if (saveBtn) saveBtn.disabled = true;
-      return;
-    }
+  msg(gate.message || "تعذّر عرض رد السيرفر.", "error");
+  renderServerResult(gate);
+
+  if (saveBtn) saveBtn.disabled = true;
+  return;
+}
 
     lastGateAllowed = true;
     if (saveBtn) saveBtn.disabled = false;
 
     msg(gate.message || "✅ مسموح بتسجيل التحصين.", "success");
+    renderServerResult(gate);
 
   } catch (err) {
     console.error("vaccination gate failed:", err);
