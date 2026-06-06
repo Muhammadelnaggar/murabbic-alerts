@@ -334,6 +334,7 @@
   let bulkAllNumbers = [];
   let bulkHasData = false;
   let bulkLoading = false;
+   let lastGateAllowed = false;
 
   function getUid() {
     try {
@@ -575,13 +576,16 @@
 
       const gate = await postJson("/api/vaccination/gate", payload);
 
-      if (!gate.ok || !gate.allowed) {
-        const extra = summarizeRejected(gate.rejected || []);
-        msg(gate.message || extra || "❌ لا يوجد أي رقم صالح لتسجيل التحصين.", "error");
-        if (extra) showWarn(extra);
-        return;
-      }
+   if (!gate.ok || !gate.allowed) {
+  const extra = summarizeRejected(gate.rejected || []);
+  const text = extra || gate.message || "❌ لا يوجد أي رقم صالح لتسجيل التحصين.";
 
+  lastGateAllowed = false;
+  msg(text, "error");
+  if (extra) showWarn(extra);
+  if (saveBtn) saveBtn.disabled = true;
+  return;
+}
       const acceptedNumbers = Array.isArray(gate.accepted)
         ? gate.accepted.map(x => String(x.animalNumber || "").trim()).filter(Boolean)
         : [];
@@ -633,11 +637,55 @@
     } catch (err) {
       console.error("vaccination server-only save failed:", err);
       msg("تعذّر الاتصال بالسيرفر أثناء حفظ التحصين.", "error");
-    } finally {
-      saveBtn.disabled = false;
-    }
+} finally {
+  if (lastGateAllowed) {
+    saveBtn.disabled = false;
+  }
+}
+  }
+async function runServerGate(reason = "page_load") {
+  clearWarn();
+
+  const payload = collectPayload();
+
+  // الصفحة لا تقرر. فقط لا ترسل Gate ناقص بلا رقم أو تاريخ.
+  if (!payload.animalNumbers.length || !payload.eventDate) {
+    lastGateAllowed = false;
+    if (saveBtn) saveBtn.disabled = true;
+    return;
   }
 
+  try {
+    if (saveBtn) saveBtn.disabled = true;
+
+    msg("جارِ التحقق من بيانات التحصين…", "info");
+
+    const gate = await postJson("/api/vaccination/gate", payload);
+
+    if (!gate.ok || !gate.allowed) {
+      const extra = summarizeRejected(gate.rejected || []);
+      const text = extra || gate.message || "❌ غير مسموح بتسجيل التحصين.";
+
+      lastGateAllowed = false;
+      msg(text, "error");
+      if (extra) showWarn(extra);
+      if (saveBtn) saveBtn.disabled = true;
+      return;
+    }
+
+    lastGateAllowed = true;
+    if (saveBtn) saveBtn.disabled = false;
+
+    msg(gate.message || "✅ مسموح بتسجيل التحصين.", "success");
+
+  } catch (err) {
+    console.error("vaccination gate failed:", err);
+
+    lastGateAllowed = false;
+    if (saveBtn) saveBtn.disabled = true;
+    msg("تعذّر التحقق من بيانات التحصين من السيرفر.", "error");
+  }
+}
   function applyModeUI() {
     const isBulk = getMode() === "bulk";
 
@@ -690,7 +738,8 @@
         } else {
           bulkSelected.delete(num);
         }
-        updateContext();
+      updateContext();
+runServerGate("bulk_selection_change");
       });
 
       row.appendChild(left);
@@ -809,8 +858,9 @@
       animalNumberEl.value = parseNumbers(numberFromUrl)[0] || "";
     }
 
-    applyModeUI();
-    updateContext();
+   applyModeUI();
+   updateContext();
+   runServerGate("page_load");
   }
 
   dashBtn?.addEventListener("click", () => {
@@ -819,10 +869,18 @@
 
   form?.addEventListener("submit", submitVaccination);
 
-  animalNumberEl?.addEventListener("input", updateContext);
+ animalNumberEl?.addEventListener("input", () => {
+  updateContext();
+  runServerGate("animal_change");
+});
 
-  eventDateEl?.addEventListener("input", updateContext);
-
+ eventDateEl?.addEventListener("input", () => {
+  updateContext();
+  runServerGate("date_change");
+});
+vaccineEl?.addEventListener("change", () => {
+  runServerGate("vaccine_change");
+});
   document.querySelectorAll('input[name="entryMode"]').forEach(r => {
     r.addEventListener("change", applyModeUI);
   });
@@ -831,17 +889,19 @@
     renderBulkList(bulkSearch.value);
   });
 
-  bulkSelectAll?.addEventListener("click", () => {
-    for (const n of bulkAllNumbers) bulkSelected.add(n);
-    renderBulkList(bulkSearch?.value || "");
-    updateContext();
-  });
+bulkSelectAll?.addEventListener("click", () => {
+  for (const n of bulkAllNumbers) bulkSelected.add(n);
+  renderBulkList(bulkSearch?.value || "");
+  updateContext();
+  runServerGate("bulk_select_all");
+});
 
-  bulkClearAll?.addEventListener("click", () => {
-    bulkSelected.clear();
-    renderBulkList(bulkSearch?.value || "");
-    updateContext();
-  });
+bulkClearAll?.addEventListener("click", () => {
+  bulkSelected.clear();
+  renderBulkList(bulkSearch?.value || "");
+  updateContext();
+  runServerGate("bulk_clear_all");
+});
 
   const backBtn = document.getElementById("backToEventsBtn");
   backBtn?.addEventListener("click", () => {
