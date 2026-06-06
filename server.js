@@ -10395,8 +10395,33 @@ if (notes) {
 if (campaignId) {
   payload.campaignId = campaignId;
 }
-      const eventRef = await db.collection("events").add(payload);
 
+const vaccineKeyForDoc = String(vaccine || "")
+  .trim()
+  .replace(/[^\p{L}\p{N}]+/gu, "_")
+  .replace(/^_+|_+$/g, "");
+
+const vaccinationEventId = [
+  "vaccination",
+  uid,
+  animalNumber,
+  eventDate,
+  vaccineKeyForDoc || "vaccine"
+].join("__");
+
+const eventRef = db.collection("events").doc(vaccinationEventId);
+
+const existingEventSnap = await eventRef.get();
+
+if (existingEventSnap.exists) {
+  rejected.push({
+    animalNumber,
+    reason: "🚫 تم تسجيل نفس التحصين لهذا الحيوان في نفس اليوم."
+  });
+  continue;
+}
+
+await eventRef.set(payload);
       if (animalId) {
         await db.collection("animals").doc(animalId).set({
           lastVaccinationDate: eventDate,
