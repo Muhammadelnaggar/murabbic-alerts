@@ -473,37 +473,29 @@
       }
     }
   }
+async function postJson(path, body) {
+  const uid = getUid();
 
-  async function postJson(path, body) {
-    const uid = getUid();
+  const r = await fetch(apiUrl(path), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-User-Id": uid
+    },
+    body: JSON.stringify(body || {})
+  });
 
-    if (!uid) {
-      return {
-        ok: false,
-        message: "سجّل الدخول أولًا."
-      };
-    }
+  const data = await r.json().catch(() => ({
+    ok: false,
+    message: "تعذّر قراءة رد السيرفر."
+  }));
 
-    const r = await fetch(apiUrl(path), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": uid
-      },
-      body: JSON.stringify(body || {})
-    });
-
-    const data = await r.json().catch(() => ({
-      ok: false,
-      message: "تعذّر قراءة رد السيرفر."
-    }));
-
-    if (!r.ok && data.ok !== true) {
-      data.ok = false;
-    }
-
-    return data;
+  if (!r.ok && data.ok !== true) {
+    data.ok = false;
   }
+
+  return data;
+}
 
   function collectPayload() {
     const numbers = getSelectedNumbers();
@@ -520,27 +512,6 @@
       doseType
     };
   }
-
-  function validateBasic(payload) {
-    if (!payload.animalNumbers.length) {
-      return "اكتب رقم الحيوان أو اختر من القائمة.";
-    }
-
-    if (!payload.eventDate) {
-      return "اختر تاريخ التحصين.";
-    }
-
-    if (!payload.vaccine) {
-      return "اختر نوع التحصين.";
-    }
-
-    if (!payload.doseType) {
-      return "اختر نوع الجرعة.";
-    }
-
-    return "";
-  }
-
   function summarizeRejected(rejected = []) {
     if (!Array.isArray(rejected) || !rejected.length) return "";
 
@@ -557,18 +528,7 @@
     clearWarn();
 
     const payload = collectPayload();
-    const basicError = validateBasic(payload);
-
-    if (basicError) {
-      msg(basicError, "error");
-      return;
-    }
-
-    const uid = getUid();
-    if (!uid) {
-      msg("سجّل الدخول أولًا.", "error");
-      return;
-    }
+   
 
     try {
       saveBtn.disabled = true;
@@ -649,11 +609,9 @@ async function runServerGate(reason = "page_load") {
   const payload = collectPayload();
 
   // الصفحة لا تقرر. فقط لا ترسل Gate ناقص بلا رقم أو تاريخ.
-  if (!payload.animalNumbers.length || !payload.eventDate) {
-    lastGateAllowed = false;
-    if (saveBtn) saveBtn.disabled = true;
-    return;
-  }
+  if (!payload.animalNumbers.length && !payload.eventDate && !payload.vaccine && !payload.doseType) {
+  return;
+}
 
   try {
     if (saveBtn) saveBtn.disabled = true;
