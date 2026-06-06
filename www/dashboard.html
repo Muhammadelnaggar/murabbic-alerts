@@ -1819,13 +1819,52 @@ function renderMiniGauge(id, percent){
     console.warn('ovsynch dashboard alerts failed', e);
   }
 }
+  async function loadVaccinationDashboardAlerts(){
+  try{
+    const uid = getTenantId();
+    if (!uid) return;
+
+    const r = await fetch(API_BASE + '/api/vaccination/dashboard-alerts', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'X-User-Id': uid
+      },
+      cache: 'no-store'
+    });
+
+    const data = await r.json().catch(() => null);
+    const alerts = Array.isArray(data?.alerts) ? data.alerts : [];
+    if (!alerts.length) return;
+
+    alerts.forEach(a => {
+      if (!a?.message) return;
+
+      window.mbk?.alertsUI?.show?.({
+        ruleId: a.id || 'vaccination_dashboard_alert',
+        severity: a.level === 'warn' ? 'warn' : 'info',
+        title: a.title || 'تنبيه تحصين',
+        message: a.message,
+        actionText: a.actionText || 'فتح صفحة التحصين',
+        actionUrl: a.actionUrl || 'vaccination.html',
+        animalNumbers: a.animalNumbers || [],
+        count: a.count || 0
+      });
+    });
+
+  }catch(e){
+    console.warn('vaccination dashboard alerts failed', e);
+  }
+}
   // ============ تشغيل ============
 document.addEventListener('DOMContentLoaded', () => {
   loadWeatherTHI();
   loadHerdKPIs();
+  loadOvsynchDashboardAlerts();
+  loadVaccinationDashboardAlerts();
 
- loadOvsynchDashboardAlerts();
-setInterval(loadOvsynchDashboardAlerts, 10 * 60 * 1000);
+  setInterval(loadOvsynchDashboardAlerts, 10 * 60 * 1000);
+  setInterval(loadVaccinationDashboardAlerts, 10 * 60 * 1000);
 });
 
 </script>
