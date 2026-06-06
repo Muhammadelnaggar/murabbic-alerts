@@ -1841,7 +1841,7 @@ function renderMiniGauge(id, percent){
       if (!a?.message) return;
 
       window.mbk?.alertsUI?.show?.({
-        ruleId: a.id || 'vaccination_dashboard_alert',
+        ruleId: `${a.id || 'vaccination_dashboard_alert'}__${(a.animalNumbers || []).join('_')}__${a.count || 0}`,
         severity: a.level === 'warn' ? 'warn' : 'info',
         title: a.title || 'تنبيه تحصين',
         message: a.message,
