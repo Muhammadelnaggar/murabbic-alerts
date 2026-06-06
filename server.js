@@ -9946,18 +9946,20 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
       });
     }
 
-    return res.json({
-      ok: true,
-      allowed: accepted.length > 0,
-      stage: "vaccination_gate",
-      message: accepted.length
-        ? `✅ تم التحقق — جاهز لتسجيل التحصين لعدد ${accepted.length}.`
-        : "❌ لا يوجد أي رقم صالح لتسجيل التحصين.",
-      acceptedCount: accepted.length,
-      rejectedCount: rejected.length,
-      accepted,
-      rejected
-    });
+const firstReason = rejected[0]?.reason || "";
+
+return res.json({
+  ok: true,
+  allowed: accepted.length > 0,
+  stage: "vaccination_gate",
+  message: accepted.length
+    ? `✅ تم التحقق — جاهز لتسجيل التحصين لعدد ${accepted.length}.`
+    : (firstReason || "❌ لا يوجد أي رقم صالح لتسجيل التحصين."),
+  acceptedCount: accepted.length,
+  rejectedCount: rejected.length,
+  accepted,
+  rejected
+});
 
   } catch (e) {
     console.error("vaccination-gate", e);
