@@ -568,13 +568,10 @@ const numberFromUrl =
 vaccineEl?.addEventListener("change", () => {
   runServerGate("vaccine_change");
 });
-  const backBtn = document.getElementById("backToEventsBtn");
-  backBtn?.addEventListener("click", () => {
-    const nums = getSelectedNumbers();
-    const id = nums[0] || "";
-    const dt = String(eventDateEl?.value || "").trim() || todayLocal();
-    location.href = `add-event.html?number=${encodeURIComponent(id)}&date=${encodeURIComponent(dt)}`;
-  });
+ const backBtn = document.getElementById("backToEventsBtn");
+backBtn?.addEventListener("click", () => {
+  location.href = "add-event.html";
+});
 
   hydrate();
 </script>
