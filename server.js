@@ -14422,12 +14422,25 @@ app.get("/api/death-reasons/options", requireUserId, async (req, res) => {
       .limit(200)
       .get();
 
-    const reasons = [];
+    const defaultReasons = [
+  "التهاب ضرع حاد / تسمم دموي",
+  "نفاخ حاد",
+  "تسمم غذائي",
+  "حمى لبن / نقص كالسيوم حاد",
+  "تعسر ولادة ومضاعفاته",
+  "نزيف داخلي",
+  "التهاب رحم حاد / تسمم رحمي",
+  "إصابة أو حادث",
+  "إجهاد حراري حاد",
+  "مرض وبائي مشتبه"
+];
+
+const reasons = [...defaultReasons];
 
     snap.forEach(d => {
       const x = d.data() || {};
       const label = String(x.label || "").trim();
-      if (label) reasons.push(label);
+      if (label && !reasons.includes(label)) reasons.push(label);
     });
 
     reasons.sort((a, b) => a.localeCompare(b, "ar"));
