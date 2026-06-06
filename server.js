@@ -9758,6 +9758,838 @@ app.post("/api/ovsynch/confirm-step", requireUserId, async (req, res) => {
   }
 });
 // ============================================================
+//                 API: VACCINATION GATE ONLY
+//                 تحقق التحصين من السيرفر فقط — فردي/جماعي — بدون حفظ
+// ============================================================
+
+function vaccinationParseNumbersSrv(raw) {
+  let arr = [];
+
+  if (Array.isArray(raw)) {
+    arr = raw;
+  } else {
+    const txt = String(raw || "").trim();
+    if (!txt) return [];
+    arr = txt.split(/\n|,|;|،|\s+/g);
+  }
+
+  return [...new Set(
+    arr
+      .map(x => calvingNormDigitsOnlySrv(x))
+      .filter(Boolean)
+  )];
+}
+
+async function vaccinationHasSameDaySrv(uid, animalNumber, eventDate, vaccine) {
+  const num = calvingNormDigitsOnlySrv(animalNumber);
+  const dt = String(eventDate || "").trim().slice(0, 10);
+  const vx = String(vaccine || "").trim();
+
+  if (!db || !uid || !num || !dt || !vx) return false;
+
+  const snap = await db.collection("events")
+    .where("userId", "==", uid)
+    .where("animalNumber", "==", num)
+    .limit(80)
+    .get();
+
+  let found = false;
+
+  snap.forEach(ds => {
+    const ev = ds.data() || {};
+
+    const t = String(ev.eventType || ev.type || ev.eventTypeNorm || "").trim();
+    const ed = String(ev.eventDate || ev.date || "").trim().slice(0, 10);
+    const v = String(ev.vaccine || ev.vaccineName || "").trim();
+
+    const isVaccination =
+      t === "تحصين" ||
+      t === "vaccination" ||
+      t.includes("تحصين") ||
+      t.includes("vaccination");
+
+    if (isVaccination && ed === dt && v === vx) {
+      found = true;
+    }
+  });
+
+  return found;
+}
+
+app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        allowed: false,
+        stage: "firestore_disabled",
+        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة.",
+        acceptedCount: 0,
+        rejectedCount: 0,
+        accepted: [],
+        rejected: []
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const rawNumbers =
+      body.animalNumbers ||
+      body.numbers ||
+      body.selectedNumbers ||
+      body.groupNumbers ||
+      body.animals ||
+      body.animalNumber ||
+      body.number ||
+      "";
+
+    const eventDate = String(
+      body.eventDate ||
+      body.date ||
+      ""
+    ).trim().slice(0, 10);
+
+    const vaccine = String(
+      body.vaccine ||
+      body.vaccineName ||
+      ""
+    ).trim();
+
+    const numbers = vaccinationParseNumbersSrv(rawNumbers);
+
+    if (!numbers.length || !eventDate || !vaccine) {
+      return res.json({
+        ok: true,
+        allowed: false,
+        silent: true,
+        stage: "missing_basic",
+        message: "أدخل رقم الحيوان والتاريخ ونوع التحصين لبدء التحقق.",
+        acceptedCount: 0,
+        rejectedCount: 0,
+        accepted: [],
+        rejected: []
+      });
+    }
+
+    if (!calvingIsDateSrv(eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        stage: "invalid_date",
+        message: "❌ تاريخ التحصين غير صالح.",
+        acceptedCount: 0,
+        rejectedCount: numbers.length,
+        accepted: [],
+        rejected: numbers.map(n => ({
+          animalNumber: String(n || ""),
+          reason: "تاريخ التحصين غير صالح."
+        }))
+      });
+    }
+
+    const accepted = [];
+    const rejected = [];
+
+    for (const rawNum of numbers) {
+      const animalNumber = calvingNormDigitsOnlySrv(rawNum);
+
+      if (!animalNumber) {
+        rejected.push({
+          animalNumber: String(rawNum || ""),
+          reason: "رقم غير صالح."
+        });
+        continue;
+      }
+
+      const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+      if (!animal) {
+        rejected.push({
+          animalNumber,
+          reason: "الحيوان غير موجود في حسابك."
+        });
+        continue;
+      }
+
+      const doc = animal.data || {};
+      const status = String(doc.status || "active").trim().toLowerCase();
+
+      if (status === "inactive" || status === "archived") {
+        rejected.push({
+          animalNumber,
+          reason: "❌ لا يمكن تسجيل تحصين — الحيوان غير موجود بالقطيع."
+        });
+        continue;
+      }
+
+      const duplicated = await vaccinationHasSameDaySrv(
+        uid,
+        animalNumber,
+        eventDate,
+        vaccine
+      );
+
+      if (duplicated) {
+        rejected.push({
+          animalNumber,
+          reason: "🚫 تم تسجيل نفس التحصين لهذا الحيوان في نفس اليوم."
+        });
+        continue;
+      }
+
+      accepted.push({
+        animalNumber,
+        animalId: animal.id || "",
+        species: doc.species || doc.animalTypeAr || doc.animalType || "",
+        status
+      });
+    }
+
+    return res.json({
+      ok: true,
+      allowed: accepted.length > 0,
+      stage: "vaccination_gate",
+      message: accepted.length
+        ? `✅ تم التحقق — جاهز لتسجيل التحصين لعدد ${accepted.length}.`
+        : "❌ لا يوجد أي رقم صالح لتسجيل التحصين.",
+      acceptedCount: accepted.length,
+      rejectedCount: rejected.length,
+      accepted,
+      rejected
+    });
+
+  } catch (e) {
+    console.error("vaccination-gate", e);
+
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      stage: "vaccination_gate_failed",
+      message: "تعذّر التحقق من التحصين الآن — تحقّق من الاتصال والصلاحيات.",
+      acceptedCount: 0,
+      rejectedCount: 0,
+      accepted: [],
+      rejected: []
+    });
+  }
+});
+// ============================================================
+//                 VACCINATION TASKS ENGINE ONLY
+//                 مولّد متابعة التحصين من السيرفر — بدون Route وبدون حفظ حدث
+// ============================================================
+
+function vaccinationYmdAddDaysSrv(ymd, days) {
+  const s = String(ymd || "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+
+  const d = new Date(s + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return "";
+
+  d.setDate(d.getDate() + Number(days || 0));
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+
+  return d.toISOString().slice(0, 10);
+}
+
+function vaccinationMakeTaskSrv(vaccineKey, dueDate, meta = {}) {
+  const dd = String(dueDate || "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dd)) return null;
+
+  return {
+    taskType: "vaccination",
+    vaccineKey: String(vaccineKey || "").trim(),
+    dueDate: dd,
+    windowStart: dd,
+    windowEnd: vaccinationYmdAddDaysSrv(dd, 6),
+    status: "pending",
+    done: false,
+    ...meta
+  };
+}
+
+function vaccinationTasksFromEventSrv({ vaccine, doseType, eventDate, campaignId } = {}) {
+  const v = String(vaccine || "").trim();
+
+  const rawDose = String(doseType || "").trim();
+  const normalizedDose =
+    rawDose === "prime" ? "primary" :
+    rawDose === "periodic" ? "booster" :
+    rawDose;
+
+  const dt = String(eventDate || "").trim().slice(0, 10);
+
+  if (!v || !normalizedDose || !/^\d{4}-\d{2}-\d{2}$/.test(dt)) {
+    return [];
+  }
+
+  const meta = campaignId ? { campaignId } : {};
+
+  // جرعة تأسيس لأول مرة → Booster بعد 21 يوم فقط
+  if (normalizedDose === "primary") {
+    return [
+      vaccinationMakeTaskSrv(v, vaccinationYmdAddDaysSrv(dt, 21), {
+        ...meta,
+        doseType: "booster",
+        basedOn: "primary+21"
+      })
+    ].filter(Boolean);
+  }
+
+  const SIX_MONTHS = 182;
+  const ONE_YEAR = 365;
+
+  // الحمى القلاعية — كل 6 شهور
+  if (v.includes("FMD") || v.includes("الحمى القلاعية")) {
+    return [
+      vaccinationMakeTaskSrv(v, vaccinationYmdAddDaysSrv(dt, SIX_MONTHS), {
+        ...meta,
+        doseType: "booster",
+        cycle: "6m"
+      })
+    ].filter(Boolean);
+  }
+
+  // الباستريلا / HS — كل 6 شهور
+  if (v.includes("Pasteurella") || v.includes("الباستريلا") || v.includes("HS")) {
+    return [
+      vaccinationMakeTaskSrv(v, vaccinationYmdAddDaysSrv(dt, SIX_MONTHS), {
+        ...meta,
+        doseType: "booster",
+        cycle: "6m"
+      })
+    ].filter(Boolean);
+  }
+
+  // التسمم المعوي / Clostridial — كل 6 شهور
+  if (v.includes("Clostridial") || v.includes("التسمم المعوي")) {
+    return [
+      vaccinationMakeTaskSrv(v, vaccinationYmdAddDaysSrv(dt, SIX_MONTHS), {
+        ...meta,
+        doseType: "booster",
+        cycle: "6m"
+      })
+    ].filter(Boolean);
+  }
+
+  // الجلد العقدي — سنوي
+  if (v.includes("LSD") || v.includes("الجلد العقدي")) {
+    return [
+      vaccinationMakeTaskSrv(v, vaccinationYmdAddDaysSrv(dt, ONE_YEAR), {
+        ...meta,
+        doseType: "booster",
+        cycle: "1y"
+      })
+    ].filter(Boolean);
+  }
+
+  // IBR / BVD / تنفسي — سنوي
+  if (v === "IBR" || v === "BVD" || v.includes("تنفسي")) {
+    return [
+      vaccinationMakeTaskSrv(v, vaccinationYmdAddDaysSrv(dt, ONE_YEAR), {
+        ...meta,
+        doseType: "booster",
+        cycle: "1y"
+      })
+    ].filter(Boolean);
+  }
+
+  // بروسيلا — مرة واحدة، لا متابعة لاحقة
+  if (v.includes("Brucella") || v.includes("البروسيلا")) {
+    return [];
+  }
+
+  // الافتراضي — سنوي
+  return [
+    vaccinationMakeTaskSrv(v, vaccinationYmdAddDaysSrv(dt, ONE_YEAR), {
+      ...meta,
+      doseType: "booster",
+      cycle: "1y"
+    })
+  ].filter(Boolean);
+}
+
+async function vaccinationUpsertTasksForEventSrv({
+  uid,
+  animalNumber,
+  eventDate,
+  vaccine,
+  doseType,
+  campaignId,
+  eventId
+} = {}) {
+  const num = calvingNormDigitsOnlySrv(animalNumber);
+  const dt = String(eventDate || "").trim().slice(0, 10);
+  const vx = String(vaccine || "").trim();
+
+  if (!db || !uid || !num || !dt || !vx) return [];
+
+  const tasks = vaccinationTasksFromEventSrv({
+    vaccine: vx,
+    doseType,
+    eventDate: dt,
+    campaignId
+  });
+
+  if (!tasks.length) return [];
+
+  const written = [];
+
+  for (const t of tasks) {
+    const dueDate = String(t.dueDate || "").trim().slice(0, 10);
+    if (!dueDate) continue;
+
+    const keySafe = String(t.vaccineKey || vx).replace(/\s+/g, "_");
+    const doseSafe = String(t.doseType || doseType || "").replace(/\s+/g, "_");
+
+    const taskId = `vax__${num}__${keySafe}__${dueDate}__${doseSafe}`;
+    const ref = db.collection("tasks").doc(taskId);
+
+    const payload = {
+      userId: uid,
+      animalNumber: num,
+
+      type: "task",
+      taskType: "vaccination",
+
+      vaccineKey: String(t.vaccineKey || vx),
+      vaccine: vx,
+
+      dueDate,
+      windowStart: String(t.windowStart || dueDate).slice(0, 10),
+      windowEnd: String(t.windowEnd || dueDate).slice(0, 10),
+
+      doseType: String(t.doseType || doseType || ""),
+      campaignId: campaignId || t.campaignId || "",
+      basedOn: t.basedOn || "",
+      cycle: t.cycle || "",
+
+      status: "pending",
+      done: false,
+
+      sourceEventId: eventId || "",
+      source: "server:/api/vaccination/save",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+
+    await ref.set(payload, { merge: true });
+
+    written.push({
+      taskId,
+      dueDate,
+      vaccineKey: payload.vaccineKey,
+      doseType: payload.doseType,
+      cycle: payload.cycle
+    });
+  }
+
+  return written;
+}
+// ============================================================
+//                 API: VACCINATION SAVE ONLY
+//                 حفظ التحصين من السيرفر فقط — فردي/جماعي + Tasks
+// ============================================================
+
+function vaccinationSaveRowsFromBodySrv(body = {}) {
+  if (Array.isArray(body.accepted) && body.accepted.length) return body.accepted;
+  if (Array.isArray(body.rows) && body.rows.length) return body.rows;
+
+  const rawNumbers =
+    body.animalNumbers ||
+    body.numbers ||
+    body.selectedNumbers ||
+    body.groupNumbers ||
+    body.animals ||
+    body.animalNumber ||
+    body.number ||
+    "";
+
+  return vaccinationParseNumbersSrv(rawNumbers).map(n => ({
+    animalNumber: n,
+    animalId: ""
+  }));
+}
+
+function vaccinationRequiredSrv(v) {
+  return !(v === undefined || v === null || String(v).trim() === "");
+}
+
+app.post("/api/vaccination/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        message: "تعذّر حفظ التحصين — قاعدة البيانات غير متاحة.",
+        savedCount: 0,
+        rejectedCount: 0,
+        saved: [],
+        rejected: []
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const eventDate = String(
+      body.eventDate ||
+      body.date ||
+      ""
+    ).trim().slice(0, 10);
+
+    const vaccine = String(
+      body.vaccine ||
+      body.vaccineName ||
+      ""
+    ).trim();
+
+    const doseType = String(body.doseType || "").trim();
+    const notes = String(body.notes || "").trim();
+    const campaignId = String(body.campaignId || "").trim();
+
+    const rows = vaccinationSaveRowsFromBodySrv(body);
+
+    if (!rows.length) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ رقم الحيوان مطلوب.",
+        savedCount: 0,
+        rejectedCount: 0,
+        saved: [],
+        rejected: []
+      });
+    }
+
+    if (!calvingIsDateSrv(eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ تاريخ التحصين غير صالح.",
+        savedCount: 0,
+        rejectedCount: rows.length,
+        saved: [],
+        rejected: rows.map(r => ({
+          animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || ""),
+          reason: "تاريخ التحصين غير صالح."
+        }))
+      });
+    }
+
+    if (!vaccinationRequiredSrv(vaccine)) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ نوع التحصين مطلوب.",
+        savedCount: 0,
+        rejectedCount: rows.length,
+        saved: [],
+        rejected: rows.map(r => ({
+          animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || ""),
+          reason: "نوع التحصين مطلوب."
+        }))
+      });
+    }
+
+    if (!vaccinationRequiredSrv(doseType)) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ نوع الجرعة مطلوب.",
+        savedCount: 0,
+        rejectedCount: rows.length,
+        saved: [],
+        rejected: rows.map(r => ({
+          animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || ""),
+          reason: "نوع الجرعة مطلوب."
+        }))
+      });
+    }
+
+    const saved = [];
+    const rejected = [];
+
+    for (const row of rows) {
+      const animalNumber = calvingNormDigitsOnlySrv(row.animalNumber || row.number || "");
+
+      if (!animalNumber) {
+        rejected.push({
+          animalNumber: "",
+          reason: "رقم غير صالح."
+        });
+        continue;
+      }
+
+      let animalId = String(row.animalId || "").trim();
+      let animalDoc = null;
+
+      if (animalId) {
+        const snap = await db.collection("animals").doc(animalId).get();
+        if (snap.exists) {
+          animalDoc = snap.data() || {};
+        }
+      }
+
+      if (!animalDoc) {
+        const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+        if (!animal) {
+          rejected.push({
+            animalNumber,
+            reason: "الحيوان غير موجود في حسابك."
+          });
+          continue;
+        }
+
+        animalId = animal.id || "";
+        animalDoc = animal.data || {};
+      }
+
+      const status = String(animalDoc.status || "active").trim().toLowerCase();
+
+      if (status === "inactive" || status === "archived") {
+        rejected.push({
+          animalNumber,
+          reason: "❌ لا يمكن تسجيل تحصين — الحيوان غير موجود بالقطيع."
+        });
+        continue;
+      }
+
+      const duplicated = await vaccinationHasSameDaySrv(
+        uid,
+        animalNumber,
+        eventDate,
+        vaccine
+      );
+
+      if (duplicated) {
+        rejected.push({
+          animalNumber,
+          reason: "🚫 تم تسجيل نفس التحصين لهذا الحيوان في نفس اليوم."
+        });
+        continue;
+      }
+
+const payload = {
+  userId: uid,
+
+  animalId,
+  animalNumber,
+
+  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+
+  date: eventDate,
+  doseType,
+  eventDate,
+
+  eventType: "تحصين",
+  source: "server:/api/vaccination/save",
+  type: "vaccination",
+  vaccine
+};
+
+if (notes) {
+  payload.notes = notes;
+}
+
+if (campaignId) {
+  payload.campaignId = campaignId;
+}
+      const eventRef = await db.collection("events").add(payload);
+
+      if (animalId) {
+        await db.collection("animals").doc(animalId).set({
+          lastVaccinationDate: eventDate,
+          lastVaccine: vaccine,
+          lastVaccinationDoseType: doseType,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
+
+      const tasks = await vaccinationUpsertTasksForEventSrv({
+        uid,
+        animalNumber,
+        eventDate,
+        vaccine,
+        doseType,
+        campaignId,
+        eventId: eventRef.id
+      });
+
+      saved.push({
+        animalNumber,
+        animalId,
+        eventId: eventRef.id,
+        eventDate,
+        vaccine,
+        doseType,
+        tasksCount: tasks.length,
+        tasks
+      });
+    }
+
+    return res.json({
+      ok: saved.length > 0,
+      message: saved.length
+        ? `✅ تم حفظ التحصين بنجاح لعدد ${saved.length}.`
+        : "❌ لم يتم حفظ أي تحصين.",
+      savedCount: saved.length,
+      rejectedCount: rejected.length,
+      saved,
+      rejected,
+      redirectUrl: saved.length === 1
+        ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
+        : ""
+    });
+
+  } catch (e) {
+    console.error("vaccination-save", e);
+
+    return res.status(500).json({
+      ok: false,
+      message: "تعذّر حفظ التحصين — تحقّق من الاتصال والصلاحيات.",
+      savedCount: 0,
+      rejectedCount: 0,
+      saved: [],
+      rejected: []
+    });
+  }
+});
+// ============================================================
+//                 API: VACCINATION DASHBOARD ALERTS ONLY
+//                 تنبيهات التحصين من السيرفر فقط — للداشبورد
+// ============================================================
+
+app.get("/api/vaccination/dashboard-alerts", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        count: 0,
+        alerts: [],
+        message: "تعذّر تحميل تنبيهات التحصين — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+
+    const today = cairoTodayISO();
+    const tomorrow = vaccinationYmdAddDaysSrv(today, 1);
+
+    const snap = await db.collection("tasks")
+      .where("userId", "==", uid)
+      .where("status", "==", "pending")
+      .limit(500)
+      .get();
+
+    const groups = new Map();
+
+    snap.forEach(ds => {
+      const t = ds.data() || {};
+
+      if (String(t.taskType || "").trim() !== "vaccination") return;
+      if (t.done === true) return;
+
+      const dueDate = String(t.dueDate || "").trim().slice(0, 10);
+      if (dueDate !== today && dueDate !== tomorrow) return;
+
+      const animalNumber = calvingNormDigitsOnlySrv(t.animalNumber || "");
+      if (!animalNumber) return;
+
+      const vaccineKey = String(
+        t.vaccineKey ||
+        t.vaccine ||
+        "تحصين"
+      ).trim();
+
+      const doseType = String(
+        t.doseType ||
+        "booster"
+      ).trim();
+
+      const key = `${dueDate}__${vaccineKey}__${doseType}`;
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          dueDate,
+          vaccineKey,
+          doseType,
+          animalNumbers: []
+        });
+      }
+
+      groups.get(key).animalNumbers.push(animalNumber);
+    });
+
+    const alerts = [];
+
+    for (const g of groups.values()) {
+      const nums = [...new Set(g.animalNumbers)]
+        .filter(Boolean)
+        .sort((a, b) => Number(a) - Number(b));
+
+      if (!nums.length) continue;
+
+      const isToday = g.dueDate === today;
+
+      const doseQuery =
+        g.doseType === "booster" ? "periodic" :
+        g.doseType === "primary" ? "prime" :
+        g.doseType;
+
+      alerts.push({
+        id: `vaccination_${g.dueDate}_${g.vaccineKey}_${g.doseType}`.replace(/\s+/g, "_"),
+        source: "server:/api/vaccination/dashboard-alerts",
+
+        type: "vaccination",
+        level: isToday ? "warn" : "info",
+
+        title: isToday ? "تحصين مستحق اليوم" : "تحصين مستحق غدًا",
+
+        message: `${isToday ? "⏰ اليوم" : "📌 غدًا"} ${g.vaccineKey}\nللحيوانات أرقام: ${nums.join("، ")}`,
+
+        actionText: "فتح صفحة التحصين",
+        actionUrl:
+          `vaccination.html?entryMode=bulk` +
+          `&date=${encodeURIComponent(g.dueDate)}` +
+          `&vaccine=${encodeURIComponent(g.vaccineKey)}` +
+          `&doseType=${encodeURIComponent(doseQuery)}` +
+          `&numbers=${encodeURIComponent(nums.join(","))}`,
+
+        dueDate: g.dueDate,
+        vaccineKey: g.vaccineKey,
+        doseType: g.doseType,
+        animalNumbers: nums,
+        count: nums.length
+      });
+    }
+
+    alerts.sort((a, b) => {
+      const d = String(a.dueDate || "").localeCompare(String(b.dueDate || ""));
+      if (d !== 0) return d;
+      return String(a.vaccineKey || "").localeCompare(String(b.vaccineKey || ""));
+    });
+
+    return res.json({
+      ok: true,
+      today,
+      tomorrow,
+      count: alerts.length,
+      alerts
+    });
+
+  } catch (e) {
+    console.error("vaccination-dashboard-alerts", e);
+
+    return res.status(500).json({
+      ok: false,
+      count: 0,
+      alerts: [],
+      message: "تعذّر تحميل تنبيهات التحصين."
+    });
+  }
+});
+// ============================================================
 //                 API: DRY-OFF GATE ONLY
 //                 أهلية + حساب + تعبئة فقط — بدون حفظ
 // ============================================================
