@@ -245,15 +245,9 @@
             <div id="bulkBox" class="bulk-box" style="display:none;">
               <label>اختيار الحيوانات (جماعي)</label>
 
-              <div class="bulk-tools">
-                <input id="bulkSearch" type="text" placeholder="ابحث بالرقم..." inputmode="numeric">
-                <button type="button" id="bulkSelectAll" class="btn-ghost">تحديد الكل</button>
-                <button type="button" id="bulkClearAll" class="btn-ghost">مسح</button>
-              </div>
+<div id="bulkList" class="bulk-list" role="listbox" aria-label="قائمة الحيوانات"></div>
 
-              <div id="bulkList" class="bulk-list" role="listbox" aria-label="قائمة الحيوانات"></div>
-
-              <div class="bulk-hint">اضغط لاختيار أكثر من رقم (مناسب للموبايل).</div>
+<div class="bulk-hint">الأرقام مرسلة من صفحة الأحداث.</div>
             </div>
 
             <input id="animalNumber" data-field="animalNumber" type="text" placeholder="مثال: 105"/>
@@ -326,10 +320,6 @@
 
   const bulkBox       = document.getElementById("bulkBox");
   const bulkList      = document.getElementById("bulkList");
-  const bulkSearch    = document.getElementById("bulkSearch");
-  const bulkSelectAll = document.getElementById("bulkSelectAll");
-  const bulkClearAll  = document.getElementById("bulkClearAll");
-
   const bulkSelected = new Set();
   let bulkAllNumbers = [];
   let bulkHasData = false;
@@ -653,28 +643,14 @@ async function runServerGate(reason = "page_load") {
       animalNumberEl.readOnly = false;
     }
 
-    if (isBulk && !bulkHasData && !bulkLoading) {
-      loadMyAnimalsToBulk();
-    }
-
-    renderBulkList(bulkSearch?.value || "");
+    renderBulkList();
     updateContext();
   }
 
-function renderBulkList(filterText = "") {
+function renderBulkList() {
   if (!bulkList) return;
 
-  const f = normalizeDigits(filterText).trim();
-
-  const selectedNums = [...bulkSelected].map(String).filter(Boolean);
-
-  const sourceList = selectedNums.length
-    ? selectedNums
-    : bulkAllNumbers;
-
-  const list = f
-    ? sourceList.filter(n => String(n).includes(f))
-    : sourceList;
+  const list = [...bulkSelected].map(String).filter(Boolean);
 
   bulkList.innerHTML = "";
 
@@ -691,66 +667,6 @@ function renderBulkList(filterText = "") {
     bulkList.appendChild(row);
   }
 }
-  async function loadMyAnimalsToBulk() {
-    const uid = getUid();
-
-    if (!uid) {
-      msg("سجّل الدخول أولًا.", "error");
-      return;
-    }
-
-    if (bulkLoading) return;
-
-    bulkLoading = true;
-
-    try {
-      const r = await fetch(apiUrl("/api/animals?limit=800"), {
-        headers: {
-          "X-User-Id": uid
-        }
-      });
-
-      const data = await r.json().catch(() => null);
-      const arr = Array.isArray(data)
-        ? data
-        : (Array.isArray(data?.animals) ? data.animals : []);
-
-      const nums = [];
-
-      for (const a of arr) {
-        const status = String(a?.status || "active").trim().toLowerCase();
-        if (status === "inactive" || status === "archived") continue;
-
-        const n =
-          a?.animalNumber ??
-          a?.number ??
-          a?.animalNo ??
-          a?.id;
-
-        const clean = parseNumbers(n)[0] || "";
-        if (clean) nums.push(clean);
-      }
-
-      nums.sort((x, y) => (Number(x) || 0) - (Number(y) || 0));
-
-      bulkAllNumbers = [...new Set(nums)];
-      bulkHasData = bulkAllNumbers.length > 0;
-
-      if (!bulkHasData) {
-        msg("⚠️ لم يتم العثور على أرقام قطيع للعرض.", "warning");
-      }
-
-      renderBulkList(bulkSearch?.value || "");
-      updateContext();
-
-    } catch (err) {
-      console.error("load animals for vaccination failed:", err);
-      msg("تعذّر تحميل أرقام الحيوانات من السيرفر.", "error");
-    } finally {
-      bulkLoading = false;
-    }
-  }
-
   function hydrate() {
     const qp = new URLSearchParams(location.search);
 
@@ -838,23 +754,7 @@ vaccineEl?.addEventListener("change", () => {
     r.addEventListener("change", applyModeUI);
   });
 
-  bulkSearch?.addEventListener("input", () => {
-    renderBulkList(bulkSearch.value);
-  });
 
-bulkSelectAll?.addEventListener("click", () => {
-  for (const n of bulkAllNumbers) bulkSelected.add(n);
-  renderBulkList(bulkSearch?.value || "");
-  updateContext();
-  runServerGate("bulk_select_all");
-});
-
-bulkClearAll?.addEventListener("click", () => {
-  bulkSelected.clear();
-  renderBulkList(bulkSearch?.value || "");
-  updateContext();
-  runServerGate("bulk_clear_all");
-});
 
   const backBtn = document.getElementById("backToEventsBtn");
   backBtn?.addEventListener("click", () => {
