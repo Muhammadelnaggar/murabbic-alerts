@@ -7,7 +7,6 @@
   <title>النفوق — مُرَبِّيك</title>
 
   <link rel="stylesheet" href="css/forms.css" />
-  <script type="module" src="js/forms-init.js"></script>
 
 
 </head>
@@ -63,186 +62,235 @@
        <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
       </div>
     </section>
-<div class="btn-row">
-      <button class="save-btn" id="saveBtn" type="submit" form="deathForm">تسجيل الحدث</button>
-      <a class="open-card" href="dashboard.html">لوحة التحكم</a>
-    </div>
+<div class="actions-bar">
+  <button class="save" id="saveBtn" type="submit" form="deathForm">تسجيل النفوق</button>
+  <button class="ghost" id="dashboardBtn" type="button">لوحة التحكم</button>
+</div>
       </form>
   </main>
 
-<script type="module">
-  import { db, auth, ensureAuth } from "/js/firebase-config.js";
- import {
-  collection, addDoc, serverTimestamp,
-  updateDoc, getDocs, query, where, limit,
-  doc, setDoc
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+<script>
   const $ = (id) => document.getElementById(id);
 
   const form = $("deathForm");
   const info = $("info");
- const reasonInput = $("reasonInput");
-const reasonsList = $("deathReasonsList");
+  const reasonInput = $("reasonInput");
+  const reasonsList = $("deathReasonsList");
+  const saveBtn = $("saveBtn");
 
-function msg(text, ok = false){
-  if (!info) return;
-  info.className = ok ? "infobar ok" : "infobar err";
-  info.textContent = text;
-  info.style.display = "block";
-  info.scrollIntoView({ behavior:"smooth", block:"start" });
-}
+  let deathGateAllowed = false;
 
-  const p = new URLSearchParams(location.search);
-
-  const num = (
-    p.get("number") ||
-    p.get("animalNumber") ||
-    p.get("animalId") ||
-    p.get("id") ||
-    localStorage.getItem("lastAnimalNumber") ||
-    localStorage.getItem("lastAnimalId") ||
-    localStorage.getItem("currentAnimalNumber") ||
-    ""
-  ).toString().trim();
-
-  const dt = (
-    p.get("date") ||
-    p.get("eventDate") ||
-    localStorage.getItem("lastEventDate") ||
-    new Date().toISOString().slice(0,10)
-  ).toString().slice(0,10);
-
-  $("animalNumber").value = num;
-  $("eventDate").value = dt;
-(async () => {
-  try {
-    await ensureAuth();
-    const uid = auth.currentUser?.uid;
-    if (uid) await loadUserDeathReasons(uid);
-  } catch (e) {
-    console.error("loadUserDeathReasons failed", e);
+  function getUid() {
+    return String(
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("tenantId") ||
+      ""
+    ).trim();
   }
-})();
- function getReason(){
-  return (reasonInput?.value || "").trim();
-}
 
-function normalizeReasonKey(text){
-  return String(text || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
-}
+  function msg(text, type = "info") {
+    if (!info) return;
 
-async function loadUserDeathReasons(uid){
-  if (!uid || !reasonsList) return;
+    const cls =
+      type === "success" ? "success" :
+      type === "error" ? "error" :
+      type === "warning" ? "warning" :
+      "info";
 
-  reasonsList.innerHTML = "";
+    info.className = `infobar mbk-infobar show ${cls}`;
+    info.textContent = text;
+    info.style.display = "block";
 
-  const snap = await getDocs(query(
-    collection(db, "death_reasons"),
-    where("userId", "==", uid)
-  ));
+    try { info.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+  }
 
-  const items = [];
-  snap.forEach((d) => {
-    const data = d.data() || {};
-    const label = String(data.label || "").trim();
-    if (label) items.push(label);
-  });
+  function getReason() {
+    return String(reasonInput?.value || "").trim();
+  }
 
-  items
-    .sort((a, b) => a.localeCompare(b, "ar"))
-    .forEach((label) => {
-      const opt = document.createElement("option");
-      opt.value = label;
-      reasonsList.appendChild(opt);
-    });
-}
+  function initFromUrl() {
+    const p = new URLSearchParams(location.search);
 
-async function saveUserDeathReason(uid, label){
-  const clean = String(label || "").trim();
-  if (!uid || !clean) return;
+    const num = (
+      p.get("number") ||
+      p.get("animalNumber") ||
+      p.get("animalId") ||
+      p.get("id") ||
+      localStorage.getItem("lastAnimalNumber") ||
+      localStorage.getItem("lastAnimalId") ||
+      localStorage.getItem("currentAnimalNumber") ||
+      ""
+    ).toString().trim();
 
-  const key = `${uid}__${normalizeReasonKey(clean)}`;
+    const dt = (
+      p.get("date") ||
+      p.get("eventDate") ||
+      localStorage.getItem("lastEventDate") ||
+      new Date().toISOString().slice(0,10)
+    ).toString().slice(0,10);
 
-  await setDoc(doc(db, "death_reasons", key), {
-    userId: uid,
-    label: clean,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-}
-  form?.addEventListener("mbk:valid", async () => {
+    $("animalNumber").value = num;
+    $("eventDate").value = dt;
+  }
+
+  async function loadDeathReasons() {
+    const uid = getUid();
+    if (!uid || !reasonsList) return;
+
     try {
-      await ensureAuth();
-      const uid = auth.currentUser?.uid;
-      if (!uid) throw new Error("NO_AUTH");
+      const r = await fetch("/api/death-reasons/options", {
+        method: "GET",
+        headers: { "X-User-Id": uid }
+      });
 
-      const animalNumber = ($("animalNumber")?.value || "").toString().trim();
-      const eventDate = ($("eventDate")?.value || "").slice(0,10);
-      const reason = getReason();
-      const notes = ($("notes")?.value || "").trim();
+      const data = await r.json().catch(() => null);
+      const items = Array.isArray(data?.reasons) ? data.reasons : [];
 
-      let snap = await getDocs(query(
-        collection(db, "animals"),
-        where("userId", "==", uid),
-        where("number", "==", animalNumber),
-        limit(1)
-      ));
+      reasonsList.innerHTML = "";
 
-      if (snap.empty) {
-        snap = await getDocs(query(
-          collection(db, "animals"),
-          where("userId", "==", uid),
-          where("animalNumber", "==", animalNumber),
-          limit(1)
-        ));
+      items.forEach((label) => {
+        const opt = document.createElement("option");
+        opt.value = String(label || "").trim();
+        reasonsList.appendChild(opt);
+      });
+    } catch (e) {
+      console.error("loadDeathReasons failed", e);
+    }
+  }
+
+  async function runDeathGate() {
+    const uid = getUid();
+    const animalNumber = String($("animalNumber")?.value || "").trim();
+
+    deathGateAllowed = false;
+    if (saveBtn) saveBtn.disabled = true;
+
+    if (!uid) {
+      msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
+      return false;
+    }
+
+    if (!animalNumber) {
+      msg("❌ رقم الحيوان مطلوب.", "error");
+      return false;
+    }
+
+    try {
+      msg("جارِ التحقق من الحيوان...", "info");
+
+      const r = await fetch("/api/animals/archive/gate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify({
+          animalNumber,
+          archiveReason: "death"
+        })
+      });
+
+      const data = await r.json().catch(() => null);
+
+      if (!r.ok || data?.allowed !== true) {
+        msg(data?.message || "❌ لا يمكن تسجيل نفوق لهذا الحيوان.", "error");
+        return false;
       }
 
-      if (snap.empty) {
-        msg("❌ رقم الحيوان غير موجود.", false);
+      deathGateAllowed = true;
+      if (saveBtn) saveBtn.disabled = false;
+
+      msg(data.message || "✅ الحيوان مؤهل لتسجيل النفوق.", "success");
+      return true;
+
+    } catch (e) {
+      console.error("death gate failed", e);
+      msg("❌ فشل الاتصال بالسيرفر أثناء التحقق من الحيوان.", "error");
+      return false;
+    }
+  }
+
+  async function saveDeath() {
+    const uid = getUid();
+
+    if (!deathGateAllowed) {
+      msg("❌ لا يمكن الحفظ قبل نجاح التحقق من الحيوان.", "error");
+      return;
+    }
+
+    const payload = {
+      animalNumber: String($("animalNumber")?.value || "").trim(),
+      eventDate: String($("eventDate")?.value || "").slice(0,10),
+      archiveReason: "death",
+      reason: getReason(),
+      deathReason: getReason(),
+      notes: String($("notes")?.value || "").trim()
+    };
+
+    try {
+      if (!uid) {
+        msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
         return;
       }
 
-      const animalRef = snap.docs[0].ref;
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = "جارِ الأرشفة...";
+      }
 
-await addDoc(collection(db, "events"), {
-  animalNumber,
-  animalId: animalNumber,
-  type: "نفوق",
-  eventType: "نفوق",
-  eventDate,
-  reason,
-  notes,
-  userId: uid,
-  source: "/death.html",
-  createdAt: serverTimestamp()
-});
-if (reason) {
-  await saveUserDeathReason(uid, reason);
-}
-await updateDoc(animalRef, {
-  archived: true,
-  status: "inactive",
-  eventType: "نفوق",
-  deathDate: eventDate,
-  deathReason: reason || null,
-  updatedAt: serverTimestamp()
-});
+      msg("جارِ أرشفة الحيوان بعد النفوق...", "info");
 
-localStorage.setItem("lastAnimalNumber", animalNumber);
-localStorage.setItem("lastEventDate", eventDate);
+      const r = await fetch("/api/animals/archive", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify(payload)
+      });
 
-msg("✅ تم تسجيل النفوق بنجاح", true);
-const saveBtn = document.getElementById("saveBtn");
-saveBtn?.setAttribute("disabled", "disabled");
-if (saveBtn) saveBtn.style.opacity = ".7";
+      const data = await r.json().catch(() => null);
+
+      if (!r.ok || data?.ok !== true) {
+        msg(data?.message || "❌ فشل أرشفة الحيوان بعد النفوق.", "error");
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "تسجيل النفوق";
+        }
+        return;
+      }
+
+      localStorage.setItem("lastAnimalNumber", payload.animalNumber);
+      localStorage.setItem("lastEventDate", payload.eventDate);
+
+      msg(data.message || "✅ تم أرشفة الحيوان وأحداثه بعد النفوق.", "success");
+
+      setTimeout(() => {
+        location.href = "add-event.html";
+      }, 900);
+
     } catch (e) {
-      console.error(e);
-      msg("❌ فشل في الحفظ.", false);
+      console.error("save death failed", e);
+      msg("❌ فشل الاتصال بالسيرفر أثناء أرشفة النفوق.", "error");
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "تسجيل النفوق";
+      }
     }
+  }
+
+  initFromUrl();
+  loadDeathReasons();
+  runDeathGate();
+
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    saveDeath();
   });
+  $("dashboardBtn")?.addEventListener("click", () => {
+  location.href = "dashboard.html";
+});
 </script>
  
 </body>
