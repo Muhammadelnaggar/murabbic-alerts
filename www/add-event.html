@@ -593,12 +593,16 @@ function blockNutritionIfOutOfLaunchCore(list){
         $('#dateInfo').textContent = `📅 التاريخ الحالي: ${date}`;
         if (!norm($('#eventDate').value)) $('#eventDate').value = date;
 
-        // لو جاي number من صفحة تانية: حطه كسطر واحد
-        const rawNum = norm(qs.get('number') || qs.get('animalNumber') || '');
-        const one = toDigitsOnly(rawNum);
-        if (one){
-          $('#animalNumbers').value = one;
-        }
+       // لو جاي number من صفحة تانية: حطه كسطر واحد
+// لو مفيش رقم في الرابط: افتح صفحة الحدث نظيفة بدون رقم عالق
+const rawNum = norm(qs.get('number') || qs.get('animalNumber') || '');
+const one = toDigitsOnly(rawNum);
+
+if (one){
+  $('#animalNumbers').value = one;
+} else {
+  $('#animalNumbers').value = '';
+}
 
         // تحديث العنوان/زر البطاقة
         const list = parseNumbers($('#animalNumbers').value);
