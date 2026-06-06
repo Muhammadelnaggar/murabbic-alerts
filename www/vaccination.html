@@ -290,7 +290,7 @@
   </div>
 </div>
 
-        <div id="warn" class="warn"></div>
+       
       </form>
     </div>
   </main>
@@ -316,7 +316,7 @@
   const vaccineEl  = document.getElementById("vaccine");
   const saveBtn    = document.getElementById("saveBtn");
   const dashBtn    = document.getElementById("dashBtn");
-  const warn       = document.getElementById("warn");
+ 
 
   const bulkBox       = document.getElementById("bulkBox");
   const bulkList      = document.getElementById("bulkList");
@@ -392,14 +392,15 @@
     } catch (_) {}
   }
 
-  function showWarn(t) {
-    if (warn) warn.textContent = String(t || "");
-  }
+ function showWarn(t) {
+  const text = String(t || "").trim();
+  if (!text) return;
+  msg(text, "info");
+}
 
-  function clearWarn() {
-    if (warn) warn.textContent = "";
-  }
-
+function clearWarn() {
+  // لا توجد رسالة أسفل الفورم؛ كل الرسائل في الـ Infobar
+}
   function todayLocal() {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
