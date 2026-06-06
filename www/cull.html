@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>تسجيل استبعاد — مُرَبِّك</title>
   <link rel="stylesheet" href="css/forms.css" />
-  <script type="module" src="js/forms-init.js"></script>
 
 </head>
 <body>
@@ -47,140 +46,288 @@
     <label>ملاحظات</label>
    <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
     </section>
-  <div class="btn-row">
-<button class="save-btn" id="saveBtn" data-validate="true" type="submit">تسجيل الحدث</button>
-  <button class="open-card" type="button" id="openCardBtn">بطاقة الحيوان</button>
+<div class="actions-bar">
+  <button class="save" id="saveBtn" type="submit">تسجيل الاستبعاد</button>
+  <button class="ghost" type="button" id="openCardBtn">بطاقة الحيوان</button>
 </div>
 </form>
   </main>
 
-  <script type="module">
-    import { db, auth, ensureAuth } from "/js/firebase-config.js";
-    import { updateAnimalByEvent } from "/js/animal-update.js";
-    import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+ <script>
+  const $ = (id) => document.getElementById(id);
 
-    const $ = (id) => document.getElementById(id);
-    const info = $("info");
-const btn = $("saveBtn");
+  const form = $("cullForm");
+  const info = $("info");
+  const btn = $("saveBtn");
+  const openBtn = $("openCardBtn");
+  const mainEl = $("cullMain");
+  const detailEl = $("cullDetail");
 
-const openBtn = $("openCardBtn");
+  let cullGateAllowed = false;
+  let cullOptions = {};
 
-openBtn.onclick = () => {
-  const n = String($("animalNumber").value || "").trim();
-  if (!n) return;
-  location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
-};
-
-   function msg(t, ok=false){
-  info.className = "infobar mbk-infobar show " + (ok ? "success" : "error");
-  info.style.display = "block";
-  info.textContent = t;
-}
-
-    const p = new URLSearchParams(location.search);
-    const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
-    const dt  = p.get("date") || p.get("eventDate") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
-
-    $("animalNumber").value = String(num || "").trim();
-    $("eventDate").value = String(dt || "").slice(0,10);
-
-    // ✅ قوائم التفاصيل
-    const DETAILS = {
-      "انتاجي": [
-        "انخفاض إنتاج اللبن",
-        "موسم ضعيف متكرر",
-        "جودة لبن ضعيفة / SCC مرتفع",
-        "عمر إنتاجي كبير",
-        "مشاكل حليب متكررة"
-      ],
-      "تناسلي": [
-        "تكرار تلقيح بدون حمل",
-        "تأخر عشار / طول فترة مفتوحة",
-        "التهاب رحم مزمن",
-        "تكرار إجهاض",
-        "مشاكل ولادة متكررة"
-      ],
-      "صحي": [
-        "التهاب ضرع مزمن",
-        "عرج مزمن",
-        "هزال شديد / BCS منخفض",
-        "أمراض متكررة (تنفسي/هضمي)",
-        "إصابة/كسر",
-        "اضطرابات أيضية متكررة"
-      ]
-    };
-
-    const mainEl = $("cullMain");
-    const detailEl = $("cullDetail");
-
-   function fillDetails(){
-  const m = (mainEl.value || "").trim();
-
-  if (!m) {
-    detailEl.innerHTML = `<option value="">— اختر السبب الرئيسي أولاً —</option>`;
-    detailEl.value = "";
-    detailEl.disabled = true;
-    return;
+  function getUid() {
+    return String(
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("tenantId") ||
+      ""
+    ).trim();
   }
 
-  const arr = DETAILS[m] || [];
-  detailEl.disabled = false;
-  detailEl.innerHTML =
-    `<option value="">— اختر —</option>` +
-    arr.map(x => `<option value="${x}">${x}</option>`).join("");
-}
+  function msg(text, type = "info") {
+    if (!info) return;
 
-    mainEl.addEventListener("change", fillDetails);
-    fillDetails();
+    const cls =
+      type === "success" ? "success" :
+      type === "error" ? "error" :
+      type === "warning" ? "warning" :
+      "info";
 
-   window.addEventListener("mbk:valid", async (ev) => {
-      try {
-        await ensureAuth();
-        const uid = auth.currentUser?.uid;
-        if (!uid) throw new Error("NO_AUTH");
-        const formData = (ev && ev.detail && ev.detail.formData) ? ev.detail.formData : {};
+    info.className = `infobar mbk-infobar show ${cls}`;
+    info.style.display = "block";
+    info.textContent = text;
 
-        const n = String(num || "").trim();
-        if (!n) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
+    try { info.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+  }
 
-const eventDate = String(formData.eventDate || dt || "").slice(0,10);
+  function initFromUrl() {
+    const p = new URLSearchParams(location.search);
 
-const cullMain = String(formData.cullMain || "").trim();
-const cullDetail = String(formData.cullDetail || "").trim();
-        if (!cullMain) { msg("⚠️ اختر سبب الاستبعاد (رئيسي).", false); return; }
-        if (!cullDetail) { msg("⚠️ اختر تفصيل السبب.", false); return; }
+    const num =
+      p.get("number") ||
+      p.get("animalNumber") ||
+      localStorage.getItem("lastAnimalNumber") ||
+      "";
 
-        const payload = {
-          animalNumber: n,
-          animalId: n,
-          type: "استبعاد",
-          eventType: "استبعاد",
-          eventDate,
+    const dt =
+      p.get("date") ||
+      p.get("eventDate") ||
+      localStorage.getItem("lastEventDate") ||
+      new Date().toISOString().slice(0, 10);
 
-          // ✅ السبب من القائمتين
-          cullMain,
-          cullDetail,
-          reason: `${cullMain} — ${cullDetail}`,
+    $("animalNumber").value = String(num || "").trim();
+    $("eventDate").value = String(dt || "").slice(0, 10);
+  }
 
-          notes: String(formData.notes || "").trim(),
-          userId: uid,
-          source: "/cull.html",
-          createdAt: serverTimestamp()
-        };
+  function fillMainOptions() {
+    const current = String(mainEl?.value || "").trim();
 
-        await addDoc(collection(db, "events"), payload);
-        await updateAnimalByEvent(payload);
+    mainEl.innerHTML = `<option value="">— اختر —</option>`;
 
-        msg("تم تسجيل الاستبعاد بنجاح ✅", true);
-        localStorage.setItem("lastAnimalNumber", n);
-        localStorage.setItem("lastEventDate", eventDate);
-        setTimeout(()=>location.href=`cow-card.html?number=${encodeURIComponent(n)}`, 900);
-
-      } catch (e) {
-        console.error(e);
-        msg("❌ فشل في الحفظ.", false);
-      }
+    Object.keys(cullOptions || {}).forEach((key) => {
+      const opt = document.createElement("option");
+      opt.value = key;
+      opt.textContent = key;
+      mainEl.appendChild(opt);
     });
-  </script>
+
+    if (current && cullOptions[current]) {
+      mainEl.value = current;
+    }
+  }
+
+  function fillDetails() {
+    const m = String(mainEl?.value || "").trim();
+
+    if (!m || !Array.isArray(cullOptions[m])) {
+      detailEl.innerHTML = `<option value="">— اختر السبب الرئيسي أولاً —</option>`;
+      detailEl.value = "";
+      detailEl.disabled = true;
+      return;
+    }
+
+    detailEl.disabled = false;
+    detailEl.innerHTML = `<option value="">— اختر —</option>`;
+
+    cullOptions[m].forEach((label) => {
+      const opt = document.createElement("option");
+      opt.value = String(label || "").trim();
+      opt.textContent = String(label || "").trim();
+      detailEl.appendChild(opt);
+    });
+  }
+
+  async function loadCullOptions() {
+    const uid = getUid();
+
+    if (!uid) {
+      msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
+      return false;
+    }
+
+    try {
+      const r = await fetch("/api/cull/options", {
+        method: "GET",
+        headers: { "X-User-Id": uid }
+      });
+
+      const data = await r.json().catch(() => null);
+
+      if (!r.ok || data?.ok !== true || !data?.options) {
+        msg(data?.message || "❌ تعذّر تحميل أسباب الاستبعاد.", "error");
+        return false;
+      }
+
+      cullOptions = data.options || {};
+      fillMainOptions();
+      fillDetails();
+      return true;
+
+    } catch (e) {
+      console.error("load cull options failed", e);
+      msg("❌ فشل الاتصال بالسيرفر أثناء تحميل أسباب الاستبعاد.", "error");
+      return false;
+    }
+  }
+
+  async function runCullGate() {
+    const uid = getUid();
+    const animalNumber = String($("animalNumber")?.value || "").trim();
+
+    cullGateAllowed = false;
+    if (btn) btn.disabled = true;
+
+    if (!uid) {
+      msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
+      return false;
+    }
+
+    if (!animalNumber) {
+      msg("❌ رقم الحيوان مطلوب.", "error");
+      return false;
+    }
+
+    try {
+      msg("جارِ التحقق من الحيوان...", "info");
+
+      const r = await fetch("/api/cull/gate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify({ animalNumber })
+      });
+
+      const data = await r.json().catch(() => null);
+
+      if (!r.ok || data?.allowed !== true) {
+        cullGateAllowed = false;
+        if (btn) btn.disabled = true;
+        msg(data?.message || "❌ لا يمكن تسجيل استبعاد لهذا الحيوان.", "error");
+        return false;
+      }
+
+      cullGateAllowed = true;
+      if (btn) btn.disabled = false;
+
+      msg(data.message || "✅ الحيوان مؤهل لتسجيل الاستبعاد.", "success");
+      return true;
+
+    } catch (e) {
+      console.error("cull gate failed", e);
+      cullGateAllowed = false;
+      if (btn) btn.disabled = true;
+      msg("❌ فشل الاتصال بالسيرفر أثناء التحقق من الحيوان.", "error");
+      return false;
+    }
+  }
+
+  async function saveCull() {
+    const uid = getUid();
+
+    if (!cullGateAllowed) {
+      msg("❌ لا يمكن الحفظ قبل نجاح التحقق من الحيوان.", "error");
+      return;
+    }
+
+    const payload = {
+      animalNumber: String($("animalNumber")?.value || "").trim(),
+      eventDate: String($("eventDate")?.value || "").slice(0, 10),
+      cullMain: String(mainEl?.value || "").trim(),
+      cullDetail: String(detailEl?.value || "").trim(),
+      notes: String($("notes")?.value || "").trim()
+    };
+
+    if (!payload.cullMain) {
+      msg("⚠️ اختر سبب الاستبعاد الرئيسي.", "warning");
+      return;
+    }
+
+    if (!payload.cullDetail) {
+      msg("⚠️ اختر تفصيل سبب الاستبعاد.", "warning");
+      return;
+    }
+
+    try {
+      if (!uid) {
+        msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
+        return;
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "جارِ الحفظ...";
+      }
+
+      msg("جارِ حفظ الاستبعاد...", "info");
+
+      const r = await fetch("/api/cull/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": uid
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await r.json().catch(() => null);
+
+      if (!r.ok || data?.ok !== true) {
+        msg(data?.message || "❌ فشل حفظ الاستبعاد.", "error");
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "تسجيل الاستبعاد";
+        }
+        return;
+      }
+
+      localStorage.setItem("lastAnimalNumber", payload.animalNumber);
+      localStorage.setItem("lastEventDate", payload.eventDate);
+
+      msg(data.message || "✅ تم حفظ الاستبعاد بنجاح", "success");
+
+      setTimeout(() => {
+        location.href = data.redirectUrl || `cow-card.html?number=${encodeURIComponent(payload.animalNumber)}`;
+      }, 900);
+
+    } catch (e) {
+      console.error("save cull failed", e);
+      msg("❌ فشل الاتصال بالسيرفر أثناء حفظ الاستبعاد.", "error");
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "تسجيل الاستبعاد";
+      }
+    }
+  }
+
+  mainEl?.addEventListener("change", fillDetails);
+
+  openBtn?.addEventListener("click", () => {
+    const n = String($("animalNumber")?.value || "").trim();
+    if (!n) return;
+    location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
+  });
+
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    saveCull();
+  });
+
+  initFromUrl();
+  loadCullOptions();
+  runCullGate();
+</script>
 </body>
 </html>
