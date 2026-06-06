@@ -395,7 +395,22 @@
  function showWarn(t) {
   const text = String(t || "").trim();
   if (!text) return;
-  msg(text, "info");
+
+  let bar =
+    document.getElementById("mbk-infobar") ||
+    document.getElementById("sysbar") ||
+    document.getElementById("infobar") ||
+    document.querySelector(".infobar");
+
+  if (!bar) {
+    msg(text, "info");
+    return;
+  }
+
+  const old = String(bar.textContent || "").trim();
+  bar.textContent = old ? `${old}\n\n${text}` : text;
+  bar.style.whiteSpace = "pre-line";
+  bar.style.display = "block";
 }
 
 function clearWarn() {
