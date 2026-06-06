@@ -232,15 +232,7 @@
           <div>
             <label for="animalNumber">رقم الحيوان</label>
 
-            <div class="mode-container">
-              <div class="mode-pills">
-                <input type="radio" id="modeSingle" name="entryMode" value="single" checked hidden>
-                <label for="modeSingle" class="pill">فردي</label>
-
-                <input type="radio" id="modeBulk" name="entryMode" value="bulk" hidden>
-                <label for="modeBulk" class="pill">جماعي</label>
-              </div>
-            </div>
+           
 
             <div id="bulkBox" class="bulk-box" style="display:none;">
               <label>اختيار الحيوانات (جماعي)</label>
@@ -321,10 +313,11 @@
   const bulkBox       = document.getElementById("bulkBox");
   const bulkList      = document.getElementById("bulkList");
   const bulkSelected = new Set();
+  let pageMode = "single";
   let bulkAllNumbers = [];
   let bulkHasData = false;
   let bulkLoading = false;
-   let lastGateAllowed = false;
+  let lastGateAllowed = false;
 
   function getUid() {
     try {
@@ -445,9 +438,9 @@ function clearWarn() {
     return document.querySelector('input[name="doseType"]:checked')?.value || "";
   }
 
-  function getMode() {
-    return document.querySelector('input[name="entryMode"]:checked')?.value || "single";
-  }
+ function getMode() {
+  return pageMode;
+}
 
   function getSelectedNumbers() {
     if (getMode() === "bulk") {
@@ -462,20 +455,20 @@ function clearWarn() {
     const first = nums[0] || animalNumberEl?.value || "";
     const dt = String(eventDateEl?.value || "").trim();
 
-    if (ctxAnimal) {
-      ctxAnimal.textContent =
-        getMode() === "bulk"
-          ? `الحيوانات: ${nums.length || 0}`
-          : `الحيوان: ${String(first || "").trim() || "غير محدد"}`;
-    }
+   if (ctxAnimal) {
+  ctxAnimal.textContent =
+    getMode() === "bulk"
+      ? `عدد الحيوانات: ${nums.length || 0}`
+      : `رقم الحيوان: ${String(first || "").trim() || "غير محدد"}`;
+}
 
     if (ctxDate) {
       try {
-        ctxDate.textContent = dt
-          ? `التاريخ: ${new Date(dt).toLocaleDateString("ar-EG")}`
-          : "التاريخ: —";
+       ctxDate.textContent = dt
+  ? `تاريخ التحصين: ${new Date(dt).toLocaleDateString("ar-EG")}`
+  : "تاريخ التحصين: —";
       } catch (_) {
-        ctxDate.textContent = `التاريخ: ${dt || "—"}`;
+        ctxDate.textContent = `تاريخ التحصين: ${dt || "—"}`;
       }
     }
   }
@@ -726,13 +719,7 @@ const numberFromUrl =
     const vaccine = String(qp.get("vaccine") || "").trim();
     const doseType = String(qp.get("doseType") || "").toLowerCase();
 
-    if (entryMode === "bulk" || numbersFromUrl) {
-      const r = document.getElementById("modeBulk");
-      if (r) r.checked = true;
-    } else {
-      const r = document.getElementById("modeSingle");
-      if (r) r.checked = true;
-    }
+   pageMode = (entryMode === "bulk" || numbersFromUrl) ? "bulk" : "single";
 
     if (eventDateEl) eventDateEl.value = dt;
 
@@ -779,12 +766,6 @@ const numberFromUrl =
 vaccineEl?.addEventListener("change", () => {
   runServerGate("vaccine_change");
 });
-  document.querySelectorAll('input[name="entryMode"]').forEach(r => {
-    r.addEventListener("change", applyModeUI);
-  });
-
-
-
   const backBtn = document.getElementById("backToEventsBtn");
   backBtn?.addEventListener("click", () => {
     const nums = getSelectedNumbers();
