@@ -6,218 +6,25 @@
 
   <link rel="stylesheet" href="css/forms.css">
   <title>تسجيل التحصين</title>
-  <style>
-  /* ===== Header Style (ONE VERSION) ===== */
-  .mbk-head-vax{
-    max-width: 780px;
-    margin: 10px auto 10px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-  }
-  .mbk-right,
-  .mbk-left{
-    width: 64px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  .mbk-center{
-    text-align: center;
-    flex: 1;
-    line-height: 1.05;
-  }
-  .mbk-page-title{
-    color:#000;
-    font-weight: 900;
-    font-size: 20px;
-  }
-  .mbk-brand{
-    color:#0ea05a;
-    font-weight: 900;
-    font-size: 15px;
-    margin-top: 3px;
-  }
-  .mbk-logo-vax{
-    width: 56px;
-    height: 56px;
-    object-fit: contain;
-  }
-  .mbk-back-pill{
-    width: 44px;
-    height: 44px;
-    border-radius: 999px;
-    background: #fff;
-    border: 2px solid #0ea05a;
-    color: #0b7f47;
-    font-weight: 900;
-    font-size: 13px;
-    cursor: pointer;
-  }
-
-  /* ===== Bottom Bar (Murabbik) ===== */
-  .mbk-bottombar{
-    position: fixed;
-    left: 0; right: 0; bottom: 0;
-    background: rgba(255,255,255,.96);
-    border-top: 1px solid #e2e8f0;
-    padding: 10px 12px;
-    z-index: 20;
-  }
-  .mbk-bottombar-wrap{
-    max-width: 520px;
-    margin: 0 auto;
-    display: flex;
-    gap: 10px;
-  }
-  .mbk-btn{
-    flex: 1;
-    appearance: none;
-    border-radius: 12px;
-    padding: 12px 14px;
-    font-weight: 900;
-    font-size: 16px;
-    cursor: pointer;
-  }
-  .mbk-btn-primary{
-    border: 0;
-    background: #0ea05a;
-    color: #fff;
-  }
-  .mbk-btn-ghost{
-    background: #fff;
-    border: 2px solid #0ea05a;
-    color: #0b7f47;
-  }
-
-  /* ===== Center everything between header & bottom bar ===== */
-  .mbk-main{
-    max-width: 520px;
-    margin: 0 auto;
-    padding: 0 12px 92px; /* مساحة تحت عشان الشريط السفلي ما يغطيش المحتوى */
-    box-sizing: border-box;
-  }
-
-  /* ===== Dose White Container ===== */
-  .dose-container{
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 14px 12px;
-    margin-top: 6px;
-    box-shadow: 0 2px 6px rgba(0,0,0,.04);
-  }
-  .radio-group{
-    display: flex;
-    gap: 18px;
-    align-items: center;
-    justify-content: center;
-  }
-  .radio-group label{
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  .radio-group input[type="radio"]{
-    accent-color: #0ea05a;
-  }
-
-  /* ===== Bulk (Mobile First) ===== */
-  .bulk-box{
-    background:#fff;
-    border:1px solid #e2e8f0;
-    border-radius:14px;
-    padding:12px;
-    margin-top:8px;
-  }
-  .bulk-tools{
-    display:grid;
-    grid-template-columns: 1fr auto auto;
-    gap:8px;
-    align-items:center;
-    margin-top:8px;
-  }
-  #bulkSearch{
-    width:100%;
-    padding:10px 12px;
-    border:1px solid #cbd5e1;
-    border-radius:12px;
-    font-size:16px;
-    box-sizing:border-box;
-  }
-  .bulk-list{
-    margin-top:10px;
-    max-height: 220px;
-    overflow:auto;
-    border:1px solid #e2e8f0;
-    border-radius:12px;
-    padding:6px;
-  }
-  .bulk-item{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    padding:10px 10px;
-    border-radius:10px;
-    border:1px solid transparent;
-    cursor:pointer;
-    user-select:none;
-  }
-  .bulk-item:hover{ border-color:#cfe7d8; background:#f7faf7; }
-  .bulk-item input{ width:18px; height:18px; accent-color:#0ea05a; }
-  .bulk-num{ font-weight:900; color:#0f172a; }
-  .bulk-hint{ margin-top:8px; font-size:12px; color:#64748b; text-align:center; }
-
-  /* ===== Entry Mode Pills ===== */
-  .mode-container{
-    background:#fff;
-    border:1px solid #e2e8f0;
-    border-radius:14px;
-    padding:10px;
-    margin-top:6px;
-    box-shadow: 0 2px 6px rgba(0,0,0,.04);
-  }
-  .mode-pills{
-    display:flex;
-    justify-content:center;
-    gap:12px;
-  }
-  .mode-pills .pill{
-    padding:8px 22px;
-    border-radius:999px;
-    border:2px solid #0ea05a;
-    font-weight:900;
-    cursor:pointer;
-    color:#0b7f47;
-    transition:all .2s ease;
-    user-select:none;
-  }
-  #modeSingle:checked + label,
-  #modeBulk:checked + label{
-    background:#0ea05a;
-    color:#fff;
-  }
-  </style>
+  
 </head>
 
 <body>
-  <header class="mbk-head-vax">
+  <header>
+  <div class="mbk-head">
     <div class="mbk-right">
-      <button type="button" id="backToEventsBtn" class="mbk-back-pill">رجوع</button>
+    <button type="button" id="backToEventsBtn" class="mbk-back">رجوع</button>
     </div>
 
     <div class="mbk-center">
       <div class="mbk-page-title">تسجيل التحصين</div>
-      <div class="mbk-brand">مُرَبِّيك</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
     </div>
 
     <div class="mbk-left">
-      <img src="/images/logo.png" class="mbk-logo-vax" alt="مُرَبِّيك">
+    <img src="/images/logo.png" class="mbk-logo" alt="مُرَبِّيك">
     </div>
+     </div>
   </header>
 
   <main class="mbk-main">
@@ -234,14 +41,13 @@
 
            
 
-            <div id="bulkBox" class="bulk-box" style="display:none;">
-              <label>اختيار الحيوانات (جماعي)</label>
+<div id="bulkBox" class="hidden-block">
+  <label>الأرقام الجماعية</label>
 
-<div id="bulkList" class="bulk-list" role="listbox" aria-label="قائمة الحيوانات"></div>
+  <div id="bulkList" class="steps-list" role="listbox" aria-label="قائمة الحيوانات"></div>
 
-<div class="bulk-hint">الأرقام مرسلة من صفحة الأحداث.</div>
-            </div>
-
+  <div class="form-hint">الأرقام مرسلة من صفحة الأحداث.</div>
+</div>
             <input id="animalNumber" data-field="animalNumber" type="text" placeholder="مثال: 105"/>
           </div>
 
@@ -268,8 +74,8 @@
           </div>
         </div>
 
-       <label>نوع الجرعة</label>
-<div class="dose-container">
+<fieldset>
+  <legend>نوع الجرعة</legend>
   <div class="radio-group">
     <label>
       <input type="radio" name="doseType" data-field="doseType" value="prime"/>
@@ -280,19 +86,18 @@
       جرعة دورية (متابعة)
     </label>
   </div>
-</div>
+</fieldset>
 
        
       </form>
     </div>
   </main>
 
-  <div class="mbk-bottombar">
-    <div class="mbk-bottombar-wrap">
-      <button id="saveBtn" class="mbk-btn mbk-btn-primary" type="submit" form="vaccinationForm">💾 تسجيل التحصين</button>
-      <button id="dashBtn" class="mbk-btn mbk-btn-ghost" type="button">لوحة التحكم</button>
-    </div>
-  </div>
+ <div class="actions-bar">
+  <button id="saveBtn" class="save" type="submit" form="vaccinationForm">💾 تسجيل التحصين</button>
+  <button id="dashBtn" class="ghost" type="button">لوحة التحكم</button>
+</div>
+ 
 
  <script>
   // ============================================================
@@ -314,9 +119,6 @@
   const bulkList      = document.getElementById("bulkList");
   const bulkSelected = new Set();
   let pageMode = "single";
-  let bulkAllNumbers = [];
-  let bulkHasData = false;
-  let bulkLoading = false;
   let lastGateAllowed = false;
 
   function getUid() {
@@ -659,7 +461,7 @@ async function runServerGate(reason = "page_load") {
   function applyModeUI() {
     const isBulk = getMode() === "bulk";
 
-    if (bulkBox) bulkBox.style.display = isBulk ? "block" : "none";
+    if (bulkBox) bulkBox.classList.toggle("hidden-block", !isBulk);
     if (animalNumberEl) {
       animalNumberEl.disabled = isBulk;
       animalNumberEl.readOnly = false;
@@ -678,11 +480,11 @@ function renderBulkList() {
 
   for (const num of list) {
     const row = document.createElement("div");
-    row.className = "bulk-item";
+   row.className = "step-item";
     row.setAttribute("role", "option");
 
     const left = document.createElement("div");
-    left.className = "bulk-num";
+    left.className = "name";
     left.textContent = num;
 
     row.appendChild(left);
