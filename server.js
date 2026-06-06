@@ -14716,6 +14716,229 @@ if (typeof scheduleGroupsRebuildSrv === "function") {
     });
   }
 });
+// ============================================================
+//                 API: CULL — SERVER SIDE
+//                 الاستبعاد لا يؤرشف الحيوان
+// ============================================================
+
+const CULL_OPTIONS_SRV = {
+  "انتاجي": [
+    "انخفاض إنتاج اللبن",
+    "موسم ضعيف متكرر",
+    "جودة لبن ضعيفة / SCC مرتفع",
+    "عمر إنتاجي كبير",
+    "مشاكل حليب متكررة"
+  ],
+  "تناسلي": [
+    "تكرار تلقيح بدون حمل",
+    "تأخر عشار / طول فترة مفتوحة",
+    "التهاب رحم مزمن",
+    "تكرار إجهاض",
+    "مشاكل ولادة متكررة"
+  ],
+  "صحي": [
+    "التهاب ضرع مزمن",
+    "عرج مزمن",
+    "هزال شديد / BCS منخفض",
+    "أمراض متكررة",
+    "إصابة / كسر",
+    "اضطرابات أيضية متكررة"
+  ]
+};
+
+app.get("/api/cull/options", requireUserId, async (req, res) => {
+  return res.json({
+    ok: true,
+    options: CULL_OPTIONS_SRV
+  });
+});
+
+app.post("/api/cull/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        allowed: false,
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const animalNumber = archiveNormNumberSrv(body.animalNumber || body.number || "");
+
+    if (!animalNumber) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: "رقم الحيوان مطلوب."
+      });
+    }
+
+    const animal = await archiveFindAnimalSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        allowed: false,
+        message: "❌ الحيوان غير موجود في القطيع."
+      });
+    }
+
+    const doc = animal.data || {};
+    const st = String(doc.status || "active").trim().toLowerCase();
+
+    if (st !== "active") {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: "❌ الحيوان غير موجود في القطيع."
+      });
+    }
+
+    return res.json({
+      ok: true,
+      allowed: true,
+      message: "✅ الحيوان مؤهل لتسجيل الاستبعاد.",
+      animal: {
+        id: animal.id,
+        animalNumber,
+        number: String(doc.number || animalNumber),
+        reproductiveStatus: doc.reproductiveStatus || null,
+        productionStatus: doc.productionStatus || null,
+        breedingBlocked: doc.breedingBlocked === true
+      }
+    });
+
+  } catch (e) {
+    console.error("cull.gate", e);
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      message: "فشل التحقق من الحيوان."
+    });
+  }
+});
+
+app.post("/api/cull/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const animalNumber = archiveNormNumberSrv(body.animalNumber || body.number || "");
+    const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
+    const cullMain = String(body.cullMain || "").trim();
+    const cullDetail = String(body.cullDetail || "").trim();
+    const notes = String(body.notes || "").trim();
+
+    if (!animalNumber) {
+      return res.status(400).json({
+        ok: false,
+        message: "رقم الحيوان مطلوب."
+      });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        message: "تاريخ الاستبعاد غير صالح."
+      });
+    }
+
+    if (!cullMain || !CULL_OPTIONS_SRV[cullMain]) {
+      return res.status(400).json({
+        ok: false,
+        message: "سبب الاستبعاد الرئيسي مطلوب."
+      });
+    }
+
+    if (!cullDetail || !CULL_OPTIONS_SRV[cullMain].includes(cullDetail)) {
+      return res.status(400).json({
+        ok: false,
+        message: "تفصيل سبب الاستبعاد مطلوب."
+      });
+    }
+
+    const animal = await archiveFindAnimalSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        message: "❌ الحيوان غير موجود في القطيع."
+      });
+    }
+
+    const doc = animal.data || {};
+    const st = String(doc.status || "active").trim().toLowerCase();
+
+    if (st !== "active") {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ الحيوان غير موجود في القطيع."
+      });
+    }
+
+    const reason = `${cullMain} — ${cullDetail}`;
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    const eventRef = db.collection("events").doc();
+
+    await db.runTransaction(async (tx) => {
+      tx.set(eventRef, {
+        animalNumber,
+        animalId: animalNumber,
+        type: "استبعاد",
+        eventType: "استبعاد",
+        eventTypeNorm: "cull",
+        eventDate,
+        cullMain,
+        cullDetail,
+        reason,
+        notes,
+        userId: uid,
+        source: "/cull.html",
+        createdAt: now
+      });
+
+      tx.set(animal.ref, {
+        breedingBlocked: true,
+        cullStatus: "excluded",
+        lastCullDate: eventDate,
+        cullMain,
+        cullDetail,
+        cullReason: reason,
+        reproductiveStatus: "لا تلقح مرة أخرى",
+        updatedAt: now
+      }, { merge: true });
+    });
+
+    if (typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "cull_saved");
+    }
+
+    return res.json({
+      ok: true,
+      message: "✅ تم حفظ الاستبعاد بنجاح",
+      eventId: eventRef.id,
+      animalNumber,
+      redirectUrl: `cow-card.html?number=${encodeURIComponent(animalNumber)}`
+    });
+
+  } catch (e) {
+    console.error("cull.save", e);
+    return res.status(500).json({
+      ok: false,
+      message: "فشل حفظ الاستبعاد."
+    });
+  }
+});
 // Static last
 app.use(express.static(path.join(__dirname, 'www')));
 // ✅ DIM job
