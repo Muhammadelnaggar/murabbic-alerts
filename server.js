@@ -10484,7 +10484,7 @@ await eventRef.set(payload);
 });
 // ============================================================
 //                 API: DAILY MILK HELPERS
-//                 أدوات اللبن اليومي فقط — بدون Route
+//                 السيرفر يجهز القرار + العرض بالكامل
 // ============================================================
 
 function dailyMilkParseNumbersSrv(raw) {
@@ -10503,10 +10503,6 @@ function dailyMilkParseNumbersSrv(raw) {
       .map(x => calvingNormDigitsOnlySrv(x))
       .filter(Boolean)
   )];
-}
-
-function dailyMilkRequiredSrv(v) {
-  return !(v === undefined || v === null || String(v).trim() === "");
 }
 
 function dailyMilkSpeciesSrv(doc = {}) {
@@ -10543,8 +10539,6 @@ function dailyMilkNumStrictSrv(v) {
 function dailyMilkRowsFromBodySrv(body = {}) {
   if (Array.isArray(body.rows) && body.rows.length) return body.rows;
   if (Array.isArray(body.items) && body.items.length) return body.items;
-  if (Array.isArray(body.accepted) && body.accepted.length) return body.accepted;
-  if (Array.isArray(body.valid) && body.valid.length) return body.valid;
 
   const rawNumbers =
     body.animalNumbers ||
@@ -10572,6 +10566,10 @@ async function dailyMilkHasSameDaySrv(uid, animalNumber, eventDate) {
   const dt = String(eventDate || "").trim().slice(0, 10);
 
   if (!db || !uid || !num || !calvingIsDateSrv(dt)) return false;
+
+  const fixedId = ["daily_milk", uid, num, dt].join("__");
+  const fixedSnap = await db.collection("events").doc(fixedId).get();
+  if (fixedSnap.exists) return true;
 
   const snap = await db.collection("events")
     .where("userId", "==", uid)
@@ -10605,24 +10603,177 @@ async function dailyMilkHasSameDaySrv(uid, animalNumber, eventDate) {
   return found;
 }
 
+function dailyMilkSessionSpecSrv(kind) {
+  if (kind === "buffalo") {
+    return {
+      sessionCount: 2,
+      showThirdMilking: false,
+      sessionLabels: ["حلبة صباح (كجم)", "حلبة مساء (كجم)"],
+      inputs: [
+        { key: "milkS1", label: "حلبة صباح (كجم)", visible: true, disabled: false },
+        { key: "milkS2", label: "حلبة مساء (كجم)", visible: true, disabled: false },
+        { key: "milkS3", label: "حلبة 3 (كجم)", visible: false, disabled: true }
+      ]
+    };
+  }
+
+  return {
+    sessionCount: 3,
+    showThirdMilking: true,
+    sessionLabels: ["حلبة 1 (كجم)", "حلبة 2 (كجم)", "حلبة 3 (كجم)"],
+    inputs: [
+      { key: "milkS1", label: "حلبة 1 (كجم)", visible: true, disabled: false },
+      { key: "milkS2", label: "حلبة 2 (كجم)", visible: true, disabled: false },
+      { key: "milkS3", label: "حلبة 3 (كجم)", visible: true, disabled: false }
+    ]
+  };
+}
+
+function dailyMilkRejectedUiRowSrv(animalNumber, reason) {
+  return {
+    animalNumber: calvingNormDigitsOnlySrv(animalNumber || ""),
+    number: calvingNormDigitsOnlySrv(animalNumber || ""),
+    eligible: false,
+    canEdit: false,
+    canSave: false,
+    reason: String(reason || "مرفوض"),
+    species: "",
+    speciesLabel: "مرفوض",
+    kind: "",
+    sessionCount: 0,
+    showThirdMilking: false,
+    sessionLabels: [],
+    inputs: [
+      { key: "milkS1", label: "حلبة 1", visible: true, disabled: true },
+      { key: "milkS2", label: "حلبة 2", visible: true, disabled: true },
+      { key: "milkS3", label: "حلبة 3", visible: true, disabled: true }
+    ]
+  };
+}
+
+function dailyMilkAcceptedUiRowSrv(item = {}) {
+  const species = String(item.species || "").trim() || "أبقار";
+  const kind = String(item.kind || dailyMilkKindSrv(species)).trim();
+  const spec = dailyMilkSessionSpecSrv(kind);
+
+  return {
+    animalNumber: calvingNormDigitsOnlySrv(item.animalNumber || item.number || ""),
+    number: calvingNormDigitsOnlySrv(item.animalNumber || item.number || ""),
+    animalId: String(item.animalId || "").trim(),
+    eligible: true,
+    canEdit: true,
+    canSave: true,
+    reason: "",
+    species,
+    speciesLabel: species,
+    kind,
+    sessionCount: spec.sessionCount,
+    showThirdMilking: spec.showThirdMilking,
+    sessionLabels: spec.sessionLabels,
+    inputs: spec.inputs
+  };
+}
+
+function dailyMilkBuildGateUiSrv({ accepted = [], rejected = [], message = "", eventDate = "" } = {}) {
+  const acceptedRows = accepted.map(dailyMilkAcceptedUiRowSrv);
+  const rejectedRows = rejected.map(r => dailyMilkRejectedUiRowSrv(r.animalNumber || r.number, r.reason));
+
+  const rows = [...acceptedRows, ...rejectedRows];
+  const first = acceptedRows[0] || null;
+  const canSave = acceptedRows.length > 0;
+
+  return {
+    screen: "daily_milk",
+    mode: rows.length > 1 ? "bulk" : "single",
+    eventDate: String(eventDate || "").slice(0, 10),
+    status: canSave ? "success" : "error",
+    message: message || (canSave ? "✅ تم التحقق — أكمل إدخال اللبن." : "❌ لا يوجد رقم مؤهل لتسجيل اللبن."),
+    canSave,
+    acceptedCount: acceptedRows.length,
+    rejectedCount: rejectedRows.length,
+    rows,
+
+    single: first ? {
+      animalNumber: first.animalNumber,
+      animalId: first.animalId,
+      species: first.species,
+      speciesLabel: first.speciesLabel,
+      kind: first.kind,
+      sessionCount: first.sessionCount,
+      showThirdMilking: first.showThirdMilking,
+      sessionLabels: first.sessionLabels,
+      inputs: first.inputs
+    } : null,
+
+    bulk: {
+      rows,
+      columns: [
+        { key: "animalNumber", label: "رقم الحيوان", visible: true },
+        { key: "speciesLabel", label: "النوع", visible: true },
+        { key: "milkS1", label: "حلبة 1", visible: true },
+        { key: "milkS2", label: "حلبة 2", visible: true },
+        { key: "milkS3", label: "حلبة 3", visible: true },
+        { key: "total", label: "الإجمالي", visible: true }
+      ]
+    }
+  };
+}
+
+function dailyMilkBuildSaveUiSrv({ saved = [], rejected = [], message = "", eventDate = "" } = {}) {
+  const savedCount = saved.length;
+  const rejectedCount = rejected.length;
+  const first = saved[0] || null;
+
+  const redirectUrl = savedCount === 1
+    ? `/event-list.html?number=${encodeURIComponent(first.animalNumber)}`
+    : "/dashboard.html";
+
+  return {
+    screen: "daily_milk",
+    status: savedCount ? "success" : "error",
+    message: message || (savedCount ? "✅ تم حفظ اللبن اليومي بنجاح" : "❌ لم يتم حفظ أي سجل لبن."),
+    savedCount,
+    rejectedCount,
+    canRedirect: savedCount > 0,
+    redirectUrl,
+    saved: saved.map(x => ({
+      animalNumber: x.animalNumber,
+      animalId: x.animalId,
+      eventId: x.eventId,
+      eventDate: x.eventDate,
+      milkKg: x.milkKg
+    })),
+    rejected: rejected.map(x => ({
+      animalNumber: x.animalNumber || "",
+      reason: x.reason || "تعذّر الحفظ"
+    })),
+    eventDate: String(eventDate || "").slice(0, 10)
+  };
+}
+
 // ============================================================
 //                 API: DAILY MILK GATE ONLY
-//                 تحقق أهلية فقط — بدون حفظ
+//                 السيرفر يجهز أهلية + UI كامل
 // ============================================================
 
 app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
+      const ui = dailyMilkBuildGateUiSrv({
+        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة."
+      });
+
       return res.status(503).json({
         ok: false,
         allowed: false,
         stage: "firestore_disabled",
-        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة.",
+        message: ui.message,
         acceptedCount: 0,
         rejectedCount: 0,
         accepted: [],
         valid: [],
-        rejected: []
+        rejected: [],
+        ui
       });
     }
 
@@ -10648,34 +10799,49 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
     const numbers = dailyMilkParseNumbersSrv(rawNumbers);
 
     if (!numbers.length || !eventDate) {
+      const ui = dailyMilkBuildGateUiSrv({
+        message: "أدخل رقم الحيوان والتاريخ لبدء التحقق.",
+        eventDate
+      });
+
       return res.json({
         ok: true,
         allowed: false,
         silent: true,
         stage: "missing_basic",
-        message: "أدخل رقم الحيوان والتاريخ لبدء التحقق.",
+        message: ui.message,
         acceptedCount: 0,
         rejectedCount: 0,
         accepted: [],
         valid: [],
-        rejected: []
+        rejected: [],
+        ui
       });
     }
 
     if (!calvingIsDateSrv(eventDate)) {
+      const rejected = numbers.map(n => ({
+        animalNumber: String(n || ""),
+        reason: "تاريخ اللبن غير صالح."
+      }));
+
+      const ui = dailyMilkBuildGateUiSrv({
+        rejected,
+        message: "❌ تاريخ اللبن غير صالح.",
+        eventDate
+      });
+
       return res.status(400).json({
         ok: false,
         allowed: false,
         stage: "invalid_date",
-        message: "❌ تاريخ اللبن غير صالح.",
+        message: ui.message,
         acceptedCount: 0,
-        rejectedCount: numbers.length,
+        rejectedCount: rejected.length,
         accepted: [],
         valid: [],
-        rejected: numbers.map(n => ({
-          animalNumber: String(n || ""),
-          reason: "تاريخ اللبن غير صالح."
-        }))
+        rejected,
+        ui
       });
     }
 
@@ -10739,13 +10905,22 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
     const rejectedCount = rejected.length;
     const allowed = acceptedCount > 0;
 
+    const message = allowed
+      ? `✅ تم التحقق — جاهز لتسجيل اللبن لعدد ${acceptedCount}.`
+      : (rejected[0]?.reason || "❌ لا يوجد أي رقم صالح لتسجيل اللبن.");
+
+    const ui = dailyMilkBuildGateUiSrv({
+      accepted,
+      rejected,
+      message,
+      eventDate
+    });
+
     return res.json({
       ok: true,
       allowed,
       stage: "daily_milk_gate",
-      message: allowed
-        ? `✅ تم التحقق — جاهز لتسجيل اللبن لعدد ${acceptedCount}.`
-        : (rejected[0]?.reason || "❌ لا يوجد أي رقم صالح لتسجيل اللبن."),
+      message,
       acceptedCount,
       rejectedCount,
       accepted,
@@ -10755,41 +10930,53 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
       animalNumber: accepted[0]?.animalNumber || "",
       animalId: accepted[0]?.animalId || "",
       species: accepted[0]?.species || "",
-      kind: accepted[0]?.kind || ""
+      kind: accepted[0]?.kind || "",
+
+      ui
     });
 
   } catch (e) {
     console.error("daily-milk-gate", e);
 
+    const ui = dailyMilkBuildGateUiSrv({
+      message: "تعذّر التحقق من اللبن اليومي الآن — تحقّق من الاتصال والصلاحيات."
+    });
+
     return res.status(500).json({
       ok: false,
       allowed: false,
       stage: "daily_milk_gate_failed",
-      message: "تعذّر التحقق من اللبن اليومي الآن — تحقّق من الاتصال والصلاحيات.",
+      message: ui.message,
       acceptedCount: 0,
       rejectedCount: 0,
       accepted: [],
       valid: [],
-      rejected: []
+      rejected: [],
+      ui
     });
   }
 });
 
 // ============================================================
 //                 API: DAILY MILK SAVE ONLY
-//                 حفظ اللبن اليومي من السيرفر فقط
+//                 السيرفر يفحص ويحفظ ويجهز UI كامل
 // ============================================================
 
 app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
   try {
     if (!db) {
+      const ui = dailyMilkBuildSaveUiSrv({
+        message: "تعذّر حفظ اللبن اليومي — قاعدة البيانات غير متاحة."
+      });
+
       return res.status(503).json({
         ok: false,
-        message: "تعذّر حفظ اللبن اليومي — قاعدة البيانات غير متاحة.",
+        message: ui.message,
         savedCount: 0,
         rejectedCount: 0,
         saved: [],
-        rejected: []
+        rejected: [],
+        ui
       });
     }
 
@@ -10805,27 +10992,42 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
     const rows = dailyMilkRowsFromBodySrv(body);
 
     if (!rows.length) {
+      const ui = dailyMilkBuildSaveUiSrv({
+        message: "❌ رقم الحيوان مطلوب.",
+        eventDate
+      });
+
       return res.status(400).json({
         ok: false,
-        message: "❌ رقم الحيوان مطلوب.",
+        message: ui.message,
         savedCount: 0,
         rejectedCount: 0,
         saved: [],
-        rejected: []
+        rejected: [],
+        ui
       });
     }
 
     if (!calvingIsDateSrv(eventDate)) {
+      const rejected = rows.map(r => ({
+        animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || r.number || ""),
+        reason: "تاريخ اللبن غير صالح."
+      }));
+
+      const ui = dailyMilkBuildSaveUiSrv({
+        rejected,
+        message: "❌ تاريخ اللبن غير صالح.",
+        eventDate
+      });
+
       return res.status(400).json({
         ok: false,
-        message: "❌ تاريخ اللبن غير صالح.",
+        message: ui.message,
         savedCount: 0,
-        rejectedCount: rows.length,
+        rejectedCount: rejected.length,
         saved: [],
-        rejected: rows.map(r => ({
-          animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || r.number || ""),
-          reason: "تاريخ اللبن غير صالح."
-        }))
+        rejected,
+        ui
       });
     }
 
@@ -10989,32 +11191,45 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
       scheduleGroupsRebuildSrv(uid, "daily_milk_save");
     }
 
+    const message = saved.length
+      ? "✅ تم حفظ اللبن اليومي بنجاح"
+      : "❌ لم يتم حفظ أي سجل لبن.";
+
+    const ui = dailyMilkBuildSaveUiSrv({
+      saved,
+      rejected,
+      message,
+      eventDate
+    });
+
     return res.json({
       ok: saved.length > 0,
-      message: saved.length
-        ? "✅ تم حفظ اللبن اليومي بنجاح"
-        : "❌ لم يتم حفظ أي سجل لبن.",
+      message,
       savedCount: saved.length,
       rejectedCount: rejected.length,
       saved,
       rejected,
       animalNumber: saved[0]?.animalNumber || "",
       eventDate,
-      redirectUrl: saved.length === 1
-        ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
-        : ""
+      redirectUrl: ui.redirectUrl,
+      ui
     });
 
   } catch (e) {
     console.error("daily-milk-save", e);
 
+    const ui = dailyMilkBuildSaveUiSrv({
+      message: "تعذّر حفظ اللبن اليومي — تحقّق من الاتصال والصلاحيات."
+    });
+
     return res.status(500).json({
       ok: false,
-      message: "تعذّر حفظ اللبن اليومي — تحقّق من الاتصال والصلاحيات.",
+      message: ui.message,
       savedCount: 0,
       rejectedCount: 0,
       saved: [],
-      rejected: []
+      rejected: [],
+      ui
     });
   }
 });
