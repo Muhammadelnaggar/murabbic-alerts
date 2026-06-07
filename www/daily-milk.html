@@ -190,23 +190,25 @@
          <input id="eventDate" name="eventDate" data-field="eventDate" type="date" required />
         </div>
       </div>
-
-      <div id="sessions">
+           <div id="sessions">
         <div class="row">
           <div class="col">
             <label id="s1label" for="s1">حلبة 1 (كجم)</label>
-           <input id="s1" data-field="milkS1" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
+            <input id="s1" data-field="milkS1" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
           </div>
           <div class="col">
             <label id="s2label" for="s2">حلبة 2 (كجم)</label>
-           <input id="s2" data-field="milkS2" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
+            <input id="s2" data-field="milkS2" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
           </div>
           <div class="col" id="col-s3">
             <label id="s3label" for="s3">حلبة 3 (كجم)</label>
-           <input id="s3" data-field="milkS3" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
+            <input id="s3" data-field="milkS3" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
           </div>
         </div>
       </div>
+      <div id="singleTotalBox" class="muted" style="margin-top:10px;font-weight:900;color:#0b7f47;text-align:center">
+  الإجمالي: <span data-key="singleTotalText">—</span> كجم
+</div>
 
 <div class="btn-row">
   <button type="submit" class="save-btn">حفظ اللبن اليومي</button>
@@ -229,6 +231,7 @@
   const dateInput = $("eventDate");
 
   const sessionsBox = $("sessions");
+  const singleTotalBox = $("singleTotalBox");
   const bulkBox = $("bulkBox");
   const bulkDateBar = $("bulkDateBar");
   const bulkInfo = $("bulkInfo");
@@ -282,7 +285,31 @@
       }
     }));
   }
+let previewTimer = null;
 
+async function runPreview() {
+  clearTimeout(previewTimer);
+
+  previewTimer = setTimeout(async () => {
+    const data = await postServer("/api/daily-milk/preview", savePayload());
+    const ui = data.ui || {};
+    const rows = Array.isArray(ui.rows) ? ui.rows : [];
+
+    if (currentMode === "bulk") {
+      rows.forEach(r => {
+        const rowEl = document.querySelector(`[data-mbk-row="daily-milk"][data-number="${r.animalNumber}"]`);
+        const totalEl = rowEl?.querySelector("[data-key='totalText']");
+        if (totalEl) totalEl.textContent = r.totalText || "—";
+      });
+      return;
+    }
+
+    const totalEl = document.querySelector("[data-key='singleTotalText']");
+    if (totalEl) {
+      totalEl.textContent = ui.single?.totalText || rows[0]?.totalText || "—";
+    }
+  }, 250);
+}
   function showBar(ui) {
     const status = String(ui?.status || "info");
     const cls =
@@ -321,6 +348,7 @@
 
     bulkBox?.classList.add("hide");
     sessionsBox?.classList.remove("hide");
+    singleTotalBox?.classList.remove("hide");
     singleActions?.classList.remove("hide");
     openCowCardBtn?.classList.remove("hide");
 
@@ -346,6 +374,7 @@
 
     bulkBox?.classList.remove("hide");
     sessionsBox?.classList.add("hide");
+    singleTotalBox?.classList.add("hide");
     singleActions?.classList.add("hide");
     openCowCardBtn?.classList.add("hide");
 
@@ -411,7 +440,7 @@
           ${inputCell("milkS2")}
           ${inputCell("milkS3")}
           <td style="padding:8px 6px;background:#fff;border:1px solid #e2e8f0;border-right:none;border-radius:12px 0 0 12px;text-align:center;font-size:14px">
-            <div style="font-weight:900;color:#0b7f47;min-width:0;font-size:14px">—</div>
+            <div data-key="totalText" style="font-weight:900;color:#0b7f47;min-width:0;font-size:14px">—</div>
           </td>
         </tr>
       `;
@@ -529,6 +558,15 @@
   animalInput?.addEventListener("change", runGate);
   animalInput?.addEventListener("blur", runGate);
   dateInput?.addEventListener("change", runGate);
+  ["milkS1", "milkS2", "milkS3"].forEach(key => {
+  inputSlots[key]?.input?.addEventListener("input", runPreview);
+});
+
+document.addEventListener("input", (e) => {
+  if (e.target?.matches?.("[data-mbk-row='daily-milk'] input[data-key]")) {
+    runPreview();
+  }
+});
 
   const initialDate = qs("date") || qs("eventDate") || "";
   const initialNumber = qs("animalNumber") || qs("number") || qs("animalId") || "";
