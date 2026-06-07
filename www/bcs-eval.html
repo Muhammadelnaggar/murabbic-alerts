@@ -573,18 +573,17 @@
   }
 
   async function uploadImage(file) {
-    const url = await new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(r.result);
-      r.onerror = reject;
-      r.readAsDataURL(file);
-    });
+  const url = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
 
-   state.captures[state.currentAngle] = url;
-state.analysis = null;
+  state.captures[state.currentAngle] = url;
+  state.analysis = null;
 
-/* عرض الصورة المختارة مكان الكاميرا */
-if (preview) {
+  /* عرض الصورة المختارة مكان الكاميرا */
   try {
     if (state.stream) {
       state.stream.getTracks().forEach(t => t.stop());
@@ -592,22 +591,22 @@ if (preview) {
       state.track = null;
     }
 
+    preview.pause();
     preview.removeAttribute("srcObject");
     preview.srcObject = null;
     preview.src = url;
     preview.style.objectFit = "contain";
-    await preview.load?.();
+    preview.load();
   } catch (e) {
     console.warn("BCS uploaded preview display error:", e);
   }
+
+  renderThumbs();
+  updateButtons();
+  showAnalysis(null);
+
+  await analyzeOnServer();
 }
-
-renderThumbs();
-updateButtons();
-showAnalysis(null);
-
-await analyzeOnServer();
-
   async function saveBCS() {
     msgBox.style.display = "none";
 
