@@ -5,14 +5,8 @@
   <title>استيراد اللبن اليومي — مُرَبِّيك</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 
-  <script type="module">
-    import { updateAnimalByEvent } from "/js/animal-update.js";
-    window.updateAnimalByEvent = updateAnimalByEvent;
-  </script>
-
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  
   <style>
     :root{
       --green:#0ea05a;
@@ -414,959 +408,269 @@
     <a href="add-event.html" class="mbk-nav-link">↩️ الأحداث</a>
   </nav>
 
-  <script type="module">
-    import * as firebaseCfg from '/js/firebase-config.js';
-    import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-   import {
-  getFirestore,
-  collection,
-  doc,
-  setDoc,
-  serverTimestamp,
-  getDocs,
-  query,
-  where,
-  limit
-} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+<script>
+  const $ = (id) => document.getElementById(id);
 
-    const $ = (id) => document.getElementById(id);
+  const eventDate = $("eventDate");
+  const batchInput = $("batchInput");
+  const fileInput = $("fileInput");
+  const loadFileBtn = $("loadFileBtn");
+  const previewBtn = $("previewBtn");
+  const clearBtn = $("clearBtn");
+  const saveBtn = $("saveBtn");
+  const previewWrap = $("previewWrap");
+  const previewRows = $("previewRows");
+  const sysbar = $("sysbar");
 
-   const eventDate = $('eventDate');
+  const kpiRows = $("kpiRows");
+  const kpiValid = $("kpiValid");
+  const kpiInvalid = $("kpiInvalid");
+  const kpiMilk = $("kpiMilk");
 
-    const batchInput = $('batchInput');
-    const fileInput = $('fileInput');
-    const loadFileBtn = $('loadFileBtn');
-    const previewBtn = $('previewBtn');
-    const clearBtn = $('clearBtn');
-    const saveBtn = $('saveBtn');
-    const previewWrap = $('previewWrap');
-    const previewRows = $('previewRows');
-    const sysbar = $('sysbar');
-    const kpiRows = $('kpiRows');
-    const kpiValid = $('kpiValid');
-    const kpiInvalid = $('kpiInvalid');
-    const kpiMilk = $('kpiMilk');
-    const firebaseConfig =
-      firebaseCfg.default ||
-      firebaseCfg.firebaseConfig ||
-      firebaseCfg.config ||
-      firebaseCfg;
+  let lastPreviewRows = [];
 
-    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-    const db = getFirestore(app, "murabbikdata");
-    
-let previewData = [];
-let fileTextCache = '';
-let parsedLinesCache = [];
-let detectedHeaderParts = null;
-let selectedSheetName = '';
-let existingAnimalSet = new Set();
-
-    function getUserId(){
-      return (
-        window.userId ||
-        (window.__TENANT__ && window.__TENANT__.userId) ||
-        localStorage.getItem("userId") ||
-        sessionStorage.getItem("userId") ||
-        null
-      );
-    }
-
-    function todayISO(){
-      const d = new Date();
-      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      return d.toISOString().slice(0,10);
-    }
-
-    function showBar(kind, text){
-      sysbar.className = 'infobar ' + kind;
-      sysbar.textContent = text;
-      sysbar.style.display = 'block';
-      try{ sysbar.scrollIntoView({ behavior:'smooth', block:'start' }); }catch(_){}
-    }
-
-    function hideBar(){
-      sysbar.className = 'infobar';
-      sysbar.textContent = '';
-      sysbar.style.display = 'none';
-    }
-
-    function latinDigits(s){
-      const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-      return String(s || '').replace(/[٠-٩۰-۹]/g, d => map[d] || d);
-    }
-
-    function toNum(v){
-      const n = parseFloat(String(v).replace(',', '.'));
-      return Number.isFinite(n) ? n : 0;
-    }
-
-  function normAnimalNo(v){
-  return latinDigits(String(v || '')).replace(/[^\d]/g,'').trim();
-}
-
-function makeDailyMilkDocId(uid, animalNumber, eventDate){
-  const u = String(uid || '').trim();
-  const n = normAnimalNo(animalNumber);
-  const d = String(eventDate || '').trim();
-  return `daily_milk__${u}__${n}__${d}`;
-}
-
-function looksLikeHeader(line){
-  const s = normalizeHeaderCell(line);
-  if (!s) return false;
-
-  const headerHints = [
-    'animal number',
-    'animal no',
-    'animal id',
-    'cow id',
-    'buffalo id',
-    'ear tag',
-    'tag number',
-    'tag no',
-    'milk total',
-    'total milk',
-    'total',
-    'yield total',
-    'morning milk',
-    'evening milk',
-    'night milk',
-    'milking date',
-    'session 1',
-    'session 2',
-    'session 3',
-    'milking 1',
-    'milking 2',
-    'milking 3',
-    'رقم الحيوان',
-    'الحيوان',
-    'اجمالي اللبن',
-    'إجمالي اللبن',
-    'تاريخ الحلب',
-    'حلبة 1',
-    'حلبة 2',
-    'حلبة 3',
-    'المحلب'
-  ];
-
-  return headerHints.some(h => s.includes(h));
-}
-function splitSmartLine(line){
-  const raw = latinDigits(String(line || '').trim());
-  if (!raw) return [];
-  if (raw.includes('\t')) return raw.split('\t').map(x => x.trim()).filter(Boolean);
-  if (raw.includes(';')) return raw.split(';').map(x => x.trim()).filter(Boolean);
-  return raw.replace(/[،]+/g, ',').split(',').map(x => x.trim()).filter(Boolean);
-}
-
-function extractMilkNumbers(parts){
-  const nums = [];
-  for (let i = 1; i < parts.length; i++){
-    const v = String(parts[i] || '').trim();
-    if (!v) continue;
-    const n = parseFloat(v.replace(',', '.'));
-    if (Number.isFinite(n) && n >= 0){
-      nums.push(n);
-    }
-  }
-  return nums;
-}
-function normalizeHeaderCell(v){
-  return latinDigits(String(v || '').trim().toLowerCase())
-    .replace(/[()]/g, ' ')
-    .replace(/\//g, ' ')
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function detectColumnMap(headerParts){
-  const map = {
-    animalIdx: -1,
-    totalIdx: -1,
-    s1Idx: -1,
-    s2Idx: -1,
-    s3Idx: -1
-  };
-
-  const cells = headerParts.map(normalizeHeaderCell);
-
-  const animalHints = [
-    'رقم الحيوان','رقم','الحيوان','animal no','animal number','animal id',
-    'cow no','cow id','buffalo id','tag','tag no','tag number','ear tag',
-    'id','animal'
-  ];
-
-  const totalHints = [
-    'اجمالي','إجمالي','total','milk total','yield total','yield',
-    'qty','quantity','kg','milk kg','total milk','daily milk','production'
-  ];
-
-  const s1Hints = [
-    'حلبة 1','الحلبة 1','session 1','milking 1','morning','am',
-    'morning milk','1st milking','milk 1','shift 1'
-  ];
-
-  const s2Hints = [
-    'حلبة 2','الحلبة 2','session 2','milking 2','evening','pm',
-    'evening milk','2nd milking','milk 2','shift 2'
-  ];
-
-  const s3Hints = [
-    'حلبة 3','الحلبة 3','session 3','milking 3','night',
-    'night milk','3rd milking','milk 3','shift 3'
-  ];
-
-  function matchAny(cell, hints){
-    return hints.some(h => cell === h || cell.includes(h));
+  function todayISO() {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
   }
 
-  cells.forEach((c, i) => {
-    if (map.animalIdx < 0 && matchAny(c, animalHints)){
-      map.animalIdx = i;
-      return;
-    }
+  function getUserId() {
+    return String(
+      window.__tenant?.userId ||
+      window.MURABBIK_USER_ID ||
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("tenantId") ||
+      ""
+    ).trim();
+  }
 
-    if (map.totalIdx < 0 && matchAny(c, totalHints)){
-      map.totalIdx = i;
-      return;
-    }
+  function showBar(status, text) {
+    const cls =
+      status === "success" || status === "ok" ? "success" :
+      status === "error" || status === "err" ? "error" :
+      status === "warning" || status === "warn" ? "warning" :
+      "info";
 
-    if (map.s1Idx < 0 && matchAny(c, s1Hints)){
-      map.s1Idx = i;
-      return;
-    }
+    sysbar.className = `infobar mbk-infobar show ${cls}`;
+    sysbar.style.display = "block";
+    sysbar.textContent = String(text || "");
+    try { sysbar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+  }
 
-    if (map.s2Idx < 0 && matchAny(c, s2Hints)){
-      map.s2Idx = i;
-      return;
-    }
+  function hideBar() {
+    sysbar.className = "infobar";
+    sysbar.textContent = "";
+    sysbar.style.display = "none";
+  }
 
-    if (map.s3Idx < 0 && matchAny(c, s3Hints)){
-      map.s3Idx = i;
-      return;
-    }
-  });
-
-  return map;
-}
-function numFromCell(v){
-  const n = parseFloat(String(v || '').trim().replace(',', '.'));
-  return Number.isFinite(n) ? n : null;
-}
-
-
-    function isGoodAutoMap(colMap){
-  if (!colMap) return false;
-  if (colMap.animalIdx < 0) return false;
-  if (colMap.totalIdx >= 0) return true;
-
-  const sessionsCount =
-    (colMap.s1Idx >= 0 ? 1 : 0) +
-    (colMap.s2Idx >= 0 ? 1 : 0) +
-    (colMap.s3Idx >= 0 ? 1 : 0);
-
-  return sessionsCount >= 2;
-}
-async function loadUserAnimalNumbers(uid){
-  const out = new Set();
-
-  try{
-    const q1 = query(
-      collection(db, 'animals'),
-      where('userId', '==', uid),
-      limit(5000)
-    );
-
-    const snap1 = await getDocs(q1);
-    snap1.forEach(docSnap => {
-      const d = docSnap.data() || {};
-      const n = normAnimalNo(d.animalNumber ?? d.number ?? d.tagNumber ?? '');
-      if (n) out.add(n);
+  async function postJson(path, payload) {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": getUserId()
+      },
+      body: JSON.stringify(payload || {})
     });
-  }catch(err){
-    console.error('animals by userId failed:', err);
+
+    return await res.json().catch(() => ({
+      ok: false,
+      ui: {
+        status: "error",
+        message: "تعذّر قراءة رد السيرفر."
+      }
+    }));
   }
 
-  try{
-    const q2 = query(
-      collection(db, 'animals'),
-      where('ownerUid', '==', uid),
-      limit(5000)
-    );
-
-    const snap2 = await getDocs(q2);
-    snap2.forEach(docSnap => {
-      const d = docSnap.data() || {};
-      const n = normAnimalNo(d.animalNumber ?? d.number ?? d.tagNumber ?? '');
-      if (n) out.add(n);
+  async function postForm(path, formData) {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: {
+        "X-User-Id": getUserId()
+      },
+      body: formData
     });
-  }catch(err){
-    console.error('animals by ownerUid failed:', err);
+
+    return await res.json().catch(() => ({
+      ok: false,
+      ui: {
+        status: "error",
+        message: "تعذّر قراءة رد السيرفر."
+      }
+    }));
   }
 
-  existingAnimalSet = out;
-  return out;
-}
+  function renderUi(ui) {
+    const rows = Array.isArray(ui?.rows) ? ui.rows : [];
+    lastPreviewRows = rows;
 
-function validateRowsAgainstAnimals(rows){
-  const animalSet = existingAnimalSet || new Set();
-  const seen = new Set();
+    const kpi = ui?.kpi || {};
+    kpiRows.textContent = String(kpi.totalRows ?? rows.length ?? 0);
+    kpiValid.textContent = String(kpi.validRows ?? rows.filter(r => r.valid === true).length);
+    kpiInvalid.textContent = String(kpi.invalidRows ?? rows.filter(r => r.valid !== true).length);
+    kpiMilk.textContent = String(kpi.totalMilk ?? "0.0");
 
-  return rows.map(row => {
-    if (!row.valid) return row;
+    previewRows.innerHTML = rows.map(row => {
+      const ok = row.valid === true;
+      const cls = ok ? "status-ok" : "status-bad";
+      const statusText = ok ? "جاهز" : (row.reason || "مرفوض");
 
-    const n = normAnimalNo(row.animalNumber || '');
+      return `
+        <tr>
+          <td class="num">${row.animalNumber || "—"}</td>
+          <td>${row.species || "—"}</td>
+          <td>${Number(row.milkS1 || 0) ? Number(row.milkS1 || 0).toFixed(1) : "—"}</td>
+          <td>${Number(row.milkS2 || 0) ? Number(row.milkS2 || 0).toFixed(1) : "—"}</td>
+          <td>${Number(row.milkS3 || 0) ? Number(row.milkS3 || 0).toFixed(1) : "—"}</td>
+          <td>${row.totalText || (Number(row.milkKg || 0) ? Number(row.milkKg || 0).toFixed(1) : "—")}</td>
+          <td class="${cls}">${statusText}</td>
+        </tr>
+      `;
+    }).join("");
 
-    if (!n){
-      return {
-        ...row,
-        valid: false,
-        reason: 'رقم الحيوان غير صالح'
-      };
-    }
+    previewWrap.classList.toggle("hide", rows.length === 0);
+    saveBtn.disabled = ui?.canSave !== true;
 
-    if (seen.has(n)){
-      return {
-        ...row,
-        valid: false,
-        reason: 'رقم مكرر داخل نفس الملف'
-      };
-    }
-
-    seen.add(n);
-
-    if (!animalSet.has(n)){
-      return {
-        ...row,
-        valid: false,
-        reason: 'رقم الحيوان غير موجود في مربيك'
-      };
-    }
-
-    if (!(Number(row.total || 0) > 0)){
-      return {
-        ...row,
-        valid: false,
-        reason: 'إجمالي اللبن غير صالح'
-      };
-    }
-
-    return row;
-  });
-}
-async function applyPreviewRows(rows, options = {}){
-  const {
-    autoLoaded = false,
-    sourceLabel = ''
-  } = options;
-
- if (!rows.length){
-  previewData = [];
-  renderPreview([]);
-  
-  showBar('warn', 'لم يتم العثور على صفوف قابلة للقراءة.');
-  return;
-}
-
-const uid = getUserId();
-if (!uid){
-  previewData = [];
-  renderPreview([]);
-  
-  showBar('err', 'تعذر تحديد المستخدم الحالي.');
-  return;
-}
-
-try{
-  await loadUserAnimalNumbers(uid);
-}catch(err){
-  console.error(err);
-  previewData = [];
-  renderPreview([]);
-  
-  showBar('err', 'تعذر تحميل قائمة الحيوانات من مربيك.');
-  return;
-}
-
-const checkedRows = validateRowsAgainstAnimals(rows);
-
-previewData = checkedRows;
-renderPreview(checkedRows);
-
-const autoMap = detectedHeaderParts?.length
-  ? detectColumnMap(detectedHeaderParts)
-  : null;
-
-
-
-if (detectedHeaderParts?.length && !isGoodAutoMap(autoMap)){
-  previewData = [];
-  renderPreview([]);
-  showBar('err', 'تعذر قراءة ملف المحلب بهذا التنسيق. ارفع ملف تصدير المحلب كما هو.');
-  return;
-}
-
-  const validCount = checkedRows.filter(x => x.valid).length;
-const invalidCount = checkedRows.length - validCount;
-const reasonCounts = {};
-checkedRows
-  .filter(x => !x.valid)
-  .forEach(x => {
-    const key = x.reason || 'مرفوض';
-    reasonCounts[key] = (reasonCounts[key] || 0) + 1;
-  });
-
-const reasonsText = Object.entries(reasonCounts)
-  .map(([k, v]) => `${k}: ${v}`)
-  .join(' — ');
-  if (!validCount){
-    showBar('warn', 'لا توجد صفوف صحيحة جاهزة للحفظ.');
-    return;
-  }
-
-if (autoLoaded && sourceLabel){
-  if (invalidCount > 0){
-    showBar('warn', `تم تحميل ${sourceLabel} ومعاينته تلقائيًا — ${validCount} صف جاهز و${invalidCount} صف مرفوض. ${reasonsText}`);
-  } else {
-    showBar('ok', `تم تحميل ${sourceLabel} ومعاينته تلقائيًا — ${validCount} صف جاهز للحفظ.`);
-  }
-  return;
-}
-
-if (invalidCount > 0){
-  showBar('warn', `تمت المعاينة — ${validCount} صف جاهز و${invalidCount} صف مرفوض. ${reasonsText}`);
-} else {
-  showBar('ok', `تمت المعاينة بنجاح — ${validCount} صف جاهز للحفظ.`);
-}
-}
-    function isExcelFile(file){
-  const name = String(file?.name || '').toLowerCase();
-  return name.endsWith('.xlsx') || name.endsWith('.xls');
-}
-
-function sheetRowsToText(rows){
-  return rows
-    .map(row => (Array.isArray(row) ? row : []))
-    .map(row => row.map(cell => {
-      if (cell == null) return '';
-      return String(cell).trim();
-    }).join(','))
-    .join('\n');
-}
-
-function scoreSheetRows(rows){
-  if (!Array.isArray(rows) || !rows.length) return 0;
-
-  let score = 0;
-  let headerParts = null;
-  let headerMap = null;
-  let dataLikeRows = 0;
-  let validAnimalRows = 0;
-  let milkLikeRows = 0;
-
-  const sampleRows = rows.slice(0, 60);
-
-  for (const row of sampleRows){
-    const parts = (Array.isArray(row) ? row : []).map(v => String(v ?? '').trim());
-    const joined = parts.join(' , ').trim();
-    if (!joined) continue;
-
-    if (!headerParts && looksLikeHeader(joined)){
-      headerParts = parts.slice();
-      headerMap = detectColumnMap(headerParts);
-
-      score += 10;
-
-      if (headerMap.animalIdx >= 0) score += 20;
-      if (headerMap.totalIdx >= 0) score += 18;
-      if (headerMap.s1Idx >= 0) score += 10;
-      if (headerMap.s2Idx >= 0) score += 10;
-      if (headerMap.s3Idx >= 0) score += 10;
-
-      continue;
-    }
-
-    if (headerMap && headerMap.animalIdx >= 0){
-      const animalNo = normAnimalNo(parts[headerMap.animalIdx] || '');
-      const totalVal = headerMap.totalIdx >= 0 ? numFromCell(parts[headerMap.totalIdx]) : null;
-      const v1 = headerMap.s1Idx >= 0 ? numFromCell(parts[headerMap.s1Idx]) : null;
-      const v2 = headerMap.s2Idx >= 0 ? numFromCell(parts[headerMap.s2Idx]) : null;
-      const v3 = headerMap.s3Idx >= 0 ? numFromCell(parts[headerMap.s3Idx]) : null;
-      const sessionVals = [v1, v2, v3].filter(v => v !== null && v >= 0);
-
-      if (animalNo) validAnimalRows++;
-      if ((totalVal !== null && totalVal > 0) || sessionVals.length >= 1) milkLikeRows++;
-      if (animalNo && ((totalVal !== null && totalVal > 0) || sessionVals.length >= 1)) dataLikeRows++;
-    } else {
-      const animalNo = normAnimalNo(parts[0] || '');
-      const nums = extractMilkNumbers(parts);
-
-      if (animalNo) validAnimalRows++;
-      if (nums.length) milkLikeRows++;
-      if (animalNo && nums.length) dataLikeRows++;
+    if (ui?.message) {
+      showBar(ui.status || "info", ui.message);
     }
   }
 
-  score += Math.min(validAnimalRows, 20) * 2;
-  score += Math.min(milkLikeRows, 20) * 2;
-  score += Math.min(dataLikeRows, 20) * 4;
+  async function makePreview() {
+    hideBar();
 
-  return score;
-}
-
-function workbookSheetToRows(workbook, sheetName){
-  const sheet = workbook.Sheets[sheetName];
-  if (!sheet) return [];
-  return XLSX.utils.sheet_to_json(sheet, {
-    header: 1,
-    defval: '',
-    blankrows: false,
-    raw: false
-  });
-}
-function pickPreferredMilkSheet(workbook){
-  const names = workbook.SheetNames || [];
-  if (!names.length) return null;
-
-  for (const name of names){
-    const rows = workbookSheetToRows(workbook, name);
-    if (!rows.length) continue;
-
-    const header = (rows[0] || []).map(v => normalizeHeaderCell(v));
-    const hasAnimal =
-      header.some(h => h.includes('animal number') || h.includes('animal id') || h.includes('رقم الحيوان'));
-    const hasMorning =
-      header.some(h => h.includes('morning milk') || h.includes('morning') || h.includes('حلبة 1'));
-    const hasNight =
-      header.some(h => h.includes('night milk') || h.includes('evening milk') || h.includes('evening') || h.includes('حلبة 2'));
-    const hasTotal =
-      header.some(h => h.includes('total milk') || h === 'total' || h.includes('yield'));
-
-    // الأفضل لملفات الجاموس ذات الحلبتين
-    if (hasAnimal && hasMorning && hasNight && hasTotal){
-      return { sheetName: name, rows };
+    const date = String(eventDate.value || "").trim();
+    if (!date) {
+      showBar("warning", "اختر تاريخ اليوم أولًا.");
+      return;
     }
-  }
 
-  return null;
-}
-function pickBestSheet(workbook){
-  const names = workbook.SheetNames || [];
-  if (!names.length) return { sheetName:'', rows:[] };
+    const file = fileInput.files?.[0] || null;
+    const rawText = String(batchInput.value || "").trim();
 
-  let best = {
-    sheetName: names[0],
-    rows: workbookSheetToRows(workbook, names[0]),
-    score: -1
-  };
-
-  for (const name of names){
-    const rows = workbookSheetToRows(workbook, name);
-    const score = scoreSheetRows(rows);
-
-    if (score > best.score){
-      best = { sheetName:name, rows, score };
+    if (!file && !rawText) {
+      showBar("warning", "ألصق بيانات المحلب أو حمّل ملف المحلب أولًا.");
+      return;
     }
-  }
 
-  return { sheetName: best.sheetName, rows: best.rows };
-}
+    previewBtn.disabled = true;
+    saveBtn.disabled = true;
+    clearBtn.disabled = true;
 
-async function readExcelFileAsText(file){
-  const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type:'array' });
+    try {
+      let data;
 
-  if (!workbook.SheetNames?.length){
-    throw new Error('EMPTY_WORKBOOK');
-  }
-
-const preferred = pickPreferredMilkSheet(workbook);
-const picked = preferred || pickBestSheet(workbook);
-
-if (!picked.sheetName || !picked.rows?.length){
-  throw new Error('NO_VALID_SHEET');
-}
-
-selectedSheetName = picked.sheetName;
-return sheetRowsToText(picked.rows);
-}
-function parseRawText(text){
-  const lines = String(text || '')
-    .replace(/\r/g,'')
-    .split('\n')
-    .map(x => x.trim())
-    .filter(Boolean);
-
-  const out = [];
-  let colMap = null;
-  detectedHeaderParts = null;
-  parsedLinesCache = [];
-  for (const line of lines){
-   const parts = splitSmartLine(line);
-if (!parts.length) continue;
-
-parsedLinesCache.push({ line, parts });
-
-if (looksLikeHeader(line)){
-  detectedHeaderParts = parts.slice();
-  colMap = detectColumnMap(parts);
-  continue;
-}
-
-    let animalNumber = '';
-    let s1 = 0, s2 = 0, s3 = 0, total = 0;
-    let kind = 'cow', species = 'أبقار', importMode = '';
-
-    if (colMap && colMap.animalIdx >= 0){
-      animalNumber = normAnimalNo(parts[colMap.animalIdx] || '');
-
-      const totalVal = colMap.totalIdx >= 0 ? numFromCell(parts[colMap.totalIdx]) : null;
-      const v1 = colMap.s1Idx >= 0 ? numFromCell(parts[colMap.s1Idx]) : null;
-      const v2 = colMap.s2Idx >= 0 ? numFromCell(parts[colMap.s2Idx]) : null;
-      const v3 = colMap.s3Idx >= 0 ? numFromCell(parts[colMap.s3Idx]) : null;
-
-      const sessionVals = [v1, v2, v3].filter(v => v !== null && v >= 0);
-
-      if (totalVal !== null && totalVal > 0){
-        total = totalVal;
-
-        if (sessionVals.length >= 3){
-          s1 = v1 || 0;
-          s2 = v2 || 0;
-          s3 = v3 || 0;
-          importMode = 'sessions_3';
-          kind = 'cow';
-          species = 'أبقار';
-      } else if (sessionVals.length === 2){
-  s1 = sessionVals[0] || 0;
-  s2 = sessionVals[1] || 0;
-  importMode = 'sessions_2';
-  kind = 'buffalo';
-  species = 'جاموس';
-}
-        else {
-          s1 = totalVal;
-          importMode = 'total_only';
-          kind = 'cow';
-          species = 'أبقار';
-        }
-      } else if (sessionVals.length >= 3){
-        s1 = v1 || 0;
-        s2 = v2 || 0;
-        s3 = v3 || 0;
-        total = s1 + s2 + s3;
-        importMode = 'sessions_3';
-        kind = 'cow';
-        species = 'أبقار';
-     } else if (sessionVals.length === 2){
-  s1 = sessionVals[0] || 0;
-  s2 = sessionVals[1] || 0;
-  total = s1 + s2;
-  importMode = 'sessions_2';
-  kind = 'buffalo';
-  species = 'جاموس';
-}
-    } else {
-      if (parts.length < 2){
-        out.push({
-          raw: line,
-          animalNumber: '',
-          s1: 0, s2: 0, s3: 0,
-          total: 0,
-          valid: false,
-          reason: 'السطر لا يحتوي على رقم الحيوان وبيانات اللبن'
+      if (file) {
+        const fd = new FormData();
+        fd.append("eventDate", date);
+        fd.append("file", file);
+        data = await postForm("/api/daily-milk/import/preview", fd);
+      } else {
+        data = await postJson("/api/daily-milk/import/preview", {
+          eventDate: date,
+          rawText
         });
-        continue;
       }
 
-      animalNumber = normAnimalNo(parts[0]);
-      const nums = extractMilkNumbers(parts);
-
-      if (nums.length === 1){
-        total = nums[0];
-        s1 = total;
-        kind = 'cow';
-        species = 'أبقار';
-        importMode = 'total_only';
-      } else if (nums.length === 2){
-        s1 = nums[0];
-        s2 = nums[1];
-        total = s1 + s2;
-        kind = 'buffalo';
-        species = 'جاموس';
-        importMode = 'sessions_2';
-      } else if (nums.length >= 3){
-        s1 = nums[0] || 0;
-        s2 = nums[1] || 0;
-        s3 = nums[2] || 0;
-        total = s1 + s2 + s3;
-        kind = 'cow';
-        species = 'أبقار';
-        importMode = 'sessions_3';
-      }
-    }
-
-    if (!animalNumber){
-      out.push({
-        raw: line,
-        animalNumber: '',
-        s1: 0, s2: 0, s3: 0,
-        total: 0,
-        valid: false,
-        reason: 'رقم الحيوان غير صالح'
+      renderUi(data.ui || {
+        status: data.ok ? "success" : "error",
+        message: data.message || "تم استلام رد السيرفر.",
+        rows: data.rows || []
       });
-      continue;
-    }
 
-    if (!(total > 0)){
-      out.push({
-        raw: line,
-        animalNumber,
-        s1: 0, s2: 0, s3: 0,
-        total: 0,
-        valid: false,
-        reason: 'لم يتم العثور على قيم لبن صالحة'
-      });
-      continue;
-    }
-
-    out.push({
-      raw: line,
-      animalNumber,
-      s1, s2, s3,
-      total,
-      valid: true,
-      reason: '',
-      kind,
-      species,
-      importMode
-    });
-  }
-
-  return out;
-}
-
-    function renderPreview(rows){
-      previewRows.innerHTML = rows.map(row => {
-        const statusClass = row.valid ? 'status-ok' : 'status-bad';
-       const statusText = row.valid
-  ? (
-      row.importMode === 'total_only' ? 'جاهز (إجمالي فقط)' :
-      row.importMode === 'sessions_2' ? 'جاهز (حلبتان)' :
-      'جاهز (3 حلبات)'
-    )
-  : (row.reason || 'مرفوض');
-        return `
-          <tr>
-            <td class="num">${row.animalNumber || '—'}</td>
-            <td>${row.species || '—'}</td>
-            <td>${row.s1 ? row.s1.toFixed(1) : '—'}</td>
-            <td>${row.s2 ? row.s2.toFixed(1) : '—'}</td>
-            <td>${row.s3 ? row.s3.toFixed(1) : '—'}</td>
-            <td>${row.total ? row.total.toFixed(1) : '0.0'}</td>
-          <td class="${statusClass}" title="${row.reason || ''}">${statusText}</td>
-          </tr>
-        `;
-      }).join('');
-
-      previewWrap.classList.toggle('hide', !rows.length);
-
-      const totalRows = rows.length;
-      const validRows = rows.filter(x => x.valid).length;
-      const invalidRows = totalRows - validRows;
-      const milkTotal = rows.filter(x => x.valid).reduce((s, x) => s + (x.total || 0), 0);
-
-      kpiRows.textContent = String(totalRows);
-      kpiValid.textContent = String(validRows);
-      kpiInvalid.textContent = String(invalidRows);
-      kpiMilk.textContent = milkTotal.toFixed(1);
-    }
-
-    async function makePreview(){
-  hideBar();
-
-const date = String(eventDate.value || '').trim();
-if (!date){
-  showBar('warn', 'اختر تاريخ اليوم أولًا.');
-  return;
-}
-
-const raw = String(batchInput.value || '').trim();
-if (!raw){
-  showBar('warn', 'ألصق بيانات المحلب أو حمّل ملف المحلب أولًا.');
-  return;
-}
-
-const rows = parseRawText(raw);
-await applyPreviewRows(rows);
-    }
-
-    async function saveAll(){
-      hideBar();
-
-      const uid = getUserId();
-      if (!uid){
-        showBar('err', 'تعذر تحديد المستخدم الحالي.');
-        return;
-      }
-
-      const date = String(eventDate.value || '').trim();
-      if (!date){
-        showBar('warn', 'اختر تاريخ اليوم أولًا.');
-        return;
-      }
-
-      const validRows = previewData.filter(x => x.valid);
-      if (!validRows.length){
-        showBar('warn', 'لا توجد صفوف صحيحة جاهزة للحفظ.');
-        return;
-      }
-
-      saveBtn.disabled = true;
-      previewBtn.disabled = true;
-      clearBtn.disabled = true;
-
-      let saved = 0;
-      let failed = 0;
-      const rejected = [];
-
-      for (const row of validRows){
-       const payload = {
-  userId: uid,
-  animalId: row.animalNumber,
-  animalNumber: row.animalNumber,
-  eventType: 'لبن يومي',
-  type: 'daily_milk',
-  eventDate: date,
-  kind: row.kind === 'buffalo' ? 'buffalo' : 'cow',
-  importMode: row.importMode || 'sessions_3',
-  milkSessions:
-    row.importMode === 'total_only'
-      ? [{ n:1, kg:row.total }]
-      : row.kind === 'buffalo'
-        ? [{ n:1, kg:row.s1 }, { n:2, kg:row.s2 }]
-        : [{ n:1, kg:row.s1 }, { n:2, kg:row.s2 }, { n:3, kg:row.s3 }],
-  milkKg: Number(row.total.toFixed(1)),
-  source: '/daily-milk-import.html',
-  createdAt: serverTimestamp()
-};
-
-       try{
-  const eventId = makeDailyMilkDocId(uid, row.animalNumber, date);
-
-  await setDoc(
-    doc(collection(db, 'events'), eventId),
-    payload,
-    { merge: true }
-  );
-
-  try{
-    await window.updateAnimalByEvent(payload);
-  }catch(e){
-    console.error('Animal update failed:', e);
-  }
-
-  saved++;
-}catch(err){
-  console.error(err);
-  failed++;
-  rejected.push(row.animalNumber);
-}
-      }
-
-      saveBtn.disabled = false;
+    } catch (_) {
+      showBar("error", "تعذّرت معاينة بيانات المحلب الآن.");
+    } finally {
       previewBtn.disabled = false;
       clearBtn.disabled = false;
+    }
+  }
 
-      if (saved && !failed){
-        showBar('ok', `✅ تم حفظ ${saved} سجل لبن بنجاح.`);
-        try{ window.scrollTo({ top:0, behavior:'smooth' }); }catch(_){}
-        return;
-      }
+  async function saveAll() {
+    hideBar();
 
-      if (saved && failed){
-        showBar('warn', `تم حفظ ${saved} سجل — وتعذر حفظ ${failed} (${rejected.join(' - ')})`);
-        try{ window.scrollTo({ top:0, behavior:'smooth' }); }catch(_){}
-        return;
-      }
-
-      showBar('err', 'تعذر حفظ السجلات الآن.');
+    const date = String(eventDate.value || "").trim();
+    if (!date) {
+      showBar("warning", "اختر تاريخ اليوم أولًا.");
+      return;
     }
 
-  function clearAll(){
-  hideBar();
-  batchInput.value = '';
-  fileInput.value = '';
-  fileTextCache = '';
-  previewData = [];
-  parsedLinesCache = [];
-  detectedHeaderParts = null;
-  selectedSheetName = '';
-  
-  renderPreview([]);
-}
+    const rows = lastPreviewRows.filter(r => r.valid === true);
+    if (!rows.length) {
+      showBar("warning", "لا توجد صفوف صحيحة جاهزة للحفظ.");
+      return;
+    }
 
-      loadFileBtn.addEventListener('click', () => {
-      fileInput.click();
+    saveBtn.disabled = true;
+    previewBtn.disabled = true;
+    clearBtn.disabled = true;
+
+    try {
+      const data = await postJson("/api/daily-milk/import/save", {
+        eventDate: date,
+        rows
+      });
+
+      renderUi(data.ui || {
+        status: data.ok ? "success" : "error",
+        message: data.message || "تم استلام رد السيرفر.",
+        rows: []
+      });
+
+    } catch (_) {
+      showBar("error", "تعذّر حفظ بيانات المحلب الآن.");
+    } finally {
+      previewBtn.disabled = false;
+      clearBtn.disabled = false;
+      saveBtn.disabled = lastPreviewRows.filter(r => r.valid === true).length === 0;
+    }
+  }
+
+  function clearAll() {
+    hideBar();
+    batchInput.value = "";
+    fileInput.value = "";
+    lastPreviewRows = [];
+    renderUi({
+      rows: [],
+      kpi: {
+        totalRows: 0,
+        validRows: 0,
+        invalidRows: 0,
+        totalMilk: "0.0"
+      },
+      canSave: false
     });
-
-   fileInput.addEventListener('change', async (e) => {
-  const f = e.target.files?.[0];
-  if (!f){
-    fileTextCache = '';
-    return;
   }
 
-  try{
-    let text = '';
+  loadFileBtn.addEventListener("click", () => {
+    fileInput.click();
+  });
 
-    if (isExcelFile(f)){
-      text = await readExcelFileAsText(f);
-    } else {
-      text = await f.text();
+  fileInput.addEventListener("change", async () => {
+    const f = fileInput.files?.[0];
+    if (!f) return;
+
+    const date = String(eventDate.value || "").trim();
+    if (!date) {
+      showBar("warning", "تم اختيار الملف. اختر تاريخ اليوم ثم اضغط معاينة.");
+      return;
     }
 
-fileTextCache = text;
-batchInput.value = text;
-
-const date = String(eventDate.value || '').trim();
-if (!date){
-  showBar('warn', 'تم تحميل الملف. اختر تاريخ اليوم ثم ستتم المعاينة.');
-  return;
-}
-
-const rows = parseRawText(text);
-
-if (isExcelFile(f) && selectedSheetName){
-  await applyPreviewRows(rows, {
-    autoLoaded: true,
-    sourceLabel: `ملف Excel — ${selectedSheetName}`
+    await makePreview();
   });
-} else {
-  await applyPreviewRows(rows, {
-    autoLoaded: true,
-    sourceLabel: f.name
-  });
-}
-  }catch(err){
-    console.error(err);
-    fileTextCache = '';
-    batchInput.value = '';
-    showBar('err', 'تعذر قراءة ملف المحلب. تأكد أن الملف Excel أو CSV أو TXT صالح.');
-  }
-});
-previewBtn.addEventListener('click', makePreview);
-clearBtn.addEventListener('click', clearAll);
 
+  previewBtn.addEventListener("click", makePreview);
+  saveBtn.addEventListener("click", saveAll);
+  clearBtn.addEventListener("click", clearAll);
 
-saveBtn.addEventListener('click', saveAll);
-    const qs = new URLSearchParams(location.search);
-    const rawDate = String(qs.get('eventDate') || qs.get('date') || '').trim();
-    eventDate.value = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayISO();
+  const qs = new URLSearchParams(location.search);
+  const rawDate = String(qs.get("eventDate") || qs.get("date") || "").trim();
+  eventDate.value = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayISO();
 
-    renderPreview([]);
-  </script>
+  clearAll();
+</script>
 </body>
 </html>
