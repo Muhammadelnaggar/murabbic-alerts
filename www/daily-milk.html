@@ -239,6 +239,7 @@
   const openCowCardBtn = $("openCowCardBtn");
 
   const singleSaveBtn = form?.querySelector('button[type="submit"]');
+  const singleActions = singleSaveBtn?.closest(".btn-row");
 
   const inputSlots = {
     milkS1: { input: $("s1"), label: $("s1label"), wrap: $("s1")?.closest(".col") },
@@ -320,6 +321,8 @@
 
     bulkBox?.classList.add("hide");
     sessionsBox?.classList.remove("hide");
+    singleActions?.classList.remove("hide");
+    openCowCardBtn?.classList.remove("hide");
 
     Object.values(inputSlots).forEach(slot => {
       slot.wrap?.classList.add("hide");
@@ -343,6 +346,8 @@
 
     bulkBox?.classList.remove("hide");
     sessionsBox?.classList.add("hide");
+    singleActions?.classList.add("hide");
+    openCowCardBtn?.classList.add("hide");
 
     const animalCol = animalInput?.closest(".col");
     const dateCol = dateInput?.closest(".col");
