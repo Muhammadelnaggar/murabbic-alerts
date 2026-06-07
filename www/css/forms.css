@@ -813,3 +813,10 @@ textarea{
     grid-template-columns:repeat(2,1fr);
   }
 }
+.actions-bar.inline{
+  position:static;
+  margin-top:14px;
+  box-shadow:none;
+  border:0;
+  padding:0;
+}
