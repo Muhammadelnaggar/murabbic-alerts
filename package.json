@@ -13,10 +13,11 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
- "dependencies": {
+"dependencies": {
   "cors": "^2.8.5",
   "express": "^5.1.0",
   "firebase-admin": "^12.5.0",
+  "sharp": "^0.33.5",
   "xlsx": "^0.18.5"
 },
   "devDependencies": {
