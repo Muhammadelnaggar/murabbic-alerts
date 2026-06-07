@@ -118,10 +118,11 @@
         </div>
       </div>
 
-      <div class="preview-wrap">
-        <video id="preview" playsinline autoplay muted></video>
-        <canvas id="overlay"></canvas>
-      </div>
+<div class="preview-wrap">
+  <video id="preview" playsinline autoplay muted></video>
+  <img id="photoPreview" alt="الصورة المختارة" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;" />
+  <canvas id="overlay"></canvas>
+</div>
 
       <div class="thumbs" id="thumbs"></div>
 
@@ -156,6 +157,7 @@
   const $$ = (s, p = document) => Array.from(p.querySelectorAll(s));
 
   const preview = $("#preview");
+  const photoPreview = $("#photoPreview");
   const overlay = $("#overlay");
   const cameraSelect = $("#cameraSelect");
   const toggleFlash = $("#toggleFlash");
@@ -338,7 +340,14 @@
 
   async function startCamera(deviceId) {
     await stopCamera();
+    if (photoPreview) {
+  photoPreview.style.display = "none";
+  photoPreview.removeAttribute("src");
+}
 
+if (preview) {
+  preview.style.display = "block";
+}
     const constraints = {
       video: {
         facingMode: deviceId ? undefined : { ideal: "environment" },
@@ -583,24 +592,27 @@
   state.captures[state.currentAngle] = url;
   state.analysis = null;
 
-  /* عرض الصورة المختارة مكان الكاميرا */
-  try {
-    if (state.stream) {
-      state.stream.getTracks().forEach(t => t.stop());
-      state.stream = null;
-      state.track = null;
-    }
-
-   preview.pause();
-preview.removeAttribute("srcObject");
-preview.removeAttribute("src");
-preview.srcObject = null;
-preview.poster = url;
-preview.style.objectFit = "contain";
-preview.load();
-  } catch (e) {
-    console.warn("BCS uploaded preview display error:", e);
+ /* عرض الصورة المختارة مكان الكاميرا */
+try {
+  if (state.stream) {
+    state.stream.getTracks().forEach(t => t.stop());
+    state.stream = null;
+    state.track = null;
   }
+
+  if (preview) {
+    preview.pause();
+    preview.srcObject = null;
+    preview.style.display = "none";
+  }
+
+  if (photoPreview) {
+    photoPreview.src = url;
+    photoPreview.style.display = "block";
+  }
+} catch (e) {
+  console.warn("BCS uploaded preview display error:", e);
+}
 
   renderThumbs();
   updateButtons();
