@@ -14847,6 +14847,208 @@ app.post('/api/heat/save', requireUserId, async (req, res) => {
   }
 });
 // ============================================================
+//                 API: BCS SAVE (server-only)
+//                 تقييم حالة الجسم — حفظ وتحديث الحيوان
+// ============================================================
+
+function bcsNormalizeKindSrv(v = "") {
+  const s = String(v || "").trim().toLowerCase();
+  if (/buffalo|جاموس/.test(s)) return "buffalo";
+  return "cow";
+}
+
+function bcsKindArabicSrv(kind = "") {
+  return bcsNormalizeKindSrv(kind) === "buffalo" ? "جاموس" : "أبقار";
+}
+
+function bcsLabelSrv(score) {
+  const s = Number(score);
+  if (!Number.isFinite(s)) return "غير محدد";
+  if (s < 1.6) return "نحيفة جدًا";
+  if (s < 2.5) return "نحيفة";
+  if (Math.abs(s - 3) < 0.06) return "مثالية";
+  if (s < 3.7) return "تميل للسمنة";
+  if (s < 4.6) return "سمينة";
+  return "سمينة جدًا";
+}
+
+function bcsBuildNoteSrv({ score, kind, animalType, userComment }) {
+  const k = bcsNormalizeKindSrv(kind);
+  const range = k === "buffalo" ? "1–5" : "2–5";
+  const kindTx = bcsKindArabicSrv(k);
+  const typeTx = animalType ? `، التصنيف: ${animalType}` : "";
+  const label = bcsLabelSrv(score);
+  const base = `BCS ${Number(score).toFixed(2)} (${label}) — النوع: ${kindTx}${typeTx} — النطاق ${range}؛ المثالي ≈ 3.`;
+  const extra = String(userComment || "").trim();
+  return extra ? `${base} — ملاحظة: ${extra}` : base;
+}
+
+app.post("/api/bcs/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        message: "تعذّر حفظ تقييم حالة الجسم — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
+    const animalNumber = calvingNormDigitsOnlySrv(body.animalNumber || body.number || "");
+    const animalIdFromPage = String(body.animalId || "").trim();
+
+    const score = Number(body.score ?? body.bcs ?? body.value);
+    const kind = bcsNormalizeKindSrv(body.kind || body.animalKind || body.species);
+    const animalType = String(body.animalType || body.typeLabel || "").trim();
+    const userComment = String(body.comment || body.notes || "").trim();
+
+    if (!animalNumber && !animalIdFromPage) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ رقم الحيوان مطلوب."
+      });
+    }
+
+    if (!calvingIsDateSrv(eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ تاريخ التقييم غير صالح."
+      });
+    }
+
+    if (!Number.isFinite(score)) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ درجة الحالة الجثمانية غير صالحة."
+      });
+    }
+
+    const minScore = kind === "buffalo" ? 1 : 2;
+    const maxScore = 5;
+
+    if (score < minScore || score > maxScore) {
+      return res.status(400).json({
+        ok: false,
+        message: `❌ درجة الحالة الجثمانية خارج النطاق المسموح (${minScore}–${maxScore}).`
+      });
+    }
+
+    let animal = null;
+    let animalDoc = null;
+
+    if (animalNumber) {
+      animal = await findAnimalDocByNumberSrv(uid, animalNumber);
+      animalDoc = await findAnimalDocRefByNumberForTenant(uid, animalNumber);
+    }
+
+    if (!animal && animalIdFromPage) {
+      const ref = db.collection("animals").doc(animalIdFromPage);
+      const snap = await ref.get();
+      const data = snap.exists ? (snap.data() || {}) : null;
+      const owner = String(data?.userId || data?.ownerUid || "").trim();
+
+      if (data && owner === uid) {
+        animal = { id: snap.id, ...data };
+        animalDoc = snap;
+      }
+    }
+
+    if (!animal || !animalDoc) {
+      return res.status(404).json({
+        ok: false,
+        message: "❌ الحيوان غير موجود في القطيع/حسابك."
+      });
+    }
+
+    const st = String(animal.status || "active").trim().toLowerCase();
+    if (st === "inactive" || st === "archived") {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ لا يمكن تسجيل تقييم لحيوان خارج القطيع."
+      });
+    }
+
+    const finalAnimalNumber = String(animal.animalNumber || animal.number || animalNumber || "").trim();
+    const finalAnimalId = String(animal.id || animalDoc.id || animalIdFromPage || "").trim();
+
+    const roundedScore = Number(score.toFixed(2));
+    const label = bcsLabelSrv(roundedScore);
+    const notes = bcsBuildNoteSrv({
+      score: roundedScore,
+      kind,
+      animalType,
+      userComment
+    });
+
+    const eventRef = db.collection("events").doc();
+
+    const payload = {
+      userId: uid,
+      animalId: finalAnimalId,
+      animalNumber: finalAnimalNumber,
+
+      type: "تقييم حالة الجسم",
+      eventType: "تقييم حالة الجسم",
+      eventTypeNorm: "bcs_eval",
+
+      date: eventDate,
+      eventDate,
+
+      score: roundedScore,
+      value: roundedScore,
+      bcs: roundedScore,
+      label,
+      kind,
+      species: bcsKindArabicSrv(kind),
+      animalType: animalType || null,
+      notes,
+      comment: userComment || null,
+
+      source: "server:/api/bcs/save",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const batch = db.batch();
+
+    batch.set(eventRef, payload);
+
+    batch.set(animalDoc.ref, {
+      lastBCS: roundedScore,
+      lastBcs: roundedScore,
+      lastBCSDate: eventDate,
+      lastBcsDate: eventDate,
+      lastBCSLabel: label,
+      lastBcsLabel: label,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    await batch.commit();
+
+    return res.json({
+      ok: true,
+      message: "✅ تم حفظ تقييم حالة الجسم بنجاح",
+      id: eventRef.id,
+      eventId: eventRef.id,
+      animalId: finalAnimalId,
+      animalNumber: finalAnimalNumber,
+      eventDate,
+      score: roundedScore,
+      label,
+      saved: payload
+    });
+
+  } catch (e) {
+    console.error("bcs-save", e);
+    return res.status(500).json({
+      ok: false,
+      message: "تعذّر حفظ تقييم حالة الجسم الآن."
+    });
+  }
+});
+// ============================================================
 //                       API: ANIMALS (robust)
 // ============================================================
 
