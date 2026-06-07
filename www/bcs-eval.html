@@ -591,12 +591,13 @@
       state.track = null;
     }
 
-    preview.pause();
-    preview.removeAttribute("srcObject");
-    preview.srcObject = null;
-    preview.src = url;
-    preview.style.objectFit = "contain";
-    preview.load();
+   preview.pause();
+preview.removeAttribute("srcObject");
+preview.removeAttribute("src");
+preview.srcObject = null;
+preview.poster = url;
+preview.style.objectFit = "contain";
+preview.load();
   } catch (e) {
     console.warn("BCS uploaded preview display error:", e);
   }
