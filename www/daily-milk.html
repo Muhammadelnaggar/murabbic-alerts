@@ -4,13 +4,9 @@
   <meta charset="UTF-8" />
   <title>تسجيل إنتاج اللبن اليومي — مُرَبِّك</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
- <script type="module">
-  import { updateAnimalByEvent } from "/js/animal-update.js";
-  window.updateAnimalByEvent = updateAnimalByEvent;
-</script>
 
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+ 
   <style>
     :root{
       --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --card:#ffffff;
@@ -155,7 +151,7 @@
     <!-- رسالة عامة للمستخدم عند الحاجة فقط -->
     <div id="msg" class="msg" aria-live="polite"></div>
 
-    <form id="milkForm" data-validate="true" data-event="لبن يومي" autocomplete="off" novalidate>
+   <form id="milkForm" autocomplete="off" novalidate>
   <div id="sysbar" class="infobar"></div>
 <div id="bulkBox" class="hide">
   <div id="bulkDateBar" style="display:none;margin:0 0 12px 0"></div>
@@ -234,580 +230,589 @@
     </form>
   </div>
 
-  <script type="module">
-    // ===== إعداد وضع التطوير الاختياري =====
+ <script type="module">
+  const $ = (id) => document.getElementById(id);
 
-    const DEV = new URL(location.href).searchParams.get('debug') === '1' || localStorage.getItem('debug') === '1';
-    const devbar = document.getElementById('devbar');
-    function dev(msg){ if(DEV){ devbar.style.display='block'; devbar.textContent = String(msg); } console.error(msg); }
+  const form = $("milkForm");
+  const inputAnimal = $("animalNumber");
+  const inputDate = $("eventDate");
+  const sysbar = $("sysbar");
+  const msgBox = $("msg");
 
-    // ===== أدوات عامة =====
-    const $ = (id)=> document.getElementById(id);
-    const msgBox = $('msg');
-    function showMsg(text){ msgBox.textContent = text; msgBox.style.display = 'block'; }
-    function hideMsg(){ msgBox.textContent=''; msgBox.style.display = 'none'; }
-    function getQS(k){ return new URL(location.href).searchParams.get(k) || ''; }
-    function firstNonEmpty(...vals){ return vals.find(v => (v ?? '').toString().trim() !== '') || ''; }
-    function buildUrl(path, params){
-      const u = new URL(path, location.origin);
-      Object.entries(params||{}).forEach(([k,v])=>{
-        if ((v ?? '').toString().trim() !== '') u.searchParams.set(k, v);
-      });
-      return u.toString();
-    }
-    function toNum(v){ const n = parseFloat(String(v).replace(',', '.')); return Number.isFinite(n) ? n : 0; }
+  const colS3 = $("col-s3");
+  const s1label = $("s1label");
+  const s2label = $("s2label");
+  const s3label = $("s3label");
 
-    // ===== تفعيل/إخفاء الحلبة الثالثة حسب النوع =====
-    const colS3 = $('col-s3'), s1label = $('s1label'), s2label = $('s2label'), s3label = $('s3label');
-    function applyKindUI(kind){
-      if (kind === 'buffalo'){
-        colS3.classList.add('hide'); s1label.textContent='حلبة صباح (كجم)'; s2label.textContent='حلبة مساء (كجم)';
-      } else {
-        colS3.classList.remove('hide'); s1label.textContent='حلبة 1 (كجم)'; s2label.textContent='حلبة 2 (كجم)'; s3label.textContent='حلبة 3 (كجم)';
-      }
-    }
+  const s1Input = $("s1");
+  const s2Input = $("s2");
+  const s3Input = $("s3");
 
-    // ===== تهيئة السياق =====
-const inputAnimal = $('animalNumber');
-const inputDate   = $('eventDate');
-const qsMode = firstNonEmpty(getQS('mode'));
-const qsNumbersRaw = firstNonEmpty(getQS('numbers'));
+  const bulkBox = $("bulkBox");
+  const bulkDateBar = $("bulkDateBar");
+  const bulkInfo = $("bulkInfo");
+  const bulkRows = $("bulkRows");
+  const saveBulkBtn = $("saveBulkBtn");
+  const cancelBulkBtn = $("cancelBulkBtn");
+  const openCowCardBtn = $("openCowCardBtn");
 
-const qsAnimal = firstNonEmpty(getQS('animalId'), getQS('number'), getQS('animalNumber'),
-                               localStorage.getItem('lastAnimalId'), localStorage.getItem('currentAnimalId'));
-const qsDate   = firstNonEmpty(getQS('date'), getQS('eventDate'),
-                               localStorage.getItem('eventDate'), localStorage.getItem('lastEventDate'));
-const qsKind   = firstNonEmpty(getQS('kind'), getQS('type'), localStorage.getItem('lastKind'));
+  const goAddEventBtn = $("goAddEvent");
+  const backDashBtn = $("backDash");
+  const confirmBox = $("confirmBox");
 
-function parseBulkNumbers(raw){
-  const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-  return [...new Set(
-    String(raw || '')
-      .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
-      .split(/[,\n،;\s]+/)
-      .map(x => x.trim())
-      .filter(Boolean)
-  )];
-}
-
-const bulkNumbers = parseBulkNumbers(qsNumbersRaw);
-const isBulkMode = (qsMode === 'bulk' && bulkNumbers.length > 1);
-
-if (!isBulkMode && !inputAnimal.value && qsAnimal) inputAnimal.value = qsAnimal;
-if (!inputDate.value && qsDate) inputDate.value = qsDate;
-   
-
-    // ===== ربط فايرستور (من غير أي رسائل تقنية للمستخدم) =====
-   let db, addDoc, collection, serverTimestamp, query, where, getDocs, limit;
-    async function ensureDb(){
-      try{
-        const appMod = await import('/js/firebase-config.js');
-        const app = appMod.app || appMod.default || appMod;
-        const mod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-        db = appMod.db || mod.getFirestore(app.app || app);
-       addDoc = mod.addDoc;
-collection = mod.collection;
-serverTimestamp = mod.serverTimestamp;
-query = mod.query;
-where = mod.where;
-getDocs = mod.getDocs;
-limit = mod.limit;
-      } catch (e){
-        // لا نعرض أي تحذير للمستخدم — فقط سجل للمطور
-        dev('Firebase init failed: ' + (e?.message || e));
-      }
-    }
-    await ensureDb();
-
-    // ===== منطق الإرسال =====
-    const form = $('milkForm');
-    const confirmBox = $('confirmBox');
-    const totalLine = $('totalLine');
-const goAddEventBtn = $('goAddEvent');
-const backDashBtn = $('backDash');
-const openCowCardBtn = $('openCowCardBtn');
-
-openCowCardBtn?.addEventListener('click', () => {
-  const n = inputAnimal.value.trim();
-  if (!n) return;
-  location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
-});
-    const sysbar = document.getElementById("sysbar");
-function showSaveOK(text){
-  if (!sysbar) return;
-  sysbar.style.display = "block";
-  sysbar.style.border = "1px solid #86efac";
-  sysbar.style.background = "#ecfdf5";
-  sysbar.style.color = "#065f46";
-  sysbar.style.padding = "12px 14px";
-  sysbar.style.borderRadius = "12px";
-  sysbar.style.margin = "12px 0";
-  sysbar.style.fontWeight = "800";
-  sysbar.textContent = text;
-  try { sysbar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_){}
-}
-
-const bulkBox = $('bulkBox');
-const bulkDateBar = $('bulkDateBar');
-const bulkInfo = $('bulkInfo');
-const bulkRows = $('bulkRows');
-const saveBulkBtn = $('saveBulkBtn');
-const cancelBulkBtn = $('cancelBulkBtn');
-const s1Input = $('s1');
-const s2Input = $('s2');
-const s3Input = $('s3');
-
-let bulkSubmitState = null;
-function applyCentralDailyMilkPreviewToRows(preview) {
-  const validMap = new Map(
-    (preview?.valid || []).map(x => [String(x.number || "").trim(), x])
-  );
-
-  const rejectedMap = new Map(
-    (preview?.rejected || []).map(x => [String(x.number || "").trim(), x.reason || "مرفوض"])
-  );
-
-  const rows = Array.from(document.querySelectorAll('.bulk-row'));
-  let ok = 0;
-  let bad = 0;
-
-  for (const row of rows) {
-    const n = String(row.dataset.number || '').trim();
-
-   if (validMap.has(n)) {
-  const item = validMap.get(n) || {};
-  row.dataset.eligible = '1';
-  row.style.opacity = '1';
-  row.style.filter = 'none';
-
-  const sp = String(item.species || '').trim();
-  const kind = (sp === 'جاموس') ? 'buffalo' : 'cow';
-
-  // ✅ خزّن بيانات الحيوان نفسها على الصف لاستخدامها وقت الحفظ
-  row.__animalDoc = item.documentData || null;
-  row.dataset.animalId = String(item.animalId || "");
-  row.dataset.species = sp || "أبقار";
-
-  applyBulkRowKind(row, kind);
-
-  row.querySelectorAll('input').forEach(inp => { inp.disabled = false; });
-  ok++;
-  continue;
-}
-
-    row.dataset.eligible = '0';
-    row.style.opacity = '0.55';
-    row.style.filter = 'grayscale(.15)';
-
-    const kindCell = row.querySelector('.bulk-kind-cell');
-    if (kindCell) {
-      kindCell.textContent = rejectedMap.get(n) || 'مرفوض';
-      kindCell.style.color = '#b91c1c';
-      kindCell.style.fontWeight = '800';
-    }
-
-    row.querySelectorAll('input').forEach(inp => {
-      inp.disabled = true;
-      inp.value = '';
-    });
-
-    updateBulkRowTotal(row);
-    bad++;
-  }
-
-  if (ok && !bad) {
-    bulkInfo.textContent = `إدخال جماعي: ${ok} حيوان جاهز`;
-    return;
-  }
-
-  if (ok && bad) {
-    bulkInfo.textContent = `إدخال جماعي: ${ok} جاهز — ${bad} مرفوض`;
-    return;
-  }
-
-  bulkInfo.textContent = `إدخال جماعي: لا توجد أرقام مؤهلة`;
-}
-
-function fillSingleFormFromBulkRow(row, eventDate){
-  const animalNumber = String(row.dataset.number || '').trim();
-  const kind = String(row.dataset.kind || 'cow').trim();
-  const s1 = toNum(row.querySelector('.bulk-s1')?.value);
-  const s2 = toNum(row.querySelector('.bulk-s2')?.value);
-  const s3 = toNum(row.querySelector('.bulk-s3')?.value);
-
-  inputAnimal.value = animalNumber;
-  inputDate.value = eventDate;
-  applyKindUI(kind);
-
-  s1Input.value = s1 > 0 ? String(s1) : '';
-  s2Input.value = s2 > 0 ? String(s2) : '';
-  s3Input.value = (kind === 'buffalo') ? '' : (s3 > 0 ? String(s3) : '');
-
-  // ✅ أهم نقطة: مرّر وثيقة الحيوان نفسها للمركزي قبل submit
-  form.__mbkDoc = row.__animalDoc || null;
-  form.__mbkAnimalId = String(row.dataset.animalId || "");
-
-  return {
-    animalNumber,
-    kind,
-    s1,
-    s2,
-    s3,
-    animalId: form.__mbkAnimalId,
-    documentData: form.__mbkDoc
+  let gateState = {
+    allowed: false,
+    accepted: [],
+    rejected: [],
+    byNumber: new Map()
   };
-}
 
-function settleBulkSubmit(result){
-  if (!bulkSubmitState) return false;
-  clearTimeout(bulkSubmitState.timer);
-  const resolve = bulkSubmitState.resolve;
-  bulkSubmitState = null;
-  resolve(result);
-  return true;
-}
-
-function submitOneBulkRowThroughCentral(){
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      if (!bulkSubmitState) return;
-      bulkSubmitState = null;
-      resolve({ ok:false, reason:'timeout' });
-    }, 3000);
-
-    bulkSubmitState = { resolve, timer };
-    form.requestSubmit();
-  });
-}
-function bulkRowHtml(n){
-  return `
-    <tr class="bulk-row" data-number="${n}" data-kind="cow">
-      <td style="padding:8px 6px;background:#fff;border:1px solid #e2e8f0;border-left:none;border-radius:0 12px 12px 0;font-weight:800;white-space:nowrap;font-size:15px">
-        ${n}
-      </td>
-
-     <td class="bulk-kind-cell" style="padding:8px 6px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:#0b7f47;font-size:14px">
-        ...
-      </td>
-
-      <td style="padding:6px 4px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
-       <input type="number" class="bulk-s1" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:100%;min-width:0;padding:10px 6px;text-align:center" />
-      </td>
-
-     <td style="padding:6px 4px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
-       <input type="number" class="bulk-s2" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:100%;min-width:0;padding:10px 6px;text-align:center" />
-      </td>
-
-      <td class="bulk-s3-cell" style="padding:8px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
-      <input type="number" class="bulk-s3" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:100%;min-width:0;padding:10px 6px;text-align:center" />
-      </td>
-
-      <td style="padding:8px 6px;background:#fff;border:1px solid #e2e8f0;border-right:none;border-radius:12px 0 0 12px;text-align:center;font-size:14px">
-       <div class="bulk-total" style="font-weight:900;color:#0b7f47;min-width:0;font-size:14px">0.0</div>
-      </td>
-    </tr>
-  `;
-}
-
-function updateBulkRowTotal(row){
-  if (!row) return;
- const s1 = toNum(row.querySelector('.bulk-s1')?.value);
-const s2 = toNum(row.querySelector('.bulk-s2')?.value);
-const s3 = toNum(row.querySelector('.bulk-s3')?.value);
-const kind = String(row.dataset.kind || 'cow').trim();
-const total = (kind === 'buffalo') ? (s1 + s2) : (s1 + s2 + s3);
-
-  const totalBox = row.querySelector('.bulk-total');
-  if (totalBox) totalBox.textContent = `${total.toFixed(1)} كجم`;
-}
-function bindBulkTotals(){
-  document.querySelectorAll('.bulk-row').forEach((row) => {
-    ['.bulk-s1','.bulk-s2','.bulk-s3'].forEach((sel) => {
-      row.querySelector(sel)?.addEventListener('input', () => updateBulkRowTotal(row));
-    });
-    updateBulkRowTotal(row);
-  });
-}
-
-function setupBulkMode(){
-  if (!isBulkMode) return;
-
-  bulkBox.classList.remove('hide');
-
-  const animalCol = inputAnimal.closest('.col');
-  const dateCol = inputDate.closest('.col');
-  const firstRow = inputAnimal.closest('.row');
-  const singleBtns = form.querySelectorAll('.btn-row')[1];
-
-  // أخفِ عمود رقم الحيوان الفردي فقط
-  if (animalCol) animalCol.classList.add('hide');
-
-  // انقل عمود التاريخ كاملًا (اللابيل + الحقل) تحت الهيدر داخل الـ bulkBox
-  if (bulkDateBar && dateCol && !bulkDateBar.contains(dateCol)) {
-    bulkDateBar.style.display = 'block';
-    dateCol.style.flex = '1 1 100%';
-    dateCol.style.minWidth = '100%';
-    dateCol.style.margin = '0';
-    bulkDateBar.innerHTML = '';
-    bulkDateBar.appendChild(dateCol);
+  function getQS(k) {
+    return new URL(location.href).searchParams.get(k) || "";
   }
 
-  // لو الصف الأول لم يبق فيه شيء ظاهر غير التاريخ المنقول، أخفه
-  if (firstRow) {
-    const visibleCols = Array.from(firstRow.querySelectorAll('.col'))
-      .filter(el => !el.classList.contains('hide') && !bulkDateBar.contains(el));
-    if (!visibleCols.length) firstRow.classList.add('hide');
+  function firstNonEmpty(...vals) {
+    return vals.find(v => String(v ?? "").trim() !== "") || "";
   }
 
-  bulkInfo.textContent = `إدخال جماعي: ${bulkNumbers.length} حيوان`;
-  bulkRows.innerHTML = bulkNumbers.map(bulkRowHtml).join('');
-  bindBulkTotals();
- 
+  function apiBase() {
+    return String(window.API_BASE || localStorage.getItem("API_BASE") || "").replace(/\/$/, "");
+  }
 
-  document.getElementById('sessions')?.classList.add('hide');
-  singleBtns?.classList.add('hide');
-  openCowCardBtn?.classList.add('hide');
-  const previewRaw = form?.dataset?.mbkDailyMilkPreview || "";
-if (previewRaw) {
-  try {
-    const preview = JSON.parse(previewRaw);
-    applyCentralDailyMilkPreviewToRows(preview);
-  } catch(_) {}
-}
-}
+  function apiUrl(path) {
+    const base = apiBase();
+    return base ? `${base}${path}` : path;
+  }
 
+  async function getUid() {
+    const fromTenant = String(window.__tenant?.userId || "").trim();
+    if (fromTenant) return fromTenant;
 
-function applyBulkRowKind(row, kind){
-  const s3Cell = row.querySelector('.bulk-s3-cell');
-  const s3Input = row.querySelector('.bulk-s3');
-  const kindCell = row.querySelector('.bulk-kind-cell');
+    try {
+      const v = String(
+        localStorage.getItem("userId") ||
+        localStorage.getItem("uid") ||
+        localStorage.getItem("tenantId") ||
+        ""
+      ).trim();
 
-  if (kind === 'buffalo') {
-    if (kindCell) kindCell.textContent = 'جاموس';
-    if (s3Cell) s3Cell.style.display = 'none';
-    if (s3Input) {
-      s3Input.value = '';
-      s3Input.disabled = true;
+      return v;
+    } catch (_) {
+      return "";
     }
-  } else {
-    if (kindCell) kindCell.textContent = 'أبقار';
-    if (s3Cell) s3Cell.style.display = '';
+  }
+
+  function normalizeDigits(v) {
+    const map = {
+      "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+      "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+    };
+
+    return String(v || "")
+      .trim()
+      .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
+      .replace(/[^\d]/g, "");
+  }
+
+  function parseBulkNumbers(raw) {
+    return [...new Set(
+      String(raw || "")
+        .replace(/[٠-٩۰-۹]/g, d => ({
+          "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+          "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+        }[d] || d))
+        .split(/[,\n،;\s]+/)
+        .map(x => normalizeDigits(x))
+        .filter(Boolean)
+    )];
+  }
+
+  function toNumberOrBlank(v) {
+    const s = String(v ?? "").trim();
+    if (!s) return "";
+    return s.replace(",", ".");
+  }
+
+  function showBar(text, type = "info") {
+    if (!sysbar) return;
+
+    const cls =
+      type === "success" ? "success" :
+      type === "error" ? "error" :
+      type === "warning" ? "warning" :
+      "info";
+
+    sysbar.className = `infobar mbk-infobar show ${cls}`;
+    sysbar.style.display = "block";
+    sysbar.textContent = String(text || "");
+    try { sysbar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+  }
+
+  function hideBar() {
+    if (!sysbar) return;
+    sysbar.textContent = "";
+    sysbar.style.display = "none";
+  }
+
+  function showMsg(text) {
+    if (!msgBox) return;
+    msgBox.textContent = String(text || "");
+    msgBox.style.display = "block";
+  }
+
+  function hideMsg() {
+    if (!msgBox) return;
+    msgBox.textContent = "";
+    msgBox.style.display = "none";
+  }
+
+  function applyKindUI(kind) {
+    if (kind === "buffalo") {
+      colS3?.classList.add("hide");
+      if (s1label) s1label.textContent = "حلبة صباح (كجم)";
+      if (s2label) s2label.textContent = "حلبة مساء (كجم)";
+      if (s3Input) s3Input.value = "";
+      return;
+    }
+
+    colS3?.classList.remove("hide");
+    if (s1label) s1label.textContent = "حلبة 1 (كجم)";
+    if (s2label) s2label.textContent = "حلبة 2 (كجم)";
+    if (s3label) s3label.textContent = "حلبة 3 (كجم)";
+  }
+
+  async function callDailyMilkGate(numbers, eventDate) {
+    const uid = await getUid();
+
+    const r = await fetch(apiUrl("/api/daily-milk/gate"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify({
+        animalNumbers: numbers,
+        animalNumber: Array.isArray(numbers) ? "" : numbers,
+        eventDate
+      })
+    });
+
+    return await r.json().catch(() => ({
+      ok: false,
+      allowed: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+  }
+
+  async function callDailyMilkSave(payload) {
+    const uid = await getUid();
+
+    const r = await fetch(apiUrl("/api/daily-milk/save"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+  }
+
+  function applyGateResult(data) {
+    const accepted = Array.isArray(data?.accepted)
+      ? data.accepted
+      : (Array.isArray(data?.valid) ? data.valid : []);
+
+    const rejected = Array.isArray(data?.rejected) ? data.rejected : [];
+
+    gateState = {
+      allowed: data?.allowed === true && accepted.length > 0,
+      accepted,
+      rejected,
+      byNumber: new Map(accepted.map(x => [String(x.animalNumber || x.number || "").trim(), x]))
+    };
+
+    if (!gateState.allowed) {
+      showBar(data?.message || "❌ لا يوجد رقم مؤهل لتسجيل اللبن.", "error");
+      return;
+    }
+
+    const first = accepted[0] || {};
+    const kind = String(first.kind || "").trim() || (String(first.species || "") === "جاموس" ? "buffalo" : "cow");
+    applyKindUI(kind);
+
+    showBar(data?.message || "✅ تم التحقق — أكمل إدخال اللبن.", "success");
+  }
+
+  async function runSingleGate() {
+    const n = normalizeDigits(inputAnimal?.value || "");
+    const d = String(inputDate?.value || "").trim();
+
+    if (!n || !d) {
+      gateState = { allowed: false, accepted: [], rejected: [], byNumber: new Map() };
+      hideBar();
+      return;
+    }
+
+    showBar("جارِ التحقق من الرقم…", "info");
+
+    try {
+      const data = await callDailyMilkGate(n, d);
+      applyGateResult(data);
+    } catch (_) {
+      gateState = { allowed: false, accepted: [], rejected: [], byNumber: new Map() };
+      showBar("تعذّر الاتصال بالسيرفر للتحقق.", "error");
+    }
+  }
+
+  function bulkRowHtml(n) {
+    return `
+      <tr class="bulk-row" data-number="${n}" data-kind="cow" data-eligible="0">
+        <td style="padding:8px 6px;background:#fff;border:1px solid #e2e8f0;border-left:none;border-radius:0 12px 12px 0;font-weight:800;white-space:nowrap;font-size:15px">
+          ${n}
+        </td>
+        <td class="bulk-kind-cell" style="padding:8px 6px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:#0b7f47;font-size:14px">
+          ...
+        </td>
+        <td style="padding:6px 4px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
+          <input type="number" class="bulk-s1" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:100%;min-width:0;padding:10px 6px;text-align:center" disabled />
+        </td>
+        <td style="padding:6px 4px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
+          <input type="number" class="bulk-s2" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:100%;min-width:0;padding:10px 6px;text-align:center" disabled />
+        </td>
+        <td class="bulk-s3-cell" style="padding:8px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
+          <input type="number" class="bulk-s3" min="0" step="0.1" inputmode="decimal" placeholder="0.0" style="width:100%;min-width:0;padding:10px 6px;text-align:center" disabled />
+        </td>
+        <td style="padding:8px 6px;background:#fff;border:1px solid #e2e8f0;border-right:none;border-radius:12px 0 0 12px;text-align:center;font-size:14px">
+          <div class="bulk-total" style="font-weight:900;color:#0b7f47;min-width:0;font-size:14px">—</div>
+        </td>
+      </tr>
+    `;
+  }
+
+  function applyBulkRowKind(row, kind) {
+    const s3Cell = row.querySelector(".bulk-s3-cell");
+    const s3Input = row.querySelector(".bulk-s3");
+    const kindCell = row.querySelector(".bulk-kind-cell");
+
+    row.dataset.kind = kind;
+
+    if (kind === "buffalo") {
+      if (kindCell) kindCell.textContent = "جاموس";
+      if (s3Cell) s3Cell.style.display = "none";
+      if (s3Input) {
+        s3Input.value = "";
+        s3Input.disabled = true;
+      }
+      return;
+    }
+
+    if (kindCell) kindCell.textContent = "أبقار";
+    if (s3Cell) s3Cell.style.display = "";
     if (s3Input) s3Input.disabled = false;
   }
 
-  row.dataset.kind = kind;
-  updateBulkRowTotal(row);
-}
+  function applyBulkGateResult(data) {
+    const accepted = Array.isArray(data?.accepted)
+      ? data.accepted
+      : (Array.isArray(data?.valid) ? data.valid : []);
 
-async function saveMilkPayload(payload){
-  await addDoc(collection(db, "events"), payload);
+    const validMap = new Map(
+      accepted.map(x => [String(x.animalNumber || x.number || "").trim(), x])
+    );
 
-  try {
-    await window.updateAnimalByEvent(payload);
-  } catch (e) {
-    console.error("Frontend animal update failed:", e);
+    const rejectedMap = new Map(
+      (Array.isArray(data?.rejected) ? data.rejected : [])
+        .map(x => [String(x.animalNumber || x.number || "").trim(), x.reason || "مرفوض"])
+    );
+
+    let ok = 0;
+    let bad = 0;
+
+    document.querySelectorAll(".bulk-row").forEach(row => {
+      const n = String(row.dataset.number || "").trim();
+      const item = validMap.get(n);
+
+      if (item) {
+        const kind = String(item.kind || "").trim() || (String(item.species || "") === "جاموس" ? "buffalo" : "cow");
+
+        row.dataset.eligible = "1";
+        row.dataset.animalId = String(item.animalId || "");
+        row.dataset.species = String(item.species || "");
+        row.style.opacity = "1";
+        row.style.filter = "none";
+
+        applyBulkRowKind(row, kind);
+
+        row.querySelectorAll("input").forEach(inp => {
+          if (!inp.closest(".bulk-s3-cell") || kind !== "buffalo") inp.disabled = false;
+        });
+
+        ok++;
+        return;
+      }
+
+      row.dataset.eligible = "0";
+      row.style.opacity = "0.55";
+      row.style.filter = "grayscale(.15)";
+
+      const kindCell = row.querySelector(".bulk-kind-cell");
+      if (kindCell) {
+        kindCell.textContent = rejectedMap.get(n) || "مرفوض";
+        kindCell.style.color = "#b91c1c";
+        kindCell.style.fontWeight = "800";
+      }
+
+      row.querySelectorAll("input").forEach(inp => {
+        inp.disabled = true;
+        inp.value = "";
+      });
+
+      bad++;
+    });
+
+    if (saveBulkBtn) saveBulkBtn.disabled = ok === 0;
+
+    bulkInfo.textContent = ok
+      ? `إدخال جماعي: ${ok} جاهز${bad ? ` — ${bad} مرفوض` : ""}`
+      : "إدخال جماعي: لا توجد أرقام مؤهلة";
   }
 
-  localStorage.setItem("lastAnimalId", payload.animalNumber || "");
-  localStorage.setItem("currentAnimalId", payload.animalNumber || "");
-  localStorage.setItem("eventDate", payload.eventDate || "");
-  localStorage.setItem("lastEventDate", payload.eventDate || "");
-  localStorage.setItem("lastKind", payload.kind || "");
-}
-form.addEventListener("mbk:valid", async (ev) => {
-  hideMsg();
+  async function runBulkGate(numbers) {
+    const d = String(inputDate?.value || "").trim();
 
-  const fd = ev?.detail?.formData || {};
-  const animalNumber = String(fd.animalNumber || "").trim();
-  const eventDate = String(fd.eventDate || "").trim();
-
-  // الحلبات (محسوبة/مقروءة من data-field)
-  const s1 = toNum(fd.milkS1);
-  const s2 = toNum(fd.milkS2);
-  const s3 = toNum(fd.milkS3);
-
-  // النوع من وثيقة الحيوان (أفضل مصدر)
-  const doc = fd.documentData || {};
-  let sp = String(fd.species || doc.species || doc.animalTypeAr || doc.animalType || "").trim();
-  if (/cow|بقر/i.test(sp)) sp = "أبقار";
-  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
-
-  const kind = (sp === "جاموس") ? "buffalo" : "cow";
-  applyKindUI(kind);
-
-  const total = (kind === "buffalo") ? (s1 + s2) : (s1 + s2 + s3);
-
-  // Firestore جاهز؟
-  if (!db) {
-    showMsg("تعذّر الحفظ الآن. أعد المحاولة لاحقًا.");
-    dev("Save blocked — Firestore not ready");
-    return;
-  }
-
-  const payload = {
-    userId: (window.__tenant?.userId || localStorage.getItem("userId") || "").trim(),
-    animalId: animalNumber,
-    animalNumber: animalNumber,
-    eventType: "لبن يومي",
-    type: "daily_milk",
-    eventDate,
-    kind,
-    milkSessions: (kind === "buffalo")
-      ? [{ n: 1, kg: s1 }, { n: 2, kg: s2 }]
-      : [{ n: 1, kg: s1 }, { n: 2, kg: s2 }, { n: 3, kg: s3 }],
-    milkKg: Number(total.toFixed(1)),
-    source: location.pathname,
-    createdAt: serverTimestamp()
-  };
-
-  try {
-   
-await saveMilkPayload(payload);
-
-if (settleBulkSubmit({ ok:true, animalNumber, milkKg: payload.milkKg })) {
-  return;
-}
-
-showSaveOK(`✅ تم تسجيل اللبن اليومي بنجاح — الإجمالي: ${payload.milkKg.toFixed(1)} كجم`);
-if (confirmBox) confirmBox.style.display = "none";
-
-try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(_) {}
- } catch (err) {
-  dev("Firestore save error: " + (err?.message || err));
-
-  if (settleBulkSubmit({ ok:false, animalNumber, reason:'save_error' })) {
-    return;
-  }
-
-  showMsg("تعذّر حفظ اللبن اليومي. أعد المحاولة لاحقًا.");
-  try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(_) {}
-}
-});
-
-saveBulkBtn?.addEventListener('click', async () => {
-  hideMsg();
-
-  const eventDate = String(inputDate.value || '').trim();
-  if (!eventDate) {
-    showMsg('اختر تاريخ اليوم أولًا.');
-    return;
-  }
-
-  const rows = Array.from(document.querySelectorAll('.bulk-row'));
-  const eligibleRows = rows.filter(row => row.dataset.eligible === '1');
-
-  if (!eligibleRows.length) {
-    showMsg('لا توجد أرقام مؤهلة للحفظ.');
-    return;
-  }
-
-  saveBulkBtn.disabled = true;
-  cancelBulkBtn.disabled = true;
-
-  let saved = 0;
-  let failed = 0;
-  const rejected = [];
-
-  for (const row of eligibleRows) {
-    const preview = fillSingleFormFromBulkRow(row, eventDate);
-    if (!preview.documentData) {
-  failed++;
-  rejected.push(preview.animalNumber);
-  continue;
-}
-    const total = (preview.kind === 'buffalo')
-      ? (preview.s1 + preview.s2)
-      : (preview.s1 + preview.s2 + preview.s3);
-
-    if (total <= 0) continue;
-
-    const result = await submitOneBulkRowThroughCentral();
-
-    if (result?.ok) {
-      saved++;
-    } else {
-      failed++;
-      rejected.push(preview.animalNumber);
+    if (!d) {
+      bulkInfo.textContent = "اختر تاريخ اليوم لبدء التحقق.";
+      if (saveBulkBtn) saveBulkBtn.disabled = true;
+      return;
     }
-  }
 
-  saveBulkBtn.disabled = false;
-  cancelBulkBtn.disabled = false;
-
-  if (saved > 0) {
-    let text = `✅ تم تسجيل ${saved} سجل لبن جماعي بنجاح`;
-    if (failed) text += ` — وتعذر حفظ ${failed}`;
-    if (rejected.length) text += ` — أرقام مرفوضة: ${rejected.join(' - ')}`;
-    showSaveOK(text);
-    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(_) {}
-    return;
-  }
-
-  if (rejected.length) {
-    showMsg(`تعذّر حفظ الأرقام التالية: ${rejected.join(' - ')}`);
-    return;
-  }
-
-  showMsg('لم يتم حفظ أي سجل. أدخل كميات اللبن في صف واحد على الأقل.');
-});
-cancelBulkBtn?.addEventListener('click', () => {
-  location.href = '/dashboard.html';
-});
-    setupBulkMode();
-   if (isBulkMode) {
-  const raw = bulkNumbers.join(",");
-  if (inputAnimal) inputAnimal.value = raw;
-
-  saveBulkBtn.disabled = true;
-  bulkInfo.textContent = `جارِ التحقق من ${bulkNumbers.length} رقم...`;
-
-  form.requestSubmit();
-
-  const waitPreview = setInterval(() => {
-    const previewRaw = form?.dataset?.mbkDailyMilkPreview || "";
-    if (!previewRaw) return;
-
-    clearInterval(waitPreview);
+    bulkInfo.textContent = `جارِ التحقق من ${numbers.length} رقم...`;
+    if (saveBulkBtn) saveBulkBtn.disabled = true;
 
     try {
-      const preview = JSON.parse(previewRaw);
-
-      // 1) طبّق نتيجة الفحص المركزي
-      applyCentralDailyMilkPreviewToRows(preview);
-
-      // 2) احذف الصفوف المرفوضة من الجدول نهائيًا
-      const validNums = (preview.valid || []).map(x => String(x.number || "").trim());
-
-      document.querySelectorAll('.bulk-row').forEach((row) => {
-        const n = String(row.dataset.number || '').trim();
-        if (!validNums.includes(n)) row.remove();
-      });
-
-      // 3) حدّث العنوان وزر الحفظ
-      bulkInfo.textContent = `إدخال جماعي: ${validNums.length} حيوان`;
-      saveBulkBtn.disabled = validNums.length === 0;
-
-      // 4) لو بقي صف واحد فقط وكان جاموس، سيظل بحلبتين لأن applyCentralDailyMilkPreviewToRows
-      //    استدعت applyBulkRowKind(row, 'buffalo') بالفعل
+      const data = await callDailyMilkGate(numbers, d);
+      applyBulkGateResult(data);
     } catch (_) {
-      saveBulkBtn.disabled = true;
+      bulkInfo.textContent = "تعذّر الاتصال بالسيرفر للتحقق.";
+      if (saveBulkBtn) saveBulkBtn.disabled = true;
     }
-  }, 120);
+  }
 
-  setTimeout(() => {
-    clearInterval(waitPreview);
-  }, 4000);
-}
-    // ===== ما بعد النجاح =====
-    goAddEventBtn.addEventListener('click', ()=>{
-      const url = buildUrl('/add-event.html', {
-        animalId: inputAnimal.value.trim(),
-        date: inputDate.value.trim()
-      });
+  function setupBulkMode(numbers) {
+    bulkBox?.classList.remove("hide");
+
+    const animalCol = inputAnimal?.closest(".col");
+    const dateCol = inputDate?.closest(".col");
+    const firstRow = inputAnimal?.closest(".row");
+    const singleBtns = form?.querySelectorAll(".btn-row")?.[1];
+
+    animalCol?.classList.add("hide");
+
+    if (bulkDateBar && dateCol && !bulkDateBar.contains(dateCol)) {
+      bulkDateBar.style.display = "block";
+      dateCol.style.flex = "1 1 100%";
+      dateCol.style.minWidth = "100%";
+      dateCol.style.margin = "0";
+      bulkDateBar.innerHTML = "";
+      bulkDateBar.appendChild(dateCol);
+    }
+
+    if (firstRow) {
+      const visibleCols = Array.from(firstRow.querySelectorAll(".col"))
+        .filter(el => !el.classList.contains("hide") && !bulkDateBar.contains(el));
+
+      if (!visibleCols.length) firstRow.classList.add("hide");
+    }
+
+    document.getElementById("sessions")?.classList.add("hide");
+    singleBtns?.classList.add("hide");
+    openCowCardBtn?.classList.add("hide");
+
+    bulkInfo.textContent = `إدخال جماعي: ${numbers.length} حيوان`;
+    bulkRows.innerHTML = numbers.map(bulkRowHtml).join("");
+
+    inputDate?.addEventListener("change", () => runBulkGate(numbers));
+    runBulkGate(numbers);
+  }
+
+  function collectSinglePayload() {
+    const animalNumber = normalizeDigits(inputAnimal?.value || "");
+    const eventDate = String(inputDate?.value || "").trim();
+
+    return {
+      animalNumber,
+      eventDate,
+      milkS1: toNumberOrBlank(s1Input?.value),
+      milkS2: toNumberOrBlank(s2Input?.value),
+      milkS3: toNumberOrBlank(s3Input?.value)
+    };
+  }
+
+  function collectBulkRows() {
+    return Array.from(document.querySelectorAll(".bulk-row"))
+      .filter(row => row.dataset.eligible === "1")
+      .map(row => ({
+        animalNumber: String(row.dataset.number || "").trim(),
+        animalId: String(row.dataset.animalId || "").trim(),
+        milkS1: toNumberOrBlank(row.querySelector(".bulk-s1")?.value),
+        milkS2: toNumberOrBlank(row.querySelector(".bulk-s2")?.value),
+        milkS3: toNumberOrBlank(row.querySelector(".bulk-s3")?.value)
+      }));
+  }
+
+  async function saveSingle() {
+    hideMsg();
+
+    const payload = collectSinglePayload();
+
+    showBar("جارِ حفظ اللبن اليومي…", "info");
+
+    const data = await callDailyMilkSave(payload);
+
+    if (!data?.ok) {
+      showBar(data?.message || "تعذّر حفظ اللبن اليومي.", "error");
+      return;
+    }
+
+    try {
+      localStorage.setItem("lastAnimalId", payload.animalNumber || "");
+      localStorage.setItem("currentAnimalId", payload.animalNumber || "");
+      localStorage.setItem("eventDate", payload.eventDate || "");
+      localStorage.setItem("lastEventDate", payload.eventDate || "");
+    } catch (_) {}
+
+    showBar(data.message || "✅ تم حفظ اللبن اليومي بنجاح", "success");
+    if (confirmBox) confirmBox.style.display = "none";
+
+    const url = data.redirectUrl || `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`;
+    setTimeout(() => {
       location.href = url;
+    }, 900);
+  }
+
+  async function saveBulk() {
+    hideMsg();
+
+    const eventDate = String(inputDate?.value || "").trim();
+    const rows = collectBulkRows();
+
+    if (!rows.length) {
+      showMsg("لا توجد أرقام مؤهلة للحفظ.");
+      return;
+    }
+
+    saveBulkBtn.disabled = true;
+    cancelBulkBtn.disabled = true;
+
+    showBar("جارِ حفظ اللبن الجماعي…", "info");
+
+    const data = await callDailyMilkSave({
+      eventDate,
+      rows
     });
-    backDashBtn.addEventListener('click', ()=>{ location.href = '/dashboard.html'; });
-  </script>
+
+    saveBulkBtn.disabled = false;
+    cancelBulkBtn.disabled = false;
+
+    if (!data?.ok) {
+      showBar(data?.message || "تعذّر حفظ اللبن الجماعي.", "error");
+      return;
+    }
+
+    const saved = Number(data.savedCount || 0);
+    const rejected = Number(data.rejectedCount || 0);
+
+    let text = data.message || `✅ تم حفظ اللبن اليومي بنجاح`;
+    if (saved || rejected) {
+      text = `✅ تم حفظ ${saved} سجل لبن${rejected ? ` — وتعذر حفظ ${rejected}` : ""}`;
+    }
+
+    showBar(text, "success");
+
+    setTimeout(() => {
+      location.href = "/dashboard.html";
+    }, 1000);
+  }
+
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    try {
+      await saveSingle();
+    } catch (_) {
+      showBar("تعذّر الاتصال بالسيرفر أثناء حفظ اللبن اليومي.", "error");
+    }
+  });
+
+  saveBulkBtn?.addEventListener("click", async () => {
+    try {
+      await saveBulk();
+    } catch (_) {
+      saveBulkBtn.disabled = false;
+      cancelBulkBtn.disabled = false;
+      showBar("تعذّر الاتصال بالسيرفر أثناء حفظ اللبن الجماعي.", "error");
+    }
+  });
+
+  cancelBulkBtn?.addEventListener("click", () => {
+    location.href = "/dashboard.html";
+  });
+
+  openCowCardBtn?.addEventListener("click", () => {
+    const n = normalizeDigits(inputAnimal?.value || "");
+    if (!n) return;
+    location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
+  });
+
+  goAddEventBtn?.addEventListener("click", () => {
+    location.href = "/add-event.html";
+  });
+
+  backDashBtn?.addEventListener("click", () => {
+    location.href = "/dashboard.html";
+  });
+
+  const qsMode = firstNonEmpty(getQS("mode"));
+  const qsNumbersRaw = firstNonEmpty(getQS("numbers"));
+  const bulkNumbers = parseBulkNumbers(qsNumbersRaw);
+  const isBulkMode = qsMode === "bulk" && bulkNumbers.length > 1;
+
+  const qsAnimal = firstNonEmpty(
+    getQS("animalId"),
+    getQS("number"),
+    getQS("animalNumber"),
+    localStorage.getItem("lastAnimalId"),
+    localStorage.getItem("currentAnimalId")
+  );
+
+  const qsDate = firstNonEmpty(
+    getQS("date"),
+    getQS("eventDate"),
+    localStorage.getItem("eventDate"),
+    localStorage.getItem("lastEventDate")
+  );
+
+  if (!inputDate.value && qsDate) inputDate.value = qsDate;
+
+  if (isBulkMode) {
+    setupBulkMode(bulkNumbers);
+  } else {
+    if (!inputAnimal.value && qsAnimal) inputAnimal.value = normalizeDigits(qsAnimal);
+
+    inputAnimal?.addEventListener("change", runSingleGate);
+    inputAnimal?.addEventListener("blur", runSingleGate);
+    inputDate?.addEventListener("change", runSingleGate);
+
+    if (inputAnimal.value && inputDate.value) {
+      runSingleGate();
+    }
+  }
+</script>
 </body>
 </html>
 
