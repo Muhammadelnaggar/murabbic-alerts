@@ -670,7 +670,9 @@ textarea{
    Murabbik Shared Compact Table Utilities
    جدول إدخال مدمج عام — بدون أزرار
    ========================================================= */
-
+.hide{
+  display:none !important;
+}
 .wrap{
   max-width:720px;
   margin:16px auto;
