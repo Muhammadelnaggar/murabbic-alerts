@@ -757,3 +757,59 @@ textarea{
     padding:7px 2px !important;
   }
 }
+/* =========================================================
+   Murabbik Shared KPI / Preview Status Utilities
+   أدوات عامة لمؤشرات ومعاينات النماذج
+   ========================================================= */
+
+.kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  margin-top:12px;
+}
+
+.kpi-box{
+  background:#fff;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:12px;
+  padding:12px;
+  text-align:center;
+}
+
+.kpi-value{
+  font-size:20px;
+  font-weight:900;
+  color:var(--brand-600, #0b7f47);
+}
+
+.kpi-label{
+  font-size:12px;
+  color:var(--muted, #64748b);
+  margin-top:4px;
+  font-weight:800;
+}
+
+.preview-scroll{
+  overflow:auto;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:14px;
+  background:#fff;
+  margin-top:12px;
+}
+
+.status-ok{
+  color:var(--brand-600, #0b7f47);
+  font-weight:900;
+}
+
+.status-bad{
+  color:#b91c1c;
+  font-weight:900;
+}
+
+@media (max-width:640px){
+  .kpi-grid{
+    grid-template-columns:repeat(2,1fr);
+  }
+}
