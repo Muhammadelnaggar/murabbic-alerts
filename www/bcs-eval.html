@@ -112,8 +112,8 @@
           <select id="cameraSelect" class="select" title="اختيار الكاميرا"></select>
           <button id="toggleFlash" class="btn btn-light" title="تشغيل الفلاش" aria-pressed="false">الفلاش</button>
           <button id="restartBtn" class="btn btn-light">إعادة التهيئة</button>
-          <button id="uploadBtn" type="button" class="btn btn-light">رفع صورة بديلة</button>
-          <input id="uploadInput" type="file" accept="image/*" capture="environment" style="display:none" />
+          <label id="uploadBtn" for="uploadInput" class="btn btn-light" role="button">رفع صورة بديلة</label>
+<input id="uploadInput" type="file" accept="image/*" capture="environment" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;" />none" />
           <button id="nextAngleBtn" class="btn btn-light">التالي ▸</button>
         </div>
       </div>
@@ -699,10 +699,7 @@
 
     toggleFlash?.addEventListener("click", toggleTorch);
 
-    uploadBtn?.addEventListener("click", e => {
-      e.preventDefault();
-      uploadInput.click();
-    });
+   
 
     uploadInput?.addEventListener("change", async e => {
       const file = e.target.files?.[0];
