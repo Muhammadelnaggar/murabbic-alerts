@@ -10750,7 +10750,59 @@ function dailyMilkBuildSaveUiSrv({ saved = [], rejected = [], message = "", even
     eventDate: String(eventDate || "").slice(0, 10)
   };
 }
+function dailyMilkFormatTotalSrv(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
 
+function dailyMilkPreviewRowSrv(row = {}, kind = "cow") {
+  const s1 = dailyMilkNumStrictSrv(row.milkS1 ?? row.s1 ?? row.session1);
+  const s2 = dailyMilkNumStrictSrv(row.milkS2 ?? row.s2 ?? row.session2);
+  const s3 = dailyMilkNumStrictSrv(row.milkS3 ?? row.s3 ?? row.session3);
+
+  if (![s1, s2, s3].every(Number.isFinite)) {
+    return {
+      ok: false,
+      milkKg: null,
+      totalText: "—",
+      reason: "كمية اللبن غير صالحة."
+    };
+  }
+
+  if (s1 < 0 || s2 < 0 || s3 < 0) {
+    return {
+      ok: false,
+      milkKg: null,
+      totalText: "—",
+      reason: "كمية اللبن لا يمكن أن تكون سالبة."
+    };
+  }
+
+  const milkKg = kind === "buffalo"
+    ? Number((s1 + s2).toFixed(1))
+    : Number((s1 + s2 + s3).toFixed(1));
+
+  return {
+    ok: true,
+    milkKg,
+    totalText: dailyMilkFormatTotalSrv(milkKg),
+    reason: ""
+  };
+}
+
+function dailyMilkBuildPreviewUiSrv({ rows = [], message = "" } = {}) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+
+  return {
+    screen: "daily_milk",
+    mode: safeRows.length > 1 ? "bulk" : "single",
+    status: "info",
+    message: message || "",
+    rows: safeRows,
+    single: safeRows[0] || null
+  };
+}
 // ============================================================
 //                 API: DAILY MILK GATE ONLY
 //                 السيرفر يجهز أهلية + UI كامل
@@ -10952,6 +11004,117 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
       accepted: [],
       valid: [],
       rejected: [],
+      ui
+    });
+  }
+});
+// ============================================================
+//                 API: DAILY MILK PREVIEW ONLY
+//                 حساب إجمالي اللبن من السيرفر — بدون حفظ
+// ============================================================
+
+app.post("/api/daily-milk/preview", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      const ui = dailyMilkBuildPreviewUiSrv({
+        message: "تعذّر حساب الإجمالي الآن — قاعدة البيانات غير متاحة.",
+        rows: []
+      });
+
+      return res.status(503).json({
+        ok: false,
+        message: ui.message,
+        ui
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const rows = dailyMilkRowsFromBodySrv(body);
+
+    if (!rows.length) {
+      const ui = dailyMilkBuildPreviewUiSrv({
+        message: "",
+        rows: []
+      });
+
+      return res.json({
+        ok: true,
+        message: "",
+        ui
+      });
+    }
+
+    const outRows = [];
+
+    for (const row of rows) {
+      const animalNumber = calvingNormDigitsOnlySrv(row.animalNumber || row.number || "");
+
+      if (!animalNumber) {
+        outRows.push({
+          animalNumber: "",
+          milkKg: null,
+          totalText: "—",
+          ok: false,
+          reason: "رقم الحيوان مطلوب."
+        });
+        continue;
+      }
+
+      const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+      if (!animal) {
+        outRows.push({
+          animalNumber,
+          milkKg: null,
+          totalText: "—",
+          ok: false,
+          reason: "الحيوان غير موجود في حسابك."
+        });
+        continue;
+      }
+
+      const animalDoc = animal.data || {};
+      const species = dailyMilkSpeciesSrv(animalDoc);
+      const kind = dailyMilkKindSrv(species);
+
+      const preview = dailyMilkPreviewRowSrv(row, kind);
+
+      outRows.push({
+        animalNumber,
+        animalId: animal.id || "",
+        species,
+        kind,
+        milkKg: preview.milkKg,
+        totalText: preview.totalText,
+        ok: preview.ok,
+        reason: preview.reason || ""
+      });
+    }
+
+    const ui = dailyMilkBuildPreviewUiSrv({
+      rows: outRows,
+      message: ""
+    });
+
+    return res.json({
+      ok: true,
+      message: "",
+      rows: outRows,
+      ui
+    });
+
+  } catch (e) {
+    console.error("daily-milk-preview", e);
+
+    const ui = dailyMilkBuildPreviewUiSrv({
+      message: "تعذّر حساب إجمالي اللبن الآن.",
+      rows: []
+    });
+
+    return res.status(500).json({
+      ok: false,
+      message: ui.message,
       ui
     });
   }
