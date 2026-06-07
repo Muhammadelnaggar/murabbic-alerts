@@ -14864,11 +14864,11 @@ function bcsKindArabicSrv(kind = "") {
 function bcsLabelSrv(score) {
   const s = Number(score);
   if (!Number.isFinite(s)) return "غير محدد";
-  if (s < 1.6) return "نحيفة جدًا";
-  if (s < 2.5) return "نحيفة";
-  if (Math.abs(s - 3) < 0.06) return "مثالية";
-  if (s < 3.7) return "تميل للسمنة";
-  if (s < 4.6) return "سمينة";
+
+  if (s < 1.75) return "نحيفة جدًا";
+  if (s < 2.75) return "نحيفة";
+  if (s <= 3.25) return "مثالية";
+  if (s < 4.25) return "سمينة";
   return "سمينة جدًا";
 }
 
