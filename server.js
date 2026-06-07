@@ -14882,7 +14882,370 @@ function bcsBuildNoteSrv({ score, kind, animalType, userComment }) {
   const extra = String(userComment || "").trim();
   return extra ? `${base} — ملاحظة: ${extra}` : base;
 }
+// ============================================================
+//                 API: BCS ANALYZE (server-only)
+//                 تحليل حالة الجسم من الصور — لا تحليل في الواجهة
+// ============================================================
 
+let sharpSrv = null;
+
+function getSharpSrv() {
+  if (sharpSrv) return sharpSrv;
+
+  try {
+    sharpSrv = require("sharp");
+    return sharpSrv;
+  } catch (e) {
+    return null;
+  }
+}
+
+const BCS_REF_EXTS_SRV = ["jpg", "png", "webp"];
+
+const BCS_MAP_COW_SRV = {
+  side: [
+    { score: 2, bases: ["bsc2_side"] },
+    { score: 2.75, bases: ["bsc2_75_side"] },
+    { score: 3, bases: ["bsc3_side"] },
+    { score: 3.25, bases: ["bsc3_25_side"] },
+    { score: 4, bases: ["bsc4_side"] },
+    { score: 5, bases: ["bsc5_side"] }
+  ],
+  rear: [
+    { score: 2, bases: ["bsc2_rear"] },
+    { score: 2.75, bases: ["bsc2_75_rear"] },
+    { score: 3, bases: ["bsc3_rear"] },
+    { score: 3.25, bases: ["bsc3_25_rear"] },
+    { score: 4, bases: ["bsc4_rear"] },
+    { score: 5, bases: ["bsc5_rear"] }
+  ]
+};
+
+const BCS_MAP_BUF_EGY_SRV = [
+  { score: 1, bases: ["bcs_egybuf_1"] },
+  { score: 2, bases: ["bcs_egybuf_2"] },
+  { score: 3, bases: ["bcs_egybuf_3"] },
+  { score: 4, bases: ["bcs_egybuf_4"] },
+  { score: 5, bases: ["bcs_egybuf_5"] }
+];
+
+const BCS_MAP_BUF_HYP_SRV = [
+  { score: 1, bases: ["bcs_hypbuf_1"] },
+  { score: 2, bases: ["bcs_hypbuf_2"] },
+  { score: 3, bases: ["bcs_hypbuf_3"] },
+  { score: 4, bases: ["bcs_hypbuf_4"] },
+  { score: 5, bases: ["bcs_hypbuf_5"] }
+];
+
+const bcsRefVecCacheSrv = new Map();
+
+function bcsDataUrlToBufferSrv(dataUrl = "") {
+  const s = String(dataUrl || "");
+  const m = s.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$/);
+  if (!m) return null;
+  return Buffer.from(m[1], "base64");
+}
+
+function bcsRefPathCandidatesSrv(baseName = "") {
+  const out = [];
+
+  for (const ext of BCS_REF_EXTS_SRV) {
+    out.push(path.join(__dirname, "www", "images", `${baseName}.${ext}`));
+    out.push(path.join(__dirname, "public", "images", `${baseName}.${ext}`));
+    out.push(path.join(__dirname, "images", `${baseName}.${ext}`));
+  }
+
+  return out;
+}
+
+function bcsBuildRefListSrv(kind = "cow", angle = "rear", animalType = "") {
+  const k = bcsNormalizeKindSrv(kind);
+
+  if (k === "buffalo") {
+    if (angle !== "rear") return [];
+
+    const type = String(animalType || "").trim();
+    const list = type === "هجين" ? BCS_MAP_BUF_HYP_SRV : BCS_MAP_BUF_EGY_SRV;
+
+    return list.flatMap(x =>
+      x.bases.map(base => ({
+        score: x.score,
+        base
+      }))
+    );
+  }
+
+  const list = BCS_MAP_COW_SRV[angle] || [];
+
+  return list.flatMap(x =>
+    x.bases.map(base => ({
+      score: x.score,
+      base
+    }))
+  );
+}
+
+async function bcsImageVectorSrv(inputBuffer) {
+  const sharp = getSharpSrv();
+
+  if (!sharp) {
+    throw new Error("sharp_missing");
+  }
+
+  const raw = await sharp(inputBuffer)
+    .rotate()
+    .resize(64, 64, { fit: "fill" })
+    .greyscale()
+    .raw()
+    .toBuffer();
+
+  const vec = new Float32Array(raw.length);
+  let sum = 0;
+
+  for (let i = 0; i < raw.length; i++) {
+    const v = Number(raw[i]) / 255;
+    vec[i] = v;
+    sum += v;
+  }
+
+  const mean = sum / raw.length;
+  let norm = 0;
+
+  for (let i = 0; i < vec.length; i++) {
+    vec[i] = vec[i] - mean;
+    norm += vec[i] * vec[i];
+  }
+
+  norm = Math.sqrt(norm) || 1;
+
+  for (let i = 0; i < vec.length; i++) {
+    vec[i] = vec[i] / norm;
+  }
+
+  return vec;
+}
+
+function bcsCosineSrv(a, b) {
+  if (!a || !b || a.length !== b.length) return -1;
+
+  let s = 0;
+
+  for (let i = 0; i < a.length; i++) {
+    s += a[i] * b[i];
+  }
+
+  return s;
+}
+
+async function bcsLoadRefVectorSrv(baseName) {
+  if (bcsRefVecCacheSrv.has(baseName)) {
+    return bcsRefVecCacheSrv.get(baseName);
+  }
+
+  for (const p of bcsRefPathCandidatesSrv(baseName)) {
+    if (!fs.existsSync(p)) continue;
+
+    const buf = fs.readFileSync(p);
+    const vec = await bcsImageVectorSrv(buf);
+
+    bcsRefVecCacheSrv.set(baseName, vec);
+    return vec;
+  }
+
+  bcsRefVecCacheSrv.set(baseName, null);
+  return null;
+}
+
+async function bcsScoreOneAngleSrv({ dataUrl, kind, angle, animalType }) {
+  const buf = bcsDataUrlToBufferSrv(dataUrl);
+
+  if (!buf) {
+    return {
+      ok: false,
+      angle,
+      message: "صورة غير صالحة."
+    };
+  }
+
+  const inputVec = await bcsImageVectorSrv(buf);
+  const refs = bcsBuildRefListSrv(kind, angle, animalType);
+
+  let best = null;
+
+  for (const ref of refs) {
+    const refVec = await bcsLoadRefVectorSrv(ref.base);
+    if (!refVec) continue;
+
+    const similarity = bcsCosineSrv(inputVec, refVec);
+
+    if (!best || similarity > best.similarity) {
+      best = {
+        score: Number(ref.score),
+        similarity: Number(similarity.toFixed(4)),
+        ref: ref.base
+      };
+    }
+  }
+
+  if (!best) {
+    return {
+      ok: false,
+      angle,
+      message: "لم يتم العثور على مراجع مناسبة للتحليل."
+    };
+  }
+
+  return {
+    ok: true,
+    angle,
+    ...best
+  };
+}
+
+function bcsQualityLabelSrv(similarity) {
+  const s = Number(similarity);
+
+  if (!Number.isFinite(s)) return "غير محددة";
+  if (s >= 0.78) return "جيدة";
+  if (s >= 0.65) return "متوسطة";
+
+  return "ضعيفة — يفضّل إعادة التصوير";
+}
+
+app.post("/api/bcs/analyze", async (req, res) => {
+  try {
+    const body = req.body || {};
+
+    const kind = bcsNormalizeKindSrv(
+      body.kind ||
+      body.animalKind ||
+      body.species
+    );
+
+    const animalType = String(
+      body.animalType ||
+      body.typeLabel ||
+      ""
+    ).trim();
+
+    const captures = body.captures || {};
+
+    const rearImage =
+      captures.rear ||
+      body.rearImage ||
+      body.rear ||
+      "";
+
+    const sideImage =
+      captures.side ||
+      body.sideImage ||
+      body.side ||
+      "";
+
+    if (!rearImage) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ لقطة الخلفية مطلوبة لتحليل حالة الجسم."
+      });
+    }
+
+    const rear = await bcsScoreOneAngleSrv({
+      dataUrl: rearImage,
+      kind,
+      angle: "rear",
+      animalType
+    });
+
+    if (!rear.ok) {
+      return res.status(400).json({
+        ok: false,
+        message: rear.message || "تعذّر تحليل لقطة الخلفية."
+      });
+    }
+
+    let side = null;
+
+    if (kind === "cow") {
+      if (!sideImage) {
+        return res.status(400).json({
+          ok: false,
+          message: "❌ الأبقار تحتاج لقطة خلفية ولقطة جانبية."
+        });
+      }
+
+      side = await bcsScoreOneAngleSrv({
+        dataUrl: sideImage,
+        kind,
+        angle: "side",
+        animalType
+      });
+
+      if (!side.ok) {
+        return res.status(400).json({
+          ok: false,
+          message: side.message || "تعذّر تحليل اللقطة الجانبية."
+        });
+      }
+    }
+
+    const score = kind === "buffalo"
+      ? Number(rear.score)
+      : Number(
+          (
+            (Number(rear.score) * 0.6) +
+            (Number(side.score) * 0.4)
+          ).toFixed(2)
+        );
+
+    const roundedScore = Number(score.toFixed(2));
+    const label = bcsLabelSrv(roundedScore);
+
+    const similarity = kind === "buffalo"
+      ? rear.similarity
+      : Number(
+          (
+            (Number(rear.similarity) * 0.6) +
+            (Number(side.similarity) * 0.4)
+          ).toFixed(4)
+        );
+
+    const rangeText = kind === "buffalo" ? "1–5" : "2–5";
+
+    return res.json({
+      ok: true,
+      score: roundedScore,
+      label,
+      kind,
+      species: bcsKindArabicSrv(kind),
+      animalType: animalType || null,
+      rangeText,
+      quality: {
+        similarity,
+        label: bcsQualityLabelSrv(similarity)
+      },
+      angles: {
+        rear,
+        side
+      },
+      message: `تم تحليل حالة الجسم — BCS ${roundedScore.toFixed(2)} (${label})`
+    });
+
+  } catch (e) {
+    console.error("bcs-analyze", e);
+
+    if (String(e.message || "") === "sharp_missing") {
+      return res.status(500).json({
+        ok: false,
+        message: "تحليل الصور غير مفعّل على السيرفر — مكتبة sharp غير مثبتة."
+      });
+    }
+
+    return res.status(500).json({
+      ok: false,
+      message: "تعذّر تحليل صورة حالة الجسم الآن."
+    });
+  }
+});
 app.post("/api/bcs/save", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -14899,7 +15262,14 @@ app.post("/api/bcs/save", requireUserId, async (req, res) => {
     const animalNumber = calvingNormDigitsOnlySrv(body.animalNumber || body.number || "");
     const animalIdFromPage = String(body.animalId || "").trim();
 
-    const score = Number(body.score ?? body.bcs ?? body.value);
+    const analysis = body.analysis && typeof body.analysis === "object" ? body.analysis : null;
+
+const score = Number(
+  analysis?.score ??
+  body.score ??
+  body.bcs ??
+  body.value
+);
     const kind = bcsNormalizeKindSrv(body.kind || body.animalKind || body.species);
     const animalType = String(body.animalType || body.typeLabel || "").trim();
     const userComment = String(body.comment || body.notes || "").trim();
@@ -15003,6 +15373,14 @@ app.post("/api/bcs/save", requireUserId, async (req, res) => {
       kind,
       species: bcsKindArabicSrv(kind),
       animalType: animalType || null,
+      analysis: analysis ? cleanObj({
+     score: analysis.score,
+     label: analysis.label,
+     quality: analysis.quality || null,
+     angles: analysis.angles || null,
+     rangeText: analysis.rangeText || null,
+     source: "server:/api/bcs/analyze"
+  }) : null,
       notes,
       comment: userComment || null,
 
