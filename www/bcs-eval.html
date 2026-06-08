@@ -551,7 +551,7 @@ function showUploadPreview(url) {
       return;
     }
 
-    const r = await fetch("/api/bcs/analyze", {
+    const r = await fetch("/api/bcs/vision-analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
