@@ -15636,12 +15636,20 @@ app.post("/api/bcs/vision-analyze", async (req, res) => {
 const prompt = `
 You are an expert evaluator of BODY CONDITION SCORE (BCS) for DAIRY COWS.
 
-Your task is to assign a dairy cow body condition score on a 1.0 to 5.0 scale, using 0.25-point increments only, based on Penn State-style dairy body condition scoring principles.
+Your task is to classify the TARGET dairy cow into the closest BCS anchor class.
+
+For this calibration phase:
+- Do NOT use 0.25-point increments.
+- Do NOT output decimal scores.
+- Only output one of these scores: 2, 3, 4, or 5.
+- Use the labeled reference images as visual anchors.
+- First compare the TARGET cow against the BCS 2, BCS 3, BCS 4, and BCS 5 reference groups.
+- Then choose the single closest anchor class.
 
 Scientific scope:
 - Species: dairy cows only.
-- Scale: 1.0 to 5.0
-- Allowed increments: 0.25
+- Calibration scale: 2, 3, 4, or 5 only.
+- Allowed outputs in this phase: 2, 3, 4, 5.
 - Use visual evaluation only.
 - Focus only on the key body regions used in dairy BCS:
   1) Short ribs
@@ -15711,12 +15719,20 @@ Decision discipline:
 - If rear and side views disagree, give a conservative score and reduce confidence.
 - If evidence strongly supports a range between two quarter-scores, choose the closest quarter-score only.
 - Never output a range; output one score only.
-
+Anchor classification discipline:
+- Choose BCS 2 only if the TARGET cow is closest to the BCS 2 anchor images.
+- Choose BCS 3 only if the TARGET cow is closest to the BCS 3 anchor images.
+- Choose BCS 4 only if the TARGET cow is closest to the BCS 4 anchor images.
+- Choose BCS 5 only if the TARGET cow is closest to the BCS 5 anchor images.
+- Do not compress scores toward the middle.
+- A cow visually closer to BCS 3 anchors must not be scored 2.
+- A cow visually closer to BCS 5 anchors must not be scored 4.
+- If uncertain between two adjacent anchors, choose the closer anchor, not an average.
 Return JSON only in this exact structure:
 
 {
   "ok": true,
-  "score": 3.25,
+  "score": 3
   "confidence": "high",
   "qualityLabel": "صالحة للتقييم",
   "reason": "درجة 3.25 لأن الـ short ribs أقل وضوحًا، والـ hooks والـ pins ظاهرة لكن غير حادة، مع تغطية دهنية متوسطة حول الـ tailhead والـ loin.",
@@ -15750,21 +15766,37 @@ If the image(s) are not adequate for valid scoring, return:
       { type: "input_image", image_url: imgUrl("bcs_2_r_01.jpeg"), detail: "high" },
       { type: "input_text", text: "Reference BCS 2.00 side view." },
       { type: "input_image", image_url: imgUrl("bcs_2_s_01.jpeg"), detail: "high" },
+      { type: "input_text", text: "Reference BCS 2.00 rear view - second example." },
+      { type: "input_image", image_url: imgUrl("bcs_2_r_02.jpeg"), detail: "high" },
+      { type: "input_text", text: "Reference BCS 2.00 side view - second example." },
+      { type: "input_image", image_url: imgUrl("bcs_2_s_02.jpeg"), detail: "high" },
 
       { type: "input_text", text: "Reference BCS 3.00 rear view." },
       { type: "input_image", image_url: imgUrl("bcs_3_r_01.jpeg"), detail: "high" },
       { type: "input_text", text: "Reference BCS 3.00 side view." },
       { type: "input_image", image_url: imgUrl("bcs_3_s_01.jpeg"), detail: "high" },
+      { type: "input_text", text: "Reference BCS 3.00 rear view - second example." },
+      { type: "input_image", image_url: imgUrl("bcs_3_r_02.jpeg"), detail: "high" },
+      { type: "input_text", text: "Reference BCS 3.00 side view - second example." },
+      { type: "input_image", image_url: imgUrl("bcs_3_s_02.jpeg"), detail: "high" },
 
       { type: "input_text", text: "Reference BCS 4.00 rear view." },
       { type: "input_image", image_url: imgUrl("bcs_4_r_01.jpeg"), detail: "high" },
       { type: "input_text", text: "Reference BCS 4.00 side view." },
       { type: "input_image", image_url: imgUrl("bcs_4_s_01.jpeg"), detail: "high" },
+      { type: "input_text", text: "Reference BCS 4.00 rear view - second example." },
+      { type: "input_image", image_url: imgUrl("bcs_4_r_02.jpeg"), detail: "high" },
+      { type: "input_text", text: "Reference BCS 4.00 side view - second example." },
+      { type: "input_image", image_url: imgUrl("bcs_4_s_02.jpeg"), detail: "high" },
 
       { type: "input_text", text: "Reference BCS 5.00 rear view." },
       { type: "input_image", image_url: imgUrl("bcs_5_r_01.jpeg"), detail: "high" },
       { type: "input_text", text: "Reference BCS 5.00 side view." },
       { type: "input_image", image_url: imgUrl("bcs_5_s_01.jpeg"), detail: "high" },
+      { type: "input_text", text: "Reference BCS 5.00 rear view - second example." },
+      { type: "input_image", image_url: imgUrl("bcs_5_r_02.jpeg"), detail: "high" },
+      { type: "input_text", text: "Reference BCS 5.00 side view - second example." },
+      { type: "input_image", image_url: imgUrl("bcs_5_s_02.jpeg"), detail: "high" },
 
       {
         type: "input_text",
