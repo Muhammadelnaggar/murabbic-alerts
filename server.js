@@ -15720,14 +15720,14 @@ Decision discipline:
 - If evidence strongly supports a range between two quarter-scores, choose the closest quarter-score only.
 - Never output a range; output one score only.
 Anchor classification discipline:
-- Choose BCS 2 only if the TARGET cow is closest to the BCS 2 anchor images.
-- Choose BCS 3 only if the TARGET cow is closest to the BCS 3 anchor images.
-- Choose BCS 4 only if the TARGET cow is closest to the BCS 4 anchor images.
-- Choose BCS 5 only if the TARGET cow is closest to the BCS 5 anchor images.
-- Do not compress scores toward the middle.
-- A cow visually closer to BCS 3 anchors must not be scored 2.
-- A cow visually closer to BCS 5 anchors must not be scored 4.
-- If uncertain between two adjacent anchors, choose the closer anchor, not an average.
+Strict separation between BCS 2, BCS 3, and BCS 3.5:
+- BCS 2 is reserved for clearly thin cows only: sharp hooks, sharp pins, prominent short ribs, angular loin/backbone, sunken tailhead, and very little fat cover.
+- Do NOT choose BCS 2 if the cow is moderate and the skeletal landmarks are visible but not sharp.
+- Choose BCS 3 when hooks and pins are visible but softened, the loin/rump are not severely angular, and the cow is not clearly thin.
+- BCS 3 is a moderate condition, not a thin condition.
+- BCS 3.5 is higher than BCS 3; at BCS 3.5 only the last 3 ribs/short ribs should be clearly visible.
+- If more than the last 3 ribs are clearly visible with moderate angularity, the cow is closer to BCS 3 than 3.5.
+- If the cow does not show severe thinness, do not classify it as BCS 2.
 Return JSON only in this exact structure:
 
 {
