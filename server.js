@@ -15533,6 +15533,243 @@ if (!uid || !animal || !animalDoc) {
   }
 });
 // ============================================================
+//          API: BCS VISION ANALYZE (OpenAI Vision)
+//          تحليل حالة الجسم برؤية حقيقية — السيرفر فقط
+// ============================================================
+
+function bcsClampScoreSrv(v, kind = "cow") {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+
+  const min = bcsNormalizeKindSrv(kind) === "buffalo" ? 1 : 2;
+  const max = 5;
+
+  return Math.max(min, Math.min(max, Math.round(n * 4) / 4));
+}
+
+function bcsExtractJsonTextSrv(text = "") {
+  const s = String(text || "").trim();
+
+  try {
+    return JSON.parse(s);
+  } catch {}
+
+  const m = s.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+
+  try {
+    return JSON.parse(m[0]);
+  } catch {
+    return null;
+  }
+}
+
+function bcsOpenAIOutputTextSrv(j = {}) {
+  if (typeof j.output_text === "string" && j.output_text.trim()) {
+    return j.output_text.trim();
+  }
+
+  const parts = [];
+
+  for (const item of (j.output || [])) {
+    for (const c of (item.content || [])) {
+      if (typeof c.text === "string") parts.push(c.text);
+      if (typeof c.output_text === "string") parts.push(c.output_text);
+    }
+  }
+
+  return parts.join("\n").trim();
+}
+
+app.post("/api/bcs/vision-analyze", async (req, res) => {
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({
+        ok: false,
+        message: "❌ مفتاح OpenAI غير موجود على السيرفر."
+      });
+    }
+
+    const body = req.body || {};
+
+    const kind = bcsNormalizeKindSrv(
+      body.kind ||
+      body.animalKind ||
+      body.species
+    );
+
+    const animalType = String(
+      body.animalType ||
+      body.typeLabel ||
+      ""
+    ).trim();
+
+    const captures = body.captures || {};
+
+    const rearImage =
+      captures.rear ||
+      body.rearImage ||
+      body.rear ||
+      "";
+
+    const sideImage =
+      captures.side ||
+      body.sideImage ||
+      body.side ||
+      "";
+
+    if (!rearImage) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ لقطة الخلفية مطلوبة لتحليل حالة الجسم."
+      });
+    }
+
+    if (kind === "cow" && !sideImage) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ الأبقار تحتاج لقطة خلفية ولقطة جانبية لتقييم نهائي دقيق."
+      });
+    }
+
+    const prompt = `
+أنت خبير تقييم حالة الجسم BCS في أبقار وجاموس اللبن.
+المطلوب تقييم الصورة/الصور فقط من مناطق الحكم التشريحية، وليس من لون الحيوان أو الخلفية.
+
+قواعد مُرَبِّيك:
+- للأبقار: المقياس من 2 إلى 5.
+- للجاموس: المقياس من 1 إلى 5.
+- الأبقار تحتاج خلفية + جانبية.
+- ركّز في الخلفية على: الحوض، قاعدة الذيل، عظام الورك Hook bones، عظام الدبوس Pin bones، الامتلاء بين الفخذين.
+- ركّز في الجانبية على: خط الظهر، الخاصرة، آخر الضلوع، الضلوع، الحوض، امتلاء الفخذ.
+- إذا مناطق الحكم غير ظاهرة بوضوح، لا تعطي رقمًا؛ أعد ok=false.
+- لا تعتمد على اللون أو الخلفية أو حجم الصورة.
+- أرجع JSON فقط بدون شرح خارج JSON.
+
+صيغة JSON المطلوبة:
+{
+  "ok": true,
+  "score": 3.25,
+  "confidence": "high|medium|low",
+  "qualityLabel": "صالحة للتقييم|متوسطة وتحتاج حذر|غير صالحة للتقييم",
+  "reason": "سبب مختصر بالعربية يذكر علامات الحكم التشريحية",
+  "rearFindings": "ملخص الخلفية",
+  "sideFindings": "ملخص الجانبية أو فارغ للجاموس"
+}
+
+لو الصورة غير صالحة:
+{
+  "ok": false,
+  "message": "سبب الرفض بالعربية"
+}
+`.trim();
+
+    const content = [
+      { type: "input_text", text: prompt },
+      { type: "input_text", text: `النوع: ${bcsKindArabicSrv(kind)}. التصنيف: ${animalType || "غير محدد"}.` },
+      { type: "input_text", text: "الصورة الأولى: لقطة خلفية." },
+      { type: "input_image", image_url: rearImage }
+    ];
+
+    if (kind === "cow") {
+      content.push(
+        { type: "input_text", text: "الصورة الثانية: لقطة جانبية." },
+        { type: "input_image", image_url: sideImage }
+      );
+    }
+
+    const r = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_BCS_MODEL || "gpt-4.1",
+        input: [
+          {
+            role: "user",
+            content
+          }
+        ],
+        temperature: 0,
+        max_output_tokens: 700
+      })
+    });
+
+    const j = await r.json().catch(() => ({}));
+
+    if (!r.ok) {
+      console.error("BCS OpenAI vision error:", j);
+      return res.status(500).json({
+        ok: false,
+        message: "تعذّر تحليل حالة الجسم عبر نموذج الرؤية."
+      });
+    }
+
+    const outText = bcsOpenAIOutputTextSrv(j);
+    const parsed = bcsExtractJsonTextSrv(outText);
+
+    if (!parsed || parsed.ok === false) {
+      return res.status(400).json({
+        ok: false,
+        message: parsed?.message || "الصورة غير صالحة لتقييم حالة الجسم بدقة."
+      });
+    }
+
+    const score = bcsClampScoreSrv(parsed.score, kind);
+
+    if (!Number.isFinite(Number(score))) {
+      return res.status(400).json({
+        ok: false,
+        message: "تعذّر استخراج درجة BCS صالحة من تحليل الرؤية."
+      });
+    }
+
+    const label = bcsLabelSrv(score);
+    const confidence = String(parsed.confidence || "medium").trim();
+
+    const qualityLabel =
+      parsed.qualityLabel ||
+      (
+        confidence === "high"
+          ? "صالحة للتقييم"
+          : confidence === "medium"
+            ? "متوسطة وتحتاج حذر"
+            : "غير صالحة للتقييم"
+      );
+
+    return res.json({
+      ok: true,
+      score,
+      label,
+      kind,
+      species: bcsKindArabicSrv(kind),
+      animalType,
+      rangeText: kind === "buffalo" ? "1–5" : "2–5",
+      quality: {
+        label: qualityLabel,
+        confidence
+      },
+      reason: String(parsed.reason || "").trim(),
+      findings: {
+        rear: String(parsed.rearFindings || "").trim(),
+        side: String(parsed.sideFindings || "").trim()
+      },
+      message: `تم تحليل حالة الجسم — BCS ${Number(score).toFixed(2)} (${label})`
+    });
+
+  } catch (e) {
+    console.error("bcs vision analyze error:", e);
+    return res.status(500).json({
+      ok: false,
+      message: "حدث خطأ أثناء تحليل حالة الجسم بالرؤية."
+    });
+  }
+});
+// ============================================================
 //                       API: ANIMALS (robust)
 // ============================================================
 
