@@ -15701,13 +15701,30 @@ app.post("/api/bcs/vision-analyze", async (req, res) => {
 
     const j = await r.json().catch(() => ({}));
 
-    if (!r.ok) {
-      console.error("BCS OpenAI vision error:", j);
-      return res.status(500).json({
-        ok: false,
-        message: "تعذّر تحليل حالة الجسم عبر نموذج الرؤية."
-      });
+ if (!r.ok) {
+  const openaiMessage =
+    j?.error?.message ||
+    j?.message ||
+    `openai_http_${r.status}`;
+
+  console.error("BCS OpenAI vision error:", {
+    status: r.status,
+    message: openaiMessage,
+    type: j?.error?.type || null,
+    code: j?.error?.code || null
+  });
+
+  return res.status(500).json({
+    ok: false,
+    message: "تعذّر تحليل حالة الجسم عبر نموذج الرؤية.",
+    debug: {
+      status: r.status,
+      message: openaiMessage,
+      type: j?.error?.type || null,
+      code: j?.error?.code || null
     }
+  });
+}
 
     const outText = bcsOpenAIOutputTextSrv(j);
     const parsed = bcsExtractJsonTextSrv(outText);
