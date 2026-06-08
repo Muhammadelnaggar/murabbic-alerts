@@ -15659,7 +15659,31 @@ Scientific scope:
   5) Pins (pin bones)
   6) Tailhead area
   7) Pelvic area / rump
+BCS scale definition:
+- Body Condition Score is a 1 to 5 scale.
+- BCS 1 means extremely thin / skinny / emaciated, with very sharp skeletal landmarks and almost no fat cover.
+- BCS 5 means extremely fat / obese, with skeletal landmarks hidden by heavy fat cover.
+- BCS 2 is thin.
+- BCS 3 is moderate / ideal.
+- BCS 4 is fat / heavy.
+Use the full BCS scale from 1 to 5.
 
+Allowed output scores in this calibration phase:
+1, 2, 3, 4, or 5.
+
+Use the labeled BCS 2, 3, 4, and 5 reference images as visual anchors.
+
+Choose BCS 1 only if the TARGET cow is extremely skinny/emaciated and clearly worse than the BCS 2 anchor images.
+
+Choose BCS 2 if the TARGET cow is thin and closest to the BCS 2 anchor images.
+
+Choose BCS 3 if the TARGET cow is moderate/ideal and closest to the BCS 3 anchor images.
+
+Choose BCS 4 if the TARGET cow is fat/heavy and closest to the BCS 4 anchor images.
+
+Choose BCS 5 if the TARGET cow is extremely fat/obese and closest to or beyond the BCS 5 anchor images.
+
+Do not output decimal scores in this calibration phase.
 Important rules:
 - Judge body fat cover, angularity, and prominence/smoothness of skeletal landmarks.
 - Do NOT use coat color, background, image style, udder size, abdominal fill, breed beauty, or general body size as scoring criteria.
