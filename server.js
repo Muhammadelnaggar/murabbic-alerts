@@ -15541,7 +15541,7 @@ function bcsClampScoreSrv(v, kind = "cow") {
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
 
-  const min = bcsNormalizeKindSrv(kind) === "buffalo" ? 1 : 2;
+  const min = 1;
   const max = 5;
 
   return Math.max(min, Math.min(max, Math.round(n * 4) / 4));
@@ -15633,7 +15633,7 @@ app.post("/api/bcs/vision-analyze", async (req, res) => {
         message: "❌ الأبقار تحتاج لقطة خلفية ولقطة جانبية لتقييم نهائي دقيق."
       });
     }
-
+const prompt = `
 You are an expert evaluator of BODY CONDITION SCORE (BCS) for DAIRY COWS.
 
 Your task is to assign a dairy cow body condition score on a 1.0 to 5.0 scale, using 0.25-point increments only, based on Penn State-style dairy body condition scoring principles.
@@ -15730,7 +15730,7 @@ If the image(s) are not adequate for valid scoring, return:
   "ok": false,
   "message": "الصورة غير صالحة لتقييم حالة الجسم بدقة. يرجى إظهار مناطق الحوض والـ loin والـ short ribs والـ tailhead بوضوح."
 }
-
+`.trim();
     const content = [
       { type: "input_text", text: prompt },
       { type: "input_text", text: `النوع: ${bcsKindArabicSrv(kind)}. التصنيف: ${animalType || "غير محدد"}.` },
@@ -15830,7 +15830,7 @@ If the image(s) are not adequate for valid scoring, return:
       kind,
       species: bcsKindArabicSrv(kind),
       animalType,
-      rangeText: kind === "buffalo" ? "1–5" : "2–5",
+      rangeText: "1–5",
       quality: {
         label: qualityLabel,
         confidence
