@@ -15070,24 +15070,71 @@ async function bcsScoreOneAngleSrv({ dataUrl, kind, angle, animalType }) {
   const inputVec = await bcsImageVectorSrv(buf);
   const refs = bcsBuildRefListSrv(kind, angle, animalType);
 
-  let best = null;
+  const byScore = new Map();
+  const allMatches = [];
 
   for (const ref of refs) {
     const refVec = await bcsLoadRefVectorSrv(ref.base);
     if (!refVec) continue;
 
     const similarity = bcsCosineSrv(inputVec, refVec);
+    const score = Number(ref.score);
 
-    if (!best || similarity > best.similarity) {
-      best = {
-        score: Number(ref.score),
-        similarity: Number(similarity.toFixed(4)),
-        ref: ref.base
-      };
-    }
+    const match = {
+      score,
+      similarity: Number(similarity.toFixed(4)),
+      ref: ref.base
+    };
+
+    allMatches.push(match);
+
+    if (!byScore.has(score)) byScore.set(score, []);
+    byScore.get(score).push(match);
   }
 
-  if (!best) {
+  if (!allMatches.length) {
+    return {
+      ok: false,
+      angle,
+      message: "لم يتم العثور على مراجع مناسبة للتحليل."
+    };
+  }
+
+  const scoreGroups = [];
+
+  for (const [score, matches] of byScore.entries()) {
+    const sorted = matches
+      .filter(m => Number.isFinite(Number(m.similarity)))
+      .sort((a, b) => Number(b.similarity) - Number(a.similarity));
+
+    if (!sorted.length) continue;
+
+    const top = sorted.slice(0, 3);
+    const avgTop = top.reduce((sum, m) => sum + Number(m.similarity), 0) / top.length;
+    const best = sorted[0];
+
+    scoreGroups.push({
+      score,
+      groupSimilarity: Number(avgTop.toFixed(4)),
+      bestSimilarity: Number(best.similarity.toFixed(4)),
+      ref: best.ref,
+      topRefs: top.map(m => ({
+        ref: m.ref,
+        similarity: m.similarity
+      }))
+    });
+  }
+
+  scoreGroups.sort((a, b) => {
+    if (Number(b.groupSimilarity) !== Number(a.groupSimilarity)) {
+      return Number(b.groupSimilarity) - Number(a.groupSimilarity);
+    }
+    return Number(b.bestSimilarity) - Number(a.bestSimilarity);
+  });
+
+  const bestGroup = scoreGroups[0];
+
+  if (!bestGroup) {
     return {
       ok: false,
       angle,
@@ -15098,7 +15145,17 @@ async function bcsScoreOneAngleSrv({ dataUrl, kind, angle, animalType }) {
   return {
     ok: true,
     angle,
-    ...best
+    score: Number(bestGroup.score),
+    similarity: Number(bestGroup.groupSimilarity.toFixed(4)),
+    ref: bestGroup.ref,
+    bestSimilarity: bestGroup.bestSimilarity,
+    topRefs: bestGroup.topRefs,
+    scoreGroups: scoreGroups.map(g => ({
+      score: g.score,
+      groupSimilarity: g.groupSimilarity,
+      bestSimilarity: g.bestSimilarity,
+      ref: g.ref
+    }))
   };
 }
 
