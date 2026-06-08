@@ -15731,20 +15731,56 @@ If the image(s) are not adequate for valid scoring, return:
   "message": "الصورة غير صالحة لتقييم حالة الجسم بدقة. يرجى إظهار مناطق الحوض والـ loin والـ short ribs والـ tailhead بوضوح."
 }
 `.trim();
+       const publicBase =
+      process.env.PUBLIC_BASE_URL ||
+      `${req.protocol}://${req.get("host")}`;
+
+    const imgUrl = (name) => `${publicBase}/images/${name}`;
+
     const content = [
       { type: "input_text", text: prompt },
-      { type: "input_text", text: `النوع: ${bcsKindArabicSrv(kind)}. التصنيف: ${animalType || "غير محدد"}.` },
-      { type: "input_text", text: "الصورة الأولى: لقطة خلفية." },
-      { type: "input_image", image_url: rearImage }
+
+      {
+        type: "input_text",
+        text:
+          "Calibration reference examples. These are labeled dairy cow BCS anchor images. Use them only to calibrate visual scoring, then score the TARGET cow images at the end."
+      },
+
+      { type: "input_text", text: "Reference BCS 2.00 rear view." },
+      { type: "input_image", image_url: imgUrl("bcs_2_r_01.jpeg"), detail: "high" },
+      { type: "input_text", text: "Reference BCS 2.00 side view." },
+      { type: "input_image", image_url: imgUrl("bcs_2_s_01.jpeg"), detail: "high" },
+
+      { type: "input_text", text: "Reference BCS 3.00 rear view." },
+      { type: "input_image", image_url: imgUrl("bcs_3_r_01.jpeg"), detail: "high" },
+      { type: "input_text", text: "Reference BCS 3.00 side view." },
+      { type: "input_image", image_url: imgUrl("bcs_3_s_01.jpeg"), detail: "high" },
+
+      { type: "input_text", text: "Reference BCS 4.00 rear view." },
+      { type: "input_image", image_url: imgUrl("bcs_4_r_01.jpeg"), detail: "high" },
+      { type: "input_text", text: "Reference BCS 4.00 side view." },
+      { type: "input_image", image_url: imgUrl("bcs_4_s_01.jpeg"), detail: "high" },
+
+      { type: "input_text", text: "Reference BCS 5.00 rear view." },
+      { type: "input_image", image_url: imgUrl("bcs_5_r_01.jpeg"), detail: "high" },
+      { type: "input_text", text: "Reference BCS 5.00 side view." },
+      { type: "input_image", image_url: imgUrl("bcs_5_s_01.jpeg"), detail: "high" },
+
+      {
+        type: "input_text",
+        text:
+          `Now score the TARGET cow only. النوع: ${bcsKindArabicSrv(kind)}. التصنيف: ${animalType || "غير محدد"}.`
+      },
+      { type: "input_text", text: "TARGET rear view." },
+      { type: "input_image", image_url: rearImage, detail: "high" }
     ];
 
     if (kind === "cow") {
       content.push(
-        { type: "input_text", text: "الصورة الثانية: لقطة جانبية." },
-        { type: "input_image", image_url: sideImage }
+        { type: "input_text", text: "TARGET side view." },
+        { type: "input_image", image_url: sideImage, detail: "high" }
       );
     }
-
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
