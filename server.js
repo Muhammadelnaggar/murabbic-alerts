@@ -15106,12 +15106,13 @@ function bcsQualityLabelSrv(similarity) {
   const s = Number(similarity);
 
   if (!Number.isFinite(s)) return "غير محددة";
-  if (s >= 0.78) return "جيدة";
-  if (s >= 0.65) return "متوسطة";
+
+  if (s >= 0.45) return "ممتازة";
+  if (s >= 0.35) return "جيدة";
+  if (s >= 0.25) return "مقبولة";
 
   return "ضعيفة — يفضّل إعادة التصوير";
 }
-
 app.post("/api/bcs/analyze", async (req, res) => {
   try {
     const body = req.body || {};
