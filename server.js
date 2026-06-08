@@ -14900,24 +14900,24 @@ function getSharpSrv() {
   }
 }
 
-const BCS_REF_EXTS_SRV = ["jpg", "png", "webp"];
+const BCS_REF_EXTS_SRV = ["jpg", "jpeg", "png", "webp", "JPG", "JPEG", "PNG", "WEBP"];
+
+function bcsCowRefBasesSrv(score, angleCode) {
+  return ["00", "01", "02", "03", "04", "05"].map(i => `bcs_${score}_${angleCode}_${i}`);
+}
 
 const BCS_MAP_COW_SRV = {
-  side: [
-    { score: 2, bases: ["bsc2_side"] },
-    { score: 2.75, bases: ["bsc2_75_side"] },
-    { score: 3, bases: ["bsc3_side"] },
-    { score: 3.25, bases: ["bsc3_25_side"] },
-    { score: 4, bases: ["bsc4_side"] },
-    { score: 5, bases: ["bsc5_side"] }
-  ],
   rear: [
-    { score: 2, bases: ["bsc2_rear"] },
-    { score: 2.75, bases: ["bsc2_75_rear"] },
-    { score: 3, bases: ["bsc3_rear"] },
-    { score: 3.25, bases: ["bsc3_25_rear"] },
-    { score: 4, bases: ["bsc4_rear"] },
-    { score: 5, bases: ["bsc5_rear"] }
+    { score: 2, bases: bcsCowRefBasesSrv("2", "r") },
+    { score: 3, bases: bcsCowRefBasesSrv("3", "r") },
+    { score: 4, bases: bcsCowRefBasesSrv("4", "r") },
+    { score: 5, bases: bcsCowRefBasesSrv("5", "r") }
+  ],
+  side: [
+    { score: 2, bases: bcsCowRefBasesSrv("2", "s") },
+    { score: 3, bases: bcsCowRefBasesSrv("3", "s") },
+    { score: 4, bases: bcsCowRefBasesSrv("4", "s") },
+    { score: 5, bases: bcsCowRefBasesSrv("5", "s") }
   ]
 };
 
