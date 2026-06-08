@@ -15680,8 +15680,26 @@ Choose BCS 2 if the TARGET cow is thin and closest to the BCS 2 anchor images.
 Choose BCS 3 if the TARGET cow is moderate/ideal and closest to the BCS 3 anchor images.
 
 Choose BCS 4 if the TARGET cow is fat/heavy and closest to the BCS 4 anchor images.
+BCS 4 means a fat/heavy cow:
+- short ribs are difficult to distinguish,
+- hooks and pins are rounded and clearly covered,
+- tailhead has clear fat cover,
+- the loin and rump are smooth,
+- but the cow is not at the extreme obese end of the scale.
 
 Choose BCS 5 if the TARGET cow is extremely fat/obese and closest to or beyond the BCS 5 anchor images.
+BCS 5 means an obese cow:
+- short ribs are not visible,
+- hooks and pins are not distinct or are nearly hidden,
+- the tailhead is heavily padded or buried in fat,
+- the pelvic area/rump is very smooth and rounded,
+- there is obvious heavy fat cover, not just good condition.
+
+Strict separation between BCS 4 and BCS 5:
+- Do NOT choose BCS 4 if the tailhead is heavily padded/buried and the hooks/pins are nearly hidden by fat.
+- If the pelvic area is extremely smooth and rounded, with no obvious bony sharpness and clear obesity, choose BCS 5, not BCS 4.
+- BCS 4 is fat; BCS 5 is obese.
+- When uncertain between BCS 4 and BCS 5, choose BCS 5 if the cow shows obvious obesity and the skeletal landmarks are largely hidden by fat.
 
 Do not output decimal scores in this calibration phase.
 Important rules:
