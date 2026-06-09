@@ -541,7 +541,16 @@ function showUploadPreview(url) {
 
     await analyzeOnServer();
   }
-
+function getTenantUid() {
+  return String(
+    window.MBK_USER_ID ||
+    window.mbkUserId ||
+    window.mbk?.userId ||
+    localStorage.getItem("userId") ||
+    localStorage.getItem("uid") ||
+    ""
+  ).trim();
+}
   async function saveBCS() {
     msgBox.style.display = "none";
 
@@ -566,12 +575,16 @@ function showUploadPreview(url) {
     try {
       saveBtn.disabled = true;
 
-      const r = await fetch("/api/bcs/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+ const uid = getTenantUid();
 
+const r = await fetch("/api/bcs/save", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    ...(uid ? { "X-User-Id": uid } : {})
+  },
+  body: JSON.stringify(payload)
+});
       const j = await r.json().catch(() => ({}));
 
       if (!r.ok || !j.ok) {
