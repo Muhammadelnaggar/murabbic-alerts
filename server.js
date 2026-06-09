@@ -15304,7 +15304,7 @@ app.post("/api/bcs/analyze", async (req, res) => {
     });
   }
 });
-app.post("/api/bcs/save", async (req, res) => {
+app.post("/api/bcs/save", requireUserId, async (req, res) => {
   try {
     if (!db) {
       return res.status(503).json({
@@ -15314,7 +15314,7 @@ app.post("/api/bcs/save", async (req, res) => {
     }
 
     const body = req.body || {};
-    let uid = resolveTenant(req) || "";
+    const uid = req.userId;
 
     const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
     const animalNumber = calvingNormDigitsOnlySrv(body.animalNumber || body.number || "");
@@ -15363,25 +15363,17 @@ const score = Number(
       });
     }
 
-   let animal = null;
+let animal = null;
 let animalDoc = null;
 
-/*
-  BCS page is UI-only:
-  لا UID من الصفحة، ولا Firebase، ولا ملفات وسيطة.
-  السيرفر يحدد مالك الحيوان من وثيقة الحيوان نفسها.
-*/
-
 if (animalIdFromPage) {
-  const ref = db.collection("animals").doc(animalIdFromPage);
-  const snap = await ref.get();
+  const snap = await db.collection("animals").doc(animalIdFromPage).get();
 
   if (snap.exists) {
     const data = snap.data() || {};
     const owner = String(data.userId || data.ownerUid || "").trim();
 
-    if (owner) {
-      uid = owner;
+    if (owner === uid) {
       animal = { id: snap.id, ...data };
       animalDoc = snap;
     }
@@ -15392,6 +15384,7 @@ if (!animal && animalNumber) {
   const found = new Map();
 
   const snap1 = await db.collection("animals")
+    .where("userId", "==", uid)
     .where("animalNumber", "==", animalNumber)
     .limit(3)
     .get();
@@ -15399,6 +15392,7 @@ if (!animal && animalNumber) {
   snap1.forEach(doc => found.set(doc.id, doc));
 
   const snap2 = await db.collection("animals")
+    .where("userId", "==", uid)
     .where("number", "==", animalNumber)
     .limit(3)
     .get();
@@ -15414,27 +15408,21 @@ if (!animal && animalNumber) {
   if (docs.length === 1) {
     const doc = docs[0];
     const data = doc.data() || {};
-    const owner = String(data.userId || data.ownerUid || "").trim();
-
-    if (owner) {
-      uid = owner;
-      animal = { id: doc.id, ...data };
-      animalDoc = doc;
-    }
+    animal = { id: doc.id, ...data };
+    animalDoc = doc;
   }
 
   if (docs.length > 1) {
     return res.status(409).json({
       ok: false,
-      message: "❌ رقم الحيوان مكرر. افتح التقييم من بطاقة الحيوان أو مرّر animalId."
+      message: "❌ رقم الحيوان مكرر داخل حسابك. افتح التقييم من بطاقة الحيوان أو مرّر animalId."
     });
   }
 }
-
-if (!uid || !animal || !animalDoc) {
+if (!animal || !animalDoc) {
   return res.status(404).json({
     ok: false,
-    message: "❌ الحيوان غير موجود أو لا يمكن تحديد مالكه من السيرفر."
+    message: "❌ الحيوان غير موجود في حسابك."
   });
 }
 
