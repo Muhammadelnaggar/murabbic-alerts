@@ -94,24 +94,7 @@
       .save-bar label{flex:1 1 260px}
       .save-bar button,#backBtn{width:auto !important}
     }
-    .auto-status{
-  position:absolute;
-  right:12px;
-  left:12px;
-  bottom:12px;
-  z-index:3;
-  background:rgba(15,23,42,.78);
-  color:#fff;
-  border-radius:999px;
-  padding:10px 14px;
-  font-weight:800;
-  text-align:center;
-  font-size:14px;
-  backdrop-filter:blur(6px);
-}
-.auto-status.ok{
-  background:rgba(14,160,90,.88);
-}
+  
   </style>
 </head>
 <body>
@@ -154,10 +137,9 @@
       </div>
 
       <div class="preview-wrap">
-      <video id="preview" playsinline autoplay muted></video>
-      <canvas id="overlay"></canvas>
-      <div id="autoStatus" class="auto-status">ثبّت الكاميرا داخل الإطار</div>
-   </div>
+  <video id="preview" playsinline autoplay muted></video>
+  <canvas id="overlay"></canvas>
+</div>
 
       <div class="thumbs" id="thumbs"></div>
 
@@ -201,7 +183,6 @@
 
   const preview = $("#preview");
   const overlay = $("#overlay");
-  const autoStatus = $("#autoStatus");
   const cameraSelect = $("#cameraSelect");
   const toggleFlash = $("#toggleFlash");
   const restartBtn = $("#restartBtn");
@@ -240,11 +221,7 @@
     track: null,
     torchOn: false,
     captures: { rear: null, side: null },
-    analysis: null,
-    autoTimer: null,
-    autoBusy: false,
-    autoOkFrames: 0,
-    lastAutoFrame: null
+    analysis: null
    };
 
   const msgBox = document.createElement("div");
@@ -379,12 +356,6 @@
   }
 
   async function stopCamera() {
-    if (state.autoTimer) {
-  clearInterval(state.autoTimer);
-  state.autoTimer = null;
-}
-state.autoOkFrames = 0;
-state.lastAutoFrame = null;
     if (state.stream) {
       state.stream.getTracks().forEach(t => t.stop());
     }
@@ -438,7 +409,6 @@ fitOverlay();
 drawGuide();
 updateTorchButton();
 await populateCameras();
-startAutoCaptureLoop();
 }
   async function populateCameras() {
     if (!navigator.mediaDevices?.enumerateDevices || !cameraSelect) return;
@@ -499,143 +469,10 @@ startAutoCaptureLoop();
 
     return c.toDataURL("image/jpeg", 0.92);
   }
-  function setAutoStatus(text, ok = false) {
-  if (!autoStatus) return;
-  autoStatus.textContent = text;
-  autoStatus.classList.toggle("ok", !!ok);
-}
-
-function mobileNeedsOrientationGate() {
-  return window.matchMedia && window.matchMedia("(max-width: 760px)").matches;
-}
-
-function checkCaptureOrientation() {
-  if (!mobileNeedsOrientationGate()) return { ok: true };
-
-  const isPortrait = window.innerHeight >= window.innerWidth;
-  const isLandscape = window.innerWidth > window.innerHeight;
-
-  if (state.currentAngle === "rear" && !isPortrait) {
-    return { ok: false, msg: "لف الهاتف رأسيًا للخلفية" };
-  }
-
-  if (state.currentAngle === "side" && !isLandscape) {
-    return { ok: false, msg: "لف الهاتف أفقيًا للجانبية" };
-  }
-
-  return { ok: true };
-}
-
-function measureFrameQuality() {
-  const vw = preview.videoWidth || 0;
-  const vh = preview.videoHeight || 0;
-
-  if (!vw || !vh) {
-    return { ok: false, msg: "تشغيل الكاميرا..." };
-  }
-
-  const orient = checkCaptureOrientation();
-  if (!orient.ok) return orient;
-
-  const w = 80;
-  const h = 60;
-  const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
-
-  const g = c.getContext("2d", { willReadFrequently: true });
-  g.drawImage(preview, 0, 0, w, h);
-
-  const data = g.getImageData(0, 0, w, h).data;
-
-  let sum = 0;
-  let dark = 0;
-  let bright = 0;
-  let sharp = 0;
-  const gray = new Uint8Array(w * h);
-
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    const y = Math.round((data[i] * 0.299) + (data[i + 1] * 0.587) + (data[i + 2] * 0.114));
-    gray[p] = y;
-    sum += y;
-    if (y < 45) dark++;
-    if (y > 235) bright++;
-  }
-
-  const mean = sum / gray.length;
-  const darkRatio = dark / gray.length;
-  const brightRatio = bright / gray.length;
-
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const p = y * w + x;
-      sharp += Math.abs(gray[p] - gray[p - 1]) + Math.abs(gray[p] - gray[p - w]);
-    }
-  }
-
-  sharp = sharp / (w * h);
-
-  let motion = 999;
-  if (state.lastAutoFrame && state.lastAutoFrame.length === gray.length) {
-    let diff = 0;
-    for (let i = 0; i < gray.length; i++) {
-      diff += Math.abs(gray[i] - state.lastAutoFrame[i]);
-    }
-    motion = diff / gray.length;
-  }
-
-  state.lastAutoFrame = gray;
-
-  if (mean < 55) return { ok: false, msg: "الإضاءة ضعيفة" };
-  if (mean > 215 || brightRatio > 0.35) return { ok: false, msg: "الإضاءة قوية جدًا" };
-  if (darkRatio > 0.45) return { ok: false, msg: "ظل قوي على الصورة" };
-  if (sharp < 7) return { ok: false, msg: "الصورة غير واضحة" };
-  if (motion > 9) return { ok: false, msg: "ثبّت الكاميرا" };
-
-  return { ok: true, msg: "جاهز للالتقاط" };
-}
-
-function startAutoCaptureLoop() {
-  if (state.autoTimer) clearInterval(state.autoTimer);
-
-  state.autoTimer = setInterval(async () => {
-    if (!preview || !preview.srcObject) return;
-    if (state.autoBusy) return;
-    if (state.captures[state.currentAngle]) {
-      setAutoStatus("اللقطة محفوظة", true);
-      state.autoOkFrames = 0;
-      return;
-    }
-
-    const q = measureFrameQuality();
-
-    if (!q.ok) {
-      state.autoOkFrames = 0;
-      setAutoStatus(q.msg || "اضبط الصورة");
-      return;
-    }
-
-    state.autoOkFrames++;
-    setAutoStatus("ثابتة... جاري التجهيز", true);
-
-    if (state.autoOkFrames >= 3) {
-      state.autoOkFrames = 0;
-      state.autoBusy = true;
-      setAutoStatus("جاري الالتقاط تلقائيًا", true);
-
-      try {
-        await captureCurrentAngle();
-      } finally {
-        state.autoBusy = false;
-      }
-    }
-  }, 450);
-}
+ 
   function setAngle(angle) {
     state.currentAngle = angle;
-    state.autoOkFrames = 0;
-    state.lastAutoFrame = null;
-
+  
     $$(".angle-tab").forEach(btn => {
       btn.classList.toggle("active", btn.dataset.angle === angle);
     });
