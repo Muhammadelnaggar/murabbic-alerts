@@ -820,3 +820,288 @@ textarea{
   border:0;
   padding:0;
 }
+/* =========================================================
+   Murabbik Shared Vision / Camera UI
+   مكونات عامة للكاميرا والتحليل المرئي
+   ========================================================= */
+
+.mbk-vision-container{
+  max-width:880px;
+  margin:16px auto;
+  padding:0 16px;
+}
+
+.mbk-vision-tabs{
+  display:flex;
+  gap:8px;
+  padding:12px;
+  border-bottom:1px solid var(--border, #e2e8f0);
+}
+
+.mbk-vision-tab{
+  padding:10px 12px;
+  border-radius:999px;
+  border:1px solid #cbd5e1;
+  background:#fff;
+  cursor:pointer;
+  font-weight:700;
+  min-height:44px;
+}
+
+.mbk-vision-tab.active{
+  background:var(--brand, #0ea05a);
+  color:#fff;
+  border-color:var(--brand, #0ea05a);
+}
+
+.mbk-vision-controls{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px;
+  align-items:center;
+  padding:8px;
+}
+
+.mbk-vision-controls .left{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+.mbk-vision-controls .right{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+}
+
+.mbk-btn{
+  padding:12px 14px;
+  border:none;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:700;
+  min-height:44px;
+  box-shadow:0 1px 2px rgba(0,0,0,.04);
+}
+
+.mbk-btn-lg{
+  padding:14px 18px;
+  font-size:18px;
+}
+
+.mbk-btn-primary{
+  background:var(--brand, #0ea05a);
+  color:#fff;
+}
+
+.mbk-btn-light{
+  background:#f1f5f9;
+  color:#0f172a;
+  border:1px solid #cbd5e1;
+}
+
+.mbk-btn-danger{
+  background:#c2410c;
+  color:#fff;
+}
+
+.mbk-btn:disabled{
+  opacity:.6;
+  cursor:not-allowed;
+}
+
+.mbk-camera-frame{
+  position:relative;
+  border-radius:16px;
+  overflow:hidden;
+  background:#000;
+  aspect-ratio:4/3;
+  max-height:56vh;
+}
+
+.mbk-camera-frame.rear-view{
+  aspect-ratio:3/4;
+}
+
+.mbk-camera-frame.side-view{
+  aspect-ratio:4/3;
+}
+
+.mbk-camera-preview{
+  width:100%;
+  height:100%;
+  display:block;
+  background:#000;
+  object-fit:cover;
+}
+
+.mbk-camera-overlay{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+}
+
+.mbk-thumbs{
+  display:flex;
+  gap:8px;
+  padding:8px;
+  border-top:1px solid var(--border, #e2e8f0);
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  scroll-snap-type:x mandatory;
+}
+
+.mbk-thumb{
+  width:56px;
+  height:56px;
+  border-radius:12px;
+  overflow:hidden;
+  border:2px solid var(--border, #e2e8f0);
+  background:#f8fafc;
+  position:relative;
+  flex:0 0 auto;
+  scroll-snap-align:start;
+}
+
+.mbk-thumb img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.mbk-thumb .label{
+  position:absolute;
+  bottom:0;
+  left:0;
+  right:0;
+  background:rgba(0,0,0,.5);
+  color:#fff;
+  font-size:11px;
+  text-align:center;
+}
+
+.mbk-results{
+  padding:12px;
+  border-top:1px solid var(--border, #e2e8f0);
+  display:grid;
+  gap:10px;
+}
+
+.mbk-upload-preview{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  padding:10px;
+  background:#fff;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:14px;
+}
+
+.mbk-upload-preview img{
+  width:96px;
+  height:96px;
+  object-fit:cover;
+  border-radius:12px;
+  border:1px solid #e5e7eb;
+}
+
+.mbk-score-card{
+  display:grid;
+  gap:8px;
+  padding:8px;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:12px;
+  background:#fff;
+}
+
+.mbk-score-badge{
+  display:inline-block;
+  padding:6px 10px;
+  border:1px solid transparent;
+  border-radius:999px;
+  font-weight:800;
+  width:max-content;
+}
+
+.mbk-score-bar{
+  height:10px;
+  background:#f1f5f9;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:999px;
+  overflow:hidden;
+}
+
+.mbk-score-fill{
+  height:100%;
+}
+
+.mbk-score-note{
+  color:var(--muted, #64748b);
+  font-weight:700;
+}
+
+.mbk-save-panel{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:8px;
+  padding:12px;
+  border-top:1px solid var(--border, #e2e8f0);
+}
+
+.mbk-save-panel button{
+  width:100% !important;
+  max-width:100%;
+}
+
+.mbk-save-panel label{
+  width:100%;
+  min-width:0;
+}
+
+.vision-card .mbk-vision-controls{
+  position:sticky;
+  top:56px;
+  z-index:5;
+  background:#fff;
+  border-bottom:1px solid var(--border, #e2e8f0);
+}
+
+@media(max-width:560px){
+  .mbk-vision-controls{
+    grid-template-columns:1fr;
+  }
+
+  .mbk-vision-controls .right{
+    justify-content:stretch;
+  }
+
+  .mbk-vision-controls .mbk-btn{
+    width:100%;
+  }
+
+  .mbk-vision-controls #captureBtn{
+    order:-1;
+  }
+}
+
+@media(min-width:640px){
+  .mbk-save-panel{
+    flex-direction:row;
+    align-items:center;
+  }
+
+  .mbk-save-panel label{
+    flex:1 1 260px;
+  }
+
+  .mbk-save-panel button{
+    width:auto !important;
+  }
+}
+
+@media(min-width:860px){
+  .mbk-vision-controls .right{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+}
