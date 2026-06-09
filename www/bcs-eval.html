@@ -105,15 +105,6 @@
   </header>
 
   <div class="container">
-    <section class="card kind-card">
-      <div class="kind-grid">
-        <div role="radiogroup" aria-label="نوع الحيوان" style="display:flex;gap:12px;align-items:center">
-          <label style="display:flex;gap:6px;align-items:center"><input type="radio" name="animalKind" id="kindCow" value="cow"> أبقار</label>
-          <label style="display:flex;gap:6px;align-items:center"><input type="radio" name="animalKind" id="kindBuffalo" value="buffalo"> جاموس</label>
-        </div>
-        <select id="animalType" class="select" title="التصنيف"></select>
-      </div>
-    </section>
 
     <section class="card" id="cameraCard">
       <div class="angles">
@@ -127,13 +118,9 @@
           <button id="retakeBtn" class="btn btn-danger" disabled>إعادة الالتقاط</button>
         </div>
         <div class="right">
-          <select id="cameraSelect" class="select" title="اختيار الكاميرا"></select>
-          <button id="toggleFlash" class="btn btn-light" title="تشغيل الفلاش" aria-pressed="false">الفلاش</button>
-          <button id="restartBtn" class="btn btn-light">إعادة التهيئة</button>
-          <button id="uploadBtn" type="button" class="btn btn-light">رفع صورة بديلة</button>
-         <input id="uploadInput" type="file" accept="image/*" style="display:none" />
-          <button id="nextAngleBtn" class="btn btn-light">التالي ▸</button>
-        </div>
+  <button id="uploadBtn" type="button" class="btn btn-light">رفع صورة بديلة</button>
+  <input id="uploadInput" type="file" accept="image/*" style="display:none" />
+</div>
       </div>
 
       <div class="preview-wrap">
@@ -183,9 +170,9 @@
 
   const preview = $("#preview");
   const overlay = $("#overlay");
-  const cameraSelect = $("#cameraSelect");
-  const toggleFlash = $("#toggleFlash");
-  const restartBtn = $("#restartBtn");
+  const cameraSelect = null;
+  const toggleFlash = null;
+  const restartBtn = null;
   const captureBtn = $("#captureBtn");
   const retakeBtn = $("#retakeBtn");
   const uploadBtn = $("#uploadBtn");
@@ -201,17 +188,9 @@
   const thumbs = $("#thumbs");
   const uploadPreviewBox = $("#uploadPreviewBox");
   const uploadPreviewImg = $("#uploadPreviewImg");
-  const kindCow = $("#kindCow");
-  const kindBuffalo = $("#kindBuffalo");
-  const animalTypeSel = $("#animalType");
+  const animalTypeSel = { value: "" };
   const commentInput = $("#commentInput");
   const formBar = $(".save-bar");
-
-  const TYPE_OPTIONS = {
-    cow: ["حلاب", "ثنائي الغرض", "سلالات صغيرة"],
-    buffalo: ["مصري", "هجين"]
-  };
-
   const anglesOrder = ["rear", "side"];
   const angleLabels = { rear: "خلفية", side: "جانبية" };
 
@@ -259,24 +238,18 @@
     };
   }
 
-  function currentKind() {
-    return kindBuffalo?.checked ? "buffalo" : "cow";
-  }
+function currentKind() {
+  const raw = String(
+    qs.get("kind") ||
+    qs.get("species") ||
+    qs.get("animalKind") ||
+    qs.get("animalSpecies") ||
+    ""
+  ).trim().toLowerCase();
 
-  function populateType(kind) {
-    const opts = TYPE_OPTIONS[kind] || [];
-
-    if (!animalTypeSel) return;
-
-    animalTypeSel.innerHTML = "";
-
-    opts.forEach(v => {
-      const o = document.createElement("option");
-      o.value = v;
-      o.textContent = v;
-      animalTypeSel.appendChild(o);
-    });
-  }
+  if (raw.includes("buffalo") || raw.includes("جاموس")) return "buffalo";
+  return "cow";
+}
 
   function fitOverlay() {
     if (!preview || !overlay) return;
@@ -431,11 +404,12 @@ await populateCameras();
     }
   }
 
-  function updateTorchButton() {
-    const caps = state.track?.getCapabilities?.() || {};
-    const ok = !!caps.torch;
-    toggleFlash.disabled = !ok;
-  }
+ function updateTorchButton() {
+  if (!toggleFlash) return;
+  const caps = state.track?.getCapabilities?.() || {};
+  const ok = !!caps.torch;
+  toggleFlash.disabled = !ok;
+}
 
   async function toggleTorch() {
     try {
@@ -481,23 +455,22 @@ await populateCameras();
     updateButtons();
   }
 
-  function updateKindUI() {
-    const kind = currentKind();
-    const sideBtn = document.querySelector('[data-angle="side"]');
+function updateKindUI() {
+  const kind = currentKind();
+  const sideBtn = document.querySelector('[data-angle="side"]');
 
-    if (sideBtn) {
-      sideBtn.style.display = kind === "buffalo" ? "none" : "";
-    }
-
-    if (kind === "buffalo" && state.currentAngle !== "rear") {
-      setAngle("rear");
-    }
-
-    scoreNote.textContent = kind === "buffalo"
-      ? "الجاموس يحتاج لقطة خلفية فقط."
-      : "الأبقار تحتاج لقطة خلفية ولقطة جانبية.";
+  if (sideBtn) {
+    sideBtn.style.display = kind === "buffalo" ? "none" : "";
   }
 
+  if (kind === "buffalo" && state.currentAngle !== "rear") {
+    setAngle("rear");
+  }
+
+  scoreNote.textContent = kind === "buffalo"
+    ? "الجاموس يحتاج لقطة خلفية فقط."
+    : "الأبقار تحتاج لقطة خلفية ولقطة جانبية.";
+}
   function renderThumbs() {
     thumbs.innerHTML = "";
 
@@ -695,33 +668,9 @@ function showUploadPreview(url) {
   }
 
   function initEvents() {
-    kindCow?.addEventListener("change", () => {
-      populateType("cow");
-      state.analysis = null;
-      showAnalysis(null);
-      updateKindUI();
-    });
-
-    kindBuffalo?.addEventListener("change", () => {
-      populateType("buffalo");
-      state.analysis = null;
-      showAnalysis(null);
-      updateKindUI();
-    });
-
-    animalTypeSel?.addEventListener("change", () => {
-      state.analysis = null;
-      showAnalysis(null);
-    });
 
     $$(".angle-tab").forEach(btn => {
       btn.addEventListener("click", () => setAngle(btn.dataset.angle));
-    });
-
-    $("#nextAngleBtn")?.addEventListener("click", () => {
-      const visibleAngles = currentKind() === "buffalo" ? ["rear"] : anglesOrder;
-      const i = visibleAngles.indexOf(state.currentAngle);
-      setAngle(visibleAngles[(i + 1) % visibleAngles.length]);
     });
 
     captureBtn?.addEventListener("click", captureCurrentAngle);
@@ -798,8 +747,6 @@ function showUploadPreview(url) {
     if (eventDateInput) eventDateInput.value = ctx.eventDate || todayCairo();
     if (numberSpan) numberSpan.textContent = ctx.animalNumber || (ctx.animalId ? `#${ctx.animalId.slice(-5)}` : "—");
 
-    kindCow.checked = true;
-    populateType("cow");
     updateKindUI();
     renderThumbs();
     updateButtons();
