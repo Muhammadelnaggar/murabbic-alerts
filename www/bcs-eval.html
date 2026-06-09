@@ -409,11 +409,30 @@ state.lastAutoFrame = null;
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     state.stream = stream;
 
-    preview.srcObject = stream;
-    await preview.play();
+   preview.srcObject = stream;
 
-    const tracks = stream.getVideoTracks();
-    state.track = tracks[0] || null;
+await new Promise((resolve) => {
+  if (preview.readyState >= 2 && preview.videoWidth) {
+    resolve();
+    return;
+  }
+
+  preview.onloadedmetadata = () => resolve();
+});
+
+await preview.play();
+
+await new Promise((resolve) => {
+  if (preview.videoWidth && preview.videoHeight) {
+    resolve();
+    return;
+  }
+
+  preview.oncanplay = () => resolve();
+});
+
+const tracks = stream.getVideoTracks();
+state.track = tracks[0] || null;
 
 fitOverlay();
 drawGuide();
