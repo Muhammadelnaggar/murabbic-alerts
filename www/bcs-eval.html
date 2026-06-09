@@ -30,6 +30,29 @@
     .btn:disabled{opacity:.6;cursor:not-allowed}
 
     .preview-wrap{position:relative;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:4/3;max-height:56vh}
+    .preview-wrap.rear-view{
+  aspect-ratio:3/4;
+}
+
+.preview-wrap.side-view{
+  aspect-ratio:4/3;
+}
+
+.orientation-hint{
+  display:none;
+  margin:8px;
+  padding:10px 12px;
+  border-radius:12px;
+  background:#fff7ed;
+  color:#9a3412;
+  font-weight:800;
+  text-align:center;
+  border:1px solid #fed7aa;
+}
+
+.orientation-hint.show{
+  display:block;
+}
     video#preview{width:100%;height:100%;display:block;background:#000;object-fit:cover}
     canvas#overlay{position:absolute;inset:0;pointer-events:none}
 
@@ -123,9 +146,13 @@
 </div>
       </div>
 
-      <div class="preview-wrap">
+     <div class="preview-wrap rear-view" id="previewWrap">
   <video id="preview" playsinline autoplay muted></video>
   <canvas id="overlay"></canvas>
+</div>
+
+<div id="orientationHint" class="orientation-hint">
+  لف الموبايل أفقيًا لالتقاط اللقطة الجانبية بدقة.
 </div>
 
       <div class="thumbs" id="thumbs"></div>
@@ -170,6 +197,8 @@
 
   const preview = $("#preview");
   const overlay = $("#overlay");
+  const previewWrap = $("#previewWrap");
+  const orientationHint = $("#orientationHint");
   const cameraSelect = null;
   const toggleFlash = null;
   const restartBtn = null;
@@ -443,7 +472,35 @@ await populateCameras();
 
     return c.toDataURL("image/jpeg", 0.92);
   }
- 
+ function isPortraitScreen() {
+  return window.innerHeight > window.innerWidth;
+}
+
+function applyAngleView() {
+  if (!previewWrap) return;
+
+  const isSide = state.currentAngle === "side";
+
+  previewWrap.classList.toggle("rear-view", !isSide);
+  previewWrap.classList.toggle("side-view", isSide);
+
+  fitOverlay();
+  drawGuide();
+  updateOrientationGuard();
+}
+
+function updateOrientationGuard() {
+  const mustBeLandscape = state.currentAngle === "side" && currentKind() === "cow";
+  const blocked = mustBeLandscape && isPortraitScreen();
+
+  if (orientationHint) {
+    orientationHint.classList.toggle("show", blocked);
+  }
+
+  if (captureBtn) {
+    captureBtn.disabled = blocked;
+  }
+}
   function setAngle(angle) {
     state.currentAngle = angle;
   
@@ -451,7 +508,7 @@ await populateCameras();
       btn.classList.toggle("active", btn.dataset.angle === angle);
     });
 
-    drawGuide();
+    applyAngleView();
     updateButtons();
   }
 
@@ -567,6 +624,12 @@ function showUploadPreview(url) {
 
   async function captureCurrentAngle() {
     try {
+      updateOrientationGuard();
+
+if (state.currentAngle === "side" && currentKind() === "cow" && isPortraitScreen()) {
+  showMsg("err", "لف الموبايل أفقيًا لالتقاط اللقطة الجانبية بدقة.");
+  return;
+}
       captureBtn.disabled = true;
       captureBtn.textContent = "جاري الالتقاط...";
 
@@ -734,9 +797,8 @@ function showUploadPreview(url) {
       location.href = `add-event.html?number=${encodeURIComponent(num)}&date=${encodeURIComponent(dt)}`;
     });
 
-    window.addEventListener("resize", () => {
-      fitOverlay();
-      drawGuide();
+   window.addEventListener("resize", () => {
+   applyAngleView();
     });
   }
 
@@ -748,6 +810,7 @@ function showUploadPreview(url) {
     if (numberSpan) numberSpan.textContent = ctx.animalNumber || (ctx.animalId ? `#${ctx.animalId.slice(-5)}` : "—");
 
     updateKindUI();
+    applyAngleView();
     renderThumbs();
     updateButtons();
     showAnalysis(null);
