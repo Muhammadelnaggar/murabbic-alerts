@@ -15636,144 +15636,122 @@ app.post("/api/bcs/vision-analyze", async (req, res) => {
 const prompt = `
 You are an expert evaluator of BODY CONDITION SCORE (BCS) for DAIRY COWS.
 
-Your task is to classify the TARGET dairy cow into the closest BCS anchor class.
+Your task:
+Classify the TARGET dairy cow into one Body Condition Score using visual anatomical assessment only.
 
-For this calibration phase:
-- Do NOT use 0.25-point increments.
-- Do NOT output decimal scores.
-- Only output one of these scores: 2, 3, 4, or 5.
-- Use the labeled reference images as visual anchors.
-- First compare the TARGET cow against the BCS 2, BCS 3, BCS 4, and BCS 5 reference groups.
-- Then choose the single closest anchor class.
-
-Scientific scope:
-- Species: dairy cows only.
-- Calibration scale: 2, 3, 4, or 5 only.
-- Allowed outputs in this phase: 2, 3, 4, 5.
-- Use visual evaluation only.
-- Focus only on the key body regions used in dairy BCS:
-  1) Short ribs
-  2) Loin
-  3) Backbone / topline
-  4) Hooks (hip bones)
-  5) Pins (pin bones)
-  6) Tailhead area
-  7) Pelvic area / rump
-BCS scale definition:
+BCS scale:
 - Body Condition Score is a 1 to 5 scale.
-- BCS 1 means extremely thin / skinny / emaciated, with very sharp skeletal landmarks and almost no fat cover.
-- BCS 5 means extremely fat / obese, with skeletal landmarks hidden by heavy fat cover.
-- BCS 2 is thin.
-- BCS 3 is moderate / ideal.
-- BCS 4 is fat / heavy.
-Use the full BCS scale from 1 to 5.
+- BCS 1 = extremely thin / emaciated / skinny.
+- BCS 2 = thin.
+- BCS 3 = moderate / ideal.
+- BCS 4 = fat / heavy.
+- BCS 5 = extremely fat / obese.
 
-Allowed output scores in this calibration phase:
-1, 2, 3, 4, or 5.
+Current calibration rule:
+- Output integer scores only: 1, 2, 3, 4, or 5.
+- Do not output decimal scores.
+- Do not output ranges.
+- Use the labeled BCS 2, 3, 4, and 5 reference images as visual anchors.
+- First compare the TARGET cow with the reference anchor groups.
+- Then choose the single closest BCS class.
+- Choose BCS 1 only if the TARGET cow is clearly worse than the BCS 2 anchors and shows severe emaciation.
 
-Use the labeled BCS 2, 3, 4, and 5 reference images as visual anchors.
+Evaluate only these anatomical regions:
+1) Short ribs
+2) Loin
+3) Backbone / topline
+4) Hooks / hip bones
+5) Pins / pin bones
+6) Tailhead area
+7) Pelvic area / rump
 
-Choose BCS 1 only if the TARGET cow is extremely skinny/emaciated and clearly worse than the BCS 2 anchor images.
+Do not use:
+- coat color
+- background
+- image style
+- udder size
+- abdominal fill
+- breed beauty
+- general body size
+- camera angle alone
 
-Choose BCS 2 if the TARGET cow is thin and closest to the BCS 2 anchor images.
+BCS class rules:
 
-Choose BCS 3 if the TARGET cow is moderate/ideal and closest to the BCS 3 anchor images.
+BCS 1:
+Choose BCS 1 only when the cow is severely emaciated:
+- skeletal landmarks are extremely sharp,
+- short ribs are highly visible,
+- hooks and pins are very sharp,
+- loin/backbone are sharply angular,
+- tailhead is deeply sunken,
+- almost no fat cover is visible.
 
-BCS 4 vs BCS 5 decision:
-BCS 4 = fat/heavy cow, but not obese.
-Choose BCS 4 when short ribs are difficult to distinguish, hooks and pins are rounded/covered but still somewhat distinguishable, rump and loin are smooth, and tailhead has fat cover.
+BCS 2:
+Choose BCS 2 when the cow is thin:
+- short ribs are clearly visible,
+- hooks and pins are obvious and angular,
+- loin/backbone show clear angularity,
+- tailhead has little fat cover,
+- the cow lacks smoothness over pelvis and loin.
+Do not choose BCS 2 if the cow is moderate and the landmarks are visible but softened.
 
-BCS 5 = obese endpoint of the scale.
-Choose BCS 5 when short ribs are not visible, hooks and pins are not distinct or nearly hidden, rump/pelvis are very smooth and rounded, and heavy fat cover is evident around tailhead/rump.
+BCS 3:
+Choose BCS 3 when the cow is moderate / ideal:
+- hooks and pins may be visible but are not sharp,
+- short ribs may be visible but are not prominent or severe,
+- loin and rump are not severely angular,
+- tailhead is not deeply sunken,
+- there is moderate fat cover.
+BCS 3 is not a thin cow.
 
-Do not require the tailhead to be completely buried to choose BCS 5.
-If the cow matches the BCS 5 reference anchors and the main skeletal landmarks are hidden or nearly hidden, choose BCS 5, not BCS 4.
-Do not output decimal scores in this calibration phase.
-Important rules:
-- Judge body fat cover, angularity, and prominence/smoothness of skeletal landmarks.
-- Do NOT use coat color, background, image style, udder size, abdominal fill, breed beauty, or general body size as scoring criteria.
-- Do NOT guess if the important landmarks are not visible.
+BCS 4:
+Choose BCS 4 when the cow is fat / heavy but not obese:
+- short ribs are difficult to distinguish but may not be completely absent,
+- hooks and pins are rounded and covered but still somewhat distinguishable,
+- loin and rump are smooth,
+- tailhead has clear fat cover,
+- some skeletal landmarks can still be identified with effort.
+
+BCS 5:
+Choose BCS 5 when the cow is extremely fat / obese:
+- short ribs are not visible,
+- hooks are not visible or nearly hidden,
+- pins are not visible or nearly hidden,
+- rump and pelvic area are very smooth and rounded,
+- heavy fat cover is evident around rump, pelvis, and tailhead,
+- main skeletal landmarks are hidden or nearly hidden by fat.
+
+Important BCS 4 vs BCS 5 rule:
+- Do not require the tailhead to be completely buried to choose BCS 5.
+- If short ribs are not visible and hooks/pins are hidden or nearly hidden, choose BCS 5, not BCS 4.
+- If your findings describe no visible short ribs, covered or non-distinct hooks/pins, very smooth rounded rump, and heavy fat cover, the score must be BCS 5.
+- BCS 4 still has some distinguishable skeletal landmarks.
+- BCS 5 has landmarks hidden or nearly hidden by fat.
+
+Consistency rules:
+- The final score must match the anatomical findings.
+- Do not describe BCS 5 anatomy and output BCS 4.
+- Do not describe BCS 3 anatomy and output BCS 2.
+- If the TARGET cow is between two adjacent classes, choose the closer anatomical class based on skeletal landmark visibility and fat cover.
 - If image quality is insufficient or key regions are obscured, return ok=false.
-- If both rear and side views are provided, use both. If only one view is provided, evaluate cautiously and lower confidence if needed.
 
-Scoring logic:
-- Lower scores correspond to sharper, more angular cows with more visible skeletal landmarks and less fat cover.
-- Mid scores correspond to moderate condition, where landmarks are visible but not sharp.
-- Higher scores correspond to smoother, rounder cows with more fat cover and less visible skeletal landmarks.
-
-Use the following guide:
-
-BCS 1.0–1.5:
-- Extremely thin.
-- Skeletal landmarks are extremely sharp and prominent.
-- Short ribs are highly visible.
-- Hooks and pins are very sharp.
-- Tailhead area is deeply sunken.
-- Very little fat cover.
-
-BCS 2.0–2.5:
-- Thin.
-- Short ribs are still clearly visible.
-- Hooks and pins are obvious and angular.
-- Loin and backbone appear sharp.
-- Tailhead has little fat cover.
-- Cow lacks smoothness over the pelvis and loin.
-
-BCS 2.75–3.25:
-- Moderate / acceptable condition.
-- Skeletal landmarks can still be identified, but sharpness is reduced.
-- Short ribs are less visually dominant.
-- Hooks and pins are visible but smoother.
-- Loin and pelvis are not excessively angular.
-- Tailhead is not deeply sunken and not heavily padded.
-
-BCS 3.5–4.0:
-- Fleshy / heavy condition.
-- Short ribs are difficult to distinguish.
-- Hooks and pins are rounded and less distinct.
-- Loin and rump are smooth.
-- Tailhead has noticeable fat cover.
-- Angularity is reduced.
-
-BCS 4.25–5.0:
-- Fat to obese.
-- Skeletal landmarks are difficult to detect or nearly hidden.
-- Short ribs are not visible.
-- Hooks and pins are well covered and rounded.
-- Tailhead area has substantial fat cover.
-- Pelvic area is very smooth and rounded.
-
-Decision discipline:
-- Base the score on skeletal landmark visibility and fat cover, not on general appearance.
-- If rear and side views disagree, give a conservative score and reduce confidence.
-- If evidence strongly supports a range between two quarter-scores, choose the closest quarter-score only.
-- Never output a range; output one score only.
-Anchor classification discipline:
-Strict separation between BCS 2, BCS 3, and BCS 3.5:
-- BCS 2 is reserved for clearly thin cows only: sharp hooks, sharp pins, prominent short ribs, angular loin/backbone, sunken tailhead, and very little fat cover.
-- Do NOT choose BCS 2 if the cow is moderate and the skeletal landmarks are visible but not sharp.
-- Choose BCS 3 when hooks and pins are visible but softened, the loin/rump are not severely angular, and the cow is not clearly thin.
-- BCS 3 is a moderate condition, not a thin condition.
-- BCS 3.5 is higher than BCS 3; at BCS 3.5 only the last 3 ribs/short ribs should be clearly visible.
-- If more than the last 3 ribs are clearly visible with moderate angularity, the cow is closer to BCS 3 than 3.5.
-- If the cow does not show severe thinness, do not classify it as BCS 2.
 Return JSON only in this exact structure:
 
 {
   "ok": true,
-  "score": 3
+  "score": 3,
   "confidence": "high",
   "qualityLabel": "صالحة للتقييم",
-  "reason": "درجة 3.25 لأن الـ short ribs أقل وضوحًا، والـ hooks والـ pins ظاهرة لكن غير حادة، مع تغطية دهنية متوسطة حول الـ tailhead والـ loin.",
-  "rearFindings": "وصف مختصر علمي لما يظهر في الخلفية",
-  "sideFindings": "وصف مختصر علمي لما يظهر في الجانبية"
+  "reason": "سبب مختصر بالعربية يربط الدرجة بعلامات BCS التشريحية فقط.",
+  "rearFindings": "وصف مختصر علمي لما يظهر في الخلفية: الحوض، قاعدة الذيل، hooks، pins.",
+  "sideFindings": "وصف مختصر علمي لما يظهر في الجانبية: short ribs، loin، backbone، rump."
 }
 
-If the image(s) are not adequate for valid scoring, return:
+If the image is not adequate for valid scoring, return:
 
 {
   "ok": false,
-  "message": "الصورة غير صالحة لتقييم حالة الجسم بدقة. يرجى إظهار مناطق الحوض والـ loin والـ short ribs والـ tailhead بوضوح."
+  "message": "الصورة غير صالحة لتقييم حالة الجسم بدقة. يرجى إظهار الحوض والـ loin والـ short ribs والـ tailhead بوضوح."
 }
 `.trim();
        const publicBase =
