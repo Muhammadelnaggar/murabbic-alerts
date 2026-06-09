@@ -15636,25 +15636,26 @@ app.post("/api/bcs/vision-analyze", async (req, res) => {
 const prompt = `
 You are an expert evaluator of BODY CONDITION SCORE (BCS) for DAIRY COWS.
 
-Your task:
-Classify the TARGET dairy cow into one Body Condition Score using visual anatomical assessment only.
+Task:
+Evaluate the TARGET dairy cow from rear and side images and return one Body Condition Score.
 
 BCS scale:
-- Body Condition Score is a 1 to 5 scale.
-- BCS 1 = extremely thin / emaciated / skinny.
-- BCS 2 = thin.
-- BCS 3 = moderate / ideal.
-- BCS 4 = fat / heavy.
-- BCS 5 = extremely fat / obese.
-
-Current calibration rule:
-- Output integer scores only: 1, 2, 3, 4, or 5.
-- Do not output decimal scores.
+- Use the full BCS scale from 1.00 to 5.00.
+- Allowed increments are 0.25 only.
+- Valid scores are:
+  1.00, 1.25, 1.50, 1.75,
+  2.00, 2.25, 2.50, 2.75,
+  3.00, 3.25, 3.50, 3.75,
+  4.00, 4.25, 4.50, 4.75,
+  5.00.
 - Do not output ranges.
-- Use the labeled BCS 2, 3, 4, and 5 reference images as visual anchors.
+- Do not output scores outside this scale.
+
+Reference images:
+- The labeled BCS reference images are visual anchors.
 - First compare the TARGET cow with the reference anchor groups.
-- Then choose the single closest BCS class.
-- Choose BCS 1 only if the TARGET cow is clearly worse than the BCS 2 anchors and shows severe emaciation.
+- Then assign the closest BCS score using 0.25 increments.
+- Do not ignore the anatomical signs in favor of a general impression.
 
 Evaluate only these anatomical regions:
 1) Short ribs
@@ -15664,6 +15665,7 @@ Evaluate only these anatomical regions:
 5) Pins / pin bones
 6) Tailhead area
 7) Pelvic area / rump
+8) Fat cover and angularity
 
 Do not use:
 - coat color
@@ -15675,71 +15677,80 @@ Do not use:
 - general body size
 - camera angle alone
 
-BCS class rules:
+BCS interpretation:
+- BCS 1.00 = extremely thin / emaciated.
+- BCS 2.00 = thin.
+- BCS 3.00 = moderate / ideal.
+- BCS 4.00 = fat / heavy.
+- BCS 5.00 = extremely fat / obese.
 
-BCS 1:
-Choose BCS 1 only when the cow is severely emaciated:
-- skeletal landmarks are extremely sharp,
-- short ribs are highly visible,
-- hooks and pins are very sharp,
-- loin/backbone are sharply angular,
-- tailhead is deeply sunken,
-- almost no fat cover is visible.
+Scoring rules:
 
-BCS 2:
-Choose BCS 2 when the cow is thin:
-- short ribs are clearly visible,
-- hooks and pins are obvious and angular,
-- loin/backbone show clear angularity,
+BCS 1.00–1.75:
+Use this range only for severe emaciation:
+- very sharp skeletal landmarks,
+- highly visible short ribs,
+- very sharp hooks and pins,
+- sharply angular loin/backbone,
+- deeply sunken tailhead,
+- almost no visible fat cover.
+
+BCS 2.00–2.75:
+Use this range for thin cows:
+- short ribs clearly visible,
+- hooks and pins obvious and angular,
+- loin/backbone show angularity,
 - tailhead has little fat cover,
-- the cow lacks smoothness over pelvis and loin.
-Do not choose BCS 2 if the cow is moderate and the landmarks are visible but softened.
+- pelvis and loin lack smoothness.
+Do not use this range for a moderate cow with visible but softened landmarks.
 
-BCS 3:
-Choose BCS 3 when the cow is moderate / ideal:
+BCS 3.00–3.75:
+Use this range for moderate to ideal cows:
 - hooks and pins may be visible but are not sharp,
-- short ribs may be visible but are not prominent or severe,
+- short ribs may be visible but are not severe or dominant,
 - loin and rump are not severely angular,
 - tailhead is not deeply sunken,
-- there is moderate fat cover.
+- fat cover is moderate.
 BCS 3 is not a thin cow.
 
-BCS 4:
-Choose BCS 4 when the cow is fat / heavy but not obese:
-- short ribs are difficult to distinguish but may not be completely absent,
-- hooks and pins are rounded and covered but still somewhat distinguishable,
+BCS 4.00–4.75:
+Use this range for fat/heavy cows:
+- short ribs are difficult to distinguish,
+- hooks and pins are rounded and covered,
 - loin and rump are smooth,
 - tailhead has clear fat cover,
-- some skeletal landmarks can still be identified with effort.
+- some skeletal landmarks may still be distinguishable with effort.
 
-BCS 5:
-Choose BCS 5 when the cow is extremely fat / obese:
+BCS 5.00:
+Use BCS 5.00 for extremely fat / obese cows:
 - short ribs are not visible,
 - hooks are not visible or nearly hidden,
 - pins are not visible or nearly hidden,
 - rump and pelvic area are very smooth and rounded,
 - heavy fat cover is evident around rump, pelvis, and tailhead,
 - main skeletal landmarks are hidden or nearly hidden by fat.
+Do not require the tailhead to be completely buried to score 5.00.
 
-Important BCS 4 vs BCS 5 rule:
-- Do not require the tailhead to be completely buried to choose BCS 5.
-- If short ribs are not visible and hooks/pins are hidden or nearly hidden, choose BCS 5, not BCS 4.
-- If your findings describe no visible short ribs, covered or non-distinct hooks/pins, very smooth rounded rump, and heavy fat cover, the score must be BCS 5.
-- BCS 4 still has some distinguishable skeletal landmarks.
-- BCS 5 has landmarks hidden or nearly hidden by fat.
+Quarter-score guidance:
+- Use .00 when the cow clearly matches the main class.
+- Use .25 when the cow is slightly above the lower class.
+- Use .50 when the cow is clearly between two adjacent main classes.
+- Use .75 when the cow is close to the next higher class but not fully there.
+- The quarter score must be justified by visible anatomical signs, not by uncertainty.
 
-Consistency rules:
+Critical consistency rules:
 - The final score must match the anatomical findings.
 - Do not describe BCS 5 anatomy and output BCS 4.
 - Do not describe BCS 3 anatomy and output BCS 2.
-- If the TARGET cow is between two adjacent classes, choose the closer anatomical class based on skeletal landmark visibility and fat cover.
+- If short ribs are not visible and hooks/pins are hidden or nearly hidden, the score must be in the BCS 5 range.
+- If hooks/pins are visible but softened and the cow is not clearly thin, the score must be in the BCS 3 range or higher.
 - If image quality is insufficient or key regions are obscured, return ok=false.
 
 Return JSON only in this exact structure:
 
 {
   "ok": true,
-  "score": 3,
+  "score": 3.25,
   "confidence": "high",
   "qualityLabel": "صالحة للتقييم",
   "reason": "سبب مختصر بالعربية يربط الدرجة بعلامات BCS التشريحية فقط.",
