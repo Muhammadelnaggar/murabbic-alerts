@@ -66,16 +66,20 @@
 </div>
 </div>
 
-     <div class="mbk-save-panel">
-    
-        <input type="hidden" id="animalId" />
-        <label style="display:flex;gap:8px;align-items:center">تاريخ التقييم
-          <input type="date" id="eventDate" class="input" />
-        </label>
-        <input id="commentInput" class="input" placeholder="تعليق (اختياري)" />
-        <div style="margin-inline-start:auto"></div>
-       <button id="backEventsBtn" class="mbk-btn mbk-btn-light">رجوع للأحداث</button>
-       <button id="saveBtn" class="mbk-btn mbk-btn-primary">حفظ التقييم</button>
+<div class="mbk-save-panel">
+  <input type="hidden" id="animalId" />
+
+  <label style="display:flex;gap:8px;align-items:center">تاريخ التقييم
+    <input type="date" id="eventDate" class="input" />
+  </label>
+
+  <input id="commentInput" class="input" placeholder="تعليق (اختياري)" />
+
+  <div class="actions-bar inline">
+    <button id="backEventsBtn" class="ghost" type="button">رجوع للأحداث</button>
+    <button id="saveBtn" class="save" type="button">حفظ التقييم</button>
+  </div>
+</div>
       </div>
     </section>
   </div>
