@@ -15831,6 +15831,12 @@ If the image is not adequate for valid scoring, return:
         { type: "input_image", image_url: sideImage, detail: "high" }
       );
     }
+    const sentBcsImages = content
+  .filter(x => x && x.type === "input_image")
+  .map(x => String(x.image_url || "").split("/").pop());
+
+console.log("BCS Vision images sent to OpenAI:", sentBcsImages);
+console.log("BCS Vision image count:", sentBcsImages.length);
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
