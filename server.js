@@ -16041,14 +16041,18 @@ Scoring rules:
 - Score 5 is very dry/hard manure.
 - Do not return decimals or ranges.
 
+All returned values that may be displayed to the user must be Arabic only.
+Do not write English words in "visualFindings", "reason", "qualityLabel", or "message".
+Explain the reason educationally but briefly, based only on visible manure consistency, spread, moisture, pile shape, and dryness.
+
 Return JSON only:
 {
   "ok": true,
   "score": 3,
   "confidence": "high|medium|low",
   "qualityLabel": "صالحة للتقييم|متوسطة وتحتاج حذر|غير صالحة للتقييم",
-  "visualFindings": "brief visible evidence",
-  "reason": "brief reason for the selected score"
+  "visualFindings": "وصف عربي مختصر لما يظهر في الصورة",
+  "reason": "سبب عربي تعليمي مختصر لاختيار الدرجة"
 }
 `.trim();
 
