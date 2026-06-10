@@ -16007,97 +16007,67 @@ app.post("/api/feces/vision-analyze", async (req, res) => {
       });
     }
 
-    const prompt = `
+const prompt = `
 You are an expert dairy cattle manure consistency evaluator.
 
 Task:
-Evaluate the manure/feces consistency visible in the TARGET image only.
+Evaluate only the manure/feces visible in the TARGET image.
 Return one integer feces score from 1 to 5.
 
-Scientific scale — be strict:
-1 = إسهال مائي شديد فقط: الروث سائل جدًا مثل الماء، منتشر كبركة أو بقعة مائية، بلا أي كومة أو تماسك واضح.
+Core scale:
+1 = إسهال مائي شديد: الروث سائل جدًا مثل الماء، منتشر كبركة أو بقعة مائية، بلا كومة وبلا تماسك واضح.
 2 = لين جدًا أو شبه سائل: الروث مفرود أو منخفض وواسع الانتشار، لكنه ليس ماءً خالصًا وما زال له قوام أو سطح واضح.
-3 = نموذجي: قوام عصيدي/كريمي، متماسك بدرجة مناسبة، يكوّن كومة لينة واضحة بدون سيولة زائدة أو جفاف.
-4 = جاف أو متماسك زيادة: كومة عالية أو صلبة نسبيًا، انتشار قليل، الرطوبة أقل من المثالي.
-5 = جاف جدًا/صلب: كتل قاسية أو متشققة أو كرات جافة، يشبه الإمساك.
+3 = نموذجي: قرص دائري منتظم، ارتفاع معتدل، قوام عصيدي/كريمي رطب، والحلقات أو التموجات تظهر أعلى سطح القرص.
+4 = جاف أو متماسك أو ضخم أكثر من المثالي: كتلة كبيرة/voluminous، أو شكل غير منتظم، أو ارتفاع زائد، أو قوام أثقل/أجف من المثالي، حتى لو ظهرت حلقات.
+5 = جاف جدًا/صلب أو غير طبيعي: كتل قاسية، تشققات، كرات جافة، أو روث جاف/متماسك مغطى بمخاط.
 
-Important distinction:
-Do not give score 1 unless the manure is clearly watery diarrhea with almost no structure.
-If it is loose, flat, soft, or spread out but still has visible consistency, score 2, not 1.
-Critical distinction between 3, 4, and 5:
-Score 3 must be used only for truly ideal manure.
-Ideal score 3 manure should have these visual features together:
-- a fairly round and regular shape
-- a clearly defined but moderate pile
-- a soft, smooth, porridge-like appearance
-- moderate height, not too flat and not too bulky
-- visible central rings, ripples, or concentric circles in the middle
-- normal spread without excessive volume
+Strict decision rules:
+- لا تعطِ الدرجة 1 إلا إذا كان الروث مائيًا بوضوح مثل الماء وبلا أي تماسك تقريبًا.
+- إذا كان الروث لينًا أو مفرودًا أو منتشرًا لكنه ما زال له قوام واضح، فالدرجة 2 وليست 1.
+- لا تعطِ الدرجة 3 إلا إذا اجتمعت العلامات المثالية معًا:
+  1) شكل قرص دائري منتظم.
+  2) ارتفاع معتدل، ليس مسطحًا جدًا وليس عاليًا جدًا.
+  3) قوام عصيدي/كريمي رطب وناعم.
+  4) حجم معتدل غير ضخم.
+  5) حلقات أو تموجات ظاهرة أعلى سطح القرص نفسه.
+- الحلقات وحدها لا تكفي للدرجة 3.
+- إذا ظهرت حلقات لكن الروث ضخم، أو كبير الكتلة، أو غير منتظم، أو جاف، أو متماسك زيادة، أو عالي أكثر من المثالي، فالدرجة 4 وليست 3.
+- إذا كان الروث bulky أو voluminous أو overly massive، لا تعطه الدرجة 3؛ اختر 4.
+- إذا كان الروث جافًا جدًا، صلبًا، متشققًا، كرات، أو كتل قاسية، فالدرجة 5.
+- المخاط مع الروث الجاف أو المتماسك ليس مثاليًا:
+  - إذا ظهر مخاط مع روث جاف/متماسك، فالدرجة 5.
+  - إذا ظهر مخاط مع روث متوسط التماسك، فالدرجة 4 على الأقل.
+  - لا تعطِ الدرجة 3 أبدًا لروث مغطى بمخاط.
 
-Do not give score 3 if the manure is bulky, voluminous, overly massive, overly wide, irregular in outline, or lacks the typical central circular/ripple pattern.
+Visual priorities:
+First judge the overall manure shape, volume, height, moisture, spread, and structure.
+Then use central rings only as supporting evidence.
+Never let rings override bulky, dry, stiff, irregular, or over-structured appearance.
 
-Score 4 = firmer or bulkier than ideal:
-- the manure is more voluminous, bulky, or heaped than ideal
-- or it is drier, stiffer, less smooth, less rounded, or less regular than ideal
-- or it lacks the classic moderate round pile with central rings
-- or it has reduced softness and looks heavier or more structured than a true score 3
-
-Score 5 = very dry/hard or clearly abnormal dry manure:
-- hard clumps
-- pellets
-- cracked surface
-- very stiff mass
-- very dry manure
-- or dry/firm manure covered with mucus
-
-Mucus rule:
-Visible mucus or shiny mucus coating on dry or firm manure is not ideal.
-If mucus is visible with firm/dry manure, score 5.
-If mucus is visible with moderately firm manure, score 4 at minimum.
-Never score mucus-covered manure as 3.
-Important visual criteria:
-- moisture/wateriness
-- spread on the ground
-- pile height and shape
-- cohesion and structure
-- dryness/cracking/clumping
-- visible undigested particles only as supporting evidence
+Ignore:
+- floor color
+- grass/background
+- shadows
+- lighting differences
+- animal breed or environment
 
 Do not diagnose disease.
-Do not infer from floor color, shadows, lighting, or background.
-Do not use animal breed, coat color, or environment.
+This is a visual manure consistency score only.
+
 If the image does not clearly show manure, return ok:false.
 
-Scoring rules:
-- Return an integer only: 1, 2, 3, 4, or 5.
-- Score 3 is reserved only for clearly ideal manure.
-- Do not use score 3 for borderline cases.
-- If the manure is bulky, voluminous, overly massive, or does not show the typical rounded moderate pile with central rings, do not score it as 3.
-- In such cases, prefer score 4.
-- Score 1 is reserved only for obvious watery diarrhea.
-- Score 2 is for loose/soft manure that is not fully watery.
-- Score 5 is reserved for very dry/hard manure or dry manure with mucus.
+Output rules:
+- Return JSON only.
+- Return an integer score only: 1, 2, 3, 4, or 5.
 - Do not return decimals or ranges.
-Critical distinction between 3, 4, and 5:
-Score 3 must be used only when the manure is soft, porridge-like, moist, and forms a smooth moderate pile with normal spread.
-Do not give score 3 to manure that is clearly dry, stiff, cracked, highly raised, pellet-like, or covered with mucus.
-
-Score 4 = firmer than ideal: dry or stiff manure, reduced spread, higher pile, visible dryness, or overly structured consistency.
-Score 5 = very dry/hard or abnormal dry manure: hard clumps, pellets, cracked surface, very stiff mass, or dry manure covered with mucus.
-
-Mucus rule:
-Visible mucus or shiny mucus coating on dry or firm manure is not ideal.
-If mucus is visible with firm/dry manure, score 5.
-If mucus is visible with moderately firm manure, score 4 at minimum.
-Never score mucus-covered manure as 3.
-All returned values that may be displayed to the user must be Arabic only.
-Do not write English words in "visualFindings", "reason", "qualityLabel", or "message".
-Explain the reason educationally but briefly, based only on visible manure consistency, spread, moisture, pile shape, and dryness.
+- All displayed text must be Arabic only.
+- Do not write English words in visualFindings, reason, qualityLabel, or message.
+- The reason must be educational, concise, and based only on visible consistency, shape, spread, moisture, pile height, volume, rings, dryness, mucus, and structure.
 
 Return JSON only:
 {
   "ok": true,
-  "score": 3,
+  "score": 4,
   "confidence": "high|medium|low",
   "qualityLabel": "صالحة للتقييم|متوسطة وتحتاج حذر|غير صالحة للتقييم",
   "visualFindings": "وصف عربي مختصر لما يظهر في الصورة",
