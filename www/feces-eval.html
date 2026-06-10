@@ -7,425 +7,9 @@
   <link rel="stylesheet" href="css/forms.css">
   
   <title>تقييم الروث بالكاميرا — مُرَبِّك</title>
- <style>
-  :root{
-    --green:#0ea05a;
-    --green-600:#0b7f47;
-    --green-700:#0a6a3c;
-    --bg:#f7faf7;
-    --text:#0f172a;
-    --muted:#64748b;
-    --card:#ffffff;
-    --danger:#c2410c;
-    --border:#c5e1a5;
-    --cream:#fffdf7;
-    --soft:#eefaf3;
-  }
 
-  *{box-sizing:border-box}
-
-  body{
-    margin:0;
-    font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif;
-    background:var(--bg);
-    color:var(--text);
-  }
-
-  .mbk-shell{
-    max-width:520px;
-    margin:0 auto;
-    min-height:100vh;
-    background:transparent;
-  }
-
-  header{
-    position:sticky;
-    top:0;
-    z-index:20;
-    background:rgba(255,255,255,.96);
-    backdrop-filter:blur(8px);
-    border-bottom:1px solid #e5efe7;
-    padding:10px 12px;
-  }
-
-  .mbk-head{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    max-width:520px;
-    margin:0 auto;
-  }
-
-  .mbk-logo{
-    width:42px;
-    height:42px;
-    object-fit:contain;
-    opacity:.6;
-    flex:0 0 auto;
-  }
-
-  .mbk-center{
-    min-width:0;
-    flex:1 1 auto;
-    display:grid;
-    gap:2px;
-  }
-
-  .mbk-page-title{
-    margin:0;
-    font-size:18px;
-    font-weight:800;
-    line-height:1.2;
-    color:#0f172a;
-  }
-
-  .mbk-app-name{
-    font-size:13px;
-    font-weight:800;
-    color:var(--green);
-    line-height:1;
-  }
-
-  .mbk-subline{
-    font-size:12px;
-    color:var(--muted);
-    font-weight:700;
-    white-space:nowrap;
-  }
-  .mbk-animal-wrap{
-  max-width:520px;
-  margin:10px auto 0;
-  padding:0 12px;
-}
-
-.mbk-field-label{
-  display:block;
-  margin:0 0 6px;
-  font-size:13px;
-  font-weight:800;
-  color:var(--muted);
-}
-
-.mbk-readonly-field{
-  min-height:48px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:12px 14px;
-  border:1px solid #cbd5e1;
-  border-radius:14px;
-  background:#fff;
-  color:#0f172a;
-  font-size:18px;
-  font-weight:900;
-  box-shadow:0 1px 2px rgba(0,0,0,.04);
-} 
-.mbk-back{
-  flex:0 0 auto;
-  min-height:40px;
-  padding:8px 12px;
-  border:1px solid #dbe5ee;
-  border-radius:12px;
-  background:#fff;
-  color:#0f172a;
-  text-decoration:none;
-  font-weight:800;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-}
-
-.mbk-animal-line{
-  max-width:520px;
-  margin:8px auto 0;
-  padding-top:8px;
-  border-top:1px solid var(--border);
-  text-align:center;
-}
- 
-
- .container{
-  max-width:520px;
-  margin:14px auto 220px;
-  padding:0 12px;
-}
-
-  .card{
-    background:var(--card);
-    border:1px solid #e2e8f0;
-    border-radius:18px;
-    box-shadow:0 2px 10px rgba(0,0,0,.04);
-    overflow:hidden;
-  }
-
-  .controls{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-    align-items:center;
-    padding:12px;
-    background:#fff;
-  }
-
-  .controls .select,
-  .controls .input,
-  .save-bar .input{
-    padding:12px 14px;
-    border:1px solid #cbd5e1;
-    border-radius:14px;
-    background:#fff;
-    font-size:16px;
-    min-height:48px;
-  }
-
-  .controls .select{
-    min-width:150px;
-    flex:1 1 160px;
-  }
-
-  .btn{
-    border:none;
-    border-radius:14px;
-    cursor:pointer;
-    font-weight:800;
-    min-height:50px;
-    padding:13px 16px;
-    box-shadow:0 1px 2px rgba(0,0,0,.04);
-    transition:.18s ease;
-  }
-
-  .btn:disabled{
-    opacity:.6;
-    cursor:not-allowed;
-  }
-
-  .btn-primary{
-    background:var(--green);
-    color:#fff;
-  }
-
-  .btn-primary:hover{ background:var(--green-700); }
-
-  .btn-light{
-    background:#f8fafc;
-    color:#0f172a;
-    border:1px solid #dbe5ee;
-  }
-
-  .btn-danger{
-    background:#fff1f2;
-    color:#b42318;
-    border:1px solid #fecdd3;
-  }
-
-  .preview-wrap{
-    position:relative;
-    border-top:1px solid #eef2f7;
-    border-bottom:1px solid #eef2f7;
-    overflow:hidden;
-    background:#000;
-  }
-
-  video#preview{
-    width:100%;
-    height:auto;
-    display:block;
-    background:#000;
-  }
-
-  canvas#overlay{
-    position:absolute;
-    inset:0;
-    pointer-events:none;
-  }
-
-  .results{
-  padding:12px;
-  padding-bottom:28px;
-  display:grid;
-  gap:12px;
-  background:#fff;
-}
-  .section-title{
-    margin:0;
-    color:var(--green-600);
-    font-size:16px;
-    font-weight:800;
-  }
-
-  .upload-preview{
-    display:flex;
-    gap:12px;
-    align-items:center;
-    padding:10px;
-    background:#fff;
-    border:1px solid #e2e8f0;
-    border-radius:14px;
-  }
-
-  .upload-preview img{
-    width:96px;
-    height:96px;
-    object-fit:cover;
-    border-radius:12px;
-    border:1px solid #e5e7eb;
-  }
-
-  .score{
-    display:grid;
-    gap:10px;
-    padding:12px;
-    border:1px solid #dfe8e2;
-    border-radius:16px;
-    background:linear-gradient(180deg,#ffffff 0%, #fbfefc 100%);
-  }
-
-  .score-badge{
-    display:inline-block;
-    padding:8px 12px;
-    border:1px solid transparent;
-    border-radius:999px;
-    font-weight:800;
-    width:max-content;
-    background:#f8fafc;
-    color:#0f172a;
-  }
-
-  .score-bar{
-    height:12px;
-    background:#f1f5f9;
-    border:1px solid #e2e8f0;
-    border-radius:999px;
-    overflow:hidden;
-  }
-
-  .score-bar .fill{
-    height:100%;
-    transition:width .22s ease;
-  }
-
-  .score-note{
-    color:var(--muted);
-    font-weight:700;
-    line-height:1.7;
-    font-size:14px;
-  }
-
-  .save-bar{
-    position:fixed;
-    right:0;
-    left:0;
-    bottom:0;
-    z-index:25;
-    background:rgba(255,255,255,.98);
-    backdrop-filter:blur(8px);
-    border-top:1px solid #e2e8f0;
-    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-  }
-
-  .save-bar-inner{
-    max-width:520px;
-    margin:0 auto;
-    display:grid;
-    gap:10px;
-  }
-
-  .save-top{
-    display:grid;
-    gap:8px;
-  }
-
-  .date-wrap{
-    display:flex;
-    gap:8px;
-    align-items:center;
-    color:#0f172a;
-    font-weight:800;
-    background:#fff;
-    border:1px solid #e2e8f0;
-    border-radius:14px;
-    padding:10px 12px;
-  }
-
-  .date-wrap input{
-    flex:1 1 auto;
-    border:none;
-    background:transparent;
-    font:inherit;
-    color:inherit;
-    min-height:32px;
-  }
-
-  .save-actions{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:8px;
-  }
-
-.save-actions .btn{
-  width:100%;
-  min-height:56px;
-  font-size:16px;
-  border-radius:16px;
-  font-weight:900;
-  box-shadow:0 2px 8px rgba(0,0,0,.05);
-}
-
-.save-actions #backBtn{
-  background:#f0fdf4;
-  color:#166534;
-  border:1px solid #86efac;
-}
-
-.save-actions #saveBtn{
-  background:var(--green);
-  color:#fff;
-  border:1px solid var(--green);
-}
-
-  #saveMsg{
-    display:none;
-    width:100%;
-    padding:12px;
-    border-radius:14px;
-    font-weight:800;
-    text-align:center;
-    line-height:1.6;
-  }
-
-  editor-card,.editor-card{
-    pointer-events:none !important;
-    opacity:0 !important;
-    visibility:hidden !important;
-    position:static !important;
-    z-index:-1 !important;
-  }
-
-@media (max-width:520px){
-  .controls{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-  }
-
- #captureBtn,
-#retakeBtn,
-#uploadBtn{
-  width:100%;
-}
-
-  .save-actions{
-    grid-template-columns:1fr 1fr;
-  }
-
-  .save-actions .btn{
-    min-height:56px;
-    font-size:16px;
-  }
-}
-</style>
 </head>
 <body>
- <div class="mbk-shell">
 <header>
   <div class="mbk-head">
     <a class="mbk-back" href="add-event.html" id="headBackBtn">رجوع</a>
@@ -439,33 +23,37 @@
    
   </div>
 </header>
-<div class="mbk-animal-wrap">
-  <label class="mbk-field-label">رقم الحيوان</label>
-  <div class="mbk-readonly-field">
-    <span class="animal-number">—</span>
+<main class="mbk-vision-container">
+  <div class="mbk-card">
+    <label>رقم الحيوان</label>
+    <div class="mbk-score-card">
+      <span class="mbk-score-badge animal-number">—</span>
+    </div>
   </div>
+
+  <section class="card vision-card" id="cameraCard">
+ <div class="mbk-vision-controls">
+  <div class="left"></div>
+
+  <div class="right" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+    <button id="captureBtn" class="mbk-btn mbk-btn-primary">التقاط</button>
+    <button id="retakeBtn" class="mbk-btn mbk-btn-danger" disabled>إعادة الالتقاط</button>
+    <button id="uploadBtn" class="mbk-btn mbk-btn-light" style="grid-column:1 / -1;">رفع صورة بديلة</button>
+  </div>
+
+  <input id="uploadInput" type="file" accept="image/*" style="display:none" />
 </div>
-  <div class="container">
-    <section class="card" id="cameraCard">
-      <div class="controls">
-       
-        <div style="margin-inline-start:auto"></div>
-        <button id="captureBtn" class="btn btn-primary">التقاط</button>
-        <button id="retakeBtn" class="btn btn-danger" disabled>إعادة الالتقاط</button>
-        <button id="uploadBtn" class="btn btn-light">رفع صورة بديلة</button>
-        <input id="uploadInput" type="file" accept="image/*" style="display:none" />
-      </div>
 
-      <div class="preview-wrap">
-        <video id="preview" playsinline autoplay muted></video>
-        <canvas id="overlay"></canvas>
-      </div>
+<div class="mbk-camera-frame">
+  <video id="preview" class="mbk-camera-preview" playsinline autoplay muted></video>
+  <canvas id="overlay" class="mbk-camera-overlay"></canvas>
+</div>
 
-      <div class="results" id="resultsBox">
-       <h3 class="section-title">تقييم الحالة</h3>
+     <div class="mbk-results" id="resultsBox">
+      <h3 class="mbk-page-title">تقييم الروث</h3>
 
         <!-- خانة عرض الصورة المرفوعة/المُلتقطة (المطلوب 2) -->
-        <div class="upload-preview" id="uploadPreviewBox" style="display:none">
+       <div class="mbk-upload-preview" id="uploadPreviewBox" style="display:none">
           <img id="uploadPreviewImg" alt="المعاينة" />
           <div style="display:grid;gap:6px">
             <div style="font-weight:800;color:#0f172a">الصورة المستخدمة في التقييم</div>
@@ -473,38 +61,33 @@
           </div>
         </div>
 
-        <div id="scoreWidget" class="score">
-         <div class="score-badge" id="scoreBadge">بانتظار التقييم</div>
-          <div class="score-bar"><div class="fill" id="scoreFill" style="width:0%"></div></div>
-        <div class="score-note" id="scoreNote">
+       <div id="scoreWidget" class="mbk-score-card">
+ <div class="mbk-score-badge" id="scoreBadge">بانتظار التقييم</div>
+  <div class="mbk-score-bar"><div class="mbk-score-fill" id="scoreFill" style="width:0%"></div></div>
+<div class="mbk-score-note" id="scoreNote">
   قرّب الكاميرا من الروث واجعله داخل الإطار بوضوح.<br>
   صوّر من مسافة قريبة مع أقل قدر ممكن من الأرضية حوله.
 </div>
         </div>
       </div>
 
-     <div class="save-bar">
-  <div class="save-bar-inner">
-    <input type="hidden" id="animalId" />
+<div class="mbk-save-panel">
+  <input type="hidden" id="animalId" />
 
-    <div class="save-top">
-      <div id="saveMsg"></div>
+  <div id="saveMsg"></div>
 
-      <label class="date-wrap">
-        <span>تاريخ التقييم</span>
-        <input type="date" id="eventDate" class="input" />
-      </label>
-    </div>
+  <label>
+    تاريخ التقييم
+    <input type="date" id="eventDate" class="input" />
+  </label>
 
-    <div class="save-actions">
-     <button id="backBtn" class="btn btn-light" type="button">لوحة التحكم</button>
-      <button id="saveBtn" class="btn btn-primary" type="button">حفظ التقييم</button>
-    </div>
-  </div>
+  <div class="actions-bar inline">
+  <button id="saveBtn" class="save" type="button">حفظ التقييم</button>
+  <button id="backBtn" class="ghost" type="button">لوحة التحكم</button>
 </div>
-    </section>
-  </div>
-
+</div>
+  </section>
+</main>
 
 <script>
 (function () {
@@ -980,6 +563,5 @@
   init();
 })();
 </script>
-</div>
 </body>
 </html>
