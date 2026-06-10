@@ -38,7 +38,6 @@
     <div class="mbk-vision-tabs">
       <button class="mbk-vision-tab active" data-angle="side">جانبية كاملة</button>
       <button class="mbk-vision-tab" data-angle="rear">خلفية كاملة</button>
-      <button class="mbk-vision-tab" data-angle="front">أمامية كاملة</button>
     </div>
 
     <div class="mbk-vision-controls">
@@ -59,9 +58,8 @@
     </div>
 
     <div class="form-hint" style="padding:10px 12px;line-height:1.8;font-weight:800">
-      الجانبية: الحيوان كاملًا من الجانب مع الجسم والضرع والأرجل والحوض.<br>
-      الخلفية: الحيوان كاملًا من الخلف مع الضرع والحلمات والأخدود الضرعي والأرجل الخلفية.<br>
-      الأمامية: الحيوان كاملًا من الأمام مع عرض الصدر واستقامة الأرجل الأمامية وتباعدها.
+     الجانبية: الحيوان كاملًا من الجانب مع الجسم والضرع والأرجل والحوض.<br>
+الخلفية: الحيوان كاملًا من الخلف مع الضرع والحلمات والأخدود الضرعي والأرجل الخلفية.
     </div>
 
     <div class="mbk-thumbs" id="thumbs"></div>
@@ -75,7 +73,7 @@
           <div class="mbk-score-fill" id="scoreFill" style="width:0%"></div>
         </div>
         <div class="mbk-score-note" id="scoreNote">
-          التقط 3 صور كاملة: جانبية، خلفية، وأمامية.
+         التقط صورتين كاملتين: جانبية وخلفية.
         </div>
       </div>
 
@@ -105,19 +103,15 @@
   const qs = new URLSearchParams(location.search);
   const $ = (s, p = document) => p.querySelector(s);
   const $$ = (s, p = document) => Array.from(p.querySelectorAll(s));
-
-  const angles = ["side", "rear", "front"];
-
+  const angles = ["side", "rear"];
   const angleLabels = {
     side: "جانبية",
     rear: "خلفية",
-    front: "أمامية"
   };
 
   const guideText = {
     side: "صورة جانبية كاملة: الجسم، الظهر، الحوض، الضرع، والأرجل.",
     rear: "صورة خلفية كاملة: الضرع، الحلمات، الأخدود الضرعي، الحوض، والأرجل الخلفية.",
-    front: "صورة أمامية كاملة: الصدر، الأرجل الأمامية، وتباعدها المنتظم."
   };
 
   const preview = $("#preview");
@@ -375,7 +369,7 @@
   }
 
   function hasAllCaptures() {
-    return !!(state.captures.side && state.captures.rear && state.captures.front);
+   return !!(state.captures.side && state.captures.rear);
   }
 
   function setWaiting() {
@@ -383,15 +377,15 @@
 
     scoreBadge.textContent = hasAllCaptures()
       ? "جاهز للتحليل"
-      : "بانتظار الصور الثلاث";
+     : "بانتظار الصورتين";
 
     scoreFill.style.width = "0%";
     scoreFill.style.background = "#e5e7eb";
 
     scoreNote.textContent = hasAllCaptures()
       ? "اضغط التقاط/رفع عند أي زاوية لتحديثها، وسيتم التحليل بعد اكتمال الصور."
-      : "التقط 3 صور كاملة: جانبية، خلفية، وأمامية.";
-
+     : "التقط صورتين كاملتين: جانبية وخلفية.";
+    
     if (breakdownBox) {
       breakdownBox.style.display = "none";
       breakdownBox.innerHTML = "";
@@ -440,11 +434,10 @@
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        captures: {
-          side: state.captures.side,
-          rear: state.captures.rear,
-          front: state.captures.front
-        }
+ captures: {
+  side: state.captures.side,
+  rear: state.captures.rear
+}
       })
     });
 
@@ -539,7 +532,7 @@
     const analysis = state.analysis;
 
     if (!analysis || !analysis.ok || !Number.isFinite(Number(analysis.score))) {
-      showMsg("حلّل الصور الثلاث أولًا قبل الحفظ.", false);
+      showMsg("حلّل الصورتين أولًا قبل الحفظ.", false);
       return;
     }
 
