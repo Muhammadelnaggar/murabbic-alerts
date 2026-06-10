@@ -16448,19 +16448,12 @@ app.post("/api/dairy-traits/vision-analyze", async (req, res) => {
       body.udderRear ||
       "";
 
-    const frontImage =
-      captures.front ||
-      body.frontImage ||
-      body.front ||
-      "";
-
-    if (!sideImage || !rearImage || !frontImage) {
-      return res.status(400).json({
-        ok: false,
-        message: "❌ تقييم سمات إنتاج اللبن يحتاج 3 لقطات كاملة: جانبية، خلفية، وأمامية."
-      });
-    }
-
+  if (!sideImage || !rearImage) {
+  return res.status(400).json({
+    ok: false,
+    message: "❌ تقييم سمات إنتاج اللبن يحتاج لقطتين كاملتين: جانبية وخلفية."
+  });
+}
     const prompt = `
 You are an expert dairy cattle conformation evaluator.
 
@@ -16482,6 +16475,7 @@ Required TARGET views:
 - side udder depth
 - fore udder attachment
 - legs from side
+- dairy form and body capacity
 
 2) Rear view:
 - rear udder
@@ -16492,14 +16486,11 @@ Required TARGET views:
 - udder symmetry
 - rear legs
 - rump width
+- front-end/chest impression only if reasonably visible from posture
 
-3) Front view:
-- chest width
-- front legs straightness
-- front legs spacing
-- front-end strength
-- the space between the front legs should look rectangular, not too narrow and not excessively open
-
+Do not require a separate front view.
+Evaluate front end, chest width, and front-leg placement only as far as they are visible from the side and rear views.
+Do not invent front-leg traits that are not visible.
 Use this official-style dairy cow score structure:
 - Udder = 40 points
 - Feet and legs = 20 points
@@ -16618,11 +16609,9 @@ Return JSON only:
       { type: "input_text", text: "TARGET rear view." },
       { type: "input_image", image_url: rearImage, detail: "high" },
 
-      { type: "input_text", text: "TARGET front view." },
-      { type: "input_image", image_url: frontImage, detail: "high" }
     ];
 
-    console.log("Dairy Traits Vision image count:", 3);
+   console.log("Dairy Traits Vision image count:", 2);
 
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
