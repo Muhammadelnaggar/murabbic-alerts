@@ -16014,13 +16014,28 @@ Task:
 Evaluate the manure/feces consistency visible in the TARGET image only.
 Return one integer feces score from 1 to 5.
 
-Scientific scale:
-1 = watery diarrhea / very liquid manure
-2 = loose manure, too soft, little structure
-3 = ideal manure consistency; porridge-like, forms a soft pile
-4 = firm/dry manure, too much structure
-5 = very dry/hard manure, stiff clumps or constipation-like
+Scientific scale — be strict:
+1 = إسهال مائي شديد فقط: الروث سائل جدًا مثل الماء، منتشر كبركة أو بقعة مائية، بلا أي كومة أو تماسك واضح.
+2 = لين جدًا أو شبه سائل: الروث مفرود أو منخفض وواسع الانتشار، لكنه ليس ماءً خالصًا وما زال له قوام أو سطح واضح.
+3 = نموذجي: قوام عصيدي/كريمي، متماسك بدرجة مناسبة، يكوّن كومة لينة واضحة بدون سيولة زائدة أو جفاف.
+4 = جاف أو متماسك زيادة: كومة عالية أو صلبة نسبيًا، انتشار قليل، الرطوبة أقل من المثالي.
+5 = جاف جدًا/صلب: كتل قاسية أو متشققة أو كرات جافة، يشبه الإمساك.
 
+Important distinction:
+Do not give score 1 unless the manure is clearly watery diarrhea with almost no structure.
+If it is loose, flat, soft, or spread out but still has visible consistency, score 2, not 1.
+Critical distinction between 3, 4, and 5:
+Score 3 must be used only when the manure is soft, porridge-like, moist, and forms a smooth moderate pile with normal spread.
+Do not give score 3 to manure that is clearly dry, stiff, cracked, highly raised, pellet-like, or covered with mucus.
+
+Score 4 = firmer than ideal: dry or stiff manure, reduced spread, higher pile, visible dryness, or overly structured consistency.
+Score 5 = very dry/hard or abnormal dry manure: hard clumps, pellets, cracked surface, very stiff mass, or dry manure covered with mucus.
+
+Mucus rule:
+Visible mucus or shiny mucus coating on dry or firm manure is not ideal.
+If mucus is visible with firm/dry manure, score 5.
+If mucus is visible with moderately firm manure, score 4 at minimum.
+Never score mucus-covered manure as 3.
 Important visual criteria:
 - moisture/wateriness
 - spread on the ground
@@ -16037,10 +16052,22 @@ If the image does not clearly show manure, return ok:false.
 Scoring rules:
 - Return an integer only: 1, 2, 3, 4, or 5.
 - Score 3 is the target/ideal.
-- Score 1 is very watery diarrhea.
-- Score 5 is very dry/hard manure.
+- Score 1 is reserved only for obvious watery diarrhea.
+- Score 2 is the correct score for loose/soft manure that is not fully watery.
+- Score 5 is reserved only for very dry/hard manure.
 - Do not return decimals or ranges.
+Critical distinction between 3, 4, and 5:
+Score 3 must be used only when the manure is soft, porridge-like, moist, and forms a smooth moderate pile with normal spread.
+Do not give score 3 to manure that is clearly dry, stiff, cracked, highly raised, pellet-like, or covered with mucus.
 
+Score 4 = firmer than ideal: dry or stiff manure, reduced spread, higher pile, visible dryness, or overly structured consistency.
+Score 5 = very dry/hard or abnormal dry manure: hard clumps, pellets, cracked surface, very stiff mass, or dry manure covered with mucus.
+
+Mucus rule:
+Visible mucus or shiny mucus coating on dry or firm manure is not ideal.
+If mucus is visible with firm/dry manure, score 5.
+If mucus is visible with moderately firm manure, score 4 at minimum.
+Never score mucus-covered manure as 3.
 All returned values that may be displayed to the user must be Arabic only.
 Do not write English words in "visualFindings", "reason", "qualityLabel", or "message".
 Explain the reason educationally but briefly, based only on visible manure consistency, spread, moisture, pile shape, and dryness.
