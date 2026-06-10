@@ -16390,6 +16390,557 @@ app.post("/api/feces/save", requireUserId, async (req, res) => {
   }
 });
 // ============================================================
+//      API: DAIRY TRAITS VISION ANALYZE (OpenAI Vision)
+//      تقييم سمات إنتاج اللبن — السيرفر فقط
+// ============================================================
+
+function dairyTraitsClampScoreSrv(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function dairyTraitsClampPartSrv(v, max) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(Number(max) || 0, Math.round(n)));
+}
+
+function dairyTraitsGradeSrv(score) {
+  const s = Number(score);
+
+  if (s >= 90) return "ممتاز";
+  if (s >= 85) return "جيد جدًا";
+  if (s >= 80) return "جيد مرتفع";
+  if (s >= 75) return "جيد";
+  if (s >= 65) return "متوسط";
+  if (s >= 50) return "ضعيف";
+
+  return "ضعيف جدًا";
+}
+
+app.post("/api/dairy-traits/vision-analyze", async (req, res) => {
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({
+        ok: false,
+        message: "❌ مفتاح OpenAI غير موجود على السيرفر."
+      });
+    }
+
+    const body = req.body || {};
+    const captures = body.captures || {};
+
+    const sideImage =
+      captures.side ||
+      body.sideImage ||
+      body.side ||
+      "";
+
+    const rearImage =
+      captures.rear ||
+      captures.udderRear ||
+      body.rearImage ||
+      body.udderRearImage ||
+      body.rear ||
+      body.udderRear ||
+      "";
+
+    const frontImage =
+      captures.front ||
+      body.frontImage ||
+      body.front ||
+      "";
+
+    if (!sideImage || !rearImage || !frontImage) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ تقييم سمات إنتاج اللبن يحتاج 3 لقطات كاملة: جانبية، خلفية، وأمامية."
+      });
+    }
+
+    const prompt = `
+You are an expert dairy cattle conformation evaluator.
+
+Task:
+Evaluate the visible dairy-production body traits of the animal using the TARGET images.
+Return a final dairy traits score from 0 to 100.
+
+This is NOT a milk yield prediction.
+Do not estimate milk kilograms.
+Do not diagnose disease.
+Evaluate only visible physical conformation traits related to dairy production suitability.
+
+Required TARGET views:
+1) Side view:
+- full body
+- body depth
+- topline
+- rump angle
+- side udder depth
+- fore udder attachment
+- legs from side
+
+2) Rear view:
+- rear udder
+- udder cleft / median suspensory ligament
+- teat placement
+- teat distribution
+- rear udder width and height
+- udder symmetry
+- rear legs
+- rump width
+
+3) Front view:
+- chest width
+- front legs straightness
+- front legs spacing
+- front-end strength
+- the space between the front legs should look rectangular, not too narrow and not excessively open
+
+Use this official-style dairy cow score structure:
+- Udder = 40 points
+- Feet and legs = 20 points
+- Dairy strength = 20 points
+- Front end and body capacity = 15 points
+- Rump = 5 points
+Total = 100 points.
+
+1) Udder = 40 points.
+Evaluate:
+- udder depth relative to the hock
+- fore udder attachment
+- rear udder height and width
+- teat placement under the quarters
+- teat size and uniformity
+- udder cleft / median suspensory ligament
+- udder balance and symmetry
+- udder floor and texture if visible
+
+Udder is the most important category.
+Rear view is essential for udder cleft, teat placement, rear udder width, and symmetry.
+Side view is important for udder depth and fore udder attachment.
+
+2) Feet and legs = 20 points.
+Evaluate:
+- rear legs from rear view: straight, wide apart, feet squarely placed
+- rear legs from side view: moderate hock set
+- feet angle and heel depth if visible
+- clean hocks
+- pastern strength
+- ability to stand functionally from the visible posture
+
+3) Dairy strength = 20 points.
+Evaluate:
+- open and angular dairy form
+- width and strength of chest
+- spring of fore rib
+- wide, flat, deep ribs slanting toward the rear
+- lean thighs
+- sharp withers
+- long clean neck
+- strength without beefiness or excessive flesh
+- body condition should not be confused with dairy quality
+
+4) Front end and body capacity = 15 points.
+Evaluate:
+- front legs straight, wide apart, and squarely placed
+- chest floor deep and wide
+- rectangular space between front legs
+- shoulder blades and elbows set firmly against chest wall
+- barrel long, deep, and wide
+- body depth and abdominal capacity
+- back and loin straight, strong, and nearly level
+- stature and proportional frame
+
+5) Rump = 5 points.
+Evaluate:
+- rump angle: pins slightly lower than hips
+- rump width and pin width
+- rump length
+- thurls wide apart and centrally placed
+- tail head neatly set between pins
+- pelvic balance related to fertility, calving ease, mobility, and rear udder support
+
+Important rules:
+- Do not reward fatness as dairy quality.
+- A fleshy or beefy animal should not score high just because it looks full.
+- Dairy quality favors angularity, openness, capacity, functional udder, strong legs, and balanced frame.
+- Score only visible traits from the TARGET images.
+- Do not invent hidden traits.
+- The final score must equal the weighted structure above.
+- All user-visible text must be Arabic only.
+- Do not write English words in returned values.
+
+Score bands:
+90–100 = ممتاز
+85–89 = جيد جدًا
+80–84 = جيد مرتفع
+75–79 = جيد
+65–74 = متوسط
+50–64 = ضعيف
+0–49 = ضعيف جدًا
+
+Return JSON only:
+{
+  "ok": true,
+  "score": 86,
+  "grade": "جيد جدًا",
+  "confidence": "high|medium|low",
+  "breakdown": {
+    "udder": 34,
+    "feetAndLegs": 16,
+    "dairyStrength": 17,
+    "frontEndAndCapacity": 13,
+    "rump": 4
+  },
+  "strengths": [
+    "نقطة قوة عربية مختصرة",
+    "نقطة قوة عربية مختصرة"
+  ],
+  "weaknesses": [
+    "نقطة تحتاج تحسين أو متابعة",
+    "نقطة تحتاج تحسين أو متابعة"
+  ],
+  "reason": "تفسير عربي تعليمي مختصر للدرجة النهائية بناءً على الضرع والأرجل والطابع الحلاب والسعة والرامب.",
+  "recommendation": "توصية عربية مختصرة للتصوير أو المتابعة."
+}
+`.trim();
+
+    const content = [
+      { type: "input_text", text: prompt },
+
+      { type: "input_text", text: "TARGET side view." },
+      { type: "input_image", image_url: sideImage, detail: "high" },
+
+      { type: "input_text", text: "TARGET rear view." },
+      { type: "input_image", image_url: rearImage, detail: "high" },
+
+      { type: "input_text", text: "TARGET front view." },
+      { type: "input_image", image_url: frontImage, detail: "high" }
+    ];
+
+    console.log("Dairy Traits Vision image count:", 3);
+
+    const r = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_DAIRY_TRAITS_MODEL || process.env.OPENAI_BCS_MODEL || "gpt-4.1",
+        input: [
+          {
+            role: "user",
+            content
+          }
+        ],
+        temperature: 0,
+        max_output_tokens: 900
+      })
+    });
+
+    const j = await r.json().catch(() => ({}));
+
+    if (!r.ok) {
+      const openaiMessage =
+        j?.error?.message ||
+        j?.message ||
+        `openai_http_${r.status}`;
+
+      console.error("Dairy Traits OpenAI vision error:", {
+        status: r.status,
+        message: openaiMessage,
+        type: j?.error?.type || null,
+        code: j?.error?.code || null
+      });
+
+      return res.status(500).json({
+        ok: false,
+        message: "تعذّر تحليل سمات إنتاج اللبن عبر نموذج الرؤية.",
+        debug: {
+          status: r.status,
+          message: openaiMessage,
+          type: j?.error?.type || null,
+          code: j?.error?.code || null
+        }
+      });
+    }
+
+    const outText = bcsOpenAIOutputTextSrv(j);
+    const parsed = bcsExtractJsonTextSrv(outText);
+
+    if (!parsed || parsed.ok === false) {
+      return res.status(400).json({
+        ok: false,
+        message: parsed?.message || "الصورة غير صالحة لتقييم سمات إنتاج اللبن بدقة."
+      });
+    }
+
+    const rawBreakdown = parsed.breakdown || {};
+
+    const breakdown = {
+      udder: dairyTraitsClampPartSrv(rawBreakdown.udder, 40),
+      feetAndLegs: dairyTraitsClampPartSrv(rawBreakdown.feetAndLegs, 20),
+      dairyStrength: dairyTraitsClampPartSrv(rawBreakdown.dairyStrength, 20),
+      frontEndAndCapacity: dairyTraitsClampPartSrv(rawBreakdown.frontEndAndCapacity, 15),
+      rump: dairyTraitsClampPartSrv(rawBreakdown.rump, 5)
+    };
+
+    const summedScore =
+      breakdown.udder +
+      breakdown.feetAndLegs +
+      breakdown.dairyStrength +
+      breakdown.frontEndAndCapacity +
+      breakdown.rump;
+
+    const score = dairyTraitsClampScoreSrv(
+      Number.isFinite(Number(parsed.score)) ? parsed.score : summedScore
+    );
+
+    if (!Number.isFinite(Number(score))) {
+      return res.status(400).json({
+        ok: false,
+        message: "تعذّر استخراج درجة صالحة لسمات إنتاج اللبن."
+      });
+    }
+
+    const grade = parsed.grade || dairyTraitsGradeSrv(score);
+    const confidence = String(parsed.confidence || "medium").trim();
+
+    return res.json({
+      ok: true,
+      score,
+      grade,
+      rangeText: "0–100",
+      confidence,
+      breakdown,
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 4) : [],
+      weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses.slice(0, 4) : [],
+      reason: String(parsed.reason || "").trim(),
+      recommendation: String(parsed.recommendation || "").trim(),
+      message: `تم تحليل سمات إنتاج اللبن — الدرجة ${score} (${grade})`
+    });
+
+  } catch (e) {
+    console.error("dairy traits vision analyze error:", e);
+    return res.status(500).json({
+      ok: false,
+      message: "حدث خطأ أثناء تحليل سمات إنتاج اللبن بالرؤية."
+    });
+  }
+});
+// ============================================================
+//              API: DAIRY TRAITS SAVE (server-only)
+//              حفظ تقييم سمات إنتاج اللبن من السيرفر فقط
+// ============================================================
+
+app.post("/api/dairy-traits/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر حفظ تقييم سمات إنتاج اللبن — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const animalIdFromPage = String(
+      body.animalId ||
+      body.id ||
+      ""
+    ).trim();
+
+    const animalNumber = calvingNormDigitsOnlySrv(
+      body.animalNumber ||
+      body.number ||
+      ""
+    );
+
+    const eventDate = String(
+      body.eventDate ||
+      body.date ||
+      ""
+    ).trim().slice(0, 10);
+
+    const analysis = body.analysis || body.result || {};
+    const score = dairyTraitsClampScoreSrv(
+      body.score ??
+      body.dairyTraitsScore ??
+      analysis.score
+    );
+
+    const userComment = String(
+      body.comment ||
+      body.notes ||
+      ""
+    ).trim();
+
+    if (!eventDate) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ تاريخ تقييم سمات إنتاج اللبن مطلوب."
+      });
+    }
+
+    if (!animalIdFromPage && !animalNumber) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ رقم الحيوان مطلوب لحفظ تقييم سمات إنتاج اللبن."
+      });
+    }
+
+    if (!Number.isFinite(Number(score))) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ حلّل صور الحيوان أولًا قبل الحفظ."
+      });
+    }
+
+    let animal = null;
+    let animalDocSnap = null;
+    let animalCollection = "animals";
+
+    if (animalIdFromPage) {
+      const snap = await db.collection("animals").doc(animalIdFromPage).get();
+
+      if (snap.exists) {
+        const data = snap.data() || {};
+        const owner = String(data.userId || data.ownerUid || "").trim();
+
+        if (owner === uid) {
+          animal = { id: snap.id, data, _collection: "animals" };
+          animalDocSnap = snap;
+          animalCollection = "animals";
+        }
+      }
+    }
+
+    if (!animal && animalNumber) {
+      const found = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+      if (found) {
+        animal = found;
+        animalCollection = found._collection || "animals";
+        animalDocSnap = await db.collection(animalCollection).doc(found.id).get();
+      }
+    }
+
+    if (!animal || !animalDocSnap || !animalDocSnap.exists) {
+      return res.status(404).json({
+        ok: false,
+        message: "❌ الحيوان غير موجود في حسابك."
+      });
+    }
+
+    const animalDoc = animal.data || animalDocSnap.data() || {};
+    const st = String(animalDoc.status || "active").trim().toLowerCase();
+
+    if (st === "inactive" || st === "archived") {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ لا يمكن حفظ تقييم سمات إنتاج اللبن — الحيوان غير موجود بالقطيع."
+      });
+    }
+
+    const finalAnimalId = animal.id || animalDocSnap.id;
+    const finalAnimalNumber = calvingNormDigitsOnlySrv(
+      animalNumber ||
+      animalDoc.animalNumber ||
+      animalDoc.number ||
+      ""
+    );
+
+    const grade = analysis.grade || dairyTraitsGradeSrv(score);
+    const breakdown = analysis.breakdown || {};
+
+    const payload = {
+      userId: uid,
+      ownerUid: uid,
+
+      animalId: finalAnimalId,
+      animalNumber: finalAnimalNumber,
+
+      type: "تقييم سمات إنتاج اللبن",
+      eventType: "تقييم سمات إنتاج اللبن",
+      eventTypeNorm: "dairy_traits_eval",
+
+      date: eventDate,
+      eventDate,
+
+      score,
+      value: score,
+      dairyTraitsScore: score,
+      grade,
+
+      analysis: cleanObj({
+        score: analysis.score ?? score,
+        grade,
+        rangeText: analysis.rangeText || "0–100",
+        confidence: analysis.confidence || null,
+        breakdown,
+        strengths: analysis.strengths || [],
+        weaknesses: analysis.weaknesses || [],
+        reason: analysis.reason || null,
+        recommendation: analysis.recommendation || null,
+        source: "server:/api/dairy-traits/vision-analyze"
+      }),
+
+      notes: userComment || null,
+      comment: userComment || null,
+
+      source: "server:/api/dairy-traits/save",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const eventRef = db.collection("events").doc();
+    const batch = db.batch();
+
+    batch.set(eventRef, payload);
+
+    batch.set(db.collection(animalCollection).doc(finalAnimalId), {
+      lastDairyTraitsScore: score,
+      lastDairyTraitsDate: eventDate,
+      lastDairyTraitsGrade: grade,
+      lastDairyTraitsBreakdown: cleanObj(breakdown),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    await batch.commit();
+
+    if (typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "dairy_traits_eval_save");
+    }
+
+    return res.json({
+      ok: true,
+      message: "✅ تم حفظ تقييم سمات إنتاج اللبن بنجاح",
+      id: eventRef.id,
+      eventId: eventRef.id,
+      animalId: finalAnimalId,
+      animalNumber: finalAnimalNumber,
+      eventDate,
+      score,
+      grade,
+      saved: payload
+    });
+
+  } catch (e) {
+    console.error("dairy-traits-save", e);
+    return res.status(500).json({
+      ok: false,
+      message: "تعذّر حفظ تقييم سمات إنتاج اللبن الآن."
+    });
+  }
+});
+// ============================================================
 //                       API: ANIMALS (robust)
 // ============================================================
 
