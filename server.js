@@ -15915,12 +15915,12 @@ console.log("BCS Vision image count:", sentBcsImages.length);
         label: qualityLabel,
         confidence
       },
-      reason: String(parsed.reason || "").trim(),
-      findings: {
-        rear: String(parsed.rearFindings || "").trim(),
-        side: String(parsed.sideFindings || "").trim()
-      },
-      message: `تم تحليل حالة الجسم — BCS ${Number(score).toFixed(2)} (${label})`
+     reason: String(parsed.reason || parsed.visualFindings || "").trim(),
+findings: {
+  visual: String(parsed.visualFindings || "").trim()
+},
+note: "",
+message: `تم تحليل الروث — الدرجة ${score} (${label})`
     });
 
   } catch (e) {
