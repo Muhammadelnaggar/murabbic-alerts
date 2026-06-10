@@ -15932,6 +15932,441 @@ console.log("BCS Vision image count:", sentBcsImages.length);
   }
 });
 // ============================================================
+//          API: FECES VISION ANALYZE (OpenAI Vision)
+//          تقييم الروث بالرؤية — السيرفر فقط
+// ============================================================
+
+function fecesClampScoreSrv(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(1, Math.min(5, Math.round(n)));
+}
+
+function fecesLabelSrv(score) {
+  const s = Number(score);
+
+  if (s === 1) return "إسهال شديد";
+  if (s === 2) return "لين زيادة";
+  if (s === 3) return "نموذجي";
+  if (s === 4) return "جاف زيادة";
+  if (s === 5) return "جاف جدًا";
+
+  return "غير محدد";
+}
+
+function fecesBuildNoteSrv(score) {
+  const s = Number(score);
+
+  if (s === 1) {
+    return "روث مائي جدًا؛ مؤشر بصري لاحتمال إسهال أو سرعة مرور عالية. يحتاج ربطه بحالة الحيوان والعليقة.";
+  }
+
+  if (s === 2) {
+    return "روث لين أكثر من المطلوب؛ قد يشير إلى سرعة مرور أعلى أو نقص ألياف فعالة أو زيادة تخمر سريع.";
+  }
+
+  if (s === 3) {
+    return "قوام نموذجي؛ الروث متماسك بدرجة مناسبة ويكوّن كومة واضحة بدون جفاف أو سيولة زائدة.";
+  }
+
+  if (s === 4) {
+    return "روث متماسك أو جاف زيادة؛ قد يرتبط بزيادة الألياف أو قلة الماء أو بطء المرور.";
+  }
+
+  if (s === 5) {
+    return "روث جاف جدًا أو صلب؛ مؤشر بصري لاحتمال جفاف/إمساك أو خلل واضح في الاتزان الغذائي.";
+  }
+
+  return "";
+}
+
+app.post("/api/feces/vision-analyze", async (req, res) => {
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({
+        ok: false,
+        message: "❌ مفتاح OpenAI غير موجود على السيرفر."
+      });
+    }
+
+    const body = req.body || {};
+    const image =
+      body.image ||
+      body.imageData ||
+      body.photo ||
+      body.capture ||
+      body.dataUrl ||
+      "";
+
+    if (!image) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ صورة الروث مطلوبة للتحليل."
+      });
+    }
+
+    const prompt = `
+You are an expert dairy cattle manure consistency evaluator.
+
+Task:
+Evaluate the manure/feces consistency visible in the TARGET image only.
+Return one integer feces score from 1 to 5.
+
+Scientific scale:
+1 = watery diarrhea / very liquid manure
+2 = loose manure, too soft, little structure
+3 = ideal manure consistency; porridge-like, forms a soft pile
+4 = firm/dry manure, too much structure
+5 = very dry/hard manure, stiff clumps or constipation-like
+
+Important visual criteria:
+- moisture/wateriness
+- spread on the ground
+- pile height and shape
+- cohesion and structure
+- dryness/cracking/clumping
+- visible undigested particles only as supporting evidence
+
+Do not diagnose disease.
+Do not infer from floor color, shadows, lighting, or background.
+Do not use animal breed, coat color, or environment.
+If the image does not clearly show manure, return ok:false.
+
+Scoring rules:
+- Return an integer only: 1, 2, 3, 4, or 5.
+- Score 3 is the target/ideal.
+- Score 1 is very watery diarrhea.
+- Score 5 is very dry/hard manure.
+- Do not return decimals or ranges.
+
+Return JSON only:
+{
+  "ok": true,
+  "score": 3,
+  "confidence": "high|medium|low",
+  "qualityLabel": "صالحة للتقييم|متوسطة وتحتاج حذر|غير صالحة للتقييم",
+  "visualFindings": "brief visible evidence",
+  "reason": "brief reason for the selected score"
+}
+`.trim();
+
+    const content = [
+      { type: "input_text", text: prompt },
+      { type: "input_text", text: "TARGET manure/feces image." },
+      { type: "input_image", image_url: image, detail: "high" }
+    ];
+
+    console.log("Feces Vision image count:", 1);
+
+    const r = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_FECES_MODEL || process.env.OPENAI_BCS_MODEL || "gpt-4.1",
+        input: [
+          {
+            role: "user",
+            content
+          }
+        ],
+        temperature: 0,
+        max_output_tokens: 500
+      })
+    });
+
+    const j = await r.json().catch(() => ({}));
+
+    if (!r.ok) {
+      const openaiMessage =
+        j?.error?.message ||
+        j?.message ||
+        `openai_http_${r.status}`;
+
+      console.error("Feces OpenAI vision error:", {
+        status: r.status,
+        message: openaiMessage,
+        type: j?.error?.type || null,
+        code: j?.error?.code || null
+      });
+
+      return res.status(500).json({
+        ok: false,
+        message: "تعذّر تحليل الروث عبر نموذج الرؤية.",
+        debug: {
+          status: r.status,
+          message: openaiMessage,
+          type: j?.error?.type || null,
+          code: j?.error?.code || null
+        }
+      });
+    }
+
+    const outText = bcsOpenAIOutputTextSrv(j);
+    const parsed = bcsExtractJsonTextSrv(outText);
+
+    if (!parsed || parsed.ok === false) {
+      return res.status(400).json({
+        ok: false,
+        message: parsed?.message || "الصورة غير صالحة لتقييم الروث بدقة."
+      });
+    }
+
+    const score = fecesClampScoreSrv(parsed.score);
+
+    if (!Number.isFinite(Number(score))) {
+      return res.status(400).json({
+        ok: false,
+        message: "تعذّر استخراج درجة روث صالحة من تحليل الرؤية."
+      });
+    }
+
+    const label = fecesLabelSrv(score);
+    const confidence = String(parsed.confidence || "medium").trim();
+
+    const qualityLabel =
+      parsed.qualityLabel ||
+      (
+        confidence === "high"
+          ? "صالحة للتقييم"
+          : confidence === "medium"
+            ? "متوسطة وتحتاج حذر"
+            : "غير صالحة للتقييم"
+      );
+
+    return res.json({
+      ok: true,
+      score,
+      label,
+      rangeText: "1–5",
+      quality: {
+        label: qualityLabel,
+        confidence
+      },
+      reason: String(parsed.reason || "").trim(),
+      findings: {
+        visual: String(parsed.visualFindings || "").trim()
+      },
+      note: fecesBuildNoteSrv(score),
+      message: `تم تحليل الروث — الدرجة ${score} (${label})`
+    });
+
+  } catch (e) {
+    console.error("feces vision analyze error:", e);
+    return res.status(500).json({
+      ok: false,
+      message: "حدث خطأ أثناء تحليل الروث بالرؤية."
+    });
+  }
+});
+// ============================================================
+//                 API: FECES SAVE (server-only)
+//                 حفظ تقييم الروث وتحديث الحيوان من السيرفر فقط
+// ============================================================
+
+app.post("/api/feces/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر حفظ تقييم الروث — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const animalIdFromPage = String(
+      body.animalId ||
+      body.id ||
+      ""
+    ).trim();
+
+    const animalNumber = calvingNormDigitsOnlySrv(
+      body.animalNumber ||
+      body.number ||
+      ""
+    );
+
+    const eventDate = String(
+      body.eventDate ||
+      body.date ||
+      ""
+    ).trim().slice(0, 10);
+
+    const analysis = body.analysis || body.result || {};
+    const score = fecesClampScoreSrv(
+      body.score ??
+      body.fecesScore ??
+      analysis.score
+    );
+
+    const userComment = String(
+      body.comment ||
+      body.notes ||
+      ""
+    ).trim();
+
+    if (!eventDate) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ تاريخ تقييم الروث مطلوب."
+      });
+    }
+
+    if (!animalIdFromPage && !animalNumber) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ رقم الحيوان مطلوب لحفظ تقييم الروث."
+      });
+    }
+
+    if (!Number.isFinite(Number(score))) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ حلّل صورة الروث أولًا قبل الحفظ."
+      });
+    }
+
+    let animal = null;
+    let animalDocSnap = null;
+    let animalCollection = "animals";
+
+    if (animalIdFromPage) {
+      const snap = await db.collection("animals").doc(animalIdFromPage).get();
+
+      if (snap.exists) {
+        const data = snap.data() || {};
+        const owner = String(data.userId || data.ownerUid || "").trim();
+
+        if (owner === uid) {
+          animal = { id: snap.id, data, _collection: "animals" };
+          animalDocSnap = snap;
+          animalCollection = "animals";
+        }
+      }
+    }
+
+    if (!animal && animalNumber) {
+      const found = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+      if (found) {
+        animal = found;
+        animalCollection = found._collection || "animals";
+        animalDocSnap = await db.collection(animalCollection).doc(found.id).get();
+      }
+    }
+
+    if (!animal || !animalDocSnap || !animalDocSnap.exists) {
+      return res.status(404).json({
+        ok: false,
+        message: "❌ الحيوان غير موجود في حسابك."
+      });
+    }
+
+    const animalDoc = animal.data || animalDocSnap.data() || {};
+    const st = String(animalDoc.status || "active").trim().toLowerCase();
+
+    if (st === "inactive" || st === "archived") {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ لا يمكن حفظ تقييم الروث — الحيوان غير موجود بالقطيع."
+      });
+    }
+
+    const finalAnimalId = animal.id || animalDocSnap.id;
+    const finalAnimalNumber = calvingNormDigitsOnlySrv(
+      animalNumber ||
+      animalDoc.animalNumber ||
+      animalDoc.number ||
+      ""
+    );
+
+    const label = fecesLabelSrv(score);
+
+    const payload = {
+      userId: uid,
+      ownerUid: uid,
+
+      animalId: finalAnimalId,
+      animalNumber: finalAnimalNumber,
+
+      type: "تقييم الروث",
+      eventType: "تقييم الروث",
+      eventTypeNorm: "feces_eval",
+
+      date: eventDate,
+      eventDate,
+
+      score,
+      value: score,
+      fecesScore: score,
+      label,
+
+      analysis: analysis ? cleanObj({
+        score: analysis.score ?? score,
+        label: analysis.label || label,
+        quality: analysis.quality || null,
+        reason: analysis.reason || null,
+        findings: analysis.findings || null,
+        note: analysis.note || null,
+        rangeText: analysis.rangeText || "1–5",
+        source: "server:/api/feces/vision-analyze"
+      }) : null,
+
+      notes: userComment || null,
+      comment: userComment || null,
+
+      source: "server:/api/feces/save",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const eventRef = db.collection("events").doc();
+    const batch = db.batch();
+
+    batch.set(eventRef, payload);
+
+    batch.set(db.collection(animalCollection).doc(finalAnimalId), {
+      lastFecesScore: score,
+      lastFecesDate: eventDate,
+      lastFecesLabel: label,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    await batch.commit();
+
+    if (typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "feces_eval_save");
+    }
+
+    return res.json({
+      ok: true,
+      message: "✅ تم حفظ تقييم الروث بنجاح",
+      id: eventRef.id,
+      eventId: eventRef.id,
+      animalId: finalAnimalId,
+      animalNumber: finalAnimalNumber,
+      eventDate,
+      score,
+      label,
+      saved: payload
+    });
+
+  } catch (e) {
+    console.error("feces-save", e);
+    return res.status(500).json({
+      ok: false,
+      message: "تعذّر حفظ تقييم الروث الآن."
+    });
+  }
+});
+// ============================================================
 //                       API: ANIMALS (robust)
 // ============================================================
 
