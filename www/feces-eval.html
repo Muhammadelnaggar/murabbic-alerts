@@ -23,6 +23,9 @@
    
   </div>
 </header>
+
+<div id="sysbar" class="infobar" role="status" aria-live="polite"></div>
+
 <main class="mbk-vision-container">
   <div class="mbk-card">
     <label>رقم الحيوان</label>
@@ -74,8 +77,6 @@
 <div class="mbk-save-panel">
   <input type="hidden" id="animalId" />
 
-  <div id="saveMsg"></div>
-
   <label>
     تاريخ التقييم
     <input type="date" id="eventDate" class="input" />
@@ -115,7 +116,7 @@
 
   const uploadPreviewBox = $("#uploadPreviewBox");
   const uploadPreviewImg = $("#uploadPreviewImg");
-  const msgBox = $("#saveMsg");
+  const msgBox = $("#sysbar");
 
   const state = {
     stream: null,
@@ -151,21 +152,22 @@
     ).trim();
   }
 
-  function showMsg(text, ok) {
-    if (!msgBox) return;
+ function showMsg(text, ok) {
+  if (!msgBox) return;
 
-    msgBox.style.display = "block";
-    msgBox.textContent = text;
-    msgBox.style.background = ok ? "#dcfce7" : "#fee2e2";
-    msgBox.style.color = ok ? "#166534" : "#991b1b";
-    msgBox.style.border = ok ? "1px solid #86efac" : "1px solid #fca5a5";
-  }
+  msgBox.textContent = text;
+  msgBox.className = "infobar show " + (ok ? "success" : "error");
 
-  function hideMsg() {
-    if (!msgBox) return;
-    msgBox.style.display = "none";
-    msgBox.textContent = "";
-  }
+  try {
+    msgBox.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (_) {}
+}
+
+ function hideMsg() {
+  if (!msgBox) return;
+  msgBox.className = "infobar";
+  msgBox.textContent = "";
+}
 
   function setWaiting() {
     state.analysis = null;
