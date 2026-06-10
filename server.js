@@ -16025,11 +16025,30 @@ Important distinction:
 Do not give score 1 unless the manure is clearly watery diarrhea with almost no structure.
 If it is loose, flat, soft, or spread out but still has visible consistency, score 2, not 1.
 Critical distinction between 3, 4, and 5:
-Score 3 must be used only when the manure is soft, porridge-like, moist, and forms a smooth moderate pile with normal spread.
-Do not give score 3 to manure that is clearly dry, stiff, cracked, highly raised, pellet-like, or covered with mucus.
+Score 3 must be used only for truly ideal manure.
+Ideal score 3 manure should have these visual features together:
+- a fairly round and regular shape
+- a clearly defined but moderate pile
+- a soft, smooth, porridge-like appearance
+- moderate height, not too flat and not too bulky
+- visible central rings, ripples, or concentric circles in the middle
+- normal spread without excessive volume
 
-Score 4 = firmer than ideal: dry or stiff manure, reduced spread, higher pile, visible dryness, or overly structured consistency.
-Score 5 = very dry/hard or abnormal dry manure: hard clumps, pellets, cracked surface, very stiff mass, or dry manure covered with mucus.
+Do not give score 3 if the manure is bulky, voluminous, overly massive, overly wide, irregular in outline, or lacks the typical central circular/ripple pattern.
+
+Score 4 = firmer or bulkier than ideal:
+- the manure is more voluminous, bulky, or heaped than ideal
+- or it is drier, stiffer, less smooth, less rounded, or less regular than ideal
+- or it lacks the classic moderate round pile with central rings
+- or it has reduced softness and looks heavier or more structured than a true score 3
+
+Score 5 = very dry/hard or clearly abnormal dry manure:
+- hard clumps
+- pellets
+- cracked surface
+- very stiff mass
+- very dry manure
+- or dry/firm manure covered with mucus
 
 Mucus rule:
 Visible mucus or shiny mucus coating on dry or firm manure is not ideal.
@@ -16051,10 +16070,13 @@ If the image does not clearly show manure, return ok:false.
 
 Scoring rules:
 - Return an integer only: 1, 2, 3, 4, or 5.
-- Score 3 is the target/ideal.
+- Score 3 is reserved only for clearly ideal manure.
+- Do not use score 3 for borderline cases.
+- If the manure is bulky, voluminous, overly massive, or does not show the typical rounded moderate pile with central rings, do not score it as 3.
+- In such cases, prefer score 4.
 - Score 1 is reserved only for obvious watery diarrhea.
-- Score 2 is the correct score for loose/soft manure that is not fully watery.
-- Score 5 is reserved only for very dry/hard manure.
+- Score 2 is for loose/soft manure that is not fully watery.
+- Score 5 is reserved for very dry/hard manure or dry manure with mucus.
 - Do not return decimals or ranges.
 Critical distinction between 3, 4, and 5:
 Score 3 must be used only when the manure is soft, porridge-like, moist, and forms a smooth moderate pile with normal spread.
