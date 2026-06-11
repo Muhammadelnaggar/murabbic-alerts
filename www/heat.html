@@ -7,12 +7,6 @@
 
   <link rel="stylesheet" href="css/forms.css" />
 
-  <!-- Tracking (مرة واحدة فقط) -->
-  <script>window.dataLayer = window.dataLayer || [];</script>
-  <script src="/js/app-core.js"></script>
-
-  <!-- Validation / Forms init (Central Gate + Validation) -->
-  <script type="module" src="js/forms-init.js"></script>
 
   <style>
     header{
@@ -136,8 +130,7 @@
 
   <div class="wrap">
 
-    <!-- ✅ لازم Form علشان forms-init يشتغل -->
-   <form id="heatForm" class="mbk-card" data-validate="true" data-event-type="شياع" data-event="شياع" novalidate>
+   <form id="heatForm" class="mbk-card" novalidate>
 
       <!-- Hidden: علشان forms-init يحقن animalId -->
       <input id="animalId" data-field="animalId" type="hidden" />
@@ -182,197 +175,332 @@
     <button id="openCowCard" class="open-card" type="button">🧾 بطاقة الحيوان</button>
   </div>
 
-  <script type="module">
-   import { auth } from "/js/firebase-config.js";
-import { apiGet, apiPost } from "/js/api.js";
+<script>
+(function(){
+  "use strict";
 
-    const $ = (id) => document.getElementById(id);
-    const form = $("heatForm");
-    const bar  = $("sysbar");
+  const $ = id => document.getElementById(id);
 
-    function msg(t, ok=false){
-      bar.className = "infobar " + (ok ? "success" : "error");
-      bar.style.display = "block";
-      bar.textContent = t;
-      try{ bar.scrollIntoView({behavior:"smooth", block:"start"}); }catch(_){}
-    }
+  const form = $("heatForm");
+  const bar = $("sysbar");
+  const animalEl = $("animalNumber");
+  const dateEl = $("eventDate");
+  const saveBtn = $("saveBtnUI");
+  const openCowCardBtn = $("openCowCard");
 
-   // ✅ Prefill من URL / localStorage (يدعم فردي + جماعي من add-event)
-const p  = new URLSearchParams(location.search);
+  let gateTimer = null;
+  let gateState = {
+    allowed: false,
+    animalNumbers: [],
+    results: []
+  };
 
-// ✅ لو جاي جماعي من add-event: mbkMode=group&bulk=33,34,35
-const mode = (p.get("mbkMode") || "").toString().trim().toLowerCase();
-const bulk = (p.get("bulk") || "").toString().trim();
+  function normDigits(v){
+    const map = {
+      "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+      "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+    };
 
-// ✅ رقم مفرد (لو موجود)
-const numSingle = (p.get("number") || p.get("animalNumber") || "").toString().trim();
-
-// ✅ الأسبقية: bulk (لو group) → single → localStorage
-const num =
-  (mode === "group" && bulk ? bulk : "") ||
-  numSingle ||
-  (localStorage.getItem("lastAnimalNumber") || "").toString().trim() ||
-  "";
-
-const dt =
-  (p.get("date") || p.get("eventDate") ||
-   localStorage.getItem("lastEventDate") ||
-   new Date().toISOString().slice(0,10)
-  ).toString().slice(0,10);
-
-// ✅ تعبئة الحقول
-$("animalNumber").value = num;
-$("eventDate").value = dt;
-
-
-    function toDate(s){
-      const d = new Date(String(s || "").slice(0,10));
-      return isNaN(d.getTime()) ? null : d;
-    }
-async function loadHeatContextFromServer(){
-  const raw = $("animalNumber").value.trim();
-  const eventDate = $("eventDate").value;
-
-  if (!raw || !eventDate) {
-    $("reproStatus").value = "";
-    $("dim").value = "";
-    $("daysSinceLastHeatOrAI").value = "";
-    return;
+    return String(v || "")
+      .trim()
+      .replace(/[٠-٩۰-۹]/g, d => map[d] || d);
   }
 
-  // جماعي: ما نحملش context مفرد
-  if (/[\s,\n،;]/.test(raw)) {
-    $("reproStatus").value = "";
-    $("dim").value = "";
-    $("daysSinceLastHeatOrAI").value = "";
-    return;
+  function splitNumbers(v){
+    return String(v || "")
+      .split(/[\s,،;]+/)
+      .map(x => normDigits(x).replace(/[^\d]/g, ""))
+      .filter(Boolean);
   }
 
-  try{
+  function todayISO(){
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
+  }
+
+  function getQS(name){
+    return new URL(location.href).searchParams.get(name) || "";
+  }
+
+  function getUid(){
+    return String(
+      window.MBK_USER_ID ||
+      window.mbkUserId ||
+      window.mbk?.userId ||
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("tenantId") ||
+      ""
+    ).trim();
+  }
+
+  function msg(text, ok=false){
+    if (!bar) return;
+    bar.className = "infobar show " + (ok ? "success" : "error");
+    bar.style.display = "block";
+    bar.textContent = text || "";
+    try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_){}
+  }
+
+  function clearMsg(){
+    if (!bar) return;
+    bar.className = "infobar";
+    bar.textContent = "";
+  }
+
+  function getHeatTime(){
+    return form.querySelector('input[name="heatTime"]:checked')?.value || "";
+  }
+
+  async function postJson(url, body){
+    const uid = getUid();
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(uid ? { "X-User-Id": uid } : {})
+      },
+      body: JSON.stringify(body || {})
+    });
+
+    const j = await r.json().catch(() => ({}));
+
+    if (!r.ok) {
+      const err = new Error(j.message || "تعذّر الاتصال بالسيرفر.");
+      err.payload = j;
+      throw err;
+    }
+
+    return j;
+  }
+
+  async function getContextSingle(number, eventDate){
+    const uid = getUid();
     const q =
-      `/api/heat/context?animalNumber=${encodeURIComponent(raw)}&eventDate=${encodeURIComponent(eventDate)}`;
+      `/api/heat/context?animalNumber=${encodeURIComponent(number)}` +
+      `&eventDate=${encodeURIComponent(eventDate)}`;
 
-    const res = await apiGet(q);
+    const r = await fetch(q, {
+      headers: {
+        ...(uid ? { "X-User-Id": uid } : {})
+      }
+    });
 
-    if (!res?.ok) {
-      $("reproStatus").value = "";
-      $("dim").value = "";
-      $("daysSinceLastHeatOrAI").value = "";
+    return await r.json().catch(() => ({}));
+  }
+
+  function clearContextFields(){
+    if ($("animalId")) $("animalId").value = "";
+    if ($("reproStatus")) $("reproStatus").value = "";
+    if ($("dim")) $("dim").value = "";
+    if ($("daysSinceLastHeatOrAI")) $("daysSinceLastHeatOrAI").value = "";
+  }
+
+  async function loadContextAfterGate(){
+    const nums = splitNumbers(animalEl.value);
+    const eventDate = String(dateEl.value || "").slice(0,10);
+
+    if (nums.length !== 1 || !eventDate) {
+      clearContextFields();
       return;
     }
 
-    if ($("animalId")) $("animalId").value = String(res.animalId || "");
-    $("reproStatus").value = String(res.reproductiveStatus || "").trim();
-    $("dim").value = (res.dimAtEvent ?? "") === "" ? "" : String(res.dimAtEvent);
-    $("daysSinceLastHeatOrAI").value =
-      (res.daysSinceLastHeatOrAI ?? "") === "" ? "" : String(res.daysSinceLastHeatOrAI);
+    try {
+      const res = await getContextSingle(nums[0], eventDate);
 
-  }catch(err){
-    console.error("heat context load failed", err);
-    $("reproStatus").value = "";
-    $("dim").value = "";
-    $("daysSinceLastHeatOrAI").value = "";
+      if (!res?.ok) {
+        clearContextFields();
+        return;
+      }
+
+      if ($("animalId")) $("animalId").value = String(res.animalId || "");
+      if ($("reproStatus")) $("reproStatus").value = String(res.reproductiveStatus || "");
+      if ($("dim")) $("dim").value = res.dimAtEvent == null ? "" : String(res.dimAtEvent);
+      if ($("daysSinceLastHeatOrAI")) {
+        $("daysSinceLastHeatOrAI").value =
+          res.daysSinceLastHeatOrAI == null ? "" : String(res.daysSinceLastHeatOrAI);
+      }
+
+    } catch(e) {
+      console.error("heat context failed:", e);
+      clearContextFields();
+    }
   }
-}
-   function calcDIMFromDoc(){}
 
-   async function fillFromDocIfReady(){
-  if (form?.dataset?.animalOk !== "1") return;
-  await loadHeatContextFromServer();
-}
+  async function runGate(){
+    const raw = String(animalEl.value || "").trim();
+    const eventDate = String(dateEl.value || "").slice(0,10);
 
-    // بعد نجاح الـGate، forms-init سيملأ form.__mbkDoc و dataset.animalOk
-const docWatcher = setInterval(async () => {
-  await fillFromDocIfReady();
+    gateState = { allowed:false, animalNumbers:[], results:[] };
+    if (saveBtn) saveBtn.disabled = true;
 
-  if (form?.dataset?.animalOk === "1" && form.__mbkDoc) {
-    clearInterval(docWatcher);
+    if (!raw || !eventDate) {
+      clearContextFields();
+      clearMsg();
+      return;
+    }
+
+    try {
+      const res = await postJson("/api/heat/gate", {
+        animalNumber: raw,
+        eventDate
+      });
+
+      gateState = {
+        allowed: !!res.allowed,
+        animalNumbers: Array.isArray(res.animalNumbers) ? res.animalNumbers : [],
+        results: Array.isArray(res.results) ? res.results : []
+      };
+
+      if (!res.allowed) {
+        const preview = gateState.results
+          .slice(0,5)
+          .map(x => `${x.animalNumber}: ${x.message}`)
+          .join(" — ");
+
+        msg(preview || res.message || "❌ لا يوجد أي رقم مؤهل لتسجيل الشياع.", false);
+        clearContextFields();
+        return;
+      }
+
+      animalEl.value = gateState.animalNumbers.join(",");
+
+      const rejected = Array.isArray(res.rejected) ? res.rejected : [];
+      const suffix = rejected.length
+        ? ` — تم استبعاد ${rejected.length}: ${rejected.slice(0,3).map(x => x.animalNumber).join("، ")}${rejected.length > 3 ? "…" : ""}`
+        : "";
+
+      msg((res.message || "✅ تم التحقق — يمكن تسجيل الشياع.") + suffix, true);
+
+      if (saveBtn) saveBtn.disabled = false;
+      await loadContextAfterGate();
+
+    } catch(e) {
+      console.error("heat gate failed:", e);
+      msg(e.message || "تعذّر التحقق من الشياع الآن.", false);
+      clearContextFields();
+    }
   }
-}, 120);
-$("eventDate").addEventListener("change", async () => {
-  await loadHeatContextFromServer();
-});
-$("animalNumber").addEventListener("blur", async () => {
-  await loadHeatContextFromServer();
-});
-   $("openCowCard").addEventListener("click", ()=> {
-  const n = String($("animalNumber").value || "").trim();
-  if (!n) { msg("⚠️ لم يتم تمرير رقم الحيوان.", false); return; }
-  // ✅ لو جماعي (فواصل/مسافات) امنع فتح البطاقة
-  if (/[\s,]/.test(n)) { msg("⚠️ بطاقة الحيوان تعمل مع رقم واحد فقط.", false); return; }
-  location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
-});
 
+  function scheduleGate(){
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(runGate, 350);
+  }
 
-    // ✅ الحفظ المركزي: ممنوع submit محلي — ننتظر mbk:valid
-    
-// ✅ الحفظ المركزي: ممنوع submit محلي — ننتظر mbk:valid (Single + Bulk)
-form.addEventListener("mbk:valid", async (e) => {
-  const d = e?.detail || {};
-  if (!d || d.eventName !== "شياع") return;
+  async function saveHeat(e){
+    e.preventDefault();
 
-  try{
-    const uid = auth?.currentUser?.uid || localStorage.getItem("userId") || "";
-    if (!uid) { msg("⚠️ لم يتم تأكيد الدخول.", false); return; }
+    const raw = String(animalEl.value || "").trim();
+    const eventDate = String(dateEl.value || "").slice(0,10);
+    const heatTime = getHeatTime();
+    const notes = String($("notes")?.value || "").trim();
 
-    // ====== Bulk ======
-    if (d.bulk && Array.isArray(d.bulkEvents) && d.bulkEvents.length) {
+    if (!raw) return msg("❌ رقم الحيوان مطلوب.", false);
+    if (!eventDate) return msg("❌ تاريخ الشياع مطلوب.", false);
+    if (!heatTime) return msg("❌ وقت ملاحظة الشياع مطلوب.", false);
+
+    try {
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = "جارٍ الحفظ…";
+      }
+
+      if (!gateState.allowed) {
+        await runGate();
+        if (!gateState.allowed) return;
+      }
+
+      const nums = gateState.animalNumbers.length ? gateState.animalNumbers : splitNumbers(raw);
+
       const ok = [];
       const bad = [];
 
-      for (const fd of d.bulkEvents) {
-        const eventDate = String(fd.eventDate || "").slice(0,10);
-        const animalNumber = String(fd.animalNumber || "").trim();
-
-        try{
-          const res = await apiPost('/api/heat/save', {
-            animalNumber,
+      for (const n of nums) {
+        try {
+          const res = await postJson("/api/heat/save", {
+            animalNumber: n,
             eventDate,
-            heatTime: String(fd.heatTime || "").trim() || null,
-            notes: String(fd.notes || "").trim() || null
+            heatTime,
+            notes: notes || null
           });
 
-          if (res?.ok) ok.push(animalNumber);
-          else bad.push(animalNumber);
-        }catch(err){
-          bad.push(animalNumber);
-          console.error("heat save bulk err", animalNumber, err);
+          if (res?.ok) ok.push(n);
+          else bad.push(n);
+        } catch(err) {
+          console.error("heat save failed:", n, err);
+          bad.push(n);
         }
       }
 
-      if (ok.length) msg(`✅ تم تسجيل الشياع لـ ${ok.length} حيوان.`, true);
-      if (bad.length) msg(`⚠️ تعذّر الحفظ لـ: ${bad.join("، ")}`, false);
-      return;
+      localStorage.setItem("lastEventDate", eventDate);
+      if (ok.length === 1) {
+        localStorage.setItem("lastAnimalNumber", ok[0]);
+      }
+
+      if (ok.length && !bad.length) {
+        msg(ok.length === 1 ? "✅ تم حفظ شياع بنجاح" : `✅ تم حفظ الشياع لـ ${ok.length} حيوان.`, true);
+
+        if (ok.length === 1) {
+          setTimeout(() => {
+            location.href = `event-list.html?number=${encodeURIComponent(ok[0])}`;
+          }, 900);
+        }
+
+        return;
+      }
+
+      if (ok.length && bad.length) {
+        msg(`✅ تم حفظ ${ok.length} — وتعذّر حفظ: ${bad.join("، ")}`, false);
+        return;
+      }
+
+      msg(`❌ تعذّر حفظ الشياع للأرقام: ${bad.join("، ")}`, false);
+
+    } catch(err) {
+      console.error(err);
+      msg(err.message || "❌ حدث خطأ أثناء الحفظ.", false);
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "✅ تسجيل الشياع";
+      }
     }
-
-    // ====== Single ======
-    const fd = d.formData || {};
-    const eventDate = String(fd.eventDate || "").slice(0,10);
-    const animalNumber = String(fd.animalNumber || "").trim();
-
-    const res = await apiPost('/api/heat/save', {
-      animalNumber,
-      eventDate,
-      heatTime: String(fd.heatTime || "").trim() || null,
-      notes: String(fd.notes || "").trim() || null
-    });
-
-    if (!res?.ok) {
-      msg("❌ فشل حفظ الشياع.", false);
-      return;
-    }
-
-    msg("✅ تم تسجيل الشياع بنجاح.", true);
-  }catch(err){
-    console.error(err);
-    msg("❌ حدث خطأ أثناء الحفظ.", false);
   }
-});
 
-    // Tracking
-    const t = window.t || { event:(n,d)=>window.dataLayer.push({event:n, ...d}) };
-    t.event("page_view", { page: "heat", title: "تسجيل شياع" });
-  </script>
+  const p = new URLSearchParams(location.search);
+  const mode = String(p.get("mbkMode") || "").trim().toLowerCase();
+  const bulk = String(p.get("bulk") || "").trim();
+
+  const num =
+    (mode === "group" && bulk ? bulk : "") ||
+    String(p.get("number") || p.get("animalNumber") || "").trim() ||
+    String(localStorage.getItem("lastAnimalNumber") || "").trim();
+
+  const dt =
+    String(p.get("date") || p.get("eventDate") || localStorage.getItem("lastEventDate") || todayISO())
+      .slice(0,10);
+
+  if (animalEl) animalEl.value = num;
+  if (dateEl) dateEl.value = dt;
+
+  animalEl?.addEventListener("input", scheduleGate);
+  animalEl?.addEventListener("blur", runGate);
+  dateEl?.addEventListener("change", scheduleGate);
+  form?.addEventListener("submit", saveHeat);
+
+  openCowCardBtn?.addEventListener("click", () => {
+    const nums = splitNumbers(animalEl.value);
+    if (!nums.length) return msg("⚠️ لم يتم تمرير رقم الحيوان.", false);
+    if (nums.length > 1) return msg("⚠️ بطاقة الحيوان تعمل مع رقم واحد فقط.", false);
+    location.href = `cow-card.html?number=${encodeURIComponent(nums[0])}`;
+  });
+
+  scheduleGate();
+
+})();
+</script>
 
 </body>
 </html>
