@@ -49,7 +49,7 @@
         <button id="uploadBtn" class="mbk-btn mbk-btn-light" type="button">رفع صورة</button>
       </div>
 
-      <input id="uploadInput" type="file" accept="image/*" style="display:none" />
+     <input id="uploadInput" class="hide" type="file" accept="image/*" />
     </div>
 
     <div class="mbk-camera-frame side-view" id="previewWrap">
@@ -57,7 +57,7 @@
       <canvas id="overlay" class="mbk-camera-overlay"></canvas>
     </div>
 
-    <div class="form-hint" style="padding:10px 12px;line-height:1.8;font-weight:800">
+   <div class="form-hint mbk-vision-instructions">
      الجانبية: الحيوان كاملًا من الجانب مع الجسم والضرع والأرجل والحوض.<br>
 الخلفية: الحيوان كاملًا من الخلف مع الضرع والحلمات والأخدود الضرعي والأرجل الخلفية.
     </div>
@@ -70,14 +70,14 @@
       <div id="scoreWidget" class="mbk-score-card">
         <div class="mbk-score-badge" id="scoreBadge">بانتظار التقييم</div>
         <div class="mbk-score-bar">
-          <div class="mbk-score-fill" id="scoreFill" style="width:0%"></div>
+         <div class="mbk-score-fill" id="scoreFill"></div>
         </div>
         <div class="mbk-score-note" id="scoreNote">
          التقط صورتين كاملتين: جانبية وخلفية.
         </div>
       </div>
 
-      <div class="mbk-score-card" id="breakdownBox" style="display:none"></div>
+     <div class="mbk-score-card hide" id="breakdownBox"></div>
     </div>
 
     <div class="mbk-save-panel">
@@ -386,10 +386,10 @@
       ? "اضغط التقاط/رفع عند أي زاوية لتحديثها، وسيتم التحليل بعد اكتمال الصور."
      : "التقط صورتين كاملتين: جانبية وخلفية.";
     
-    if (breakdownBox) {
-      breakdownBox.style.display = "none";
-      breakdownBox.innerHTML = "";
-    }
+   if (breakdownBox) {
+  breakdownBox.classList.add("hide");
+  breakdownBox.innerHTML = "";
+}
   }
 
   function renderAnalysis(result) {
@@ -410,7 +410,7 @@
     if (breakdownBox) {
       const b = result.breakdown || {};
 
-      breakdownBox.style.display = "grid";
+      breakdownBox.classList.remove("hide");
       breakdownBox.innerHTML = `
         <div class="mbk-score-badge">التوزيع العلمي</div>
         <div>الضرع: ${Number(b.udder || 0)} / 40</div>
