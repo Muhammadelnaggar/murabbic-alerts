@@ -21,40 +21,41 @@
     <a class="mbk-back" id="backBtn" href="add-event.html">رجوع</a>
   </div>
 </header>
- <main class="mbk-smartcam-wrap">
-  <div class="mbk-smartcam-meta">
-    <div class="mbk-smartcam-chip" id="chipAnimal">🐄 الحيوان: —</div>
-    <div class="mbk-smartcam-chip" id="chipDate">📅 التاريخ: —</div>
+<main class="mbk-form">
+  <div class="mbk-card">
+    <div class="grid">
+      <div class="mbk-score-card">
+        <span class="mbk-score-badge" id="chipAnimal">🐄 الحيوان: —</span>
+      </div>
+
+      <div class="mbk-score-card">
+        <span class="mbk-score-badge" id="chipDate">📅 التاريخ: —</span>
+      </div>
+    </div>
   </div>
 
-  <section class="mbk-card mbk-smartcam-section" aria-label="أدوات الكاميرا السريعة">
+  <section class="mbk-card" aria-label="أدوات الكاميرا السريعة">
     <div class="mbk-page-title">🤖 أدوات الكاميرا السريعة</div>
-    <div class="form-hint mbk-smartcam-sub">تصوير سريع وتحليل مباشر</div>
+    <div class="form-hint">تصوير سريع وتحليل مباشر</div>
 
-    <div class="mbk-smartcam-grid">
-      <button class="mbk-smartcam-tool mbk-btn mbk-btn-lg mbk-btn-primary" data-page="visual-eval.html" aria-label="سمات إنتاج اللبن للحيوان">
-        <div class="mbk-smartcam-ico">🥛</div>
-        <div class="mbk-smartcam-title">سمات إنتاج اللبن للحيوان</div>
-        <div class="mbk-smartcam-hint">تقييم الصفات الجسمية المرتبطة بإنتاج اللبن</div>
+    <div class="grid">
+      <button class="mbk-btn mbk-btn-lg mbk-btn-primary" data-page="visual-eval.html" aria-label="سمات إنتاج اللبن للحيوان">
+        🥛 سمات إنتاج اللبن للحيوان
       </button>
     </div>
   </section>
 
-  <section class="mbk-card mbk-smartcam-section" aria-label="التقييم الذكي للتغذية بالكاميرا">
+  <section class="mbk-card" aria-label="التقييم الذكي للتغذية بالكاميرا">
     <div class="mbk-page-title">🌿 التقييم الذكي للتغذية بالكاميرا</div>
-    <div class="form-hint mbk-smartcam-sub">تحليل الحالة الغذائية بصريًا</div>
+    <div class="form-hint">تحليل الحالة الغذائية بصريًا</div>
 
-    <div class="mbk-smartcam-grid">
-      <button class="mbk-smartcam-tool mbk-btn mbk-btn-lg mbk-btn-light" data-page="bcs-eval.html" aria-label="تقييم حالة الجسم">
-        <div class="mbk-smartcam-ico">📏</div>
-        <div class="mbk-smartcam-title">تقييم حالة الجسم</div>
-        <div class="mbk-smartcam-hint">تحديد درجة الحالة الجسمية من الصورة</div>
+    <div class="grid">
+      <button class="mbk-btn mbk-btn-lg mbk-btn-light" data-page="bcs-eval.html" aria-label="تقييم حالة الجسم">
+        📏 تقييم حالة الجسم
       </button>
 
-      <button class="mbk-smartcam-tool mbk-btn mbk-btn-lg mbk-btn-light" data-page="feces-eval.html" aria-label="تقييم الروث">
-        <div class="mbk-smartcam-ico">💩</div>
-        <div class="mbk-smartcam-title">تقييم الروث</div>
-        <div class="mbk-smartcam-hint">تقييم قوام وشكل الروث بصريًا</div>
+      <button class="mbk-btn mbk-btn-lg mbk-btn-light" data-page="feces-eval.html" aria-label="تقييم الروث">
+        💩 تقييم الروث
       </button>
     </div>
   </section>
@@ -102,8 +103,6 @@
       }, {passive:true});
     });
 
-    // Analytics
-    window.dataLayer.push({event:'smartcam_loaded', number: number || null, date});
   })();
   </script>
 </body>
