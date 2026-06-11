@@ -1033,13 +1033,19 @@ textarea{
 
 .mbk-score-fill{
   height:100%;
+  width:0;
 }
 
 .mbk-score-note{
   color:var(--muted, #64748b);
   font-weight:700;
+  white-space:pre-line;
 }
-
+.mbk-vision-instructions{
+  padding:10px 12px;
+  line-height:1.8;
+  font-weight:800;
+}
 .mbk-save-panel{
   display:flex;
   flex-direction:column;
