@@ -12840,13 +12840,15 @@ function closeupDecisionSrv(fd = {}) {
   }
 
   // نوع الحيوان — بعد التأكد من الحالة والتلقيح
-  const sp = calvingNormalizeSpeciesSrv(
-    fd.species ||
-    doc.species ||
-    doc.animalTypeAr ||
-    doc.animalType ||
-    ""
-  );
+ const sp = calvingNormalizeSpeciesSrv(
+  fd.species ||
+  doc.species ||
+  doc.animalTypeAr ||
+  doc.animalType ||
+  doc.animaltype ||
+  doc.groupSpecies ||
+  ""
+);
 
   const th = CALVING_THRESHOLDS_SRV[sp]?.minGestationDays;
   if (!th) {
@@ -12929,14 +12931,15 @@ app.post("/api/close-up/gate", requireUserId, async (req, res) => {
 
     const doc = animal.data || {};
     const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
-
-    const species = calvingNormalizeSpeciesSrv(
-      body.species ||
-      doc.species ||
-      doc.animalTypeAr ||
-      doc.animalType ||
-      ""
-    );
+ const species = calvingNormalizeSpeciesSrv(
+  body.species ||
+  doc.species ||
+  doc.animalTypeAr ||
+  doc.animalType ||
+  doc.animaltype ||
+  doc.groupSpecies ||
+  ""
+);
 
     const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
     const reproFromDoc = String(doc.reproductiveStatus || "").trim();
@@ -13052,13 +13055,15 @@ app.post("/api/close-up/save", requireUserId, async (req, res) => {
     const doc = animal.data || {};
     const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
 
-    const species = calvingNormalizeSpeciesSrv(
-      body.species ||
-      doc.species ||
-      doc.animalTypeAr ||
-      doc.animalType ||
-      ""
-    );
+const species = calvingNormalizeSpeciesSrv(
+  body.species ||
+  doc.species ||
+  doc.animalTypeAr ||
+  doc.animalType ||
+  doc.animaltype ||
+  doc.groupSpecies ||
+  ""
+);
 
     const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
     const reproFromDoc = String(doc.reproductiveStatus || "").trim();
