@@ -15498,18 +15498,23 @@ if (duplicateMsg) {
       dimAtEvent: ctx.dimAtEvent ?? null,
       daysSinceLastHeatOrAI: ctx.daysSinceLastHeatOrAI ?? null,
       userId: uid,
-      source: "/heat.html",
+     source: "server:/api/heat/save",
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
 
     const evRef = await db.collection('events').add(payload);
 
-    const animalRef = await findAnimalDocRefByNumberForTenant(uid, animalNumber);
-    if (animalRef) {
-      await animalRef.ref.set({
-        lastHeatDate: eventDate
-      }, { merge:true });
-    }
+const animalRef = await findAnimalDocRefByNumberForTenant(uid, animalNumber);
+if (animalRef) {
+  await animalRef.ref.set({
+    lastHeatDate: eventDate,
+    lastHeatTime: heatTime,
+    lastHeatEventId: evRef.id,
+    reproductiveStatus: "مفتوحة",
+    status: "active",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge:true });
+}
 
     return res.json({
       ok: true,
