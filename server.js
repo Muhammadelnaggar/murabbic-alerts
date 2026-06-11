@@ -15097,7 +15097,212 @@ singleHerdType
     return res.json({ ok:false, error:e.message });
   }
 });
+// ============================================================
+//                 HEAT / شياع — SERVER DECISION HELPERS
+// ============================================================
 
+function heatStripArSrv(s){
+  return String(s || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[ًٌٍَُِّْ]/g, "");
+}
+
+function heatReproCategorySrv(raw){
+  const n = heatStripArSrv(raw);
+
+  if (n.includes("لاتلقح") || n.includes("لاتلقحمرةاخرى")) return "blocked";
+  if (n.includes("عشار")) return "pregnant";
+  if (n.includes("ملقح") || n.includes("ملقحة") || n.includes("ملقّحة")) return "inseminated";
+  if (n.includes("مفتوح") || n.includes("فارغ") || n.includes("فارغة")) return "open";
+
+  return "unknown";
+}
+
+function heatAnimalWordSrv(species){
+  return normalizeSpeciesSrv(species) === "جاموس" ? "جاموسة" : "بقرة";
+}
+
+function heatPickSpeciesSrv(animal = {}, body = {}){
+  return normalizeSpeciesSrv(
+    body.species ||
+    animal.species ||
+    animal.animalTypeAr ||
+    animal.animalType ||
+    animal.animaltype ||
+    animal.groupSpecies ||
+    ""
+  );
+}
+
+function heatCurrentReproStatusSrv(animal = {}, fallback = ""){
+  return String(
+    animal.reproductiveStatus ||
+    animal.reproStatus ||
+    animal.lastDiagnosis ||
+    fallback ||
+    ""
+  ).trim();
+}
+
+function heatDecisionSrv({ animal = {}, species = "", reproductiveStatus = "" } = {}){
+  if (!animal || !Object.keys(animal).length) {
+    return "❌ تعذّر العثور على الحيوان.";
+  }
+
+  const st = String(animal.status ?? "").trim().toLowerCase();
+  if (st === "inactive" || st === "archived") {
+    return "❌ الحيوان خارج القطيع.";
+  }
+
+  const sp = heatPickSpeciesSrv(animal, { species });
+  const aw = heatAnimalWordSrv(sp);
+
+  const rsRaw = heatCurrentReproStatusSrv(animal, reproductiveStatus);
+  const cat = heatReproCategorySrv(rsRaw);
+
+  if (animal.breedingBlocked === true || cat === "blocked") {
+    return `❌ هذه ${aw} مستبعدة تناسليًا — لا تُلقّح مرة أخرى.`;
+  }
+
+  if (cat === "pregnant") {
+    return `❌ هذه ${aw} عِشار — لا يمكن تسجيل شياع.`;
+  }
+
+  return null;
+}
+
+async function heatDuplicateCheckSrv(uid, animalNumber, eventDate, windowDays = 3){
+  const num = normalizeDigitsSrv(animalNumber || "");
+  const dt = String(eventDate || "").slice(0,10);
+
+  if (!uid || !num || !/^\d{4}-\d{2}-\d{2}$/.test(dt)) return null;
+
+  const candidates = [];
+  const vals = findAnimalNumberMatches(num);
+
+  for (const field of ["animalNumber", "number"]) {
+    for (const v of vals) {
+      try {
+        const snap = await db.collection("events")
+          .where("userId", "==", uid)
+          .where(field, "==", v)
+          .limit(120)
+          .get();
+
+        snap.docs.forEach(ds => candidates.push(ds.data() || {}));
+      } catch (e) {
+        console.error("heat duplicate check failed:", e.message || e);
+        return "⚠️ تعذّر التحقق من تكرار الشياع الآن. أعد المحاولة بعد لحظات.";
+      }
+    }
+  }
+
+  const cur = new Date(dt + "T00:00:00");
+  if (Number.isNaN(cur.getTime())) return null;
+
+  let bestDate = "";
+  let bestDiff = 999999;
+
+  for (const ev of candidates) {
+    const txt = eventTextSrv(ev);
+    const isHeat =
+      txt.includes("شياع") ||
+      txt.includes("heat");
+
+    if (!isHeat) continue;
+
+    const d = computeEventDateFromDoc(ev);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d || ""))) continue;
+
+    const last = new Date(d + "T00:00:00");
+    if (Number.isNaN(last.getTime())) continue;
+
+    const diff = Math.floor((cur - last) / 86400000);
+
+    if (diff >= 0 && diff <= Number(windowDays)) {
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestDate = d;
+      }
+    }
+  }
+
+  if (!bestDate) return null;
+
+  if (bestDate === dt) {
+    return `❌ تم تسجيل شياع للحيوان رقم ${num} في نفس اليوم (${dt}).`;
+  }
+
+  return `❌ تم تسجيل شياع للحيوان رقم ${num} بتاريخ ${bestDate}. لا يمكن تكرار التسجيل خلال ${windowDays} أيام.`;
+}
+
+async function buildHeatContextSrv(uid, animalNumber, eventDate){
+  const num = normalizeDigitsSrv(animalNumber || "");
+  const dt = String(eventDate || "").slice(0,10);
+
+  if (!num) {
+    return { ok:false, status:400, error:"animalNumber_required", message:"❌ رقم الحيوان مطلوب." };
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dt)) {
+    return { ok:false, status:400, error:"eventDate_required", message:"❌ تاريخ الشياع غير صالح." };
+  }
+
+  const animal = await findAnimalDocByNumberSrv(uid, num);
+  if (!animal) {
+    return { ok:false, status:404, error:"animal_not_found", message:"❌ رقم الحيوان غير موجود في حسابك." };
+  }
+
+  const species = heatPickSpeciesSrv(animal);
+  const reproductiveStatus = heatCurrentReproStatusSrv(animal);
+
+  let dimAtEvent = null;
+  const lastCalvingDate = String(animal.lastCalvingDate || "").slice(0,10);
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(lastCalvingDate)) {
+    dimAtEvent = daysBetweenIsoSrv(lastCalvingDate, dt);
+    if (dimAtEvent != null && dimAtEvent < 0) dimAtEvent = 0;
+  }
+
+  const lastEvent = await getLatestHeatOrInseminationSrv(uid, num, dt);
+
+  let lastEventType = null;
+  let lastEventDate = null;
+  let daysSinceLastHeatOrAI = null;
+
+  if (lastEvent?._eventDate) {
+    lastEventDate = lastEvent._eventDate;
+    lastEventType = lastEvent._typeNorm;
+    daysSinceLastHeatOrAI = daysBetweenIsoSrv(lastEventDate, dt);
+    if (daysSinceLastHeatOrAI != null && daysSinceLastHeatOrAI < 0) {
+      daysSinceLastHeatOrAI = null;
+    }
+  }
+
+  const decisionMsg = heatDecisionSrv({
+    animal,
+    species,
+    reproductiveStatus
+  });
+
+  const duplicateMsg = await heatDuplicateCheckSrv(uid, num, dt, 3);
+
+  return {
+    ok: true,
+    allowed: !decisionMsg && !duplicateMsg,
+    message: decisionMsg || duplicateMsg || "✅ تم التحقق — يمكن تسجيل الشياع.",
+    animal,
+    animalId: String(animal.id || animal.animalId || num),
+    animalNumber: String(animal.animalNumber || animal.number || num),
+    species,
+    reproductiveStatus,
+    dimAtEvent,
+    lastEventType,
+    lastEventDate,
+    daysSinceLastHeatOrAI
+  };
+}
 // ============================================================
 //                 API: HEAT CONTEXT (server-only)
 // ============================================================
@@ -15105,66 +15310,105 @@ app.get('/api/heat/context', requireUserId, async (req, res) => {
   try {
     if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
 
-    const uid = req.userId;
-    const animalNumber = normalizeDigitsSrv(req.query.animalNumber || '');
-    const eventDate = String(req.query.eventDate || '').slice(0,10);
+    const ctx = await buildHeatContextSrv(
+      req.userId,
+      req.query.animalNumber || "",
+      req.query.eventDate || ""
+    );
 
-    if (!animalNumber) {
-      return res.status(400).json({ ok:false, error:'animalNumber_required' });
-    }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
-      return res.status(400).json({ ok:false, error:'eventDate_required' });
-    }
-
-    const animal = await findAnimalDocByNumberSrv(uid, animalNumber);
-    if (!animal) {
-      return res.status(404).json({ ok:false, error:'animal_not_found' });
-    }
-
-    const reproductiveStatus =
-      String(
-        animal.reproductiveStatus ||
-        animal.reproStatus ||
-        animal.lastDiagnosis ||
-        ''
-      ).trim();
-
-    let dimAtEvent = null;
-    const lastCalvingDate = String(animal.lastCalvingDate || '').slice(0,10);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(lastCalvingDate)) {
-      dimAtEvent = daysBetweenIsoSrv(lastCalvingDate, eventDate);
-      if (dimAtEvent != null && dimAtEvent < 0) dimAtEvent = 0;
-    }
-
-    const lastEvent = await getLatestHeatOrInseminationSrv(uid, animalNumber, eventDate);
-
-    let lastEventType = null;
-    let lastEventDate = null;
-    let daysSinceLastHeatOrAI = null;
-
-    if (lastEvent?._eventDate) {
-      lastEventDate = lastEvent._eventDate;
-      lastEventType = lastEvent._typeNorm;
-      daysSinceLastHeatOrAI = daysBetweenIsoSrv(lastEventDate, eventDate);
-      if (daysSinceLastHeatOrAI != null && daysSinceLastHeatOrAI < 0) {
-        daysSinceLastHeatOrAI = null;
-      }
+    if (!ctx.ok) {
+      return res.status(ctx.status || 400).json(ctx);
     }
 
     return res.json({
       ok: true,
-      animalId: String(animal.id || animal.animalId || animalNumber),
-      animalNumber: String(animal.animalNumber || animal.number || animalNumber),
-      species: normalizeSpeciesSrv(animal.species || animal.animalTypeAr || animal.animalType || animal.animaltype),
-      reproductiveStatus,
-      dimAtEvent,
-      lastEventType,
-      lastEventDate,
-      daysSinceLastHeatOrAI
+      allowed: ctx.allowed,
+      message: ctx.message,
+      animalId: ctx.animalId,
+      animalNumber: ctx.animalNumber,
+      species: ctx.species,
+      reproductiveStatus: ctx.reproductiveStatus,
+      dimAtEvent: ctx.dimAtEvent,
+      lastEventType: ctx.lastEventType,
+      lastEventDate: ctx.lastEventDate,
+      daysSinceLastHeatOrAI: ctx.daysSinceLastHeatOrAI
     });
+
   } catch (e) {
     console.error('heat-context', e);
-    return res.status(500).json({ ok:false, error:'heat_context_failed' });
+    return res.status(500).json({
+      ok:false,
+      error:'heat_context_failed',
+      message:"تعذّر التحقق من الشياع الآن."
+    });
+  }
+});
+// ============================================================
+//                 API: HEAT GATE (server-only)
+// ============================================================
+app.post('/api/heat/gate', requireUserId, async (req, res) => {
+  try {
+    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+
+    const body = req.body || {};
+    const raw = String(body.animalNumber || body.animalNumbers || body.number || "").trim();
+    const eventDate = String(body.eventDate || body.date || "").slice(0,10);
+
+    const nums = raw
+      .split(/[\s,،;]+/)
+      .map(x => normalizeDigitsSrv(x))
+      .filter(Boolean);
+
+    if (!nums.length) {
+      return res.status(400).json({
+        ok:false,
+        allowed:false,
+        message:"❌ رقم الحيوان مطلوب."
+      });
+    }
+
+    const results = [];
+
+    for (const n of nums) {
+      const ctx = await buildHeatContextSrv(req.userId, n, eventDate);
+
+      results.push({
+        animalNumber: n,
+        ok: !!ctx.ok,
+        allowed: !!ctx.allowed,
+        message: ctx.message || ctx.error || "تعذّر التحقق.",
+        animalId: ctx.animalId || "",
+        species: ctx.species || "",
+        reproductiveStatus: ctx.reproductiveStatus || "",
+        dimAtEvent: ctx.dimAtEvent ?? null,
+        lastEventType: ctx.lastEventType || null,
+        lastEventDate: ctx.lastEventDate || null,
+        daysSinceLastHeatOrAI: ctx.daysSinceLastHeatOrAI ?? null
+      });
+    }
+
+    const allowedNumbers = results.filter(x => x.allowed).map(x => x.animalNumber);
+    const rejected = results.filter(x => !x.allowed);
+
+    return res.json({
+      ok: true,
+      allowed: allowedNumbers.length > 0,
+      animalNumbers: allowedNumbers,
+      rejected,
+      results,
+      message: rejected.length
+        ? `تم التحقق — صالح: ${allowedNumbers.length} / مرفوض: ${rejected.length}`
+        : "✅ تم التحقق — يمكن تسجيل الشياع."
+    });
+
+  } catch (e) {
+    console.error('heat-gate', e);
+    return res.status(500).json({
+      ok:false,
+      allowed:false,
+      error:'heat_gate_failed',
+      message:"تعذّر التحقق من الشياع الآن."
+    });
   }
 });
 // ============================================================
@@ -15193,15 +15437,34 @@ app.post('/api/heat/save', requireUserId, async (req, res) => {
     if (!animal) {
       return res.status(404).json({ ok:false, error:'animal_not_found' });
     }
+   const species = heatPickSpeciesSrv(animal, body);
+const reproductiveStatus = heatCurrentReproStatusSrv(animal);
 
+const decisionMsg = heatDecisionSrv({
+  animal,
+  species,
+  reproductiveStatus
+});
+
+if (decisionMsg) {
+  return res.status(400).json({
+    ok:false,
+    allowed:false,
+    message: decisionMsg
+  });
+}
+
+const duplicateMsg = await heatDuplicateCheckSrv(uid, animalNumber, eventDate, 3);
+
+if (duplicateMsg) {
+  return res.status(400).json({
+    ok:false,
+    allowed:false,
+    message: duplicateMsg
+  });
+}
     const ctx = await (async () => {
-      const reproductiveStatus =
-        String(
-          animal.reproductiveStatus ||
-          animal.reproStatus ||
-          animal.lastDiagnosis ||
-          ''
-        ).trim();
+     const reproductiveStatus = heatCurrentReproStatusSrv(animal);
 
       let dimAtEvent = null;
       const lastCalvingDate = String(animal.lastCalvingDate || '').slice(0,10);
