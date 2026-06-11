@@ -12760,20 +12760,7 @@ function closeupDecisionSrv(fd = {}) {
   if (st === "inactive" || st === "archived") {
     return "❌ لا يمكن تسجيل التحضير — الحيوان خارج القطيع.";
   }
-  // الحالة التناسلية
-  const rsRaw = String(
-    fd.reproStatusFromEvents ||
-    fd.reproductiveStatus ||
-    doc.reproductiveStatus ||
-    ""
-  ).trim();
 
-  const rsNorm = calvingStripArSrv(rsRaw);
-
-  if (!rsNorm.includes("عشار")) {
-    const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
-    return `❌ لا يمكن تسجيل التحضير — الحالة التناسلية الحالية: ${shown}.`;
-  }
    // الحالة التناسلية — قبل نوع القطيع
  const rsRaw = String(
   fd.reproStatusFromEvents ||
