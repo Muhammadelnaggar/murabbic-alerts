@@ -11,12 +11,7 @@
  
 </head>
 <body>
- <main class="mbk-smartcam-wrap">
-  <div class="mbk-smartcam-meta">
-    <div class="mbk-smartcam-chip" id="chipAnimal">🐄 الحيوان: —</div>
-    <div class="mbk-smartcam-chip" id="chipDate">📅 التاريخ: —</div>
-  </div>
-<header>
+  <header>
   <div class="mbk-head">
     <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
     <div class="mbk-center">
@@ -26,31 +21,44 @@
     <a class="mbk-back" id="backBtn" href="add-event.html">رجوع</a>
   </div>
 </header>
+ <main class="mbk-smartcam-wrap">
+  <div class="mbk-smartcam-meta">
+    <div class="mbk-smartcam-chip" id="chipAnimal">🐄 الحيوان: —</div>
+    <div class="mbk-smartcam-chip" id="chipDate">📅 التاريخ: —</div>
+  </div>
+
   <section class="mbk-card mbk-smartcam-section" aria-label="أدوات الكاميرا السريعة">
-  <div class="mbk-page-title">🤖 أدوات الكاميرا السريعة</div>
-  <div class="form-hint mbk-smartcam-sub">تصوير سريع وتحليل مباشر</div>
+    <div class="mbk-page-title">🤖 أدوات الكاميرا السريعة</div>
+    <div class="form-hint mbk-smartcam-sub">تصوير سريع وتحليل مباشر</div>
 
-  <div class="mbk-smartcam-grid">
-    <button class="mbk-smartcam-tool mbk-btn mbk-btn-lg mbk-btn-primary" data-page="visual-eval.html" aria-label="سمات إنتاج اللبن للحيوان">
-      <div class="mbk-smartcam-ico">🥛</div>
-      <div class="mbk-smartcam-title">سمات إنتاج اللبن للحيوان</div>
-      <div class="mbk-smartcam-hint">تقييم الصفات الجسمية المرتبطة بإنتاج اللبن</div>
-    </button>
-  </div>
-</section>
+    <div class="mbk-smartcam-grid">
+      <button class="mbk-smartcam-tool mbk-btn mbk-btn-lg mbk-btn-primary" data-page="visual-eval.html" aria-label="سمات إنتاج اللبن للحيوان">
+        <div class="mbk-smartcam-ico">🥛</div>
+        <div class="mbk-smartcam-title">سمات إنتاج اللبن للحيوان</div>
+        <div class="mbk-smartcam-hint">تقييم الصفات الجسمية المرتبطة بإنتاج اللبن</div>
+      </button>
+    </div>
+  </section>
 
- <section class="mbk-card mbk-smartcam-section" aria-label="أدوات الكاميرا السريعة">
-  <div class="mbk-page-title">🤖 أدوات الكاميرا السريعة</div>
-  <div class="form-hint mbk-smartcam-sub">تصوير سريع وتحليل مباشر</div>
+  <section class="mbk-card mbk-smartcam-section" aria-label="التقييم الذكي للتغذية بالكاميرا">
+    <div class="mbk-page-title">🌿 التقييم الذكي للتغذية بالكاميرا</div>
+    <div class="form-hint mbk-smartcam-sub">تحليل الحالة الغذائية بصريًا</div>
 
-  <div class="mbk-smartcam-grid">
-    <button class="mbk-smartcam-tool mbk-btn mbk-btn-lg mbk-btn-primary" data-page="visual-eval.html" aria-label="سمات إنتاج اللبن للحيوان">
-      <div class="mbk-smartcam-ico">🥛</div>
-      <div class="mbk-smartcam-title">سمات إنتاج اللبن للحيوان</div>
-      <div class="mbk-smartcam-hint">تقييم الصفات الجسمية المرتبطة بإنتاج اللبن</div>
-    </button>
-  </div>
-</section>
+    <div class="mbk-smartcam-grid">
+      <button class="mbk-smartcam-tool mbk-btn mbk-btn-lg mbk-btn-light" data-page="bcs-eval.html" aria-label="تقييم حالة الجسم">
+        <div class="mbk-smartcam-ico">📏</div>
+        <div class="mbk-smartcam-title">تقييم حالة الجسم</div>
+        <div class="mbk-smartcam-hint">تحديد درجة الحالة الجسمية من الصورة</div>
+      </button>
+
+      <button class="mbk-smartcam-tool mbk-btn mbk-btn-lg mbk-btn-light" data-page="feces-eval.html" aria-label="تقييم الروث">
+        <div class="mbk-smartcam-ico">💩</div>
+        <div class="mbk-smartcam-title">تقييم الروث</div>
+        <div class="mbk-smartcam-hint">تقييم قوام وشكل الروث بصريًا</div>
+      </button>
+    </div>
+  </section>
+</main>
   <script>
   (function(){
     const $ = s=>document.querySelector(s);
@@ -83,12 +91,11 @@
     }
 
     // Wire tools
-    $$('.tool[data-page]').forEach(btn=>{
+   $$('[data-page]').forEach(btn=>{
       btn.addEventListener('click', e=>{
         e.preventDefault();
         if(!number){
-          // لا نعرض تعليقات داخل النماذج؛ مجرد تحليلات صامتة
-          window.dataLayer.push({event:'smartcam_click_without_number', page:location.pathname});
+       
         }
         const target = btn.getAttribute('data-page');
         if(target){ location.href = buildUrl(target); }
