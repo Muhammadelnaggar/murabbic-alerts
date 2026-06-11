@@ -12761,11 +12761,64 @@ function closeupDecisionSrv(fd = {}) {
     return "❌ لا يمكن تسجيل التحضير — الحيوان خارج القطيع.";
   }
 
-    // الحالة التناسلية — وثيقة الحيوان الحالية أولًا
+  // آخر تلقيح
+  const lf = String(
+    fd.lastInseminationDate ||
+    doc.lastInseminationDate ||
+    doc.lastAI ||
+    doc.lastInsemination ||
+    doc.lastServiceDate ||
+    ""
+  ).trim();
+
+  // أحداث من وثيقة الحيوان نفسها تنهي الحمل الحالي
+  const lastAbortion = String(doc.lastAbortionDate || "").trim();
+
+  if (calvingIsDateSrv(lf) && calvingIsDateSrv(lastCalving)) {
+    const calvingAfterService = calvingDaysBetweenSrv(lf, lastCalving);
+    const eventAfterCalving = calvingDaysBetweenSrv(lastCalving, fd.eventDate);
+
+    if (
+      Number.isFinite(calvingAfterService) &&
+      Number.isFinite(eventAfterCalving) &&
+      calvingAfterService >= 0 &&
+      eventAfterCalving >= 0
+    ) {
+      return `❌ لا يمكن تسجيل التحضير — آخر ولادة بتاريخ ${lastCalving} أنهت الحمل الحالي.`;
+    }
+  }
+
+  if (calvingIsDateSrv(lf) && calvingIsDateSrv(lastAbortion)) {
+    const abortionAfterService = calvingDaysBetweenSrv(lf, lastAbortion);
+    const eventAfterAbortion = calvingDaysBetweenSrv(lastAbortion, fd.eventDate);
+
+    if (
+      Number.isFinite(abortionAfterService) &&
+      Number.isFinite(eventAfterAbortion) &&
+      abortionAfterService >= 0 &&
+      eventAfterAbortion >= 0
+    ) {
+      return `❌ لا يمكن تسجيل التحضير — آخر إجهاض بتاريخ ${lastAbortion} أنهى الحمل الحالي.`;
+    }
+  }
+
+  // الحالة الإنتاجية الحالية لو كانت حديثة الولادة تمنع التحضير مباشرة
+  const psRaw = String(doc.productionStatus || "").trim();
+  const psNorm = calvingStripArSrv(psRaw).toLowerCase();
+
+  if (
+    psNorm.includes("حديث") ||
+    psNorm.includes("fresh") ||
+    psNorm.includes("فريش")
+  ) {
+    const shown = psRaw ? `«${psRaw}»` : "حديث الولادة";
+    return `❌ لا يمكن تسجيل التحضير — الحالة الحالية: ${shown}.`;
+  }
+
+  // الحالة التناسلية — وثيقة الحيوان الحالية أولًا
   const rsRaw = String(
     doc.reproductiveStatus ||
     doc.reproStatus ||
-    doc.productionStatus ||
     fd.reproductiveStatus ||
     fd.reproStatusFromEvents ||
     ""
@@ -12777,13 +12830,16 @@ function closeupDecisionSrv(fd = {}) {
     const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
     return `❌ لا يمكن تسجيل التحضير — الحالة التناسلية الحالية: ${shown}.`;
   }
-const boundary = String(fd.lastBoundary || "").trim();
-const boundaryType = String(fd.lastBoundaryType || "حدث سابق").trim();
 
-if (calvingIsDateSrv(boundary)) {
-  return `❌ لا يمكن تسجيل التحضير — آخر ${boundaryType} بتاريخ ${boundary} أنهى الحمل الحالي.`;
-}
-  // نوع الحيوان — بعد التأكد أن الحيوان عِشار
+  if (!calvingIsDateSrv(lf)) {
+    return '❌ لا يمكن تسجيل التحضير — لا يوجد "آخر تلقيح مُخصِّب".';
+  }
+
+  if (!calvingIsDateSrv(fd.eventDate)) {
+    return "❌ تاريخ التحضير غير صالح.";
+  }
+
+  // نوع الحيوان — بعد التأكد من الحالة والتلقيح
   const sp = calvingNormalizeSpeciesSrv(
     fd.species ||
     doc.species ||
@@ -12795,25 +12851,6 @@ if (calvingIsDateSrv(boundary)) {
   const th = CALVING_THRESHOLDS_SRV[sp]?.minGestationDays;
   if (!th) {
     return "❌ نوع القطيع غير معروف لحساب عمر الحمل.";
-  }
-
-
-  // آخر تلقيح
-  const lf = String(
-    fd.lastInseminationDate ||
-    doc.lastInseminationDate ||
-    doc.lastAI ||
-    doc.lastInsemination ||
-    doc.lastServiceDate ||
-    ""
-  ).trim();
-
-  if (!calvingIsDateSrv(lf)) {
-    return '❌ لا يمكن تسجيل التحضير — لا يوجد "آخر تلقيح مُخصِّب".';
-  }
-
-  if (!calvingIsDateSrv(fd.eventDate)) {
-    return "❌ تاريخ التحضير غير صالح.";
   }
 
   const gDays = calvingDaysBetweenSrv(lf, fd.eventDate);
@@ -12829,7 +12866,6 @@ if (calvingIsDateSrv(boundary)) {
 
   return null;
 }
-
 async function updateAnimalAfterCloseupSaveSrv(ev = {}) {
   const uid = String(ev.userId || "").trim();
   const animalNumber = calvingNormDigitsOnlySrv(ev.animalNumber || ev.number || "");
@@ -12923,8 +12959,7 @@ app.post("/api/close-up/gate", requireUserId, async (req, res) => {
   reproductiveStatus: reproFromDoc || reproFromEvents || "",
   reproStatusFromEvents: reproFromEvents,
   lastInseminationDate,
-  lastBoundary: String(signals.lastBoundary || "").trim(),
-  lastBoundaryType: String(signals.lastBoundaryType || "").trim()
+  
 };
 
     const errMsg = closeupDecisionSrv(gateData);
@@ -13046,8 +13081,7 @@ app.post("/api/close-up/save", requireUserId, async (req, res) => {
   reproductiveStatus: reproFromDoc || reproFromEvents || "",
   reproStatusFromEvents: reproFromEvents,
   lastInseminationDate,
-  lastBoundary: String(signals.lastBoundary || "").trim(),
-  lastBoundaryType: String(signals.lastBoundaryType || "").trim()
+  
 };
 
     const errMsg = closeupDecisionSrv(decisionData);
