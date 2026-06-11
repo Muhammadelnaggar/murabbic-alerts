@@ -12774,7 +12774,24 @@ function closeupDecisionSrv(fd = {}) {
     const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
     return `❌ لا يمكن تسجيل التحضير — الحالة التناسلية الحالية: ${shown}.`;
   }
-  // نوع الحيوان
+   // الحالة التناسلية — قبل نوع القطيع
+ const rsRaw = String(
+  fd.reproStatusFromEvents ||
+  fd.reproductiveStatus ||
+  doc.reproductiveStatus ||
+  doc.reproStatus ||
+  doc.productionStatus ||
+  ""
+).trim();
+
+  const rsNorm = calvingStripArSrv(rsRaw);
+
+  if (!rsNorm.includes("عشار")) {
+    const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+    return `❌ لا يمكن تسجيل التحضير — الحالة التناسلية الحالية: ${shown}.`;
+  }
+
+  // نوع الحيوان — بعد التأكد أن الحيوان عِشار
   const sp = calvingNormalizeSpeciesSrv(
     fd.species ||
     doc.species ||
@@ -12787,7 +12804,6 @@ function closeupDecisionSrv(fd = {}) {
   if (!th) {
     return "❌ نوع القطيع غير معروف لحساب عمر الحمل.";
   }
-
 
 
   // آخر تلقيح
