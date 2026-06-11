@@ -16454,149 +16454,222 @@ app.post("/api/dairy-traits/vision-analyze", async (req, res) => {
     message: "❌ تقييم سمات إنتاج اللبن يحتاج لقطتين كاملتين: جانبية وخلفية."
   });
 }
-    const prompt = `
+const prompt = `
 You are an expert dairy cattle conformation evaluator.
 
 Task:
-Evaluate the visible dairy-production body traits of the animal using the TARGET images.
-Return a final dairy traits score from 0 to 100.
+Evaluate the dairy-production conformation of the cow visible in the TARGET images.
+Use ONLY the TARGET images:
+1) complete side view
+2) complete rear view
+
+Return one final conformation score from 0 to 100.
 
 This is NOT a milk yield prediction.
-Do not estimate milk kilograms.
-Do not diagnose disease.
-Evaluate only visible physical conformation traits related to dairy production suitability.
+Do NOT estimate kilograms of milk.
+Do NOT diagnose disease.
+Do NOT give feeding advice.
+Do NOT give photography advice.
+Do NOT give generic management advice.
+Explain only the visible conformation reasons for the score.
 
-Required TARGET views:
-1) Side view:
-- full body
-- body depth
-- topline
-- rump angle
-- side udder depth
-- fore udder attachment
-- legs from side
-- dairy form and body capacity
-
-2) Rear view:
-- rear udder
-- udder cleft / median suspensory ligament
-- teat placement
-- teat distribution
-- rear udder width and height
-- udder symmetry
-- rear legs
-- rump width
-- front-end/chest impression only if reasonably visible from posture
-
-Do not require a separate front view.
-Evaluate front end, chest width, and front-leg placement only as far as they are visible from the side and rear views.
-Do not invent front-leg traits that are not visible.
-Use this official-style dairy cow score structure:
+Use this scientific weighted score structure exactly:
 - Udder = 40 points
-- Feet and legs = 20 points
-- Dairy strength = 20 points
-- Front end and body capacity = 15 points
+- Feet and Legs = 20 points
+- Dairy Strength = 20 points
+- Front End and Body Capacity = 15 points
 - Rump = 5 points
 Total = 100 points.
 
-1) Udder = 40 points.
-Evaluate:
-- udder depth relative to the hock
-- fore udder attachment
-- rear udder height and width
-- teat placement under the quarters
-- teat size and uniformity
-- udder cleft / median suspensory ligament
-- udder balance and symmetry
-- udder floor and texture if visible
+The final score must be the sum of these five main categories.
+
+Official classification meaning:
+90–97 = Excellent
+85–89 = Very Good
+80–84 = Good Plus
+75–79 = Good
+65–74 = Fair
+50–64 = Poor
+
+Use the full score range honestly.
+Do not compress excellent cows into 85–89.
+If the cow is truly excellent in the visible traits, use the excellent range.
+
+==================================================
+1) UDDER = 40 POINTS
+==================================================
 
 Udder is the most important category.
-Rear view is essential for udder cleft, teat placement, rear udder width, and symmetry.
-Side view is important for udder depth and fore udder attachment.
+Calculate udder score ONLY as the sum of these official udder subtraits:
 
-2) Feet and legs = 20 points.
+- Udder Depth = 10 points
+- Rear Udder = 9 points
+- Teat Placement = 5 points
+- Udder Cleft = 5 points
+- Fore Udder = 5 points
+- Teats = 3 points
+- Udder Balance and Texture = 3 points
+Total udder = 40 points.
+
+Evaluate each udder subtrait separately:
+
+A) Udder Depth = 0–10
+Best: moderate depth relative to the hock, with adequate capacity and clearance.
+Lose points if the udder is too deep, hanging low, close to the hock, below the hock, or pendulous.
+
+B) Rear Udder = 0–9
+Best: high, wide, firmly attached rear udder with uniform width from top to bottom.
+Lose points if rear udder is low, narrow, weakly attached, uneven, or lacks width/height.
+
+C) Teat Placement = 0–5
+Best: teats placed squarely under each quarter, plumb, and properly spaced.
+Lose points for teats too close, too wide, not under quarters, uneven, angled, or poorly distributed.
+
+D) Udder Cleft = 0–5
+Best: clearly defined halving showing a strong median suspensory ligament.
+Lose points for weak cleft, shallow cleft, no clear division, or poor central support.
+
+E) Fore Udder = 0–5
+Best: firmly attached fore udder with moderate length and ample capacity.
+Lose points for loose fore attachment, short attachment, broken attachment, or poor blending into the body wall.
+
+F) Teats = 0–3
+Best: cylindrical shape, uniform size, medium length and diameter.
+Lose points for very long, very short, thick, uneven, malformed, or non-uniform teats.
+
+G) Udder Balance and Texture = 0–3
+Best: level udder floor from the side, evenly balanced quarters, soft and pliable appearance if visible.
+Lose points for uneven floor, unbalanced quarters, asymmetry, hard-looking or coarse udder appearance.
+
+Critical udder rule:
+A pendulous udder is not a separate invented penalty.
+It must be reflected through the official sub-scores:
+low Udder Depth, weak Fore Udder, weak Rear Udder, weak Udder Cleft, poor Udder Balance, and possibly poor Teat Placement.
+Do not give a high udder score to a pendulous, very deep, weakly attached, unbalanced, or poorly supported udder.
+Do not give the same final score to a cow with an excellent udder and a cow with a pendulous udder.
+
+==================================================
+2) FEET AND LEGS = 20 POINTS
+==================================================
+
 Evaluate:
 - rear legs from rear view: straight, wide apart, feet squarely placed
 - rear legs from side view: moderate hock set
 - feet angle and heel depth if visible
 - clean hocks
 - pastern strength
-- ability to stand functionally from the visible posture
+- functional support and stance
 
-3) Dairy strength = 20 points.
+Score from 0 to 20.
+
+==================================================
+3) DAIRY STRENGTH = 20 POINTS
+==================================================
+
 Evaluate:
-- open and angular dairy form
-- width and strength of chest
-- spring of fore rib
+- angularity
+- openness and dairy form
+- width and strength of chest as visible
+- spring and openness of ribs
 - wide, flat, deep ribs slanting toward the rear
 - lean thighs
 - sharp withers
 - long clean neck
-- strength without beefiness or excessive flesh
-- body condition should not be confused with dairy quality
+- strength without beefiness or excess flesh
 
-4) Front end and body capacity = 15 points.
-Evaluate:
-- front legs straight, wide apart, and squarely placed
-- chest floor deep and wide
-- rectangular space between front legs
-- shoulder blades and elbows set firmly against chest wall
-- barrel long, deep, and wide
-- body depth and abdominal capacity
-- back and loin straight, strong, and nearly level
-- stature and proportional frame
+Do NOT reward fatness as dairy quality.
+A fleshy or beefy cow should NOT score high just because it looks full.
 
-5) Rump = 5 points.
+Score from 0 to 20.
+
+==================================================
+4) FRONT END AND BODY CAPACITY = 15 POINTS
+==================================================
+
+Evaluate from visible side/rear posture:
+- chest depth and width as visible
+- front end strength as visible
+- body depth
+- barrel length, depth, and width
+- abdominal capacity
+- strength of back and loin
+- overall proportional frame
+
+Do not invent front-leg traits that are not visible.
+Do not require a separate front view.
+
+Score from 0 to 15.
+
+==================================================
+5) RUMP = 5 POINTS
+==================================================
+
 Evaluate:
 - rump angle: pins slightly lower than hips
 - rump width and pin width
 - rump length
-- thurls wide apart and centrally placed
-- tail head neatly set between pins
+- thurls wide apart and centrally placed if visible
+- tail head placement
 - pelvic balance related to fertility, calving ease, mobility, and rear udder support
 
-Important rules:
-- Do not reward fatness as dairy quality.
-- A fleshy or beefy animal should not score high just because it looks full.
-- Dairy quality favors angularity, openness, capacity, functional udder, strong legs, and balanced frame.
-- Score only visible traits from the TARGET images.
-- Do not invent hidden traits.
-- The final score must equal the weighted structure above.
-- All user-visible text must be Arabic only.
-- Do not write English words in returned values.
+Score from 0 to 5.
 
-Score bands:
-90–100 = ممتاز
-85–89 = جيد جدًا
-80–84 = جيد مرتفع
-75–79 = جيد
-65–74 = متوسط
-50–64 = ضعيف
-0–49 = ضعيف جدًا
+==================================================
+FINAL SCORE RULES
+==================================================
+
+Final score = udder + feetAndLegs + dairyStrength + frontEndAndCapacity + rump.
+
+Important:
+- The udder must heavily influence the final score because it is 40% of the total.
+- A cow with an excellent udder must score meaningfully higher than a cow with a pendulous or weak udder.
+- A cow with a pendulous, very deep, weakly attached, or unbalanced udder should lose points through the official udder subtraits.
+- Do not use generic scoring.
+- Do not average everything visually.
+- Score each category, then sum.
+
+==================================================
+OUTPUT RULES
+==================================================
+
+All user-visible text must be Arabic only.
+Do not write English words in returned values.
+Do not include generic praise.
+Do not include advice.
+Do not mention feeding, ration, nutrition, management, follow-up, or photography.
+Explain only the visible conformation reasons for the score.
 
 Return JSON only:
 {
   "ok": true,
-  "score": 86,
-  "grade": "جيد جدًا",
+  "score": 96,
+  "grade": "ممتاز",
   "confidence": "high|medium|low",
   "breakdown": {
-    "udder": 34,
-    "feetAndLegs": 16,
-    "dairyStrength": 17,
-    "frontEndAndCapacity": 13,
-    "rump": 4
+    "udder": 38,
+    "feetAndLegs": 19,
+    "dairyStrength": 19,
+    "frontEndAndCapacity": 15,
+    "rump": 5
+  },
+  "udderSubscores": {
+    "udderDepth": 10,
+    "rearUdder": 9,
+    "teatPlacement": 5,
+    "udderCleft": 5,
+    "foreUdder": 4,
+    "teats": 3,
+    "udderBalanceTexture": 2
   },
   "strengths": [
-    "نقطة قوة عربية مختصرة",
-    "نقطة قوة عربية مختصرة"
+    "نقطة قوة شكلية واضحة",
+    "نقطة قوة شكلية واضحة"
   ],
   "weaknesses": [
-    "نقطة تحتاج تحسين أو متابعة",
-    "نقطة تحتاج تحسين أو متابعة"
+    "نقطة ضعف شكلية إن وجدت",
+    "نقطة ضعف شكلية إن وجدت"
   ],
-  "reason": "تفسير عربي تعليمي مختصر للدرجة النهائية بناءً على الضرع والأرجل والطابع الحلاب والسعة والرامب.",
-  "recommendation": "توصية عربية مختصرة للتصوير أو المتابعة."
+  "reason": "سبب عربي مختصر ومهني يوضح الدرجة، مع التركيز على الضرع أولًا ثم الأرجل والطابع الحلاب والسعة والرامب."
 }
 `.trim();
 
@@ -16670,14 +16743,36 @@ Return JSON only:
     }
 
     const rawBreakdown = parsed.breakdown || {};
+const rawUdderSub = parsed.udderSubscores || {};
 
-    const breakdown = {
-      udder: dairyTraitsClampPartSrv(rawBreakdown.udder, 40),
-      feetAndLegs: dairyTraitsClampPartSrv(rawBreakdown.feetAndLegs, 20),
-      dairyStrength: dairyTraitsClampPartSrv(rawBreakdown.dairyStrength, 20),
-      frontEndAndCapacity: dairyTraitsClampPartSrv(rawBreakdown.frontEndAndCapacity, 15),
-      rump: dairyTraitsClampPartSrv(rawBreakdown.rump, 5)
-    };
+const udderSubscores = {
+  udderDepth: dairyTraitsClampPartSrv(rawUdderSub.udderDepth, 10),
+  rearUdder: dairyTraitsClampPartSrv(rawUdderSub.rearUdder, 9),
+  teatPlacement: dairyTraitsClampPartSrv(rawUdderSub.teatPlacement, 5),
+  udderCleft: dairyTraitsClampPartSrv(rawUdderSub.udderCleft, 5),
+  foreUdder: dairyTraitsClampPartSrv(rawUdderSub.foreUdder, 5),
+  teats: dairyTraitsClampPartSrv(rawUdderSub.teats, 3),
+  udderBalanceTexture: dairyTraitsClampPartSrv(rawUdderSub.udderBalanceTexture, 3)
+};
+
+const udderFromSubscores =
+  udderSubscores.udderDepth +
+  udderSubscores.rearUdder +
+  udderSubscores.teatPlacement +
+  udderSubscores.udderCleft +
+  udderSubscores.foreUdder +
+  udderSubscores.teats +
+  udderSubscores.udderBalanceTexture;
+
+const breakdown = {
+  udder: udderFromSubscores > 0
+    ? dairyTraitsClampPartSrv(udderFromSubscores, 40)
+    : dairyTraitsClampPartSrv(rawBreakdown.udder, 40),
+  feetAndLegs: dairyTraitsClampPartSrv(rawBreakdown.feetAndLegs, 20),
+  dairyStrength: dairyTraitsClampPartSrv(rawBreakdown.dairyStrength, 20),
+  frontEndAndCapacity: dairyTraitsClampPartSrv(rawBreakdown.frontEndAndCapacity, 15),
+  rump: dairyTraitsClampPartSrv(rawBreakdown.rump, 5)
+};
 
     const summedScore =
       breakdown.udder +
@@ -16707,10 +16802,10 @@ Return JSON only:
       rangeText: "0–100",
       confidence,
       breakdown,
+      udderSubscores,
       strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 4) : [],
       weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses.slice(0, 4) : [],
       reason: String(parsed.reason || "").trim(),
-      recommendation: String(parsed.recommendation || "").trim(),
       message: `تم تحليل سمات إنتاج اللبن — الدرجة ${score} (${grade})`
     });
 
@@ -16874,10 +16969,10 @@ app.post("/api/dairy-traits/save", requireUserId, async (req, res) => {
         rangeText: analysis.rangeText || "0–100",
         confidence: analysis.confidence || null,
         breakdown,
+        udderSubscores: analysis.udderSubscores || null,
         strengths: analysis.strengths || [],
         weaknesses: analysis.weaknesses || [],
         reason: analysis.reason || null,
-        recommendation: analysis.recommendation || null,
         source: "server:/api/dairy-traits/vision-analyze"
       }),
 
