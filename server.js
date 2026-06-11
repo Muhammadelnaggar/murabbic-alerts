@@ -12760,21 +12760,6 @@ function closeupDecisionSrv(fd = {}) {
   if (st === "inactive" || st === "archived") {
     return "❌ لا يمكن تسجيل التحضير — الحيوان خارج القطيع.";
   }
-
-  // نوع الحيوان
-  const sp = calvingNormalizeSpeciesSrv(
-    fd.species ||
-    doc.species ||
-    doc.animalTypeAr ||
-    doc.animalType ||
-    ""
-  );
-
-  const th = CALVING_THRESHOLDS_SRV[sp]?.minGestationDays;
-  if (!th) {
-    return "❌ نوع القطيع غير معروف لحساب عمر الحمل.";
-  }
-
   // الحالة التناسلية
   const rsRaw = String(
     fd.reproStatusFromEvents ||
@@ -12789,6 +12774,21 @@ function closeupDecisionSrv(fd = {}) {
     const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
     return `❌ لا يمكن تسجيل التحضير — الحالة التناسلية الحالية: ${shown}.`;
   }
+  // نوع الحيوان
+  const sp = calvingNormalizeSpeciesSrv(
+    fd.species ||
+    doc.species ||
+    doc.animalTypeAr ||
+    doc.animalType ||
+    ""
+  );
+
+  const th = CALVING_THRESHOLDS_SRV[sp]?.minGestationDays;
+  if (!th) {
+    return "❌ نوع القطيع غير معروف لحساب عمر الحمل.";
+  }
+
+
 
   // آخر تلقيح
   const lf = String(
