@@ -21,41 +21,40 @@
     <a class="mbk-back" id="backBtn" href="add-event.html">رجوع</a>
   </div>
 </header>
-<main class="mbk-form">
-  <div class="mbk-card">
-    <div class="grid">
-      <div class="mbk-score-card">
-        <span class="mbk-score-badge" id="chipAnimal">🐄 الحيوان: —</span>
-      </div>
-
-      <div class="mbk-score-card">
-        <span class="mbk-score-badge" id="chipDate">📅 التاريخ: —</span>
-      </div>
-    </div>
+<main class="smart-camera-wrap">
+  <div class="smart-camera-meta">
+    <div class="smart-camera-chip" id="chipAnimal">🐄 الحيوان: —</div>
+    <div class="smart-camera-chip" id="chipDate">📅 التاريخ: —</div>
   </div>
 
-  <section class="mbk-card" aria-label="أدوات الكاميرا السريعة">
-    <div class="mbk-page-title">🤖 أدوات الكاميرا السريعة</div>
-    <div class="form-hint">تصوير سريع وتحليل مباشر</div>
+  <section class="mbk-card smart-camera-section" aria-label="أدوات الكاميرا السريعة">
+    <div class="smart-camera-title">🤖 أدوات الكاميرا السريعة</div>
+    <div class="smart-camera-sub">تصوير سريع وتحليل مباشر</div>
 
-    <div class="grid">
-      <button class="mbk-btn mbk-btn-lg mbk-btn-primary" data-page="visual-eval.html" aria-label="سمات إنتاج اللبن للحيوان">
-        🥛 سمات إنتاج اللبن للحيوان
+    <div class="smart-camera-grid single">
+      <button class="mbk-btn mbk-btn-lg mbk-btn-primary smart-camera-tool" data-page="visual-eval.html" aria-label="سمات إنتاج اللبن للحيوان">
+        <span class="smart-camera-icon">🥛</span>
+        <span class="smart-camera-tool-title">سمات إنتاج اللبن للحيوان</span>
+        <span class="smart-camera-tool-hint">تقييم الصفات الجسمية المرتبطة بإنتاج اللبن</span>
       </button>
     </div>
   </section>
 
-  <section class="mbk-card" aria-label="التقييم الذكي للتغذية بالكاميرا">
-    <div class="mbk-page-title">🌿 التقييم الذكي للتغذية بالكاميرا</div>
-    <div class="form-hint">تحليل الحالة الغذائية بصريًا</div>
+  <section class="mbk-card smart-camera-section" aria-label="التقييم الذكي للتغذية بالكاميرا">
+    <div class="smart-camera-title">🌿 التقييم الذكي للتغذية بالكاميرا</div>
+    <div class="smart-camera-sub">تحليل الحالة الغذائية بصريًا</div>
 
-    <div class="grid">
-      <button class="mbk-btn mbk-btn-lg mbk-btn-light" data-page="bcs-eval.html" aria-label="تقييم حالة الجسم">
-        📏 تقييم حالة الجسم
+    <div class="smart-camera-grid">
+      <button class="mbk-btn mbk-btn-lg mbk-btn-light smart-camera-tool" data-page="bcs-eval.html" aria-label="تقييم حالة الجسم">
+        <span class="smart-camera-icon">📏</span>
+        <span class="smart-camera-tool-title">تقييم حالة الجسم</span>
+        <span class="smart-camera-tool-hint">تحديد درجة الحالة الجسمية من الصورة</span>
       </button>
 
-      <button class="mbk-btn mbk-btn-lg mbk-btn-light" data-page="feces-eval.html" aria-label="تقييم الروث">
-        💩 تقييم الروث
+      <button class="mbk-btn mbk-btn-lg mbk-btn-light smart-camera-tool" data-page="feces-eval.html" aria-label="تقييم الروث">
+        <span class="smart-camera-icon">💩</span>
+        <span class="smart-camera-tool-title">تقييم الروث</span>
+        <span class="smart-camera-tool-hint">تقييم قوام وشكل الروث بصريًا</span>
       </button>
     </div>
   </section>
@@ -95,9 +94,7 @@
    $$('[data-page]').forEach(btn=>{
       btn.addEventListener('click', e=>{
         e.preventDefault();
-        if(!number){
        
-        }
         const target = btn.getAttribute('data-page');
         if(target){ location.href = buildUrl(target); }
       }, {passive:true});
