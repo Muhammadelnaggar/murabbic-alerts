@@ -7,120 +7,50 @@
   <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
   <meta name="theme-color" content="#2e7d32" />
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
-  <style>
-    :root{
-      --green:#2e7d32; --green-50:#f1f8e9; --green-100:#e8f5e9; --green-200:#c5e1a5; --green-600:#1b5e20;
-      --bg1:#fdfdf6; --bg2:#fff9db; --card:#ffffff; --ink:#224e24; --muted:#6b8c6b;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0;background:linear-gradient(to bottom,var(--bg1),var(--bg2));font-family:'Cairo','Arial',sans-serif;color:var(--green-600)}
-
-    /* Header */
-    .topbar{position:sticky;top:0;z-index:10;display:flex;gap:10px;align-items:center;justify-content:space-between;
-      background:var(--green);color:#fff;padding:14px 12px;border-bottom-left-radius:20px;border-bottom-right-radius:20px;
-      box-shadow:0 3px 8px rgba(0,0,0,.22)}
-    .brand{display:flex;align-items:center;gap:10px;font-weight:900}
-    .brand svg{width:26px;height:26px}
-    .back{appearance:none;border:0;background:#fff;color:var(--green);border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;
-      box-shadow:0 2px 6px rgba(0,0,0,.12)}
-    .back:hover{transform:translateY(-1px)}
-
-    /* Meta chips */
-    .meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;margin:10px 12px}
-    .chip{background:#fff;border:1px solid var(--green-200);border-radius:999px;padding:6px 12px;font-weight:800;color:var(--ink)}
-
-    /* Sections */
-    .section{margin:12px;padding:12px;background:var(--card);border:1px solid var(--green-200);border-radius:14px;box-shadow:0 2px 6px rgba(0,0,0,.06)}
-    .section .head{display:flex;align-items:center;justify-content:center;gap:8px;font-weight:900;color:var(--ink);margin-bottom:6px}
-    .section .sub{font-size:13px;text-align:center;color:var(--muted);margin:0 0 8px}
-
-    /* Grid of tools */
-    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:10px}
-    @media(min-width:920px){.grid{grid-template-columns:repeat(3,1fr)}}
-    @media(max-width:560px){.grid{grid-template-columns:1fr}}
-
-    /* Tool cards */
-    .tool{position:relative;padding:16px;border:1.5px solid var(--green-200);border-radius:14px;background:linear-gradient(180deg,#ffffff, var(--green-50));
-      text-align:center;cursor:pointer;font-weight:900;color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.06);transition:transform .12s ease, box-shadow .12s ease}
-    .tool:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.12)}
-    .tool .ico{display:inline-grid;place-items:center;width:58px;height:58px;margin:0 auto 8px;border-radius:50%;
-      border:1px solid var(--green-200);box-shadow:inset 0 0 0 6px #ffffff}
-    .tool .title{font-size:16px}
-    .tool .hint{font-size:12px;color:var(--muted);font-weight:700;margin-top:4px}
-
-    /* Group wrappers */
-    .smart{background:linear-gradient(180deg,var(--green-100),#f7fbef);border:2px dashed var(--green-200)}
-    .smart .head{font-size:18px}
-
-    /* Footer tips */
-    .tips{margin:10px 12px;color:var(--muted);text-align:center;font-size:12px}
-
-    /* Utility hidden warning area (not shown unless we need it) */
-    #warn{display:none;color:#b71c1c;text-align:center;font-weight:800}
-  </style>
+ 
+ 
 </head>
 <body>
-  <!-- Top bar -->
-  <header class="topbar">
-    <div class="brand" aria-label="الرجوع">
-      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M6 38 L18 50 L40 18" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-        <rect x="28" y="46" width="30" height="6" rx="3" fill="#fff" opacity=".9"/>
-      </svg>
-      <div>الكاميرا الذكية - مربيك</div>
-    </div>
-    <button id="backBtn" class="back">↩︎ رجوع للأحداث</button>
-  </header>
-
-  <!-- context chips -->
-  <div class="meta">
-    <div class="chip" id="chipAnimal">🐄 الحيوان: —</div>
-    <div class="chip" id="chipDate">📅 التاريخ: —</div>
+ <main class="mbk-smartcam-wrap">
+  <div class="mbk-smartcam-meta">
+    <div class="mbk-smartcam-chip" id="chipAnimal">🐄 الحيوان: —</div>
+    <div class="mbk-smartcam-chip" id="chipDate">📅 التاريخ: —</div>
   </div>
-  <div id="warn"></div>
-
-  <!-- مجموعة 1: أدوات الكاميرا السريعة -->
-  <section class="section smart" aria-label="أدوات الكاميرا السريعة">
-    <div class="head">🤖 أدوات الكاميرا السريعة</div>
-    <p class="sub">تصوير سريع وتحليل مباشر</p>
-    <div class="grid">
-      <button class="tool" data-page="visual-eval.html" aria-label="سمات اللبن للحيوان (Milk production traits)">
-        <div class="ico">🥛</div>
-        <div class="title">سمات اللبن للحيوان</div>
-        <div class="hint">Milk production traits</div>
-      </button>
-      <button class="tool" data-page="weight-eval.html" aria-label="تقدير الوزن بالكاميرا">
-        <div class="ico">⚖️</div>
-        <div class="title">تقدير الوزن بالكاميرا</div>
-        <div class="hint">تقدير تقريبي من اللقطة</div>
-      </button>
+<header>
+  <div class="mbk-head">
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div class="mbk-center">
+      <div class="mbk-page-title">الكاميرا الذكية</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
     </div>
-  </section>
+    <a class="mbk-back" id="backBtn" href="add-event.html">رجوع</a>
+  </div>
+</header>
+  <section class="mbk-card mbk-smartcam-section" aria-label="أدوات الكاميرا السريعة">
+  <div class="mbk-page-title">🤖 أدوات الكاميرا السريعة</div>
+  <div class="form-hint mbk-smartcam-sub">تصوير سريع وتحليل مباشر</div>
 
-  <!-- مجموعة 2: التقييم الذكي للتغذية -->
-  <section class="section smart" aria-label="التقييم الذكي للتغذية بالكاميرا">
-    <div class="head">🌿 التقييم الذكي للتغذية بالكاميرا</div>
-    <p class="sub">تحليل الحالة الغذائية بصريًا</p>
-    <div class="grid">
-      <button class="tool" data-page="bcs-eval.html" aria-label="تقييم حالة الجسم BCS">
-        <div class="ico">📏</div>
-        <div class="title">تقييم حالة الجسم (BCS)</div>
-        <div class="hint">تحديد الدرجة من الصورة</div>
-      </button>
-      <button class="tool" data-page="feces-eval.html" aria-label="تقييم الروث">
-        <div class="ico">💩</div>
-        <div class="title">تقييم الروث</div>
-        <div class="hint">ملمس/شكل للدلالة على العليقة</div>
-      </button>
-    </div>
-  </section>
+  <div class="mbk-smartcam-grid">
+    <button class="mbk-smartcam-tool mbk-btn mbk-btn-lg mbk-btn-primary" data-page="visual-eval.html" aria-label="سمات إنتاج اللبن للحيوان">
+      <div class="mbk-smartcam-ico">🥛</div>
+      <div class="mbk-smartcam-title">سمات إنتاج اللبن للحيوان</div>
+      <div class="mbk-smartcam-hint">تقييم الصفات الجسمية المرتبطة بإنتاج اللبن</div>
+    </button>
+  </div>
+</section>
 
-  <script>window.dataLayer = window.dataLayer || [];</script>
-  <script src="/js/app-core.js"></script>
-  <script src="/js/tenant-bootstrap.js"></script>
+ <section class="mbk-card mbk-smartcam-section" aria-label="أدوات الكاميرا السريعة">
+  <div class="mbk-page-title">🤖 أدوات الكاميرا السريعة</div>
+  <div class="form-hint mbk-smartcam-sub">تصوير سريع وتحليل مباشر</div>
 
+  <div class="mbk-smartcam-grid">
+    <button class="mbk-smartcam-tool mbk-btn mbk-btn-lg mbk-btn-primary" data-page="visual-eval.html" aria-label="سمات إنتاج اللبن للحيوان">
+      <div class="mbk-smartcam-ico">🥛</div>
+      <div class="mbk-smartcam-title">سمات إنتاج اللبن للحيوان</div>
+      <div class="mbk-smartcam-hint">تقييم الصفات الجسمية المرتبطة بإنتاج اللبن</div>
+    </button>
+  </div>
+</section>
   <script>
   (function(){
     const $ = s=>document.querySelector(s);
@@ -143,7 +73,7 @@
     const backUrl = new URL('add-event.html', location.href);
     if(number) backUrl.searchParams.set('number', number);
     if(date)   backUrl.searchParams.set('date', date);
-    $('#backBtn').addEventListener('click', ()=>{ location.href = backUrl.toString(); });
+   $('#backBtn').href = backUrl.toString();
 
     function buildUrl(page){
       const u = new URL(page, location.href);
