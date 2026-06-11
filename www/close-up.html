@@ -6,138 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
  
   <link rel="stylesheet" href="css/forms.css">
-   <script type="module" src="/js/forms-init.js"></script>
 
-  <style>
-    :root{
-      --green:#0ea05a; --green-600:#0b7f47; --bg:#f7faf7; --card:#ffffff;
-      --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --danger:#c2410c;
-    }
-    *{box-sizing:border-box}
-    html,body{max-width:100%;overflow-x:hidden}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif}
-    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px}
-    h1{margin:0;color:var(--green-600);font-size:20px;font-weight:800}
-    .wrap{max-width:720px;margin:16px auto;padding:0 12px}
-    form{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    label{display:block;margin-top:12px;font-weight:700}
-    input[type="text"],input[type="date"]{
-      width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:16px;outline:none
-    }
-    input:focus{border-color:var(--green-600)}
-  #animalNumber{ ... }
-    font-size:20px;
-    padding:14px 16px;
-    border-radius:12px;
-    letter-spacing:.3px;
-    height:56px;
-  }
-    .radio-group{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap}
-    .radio-group label{font-weight:600}
-    .btn{
-      display:inline-flex;align-items:center;justify-content:center;
-      appearance:none;border:none;border-radius:12px;padding:12px 14px;cursor:pointer;font-weight:800;font-size:16px
-    }
-    .btn-primary{background:var(--green);color:#fff}
-    .btn-ghost{background:#fff;border:1px solid var(--border);color:var(--text)}
-    .submit{width:100%;margin-top:18px}
-    .confirm{display:none;margin-top:14px;border:1px dashed var(--green-600);background:#eaf7f0;border-radius:12px;padding:12px}
-    .confirm .title{font-weight:900;color:var(--green-600);margin-bottom:8px}
-    .row{display:flex;gap:8px;flex-wrap:wrap}
-    .err{display:none;margin:12px 0;padding:10px;border:1px solid #fecaca;background:#fff1f2;color:#7f1d1d;border-radius:10px;font-weight:700}
-    .dialog{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);align-items:center;justify-content:center;padding:16px;z-index:50}
-    .dialog .card{background:#fff;border-radius:16px;max-width:420px;width:100%;padding:16px;border:1px solid var(--border)}
-    .dialog h3{margin:0 0 8px 0;color:var(--green-600)}
-    .muted{color:var(--muted);font-size:14px}
-    /* ===== Murabbik Standard Header ===== */
-header{
-  position:sticky;
-  top:0;
-  z-index:20;
-  background:#ffffff;
-  border-bottom:1px solid var(--border);
-}
-
-.mbk-head{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:10px 14px;
-}
-
-.mbk-logo{
-  height:34px;
-  opacity:.95;
-}
-
-.mbk-center{
-  text-align:center;
-  line-height:1.2;
-}
-
-.mbk-page-title{
-  font-weight:800;
-  font-size:16px;
-  color:var(--green-600);
-}
-
-.mbk-app-name{
-  font-size:12px;
-  font-weight:700;
-  color:var(--muted);
-}
-
-.mbk-back{
-  text-decoration:none;
-  font-weight:700;
-  font-size:14px;
-  color:var(--green-600);
-  background:#e8f7f0;
-  padding:6px 10px;
-  border-radius:8px;
-}
-/* ===============================
-   Bottom actions (Murabbik style)
-   =============================== */
-.btn-row{
-  display:flex;
-  gap:10px;
-  margin-top:12px;
-}
-
-.btn-row .save-btn,
-.btn-row .open-card{
-  flex:1;
-  width:auto;
-  border-radius:14px;
-  padding:12px 14px;
-  font-weight:900;
-  font-size:16px;
-}
-
-/* Primary */
-.btn-row .save-btn{
-  background: var(--brand);
-  color:#fff;
-  border:0;
-}
-
-/* Secondary (outline) — لازم يغلب mbk-form button */
-.btn-row .open-card{
-  background:#fff !important;
-  color: var(--brand-600) !important;
-  border:2px solid var(--brand-600) !important;
-}
-.btn-row{
-  position: sticky;
-  bottom: 10px;
-  background: #fff;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-}
-
-  </style>
+ 
 </head>
 <body>
  <header>
@@ -151,220 +21,285 @@ header{
   </div>
 </header>
 
+<div id="sysbar" class="infobar" role="status" aria-live="polite"></div>
+ <main class="mbk-form">
+  <form id="closeupForm" class="mbk-card">
+    <label for="animalNumber">رقم الحيوان</label>
+    <input id="animalNumber" name="animalNumber" inputmode="numeric" autocomplete="off" required />
 
-  <div class="wrap">
-    <div id="err" class="err"></div>
+    <label for="eventDate">تاريخ التحضير</label>
+    <input id="eventDate" name="eventDate" type="date" required />
 
-   <form id="closeupForm" data-validate="true" data-event="تحضير للولادة">
-      <label for="animalId">رقم الحيوان</label>
-      <input id="animalNumber" name="animalNumber" data-field="animalNumber" inputmode="numeric" autocomplete="off" required />
-
-
-      <label for="eventDate">تاريخ التحضير</label>
-     <input id="eventDate" name="eventDate" data-field="eventDate" type="date" required />
-
-      <label>عليقة التحضير</label>
+    <fieldset>
+      <legend>عليقة التحضير</legend>
       <div class="radio-group">
-       <label><input type="radio" data-field="ration" name="ration" value="نعم" required> نعم</label>
-<label><input type="radio" data-field="ration" name="ration" value="لا" required> لا</label>
-
+        <label><input type="radio" name="ration" value="نعم" required> نعم</label>
+        <label><input type="radio" name="ration" value="لا" required> لا</label>
       </div>
+    </fieldset>
 
-      <label>الأملاح الأنيونية</label>
+    <fieldset>
+      <legend>الأملاح الأنيونية</legend>
       <div class="radio-group">
-        <label><input type="radio" data-field="anionicSalts" name="anionicSalts" value="نعم" required> نعم</label>
-<label><input type="radio" data-field="anionicSalts" name="anionicSalts" value="لا" required> لا</label>
-
+        <label><input type="radio" name="anionicSalts" value="نعم" required> نعم</label>
+        <label><input type="radio" name="anionicSalts" value="لا" required> لا</label>
       </div>
+    </fieldset>
 
-<div class="btn-row">
-  <button class="save-btn" type="submit">حفظ التحضير</button>
-  <button class="open-card" id="openCowCard" type="button">فتح بطاقة الحيوان</button>
-</div>
+    <div class="actions-bar inline">
+      <button class="save" id="saveBtn" type="submit">حفظ التحضير</button>
+      <button class="ghost" id="openCowCard" type="button">فتح بطاقة الحيوان</button>
+    </div>
+  </form>
+</main>
 
-
-     
-    </form>
-  </div>
-
-  <!-- مربع حوار “إدخال العليقة؟” -->
-  <div id="nutritionDialog" class="dialog" role="dialog" aria-modal="true" aria-labelledby="nd_t">
-    <div class="card">
-      <h3 id="nd_t">إدخال عليقة التحضير؟</h3>
-      <p class="muted">يمكنك الانتقال الآن لصفحة التغذية لإدخال مكونات العليقة لهذا الحيوان.</p>
-      <div class="row" style="margin-top:10px">
-        <button type="button" id="nd_yes" class="btn btn-primary">نعم، انتقل الآن</button>
-        <button type="button" id="nd_no" class="btn btn-ghost">لاحقًا</button>
-      </div>
+<div id="nutritionDialog" class="mbk-card hide" role="dialog" aria-modal="true" aria-labelledby="nd_t">
+  <div class="card">
+    <h3 id="nd_t">إدخال عليقة التحضير؟</h3>
+    <p class="form-hint">يمكنك الانتقال الآن لصفحة التغذية لإدخال مكونات العليقة لهذا الحيوان.</p>
+    <div class="actions-bar inline">
+      <button type="button" id="nd_yes" class="save">نعم، انتقل الآن</button>
+      <button type="button" id="nd_no" class="ghost">لاحقًا</button>
     </div>
   </div>
+</div>
+ <script>
+(function(){
+  "use strict";
 
-  <!-- منطق الصفحة + ربط فايرستور (كلّه في سكربت واحد) -->
-  <script type="module">
-    // 🔹 نستخدم ملف firestore-config.js الموجود عندك فعلاً
-    import * as fsCfg from "/js/firebase-config.js";
+  const $ = id => document.getElementById(id);
 
-    import { updateAnimalByEvent } from "/js/animal-update.js";
-    import {
-      collection,
-      addDoc,
-      serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  const form = $("closeupForm");
+  const inputAnimal = $("animalNumber");
+  const inputDate = $("eventDate");
+  const saveBtn = $("saveBtn");
+  const openCowCardBtn = $("openCowCard");
+  const dialog = $("nutritionDialog");
+  const ndYes = $("nd_yes");
+  const ndNo = $("nd_no");
+  const sysbar = $("sysbar");
 
-    // نحاول نقرأ db بأي شكل من الأشكال الشائعة
-    const db =
-      fsCfg.db ||
-      (fsCfg.default && fsCfg.default.db) ||
-      fsCfg;
+  let gateOk = false;
+  let gateTimer = null;
 
-    // 2) أدوات صغيرة
-    const $ = (id)=> document.getElementById(id);
-    const errBox = $('err');
-function showErr(msg){
-  const bar =
-    document.getElementById("sysbar") ||
-    document.getElementById("info") ||
-    document.querySelector(".infobar");
-
-  if (bar){
-    bar.style.display = "block";
-    bar.className = "infobar error";
-    bar.textContent = "⚠️ " + msg;
-    try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_) {}
-    return;
+  function normDigits(v){
+    const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9","۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"};
+    return String(v || "").trim().replace(/[٠-٩۰-۹]/g, d => map[d] || d).replace(/[^\d]/g, "");
   }
 
-  errBox.textContent = "⚠️ " + msg;
-  errBox.style.display = "block";
-}
+  function todayISO(){
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
+  }
 
-function hideErr(){
-  errBox.style.display = "none";
-  errBox.textContent = "";
-}
+  function getQS(name){
+    return new URL(location.href).searchParams.get(name) || "";
+  }
 
-    function getQS(name){ return new URL(location.href).searchParams.get(name) || ''; }
-    function firstNonEmpty(...vals){ return vals.find(v => (v ?? '').toString().trim() !== '') || ''; }
-    function buildUrl(path, params){
-      const u = new URL(path, location.origin);
-      Object.entries(params||{}).forEach(([k,v])=>{
-        if ((v ?? '').toString().trim() !== '') u.searchParams.set(k, v);
+  function firstNonEmpty(...vals){
+    return vals.find(v => String(v || "").trim() !== "") || "";
+  }
+
+  function getUid(){
+    return String(
+      window.MBK_USER_ID ||
+      window.mbkUserId ||
+      window.mbk?.userId ||
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("tenantId") ||
+      ""
+    ).trim();
+  }
+
+  function buildUrl(path, params){
+    const u = new URL(path, location.origin);
+    Object.entries(params || {}).forEach(([k,v]) => {
+      if (String(v || "").trim()) u.searchParams.set(k, v);
+    });
+    return u.toString();
+  }
+
+  function showMsg(text, ok){
+    if (!sysbar) return;
+    sysbar.textContent = text || "";
+    sysbar.className = "infobar show " + (ok ? "success" : "error");
+    try { sysbar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_){}
+  }
+
+  function hideMsg(){
+    if (!sysbar) return;
+    sysbar.textContent = "";
+    sysbar.className = "infobar";
+  }
+
+  function getRadio(name){
+    return form.querySelector(`input[name="${name}"]:checked`)?.value || "";
+  }
+
+  function setSaveEnabled(v){
+    if (saveBtn) saveBtn.disabled = !v;
+  }
+
+  async function runGate(){
+    const uid = getUid();
+    const animalNumber = normDigits(inputAnimal.value);
+    const eventDate = String(inputDate.value || "").trim();
+
+    gateOk = false;
+    setSaveEnabled(false);
+
+    if (!animalNumber || !eventDate) {
+      hideMsg();
+      return;
+    }
+
+    try {
+      const r = await fetch("/api/close-up/gate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(uid ? {"X-User-Id": uid} : {})
+        },
+        body: JSON.stringify({ animalNumber, eventDate })
       });
-      return u.toString();
+
+      const j = await r.json().catch(() => ({}));
+
+      if (!r.ok || !j.ok || !j.allowed) {
+        showMsg(j.message || "❌ الحيوان غير مؤهل لتسجيل التحضير.", false);
+        return;
+      }
+
+      gateOk = true;
+      setSaveEnabled(true);
+      showMsg(j.message || "✅ تم التحقق — أكمل تسجيل تحضير الولادة.", true);
+
+    } catch(e) {
+      console.error("close-up gate error:", e);
+      showMsg("تعذّر التحقق من تحضير الولادة الآن.", false);
     }
-
-    // 3) تهيئة الحقول من السياق (addevent → animalId/date)
-   const inputAnimal = $('animalNumber');
-    const inputDate = $('eventDate');
-    const qsAnimal = firstNonEmpty(
-      getQS('animalId'),
-      getQS('number'),
-      getQS('animalNumber'),
-      localStorage.getItem('lastAnimalId'),
-      localStorage.getItem('currentAnimalId')
-    );
-    const qsDate   = firstNonEmpty(
-      getQS('date'),
-      getQS('eventDate'),
-      localStorage.getItem('eventDate'),
-      localStorage.getItem('lastEventDate')
-    );
-    if (!inputAnimal.value && qsAnimal) inputAnimal.value = qsAnimal;
-    if (!inputDate.value && qsDate)     inputDate.value   = qsDate;
-
-    // 4) الحفظ في Firestore
-    const form = $('closeupForm');
-    const openCowCardBtn = $('openCowCard');
-
-openCowCardBtn?.addEventListener("click", ()=>{
-  const n = (inputAnimal.value || "").trim();
-  if (!n) return;
-  location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
-});
-
-    const dialog = $('nutritionDialog');
-    const ndYes = $('nd_yes');
-    const ndNo  = $('nd_no');
-
-    if (!db) {
-      // لو في مشكلة في firestore-config.js نفسها
-      showErr('تعذّر تهيئة الاتصال بفايرستور من firestore-config.js');
-      console.error("Firestore db is undefined from firestore-config.js", fsCfg);
-    }
-form.addEventListener('mbk:valid', async (e)=>{
-  hideErr();
-
-  const fd = e.detail?.formData || {};
-
-  const animalId = String(fd.animalNumber || "").trim();
-  const eventDate = String(fd.eventDate || "").trim();
-  const ration = String(fd.ration || "").trim();
-  const anionicSalts = String(fd.anionicSalts || "").trim();
-
-  if (!db){
-    showErr('قاعدة البيانات غير جاهزة بعد. راجع ملف firebase-config.js.');
-    return;
   }
 
-  const userId = (window.__tenant?.userId || localStorage.getItem('userId') || '').trim();
-
-  const payload = {
-    userId,
-    animalId,
-    animalNumber: animalId,
-    eventType: 'تحضير للولادة',
-    type: 'closeup',
-    eventDate,
-    ration,
-    anionicSalts,
-    source: location.pathname,
-    createdAt: serverTimestamp()
-  };
-
-  try {
-    await addDoc(collection(db, 'events'), payload);
-    await updateAnimalByEvent(payload);
-
-    localStorage.setItem('lastAnimalId', animalId);
-    localStorage.setItem('currentAnimalId', animalId);
-    localStorage.setItem('eventDate', eventDate);
-    localStorage.setItem('lastEventDate', eventDate);
-
-   // ✅ اعرض رسالة الحفظ في infobar (الهيدر) بدل أسفل الصفحة
-const bar = document.getElementById("sysbar") || form.querySelector(".infobar") || null;
-
-if (bar) {
-  bar.style.display = "block";
- bar.className = "infobar show";
-  bar.style.borderColor = "#bbf7d0";
-  bar.style.background = "#ecfdf5";
-  bar.style.color = "#065f46";
-  bar.innerHTML = "✅ تم تسجيل تحضير الولادة بنجاح";
-
-  try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(_) {}
-  setTimeout(() => { bar.style.display = "none"; }, 4000);
-} else {
-  // fallback لو لأي سبب infobar مش موجود
-}
-
-    if (ration === 'نعم') dialog.style.display = 'flex';
-  } catch (err) {
-    console.error('Firestore save error:', err);
-    showErr('تعذّر حفظ التحضير. تأكّد من الصلاحيات/الاتصال وأعد المحاولة.');
+  function scheduleGate(){
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(runGate, 350);
   }
-});
 
-    function goNutrition(){
-      const url = buildUrl('/nutrition.html', {
-        animalId: inputAnimal.value.trim(),
-        date: inputDate.value.trim()
+  async function saveCloseup(e){
+    e.preventDefault();
+
+    const uid = getUid();
+    const animalNumber = normDigits(inputAnimal.value);
+    const eventDate = String(inputDate.value || "").trim();
+    const ration = getRadio("ration");
+    const anionicSalts = getRadio("anionicSalts");
+
+    if (!animalNumber) return showMsg("❌ رقم الحيوان مطلوب.", false);
+    if (!eventDate) return showMsg("❌ تاريخ التحضير مطلوب.", false);
+    if (!ration) return showMsg("❌ يجب تحديد هل تم تقديم عليقة التحضير.", false);
+    if (!anionicSalts) return showMsg("❌ يجب تحديد هل تم استخدام الأملاح الأنيونية.", false);
+
+    try {
+      saveBtn.disabled = true;
+      saveBtn.textContent = "جارٍ الحفظ…";
+
+      if (!gateOk) {
+        await runGate();
+        if (!gateOk) return;
+      }
+
+      const r = await fetch("/api/close-up/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(uid ? {"X-User-Id": uid} : {})
+        },
+        body: JSON.stringify({
+          animalNumber,
+          eventDate,
+          ration,
+          anionicSalts
+        })
       });
-      location.href = url;
-    }
-    ndYes?.addEventListener('click', goNutrition);
-    ndNo?.addEventListener('click', ()=>{ dialog.style.display = 'none'; });
-  </script>
 
+      const j = await r.json().catch(() => ({}));
+
+      if (!r.ok || !j.ok) {
+        throw new Error(j.message || "تعذّر حفظ تحضير الولادة.");
+      }
+
+      localStorage.setItem("lastAnimalId", animalNumber);
+      localStorage.setItem("currentAnimalId", animalNumber);
+      localStorage.setItem("eventDate", eventDate);
+      localStorage.setItem("lastEventDate", eventDate);
+
+      showMsg(j.message || "✅ تم حفظ تحضير الولادة بنجاح", true);
+
+      if (ration === "نعم") {
+       dialog.classList.remove("hide");
+      } else {
+        setTimeout(() => {
+          location.href = j.redirectUrl || `/event-list.html?number=${encodeURIComponent(animalNumber)}`;
+        }, 900);
+      }
+
+    } catch(err) {
+      console.error("close-up save error:", err);
+      showMsg(err.message || "تعذّر حفظ تحضير الولادة.", false);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "حفظ التحضير";
+    }
+  }
+
+  const qsAnimal = firstNonEmpty(
+    getQS("animalId"),
+    getQS("number"),
+    getQS("animalNumber"),
+    localStorage.getItem("lastAnimalId"),
+    localStorage.getItem("currentAnimalId")
+  );
+
+  const qsDate = firstNonEmpty(
+    getQS("date"),
+    getQS("eventDate"),
+    localStorage.getItem("eventDate"),
+    localStorage.getItem("lastEventDate"),
+    todayISO()
+  );
+
+  if (inputAnimal && qsAnimal) inputAnimal.value = normDigits(qsAnimal);
+  if (inputDate && qsDate) inputDate.value = qsDate;
+
+  setSaveEnabled(false);
+  scheduleGate();
+
+  inputAnimal?.addEventListener("input", scheduleGate);
+  inputDate?.addEventListener("change", scheduleGate);
+
+  form?.addEventListener("submit", saveCloseup);
+
+  openCowCardBtn?.addEventListener("click", () => {
+    const n = normDigits(inputAnimal.value);
+    if (!n) return;
+    location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
+  });
+
+  ndYes?.addEventListener("click", () => {
+    const n = normDigits(inputAnimal.value);
+    const d = String(inputDate.value || "").trim();
+    location.href = buildUrl("/nutrition.html", { animalId: n, number: n, date: d });
+  });
+
+  ndNo?.addEventListener("click", () => {
+    const n = normDigits(inputAnimal.value);
+   dialog.classList.add("hide");
+    location.href = `/event-list.html?number=${encodeURIComponent(n)}`;
+  });
+})();
+</script>
 </body>
 </html>
 
