@@ -12777,7 +12777,12 @@ function closeupDecisionSrv(fd = {}) {
     const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
     return `❌ لا يمكن تسجيل التحضير — الحالة التناسلية الحالية: ${shown}.`;
   }
+const boundary = String(fd.lastBoundary || "").trim();
+const boundaryType = String(fd.lastBoundaryType || "حدث سابق").trim();
 
+if (calvingIsDateSrv(boundary)) {
+  return `❌ لا يمكن تسجيل التحضير — آخر ${boundaryType} بتاريخ ${boundary} أنهى الحمل الحالي.`;
+}
   // نوع الحيوان — بعد التأكد أن الحيوان عِشار
   const sp = calvingNormalizeSpeciesSrv(
     fd.species ||
@@ -12910,15 +12915,17 @@ app.post("/api/close-up/gate", requireUserId, async (req, res) => {
     ).trim();
 
     const gateData = {
-      animalNumber,
-      eventDate,
-      animalId: animal.id || "",
-      species,
-      documentData: doc,
-      reproductiveStatus: reproFromEvents || reproFromDoc || "",
-      reproStatusFromEvents: reproFromEvents,
-      lastInseminationDate
-    };
+  animalNumber,
+  eventDate,
+  animalId: animal.id || "",
+  species,
+  documentData: doc,
+  reproductiveStatus: reproFromDoc || reproFromEvents || "",
+  reproStatusFromEvents: reproFromEvents,
+  lastInseminationDate,
+  lastBoundary: String(signals.lastBoundary || "").trim(),
+  lastBoundaryType: String(signals.lastBoundaryType || "").trim()
+};
 
     const errMsg = closeupDecisionSrv(gateData);
 
@@ -13031,15 +13038,17 @@ app.post("/api/close-up/save", requireUserId, async (req, res) => {
     ).trim();
 
     const decisionData = {
-      animalNumber,
-      eventDate,
-      animalId: animal.id || "",
-      species,
-      documentData: doc,
-      reproductiveStatus: reproFromEvents || reproFromDoc || "",
-      reproStatusFromEvents: reproFromEvents,
-      lastInseminationDate
-    };
+  animalNumber,
+  eventDate,
+  animalId: animal.id || "",
+  species,
+  documentData: doc,
+  reproductiveStatus: reproFromDoc || reproFromEvents || "",
+  reproStatusFromEvents: reproFromEvents,
+  lastInseminationDate,
+  lastBoundary: String(signals.lastBoundary || "").trim(),
+  lastBoundaryType: String(signals.lastBoundaryType || "").trim()
+};
 
     const errMsg = closeupDecisionSrv(decisionData);
 
