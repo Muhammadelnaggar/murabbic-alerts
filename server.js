@@ -12729,7 +12729,370 @@ function dryOffSaveRowsFromBodySrv(body = {}) {
 function dryOffSaveRequiredSrv(v) {
   return !(v === undefined || v === null || String(v).trim() === "");
 }
+// ============================================================
+//                 CLOSE-UP / تحضير للولادة — SERVER SIDE
+//                 نقل منطق التحضير من form-rules.js كما هو
+// ============================================================
 
+function closeupDecisionSrv(fd = {}) {
+  const doc = fd.documentData || {};
+  if (!doc || !Object.keys(doc).length) {
+    return "❌ تعذّر العثور على الحيوان.";
+  }
+
+  // منع تكرار "تحضير للولادة" داخل نفس الموسم
+  const lastCloseUp = String(doc.lastCloseUpDate || "").trim();
+  const lastCalving = String(doc.lastCalvingDate || "").trim();
+
+  if (calvingIsDateSrv(lastCloseUp)) {
+    if (!calvingIsDateSrv(lastCalving)) {
+      return `❌ تم تسجيل تحضير للولادة مسبقًا بتاريخ ${lastCloseUp} — لا يمكن تكراره في نفس الموسم.`;
+    }
+
+    const gapFromCalvingToCloseUp = calvingDaysBetweenSrv(lastCalving, lastCloseUp);
+    if (Number.isFinite(gapFromCalvingToCloseUp) && gapFromCalvingToCloseUp >= 0) {
+      return `❌ تم تسجيل تحضير للولادة مسبقًا في هذا الموسم بتاريخ ${lastCloseUp} — لا يمكن تكراره.`;
+    }
+  }
+
+  // خارج القطيع
+  const st = String(doc.status ?? "").trim().toLowerCase();
+  if (st === "inactive" || st === "archived") {
+    return "❌ لا يمكن تسجيل التحضير — الحيوان خارج القطيع.";
+  }
+
+  // نوع الحيوان
+  const sp = calvingNormalizeSpeciesSrv(
+    fd.species ||
+    doc.species ||
+    doc.animalTypeAr ||
+    doc.animalType ||
+    ""
+  );
+
+  const th = CALVING_THRESHOLDS_SRV[sp]?.minGestationDays;
+  if (!th) {
+    return "❌ نوع القطيع غير معروف لحساب عمر الحمل.";
+  }
+
+  // الحالة التناسلية
+  const rsRaw = String(
+    fd.reproStatusFromEvents ||
+    fd.reproductiveStatus ||
+    doc.reproductiveStatus ||
+    ""
+  ).trim();
+
+  const rsNorm = calvingStripArSrv(rsRaw);
+
+  if (!rsNorm.includes("عشار")) {
+    const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+    return `❌ لا يمكن تسجيل التحضير — الحالة التناسلية الحالية: ${shown}.`;
+  }
+
+  // آخر تلقيح
+  const lf = String(
+    fd.lastInseminationDate ||
+    doc.lastInseminationDate ||
+    doc.lastAI ||
+    doc.lastInsemination ||
+    doc.lastServiceDate ||
+    ""
+  ).trim();
+
+  if (!calvingIsDateSrv(lf)) {
+    return '❌ لا يمكن تسجيل التحضير — لا يوجد "آخر تلقيح مُخصِّب".';
+  }
+
+  if (!calvingIsDateSrv(fd.eventDate)) {
+    return "❌ تاريخ التحضير غير صالح.";
+  }
+
+  const gDays = calvingDaysBetweenSrv(lf, fd.eventDate);
+  if (!Number.isFinite(gDays)) {
+    return "❌ تعذّر حساب عمر الحمل.";
+  }
+
+  const remaining = th - gDays;
+
+  if (remaining > 40) {
+    return `❌ لا يمكن تسجيل التحضير — المتبقي على أقل موعد ولادة ${remaining} يوم (أكثر من 40 يوم).`;
+  }
+
+  return null;
+}
+
+async function updateAnimalAfterCloseupSaveSrv(ev = {}) {
+  const uid = String(ev.userId || "").trim();
+  const animalNumber = calvingNormDigitsOnlySrv(ev.animalNumber || ev.number || "");
+  let animalId = String(ev.animalId || "").trim();
+
+  if (!animalId) {
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+    animalId = String(animal?.id || "").trim();
+  }
+
+  if (!uid || !animalNumber || !animalId) {
+    console.warn("⛔ close-up animal update skipped:", { uid, animalNumber, animalId });
+    return;
+  }
+
+  const eventDate = String(ev.eventDate || "").trim().slice(0, 10);
+
+  await db.collection("animals").doc(animalId).set({
+    lastCloseUpDate: eventDate,
+    productionStatus: "close_up",
+    reproductiveStatus: "تحضير للولادة",
+    closeUpRation: String(ev.ration || "").trim(),
+    anionicSalts: String(ev.anionicSalts || "").trim(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+}
+app.post("/api/close-up/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        allowed: false,
+        error: "firestore_disabled",
+        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const animalNumber = calvingNormDigitsOnlySrv(body.animalNumber || body.number || "");
+    const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
+
+    if (!animalNumber || !eventDate) {
+      return res.json({
+        ok: true,
+        allowed: false,
+        silent: true
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        allowed: false,
+        message: "❌ رقم الحيوان غير موجود في حسابك. اكتب الرقم الصحيح أولًا."
+      });
+    }
+
+    const doc = animal.data || {};
+    const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+
+    const species = calvingNormalizeSpeciesSrv(
+      body.species ||
+      doc.species ||
+      doc.animalTypeAr ||
+      doc.animalType ||
+      ""
+    );
+
+    const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+
+    const lastInseminationDate = String(
+      signals.lastInseminationDateFromEvents ||
+      doc.lastInseminationDate ||
+      doc.lastAI ||
+      doc.lastInsemination ||
+      doc.lastServiceDate ||
+      ""
+    ).trim();
+
+    const gateData = {
+      animalNumber,
+      eventDate,
+      animalId: animal.id || "",
+      species,
+      documentData: doc,
+      reproductiveStatus: reproFromEvents || reproFromDoc || "",
+      reproStatusFromEvents: reproFromEvents,
+      lastInseminationDate
+    };
+
+    const errMsg = closeupDecisionSrv(gateData);
+
+    if (errMsg) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        message: String(errMsg)
+      });
+    }
+
+    return res.json({
+      ok: true,
+      allowed: true,
+      message: "✅ تم التحقق — أكمل تسجيل تحضير الولادة.",
+      animalId: animal.id || "",
+      animalNumber,
+      eventDate,
+      species,
+      lastInseminationDate,
+      reproductiveStatus: gateData.reproductiveStatus
+    });
+
+  } catch (e) {
+    console.error("close-up-gate", e);
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      error: "close_up_gate_failed",
+      message: "تعذّر التحقق من تحضير الولادة الآن."
+    });
+  }
+});
+app.post("/api/close-up/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر حفظ تحضير الولادة — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const animalNumber = calvingNormDigitsOnlySrv(body.animalNumber || body.number || "");
+    const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
+    const ration = String(body.ration || "").trim();
+    const anionicSalts = String(body.anionicSalts || "").trim();
+
+    if (!animalNumber) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ رقم الحيوان مطلوب."
+      });
+    }
+
+    if (!calvingIsDateSrv(eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ تاريخ التحضير غير صالح."
+      });
+    }
+
+    if (!ration) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ يجب تحديد هل تم تقديم عليقة التحضير."
+      });
+    }
+
+    if (!anionicSalts) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ يجب تحديد هل تم استخدام الأملاح الأنيونية."
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        message: "❌ رقم الحيوان غير موجود في حسابك."
+      });
+    }
+
+    const doc = animal.data || {};
+    const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+
+    const species = calvingNormalizeSpeciesSrv(
+      body.species ||
+      doc.species ||
+      doc.animalTypeAr ||
+      doc.animalType ||
+      ""
+    );
+
+    const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+
+    const lastInseminationDate = String(
+      signals.lastInseminationDateFromEvents ||
+      doc.lastInseminationDate ||
+      doc.lastAI ||
+      doc.lastInsemination ||
+      doc.lastServiceDate ||
+      ""
+    ).trim();
+
+    const decisionData = {
+      animalNumber,
+      eventDate,
+      animalId: animal.id || "",
+      species,
+      documentData: doc,
+      reproductiveStatus: reproFromEvents || reproFromDoc || "",
+      reproStatusFromEvents: reproFromEvents,
+      lastInseminationDate
+    };
+
+    const errMsg = closeupDecisionSrv(decisionData);
+
+    if (errMsg) {
+      return res.status(400).json({
+        ok: false,
+        message: String(errMsg)
+      });
+    }
+
+    const payload = {
+      userId: uid,
+
+      animalId: animal.id || "",
+      animalNumber,
+
+      eventDate,
+
+      ration,
+      anionicSalts,
+
+      lastInseminationDate,
+      species,
+
+      eventType: "تحضير للولادة",
+      type: "closeup",
+      eventTypeNorm: "close_up",
+
+      source: "server:/api/close-up/save",
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const eventRef = await db.collection("events").add(payload);
+    await updateAnimalAfterCloseupSaveSrv(payload);
+
+    return res.json({
+      ok: true,
+      message: "✅ تم حفظ تحضير الولادة بنجاح",
+      eventId: eventRef.id,
+      animalId: animal.id || "",
+      animalNumber,
+      eventDate,
+      ration,
+      anionicSalts,
+      redirectUrl: `/event-list.html?number=${encodeURIComponent(animalNumber)}`
+    });
+
+  } catch (e) {
+    console.error("close-up-save", e);
+    return res.status(500).json({
+      ok: false,
+      error: "close_up_save_failed",
+      message: "تعذّر حفظ تحضير الولادة — تحقّق من الاتصال والصلاحيات."
+    });
+  }
+});
 async function updateAnimalAfterDryOffSaveSrv(ev = {}) {
   const uid = String(ev.userId || "").trim();
   const animalNumber = calvingNormDigitsOnlySrv(ev.animalNumber || "");
