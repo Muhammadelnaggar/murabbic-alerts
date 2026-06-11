@@ -1111,3 +1111,119 @@ textarea{
     grid-template-columns:repeat(4,minmax(0,1fr));
   }
 }
+/* =========================================================
+   Smart Camera Page — صفحة الكاميرا الذكية فقط
+   ========================================================= */
+
+.smart-camera-wrap{
+  width:100%;
+  max-width:920px;
+  margin:18px auto;
+  padding:16px;
+  padding-bottom:80px;
+}
+
+.smart-camera-meta{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+  margin:0 auto 16px;
+}
+
+@media(min-width:640px){
+  .smart-camera-meta{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+.smart-camera-chip{
+  background:#fff;
+  border:1px solid var(--border,#e2e8f0);
+  border-radius:16px;
+  padding:12px 14px;
+  font-weight:900;
+  color:var(--ink,#0f172a);
+  text-align:center;
+  box-shadow:0 1px 0 rgba(15,23,42,.04);
+}
+
+.smart-camera-section{
+  text-align:center;
+  padding:20px 16px;
+}
+
+.smart-camera-section + .smart-camera-section{
+  margin-top:16px;
+}
+
+.smart-camera-title{
+  font-size:19px;
+  font-weight:900;
+  color:var(--brand-600,#0b7f47);
+  margin-bottom:6px;
+}
+
+.smart-camera-sub{
+  font-size:13px;
+  font-weight:800;
+  color:var(--muted,#64748b);
+  margin-bottom:14px;
+}
+
+.smart-camera-grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:14px;
+  margin-top:12px;
+}
+
+@media(min-width:720px){
+  .smart-camera-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .smart-camera-grid.single{
+    grid-template-columns:1fr;
+  }
+}
+
+.smart-camera-tool{
+  min-height:142px;
+  border-radius:20px;
+  padding:20px 14px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  text-align:center;
+  font-weight:900;
+  line-height:1.45;
+}
+
+.smart-camera-tool.mbk-btn-primary{
+  box-shadow:0 8px 18px rgba(14,160,90,.20);
+}
+
+.smart-camera-icon{
+  width:58px;
+  height:58px;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  background:rgba(255,255,255,.88);
+  font-size:32px;
+  line-height:1;
+}
+
+.smart-camera-tool-title{
+  font-size:18px;
+  font-weight:900;
+}
+
+.smart-camera-tool-hint{
+  font-size:13px;
+  font-weight:800;
+  opacity:.86;
+  line-height:1.5;
+}
