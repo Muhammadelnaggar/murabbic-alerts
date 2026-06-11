@@ -12761,15 +12761,15 @@ function closeupDecisionSrv(fd = {}) {
     return "❌ لا يمكن تسجيل التحضير — الحيوان خارج القطيع.";
   }
 
-   // الحالة التناسلية — قبل نوع القطيع
- const rsRaw = String(
-  fd.reproStatusFromEvents ||
-  fd.reproductiveStatus ||
-  doc.reproductiveStatus ||
-  doc.reproStatus ||
-  doc.productionStatus ||
-  ""
-).trim();
+    // الحالة التناسلية — وثيقة الحيوان الحالية أولًا
+  const rsRaw = String(
+    doc.reproductiveStatus ||
+    doc.reproStatus ||
+    doc.productionStatus ||
+    fd.reproductiveStatus ||
+    fd.reproStatusFromEvents ||
+    ""
+  ).trim();
 
   const rsNorm = calvingStripArSrv(rsRaw);
 
