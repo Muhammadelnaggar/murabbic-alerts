@@ -9,348 +9,6 @@
   <link rel="stylesheet" href="css/forms.css">
 
 
-  <style>
-    :root{
-      --bg:#f7faf7;
-      --card:#ffffff;
-      --text:#0f172a;
-      --muted:#64748b;
-      --border:#e2e8f0;
-      --brand:#0ea05a;
-      --brand-600:#0b7f47;
-      --danger:#c2410c;
-    }
-
-    .mbk-top{
-      position: sticky; top:0; z-index:50;
-      background:#fff;
-      border-bottom:1px solid var(--border);
-    }
-    .mbk-head{
-      max-width:980px;
-      margin:0 auto;
-      padding:10px 12px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-    }
-    .mbk-title{ line-height:1.1; }
-    .mbk-page{ font-size:18px; font-weight:900; color:var(--text); }
-    .mbk-app{ font-size:13px; font-weight:900; color:var(--brand-600); opacity:.9; }
-    .mbk-logo{ height:46px; width:auto; object-fit:contain; opacity:.95; }
-
-    *{box-sizing:border-box}
-   body{
-  margin:0;
-  padding-bottom:8px;
-  background:var(--bg);
-  font-family:'Cairo','Arial',sans-serif;
-  color:var(--text);
-}
-
-  .context-strip{
-  margin:10px 12px 8px;
-  padding:10px 12px;
-  background:rgba(255,255,255,.92);
-  border:1px solid rgba(14,160,90,.18);
-  border-radius:18px;
-  box-shadow:0 8px 18px rgba(15,23,42,.06);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:10px;
-  flex-wrap:nowrap;
-}
-
-.context-item{
-  min-width:0;
-  font-size:14px;
-  font-weight:900;
-  color:var(--text);
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-
-.context-sep{
-  width:1px;
-  height:22px;
-  background:rgba(14,160,90,.22);
-  flex:0 0 auto;
-}
-
-.warning{
-  min-height:22px;
-  margin:0 12px;
-  text-align:center;
-  color:var(--danger);
-  font-size:14px;
-  font-weight:800;
-}
-
-@media(max-width:390px){
-  .context-strip{
-    gap:7px;
-    padding:9px 10px;
-  }
-
-  .context-item{
-    font-size:13px;
-  }
-}
-    .form{
-      margin:12px;
-      padding:14px;
-      background:var(--card);
-      border-radius:12px;
-      box-shadow:0 2px 5px rgba(0,0,0,.08);
-      display:grid;
-      gap:10px
-    }
-
-    .form input, .form textarea{
-      width:100%;
-      padding:12px;
-      border:1px solid #ccc;
-      border-radius:10px;
-      font-size:16px;
-      font-family:inherit;
-    }
-
-    .hint{
-      font-size:13px;
-      color:var(--muted);
-      line-height:1.6;
-      padding:0 2px;
-    }
-
-   .grid{
-  margin:12px;
-  display:grid;
-  gap:14px;
-}
-
-.event-section{
-  background:#fff;
-  border:1px solid rgba(226,232,240,.95);
-  border-radius:18px;
-  padding:12px;
-  box-shadow:0 8px 18px rgba(15,23,42,.05);
-}
-
-.event-section-title{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  margin:0 0 10px;
-  color:var(--brand-600);
-  font-size:15px;
-  font-weight:900;
-}
-
-.event-list{
-  display:grid;
-  gap:8px;
-}
-
-.btn{
-  width:100%;
-  padding:12px 13px;
-  background:linear-gradient(135deg,#fff 0%,#fbfffc 100%);
-  border:1px solid var(--border);
-  border-radius:14px;
-  font-family:inherit;
-  cursor:pointer;
-  text-align:right;
-  transition:.18s ease;
-  box-shadow:0 2px 8px rgba(15,23,42,.04);
-  font-size:15px;
-  font-weight:900;
-  color:var(--text);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-}
-
-.btn::after{
-  content:'←';
-  color:var(--brand-600);
-  font-weight:900;
-  opacity:.75;
-}
-
-.btn small{
-  display:block;
-  margin-top:3px;
-  font-size:12px;
-  font-weight:700;
-  color:var(--muted);
-  line-height:1.35;
-}
-
-.btn:hover{
-  background:linear-gradient(135deg,rgba(14,160,90,.10),#fff);
-  border-color:rgba(14,160,90,.45);
-  transform:translateY(-1px);
-  box-shadow:0 8px 18px rgba(14,160,90,.10);
-  color:var(--text);
-}
-
-.btn-main{
-  display:block;
-}
-
-@media(min-width:768px){
-  .event-list{
-    grid-template-columns:repeat(2,1fr);
-  }
-}
-    #inlineMsg{margin:12px;padding:10px;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:10px;display:none}
-    #inlineMsg .text{font-size:14px;font-weight:700;color:var(--text);text-align:center}
-    .import-box{
-  margin:12px;
-  padding:14px;
-  background:linear-gradient(135deg,#eefaf2 0%, #f8fffb 100%);
-  border:2px dashed #86cfa0;
-  border-radius:16px;
-  box-shadow:0 4px 10px rgba(14,160,90,.08);
-}
-
-.import-title{
-  font-size:15px;
-  font-weight:900;
-  color:var(--brand-600);
-  margin:0 0 6px;
-  text-align:center;
-}
-
-.import-sub{
-  font-size:13px;
-  color:var(--muted);
-  text-align:center;
-  line-height:1.7;
-  margin:0 0 12px;
-}
-
-.btn-import-milk{
-  display:block;
-  width:calc(100% - 24px);
-  margin:12px 12px 84px;
-  padding:15px 16px;
-  border:none;
-  border-radius:14px;
-  background:linear-gradient(135deg,#0ea05a 0%, #13b767 100%);
-  color:#fff;
-  font-size:17px;
-  font-weight:900;
-  font-family:inherit;
-  cursor:pointer;
-  box-shadow:0 8px 18px rgba(14,160,90,.20);
-  transition:.2s ease;
-}
-
-.btn-import-milk:hover{
-  transform:translateY(-2px);
-  box-shadow:0 12px 24px rgba(14,160,90,.24);
-}
-
-.btn-import-milk small{
-  display:block;
-  font-size:12px;
-  font-weight:700;
-  opacity:.95;
-  margin-top:4px;
-}
-
-@media (max-width:480px){
-  .btn-import-milk{
-    font-size:16px;
-    padding:14px;
-  }
-}
-    .event-list-hero{
-  margin:10px 12px 4px;
-}
-
-.event-list-hero-btn{
-  width:100%;
-  border:1px solid rgba(14,160,90,.22);
-  border-radius:18px;
-  padding:13px 14px;
-  background:
-    linear-gradient(135deg, rgba(14,160,90,.10), rgba(255,255,255,.96)),
-    #fff;
-  color:var(--text);
-  font-family:inherit;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:12px;
-  box-shadow:0 8px 18px rgba(15,23,42,.07);
-  transition:.18s ease;
-}
-
-.event-list-hero-btn:hover{
-  transform:translateY(-1px);
-  border-color:rgba(14,160,90,.45);
-  box-shadow:0 12px 24px rgba(14,160,90,.12);
-}
-
-.event-list-hero-icon{
-  width:42px;
-  height:42px;
-  border-radius:14px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#ecfdf5;
-  border:1px solid #bbf7d0;
-  font-size:20px;
-  flex:0 0 auto;
-}
-
-.event-list-hero-btn b{
-  display:block;
-  font-size:15px;
-  font-weight:900;
-  color:var(--brand-600);
-  line-height:1.3;
-}
-
-.event-list-hero-btn small{
-  display:block;
-  margin-top:3px;
-  font-size:12px;
-  font-weight:700;
-  color:var(--muted);
-  line-height:1.4;
-}
-    .mbk-bottom-nav{
-      position:fixed;
-      bottom:0; left:0; right:0;
-      height:58px;
-      background:#ffffff;
-      border-top:1px solid var(--border);
-      display:flex;
-      justify-content:space-around;
-      align-items:center;
-      z-index:9999;
-    }
-    .mbk-bottom-nav .mbk-nav-link{
-      text-decoration:none;
-      padding:8px 14px;
-      border-radius:999px;
-      border:1px solid var(--border);
-      background:#ffffff;
-      color:var(--text);
-      font-size:0.9rem;
-      white-space:nowrap;
-    }
-    .mbk-nav-link-disabled{opacity:0.5; pointer-events:none;}
-  </style>
 </head>
 
 <body>
@@ -365,38 +23,38 @@
     </div>
   </header>
 
- <div class="context-strip">
-  <div class="context-item" id="animalInfo">🐄 الحيوان الحالي: غير محدد</div>
-  <div class="context-sep"></div>
-  <div class="context-item" id="dateInfo">📅 التاريخ الحالي: —</div>
+ <div class="mbk-context-strip">
+  <div class="mbk-context-item" id="animalInfo">🐄 الحيوان الحالي: غير محدد</div>
+  <div class="mbk-context-sep"></div>
+  <div class="mbk-context-item" id="dateInfo">📅 التاريخ الحالي: —</div>
 </div>
 
-<div class="warning" id="warn"></div>
-  <div class="event-list-hero">
-  <button type="button" id="btnEventListTop" class="event-list-hero-btn">
-    <span class="event-list-hero-icon">📜</span>
+<div class="mbk-page-warn" id="warn"></div>
+  <div class="mbk-action-hero">
+  <button type="button" id="btnEventListTop" class="mbk-action-hero-btn">
+    <span class="mbk-action-hero-icon">📜</span>
     <span>
       <b>قائمة أحداث الحيوان</b>
       <small>عرض سجل الحيوان الحالي والفلاتر من السيرفر</small>
     </span>
   </button>
 </div>
-  <div class="form">
+ <div class="mbk-action-form">
     <!-- ✅ حقل واحد (فردي/جماعي) -->
     <textarea id="animalNumbers" inputmode="numeric" placeholder="أرقام الحيوانات (اكتب رقمًا واحدًا أو عدة أرقام... كل رقم في سطر)"
       style="min-height:110px; line-height:1.6; resize:vertical;"></textarea>
     <div style="display:grid; gap:8px;">
-  <button type="button" class="btn" id="btnPickGroup">📦 تحميل مجموعة من المجموعات</button>
+  <button type="button" class="mbk-action-tile" id="btnPickGroup">📦 تحميل مجموعة من المجموعات</button>
 
   <select id="groupSelect" style="display:none; width:100%; padding:12px; border:1px solid #ccc; border-radius:10px; font-size:16px; font-family:inherit;">
     <option value="">اختر مجموعة...</option>
   </select>
 
-  <div id="groupHint" class="hint" style="display:none">
+  <div id="groupHint" class="mbk-action-hint" style="display:none">
     عند اختيار مجموعة، سيقوم مُرَبِّيك بتحميل أرقام الحيوانات الخام داخل نفس الحقل الحالي، ثم تُرسل لأي صفحة حدث بالطريقة المعتادة.
   </div>
 </div>
-    <div class="hint">
+    <div class="mbk-action-hint">
       ✅ للموبايل: اكتب كل رقم في سطر (زر Enter).<br>
       مثال:<br>
       <b>31</b> ثم Enter ثم <b>32</b>
@@ -407,111 +65,111 @@
 
   <div id="inlineMsg"><div class="text"></div></div>
 
- <div class="grid" id="eventButtons">
+<div class="mbk-action-hub" id="eventButtons">
 
-  <section class="event-section">
-    <h3 class="event-section-title">🧬 التناسل وإدارة دورة الإنتاج</h3>
-    <div class="event-list">
-      <button class="btn" data-page="calving.html">
-        <span class="btn-main">👶 ولادة <small>تسجيل ولادة وتحديث حالة الحيوان</small></span>
+  <section class="mbk-action-section">
+    <h3 class="mbk-action-section-title">🧬 التناسل وإدارة دورة الإنتاج</h3>
+    <div class="mbk-action-list">
+      <button class="mbk-action-tile" data-page="calving.html">
+        <span class="mbk-action-tile-main">👶 ولادة <small>تسجيل ولادة وتحديث حالة الحيوان</small></span>
       </button>
 
-      <button class="btn" data-page="insemination.html">
-        <span class="btn-main">📅 تلقيح <small>فردي أو جماعي حسب قرار السيرفر</small></span>
+      <button class="mbk-action-tile" data-page="insemination.html">
+        <span class="mbk-action-tile-main">📅 تلقيح <small>فردي أو جماعي حسب قرار السيرفر</small></span>
       </button>
 
-      <button class="btn" data-page="pregnancy-diagnosis.html">
-        <span class="btn-main">🧪 تشخيص حمل <small>سونار أو جس وتحديث الحالة</small></span>
+      <button class="mbk-action-tile" data-page="pregnancy-diagnosis.html">
+        <span class="mbk-action-tile-main">🧪 تشخيص حمل <small>سونار أو جس وتحديث الحالة</small></span>
       </button>
 
-      <button class="btn" data-page="heat.html">
-        <span class="btn-main">🔥 شياع <small>تسجيل الشياع ومتابعة الحيوان</small></span>
+      <button class="mbk-action-tile" data-page="heat.html">
+        <span class="mbk-action-tile-main">🔥 شياع <small>تسجيل الشياع ومتابعة الحيوان</small></span>
       </button>
 
-      <button class="btn" data-page="ovysynch.html">
-        <span class="btn-main">📌 تزامن <small>بروتوكول التبويض والتلقيح الإجباري</small></span>
+      <button class="mbk-action-tile" data-page="ovysynch.html">
+        <span class="mbk-action-tile-main">📌 تزامن <small>بروتوكول التبويض والتلقيح الإجباري</small></span>
       </button>
 
-      <button class="btn" data-page="abortion.html">
-        <span class="btn-main">🩸 إجهاض <small>تسجيل الإجهاض وتحليل الحالة</small></span>
+      <button class="mbk-action-tile" data-page="abortion.html">
+        <span class="mbk-action-tile-main">🩸 إجهاض <small>تسجيل الإجهاض وتحليل الحالة</small></span>
       </button>
 
-      <button class="btn" data-page="dry-off.html">
-        <span class="btn-main">🚫 تجفيف <small>نقل الحيوان لمرحلة الجفاف</small></span>
+      <button class="mbk-action-tile" data-page="dry-off.html">
+        <span class="mbk-action-tile-main">🚫 تجفيف <small>نقل الحيوان لمرحلة الجفاف</small></span>
       </button>
 
-      <button class="btn" data-page="close-up.html">
-        <span class="btn-main">🍼 تحضير للولادة <small>إدخال الحيوان أو المجموعة لمرحلة الانتظار</small></span>
-      </button>
-    </div>
-  </section>
-
-  <section class="event-section">
-    <h3 class="event-section-title">🥛 الإنتاج والتغذية</h3>
-    <div class="event-list">
-      <button class="btn" data-page="daily-milk.html">
-        <span class="btn-main">🥛 إنتاج اللبن اليومي <small>تسجيل إنتاج فردي أو جماعي</small></span>
-      </button>
-
-      <button class="btn" data-page="nutrition.html">
-        <span class="btn-main">🌿 تغذية <small>عليقة وتحليل اقتصادي من السيرفر</small></span>
+      <button class="mbk-action-tile" data-page="close-up.html">
+        <span class="mbk-action-tile-main">🍼 تحضير للولادة <small>إدخال الحيوان أو المجموعة لمرحلة الانتظار</small></span>
       </button>
     </div>
   </section>
 
-  <section class="event-section">
-    <h3 class="event-section-title">💉 الصحة والرعاية</h3>
-    <div class="event-list">
-      <button class="btn" data-page="vaccination.html">
-        <span class="btn-main">💉 تحصين <small>تحصين فردي أو جماعي مع منع التكرار</small></span>
+  <section class="mbk-action-section">
+    <h3 class="mbk-action-section-title">🥛 الإنتاج والتغذية</h3>
+    <div class="mbk-action-list">
+      <button class="mbk-action-tile" data-page="daily-milk.html">
+        <span class="mbk-action-tile-main">🥛 إنتاج اللبن اليومي <small>تسجيل إنتاج فردي أو جماعي</small></span>
       </button>
 
-      <button class="btn" data-page="disease.html">
-        <span class="btn-main">🔬 التشخيص <small>تسجيل حالة مرضية أو فحص صحي</small></span>
-      </button>
-
-      <button class="btn" id="btnTrimming" data-action="trimming">
-        <span class="btn-main">🦶 تقليم الحوافر <small>حفظ فردي أو جماعي من السيرفر</small></span>
-      </button>
-
-      <button class="btn" data-page="supernumerary-teat-removal.html">
-        <span class="btn-main">✂️ إزالة الحلمات الزائدة <small>تسجيل إجراء الرعاية</small></span>
+      <button class="mbk-action-tile" data-page="nutrition.html">
+        <span class="mbk-action-tile-main">🌿 تغذية <small>عليقة وتحليل اقتصادي من السيرفر</small></span>
       </button>
     </div>
   </section>
 
-  <section class="event-section">
-    <h3 class="event-section-title">📦 إدارة القطيع</h3>
-    <div class="event-list">
-      <button class="btn" data-page="weaning.html">
-        <span class="btn-main">🐮 فطام <small>تسجيل الفطام وتحديث السجل</small></span>
+  <section class="mbk-action-section">
+    <h3 class="mbk-action-section-title">💉 الصحة والرعاية</h3>
+    <div class="mbk-action-list">
+      <button class="mbk-action-tile" data-page="vaccination.html">
+        <span class="mbk-action-tile-main">💉 تحصين <small>تحصين فردي أو جماعي مع منع التكرار</small></span>
       </button>
 
-      <button class="btn" data-page="sale.html">
-        <span class="btn-main">💰 بيع <small>أرشفة الحيوان كمباع</small></span>
+      <button class="mbk-action-tile" data-page="disease.html">
+        <span class="mbk-action-tile-main">🔬 التشخيص <small>تسجيل حالة مرضية أو فحص صحي</small></span>
       </button>
 
-      <button class="btn" data-page="death.html">
-        <span class="btn-main">☠️ نفوق <small>أرشفة الحيوان كنافق</small></span>
+      <button class="mbk-action-tile" id="btnTrimming" data-action="trimming">
+        <span class="mbk-action-tile-main">🦶 تقليم الحوافر <small>حفظ فردي أو جماعي من السيرفر</small></span>
       </button>
 
-      <button class="btn" data-page="cull.html">
-        <span class="btn-main">🚫 استبعاد <small>تسجيل سبب الاستبعاد</small></span>
+      <button class="mbk-action-tile" data-page="supernumerary-teat-removal.html">
+        <span class="mbk-action-tile-main">✂️ إزالة الحلمات الزائدة <small>تسجيل إجراء الرعاية</small></span>
       </button>
     </div>
   </section>
 
-  <section class="event-section">
-    <h3 class="event-section-title">🤖 أدوات ذكية</h3>
-    <div class="event-list">
-      <button class="btn" data-page="smart-camera.html">
-        <span class="btn-main">🤖 الكاميرا الذكية <small>تحليلات الرؤية والتقييمات الذكية</small></span>
+  <section class="mbk-action-section">
+    <h3 class="mbk-action-section-title">📦 إدارة القطيع</h3>
+    <div class="mbk-action-list">
+      <button class="mbk-action-tile" data-page="weaning.html">
+        <span class="mbk-action-tile-main">🐮 فطام <small>تسجيل الفطام وتحديث السجل</small></span>
+      </button>
+
+      <button class="mbk-action-tile" data-page="sale.html">
+        <span class="mbk-action-tile-main">💰 بيع <small>أرشفة الحيوان كمباع</small></span>
+      </button>
+
+      <button class="mbk-action-tile" data-page="death.html">
+        <span class="mbk-action-tile-main">☠️ نفوق <small>أرشفة الحيوان كنافق</small></span>
+      </button>
+
+      <button class="mbk-action-tile" data-page="cull.html">
+        <span class="mbk-action-tile-main">🚫 استبعاد <small>تسجيل سبب الاستبعاد</small></span>
+      </button>
+    </div>
+  </section>
+
+  <section class="mbk-action-section">
+    <h3 class="mbk-action-section-title">🤖 أدوات ذكية</h3>
+    <div class="mbk-action-list">
+      <button class="mbk-action-tile" data-page="smart-camera.html">
+        <span class="mbk-action-tile-main">🤖 الكاميرا الذكية <small>تحليلات الرؤية والتقييمات الذكية</small></span>
       </button>
     </div>
   </section>
 
 </div>
- <button type="button" class="btn-import-milk" id="btnMilkImport">📥 استيراد اللبن / باتش</button>
+<button type="button" class="mbk-import-action" id="btnMilkImport">📥 استيراد اللبن / باتش</button>
  
  
  <script>
@@ -838,7 +496,7 @@
     }
 
     function wireButtons(){
-      $$('#eventButtons .btn[data-page]').forEach(btn=>{
+     $$('#eventButtons [data-page]').forEach(btn=>{
         btn.addEventListener('click', async (e)=>{
           e.preventDefault();
 
