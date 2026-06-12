@@ -5,7 +5,7 @@
   <title>إضافة حيوان</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+
   <style>
     
     body{
@@ -415,411 +415,52 @@
    </form>
 </main>
 
-  <!-- واجهة النموذج (سلالات/حسابات تلقائية) -->
-  <script>
-    (function(){
-      const animalTypeEl = document.getElementById('animalType');
-      const breedEl = document.getElementById('breed');
-      const productionEl = document.getElementById('productionStatus');
-      const milkField = document.getElementById('milkField');
-      const dailyMilk = document.getElementById('dailyMilk');
-      const reproductiveEl = document.getElementById('reproductiveStatus');
-      const inseminationField = document.getElementById('inseminationField');
-      const lastInseminationDate = document.getElementById('lastInseminationDate');
-      const sireField = document.getElementById('sireField');
-      const sireNumber = document.getElementById('sireNumber');
-      const lastCalvingDate = document.getElementById('lastCalvingDate');
-      const daysInMilk = document.getElementById('daysInMilk');
-      const pregnancyBox = document.getElementById('pregnancyBox');
-      const pregnancyDays = document.getElementById('pregnancyDays');
-const entryType = document.getElementById('entryType');
-const btnMothers = document.getElementById('btnMothers');
-const btnFollowers = document.getElementById('btnFollowers');
-const btnImport = document.getElementById('btnImport');
-const sharedAnimalFields = document.getElementById('sharedAnimalFields');
-const mothersFields = document.getElementById('mothersFields');
-const followersFields = document.getElementById('followersFields');
-const importFields = document.getElementById('importFields');
-const primaryActionBtn = document.getElementById('primaryActionBtn');
-const dashboardBtn = document.getElementById('dashboardBtn');
-const followerSex = document.getElementById('followerSex');
-const followerStatus = document.getElementById('followerStatus');
-const damNumber = document.getElementById('damNumber');
-const weaningField = document.getElementById('weaningField');
-const weaningDate = document.getElementById('weaningDate');
-const followerInseminationField = document.getElementById('followerInseminationField');
-const followerLastInseminationDate = document.getElementById('followerLastInseminationDate');
-const followerServicesCount = document.getElementById('followerServicesCount');
-const followerSireNumber = document.getElementById('followerSireNumber');
-const followerPregnancyBox = document.getElementById('followerPregnancyBox');
-const followerPregnancyDays = document.getElementById('followerPregnancyDays');  
-      const importBypassIds = [
-  'animalNumber',
-  'animalType',
-  'breed',
-  'birthDate',
-  'productionStatus',
-  'dailyMilk',
-  'reproductiveStatus',
-  'servicesCount',
-  'lactationNumber',
-  'lastCalvingDate',
-  'daysInMilk',
-  'pregnancyDays',
-  'lastInseminationDate',
-  'sireNumber',
-  'followerSex',
-  'followerStatus',
-  'damNumber',
-  'weaningDate',
-  'followerLastInseminationDate',
-  'followerServicesCount',
-  'followerSireNumber',
-  'followerPregnancyDays'
-];
+ <script>
+  (function(){
+    const entryType = document.getElementById('entryType');
+    const btnMothers = document.getElementById('btnMothers');
+    const btnFollowers = document.getElementById('btnFollowers');
+    const btnImport = document.getElementById('btnImport');
 
-function setImportValidationBypass(on) {
-  importBypassIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
+    const sharedAnimalFields = document.getElementById('sharedAnimalFields');
+    const mothersFields = document.getElementById('mothersFields');
+    const followersFields = document.getElementById('followersFields');
+    const importFields = document.getElementById('importFields');
+    const primaryActionBtn = document.getElementById('primaryActionBtn');
 
-    if (on) {
-      if (el.hasAttribute('data-field')) {
-        el.setAttribute('data-orig-field', el.getAttribute('data-field'));
-        el.removeAttribute('data-field');
-      }
-    } else {
-      if (!el.hasAttribute('data-field') && el.hasAttribute('data-orig-field')) {
-        el.setAttribute('data-field', el.getAttribute('data-orig-field'));
-        el.removeAttribute('data-orig-field');
-      }
+    function setEntryMode(mode){
+      entryType.value = mode;
+
+      const mothers = mode === 'mothers';
+      const followers = mode === 'followers';
+      const importing = mode === 'import';
+
+      sharedAnimalFields.classList.toggle('hidden-block', importing);
+      mothersFields.classList.toggle('hidden-block', !mothers);
+      followersFields.classList.toggle('hidden-block', !followers);
+      importFields.classList.toggle('hidden-block', !importing);
+
+      btnMothers.classList.toggle('active', mothers);
+      btnFollowers.classList.toggle('active', followers);
+      btnImport.classList.toggle('active', importing);
+
+      primaryActionBtn.textContent = importing ? 'حفظ الاستيراد' : '📥 تسجيل الحيوان';
     }
-  });
-}
-      const cowBreeds = ["خليط","هولشتاين","جيرسي","مونبليار","سيمينتال","أخرى"];
-      const buffaloBreeds = ["مصري","هجين إيطالي","هجين هندي"];
 
-      function updateBreedOptionsLocal(){
-        const type = animalTypeEl.value;
-        const breeds = (type === "بقرة") ? cowBreeds : (type === "جاموسة") ? buffaloBreeds : [];
-        breedEl.innerHTML = '<option value="">اختر السلالة</option>' + breeds.map(b=>`<option value="${b}">${b}</option>`).join('');
-      }
+    btnMothers?.addEventListener('click', () => setEntryMode('mothers'));
+    btnFollowers?.addEventListener('click', () => setEntryMode('followers'));
+    btnImport?.addEventListener('click', () => setEntryMode('import'));
 
-      function toggleMilkFieldLocal(){
-        const show = (productionEl.value === "حلاب");
-        milkField.style.display = show ? "block" : "none";
-        dailyMilk.required = show; if(!show) dailyMilk.value = "";
-        toggleMilkVsPregnancy();
-      }
-
- function toggleInseminationFieldLocal(){
-  const val = reproductiveEl.value;
-  const showByRep = (val === "ملقحة" || val === "عشار" || val === "مفتوحة");
-  const showByProd = (productionEl.value === "جاف");
-  const show = showByRep || showByProd;
-
-  inseminationField.style.display = show ? "block" : "none";
-  lastInseminationDate.required = (val === "ملقحة" || val === "عشار" || productionEl.value === "جاف");
-  if(!show){ lastInseminationDate.value = ""; }
-
-  const showSire = (val === "ملقحة" || val === "عشار");
-  sireField.style.display = showSire ? "block" : "none";
-  sireNumber.required = showSire;
-  if(!showSire){ sireNumber.value = ""; }
-}
-
-      function toggleCalvingForLactation(){
-  const mothersMode = (entryType.value === "mothers");
-  if (!mothersMode){
-    lastCalvingDate.value = "";
-    lastCalvingDate.disabled = true;
-    lastCalvingDate.required = false;
-    daysInMilk.value = "";
-    daysInMilk.disabled = true;
-    return;
-  }
-
-  lastCalvingDate.disabled = false;
-  lastCalvingDate.required = true;
-
-  if (productionEl.value === "جاف"){
-    daysInMilk.value = "";
-    daysInMilk.disabled = true;
-  } else {
-    daysInMilk.disabled = false;
-  }
-}
-
-      function computeDIM(){
-        if (productionEl.value === "جاف") { daysInMilk.value=""; return; }
-        const calv = lastCalvingDate.value;
-        if (!calv){ daysInMilk.value = ""; return; }
-        const d0 = new Date(calv), d1 = new Date();
-        d0.setHours(0,0,0,0); d1.setHours(0,0,0,0);
-        const diff = Math.max(0, Math.round((d1-d0)/86400000));
-        daysInMilk.value = String(diff);
-      }
-
-      function computePregnancy(){
-        if (productionEl.value !== "جاف"){ pregnancyDays.value=""; return; }
-        const ins = lastInseminationDate.value;
-        if (!ins){ pregnancyDays.value=""; return; }
-        const d0 = new Date(ins), d1 = new Date();
-        d0.setHours(0,0,0,0); d1.setHours(0,0,0,0);
-        const diff = Math.max(0, Math.round((d1-d0)/86400000));
-        pregnancyDays.value = String(diff);
-      }
-
-      function toggleMilkVsPregnancy(){
-        const isDry = (productionEl.value === "جاف");
-        if (isDry){
-          daysInMilk.value = "";
-          daysInMilk.disabled = true;
-          pregnancyBox.style.display = "block";
-          pregnancyDays.disabled = false;
-          computePregnancy();
-        }else{
-          pregnancyBox.style.display = "none";
-          pregnancyDays.value = "";
-          pregnancyDays.disabled = true;
-            daysInMilk.disabled = false;
-            computeDIM();
-          }
-        }
-     function updateFollowerStatusOptions(){
-  const sex = followerSex.value;
-  const femaleOptions = ["رضيع","فطام","نامي","تحت التلقيح","ملقح","عشار"];
-  const maleOptions = ["رضيع","فطام","نامي"];
-  const list = sex === "ذكر" ? maleOptions : sex === "أنثى" ? femaleOptions : [];
-
-  followerStatus.innerHTML =
-    '<option value="">اختر الحالة</option>' +
-    list.map(v => `<option value="${v}">${v}</option>`).join('');
-}
-
-function computeFollowerPregnancy(){
-  if (followerStatus.value !== "عشار"){
-    followerPregnancyDays.value = "";
-    return;
-  }
-  const ins = followerLastInseminationDate.value;
-  if (!ins){
-    followerPregnancyDays.value = "";
-    return;
-  }
-  const d0 = new Date(ins), d1 = new Date();
-  d0.setHours(0,0,0,0);
-  d1.setHours(0,0,0,0);
-  const diff = Math.max(0, Math.round((d1 - d0) / 86400000));
-  followerPregnancyDays.value = String(diff);
-}
-
-function toggleFollowerFields(){
-  const st = followerStatus.value;
-
-  const showWeaning = (st === "فطام");
-  weaningField.classList.toggle('hidden-block', !showWeaning);
-  weaningDate.required = (entryType.value === "followers" && showWeaning);
-
-  const showInsemination = (st === "ملقح" || st === "عشار");
-  followerInseminationField.classList.toggle('hidden-block', !showInsemination);
-  followerLastInseminationDate.required = (entryType.value === "followers" && showInsemination);
-
-  const showPregnancy = (st === "عشار");
-  followerPregnancyBox.classList.toggle('hidden-block', !showPregnancy);
-
-  if (!showWeaning){
-    weaningDate.value = "";
-  }
-
-  if (!showInsemination){
-    followerLastInseminationDate.value = "";
-    followerServicesCount.value = "";
-    followerSireNumber.value = "";
-  }
-
-  if (!showPregnancy){
-    followerPregnancyDays.value = "";
-  } else {
-    computeFollowerPregnancy();
-  }
-}
-
-
- function setEntryMode(mode){
-  entryType.value = mode;
-
- const mothers = (mode === "mothers");
-const followers = (mode === "followers");
-const importing = (mode === "import");
-setImportValidationBypass(importing);
-sharedAnimalFields.classList.toggle('hidden-block', importing);
-mothersFields.classList.toggle('hidden-block', !mothers);
-followersFields.classList.toggle('hidden-block', !followers);
-importFields.classList.toggle('hidden-block', !importing);
-primaryActionBtn.textContent = importing ? 'حفظ الاستيراد' : '📥 تسجيل الحيوان';
-
-  btnMothers.classList.toggle('active', mothers);
-  btnFollowers.classList.toggle('active', followers);
-  btnImport.classList.toggle('active', importing);
-
-const sharedRequiredIds = [
-  'animalNumber',
-  'animalType',
-  'breed'
-];
-
-const motherRequiredIds = [
-  'productionStatus',
-  'reproductiveStatus'
-];
-
-const followerRequiredIds = [
-  'followerSex',
-  'followerStatus',
-  'damNumber'
-];
-
-sharedRequiredIds.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.required = !importing;
-});
-
-motherRequiredIds.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.required = mothers;
-});
-
-followerRequiredIds.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.required = followers;
-});
+    document.addEventListener('DOMContentLoaded', () => {
+      setEntryMode('mothers');
+    });
+  })();
+</script>
  
-
-  if (weaningDate) {
-    weaningDate.required = (followers && followerStatus.value === "فطام");
-  }
-
-  if (followerLastInseminationDate) {
-    followerLastInseminationDate.required = (followers && (followerStatus.value === "ملقح" || followerStatus.value === "عشار"));
-  }
-
- const sharedDisabledIds = ['animalNumber','animalType','breed','birthDate'];
-const mothersDisabledIds = [
-  'productionStatus','dailyMilk','reproductiveStatus',
-  'servicesCount','lactationNumber','lastCalvingDate',
-  'daysInMilk','pregnancyDays','lastInseminationDate','sireNumber'
-];
-const followersDisabledIds = [
-  'followerSex','followerStatus','damNumber','weaningDate',
-  'followerLastInseminationDate','followerServicesCount',
-  'followerSireNumber','followerPregnancyDays'
-];
-
-sharedDisabledIds.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.disabled = importing;
-});
-
-mothersDisabledIds.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.disabled = importing || !mothers;
-});
-
-followersDisabledIds.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.disabled = importing || !followers;
-});
-
-    toggleCalvingForLactation();
-  toggleMilkFieldLocal();
-  toggleInseminationFieldLocal();
-
-  const msgBox = document.getElementById('msg');
-  if (msgBox) {
-    msgBox.className = '';
-    msgBox.style.display = 'none';
-    msgBox.innerHTML = '';
-  }
-
-  const sysBar = document.querySelector('.mbk-infobar, .sysbar, #sysbar, #statusBar');
-  if (sysBar) {
-    sysBar.className = 'infobar mbk-infobar';
-    sysBar.style.display = 'none';
-    sysBar.innerHTML = '';
-  }
-}
-      ['change','input'].forEach(e=>animalTypeEl.addEventListener(e,updateBreedOptionsLocal));
-      ['change','input'].forEach(e=>productionEl.addEventListener(e,()=>{toggleMilkFieldLocal();toggleInseminationFieldLocal();}));
-      ['change','input'].forEach(e=>reproductiveEl.addEventListener(e,toggleInseminationFieldLocal));
-      ['change','input'].forEach(e=>lastCalvingDate.addEventListener(e,computeDIM));
-      ['change','input'].forEach(e=>lastInseminationDate.addEventListener(e,computePregnancy));
-     
-btnMothers.addEventListener('click', ()=> setEntryMode('mothers'));
-btnFollowers.addEventListener('click', ()=> setEntryMode('followers'));
-btnImport.addEventListener('click', ()=> setEntryMode('import'));
- 
-      followerSex.addEventListener('change', ()=>{
-  updateFollowerStatusOptions();
-  toggleFollowerFields();
-});
-
-followerStatus.addEventListener('change', toggleFollowerFields);
-followerLastInseminationDate.addEventListener('change', computeFollowerPregnancy);
-followerLastInseminationDate.addEventListener('input', computeFollowerPregnancy);
- document.addEventListener('DOMContentLoaded', ()=>{
-  updateBreedOptionsLocal();
-  toggleCalvingForLactation();
-  toggleMilkFieldLocal();
-  toggleInseminationFieldLocal();
-  toggleMilkVsPregnancy();
-  computeDIM();
-  computePregnancy();
-  setEntryMode('mothers');
-  updateFollowerStatusOptions();
-  toggleFollowerFields(); 
-});
-
-      window.__mbkUI = { updateBreedOptions: updateBreedOptionsLocal, toggleMilkField: toggleMilkFieldLocal, toggleInseminationField: toggleInseminationFieldLocal, computeDIM, computePregnancy, toggleCalvingForLactation };
-    })();
-  </script>
-
-  <script>
-    if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1');
-    (function () {
-      window.dataLayer = window.dataLayer || [];
-      window.__sentEvents = window.__sentEvents || new Set();
-      window.t = window.t || { event: function (name, props){ try{
-        props = props || {};
-        if (name === 'page_view'){
-          var key = 'pv:' + (props.page || location.pathname);
-          if (window.__sentEvents.has(key)) return;
-          window.__sentEvents.add(key);
-        }
-        dataLayer.push({event:name, ts:Date.now(), ...props});
-      }catch{}}};
-      t.event('page_view', { page: location.pathname });
-    })();
-
-    window.flashOK = function(text, ms = 1600){
-      const box = document.getElementById('msg');
-      if (!box) return;
-      box.className = 'toast show';
-      box.style.display = 'block';
-      box.innerHTML = `
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2"></circle>
-          <path d="M7 12l3 3 7-7" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-        </svg>
-        <div>${text}</div>
-        <div class="bar"><span></span></div>
-      `;
-      setTimeout(()=>{ box.className = 'toast'; box.style.display = 'none'; box.innerHTML = ''; }, ms + 80);
-    };
-  </script>
 
 <script>
   const form = document.getElementById("animalForm");
+  form.noValidate = true;
   const msgDiv = document.getElementById("msg");
 
   const bar = window.ensureInfoBar ? window.ensureInfoBar(form) : null;
@@ -907,8 +548,18 @@ followerLastInseminationDate.addEventListener('input', computeFollowerPregnancy)
       location.href = DASHBOARD_URL;
     });
   });
+function collectAddAnimalFormData(){
+  const out = {};
 
-  form.addEventListener("mbk:valid", async (e) => {
+  document.querySelectorAll("[data-field]").forEach(el => {
+    if (!el || !el.dataset || !el.dataset.field) return;
+    out[el.dataset.field] = el.value ?? "";
+  });
+
+  return out;
+}
+  form.addEventListener("submit", async (e) => {
+  e.preventDefault();
     try {
       if (msgDiv) msgDiv.style.display = "none";
 
@@ -939,7 +590,7 @@ followerLastInseminationDate.addEventListener('input', computeFollowerPregnancy)
         return;
       }
 
-      const formData = e.detail?.formData || {};
+     const formData = collectAddAnimalFormData();
 
       const res = await postAddAnimalApi("/api/add-animal/save", {
         formData
@@ -1153,9 +804,7 @@ if (msgBox) {
     }
   });
 </script>
-  <script type="module" src="/js/timeline.js"></script>
-  <script type="module" src="/js/smart-checks.js"></script>
-  <script src="/js/tenant-bootstrap.js"></script>
+
 </body>
 </html>
 
