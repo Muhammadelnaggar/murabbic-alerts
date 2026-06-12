@@ -978,7 +978,143 @@ function addAnimalImportRowsSrv(body = {}) {
     .map(r => (r && typeof r === "object") ? r : {})
     .filter(r => Object.keys(r).length > 0);
 }
+function addAnimalImportDecodeBase64Srv(fileBase64 = "") {
+  const raw = String(fileBase64 || "").trim();
 
+  if (!raw) return Buffer.alloc(0);
+
+  const clean = raw.includes(",")
+    ? raw.split(",").pop()
+    : raw;
+
+  return Buffer.from(clean, "base64");
+}
+
+function addAnimalImportSplitCsvLineSrv(line) {
+  const out = [];
+  let cur = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    const next = line[i + 1];
+
+    if (ch === '"') {
+      if (inQuotes && next === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === "," && !inQuotes) {
+      out.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+
+  out.push(cur.trim());
+  return out;
+}
+
+function addAnimalImportParseCsvTextSrv(text = "") {
+  const lines = String(text || "")
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if (!lines.length) return [];
+
+  const headers = addAnimalImportSplitCsvLineSrv(lines[0])
+    .map(h => String(h || "").trim())
+    .filter(Boolean);
+
+  if (!headers.length) return [];
+
+  return lines.slice(1).map(line => {
+    const vals = addAnimalImportSplitCsvLineSrv(line);
+    const row = {};
+
+    headers.forEach((h, i) => {
+      row[h] = vals[i] ?? "";
+    });
+
+    return row;
+  }).filter(r => Object.keys(r).length > 0);
+}
+
+function addAnimalImportNormalizeSheetRowsSrv(rows = []) {
+  if (!Array.isArray(rows) || !rows.length) return [];
+
+  return rows
+    .map(r => {
+      const clean = {};
+
+      Object.keys(r || {}).forEach(k => {
+        const key = String(k || "").trim();
+        if (!key) return;
+        clean[key] = r[k] == null ? "" : String(r[k]).trim();
+      });
+
+      return clean;
+    })
+    .filter(r => Object.keys(r).length > 0);
+}
+
+function addAnimalImportParseUploadedFileSrv(body = {}) {
+  const fileName = String(body.fileName || body.filename || "").toLowerCase().trim();
+  const fileBase64 = String(body.fileBase64 || body.base64 || "").trim();
+
+  if (!fileBase64) return [];
+
+  const buf = addAnimalImportDecodeBase64Srv(fileBase64);
+
+  if (!buf.length) return [];
+
+  if (fileName.endsWith(".csv") || fileName.endsWith(".txt")) {
+    return addAnimalImportParseCsvTextSrv(buf.toString("utf8"));
+  }
+
+  if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+    let XLSX = null;
+
+    try {
+      XLSX = require("xlsx");
+    } catch (e) {
+      const err = new Error("xlsx_package_missing");
+      err.code = "xlsx_package_missing";
+      throw err;
+    }
+
+    const wb = XLSX.read(buf, { type: "buffer" });
+    const firstSheetName = wb.SheetNames?.[0];
+
+    if (!firstSheetName) return [];
+
+    const sheet = wb.Sheets[firstSheetName];
+
+    if (!sheet) return [];
+
+    const jsonRows = XLSX.utils.sheet_to_json(sheet, {
+      defval: "",
+      raw: false
+    });
+
+    return addAnimalImportNormalizeSheetRowsSrv(jsonRows);
+  }
+
+  return [];
+}
+
+function addAnimalImportRowsFromBodySrv(body = {}) {
+  const existing = addAnimalImportRowsSrv(body);
+
+  if (existing.length) return existing;
+
+  return addAnimalImportParseUploadedFileSrv(body);
+}
 function addAnimalImportKindSrv(body = {}) {
   const raw = addAnimalStrSrv(
     body.importKind ||
@@ -1138,8 +1274,7 @@ app.post("/api/add-animal/import-preview", requireUserId, async (req, res) => {
     const body = req.body || {};
     const importKind = addAnimalImportKindSrv(body);
     const collectionName = importKind === "followers" ? "calves" : "animals";
-    const rows = addAnimalImportRowsSrv(body);
-
+   const rows = addAnimalImportRowsFromBodySrv(body);
     if (!rows.length) {
       return res.status(400).json({
         ok: false,
@@ -1204,6 +1339,15 @@ app.post("/api/add-animal/import-preview", requireUserId, async (req, res) => {
   } catch (e) {
     console.error("add-animal-import-preview failed", e);
 
+    if (e?.code === "xlsx_package_missing" || e?.message === "xlsx_package_missing") {
+      return res.status(500).json({
+        ok: false,
+        error: "xlsx_package_missing",
+        message: "قراءة ملفات Excel تحتاج تثبيت حزمة xlsx على السيرفر.",
+        rows: []
+      });
+    }
+
     return res.status(500).json({
       ok: false,
       error: "add_animal_import_preview_failed",
@@ -1230,7 +1374,7 @@ app.post("/api/add-animal/import-save", requireUserId, async (req, res) => {
     const body = req.body || {};
     const importKind = addAnimalImportKindSrv(body);
     const collectionName = importKind === "followers" ? "calves" : "animals";
-    const rows = addAnimalImportRowsSrv(body);
+    const rows = addAnimalImportRowsFromBodySrv(body);
     const importSource = addAnimalStrSrv(body.importSource || body.profileKey || "server_import");
 
     if (!rows.length) {
