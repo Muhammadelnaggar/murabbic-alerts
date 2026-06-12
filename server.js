@@ -16,7 +16,7 @@ const EVENT_SYNONYMS = {
   daily_milk: ['daily milk', 'daily_milk', 'لبن يومي', 'اللبن اليومي', 'لبن'],
   nutrition: ['nutrition', 'تغذية', 'عليقة'],
   weaning: ['weaning', 'فطام'],
-  lameness: ['lameness', 'عرج'],
+  lameness: ['lameness', 'عرج'], 
   hoof_trimming: ['hoof trimming', 'تقليم حوافر', 'حافر'], 
   vaccination: ['vaccination', 'تحصين', 'تطعيم'],
   milking_status: ['milking', 'milking status', 'حلاب'],
