@@ -328,10 +328,7 @@
     <button class="btn" data-page="smart-camera.html">🤖 الكاميرا الذكية</button>
   </div>
  <button type="button" class="btn-import-milk" id="btnMilkImport">📥 استيراد اللبن / باتش</button>
-  <script>window.dataLayer = window.dataLayer || [];</script>
-  <script src="/js/app-core.js"></script>
-  <script src="/js/tenant-bootstrap.js"></script>
-  <script type="module" src="/js/api.js"></script>
+ 
  
  <script>
   function updateCowCardNav(number, multi){
@@ -729,12 +726,7 @@ function wireEventListTop(){
         box.querySelector('.text').textContent = j.message || '✅ تم تسجيل تقليم الحوافر.';
         box.style.display = 'block';
 
-        window.dataLayer.push({
-          event: 'event_saved',
-          eventType: 'trimming',
-          count: Array.isArray(j.saved) ? j.saved.length : numbers.length,
-          date
-        });
+       
 
       } catch(err){
         const box = document.getElementById('inlineMsg');
