@@ -1486,6 +1486,66 @@ app.post("/api/add-animal/import-save", requireUserId, async (req, res) => {
   }
 });
 // ============================================================
+//                 API: ADD ANIMAL — PAGE OPTIONS
+//                 اختيارات صفحة إضافة الحيوان من السيرفر فقط
+// ============================================================
+
+app.get("/api/add-animal/options", requireUserId, async (req, res) => {
+  try {
+    return res.json({
+      ok: true,
+      animalTypes: [
+        { value: "بقرة", label: "بقرة" },
+        { value: "جاموسة", label: "جاموسة" }
+      ],
+      breeds: [
+        { value: "خليط", label: "خليط", species: "cow" },
+        { value: "هولشتاين", label: "هولشتاين", species: "cow" },
+        { value: "جيرسي", label: "جيرسي", species: "cow" },
+        { value: "مونبليار", label: "مونبليار", species: "cow" },
+        { value: "سيمينتال", label: "سيمينتال", species: "cow" },
+        { value: "أخرى", label: "أخرى", species: "cow" },
+
+        { value: "مصري", label: "مصري", species: "buffalo" },
+        { value: "هجين إيطالي", label: "هجين إيطالي", species: "buffalo" },
+        { value: "هجين هندي", label: "هجين هندي", species: "buffalo" }
+      ],
+      productionStatuses: [
+        { value: "حلاب", label: "حلاب" },
+        { value: "جاف", label: "جاف" }
+      ],
+      reproductiveStatuses: [
+        { value: "حديث الولادة", label: "حديث الولادة" },
+        { value: "ملقحة", label: "ملقحة" },
+        { value: "عشار", label: "عشار" },
+        { value: "مفتوحة", label: "مفتوحة" },
+        { value: "إجهاض", label: "إجهاض" }
+      ],
+      followerSexes: [
+        { value: "أنثى", label: "أنثى" },
+        { value: "ذكر", label: "ذكر" }
+      ],
+      followerStatuses: [
+        { value: "رضيع", label: "رضيع" },
+        { value: "فطام", label: "فطام" },
+        { value: "نامي", label: "نامي" },
+        { value: "تحت التلقيح", label: "تحت التلقيح" },
+        { value: "ملقح", label: "ملقح" },
+        { value: "عشار", label: "عشار" }
+      ]
+    });
+
+  } catch (e) {
+    console.error("add-animal-options failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "add_animal_options_failed",
+      message: "تعذّر تحميل اختيارات صفحة إضافة الحيوان."
+    });
+  }
+});
+// ============================================================
 //                 EVENTS PAGE: SERVER-ONLY CONTEXT / GROUPS / RESOLVE
 //                 صفحة الأحداث تسأل السيرفر — الواجهة عرض فقط لاحقًا
 // ============================================================
