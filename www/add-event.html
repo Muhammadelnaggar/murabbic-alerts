@@ -78,34 +78,88 @@
       padding:0 2px;
     }
 
-    .grid{
-      display:grid;
-      grid-template-columns:repeat(2,1fr);
-      gap:12px;
-      margin:12px;
-    }
-    @media(min-width:768px){.grid{grid-template-columns:repeat(3,1fr);} }
+   .grid{
+  margin:12px;
+  display:grid;
+  gap:14px;
+}
 
-    .btn{
-      padding:14px;
-      background:#fff;
-      border:1px solid var(--border);
-      border-radius:12px;
-      font-weight:700;
-      cursor:pointer;
-      text-align:center;
-      transition:.2s;
-      box-shadow:0 2px 5px rgba(0,0,0,.06);
-      font-size:16px
-    }
-    .btn:hover{
-      background:var(--brand);
-      border-color:var(--brand);
-      color:#fff;
-      transform:translateY(-2px);
-      box-shadow:0 6px 12px rgba(0,0,0,.12)
-    }
+.event-section{
+  background:#fff;
+  border:1px solid rgba(226,232,240,.95);
+  border-radius:18px;
+  padding:12px;
+  box-shadow:0 8px 18px rgba(15,23,42,.05);
+}
 
+.event-section-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:0 0 10px;
+  color:var(--brand-600);
+  font-size:15px;
+  font-weight:900;
+}
+
+.event-list{
+  display:grid;
+  gap:8px;
+}
+
+.btn{
+  width:100%;
+  padding:12px 13px;
+  background:linear-gradient(135deg,#fff 0%,#fbfffc 100%);
+  border:1px solid var(--border);
+  border-radius:14px;
+  font-family:inherit;
+  cursor:pointer;
+  text-align:right;
+  transition:.18s ease;
+  box-shadow:0 2px 8px rgba(15,23,42,.04);
+  font-size:15px;
+  font-weight:900;
+  color:var(--text);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.btn::after{
+  content:'←';
+  color:var(--brand-600);
+  font-weight:900;
+  opacity:.75;
+}
+
+.btn small{
+  display:block;
+  margin-top:3px;
+  font-size:12px;
+  font-weight:700;
+  color:var(--muted);
+  line-height:1.35;
+}
+
+.btn:hover{
+  background:linear-gradient(135deg,rgba(14,160,90,.10),#fff);
+  border-color:rgba(14,160,90,.45);
+  transform:translateY(-1px);
+  box-shadow:0 8px 18px rgba(14,160,90,.10);
+  color:var(--text);
+}
+
+.btn-main{
+  display:block;
+}
+
+@media(min-width:768px){
+  .event-list{
+    grid-template-columns:repeat(2,1fr);
+  }
+}
     #inlineMsg{margin:12px;padding:10px;background:#f1f8e9;border:1px solid #c5e1a5;border-radius:10px;display:none}
     #inlineMsg .text{font-size:14px;font-weight:700;color:var(--text);text-align:center}
     .import-box{
@@ -302,27 +356,110 @@
 
   <div id="inlineMsg"><div class="text"></div></div>
 
-  <div class="grid" id="eventButtons">
-    <button class="btn" data-page="calving.html">👶 ولادة</button>
-    <button class="btn" data-page="insemination.html">📅 تلقيح</button>
-    <button class="btn" data-page="vaccination.html">💉 تحصين</button>
-    <button class="btn" data-page="dry-off.html">🚫 تجفيف</button>
-    <button class="btn" data-page="close-up.html">🍼 تحضير للولادة</button>
-    <button class="btn" data-page="daily-milk.html">🥛 إنتاج اللبن اليومي</button>
-    <button class="btn" data-page="nutrition.html">🌿 تغذية</button>
-    <button class="btn" data-page="pregnancy-diagnosis.html">🧪 تشخيص الحمل</button>
-    <button class="btn" data-page="disease.html">🔬 التشخيص</button>
-    <button class="btn" id="btnTrimming" data-action="trimming">🦶 تقليم الحوافر</button>
-    <button class="btn" data-page="abortion.html">🩸 إجهاض</button>
-    <button class="btn" data-page="weaning.html">🐮 فطام</button>
-    <button class="btn" data-page="supernumerary-teat-removal.html">✂️ إزالة الحلمات الزائدة</button>
-    <button class="btn" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
-    <button class="btn" data-page="heat.html">🔥 شياع</button>
-    <button class="btn" data-page="death.html">☠️ نفوق</button>
-    <button class="btn" data-page="cull.html">🚫 استبعاد</button>
-    <button class="btn" data-page="sale.html">💰 بيع</button>
-    <button class="btn" data-page="smart-camera.html">🤖 الكاميرا الذكية</button>
-  </div>
+ <div class="grid" id="eventButtons">
+
+  <section class="event-section">
+    <h3 class="event-section-title">🧬 التناسل وإدارة دورة الإنتاج</h3>
+    <div class="event-list">
+      <button class="btn" data-page="calving.html">
+        <span class="btn-main">👶 ولادة <small>تسجيل ولادة وتحديث حالة الحيوان</small></span>
+      </button>
+
+      <button class="btn" data-page="insemination.html">
+        <span class="btn-main">📅 تلقيح <small>فردي أو جماعي حسب قرار السيرفر</small></span>
+      </button>
+
+      <button class="btn" data-page="pregnancy-diagnosis.html">
+        <span class="btn-main">🧪 تشخيص حمل <small>سونار أو جس وتحديث الحالة</small></span>
+      </button>
+
+      <button class="btn" data-page="heat.html">
+        <span class="btn-main">🔥 شياع <small>تسجيل الشياع ومتابعة الحيوان</small></span>
+      </button>
+
+      <button class="btn" data-page="ovysynch.html">
+        <span class="btn-main">📌 تزامن <small>بروتوكول التبويض والتلقيح الإجباري</small></span>
+      </button>
+
+      <button class="btn" data-page="abortion.html">
+        <span class="btn-main">🩸 إجهاض <small>تسجيل الإجهاض وتحليل الحالة</small></span>
+      </button>
+
+      <button class="btn" data-page="dry-off.html">
+        <span class="btn-main">🚫 تجفيف <small>نقل الحيوان لمرحلة الجفاف</small></span>
+      </button>
+
+      <button class="btn" data-page="close-up.html">
+        <span class="btn-main">🍼 تحضير للولادة <small>إدخال الحيوان أو المجموعة لمرحلة الانتظار</small></span>
+      </button>
+    </div>
+  </section>
+
+  <section class="event-section">
+    <h3 class="event-section-title">🥛 الإنتاج والتغذية</h3>
+    <div class="event-list">
+      <button class="btn" data-page="daily-milk.html">
+        <span class="btn-main">🥛 إنتاج اللبن اليومي <small>تسجيل إنتاج فردي أو جماعي</small></span>
+      </button>
+
+      <button class="btn" data-page="nutrition.html">
+        <span class="btn-main">🌿 تغذية <small>عليقة وتحليل اقتصادي من السيرفر</small></span>
+      </button>
+    </div>
+  </section>
+
+  <section class="event-section">
+    <h3 class="event-section-title">💉 الصحة والرعاية</h3>
+    <div class="event-list">
+      <button class="btn" data-page="vaccination.html">
+        <span class="btn-main">💉 تحصين <small>تحصين فردي أو جماعي مع منع التكرار</small></span>
+      </button>
+
+      <button class="btn" data-page="disease.html">
+        <span class="btn-main">🔬 التشخيص <small>تسجيل حالة مرضية أو فحص صحي</small></span>
+      </button>
+
+      <button class="btn" id="btnTrimming" data-action="trimming">
+        <span class="btn-main">🦶 تقليم الحوافر <small>حفظ فردي أو جماعي من السيرفر</small></span>
+      </button>
+
+      <button class="btn" data-page="supernumerary-teat-removal.html">
+        <span class="btn-main">✂️ إزالة الحلمات الزائدة <small>تسجيل إجراء الرعاية</small></span>
+      </button>
+    </div>
+  </section>
+
+  <section class="event-section">
+    <h3 class="event-section-title">📦 إدارة القطيع</h3>
+    <div class="event-list">
+      <button class="btn" data-page="weaning.html">
+        <span class="btn-main">🐮 فطام <small>تسجيل الفطام وتحديث السجل</small></span>
+      </button>
+
+      <button class="btn" data-page="sale.html">
+        <span class="btn-main">💰 بيع <small>أرشفة الحيوان كمباع</small></span>
+      </button>
+
+      <button class="btn" data-page="death.html">
+        <span class="btn-main">☠️ نفوق <small>أرشفة الحيوان كنافق</small></span>
+      </button>
+
+      <button class="btn" data-page="cull.html">
+        <span class="btn-main">🚫 استبعاد <small>تسجيل سبب الاستبعاد</small></span>
+      </button>
+    </div>
+  </section>
+
+  <section class="event-section">
+    <h3 class="event-section-title">🤖 أدوات ذكية</h3>
+    <div class="event-list">
+      <button class="btn" data-page="smart-camera.html">
+        <span class="btn-main">🤖 الكاميرا الذكية <small>تحليلات الرؤية والتقييمات الذكية</small></span>
+      </button>
+    </div>
+  </section>
+
+</div>
  <button type="button" class="btn-import-milk" id="btnMilkImport">📥 استيراد اللبن / باتش</button>
  
  
