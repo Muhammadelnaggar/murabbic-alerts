@@ -5,7 +5,7 @@
   <title>إضافة حيوان</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+ 
   <style>
     
     body{
@@ -255,7 +255,7 @@
   </div>
 </header>
  <main class="mbk-main">
-  <form id="animalForm" class="mbk-form">
+ <form id="animalForm" class="mbk-form" novalidate>
     <div id="msg"></div>
 <div id="entryTypeBox" class="entry-type-box">
   <button type="button" id="btnMothers" class="entry-tab active">أمهات</button>
@@ -267,7 +267,7 @@
 
 <div id="sharedAnimalFields">
   <label for="animalNumber">رقم الحيوان:</label>
-  <input type="text" id="animalNumber" required data-field="animalNumber" />
+ <input type="text" id="animalNumber" data-field="animalNumber" />
 
   <label for="animalType">نوع الحيوان:</label>
   <select id="animalType" required data-field="animalType">
@@ -415,375 +415,215 @@
    </form>
 </main>
 
-  <!-- واجهة النموذج (سلالات/حسابات تلقائية) -->
-  <script>
-    (function(){
-      const animalTypeEl = document.getElementById('animalType');
-      const breedEl = document.getElementById('breed');
-      const productionEl = document.getElementById('productionStatus');
-      const milkField = document.getElementById('milkField');
-      const dailyMilk = document.getElementById('dailyMilk');
-      const reproductiveEl = document.getElementById('reproductiveStatus');
-      const inseminationField = document.getElementById('inseminationField');
-      const lastInseminationDate = document.getElementById('lastInseminationDate');
-      const sireField = document.getElementById('sireField');
-      const sireNumber = document.getElementById('sireNumber');
-      const lastCalvingDate = document.getElementById('lastCalvingDate');
-      const daysInMilk = document.getElementById('daysInMilk');
-      const pregnancyBox = document.getElementById('pregnancyBox');
-      const pregnancyDays = document.getElementById('pregnancyDays');
-const entryType = document.getElementById('entryType');
-const btnMothers = document.getElementById('btnMothers');
-const btnFollowers = document.getElementById('btnFollowers');
-const btnImport = document.getElementById('btnImport');
-const sharedAnimalFields = document.getElementById('sharedAnimalFields');
-const mothersFields = document.getElementById('mothersFields');
-const followersFields = document.getElementById('followersFields');
-const importFields = document.getElementById('importFields');
-const primaryActionBtn = document.getElementById('primaryActionBtn');
-const dashboardBtn = document.getElementById('dashboardBtn');
-const followerSex = document.getElementById('followerSex');
-const followerStatus = document.getElementById('followerStatus');
-const damNumber = document.getElementById('damNumber');
-const weaningField = document.getElementById('weaningField');
-const weaningDate = document.getElementById('weaningDate');
-const followerInseminationField = document.getElementById('followerInseminationField');
-const followerLastInseminationDate = document.getElementById('followerLastInseminationDate');
-const followerServicesCount = document.getElementById('followerServicesCount');
-const followerSireNumber = document.getElementById('followerSireNumber');
-const followerPregnancyBox = document.getElementById('followerPregnancyBox');
-const followerPregnancyDays = document.getElementById('followerPregnancyDays');  
-      const importBypassIds = [
-  'animalNumber',
-  'animalType',
-  'breed',
-  'birthDate',
-  'productionStatus',
-  'dailyMilk',
-  'reproductiveStatus',
-  'servicesCount',
-  'lactationNumber',
-  'lastCalvingDate',
-  'daysInMilk',
-  'pregnancyDays',
-  'lastInseminationDate',
-  'sireNumber',
-  'followerSex',
-  'followerStatus',
-  'damNumber',
-  'weaningDate',
-  'followerLastInseminationDate',
-  'followerServicesCount',
-  'followerSireNumber',
-  'followerPregnancyDays'
-];
+<!-- واجهة النموذج فقط: إظهار/إخفاء الحقول بدون تحقق أو حساب -->
+<script>
+(function(){
+  const $ = (id) => document.getElementById(id);
 
-function setImportValidationBypass(on) {
-  importBypassIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
+  const animalTypeEl = $("animalType");
+  const breedEl = $("breed");
+  const productionEl = $("productionStatus");
+  const reproductiveEl = $("reproductiveStatus");
 
-    if (on) {
-      if (el.hasAttribute('data-field')) {
-        el.setAttribute('data-orig-field', el.getAttribute('data-field'));
-        el.removeAttribute('data-field');
-      }
-    } else {
-      if (!el.hasAttribute('data-field') && el.hasAttribute('data-orig-field')) {
-        el.setAttribute('data-field', el.getAttribute('data-orig-field'));
-        el.removeAttribute('data-orig-field');
-      }
+  const entryType = $("entryType");
+  const btnMothers = $("btnMothers");
+  const btnFollowers = $("btnFollowers");
+  const btnImport = $("btnImport");
+
+  const sharedAnimalFields = $("sharedAnimalFields");
+  const mothersFields = $("mothersFields");
+  const followersFields = $("followersFields");
+  const importFields = $("importFields");
+  const primaryActionBtn = $("primaryActionBtn");
+  const dashboardBtn = $("dashboardBtn");
+
+  const milkField = $("milkField");
+  const inseminationField = $("inseminationField");
+  const sireField = $("sireField");
+  const pregnancyBox = $("pregnancyBox");
+
+  const followerSex = $("followerSex");
+  const followerStatus = $("followerStatus");
+  const weaningField = $("weaningField");
+  const followerInseminationField = $("followerInseminationField");
+  const followerPregnancyBox = $("followerPregnancyBox");
+
+  const cowBreeds = ["خليط","هولشتاين","جيرسي","مونبليار","سيمينتال","أخرى"];
+  const buffaloBreeds = ["مصري","هجين إيطالي","هجين هندي"];
+
+  function updateBreedOptionsLocal(){
+    if (!animalTypeEl || !breedEl) return;
+
+    const type = animalTypeEl.value;
+    const breeds =
+      type === "بقرة" ? cowBreeds :
+      type === "جاموسة" ? buffaloBreeds :
+      [];
+
+    const current = breedEl.value;
+
+    breedEl.innerHTML =
+      '<option value="">اختر السلالة</option>' +
+      breeds.map(b => `<option value="${b}">${b}</option>`).join("");
+
+    if (breeds.includes(current)) {
+      breedEl.value = current;
     }
+  }
+
+  function toggleMotherFields(){
+    const prod = productionEl?.value || "";
+    const repro = reproductiveEl?.value || "";
+
+    if (milkField) {
+      milkField.style.display = prod === "حلاب" ? "block" : "none";
+    }
+
+    const showInsemination =
+      repro === "ملقحة" ||
+      repro === "عشار" ||
+      repro === "مفتوحة" ||
+      prod === "جاف";
+
+    if (inseminationField) {
+      inseminationField.style.display = showInsemination ? "block" : "none";
+    }
+
+    if (sireField) {
+      sireField.style.display =
+        (repro === "ملقحة" || repro === "عشار") ? "block" : "none";
+    }
+
+    if (pregnancyBox) {
+      pregnancyBox.style.display = prod === "جاف" ? "block" : "none";
+    }
+  }
+
+  function updateFollowerStatusOptions(){
+    if (!followerSex || !followerStatus) return;
+
+    const sex = followerSex.value;
+    const current = followerStatus.value;
+
+    const femaleOptions = ["رضيع","فطام","نامي","تحت التلقيح","ملقح","عشار"];
+    const maleOptions = ["رضيع","فطام","نامي"];
+
+    const list =
+      sex === "ذكر" ? maleOptions :
+      sex === "أنثى" ? femaleOptions :
+      [];
+
+    followerStatus.innerHTML =
+      '<option value="">اختر الحالة</option>' +
+      list.map(v => `<option value="${v}">${v}</option>`).join("");
+
+    if (list.includes(current)) {
+      followerStatus.value = current;
+    }
+  }
+
+  function toggleFollowerFields(){
+    const st = followerStatus?.value || "";
+
+    if (weaningField) {
+      weaningField.classList.toggle("hidden-block", st !== "فطام");
+    }
+
+    if (followerInseminationField) {
+      followerInseminationField.classList.toggle(
+        "hidden-block",
+        !(st === "ملقح" || st === "عشار")
+      );
+    }
+
+    if (followerPregnancyBox) {
+      followerPregnancyBox.classList.toggle("hidden-block", st !== "عشار");
+    }
+  }
+
+  function setSectionEnabled(root, enabled){
+    if (!root) return;
+
+    root.querySelectorAll("input, select, textarea, button").forEach((el) => {
+      if (el.id === "previewImportBtn") return;
+      el.disabled = !enabled;
+    });
+  }
+
+  function setEntryMode(mode){
+    if (!entryType) return;
+
+    entryType.value = mode;
+
+    const mothers = mode === "mothers";
+    const followers = mode === "followers";
+    const importing = mode === "import";
+
+    sharedAnimalFields?.classList.toggle("hidden-block", importing);
+    mothersFields?.classList.toggle("hidden-block", !mothers);
+    followersFields?.classList.toggle("hidden-block", !followers);
+    importFields?.classList.toggle("hidden-block", !importing);
+
+    setSectionEnabled(sharedAnimalFields, !importing);
+    setSectionEnabled(mothersFields, mothers);
+    setSectionEnabled(followersFields, followers);
+    setSectionEnabled(importFields, importing);
+
+    if (entryType) entryType.disabled = false;
+
+    if (primaryActionBtn) {
+      primaryActionBtn.textContent = importing ? "حفظ الاستيراد" : "📥 تسجيل الحيوان";
+      primaryActionBtn.disabled = false;
+    }
+
+    btnMothers?.classList.toggle("active", mothers);
+    btnFollowers?.classList.toggle("active", followers);
+    btnImport?.classList.toggle("active", importing);
+
+    toggleMotherFields();
+    updateFollowerStatusOptions();
+    toggleFollowerFields();
+
+    const msgBox = $("msg");
+    if (msgBox) {
+      msgBox.className = "";
+      msgBox.style.display = "none";
+      msgBox.innerHTML = "";
+    }
+  }
+
+  animalTypeEl?.addEventListener("change", updateBreedOptionsLocal);
+  productionEl?.addEventListener("change", toggleMotherFields);
+  reproductiveEl?.addEventListener("change", toggleMotherFields);
+
+  btnMothers?.addEventListener("click", () => setEntryMode("mothers"));
+  btnFollowers?.addEventListener("click", () => setEntryMode("followers"));
+  btnImport?.addEventListener("click", () => setEntryMode("import"));
+
+  followerSex?.addEventListener("change", () => {
+    updateFollowerStatusOptions();
+    toggleFollowerFields();
   });
-}
-      const cowBreeds = ["خليط","هولشتاين","جيرسي","مونبليار","سيمينتال","أخرى"];
-      const buffaloBreeds = ["مصري","هجين إيطالي","هجين هندي"];
 
-      function updateBreedOptionsLocal(){
-        const type = animalTypeEl.value;
-        const breeds = (type === "بقرة") ? cowBreeds : (type === "جاموسة") ? buffaloBreeds : [];
-        breedEl.innerHTML = '<option value="">اختر السلالة</option>' + breeds.map(b=>`<option value="${b}">${b}</option>`).join('');
-      }
+  followerStatus?.addEventListener("change", toggleFollowerFields);
 
-      function toggleMilkFieldLocal(){
-        const show = (productionEl.value === "حلاب");
-        milkField.style.display = show ? "block" : "none";
-        dailyMilk.required = show; if(!show) dailyMilk.value = "";
-        toggleMilkVsPregnancy();
-      }
+  dashboardBtn?.addEventListener("click", () => {
+    location.href = "dashboard.html";
+  });
 
- function toggleInseminationFieldLocal(){
-  const val = reproductiveEl.value;
-  const showByRep = (val === "ملقحة" || val === "عشار" || val === "مفتوحة");
-  const showByProd = (productionEl.value === "جاف");
-  const show = showByRep || showByProd;
+  document.addEventListener("DOMContentLoaded", () => {
+    updateBreedOptionsLocal();
+    setEntryMode("mothers");
+  });
 
-  inseminationField.style.display = show ? "block" : "none";
-  lastInseminationDate.required = (val === "ملقحة" || val === "عشار" || productionEl.value === "جاف");
-  if(!show){ lastInseminationDate.value = ""; }
-
-  const showSire = (val === "ملقحة" || val === "عشار");
-  sireField.style.display = showSire ? "block" : "none";
-  sireNumber.required = showSire;
-  if(!showSire){ sireNumber.value = ""; }
-}
-
-      function toggleCalvingForLactation(){
-  const mothersMode = (entryType.value === "mothers");
-  if (!mothersMode){
-    lastCalvingDate.value = "";
-    lastCalvingDate.disabled = true;
-    lastCalvingDate.required = false;
-    daysInMilk.value = "";
-    daysInMilk.disabled = true;
-    return;
-  }
-
-  lastCalvingDate.disabled = false;
-  lastCalvingDate.required = true;
-
-  if (productionEl.value === "جاف"){
-    daysInMilk.value = "";
-    daysInMilk.disabled = true;
-  } else {
-    daysInMilk.disabled = false;
-  }
-}
-
-      function computeDIM(){
-        if (productionEl.value === "جاف") { daysInMilk.value=""; return; }
-        const calv = lastCalvingDate.value;
-        if (!calv){ daysInMilk.value = ""; return; }
-        const d0 = new Date(calv), d1 = new Date();
-        d0.setHours(0,0,0,0); d1.setHours(0,0,0,0);
-        const diff = Math.max(0, Math.round((d1-d0)/86400000));
-        daysInMilk.value = String(diff);
-      }
-
-      function computePregnancy(){
-        if (productionEl.value !== "جاف"){ pregnancyDays.value=""; return; }
-        const ins = lastInseminationDate.value;
-        if (!ins){ pregnancyDays.value=""; return; }
-        const d0 = new Date(ins), d1 = new Date();
-        d0.setHours(0,0,0,0); d1.setHours(0,0,0,0);
-        const diff = Math.max(0, Math.round((d1-d0)/86400000));
-        pregnancyDays.value = String(diff);
-      }
-
-      function toggleMilkVsPregnancy(){
-        const isDry = (productionEl.value === "جاف");
-        if (isDry){
-          daysInMilk.value = "";
-          daysInMilk.disabled = true;
-          pregnancyBox.style.display = "block";
-          pregnancyDays.disabled = false;
-          computePregnancy();
-        }else{
-          pregnancyBox.style.display = "none";
-          pregnancyDays.value = "";
-          pregnancyDays.disabled = true;
-            daysInMilk.disabled = false;
-            computeDIM();
-          }
-        }
-     function updateFollowerStatusOptions(){
-  const sex = followerSex.value;
-  const femaleOptions = ["رضيع","فطام","نامي","تحت التلقيح","ملقح","عشار"];
-  const maleOptions = ["رضيع","فطام","نامي"];
-  const list = sex === "ذكر" ? maleOptions : sex === "أنثى" ? femaleOptions : [];
-
-  followerStatus.innerHTML =
-    '<option value="">اختر الحالة</option>' +
-    list.map(v => `<option value="${v}">${v}</option>`).join('');
-}
-
-function computeFollowerPregnancy(){
-  if (followerStatus.value !== "عشار"){
-    followerPregnancyDays.value = "";
-    return;
-  }
-  const ins = followerLastInseminationDate.value;
-  if (!ins){
-    followerPregnancyDays.value = "";
-    return;
-  }
-  const d0 = new Date(ins), d1 = new Date();
-  d0.setHours(0,0,0,0);
-  d1.setHours(0,0,0,0);
-  const diff = Math.max(0, Math.round((d1 - d0) / 86400000));
-  followerPregnancyDays.value = String(diff);
-}
-
-function toggleFollowerFields(){
-  const st = followerStatus.value;
-
-  const showWeaning = (st === "فطام");
-  weaningField.classList.toggle('hidden-block', !showWeaning);
-  weaningDate.required = (entryType.value === "followers" && showWeaning);
-
-  const showInsemination = (st === "ملقح" || st === "عشار");
-  followerInseminationField.classList.toggle('hidden-block', !showInsemination);
-  followerLastInseminationDate.required = (entryType.value === "followers" && showInsemination);
-
-  const showPregnancy = (st === "عشار");
-  followerPregnancyBox.classList.toggle('hidden-block', !showPregnancy);
-
-  if (!showWeaning){
-    weaningDate.value = "";
-  }
-
-  if (!showInsemination){
-    followerLastInseminationDate.value = "";
-    followerServicesCount.value = "";
-    followerSireNumber.value = "";
-  }
-
-  if (!showPregnancy){
-    followerPregnancyDays.value = "";
-  } else {
-    computeFollowerPregnancy();
-  }
-}
-
-
- function setEntryMode(mode){
-  entryType.value = mode;
-
- const mothers = (mode === "mothers");
-const followers = (mode === "followers");
-const importing = (mode === "import");
-setImportValidationBypass(importing);
-sharedAnimalFields.classList.toggle('hidden-block', importing);
-mothersFields.classList.toggle('hidden-block', !mothers);
-followersFields.classList.toggle('hidden-block', !followers);
-importFields.classList.toggle('hidden-block', !importing);
-primaryActionBtn.textContent = importing ? 'حفظ الاستيراد' : '📥 تسجيل الحيوان';
-
-  btnMothers.classList.toggle('active', mothers);
-  btnFollowers.classList.toggle('active', followers);
-  btnImport.classList.toggle('active', importing);
-
-const sharedRequiredIds = [
-  'animalNumber',
-  'animalType',
-  'breed'
-];
-
-const motherRequiredIds = [
-  'productionStatus',
-  'reproductiveStatus'
-];
-
-const followerRequiredIds = [
-  'followerSex',
-  'followerStatus',
-  'damNumber'
-];
-
-sharedRequiredIds.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.required = !importing;
-});
-
-motherRequiredIds.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.required = mothers;
-});
-
-followerRequiredIds.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.required = followers;
-});
- 
-
-  if (weaningDate) {
-    weaningDate.required = (followers && followerStatus.value === "فطام");
-  }
-
-  if (followerLastInseminationDate) {
-    followerLastInseminationDate.required = (followers && (followerStatus.value === "ملقح" || followerStatus.value === "عشار"));
-  }
-
- const sharedDisabledIds = ['animalNumber','animalType','breed','birthDate'];
-const mothersDisabledIds = [
-  'productionStatus','dailyMilk','reproductiveStatus',
-  'servicesCount','lactationNumber','lastCalvingDate',
-  'daysInMilk','pregnancyDays','lastInseminationDate','sireNumber'
-];
-const followersDisabledIds = [
-  'followerSex','followerStatus','damNumber','weaningDate',
-  'followerLastInseminationDate','followerServicesCount',
-  'followerSireNumber','followerPregnancyDays'
-];
-
-sharedDisabledIds.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.disabled = importing;
-});
-
-mothersDisabledIds.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.disabled = importing || !mothers;
-});
-
-followersDisabledIds.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.disabled = importing || !followers;
-});
-
-    toggleCalvingForLactation();
-  toggleMilkFieldLocal();
-  toggleInseminationFieldLocal();
-
-  const msgBox = document.getElementById('msg');
-  if (msgBox) {
-    msgBox.className = '';
-    msgBox.style.display = 'none';
-    msgBox.innerHTML = '';
-  }
-
-  const sysBar = document.querySelector('.mbk-infobar, .sysbar, #sysbar, #statusBar');
-  if (sysBar) {
-    sysBar.className = 'infobar mbk-infobar';
-    sysBar.style.display = 'none';
-    sysBar.innerHTML = '';
-  }
-}
-      ['change','input'].forEach(e=>animalTypeEl.addEventListener(e,updateBreedOptionsLocal));
-      ['change','input'].forEach(e=>productionEl.addEventListener(e,()=>{toggleMilkFieldLocal();toggleInseminationFieldLocal();}));
-      ['change','input'].forEach(e=>reproductiveEl.addEventListener(e,toggleInseminationFieldLocal));
-      ['change','input'].forEach(e=>lastCalvingDate.addEventListener(e,computeDIM));
-      ['change','input'].forEach(e=>lastInseminationDate.addEventListener(e,computePregnancy));
-     
-btnMothers.addEventListener('click', ()=> setEntryMode('mothers'));
-btnFollowers.addEventListener('click', ()=> setEntryMode('followers'));
-btnImport.addEventListener('click', ()=> setEntryMode('import'));
- 
-      followerSex.addEventListener('change', ()=>{
-  updateFollowerStatusOptions();
-  toggleFollowerFields();
-});
-
-followerStatus.addEventListener('change', toggleFollowerFields);
-followerLastInseminationDate.addEventListener('change', computeFollowerPregnancy);
-followerLastInseminationDate.addEventListener('input', computeFollowerPregnancy);
- document.addEventListener('DOMContentLoaded', ()=>{
-  updateBreedOptionsLocal();
-  toggleCalvingForLactation();
-  toggleMilkFieldLocal();
-  toggleInseminationFieldLocal();
-  toggleMilkVsPregnancy();
-  computeDIM();
-  computePregnancy();
-  setEntryMode('mothers');
-  updateFollowerStatusOptions();
-  toggleFollowerFields(); 
-});
-
-      window.__mbkUI = { updateBreedOptions: updateBreedOptionsLocal, toggleMilkField: toggleMilkFieldLocal, toggleInseminationField: toggleInseminationFieldLocal, computeDIM, computePregnancy, toggleCalvingForLactation };
-    })();
-  </script>
-
+  window.__mbkUI = {
+    updateBreedOptions: updateBreedOptionsLocal,
+    toggleMotherFields,
+    toggleFollowerFields,
+    setEntryMode
+  };
+})();
+</script>
   <script>
     if (localStorage.getItem('SMART_ON') === null) localStorage.setItem('SMART_ON','1');
     (function () {
@@ -818,346 +658,156 @@ followerLastInseminationDate.addEventListener('input', computeFollowerPregnancy)
     };
   </script>
 
-  <!-- حفظ في فايرستور تحت حساب المستخدم الحالي فقط -->
-<script type="module">
-  import { db } from "./js/firebase-config.js";
-  import { collection, addDoc, serverTimestamp, query, where, limit, getDocs }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { getAuth, onAuthStateChanged }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-  const auth = getAuth();
-  let CURRENT_UID = null;
-
-  onAuthStateChanged(auth, (u) => {
-    if (!u) {
-      location.href = "login.html?next=add-animal.html";
-    } else {
-      CURRENT_UID = u.uid;
-      localStorage.setItem("userId", CURRENT_UID);
-    }
-  });
-
-  const form   = document.getElementById("animalForm");
+<!-- حفظ مباشر عبر السيرفر فقط: لا forms-init ولا Firebase ولا mbk:valid -->
+<script>
+(function(){
+  const form = document.getElementById("animalForm");
   const msgDiv = document.getElementById("msg");
-  const bar = window.ensureInfoBar ? window.ensureInfoBar(form) : null;
-const showCentral = (msg, type="success") => window.showMsg ? window.showMsg(bar, msg, type) : showPopup(msg, type !== "error");
-  const $ = (id)=>document.getElementById(id);
-  const DASHBOARD_URL = "dashboard.html";
-  const todayLocal = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
-const setMsg = (t, ok=false) => {
-  showCentral(t, ok ? "success" : "error");
-};
-  // رجوع ذكي
-  let __hasAnimals = null;
-  window.addEventListener("DOMContentLoaded", async () => {
-    history.pushState({page:"add-animal"}, "", location.href);
-    if (CURRENT_UID){
-      try {
-        const s0 = await getDocs(query(collection(db,"animals"), where("ownerUid","==",CURRENT_UID), limit(1)));
-        __hasAnimals = !s0.empty;
-      } catch {}
+  const primaryActionBtn = document.getElementById("primaryActionBtn");
+
+  if (!form) return;
+
+  function getUidDirect(){
+    return String(
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("tenantId") ||
+      ""
+    ).trim();
+  }
+
+  function showServerMessage(text, ok){
+    const msg = String(text || "").trim() || (ok ? "✅ تم بنجاح" : "تعذّر تنفيذ العملية.");
+
+    if (window.flashOK && ok) {
+      window.flashOK(msg);
+      return;
     }
-    window.addEventListener("popstate", () => {
-      if (__hasAnimals === false){
-        alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.");
-        history.pushState({page:"add-animal"}, "", location.href);
-      } else {
-        location.href = DASHBOARD_URL;
+
+    if (!msgDiv) {
+      alert(msg);
+      return;
+    }
+
+    msgDiv.className = "toast show";
+    msgDiv.style.display = "block";
+    msgDiv.textContent = msg;
+    msgDiv.style.background = ok ? "#ecfdf5" : "#ffebee";
+    msgDiv.style.color = ok ? "#065f46" : "#b71c1c";
+    msgDiv.style.border = ok ? "1px solid #10b98133" : "1px solid #ef9a9a";
+
+    try { msgDiv.scrollIntoView({ behavior:"smooth", block:"center" }); } catch(_){}
+  }
+
+  function collectFormData(){
+    const out = {};
+
+    form.querySelectorAll("[data-field]").forEach((el) => {
+      const key = el.getAttribute("data-field");
+      if (!key) return;
+      if (el.disabled) return;
+
+      if (el.type === "checkbox") {
+        out[key] = !!el.checked;
+        return;
       }
+
+      out[key] = String(el.value ?? "").trim();
     });
-    document.getElementById("cancelLink")?.addEventListener("click",(e)=>{
-      e.preventDefault();
-      if (__hasAnimals === false){ alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع."); return; }
-      location.href = DASHBOARD_URL;
+
+    return out;
+  }
+
+  async function postToServer(path, payload){
+    const uid = getUidDirect();
+
+    if (!uid) {
+      return {
+        status: 400,
+        data: {
+          ok: false,
+          message: "لم يتم العثور على معرف المستخدم. سجّل الدخول مرة أخرى."
+        }
+      };
+    }
+
+    const r = await fetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(payload || {})
     });
+
+    const data = await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+
+    return { status: r.status, data };
+  }
+
+  function getImportRows(){
+    return Array.isArray(window.__IMPORT_PREVIEW__)
+      ? window.__IMPORT_PREVIEW__
+      : [];
+  }
+
+  form.addEventListener("submit", async function(e){
+    e.preventDefault();
+
+    const formData = collectFormData();
+    const entryType = String(formData.entryType || document.getElementById("entryType")?.value || "").trim();
+
+    const isImport = entryType === "import";
+
+    try {
+      if (primaryActionBtn) primaryActionBtn.disabled = true;
+
+      showServerMessage("جارِ إرسال البيانات للسيرفر…", true);
+
+      const result = isImport
+        ? await postToServer("/api/add-animal/import", {
+            importKind: String(document.getElementById("importKind")?.value || "mothers").trim(),
+            rows: getImportRows()
+          })
+        : await postToServer("/api/add-animal/save", { formData });
+
+      const data = result.data || {};
+
+      if (!data.ok) {
+        showServerMessage(data.message || "تعذّر تسجيل الحيوان.", false);
+        console.warn("add-animal server rejected:", result.status, data);
+        return;
+      }
+
+      showServerMessage(data.message || "✅ تم تسجيل الحيوان بنجاح", true);
+
+      setTimeout(() => {
+        if (data.redirectUrl) {
+          location.href = data.redirectUrl;
+          return;
+        }
+
+        if (data.animalNumber) {
+          location.href = "add-event.html?number=" + encodeURIComponent(data.animalNumber);
+          return;
+        }
+
+        location.href = "dashboard.html";
+      }, 900);
+
+    } catch (err) {
+      console.error("add-animal direct server request failed:", err);
+      showServerMessage("تعذّر الاتصال بالسيرفر أثناء تسجيل الحيوان.", false);
+
+    } finally {
+      if (primaryActionBtn) primaryActionBtn.disabled = false;
+    }
   });
-
-  const normAnimaltype = (ar)=>{
-    const s=String(ar||"").trim().toLowerCase();
-    if (s==="cow" || ar==="بقرة") return "cow";
-    if (s==="buffalo" || ar==="جاموسة") return "buffalo";
-    return "cow";
-  };
-function showPopup(msg, ok=true){
-  const box = document.getElementById("popupBox");
-  const content = document.getElementById("popupContent");
-
-  content.textContent = msg;
-  content.className = "mbk-popup-content " + (ok ? "mbk-popup-success" : "mbk-popup-error");
-
-  box.style.display = "flex";
-
-  setTimeout(() => { box.style.display = "none"; }, 1800);
-}
-
-form.addEventListener("mbk:valid", async (e)=>{
- if (document.getElementById("entryType")?.value === "import"){
-  const preview = window.__IMPORT_PREVIEW__ || [];
-  const profile = window.__IMPORT_PROFILE__ || null;
-  const importKind = String(document.getElementById("importKind")?.value || "mothers").trim();
-
-  if (!CURRENT_UID){
-    setMsg("فضلاً سجّل الدخول أولاً.", false);
-    return;
-  }
-
-  if (!profile || !preview.length){
-    setMsg("اعمل معاينة للملف أولاً قبل الحفظ.", false);
-    return;
-  }
-
-  try{
-    const targetCollection = (importKind === "followers") ? "calves" : "animals";
-    let saved = 0;
-    let skipped = 0;
-    for (const item of preview){
-      const x = item?.normalized || {};
-      const numberStr = String(x.animalNumber || "").trim();
-      if (!numberStr) continue;
-
-      const key = `${CURRENT_UID}#${numberStr}`;
-
-      const animalTypeAr = String(x.animalType || "").trim();
-      const breed = String(x.breed || "").trim();
-      const birthDate = String(x.birthDate || "").trim() || null;
-      const productionStatus = String(x.productionStatus || "").trim();
-      const dailyMilkVal = Number(x.dailyMilk || 0);
-      const reproductiveStatus = String(x.reproductiveStatus || "").trim();
-      const servicesCount = Number(x.servicesCount || 0);
-      const lactationNumber = Number(x.lactationNumber || 0);
-      const sireNumberInp = String(x.sireNumber || "").trim() || null;
-    const lastCalvingDate = String(x.lastCalvingDate || "").trim() || null;
-const lastInseminationInp = String(x.lastInseminationDate || "").trim() || null;
-const previousInseminationInp = String(x.previousInseminationDate || "").trim() || null;
-const lastHeatDateInp = String(x.lastHeatDate || "").trim() || null;
-
-      const followerStatusVal = String(x.followerStatus || "").trim();
-      const followerSexVal = String(x.followerSex || "").trim();
-      const damNumberVal = String(x.damNumber || "").trim() || null;
-      const weaningDateVal = String(x.weaningDate || "").trim() || null;
-      const followerPregnancyDaysVal = Number(x.followerPregnancyDays || 0);
-
-      const payload = (importKind === "mothers")
-        ? {
-            ownerUid: CURRENT_UID,
-            userId: CURRENT_UID,
-            userId_number: key,
-            entryType: "mothers",
-
-            number: numberStr,
-            animalNumber: Number(numberStr),
-            animaltype: normAnimaltype(animalTypeAr),
-            animalTypeAr,
-            breed,
-
-           productionStatus,
-dailyMilk: productionStatus === "حلاب" ? dailyMilkVal : null,
-reproductiveStatus,
-servicesCount,
-lactationNumber,
-birthDate,
-lastCalvingDate: lactationNumber > 0 ? lastCalvingDate : null,
-lastInseminationDate: lastInseminationInp || null,
-previousInseminationDate: previousInseminationInp || null,
-lastHeatDate: lastHeatDateInp || null,
-sireNumber: sireNumberInp || null,
-
-importSource: profile.key,
-            importedAt: serverTimestamp(),
-            createdAt: serverTimestamp()
-          }
-        : {
-            ownerUid: CURRENT_UID,
-            userId: CURRENT_UID,
-            userId_number: key,
-            entryType: "followers",
-
-            calfNumber: numberStr,
-            number: numberStr,
-            animalNumber: Number(numberStr),
-
-            species: animalTypeAr === "بقرة" ? "أبقار" : "جاموس",
-            animaltype: normAnimaltype(animalTypeAr),
-            animalTypeAr,
-            breed,
-
-            sex: followerSexVal,
-            status: followerStatusVal,
-            followerStatus: followerStatusVal,
-
-            birthDate,
-            damNumber: damNumberVal,
-            weaningDate: weaningDateVal,
-            lastInseminationDate: lastInseminationInp || null,
-            servicesCount,
-            sireNumber: sireNumberInp || null,
-            pregnancyDays: followerPregnancyDaysVal || null,
-
-            importSource: profile.key,
-            importedAt: serverTimestamp(),
-            createdAt: serverTimestamp()
-          };
-
-      const dupQ = query(
-  collection(db, targetCollection),
-  where("userId", "==", CURRENT_UID),
-  where("animalNumber", "==", Number(numberStr)),
-  limit(1)
-);
-
-const dupSnap = await getDocs(dupQ);
-if (!dupSnap.empty) {
-  skipped++;
-  continue;
-}
-
-await addDoc(collection(db, targetCollection), payload);
-saved++;
-    }
-
-    setMsg(`تم استيراد ${saved} سجل بنجاح — وتخطي ${skipped} سجل مكرر`, true);
-    setTimeout(()=>{
-      location.href = "dashboard.html";
-    }, 1200);
-    return;
-  }catch(err){
-    console.error(err);
-    setMsg("حدث خطأ أثناء حفظ ملف الاستيراد.", false);
-    return;
-  }
-}
- const formData = e.detail?.formData || {};
-msgDiv.style.display = "none";
-
-  if (!CURRENT_UID){
-    setMsg("فضلاً سجّل الدخول أولاً.", false);
-    return;
-  }
-
-  const numberStr = String(formData.animalNumber || "").trim();
-const entryTypeVal = String(formData.entryType || "mothers").trim();
-
-const followerSexVal = String(formData.followerSex || "").trim();
-const followerStatusVal = String(formData.followerStatus || "").trim();
-const damNumberVal = String(formData.damNumber || "").trim() || null;
-const weaningDateVal = String(formData.weaningDate || "").trim() || null;
-const followerLastInseminationVal = String(formData.followerLastInseminationDate || "").trim() || null;
-const followerServicesCountVal = Number(formData.followerServicesCount || 0);
-const followerSireNumberVal = String(formData.followerSireNumber || "").trim() || null;
-const followerPregnancyDaysVal = Number(formData.followerPregnancyDays || 0);
-
-const animalTypeAr = String(formData.animalType || "").trim();
-const breed = String(formData.breed || "").trim();
-const productionStatus = String(formData.productionStatus || "").trim();
-const dailyMilkVal = String(formData.dailyMilk || "").trim();
-const reproductiveStatus = String(formData.reproductiveStatus || "").trim();
-const servicesCount = Number(formData.servicesCount || 0);
-const lactationNumber = Number(formData.lactationNumber || 0);
-const birthDate = String(formData.birthDate || "").trim() || null;
-const lastCalvingDate = String(formData.lastCalvingDate || "").trim();
-const lastInseminationInp = String(formData.lastInseminationDate || "").trim() || null;
-const sireNumberInp = String(formData.sireNumber || "").trim() || null;
-const daysInMilkVal = Number(formData.daysInMilk || 0);
-
-  try{
-    // 🔍 منع تكرار نفس الرقم لنفس المستخدم فقط
-    const key = `${CURRENT_UID}#${numberStr}`;
-    // ✅ لا يوجد تكرار لهذا المستخدم → احفظ الحيوان
-const payload = (entryTypeVal === "mothers")
-  ? {
-      ownerUid: CURRENT_UID,
-      userId: CURRENT_UID,
-      userId_number: key,
-      entryType: "mothers",
-
-      number: numberStr,
-      animalNumber: Number(numberStr),
-      animaltype: normAnimaltype(animalTypeAr),
-      animalTypeAr,
-      breed,
-
-      productionStatus,
-      dailyMilk: productionStatus === "حلاب" ? Number(dailyMilkVal || 0) : null,
-      reproductiveStatus,
-      servicesCount,
-      lactationNumber,
-      birthDate,
-      lastCalvingDate: lactationNumber > 0 ? (lastCalvingDate || null) : null,
-
-      lastInseminationDate:
-        (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار" || productionStatus === "جاف" || reproductiveStatus === "مفتوحة")
-          ? (lastInseminationInp || null) : null,
-
-      sireNumber:
-        (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار")
-          ? (sireNumberInp || null) : null,
-
-      daysInMilk: productionStatus === "جاف" ? null : (daysInMilkVal || null),
-      createdAt: serverTimestamp(),
-      
-    }
-: {
-      ownerUid: CURRENT_UID,
-      userId: CURRENT_UID,
-      userId_number: key,
-      entryType: "followers",
-
-      calfNumber: numberStr,
-      number: numberStr,
-      animalNumber: Number(numberStr),
-
-      species: animalTypeAr === "بقرة" ? "أبقار" : "جاموس",
-      animaltype: normAnimaltype(animalTypeAr),
-      animalTypeAr,
-      breed,
-
-      sex: followerSexVal,
-      status: followerStatusVal,
-      followerStatus: followerStatusVal,
-
-      birthDate,
-      damNumber: damNumberVal,
-      weaningDate: followerStatusVal === "فطام" ? weaningDateVal : null,
-
-      lastInseminationDate:
-        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
-          ? (followerLastInseminationVal || null) : null,
-
-      servicesCount:
-        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
-          ? followerServicesCountVal : 0,
-
-      sireNumber:
-        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
-          ? (followerSireNumberVal || null) : null,
-
-      pregnancyDays:
-        (followerStatusVal === "عشار")
-          ? (followerPregnancyDaysVal || null) : null,
-
-      createdAt: serverTimestamp()
-    };
-  
-
-const targetCollection = (entryTypeVal === "followers") ? "calves" : "animals";
-const ref = await addDoc(collection(db, targetCollection), payload);
-showCentral("✅ تم تسجيل الحيوان بنجاح", "success");
-  localStorage.setItem("currentAnimalId", ref.id);
-localStorage.setItem("currentAnimalNumber", numberStr);
-const d = todayLocal();
-
-setTimeout(()=>{
-  location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`;
-}, 1200);
-  }catch(err){
-    console.error(err);
-    setMsg("حدث خطأ أثناء تسجيل الحيوان. تأكد من الصلاحيات والاتصال.", false);
-  }
-});
-
+})();
 </script>
-
   <script type="module">
   import { detectBestProfile, buildPreviewRows } from "/js/import-engine.js";
   import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
