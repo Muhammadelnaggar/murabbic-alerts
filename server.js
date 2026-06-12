@@ -1564,6 +1564,38 @@ app.get("/api/add-animal/options", requireUserId, async (req, res) => {
     });
   }
 });
+app.get("/api/add-animal/calc", requireUserId, async (req, res) => {
+  try {
+    const today = addAnimalTodaySrv();
+
+    const lastCalvingDate = addAnimalDateOrNullSrv(req.query.lastCalvingDate || "");
+    const lastInseminationDate = addAnimalDateOrNullSrv(req.query.lastInseminationDate || "");
+
+    const daysInMilk = lastCalvingDate
+      ? addAnimalDiffDaysSrv(lastCalvingDate, today)
+      : null;
+
+    const pregnancyDays = lastInseminationDate
+      ? addAnimalDiffDaysSrv(lastInseminationDate, today)
+      : null;
+
+    return res.json({
+      ok: true,
+      today,
+      daysInMilk,
+      pregnancyDays
+    });
+
+  } catch (e) {
+    console.error("add-animal-calc failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "add_animal_calc_failed",
+      message: "تعذّر حساب أيام الحليب أو الحمل."
+    });
+  }
+});
 // ============================================================
 //                 EVENTS PAGE: SERVER-ONLY CONTEXT / GROUPS / RESOLVE
 //                 صفحة الأحداث تسأل السيرفر — الواجهة عرض فقط لاحقًا
