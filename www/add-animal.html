@@ -539,6 +539,8 @@ function fillSelectOptions(selectId, items, placeholder = "اختر"){
   const el = document.getElementById(selectId);
   if (!el) return;
 
+  const currentValue = el.value || "";
+
   el.innerHTML = `<option value="">${placeholder}</option>`;
 
   (Array.isArray(items) ? items : []).forEach(item => {
@@ -547,6 +549,10 @@ function fillSelectOptions(selectId, items, placeholder = "اختر"){
     opt.textContent = item.label || item.value || "";
     el.appendChild(opt);
   });
+
+  if (currentValue && Array.from(el.options).some(opt => opt.value === currentValue)) {
+    el.value = currentValue;
+  }
 }
 
 async function loadAddAnimalOptions(){
@@ -556,7 +562,16 @@ async function loadAddAnimalOptions(){
     throw new Error("userId_required");
   }
 
-  const r = await fetch("/api/add-animal/options", {
+ const animalType = document.getElementById("animalType")?.value || "";
+const qs = new URLSearchParams();
+
+if (animalType) {
+  qs.set("animalType", animalType);
+}
+
+const url = "/api/add-animal/options" + (qs.toString() ? "?" + qs.toString() : "");
+
+const r = await fetch(url, {
     method: "GET",
     headers: {
       "Accept": "application/json",
@@ -585,6 +600,15 @@ window.addEventListener("DOMContentLoaded", () => {
     console.error(err);
     setMsg("تعذّر تحميل اختيارات صفحة إضافة الحيوان من السيرفر.", false);
   });
+
+  document.getElementById("animalType")?.addEventListener("change", () => {
+  fillSelectOptions("breed", [], "اختر السلالة");
+
+  loadAddAnimalOptions().catch(err => {
+    console.error(err);
+    setMsg("تعذّر تحميل السلالات من السيرفر.", false);
+  });
+});
 
   document.getElementById("dashboardBtn")?.addEventListener("click", () => {
     location.href = DASHBOARD_URL;
