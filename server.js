@@ -519,6 +519,485 @@ function normalizeEventType(raw) {
   return t;
 }
 // ============================================================
+//                 API: ADD ANIMAL — SERVER SIDE SAVE
+//                 تسجيل حيوان جديد من السيرفر فقط
+// ============================================================
+
+function addAnimalDigitsSrv(v) {
+  const map = {
+    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+  };
+
+  return String(v || "")
+    .trim()
+    .replace(/[^\d٠-٩۰-۹]/g, "")
+    .replace(/[٠-٩۰-۹]/g, d => map[d] || d);
+}
+
+function addAnimalStrSrv(v) {
+  return String(v ?? "").trim();
+}
+
+function addAnimalNumSrv(v, fallback = 0) {
+  if (v === "" || v === null || v === undefined) return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function addAnimalIsDateSrv(v) {
+  const s = String(v || "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+function addAnimalDateOrNullSrv(v) {
+  const s = String(v || "").trim().slice(0, 10);
+  return addAnimalIsDateSrv(s) ? s : null;
+}
+
+function addAnimalTodaySrv() {
+  return typeof cairoTodayISO === "function"
+    ? cairoTodayISO()
+    : new Date().toISOString().slice(0, 10);
+}
+
+function addAnimalDiffDaysSrv(fromISO, toISO) {
+  if (!addAnimalIsDateSrv(fromISO) || !addAnimalIsDateSrv(toISO)) return null;
+
+  const [fy, fm, fd] = String(fromISO).slice(0, 10).split("-").map(Number);
+  const [ty, tm, td] = String(toISO).slice(0, 10).split("-").map(Number);
+
+  const a = Date.UTC(fy, fm - 1, fd);
+  const b = Date.UTC(ty, tm - 1, td);
+  const d = Math.floor((b - a) / 86400000);
+
+  return Number.isFinite(d) && d >= 0 ? d : null;
+}
+
+function addAnimalSpeciesFromTypeSrv(animalType) {
+  const raw = addAnimalStrSrv(animalType);
+
+  if (raw === "بقرة" || /cow|بقر|ابقار|أبقار/i.test(raw)) {
+    return {
+      animalTypeAr: "بقرة",
+      animaltype: "cow",
+      species: "أبقار"
+    };
+  }
+
+  if (raw === "جاموسة" || /buffalo|جاموس/i.test(raw)) {
+    return {
+      animalTypeAr: "جاموسة",
+      animaltype: "buffalo",
+      species: "جاموس"
+    };
+  }
+
+  return {
+    animalTypeAr: raw,
+    animaltype: "",
+    species: ""
+  };
+}
+
+function addAnimalBasicFieldsDecisionSrv(fd = {}) {
+  const errors = {};
+
+  if (!addAnimalDigitsSrv(fd.animalNumber || fd.number || fd.calfNumber)) {
+    errors.animalNumber = "رقم الحيوان مطلوب.";
+  }
+
+  if (!addAnimalStrSrv(fd.animalType || fd.animalTypeAr)) {
+    errors.animalType = "نوع الحيوان مطلوب.";
+  }
+
+  if (!addAnimalStrSrv(fd.breed)) {
+    errors.breed = "السلالة مطلوبة.";
+  }
+
+  if (!addAnimalStrSrv(fd.entryType)) {
+    errors.entryType = "نوع الإدخال غير محدد.";
+  }
+
+  const dateFields = [
+    ["birthDate", "تاريخ الميلاد غير صالح."],
+    ["lastCalvingDate", "تاريخ آخر ولادة غير صالح."],
+    ["lastInseminationDate", "تاريخ آخر تلقيح غير صالح."],
+    ["weaningDate", "تاريخ الفطام غير صالح."],
+    ["followerLastInseminationDate", "تاريخ آخر تلقيح غير صالح."]
+  ];
+
+  for (const [field, msg] of dateFields) {
+    if (addAnimalStrSrv(fd[field]) && !addAnimalIsDateSrv(fd[field])) {
+      errors[field] = msg;
+    }
+  }
+
+  const numFields = [
+    ["dailyMilk", "إنتاج اللبن غير صالح."],
+    ["servicesCount", "عدد مرات التلقيح غير صالح."],
+    ["lactationNumber", "رقم موسم الحليب غير صالح."],
+    ["daysInMilk", "عدد أيام الحليب غير صالح."],
+    ["pregnancyDays", "عدد أيام الحمل غير صالح."],
+    ["followerServicesCount", "عدد مرات التلقيح غير صالح."],
+    ["followerPregnancyDays", "عدد أيام الحمل غير صالح."]
+  ];
+
+  for (const [field, msg] of numFields) {
+    const val = addAnimalStrSrv(fd[field]);
+    if (val && !Number.isFinite(Number(val))) {
+      errors[field] = msg;
+    }
+  }
+
+  return errors;
+}
+
+function addAnimalDecisionSrv(fd = {}) {
+  const mode = addAnimalStrSrv(fd.entryType);
+
+  if (mode === "mothers") {
+    if (!addAnimalStrSrv(fd.productionStatus)) {
+      return "❌ الحالة الإنتاجية مطلوبة.";
+    }
+
+    if (!addAnimalStrSrv(fd.reproductiveStatus)) {
+      return "❌ الحالة التناسلية مطلوبة.";
+    }
+
+    if (addAnimalStrSrv(fd.productionStatus) === "حلاب" && !addAnimalStrSrv(fd.dailyMilk)) {
+      return "❌ إنتاج اللبن اليومي مطلوب للحيوان الحلاب.";
+    }
+
+    if (addAnimalNumSrv(fd.lactationNumber, 0) > 0 && !addAnimalStrSrv(fd.lastCalvingDate)) {
+      return "❌ تاريخ آخر ولادة مطلوب عند وجود رقم موسم.";
+    }
+
+    const repro = addAnimalStrSrv(fd.reproductiveStatus);
+    const services = addAnimalNumSrv(fd.servicesCount, 0);
+
+    if (
+      (repro === "ملقحة" || repro === "ملقح" || repro === "عشار" || services > 0) &&
+      !addAnimalStrSrv(fd.lastInseminationDate)
+    ) {
+      return "❌ تاريخ آخر تلقيح مطلوب للحيوان العشار أو الملقح أو الذي له تلقيح سابق في الموسم.";
+    }
+
+    return null;
+  }
+
+  if (mode === "followers") {
+    if (!addAnimalStrSrv(fd.birthDate)) {
+      return "❌ تاريخ الميلاد مطلوب للتابع.";
+    }
+
+    if (!addAnimalStrSrv(fd.followerSex)) {
+      return "❌ جنس التابع مطلوب.";
+    }
+
+    if (!addAnimalStrSrv(fd.followerStatus)) {
+      return "❌ الحالة الحالية للتابع مطلوبة.";
+    }
+
+    if (!addAnimalStrSrv(fd.damNumber)) {
+      return "❌ رقم الأم مطلوب.";
+    }
+
+    if (addAnimalStrSrv(fd.followerStatus) === "فطام" && !addAnimalStrSrv(fd.weaningDate)) {
+      return "❌ تاريخ الفطام مطلوب.";
+    }
+
+    const st = addAnimalStrSrv(fd.followerStatus);
+
+    if ((st === "ملقح" || st === "عشار") && !addAnimalStrSrv(fd.followerLastInseminationDate)) {
+      return "❌ تاريخ آخر تلقيح مطلوب.";
+    }
+
+    return null;
+  }
+
+  return "❌ نوع الإدخال غير معروف.";
+}
+
+async function addAnimalDuplicateCheckSrv(uid, numberStr) {
+  if (!db || !uid || !numberStr) {
+    return {
+      ok: false,
+      message: "⚠️ تعذّر التحقق من رقم الحيوان الآن."
+    };
+  }
+
+  const key = `${uid}#${numberStr}`;
+  const nNum = Number(numberStr);
+  const collectionsToCheck = ["animals", "calves"];
+
+  for (const colName of collectionsToCheck) {
+    const q1 = await db.collection(colName)
+      .where("userId_number", "==", key)
+      .limit(1)
+      .get();
+
+    if (!q1.empty) {
+      return {
+        ok: false,
+        duplicate: true,
+        collection: colName,
+        message: `⚠️ يوجد حيوان مسجَّل بالفعل برقم ${numberStr} في حسابك.`
+      };
+    }
+
+    const q2 = await db.collection(colName)
+      .where("userId", "==", uid)
+      .where("number", "==", numberStr)
+      .limit(1)
+      .get();
+
+    if (!q2.empty) {
+      return {
+        ok: false,
+        duplicate: true,
+        collection: colName,
+        message: `⚠️ يوجد حيوان مسجَّل بالفعل برقم ${numberStr} في حسابك.`
+      };
+    }
+
+    if (Number.isFinite(nNum)) {
+      const q3 = await db.collection(colName)
+        .where("userId", "==", uid)
+        .where("animalNumber", "==", nNum)
+        .limit(1)
+        .get();
+
+      if (!q3.empty) {
+        return {
+          ok: false,
+          duplicate: true,
+          collection: colName,
+          message: `⚠️ يوجد حيوان مسجَّل بالفعل برقم ${numberStr} في حسابك.`
+        };
+      }
+    }
+  }
+
+  return { ok: true };
+}
+
+function addAnimalBuildSinglePayloadSrv(uid, fd = {}) {
+  const entryType = addAnimalStrSrv(fd.entryType || "mothers");
+  const numberStr = addAnimalDigitsSrv(fd.animalNumber || fd.number || fd.calfNumber);
+  const speciesInfo = addAnimalSpeciesFromTypeSrv(fd.animalType || fd.animalTypeAr);
+  const key = `${uid}#${numberStr}`;
+  const today = addAnimalTodaySrv();
+
+  if (entryType === "followers") {
+    const followerStatus = addAnimalStrSrv(fd.followerStatus);
+    const followerLastAI = addAnimalDateOrNullSrv(fd.followerLastInseminationDate);
+    const isInseminatedFollower = followerStatus === "ملقح" || followerStatus === "عشار";
+
+    const followerPregDays =
+      followerStatus === "عشار" && followerLastAI
+        ? addAnimalDiffDaysSrv(followerLastAI, today)
+        : addAnimalNumSrv(fd.followerPregnancyDays, 0);
+
+    return {
+      collectionName: "calves",
+      payload: {
+        ownerUid: uid,
+        userId: uid,
+        userId_number: key,
+        entryType: "followers",
+
+        calfNumber: numberStr,
+        number: numberStr,
+        animalNumber: Number(numberStr),
+
+        species: speciesInfo.species,
+        animaltype: speciesInfo.animaltype,
+        animalTypeAr: speciesInfo.animalTypeAr,
+        breed: addAnimalStrSrv(fd.breed),
+
+        sex: addAnimalStrSrv(fd.followerSex),
+        status: followerStatus,
+        followerStatus,
+
+        birthDate: addAnimalDateOrNullSrv(fd.birthDate),
+        damNumber: addAnimalStrSrv(fd.damNumber) || null,
+
+        weaningDate: followerStatus === "فطام"
+          ? addAnimalDateOrNullSrv(fd.weaningDate)
+          : null,
+
+        lastInseminationDate: isInseminatedFollower
+          ? followerLastAI
+          : null,
+
+        servicesCount: isInseminatedFollower
+          ? addAnimalNumSrv(fd.followerServicesCount, 0)
+          : 0,
+
+        sireNumber: isInseminatedFollower
+          ? (addAnimalStrSrv(fd.followerSireNumber) || null)
+          : null,
+
+        pregnancyDays: followerStatus === "عشار"
+          ? (Number.isFinite(Number(followerPregDays)) ? Number(followerPregDays) : null)
+          : null,
+
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        source: "server:/api/add-animal/save"
+      }
+    };
+  }
+
+  const productionStatus = addAnimalStrSrv(fd.productionStatus);
+  const reproductiveStatus = addAnimalStrSrv(fd.reproductiveStatus);
+  const lastCalvingDate = addAnimalDateOrNullSrv(fd.lastCalvingDate);
+  const lastAI = addAnimalDateOrNullSrv(fd.lastInseminationDate);
+  const servicesCount = addAnimalNumSrv(fd.servicesCount, 0);
+
+  const hasMotherInseminationHistory =
+    reproductiveStatus === "ملقحة" ||
+    reproductiveStatus === "ملقح" ||
+    reproductiveStatus === "عشار" ||
+    servicesCount > 0;
+
+  const daysInMilk =
+    productionStatus === "جاف"
+      ? null
+      : lastCalvingDate
+        ? addAnimalDiffDaysSrv(lastCalvingDate, today)
+        : addAnimalNumSrv(fd.daysInMilk, 0);
+
+  const pregnancyDays =
+    reproductiveStatus === "عشار" && lastAI
+      ? addAnimalDiffDaysSrv(lastAI, today)
+      : addAnimalNumSrv(fd.pregnancyDays, 0);
+
+  return {
+    collectionName: "animals",
+    payload: {
+      ownerUid: uid,
+      userId: uid,
+      userId_number: key,
+      entryType: "mothers",
+
+      number: numberStr,
+      animalNumber: Number(numberStr),
+
+      animaltype: speciesInfo.animaltype,
+      animalTypeAr: speciesInfo.animalTypeAr,
+      species: speciesInfo.species,
+      breed: addAnimalStrSrv(fd.breed),
+
+      productionStatus,
+      dailyMilk: productionStatus === "حلاب"
+        ? Number(addAnimalNumSrv(fd.dailyMilk, 0))
+        : null,
+
+      reproductiveStatus,
+      servicesCount,
+      lactationNumber: addAnimalNumSrv(fd.lactationNumber, 0),
+
+      birthDate: addAnimalDateOrNullSrv(fd.birthDate),
+      lastCalvingDate,
+      lastInseminationDate: hasMotherInseminationHistory ? lastAI : null,
+      sireNumber: hasMotherInseminationHistory ? (addAnimalStrSrv(fd.sireNumber) || null) : null,
+
+      daysInMilk: Number.isFinite(Number(daysInMilk)) ? Number(daysInMilk) : null,
+      pregnancyDays: reproductiveStatus === "عشار"
+        ? (Number.isFinite(Number(pregnancyDays)) ? Number(pregnancyDays) : null)
+        : null,
+
+      status: "active",
+
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      source: "server:/api/add-animal/save"
+    }
+  };
+}
+
+app.post("/api/add-animal/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const fd = body.formData && typeof body.formData === "object"
+      ? body.formData
+      : body;
+
+    const numberStr = addAnimalDigitsSrv(fd.animalNumber || fd.number || fd.calfNumber);
+
+    const fieldErrors = addAnimalBasicFieldsDecisionSrv(fd);
+
+    if (Object.keys(fieldErrors).length) {
+      return res.status(400).json({
+        ok: false,
+        error: "add_animal_fields_invalid",
+        message: "راجع بيانات الحيوان المطلوبة.",
+        fieldErrors
+      });
+    }
+
+    const guardMessage = addAnimalDecisionSrv(fd);
+
+    if (guardMessage) {
+      return res.status(400).json({
+        ok: false,
+        error: "add_animal_decision_failed",
+        message: guardMessage
+      });
+    }
+
+    const duplicate = await addAnimalDuplicateCheckSrv(uid, numberStr);
+
+    if (!duplicate.ok) {
+      return res.status(duplicate.duplicate ? 409 : 503).json({
+        ok: false,
+        error: duplicate.duplicate ? "duplicate_animal_number" : "duplicate_check_failed",
+        message: duplicate.message,
+        collection: duplicate.collection || null
+      });
+    }
+
+    const { collectionName, payload } = addAnimalBuildSinglePayloadSrv(uid, fd);
+
+    const ref = await db.collection(collectionName).add(payload);
+
+    if (typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "add_animal_save");
+    }
+
+    return res.json({
+      ok: true,
+      message: "✅ تم تسجيل الحيوان بنجاح",
+      animalId: ref.id,
+      animalNumber: numberStr,
+      number: numberStr,
+      entryType: payload.entryType,
+      collection: collectionName,
+      redirectUrl: `add-event.html?number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(addAnimalTodaySrv())}`
+    });
+
+  } catch (e) {
+    console.error("add-animal-save failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "add_animal_save_failed",
+      message: "حدث خطأ أثناء تسجيل الحيوان."
+    });
+  }
+});
+// ============================================================
 //                 EVENTS PAGE: SERVER-ONLY CONTEXT / GROUPS / RESOLVE
 //                 صفحة الأحداث تسأل السيرفر — الواجهة عرض فقط لاحقًا
 // ============================================================
