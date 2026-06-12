@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
   <meta name="theme-color" content="#2e7d32" />
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+
 
   <style>
     :root{
@@ -271,558 +271,428 @@
   <script src="/js/app-core.js"></script>
   <script src="/js/tenant-bootstrap.js"></script>
   <script type="module" src="/js/api.js"></script>
-  <script type="module">
- import * as firebaseCfg from '/js/firebase-config.js';
-  import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-  import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-  import {
-    getFirestore, collection, query, where, getDocs, limit
-  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+ 
+ <script>
+  function updateCowCardNav(number, multi){
+    const link = document.querySelector('[data-nav="cow-card"]');
+    if (!link) return;
 
- const firebaseConfig =
-  firebaseCfg.default ||
-  firebaseCfg.firebaseConfig ||
-  firebaseCfg.config ||
-  firebaseCfg;
+    if (multi){
+      link.href = '#';
+      link.classList.add('mbk-nav-link-disabled');
+      return;
+    }
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app, "murabbikdata");
+    if (number){
+      link.href = 'cow-card.html?number=' + encodeURIComponent(number);
+      link.classList.remove('mbk-nav-link-disabled');
+    } else {
+      link.href = '#';
+      link.classList.add('mbk-nav-link-disabled');
+    }
+  }
 
-  window.mbkAddEventDb = db;
-  window.mbkAddEventAuth = auth;
-    window.mbkFs = {
-  collection,
-  query,
-  where,
-  getDocs,
-  limit
-};
-</script>
-  <script>
-    function updateCowCardNav(number, multi){
-      const link = document.querySelector('[data-nav="cow-card"]');
-      if (!link) return;
+  (function(){
+    const $ = s => document.querySelector(s);
+    const $$ = s => document.querySelectorAll(s);
 
-      // ✅ لو أكتر من رقم: مقفول كما طلبت
-      if (multi){
-        link.href = '#';
-        link.classList.add('mbk-nav-link-disabled');
-        return;
-      }
+    const norm = v =>
+      (v == null || v === 'undefined' || v === 'null' || v === 'NaN')
+        ? ''
+        : String(v).trim();
 
-      if (number){
-        link.href = 'cow-card.html?number=' + encodeURIComponent(number);
-        link.classList.remove('mbk-nav-link-disabled');
+    const todayISO = () => {
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0, 10);
+    };
+
+    const DIGITS = {
+      '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+      '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
+    };
+
+    const toLatinKeepSep = s =>
+      String(s || '').replace(/[٠-٩۰-۹]/g, d => DIGITS[d] || d);
+
+    const toDigitsOnly = s =>
+      String(s || '')
+        .replace(/[٠-٩۰-۹]/g, d => DIGITS[d] || d)
+        .replace(/[^\d]/g, '');
+
+    function parseNumbers(raw){
+      const s = toLatinKeepSep(raw || '');
+      const matches = s.match(/\d+/g) || [];
+      const list = matches.map(x => toDigitsOnly(x)).filter(Boolean);
+      return [...new Set(list)];
+    }
+
+    function getCurrentUid(){
+      return window.mbk?.userId
+        || localStorage.getItem('userId')
+        || localStorage.getItem('uid')
+        || '';
+    }
+
+    function getSelectedGroupMeta(){
+      const sel = $('#groupSelect');
+      const opt = sel?.options?.[sel.selectedIndex];
+
+      return {
+        name: norm(opt?.dataset?.groupName || ''),
+        groupName: norm(opt?.dataset?.groupName || ''),
+        animalType: norm(opt?.dataset?.animalType || ''),
+        groupId: norm(opt?.dataset?.groupId || ''),
+        groupKey: norm(opt?.dataset?.groupKey || ''),
+        feedingEligible: opt?.dataset?.feedingEligible === '1'
+      };
+    }
+
+    function currentNumbersAndDate(){
+      const numbers = parseNumbers($('#animalNumbers')?.value || '');
+
+      let date = norm($('#eventDate')?.value) || todayISO();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
+
+      return { numbers, date };
+    }
+
+    function refreshAnimalInfo(){
+      const list = parseNumbers($('#animalNumbers')?.value || '');
+
+      if (list.length === 1){
+        $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${list[0]}`;
+        updateCowCardNav(list[0], false);
+      } else if (list.length > 1){
+        $('#animalInfo').textContent = `🐄 إدخال جماعي: ${list.length} أرقام`;
+        updateCowCardNav('', true);
       } else {
-        link.href = '#';
-        link.classList.add('mbk-nav-link-disabled');
+        $('#animalInfo').textContent = '🐄 الحيوان الحالي: غير محدد';
+        updateCowCardNav('', false);
       }
     }
 
-    (function(){
-      const $ = s=>document.querySelector(s);
-      const $$ = s=>document.querySelectorAll(s);
-           function getCurrentUid(){
-        return window.mbk?.userId
-          || localStorage.getItem('userId')
-          || window.mbkAddEventAuth?.currentUser?.uid
-          || '';
-      }
+    async function hydrate(){
+      const uid = getCurrentUid();
+      const qs = new URLSearchParams(location.search);
 
-      async function loadGroupsIntoSelect(){
-        const select = $('#groupSelect');
-        const hint = $('#groupHint');
-        const warn = $('#warn');
+      const rawNumbers =
+        qs.get('numbers') ||
+        qs.get('bulk') ||
+        qs.get('number') ||
+        qs.get('animalNumber') ||
+        '';
 
-        if (!select) return;
+      const rawDate =
+        qs.get('eventDate') ||
+        qs.get('date') ||
+        '';
 
-        const db = window.mbkAddEventDb;
-        const uid = getCurrentUid();
-        const { collection, query, where, getDocs, limit } = window.mbkFs || {};
-        if (!db || !uid){
-          warn.textContent = '⚠️ تعذر تحميل المجموعات الآن.';
-          return;
-        }
+      let date = todayISO();
 
-        try{
-          warn.textContent = '';
-          select.innerHTML = '<option value="">جاري تحميل المجموعات...</option>';
-          select.style.display = 'block';
-          if (hint) hint.style.display = 'block';
+      if (uid) {
+        try {
+          const q = new URLSearchParams();
+          if (rawNumbers) q.set('numbers', rawNumbers);
+          if (rawDate) q.set('eventDate', rawDate);
 
-          const q1 = query(
-            collection(db, 'groups'),
-            where('userId', '==', uid),
-            limit(100)
-          );
-
-          const snap = await getDocs(q1);
-
-          const rows = [];
-          snap.forEach(doc => {
-            const d = doc.data() || {};
-           rows.push({
-  id: doc.id,
-  name: String(d.groupName || d.name || doc.id),
-  members: Array.isArray(d.animalNumbers)
-    ? d.animalNumbers
-    : Array.isArray(d.members)
-      ? d.members
-      : [],
- animalType: String(d.animalType || d.species || ''),
-animalsCount: Number(d.animalsCount || 0),
-groupId: String(d.groupId || doc.id || ''),
-groupKey: String(d.groupKey || ''),
-feedingEligible: d.feedingEligible === true
-});
+          const r = await fetch('/api/events-page/context?' + q.toString(), {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'X-User-Id': uid
+            },
+            cache: 'no-store'
           });
 
-          if (!rows.length){
-            select.innerHTML = '<option value="">لا توجد مجموعات محفوظة</option>';
-            return;
-          }
+          const j = await r.json().catch(() => null);
 
-          select.innerHTML = '<option value="">اختر مجموعة...</option>' + rows.map(g => {
-            const nums = g.members.map(x => String(x).trim()).filter(Boolean).join(',');
-           const label = `${g.name}${g.animalType ? ' — ' + (g.animalType === 'buffalo' ? 'جاموس' : g.animalType === 'cow' ? 'أبقار' : g.animalType) : ''} (${g.animalsCount || g.members.length || 0})`;
-return `<option value="${nums}"
-  data-group-name="${String(g.name || '').replace(/"/g, '&quot;')}"
-  data-animal-type="${String(g.animalType || '').replace(/"/g, '&quot;')}"
-  data-group-id="${String(g.groupId || '').replace(/"/g, '&quot;')}"
-  data-group-key="${String(g.groupKey || '').replace(/"/g, '&quot;')}"
-  data-feeding-eligible="${g.feedingEligible ? '1' : '0'}">${label}</option>`;
-          }).join('');
-        }catch(err){
-          console.error('groups load failed', err);
-          warn.textContent = '⚠️ فشل تحميل المجموعات.';
-          select.innerHTML = '<option value="">تعذر تحميل المجموعات</option>';
-          select.style.display = 'block';
-        }
-      }
+          if (r.ok && j && j.ok !== false) {
+            date = j.eventDate || date;
 
-     function applySelectedGroupNumbers(raw, groupName = ''){
-        const list = parseNumbers(raw || '');
-        const textarea = $('#animalNumbers');
+            if (Array.isArray(j.numbers) && j.numbers.length) {
+              $('#animalNumbers').value = j.numbers.join('\n');
+            } else {
+              $('#animalNumbers').value = '';
+            }
 
-        if (!textarea) return;
-
-        textarea.value = list.join('\n');
-
-       if (list.length === 1){
-  $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${list[0]}`;
-  updateCowCardNav(list[0], false);
-} else if (list.length > 1){
-  $('#animalInfo').textContent = groupName
-    ? `🐄 المجموعة الحالية: ${groupName}`
-    : `🐄 إدخال جماعي: ${list.length} أرقام`;
-  updateCowCardNav('', true);
-} else {
-  $('#animalInfo').textContent = '🐄 الحيوان الحالي: غير محدد';
-  updateCowCardNav('', false);
-}
-      }
-
-      function wireGroupsPicker(){
-        $('#btnPickGroup')?.addEventListener('click', async (e)=>{
-          e.preventDefault();
-          await loadGroupsIntoSelect();
-        }, {passive:false});
-
-       $('#groupSelect')?.addEventListener('change', (e)=>{
-  const raw = e.target.value || '';
-  const groupName =
-    e.target.options?.[e.target.selectedIndex]?.dataset?.groupName || '';
-  applySelectedGroupNumbers(raw, groupName);
-}, {passive:true});
-      }
-      const norm = v => (v==null||v==='undefined'||v==='null'||v==='NaN')? '' : String(v).trim();
-      const todayISO = ()=>{const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10);};
-
-      // ✅ تحويل الأرقام العربية للاتينية بدون حذف الفواصل/الأسطر
-      const DIGITS = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-      const toLatinKeepSep = (s)=> String(s||'').replace(/[٠-٩۰-۹]/g, d => DIGITS[d] || d);
-      const toDigitsOnly = (s)=> String(s||'').replace(/[٠-٩۰-۹]/g, d => DIGITS[d] || d).replace(/[^\d]/g,'');
-
-      function parseNumbers(raw){
-        const s = toLatinKeepSep(raw || '');
-        // ✅ استخراج كل سلاسل الأرقام كما هي (يدعم فواصل/مسافات/أسطر)
-        // يمنع تكوين رقم "32" بالخطأ لو الكيبورد أدخل فاصل بين رقمين داخل نفس الرقم
-       const matches = s.match(/\d+/g) || [];
-
-        const list = matches.map(x=>toDigitsOnly(x)).filter(Boolean);
-        // unique مع الحفاظ على ترتيب الإدخال
-        return [...new Set(list)];
-      }
-const NUTRITION_LAUNCH_CORE_MSG =
-  'مُرَبِّيك يبدأ من مركز الربح: علائق الحلاب والجاف وانتظار الولادة. علائق التوابع في التحديثات.';
-
-const NUTRITION_ALLOWED_GROUP_KEYS = new Set([
-  'fresh',
-  'closeup',
-  'dry',
-  'high',
-  'med',
-  'low'
-]);
-
-const NUTRITION_BLOCKED_GROUP_KEYS = new Set([
-  'suckling',
-  'weaned',
-  'growing',
-  'breeding',
-  'heiferOpen',
-  'pregHeifers',
-  'heiferCloseup',
-  'males',
-  'hospital',
-  'all'
-]);
-
-function normalizeGroupText(s){
-  return String(s || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[أإآ]/g, 'ا')
-    .replace(/ة/g, 'ه');
-}
-
-function normalizeGroupKey(s){
-  return String(s || '').trim();
-}
-
-function getCurrentSelectedGroupMeta(){
-  const sel = $('#groupSelect');
-  const opt = sel?.options?.[sel.selectedIndex];
-
-  return {
-    name: norm(opt?.dataset?.groupName || ''),
-    animalType: norm(opt?.dataset?.animalType || ''),
-    groupId: norm(opt?.dataset?.groupId || ''),
-    groupKey: norm(opt?.dataset?.groupKey || ''),
-    feedingEligible: opt?.dataset?.feedingEligible === '1',
-    hasGroup: !!norm(opt?.dataset?.groupName || '')
-  };
-}
-
-function inferNutritionAllowedFromText(text){
-  const s = normalizeGroupText(text);
-
-  return (
-    s.includes('حديث الولاده') ||
-    s.includes('حديثه الولاده') ||
-    s.includes('عالي الادرار') ||
-    s.includes('متوسط الادرار') ||
-    s.includes('منخفض الادرار') ||
-    s.includes('حلاب') ||
-    s.includes('حليب') ||
-    s.includes('لبن') ||
-    s.includes('جاف') ||
-    s.includes('انتظار ولاده') ||
-    s.includes('انتظار الولاده') ||
-    s.includes('قبل الولاده') ||
-    s.includes('تحضير للولاده') ||
-    s.includes('fresh') ||
-    s.includes('closeup') ||
-    s.includes('dry') ||
-    s.includes('high') ||
-    s.includes('med') ||
-    s.includes('low')
-  );
-}
-
-function inferNutritionBlockedFromText(text){
-  const s = normalizeGroupText(text);
-
-  return (
-    s.includes('رضيع') ||
-    s.includes('فطام') ||
-    s.includes('نامي') ||
-    s.includes('تحت التلقيح') ||
-    s.includes('عجلات') ||
-    s.includes('عجله') ||
-    s.includes('عجل') ||
-    s.includes('ذكور') ||
-    s.includes('ذكر') ||
-    s.includes('كل الابقار') ||
-    s.includes('كل الجاموس') ||
-    s.includes('كل الحيوانات') ||
-    s.includes('مستشفى') ||
-    s.includes('مستشفي') ||
-    s.includes('suckling') ||
-    s.includes('weaned') ||
-    s.includes('growing') ||
-    s.includes('breeding') ||
-    s.includes('heifer') ||
-    s.includes('males') ||
-    s.includes('hospital') ||
-    s.includes('all')
-  );
-}
-
-function isNutritionLaunchCoreGroup(meta){
-  const key = normalizeGroupKey(meta.groupKey || meta.groupId).replace(/^cow_|^buffalo_/, '');
-  const label = `${meta.name} ${meta.groupId} ${meta.groupKey}`;
-
-  if (NUTRITION_ALLOWED_GROUP_KEYS.has(key)) return true;
-  if (meta.feedingEligible && inferNutritionAllowedFromText(label)) return true;
-
-  return inferNutritionAllowedFromText(label) && !inferNutritionBlockedFromText(label);
-}
-
-function blockNutritionIfOutOfLaunchCore(list){
-  const meta = getCurrentSelectedGroupMeta();
-
-  if (!meta.hasGroup) return false;
-
-  if (!list.length) {
-    $('#warn').textContent = '⚠️ هذه المجموعة لا تحتوي أرقام حيوانات صالحة.';
-    return true;
-  }
-
-  if (isNutritionLaunchCoreGroup(meta)) return false;
-
-  $('#warn').textContent = NUTRITION_LAUNCH_CORE_MSG;
-  return true;
-}
-      function hydrate(){
-        const qs = new URLSearchParams(location.search);
-
-        const rawDate = norm(qs.get('eventDate') || qs.get('date') || '');
-        const date = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayISO();
-        $('#dateInfo').textContent = `📅 التاريخ الحالي: ${date}`;
-        if (!norm($('#eventDate').value)) $('#eventDate').value = date;
-
-       // لو جاي number من صفحة تانية: حطه كسطر واحد
-// لو مفيش رقم في الرابط: افتح صفحة الحدث نظيفة بدون رقم عالق
-const rawNum = norm(qs.get('number') || qs.get('animalNumber') || '');
-const one = toDigitsOnly(rawNum);
-
-if (one){
-  $('#animalNumbers').value = one;
-} else {
-  $('#animalNumbers').value = '';
-}
-
-        // تحديث العنوان/زر البطاقة
-        const list = parseNumbers($('#animalNumbers').value);
-        if (list.length === 1){
-          $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${list[0]}`;
-          updateCowCardNav(list[0], false);
-        } else if (list.length > 1){
-          $('#animalInfo').textContent = `🐄 إدخال جماعي: ${list.length} أرقام`;
-          updateCowCardNav('', true);
-        } else {
-          $('#animalInfo').textContent = `🐄 الحيوان الحالي: غير محدد`;
-          updateCowCardNav('', false);
-        }
-      }
-
-      function getCtxOrWarn(targetPage){
-        const raw = norm($('#animalNumbers').value);
-        const currentGroupName = norm($('#groupSelect')?.options?.[$('#groupSelect')?.selectedIndex]?.dataset?.groupName || '');
-        const list = parseNumbers(raw);
-
-        let date = norm($('#eventDate').value) || todayISO();
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
-const isDailyMilkImport = /daily-milk-import\.html/i.test(String(targetPage || ''));
-
-// ✅ صفحة استيراد اللبن لا تحتاج رقم حيوان، فقط التاريخ
-if (isDailyMilkImport){
-  $('#warn').textContent = '';
-  $('#animalInfo').textContent = '🥛 استيراد اللبن اليومي / باتش';
-  updateCowCardNav('', true);
-  return { mode:'import', date };
-}
-        if (!list.length){
-          $('#warn').textContent = '⚠️ أدخل رقم الحيوان أولًا.';
-          updateCowCardNav('', false);
-          return null;
-        }
-const isOvsynch = /ovysynch/i.test(String(targetPage||'')) || /ovsynch/i.test(String(targetPage||''));
-const isHeat = /heat\.html/i.test(String(targetPage||''));
-const isNutrition = /nutrition\.html/i.test(String(targetPage||''));
-
-if (isNutrition && blockNutritionIfOutOfLaunchCore(list)) {
-  updateCowCardNav(list.length === 1 ? list[0] : '', list.length > 1);
-  return null;
-}
-
-const isWeaning = /weaning\.html/i.test(String(targetPage||''));
-const isExtraTeats = /supernumerary-teat-removal\.html/i.test(String(targetPage||''));
-const isDailyMilk = /daily-milk\.html/i.test(String(targetPage||''));
-
-// ✅ أحداث جماعية سيرفرية — صفحة الأحداث تمرر الأرقام فقط
-const isInsemination = /insemination\.html/i.test(String(targetPage||''));
-const isPregnancyDiagnosis = /pregnancy-diagnosis\.html/i.test(String(targetPage||''));
-const isVaccination = /vaccination\.html/i.test(String(targetPage||''));
-const isDryOff = /dry-off\.html/i.test(String(targetPage||''));
-
-const isGroupAllowed =
-  isOvsynch ||
-  isHeat ||
-  isNutrition ||
-  isWeaning ||
-  isExtraTeats ||
-  isDailyMilk ||
-  isInsemination ||
-  isPregnancyDiagnosis ||
-  isVaccination ||
-  isDryOff;
-// ✅ لو أكتر من رقم:
-        if (list.length > 1){
-          // بطاقة الحيوان مقفولة
-          updateCowCardNav('', true);
-
-          // مسموح جماعي فقط لـ Ovsynch حاليًا
-          if (!isGroupAllowed){
-            $('#warn').textContent = '⚠️ هذا الحدث فردي فقط حاليًا. اكتب رقمًا واحدًا.';
-            return null;
-          }
-
-          $('#warn').textContent = '';
-          $('#animalInfo').textContent = `🐄 إدخال جماعي: ${list.length} أرقام`;
-         return { mode:'group', bulk:list.join(','), number:list[0], date, groupName: currentGroupName };
-        }
-
-        // ✅ رقم واحد
-        $('#warn').textContent = '';
-        $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${list[0]}`;
-        updateCowCardNav(list[0], false);
-        return { mode:'single', number:list[0], date };
-      }
-
-      function buildUrl(page, ctx){
-        const u = new URL(page, location.href);
-const isOvsynch = /ovysynch/i.test(String(page)) || /ovsynch/i.test(String(page));
-const isHeat = /heat\.html/i.test(String(page));
-const isNutrition = /nutrition\.html/i.test(String(page));
-const isWeaning = /weaning\.html/i.test(String(page));
-const isExtraTeats = /supernumerary-teat-removal\.html/i.test(String(page));
-const isColostrum = /colostrum-feeding\.html/i.test(String(page));
-const isDailyMilk = /daily-milk\.html/i.test(String(page));
-const isDailyMilkImport = /daily-milk-import\.html/i.test(String(page));
-
-// ✅ أحداث جماعية سيرفرية — صفحة الأحداث تمرر الأرقام فقط
-const isInsemination = /insemination\.html/i.test(String(page));
-const isPregnancyDiagnosis = /pregnancy-diagnosis\.html/i.test(String(page));
-const isVaccination = /vaccination\.html/i.test(String(page));
-const isDryOff = /dry-off\.html/i.test(String(page));
-if (isDailyMilkImport) {
-  u.searchParams.set('mode', 'import');
-  u.searchParams.set('source', 'batch');
-}
-else if ((isInsemination || isPregnancyDiagnosis || isVaccination || isDryOff) && ctx.mode === 'group') {
-  // ✅ تمرير الأرقام فقط — الحفظ/الفلترة/التحديث في السيرفر
-  u.searchParams.set('mode', 'bulk');
-  u.searchParams.set('number', ctx.bulk);   // مهم لأن بعض الصفحات تقرأ number
-  u.searchParams.set('numbers', ctx.bulk);  // للربط السيرفري
-  u.searchParams.set('bulk', ctx.bulk);     // احتياطي واضح
-  if (ctx.groupName) u.searchParams.set('group', ctx.groupName);
-}
-else if ((isOvsynch || isHeat || isNutrition || isWeaning || isExtraTeats || isColostrum) && ctx.mode === 'group'){
-  u.searchParams.set('mbkMode', 'group');
-  u.searchParams.set('bulk', ctx.bulk);
-  if (ctx.groupName) u.searchParams.set('group', ctx.groupName);
-}
-else if (isDailyMilk && ctx.mode === 'group') {
-  u.searchParams.set('mode', 'bulk');
-  u.searchParams.set('numbers', ctx.bulk);
-  if (ctx.groupName) u.searchParams.set('group', ctx.groupName);
-}
-else {
-  u.searchParams.set('number', ctx.number);
-}
-        u.searchParams.set('date', ctx.date);
-        u.searchParams.set('eventDate', ctx.date);
-        return u.toString();
-      }
-      function openMilkImport(){
-  let date = norm($('#eventDate').value) || todayISO();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
-
-  $('#warn').textContent = '';
-  const u = new URL('daily-milk-import.html', location.href);
-  u.searchParams.set('mode', 'import');
-  u.searchParams.set('source', 'batch');
-  u.searchParams.set('date', date);
-  u.searchParams.set('eventDate', date);
-  location.href = u.toString();
-}
-      function wireButtons(){
-        $$('#eventButtons .btn[data-page]').forEach(btn=>{
-          btn.addEventListener('click', (e)=>{
-            e.preventDefault();
-            const target = btn.getAttribute('data-page') || '';
-            const ctx = getCtxOrWarn(target); if(!ctx) return;
-            location.href = buildUrl(target, ctx);
-          }, {passive:false});
-        });
-      }
-
-      // ✅ تحديث فوري للعنوان/زر البطاقة أثناء الكتابة
-      function wireLive(){
-        const input = $('#animalNumbers');
-        if (!input) return;
-        input.addEventListener('input', ()=>{
-          const list = parseNumbers(input.value);
-          if (list.length === 1){
-            $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${list[0]}`;
-            updateCowCardNav(list[0], false);
-          } else if (list.length > 1){
-            $('#animalInfo').textContent = `🐄 إدخال جماعي: ${list.length} أرقام`;
-            updateCowCardNav('', true);
+            $('#animalInfo').textContent = j.animalInfoText || '🐄 الحيوان الحالي: غير محدد';
           } else {
-            $('#animalInfo').textContent = `🐄 الحيوان الحالي: غير محدد`;
-            updateCowCardNav('', false);
+            $('#animalNumbers').value = '';
           }
-        }, {passive:true});
+
+        } catch (e) {
+          console.error('events context failed', e);
+          $('#animalNumbers').value = '';
+        }
+      } else {
+        const one = toDigitsOnly(qs.get('number') || qs.get('animalNumber') || '');
+        $('#animalNumbers').value = one || '';
       }
 
-      async function saveTrimmingInline(){
-        const ctx = getCtxOrWarn('trimming'); if(!ctx) return;
-        if (ctx.mode !== 'single'){
-          $('#warn').textContent = '⚠️ تقليم الحوافر يُسجل لفرد واحد فقط.';
+      $('#dateInfo').textContent = `📅 التاريخ الحالي: ${date}`;
+      if (!norm($('#eventDate').value)) $('#eventDate').value = date;
+
+      refreshAnimalInfo();
+    }
+
+    async function loadGroupsIntoSelect(){
+      const select = $('#groupSelect');
+      const hint = $('#groupHint');
+      const warn = $('#warn');
+
+      if (!select) return;
+
+      const uid = getCurrentUid();
+
+      if (!uid){
+        warn.textContent = '⚠️ تعذر تحميل المجموعات الآن.';
+        return;
+      }
+
+      try{
+        warn.textContent = '';
+        select.innerHTML = '<option value="">جاري تحميل المجموعات...</option>';
+        select.style.display = 'block';
+        if (hint) hint.style.display = 'block';
+
+        const r = await fetch('/api/events-page/groups', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'X-User-Id': uid
+          },
+          cache: 'no-store'
+        });
+
+        const j = await r.json().catch(() => null);
+
+        if (!r.ok || !j || j.ok === false){
+          warn.textContent = j?.message || '⚠️ فشل تحميل المجموعات من السيرفر.';
+          select.innerHTML = '<option value="">تعذر تحميل المجموعات</option>';
           return;
         }
-        try{
-          const payload = { type:'تقليم الحوافر', number:ctx.number, eventDate:ctx.date, source:location.pathname };
-          if(typeof window.api?.post === 'function'){
-            await window.api.post('/api/events', payload);
-          }
-          const box = document.getElementById('inlineMsg');
-          box.querySelector('.text').textContent = `✅ تم تسجيل تقليم الحوافر للحيوان رقم ${ctx.number} بتاريخ ${ctx.date}.`;
-          box.style.display = 'block';
-          window.dataLayer.push({event:'event_saved', eventType:'trimming', number:ctx.number, date:ctx.date});
-        }catch(err){
-          const box = document.getElementById('inlineMsg');
-          box.querySelector('.text').textContent = `❌ تعذر التسجيل الآن. جرّب لاحقًا.`;
-          box.style.display = 'block';
-          console.error('Trimming save failed', err);
+
+        const rows = Array.isArray(j.groups) ? j.groups : [];
+
+        if (!rows.length){
+          select.innerHTML = '<option value="">لا توجد مجموعات محفوظة</option>';
+          return;
         }
+
+        select.innerHTML = '<option value="">اختر مجموعة...</option>' + rows.map(g => {
+          const members = Array.isArray(g.members) ? g.members : [];
+          const nums = members.map(x => String(x).trim()).filter(Boolean).join(',');
+          const animalType = String(g.animalType || '');
+          const label = `${g.name || g.id || 'مجموعة'}${animalType ? ' — ' + (animalType === 'buffalo' ? 'جاموس' : animalType === 'cow' ? 'أبقار' : animalType) : ''} (${Number(g.animalsCount || members.length || 0)})`;
+
+          return `<option value="${nums}"
+            data-group-name="${String(g.name || '').replace(/"/g, '&quot;')}"
+            data-animal-type="${String(g.animalType || '').replace(/"/g, '&quot;')}"
+            data-group-id="${String(g.groupId || g.id || '').replace(/"/g, '&quot;')}"
+            data-group-key="${String(g.groupKey || '').replace(/"/g, '&quot;')}"
+            data-feeding-eligible="${g.feedingEligible ? '1' : '0'}">${label}</option>`;
+        }).join('');
+
+      } catch(err){
+        console.error('groups load failed', err);
+        warn.textContent = '⚠️ فشل تحميل المجموعات من السيرفر.';
+        select.innerHTML = '<option value="">تعذر تحميل المجموعات</option>';
+        select.style.display = 'block';
+      }
+    }
+
+    function applySelectedGroupNumbers(raw, groupName = ''){
+      const list = parseNumbers(raw || '');
+      const textarea = $('#animalNumbers');
+
+      if (!textarea) return;
+
+      textarea.value = list.join('\n');
+
+      if (list.length === 1){
+        $('#animalInfo').textContent = `🐄 الحيوان الحالي: ${list[0]}`;
+        updateCowCardNav(list[0], false);
+      } else if (list.length > 1){
+        $('#animalInfo').textContent = groupName
+          ? `🐄 المجموعة الحالية: ${groupName}`
+          : `🐄 إدخال جماعي: ${list.length} أرقام`;
+        updateCowCardNav('', true);
+      } else {
+        $('#animalInfo').textContent = '🐄 الحيوان الحالي: غير محدد';
+        updateCowCardNav('', false);
+      }
+    }
+
+    function wireGroupsPicker(){
+      $('#btnPickGroup')?.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        await loadGroupsIntoSelect();
+      }, {passive:false});
+
+      $('#groupSelect')?.addEventListener('change', (e)=>{
+        const raw = e.target.value || '';
+        const groupName =
+          e.target.options?.[e.target.selectedIndex]?.dataset?.groupName || '';
+        applySelectedGroupNumbers(raw, groupName);
+      }, {passive:true});
+    }
+
+    async function resolveEventFromServer({ page = '', action = '' } = {}){
+      const uid = getCurrentUid();
+      const { numbers, date } = currentNumbersAndDate();
+
+      if (!uid){
+        $('#warn').textContent = '⚠️ تعذر تحديد المستخدم الحالي.';
+        return null;
       }
 
-      function wireTrimming(){
-        document.getElementById('btnTrimming')?.addEventListener('click', (e)=>{
+      try{
+        $('#warn').textContent = '';
+
+        const r = await fetch('/api/events-page/resolve', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-User-Id': uid
+          },
+          body: JSON.stringify({
+            page,
+            action,
+            numbers,
+            eventDate: date,
+            group: getSelectedGroupMeta()
+          })
+        });
+
+        const j = await r.json().catch(() => null);
+
+        if (!r.ok || !j || j.ok === false || j.allowed === false){
+          $('#warn').textContent = j?.message || '⚠️ تعذر تجهيز الحدث من السيرفر.';
+          return null;
+        }
+
+        return j;
+
+      } catch(err){
+        console.error('events resolve failed', err);
+        $('#warn').textContent = '⚠️ تعذر الاتصال بالسيرفر.';
+        return null;
+      }
+    }
+
+    function openMilkImport(){
+      let date = norm($('#eventDate').value) || todayISO();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
+
+      $('#warn').textContent = '';
+      const u = new URL('daily-milk-import.html', location.href);
+      u.searchParams.set('mode', 'import');
+      u.searchParams.set('source', 'batch');
+      u.searchParams.set('date', date);
+      u.searchParams.set('eventDate', date);
+      location.href = u.toString();
+    }
+
+    function wireButtons(){
+      $$('#eventButtons .btn[data-page]').forEach(btn=>{
+        btn.addEventListener('click', async (e)=>{
           e.preventDefault();
-          saveTrimmingInline();
-        }, {passive:false});
-      }
-     function wireMilkImport(){
-  document.getElementById('btnMilkImport')?.addEventListener('click', (e)=>{
-    e.preventDefault();
-    openMilkImport();
-  }, {passive:false});
-}
-hydrate();
-wireLive();
-wireButtons();
-wireTrimming();
-wireMilkImport();
-wireGroupsPicker();
-    })();
-  </script>
 
+          const target = btn.getAttribute('data-page') || '';
+          const out = await resolveEventFromServer({ page: target });
+
+          if (!out) return;
+
+          if (out.redirectUrl){
+            location.href = out.redirectUrl;
+          }
+        }, {passive:false});
+      });
+    }
+
+    function wireLive(){
+      const input = $('#animalNumbers');
+      if (!input) return;
+
+      input.addEventListener('input', ()=>{
+        refreshAnimalInfo();
+      }, {passive:true});
+    }
+
+    async function saveTrimmingInline(){
+      const out = await resolveEventFromServer({ action: 'trimming' });
+      if (!out) return;
+
+      const uid = getCurrentUid();
+      const { numbers, date } = currentNumbersAndDate();
+
+      try{
+        const r = await fetch('/api/hoof-trimming/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-User-Id': uid
+          },
+          body: JSON.stringify({
+            numbers,
+            eventDate: date,
+            source: location.pathname
+          })
+        });
+
+        const j = await r.json().catch(() => null);
+
+        const box = document.getElementById('inlineMsg');
+
+        if (!r.ok || !j || j.ok === false){
+          box.querySelector('.text').textContent = j?.message || '❌ تعذر تسجيل تقليم الحوافر.';
+          box.style.display = 'block';
+          return;
+        }
+
+        box.querySelector('.text').textContent = j.message || '✅ تم تسجيل تقليم الحوافر.';
+        box.style.display = 'block';
+
+        window.dataLayer.push({
+          event: 'event_saved',
+          eventType: 'trimming',
+          count: Array.isArray(j.saved) ? j.saved.length : numbers.length,
+          date
+        });
+
+      } catch(err){
+        const box = document.getElementById('inlineMsg');
+        box.querySelector('.text').textContent = '❌ تعذر الاتصال بالسيرفر.';
+        box.style.display = 'block';
+        console.error('Trimming save failed', err);
+      }
+    }
+
+    function wireTrimming(){
+      document.getElementById('btnTrimming')?.addEventListener('click', (e)=>{
+        e.preventDefault();
+        saveTrimmingInline();
+      }, {passive:false});
+    }
+
+    function wireMilkImport(){
+      document.getElementById('btnMilkImport')?.addEventListener('click', (e)=>{
+        e.preventDefault();
+        openMilkImport();
+      }, {passive:false});
+    }
+
+    hydrate();
+    wireLive();
+    wireButtons();
+    wireTrimming();
+    wireMilkImport();
+    wireGroupsPicker();
+  })();
+</script>
   <nav class="mbk-bottom-nav">
     <a href="dashboard.html" class="mbk-nav-link">🏠 لوحة التحكم</a>
     <a href="#" class="mbk-nav-link mbk-nav-link-disabled" data-nav="cow-card">🧾 بطاقة الحيوان</a>
