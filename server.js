@@ -992,6 +992,7 @@ function addAnimalImportKindSrv(body = {}) {
 }
 
 function addAnimalImportFdSrv(row = {}, importKind = "mothers") {
+  row = row?.normalized || row?.row || row;
   const number =
     row.animalNumber ||
     row.number ||
@@ -1249,7 +1250,7 @@ app.post("/api/add-animal/import-save", requireUserId, async (req, res) => {
     const seen = new Set();
 
     for (const row of rows) {
-      const fd = addAnimalImportFdSrv(row.row || row, importKind);
+      const fd = addAnimalImportFdSrv(row, importKind);
       const numberStr = addAnimalDigitsSrv(fd.animalNumber || fd.number || fd.calfNumber);
 
       if (!numberStr) {
