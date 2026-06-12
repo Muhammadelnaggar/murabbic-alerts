@@ -998,6 +998,281 @@ app.post("/api/add-animal/save", requireUserId, async (req, res) => {
   }
 });
 // ============================================================
+//                 API: ADD ANIMAL — SERVER SIDE IMPORT
+//                 استيراد الحيوانات من السيرفر فقط
+// ============================================================
+
+function addAnimalImportRowsSrv(body = {}) {
+  if (Array.isArray(body.rows)) return body.rows;
+  if (Array.isArray(body.preview)) return body.preview;
+  if (Array.isArray(body.records)) return body.records;
+  if (Array.isArray(body.formData?.rows)) return body.formData.rows;
+  return [];
+}
+
+function addAnimalImportKindSrv(body = {}) {
+  const raw = addAnimalStrSrv(
+    body.importKind ||
+    body.kind ||
+    body.entryType ||
+    body.mode ||
+    body.formData?.entryType ||
+    "mothers"
+  );
+
+  return raw === "followers" ? "followers" : "mothers";
+}
+
+function addAnimalImportPickSrv(row = {}, keys = []) {
+  for (const k of keys) {
+    if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "") {
+      return row[k];
+    }
+  }
+  return "";
+}
+
+function addAnimalImportFdSrv(row = {}, importKind = "mothers") {
+  const number = addAnimalImportPickSrv(row, [
+    "animalNumber", "number", "calfNumber",
+    "رقم الحيوان", "رقم", "رقم العجل"
+  ]);
+
+  const animalType = addAnimalImportPickSrv(row, [
+    "animalType", "animalTypeAr", "type",
+    "نوع الحيوان", "النوع"
+  ]);
+
+  const breed = addAnimalImportPickSrv(row, [
+    "breed", "السلالة"
+  ]);
+
+  if (importKind === "followers") {
+    return {
+      entryType: "followers",
+      animalNumber: number,
+      animalType,
+      animalTypeAr: animalType,
+      breed,
+
+      birthDate: addAnimalImportPickSrv(row, ["birthDate", "تاريخ الميلاد"]),
+      followerSex: addAnimalImportPickSrv(row, ["followerSex", "sex", "الجنس"]),
+      followerStatus: addAnimalImportPickSrv(row, ["followerStatus", "status", "الحالة", "الحالة الحالية"]),
+      damNumber: addAnimalImportPickSrv(row, ["damNumber", "رقم الأم"]),
+
+      weaningDate: addAnimalImportPickSrv(row, ["weaningDate", "تاريخ الفطام"]),
+      followerLastInseminationDate: addAnimalImportPickSrv(row, [
+        "followerLastInseminationDate",
+        "lastInseminationDate",
+        "تاريخ آخر تلقيح",
+        "آخر تلقيح"
+      ]),
+      followerServicesCount: addAnimalImportPickSrv(row, [
+        "followerServicesCount",
+        "servicesCount",
+        "عدد التلقيحات"
+      ]),
+      followerSireNumber: addAnimalImportPickSrv(row, [
+        "followerSireNumber",
+        "sireNumber",
+        "رقم الطلوقة",
+        "كود السائل"
+      ])
+    };
+  }
+
+  return {
+    entryType: "mothers",
+    animalNumber: number,
+    animalType,
+    animalTypeAr: animalType,
+    breed,
+
+    birthDate: addAnimalImportPickSrv(row, ["birthDate", "تاريخ الميلاد"]),
+
+    productionStatus: addAnimalImportPickSrv(row, [
+      "productionStatus", "الحالة الإنتاجية"
+    ]),
+    dailyMilk: addAnimalImportPickSrv(row, [
+      "dailyMilk", "milk", "إنتاج اللبن", "إنتاج اللبن اليومي"
+    ]),
+
+    reproductiveStatus: addAnimalImportPickSrv(row, [
+      "reproductiveStatus", "الحالة التناسلية"
+    ]),
+    servicesCount: addAnimalImportPickSrv(row, [
+      "servicesCount", "عدد التلقيحات", "عدد مرات التلقيح"
+    ]),
+    lactationNumber: addAnimalImportPickSrv(row, [
+      "lactationNumber", "رقم الموسم", "موسم الحليب"
+    ]),
+    lastCalvingDate: addAnimalImportPickSrv(row, [
+      "lastCalvingDate", "تاريخ آخر ولادة", "آخر ولادة"
+    ]),
+    lastInseminationDate: addAnimalImportPickSrv(row, [
+      "lastInseminationDate", "تاريخ آخر تلقيح", "آخر تلقيح"
+    ]),
+    sireNumber: addAnimalImportPickSrv(row, [
+      "sireNumber", "رقم الطلوقة", "كود السائل"
+    ])
+  };
+}
+
+app.post("/api/add-animal/import", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن.",
+        saved: [],
+        rejected: []
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const importKind = addAnimalImportKindSrv(body);
+    const rows = addAnimalImportRowsSrv(body);
+
+    if (!rows.length) {
+      return res.status(400).json({
+        ok: false,
+        error: "import_rows_required",
+        message: "لا توجد صفوف صالحة للاستيراد.",
+        saved: [],
+        rejected: []
+      });
+    }
+
+    const saved = [];
+    const rejected = [];
+    const seenInFile = new Set();
+
+    let batch = db.batch();
+    let ops = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const rowNumber = i + 1;
+      const row = rows[i] || {};
+      const fd = addAnimalImportFdSrv(row, importKind);
+      const numberStr = addAnimalDigitsSrv(fd.animalNumber || fd.number || fd.calfNumber);
+
+      if (!numberStr) {
+        rejected.push({
+          row: rowNumber,
+          animalNumber: "",
+          reason: "animal_number_required",
+          message: `السطر ${rowNumber}: رقم الحيوان مطلوب.`
+        });
+        continue;
+      }
+
+      if (seenInFile.has(numberStr)) {
+        rejected.push({
+          row: rowNumber,
+          animalNumber: numberStr,
+          reason: "duplicate_in_file",
+          message: `السطر ${rowNumber}: الرقم ${numberStr} مكرر داخل ملف الاستيراد.`
+        });
+        continue;
+      }
+
+      seenInFile.add(numberStr);
+
+      const fieldErrors = addAnimalBasicFieldsDecisionSrv(fd);
+
+      if (Object.keys(fieldErrors).length) {
+        rejected.push({
+          row: rowNumber,
+          animalNumber: numberStr,
+          reason: "fields_invalid",
+          message: `السطر ${rowNumber}: راجع بيانات الحيوان المطلوبة.`,
+          fieldErrors
+        });
+        continue;
+      }
+
+      const guardMessage = addAnimalDecisionSrv(fd);
+
+      if (guardMessage) {
+        rejected.push({
+          row: rowNumber,
+          animalNumber: numberStr,
+          reason: "decision_failed",
+          message: `السطر ${rowNumber}: ${guardMessage}`
+        });
+        continue;
+      }
+
+      const duplicate = await addAnimalDuplicateCheckSrv(uid, numberStr);
+
+      if (!duplicate.ok) {
+        rejected.push({
+          row: rowNumber,
+          animalNumber: numberStr,
+          reason: duplicate.duplicate ? "duplicate_animal_number" : "duplicate_check_failed",
+          collection: duplicate.collection || null,
+          message: `السطر ${rowNumber}: ${duplicate.message}`
+        });
+        continue;
+      }
+
+      const { collectionName, payload } = addAnimalBuildSinglePayloadSrv(uid, fd);
+      const ref = db.collection(collectionName).doc();
+
+      batch.set(ref, payload);
+      ops++;
+
+      saved.push({
+        row: rowNumber,
+        animalNumber: numberStr,
+        animalId: ref.id,
+        collection: collectionName,
+        message: `تم تجهيز الحيوان رقم ${numberStr} للحفظ.`
+      });
+
+      if (ops >= 400) {
+        await batch.commit();
+        batch = db.batch();
+        ops = 0;
+      }
+    }
+
+    if (ops > 0) {
+      await batch.commit();
+    }
+
+    if (saved.length && typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "add_animal_import");
+    }
+
+    return res.status(saved.length ? 200 : 400).json({
+      ok: saved.length > 0,
+      partial: saved.length > 0 && rejected.length > 0,
+      message: saved.length
+        ? `✅ تم استيراد ${saved.length} حيوان بنجاح.`
+        : "لم يتم استيراد أي حيوان.",
+      importKind,
+      savedCount: saved.length,
+      rejectedCount: rejected.length,
+      saved,
+      rejected
+    });
+
+  } catch (e) {
+    console.error("add-animal-import failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "add_animal_import_failed",
+      message: "حدث خطأ أثناء استيراد الحيوانات.",
+      saved: [],
+      rejected: []
+    });
+  }
+});
+// ============================================================
 //                 EVENTS PAGE: SERVER-ONLY CONTEXT / GROUPS / RESOLVE
 //                 صفحة الأحداث تسأل السيرفر — الواجهة عرض فقط لاحقًا
 // ============================================================
