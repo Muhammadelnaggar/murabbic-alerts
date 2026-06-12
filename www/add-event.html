@@ -169,6 +169,64 @@
     padding:14px;
   }
 }
+    .event-list-hero{
+  margin:10px 12px 4px;
+}
+
+.event-list-hero-btn{
+  width:100%;
+  border:1px solid rgba(14,160,90,.22);
+  border-radius:18px;
+  padding:13px 14px;
+  background:
+    linear-gradient(135deg, rgba(14,160,90,.10), rgba(255,255,255,.96)),
+    #fff;
+  color:var(--text);
+  font-family:inherit;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  box-shadow:0 8px 18px rgba(15,23,42,.07);
+  transition:.18s ease;
+}
+
+.event-list-hero-btn:hover{
+  transform:translateY(-1px);
+  border-color:rgba(14,160,90,.45);
+  box-shadow:0 12px 24px rgba(14,160,90,.12);
+}
+
+.event-list-hero-icon{
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#ecfdf5;
+  border:1px solid #bbf7d0;
+  font-size:20px;
+  flex:0 0 auto;
+}
+
+.event-list-hero-btn b{
+  display:block;
+  font-size:15px;
+  font-weight:900;
+  color:var(--brand-600);
+  line-height:1.3;
+}
+
+.event-list-hero-btn small{
+  display:block;
+  margin-top:3px;
+  font-size:12px;
+  font-weight:700;
+  color:var(--muted);
+  line-height:1.4;
+}
     .mbk-bottom-nav{
       position:fixed;
       bottom:0; left:0; right:0;
@@ -213,7 +271,15 @@
   <div class="meta" id="animalInfo">🐄 الحيوان الحالي: غير محدد</div>
   <div class="meta" id="dateInfo"></div>
   <div class="warning" id="warn"></div>
-
+  <div class="event-list-hero">
+  <button type="button" id="btnEventListTop" class="event-list-hero-btn">
+    <span class="event-list-hero-icon">📜</span>
+    <span>
+      <b>قائمة أحداث الحيوان</b>
+      <small>عرض سجل الحيوان الحالي والفلاتر من السيرفر</small>
+    </span>
+  </button>
+</div>
   <div class="form">
     <!-- ✅ حقل واحد (فردي/جماعي) -->
     <textarea id="animalNumbers" inputmode="numeric" placeholder="أرقام الحيوانات (اكتب رقمًا واحدًا أو عدة أرقام... كل رقم في سطر)"
@@ -252,14 +318,9 @@
     <button class="btn" data-page="disease.html">🔬 التشخيص</button>
     <button class="btn" id="btnTrimming" data-action="trimming">🦶 تقليم الحوافر</button>
     <button class="btn" data-page="abortion.html">🩸 إجهاض</button>
-    <button class="btn" data-page="early-fetal-death.html">💔 موت جنيني مبكر</button>
     <button class="btn" data-page="weaning.html">🐮 فطام</button>
-   <button class="btn" data-page="supernumerary-teat-removal.html">✂️ إزالة الحلمات الزائدة</button>
-    <button class="btn" data-page="colostrum-feeding.html">🍼 تغذية السرسوب</button>
-    <!-- ✅ نفس ملفك -->
+    <button class="btn" data-page="supernumerary-teat-removal.html">✂️ إزالة الحلمات الزائدة</button>
     <button class="btn" data-page="ovysynch.html">📌 تزامن التبويض والتلقيح الإجباري</button>
-
-    <button class="btn" data-page="event-list.html">📜 قائمة الأحداث</button>
     <button class="btn" data-page="heat.html">🔥 شياع</button>
     <button class="btn" data-page="death.html">☠️ نفوق</button>
     <button class="btn" data-page="cull.html">🚫 استبعاد</button>
@@ -611,11 +672,23 @@
         }, {passive:false});
       });
     }
+function wireEventListTop(){
+  document.getElementById('btnEventListTop')?.addEventListener('click', async (e)=>{
+    e.preventDefault();
 
+    const out = await resolveEventFromServer({ page: 'event-list.html' });
+
+    if (!out) return;
+
+    if (out.redirectUrl){
+      location.href = out.redirectUrl;
+    }
+  }, {passive:false});
+}
     function wireLive(){
       const input = $('#animalNumbers');
       if (!input) return;
-
+   
       input.addEventListener('input', ()=>{
         refreshAnimalInfo();
       }, {passive:true});
@@ -688,6 +761,7 @@
     hydrate();
     wireLive();
     wireButtons();
+    wireEventListTop();
     wireTrimming();
     wireMilkImport();
     wireGroupsPicker();
