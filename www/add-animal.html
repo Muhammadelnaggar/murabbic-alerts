@@ -818,344 +818,155 @@ followerLastInseminationDate.addEventListener('input', computeFollowerPregnancy)
     };
   </script>
 
-  <!-- حفظ في فايرستور تحت حساب المستخدم الحالي فقط -->
-<script type="module">
-  import { db } from "./js/firebase-config.js";
-  import { collection, addDoc, serverTimestamp, query, where, limit, getDocs }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { getAuth, onAuthStateChanged }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-  const auth = getAuth();
-  let CURRENT_UID = null;
-
-  onAuthStateChanged(auth, (u) => {
-    if (!u) {
-      location.href = "login.html?next=add-animal.html";
-    } else {
-      CURRENT_UID = u.uid;
-      localStorage.setItem("userId", CURRENT_UID);
-    }
-  });
-
-  const form   = document.getElementById("animalForm");
+<script>
+  const form = document.getElementById("animalForm");
   const msgDiv = document.getElementById("msg");
+
   const bar = window.ensureInfoBar ? window.ensureInfoBar(form) : null;
-const showCentral = (msg, type="success") => window.showMsg ? window.showMsg(bar, msg, type) : showPopup(msg, type !== "error");
-  const $ = (id)=>document.getElementById(id);
+
+  const showCentral = (msg, type = "success") =>
+    window.showMsg
+      ? window.showMsg(bar, msg, type)
+      : showPopup(msg, type !== "error");
+
   const DASHBOARD_URL = "dashboard.html";
-  const todayLocal = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
-const setMsg = (t, ok=false) => {
-  showCentral(t, ok ? "success" : "error");
-};
-  // رجوع ذكي
-  let __hasAnimals = null;
-  window.addEventListener("DOMContentLoaded", async () => {
-    history.pushState({page:"add-animal"}, "", location.href);
-    if (CURRENT_UID){
-      try {
-        const s0 = await getDocs(query(collection(db,"animals"), where("ownerUid","==",CURRENT_UID), limit(1)));
-        __hasAnimals = !s0.empty;
-      } catch {}
+
+  function getCurrentUid(){
+    return (
+      window.mbk?.userId ||
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("tenantId") ||
+      ""
+    ).trim();
+  }
+
+  function todayLocal(){
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
+  }
+
+  function setMsg(text, ok = false){
+    showCentral(text, ok ? "success" : "error");
+  }
+
+  function showPopup(msg, ok = true){
+    const box = document.getElementById("popupBox");
+    const content = document.getElementById("popupContent");
+    if (!box || !content) return;
+
+    content.textContent = msg;
+    content.className = "mbk-popup-content " + (ok ? "mbk-popup-success" : "mbk-popup-error");
+    box.style.display = "flex";
+
+    setTimeout(() => {
+      box.style.display = "none";
+    }, 1800);
+  }
+
+  async function postAddAnimalApi(url, body){
+    const uid = getCurrentUid();
+
+    if (!uid) {
+      throw new Error("userId_required");
     }
-    window.addEventListener("popstate", () => {
-      if (__hasAnimals === false){
-        alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع.");
-        history.pushState({page:"add-animal"}, "", location.href);
-      } else {
-        location.href = DASHBOARD_URL;
-      }
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-User-Id": uid
+      },
+      cache: "no-store",
+      body: JSON.stringify(body || {})
     });
-    document.getElementById("cancelLink")?.addEventListener("click",(e)=>{
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok || !j || j.ok === false) {
+      const msg = j?.message || "حدث خطأ أثناء تنفيذ العملية.";
+      const err = new Error(msg);
+      err.response = j;
+      throw err;
+    }
+
+    return j;
+  }
+
+  window.addEventListener("DOMContentLoaded", () => {
+    history.pushState({ page: "add-animal" }, "", location.href);
+
+    window.addEventListener("popstate", () => {
+      location.href = DASHBOARD_URL;
+    });
+
+    document.getElementById("cancelLink")?.addEventListener("click", (e) => {
       e.preventDefault();
-      if (__hasAnimals === false){ alert("أنت مستخدم جديد — يجب إضافة أول حيوان قبل الرجوع."); return; }
       location.href = DASHBOARD_URL;
     });
   });
 
-  const normAnimaltype = (ar)=>{
-    const s=String(ar||"").trim().toLowerCase();
-    if (s==="cow" || ar==="بقرة") return "cow";
-    if (s==="buffalo" || ar==="جاموسة") return "buffalo";
-    return "cow";
-  };
-function showPopup(msg, ok=true){
-  const box = document.getElementById("popupBox");
-  const content = document.getElementById("popupContent");
+  form.addEventListener("mbk:valid", async (e) => {
+    try {
+      if (msgDiv) msgDiv.style.display = "none";
 
-  content.textContent = msg;
-  content.className = "mbk-popup-content " + (ok ? "mbk-popup-success" : "mbk-popup-error");
+      const entryType = String(document.getElementById("entryType")?.value || "").trim();
 
-  box.style.display = "flex";
+      if (entryType === "import") {
+        const preview = window.__IMPORT_PREVIEW__ || [];
+        const profile = window.__IMPORT_PROFILE__ || null;
+        const importKind = String(document.getElementById("importKind")?.value || "mothers").trim();
 
-  setTimeout(() => { box.style.display = "none"; }, 1800);
-}
+        if (!preview.length) {
+          setMsg("راجع الملف أولًا قبل الحفظ.", false);
+          return;
+        }
 
-form.addEventListener("mbk:valid", async (e)=>{
- if (document.getElementById("entryType")?.value === "import"){
-  const preview = window.__IMPORT_PREVIEW__ || [];
-  const profile = window.__IMPORT_PROFILE__ || null;
-  const importKind = String(document.getElementById("importKind")?.value || "mothers").trim();
+        const res = await postAddAnimalApi("/api/add-animal/import-save", {
+          importKind,
+          profileKey: profile?.key || "",
+          rows: preview
+        });
 
-  if (!CURRENT_UID){
-    setMsg("فضلاً سجّل الدخول أولاً.", false);
-    return;
-  }
+        showCentral(res.message || "✅ تم حفظ الاستيراد بنجاح", "success");
 
-  if (!profile || !preview.length){
-    setMsg("اعمل معاينة للملف أولاً قبل الحفظ.", false);
-    return;
-  }
+        setTimeout(() => {
+          location.href = res.redirectUrl || "dashboard.html";
+        }, 1200);
 
-  try{
-    const targetCollection = (importKind === "followers") ? "calves" : "animals";
-    let saved = 0;
-    let skipped = 0;
-    for (const item of preview){
-      const x = item?.normalized || {};
-      const numberStr = String(x.animalNumber || "").trim();
-      if (!numberStr) continue;
+        return;
+      }
 
-      const key = `${CURRENT_UID}#${numberStr}`;
+      const formData = e.detail?.formData || {};
 
-      const animalTypeAr = String(x.animalType || "").trim();
-      const breed = String(x.breed || "").trim();
-      const birthDate = String(x.birthDate || "").trim() || null;
-      const productionStatus = String(x.productionStatus || "").trim();
-      const dailyMilkVal = Number(x.dailyMilk || 0);
-      const reproductiveStatus = String(x.reproductiveStatus || "").trim();
-      const servicesCount = Number(x.servicesCount || 0);
-      const lactationNumber = Number(x.lactationNumber || 0);
-      const sireNumberInp = String(x.sireNumber || "").trim() || null;
-    const lastCalvingDate = String(x.lastCalvingDate || "").trim() || null;
-const lastInseminationInp = String(x.lastInseminationDate || "").trim() || null;
-const previousInseminationInp = String(x.previousInseminationDate || "").trim() || null;
-const lastHeatDateInp = String(x.lastHeatDate || "").trim() || null;
+      const res = await postAddAnimalApi("/api/add-animal/save", {
+        formData
+      });
 
-      const followerStatusVal = String(x.followerStatus || "").trim();
-      const followerSexVal = String(x.followerSex || "").trim();
-      const damNumberVal = String(x.damNumber || "").trim() || null;
-      const weaningDateVal = String(x.weaningDate || "").trim() || null;
-      const followerPregnancyDaysVal = Number(x.followerPregnancyDays || 0);
+      showCentral(res.message || "✅ تم تسجيل الحيوان بنجاح", "success");
 
-      const payload = (importKind === "mothers")
-        ? {
-            ownerUid: CURRENT_UID,
-            userId: CURRENT_UID,
-            userId_number: key,
-            entryType: "mothers",
+      localStorage.setItem("currentAnimalId", res.animalId || "");
+      localStorage.setItem("currentAnimalNumber", res.animalNumber || res.number || "");
 
-            number: numberStr,
-            animalNumber: Number(numberStr),
-            animaltype: normAnimaltype(animalTypeAr),
-            animalTypeAr,
-            breed,
+      setTimeout(() => {
+        location.href =
+          res.redirectUrl ||
+          `add-event.html?number=${encodeURIComponent(res.animalNumber || res.number || "")}&date=${encodeURIComponent(todayLocal())}`;
+      }, 1200);
 
-           productionStatus,
-dailyMilk: productionStatus === "حلاب" ? dailyMilkVal : null,
-reproductiveStatus,
-servicesCount,
-lactationNumber,
-birthDate,
-lastCalvingDate: lactationNumber > 0 ? lastCalvingDate : null,
-lastInseminationDate: lastInseminationInp || null,
-previousInseminationDate: previousInseminationInp || null,
-lastHeatDate: lastHeatDateInp || null,
-sireNumber: sireNumberInp || null,
+    } catch (err) {
+      console.error(err);
 
-importSource: profile.key,
-            importedAt: serverTimestamp(),
-            createdAt: serverTimestamp()
-          }
-        : {
-            ownerUid: CURRENT_UID,
-            userId: CURRENT_UID,
-            userId_number: key,
-            entryType: "followers",
+      const msg =
+        err?.response?.message ||
+        err?.message ||
+        "حدث خطأ أثناء تسجيل الحيوان.";
 
-            calfNumber: numberStr,
-            number: numberStr,
-            animalNumber: Number(numberStr),
-
-            species: animalTypeAr === "بقرة" ? "أبقار" : "جاموس",
-            animaltype: normAnimaltype(animalTypeAr),
-            animalTypeAr,
-            breed,
-
-            sex: followerSexVal,
-            status: followerStatusVal,
-            followerStatus: followerStatusVal,
-
-            birthDate,
-            damNumber: damNumberVal,
-            weaningDate: weaningDateVal,
-            lastInseminationDate: lastInseminationInp || null,
-            servicesCount,
-            sireNumber: sireNumberInp || null,
-            pregnancyDays: followerPregnancyDaysVal || null,
-
-            importSource: profile.key,
-            importedAt: serverTimestamp(),
-            createdAt: serverTimestamp()
-          };
-
-      const dupQ = query(
-  collection(db, targetCollection),
-  where("userId", "==", CURRENT_UID),
-  where("animalNumber", "==", Number(numberStr)),
-  limit(1)
-);
-
-const dupSnap = await getDocs(dupQ);
-if (!dupSnap.empty) {
-  skipped++;
-  continue;
-}
-
-await addDoc(collection(db, targetCollection), payload);
-saved++;
+      setMsg(msg, false);
     }
-
-    setMsg(`تم استيراد ${saved} سجل بنجاح — وتخطي ${skipped} سجل مكرر`, true);
-    setTimeout(()=>{
-      location.href = "dashboard.html";
-    }, 1200);
-    return;
-  }catch(err){
-    console.error(err);
-    setMsg("حدث خطأ أثناء حفظ ملف الاستيراد.", false);
-    return;
-  }
-}
- const formData = e.detail?.formData || {};
-msgDiv.style.display = "none";
-
-  if (!CURRENT_UID){
-    setMsg("فضلاً سجّل الدخول أولاً.", false);
-    return;
-  }
-
-  const numberStr = String(formData.animalNumber || "").trim();
-const entryTypeVal = String(formData.entryType || "mothers").trim();
-
-const followerSexVal = String(formData.followerSex || "").trim();
-const followerStatusVal = String(formData.followerStatus || "").trim();
-const damNumberVal = String(formData.damNumber || "").trim() || null;
-const weaningDateVal = String(formData.weaningDate || "").trim() || null;
-const followerLastInseminationVal = String(formData.followerLastInseminationDate || "").trim() || null;
-const followerServicesCountVal = Number(formData.followerServicesCount || 0);
-const followerSireNumberVal = String(formData.followerSireNumber || "").trim() || null;
-const followerPregnancyDaysVal = Number(formData.followerPregnancyDays || 0);
-
-const animalTypeAr = String(formData.animalType || "").trim();
-const breed = String(formData.breed || "").trim();
-const productionStatus = String(formData.productionStatus || "").trim();
-const dailyMilkVal = String(formData.dailyMilk || "").trim();
-const reproductiveStatus = String(formData.reproductiveStatus || "").trim();
-const servicesCount = Number(formData.servicesCount || 0);
-const lactationNumber = Number(formData.lactationNumber || 0);
-const birthDate = String(formData.birthDate || "").trim() || null;
-const lastCalvingDate = String(formData.lastCalvingDate || "").trim();
-const lastInseminationInp = String(formData.lastInseminationDate || "").trim() || null;
-const sireNumberInp = String(formData.sireNumber || "").trim() || null;
-const daysInMilkVal = Number(formData.daysInMilk || 0);
-
-  try{
-    // 🔍 منع تكرار نفس الرقم لنفس المستخدم فقط
-    const key = `${CURRENT_UID}#${numberStr}`;
-    // ✅ لا يوجد تكرار لهذا المستخدم → احفظ الحيوان
-const payload = (entryTypeVal === "mothers")
-  ? {
-      ownerUid: CURRENT_UID,
-      userId: CURRENT_UID,
-      userId_number: key,
-      entryType: "mothers",
-
-      number: numberStr,
-      animalNumber: Number(numberStr),
-      animaltype: normAnimaltype(animalTypeAr),
-      animalTypeAr,
-      breed,
-
-      productionStatus,
-      dailyMilk: productionStatus === "حلاب" ? Number(dailyMilkVal || 0) : null,
-      reproductiveStatus,
-      servicesCount,
-      lactationNumber,
-      birthDate,
-      lastCalvingDate: lactationNumber > 0 ? (lastCalvingDate || null) : null,
-
-      lastInseminationDate:
-        (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار" || productionStatus === "جاف" || reproductiveStatus === "مفتوحة")
-          ? (lastInseminationInp || null) : null,
-
-      sireNumber:
-        (reproductiveStatus === "ملقحة" || reproductiveStatus === "عشار")
-          ? (sireNumberInp || null) : null,
-
-      daysInMilk: productionStatus === "جاف" ? null : (daysInMilkVal || null),
-      createdAt: serverTimestamp(),
-      
-    }
-: {
-      ownerUid: CURRENT_UID,
-      userId: CURRENT_UID,
-      userId_number: key,
-      entryType: "followers",
-
-      calfNumber: numberStr,
-      number: numberStr,
-      animalNumber: Number(numberStr),
-
-      species: animalTypeAr === "بقرة" ? "أبقار" : "جاموس",
-      animaltype: normAnimaltype(animalTypeAr),
-      animalTypeAr,
-      breed,
-
-      sex: followerSexVal,
-      status: followerStatusVal,
-      followerStatus: followerStatusVal,
-
-      birthDate,
-      damNumber: damNumberVal,
-      weaningDate: followerStatusVal === "فطام" ? weaningDateVal : null,
-
-      lastInseminationDate:
-        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
-          ? (followerLastInseminationVal || null) : null,
-
-      servicesCount:
-        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
-          ? followerServicesCountVal : 0,
-
-      sireNumber:
-        (followerStatusVal === "ملقح" || followerStatusVal === "عشار")
-          ? (followerSireNumberVal || null) : null,
-
-      pregnancyDays:
-        (followerStatusVal === "عشار")
-          ? (followerPregnancyDaysVal || null) : null,
-
-      createdAt: serverTimestamp()
-    };
-  
-
-const targetCollection = (entryTypeVal === "followers") ? "calves" : "animals";
-const ref = await addDoc(collection(db, targetCollection), payload);
-showCentral("✅ تم تسجيل الحيوان بنجاح", "success");
-  localStorage.setItem("currentAnimalId", ref.id);
-localStorage.setItem("currentAnimalNumber", numberStr);
-const d = todayLocal();
-
-setTimeout(()=>{
-  location.href = `add-event.html?animalId=${encodeURIComponent(ref.id)}&number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(d)}`;
-}, 1200);
-  }catch(err){
-    console.error(err);
-    setMsg("حدث خطأ أثناء تسجيل الحيوان. تأكد من الصلاحيات والاتصال.", false);
-  }
-});
-
+  });
 </script>
 
   <script type="module">
