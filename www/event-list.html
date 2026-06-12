@@ -10,7 +10,7 @@
 
   <!-- نفس اعتماد animal-list -->
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+ 
 
   <style>
     :root{ --green:#2e7d32; --green-600:#1b5e20; --bg:#f7faf7; --card:#fff; --border:#c5e1a5; --ink:#143b24; }
@@ -210,391 +210,158 @@ thead .sticky-type{
     </div>
   </div>
 
-  <!-- Firebase (ESM) -->
-  <script type="module">
-    // ✅ استخدم ملفك الرسمي مباشرة: /js/firebase-config.js يهيّئ التطبيق ويصدر db, auth
-    import { db, auth } from '/js/firebase-config.js';
-    import { collection, query, where, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+ <script>
+  const fNum  = document.getElementById('f-num');
+  const fType = document.getElementById('f-type');
+  const evBody = document.getElementById('evBody');
 
-    // ثوابت DOM
-    const fNum  = document.getElementById('f-num');
-    const fType = document.getElementById('f-type');
-    const evBody = document.getElementById('evBody');
-    if(!evBody){
-  console.error('[event-list] evBody not found (#evBody). Check tbody id.');
-}
+  const getParam = (...keys) => {
+    const u = new URL(location.href);
+    for (const k of keys){
+      const v = u.searchParams.get(k);
+      if(v != null && v !== '') return v;
+    }
+    return '';
+  };
 
-    // أدوات مساعدة
-    const pick = (obj, keys, def='') => { for (const k of keys) { if (obj && obj[k] != null && obj[k] !== '') return obj[k]; } return def; };
-    const getParam = (...keys) => { const u=new URL(location.href); for (const k of keys){ const v=u.searchParams.get(k); if(v!=null && v!=='') return v; } return ''; };
+  function currentUserId(){
+    return (
+      window.mbk?.userId ||
+      getParam('userId','uid') ||
+      localStorage.getItem('userId') ||
+      localStorage.getItem('uid') ||
+      ''
+    );
+  }
 
-    function currentUserId(){
-      const viaUrl = getParam('userId','uid');
-      const ls = viaUrl || localStorage.getItem('userId') || localStorage.getItem('uid') || '';
-      if(ls) return ls;
-      const u = auth.currentUser; return u?.uid || '';
+  function renderRows(rows){
+    if(!evBody) return;
+
+    evBody.innerHTML = '';
+
+    if(!rows.length){
+      evBody.innerHTML = '<tr><td colspan="3" class="empty">لا توجد نتائج مطابقة…</td></tr>';
+      return;
     }
 
- function normalizeTypeKey(ev){
-  // نفضل eventTypeNorm ثم eventType ثم type
-  const raw =
-    String(pick(ev, ['eventTypeNorm','eventType','type','event_name','name','نوع الحدث'], '')).trim();
+    const frag = document.createDocumentFragment();
 
-  // key موحد: lowercase + تحويل مسافات/شرطات لنفس الشكل
-  const k = raw
-    .toLowerCase()
-    .replace(/\s+/g,'_')
-    .replace(/-/g,'_');
+    for(const row of rows){
+      const tr = document.createElement('tr');
 
-  // خريطة التطبيع (ضيفنا daily_milk + feces_eval حسب بياناتك)
-  const map = {
-    // milk
-    'لبن_يومي': 'daily_milk',
-    'daily_milk': 'daily_milk',
-    'daily-milk': 'daily_milk',
-    'dailymilk': 'daily_milk',
+      const cDate = document.createElement('td');
+      cDate.textContent = row.eventDate || '';
+      cDate.className = 'sticky-col sticky-date';
 
-    // insemination
-    'تلقيح': 'insemination',
-    'insemination': 'insemination',
+      const cType = document.createElement('td');
+      cType.innerHTML = `<span class="pill">${row.typeLabel || 'حدث'}</span>`;
+      cType.className = 'sticky-col sticky-type';
 
-    // vaccination
-    'تحصين': 'vaccination',
-    'vaccination': 'vaccination',
+      const cDet = document.createElement('td');
+      cDet.textContent = row.details || '—';
 
-    // pregnancy diagnosis
-    'تشخيص_حمل': 'pregnancy_diagnosis',
-    'pregnancy_diagnosis': 'pregnancy_diagnosis',
+      tr.append(cDate, cType, cDet);
+      frag.appendChild(tr);
+    }
 
-    // calving
-    'ولادة': 'calving',
-    'calving': 'calving',
-
-    // heat
-    'شياع': 'heat',
-    'heat': 'heat',
-
-    // dry-off
-    'تجفيف': 'dry_off',
-    'dryoff': 'dry_off',
-    'dry_off': 'dry_off',
-
-    // abortion
-    'إجهاض': 'abortion',
-    'abortion': 'abortion',
-
-    // feces / bcs
-    'feces_eval': 'feces_eval',
-    'تقييم_الروث_بالكاميرا': 'feces_eval',
-    'تقييم_الروث': 'feces_eval',
-
-    'bcs_eval': 'bcs_eval',
-    'تقييم_حالة_الجسم': 'bcs_eval',
-    'فحص_حالة_الجسم': 'bcs_eval',
-    'بيع': 'sale',
-'sale': 'sale',
-  };
-
-  return map[k] || k; // لو مش موجود، نرجّع key بعد التطبيع
-}
-
-function typeLabel(ev){
-  // نطلع لابل عربي ثابت للعرض
-  const key = normalizeTypeKey(ev);
-  const labels = {
-    daily_milk: 'لبن يومي',
-    insemination: 'تلقيح',
-    vaccination: 'تحصين',
-    pregnancy_diagnosis: 'تشخيص حمل',
-    calving: 'ولادة',
-    heat: 'شياع',
-    dry_off: 'تجفيف',
-    abortion: 'إجهاض',
-    feces_eval: 'تقييم الروث',
-    bcs_eval: 'فحص حالة الجسم',
-    sale: 'بيع',
-  };
-  // لو عندك eventType عربي أصلاً خده، وإلا استخدم اللابل
-const rawAr = String(pick(ev, ['eventType','type'], '')).trim();
-return rawAr || labels[key] || 'حدث';
-}
-
-function detailsFor(ev){
-  const key = normalizeTypeKey(ev);
-
-  // ================== تلقيح ==================
-  if(key === 'insemination'){
-    const at = pick(ev, ['inseminationTime','time','eventTime','at','وقت','ساعة'], '');
-    const method = pick(ev, ['inseminationMethod','method','طريقة'], '');
-    const semen = pick(ev, ['semenCode','strawCode','straw','القشة','كود القشة'], '');
-    const who = pick(ev, ['inseminator','by','الملقح'], '');
-    const heat = pick(ev, ['heatStatus','heatTime','الشياع'], '');
-
-    return [
-      at ? `الوقت: ${at}` : '',
-      method ? `الطريقة: ${method}` : '',
-      semen ? `السائل/القشة: ${semen}` : '',
-      who ? `الملقّح: ${who}` : '',
-      heat ? `الشياع: ${heat}` : ''
-    ].filter(Boolean).join(' — ');
+    evBody.appendChild(frag);
+    updateStickyWidths();
   }
 
-  // ================== لبن يومي ==================
-  if(key === 'daily_milk'){
-    const total = pick(ev, ['milkKg','dailyMilk','kg','milk','milkTotalKg'], '');
-    const sessions = Array.isArray(ev.milkSessions) ? ev.milkSessions : [];
-    const sText = sessions.length
-      ? `الحلبات: ${sessions.map(s=>s?.kg ?? s?.milkKg ?? s?.value).filter(v=>v!=null).join('+')}`
-      : '';
-    return [
-      total!=='' ? `إجمالي: ${total} كجم` : '',
-      sessions.length ? `عدد الحلبات: ${sessions.length}` : '',
-      sText
-    ].filter(Boolean).join(' — ');
-  }
-
-  // ================== تحصين ==================
-  if(key === 'vaccination'){
-    const v = pick(ev, ['vaccine','vaccineName','vaccineKey'], '');
-    const dose = pick(ev, ['doseType','dose','جرعة'], '');
-    return [
-      v ? `اللقاح: ${v}` : '',
-      dose ? `الجرعة: ${dose}` : ''
-    ].filter(Boolean).join(' — ');
-  }
-
-  // ================== تشخيص حمل ==================
-  if(key === 'pregnancy_diagnosis'){
-    const method = pick(ev, ['method','طريقة'], '');
-    const result = pick(ev, ['result','النتيجة'], '');
-    const vet = pick(ev, ['vet','doctor','الطبيب'], '');
-    return [
-      method ? `الطريقة: ${method}` : '',
-      result ? `النتيجة: ${result}` : '',
-      vet ? `الطبيب: ${vet}` : ''
-    ].filter(Boolean).join(' — ');
-  }
-
-  // ================== ولادة ==================
-  if(key === 'calving'){
-    const kind = pick(ev, ['calvingKind'], '');
-    const cnt = pick(ev, ['calfCount'], '');
-    const calfId = pick(ev, ['calfId'], '');
-    return [
-      kind ? `الولادة: ${kind}` : '',
-      cnt ? `عدد العجول: ${cnt}` : '',
-      calfId ? `رقم العجل: ${calfId}` : ''
-    ].filter(Boolean).join(' — ');
-  }
-
-  // ================== إجهاض ==================
-  if(key === 'abortion'){
-    const cause = pick(ev, ['probableCause','cause','reason','سبب','السبب'], '');
-    const age = pick(ev, ['abortionAgeMonths','ageMonths'], '');
-    const lastAI = pick(ev, ['lastInseminationDate'], '');
-    return [
-      cause ? `السبب المحتمل: ${cause}` : '',
-      age!=='' ? `عمر الحمل: ${age} شهر` : '',
-      lastAI ? `آخر تلقيح: ${lastAI}` : ''
-    ].filter(Boolean).join(' — ');
-  }
-
-  // ================== تجفيف ==================
-  if(key === 'dry_off'){
-    const reason = pick(ev, ['reason','سبب','السبب'], '');
-    const ab = pick(ev, ['usedDryingAntibiotics','dryingAntibiotics'], '');
-    const preg = pick(ev, ['pregnancyStatus','reproStatus'], '');
-    const dt = pick(ev, ['dryOffDate','eventDate'], '');
-    return [
-      dt ? `تاريخ: ${dt}` : '',
-      preg ? `الحالة: ${preg}` : '',
-      reason ? `السبب: ${reason}` : '',
-      ab ? `مضاد تجفيف: ${ab}` : ''
-    ].filter(Boolean).join(' — ');
-  }
-
-  // ================== تقييم الروث ==================
-  if(key === 'feces_eval'){
-    const score = pick(ev, ['fecesScore','value'], '');
-    const desc  = pick(ev, ['description','note','notes','ملاحظة'], '');
-    return [
-      score!=='' ? `الدرجة: ${score}` : '',
-      desc ? `الوصف: ${desc}` : ''
-    ].filter(Boolean).join(' — ');
-  }
-
-  // ================== مرض / Health ==================
-  if(key === 'health'){
-    const name = pick(ev, ['diseaseName','disease','name'], '');
-    const code = pick(ev, ['diseaseCode'], '');
-    return [
-      name ? `المرض: ${name}` : '',
-      code ? `الكود: ${code}` : ''
-    ].filter(Boolean).join(' — ');
-  }
-
-  // ================== تزامن / Ovsynch ==================
-  if(key === 'ovsynch' || key === 'ovysynch'){
-    const prog = pick(ev, ['program','type'], '');
-    const start = pick(ev, ['startDate','eventDate'], '');
-    const steps = Array.isArray(ev.steps) ? ev.steps : [];
-    const next = steps.find(s => !s?.done);
-    const nextTxt = next ? `التالي: ${next.name} (${next.date || ''})` : '';
-    return [
-      prog ? `البرنامج: ${prog}` : '',
-      start ? `البداية: ${start}` : '',
-      nextTxt
-    ].filter(Boolean).join(' — ');
-  }
-
-  // ================== استبعاد ==================
-  if(key === 'cull'){
-    const r = pick(ev, ['reason','cullMain','cullDetail'], '');
-    return r ? `السبب: ${r}` : 'استبعاد';
-  }
-
-  // ================== بيع ==================
-if(key === 'sale'){
-  const price = pick(ev, ['price'], '');
-  const reason = String(pick(ev, ['saleReason','reason','notes','note'], '')).trim();
-
-  return [
-    price!=='' ? `السعر: ${price}` : '',
-    reason ? `السبب: ${reason}` : 'السبب: غير مسجل'
-  ].filter(Boolean).join(' — ') || '—';
-}
-
-  // ================== تحضير للولادة (Close-up) ==================
-  if(key === 'closeup'){
-    const ration = pick(ev, ['ration'], '');
-    const an = pick(ev, ['anionicSalts'], '');
-    return [
-      ration ? `عليقة: ${ration}` : '',
-      an ? `أملاح أنيونية: ${an}` : ''
-    ].filter(Boolean).join(' — ');
-  }
-
-  // ================== تقييم صفات اللبن (Milking traits) ==================
-  if(key === 'milking_traits_eval' || key === 'milking_traits'){
-    const score = pick(ev, ['kpi.overallScore','overallScore'], '');
-    return score!=='' ? `الدرجة الكلية: ${score}` : 'تقييم صفات اللبن';
-  }
-
-  // fallback عام
-  const note = pick(ev, ['note','notes','ملاحظة','description'], '');
-  const result = pick(ev, ['result','النتيجة'], '');
-  return [note, result].filter(Boolean).join(' — ') || '—';
-}  
   function updateStickyWidths(){
-  const thDate = document.querySelector('thead th.sticky-date');
-  const thType = document.querySelector('thead th.sticky-type');
-  if(!thDate || !thType) return;
+    const thDate = document.querySelector('thead th.sticky-date');
+    const thType = document.querySelector('thead th.sticky-type');
+    if(!thDate || !thType) return;
 
-  const wDate = Math.ceil(thDate.getBoundingClientRect().width);
-  const wType = Math.ceil(thType.getBoundingClientRect().width);
+    const wDate = Math.ceil(thDate.getBoundingClientRect().width);
+    const wType = Math.ceil(thType.getBoundingClientRect().width);
 
-  document.documentElement.style.setProperty('--w-date', wDate + 'px');
-  document.documentElement.style.setProperty('--w-type', wType + 'px');
-}  
-    function renderRows(events){
-  if(!evBody){
-  console.error('[event-list] evBody is missing (#evBody).');
-  return;
-}
-      evBody.innerHTML = '';
-      if(!events.length){
-       evBody.innerHTML = '<tr><td colspan="3" class="empty">لا توجد نتائج مطابقة…</td></tr>';
-        return;
-      }
-      const frag = document.createDocumentFragment();
-      for(const ev of events){
-       const tr = document.createElement('tr');
+    document.documentElement.style.setProperty('--w-date', wDate + 'px');
+    document.documentElement.style.setProperty('--w-type', wType + 'px');
+  }
 
-const cDate  = document.createElement('td');
-cDate.textContent = pick(ev, ['eventDate','date','dt'], '');
-cDate.className = 'sticky-col sticky-date';
+  async function loadAndFilter(){
+    const uid = currentUserId();
 
-const cType  = document.createElement('td');
-cType.innerHTML = `<span class="pill">${typeLabel(ev)}</span>`;
-cType.className = 'sticky-col sticky-type';
+    const fixedNumber =
+      getParam('number','animalNumber','num','n') ||
+      localStorage.getItem('currentAnimalNumber') ||
+      fNum.value.trim() ||
+      '';
 
-const cDet   = document.createElement('td');
-cDet.textContent = detailsFor(ev);
+    const type = (fType.value || '').trim();
 
-tr.append(cDate, cType, cDet);
-frag.appendChild(tr);
-      }
-      evBody.appendChild(frag);
-      updateStickyWidths();
+    if(!fixedNumber){
+      renderRows([]);
+      return;
     }
 
-    async function loadAndFilter(){
-      const uid = currentUserId();
-      const fixedNumber =
-  getParam('number','animalNumber','num','n') ||
-  localStorage.getItem('currentAnimalNumber') ||
-  '';
+    if(!uid){
+      renderRows([]);
+      return;
+    }
 
-if(!fixedNumber){
-  renderRows([]);
-  return;
-}
-      if(!uid){ renderRows([]); return; }
-      const q = query(
-        collection(db,'events'),
-        where('userId','==',uid),
-        orderBy('eventDate','desc'),
-        limit(200)
-      );
-      const snap = await getDocs(q);
-      const rows = [];
-      snap.forEach(doc => rows.push({ id:doc.id, ...doc.data() }));
+    try{
+      evBody.innerHTML = '<tr><td colspan="3" class="empty">جاري تحميل الأحداث…</td></tr>';
 
-     const num = fixedNumber;
-      const type = (fType.value || '').trim();
+      const qs = new URLSearchParams();
+      qs.set('number', fixedNumber);
+      if(type) qs.set('type', type);
 
-      const filtered = rows.filter(r => {
-        const okNum  = !num  || (String(pick(r,['animalNumber','number','animalId'],'')).trim() === num);
-        const tvalLabel = typeLabel(r);
-const okType = !type || (tvalLabel === type);
-        return okNum && okType;
+      const r = await fetch('/api/events-page/list?' + qs.toString(), {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'X-User-Id': uid
+        },
+        cache: 'no-store'
       });
 
-      renderRows(filtered);
-    }
-    // ✅ فلترة تلقائية بمجرد اختيار النوع من القائمة
-fType.addEventListener('change', loadAndFilter);
-    // تحديث تلقائي عند مسح رقم الحيوان
-fNum.addEventListener('input', () => {
-  if (!fNum.value.trim()) loadAndFilter();
-});
-    // إقلاع الصفحة
-    window.addEventListener('DOMContentLoaded', () => {
-      const fixedNumber =
-  getParam('number','animalNumber','num','n') ||
-  localStorage.getItem('currentAnimalNumber') ||
-  '';
+      const j = await r.json().catch(() => null);
 
-const cowBtn = document.getElementById('btn-cow-card');
-
-if(cowBtn && fixedNumber){
-  cowBtn.href = `cow-card.html?number=${fixedNumber}`;
-}
-      const n = getParam('number','animalNumber','num','n') || localStorage.getItem('currentAnimalNumber') || '';
-      if(n){ fNum.value = n; } else { fNum.placeholder = 'رقم الحيوان (مثال 108)'; }
-
-      if (auth.currentUser || localStorage.getItem('userId') || getParam('userId','uid')) {
-        loadAndFilter();
-      } else {
-        // انتظر استعادة الجلسة بهدوء
-        const off = auth.onAuthStateChanged ? auth.onAuthStateChanged(() => { off(); loadAndFilter(); }) : null;
-        // fallback بسيط بعد ثانيتين
-        setTimeout(loadAndFilter, 2000);
+      if(!r.ok || !j || j.ok === false){
+        evBody.innerHTML = `<tr><td colspan="3" class="empty">${j?.message || 'تعذّر تحميل قائمة الأحداث.'}</td></tr>`;
+        return;
       }
-      window.addEventListener('resize', updateStickyWidths);
-setTimeout(updateStickyWidths, 0);
-    });
-  </script>
+
+      renderRows(Array.isArray(j.rows) ? j.rows : []);
+
+    }catch(e){
+      console.error('[event-list] server load failed', e);
+      evBody.innerHTML = '<tr><td colspan="3" class="empty">تعذّر الاتصال بالسيرفر.</td></tr>';
+    }
+  }
+
+  fType.addEventListener('change', loadAndFilter);
+
+  fNum.addEventListener('input', () => {
+    if (fNum.value.trim()) loadAndFilter();
+  });
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const fixedNumber =
+      getParam('number','animalNumber','num','n') ||
+      localStorage.getItem('currentAnimalNumber') ||
+      '';
+
+    const cowBtn = document.getElementById('btn-cow-card');
+
+    if(cowBtn && fixedNumber){
+      cowBtn.href = `cow-card.html?number=${encodeURIComponent(fixedNumber)}`;
+    }
+
+    if(fixedNumber){
+      fNum.value = fixedNumber;
+    } else {
+      fNum.placeholder = 'رقم الحيوان (مثال 108)';
+    }
+
+    loadAndFilter();
+
+    window.addEventListener('resize', updateStickyWidths);
+    setTimeout(updateStickyWidths, 0);
+  });
+</script>
   <!-- ===== Bottom Fixed Bar ===== -->
 <div class="mbk-bottom-bar">
   <a id="btn-cow-card" class="mbk-bottom-btn secondary">
