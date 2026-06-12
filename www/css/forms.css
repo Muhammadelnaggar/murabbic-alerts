@@ -1482,3 +1482,51 @@ textarea{
     grid-template-columns:repeat(2,1fr);
   }
 }
+/* =========================================================
+   Murabbik Shared Bottom Navigation
+   الشريط السفلي الموحد
+   ========================================================= */
+
+.mbk-bottom-nav{
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  height:58px;
+  background:#ffffff;
+  border-top:1px solid var(--border, #e2e8f0);
+  display:flex;
+  justify-content:space-around;
+  align-items:center;
+  gap:8px;
+  padding:6px 10px;
+  z-index:9999;
+  box-shadow:0 -4px 12px rgba(15,23,42,.06);
+}
+
+.mbk-bottom-nav .mbk-nav-link{
+  text-decoration:none;
+  padding:8px 14px;
+  border-radius:999px;
+  border:1px solid var(--border, #e2e8f0);
+  background:#ffffff;
+  color:var(--ink, #0f172a);
+  font-size:.9rem;
+  font-weight:900;
+  white-space:nowrap;
+  min-height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.mbk-bottom-nav .mbk-nav-link:hover{
+  border-color:rgba(14,160,90,.45);
+  background:#f0fdf4;
+  color:var(--brand-600, #0b7f47);
+}
+
+.mbk-nav-link-disabled{
+  opacity:.5;
+  pointer-events:none;
+}
