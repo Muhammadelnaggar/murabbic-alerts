@@ -1530,3 +1530,172 @@ textarea{
   opacity:.5;
   pointer-events:none;
 }
+/* =========================================================
+   Murabbik Event List Page
+   قائمة أحداث الحيوان — ستايل مركزي
+   ========================================================= */
+
+.event-list-page{
+  --green:#2e7d32;
+  --green-600:#1b5e20;
+  --bg:#f7faf7;
+  --card:#fff;
+  --event-list-border:#c5e1a5;
+  --event-list-ink:#143b24;
+
+  margin:0;
+  background:var(--bg);
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,'Cairo',Arial;
+  line-height:1.45;
+  color:var(--event-list-ink);
+  padding:0 0 65px;
+}
+
+.event-list-page .wrap{
+  max-width:520px;
+  margin:0 auto;
+  padding:12px;
+}
+
+.event-list-page .controls{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:center;
+  margin:10px 0 12px;
+}
+
+.event-list-page .controls input,
+.event-list-page .controls select{
+  padding:10px 12px;
+  border:1px solid var(--event-list-border);
+  border-radius:10px;
+  background:#fff;
+  font:14px system-ui;
+}
+
+.event-list-page .table{
+  background:var(--card);
+  border:1px solid var(--event-list-border);
+  border-radius:14px;
+  max-height:calc(100vh - 260px);
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+}
+
+.event-list-page table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+}
+
+.event-list-page th,
+.event-list-page td{
+  padding:10px 12px;
+  border-bottom:1px solid var(--event-list-border);
+  font-size:13px;
+  vertical-align:top;
+}
+
+.event-list-page thead th{
+  position:sticky;
+  top:0;
+  background:#f6fff2;
+  color:#2e7d32;
+  font-weight:800;
+  z-index:10;
+}
+
+.event-list-page tbody tr:last-child td{
+  border-bottom:none;
+}
+
+.event-list-page .pill{
+  display:inline-block;
+  padding:2px 8px;
+  border:1px solid #bbf7d0;
+  border-radius:999px;
+  background:#ecfdf5;
+  color:#065f46;
+  font-size:12px;
+}
+
+.event-list-page .empty{
+  padding:18px;
+  text-align:center;
+  color:#6b7280;
+}
+
+.event-list-page .sticky-col{
+  position:sticky;
+  z-index:5;
+}
+
+.event-list-page thead .sticky-col{
+  background:#f6fff2;
+  z-index:11;
+}
+
+.event-list-page tbody .sticky-col{
+  background:#fff;
+}
+
+.event-list-page .sticky-date{
+  right:0;
+  white-space:nowrap;
+  width:1%;
+}
+
+.event-list-page .sticky-type{
+  right:var(--w-date, 0px);
+  white-space:nowrap;
+  width:1%;
+}
+
+.event-list-page thead .sticky-type,
+.event-list-page tbody .sticky-type{
+  box-shadow:-1px 0 0 rgba(0,0,0,.08);
+}
+
+.event-list-page td:last-child{
+  text-align:right;
+  white-space:normal;
+  line-height:1.4;
+}
+
+.event-list-page .mbk-bottom-bar{
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  backdrop-filter:blur(6px);
+  background:rgba(247,250,247,.65);
+  border-top:1px solid rgba(46,125,50,.15);
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  z-index:1000;
+}
+
+.event-list-page .mbk-bottom-btn{
+  flex:1;
+  text-align:center;
+  padding:12px;
+  border-radius:14px;
+  font-weight:800;
+  text-decoration:none;
+  font-size:14px;
+}
+
+.event-list-page .mbk-bottom-btn.primary{
+  background:rgba(46,125,50,.85);
+  color:#fff;
+}
+
+.event-list-page .mbk-bottom-btn.secondary{
+  background:rgba(255,255,255,.7);
+  color:#2e7d32;
+  border:2px solid rgba(46,125,50,.6);
+}
