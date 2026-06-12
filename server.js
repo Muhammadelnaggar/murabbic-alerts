@@ -519,6 +519,611 @@ function normalizeEventType(raw) {
   return t;
 }
 // ============================================================
+//                 EVENTS PAGE: SERVER-ONLY CONTEXT / GROUPS / RESOLVE
+//                 صفحة الأحداث تسأل السيرفر — الواجهة عرض فقط لاحقًا
+// ============================================================
+
+const EVENTS_PAGE_BULK_ALLOWED = new Set([
+  "ovysynch.html",
+  "heat.html",
+  "nutrition.html",
+  "weaning.html",
+  "supernumerary-teat-removal.html",
+  "daily-milk.html",
+  "insemination.html",
+  "pregnancy-diagnosis.html",
+  "vaccination.html",
+  "dry-off.html",
+  "close-up.html"
+]);
+const EVENTS_PAGE_BULK_ALLOWED_ACTIONS = new Set([
+  "trimming"
+]);
+const EVENTS_PAGE_NO_NUMBER_ALLOWED = new Set([
+  "event-list.html",
+  "smart-camera.html"
+]);
+
+const EVENTS_PAGE_KNOWN_PAGES = new Set([
+  "calving.html",
+  "insemination.html",
+  "vaccination.html",
+  "dry-off.html",
+  "close-up.html",
+  "daily-milk.html",
+  "nutrition.html",
+  "pregnancy-diagnosis.html",
+  "disease.html",
+  "abortion.html",
+  "early-fetal-death.html",
+  "weaning.html",
+  "supernumerary-teat-removal.html",
+  "colostrum-feeding.html",
+  "ovysynch.html",
+  "event-list.html",
+  "heat.html",
+  "death.html",
+  "cull.html",
+  "sale.html",
+  "smart-camera.html"
+]);
+
+const EVENTS_PAGE_NUTRITION_ALLOWED_GROUP_KEYS = new Set([
+  "fresh",
+  "closeup",
+  "dry",
+  "high",
+  "med",
+  "low"
+]);
+
+const EVENTS_PAGE_NUTRITION_BLOCKED_GROUP_KEYS = new Set([
+  "suckling",
+  "weaned",
+  "growing",
+  "breeding",
+  "heiferOpen",
+  "pregHeifers",
+  "heiferCloseup",
+  "males",
+  "hospital",
+  "all"
+]);
+
+const EVENTS_PAGE_NUTRITION_LAUNCH_CORE_MSG =
+  "⚠️ التغذية متاحة الآن لمجموعات الحلاب والجاف وانتظار الولادة فقط. اختر مجموعة تغذية معتمدة من مُرَبِّيك.";
+
+function eventsPageTodayISO(){
+  return typeof cairoTodayISO === "function"
+    ? cairoTodayISO()
+    : toYYYYMMDD(Date.now());
+}
+
+function eventsPageDigitsSrv(v){
+  const map = {
+    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+  };
+
+  return String(v || "").replace(/[٠-٩۰-۹]/g, d => map[d] || d);
+}
+
+function eventsPageParseNumbersSrv(raw){
+  if (Array.isArray(raw)) {
+    return raw
+      .map(x => eventsPageDigitsSrv(x).replace(/[^\d]/g, ""))
+      .filter(Boolean);
+  }
+
+  return eventsPageDigitsSrv(raw || "")
+    .match(/\d+/g)?.map(x => String(x).trim()).filter(Boolean) || [];
+}
+
+function eventsPageDateSrv(raw){
+  const s = String(raw || "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : eventsPageTodayISO();
+}
+
+function eventsPageNormPageSrv(page){
+  return String(page || "")
+    .trim()
+    .replace(/^\/+/, "")
+    .replace(/^\.?\//, "");
+}
+
+function eventsPageNormGroupTextSrv(s){
+  return String(s || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه");
+}
+
+function eventsPageNormGroupKeySrv(s){
+  return String(s || "").trim();
+}
+
+function eventsPageInferNutritionAllowedFromTextSrv(text){
+  const s = eventsPageNormGroupTextSrv(text);
+
+  return (
+    s.includes("حديث الولاده") ||
+    s.includes("حديثه الولاده") ||
+    s.includes("عالي الادرار") ||
+    s.includes("متوسط الادرار") ||
+    s.includes("منخفض الادرار") ||
+    s.includes("حلاب") ||
+    s.includes("حليب") ||
+    s.includes("لبن") ||
+    s.includes("جاف") ||
+    s.includes("انتظار ولاده") ||
+    s.includes("انتظار الولاده") ||
+    s.includes("قبل الولاده") ||
+    s.includes("تحضير للولاده") ||
+    s.includes("fresh") ||
+    s.includes("closeup") ||
+    s.includes("dry") ||
+    s.includes("high") ||
+    s.includes("med") ||
+    s.includes("low")
+  );
+}
+
+function eventsPageInferNutritionBlockedFromTextSrv(text){
+  const s = eventsPageNormGroupTextSrv(text);
+
+  return (
+    s.includes("رضيع") ||
+    s.includes("فطام") ||
+    s.includes("نامي") ||
+    s.includes("تحت التلقيح") ||
+    s.includes("عجلات") ||
+    s.includes("عجله") ||
+    s.includes("عجل") ||
+    s.includes("ذكور") ||
+    s.includes("ذكر") ||
+    s.includes("كل الابقار") ||
+    s.includes("كل الجاموس") ||
+    s.includes("كل الحيوانات") ||
+    s.includes("مستشفى") ||
+    s.includes("مستشفي") ||
+    s.includes("suckling") ||
+    s.includes("weaned") ||
+    s.includes("growing") ||
+    s.includes("breeding") ||
+    s.includes("heifer") ||
+    s.includes("males") ||
+    s.includes("hospital") ||
+    s.includes("all")
+  );
+}
+
+function eventsPageIsNutritionLaunchCoreGroupSrv(meta = {}){
+  const key = eventsPageNormGroupKeySrv(meta.groupKey || meta.groupId)
+    .replace(/^cow_/, "")
+    .replace(/^buffalo_/, "");
+
+  const label = `${meta.name || ""} ${meta.groupId || ""} ${meta.groupKey || ""}`;
+
+  if (EVENTS_PAGE_NUTRITION_ALLOWED_GROUP_KEYS.has(key)) return true;
+  if (EVENTS_PAGE_NUTRITION_BLOCKED_GROUP_KEYS.has(key)) return false;
+
+  if (meta.feedingEligible === true && eventsPageInferNutritionAllowedFromTextSrv(label)) {
+    return true;
+  }
+
+  return (
+    eventsPageInferNutritionAllowedFromTextSrv(label) &&
+    !eventsPageInferNutritionBlockedFromTextSrv(label)
+  );
+}
+
+function eventsPageBuildRedirectSrv({ page, numbers, eventDate, group = {} }){
+  const p = eventsPageNormPageSrv(page);
+  const nums = Array.isArray(numbers) ? numbers.filter(Boolean) : [];
+  const date = eventsPageDateSrv(eventDate);
+  const isBulk = nums.length > 1;
+
+  const qs = new URLSearchParams();
+
+  if (isBulk) {
+    qs.set("mode", "bulk");
+    qs.set("numbers", nums.join(","));
+    qs.set("bulk", nums.join(","));
+
+    if (group.name || group.groupName) {
+      qs.set("group", String(group.name || group.groupName || ""));
+    }
+    if (group.groupId) qs.set("groupId", String(group.groupId));
+    if (group.groupKey) qs.set("groupKey", String(group.groupKey));
+    if (group.animalType) qs.set("animalType", String(group.animalType));
+  } else if (nums.length === 1) {
+    qs.set("number", nums[0]);
+  }
+
+  qs.set("date", date);
+  qs.set("eventDate", date);
+
+  return qs.toString() ? `${p}?${qs.toString()}` : p;
+}
+
+app.get("/api/events-page/context", requireUserId, async (req, res) => {
+  try {
+    const rawNumbers =
+      req.query.numbers ||
+      req.query.bulk ||
+      req.query.number ||
+      req.query.animalNumber ||
+      "";
+
+    const numbers = eventsPageParseNumbersSrv(rawNumbers);
+    const eventDate = eventsPageDateSrv(req.query.eventDate || req.query.date);
+
+    return res.json({
+      ok: true,
+      userId: req.userId,
+      eventDate,
+      numbers,
+      mode: numbers.length > 1 ? "bulk" : "single",
+      animalInfoText: numbers.length === 1
+        ? `🐄 الحيوان الحالي: ${numbers[0]}`
+        : numbers.length > 1
+          ? `🐄 إدخال جماعي: ${numbers.length} أرقام`
+          : "🐄 الحيوان الحالي: غير محدد"
+    });
+
+  } catch (e) {
+    console.error("events-page-context failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "events_page_context_failed",
+      message: "تعذّر تحميل سياق صفحة الأحداث."
+    });
+  }
+});
+
+app.get("/api/events-page/groups", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر تحميل المجموعات — قاعدة البيانات غير متاحة.",
+        groups: []
+      });
+    }
+
+    const snap = await db.collection("groups")
+      .where("userId", "==", req.userId)
+      .limit(100)
+      .get();
+
+    const groups = [];
+
+    snap.forEach(doc => {
+      const d = doc.data() || {};
+
+      const members = Array.isArray(d.animalNumbers)
+        ? d.animalNumbers
+        : Array.isArray(d.members)
+          ? d.members
+          : [];
+
+      groups.push({
+        id: doc.id,
+        name: String(d.groupName || d.name || doc.id),
+        members: members.map(x => String(x || "").trim()).filter(Boolean),
+        animalType: String(d.animalType || d.species || ""),
+        animalsCount: Number(d.animalsCount || members.length || 0),
+        groupId: String(d.groupId || doc.id || ""),
+        groupKey: String(d.groupKey || ""),
+        feedingEligible: d.feedingEligible === true
+      });
+    });
+
+    return res.json({
+      ok: true,
+      groups
+    });
+
+  } catch (e) {
+    console.error("events-page-groups failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "events_page_groups_failed",
+      message: "فشل تحميل المجموعات من السيرفر.",
+      groups: []
+    });
+  }
+});
+
+app.post("/api/events-page/resolve", requireUserId, async (req, res) => {
+  try {
+    const body = req.body || {};
+
+    const action = String(body.action || "").trim();
+    const page = eventsPageNormPageSrv(body.page || body.targetPage || "");
+    const numbers = eventsPageParseNumbersSrv(
+      body.numbers ||
+      body.animalNumbers ||
+      body.number ||
+      body.animalNumber ||
+      ""
+    );
+
+    const eventDate = eventsPageDateSrv(body.eventDate || body.date);
+    const group = body.group && typeof body.group === "object" ? body.group : {};
+
+   if (!page && !action) {
+  return res.status(400).json({
+    ok: false,
+    allowed: false,
+    error: "event_page_required",
+    message: "لم يتم تحديد نوع الحدث."
+  });
+}
+
+if (action === "trimming") {
+  if (!numbers.length) {
+    return res.status(400).json({
+      ok: false,
+      allowed: false,
+      error: "animal_number_required",
+      message: "اكتب رقم الحيوان أو اختر مجموعة أولًا."
+    });
+  }
+
+  return res.json({
+    ok: true,
+    allowed: true,
+    action: "trimming",
+    mode: numbers.length > 1 ? "bulk" : "single",
+    numbers,
+    eventDate,
+    api: "/api/hoof-trimming/save"
+  });
+}
+    if (!EVENTS_PAGE_KNOWN_PAGES.has(page)) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        error: "unknown_event_page",
+        message: "نوع الحدث غير معروف في مُرَبِّيك."
+      });
+    }
+
+    if (!numbers.length && !EVENTS_PAGE_NO_NUMBER_ALLOWED.has(page)) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        error: "animal_number_required",
+        message: "اكتب رقم الحيوان أو اختر مجموعة أولًا."
+      });
+    }
+
+    if (numbers.length > 1 && !EVENTS_PAGE_BULK_ALLOWED.has(page)) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        error: "bulk_not_allowed",
+        message: "هذا الحدث لا يقبل الإدخال الجماعي من صفحة الأحداث."
+      });
+    }
+
+    if (page === "nutrition.html") {
+      const hasGroup = !!String(group.name || group.groupName || group.groupId || group.groupKey || "").trim();
+
+      if (numbers.length > 1 && !hasGroup) {
+        return res.status(400).json({
+          ok: false,
+          allowed: false,
+          error: "nutrition_group_required",
+          message: "اختر مجموعة تغذية أولًا."
+        });
+      }
+
+      if (numbers.length > 1 && !eventsPageIsNutritionLaunchCoreGroupSrv(group)) {
+        return res.status(400).json({
+          ok: false,
+          allowed: false,
+          error: "nutrition_group_not_allowed",
+          message: EVENTS_PAGE_NUTRITION_LAUNCH_CORE_MSG
+        });
+      }
+    }
+
+    const redirectUrl = eventsPageBuildRedirectSrv({
+      page,
+      numbers,
+      eventDate,
+      group
+    });
+
+    return res.json({
+      ok: true,
+      allowed: true,
+      page,
+      mode: numbers.length > 1 ? "bulk" : "single",
+      numbers,
+      eventDate,
+      redirectUrl
+    });
+
+  } catch (e) {
+    console.error("events-page-resolve failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      error: "events_page_resolve_failed",
+      message: "تعذّر تجهيز الحدث من السيرفر."
+    });
+  }
+});
+// ============================================================
+//                 API: HOOF TRIMMING SAVE
+//                 حفظ تقليم الحوافر فردي/جماعي من السيرفر فقط
+// ============================================================
+
+async function eventsPageFindAnimalByNumberSrv(uid, number) {
+  const n = eventsPageParseNumbersSrv(number)[0] || "";
+
+  if (!db || !n) return null;
+
+  const snap = await db.collection("animals")
+    .where("userId", "==", uid)
+    .where("number", "==", n)
+    .limit(1)
+    .get();
+
+  if (snap.empty) return null;
+
+  const doc = snap.docs[0];
+
+  return {
+    id: doc.id,
+    data: doc.data() || {}
+  };
+}
+
+async function existsHoofTrimmingSameDaySrv(uid, animalNumber, eventDate) {
+  if (!db) return false;
+
+  const n = eventsPageParseNumbersSrv(animalNumber)[0] || "";
+  const d = eventsPageDateSrv(eventDate);
+
+  const snap = await db.collection("events")
+    .where("userId", "==", uid)
+    .where("animalNumber", "==", n)
+    .where("eventTypeNorm", "==", "hoof_trimming")
+    .where("eventDate", "==", d)
+    .limit(1)
+    .get();
+
+  return !snap.empty;
+}
+
+app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر حفظ تقليم الحوافر — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const numbers = eventsPageParseNumbersSrv(
+      body.animalNumbers ||
+      body.numbers ||
+      body.animalNumber ||
+      body.number ||
+      ""
+    );
+
+    const eventDate = eventsPageDateSrv(body.eventDate || body.date);
+    const notes = String(body.notes || "").trim() || null;
+
+    if (!numbers.length) {
+      return res.status(400).json({
+        ok: false,
+        error: "animal_number_required",
+        message: "اكتب رقم الحيوان أو اختر مجموعة أولًا.",
+        saved: [],
+        rejected: []
+      });
+    }
+
+    const saved = [];
+    const rejected = [];
+
+    for (const animalNumber of numbers) {
+      const animal = await eventsPageFindAnimalByNumberSrv(uid, animalNumber);
+
+      if (!animal) {
+        rejected.push({
+          animalNumber,
+          reason: "animal_not_found",
+          message: `الحيوان رقم ${animalNumber} غير موجود في القطيع.`
+        });
+        continue;
+      }
+
+      const already = await existsHoofTrimmingSameDaySrv(uid, animalNumber, eventDate);
+
+      if (already) {
+        rejected.push({
+          animalNumber,
+          reason: "duplicate_same_day",
+          message: `تم تسجيل تقليم الحوافر للحيوان رقم ${animalNumber} في نفس التاريخ من قبل.`
+        });
+        continue;
+      }
+
+      const payload = {
+        userId: uid,
+
+        animalNumber,
+        animalId: animal.id,
+
+        eventDate,
+        date: eventDate,
+
+        eventType: "تقليم الحوافر",
+        eventTypeNorm: "hoof_trimming",
+        type: "تقليم الحوافر",
+
+        notes,
+
+        source: "server:/api/hoof-trimming/save",
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      const eventRef = await db.collection("events").add(payload);
+
+      await db.collection("animals").doc(animal.id).set({
+        lastHoofTrimmingDate: eventDate,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      saved.push({
+        animalNumber,
+        animalId: animal.id,
+        eventId: eventRef.id,
+        message: `تم تسجيل تقليم الحوافر للحيوان رقم ${animalNumber}.`
+      });
+    }
+
+    return res.json({
+      ok: saved.length > 0,
+      partial: saved.length > 0 && rejected.length > 0,
+      message: saved.length
+        ? `✅ تم تسجيل تقليم الحوافر لعدد ${saved.length} حيوان.`
+        : "لم يتم تسجيل تقليم الحوافر لأي حيوان.",
+      saved,
+      rejected,
+      eventDate,
+      redirectUrl: "/event-list.html"
+    });
+
+  } catch (e) {
+    console.error("hoof-trimming-save failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "hoof_trimming_save_failed",
+      message: "تعذّر حفظ تقليم الحوافر الآن.",
+      saved: [],
+      rejected: []
+    });
+  }
+});
+// ============================================================
 //                 NUTRITION: CENTRAL SAVE HELPERS
 // ============================================================
 function cleanObj(x){
