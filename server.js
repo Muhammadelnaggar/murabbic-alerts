@@ -1124,6 +1124,413 @@ app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
   }
 });
 // ============================================================
+//                 API: EVENTS PAGE LIST
+//                 قائمة الأحداث من السيرفر فقط
+// ============================================================
+
+function eventsPagePickSrv(obj, keys, def = "") {
+  for (const k of keys) {
+    if (!k.includes(".")) {
+      if (obj && obj[k] != null && obj[k] !== "") return obj[k];
+      continue;
+    }
+
+    const parts = k.split(".");
+    let cur = obj;
+
+    for (const p of parts) {
+      cur = cur?.[p];
+    }
+
+    if (cur != null && cur !== "") return cur;
+  }
+
+  return def;
+}
+
+function eventsPageNormalizeTypeKeySrv(ev = {}) {
+  const raw = String(eventsPagePickSrv(ev, [
+    "eventTypeNorm",
+    "eventType",
+    "type",
+    "event_name",
+    "name",
+    "نوع الحدث"
+  ], "")).trim();
+
+  const k = raw
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
+
+  const map = {
+    "لبن_يومي": "daily_milk",
+    "daily_milk": "daily_milk",
+    "daily_milk_report": "daily_milk",
+    "dailymilk": "daily_milk",
+
+    "تلقيح": "insemination",
+    "insemination": "insemination",
+
+    "تحصين": "vaccination",
+    "vaccination": "vaccination",
+
+    "تشخيص_حمل": "pregnancy_diagnosis",
+    "pregnancy_diagnosis": "pregnancy_diagnosis",
+
+    "ولادة": "calving",
+    "calving": "calving",
+
+    "شياع": "heat",
+    "heat": "heat",
+
+    "تجفيف": "dry_off",
+    "dryoff": "dry_off",
+    "dry_off": "dry_off",
+
+    "إجهاض": "abortion",
+    "اجهاض": "abortion",
+    "abortion": "abortion",
+
+    "فطام": "weaning",
+    "weaning": "weaning",
+
+    "تقليم_الحوافر": "hoof_trimming",
+    "hoof_trimming": "hoof_trimming",
+
+    "feces_eval": "feces_eval",
+    "تقييم_الروث_بالكاميرا": "feces_eval",
+    "تقييم_الروث": "feces_eval",
+
+    "bcs_eval": "bcs_eval",
+    "تقييم_حالة_الجسم": "bcs_eval",
+    "فحص_حالة_الجسم": "bcs_eval",
+
+    "بيع": "sale",
+    "sale": "sale",
+
+    "نفوق": "death",
+    "death": "death",
+
+    "استبعاد": "cull",
+    "cull": "cull",
+
+    "مرض": "health",
+    "health": "health",
+    "disease": "health",
+
+    "تزامن": "ovsynch",
+    "ovsynch": "ovsynch",
+    "ovysynch": "ovsynch",
+
+    "تحضير_ولادة": "close_up",
+    "تحضير_للولادة": "close_up",
+    "closeup": "close_up",
+    "close_up": "close_up",
+    "close_up_save": "close_up"
+  };
+
+  return map[k] || k;
+}
+
+function eventsPageTypeLabelSrv(ev = {}) {
+  const key = eventsPageNormalizeTypeKeySrv(ev);
+
+  const labels = {
+    daily_milk: "لبن يومي",
+    insemination: "تلقيح",
+    vaccination: "تحصين",
+    pregnancy_diagnosis: "تشخيص حمل",
+    calving: "ولادة",
+    heat: "شياع",
+    dry_off: "تجفيف",
+    abortion: "إجهاض",
+    weaning: "فطام",
+    hoof_trimming: "تقليم الحوافر",
+    feces_eval: "تقييم الروث",
+    bcs_eval: "فحص حالة الجسم",
+    sale: "بيع",
+    death: "نفوق",
+    cull: "استبعاد",
+    health: "مرض",
+    ovsynch: "تزامن",
+    close_up: "تحضير ولادة"
+  };
+
+  const rawAr = String(eventsPagePickSrv(ev, ["eventType", "type"], "")).trim();
+  return rawAr || labels[key] || "حدث";
+}
+
+function eventsPageDetailsSrv(ev = {}) {
+  const key = eventsPageNormalizeTypeKeySrv(ev);
+
+  if (key === "insemination") {
+    const at = eventsPagePickSrv(ev, ["inseminationTime", "time", "eventTime", "at", "وقت", "ساعة"], "");
+    const method = eventsPagePickSrv(ev, ["inseminationMethod", "method", "طريقة"], "");
+    const semen = eventsPagePickSrv(ev, ["semenCode", "strawCode", "straw", "القشة", "كود القشة"], "");
+    const who = eventsPagePickSrv(ev, ["inseminator", "by", "الملقح"], "");
+    const heat = eventsPagePickSrv(ev, ["heatStatus", "heatTime", "الشياع"], "");
+
+    return [
+      at ? `الوقت: ${at}` : "",
+      method ? `الطريقة: ${method}` : "",
+      semen ? `السائل/القشة: ${semen}` : "",
+      who ? `الملقّح: ${who}` : "",
+      heat ? `الشياع: ${heat}` : ""
+    ].filter(Boolean).join(" — ") || "—";
+  }
+
+  if (key === "daily_milk") {
+    const total = eventsPagePickSrv(ev, ["milkKg", "dailyMilk", "kg", "milk", "milkTotalKg", "totalMilkKg"], "");
+    const sessions = Array.isArray(ev.milkSessions) ? ev.milkSessions : [];
+    const sText = sessions.length
+      ? `الحلبات: ${sessions.map(s => s?.kg ?? s?.milkKg ?? s?.value).filter(v => v != null).join("+")}`
+      : "";
+
+    return [
+      total !== "" ? `إجمالي: ${total} كجم` : "",
+      sessions.length ? `عدد الحلبات: ${sessions.length}` : "",
+      sText
+    ].filter(Boolean).join(" — ") || "—";
+  }
+
+  if (key === "vaccination") {
+    const v = eventsPagePickSrv(ev, ["vaccine", "vaccineName", "vaccineKey"], "");
+    const dose = eventsPagePickSrv(ev, ["doseType", "dose", "جرعة"], "");
+
+    return [
+      v ? `اللقاح: ${v}` : "",
+      dose ? `الجرعة: ${dose}` : ""
+    ].filter(Boolean).join(" — ") || "—";
+  }
+
+  if (key === "pregnancy_diagnosis") {
+    const method = eventsPagePickSrv(ev, ["method", "طريقة"], "");
+    const result = eventsPagePickSrv(ev, ["result", "النتيجة"], "");
+    const vet = eventsPagePickSrv(ev, ["vet", "doctor", "الطبيب"], "");
+
+    return [
+      method ? `الطريقة: ${method}` : "",
+      result ? `النتيجة: ${result}` : "",
+      vet ? `الطبيب: ${vet}` : ""
+    ].filter(Boolean).join(" — ") || "—";
+  }
+
+  if (key === "calving") {
+    const kind = eventsPagePickSrv(ev, ["calvingKind"], "");
+    const cnt = eventsPagePickSrv(ev, ["calfCount"], "");
+    const calfId = eventsPagePickSrv(ev, ["calfId"], "");
+
+    return [
+      kind ? `الولادة: ${kind}` : "",
+      cnt ? `عدد العجول: ${cnt}` : "",
+      calfId ? `رقم العجل: ${calfId}` : ""
+    ].filter(Boolean).join(" — ") || "—";
+  }
+
+  if (key === "abortion") {
+    const cause = eventsPagePickSrv(ev, ["probableCause", "cause", "reason", "سبب", "السبب"], "");
+    const age = eventsPagePickSrv(ev, ["abortionAgeMonths", "ageMonths"], "");
+    const lastAI = eventsPagePickSrv(ev, ["lastInseminationDate"], "");
+
+    return [
+      cause ? `السبب المحتمل: ${cause}` : "",
+      age !== "" ? `عمر الحمل: ${age} شهر` : "",
+      lastAI ? `آخر تلقيح: ${lastAI}` : ""
+    ].filter(Boolean).join(" — ") || "—";
+  }
+
+  if (key === "dry_off") {
+    const reason = eventsPagePickSrv(ev, ["reason", "سبب", "السبب"], "");
+    const ab = eventsPagePickSrv(ev, ["usedDryingAntibiotics", "dryingAntibiotics"], "");
+    const preg = eventsPagePickSrv(ev, ["pregnancyStatus", "reproStatus"], "");
+    const dt = eventsPagePickSrv(ev, ["dryOffDate", "eventDate"], "");
+
+    return [
+      dt ? `تاريخ: ${dt}` : "",
+      preg ? `الحالة: ${preg}` : "",
+      reason ? `السبب: ${reason}` : "",
+      ab ? `مضاد تجفيف: ${ab}` : ""
+    ].filter(Boolean).join(" — ") || "—";
+  }
+
+  if (key === "hoof_trimming") {
+    const notes = eventsPagePickSrv(ev, ["notes", "note", "description"], "");
+    return notes ? `ملاحظة: ${notes}` : "تقليم الحوافر";
+  }
+
+  if (key === "feces_eval") {
+    const score = eventsPagePickSrv(ev, ["fecesScore", "value"], "");
+    const desc = eventsPagePickSrv(ev, ["description", "note", "notes", "ملاحظة"], "");
+
+    return [
+      score !== "" ? `الدرجة: ${score}` : "",
+      desc ? `الوصف: ${desc}` : ""
+    ].filter(Boolean).join(" — ") || "—";
+  }
+
+  if (key === "health") {
+    const name = eventsPagePickSrv(ev, ["diseaseName", "disease", "name"], "");
+    const code = eventsPagePickSrv(ev, ["diseaseCode"], "");
+
+    return [
+      name ? `المرض: ${name}` : "",
+      code ? `الكود: ${code}` : ""
+    ].filter(Boolean).join(" — ") || "—";
+  }
+
+  if (key === "ovsynch") {
+    const prog = eventsPagePickSrv(ev, ["program", "type"], "");
+    const start = eventsPagePickSrv(ev, ["startDate", "eventDate"], "");
+    const steps = Array.isArray(ev.steps) ? ev.steps : [];
+    const next = steps.find(s => !s?.done);
+    const nextTxt = next ? `التالي: ${next.name} (${next.date || ""})` : "";
+
+    return [
+      prog ? `البرنامج: ${prog}` : "",
+      start ? `البداية: ${start}` : "",
+      nextTxt
+    ].filter(Boolean).join(" — ") || "—";
+  }
+
+  if (key === "cull") {
+    const r = eventsPagePickSrv(ev, ["reason", "cullMain", "cullDetail"], "");
+    return r ? `السبب: ${r}` : "استبعاد";
+  }
+
+  if (key === "sale") {
+    const price = eventsPagePickSrv(ev, ["price"], "");
+    const reason = String(eventsPagePickSrv(ev, ["saleReason", "reason", "notes", "note"], "")).trim();
+
+    return [
+      price !== "" ? `السعر: ${price}` : "",
+      reason ? `السبب: ${reason}` : "السبب: غير مسجل"
+    ].filter(Boolean).join(" — ") || "—";
+  }
+
+  if (key === "death") {
+    const reason = eventsPagePickSrv(ev, ["deathReason", "reason", "notes", "note"], "");
+    return reason ? `السبب: ${reason}` : "نفوق";
+  }
+
+  if (key === "close_up") {
+    const ration = eventsPagePickSrv(ev, ["ration"], "");
+    const an = eventsPagePickSrv(ev, ["anionicSalts"], "");
+
+    return [
+      ration ? `عليقة: ${ration}` : "",
+      an ? `أملاح أنيونية: ${an}` : ""
+    ].filter(Boolean).join(" — ") || "تحضير ولادة";
+  }
+
+  if (key === "milking_traits_eval" || key === "milking_traits") {
+    const score = eventsPagePickSrv(ev, ["kpi.overallScore", "overallScore"], "");
+    return score !== "" ? `الدرجة الكلية: ${score}` : "تقييم صفات اللبن";
+  }
+
+  const note = eventsPagePickSrv(ev, ["note", "notes", "ملاحظة", "description"], "");
+  const result = eventsPagePickSrv(ev, ["result", "النتيجة"], "");
+
+  return [note, result].filter(Boolean).join(" — ") || "—";
+}
+
+function eventsPageEventAnimalNumberSrv(ev = {}) {
+  return String(eventsPagePickSrv(ev, [
+    "animalNumber",
+    "number",
+    "animalId",
+    "animalID",
+    "calfNumber"
+  ], "")).trim();
+}
+
+function eventsPageRowSrv(docId, ev = {}) {
+  const eventDate = eventsPageDateSrv(
+    eventsPagePickSrv(ev, ["eventDate", "date", "dt"], "")
+  );
+
+  return {
+    id: docId,
+    eventDate,
+    animalNumber: eventsPageEventAnimalNumberSrv(ev),
+    typeKey: eventsPageNormalizeTypeKeySrv(ev),
+    typeLabel: eventsPageTypeLabelSrv(ev),
+    details: eventsPageDetailsSrv(ev)
+  };
+}
+
+app.get("/api/events-page/list", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر تحميل قائمة الأحداث — قاعدة البيانات غير متاحة.",
+        rows: []
+      });
+    }
+
+    const uid = req.userId;
+    const number = eventsPageParseNumbersSrv(
+      req.query.number ||
+      req.query.animalNumber ||
+      req.query.num ||
+      req.query.n ||
+      ""
+    )[0] || "";
+
+    const typeRaw = String(req.query.type || req.query.eventType || "").trim();
+
+    if (!number) {
+      return res.status(400).json({
+        ok: false,
+        error: "animal_number_required",
+        message: "رقم الحيوان مطلوب لعرض قائمة الأحداث.",
+        rows: []
+      });
+    }
+
+    const snap = await db.collection("events")
+      .where("userId", "==", uid)
+      .orderBy("eventDate", "desc")
+      .limit(300)
+      .get();
+
+    const rows = [];
+
+    snap.forEach(doc => {
+      const ev = doc.data() || {};
+      const animalNumber = eventsPageEventAnimalNumberSrv(ev);
+
+      if (String(animalNumber).trim() !== String(number).trim()) return;
+
+      const row = eventsPageRowSrv(doc.id, ev);
+
+      if (typeRaw && row.typeLabel !== typeRaw && row.typeKey !== typeRaw) return;
+
+      rows.push(row);
+    });
+
+    return res.json({
+      ok: true,
+      number,
+      type: typeRaw,
+      count: rows.length,
+      rows
+    });
+
+  } catch (e) {
+    console.error("events-page-list failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "events_page_list_failed",
+      message: "تعذّر تحميل قائمة الأحداث الآن.",
+      rows: []
+    });
+  }
+});
+// ============================================================
 //                 NUTRITION: CENTRAL SAVE HELPERS
 // ============================================================
 function cleanObj(x){
