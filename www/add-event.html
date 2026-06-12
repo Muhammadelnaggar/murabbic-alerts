@@ -49,9 +49,56 @@
   color:var(--text);
 }
 
-    .meta{padding:8px 10px;text-align:center;font-size:16px}
-    .warning{min-height:22px;text-align:center;color:var(--danger);font-size:14px}
+  .context-strip{
+  margin:10px 12px 8px;
+  padding:10px 12px;
+  background:rgba(255,255,255,.92);
+  border:1px solid rgba(14,160,90,.18);
+  border-radius:18px;
+  box-shadow:0 8px 18px rgba(15,23,42,.06);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  flex-wrap:nowrap;
+}
 
+.context-item{
+  min-width:0;
+  font-size:14px;
+  font-weight:900;
+  color:var(--text);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.context-sep{
+  width:1px;
+  height:22px;
+  background:rgba(14,160,90,.22);
+  flex:0 0 auto;
+}
+
+.warning{
+  min-height:22px;
+  margin:0 12px;
+  text-align:center;
+  color:var(--danger);
+  font-size:14px;
+  font-weight:800;
+}
+
+@media(max-width:390px){
+  .context-strip{
+    gap:7px;
+    padding:9px 10px;
+  }
+
+  .context-item{
+    font-size:13px;
+  }
+}
     .form{
       margin:12px;
       padding:14px;
@@ -319,8 +366,6 @@
   </header>
 
   <div class="meta" id="animalInfo">🐄 الحيوان الحالي: غير محدد</div>
-  <div class="meta" id="dateInfo"></div>
-  <div class="warning" id="warn"></div>
   <div class="event-list-hero">
   <button type="button" id="btnEventListTop" class="event-list-hero-btn">
     <span class="event-list-hero-icon">📜</span>
