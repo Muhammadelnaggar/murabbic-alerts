@@ -253,6 +253,7 @@
  <main class="mbk-main">
  <form id="animalForm" class="mbk-form" novalidate>
     <div id="msg"></div>
+   <div id="addAnimalInfoBar" class="mbk-infobar" style="display:none;"></div>
 <div id="entryTypeBox" class="entry-type-box">
   <button type="button" id="btnMothers" class="entry-tab active">أمهات</button>
   <button type="button" id="btnFollowers" class="entry-tab">توابع</button>
@@ -659,6 +660,7 @@
 (function(){
   const form = document.getElementById("animalForm");
   const msgDiv = document.getElementById("msg");
+  const infoBar = document.getElementById("addAnimalInfoBar");
   const primaryActionBtn = document.getElementById("primaryActionBtn");
 
   if (!form) return;
@@ -672,29 +674,29 @@
     ).trim();
   }
 
-  function showServerMessage(text, ok){
-    const msg = String(text || "").trim() || (ok ? "✅ تم بنجاح" : "تعذّر تنفيذ العملية.");
+function showServerMessage(text, ok){
+  const msg = String(text || "").trim() || (ok ? "✅ تم بنجاح" : "تعذّر تنفيذ العملية.");
 
-    if (window.flashOK && ok) {
-      window.flashOK(msg);
-      return;
-    }
+  if (infoBar) {
+    infoBar.style.display = "block";
+    infoBar.className = ok
+      ? "mbk-infobar status-ok"
+      : "mbk-infobar status-error";
+    infoBar.textContent = msg;
 
-    if (!msgDiv) {
-      alert(msg);
-      return;
-    }
-
-    msgDiv.className = "toast show";
-    msgDiv.style.display = "block";
-    msgDiv.textContent = msg;
-    msgDiv.style.background = ok ? "#ecfdf5" : "#ffebee";
-    msgDiv.style.color = ok ? "#065f46" : "#b71c1c";
-    msgDiv.style.border = ok ? "1px solid #10b98133" : "1px solid #ef9a9a";
-
-    try { msgDiv.scrollIntoView({ behavior:"smooth", block:"center" }); } catch(_){}
+    try { infoBar.scrollIntoView({ behavior:"smooth", block:"center" }); } catch(_){}
+    return;
   }
 
+  if (!msgDiv) {
+    alert(msg);
+    return;
+  }
+
+  msgDiv.className = "toast show";
+  msgDiv.style.display = "block";
+  msgDiv.textContent = msg;
+}
   function collectFormData(){
     const out = {};
 
@@ -747,7 +749,49 @@
   function getImportFilePayload(){
   return window.__IMPORT_FILE_PAYLOAD__ || null;
 }
+function setValue(id, value){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.value = value === null || value === undefined ? "" : String(value);
+}
 
+let previewTimer = null;
+
+async function refreshServerPreview(){
+  clearTimeout(previewTimer);
+
+  previewTimer = setTimeout(async () => {
+    try {
+      const formData = collectFormData();
+
+      const result = await postToServer("/api/add-animal/preview", { formData });
+      const data = result.data || {};
+
+      if (!data.ok) return;
+
+      setValue("daysInMilk", data.daysInMilk);
+      setValue("pregnancyDays", data.pregnancyDays);
+      setValue("followerPregnancyDays", data.followerPregnancyDays);
+
+    } catch (err) {
+      console.warn("add animal preview failed:", err);
+    }
+  }, 250);
+}
+
+[
+  "productionStatus",
+  "reproductiveStatus",
+  "lastCalvingDate",
+  "lastInseminationDate",
+  "followerStatus",
+  "followerLastInseminationDate"
+].forEach((id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener("change", refreshServerPreview);
+  el.addEventListener("input", refreshServerPreview);
+});
   form.addEventListener("submit", async function(e){
     e.preventDefault();
 
