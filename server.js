@@ -2339,7 +2339,283 @@ function herdImportRowKindSrv(row = {}) {
   if (hasEvent) return "event";
   return "animal";
 }
+function herdImportNumOrNullSrv(v) {
+  if (v === "" || v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
 
+function herdImportResultCategorySrv(v = "") {
+  const s = String(v || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+
+  if (!s) return "unknown";
+
+  if (
+    s.includes("عشار") ||
+    s.includes("حامل") ||
+    s.includes("preg") ||
+    s.includes("positive") ||
+    s.includes("pos")
+  ) {
+    return "pregnant";
+  }
+
+  if (
+    s.includes("غيرحامل") ||
+    s.includes("فارغ") ||
+    s.includes("فاضي") ||
+    s.includes("مفتوح") ||
+    s.includes("سالب") ||
+    s.includes("negative") ||
+    s.includes("neg") ||
+    s.includes("open") ||
+    s.includes("empty") ||
+    s.includes("notpreg")
+  ) {
+    return "open";
+  }
+
+  return "unknown";
+}
+
+function herdImportBaseStateSrv(animalNumber, draft = null) {
+  const today = addAnimalTodaySrv();
+
+  const st = {
+    animalNumber,
+    entryType: draft?.entryType || "mothers",
+
+    animalType: draft?.animalType || "",
+    breed: draft?.breed || "",
+
+    productionStatus: draft?.productionStatus || "",
+    reproductiveStatus: draft?.reproductiveStatus || "",
+
+    followerStatus: draft?.followerStatus || "",
+    followerSex: draft?.followerSex || "",
+    damNumber: draft?.damNumber || "",
+
+    birthDate: draft?.birthDate || "",
+    lastCalvingDate: draft?.lastCalvingDate || "",
+    lastInseminationDate: draft?.lastInseminationDate || "",
+
+    lactationNumber: herdImportNumOrNullSrv(draft?.lactationNumber),
+    servicesCount: herdImportNumOrNullSrv(draft?.servicesCount || draft?.followerServicesCount) || 0,
+    dailyMilk: herdImportNumOrNullSrv(draft?.dailyMilk),
+
+    daysInMilk: null,
+    pregnancyDays: null,
+
+    status: "active",
+    archiveReason: "",
+    lastEventDate: "",
+    lastMilkDate: "",
+    lastVaccinationDate: "",
+
+    warnings: []
+  };
+
+  if (st.lastCalvingDate && st.productionStatus !== "جاف") {
+    st.daysInMilk = addAnimalDiffDaysSrv(st.lastCalvingDate, today);
+  }
+
+  if (st.reproductiveStatus === "عشار" && st.lastInseminationDate) {
+    st.pregnancyDays = addAnimalDiffDaysSrv(st.lastInseminationDate, today);
+  }
+
+  return st;
+}
+
+function herdImportApplyEventToStateSrv(state, ev = {}) {
+  const today = addAnimalTodaySrv();
+  const t = ev.murabbikEventType;
+  const d = ev.eventDate;
+  const p = ev.payload || {};
+
+  if (!t || !d) {
+    state.warnings.push("حدث بدون نوع أو تاريخ لم يدخل في محاكاة الحالة.");
+    return state;
+  }
+
+  state.lastEventDate = d;
+
+  if (t === "calving") {
+    state.productionStatus = "حلاب";
+    state.reproductiveStatus = "حديث الولادة";
+    state.lastCalvingDate = d;
+    state.daysInMilk = addAnimalDiffDaysSrv(d, today);
+    state.pregnancyDays = null;
+    state.lastInseminationDate = "";
+
+    const lact = herdImportNumOrNullSrv(state.lactationNumber);
+    state.lactationNumber = Number.isFinite(lact) ? lact + 1 : 1;
+
+    return state;
+  }
+
+  if (t === "insemination") {
+    state.reproductiveStatus = "ملقحة";
+    state.lastInseminationDate = d;
+    state.pregnancyDays = null;
+
+    const sc = herdImportNumOrNullSrv(state.servicesCount);
+    state.servicesCount = Number.isFinite(sc) ? sc + 1 : 1;
+
+    if (p.sireNumber) state.sireNumber = p.sireNumber;
+
+    return state;
+  }
+
+  if (t === "pregnancy_diagnosis") {
+    const result = herdImportResultCategorySrv(p.result);
+
+    if (result === "pregnant") {
+      state.reproductiveStatus = "عشار";
+
+      if (state.lastInseminationDate) {
+        state.pregnancyDays = addAnimalDiffDaysSrv(state.lastInseminationDate, today);
+      } else {
+        state.pregnancyDays = null;
+        state.warnings.push("تشخيص حمل موجب بدون تاريخ تلقيح سابق واضح.");
+      }
+
+      return state;
+    }
+
+    if (result === "open") {
+      state.reproductiveStatus = "مفتوحة";
+      state.pregnancyDays = null;
+      return state;
+    }
+
+    state.warnings.push("تشخيص حمل بدون نتيجة واضحة؛ لم يتم تغيير الحالة التناسلية.");
+    return state;
+  }
+
+  if (t === "dry_off") {
+    state.productionStatus = "جاف";
+    state.daysInMilk = null;
+    return state;
+  }
+
+  if (t === "abortion") {
+    state.reproductiveStatus = "مفتوحة";
+    state.pregnancyDays = null;
+    return state;
+  }
+
+  if (t === "daily_milk") {
+    const milk = herdImportNumOrNullSrv(p.milk);
+
+    if (Number.isFinite(milk)) {
+      state.dailyMilk = milk;
+      state.lastMilkDate = d;
+      state.productionStatus = state.productionStatus || "حلاب";
+    } else {
+      state.warnings.push("حدث لبن يومي بدون كمية لبن صالحة.");
+    }
+
+    return state;
+  }
+
+  if (t === "weaning") {
+    state.entryType = state.entryType === "followers" ? "followers" : state.entryType;
+    state.followerStatus = "فطام";
+    state.weaningDate = d;
+    return state;
+  }
+
+  if (t === "vaccination") {
+    state.lastVaccinationDate = d;
+    return state;
+  }
+
+  if (t === "sale") {
+    state.status = "archived";
+    state.archiveReason = "sale";
+    return state;
+  }
+
+  if (t === "death") {
+    state.status = "archived";
+    state.archiveReason = "death";
+    return state;
+  }
+
+  state.warnings.push(`حدث غير مدعوم في المحاكاة: ${t}`);
+  return state;
+}
+
+function herdImportBuildAnimalSummariesSrv(animalsDraft = new Map(), eventsByAnimal = new Map()) {
+  const allNumbers = new Set([
+    ...Array.from(animalsDraft.keys()),
+    ...Array.from(eventsByAnimal.keys())
+  ]);
+
+  const summaries = [];
+
+  for (const animalNumber of allNumbers) {
+    const draft = animalsDraft.get(animalNumber) || null;
+
+    const events = (eventsByAnimal.get(animalNumber) || [])
+      .filter(e => e && e.murabbikEventType && e.eventDate)
+      .sort((a, b) => String(a.eventDate || "").localeCompare(String(b.eventDate || "")));
+
+    const state = herdImportBaseStateSrv(animalNumber, draft);
+
+    if (!draft) {
+      state.warnings.push("لا توجد وثيقة حيوان داخل الملف لهذا الرقم؛ الأحداث ستحتاج حيوانًا موجودًا أو وثيقة مستوردة.");
+    }
+
+    for (const ev of events) {
+      herdImportApplyEventToStateSrv(state, ev);
+    }
+
+    summaries.push({
+      animalNumber,
+      hasAnimalDraft: !!draft,
+      eventCount: events.length,
+      firstEventDate: events[0]?.eventDate || "",
+      lastEventDate: events[events.length - 1]?.eventDate || "",
+      expectedFinalState: {
+        entryType: state.entryType,
+        animalType: state.animalType,
+        breed: state.breed,
+
+        productionStatus: state.productionStatus,
+        reproductiveStatus: state.reproductiveStatus,
+
+        followerStatus: state.followerStatus,
+        birthDate: state.birthDate,
+        damNumber: state.damNumber,
+
+        lastCalvingDate: state.lastCalvingDate,
+        lastInseminationDate: state.lastInseminationDate,
+
+        lactationNumber: state.lactationNumber,
+        servicesCount: state.servicesCount,
+        dailyMilk: state.dailyMilk,
+
+        daysInMilk: state.daysInMilk,
+        pregnancyDays: state.pregnancyDays,
+
+        status: state.status,
+        archiveReason: state.archiveReason,
+
+        lastMilkDate: state.lastMilkDate,
+        lastVaccinationDate: state.lastVaccinationDate
+      },
+      warnings: state.warnings
+    });
+  }
+
+  summaries.sort((a, b) => String(a.animalNumber).localeCompare(String(b.animalNumber), "en", { numeric: true }));
+
+  return summaries;
+}
 app.post("/api/herd-import/preview", requireUserId, async (req, res) => {
   try {
     const uid = req.userId;
@@ -2433,23 +2709,25 @@ app.post("/api/herd-import/preview", requireUserId, async (req, res) => {
       });
     }
 
-    for (const [animalNumber, list] of eventsByAnimal.entries()) {
-      list.sort((a, b) => String(a.eventDate || "").localeCompare(String(b.eventDate || "")));
-    }
+   for (const [animalNumber, list] of eventsByAnimal.entries()) {
+  list.sort((a, b) => String(a.eventDate || "").localeCompare(String(b.eventDate || "")));
+}
 
-    return res.json({
-      ok: true,
-      mode: "herd",
-      userId: uid,
-      message: `تمت معاينة القطيع: جاهز ${readyCount} / مرفوض ${rejectedCount}. لم يتم حفظ أي بيانات.`,
-      totalRows: previewRows.length,
-      readyCount,
-      rejectedCount,
-      animalsDetected: animalsDraft.size,
-      animalsWithEvents: eventsByAnimal.size,
-      rows: previewRows
-    });
+const animalSummaries = herdImportBuildAnimalSummariesSrv(animalsDraft, eventsByAnimal);
 
+return res.json({
+  ok: true,
+  mode: "herd",
+  userId: uid,
+  message: `تمت معاينة القطيع: جاهز ${readyCount} / مرفوض ${rejectedCount}. لم يتم حفظ أي بيانات.`,
+  totalRows: previewRows.length,
+  readyCount,
+  rejectedCount,
+  animalsDetected: animalsDraft.size,
+  animalsWithEvents: eventsByAnimal.size,
+  animalSummaries,
+  rows: previewRows
+});
   } catch (e) {
     console.error("herd-import-preview failed", e);
 
