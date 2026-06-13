@@ -1938,6 +1938,529 @@ app.post("/api/add-animal/import-preview", requireUserId, async (req, res) => {
     });
   }
 });
+// ============================================================
+//                 API: HERD IMPORT — PREVIEW ONLY
+//                 باب واحد لاستيراد القطيع: حيوانات + أحداث
+//                 لا حفظ هنا نهائيًا
+// ============================================================
+
+function herdImportPickAnySrv(row = {}, keys = []) {
+  return addAnimalImportPickAnySrv(row, keys);
+}
+
+function herdImportPickDateSrv(row = {}, keys = []) {
+  if (typeof addAnimalImportPickDateSrv === "function") {
+    return addAnimalImportPickDateSrv(row, keys);
+  }
+
+  const v = herdImportPickAnySrv(row, keys);
+  return addAnimalDateOrNullSrv(v);
+}
+
+function herdImportNormTextSrv(v) {
+  return String(v ?? "").trim();
+}
+
+function herdImportDetectOriginalEventSrv(row = {}) {
+  return herdImportPickAnySrv(row, [
+    "eventType",
+    "event",
+    "type",
+    "EVENT",
+    "EVT",
+    "EVENTTYPE",
+    "remark",
+    "remarks",
+    "action",
+    "activity",
+    "code",
+    "reason",
+    "نوع الحدث",
+    "الحدث",
+    "نوع السجل",
+    "الإجراء",
+    "الاجراء",
+    "ملاحظة",
+    "ملاحظات"
+  ]);
+}
+
+function herdImportDetectEventDateSrv(row = {}) {
+  return herdImportPickDateSrv(row, [
+    "eventDate",
+    "date",
+    "DATE",
+    "event_date",
+    "EVTDATE",
+    "EVENTDATE",
+    "تاريخ الحدث",
+    "التاريخ",
+    "تاريخ",
+    "يوم"
+  ]);
+}
+
+function herdImportDetectAnimalNumberSrv(row = {}) {
+  return addAnimalDigitsSrv(herdImportPickAnySrv(row, [
+    "animalNumber",
+    "number",
+    "cow",
+    "cowNo",
+    "cowId",
+    "cowID",
+    "COW",
+    "COWID",
+    "COWNO",
+    "ID",
+    "ANIMALID",
+    "animalId",
+    "tag",
+    "earTag",
+    "رقم الحيوان",
+    "رقم",
+    "رقم البقرة",
+    "رقم الجاموسة",
+    "رقم الاذن",
+    "رقم الأذن"
+  ]));
+}
+
+function herdImportHasAnimalFieldsSrv(row = {}) {
+  const probes = [
+    "breed", "السلالة",
+    "birthDate", "تاريخ الميلاد",
+    "sex", "الجنس",
+    "productionStatus", "الحالة الإنتاجية",
+    "reproductiveStatus", "الحالة التناسلية",
+    "lastCalvingDate", "تاريخ آخر ولادة",
+    "lastInseminationDate", "تاريخ آخر تلقيح",
+    "damNumber", "رقم الأم",
+    "lactationNumber", "LACT", "LAC",
+    "dailyMilk", "MILK"
+  ];
+
+  return probes.some(k => herdImportNormTextSrv(row[k]));
+}
+
+function herdImportNormalizeMurabbikEventSrv(original = "") {
+  const raw = herdImportNormTextSrv(original);
+  const low = raw.toLowerCase().replace(/\s+/g, " ");
+
+  if (!raw) return "";
+
+  if (
+    low.includes("calv") ||
+    low.includes("fresh") ||
+    raw.includes("ولادة") ||
+    raw.includes("حديث الولادة")
+  ) {
+    return "calving";
+  }
+
+  if (
+    low.includes("bred") ||
+    low.includes("breed") ||
+    low.includes("insemin") ||
+    low === "ai" ||
+    raw.includes("تلقيح")
+  ) {
+    return "insemination";
+  }
+
+  if (
+    low.includes("preg") ||
+    low.includes("check") ||
+    raw.includes("تشخيص حمل") ||
+    raw.includes("سونار") ||
+    raw.includes("جس")
+  ) {
+    return "pregnancy_diagnosis";
+  }
+
+  if (
+    low.includes("dry") ||
+    raw.includes("تجفيف") ||
+    raw.includes("جاف")
+  ) {
+    return "dry_off";
+  }
+
+  if (
+    low.includes("abort") ||
+    raw.includes("إجهاض") ||
+    raw.includes("اجهاض")
+  ) {
+    return "abortion";
+  }
+
+  if (
+    low.includes("milk") ||
+    raw.includes("لبن") ||
+    raw.includes("حليب")
+  ) {
+    return "daily_milk";
+  }
+
+  if (
+    low.includes("wean") ||
+    raw.includes("فطام")
+  ) {
+    return "weaning";
+  }
+
+  if (
+    low.includes("vacc") ||
+    raw.includes("تحصين") ||
+    raw.includes("تطعيم")
+  ) {
+    return "vaccination";
+  }
+
+  if (
+    low.includes("sold") ||
+    low.includes("sale") ||
+    raw.includes("بيع") ||
+    raw.includes("مباع")
+  ) {
+    return "sale";
+  }
+
+  if (
+    low.includes("death") ||
+    low.includes("dead") ||
+    low.includes("died") ||
+    raw.includes("نفوق") ||
+    raw.includes("نافق")
+  ) {
+    return "death";
+  }
+
+  return normalizeEventType(raw);
+}
+
+function herdImportBuildAnimalDraftSrv(row = {}) {
+  const animalNumber = herdImportDetectAnimalNumberSrv(row);
+
+  const animalType = addAnimalImportNormalizeAnimalTypeSrv(herdImportPickAnySrv(row, [
+    "animalType",
+    "species",
+    "type",
+    "نوع الحيوان",
+    "النوع",
+    "Species"
+  ]));
+
+  const dailyMilk = herdImportPickAnySrv(row, [
+    "dailyMilk",
+    "milk",
+    "MILK",
+    "lastMilk",
+    "لبن",
+    "إنتاج اللبن",
+    "انتاج اللبن"
+  ]);
+
+  const productionStatus = addAnimalImportNormalizeProductionSrv(
+    herdImportPickAnySrv(row, [
+      "productionStatus",
+      "prodStatus",
+      "status",
+      "الحالة الإنتاجية",
+      "حالة الإنتاج",
+      "حالة الانتاج"
+    ]),
+    { dailyMilk }
+  );
+
+  const reproductiveStatus = addAnimalImportNormalizeReproSrv(herdImportPickAnySrv(row, [
+    "reproductiveStatus",
+    "reproStatus",
+    "pregStatus",
+    "status",
+    "الحالة التناسلية",
+    "حالة الحمل"
+  ]));
+
+  const followerSex = addAnimalImportNormalizeSexSrv(herdImportPickAnySrv(row, [
+    "sex",
+    "gender",
+    "جنس",
+    "الجنس"
+  ]));
+
+  const damNumber = addAnimalDigitsSrv(herdImportPickAnySrv(row, [
+    "damNumber",
+    "dam",
+    "DAM",
+    "mother",
+    "رقم الأم",
+    "رقم الام",
+    "الأم",
+    "الام"
+  ]));
+
+  const birthDate = herdImportPickDateSrv(row, [
+    "birthDate",
+    "birth",
+    "DOB",
+    "BDAT",
+    "تاريخ الميلاد",
+    "ميلاد"
+  ]);
+
+  const lastCalvingDate = herdImportPickDateSrv(row, [
+    "lastCalvingDate",
+    "fresh",
+    "FRESH",
+    "calvingDate",
+    "lastCalv",
+    "تاريخ آخر ولادة",
+    "تاريخ اخر ولادة",
+    "آخر ولادة",
+    "اخر ولادة"
+  ]);
+
+  const lastInseminationDate = herdImportPickDateSrv(row, [
+    "lastInseminationDate",
+    "bred",
+    "BRED",
+    "lastBred",
+    "serviceDate",
+    "AIDATE",
+    "تاريخ آخر تلقيح",
+    "تاريخ اخر تلقيح",
+    "آخر تلقيح",
+    "اخر تلقيح"
+  ]);
+
+  const followerStatus = addAnimalImportNormalizeFollowerStatusSrv(herdImportPickAnySrv(row, [
+    "followerStatus",
+    "calfStatus",
+    "heiferStatus",
+    "status",
+    "حالة التابع",
+    "الحالة"
+  ]));
+
+  const isFollower =
+    !!damNumber ||
+    !!followerSex ||
+    ["رضيع", "فطام", "نامي", "تحت التلقيح", "ملقح", "عشار"].includes(followerStatus);
+
+  return {
+    entryType: isFollower ? "followers" : "mothers",
+    animalNumber,
+    animalType,
+    breed: herdImportNormTextSrv(herdImportPickAnySrv(row, [
+      "breed",
+      "BREED",
+      "سلالة",
+      "السلالة"
+    ])) || "خليط",
+    birthDate,
+
+    productionStatus: isFollower ? "" : (productionStatus || "حلاب"),
+    reproductiveStatus: isFollower ? "" : (reproductiveStatus || "مفتوحة"),
+    dailyMilk,
+    lactationNumber: herdImportPickAnySrv(row, [
+      "lactationNumber", "LACT", "LAC", "parity", "رقم الموسم", "الموسم"
+    ]),
+    lastCalvingDate,
+    lastInseminationDate,
+    servicesCount: herdImportPickAnySrv(row, [
+      "servicesCount", "services", "SERV", "مرات التلقيح", "عدد مرات التلقيح"
+    ]),
+    sireNumber: addAnimalDigitsSrv(herdImportPickAnySrv(row, [
+      "sireNumber", "sire", "SIRE", "bull", "BULL", "رقم الطلوقة", "الطلوقة"
+    ])),
+
+    followerSex,
+    followerStatus: followerStatus || (isFollower ? "نامي" : ""),
+    damNumber,
+    weaningDate: herdImportPickDateSrv(row, [
+      "weaningDate", "weanDate", "WEAN", "تاريخ الفطام", "الفطام"
+    ]),
+    followerLastInseminationDate: lastInseminationDate,
+    followerServicesCount: herdImportPickAnySrv(row, [
+      "servicesCount", "services", "SERV", "مرات التلقيح", "عدد مرات التلقيح"
+    ]),
+    followerSireNumber: addAnimalDigitsSrv(herdImportPickAnySrv(row, [
+      "sireNumber", "sire", "SIRE", "bull", "BULL", "رقم الطلوقة", "الطلوقة"
+    ]))
+  };
+}
+
+function herdImportBuildEventDraftSrv(row = {}) {
+  const originalEventType = herdImportDetectOriginalEventSrv(row);
+  const murabbikEventType = herdImportNormalizeMurabbikEventSrv(originalEventType);
+  const eventDate = herdImportDetectEventDateSrv(row);
+  const animalNumber = herdImportDetectAnimalNumberSrv(row);
+
+  return {
+    animalNumber,
+    recordKind: "event",
+    originalEventType,
+    murabbikEventType,
+    eventDate,
+    payload: {
+      originalRow: row,
+      milk: herdImportPickAnySrv(row, ["milk", "MILK", "dailyMilk", "لبن", "حليب"]),
+      result: herdImportPickAnySrv(row, ["result", "RESULT", "نتيجة", "نتيجة التشخيص"]),
+      method: herdImportPickAnySrv(row, ["method", "METHOD", "طريقة", "طريقة التشخيص"]),
+      sireNumber: addAnimalDigitsSrv(herdImportPickAnySrv(row, ["sire", "SIRE", "bull", "BULL", "رقم الطلوقة"])),
+      doseType: herdImportPickAnySrv(row, ["doseType", "dose", "جرعة", "نوع الجرعة"]),
+      reason: herdImportPickAnySrv(row, ["reason", "REASON", "سبب", "سبب الحدث"])
+    }
+  };
+}
+
+function herdImportEffectTextSrv(ev = {}) {
+  const t = ev.murabbikEventType;
+
+  if (t === "calving") return "سيجعل الحيوان حديث الولادة/حلاب، ويحدّث آخر ولادة و DIM.";
+  if (t === "insemination") return "سيحدّث آخر تلقيح والحالة التناسلية إلى ملقحة.";
+  if (t === "pregnancy_diagnosis") return "سيحدّث الحالة التناسلية حسب نتيجة التشخيص.";
+  if (t === "dry_off") return "سيحوّل الحالة الإنتاجية إلى جاف.";
+  if (t === "abortion") return "سينهي الحمل ويحدّث الحيوان بعد الإجهاض.";
+  if (t === "daily_milk") return "سيضيف إنتاج لبن تاريخي وقد يحدّث آخر إنتاج.";
+  if (t === "weaning") return "سيحدّث حالة التابع إلى فطام.";
+  if (t === "vaccination") return "سيضيف حدث تحصين وقد ينتج عنه متابعة لاحقة لاحقًا.";
+  if (t === "sale") return "سيؤرشف الحيوان كحالة بيع.";
+  if (t === "death") return "سيؤرشف الحيوان كحالة نفوق.";
+
+  return "حدث غير معروف الأثر حتى الآن.";
+}
+
+function herdImportRowKindSrv(row = {}) {
+  const hasEvent = !!herdImportDetectOriginalEventSrv(row) || !!herdImportDetectEventDateSrv(row);
+  const hasAnimal = herdImportHasAnimalFieldsSrv(row);
+
+  if (hasAnimal && hasEvent) return "mixed";
+  if (hasEvent) return "event";
+  return "animal";
+}
+
+app.post("/api/herd-import/preview", requireUserId, async (req, res) => {
+  try {
+    const uid = req.userId;
+    const body = req.body || {};
+    const rows = addAnimalImportRowsFromBodySrv(body);
+
+    if (!rows.length) {
+      return res.status(400).json({
+        ok: false,
+        error: "herd_import_rows_required",
+        message: "لا توجد صفوف صالحة للمعاينة.",
+        rows: []
+      });
+    }
+
+    const previewRows = [];
+    const animalsDraft = new Map();
+    const eventsByAnimal = new Map();
+
+    let readyCount = 0;
+    let rejectedCount = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const rowNumber = i + 1;
+      const row = rows[i] || {};
+      const recordKind = herdImportRowKindSrv(row);
+      const animalNumber = herdImportDetectAnimalNumberSrv(row);
+
+      const messages = [];
+
+      if (!animalNumber) {
+        messages.push("رقم الحيوان غير موجود أو غير صالح.");
+      }
+
+      let animalDraft = null;
+      let eventDraft = null;
+
+      if (recordKind === "animal" || recordKind === "mixed") {
+        animalDraft = herdImportBuildAnimalDraftSrv(row);
+
+        if (!animalDraft.animalType) {
+          messages.push("نوع الحيوان غير واضح.");
+        }
+
+        if (!animalDraft.breed) {
+          messages.push("السلالة غير واضحة.");
+        }
+
+        if (animalNumber && !animalsDraft.has(animalNumber)) {
+          animalsDraft.set(animalNumber, animalDraft);
+        }
+      }
+
+      if (recordKind === "event" || recordKind === "mixed") {
+        eventDraft = herdImportBuildEventDraftSrv(row);
+
+        if (!eventDraft.originalEventType) {
+          messages.push("نوع الحدث الأصلي غير موجود.");
+        }
+
+        if (!eventDraft.murabbikEventType) {
+          messages.push("تعذّر تحويل نوع الحدث إلى حدث مُرَبِّيك.");
+        }
+
+        if (!eventDraft.eventDate) {
+          messages.push("تاريخ الحدث غير صالح أو غير موجود.");
+        }
+
+        if (animalNumber) {
+          if (!eventsByAnimal.has(animalNumber)) eventsByAnimal.set(animalNumber, []);
+          eventsByAnimal.get(animalNumber).push(eventDraft);
+        }
+      }
+
+      const ok = messages.length === 0;
+
+      if (ok) readyCount++;
+      else rejectedCount++;
+
+      previewRows.push({
+        row: rowNumber,
+        ok,
+        recordKind,
+        animalNumber,
+        originalEventType: eventDraft?.originalEventType || "",
+        murabbikEventType: eventDraft?.murabbikEventType || "",
+        eventDate: eventDraft?.eventDate || "",
+        message: ok ? "جاهز للمعاينة — لم يتم الحفظ." : messages.join(" "),
+        expectedAnimalEffect: eventDraft ? herdImportEffectTextSrv(eventDraft) : "سيتم إنشاء/تجهيز وثيقة الحيوان.",
+        data: animalDraft || eventDraft || {}
+      });
+    }
+
+    for (const [animalNumber, list] of eventsByAnimal.entries()) {
+      list.sort((a, b) => String(a.eventDate || "").localeCompare(String(b.eventDate || "")));
+    }
+
+    return res.json({
+      ok: true,
+      mode: "herd",
+      userId: uid,
+      message: `تمت معاينة القطيع: جاهز ${readyCount} / مرفوض ${rejectedCount}. لم يتم حفظ أي بيانات.`,
+      totalRows: previewRows.length,
+      readyCount,
+      rejectedCount,
+      animalsDetected: animalsDraft.size,
+      animalsWithEvents: eventsByAnimal.size,
+      rows: previewRows
+    });
+
+  } catch (e) {
+    console.error("herd-import-preview failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "herd_import_preview_failed",
+      message: "تعذّرت معاينة ملف القطيع الآن.",
+      rows: []
+    });
+  }
+});
 app.post("/api/add-animal/import", requireUserId, async (req, res) => {
   try {
     if (!db) {
