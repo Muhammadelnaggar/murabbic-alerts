@@ -2441,11 +2441,12 @@ function herdImportApplyEventToStateSrv(state, ev = {}) {
   }
 
   if (state.status === "archived" && t !== "sale" && t !== "death") {
-    state.warnings.push(`يوجد حدث ${t} بتاريخ ${d} بعد أرشفة الحيوان؛ راجع ترتيب/صحة التاريخ.`);
-  }
-
+  state.warnings.push(`يوجد حدث ${t} بتاريخ ${d} بعد أرشفة الحيوان؛ لن يتم تطبيق أثره على وثيقة الحيوان المتوقعة.`);
   state.lastEventDate = d;
+  return state;
+}
 
+state.lastEventDate = d;
   if (t === "calving") {
     if (state.status === "archived") {
       state.warnings.push("ولادة بعد بيع/نفوق الحيوان؛ هذا يحتاج مراجعة قبل الحفظ.");
@@ -2671,6 +2672,40 @@ function herdImportBuildAnimalSummariesSrv(animalsDraft = new Map(), eventsByAni
 
   return summaries;
 }
+function herdImportFindPostArchiveRowsSrv(eventsByAnimal = new Map()) {
+  const rejectedRows = new Map();
+
+  for (const [animalNumber, list] of eventsByAnimal.entries()) {
+    const events = (list || [])
+      .filter(e => e && e.murabbikEventType && e.eventDate)
+      .sort((a, b) => String(a.eventDate || "").localeCompare(String(b.eventDate || "")));
+
+    let archiveDate = "";
+    let archiveType = "";
+
+    for (const ev of events) {
+      const t = ev.murabbikEventType;
+      const d = ev.eventDate;
+
+      if (!archiveDate && (t === "sale" || t === "death")) {
+        archiveDate = d;
+        archiveType = t;
+        continue;
+      }
+
+      if (archiveDate && String(d) > String(archiveDate)) {
+        rejectedRows.set(Number(ev.row), {
+          animalNumber,
+          archiveDate,
+          archiveType,
+          message: `حدث بعد ${archiveType === "death" ? "نفوق" : "بيع"} الحيوان بتاريخ ${archiveDate} ولا يجوز استيراده.`
+        });
+      }
+    }
+  }
+
+  return rejectedRows;
+}
 app.post("/api/herd-import/preview", requireUserId, async (req, res) => {
   try {
     const uid = req.userId;
@@ -2726,6 +2761,7 @@ app.post("/api/herd-import/preview", requireUserId, async (req, res) => {
 
       if (recordKind === "event" || recordKind === "mixed") {
         eventDraft = herdImportBuildEventDraftSrv(row);
+        eventDraft.row = rowNumber;
 
         if (!eventDraft.originalEventType) {
           messages.push("نوع الحدث الأصلي غير موجود.");
@@ -2763,12 +2799,38 @@ app.post("/api/herd-import/preview", requireUserId, async (req, res) => {
         data: animalDraft || eventDraft || {}
       });
     }
-
-   for (const [animalNumber, list] of eventsByAnimal.entries()) {
+for (const [animalNumber, list] of eventsByAnimal.entries()) {
   list.sort((a, b) => String(a.eventDate || "").localeCompare(String(b.eventDate || "")));
 }
 
-const animalSummaries = herdImportBuildAnimalSummariesSrv(animalsDraft, eventsByAnimal);
+const postArchiveRejectedRows = herdImportFindPostArchiveRowsSrv(eventsByAnimal);
+
+if (postArchiveRejectedRows.size) {
+  for (const item of previewRows) {
+    const rejected = postArchiveRejectedRows.get(Number(item.row));
+    if (!rejected) continue;
+
+    item.ok = false;
+    item.status = "rejected";
+    item.reason = "event_after_archive";
+    item.message = rejected.message;
+    item.expectedAnimalEffect = "لن يتم استيراد هذا الحدث لأنه بعد أرشفة الحيوان.";
+  }
+}
+
+readyCount = previewRows.filter(x => x.ok).length;
+rejectedCount = previewRows.length - readyCount;
+
+const cleanEventsByAnimal = new Map();
+
+for (const [animalNumber, list] of eventsByAnimal.entries()) {
+  cleanEventsByAnimal.set(
+    animalNumber,
+    (list || []).filter(ev => !postArchiveRejectedRows.has(Number(ev.row)))
+  );
+}
+
+const animalSummaries = herdImportBuildAnimalSummariesSrv(animalsDraft, cleanEventsByAnimal);
 
 return res.json({
   ok: true,
