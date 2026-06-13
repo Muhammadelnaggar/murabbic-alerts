@@ -2706,6 +2706,29 @@ function herdImportFindPostArchiveRowsSrv(eventsByAnimal = new Map()) {
 
   return rejectedRows;
 }
+function herdImportBuildArchiveContextByAnimalSrv(eventsByAnimal = new Map()) {
+  const out = new Map();
+
+  for (const [animalNumber, list] of eventsByAnimal.entries()) {
+    const events = (list || [])
+      .filter(e => e && e.murabbikEventType && e.eventDate)
+      .sort((a, b) => String(a.eventDate || "").localeCompare(String(b.eventDate || "")));
+
+    for (const ev of events) {
+      if (ev.murabbikEventType === "sale" || ev.murabbikEventType === "death") {
+        out.set(String(animalNumber), {
+          archivedAnimal: true,
+          archiveReason: ev.murabbikEventType === "death" ? "death" : "sale",
+          archiveDate: ev.eventDate,
+          archiveEventRow: ev.row || null
+        });
+        break;
+      }
+    }
+  }
+
+  return out;
+}
 app.post("/api/herd-import/preview", requireUserId, async (req, res) => {
   try {
     const uid = req.userId;
@@ -2828,6 +2851,36 @@ for (const [animalNumber, list] of eventsByAnimal.entries()) {
     animalNumber,
     (list || []).filter(ev => !postArchiveRejectedRows.has(Number(ev.row)))
   );
+}
+
+const archiveContextByAnimal = herdImportBuildArchiveContextByAnimalSrv(cleanEventsByAnimal);
+
+for (const item of previewRows) {
+  if (item.ok && !item.status) {
+    item.status = "ready";
+  }
+
+  if (!item.ok) continue;
+
+  const ctx = archiveContextByAnimal.get(String(item.animalNumber));
+  if (!ctx) {
+    item.archivedAnimal = false;
+    item.archiveReason = "";
+    item.archiveDate = "";
+    continue;
+  }
+
+  item.archivedAnimal = true;
+  item.archiveReason = ctx.archiveReason;
+  item.archiveDate = ctx.archiveDate;
+
+  if (item.recordKind === "animal") {
+    item.expectedAnimalEffect = `سيتم تجهيز وثيقة الحيوان، ثم أرشفتها بسبب ${ctx.archiveReason === "death" ? "النفوق" : "البيع"} بتاريخ ${ctx.archiveDate}.`;
+  }
+
+  if (item.recordKind === "event" || item.recordKind === "mixed") {
+    item.expectedAnimalEffect = `${item.expectedAnimalEffect || ""} — هذا الحدث ضمن تاريخ حيوان مؤرشف.`;
+  }
 }
 
 const animalSummaries = herdImportBuildAnimalSummariesSrv(animalsDraft, cleanEventsByAnimal);
