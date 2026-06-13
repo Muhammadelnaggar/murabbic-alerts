@@ -2436,13 +2436,28 @@ function herdImportApplyEventToStateSrv(state, ev = {}) {
   const p = ev.payload || {};
 
   if (!t || !d) {
-    state.warnings.push("حدث بدون نوع أو تاريخ لم يدخل في محاكاة الحالة.");
+    state.warnings.push("حدث بدون نوع أو تاريخ لم يدخل في معاينة أثر وثيقة الحيوان.");
     return state;
+  }
+
+  if (state.status === "archived" && t !== "sale" && t !== "death") {
+    state.warnings.push(`يوجد حدث ${t} بتاريخ ${d} بعد أرشفة الحيوان؛ راجع ترتيب/صحة التاريخ.`);
   }
 
   state.lastEventDate = d;
 
   if (t === "calving") {
+    if (state.status === "archived") {
+      state.warnings.push("ولادة بعد بيع/نفوق الحيوان؛ هذا يحتاج مراجعة قبل الحفظ.");
+    }
+
+    if (state.lastInseminationDate) {
+      const gDays = addAnimalDiffDaysSrv(state.lastInseminationDate, d);
+      if (Number.isFinite(gDays) && gDays < 250) {
+        state.warnings.push(`ولادة بعد ${gDays} يوم فقط من آخر تلقيح؛ راجع تاريخ الولادة أو التلقيح.`);
+      }
+    }
+
     state.productionStatus = "حلاب";
     state.reproductiveStatus = "حديث الولادة";
     state.lastCalvingDate = d;
@@ -2457,6 +2472,10 @@ function herdImportApplyEventToStateSrv(state, ev = {}) {
   }
 
   if (t === "insemination") {
+    if (state.status === "archived") {
+      state.warnings.push("تلقيح بعد بيع/نفوق الحيوان؛ هذا يحتاج مراجعة قبل الحفظ.");
+    }
+
     state.reproductiveStatus = "ملقحة";
     state.lastInseminationDate = d;
     state.pregnancyDays = null;
@@ -2470,6 +2489,10 @@ function herdImportApplyEventToStateSrv(state, ev = {}) {
   }
 
   if (t === "pregnancy_diagnosis") {
+    if (state.status === "archived") {
+      state.warnings.push("تشخيص حمل بعد بيع/نفوق الحيوان؛ هذا يحتاج مراجعة قبل الحفظ.");
+    }
+
     const result = herdImportResultCategorySrv(p.result);
 
     if (result === "pregnant") {
@@ -2496,18 +2519,42 @@ function herdImportApplyEventToStateSrv(state, ev = {}) {
   }
 
   if (t === "dry_off") {
+    if (state.status === "archived") {
+      state.warnings.push("تجفيف بعد بيع/نفوق الحيوان؛ هذا يحتاج مراجعة قبل الحفظ.");
+    }
+
+    if (state.reproductiveStatus !== "عشار" && !state.lastInseminationDate) {
+      state.warnings.push("تجفيف بدون حمل مؤكد أو تاريخ تلقيح سابق واضح.");
+    }
+
     state.productionStatus = "جاف";
     state.daysInMilk = null;
     return state;
   }
 
   if (t === "abortion") {
+    if (state.status === "archived") {
+      state.warnings.push("إجهاض بعد بيع/نفوق الحيوان؛ هذا يحتاج مراجعة قبل الحفظ.");
+    }
+
+    if (state.reproductiveStatus !== "عشار" && !state.lastInseminationDate) {
+      state.warnings.push("إجهاض بدون حمل مؤكد أو تاريخ تلقيح سابق واضح.");
+    }
+
     state.reproductiveStatus = "مفتوحة";
     state.pregnancyDays = null;
     return state;
   }
 
   if (t === "daily_milk") {
+    if (state.status === "archived") {
+      state.warnings.push("لبن يومي بعد بيع/نفوق الحيوان؛ هذا يحتاج مراجعة قبل الحفظ.");
+    }
+
+    if (state.productionStatus === "جاف") {
+      state.warnings.push("تسجيل لبن يومي لحيوان جاف؛ راجع تاريخ اللبن أو التجفيف.");
+    }
+
     const milk = herdImportNumOrNullSrv(p.milk);
 
     if (Number.isFinite(milk)) {
@@ -2522,6 +2569,10 @@ function herdImportApplyEventToStateSrv(state, ev = {}) {
   }
 
   if (t === "weaning") {
+    if (state.status === "archived") {
+      state.warnings.push("فطام بعد بيع/نفوق الحيوان؛ هذا يحتاج مراجعة قبل الحفظ.");
+    }
+
     state.entryType = state.entryType === "followers" ? "followers" : state.entryType;
     state.followerStatus = "فطام";
     state.weaningDate = d;
@@ -2529,6 +2580,10 @@ function herdImportApplyEventToStateSrv(state, ev = {}) {
   }
 
   if (t === "vaccination") {
+    if (state.status === "archived") {
+      state.warnings.push("تحصين بعد بيع/نفوق الحيوان؛ هذا يحتاج مراجعة قبل الحفظ.");
+    }
+
     state.lastVaccinationDate = d;
     return state;
   }
@@ -2545,7 +2600,7 @@ function herdImportApplyEventToStateSrv(state, ev = {}) {
     return state;
   }
 
-  state.warnings.push(`حدث غير مدعوم في المحاكاة: ${t}`);
+  state.warnings.push(`حدث غير مدعوم في معاينة أثر وثيقة الحيوان: ${t}`);
   return state;
 }
 
