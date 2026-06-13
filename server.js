@@ -1357,7 +1357,141 @@ function addAnimalImportFdSrv(row = {}, importKind = "mothers") {
     ])
   };
 }
+app.post("/api/add-animal/import-preview", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن.",
+        rows: []
+      });
+    }
 
+    const uid = req.userId;
+    const body = req.body || {};
+    const importKind = addAnimalImportKindSrv(body);
+    const rows = addAnimalImportRowsFromBodySrv(body);
+
+    if (!rows.length) {
+      return res.status(400).json({
+        ok: false,
+        error: "import_rows_required",
+        message: "لا توجد صفوف صالحة للمعاينة.",
+        importKind,
+        rows: []
+      });
+    }
+
+    const seenInFile = new Set();
+    const previewRows = [];
+
+    let readyCount = 0;
+    let rejectedCount = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const rowNumber = i + 1;
+      const row = rows[i] || {};
+      const fd = addAnimalImportFdSrv(row, importKind);
+      const numberStr = addAnimalDigitsSrv(fd.animalNumber || fd.number || fd.calfNumber);
+
+      const item = {
+        row: rowNumber,
+        animalNumber: numberStr,
+        importKind,
+        status: "ready",
+        ok: true,
+        reason: null,
+        message: "جاهز للحفظ.",
+        data: fd
+      };
+
+      if (!numberStr) {
+        item.status = "rejected";
+        item.ok = false;
+        item.reason = "animal_number_required";
+        item.message = `السطر ${rowNumber}: رقم الحيوان مطلوب.`;
+        previewRows.push(item);
+        rejectedCount++;
+        continue;
+      }
+
+      if (seenInFile.has(numberStr)) {
+        item.status = "rejected";
+        item.ok = false;
+        item.reason = "duplicate_in_file";
+        item.message = `السطر ${rowNumber}: الرقم ${numberStr} مكرر داخل ملف الاستيراد.`;
+        previewRows.push(item);
+        rejectedCount++;
+        continue;
+      }
+
+      seenInFile.add(numberStr);
+
+      const fieldErrors = addAnimalBasicFieldsDecisionSrv(fd);
+
+      if (Object.keys(fieldErrors).length) {
+        item.status = "rejected";
+        item.ok = false;
+        item.reason = "fields_invalid";
+        item.message = `السطر ${rowNumber}: راجع بيانات الحيوان المطلوبة.`;
+        item.fieldErrors = fieldErrors;
+        previewRows.push(item);
+        rejectedCount++;
+        continue;
+      }
+
+      const guardMessage = addAnimalDecisionSrv(fd);
+
+      if (guardMessage) {
+        item.status = "rejected";
+        item.ok = false;
+        item.reason = "decision_failed";
+        item.message = `السطر ${rowNumber}: ${guardMessage}`;
+        previewRows.push(item);
+        rejectedCount++;
+        continue;
+      }
+
+      const duplicate = await addAnimalDuplicateCheckSrv(uid, numberStr);
+
+      if (!duplicate.ok) {
+        item.status = "rejected";
+        item.ok = false;
+        item.reason = duplicate.duplicate ? "duplicate_animal_number" : "duplicate_check_failed";
+        item.collection = duplicate.collection || null;
+        item.message = `السطر ${rowNumber}: ${duplicate.message}`;
+        previewRows.push(item);
+        rejectedCount++;
+        continue;
+      }
+
+      previewRows.push(item);
+      readyCount++;
+    }
+
+    return res.json({
+      ok: true,
+      importKind,
+      totalCount: rows.length,
+      readyCount,
+      rejectedCount,
+      partial: readyCount > 0 && rejectedCount > 0,
+      message: `تمت معاينة ${rows.length} سجل: ${readyCount} جاهز، ${rejectedCount} مرفوض.`,
+      rows: previewRows
+    });
+
+  } catch (e) {
+    console.error("add-animal-import-preview failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "add_animal_import_preview_failed",
+      message: "حدث خطأ أثناء معاينة ملف الاستيراد.",
+      rows: []
+    });
+  }
+});
 app.post("/api/add-animal/import", requireUserId, async (req, res) => {
   try {
     if (!db) {
