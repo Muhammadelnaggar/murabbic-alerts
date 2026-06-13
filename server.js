@@ -1446,6 +1446,48 @@ function addAnimalImportNormalizeFollowerStatusSrv(v) {
 
   return s0;
 }
+function addAnimalImportNormalizeDateSrv(v) {
+  if (v === null || v === undefined || v === "") return "";
+
+  if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    return v.toISOString().slice(0, 10);
+  }
+
+  const s = String(v || "").trim();
+  if (!s) return "";
+
+  // already ISO-ish
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    return s.slice(0, 10);
+  }
+
+  // Excel serial date, e.g. 43929
+  const n = Number(s);
+  if (Number.isFinite(n) && n > 20000 && n < 80000) {
+    const ms = Math.round((n - 25569) * 86400 * 1000);
+    return new Date(ms).toISOString().slice(0, 10);
+  }
+
+  // dd/mm/yyyy or mm/dd/yyyy — نتركها محافظة كـ month/day عند ملفات DairyComp الإنجليزية
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m) {
+    let mm = Number(m[1]);
+    let dd = Number(m[2]);
+    let yy = Number(m[3]);
+
+    if (yy < 100) yy += yy >= 70 ? 1900 : 2000;
+
+    return `${yy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  }
+
+  return s;
+}
+
+function addAnimalImportPickDateSrv(row = {}, keys = []) {
+  return addAnimalImportNormalizeDateSrv(
+    addAnimalImportPickAnySrv(row, keys)
+  );
+}
 function addAnimalImportFdSrv(row = {}, importKind = "mothers") {
   const number = addAnimalImportPickAnySrv(row, [
     "animalNumber",
@@ -1514,7 +1556,7 @@ function addAnimalImportFdSrv(row = {}, importKind = "mothers") {
       animalTypeAr: addAnimalImportNormalizeAnimalTypeSrv(animalTypeRaw),
       breed,
 
-      birthDate: addAnimalImportPickAnySrv(row, [
+     birthDate: addAnimalImportPickDateSrv(row, [
         "birthDate",
         "BIRTH",
         "birth",
@@ -1549,7 +1591,7 @@ function addAnimalImportFdSrv(row = {}, importKind = "mothers") {
         "الام"
       ]),
 
-      weaningDate: addAnimalImportPickAnySrv(row, [
+     weaningDate: addAnimalImportPickDateSrv(row, [
         "weaningDate",
         "WEANDATE",
         "weanDate",
@@ -1558,7 +1600,7 @@ function addAnimalImportFdSrv(row = {}, importKind = "mothers") {
         "فطام"
       ]),
 
-      followerLastInseminationDate: addAnimalImportPickAnySrv(row, [
+     followerLastInseminationDate: addAnimalImportPickDateSrv(row, [
         "followerLastInseminationDate",
         "lastInseminationDate",
         "LASTBRED",
@@ -1660,7 +1702,7 @@ function addAnimalImportFdSrv(row = {}, importKind = "mothers") {
     animalTypeAr: addAnimalImportNormalizeAnimalTypeSrv(animalTypeRaw),
     breed,
 
-    birthDate: addAnimalImportPickAnySrv(row, [
+  birthDate: addAnimalImportPickDateSrv(row, [
       "birthDate",
       "BIRTH",
       "birth",
@@ -1704,7 +1746,7 @@ function addAnimalImportFdSrv(row = {}, importKind = "mothers") {
       "الموسم"
     ]),
 
-    lastCalvingDate: addAnimalImportPickAnySrv(row, [
+   lastCalvingDate: addAnimalImportPickDateSrv(row, [
       "lastCalvingDate",
       "FRESH",
       "fresh",
@@ -1719,7 +1761,7 @@ function addAnimalImportFdSrv(row = {}, importKind = "mothers") {
       "اخر ولادة"
     ]),
 
-    lastInseminationDate: addAnimalImportPickAnySrv(row, [
+   lastInseminationDate: addAnimalImportPickDateSrv(row, [
       "lastInseminationDate",
       "BRED",
       "bred",
