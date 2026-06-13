@@ -920,19 +920,23 @@ function addAnimalBuildSinglePayloadSrv(uid, fd = {}) {
   const lastAI = addAnimalDateOrNullSrv(fd.lastInseminationDate);
   const servicesCount = addAnimalNumSrv(fd.servicesCount, 0);
 
-  const hasMotherInseminationHistory =
-    reproductiveStatus === "ملقحة" ||
-    reproductiveStatus === "ملقح" ||
-    reproductiveStatus === "عشار" ||
-    servicesCount > 0;
+ const hasMotherInseminationHistory =
+  reproductiveStatus === "ملقحة" ||
+  reproductiveStatus === "ملقح" ||
+  reproductiveStatus === "عشار" ||
+  servicesCount > 0;
 
-  addAnimalBuildSinglePayloadSrv
+const daysInMilk =
+  productionStatus === "جاف"
+    ? null
+    : lastCalvingDate
+      ? addAnimalDiffDaysSrv(lastCalvingDate, today)
+      : null;
 
-  const pregnancyDays =
-    reproductiveStatus === "عشار" && lastAI
-      ? addAnimalDiffDaysSrv(lastAI, today)
-      : addAnimalNumSrv(fd.pregnancyDays, 0);
-
+const pregnancyDays =
+  reproductiveStatus === "عشار" && lastAI
+    ? addAnimalDiffDaysSrv(lastAI, today)
+    : addAnimalNumSrv(fd.pregnancyDays, 0);
   return {
     collectionName: "animals",
     payload: {
