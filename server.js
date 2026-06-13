@@ -2042,100 +2042,145 @@ function herdImportHasAnimalFieldsSrv(row = {}) {
   return probes.some(k => herdImportNormTextSrv(row[k]));
 }
 
+const HERD_IMPORT_EVENT_ALIASES = {
+  calving: [
+    "fresh",
+    "freshen",
+    "calv",
+    "calving",
+    "calved",
+    "birth",
+    "parturition",
+    "ولادة",
+    "ولاده",
+    "حديث الولادة",
+    "فريش"
+  ],
+
+  insemination: [
+    "bred",
+    "breeding",
+    "service",
+    "serv",
+    "served",
+    "ai",
+    "insemination",
+    "inseminated",
+    "mating",
+    "تلقيح",
+    "تلقيحه",
+    "خدمة"
+  ],
+
+  pregnancy_diagnosis: [
+    "preg",
+    "pregnant",
+    "preg check",
+    "pregnancy check",
+    "pd",
+    "vet check",
+    "checked",
+    "open",
+    "not preg",
+    "notpreg",
+    "empty",
+    "preg-",
+    "preg+",
+    "تشخيص حمل",
+    "فحص حمل",
+    "سونار",
+    "جس",
+    "عشار",
+    "غير حامل",
+    "مفتوحة"
+  ],
+
+  dry_off: [
+    "dry",
+    "dryoff",
+    "dry off",
+    "تجفيف",
+    "جاف"
+  ],
+
+  abortion: [
+    "abort",
+    "abrt",
+    "abortion",
+    "إجهاض",
+    "اجهاض"
+  ],
+
+  daily_milk: [
+    "milk",
+    "testday",
+    "test day",
+    "milk test",
+    "لبن",
+    "حليب",
+    "لبن يومي",
+    "اختبار اللبن"
+  ],
+
+  weaning: [
+    "wean",
+    "weaned",
+    "weaning",
+    "فطام"
+  ],
+
+  vaccination: [
+    "vacc",
+    "vaccine",
+    "vaccination",
+    "shot",
+    "تحصين",
+    "تطعيم"
+  ],
+
+  sale: [
+    "sold",
+    "sale",
+    "sell",
+    "cull sale",
+    "مباع",
+    "بيع"
+  ],
+
+  death: [
+    "died",
+    "dead",
+    "death",
+    "mortality",
+    "cull death",
+    "نافق",
+    "نفوق"
+  ]
+};
+
+function herdImportCleanEventKeySrv(v = "") {
+  return String(v || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/[_\-\/\\.,:;#()[\]]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function herdImportNormalizeMurabbikEventSrv(original = "") {
-  const raw = herdImportNormTextSrv(original);
-  const low = raw.toLowerCase().replace(/\s+/g, " ");
+  const key = herdImportCleanEventKeySrv(original);
+  if (!key) return "";
 
-  if (!raw) return "";
-
-  if (
-    low.includes("calv") ||
-    low.includes("fresh") ||
-    raw.includes("ولادة") ||
-    raw.includes("حديث الولادة")
-  ) {
-    return "calving";
+  for (const [murabbikType, aliases] of Object.entries(HERD_IMPORT_EVENT_ALIASES)) {
+    for (const alias of aliases) {
+      const a = herdImportCleanEventKeySrv(alias);
+      if (key === a || key.includes(a)) return murabbikType;
+    }
   }
 
-  if (
-    low.includes("bred") ||
-    low.includes("breed") ||
-    low.includes("insemin") ||
-    low === "ai" ||
-    raw.includes("تلقيح")
-  ) {
-    return "insemination";
-  }
-
-  if (
-    low.includes("preg") ||
-    low.includes("check") ||
-    raw.includes("تشخيص حمل") ||
-    raw.includes("سونار") ||
-    raw.includes("جس")
-  ) {
-    return "pregnancy_diagnosis";
-  }
-
-  if (
-    low.includes("dry") ||
-    raw.includes("تجفيف") ||
-    raw.includes("جاف")
-  ) {
-    return "dry_off";
-  }
-
-  if (
-    low.includes("abort") ||
-    raw.includes("إجهاض") ||
-    raw.includes("اجهاض")
-  ) {
-    return "abortion";
-  }
-
-  if (
-    low.includes("milk") ||
-    raw.includes("لبن") ||
-    raw.includes("حليب")
-  ) {
-    return "daily_milk";
-  }
-
-  if (
-    low.includes("wean") ||
-    raw.includes("فطام")
-  ) {
-    return "weaning";
-  }
-
-  if (
-    low.includes("vacc") ||
-    raw.includes("تحصين") ||
-    raw.includes("تطعيم")
-  ) {
-    return "vaccination";
-  }
-
-  if (
-    low.includes("sold") ||
-    low.includes("sale") ||
-    raw.includes("بيع") ||
-    raw.includes("مباع")
-  ) {
-    return "sale";
-  }
-
-  if (
-    low.includes("death") ||
-    low.includes("dead") ||
-    low.includes("died") ||
-    raw.includes("نفوق") ||
-    raw.includes("نافق")
-  ) {
-    return "death";
-  }
-
-  return normalizeEventType(raw);
+  return "";
 }
 
 function herdImportBuildAnimalDraftSrv(row = {}) {
