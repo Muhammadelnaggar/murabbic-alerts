@@ -781,7 +781,75 @@ async function addAnimalDuplicateCheckSrv(uid, numberStr) {
 
   return { ok: true };
 }
+app.get("/api/add-animal/check-number", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
 
+    const uid = req.userId;
+    const numberStr = addAnimalDigitsSrv(
+      req.query.number ||
+      req.query.animalNumber ||
+      req.query.calfNumber ||
+      ""
+    );
+
+    if (!numberStr) {
+      return res.status(400).json({
+        ok: false,
+        error: "animal_number_required",
+        available: false,
+        message: "رقم الحيوان مطلوب."
+      });
+    }
+
+    const duplicate = await addAnimalDuplicateCheckSrv(uid, numberStr);
+
+    if (!duplicate.ok && duplicate.duplicate) {
+      return res.json({
+        ok: true,
+        available: false,
+        duplicate: true,
+        animalNumber: numberStr,
+        collection: duplicate.collection || null,
+        message: duplicate.message || `⚠️ يوجد حيوان مسجَّل بالفعل برقم ${numberStr} في حسابك.`
+      });
+    }
+
+    if (!duplicate.ok) {
+      return res.status(503).json({
+        ok: false,
+        available: false,
+        error: "duplicate_check_failed",
+        animalNumber: numberStr,
+        message: duplicate.message || "تعذّر التحقق من رقم الحيوان الآن."
+      });
+    }
+
+    return res.json({
+      ok: true,
+      available: true,
+      duplicate: false,
+      animalNumber: numberStr,
+      message: `✅ الرقم ${numberStr} متاح للتسجيل.`
+    });
+
+  } catch (e) {
+    console.error("add-animal-check-number failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      available: false,
+      error: "add_animal_check_number_failed",
+      message: "تعذّر التحقق من رقم الحيوان الآن."
+    });
+  }
+});
 function addAnimalBuildSinglePayloadSrv(uid, fd = {}) {
   const entryType = addAnimalStrSrv(fd.entryType || "mothers");
   const numberStr = addAnimalDigitsSrv(fd.animalNumber || fd.number || fd.calfNumber);
