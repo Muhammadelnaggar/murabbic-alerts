@@ -3015,6 +3015,440 @@ return res.json({
     });
   }
 });
+// ============================================================
+//                 API: HERD IMPORT — SAVE V1
+//                 يحفظ المقبول فقط ويتخطى المرفوض
+// ============================================================
+
+async function herdImportFindAnimalDocSrv(uid, animalNumber) {
+  const numberStr = addAnimalDigitsSrv(animalNumber);
+  if (!db || !uid || !numberStr) return null;
+
+  const key = `${uid}#${numberStr}`;
+  const nNum = Number(numberStr);
+
+  for (const col of ["animals", "calves"]) {
+    const byKey = await db.collection(col)
+      .where("userId_number", "==", key)
+      .limit(1)
+      .get();
+
+    if (!byKey.empty) {
+      const d = byKey.docs[0];
+      return { id: d.id, collection: col, ref: d.ref, data: d.data() || {} };
+    }
+
+    const byNumber = await db.collection(col)
+      .where("userId", "==", uid)
+      .where("number", "==", numberStr)
+      .limit(1)
+      .get();
+
+    if (!byNumber.empty) {
+      const d = byNumber.docs[0];
+      return { id: d.id, collection: col, ref: d.ref, data: d.data() || {} };
+    }
+
+    if (Number.isFinite(nNum)) {
+      const byAnimalNumber = await db.collection(col)
+        .where("userId", "==", uid)
+        .where("animalNumber", "==", nNum)
+        .limit(1)
+        .get();
+
+      if (!byAnimalNumber.empty) {
+        const d = byAnimalNumber.docs[0];
+        return { id: d.id, collection: col, ref: d.ref, data: d.data() || {} };
+      }
+    }
+  }
+
+  return null;
+}
+
+function herdImportEventPayloadSrv(uid, ev = {}, animalDoc = null) {
+  const t = String(ev.murabbikEventType || "").trim();
+  const eventDate = String(ev.eventDate || "").trim().slice(0, 10);
+  const animalNumber = addAnimalDigitsSrv(ev.animalNumber);
+  const p = ev.payload || {};
+
+  const ar = {
+    calving: "ولادة",
+    insemination: "تلقيح",
+    pregnancy_diagnosis: "تشخيص حمل",
+    dry_off: "تجفيف",
+    abortion: "إجهاض",
+    daily_milk: "لبن يومي",
+    weaning: "فطام",
+    vaccination: "تحصين",
+    sale: "بيع",
+    death: "نفوق"
+  };
+
+  return {
+    userId: uid,
+    animalNumber,
+    animalId: animalDoc?.id || "",
+
+    eventDate,
+    date: eventDate,
+
+    eventType: ar[t] || t,
+    type: ar[t] || t,
+    eventTypeNorm: t,
+
+    originalEventType: ev.originalEventType || "",
+    source: "server:/api/herd-import/save",
+
+    milk: p.milk || null,
+    result: p.result || null,
+    method: p.method || null,
+    sireNumber: p.sireNumber || null,
+    doseType: p.doseType || null,
+    reason: p.reason || null,
+
+    archivedAnimal: !!ev.archivedAnimal,
+    archiveReason: ev.archiveReason || "",
+    archiveDate: ev.archiveDate || "",
+
+    importedBy: "herd_import",
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  };
+}
+
+function herdImportAnimalFinalPatchSrv(summary = {}) {
+  const st = summary.expectedFinalState || {};
+
+  const patch = {
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    sourceLastUpdate: "server:/api/herd-import/save"
+  };
+
+  [
+    "productionStatus",
+    "reproductiveStatus",
+    "followerStatus",
+    "lastCalvingDate",
+    "lastInseminationDate",
+    "lactationNumber",
+    "servicesCount",
+    "dailyMilk",
+    "daysInMilk",
+    "pregnancyDays",
+    "status",
+    "archiveReason",
+    "lastMilkDate",
+    "lastVaccinationDate"
+  ].forEach(k => {
+    if (st[k] !== undefined && st[k] !== "") {
+      patch[k] = st[k];
+    }
+  });
+
+  return patch;
+}
+
+app.post("/api/herd-import/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن.",
+        savedAnimals: [],
+        savedEvents: [],
+        skippedRows: []
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const rows = addAnimalImportRowsFromBodySrv(body);
+
+    if (!rows.length) {
+      return res.status(400).json({
+        ok: false,
+        error: "herd_import_rows_required",
+        message: "لا توجد صفوف صالحة للحفظ.",
+        savedAnimals: [],
+        savedEvents: [],
+        skippedRows: []
+      });
+    }
+
+    const previewRows = [];
+    const animalsDraft = new Map();
+    const animalDraftRows = new Map();
+    const eventsByAnimal = new Map();
+
+    for (let i = 0; i < rows.length; i++) {
+      const rowNumber = i + 1;
+      const row = rows[i] || {};
+      const recordKind = herdImportRowKindSrv(row);
+      const animalNumber = herdImportDetectAnimalNumberSrv(row);
+
+      const messages = [];
+      let animalDraft = null;
+      let eventDraft = null;
+
+      if (!animalNumber) messages.push("رقم الحيوان غير موجود أو غير صالح.");
+
+      if (recordKind === "animal" || recordKind === "mixed") {
+        animalDraft = herdImportBuildAnimalDraftSrv(row);
+
+        if (!animalDraft.animalType) messages.push("نوع الحيوان غير واضح.");
+        if (!animalDraft.breed) messages.push("السلالة غير واضحة.");
+
+        if (animalNumber && !animalsDraft.has(animalNumber)) {
+          animalsDraft.set(animalNumber, animalDraft);
+          animalDraftRows.set(animalNumber, rowNumber);
+        }
+      }
+
+      if (recordKind === "event" || recordKind === "mixed") {
+        eventDraft = herdImportBuildEventDraftSrv(row);
+        eventDraft.row = rowNumber;
+
+        if (!eventDraft.originalEventType) messages.push("نوع الحدث الأصلي غير موجود.");
+        if (!eventDraft.murabbikEventType) messages.push("تعذّر تحويل نوع الحدث إلى حدث مُرَبِّيك.");
+        if (!eventDraft.eventDate) messages.push("تاريخ الحدث غير صالح أو غير موجود.");
+
+        if (animalNumber) {
+          if (!eventsByAnimal.has(animalNumber)) eventsByAnimal.set(animalNumber, []);
+          eventsByAnimal.get(animalNumber).push(eventDraft);
+        }
+      }
+
+      const ok = messages.length === 0;
+
+      previewRows.push({
+        row: rowNumber,
+        ok,
+        status: ok ? "ready" : "rejected",
+        reason: ok ? "" : "preview_failed",
+        recordKind,
+        animalNumber,
+        originalEventType: eventDraft?.originalEventType || "",
+        murabbikEventType: eventDraft?.murabbikEventType || "",
+        eventDate: eventDraft?.eventDate || "",
+        message: ok ? "جاهز للحفظ." : messages.join(" "),
+        data: animalDraft || eventDraft || {}
+      });
+    }
+
+    for (const [animalNumber, list] of eventsByAnimal.entries()) {
+      list.sort((a, b) => String(a.eventDate || "").localeCompare(String(b.eventDate || "")));
+    }
+
+    const postArchiveRejectedRows = herdImportFindPostArchiveRowsSrv(eventsByAnimal);
+
+    if (postArchiveRejectedRows.size) {
+      for (const item of previewRows) {
+        const rejected = postArchiveRejectedRows.get(Number(item.row));
+        if (!rejected) continue;
+
+        item.ok = false;
+        item.status = "rejected";
+        item.reason = "event_after_archive";
+        item.message = rejected.message;
+      }
+    }
+
+    const skippedRows = previewRows
+      .filter(x => !x.ok)
+      .map(r => ({
+        row: r.row,
+        animalNumber: r.animalNumber,
+        reason: r.reason || "",
+        message: r.message || ""
+      }));
+
+    const cleanEventsByAnimal = new Map();
+
+    for (const [animalNumber, list] of eventsByAnimal.entries()) {
+      cleanEventsByAnimal.set(
+        animalNumber,
+        (list || []).filter(ev => !postArchiveRejectedRows.has(Number(ev.row)))
+      );
+    }
+
+    const archiveContextByAnimal = herdImportBuildArchiveContextByAnimalSrv(cleanEventsByAnimal);
+
+    for (const [animalNumber, list] of cleanEventsByAnimal.entries()) {
+      const ctx = archiveContextByAnimal.get(String(animalNumber));
+      if (!ctx) continue;
+
+      for (const ev of list || []) {
+        ev.archivedAnimal = true;
+        ev.archiveReason = ctx.archiveReason || "";
+        ev.archiveDate = ctx.archiveDate || "";
+      }
+    }
+
+    const animalSummaries = herdImportBuildAnimalSummariesSrv(animalsDraft, cleanEventsByAnimal);
+
+    const savedAnimals = [];
+    const savedEvents = [];
+    const skippedEvents = [];
+    const animalRefs = new Map();
+
+    let batch = db.batch();
+    let ops = 0;
+
+    async function commitIfNeeded(force = false) {
+      if (ops > 0 && (force || ops >= 400)) {
+        await batch.commit();
+        batch = db.batch();
+        ops = 0;
+      }
+    }
+
+    for (const [animalNumber, draft] of animalsDraft.entries()) {
+      const rowNo = animalDraftRows.get(animalNumber);
+      const rowItem = previewRows.find(r => Number(r.row) === Number(rowNo));
+
+      if (rowItem && !rowItem.ok) {
+        continue;
+      }
+
+      const existing = await herdImportFindAnimalDocSrv(uid, animalNumber);
+      const built = addAnimalBuildSinglePayloadSrv(uid, draft);
+
+      let ref = existing?.ref || null;
+      let collectionName = existing?.collection || built.collectionName;
+
+      if (!ref) {
+        ref = db.collection(collectionName).doc();
+      }
+
+      batch.set(ref, {
+        ...built.payload,
+        source: "server:/api/herd-import/save",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      ops++;
+
+      animalRefs.set(String(animalNumber), {
+        id: ref.id,
+        ref,
+        collection: collectionName
+      });
+
+      savedAnimals.push({
+        animalNumber,
+        animalId: ref.id,
+        collection: collectionName,
+        action: existing ? "updated" : "created"
+      });
+
+      await commitIfNeeded(false);
+    }
+
+    for (const [animalNumber] of cleanEventsByAnimal.entries()) {
+      if (animalRefs.has(String(animalNumber))) continue;
+
+      const existing = await herdImportFindAnimalDocSrv(uid, animalNumber);
+      if (existing) {
+        animalRefs.set(String(animalNumber), {
+          id: existing.id,
+          ref: existing.ref,
+          collection: existing.collection
+        });
+      }
+    }
+
+    for (const [animalNumber, list] of cleanEventsByAnimal.entries()) {
+      const animalDoc = animalRefs.get(String(animalNumber));
+
+      if (!animalDoc) {
+        for (const ev of list || []) {
+          skippedEvents.push({
+            row: ev.row || null,
+            animalNumber,
+            eventDate: ev.eventDate,
+            eventTypeNorm: ev.murabbikEventType,
+            reason: "animal_not_found_for_event",
+            message: "لم يتم حفظ الحدث لأن الحيوان غير موجود ولم توجد وثيقة حيوان له في الملف."
+          });
+        }
+        continue;
+      }
+
+      for (const ev of list || []) {
+        const eventRef = db.collection("events").doc();
+        const payload = herdImportEventPayloadSrv(uid, ev, animalDoc);
+
+        batch.set(eventRef, payload);
+        ops++;
+
+        savedEvents.push({
+          row: ev.row || null,
+          animalNumber,
+          eventId: eventRef.id,
+          eventDate: ev.eventDate,
+          eventTypeNorm: ev.murabbikEventType
+        });
+
+        await commitIfNeeded(false);
+      }
+    }
+
+    for (const summary of animalSummaries) {
+      const animalNumber = String(summary.animalNumber || "").trim();
+      if (!animalNumber) continue;
+
+      let refInfo = animalRefs.get(animalNumber);
+
+      if (!refInfo) {
+        const existing = await herdImportFindAnimalDocSrv(uid, animalNumber);
+        if (!existing) continue;
+
+        refInfo = {
+          id: existing.id,
+          ref: existing.ref,
+          collection: existing.collection
+        };
+      }
+
+      batch.set(refInfo.ref, herdImportAnimalFinalPatchSrv(summary), { merge: true });
+      ops++;
+
+      await commitIfNeeded(false);
+    }
+
+    await commitIfNeeded(true);
+
+    if (typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "herd_import_save");
+    }
+
+    return res.json({
+      ok: true,
+      message: `✅ تم حفظ المقبول من استيراد القطيع: ${savedAnimals.length} حيوان، ${savedEvents.length} حدث. تم تخطي ${skippedRows.length + skippedEvents.length} صف/حدث.`,
+      savedAnimalCount: savedAnimals.length,
+      savedEventCount: savedEvents.length,
+      skippedCount: skippedRows.length + skippedEvents.length,
+      savedAnimals,
+      savedEvents,
+      skippedRows,
+      skippedEvents
+    });
+
+  } catch (e) {
+    console.error("herd-import-save failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "herd_import_save_failed",
+      message: "تعذّر حفظ استيراد القطيع الآن.",
+      savedAnimals: [],
+      savedEvents: [],
+      skippedRows: [],
+      skippedEvents: []
+    });
+  }
+});
 app.post("/api/add-animal/import", requireUserId, async (req, res) => {
   try {
     if (!db) {
