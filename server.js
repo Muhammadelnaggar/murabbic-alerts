@@ -669,10 +669,6 @@ function addAnimalDecisionSrv(fd = {}) {
       return "❌ إنتاج اللبن اليومي مطلوب للحيوان الحلاب.";
     }
 
-    if (addAnimalNumSrv(fd.lactationNumber, 0) > 0 && !addAnimalStrSrv(fd.lastCalvingDate)) {
-      return "❌ تاريخ آخر ولادة مطلوب عند وجود رقم موسم.";
-    }
-
     const repro = addAnimalStrSrv(fd.reproductiveStatus);
     const services = addAnimalNumSrv(fd.servicesCount, 0);
 
@@ -930,12 +926,7 @@ function addAnimalBuildSinglePayloadSrv(uid, fd = {}) {
     reproductiveStatus === "عشار" ||
     servicesCount > 0;
 
-  const daysInMilk =
-    productionStatus === "جاف"
-      ? null
-      : lastCalvingDate
-        ? addAnimalDiffDaysSrv(lastCalvingDate, today)
-        : addAnimalNumSrv(fd.daysInMilk, 0);
+  addAnimalBuildSinglePayloadSrv
 
   const pregnancyDays =
     reproductiveStatus === "عشار" && lastAI
@@ -1271,89 +1262,498 @@ function addAnimalImportPickSrv(row = {}, keys = []) {
   }
   return "";
 }
+function addAnimalImportNormKeySrv(v) {
+  return String(v || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[_\-\/\\.#!:;()\[\]]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه");
+}
 
+function addAnimalImportPickAnySrv(row = {}, keys = []) {
+  const wanted = keys.map(addAnimalImportNormKeySrv);
+
+  for (const rawKey of Object.keys(row || {})) {
+    const nk = addAnimalImportNormKeySrv(rawKey);
+    if (!wanted.includes(nk)) continue;
+
+    const val = row[rawKey];
+    if (val !== undefined && val !== null && String(val).trim() !== "") {
+      return val;
+    }
+  }
+
+  return "";
+}
+
+function addAnimalImportNormalizeAnimalTypeSrv(v) {
+  const s = String(v || "").trim().toLowerCase();
+
+  if (!s) return "بقرة";
+
+  if (
+    s.includes("buffalo") ||
+    s.includes("buff") ||
+    s.includes("جاموس")
+  ) {
+    return "جاموسة";
+  }
+
+  if (
+    s.includes("cow") ||
+    s.includes("cattle") ||
+    s.includes("bovine") ||
+    s.includes("بقر") ||
+    s.includes("بقرة") ||
+    s.includes("بقره")
+  ) {
+    return "بقرة";
+  }
+
+  return String(v || "").trim();
+}
+
+function addAnimalImportNormalizeProductionSrv(v, hint = {}) {
+  const s = String(v || "").trim().toLowerCase();
+
+  if (
+    s === "dry" ||
+    s.includes("dry") ||
+    s.includes("جاف")
+  ) {
+    return "جاف";
+  }
+
+  if (
+    s === "milking" ||
+    s.includes("milk") ||
+    s.includes("lact") ||
+    s.includes("fresh") ||
+    s.includes("حلاب") ||
+    s.includes("لبن") ||
+    s.includes("حليب") ||
+    s.includes("حديث")
+  ) {
+    return "حلاب";
+  }
+
+  if (addAnimalStrSrv(hint.dailyMilk)) return "حلاب";
+
+  return String(v || "").trim();
+}
+
+function addAnimalImportNormalizeReproSrv(v) {
+  const s0 = String(v || "").trim();
+  const s = s0.toLowerCase().replace(/\s+/g, "");
+
+  if (!s) return "";
+
+  if (
+    s === "bred" ||
+    s.includes("bred") ||
+    s.includes("inseminated") ||
+    s.includes("insemination") ||
+    s.includes("served") ||
+    s.includes("service") ||
+    s === "ai" ||
+    s.includes("ملقح") ||
+    s.includes("ملقحة")
+  ) {
+    return "ملقحة";
+  }
+
+  if (
+    s.includes("preg") ||
+    s.includes("confirmedpreg") ||
+    s.includes("pregnant") ||
+    s.includes("حامل") ||
+    s.includes("عشار")
+  ) {
+    return "عشار";
+  }
+
+  if (
+    s.includes("open") ||
+    s.includes("empty") ||
+    s.includes("notpreg") ||
+    s.includes("مفتوح") ||
+    s.includes("مفتوحة")
+  ) {
+    return "مفتوحة";
+  }
+
+  if (
+    s.includes("fresh") ||
+    s.includes("postpartum") ||
+    s.includes("حديث")
+  ) {
+    return "حديث الولادة";
+  }
+
+  if (
+    s.includes("abort") ||
+    s.includes("abortion") ||
+    s.includes("اجهاض") ||
+    s.includes("إجهاض")
+  ) {
+    return "إجهاض";
+  }
+
+  return s0;
+}
+
+function addAnimalImportNormalizeSexSrv(v) {
+  const s = String(v || "").trim().toLowerCase();
+
+  if (!s) return "";
+
+  if (
+    s === "f" ||
+    s.includes("female") ||
+    s.includes("heifer") ||
+    s.includes("انثى") ||
+    s.includes("أنثى")
+  ) {
+    return "أنثى";
+  }
+
+  if (
+    s === "m" ||
+    s.includes("male") ||
+    s.includes("bull") ||
+    s.includes("ذكر")
+  ) {
+    return "ذكر";
+  }
+
+  return String(v || "").trim();
+}
+
+function addAnimalImportNormalizeFollowerStatusSrv(v) {
+  const s0 = String(v || "").trim();
+  const s = s0.toLowerCase().replace(/\s+/g, "");
+
+  if (!s) return "";
+
+  if (s.includes("calf") || s.includes("suck") || s.includes("رضيع")) return "رضيع";
+  if (s.includes("wean") || s.includes("فطام")) return "فطام";
+  if (s.includes("grow") || s.includes("growing") || s.includes("نامي")) return "نامي";
+  if (s.includes("ready") || s.includes("breedable") || s.includes("تحت")) return "تحت التلقيح";
+  if (s.includes("bred") || s.includes("inseminated") || s.includes("ملقح")) return "ملقح";
+  if (s.includes("preg") || s.includes("عشار") || s.includes("حامل")) return "عشار";
+
+  return s0;
+}
 function addAnimalImportFdSrv(row = {}, importKind = "mothers") {
-  const number = addAnimalImportPickSrv(row, [
-    "animalNumber", "number", "calfNumber",
-    "رقم الحيوان", "رقم", "رقم العجل"
+  const number = addAnimalImportPickAnySrv(row, [
+    "animalNumber",
+    "number",
+
+    // DairyComp / VAS
+    "ID",
+    "COW",
+    "COWID",
+    "COWNO",
+    "COW#",
+    "ANIMALID",
+
+    // common herd files
+    "earTag",
+    "eartag",
+    "tag",
+    "tagNo",
+    "tagNumber",
+
+    // Arabic
+    "رقم الحيوان",
+    "رقم",
+    "رقم البقرة",
+    "رقم الاذن",
+    "رقم الأذن"
   ]);
 
-  const animalType = addAnimalImportPickSrv(row, [
-    "animalType", "animalTypeAr", "type",
-    "نوع الحيوان", "النوع"
+  const animalTypeRaw = addAnimalImportPickAnySrv(row, [
+    "animalType",
+    "animalTypeAr",
+    "TYPE",
+    "species",
+    "kind",
+    "نوع الحيوان",
+    "النوع",
+    "الفصيلة"
   ]);
 
-  const breed = addAnimalImportPickSrv(row, [
-    "breed", "السلالة"
+  const breed = addAnimalImportPickAnySrv(row, [
+    "breed",
+    "BREED",
+    "brd",
+    "race",
+    "strain",
+    "سلالة",
+    "السلالة"
   ]);
 
   if (importKind === "followers") {
+    const followerStatusRaw = addAnimalImportPickAnySrv(row, [
+      "followerStatus",
+      "STATUS",
+      "status",
+      "heiferStatus",
+      "calfStatus",
+      "الحالة",
+      "الحالة الحالية",
+      "حالة التابع"
+    ]);
+
     return {
       entryType: "followers",
       animalNumber: number,
-      animalType,
-      animalTypeAr: animalType,
+      animalType: addAnimalImportNormalizeAnimalTypeSrv(animalTypeRaw),
+      animalTypeAr: addAnimalImportNormalizeAnimalTypeSrv(animalTypeRaw),
       breed,
 
-      birthDate: addAnimalImportPickSrv(row, ["birthDate", "تاريخ الميلاد"]),
-      followerSex: addAnimalImportPickSrv(row, ["followerSex", "sex", "الجنس"]),
-      followerStatus: addAnimalImportPickSrv(row, ["followerStatus", "status", "الحالة", "الحالة الحالية"]),
-      damNumber: addAnimalImportPickSrv(row, ["damNumber", "رقم الأم"]),
+      birthDate: addAnimalImportPickAnySrv(row, [
+        "birthDate",
+        "BIRTH",
+        "birth",
+        "DOB",
+        "dateOfBirth",
+        "born",
+        "تاريخ الميلاد",
+        "ميلاد"
+      ]),
 
-      weaningDate: addAnimalImportPickSrv(row, ["weaningDate", "تاريخ الفطام"]),
-      followerLastInseminationDate: addAnimalImportPickSrv(row, [
+      followerSex: addAnimalImportNormalizeSexSrv(addAnimalImportPickAnySrv(row, [
+        "followerSex",
+        "SEX",
+        "sex",
+        "gender",
+        "الجنس",
+        "نوع الجنس"
+      ])),
+
+      followerStatus: addAnimalImportNormalizeFollowerStatusSrv(followerStatusRaw),
+
+      damNumber: addAnimalImportPickAnySrv(row, [
+        "damNumber",
+        "DAM",
+        "dam",
+        "damId",
+        "mother",
+        "motherNumber",
+        "رقم الأم",
+        "رقم الام",
+        "الأم",
+        "الام"
+      ]),
+
+      weaningDate: addAnimalImportPickAnySrv(row, [
+        "weaningDate",
+        "WEANDATE",
+        "weanDate",
+        "weanedDate",
+        "تاريخ الفطام",
+        "فطام"
+      ]),
+
+      followerLastInseminationDate: addAnimalImportPickAnySrv(row, [
         "followerLastInseminationDate",
         "lastInseminationDate",
+        "LASTBRED",
+        "BRED",
+        "bredDate",
+        "lastBred",
+        "lastService",
+        "serviceDate",
+        "AIDATE",
+        "aiDate",
+        "lastAI",
+        "inseminationDate",
         "تاريخ آخر تلقيح",
-        "آخر تلقيح"
+        "تاريخ اخر تلقيح",
+        "آخر تلقيح",
+        "اخر تلقيح"
       ]),
-      followerServicesCount: addAnimalImportPickSrv(row, [
+
+      followerServicesCount: addAnimalImportPickAnySrv(row, [
         "followerServicesCount",
+        "SERVICES",
         "servicesCount",
-        "عدد التلقيحات"
+        "services",
+        "breedings",
+        "timesBred",
+        "عدد التلقيحات",
+        "عدد مرات التلقيح",
+        "مرات التلقيح"
       ]),
-      followerSireNumber: addAnimalImportPickSrv(row, [
+
+      followerSireNumber: addAnimalImportPickAnySrv(row, [
         "followerSireNumber",
         "sireNumber",
+        "SIRE",
+        "sire",
+        "sireId",
+        "BULL",
+        "bull",
+        "bullId",
+        "bullCode",
+        "SEMEN",
+        "semen",
+        "semenCode",
+        "straw",
         "رقم الطلوقة",
-        "كود السائل"
+        "كود السائل",
+        "الطلوقة"
       ])
     };
   }
 
+  const dailyMilk = addAnimalImportPickAnySrv(row, [
+    "dailyMilk",
+    "MILK",
+    "milk",
+    "milkKg",
+    "milkL",
+    "milkYield",
+    "currentMilk",
+    "lastMilk",
+    "testMilk",
+    "kgMilk",
+    "إنتاج اللبن",
+    "انتاج اللبن",
+    "إنتاج اللبن اليومي",
+    "لبن",
+    "حليب"
+  ]);
+
+  const productionRaw = addAnimalImportPickAnySrv(row, [
+    "productionStatus",
+    "LACT_STATUS",
+    "milkStatus",
+    "lactStatus",
+    "lactationStatus",
+    "prodStatus",
+    "الحالة الإنتاجية",
+    "الحالة الانتاجية"
+  ]);
+
+  const reproRaw = addAnimalImportPickAnySrv(row, [
+    "reproductiveStatus",
+    "RPRO",
+    "REPRO",
+    "reproStatus",
+    "breedStatus",
+    "bredStatus",
+    "pregStatus",
+    "remarks",
+    "remark",
+    "الحالة التناسلية",
+    "الحاله التناسليه"
+  ]);
+
   return {
     entryType: "mothers",
     animalNumber: number,
-    animalType,
-    animalTypeAr: animalType,
+    animalType: addAnimalImportNormalizeAnimalTypeSrv(animalTypeRaw),
+    animalTypeAr: addAnimalImportNormalizeAnimalTypeSrv(animalTypeRaw),
     breed,
 
-    birthDate: addAnimalImportPickSrv(row, ["birthDate", "تاريخ الميلاد"]),
+    birthDate: addAnimalImportPickAnySrv(row, [
+      "birthDate",
+      "BIRTH",
+      "birth",
+      "DOB",
+      "dateOfBirth",
+      "born",
+      "تاريخ الميلاد",
+      "ميلاد"
+    ]),
 
-    productionStatus: addAnimalImportPickSrv(row, [
-      "productionStatus", "الحالة الإنتاجية"
-    ]),
-    dailyMilk: addAnimalImportPickSrv(row, [
-      "dailyMilk", "milk", "إنتاج اللبن", "إنتاج اللبن اليومي"
+    productionStatus: addAnimalImportNormalizeProductionSrv(productionRaw, { dailyMilk }),
+
+    dailyMilk,
+
+    reproductiveStatus: addAnimalImportNormalizeReproSrv(reproRaw),
+
+    servicesCount: addAnimalImportPickAnySrv(row, [
+      "servicesCount",
+      "SERVICES",
+      "services",
+      "breedings",
+      "breedingCount",
+      "timesBred",
+      "noServices",
+      "serviceNo",
+      "servNo",
+      "عدد التلقيحات",
+      "عدد مرات التلقيح",
+      "مرات التلقيح"
     ]),
 
-    reproductiveStatus: addAnimalImportPickSrv(row, [
-      "reproductiveStatus", "الحالة التناسلية"
+    lactationNumber: addAnimalImportPickAnySrv(row, [
+      "lactationNumber",
+      "LACT",
+      "LAC",
+      "lactNo",
+      "parity",
+      "lactation",
+      "رقم الموسم",
+      "موسم الحليب",
+      "الموسم"
     ]),
-    servicesCount: addAnimalImportPickSrv(row, [
-      "servicesCount", "عدد التلقيحات", "عدد مرات التلقيح"
+
+    lastCalvingDate: addAnimalImportPickAnySrv(row, [
+      "lastCalvingDate",
+      "FRESH",
+      "fresh",
+      "freshDate",
+      "lastFresh",
+      "lastCalv",
+      "calvingDate",
+      "calvDate",
+      "تاريخ آخر ولادة",
+      "تاريخ اخر ولادة",
+      "آخر ولادة",
+      "اخر ولادة"
     ]),
-    lactationNumber: addAnimalImportPickSrv(row, [
-      "lactationNumber", "رقم الموسم", "موسم الحليب"
+
+    lastInseminationDate: addAnimalImportPickAnySrv(row, [
+      "lastInseminationDate",
+      "BRED",
+      "bred",
+      "LASTBRED",
+      "lastBred",
+      "bredDate",
+      "lastService",
+      "serviceDate",
+      "AIDATE",
+      "aiDate",
+      "lastAI",
+      "inseminationDate",
+      "تاريخ آخر تلقيح",
+      "تاريخ اخر تلقيح",
+      "آخر تلقيح",
+      "اخر تلقيح"
     ]),
-    lastCalvingDate: addAnimalImportPickSrv(row, [
-      "lastCalvingDate", "تاريخ آخر ولادة", "آخر ولادة"
-    ]),
-    lastInseminationDate: addAnimalImportPickSrv(row, [
-      "lastInseminationDate", "تاريخ آخر تلقيح", "آخر تلقيح"
-    ]),
-    sireNumber: addAnimalImportPickSrv(row, [
-      "sireNumber", "رقم الطلوقة", "كود السائل"
+
+    sireNumber: addAnimalImportPickAnySrv(row, [
+      "sireNumber",
+      "SIRE",
+      "sire",
+      "sireId",
+      "BULL",
+      "bull",
+      "bullId",
+      "bullCode",
+      "SEMEN",
+      "semen",
+      "semenCode",
+      "straw",
+      "رقم الطلوقة",
+      "كود السائل",
+      "الطلوقة"
     ])
   };
 }
