@@ -951,19 +951,88 @@ async function refreshServerPreview(){
     });
   }
 
-  function renderFileReady(file){
-    if (!previewRows || !previewWrap) return;
+ function getUidDirect(){
+  return String(
+    localStorage.getItem("userId") ||
+    localStorage.getItem("uid") ||
+    localStorage.getItem("tenantId") ||
+    ""
+  ).trim();
+}
 
+async function previewImportOnServer(payload){
+  const uid = getUidDirect();
+
+  if (!uid) {
+    return {
+      status: 400,
+      data: {
+        ok: false,
+        message: "لم يتم العثور على معرف المستخدم. سجّل الدخول مرة أخرى.",
+        rows: []
+      }
+    };
+  }
+
+  const r = await fetch("/api/add-animal/import-preview", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-User-Id": uid
+    },
+    body: JSON.stringify(payload || {})
+  });
+
+  const data = await r.json().catch(() => ({
+    ok: false,
+    message: "تعذّر قراءة رد السيرفر.",
+    rows: []
+  }));
+
+  return { status: r.status, data };
+}
+
+function renderServerPreview(rows){
+  if (!previewRows || !previewWrap) return;
+
+  const list = Array.isArray(rows) ? rows : [];
+
+  if (!list.length) {
     previewRows.innerHTML = `
       <tr>
-        <td colspan="14">
-          الملف جاهز للإرسال للسيرفر: ${file.name}
-        </td>
+        <td colspan="14">لا توجد صفوف للعرض.</td>
       </tr>
     `;
-
     previewWrap.classList.remove("hidden-block");
+    return;
   }
+
+  previewRows.innerHTML = list.map(r => {
+    const x = r.data || {};
+    const state = r.ok ? "جاهز" : "مرفوض";
+
+    return `
+      <tr>
+        <td>${r.animalNumber || ""}</td>
+        <td>${x.animalType || ""}</td>
+        <td>${x.breed || ""}</td>
+        <td>${x.birthDate || ""}</td>
+        <td>${x.productionStatus || x.followerStatus || ""}</td>
+        <td>${x.dailyMilk || ""}</td>
+        <td>${x.reproductiveStatus || ""}</td>
+        <td>${x.servicesCount || x.followerServicesCount || ""}</td>
+        <td>${x.lactationNumber || ""}</td>
+        <td>${x.sireNumber || x.followerSireNumber || ""}</td>
+        <td>${x.lastCalvingDate || ""}</td>
+        <td>${x.lastInseminationDate || x.followerLastInseminationDate || ""}</td>
+        <td>${state}</td>
+        <td>${r.message || ""}</td>
+      </tr>
+    `;
+  }).join("");
+
+  previewWrap.classList.remove("hidden-block");
+}
 
   previewBtn?.addEventListener("click", async () => {
     try {
@@ -998,9 +1067,20 @@ async function refreshServerPreview(){
         fileBase64
       };
 
-      renderFileReady(file);
-      showImportMsg("تم تجهيز الملف. سيقرأه السيرفر عند الحفظ.", true);
+      showImportMsg("جارِ معاينة الملف من السيرفر…", true);
 
+const importKind = String(document.getElementById("importKind")?.value || "mothers").trim();
+
+const result = await previewImportOnServer({
+  importKind,
+  fileName: file.name,
+  fileBase64
+});
+
+const data = result.data || {};
+
+renderServerPreview(data.rows || []);
+showImportMsg(data.message || "تمت معاينة الملف من السيرفر.", !!data.ok);
     } catch (err) {
       console.error(err);
       window.__IMPORT_FILE_PAYLOAD__ = null;
