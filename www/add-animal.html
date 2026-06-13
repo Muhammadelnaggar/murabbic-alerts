@@ -745,7 +745,85 @@ function showServerMessage(text, ok){
 
     return { status: r.status, data };
   }
+async function getFromServer(path){
+  const uid = getUidDirect();
 
+  if (!uid) {
+    return {
+      status: 400,
+      data: {
+        ok: false,
+        message: "لم يتم العثور على معرف المستخدم. سجّل الدخول مرة أخرى."
+      }
+    };
+  }
+
+  const r = await fetch(path, {
+    method: "GET",
+    headers: {
+      "X-User-Id": uid
+    }
+  });
+
+  const data = await r.json().catch(() => ({
+    ok: false,
+    message: "تعذّر قراءة رد السيرفر."
+  }));
+
+  return { status: r.status, data };
+}
+
+let numberCheckTimer = null;
+let lastCheckedNumber = "";
+
+function setNumberCheckMessage(text, ok){
+  showServerMessage(text, ok);
+}
+
+function watchAnimalNumberAvailability(){
+  const numberEl = document.getElementById("animalNumber");
+  if (!numberEl) return;
+
+  numberEl.addEventListener("input", () => {
+    clearTimeout(numberCheckTimer);
+
+    const n = String(numberEl.value || "").trim();
+
+    if (!n) {
+      lastCheckedNumber = "";
+      return;
+    }
+
+    numberCheckTimer = setTimeout(async () => {
+      try {
+        if (n === lastCheckedNumber) return;
+        lastCheckedNumber = n;
+
+        const result = await getFromServer(
+          "/api/add-animal/check-number?number=" + encodeURIComponent(n)
+        );
+
+        const data = result.data || {};
+
+        if (!data.ok) {
+          setNumberCheckMessage(data.message || "تعذّر التحقق من الرقم الآن.", false);
+          return;
+        }
+
+        setNumberCheckMessage(
+          data.message || (data.available ? "✅ الرقم متاح للتسجيل." : "⚠️ الرقم موجود بالفعل."),
+          !!data.available
+        );
+
+      } catch (err) {
+        console.warn("animal number check failed:", err);
+        setNumberCheckMessage("تعذّر التحقق من الرقم الآن.", false);
+      }
+    }, 350);
+  });
+}
+
+watchAnimalNumberAvailability();
   function getImportFilePayload(){
   return window.__IMPORT_FILE_PAYLOAD__ || null;
 }
