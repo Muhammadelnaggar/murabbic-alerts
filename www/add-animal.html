@@ -381,20 +381,20 @@
     <table>
      <thead>
   <tr>
-<th>رقم الحيوان</th>
-<th>النوع</th>
-<th>السلالة</th>
-<th>تاريخ الميلاد</th>
-<th>الحالة الإنتاجية</th>
-<th>اللبن</th>
-<th>الحالة التناسلية</th>
-<th>مرات التلقيح</th>
-<th>الموسم</th>
-<th>رقم الطلوقة</th>
-<th>آخر ولادة</th>
-<th>آخر تلقيح</th>
-<th>التلقيح السابق</th>
-<th>آخر شياع</th>
+    <th>السطر</th>
+    <th>رقم الحيوان</th>
+    <th>رقم الأم</th>
+    <th>النوع</th>
+    <th>السلالة</th>
+    <th>تاريخ الميلاد</th>
+    <th>الجنس</th>
+    <th>الحالة</th>
+    <th>تاريخ الفطام</th>
+    <th>آخر تلقيح</th>
+    <th>مرات التلقيح</th>
+    <th>رقم الطلوقة</th>
+    <th>النتيجة</th>
+    <th>الملاحظة</th>
   </tr>
 </thead>
       <tbody id="importPreviewRows"></tbody>
@@ -1011,24 +1011,24 @@ function renderServerPreview(rows){
     const x = r.data || {};
     const state = r.ok ? "جاهز" : "مرفوض";
 
-    return `
-      <tr>
-        <td>${r.animalNumber || ""}</td>
-        <td>${x.animalType || ""}</td>
-        <td>${x.breed || ""}</td>
-        <td>${x.birthDate || ""}</td>
-        <td>${x.productionStatus || x.followerStatus || ""}</td>
-        <td>${x.dailyMilk || ""}</td>
-        <td>${x.reproductiveStatus || ""}</td>
-        <td>${x.servicesCount || x.followerServicesCount || ""}</td>
-        <td>${x.lactationNumber || ""}</td>
-        <td>${x.sireNumber || x.followerSireNumber || ""}</td>
-        <td>${x.lastCalvingDate || ""}</td>
-        <td>${x.lastInseminationDate || x.followerLastInseminationDate || ""}</td>
-        <td>${state}</td>
-        <td>${r.message || ""}</td>
-      </tr>
-    `;
+return `
+  <tr>
+    <td>${r.row || ""}</td>
+    <td>${r.animalNumber || ""}</td>
+    <td>${x.damNumber || ""}</td>
+    <td>${x.animalType || ""}</td>
+    <td>${x.breed || ""}</td>
+    <td>${x.birthDate || ""}</td>
+    <td>${x.followerSex || ""}</td>
+    <td>${x.followerStatus || x.productionStatus || ""}</td>
+    <td>${x.weaningDate || ""}</td>
+    <td>${x.followerLastInseminationDate || x.lastInseminationDate || ""}</td>
+    <td>${x.followerServicesCount || x.servicesCount || ""}</td>
+    <td>${x.followerSireNumber || x.sireNumber || ""}</td>
+    <td>${state}</td>
+    <td>${r.message || ""}</td>
+  </tr>
+`;
   }).join("");
 
   previewWrap.classList.remove("hidden-block");
@@ -1078,7 +1078,7 @@ const result = await previewImportOnServer({
 });
 
 const data = result.data || {};
-
+window.__IMPORT_LAST_PREVIEW__ = data;
 renderServerPreview(data.rows || []);
 showImportMsg(data.message || "تمت معاينة الملف من السيرفر.", !!data.ok);
     } catch (err) {
