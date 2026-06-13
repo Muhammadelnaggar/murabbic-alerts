@@ -997,6 +997,58 @@ app.post("/api/add-animal/save", requireUserId, async (req, res) => {
     });
   }
 });
+app.post("/api/add-animal/preview", requireUserId, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const fd = body.formData && typeof body.formData === "object"
+      ? body.formData
+      : body;
+
+    const today = addAnimalTodaySrv();
+
+    const productionStatus = addAnimalStrSrv(fd.productionStatus);
+    const reproductiveStatus = addAnimalStrSrv(fd.reproductiveStatus);
+    const followerStatus = addAnimalStrSrv(fd.followerStatus);
+
+    const lastCalvingDate = addAnimalDateOrNullSrv(fd.lastCalvingDate);
+    const lastInseminationDate = addAnimalDateOrNullSrv(fd.lastInseminationDate);
+    const followerLastInseminationDate = addAnimalDateOrNullSrv(fd.followerLastInseminationDate);
+
+    const daysInMilk =
+      productionStatus === "جاف"
+        ? null
+        : lastCalvingDate
+          ? addAnimalDiffDaysSrv(lastCalvingDate, today)
+          : null;
+
+    const pregnancyDays =
+      reproductiveStatus === "عشار" && lastInseminationDate
+        ? addAnimalDiffDaysSrv(lastInseminationDate, today)
+        : null;
+
+    const followerPregnancyDays =
+      followerStatus === "عشار" && followerLastInseminationDate
+        ? addAnimalDiffDaysSrv(followerLastInseminationDate, today)
+        : null;
+
+    return res.json({
+      ok: true,
+      today,
+      daysInMilk,
+      pregnancyDays,
+      followerPregnancyDays
+    });
+
+  } catch (e) {
+    console.error("add-animal-preview failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "add_animal_preview_failed",
+      message: "تعذّر حساب المعاينة الآن."
+    });
+  }
+});
 // ============================================================
 //                 API: ADD ANIMAL — SERVER SIDE IMPORT
 //                 استيراد الحيوانات من السيرفر فقط
