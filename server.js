@@ -2046,6 +2046,7 @@ const HERD_IMPORT_EVENT_ALIASES = {
   calving: [
     "fresh",
     "freshen",
+    "freshened",
     "calv",
     "calving",
     "calved",
@@ -2064,6 +2065,7 @@ const HERD_IMPORT_EVENT_ALIASES = {
     "serv",
     "served",
     "ai",
+    "a i",
     "insemination",
     "inseminated",
     "mating",
@@ -2077,17 +2079,20 @@ const HERD_IMPORT_EVENT_ALIASES = {
     "pregnant",
     "preg check",
     "pregnancy check",
+    "check preg",
     "pd",
     "vet check",
     "checked",
     "open",
     "not preg",
     "notpreg",
+    "not pregnant",
     "empty",
-    "preg-",
     "preg+",
+    "preg-",
     "تشخيص حمل",
     "فحص حمل",
+    "كشف حمل",
     "سونار",
     "جس",
     "عشار",
@@ -2099,6 +2104,7 @@ const HERD_IMPORT_EVENT_ALIASES = {
     "dry",
     "dryoff",
     "dry off",
+    "dried",
     "تجفيف",
     "جاف"
   ],
@@ -2107,15 +2113,18 @@ const HERD_IMPORT_EVENT_ALIASES = {
     "abort",
     "abrt",
     "abortion",
+    "aborted",
     "إجهاض",
     "اجهاض"
   ],
 
   daily_milk: [
     "milk",
+    "milk test",
+    "test milk",
     "testday",
     "test day",
-    "milk test",
+    "daily milk",
     "لبن",
     "حليب",
     "لبن يومي",
@@ -2133,7 +2142,6 @@ const HERD_IMPORT_EVENT_ALIASES = {
     "vacc",
     "vaccine",
     "vaccination",
-    "shot",
     "تحصين",
     "تطعيم"
   ],
@@ -2157,7 +2165,6 @@ const HERD_IMPORT_EVENT_ALIASES = {
     "نفوق"
   ]
 };
-
 function herdImportCleanEventKeySrv(v = "") {
   return String(v || "")
     .trim()
@@ -2774,6 +2781,58 @@ function herdImportBuildArchiveContextByAnimalSrv(eventsByAnimal = new Map()) {
 
   return out;
 }
+function herdImportBuildSavePlanSrv(previewRows = [], animalSummaries = []) {
+  const accepted = (previewRows || []).filter(r => r && r.ok === true);
+  const rejected = (previewRows || []).filter(r => !r || r.ok !== true);
+
+  const animals = accepted.filter(r =>
+    r.recordKind === "animal" || r.recordKind === "mixed"
+  );
+
+  const events = accepted.filter(r =>
+    r.recordKind === "event" || r.recordKind === "mixed"
+  );
+
+  const archivedAnimals = (animalSummaries || []).filter(s =>
+    s?.expectedFinalState?.status === "archived"
+  );
+
+  return {
+    willSave: false,
+    note: "خطة حفظ من المعاينة فقط. لم يتم حفظ أي بيانات.",
+    counts: {
+      acceptedRows: accepted.length,
+      rejectedRows: rejected.length,
+      animalsToImport: animals.length,
+      eventsToImport: events.length,
+      animalsToArchive: archivedAnimals.length
+    },
+    animals: animals.map(r => ({
+      row: r.row,
+      animalNumber: r.animalNumber,
+      recordKind: r.recordKind,
+      archivedAnimal: !!r.archivedAnimal,
+      archiveReason: r.archiveReason || "",
+      archiveDate: r.archiveDate || ""
+    })),
+    events: events.map(r => ({
+      row: r.row,
+      animalNumber: r.animalNumber,
+      originalEventType: r.originalEventType || "",
+      murabbikEventType: r.murabbikEventType || "",
+      eventDate: r.eventDate || "",
+      archivedAnimal: !!r.archivedAnimal,
+      archiveReason: r.archiveReason || "",
+      archiveDate: r.archiveDate || ""
+    })),
+    rejected: rejected.map(r => ({
+      row: r?.row || null,
+      animalNumber: r?.animalNumber || "",
+      reason: r?.reason || "",
+      message: r?.message || ""
+    }))
+  };
+}
 app.post("/api/herd-import/preview", requireUserId, async (req, res) => {
   try {
     const uid = req.userId;
@@ -2929,6 +2988,7 @@ for (const item of previewRows) {
 }
 
 const animalSummaries = herdImportBuildAnimalSummariesSrv(animalsDraft, cleanEventsByAnimal);
+const savePlan = herdImportBuildSavePlanSrv(previewRows, animalSummaries);
 
 return res.json({
   ok: true,
@@ -2941,6 +3001,7 @@ return res.json({
   animalsDetected: animalsDraft.size,
   animalsWithEvents: eventsByAnimal.size,
   animalSummaries,
+  savePlan,
   rows: previewRows
 });
   } catch (e) {
