@@ -3372,7 +3372,11 @@ app.post("/api/herd-import/save", requireUserId, async (req, res) => {
 
     const animalSummaries = herdImportBuildAnimalSummariesSrv(animalsDraft, cleanEventsByAnimal);
 
-    const savedAnimals = [];
+const summaryByAnimal = new Map(
+  (animalSummaries || []).map(s => [String(s.animalNumber), s])
+);
+
+const savedAnimals = [];
     const savedEvents = [];
     const skippedEvents = [];
     const animalRefs = new Map();
@@ -3396,15 +3400,28 @@ app.post("/api/herd-import/save", requireUserId, async (req, res) => {
         continue;
       }
 
-      const existing = await herdImportFindAnimalDocSrv(uid, animalNumber);
-      const built = addAnimalBuildSinglePayloadSrv(uid, draft);
+     const existing = await herdImportFindAnimalDocSrv(uid, animalNumber);
+const built = addAnimalBuildSinglePayloadSrv(uid, draft);
 
-      let ref = existing?.ref || null;
-      let collectionName = existing?.collection || built.collectionName;
+const summary = summaryByAnimal.get(String(animalNumber));
+const st = summary?.expectedFinalState || {};
+const isArchived = st.status === "archived";
+const archiveReason = st.archiveReason || draft.archiveReason || "archived";
 
-      if (!ref) {
-        ref = db.collection(collectionName).doc();
-      }
+let ref = null;
+let collectionName = built.collectionName;
+
+if (isArchived) {
+  collectionName = "archived_animals";
+  ref = db.collection(collectionName).doc(`${uid}__${animalNumber}__${archiveReason}`);
+} else {
+  ref = existing?.ref || null;
+  collectionName = existing?.collection || built.collectionName;
+
+  if (!ref) {
+    ref = db.collection(collectionName).doc();
+  }
+}
 
       batch.set(ref, {
         ...built.payload,
@@ -3413,12 +3430,16 @@ app.post("/api/herd-import/save", requireUserId, async (req, res) => {
       }, { merge: true });
 
       ops++;
-
-      animalRefs.set(String(animalNumber), {
-        id: ref.id,
-        ref,
-        collection: collectionName
-      });
+      if (isArchived && existing?.collection === "animals") {
+  batch.delete(existing.ref);
+  ops++;
+}
+     animalRefs.set(String(animalNumber), {
+  id: ref.id,
+  ref,
+  collection: collectionName,
+  archived: isArchived
+});
 
       savedAnimals.push({
         animalNumber,
@@ -3461,21 +3482,23 @@ app.post("/api/herd-import/save", requireUserId, async (req, res) => {
       }
 
       for (const ev of list || []) {
-        const eventRef = db.collection("events").doc();
-        const payload = herdImportEventPayloadSrv(uid, ev, animalDoc);
+  const eventCollection = animalDoc.archived ? "archived_events" : "events";
+  const eventRef = db.collection(eventCollection).doc();
+  const payload = herdImportEventPayloadSrv(uid, ev, animalDoc);
 
-        batch.set(eventRef, payload);
-        ops++;
+  batch.set(eventRef, payload);
+  ops++;
 
-        savedEvents.push({
-          row: ev.row || null,
-          animalNumber,
-          eventId: eventRef.id,
-          eventDate: ev.eventDate,
-          eventTypeNorm: ev.murabbikEventType
-        });
-
-        await commitIfNeeded(false);
+savedEvents.push({
+  row: ev.row || null,
+  animalNumber,
+  eventId: eventRef.id,
+  collection: eventCollection,
+  eventDate: ev.eventDate,
+  eventTypeNorm: ev.murabbikEventType
+});
+  await commitIfNeeded(false);
+}
       }
     }
 
