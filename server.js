@@ -10404,12 +10404,7 @@ function calvingRequiredFieldsSrv(fd) {
     const n = Number(id);
     if (!Number.isFinite(n)) return { field: idKey, msg: `❌ رقم العجل (${label}) غير صالح.` };
 
-    if (sex === "ذكر" && !calvingIsOddSrv(n)) {
-      return { field: idKey, msg: `❌ رقم العجل الذكر يجب أن يكون فردي. (${id})` };
-    }
-    if (sex === "أنثى" && !calvingIsEvenSrv(n)) {
-      return { field: idKey, msg: `❌ رقم العجل الأنثى يجب أن يكون زوجي. (${id})` };
-    }
+   
     return null;
   };
 
@@ -10896,18 +10891,66 @@ async function uniqueCalfNumbersSrv(ctx) {
     s.add(n);
   }
 
-  // شيك قاعدة البيانات
-  for (const n of cleaned){
-    const snap = await db.collection("calves")
+// شيك القطيع كله: calves + animals
+for (const n of cleaned) {
+  const userKey = `${userId}#${n}`;
+  const nNum = Number(n);
+
+  const checks = [
+    db.collection("calves")
       .where("userId", "==", userId)
       .where("calfNumber", "==", n)
       .limit(1)
-      .get();
+      .get(),
 
-    if (!snap.empty){
-      return { ok:false, msg:`⚠️ رقم العجل "${n}" موجود بالفعل في حسابك — اختر رقمًا آخر.` };
-    }
+    db.collection("calves")
+      .where("userId", "==", userId)
+      .where("number", "==", n)
+      .limit(1)
+      .get(),
+
+    db.collection("calves")
+      .where("userId_number", "==", userKey)
+      .limit(1)
+      .get(),
+
+    db.collection("animals")
+      .where("userId", "==", userId)
+      .where("number", "==", n)
+      .limit(1)
+      .get(),
+
+    db.collection("animals")
+      .where("userId_number", "==", userKey)
+      .limit(1)
+      .get()
+  ];
+
+  if (Number.isFinite(nNum)) {
+    checks.push(
+      db.collection("calves")
+        .where("userId", "==", userId)
+        .where("animalNumber", "==", nNum)
+        .limit(1)
+        .get(),
+
+      db.collection("animals")
+        .where("userId", "==", userId)
+        .where("animalNumber", "==", nNum)
+        .limit(1)
+        .get()
+    );
   }
+
+  const snaps = await Promise.all(checks);
+
+  if (snaps.some(s => !s.empty)) {
+    return {
+      ok: false,
+      msg: `⚠️ رقم العجل "${n}" موجود بالفعل في القطيع — اختر رقمًا آخر.`
+    };
+  }
+}
 
   return { ok:true };
 }
