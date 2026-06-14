@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>استيراد القطيع — مؤقت</title>
+  <link rel="stylesheet" href="css/forms.css" />
+</head>
+
+<body>
+<header>
+  <div class="header-title">استيراد القطيع — مؤقت</div>
+  <button type="button" class="back-btn" onclick="location.href='add-animal.html'">رجوع</button>
+</header>
+
+<main class="page">
+  <section class="card">
+    <h2>رفع ملف القطيع</h2>
+    <p class="hint">
+      هذه صفحة مؤقتة لا تحفظ إلا بعد المعاينة. الحفظ يتم من السيرفر فقط.
+    </p>
+
+    <label>ملف Excel / CSV</label>
+    <input id="herdFile" type="file" accept=".xlsx,.xls,.csv,.txt" />
+
+    <div class="actions-bar inline">
+      <button id="btnPreview" type="button" class="primary">معاينة</button>
+      <button id="btnSave" type="button" class="success" disabled>حفظ المقبول فقط</button>
+    </div>
+  </section>
+
+  <section id="summaryBox" class="card" style="display:none;">
+    <h2>ملخص المعاينة</h2>
+    <div class="kpi-grid">
+      <div class="kpi-box">
+        <div id="totalRows" class="kpi-value">0</div>
+        <div class="kpi-label">إجمالي الصفوف</div>
+      </div>
+      <div class="kpi-box">
+        <div id="readyRows" class="kpi-value">0</div>
+        <div class="kpi-label">جاهز</div>
+      </div>
+      <div class="kpi-box">
+        <div id="rejectedRows" class="kpi-value">0</div>
+        <div class="kpi-label">مرفوض</div>
+      </div>
+      <div class="kpi-box">
+        <div id="archivedRows" class="kpi-value">0</div>
+        <div class="kpi-label">مؤرشف</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="messageBox" class="card" style="display:none;"></section>
+
+  <section id="resultsBox" class="card" style="display:none;">
+    <h2>نتائج الصفوف</h2>
+    <div id="rowsList" class="preview-scroll"></div>
+  </section>
+</main>
+
+<script>
+(function(){
+  const API_BASE = "https://murabbic-alerts.onrender.com";
+
+  const $ = id => document.getElementById(id);
+
+  const herdFile = $("herdFile");
+  const btnPreview = $("btnPreview");
+  const btnSave = $("btnSave");
+
+  const summaryBox = $("summaryBox");
+  const messageBox = $("messageBox");
+  const resultsBox = $("resultsBox");
+  const rowsList = $("rowsList");
+
+  let lastFilePayload = null;
+  let lastPreviewOk = false;
+
+  function getUid(){
+    return (
+      localStorage.getItem("murabbik_uid") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("userId") ||
+      localStorage.getItem("currentUserId") ||
+      ""
+    ).trim();
+  }
+
+  function showMessage(text, type){
+    messageBox.style.display = "block";
+    messageBox.className = "card " + (type || "");
+    messageBox.textContent = text || "";
+  }
+
+  function fileToBase64(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function setSummary(j){
+    const rows = j.rows || [];
+    const archived = rows.filter(r => r.archivedAnimal).length;
+
+    $("totalRows").textContent = j.totalRows ?? rows.length ?? 0;
+    $("readyRows").textContent = j.readyCount ?? rows.filter(r => r.ok).length ?? 0;
+    $("rejectedRows").textContent = j.rejectedCount ?? rows.filter(r => !r.ok).length ?? 0;
+    $("archivedRows").textContent = archived;
+
+    summaryBox.style.display = "block";
+  }
+
+  function renderRows(rows){
+    rowsList.innerHTML = "";
+
+    (rows || []).forEach(r => {
+      const item = document.createElement("div");
+      item.className = "preview-row " + (r.ok ? "status-ok" : "status-error");
+
+      item.innerHTML = `
+        <div><b>السطر:</b> ${r.row || ""}</div>
+        <div><b>رقم الحيوان:</b> ${r.animalNumber || ""}</div>
+        <div><b>النوع:</b> ${r.recordKind || ""}</div>
+        <div><b>الحالة:</b> ${r.ok ? "جاهز" : "مرفوض"}</div>
+        <div><b>الحدث:</b> ${r.murabbikEventType || r.originalEventType || "-"}</div>
+        <div><b>الأرشفة:</b> ${r.archivedAnimal ? (r.archiveReason || "archived") : "-"}</div>
+        <div class="hint">${r.message || ""}</div>
+        <div class="hint">${r.expectedAnimalEffect || ""}</div>
+      `;
+
+      rowsList.appendChild(item);
+    });
+
+    resultsBox.style.display = "block";
+  }
+
+  async function callHerdImport(path){
+    const uid = getUid();
+
+    if (!uid) {
+      throw new Error("لم يتم العثور على X-User-Id في localStorage.");
+    }
+
+    const r = await fetch(API_BASE + path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(lastFilePayload)
+    });
+
+    return r.json();
+  }
+
+  btnPreview.addEventListener("click", async () => {
+    try {
+      btnPreview.disabled = true;
+      btnSave.disabled = true;
+      lastPreviewOk = false;
+
+      const file = herdFile.files && herdFile.files[0];
+      if (!file) {
+        showMessage("اختر ملفًا أولًا.", "status-error");
+        return;
+      }
+
+      lastFilePayload = {
+        fileName: file.name,
+        fileBase64: await fileToBase64(file)
+      };
+
+      showMessage("جاري المعاينة من السيرفر...", "status-warn");
+
+      const j = await callHerdImport("/api/herd-import/preview");
+
+      console.log("HERD PREVIEW:", j);
+
+      setSummary(j);
+      renderRows(j.rows || []);
+
+      lastPreviewOk = !!j.ok && (j.readyCount || 0) > 0;
+      btnSave.disabled = !lastPreviewOk;
+
+      showMessage(j.message || "تمت المعاينة.", j.ok ? "status-ok" : "status-error");
+
+    } catch (e) {
+      console.error(e);
+      showMessage(e.message || "فشلت المعاينة.", "status-error");
+    } finally {
+      btnPreview.disabled = false;
+    }
+  });
+
+  btnSave.addEventListener("click", async () => {
+    try {
+      if (!lastPreviewOk || !lastFilePayload) {
+        showMessage("اعمل معاينة ناجحة أولًا.", "status-error");
+        return;
+      }
+
+      btnSave.disabled = true;
+      showMessage("جاري حفظ المقبول فقط من السيرفر...", "status-warn");
+
+      const j = await callHerdImport("/api/herd-import/save");
+
+      console.log("HERD SAVE:", j);
+
+      showMessage(j.message || "تم الحفظ.", j.ok ? "status-ok" : "status-error");
+
+      if (j.skippedRows && j.skippedRows.length) {
+        renderRows(j.skippedRows.map(x => ({
+          ...x,
+          ok: false,
+          recordKind: "skipped",
+          expectedAnimalEffect: "لم يتم حفظ هذا الصف."
+        })));
+      }
+
+    } catch (e) {
+      console.error(e);
+      showMessage(e.message || "فشل الحفظ.", "status-error");
+    } finally {
+      btnSave.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
