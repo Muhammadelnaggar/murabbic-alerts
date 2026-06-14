@@ -2189,7 +2189,54 @@ function herdImportNormalizeMurabbikEventSrv(original = "") {
 
   return "";
 }
+function herdImportDetectAnimalArchiveSrv(row = {}) {
+  const raw = herdImportPickAnySrv(row, [
+    "archiveReason",
+    "status",
+    "STATUS",
+    "animalStatus",
+    "cowStatus",
+    "state",
+    "exitReason",
+    "cullReason",
+    "الحالة",
+    "حالة الحيوان",
+    "الحالة الحالية",
+    "سبب الخروج",
+    "سبب الاستبعاد"
+  ]);
 
+  const key = herdImportCleanEventKeySrv(raw);
+
+  if (!key) return null;
+
+  if (
+    key.includes("مباع") ||
+    key.includes("بيع") ||
+    key.includes("sold") ||
+    key.includes("sale")
+  ) {
+    return {
+      status: "archived",
+      archiveReason: "sale"
+    };
+  }
+
+  if (
+    key.includes("نافق") ||
+    key.includes("نفوق") ||
+    key.includes("dead") ||
+    key.includes("death") ||
+    key.includes("died")
+  ) {
+    return {
+      status: "archived",
+      archiveReason: "death"
+    };
+  }
+
+  return null;
+}
 function herdImportBuildAnimalDraftSrv(row = {}) {
   const animalNumber = herdImportDetectAnimalNumberSrv(row);
 
@@ -2294,15 +2341,19 @@ function herdImportBuildAnimalDraftSrv(row = {}) {
     "الحالة"
   ]));
 
-  const isFollower =
-    !!damNumber ||
-    !!followerSex ||
-    ["رضيع", "فطام", "نامي", "تحت التلقيح", "ملقح", "عشار"].includes(followerStatus);
+ const isFollower =
+  !!damNumber ||
+  !!followerSex ||
+  ["رضيع", "فطام", "نامي", "تحت التلقيح", "ملقح", "عشار"].includes(followerStatus);
 
-  return {
+const archiveInfo = herdImportDetectAnimalArchiveSrv(row);
+
+return {
     entryType: isFollower ? "followers" : "mothers",
     animalNumber,
     animalType,
+    status: archiveInfo?.status || "active",
+    archiveReason: archiveInfo?.archiveReason || "",
     breed: herdImportNormTextSrv(herdImportPickAnySrv(row, [
       "breed",
       "BREED",
@@ -2988,6 +3039,29 @@ for (const item of previewRows) {
 }
 
 const animalSummaries = herdImportBuildAnimalSummariesSrv(animalsDraft, cleanEventsByAnimal);
+
+const summaryArchiveByAnimal = new Map(
+  animalSummaries
+    .filter(s => s?.expectedFinalState?.status === "archived")
+    .map(s => [String(s.animalNumber), s.expectedFinalState])
+);
+
+for (const item of previewRows) {
+  if (!item.ok) continue;
+
+  const st = summaryArchiveByAnimal.get(String(item.animalNumber));
+  if (!st) continue;
+
+  item.archivedAnimal = true;
+  item.archiveReason = st.archiveReason || "";
+  item.archiveDate = item.archiveDate || "";
+
+  if (item.recordKind === "animal") {
+    item.expectedAnimalEffect =
+      `سيتم استيراد الحيوان كمؤرشف بسبب ${st.archiveReason === "death" ? "النفوق" : "البيع"} من حالة الحيوان في الملف.`;
+  }
+}
+
 const savePlan = herdImportBuildSavePlanSrv(previewRows, animalSummaries);
 
 return res.json({
