@@ -2512,8 +2512,8 @@ function herdImportBaseStateSrv(animalNumber, draft = null) {
     daysInMilk: null,
     pregnancyDays: null,
 
-    status: "active",
-    archiveReason: "",
+    status: draft?.status === "archived" ? "archived" : "active",
+    archiveReason: draft?.status === "archived" ? (draft?.archiveReason || "") : "",
     lastEventDate: "",
     lastMilkDate: "",
     lastVaccinationDate: "",
