@@ -3293,8 +3293,6 @@ app.post("/api/herd-import/save", requireUserId, async (req, res) => {
         if (!animalDraft.animalType) messages.push("نوع الحيوان غير واضح.");
         if (!animalDraft.breed) messages.push("السلالة غير واضحة.");
 
-       if (!animalDraft.breed) messages.push("السلالة غير واضحة.");
-
 const fieldErrors = addAnimalBasicFieldsDecisionSrv(animalDraft);
 if (Object.keys(fieldErrors).length) {
   messages.push("راجع بيانات الحيوان المطلوبة.");
