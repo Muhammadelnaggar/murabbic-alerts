@@ -18297,12 +18297,17 @@ async function updateAnimalByCalvingSrv(ev) {
   const date = String(ev.eventDate || "").trim();
 
   const upd = {
-    lastCalvingDate: date,
-    reproductiveStatus: "حديث الولادة",
-    productionStatus: "fresh",
-    daysInMilk: 0,
-    status: "active"
-  };
+  lastCalvingDate: date,
+  reproductiveStatus: "حديث الولادة",
+  productionStatus: "fresh",
+  daysInMilk: 0,
+  status: "active",
+
+  servicesCount: 0,
+  lastInseminationDate: null,
+  pregnancyDays: null,
+  sireNumber: null
+};
 
   let wantIncLactation = false;
 
