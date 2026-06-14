@@ -3709,8 +3709,9 @@ const summaryByAnimal = new Map(
   (animalSummaries || []).map(s => [String(s.animalNumber), s])
 );
 
-const savedAnimals = [];
+    const savedAnimals = [];
     const savedEvents = [];
+    const officialCalvingAnimals = new Set();
     const skippedEvents = [];
     const animalRefs = new Map();
 
@@ -3840,7 +3841,7 @@ for (const ev of list || []) {
       });
       continue;
     }
-
+    officialCalvingAnimals.add(String(animalNumber));
     savedEvents.push({
       row: ev.row || null,
       animalNumber,
@@ -3904,7 +3905,22 @@ for (const ev of list || []) {
         };
       }
 
-      batch.set(refInfo.ref, herdImportAnimalFinalPatchSrv(summary), { merge: true });
+     const finalPatch = herdImportAnimalFinalPatchSrv(summary);
+
+if (officialCalvingAnimals.has(animalNumber)) {
+  Object.assign(finalPatch, {
+    reproductiveStatus: "حديث الولادة",
+    productionStatus: "fresh",
+    daysInMilk: 0,
+
+    servicesCount: 0,
+    lastInseminationDate: null,
+    pregnancyDays: null,
+    sireNumber: null
+  });
+}
+
+batch.set(refInfo.ref, finalPatch, { merge: true });
       ops++;
 
       await commitIfNeeded(false);
