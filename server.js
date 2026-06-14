@@ -2974,9 +2974,12 @@ if (animalNumber && !animalsDraft.has(animalNumber)) {
         if (!eventDraft.eventDate) {
           messages.push("تاريخ الحدث غير صالح أو غير موجود.");
         }
-        if (herdImportRequiresOfficialEventRouteSrv(eventDraft.murabbikEventType)) {
-         messages.push("هذا الحدث يحتاج حفظه من راوت الحدث الرسمي في مُرَبِّيك ولم يتم ربطه بالاستيراد بعد.");
-        }
+       if (
+  herdImportRequiresOfficialEventRouteSrv(eventDraft.murabbikEventType) &&
+  eventDraft.murabbikEventType !== "calving"
+) {
+  messages.push("هذا الحدث يحتاج حفظه من راوت الحدث الرسمي في مُرَبِّيك ولم يتم ربطه بالاستيراد بعد.");
+}
         if (animalNumber) {
           if (!eventsByAnimal.has(animalNumber)) eventsByAnimal.set(animalNumber, []);
           eventsByAnimal.get(animalNumber).push(eventDraft);
@@ -3213,7 +3216,299 @@ function herdImportEventPayloadSrv(uid, ev = {}, animalDoc = null) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   };
 }
+function herdImportNormalizeCalfSexSrv(v = "") {
+  const s = String(v || "").trim().toLowerCase();
 
+  if (s === "m" || s.includes("male") || s.includes("ذكر")) return "ذكر";
+  if (s === "f" || s.includes("female") || s.includes("انثى") || s.includes("أنثى")) return "أنثى";
+
+  return String(v || "").trim();
+}
+
+function herdImportOfficialFailSrv(reason, message, extra = {}) {
+  return {
+    ok: false,
+    reason,
+    message: message || "تعذّر حفظ الحدث من راوت مُرَبِّيك الرسمي.",
+    ...extra
+  };
+}
+
+async function herdImportSaveCalvingOfficialSrv(uid, ev = {}) {
+  const row = ev?.payload?.originalRow || {};
+  const animalNumber = addAnimalDigitsSrv(ev.animalNumber);
+  const eventDate = String(ev.eventDate || "").trim().slice(0, 10);
+
+  const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+  if (!animal) {
+    return herdImportOfficialFailSrv(
+      "animal_not_found_for_calving",
+      "لم يتم حفظ الولادة لأن الحيوان غير موجود في القطيع النشط."
+    );
+  }
+
+  const doc = animal.data || {};
+  const sig = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+
+  const docSpecies = String(doc?.species || doc?.animalTypeAr || "").trim();
+
+  let sp = String(
+    herdImportPickAnySrv(row, ["species", "animalType", "نوع الحيوان", "النوع"]) ||
+    docSpecies ||
+    ""
+  ).trim();
+
+  if (/cow|بقر/i.test(sp)) sp = "أبقار";
+  if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
+
+  const lastAI = String(
+    herdImportPickDateSrv(row, [
+      "lastInseminationDate",
+      "BRED",
+      "LASTBRED",
+      "lastBred",
+      "serviceDate",
+      "AIDATE",
+      "aiDate",
+      "تاريخ آخر تلقيح",
+      "تاريخ اخر تلقيح",
+      "آخر تلقيح",
+      "اخر تلقيح"
+    ]) ||
+    sig.lastInseminationDateFromEvents ||
+    doc.lastInseminationDate ||
+    ""
+  ).trim();
+
+  const formData = {
+    animalNumber,
+    number: animalNumber,
+    animalId: animal.id || "",
+    eventDate,
+    date: eventDate,
+    species: sp,
+
+    lastInseminationDate: lastAI,
+
+    calvingKind: herdImportNormTextSrv(herdImportPickAnySrv(row, [
+      "calvingKind",
+      "birthType",
+      "calvingType",
+      "نوع الولادة",
+      "eventValue"
+    ])),
+
+    calfCount: herdImportNormTextSrv(herdImportPickAnySrv(row, [
+      "calfCount",
+      "calvesCount",
+      "عدد المواليد",
+      "عدد العجول"
+    ])),
+
+    calfId: addAnimalDigitsSrv(herdImportPickAnySrv(row, [
+      "calfId",
+      "calf1Id",
+      "calf1Number",
+      "calfNumber",
+      "رقم العجل",
+      "رقم المولود"
+    ])),
+
+    calf1Sex: herdImportNormalizeCalfSexSrv(herdImportPickAnySrv(row, [
+      "calf1Sex",
+      "calfSex",
+      "جنس العجل",
+      "جنس المولود"
+    ])),
+
+    calf1Fate: herdImportNormTextSrv(herdImportPickAnySrv(row, [
+      "calf1Fate",
+      "calfFate",
+      "مصير العجل",
+      "مصير المولود"
+    ])),
+
+    calf2Id: addAnimalDigitsSrv(herdImportPickAnySrv(row, ["calf2Id", "calf2Number", "رقم العجل 2"])),
+    calf2Sex: herdImportNormalizeCalfSexSrv(herdImportPickAnySrv(row, ["calf2Sex", "جنس العجل 2"])),
+    calf2Fate: herdImportNormTextSrv(herdImportPickAnySrv(row, ["calf2Fate", "مصير العجل 2"])),
+
+    calf3Id: addAnimalDigitsSrv(herdImportPickAnySrv(row, ["calf3Id", "calf3Number", "رقم العجل 3"])),
+    calf3Sex: herdImportNormalizeCalfSexSrv(herdImportPickAnySrv(row, ["calf3Sex", "جنس العجل 3"])),
+    calf3Fate: herdImportNormTextSrv(herdImportPickAnySrv(row, ["calf3Fate", "مصير العجل 3"])),
+
+    notes: herdImportNormTextSrv(herdImportPickAnySrv(row, ["notes", "ملاحظات", "ملاحظة"]))
+  };
+
+  const reproFromEvents = String(sig.reproStatusFromEvents || "").trim();
+  const reproFromDoc = String(doc?.reproductiveStatus || "").trim();
+  const repro = reproFromEvents || reproFromDoc || "";
+
+  const gateData = {
+    animalNumber,
+    eventDate,
+    animalId: animal.id || "",
+    species: sp,
+    documentData: doc,
+    reproductiveStatus: repro,
+    reproStatusFromEvents: reproFromEvents,
+    lastInseminationDate: lastAI,
+    lastBoundary: String(sig.lastBoundary || "").trim(),
+    lastBoundaryType: String(sig.lastBoundaryType || "").trim()
+  };
+
+  const gateErr = calvingDecisionSrv(gateData);
+
+  if (gateErr) {
+    const raw = String(gateErr || "");
+    const cleaned = raw
+      .replace(/^OFFER_ABORT\|/, "")
+      .replace(/^لا يُسمح/, "❌ لا يُسمح");
+
+    return herdImportOfficialFailSrv("calving_gate_failed", cleaned, {
+      guardError: raw
+    });
+  }
+
+  const payload = {
+    userId: uid,
+    type: "ولادة",
+    eventType: "ولادة",
+    eventDate,
+    animalNumber,
+    animalId: animal.id || "",
+    species: sp || "",
+
+    reproStatus: "عشار",
+    lastInseminationDate: lastAI,
+    lastFertileInseminationDate: lastAI,
+
+    calvingKind: formData.calvingKind || "",
+    calfCount: formData.calfCount || "",
+    calf1Sex: formData.calf1Sex || "",
+    calfId: formData.calfId || "",
+    calf2Sex: formData.calf2Sex || "",
+    calf2Id: formData.calf2Id || "",
+    calf3Sex: formData.calf3Sex || "",
+    calf3Id: formData.calf3Id || "",
+
+    calf1Fate: formData.calf1Fate || "",
+    calf2Fate: formData.calf2Fate || "",
+    calf3Fate: formData.calf3Fate || "",
+
+    notes: formData.notes || "",
+    idempotencyKey: `${animalNumber}-ولادة-${eventDate}`,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  };
+
+  const requiredErr = calvingRequiredFieldsSrv({
+    ...payload,
+    documentData: doc
+  });
+
+  if (requiredErr) {
+    return herdImportOfficialFailSrv(
+      "calving_required_fields_failed",
+      typeof requiredErr === "string"
+        ? requiredErr
+        : (requiredErr.msg || "بيانات الولادة غير مكتملة."),
+      {
+        fieldErrors: requiredErr.field ? { [requiredErr.field]: requiredErr.msg } : {}
+      }
+    );
+  }
+
+  const isDead = String(payload.calvingKind || "").trim() === "نافقة";
+
+  if (!isDead) {
+    const count = parseInt(payload.calfCount || "1", 10) || 1;
+
+    const calfNums = [
+      payload.calfId || "",
+      count >= 2 ? payload.calf2Id || "" : "",
+      count >= 3 ? payload.calf3Id || "" : ""
+    ].filter(Boolean);
+
+    const uniqueCheck = await uniqueCalfNumbersSrv({
+      userId: uid,
+      calfNumbers: calfNums
+    });
+
+    if (!uniqueCheck || uniqueCheck.ok === false) {
+      return herdImportOfficialFailSrv(
+        "calving_duplicate_calf",
+        uniqueCheck?.msg || "⚠️ رقم عجل مكرر في حسابك."
+      );
+    }
+  }
+
+  const alreadyExists = await existsCalvingSameDaySrv(uid, animalNumber, eventDate);
+
+  if (alreadyExists) {
+    return herdImportOfficialFailSrv(
+      "duplicate_calving_same_day",
+      "⚠️ تم تسجيل ولادة لهذا الحيوان في نفس التاريخ من قبل."
+    );
+  }
+
+  const eventRef = await db.collection("events").add(payload);
+
+  await updateAnimalByCalvingSrv({
+    ...payload,
+    type: "calving",
+    eventType: "calving"
+  });
+
+  if (!isDead) {
+    const damId = payload.animalId;
+    const damNumber = payload.animalNumber;
+    const birthDate = payload.eventDate;
+    const species = payload.species;
+
+    const calvesToSave = [];
+    const count = parseInt(payload.calfCount || "1", 10) || 1;
+
+    const pushCalf = (calfIdField, calfSexField, calfFateField) => {
+      const id = String(formData[calfIdField] || "").trim();
+      const sex = String(formData[calfSexField] || "").trim();
+      const fate = String(formData[calfFateField] || "").trim();
+      if (!id || !sex) return;
+
+      calvesToSave.push({
+        userId: uid,
+        damId,
+        damNumber,
+        birthDate,
+        calfNumber: id,
+        sex,
+        fate,
+        species,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    };
+
+    pushCalf("calfId", "calf1Sex", "calf1Fate");
+    if (count >= 2) pushCalf("calf2Id", "calf2Sex", "calf2Fate");
+    if (count >= 3) pushCalf("calf3Id", "calf3Sex", "calf3Fate");
+
+    for (const calf of calvesToSave) {
+      await db.collection("calves").add(calf);
+    }
+  }
+
+  if (typeof scheduleGroupsRebuildSrv === "function") {
+    scheduleGroupsRebuildSrv(uid, "herd_import_calving_save");
+  }
+
+  return {
+    ok: true,
+    eventId: eventRef.id,
+    animalNumber,
+    animalId: animal.id || "",
+    eventDate,
+    message: "✅ تم حفظ الولادة من راوت مُرَبِّيك الرسمي"
+  };
+}
 function herdImportAnimalFinalPatchSrv(summary = {}) {
   const st = summary.expectedFinalState || {};
 
@@ -3329,9 +3624,12 @@ app.post("/api/herd-import/save", requireUserId, async (req, res) => {
         if (!eventDraft.originalEventType) messages.push("نوع الحدث الأصلي غير موجود.");
         if (!eventDraft.murabbikEventType) messages.push("تعذّر تحويل نوع الحدث إلى حدث مُرَبِّيك.");
         if (!eventDraft.eventDate) messages.push("تاريخ الحدث غير صالح أو غير موجود.");
-        if (herdImportRequiresOfficialEventRouteSrv(eventDraft.murabbikEventType)) {
-           messages.push("هذا الحدث يحتاج حفظه من راوت الحدث الرسمي في مُرَبِّيك ولم يتم ربطه بالاستيراد بعد.");
-        }
+       if (
+  herdImportRequiresOfficialEventRouteSrv(eventDraft.murabbikEventType) &&
+  eventDraft.murabbikEventType !== "calving"
+) {
+  messages.push("هذا الحدث يحتاج حفظه من راوت الحدث الرسمي في مُرَبِّيك ولم يتم ربطه بالاستيراد بعد.");
+}
 
         if (animalNumber) {
           if (!eventsByAnimal.has(animalNumber)) eventsByAnimal.set(animalNumber, []);
@@ -3391,7 +3689,7 @@ app.post("/api/herd-import/save", requireUserId, async (req, res) => {
         (list || []).filter(ev => !postArchiveRejectedRows.has(Number(ev.row)))
       );
     }
-
+    await commitIfNeeded(true);
     const archiveContextByAnimal = herdImportBuildArchiveContextByAnimalSrv(cleanEventsByAnimal);
 
     for (const [animalNumber, list] of cleanEventsByAnimal.entries()) {
@@ -3515,8 +3813,59 @@ if (isArchived) {
         }
         continue;
       }
+for (const ev of list || []) {
+  if (ev.murabbikEventType === "calving") {
+    if (animalDoc.archived) {
+      skippedEvents.push({
+        row: ev.row || null,
+        animalNumber,
+        eventDate: ev.eventDate,
+        eventTypeNorm: ev.murabbikEventType,
+        reason: "official_calving_requires_active_animal",
+        message: "استيراد ولادة لحيوان مؤرشف يحتاج مسار: حفظ مؤقت في القطيع ثم أحداث رسمية ثم أرشفة رسمية. لم يتم حفظها خام."
+      });
+      continue;
+    }
 
-      for (const ev of list || []) {
+    const official = await herdImportSaveCalvingOfficialSrv(uid, ev);
+
+    if (!official.ok) {
+      skippedEvents.push({
+        row: ev.row || null,
+        animalNumber,
+        eventDate: ev.eventDate,
+        eventTypeNorm: ev.murabbikEventType,
+        reason: official.reason || "official_calving_failed",
+        message: official.message || "فشل حفظ الولادة من راوت مُرَبِّيك الرسمي."
+      });
+      continue;
+    }
+
+    savedEvents.push({
+      row: ev.row || null,
+      animalNumber,
+      eventId: official.eventId,
+      collection: "events",
+      eventDate: ev.eventDate,
+      eventTypeNorm: "calving",
+      officialRoute: "/api/calving/save"
+    });
+
+    continue;
+  }
+
+  if (herdImportRequiresOfficialEventRouteSrv(ev.murabbikEventType)) {
+    skippedEvents.push({
+      row: ev.row || null,
+      animalNumber,
+      eventDate: ev.eventDate,
+      eventTypeNorm: ev.murabbikEventType,
+      reason: "official_route_not_wired",
+      message: "هذا الحدث يحتاج حفظه من راوت الحدث الرسمي في مُرَبِّيك ولم يتم ربطه بالاستيراد بعد."
+    });
+    continue;
+  }
+
   const eventCollection = animalDoc.archived ? "archived_events" : "events";
   const eventRef = db.collection(eventCollection).doc();
   const payload = herdImportEventPayloadSrv(uid, ev, animalDoc);
@@ -3524,14 +3873,15 @@ if (isArchived) {
   batch.set(eventRef, payload);
   ops++;
 
-savedEvents.push({
-  row: ev.row || null,
-  animalNumber,
-  eventId: eventRef.id,
-  collection: eventCollection,
-  eventDate: ev.eventDate,
-  eventTypeNorm: ev.murabbikEventType
-});
+  savedEvents.push({
+    row: ev.row || null,
+    animalNumber,
+    eventId: eventRef.id,
+    collection: eventCollection,
+    eventDate: ev.eventDate,
+    eventTypeNorm: ev.murabbikEventType
+  });
+
   await commitIfNeeded(false);
 }
       }
