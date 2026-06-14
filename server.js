@@ -22635,6 +22635,7 @@ function shouldAppearInGroupsSrv(a = {}) {
   if (a?.inactive === true) return false;
 
   if (txt.includes('inactive')) return false;
+  if (txt.includes('archived')) return false;
   if (txt.includes('dead')) return false;
   if (txt.includes('sold')) return false;
   if (txt.includes('نافق')) return false;
