@@ -3500,7 +3500,7 @@ savedEvents.push({
   await commitIfNeeded(false);
 }
       }
-    }
+  
 
     for (const summary of animalSummaries) {
       const animalNumber = String(summary.animalNumber || "").trim();
