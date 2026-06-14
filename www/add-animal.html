@@ -26,6 +26,7 @@
   <button type="button" id="btnMothers" class="entry-tab active">أمهات</button>
   <button type="button" id="btnFollowers" class="entry-tab">توابع</button>
   <button type="button" id="btnImport" class="entry-tab">استيراد</button>
+  <button type="button" id="btnHerdImportTemp" class="entry-tab">استيراد القطيع</button>
 </div>
 
 <input type="hidden" id="entryType" value="mothers" data-field="entryType" />
@@ -194,7 +195,7 @@
   const btnMothers = $("btnMothers");
   const btnFollowers = $("btnFollowers");
   const btnImport = $("btnImport");
-
+  const btnHerdImportTemp = $("btnHerdImportTemp");
   const sharedAnimalFields = $("sharedAnimalFields");
   const mothersFields = $("mothersFields");
   const followersFields = $("followersFields");
@@ -364,6 +365,9 @@
   btnMothers?.addEventListener("click", () => setEntryMode("mothers"));
   btnFollowers?.addEventListener("click", () => setEntryMode("followers"));
   btnImport?.addEventListener("click", () => setEntryMode("import"));
+  btnHerdImportTemp?.addEventListener("click", () => {
+  location.href = "herd-import-temp.html";
+});
 
   followerSex?.addEventListener("change", () => {
     updateFollowerStatusOptions();
