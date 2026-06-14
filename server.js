@@ -2929,12 +2929,22 @@ app.post("/api/herd-import/preview", requireUserId, async (req, res) => {
         }
 
         if (!animalDraft.breed) {
-          messages.push("السلالة غير واضحة.");
-        }
+  messages.push("السلالة غير واضحة.");
+}
 
-        if (animalNumber && !animalsDraft.has(animalNumber)) {
-          animalsDraft.set(animalNumber, animalDraft);
-        }
+const fieldErrors = addAnimalBasicFieldsDecisionSrv(animalDraft);
+if (Object.keys(fieldErrors).length) {
+  messages.push("راجع بيانات الحيوان المطلوبة.");
+}
+
+const guardMessage = addAnimalDecisionSrv(animalDraft);
+if (guardMessage) {
+  messages.push(guardMessage);
+}
+
+if (animalNumber && !animalsDraft.has(animalNumber)) {
+  animalsDraft.set(animalNumber, animalDraft);
+}
       }
 
       if (recordKind === "event" || recordKind === "mixed") {
@@ -3283,9 +3293,22 @@ app.post("/api/herd-import/save", requireUserId, async (req, res) => {
         if (!animalDraft.animalType) messages.push("نوع الحيوان غير واضح.");
         if (!animalDraft.breed) messages.push("السلالة غير واضحة.");
 
-        if (animalNumber && !animalsDraft.has(animalNumber)) {
-          animalsDraft.set(animalNumber, animalDraft);
-          animalDraftRows.set(animalNumber, rowNumber);
+       if (!animalDraft.breed) messages.push("السلالة غير واضحة.");
+
+const fieldErrors = addAnimalBasicFieldsDecisionSrv(animalDraft);
+if (Object.keys(fieldErrors).length) {
+  messages.push("راجع بيانات الحيوان المطلوبة.");
+}
+
+const guardMessage = addAnimalDecisionSrv(animalDraft);
+if (guardMessage) {
+  messages.push(guardMessage);
+}
+
+if (animalNumber && !animalsDraft.has(animalNumber)) {
+  animalsDraft.set(animalNumber, animalDraft);
+  animalDraftRows.set(animalNumber, rowNumber);
+}
         }
       }
 
