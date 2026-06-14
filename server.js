@@ -3201,7 +3201,6 @@ function herdImportAnimalFinalPatchSrv(summary = {}) {
  [
   "productionStatus",
   "reproductiveStatus",
-  "followerStatus",
   "lastCalvingDate",
   "lastInseminationDate",
   "lactationNumber",
