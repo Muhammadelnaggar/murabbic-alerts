@@ -3124,28 +3124,39 @@ function herdImportAnimalFinalPatchSrv(summary = {}) {
     sourceLastUpdate: "server:/api/herd-import/save"
   };
 
-  [
-    "productionStatus",
-    "reproductiveStatus",
-    "followerStatus",
-    "lastCalvingDate",
-    "lastInseminationDate",
-    "lactationNumber",
-    "servicesCount",
-    "dailyMilk",
-    "daysInMilk",
-    "pregnancyDays",
-    "status",
-    "archiveReason",
-    "lastMilkDate",
-    "lastVaccinationDate"
-  ].forEach(k => {
-    if (st[k] !== undefined && st[k] !== "") {
-      patch[k] = st[k];
-    }
-  });
+ [
+  "productionStatus",
+  "reproductiveStatus",
+  "followerStatus",
+  "lastCalvingDate",
+  "lastInseminationDate",
+  "lactationNumber",
+  "servicesCount",
+  "dailyMilk",
+  "daysInMilk",
+  "pregnancyDays",
+  "status",
+  "archiveReason",
+  "lastMilkDate",
+  "lastVaccinationDate"
+].forEach(k => {
+  if (st[k] !== undefined && st[k] !== "") {
+    patch[k] = st[k];
+  }
+});
 
-  return patch;
+if (st.status === "archived") {
+  patch.feedingEligible = false;
+  patch.group = null;
+  patch.groupId = null;
+  patch.groupKey = null;
+  patch.groupSpecies = null;
+  patch.groupAvgMilkKg = null;
+  patch.groupAvgDim = null;
+  patch.groupUpdatedAt = null;
+}
+
+return patch;
 }
 
 app.post("/api/herd-import/save", requireUserId, async (req, res) => {
