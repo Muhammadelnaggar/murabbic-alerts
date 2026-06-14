@@ -3689,7 +3689,7 @@ app.post("/api/herd-import/save", requireUserId, async (req, res) => {
         (list || []).filter(ev => !postArchiveRejectedRows.has(Number(ev.row)))
       );
     }
-    await commitIfNeeded(true);
+    
     const archiveContextByAnimal = herdImportBuildArchiveContextByAnimalSrv(cleanEventsByAnimal);
 
     for (const [animalNumber, list] of cleanEventsByAnimal.entries()) {
@@ -3796,7 +3796,7 @@ if (isArchived) {
         });
       }
     }
-
+    await commitIfNeeded(true);
     for (const [animalNumber, list] of cleanEventsByAnimal.entries()) {
       const animalDoc = animalRefs.get(String(animalNumber));
 
