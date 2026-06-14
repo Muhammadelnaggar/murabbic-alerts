@@ -3289,24 +3289,22 @@ app.post("/api/herd-import/save", requireUserId, async (req, res) => {
 
       if (recordKind === "animal" || recordKind === "mixed") {
         animalDraft = herdImportBuildAnimalDraftSrv(row);
-
         if (!animalDraft.animalType) messages.push("نوع الحيوان غير واضح.");
         if (!animalDraft.breed) messages.push("السلالة غير واضحة.");
 
-const fieldErrors = addAnimalBasicFieldsDecisionSrv(animalDraft);
-if (Object.keys(fieldErrors).length) {
-  messages.push("راجع بيانات الحيوان المطلوبة.");
-}
+        const fieldErrors = addAnimalBasicFieldsDecisionSrv(animalDraft);
+        if (Object.keys(fieldErrors).length) {
+          messages.push("راجع بيانات الحيوان المطلوبة.");
+        }
 
-const guardMessage = addAnimalDecisionSrv(animalDraft);
-if (guardMessage) {
-  messages.push(guardMessage);
-}
+        const guardMessage = addAnimalDecisionSrv(animalDraft);
+        if (guardMessage) {
+          messages.push(guardMessage);
+        }
 
-if (animalNumber && !animalsDraft.has(animalNumber)) {
-  animalsDraft.set(animalNumber, animalDraft);
-  animalDraftRows.set(animalNumber, rowNumber);
-}
+        if (animalNumber && !animalsDraft.has(animalNumber)) {
+          animalsDraft.set(animalNumber, animalDraft);
+          animalDraftRows.set(animalNumber, rowNumber);
         }
       }
 
