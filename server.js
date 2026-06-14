@@ -2189,6 +2189,18 @@ function herdImportNormalizeMurabbikEventSrv(original = "") {
 
   return "";
 }
+function herdImportRequiresOfficialEventRouteSrv(type = "") {
+  return new Set([
+    "calving",
+    "insemination",
+    "pregnancy_diagnosis",
+    "dry_off",
+    "abortion",
+    "daily_milk",
+    "vaccination",
+    "weaning"
+  ]).has(String(type || "").trim());
+}
 function herdImportDetectAnimalArchiveSrv(row = {}) {
   const raw = herdImportPickAnySrv(row, [
     "archiveReason",
@@ -2962,7 +2974,9 @@ if (animalNumber && !animalsDraft.has(animalNumber)) {
         if (!eventDraft.eventDate) {
           messages.push("تاريخ الحدث غير صالح أو غير موجود.");
         }
-
+        if (herdImportRequiresOfficialEventRouteSrv(eventDraft.murabbikEventType)) {
+         messages.push("هذا الحدث يحتاج حفظه من راوت الحدث الرسمي في مُرَبِّيك ولم يتم ربطه بالاستيراد بعد.");
+        }
         if (animalNumber) {
           if (!eventsByAnimal.has(animalNumber)) eventsByAnimal.set(animalNumber, []);
           eventsByAnimal.get(animalNumber).push(eventDraft);
@@ -3315,6 +3329,9 @@ app.post("/api/herd-import/save", requireUserId, async (req, res) => {
         if (!eventDraft.originalEventType) messages.push("نوع الحدث الأصلي غير موجود.");
         if (!eventDraft.murabbikEventType) messages.push("تعذّر تحويل نوع الحدث إلى حدث مُرَبِّيك.");
         if (!eventDraft.eventDate) messages.push("تاريخ الحدث غير صالح أو غير موجود.");
+        if (herdImportRequiresOfficialEventRouteSrv(eventDraft.murabbikEventType)) {
+           messages.push("هذا الحدث يحتاج حفظه من راوت الحدث الرسمي في مُرَبِّيك ولم يتم ربطه بالاستيراد بعد.");
+        }
 
         if (animalNumber) {
           if (!eventsByAnimal.has(animalNumber)) eventsByAnimal.set(animalNumber, []);
