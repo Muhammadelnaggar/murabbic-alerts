@@ -2756,7 +2756,13 @@ function herdImportV2BuildAnimalBaselineOneInternalSrv(row = {}, rowIndex = 0, c
       herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "pregDays")
     ),
     dryOffDate,
-    animalStatus
+heatDate: herdImportV2NormalizeBaselineDateInternalSrv(
+  herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "heatDate")
+),
+heatDatesRaw: String(
+  herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "heatDates") || ""
+).trim(),
+animalStatus
   };
 
   base.productionStatus = herdImportV2InferProductionStatusInternalSrv(base);
@@ -2865,6 +2871,176 @@ function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapI
     readyForSavePreview: rows.length > 0 && readyAnimalsCount > 0 && needsReviewCount === 0
   };
 }
+// ============================================================
+// HERD IMPORT V2 - seed events preview only
+// بناء الأحداث التأسيسية داخليًا — بدون حفظ وبدون كشف التفاصيل
+// ============================================================
+
+function herdImportV2SplitSeedDatesInternalSrv(v) {
+  const raw = String(v ?? "").trim();
+  if (!raw) return [];
+
+  const parts = raw
+    .split(/[\n;,،|]+/g)
+    .map(x => x.trim())
+    .filter(Boolean);
+
+  const out = [];
+
+  for (const p of parts) {
+    const d = addAnimalImportNormalizeDateSrv(p);
+    if (d) out.push(d);
+  }
+
+  return [...new Set(out)];
+}
+
+function herdImportV2PushSeedEventInternalSrv(list, base, eventTypeNorm, eventTypeAr, eventDate, details = {}) {
+  if (!base?.animalNumber || !eventDate) return false;
+
+  list.push({
+    animalNumber: base.animalNumber,
+    animalType: base.animalType || "",
+    eventTypeNorm,
+    eventTypeAr,
+    eventDate,
+    details: {
+      ...details,
+      importedBy: "herd_import_v2",
+      importMode: "seed_history",
+      isImportedSeed: true
+    }
+  });
+
+  return true;
+}
+
+function herdImportV2BuildSeedEventsPreviewInternalSrv(animalsInternal = []) {
+  const seedEventsInternal = [];
+
+  const counts = {
+    calvingEventsCount: 0,
+    inseminationEventsCount: 0,
+    pregnancyDiagnosisEventsCount: 0,
+    dryOffEventsCount: 0,
+    heatEventsCount: 0
+  };
+
+  let skippedNoAnimalNumberCount = 0;
+  let skippedNoEventDateCount = 0;
+
+  for (const base of animalsInternal || []) {
+    if (!base?.animalNumber) {
+      skippedNoAnimalNumberCount++;
+      continue;
+    }
+
+    if (base.lastCalvingDate) {
+      const ok = herdImportV2PushSeedEventInternalSrv(
+        seedEventsInternal,
+        base,
+        "calving",
+        "ولادة",
+        base.lastCalvingDate,
+        {
+          sourceField: "lastCalvingDate",
+          lactationNumber: base.lactationNumber ?? null,
+          daysInMilkAtImport: base.daysInMilk ?? null
+        }
+      );
+
+      if (ok) counts.calvingEventsCount++;
+    }
+
+    if (base.lastInseminationDate) {
+      const ok = herdImportV2PushSeedEventInternalSrv(
+        seedEventsInternal,
+        base,
+        "insemination",
+        "تلقيح",
+        base.lastInseminationDate,
+        {
+          sourceField: "lastInseminationDate",
+          servicesCountAtImport: base.servicesCount ?? null,
+          sireNumber: base.sireNumber || ""
+        }
+      );
+
+      if (ok) counts.inseminationEventsCount++;
+    }
+
+    if (base.pdDate && base.pdResult) {
+      const ok = herdImportV2PushSeedEventInternalSrv(
+        seedEventsInternal,
+        base,
+        "pregnancy_diagnosis",
+        "تشخيص حمل",
+        base.pdDate,
+        {
+          sourceField: "pdDate/pdResult",
+          result: base.pdResult,
+          pregDaysAtImport: base.pregDays ?? null
+        }
+      );
+
+      if (ok) counts.pregnancyDiagnosisEventsCount++;
+    }
+
+    if (base.dryOffDate) {
+      const ok = herdImportV2PushSeedEventInternalSrv(
+        seedEventsInternal,
+        base,
+        "dry_off",
+        "تجفيف",
+        base.dryOffDate,
+        {
+          sourceField: "dryOffDate"
+        }
+      );
+
+      if (ok) counts.dryOffEventsCount++;
+    }
+
+    const heatDates = [
+      ...(base.heatDate ? [base.heatDate] : []),
+      ...herdImportV2SplitSeedDatesInternalSrv(base.heatDatesRaw)
+    ];
+
+    for (const heatDate of [...new Set(heatDates)]) {
+      const ok = herdImportV2PushSeedEventInternalSrv(
+        seedEventsInternal,
+        base,
+        "heat",
+        "شياع",
+        heatDate,
+        {
+          sourceField: "heatDate/heatDates"
+        }
+      );
+
+      if (ok) counts.heatEventsCount++;
+    }
+  }
+
+  const totalSeedEventsCount =
+    counts.calvingEventsCount +
+    counts.inseminationEventsCount +
+    counts.pregnancyDiagnosisEventsCount +
+    counts.dryOffEventsCount +
+    counts.heatEventsCount;
+
+  return {
+    seedEventsInternal,
+    ...counts,
+    totalSeedEventsCount,
+    skippedNoAnimalNumberCount,
+    skippedNoEventDateCount,
+    seedEventsConfidence: animalsInternal.length
+      ? Number((totalSeedEventsCount / animalsInternal.length).toFixed(2))
+      : 0,
+    readyForSavePreview: animalsInternal.length > 0 && totalSeedEventsCount > 0
+  };
+}
 app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
   try {
     const body = req.body || {};
@@ -2889,6 +3065,9 @@ app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
 const baselinePreview = herdImportV2BuildAnimalBaselinePreviewInternalSrv(
   rows,
   columnMapping.columnMapInternal
+);
+const seedEventsPreview = herdImportV2BuildSeedEventsPreviewInternalSrv(
+  baselinePreview.animalsInternal
 );
     return res.json({
   ok: true,
@@ -2932,7 +3111,22 @@ baselineSummary: {
   productionStatusCounts: baselinePreview.productionStatusCounts,
   reproductiveStatusCounts: baselinePreview.reproductiveStatusCounts,
   reasonCounts: baselinePreview.reasonCounts
-}
+},
+  seedEventsSummary: {
+  calvingEventsCount: seedEventsPreview.calvingEventsCount,
+  inseminationEventsCount: seedEventsPreview.inseminationEventsCount,
+  pregnancyDiagnosisEventsCount: seedEventsPreview.pregnancyDiagnosisEventsCount,
+  dryOffEventsCount: seedEventsPreview.dryOffEventsCount,
+  heatEventsCount: seedEventsPreview.heatEventsCount,
+  totalSeedEventsCount: seedEventsPreview.totalSeedEventsCount,
+  skippedNoAnimalNumberCount: seedEventsPreview.skippedNoAnimalNumberCount,
+  skippedNoEventDateCount: seedEventsPreview.skippedNoEventDateCount,
+  seedEventsConfidence: seedEventsPreview.seedEventsConfidence,
+  seedEventsConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(
+    Math.min(1, seedEventsPreview.seedEventsConfidence)
+  ),
+  readyForSavePreview: seedEventsPreview.readyForSavePreview
+}    
 });
 
   } catch (e) {
