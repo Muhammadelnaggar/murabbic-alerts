@@ -3533,15 +3533,31 @@ const baselinePreview = herdImportV2BuildAnimalBaselinePreviewInternalSrv(
   columnMapping.columnMapInternal,
   importOptions
 );
+ const missingAnimalTypeCount = Number(
+  baselinePreview.reasonCounts?.missing_animal_type || 0
+);
+const requiresDefaultAnimalType = missingAnimalTypeCount > 0;
 const seedEventsPreview = herdImportV2BuildSeedEventsPreviewInternalSrv(
   baselinePreview.animalsInternal
 );
-    return res.json({
+
+return res.json({
   ok: true,
   mode: "herd_import_v2",
   importMode: "source_profile_preview_only",
-  message: "تمت قراءة ملف القطيع وتحليل بنيته بنجاح. لم يتم حفظ أي بيانات.",
+ message: requiresDefaultAnimalType
+  ? "الملف لا يحتوي على نوع الحيوان. اختر نوع القطيع ثم أعد المعاينة."
+  : "تمت قراءة ملف القطيع وتحليل بنيته بنجاح. لم يتم حفظ أي بيانات.",
   totalRows: rows.length,
+  requiresDefaultAnimalType,
+requiredInput: requiresDefaultAnimalType
+  ? {
+      field: "defaultAnimalType",
+      label: "نوع القطيع",
+      options: ["بقرة", "جاموسة"],
+      message: "الملف لا يحتوي على نوع الحيوان. اختر نوع القطيع ثم أعد المعاينة."
+    }
+  : null,
 
   sourceProfile: herdImportV2PublicSourceProfileSrv(sourceProfile),
 
@@ -3572,7 +3588,7 @@ baselineSummary: {
   archivedRowsCount: baselinePreview.archivedRowsCount,
   baselineConfidence: baselinePreview.baselineConfidence,
   baselineConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(baselinePreview.baselineConfidence),
-  readyForSavePreview: baselinePreview.readyForSavePreview,
+  readyForSavePreview: !requiresDefaultAnimalType && baselinePreview.readyForSavePreview,
 
   animalTypeCounts: baselinePreview.animalTypeCounts,
   productionStatusCounts: baselinePreview.productionStatusCounts,
