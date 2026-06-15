@@ -2556,8 +2556,20 @@ function herdImportEffectTextSrv(ev = {}) {
 }
 
 function herdImportRowKindSrv(row = {}) {
-  const hasEvent = !!herdImportDetectOriginalEventSrv(row) || !!herdImportDetectEventDateSrv(row);
+  const originalEvent = herdImportDetectOriginalEventSrv(row);
+  const eventDate = herdImportDetectEventDateSrv(row);
+  const murabbikEventType = herdImportNormalizeMurabbikEventSrv(originalEvent);
+
+  const hasEvent = !!originalEvent || !!eventDate;
   const hasAnimal = herdImportHasAnimalFieldsSrv(row);
+
+  if (
+    hasEvent &&
+    murabbikEventType &&
+    herdImportRequiresOfficialEventRouteSrv(murabbikEventType)
+  ) {
+    return "event";
+  }
 
   if (hasAnimal && hasEvent) return "mixed";
   if (hasEvent) return "event";
