@@ -3746,7 +3746,8 @@ async function herdImportSaveInseminationOfficialSrv(uid, ev = {}) {
     animalNumber,
     eventDate,
 
-    eventType: "insemination",
+    eventType: "تلقيح",
+    eventTypeAr: "تلقيح",
     type: "insemination",
     eventTypeNorm: "insemination",
 
