@@ -2907,10 +2907,10 @@ const defaultAnimalType = addAnimalStrSrv(
 );
 
 const animalType = addAnimalStrSrv(rawAnimalType)
-  ? addAnimalImportNormalizeAnimalTypeSrv(rawAnimalType)
+  ? herdImportV2NormalizeAnimalTypeStrictInternalSrv(rawAnimalType)
   : (
       defaultAnimalType
-        ? addAnimalImportNormalizeAnimalTypeSrv(defaultAnimalType)
+        ? herdImportV2NormalizeAnimalTypeStrictInternalSrv(defaultAnimalType)
         : ""
     );
 
@@ -3030,7 +3030,11 @@ animalStatus
     reviewReasons
   };
 }
-
+function herdImportV2NormalizeAnimalTypeStrictInternalSrv(v) {
+  const raw = addAnimalStrSrv(v);
+  if (!raw) return "";
+  return addAnimalImportNormalizeAnimalTypeSrv(raw);
+}
 function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapInternal = {}, options = {}) {
   const built = [];
   const seenNumbers = new Set();
@@ -3650,7 +3654,18 @@ app.post("/api/herd-import-v2/save-operational", requireUserId, async (req, res)
       columnMapping.columnMapInternal,
       importOptions
     );
+    const missingAnimalTypeCount = Number(
+  baselinePreview.reasonCounts?.missing_animal_type || 0
+);
 
+if (missingAnimalTypeCount > 0) {
+  return res.status(400).json({
+    ok: false,
+    error: "herd_import_v2_missing_animal_type",
+    message: "الملف لا يحتوي على نوع الحيوان. اختر نوع القطيع ثم أعد المعاينة والحفظ.",
+    missingAnimalTypeCount
+  });
+}
     const seedEventsPreview = herdImportV2BuildSeedEventsPreviewInternalSrv(
       baselinePreview.animalsInternal
     );
