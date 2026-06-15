@@ -2100,43 +2100,170 @@ app.post("/api/add-animal/import", requireUserId, async (req, res) => {
 const HERD_IMPORT_V2_SOURCE_SIGNATURES = {
   dairycomp: {
     name: "DairyComp / DC305 / VAS style",
-    signatures: [
-      "COW", "COWID", "COWNO", "DIM", "FRESH",
-      "BRED", "RPRO", "REPRO", "DCC", "LACT", "MILK", "SIRE", "SERV"
-    ]
+    requiredGroups: [
+      "animalNumber",
+      "lastCalvingDate",
+      "daysInMilk",
+      "dailyMilk",
+      "reproductiveStatus",
+      "lastInseminationDate"
+    ],
+    groups: {
+      animalNumber: ["COW", "COWID", "COWNO", "COW#", "ID", "ANIMALID"],
+      animalType: ["TYPE", "CLASS", "SPECIES"],
+      breed: ["BREED", "BRD"],
+      birthDate: ["BDAT", "BIRTH", "DOB", "BIRTHDATE"],
+      lactationNumber: ["LACT", "LAC", "PARITY"],
+
+      lastCalvingDate: ["FRESH", "LASTFRESH", "FRESHDATE", "CALV", "CALVDATE", "LASTCALV"],
+      daysInMilk: ["DIM"],
+      dailyMilk: ["MILK", "TESTMILK", "LASTMILK", "KG", "KGMILK", "LBS", "LBSMILK"],
+
+      reproductiveStatus: ["RPRO", "REPRO", "REPROSTATUS", "BREEDSTATUS", "PREGSTATUS"],
+      lastInseminationDate: ["BRED", "LASTBRED", "BREDATE", "BREDDATE", "SERVDATE", "SERVICE_DATE", "AIDATE"],
+      servicesCount: ["SERV", "SERVS", "SERVICES", "BREEDINGS", "TIMESBRED"],
+      sireNumber: ["SIRE", "BULL", "SEMEN", "SIREID", "BULLID", "STRAW"],
+      timeBred: ["TIMEBRED", "BREDTIME", "SERVTIME", "AITIME"],
+
+      pregDays: ["DCC", "PREGDAYS", "DAYSPREG"],
+      pdDate: ["PDDATE", "PD_DATE", "PREGCHECKDATE", "CHECKDATE", "VETCHECKDATE"],
+      pdResult: ["PREG", "PD", "PDRESULT", "PREGRESULT", "PREG_STATUS"],
+      dryOffDate: ["DRY", "DRYDATE", "DRYOFF", "DRYOFFDATE"],
+      heatDate: ["HEAT", "HEATDATE", "LASTHEAT"],
+      heatDates: ["HEATS", "HEATDATES"],
+      group: ["GROUP", "STRING", "HERD"],
+      pen: ["PEN", "LOT"],
+      animalStatus: ["STATUS", "COWSTATUS"]
+    }
   },
 
   delpro: {
     name: "DeLaval DelPro style",
-    signatures: [
-      "Animal ID", "Animal Number", "Cow No.", "Days in milk",
-      "Last calving", "Milk yield", "Last insemination", "Pregnancy status"
-    ]
+    requiredGroups: [
+      "animalNumber",
+      "lastCalvingDate",
+      "daysInMilk",
+      "dailyMilk",
+      "lastInseminationDate"
+    ],
+    groups: {
+      animalNumber: ["Animal ID", "Animal Number", "Cow No.", "Cow Number", "Ear tag", "Tag"],
+      breed: ["Breed", "Animal breed"],
+      birthDate: ["Date of birth", "Birth date", "DOB"],
+      lactationNumber: ["Lactation", "Lactation No.", "Lactation number", "Parity"],
+      lastCalvingDate: ["Last calving", "Calving date", "Last calving date"],
+      daysInMilk: ["Days in milk", "DIM"],
+      dailyMilk: ["Milk yield", "Daily milk", "Last milk", "Milk kg", "Milk production"],
+      lastInseminationDate: ["Last insemination", "Last breeding", "Insemination date", "Service date"],
+      servicesCount: ["No. of inseminations", "Number of inseminations", "Services", "Service count"],
+      sireNumber: ["Sire", "Bull", "Semen", "Semen code"],
+      reproductiveStatus: ["Pregnancy status", "Reproduction status", "Repro status", "Breeding status"],
+      pdDate: ["Pregnancy check date", "Vet check date", "Diagnosis date"],
+      pdResult: ["Pregnancy result", "Pregnancy status", "Pregnancy check result"],
+      pregDays: ["Days pregnant", "Pregnant days"],
+      dryOffDate: ["Dry off date", "Dry-off date", "Dry date"],
+      heatDate: ["Heat date", "Last heat", "Estrus date"],
+      group: ["Group"],
+      pen: ["Pen"]
+    }
   },
 
   afimilk: {
     name: "Afimilk / AfiFarm style",
-    signatures: [
-      "Cow", "Cow ID", "Animal ID", "Lactation", "DIM",
-      "Milk yield", "Calving date", "Insemination", "Activity"
-    ]
+    requiredGroups: [
+      "animalNumber",
+      "lastCalvingDate",
+      "daysInMilk",
+      "dailyMilk",
+      "lastInseminationDate"
+    ],
+    groups: {
+      animalNumber: ["Cow", "Cow ID", "Animal ID", "Animal No", "Tag", "Tag No"],
+      breed: ["Breed"],
+      birthDate: ["Birth date", "Date of birth", "DOB"],
+      lactationNumber: ["Lactation", "Lactation number", "Parity"],
+      lastCalvingDate: ["Calving date", "Last calving", "Fresh date"],
+      daysInMilk: ["DIM", "Days in milk"],
+      dailyMilk: ["Milk", "Milk yield", "Daily yield", "Daily milk", "Last milk"],
+      lastInseminationDate: ["Insemination", "Insemination date", "AI date", "Breeding date"],
+      servicesCount: ["Inseminations", "Services", "Service count"],
+      sireNumber: ["Bull", "Sire", "Semen", "Semen code"],
+      reproductiveStatus: ["Pregnancy", "Preg status", "Repro status", "Breeding status"],
+      pdDate: ["Preg check", "Preg check date", "Diagnosis date"],
+      pdResult: ["Preg result", "Pregnancy result", "Pregnancy"],
+      pregDays: ["Days pregnant", "Pregnant days"],
+      heatDate: ["Heat", "Heat date", "Activity date", "Estrus date"],
+      dryOffDate: ["Dry off", "Dry off date", "Dry date"],
+      group: ["Group"],
+      pen: ["Pen"]
+    }
   },
 
   uniform_agri: {
     name: "Uniform-Agri style",
-    signatures: [
-      "Animal number", "Ear tag", "Life number", "Birth date",
-      "Calving date", "Days in milk", "Milk kg", "Insemination date"
-    ]
+    requiredGroups: [
+      "animalNumber",
+      "lastCalvingDate",
+      "daysInMilk",
+      "dailyMilk",
+      "lastInseminationDate"
+    ],
+    groups: {
+      animalNumber: ["Animal number", "Animal no", "Ear tag", "Life number", "Cow number", "Tag"],
+      breed: ["Breed"],
+      birthDate: ["Birth date", "Date of birth", "DOB"],
+      lactationNumber: ["Lactation number", "Lactation", "Parity"],
+      lastCalvingDate: ["Calving date", "Last calving", "Last calving date"],
+      daysInMilk: ["Days in milk", "DIM"],
+      dailyMilk: ["Milk kg", "Milk production", "Daily milk", "Milk yield"],
+      lastInseminationDate: ["Insemination date", "Service date", "Breeding date", "Last insemination"],
+      servicesCount: ["Number of inseminations", "Inseminations", "Services", "Service count"],
+      sireNumber: ["Sire", "Bull", "Semen"],
+      reproductiveStatus: ["Pregnancy status", "Reproduction status", "Breeding status"],
+      pdDate: ["Pregnancy diagnosis date", "Pregnancy check date", "Diagnosis date"],
+      pdResult: ["Pregnancy diagnosis", "Pregnancy result", "Pregnancy status"],
+      pregDays: ["Pregnant days", "Days pregnant"],
+      dryOffDate: ["Dry off date", "Dry date"],
+      heatDate: ["Heat date", "Estrus date"],
+      group: ["Group"],
+      pen: ["Pen"]
+    }
   },
 
   arabic_excel: {
     name: "Arabic Excel / manual farm sheet",
-    signatures: [
-      "رقم الحيوان", "رقم البقرة", "تاريخ آخر ولادة",
-      "أيام الحليب", "إنتاج اللبن", "تاريخ آخر تلقيح",
-      "الحالة التناسلية"
-    ]
+    requiredGroups: [
+      "animalNumber",
+      "lastCalvingDate",
+      "daysInMilk",
+      "dailyMilk",
+      "reproductiveStatus",
+      "lastInseminationDate"
+    ],
+    groups: {
+      animalNumber: ["رقم الحيوان", "رقم", "رقم البقرة", "رقم الجاموسة", "رقم الأذن", "رقم الاذن"],
+      animalType: ["نوع الحيوان", "النوع", "الفصيلة"],
+      breed: ["السلالة", "سلالة"],
+      birthDate: ["تاريخ الميلاد", "ميلاد"],
+      lactationNumber: ["رقم الموسم", "الموسم", "موسم الحليب"],
+      productionStatus: ["الحالة الإنتاجية", "الحالة الانتاجية", "حالة الإنتاج", "حالة الانتاج"],
+      reproductiveStatus: ["الحالة التناسلية", "الحاله التناسليه", "حالة الحمل"],
+      lastCalvingDate: ["تاريخ آخر ولادة", "تاريخ اخر ولادة", "آخر ولادة", "اخر ولادة"],
+      daysInMilk: ["أيام الحليب", "ايام الحليب", "أيام اللبن", "ايام اللبن", "DIM"],
+      dailyMilk: ["إنتاج اللبن", "انتاج اللبن", "إنتاج اللبن اليومي", "لبن", "حليب"],
+      lastInseminationDate: ["تاريخ آخر تلقيح", "تاريخ اخر تلقيح", "آخر تلقيح", "اخر تلقيح"],
+      servicesCount: ["عدد التلقيحات", "عدد مرات التلقيح", "مرات التلقيح"],
+      sireNumber: ["الطلوقة", "رقم الطلوقة", "كود السائل", "كود السائل المنوي"],
+      timeBred: ["وقت التلقيح", "توقيت التلقيح", "فترة التلقيح"],
+      heatDate: ["تاريخ الشياع", "تاريخ الشبق", "آخر شياع", "اخر شياع"],
+      heatDates: ["تواريخ الشياع", "تواريخ الشبق"],
+      pdDate: ["تاريخ تشخيص الحمل", "تاريخ فحص الحمل", "تاريخ السونار", "تاريخ الجس"],
+      pdResult: ["نتيجة تشخيص الحمل", "نتيجة الحمل", "نتيجة الفحص"],
+      pregDays: ["أيام الحمل", "ايام الحمل"],
+      dryOffDate: ["تاريخ التجفيف", "تاريخ الجفاف", "جفاف"],
+      group: ["المجموعة", "الجروب"],
+      pen: ["الحظيرة", "العنبر"]
+    }
   }
 };
 
@@ -2160,6 +2287,16 @@ function herdImportV2UniqueHeadersSrv(rows = []) {
   return headers;
 }
 
+function herdImportV2GroupHitSrv(normHeaders, aliases = []) {
+  for (const alias of aliases || []) {
+    if (normHeaders.has(addAnimalImportNormKeySrv(alias))) {
+      return alias;
+    }
+  }
+
+  return "";
+}
+
 function herdImportV2DetectSourceProfileSrv(rows = []) {
   const headers = herdImportV2UniqueHeadersSrv(rows);
   const normHeaders = new Set(headers.map(addAnimalImportNormKeySrv));
@@ -2168,36 +2305,64 @@ function herdImportV2DetectSourceProfileSrv(rows = []) {
     key: "unknown",
     name: "غير محدد",
     confidence: 0,
-    hits: []
+    hits: [],
+    matchedGroups: [],
+    missingImportantGroups: [],
+    headers
   };
 
   for (const [profileKey, profile] of Object.entries(HERD_IMPORT_V2_SOURCE_SIGNATURES)) {
-    const hits = [];
+    const groups = profile.groups || {};
+    const requiredGroups = profile.requiredGroups || Object.keys(groups);
 
-    for (const sig of profile.signatures || []) {
-      if (normHeaders.has(addAnimalImportNormKeySrv(sig))) {
-        hits.push(sig);
+    const hits = [];
+    const matchedGroups = [];
+    const missingImportantGroups = [];
+
+    for (const [groupKey, aliases] of Object.entries(groups)) {
+      const hit = herdImportV2GroupHitSrv(normHeaders, aliases);
+
+      if (hit) {
+        hits.push(hit);
+        matchedGroups.push(groupKey);
       }
     }
 
-    const confidence = profile.signatures?.length
-      ? Number((hits.length / profile.signatures.length).toFixed(2))
+    for (const groupKey of requiredGroups) {
+      if (!matchedGroups.includes(groupKey)) {
+        missingImportantGroups.push(groupKey);
+      }
+    }
+
+    const requiredMatched = requiredGroups.filter(g => matchedGroups.includes(g)).length;
+    const requiredScore = requiredGroups.length
+      ? requiredMatched / requiredGroups.length
       : 0;
+
+    const optionalGroups = Object.keys(groups).filter(g => !requiredGroups.includes(g));
+    const optionalMatched = optionalGroups.filter(g => matchedGroups.includes(g)).length;
+    const optionalScore = optionalGroups.length
+      ? optionalMatched / optionalGroups.length
+      : 0;
+
+    const confidence = Number(
+      Math.min(1, (requiredScore * 0.85) + (optionalScore * 0.15)).toFixed(2)
+    );
 
     if (confidence > best.confidence) {
       best = {
         key: profileKey,
         name: profile.name,
         confidence,
-        hits
+        hits,
+        matchedGroups,
+        missingImportantGroups,
+        headers
       };
     }
   }
 
-  return {
-    ...best,
-    headers
-  };
+  return best;
 }
 
 app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
