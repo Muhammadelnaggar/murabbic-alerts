@@ -2613,6 +2613,252 @@ function herdImportV2AnalyzeValueMappingInternalSrv(rows = [], columnMapInternal
     fieldsWithUnknownValuesCount: fieldsWithUnknownValues.size
   };
 }
+// ============================================================
+// HERD IMPORT V2 - animal baseline preview only
+// بناء حالة الحيوان المبدئية داخليًا — بدون حفظ وبدون كشف التفاصيل
+// ============================================================
+
+function herdImportV2FirstValueByCanonicalInternalSrv(row = {}, columnMapInternal = {}, canonical = "") {
+  for (const [header, info] of Object.entries(columnMapInternal || {})) {
+    if (info?.canonical !== canonical) continue;
+
+    const v = row?.[header];
+    const s = String(v ?? "").trim();
+
+    if (s) return v;
+  }
+
+  return "";
+}
+
+function herdImportV2NumberInternalSrv(v) {
+  const s = String(v ?? "")
+    .trim()
+    .replace(/[٬,]/g, ".")
+    .replace(/[^\d.\-]/g, "");
+
+  if (!s) return null;
+
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+function herdImportV2IntInternalSrv(v) {
+  const n = herdImportV2NumberInternalSrv(v);
+  if (n === null) return null;
+  return Math.round(n);
+}
+
+function herdImportV2NormalizeBaselineDateInternalSrv(v) {
+  const d = addAnimalImportNormalizeDateSrv(v);
+  return d || "";
+}
+
+function herdImportV2NormalizeBaselineAnimalStatusInternalSrv(v) {
+  return herdImportV2NormalizeArchiveStatusInternalSrv(v) || "active";
+}
+
+function herdImportV2InferProductionStatusInternalSrv(base = {}) {
+  if (base.dryOffDate) return "جاف";
+
+  if (
+    base.lastCalvingDate ||
+    Number(base.daysInMilk || 0) > 0 ||
+    Number(base.dailyMilk || 0) > 0
+  ) {
+    return "حلاب";
+  }
+
+  return "";
+}
+
+function herdImportV2InferReproductiveStatusInternalSrv(base = {}) {
+  if (base.pdResult === "عشار") return "عشار";
+  if (base.pdResult === "فارغة") return "غير حامل";
+
+  if (base.reproductiveStatus) return base.reproductiveStatus;
+
+  if (base.lastInseminationDate) return "ملقحة";
+
+  return "";
+}
+
+function herdImportV2BuildAnimalBaselineOneInternalSrv(row = {}, rowIndex = 0, columnMapInternal = {}) {
+  const rawAnimalNumber = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "animalNumber");
+  const animalNumber = addAnimalDigitsSrv(rawAnimalNumber);
+
+  const rawAnimalType = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "animalType");
+  const animalType = addAnimalImportNormalizeAnimalTypeSrv(rawAnimalType);
+
+  const birthDate = herdImportV2NormalizeBaselineDateInternalSrv(
+    herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "birthDate")
+  );
+
+  const lastCalvingDate = herdImportV2NormalizeBaselineDateInternalSrv(
+    herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "lastCalvingDate")
+  );
+
+  const lastInseminationDate = herdImportV2NormalizeBaselineDateInternalSrv(
+    herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "lastInseminationDate")
+  );
+
+  const pdDate = herdImportV2NormalizeBaselineDateInternalSrv(
+    herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "pdDate")
+  );
+
+  const dryOffDate = herdImportV2NormalizeBaselineDateInternalSrv(
+    herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "dryOffDate")
+  );
+
+  const daysInMilkRaw = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "daysInMilk");
+  const daysInMilk = herdImportV2IntInternalSrv(daysInMilkRaw);
+
+  const dailyMilkRaw = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "dailyMilk");
+  const dailyMilk = herdImportV2NumberInternalSrv(dailyMilkRaw);
+
+  const lactationRaw = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "lactationNumber");
+  const lactationNumber = herdImportV2IntInternalSrv(lactationRaw);
+
+  const servicesRaw = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "servicesCount");
+  const servicesCount = herdImportV2IntInternalSrv(servicesRaw);
+
+  const rawRepro = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "reproductiveStatus");
+  const reproductiveStatus = addAnimalImportNormalizeReproSrv(rawRepro);
+
+  const rawPdResult = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "pdResult");
+  const pdResult = herdImportV2NormalizePdResultInternalSrv(rawPdResult);
+
+  const rawAnimalStatus = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "animalStatus");
+  const animalStatus = herdImportV2NormalizeBaselineAnimalStatusInternalSrv(rawAnimalStatus);
+
+  const base = {
+    rowIndex: rowIndex + 1,
+    animalNumber,
+    animalType,
+    breed: String(herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "breed") || "").trim(),
+    birthDate,
+    lactationNumber,
+    lastCalvingDate,
+    daysInMilk,
+    dailyMilk,
+    lastInseminationDate,
+    servicesCount,
+    sireNumber: String(herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "sireNumber") || "").trim(),
+    pdDate,
+    pdResult,
+    pregDays: herdImportV2IntInternalSrv(
+      herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "pregDays")
+    ),
+    dryOffDate,
+    animalStatus
+  };
+
+  base.productionStatus = herdImportV2InferProductionStatusInternalSrv(base);
+  base.reproductiveStatus = herdImportV2InferReproductiveStatusInternalSrv({
+    ...base,
+    reproductiveStatus,
+    pdResult
+  });
+
+  const reviewReasons = [];
+
+  if (!base.animalNumber) reviewReasons.push("missing_animal_number");
+  if (!base.animalType) reviewReasons.push("missing_animal_type");
+  if (base.animalStatus && base.animalStatus !== "active") reviewReasons.push("not_active_animal");
+
+  if (
+    !base.lastCalvingDate &&
+    !base.daysInMilk &&
+    !base.dailyMilk &&
+    !base.reproductiveStatus &&
+    !base.lastInseminationDate &&
+    !base.dryOffDate
+  ) {
+    reviewReasons.push("weak_current_state");
+  }
+
+  return {
+    base,
+    ok: reviewReasons.length === 0,
+    reviewReasons
+  };
+}
+
+function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapInternal = {}) {
+  const built = [];
+  const seenNumbers = new Set();
+  const duplicateNumbers = new Set();
+
+  for (let i = 0; i < rows.length; i++) {
+    const item = herdImportV2BuildAnimalBaselineOneInternalSrv(rows[i], i, columnMapInternal);
+
+    if (item.base.animalNumber) {
+      if (seenNumbers.has(item.base.animalNumber)) {
+        duplicateNumbers.add(item.base.animalNumber);
+        item.ok = false;
+        item.reviewReasons.push("duplicate_in_file");
+      } else {
+        seenNumbers.add(item.base.animalNumber);
+      }
+    }
+
+    built.push(item);
+  }
+
+  const reasonCounts = {};
+  const animalTypeCounts = {};
+  const productionStatusCounts = {};
+  const reproductiveStatusCounts = {};
+
+  let readyAnimalsCount = 0;
+  let needsReviewCount = 0;
+  let missingNumberCount = 0;
+  let archivedRowsCount = 0;
+
+  for (const item of built) {
+    const base = item.base || {};
+
+    if (item.ok) readyAnimalsCount++;
+    else needsReviewCount++;
+
+    if (!base.animalNumber) missingNumberCount++;
+    if (base.animalStatus && base.animalStatus !== "active") archivedRowsCount++;
+
+    if (base.animalType) {
+      animalTypeCounts[base.animalType] = (animalTypeCounts[base.animalType] || 0) + 1;
+    }
+
+    if (base.productionStatus) {
+      productionStatusCounts[base.productionStatus] = (productionStatusCounts[base.productionStatus] || 0) + 1;
+    }
+
+    if (base.reproductiveStatus) {
+      reproductiveStatusCounts[base.reproductiveStatus] = (reproductiveStatusCounts[base.reproductiveStatus] || 0) + 1;
+    }
+
+    for (const reason of item.reviewReasons || []) {
+      reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
+    }
+  }
+
+  return {
+    animalsInternal: built.map(x => x.base),
+    totalRows: rows.length,
+    readyAnimalsCount,
+    needsReviewCount,
+    missingNumberCount,
+    duplicateInFileCount: duplicateNumbers.size,
+    archivedRowsCount,
+    baselineConfidence: rows.length
+      ? Number((readyAnimalsCount / rows.length).toFixed(2))
+      : 0,
+    reasonCounts,
+    animalTypeCounts,
+    productionStatusCounts,
+    reproductiveStatusCounts,
+    readyForSavePreview: rows.length > 0 && readyAnimalsCount > 0 && needsReviewCount === 0
+  };
+}
 app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
   try {
     const body = req.body || {};
@@ -2634,7 +2880,10 @@ app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
   rows,
   columnMapping.columnMapInternal
 );
-
+const baselinePreview = herdImportV2BuildAnimalBaselinePreviewInternalSrv(
+  rows,
+  columnMapping.columnMapInternal
+);
     return res.json({
   ok: true,
   mode: "herd_import_v2",
@@ -2660,6 +2909,23 @@ valueSummary: {
   valueConfidenceLevel: valueMapping.valueConfidenceLevel,
   fieldsAnalyzedCount: valueMapping.fieldsAnalyzedCount,
   fieldsWithUnknownValuesCount: valueMapping.fieldsWithUnknownValuesCount
+},
+
+baselineSummary: {
+  totalRows: baselinePreview.totalRows,
+  readyAnimalsCount: baselinePreview.readyAnimalsCount,
+  needsReviewCount: baselinePreview.needsReviewCount,
+  missingNumberCount: baselinePreview.missingNumberCount,
+  duplicateInFileCount: baselinePreview.duplicateInFileCount,
+  archivedRowsCount: baselinePreview.archivedRowsCount,
+  baselineConfidence: baselinePreview.baselineConfidence,
+  baselineConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(baselinePreview.baselineConfidence),
+  readyForSavePreview: baselinePreview.readyForSavePreview,
+
+  animalTypeCounts: baselinePreview.animalTypeCounts,
+  productionStatusCounts: baselinePreview.productionStatusCounts,
+  reproductiveStatusCounts: baselinePreview.reproductiveStatusCounts,
+  reasonCounts: baselinePreview.reasonCounts
 }
 });
 
