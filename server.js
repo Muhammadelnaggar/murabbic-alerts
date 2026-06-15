@@ -2447,6 +2447,172 @@ function herdImportV2PublicSourceProfileSrv(sourceProfile = {}) {
     confidenceLevel: herdImportV2PublicConfidenceLevelSrv(sourceProfile.confidence)
   };
 }
+// ============================================================
+// HERD IMPORT V2 - internal value mapping only
+// لا يتم كشف قاموس القيم للمستخدم
+// ============================================================
+
+function herdImportV2NormalizePdResultInternalSrv(v) {
+  const raw = String(v ?? "").trim();
+  const s = raw.toLowerCase().replace(/\s+/g, "");
+
+  if (!s) return "";
+
+  if (
+    s.includes("preg+") ||
+    s === "+" ||
+    s.includes("positive") ||
+    s.includes("confirmed") ||
+    s.includes("pregnant") ||
+    s.includes("preg") ||
+    s.includes("حامل") ||
+    s.includes("عشار")
+  ) {
+    return "عشار";
+  }
+
+  if (
+    s.includes("preg-") ||
+    s === "-" ||
+    s.includes("negative") ||
+    s.includes("open") ||
+    s.includes("empty") ||
+    s.includes("notpreg") ||
+    s.includes("notpregnant") ||
+    s.includes("فارغ") ||
+    s.includes("فاضي") ||
+    s.includes("غيرحامل") ||
+    s.includes("مفتوح")
+  ) {
+    return "فارغة";
+  }
+
+  return "";
+}
+
+function herdImportV2NormalizeArchiveStatusInternalSrv(v) {
+  const raw = String(v ?? "").trim();
+  const s = raw.toLowerCase().replace(/\s+/g, "");
+
+  if (!s) return "";
+
+  if (
+    s.includes("active") ||
+    s.includes("alive") ||
+    s.includes("inherd") ||
+    s.includes("بالقطيع") ||
+    s.includes("نشط")
+  ) {
+    return "active";
+  }
+
+  if (
+    s.includes("sold") ||
+    s.includes("sale") ||
+    s.includes("sell") ||
+    s.includes("مباع") ||
+    s.includes("بيع")
+  ) {
+    return "archived_sale";
+  }
+
+  if (
+    s.includes("dead") ||
+    s.includes("death") ||
+    s.includes("died") ||
+    s.includes("نافق") ||
+    s.includes("نفوق")
+  ) {
+    return "archived_death";
+  }
+
+  return "";
+}
+
+function herdImportV2NormalizeValueInternalSrv(canonical, rawValue) {
+  const raw = String(rawValue ?? "").trim();
+  if (!raw) return "";
+
+  if (canonical === "animalType") {
+    const v = addAnimalImportNormalizeAnimalTypeSrv(raw);
+    return v || "";
+  }
+
+  if (canonical === "productionStatus") {
+    const v = addAnimalImportNormalizeProductionSrv(raw, {});
+    return v || "";
+  }
+
+  if (canonical === "reproductiveStatus") {
+    const v = addAnimalImportNormalizeReproSrv(raw);
+    return v || "";
+  }
+
+  if (canonical === "pdResult") {
+    return herdImportV2NormalizePdResultInternalSrv(raw);
+  }
+
+  if (canonical === "animalStatus") {
+    return herdImportV2NormalizeArchiveStatusInternalSrv(raw);
+  }
+
+  return raw;
+}
+
+function herdImportV2AnalyzeValueMappingInternalSrv(rows = [], columnMapInternal = {}) {
+  const valueFields = new Set([
+    "animalType",
+    "productionStatus",
+    "reproductiveStatus",
+    "pdResult",
+    "animalStatus"
+  ]);
+
+  let checkedValuesCount = 0;
+  let normalizedValuesCount = 0;
+  let unrecognizedValuesCount = 0;
+
+  const fieldsAnalyzed = new Set();
+  const fieldsWithUnknownValues = new Set();
+
+  for (const row of rows.slice(0, 200)) {
+    for (const [header, info] of Object.entries(columnMapInternal || {})) {
+      const canonical = info?.canonical || "";
+
+      if (!valueFields.has(canonical)) continue;
+
+      const raw = row?.[header];
+      const rawText = String(raw ?? "").trim();
+      if (!rawText) continue;
+
+      checkedValuesCount++;
+      fieldsAnalyzed.add(canonical);
+
+      const normalized = herdImportV2NormalizeValueInternalSrv(canonical, rawText);
+
+      if (normalized) {
+        normalizedValuesCount++;
+      } else {
+        unrecognizedValuesCount++;
+        fieldsWithUnknownValues.add(canonical);
+      }
+    }
+  }
+
+  const valueConfidence = checkedValuesCount
+    ? Number((normalizedValuesCount / checkedValuesCount).toFixed(2))
+    : 0;
+
+  return {
+    checkedValuesCount,
+    normalizedValuesCount,
+    unrecognizedValuesCount,
+    valueConfidence,
+    valueConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(valueConfidence),
+    fieldsAnalyzedCount: fieldsAnalyzed.size,
+    fieldsWithUnknownValuesCount: fieldsWithUnknownValues.size
+  };
+}
 app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
   try {
     const body = req.body || {};
@@ -2464,6 +2630,10 @@ app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
 
     const sourceProfile = herdImportV2DetectSourceProfileSrv(rows);
     const columnMapping = herdImportV2BuildColumnMappingInternalSrv(rows, sourceProfile.key);
+    const valueMapping = herdImportV2AnalyzeValueMappingInternalSrv(
+  rows,
+  columnMapping.columnMapInternal
+);
 
     return res.json({
   ok: true,
@@ -2474,13 +2644,23 @@ app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
 
   sourceProfile: herdImportV2PublicSourceProfileSrv(sourceProfile),
 
-  mappingSummary: {
-    mappedColumnsCount: columnMapping.mappedColumnsCount,
-    unmappedColumnsCount: columnMapping.unmappedColumnsCount,
-    mappingConfidence: columnMapping.mappingConfidence,
-    mappingConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(columnMapping.mappingConfidence),
-    readyForNextStep: columnMapping.readyForNextStep
-  }
+mappingSummary: {
+  mappedColumnsCount: columnMapping.mappedColumnsCount,
+  unmappedColumnsCount: columnMapping.unmappedColumnsCount,
+  mappingConfidence: columnMapping.mappingConfidence,
+  mappingConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(columnMapping.mappingConfidence),
+  readyForNextStep: columnMapping.readyForNextStep
+},
+
+valueSummary: {
+  checkedValuesCount: valueMapping.checkedValuesCount,
+  normalizedValuesCount: valueMapping.normalizedValuesCount,
+  unrecognizedValuesCount: valueMapping.unrecognizedValuesCount,
+  valueConfidence: valueMapping.valueConfidence,
+  valueConfidenceLevel: valueMapping.valueConfidenceLevel,
+  fieldsAnalyzedCount: valueMapping.fieldsAnalyzedCount,
+  fieldsWithUnknownValuesCount: valueMapping.fieldsWithUnknownValuesCount
+}
 });
 
   } catch (e) {
