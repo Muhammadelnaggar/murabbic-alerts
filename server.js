@@ -3739,25 +3739,7 @@ async function herdImportSaveInseminationOfficialSrv(uid, ev = {}) {
     );
   }
 
-  const decision = inseminationDecisionSrv(gateData);
-  let warningMessage = "";
-
-  if (decision) {
-    const raw = String(decision || "");
-    const isWarn = raw.startsWith("WARN|");
-    const message = isWarn ? raw.replace(/^WARN\|/, "") : raw;
-
-    if (!isWarn) {
-      return herdImportOfficialFailSrv(
-        "insemination_gate_failed",
-        message,
-        { guardError: raw }
-      );
-    }
-
-    warningMessage = message;
-  }
-
+ const warningMessage = "";
   const payload = {
     userId: uid,
     animalId: animal.id || "",
