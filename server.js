@@ -2928,8 +2928,10 @@ function herdImportV2BuildSeedEventsPreviewInternalSrv(animalsInternal = []) {
 
   let skippedNoAnimalNumberCount = 0;
   let skippedNoEventDateCount = 0;
+  let animalsWithSeedEventsCount = 0;
 
   for (const base of animalsInternal || []) {
+    const eventsBeforeThisAnimal = seedEventsInternal.length;
     if (!base?.animalNumber) {
       skippedNoAnimalNumberCount++;
       continue;
@@ -3020,6 +3022,9 @@ function herdImportV2BuildSeedEventsPreviewInternalSrv(animalsInternal = []) {
 
       if (ok) counts.heatEventsCount++;
     }
+    if (seedEventsInternal.length > eventsBeforeThisAnimal) {
+  animalsWithSeedEventsCount++;
+}
   }
 
   const totalSeedEventsCount =
@@ -3035,9 +3040,13 @@ function herdImportV2BuildSeedEventsPreviewInternalSrv(animalsInternal = []) {
     totalSeedEventsCount,
     skippedNoAnimalNumberCount,
     skippedNoEventDateCount,
-    seedEventsConfidence: animalsInternal.length
-      ? Number((totalSeedEventsCount / animalsInternal.length).toFixed(2))
-      : 0,
+    animalsWithSeedEventsCount,
+seedEventsPerAnimal: animalsInternal.length
+  ? Number((totalSeedEventsCount / animalsInternal.length).toFixed(2))
+  : 0,
+seedEventsConfidence: animalsInternal.length
+  ? Number((animalsWithSeedEventsCount / animalsInternal.length).toFixed(2))
+  : 0,
     readyForSavePreview: animalsInternal.length > 0 && totalSeedEventsCount > 0
   };
 }
@@ -3122,6 +3131,8 @@ baselineSummary: {
   skippedNoAnimalNumberCount: seedEventsPreview.skippedNoAnimalNumberCount,
   skippedNoEventDateCount: seedEventsPreview.skippedNoEventDateCount,
   seedEventsConfidence: seedEventsPreview.seedEventsConfidence,
+  animalsWithSeedEventsCount: seedEventsPreview.animalsWithSeedEventsCount,
+  seedEventsPerAnimal: seedEventsPreview.seedEventsPerAnimal,
   seedEventsConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(
     Math.min(1, seedEventsPreview.seedEventsConfidence)
   ),
