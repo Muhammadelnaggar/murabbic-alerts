@@ -2092,6 +2092,7 @@ app.post("/api/add-animal/import", requireUserId, async (req, res) => {
     });
   }
 });
+
 // ============================================================
 //                 EVENTS PAGE: SERVER-ONLY CONTEXT / GROUPS / RESOLVE
 //                 صفحة الأحداث تسأل السيرفر — الواجهة عرض فقط لاحقًا
