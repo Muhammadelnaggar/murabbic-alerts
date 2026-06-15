@@ -2092,7 +2092,153 @@ app.post("/api/add-animal/import", requireUserId, async (req, res) => {
     });
   }
 });
+// ============================================================
+//                 API: HERD IMPORT V2 — SOURCE PREVIEW ONLY
+//                 اكتشاف مصدر ملف القطيع فقط — لا حفظ نهائيًا
+// ============================================================
 
+const HERD_IMPORT_V2_SOURCE_SIGNATURES = {
+  dairycomp: {
+    name: "DairyComp / DC305 / VAS style",
+    signatures: [
+      "COW", "COWID", "COWNO", "DIM", "FRESH",
+      "BRED", "RPRO", "REPRO", "DCC", "LACT", "MILK", "SIRE", "SERV"
+    ]
+  },
+
+  delpro: {
+    name: "DeLaval DelPro style",
+    signatures: [
+      "Animal ID", "Animal Number", "Cow No.", "Days in milk",
+      "Last calving", "Milk yield", "Last insemination", "Pregnancy status"
+    ]
+  },
+
+  afimilk: {
+    name: "Afimilk / AfiFarm style",
+    signatures: [
+      "Cow", "Cow ID", "Animal ID", "Lactation", "DIM",
+      "Milk yield", "Calving date", "Insemination", "Activity"
+    ]
+  },
+
+  uniform_agri: {
+    name: "Uniform-Agri style",
+    signatures: [
+      "Animal number", "Ear tag", "Life number", "Birth date",
+      "Calving date", "Days in milk", "Milk kg", "Insemination date"
+    ]
+  },
+
+  arabic_excel: {
+    name: "Arabic Excel / manual farm sheet",
+    signatures: [
+      "رقم الحيوان", "رقم البقرة", "تاريخ آخر ولادة",
+      "أيام الحليب", "إنتاج اللبن", "تاريخ آخر تلقيح",
+      "الحالة التناسلية"
+    ]
+  }
+};
+
+function herdImportV2UniqueHeadersSrv(rows = []) {
+  const seen = new Set();
+  const headers = [];
+
+  for (const row of rows.slice(0, 30)) {
+    for (const key of Object.keys(row || {})) {
+      const raw = String(key || "").trim();
+      if (!raw) continue;
+
+      const norm = addAnimalImportNormKeySrv(raw);
+      if (seen.has(norm)) continue;
+
+      seen.add(norm);
+      headers.push(raw);
+    }
+  }
+
+  return headers;
+}
+
+function herdImportV2DetectSourceProfileSrv(rows = []) {
+  const headers = herdImportV2UniqueHeadersSrv(rows);
+  const normHeaders = new Set(headers.map(addAnimalImportNormKeySrv));
+
+  let best = {
+    key: "unknown",
+    name: "غير محدد",
+    confidence: 0,
+    hits: []
+  };
+
+  for (const [profileKey, profile] of Object.entries(HERD_IMPORT_V2_SOURCE_SIGNATURES)) {
+    const hits = [];
+
+    for (const sig of profile.signatures || []) {
+      if (normHeaders.has(addAnimalImportNormKeySrv(sig))) {
+        hits.push(sig);
+      }
+    }
+
+    const confidence = profile.signatures?.length
+      ? Number((hits.length / profile.signatures.length).toFixed(2))
+      : 0;
+
+    if (confidence > best.confidence) {
+      best = {
+        key: profileKey,
+        name: profile.name,
+        confidence,
+        hits
+      };
+    }
+  }
+
+  return {
+    ...best,
+    headers
+  };
+}
+
+app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const rows = addAnimalImportRowsFromBodySrv(body);
+
+    if (!rows.length) {
+      return res.status(400).json({
+        ok: false,
+        error: "herd_import_v2_rows_required",
+        message: "لا توجد صفوف صالحة للمعاينة.",
+        sourceProfile: null,
+        headers: []
+      });
+    }
+
+    const sourceProfile = herdImportV2DetectSourceProfileSrv(rows);
+
+    return res.json({
+      ok: true,
+      mode: "herd_import_v2",
+      importMode: "source_profile_preview_only",
+      message: "تمت قراءة الملف واكتشاف نوع المصدر فقط. لم يتم حفظ أي بيانات.",
+      totalRows: rows.length,
+      sourceProfile,
+      headers: sourceProfile.headers || []
+    });
+
+  } catch (e) {
+    console.error("herd-import-v2-source-preview failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "herd_import_v2_source_preview_failed",
+      message: "تعذّر تحليل مصدر ملف القطيع الآن.",
+      sourceProfile: null,
+      headers: []
+    });
+  }
+});
 // ============================================================
 //                 EVENTS PAGE: SERVER-ONLY CONTEXT / GROUPS / RESOLVE
 //                 صفحة الأحداث تسأل السيرفر — الواجهة عرض فقط لاحقًا
