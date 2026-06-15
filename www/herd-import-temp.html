@@ -176,15 +176,27 @@
 
       showMessage("جاري المعاينة من السيرفر...", "status-warn");
 
-      const j = await callHerdImport("/api/herd-import/preview");
+     const j = await callHerdImport("/api/herd-import-v2/preview");
 
       console.log("HERD PREVIEW:", j);
 
       setSummary(j);
-      renderRows(j.rows || []);
+      if (j.sourceProfile) {
+  rowsList.innerHTML = `
+    <div class="preview-row status-ok">
+      <div><b>مصدر الملف:</b> ${j.sourceProfile.name || "غير محدد"}</div>
+      <div><b>الكود:</b> ${j.sourceProfile.key || "unknown"}</div>
+      <div><b>الثقة:</b> ${j.sourceProfile.confidence ?? 0}</div>
+      <div><b>الأعمدة المتطابقة:</b> ${(j.sourceProfile.hits || []).join(", ") || "-"}</div>
+      <div class="hint"><b>الأعمدة المقروءة:</b> ${(j.headers || []).join(", ")}</div>
+    </div>
+  `;
+  resultsBox.style.display = "block";
+}
+      if (j.rows) renderRows(j.rows || []);
 
-      lastPreviewOk = !!j.ok && (j.readyCount || 0) > 0;
-      btnSave.disabled = !lastPreviewOk;
+      lastPreviewOk = false;
+      btnSave.disabled = true;
 
       showMessage(j.message || "تمت المعاينة.", j.ok ? "status-ok" : "status-error");
 
