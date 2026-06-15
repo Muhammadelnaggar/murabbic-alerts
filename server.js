@@ -2894,12 +2894,25 @@ function herdImportV2InferReproductiveStatusInternalSrv(base = {}) {
   return "";
 }
 
-function herdImportV2BuildAnimalBaselineOneInternalSrv(row = {}, rowIndex = 0, columnMapInternal = {}) {
+function herdImportV2BuildAnimalBaselineOneInternalSrv(row = {}, rowIndex = 0, columnMapInternal = {}, options = {}) {
   const rawAnimalNumber = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "animalNumber");
   const animalNumber = addAnimalDigitsSrv(rawAnimalNumber);
 
   const rawAnimalType = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "animalType");
-  const animalType = addAnimalImportNormalizeAnimalTypeSrv(rawAnimalType);
+const defaultAnimalType = addAnimalStrSrv(
+  options.defaultAnimalType ||
+  options.animalTypeDefault ||
+  options.herdAnimalType ||
+  ""
+);
+
+const animalType = addAnimalStrSrv(rawAnimalType)
+  ? addAnimalImportNormalizeAnimalTypeSrv(rawAnimalType)
+  : (
+      defaultAnimalType
+        ? addAnimalImportNormalizeAnimalTypeSrv(defaultAnimalType)
+        : ""
+    );
 
   const birthDate = herdImportV2NormalizeBaselineDateInternalSrv(
     herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "birthDate")
@@ -3018,13 +3031,13 @@ animalStatus
   };
 }
 
-function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapInternal = {}) {
+function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapInternal = {}, options = {}) {
   const built = [];
   const seenNumbers = new Set();
   const duplicateNumbers = new Set();
 
   for (let i = 0; i < rows.length; i++) {
-    const item = herdImportV2BuildAnimalBaselineOneInternalSrv(rows[i], i, columnMapInternal);
+    const item = herdImportV2BuildAnimalBaselineOneInternalSrv(rows[i], i, columnMapInternal, options);
 
     if (item.base.animalNumber) {
       if (seenNumbers.has(item.base.animalNumber)) {
@@ -3136,7 +3149,217 @@ function herdImportV2PushSeedEventInternalSrv(list, base, eventTypeNorm, eventTy
 
   return true;
 }
+// ============================================================
+// HERD IMPORT V2 - operational save
+// حفظ تشغيلي فقط: animals baseline + seed events
+// ============================================================
 
+function herdImportV2DateOrNullInternalSrv(v) {
+  const s = String(v || "").trim().slice(0, 10);
+  return addAnimalIsDateSrv(s) ? s : null;
+}
+
+function herdImportV2PregnancyDaysForSaveInternalSrv(base = {}) {
+  if (base.reproductiveStatus !== "عشار") return null;
+
+  const pregDays = Number(base.pregDays);
+  if (Number.isFinite(pregDays) && pregDays >= 0) {
+    return Math.round(pregDays);
+  }
+
+  if (base.lastInseminationDate) {
+    const d = addAnimalDiffDaysSrv(base.lastInseminationDate, addAnimalTodaySrv());
+    return Number.isFinite(Number(d)) ? Number(d) : null;
+  }
+
+  return null;
+}
+
+function herdImportV2DaysInMilkForSaveInternalSrv(base = {}) {
+  if (base.productionStatus === "جاف") return null;
+
+  const dim = Number(base.daysInMilk);
+  if (Number.isFinite(dim) && dim >= 0) {
+    return Math.round(dim);
+  }
+
+  if (base.lastCalvingDate) {
+    const d = addAnimalDiffDaysSrv(base.lastCalvingDate, addAnimalTodaySrv());
+    return Number.isFinite(Number(d)) ? Number(d) : null;
+  }
+
+  return null;
+}
+
+async function herdImportV2FindAnimalRefInternalSrv(uid, numberStr) {
+  const key = `${uid}#${numberStr}`;
+  const nNum = Number(numberStr);
+
+  const q1 = await db.collection("animals")
+    .where("userId_number", "==", key)
+    .limit(1)
+    .get();
+
+  if (!q1.empty) {
+    return {
+      ref: q1.docs[0].ref,
+      exists: true
+    };
+  }
+
+  const q2 = await db.collection("animals")
+    .where("userId", "==", uid)
+    .where("number", "==", numberStr)
+    .limit(1)
+    .get();
+
+  if (!q2.empty) {
+    return {
+      ref: q2.docs[0].ref,
+      exists: true
+    };
+  }
+
+  if (Number.isFinite(nNum)) {
+    const q3 = await db.collection("animals")
+      .where("userId", "==", uid)
+      .where("animalNumber", "==", nNum)
+      .limit(1)
+      .get();
+
+    if (!q3.empty) {
+      return {
+        ref: q3.docs[0].ref,
+        exists: true
+      };
+    }
+  }
+
+  return {
+    ref: db.collection("animals").doc(),
+    exists: false
+  };
+}
+
+function herdImportV2BuildAnimalOperationalPayloadInternalSrv(uid, base = {}, sourceProfile = {}, isNew = true) {
+  const numberStr = addAnimalDigitsSrv(base.animalNumber);
+  const speciesInfo = addAnimalSpeciesFromTypeSrv(base.animalType || base.animalTypeAr);
+
+  const productionStatus = addAnimalStrSrv(base.productionStatus);
+  const reproductiveStatus = addAnimalStrSrv(base.reproductiveStatus);
+
+  const payload = {
+    ownerUid: uid,
+    userId: uid,
+    userId_number: `${uid}#${numberStr}`,
+    entryType: "mothers",
+
+    number: numberStr,
+    animalNumber: Number(numberStr),
+
+    animaltype: speciesInfo.animaltype,
+    animalTypeAr: speciesInfo.animalTypeAr,
+    species: speciesInfo.species,
+    breed: addAnimalStrSrv(base.breed),
+
+    birthDate: herdImportV2DateOrNullInternalSrv(base.birthDate),
+
+    lactationNumber: Number.isFinite(Number(base.lactationNumber))
+      ? Number(base.lactationNumber)
+      : 0,
+
+    productionStatus,
+    dailyMilk: productionStatus === "حلاب" && Number.isFinite(Number(base.dailyMilk))
+      ? Number(base.dailyMilk)
+      : null,
+
+    reproductiveStatus,
+
+    lastCalvingDate: herdImportV2DateOrNullInternalSrv(base.lastCalvingDate),
+    daysInMilk: herdImportV2DaysInMilkForSaveInternalSrv(base),
+
+    lastInseminationDate: herdImportV2DateOrNullInternalSrv(base.lastInseminationDate),
+    servicesCount: Number.isFinite(Number(base.servicesCount))
+      ? Number(base.servicesCount)
+      : 0,
+
+    sireNumber: addAnimalStrSrv(base.sireNumber) || null,
+    pregnancyDays: herdImportV2PregnancyDaysForSaveInternalSrv(base),
+
+    dryOffDate: herdImportV2DateOrNullInternalSrv(base.dryOffDate),
+
+    status: "active",
+
+    importedBy: "herd_import_v2",
+    importMode: "operational_baseline",
+    isImportedBaseline: true,
+    sourceProfileKey: sourceProfile.key || "unknown",
+
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    source: "server:/api/herd-import-v2/save-operational"
+  };
+
+  if (isNew) {
+    payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  return payload;
+}
+
+function herdImportV2SeedEventDocIdInternalSrv(uid, ev = {}) {
+  const crypto = require("crypto");
+
+  const raw = [
+    uid,
+    ev.animalNumber,
+    ev.eventTypeNorm,
+    ev.eventDate,
+    ev.details?.sourceField || ""
+  ].map(x => String(x || "").trim()).join("|");
+
+  return "herdimp_" + crypto
+    .createHash("sha1")
+    .update(raw)
+    .digest("hex")
+    .slice(0, 32);
+}
+
+function herdImportV2BuildSeedEventPayloadInternalSrv(uid, ev = {}, sourceProfile = {}) {
+  const numberStr = addAnimalDigitsSrv(ev.animalNumber);
+  const eventTypeNorm = addAnimalStrSrv(ev.eventTypeNorm);
+  const eventTypeAr = addAnimalStrSrv(ev.eventTypeAr);
+
+  return {
+    ownerUid: uid,
+    userId: uid,
+    animalNumber: Number(numberStr),
+    number: numberStr,
+    animalTypeAr: addAnimalStrSrv(ev.animalType),
+
+    eventTypeNorm,
+    eventTypeAr,
+    eventType: eventTypeAr,
+    type: eventTypeAr,
+    eventDate: herdImportV2DateOrNullInternalSrv(ev.eventDate),
+
+    details: {
+      ...(ev.details || {}),
+      importedBy: "herd_import_v2",
+      importMode: "seed_history",
+      isImportedSeed: true,
+      sourceProfileKey: sourceProfile.key || "unknown"
+    },
+
+    importedBy: "herd_import_v2",
+    importMode: "seed_history",
+    isImportedSeed: true,
+    sourceProfileKey: sourceProfile.key || "unknown",
+
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    source: "server:/api/herd-import-v2/save-operational"
+  };
+}
 function herdImportV2BuildSeedEventsPreviewInternalSrv(animalsInternal = []) {
   const seedEventsInternal = [];
 
@@ -3293,9 +3516,18 @@ app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
   rows,
   columnMapping.columnMapInternal
 );
+    const importOptions = {
+  defaultAnimalType: addAnimalStrSrv(
+    body.defaultAnimalType ||
+    body.animalTypeDefault ||
+    body.herdAnimalType ||
+    ""
+  )
+};
 const baselinePreview = herdImportV2BuildAnimalBaselinePreviewInternalSrv(
   rows,
-  columnMapping.columnMapInternal
+  columnMapping.columnMapInternal,
+  importOptions
 );
 const seedEventsPreview = herdImportV2BuildSeedEventsPreviewInternalSrv(
   baselinePreview.animalsInternal
@@ -3371,6 +3603,180 @@ baselineSummary: {
       message: "تعذّر تحليل مصدر ملف القطيع الآن.",
       sourceProfile: null,
       headers: []
+    });
+  }
+});
+app.post("/api/herd-import-v2/save-operational", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const rows = addAnimalImportRowsFromBodySrv(body);
+
+    if (!rows.length) {
+      return res.status(400).json({
+        ok: false,
+        error: "herd_import_v2_rows_required",
+        message: "لا توجد صفوف صالحة للاستيراد."
+      });
+    }
+
+    const importOptions = {
+      defaultAnimalType: addAnimalStrSrv(
+        body.defaultAnimalType ||
+        body.animalTypeDefault ||
+        body.herdAnimalType ||
+        ""
+      )
+    };
+
+    const sourceProfile = herdImportV2DetectSourceProfileSrv(rows);
+    const columnMapping = herdImportV2BuildColumnMappingInternalSrv(rows, sourceProfile.key);
+
+    const valueMapping = herdImportV2AnalyzeValueMappingInternalSrv(
+      rows,
+      columnMapping.columnMapInternal
+    );
+
+    const baselinePreview = herdImportV2BuildAnimalBaselinePreviewInternalSrv(
+      rows,
+      columnMapping.columnMapInternal,
+      importOptions
+    );
+
+    const seedEventsPreview = herdImportV2BuildSeedEventsPreviewInternalSrv(
+      baselinePreview.animalsInternal
+    );
+
+    if (
+      sourceProfile.key === "unknown" ||
+      !columnMapping.readyForNextStep ||
+      valueMapping.valueConfidence < 0.6 ||
+      !baselinePreview.readyForSavePreview
+    ) {
+      return res.status(400).json({
+        ok: false,
+        error: "herd_import_v2_not_operationally_ready",
+        message: "ملف القطيع غير كافٍ لتشغيل مُرَبِّيك بعد الاستيراد.",
+        summary: {
+          sourceProfile: herdImportV2PublicSourceProfileSrv(sourceProfile),
+          mappingReady: columnMapping.readyForNextStep,
+          valueConfidence: valueMapping.valueConfidence,
+          readyAnimalsCount: baselinePreview.readyAnimalsCount,
+          needsReviewCount: baselinePreview.needsReviewCount,
+          missingNumberCount: baselinePreview.missingNumberCount,
+          duplicateInFileCount: baselinePreview.duplicateInFileCount,
+          baselineReady: baselinePreview.readyForSavePreview
+        }
+      });
+    }
+
+    let batch = db.batch();
+    let ops = 0;
+
+    let insertedAnimalsCount = 0;
+    let updatedAnimalsCount = 0;
+    let savedSeedEventsCount = 0;
+
+    for (const base of baselinePreview.animalsInternal || []) {
+      const numberStr = addAnimalDigitsSrv(base.animalNumber);
+      if (!numberStr) continue;
+
+      const found = await herdImportV2FindAnimalRefInternalSrv(uid, numberStr);
+
+      const payload = herdImportV2BuildAnimalOperationalPayloadInternalSrv(
+        uid,
+        base,
+        sourceProfile,
+        !found.exists
+      );
+
+      batch.set(found.ref, payload, { merge: true });
+      ops++;
+
+      if (found.exists) updatedAnimalsCount++;
+      else insertedAnimalsCount++;
+
+      if (ops >= 350) {
+        await batch.commit();
+        batch = db.batch();
+        ops = 0;
+      }
+    }
+
+    for (const ev of seedEventsPreview.seedEventsInternal || []) {
+      if (!ev?.animalNumber || !ev?.eventDate || !ev?.eventTypeNorm) continue;
+
+      const eventDocId = herdImportV2SeedEventDocIdInternalSrv(uid, ev);
+      const eventRef = db.collection("events").doc(eventDocId);
+      const payload = herdImportV2BuildSeedEventPayloadInternalSrv(uid, ev, sourceProfile);
+
+      batch.set(eventRef, payload, { merge: true });
+      ops++;
+      savedSeedEventsCount++;
+
+      if (ops >= 350) {
+        await batch.commit();
+        batch = db.batch();
+        ops = 0;
+      }
+    }
+
+    if (ops > 0) {
+      await batch.commit();
+    }
+
+    if ((insertedAnimalsCount || updatedAnimalsCount || savedSeedEventsCount) && typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "herd_import_v2_save_operational");
+    }
+
+    return res.json({
+      ok: true,
+      mode: "herd_import_v2",
+      importMode: "save_operational_import",
+      message: `✅ تم استيراد القطيع تشغيليًا: ${insertedAnimalsCount} حيوان جديد، ${updatedAnimalsCount} تحديث، ${savedSeedEventsCount} حدث تأسيسي.`,
+      insertedAnimalsCount,
+      updatedAnimalsCount,
+      savedSeedEventsCount,
+      totalAnimalsTouched: insertedAnimalsCount + updatedAnimalsCount,
+
+      sourceProfile: herdImportV2PublicSourceProfileSrv(sourceProfile),
+
+      baselineSummary: {
+        totalRows: baselinePreview.totalRows,
+        readyAnimalsCount: baselinePreview.readyAnimalsCount,
+        needsReviewCount: baselinePreview.needsReviewCount,
+        baselineConfidence: baselinePreview.baselineConfidence,
+        baselineConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(
+          baselinePreview.baselineConfidence
+        )
+      },
+
+      seedEventsSummary: {
+        totalSeedEventsCount: seedEventsPreview.totalSeedEventsCount,
+        animalsWithSeedEventsCount: seedEventsPreview.animalsWithSeedEventsCount,
+        seedEventsPerAnimal: seedEventsPreview.seedEventsPerAnimal,
+        seedEventsConfidence: seedEventsPreview.seedEventsConfidence,
+        seedEventsConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(
+          seedEventsPreview.seedEventsConfidence
+        )
+      }
+    });
+
+  } catch (e) {
+    console.error("herd-import-v2-save-operational failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "herd_import_v2_save_operational_failed",
+      message: "تعذّر استيراد القطيع تشغيليًا الآن."
     });
   }
 });
