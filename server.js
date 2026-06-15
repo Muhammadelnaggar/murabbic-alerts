@@ -2266,7 +2266,134 @@ const HERD_IMPORT_V2_SOURCE_SIGNATURES = {
     }
   }
 };
+// ============================================================
+// HERD IMPORT V2 - operational dictionary patch only
+// قاموس تشغيلي فقط: لا نخزن إلا ما يستخدمه مُرَبِّيك
+// ============================================================
 
+function herdImportV2MergeProfilePatchSrv(profileKey, patch = {}) {
+  const profile = HERD_IMPORT_V2_SOURCE_SIGNATURES[profileKey] || {
+    name: patch.name || profileKey,
+    requiredGroups: [],
+    groups: {}
+  };
+
+  profile.name = patch.name || profile.name || profileKey;
+
+  profile.requiredGroups = [
+    ...new Set([
+      ...(profile.requiredGroups || []),
+      ...(patch.requiredGroups || [])
+    ])
+  ];
+
+  profile.groups = profile.groups || {};
+
+  for (const [groupKey, aliases] of Object.entries(patch.groups || {})) {
+    profile.groups[groupKey] = [
+      ...new Set([
+        ...(profile.groups[groupKey] || []),
+        ...(aliases || [])
+      ])
+    ];
+  }
+
+  HERD_IMPORT_V2_SOURCE_SIGNATURES[profileKey] = profile;
+}
+
+(function herdImportV2ApplyOperationalDictionaryPatchSrv() {
+  // DairyComp 305
+  herdImportV2MergeProfilePatchSrv("dairycomp", {
+    groups: {
+      animalNumber: ["ID"],
+      birthDate: ["BIRT"],
+      lactationNumber: ["LACT"],
+      sireNumber: ["SIRE"],
+      reproductiveStatus: ["RC"],
+      daysInMilk: ["DIM"],
+      dailyMilk: ["MILK"],
+      pregDays: ["DCC"],
+      servicesCount: ["TIMES"],
+
+      lastCalvingDate: ["FRESH"],
+      lastInseminationDate: ["BRED"],
+      dryOffDate: ["DRY"],
+      heatDate: ["HEAT"],
+      pdResult: ["PREG", "OPEN"]
+    }
+  });
+
+  // AfiFarm
+  herdImportV2MergeProfilePatchSrv("afimilk", {
+    groups: {
+      animalNumber: ["Cow ID"],
+      birthDate: ["Birth Date"],
+      lactationNumber: ["Lact"],
+      sireNumber: ["Sire"],
+      reproductiveStatus: ["Rep. Status"],
+      daysInMilk: ["DIM"],
+      dailyMilk: ["Daily Milk"],
+      pregDays: ["Days Pregnant"],
+      servicesCount: ["Ins. Number"],
+
+      lastCalvingDate: ["Calv"],
+      lastInseminationDate: ["Insem", "Ins"],
+      dryOffDate: ["Dry Off"],
+      heatDate: ["Heat"],
+      pdResult: ["PD+", "PD-"]
+    }
+  });
+
+  // DelPro / DeLaval
+  herdImportV2MergeProfilePatchSrv("delpro", {
+    groups: {
+      animalNumber: ["Animal ID", "Animal No.", "Animal No"],
+      birthDate: ["DOB"],
+      lactationNumber: ["Lact. No", "Lact No"],
+      sireNumber: ["Sire"],
+      reproductiveStatus: ["Rep. State"],
+      daysInMilk: ["DIM"],
+      dailyMilk: ["Today Milk"],
+      pregDays: ["Days Preg"],
+      servicesCount: ["Inseminations"],
+
+      lastCalvingDate: ["Calving"],
+      lastInseminationDate: ["Bred", "Ins"],
+      dryOffDate: ["Dry"],
+      heatDate: ["Heat"],
+      pdResult: ["Preg", "Non-Preg"]
+    }
+  });
+
+  // DairyPlan / GEA
+  herdImportV2MergeProfilePatchSrv("dairyplan_gea", {
+    name: "DairyPlan / GEA style",
+    requiredGroups: [
+      "animalNumber",
+      "lactationNumber",
+      "reproductiveStatus",
+      "daysInMilk",
+      "dailyMilk"
+    ],
+    groups: {
+      animalNumber: ["Animal ID", "Animal No.", "Animal No", "ID"],
+      birthDate: ["DOB"],
+      lactationNumber: ["Lact. No", "Lact No"],
+      sireNumber: ["Sire"],
+      reproductiveStatus: ["Rep. State"],
+      daysInMilk: ["DIM"],
+      dailyMilk: ["Today Milk"],
+      pregDays: ["Days Preg"],
+      servicesCount: ["Inseminations"],
+
+      lastCalvingDate: ["Calving", "CAL"],
+      lastInseminationDate: ["Bred", "Ins", "INS"],
+      dryOffDate: ["Dry", "DRY"],
+      heatDate: ["Heat", "OES"],
+      pdResult: ["Preg", "PRG", "Non-Preg", "OPEN"]
+    }
+  });
+})();
 function herdImportV2UniqueHeadersSrv(rows = []) {
   const seen = new Set();
   const headers = [];
@@ -2454,13 +2581,35 @@ function herdImportV2PublicSourceProfileSrv(sourceProfile = {}) {
 
 function herdImportV2NormalizePdResultInternalSrv(v) {
   const raw = String(v ?? "").trim();
-  const s = raw.toLowerCase().replace(/\s+/g, "");
+  const s = raw.toLowerCase().replace(/[\s_\-]+/g, "");
 
   if (!s) return "";
 
+  // السالب أولًا حتى لا تتحول Non-Preg إلى Preg بالغلط
   if (
-    s.includes("preg+") ||
+    s === "pd-" ||
+    s === "-" ||
+    s === "o" ||
+    s === "open" ||
+    s === "nonpreg" ||
+    s === "nonpregnant" ||
+    s.includes("notpreg") ||
+    s.includes("negative") ||
+    s.includes("empty") ||
+    s.includes("فارغ") ||
+    s.includes("فاضي") ||
+    s.includes("غيرحامل") ||
+    s.includes("مفتوح")
+  ) {
+    return "فارغة";
+  }
+
+  if (
+    s === "pd+" ||
     s === "+" ||
+    s === "p" ||
+    s === "prg" ||
+    s === "preg" ||
     s.includes("positive") ||
     s.includes("confirmed") ||
     s.includes("pregnant") ||
@@ -2471,23 +2620,69 @@ function herdImportV2NormalizePdResultInternalSrv(v) {
     return "عشار";
   }
 
+  return "";
+}
+function herdImportV2NormalizeReproductiveStatusInternalSrv(v) {
+  const raw = String(v ?? "").trim();
+  const s = raw.toLowerCase().replace(/[\s_\-]+/g, "");
+
+  if (!s) return "";
+
+  // غير حامل / مفتوحة أولًا
   if (
-    s.includes("preg-") ||
-    s === "-" ||
-    s.includes("negative") ||
-    s.includes("open") ||
-    s.includes("empty") ||
+    s === "open" ||
+    s === "o" ||
+    s === "pd-" ||
+    s === "nonpreg" ||
+    s === "nonpregnant" ||
     s.includes("notpreg") ||
-    s.includes("notpregnant") ||
-    s.includes("فارغ") ||
-    s.includes("فاضي") ||
+    s.includes("empty") ||
+    s.includes("مفتوح") ||
+    s.includes("مفتوحة") ||
     s.includes("غيرحامل") ||
-    s.includes("مفتوح")
+    s.includes("فارغ") ||
+    s.includes("فاضي")
   ) {
-    return "فارغة";
+    return "غير حامل";
   }
 
-  return "";
+  if (
+    s === "bred" ||
+    s === "insem" ||
+    s === "ins" ||
+    s.includes("bred") ||
+    s.includes("inseminated") ||
+    s.includes("insemination") ||
+    s.includes("served") ||
+    s.includes("service") ||
+    s.includes("ملقح") ||
+    s.includes("ملقحة")
+  ) {
+    return "ملقحة";
+  }
+
+  if (
+    s === "pd+" ||
+    s === "p" ||
+    s === "prg" ||
+    s === "preg" ||
+    s.includes("pregnant") ||
+    s.includes("preg") ||
+    s.includes("حامل") ||
+    s.includes("عشار")
+  ) {
+    return "عشار";
+  }
+
+  if (
+    s.includes("fresh") ||
+    s.includes("postpartum") ||
+    s.includes("حديث")
+  ) {
+    return "حديث الولادة";
+  }
+
+  return raw;
 }
 
 function herdImportV2NormalizeArchiveStatusInternalSrv(v) {
@@ -2533,10 +2728,9 @@ function herdImportV2NormalizeValueInternalSrv(canonical, rawValue) {
   const raw = String(rawValue ?? "").trim();
   if (!raw) return "";
 
-  if (canonical === "animalType") {
-    const v = addAnimalImportNormalizeAnimalTypeSrv(raw);
-    return v || "";
-  }
+if (canonical === "reproductiveStatus") {
+  return herdImportV2NormalizeReproductiveStatusInternalSrv(raw);
+}
 
   if (canonical === "productionStatus") {
     const v = addAnimalImportNormalizeProductionSrv(raw, {});
@@ -2651,7 +2845,18 @@ function herdImportV2IntInternalSrv(v) {
 
 function herdImportV2NormalizeBaselineDateInternalSrv(v) {
   const d = addAnimalImportNormalizeDateSrv(v);
-  return d || "";
+  return addAnimalIsDateSrv(d) ? d : "";
+}
+
+function herdImportV2DateMinusDaysInternalSrv(days, todayISO = addAnimalTodaySrv()) {
+  const n = Number(days);
+  if (!Number.isFinite(n) || n <= 0 || !addAnimalIsDateSrv(todayISO)) return "";
+
+  const [y, m, d] = String(todayISO).split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - Math.round(n));
+
+  return dt.toISOString().slice(0, 10);
 }
 
 function herdImportV2NormalizeBaselineAnimalStatusInternalSrv(v) {
@@ -2700,11 +2905,11 @@ function herdImportV2BuildAnimalBaselineOneInternalSrv(row = {}, rowIndex = 0, c
     herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "birthDate")
   );
 
-  const lastCalvingDate = herdImportV2NormalizeBaselineDateInternalSrv(
+ let lastCalvingDate = herdImportV2NormalizeBaselineDateInternalSrv(
     herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "lastCalvingDate")
   );
 
-  const lastInseminationDate = herdImportV2NormalizeBaselineDateInternalSrv(
+  let lastInseminationDate = herdImportV2NormalizeBaselineDateInternalSrv(
     herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "lastInseminationDate")
   );
 
@@ -2729,11 +2934,30 @@ function herdImportV2BuildAnimalBaselineOneInternalSrv(row = {}, rowIndex = 0, c
   const servicesCount = herdImportV2IntInternalSrv(servicesRaw);
 
   const rawRepro = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "reproductiveStatus");
-  const reproductiveStatus = addAnimalImportNormalizeReproSrv(rawRepro);
+ const reproductiveStatus = herdImportV2NormalizeReproductiveStatusInternalSrv(rawRepro);
 
   const rawPdResult = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "pdResult");
   const pdResult = herdImportV2NormalizePdResultInternalSrv(rawPdResult);
+  const pregDays = herdImportV2IntInternalSrv(
+  herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "pregDays")
+);
 
+// لو الملف أعطى DIM ولم يعطِ تاريخ آخر ولادة:
+// نشتق تاريخ آخر ولادة كأساس حسابي ليبدأ مُرَبِّيك حساب DIM يوميًا بعد الاستيراد.
+if (!lastCalvingDate && Number.isFinite(Number(daysInMilk)) && Number(daysInMilk) > 0) {
+  lastCalvingDate = herdImportV2DateMinusDaysInternalSrv(daysInMilk);
+}
+
+// لو الملف أعطى أيام حمل مؤكدة ولم يعطِ آخر تلقيح:
+// نشتق آخر تلقيح كأساس حسابي ليحسب مُرَبِّيك عمر الحمل لاحقًا.
+if (
+  !lastInseminationDate &&
+  Number.isFinite(Number(pregDays)) &&
+  Number(pregDays) > 0 &&
+  (pdResult === "عشار" || reproductiveStatus === "عشار")
+) {
+  lastInseminationDate = herdImportV2DateMinusDaysInternalSrv(pregDays);
+}
   const rawAnimalStatus = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "animalStatus");
   const animalStatus = herdImportV2NormalizeBaselineAnimalStatusInternalSrv(rawAnimalStatus);
 
@@ -2752,12 +2976,10 @@ function herdImportV2BuildAnimalBaselineOneInternalSrv(row = {}, rowIndex = 0, c
     sireNumber: String(herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "sireNumber") || "").trim(),
     pdDate,
     pdResult,
-    pregDays: herdImportV2IntInternalSrv(
-      herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "pregDays")
-    ),
+    pregDays,
     dryOffDate,
-heatDate: herdImportV2NormalizeBaselineDateInternalSrv(
-  herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "heatDate")
+    heatDate: herdImportV2NormalizeBaselineDateInternalSrv(
+    herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "heatDate")
 ),
 heatDatesRaw: String(
   herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "heatDates") || ""
