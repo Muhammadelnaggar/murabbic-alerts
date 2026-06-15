@@ -2017,7 +2017,6 @@ function herdImportDetectOriginalEventSrv(row = {}) {
   const explicit = herdImportPickAnySrv(row, [
     "eventType",
     "event",
-    "type",
     "EVENT",
     "EVT",
     "EVENTTYPE",
