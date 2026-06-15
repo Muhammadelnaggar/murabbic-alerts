@@ -22,10 +22,19 @@
 
     <label>ملف Excel / CSV</label>
     <input id="herdFile" type="file" accept=".xlsx,.xls,.csv,.txt" />
+    <label>نوع القطيع إذا كان الملف لا يحتوي على النوع</label>
+<select id="defaultAnimalType">
+  <option value="">حسب الملف فقط</option>
+  <option value="بقرة">أبقار</option>
+  <option value="جاموسة">جاموس</option>
+</select>
+<p class="hint">
+  استخدم هذا الاختيار فقط لو الملف لا يحتوي على عمود نوع الحيوان.
+</p>
 
     <div class="actions-bar inline">
       <button id="btnPreview" type="button" class="primary">معاينة</button>
-      <button id="btnSave" type="button" class="success" disabled>حفظ المقبول فقط</button>
+     <button id="btnSave" type="button" class="success" disabled>حفظ القطيع</button>
     </div>
   </section>
 
@@ -66,6 +75,7 @@
   const $ = id => document.getElementById(id);
 
   const herdFile = $("herdFile");
+  const defaultAnimalType = $("defaultAnimalType");
   const btnPreview = $("btnPreview");
   const btnSave = $("btnSave");
 
@@ -102,17 +112,34 @@
     });
   }
 
-  function setSummary(j){
-    const rows = j.rows || [];
-    const archived = rows.filter(r => r.archivedAnimal).length;
+function setSummary(j){
+  const baseline = j.baselineSummary || {};
+  const seeds = j.seedEventsSummary || {};
 
-    $("totalRows").textContent = j.totalRows ?? rows.length ?? 0;
-    $("readyRows").textContent = j.readyCount ?? rows.filter(r => r.ok).length ?? 0;
-    $("rejectedRows").textContent = j.rejectedCount ?? rows.filter(r => !r.ok).length ?? 0;
-    $("archivedRows").textContent = archived;
+  $("totalRows").textContent = baseline.totalRows ?? j.totalRows ?? 0;
+  $("readyRows").textContent = baseline.readyAnimalsCount ?? 0;
+  $("rejectedRows").textContent = baseline.needsReviewCount ?? 0;
+  $("archivedRows").textContent = baseline.archivedRowsCount ?? 0;
 
-    summaryBox.style.display = "block";
-  }
+  summaryBox.style.display = "block";
+
+  rowsList.innerHTML = `
+    <div class="preview-row ${j.ok ? "status-ok" : "status-error"}">
+      <div><b>مصدر الملف:</b> ${j.sourceProfile?.name || "غير محدد"}</div>
+      <div><b>الثقة:</b> ${j.sourceProfile?.confidenceLevel || "-"}</div>
+      <div><b>حيوانات جاهزة:</b> ${baseline.readyAnimalsCount ?? 0}</div>
+      <div><b>تحتاج مراجعة:</b> ${baseline.needsReviewCount ?? 0}</div>
+      <div><b>أحداث تأسيسية:</b> ${seeds.totalSeedEventsCount ?? 0}</div>
+      <div><b>ولادات:</b> ${seeds.calvingEventsCount ?? 0}</div>
+      <div><b>تلقيحات:</b> ${seeds.inseminationEventsCount ?? 0}</div>
+      <div><b>تشخيص حمل:</b> ${seeds.pregnancyDiagnosisEventsCount ?? 0}</div>
+      <div><b>تجفيف:</b> ${seeds.dryOffEventsCount ?? 0}</div>
+      <div><b>شياع:</b> ${seeds.heatEventsCount ?? 0}</div>
+    </div>
+  `;
+
+  resultsBox.style.display = "block";
+}
 
   function renderRows(rows){
     rowsList.innerHTML = "";
@@ -169,10 +196,14 @@
         return;
       }
 
-      lastFilePayload = {
-        fileName: file.name,
-        fileBase64: await fileToBase64(file)
-      };
+    lastFilePayload = {
+  fileName: file.name,
+  fileBase64: await fileToBase64(file)
+};
+
+if (defaultAnimalType && defaultAnimalType.value) {
+  lastFilePayload.defaultAnimalType = defaultAnimalType.value;
+}
 
       showMessage("جاري المعاينة من السيرفر...", "status-warn");
 
@@ -181,22 +212,16 @@
       console.log("HERD PREVIEW:", j);
 
       setSummary(j);
-      if (j.sourceProfile) {
-  rowsList.innerHTML = `
-    <div class="preview-row status-ok">
-      <div><b>مصدر الملف:</b> ${j.sourceProfile.name || "غير محدد"}</div>
-      <div><b>الكود:</b> ${j.sourceProfile.key || "unknown"}</div>
-      <div><b>الثقة:</b> ${j.sourceProfile.confidence ?? 0}</div>
-      <div><b>الأعمدة المتطابقة:</b> ${(j.sourceProfile.hits || []).join(", ") || "-"}</div>
-      <div class="hint"><b>الأعمدة المقروءة:</b> ${(j.headers || []).join(", ")}</div>
-    </div>
-  `;
-  resultsBox.style.display = "block";
-}
-      if (j.rows) renderRows(j.rows || []);
+     
+     lastPreviewOk = !!(
+  j.ok &&
+  j.baselineSummary &&
+  j.baselineSummary.readyForSavePreview &&
+  j.seedEventsSummary &&
+  j.seedEventsSummary.readyForSavePreview
+);
 
-      lastPreviewOk = false;
-      btnSave.disabled = true;
+btnSave.disabled = !lastPreviewOk;
 
       showMessage(j.message || "تمت المعاينة.", j.ok ? "status-ok" : "status-error");
 
@@ -216,23 +241,26 @@
       }
 
       btnSave.disabled = true;
-      showMessage("جاري حفظ المقبول فقط من السيرفر...", "status-warn");
+     showMessage("جاري حفظ القطيع تشغيليًا من السيرفر...", "status-warn");
 
-      const j = await callHerdImport("/api/herd-import/save");
+const j = await callHerdImport("/api/herd-import-v2/save-operational");
 
       console.log("HERD SAVE:", j);
 
       showMessage(j.message || "تم الحفظ.", j.ok ? "status-ok" : "status-error");
+      if (j.ok) {
+  rowsList.innerHTML = `
+    <div class="preview-row status-ok">
+      <div><b>حيوانات جديدة:</b> ${j.insertedAnimalsCount ?? 0}</div>
+      <div><b>حيوانات تم تحديثها:</b> ${j.updatedAnimalsCount ?? 0}</div>
+      <div><b>أحداث تأسيسية محفوظة:</b> ${j.savedSeedEventsCount ?? 0}</div>
+      <div><b>إجمالي الحيوانات المتأثرة:</b> ${j.totalAnimalsTouched ?? 0}</div>
+    </div>
+  `;
+  resultsBox.style.display = "block";
+}
 
-      if (j.skippedRows && j.skippedRows.length) {
-        renderRows(j.skippedRows.map(x => ({
-          ...x,
-          ok: false,
-          recordKind: "skipped",
-          expectedAnimalEffect: "لم يتم حفظ هذا الصف."
-        })));
-      }
-
+     
     } catch (e) {
       console.error(e);
       showMessage(e.message || "فشل الحفظ.", "status-error");
