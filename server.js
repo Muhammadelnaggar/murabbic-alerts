@@ -2364,7 +2364,89 @@ function herdImportV2DetectSourceProfileSrv(rows = []) {
 
   return best;
 }
+function herdImportV2FindHeaderCanonicalInternalSrv(header, groups = {}) {
+  const nh = addAnimalImportNormKeySrv(header);
 
+  for (const [groupKey, aliases] of Object.entries(groups || {})) {
+    for (const alias of aliases || []) {
+      if (nh === addAnimalImportNormKeySrv(alias)) {
+        return {
+          canonical: groupKey,
+          matchedAlias: alias
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+function herdImportV2BuildColumnMappingInternalSrv(rows = [], profileKey = "unknown") {
+  const headers = herdImportV2UniqueHeadersSrv(rows);
+  const profile = HERD_IMPORT_V2_SOURCE_SIGNATURES[profileKey] || null;
+  const groups = profile?.groups || {};
+  const requiredGroups = profile?.requiredGroups || [];
+
+  const columnMapInternal = {};
+  const matchedGroupsSet = new Set();
+  let mappedColumnsCount = 0;
+  let unmappedColumnsCount = 0;
+
+  for (const header of headers) {
+    const hit = herdImportV2FindHeaderCanonicalInternalSrv(header, groups);
+
+    if (hit) {
+      columnMapInternal[header] = {
+        canonical: hit.canonical,
+        matchedAlias: hit.matchedAlias
+      };
+
+      matchedGroupsSet.add(hit.canonical);
+      mappedColumnsCount++;
+    } else {
+      unmappedColumnsCount++;
+    }
+  }
+
+  const missingImportantGroups = requiredGroups.filter(g => !matchedGroupsSet.has(g));
+
+  const mappingConfidence = headers.length
+    ? Number((mappedColumnsCount / headers.length).toFixed(2))
+    : 0;
+
+  const readyForNextStep =
+    profileKey !== "unknown" &&
+    mappingConfidence >= 0.6 &&
+    missingImportantGroups.length === 0;
+
+  return {
+    columnMapInternal,
+    mappedColumnsCount,
+    unmappedColumnsCount,
+    mappingConfidence,
+    matchedGroupsCount: matchedGroupsSet.size,
+    missingImportantGroups,
+    readyForNextStep
+  };
+}
+
+function herdImportV2PublicConfidenceLevelSrv(confidence) {
+  const n = Number(confidence);
+
+  if (!Number.isFinite(n) || n <= 0) return "غير معروف";
+  if (n >= 0.85) return "عالية";
+  if (n >= 0.6) return "متوسطة";
+  return "منخفضة";
+}
+
+function herdImportV2PublicSourceProfileSrv(sourceProfile = {}) {
+  return {
+    key: sourceProfile.key || "unknown",
+    name: sourceProfile.name || "غير محدد",
+    confidence: Number(sourceProfile.confidence || 0),
+    confidenceLevel: herdImportV2PublicConfidenceLevelSrv(sourceProfile.confidence)
+  };
+}
 app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
   try {
     const body = req.body || {};
@@ -2381,16 +2463,25 @@ app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
     }
 
     const sourceProfile = herdImportV2DetectSourceProfileSrv(rows);
+    const columnMapping = herdImportV2BuildColumnMappingInternalSrv(rows, sourceProfile.key);
 
     return res.json({
-      ok: true,
-      mode: "herd_import_v2",
-      importMode: "source_profile_preview_only",
-      message: "تمت قراءة الملف واكتشاف نوع المصدر فقط. لم يتم حفظ أي بيانات.",
-      totalRows: rows.length,
-      sourceProfile,
-      headers: sourceProfile.headers || []
-    });
+  ok: true,
+  mode: "herd_import_v2",
+  importMode: "source_profile_preview_only",
+  message: "تمت قراءة ملف القطيع وتحليل بنيته بنجاح. لم يتم حفظ أي بيانات.",
+  totalRows: rows.length,
+
+  sourceProfile: herdImportV2PublicSourceProfileSrv(sourceProfile),
+
+  mappingSummary: {
+    mappedColumnsCount: columnMapping.mappedColumnsCount,
+    unmappedColumnsCount: columnMapping.unmappedColumnsCount,
+    mappingConfidence: columnMapping.mappingConfidence,
+    mappingConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(columnMapping.mappingConfidence),
+    readyForNextStep: columnMapping.readyForNextStep
+  }
+});
 
   } catch (e) {
     console.error("herd-import-v2-source-preview failed", e);
