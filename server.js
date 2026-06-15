@@ -2676,7 +2676,13 @@ function herdImportV2InferReproductiveStatusInternalSrv(base = {}) {
   if (base.pdResult === "عشار") return "عشار";
   if (base.pdResult === "فارغة") return "غير حامل";
 
-  if (base.reproductiveStatus) return base.reproductiveStatus;
+  const repro = String(base.reproductiveStatus || "").trim();
+
+  // في الاستيراد: Fresh/حديث الولادة لا تُحفظ كحالة تناسلية نهائية.
+  // وجود آخر ولادة/DIM سيُستخدم لبناء حدث ولادة Seed، أما تناسليًا فهي غير حامل.
+  if (repro === "حديث الولادة") return "غير حامل";
+
+  if (repro) return repro;
 
   if (base.lastInseminationDate) return "ملقحة";
 
