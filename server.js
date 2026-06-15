@@ -2008,10 +2008,54 @@ const HERD_IMPORT_INSEMINATION_TIME_KEYS = [
 ];
 
 const HERD_IMPORT_INSEMINATION_HEAT_KEYS = [
+  
   "heatStatus", "heat", "estrus", "oestrus", "standingHeat",
   "activity", "activityStatus", "heatDetection", "detectedHeat",
 
   "حالة الشياع", "الشياع", "الشبق", "علامات الشياع", "نشاط"
+];
+const HERD_IMPORT_PREG_DIAG_DATE_KEYS = [
+  "PREG_DATE", "PREGDATE", "PREG_CHECK_DATE", "PREGCHECKDATE",
+  "PD_DATE", "PDDATE", "CHECK_DATE", "CHECKDATE",
+  "DIAGNOSIS_DATE", "DIAGDATE", "EXAM_DATE", "VET_DATE",
+
+  "pregnancyDiagnosisDate", "pregDiagnosisDate", "pregCheckDate",
+  "diagnosisDate", "checkDate", "examDate", "vetDate",
+
+  "تاريخ تشخيص الحمل", "تاريخ فحص الحمل", "تاريخ كشف الحمل",
+  "تاريخ السونار", "تاريخ الجس", "تاريخ التشخيص", "تاريخ الفحص"
+];
+
+const HERD_IMPORT_PREG_DIAG_METHOD_KEYS = [
+  "pregnancyDiagnosisMethod", "pregMethod", "diagnosisMethod",
+  "checkMethod", "examMethod", "METHOD", "method",
+  "PD_METHOD", "PREG_METHOD",
+
+  "طريقة تشخيص الحمل", "طريقة فحص الحمل", "طريقة التشخيص",
+  "طريقة الفحص"
+];
+
+const HERD_IMPORT_PREG_DIAG_RESULT_KEYS = [
+  "pregnancyResult", "pregResult", "diagnosisResult",
+  "checkResult", "RESULT", "result",
+  "PREG", "PREG_RESULT", "PD_RESULT",
+
+  "نتيجة تشخيص الحمل", "نتيجة فحص الحمل", "نتيجة التشخيص",
+  "نتيجة", "حالة الحمل"
+];
+
+const HERD_IMPORT_PREG_DIAG_VET_KEYS = [
+  "vet", "VET", "doctor", "veterinarian", "examiner",
+  "technician", "checkedBy", "doneBy",
+
+  "الطبيب", "الدكتور", "الفاحص", "القائم بالفحص"
+];
+
+const HERD_IMPORT_PREG_DIAG_DAYS_KEYS = [
+  "pregnancyDays", "pregDays", "daysPregnant", "daysInPregnancy",
+  "PREG_DAYS", "DAYS_PREG",
+
+  "أيام الحمل", "ايام الحمل", "عمر الحمل"
 ];
 function herdImportDetectOriginalEventSrv(row = {}) {
   const explicit = herdImportPickAnySrv(row, [
@@ -2040,7 +2084,13 @@ function herdImportDetectOriginalEventSrv(row = {}) {
   ]);
 
   if (explicit) return explicit;
+  const pregDiagDate = herdImportPickDateSrv(row, HERD_IMPORT_PREG_DIAG_DATE_KEYS);
+  const pregDiagResult = herdImportPickAnySrv(row, HERD_IMPORT_PREG_DIAG_RESULT_KEYS);
+  const pregDiagMethod = herdImportPickAnySrv(row, HERD_IMPORT_PREG_DIAG_METHOD_KEYS);
 
+  if (pregDiagDate && (pregDiagResult || pregDiagMethod)) {
+    return "pregnancy_diagnosis";
+}
   const inseminationDate = herdImportPickDateSrv(row, HERD_IMPORT_INSEMINATION_DATE_KEYS);
 
   if (inseminationDate) {
@@ -2064,7 +2114,8 @@ function herdImportDetectEventDateSrv(row = {}) {
   ]);
 
   if (genericDate) return genericDate;
-
+  const pregDiagDate = herdImportPickDateSrv(row, HERD_IMPORT_PREG_DIAG_DATE_KEYS);
+  if (pregDiagDate) return pregDiagDate;
   return herdImportPickDateSrv(row, HERD_IMPORT_INSEMINATION_DATE_KEYS);
 }
 
@@ -2502,11 +2553,22 @@ function herdImportBuildEventDraftSrv(row = {}) {
     payload: {
       originalRow: row,
       milk: herdImportPickAnySrv(row, ["milk", "MILK", "dailyMilk", "لبن", "حليب"]),
-      result: herdImportPickAnySrv(row, ["result", "RESULT", "نتيجة", "نتيجة التشخيص"]),
-      method: herdImportPickAnySrv(row, ["method", "METHOD", "طريقة", "طريقة التشخيص"]),
-           sireNumber: addAnimalDigitsSrv(herdImportPickAnySrv(row, ["sire", "SIRE", "bull", "BULL", "رقم الطلوقة"])),
-      doseType: herdImportPickAnySrv(row, ["doseType", "dose", "جرعة", "نوع الجرعة"]),
-      reason: herdImportPickAnySrv(row, ["reason", "REASON", "سبب", "سبب الحدث"]),
+      result:
+  herdImportPickAnySrv(row, ["result", "RESULT", "نتيجة", "نتيجة التشخيص"]) ||
+  herdImportPickAnySrv(row, HERD_IMPORT_PREG_DIAG_RESULT_KEYS),
+
+method:
+  herdImportPickAnySrv(row, ["method", "METHOD", "طريقة", "طريقة التشخيص"]) ||
+  herdImportPickAnySrv(row, HERD_IMPORT_PREG_DIAG_METHOD_KEYS),
+
+vet:
+     herdImportPickAnySrv(row, HERD_IMPORT_PREG_DIAG_VET_KEYS),
+
+        pregnancyDaysAtDiagnosis:
+                    herdImportPickAnySrv(row, HERD_IMPORT_PREG_DIAG_DAYS_KEYS),
+        sireNumber: addAnimalDigitsSrv(herdImportPickAnySrv(row, ["sire", "SIRE", "bull", "BULL", "رقم الطلوقة"])),
+        doseType: herdImportPickAnySrv(row, ["doseType", "dose", "جرعة", "نوع الجرعة"]),
+        reason: herdImportPickAnySrv(row, ["reason", "REASON", "سبب", "سبب الحدث"]),
         inseminationMethod:
         herdImportNormTextSrv(herdImportPickAnySrv(row, HERD_IMPORT_INSEMINATION_METHOD_KEYS)) ||
         "تلقيح اصطناعي",
@@ -3096,7 +3158,7 @@ if (animalNumber && !animalsDraft.has(animalNumber)) {
         }
        if (
   herdImportRequiresOfficialEventRouteSrv(eventDraft.murabbikEventType) &&
-  !["calving", "insemination"].includes(eventDraft.murabbikEventType)
+!["calving", "insemination", "pregnancy_diagnosis"].includes(eventDraft.murabbikEventType)
 ) {
   messages.push("هذا الحدث يحتاج حفظه من راوت الحدث الرسمي في مُرَبِّيك ولم يتم ربطه بالاستيراد بعد.");
 }
@@ -3835,6 +3897,167 @@ const inseminatorOption =
     message: "✅ تم حفظ التلقيح من راوت مُرَبِّيك الرسمي"
   };
 }
+async function herdImportSavePregnancyDiagnosisOfficialSrv(uid, ev = {}) {
+  const row = ev?.payload?.originalRow || {};
+  const p = ev?.payload || {};
+
+  const animalNumber = addAnimalDigitsSrv(ev.animalNumber);
+  const eventDate = String(ev.eventDate || "").trim().slice(0, 10);
+
+  const animal = await herdImportFindAnimalDocSrv(uid, animalNumber);
+
+  if (!animal) {
+    return herdImportOfficialFailSrv(
+      "animal_not_found_for_pregnancy_diagnosis",
+      "لم يتم حفظ تشخيص الحمل لأن الحيوان غير موجود في القطيع."
+    );
+  }
+
+  const doc = animal.data || {};
+
+  let species = String(
+    herdImportPickAnySrv(row, ["species", "animalType", "animalTypeAr", "نوع الحيوان", "النوع"]) ||
+    doc.species ||
+    doc.animalTypeAr ||
+    doc.animalType ||
+    doc.animaltype ||
+    doc.type ||
+    ""
+  ).trim();
+
+  if (/cow|بقر/i.test(species)) species = "أبقار";
+  if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+
+  const method = normalizePregnancyMethodSrv(
+    herdImportNormTextSrv(
+      p.method ||
+      herdImportPickAnySrv(row, HERD_IMPORT_PREG_DIAG_METHOD_KEYS)
+    )
+  );
+
+  const result = normalizePregnancyResultSrv(
+    herdImportNormTextSrv(
+      p.result ||
+      herdImportPickAnySrv(row, HERD_IMPORT_PREG_DIAG_RESULT_KEYS)
+    )
+  );
+
+  const vet = herdImportNormTextSrv(
+    p.vet ||
+    herdImportPickAnySrv(row, HERD_IMPORT_PREG_DIAG_VET_KEYS)
+  );
+
+  const pregnancyDaysRaw = herdImportNormTextSrv(
+    p.pregnancyDaysAtDiagnosis ||
+    herdImportPickAnySrv(row, HERD_IMPORT_PREG_DIAG_DAYS_KEYS)
+  );
+
+  const pregnancyDaysAtDiagnosis = Number(pregnancyDaysRaw);
+
+  const gateData = {
+    animalNumber,
+    eventDate,
+    animalId: animal.id || "",
+    species,
+    documentData: doc,
+    method,
+    result
+  };
+
+  const fieldErrors = validatePregnancyDiagnosisFieldsSrv(gateData);
+  const cleanFieldErrors = {};
+
+  for (const [k, v] of Object.entries(fieldErrors || {})) {
+    if (v !== undefined && v !== null && String(v).trim() !== "") {
+      cleanFieldErrors[k] = v;
+    }
+  }
+
+  if (Object.keys(cleanFieldErrors).length) {
+    return herdImportOfficialFailSrv(
+      "pregnancy_diagnosis_required_fields_failed",
+      "❌ راجع بيانات تشخيص الحمل المطلوبة.",
+      { fieldErrors: cleanFieldErrors }
+    );
+  }
+
+  const eventRef = db.collection("events").doc();
+
+  const payload = {
+    userId: uid,
+
+    animalId: animal.id || "",
+    animalNumber,
+    eventDate,
+    date: eventDate,
+
+    type: "pregnancy_diagnosis",
+    eventType: "تشخيص حمل",
+    eventTypeAr: "تشخيص حمل",
+    eventTypeNorm: "pregnancy_diagnosis",
+
+    method,
+    result,
+    vet: vet || null,
+
+    pregnancyDaysAtDiagnosis: Number.isFinite(pregnancyDaysAtDiagnosis)
+      ? pregnancyDaysAtDiagnosis
+      : null,
+
+    notes: herdImportNormTextSrv(
+      p.notes ||
+      herdImportPickAnySrv(row, ["notes", "note", "ملاحظات", "ملاحظة"])
+    ) || null,
+
+    species,
+    reproductiveStatusBefore: String(doc.reproductiveStatus || "").trim(),
+
+    source: "server:/api/pregnancy-diagnosis/save",
+    importedBy: "herd_import",
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  };
+
+  const animalPatch = {
+    lastDiagnosis: "تشخيص حمل",
+    lastDiagnosisDate: eventDate,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  };
+
+  const docStatus = String(doc.status || "active").trim().toLowerCase();
+  if (docStatus !== "archived") {
+    animalPatch.status = "active";
+  }
+
+  if (result === "عشار") {
+    animalPatch.reproductiveStatus = "عشار";
+  }
+
+  if (result === "فارغة") {
+    animalPatch.reproductiveStatus = "مفتوحة";
+  }
+
+  const batch = db.batch();
+
+  batch.set(eventRef, payload);
+  batch.set(animal.ref, animalPatch, { merge: true });
+
+  await batch.commit();
+
+  if (typeof scheduleGroupsRebuildSrv === "function") {
+    scheduleGroupsRebuildSrv(uid, "herd_import_pregnancy_diagnosis_save");
+  }
+
+  return {
+    ok: true,
+    eventId: eventRef.id,
+    animalNumber,
+    animalId: animal.id || "",
+    eventDate,
+    result,
+    reproductiveStatus: animalPatch.reproductiveStatus || String(doc.reproductiveStatus || "").trim(),
+    message: "✅ تم حفظ تشخيص الحمل من راوت مُرَبِّيك الرسمي"
+  };
+}
 function herdImportAnimalFinalPatchSrv(summary = {}) {
   const st = summary.expectedFinalState || {};
 
@@ -3951,8 +4174,8 @@ app.post("/api/herd-import/save", requireUserId, async (req, res) => {
         if (!eventDraft.murabbikEventType) messages.push("تعذّر تحويل نوع الحدث إلى حدث مُرَبِّيك.");
         if (!eventDraft.eventDate) messages.push("تاريخ الحدث غير صالح أو غير موجود.");
        if (
-  herdImportRequiresOfficialEventRouteSrv(eventDraft.murabbikEventType) &&
-  !["calving", "insemination"].includes(eventDraft.murabbikEventType)
+ herdImportRequiresOfficialEventRouteSrv(eventDraft.murabbikEventType) &&
+!["calving", "insemination", "pregnancy_diagnosis"].includes(eventDraft.murabbikEventType)
 ) {
   messages.push("هذا الحدث يحتاج حفظه من راوت الحدث الرسمي في مُرَبِّيك ولم يتم ربطه بالاستيراد بعد.");
 }
@@ -4039,6 +4262,7 @@ const summaryByAnimal = new Map(
     const savedEvents = [];
     const officialCalvingAnimals = new Set();
     const officialInseminationAnimals = new Set();
+    const officialPregnancyDiagnosisAnimals = new Set();
     const skippedEvents = [];
     const animalRefs = new Map();
 
@@ -4228,17 +4452,50 @@ for (const ev of list || []) {
 
  
 
-  if (herdImportRequiresOfficialEventRouteSrv(ev.murabbikEventType)) {
+  if (ev.murabbikEventType === "pregnancy_diagnosis") {
+  const official = await herdImportSavePregnancyDiagnosisOfficialSrv(uid, ev);
+
+  if (!official.ok) {
     skippedEvents.push({
       row: ev.row || null,
       animalNumber,
       eventDate: ev.eventDate,
       eventTypeNorm: ev.murabbikEventType,
-      reason: "official_route_not_wired",
-      message: "هذا الحدث يحتاج حفظه من راوت الحدث الرسمي في مُرَبِّيك ولم يتم ربطه بالاستيراد بعد."
+      reason: official.reason || "official_pregnancy_diagnosis_failed",
+      message: official.message || "فشل حفظ تشخيص الحمل من راوت مُرَبِّيك الرسمي.",
+      fieldErrors: official.fieldErrors || undefined
     });
     continue;
   }
+
+  officialPregnancyDiagnosisAnimals.add(String(animalNumber));
+
+  savedEvents.push({
+    row: ev.row || null,
+    animalNumber,
+    eventId: official.eventId,
+    collection: "events",
+    eventDate: ev.eventDate,
+    eventTypeNorm: "pregnancy_diagnosis",
+    officialRoute: "/api/pregnancy-diagnosis/save",
+    result: official.result,
+    reproductiveStatus: official.reproductiveStatus || ""
+  });
+
+  continue;
+}
+
+if (herdImportRequiresOfficialEventRouteSrv(ev.murabbikEventType)) {
+  skippedEvents.push({
+    row: ev.row || null,
+    animalNumber,
+    eventDate: ev.eventDate,
+    eventTypeNorm: ev.murabbikEventType,
+    reason: "official_route_not_wired",
+    message: "هذا الحدث يحتاج حفظه من راوت الحدث الرسمي في مُرَبِّيك ولم يتم ربطه بالاستيراد بعد."
+  });
+  continue;
+}
 
   const eventCollection = animalDoc.archived ? "archived_events" : "events";
   const eventRef = db.collection(eventCollection).doc();
@@ -4300,7 +4557,10 @@ if (officialInseminationAnimals.has(animalNumber)) {
   delete finalPatch.pregnancyDays;
   delete finalPatch.sireNumber;
 }
-
+if (officialPregnancyDiagnosisAnimals.has(animalNumber)) {
+  delete finalPatch.reproductiveStatus;
+  delete finalPatch.pregnancyDays;
+}
 batch.set(refInfo.ref, finalPatch, { merge: true });
       ops++;
 
