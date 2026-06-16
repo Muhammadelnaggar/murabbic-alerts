@@ -3082,7 +3082,7 @@ animalStatus
     reproductiveStatus,
     pdResult
   });
-  base.entryType = herdImportV2InferEntryTypeInternalSrv(base);
+ base.entryType = herdImportV2InferEntryTypeInternalSrv(base);
 
 if (base.entryType === "followers") {
   base.followerStatus = herdImportV2InferFollowerStatusInternalSrv(base);
@@ -3096,8 +3096,21 @@ if (base.entryType === "followers") {
     base.dryOffDate = "";
   }
 }
-  const reviewReasons = [];
 
+if (base.entryType === "mothers") {
+  const lact = Number(base.lactationNumber);
+  const dim = Number(base.daysInMilk);
+
+  const hasCalvedSignal =
+    !!base.lastCalvingDate ||
+    (Number.isFinite(dim) && dim > 0);
+
+  if ((!Number.isFinite(lact) || lact < 1) && hasCalvedSignal) {
+    base.lactationNumber = 1;
+  }
+}
+
+const reviewReasons = [];
   if (!base.animalNumber) reviewReasons.push("missing_animal_number");
   if (!base.animalType) reviewReasons.push("missing_animal_type");
   if (base.animalStatus && base.animalStatus !== "active") reviewReasons.push("not_active_animal");
