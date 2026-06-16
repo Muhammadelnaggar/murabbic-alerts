@@ -21,11 +21,13 @@
   </button>
 </header>
 
+<div id="messageBox" class="infobar" role="status" aria-live="polite"></div>
+
 <main class="page">
  <section class="card herd-import-hero">
   <div class="herd-import-title">استيراد قطيع كامل</div>
   <div class="herd-import-sub">
-    ارفع ملف القطيع كما هو، وسيقوم مُرَبِّيك بتحليل مصدر الملف وتجهيز الحيوانات والأحداث التأسيسية للحفظ التشغيلي.
+   ارفع ملف القطيع كما هو، وسيقوم مُرَبِّيك بتحليل مصدر الملف وتجهيز الحيوانات وسجل الأحداث للحفظ داخل مُرَبِّيك.
   </div>
 
   <div class="herd-import-systems">
@@ -51,7 +53,7 @@
 
   <div class="actions-bar inline">
     <button id="btnPreview" type="button" class="ghost">معاينة ذكية</button>
-<button id="btnSave" type="button" class="save" disabled>حفظ القطيع تشغيليًا</button>
+<button id="btnSave" type="button" class="save" disabled>حفظ القطيع</button>
   </div>
 </section>
 
@@ -72,12 +74,10 @@
       </div>
       <div class="kpi-box">
         <div id="archivedRows" class="kpi-value">0</div>
-       <div class="kpi-label">أحداث تأسيسية</div>
+       <div class="kpi-label">سجل الأحداث</div>
       </div>
     </div>
   </section>
-
-  <section id="messageBox" class="card" style="display:none;"></section>
 
   <section id="resultsBox" class="card" style="display:none;">
     <h2>نتائج الصفوف</h2>
@@ -115,10 +115,19 @@
   }
 
   function showMessage(text, type){
-    messageBox.style.display = "block";
-    messageBox.className = "card " + (type || "");
-    messageBox.textContent = text || "";
-  }
+  const cls =
+    type === "status-ok" ? "success" :
+    type === "status-error" ? "error" :
+    type === "status-warn" ? "warning" :
+    "info";
+
+  messageBox.className = "infobar show " + cls;
+  messageBox.textContent = text || "";
+
+  try {
+    messageBox.scrollIntoView({ behavior:"smooth", block:"center" });
+  } catch (_) {}
+}
 
   function fileToBase64(file){
     return new Promise((resolve, reject) => {
@@ -146,7 +155,7 @@ function setSummary(j){
       <div><b>الثقة:</b> ${j.sourceProfile?.confidenceLevel || "-"}</div>
       <div><b>حيوانات جاهزة:</b> ${baseline.readyAnimalsCount ?? 0}</div>
       <div><b>تحتاج مراجعة:</b> ${baseline.needsReviewCount ?? 0}</div>
-      <div><b>أحداث تأسيسية:</b> ${seeds.totalSeedEventsCount ?? 0}</div>
+      <div><b>سجل الأحداث:</b> ${seeds.totalSeedEventsCount ?? 0}</div>
       <div><b>ولادات:</b> ${seeds.calvingEventsCount ?? 0}</div>
       <div><b>تلقيحات:</b> ${seeds.inseminationEventsCount ?? 0}</div>
       <div><b>تشخيص حمل:</b> ${seeds.pregnancyDiagnosisEventsCount ?? 0}</div>
@@ -265,7 +274,7 @@ btnSave.disabled = !lastPreviewOk;
       }
 
       btnSave.disabled = true;
-     showMessage("جاري حفظ القطيع تشغيليًا من السيرفر...", "status-warn");
+     showMessage("جاري حفظ القطيع داخل مُرَبِّيك...", "status-warn");
 
 const j = await callHerdImport("/api/herd-import-v2/save-operational");
 
@@ -277,7 +286,7 @@ const j = await callHerdImport("/api/herd-import-v2/save-operational");
     <div class="preview-row status-ok">
       <div><b>حيوانات جديدة:</b> ${j.insertedAnimalsCount ?? 0}</div>
       <div><b>حيوانات تم تحديثها:</b> ${j.updatedAnimalsCount ?? 0}</div>
-      <div><b>أحداث تأسيسية محفوظة:</b> ${j.savedSeedEventsCount ?? 0}</div>
+     <div><b>أحداث محفوظة:</b> ${j.savedSeedEventsCount ?? 0}</div>
       <div><b>إجمالي الحيوانات المتأثرة:</b> ${j.totalAnimalsTouched ?? 0}</div>
     </div>
   `;
