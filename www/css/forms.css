@@ -2023,3 +2023,49 @@ body.add-animal-page{
   border-inline-start-color:#c62828;
   color:#c62828;
 }
+.herd-import-card{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:14px;
+  margin:14px 0 18px;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:16px;
+  background:#fff;
+  box-shadow:0 8px 22px rgba(15,23,42,.06);
+}
+
+.herd-import-text{
+  flex:1;
+  min-width:0;
+}
+
+.herd-import-title{
+  font-weight:800;
+  font-size:15px;
+  color:var(--text, #0f172a);
+  margin-bottom:4px;
+}
+
+.herd-import-sub{
+  font-size:12px;
+  line-height:1.7;
+  color:var(--muted, #64748b);
+}
+
+.herd-import-btn{
+  border:0;
+  border-radius:12px;
+  padding:10px 14px;
+  font-weight:800;
+  white-space:nowrap;
+  color:#fff;
+  background:var(--brand, #16a34a);
+  box-shadow:0 8px 18px rgba(22,163,74,.22);
+  cursor:pointer;
+}
+
+.herd-import-btn:active{
+  transform:translateY(1px);
+}
