@@ -21,12 +21,18 @@
  <main class="mbk-main">
  <form id="animalForm" class="mbk-form" novalidate>
     <div id="msg"></div>
-   <div id="addAnimalInfoBar" class="mbk-infobar" style="display:none;"></div>
+<div id="addAnimalInfoBar" class="mbk-infobar" style="display:none;"></div>
+
+<div id="herdImportShortcut" class="mbk-infobar status-warn">
+  <div>لو عندك ملف قطيع كامل، استخدم الاستيراد الذكي بدل الإدخال اليدوي.</div>
+  <button type="button" id="openHerdImportBtn" class="mbk-bottom-btn mbk-bottom-btn-ghost">
+    استيراد قطيع من ملف Excel / CSV
+  </button>
+</div>
+
 <div id="entryTypeBox" class="entry-type-box">
   <button type="button" id="btnMothers" class="entry-tab active">أمهات</button>
   <button type="button" id="btnFollowers" class="entry-tab">توابع</button>
-  <button type="button" id="btnImport" class="entry-tab">استيراد</button>
-  <button type="button" id="btnHerdImportTemp" class="entry-tab">استيراد القطيع</button>
 </div>
 
 <input type="hidden" id="entryType" value="mothers" data-field="entryType" />
@@ -126,55 +132,13 @@
     <label for="followerPregnancyDays">عدد أيام الحمل:</label>
 <input type="number" id="followerPregnancyDays" readonly disabled placeholder="يُحسب تلقائيًا" data-field="followerPregnancyDays" />  </div>
 </div>
-    <div id="importFields" class="hidden-block">
-  <label for="importKind">نوع الاستيراد:</label>
-  <select id="importKind">
-    <option value="mothers">أمهات</option>
-    <option value="followers">توابع</option>
-  </select>
 
-  <label for="importFile">ملف الاستيراد:</label>
-  <input type="file" id="importFile" accept=".csv,.txt,.xlsx,.xls" />
-
-  <div class="hint">
-    ارفع ملف القطيع كما هو، ثم راجع المعاينة قبل الحفظ.
-  </div>
-
-<div class="btn-row">
- <button type="button" id="previewImportBtn" class="mbk-bottom-btn mbk-bottom-btn-ghost">معاينة الملف</button>
-</div>
-
-  <div id="importMsg" class="toast"></div>
-
-  <div class="preview-wrap hidden-block" id="importPreviewWrap">
-    <table>
-     <thead>
-  <tr>
-    <th>السطر</th>
-    <th>رقم الحيوان</th>
-    <th>رقم الأم</th>
-    <th>النوع</th>
-    <th>السلالة</th>
-    <th>تاريخ الميلاد</th>
-    <th>الجنس</th>
-    <th>الحالة</th>
-    <th>تاريخ الفطام</th>
-    <th>آخر تلقيح</th>
-    <th>مرات التلقيح</th>
-    <th>رقم الطلوقة</th>
-    <th>النتيجة</th>
-    <th>الملاحظة</th>
-  </tr>
-</thead>
-      <tbody id="importPreviewRows"></tbody>
-    </table>
-  </div>
-</div>
- <div id="pageBottomBar" class="mbk-page-bottom-bar">
+<div id="pageBottomBar" class="mbk-page-bottom-bar">
   <button type="submit" id="primaryActionBtn" class="mbk-bottom-btn mbk-bottom-btn-primary">📥 تسجيل الحيوان</button>
   <button type="button" id="dashboardBtn" class="mbk-bottom-btn mbk-bottom-btn-ghost">لوحة التحكم</button>
 </div>
-    <div id="popupBox" class="mbk-popup">
+
+<div id="popupBox" class="mbk-popup">
   <div class="mbk-popup-content" id="popupContent"></div>
 </div>
 
@@ -194,20 +158,16 @@
   const entryType = $("entryType");
   const btnMothers = $("btnMothers");
   const btnFollowers = $("btnFollowers");
-  const btnImport = $("btnImport");
-  const btnHerdImportTemp = $("btnHerdImportTemp");
   const sharedAnimalFields = $("sharedAnimalFields");
   const mothersFields = $("mothersFields");
   const followersFields = $("followersFields");
-  const importFields = $("importFields");
   const primaryActionBtn = $("primaryActionBtn");
   const dashboardBtn = $("dashboardBtn");
-
   const milkField = $("milkField");
   const inseminationField = $("inseminationField");
   const sireField = $("sireField");
   const pregnancyBox = $("pregnancyBox");
-
+  const openHerdImportBtn = $("openHerdImportBtn");
   const followerSex = $("followerSex");
   const followerStatus = $("followerStatus");
   const weaningField = $("weaningField");
@@ -316,56 +276,50 @@
     });
   }
 
-  function setEntryMode(mode){
-    if (!entryType) return;
+function setEntryMode(mode){
+  if (!entryType) return;
 
-    entryType.value = mode;
+  entryType.value = mode;
 
-    const mothers = mode === "mothers";
-    const followers = mode === "followers";
-    const importing = mode === "import";
+  const mothers = mode === "mothers";
+  const followers = mode === "followers";
 
-    sharedAnimalFields?.classList.toggle("hidden-block", importing);
-    mothersFields?.classList.toggle("hidden-block", !mothers);
-    followersFields?.classList.toggle("hidden-block", !followers);
-    importFields?.classList.toggle("hidden-block", !importing);
+  sharedAnimalFields?.classList.remove("hidden-block");
+  mothersFields?.classList.toggle("hidden-block", !mothers);
+  followersFields?.classList.toggle("hidden-block", !followers);
 
-    setSectionEnabled(sharedAnimalFields, !importing);
-    setSectionEnabled(mothersFields, mothers);
-    setSectionEnabled(followersFields, followers);
-    setSectionEnabled(importFields, importing);
+  setSectionEnabled(sharedAnimalFields, true);
+  setSectionEnabled(mothersFields, mothers);
+  setSectionEnabled(followersFields, followers);
 
-    if (entryType) entryType.disabled = false;
+  if (entryType) entryType.disabled = false;
 
-    if (primaryActionBtn) {
-      primaryActionBtn.textContent = importing ? "حفظ الاستيراد" : "📥 تسجيل الحيوان";
-      primaryActionBtn.disabled = false;
-    }
-
-    btnMothers?.classList.toggle("active", mothers);
-    btnFollowers?.classList.toggle("active", followers);
-    btnImport?.classList.toggle("active", importing);
-
-    toggleMotherFields();
-    updateFollowerStatusOptions();
-    toggleFollowerFields();
-
-    const msgBox = $("msg");
-    if (msgBox) {
-      msgBox.className = "";
-      msgBox.style.display = "none";
-      msgBox.innerHTML = "";
-    }
+  if (primaryActionBtn) {
+    primaryActionBtn.textContent = "📥 تسجيل الحيوان";
+    primaryActionBtn.disabled = false;
   }
 
+  btnMothers?.classList.toggle("active", mothers);
+  btnFollowers?.classList.toggle("active", followers);
+
+  toggleMotherFields();
+  updateFollowerStatusOptions();
+  toggleFollowerFields();
+
+  const msgBox = $("msg");
+  if (msgBox) {
+    msgBox.className = "";
+    msgBox.style.display = "none";
+    msgBox.innerHTML = "";
+  }
+}
   animalTypeEl?.addEventListener("change", updateBreedOptionsLocal);
   productionEl?.addEventListener("change", toggleMotherFields);
   reproductiveEl?.addEventListener("change", toggleMotherFields);
 
   btnMothers?.addEventListener("click", () => setEntryMode("mothers"));
   btnFollowers?.addEventListener("click", () => setEntryMode("followers"));
-  btnImport?.addEventListener("click", () => setEntryMode("import"));
-  btnHerdImportTemp?.addEventListener("click", () => {
+  openHerdImportBtn?.addEventListener("click", () => {
   location.href = "herd-import-temp.html";
 });
 
@@ -596,9 +550,6 @@ function watchAnimalNumberAvailability(){
 }
 
 watchAnimalNumberAvailability();
-  function getImportFilePayload(){
-  return window.__IMPORT_FILE_PAYLOAD__ || null;
-}
 function setValue(id, value){
   const el = document.getElementById(id);
   if (!el) return;
@@ -646,21 +597,13 @@ async function refreshServerPreview(){
     e.preventDefault();
 
     const formData = collectFormData();
-    const entryType = String(formData.entryType || document.getElementById("entryType")?.value || "").trim();
-
-    const isImport = entryType === "import";
 
     try {
       if (primaryActionBtn) primaryActionBtn.disabled = true;
 
       showServerMessage("جارِ إرسال البيانات للسيرفر…", true);
 
-     const result = isImport
-  ? await postToServer("/api/add-animal/import", {
-      importKind: String(document.getElementById("importKind")?.value || "mothers").trim(),
-      ...(getImportFilePayload() || {})
-    })
-  : await postToServer("/api/add-animal/save", { formData });
+const result = await postToServer("/api/add-animal/save", { formData });
 
       const data = result.data || {};
 
@@ -696,171 +639,7 @@ async function refreshServerPreview(){
   });
 })();
 </script>
- <script>
-(function(){
-  const importFileEl = document.getElementById("importFile");
-  const previewBtn = document.getElementById("previewImportBtn");
-  const importMsg = document.getElementById("importMsg");
-  const previewWrap = document.getElementById("importPreviewWrap");
-  const previewRows = document.getElementById("importPreviewRows");
-
-  function showImportMsg(text, ok = true) {
-    if (!importMsg) return;
-    importMsg.className = "toast show";
-    importMsg.style.display = "block";
-    importMsg.innerHTML = `<div>${String(text || "")}</div>`;
-    importMsg.style.background = ok ? "#ecfdf5" : "#ffebee";
-    importMsg.style.color = ok ? "#065f46" : "#b71c1c";
-    importMsg.style.border = ok ? "1px solid #10b98133" : "1px solid #ef9a9a";
-  }
-
-  function fileToBase64(file){
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
- function getUidDirect(){
-  return String(
-    localStorage.getItem("userId") ||
-    localStorage.getItem("uid") ||
-    localStorage.getItem("tenantId") ||
-    ""
-  ).trim();
-}
-
-async function previewImportOnServer(payload){
-  const uid = getUidDirect();
-
-  if (!uid) {
-    return {
-      status: 400,
-      data: {
-        ok: false,
-        message: "لم يتم العثور على معرف المستخدم. سجّل الدخول مرة أخرى.",
-        rows: []
-      }
-    };
-  }
-
-  const r = await fetch("/api/add-animal/import-preview", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-User-Id": uid
-    },
-    body: JSON.stringify(payload || {})
-  });
-
-  const data = await r.json().catch(() => ({
-    ok: false,
-    message: "تعذّر قراءة رد السيرفر.",
-    rows: []
-  }));
-
-  return { status: r.status, data };
-}
-
-function renderServerPreview(rows){
-  if (!previewRows || !previewWrap) return;
-
-  const list = Array.isArray(rows) ? rows : [];
-
-  if (!list.length) {
-    previewRows.innerHTML = `
-      <tr>
-        <td colspan="14">لا توجد صفوف للعرض.</td>
-      </tr>
-    `;
-    previewWrap.classList.remove("hidden-block");
-    return;
-  }
-
-  previewRows.innerHTML = list.map(r => {
-    const x = r.data || {};
-    const state = r.ok ? "جاهز" : "مرفوض";
-
-return `
-  <tr>
-    <td>${r.row || ""}</td>
-    <td>${r.animalNumber || ""}</td>
-    <td>${x.damNumber || ""}</td>
-    <td>${x.animalType || ""}</td>
-    <td>${x.breed || ""}</td>
-    <td>${x.birthDate || ""}</td>
-    <td>${x.followerSex || ""}</td>
-    <td>${x.followerStatus || x.productionStatus || ""}</td>
-    <td>${x.weaningDate || ""}</td>
-    <td>${x.followerLastInseminationDate || x.lastInseminationDate || ""}</td>
-    <td>${x.followerServicesCount || x.servicesCount || ""}</td>
-    <td>${x.followerSireNumber || x.sireNumber || ""}</td>
-    <td>${state}</td>
-    <td>${r.message || ""}</td>
-  </tr>
-`;
-  }).join("");
-
-  previewWrap.classList.remove("hidden-block");
-}
-
-  previewBtn?.addEventListener("click", async () => {
-    try {
-      const file = importFileEl?.files?.[0];
-
-      window.__IMPORT_FILE_PAYLOAD__ = null;
-
-      if (previewRows) previewRows.innerHTML = "";
-      if (previewWrap) previewWrap.classList.add("hidden-block");
-
-      if (!file) {
-        showImportMsg("اختر ملف الاستيراد أولاً", false);
-        return;
-      }
-
-      const name = String(file.name || "").toLowerCase();
-      const allowed =
-        name.endsWith(".csv") ||
-        name.endsWith(".txt") ||
-        name.endsWith(".xlsx") ||
-        name.endsWith(".xls");
-
-      if (!allowed) {
-        showImportMsg("صيغة الملف غير مدعومة.", false);
-        return;
-      }
-
-      const fileBase64 = await fileToBase64(file);
-
-      window.__IMPORT_FILE_PAYLOAD__ = {
-        fileName: file.name,
-        fileBase64
-      };
-
-      showImportMsg("جارِ معاينة الملف من السيرفر…", true);
-
-const importKind = String(document.getElementById("importKind")?.value || "mothers").trim();
-
-const result = await previewImportOnServer({
-  importKind,
-  fileName: file.name,
-  fileBase64
-});
-
-const data = result.data || {};
-window.__IMPORT_LAST_PREVIEW__ = data;
-renderServerPreview(data.rows || []);
-showImportMsg(data.message || "تمت معاينة الملف من السيرفر.", !!data.ok);
-    } catch (err) {
-      console.error(err);
-      window.__IMPORT_FILE_PAYLOAD__ = null;
-      showImportMsg("حدث خطأ أثناء تجهيز ملف الاستيراد", false);
-    }
-  });
-})();
-</script>
+ 
 </body>
 </html>
 
