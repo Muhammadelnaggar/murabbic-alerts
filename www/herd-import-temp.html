@@ -22,29 +22,38 @@
 </header>
 
 <main class="page">
-  <section class="card">
-    <h2>رفع ملف القطيع</h2>
-    <p class="hint">
-      هذه صفحة مؤقتة لا تحفظ إلا بعد المعاينة. الحفظ يتم من السيرفر فقط.
-    </p>
+ <section class="card herd-import-hero">
+  <div class="herd-import-title">استيراد قطيع كامل</div>
+  <div class="herd-import-sub">
+    ارفع ملف القطيع كما هو، وسيقوم مُرَبِّيك بتحليل مصدر الملف وتجهيز الحيوانات والأحداث التأسيسية للحفظ التشغيلي.
+  </div>
 
-    <label>ملف Excel / CSV</label>
-    <input id="herdFile" type="file" accept=".xlsx,.xls,.csv,.txt" />
-    <label>نوع القطيع إذا كان الملف لا يحتوي على النوع</label>
-<select id="defaultAnimalType">
-  <option value="">حسب الملف فقط</option>
-  <option value="بقرة">أبقار</option>
-  <option value="جاموسة">جاموس</option>
-</select>
-<p class="hint">
-  استخدم هذا الاختيار فقط لو الملف لا يحتوي على عمود نوع الحيوان.
-</p>
+  <div class="herd-import-systems">
+    <span>DairyComp / DC305</span>
+    <span>DelPro</span>
+    <span>AfiMilk</span>
+    <span>Uniform-Agri</span>
+    <span>Excel عربي</span>
+  </div>
 
-    <div class="actions-bar inline">
-      <button id="btnPreview" type="button" class="primary">معاينة</button>
-     <button id="btnSave" type="button" class="success" disabled>حفظ القطيع</button>
-    </div>
-  </section>
+  <label for="herdFile">ملف القطيع Excel / CSV</label>
+  <input id="herdFile" type="file" accept=".xlsx,.xls,.csv,.txt" />
+
+  <div id="defaultAnimalTypeBox" class="hidden-block">
+    <label for="defaultAnimalType">نوع القطيع</label>
+    <select id="defaultAnimalType">
+      <option value="">اختر النوع</option>
+      <option value="بقرة">أبقار</option>
+      <option value="جاموسة">جاموس</option>
+    </select>
+    <div class="hint">يظهر هذا الاختيار فقط إذا لم يستطع مُرَبِّيك تحديد نوع الحيوان من الملف.</div>
+  </div>
+
+  <div class="actions-bar inline">
+    <button id="btnPreview" type="button" class="primary">معاينة ذكية</button>
+    <button id="btnSave" type="button" class="success" disabled>حفظ القطيع تشغيليًا</button>
+  </div>
+</section>
 
   <section id="summaryBox" class="card" style="display:none;">
     <h2>ملخص المعاينة</h2>
@@ -86,7 +95,8 @@
   const defaultAnimalType = $("defaultAnimalType");
   const btnPreview = $("btnPreview");
   const btnSave = $("btnSave");
-
+  const defaultAnimalTypeBox = $("defaultAnimalTypeBox");
+  const defaultAnimalType = $("defaultAnimalType");
   const summaryBox = $("summaryBox");
   const messageBox = $("messageBox");
   const resultsBox = $("resultsBox");
@@ -148,7 +158,9 @@ function setSummary(j){
 
   resultsBox.style.display = "block";
 }
-
+if (defaultAnimalTypeBox) {
+  defaultAnimalTypeBox.classList.toggle("hidden-block", !j.requiresDefaultAnimalType);
+}
   function renderRows(rows){
     rowsList.innerHTML = "";
 
@@ -186,7 +198,10 @@ function setSummary(j){
         "Content-Type": "application/json",
         "X-User-Id": uid
       },
-      body: JSON.stringify(lastFilePayload)
+     body: JSON.stringify({
+  ...(lastFilePayload || {}),
+  defaultAnimalType: String(defaultAnimalType?.value || "").trim()
+})
     });
 
     return r.json();
