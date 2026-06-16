@@ -23216,16 +23216,33 @@ function isGrowingGroupSrv(an = {}, sp = 'cow', thresholds = {}) {
   const m = getAgeMonthsSrv(an), c = ageCfgGroupSrv(sp, thresholds);
   return !hasCalvedBeforeGroupSrv(an) && hasWeaningEventGroupSrv(an) && m > c.weanedMax && m <= c.growingMax;
 }
+function groupMilkMetricAllowedSrv(groupId, def = {}) {
+  const key = String(def?.baseKey || def?.groupKey || groupId || "").trim();
+  const id = String(groupId || "").trim();
 
+  return (
+    key === "fresh" ||
+    key === "high" ||
+    key === "med" ||
+    key === "low" ||
+    /_(fresh|high|med|low)$/.test(id)
+  );
+}
 function buildServerGroupDocSrv(tenant, groupId, list, thresholds = {}) {
-  const def = GROUP_DEF_BY_ID_SRV[groupId];
-  const count = list.length || 0;
-  const milkVals = list.map(getMilkKgSrv).filter(v => Number.isFinite(v));
-  const dimVals  = list.map(getDimSrv).filter(v => Number.isFinite(v));
+ const def = GROUP_DEF_BY_ID_SRV[groupId];
+const count = list.length || 0;
 
-  const avgMilkKg = milkVals.length
-    ? +(milkVals.reduce((a, b) => a + b, 0) / milkVals.length).toFixed(2)
-    : 0;
+const milkMetricAllowed = groupMilkMetricAllowedSrv(groupId, def);
+
+const milkVals = milkMetricAllowed
+  ? list.map(getMilkKgSrv).filter(v => Number.isFinite(v))
+  : [];
+
+const dimVals  = list.map(getDimSrv).filter(v => Number.isFinite(v));
+
+const avgMilkKg = milkVals.length
+  ? +(milkVals.reduce((a, b) => a + b, 0) / milkVals.length).toFixed(2)
+  : 0;
 
   const avgDim = dimVals.length
     ? Math.round(dimVals.reduce((a, b) => a + b, 0) / dimVals.length)
