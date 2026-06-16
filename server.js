@@ -252,7 +252,70 @@ function diffDaysISO(fromISO, toISO){
   const ms = isoToUtcMidnightMs(toISO) - isoToUtcMidnightMs(fromISO);
   return Math.floor(ms / 86400000);
 }
+function reproAutoNormArSrv(s) {
+  return String(s || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي");
+}
 
+function isFreshReproStatusForAutoOpenSrv(v) {
+  const n = reproAutoNormArSrv(v);
+
+  return (
+    n === "حديثه الولاده" ||
+    (n.includes("حديث") && n.includes("ولاد"))
+  );
+}
+
+function reproAutoOpenThresholdDaysSrv(a = {}) {
+  const t = String(
+    a.animaltype ||
+    a.animalTypeAr ||
+    a.animalType ||
+    a.species ||
+    a.type ||
+    ""
+  ).trim().toLowerCase();
+
+  const isBuffalo =
+    t.includes("buffalo") ||
+    t.includes("جاموس");
+
+  // نفس السلوك الفعلي في repro-auto القديم:
+  // جاموس: من 41 يوم، أبقار: من 50 يوم
+  return isBuffalo ? 41 : 50;
+}
+
+function buildReproAutoOpenPatchSrv(a = {}, todayISO = "") {
+  if (!isFreshReproStatusForAutoOpenSrv(a.reproductiveStatus)) return null;
+  if (a.breedingBlocked === true) return null;
+
+  const lcd = String(
+    a.lastCalvingDate ||
+    a.calvingDate ||
+    a.lastCalving ||
+    ""
+  ).trim().slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(lcd)) return null;
+
+  const dim = diffDaysISO(lcd, todayISO);
+  if (!Number.isFinite(dim) || dim < 0) return null;
+
+  const threshold = reproAutoOpenThresholdDaysSrv(a);
+  if (dim < threshold) return null;
+
+  return {
+    reproductiveStatus: "مفتوحة",
+    reproAutoUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    reproAutoReason: `AutoOpenAfter${threshold}Days`,
+    reproAutoDim: dim,
+    reproAutoSource: "server:daily_maintenance"
+  };
+}
 async function updateAllDIM(){
   try{
     if (!db) {
@@ -277,6 +340,21 @@ async function updateAllDIM(){
 
       const st = String(a.status || "active").toLowerCase();
       if (st === "inactive") continue;
+      const reproPatch = buildReproAutoOpenPatchSrv(a, todayISO);
+
+if (reproPatch) {
+  batch.set(doc.ref, reproPatch, { merge: true });
+
+  if (a.userId) touchedTenants.add(String(a.userId).trim());
+  updated++;
+  ops++;
+
+  if (ops >= 400) {
+    await batch.commit();
+    batch = db.batch();
+    ops = 0;
+  }
+}
       const productionStatusText = String(a.productionStatus || "").trim().toLowerCase();
 
 const isDryAnimal =
