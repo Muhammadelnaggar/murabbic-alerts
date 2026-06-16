@@ -2394,6 +2394,68 @@ function herdImportV2MergeProfilePatchSrv(profileKey, patch = {}) {
     }
   });
 })();
+// ============================================================
+// HERD IMPORT V2 - follower / dam columns dictionary patch
+// دعم أعمدة التوابع ورقم الأم داخل نفس ملف الاستيراد
+// ============================================================
+
+(function herdImportV2ApplyFollowerDictionaryPatchSrv() {
+  const followerGroups = {
+    damNumber: [
+      "DAM",
+      "Dam",
+      "DAM ID",
+      "DAMID",
+      "Dam No",
+      "Dam Number",
+      "Dam ID No",
+      "MOTHER",
+      "Mother",
+      "Mother ID",
+      "MOTHERID",
+      "Mother No",
+      "Mother Number",
+      "رقم الأم",
+      "رقم الام",
+      "الأم",
+      "الام",
+      "ام",
+      "أم"
+    ],
+
+    followerSex: [
+      "SEX",
+      "Sex",
+      "GENDER",
+      "Gender",
+      "CALF SEX",
+      "Calf Sex",
+      "Calf Gender",
+      "الجنس",
+      "جنس",
+      "جنس التابع",
+      "جنس العجل",
+      "نوع الجنس"
+    ],
+
+    followerStatus: [
+      "Follower Status",
+      "Calf Status",
+      "Youngstock Status",
+      "Heifer Status",
+      "حالة التابع",
+      "حالة العجل",
+      "حالة العجلة",
+      "حالة"
+    ]
+  };
+
+  for (const profileKey of Object.keys(HERD_IMPORT_V2_SOURCE_SIGNATURES || {})) {
+    herdImportV2MergeProfilePatchSrv(profileKey, {
+      groups: followerGroups
+    });
+  }
+})();
 function herdImportV2UniqueHeadersSrv(rows = []) {
   const seen = new Set();
   const headers = [];
@@ -2643,7 +2705,7 @@ function herdImportV2NormalizeReproductiveStatusInternalSrv(v) {
     s.includes("فارغ") ||
     s.includes("فاضي")
   ) {
-    return "غير حامل";
+   return "مفتوحة";
   }
 
   if (
@@ -2879,13 +2941,13 @@ function herdImportV2InferProductionStatusInternalSrv(base = {}) {
 
 function herdImportV2InferReproductiveStatusInternalSrv(base = {}) {
   if (base.pdResult === "عشار") return "عشار";
-  if (base.pdResult === "فارغة") return "غير حامل";
+ if (base.pdResult === "فارغة") return "مفتوحة";
 
   const repro = String(base.reproductiveStatus || "").trim();
 
   // في الاستيراد: Fresh/حديث الولادة لا تُحفظ كحالة تناسلية نهائية.
   // وجود آخر ولادة/DIM سيُستخدم لبناء حدث ولادة Seed، أما تناسليًا فهي غير حامل.
-  if (repro === "حديث الولادة") return "غير حامل";
+  if (repro === "حديث الولادة") return "مفتوحة";
 
   if (repro) return repro;
 
@@ -2913,7 +2975,17 @@ const animalType = addAnimalStrSrv(rawAnimalType)
         ? herdImportV2NormalizeAnimalTypeStrictInternalSrv(defaultAnimalType)
         : ""
     );
+  const damNumber = addAnimalDigitsSrv(
+  herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "damNumber")
+);
 
+const followerSex = addAnimalImportNormalizeSexSrv(
+  herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "followerSex")
+);
+
+const followerStatus = addAnimalImportNormalizeFollowerStatusSrv(
+  herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "followerStatus")
+);
   const birthDate = herdImportV2NormalizeBaselineDateInternalSrv(
     herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "birthDate")
   );
@@ -2978,6 +3050,10 @@ if (
     rowIndex: rowIndex + 1,
     animalNumber,
     animalType,
+    entryType: "mothers",
+    damNumber,
+    followerSex,
+    followerStatus,
     breed: String(herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "breed") || "").trim(),
     birthDate,
     lactationNumber,
@@ -3006,23 +3082,40 @@ animalStatus
     reproductiveStatus,
     pdResult
   });
+  base.entryType = herdImportV2InferEntryTypeInternalSrv(base);
 
+if (base.entryType === "followers") {
+  base.followerStatus = herdImportV2InferFollowerStatusInternalSrv(base);
+  base.productionStatus = "";
+
+  if (base.followerStatus !== "ملقح" && base.followerStatus !== "عشار") {
+    base.reproductiveStatus = "";
+    base.lastCalvingDate = "";
+    base.daysInMilk = null;
+    base.dailyMilk = null;
+    base.dryOffDate = "";
+  }
+}
   const reviewReasons = [];
 
   if (!base.animalNumber) reviewReasons.push("missing_animal_number");
   if (!base.animalType) reviewReasons.push("missing_animal_type");
   if (base.animalStatus && base.animalStatus !== "active") reviewReasons.push("not_active_animal");
 
-  if (
-    !base.lastCalvingDate &&
-    !base.daysInMilk &&
-    !base.dailyMilk &&
-    !base.reproductiveStatus &&
-    !base.lastInseminationDate &&
-    !base.dryOffDate
-  ) {
-    reviewReasons.push("weak_current_state");
+  if (base.entryType === "followers") {
+  if (!base.damNumber || !base.birthDate) {
+    reviewReasons.push("weak_follower_identity");
   }
+} else if (
+  !base.lastCalvingDate &&
+  !base.daysInMilk &&
+  !base.dailyMilk &&
+  !base.reproductiveStatus &&
+  !base.lastInseminationDate &&
+  !base.dryOffDate
+) {
+  reviewReasons.push("weak_current_state");
+}
 
   return {
     base,
@@ -3034,6 +3127,46 @@ function herdImportV2NormalizeAnimalTypeStrictInternalSrv(v) {
   const raw = addAnimalStrSrv(v);
   if (!raw) return "";
   return addAnimalImportNormalizeAnimalTypeSrv(raw);
+}
+function herdImportV2OperationalCollectionNameInternalSrv(base = {}) {
+  return base.entryType === "followers" ? "calves" : "animals";
+}
+
+function herdImportV2InferEntryTypeInternalSrv(base = {}) {
+  const damNumber = addAnimalDigitsSrv(base.damNumber);
+  if (!damNumber) return "mothers";
+
+  const lact = Number(base.lactationNumber);
+  const dim = Number(base.daysInMilk);
+  const milk = Number(base.dailyMilk);
+
+  const hasMotherSignals =
+    !!base.lastCalvingDate ||
+    !!base.dryOffDate ||
+    (Number.isFinite(lact) && lact > 0) ||
+    (Number.isFinite(dim) && dim > 0) ||
+    (Number.isFinite(milk) && milk > 0);
+
+  return hasMotherSignals ? "mothers" : "followers";
+}
+
+function herdImportV2InferFollowerStatusInternalSrv(base = {}) {
+  const explicit = addAnimalImportNormalizeFollowerStatusSrv(base.followerStatus);
+  if (explicit) return explicit;
+
+  if (base.reproductiveStatus === "عشار") return "عشار";
+  if (base.reproductiveStatus === "ملقحة") return "ملقح";
+
+  if (base.birthDate) {
+    const ageDays = Number(addAnimalDiffDaysSrv(base.birthDate, addAnimalTodaySrv()));
+    if (Number.isFinite(ageDays)) {
+      if (ageDays < 120) return "رضيع";
+      if (ageDays < 240) return "فطام";
+      return "نامي";
+    }
+  }
+
+  return "نامي";
 }
 function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapInternal = {}, options = {}) {
   const built = [];
@@ -3195,11 +3328,12 @@ function herdImportV2DaysInMilkForSaveInternalSrv(base = {}) {
   return null;
 }
 
-async function herdImportV2FindAnimalRefInternalSrv(uid, numberStr) {
+async function herdImportV2FindAnimalRefInternalSrv(uid, numberStr, collectionName = "animals") {
+  const col = collectionName === "calves" ? "calves" : "animals";
   const key = `${uid}#${numberStr}`;
   const nNum = Number(numberStr);
 
-  const q1 = await db.collection("animals")
+  const q1 = await db.collection(col)
     .where("userId_number", "==", key)
     .limit(1)
     .get();
@@ -3211,7 +3345,7 @@ async function herdImportV2FindAnimalRefInternalSrv(uid, numberStr) {
     };
   }
 
-  const q2 = await db.collection("animals")
+  const q2 = await db.collection(col)
     .where("userId", "==", uid)
     .where("number", "==", numberStr)
     .limit(1)
@@ -3225,7 +3359,7 @@ async function herdImportV2FindAnimalRefInternalSrv(uid, numberStr) {
   }
 
   if (Number.isFinite(nNum)) {
-    const q3 = await db.collection("animals")
+    const q3 = await db.collection(col)
       .where("userId", "==", uid)
       .where("animalNumber", "==", nNum)
       .limit(1)
@@ -3240,7 +3374,7 @@ async function herdImportV2FindAnimalRefInternalSrv(uid, numberStr) {
   }
 
   return {
-    ref: db.collection("animals").doc(),
+    ref: db.collection(col).doc(),
     exists: false
   };
 }
@@ -3251,7 +3385,68 @@ function herdImportV2BuildAnimalOperationalPayloadInternalSrv(uid, base = {}, so
 
   const productionStatus = addAnimalStrSrv(base.productionStatus);
   const reproductiveStatus = addAnimalStrSrv(base.reproductiveStatus);
+  if (herdImportV2OperationalCollectionNameInternalSrv(base) === "calves") {
+  const followerStatus = herdImportV2InferFollowerStatusInternalSrv(base);
+  const isInseminatedFollower = followerStatus === "ملقح" || followerStatus === "عشار";
 
+  const payload = {
+    ownerUid: uid,
+    userId: uid,
+    userId_number: `${uid}#${numberStr}`,
+    entryType: "followers",
+
+    calfNumber: numberStr,
+    number: numberStr,
+    animalNumber: Number(numberStr),
+
+    animaltype: speciesInfo.animaltype,
+    animalTypeAr: speciesInfo.animalTypeAr,
+    species: speciesInfo.species,
+    breed: addAnimalStrSrv(base.breed),
+
+    sex: addAnimalStrSrv(base.followerSex),
+    status: followerStatus,
+    followerStatus,
+
+    birthDate: herdImportV2DateOrNullInternalSrv(base.birthDate),
+    damNumber: addAnimalStrSrv(base.damNumber) || null,
+
+    lastInseminationDate: isInseminatedFollower
+      ? herdImportV2DateOrNullInternalSrv(base.lastInseminationDate)
+      : null,
+
+    servicesCount: isInseminatedFollower && Number.isFinite(Number(base.servicesCount))
+      ? Number(base.servicesCount)
+      : 0,
+
+    sireNumber: isInseminatedFollower
+      ? (addAnimalStrSrv(base.sireNumber) || null)
+      : null,
+
+    pregnancyDays: followerStatus === "عشار"
+      ? herdImportV2PregnancyDaysForSaveInternalSrv({
+          ...base,
+          reproductiveStatus: "عشار"
+        })
+      : null,
+
+    statusInHerd: "active",
+
+    importedBy: "herd_import_v2",
+    importMode: "operational_baseline",
+    isImportedBaseline: true,
+    sourceProfileKey: sourceProfile.key || "unknown",
+
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    source: "server:/api/herd-import-v2/save-operational"
+  };
+
+  if (isNew) {
+    payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  return payload;
+}
   const payload = {
     ownerUid: uid,
     userId: uid,
@@ -3720,7 +3915,13 @@ if (missingAnimalTypeCount > 0) {
       const numberStr = addAnimalDigitsSrv(base.animalNumber);
       if (!numberStr) continue;
 
-      const found = await herdImportV2FindAnimalRefInternalSrv(uid, numberStr);
+     const collectionName = herdImportV2OperationalCollectionNameInternalSrv(base);
+
+const found = await herdImportV2FindAnimalRefInternalSrv(
+  uid,
+  numberStr,
+  collectionName
+);
 
       const payload = herdImportV2BuildAnimalOperationalPayloadInternalSrv(
         uid,
