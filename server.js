@@ -3124,7 +3124,15 @@ function herdImportV2InferAnimalTypeFromBreedInternalSrv(breedRaw) {
   return "";
 }
 function herdImportV2BuildAnimalBaselineOneInternalSrv(row = {}, rowIndex = 0, columnMapInternal = {}, options = {}) {
- const rawAnimalType = herdImportV2FirstValueByCanonicalInternalSrv(
+  const rawAnimalNumber = herdImportV2FirstValueByCanonicalInternalSrv(
+    row,
+    columnMapInternal,
+    "animalNumber"
+  );
+
+  const animalNumber = addAnimalDigitsSrv(rawAnimalNumber);
+
+  const rawAnimalType = herdImportV2FirstValueByCanonicalInternalSrv(
   row,
   columnMapInternal,
   "animalType"
