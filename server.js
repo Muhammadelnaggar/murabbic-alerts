@@ -3069,12 +3069,70 @@ function herdImportV2InferReproductiveStatusInternalSrv(base = {}) {
 
   return "";
 }
+function herdImportV2NormalizeBreedKeyInternalSrv(v) {
+  return String(v || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/[_\-\/\\.#!:;()\[\]]/g, " ")
+    .replace(/\s+/g, " ");
+}
 
+function herdImportV2InferAnimalTypeFromBreedInternalSrv(breedRaw) {
+  const b = herdImportV2NormalizeBreedKeyInternalSrv(breedRaw);
+  if (!b) return "";
+
+  const cowSignals = [
+    "holstein",
+    "friesian",
+    "freisian",
+    "jersey",
+    "brown swiss",
+    "montbeliarde",
+    "montbéliarde",
+    "simmental",
+    "fleckvieh",
+    "ayrshire",
+    "guernsey",
+    "shorthorn"
+  ];
+
+  const buffaloSignals = [
+    "buffalo",
+    "murrah",
+    "nili ravi",
+    "nili-ravi",
+    "mediterranean buffalo",
+    "egyptian buffalo",
+    "surti",
+    "jaffarabadi",
+    "mehsana",
+    "banni",
+    "pandharpuri"
+  ];
+
+  const isCow = cowSignals.some(x => b.includes(herdImportV2NormalizeBreedKeyInternalSrv(x)));
+  const isBuffalo = buffaloSignals.some(x => b.includes(herdImportV2NormalizeBreedKeyInternalSrv(x)));
+
+  if (isCow && !isBuffalo) return "بقرة";
+  if (isBuffalo && !isCow) return "جاموسة";
+
+  return "";
+}
 function herdImportV2BuildAnimalBaselineOneInternalSrv(row = {}, rowIndex = 0, columnMapInternal = {}, options = {}) {
-  const rawAnimalNumber = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "animalNumber");
-  const animalNumber = addAnimalDigitsSrv(rawAnimalNumber);
-
   const rawAnimalType = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "animalType");
+
+const breed = String(
+  herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "breed") || ""
+).trim();
+
+const inferredAnimalTypeFromBreed =
+  herdImportV2InferAnimalTypeFromBreedInternalSrv(breed);
+
 const defaultAnimalType = addAnimalStrSrv(
   options.defaultAnimalType ||
   options.animalTypeDefault ||
@@ -3085,9 +3143,13 @@ const defaultAnimalType = addAnimalStrSrv(
 const animalType = addAnimalStrSrv(rawAnimalType)
   ? herdImportV2NormalizeAnimalTypeStrictInternalSrv(rawAnimalType)
   : (
-      defaultAnimalType
-        ? herdImportV2NormalizeAnimalTypeStrictInternalSrv(defaultAnimalType)
-        : ""
+      inferredAnimalTypeFromBreed
+        ? herdImportV2NormalizeAnimalTypeStrictInternalSrv(inferredAnimalTypeFromBreed)
+        : (
+            defaultAnimalType
+              ? herdImportV2NormalizeAnimalTypeStrictInternalSrv(defaultAnimalType)
+              : ""
+          )
     );
   const damNumber = addAnimalDigitsSrv(
   herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "damNumber")
@@ -3168,7 +3230,7 @@ if (
     damNumber,
     followerSex,
     followerStatus,
-    breed: String(herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "breed") || "").trim(),
+    breed,
     birthDate,
     lactationNumber,
     lastCalvingDate,
