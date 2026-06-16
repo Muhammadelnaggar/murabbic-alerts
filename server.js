@@ -23646,6 +23646,7 @@ async function loadAnimalsForGroupsSrv(tenant) {
   }
 
   return [...byNumber.values()];
+}
 
 async function enrichAnimalsForGroupsSrv(tenant, list = []) {
   if (!Array.isArray(list) || !list.length) return list;
