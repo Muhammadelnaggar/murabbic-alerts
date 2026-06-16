@@ -52,9 +52,8 @@
   </div>
 
   <div class="actions-bar inline">
-    <button id="btnPreview" type="button" class="ghost">معاينة ذكية</button>
-<button id="btnSave" type="button" class="save" disabled>حفظ القطيع</button>
-  </div>
+  <button id="btnPreview" type="button" class="ghost">معاينة ذكية</button>
+</div>
 </section>
 
   <section id="summaryBox" class="card" style="display:none;">
@@ -85,6 +84,16 @@
   </section>
 </main>
 
+<div id="pageBottomBar" class="mbk-page-bottom-bar">
+  <button id="btnSave" type="button" class="mbk-bottom-btn mbk-bottom-btn-primary" disabled>
+    حفظ القطيع
+  </button>
+
+  <button id="animalsListBtn" type="button" class="mbk-bottom-btn mbk-bottom-btn-ghost">
+    قائمة الحيوانات
+  </button>
+</div>
+
 <script>
 (function(){
   const API_BASE = "https://murabbic-alerts.onrender.com";
@@ -94,6 +103,7 @@
   const herdFile = $("herdFile");
   const btnPreview = $("btnPreview");
   const btnSave = $("btnSave");
+  const animalsListBtn = $("animalsListBtn");
   const defaultAnimalTypeBox = $("defaultAnimalTypeBox");
   const defaultAnimalType = $("defaultAnimalType");
   const summaryBox = $("summaryBox");
@@ -265,7 +275,9 @@ btnSave.disabled = !lastPreviewOk;
       btnPreview.disabled = false;
     }
   });
-
+  animalsListBtn?.addEventListener("click", () => {
+  location.href = "animal-list.html";
+});
   btnSave.addEventListener("click", async () => {
     try {
       if (!lastPreviewOk || !lastFilePayload) {
