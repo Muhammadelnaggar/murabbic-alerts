@@ -23262,12 +23262,36 @@ function speciesOfSrv(an = {}) {
 }
 
 function getSexTextSrv(an = {}) {
-  const raw = [
-    an?.sex, an?.gender, an?.animalSex, an?.sexAr, an?.genderAr
-  ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
+  const parts = [
+    an?.sex,
+    an?.gender,
+    an?.animalSex,
+    an?.sexAr,
+    an?.genderAr
+  ].map(v => String(v ?? '').trim().toLowerCase()).filter(Boolean);
 
-  if (raw.includes('female') || raw.includes('انث') || raw.includes('أنث') || raw.includes('نتاي')) return 'أنثى';
-  if (raw.includes('male') || raw === 'm' || raw.includes('ذكر')) return 'ذكر';
+  const raw = parts.join(' ');
+
+  if (
+    parts.includes('f') ||
+    raw.includes('female') ||
+    raw.includes('heifer') ||
+    raw.includes('انث') ||
+    raw.includes('أنث') ||
+    raw.includes('نتاي')
+  ) {
+    return 'أنثى';
+  }
+
+  if (
+    parts.includes('m') ||
+    raw.includes('male') ||
+    raw.includes('bull') ||
+    raw.includes('ذكر')
+  ) {
+    return 'ذكر';
+  }
+
   return 'غير محدد';
 }
 
@@ -23595,21 +23619,33 @@ async function loadAnimalsForGroupsSrv(tenant) {
     }));
   } catch (_) {}
 
-  const clean = rows.filter(shouldAppearInGroupsSrv);
+   const clean = rows.filter(shouldAppearInGroupsSrv);
   const byNumber = new Map();
 
   for (const r of clean) {
     const n = normGroupNumberSrv(r?.animalNumber ?? r?.number ?? r?.calfNumber ?? r?.id ?? '');
     if (!n) continue;
-    const row = { ...r, animalNumber:n, number:n };
+
+    const row = { ...r, animalNumber: n, number: n };
     const old = byNumber.get(n);
-    if (!old || Number(row._sourceRank || 99) < Number(old._sourceRank || 99)) {
+
+    if (!old) {
       byNumber.set(n, row);
+      continue;
+    }
+
+    // نفس فكرة الصفحة: عند تكرار الرقم بين animals و calves
+    // نحافظ على بيانات الطرفين، مع تفضيل سجل animals عند وجوده.
+    if (old._source === 'calves' && row._source === 'animals') {
+      byNumber.set(n, { ...old, ...row, animalNumber: n, number: n });
+    } else if (old._source === 'animals' && row._source === 'calves') {
+      byNumber.set(n, { ...row, ...old, animalNumber: n, number: n });
+    } else {
+      byNumber.set(n, { ...old, ...row, animalNumber: n, number: n });
     }
   }
 
   return [...byNumber.values()];
-}
 
 async function enrichAnimalsForGroupsSrv(tenant, list = []) {
   if (!Array.isArray(list) || !list.length) return list;
