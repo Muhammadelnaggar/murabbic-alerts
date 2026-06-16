@@ -277,6 +277,42 @@ async function updateAllDIM(){
 
       const st = String(a.status || "active").toLowerCase();
       if (st === "inactive") continue;
+      const productionStatusText = String(a.productionStatus || "").trim().toLowerCase();
+
+const isDryAnimal =
+  a.inMilk === false ||
+  productionStatusText === "جاف" ||
+  productionStatusText === "dry" ||
+  productionStatusText.includes("جاف") ||
+  productionStatusText.includes("dry");
+
+if (isDryAnimal) {
+  const needsDryDimReset =
+    a.daysInMilk !== null ||
+    a.dailyMilk !== null ||
+    a.milkTodayKg !== null;
+
+  if (needsDryDimReset) {
+    batch.set(doc.ref, {
+      daysInMilk: null,
+      dailyMilk: null,
+      milkTodayKg: null,
+      _dimUpdatedAt: todayISO
+    }, { merge: true });
+
+    if (a.userId) touchedTenants.add(String(a.userId).trim());
+    updated++;
+    ops++;
+  }
+
+  if (ops >= 400) {
+    await batch.commit();
+    batch = db.batch();
+    ops = 0;
+  }
+
+  continue;
+}
 
       const lcd = String(a.lastCalvingDate || "").trim();
       if (!/^\d{4}-\d{2}-\d{2}$/.test(lcd)) continue;
@@ -17679,11 +17715,17 @@ async function updateAnimalAfterDryOffSaveSrv(ev = {}) {
   }
 
   await db.collection("animals").doc(animalId).set({
-    lastDryOffDate: String(ev.eventDate || ev.dryOffDate || "").slice(0, 10),
-    productionStatus: "dry",
-    inMilk: false,
+  lastDryOffDate: String(ev.eventDate || ev.dryOffDate || "").slice(0, 10),
+  dryOffDate: String(ev.eventDate || ev.dryOffDate || "").slice(0, 10),
 
-    dryOffReason: String(ev.reason || "").trim(),
+  productionStatus: "جاف",
+  inMilk: false,
+
+  dailyMilk: null,
+  milkTodayKg: null,
+  daysInMilk: null,
+
+  dryOffReason: String(ev.reason || "").trim(),
     lastDryOffReason: String(ev.reason || "").trim(),
     pregnancyStatusAtDryOff: String(ev.pregnancyStatus || "").trim(),
     usedDryingAntibiotics: String(ev.usedDryingAntibiotics || "").trim(),
