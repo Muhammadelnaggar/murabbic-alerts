@@ -50,8 +50,8 @@
   </div>
 
   <div class="actions-bar inline">
-    <button id="btnPreview" type="button" class="primary">معاينة ذكية</button>
-    <button id="btnSave" type="button" class="success" disabled>حفظ القطيع تشغيليًا</button>
+    <button id="btnPreview" type="button" class="ghost">معاينة ذكية</button>
+<button id="btnSave" type="button" class="save" disabled>حفظ القطيع تشغيليًا</button>
   </div>
 </section>
 
@@ -72,7 +72,7 @@
       </div>
       <div class="kpi-box">
         <div id="archivedRows" class="kpi-value">0</div>
-        <div class="kpi-label">مؤرشف</div>
+       <div class="kpi-label">أحداث تأسيسية</div>
       </div>
     </div>
   </section>
@@ -92,7 +92,6 @@
   const $ = id => document.getElementById(id);
 
   const herdFile = $("herdFile");
-  const defaultAnimalType = $("defaultAnimalType");
   const btnPreview = $("btnPreview");
   const btnSave = $("btnSave");
   const defaultAnimalTypeBox = $("defaultAnimalTypeBox");
@@ -137,7 +136,7 @@ function setSummary(j){
   $("totalRows").textContent = baseline.totalRows ?? j.totalRows ?? 0;
   $("readyRows").textContent = baseline.readyAnimalsCount ?? 0;
   $("rejectedRows").textContent = baseline.needsReviewCount ?? 0;
-  $("archivedRows").textContent = baseline.archivedRowsCount ?? 0;
+  $("archivedRows").textContent = seeds.totalSeedEventsCount ?? 0;
 
   summaryBox.style.display = "block";
 
@@ -156,12 +155,14 @@ function setSummary(j){
     </div>
   `;
 
-  resultsBox.style.display = "block";
+    resultsBox.style.display = "block";
+
+  if (defaultAnimalTypeBox) {
+    defaultAnimalTypeBox.classList.toggle("hidden-block", !j.requiresDefaultAnimalType);
+  }
 }
-if (defaultAnimalTypeBox) {
-  defaultAnimalTypeBox.classList.toggle("hidden-block", !j.requiresDefaultAnimalType);
-}
-  function renderRows(rows){
+
+function renderRows(rows){
     rowsList.innerHTML = "";
 
     (rows || []).forEach(r => {
