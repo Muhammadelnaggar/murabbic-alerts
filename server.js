@@ -3124,14 +3124,18 @@ function herdImportV2InferAnimalTypeFromBreedInternalSrv(breedRaw) {
   return "";
 }
 function herdImportV2BuildAnimalBaselineOneInternalSrv(row = {}, rowIndex = 0, columnMapInternal = {}, options = {}) {
-  const rawAnimalType = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "animalType");
+ const rawAnimalType = herdImportV2FirstValueByCanonicalInternalSrv(
+  row,
+  columnMapInternal,
+  "animalType"
+);
 
-const breed = String(
+const breedRawForType = String(
   herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "breed") || ""
 ).trim();
 
 const inferredAnimalTypeFromBreed =
-  herdImportV2InferAnimalTypeFromBreedInternalSrv(breed);
+  herdImportV2InferAnimalTypeFromBreedInternalSrv(breedRawForType);
 
 const defaultAnimalType = addAnimalStrSrv(
   options.defaultAnimalType ||
@@ -3230,7 +3234,7 @@ if (
     damNumber,
     followerSex,
     followerStatus,
-    breed,
+    breed: breedRawForType,
     birthDate,
     lactationNumber,
     lastCalvingDate,
