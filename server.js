@@ -23962,6 +23962,175 @@ function groupAnimalForPageSrv(an = {}) {
     _latestMilkDate: groupPageDateIsoSrv(an?._latestMilkDate)
   };
 }
+function groupPageShortLabelSrv(def = {}) {
+  return String(def.label || def.id || "")
+    .replace(/^أبقار\s*/, "")
+    .replace(/^جاموس\s*/, "")
+    .replace(/\s+أبقار$/, "")
+    .replace(/\s+جاموس$/, "");
+}
+
+function groupPageSexLabelSrv(an = {}) {
+  const raw = [
+    an.sex,
+    an.gender,
+    an.animalSex,
+    an.sexAr,
+    an.genderAr
+  ].map(v => String(v || "").trim().toLowerCase()).join(" ");
+
+  if (
+    raw.includes("female") ||
+    raw.includes("heifer") ||
+    raw.includes("أنث") ||
+    raw.includes("انث") ||
+    raw.includes("نتاي")
+  ) return "أنثى";
+
+  if (
+    raw.includes("male") ||
+    raw.includes("bull") ||
+    raw.includes("ذكر")
+  ) return "ذكر";
+
+  return "غير محدد";
+}
+
+function groupPageKindLabelSrv(an = {}) {
+  return an.species === "buffalo" ? "جاموس" : "أبقار";
+}
+
+function groupPageBandLabelSrv(baseKey = "") {
+  if (baseKey === "high") return "عالي";
+  if (baseKey === "med") return "متوسط";
+  if (baseKey === "low") return "منخفض";
+  return "";
+}
+
+function groupPageStatusLabelSrv(an = {}, def = {}) {
+  const baseKey = String(def.baseKey || "");
+
+  if (baseKey === "fresh") return "حديث الولادة";
+  if (baseKey === "high") return "حلاب";
+  if (baseKey === "med") return "حلاب";
+  if (baseKey === "low") return "حلاب";
+  if (baseKey === "dry") return "جاف";
+  if (baseKey === "closeup") return "انتظار ولادة";
+  if (baseKey === "suckling") return "رضيع";
+  if (baseKey === "weaned") return "فطام";
+  if (baseKey === "growing") return "نامي";
+  if (baseKey === "heiferOpen") return "تحت التلقيح";
+  if (baseKey === "breeding") return "ملقحة";
+  if (baseKey === "pregHeifers") return "عشار";
+  if (baseKey === "males") return "ذكر";
+
+  if (an.pregnant === true) return "عشار";
+  if (an.dry === true) return "جاف";
+  if (an.isCalf === true) return groupPageSexLabelSrv(an);
+
+  return "حلاب";
+}
+
+function groupPageAnimalTitleSrv(an = {}) {
+  const n = String(an.animalNumber || an.number || an.id || "").trim();
+  const sex = groupPageSexLabelSrv(an);
+
+  if (an.isCalf === true) {
+    return sex === "ذكر" ? `عجل رقم ${n}` : `عجلة رقم ${n}`;
+  }
+
+  return `حيوان رقم ${n}`;
+}
+
+function groupPageShapeClassSrv(an = {}) {
+  if (an.isCalf === true) return "shape-calf";
+  return an.species === "buffalo" ? "shape-buffalo" : "shape-cow";
+}
+
+function groupPageStateClassesSrv(an = {}, def = {}) {
+  const baseKey = String(def.baseKey || "");
+  const cls = ["animal-dot"];
+
+  if (baseKey === "high") cls.push("is-high");
+  if (baseKey === "med") cls.push("is-med");
+  if (baseKey === "low") cls.push("is-low");
+  if (baseKey === "dry" || an.dry === true) cls.push("is-dry");
+  if (baseKey === "pregHeifers" || an.pregnant === true) cls.push("is-preg");
+
+  return cls;
+}
+
+function groupPageMiniRowsSrv(an = {}, def = {}) {
+  const kind = groupPageKindLabelSrv(an);
+  const status = groupPageStatusLabelSrv(an, def);
+  const milk = Number(an.milkKg ?? an.dailyMilk ?? 0);
+  const dim = an.daysInMilk == null ? "—" : String(an.daysInMilk);
+  const ageM = an.ageMonths == null ? "—" : `${an.ageMonths} شهر`;
+
+  if (an.isCalf === true) {
+    return [
+      { label: "الجنس", value: groupPageSexLabelSrv(an) },
+      { label: "العمر", value: ageM },
+      { label: "الميلاد", value: an.birthDate || "غير مسجل" },
+      { label: "النوع", value: kind }
+    ];
+  }
+
+  return [
+    { label: "اللبن", value: Number.isFinite(milk) && milk > 0 ? `${milk.toFixed(1)} كجم/يوم` : "—" },
+    { label: "DIM", value: dim },
+    { label: "الحالة", value: status },
+    { label: "النوع", value: kind }
+  ];
+}
+
+function groupAnimalViewForPageSrv(rawAn = {}, def = {}) {
+  const an = groupAnimalForPageSrv(rawAn);
+  const n = String(an.animalNumber || an.number || an.id || "").trim();
+  const today = cairoTodayISO();
+
+  const kind = groupPageKindLabelSrv(an);
+  const status = groupPageStatusLabelSrv(an, def);
+  const band = groupPageBandLabelSrv(def.baseKey);
+
+  const milk = Number(an.milkKg ?? an.dailyMilk ?? 0);
+
+  return {
+    ...an,
+
+    groupId: def.id,
+    groupName: def.label,
+    groupKey: def.baseKey,
+    groupShortLabel: groupPageShortLabelSrv(def),
+
+    displayTitle: groupPageAnimalTitleSrv(an),
+    badges: [kind, status, an.breed || "", band].filter(Boolean),
+    miniRows: groupPageMiniRowsSrv(an, def),
+
+    shapeClass: groupPageShapeClassSrv(an),
+    stateClasses: groupPageStateClassesSrv(an, def),
+    dotSub: an.isCalf === true
+      ? groupPageSexLabelSrv(an)
+      : (Number.isFinite(milk) && milk > 0 ? `${Math.round(milk)}ك` : status),
+
+    cardUrl: `/cow-card.html?number=${encodeURIComponent(n)}&date=${today}`,
+    eventUrl: `/add-event.html?number=${encodeURIComponent(n)}&date=${today}`,
+
+    searchText: [
+      n,
+      an.number,
+      an.calfNumber,
+      kind,
+      an.animalTypeAr,
+      an.breed,
+      status,
+      def.label,
+      band
+    ].filter(Boolean).join(" "),
+
+    viewModelVersion: 1
+  };
+}
 
 function buildGroupsPagePayloadSrv(tenant, groupsMap = {}, thresholds = {}, animalsCount = 0) {
   const groups = [];
@@ -23970,7 +24139,7 @@ function buildGroupsPagePayloadSrv(tenant, groupsMap = {}, thresholds = {}, anim
 
   for (const def of GROUP_DEFS_SRV) {
     const rawList = groupsMap[def.id] || [];
-    const animals = rawList.map(groupAnimalForPageSrv);
+   const animals = rawList.map(an => groupAnimalViewForPageSrv(an, def));
 
     counts[def.id] = animals.length;
     pageGroupsMap[def.id] = animals;
