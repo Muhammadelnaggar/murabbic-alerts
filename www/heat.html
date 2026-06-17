@@ -389,86 +389,62 @@
     gateTimer = setTimeout(runGate, 350);
   }
 
-  async function saveHeat(e){
-    e.preventDefault();
+async function saveHeat(e){
+  e.preventDefault();
 
-    const raw = String(animalEl.value || "").trim();
-    const eventDate = String(dateEl.value || "").slice(0,10);
-    const heatTime = getHeatTime();
-    const notes = String($("notes")?.value || "").trim();
+  const raw = String(animalEl.value || "").trim();
+  const eventDate = String(dateEl.value || "").slice(0,10);
+  const heatTime = getHeatTime();
+  const notes = String($("notes")?.value || "").trim();
 
-    if (!raw) return msg("❌ رقم الحيوان مطلوب.", false);
-    if (!eventDate) return msg("❌ تاريخ الشياع مطلوب.", false);
-    if (!heatTime) return msg("❌ وقت ملاحظة الشياع مطلوب.", false);
+  if (!raw) return msg("❌ رقم الحيوان مطلوب.", false);
+  if (!eventDate) return msg("❌ تاريخ الشياع مطلوب.", false);
+  if (!heatTime) return msg("❌ وقت ملاحظة الشياع مطلوب.", false);
 
-    try {
-      if (saveBtn) {
-        saveBtn.disabled = true;
-        saveBtn.textContent = "جارٍ الحفظ…";
-      }
+  try {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = "جارٍ الحفظ…";
+    }
 
-      if (!gateState.allowed) {
-        await runGate();
-        if (!gateState.allowed) return;
-      }
+    if (!gateState.allowed) {
+      await runGate();
+      if (!gateState.allowed) return;
+    }
 
-      const nums = gateState.animalNumbers.length ? gateState.animalNumbers : splitNumbers(raw);
+    const res = await postJson("/api/heat/save", {
+      animalNumber: animalEl.value,
+      eventDate,
+      heatTime,
+      notes: notes || null
+    });
 
-      const ok = [];
-      const bad = [];
+    const savedNums = Array.isArray(res.animalNumbers) ? res.animalNumbers : [];
 
-      for (const n of nums) {
-        try {
-          const res = await postJson("/api/heat/save", {
-            animalNumber: n,
-            eventDate,
-            heatTime,
-            notes: notes || null
-          });
+    localStorage.setItem("lastEventDate", eventDate);
 
-          if (res?.ok) ok.push(n);
-          else bad.push(n);
-        } catch(err) {
-          console.error("heat save failed:", n, err);
-          bad.push(n);
-        }
-      }
+    if (savedNums.length === 1) {
+      localStorage.setItem("lastAnimalNumber", savedNums[0]);
+    }
 
-      localStorage.setItem("lastEventDate", eventDate);
-      if (ok.length === 1) {
-        localStorage.setItem("lastAnimalNumber", ok[0]);
-      }
+    msg(res.message || "✅ تم حفظ الشياع بنجاح", true);
 
-      if (ok.length && !bad.length) {
-        msg(ok.length === 1 ? "✅ تم حفظ شياع بنجاح" : `✅ تم حفظ الشياع لـ ${ok.length} حيوان.`, true);
+    if (res.redirectUrl) {
+      setTimeout(() => {
+        location.href = res.redirectUrl;
+      }, 900);
+    }
 
-        if (ok.length === 1) {
-          setTimeout(() => {
-            location.href = `event-list.html?number=${encodeURIComponent(ok[0])}`;
-          }, 900);
-        }
-
-        return;
-      }
-
-      if (ok.length && bad.length) {
-        msg(`✅ تم حفظ ${ok.length} — وتعذّر حفظ: ${bad.join("، ")}`, false);
-        return;
-      }
-
-      msg(`❌ تعذّر حفظ الشياع للأرقام: ${bad.join("، ")}`, false);
-
-    } catch(err) {
-      console.error(err);
-      msg(err.message || "❌ حدث خطأ أثناء الحفظ.", false);
-    } finally {
-      if (saveBtn) {
-        saveBtn.disabled = false;
-        saveBtn.textContent = "✅ تسجيل الشياع";
-      }
+  } catch(err) {
+    console.error(err);
+    msg(err.message || "❌ حدث خطأ أثناء الحفظ.", false);
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "✅ تسجيل الشياع";
     }
   }
-
+}
   const p = new URLSearchParams(location.search);
   const mode = String(p.get("mbkMode") || "").trim().toLowerCase();
   const bulk = String(p.get("bulk") || "").trim();
