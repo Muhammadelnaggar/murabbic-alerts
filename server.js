@@ -24063,8 +24063,9 @@ function groupPageStateClassesSrv(an = {}, def = {}) {
 function groupPageMiniRowsSrv(an = {}, def = {}) {
   const kind = groupPageKindLabelSrv(an);
   const status = groupPageStatusLabelSrv(an, def);
-  const milk = Number(an.milkKg ?? an.dailyMilk ?? 0);
-  const dim = an.daysInMilk == null ? "—" : String(an.daysInMilk);
+  const isDryView = status === "جاف" || String(def.baseKey || "") === "dry" || an.dry === true;
+  const milk = isDryView ? 0 : Number(an.milkKg ?? an.dailyMilk ?? 0);
+  const dim = isDryView ? "—" : (an.daysInMilk == null ? "—" : String(an.daysInMilk));
   const ageM = an.ageMonths == null ? "—" : `${an.ageMonths} شهر`;
 
   if (an.isCalf === true) {
@@ -24093,7 +24094,8 @@ function groupAnimalViewForPageSrv(rawAn = {}, def = {}) {
   const status = groupPageStatusLabelSrv(an, def);
   const band = groupPageBandLabelSrv(def.baseKey);
 
-  const milk = Number(an.milkKg ?? an.dailyMilk ?? 0);
+  const isDryView = status === "جاف" || String(def.baseKey || "") === "dry" || an.dry === true;
+  const displayMilk = isDryView ? 0 : milk;
 
   return {
     ...an,
@@ -24109,9 +24111,9 @@ function groupAnimalViewForPageSrv(rawAn = {}, def = {}) {
 
     shapeClass: groupPageShapeClassSrv(an),
     stateClasses: groupPageStateClassesSrv(an, def),
-    dotSub: an.isCalf === true
-      ? groupPageSexLabelSrv(an)
-      : (Number.isFinite(milk) && milk > 0 ? `${Math.round(milk)}ك` : status),
+   dotSub: an.isCalf === true
+  ? groupPageSexLabelSrv(an)
+  : (Number.isFinite(displayMilk) && displayMilk > 0 ? `${Math.round(displayMilk)}ك` : status),
 
     cardUrl: `/cow-card.html?number=${encodeURIComponent(n)}&date=${today}`,
     eventUrl: `/add-event.html?number=${encodeURIComponent(n)}&date=${today}`,
