@@ -1084,6 +1084,182 @@ textarea{
   color:#5f7065;
   margin-top:1px;
 }
+.animal-dot.shape-cow::before{
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 92'><path fill='%23ecf8ef' stroke='%239ecfb0' stroke-width='3.4' d='M22 51c0-10 8-18 18-18h31c9 0 18 3 25 8l8 5c7 4 9 13 5 20l-2 4c-2 4-6 7-11 7H34c-9 0-16-7-16-16 0-4 1-7 4-10z'/><path fill='%23ecf8ef' stroke='%239ecfb0' stroke-width='3.4' d='M27 42V28c0-8 6-14 14-14h6c9 0 16 7 16 16v12'/><path fill='%23ecf8ef' stroke='%239ecfb0' stroke-width='3.4' d='M33 18l-9 8 3 8 11-8M71 18l9 8-3 8-11-8'/><path stroke='%239ecfb0' stroke-width='4.2' stroke-linecap='round' d='M35 75v12M53 75v12M77 75v12M95 75v12M101 47l12-5'/><path fill='%238db39a' d='M58 41c0 5-4 9-9 9-6 0-11-4-11-9 0-6 5-11 11-11 5 0 9 5 9 11z'/><path fill='%238db39a' d='M89 52c0 4-4 8-8 8-5 0-9-4-9-8 0-5 4-9 9-9 4 0 8 4 8 9z'/><circle cx='44' cy='35' r='2.6' fill='%23566f5d'/><circle cx='59' cy='35' r='2.6' fill='%23566f5d'/></svg>");
+}
+
+.animal-dot.shape-buffalo::before{
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 92'><path fill='%23eef2f6' stroke='%2394a2b3' stroke-width='3.6' d='M18 52c0-11 8-20 20-20h31c10 0 19 3 27 9l8 6c7 5 9 14 5 21l-2 4c-2 4-6 7-11 7H31c-9 0-16-7-16-16 0-4 1-7 3-11z'/><path fill='%23eef2f6' stroke='%2394a2b3' stroke-width='3.6' d='M27 44V29c0-8 6-14 14-14h7c9 0 16 7 16 16v13'/><path fill='none' stroke='%2394a2b3' stroke-width='6' stroke-linecap='round' d='M34 19C22 8 12 10 6 19M82 19c12-11 22-9 31 0'/><path fill='none' stroke='%2394a2b3' stroke-width='4.8' stroke-linecap='round' d='M10 19c8 6 18 7 28 6M82 25c10 1 20 0 28-6'/><path stroke='%2394a2b3' stroke-width='4.2' stroke-linecap='round' d='M34 76v11M53 76v11M78 76v11M96 76v11M102 48l11-4'/><path fill='%23aeb8c4' d='M61 50c0 5-5 9-11 9-5 0-10-4-10-9 0-6 5-10 10-10 6 0 11 4 11 10z'/><circle cx='45' cy='36' r='2.7' fill='%235f6975'/><circle cx='61' cy='36' r='2.7' fill='%235f6975'/></svg>");
+}
+
+.animal-dot.shape-calf::before{
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 92'><path fill='%23fbf1e5' stroke='%23d7b487' stroke-width='3.4' d='M27 54c0-8 6-15 15-15h23c9 0 16 3 22 7l7 5c5 4 6 10 4 15l-2 4c-2 3-5 5-9 5H38c-7 0-12-5-12-12 0-4 1-6 1-9z'/><path fill='%23fbf1e5' stroke='%23d7b487' stroke-width='3.4' d='M31 44V34c0-8 5-13 13-13h5c8 0 14 6 14 14v9'/><path fill='%23fbf1e5' stroke='%23d7b487' stroke-width='3.2' d='M36 24l-7 7M67 24l7 7'/><path stroke='%23d7b487' stroke-width='3.8' stroke-linecap='round' d='M39 74v10M54 74v10M73 74v10M88 74v10M97 49l9-5'/><path fill='%23c5965f' d='M58 48c0 4-4 7-8 7-5 0-9-3-9-7 0-5 4-8 9-8 4 0 8 3 8 8z'/><circle cx='45' cy='38' r='2.5' fill='%23885c31'/><circle cx='59' cy='38' r='2.5' fill='%23885c31'/></svg>");
+}
+.animal-dot.is-high::before{
+  filter:drop-shadow(0 2px 4px rgba(14,160,90,.18));
+}
+
+.animal-dot.is-med::before{
+  filter:drop-shadow(0 2px 4px rgba(140,140,40,.16));
+}
+
+.animal-dot.is-low::before{
+  filter:drop-shadow(0 2px 4px rgba(180,120,30,.16));
+}
+
+.animal-dot.is-dry::before{
+  opacity:.82;
+}
+
+.animal-dot.is-preg .dot-label{
+  box-shadow:0 0 0 2px rgba(14,160,90,.12);
+}
+
+.animal-dot.is-selected::after{
+  content:"";
+  position:absolute;
+  inset:-3px;
+  border-radius:20px;
+  border:2px solid var(--brand, #0ea05a);
+  box-shadow:0 0 0 3px rgba(14,160,90,.10);
+  z-index:0;
+}
+.animal-panel{
+  margin-top:12px;
+  background:#fff;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:20px;
+  padding:12px;
+}
+
+.animal-panel[hidden]{
+  display:none !important;
+}
+
+.animal-panel-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:10px;
+}
+
+.animal-panel-title{
+  font-size:16px;
+  font-weight:900;
+  color:var(--brand-600, #0b7f47);
+}
+
+.animal-panel-badges{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
+
+.mini-badge{
+  padding:4px 8px;
+  border-radius:999px;
+  border:1px solid var(--border, #e2e8f0);
+  background:#f3f8f1;
+  font-size:12px;
+  font-weight:800;
+}
+
+.animal-mini-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:10px;
+}
+
+.animal-mini-item{
+  background:#fff;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:14px;
+  padding:8px 10px;
+}
+
+.animal-mini-label{
+  display:block;
+  font-size:11px;
+  color:#728277;
+  font-weight:700;
+  margin-bottom:2px;
+}
+
+.animal-mini-value{
+  display:block;
+  font-size:14px;
+  color:var(--ink, #0f172a);
+  font-weight:900;
+}
+
+.animal-panel-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+
+.animal-panel-actions .btn{
+  min-height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+}
+.animal-pop{
+  position:fixed;
+  inset:auto 12px 86px 12px;
+  z-index:60;
+  background:#fff;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:20px;
+  box-shadow:0 10px 28px rgba(0,0,0,.12);
+  padding:12px;
+}
+
+.animal-pop[hidden]{
+  display:none !important;
+}
+
+@media(min-width:860px){
+  .animal-pop{
+    position:absolute;
+    inset:auto;
+    min-width:260px;
+    max-width:300px;
+    pointer-events:none;
+  }
+}
+.mobile-footer{
+  position:sticky;
+  bottom:0;
+  z-index:9;
+  background:linear-gradient(0deg, rgba(246,251,247,.98), rgba(246,251,247,.78));
+  padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--border, #e2e8f0);
+}
+
+.mobile-footer .back-wide{
+  width:100%;
+  padding:14px;
+  border-radius:16px;
+  border:1px solid var(--brand, #0ea05a);
+  background:var(--brand, #0ea05a);
+  color:#fff;
+  font-weight:900;
+  text-decoration:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+@media(min-width:860px){
+  .mobile-footer{
+    display:none;
+  }
+}
 /* =========================================================
    Murabbik Shared Vision / Camera UI
    مكونات عامة للكاميرا والتحليل المرئي
