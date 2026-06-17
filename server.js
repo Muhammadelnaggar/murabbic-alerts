@@ -24094,8 +24094,9 @@ function groupAnimalViewForPageSrv(rawAn = {}, def = {}) {
   const status = groupPageStatusLabelSrv(an, def);
   const band = groupPageBandLabelSrv(def.baseKey);
 
-  const isDryView = status === "جاف" || String(def.baseKey || "") === "dry" || an.dry === true;
-  const displayMilk = isDryView ? 0 : milk;
+ const milk = Number(an.milkKg ?? an.dailyMilk ?? 0);
+ const isDryView = status === "جاف" || String(def.baseKey || "") === "dry" || an.dry === true;
+ const displayMilk = isDryView ? 0 : milk;
 
   return {
     ...an,
