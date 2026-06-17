@@ -20141,116 +20141,173 @@ app.post('/api/heat/gate', requireUserId, async (req, res) => {
 // ============================================================
 app.post('/api/heat/save', requireUserId, async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+    if (!db) {
+      return res.status(503).json({
+        ok:false,
+        error:'firestore_disabled',
+        message:"قاعدة البيانات غير متاحة الآن."
+      });
+    }
 
     const uid = req.userId;
     const body = req.body || {};
 
-    const animalNumber = normalizeDigitsSrv(body.animalNumber || '');
-    const eventDate = String(body.eventDate || '').slice(0,10);
-    const heatTime = String(body.heatTime || '').trim() || null;
+    const raw = String(
+      body.animalNumber ||
+      body.animalNumbers ||
+      body.number ||
+      ""
+    ).trim();
+
+    const eventDate = String(body.eventDate || body.date || '').slice(0,10);
+    const heatTime = String(body.heatTime || '').trim();
     const notes = String(body.notes || '').trim() || null;
 
-    if (!animalNumber) {
-      return res.status(400).json({ ok:false, error:'animalNumber_required' });
+    const nums = [...new Set(
+      raw
+        .split(/[\s,،;]+/)
+        .map(x => normalizeDigitsSrv(x))
+        .filter(Boolean)
+    )];
+
+    if (!nums.length) {
+      return res.status(400).json({
+        ok:false,
+        allowed:false,
+        error:'animalNumber_required',
+        message:"❌ رقم الحيوان مطلوب."
+      });
     }
+
     if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
-      return res.status(400).json({ ok:false, error:'eventDate_required' });
+      return res.status(400).json({
+        ok:false,
+        allowed:false,
+        error:'eventDate_required',
+        message:"❌ تاريخ الشياع مطلوب."
+      });
     }
 
-    const animal = await findAnimalDocByNumberSrv(uid, animalNumber);
-    if (!animal) {
-      return res.status(404).json({ ok:false, error:'animal_not_found' });
+    if (!heatTime) {
+      return res.status(400).json({
+        ok:false,
+        allowed:false,
+        error:'heatTime_required',
+        message:"❌ وقت ملاحظة الشياع مطلوب."
+      });
     }
-   const species = heatPickSpeciesSrv(animal, body);
-const reproductiveStatus = heatCurrentReproStatusSrv(animal);
 
-const decisionMsg = heatDecisionSrv({
-  animal,
-  species,
-  reproductiveStatus
-});
+    const saved = [];
+    const rejected = [];
 
-if (decisionMsg) {
-  return res.status(400).json({
-    ok:false,
-    allowed:false,
-    message: decisionMsg
-  });
-}
+    for (const animalNumber of nums) {
+      try {
+        const ctx = await buildHeatContextSrv(uid, animalNumber, eventDate);
 
-const duplicateMsg = await heatDuplicateCheckSrv(uid, animalNumber, eventDate, 3);
-
-if (duplicateMsg) {
-  return res.status(400).json({
-    ok:false,
-    allowed:false,
-    message: duplicateMsg
-  });
-}
-    const ctx = await (async () => {
-     const reproductiveStatus = heatCurrentReproStatusSrv(animal);
-
-      let dimAtEvent = null;
-      const lastCalvingDate = String(animal.lastCalvingDate || '').slice(0,10);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(lastCalvingDate)) {
-        dimAtEvent = daysBetweenIsoSrv(lastCalvingDate, eventDate);
-        if (dimAtEvent != null && dimAtEvent < 0) dimAtEvent = 0;
-      }
-
-      const lastEvent = await getLatestHeatOrInseminationSrv(uid, animalNumber, eventDate);
-
-      let daysSinceLastHeatOrAI = null;
-      if (lastEvent?._eventDate) {
-        daysSinceLastHeatOrAI = daysBetweenIsoSrv(lastEvent._eventDate, eventDate);
-        if (daysSinceLastHeatOrAI != null && daysSinceLastHeatOrAI < 0) {
-          daysSinceLastHeatOrAI = null;
+        if (!ctx?.ok || !ctx?.allowed) {
+          rejected.push({
+            animalNumber,
+            message: ctx?.message || ctx?.error || "❌ الحيوان غير مؤهل لتسجيل الشياع."
+          });
+          continue;
         }
+
+        const animal = ctx.animal || {};
+
+        const payload = {
+          animalNumber: String(ctx.animalNumber || animal.animalNumber || animal.number || animalNumber),
+          animalId: String(ctx.animalId || animal.id || animal.animalId || animalNumber),
+
+          type: "شياع",
+          eventType: "شياع",
+          eventTypeNorm: "heat",
+          eventDate,
+          heatTime,
+          notes,
+
+          reproductiveStatusSnapshot: ctx.reproductiveStatus || null,
+          dimAtEvent: ctx.dimAtEvent ?? null,
+          daysSinceLastHeatOrAI: ctx.daysSinceLastHeatOrAI ?? null,
+
+          userId: uid,
+          source: "server:/api/heat/save",
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        const evRef = await db.collection('events').add(payload);
+
+        const animalRef = await findAnimalDocRefByNumberForTenant(uid, animalNumber);
+
+        if (animalRef) {
+          await animalRef.ref.set({
+            lastHeatDate: eventDate,
+            lastHeatTime: heatTime,
+            lastHeatEventId: evRef.id,
+            reproductiveStatus: "مفتوحة",
+            status: "active",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge:true });
+        }
+
+        saved.push({
+          animalNumber: payload.animalNumber,
+          animalId: payload.animalId,
+          eventId: evRef.id
+        });
+
+      } catch (oneErr) {
+        console.error('heat-save-one', animalNumber, oneErr);
+
+        rejected.push({
+          animalNumber,
+          message:"❌ تعذّر حفظ الشياع لهذا الرقم."
+        });
       }
+    }
 
-      return { reproductiveStatus, dimAtEvent, daysSinceLastHeatOrAI };
-    })();
+    if (saved.length && typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "heat_save");
+    }
 
-    const payload = {
-      animalNumber: String(animal.animalNumber || animal.number || animalNumber),
-      animalId: String(animal.id || animal.animalId || animalNumber),
-      type: "شياع",
-      eventType: "شياع",
-      eventDate,
-      heatTime,
-      notes,
-      reproductiveStatusSnapshot: ctx.reproductiveStatus || null,
-      dimAtEvent: ctx.dimAtEvent ?? null,
-      daysSinceLastHeatOrAI: ctx.daysSinceLastHeatOrAI ?? null,
-      userId: uid,
-     source: "server:/api/heat/save",
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    };
-
-    const evRef = await db.collection('events').add(payload);
-
-const animalRef = await findAnimalDocRefByNumberForTenant(uid, animalNumber);
-if (animalRef) {
-  await animalRef.ref.set({
-    lastHeatDate: eventDate,
-    lastHeatTime: heatTime,
-    lastHeatEventId: evRef.id,
-    reproductiveStatus: "مفتوحة",
-    status: "active",
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  }, { merge:true });
-}
+    if (!saved.length) {
+      return res.status(400).json({
+        ok:false,
+        allowed:false,
+        savedCount:0,
+        rejectedCount:rejected.length,
+        saved,
+        rejected,
+        message: rejected.length
+          ? rejected.slice(0,5).map(x => `${x.animalNumber}: ${x.message}`).join(" — ")
+          : "❌ لا يوجد أي رقم مؤهل لتسجيل الشياع."
+      });
+    }
 
     return res.json({
-      ok: true,
-      id: evRef.id,
-      animalNumber: payload.animalNumber,
-      animalId: payload.animalId,
-      saved: payload
+      ok:true,
+      allowed:true,
+      savedCount:saved.length,
+      rejectedCount:rejected.length,
+      saved,
+      rejected,
+      animalNumbers:saved.map(x => x.animalNumber),
+      message: rejected.length
+        ? `✅ تم حفظ الشياع لـ ${saved.length} حيوان — وتعذّر حفظ ${rejected.length}.`
+        : (saved.length === 1 ? "✅ تم حفظ شياع بنجاح" : `✅ تم حفظ الشياع لـ ${saved.length} حيوان.`),
+      redirectUrl: saved.length === 1
+        ? `event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
+        : ""
     });
+
   } catch (e) {
     console.error('heat-save', e);
-    return res.status(500).json({ ok:false, error:'heat_save_failed' });
+
+    return res.status(500).json({
+      ok:false,
+      allowed:false,
+      error:'heat_save_failed',
+      message:"❌ حدث خطأ أثناء حفظ الشياع."
+    });
   }
 });
 // ============================================================
