@@ -648,21 +648,21 @@ header{
   <div class="list" id="list-all"></div>
 </section>
 
-   <section class="toolbar">
-  <div class="search"><input id="q" placeholder="ابحث برقم/اسم/نوع…" /></div>
-  <button class="btn" id="refreshBtn">تحديث</button>
-  <button class="btn" id="settingsBtn" type="button">الإعدادات</button>
-  <span class="hint">اختر المجموعة من القائمة بالأعلى، ويمكنك البحث ثم مسح البحث للعودة للوضع الطبيعي.</span>
+ <section class="groups-toolbar">
+  <div class="groups-search"><input id="q" placeholder="ابحث برقم/اسم/نوع…" /></div>
+ <button class="mbk-btn mbk-btn-light" id="refreshBtn">تحديث</button>
+ <button class="mbk-btn mbk-btn-light" id="settingsBtn" type="button">الإعدادات</button>
+  <span class="form-hint">اختر المجموعة من القائمة بالأعلى، ويمكنك البحث ثم مسح البحث للعودة للوضع الطبيعي.</span>
 </section>
 
    <section class="settings" id="settings" hidden>
-    <div class="hint" style="margin-bottom:8px">
+    <div class="form-hint" style="margin-bottom:8px">
   المستخدم يحدد عتبات الجروبات بنفسه. يجب أن تكون الرينجات متصلة بلا فجوات: بداية الفطام ثم نهاية الفطام/بداية نامي ثم نهاية نامي/بداية تحت التلقيح، حتى لا يسقط أي حيوان خارج أي مجموعة.
 </div>
-      <div class="radio-row">
+      <div class="radio-group">
         <label><input type="radio" name="species" value="cow" checked> أبقار</label>
         <label><input type="radio" name="species" value="buffalo"> جاموس</label>
-        <span class="hint">تعرض الحقول المناسبة حسب النوع المختار.</span>
+        <span class="form-hint">تعرض الحقول المناسبة حسب النوع المختار.</span>
       </div>
      <div class="row" id="cowThresholds">
   <label>منخفض الإدرار من <input type="number" id="cowLowMin" value="0.1" min="0" step="0.1"> إلى <input type="number" id="cowLowMax" value="19.9" min="0" step="0.1"> كجم/يوم</label>
@@ -677,9 +677,9 @@ header{
 </div>
       </div>
       <div class="row" style="margin-top:8px">
-        <button class="btn primary" id="saveSettings">حفظ الإعدادات</button>
+        <button class="mbk-btn mbk-btn-primary" id="saveSettings">حفظ الإعدادات</button>
       </div>
-      <div class="hint" style="margin-top:6px">حديث الولادة يدخل تلقائيًا بعد حدث الولادة لمدة 21 يوم، ثم ينتقل تلقائيًا حسب عتبة اللبن. الرضيع يبقى رضيعًا حتى تسجيل حدث فطام.</div>
+      <div class="form-hint" style="margin-top:6px">حديث الولادة يدخل تلقائيًا بعد حدث الولادة لمدة 21 يوم، ثم ينتقل تلقائيًا حسب عتبة اللبن. الرضيع يبقى رضيعًا حتى تسجيل حدث فطام.</div>
     </section>
 
  
@@ -1254,15 +1254,15 @@ function animalSummaryHTML(an){
   return `
     <div class="animal-panel-head">
       <div class="animal-panel-title">${title}</div>
-      <button type="button" class="btn" data-close-animal style="min-height:36px;padding:6px 10px">إغلاق</button>
+      <button type="button" class="mbk-btn mbk-btn-light" data-close-animal style="min-height:36px;padding:6px 10px">إغلاق</button>
     </div>
     <div class="animal-panel-badges">${badges.map(x => `<span class="mini-badge">${x}</span>`).join('')}</div>
     <div class="animal-mini-grid">
       ${rows.map(([k,v]) => `<div class="animal-mini-item"><span class="animal-mini-label">${k}</span><span class="animal-mini-value">${v}</span></div>`).join('')}
     </div>
     <div class="animal-panel-actions">
-      <a class="btn" href="/cow-card.html?number=${encodeURIComponent(core.id)}&date=${date}">البطاقة</a>
-      <a class="btn" href="/add-event.html?number=${encodeURIComponent(core.id)}&date=${date}">حدث جديد</a>
+     <a class="mbk-btn mbk-btn-light" href="/cow-card.html?number=${encodeURIComponent(core.id)}&date=${date}">البطاقة</a>
+<a class="mbk-btn mbk-btn-light" href="/add-event.html?number=${encodeURIComponent(core.id)}&date=${date}">حدث جديد</a>
     </div>
   `;
 }
