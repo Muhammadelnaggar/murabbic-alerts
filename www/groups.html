@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
   <meta name="theme-color" content="#2e7d32" />
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+ 
 
 </head>
 <body data-page="groups">
@@ -91,1332 +91,438 @@
     <a class="back-wide" href="/dashboard.html">العودة إلى لوحة التحكّم</a>
   </div>
 
-  <!-- تتبّع -->
-  <script>window.dataLayer = window.dataLayer || [];</script>
-  <script src="/js/app-core.js"></script>
-  <script src="/js/tenant-bootstrap.js"></script>
- <script type="module" src="/js/api.js"></script>
-  <script type="module" src="/js/smart-checks.js"></script>
- <!-- <script type="module" src="/js/smart-alerts.js"></script> -->
- 
- 
-
-  <!-- منطق الصفحة -->
-<script type="module">
-/* ============= API فقط (بدون أي اتصال Firebase محلي) ============= */
-import { apiGet, apiPost } from "/js/api.js";
-/* ============= أدوات سريعة ============= */
-const $  = (s,p=document)=>p.querySelector(s);
-const $$ = (s,p=document)=>[...p.querySelectorAll(s)];
-const normTxt = v => String(v ?? '').trim().toLowerCase();
-
-
-const GROUP_DEFS = [
-  { id:'cow_males',        species:'cow',     baseKey:'males',       label:'ذكور أبقار',               feedingEligible:true  },
-  { id:'cow_all',          species:'cow',     baseKey:'all',         label:'كل الأبقار',               feedingEligible:false },
-  { id:'cow_fresh',        species:'cow',     baseKey:'fresh',       label:'حديث الولادة أبقار',       feedingEligible:true  },
-  { id:'cow_high',         species:'cow',     baseKey:'high',        label:'عالي الإدرار أبقار',       feedingEligible:true  },
-  { id:'cow_med',          species:'cow',     baseKey:'med',         label:'متوسط الإدرار أبقار',      feedingEligible:true  },
-  { id:'cow_low',          species:'cow',     baseKey:'low',         label:'منخفض الإدرار أبقار',      feedingEligible:true  },
-  { id:'cow_dry',          species:'cow',     baseKey:'dry',         label:'جاف بعيد أبقار',           feedingEligible:true  },
-  { id:'cow_closeup',      species:'cow',     baseKey:'closeup',     label:'انتظار ولادة أبقار',       feedingEligible:true  },
-  { id:'cow_suckling',     species:'cow',     baseKey:'suckling',    label:'رضيع أبقار',               feedingEligible:true  },
-  { id:'cow_weaned',       species:'cow',     baseKey:'weaned',      label:'فطام أبقار',               feedingEligible:true  },
-  { id:'cow_growing',      species:'cow',     baseKey:'growing',     label:'نامي أبقار',               feedingEligible:true  },
-  { id:'cow_heiferOpen',   species:'cow',     baseKey:'heiferOpen',  label:'تحت التلقيح أبقار',        feedingEligible:true  },
-  { id:'cow_breeding',     species:'cow',     baseKey:'breeding',    label:'عجلات ملقحة أبقار',        feedingEligible:true  },
-  { id:'cow_pregHeifers',  species:'cow',     baseKey:'pregHeifers', label:'عجلات عشار أبقار',         feedingEligible:true  },
-
-  { id:'buffalo_males',       species:'buffalo', baseKey:'males',       label:'ذكور جاموس',              feedingEligible:true  },
-  { id:'buffalo_all',         species:'buffalo', baseKey:'all',         label:'كل الجاموس',              feedingEligible:false },
-  { id:'buffalo_fresh',       species:'buffalo', baseKey:'fresh',       label:'حديث الولادة جاموس',      feedingEligible:true  },
-  { id:'buffalo_high',        species:'buffalo', baseKey:'high',        label:'عالي الإدرار جاموس',      feedingEligible:true  },
-  { id:'buffalo_med',         species:'buffalo', baseKey:'med',         label:'متوسط الإدرار جاموس',     feedingEligible:true  },
-  { id:'buffalo_low',         species:'buffalo', baseKey:'low',         label:'منخفض الإدرار جاموس',     feedingEligible:true  },
-  { id:'buffalo_dry',         species:'buffalo', baseKey:'dry',         label:'جاف بعيد جاموس',          feedingEligible:true  },
-  { id:'buffalo_closeup',     species:'buffalo', baseKey:'closeup',     label:'انتظار ولادة جاموس',      feedingEligible:true  },
-  { id:'buffalo_suckling',    species:'buffalo', baseKey:'suckling',    label:'رضيع جاموس',              feedingEligible:true  },
-  { id:'buffalo_weaned',      species:'buffalo', baseKey:'weaned',      label:'فطام جاموس',              feedingEligible:true  },
-  { id:'buffalo_growing',     species:'buffalo', baseKey:'growing',     label:'نامي جاموس',              feedingEligible:true  },
-  { id:'buffalo_heiferOpen',  species:'buffalo', baseKey:'heiferOpen',  label:'تحت التلقيح جاموس',       feedingEligible:true  },
-  { id:'buffalo_breeding',    species:'buffalo', baseKey:'breeding',    label:'عجلات ملقحة جاموس',       feedingEligible:true  },
-  { id:'buffalo_pregHeifers', species:'buffalo', baseKey:'pregHeifers', label:'عجلات عشار جاموس',        feedingEligible:true  }
-];
-const GROUP_DEF_BY_ID = Object.fromEntries(GROUP_DEFS.map(x => [x.id, x]));
-function shortGroupLabel(def){
-  return String(def?.label || '')
-    .replace(/^أبقار\s*/, '')
-    .replace(/^جاموس\s*/, '')
-    .replace(/\s+أبقار$/, '')
-    .replace(/\s+جاموس$/, '');
-}
-const LEGACY_SECTION_IDS = [
-  'sec-all','sec-fresh','sec-high','sec-med','sec-low','sec-dry',
-  'sec-suckling','sec-weaned','sec-growing','sec-breeding','sec-pregHeifers','sec-hospital'
-];
+ <!-- عرض صفحة المجموعات من السيرفر فقط -->
+<script>
+const $ = (s, p = document) => p.querySelector(s);
+const $$ = (s, p = document) => [...p.querySelectorAll(s)];
 
 const state = {
-  animals: [],
   userId: null,
-  thresholds: loadThresholds(),
-  currentGroup: null,
-  viewSpecies: 'cow',
-  selectedAnimalId: null,
-
-  groupsCache: {},
-  groupsSource: '',
-  groupsServerOk: false
+  groups: [],
+  groupsMap: {},
+  thresholds: {},
+  viewSpecies: "cow",
+  currentGroup: "",
+  selectedAnimalId: ""
 };
 
-/* ============= انتظار userId ============= */
-async function waitForUserId(timeoutMs=6000){
-  const t0 = Date.now();
-  while(Date.now()-t0 < timeoutMs){
-    const uid = window.__TENANT__?.userId || localStorage.getItem('userId');
-    if(uid){ state.userId = uid; return uid; }
-    await new Promise(r=>setTimeout(r,100));
-  }
-  return null;
+function getUidDirect(){
+  return String(
+    localStorage.getItem("userId") ||
+    localStorage.getItem("uid") ||
+    localStorage.getItem("tenantId") ||
+    window.MBK_USER_ID ||
+    window.mbkUserId ||
+    window.mbk?.userId ||
+    ""
+  ).trim();
 }
 
-/* ============= العتبات (محلي + سحابي) ============= */
-function loadThresholds(){
- const d = {
-  cowLowMin:0.1,  cowLowMax:19.9,
-  cowMedMin:20,   cowMedMax:24.9,
-  cowHighMin:25,
+async function apiGetDirect(url){
+  const uid = state.userId || getUidDirect();
+  if (!uid) throw new Error("userId_required");
 
-  bufLowMin:0.1,  bufLowMax:7.9,
-  bufMedMin:8,    bufMedMax:11.9,
-  bufHighMin:12,
-
-  species:'cow',
-  };
-  try{ return Object.assign(d, JSON.parse(localStorage.getItem('mbk_group_thresholds')||'{}')); }catch{ return d; }
-}
-function saveThresholdsLocal(){
-  localStorage.setItem('mbk_group_thresholds', JSON.stringify(state.thresholds));
-}
-async function loadThresholdsFromFirestore(){
-  try{
-    const res = await apiGet('/api/groups/settings');
-    if (res?.ok && res.thresholds) {
-      state.thresholds = { ...state.thresholds, ...res.thresholds };
-      saveThresholdsLocal();
+  const r = await fetch(url, {
+    method: "GET",
+    cache: "no-store",
+    headers: {
+      "Accept": "application/json",
+      "X-User-Id": uid
     }
-  }catch(e){
-    console.warn('thresh get err', e);
-  }
-}
-async function saveThresholdsToFirestore(){
-  try{
-    await apiPost('/api/groups/settings', {
-      thresholds: state.thresholds
-    });
-  }catch(e){
-    console.warn('thresh save err', e);
-  }
-}
+  });
 
-/* ============= تواريخ/مقاييس ============= */
-  const num = v => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
-const toDate = v => {
-  if (!v) return null;
-  if (v instanceof Date) return v;
-  if (typeof v === 'string') return new Date(v);
-  if (typeof v === 'object') {
-    if (typeof v.seconds === 'number')   return new Date(v.seconds * 1000);
-    if (typeof v._seconds === 'number')  return new Date(v._seconds * 1000);
-  }
-  return null;
-};
-const daysBetween = (a,b)=> Math.floor((a-b)/86400000);
-
-function getDIM(an){
-  const calv =
-    toDate(an?.lastCalvingDate) ||
-    toDate(an?.calvingDate)     ||
-    toDate(an?.calvedAt);
-  if (!calv) return Number(an?.daysInMilk) || 0;
-  return Math.max(0, daysBetween(new Date(), calv));
-}
-function getAgeMonths(an){
-  const birth = toDate(an?.birthDate);
-  if(!birth) return 0;
-  return Math.max(0, Math.floor((new Date()-birth)/(30.4375*24*3600*1000)));
-}
-  function getBirthDateText(an){
-  const d = toDate(an?.birthDate);
-  if(!d || Number.isNaN(d.getTime())) return 'غير مسجل';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function getSexText(an){
-  const raw = [
-    an?.sex,
-    an?.gender,
-    an?.animalSex,
-    an?.sexAr,
-    an?.genderAr
-  ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
-
-  if (
-    raw.includes('female') ||
-    raw.includes('f') ||
-    raw.includes('أنث') ||
-    raw.includes('نتاي') ||
-    raw.includes('انثى')
-  ) return 'أنثى';
-
-  if (
-    raw.includes('male') ||
-    raw.includes('m') ||
-    raw.includes('ذكر')
-  ) return 'ذكر';
-
-  return 'غير محدد';
-}
-function isMale(an){
-  return getSexText(an) === 'ذكر';
-}
-function isYoungStock(an){
-  return !hasCalvedBefore(an);
-}
-  function hasWeaningEvent(an){
-  return an?._hasWeaningEvent === true;
-}
-
-function isInfantGroup(an){
-  return !hasCalvedBefore(an) && !hasWeaningEvent(an);
-}
-function getMilkKg(an){
-  return num(
-    an?.dailyMilk ??
-    an?.daily_milk ??
-    an?.milkDaily ??
-    an?.milk_per_day ??
-    an?.milkPerDay ??
-    an?.lastMilkKg ??
-    an?.production?.milkKg ??
-    an?.avgMilkKg ??
-    an?.milk_today ??
-    an?.milkToday ??
-    an?.milk ??
-    an?.milkKg ??
-    an?.milk_kg ??
-    an?.yield ??
-    an?.yieldToday ??
-    0
-  );
-}
-function getEventDate(e){
-  return toDate(e?.eventDate) || toDate(e?.date) || toDate(e?.createdAt) || toDate(e?.timestamp);
-}
-function getMilkFromEvent(e){
-  return num(e?.milkKg ?? e?.dailyMilk ?? e?.milk ?? e?.yield ?? e?.kg);
-}
-function isTypeOneOf(e, names=[]){
-  const txt = [e?.type, e?.eventType, e?.name, e?.kind].map(normTxt).join(' ');
-  return names.some(n => txt.includes(normTxt(n)));
-}
-const milkEventNames = ['daily_milk','لبن يومي','milk','milk report'];
-
-
-function eventText(e){
-  return [
-    e?.type,
-    e?.eventType,
-    e?.name,
-    e?.kind
-  ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
-}
-
-function isWeaningEvent(e){
-  const txt = eventText(e);
-  return (
-    txt.includes('فطام') ||
-    txt.includes('weaning') ||
-    txt.includes('weaned')
-  );
-}
-function isCloseUpEvent(e){
-  const txt = eventText(e);
-  return (
-    txt.includes('انتظار الولادة') ||
-    txt.includes('close up') ||
-    txt.includes('closeup')
-  );
-}
-async function enrichLifecycleFromEvents(list){
-  if (!state.userId || !Array.isArray(list) || !list.length) return;
-
-  try {
-    const animalNumbers = list
-      .map(an => String(an?.animalNumber ?? an?.number ?? an?.calfNumber ?? an?.id ?? '').trim())
-      .filter(Boolean);
-
-    if (!animalNumbers.length) return;
-
-    const res = await apiPost('/api/groups/events-enrich', { animalNumbers });
-    const enrichments = res?.ok && res?.enrichments ? res.enrichments : {};
-
-    list.forEach(an => {
-      const key = String(an?.animalNumber ?? an?.number ?? an?.calfNumber ?? an?.id ?? '').trim();
-      const row = enrichments[key] || {};
-
-      an._hasWeaningEvent = row.hasWeaningEvent === true;
-      an._firstWeaningDate = row.firstWeaningDate || null;
-      an._hasCloseUpEvent = row.hasCloseUpEvent === true;
-      an._lastCloseUpDate = row.lastCloseUpDate || null;
-
-      if (Number(row.lastMilkKg) > 0) {
-        an.lastMilkKg = Number(row.lastMilkKg);
-        if (!Number(getMilkKg(an))) {
-          an.dailyMilk = Number(row.lastMilkKg);
-        }
-      }
-
-      if (row.latestMilkDate) {
-        an._latestMilkDate = row.latestMilkDate;
-      }
-    });
-  } catch (e) {
-    console.warn('lifecycle events read err', e);
-  }
-}
-
-function speciesOf(an){
-  const txt = [
-    an?.animaltype, an?.animalType, an?.animalTypeAr,
-    an?.kind, an?.type, an?.breed
-  ].map(v => String(v || '').toLowerCase()).join(' ');
-  if (txt.includes('buff') || txt.includes('جاموس')) return 'buffalo';
-  return 'cow';
-}
-const isBuffalo = an => speciesOf(an) === 'buffalo';
-
-function reproText(an){
-  return [
-    an?.reproductiveStatus, an?.pregStatus, an?.statusRepro, an?.lastDiagnosis,
-    an?.['الحالة_التناسلية'], an?.['الحالة التناسلية']
-  ].map(normTxt).join(' ');
-}
-function isPregnant(an){
-  const joined = reproText(an);
-  return an?.pregnant === true || joined.includes('عشار') || joined.includes('preg');
-}
-function isBreedingStatus(an){
-  const joined = reproText(an);
-  return joined.includes('ملقح') || joined.includes('تحت التلقيح') || joined.includes('breeding') || joined.includes('insemin');
-}
-function hasCalvedBefore(an){
-  return Number(an?.lactationNumber || 0) > 0 || !!toDate(an?.lastCalvingDate) || getDIM(an) > 0;
-}
-function isDry(an){
-  const joined = [
-    an?.lactationStatus,
-    an?.productionStatus,
-    an?.status,
-    an?.['الحالةُ_اللبنية'] ?? an?.['الحالة_اللبنية']
-  ].map(normTxt).join(' ');
-
-  const milkToday = getMilkKg(an);
-  const latest = an._latestMilkDate ? new Date(an._latestMilkDate) : null;
-  const recentMilk = milkToday > 0 && (!latest || (Date.now() - +latest) < 3*86400000);
-  if (recentMilk) return false;
-
-  return (
-    an?.inMilk === false ||
-    an?.dry === true ||
-    joined.includes('جاف') ||
-    joined.includes('dry')
-  );
-}
-const hasDisease = an =>
-  an?.activeDisease===true || (Array.isArray(an?.diseases) && an.diseases.some(d=>!d.resolved));
-
-function getGestationLengthDays(sp){ return sp === 'buffalo' ? 300 : 270; }
-
-function getECD(an, sp){
-  return toDate(an?.expectedCalvingDate) ||
-         toDate(an?.expectedDateOfCalving) ||
-         toDate(an?.ecd) ||
-         (() => {
-           const ins = toDate(an?.lastInseminationDate) || toDate(an?.lastServiceDate) || toDate(an?.conceptionDate);
-           if (!ins) return null;
-           const d = new Date(ins);
-           d.setDate(d.getDate() + getGestationLengthDays(sp));
-           return d;
-         })();
-}
-function isCloseUp(an, sp){
-  return !!an?._hasCloseUpEvent;
-}
-
-const FRESH_FROM = 1, FRESH_TO = 21;
-function isFresh(an){
-  const d = getDIM(an);
-  return d>=FRESH_FROM && d<=FRESH_TO && !isDry(an) && hasCalvedBefore(an);
-}
-function milkBand(an, milk){
-  const t = state.thresholds;
-  const v = Number(milk || 0);
-
-  if (v <= 0) return null;
-
-  if (isBuffalo(an)) {
-    const lowMin  = Number(t.bufLowMin  || 0.1);
-    const lowMax  = Number(t.bufLowMax  || 7.9);
-    const medMin  = Number(t.bufMedMin  || 8);
-    const medMax  = Number(t.bufMedMax  || 11.9);
-    const highMin = Number(t.bufHighMin || 12);
-
-    if (v >= highMin) return 'high';
-    if (v >= medMin && v <= medMax) return 'med';
-    if (v >= lowMin && v <= lowMax) return 'low';
-    return null;
-  } else {
-    const lowMin  = Number(t.cowLowMin  || 0.1);
-    const lowMax  = Number(t.cowLowMax  || 19.9);
-    const medMin  = Number(t.cowMedMin  || 20);
-    const medMax  = Number(t.cowMedMax  || 24.9);
-    const highMin = Number(t.cowHighMin || 25);
-
-    if (v >= highMin) return 'high';
-    if (v >= medMin && v <= medMax) return 'med';
-    if (v >= lowMin && v <= lowMax) return 'low';
-    return null;
-  }
-}
-
-function ageCfg(sp){
-  if (sp === 'buffalo') {
-    return {
-      weanedMax:  Number(state.thresholds.bufWeanedMax || 5),
-      growingMax: Number(state.thresholds.bufGrowingMax || 12)
-    };
-  }
-  return {
-    weanedMax:  Number(state.thresholds.cowWeanedMax || 5),
-    growingMax: Number(state.thresholds.cowGrowingMax || 12)
-  };
-}
-function isLactatingAdult(an){
-  return !isDry(an) && (getMilkKg(an) > 0 || getDIM(an) > 0 || hasCalvedBefore(an));
-}
-function isSucklingGroup(an, sp){
-  return isInfantGroup(an);
-}
-function isWeanedGroup(an, sp){
-  const m = getAgeMonths(an), c = ageCfg(sp);
-  return !hasCalvedBefore(an) && hasWeaningEvent(an) && m <= c.weanedMax;
-}
-function isGrowingGroup(an, sp){
-  const m = getAgeMonths(an), c = ageCfg(sp);
-  return !hasCalvedBefore(an) && hasWeaningEvent(an) && m > c.weanedMax && m <= c.growingMax;
-}
-function isHeiferAge(an, sp){
-  const m = getAgeMonths(an), c = ageCfg(sp);
-  return !hasCalvedBefore(an) && hasWeaningEvent(an) && m > c.growingMax;
-}
-function isMatureOpenNonLactating(an, sp){
-  const m = getAgeMonths(an), c = ageCfg(sp);
-  return !hasCalvedBefore(an) && hasWeaningEvent(an) && !isPregnant(an) && !isBreedingStatus(an) && m > c.growingMax;
-}
-
-/* ============= تنسيق بيانات الحيوان ============= */
-function normalizeAnimalNumberForGroups(v){
-  const map = {
-    '٠':'0','١':'1','٢':'2','٣':'3','٤':'4',
-    '٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
-    '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4',
-    '۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
-  };
-  return String(v ?? '')
-    .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
-    .replace(/\s+/g, '')
-    .trim();
-}
-
-function normalize(an){
-  const n={...an};
-
-  const canonicalNumber = normalizeAnimalNumberForGroups(
-    n.animalNumber ?? n.number ?? n.calfNumber ?? n.id
-  );
-
-  if(canonicalNumber){
-    n.animalNumber = canonicalNumber;
-    n.number = canonicalNumber;
-    if(n.isCalf && !n.calfNumber) n.calfNumber = canonicalNumber;
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j?.ok === false) {
+    throw new Error(j.message || j.error || "server_request_failed");
   }
 
-  if(n.kind){
-    const k=String(n.kind).toLowerCase();
-    if(k.includes('buff')) n.kind='جاموس';
-    if(k.includes('cow'))  n.kind='أبقار';
-  }
-  if(!n.animaltype){
-    n.animaltype = speciesOf(n);
-  }
-  return n;
+  return j;
 }
 
-function dedupeAnimalsForGroups(list = []){
-  const byKey = new Map();
+async function apiPostDirect(url, body){
+  const uid = state.userId || getUidDirect();
+  if (!uid) throw new Error("userId_required");
 
-  for (const raw of list) {
-    const an = normalize(raw);
-    const key = normalizeAnimalNumberForGroups(
-      an.animalNumber ?? an.number ?? an.calfNumber ?? an.id
-    );
+  const r = await fetch(url, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "X-User-Id": uid
+    },
+    body: JSON.stringify(body || {})
+  });
 
-    if (!key) continue;
-
-    const prev = byKey.get(key);
-    if (!prev) {
-      byKey.set(key, an);
-      continue;
-    }
-
-    // عند وجود نفس الرقم في animals و calves نُفضل سجل الحيوان الأساسي
-    if (prev.isCalf && !an.isCalf) {
-      byKey.set(key, { ...prev, ...an, animalNumber:key, number:key });
-    } else if (!prev.isCalf && an.isCalf) {
-      byKey.set(key, { ...an, ...prev, animalNumber:key, number:key });
-    } else {
-      byKey.set(key, { ...prev, ...an, animalNumber:key, number:key });
-    }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j?.ok === false) {
+    throw new Error(j.message || j.error || "server_request_failed");
   }
 
-  return [...byKey.values()];
+  return j;
 }
 
-/* ============= عرض الحظيرة + بطاقة مختصرة ============= */
-function getAnimalCore(an){
-  const milk = getMilkKg(an);
-  const dim = getDIM(an);
-  const ageM = getAgeMonths(an);
-  const sexText = getSexText(an);
-  const young = isYoungStock(an);
-  const id = String(an?.animalNumber || an?.number || an?.id || '');
-  const sp = isBuffalo(an) ? 'جاموس' : 'أبقار';
-  const status = isPregnant(an) ? 'عشار' : (isDry(an) ? 'جاف' : (young ? sexText : 'حلاب'));
-  const band = milkBand(an, milk);
-  return { milk, dim, ageM, sexText, young, id, sp, status, band };
+function ensureUser(){
+  const uid = getUidDirect();
+  if (!uid) {
+    location.href = "/login.html?next=groups.html";
+    return false;
+  }
+  state.userId = uid;
+  return true;
 }
 
-function dotClass(an){
-  const core = getAnimalCore(an);
-  const cls = ['animal-dot'];
-  if (core.band === 'high') cls.push('is-high');
-  else if (core.band === 'med') cls.push('is-med');
-  else if (core.band === 'low') cls.push('is-low');
-  if (isDry(an)) cls.push('is-dry');
-  if (isPregnant(an)) cls.push('is-preg');
-  if (state.selectedAnimalId && state.selectedAnimalId === core.id) cls.push('is-selected');
-  return cls.join(' ');
+function ensureDisplayHost(){
+  document.getElementById("sec-all")?.remove();
+
+  let host = document.getElementById("dynamicGroupsHost");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "dynamicGroupsHost";
+    $("#settings")?.insertAdjacentElement("afterend", host);
+  }
+
+  return host;
 }
 
-function animalSummaryHTML(an){
-  const core = getAnimalCore(an);
-  const title = core.young
-    ? (core.sexText === 'ذكر' ? `عجل رقم ${core.id}` : `عجلة رقم ${core.id}`)
-    : `حيوان رقم ${core.id}`;
+function ensureSettingsExtraInputs(){
+  if ($("#cowWeanedMax")) return;
 
-  const badges = [core.sp, core.status];
-  if (an?.breed) badges.push(String(an.breed));
-  if (core.band) badges.push(core.band === 'high' ? 'عالي' : core.band === 'med' ? 'متوسط' : 'منخفض');
-
-  const rows = core.young
-    ? [
-        ['الجنس', core.sexText],
-        ['العمر', `${core.ageM} شهر`],
-        ['الميلاد', getBirthDateText(an)],
-        ['النوع', core.sp]
-      ]
-    : [
-        ['اللبن', `${core.milk.toFixed(1)} كجم/يوم`],
-        ['DIM', String(core.dim)],
-        ['الحالة', core.status],
-        ['النوع', core.sp]
-      ];
-
-  const date = new Date().toISOString().slice(0,10);
-  return `
-    <div class="animal-panel-head">
-      <div class="animal-panel-title">${title}</div>
-      <button type="button" class="mbk-btn mbk-btn-light" data-close-animal style="min-height:36px;padding:6px 10px">إغلاق</button>
-    </div>
-    <div class="animal-panel-badges">${badges.map(x => `<span class="mini-badge">${x}</span>`).join('')}</div>
-    <div class="animal-mini-grid">
-      ${rows.map(([k,v]) => `<div class="animal-mini-item"><span class="animal-mini-label">${k}</span><span class="animal-mini-value">${v}</span></div>`).join('')}
-    </div>
-    <div class="animal-panel-actions">
-     <a class="mbk-btn mbk-btn-light" href="/cow-card.html?number=${encodeURIComponent(core.id)}&date=${date}">البطاقة</a>
-<a class="mbk-btn mbk-btn-light" href="/add-event.html?number=${encodeURIComponent(core.id)}&date=${date}">حدث جديد</a>
-    </div>
+  const cowRow = document.createElement("div");
+  cowRow.className = "row";
+  cowRow.id = "cowExtraThresholds";
+  cowRow.style.marginTop = "8px";
+  cowRow.innerHTML = `
+    <label>نهاية الفطام / بداية نامي أبقار <input type="number" id="cowWeanedMax" min="0" step="1"></label>
+    <label>نهاية نامي / بداية تحت التلقيح أبقار <input type="number" id="cowGrowingMax" min="0" step="1"></label>
   `;
-}
 
-function bindAnimalPanelClose(root){
-  root?.querySelector('[data-close-animal]')?.addEventListener('click', () => {
-    state.selectedAnimalId = null;
-    hideAnimalPop();
-    const panel = root;
-    if (panel) {
-      panel.hidden = true;
-      panel.innerHTML = '';
-      panel.closest('.barn-wrap')?.querySelectorAll('.animal-dot.is-selected').forEach(x => x.classList.remove('is-selected'));
-    }
-  });
-}
-
-function scrollToAnimalPanel(panel){
-  if (!panel) return;
-  requestAnimationFrame(() => {
-    const y = panel.getBoundingClientRect().top + window.scrollY - 88;
-    try {
-      window.scrollTo({ top: Math.max(0, y), behavior:'smooth' });
-    } catch (_) {
-      window.scrollTo(0, Math.max(0, y));
-    }
-  });
-}
-
-function showAnimalPanel(an, panelEl = null, opts = {}){
-  state.selectedAnimalId = String(an?.animalNumber || an?.number || an?.id || '');
-  const panel = panelEl || $('#animalPanel');
-  if (!panel) return;
-  panel.innerHTML = animalSummaryHTML(an);
-  panel.hidden = false;
-  bindAnimalPanelClose(panel);
-  if (opts.scroll !== false) scrollToAnimalPanel(panel);
-}
-
-function hideAnimalPop(){
-  const pop = $('#animalPop');
-  if (!pop) return;
-  pop.hidden = true;
-  pop.innerHTML = '';
-  pop.style.left = '';
-  pop.style.top = '';
-}
-
-function showAnimalPop(an, el){
-  const pop = $('#animalPop');
-  if (!pop) return;
-  pop.innerHTML = animalSummaryHTML(an);
-  pop.hidden = false;
-  bindAnimalPanelClose(pop);
-
-  if (window.innerWidth >= 860 && el) {
-    const wrap = el.closest('.barn-wrap');
-    const er = el.getBoundingClientRect();
-    const wr = wrap?.getBoundingClientRect();
-    if (wr) {
-      pop.style.left = `${Math.max(8, er.left - wr.left - 8)}px`;
-      pop.style.top = `${Math.max(8, er.bottom - wr.top + 8)}px`;
-    }
-  }
-}
-
-function createAnimalDot(an, panel){
-  const core = getAnimalCore(an);
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  const shapeClass = core.young ? 'shape-calf' : (core.sp === 'جاموس' ? 'shape-buffalo' : 'shape-cow');
-  btn.className = `${dotClass(an)} ${shapeClass}`;
-  btn.setAttribute('data-animal-id', core.id);
-  btn.innerHTML = `<span class="dot-label"><span class="dot-id">${core.id}</span><span class="dot-sub">${core.young ? core.sexText : (core.milk > 0 ? core.milk.toFixed(0)+'ك' : core.status)}</span></span>`;
-
-  btn.addEventListener('click', (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    panel.hidden = false;
-    showAnimalPanel(an, panel, { scroll:true });
-    hideAnimalPop();
-    panel.closest('.barn-wrap')?.querySelectorAll('.animal-dot.is-selected').forEach(x => x.classList.remove('is-selected'));
-    btn.classList.add('is-selected');
-  });
-  btn.addEventListener('mouseenter', () => {
-    if (window.innerWidth >= 860) showAnimalPop(an, btn);
-  });
-  btn.addEventListener('mouseleave', () => {
-    if (window.innerWidth >= 860) hideAnimalPop();
-  });
-  return btn;
-}
-
-function renderBarn(list, groupId){
-  const def = GROUP_DEF_BY_ID[groupId];
-  const wrap = document.createElement('div');
-  wrap.className = 'barn-wrap';
-  wrap.innerHTML = `
-    <div class="barn-head">
-      <div class="barn-title">${shortGroupLabel(def)} — ${list.length} رأس</div>
-      <div class="barn-note">كل نقطة = حيوان</div>
-    </div>
-    <div class="barn-grid" id="barnGrid"></div>
-    <div class="animal-panel" id="animalPanel" hidden></div>
+  const bufRow = document.createElement("div");
+  bufRow.className = "row";
+  bufRow.id = "buffExtraThresholds";
+  bufRow.style.marginTop = "8px";
+  bufRow.style.display = "none";
+  bufRow.innerHTML = `
+    <label>نهاية الفطام / بداية نامي جاموس <input type="number" id="bufWeanedMax" min="0" step="1"></label>
+    <label>نهاية نامي / بداية تحت التلقيح جاموس <input type="number" id="bufGrowingMax" min="0" step="1"></label>
   `;
-  const grid = wrap.querySelector('#barnGrid');
-  const panel = wrap.querySelector('#animalPanel');
-  if (!list.length) {
-    grid.outerHTML = `<div class="barn-empty">لا عناصر في هذه المجموعة الآن</div>`;
-    return wrap;
-  }
-  list.forEach(an => grid.appendChild(createAnimalDot(an, panel)));
 
-  if (state.selectedAnimalId) {
-    const selected = list.find(an => String(an?.animalNumber || an?.number || an?.id || '') === state.selectedAnimalId);
-    if (selected) {
-      showAnimalPanel(selected, panel, { scroll:false });
-      const selectedBtn = wrap.querySelector(`.animal-dot[data-animal-id="${CSS.escape(state.selectedAnimalId)}"]`);
-      if (selectedBtn) selectedBtn.classList.add('is-selected');
-    }
-  }
-  return wrap;
-}
-/* ============= واجهة الإعدادات الديناميكية ============= */
-function ensureSettingsUI(){
-  if ($('#cowSucklingMax')) return;
-
-  const cowRow = document.createElement('div');
-  cowRow.className = 'row';
-  cowRow.id = 'cowExtraThresholds';
-  cowRow.style.marginTop = '8px';
- cowRow.innerHTML = `
-  <label>نهاية الفطام / بداية نامي أبقار <input type="number" id="cowWeanedMax" min="0" step="1"> شهر</label>
-  <label>نهاية نامي / بداية تحت التلقيح أبقار <input type="number" id="cowGrowingMax" min="0" step="1"> شهر</label>
-`;
-
-  const bufRow = document.createElement('div');
-  bufRow.className = 'row';
-  bufRow.id = 'buffExtraThresholds';
-  bufRow.style.display = 'none';
-  bufRow.style.marginTop = '8px';
-bufRow.innerHTML = `
-  <label>نهاية الفطام / بداية نامي جاموس <input type="number" id="bufWeanedMax" min="0" step="1"> شهر</label>
-  <label>نهاية نامي / بداية تحت التلقيح جاموس <input type="number" id="bufGrowingMax" min="0" step="1"> شهر</label>
-`;
-
-  const saveRow = $('#saveSettings')?.closest('.row');
+  const saveRow = $("#saveSettings")?.closest(".row");
   if (saveRow) {
     saveRow.parentNode.insertBefore(cowRow, saveRow);
     saveRow.parentNode.insertBefore(bufRow, saveRow);
-  } else {
-    $('#settings')?.appendChild(cowRow);
-    $('#settings')?.appendChild(bufRow);
   }
-
-  const hint = document.createElement('div');
-  hint.className = 'form-hint';
-  hint.style.marginTop = '6px';
- hint.textContent = 'كل المجموعات هنا مفصولة أبقار/جاموس. حديث الولادة مجموعة رسمية مؤقتة 21 يوم، ثم يُوزّع الحيوان تلقائيًا حسب اللبن. الذكور في مجموعة مستقلة، والرضيع يظل رضيعًا حتى تسجيل حدث فطام.';
-  $('#settings')?.appendChild(hint);
 }
 
-function syncSettingsUIFromState(){
-  const sp = state.thresholds.species === 'buffalo' ? 'buffalo' : 'cow';
-  $$('input[name="species"]').forEach(r=> r.checked = (r.value===sp));
-  $('#cowThresholds').style.display = sp==='cow'? 'flex':'none';
-  $('#buffThresholds').style.display = sp==='buffalo'? 'flex':'none';
-  if ($('#cowExtraThresholds')) $('#cowExtraThresholds').style.display = sp==='cow' ? 'flex' : 'none';
-  if ($('#buffExtraThresholds')) $('#buffExtraThresholds').style.display = sp==='buffalo' ? 'flex' : 'none';
+function applyThresholdsToInputs(){
+  const t = state.thresholds || {};
+  const sp = t.species === "buffalo" ? "buffalo" : "cow";
 
- if($('#cowLowMin'))  $('#cowLowMin').value  = state.thresholds.cowLowMin;
-if($('#cowLowMax'))  $('#cowLowMax').value  = state.thresholds.cowLowMax;
-if($('#cowMedMin'))  $('#cowMedMin').value  = state.thresholds.cowMedMin;
-if($('#cowMedMax'))  $('#cowMedMax').value  = state.thresholds.cowMedMax;
-if($('#cowHighMin')) $('#cowHighMin').value = state.thresholds.cowHighMin;
+  $$('input[name="species"]').forEach(r => r.checked = r.value === sp);
 
-if($('#bufLowMin'))  $('#bufLowMin').value  = state.thresholds.bufLowMin;
-if($('#bufLowMax'))  $('#bufLowMax').value  = state.thresholds.bufLowMax;
-if($('#bufMedMin'))  $('#bufMedMin').value  = state.thresholds.bufMedMin;
-if($('#bufMedMax'))  $('#bufMedMax').value  = state.thresholds.bufMedMax;
-if($('#bufHighMin')) $('#bufHighMin').value = state.thresholds.bufHighMin;
+  if ($("#cowThresholds")) $("#cowThresholds").style.display = sp === "cow" ? "flex" : "none";
+  if ($("#buffThresholds")) $("#buffThresholds").style.display = sp === "buffalo" ? "flex" : "none";
+  if ($("#cowExtraThresholds")) $("#cowExtraThresholds").style.display = sp === "cow" ? "flex" : "none";
+  if ($("#buffExtraThresholds")) $("#buffExtraThresholds").style.display = sp === "buffalo" ? "flex" : "none";
 
- const ids = [
-  'cowWeanedMax','cowGrowingMax',
-  'bufWeanedMax','bufGrowingMax'
-];
-ids.forEach(id => {
-  const el = $('#'+id);
-  if (!el) return;
-  const v = state.thresholds[id];
-  el.value = (v === undefined || v === null) ? '' : v;
-});
+  Object.entries(t).forEach(([k, v]) => {
+    const el = $("#" + k);
+    if (el && v !== undefined && v !== null) el.value = v;
+  });
 }
 
-function readSettingsFromUI(){
-  state.thresholds.species = ($('input[name="species"]:checked')?.value || 'cow');
- state.thresholds.cowLowMin  = Number($('#cowLowMin')?.value  || 0.1);
-state.thresholds.cowLowMax  = Number($('#cowLowMax')?.value  || 19.9);
-state.thresholds.cowMedMin  = Number($('#cowMedMin')?.value  || 20);
-state.thresholds.cowMedMax  = Number($('#cowMedMax')?.value  || 24.9);
-state.thresholds.cowHighMin = Number($('#cowHighMin')?.value || 25);
+function readThresholdsFromInputs(){
+  const ids = [
+    "cowLowMin","cowLowMax","cowMedMin","cowMedMax","cowHighMin",
+    "bufLowMin","bufLowMax","bufMedMin","bufMedMax","bufHighMin",
+    "cowWeanedMax","cowGrowingMax","bufWeanedMax","bufGrowingMax"
+  ];
 
-state.thresholds.bufLowMin  = Number($('#bufLowMin')?.value  || 0.1);
-state.thresholds.bufLowMax  = Number($('#bufLowMax')?.value  || 7.9);
-state.thresholds.bufMedMin  = Number($('#bufMedMin')?.value  || 8);
-state.thresholds.bufMedMax  = Number($('#bufMedMax')?.value  || 11.9);
-state.thresholds.bufHighMin = Number($('#bufHighMin')?.value || 12);
+  const out = {
+    ...state.thresholds,
+    species: $('input[name="species"]:checked')?.value || "cow"
+  };
 
-[
-  'cowWeanedMax','cowGrowingMax',
-  'bufWeanedMax','bufGrowingMax'
-].forEach(id => {
-  state.thresholds[id] = Number($('#'+id)?.value || state.thresholds[id] || 0);
-});
-}
-
-/* ============= المجموعات الديناميكية ============= */
-function ensureDynamicGroupsUI(){
-  LEGACY_SECTION_IDS.forEach(id => document.getElementById(id)?.remove());
-  let host = document.getElementById('dynamicGroupsHost');
-  if (!host) {
-    host = document.createElement('div');
-    host.id = 'dynamicGroupsHost';
-    $('#settings')?.insertAdjacentElement('afterend', host);
-  }
-  host.innerHTML = GROUP_DEFS.map(def => `
-    <section class="group-sec" id="sec-${def.id}">
-      <div class="group-head" data-id="${def.id}">
-        <span class="name">${def.label}</span>
-        <span class="count" id="c-${def.id}">0</span>
-      </div>
-      <div class="list" id="list-${def.id}"></div>
-    </section>
-  `).join('');
-  
-  $$('.group-head', host).forEach(h => h.style.display = 'none');
-}
-
-function filterByQuery(list){
-  const q=$('#q').value.trim().toLowerCase();
-  if(!q) return list;
-  return list.filter(an=>(`${an?.animalNumber||''} ${an?.number||''} ${an?.name||''} ${an?.kind||''} ${an?.type||''} ${an?.breed||''}`).toLowerCase().includes(q));
-}
-
-function splitGroups(applyQuery = true){
-  const A = applyQuery ? filterByQuery(state.animals) : [...state.animals];
-  const g = Object.fromEntries(GROUP_DEFS.map(def => [def.id, []]));
-
-  for(const an of A){
-    const sp = speciesOf(an);
-    const pref = sp === 'buffalo' ? 'buffalo_' : 'cow_';
-    const m = getAgeMonths(an);
-    const milk = getMilkKg(an);
-    const c = ageCfg(sp);
-
-  g[pref+'all'].push(an);
-
-if (isMale(an)) {
-  g[pref+'males'].push(an);
-  continue;
-}
-
-if (isFresh(an)) {
-  g[pref+'fresh'].push(an);
-  continue;
-}
-
-if (isLactatingAdult(an) && hasCalvedBefore(an)) {
-  const band = milkBand(an, milk);
-  if (band === 'high') {
-    g[pref+'high'].push(an);
-    continue;
-  }
-
-  if (band === 'med') {
-    g[pref+'med'].push(an);
-    continue;
-  }
-
-  if (band === 'low') {
-    g[pref+'low'].push(an);
-    continue;
-  }
-
-  continue;
-}
-
-   if (isInfantGroup(an)) {
-  g[pref+'suckling'].push(an);
-  continue;
-}
-
-if (isPregnant(an)) {
-  if (isCloseUp(an, sp)) {
-    g[pref+'closeup'].push(an);
-  } else if (hasCalvedBefore(an)) {
-    g[pref+'dry'].push(an);
-  } else {
-    g[pref+'pregHeifers'].push(an);
-  }
-  continue;
-}
-
-if (isWeanedGroup(an, sp))  { g[pref+'weaned'].push(an); continue; }
-if (isGrowingGroup(an, sp)) { g[pref+'growing'].push(an); continue; }
-
-if (!hasCalvedBefore(an) && hasWeaningEvent(an) && !isPregnant(an) && isBreedingStatus(an)) {
-  g[pref+'breeding'].push(an);
-  continue;
-}
-
-if (!hasCalvedBefore(an) && hasWeaningEvent(an) && !isPregnant(an) && m > c.growingMax) {
-  g[pref+'heiferOpen'].push(an);
-  continue;
-}
-
-if (isDry(an) && hasCalvedBefore(an)) {
-  g[pref+'dry'].push(an);
-}
-  }
-
-  return g;
-}
-function getGroupsForView(applyQuery = true) {
-  const base = state.groupsCache && typeof state.groupsCache === 'object'
-    ? state.groupsCache
-    : {};
-
-  if (!applyQuery) return base;
-
-  const q = $('#q')?.value?.trim();
-  if (!q) return base;
-
-  const out = {};
-  Object.entries(base).forEach(([groupId, list]) => {
-    out[groupId] = filterByQuery(Array.isArray(list) ? list : []);
+  ids.forEach(id => {
+    const el = $("#" + id);
+    if (!el) return;
+    const n = Number(el.value);
+    if (Number.isFinite(n)) out[id] = n;
   });
 
   return out;
 }
 
-async function loadGroupsPageFromServer() {
-  const res = await apiGet('/api/groups/page');
-
-  if (!res?.ok || res.source !== 'server_groups_page' || !res.groupsMap) {
-    throw new Error(res?.message || res?.error || 'groups_page_failed');
-  }
-
-  state.groupsCache = res.groupsMap || {};
-  state.groupsSource = res.source;
-  state.groupsServerOk = true;
-
-  state.animals = Object.values(state.groupsCache)
-    .flat()
-    .filter(Boolean);
-
-  if (res.thresholds && typeof res.thresholds === 'object') {
-    state.thresholds = { ...state.thresholds, ...res.thresholds };
-    saveThresholdsLocal();
-    syncSettingsUIFromState();
-  }
-
-  console.info('✅ groups page source: server', {
-    animalsCount: res.animalsCount,
-    groupsCount: res.groupsCount,
-    counts: res.counts
-  });
+function groupsForCurrentSpecies(){
+  return state.groups.filter(g => g.species === state.viewSpecies);
 }
-/* ============= عدادات + عرض ============= */
-function updateSelectedGroupSummary(id){
-  const def = GROUP_DEF_BY_ID[id];
- const counts = getGroupsForView(true);
-  const count = (counts[id] || []).length;
-  const nameEl = $('#groupSummaryName');
-  const countEl = $('#groupSummaryCount');
-  if (nameEl) nameEl.textContent = shortGroupLabel(def) || 'المجموعة';
-  if (countEl) countEl.textContent = String(count);
-}
-function updateCounters(){
- const g = getGroupsForView(true);
-  GROUP_DEFS.forEach(def => {
-    const el = $('#c-'+def.id);
-    if (el) el.textContent = (g[def.id] || []).length;
-  });
-  const sel = $('#groupSelect');
-  if (sel) {
-    const current = state.currentGroup;
-    buildGroupSelect();
-    if (current) sel.value = current;
-  }
-  if (state.currentGroup) updateSelectedGroupSummary(state.currentGroup);
-}
-function renderSelected(id){
-  const g = getGroupsForView(true);
-  const map = g[id] || [];
-  const list = $('#list-'+id);
-  if (!list) return;
-  list.innerHTML='';
-  list.appendChild(renderBarn(map, id));
 
-  $$('.group-sec').forEach(s=>s.classList.remove('show'));
-  $$('.list').forEach(l=>l.classList.remove('show'));
-
-  const sec = document.getElementById('sec-'+id);
-  if(sec) sec.classList.add('show');
-
-  list.classList.add('show');
-
-  const head = sec?.querySelector('.group-head');
-  if (head) head.style.display = 'none';
-}
- function buildSpeciesTabs(){
-  const host = $('#speciesTabs');
-  if (!host) return;
-
-  $$('#speciesTabs .species-tab').forEach(btn=>{
-    btn.classList.toggle('active', btn.dataset.species === state.viewSpecies);
+function buildSpeciesTabs(){
+  $$("#speciesTabs .species-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.species === state.viewSpecies);
 
     btn.onclick = () => {
-      state.viewSpecies = btn.dataset.species;
-      $$('#speciesTabs .species-tab').forEach(x=>{
-        x.classList.toggle('active', x === btn);
+      state.viewSpecies = btn.dataset.species || "cow";
+      state.selectedAnimalId = "";
+
+      $$("#speciesTabs .species-tab").forEach(x => {
+        x.classList.toggle("active", x === btn);
       });
 
-     buildGroupSelect();
-
-const sel = $('#groupSelect');
-if (sel && sel.value) {
-  state.currentGroup = sel.value;
-  renderSelected(sel.value);
-}
+      buildGroupSelect();
+      renderCurrentGroup();
     };
   });
-} 
+}
+
 function buildGroupSelect(){
-  const sel = $('#groupSelect');
+  const sel = $("#groupSelect");
   if (!sel) return;
 
-  const defs = GROUP_DEFS.filter(def => def.species === state.viewSpecies);
+  const groups = groupsForCurrentSpecies();
 
- const counts = getGroupsForView(false);
-  sel.innerHTML = defs.map(def => {
-    const label = shortGroupLabel(def);
-    const count = (counts[def.id] || []).length;
-    return `<option value="${def.id}">${label} (${count})</option>`;
-  }).join('');
+  sel.innerHTML = groups.map(g => {
+    const count = Number(g.animalsCount ?? state.groupsMap[g.id]?.length ?? 0);
+    return `<option value="${g.id}">${g.label || g.groupName || g.id} (${count})</option>`;
+  }).join("");
 
-  if (state.currentGroup && defs.some(d => d.id === state.currentGroup)) {
-    sel.value = state.currentGroup;
-  } else if (defs[0]) {
-    state.currentGroup = defs[0].id;
-    sel.value = defs[0].id;
+  if (!state.currentGroup || !groups.some(g => g.id === state.currentGroup)) {
+    state.currentGroup = groups[0]?.id || "";
   }
 
-  updateSelectedGroupSummary(state.currentGroup);
+  sel.value = state.currentGroup;
 
-sel.onchange = () => {
-  state.currentGroup = sel.value;
-  renderSelected(sel.value);
-  updateSelectedGroupSummary(sel.value);
+  sel.onchange = () => {
+    state.currentGroup = sel.value;
+    state.selectedAnimalId = "";
+    renderCurrentGroup();
+  };
 
-  const counts = getGroupsForView(true);
-  window.dataLayer.push({
-    event:'group_select',
-    group:sel.value,
-    count:(counts[sel.value]||[]).length
-  });
-};
+  updateSummary();
 }
-function bindGroupHeaders(){
-  $$('.group-head').forEach(h=>{
-    h.addEventListener('click', ()=>{
-      const id=h.getAttribute('data-id');
-      if(!id) return;
-      state.currentGroup=id;
-      renderSelected(id);
-      const counts = getGroupsForView(true);
-      window.dataLayer.push({event:'group_header_click', group:id, count:(counts[id]||[]).length});
-    });
+
+function currentGroupObj(){
+  return state.groups.find(g => g.id === state.currentGroup) || null;
+}
+
+function currentAnimals(){
+  const list = state.groupsMap[state.currentGroup] || [];
+  const q = String($("#q")?.value || "").trim().toLowerCase();
+
+  if (!q) return list;
+
+  return list.filter(an => {
+    const txt = String(
+      an.searchText ||
+      `${an.animalNumber || ""} ${an.displayTitle || ""} ${(an.badges || []).join(" ")}`
+    ).toLowerCase();
+
+    return txt.includes(q);
   });
 }
 
-/* ============= Firestore snapshot ============= */
-function groupDocId(groupId){
-  return `${state.userId}_${groupId}`;
+function updateSummary(){
+  const g = currentGroupObj();
+  const list = currentAnimals();
+
+  if ($("#groupSummaryName")) {
+    $("#groupSummaryName").textContent = g?.label || g?.groupName || "المجموعة";
+  }
+
+  if ($("#groupSummaryCount")) {
+    $("#groupSummaryCount").textContent = String(list.length);
+  }
 }
-function groupMemberDocId(groupId, animalNumber){
-  return `${state.userId}_${groupId}_${String(animalNumber).trim()}`;
+
+function animalSummaryHTML(an){
+  const badges = Array.isArray(an.badges) ? an.badges : [];
+  const rows = Array.isArray(an.miniRows) ? an.miniRows : [];
+
+  return `
+    <div class="animal-panel-head">
+      <div class="animal-panel-title">${an.displayTitle || ("حيوان رقم " + (an.animalNumber || ""))}</div>
+      <button type="button" class="mbk-btn mbk-btn-light" data-close-animal style="min-height:36px;padding:6px 10px">إغلاق</button>
+    </div>
+
+    <div class="animal-panel-badges">
+      ${badges.map(x => `<span class="mini-badge">${x}</span>`).join("")}
+    </div>
+
+    <div class="animal-mini-grid">
+      ${rows.map(r => `
+        <div class="animal-mini-item">
+          <span class="animal-mini-label">${r.label || ""}</span>
+          <span class="animal-mini-value">${r.value || "—"}</span>
+        </div>
+      `).join("")}
+    </div>
+
+    <div class="animal-panel-actions">
+      <a class="mbk-btn mbk-btn-light" href="${an.cardUrl || "#"}">البطاقة</a>
+      <a class="mbk-btn mbk-btn-light" href="${an.eventUrl || "#"}">حدث جديد</a>
+    </div>
+  `;
 }
-function buildGroupDoc(groupId, list){
-  const def = GROUP_DEF_BY_ID[groupId];
-  const count = list.length || 0;
-  const milkVals = list.map(getMilkKg).filter(v => Number.isFinite(v));
-  const dimVals  = list.map(getDIM).filter(v => Number.isFinite(v));
 
-  const avgMilkKg = milkVals.length
-    ? +(milkVals.reduce((a,b)=>a+b,0) / milkVals.length).toFixed(2)
-    : 0;
+function bindPanelClose(panel){
+  panel?.querySelector("[data-close-animal]")?.addEventListener("click", () => {
+    state.selectedAnimalId = "";
+    panel.hidden = true;
+    panel.innerHTML = "";
+    panel.closest(".barn-wrap")?.querySelectorAll(".animal-dot.is-selected").forEach(x => {
+      x.classList.remove("is-selected");
+    });
+  });
+}
 
-  const avgDim = dimVals.length
-    ? Math.round(dimVals.reduce((a,b)=>a+b,0) / dimVals.length)
-    : 0;
+function createAnimalDot(an, panel){
+  const btn = document.createElement("button");
+  const id = String(an.animalNumber || an.number || an.id || "");
 
-  return {
-    userId: state.userId,
-    groupId,
-    species: def?.species || 'cow',
-    groupKey: def?.baseKey || groupId,
-    groupName: def?.label || groupId,
-    feedingEligible: !!def?.feedingEligible,
-    animalsCount: count,
-    animalNumbers: list
-      .map(an => String(an?.animalNumber || an?.number || an?.id || '').trim())
-      .filter(Boolean)
-      .slice(0, 500),
-    avgMilkKg,
-    avgDim,
-    thresholds: { ...state.thresholds },
-    updatedAt: new Date().toISOString()
+  const classes = [
+    ...(Array.isArray(an.stateClasses) ? an.stateClasses : ["animal-dot"]),
+    an.shapeClass || ""
+  ].filter(Boolean);
+
+  btn.type = "button";
+  btn.className = [...new Set(classes)].join(" ");
+  btn.dataset.animalId = id;
+
+  btn.innerHTML = `
+    <span class="dot-label">
+      <span class="dot-id">${id}</span>
+      <span class="dot-sub">${an.dotSub || ""}</span>
+    </span>
+  `;
+
+  btn.onclick = () => {
+    state.selectedAnimalId = id;
+
+    panel.innerHTML = animalSummaryHTML(an);
+    panel.hidden = false;
+    bindPanelClose(panel);
+
+    panel.closest(".barn-wrap")?.querySelectorAll(".animal-dot.is-selected").forEach(x => {
+      x.classList.remove("is-selected");
+    });
+
+    btn.classList.add("is-selected");
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
+
+  return btn;
 }
-function buildGroupMemberDoc(groupId, an){
-  const def = GROUP_DEF_BY_ID[groupId];
-  const animalNumber = String(an?.animalNumber ?? an?.number ?? '').trim();
-  return {
-    userId: state.userId,
-    groupId,
-    species: def?.species || speciesOf(an),
-    groupKey: def?.baseKey || groupId,
-    groupName: def?.label || groupId,
-    groupDocId: groupDocId(groupId),
-    animalId: String(an?.id ?? an?.animalId ?? animalNumber),
-    animalNumber,
-    animalType: an?.animaltype || an?.kind || an?.type || '',
-    animalTypeAr: an?.animalTypeAr || '',
-    breed: an?.breed || '',
-    milkKg: getMilkKg(an),
-    daysInMilk: getDIM(an),
-    reproductiveStatus: an?.reproductiveStatus || '',
-    status: an?.status || '',
-    updatedAt: new Date().toISOString()
-  };
-}
-function chunkArray(arr, size = 100){
-  const out = [];
-  for (let i = 0; i < arr.length; i += size) {
-    out.push(arr.slice(i, i + size));
+
+function renderCurrentGroup(){
+  const host = ensureDisplayHost();
+  const g = currentGroupObj();
+  const list = currentAnimals();
+
+  updateSummary();
+
+  host.innerHTML = `
+    <section class="group-sec show" id="sec-current-group">
+      <div class="list show" id="list-current-group"></div>
+    </section>
+  `;
+
+  const listEl = $("#list-current-group", host);
+
+  const wrap = document.createElement("div");
+  wrap.className = "barn-wrap";
+  wrap.innerHTML = `
+    <div class="barn-head">
+      <div class="barn-title">${g?.label || g?.groupName || "المجموعة"} — ${list.length} رأس</div>
+      <div class="barn-note">كل نقطة = حيوان</div>
+    </div>
+    <div class="barn-grid"></div>
+    <div class="animal-panel" hidden></div>
+  `;
+
+  const grid = $(".barn-grid", wrap);
+  const panel = $(".animal-panel", wrap);
+
+  if (!list.length) {
+    grid.outerHTML = `<div class="barn-empty">لا عناصر في هذه المجموعة الآن</div>`;
+  } else {
+    list.forEach(an => grid.appendChild(createAnimalDot(an, panel)));
   }
-  return out;
+
+  listEl.appendChild(wrap);
 }
 
-async function syncAllGroupsData(){
-  try{
-    const groupsMap = splitGroups(false);
+async function loadGroupsPage(){
+  const res = await apiGetDirect("/api/groups/page");
 
-    const groups = GROUP_DEFS.map(def => buildGroupDoc(def.id, groupsMap[def.id] || []));
+  if (res.source !== "server_groups_page") {
+    throw new Error("groups_page_not_server_source");
+  }
 
-    const members = [];
-    GROUP_DEFS.forEach(def => {
-      (groupsMap[def.id] || []).forEach(an => {
-        members.push(buildGroupMemberDoc(def.id, an));
-      });
+  state.groups = Array.isArray(res.groups) ? res.groups : [];
+  state.groupsMap = res.groupsMap && typeof res.groupsMap === "object" ? res.groupsMap : {};
+  state.thresholds = res.thresholds && typeof res.thresholds === "object" ? res.thresholds : {};
+
+  applyThresholdsToInputs();
+  buildSpeciesTabs();
+  buildGroupSelect();
+  renderCurrentGroup();
+
+  console.info("✅ groups page loaded from server", {
+    animalsCount: res.animalsCount,
+    groupsCount: res.groupsCount
+  });
+}
+
+function bindEvents(){
+  $("#settingsBtn")?.addEventListener("click", () => {
+    const box = $("#settings");
+    if (!box) return;
+    if (box.hasAttribute("hidden")) box.removeAttribute("hidden");
+    else box.setAttribute("hidden", "");
+  });
+
+  $$('input[name="species"]').forEach(r => {
+    r.addEventListener("change", () => {
+      state.thresholds.species = r.value;
+      applyThresholdsToInputs();
     });
+  });
 
-    const desiredMemberIds = members
-      .map(m => {
-        const groupId = String(m?.groupId || '').trim();
-        const animalNumber = String(m?.animalNumber || '').trim();
-        if (!groupId || !animalNumber || !state.userId) return '';
-        return `${state.userId}_${groupId}_${animalNumber}`;
-      })
-      .filter(Boolean);
+  $("#saveSettings")?.addEventListener("click", async () => {
+    state.thresholds = readThresholdsFromInputs();
+    await apiPostDirect("/api/groups/settings", { thresholds: state.thresholds });
+    await loadGroupsPage();
+    $("#settings")?.setAttribute("hidden", "");
+  });
 
-    const chunks = chunkArray(members, 100);
+  $("#refreshBtn")?.addEventListener("click", async () => {
+    if ($("#q")) $("#q").value = "";
+    await loadGroupsPage();
+  });
 
-    await apiPost('/api/groups/sync', {
-      groups,
-      members: [],
-      partial: true
-    });
-
-    for (const part of chunks) {
-      await apiPost('/api/groups/sync', {
-        groups: [],
-        members: part,
-        partial: true
-      });
-    }
-
-    await apiPost('/api/groups/sync', {
-      groups: [],
-      members: [],
-      finalize: true,
-      desiredMemberIds
-    });
-
-  }catch(e){
-    console.error('syncAllGroupsData error:', e);
-  }
-}
-let __groupsSyncTimer = null;
-let __groupsSyncBusy = false;
-
-function requestGroupsSync(delay = 700){
-  // صفحة المجموعات أصبحت قراءة من السيرفر فقط.
-  // ممنوع كتابة Snapshot من الواجهة.
-  return;
-}
-/* ============= تحميل الحيوانات ============= */
-
-  function shouldAppearInGroups(a){
-  const txt = [
-    a?.status,
-    a?.animalStatus,
-    a?.statusAr,
-    a?.saleStatus,
-    a?.lifeStatus,
-    a?.fate,
-    a?.exitReason
-  ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
-
-  // flags صريحة
-  if (a?.active === false) return false;
-  if (a?.isActive === false) return false;
-  if (a?.inactive === true) return false;
-
-  // حالات تمنع الظهور
-  if (txt.includes('inactive')) return false;
-  if (txt.includes('dead')) return false;
-  if (txt.includes('sold')) return false;
-
-  if (txt.includes('نافق')) return false;
-  if (txt.includes('نفوق')) return false;
-  if (txt.includes('مباع')) return false;
-  if (txt.includes('بيع')) return false;
-  if (txt.includes('غير نشط')) return false;
-  if (txt.includes('خارج القطيع')) return false;
-
-  // ✅ لا نستبعد "مستبعد" أو breedingBlocked
-  // لأنه قد يظل يحلب ويستمر في المجموعات حتى البيع أو النفوق
-
-  return true;
-}
-async function loadAnimals(){
-  try {
-    await loadGroupsPageFromServer();
-  } catch (e) {
-    console.error('groups server page load failed:', e);
-
-    state.animals = [];
-    state.groupsCache = {};
-    state.groupsSource = 'server_failed';
-    state.groupsServerOk = false;
-
-    alert('تعذّر تحميل المجموعات من السيرفر. لن يتم تشغيل منطق المجموعات من الواجهة.');
-  }
-}
-/* ============= ربط الواجهة ============= */
-$$('input[name="species"]').forEach(r => r.addEventListener('change', async () => {
-  state.thresholds.species = r.value;
-  syncSettingsUIFromState();
-  saveThresholdsLocal();
-  saveThresholdsToFirestore().catch(()=>{});
-  refreshCurrentView();
-  requestGroupsSync();
-  window.dataLayer.push({ event:'species_switch', species:r.value });
-}));
-
-$('#saveSettings').addEventListener('click', async ()=>{
-  readSettingsFromUI();
-  saveThresholdsLocal();
-  try{ await saveThresholdsToFirestore(); }catch{}
-  await loadAnimals();
-  refreshCurrentView();
-  requestGroupsSync();
-  document.getElementById('settings')?.setAttribute('hidden', '');
-  window.dataLayer.push({event:'groups_settings_save', thresholds:{...state.thresholds}});
-});
-$('#settingsBtn')?.addEventListener('click', ()=>{
-  const box = document.getElementById('settings');
-  if (!box) return;
-  if (box.hasAttribute('hidden')) box.removeAttribute('hidden');
-  else box.setAttribute('hidden', '');
-});
-function refreshCurrentView(){
-  updateCounters();
-  if (state.currentGroup) renderSelected(state.currentGroup);
+  $("#q")?.addEventListener("input", () => {
+    renderCurrentGroup();
+  });
 }
 
-function clearSearchAndRestore(){
-  const q = $('#q');
-  if (!q) return;
-  q.value = '';
-  refreshCurrentView();
-}
-
-$('#q').addEventListener('input', ()=>{
-  refreshCurrentView();
-});
-
-$('#q').addEventListener('keydown', (e)=>{
-  if (e.key === 'Escape') {
-    e.preventDefault();
-    clearSearchAndRestore();
-    $('#q').blur();
-  }
-});
-
-$('#q').addEventListener('search', ()=>{
-  if (!$('#q').value.trim()) {
-    refreshCurrentView();
-  }
-});
-$('#refreshBtn').addEventListener('click', async ()=>{
-  $('#q').value = '';
-  await loadAnimals();
-  refreshCurrentView();
- 
-});
-/* ============= تشخيص للأخطاء العامة ============= */
-window.addEventListener('error', e => console.error('JS Error:', e.message, e.filename, e.lineno, e.colno));
-window.addEventListener('unhandledrejection', e => console.error('Promise Rejection:', e.reason));
-
-
-document.addEventListener('click', (e) => {
-  if (window.innerWidth >= 860) {
-    const insideDot = e.target.closest('.animal-dot');
-    const insidePop = e.target.closest('#animalPop');
-    if (!insideDot && !insidePop) hideAnimalPop();
-  }
-});
-
-/* ============= تشغيل ============= */
-window.dataLayer = window.dataLayer || [];
-window.dataLayer.push({event:'page_view', page:'/groups.html'});
+window.addEventListener("error", e => console.error("JS Error:", e.message, e.filename, e.lineno, e.colno));
+window.addEventListener("unhandledrejection", e => console.error("Promise Rejection:", e.reason));
 
 (async function start(){
-  ensureSettingsUI();
-  ensureDynamicGroupsUI();
- await waitForUserId();
+  try {
+    if (!ensureUser()) return;
 
-try { await loadThresholdsFromFirestore(); } catch (e) { console.warn('thresh get err', e); }
-syncSettingsUIFromState();
+    ensureSettingsExtraInputs();
+    ensureDisplayHost();
+    bindEvents();
 
- buildSpeciesTabs();
-buildGroupSelect();
-bindGroupHeaders();
-
-await loadAnimals();
-updateCounters();
-
-state.currentGroup = 'cow_all';
-buildGroupSelect();
-renderSelected(state.currentGroup);
-
-})();</script>
+    await loadGroupsPage();
+  } catch (e) {
+    console.error("groups page failed:", e);
+    alert("تعذّر تحميل المجموعات من السيرفر.");
+  }
+})();
+</script>
 
 </body>
 </html>
