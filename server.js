@@ -23803,7 +23803,150 @@ async function rebuildGroupsForTenantSrv(tenant, opts = {}) {
     counts
   };
 }
+function groupPageDateIsoSrv(v) {
+  const d = toDate(v);
+  if (d && !Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
 
+  const s = String(v || '').trim();
+  return s ? s.slice(0, 10) : null;
+}
+
+function groupAnimalForPageSrv(an = {}) {
+  const sp = speciesOfSrv(an);
+
+  const animalNumber = normGroupNumberSrv(
+    an?.animalNumber ??
+    an?.number ??
+    an?.calfNumber ??
+    an?.id ??
+    ''
+  );
+
+  const milkKg = getMilkKgSrv(an);
+  const dim = getDimSrv(an);
+
+  return {
+    id: String(an?.id ?? an?.animalId ?? animalNumber),
+    animalId: String(an?.animalId ?? an?.id ?? animalNumber),
+
+    animalNumber,
+    number: animalNumber,
+    calfNumber: an?.calfNumber
+      ? normGroupNumberSrv(an.calfNumber)
+      : (an?.isCalf ? animalNumber : ''),
+
+    isCalf: an?.isCalf === true,
+    source: an?._source || '',
+
+    species: sp,
+    animaltype: an?.animaltype || sp,
+    animalType: an?.animalType || an?.type || '',
+    animalTypeAr: an?.animalTypeAr || '',
+    breed: an?.breed || '',
+
+    sex: an?.sex || an?.gender || an?.animalSex || '',
+    gender: an?.gender || an?.sex || '',
+
+    birthDate: groupPageDateIsoSrv(an?.birthDate),
+    lastCalvingDate: groupPageDateIsoSrv(an?.lastCalvingDate || an?.calvingDate || an?.calvedAt),
+    lastInseminationDate: groupPageDateIsoSrv(an?.lastInseminationDate || an?.lastServiceDate || an?.conceptionDate),
+    lastDryOffDate: groupPageDateIsoSrv(an?.lastDryOffDate),
+    expectedCalvingDate: groupPageDateIsoSrv(an?.expectedCalvingDate || an?.expectedDateOfCalving || an?.ecd),
+
+    dailyMilk: milkKg,
+    milkKg,
+    lastMilkKg: milkKg,
+    daysInMilk: dim,
+    lactationNumber: Number(an?.lactationNumber || 0),
+    ageMonths: getAgeMonthsSrv(an),
+
+    reproductiveStatus: an?.reproductiveStatus || '',
+    productionStatus: an?.productionStatus || '',
+    lactationStatus: an?.lactationStatus || '',
+    status: an?.status || '',
+
+    pregnant: isPregnantGroupSrv(an),
+    dry: isDryGroupSrv(an),
+    inMilk: an?.inMilk === false ? false : (isDryGroupSrv(an) ? false : undefined),
+
+    _hasWeaningEvent: an?._hasWeaningEvent === true,
+    _firstWeaningDate: groupPageDateIsoSrv(an?._firstWeaningDate),
+    _hasCloseUpEvent: an?._hasCloseUpEvent === true,
+    _lastCloseUpDate: groupPageDateIsoSrv(an?._lastCloseUpDate),
+    _latestMilkDate: groupPageDateIsoSrv(an?._latestMilkDate)
+  };
+}
+
+function buildGroupsPagePayloadSrv(tenant, groupsMap = {}, thresholds = {}, animalsCount = 0) {
+  const groups = [];
+  const pageGroupsMap = {};
+  const counts = {};
+
+  for (const def of GROUP_DEFS_SRV) {
+    const rawList = groupsMap[def.id] || [];
+    const animals = rawList.map(groupAnimalForPageSrv);
+
+    counts[def.id] = animals.length;
+    pageGroupsMap[def.id] = animals;
+
+    groups.push({
+      userId: tenant,
+      groupId: def.id,
+      id: def.id,
+      species: def.species,
+      groupKey: def.baseKey,
+      baseKey: def.baseKey,
+      groupName: def.label,
+      label: def.label,
+      feedingEligible: !!def.feedingEligible,
+      animalsCount: animals.length,
+      animalNumbers: animals.map(x => x.animalNumber).filter(Boolean).slice(0, 500),
+      animals
+    });
+  }
+
+  return {
+    ok: true,
+    source: 'server_groups_page',
+    readOnly: true,
+    thresholds,
+    animalsCount,
+    groupsCount: groups.length,
+    counts,
+    groups,
+    groupsMap: pageGroupsMap
+  };
+}
+
+async function buildGroupsPageForTenantSrv(tenant) {
+  if (!db) return { ok: false, error: 'firestore_disabled' };
+
+  const uid = String(tenant || '').trim();
+  if (!uid) return { ok: false, error: 'userId_required' };
+
+  const thresholds = await loadGroupThresholdsSrv(uid);
+  const animals = await loadAnimalsForGroupsSrv(uid);
+
+  await enrichAnimalsForGroupsSrv(uid, animals);
+
+  const groupsMap = splitGroupsServerSrv(animals, thresholds);
+
+  return buildGroupsPagePayloadSrv(uid, groupsMap, thresholds, animals.length);
+}
+
+app.get('/api/groups/page', requireUserId, async (req, res) => {
+  try {
+    const result = await buildGroupsPageForTenantSrv(req.userId);
+    return res.status(result.ok ? 200 : 503).json(result);
+  } catch (e) {
+    console.error('groups.page', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'groups_page_failed',
+      message: e.message || String(e)
+    });
+  }
+});
 app.post('/api/groups/rebuild', requireUserId, async (req, res) => {
   try {
     const result = await rebuildGroupsForTenantSrv(req.userId, { reason:'manual_api_rebuild' });
