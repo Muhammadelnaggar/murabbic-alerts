@@ -17827,10 +17827,14 @@ const species = calvingNormalizeSpeciesSrv(
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
 
-    const eventRef = await db.collection("events").add(payload);
-    await updateAnimalAfterCloseupSaveSrv(payload);
+   const eventRef = await db.collection("events").add(payload);
+await updateAnimalAfterCloseupSaveSrv(payload);
 
-    return res.json({
+if (typeof scheduleGroupsRebuildSrv === "function") {
+  scheduleGroupsRebuildSrv(uid, "close_up_save");
+}
+
+return res.json({
       ok: true,
       message: "✅ تم حفظ تحضير الولادة بنجاح",
       eventId: eventRef.id,
@@ -18028,6 +18032,10 @@ app.post("/api/dry-off/save", requireUserId, async (req, res) => {
         reason,
         gestationDays
       });
+       }
+
+    if (saved.length && typeof scheduleGroupsRebuildSrv === "function") {
+      scheduleGroupsRebuildSrv(uid, "dry_off_save");
     }
 
     return res.json({
@@ -18323,7 +18331,11 @@ abortionDiagnosticNote: derived.abortionDiagnosticNote || "",
 
     const evRef = await db.collection("events").add(payload);
 
-    await updateAnimalByAbortionSrv(payload);
+await updateAnimalByAbortionSrv(payload);
+
+if (typeof scheduleGroupsRebuildSrv === "function") {
+  scheduleGroupsRebuildSrv(uid, "abortion_save");
+}
 
 return res.json({
   ok: true,
