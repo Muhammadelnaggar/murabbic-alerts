@@ -7,107 +7,6 @@
 
   <link rel="stylesheet" href="css/forms.css" />
 
-
-  <style>
-    header{
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      background: #fff;
-      border-bottom: 1px solid var(--border, #e2e8f0);
-    }
-    .mbk-head{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      padding:10px 12px;
-      max-width:980px;
-      margin:0 auto;
-    }
-    .mbk-logo{
-      height:48px;
-      width:auto;
-      object-fit:contain;
-      opacity:.6;
-      flex-shrink:0;
-    }
-    .mbk-center{ flex:1; text-align:center; line-height:1.15; }
-    .mbk-page-title{ font-size:18px; font-weight:900; color: var(--ink, #0f172a); }
-    .mbk-app-name{ font-size:13px; font-weight:800; color: var(--brand-600, #0b7f47); opacity:.9; }
-
-    .mbk-back{
-      width:42px;
-      height:42px;
-      border-radius:50%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      text-decoration:none;
-      font-weight:900;
-      color: var(--brand-600, #0b7f47);
-      border:2px solid var(--brand-600, #0b7f47);
-      background:#fff;
-      flex-shrink:0;
-    }
-
-    /* Infobar تحت الهيدر */
-    #sysbar.infobar{
-      display:block;
-      position: sticky;
-      top: 72px;
-      z-index: 19;
-      margin: 10px 12px;
-      max-width:520px;
-      margin-left:auto;
-      margin-right:auto;
-    }
-
-    .wrap{ max-width:520px; margin:12px auto 24px; padding:0 12px; }
-    .mbk-card{
-      background:#fff;
-      border:1px solid var(--border, #e2e8f0);
-      border-radius:16px;
-      padding:14px;
-      box-shadow:0 1px 0 rgba(15,23,42,.04);
-    }
-
-    .btn-row{
-      position: sticky;
-      bottom: 10px;
-      background: #fff;
-      padding: 10px;
-      border: 1px solid var(--border, #e2e8f0);
-      border-radius: 16px;
-      display:flex;
-      gap:10px;
-      margin:14px 12px 18px;
-      max-width:520px;
-      margin-left:auto;
-      margin-right:auto;
-      z-index: 5;
-    }
-    .btn-row .save-btn,
-    .btn-row .open-card{
-      flex:1;
-      width:auto;
-      border-radius:14px;
-      padding:12px 14px;
-      font-weight:900;
-      font-size:16px;
-      cursor:pointer;
-      border:0;
-    }
-    .btn-row .save-btn{
-      background: var(--brand, #0ea05a);
-      color:#fff;
-    }
-    .btn-row .open-card{
-      background:#fff !important;
-      color: var(--brand-600, #0b7f47) !important;
-      border:2px solid var(--brand-600, #0b7f47) !important;
-    }
-  </style>
 </head>
 
 <body data-page="heat">
@@ -137,18 +36,18 @@
 
       <label>رقم الحيوان</label>
      <textarea id="animalNumber" data-field="animalNumber" rows="3" style="width:100%"></textarea>
-      <div class="hint" style="font-size:12px;color:#64748b;margin-top:6px">يمكن إدخال رقم واحد أو عدة أرقام مفصولة بفاصلة أو مسافة.</div>
+     <div class="form-hint">يمكن إدخال رقم واحد أو عدة أرقام مفصولة بفاصلة أو مسافة.</div>
 
       <label>تاريخ الشياع</label>
       <input id="eventDate" data-field="eventDate" type="date" />
      <label>وقت ملاحظة الشياع</label>
-<div class="radio-row" style="display:flex;gap:14px;align-items:center;margin:6px 0 10px;">
-  <label style="display:flex;gap:8px;align-items:center;font-weight:800;">
+<div class="radio-group">
+  <label>
     <input type="radio" name="heatTime" data-field="heatTime" value="ص" />
     ص
   </label>
 
-  <label style="display:flex;gap:8px;align-items:center;font-weight:800;">
+  <label>
     <input type="radio" name="heatTime" data-field="heatTime" value="م" />
     م
   </label>
@@ -169,10 +68,10 @@
     </form>
   </div>
 
-  <div class="btn-row">
+ <div class="actions-bar">
     <!-- ✅ زر الحفظ = submit (بدون onclick) -->
-    <button id="saveBtnUI" class="save-btn" type="submit" form="heatForm">✅ تسجيل الشياع</button>
-    <button id="openCowCard" class="open-card" type="button">🧾 بطاقة الحيوان</button>
+   <button id="saveBtnUI" class="save" type="submit" form="heatForm">✅ تسجيل الشياع</button>
+   <button id="openCowCard" class="ghost" type="button">🧾 بطاقة الحيوان</button>
   </div>
 
 <script>
