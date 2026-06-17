@@ -23542,29 +23542,46 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
 
     if (isInfantGroupSrv(an)) { g[pref + 'suckling'].push(an); continue; }
 
-    if (isPregnantGroupSrv(an)) {
-      if (isCloseUpGroupSrv(an)) {
-        g[pref + 'closeup'].push(an);
-      } else if (hasCalvedBeforeGroupSrv(an)) {
-        g[pref + 'dry'].push(an);
-      } else {
-        g[pref + 'pregHeifers'].push(an);
-      }
-      continue;
-    }
+   if (isPregnantGroupSrv(an)) {
+  if (isCloseUpGroupSrv(an)) {
+    g[pref + 'closeup'].push(an);
+    continue;
+  }
 
-    if (isWeanedGroupSrv(an, sp, thresholds))  { g[pref + 'weaned'].push(an); continue; }
-    if (isGrowingGroupSrv(an, sp, thresholds)) { g[pref + 'growing'].push(an); continue; }
+  if (hasCalvedBeforeGroupSrv(an)) {
+    g[pref + 'dry'].push(an);
+    continue;
+  }
 
-    if (!hasCalvedBeforeGroupSrv(an) && hasWeaningEventGroupSrv(an) && !isPregnantGroupSrv(an) && isBreedingStatusGroupSrv(an)) {
-      g[pref + 'breeding'].push(an);
-      continue;
-    }
+  // العجلات لا تدخل ملقحة/عشار إلا بعد سن التلقيح.
+  // افتراضيًا: نهاية النامي 12 شهر، إذن بداية تحت التلقيح من 13 شهر.
+  if (hasWeaningEventGroupSrv(an) && m > c.growingMax) {
+    g[pref + 'pregHeifers'].push(an);
+    continue;
+  }
 
-    if (!hasCalvedBeforeGroupSrv(an) && hasWeaningEventGroupSrv(an) && !isPregnantGroupSrv(an) && m > c.growingMax) {
-      g[pref + 'heiferOpen'].push(an);
-      continue;
-    }
+  // لو داتا شاذة: عجلة صغيرة مكتوب عليها عشار
+  // لا نصدق الحالة التناسلية قبل سن التلقيح، ونتركها تكمل لمسار العمر الطبيعي.
+}
+
+if (isWeanedGroupSrv(an, sp, thresholds))  { g[pref + 'weaned'].push(an); continue; }
+if (isGrowingGroupSrv(an, sp, thresholds)) { g[pref + 'growing'].push(an); continue; }
+
+if (
+  !hasCalvedBeforeGroupSrv(an) &&
+  hasWeaningEventGroupSrv(an) &&
+  !isPregnantGroupSrv(an) &&
+  isBreedingStatusGroupSrv(an) &&
+  m > c.growingMax
+) {
+  g[pref + 'breeding'].push(an);
+  continue;
+}
+
+if (!hasCalvedBeforeGroupSrv(an) && hasWeaningEventGroupSrv(an) && !isPregnantGroupSrv(an) && m > c.growingMax) {
+  g[pref + 'heiferOpen'].push(an);
+  continue;
+}
 
     if (isDryGroupSrv(an) && hasCalvedBeforeGroupSrv(an)) {
       g[pref + 'dry'].push(an);
