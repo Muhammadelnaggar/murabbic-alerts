@@ -1719,16 +1719,18 @@ function buildGroupSelect(){
 
   updateSelectedGroupSummary(state.currentGroup);
 
-  sel.onchange = () => {
-    state.currentGroup = sel.value;
-    renderSelected(sel.value);
-    const counts = getGroupsForView(true);
-window.dataLayer.push({
-  event:'group_select',
-  group:sel.value,
-  count:(counts[sel.value]||[]).length
-});
-  };
+sel.onchange = () => {
+  state.currentGroup = sel.value;
+  renderSelected(sel.value);
+  updateSelectedGroupSummary(sel.value);
+
+  const counts = getGroupsForView(true);
+  window.dataLayer.push({
+    event:'group_select',
+    group:sel.value,
+    count:(counts[sel.value]||[]).length
+  });
+};
 }
 function bindGroupHeaders(){
   $$('.group-head').forEach(h=>{
