@@ -757,14 +757,17 @@ const LEGACY_SECTION_IDS = [
   'sec-suckling','sec-weaned','sec-growing','sec-breeding','sec-pregHeifers','sec-hospital'
 ];
 
-/* ============= حالة الصفحة ============= */
 const state = {
   animals: [],
   userId: null,
   thresholds: loadThresholds(),
   currentGroup: null,
   viewSpecies: 'cow',
-  selectedAnimalId: null
+  selectedAnimalId: null,
+
+  groupsCache: {},
+  groupsSource: '',
+  groupsServerOk: false
 };
 
 /* ============= انتظار userId ============= */
@@ -1583,11 +1586,55 @@ if (isDry(an) && hasCalvedBefore(an)) {
 
   return g;
 }
+function getGroupsForView(applyQuery = true) {
+  const base = state.groupsCache && typeof state.groupsCache === 'object'
+    ? state.groupsCache
+    : {};
 
+  if (!applyQuery) return base;
+
+  const q = $('#q')?.value?.trim();
+  if (!q) return base;
+
+  const out = {};
+  Object.entries(base).forEach(([groupId, list]) => {
+    out[groupId] = filterByQuery(Array.isArray(list) ? list : []);
+  });
+
+  return out;
+}
+
+async function loadGroupsPageFromServer() {
+  const res = await apiGet('/api/groups/page');
+
+  if (!res?.ok || res.source !== 'server_groups_page' || !res.groupsMap) {
+    throw new Error(res?.message || res?.error || 'groups_page_failed');
+  }
+
+  state.groupsCache = res.groupsMap || {};
+  state.groupsSource = res.source;
+  state.groupsServerOk = true;
+
+  state.animals = Object.values(state.groupsCache)
+    .flat()
+    .filter(Boolean);
+
+  if (res.thresholds && typeof res.thresholds === 'object') {
+    state.thresholds = { ...state.thresholds, ...res.thresholds };
+    saveThresholdsLocal();
+    syncSettingsUIFromState();
+  }
+
+  console.info('✅ groups page source: server', {
+    animalsCount: res.animalsCount,
+    groupsCount: res.groupsCount,
+    counts: res.counts
+  });
+}
 /* ============= عدادات + عرض ============= */
 function updateSelectedGroupSummary(id){
   const def = GROUP_DEF_BY_ID[id];
-  const counts = state.groupsCache || splitGroups();
+ const counts = getGroupsForView(true);
   const count = (counts[id] || []).length;
   const nameEl = $('#groupSummaryName');
   const countEl = $('#groupSummaryCount');
@@ -1595,8 +1642,7 @@ function updateSelectedGroupSummary(id){
   if (countEl) countEl.textContent = String(count);
 }
 function updateCounters(){
-  const g = state.groupsCache || splitGroups();
-  state.groupsCache = g;
+ const g = getGroupsForView(true);
   GROUP_DEFS.forEach(def => {
     const el = $('#c-'+def.id);
     if (el) el.textContent = (g[def.id] || []).length;
@@ -1610,8 +1656,7 @@ function updateCounters(){
   if (state.currentGroup) updateSelectedGroupSummary(state.currentGroup);
 }
 function renderSelected(id){
-  const g = state.groupsCache || splitGroups();
-  state.groupsCache = g;
+  const g = getGroupsForView(true);
   const map = g[id] || [];
   const list = $('#list-'+id);
   if (!list) return;
@@ -1658,7 +1703,7 @@ function buildGroupSelect(){
 
   const defs = GROUP_DEFS.filter(def => def.species === state.viewSpecies);
 
-  const counts = state.groupsCache || splitGroups(false);
+ const counts = getGroupsForView(false);
   sel.innerHTML = defs.map(def => {
     const label = shortGroupLabel(def);
     const count = (counts[def.id] || []).length;
@@ -1677,12 +1722,12 @@ function buildGroupSelect(){
   sel.onchange = () => {
     state.currentGroup = sel.value;
     renderSelected(sel.value);
-    const counts = splitGroups();
-    window.dataLayer.push({
-      event:'group_select',
-      group:sel.value,
-      count:(counts[sel.value]||[]).length
-    });
+    const counts = getGroupsForView(true);
+window.dataLayer.push({
+  event:'group_select',
+  group:sel.value,
+  count:(counts[sel.value]||[]).length
+});
   };
 }
 function bindGroupHeaders(){
@@ -1692,7 +1737,7 @@ function bindGroupHeaders(){
       if(!id) return;
       state.currentGroup=id;
       renderSelected(id);
-      const counts = splitGroups();
+      const counts = getGroupsForView(true);
       window.dataLayer.push({event:'group_header_click', group:id, count:(counts[id]||[]).length});
     });
   });
@@ -1820,16 +1865,9 @@ let __groupsSyncTimer = null;
 let __groupsSyncBusy = false;
 
 function requestGroupsSync(delay = 700){
-  clearTimeout(__groupsSyncTimer);
-  __groupsSyncTimer = setTimeout(async ()=>{
-    if (__groupsSyncBusy) return;
-    __groupsSyncBusy = true;
-    try{
-      await syncAllGroupsData();
-    }finally{
-      __groupsSyncBusy = false;
-    }
-  }, delay);
+  // صفحة المجموعات أصبحت قراءة من السيرفر فقط.
+  // ممنوع كتابة Snapshot من الواجهة.
+  return;
 }
 /* ============= تحميل الحيوانات ============= */
 
@@ -1868,29 +1906,16 @@ function requestGroupsSync(delay = 700){
 }
 async function loadAnimals(){
   try {
-    const [animalsRes, calvesRes] = await Promise.all([
-      apiGet('/api/animals'),
-      apiGet('/api/calves')
-    ]);
-
-    const animals = (Array.isArray(animalsRes?.animals) ? animalsRes.animals : [])
-      .filter(shouldAppearInGroups);
-
-    const calves = (Array.isArray(calvesRes?.calves) ? calvesRes.calves : [])
-      .map(d => ({
-        ...d,
-        animalNumber: d.calfNumber || d.animalNumber || d.id,
-        isCalf: true
-      }))
-      .filter(shouldAppearInGroups);
-
-    state.animals = dedupeAnimalsForGroups([...animals, ...calves]);
-await enrichLifecycleFromEvents(state.animals);
-state.groupsCache = null;
+    await loadGroupsPageFromServer();
   } catch (e) {
-    console.warn('groups load err', e);
+    console.error('groups server page load failed:', e);
+
     state.animals = [];
-    state.groupsCache = null;
+    state.groupsCache = {};
+    state.groupsSource = 'server_failed';
+    state.groupsServerOk = false;
+
+    alert('تعذّر تحميل المجموعات من السيرفر. لن يتم تشغيل منطق المجموعات من الواجهة.');
   }
 }
 /* ============= ربط الواجهة ============= */
@@ -1908,6 +1933,7 @@ $('#saveSettings').addEventListener('click', async ()=>{
   readSettingsFromUI();
   saveThresholdsLocal();
   try{ await saveThresholdsToFirestore(); }catch{}
+  await loadAnimals();
   refreshCurrentView();
   requestGroupsSync();
   document.getElementById('settings')?.setAttribute('hidden', '');
@@ -1920,7 +1946,6 @@ $('#settingsBtn')?.addEventListener('click', ()=>{
   else box.setAttribute('hidden', '');
 });
 function refreshCurrentView(){
-  state.groupsCache = null;
   updateCounters();
   if (state.currentGroup) renderSelected(state.currentGroup);
 }
@@ -1953,7 +1978,7 @@ $('#refreshBtn').addEventListener('click', async ()=>{
   $('#q').value = '';
   await loadAnimals();
   refreshCurrentView();
-  requestGroupsSync(100);
+ 
 });
 /* ============= تشخيص للأخطاء العامة ============= */
 window.addEventListener('error', e => console.error('JS Error:', e.message, e.filename, e.lineno, e.colno));
@@ -1991,7 +2016,6 @@ state.currentGroup = 'cow_all';
 buildGroupSelect();
 renderSelected(state.currentGroup);
 
-requestGroupsSync(100);
 })();</script>
 
 </body>
