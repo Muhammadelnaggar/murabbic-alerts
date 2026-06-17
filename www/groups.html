@@ -262,8 +262,9 @@ function buildSpeciesTabs(){
     btn.classList.toggle("active", btn.dataset.species === state.viewSpecies);
 
     btn.onclick = () => {
-      state.viewSpecies = btn.dataset.species || "cow";
-      state.selectedAnimalId = "";
+   state.viewSpecies = btn.dataset.species || "cow";
+state.selectedAnimalId = "";
+state.currentGroup = state.viewSpecies === "buffalo" ? "buffalo_all" : "cow_all";
 
       $$("#speciesTabs .species-tab").forEach(x => {
         x.classList.toggle("active", x === btn);
@@ -287,10 +288,13 @@ function buildGroupSelect(){
   }).join("");
 
   if (!state.currentGroup || !groups.some(g => g.id === state.currentGroup)) {
-    state.currentGroup = groups[0]?.id || "";
-  }
+  const preferredId = state.viewSpecies === "buffalo" ? "buffalo_all" : "cow_all";
+  state.currentGroup = groups.some(g => g.id === preferredId)
+    ? preferredId
+    : (groups[0]?.id || "");
+}
 
-  sel.value = state.currentGroup;
+sel.value = state.currentGroup;
 
   sel.onchange = () => {
     state.currentGroup = sel.value;
