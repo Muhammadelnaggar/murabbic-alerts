@@ -13256,7 +13256,148 @@ app.post("/api/disease/gate", requireUserId, async (req, res) => {
     });
   }
 });
+// ============================================================
+//              HEALTH EVENTS DUPLICATE GUARD — CENTRAL
+//              منع تكرار نفس الحدث الصحي بنفس تفاصيله
+// ============================================================
 
+function healthDupStrSrv(v) {
+  return String(v ?? "").trim();
+}
+
+function healthDupDateSrv(v) {
+  const s = String(v || "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+}
+
+function healthDupAnimalNumberSrv(v) {
+  return String(v ?? "")
+    .trim()
+    .replace(/[^\d٠-٩۰-۹]/g, "")
+    .replace(/[٠-٩۰-۹]/g, d => ({
+      "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+      "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+    }[d] || d));
+}
+
+function healthEventSignatureSrv(e = {}) {
+  const diseaseCode = healthDupStrSrv(
+    e.diseaseCode ||
+    e.details?.diseaseCode ||
+    ""
+  );
+
+  const eventTypeNorm = healthDupStrSrv(e.eventTypeNorm || e.eventType || e.type).toLowerCase();
+  const diseaseName = healthDupStrSrv(e.diseaseName || e.details?.diseaseName || e.diagnosis || "");
+
+  const isLameness =
+    diseaseCode === "lameness" ||
+    eventTypeNorm.includes("lameness") ||
+    eventTypeNorm.includes("عرج") ||
+    diseaseName === "عرج";
+
+  if (isLameness) {
+    const affectedLeg = healthDupStrSrv(
+      e.affectedLeg ||
+      e.affectedHoof ||
+      e.details?.affectedLeg ||
+      e.details?.affectedHoof ||
+      ""
+    );
+
+    const lamenessType = healthDupStrSrv(
+      e.lamenessType ||
+      e.details?.lamenessType ||
+      e.diagnosis ||
+      e.details?.diagnosis ||
+      ""
+    );
+
+    return `lameness|${affectedLeg}|${lamenessType}`;
+  }
+
+  if (diseaseCode) {
+    return `disease|${diseaseCode}`;
+  }
+
+  if (diseaseName) {
+    return `diseaseName|${diseaseName}`;
+  }
+
+  return "";
+}
+
+async function healthDuplicateSameDayDetailsSrv(uid, candidate = {}) {
+  const animalNumber = healthDupAnimalNumberSrv(
+    candidate.animalNumber ||
+    candidate.number ||
+    candidate.animalId ||
+    ""
+  );
+
+  const eventDate = healthDupDateSrv(candidate.eventDate || candidate.date || "");
+  const wantedSignature = healthEventSignatureSrv(candidate);
+
+  if (!uid || !animalNumber || !eventDate || !wantedSignature) {
+    return { found: false };
+  }
+
+  const values = [animalNumber];
+  const asNum = Number(animalNumber);
+  if (Number.isFinite(asNum)) values.push(asNum);
+
+  const candidates = [];
+
+  for (const field of ["animalNumber", "number"]) {
+    for (const value of [...new Set(values)]) {
+      try {
+        const snap = await db.collection("events")
+          .where("userId", "==", uid)
+          .where(field, "==", value)
+          .limit(150)
+          .get();
+
+        snap.docs.forEach(doc => {
+          candidates.push({
+            id: doc.id,
+            data: doc.data() || {}
+          });
+        });
+      } catch (e) {
+        console.error("health duplicate check failed", e.message || e);
+        return {
+          found: false,
+          error: "health_duplicate_check_failed",
+          message: "⚠️ تعذّر التحقق من تكرار الحدث الصحي الآن."
+        };
+      }
+    }
+  }
+
+  const seen = new Set();
+
+  for (const item of candidates) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+
+    const ev = item.data || {};
+    const evDate = healthDupDateSrv(ev.eventDate || ev.date || "");
+
+    if (evDate !== eventDate) continue;
+
+    const evSignature = healthEventSignatureSrv(ev);
+
+    if (evSignature && evSignature === wantedSignature) {
+      return {
+        found: true,
+        eventId: item.id,
+        message: `❌ تم تسجيل نفس الحدث الصحي للحيوان رقم ${animalNumber} في نفس اليوم بنفس التفاصيل.`
+      };
+    }
+  }
+
+  return { found: false };
+}
 app.post("/api/disease/save", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -13322,7 +13463,7 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
       });
     }
 
-   if (disease.specialPage) {
+     if (disease.specialPage) {
   const redirectUrl = diseaseSpecialUrlSrv(diseaseCode, animalNumber, eventDate);
 
   return res.status(409).json({
@@ -13332,6 +13473,31 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
     redirectUrl
   });
 }
+
+    const duplicateHealth = await healthDuplicateSameDayDetailsSrv(uid, {
+      animalNumber,
+      eventDate,
+      diseaseCode,
+      diseaseName: disease.name
+    });
+
+    if (duplicateHealth?.error) {
+      return res.status(503).json({
+        ok:false,
+        error: duplicateHealth.error,
+        message: duplicateHealth.message
+      });
+    }
+
+    if (duplicateHealth?.found) {
+      return res.status(409).json({
+        ok:false,
+        duplicate:true,
+        error:"duplicate_health_event_same_day_details",
+        eventId: duplicateHealth.eventId || null,
+        message: duplicateHealth.message
+      });
+    }
 
     const eventRef = db.collection("events").doc();
     const targetCollection = animal._collection || "animals";
@@ -13611,11 +13777,38 @@ app.post("/api/lameness/save", requireUserId, async (req, res) => {
       });
     }
 
-    if (diseaseIsArchivedSrv(animal.data || {})) {
+        if (diseaseIsArchivedSrv(animal.data || {})) {
       return res.status(400).json({
         ok: false,
         error: "animal_archived",
         message: "❌ لا يمكن تسجيل عرج — الحيوان خارج القطيع."
+      });
+    }
+
+    const duplicateHealth = await healthDuplicateSameDayDetailsSrv(uid, {
+      animalNumber: fd.animalNumber,
+      eventDate: fd.eventDate,
+      diseaseCode: "lameness",
+      diseaseName: "عرج",
+      affectedLeg: fd.affectedLeg,
+      lamenessType: fd.lamenessType
+    });
+
+    if (duplicateHealth?.error) {
+      return res.status(503).json({
+        ok: false,
+        error: duplicateHealth.error,
+        message: duplicateHealth.message
+      });
+    }
+
+    if (duplicateHealth?.found) {
+      return res.status(409).json({
+        ok: false,
+        duplicate: true,
+        error: "duplicate_health_event_same_day_details",
+        eventId: duplicateHealth.eventId || null,
+        message: duplicateHealth.message
       });
     }
 
