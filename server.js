@@ -13297,13 +13297,26 @@ function healthEventSignatureSrv(e = {}) {
     diseaseName === "عرج";
 
   if (isLameness) {
-    const affectedLeg = healthDupStrSrv(
-      e.affectedLeg ||
-      e.affectedHoof ||
-      e.details?.affectedLeg ||
-      e.details?.affectedHoof ||
-      ""
-    );
+   const rawLegs =
+  e.affectedLegs ||
+  e.affectedHooves ||
+  e.details?.affectedLegs ||
+  e.details?.affectedHooves ||
+  e.affectedLeg ||
+  e.affectedHoof ||
+  e.details?.affectedLeg ||
+  e.details?.affectedHoof ||
+  "";
+
+const affectedLeg = (
+  Array.isArray(rawLegs)
+    ? rawLegs
+    : String(rawLegs || "").split(/[،,|]/)
+)
+  .map(x => healthDupStrSrv(x))
+  .filter(Boolean)
+  .sort()
+  .join("+");
 
     const lamenessType = healthDupStrSrv(
       e.lamenessType ||
@@ -13585,7 +13598,26 @@ const LAMENESS_AFFECTED_LEGS_SRV = [
   "خلف يمين",
   "خلف شمال"
 ];
+function lamenessNormalizeLegsSrv(body = {}) {
+  const raw =
+    body.affectedLegs ||
+    body.affectedHooves ||
+    body.affectedLeg ||
+    body.affectedHoof ||
+    [];
 
+  const arr = Array.isArray(raw)
+    ? raw
+    : String(raw || "").split(/[،,|]/);
+
+  return [...new Set(
+    arr.map(v => lamenessStrSrv(v)).filter(Boolean)
+  )];
+}
+
+function lamenessLegsTextSrv(legs = []) {
+  return Array.isArray(legs) ? legs.join("، ") : "";
+}
 const LAMENESS_TYPES_SRV = [
   "مرض الخط الأبيض",
   "قرحة النعل",
@@ -13608,10 +13640,13 @@ function lamenessNormalizeBodySrv(body = {}) {
     ""
   );
 
+  const affectedLegs = lamenessNormalizeLegsSrv(body);
+
   return {
     animalNumber,
     eventDate: lamenessDateOnlySrv(body.eventDate || body.date || body.lamenessDate || ""),
-    affectedLeg: lamenessStrSrv(body.affectedLeg),
+    affectedLegs,
+    affectedLeg: lamenessLegsTextSrv(affectedLegs),
     lamenessType: lamenessStrSrv(body.lamenessType),
     vet: lamenessStrSrv(body.vet || body.doctor || "")
   };
@@ -13756,13 +13791,16 @@ app.post("/api/lameness/save", requireUserId, async (req, res) => {
       });
     }
 
-    if (!LAMENESS_AFFECTED_LEGS_SRV.includes(fd.affectedLeg)) {
-      return res.status(400).json({
-        ok: false,
-        error: "invalid_affected_leg",
-        message: "❌ الحافر المصاب غير معروف."
-      });
-    }
+   const invalidAffectedLegs = (fd.affectedLegs || [])
+  .filter(x => !LAMENESS_AFFECTED_LEGS_SRV.includes(x));
+
+if (!fd.affectedLegs?.length || invalidAffectedLegs.length) {
+  return res.status(400).json({
+    ok: false,
+    error: "invalid_affected_leg",
+    message: "❌ اختر حافرًا مصابًا واحدًا على الأقل."
+  });
+}
 
     if (!LAMENESS_TYPES_SRV.includes(fd.lamenessType)) {
       return res.status(400).json({
@@ -13838,19 +13876,23 @@ app.post("/api/lameness/save", requireUserId, async (req, res) => {
       diseaseName: "عرج",
       diseaseGroup: "حركة وعرج",
 
-      affectedLeg: fd.affectedLeg,
-      affectedHoof: fd.affectedLeg,
-      lamenessType: fd.lamenessType,
-      vet: fd.vet || null,
+     affectedLeg: fd.affectedLeg,
+affectedLegs: fd.affectedLegs,
+affectedHoof: fd.affectedLeg,
+affectedHooves: fd.affectedLegs,
+lamenessType: fd.lamenessType,
+vet: fd.vet || null,
 
-      details: {
-        affectedLeg: fd.affectedLeg,
-        affectedHoof: fd.affectedLeg,
-        lamenessType: fd.lamenessType,
-        diagnosis: fd.lamenessType,
-        diseaseName: "عرج",
-        vet: fd.vet || null
-      },
+details: {
+  affectedLeg: fd.affectedLeg,
+  affectedLegs: fd.affectedLegs,
+  affectedHoof: fd.affectedLeg,
+  affectedHooves: fd.affectedLegs,
+  lamenessType: fd.lamenessType,
+  diagnosis: fd.lamenessType,
+  diseaseName: "عرج",
+  vet: fd.vet || null
+},
 
       animalCollection: targetCollection,
       source: "server:/api/lameness/save",
