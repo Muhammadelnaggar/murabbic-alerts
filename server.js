@@ -13085,47 +13085,35 @@ app.post("/api/pregnancy-diagnosis/save", requireUserId, async (req, res) => {
 // ============================================================
 
 const DISEASE_CATALOG_SRV = {
-  // صفحات متخصصة
-  mastitis: { name:"التهاب ضرع", group:"special", specialPage:"mastitis.html", targets:["adult"] },
-  lameness: { name:"عرج", group:"special", specialPage:"lameness.html", targets:["adult","young"] },
+  // تمثيل وإنتاج
+  milk_fever: { name:"حمى اللبن", group:"تمثيل وإنتاج", targets:["adult","calf"] },
+  ketosis: { name:"كيتوزس", group:"تمثيل وإنتاج", targets:["adult","calf"] },
+  displaced_abomasum: { name:"انقلاب المنفحة", group:"تمثيل وإنتاج", targets:["adult","calf"] },
+  rumen_acidosis: { name:"حموضة الكرش", group:"تمثيل وإنتاج", targets:["adult","calf"] },
 
-  // حلاب / انتقال / عام
-  pneumonia: { name:"التهاب رئوي", group:"general", targets:["adult","young"] },
-  diarrhea: { name:"إسهال", group:"general", targets:["adult","young"] },
-  displaced_abomasum: { name:"انقلاب منفحة", group:"transition", targets:["adult"] },
-  navel_infection: { name:"التهاب سرة", group:"calf", targets:["calf"] },
-  lumpy_skin: { name:"التهاب جلد عقدي", group:"epidemic", targets:["adult","young"] },
-  hardware_disease: { name:"ابتلاع جسم معدني", group:"general", targets:["adult"] },
-  three_day_sickness: { name:"حمى الثلاث أيام", group:"epidemic", targets:["adult","young"] },
-  fmd: { name:"حمى قلاعية", group:"epidemic", targets:["adult","young","calf"] },
-  rumen_acidosis: { name:"حموضة كرش / لكمة كرش", group:"nutrition", targets:["adult","young"] },
-  septicemia: { name:"تسمم دموي", group:"general", targets:["adult","young","calf"] },
-  pinkeye: { name:"التهاب العين", group:"general", targets:["adult","young","calf"] },
-  heat_stress: { name:"إجهاد حراري", group:"general", targets:["adult","young","calf"] },
-  milk_fever: { name:"حمى اللبن / نقص كالسيوم", group:"transition", targets:["adult"] },
-  blood_parasites: { name:"طفيليات دم", group:"general", targets:["adult","young"] },
-  phosphorus_def: { name:"نقص فوسفور", group:"nutrition", targets:["adult","young"] },
-  magnesium_def: { name:"نقص ماغنيسيوم", group:"nutrition", targets:["adult"] },
+  // صحة الضرع
+  mastitis: { name:"التهاب ضرع", group:"صحة الضرع", targets:["adult","calf"] },
 
-  // إضافات مهمة للحلاب
-  ketosis: { name:"كيتوزس / أسيتون", group:"transition", targets:["adult"] },
-  retained_placenta: { name:"احتباس مشيمة", group:"transition", targets:["adult"] },
-  metritis: { name:"التهاب رحم", group:"transition", targets:["adult"] },
-  bloat: { name:"نفاخ", group:"general", targets:["adult","young","calf"] },
-  downer_cow: { name:"رقود / غير قادرة على الوقوف", group:"urgent", targets:["adult"] },
-  trauma: { name:"إصابة / جرح", group:"general", targets:["adult","young","calf"] },
-  toxicity: { name:"اشتباه تسمم", group:"urgent", targets:["adult","young","calf"] },
-  dehydration: { name:"جفاف شديد", group:"urgent", targets:["adult","young","calf"] },
+  // تناسل
+  retained_placenta: { name:"احتباس مشيمة", group:"تناسل", targets:["adult","calf"] },
+  metritis: { name:"التهاب رحم", group:"تناسل", targets:["adult","calf"] },
+  ovarian_cysts: { name:"تكيسات مبيضية", group:"تناسل", targets:["adult","calf"] },
 
-  // أمراض العجول الرضيعة
-  calf_scours: { name:"سكاور / إسهال عجول", group:"calf", targets:["calf"] },
-  calf_pneumonia: { name:"نيمونيا عجول", group:"calf", targets:["calf","young"] },
-  joint_ill: { name:"التهاب مفاصل عجول", group:"calf", targets:["calf"] },
-  calf_coccidiosis: { name:"كوكسيديا عجول", group:"calf", targets:["calf","young"] },
-  poor_colostrum_intake: { name:"ضعف رضاعة / مشكلة سرسوب", group:"calf", targets:["calf"] },
-  weak_calf: { name:"عجل ضعيف / هزال", group:"calf", targets:["calf"] }
+  // حركة وعرج
+  lameness: { name:"عرج / مشاكل حافر", group:"حركة وعرج", targets:["adult","calf"] },
+
+  // معدية / جهازية
+  bovine_respiratory_disease: { name:"مرض تنفسي بقري", group:"معدية / جهازية", targets:["adult","calf"] },
+  johnes_disease: { name:"جونز", group:"معدية / جهازية", targets:["adult","calf"] },
+  bovine_viral_diarrhea: { name:"BVD / الإسهال الفيروسي البقري", group:"معدية / جهازية", targets:["adult","calf"] },
+
+  // أمراض العجول
+  calf_scours: { name:"سكاور / إسهال عجول", group:"أمراض العجول", targets:["adult","calf"] },
+  calf_pneumonia: { name:"نيمونيا عجول", group:"أمراض العجول", targets:["adult","calf"] },
+  navel_infection: { name:"التهاب سرة", group:"أمراض العجول", targets:["adult","calf"] },
+  joint_ill: { name:"التهاب مفاصل عجول", group:"أمراض العجول", targets:["adult","calf"] },
+  calf_coccidiosis: { name:"كوكسيديا عجول", group:"أمراض العجول", targets:["adult","calf"] }
 };
-
 function diseaseDateOnlySrv(v){
   const s = String(v || "").trim().slice(0,10);
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
