@@ -13094,7 +13094,7 @@ const DISEASE_CATALOG_SRV = {
   magnesium_def: { name:"نقص ماغنيسيوم", group:"تمثيل وإنتاج" },
 
   // صحة الضرع
-  mastitis: { name:"التهاب ضرع", group:"صحة الضرع" },
+  mastitis: { name:"التهاب ضرع", group:"صحة الضرع", specialPage:"mastitis.html" },
 
   // تناسل
   retained_placenta: { name:"احتباس مشيمة", group:"تناسل" },
@@ -13103,7 +13103,7 @@ const DISEASE_CATALOG_SRV = {
   brucellosis: { name:"بروسيلا", group:"تناسل" },
 
   // حركة وعرج
-  lameness: { name:"عرج / مشاكل حافر", group:"حركة وعرج" },
+  lameness: { name:"عرج / مشاكل حافر", group:"حركة وعرج", specialPage:"lameness.html" },
 
   // معدية / جهازية
   bovine_respiratory_disease: { name:"مرض تنفسي بقري", group:"معدية / جهازية" },
@@ -13164,10 +13164,10 @@ function diseaseListForAnimalSrv(animal = {}){
     .map(([code, x]) => ({
       code,
       name: x.name,
-      group: x.group || "عام"
+      group: x.group || "عام",
+      specialPage: x.specialPage || ""
     }));
 }
-
 function diseaseSpecialUrlSrv(code, number, date){
   const x = DISEASE_CATALOG_SRV[code];
   if (!x || !x.specialPage) return "";
@@ -13322,16 +13322,16 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
       });
     }
 
-    if (disease.specialPage) {
-      const redirectUrl = diseaseSpecialUrlSrv(diseaseCode, animalNumber, eventDate);
+   if (disease.specialPage) {
+  const redirectUrl = diseaseSpecialUrlSrv(diseaseCode, animalNumber, eventDate);
 
-      return res.status(409).json({
-        ok:false,
-        error:"specialized_page_required",
-        message:`⚠️ ${disease.name} له صفحة متخصصة ولا يُسجل كتشخيص خام.`,
-        redirectUrl
-      });
-    }
+  return res.status(409).json({
+    ok:false,
+    error:"page_redirect_required",
+    message:`⚠️ ${disease.name} يتم تسجيله من صفحته المخصصة.`,
+    redirectUrl
+  });
+}
 
     const eventRef = db.collection("events").doc();
     const targetCollection = animal._collection || "animals";
