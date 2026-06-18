@@ -4922,7 +4922,21 @@ function eventsPageNormalizeTypeKeySrv(ev = {}) {
     "تحضير_للولادة": "close_up",
     "closeup": "close_up",
     "close_up": "close_up",
-    "close_up_save": "close_up"
+    "close_up_save": "close_up",
+        "تغذية": "nutrition",
+    "عليقة": "nutrition",
+    "nutrition": "nutrition",
+
+    "عرج": "lameness",
+    "lameness": "lameness",
+
+    "التهاب_الضرع": "mastitis",
+    "mastitis": "mastitis",
+
+    "تقييم_صفات_اللبن": "milking_traits_eval",
+    "صفات_اللبن": "milking_traits_eval",
+    "milking_traits_eval": "milking_traits_eval",
+    "dairy_traits": "milking_traits_eval"
   };
 
   return map[k] || k;
@@ -4949,13 +4963,24 @@ function eventsPageTypeLabelSrv(ev = {}) {
     cull: "استبعاد",
     health: "مرض",
     ovsynch: "تزامن",
-    close_up: "تحضير ولادة"
+    close_up: "تحضير ولادة",
+    nutrition: "تغذية",
+    lameness: "عرج",
+    mastitis: "التهاب الضرع",
+    milking_traits_eval: "تقييم صفات اللبن",
+    milking_traits: "تقييم صفات اللبن"
   };
 
-  const rawAr = String(eventsPagePickSrv(ev, ["eventType", "type"], "")).trim();
-  return rawAr || labels[key] || "حدث";
-}
+  if (labels[key]) return labels[key];
 
+  const rawAr = String(eventsPagePickSrv(ev, ["eventType", "type", "name", "نوع الحدث"], "")).trim();
+
+  if (/[\u0600-\u06FF]/.test(rawAr)) {
+    return rawAr;
+  }
+
+  return "حدث";
+}
 function eventsPageDetailsSrv(ev = {}) {
   const key = eventsPageNormalizeTypeKeySrv(ev);
 
@@ -5138,19 +5163,159 @@ function eventsPageEventAnimalNumberSrv(ev = {}) {
     "calfNumber"
   ], "")).trim();
 }
+function eventsPageListDateSrv(ev = {}) {
+  const raw = eventsPagePickSrv(ev, [
+    "eventDate",
+    "date",
+    "dt",
+    "createdAt",
+    "timestamp"
+  ], "");
 
+  const d = toDate(raw);
+  if (d && !Number.isNaN(d.getTime())) {
+    return toYYYYMMDD(d);
+  }
+
+  const s = String(raw || "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+}
+
+function eventsPageListSortMsSrv(ev = {}) {
+  const raw = eventsPagePickSrv(ev, [
+    "eventDate",
+    "date",
+    "dt",
+    "createdAt",
+    "timestamp"
+  ], "");
+
+  const d = toDate(raw);
+  return d && !Number.isNaN(d.getTime()) ? d.getTime() : 0;
+}
+
+function eventsPageListTypeOptionsSrv() {
+  return [
+    { value: "", label: "كل الأنواع" },
+    { value: "insemination", label: "تلقيح" },
+    { value: "daily_milk", label: "لبن يومي" },
+    { value: "calving", label: "ولادة" },
+    { value: "pregnancy_diagnosis", label: "تشخيص حمل" },
+    { value: "vaccination", label: "تحصين" },
+    { value: "hoof_trimming", label: "تقليم الحوافر" },
+    { value: "lameness", label: "عرج" },
+    { value: "mastitis", label: "التهاب الضرع" },
+    { value: "heat", label: "شياع" },
+    { value: "ovsynch", label: "تزامن" },
+    { value: "dry_off", label: "تجفيف" },
+    { value: "abortion", label: "إجهاض" },
+    { value: "weaning", label: "فطام" },
+    { value: "sale", label: "بيع" },
+    { value: "death", label: "نفوق" },
+    { value: "cull", label: "استبعاد" },
+    { value: "bcs_eval", label: "فحص حالة الجسم" },
+    { value: "feces_eval", label: "تقييم الروث" },
+    { value: "milking_traits_eval", label: "تقييم صفات اللبن" },
+    { value: "nutrition", label: "تغذية" },
+    { value: "health", label: "مرض" }
+  ];
+}
+
+function eventsPageTypeFilterKeySrv(raw = "") {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+
+  return eventsPageNormalizeTypeKeySrv({
+    eventTypeNorm: s,
+    eventType: s,
+    type: s
+  });
+}
+
+async function eventsPageFetchAnimalEventsSrv(uid, number) {
+  const numberStr = String(number || "").trim();
+  const nNum = Number(numberStr);
+
+  const fields = ["animalNumber", "number", "calfNumber"];
+  const values = [numberStr];
+
+  if (Number.isFinite(nNum)) {
+    values.push(nNum);
+  }
+
+  const found = new Map();
+  let hadDirectError = false;
+
+  for (const field of fields) {
+    for (const value of values) {
+      try {
+        const snap = await db.collection("events")
+          .where("userId", "==", uid)
+          .where(field, "==", value)
+          .limit(1000)
+          .get();
+
+        snap.forEach(doc => {
+          found.set(doc.id, {
+            id: doc.id,
+            data: doc.data() || {}
+          });
+        });
+
+      } catch (e) {
+        hadDirectError = true;
+        console.warn("events-page direct query failed", {
+          field,
+          value,
+          message: e.message || e
+        });
+      }
+    }
+  }
+
+  if (found.size || !hadDirectError) {
+    return Array.from(found.values());
+  }
+
+  const fallbackSnap = await db.collection("events")
+    .where("userId", "==", uid)
+    .orderBy("eventDate", "desc")
+    .limit(1500)
+    .get();
+
+  fallbackSnap.forEach(doc => {
+    const ev = doc.data() || {};
+    const evNumber = eventsPageParseNumbersSrv(eventsPageEventAnimalNumberSrv(ev))[0] || "";
+
+    if (evNumber === numberStr) {
+      found.set(doc.id, {
+        id: doc.id,
+        data: ev
+      });
+    }
+  });
+
+  return Array.from(found.values());
+}
 function eventsPageRowSrv(docId, ev = {}) {
-  const eventDate = eventsPageDateSrv(
-    eventsPagePickSrv(ev, ["eventDate", "date", "dt"], "")
-  );
+  const animalNumber = eventsPageEventAnimalNumberSrv(ev);
+  const eventDate = eventsPageListDateSrv(ev);
+  const typeKey = eventsPageNormalizeTypeKeySrv(ev);
 
   return {
     id: docId,
-    eventDate,
-    animalNumber: eventsPageEventAnimalNumberSrv(ev),
-    typeKey: eventsPageNormalizeTypeKeySrv(ev),
+    eventDate: eventDate || "غير مسجل",
+    animalNumber,
+    typeKey,
     typeLabel: eventsPageTypeLabelSrv(ev),
-    details: eventsPageDetailsSrv(ev)
+    details: eventsPageDetailsSrv(ev),
+    animalCardUrl: animalNumber
+      ? `/cow-card.html?number=${encodeURIComponent(animalNumber)}`
+      : "",
+    addEventUrl: animalNumber
+      ? `/add-event.html?number=${encodeURIComponent(animalNumber)}`
+      : "",
+    _sortMs: eventsPageListSortMsSrv(ev)
   };
 }
 
@@ -5161,11 +5326,13 @@ app.get("/api/events-page/list", requireUserId, async (req, res) => {
         ok: false,
         error: "firestore_disabled",
         message: "تعذّر تحميل قائمة الأحداث — قاعدة البيانات غير متاحة.",
-        rows: []
+        rows: [],
+        typeOptions: eventsPageListTypeOptionsSrv()
       });
     }
 
     const uid = req.userId;
+
     const number = eventsPageParseNumbersSrv(
       req.query.number ||
       req.query.animalNumber ||
@@ -5175,42 +5342,46 @@ app.get("/api/events-page/list", requireUserId, async (req, res) => {
     )[0] || "";
 
     const typeRaw = String(req.query.type || req.query.eventType || "").trim();
+    const typeKey = eventsPageTypeFilterKeySrv(typeRaw);
 
     if (!number) {
       return res.status(400).json({
         ok: false,
         error: "animal_number_required",
         message: "رقم الحيوان مطلوب لعرض قائمة الأحداث.",
-        rows: []
+        rows: [],
+        typeOptions: eventsPageListTypeOptionsSrv()
       });
     }
 
-    const snap = await db.collection("events")
-      .where("userId", "==", uid)
-      .orderBy("eventDate", "desc")
-      .limit(300)
-      .get();
+    const docs = await eventsPageFetchAnimalEventsSrv(uid, number);
 
-    const rows = [];
+    const rows = docs
+      .map(item => eventsPageRowSrv(item.id, item.data))
+      .filter(row => {
+        const rowNumber = eventsPageParseNumbersSrv(row.animalNumber)[0] || "";
 
-    snap.forEach(doc => {
-      const ev = doc.data() || {};
-      const animalNumber = eventsPageEventAnimalNumberSrv(ev);
+        if (rowNumber !== number) return false;
 
-      if (String(animalNumber).trim() !== String(number).trim()) return;
+        if (!typeKey) return true;
 
-      const row = eventsPageRowSrv(doc.id, ev);
-
-      if (typeRaw && row.typeLabel !== typeRaw && row.typeKey !== typeRaw) return;
-
-      rows.push(row);
-    });
+        return row.typeKey === typeKey || row.typeLabel === typeRaw;
+      })
+      .sort((a, b) => (b._sortMs || 0) - (a._sortMs || 0))
+      .map(row => {
+        const { _sortMs, ...clean } = row;
+        return clean;
+      });
 
     return res.json({
       ok: true,
       number,
       type: typeRaw,
+      typeKey,
       count: rows.length,
+      typeOptions: eventsPageListTypeOptionsSrv(),
+      animalCardUrl: `/cow-card.html?number=${encodeURIComponent(number)}`,
+      addEventUrl: `/add-event.html?number=${encodeURIComponent(number)}`,
       rows
     });
 
@@ -5221,7 +5392,8 @@ app.get("/api/events-page/list", requireUserId, async (req, res) => {
       ok: false,
       error: "events_page_list_failed",
       message: "تعذّر تحميل قائمة الأحداث الآن.",
-      rows: []
+      rows: [],
+      typeOptions: eventsPageListTypeOptionsSrv()
     });
   }
 });
