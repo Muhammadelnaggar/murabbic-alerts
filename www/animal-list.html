@@ -5,7 +5,6 @@
   <title>قائمة الحيوانات</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
   <style>
 body{
   font-family: 'Arial', sans-serif;
@@ -35,8 +34,7 @@ body{
     tr:nth-child(even) { background-color: #f9fbe7; }
     .button { padding: 5px 10px; background-color: #43a047; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
     .button:hover { background-color: #388e3c; }
-    .delete-button { background-color: #c62828; }
-    .delete-button:hover { background-color: #b71c1c; }
+   
     .no-data { text-align: center; color: #c62828; margin-top: 30px; font-size: 18px; }
     .back-button { display: block; text-align: center; background-color: #4caf50; color: white; font-size: 16px; padding: 10px; border-radius: 8px; text-decoration: none; }
 
@@ -226,15 +224,18 @@ html, body{
 .mbk-logo{
   height: 48px;                   /* تكبير الشعار */
 }
+/* تلوين الصفوف حسب النوع — اللون جايز من السيرفر فقط كـ rowClass */
+#animalTable tbody tr.mbk-row-cow td{
+  background:#fffde7 !important;
+}
 
+#animalTable tbody tr.mbk-row-buffalo td{
+  background:#eeeeee !important;
+}
   </style>
 </head>
 <body>
-  <script type="module">
-  import { protectPage, lockBackButton } from "/js/nav-guard.js";
-  protectPage();
-  lockBackButton();
-</script>
+  
 <header class="mbk-top">
   <div class="mbk-head">
     <div class="mbk-title">
@@ -247,10 +248,10 @@ html, body{
 
   <div class="controls">
     <input type="text" id="searchNumber" placeholder="ابحث برقم الحيوان">
-    <select id="typeSelector" onchange="filterType(this.value)">
+   <select id="typeSelector">
       <option value="">عرض النوع</option>
     </select>
-    <select id="filterReproductive" onchange="filterReproductiveStatus(this.value)">
+   <select id="filterReproductive">
       <option value="">كل الحالات التناسلية</option>
       <option value="حديث الولادة">حديث الولادة</option>
       <option value="ملقحة">ملقحة</option>
@@ -258,7 +259,7 @@ html, body{
       <option value="مفتوحة">مفتوحة</option>
       <option value="إجهاض">إجهاض</option>
     </select>
-    <button onclick="resetFilter()">عرض الكل</button>
+   <button id="resetFilterBtn" type="button">عرض الكل</button>
   </div>
 
   <div class="table-wrapper">
@@ -278,7 +279,7 @@ html, body{
           <th>تاريخ آخر ولادة</th>
           <th>البطاقة</th>
           <th>تسجيل حدث</th>
-          <th>حذف</th>
+       
         </tr>
       </thead>
       <tbody id="animalBody"></tbody>
@@ -288,158 +289,212 @@ html, body{
   <div id="noData" class="no-data" style="display:none;">لا يوجد حيوانات مسجلة بعد.</div>
   <a href="dashboard.html" class="back-button">🔙 عودة إلى غرفة التحكم</a>
 
-  <!-- سكربت تحسين التمرير (لو الملف موجود) -->
-  <script src="js/mbk-animals.js?v=1"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', function(){
-      if (window.MBK?.animal?.enhanceAnimalList) {
-        MBK.animal.enhanceAnimalList();
-      }
-    });
-  </script>
-
-  <!-- سكربت فايرستور (يعتمد على firebase-config.js) -->
- <script type="module">
-  import { db, auth } from "/js/firebase-config.js";
-  import { collection, query, where, getDocs, deleteDoc, doc }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-  const $  = id => document.getElementById(id);
+<script>
+  const $ = id => document.getElementById(id);
   let animalsData = [];
-   function updateStickyCols(){
-  const th1 = document.querySelector("#animalTable thead th:nth-child(1)");
-  if (!th1) return;
-  document.documentElement.style.setProperty("--sticky-col1", th1.offsetWidth + "px");
-}
-window.addEventListener("resize", updateStickyCols);
+  let searchTimer = null;
 
+  function readStoredUid() {
+    const keys = [
+      'murabbik_uid',
+      'mbk_uid',
+      'uid',
+      'userId',
+      'ownerUid',
+      'currentUserId'
+    ];
 
-  // انتظر جلسة مستخدم حقيقية؛ مفيش مجهول هنا
-  onAuthStateChanged(auth, async (u) => {
-    if (!u) {
-      location.href = "login.html?next=animal-list.html";
-      return;
+    for (const k of keys) {
+      const v = (localStorage.getItem(k) || sessionStorage.getItem(k) || '').trim();
+      if (v) return v;
     }
-    await loadAnimals(u.uid);
-  });
 
-  async function loadAnimals(uid) {
-    const snap = await getDocs(
-      query(collection(db, "animals"), where("ownerUid", "==", uid))
-    );
-    animalsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    updateTypeOptions();
-    renderTable(animalsData);
+    const jsonKeys = ['murabbik_user', 'mbk_user', 'user', 'currentUser'];
+    for (const k of jsonKeys) {
+      const raw = localStorage.getItem(k) || sessionStorage.getItem(k) || '';
+      if (!raw) continue;
+
+      try {
+        const obj = JSON.parse(raw);
+        const v = String(obj.uid || obj.userId || obj.ownerUid || obj.id || '').trim();
+        if (v) return v;
+      } catch (_) {}
+    }
+
+    return '';
   }
 
-  function updateTypeOptions() {
-    const typeSelector = $("typeSelector");
+  function setMessage(text) {
+    const noData = $('noData');
+    const tbody = $('animalBody');
+    if (tbody) tbody.innerHTML = '';
+    if (noData) {
+      noData.textContent = text || 'لا يوجد حيوانات مسجلة بعد.';
+      noData.style.display = 'block';
+    }
+  }
+
+  function updateStickyCols() {
+    const th1 = document.querySelector('#animalTable thead th:nth-child(1)');
+    if (!th1) return;
+    document.documentElement.style.setProperty('--sticky-col1', th1.offsetWidth + 'px');
+  }
+
+  window.addEventListener('resize', updateStickyCols);
+
+  function buildAnimalsUrl() {
+    const params = new URLSearchParams();
+
+    const q = $('searchNumber')?.value.trim() || '';
+    const type = $('typeSelector')?.value || '';
+    const repro = $('filterReproductive')?.value || '';
+
+    if (q) params.set('searchNumber', q);
+    if (type) params.set('type', type);
+    if (repro) params.set('reproductiveStatus', repro);
+
+    const qs = params.toString();
+    return qs ? `/api/animals?${qs}` : '/api/animals';
+  }
+
+  async function apiLoadAnimals() {
+    const uid = readStoredUid();
+
+    if (!uid) {
+      location.href = 'login.html?next=animal-list.html';
+      return null;
+    }
+
+    const res = await fetch(buildAnimalsUrl(), {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        'Accept': 'application/json',
+        'X-User-Id': uid
+      }
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.message || data.error || 'تعذّر تحميل قائمة الحيوانات.');
+    }
+
+    return data;
+  }
+
+  function updateTypeOptions(types = []) {
+    const typeSelector = $('typeSelector');
+    if (!typeSelector) return;
+
+    const selected = typeSelector.value;
     typeSelector.innerHTML = '<option value="">عرض النوع</option>';
-    // النوع العربي محفوظ في animalTypeAr
-    const types = [...new Set(animalsData.map(a => a.animalTypeAr).filter(Boolean))];
+
     types.forEach(type => {
-      const opt = document.createElement("option");
+      const opt = document.createElement('option');
       opt.value = type;
-      opt.textContent = (type === "بقرة") ? "🐄 الأبقار" : "🐃 الجاموس";
+      opt.textContent = type === 'بقرة' ? '🐄 الأبقار' : type === 'جاموسة' ? '🐃 الجاموس' : type;
       typeSelector.appendChild(opt);
     });
+
+    if (selected && types.includes(selected)) {
+      typeSelector.value = selected;
+    }
+  }
+
+  function appendTextCell(tr, text) {
+    const td = document.createElement('td');
+    td.textContent = text ?? '---';
+    tr.appendChild(td);
+  }
+
+  function appendButtonCell(tr, label, url) {
+    const td = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'button';
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      if (url) location.href = url;
+    });
+    td.appendChild(btn);
+    tr.appendChild(td);
   }
 
   function renderTable(data) {
-    const tbody  = $("animalBody");
-    const noData = $("noData");
-    tbody.innerHTML = "";
-    if (!data || data.length === 0) { noData.style.display = "block"; return; }
-    noData.style.display = "none";
+    const tbody = $('animalBody');
+    const noData = $('noData');
+    if (!tbody || !noData) return;
+
+    tbody.innerHTML = '';
+
+    if (!data || data.length === 0) {
+      noData.textContent = 'لا يوجد حيوانات مطابقة.';
+      noData.style.display = 'block';
+      updateStickyCols();
+      return;
+    }
+
+    noData.style.display = 'none';
 
     data.forEach(animal => {
-      const days = ms => Math.floor(ms / 86400000);
+      const tr = document.createElement('tr');
+      if (animal.rowClass) tr.className = animal.rowClass;
 
-      const daysInMilk = animal.lastCalvingDate
-        ? days(Date.now() - new Date(animal.lastCalvingDate))
-        : (animal.daysInMilk ?? '---');
+      appendTextCell(tr, animal.animalNumber);
+      appendTextCell(tr, animal.animalTypeAr);
+      appendTextCell(tr, animal.breed);
+      appendTextCell(tr, animal.productionStatus);
+      appendTextCell(tr, animal.daysInMilk);
+      appendTextCell(tr, animal.reproductiveStatus);
+      appendTextCell(tr, animal.inseminatedDays);
+      appendTextCell(tr, animal.dailyMilk);
+      appendTextCell(tr, animal.pregnancyDays);
+      appendTextCell(tr, animal.birthDate);
+      appendTextCell(tr, animal.lastCalvingDate);
+      appendButtonCell(tr, '📄', animal.cardUrl);
+      appendButtonCell(tr, '📋', animal.eventUrl);
 
-      const pregnantDays = (animal.reproductiveStatus === 'عشار' && animal.lastInseminationDate)
-        ? days(Date.now() - new Date(animal.lastInseminationDate))
-        : '---';
-
-      const inseminatedDays = (animal.reproductiveStatus === 'ملقحة' && animal.lastInseminationDate)
-        ? days(Date.now() - new Date(animal.lastInseminationDate))
-        : '---';
-
-      const tr = document.createElement("tr");
-      const typeEn = animal.animaltype;         // cow / buffalo
-      const typeAr = animal.animalTypeAr || ""; // بقرة / جاموسة
-
-      tr.style.backgroundColor = (typeEn === "cow") ? "#fffde7" : "#eeeeee";
-      tr.innerHTML = `
-        <td>${animal.animalNumber ?? ""}</td>
-        <td>${typeAr}</td>
-        <td>${animal.breed ?? ""}</td>
-        <td>${animal.productionStatus ?? "---"}</td>
-        <td>${daysInMilk}</td>
-        <td>${animal.reproductiveStatus ?? ""}</td>
-        <td>${inseminatedDays}</td>
-        <td>${animal.dailyMilk ?? "---"}</td>
-        <td>${pregnantDays}</td>
-        <td>${animal.birthDate || "---"}</td>
-        <td>${animal.lastCalvingDate || "---"}</td>
-        <td><button class="button" onclick="viewCard('${animal.animalNumber ?? ""}')">📄</button></td>
-        <td><button class="button" onclick="goToAddEvent('${animal.animalNumber ?? ""}')">📋</button></td>
-        <td><button class="button delete-button" onclick="deleteAnimal('${animal.id}')">🗑️</button></td>
-      `;
       tbody.appendChild(tr);
     });
+
     updateStickyCols();
   }
 
-  // أزرار الجدول (global)
-  window.viewCard = function(animalNumber){
-    if(!animalNumber) return;
-    location.href = `cow-card.html?number=${encodeURIComponent(animalNumber)}`;
-  };
+  async function loadAnimals() {
+    try {
+      const data = await apiLoadAnimals();
+      if (!data) return;
 
-  window.goToAddEvent = function(animalNumber){
-    if(!animalNumber) return;
-    const today = new Date().toISOString().slice(0,10);
-    localStorage.setItem("lastAnimalId", animalNumber);
-    localStorage.setItem("lastEventDate", today);
-    location.href =
-      `add-event.html?animalId=${encodeURIComponent(animalNumber)}&number=${encodeURIComponent(animalNumber)}&animalNumber=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(today)}&date=${encodeURIComponent(today)}`;
-  };
+      animalsData = data.animals || [];
+      updateTypeOptions(data.typeOptions || []);
+      renderTable(animalsData);
+    } catch (e) {
+      console.error('animal-list load failed:', e);
+      setMessage(e.message || 'تعذّر تحميل قائمة الحيوانات.');
+    }
+  }
 
-  window.deleteAnimal = async function(animalDocId){
-    if(!confirm("هل أنت متأكد من حذف الحيوان؟")) return;
-    await deleteDoc(doc(db, "animals", animalDocId));
-    animalsData = animalsData.filter(a => a.id !== animalDocId);
-    renderTable(animalsData);
-  };
+  function scheduleLoadAnimals() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadAnimals, 250);
+  }
 
-  // فلاتر أعلى الجدول
-  $("searchNumber").addEventListener("input", function(){
-    const q = this.value.trim();
-    renderTable(animalsData.filter(a => String(a.animalNumber ?? "").includes(q)));
-  });
+  $('searchNumber')?.addEventListener('input', scheduleLoadAnimals);
 
-  window.filterType = function(type){
-    if(!type) return renderTable(animalsData);
-    renderTable(animalsData.filter(a => (a.animalTypeAr || "") === type));
-  };
+ 
+  $('typeSelector')?.addEventListener('change', loadAnimals);
+$('filterReproductive')?.addEventListener('change', loadAnimals);
 
-  window.filterReproductiveStatus = function(status){
-    if(!status) return renderTable(animalsData);
-    renderTable(animalsData.filter(a => (a.reproductiveStatus || "") === status));
-  };
-
-  window.resetFilter = function(){
-    $("searchNumber").value = "";
-    $("filterReproductive").value = "";
-    $("typeSelector").value = "";
-    renderTable(animalsData);
-  };
+$('resetFilterBtn')?.addEventListener('click', function(){
+  $('searchNumber').value = '';
+  $('filterReproductive').value = '';
+  $('typeSelector').value = '';
+  loadAnimals();
+});
+  document.addEventListener('DOMContentLoaded', loadAnimals);
 </script>
-<script type="module" src="/js/smart-alerts.js"></script>
+
 
 </body>
 </html>
