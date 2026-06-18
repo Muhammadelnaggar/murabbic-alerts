@@ -2796,3 +2796,74 @@ body[data-page="animal-list"] .no-data{
   margin-top:30px;
   font-size:18px;
 }
+/* ===== Event List — sticky date/type + horizontal details ===== */
+
+.event-list-page .table {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.event-list-page #evTable {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.event-list-page #evTable th,
+.event-list-page #evTable td {
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.event-list-page .sticky-col {
+  position: sticky;
+  background: var(--mbk-card, #fff);
+  z-index: 3;
+}
+
+.event-list-page thead .sticky-col {
+  z-index: 6;
+}
+
+.event-list-page .sticky-date {
+  right: 0;
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+}
+
+.event-list-page .sticky-type {
+  right: var(--w-date, 112px);
+  width: 132px;
+  min-width: 132px;
+  max-width: 132px;
+}
+
+.event-list-page .event-details-cell {
+  min-width: 460px;
+  max-width: 460px;
+  overflow: hidden;
+}
+
+.event-list-page .event-details-scroll {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+.event-list-page .pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 112px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
