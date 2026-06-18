@@ -150,11 +150,13 @@
   async function loadAndFilter(){
     const uid = currentUserId();
 
-    const fixedNumber =
-      getParam('number','animalNumber','num','n') ||
-      localStorage.getItem('currentAnimalNumber') ||
-      fNum.value.trim() ||
-      '';
+    const inputNumber = fNum.value.trim();
+
+const fixedNumber =
+  inputNumber ||
+  getParam('number','animalNumber','num','n') ||
+  localStorage.getItem('currentAnimalNumber') ||
+  '';
 
     const type = (fType.value || '').trim();
 
