@@ -5168,15 +5168,19 @@ function eventsPageDetailsSrv(ev = {}) {
     return eventsPageJoinDetailsSrv(parts);
   }
 
-  if (key === "heat") {
-    add("شدة الشياع", ["heatIntensity", "intensity", "score"]);
-    add("علامات الشياع", ["signs", "heatSigns"]);
-    add("وقت الملاحظة", ["observedAt", "time", "timeOfDay"]);
-    add("قرار المتابعة", ["action", "recommendation"]);
-    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+ if (key === "heat") {
+  add("وقت ملاحظة الشياع", ["heatTime", "observedAt", "time", "timeOfDay"]);
+  add("الحالة التناسلية وقت التسجيل", ["reproductiveStatusSnapshot", "reproductiveStatus"]);
+  add("أيام الحليب وقت الشياع", ["dimAtEvent", "daysInMilk"], " يوم");
+  add("منذ آخر شياع/تلقيح", ["daysSinceLastHeatOrAI", "daysSinceLastHeat", "daysSinceLastAI"], " يوم");
+  add("علامات الشياع", ["heatSigns", "signs"]);
+  add("شدة الشياع", ["heatIntensity", "intensity", "score"]);
+  add("قرار المتابعة", ["action", "recommendation"]);
 
-    return eventsPageJoinDetailsSrv(parts);
-  }
+  if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+
+  return eventsPageJoinDetailsSrv(parts, "شياع مسجّل");
+}
 
   if (key === "ovsynch") {
     add("البروتوكول", ["protocolName", "protocol", "program"]);
