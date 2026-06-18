@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+
+     <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
@@ -15,7 +16,7 @@
 
     <div class="mbk-center">
       <div class="mbk-page-title">التشخيص الصحي</div>
-      <div class="mbk-app-name">مُرَبِّك — بوابة تشخيص انتقائية</div>
+     <div class="mbk-app-name">مُرَبِّك — تسجيل تشخيص صحي</div>
     </div>
 
     <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّك" />
@@ -51,7 +52,7 @@
 </div>
   </main>
 
- <script>
+<script>
 (function(){
   const API_BASE = location.origin;
   const $ = (id) => document.getElementById(id);
@@ -64,6 +65,7 @@
   const animalSummary = $("animalSummary");
 
   let gateTimer = null;
+  let selectedDiseaseCode = "";
 
   function todayLocal(){
     const d = new Date();
@@ -84,45 +86,45 @@
   }
 
   function getTenantId(){
-  try {
-    const p = new URLSearchParams(location.search);
-    const T = window.__TENANT__ || window.__MURABBIK_USER__ || {};
+    try {
+      const p = new URLSearchParams(location.search);
+      const T = window.__TENANT__ || window.__MURABBIK_USER__ || {};
 
-    const direct =
-      T.userId ||
-      T.uid ||
-      T.id ||
-      p.get("userId") ||
-      p.get("uid") ||
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("ownerUid") ||
-      sessionStorage.getItem("userId") ||
-      sessionStorage.getItem("uid") ||
-      "";
+      const direct =
+        T.userId ||
+        T.uid ||
+        T.id ||
+        p.get("userId") ||
+        p.get("uid") ||
+        localStorage.getItem("userId") ||
+        localStorage.getItem("uid") ||
+        localStorage.getItem("ownerUid") ||
+        sessionStorage.getItem("userId") ||
+        sessionStorage.getItem("uid") ||
+        "";
 
-    if (direct && direct !== "null" && direct !== "undefined") {
-      return String(direct).trim();
+      if (direct && direct !== "null" && direct !== "undefined") {
+        return String(direct).trim();
+      }
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i) || "";
+        const v = localStorage.getItem(k) || "";
+
+        if (!k.includes("firebase") && !v.includes("uid")) continue;
+
+        try {
+          const j = JSON.parse(v);
+          const uid = j.uid || j.user?.uid || j.stsTokenManager?.uid || "";
+          if (uid) return String(uid).trim();
+        } catch {}
+      }
+
+      return "";
+    } catch {
+      return "";
     }
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i) || "";
-      const v = localStorage.getItem(k) || "";
-
-      if (!k.includes("firebase") && !v.includes("uid")) continue;
-
-      try {
-        const j = JSON.parse(v);
-        const uid = j.uid || j.user?.uid || j.stsTokenManager?.uid || "";
-        if (uid) return String(uid).trim();
-      } catch {}
-    }
-
-    return "";
-  } catch {
-    return "";
   }
-}
 
   function setBar(el, text, type){
     if (!el) return;
@@ -140,7 +142,6 @@
 
     const parts = [];
 
-    if (animal.collection) parts.push(animal.collection === "calves" ? "عجل/تابع" : "حيوان بالغ");
     if (animal.productionStatus) parts.push("إنتاجيًا: " + animal.productionStatus);
     if (animal.reproductiveStatus) parts.push("تناسليًا: " + animal.reproductiveStatus);
     if (animal.followerStatus) parts.push("حالة التابع: " + animal.followerStatus);
@@ -150,6 +151,7 @@
 
   function renderDiseases(list){
     dz.innerHTML = "";
+    selectedDiseaseCode = "";
 
     if (!Array.isArray(list) || !list.length) {
       dz.innerHTML = '<div class="infobar warning show">لا توجد تشخيصات مناسبة للعرض الآن.</div>';
@@ -159,7 +161,7 @@
     const groups = new Map();
 
     list.forEach(item => {
-      const g = item.group || "general";
+      const g = item.group || "عام";
       if (!groups.has(g)) groups.set(g, []);
       groups.get(g).push(item);
     });
@@ -180,24 +182,16 @@
         btn.type = "button";
         btn.className = "mbk-action-tile";
         btn.dataset.code = item.code || "";
-        btn.dataset.specialPage = item.specialPage || "";
-
-        const hint = item.specialPage
-          ? "يفتح صفحة متخصصة"
-          : "تسجيل خام للتحليل";
-
-        btn.innerHTML = `<span>${item.name}<small>${hint}</small></span>`;
+        btn.textContent = item.name || "";
 
         btn.addEventListener("click", () => {
-          const n = digitsOnly(animalNumberEl.value);
-          const d = eventDateEl.value || todayLocal();
+          selectedDiseaseCode = item.code || "";
 
-          if (item.specialPage) {
-            location.href = `${item.specialPage}?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`;
-            return;
-          }
+          dz.querySelectorAll(".mbk-action-tile.is-selected")
+            .forEach(x => x.classList.remove("is-selected"));
 
-          setBar(info, "الحفظ في الخطوة التالية بعد اختبار عرض التشخيصات.", "info");
+          btn.classList.add("is-selected");
+          setBar(info, "تم اختيار التشخيص الصحي.", "success");
         });
 
         wrap.appendChild(btn);
@@ -236,10 +230,7 @@
           "Content-Type": "application/json",
           "X-User-Id": uid
         },
-        body: JSON.stringify({
-          animalNumber,
-          eventDate
-        })
+        body: JSON.stringify({ animalNumber, eventDate })
       });
 
       const j = await r.json();
