@@ -13086,33 +13086,42 @@ app.post("/api/pregnancy-diagnosis/save", requireUserId, async (req, res) => {
 
 const DISEASE_CATALOG_SRV = {
   // تمثيل وإنتاج
-  milk_fever: { name:"حمى اللبن", group:"تمثيل وإنتاج", targets:["adult","calf"] },
-  ketosis: { name:"كيتوزس", group:"تمثيل وإنتاج", targets:["adult","calf"] },
-  displaced_abomasum: { name:"انقلاب المنفحة", group:"تمثيل وإنتاج", targets:["adult","calf"] },
-  rumen_acidosis: { name:"حموضة الكرش", group:"تمثيل وإنتاج", targets:["adult","calf"] },
+  milk_fever: { name:"حمى اللبن", group:"تمثيل وإنتاج" },
+  ketosis: { name:"كيتوزس", group:"تمثيل وإنتاج" },
+  displaced_abomasum: { name:"انقلاب المنفحة", group:"تمثيل وإنتاج" },
+  rumen_acidosis: { name:"حموضة الكرش", group:"تمثيل وإنتاج" },
+  phosphorus_def: { name:"نقص فوسفور", group:"تمثيل وإنتاج" },
+  magnesium_def: { name:"نقص ماغنيسيوم", group:"تمثيل وإنتاج" },
 
   // صحة الضرع
-  mastitis: { name:"التهاب ضرع", group:"صحة الضرع", targets:["adult","calf"] },
+  mastitis: { name:"التهاب ضرع", group:"صحة الضرع" },
 
   // تناسل
-  retained_placenta: { name:"احتباس مشيمة", group:"تناسل", targets:["adult","calf"] },
-  metritis: { name:"التهاب رحم", group:"تناسل", targets:["adult","calf"] },
-  ovarian_cysts: { name:"تكيسات مبيضية", group:"تناسل", targets:["adult","calf"] },
+  retained_placenta: { name:"احتباس مشيمة", group:"تناسل" },
+  metritis_endometritis: { name:"التهاب رحم / التهاب بطانة الرحم", group:"تناسل" },
+  ovarian_cysts: { name:"تكيسات مبيضية", group:"تناسل" },
+  brucellosis: { name:"بروسيلا", group:"تناسل" },
 
   // حركة وعرج
-  lameness: { name:"عرج / مشاكل حافر", group:"حركة وعرج", targets:["adult","calf"] },
+  lameness: { name:"عرج / مشاكل حافر", group:"حركة وعرج" },
 
   // معدية / جهازية
-  bovine_respiratory_disease: { name:"مرض تنفسي بقري", group:"معدية / جهازية", targets:["adult","calf"] },
-  johnes_disease: { name:"جونز", group:"معدية / جهازية", targets:["adult","calf"] },
-  bovine_viral_diarrhea: { name:"BVD / الإسهال الفيروسي البقري", group:"معدية / جهازية", targets:["adult","calf"] },
+  bovine_respiratory_disease: { name:"مرض تنفسي بقري", group:"معدية / جهازية" },
+  johnes_disease: { name:"جونز", group:"معدية / جهازية" },
+  bovine_viral_diarrhea: { name:"BVD / الإسهال الفيروسي البقري", group:"معدية / جهازية" },
+  fmd: { name:"حمى قلاعية", group:"معدية / جهازية" },
+  three_day_sickness: { name:"حمى الثلاث أيام", group:"معدية / جهازية" },
+  lumpy_skin: { name:"جلد عقدي", group:"معدية / جهازية" },
+  septicemia: { name:"تسمم دموي", group:"معدية / جهازية" },
+  blood_parasites: { name:"طفيليات دم", group:"معدية / جهازية" },
+  pinkeye: { name:"التهاب العين", group:"معدية / جهازية" },
 
   // أمراض العجول
-  calf_scours: { name:"سكاور / إسهال عجول", group:"أمراض العجول", targets:["adult","calf"] },
-  calf_pneumonia: { name:"نيمونيا عجول", group:"أمراض العجول", targets:["adult","calf"] },
-  navel_infection: { name:"التهاب سرة", group:"أمراض العجول", targets:["adult","calf"] },
-  joint_ill: { name:"التهاب مفاصل عجول", group:"أمراض العجول", targets:["adult","calf"] },
-  calf_coccidiosis: { name:"كوكسيديا عجول", group:"أمراض العجول", targets:["adult","calf"] }
+  calf_scours: { name:"سكاور / إسهال عجول", group:"أمراض العجول" },
+  calf_pneumonia: { name:"نيمونيا عجول", group:"أمراض العجول" },
+  navel_infection: { name:"التهاب سرة", group:"أمراض العجول" },
+  joint_ill: { name:"التهاب مفاصل عجول", group:"أمراض العجول" },
+  calf_coccidiosis: { name:"كوكسيديا عجول", group:"أمراض العجول" }
 };
 function diseaseDateOnlySrv(v){
   const s = String(v || "").trim().slice(0,10);
@@ -13151,16 +13160,12 @@ function diseaseAnimalClassSrv(animal = {}){
 }
 
 function diseaseListForAnimalSrv(animal = {}){
-  const cls = diseaseAnimalClassSrv(animal);
-
   return Object.entries(DISEASE_CATALOG_SRV)
-    .filter(([, x]) => Array.isArray(x.targets) && x.targets.includes(cls))
     .map(([code, x]) => ({
       code,
       name: x.name,
-      group: x.group || "general",
-      specialPage: x.specialPage || "",
-      raw: !x.specialPage
+      group: x.group || "عام",
+      raw: true
     }));
 }
 
