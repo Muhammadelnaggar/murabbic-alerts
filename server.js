@@ -13164,8 +13164,7 @@ function diseaseListForAnimalSrv(animal = {}){
     .map(([code, x]) => ({
       code,
       name: x.name,
-      group: x.group || "عام",
-      raw: true
+      group: x.group || "عام"
     }));
 }
 
@@ -13351,7 +13350,7 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
       diseaseCode,
       diseaseName: disease.name,
       diseaseGroup: disease.group || "general",
-      diagnosisMode: "raw_health",
+      diagnosisMode: "health_diagnosis",
       notes: notes || null,
 
       animalCollection: targetCollection,
