@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+ 
   <title>تسجيل العرج</title>
   <style>
     body {
@@ -116,30 +116,6 @@
     <button type="submit" id="saveBtn">تسجيل الحالة</button>
   </form>
 
-  <!-- تتبّع بسيط -->
-  <script>
-    (function () {
-      window.dataLayer = window.dataLayer || [];
-      window.__sentEvents = window.__sentEvents || new Set();
-      window.t = window.t || {
-        event: function (name, props) {
-          try {
-            props = props || {};
-            if (name === 'page_view') {
-              var key = 'pv:' + (props.page || location.pathname);
-              if (window.__sentEvents.has(key)) return;
-              window.__sentEvents.add(key);
-            }
-            dataLayer.push({ event: name, ts: Date.now(), ...props });
-          } catch (e) {}
-        }
-      };
-      t.event('page_view', { page: location.pathname, feature: 'lameness' });
-    })();
-  </script>
-
-  <!-- اختياري -->
-  <script src="/js/app-core.js" defer></script>
 
 <script>
   const form = document.getElementById('lamenessForm');
