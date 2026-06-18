@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -48,7 +47,7 @@
    <div class="card grid">
   <div id="animalSummary" class="form-hint"></div>
   <div id="dz" class="mbk-action-hub"></div>
-  <div id="info" class="infobar"></div>
+ 
 </div>
   </main>
 
@@ -56,17 +55,15 @@
 (function(){
   const API_BASE = location.origin;
   const $ = (id) => document.getElementById(id);
-
   const animalNumberEl = $("animalNumber");
   const eventDateEl = $("eventDate");
   const gateBox = $("gateBox");
-  const info = $("info");
   const dz = $("dz");
   const animalSummary = $("animalSummary");
   const notesEl = $("notes");
 
   let gateTimer = null;
-  let selectedDiseaseCode = "";
+ 
 
   function todayLocal(){
     const d = new Date();
@@ -161,7 +158,7 @@ async function saveDiseaseItem(item, btn){
   }
 
   btn.disabled = true;
-  setBar(info, "جاري حفظ التشخيص...", "info");
+ setBar(gateBox, "جاري حفظ التشخيص...", "info");
 
   try {
     const r = await fetch(API_BASE + "/api/disease/save", {
@@ -179,7 +176,7 @@ async function saveDiseaseItem(item, btn){
     });
 
     const j = await r.json();
-    setBar(info, j.message || "تم الحفظ.", j.ok ? "success" : "error");
+   setBar(gateBox, j.message || "✅ تم حفظ التشخيص الصحي بنجاح.", j.ok ? "success" : "error");
 
     if (!r.ok || !j.ok) {
       btn.disabled = false;
@@ -192,14 +189,13 @@ async function saveDiseaseItem(item, btn){
 
   } catch (e) {
     console.error("disease save failed", e);
-    setBar(info, "❌ تعذّر الاتصال بالسيرفر.", "error");
+    setBar(gateBox, "❌ تعذّر الاتصال بالسيرفر.", "error");
     btn.disabled = false;
   }
 }
   function renderDiseases(list){
     dz.innerHTML = "";
-    selectedDiseaseCode = "";
-
+   
     if (!Array.isArray(list) || !list.length) {
       dz.innerHTML = '<div class="infobar warning show">لا توجد تشخيصات مناسبة للعرض الآن.</div>';
       return;
