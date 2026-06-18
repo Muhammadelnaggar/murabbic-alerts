@@ -22550,7 +22550,50 @@ function animalListNumberTextSrv(a = {}) {
   const raw = a.animalNumber ?? a.number ?? a.calfNumber ?? '';
   return normalizeDigitsSrv(raw) || animalListStrSrv(raw);
 }
+function animalListBreedDisplaySrv(v) {
+  const raw = animalListStrSrv(v);
+  if (!raw) return '---';
 
+  const k = raw
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const map = {
+    'holstein': 'هولشتاين',
+    'holstein friesian': 'هولشتاين فريزيان',
+    'friesian': 'فريزيان',
+    'brown swiss': 'براون سويس',
+    'montbeliarde': 'مونتبليارد',
+    'montbéliarde': 'مونتبليارد',
+    'jersey': 'جيرسي',
+    'simmental': 'سيمنتال',
+    'fleckvieh': 'فليكفيه',
+    'charolais': 'شاروليه',
+    'ayrshire': 'أيرشاير',
+
+    'buffalo': 'جاموسي',
+    'egyptian buffalo': 'جاموس مصري',
+    'murrah': 'مورا',
+    'nili ravi': 'نيلي رافي',
+
+    'هولستين': 'هولشتاين',
+    'هولشتاين': 'هولشتاين',
+    'فريزيان': 'فريزيان',
+    'براون سويس': 'براون سويس',
+    'مونتبليارد': 'مونتبليارد',
+    'جيرسي': 'جيرسي',
+    'سيمنتال': 'سيمنتال',
+    'جاموس': 'جاموسي',
+    'جاموسي': 'جاموسي',
+    'جاموس مصري': 'جاموس مصري'
+  };
+
+  return map[k] || raw;
+}
 function animalListBuildRowSrv(a = {}, todayISO = '') {
   const animalNumber = animalListNumberTextSrv(a);
   const typeEn = animalListTypeEnSrv(a);
@@ -22594,7 +22637,7 @@ function animalListBuildRowSrv(a = {}, todayISO = '') {
       : typeEn === 'buffalo'
         ? 'mbk-row-buffalo'
         : '',
-    breed: animalListStrSrv(a.breed) || '---',
+    breed: animalListBreedDisplaySrv(a.breed),
     productionStatus,
     daysInMilk,
     reproductiveStatus: reproductiveStatus || '---',
