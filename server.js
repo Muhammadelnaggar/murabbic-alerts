@@ -22656,10 +22656,22 @@ function animalListBreedDisplaySrv(v) {
     'ayrshire': 'أيرشاير',
 
     'cross': 'خليط',
-    'italian cross': 'خليط إيطالي',
+
+'italian': 'إيطالي',
+'italian cross': 'خليط إيطالي',
+'italiancross': 'خليط إيطالي',
+'cross italian': 'خليط إيطالي',
+
+'indian': 'هندي',
+'indian cross': 'خليط هندي',
+'indiancross': 'خليط هندي',
+'cross indian': 'خليط هندي',
 
     'buffalo': 'جاموسي',
-    'egyptian buffalo': 'جاموس مصري',
+    'baladi': 'بلدي',
+    'balady': 'بلدي',
+    'local': 'بلدي',
+    'native': 'بلدي',
     'italian buffalo': 'جاموس إيطالي',
     'murrah': 'مورا',
     'nili ravi': 'نيلي رافي'
