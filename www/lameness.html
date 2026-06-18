@@ -1,120 +1,81 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl" data-page="lameness">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="css/forms.css">
  
   <title>تسجيل العرج</title>
-  <style>
-    body {
-      background-color: #fff9db;
-      direction: rtl;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      padding: 20px;
-      margin: 0;
-    }
-    h2 {
-      color: #2e7d32;
-      text-align: center;
-      margin-bottom: 25px;
-      font-size: 24px;
-    }
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-      max-width: 560px;
-      margin: 0 auto;
-      background: #fffef4;
-      padding: 16px;
-      border: 1px solid #ffe08a;
-      border-radius: 10px;
-    }
-    label {
-      font-weight: bold;
-      font-size: 18px;
-    }
-    input, select, button {
-      padding: 14px;
-      font-size: 18px;
-      border-radius: 8px;
-      border: 1px solid #2e7d32; /* ✅ تصحيح كود اللون */
-      box-sizing: border-box;
-      background: #fff;
-    }
-    .radio-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    .radio-group label {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 17px;
-      background-color: #e8f5e9;
-      padding: 8px 12px;
-      border-radius: 8px;
-      border: 1px solid #2e7d32;
-      cursor: pointer;
-    }
-    button[type="submit"] {
-      background-color: #2e7d32;
-      color: white;
-      font-size: 20px;
-      cursor: pointer;
-    }
-    /* رسالة داخلية */
-    #msg {
-      display: none;
-      text-align: center;
-      font-weight: bold;
-      margin: 10px auto 0;
-      padding: 10px;
-      border-radius: 8px;
-      max-width: 560px;
-    }
-    #msg.success { background:#d1e7dd; color:#0f5132; border:1px solid #a3cfbb; }
-    #msg.error   { background:#f8d7da; color:#842029; border:1px solid #f1aeb5; }
-  </style>
+ 
 </head>
 <body>
-  <h2>تسجيل حالة العرج</h2>
-
-  <div id="msg"></div>
-
-  <form id="lamenessForm">
-    <label for="animalId">رقم الحيوان</label>
-    <input type="text" id="animalId" name="animalId" required>
-
-    <label for="lamenessDate">تاريخ العرج</label>
-    <input type="date" id="lamenessDate" name="lamenessDate" required>
-
-    <label>الحافر المصاب</label>
-    <div class="radio-group">
-      <label><input type="radio" name="affectedLeg" value="أمام يمين" required> أمام يمين</label>
-      <label><input type="radio" name="affectedLeg" value="أمام شمال"> أمام شمال</label>
-      <label><input type="radio" name="affectedLeg" value="خلف يمين"> خلف يمين</label>
-      <label><input type="radio" name="affectedLeg" value="خلف شمال"> خلف شمال</label>
+  <header>
+  <div class="mbk-head">
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div class="mbk-center">
+      <div class="mbk-page-title">تسجيل حالة العرج</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
     </div>
+    <a class="mbk-back" href="add-event.html">رجوع</a>
+  </div>
+</header>
 
-    <label for="lamenessType">نوع العرج</label>
-    <select id="lamenessType" name="lamenessType" required>
-      <option value="">اختر</option>
-      <option value="قرحة">قرحة</option>
-      <option value="تعفن الحافر">تعفن الحافر</option>
-      <option value="خراج الحافر">خراج الحافر</option>
-      <option value="جسم معدني">جسم معدني</option>
-      <option value="التهاب ما بين الأظلاف">التهاب ما بين الأظلاف</option>
-      <option value="التهاب الصفائح الحساسة">التهاب الصفائح الحساسة</option>
-    </select>
+  <div id="msg" class="infobar" role="status" aria-live="polite"></div>
 
-    <label for="vet">اسم الطبيب البيطري المعالج</label>
-    <input type="text" id="vet" name="vet" placeholder="اختياري">
+  <main>
+    <section class="card">
+      <form id="lamenessForm" class="grid">
 
-    <button type="submit" id="saveBtn">تسجيل الحالة</button>
-  </form>
+        <div class="row">
+          <div>
+            <label for="animalId">رقم الحيوان</label>
+            <input type="text" id="animalId" name="animalId">
+          </div>
+
+          <div>
+            <label for="lamenessDate">تاريخ العرج</label>
+            <input type="date" id="lamenessDate" name="lamenessDate">
+          </div>
+        </div>
+
+        <fieldset>
+          <legend>الحافر المصاب</legend>
+          <div class="radio-group">
+            <label><input type="radio" name="affectedLeg" value="أمام يمين"> أمام يمين</label>
+            <label><input type="radio" name="affectedLeg" value="أمام شمال"> أمام شمال</label>
+            <label><input type="radio" name="affectedLeg" value="خلف يمين"> خلف يمين</label>
+            <label><input type="radio" name="affectedLeg" value="خلف شمال"> خلف شمال</label>
+          </div>
+        </fieldset>
+
+        <div class="row">
+          <div>
+            <label for="lamenessType">نوع العرج</label>
+            <select id="lamenessType" name="lamenessType">
+              <option value="">اختر</option>
+              <option value="قرحة">قرحة</option>
+              <option value="تعفن الحافر">تعفن الحافر</option>
+              <option value="خراج الحافر">خراج الحافر</option>
+              <option value="جسم معدني">جسم معدني</option>
+              <option value="التهاب ما بين الأظلاف">التهاب ما بين الأظلاف</option>
+              <option value="التهاب الصفائح الحساسة">التهاب الصفائح الحساسة</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="vet">اسم الطبيب البيطري المعالج</label>
+            <input type="text" id="vet" name="vet" placeholder="اختياري">
+          </div>
+        </div>
+
+      </form>
+    </section>
+  </main>
+
+  <div class="actions-bar">
+    <button type="button" class="ghost" onclick="history.back()">رجوع</button>
+    <button type="submit" form="lamenessForm" id="saveBtn" class="save">تسجيل الحالة</button>
+  </div>
 
 
 <script>
