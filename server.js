@@ -13080,6 +13080,328 @@ app.post("/api/pregnancy-diagnosis/save", requireUserId, async (req, res) => {
   }
 });
 // ============================================================
+//                 API: DISEASE — SMART GATE/SAVE
+//                 صفحة disease.html — السيرفر مصدر القرار والحفظ
+// ============================================================
+
+const DISEASE_CATALOG_SRV = {
+  // صفحات متخصصة
+  mastitis: { name:"التهاب ضرع", group:"special", specialPage:"mastitis.html", targets:["adult"] },
+  lameness: { name:"عرج", group:"special", specialPage:"lameness.html", targets:["adult","young"] },
+
+  // حلاب / انتقال / عام
+  pneumonia: { name:"التهاب رئوي", group:"general", targets:["adult","young"] },
+  diarrhea: { name:"إسهال", group:"general", targets:["adult","young"] },
+  displaced_abomasum: { name:"انقلاب منفحة", group:"transition", targets:["adult"] },
+  navel_infection: { name:"التهاب سرة", group:"calf", targets:["calf"] },
+  lumpy_skin: { name:"التهاب جلد عقدي", group:"epidemic", targets:["adult","young"] },
+  hardware_disease: { name:"ابتلاع جسم معدني", group:"general", targets:["adult"] },
+  three_day_sickness: { name:"حمى الثلاث أيام", group:"epidemic", targets:["adult","young"] },
+  fmd: { name:"حمى قلاعية", group:"epidemic", targets:["adult","young","calf"] },
+  rumen_acidosis: { name:"حموضة كرش / لكمة كرش", group:"nutrition", targets:["adult","young"] },
+  septicemia: { name:"تسمم دموي", group:"general", targets:["adult","young","calf"] },
+  pinkeye: { name:"التهاب العين", group:"general", targets:["adult","young","calf"] },
+  heat_stress: { name:"إجهاد حراري", group:"general", targets:["adult","young","calf"] },
+  milk_fever: { name:"حمى اللبن / نقص كالسيوم", group:"transition", targets:["adult"] },
+  blood_parasites: { name:"طفيليات دم", group:"general", targets:["adult","young"] },
+  phosphorus_def: { name:"نقص فوسفور", group:"nutrition", targets:["adult","young"] },
+  magnesium_def: { name:"نقص ماغنيسيوم", group:"nutrition", targets:["adult"] },
+
+  // إضافات مهمة للحلاب
+  ketosis: { name:"كيتوزس / أسيتون", group:"transition", targets:["adult"] },
+  retained_placenta: { name:"احتباس مشيمة", group:"transition", targets:["adult"] },
+  metritis: { name:"التهاب رحم", group:"transition", targets:["adult"] },
+  bloat: { name:"نفاخ", group:"general", targets:["adult","young","calf"] },
+  downer_cow: { name:"رقود / غير قادرة على الوقوف", group:"urgent", targets:["adult"] },
+  trauma: { name:"إصابة / جرح", group:"general", targets:["adult","young","calf"] },
+  toxicity: { name:"اشتباه تسمم", group:"urgent", targets:["adult","young","calf"] },
+  dehydration: { name:"جفاف شديد", group:"urgent", targets:["adult","young","calf"] },
+
+  // أمراض العجول الرضيعة
+  calf_scours: { name:"سكاور / إسهال عجول", group:"calf", targets:["calf"] },
+  calf_pneumonia: { name:"نيمونيا عجول", group:"calf", targets:["calf","young"] },
+  joint_ill: { name:"التهاب مفاصل عجول", group:"calf", targets:["calf"] },
+  calf_coccidiosis: { name:"كوكسيديا عجول", group:"calf", targets:["calf","young"] },
+  poor_colostrum_intake: { name:"ضعف رضاعة / مشكلة سرسوب", group:"calf", targets:["calf"] },
+  weak_calf: { name:"عجل ضعيف / هزال", group:"calf", targets:["calf"] }
+};
+
+function diseaseDateOnlySrv(v){
+  const s = String(v || "").trim().slice(0,10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+}
+
+function diseaseTodaySrv(){
+  return typeof cairoTodayISO === "function"
+    ? cairoTodayISO()
+    : new Date().toISOString().slice(0,10);
+}
+
+function diseaseIsArchivedSrv(a = {}){
+  const st = String(a.status || "").trim().toLowerCase();
+  return (
+    st === "archived" ||
+    st === "inactive" ||
+    String(a.archiveReason || "").trim() ||
+    String(a.inactiveReason || "").trim()
+  );
+}
+
+function diseaseAnimalClassSrv(animal = {}){
+  const d = animal.data || {};
+  const col = String(animal._collection || "").trim();
+
+  if (
+    col === "calves" ||
+    String(d.entryType || "").trim() === "followers" ||
+    String(d.calfNumber || "").trim()
+  ) {
+    return "calf";
+  }
+
+  return "adult";
+}
+
+function diseaseListForAnimalSrv(animal = {}){
+  const cls = diseaseAnimalClassSrv(animal);
+
+  return Object.entries(DISEASE_CATALOG_SRV)
+    .filter(([, x]) => Array.isArray(x.targets) && x.targets.includes(cls))
+    .map(([code, x]) => ({
+      code,
+      name: x.name,
+      group: x.group || "general",
+      specialPage: x.specialPage || "",
+      raw: !x.specialPage
+    }));
+}
+
+function diseaseSpecialUrlSrv(code, number, date){
+  const x = DISEASE_CATALOG_SRV[code];
+  if (!x || !x.specialPage) return "";
+  return `/${x.specialPage}?number=${encodeURIComponent(number)}&date=${encodeURIComponent(date)}`;
+}
+
+app.post("/api/disease/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok:false,
+        allowed:false,
+        message:"قاعدة البيانات غير متاحة الآن.",
+        diseases:[]
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const animalNumber = calvingNormDigitsOnlySrv(body.animalNumber || body.number || "");
+    const eventDate = diseaseDateOnlySrv(body.eventDate || body.date || "");
+
+    if (!animalNumber || !eventDate) {
+      return res.json({
+        ok:true,
+        allowed:false,
+        silent:true,
+        message:"أدخل رقم الحيوان وتاريخ التشخيص.",
+        diseases:[]
+      });
+    }
+
+    if (eventDate > diseaseTodaySrv()) {
+      return res.status(400).json({
+        ok:false,
+        allowed:false,
+        message:"❌ تاريخ التشخيص لا يمكن أن يكون في المستقبل.",
+        diseases:[]
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok:false,
+        allowed:false,
+        message:"❌ رقم الحيوان غير موجود في حسابك.",
+        diseases:[]
+      });
+    }
+
+    if (diseaseIsArchivedSrv(animal.data || {})) {
+      return res.status(400).json({
+        ok:false,
+        allowed:false,
+        message:"❌ لا يمكن تسجيل تشخيص — الحيوان خارج القطيع.",
+        diseases:[]
+      });
+    }
+
+    return res.json({
+      ok:true,
+      allowed:true,
+      message:"✅ تم التحقق — اختر التشخيص المناسب.",
+      animalNumber,
+      eventDate,
+      animalClass: diseaseAnimalClassSrv(animal),
+      animal: {
+        id: animal.id,
+        collection: animal._collection || "",
+        productionStatus: String(animal.data?.productionStatus || ""),
+        reproductiveStatus: String(animal.data?.reproductiveStatus || ""),
+        followerStatus: String(animal.data?.followerStatus || animal.data?.status || "")
+      },
+      diseases: diseaseListForAnimalSrv(animal)
+    });
+
+  } catch (e) {
+    console.error("disease gate failed", e);
+    return res.status(500).json({
+      ok:false,
+      allowed:false,
+      message:"❌ تعذّر التحقق من التشخيص الآن.",
+      diseases:[]
+    });
+  }
+});
+
+app.post("/api/disease/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok:false,
+        message:"قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+
+    const animalNumber = calvingNormDigitsOnlySrv(body.animalNumber || body.number || "");
+    const eventDate = diseaseDateOnlySrv(body.eventDate || body.date || "");
+    const diseaseCode = String(body.diseaseCode || body.code || "").trim().toLowerCase();
+    const notes = String(body.notes || "").trim();
+
+    if (!animalNumber || !eventDate) {
+      return res.status(400).json({
+        ok:false,
+        message:"❌ رقم الحيوان وتاريخ التشخيص مطلوبان."
+      });
+    }
+
+    if (eventDate > diseaseTodaySrv()) {
+      return res.status(400).json({
+        ok:false,
+        message:"❌ تاريخ التشخيص لا يمكن أن يكون في المستقبل."
+      });
+    }
+
+    const disease = DISEASE_CATALOG_SRV[diseaseCode];
+
+    if (!disease) {
+      return res.status(400).json({
+        ok:false,
+        message:"❌ التشخيص غير معروف."
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok:false,
+        message:"❌ رقم الحيوان غير موجود في حسابك."
+      });
+    }
+
+    if (diseaseIsArchivedSrv(animal.data || {})) {
+      return res.status(400).json({
+        ok:false,
+        message:"❌ لا يمكن تسجيل تشخيص — الحيوان خارج القطيع."
+      });
+    }
+
+    const allowedCodes = new Set(diseaseListForAnimalSrv(animal).map(x => x.code));
+
+    if (!allowedCodes.has(diseaseCode)) {
+      return res.status(400).json({
+        ok:false,
+        message:"❌ هذا التشخيص غير مناسب لهذا الحيوان حسب بياناته الحالية."
+      });
+    }
+
+    if (disease.specialPage) {
+      const redirectUrl = diseaseSpecialUrlSrv(diseaseCode, animalNumber, eventDate);
+
+      return res.status(409).json({
+        ok:false,
+        error:"specialized_page_required",
+        message:`⚠️ ${disease.name} له صفحة متخصصة ولا يُسجل كتشخيص خام.`,
+        redirectUrl
+      });
+    }
+
+    const eventRef = db.collection("events").doc();
+    const targetCollection = animal._collection || "animals";
+
+    const payload = {
+      userId: uid,
+      ownerUid: uid,
+      animalId: animal.id || "",
+      animalNumber,
+      eventDate,
+
+      type: "تشخيص صحي",
+      eventType: "health",
+      eventTypeNorm: "health",
+
+      diseaseCode,
+      diseaseName: disease.name,
+      diseaseGroup: disease.group || "general",
+      diagnosisMode: "raw_health",
+      notes: notes || null,
+
+      animalCollection: targetCollection,
+      animalClass: diseaseAnimalClassSrv(animal),
+
+      source: "server:/api/disease/save",
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const animalPatch = {
+      lastDisease: disease.name,
+      lastDiseaseDate: eventDate,
+      lastDiagnosis: disease.name,
+      lastDiagnosisDate: eventDate,
+      healthStatus: disease.name,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const batch = db.batch();
+    batch.set(eventRef, payload);
+    batch.set(db.collection(targetCollection).doc(animal.id), animalPatch, { merge:true });
+    await batch.commit();
+
+    return res.json({
+      ok:true,
+      message:"✅ تم حفظ التشخيص الصحي بنجاح",
+      eventId: eventRef.id,
+      animalNumber,
+      eventDate,
+      diseaseCode,
+      diseaseName: disease.name,
+      redirectUrl:`/event-list.html?number=${encodeURIComponent(animalNumber)}`
+    });
+
+  } catch (e) {
+    console.error("disease save failed", e);
+    return res.status(500).json({
+      ok:false,
+      message:"❌ تعذّر حفظ التشخيص الصحي الآن."
+    });
+  }
+});
+// ============================================================
 //                 API: PREGNANCY DIAGNOSIS BULK SAVE
 //                 حفظ جماعي لتشخيص الحمل من السيرفر فقط
 // ============================================================
