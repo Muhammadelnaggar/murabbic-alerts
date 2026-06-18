@@ -1,5 +1,5 @@
 
-     <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
@@ -63,6 +63,7 @@
   const info = $("info");
   const dz = $("dz");
   const animalSummary = $("animalSummary");
+  const notesEl = $("notes");
 
   let gateTimer = null;
   let selectedDiseaseCode = "";
@@ -148,7 +149,53 @@
 
     animalSummary.textContent = parts.join(" — ");
   }
+async function saveDiseaseItem(item, btn){
+  const uid = getTenantId();
+  const animalNumber = digitsOnly(animalNumberEl.value);
+  const eventDate = eventDateEl.value || todayLocal();
+  const notes = notesEl ? notesEl.value : "";
 
+  if (item.specialPage) {
+    location.href = `${item.specialPage}?number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(eventDate)}`;
+    return;
+  }
+
+  btn.disabled = true;
+  setBar(info, "جاري حفظ التشخيص...", "info");
+
+  try {
+    const r = await fetch(API_BASE + "/api/disease/save", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify({
+        animalNumber,
+        eventDate,
+        diseaseCode: item.code,
+        notes
+      })
+    });
+
+    const j = await r.json();
+    setBar(info, j.message || "تم الحفظ.", j.ok ? "success" : "error");
+
+    if (!r.ok || !j.ok) {
+      btn.disabled = false;
+      return;
+    }
+
+    setTimeout(() => {
+      location.href = j.redirectUrl || `add-event.html?number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(eventDate)}`;
+    }, 700);
+
+  } catch (e) {
+    console.error("disease save failed", e);
+    setBar(info, "❌ تعذّر الاتصال بالسيرفر.", "error");
+    btn.disabled = false;
+  }
+}
   function renderDiseases(list){
     dz.innerHTML = "";
     selectedDiseaseCode = "";
@@ -184,15 +231,7 @@
         btn.dataset.code = item.code || "";
         btn.textContent = item.name || "";
 
-        btn.addEventListener("click", () => {
-          selectedDiseaseCode = item.code || "";
-
-          dz.querySelectorAll(".mbk-action-tile.is-selected")
-            .forEach(x => x.classList.remove("is-selected"));
-
-          btn.classList.add("is-selected");
-          setBar(info, "تم اختيار التشخيص الصحي.", "success");
-        });
+      btn.addEventListener("click", () => saveDiseaseItem(item, btn));
 
         wrap.appendChild(btn);
       });
