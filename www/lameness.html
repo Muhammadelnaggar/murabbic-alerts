@@ -41,11 +41,11 @@
         <fieldset>
           <legend>الحافر المصاب</legend>
           <div class="radio-group">
-            <label><input type="radio" name="affectedLeg" value="أمام يمين"> أمام يمين</label>
-            <label><input type="radio" name="affectedLeg" value="أمام شمال"> أمام شمال</label>
-            <label><input type="radio" name="affectedLeg" value="خلف يمين"> خلف يمين</label>
-            <label><input type="radio" name="affectedLeg" value="خلف شمال"> خلف شمال</label>
-          </div>
+  <label><input type="checkbox" name="affectedLegs" value="أمام يمين"> أمام يمين</label>
+  <label><input type="checkbox" name="affectedLegs" value="أمام شمال"> أمام شمال</label>
+  <label><input type="checkbox" name="affectedLegs" value="خلف يمين"> خلف يمين</label>
+  <label><input type="checkbox" name="affectedLegs" value="خلف شمال"> خلف شمال</label>
+</div>
         </fieldset>
 
         <div class="row">
@@ -108,15 +108,18 @@
   }
 
   function collectPayload(){
-    const affectedLegEl = document.querySelector('input[name="affectedLeg"]:checked');
+   const affectedLegs = Array.from(
+  document.querySelectorAll('input[name="affectedLegs"]:checked')
+).map(el => el.value);
 
-    return {
-      animalNumber: document.getElementById("animalId").value.trim(),
-      eventDate: document.getElementById("lamenessDate").value,
-      affectedLeg: affectedLegEl ? affectedLegEl.value : "",
-      lamenessType: document.getElementById("lamenessType").value,
-      vet: (document.getElementById("vet").value || "").trim()
-    };
+return {
+  animalNumber: document.getElementById("animalId").value.trim(),
+  eventDate: document.getElementById("lamenessDate").value,
+  affectedLegs,
+  affectedLeg: affectedLegs.join("، "),
+  lamenessType: document.getElementById("lamenessType").value,
+  vet: (document.getElementById("vet").value || "").trim()
+};
   }
 
   async function apiPost(url, payload){
