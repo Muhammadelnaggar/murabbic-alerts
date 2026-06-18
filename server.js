@@ -4981,177 +4981,338 @@ function eventsPageTypeLabelSrv(ev = {}) {
 
   return "حدث";
 }
+function eventsPageDetailTextSrv(v) {
+  if (v === null || v === undefined) return "";
+
+  if (Array.isArray(v)) {
+    return v
+      .map(x => eventsPageDetailTextSrv(x))
+      .filter(Boolean)
+      .join("، ");
+  }
+
+  if (typeof v === "object") {
+    return "";
+  }
+
+  return String(v).trim();
+}
+
+function eventsPageJoinDetailsSrv(parts = [], fallback = "—") {
+  const clean = parts
+    .map(p => String(p || "").trim())
+    .filter(Boolean);
+
+  return clean.length ? clean.join(" — ") : fallback;
+}
+
+function eventsPagePushDetailSrv(parts, label, value, unit = "") {
+  const txt = eventsPageDetailTextSrv(value);
+  if (!txt) return;
+
+  parts.push(`${label}: ${txt}${unit}`);
+}
+
+function eventsPageFormatMilkSessionsSrv(ev = {}) {
+  const sessions = Array.isArray(ev.milkSessions) ? ev.milkSessions : [];
+
+  if (sessions.length) {
+    const vals = sessions
+      .map((s, i) => {
+        const v = eventsPageDetailTextSrv(
+          s?.kg ?? s?.milkKg ?? s?.value ?? s?.amount ?? ""
+        );
+
+        return v ? `حلبة ${i + 1}: ${v} كجم` : "";
+      })
+      .filter(Boolean);
+
+    if (vals.length) return vals.join("، ");
+  }
+
+  const manual = [
+    ["حلبة 1", eventsPagePickSrv(ev, ["milk1", "milkS1", "morningMilk", "session1"], "")],
+    ["حلبة 2", eventsPagePickSrv(ev, ["milk2", "milkS2", "eveningMilk", "session2"], "")],
+    ["حلبة 3", eventsPagePickSrv(ev, ["milk3", "milkS3", "thirdMilk", "session3"], "")]
+  ]
+    .map(([label, val]) => {
+      const txt = eventsPageDetailTextSrv(val);
+      return txt ? `${label}: ${txt} كجم` : "";
+    })
+    .filter(Boolean);
+
+  return manual.join("، ");
+}
+
+function eventsPageFormatCalvesSrv(ev = {}) {
+  const calves = Array.isArray(ev.calves) ? ev.calves : [];
+
+  if (calves.length) {
+    return calves
+      .map((c, i) => {
+        const no = eventsPageDetailTextSrv(c?.calfNumber ?? c?.number ?? c?.animalNumber ?? "");
+        const sex = eventsPageDetailTextSrv(c?.sex ?? c?.calfSex ?? "");
+        const weight = eventsPageDetailTextSrv(c?.birthWeight ?? c?.weight ?? "");
+
+        return eventsPageJoinDetailsSrv([
+          no ? `عجل ${i + 1}: ${no}` : `عجل ${i + 1}`,
+          sex ? `الجنس ${sex}` : "",
+          weight ? `الوزن ${weight} كجم` : ""
+        ], "");
+      })
+      .filter(Boolean)
+      .join("، ");
+  }
+
+  const calfNo = eventsPagePickSrv(ev, ["calfNumber", "calfNumbers", "newbornNumber", "newbornNumbers"], "");
+  return eventsPageDetailTextSrv(calfNo);
+}
 function eventsPageDetailsSrv(ev = {}) {
   const key = eventsPageNormalizeTypeKeySrv(ev);
+  const parts = [];
+
+  const pick = (keys, def = "") => eventsPagePickSrv(ev, keys, def);
+  const add = (label, keys, unit = "") => {
+    eventsPagePushDetailSrv(parts, label, pick(keys, ""), unit);
+  };
+
+  const note = pick(["note", "notes", "ملاحظة", "description", "reasonText"], "");
+  const result = pick(["result", "النتيجة", "statusText"], "");
 
   if (key === "insemination") {
-    const at = eventsPagePickSrv(ev, ["inseminationTime", "time", "eventTime", "at", "وقت", "ساعة"], "");
-    const method = eventsPagePickSrv(ev, ["inseminationMethod", "method", "طريقة"], "");
-    const semen = eventsPagePickSrv(ev, ["semenCode", "strawCode", "straw", "القشة", "كود القشة"], "");
-    const who = eventsPagePickSrv(ev, ["inseminator", "by", "الملقح"], "");
-    const heat = eventsPagePickSrv(ev, ["heatStatus", "heatTime", "الشياع"], "");
+    add("الوقت", ["inseminationTime", "timeOfDay", "time", "eventTime", "at", "وقت", "ساعة"]);
+    add("الطريقة", ["inseminationMethod", "method", "طريقة"]);
+    add("السائل/القشة", ["semenCode", "strawCode", "straw", "sireNumber", "bullCode", "القشة", "كود القشة", "رقم الطلوقة"]);
+    add("الملقّح", ["inseminator", "by", "technician", "الملقح"]);
+    add("رقم التلقيحة", ["serviceNumber", "servicesCount", "serviceNo"]);
+    add("حالة الشياع", ["heatStatus", "heatTime", "heatSigns", "الشياع"]);
+    add("مصدر القرار", ["sourceLabel", "gateLabel"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
 
-    return [
-      at ? `الوقت: ${at}` : "",
-      method ? `الطريقة: ${method}` : "",
-      semen ? `السائل/القشة: ${semen}` : "",
-      who ? `الملقّح: ${who}` : "",
-      heat ? `الشياع: ${heat}` : ""
-    ].filter(Boolean).join(" — ") || "—";
+    return eventsPageJoinDetailsSrv(parts);
   }
 
   if (key === "daily_milk") {
-    const total = eventsPagePickSrv(ev, ["milkKg", "dailyMilk", "kg", "milk", "milkTotalKg", "totalMilkKg"], "");
-    const sessions = Array.isArray(ev.milkSessions) ? ev.milkSessions : [];
-    const sText = sessions.length
-      ? `الحلبات: ${sessions.map(s => s?.kg ?? s?.milkKg ?? s?.value).filter(v => v != null).join("+")}`
-      : "";
+    add("الإجمالي", ["milkKg", "dailyMilk", "kg", "milk", "milkTotalKg", "totalMilkKg", "totalMilk"], " كجم");
 
-    return [
-      total !== "" ? `إجمالي: ${total} كجم` : "",
-      sessions.length ? `عدد الحلبات: ${sessions.length}` : "",
-      sText
-    ].filter(Boolean).join(" — ") || "—";
+    const sessionsText = eventsPageFormatMilkSessionsSrv(ev);
+    if (sessionsText) eventsPagePushDetailSrv(parts, "تفصيل الحلبات", sessionsText);
+
+    add("نوع التسجيل", ["kind", "mode", "importMode"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+
+    return eventsPageJoinDetailsSrv(parts);
   }
 
   if (key === "vaccination") {
-    const v = eventsPagePickSrv(ev, ["vaccine", "vaccineName", "vaccineKey"], "");
-    const dose = eventsPagePickSrv(ev, ["doseType", "dose", "جرعة"], "");
+    add("اللقاح", ["vaccine", "vaccineName", "vaccineKey", "name"]);
+    add("نوع الجرعة", ["doseType", "dose", "doseLabel", "جرعة"]);
+    add("رقم التشغيلة", ["batchNo", "batchNumber", "lot", "lotNo"]);
+    add("طريقة الإعطاء", ["route", "administrationRoute"]);
+    add("الجرعة", ["doseAmount", "amount"]);
+    add("التحصين التالي", ["nextDueDate", "nextDate", "boosterDate"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
 
-    return [
-      v ? `اللقاح: ${v}` : "",
-      dose ? `الجرعة: ${dose}` : ""
-    ].filter(Boolean).join(" — ") || "—";
+    return eventsPageJoinDetailsSrv(parts);
   }
 
   if (key === "pregnancy_diagnosis") {
-    const method = eventsPagePickSrv(ev, ["method", "طريقة"], "");
-    const result = eventsPagePickSrv(ev, ["result", "النتيجة"], "");
-    const vet = eventsPagePickSrv(ev, ["vet", "doctor", "الطبيب"], "");
+    add("طريقة الفحص", ["method", "diagnosisMethod", "طريقة"]);
+    add("النتيجة", ["result", "pregnancyResult", "status", "النتيجة"]);
+    add("عمر الحمل", ["pregnancyDays", "gestationDays", "daysPregnant", "pregDays"], " يوم");
+    add("آخر تلقيح", ["lastInseminationDate", "aiDate", "inseminationDate"]);
+    add("الفاحص", ["vet", "doctor", "examiner", "الطبيب"]);
+    add("إعادة الفحص", ["nextCheckDate", "recheckDate"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
 
-    return [
-      method ? `الطريقة: ${method}` : "",
-      result ? `النتيجة: ${result}` : "",
-      vet ? `الطبيب: ${vet}` : ""
-    ].filter(Boolean).join(" — ") || "—";
+    return eventsPageJoinDetailsSrv(parts);
   }
 
   if (key === "calving") {
-    const kind = eventsPagePickSrv(ev, ["calvingKind"], "");
-    const cnt = eventsPagePickSrv(ev, ["calfCount"], "");
-    const calfId = eventsPagePickSrv(ev, ["calfId"], "");
+    add("نوع الولادة", ["birthType", "calvingType", "deliveryType"]);
+    add("سهولة الولادة", ["calvingEase", "difficulty", "assistance"]);
+    add("عدد المواليد", ["calvesCount", "calfCount", "newbornCount"]);
 
-    return [
-      kind ? `الولادة: ${kind}` : "",
-      cnt ? `عدد العجول: ${cnt}` : "",
-      calfId ? `رقم العجل: ${calfId}` : ""
-    ].filter(Boolean).join(" — ") || "—";
+    const calvesText = eventsPageFormatCalvesSrv(ev);
+    if (calvesText) eventsPagePushDetailSrv(parts, "المواليد", calvesText);
+
+    add("الجنس", ["calfSex", "sex"]);
+    add("وزن الميلاد", ["birthWeight", "calfWeight"], " كجم");
+    add("حالة المشيمة", ["placentaStatus", "retainedPlacenta"]);
+    add("السرسوب", ["colostrumStatus", "colostrum"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+
+    return eventsPageJoinDetailsSrv(parts);
   }
 
   if (key === "abortion") {
-    const cause = eventsPagePickSrv(ev, ["probableCause", "cause", "reason", "سبب", "السبب"], "");
-    const age = eventsPagePickSrv(ev, ["abortionAgeMonths", "ageMonths"], "");
-    const lastAI = eventsPagePickSrv(ev, ["lastInseminationDate"], "");
+    add("عمر الحمل عند الإجهاض", ["abortionAgeDays", "gestationDays", "pregnancyDays", "daysPregnant"], " يوم");
+    add("مرحلة الإجهاض", ["stage", "abortionStage"]);
+    add("السبب المحتمل", ["probableCause", "cause", "reason"]);
+    add("الإجراء", ["action", "treatment", "recommendation"]);
+    add("الفاحص", ["vet", "doctor", "examiner"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
 
-    return [
-      cause ? `السبب المحتمل: ${cause}` : "",
-      age !== "" ? `عمر الحمل: ${age} شهر` : "",
-      lastAI ? `آخر تلقيح: ${lastAI}` : ""
-    ].filter(Boolean).join(" — ") || "—";
+    return eventsPageJoinDetailsSrv(parts);
   }
 
   if (key === "dry_off") {
-    const reason = eventsPagePickSrv(ev, ["reason", "سبب", "السبب"], "");
-    const ab = eventsPagePickSrv(ev, ["usedDryingAntibiotics", "dryingAntibiotics"], "");
-    const preg = eventsPagePickSrv(ev, ["pregnancyStatus", "reproStatus"], "");
-    const dt = eventsPagePickSrv(ev, ["dryOffDate", "eventDate"], "");
+    add("حالة الحمل عند التجفيف", ["pregnancyStatusAtDryOff", "pregnancyStatus", "pregStatus"]);
+    add("سبب التجفيف", ["reason", "dryOffReason"]);
+    add("إنتاج اللبن وقت التجفيف", ["milkAtDryOff", "dailyMilk", "milkKg"], " كجم");
+    add("مضاد حيوي", ["usedAntibiotics", "antibioticUsed"]);
+    add("اسم المستحضر", ["antibioticName", "drugName", "productName"]);
+    add("تاريخ الولادة المتوقع", ["expectedCalvingDate", "dueDate"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
 
-    return [
-      dt ? `تاريخ: ${dt}` : "",
-      preg ? `الحالة: ${preg}` : "",
-      reason ? `السبب: ${reason}` : "",
-      ab ? `مضاد تجفيف: ${ab}` : ""
-    ].filter(Boolean).join(" — ") || "—";
+    return eventsPageJoinDetailsSrv(parts);
   }
 
-  if (key === "hoof_trimming") {
-    const notes = eventsPagePickSrv(ev, ["notes", "note", "description"], "");
-    return notes ? `ملاحظة: ${notes}` : "تقليم الحوافر";
-  }
+  if (key === "heat") {
+    add("شدة الشياع", ["heatIntensity", "intensity", "score"]);
+    add("علامات الشياع", ["signs", "heatSigns"]);
+    add("وقت الملاحظة", ["observedAt", "time", "timeOfDay"]);
+    add("قرار المتابعة", ["action", "recommendation"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
 
-  if (key === "feces_eval") {
-    const score = eventsPagePickSrv(ev, ["fecesScore", "value"], "");
-    const desc = eventsPagePickSrv(ev, ["description", "note", "notes", "ملاحظة"], "");
-
-    return [
-      score !== "" ? `الدرجة: ${score}` : "",
-      desc ? `الوصف: ${desc}` : ""
-    ].filter(Boolean).join(" — ") || "—";
-  }
-
-  if (key === "health") {
-    const name = eventsPagePickSrv(ev, ["diseaseName", "disease", "name"], "");
-    const code = eventsPagePickSrv(ev, ["diseaseCode"], "");
-
-    return [
-      name ? `المرض: ${name}` : "",
-      code ? `الكود: ${code}` : ""
-    ].filter(Boolean).join(" — ") || "—";
+    return eventsPageJoinDetailsSrv(parts);
   }
 
   if (key === "ovsynch") {
-    const prog = eventsPagePickSrv(ev, ["program", "type"], "");
-    const start = eventsPagePickSrv(ev, ["startDate", "eventDate"], "");
-    const steps = Array.isArray(ev.steps) ? ev.steps : [];
-    const next = steps.find(s => !s?.done);
-    const nextTxt = next ? `التالي: ${next.name} (${next.date || ""})` : "";
+    add("البروتوكول", ["protocolName", "protocol", "program"]);
+    add("الخطوة", ["stepName", "step", "currentStep"]);
+    add("تاريخ البداية", ["protocolStartDate", "startDate"]);
+    add("الخطوة التالية", ["nextStepName", "nextStep"]);
+    add("موعدها", ["nextDate", "nextDueDate", "dueDate"]);
+    if (result) eventsPagePushDetailSrv(parts, "النتيجة", result);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
 
-    return [
-      prog ? `البرنامج: ${prog}` : "",
-      start ? `البداية: ${start}` : "",
-      nextTxt
-    ].filter(Boolean).join(" — ") || "—";
+    return eventsPageJoinDetailsSrv(parts);
   }
 
-  if (key === "cull") {
-    const r = eventsPagePickSrv(ev, ["reason", "cullMain", "cullDetail"], "");
-    return r ? `السبب: ${r}` : "استبعاد";
+  if (key === "hoof_trimming") {
+    add("نوع التسجيل", ["trimmingType", "typeLabel"]);
+    add("الحافر/الطرف", ["hoof", "limb", "leg"]);
+    add("المشكلة", ["lesion", "problem", "diagnosis"]);
+    add("الدرجة", ["severity", "score"]);
+    add("الإجراء", ["treatment", "action"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+
+    return eventsPageJoinDetailsSrv(parts);
   }
 
-  if (key === "sale") {
-    const price = eventsPagePickSrv(ev, ["price"], "");
-    const reason = String(eventsPagePickSrv(ev, ["saleReason", "reason", "notes", "note"], "")).trim();
+  if (key === "bcs_eval") {
+    add("الدرجة", ["score", "bcsScore", "bodyConditionScore"]);
+    add("التقييم", ["label", "conditionLabel", "statusText"]);
+    add("الثقة", ["confidence", "quality.confidence"]);
+    add("زاوية التصوير", ["view", "photoView"]);
+    add("سبب التقييم", ["reason", "modelReason"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
 
-    return [
-      price !== "" ? `السعر: ${price}` : "",
-      reason ? `السبب: ${reason}` : "السبب: غير مسجل"
-    ].filter(Boolean).join(" — ") || "—";
+    return eventsPageJoinDetailsSrv(parts, "فحص حالة الجسم");
   }
 
-  if (key === "death") {
-    const reason = eventsPagePickSrv(ev, ["deathReason", "reason", "notes", "note"], "");
-    return reason ? `السبب: ${reason}` : "نفوق";
-  }
+  if (key === "feces_eval") {
+    add("الدرجة", ["score", "fecesScore", "manureScore"]);
+    add("التقييم", ["label", "consistencyLabel", "statusText"]);
+    add("القوام", ["consistency", "texture"]);
+    add("الثقة", ["confidence", "quality.confidence"]);
+    add("سبب التقييم", ["reason", "modelReason"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
 
-  if (key === "close_up") {
-    const ration = eventsPagePickSrv(ev, ["ration"], "");
-    const an = eventsPagePickSrv(ev, ["anionicSalts"], "");
-
-    return [
-      ration ? `عليقة: ${ration}` : "",
-      an ? `أملاح أنيونية: ${an}` : ""
-    ].filter(Boolean).join(" — ") || "تحضير ولادة";
+    return eventsPageJoinDetailsSrv(parts, "تقييم الروث");
   }
 
   if (key === "milking_traits_eval" || key === "milking_traits") {
-    const score = eventsPagePickSrv(ev, ["kpi.overallScore", "overallScore"], "");
-    return score !== "" ? `الدرجة الكلية: ${score}` : "تقييم صفات اللبن";
+    add("الدرجة الكلية", ["kpi.overallScore", "overallScore", "score"]);
+    add("الضرع", ["kpi.udderScore", "udderScore"]);
+    add("الأرجل والأقدام", ["kpi.feetLegsScore", "feetLegsScore"]);
+    add("القوة والطابع الحلاب", ["kpi.dairyStrengthScore", "dairyStrengthScore"]);
+    add("المقدمة والسعة", ["kpi.frameScore", "frameScore"]);
+    add("القرار", ["label", "statusText", "recommendation"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+
+    return eventsPageJoinDetailsSrv(parts, "تقييم صفات اللبن");
   }
 
-  const note = eventsPagePickSrv(ev, ["note", "notes", "ملاحظة", "description"], "");
-  const result = eventsPagePickSrv(ev, ["result", "النتيجة"], "");
+  if (key === "nutrition") {
+    add("العليقة", ["rationName", "ration", "dietName"]);
+    add("المجموعة", ["groupName", "groupId"]);
+    add("تكلفة التغذية", ["feedCost", "dailyFeedCost", "cost"], " جنيه");
+    add("سعر اللبن", ["milkPrice"], " جنيه");
+    add("كفاءة التغذية", ["feedEfficiency"]);
+    add("الحالة", ["statusText", "decision", "result"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
 
-  return [note, result].filter(Boolean).join(" — ") || "—";
+    return eventsPageJoinDetailsSrv(parts, "تغذية");
+  }
+
+  if (key === "weaning") {
+    add("رقم العجل", ["calfNumber", "number"]);
+    add("رقم الأم", ["damNumber", "motherNumber"]);
+    add("العمر", ["ageDays", "weaningAgeDays"], " يوم");
+    add("وزن الفطام", ["weaningWeight", "weight"], " كجم");
+    add("طريقة الفطام", ["method", "weaningMethod"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+
+    return eventsPageJoinDetailsSrv(parts, "فطام");
+  }
+
+  if (key === "close_up") {
+    add("العليقة", ["ration", "rationName", "dietName"]);
+    add("أملاح أنيونية", ["anionicSalts", "anionicSalt", "dcad"]);
+    add("تاريخ الولادة المتوقع", ["expectedCalvingDate", "dueDate"]);
+    add("حالة التحضير", ["statusText", "result"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+
+    return eventsPageJoinDetailsSrv(parts, "تحضير ولادة");
+  }
+
+  if (key === "sale") {
+    add("السعر", ["price", "salePrice"], " جنيه");
+    add("المشتري", ["buyer", "buyerName"]);
+    add("السبب", ["saleReason", "reason"]);
+    add("الوزن", ["weight", "saleWeight"], " كجم");
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+
+    return eventsPageJoinDetailsSrv(parts, "بيع");
+  }
+
+  if (key === "death") {
+    add("سبب النفوق", ["deathReason", "reason", "cause"]);
+    add("التشخيص", ["diagnosis", "necropsy"]);
+    add("الإجراء", ["action", "disposal"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+
+    return eventsPageJoinDetailsSrv(parts, "نفوق");
+  }
+
+  if (key === "cull") {
+    add("سبب الاستبعاد", ["reason", "cullMain", "cullDetail"]);
+    add("التفصيل", ["details", "description"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+
+    return eventsPageJoinDetailsSrv(parts, "استبعاد");
+  }
+
+  if (key === "health" || key === "lameness" || key === "mastitis") {
+    add("التشخيص", ["diagnosis", "disease", "diseaseName", "problem"]);
+    add("الشدة", ["severity", "score", "grade"]);
+    add("العلاج", ["treatment", "drugName", "medicine"]);
+    add("الجرعة", ["dose", "doseAmount"]);
+    add("فترة سحب اللبن", ["milkWithdrawalDays", "withdrawalMilkDays"], " يوم");
+    add("فترة سحب اللحم", ["meatWithdrawalDays", "withdrawalMeatDays"], " يوم");
+    add("الطبيب", ["vet", "doctor"]);
+    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+    if (result) eventsPagePushDetailSrv(parts, "النتيجة", result);
+
+    return eventsPageJoinDetailsSrv(parts, key === "mastitis" ? "التهاب الضرع" : key === "lameness" ? "عرج" : "مرض");
+  }
+
+  if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+  if (result) eventsPagePushDetailSrv(parts, "النتيجة", result);
+
+  return eventsPageJoinDetailsSrv(parts);
 }
 
 function eventsPageEventAnimalNumberSrv(ev = {}) {
