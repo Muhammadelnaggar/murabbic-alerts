@@ -22489,46 +22489,209 @@ app.post("/api/dairy-traits/save", requireUserId, async (req, res) => {
   }
 });
 // ============================================================
-//                       API: ANIMALS (robust)
+//                       API: ANIMALS LIST (server-only)
 // ============================================================
 
-app.get('/api/animals', async (req, res) => {
-  const tenant = resolveTenant(req);
+function animalListStrSrv(v) {
+  return String(v ?? '').trim();
+}
+
+function animalListIsoDateSrv(v) {
+  const s = String(v || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+
+  const d = toDate(v);
+  if (!d || Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function animalListNumDisplaySrv(v, fallback = '---') {
+  if (v === null || v === undefined || v === '') return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function animalListDaysDisplaySrv(fromISO, todayISO, fallback = '---') {
+  const from = animalListIsoDateSrv(fromISO);
+  const today = animalListIsoDateSrv(todayISO);
+  if (!from || !today) return fallback;
+
+  const d = diffDaysISO(from, today);
+  return Number.isFinite(d) && d >= 0 ? d : fallback;
+}
+
+function animalListIsActiveSrv(a = {}) {
+  const st = animalListStrSrv(a.status || 'active').toLowerCase();
+  if (a.archived === true) return false;
+  return !['inactive', 'archived', 'deleted'].includes(st);
+}
+
+function animalListTypeArSrv(a = {}) {
+  const raw = animalListStrSrv(
+    a.animalTypeAr || a.animalType || a.species || a.type || a.animaltype || a.kind
+  );
+
+  if (/buffalo|جاموس/i.test(raw)) return 'جاموسة';
+  if (/cow|cattle|بقر|أبقار|ابقار/i.test(raw)) return 'بقرة';
+  return raw;
+}
+
+function animalListTypeEnSrv(a = {}) {
+  const raw = animalListStrSrv(
+    a.animaltype || a.animalType || a.animalTypeAr || a.species || a.type || a.kind
+  );
+
+  if (/buffalo|جاموس/i.test(raw)) return 'buffalo';
+  if (/cow|cattle|بقر|أبقار|ابقار/i.test(raw)) return 'cow';
+  return '';
+}
+
+function animalListNumberTextSrv(a = {}) {
+  const raw = a.animalNumber ?? a.number ?? a.calfNumber ?? '';
+  return normalizeDigitsSrv(raw) || animalListStrSrv(raw);
+}
+
+function animalListBuildRowSrv(a = {}, todayISO = '') {
+  const animalNumber = animalListNumberTextSrv(a);
+  const typeEn = animalListTypeEnSrv(a);
+  const typeAr = animalListTypeArSrv(a);
+  const productionStatus = animalListStrSrv(a.productionStatus) || '---';
+  const reproductiveStatus = animalListStrSrv(a.reproductiveStatus);
+  const lastCalvingDate = animalListIsoDateSrv(a.lastCalvingDate);
+  const lastInseminationDate = animalListIsoDateSrv(a.lastInseminationDate);
+
+  const prodNorm = productionStatus.toLowerCase();
+  const isDry = prodNorm.includes('dry') || productionStatus.includes('جاف');
+
+  const daysInMilk = isDry
+    ? '---'
+    : lastCalvingDate
+      ? animalListDaysDisplaySrv(lastCalvingDate, todayISO)
+      : animalListNumDisplaySrv(a.daysInMilk);
+
+  const inseminatedDays = (
+    (reproductiveStatus === 'ملقحة' || reproductiveStatus === 'ملقح') &&
+    lastInseminationDate
+  ) ? animalListDaysDisplaySrv(lastInseminationDate, todayISO) : '---';
+
+  const pregnancyDays = (
+    reproductiveStatus === 'عشار' &&
+    lastInseminationDate
+  ) ? animalListDaysDisplaySrv(lastInseminationDate, todayISO)
+    : (reproductiveStatus === 'عشار' ? animalListNumDisplaySrv(a.pregnancyDays) : '---');
+
+  const eventUrl = animalNumber
+    ? `add-event.html?animalId=${encodeURIComponent(animalNumber)}&number=${encodeURIComponent(animalNumber)}&animalNumber=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(todayISO)}&date=${encodeURIComponent(todayISO)}`
+    : '';
+
+  return {
+    id: a.id || null,
+    animalNumber,
+    animalTypeAr: typeAr,
+    animaltype: typeEn,
+    rowClass: typeEn === 'cow'
+      ? 'mbk-row-cow'
+      : typeEn === 'buffalo'
+        ? 'mbk-row-buffalo'
+        : '',
+    breed: animalListStrSrv(a.breed) || '---',
+    productionStatus,
+    daysInMilk,
+    reproductiveStatus: reproductiveStatus || '---',
+    inseminatedDays,
+    dailyMilk: animalListNumDisplaySrv(a.dailyMilk),
+    pregnancyDays,
+    birthDate: animalListIsoDateSrv(a.birthDate) || '---',
+    lastCalvingDate: lastCalvingDate || '---',
+    cardUrl: animalNumber ? `cow-card.html?number=${encodeURIComponent(animalNumber)}` : '',
+    eventUrl
+  };
+}
+
+async function animalListFetchFirestoreSrv(uid) {
+  const byId = new Map();
+
+  for (const ownerField of ['userId', 'ownerUid']) {
+    try {
+      const snap = await db.collection('animals')
+        .where(ownerField, '==', uid)
+        .limit(3000)
+        .get();
+
+      snap.docs.forEach(d => {
+        if (!byId.has(d.id)) byId.set(d.id, { id: d.id, ...(d.data() || {}) });
+      });
+    } catch (e) {
+      console.warn('animal-list owner query failed:', ownerField, e.code || e.message || e);
+    }
+  }
+
+  return Array.from(byId.values());
+}
+
+function animalListApplyFiltersSrv(rows = [], query = {}) {
+  const searchNumber = normalizeDigitsSrv(query.searchNumber || query.number || query.q || '');
+  const type = animalListStrSrv(query.type || query.animalTypeAr || '');
+  const reproductiveStatus = animalListStrSrv(query.reproductiveStatus || query.repro || '');
+
+  return rows.filter(a => {
+    if (searchNumber && !String(a.animalNumber || '').includes(searchNumber)) return false;
+    if (type && animalListStrSrv(a.animalTypeAr) !== type) return false;
+    if (reproductiveStatus && animalListStrSrv(a.reproductiveStatus) !== reproductiveStatus) return false;
+    return true;
+  });
+}
+
+function animalListSortSrv(a, b) {
+  const an = Number(a.animalNumber);
+  const bn = Number(b.animalNumber);
+  if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+  return String(a.animalNumber || '').localeCompare(String(b.animalNumber || ''), 'ar');
+}
+
+app.get('/api/animals', requireUserId, async (req, res) => {
+  const uid = req.userId;
+  const todayISO = cairoTodayISO();
 
   try {
-    // لو Firestore متاح جرّب أولاً
+    let rawAnimals = [];
+
     if (db) {
-      try {
-        const snap = await db.collection('animals')
-          .where('userId', '==', tenant)
-          .limit(2000)
-          .get();
-
-        const animals = snap.docs.map(d => ({
-          id: d.id,
-          ...(d.data() || {})
-        }));
-
-        // حتى لو فاضي → تظل استجابة ناجحة
-        return res.json({ ok: true, animals });
-      } catch (e) {
-        // نطبع الخطأ في اللوج لكن ما نكسّرش الـ API
-        console.error('animals firestore error:', e.code || e.message || e);
-        // نكمل على الـ fallback المحلي
-      }
+      rawAnimals = await animalListFetchFirestoreSrv(uid);
     }
 
-    // إما db=null أو Firestore فشل → fallback محلي
-    const animalsLocal = readJson(animalsPath, []).filter(a => belongs(a, tenant));
-    return res.json({ ok: true, animals: animalsLocal });
+    if (!rawAnimals.length) {
+      rawAnimals = readJson(animalsPath, []).filter(a => belongs(a, uid));
+    }
+
+    const activeRows = rawAnimals
+      .filter(animalListIsActiveSrv)
+      .map(a => animalListBuildRowSrv(a, todayISO))
+      .filter(a => a.animalNumber);
+
+    const typeOptions = [...new Set(activeRows.map(a => a.animalTypeAr).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'ar'));
+
+    const animals = animalListApplyFiltersSrv(activeRows, req.query).sort(animalListSortSrv);
+
+    return res.json({
+      ok: true,
+      today: todayISO,
+      count: animals.length,
+      totalActive: activeRows.length,
+      typeOptions,
+      animals
+    });
 
   } catch (e) {
     console.error('animals fatal error:', e);
-    // الحالة دي نادرة جداً (كسر في السيرفر نفسه)
-    return res.status(500).json({ ok: false, error: 'animals_fatal' });
+    return res.status(500).json({
+      ok: false,
+      error: 'animals_fatal',
+      message: 'تعذّر تحميل قائمة الحيوانات الآن.'
+    });
   }
 });
-
 // ===== Helper: compute eventDate from any shape =====
 function computeEventDateFromDoc(data = {}) {
   // 1) قيم جاهزة بصيغة YYYY-MM-DD
