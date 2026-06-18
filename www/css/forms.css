@@ -2629,3 +2629,171 @@ body.add-animal-page{
   font-size:11px;
   font-weight:800;
 }
+/* =========================================================
+   Murabbik Animal List Page
+   قائمة الحيوانات — ستايل مركزي خاص بالصفحة
+   ========================================================= */
+
+body[data-page="animal-list"]{
+  --sticky-col1:140px;
+  height:100vh;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  padding:10px;
+  background:#f6fbf8;
+  direction:rtl;
+}
+
+body[data-page="animal-list"] .mbk-title{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:4px;
+}
+
+body[data-page="animal-list"] .mbk-page{
+  color:#000;
+  font-size:20px;
+  font-weight:800;
+}
+
+body[data-page="animal-list"] .mbk-app{
+  color:var(--brand, #0ea05a);
+  font-size:16px;
+  font-weight:700;
+}
+
+body[data-page="animal-list"] .controls{
+  display:flex;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-bottom:20px;
+}
+
+body[data-page="animal-list"] .controls input,
+body[data-page="animal-list"] .controls select{
+  padding:8px;
+  font-size:14px;
+  border-radius:6px;
+  border:1px solid #ccc;
+  min-width:150px;
+}
+
+body[data-page="animal-list"] .controls button,
+body[data-page="animal-list"] .button,
+body[data-page="animal-list"] .back-button{
+  background-color:var(--brand, #0ea05a);
+  color:#fff;
+  border:0;
+  border-radius:8px;
+  cursor:pointer;
+  text-decoration:none;
+}
+
+body[data-page="animal-list"] .controls button:hover,
+body[data-page="animal-list"] .button:hover,
+body[data-page="animal-list"] .back-button:hover{
+  background-color:var(--brand-600, #0b7f47);
+}
+
+body[data-page="animal-list"] .button{
+  padding:5px 10px;
+  font-size:14px;
+}
+
+body[data-page="animal-list"] .back-button{
+  flex:0 0 auto;
+  display:block;
+  text-align:center;
+  font-size:16px;
+  padding:10px;
+}
+
+body[data-page="animal-list"] .table-wrapper{
+  flex:1;
+  overflow-y:auto;
+  overflow-x:auto;
+  background:#fff;
+  border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,.06);
+  margin-bottom:10px;
+  direction:rtl;
+}
+
+body[data-page="animal-list"] #animalTable{
+  width:100%;
+  min-width:950px;
+  direction:rtl;
+  border-collapse:separate;
+  border-spacing:0;
+}
+
+body[data-page="animal-list"] #animalTable th,
+body[data-page="animal-list"] #animalTable td{
+  padding:10px;
+  text-align:center;
+  border:1px solid #cddc39;
+  font-size:15px;
+  background-clip:padding-box;
+}
+
+body[data-page="animal-list"] #animalTable thead th{
+  position:sticky;
+  top:0;
+  z-index:10;
+  background:#e8f5e9;
+  color:var(--brand-600, #0b7f47);
+  font-weight:600;
+  box-shadow:0 2px 4px rgba(0,0,0,.08);
+}
+
+body[data-page="animal-list"] #animalTable th:nth-child(1),
+body[data-page="animal-list"] #animalTable td:nth-child(1){
+  position:sticky;
+  right:0;
+  z-index:20;
+  width:1%;
+  min-width:0;
+  white-space:nowrap;
+  box-shadow:-1px 0 0 #cddc39 inset;
+}
+
+body[data-page="animal-list"] #animalTable th:nth-child(2),
+body[data-page="animal-list"] #animalTable td:nth-child(2){
+  position:sticky;
+  right:var(--sticky-col1);
+  z-index:19;
+  width:1%;
+  min-width:0;
+  white-space:nowrap;
+  box-shadow:-1px 0 0 #cddc39 inset;
+}
+
+body[data-page="animal-list"] #animalTable thead th:nth-child(1){
+  z-index:30;
+}
+
+body[data-page="animal-list"] #animalTable thead th:nth-child(2){
+  z-index:29;
+}
+
+body[data-page="animal-list"] #animalTable tbody tr:nth-child(even){
+  background-color:#f6fbf8;
+}
+
+body[data-page="animal-list"] #animalTable tbody tr.mbk-row-cow td{
+  background:#fffde7;
+}
+
+body[data-page="animal-list"] #animalTable tbody tr.mbk-row-buffalo td{
+  background:#eeeeee;
+}
+
+body[data-page="animal-list"] .no-data{
+  text-align:center;
+  color:#c62828;
+  margin-top:30px;
+  font-size:18px;
+}
