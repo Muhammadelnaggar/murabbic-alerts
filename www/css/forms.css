@@ -2635,7 +2635,6 @@ body.add-animal-page{
    ========================================================= */
 
 body[data-page="animal-list"]{
-  --sticky-col1:140px;
   height:100vh;
   overflow:hidden;
   display:flex;
