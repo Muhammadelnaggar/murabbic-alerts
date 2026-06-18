@@ -110,7 +110,7 @@
   function updateStickyCols() {
     const th1 = document.querySelector('#animalTable thead th:nth-child(1)');
     if (!th1) return;
-    document.documentElement.style.setProperty('--sticky-col1', th1.offsetWidth + 'px');
+   document.body.style.setProperty('--sticky-col1', th1.offsetWidth + 'px');
   }
 
   window.addEventListener('resize', updateStickyCols);
