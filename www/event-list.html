@@ -119,7 +119,13 @@
       cType.className = 'sticky-col sticky-type';
 
       const cDet = document.createElement('td');
-      cDet.textContent = row.details || '—';
+      cDet.className = 'event-details-cell';
+
+      const detScroll = document.createElement('div');
+      detScroll.className = 'event-details-scroll';
+      detScroll.textContent = row.details || '—';
+
+      cDet.appendChild(detScroll);
 
       tr.append(cDate, cType, cDet);
       frag.appendChild(tr);
