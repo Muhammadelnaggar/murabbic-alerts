@@ -22594,16 +22594,90 @@ function animalListBreedDisplaySrv(v) {
 
   return map[k] || raw;
 }
+function animalListDisplayKeySrv(v) {
+  return String(v ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_\-.\/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function animalListProductionDisplaySrv(v) {
+  const raw = animalListStrSrv(v);
+  if (!raw) return '---';
+
+  const k = animalListDisplayKeySrv(raw);
+
+  const map = {
+    'milking': 'حلاب',
+    'milk': 'حلاب',
+    'lactating': 'حلاب',
+    'in milk': 'حلاب',
+
+    'dry': 'جاف',
+    'dry off': 'جاف',
+    'dryoff': 'جاف',
+
+    'fresh': 'حديث الولادة',
+    'fresh cow': 'حديث الولادة',
+    'postpartum': 'حديث الولادة',
+
+    'close up': 'تحضير ولادة',
+    'closeup': 'تحضير ولادة',
+    'close up period': 'تحضير ولادة',
+    'close up cow': 'تحضير ولادة'
+  };
+
+  return map[k] || raw;
+}
+
+function animalListBreedDisplaySrv(v) {
+  const raw = animalListStrSrv(v);
+  if (!raw) return '---';
+
+  const k = animalListDisplayKeySrv(raw);
+
+  const map = {
+    'holstein': 'هولشتاين',
+    'holstein friesian': 'هولشتاين فريزيان',
+    'friesian': 'فريزيان',
+
+    'brown swiss': 'براون سويس',
+    'jersey': 'جيرسي',
+    'jersy': 'جيرسي',
+    'simmental': 'سيمنتال',
+    'montbeliarde': 'مونتبليارد',
+    'montbeliard': 'مونتبليارد',
+    'fleckvieh': 'فليكفيه',
+    'charolais': 'شاروليه',
+    'ayrshire': 'أيرشاير',
+
+    'cross': 'خليط',
+    'italian cross': 'خليط إيطالي',
+
+    'buffalo': 'جاموسي',
+    'egyptian buffalo': 'جاموس مصري',
+    'italian buffalo': 'جاموس إيطالي',
+    'murrah': 'مورا',
+    'nili ravi': 'نيلي رافي'
+  };
+
+  return map[k] || raw;
+}
 function animalListBuildRowSrv(a = {}, todayISO = '') {
   const animalNumber = animalListNumberTextSrv(a);
   const typeEn = animalListTypeEnSrv(a);
   const typeAr = animalListTypeArSrv(a);
-  const productionStatus = animalListStrSrv(a.productionStatus) || '---';
+  const productionStatusRaw = animalListStrSrv(a.productionStatus);
+  const productionStatus = animalListProductionDisplaySrv(productionStatusRaw);
   const reproductiveStatus = animalListStrSrv(a.reproductiveStatus);
   const lastCalvingDate = animalListIsoDateSrv(a.lastCalvingDate);
   const lastInseminationDate = animalListIsoDateSrv(a.lastInseminationDate);
 
-  const prodNorm = productionStatus.toLowerCase();
+  const prodNorm = animalListDisplayKeySrv(productionStatusRaw || productionStatus);
   const isDry = prodNorm.includes('dry') || productionStatus.includes('جاف');
 
   const daysInMilk = isDry
