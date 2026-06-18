@@ -176,8 +176,8 @@ async function saveDiseaseItem(item, btn){
     });
 
     const j = await r.json();
-   setBar(gateBox, j.message || "✅ تم حفظ التشخيص الصحي بنجاح.", j.ok ? "success" : "error");
-
+ setBar(gateBox, j.message || "✅ تم حفظ التشخيص الصحي بنجاح.", j.ok ? "success" : "error");
+gateBox.scrollIntoView({ behavior: "smooth", block: "start" });
     if (!r.ok || !j.ok) {
       btn.disabled = false;
       return;
@@ -185,7 +185,7 @@ async function saveDiseaseItem(item, btn){
 
     setTimeout(() => {
       location.href = j.redirectUrl || `add-event.html?number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(eventDate)}`;
-    }, 700);
+    }, 1800);
 
   } catch (e) {
     console.error("disease save failed", e);
