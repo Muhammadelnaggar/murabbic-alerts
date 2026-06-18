@@ -175,17 +175,21 @@ async function saveDiseaseItem(item, btn){
       })
     });
 
-    const j = await r.json();
- setBar(gateBox, j.message || "✅ تم حفظ التشخيص الصحي بنجاح.", j.ok ? "success" : "error");
-gateBox.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (!r.ok || !j.ok) {
-      btn.disabled = false;
-      return;
-    }
+const j = await r.json();
 
-    setTimeout(() => {
-      location.href = j.redirectUrl || `add-event.html?number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(eventDate)}`;
-    }, 1800);
+if (!r.ok || !j.ok) {
+  setBar(gateBox, j.message || "❌ تعذّر حفظ التشخيص الصحي.", "error");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  btn.disabled = false;
+  return;
+}
+
+setBar(gateBox, j.message || "✅ تم حفظ التشخيص الصحي بنجاح.", "success");
+window.scrollTo({ top: 0, behavior: "smooth" });
+
+setTimeout(() => {
+  location.href = j.redirectUrl || `event-list.html?number=${encodeURIComponent(animalNumber)}`;
+}, 2500);
 
   } catch (e) {
     console.error("disease save failed", e);
