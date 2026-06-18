@@ -13622,7 +13622,7 @@ app.post("/api/lameness/save", requireUserId, async (req, res) => {
     const targetCollection = animal._collection || "animals";
     const eventRef = db.collection("events").doc();
 
-    const eventPayload = {
+       const eventPayload = {
       userId: uid,
       ownerUid: uid,
 
@@ -13641,14 +13641,23 @@ app.post("/api/lameness/save", requireUserId, async (req, res) => {
       diseaseGroup: "حركة وعرج",
 
       affectedLeg: fd.affectedLeg,
+      affectedHoof: fd.affectedLeg,
       lamenessType: fd.lamenessType,
       vet: fd.vet || null,
+
+      details: {
+        affectedLeg: fd.affectedLeg,
+        affectedHoof: fd.affectedLeg,
+        lamenessType: fd.lamenessType,
+        diagnosis: fd.lamenessType,
+        diseaseName: "عرج",
+        vet: fd.vet || null
+      },
 
       animalCollection: targetCollection,
       source: "server:/api/lameness/save",
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
-
     const animalPatch = {
       healthStatus: "عرج",
       lastDisease: "عرج",
