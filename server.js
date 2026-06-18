@@ -13394,6 +13394,300 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
   }
 });
 // ============================================================
+//                 API: LAMENESS GATE / SAVE
+//                 تسجيل العرج من السيرفر فقط
+// ============================================================
+
+function lamenessStrSrv(v) {
+  return String(v ?? "").trim();
+}
+
+function lamenessDateOnlySrv(v) {
+  const s = String(v || "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+}
+
+function lamenessTodaySrv() {
+  return typeof cairoTodayISO === "function"
+    ? cairoTodayISO()
+    : new Date().toISOString().slice(0, 10);
+}
+
+const LAMENESS_AFFECTED_LEGS_SRV = [
+  "أمام يمين",
+  "أمام شمال",
+  "خلف يمين",
+  "خلف شمال"
+];
+
+const LAMENESS_TYPES_SRV = [
+  "قرحة",
+  "تعفن الحافر",
+  "خراج الحافر",
+  "جسم معدني",
+  "التهاب ما بين الأظلاف",
+  "التهاب الصفائح الحساسة"
+];
+
+function lamenessNormalizeBodySrv(body = {}) {
+  const animalNumber = calvingNormDigitsOnlySrv(
+    body.animalNumber ||
+    body.number ||
+    body.animalId ||
+    ""
+  );
+
+  return {
+    animalNumber,
+    eventDate: lamenessDateOnlySrv(body.eventDate || body.date || body.lamenessDate || ""),
+    affectedLeg: lamenessStrSrv(body.affectedLeg),
+    lamenessType: lamenessStrSrv(body.lamenessType),
+    vet: lamenessStrSrv(body.vet || body.doctor || "")
+  };
+}
+
+app.post("/api/lameness/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        allowed: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن.",
+        options: {
+          affectedLegs: LAMENESS_AFFECTED_LEGS_SRV,
+          lamenessTypes: LAMENESS_TYPES_SRV
+        }
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const fd = lamenessNormalizeBodySrv(body);
+
+    if (!fd.animalNumber || !fd.eventDate) {
+      return res.json({
+        ok: true,
+        allowed: false,
+        silent: true,
+        message: "أدخل رقم الحيوان وتاريخ العرج.",
+        options: {
+          affectedLegs: LAMENESS_AFFECTED_LEGS_SRV,
+          lamenessTypes: LAMENESS_TYPES_SRV
+        }
+      });
+    }
+
+    if (!calvingIsDateSrv(fd.eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        error: "invalid_date",
+        message: "❌ تاريخ العرج غير صالح."
+      });
+    }
+
+    if (fd.eventDate > lamenessTodaySrv()) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        error: "future_date",
+        message: "❌ تاريخ العرج لا يمكن أن يكون في المستقبل."
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, fd.animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        allowed: false,
+        error: "animal_not_found",
+        message: "❌ رقم الحيوان غير موجود في حسابك."
+      });
+    }
+
+    if (diseaseIsArchivedSrv(animal.data || {})) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        error: "animal_archived",
+        message: "❌ لا يمكن تسجيل عرج — الحيوان خارج القطيع."
+      });
+    }
+
+    return res.json({
+      ok: true,
+      allowed: true,
+      message: "✅ تم التحقق — جاهز لتسجيل حالة العرج.",
+      animalNumber: fd.animalNumber,
+      eventDate: fd.eventDate,
+      animal: {
+        id: animal.id,
+        collection: animal._collection || "animals",
+        productionStatus: String(animal.data?.productionStatus || ""),
+        reproductiveStatus: String(animal.data?.reproductiveStatus || ""),
+        followerStatus: String(animal.data?.followerStatus || animal.data?.status || "")
+      },
+      options: {
+        affectedLegs: LAMENESS_AFFECTED_LEGS_SRV,
+        lamenessTypes: LAMENESS_TYPES_SRV
+      }
+    });
+
+  } catch (e) {
+    console.error("lameness gate failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      error: "lameness_gate_failed",
+      message: "❌ تعذّر التحقق من العرج الآن."
+    });
+  }
+});
+
+app.post("/api/lameness/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const fd = lamenessNormalizeBodySrv(body);
+
+    if (!fd.animalNumber || !fd.eventDate || !fd.affectedLeg || !fd.lamenessType) {
+      return res.status(400).json({
+        ok: false,
+        error: "missing_required_fields",
+        message: "❌ رقم الحيوان وتاريخ العرج والحافر المصاب ونوع العرج مطلوبة."
+      });
+    }
+
+    if (!calvingIsDateSrv(fd.eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        error: "invalid_date",
+        message: "❌ تاريخ العرج غير صالح."
+      });
+    }
+
+    if (fd.eventDate > lamenessTodaySrv()) {
+      return res.status(400).json({
+        ok: false,
+        error: "future_date",
+        message: "❌ تاريخ العرج لا يمكن أن يكون في المستقبل."
+      });
+    }
+
+    if (!LAMENESS_AFFECTED_LEGS_SRV.includes(fd.affectedLeg)) {
+      return res.status(400).json({
+        ok: false,
+        error: "invalid_affected_leg",
+        message: "❌ الحافر المصاب غير معروف."
+      });
+    }
+
+    if (!LAMENESS_TYPES_SRV.includes(fd.lamenessType)) {
+      return res.status(400).json({
+        ok: false,
+        error: "invalid_lameness_type",
+        message: "❌ نوع العرج غير معروف."
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, fd.animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        error: "animal_not_found",
+        message: "❌ رقم الحيوان غير موجود في حسابك."
+      });
+    }
+
+    if (diseaseIsArchivedSrv(animal.data || {})) {
+      return res.status(400).json({
+        ok: false,
+        error: "animal_archived",
+        message: "❌ لا يمكن تسجيل عرج — الحيوان خارج القطيع."
+      });
+    }
+
+    const targetCollection = animal._collection || "animals";
+    const eventRef = db.collection("events").doc();
+
+    const eventPayload = {
+      userId: uid,
+      ownerUid: uid,
+
+      animalId: animal.id || "",
+      animalNumber: fd.animalNumber,
+      eventDate: fd.eventDate,
+      date: fd.eventDate,
+
+      type: "عرج",
+      eventType: "lameness",
+      eventTypeNorm: "lameness",
+
+      diagnosis: fd.lamenessType,
+      diseaseCode: "lameness",
+      diseaseName: "عرج",
+      diseaseGroup: "حركة وعرج",
+
+      affectedLeg: fd.affectedLeg,
+      lamenessType: fd.lamenessType,
+      vet: fd.vet || null,
+
+      animalCollection: targetCollection,
+      source: "server:/api/lameness/save",
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const animalPatch = {
+      healthStatus: "عرج",
+      lastDisease: "عرج",
+      lastDiseaseDate: fd.eventDate,
+      lastDiagnosis: `عرج - ${fd.lamenessType}`,
+      lastDiagnosisDate: fd.eventDate,
+
+      lastLamenessDate: fd.eventDate,
+      lastLamenessType: fd.lamenessType,
+      lastLamenessAffectedLeg: fd.affectedLeg,
+
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const batch = db.batch();
+    batch.set(eventRef, eventPayload);
+    batch.set(db.collection(targetCollection).doc(animal.id), animalPatch, { merge: true });
+    await batch.commit();
+
+    return res.json({
+      ok: true,
+      message: "✅ تم حفظ العرج بنجاح",
+      eventId: eventRef.id,
+      animalNumber: fd.animalNumber,
+      eventDate: fd.eventDate,
+      redirectUrl: `/event-list.html?number=${encodeURIComponent(fd.animalNumber)}`
+    });
+
+  } catch (e) {
+    console.error("lameness save failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "lameness_save_failed",
+      message: "❌ تعذّر حفظ العرج الآن."
+    });
+  }
+});
+// ============================================================
 //                 API: PREGNANCY DIAGNOSIS BULK SAVE
 //                 حفظ جماعي لتشخيص الحمل من السيرفر فقط
 // ============================================================
