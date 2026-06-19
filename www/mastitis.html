@@ -56,6 +56,29 @@
           <textarea id="notes" rows="3" placeholder="أي ملاحظة علاجية أو تشخيصية مختصرة"></textarea>
         </div>
       </div>
+      <fieldset>
+  <legend>صورة اللبن</legend>
+
+  <div class="row">
+    <div>
+      <label for="milkImage">تصوير اللبن من الربع المصاب</label>
+      <input id="milkImage" type="file" accept="image/*" capture="environment" />
+      <div class="form-hint">
+        صوّر اللبن على سطح أسود نظيف، بإضاءة قوية، ومن مسافة قريبة. اجعل اللبن واضحًا داخل الكادر وتجنّب الظل والاهتزاز والانعكاس الشديد.
+      </div>
+    </div>
+
+   <div>
+  <label>معاينة الصورة</label>
+  <div class="mbk-camera-frame">
+    <img id="milkPreview" class="mbk-camera-preview" alt="معاينة صورة اللبن" hidden />
+  </div>
+  <div id="noImageHint" class="form-hint">
+    لم يتم التقاط صورة بعد.
+  </div>
+</div>
+  </div>
+</fieldset>
     </form>
   </section>
 </main>
@@ -75,6 +98,9 @@
     quartersBox: document.getElementById("quartersBox"),
     mastitisType: document.getElementById("mastitisType"),
     notes: document.getElementById("notes"),
+    milkImage: document.getElementById("milkImage"),
+    milkPreview: document.getElementById("milkPreview"),
+    noImageHint: document.getElementById("noImageHint"),
     saveBtn: document.getElementById("saveBtn")
   };
 
@@ -252,7 +278,26 @@
       els.saveBtn.textContent = prev;
     }
   }
+els.milkImage.addEventListener("change", () => {
+  const file = els.milkImage.files && els.milkImage.files[0];
 
+  if (!file) {
+    els.milkPreview.removeAttribute("src");
+    els.milkPreview.hidden = true;
+    els.noImageHint.hidden = false;
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    els.milkPreview.src = reader.result;
+    els.milkPreview.hidden = false;
+    els.noImageHint.hidden = true;
+  };
+
+  reader.readAsDataURL(file);
+});
   hydrateFromQuery();
 
   els.animalNumber.addEventListener("blur", runGate);
