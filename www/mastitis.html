@@ -4,187 +4,263 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
   <title>تسجيل التهاب الضرع — مُرَبِّك</title>
-  <style>
-    :root{--green:#0ea05a;--green-600:#0b7f47;--bg:#fffce6;--muted:#64748b;--border:#c5e1a5;--card:#f1f8e9}
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);font-family:system-ui,'Segoe UI','Cairo',Tahoma,Arial,sans-serif;color:#0f172a;padding:16px}
-    h1{margin:12px 0 16px;text-align:center;color:var(--green-600)}
-    form{max-width:560px;margin:0 auto;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    label{display:block;margin-top:12px;font-weight:700;color:var(--green-600)}
-    input[type="text"],input[type="date"],select{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff}
-    .options-box{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-    .options-box label{background:#e8f5e9;border:1px solid #8bc34a;padding:10px;border-radius:10px;cursor:pointer}
-    .fileline{display:flex;align-items:center;gap:10px;margin-top:8px}
-    .thumb{width:72px;height:72px;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;background:#f8fafc}
-    .thumb img{width:100%;height:100%;object-fit:cover}
-    .actions{display:flex;gap:10px;margin-top:16px}
-    .btn{flex:1 1 auto;appearance:none;border:0;border-radius:12px;padding:12px 14px;font-weight:800;cursor:pointer}
-    .btn.save{background:var(--green);color:#fff}
-    .btn.ghost{background:#eef2f7}
-    .msg{display:none;margin-top:12px;padding:12px;border-radius:10px;font-weight:700;text-align:center}
-    .msg.ok{display:block;background:#dcfce7;border:1px solid #86efac;color:#14532d}
-    .msg.err{display:block;background:#fee2e2;border:1px solid #fca5a5;color:#7f1d1d}
-    .note{color:var(--muted);font-size:13px;margin-top:4px}
-  </style>
+  
 </head>
 <body>
-  <h1>تسجيل التهاب الضرع</h1>
+<header>
+  <div class="mbk-head">
+    <a class="mbk-back" href="add-event.html">رجوع</a>
 
-  <form id="mastitisForm" novalidate>
-    <label for="animalId">رقم الحيوان</label>
-    <input id="animalId" inputmode="numeric" required />
-
-    <label for="eventDate">تاريخ التشخيص</label>
-    <input id="eventDate" type="date" required />
-
-    <label>الربع المصاب</label>
-    <div class="options-box">
-      <label><input type="checkbox" name="quarters" value="أمام شمال" /> أمام شمال</label>
-      <label><input type="checkbox" name="quarters" value="أمام يمين" /> أمام يمين</label>
-      <label><input type="checkbox" name="quarters" value="خلف يمين" /> خلف يمين</label>
-      <label><input type="checkbox" name="quarters" value="خلف شمال" /> خلف شمال</label>
+    <div class="mbk-center">
+      <div class="mbk-page-title">تسجيل التهاب الضرع</div>
+      <div class="mbk-app-name">مُرَبِّك</div>
     </div>
 
-    <label for="mastitisType">نوع الالتهاب</label>
-    <select id="mastitisType" required>
-      <option value="">-- اختر --</option>
-      <option value="عادي">عادي</option>
-      <option value="مائي">مائي</option>
-    </select>
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّك" />
+  </div>
+</header>
 
-    <label>صورة اللبن من الربع المصاب (اختياري)</label>
-    <div class="fileline">
-      <input id="milkImage" type="file" accept="image/*" />
-      <div class="thumb"><img id="thumbImg" alt="" /></div>
-    </div>
-    <div class="note">ترفع الصورة (إن وُجدت) إلى Firebase Storage للتحليل والتتبع الذكي.</div>
+<div id="sysbar" class="infobar"></div>
 
-    <div id="formMsg" class="msg"></div>
+<main>
+  <section class="card">
+    <form id="mastitisForm" novalidate>
+      <div class="row">
+        <div>
+          <label for="animalNumber">رقم الحيوان</label>
+          <input id="animalNumber" inputmode="numeric" autocomplete="off" />
+        </div>
 
-    <div class="actions">
-      <button type="button" class="btn save" id="saveBtn">حفظ الحالة</button>
-      <a class="btn ghost" href="dashboard.html">رجوع للوحة التحكم</a>
-    </div>
-  </form>
+        <div>
+          <label for="eventDate">تاريخ التشخيص</label>
+          <input id="eventDate" type="date" />
+        </div>
+      </div>
 
-  <!-- تتبع ذكي -->
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    (window.t = window.t || { event:(e,p={})=>{ try{ window.dataLayer.push({event:e, ts:Date.now(), ...p}); }catch{} } });
-    t.event('page_view', { page:'/mastitis.html', feature:'mastitis_record' });
-  </script>
+      <fieldset>
+        <legend>الربع المصاب</legend>
+        <div id="quartersBox" class="radio-group"></div>
+      </fieldset>
 
-  <!-- منطق الصفحة (ESM) -->
-  <script type="module">
-    // تعبئة أولية
-    function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
-    (function hydrate(){
-      const qs=new URLSearchParams(location.search);
-      const id=qs.get('animalId')||qs.get('number')||qs.get('animalNumber')||localStorage.getItem('currentAnimalId')||localStorage.getItem('lastAnimalId')||'';
-      const dt=qs.get('date')||qs.get('eventDate')||localStorage.getItem('lastEventDate')||todayLocal();
-      document.getElementById('animalId').value=id;
-      document.getElementById('eventDate').value=dt;
-      try{ localStorage.setItem('currentAnimalId',id); localStorage.setItem('lastAnimalId',id); localStorage.setItem('lastEventDate',dt); }catch{}
-    })();
+      <div class="row">
+        <div>
+          <label for="mastitisType">نوع الالتهاب</label>
+          <select id="mastitisType">
+            <option value="">اختر من السيرفر...</option>
+          </select>
+        </div>
 
-    // معاينة الصورة
-    const milkInput = document.getElementById('milkImage');
-    const thumbImg  = document.getElementById('thumbImg');
-    milkInput.addEventListener('change', ()=>{
-      const f=milkInput.files&&milkInput.files[0]; if(!f){ thumbImg.src=''; return; }
-      const r=new FileReader(); r.onload=()=>{ thumbImg.src=r.result; }; r.readAsDataURL(f);
+        <div>
+          <label for="notes">ملاحظات اختيارية</label>
+          <textarea id="notes" rows="3" placeholder="أي ملاحظة علاجية أو تشخيصية مختصرة"></textarea>
+        </div>
+      </div>
+    </form>
+  </section>
+</main>
+
+<div class="actions-bar">
+  <button type="button" class="save" id="saveBtn">حفظ التهاب الضرع</button>
+</div>
+
+<script>
+(function(){
+  const API_BASE = "";
+
+  const els = {
+    sysbar: document.getElementById("sysbar"),
+    animalNumber: document.getElementById("animalNumber"),
+    eventDate: document.getElementById("eventDate"),
+    quartersBox: document.getElementById("quartersBox"),
+    mastitisType: document.getElementById("mastitisType"),
+    notes: document.getElementById("notes"),
+    saveBtn: document.getElementById("saveBtn")
+  };
+
+  function todayLocal(){
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
+  }
+
+  function getUserId(){
+    const qs = new URLSearchParams(location.search);
+    return (
+      qs.get("userId") ||
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("ownerUid") ||
+      localStorage.getItem("tenantId") ||
+      ""
+    ).trim();
+  }
+
+  function escapeHtml(v){
+    return String(v ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function showMsg(text, type){
+    const msg = String(text || "").trim();
+    if (!msg) {
+      els.sysbar.className = "infobar";
+      els.sysbar.textContent = "";
+      return;
+    }
+
+    els.sysbar.textContent = msg;
+    els.sysbar.className = "infobar show " + (type || "info");
+
+    try {
+      els.sysbar.scrollIntoView({ behavior:"smooth", block:"center" });
+    } catch {}
+  }
+
+  async function apiPost(path, body){
+    const uid = getUserId();
+
+    if (!uid) {
+      throw new Error("يلزم تسجيل الدخول أولًا.");
+    }
+
+    const r = await fetch(API_BASE + path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(body || {})
     });
 
-    const msgBox = document.getElementById('formMsg');
-    function setMsg(text, ok=true){ msgBox.textContent=text; msgBox.className='msg '+(ok?'ok':'err'); try{ msgBox.scrollIntoView({behavior:'smooth', block:'center'});}catch{} }
-
-    const saveBtn = document.getElementById('saveBtn');
-    saveBtn.addEventListener('click', onSave);
-
-    async function onSave(){
-      const animalId     = document.getElementById('animalId').value.trim();
-      const eventDate    = document.getElementById('eventDate').value;
-      const mastitisType = document.getElementById('mastitisType').value;
-      const quarters     = Array.from(document.querySelectorAll("input[name='quarters']:checked")).map(cb=>cb.value);
-
-      if(!animalId || !eventDate || !mastitisType || quarters.length===0){
-        setMsg('يرجى ملء كل الحقول المطلوبة واختيار ربع واحد على الأقل.', false); return;
-      }
-      const todayISO = new Date().toISOString().slice(0,10);
-      if(eventDate > todayISO){ setMsg('تاريخ التشخيص لا يمكن أن يكون في المستقبل.', false); return; }
-
-      // تحميل Firebase config + مكتبات Firestore/Storage
-      let cfg, fs, st;
-      try{
-        cfg = await import('/js/firebase-config.js'); // يوفّر db, auth, ensureAuth
-        fs  = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-        st  = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js');
-      }catch(e){ console.error(e); setMsg('تعذّر تحميل مكتبات فايربيز.', false); return; }
-
-      // تأكيد الجلسة (للالتزام بالرولز: userId == auth.uid)
-      try{ await cfg.ensureAuth(); }catch{ setMsg('يلزم تسجيل الدخول أولًا.', false); location.href='login.html'; return; }
-      const uid = cfg.auth?.currentUser?.uid;
-      if(!uid){ setMsg('يلزم تسجيل الدخول أولًا.', false); return; }
-
-      const tenantId = localStorage.getItem('tenantId') || null;
-
-      // نصائح متابعة بسيطة (ذكاء خفيف)
-      const addDays = (iso,n)=>{ const d=new Date(iso); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
-      const tips = [
-        `إعادة فحص بعد 24–48 ساعة: ${addDays(eventDate,2)}`,
-        `مراجعة إنتاج اللبن: ${addDays(eventDate,1)}`
-      ];
-
-      const payload = {
-        type:'التهاب الضرع',
-        eventType:'mastitis',
-        userId:uid,               /* ← يطابق قواعد Firestore */
-        tenantId,
-        animalId,
-        animalNumber: animalId,   /* للتوافق مع صفحات العرض */
-        eventDate,
-        diseaseName:'التهاب الضرع',
-        mastitisType,
-        quarters,
-        isSmartAlert:true,
-        alertRule:'mastitis',
-        aiHints: tips.join(' — '),
-        source: location.pathname,
-        createdAt: fs.serverTimestamp()
-      };
-
-      // حفظ + (اختياري) رفع صورة
-      saveBtn.disabled = true; const prev = saveBtn.textContent; saveBtn.textContent = 'جارٍ الحفظ…';
-      try{
-        const docRef = await fs.addDoc(fs.collection(cfg.db,'events'), payload);
-
-        const file = milkInput.files && milkInput.files[0];
-        if(file){
-          try{
-            const storage = st.getStorage();                // يستخدم الـ app الافتراضي من firebase-config
-            const path = `mastitis_images/${uid}/${docRef.id}.jpg`;
-            const aref = st.ref(storage, path);
-            await st.uploadBytes(aref, file);
-            const url = await st.getDownloadURL(aref);
-            await fs.updateDoc(docRef, { milkImageUrl:url, milkImagePath:path, milkImageType:file.type||'image/jpeg', milkImageSize:file.size||null });
-            t.event('mastitis_upload', { size:file.size||0, type:file.type||'image/jpeg' });
-          }catch(e){ console.warn('image upload failed', e); /* لا تُفشل العملية */ }
-        }
-
-        t.event('mastitis_save', { animalId, quarters:quarters.join(','), mastitisType });
-
-        try{ localStorage.setItem('lastAnimalId', animalId); localStorage.setItem('lastEventDate', eventDate); }catch{}
-        setMsg(`✅ تم حفظ الحالة بنجاح. ${tips.join(' — ')}`, true);
-        setTimeout(()=>{ location.href='dashboard.html'; }, 9000);
-      }catch(e){
-        console.error(e);
-        setMsg('❌ فشل الحفظ في فايربيز. حاول مجددًا.', false);
-      }finally{
-        saveBtn.disabled = false; saveBtn.textContent = prev;
-      }
+    let j = null;
+    try {
+      j = await r.json();
+    } catch {
+      j = null;
     }
-  </script>
+
+    if (!r.ok) {
+      const msg = j?.message || "تعذّر تنفيذ الطلب من السيرفر.";
+      const err = new Error(msg);
+      err.response = j;
+      err.status = r.status;
+      throw err;
+    }
+
+    return j || {};
+  }
+
+  function hydrateFromQuery(){
+    const qs = new URLSearchParams(location.search);
+
+    els.animalNumber.value =
+      qs.get("number") ||
+      qs.get("animalNumber") ||
+      qs.get("animalId") ||
+      "";
+
+    els.eventDate.value =
+      qs.get("date") ||
+      qs.get("eventDate") ||
+      todayLocal();
+  }
+
+  function collectPayload(){
+    return {
+      animalNumber: els.animalNumber.value.trim(),
+      eventDate: els.eventDate.value,
+      mastitisType: els.mastitisType.value,
+      quarters: Array.from(
+        document.querySelectorAll('input[name="quarters"]:checked')
+      ).map(x => x.value),
+      notes: els.notes.value.trim()
+    };
+  }
+
+  function renderOptions(options){
+    const quarters = Array.isArray(options?.quarters) ? options.quarters : [];
+    const mastitisTypes = Array.isArray(options?.mastitisTypes) ? options.mastitisTypes : [];
+
+    els.quartersBox.innerHTML = quarters.map(q => {
+      const safe = escapeHtml(q);
+      return `<label><input type="checkbox" name="quarters" value="${safe}"> ${safe}</label>`;
+    }).join("");
+
+    const oldType = els.mastitisType.value;
+
+    els.mastitisType.innerHTML =
+      `<option value="">-- اختر --</option>` +
+      mastitisTypes.map(t => {
+        const safe = escapeHtml(t);
+        return `<option value="${safe}">${safe}</option>`;
+      }).join("");
+
+    if (oldType && mastitisTypes.includes(oldType)) {
+      els.mastitisType.value = oldType;
+    }
+  }
+
+  async function runGate(){
+    try {
+      const payload = collectPayload();
+
+      const j = await apiPost("/api/mastitis/gate", {
+        animalNumber: payload.animalNumber,
+        eventDate: payload.eventDate
+      });
+
+      renderOptions(j.options || {});
+
+      if (j.message && !j.silent) {
+        showMsg(j.message, j.allowed ? "success" : "warning");
+      } else if (!payload.animalNumber) {
+        showMsg("أدخل رقم الحيوان وتاريخ التشخيص.", "info");
+      }
+
+    } catch (e) {
+      showMsg(e.message || "تعذّر التحقق من السيرفر.", "error");
+    }
+  }
+
+  async function save(){
+    const prev = els.saveBtn.textContent;
+
+    try {
+      els.saveBtn.disabled = true;
+      els.saveBtn.textContent = "جارٍ الحفظ...";
+      showMsg("جارٍ إرسال البيانات للسيرفر...", "info");
+
+      const j = await apiPost("/api/mastitis/save", collectPayload());
+
+      showMsg(j.message || "✅ تم حفظ التهاب الضرع بنجاح", "success");
+
+      if (j.redirectUrl) {
+        setTimeout(() => {
+          location.href = j.redirectUrl;
+        }, 900);
+      }
+
+    } catch (e) {
+      showMsg(e.message || "تعذّر حفظ التهاب الضرع.", "error");
+    } finally {
+      els.saveBtn.disabled = false;
+      els.saveBtn.textContent = prev;
+    }
+  }
+
+  hydrateFromQuery();
+
+  els.animalNumber.addEventListener("blur", runGate);
+  els.eventDate.addEventListener("change", runGate);
+  els.saveBtn.addEventListener("click", save);
+
+  runGate();
+})();
+</script>
 </body>
 </html>
