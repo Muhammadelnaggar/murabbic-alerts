@@ -63,7 +63,6 @@
     <div>
 <label>تصوير اللبن من الربع المصاب</label>
 
-<input id="milkCameraImage" type="file" accept="image/*" capture="environment" hidden />
 <input id="milkUploadImage" type="file" accept="image/*" hidden />
 
 <div class="row">
@@ -92,8 +91,9 @@
    <div>
   <label>معاينة الصورة</label>
   <div class="mbk-camera-frame">
-    <img id="milkPreview" class="mbk-camera-preview" alt="معاينة صورة اللبن" hidden />
-  </div>
+  <video id="milkCameraVideo" class="mbk-camera-preview" autoplay playsinline muted hidden></video>
+  <img id="milkPreview" class="mbk-camera-preview" alt="معاينة صورة اللبن" hidden />
+</div>
   <div id="noImageHint" class="form-hint">
     لم يتم التقاط صورة بعد.
   </div>
@@ -119,12 +119,12 @@
     quartersBox: document.getElementById("quartersBox"),
     mastitisType: document.getElementById("mastitisType"),
     notes: document.getElementById("notes"),
-    milkCameraImage: document.getElementById("milkCameraImage"),
     milkUploadImage: document.getElementById("milkUploadImage"),
     captureMilkBtn: document.getElementById("captureMilkBtn"),
     uploadMilkBtn: document.getElementById("uploadMilkBtn"),
     milkFileHint: document.getElementById("milkFileHint"),
     milkPreview: document.getElementById("milkPreview"),
+    milkCameraVideo: document.getElementById("milkCameraVideo"),
     noImageHint: document.getElementById("noImageHint"),
     saveBtn: document.getElementById("saveBtn")
   };
@@ -303,8 +303,24 @@
       els.saveBtn.textContent = prev;
     }
   }
-function previewMilkFile(file){
-  if (!file) {
+let milkCameraStream = null;
+let capturedMilkImageDataUrl = "";
+
+function stopMilkCamera(){
+  if (milkCameraStream) {
+    milkCameraStream.getTracks().forEach(track => track.stop());
+    milkCameraStream = null;
+  }
+
+  els.milkCameraVideo.srcObject = null;
+  els.milkCameraVideo.hidden = true;
+  els.captureMilkBtn.textContent = "📷 التقاط صورة اللبن";
+}
+
+function showMilkPreview(dataUrl, labelText){
+  capturedMilkImageDataUrl = dataUrl || "";
+
+  if (!dataUrl) {
     els.milkPreview.removeAttribute("src");
     els.milkPreview.hidden = true;
     els.noImageHint.hidden = false;
@@ -312,35 +328,107 @@ function previewMilkFile(file){
     return;
   }
 
+  els.milkPreview.src = dataUrl;
+  els.milkPreview.hidden = false;
+  els.noImageHint.hidden = true;
+  els.milkFileHint.textContent = labelText || "تم التقاط صورة اللبن.";
+}
+
+function previewMilkFile(file){
+  stopMilkCamera();
+
+  if (!file) {
+    showMilkPreview("", "لم يتم اختيار صورة بعد.");
+    return;
+  }
+
   const reader = new FileReader();
 
   reader.onload = () => {
-    els.milkPreview.src = reader.result;
-    els.milkPreview.hidden = false;
-    els.noImageHint.hidden = true;
-    els.milkFileHint.textContent = file.name || "تم اختيار صورة اللبن.";
+    showMilkPreview(reader.result, file.name || "تم اختيار صورة اللبن.");
   };
 
   reader.readAsDataURL(file);
 }
 
-els.captureMilkBtn.addEventListener("click", () => {
-  els.milkCameraImage.click();
+async function openMilkCamera(){
+  try {
+    stopMilkCamera();
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showMsg("متصفحك لا يدعم تشغيل الكاميرا. استخدم رفع صورة بديلة.", "warning");
+      els.milkUploadImage.click();
+      return;
+    }
+
+    milkCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 960 }
+      },
+      audio: false
+    });
+
+    els.milkCameraVideo.srcObject = milkCameraStream;
+    els.milkCameraVideo.hidden = false;
+    els.milkPreview.hidden = true;
+    els.noImageHint.hidden = true;
+    els.captureMilkBtn.textContent = "✅ التقط الآن";
+    els.milkFileHint.textContent = "الكاميرا مفتوحة — ضع اللبن على سطح أسود ثم اضغط التقط الآن.";
+
+    await els.milkCameraVideo.play();
+
+  } catch (e) {
+    showMsg("تعذّر فتح الكاميرا. يمكنك استخدام رفع صورة بديلة.", "warning");
+    stopMilkCamera();
+    els.milkUploadImage.click();
+  }
+}
+
+function captureMilkFromCamera(){
+  const video = els.milkCameraVideo;
+
+  if (!video.videoWidth || !video.videoHeight) {
+    showMsg("انتظر لحظة حتى تظهر صورة الكاميرا.", "warning");
+    return;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
+
+  stopMilkCamera();
+  showMilkPreview(dataUrl, "تم التقاط صورة اللبن بالكاميرا.");
+}
+
+els.captureMilkBtn.addEventListener("click", async () => {
+  if (milkCameraStream) {
+    captureMilkFromCamera();
+    return;
+  }
+
+  await openMilkCamera();
 });
 
 els.uploadMilkBtn.addEventListener("click", () => {
+  stopMilkCamera();
   els.milkUploadImage.click();
-});
-
-els.milkCameraImage.addEventListener("change", () => {
-  const file = els.milkCameraImage.files && els.milkCameraImage.files[0];
-  previewMilkFile(file);
 });
 
 els.milkUploadImage.addEventListener("change", () => {
   const file = els.milkUploadImage.files && els.milkUploadImage.files[0];
   previewMilkFile(file);
+  els.milkUploadImage.value = "";
 });
+
+window.addEventListener("pagehide", stopMilkCamera);
+window.addEventListener("beforeunload", stopMilkCamera);
   hydrateFromQuery();
 
   els.animalNumber.addEventListener("blur", runGate);
