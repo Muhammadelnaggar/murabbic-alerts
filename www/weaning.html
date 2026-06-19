@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>تسجيل الفطام — مُرَبِّيك</title>
   <link rel="stylesheet" href="css/forms.css" />
-  <script type="module" src="js/forms-init.js"></script>
+ 
 </head>
 <body>
 <header>
@@ -40,7 +40,7 @@
 
       <div class="field" id="bulkAgeHint" style="display:none;">
         <label>عمر الفطام</label>
-        <div class="hint">سيتم حساب عمر الفطام تلقائيًا لكل حيوان من تاريخ الميلاد المسجل.</div>
+       <div class="form-hint">سيتم حساب عمر الفطام تلقائيًا من السيرفر لكل حيوان حسب تاريخ الميلاد المسجل.</div>
       </div>
 
       <div class="field">
@@ -49,393 +49,269 @@
       </div>
     </section>
 
-    <div class="btn-row">
-      <button class="save-btn" id="saveBtn" type="submit">تسجيل الحدث</button>
-      <button class="open-card" id="cardBtn" type="button">بطاقة الحيوان</button>
-    </div>
+    <div class="actions-bar">
+  <button class="save" id="saveBtn" type="submit">تسجيل الحدث</button>
+  <button class="ghost" id="cardBtn" type="button">بطاقة الحيوان</button>
+</div>
   </form>
 </main>
 
-<script type="module">
-  import { db, auth, ensureAuth } from "/js/firebase-config.js";
-  import {
-collection, addDoc, serverTimestamp,
-getDocs, query, where, limit, doc, getDoc
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+<script>
   const $ = (id) => document.getElementById(id);
 
   const form = $("weaningForm");
   const info = $("info");
+  const saveBtn = $("saveBtn");
   const cardBtn = $("cardBtn");
 
   const qs = new URLSearchParams(location.search);
-  const isGroup = String(qs.get("mbkMode") || "").trim() === "group";
-  const bulkRaw = String(qs.get("bulk") || "").trim();
-  const singleNumber = String(qs.get("number") || qs.get("animalNumber") || "").trim();
-  const eventDate = String(qs.get("date") || qs.get("eventDate") || new Date().toISOString().slice(0,10)).slice(0,10);
 
-  const DIGITS = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-  const toLatin = (s) => String(s || "").replace(/[٠-٩۰-۹]/g, d => DIGITS[d] || d);
-  const onlyDigits = (s) => toLatin(s).replace(/[^\d]/g, "");
-  const parseNumbers = (raw) => {
-    const arr = (toLatin(raw).match(/\d+/g) || []).map(x => x.replace(/\D/g,"")).filter(Boolean);
-    return [...new Set(arr)];
+  const DIGITS = {
+    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
   };
 
-  const bulkList = isGroup ? parseNumbers(bulkRaw) : (singleNumber ? [onlyDigits(singleNumber)] : []);
-
-  function msg(text, ok = false){
-    info.className = "infobar mbk-infobar show " + (ok ? "success" : "error");
-    info.style.display = "block";
-    info.textContent = text;
+  function toLatin(v){
+    return String(v || "").replace(/[٠-٩۰-۹]/g, d => DIGITS[d] || d);
   }
 
-  function hideMsg(){
-    info.style.display = "none";
+  function parseNumbers(raw){
+    return [...new Set(
+      (toLatin(raw).match(/\d+/g) || [])
+        .map(x => x.replace(/\D/g, ""))
+        .filter(Boolean)
+    )];
   }
-  function setWeaningUIEnabled(enabled){
-  const saveBtn = $("saveBtn");
-  const cardBtn = $("cardBtn");
-  const notesEl = $("notes");
 
-  if (saveBtn) saveBtn.disabled = !enabled;
-  if (notesEl) notesEl.disabled = !enabled;
-
-  if (!isGroup) {
-    if (cardBtn) cardBtn.disabled = !enabled;
+  function todayISO(){
+    return new Date().toISOString().slice(0, 10);
   }
-}
-  function daysBetween(a, b){
-    const d1 = new Date(String(a || "").slice(0,10));
-    const d2 = new Date(String(b || "").slice(0,10));
-    if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return NaN;
-    d1.setHours(0,0,0,0);
-    d2.setHours(0,0,0,0);
-    return Math.round((d2 - d1) / 86400000);
+
+  function getUid(){
+    return String(
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("ownerUid") ||
+      sessionStorage.getItem("userId") ||
+      sessionStorage.getItem("uid") ||
+      ""
+    ).trim();
   }
-async function hasWeaningEvent(uid, number){
-  const nStr = String(number || "").trim();
-  const nNum = Number(nStr);
 
-  const tries = [
-    ["animalNumber", nStr],
-    ["animalNumber", nNum]
-  ];
+  const initialRaw = String(
+    qs.get("numbers") ||
+    qs.get("bulk") ||
+    qs.get("animalNumbers") ||
+    qs.get("selectedNumbers") ||
+    qs.get("number") ||
+    qs.get("animalNumber") ||
+    ""
+  ).trim();
 
-  for (const [numField, value] of tries) {
-    if (typeof value === "number" && Number.isNaN(value)) continue;
+  const initialNumbers = parseNumbers(initialRaw);
+  const initialMode = String(qs.get("mode") || qs.get("mbkMode") || "").trim().toLowerCase();
+  const startsBulk = initialMode === "bulk" || initialMode === "group" || initialNumbers.length > 1;
+  const initialDate = String(qs.get("date") || qs.get("eventDate") || todayISO()).slice(0, 10);
 
-    try {
-      const qy = query(
-        collection(db, "events"),
-        where("userId", "==", uid),
-        where(numField, "==", value),
-        where("eventType", "==", "فطام"),
-        limit(1)
+  let lastGate = null;
+  let gateTimer = null;
+
+  function getCurrentNumbers(){
+    return parseNumbers($("animalNumber").value || "");
+  }
+
+  function isBulkNow(){
+    return startsBulk || getCurrentNumbers().length > 1;
+  }
+
+  function setMessage(text, type = "info"){
+    info.className = `infobar show ${type}`;
+    info.textContent = String(text || "");
+  }
+
+  function clearMessage(){
+    info.className = "infobar";
+    info.textContent = "";
+  }
+
+  function setBusy(busy){
+    if (saveBtn) saveBtn.disabled = !!busy || !lastGate?.canSave;
+    if (cardBtn) cardBtn.disabled = !!busy || getCurrentNumbers().length !== 1;
+  }
+
+  function responseText(j = {}){
+    const lines = [];
+    if (j.message) lines.push(j.message);
+
+    const rejected = Array.isArray(j.rejected) ? j.rejected : [];
+    if (rejected.length) {
+      lines.push(
+        rejected.slice(0, 8)
+          .map(r => `رقم ${r.animalNumber || r.number || "—"}: ${r.reason || "غير مقبول"}`)
+          .join("\n")
       );
-      const snap = await getDocs(qy);
-      if (!snap.empty) return true;
-    } catch (_) {}
-  }
-
-  // fallback لو بعض الأحداث القديمة محفوظة في type فقط
-  for (const [numField, value] of tries) {
-    if (typeof value === "number" && Number.isNaN(value)) continue;
-
-    try {
-      const qy = query(
-        collection(db, "events"),
-        where("userId", "==", uid),
-        where(numField, "==", value),
-        where("type", "==", "فطام"),
-        limit(1)
-      );
-      const snap = await getDocs(qy);
-      if (!snap.empty) return true;
-    } catch (_) {}
-  }
-
-  return false;
-}
-  async function getUid(){
-    await ensureAuth();
-    return auth.currentUser?.uid || localStorage.getItem("userId") || "";
-  }
-
-async function fetchAnimal(uid, number){
-  const nStr = String(number || "").trim();
-  const nNum = Number(nStr);
-
-  // 1) ابحث أولًا في animals
-  const animalTries = [
-    ["userId", "animalNumber", nStr],
-    ["userId", "animalNumber", nNum],
-    ["ownerUid", "animalNumber", nStr],
-    ["ownerUid", "animalNumber", nNum],
-    ["userId", "number", nStr],
-    ["ownerUid", "number", nStr]
-  ];
-
-  for (const [ownerField, numField, value] of animalTries) {
-    if (typeof value === "number" && Number.isNaN(value)) continue;
-    try {
-      const qy = query(
-        collection(db, "animals"),
-        where(ownerField, "==", uid),
-        where(numField, "==", value),
-        limit(1)
-      );
-      const snap = await getDocs(qy);
-      if (!snap.empty) {
-        const d = snap.docs[0];
-        return { id: d.id, data: d.data() || {}, source: "animals" };
-      }
-    } catch (_) {}
-  }
-
-  // 2) لو لم يوجد، ابحث في calves
-  const calfTries = [
-    ["userId", "calfNumber", nStr],
-    ["userId", "calfNumber", nNum],
-    ["ownerUid", "calfNumber", nStr],
-    ["ownerUid", "calfNumber", nNum],
-    ["userId", "animalNumber", nStr],
-    ["ownerUid", "animalNumber", nStr]
-  ];
-
-  for (const [ownerField, numField, value] of calfTries) {
-    if (typeof value === "number" && Number.isNaN(value)) continue;
-    try {
-      const qy = query(
-        collection(db, "calves"),
-        where(ownerField, "==", uid),
-        where(numField, "==", value),
-        limit(1)
-      );
-      const snap = await getDocs(qy);
-      if (!snap.empty) {
-        const d = snap.docs[0];
-        return { id: d.id, data: d.data() || {}, source: "calves" };
-      }
-    } catch (_) {}
-  }
-
-  // 3) محاولة مباشرة بالرقم كـ doc id داخل calves
-  try {
-    const calfRef = doc(db, "calves", nStr);
-    const calfSnap = await getDoc(calfRef);
-    if (calfSnap.exists()) {
-      const data = calfSnap.data() || {};
-      const owner = String(data.userId || data.ownerUid || "").trim();
-      if (owner === uid) {
-        return { id: calfSnap.id, data, source: "calves" };
+      if (rejected.length > 8) {
+        lines.push(`… وعدد ${rejected.length - 8} أرقام أخرى.`);
       }
     }
-  } catch (_) {}
 
-  return null;
-}
-  async function calcWeaningAge(uid, number, dateISO){
-    const animal = await fetchAnimal(uid, number);
-    if (!animal) return { ok:false, age:null, reason:"الحيوان غير موجود." };
-
-    const birthDate =
-      String(animal.data.birthDate || animal.data.dateOfBirth || animal.data.dob || "").slice(0,10);
-
-    if (!birthDate) return { ok:false, age:null, reason:"تاريخ الميلاد غير مسجل." };
-
-    const age = daysBetween(birthDate, dateISO);
-    if (!Number.isFinite(age) || age < 0) return { ok:false, age:null, reason:"تعذّر حساب عمر الفطام." };
-
-    return { ok:true, age, animal };
+    return lines.filter(Boolean).join("\n");
   }
 
- function hydrateUI(){
-  $("eventDate").value = eventDate;
+  async function apiPost(path, payload){
+    const uid = getUid();
 
-  if (isGroup) {
-    $("animalNumber").value = bulkList.join("\n");
-    $("animalNumber").rows = Math.max(3, bulkList.length);
-    $("singleAgeWrap").style.display = "none";
-    $("bulkAgeHint").style.display = "";
-    cardBtn.disabled = true;
-    cardBtn.style.opacity = ".6";
-    cardBtn.style.pointerEvents = "none";
-  } else {
-    const n = bulkList[0] || "";
-    $("animalNumber").value = n;
-    $("animalNumber").rows = 1;
-    $("singleAgeWrap").style.display = "";
-    $("bulkAgeHint").style.display = "none";
-    cardBtn.disabled = !n;
-  }
-}
+    if (!uid) {
+      return {
+        ok: false,
+        canSave: false,
+        message: "❌ لم يتم التعرف على المستخدم. سجّل الدخول مرة أخرى."
+      };
+    }
 
-  async function refreshSingleAge(){
-    if (isGroup) return;
-    const uid = await getUid();
-    const n = String($("animalNumber").value || "").trim();
-    const dt = String($("eventDate").value || "").slice(0,10);
-    if (!uid || !n || !dt) return;
+    const r = await fetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(payload || {})
+    });
 
-    const r = await calcWeaningAge(uid, n, dt);
-if (r.ok) {
-  $("weaningAgeDays").value = String(r.age);
+    const j = await r.json().catch(() => ({
+      ok: false,
+      canSave: false,
+      message: "❌ رد السيرفر غير صالح."
+    }));
 
-  // ✅ فك القفل المركزي محليًا لصفحة الفطام
-  form.dataset.locked = "0";
-  form.dataset.animalOk = "1";
-  setWeaningUIEnabled(true);
-
-  msg("✅ تم التحقق — أكمل البيانات ثم اضغط تسجيل الحدث.", true);
-} else {
-  $("weaningAgeDays").value = "";
-
-  // ✅ أعِد القفل إذا فشل التحقق المحلي
-  form.dataset.locked = "1";
-  form.dataset.animalOk = "0";
-  setWeaningUIEnabled(false);
-}
+    return { httpStatus: r.status, ...j };
   }
 
- cardBtn.onclick = () => {
-  const raw = String($("animalNumber").value || "").trim();
-  const n = (raw.match(/\d+/) || [""])[0];
-  if (!n) return;
-  location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
-};
+  function renderGate(j = {}){
+    lastGate = j;
 
-  $("eventDate").addEventListener("change", refreshSingleAge);
-  $("eventDate").addEventListener("input", refreshSingleAge);
+    const accepted = Array.isArray(j.accepted) ? j.accepted : [];
+    const first = accepted[0] || null;
+    const bulk = isBulkNow();
 
-hydrateUI();
-form.dataset.locked = "1";
-form.dataset.animalOk = "0";
-setWeaningUIEnabled(false);
-refreshSingleAge();
- form.addEventListener("mbk:valid", async (ev) => {
-  try {
-    const uid = await getUid();
-    if (!uid) throw new Error("NO_AUTH");
+    $("singleAgeWrap").style.display = bulk ? "none" : "";
+    $("bulkAgeHint").style.display = bulk ? "" : "none";
 
-    const formData = (ev && ev.detail && ev.detail.formData) ? ev.detail.formData : {};
-    const dt = String(formData.eventDate || $("eventDate").value || "").slice(0,10);
-    const notes = String(formData.notes || "").trim();
+    $("weaningAgeDays").value =
+      !bulk && first && Number.isFinite(Number(first.weaningAgeDays))
+        ? String(first.weaningAgeDays)
+        : "";
 
-    // =========================
-    // جماعي
-    // =========================
-    if (isGroup) {
-      if (!bulkList.length) {
-        msg("❌ لا توجد أرقام لحفظ الفطام.", false);
-        return;
-      }
+    if (saveBtn) saveBtn.disabled = !j.canSave;
 
-      let saved = 0;
-      const failed = [];
-      const duplicated = [];
+    const nums = getCurrentNumbers();
+    if (cardBtn) {
+      cardBtn.disabled = nums.length !== 1;
+      cardBtn.style.opacity = nums.length === 1 ? "1" : ".6";
+      cardBtn.style.pointerEvents = nums.length === 1 ? "auto" : "none";
+    }
 
-      for (const num of bulkList) {
-        const alreadyWeaned = await hasWeaningEvent(uid, num);
-        if (alreadyWeaned) {
-          duplicated.push(num);
-          continue;
-        }
+    const text = responseText(j);
+    if (text) setMessage(text, j.canSave ? "success" : "error");
+    else clearMessage();
+  }
 
-        const ageRes = await calcWeaningAge(uid, num, dt);
-        if (!ageRes.ok) {
-          failed.push(num);
-          continue;
-        }
+  async function runGate({ silent = false } = {}){
+    const numbers = getCurrentNumbers();
+    const eventDate = String($("eventDate").value || "").slice(0, 10);
 
-        const payload = {
-          animalNumber: String(num),
-          animalId: String(num),
-          type: "فطام",
-          eventType: "فطام",
-          eventDate: dt,
-          weaningAgeDays: ageRes.age,
-          notes,
-          userId: uid,
-          source: "/weaning.html",
-          createdAt: serverTimestamp()
-        };
+    if (!numbers.length || !eventDate) {
+      lastGate = { canSave:false };
+      if (saveBtn) saveBtn.disabled = true;
+      if (!silent) setMessage("اكتب رقم الحيوان وتاريخ الفطام.", "info");
+      return;
+    }
 
-        await addDoc(collection(db, "events"), payload);
-        saved++;
-      }
+    if (!silent) setMessage("جاري التحقق من السيرفر…", "info");
+    setBusy(true);
 
-      if (!saved) {
-        if (duplicated.length) {
-          msg("❌ تم تسجيل الفطام لهذه الأرقام من قبل — لا يمكن تكراره.", false);
-        } else {
-          msg("❌ تعذّر تسجيل الفطام لأي رقم. راجع تواريخ الميلاد أو الأرقام.", false);
-        }
-        return;
-      }
+    try {
+      const j = await apiPost("/api/weaning/gate", {
+        numbers,
+        animalNumbers: numbers,
+        eventDate
+      });
 
-      if (failed.length || duplicated.length) {
-        msg(
-          `✅ تم تسجيل الفطام لعدد ${saved} حيوان.` +
-          `${duplicated.length ? ` تم استبعاد ${duplicated.length} لأن الفطام مسجل سابقًا.` : ""}` +
-          `${failed.length ? ` وتعذّر الحساب/الحفظ لعدد ${failed.length}.` : ""}`,
-          true
-        );
+      renderGate(j);
+    } catch (e) {
+      console.error(e);
+      lastGate = { canSave:false };
+      if (saveBtn) saveBtn.disabled = true;
+      setMessage("❌ تعذّر التحقق من السيرفر الآن.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function scheduleGate(){
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(() => runGate({ silent:true }), 350);
+  }
+
+  function hydrateUI(){
+    $("eventDate").value = initialDate;
+    $("animalNumber").value = initialNumbers.join(startsBulk ? "\n" : "");
+    $("animalNumber").rows = startsBulk ? Math.max(3, initialNumbers.length) : 1;
+
+    $("singleAgeWrap").style.display = startsBulk ? "none" : "";
+    $("bulkAgeHint").style.display = startsBulk ? "" : "none";
+
+    if (saveBtn) saveBtn.disabled = true;
+    if (cardBtn) cardBtn.disabled = initialNumbers.length !== 1;
+  }
+
+  cardBtn.addEventListener("click", () => {
+    const nums = getCurrentNumbers();
+    if (nums.length !== 1) return;
+    location.href = `cow-card.html?number=${encodeURIComponent(nums[0])}`;
+  });
+
+  $("animalNumber").addEventListener("input", scheduleGate);
+  $("eventDate").addEventListener("input", scheduleGate);
+  $("eventDate").addEventListener("change", () => runGate({ silent:false }));
+
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+
+    const numbers = getCurrentNumbers();
+    const eventDate = String($("eventDate").value || "").slice(0, 10);
+    const notes = String($("notes").value || "").trim();
+
+    setMessage("جاري الحفظ من السيرفر…", "info");
+    setBusy(true);
+
+    try {
+      const j = await apiPost("/api/weaning/save", {
+        numbers,
+        animalNumbers: numbers,
+        eventDate,
+        notes
+      });
+
+      setMessage(responseText(j) || j.message || "تمت المعالجة.", j.ok ? "success" : "error");
+
+      if (j.ok && j.redirectUrl) {
+        setTimeout(() => {
+          location.href = j.redirectUrl;
+        }, 900);
       } else {
-        msg(`✅ تم تسجيل الفطام لعدد ${saved} حيوان بنجاح.`, true);
+        await runGate({ silent:true });
       }
-
-      return;
+    } catch (e) {
+      console.error(e);
+      setMessage("❌ فشل حفظ الفطام من السيرفر.", "error");
+    } finally {
+      setBusy(false);
     }
+  });
 
-    // =========================
-    // فردي
-    // =========================
-    const n = String(formData.animalNumber || $("animalNumber").value || "").trim();
-
-    const alreadyWeaned = await hasWeaningEvent(uid, n);
-    if (alreadyWeaned) {
-      msg("❌ تم تسجيل الفطام لهذا الحيوان من قبل — لا يمكن تكراره.", false);
-      return;
-    }
-
-    const ageRes = await calcWeaningAge(uid, n, dt);
-    if (!ageRes.ok) {
-      msg(`❌ ${ageRes.reason}`, false);
-      return;
-    }
-
-    $("weaningAgeDays").value = String(ageRes.age);
-
-    const payload = {
-      animalNumber: n,
-      animalId: n,
-      type: "فطام",
-      eventType: "فطام",
-      eventDate: dt,
-      weaningAgeDays: ageRes.age,
-      notes,
-      userId: uid,
-      source: "/weaning.html",
-      createdAt: serverTimestamp()
-    };
-
-    await addDoc(collection(db, "events"), payload);
-
-    msg("✅ تم تسجيل الفطام بنجاح.", true);
-    localStorage.setItem("lastAnimalNumber", n);
-    localStorage.setItem("lastEventDate", dt);
-
-    setTimeout(() => {
-      location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
-    }, 900);
-
-  } catch (e) {
-    console.error(e);
-    msg("❌ فشل في الحفظ.", false);
-  }
-});
+  hydrateUI();
+  runGate({ silent:true });
 </script>
 </body>
 </html>
