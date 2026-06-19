@@ -45,7 +45,7 @@
 
       <div class="row">
         <div>
-          <label for="mastitisType">وصف التهاب الضرع</label
+          <label for="mastitisType">وصف التهاب الضرع</label>
           <select id="mastitisType">
            <option value="">اختر وصف التهاب الضرع...</option>
           </select>
@@ -195,11 +195,11 @@
     const oldType = els.mastitisType.value;
 
     els.mastitisType.innerHTML =
-      `<option value="">-- اختر --</option>` +
-      mastitisTypes.map(t => {
-        const safe = escapeHtml(t);
-        return `<option value="${safe}">${safe}</option>`;
-      }).join("");
+  `<option value="">اختر وصف التهاب الضرع...</option>` +
+  mastitisTypes.map(t => {
+    const safe = escapeHtml(t);
+    return `<option value="${safe}">${safe}</option>`;
+  }).join("");
 
     if (oldType && mastitisTypes.includes(oldType)) {
       els.mastitisType.value = oldType;
