@@ -44,12 +44,16 @@
       </fieldset>
 
       <div class="row">
-        <div>
-          <label for="mastitisType">وصف التهاب الضرع</label>
-          <select id="mastitisType">
-           <option value="">اختر وصف التهاب الضرع...</option>
-          </select>
-        </div>
+       <div>
+  <label>وصف التهاب الضرع</label>
+
+  <input id="mastitisType" type="hidden" />
+
+  <details id="mastitisTypeDrop">
+    <summary id="mastitisTypeSummary">اختر وصف التهاب الضرع...</summary>
+    <div id="mastitisTypeList" class="radio-group"></div>
+  </details>
+</div>
 
         <div>
           <label for="notes">ملاحظات اختيارية</label>
@@ -75,6 +79,9 @@
     eventDate: document.getElementById("eventDate"),
     quartersBox: document.getElementById("quartersBox"),
     mastitisType: document.getElementById("mastitisType"),
+    mastitisTypeDrop: document.getElementById("mastitisTypeDrop"),
+    mastitisTypeSummary: document.getElementById("mastitisTypeSummary"),
+    mastitisTypeList: document.getElementById("mastitisTypeList"),
     notes: document.getElementById("notes"),
     saveBtn: document.getElementById("saveBtn")
   };
@@ -192,18 +199,36 @@
       return `<label><input type="checkbox" name="quarters" value="${safe}"> ${safe}</label>`;
     }).join("");
 
-    const oldType = els.mastitisType.value;
+const oldType = els.mastitisType.value;
 
-    els.mastitisType.innerHTML =
-  `<option value="">اختر وصف التهاب الضرع...</option>` +
-  mastitisTypes.map(t => {
-    const safe = escapeHtml(t);
-    return `<option value="${safe}">${safe}</option>`;
-  }).join("");
+els.mastitisTypeList.innerHTML = mastitisTypes.map(t => {
+  const safe = escapeHtml(t);
+  const checked = oldType === t ? " checked" : "";
+  return `
+    <label>
+      <input type="radio" name="mastitisTypeChoice" value="${safe}"${checked}>
+      ${safe}
+    </label>
+  `;
+}).join("");
 
-    if (oldType && mastitisTypes.includes(oldType)) {
-      els.mastitisType.value = oldType;
-    }
+if (oldType && mastitisTypes.includes(oldType)) {
+  els.mastitisType.value = oldType;
+  els.mastitisTypeSummary.textContent = oldType;
+} else {
+  els.mastitisType.value = "";
+  els.mastitisTypeSummary.textContent = "اختر وصف التهاب الضرع...";
+}
+
+els.mastitisTypeList
+  .querySelectorAll('input[name="mastitisTypeChoice"]')
+  .forEach(input => {
+    input.addEventListener("change", () => {
+      els.mastitisType.value = input.value;
+      els.mastitisTypeSummary.textContent = input.value;
+      els.mastitisTypeDrop.open = false;
+    });
+  });
   }
 
   async function runGate(){
