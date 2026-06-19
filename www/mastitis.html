@@ -61,11 +61,32 @@
 
   <div class="row">
     <div>
-      <label for="milkImage">تصوير اللبن من الربع المصاب</label>
-      <input id="milkImage" type="file" accept="image/*" capture="environment" />
-      <div class="form-hint">
-        صوّر اللبن على سطح أسود نظيف، بإضاءة قوية، ومن مسافة قريبة. اجعل اللبن واضحًا داخل الكادر وتجنّب الظل والاهتزاز والانعكاس الشديد.
-      </div>
+<label>تصوير اللبن من الربع المصاب</label>
+
+<input id="milkCameraImage" type="file" accept="image/*" capture="environment" hidden />
+<input id="milkUploadImage" type="file" accept="image/*" hidden />
+
+<div class="row">
+  <div>
+    <button type="button" id="captureMilkBtn" class="secondary-btn">
+      📷 التقاط صورة اللبن
+    </button>
+  </div>
+
+  <div>
+    <button type="button" id="uploadMilkBtn" class="secondary-btn">
+      🖼️ رفع صورة بديلة
+    </button>
+  </div>
+</div>
+
+<div id="milkFileHint" class="form-hint">
+  لم يتم اختيار صورة بعد.
+</div>
+
+<div class="form-hint">
+  صوّر اللبن على سطح أسود نظيف، بإضاءة قوية، ومن مسافة قريبة. اجعل اللبن واضحًا داخل الكادر وتجنّب الظل والاهتزاز والانعكاس الشديد.
+</div>
     </div>
 
    <div>
@@ -98,7 +119,11 @@
     quartersBox: document.getElementById("quartersBox"),
     mastitisType: document.getElementById("mastitisType"),
     notes: document.getElementById("notes"),
-    milkImage: document.getElementById("milkImage"),
+    milkCameraImage: document.getElementById("milkCameraImage"),
+    milkUploadImage: document.getElementById("milkUploadImage"),
+    captureMilkBtn: document.getElementById("captureMilkBtn"),
+    uploadMilkBtn: document.getElementById("uploadMilkBtn"),
+    milkFileHint: document.getElementById("milkFileHint"),
     milkPreview: document.getElementById("milkPreview"),
     noImageHint: document.getElementById("noImageHint"),
     saveBtn: document.getElementById("saveBtn")
@@ -278,13 +303,12 @@
       els.saveBtn.textContent = prev;
     }
   }
-els.milkImage.addEventListener("change", () => {
-  const file = els.milkImage.files && els.milkImage.files[0];
-
+function previewMilkFile(file){
   if (!file) {
     els.milkPreview.removeAttribute("src");
     els.milkPreview.hidden = true;
     els.noImageHint.hidden = false;
+    els.milkFileHint.textContent = "لم يتم اختيار صورة بعد.";
     return;
   }
 
@@ -294,9 +318,28 @@ els.milkImage.addEventListener("change", () => {
     els.milkPreview.src = reader.result;
     els.milkPreview.hidden = false;
     els.noImageHint.hidden = true;
+    els.milkFileHint.textContent = file.name || "تم اختيار صورة اللبن.";
   };
 
   reader.readAsDataURL(file);
+}
+
+els.captureMilkBtn.addEventListener("click", () => {
+  els.milkCameraImage.click();
+});
+
+els.uploadMilkBtn.addEventListener("click", () => {
+  els.milkUploadImage.click();
+});
+
+els.milkCameraImage.addEventListener("change", () => {
+  const file = els.milkCameraImage.files && els.milkCameraImage.files[0];
+  previewMilkFile(file);
+});
+
+els.milkUploadImage.addEventListener("change", () => {
+  const file = els.milkUploadImage.files && els.milkUploadImage.files[0];
+  previewMilkFile(file);
 });
   hydrateFromQuery();
 
