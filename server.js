@@ -13937,6 +13937,495 @@ details: {
   }
 });
 // ============================================================
+//                 API: MASTITIS GATE / SAVE
+//                 تسجيل التهاب الضرع من السيرفر فقط
+// ============================================================
+
+function mastitisStrSrv(v) {
+  return String(v ?? "").trim();
+}
+
+function mastitisDateOnlySrv(v) {
+  const s = String(v || "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+}
+
+function mastitisTodaySrv() {
+  return typeof cairoTodayISO === "function"
+    ? cairoTodayISO()
+    : new Date().toISOString().slice(0, 10);
+}
+
+const MASTITIS_QUARTERS_SRV = [
+  "أمام شمال",
+  "أمام يمين",
+  "خلف يمين",
+  "خلف شمال"
+];
+
+const MASTITIS_TYPES_SRV = [
+  "عادي",
+  "مائي"
+];
+
+function mastitisNormalizeQuartersSrv(body = {}) {
+  const raw =
+    body.quarters ||
+    body.affectedQuarters ||
+    body.mastitisQuarters ||
+    body.affectedQuarter ||
+    body.mastitisQuarter ||
+    [];
+
+  const arr = Array.isArray(raw)
+    ? raw
+    : String(raw || "").split(/[،,|]/);
+
+  return [...new Set(
+    arr.map(v => mastitisStrSrv(v)).filter(Boolean)
+  )];
+}
+
+function mastitisQuartersTextSrv(quarters = []) {
+  return Array.isArray(quarters) ? quarters.join("، ") : "";
+}
+
+function mastitisNormalizeBodySrv(body = {}) {
+  const animalNumber = calvingNormDigitsOnlySrv(
+    body.animalNumber ||
+    body.number ||
+    body.animalId ||
+    ""
+  );
+
+  const quarters = mastitisNormalizeQuartersSrv(body);
+
+  return {
+    animalNumber,
+    eventDate: mastitisDateOnlySrv(body.eventDate || body.date || body.diagnosisDate || ""),
+    quarters,
+    quartersText: mastitisQuartersTextSrv(quarters),
+    mastitisType: mastitisStrSrv(body.mastitisType || body.type || ""),
+    notes: mastitisStrSrv(body.notes || "")
+  };
+}
+
+function mastitisEventSignatureSrv(e = {}) {
+  const diseaseCode = mastitisStrSrv(
+    e.diseaseCode ||
+    e.details?.diseaseCode ||
+    ""
+  ).toLowerCase();
+
+  const eventTypeNorm = mastitisStrSrv(
+    e.eventTypeNorm ||
+    e.eventType ||
+    e.type ||
+    ""
+  ).toLowerCase();
+
+  const diseaseName = mastitisStrSrv(
+    e.diseaseName ||
+    e.details?.diseaseName ||
+    e.diagnosis ||
+    ""
+  );
+
+  const isMastitis =
+    diseaseCode === "mastitis" ||
+    eventTypeNorm.includes("mastitis") ||
+    eventTypeNorm.includes("التهاب الضرع") ||
+    diseaseName.includes("التهاب الضرع") ||
+    diseaseName.includes("التهاب ضرع");
+
+  if (!isMastitis) return "";
+
+  const rawQuarters =
+    e.quarters ||
+    e.affectedQuarters ||
+    e.mastitisQuarters ||
+    e.details?.quarters ||
+    e.details?.affectedQuarters ||
+    e.details?.mastitisQuarters ||
+    e.affectedQuarter ||
+    e.details?.affectedQuarter ||
+    "";
+
+  const quarters = (
+    Array.isArray(rawQuarters)
+      ? rawQuarters
+      : String(rawQuarters || "").split(/[،,|]/)
+  )
+    .map(x => mastitisStrSrv(x))
+    .filter(Boolean)
+    .sort()
+    .join("+");
+
+  const mastitisType = mastitisStrSrv(
+    e.mastitisType ||
+    e.details?.mastitisType ||
+    e.diagnosis ||
+    e.details?.diagnosis ||
+    ""
+  );
+
+  return `mastitis|${quarters}|${mastitisType}`;
+}
+
+async function mastitisDuplicateSameDaySrv(uid, fd = {}) {
+  const animalNumber = calvingNormDigitsOnlySrv(
+    fd.animalNumber ||
+    fd.number ||
+    fd.animalId ||
+    ""
+  );
+
+  const eventDate = mastitisDateOnlySrv(fd.eventDate || fd.date || "");
+  const wantedSignature = mastitisEventSignatureSrv({
+    diseaseCode: "mastitis",
+    quarters: fd.quarters,
+    mastitisType: fd.mastitisType
+  });
+
+  if (!uid || !animalNumber || !eventDate || !wantedSignature) {
+    return { found: false };
+  }
+
+  const values = [animalNumber];
+  const asNum = Number(animalNumber);
+  if (Number.isFinite(asNum)) values.push(asNum);
+
+  const candidates = [];
+
+  for (const field of ["animalNumber", "number"]) {
+    for (const value of [...new Set(values)]) {
+      try {
+        const snap = await db.collection("events")
+          .where("userId", "==", uid)
+          .where(field, "==", value)
+          .limit(150)
+          .get();
+
+        snap.docs.forEach(doc => {
+          candidates.push({
+            id: doc.id,
+            data: doc.data() || {}
+          });
+        });
+      } catch (e) {
+        console.error("mastitis duplicate check failed", e.message || e);
+        return {
+          found: false,
+          error: "mastitis_duplicate_check_failed",
+          message: "⚠️ تعذّر التحقق من تكرار التهاب الضرع الآن."
+        };
+      }
+    }
+  }
+
+  const seen = new Set();
+
+  for (const item of candidates) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+
+    const ev = item.data || {};
+    const evDate = mastitisDateOnlySrv(ev.eventDate || ev.date || "");
+    if (evDate !== eventDate) continue;
+
+    const evSignature = mastitisEventSignatureSrv(ev);
+
+    if (evSignature && evSignature === wantedSignature) {
+      return {
+        found: true,
+        eventId: item.id,
+        message: `❌ تم تسجيل نفس التهاب الضرع للحيوان رقم ${animalNumber} في نفس اليوم بنفس التفاصيل.`
+      };
+    }
+  }
+
+  return { found: false };
+}
+
+app.post("/api/mastitis/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        allowed: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن.",
+        options: {
+          quarters: MASTITIS_QUARTERS_SRV,
+          mastitisTypes: MASTITIS_TYPES_SRV
+        }
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const fd = mastitisNormalizeBodySrv(body);
+
+    if (!fd.animalNumber || !fd.eventDate) {
+      return res.json({
+        ok: true,
+        allowed: false,
+        silent: true,
+        message: "أدخل رقم الحيوان وتاريخ التشخيص.",
+        options: {
+          quarters: MASTITIS_QUARTERS_SRV,
+          mastitisTypes: MASTITIS_TYPES_SRV
+        }
+      });
+    }
+
+    if (!calvingIsDateSrv(fd.eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        error: "invalid_date",
+        message: "❌ تاريخ التشخيص غير صالح."
+      });
+    }
+
+    if (fd.eventDate > mastitisTodaySrv()) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        error: "future_date",
+        message: "❌ تاريخ التشخيص لا يمكن أن يكون في المستقبل."
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, fd.animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        allowed: false,
+        error: "animal_not_found",
+        message: "❌ رقم الحيوان غير موجود في حسابك."
+      });
+    }
+
+    if (diseaseIsArchivedSrv(animal.data || {})) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        error: "animal_archived",
+        message: "❌ لا يمكن تسجيل التهاب ضرع — الحيوان خارج القطيع."
+      });
+    }
+
+    return res.json({
+      ok: true,
+      allowed: true,
+      message: "✅ تم التحقق — جاهز لتسجيل التهاب الضرع.",
+      animalNumber: fd.animalNumber,
+      eventDate: fd.eventDate,
+      animal: {
+        id: animal.id,
+        collection: animal._collection || "animals",
+        productionStatus: String(animal.data?.productionStatus || ""),
+        reproductiveStatus: String(animal.data?.reproductiveStatus || ""),
+        followerStatus: String(animal.data?.followerStatus || animal.data?.status || "")
+      },
+      options: {
+        quarters: MASTITIS_QUARTERS_SRV,
+        mastitisTypes: MASTITIS_TYPES_SRV
+      }
+    });
+
+  } catch (e) {
+    console.error("mastitis gate failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      error: "mastitis_gate_failed",
+      message: "❌ تعذّر التحقق من التهاب الضرع الآن."
+    });
+  }
+});
+
+app.post("/api/mastitis/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const fd = mastitisNormalizeBodySrv(body);
+
+    if (!fd.animalNumber || !fd.eventDate || !fd.mastitisType || !fd.quarters.length) {
+      return res.status(400).json({
+        ok: false,
+        error: "missing_required_fields",
+        message: "❌ رقم الحيوان وتاريخ التشخيص والربع المصاب ونوع الالتهاب مطلوبة."
+      });
+    }
+
+    if (!calvingIsDateSrv(fd.eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        error: "invalid_date",
+        message: "❌ تاريخ التشخيص غير صالح."
+      });
+    }
+
+    if (fd.eventDate > mastitisTodaySrv()) {
+      return res.status(400).json({
+        ok: false,
+        error: "future_date",
+        message: "❌ تاريخ التشخيص لا يمكن أن يكون في المستقبل."
+      });
+    }
+
+    const invalidQuarters = fd.quarters
+      .filter(x => !MASTITIS_QUARTERS_SRV.includes(x));
+
+    if (invalidQuarters.length) {
+      return res.status(400).json({
+        ok: false,
+        error: "invalid_quarter",
+        message: "❌ اختر ربعًا مصابًا صحيحًا."
+      });
+    }
+
+    if (!MASTITIS_TYPES_SRV.includes(fd.mastitisType)) {
+      return res.status(400).json({
+        ok: false,
+        error: "invalid_mastitis_type",
+        message: "❌ نوع التهاب الضرع غير معروف."
+      });
+    }
+
+    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, fd.animalNumber);
+
+    if (!animal) {
+      return res.status(404).json({
+        ok: false,
+        error: "animal_not_found",
+        message: "❌ رقم الحيوان غير موجود في حسابك."
+      });
+    }
+
+    if (diseaseIsArchivedSrv(animal.data || {})) {
+      return res.status(400).json({
+        ok: false,
+        error: "animal_archived",
+        message: "❌ لا يمكن تسجيل التهاب ضرع — الحيوان خارج القطيع."
+      });
+    }
+
+    const duplicated = await mastitisDuplicateSameDaySrv(uid, fd);
+
+    if (duplicated?.error) {
+      return res.status(503).json({
+        ok: false,
+        error: duplicated.error,
+        message: duplicated.message
+      });
+    }
+
+    if (duplicated?.found) {
+      return res.status(409).json({
+        ok: false,
+        duplicate: true,
+        error: "duplicate_mastitis_same_day_details",
+        eventId: duplicated.eventId || null,
+        message: duplicated.message
+      });
+    }
+
+    const targetCollection = animal._collection || "animals";
+    const eventRef = db.collection("events").doc();
+    const diagnosisText = `التهاب الضرع - ${fd.mastitisType}`;
+
+    const eventPayload = {
+      userId: uid,
+      ownerUid: uid,
+
+      animalId: animal.id || "",
+      animalNumber: fd.animalNumber,
+      eventDate: fd.eventDate,
+      date: fd.eventDate,
+
+      type: "التهاب الضرع",
+      eventType: "mastitis",
+      eventTypeNorm: "mastitis",
+
+      diagnosis: diagnosisText,
+      diseaseCode: "mastitis",
+      diseaseName: "التهاب الضرع",
+      diseaseGroup: "صحة الضرع",
+
+      mastitisType: fd.mastitisType,
+      quarters: fd.quarters,
+      affectedQuarter: fd.quartersText,
+      affectedQuarters: fd.quarters,
+      notes: fd.notes || null,
+
+      details: {
+        mastitisType: fd.mastitisType,
+        quarters: fd.quarters,
+        affectedQuarter: fd.quartersText,
+        affectedQuarters: fd.quarters,
+        diagnosis: diagnosisText,
+        diseaseName: "التهاب الضرع",
+        notes: fd.notes || null
+      },
+
+      animalCollection: targetCollection,
+      source: "server:/api/mastitis/save",
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const animalPatch = {
+      healthStatus: "التهاب الضرع",
+      lastDisease: "التهاب الضرع",
+      lastDiseaseDate: fd.eventDate,
+      lastDiagnosis: diagnosisText,
+      lastDiagnosisDate: fd.eventDate,
+
+      lastMastitisDate: fd.eventDate,
+      lastMastitisType: fd.mastitisType,
+      lastMastitisQuarters: fd.quarters,
+      lastMastitisAffectedQuarter: fd.quartersText,
+
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const batch = db.batch();
+    batch.set(eventRef, eventPayload);
+    batch.set(db.collection(targetCollection).doc(animal.id), animalPatch, { merge: true });
+    await batch.commit();
+
+    return res.json({
+      ok: true,
+      message: "✅ تم حفظ التهاب الضرع بنجاح",
+      eventId: eventRef.id,
+      animalNumber: fd.animalNumber,
+      eventDate: fd.eventDate,
+      redirectUrl: `/event-list.html?number=${encodeURIComponent(fd.animalNumber)}`
+    });
+
+  } catch (e) {
+    console.error("mastitis save failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "mastitis_save_failed",
+      message: "❌ تعذّر حفظ التهاب الضرع الآن."
+    });
+  }
+});
+// ============================================================
 //                 API: PREGNANCY DIAGNOSIS BULK SAVE
 //                 حفظ جماعي لتشخيص الحمل من السيرفر فقط
 // ============================================================
