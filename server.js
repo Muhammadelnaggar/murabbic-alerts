@@ -19208,8 +19208,11 @@ app.post("/api/weaning/save", requireUserId, async (req, res) => {
     }
 
     const checked = await weaningEvaluateManySrv(uid, numbers, eventDate);
-    const saved = [];
-    const rejected = [...checked.rejected];
+const saved = [];
+
+// مهم: لا نعيد مرفوضات الـ Gate في رسالة الحفظ.
+// الحفظ يعرض فقط ما تم حفظه، وأي فشل حفظ حقيقي يحدث أثناء الحفظ.
+const rejected = [];
 
     for (const row of checked.accepted) {
       const animalNumber = row.animalNumber;
