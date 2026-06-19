@@ -56,50 +56,7 @@
           <textarea id="notes" rows="3" placeholder="أي ملاحظة علاجية أو تشخيصية مختصرة"></textarea>
         </div>
       </div>
-      <fieldset>
-  <legend>صورة اللبن</legend>
-
-  <div class="row">
-    <div>
-<label>تصوير اللبن من الربع المصاب</label>
-
-<input id="milkUploadImage" type="file" accept="image/*" hidden />
-
-<div class="row">
-  <div>
-    <button type="button" id="captureMilkBtn" class="secondary-btn">
-      📷 التقاط صورة اللبن
-    </button>
-  </div>
-
-  <div>
-    <button type="button" id="uploadMilkBtn" class="secondary-btn">
-      🖼️ رفع صورة بديلة
-    </button>
-  </div>
-</div>
-
-<div id="milkFileHint" class="form-hint">
-  لم يتم اختيار صورة بعد.
-</div>
-
-<div class="form-hint">
-  صوّر اللبن على سطح أسود نظيف، بإضاءة قوية، ومن مسافة قريبة. اجعل اللبن واضحًا داخل الكادر وتجنّب الظل والاهتزاز والانعكاس الشديد.
-</div>
-    </div>
-
-   <div>
-  <label>معاينة الصورة</label>
-  <div class="mbk-camera-frame">
-  <video id="milkCameraVideo" class="mbk-camera-preview" autoplay playsinline muted hidden></video>
-  <img id="milkPreview" class="mbk-camera-preview" alt="معاينة صورة اللبن" hidden />
-</div>
-  <div id="noImageHint" class="form-hint">
-    لم يتم التقاط صورة بعد.
-  </div>
-</div>
-  </div>
-</fieldset>
+ 
     </form>
   </section>
 </main>
@@ -119,13 +76,6 @@
     quartersBox: document.getElementById("quartersBox"),
     mastitisType: document.getElementById("mastitisType"),
     notes: document.getElementById("notes"),
-    milkUploadImage: document.getElementById("milkUploadImage"),
-    captureMilkBtn: document.getElementById("captureMilkBtn"),
-    uploadMilkBtn: document.getElementById("uploadMilkBtn"),
-    milkFileHint: document.getElementById("milkFileHint"),
-    milkPreview: document.getElementById("milkPreview"),
-    milkCameraVideo: document.getElementById("milkCameraVideo"),
-    noImageHint: document.getElementById("noImageHint"),
     saveBtn: document.getElementById("saveBtn")
   };
 
@@ -303,132 +253,7 @@
       els.saveBtn.textContent = prev;
     }
   }
-let milkCameraStream = null;
-let capturedMilkImageDataUrl = "";
 
-function stopMilkCamera(){
-  if (milkCameraStream) {
-    milkCameraStream.getTracks().forEach(track => track.stop());
-    milkCameraStream = null;
-  }
-
-  els.milkCameraVideo.srcObject = null;
-  els.milkCameraVideo.hidden = true;
-  els.captureMilkBtn.textContent = "📷 التقاط صورة اللبن";
-}
-
-function showMilkPreview(dataUrl, labelText){
-  capturedMilkImageDataUrl = dataUrl || "";
-
-  if (!dataUrl) {
-    els.milkPreview.removeAttribute("src");
-    els.milkPreview.hidden = true;
-    els.noImageHint.hidden = false;
-    els.milkFileHint.textContent = "لم يتم اختيار صورة بعد.";
-    return;
-  }
-
-  els.milkPreview.src = dataUrl;
-  els.milkPreview.hidden = false;
-  els.noImageHint.hidden = true;
-  els.milkFileHint.textContent = labelText || "تم التقاط صورة اللبن.";
-}
-
-function previewMilkFile(file){
-  stopMilkCamera();
-
-  if (!file) {
-    showMilkPreview("", "لم يتم اختيار صورة بعد.");
-    return;
-  }
-
-  const reader = new FileReader();
-
-  reader.onload = () => {
-    showMilkPreview(reader.result, file.name || "تم اختيار صورة اللبن.");
-  };
-
-  reader.readAsDataURL(file);
-}
-
-async function openMilkCamera(){
-  try {
-    stopMilkCamera();
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      showMsg("متصفحك لا يدعم تشغيل الكاميرا. استخدم رفع صورة بديلة.", "warning");
-      els.milkUploadImage.click();
-      return;
-    }
-
-    milkCameraStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: "environment" },
-        width: { ideal: 1280 },
-        height: { ideal: 960 }
-      },
-      audio: false
-    });
-
-    els.milkCameraVideo.srcObject = milkCameraStream;
-    els.milkCameraVideo.hidden = false;
-    els.milkPreview.hidden = true;
-    els.noImageHint.hidden = true;
-    els.captureMilkBtn.textContent = "✅ التقط الآن";
-    els.milkFileHint.textContent = "الكاميرا مفتوحة — ضع اللبن على سطح أسود ثم اضغط التقط الآن.";
-
-    await els.milkCameraVideo.play();
-
-  } catch (e) {
-    showMsg("تعذّر فتح الكاميرا. يمكنك استخدام رفع صورة بديلة.", "warning");
-    stopMilkCamera();
-    els.milkUploadImage.click();
-  }
-}
-
-function captureMilkFromCamera(){
-  const video = els.milkCameraVideo;
-
-  if (!video.videoWidth || !video.videoHeight) {
-    showMsg("انتظر لحظة حتى تظهر صورة الكاميرا.", "warning");
-    return;
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
-
-  stopMilkCamera();
-  showMilkPreview(dataUrl, "تم التقاط صورة اللبن بالكاميرا.");
-}
-
-els.captureMilkBtn.addEventListener("click", async () => {
-  if (milkCameraStream) {
-    captureMilkFromCamera();
-    return;
-  }
-
-  await openMilkCamera();
-});
-
-els.uploadMilkBtn.addEventListener("click", () => {
-  stopMilkCamera();
-  els.milkUploadImage.click();
-});
-
-els.milkUploadImage.addEventListener("change", () => {
-  const file = els.milkUploadImage.files && els.milkUploadImage.files[0];
-  previewMilkFile(file);
-  els.milkUploadImage.value = "";
-});
-
-window.addEventListener("pagehide", stopMilkCamera);
-window.addEventListener("beforeunload", stopMilkCamera);
   hydrateFromQuery();
 
   els.animalNumber.addEventListener("blur", runGate);
