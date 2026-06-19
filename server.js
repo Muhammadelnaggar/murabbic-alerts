@@ -18814,6 +18814,91 @@ async function weaningFindAnimalSrv(uid, rawNumber) {
   const num = calvingNormDigitsOnlySrv(rawNumber);
   if (!db || !uid || !num) return null;
 
+  const nNum = Number(num);
+  const values = [num];
+  if (Number.isFinite(nNum)) values.push(nNum);
+
+  function ownerOk(data = {}) {
+    return String(data.userId || data.ownerUid || "").trim() === uid;
+  }
+
+  function sameNum(v) {
+    return calvingNormDigitsOnlySrv(v) === num;
+  }
+
+  function pack(docSnap, collectionName) {
+    return {
+      id: docSnap.id,
+      ref: docSnap.ref,
+      data: docSnap.data() || {},
+      collection: collectionName
+    };
+  }
+
+  function docMatches(docSnap) {
+    const d = docSnap.data() || {};
+    if (!ownerOk(d)) return false;
+
+    return (
+      sameNum(docSnap.id) ||
+      sameNum(d.calfNumber) ||
+      sameNum(d.animalNumber) ||
+      sameNum(d.number) ||
+      sameNum(d.tagNumber) ||
+      sameNum(d.earTag) ||
+      sameNum(d.id) ||
+      sameNum(d.calfId)
+    );
+  }
+
+  // 1) الفطام يخص العجول أولًا: doc id مباشر
+  for (const colName of ["calves", "animals"]) {
+    try {
+      const direct = await db.collection(colName).doc(num).get();
+      if (direct.exists && docMatches(direct)) {
+        return pack(direct, colName);
+      }
+    } catch (_) {}
+  }
+
+  // 2) بحث مضبوط بالحقول المعروفة
+  for (const colName of ["calves", "animals"]) {
+    for (const ownerField of ["userId", "ownerUid"]) {
+      for (const field of ["calfNumber", "animalNumber", "number", "tagNumber", "earTag", "id", "calfId"]) {
+        for (const value of values) {
+          try {
+            const snap = await db.collection(colName)
+              .where(ownerField, "==", uid)
+              .where(field, "==", value)
+              .limit(1)
+              .get();
+
+            if (!snap.empty) return pack(snap.docs[0], colName);
+          } catch (_) {}
+        }
+      }
+    }
+  }
+
+  // 3) fallback حاسم: امسح عجول المستخدم وابحث بالرقم داخل doc.id أو أي حقل رقم
+  for (const colName of ["calves", "animals"]) {
+    for (const ownerField of ["userId", "ownerUid"]) {
+      try {
+        const snap = await db.collection(colName)
+          .where(ownerField, "==", uid)
+          .limit(3000)
+          .get();
+
+        for (const d of snap.docs) {
+          if (docMatches(d)) return pack(d, colName);
+        }
+      } catch (_) {}
+    }
+  }
+
+  return null;
+}
+
   function ownedByUser(data = {}) {
     const owner = String(data.userId || data.ownerUid || "").trim();
     return owner === uid;
