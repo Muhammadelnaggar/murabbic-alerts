@@ -18760,37 +18760,29 @@ function weaningIsOutOfHerdSrv(doc = {}) {
 }
 
 function weaningAlreadyMarkedSrv(doc = {}) {
-  const txt = String(
-    doc.followerStatus ||
+  return !!String(doc.weaningDate || "").trim();
+}
+
+function weaningCurrentGroupLabelSrv(doc = {}) {
+  return String(
+    doc.groupName ||
+    doc.group ||
+    doc.groupId ||
+    doc.groupKey ||
+    doc.currentGroup ||
+    doc.currentGroupName ||
     doc.status ||
     doc.productionStatus ||
-    ""
-  ).trim().toLowerCase();
-
-  return txt === "فطام" || txt === "weaned" || txt.includes("weaned");
-}
-function weaningFollowerStatusTextSrv(doc = {}) {
-  return String(
-    doc.followerStatus ||
-    doc.calfStatus ||
-    doc.status ||
-    doc.currentStatus ||
+    doc.reproductiveStatus ||
     ""
   ).trim();
 }
 
-function weaningIsSucklingFollowerSrv(doc = {}) {
-  const status = weaningFollowerStatusTextSrv(doc)
-    .replace(/\s+/g, " ")
-    .trim();
+function weaningGroupBlocksSrv(doc = {}) {
+  const current = weaningCurrentGroupLabelSrv(doc).replace(/\s+/g, " ").trim();
+  if (!current) return false;
 
-  const entryType = String(doc.entryType || "").trim();
-
-  return (
-    status === "رضيع" ||
-    status.includes("رضيع") ||
-    entryType === "suckling"
-  );
+  return /فطام|نامي|تحت التلقيح|تحت تلقيح|تلقيح|ملقح|ملقحة|عشار|حامل/i.test(current);
 }
 function weaningBirthDateSrv(doc = {}) {
   return String(
@@ -18819,86 +18811,39 @@ async function weaningFindAnimalSrv(uid, rawNumber) {
   if (Number.isFinite(nNum)) values.push(nNum);
 
   function ownerOk(data = {}) {
-    return String(data.userId || data.ownerUid || "").trim() === uid;
+    return String(data.userId || "").trim() === uid;
   }
 
-  function sameNum(v) {
-    return calvingNormDigitsOnlySrv(v) === num;
-  }
-
-  function pack(docSnap, collectionName) {
+  function pack(docSnap) {
     return {
       id: docSnap.id,
       ref: docSnap.ref,
       data: docSnap.data() || {},
-      collection: collectionName
+      collection: "calves"
     };
   }
 
-  function docMatches(docSnap) {
-    const d = docSnap.data() || {};
-    if (!ownerOk(d)) return false;
-
-    return (
-      sameNum(docSnap.id) ||
-      sameNum(d.calfNumber) ||
-      sameNum(d.animalNumber) ||
-      sameNum(d.number) ||
-      sameNum(d.tagNumber) ||
-      sameNum(d.earTag) ||
-      sameNum(d.id) ||
-      sameNum(d.calfId)
-    );
-  }
-
-  // 1) الفطام يخص العجول أولًا: doc id مباشر
-  for (const colName of ["calves", "animals"]) {
+  for (const value of values) {
     try {
-      const direct = await db.collection(colName).doc(num).get();
-      if (direct.exists && docMatches(direct)) {
-        return pack(direct, colName);
-      }
+      const snap = await db.collection("calves")
+        .where("userId", "==", uid)
+        .where("calfNumber", "==", value)
+        .limit(1)
+        .get();
+
+      if (!snap.empty) return pack(snap.docs[0]);
     } catch (_) {}
   }
 
-  // 2) بحث مضبوط بالحقول المعروفة
-  for (const colName of ["calves", "animals"]) {
-    for (const ownerField of ["userId", "ownerUid"]) {
-      for (const field of ["calfNumber", "animalNumber", "number", "tagNumber", "earTag", "id", "calfId"]) {
-        for (const value of values) {
-          try {
-            const snap = await db.collection(colName)
-              .where(ownerField, "==", uid)
-              .where(field, "==", value)
-              .limit(1)
-              .get();
-
-            if (!snap.empty) return pack(snap.docs[0], colName);
-          } catch (_) {}
-        }
-      }
+  try {
+    const direct = await db.collection("calves").doc(num).get();
+    if (direct.exists && ownerOk(direct.data() || {})) {
+      return pack(direct);
     }
-  }
-
-  // 3) fallback حاسم: امسح عجول المستخدم وابحث بالرقم داخل doc.id أو أي حقل رقم
-  for (const colName of ["calves", "animals"]) {
-    for (const ownerField of ["userId", "ownerUid"]) {
-      try {
-        const snap = await db.collection(colName)
-          .where(ownerField, "==", uid)
-          .limit(3000)
-          .get();
-
-        for (const d of snap.docs) {
-          if (docMatches(d)) return pack(d, colName);
-        }
-      } catch (_) {}
-    }
-  }
+  } catch (_) {}
 
   return null;
 }
-
 
 function weaningIsEventSrv(ev = {}) {
   const txt = String(
@@ -18962,8 +18907,8 @@ async function weaningEvaluateOneSrv(uid, animalNumber, eventDate) {
 
   const animal = await weaningFindAnimalSrv(uid, num);
 
-  if (!animal) {
-    return { ok:false, animalNumber:num, reason:"الحيوان/العجل غير موجود في حسابك." };
+   if (!animal) {
+    return { ok:false, animalNumber:num, reason:"العجل غير موجود في سجل العجول." };
   }
 
   const doc = animal.data || {};
@@ -18973,7 +18918,7 @@ async function weaningEvaluateOneSrv(uid, animalNumber, eventDate) {
       ok:false,
       animalNumber:num,
       animalId:animal.id,
-      reason:"هذا الحيوان خارج القطيع — لا يمكن تسجيل الفطام."
+      reason:"هذا العجل خارج القطيع — لا يمكن تسجيل الفطام."
     };
   }
 
@@ -18982,19 +18927,20 @@ async function weaningEvaluateOneSrv(uid, animalNumber, eventDate) {
       ok:false,
       animalNumber:num,
       animalId:animal.id,
-      reason:"تم تسجيل الفطام لهذا الحيوان من قبل."
+      reason:"تم تسجيل الفطام لهذا العجل من قبل."
     };
   }
-  if (!weaningIsSucklingFollowerSrv(doc)) {
-  const currentStatus = weaningFollowerStatusTextSrv(doc) || "غير محددة";
 
-  return {
-    ok:false,
-    animalNumber:num,
-    animalId:animal.id,
-    reason:`الحيوان موجود بالقطيع لكنه غير مؤهل للفطام — الحالة الحالية: ${currentStatus}.`
-  };
-}
+  if (weaningGroupBlocksSrv(doc)) {
+    const currentGroup = weaningCurrentGroupLabelSrv(doc);
+    return {
+      ok:false,
+      animalNumber:num,
+      animalId:animal.id,
+      reason:`العجل غير مؤهل للفطام — الجروب/الحالة الحالية: ${currentGroup}.`
+    };
+  }
+
   if (await weaningHasPreviousEventSrv(uid, num)) {
     return {
       ok:false,
@@ -19309,19 +19255,13 @@ app.post("/api/weaning/save", requireUserId, async (req, res) => {
         source:"server:/api/weaning/save"
       });
 
-      const patch = {
-        followerStatus:"فطام",
-        weaningDate:eventDate,
-        weaningAgeDays:row.weaningAgeDays,
-        ageDaysAtWeaning:row.ageDays,
-        lastEventDate:eventDate,
-        updatedAt:now
-      };
-
-      if (row.sourceCollection === "calves") {
-        patch.status = "فطام";
-      }
-
+     const patch = {
+  weaningDate:eventDate,
+  weaningAgeDays:row.weaningAgeDays,
+  ageDaysAtWeaning:row.ageDays,
+  lastEventDate:eventDate,
+  updatedAt:now
+};
       if (row.ref) {
         batch.set(row.ref, patch, { merge:true });
       }
