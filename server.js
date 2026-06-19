@@ -18769,7 +18769,29 @@ function weaningAlreadyMarkedSrv(doc = {}) {
 
   return txt === "فطام" || txt === "weaned" || txt.includes("weaned");
 }
+function weaningFollowerStatusTextSrv(doc = {}) {
+  return String(
+    doc.followerStatus ||
+    doc.calfStatus ||
+    doc.status ||
+    doc.currentStatus ||
+    ""
+  ).trim();
+}
 
+function weaningIsSucklingFollowerSrv(doc = {}) {
+  const status = weaningFollowerStatusTextSrv(doc)
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const entryType = String(doc.entryType || "").trim();
+
+  return (
+    status === "رضيع" ||
+    status.includes("رضيع") ||
+    entryType === "suckling"
+  );
+}
 function weaningBirthDateSrv(doc = {}) {
   return String(
     doc.birthDate ||
@@ -18792,62 +18814,22 @@ async function weaningFindAnimalSrv(uid, rawNumber) {
   const num = calvingNormDigitsOnlySrv(rawNumber);
   if (!db || !uid || !num) return null;
 
-  async function findInCollection(colName) {
-    try {
-      const key = `${uid}#${num}`;
-      const s1 = await db.collection(colName)
-        .where("userId_number", "==", key)
-        .limit(1)
-        .get();
+  if (typeof fetchAnimalByNumberForCalvingGateSrv === "function") {
+    const found = await fetchAnimalByNumberForCalvingGateSrv(uid, num);
 
-      if (!s1.empty) {
-        const d = s1.docs[0];
-        return { id:d.id, ref:d.ref, data:d.data() || {}, collection:colName };
-      }
-    } catch (_) {}
-
-    const values = [num];
-    const nNum = Number(num);
-    if (Number.isFinite(nNum)) values.push(nNum);
-
-    const fields = ["calfNumber", "animalNumber", "number"];
-
-    for (const ownerField of ["userId", "ownerUid"]) {
-      for (const field of fields) {
-        for (const value of values) {
-          try {
-            const s2 = await db.collection(colName)
-              .where(ownerField, "==", uid)
-              .where(field, "==", value)
-              .limit(1)
-              .get();
-
-            if (!s2.empty) {
-              const d = s2.docs[0];
-              return { id:d.id, ref:d.ref, data:d.data() || {}, collection:colName };
-            }
-          } catch (_) {}
-        }
-      }
+    if (found) {
+      const collectionName = found._collection || found.collection || "animals";
+      return {
+        id: found.id,
+        ref: db.collection(collectionName).doc(found.id),
+        data: found.data || {},
+        collection: collectionName
+      };
     }
-
-    try {
-      const direct = await db.collection(colName).doc(num).get();
-      if (direct.exists) {
-        const data = direct.data() || {};
-        const owner = String(data.userId || data.ownerUid || "").trim();
-        if (owner === uid) {
-          return { id:direct.id, ref:direct.ref, data, collection:colName };
-        }
-      }
-    } catch (_) {}
-
-    return null;
   }
 
-  return await findInCollection("calves") || await findInCollection("animals");
+  return null;
 }
-
 function weaningIsEventSrv(ev = {}) {
   const txt = String(
     ev.eventTypeNorm ||
@@ -18933,7 +18915,16 @@ async function weaningEvaluateOneSrv(uid, animalNumber, eventDate) {
       reason:"تم تسجيل الفطام لهذا الحيوان من قبل."
     };
   }
+  if (!weaningIsSucklingFollowerSrv(doc)) {
+  const currentStatus = weaningFollowerStatusTextSrv(doc) || "غير محددة";
 
+  return {
+    ok:false,
+    animalNumber:num,
+    animalId:animal.id,
+    reason:`الحيوان موجود بالقطيع لكنه غير مؤهل للفطام — الحالة الحالية: ${currentStatus}.`
+  };
+}
   if (await weaningHasPreviousEventSrv(uid, num)) {
     return {
       ok:false,
