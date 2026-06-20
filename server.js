@@ -788,14 +788,7 @@ function addAnimalDecisionSrv(fd = {}) {
     if (!addAnimalStrSrv(fd.productionStatus)) {
       return "❌ الحالة الإنتاجية مطلوبة.";
     }
-   const needsSireNumber =
-  repro === "ملقحة" ||
-  repro === "ملقح" ||
-  repro === "عشار";
 
-if (needsSireNumber && !addAnimalSireNumberSrv(fd)) {
-  return "❌ رقم الطلوقة مطلوب للحيوان العشار أو الملقح.";
-}
     if (!addAnimalStrSrv(fd.reproductiveStatus)) {
       return "❌ الحالة التناسلية مطلوبة.";
     }
@@ -806,6 +799,15 @@ if (needsSireNumber && !addAnimalSireNumberSrv(fd)) {
 
     const repro = addAnimalStrSrv(fd.reproductiveStatus);
     const services = addAnimalNumSrv(fd.servicesCount, 0);
+
+    const needsSireNumber =
+      repro === "ملقحة" ||
+      repro === "ملقح" ||
+      repro === "عشار";
+
+    if (needsSireNumber && !addAnimalSireNumberSrv(fd)) {
+      return "❌ رقم الطلوقة مطلوب للحيوان العشار أو الملقح.";
+    }
 
     if (
       (repro === "ملقحة" || repro === "ملقح" || repro === "عشار" || services > 0) &&
