@@ -511,22 +511,38 @@
 
 function renderMilkChart(series = [], herdCurve = []){
   const svg = $('milkChart');
-  const sc = $('milkScroll');
+  const sc  = $('milkScroll');
   if (!svg || !sc) return;
 
   function normalizeRows(arr = []) {
-    return (Array.isArray(arr) ? arr : [])
+    const raw = (Array.isArray(arr) ? arr : [])
       .map(p => ({
-        dim: Number(p.dim ?? p.daysInMilk ?? 0),
-        kg: Number(p.kg ?? p.value ?? p.v ?? 0),
-        date: p.date || ''
+        dim: Number(p?.dim ?? p?.daysInMilk ?? p?.daysInMilkAtEvent ?? 0),
+        kg: Number(p?.kg ?? p?.v ?? p?.value ?? 0)
       }))
-      .filter(p =>
-        Number.isFinite(p.dim) &&
-        p.dim >= 0 &&
-        Number.isFinite(p.kg) &&
-        p.kg > 0
+      .filter(r =>
+        Number.isFinite(r.dim) &&
+        r.dim >= 0 &&
+        Number.isFinite(r.kg) &&
+        r.kg > 0
       )
+      .sort((a, b) => a.dim - b.dim);
+
+    if (!raw.length) return [];
+
+    const buckets = new Map();
+
+    for (const r of raw) {
+      const bucketDim = Math.round(r.dim / 7) * 7;
+      if (!buckets.has(bucketDim)) buckets.set(bucketDim, []);
+      buckets.get(bucketDim).push(r.kg);
+    }
+
+    return [...buckets.entries()]
+      .map(([dim, arr]) => ({
+        dim: Number(dim),
+        kg: arr.reduce((s, v) => s + v, 0) / arr.length
+      }))
       .sort((a, b) => a.dim - b.dim);
   }
 
@@ -535,180 +551,166 @@ function renderMilkChart(series = [], herdCurve = []){
 
   svg.innerHTML = '';
 
-  const NS = 'http://www.w3.org/2000/svg';
+  if (!rows.length && !herdRows.length) return;
 
-  const W = 760;
-  const H = 260;
+  const lastDim = Math.max(
+    ...rows.map(r => r.dim),
+    ...herdRows.map(r => r.dim),
+    7
+  );
 
-  const padL = 54;
-  const padR = 24;
-  const padT = 24;
-  const padB = 46;
+  const xMax = Math.max(70, Math.ceil(lastDim / 7) * 7);
 
-  const plotW = W - padL - padR;
-  const plotH = H - padT - padB;
+  const maxActual = rows.length ? Math.max(...rows.map(r => r.kg)) : 0;
+  const maxHerd   = herdRows.length ? Math.max(...herdRows.map(r => r.kg)) : 0;
+  const yMaxRaw   = Math.max(maxActual, maxHerd, 10);
+  const yMax      = Math.ceil(yMaxRaw / 5) * 5;
+
+  const padL = 50, padR = 18, padT = 18, padB = 36;
+  const H = 104;
+  const stepPx = 26; // كل 7 أيام
+  const plotW = Math.max(320, (xMax / 7) * stepPx);
+  const W = padL + plotW + padR;
 
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-  svg.style.width = '760px';
-  svg.style.height = '260px';
+  svg.style.width = W + 'px';
+  svg.style.height = '120px';
+  svg.innerHTML = '';
 
-  function make(tag){
-    return document.createElementNS(NS, tag);
-  }
+  const NS = 'http://www.w3.org/2000/svg';
 
-  function line(x1, y1, x2, y2, stroke, width = 1, dash = ''){
-    const el = make('line');
-    el.setAttribute('x1', x1);
-    el.setAttribute('y1', y1);
-    el.setAttribute('x2', x2);
-    el.setAttribute('y2', y2);
-    el.setAttribute('stroke', stroke);
-    el.setAttribute('stroke-width', width);
-    el.setAttribute('stroke-linecap', 'round');
+  const xAt = dim => padL + (dim / xMax) * plotW;
+  const yAt = kg  => padT + (H - padT - padB) - (kg / yMax) * (H - padT - padB);
 
-    if (dash) {
-      el.setAttribute('stroke-dasharray', dash);
-    }
-
-    svg.appendChild(el);
-    return el;
-  }
-
-  function text(x, y, value, size = 12, fill = '#64748b', anchor = 'middle'){
-    const el = make('text');
-    el.setAttribute('x', x);
-    el.setAttribute('y', y);
-    el.setAttribute('text-anchor', anchor);
-    el.setAttribute('font-size', size);
-    el.setAttribute('fill', fill);
-    el.setAttribute('font-weight', '700');
-    el.textContent = value;
-    svg.appendChild(el);
-    return el;
-  }
-
-  function drawPath(dataRows, stroke, width, dash = ''){
-    if (!dataRows.length) return;
-
-    if (dataRows.length === 1) {
-      const p = dataRows[0];
-      const cx = xAt(p.dim);
-      const cy = yAt(p.kg);
-      line(cx - 42, cy, cx + 42, cy, stroke, width, dash);
-      return;
-    }
-
-    let d = '';
-    dataRows.forEach((p, i) => {
-      d += `${i ? ' L ' : 'M '}${xAt(p.dim).toFixed(2)} ${yAt(p.kg).toFixed(2)}`;
-    });
-
-    const path = make('path');
-    path.setAttribute('d', d);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', stroke);
-    path.setAttribute('stroke-width', width);
-    path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('stroke-linejoin', 'round');
-
-    if (dash) {
-      path.setAttribute('stroke-dasharray', dash);
-    }
-
-    svg.appendChild(path);
-  }
-
-  const bg = make('rect');
+  const bg = document.createElementNS(NS, 'rect');
   bg.setAttribute('x', padL);
   bg.setAttribute('y', padT);
   bg.setAttribute('width', plotW);
-  bg.setAttribute('height', plotH);
-  bg.setAttribute('rx', '12');
-  bg.setAttribute('fill', '#ffffff');
-  bg.setAttribute('stroke', '#e2e8f0');
+  bg.setAttribute('height', H - padT - padB);
+  bg.setAttribute('rx', '10');
+  bg.setAttribute('fill', '#fcfdfb');
+  bg.setAttribute('stroke', '#edf2ea');
   svg.appendChild(bg);
 
-  const allRows = [...rows, ...herdRows];
-
-  if (!allRows.length) {
-    text(W / 2, H / 2, 'لا توجد قياسات لبن كافية لرسم المنحنى', 17, '#64748b');
-    return;
-  }
-
-  const xMin = Math.min(...allRows.map(r => r.dim));
-  const xMaxRaw = Math.max(...allRows.map(r => r.dim));
-  const xMax = Math.max(xMaxRaw, xMin + 7);
-
-  const yMaxRaw = Math.max(...allRows.map(r => r.kg));
-  const yMax = Math.max(5, Math.ceil(yMaxRaw / 5) * 5);
-  const yStep = yMax <= 20 ? 5 : 10;
-
-  function xAt(dim){
-    return padL + ((dim - xMin) / (xMax - xMin)) * plotW;
-  }
-
-  function yAt(kg){
-    return padT + plotH - (kg / yMax) * plotH;
-  }
-
-  for (let y = 0; y <= yMax; y += yStep) {
+  // خطوط أفقية خفيفة
+  for (let y = 0; y <= yMax; y += 5) {
     const yy = yAt(y);
-    line(padL, yy, padL + plotW, yy, '#edf2ee', 1);
-    text(padL - 10, yy + 4, String(y), 11, '#64748b', 'end');
-  }
 
-  const xTicks = 5;
-  for (let i = 0; i <= xTicks; i++) {
-    const dim = Math.round(xMin + ((xMax - xMin) * i / xTicks));
-    const xx = xAt(dim);
-    line(xx, padT, xx, padT + plotH, '#f1f5f9', 1);
-    text(xx, padT + plotH + 24, String(dim), 11, '#64748b');
-  }
+    const gl = document.createElementNS(NS, 'line');
+    gl.setAttribute('x1', padL);
+    gl.setAttribute('x2', padL + plotW);
+    gl.setAttribute('y1', yy);
+    gl.setAttribute('y2', yy);
+    gl.setAttribute('stroke', '#edf2ea');
+    gl.setAttribute('stroke-width', '0.8');
+    svg.appendChild(gl);
 
-  line(padL, padT + plotH, padL + plotW, padT + plotH, '#94a3b8', 1.4);
-  line(padL, padT, padL, padT + plotH, '#94a3b8', 1.4);
-
-  text(padL + plotW / 2, H - 10, 'DIM', 12, '#475569');
-  text(18, padT + plotH / 2, 'كجم', 12, '#475569')
-    .setAttribute('transform', `rotate(-90 18 ${padT + plotH / 2})`);
-
-  // الرمادي: منحنى القطيع القادم جاهزًا من السيرفر
-  drawPath(herdRows, '#9ca3af', 3.4, '8 6');
-
-  // الأخضر: منحنى الحيوان الحالي
-  drawPath(rows, '#0f5132', 4, '');
-
-  rows.forEach((p, i) => {
-    const cx = xAt(p.dim);
-    const cy = yAt(p.kg);
-
-    const c = make('circle');
-    c.setAttribute('cx', cx);
-    c.setAttribute('cy', cy);
-    c.setAttribute('r', i === rows.length - 1 ? '5.5' : '4');
-    c.setAttribute('fill', '#0f5132');
-    c.setAttribute('stroke', '#ffffff');
-    c.setAttribute('stroke-width', '2.5');
-    svg.appendChild(c);
-
-    if (i === rows.length - 1) {
-      text(cx, cy - 12, `${Math.round(p.kg * 10) / 10} كجم`, 12, '#0f5132');
+    if (y > 0 && y < yMax) {
+      const tx = document.createElementNS(NS, 'text');
+      tx.setAttribute('x', padL - 6);
+      tx.setAttribute('y', yy + 3);
+      tx.setAttribute('text-anchor', 'end');
+      tx.setAttribute('font-size', '8');
+      tx.setAttribute('fill', '#7b8a7d');
+      tx.textContent = y;
+      svg.appendChild(tx);
     }
-  });
+  }
 
+  // علامات DIM كل 28 يوم
+  for (let d = 0; d <= xMax; d += 28) {
+    const x = xAt(d);
+
+    const vl = document.createElementNS(NS, 'line');
+    vl.setAttribute('x1', x);
+    vl.setAttribute('x2', x);
+    vl.setAttribute('y1', padT);
+    vl.setAttribute('y2', H - padB);
+    vl.setAttribute('stroke', '#f0f4ee');
+    vl.setAttribute('stroke-width', '0.8');
+    svg.appendChild(vl);
+
+    const tx = document.createElementNS(NS, 'text');
+    tx.setAttribute('x', x);
+    tx.setAttribute('y', H - 12);
+    tx.setAttribute('text-anchor', 'middle');
+    tx.setAttribute('font-size', '8');
+    tx.setAttribute('fill', '#6d7b70');
+    tx.textContent = d;
+    svg.appendChild(tx);
+  }
+
+  function makePath(dataRows) {
+    return dataRows
+      .map((p, i) => `${i ? 'L' : 'M'}${xAt(p.dim).toFixed(1)},${yAt(p.kg).toFixed(1)}`)
+      .join(' ');
+  }
+
+  // الرمادي: منحنى القطيع القادم من السيرفر
+  if (herdRows.length >= 2) {
+    const hp = document.createElementNS(NS, 'path');
+    hp.setAttribute('d', makePath(herdRows));
+    hp.setAttribute('fill', 'none');
+    hp.setAttribute('stroke', '#9ca3af');
+    hp.setAttribute('stroke-width', '1.8');
+    hp.setAttribute('stroke-linecap', 'round');
+    hp.setAttribute('stroke-linejoin', 'round');
+    hp.setAttribute('stroke-dasharray', '5 4');
+    svg.appendChild(hp);
+  }
+
+  // الأخضر: إنتاج الحيوان
+  if (rows.length >= 2) {
+    const ap = document.createElementNS(NS, 'path');
+    ap.setAttribute('d', makePath(rows));
+    ap.setAttribute('fill', 'none');
+    ap.setAttribute('stroke', '#0f5132');
+    ap.setAttribute('stroke-width', '2.4');
+    ap.setAttribute('stroke-linecap', 'round');
+    ap.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(ap);
+  }
+
+  // نقاط القطيع بهدوء
   herdRows.forEach(p => {
-    const c = make('circle');
+    const c = document.createElementNS(NS, 'circle');
     c.setAttribute('cx', xAt(p.dim));
     c.setAttribute('cy', yAt(p.kg));
-    c.setAttribute('r', '3');
+    c.setAttribute('r', '1.8');
     c.setAttribute('fill', '#9ca3af');
-    c.setAttribute('stroke', '#ffffff');
-    c.setAttribute('stroke-width', '1.5');
+    c.setAttribute('stroke', '#fff');
+    c.setAttribute('stroke-width', '0.8');
     svg.appendChild(c);
   });
 
-  sc.scrollLeft = 0;
+  // نقاط الحيوان
+  rows.forEach((p, i) => {
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', xAt(p.dim));
+    c.setAttribute('cy', yAt(p.kg));
+    c.setAttribute('r', i === rows.length - 1 ? '2.8' : '2.2');
+    c.setAttribute('fill', '#0f5132');
+    c.setAttribute('stroke', '#fff');
+    c.setAttribute('stroke-width', '1');
+    svg.appendChild(c);
+  });
+
+  // آخر قراءة فقط بهدوء
+  if (rows.length) {
+    const last = rows[rows.length - 1];
+
+    const tag = document.createElementNS(NS, 'text');
+    tag.setAttribute('x', xAt(last.dim) - 4);
+    tag.setAttribute('y', Math.max(12, yAt(last.kg) - 8));
+    tag.setAttribute('text-anchor', 'end');
+    tag.setAttribute('font-size', '8.5');
+    tag.setAttribute('font-weight', '700');
+    tag.setAttribute('fill', '#0f5132');
+    tag.textContent = `${last.kg.toFixed(1)} كجم`;
+    svg.appendChild(tag);
+  }
+
+  setTimeout(() => { sc.scrollLeft = svg.scrollWidth; }, 0);
 }
   function renderCard(payload){
     const a = payload?.animal || {};
