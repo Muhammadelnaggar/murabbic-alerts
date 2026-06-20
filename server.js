@@ -29362,6 +29362,98 @@ async function findCalfBirthEventForCardSrv(uid, calfNumber) {
       String(b.eventDate || '').localeCompare(String(a.eventDate || ''))
     )[0] || null;
 }
+async function findCalfSireFromBirthEventSrv(uid, birthEvent = {}) {
+  if (!db || !uid || !birthEvent) return null;
+
+  const directSire = cardFirstSrv(birthEvent, [
+    'sireNumber',
+    'fatherNumber',
+    'sireId',
+    'bullNumber',
+    'bullCode',
+    'semenCode',
+    'semenNumber',
+    'strawCode',
+    'sire',
+    'bull',
+    'semen'
+  ], '');
+
+  const directName = cardFirstSrv(birthEvent, [
+    'sireName',
+    'fatherName',
+    'bullName'
+  ], '');
+
+  if (directSire || directName) {
+    return {
+      sireNumber: directSire || '',
+      sireName: directName || ''
+    };
+  }
+
+  const damNumber = String(
+    birthEvent.animalNumber ||
+    birthEvent.damNumber ||
+    birthEvent.motherNumber ||
+    birthEvent.number ||
+    ''
+  ).trim();
+
+  const aiDate = String(
+    birthEvent.lastFertileInseminationDate ||
+    birthEvent.lastInseminationDate ||
+    birthEvent.inseminationDate ||
+    ''
+  ).trim().slice(0, 10);
+
+  if (!damNumber || !aiDate) return null;
+
+  const values = Number.isFinite(Number(damNumber))
+    ? [damNumber, Number(damNumber)]
+    : [damNumber];
+
+  for (const v of values) {
+    try {
+      const snap = await db.collection('events')
+        .where('userId', '==', uid)
+        .where('animalNumber', '==', v)
+        .where('eventDate', '==', aiDate)
+        .limit(10)
+        .get();
+
+      for (const doc of snap.docs) {
+        const e = { id: doc.id, ...(doc.data() || {}) };
+        const t = String(e.eventType || e.type || e.eventTypeNorm || '').trim();
+
+        if (!(t.includes('تلقيح') || t.includes('insemination'))) continue;
+
+        return {
+          sireNumber: cardFirstSrv(e, [
+            'sireNumber',
+            'fatherNumber',
+            'sireId',
+            'bullNumber',
+            'bullCode',
+            'semenCode',
+            'semenNumber',
+            'strawCode',
+            'sire',
+            'bull',
+            'semen'
+          ], ''),
+          sireName: cardFirstSrv(e, [
+            'sireName',
+            'fatherName',
+            'bullName'
+          ], '')
+        };
+      }
+    } catch (_) {}
+  }
+
+  return null;
+}
 app.get('/api/calf-card', requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -29450,7 +29542,7 @@ const events = birthEvent && !baseEvents.some(e => e.id === birthEvent.id)
     if (damNumber && damNumber !== '—') {
       dam = await findCowCardDocSrv(uid, { number: damNumber });
     }
-
+   const birthSire = await findCalfSireFromBirthEventSrv(uid, birthEvent);
    const birthType = cardTextSrv(
   cardFirstSrv(
     calf,
@@ -29522,8 +29614,23 @@ const litterComposition = cardTextSrv(
         ageText: age.ageText,
 
         damNumber,
-        sireNumber: cardTextSrv(cardFirstSrv(calf, ['sireNumber', 'fatherNumber', 'sireId'], dam?.sireNumber || dam?.lastSireNumber || ''), '—'),
-        sireName: cardTextSrv(cardFirstSrv(calf, ['sireName', 'fatherName'], dam?.sireName || dam?.lastSireName || ''), '—'),
+        sireNumber: cardTextSrv(
+  cardFirstSrv(
+    calf,
+    ['sireNumber', 'fatherNumber', 'sireId'],
+    birthSire?.sireNumber || dam?.sireNumber || dam?.lastSireNumber || ''
+  ),
+  '—'
+),
+
+sireName: cardTextSrv(
+  cardFirstSrv(
+    calf,
+    ['sireName', 'fatherName'],
+    birthSire?.sireName || dam?.sireName || dam?.lastSireName || ''
+  ),
+  '—'
+),
 
         birthType,
         litterSize,
