@@ -509,24 +509,29 @@
     setTimeout(() => { box.scrollLeft = box.scrollWidth; }, 0);
   }
 
-function renderMilkChart(series = []){
+function renderMilkChart(series = [], herdCurve = []){
   const svg = $('milkChart');
   const sc = $('milkScroll');
   if (!svg || !sc) return;
 
-  const rows = (Array.isArray(series) ? series : [])
-    .map(p => ({
-      dim: Number(p.dim ?? p.daysInMilk ?? 0),
-      kg: Number(p.kg ?? p.value ?? p.v ?? 0),
-      date: p.date || ''
-    }))
-    .filter(p =>
-      Number.isFinite(p.dim) &&
-      p.dim >= 0 &&
-      Number.isFinite(p.kg) &&
-      p.kg > 0
-    )
-    .sort((a, b) => a.dim - b.dim);
+  function normalizeRows(arr = []) {
+    return (Array.isArray(arr) ? arr : [])
+      .map(p => ({
+        dim: Number(p.dim ?? p.daysInMilk ?? 0),
+        kg: Number(p.kg ?? p.value ?? p.v ?? 0),
+        date: p.date || ''
+      }))
+      .filter(p =>
+        Number.isFinite(p.dim) &&
+        p.dim >= 0 &&
+        Number.isFinite(p.kg) &&
+        p.kg > 0
+      )
+      .sort((a, b) => a.dim - b.dim);
+  }
+
+  const rows = normalizeRows(series);
+  const herdRows = normalizeRows(herdCurve);
 
   svg.innerHTML = '';
 
@@ -552,7 +557,7 @@ function renderMilkChart(series = []){
     return document.createElementNS(NS, tag);
   }
 
-  function line(x1, y1, x2, y2, stroke, width = 1){
+  function line(x1, y1, x2, y2, stroke, width = 1, dash = ''){
     const el = make('line');
     el.setAttribute('x1', x1);
     el.setAttribute('y1', y1);
@@ -561,6 +566,11 @@ function renderMilkChart(series = []){
     el.setAttribute('stroke', stroke);
     el.setAttribute('stroke-width', width);
     el.setAttribute('stroke-linecap', 'round');
+
+    if (dash) {
+      el.setAttribute('stroke-dasharray', dash);
+    }
+
     svg.appendChild(el);
     return el;
   }
@@ -578,6 +588,37 @@ function renderMilkChart(series = []){
     return el;
   }
 
+  function drawPath(dataRows, stroke, width, dash = ''){
+    if (!dataRows.length) return;
+
+    if (dataRows.length === 1) {
+      const p = dataRows[0];
+      const cx = xAt(p.dim);
+      const cy = yAt(p.kg);
+      line(cx - 42, cy, cx + 42, cy, stroke, width, dash);
+      return;
+    }
+
+    let d = '';
+    dataRows.forEach((p, i) => {
+      d += `${i ? ' L ' : 'M '}${xAt(p.dim).toFixed(2)} ${yAt(p.kg).toFixed(2)}`;
+    });
+
+    const path = make('path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', stroke);
+    path.setAttribute('stroke-width', width);
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+
+    if (dash) {
+      path.setAttribute('stroke-dasharray', dash);
+    }
+
+    svg.appendChild(path);
+  }
+
   const bg = make('rect');
   bg.setAttribute('x', padL);
   bg.setAttribute('y', padT);
@@ -588,21 +629,28 @@ function renderMilkChart(series = []){
   bg.setAttribute('stroke', '#e2e8f0');
   svg.appendChild(bg);
 
-  if (!rows.length) {
+  const allRows = [...rows, ...herdRows];
+
+  if (!allRows.length) {
     text(W / 2, H / 2, 'لا توجد قياسات لبن كافية لرسم المنحنى', 17, '#64748b');
     return;
   }
 
-  const xMin = Math.min(...rows.map(r => r.dim));
-  const xMaxRaw = Math.max(...rows.map(r => r.dim));
+  const xMin = Math.min(...allRows.map(r => r.dim));
+  const xMaxRaw = Math.max(...allRows.map(r => r.dim));
   const xMax = Math.max(xMaxRaw, xMin + 7);
 
-  const yMaxRaw = Math.max(...rows.map(r => r.kg));
+  const yMaxRaw = Math.max(...allRows.map(r => r.kg));
   const yMax = Math.max(5, Math.ceil(yMaxRaw / 5) * 5);
   const yStep = yMax <= 20 ? 5 : 10;
 
-  const xAt = dim => padL + ((dim - xMin) / (xMax - xMin)) * plotW;
-  const yAt = kg => padT + plotH - (kg / yMax) * plotH;
+  function xAt(dim){
+    return padL + ((dim - xMin) / (xMax - xMin)) * plotW;
+  }
+
+  function yAt(kg){
+    return padT + plotH - (kg / yMax) * plotH;
+  }
 
   for (let y = 0; y <= yMax; y += yStep) {
     const yy = yAt(y);
@@ -625,40 +673,11 @@ function renderMilkChart(series = []){
   text(18, padT + plotH / 2, 'كجم', 12, '#475569')
     .setAttribute('transform', `rotate(-90 18 ${padT + plotH / 2})`);
 
-  if (rows.length === 1) {
-    const p = rows[0];
-    const cx = xAt(p.dim);
-    const cy = yAt(p.kg);
+  // الرمادي: منحنى القطيع القادم جاهزًا من السيرفر
+  drawPath(herdRows, '#9ca3af', 3.4, '8 6');
 
-    line(cx - 42, cy, cx + 42, cy, '#0f5132', 3);
-
-    const c = make('circle');
-    c.setAttribute('cx', cx);
-    c.setAttribute('cy', cy);
-    c.setAttribute('r', '6');
-    c.setAttribute('fill', '#0f5132');
-    c.setAttribute('stroke', '#ffffff');
-    c.setAttribute('stroke-width', '3');
-    svg.appendChild(c);
-
-    text(cx, cy - 12, `${Math.round(p.kg * 10) / 10} كجم`, 12, '#0f5132');
-    sc.scrollLeft = 0;
-    return;
-  }
-
-  let d = '';
-  rows.forEach((p, i) => {
-    d += `${i ? ' L ' : 'M '}${xAt(p.dim).toFixed(2)} ${yAt(p.kg).toFixed(2)}`;
-  });
-
-  const path = make('path');
-  path.setAttribute('d', d);
-  path.setAttribute('fill', 'none');
-  path.setAttribute('stroke', '#0f5132');
-  path.setAttribute('stroke-width', '4');
-  path.setAttribute('stroke-linecap', 'round');
-  path.setAttribute('stroke-linejoin', 'round');
-  svg.appendChild(path);
+  // الأخضر: منحنى الحيوان الحالي
+  drawPath(rows, '#0f5132', 4, '');
 
   rows.forEach((p, i) => {
     const cx = xAt(p.dim);
@@ -676,6 +695,17 @@ function renderMilkChart(series = []){
     if (i === rows.length - 1) {
       text(cx, cy - 12, `${Math.round(p.kg * 10) / 10} كجم`, 12, '#0f5132');
     }
+  });
+
+  herdRows.forEach(p => {
+    const c = make('circle');
+    c.setAttribute('cx', xAt(p.dim));
+    c.setAttribute('cy', yAt(p.kg));
+    c.setAttribute('r', '3');
+    c.setAttribute('fill', '#9ca3af');
+    c.setAttribute('stroke', '#ffffff');
+    c.setAttribute('stroke-width', '1.5');
+    svg.appendChild(c);
   });
 
   sc.scrollLeft = 0;
@@ -705,7 +735,7 @@ function renderMilkChart(series = []){
     put('kpiMilkToday', a.milkTodayKg != null ? fmtNum(a.milkTodayKg, ' كجم') : '—');
     put('kpiSeason', a.seasonTotalKg != null ? fmtNum(a.seasonTotalKg, ' كجم') : '—');
     put('kpi305', a.m305Kg != null ? fmtNum(a.m305Kg, ' كجم') : '—');
-    renderMilkChart(payload?.milkSeries || []);
+   renderMilkChart(payload?.milkSeries || [], payload?.herdMilkCurve || []);
 
     put('fiLastIns', fmtDate(a.lastInseminationDate));
     put('fiServiceInterval', a.serviceIntervalDays != null ? fmtNum(a.serviceIntervalDays, ' يوم') : '—');
