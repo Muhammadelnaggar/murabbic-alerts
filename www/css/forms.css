@@ -3383,3 +3383,470 @@ html[data-page="cow-card"] .ev-row--focus{
   background:#f1faee !important;
   transition:background .4s ease;
 }
+/* =========================================================
+   Calf Card — scoped styles only
+   ستايل بطاقة العجل فقط
+   ========================================================= */
+
+html[data-page="calf-card"]{
+  --calf-green:#0ea05a;
+  --calf-green-dark:#0b7f47;
+  --calf-bg:#f6fbf7;
+  --calf-card:#ffffff;
+  --calf-text:#102217;
+  --calf-muted:#6b7280;
+  --calf-line:#dbe7df;
+  --calf-soft:#eef7f0;
+  --calf-warn-bg:#fff8e6;
+  --calf-warn-bd:#f2d58a;
+  --calf-warn-tx:#7a5200;
+  --calf-danger-bg:#fff1f2;
+  --calf-danger-bd:#fecdd3;
+  --calf-danger-tx:#9f1239;
+}
+
+html[data-page="calf-card"] body{
+  background:var(--calf-bg);
+  color:var(--calf-text);
+}
+
+html[data-page="calf-card"] .page{
+  width:min(100%,780px);
+  margin:0 auto;
+  padding:14px 12px 28px;
+}
+
+html[data-page="calf-card"] .mbk-head{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  background:#fff;
+  border:1px solid var(--calf-line);
+  border-radius:18px;
+  padding:12px 14px;
+  margin-bottom:14px;
+  box-shadow:0 6px 20px rgba(0,0,0,.04);
+  position:static;
+}
+
+html[data-page="calf-card"] .mbk-logo{
+  width:42px;
+  height:42px;
+  object-fit:contain;
+  opacity:.85;
+}
+
+html[data-page="calf-card"] .mbk-head-text{
+  flex:1;
+  min-width:0;
+}
+
+html[data-page="calf-card"] .mbk-title{
+  margin:0;
+  font-size:20px;
+  font-weight:800;
+  color:var(--calf-green-dark);
+}
+
+html[data-page="calf-card"] .mbk-sub{
+  margin-top:2px;
+  font-size:13px;
+  color:var(--calf-muted);
+}
+
+html[data-page="calf-card"] .back-btn{
+  width:42px;
+  height:42px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid var(--calf-line);
+  border-radius:12px;
+  background:var(--calf-soft);
+  color:var(--calf-green-dark);
+  text-decoration:none;
+  font-size:22px;
+  font-weight:900;
+  flex:0 0 42px;
+  box-shadow:0 4px 12px rgba(0,0,0,.04);
+}
+
+html[data-page="calf-card"] .back-btn:hover{
+  background:#e7f3ea;
+}
+
+html[data-page="calf-card"] .back-btn:active{
+  transform:translateY(1px);
+}
+
+html[data-page="calf-card"] .card{
+  background:var(--calf-card);
+  border:1px solid var(--calf-line);
+  border-radius:22px;
+  padding:16px;
+  box-shadow:0 10px 28px rgba(0,0,0,.05);
+}
+
+html[data-page="calf-card"] .section{
+  border:1px solid var(--calf-line);
+  border-radius:18px;
+  padding:14px;
+  background:#fff;
+}
+
+html[data-page="calf-card"] .section + .section{
+  margin-top:12px;
+}
+
+html[data-page="calf-card"] .section-title{
+  margin:0 0 12px;
+  font-size:16px;
+  font-weight:800;
+  color:var(--calf-green-dark);
+}
+
+html[data-page="calf-card"] .hero{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:12px;
+  align-items:start;
+}
+
+html[data-page="calf-card"] .animal-no{
+  font-size:28px;
+  font-weight:900;
+  color:var(--calf-green-dark);
+  line-height:1.1;
+}
+
+html[data-page="calf-card"] .status-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:88px;
+  padding:9px 14px;
+  border-radius:999px;
+  background:var(--calf-green);
+  color:#fff;
+  font-size:14px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+html[data-page="calf-card"] .info-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+
+html[data-page="calf-card"] .calf-basic-grid{
+  margin-top:12px;
+}
+
+html[data-page="calf-card"] .info-item{
+  background:var(--calf-soft);
+  border:1px solid #e2eee6;
+  border-radius:14px;
+  padding:10px 12px;
+  min-height:62px;
+}
+
+html[data-page="calf-card"] .info-label{
+  font-size:12px;
+  color:var(--calf-muted);
+  margin-bottom:5px;
+}
+
+html[data-page="calf-card"] .info-value{
+  font-size:15px;
+  font-weight:800;
+  color:var(--calf-text);
+  line-height:1.4;
+  word-break:break-word;
+}
+
+html[data-page="calf-card"] .warning-box,
+html[data-page="calf-card"] .info-box,
+html[data-page="calf-card"] .error-box{
+  margin-top:12px;
+  border-radius:14px;
+  padding:12px 14px;
+  font-size:14px;
+  font-weight:800;
+  line-height:1.7;
+}
+
+html[data-page="calf-card"] .warning-box{
+  background:var(--calf-warn-bg);
+  border:1px solid var(--calf-warn-bd);
+  color:var(--calf-warn-tx);
+}
+
+html[data-page="calf-card"] .info-box{
+  background:var(--calf-soft);
+  border:1px solid var(--calf-line);
+  color:var(--calf-green-dark);
+}
+
+html[data-page="calf-card"] .error-box{
+  background:var(--calf-danger-bg);
+  border:1px solid var(--calf-danger-bd);
+  color:var(--calf-danger-tx);
+}
+
+html[data-page="calf-card"] .sysbar{
+  margin-bottom:12px;
+}
+
+html[data-page="calf-card"] .lookup-bar{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  margin-bottom:12px;
+  padding:12px;
+  background:#fff;
+  border:1px solid var(--calf-line);
+  border-radius:16px;
+  box-shadow:0 6px 18px rgba(0,0,0,.04);
+}
+
+html[data-page="calf-card"] .lookup-input{
+  flex:1;
+  min-width:0;
+  height:44px;
+  border:1px solid var(--calf-line);
+  border-radius:12px;
+  padding:0 12px;
+  font:inherit;
+  background:#fff;
+  color:var(--calf-text);
+}
+
+html[data-page="calf-card"] .lookup-input:focus{
+  outline:none;
+  border-color:var(--calf-green);
+  box-shadow:0 0 0 3px rgba(14,160,90,.10);
+}
+
+html[data-page="calf-card"] .lookup-btn{
+  height:44px;
+  border:none;
+  border-radius:12px;
+  padding:0 16px;
+  background:var(--calf-green);
+  color:#fff;
+  font:inherit;
+  font-weight:800;
+  cursor:pointer;
+  white-space:nowrap;
+}
+
+html[data-page="calf-card"] .lookup-btn:hover{
+  background:var(--calf-green-dark);
+}
+
+html[data-page="calf-card"] .timeline-wrap{
+  overflow-x:auto;
+  padding-bottom:4px;
+}
+
+html[data-page="calf-card"] .timeline{
+  position:relative;
+  display:flex;
+  align-items:flex-start;
+  justify-content:flex-start;
+  gap:18px;
+  min-width:620px;
+  padding:16px 6px 4px;
+}
+
+html[data-page="calf-card"] .timeline::before{
+  content:"";
+  position:absolute;
+  top:27px;
+  right:12px;
+  left:12px;
+  height:3px;
+  background:#d7e7dc;
+  border-radius:999px;
+}
+
+html[data-page="calf-card"] .timeline-item{
+  position:relative;
+  z-index:1;
+  flex:0 0 100px;
+  min-width:100px;
+  text-align:center;
+}
+
+html[data-page="calf-card"] .timeline-dot{
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:var(--calf-green);
+  border:4px solid #dff3e6;
+  margin:0 auto 10px;
+  cursor:pointer;
+  position:relative;
+  appearance:none;
+  -webkit-appearance:none;
+}
+
+html[data-page="calf-card"] .timeline-date{
+  font-size:12px;
+  color:var(--calf-muted);
+  margin-bottom:4px;
+  font-weight:700;
+}
+
+html[data-page="calf-card"] .timeline-name{
+  font-size:13px;
+  font-weight:800;
+  line-height:1.4;
+}
+
+html[data-page="calf-card"] .tooltip{
+  position:absolute;
+  bottom:130%;
+  right:50%;
+  transform:translateX(50%);
+  min-width:170px;
+  max-width:220px;
+  background:#112117;
+  color:#fff;
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:12px;
+  line-height:1.7;
+  text-align:right;
+  box-shadow:0 10px 24px rgba(0,0,0,.18);
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:.18s ease;
+}
+
+html[data-page="calf-card"] .tooltip::after{
+  content:"";
+  position:absolute;
+  top:100%;
+  right:50%;
+  transform:translateX(50%);
+  border:7px solid transparent;
+  border-top-color:#112117;
+}
+
+html[data-page="calf-card"] .timeline-dot:hover .tooltip,
+html[data-page="calf-card"] .timeline-dot:focus .tooltip,
+html[data-page="calf-card"] .timeline-dot.active .tooltip{
+  opacity:1;
+  visibility:visible;
+}
+
+html[data-page="calf-card"] .summary-table{
+  width:100%;
+  border-collapse:collapse;
+  overflow:hidden;
+  border-radius:16px;
+  border:1px solid var(--calf-line);
+}
+
+html[data-page="calf-card"] .summary-table th,
+html[data-page="calf-card"] .summary-table td{
+  padding:11px 10px;
+  text-align:right;
+  border-bottom:1px solid #edf2ee;
+  vertical-align:top;
+  font-size:14px;
+}
+
+html[data-page="calf-card"] .summary-table thead th{
+  background:var(--calf-soft);
+  color:var(--calf-green-dark);
+  font-weight:800;
+  white-space:nowrap;
+}
+
+html[data-page="calf-card"] .summary-table tbody tr:last-child td{
+  border-bottom:none;
+}
+
+html[data-page="calf-card"] .empty{
+  padding:16px;
+  text-align:center;
+  color:var(--calf-muted);
+  background:var(--calf-soft);
+  border:1px dashed var(--calf-line);
+  border-radius:14px;
+  font-weight:700;
+}
+
+html[data-page="calf-card"] .calf-list{
+  display:grid;
+  gap:8px;
+}
+
+html[data-page="calf-card"] .calf-list-item{
+  border:1px solid var(--calf-line);
+  background:#fff;
+  border-radius:14px;
+  padding:10px 12px;
+}
+
+html[data-page="calf-card"] .calf-list-title{
+  font-weight:900;
+  color:var(--calf-green-dark);
+  margin-bottom:4px;
+}
+
+html[data-page="calf-card"] .calf-list-meta{
+  font-size:13px;
+  color:var(--calf-muted);
+  font-weight:700;
+  line-height:1.6;
+}
+
+@media (max-width:560px){
+  html[data-page="calf-card"] .page{
+    padding:12px 10px 24px;
+  }
+
+  html[data-page="calf-card"] .card{
+    padding:12px;
+    border-radius:18px;
+  }
+
+  html[data-page="calf-card"] .section{
+    padding:12px;
+    border-radius:16px;
+  }
+
+  html[data-page="calf-card"] .hero{
+    grid-template-columns:1fr;
+  }
+
+  html[data-page="calf-card"] .info-grid{
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+
+  html[data-page="calf-card"] .animal-no{
+    font-size:25px;
+  }
+
+  html[data-page="calf-card"] .summary-table th,
+  html[data-page="calf-card"] .summary-table td{
+    font-size:13px;
+    padding:10px 8px;
+  }
+
+  html[data-page="calf-card"] .lookup-bar{
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  html[data-page="calf-card"] .lookup-btn,
+  html[data-page="calf-card"] .lookup-input{
+    width:100%;
+  }
+}
