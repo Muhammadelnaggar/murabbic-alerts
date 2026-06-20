@@ -496,6 +496,7 @@ function renderTimeline(events = []){
     window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
   let activeMobileKey = '';
+  let suppressSyntheticClickUntil = 0;
 
   function cssVar(name, fallback){
     const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -736,12 +737,21 @@ if (isFinePointer) {
     if (tip) tip.style.display = 'none';
   });
 
-  hit.addEventListener('click', openDetails);
+  hit.addEventListener('click', ev => {
+  if (Date.now() < suppressSyntheticClickUntil) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    return;
+  }
+
+  openDetails(ev);
+});
 
 } else {
   hit.addEventListener('touchstart', ev => {
     ev.preventDefault();
     ev.stopPropagation();
+      suppressSyntheticClickUntil = Date.now() + 900;
 
     if (activeMobileKey === mobileKey) {
       activeMobileKey = '';
