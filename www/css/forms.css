@@ -2867,3 +2867,519 @@ body[data-page="animal-list"] .no-data{
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* =========================================================
+   Cow Card — scoped styles only
+   ستايل بطاقة الحيوان فقط — لا يؤثر على أي صفحة أخرى
+   ========================================================= */
+
+html[data-page="cow-card"]{
+  --tl-milk:#2e7d32;
+  --tl-calving:#1b5e20;
+  --tl-insem:#0d9488;
+  --tl-preg:#a16207;
+  --tl-heat:#ef6c00;
+  --tl-dry:#6b7280;
+  --tl-disease:#c62828;
+  --tl-other:#4b5563;
+}
+
+html[data-page="cow-card"] .cow-card-chips{
+  margin:10px 0 12px;
+}
+
+html[data-page="cow-card"] .openbar{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  justify-content:center;
+  margin:0 0 12px;
+  flex-wrap:wrap;
+}
+
+html[data-page="cow-card"] .openbar small{
+  opacity:.8;
+}
+
+html[data-page="cow-card"] .openbar input{
+  width:160px;
+  padding:10px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fcfff8;
+}
+
+html[data-page="cow-card"] .openbar button{
+  padding:10px 14px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#e8f5e9;
+  color:#1b5e20;
+  font-weight:700;
+  cursor:pointer;
+}
+
+html[data-page="cow-card"] .kind-badge{
+  padding:6px 10px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:#fcfff8;
+  font-weight:700;
+}
+
+html[data-page="cow-card"] .chips{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+
+html[data-page="cow-card"] .chip{
+  background:var(--muted);
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:6px 10px;
+  font-weight:700;
+  font-size:13px;
+  color:#0f5132;
+}
+
+html[data-page="cow-card"] .chip[data-variant="ok"]{
+  background:#e8f5e9;
+  border-color:#c8e6c9;
+  color:#1b5e20;
+}
+
+html[data-page="cow-card"] .chip[data-variant="warn"]{
+  background:#fff8e1;
+  border-color:#ffe0b2;
+  color:#7a4f00;
+}
+
+html[data-page="cow-card"] .chip[data-variant="danger"]{
+  background:#ffebee;
+  border-color:#ffcdd2;
+  color:#7f1d1d;
+}
+
+html[data-page="cow-card"] .chip-repro::before{ content:"🍼 "; }
+html[data-page="cow-card"] .chip-prod::before{ content:"📈 "; }
+html[data-page="cow-card"] .chip-health::before{ content:"🩺 "; }
+
+html[data-page="cow-card"] .card{
+  background:var(--card, #fff);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:14px;
+  margin:10px 0;
+  box-shadow:0 2px 8px rgba(0,0,0,.06);
+}
+
+html[data-page="cow-card"] .card h3{
+  margin:0 0 10px;
+  color:#17623b;
+  font-size:18px;
+}
+
+html[data-page="cow-card"] .grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+
+@media (max-width:560px){
+  html[data-page="cow-card"] .grid{
+    grid-template-columns:1fr;
+  }
+}
+
+html[data-page="cow-card"] .fi{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fcfff8;
+}
+
+html[data-page="cow-card"] .fi span{
+  color:#2b593a;
+  font-size:13px;
+}
+
+html[data-page="cow-card"] .fi b{
+  color:#0f5132;
+  direction:ltr;
+  unicode-bidi:plaintext;
+  font-variant-numeric:tabular-nums;
+  word-break:break-word;
+}
+
+html[data-page="cow-card"] .kpi3{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  margin:6px 0 10px;
+}
+
+@media (max-width:560px){
+  html[data-page="cow-card"] .kpi3{
+    grid-template-columns:1fr;
+  }
+}
+
+html[data-page="cow-card"] .kpi{
+  border:1px solid var(--border);
+  background:#fcfff8;
+  border-radius:12px;
+  padding:10px;
+  text-align:center;
+}
+
+html[data-page="cow-card"] .kpi .lbl{
+  font-size:12px;
+  color:#2b593a;
+}
+
+html[data-page="cow-card"] .kpi .val{
+  font-weight:800;
+  color:#14532d;
+  font-size:clamp(16px,4.6vw,20px);
+}
+
+html[data-page="cow-card"] .chart-scroll{
+  overflow-x:auto;
+  overflow-y:hidden;
+  border:1px solid #d8e4d2;
+  border-radius:18px;
+  background:#ffffff;
+  padding:10px 8px 8px;
+  box-shadow:0 2px 10px rgba(0,0,0,.04);
+}
+
+html[data-page="cow-card"] .prod-chart{
+  display:block;
+  height:300px;
+}
+
+@media (max-width:560px){
+  html[data-page="cow-card"] .prod-chart{
+    height:255px;
+  }
+}
+
+html[data-page="cow-card"] .hint{
+  font-size:11px;
+  color:#617166;
+  margin-top:8px;
+  text-align:center;
+  line-height:1.6;
+}
+
+html[data-page="cow-card"] .hl{
+  display:grid;
+  grid-template-columns:120px 1fr 1fr;
+  gap:8px;
+  align-items:center;
+}
+
+html[data-page="cow-card"] .hl.head{
+  font-weight:700;
+  color:#0f5132;
+}
+
+html[data-page="cow-card"] .hl > div{
+  border:1px solid var(--border);
+  background:#fcfff8;
+  border-radius:12px;
+  padding:8px;
+}
+
+@media (max-width:560px){
+  html[data-page="cow-card"] .hl{
+    grid-template-columns:100px 1fr;
+  }
+
+  html[data-page="cow-card"] .hl .note{
+    grid-column:1 / -1;
+  }
+}
+
+html[data-page="cow-card"] .health-list-wrap{
+  margin-top:10px;
+}
+
+html[data-page="cow-card"] .notice{
+  margin:10px 0;
+  padding:10px;
+  border:1px dashed var(--border);
+  background:#fcfff8;
+  border-radius:12px;
+  color:#14532d;
+  font:13px system-ui;
+}
+
+html[data-page="cow-card"] .ev-list{
+  display:grid;
+  gap:8px;
+}
+
+html[data-page="cow-card"] .ev-item{
+  display:grid;
+  grid-template-columns:110px 1fr 1fr;
+  gap:8px;
+  align-items:center;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fff;
+  padding:10px 12px;
+}
+
+html[data-page="cow-card"] .ev-item > div{
+  min-width:0;
+}
+
+html[data-page="cow-card"] .ev-date{
+  color:#0f5132;
+  font-size:13px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+html[data-page="cow-card"] .ev-type{
+  color:#14532d;
+  font-size:14px;
+  font-weight:800;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+html[data-page="cow-card"] .ev-note{
+  color:#355;
+  font-size:13px;
+  font-weight:700;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+@media (max-width:560px){
+  html[data-page="cow-card"] .ev-item{
+    grid-template-columns:96px 1fr 1fr;
+    gap:6px;
+    padding:9px 10px;
+  }
+
+  html[data-page="cow-card"] .ev-date{
+    font-size:12px;
+  }
+
+  html[data-page="cow-card"] .ev-type,
+  html[data-page="cow-card"] .ev-note{
+    font-size:12px;
+  }
+}
+
+/* Dairy traits clock gauge */
+html[data-page="cow-card"] .cc-dairy-card{
+  overflow:hidden;
+}
+
+html[data-page="cow-card"] .cc-dairy-wrap{
+  display:grid;
+  grid-template-columns:150px 1fr;
+  gap:14px;
+  align-items:center;
+}
+
+@media (max-width:560px){
+  html[data-page="cow-card"] .cc-dairy-wrap{
+    grid-template-columns:1fr;
+    text-align:center;
+  }
+}
+
+html[data-page="cow-card"] .cc-dairy-gauge{
+  width:136px;
+  height:136px;
+  border-radius:50%;
+  margin:auto;
+  display:grid;
+  place-items:center;
+  background:
+    conic-gradient(
+      var(--cc-dairy-color, #0f5132) var(--cc-dairy-deg, 0deg),
+      #e5e7eb 0deg
+    );
+  box-shadow:0 4px 14px rgba(0,0,0,.10);
+  position:relative;
+}
+
+html[data-page="cow-card"] .cc-dairy-gauge::after{
+  content:"";
+  position:absolute;
+  width:104px;
+  height:104px;
+  border-radius:50%;
+  background:#ffffff;
+  box-shadow:inset 0 0 0 1px #edf2ea;
+}
+
+html[data-page="cow-card"] .cc-dairy-inner{
+  position:relative;
+  z-index:2;
+  text-align:center;
+}
+
+html[data-page="cow-card"] .cc-dairy-score{
+  font-size:28px;
+  font-weight:900;
+  color:#0f5132;
+  line-height:1;
+  direction:ltr;
+}
+
+html[data-page="cow-card"] .cc-dairy-grade{
+  margin-top:7px;
+  font-size:13px;
+  font-weight:900;
+  color:#14532d;
+}
+
+html[data-page="cow-card"] .cc-dairy-final{
+  font-size:17px;
+  font-weight:900;
+  color:#0f5132;
+  margin-bottom:6px;
+}
+
+html[data-page="cow-card"] .cc-dairy-date{
+  font-size:12px;
+  color:#617166;
+  margin-bottom:8px;
+}
+
+html[data-page="cow-card"] .cc-dairy-summary{
+  font-size:13px;
+  color:#2b593a;
+  font-weight:700;
+  line-height:1.7;
+  margin-bottom:10px;
+}
+
+html[data-page="cow-card"] .cc-dairy-bars{
+  display:grid;
+  gap:8px;
+}
+
+html[data-page="cow-card"] .cc-dairy-row{
+  display:grid;
+  grid-template-columns:118px 1fr 54px;
+  gap:8px;
+  align-items:center;
+}
+
+@media (max-width:560px){
+  html[data-page="cow-card"] .cc-dairy-row{
+    grid-template-columns:96px 1fr 48px;
+    text-align:initial;
+  }
+}
+
+html[data-page="cow-card"] .cc-dairy-label{
+  font-size:12px;
+  font-weight:800;
+  color:#14532d;
+}
+
+html[data-page="cow-card"] .cc-dairy-track{
+  height:9px;
+  border-radius:999px;
+  background:#e9f0e6;
+  overflow:hidden;
+}
+
+html[data-page="cow-card"] .cc-dairy-fill{
+  height:100%;
+  width:0%;
+  border-radius:999px;
+  background:var(--cc-dairy-color, #0f5132);
+}
+
+html[data-page="cow-card"] .cc-dairy-val{
+  font-size:12px;
+  font-weight:900;
+  color:#0f5132;
+  direction:ltr;
+  unicode-bidi:plaintext;
+  text-align:end;
+}
+
+/* Timeline */
+html[data-page="cow-card"] .timeline-card{
+  position:relative;
+}
+
+html[data-page="cow-card"] .tl-wrap{
+  overflow-x:auto;
+  overflow-y:hidden;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fff;
+}
+
+html[data-page="cow-card"] .tl-svg{
+  display:block;
+  height:120px;
+}
+
+html[data-page="cow-card"] .tl-legend{
+  display:none;
+}
+
+html[data-page="cow-card"] .tl-legend .leg{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 8px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:#fcfff8;
+}
+
+html[data-page="cow-card"] .tl-dot{
+  cursor:pointer;
+}
+
+html[data-page="cow-card"] .tl-tooltip{
+  position:absolute;
+  transform:translate(-50%,-8px);
+  background:#0b3d2a;
+  color:#fff;
+  border-radius:8px;
+  padding:8px 10px;
+  font:12px/1.4 system-ui;
+  box-shadow:0 6px 18px rgba(0,0,0,.18);
+  pointer-events:none;
+  z-index:50;
+  display:none;
+  max-width:min(80vw,320px);
+}
+
+html[data-page="cow-card"] .tl-tooltip b{
+  display:block;
+  font-weight:800;
+  margin-bottom:4px;
+}
+
+html[data-page="cow-card"] .tl-date{
+  opacity:.9;
+  font-variant-numeric:tabular-nums;
+}
+
+html[data-page="cow-card"] .ev-row--focus{
+  outline:2px solid #2e7d32;
+  background:#f1faee !important;
+  transition:background .4s ease;
+}
