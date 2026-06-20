@@ -14124,6 +14124,529 @@ app.post("/api/supernumerary-teat-removal/save", requireUserId, async (req, res)
   }
 });
 // ============================================================
+//                 API: DEHORNING GATE / SAVE
+//                 تسجيل إزالة القرون من السيرفر فقط
+// ============================================================
+
+function dehorningStrSrv(v) {
+  return String(v ?? "").trim();
+}
+
+function dehorningTodaySrv() {
+  return typeof cairoTodayISO === "function"
+    ? cairoTodayISO()
+    : new Date().toISOString().slice(0, 10);
+}
+
+function dehorningParseNumbersSrv(raw) {
+  let arr = [];
+
+  if (Array.isArray(raw)) {
+    arr = raw;
+  } else {
+    const txt = String(raw || "").trim();
+    if (!txt) return [];
+    arr = txt.split(/\n|,|;|،|\s+/g);
+  }
+
+  return [...new Set(
+    arr
+      .map(x => calvingNormDigitsOnlySrv(x))
+      .filter(Boolean)
+  )];
+}
+
+function dehorningNumbersFromBodySrv(body = {}) {
+  return dehorningParseNumbersSrv(
+    body.numbers ||
+    body.animalNumbers ||
+    body.calfNumbers ||
+    body.animalNumber ||
+    body.calfNumber ||
+    body.number ||
+    ""
+  );
+}
+
+function dehorningEventDateSrv(body = {}) {
+  return String(body.eventDate || body.date || "").trim().slice(0, 10);
+}
+
+function dehorningNotesSrv(body = {}) {
+  return dehorningStrSrv(body.notes || body.note || "");
+}
+
+function dehorningIsOutSrv(doc = {}) {
+  const txt = [
+    doc.status,
+    doc.lifeStatus,
+    doc.animalStatus,
+    doc.fate,
+    doc.exitReason
+  ].map(v => String(v || "").trim().toLowerCase()).join(" ");
+
+  return (
+    doc.active === false ||
+    doc.isActive === false ||
+    doc.inactive === true ||
+    txt.includes("archived") ||
+    txt.includes("inactive") ||
+    txt.includes("dead") ||
+    txt.includes("death") ||
+    txt.includes("sold") ||
+    txt.includes("sale") ||
+    txt.includes("نافق") ||
+    txt.includes("ميت") ||
+    txt.includes("مات") ||
+    txt.includes("مباع") ||
+    txt.includes("بيع") ||
+    txt.includes("استبعاد")
+  );
+}
+
+function dehorningAlreadyMarkedSrv(doc = {}) {
+  return !!String(
+    doc.dehorningDate ||
+    doc.dehornedAt ||
+    doc.hornRemovalDate ||
+    ""
+  ).trim() || doc.dehorned === true || doc.hornsRemoved === true;
+}
+
+function dehorningIsEventSrv(ev = {}) {
+  const txt = String(
+    ev.eventTypeNorm ||
+    ev.type ||
+    ev.eventType ||
+    ev.name ||
+    ""
+  ).trim().toLowerCase();
+
+  return (
+    txt === "dehorning" ||
+    txt.includes("dehorning") ||
+    txt.includes("horn_removal") ||
+    txt.includes("إزالة القرون") ||
+    txt.includes("ازالة القرون")
+  );
+}
+
+function dehorningEventIdSrv(uid, animalNumber) {
+  const num = calvingNormDigitsOnlySrv(animalNumber);
+  return ["dehorning", uid, num].join("__");
+}
+
+async function dehorningFindCalfSrv(uid, rawNumber) {
+  const num = calvingNormDigitsOnlySrv(rawNumber);
+  if (!db || !uid || !num) return null;
+
+  const nNum = Number(num);
+  const values = [num];
+  if (Number.isFinite(nNum)) values.push(nNum);
+
+  function ownerOk(data = {}) {
+    return String(data.userId || data.ownerUid || "").trim() === uid;
+  }
+
+  function pack(docSnap) {
+    return {
+      id: docSnap.id,
+      ref: docSnap.ref,
+      data: docSnap.data() || {},
+      collection: "calves"
+    };
+  }
+
+  for (const value of values) {
+    try {
+      const snap = await db.collection("calves")
+        .where("userId", "==", uid)
+        .where("calfNumber", "==", value)
+        .limit(1)
+        .get();
+
+      if (!snap.empty) return pack(snap.docs[0]);
+    } catch (_) {}
+  }
+
+  try {
+    const direct = await db.collection("calves").doc(num).get();
+    if (direct.exists && ownerOk(direct.data() || {})) {
+      return pack(direct);
+    }
+  } catch (_) {}
+
+  return null;
+}
+
+async function dehorningHasPreviousEventSrv(uid, animalNumber) {
+  const num = calvingNormDigitsOnlySrv(animalNumber);
+  if (!db || !uid || !num) return false;
+
+  try {
+    const fixedSnap = await db.collection("events")
+      .doc(dehorningEventIdSrv(uid, num))
+      .get();
+
+    if (fixedSnap.exists) return true;
+  } catch (_) {}
+
+  const nNum = Number(num);
+  const values = [num];
+  if (Number.isFinite(nNum)) values.push(nNum);
+
+  for (const value of values) {
+    try {
+      const snap = await db.collection("events")
+        .where("userId", "==", uid)
+        .where("animalNumber", "==", value)
+        .limit(80)
+        .get();
+
+      if (!snap.empty && snap.docs.some(d => dehorningIsEventSrv(d.data() || {}))) {
+        return true;
+      }
+    } catch (_) {}
+  }
+
+  return false;
+}
+
+async function dehorningEvaluateOneSrv(uid, rawNumber, eventDate) {
+  const num = calvingNormDigitsOnlySrv(rawNumber);
+
+  if (!num) {
+    return {
+      ok: false,
+      animalNumber: "",
+      reason: "رقم العجل غير صالح."
+    };
+  }
+
+  const calf = await dehorningFindCalfSrv(uid, num);
+
+  if (!calf) {
+    return {
+      ok: false,
+      animalNumber: num,
+      reason: "العجل غير موجود في سجل العجول."
+    };
+  }
+
+  const doc = calf.data || {};
+
+  if (dehorningIsOutSrv(doc)) {
+    return {
+      ok: false,
+      animalNumber: num,
+      animalId: calf.id,
+      reason: "هذا العجل خارج القطيع أو غير صالح لتسجيل الإجراء."
+    };
+  }
+if (!superTeatIsFemaleSrv(doc)) {
+  const sex = superTeatSexTextSrv(doc) || "غير محدد";
+  return {
+    ok: false,
+    animalNumber: num,
+    animalId: calf.id,
+    reason: `إزالة القرون في مُرَبِّيك مخصصة للإناث فقط — الجنس الحالي: ${sex}.`
+  };
+}
+  if (dehorningAlreadyMarkedSrv(doc)) {
+    return {
+      ok: false,
+      animalNumber: num,
+      animalId: calf.id,
+      reason: "تم تسجيل إزالة القرون لهذا العجل من قبل."
+    };
+  }
+
+  if (await dehorningHasPreviousEventSrv(uid, num)) {
+    return {
+      ok: false,
+      animalNumber: num,
+      animalId: calf.id,
+      reason: "تم تسجيل إزالة القرون لهذا العجل من قبل."
+    };
+  }
+
+  return {
+    ok: true,
+    animalNumber: num,
+    animalId: calf.id,
+    ref: calf.ref,
+    calfNumber: String(doc.calfNumber || num).trim(),
+    birthDate: String(doc.birthDate || "").trim().slice(0, 10),
+    sex: String(doc.sex || "").trim(),
+    eventDate
+  };
+}
+
+async function dehorningEvaluateManySrv(uid, numbers = [], eventDate = "") {
+  const accepted = [];
+  const rejected = [];
+
+  for (const n of numbers) {
+    const r = await dehorningEvaluateOneSrv(uid, n, eventDate);
+
+    if (r.ok) accepted.push(r);
+    else rejected.push(r);
+  }
+
+  return { accepted, rejected };
+}
+
+function dehorningGateMessageSrv(accepted = [], rejected = []) {
+  if (accepted.length && rejected.length) {
+    return `✅ مؤهل للتسجيل: ${accepted.length}. غير مؤهل: ${rejected.length}.`;
+  }
+
+  if (accepted.length) {
+    return accepted.length === 1
+      ? "✅ العجل مؤهل لتسجيل إزالة القرون."
+      : `✅ عدد ${accepted.length} عجول مؤهلة لتسجيل إزالة القرون.`;
+  }
+
+  return "❌ لا توجد أرقام مؤهلة لتسجيل إزالة القرون.";
+}
+
+function dehorningSaveMessageSrv(saved = []) {
+  if (saved.length === 1) {
+    return "✅ تم تسجيل إزالة القرون بنجاح.";
+  }
+
+  return `✅ تم تسجيل إزالة القرون لعدد ${saved.length} عجل بنجاح.`;
+}
+
+app.post("/api/dehorning/gate", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        canSave: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن.",
+        accepted: [],
+        rejected: []
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const numbers = dehorningNumbersFromBodySrv(body);
+    const eventDate = dehorningEventDateSrv(body);
+
+    if (!numbers.length || !eventDate) {
+      return res.json({
+        ok: true,
+        canSave: false,
+        silent: true,
+        message: "أدخل رقم العجل وتاريخ إزالة القرون.",
+        accepted: [],
+        rejected: []
+      });
+    }
+
+    if (!calvingIsDateSrv(eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        canSave: false,
+        error: "invalid_date",
+        message: "❌ تاريخ إزالة القرون غير صالح.",
+        accepted: [],
+        rejected: []
+      });
+    }
+
+    if (eventDate > dehorningTodaySrv()) {
+      return res.status(400).json({
+        ok: false,
+        canSave: false,
+        error: "future_date",
+        message: "❌ تاريخ إزالة القرون لا يمكن أن يكون في المستقبل.",
+        accepted: [],
+        rejected: []
+      });
+    }
+
+    const checked = await dehorningEvaluateManySrv(uid, numbers, eventDate);
+
+    return res.json({
+      ok: true,
+      canSave: checked.accepted.length > 0,
+      acceptedCount: checked.accepted.length,
+      rejectedCount: checked.rejected.length,
+      message: dehorningGateMessageSrv(checked.accepted, checked.rejected),
+      accepted: checked.accepted.map(r => ({
+        animalNumber: r.animalNumber,
+        animalId: r.animalId,
+        calfNumber: r.calfNumber,
+        sex: r.sex,
+        birthDate: r.birthDate
+      })),
+      rejected: checked.rejected.map(r => ({
+        animalNumber: r.animalNumber,
+        animalId: r.animalId || "",
+        reason: r.reason || "غير مؤهل."
+      }))
+    });
+
+  } catch (e) {
+    console.error("dehorning gate failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      canSave: false,
+      error: "dehorning_gate_failed",
+      message: "❌ تعذّر التحقق من إزالة القرون الآن.",
+      accepted: [],
+      rejected: []
+    });
+  }
+});
+
+app.post("/api/dehorning/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن.",
+        saved: [],
+        rejected: []
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const numbers = dehorningNumbersFromBodySrv(body);
+    const eventDate = dehorningEventDateSrv(body);
+    const notes = dehorningNotesSrv(body);
+
+    if (!numbers.length || !eventDate) {
+      return res.status(400).json({
+        ok: false,
+        error: "missing_required_fields",
+        message: "❌ رقم العجل وتاريخ إزالة القرون مطلوبان.",
+        saved: [],
+        rejected: []
+      });
+    }
+
+    if (!calvingIsDateSrv(eventDate)) {
+      return res.status(400).json({
+        ok: false,
+        error: "invalid_date",
+        message: "❌ تاريخ إزالة القرون غير صالح.",
+        saved: [],
+        rejected: []
+      });
+    }
+
+    if (eventDate > dehorningTodaySrv()) {
+      return res.status(400).json({
+        ok: false,
+        error: "future_date",
+        message: "❌ تاريخ إزالة القرون لا يمكن أن يكون في المستقبل.",
+        saved: [],
+        rejected: []
+      });
+    }
+
+    const checked = await dehorningEvaluateManySrv(uid, numbers, eventDate);
+    const saved = [];
+    const saveErrors = [];
+
+    for (const row of checked.accepted) {
+      const animalNumber = row.animalNumber;
+      const eventId = dehorningEventIdSrv(uid, animalNumber);
+      const eventRef = db.collection("events").doc(eventId);
+
+      const exists = await eventRef.get();
+      if (exists.exists) {
+        saveErrors.push({
+          animalNumber,
+          reason: "تم تسجيل إزالة القرون لهذا العجل من قبل."
+        });
+        continue;
+      }
+
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      const batch = db.batch();
+
+      batch.set(eventRef, {
+        userId: uid,
+        ownerUid: uid,
+
+        animalId: row.animalId || "",
+        animalNumber,
+        number: animalNumber,
+        calfNumber: row.calfNumber || animalNumber,
+
+        eventDate,
+        date: eventDate,
+        eventType: "إزالة القرون",
+        eventTypeNorm: "dehorning",
+        type: "dehorning",
+
+        sex: row.sex || "",
+        birthDate: row.birthDate || "",
+        notes,
+
+        animalCollection: "calves",
+        source: "server:/api/dehorning/save",
+
+        createdAt: now,
+        updatedAt: now
+      });
+
+      if (row.ref) {
+        batch.set(row.ref, {
+          dehorned: true,
+          dehorningDate: eventDate,
+          lastDehorningDate: eventDate,
+          lastEventDate: eventDate,
+          updatedAt: now
+        }, { merge: true });
+      }
+
+      await batch.commit();
+
+      saved.push({
+        animalNumber,
+        animalId: row.animalId || "",
+        eventId,
+        eventDate
+      });
+    }
+
+    return res.status(saved.length ? 200 : 400).json({
+      ok: saved.length > 0,
+      message: saved.length
+        ? dehorningSaveMessageSrv(saved)
+        : "❌ لم يتم حفظ أي سجل إزالة قرون.",
+      savedCount: saved.length,
+      rejectedCount: saved.length ? saveErrors.length : checked.rejected.length + saveErrors.length,
+      saved,
+      rejected: saved.length ? saveErrors : [...checked.rejected, ...saveErrors],
+      redirectUrl: saved.length
+        ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
+        : ""
+    });
+
+  } catch (e) {
+    console.error("dehorning save failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "dehorning_save_failed",
+      message: "❌ تعذّر حفظ إزالة القرون الآن.",
+      saved: [],
+      rejected: []
+    });
+  }
+});
+// ============================================================
 //                 API: LAMENESS GATE / SAVE
 //                 تسجيل العرج من السيرفر فقط
 // ============================================================
