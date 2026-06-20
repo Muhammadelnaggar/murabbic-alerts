@@ -3328,6 +3328,18 @@ const reviewReasons = [];
   if (!base.animalType) reviewReasons.push("missing_animal_type");
   if (base.animalStatus && base.animalStatus !== "active") reviewReasons.push("not_active_animal");
 
+  const herdNeedsSireNumber =
+    base.entryType === "mothers" &&
+    (
+      base.reproductiveStatus === "ملقحة" ||
+      base.reproductiveStatus === "ملقح" ||
+      base.reproductiveStatus === "عشار"
+    );
+
+  if (herdNeedsSireNumber && !String(base.sireNumber || "").trim()) {
+    reviewReasons.push("missing_sire_number");
+  }
+
   if (base.entryType === "followers") {
   if (!base.damNumber || !base.birthDate) {
     reviewReasons.push("weak_follower_identity");
