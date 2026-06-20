@@ -652,12 +652,24 @@ function renderTimeline(events = []){
     const boxRect = box.getBoundingClientRect();
     const cardRect = box.closest('.timeline-card')?.getBoundingClientRect() || boxRect;
 
-    const left = (boxRect.left - cardRect.left) + x - box.scrollLeft;
-    const top = (boxRect.top - cardRect.top) + y - 18;
+if (!isFinePointer) {
+  tip.style.position = 'fixed';
+  tip.style.left = '50%';
+  tip.style.top = '72px';
+  tip.style.right = 'auto';
+  tip.style.transform = 'translateX(-50%)';
+  tip.style.zIndex = '9999';
+  tip.style.display = 'block';
+  return;
+}
 
-    tip.style.left = left + 'px';
-    tip.style.top = top + 'px';
-    tip.style.display = 'block';
+const left = (boxRect.left - cardRect.left) + x - box.scrollLeft;
+const top = (boxRect.top - cardRect.top) + y - 18;
+tip.style.position = 'absolute';
+tip.style.left = left + 'px';
+tip.style.top = top + 'px';
+tip.style.transform = 'translate(-50%,-8px)';
+tip.style.display = 'block';
   }
 
   function hideTip(){
@@ -737,21 +749,12 @@ if (isFinePointer) {
     if (tip) tip.style.display = 'none';
   });
 
-  hit.addEventListener('click', ev => {
-  if (Date.now() < suppressSyntheticClickUntil) {
-    ev.preventDefault();
-    ev.stopPropagation();
-    return;
-  }
-
-  openDetails(ev);
-});
+  hit.addEventListener('click', openDetails);
 
 } else {
-  hit.addEventListener('touchstart', ev => {
+  hit.addEventListener('click', ev => {
     ev.preventDefault();
     ev.stopPropagation();
-      suppressSyntheticClickUntil = Date.now() + 900;
 
     if (activeMobileKey === mobileKey) {
       activeMobileKey = '';
@@ -767,10 +770,9 @@ if (isFinePointer) {
     hit._hideTimer = setTimeout(() => {
       activeMobileKey = '';
       if (tip) tip.style.display = 'none';
-    }, 3500);
-  }, { passive: false });
+    }, 4000);
+  });
 }
-
       dot.addEventListener('focus', () => showTip(e, x, y));
       dot.addEventListener('blur', () => {
         if (tip) tip.style.display = 'none';
