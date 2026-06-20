@@ -702,48 +702,84 @@ function renderTimeline(events = []){
       dot.setAttribute('aria-label', `${eventTitle(e)} — ${fmtDate(e._date)}`);
       svg.appendChild(dot);
 
-      const hit = document.createElementNS(NS, 'circle');
-      hit.setAttribute('cx', x);
-      hit.setAttribute('cy', y);
-      hit.setAttribute('r', '18');
-      hit.setAttribute('fill', '#ffffff');
-      hit.setAttribute('fill-opacity', '0.01');
-      hit.setAttribute('pointer-events', 'all');
-      hit.style.cursor = 'pointer';
-      hit.style.touchAction = 'manipulation';
-      svg.appendChild(hit);
+const hit = document.createElementNS(NS, 'circle');
+hit.setAttribute('cx', x);
+hit.setAttribute('cy', y);
+hit.setAttribute('r', '22');
+hit.setAttribute('fill', '#ffffff');
+hit.setAttribute('fill-opacity', '0.01');
+hit.setAttribute('pointer-events', 'all');
+hit.style.cursor = 'pointer';
+hit.style.touchAction = 'none';
+svg.appendChild(hit);
 
-      if (isFinePointer) {
-        hit.addEventListener('mouseenter', () => showTip(e, x, y));
-        hit.addEventListener('mouseleave', () => {
-          if (tip) tip.style.display = 'none';
-        });
-        hit.addEventListener('click', ev => {
-          ev.stopPropagation();
-          focusRow(e);
-        });
-      } else {
-        hit.addEventListener('click', ev => {
-          ev.preventDefault();
-          ev.stopPropagation();
+function openHint(ev){
+  if (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
+  showTip(e, x, y);
+}
 
-          if (activeMobileKey === mobileKey) {
-            focusRow(e);
-            activeMobileKey = '';
-            if (tip) tip.style.display = 'none';
-            return;
-          }
+function openDetails(ev){
+  if (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
+  focusRow(e);
+}
 
-          activeMobileKey = mobileKey;
-          showTip(e, x, y);
+if (isFinePointer) {
+  hit.addEventListener('pointerenter', openHint);
+  hit.addEventListener('pointerleave', () => {
+    if (tip) tip.style.display = 'none';
+  });
+  hit.addEventListener('click', openDetails);
+} else {
+  hit.addEventListener('touchstart', ev => {
+    ev.preventDefault();
+    ev.stopPropagation();
 
-          clearTimeout(hit._hideTimer);
-          hit._hideTimer = setTimeout(() => {
-            activeMobileKey = '';
-            if (tip) tip.style.display = 'none';
-          }, 3500);
-        });
-      }
+    if (activeMobileKey === mobileKey) {
+      activeMobileKey = '';
+      if (tip) tip.style.display = 'none';
+      openDetails(ev);
+      return;
+    }
+
+    activeMobileKey = mobileKey;
+    showTip(e, x, y);
+
+    clearTimeout(hit._hideTimer);
+    hit._hideTimer = setTimeout(() => {
+      activeMobileKey = '';
+      if (tip) tip.style.display = 'none';
+    }, 3500);
+  }, { passive: false });
+
+  hit.addEventListener('pointerdown', ev => {
+    if (ev.pointerType === 'mouse') return;
+
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    if (activeMobileKey === mobileKey) {
+      activeMobileKey = '';
+      if (tip) tip.style.display = 'none';
+      openDetails(ev);
+      return;
+    }
+
+    activeMobileKey = mobileKey;
+    showTip(e, x, y);
+
+    clearTimeout(hit._hideTimer);
+    hit._hideTimer = setTimeout(() => {
+      activeMobileKey = '';
+      if (tip) tip.style.display = 'none';
+    }, 3500);
+  });
+}
 
       dot.addEventListener('focus', () => showTip(e, x, y));
       dot.addEventListener('blur', () => {
