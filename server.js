@@ -4738,7 +4738,12 @@ async function existsHoofTrimmingSameDaySrv(uid, animalNumber, eventDate) {
 
   return !snap.empty;
 }
-
+function eventsPageStableDocIdSrv(...parts) {
+  return parts
+    .map(v => encodeURIComponent(String(v || "").trim()))
+    .filter(Boolean)
+    .join("__");
+}
 app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -4818,19 +4823,48 @@ app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
-      const eventRef = await db.collection("events").add(payload);
+     const idempotencyKey = `${uid}|${animalNumber}|hoof_trimming|${eventDate}`;
+const eventDocId = eventsPageStableDocIdSrv(uid, "hoof_trimming", animalNumber, eventDate);
 
-      await db.collection("animals").doc(animal.id).set({
-        lastHoofTrimmingDate: eventDate,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
+const eventRef = db.collection("events").doc(eventDocId);
+const animalRef = db.collection("animals").doc(animal.id);
 
-      saved.push({
-        animalNumber,
-        animalId: animal.id,
-        eventId: eventRef.id,
-        message: `تم تسجيل تقليم الحوافر للحيوان رقم ${animalNumber}.`
-      });
+payload.idempotencyKey = idempotencyKey;
+
+let created = false;
+
+await db.runTransaction(async (tx) => {
+  const existing = await tx.get(eventRef);
+
+  if (existing.exists) {
+    return;
+  }
+
+  tx.set(eventRef, payload);
+
+  tx.set(animalRef, {
+    lastHoofTrimmingDate: eventDate,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  created = true;
+});
+
+if (!created) {
+  rejected.push({
+    animalNumber,
+    reason: "duplicate_same_day",
+    message: `تم تسجيل تقليم الحوافر للحيوان رقم ${animalNumber} في نفس التاريخ من قبل.`
+  });
+  continue;
+}
+
+saved.push({
+  animalNumber,
+  animalId: animal.id,
+  eventId: eventRef.id,
+  message: `تم تسجيل تقليم الحوافر للحيوان رقم ${animalNumber}.`
+});
     }
 
     return res.json({
