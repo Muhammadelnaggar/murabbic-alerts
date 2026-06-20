@@ -478,7 +478,7 @@ function renderTimeline(events = []){
   const rows = (Array.isArray(events) ? events : [])
     .map(e => ({
       ...e,
-      _date: e.date || e.eventDate || e.day || ''
+      _date: String(e.date || e.eventDate || e.day || '').slice(0, 10)
     }))
     .filter(e => e._date || e.title)
     .sort((a, b) => String(a._date).localeCompare(String(b._date)));
@@ -492,6 +492,10 @@ function renderTimeline(events = []){
   }
 
   const NS = 'http://www.w3.org/2000/svg';
+  const isFinePointer = window.matchMedia &&
+    window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  let activeMobileKey = '';
 
   function cssVar(name, fallback){
     const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -551,8 +555,19 @@ function renderTimeline(events = []){
     return txt(e.summary || e.note || e.notes || e.details || '', '');
   }
 
-  const times = rows
-    .map(e => new Date(String(e._date).slice(0, 10) + 'T00:00:00').getTime())
+  const byDay = new Map();
+
+  rows.forEach(e => {
+    const day = e._date || 'unknown';
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day).push(e);
+  });
+
+  const days = [...byDay.keys()].sort();
+
+  const times = days
+    .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .map(d => new Date(d + 'T00:00:00').getTime())
     .filter(t => Number.isFinite(t));
 
   let minT = times.length ? Math.min(...times) : Date.now();
@@ -565,11 +580,9 @@ function renderTimeline(events = []){
 
   const padL = 42;
   const padR = 42;
-  const padT = 24;
-  const padB = 34;
   const H = 120;
   const Y = 62;
-  const plotW = Math.max(620, rows.length * 48);
+  const plotW = Math.max(620, days.length * 52);
   const W = padL + plotW + padR;
 
   const svg = document.createElementNS(NS, 'svg');
@@ -595,8 +608,8 @@ function renderTimeline(events = []){
     const tick = document.createElementNS(NS, 'line');
     tick.setAttribute('x1', x);
     tick.setAttribute('x2', x);
-    tick.setAttribute('y1', Y - 8);
-    tick.setAttribute('y2', Y + 8);
+    tick.setAttribute('y1', Y - 7);
+    tick.setAttribute('y2', Y + 7);
     tick.setAttribute('stroke', '#e6efe3');
     tick.setAttribute('stroke-width', '1');
     svg.appendChild(tick);
@@ -609,6 +622,21 @@ function renderTimeline(events = []){
     label.setAttribute('fill', '#6d7b70');
     label.textContent = fmtDate(new Date(t).toISOString().slice(0, 10));
     svg.appendChild(label);
+  }
+
+  function xForDay(day){
+    const t = new Date(String(day).slice(0, 10) + 'T00:00:00').getTime();
+    const safeT = Number.isFinite(t) ? t : minT;
+    return padL + ((safeT - minT) / (maxT - minT)) * plotW;
+  }
+
+  function yForStack(index, count){
+    if (count <= 1) return Y;
+
+    const gap = 10;
+    const start = -((count - 1) * gap) / 2;
+
+    return Y + start + (index * gap);
   }
 
   function showTip(e, x, y){
@@ -633,99 +661,103 @@ function renderTimeline(events = []){
 
   function hideTip(){
     if (tip) tip.style.display = 'none';
+    activeMobileKey = '';
+  }
+
+  function focusRow(e){
+    if (!e.id) return;
+
+    const row = document.getElementById(`evrow-${e.id}`);
+    if (!row) return;
+
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.add('ev-row--focus');
+
+    setTimeout(() => {
+      row.classList.remove('ev-row--focus');
+    }, 1600);
   }
 
   box.addEventListener('scroll', hideTip, { passive: true });
 
-  rows.forEach((e, i) => {
-    const t = new Date(String(e._date).slice(0, 10) + 'T00:00:00').getTime();
-    const safeT = Number.isFinite(t) ? t : minT;
+  days.forEach(day => {
+    const dayRows = byDay.get(day) || [];
+    const x = xForDay(day);
 
-    let x = padL + ((safeT - minT) / (maxT - minT)) * plotW;
+    dayRows.forEach((e, index) => {
+      const y = yForStack(index, dayRows.length);
+      const color = colorForEvent(e);
+      const mobileKey = String(e.id || `${day}-${index}`);
 
-    // تفادي تكدس نقاط نفس اليوم فوق بعض
-    x += ((i % 3) - 1) * 5;
+      const dot = document.createElementNS(NS, 'circle');
+      dot.setAttribute('cx', x);
+      dot.setAttribute('cy', y);
+      dot.setAttribute('r', '6');
+      dot.setAttribute('fill', color);
+      dot.setAttribute('stroke', '#ffffff');
+      dot.setAttribute('stroke-width', '2');
+      dot.setAttribute('class', 'tl-dot');
+      dot.setAttribute('tabindex', '0');
+      dot.setAttribute('role', 'button');
+      dot.setAttribute('aria-label', `${eventTitle(e)} — ${fmtDate(e._date)}`);
+      svg.appendChild(dot);
 
-    const y = Y + ((i % 2) ? -7 : 7);
-    const color = colorForEvent(e);
+      const hit = document.createElementNS(NS, 'circle');
+      hit.setAttribute('cx', x);
+      hit.setAttribute('cy', y);
+      hit.setAttribute('r', '18');
+      hit.setAttribute('fill', 'transparent');
+      hit.style.cursor = 'pointer';
+      svg.appendChild(hit);
 
-    const stem = document.createElementNS(NS, 'line');
-    stem.setAttribute('x1', x);
-    stem.setAttribute('x2', x);
-    stem.setAttribute('y1', Y);
-    stem.setAttribute('y2', y);
-    stem.setAttribute('stroke', color);
-    stem.setAttribute('stroke-width', '1');
-    stem.setAttribute('opacity', '0.45');
-    svg.appendChild(stem);
+      if (isFinePointer) {
+        hit.addEventListener('mouseenter', () => showTip(e, x, y));
+        hit.addEventListener('mouseleave', () => {
+          if (tip) tip.style.display = 'none';
+        });
+        hit.addEventListener('click', ev => {
+          ev.stopPropagation();
+          focusRow(e);
+        });
+      } else {
+        hit.addEventListener('click', ev => {
+          ev.preventDefault();
+          ev.stopPropagation();
 
-    const dot = document.createElementNS(NS, 'circle');
-    dot.setAttribute('cx', x);
-    dot.setAttribute('cy', y);
-    dot.setAttribute('r', '6');
-    dot.setAttribute('fill', color);
-    dot.setAttribute('stroke', '#ffffff');
-    dot.setAttribute('stroke-width', '2');
-    dot.setAttribute('class', 'tl-dot');
-    dot.setAttribute('tabindex', '0');
-    dot.setAttribute('role', 'button');
-    dot.setAttribute('aria-label', `${eventTitle(e)} — ${fmtDate(e._date)}`);
-    svg.appendChild(dot);
+          if (activeMobileKey === mobileKey) {
+            focusRow(e);
+            activeMobileKey = '';
+            if (tip) tip.style.display = 'none';
+            return;
+          }
 
-    const hit = document.createElementNS(NS, 'circle');
-    hit.setAttribute('cx', x);
-    hit.setAttribute('cy', y);
-    hit.setAttribute('r', '18');
-    hit.setAttribute('fill', 'transparent');
-    hit.style.cursor = 'pointer';
-    svg.appendChild(hit);
+          activeMobileKey = mobileKey;
+          showTip(e, x, y);
 
-    function focusRow(){
-      if (!e.id) return;
-
-      const row = document.getElementById(`evrow-${e.id}`);
-      if (!row) return;
-
-      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      row.classList.add('ev-row--focus');
-
-      setTimeout(() => {
-        row.classList.remove('ev-row--focus');
-      }, 1600);
-    }
-
-    const open = () => showTip(e, x, y);
-
-    hit.addEventListener('mouseenter', open);
-    hit.addEventListener('mouseleave', hideTip);
-    hit.addEventListener('click', ev => {
-      ev.stopPropagation();
-      open();
-      focusRow();
-    });
-
-    hit.addEventListener('touchstart', () => {
-      open();
-      focusRow();
-      clearTimeout(hit._hideTimer);
-      hit._hideTimer = setTimeout(hideTip, 2200);
-    }, { passive: true });
-
-    dot.addEventListener('focus', open);
-    dot.addEventListener('blur', hideTip);
-    dot.addEventListener('keydown', ev => {
-      if (ev.key === 'Enter' || ev.key === ' ') {
-        ev.preventDefault();
-        open();
-        focusRow();
+          clearTimeout(hit._hideTimer);
+          hit._hideTimer = setTimeout(() => {
+            activeMobileKey = '';
+            if (tip) tip.style.display = 'none';
+          }, 3500);
+        });
       }
+
+      dot.addEventListener('focus', () => showTip(e, x, y));
+      dot.addEventListener('blur', () => {
+        if (tip) tip.style.display = 'none';
+      });
+      dot.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          focusRow(e);
+        }
+      });
     });
   });
 
   box.appendChild(svg);
   setTimeout(() => { box.scrollLeft = box.scrollWidth; }, 0);
 }
-
 function renderMilkChart(series = [], herdCurve = []){
   const svg = $('milkChart');
   const sc  = $('milkScroll');
