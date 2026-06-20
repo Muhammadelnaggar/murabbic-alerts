@@ -509,73 +509,177 @@
     setTimeout(() => { box.scrollLeft = box.scrollWidth; }, 0);
   }
 
-  function renderMilkChart(series = []){
-    const svg = $('milkChart');
-    const sc = $('milkScroll');
-    if (!svg || !sc) return;
+function renderMilkChart(series = []){
+  const svg = $('milkChart');
+  const sc = $('milkScroll');
+  if (!svg || !sc) return;
 
-    const rows = (Array.isArray(series) ? series : [])
-      .map(p => ({
-        dim: Number(p.dim ?? p.daysInMilk ?? 0),
-        kg: Number(p.kg ?? p.value ?? p.v ?? 0)
-      }))
-      .filter(p => Number.isFinite(p.dim) && p.dim >= 0 && Number.isFinite(p.kg) && p.kg > 0)
-      .sort((a, b) => a.dim - b.dim);
+  const rows = (Array.isArray(series) ? series : [])
+    .map(p => ({
+      dim: Number(p.dim ?? p.daysInMilk ?? 0),
+      kg: Number(p.kg ?? p.value ?? p.v ?? 0),
+      date: p.date || ''
+    }))
+    .filter(p =>
+      Number.isFinite(p.dim) &&
+      p.dim >= 0 &&
+      Number.isFinite(p.kg) &&
+      p.kg > 0
+    )
+    .sort((a, b) => a.dim - b.dim);
 
-    svg.innerHTML = '';
+  svg.innerHTML = '';
 
-    if (!rows.length) return;
+  const NS = 'http://www.w3.org/2000/svg';
 
-    const NS = 'http://www.w3.org/2000/svg';
-    const padL = 42, padR = 16, padT = 16, padB = 30;
-    const H = 110;
-    const xMax = Math.max(7, Math.max(...rows.map(r => r.dim)));
-    const yMax = Math.max(5, Math.ceil(Math.max(...rows.map(r => r.kg)) / 5) * 5);
-    const plotW = Math.max(320, Math.ceil(xMax / 7) * 26);
-    const W = padL + plotW + padR;
+  const W = 760;
+  const H = 260;
 
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    svg.style.width = `${W}px`;
+  const padL = 54;
+  const padR = 24;
+  const padT = 24;
+  const padB = 46;
 
-    const xAt = dim => padL + (dim / xMax) * plotW;
-    const yAt = kg => padT + (H - padT - padB) - (kg / yMax) * (H - padT - padB);
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
 
-    for (let y = 0; y <= yMax; y += 5) {
-      const line = document.createElementNS(NS, 'line');
-      line.setAttribute('x1', padL);
-      line.setAttribute('x2', padL + plotW);
-      line.setAttribute('y1', yAt(y));
-      line.setAttribute('y2', yAt(y));
-      line.setAttribute('stroke', '#edf2ee');
-      svg.appendChild(line);
-    }
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.style.width = '760px';
+  svg.style.height = '260px';
 
-    let d = '';
-    rows.forEach((p, i) => {
-      d += `${i ? ' L ' : 'M '}${xAt(p.dim).toFixed(2)} ${yAt(p.kg).toFixed(2)}`;
-    });
-
-    const path = document.createElementNS(NS, 'path');
-    path.setAttribute('d', d);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', '#1f7a3f');
-    path.setAttribute('stroke-width', '2.8');
-    path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('stroke-linejoin', 'round');
-    svg.appendChild(path);
-
-    rows.forEach((p, i) => {
-      const c = document.createElementNS(NS, 'circle');
-      c.setAttribute('cx', xAt(p.dim));
-      c.setAttribute('cy', yAt(p.kg));
-      c.setAttribute('r', i === rows.length - 1 ? '3.5' : '2.5');
-      c.setAttribute('fill', '#0f5132');
-      svg.appendChild(c);
-    });
-
-    setTimeout(() => { sc.scrollLeft = svg.scrollWidth; }, 0);
+  function make(tag){
+    return document.createElementNS(NS, tag);
   }
 
+  function line(x1, y1, x2, y2, stroke, width = 1){
+    const el = make('line');
+    el.setAttribute('x1', x1);
+    el.setAttribute('y1', y1);
+    el.setAttribute('x2', x2);
+    el.setAttribute('y2', y2);
+    el.setAttribute('stroke', stroke);
+    el.setAttribute('stroke-width', width);
+    el.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(el);
+    return el;
+  }
+
+  function text(x, y, value, size = 12, fill = '#64748b', anchor = 'middle'){
+    const el = make('text');
+    el.setAttribute('x', x);
+    el.setAttribute('y', y);
+    el.setAttribute('text-anchor', anchor);
+    el.setAttribute('font-size', size);
+    el.setAttribute('fill', fill);
+    el.setAttribute('font-weight', '700');
+    el.textContent = value;
+    svg.appendChild(el);
+    return el;
+  }
+
+  const bg = make('rect');
+  bg.setAttribute('x', padL);
+  bg.setAttribute('y', padT);
+  bg.setAttribute('width', plotW);
+  bg.setAttribute('height', plotH);
+  bg.setAttribute('rx', '12');
+  bg.setAttribute('fill', '#ffffff');
+  bg.setAttribute('stroke', '#e2e8f0');
+  svg.appendChild(bg);
+
+  if (!rows.length) {
+    text(W / 2, H / 2, 'لا توجد قياسات لبن كافية لرسم المنحنى', 17, '#64748b');
+    return;
+  }
+
+  const xMin = Math.min(...rows.map(r => r.dim));
+  const xMaxRaw = Math.max(...rows.map(r => r.dim));
+  const xMax = Math.max(xMaxRaw, xMin + 7);
+
+  const yMaxRaw = Math.max(...rows.map(r => r.kg));
+  const yMax = Math.max(5, Math.ceil(yMaxRaw / 5) * 5);
+  const yStep = yMax <= 20 ? 5 : 10;
+
+  const xAt = dim => padL + ((dim - xMin) / (xMax - xMin)) * plotW;
+  const yAt = kg => padT + plotH - (kg / yMax) * plotH;
+
+  for (let y = 0; y <= yMax; y += yStep) {
+    const yy = yAt(y);
+    line(padL, yy, padL + plotW, yy, '#edf2ee', 1);
+    text(padL - 10, yy + 4, String(y), 11, '#64748b', 'end');
+  }
+
+  const xTicks = 5;
+  for (let i = 0; i <= xTicks; i++) {
+    const dim = Math.round(xMin + ((xMax - xMin) * i / xTicks));
+    const xx = xAt(dim);
+    line(xx, padT, xx, padT + plotH, '#f1f5f9', 1);
+    text(xx, padT + plotH + 24, String(dim), 11, '#64748b');
+  }
+
+  line(padL, padT + plotH, padL + plotW, padT + plotH, '#94a3b8', 1.4);
+  line(padL, padT, padL, padT + plotH, '#94a3b8', 1.4);
+
+  text(padL + plotW / 2, H - 10, 'DIM', 12, '#475569');
+  text(18, padT + plotH / 2, 'كجم', 12, '#475569')
+    .setAttribute('transform', `rotate(-90 18 ${padT + plotH / 2})`);
+
+  if (rows.length === 1) {
+    const p = rows[0];
+    const cx = xAt(p.dim);
+    const cy = yAt(p.kg);
+
+    line(cx - 42, cy, cx + 42, cy, '#0f5132', 3);
+
+    const c = make('circle');
+    c.setAttribute('cx', cx);
+    c.setAttribute('cy', cy);
+    c.setAttribute('r', '6');
+    c.setAttribute('fill', '#0f5132');
+    c.setAttribute('stroke', '#ffffff');
+    c.setAttribute('stroke-width', '3');
+    svg.appendChild(c);
+
+    text(cx, cy - 12, `${Math.round(p.kg * 10) / 10} كجم`, 12, '#0f5132');
+    sc.scrollLeft = 0;
+    return;
+  }
+
+  let d = '';
+  rows.forEach((p, i) => {
+    d += `${i ? ' L ' : 'M '}${xAt(p.dim).toFixed(2)} ${yAt(p.kg).toFixed(2)}`;
+  });
+
+  const path = make('path');
+  path.setAttribute('d', d);
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', '#0f5132');
+  path.setAttribute('stroke-width', '4');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  svg.appendChild(path);
+
+  rows.forEach((p, i) => {
+    const cx = xAt(p.dim);
+    const cy = yAt(p.kg);
+
+    const c = make('circle');
+    c.setAttribute('cx', cx);
+    c.setAttribute('cy', cy);
+    c.setAttribute('r', i === rows.length - 1 ? '5.5' : '4');
+    c.setAttribute('fill', '#0f5132');
+    c.setAttribute('stroke', '#ffffff');
+    c.setAttribute('stroke-width', '2.5');
+    svg.appendChild(c);
+
+    if (i === rows.length - 1) {
+      text(cx, cy - 12, `${Math.round(p.kg * 10) / 10} كجم`, 12, '#0f5132');
+    }
+  });
+
+  sc.scrollLeft = 0;
+}
   function renderCard(payload){
     const a = payload?.animal || {};
     const number = txt(a.animalNumber ?? a.number);
