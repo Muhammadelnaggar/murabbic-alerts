@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>تسجيل إزالة الحلمات الزائدة — مُرَبِّيك</title>
   <link rel="stylesheet" href="css/forms.css" />
-  <script type="module" src="js/forms-init.js"></script>
+ 
 </head>
 <body>
 <header>
@@ -40,19 +40,14 @@
       </div>
     </section>
 
-    <div class="btn-row">
-      <button class="save-btn" id="saveBtn" type="submit">تسجيل الحدث</button>
-      <button class="open-card" id="cardBtn" type="button">بطاقة الحيوان</button>
-    </div>
+    <div class="actions-bar">
+  <button class="save" id="saveBtn" type="submit">تسجيل الحدث</button>
+  <button class="ghost" id="cardBtn" type="button">بطاقة الحيوان</button>
+</div>
   </form>
 </main>
 
-<script type="module">
-  import { db, auth, ensureAuth } from "/js/firebase-config.js";
-  import {
-    collection, addDoc, serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+<script>
   const $ = (id) => document.getElementById(id);
 
   const form = $("extraTeatForm");
@@ -60,155 +55,255 @@
   const saveBtn = $("saveBtn");
   const cardBtn = $("cardBtn");
 
-  function normDigits(s){
-    const map = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
-    return String(s || '')
-      .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
-      .replace(/[^\d,\n،\s;]/g, '')
-      .trim();
+  const qs = new URLSearchParams(location.search);
+
+  const DIGITS = {
+    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+  };
+
+  function toLatin(v){
+    return String(v || "").replace(/[٠-٩۰-۹]/g, d => DIGITS[d] || d);
+  }
+
+  function parseNumbers(raw){
+    return [...new Set(
+      (toLatin(raw).match(/\d+/g) || [])
+        .map(x => x.replace(/\D/g, ""))
+        .filter(Boolean)
+    )];
+  }
+
+  function todayISO(){
+    return new Date().toISOString().slice(0, 10);
   }
 
   function toISO(s){
-    if (!s) return '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    const d = new Date(s);
-    if (isNaN(d)) return '';
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,10);
+    const raw = String(s || "").trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw.slice(0, 10);
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return "";
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   }
 
   function getUid(){
-    return auth?.currentUser?.uid
-      || localStorage.getItem("userId")
-      || localStorage.getItem("uid")
-      || localStorage.getItem("tenantId")
-      || "";
+    return String(
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("ownerUid") ||
+      sessionStorage.getItem("userId") ||
+      sessionStorage.getItem("uid") ||
+      ""
+    ).trim();
   }
 
-  (function prefill(){
+  const initialRaw = String(
+    qs.get("numbers") ||
+    qs.get("bulk") ||
+    qs.get("animalNumbers") ||
+    qs.get("selectedNumbers") ||
+    qs.get("number") ||
+    qs.get("animalNumber") ||
+    ""
+  ).trim();
 
-  const qs = new URLSearchParams(location.search);
+  const initialNumbers = parseNumbers(initialRaw);
+  const initialMode = String(qs.get("mode") || qs.get("mbkMode") || "").trim().toLowerCase();
+  const startsBulk = initialMode === "bulk" || initialMode === "group" || initialNumbers.length > 1;
+  const initialDate = toISO(qs.get("date") || qs.get("dt") || qs.get("eventDate") || "") || todayISO();
 
-  const mode = String(qs.get("mbkMode") || "").trim();
-  const bulk = String(qs.get("bulk") || "").trim();
-  const num  = String(qs.get("number") || qs.get("animalNumber") || "").trim();
-  const date = qs.get("date") || qs.get("dt") || qs.get("eventDate") || "";
+  let lastGate = null;
+  let gateTimer = null;
 
-  let prefillNumbers = "";
-
-  if (mode === "group" && bulk) {
-    prefillNumbers = bulk
-      .split(",")
-      .map(x => normDigits(x))
-      .filter(Boolean)
-      .join("\n");
-  } else if (num) {
-    prefillNumbers = normDigits(num);
+  function getCurrentNumbers(){
+    return parseNumbers($("animalNumber").value || "");
   }
 
-  if (prefillNumbers && $("animalNumber")) {
-    $("animalNumber").value = prefillNumbers;
-    $("animalNumber").dispatchEvent(new Event("input", { bubbles:true }));
-    $("animalNumber").dispatchEvent(new Event("change", { bubbles:true }));
+  function setMessage(text, type = "info"){
+    info.className = `infobar show ${type}`;
+    info.style.display = "block";
+    info.textContent = String(text || "");
   }
 
-  if (date && $("eventDate")) {
-    $("eventDate").value = toISO(date);
-    $("eventDate").dispatchEvent(new Event("input", { bubbles:true }));
-    $("eventDate").dispatchEvent(new Event("change", { bubbles:true }));
+  function clearMessage(){
+    info.className = "infobar";
+    info.style.display = "";
+    info.textContent = "";
   }
-})();
 
-  cardBtn?.addEventListener("click", () => {
-    const raw = String($("animalNumber")?.value || "");
-    const nums = [...new Set((raw.match(/\d+/g) || []).map(x => x.trim()).filter(Boolean))];
-    if (!nums.length) return;
+  function setBusy(busy){
+    if (saveBtn) saveBtn.disabled = !!busy || !lastGate?.canSave;
+    if (cardBtn) cardBtn.disabled = !!busy || getCurrentNumbers().length !== 1;
+  }
+
+  function responseText(j = {}){
+    const lines = [];
+
+    if (j.message) lines.push(j.message);
+
+    const rejected = Array.isArray(j.rejected) ? j.rejected : [];
+    if (rejected.length) {
+      lines.push(
+        rejected.slice(0, 8)
+          .map(r => `رقم ${r.animalNumber || r.number || "—"}: ${r.reason || "غير مقبول"}`)
+          .join("\n")
+      );
+
+      if (rejected.length > 8) {
+        lines.push(`… وعدد ${rejected.length - 8} أرقام أخرى.`);
+      }
+    }
+
+    return lines.filter(Boolean).join("\n");
+  }
+
+  async function apiPost(path, payload){
+    const uid = getUid();
+
+    if (!uid) {
+      return {
+        ok: false,
+        canSave: false,
+        message: "❌ لم يتم التعرف على المستخدم. سجّل الدخول مرة أخرى."
+      };
+    }
+
+    const r = await fetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(payload || {})
+    });
+
+    const j = await r.json().catch(() => ({
+      ok: false,
+      canSave: false,
+      message: "❌ رد السيرفر غير صالح."
+    }));
+
+    return { httpStatus: r.status, ...j };
+  }
+
+  function renderGate(j = {}){
+    lastGate = j;
+
+    if (saveBtn) saveBtn.disabled = !j.canSave;
+
+    const nums = getCurrentNumbers();
+    if (cardBtn) {
+      cardBtn.disabled = nums.length !== 1;
+      cardBtn.style.opacity = nums.length === 1 ? "1" : ".6";
+      cardBtn.style.pointerEvents = nums.length === 1 ? "auto" : "none";
+    }
+
+    const text = responseText(j);
+    if (text) setMessage(text, j.canSave ? "success" : "error");
+    else clearMessage();
+  }
+
+  async function runGate({ silent = false } = {}){
+    const numbers = getCurrentNumbers();
+    const eventDate = String($("eventDate").value || "").slice(0, 10);
+
+    if (!numbers.length || !eventDate) {
+      lastGate = { canSave:false };
+      if (saveBtn) saveBtn.disabled = true;
+      if (!silent) setMessage("اكتب رقم العجل وتاريخ إزالة الحلمات الزائدة.", "info");
+      return;
+    }
+
+    if (!silent) setMessage("جاري التحقق من السيرفر…", "info");
+    setBusy(true);
+
+    try {
+      const j = await apiPost("/api/supernumerary-teat-removal/gate", {
+        numbers,
+        animalNumbers: numbers,
+        eventDate
+      });
+
+      renderGate(j);
+    } catch (e) {
+      console.error(e);
+      lastGate = { canSave:false };
+      if (saveBtn) saveBtn.disabled = true;
+      setMessage("❌ تعذّر التحقق من السيرفر الآن.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function scheduleGate(){
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(() => runGate({ silent:true }), 350);
+  }
+
+  function hydrateUI(){
+    $("eventDate").value = initialDate;
+    $("animalNumber").value = initialNumbers.join(startsBulk ? "\n" : "");
+    $("animalNumber").rows = startsBulk ? Math.max(3, initialNumbers.length) : 1;
+
+    if (saveBtn) saveBtn.disabled = true;
+    if (cardBtn) cardBtn.disabled = initialNumbers.length !== 1;
+  }
+
+  cardBtn.addEventListener("click", () => {
+    const nums = getCurrentNumbers();
+    if (nums.length !== 1) return;
     location.href = `cow-card.html?number=${encodeURIComponent(nums[0])}`;
   });
 
-  form.addEventListener("mbk:valid", async (ev) => {
+  $("animalNumber").addEventListener("input", scheduleGate);
+  $("eventDate").addEventListener("input", scheduleGate);
+  $("eventDate").addEventListener("change", () => runGate({ silent:false }));
+
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+
+    const numbers = getCurrentNumbers();
+    const eventDate = String($("eventDate").value || "").slice(0, 10);
+    const notes = String($("notes").value || "").trim();
+
+    if (!numbers.length) {
+      setMessage("❌ رقم العجل مطلوب.", "error");
+      return;
+    }
+
+    if (!eventDate) {
+      setMessage("❌ تاريخ إزالة الحلمات الزائدة مطلوب.", "error");
+      return;
+    }
+
+    setMessage("جاري الحفظ من السيرفر…", "info");
+    setBusy(true);
+
     try {
-      saveBtn.disabled = true;
+      const j = await apiPost("/api/supernumerary-teat-removal/save", {
+        numbers,
+        animalNumbers: numbers,
+        eventDate,
+        notes
+      });
 
-      await ensureAuth?.();
+      setMessage(responseText(j) || j.message || "تمت المعالجة.", j.ok ? "success" : "error");
 
-      const uid = getUid();
-      if (!uid) throw new Error("NO_UID");
-const detail = ev.detail || {};
-const excluded = Array.isArray(detail.excluded) ? detail.excluded : [];
-
-let payloads = [];
-
-if (detail.bulk && Array.isArray(detail.bulkEvents) && detail.bulkEvents.length) {
-  payloads = detail.bulkEvents;
-} else {
-  const base = detail.formData || {};
-  const rawNums = String(base.animalNumber || $("animalNumber")?.value || "");
-  const nums = [...new Set(
-    rawNums
-      .split(/[\n,،;\s]+/g)
-      .map(x => normDigits(x))
-      .filter(Boolean)
-  )];
-
-  if (nums.length > 1) {
-    payloads = nums.map(n => ({ ...base, animalNumber: n }));
-  } else {
-    payloads = [base];
-  }
-}
-
-      let saved = 0;
-
-      for (const p of payloads) {
-        const animalNumber = String(p.animalNumber || "").trim();
-        const eventDate = String(p.eventDate || "").slice(0,10);
-        const notes = String(p.notes || "").trim();
-
-        if (!animalNumber || !eventDate) continue;
-
-        await addDoc(collection(db, "events"), {
-          userId: uid,
-          animalNumber,
-          eventDate,
-          eventType: "إزالة الحلمات الزائدة",
-          type: "supernumerary_teat_removal",
-          notes,
-          source: "supernumerary-teat-removal.html",
-          createdAt: serverTimestamp()
-        });
-
-        saved++;
+      if (j.ok && j.redirectUrl) {
+        setTimeout(() => {
+          location.href = j.redirectUrl;
+        }, 900);
       }
-
-      if (!saved) {
-        info.className = "infobar mbk-infobar show error";
-        info.style.display = "block";
-        info.textContent = "❌ لم يتم حفظ أي سجل.";
-        return;
-      }
-
-      const msg = excluded.length
-        ? `✅ تم تسجيل إزالة الحلمات الزائدة لعدد ${saved}. وتم استبعاد ${excluded.length}.`
-        : (saved === 1
-            ? "✅ تم تسجيل إزالة الحلمات الزائدة بنجاح."
-            : `✅ تم تسجيل إزالة الحلمات الزائدة لعدد ${saved}.`);
-
-      info.className = "infobar mbk-infobar show success";
-      info.style.display = "block";
-      info.textContent = msg;
-
-      localStorage.setItem("lastAnimalId", String(payloads[0]?.animalNumber || ""));
-      localStorage.setItem("lastEventDate", String(payloads[0]?.eventDate || ""));
-
-    } catch (err) {
-      console.error(err);
-      info.className = "infobar mbk-infobar show error";
-      info.style.display = "block";
-      info.textContent = "❌ تعذر حفظ الحدث. حاول مرة أخرى.";
+    } catch (e) {
+      console.error(e);
+      setMessage("❌ فشل حفظ إزالة الحلمات الزائدة من السيرفر.", "error");
     } finally {
-      saveBtn.disabled = false;
+      setBusy(false);
     }
   });
+
+  hydrateUI();
+  runGate({ silent:true });
 </script>
 </body>
 </html>
