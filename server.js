@@ -28892,6 +28892,128 @@ function cardTwinWarningSrv(calf = {}) {
 
   return '';
 }
+function cardDairyTraitsNumSrv(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function cardDairyTraitsGradeTextSrv(score, fallback = '') {
+  const fb = String(fallback || '').trim();
+  if (fb) return fb;
+
+  if (typeof dairyTraitsGradeSrv === 'function') {
+    return dairyTraitsGradeSrv(score);
+  }
+
+  const s = Number(score);
+  if (s >= 90) return 'ممتاز';
+  if (s >= 85) return 'جيد جدًا';
+  if (s >= 80) return 'جيد مرتفع';
+  if (s >= 75) return 'جيد';
+  if (s >= 65) return 'متوسط';
+  if (s >= 50) return 'ضعيف';
+  return 'ضعيف جدًا';
+}
+
+function cardDairyTraitsPartSrv(breakdown = {}, keys = [], max = 0) {
+  for (const k of keys) {
+    const n = cardDairyTraitsNumSrv(breakdown?.[k]);
+    if (n !== null) {
+      return {
+        value: Math.max(0, Math.min(Number(max) || 0, Math.round(n))),
+        max: Number(max) || 0
+      };
+    }
+  }
+
+  return {
+    value: null,
+    max: Number(max) || 0
+  };
+}
+
+function cardDairyTraitsSummarySrv(score, grade, reason = '') {
+  const r = String(reason || '').trim();
+  if (r) return r;
+
+  const s = Number(score);
+
+  if (s >= 90) return 'تركيب إنتاجي ممتاز وملائم بقوة لإنتاج اللبن.';
+  if (s >= 85) return 'تركيب إنتاجي جيد جدًا مع صفات لبنية واضحة.';
+  if (s >= 80) return 'تركيب إنتاجي جيد مرتفع مع بعض الملاحظات البسيطة.';
+  if (s >= 75) return 'تركيب إنتاجي جيد لكنه يحتاج متابعة في بعض السمات.';
+  if (s >= 65) return 'تركيب إنتاجي متوسط مع نقاط تحتاج تحسين.';
+  return 'التقييم الإنتاجي منخفض نسبيًا حسب السمات الظاهرة.';
+}
+
+function cardDairyTraitsFromAnimalSrv(animal = {}, events = []) {
+  const dairyEvents = (Array.isArray(events) ? events : [])
+    .filter(e => {
+      const txt = eventTextSrv(e);
+      return (
+        txt.includes('dairy_traits_eval') ||
+        txt.includes('dairy traits') ||
+        txt.includes('تقييم سمات إنتاج اللبن')
+      );
+    })
+    .sort((a, b) =>
+      String(computeEventDateFromDoc(b) || '').localeCompare(String(computeEventDateFromDoc(a) || ''))
+    );
+
+  const lastEvent = dairyEvents[0] || null;
+  const analysis = lastEvent?.analysis || {};
+  const eventBreakdown = analysis.breakdown || {};
+
+  const score = cardDairyTraitsNumSrv(
+    animal.lastDairyTraitsScore ??
+    animal.dairyTraitsScore ??
+    animal.milkTraitsScore ??
+    lastEvent?.dairyTraitsScore ??
+    lastEvent?.score ??
+    analysis.score
+  );
+
+  if (score === null) return null;
+
+  const breakdown =
+    animal.lastDairyTraitsBreakdown ||
+    animal.dairyTraitsBreakdown ||
+    eventBreakdown ||
+    {};
+
+  const grade = cardDairyTraitsGradeTextSrv(
+    score,
+    animal.lastDairyTraitsGrade ||
+    animal.dairyTraitsGrade ||
+    lastEvent?.grade ||
+    analysis.grade ||
+    ''
+  );
+
+  const date = cardISODateSrv(
+    animal.lastDairyTraitsDate ||
+    animal.dairyTraitsDate ||
+    lastEvent?.eventDate ||
+    lastEvent?.date ||
+    lastEvent?.createdAt
+  );
+
+  return {
+    score: Math.max(0, Math.min(100, Math.round(score))),
+    grade,
+    date,
+    rangeText: '0–100',
+    summary: cardDairyTraitsSummarySrv(score, grade, analysis.reason || lastEvent?.notes || lastEvent?.comment || ''),
+
+    breakdown: {
+      udder: cardDairyTraitsPartSrv(breakdown, ['udder'], 40),
+      feetAndLegs: cardDairyTraitsPartSrv(breakdown, ['feetAndLegs', 'feetLegs', 'legs'], 20),
+      dairyStrength: cardDairyTraitsPartSrv(breakdown, ['dairyStrength', 'strength'], 20),
+      frontEndAndCapacity: cardDairyTraitsPartSrv(breakdown, ['frontEndAndCapacity', 'frontEndCapacity', 'capacity', 'bodyCapacity'], 15),
+      rump: cardDairyTraitsPartSrv(breakdown, ['rump'], 5)
+    }
+  };
+}
 // ============================================================
 //                 API: ANIMAL CARD (server-only)
 // ============================================================
@@ -29138,6 +29260,7 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
       .slice(-80);
 
    const alerts = await fetchCardAlertsSrv(uid, animal);
+   const dairyTraits = cardDairyTraitsFromAnimalSrv(animal, events);
    const herdMilkCurve = await fetchCardHerdMilkCurveSrv(uid, animal);
 
     return res.json({
@@ -29178,7 +29301,7 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
         lastCheckDate: cardISODateSrv(state.lastCheckDate),
         ovsynch: state.ovsynch
       },
-
+      dairyTraits,
       milkSeries: state.milkSeries,
       herdMilkCurve,
       healthHistory: state.healthHistory.slice(-20).reverse(),
