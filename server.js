@@ -28734,7 +28734,148 @@ async function fetchCardAlertsSrv(uid, subject = {}) {
 
   return out.slice(0, 8);
 }
+function cardMilkCurveAnimalClassSrv(a = {}) {
+  const s = String(
+    a.kind ||
+    a.animalTypeAr ||
+    a.animaltype ||
+    a.species ||
+    a.type ||
+    ''
+  ).trim().toLowerCase();
 
+  if (s.includes('جاموس') || s.includes('buffalo')) return 'buffalo';
+  if (s.includes('بقر') || s.includes('cow')) return 'cow';
+
+  return '';
+}
+
+function cardMilkDimSrv(e = {}, animal = {}) {
+  const direct = Number(
+    e.dim ??
+    e.DIM ??
+    e.daysInMilk ??
+    e.daysInMilkAtEvent ??
+    e.milkDim ??
+    NaN
+  );
+
+  if (Number.isFinite(direct) && direct >= 0 && direct <= 500) {
+    return direct;
+  }
+
+  const eventDate = computeEventDateFromDoc(e);
+  const calvingDate = cardISODateSrv(
+    animal.lastCalvingDate ||
+    animal.lastCalving ||
+    animal.calvingDate
+  );
+
+  if (!eventDate || !calvingDate) return null;
+
+  const dim = daysBetweenIsoSrv(calvingDate, eventDate);
+  return Number.isFinite(dim) && dim >= 0 ? dim : null;
+}
+
+async function fetchCardHerdMilkCurveSrv(uid, currentAnimal = {}) {
+  if (!db || !uid) return [];
+
+  const targetClass = cardMilkCurveAnimalClassSrv(currentAnimal);
+  const animalsByNumber = new Map();
+
+  try {
+    const animalsSnap = await db.collection('animals')
+      .where('userId', '==', uid)
+      .limit(1500)
+      .get();
+
+    animalsSnap.docs.forEach(d => {
+      const a = {
+        id: d.id,
+        ...(d.data() || {})
+      };
+
+      const st = String(a.status || 'active').trim().toLowerCase();
+      if (st === 'archived' || st === 'inactive') return;
+
+      const cls = cardMilkCurveAnimalClassSrv(a);
+      if (targetClass && cls && cls !== targetClass) return;
+
+      const nums = cardSubjectNumbersSrv(a);
+      for (const n of nums) {
+        animalsByNumber.set(String(n), a);
+      }
+    });
+  } catch (e) {
+    console.warn('card herd milk animals failed:', e.message || e);
+    return [];
+  }
+
+  if (!animalsByNumber.size) return [];
+
+  const buckets = new Map();
+
+  try {
+    const eventsSnap = await db.collection('events')
+      .where('userId', '==', uid)
+      .limit(5000)
+      .get();
+
+    eventsSnap.docs.forEach(d => {
+      const e = {
+        id: d.id,
+        ...(d.data() || {})
+      };
+
+      if (eventTypeForCardSrv(e) !== 'milk') return;
+
+      const kg = milkKgFromEventSrv(e);
+      if (!Number.isFinite(kg) || kg <= 0) return;
+
+      let animal = null;
+      const nums = cardSubjectNumbersSrv(e);
+
+      for (const n of nums) {
+        if (animalsByNumber.has(String(n))) {
+          animal = animalsByNumber.get(String(n));
+          break;
+        }
+      }
+
+      if (!animal) return;
+
+      const dim = cardMilkDimSrv(e, animal);
+      if (!Number.isFinite(dim) || dim < 0 || dim > 305) return;
+
+      const bucketDim = Math.round(dim / 7) * 7;
+
+      if (!buckets.has(bucketDim)) {
+        buckets.set(bucketDim, {
+          dim: bucketDim,
+          sum: 0,
+          count: 0
+        });
+      }
+
+      const b = buckets.get(bucketDim);
+      b.sum += kg;
+      b.count += 1;
+    });
+  } catch (e) {
+    console.warn('card herd milk events failed:', e.message || e);
+    return [];
+  }
+
+  return [...buckets.values()]
+    .filter(b => b.count > 0)
+    .map(b => ({
+      dim: b.dim,
+      kg: Math.round((b.sum / b.count) * 100) / 100,
+      count: b.count
+    }))
+    .sort((a, b) => a.dim - b.dim)
+    .slice(0, 60);
+}
 function cardTwinWarningSrv(calf = {}) {
   const sex = cardNormalizeSexSrv(cardFirstSrv(calf, ['sex', 'gender', 'followerSex'], ''));
 
@@ -28996,7 +29137,8 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
       .filter(e => e.date || e.title)
       .slice(-80);
 
-    const alerts = await fetchCardAlertsSrv(uid, animal);
+   const alerts = await fetchCardAlertsSrv(uid, animal);
+   const herdMilkCurve = await fetchCardHerdMilkCurveSrv(uid, animal);
 
     return res.json({
       ok: true,
@@ -29038,6 +29180,7 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
       },
 
       milkSeries: state.milkSeries,
+      herdMilkCurve,
       healthHistory: state.healthHistory.slice(-20).reverse(),
       alerts,
       events: eventRows,
