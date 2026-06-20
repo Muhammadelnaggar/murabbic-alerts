@@ -652,7 +652,21 @@ function addAnimalDigitsSrv(v) {
 function addAnimalStrSrv(v) {
   return String(v ?? "").trim();
 }
-
+function addAnimalSireNumberSrv(fd = {}) {
+  return addAnimalStrSrv(
+    fd.sireNumber ||
+    fd.fatherNumber ||
+    fd.sireId ||
+    fd.bullNumber ||
+    fd.bullCode ||
+    fd.semenCode ||
+    fd.semenNumber ||
+    fd.strawCode ||
+    fd.sire ||
+    fd.bull ||
+    fd.semen
+  );
+}
 function addAnimalNumSrv(v, fallback = 0) {
   if (v === "" || v === null || v === undefined) return fallback;
   const n = Number(v);
@@ -774,7 +788,14 @@ function addAnimalDecisionSrv(fd = {}) {
     if (!addAnimalStrSrv(fd.productionStatus)) {
       return "❌ الحالة الإنتاجية مطلوبة.";
     }
+   const needsSireNumber =
+  repro === "ملقحة" ||
+  repro === "ملقح" ||
+  repro === "عشار";
 
+if (needsSireNumber && !addAnimalSireNumberSrv(fd)) {
+  return "❌ رقم الطلوقة مطلوب للحيوان العشار أو الملقح.";
+}
     if (!addAnimalStrSrv(fd.reproductiveStatus)) {
       return "❌ الحالة التناسلية مطلوبة.";
     }
@@ -1033,6 +1054,8 @@ function addAnimalBuildSinglePayloadSrv(uid, fd = {}) {
   const lastCalvingDate = addAnimalDateOrNullSrv(fd.lastCalvingDate);
   const lastAI = addAnimalDateOrNullSrv(fd.lastInseminationDate);
   const servicesCount = addAnimalNumSrv(fd.servicesCount, 0);
+  const sireNumber = addAnimalSireNumberSrv(fd) || null;
+  
 
  const hasMotherInseminationHistory =
   reproductiveStatus === "ملقحة" ||
@@ -1079,7 +1102,7 @@ const pregnancyDays =
       birthDate: addAnimalDateOrNullSrv(fd.birthDate),
       lastCalvingDate,
       lastInseminationDate: hasMotherInseminationHistory ? lastAI : null,
-      sireNumber: hasMotherInseminationHistory ? (addAnimalStrSrv(fd.sireNumber) || null) : null,
+      sireNumber: hasMotherInseminationHistory ? sireNumber : null,
 
       daysInMilk: Number.isFinite(Number(daysInMilk)) ? Number(daysInMilk) : null,
       pregnancyDays: reproductiveStatus === "عشار"
