@@ -470,44 +470,261 @@
     });
   }
 
-  function renderTimeline(events = []){
-    const box = $('timelineBox');
-    if (!box) return;
+function renderTimeline(events = []){
+  const box = $('timelineBox');
+  const tip = $('tlTip');
+  if (!box) return;
 
-    const rows = (Array.isArray(events) ? events : [])
-      .filter(e => e.date || e.title)
-      .slice()
-      .reverse();
+  const rows = (Array.isArray(events) ? events : [])
+    .map(e => ({
+      ...e,
+      _date: e.date || e.eventDate || e.day || ''
+    }))
+    .filter(e => e._date || e.title)
+    .sort((a, b) => String(a._date).localeCompare(String(b._date)));
 
-    box.innerHTML = '';
+  box.innerHTML = '';
+  if (tip) tip.style.display = 'none';
 
-    if (!rows.length) {
-      box.innerHTML = '<div class="notice">لا توجد أحداث مسجلة بعد.</div>';
-      return;
+  if (!rows.length) {
+    box.innerHTML = '<div class="notice">لا توجد أحداث مسجلة بعد.</div>';
+    return;
+  }
+
+  const NS = 'http://www.w3.org/2000/svg';
+
+  function cssVar(name, fallback){
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+
+  function escapeHtml(v){
+    return String(v ?? '—')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function eventTypeKey(e = {}){
+    const s = String(
+      e.type ||
+      e.kind ||
+      e.eventTypeNorm ||
+      e.eventType ||
+      e.title ||
+      e.name ||
+      ''
+    ).toLowerCase();
+
+    if (/milk|لبن|حليب/.test(s)) return 'milk';
+    if (/calving|ولاد/.test(s)) return 'calving';
+    if (/insemin|تلقيح/.test(s)) return 'insemination';
+    if (/preg|حمل|عشار/.test(s)) return 'pregnancy';
+    if (/heat|شياع/.test(s)) return 'heat';
+    if (/dry|تجفيف|جاف/.test(s)) return 'dry';
+    if (/disease|mastitis|lameness|مرض|التهاب|عرج/.test(s)) return 'disease';
+
+    return 'other';
+  }
+
+  function colorForEvent(e){
+    const key = eventTypeKey(e);
+
+    if (key === 'milk') return cssVar('--tl-milk', '#2e7d32');
+    if (key === 'calving') return cssVar('--tl-calving', '#1b5e20');
+    if (key === 'insemination') return cssVar('--tl-insem', '#0d9488');
+    if (key === 'pregnancy') return cssVar('--tl-preg', '#a16207');
+    if (key === 'heat') return cssVar('--tl-heat', '#ef6c00');
+    if (key === 'dry') return cssVar('--tl-dry', '#6b7280');
+    if (key === 'disease') return cssVar('--tl-disease', '#c62828');
+
+    return cssVar('--tl-other', '#4b5563');
+  }
+
+  function eventTitle(e){
+    return txt(e.title || e.name || e.eventName || e.eventType || 'حدث');
+  }
+
+  function eventSummary(e){
+    return txt(e.summary || e.note || e.notes || e.details || '', '');
+  }
+
+  const times = rows
+    .map(e => new Date(String(e._date).slice(0, 10) + 'T00:00:00').getTime())
+    .filter(t => Number.isFinite(t));
+
+  let minT = times.length ? Math.min(...times) : Date.now();
+  let maxT = times.length ? Math.max(...times) : minT;
+
+  if (maxT <= minT) {
+    minT -= 3 * 86400000;
+    maxT += 3 * 86400000;
+  }
+
+  const padL = 42;
+  const padR = 42;
+  const padT = 24;
+  const padB = 34;
+  const H = 120;
+  const Y = 62;
+  const plotW = Math.max(620, rows.length * 48);
+  const W = padL + plotW + padR;
+
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'tl-svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.style.width = W + 'px';
+  svg.style.height = H + 'px';
+
+  const axis = document.createElementNS(NS, 'line');
+  axis.setAttribute('x1', padL);
+  axis.setAttribute('x2', W - padR);
+  axis.setAttribute('y1', Y);
+  axis.setAttribute('y2', Y);
+  axis.setAttribute('stroke', '#cfe9c8');
+  axis.setAttribute('stroke-width', '2');
+  axis.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(axis);
+
+  for (let i = 0; i <= 5; i++) {
+    const t = minT + ((maxT - minT) * i / 5);
+    const x = padL + ((t - minT) / (maxT - minT)) * plotW;
+
+    const tick = document.createElementNS(NS, 'line');
+    tick.setAttribute('x1', x);
+    tick.setAttribute('x2', x);
+    tick.setAttribute('y1', Y - 8);
+    tick.setAttribute('y2', Y + 8);
+    tick.setAttribute('stroke', '#e6efe3');
+    tick.setAttribute('stroke-width', '1');
+    svg.appendChild(tick);
+
+    const label = document.createElementNS(NS, 'text');
+    label.setAttribute('x', x);
+    label.setAttribute('y', H - 12);
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('font-size', '9');
+    label.setAttribute('fill', '#6d7b70');
+    label.textContent = fmtDate(new Date(t).toISOString().slice(0, 10));
+    svg.appendChild(label);
+  }
+
+  function showTip(e, x, y){
+    if (!tip) return;
+
+    tip.innerHTML = `
+      <b>${escapeHtml(eventTitle(e))}</b>
+      <div class="tl-date">${escapeHtml(fmtDate(e._date))}</div>
+      <div>${escapeHtml(eventSummary(e) || '—')}</div>
+    `;
+
+    const boxRect = box.getBoundingClientRect();
+    const cardRect = box.closest('.timeline-card')?.getBoundingClientRect() || boxRect;
+
+    const left = (boxRect.left - cardRect.left) + x - box.scrollLeft;
+    const top = (boxRect.top - cardRect.top) + y - 18;
+
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+    tip.style.display = 'block';
+  }
+
+  function hideTip(){
+    if (tip) tip.style.display = 'none';
+  }
+
+  box.addEventListener('scroll', hideTip, { passive: true });
+
+  rows.forEach((e, i) => {
+    const t = new Date(String(e._date).slice(0, 10) + 'T00:00:00').getTime();
+    const safeT = Number.isFinite(t) ? t : minT;
+
+    let x = padL + ((safeT - minT) / (maxT - minT)) * plotW;
+
+    // تفادي تكدس نقاط نفس اليوم فوق بعض
+    x += ((i % 3) - 1) * 5;
+
+    const y = Y + ((i % 2) ? -7 : 7);
+    const color = colorForEvent(e);
+
+    const stem = document.createElementNS(NS, 'line');
+    stem.setAttribute('x1', x);
+    stem.setAttribute('x2', x);
+    stem.setAttribute('y1', Y);
+    stem.setAttribute('y2', y);
+    stem.setAttribute('stroke', color);
+    stem.setAttribute('stroke-width', '1');
+    stem.setAttribute('opacity', '0.45');
+    svg.appendChild(stem);
+
+    const dot = document.createElementNS(NS, 'circle');
+    dot.setAttribute('cx', x);
+    dot.setAttribute('cy', y);
+    dot.setAttribute('r', '6');
+    dot.setAttribute('fill', color);
+    dot.setAttribute('stroke', '#ffffff');
+    dot.setAttribute('stroke-width', '2');
+    dot.setAttribute('class', 'tl-dot');
+    dot.setAttribute('tabindex', '0');
+    dot.setAttribute('role', 'button');
+    dot.setAttribute('aria-label', `${eventTitle(e)} — ${fmtDate(e._date)}`);
+    svg.appendChild(dot);
+
+    const hit = document.createElementNS(NS, 'circle');
+    hit.setAttribute('cx', x);
+    hit.setAttribute('cy', y);
+    hit.setAttribute('r', '18');
+    hit.setAttribute('fill', 'transparent');
+    hit.style.cursor = 'pointer';
+    svg.appendChild(hit);
+
+    function focusRow(){
+      if (!e.id) return;
+
+      const row = document.getElementById(`evrow-${e.id}`);
+      if (!row) return;
+
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.add('ev-row--focus');
+
+      setTimeout(() => {
+        row.classList.remove('ev-row--focus');
+      }, 1600);
     }
 
-    const strip = document.createElement('div');
-    strip.style.cssText = 'display:flex;gap:12px;min-width:max-content;padding:12px 8px;align-items:stretch';
+    const open = () => showTip(e, x, y);
 
-    rows.forEach(e => {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.style.cssText = 'min-width:120px;border:1px solid var(--border);border-radius:14px;background:#fcfff8;padding:10px;text-align:center;color:#0f5132;font:inherit;cursor:pointer';
-      item.innerHTML = `<b style="display:block;margin-bottom:6px">${txt(e.title || 'حدث')}</b><span style="font-size:12px">${fmtDate(e.date)}</span>`;
-      item.title = txt(e.summary);
-
-      if (e.id) {
-        item.addEventListener('click', () => {
-          document.getElementById(`evrow-${e.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        });
-      }
-
-      strip.appendChild(item);
+    hit.addEventListener('mouseenter', open);
+    hit.addEventListener('mouseleave', hideTip);
+    hit.addEventListener('click', ev => {
+      ev.stopPropagation();
+      open();
+      focusRow();
     });
 
-    box.appendChild(strip);
-    setTimeout(() => { box.scrollLeft = box.scrollWidth; }, 0);
-  }
+    hit.addEventListener('touchstart', () => {
+      open();
+      focusRow();
+      clearTimeout(hit._hideTimer);
+      hit._hideTimer = setTimeout(hideTip, 2200);
+    }, { passive: true });
+
+    dot.addEventListener('focus', open);
+    dot.addEventListener('blur', hideTip);
+    dot.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        open();
+        focusRow();
+      }
+    });
+  });
+
+  box.appendChild(svg);
+  setTimeout(() => { box.scrollLeft = box.scrollWidth; }, 0);
+}
 
 function renderMilkChart(series = [], herdCurve = []){
   const svg = $('milkChart');
