@@ -29320,6 +29320,48 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
     });
   }
 });
+async function findCalfBirthEventForCardSrv(uid, calfNumber) {
+  if (!db || !uid || !calfNumber) return null;
+
+  const raw = String(calfNumber).trim();
+  const asNum = Number(raw);
+  const values = Number.isFinite(asNum) ? [raw, asNum] : [raw];
+
+  const fields = ['calfId', 'calf2Id', 'calf3Id'];
+  const found = [];
+  const seen = new Set();
+
+  for (const field of fields) {
+    for (const value of values) {
+      try {
+        const snap = await db.collection('events')
+          .where('userId', '==', uid)
+          .where(field, '==', value)
+          .limit(10)
+          .get();
+
+        snap.forEach(doc => {
+          if (seen.has(doc.id)) return;
+          seen.add(doc.id);
+
+          found.push({
+            id: doc.id,
+            ...(doc.data() || {})
+          });
+        });
+      } catch (_) {}
+    }
+  }
+
+  return found
+    .filter(e => {
+      const t = String(e.eventType || e.type || e.eventTypeNorm || '').trim();
+      return t.includes('ولادة') || t.includes('calving') || t.includes('birth');
+    })
+    .sort((a, b) =>
+      String(b.eventDate || '').localeCompare(String(a.eventDate || ''))
+    )[0] || null;
+}
 app.get('/api/calf-card', requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -29366,7 +29408,17 @@ app.get('/api/calf-card', requireUserId, async (req, res) => {
       });
     }
 
-    const events = await fetchCardEventsSrv(uid, calf);
+   const baseEvents = await fetchCardEventsSrv(uid, calf);
+
+const calfNumberForBirth =
+  cardSubjectNumberSrv(calf) ||
+  cardFirstSrv(calf, ['calfNumber', 'animalNumber', 'number'], '');
+
+const birthEvent = await findCalfBirthEventForCardSrv(uid, calfNumberForBirth);
+
+const events = birthEvent && !baseEvents.some(e => e.id === birthEvent.id)
+  ? [birthEvent, ...baseEvents]
+  : baseEvents;
 
     const eventRows = events
       .map(cardEventRowSrv)
@@ -29399,26 +29451,55 @@ app.get('/api/calf-card', requireUserId, async (req, res) => {
       dam = await findCowCardDocSrv(uid, { number: damNumber });
     }
 
-    const birthType = cardTextSrv(
-      cardFirstSrv(calf, ['birthType', 'deliveryType', 'calvingKind'], ''),
-      '—'
-    );
+   const birthType = cardTextSrv(
+  cardFirstSrv(
+    calf,
+    ['birthType', 'deliveryType', 'calvingKind'],
+    birthEvent?.calvingKind || birthEvent?.birthType || ''
+  ),
+  '—'
+);
 
-    const litterSize = cardTextSrv(
-      cardFirstSrv(calf, ['litterSize', 'birthCount', 'calfCount'], ''),
-      '—'
-    );
+const litterSize = cardTextSrv(
+  cardFirstSrv(
+    calf,
+    ['litterSize', 'birthCount', 'calfCount'],
+    birthEvent?.calfCount || birthEvent?.litterSize || ''
+  ),
+  '—'
+);
 
-    const litterOrder = cardTextSrv(
-      cardFirstSrv(calf, ['litterOrder', 'birthOrder'], ''),
-      '—'
-    );
+let birthOrderFromEvent = '';
+if (birthEvent) {
+  const cn = String(calfNumber || '').trim();
 
-    const litterComposition = cardTextSrv(
-      cardFirstSrv(calf, ['litterComposition', 'birthComposition'], ''),
-      '—'
-    );
+  if (cn && String(birthEvent.calfId || '').trim() === cn) birthOrderFromEvent = 'الأول';
+  if (cn && String(birthEvent.calf2Id || '').trim() === cn) birthOrderFromEvent = 'الثاني';
+  if (cn && String(birthEvent.calf3Id || '').trim() === cn) birthOrderFromEvent = 'الثالث';
+}
 
+const litterOrder = cardTextSrv(
+  cardFirstSrv(calf, ['litterOrder', 'birthOrder'], birthOrderFromEvent),
+  '—'
+);
+
+const litterCompositionFromEvent = birthEvent
+  ? [
+      birthEvent.calf1Sex,
+      birthEvent.calfSex,
+      birthEvent.firstCalfSex,
+      birthEvent.calf2Sex,
+      birthEvent.calf3Sex
+    ]
+      .map(v => String(v || '').trim())
+      .filter(Boolean)
+      .join(' + ')
+  : '';
+
+const litterComposition = cardTextSrv(
+  cardFirstSrv(calf, ['litterComposition', 'birthComposition'], litterCompositionFromEvent),
+  '—'
+);
     return res.json({
       ok: true,
       cardType: 'calf',
