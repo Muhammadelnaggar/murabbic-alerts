@@ -646,17 +646,23 @@ function renderMilkChart(series = [], herdCurve = []){
       .join(' ');
   }
 
-  // الرمادي: منحنى القطيع القادم من السيرفر
+   // الرمادي: تظليل نطاق القطيع فقط، بدون خط
   if (herdRows.length >= 2) {
-    const hp = document.createElementNS(NS, 'path');
-    hp.setAttribute('d', makePath(herdRows));
-    hp.setAttribute('fill', 'none');
-    hp.setAttribute('stroke', '#9ca3af');
-    hp.setAttribute('stroke-width', '1.8');
-    hp.setAttribute('stroke-linecap', 'round');
-    hp.setAttribute('stroke-linejoin', 'round');
-    hp.setAttribute('stroke-dasharray', '5 4');
-    svg.appendChild(hp);
+    let areaD = makePath(herdRows);
+
+    const first = herdRows[0];
+    const last = herdRows[herdRows.length - 1];
+    const baseY = yAt(0);
+
+    areaD += ` L ${xAt(last.dim).toFixed(1)},${baseY.toFixed(1)}`;
+    areaD += ` L ${xAt(first.dim).toFixed(1)},${baseY.toFixed(1)} Z`;
+
+    const ha = document.createElementNS(NS, 'path');
+    ha.setAttribute('d', areaD);
+    ha.setAttribute('fill', '#9ca3af');
+    ha.setAttribute('fill-opacity', '0.22');
+    ha.setAttribute('stroke', 'none');
+    svg.appendChild(ha);
   }
 
   // الأخضر: إنتاج الحيوان
@@ -670,18 +676,6 @@ function renderMilkChart(series = [], herdCurve = []){
     ap.setAttribute('stroke-linejoin', 'round');
     svg.appendChild(ap);
   }
-
-  // نقاط القطيع بهدوء
-  herdRows.forEach(p => {
-    const c = document.createElementNS(NS, 'circle');
-    c.setAttribute('cx', xAt(p.dim));
-    c.setAttribute('cy', yAt(p.kg));
-    c.setAttribute('r', '1.8');
-    c.setAttribute('fill', '#9ca3af');
-    c.setAttribute('stroke', '#fff');
-    c.setAttribute('stroke-width', '0.8');
-    svg.appendChild(c);
-  });
 
   // نقاط الحيوان
   rows.forEach((p, i) => {
