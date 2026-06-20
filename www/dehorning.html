@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-page="dehorning">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>تسجيل إزالة القرون — مُرَبِّيك</title>
+  <link rel="stylesheet" href="css/forms.css" />
+</head>
+<body>
+<header>
+  <div class="mbk-head">
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div class="mbk-center">
+      <div class="mbk-page-title">تسجيل إزالة القرون</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
+    </div>
+    <a class="mbk-back" href="add-event.html">رجوع</a>
+  </div>
+</header>
+
+<main class="mbk-form">
+  <div id="info" class="infobar"></div>
+
+  <form id="dehorningForm" data-event="إزالة القرون" novalidate>
+    <section class="mbk-card">
+      <div class="field">
+        <label for="animalNumber">رقم العجل</label>
+        <textarea id="animalNumber" data-field="animalNumber" style="min-height:80px; resize:vertical;" placeholder="رقم واحد أو عدة أرقام"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="eventDate">تاريخ إزالة القرون</label>
+        <input id="eventDate" data-field="eventDate" type="date" />
+      </div>
+
+      <div class="field">
+        <label for="notes">ملاحظات</label>
+        <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
+      </div>
+    </section>
+
+    <div class="actions-bar">
+      <button class="save" id="saveBtn" type="submit">تسجيل الحدث</button>
+      <button class="ghost" id="cardBtn" type="button">بطاقة الحيوان</button>
+    </div>
+  </form>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const form = $("dehorningForm");
+  const info = $("info");
+  const saveBtn = $("saveBtn");
+  const cardBtn = $("cardBtn");
+
+  const qs = new URLSearchParams(location.search);
+
+  const DIGITS = {
+    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+  };
+
+  function toLatin(v){
+    return String(v || "").replace(/[٠-٩۰-۹]/g, d => DIGITS[d] || d);
+  }
+
+  function parseNumbers(raw){
+    return [...new Set(
+      (toLatin(raw).match(/\d+/g) || [])
+        .map(x => x.replace(/\D/g, ""))
+        .filter(Boolean)
+    )];
+  }
+
+  function todayISO(){
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function toISO(s){
+    const raw = String(s || "").trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw.slice(0, 10);
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return "";
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  }
+
+  function getUid(){
+    return String(
+      localStorage.getItem("userId") ||
+      localStorage.getItem("uid") ||
+      localStorage.getItem("ownerUid") ||
+      sessionStorage.getItem("userId") ||
+      sessionStorage.getItem("uid") ||
+      ""
+    ).trim();
+  }
+
+  const initialRaw = String(
+    qs.get("numbers") ||
+    qs.get("bulk") ||
+    qs.get("animalNumbers") ||
+    qs.get("selectedNumbers") ||
+    qs.get("number") ||
+    qs.get("animalNumber") ||
+    ""
+  ).trim();
+
+  const initialNumbers = parseNumbers(initialRaw);
+  const initialMode = String(qs.get("mode") || qs.get("mbkMode") || "").trim().toLowerCase();
+  const startsBulk = initialMode === "bulk" || initialMode === "group" || initialNumbers.length > 1;
+  const initialDate = toISO(qs.get("date") || qs.get("dt") || qs.get("eventDate") || "") || todayISO();
+
+  let lastGate = null;
+  let gateTimer = null;
+
+  function getCurrentNumbers(){
+    return parseNumbers($("animalNumber").value || "");
+  }
+
+  function setMessage(text, type = "info"){
+    info.className = `infobar show ${type}`;
+    info.style.display = "block";
+    info.textContent = String(text || "");
+  }
+
+  function clearMessage(){
+    info.className = "infobar";
+    info.style.display = "";
+    info.textContent = "";
+  }
+
+  function setBusy(busy){
+    if (saveBtn) saveBtn.disabled = !!busy || !lastGate?.canSave;
+    if (cardBtn) cardBtn.disabled = !!busy || getCurrentNumbers().length !== 1;
+  }
+
+  function responseText(j = {}){
+    const lines = [];
+
+    if (j.message) lines.push(j.message);
+
+    const rejected = Array.isArray(j.rejected) ? j.rejected : [];
+    if (rejected.length) {
+      lines.push(
+        rejected.slice(0, 8)
+          .map(r => `رقم ${r.animalNumber || r.number || "—"}: ${r.reason || "غير مقبول"}`)
+          .join("\n")
+      );
+
+      if (rejected.length > 8) {
+        lines.push(`… وعدد ${rejected.length - 8} أرقام أخرى.`);
+      }
+    }
+
+    return lines.filter(Boolean).join("\n");
+  }
+
+  async function apiPost(path, payload){
+    const uid = getUid();
+
+    if (!uid) {
+      return {
+        ok: false,
+        canSave: false,
+        message: "❌ لم يتم التعرف على المستخدم. سجّل الدخول مرة أخرى."
+      };
+    }
+
+    const r = await fetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": uid
+      },
+      body: JSON.stringify(payload || {})
+    });
+
+    const j = await r.json().catch(() => ({
+      ok: false,
+      canSave: false,
+      message: "❌ رد السيرفر غير صالح."
+    }));
+
+    return { httpStatus: r.status, ...j };
+  }
+
+  function renderGate(j = {}){
+    lastGate = j;
+
+    if (saveBtn) saveBtn.disabled = !j.canSave;
+
+    const nums = getCurrentNumbers();
+    if (cardBtn) {
+      cardBtn.disabled = nums.length !== 1;
+      cardBtn.style.opacity = nums.length === 1 ? "1" : ".6";
+      cardBtn.style.pointerEvents = nums.length === 1 ? "auto" : "none";
+    }
+
+    const text = responseText(j);
+    if (text) setMessage(text, j.canSave ? "success" : "error");
+    else clearMessage();
+  }
+
+  async function runGate({ silent = false } = {}){
+    const numbers = getCurrentNumbers();
+    const eventDate = String($("eventDate").value || "").slice(0, 10);
+
+    if (!numbers.length || !eventDate) {
+      lastGate = { canSave:false };
+      if (saveBtn) saveBtn.disabled = true;
+      if (!silent) setMessage("اكتب رقم العجل وتاريخ إزالة القرون.", "info");
+      return;
+    }
+
+    if (!silent) setMessage("جاري التحقق من السيرفر…", "info");
+    setBusy(true);
+
+    try {
+      const j = await apiPost("/api/dehorning/gate", {
+        numbers,
+        animalNumbers: numbers,
+        eventDate
+      });
+
+      renderGate(j);
+    } catch (e) {
+      console.error(e);
+      lastGate = { canSave:false };
+      if (saveBtn) saveBtn.disabled = true;
+      setMessage("❌ تعذّر التحقق من السيرفر الآن.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function scheduleGate(){
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(() => runGate({ silent:true }), 350);
+  }
+
+  function hydrateUI(){
+    $("eventDate").value = initialDate;
+    $("animalNumber").value = initialNumbers.join(startsBulk ? "\n" : "");
+    $("animalNumber").rows = startsBulk ? Math.max(3, initialNumbers.length) : 1;
+
+    if (saveBtn) saveBtn.disabled = true;
+    if (cardBtn) cardBtn.disabled = initialNumbers.length !== 1;
+  }
+
+  cardBtn.addEventListener("click", () => {
+    const nums = getCurrentNumbers();
+    if (nums.length !== 1) return;
+    location.href = `cow-card.html?number=${encodeURIComponent(nums[0])}`;
+  });
+
+  $("animalNumber").addEventListener("input", scheduleGate);
+  $("eventDate").addEventListener("input", scheduleGate);
+  $("eventDate").addEventListener("change", () => runGate({ silent:false }));
+
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+
+    const numbers = getCurrentNumbers();
+    const eventDate = String($("eventDate").value || "").slice(0, 10);
+    const notes = String($("notes").value || "").trim();
+
+    if (!numbers.length) {
+      setMessage("❌ رقم العجل مطلوب.", "error");
+      return;
+    }
+
+    if (!eventDate) {
+      setMessage("❌ تاريخ إزالة القرون مطلوب.", "error");
+      return;
+    }
+
+    setMessage("جاري الحفظ من السيرفر…", "info");
+    setBusy(true);
+
+    try {
+      const j = await apiPost("/api/dehorning/save", {
+        numbers,
+        animalNumbers: numbers,
+        eventDate,
+        notes
+      });
+
+      setMessage(responseText(j) || j.message || "تمت المعالجة.", j.ok ? "success" : "error");
+
+      if (j.ok && j.redirectUrl) {
+        setTimeout(() => {
+          location.href = j.redirectUrl;
+        }, 900);
+      }
+    } catch (e) {
+      console.error(e);
+      setMessage("❌ فشل حفظ إزالة القرون من السيرفر.", "error");
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  hydrateUI();
+  runGate({ silent:true });
+</script>
+</body>
+</html>
