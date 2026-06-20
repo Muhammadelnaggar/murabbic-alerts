@@ -28255,48 +28255,579 @@ return {
 };
 }
 // ============================================================
+//                 CARD HELPERS — cow/calves server source
+// ============================================================
+function cardTextSrv(v, fallback = '—') {
+  if (v === null || v === undefined || v === '') return fallback;
+  if (Array.isArray(v)) return v.map(x => cardTextSrv(x, '')).filter(Boolean).join('، ') || fallback;
+  if (typeof v === 'object') {
+    const d = cardISODateSrv(v);
+    if (d) return d;
+    const txt = Object.values(v).map(x => cardTextSrv(x, '')).filter(Boolean).join('، ');
+    return txt || fallback;
+  }
+  return String(v).trim() || fallback;
+}
+
+function cardFirstSrv(obj = {}, keys = [], fallback = null) {
+  for (const k of keys) {
+    const v = obj?.[k];
+    if (v !== null && v !== undefined && String(v).trim() !== '') return v;
+  }
+  return fallback;
+}
+
+function cardISODateSrv(v) {
+  if (!v) return null;
+  if (typeof v === 'string') {
+    const m = v.match(/\d{4}-\d{2}-\d{2}/);
+    if (m) return m[0];
+  }
+  try {
+    const d = toDate(v);
+    if (d && !Number.isNaN(d.getTime())) return toYYYYMMDD(d);
+  } catch (_) {}
+  return null;
+}
+
+function cardAgeTextSrv(birthDate) {
+  const bd = cardISODateSrv(birthDate);
+  if (!bd) return { ageDays: null, ageText: '—' };
+
+  const ageDays = daysBetweenIsoSrv(bd, cairoTodayISO());
+  if (!Number.isFinite(ageDays) || ageDays < 0) return { ageDays: null, ageText: '—' };
+
+  if (ageDays < 30) return { ageDays, ageText: `${ageDays} يوم` };
+
+  if (ageDays < 365) {
+    const months = Math.floor(ageDays / 30);
+    const days = ageDays % 30;
+    return {
+      ageDays,
+      ageText: days ? `${months} شهر و ${days} يوم` : `${months} شهر`
+    };
+  }
+
+  const years = Math.floor(ageDays / 365);
+  const months = Math.floor((ageDays % 365) / 30);
+
+  return {
+    ageDays,
+    ageText: months ? `${years} سنة و ${months} شهر` : `${years} سنة`
+  };
+}
+
+function cardNormalizeSexSrv(v) {
+  const s = String(v || '').trim().toLowerCase();
+  if (!s) return null;
+
+  if (/female|f\b|انث|أنث|عجلة|عجله/.test(s)) return 'أنثى';
+  if (/male|m\b|ذكر|عجل/.test(s)) return 'ذكر';
+
+  return String(v).trim();
+}
+
+function cardSubjectNumberSrv(obj = {}) {
+  return normalizeDigitsSrv(
+    obj.animalNumber ?? obj.number ?? obj.calfNumber ?? obj.no ?? obj.tag ?? ''
+  );
+}
+
+function cardNumberSetSrv(values = []) {
+  const out = new Set();
+
+  for (const v of values) {
+    if (v === null || v === undefined || v === '') continue;
+
+    const raw = String(v).trim();
+    if (raw) out.add(raw);
+
+    const dig = normalizeDigitsSrv(raw);
+    if (dig) out.add(dig);
+
+    const n = Number(dig || raw);
+    if (Number.isFinite(n)) out.add(String(n));
+  }
+
+  return out;
+}
+
+function cardSubjectNumbersSrv(subject = {}) {
+  return cardNumberSetSrv([
+    subject.animalNumber,
+    subject.number,
+    subject.calfNumber,
+    subject.no,
+    subject.tag
+  ]);
+}
+
+function cardSubjectIdsSrv(subject = {}) {
+  return new Set([
+    subject.id,
+    subject.animalId,
+    subject.calfId,
+    subject.docId
+  ].map(v => String(v || '').trim()).filter(Boolean));
+}
+
+async function findCardDocByIdSrv(uid, collectionName, id) {
+  const docId = String(id || '').trim();
+  if (!db || !uid || !collectionName || !docId) return null;
+
+  try {
+    const d = await db.collection(collectionName).doc(docId).get();
+    if (!d.exists) return null;
+
+    const row = d.data() || {};
+    const owner = String(row.userId || row.ownerUid || '').trim();
+
+    if (owner && owner !== uid) return null;
+
+    return {
+      id: d.id,
+      _collection: collectionName,
+      ...row
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+async function findCardDocByNumberSrv(uid, collectionName, number, numberFields = ['animalNumber', 'number']) {
+  if (!db || !uid || !collectionName) return null;
+
+  const numberStr = normalizeDigitsSrv(number);
+  if (!numberStr) return null;
+
+  const seen = new Set();
+
+  const push = d => {
+    if (!d || !d.exists || seen.has(d.id)) return null;
+
+    seen.add(d.id);
+
+    return {
+      id: d.id,
+      _collection: collectionName,
+      ...(d.data() || {})
+    };
+  };
+
+  const tenantNumberKey = `${uid}#${numberStr}`;
+
+  try {
+    const s = await db.collection(collectionName)
+      .where('userId_number', '==', tenantNumberKey)
+      .limit(1)
+      .get();
+
+    if (!s.empty) return push(s.docs[0]);
+  } catch (_) {}
+
+  const vals = findAnimalNumberMatches(numberStr);
+
+  for (const ownerField of ['userId', 'ownerUid']) {
+    for (const field of numberFields) {
+      for (const v of vals) {
+        try {
+          const s = await db.collection(collectionName)
+            .where(ownerField, '==', uid)
+            .where(field, '==', v)
+            .limit(1)
+            .get();
+
+          if (!s.empty) return push(s.docs[0]);
+        } catch (_) {}
+      }
+    }
+  }
+
+  return null;
+}
+
+async function findCowCardDocSrv(uid, { number, animalId } = {}) {
+  const byId = await findCardDocByIdSrv(uid, 'animals', animalId);
+  if (byId) return byId;
+
+  return findCardDocByNumberSrv(uid, 'animals', number, ['animalNumber', 'number']);
+}
+
+async function findCalfCardDocSrv(uid, { number, calfId } = {}) {
+  const byId = await findCardDocByIdSrv(uid, 'calves', calfId);
+  if (byId) return byId;
+
+  return findCardDocByNumberSrv(uid, 'calves', number, ['calfNumber', 'animalNumber', 'number']);
+}
+
+async function fetchCardEventsSrv(uid, subject = {}) {
+  if (!db || !uid || !subject) return [];
+
+  const rows = [];
+  const seen = new Set();
+
+  const pushDocs = (docs = []) => {
+    for (const d of docs) {
+      if (!d || !d.id || seen.has(d.id)) continue;
+
+      seen.add(d.id);
+      rows.push({
+        id: d.id,
+        ...(d.data() || {})
+      });
+    }
+  };
+
+  const ids = cardSubjectIdsSrv(subject);
+
+  for (const id of ids) {
+    for (const field of ['animalId', 'calfId', 'subject.animalId', 'subject.calfId']) {
+      try {
+        const s = await db.collection('events')
+          .where('userId', '==', uid)
+          .where(field, '==', id)
+          .limit(300)
+          .get();
+
+        pushDocs(s.docs);
+      } catch (_) {}
+    }
+  }
+
+  const nums = [...cardSubjectNumbersSrv(subject)];
+
+  for (const field of ['animalNumber', 'number', 'calfNumber']) {
+    for (const raw of nums) {
+      const vals = findAnimalNumberMatches(raw);
+
+      for (const v of vals) {
+        try {
+          const s = await db.collection('events')
+            .where('userId', '==', uid)
+            .where(field, '==', v)
+            .limit(300)
+            .get();
+
+          pushDocs(s.docs);
+        } catch (_) {}
+      }
+    }
+  }
+
+  return rows.sort((a, b) =>
+    String(computeEventDateFromDoc(a) || '').localeCompare(String(computeEventDateFromDoc(b) || ''))
+  );
+}
+
+function cardEventTitleSrv(e = {}) {
+  const direct = cardFirstSrv(e, [
+    'displayName',
+    'eventNameAr',
+    'pageTitleAr',
+    'nameAr',
+    'titleAr',
+    'labelAr',
+    'eventName',
+    'name',
+    'title',
+    'label',
+    'eventTypeAr',
+    'eventType',
+    'type',
+    'kind',
+    'diseaseName',
+    'diagnosis',
+    'pregnancyResult',
+    'heatStatus'
+  ], '');
+
+  const raw = String(direct || '').trim();
+
+  if (raw && /[\u0600-\u06FF]/.test(raw)) return raw;
+
+  const type = eventTypeForCardSrv(e);
+
+  const map = {
+    milk: 'لبن يومي',
+    calving: 'ولادة',
+    insemination: 'تلقيح',
+    pregnancy: 'تشخيص حمل',
+    heat: 'شياع',
+    dry: 'تجفيف',
+    disease: 'حالة صحية',
+    other: 'حدث'
+  };
+
+  return map[type] || raw || 'حدث';
+}
+
+function cardEventSummarySrv(e = {}) {
+  const existing = cardFirstSrv(e, ['summary', 'shortSummary', 'message', 'detailsText'], '');
+  if (existing) return cardTextSrv(existing, '—');
+
+  const type = eventTypeForCardSrv(e);
+
+  if (type === 'milk') {
+    const kg = milkKgFromEventSrv(e);
+    return kg > 0 ? `${Math.round(kg * 100) / 100} كجم` : '—';
+  }
+
+  if (type === 'insemination') {
+    const bull = cardFirstSrv(e, ['semenCode', 'bull', 'sire', 'sireNumber', 'straw'], '');
+    const method = cardFirstSrv(e, ['method', 'inseminationMethod'], '');
+
+    return [
+      method ? `الطريقة: ${method}` : '',
+      bull ? `الطلوقة: ${bull}` : ''
+    ].filter(Boolean).join(' — ') || 'تلقيح مسجل';
+  }
+
+  if (type === 'pregnancy') {
+    const result = cardFirstSrv(e, ['result', 'status', 'pregnancyResult', 'diagnosis'], '');
+    return result ? `النتيجة: ${cardTextSrv(result, '')}` : 'تشخيص حمل مسجل';
+  }
+
+  if (type === 'calving') {
+    const calfNo = cardFirstSrv(e, ['calfNumber', 'calf1Number', 'newCalfNumber'], '');
+    const sex = cardFirstSrv(e, ['calfSex', 'sex', 'calf1Sex'], '');
+
+    return [
+      calfNo ? `رقم المولود: ${calfNo}` : '',
+      sex ? `الجنس: ${sex}` : ''
+    ].filter(Boolean).join(' — ') || 'ولادة مسجلة';
+  }
+
+  const note = cardFirstSrv(e, ['notes', 'note', 'comment', 'reason', 'description'], '');
+
+  return note ? cardTextSrv(note, '—') : '—';
+}
+
+function cardEventRowSrv(e = {}) {
+  const date = computeEventDateFromDoc(e) || cardISODateSrv(e.createdAt) || null;
+
+  return {
+    id: e.id || '',
+    date,
+    title: cardEventTitleSrv(e),
+    summary: cardEventSummarySrv(e),
+    type: eventTypeForCardSrv(e)
+  };
+}
+
+function cardMatchSubjectSrv(row = {}, subject = {}) {
+  const nums = cardSubjectNumbersSrv(subject);
+  const ids = cardSubjectIdsSrv(subject);
+
+  const rowNums = cardNumberSetSrv([
+    row.animalNumber,
+    row.number,
+    row.calfNumber,
+    row.subject?.animalNumber,
+    row.subject?.number,
+    row.subject?.calfNumber,
+    row.animal?.animalNumber,
+    row.animal?.number,
+    row.calf?.calfNumber,
+    row.calf?.number
+  ]);
+
+  for (const n of rowNums) {
+    if (nums.has(n)) return true;
+  }
+
+  const rowIds = new Set([
+    row.animalId,
+    row.calfId,
+    row.subject?.animalId,
+    row.subject?.calfId,
+    row.subject?.id,
+    row.animal?.id,
+    row.calf?.id
+  ].map(v => String(v || '').trim()).filter(Boolean));
+
+  for (const id of rowIds) {
+    if (ids.has(id)) return true;
+  }
+
+  return false;
+}
+
+function cardAlertRowSrv(row = {}, fallbackTitle = 'تنبيه') {
+  return {
+    id: row.id || row.taskId || '',
+    level: String(row.level || row.severity || row.priority || 'info').toLowerCase(),
+    title: cardTextSrv(row.title || row.name || fallbackTitle, fallbackTitle),
+    message: cardTextSrv(row.message || row.summary || row.note || row.description || row.reason, '—'),
+    dueDate: cardISODateSrv(row.dueDate || row.plannedDate || row.date || row.ts || row.createdAt),
+    source: row.source || row.taskType || row.type || ''
+  };
+}
+
+async function fetchCardAlertsSrv(uid, subject = {}) {
+  if (!db || !uid || !subject) return [];
+
+  const out = [];
+  const seen = new Set();
+
+  const add = row => {
+    const key = String(row.id || row.taskId || `${row.title || ''}_${row.message || ''}_${row.dueDate || ''}`);
+    if (seen.has(key)) return;
+
+    seen.add(key);
+    out.push(row);
+  };
+
+  try {
+    const snap = await db.collection('alerts')
+      .where('userId', '==', uid)
+      .limit(400)
+      .get();
+
+    snap.docs.forEach(d => {
+      const row = {
+        id: d.id,
+        ...(d.data() || {})
+      };
+
+      if (cardMatchSubjectSrv(row, subject)) {
+        add(cardAlertRowSrv(row, 'تنبيه'));
+      }
+    });
+  } catch (_) {}
+
+  try {
+    const snap = await db.collection('tasks')
+      .where('userId', '==', uid)
+      .where('status', '==', 'pending')
+      .limit(500)
+      .get();
+
+    snap.docs.forEach(d => {
+      const t = {
+        id: d.id,
+        ...(d.data() || {})
+      };
+
+      if (t.done === true) return;
+      if (!cardMatchSubjectSrv(t, subject)) return;
+
+      const title = cardTextSrv(
+        t.title || t.taskTitle || t.stepName || t.taskType || 'مهمة مستحقة',
+        'مهمة مستحقة'
+      );
+
+      const msg = cardTextSrv(
+        t.message || t.note || t.description || t.vaccineKey || t.protocol || title,
+        title
+      );
+
+      add(cardAlertRowSrv({
+        ...t,
+        title,
+        message: msg,
+        level: t.level || 'warn'
+      }, 'مهمة مستحقة'));
+    });
+  } catch (_) {}
+
+  out.sort((a, b) => String(a.dueDate || '').localeCompare(String(b.dueDate || '')));
+
+  return out.slice(0, 8);
+}
+
+function cardTwinWarningSrv(calf = {}) {
+  const sex = cardNormalizeSexSrv(cardFirstSrv(calf, ['sex', 'gender', 'followerSex'], ''));
+
+  const text = [
+    calf.litterComposition,
+    calf.birthComposition,
+    calf.birthType,
+    calf.calvingKind
+  ].map(v => String(v || '')).join(' ');
+
+  if (sex === 'أنثى' && /ذكر|male|عجل/i.test(text) && /توأم|twin|\+|2/i.test(text)) {
+    return 'ملاحظة مهمة: العِجلة مولودة توأم مع عجل ذكر — يوجد احتمال Freemartin.';
+  }
+
+  return '';
+}
+// ============================================================
 //                 API: ANIMAL CARD (server-only)
 // ============================================================
 app.get('/api/animal-card', requireUserId, async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: 'firestore_disabled',
+        message: 'قاعدة البيانات غير متاحة الآن.'
+      });
+    }
 
     const uid = req.userId;
     const number = normalizeDigitsSrv(req.query.number || req.query.animalNumber || '');
+    const animalId = String(req.query.animalId || req.query.id || '').trim();
 
-    if (!number) {
-      return res.status(400).json({ ok:false, error:'animalNumber_required' });
+    if (!number && !animalId) {
+      return res.status(400).json({
+        ok: false,
+        error: 'animalNumber_required',
+        message: 'رقم الحيوان مطلوب.'
+      });
     }
 
-    const animal = await findAnimalDocByNumberSrv(uid, number);
+    const animal = await findCowCardDocSrv(uid, { number, animalId });
+
     if (!animal) {
-      return res.status(404).json({ ok:false, error:'animal_not_found' });
+      const calf = await findCalfCardDocSrv(uid, { number });
+
+      if (calf) {
+        const calfNumber = cardSubjectNumberSrv(calf) || number;
+
+        return res.json({
+          ok: false,
+          error: 'wrong_card_type',
+          cardType: 'calf',
+          message: 'هذا الرقم مسجّل كعجل. سيتم فتح بطاقة العجل.',
+          redirectUrl: `calf-card.html?number=${encodeURIComponent(calfNumber)}`
+        });
+      }
+
+      return res.status(404).json({
+        ok: false,
+        error: 'animal_not_found',
+        message: 'لم يتم العثور على الحيوان.'
+      });
     }
 
-    const events = await fetchAnimalEventsSrv(uid, animal);
+    const events = await fetchCardEventsSrv(uid, animal);
     const groupNameFromMembership = await findAnimalGroupNameSrv(uid, animal);
+
     const state = {
       number: animal.animalNumber ?? animal.number ?? number,
 
-kind: animal.animalType || animal.kind || animal.type || animal.animalTypeAr || null,
-breed:
-  animal.breed ||
-  animal.breedName ||
-  animal.breedAr ||
-  animal.animalBreed ||
-  animal.animalBreedAr ||
-  animal.strain ||
-  animal.line ||
-  null,
-group:
-  animal.group ||
-  animal.groupName ||
-  animal.currentGroup ||
-  animal.pen ||
-  animal.lot ||
-  animal.section ||
-  groupNameFromMembership ||
-  null,
+      kind: animal.animalType || animal.kind || animal.type || animal.animalTypeAr || null,
+
+      breed:
+        animal.breed ||
+        animal.breedName ||
+        animal.breedAr ||
+        animal.animalBreed ||
+        animal.animalBreedAr ||
+        animal.strain ||
+        animal.line ||
+        null,
+
+      group:
+        animal.group ||
+        animal.groupName ||
+        animal.currentGroup ||
+        animal.pen ||
+        animal.lot ||
+        animal.section ||
+        groupNameFromMembership ||
+        null,
+
       birthDate: animal.birthDate || animal.birth_date || animal.dob || null,
       lastCalvingDate: animal.lastCalvingDate || animal.lastCalving || animal.calvingDate || null,
       lactationNumber: animal.lactationNumber ?? animal.lactNo ?? null,
@@ -28362,15 +28893,29 @@ group:
         state.healthHistory.push({
           date: d || null,
           name: e.diseaseName || e.eventType || e.type || 'حالة صحية',
+          diagnosis: e.diseaseName || e.eventType || e.type || 'حالة صحية',
           note: e.notes || e.note || ''
         });
-        if (d && !state.lastCheckDate) state.lastCheckDate = d;
+
+        if (d && !state.lastCheckDate) {
+          state.lastCheckDate = d;
+        }
       }
 
       if (t === 'milk' && d) {
         const kg = milkKgFromEventSrv(e);
+
         if (kg > 0) {
-          state.milkSeries.push({ date: d, kg });
+          const dim = state.lastCalvingDate
+            ? daysBetweenIsoSrv(String(state.lastCalvingDate).slice(0, 10), d)
+            : null;
+
+          state.milkSeries.push({
+            date: d,
+            kg,
+            dim: Number.isFinite(dim) && dim >= 0 ? dim : null
+          });
+
           seasonMilk += kg;
         }
       }
@@ -28378,84 +28923,107 @@ group:
 
     state.inseminations = [...new Set(state.inseminations.filter(Boolean))].sort();
     state.estrusDates = [...new Set(state.estrusDates.filter(Boolean))].sort();
-    state.milkSeries = state.milkSeries.sort((a,b)=> String(a.date).localeCompare(String(b.date)));
+
+    state.milkSeries = state.milkSeries.sort((a, b) =>
+      String(a.date).localeCompare(String(b.date))
+    );
 
     state.lastInseminationDate = state.lastInseminationDate || lastOfSrv(state.inseminations);
-state.servicesCount =
-  Number.isFinite(Number(state.servicesCount)) && Number(state.servicesCount) > 0
-    ? Number(state.servicesCount)
-    : (state.inseminations.length || null);
 
-state.serviceIntervalDays =
-  Number.isFinite(Number(state.serviceIntervalDays)) && Number(state.serviceIntervalDays) > 0
-    ? Number(state.serviceIntervalDays)
-    : avgIntervalDaysSrv(state.inseminations);
-const lastHeatDate = lastOfSrv(state.estrusDates);
-state.lastHeatDate = state.lastHeatDate || lastHeatDate || null;
+    state.servicesCount =
+      Number.isFinite(Number(state.servicesCount)) && Number(state.servicesCount) > 0
+        ? Number(state.servicesCount)
+        : (state.inseminations.length || null);
 
-state.heatIntervalDays =
-  Number.isFinite(Number(state.heatIntervalDays)) && Number(state.heatIntervalDays) > 0
-    ? Number(state.heatIntervalDays)
-    : avgIntervalDaysSrv(state.estrusDates);
+    state.serviceIntervalDays =
+      Number.isFinite(Number(state.serviceIntervalDays)) && Number(state.serviceIntervalDays) > 0
+        ? Number(state.serviceIntervalDays)
+        : avgIntervalDaysSrv(state.inseminations);
 
-    // ✅ عمر الحمل: لا يُحسب من آخر تلقيح إطلاقًا
+    const lastHeatDate = lastOfSrv(state.estrusDates);
+    state.lastHeatDate = state.lastHeatDate || lastHeatDate || null;
+
+    state.heatIntervalDays =
+      Number.isFinite(Number(state.heatIntervalDays)) && Number(state.heatIntervalDays) > 0
+        ? Number(state.heatIntervalDays)
+        : avgIntervalDaysSrv(state.estrusDates);
+
     let gestationDays = null;
+
     if (state.reproductiveStatus && /عشار|preg/i.test(String(state.reproductiveStatus))) {
       if (state.pregnancyDate) {
-        gestationDays = daysBetweenIsoSrv(String(state.pregnancyDate).slice(0,10), cairoTodayISO());
-        if (Number.isFinite(gestationDays) && gestationDays < 0) gestationDays = null;
+        gestationDays = daysBetweenIsoSrv(String(state.pregnancyDate).slice(0, 10), cairoTodayISO());
+
+        if (Number.isFinite(gestationDays) && gestationDays < 0) {
+          gestationDays = null;
+        }
       }
     }
+
     state.gestationDays = gestationDays;
 
     if (!Number.isFinite(Number(state.daysInMilk)) && state.lastCalvingDate) {
-      const dim = daysBetweenIsoSrv(String(state.lastCalvingDate).slice(0,10), cairoTodayISO());
+      const dim = daysBetweenIsoSrv(String(state.lastCalvingDate).slice(0, 10), cairoTodayISO());
       state.daysInMilk = Number.isFinite(dim) && dim >= 0 ? dim : null;
     }
 
-if (state.milkSeries.length) {
-  const lastMilk = state.milkSeries[state.milkSeries.length - 1];
+    if (state.milkSeries.length) {
+      const lastMilk = state.milkSeries[state.milkSeries.length - 1];
 
-  state.milkTodayKg =
-    Number.isFinite(Number(state.milkTodayKg)) && Number(state.milkTodayKg) > 0
-      ? Number(state.milkTodayKg)
-      : Number(lastMilk.kg || 0);
+      state.milkTodayKg =
+        Number.isFinite(Number(state.milkTodayKg)) && Number(state.milkTodayKg) > 0
+          ? Number(state.milkTodayKg)
+          : Number(lastMilk.kg || 0);
 
-  state.seasonTotalKg =
-    Number.isFinite(Number(state.seasonTotalKg)) && Number(state.seasonTotalKg) > 0
-      ? Number(state.seasonTotalKg)
-      : Math.round(seasonMilk * 100) / 100;
+      state.seasonTotalKg =
+        Number.isFinite(Number(state.seasonTotalKg)) && Number(state.seasonTotalKg) > 0
+          ? Number(state.seasonTotalKg)
+          : Math.round(seasonMilk * 100) / 100;
 
-  const proj = projectLactation305AliSchaefferSrv({
-    milkSeries: state.milkSeries,
-    lastCalvingDate: state.lastCalvingDate,
-    species: state.kind,
-    breed: state.breed,
-    parity: state.lactationNumber
-  });
+      const proj = projectLactation305AliSchaefferSrv({
+        milkSeries: state.milkSeries,
+        lastCalvingDate: state.lastCalvingDate,
+        species: state.kind,
+        breed: state.breed,
+        parity: state.lactationNumber
+      });
 
-  state.m305Kg = proj?.m305Kg ?? null;
-}
+      state.m305Kg = proj?.m305Kg ?? null;
+    }
+
+    const eventRows = events
+      .map(cardEventRowSrv)
+      .filter(e => e.date || e.title)
+      .slice(-80);
+
+    const alerts = await fetchCardAlertsSrv(uid, animal);
+
     return res.json({
       ok: true,
+      cardType: 'cow',
+      page: 'cow-card',
+      title: 'بطاقة الحيوان',
+
       animal: {
         id: animal.id,
         animalNumber: state.number,
+        number: state.number,
         kind: state.kind,
         breed: state.breed,
         group: state.group,
-        birthDate: state.birthDate,
-        lastCalvingDate: state.lastCalvingDate,
+
+        birthDate: cardISODateSrv(state.birthDate),
+        lastCalvingDate: cardISODateSrv(state.lastCalvingDate),
         lactationNumber: state.lactationNumber,
         daysInMilk: state.daysInMilk,
 
         reproductiveStatus: state.reproductiveStatus,
-        pregnancyDate: state.pregnancyDate,
+        pregnancyDate: cardISODateSrv(state.pregnancyDate),
         gestationDays: state.gestationDays,
-        lastInseminationDate: state.lastInseminationDate,
+        lastInseminationDate: cardISODateSrv(state.lastInseminationDate),
         servicesCount: state.servicesCount,
         serviceIntervalDays: state.serviceIntervalDays,
-        lastHeatDate: state.lastHeatDate,
+        lastHeatDate: cardISODateSrv(state.lastHeatDate),
         heatIntervalDays: state.heatIntervalDays,
 
         productionStatus: state.productionStatus,
@@ -28465,16 +29033,181 @@ if (state.milkSeries.length) {
         milkTraitsScore: state.milkTraitsScore,
 
         healthStatus: state.healthStatus,
-        lastCheckDate: state.lastCheckDate,
+        lastCheckDate: cardISODateSrv(state.lastCheckDate),
         ovsynch: state.ovsynch
       },
+
       milkSeries: state.milkSeries,
       healthHistory: state.healthHistory.slice(-20).reverse(),
-      events: events.slice(-80)
+      alerts,
+      events: eventRows,
+      recentEvents: [...eventRows].reverse().slice(0, 12)
     });
+
   } catch (e) {
     console.error('animal-card', e);
-    return res.status(500).json({ ok:false, error:'animal_card_failed' });
+
+    return res.status(500).json({
+      ok: false,
+      error: 'animal_card_failed',
+      message: 'تعذّر تحميل بطاقة الحيوان.'
+    });
+  }
+});
+app.get('/api/calf-card', requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: 'firestore_disabled',
+        message: 'قاعدة البيانات غير متاحة الآن.'
+      });
+    }
+
+    const uid = req.userId;
+    const number = normalizeDigitsSrv(req.query.number || req.query.calfNumber || req.query.animalNumber || '');
+    const calfId = String(req.query.calfId || req.query.animalId || req.query.id || '').trim();
+
+    if (!number && !calfId) {
+      return res.status(400).json({
+        ok: false,
+        error: 'calfNumber_required',
+        message: 'رقم العجل مطلوب.'
+      });
+    }
+
+    const calf = await findCalfCardDocSrv(uid, { number, calfId });
+
+    if (!calf) {
+      const animal = await findCowCardDocSrv(uid, { number });
+
+      if (animal) {
+        const animalNumber = cardSubjectNumberSrv(animal) || number;
+
+        return res.json({
+          ok: false,
+          error: 'wrong_card_type',
+          cardType: 'cow',
+          message: 'هذا الرقم مسجّل كبقرة/جاموسة. سيتم فتح بطاقة الحيوان.',
+          redirectUrl: `cow-card.html?number=${encodeURIComponent(animalNumber)}`
+        });
+      }
+
+      return res.status(404).json({
+        ok: false,
+        error: 'calf_not_found',
+        message: 'لم يتم العثور على العجل.'
+      });
+    }
+
+    const events = await fetchCardEventsSrv(uid, calf);
+
+    const eventRows = events
+      .map(cardEventRowSrv)
+      .filter(e => e.date || e.title)
+      .slice(-80);
+
+    const alerts = await fetchCardAlertsSrv(uid, calf);
+
+    const calfNumber = cardSubjectNumberSrv(calf) || number;
+
+    const birthDate = cardISODateSrv(
+      cardFirstSrv(calf, ['birthDate', 'dob', 'dateOfBirth'], null)
+    );
+
+    const age = cardAgeTextSrv(birthDate);
+
+    const status = cardTextSrv(
+      cardFirstSrv(calf, ['followerStatus', 'calfStatus', 'currentStatus', 'status'], birthDate ? 'رضيع' : ''),
+      '—'
+    );
+
+    const damNumber = cardTextSrv(
+      cardFirstSrv(calf, ['damNumber', 'motherNumber', 'damId', 'motherId'], ''),
+      '—'
+    );
+
+    let dam = null;
+
+    if (damNumber && damNumber !== '—') {
+      dam = await findCowCardDocSrv(uid, { number: damNumber });
+    }
+
+    const birthType = cardTextSrv(
+      cardFirstSrv(calf, ['birthType', 'deliveryType', 'calvingKind'], ''),
+      '—'
+    );
+
+    const litterSize = cardTextSrv(
+      cardFirstSrv(calf, ['litterSize', 'birthCount', 'calfCount'], ''),
+      '—'
+    );
+
+    const litterOrder = cardTextSrv(
+      cardFirstSrv(calf, ['litterOrder', 'birthOrder'], ''),
+      '—'
+    );
+
+    const litterComposition = cardTextSrv(
+      cardFirstSrv(calf, ['litterComposition', 'birthComposition'], ''),
+      '—'
+    );
+
+    return res.json({
+      ok: true,
+      cardType: 'calf',
+      page: 'calf-card',
+      title: 'بطاقة العجل',
+
+      calf: {
+        id: calf.id,
+        calfNumber,
+        animalNumber: calfNumber,
+        number: calfNumber,
+
+        sex: cardNormalizeSexSrv(cardFirstSrv(calf, ['sex', 'gender', 'followerSex'], '')) || '—',
+        breed: cardTextSrv(cardFirstSrv(calf, ['breed', 'breedName', 'speciesBreed'], dam?.breed || ''), '—'),
+        species: cardTextSrv(cardFirstSrv(calf, ['species', 'animalTypeAr', 'animaltype'], ''), '—'),
+
+        status,
+        birthDate,
+        ageDays: age.ageDays,
+        ageText: age.ageText,
+
+        damNumber,
+        sireNumber: cardTextSrv(cardFirstSrv(calf, ['sireNumber', 'fatherNumber', 'sireId'], dam?.sireNumber || dam?.lastSireNumber || ''), '—'),
+        sireName: cardTextSrv(cardFirstSrv(calf, ['sireName', 'fatherName'], dam?.sireName || dam?.lastSireName || ''), '—'),
+
+        birthType,
+        litterSize,
+        litterOrder,
+        litterComposition,
+
+        twinWarning: cardTwinWarningSrv({
+          ...calf,
+          litterComposition,
+          birthType
+        }),
+
+        weaningDate: cardISODateSrv(cardFirstSrv(calf, ['weaningDate'], null)),
+        lastInseminationDate: cardISODateSrv(cardFirstSrv(calf, ['lastInseminationDate', 'followerLastInseminationDate'], null)),
+        servicesCount: Number.isFinite(Number(calf.servicesCount)) ? Number(calf.servicesCount) : null,
+        pregnancyDays: Number.isFinite(Number(calf.pregnancyDays)) ? Number(calf.pregnancyDays) : null
+      },
+
+      alerts,
+      events: eventRows,
+      recentEvents: [...eventRows].reverse().slice(0, 12)
+    });
+
+  } catch (e) {
+    console.error('calf-card', e);
+
+    return res.status(500).json({
+      ok: false,
+      error: 'calf_card_failed',
+      message: 'تعذّر تحميل بطاقة العجل.'
+    });
   }
 });
 app.get('/api/calves', requireUserId, async (req, res) => {
