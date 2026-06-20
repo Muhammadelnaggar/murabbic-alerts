@@ -757,29 +757,7 @@ if (isFinePointer) {
     }, 3500);
   }, { passive: false });
 
-  hit.addEventListener('pointerdown', ev => {
-    if (ev.pointerType === 'mouse') return;
 
-    ev.preventDefault();
-    ev.stopPropagation();
-
-    if (activeMobileKey === mobileKey) {
-      activeMobileKey = '';
-      if (tip) tip.style.display = 'none';
-      openDetails(ev);
-      return;
-    }
-
-    activeMobileKey = mobileKey;
-    showTip(e, x, y);
-
-    clearTimeout(hit._hideTimer);
-    hit._hideTimer = setTimeout(() => {
-      activeMobileKey = '';
-      if (tip) tip.style.display = 'none';
-    }, 3500);
-  });
-}
       dot.addEventListener('focus', () => showTip(e, x, y));
       dot.addEventListener('blur', () => {
         if (tip) tip.style.display = 'none';
