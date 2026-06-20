@@ -536,51 +536,65 @@ function wireEventListTop(){
       }, {passive:true});
     }
 
-    async function saveTrimmingInline(){
-      const out = await resolveEventFromServer({ action: 'trimming' });
-      if (!out) return;
+ let trimmingBusy = false;
 
-      const uid = getCurrentUid();
-      const { numbers, date } = currentNumbersAndDate();
+async function saveTrimmingInline(){
+  if (trimmingBusy) return;
 
-      try{
-        const r = await fetch('/api/hoof-trimming/save', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-User-Id': uid
-          },
-          body: JSON.stringify({
-            numbers,
-            eventDate: date,
-            source: location.pathname
-          })
-        });
+  const btn = document.getElementById('btnTrimming');
+  const box = document.getElementById('inlineMsg');
 
-        const j = await r.json().catch(() => null);
+  trimmingBusy = true;
+  if (btn) btn.disabled = true;
 
-        const box = document.getElementById('inlineMsg');
+  try {
+    const out = await resolveEventFromServer({ action: 'trimming' });
+    if (!out) return;
 
-        if (!r.ok || !j || j.ok === false){
-          box.querySelector('.text').textContent = j?.message || '❌ تعذر تسجيل تقليم الحوافر.';
-          box.style.display = 'block';
-          return;
-        }
+    const uid = getCurrentUid();
+    const { numbers, date } = currentNumbersAndDate();
 
-        box.querySelector('.text').textContent = j.message || '✅ تم تسجيل تقليم الحوافر.';
-        box.style.display = 'block';
+    const r = await fetch('/api/hoof-trimming/save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-User-Id': uid
+      },
+      body: JSON.stringify({
+        numbers,
+        eventDate: date,
+        source: location.pathname
+      })
+    });
 
-       
+    const j = await r.json().catch(() => null);
 
-      } catch(err){
-        const box = document.getElementById('inlineMsg');
-        box.querySelector('.text').textContent = '❌ تعذر الاتصال بالسيرفر.';
-        box.style.display = 'block';
-        console.error('Trimming save failed', err);
-      }
+    if (!box) return;
+
+    if (!r.ok || !j || j.ok === false){
+      box.querySelector('.text').textContent =
+        j?.message || '❌ تعذر تسجيل تقليم الحوافر.';
+      box.style.display = 'block';
+      return;
     }
 
+    box.querySelector('.text').textContent =
+      j.message || '✅ تم تسجيل تقليم الحوافر.';
+    box.style.display = 'block';
+
+  } catch(err){
+    if (box) {
+      box.querySelector('.text').textContent = '❌ تعذر الاتصال بالسيرفر.';
+      box.style.display = 'block';
+    }
+    console.error('Trimming save failed', err);
+
+  } finally {
+    trimmingBusy = false;
+    if (btn) btn.disabled = false;
+  }
+}
     function wireTrimming(){
       document.getElementById('btnTrimming')?.addEventListener('click', (e)=>{
         e.preventDefault();
