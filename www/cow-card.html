@@ -731,10 +731,13 @@ function openDetails(ev){
 
 if (isFinePointer) {
   hit.addEventListener('pointerenter', openHint);
+
   hit.addEventListener('pointerleave', () => {
     if (tip) tip.style.display = 'none';
   });
+
   hit.addEventListener('click', openDetails);
+
 } else {
   hit.addEventListener('touchstart', ev => {
     ev.preventDefault();
@@ -756,7 +759,7 @@ if (isFinePointer) {
       if (tip) tip.style.display = 'none';
     }, 3500);
   }, { passive: false });
-
+}
 
       dot.addEventListener('focus', () => showTip(e, x, y));
       dot.addEventListener('blur', () => {
