@@ -132,6 +132,140 @@
     font-size:12px;
   }
 }
+ /* === Cow Card Dairy Traits Gauge مؤقتًا داخل الصفحة === */
+.cc-dairy-card{
+  overflow:hidden;
+}
+
+.cc-dairy-wrap{
+  display:grid;
+  grid-template-columns:150px 1fr;
+  gap:14px;
+  align-items:center;
+}
+
+@media (max-width:560px){
+  .cc-dairy-wrap{
+    grid-template-columns:1fr;
+    text-align:center;
+  }
+}
+
+.cc-dairy-gauge{
+  width:136px;
+  height:136px;
+  border-radius:50%;
+  margin:auto;
+  display:grid;
+  place-items:center;
+  background:
+    conic-gradient(
+      var(--cc-dairy-color, #0f5132) var(--cc-dairy-deg, 0deg),
+      #e5e7eb 0deg
+    );
+  box-shadow:0 4px 14px rgba(0,0,0,.10);
+  position:relative;
+}
+
+.cc-dairy-gauge::after{
+  content:"";
+  position:absolute;
+  width:104px;
+  height:104px;
+  border-radius:50%;
+  background:#ffffff;
+  box-shadow:inset 0 0 0 1px #edf2ea;
+}
+
+.cc-dairy-inner{
+  position:relative;
+  z-index:2;
+  text-align:center;
+}
+
+.cc-dairy-score{
+  font-size:28px;
+  font-weight:900;
+  color:#0f5132;
+  line-height:1;
+  direction:ltr;
+}
+
+.cc-dairy-grade{
+  margin-top:7px;
+  font-size:13px;
+  font-weight:900;
+  color:#14532d;
+}
+
+.cc-dairy-final{
+  font-size:17px;
+  font-weight:900;
+  color:#0f5132;
+  margin-bottom:6px;
+}
+
+.cc-dairy-date{
+  font-size:12px;
+  color:#617166;
+  margin-bottom:8px;
+}
+
+.cc-dairy-summary{
+  font-size:13px;
+  color:#2b593a;
+  font-weight:700;
+  line-height:1.7;
+  margin-bottom:10px;
+}
+
+.cc-dairy-bars{
+  display:grid;
+  gap:8px;
+}
+
+.cc-dairy-row{
+  display:grid;
+  grid-template-columns:118px 1fr 54px;
+  gap:8px;
+  align-items:center;
+}
+
+@media (max-width:560px){
+  .cc-dairy-row{
+    grid-template-columns:96px 1fr 48px;
+    text-align:initial;
+  }
+}
+
+.cc-dairy-label{
+  font-size:12px;
+  font-weight:800;
+  color:#14532d;
+}
+
+.cc-dairy-track{
+  height:9px;
+  border-radius:999px;
+  background:#e9f0e6;
+  overflow:hidden;
+}
+
+.cc-dairy-fill{
+  height:100%;
+  width:0%;
+  border-radius:999px;
+  background:var(--cc-dairy-color, #0f5132);
+}
+
+.cc-dairy-val{
+  font-size:12px;
+  font-weight:900;
+  color:#0f5132;
+  direction:ltr;
+  unicode-bidi:plaintext;
+  text-align:end;
+}   
 /* === Timeline (أحداث الحيوان) === */
 .timeline-card{position:relative}
 .tl-wrap{overflow-x:auto; overflow-y:hidden; border:1px solid var(--border); border-radius:12px; background:#fff;}
@@ -202,6 +336,30 @@
     <div class="fi"><span>عمر الحمل (يوم)</span><b id="fiGestAge">—</b></div>
     <div class="fi"><span>السلالة</span><b id="fiBreed">—</b></div>
     <div class="fi"><span>المجموعة</span><b id="fiGroup">—</b></div>
+  </div>
+</section>
+
+<section class="card cc-dairy-card" id="ccDairyCard" aria-label="تقييم سمات إنتاج اللبن">
+  <h3>تقييم سمات إنتاج اللبن</h3>
+
+  <div id="ccDairyEmpty" class="notice" style="display:none">
+    لم يتم تسجيل تقييم سمات إنتاج اللبن بعد.
+  </div>
+
+  <div class="cc-dairy-wrap" id="ccDairyBody" style="display:none">
+    <div class="cc-dairy-gauge" id="ccDairyGauge">
+      <div class="cc-dairy-inner">
+        <div class="cc-dairy-score" id="ccDairyScore">—</div>
+        <div class="cc-dairy-grade" id="ccDairyGrade">—</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="cc-dairy-final" id="ccDairyFinal">التقييم النهائي: —</div>
+      <div class="cc-dairy-date">آخر تقييم: <b id="ccDairyDate">—</b></div>
+      <div class="cc-dairy-summary" id="ccDairySummary">—</div>
+      <div class="cc-dairy-bars" id="ccDairyBreakdown"></div>
+    </div>
   </div>
 </section>
 
@@ -469,7 +627,133 @@
       box.appendChild(row);
     });
   }
+function renderCowCardDairyTraits(dt){
+  const body = $('ccDairyBody');
+  const empty = $('ccDairyEmpty');
+  const gauge = $('ccDairyGauge');
+  const bars = $('ccDairyBreakdown');
 
+  if (!body || !empty || !gauge || !bars) return;
+
+  const score = Number(dt?.score ?? dt?.totalScore ?? dt?.finalScore ?? NaN);
+
+  if (!Number.isFinite(score)) {
+    body.style.display = 'none';
+    empty.style.display = 'block';
+    bars.innerHTML = '';
+    return;
+  }
+
+  const finalScore = Math.max(0, Math.min(100, Math.round(score)));
+  const grade = txt(dt?.grade || cowCardDairyGrade(finalScore));
+  const color = cowCardDairyColor(finalScore);
+
+  gauge.style.setProperty('--cc-dairy-deg', `${finalScore * 3.6}deg`);
+  gauge.style.setProperty('--cc-dairy-color', color);
+
+  put('ccDairyScore', `${finalScore}%`);
+  put('ccDairyGrade', grade);
+  put('ccDairyFinal', `التقييم النهائي: ${grade}`);
+  put('ccDairyDate', fmtDate(dt?.date || dt?.evaluationDate || dt?.createdAt));
+  put('ccDairySummary', txt(dt?.summary || cowCardDairySummary(finalScore), '—'));
+
+  bars.innerHTML = '';
+
+  const bd = dt?.breakdown || {};
+
+  const items = [
+    { label:'الضرع', data: bd.udder, max:40 },
+    { label:'الأرجل والأقدام', data: bd.feetAndLegs || bd.feetLegs || bd.legs, max:20 },
+    { label:'القوة والطابع الحلاب', data: bd.dairyStrength || bd.strength, max:20 },
+    { label:'المقدمة والسعة', data: bd.frontEndAndCapacity || bd.frontEndCapacity || bd.capacity, max:15 },
+    { label:'الحوض', data: bd.rump, max:5 }
+  ];
+
+  items.forEach(it => {
+    const part = cowCardDairyPart(it.data, it.max);
+
+    const row = document.createElement('div');
+    row.className = 'cc-dairy-row';
+
+    const label = document.createElement('div');
+    label.className = 'cc-dairy-label';
+    label.textContent = it.label;
+
+    const track = document.createElement('div');
+    track.className = 'cc-dairy-track';
+
+    const fill = document.createElement('div');
+    fill.className = 'cc-dairy-fill';
+    fill.style.background = color;
+
+    if (part.value !== null && part.max > 0) {
+      fill.style.width = `${Math.max(0, Math.min(100, (part.value / part.max) * 100))}%`;
+    }
+
+    track.appendChild(fill);
+
+    const val = document.createElement('div');
+    val.className = 'cc-dairy-val';
+    val.textContent = part.value === null ? '—' : `${part.value}/${part.max}`;
+
+    row.appendChild(label);
+    row.appendChild(track);
+    row.appendChild(val);
+    bars.appendChild(row);
+  });
+
+  empty.style.display = 'none';
+  body.style.display = 'grid';
+}
+
+function cowCardDairyPart(data, fallbackMax){
+  if (data && typeof data === 'object') {
+    const value = Number(data.value ?? data.score ?? data.points ?? NaN);
+    const max = Number(data.max ?? fallbackMax ?? 0);
+
+    return {
+      value: Number.isFinite(value) ? Math.round(value) : null,
+      max: Number.isFinite(max) ? max : 0
+    };
+  }
+
+  const value = Number(data);
+
+  return {
+    value: Number.isFinite(value) ? Math.round(value) : null,
+    max: Number(fallbackMax) || 0
+  };
+}
+
+function cowCardDairyGrade(score){
+  const s = Number(score);
+
+  if (s >= 90) return 'ممتاز';
+  if (s >= 80) return 'جيد جدًا';
+  if (s >= 70) return 'جيد';
+  if (s >= 60) return 'متوسط';
+  return 'ضعيف';
+}
+
+function cowCardDairyColor(score){
+  const s = Number(score);
+
+  if (s >= 90) return '#0f5132';
+  if (s >= 80) return '#15803d';
+  if (s >= 70) return '#65a30d';
+  if (s >= 60) return '#d97706';
+  return '#b91c1c';
+}
+
+function cowCardDairySummary(score){
+  const s = Number(score);
+
+  if (s >= 90) return 'تركيب إنتاجي ممتاز وملائم بقوة لإنتاج اللبن.';
+  if (s >= 80) return 'تركيب إنتاجي جيد جدًا مع صفات لبنية واضحة.';
+  if (s >= 70) return 'تركيب إنتاجي جيد مع ملاحظات محدودة.';
+  if (s >= 60) return 'تركيب إنتاجي متوسط ويحتاج متابعة في بعض السمات.';
+  return 'التقييم الإنتاجي منخفض نسبيًا حسب السمات الظاهرة.';
+}
 function renderTimeline(events = []){
   const box = $('timelineBox');
   const tip = $('tlTip');
@@ -1007,6 +1291,7 @@ function renderMilkChart(series = [], herdCurve = []){
     put('fiGestAge', a.gestationDays != null ? fmtNum(a.gestationDays) : '—');
     put('fiBreed', txt(a.breed));
     put('fiGroup', txt(a.group));
+    renderCowCardDairyTraits(payload?.dairyTraits || null);
 
     put('kpiMilkToday', a.milkTodayKg != null ? fmtNum(a.milkTodayKg, ' كجم') : '—');
     put('kpiSeason', a.seasonTotalKg != null ? fmtNum(a.seasonTotalKg, ' كجم') : '—');
