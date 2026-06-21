@@ -9635,50 +9635,118 @@ function reportRowSrv(section, key, label, targetText, actualText, balanceText, 
     note: note || '—'
   });
 }
-function fecesEvaluationReportRowsSrv(fe = {}) {
-  if (!fe || fe.available !== true) return [];
+function rumenDecisionRowForReportSrv(e = {}) {
+  const a = e?.nutrition?.analysis || {};
+  const n = a.nutrition || {};
+  const rh = n.rumenHealthModel || {};
+
+  return reportRowSrv(
+    "صحة الكرش",
+    "rumen",
+    "صحة الكرش",
+    "آمن",
+    rh.title || n.rumenStatus || "—",
+    "—",
+    rh.status || n.rumenStatus || "muted",
+    rh.reason || rh.instruction || n.rumenNote || "—"
+  );
+}
+
+function buildRumenDigestiveReadingSrv(e = {}) {
+  const a = e?.nutrition?.analysis || {};
+  const n = a.nutrition || {};
+  const rh = n.rumenHealthModel || {};
+
+  const rawStatus = String(rh.status || n.rumenStatus || "muted").toLowerCase();
+
+  const statusLabel =
+    rawStatus.includes("danger") ? "خطر" :
+    rawStatus.includes("warn") || rawStatus.includes("watch") ? "يحتاج متابعة" :
+    rawStatus.includes("good") || rawStatus.includes("ok") ? "آمنة" :
+    "غير محددة";
+
+  const result =
+    rh.title ||
+    rh.displayText ||
+    n.rumenStatus ||
+    "صحة الكرش آمنة";
+
+  const reading =
+    rh.reason ||
+    rh.noteText ||
+    "توازن الألياف والنشا مناسب حسب بيانات العليقة الحالية.";
+
+  const guidance =
+    rh.adviceText ||
+    rh.instruction ||
+    n.rumenNote ||
+    "حافظ على جودة الخشن وطول التقطيع وانتظام الخلط ومتابعة المتبقي.";
+
+  return cleanObj({
+    available: true,
+    title: "صحة الكرش",
+    status: rawStatus,
+    statusLabel,
+    result,
+    reading,
+    guidance
+  });
+}
+
+function buildFecesDigestiveReadingSrv(fe = {}) {
+  if (!fe || fe.available !== true) {
+    return {
+      available: false,
+      title: "تقييم روث المجموعة",
+      message: fe?.message || "لا يوجد تقييم روث مجموعة مكتمل لهذه المجموعة."
+    };
+  }
 
   const isConsistent = fe.consistency === "consistent";
+
   const scoreText = Number.isFinite(Number(fe.score))
     ? `${fe.scoreLabel || "تقييم الروث"} — ${fe.score}/5`
     : (fe.scoreLabel || "تقييم الروث");
 
-  const scoreStatus =
-    fe.scoreLabel && String(fe.scoreLabel).includes("مناسب")
-      ? "good"
-      : "warn";
+  const result = isConsistent
+    ? scoreText
+    : `الغالب: ${scoreText}`;
 
-  const rows = [];
+  const reading = isConsistent
+    ? "العينات متجانسة؛ يتم اعتماد مقياس تقييم الروث من 1 إلى 5 وأسبابه المعتمدة."
+    : "العينات غير متجانسة؛ تم تقييم الاتجاه الغالب من الأربع عينات.";
 
-  rows.push(reportRowSrv(
-    "تقييم روث المجموعة",
-    "feces_eval",
-    isConsistent ? "تقييم الروث" : "الغالب من 4 عينات",
-    isConsistent ? "مقياس الروث من 1 إلى 5" : "تقييم الاتجاه الغالب",
-    scoreText,
-    fe.consistencyLabel || "—",
-    isConsistent ? scoreStatus : "warn",
-    fe.guidance || "—",
-    fe.scoreLabel || "قراءة الروث"
-  ));
+  const reasons = isConsistent
+    ? (Array.isArray(fe.likelyReasons) ? fe.likelyReasons : [])
+    : (Array.isArray(fe.inconsistencyReasons) ? fe.inconsistencyReasons : []);
 
-  if (!isConsistent) {
-    rows.push(reportRowSrv(
-      "تقييم روث المجموعة",
-      "feces_inconsistency",
-      "أسباب عدم تجانس العينات",
-      "مراجعة تشغيلية داخل نفس المجموعة",
-      Array.isArray(fe.inconsistencyReasons) && fe.inconsistencyReasons.length
-        ? fe.inconsistencyReasons.join("، ")
-        : "خلط غير جيد، سيليكشن/فرز، تناول دفعات غير منتظمة، أو تفاوت وصول العليقة/الماء",
-      "—",
-      "warn",
-      "راجع جودة الخلط وشكل العليقة على المعلف ووجود فرز قبل الحكم على تركيبة العليقة.",
-      "عدم تجانس"
-    ));
-  }
+  const guidance = isConsistent
+    ? (fe.guidance || "اقرأ تقييم الروث مع إنتاج اللبن والاستهلاك وTHI وتركيب العليقة.")
+    : "راجع جودة الخلط، السيليكشن/الفرز، تناول دفعات غير منتظمة، وتفاوت وصول العليقة أو الماء قبل الحكم على تركيبة العليقة.";
 
-  return rows;
+  return cleanObj({
+    available: true,
+    title: "تقييم روث المجموعة",
+    result,
+    score: fe.score ?? null,
+    scoreLabel: fe.scoreLabel || null,
+    consistency: fe.consistency || null,
+    consistencyLabel: fe.consistencyLabel || null,
+    reading,
+    reasons,
+    guidance,
+    sampleCount: fe.sampleCount || null,
+    sampleScores: fe.sampleScores || []
+  });
+}
+
+function buildDigestiveReadingReportSrv(e = {}, fecesEvaluation = {}) {
+  return cleanObj({
+    available: true,
+    title: "قراءة الهضم والروث",
+    rumen: buildRumenDigestiveReadingSrv(e),
+    feces: buildFecesDigestiveReadingSrv(fecesEvaluation)
+  });
 }
 function reportBalanceStateTextSrv(status, balance = null){
   const s = String(status || '').toLowerCase();
@@ -10129,7 +10197,12 @@ function buildNutritionFinalDecisionSrv(e = {}, rows = []){
 }
 function buildNutritionReportDecisionSrv(e = {}, preparedRows = null){
   const rows = Array.isArray(preparedRows) ? preparedRows : buildNutritionReportRowsSrv(e);
-  return buildNutritionFinalDecisionSrv(e, rows);
+  const rumenDecisionRow = rumenDecisionRowForReportSrv(e);
+
+  return buildNutritionFinalDecisionSrv(
+    e,
+    rumenDecisionRow ? [...rows, rumenDecisionRow] : rows
+  );
 }
 function buildNutritionReportRowsSrv(e = {}, options = {}){
 const a = e?.nutrition?.analysis || {};
@@ -10322,22 +10395,6 @@ const nelReportLabel = isDryReport ? 'الطاقة الصافية' : 'الطاق
   ));
 }
 
-  const rh = n.rumenHealthModel || {};
-  rows.push(reportRowSrv(
-    'صحة الكرش',
-    'rumen',
-    'صحة الكرش',
-    'آمن',
-    rh.title || n.rumenStatus || '—',
-    '—',
-    rh.status || n.rumenStatus || 'muted',
-    rh.reason || rh.instruction || n.rumenNote || '—'
-  ));
-const fecesEvaluationForRows =
-  options.fecesEvaluation ||
-  buildFecesEvaluationForNutritionReportSrv(e, options.fecesEvents || []);
-
-rows.push(...fecesEvaluationReportRowsSrv(fecesEvaluationForRows));
 const dcadVal = n.dcadModel?.dcadMeqKgDM;
 if (reportStage === 'close_up' && finiteSrv(dcadVal)) {
   const isBuffaloForDcad =
@@ -10544,11 +10601,9 @@ function buildNutritionOperationalBatchSrv(e = {}, options = {}) {
 }
 function attachNutritionReportPayloadSrv(e = {}, options = {}){
   const fecesEvaluation = buildFecesEvaluationForNutritionReportSrv(e, options.fecesEvents || []);
-  const reportRows = buildNutritionReportRowsSrv(e, {
-    ...options,
-    fecesEvaluation
-  });
+  const digestiveReading = buildDigestiveReadingReportSrv(e, fecesEvaluation);
 
+  const reportRows = buildNutritionReportRowsSrv(e, options);
   const reportDecision = buildNutritionReportDecisionSrv(e, reportRows);
   const operationalBatch = buildNutritionOperationalBatchSrv(e, options);
 
@@ -10560,7 +10615,8 @@ function attachNutritionReportPayloadSrv(e = {}, options = {}){
       reportStatus: reportDecision.status || reportStatusFromEventSrv(e),
       reportRows,
       operationalBatch,
-      fecesEvaluation
+      fecesEvaluation,
+      digestiveReading
     }
   });
 }
