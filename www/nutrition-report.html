@@ -608,6 +608,328 @@
     }
   })();
 </script>
-<script type="module" src="/js/nutrition-report.js"></script>
+<script>
+(function(){
+  const API_BASE = window.API_BASE || 'https://murabbic-alerts.onrender.com';
+
+  const $ = (id) => document.getElementById(id);
+
+  function esc(v){
+    return String(v ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#039;');
+  }
+
+  function getUserId(){
+    const q = new URLSearchParams(location.search);
+    return (
+      q.get('userId') ||
+      q.get('uid') ||
+      localStorage.getItem('murabbik:userId') ||
+      localStorage.getItem('murabbik_uid') ||
+      localStorage.getItem('userId') ||
+      localStorage.getItem('uid') ||
+      ''
+    ).trim();
+  }
+
+  function badgeClass(status){
+    const s = String(status || '').toLowerCase();
+    if (s.includes('danger')) return 'badge danger';
+    if (s.includes('warn') || s.includes('watch')) return 'badge warn';
+    return 'badge';
+  }
+
+  function stageLabel(stage){
+    const s = String(stage || '').toLowerCase();
+    if (s === 'lactating') return 'حلاب';
+    if (s === 'far_dry') return 'جاف بعيد';
+    if (s === 'close_up') return 'انتظار الولادة';
+    return 'غير مصنف';
+  }
+
+  function groupNameFromEvent(e){
+    const ctx = e?.nutrition?.context || {};
+    return (
+      ctx.groupName ||
+      ctx.group ||
+      ctx.groupLabel ||
+      e.groupName ||
+      'مجموعة غير محددة'
+    );
+  }
+
+  function nutritionStageFromEvent(e){
+    const ctx = e?.nutrition?.context || {};
+    const targets = e?.nutrition?.analysis?.targets || {};
+    const groupType = String(ctx.groupType || '').toLowerCase();
+    const avgMilk = Number(ctx.avgMilkKg || e?.nutrition?.analysis?.inputs?.avgMilkKg || 0);
+
+    if (ctx.closeUp || groupType.includes('close')) return 'close_up';
+    if (ctx.earlyDry || groupType.includes('far') || groupType.includes('dry')) return 'far_dry';
+    if (avgMilk > 0 || groupType.includes('lact')) return 'lactating';
+
+    const chapterStage = String(targets?.chapter12EnergyModel?.stage || '').toLowerCase();
+    if (chapterStage.includes('close')) return 'close_up';
+    if (chapterStage.includes('far') || chapterStage.includes('dry')) return 'far_dry';
+
+    return 'unknown';
+  }
+
+  function renderDigestiveReading(d){
+    if (!d || d.available !== true) return '';
+
+    const rumen = d.rumen || {};
+    const feces = d.feces || {};
+
+    const rumenHtml = `
+      <div class="mini">
+        <div class="name">صحة الكرش</div>
+        <div class="value">${esc(rumen.result || rumen.statusLabel || '—')}</div>
+        <div class="note">
+          <b>الحالة:</b> ${esc(rumen.statusLabel || '—')}<br>
+          <b>قراءة مُرَبِّيك:</b> ${esc(rumen.reading || '—')}<br>
+          <b>التوجيه:</b> ${esc(rumen.guidance || '—')}
+        </div>
+      </div>
+    `;
+
+    const fecesReasons = Array.isArray(feces.reasons) && feces.reasons.length
+      ? `<br><b>الأسباب المحتملة:</b> ${feces.reasons.map(esc).join('، ')}`
+      : '';
+
+    const fecesHtml = `
+      <div class="mini">
+        <div class="name">تقييم روث المجموعة</div>
+        <div class="value">${esc(feces.available === false ? (feces.message || 'غير متاح') : (feces.result || '—'))}</div>
+        <div class="note">
+          ${feces.consistencyLabel ? `<b>تجانس العينات:</b> ${esc(feces.consistencyLabel)}<br>` : ''}
+          <b>قراءة مُرَبِّيك:</b> ${esc(feces.reading || feces.message || '—')}
+          ${fecesReasons}<br>
+          ${feces.guidance ? `<b>التوجيه:</b> ${esc(feces.guidance)}` : ''}
+        </div>
+      </div>
+    `;
+
+    return `
+      <section class="card">
+        <h2 class="section-title">${esc(d.title || 'قراءة الهضم والروث')}</h2>
+        <div class="cards">
+          ${rumenHtml}
+          ${fecesHtml}
+        </div>
+      </section>
+    `;
+  }
+
+  function rowsBySection(rows){
+    const map = new Map();
+    (Array.isArray(rows) ? rows : []).forEach(r => {
+      const sec = String(r.section || 'بنود التغذية').trim();
+      if (!map.has(sec)) map.set(sec, []);
+      map.get(sec).push(r);
+    });
+    return [...map.entries()];
+  }
+
+  function renderRowsTable(section, rows){
+    if (!rows || !rows.length) return '';
+
+    return `
+      <section class="card">
+        <h2 class="section-title">${esc(section)}</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>البند</th>
+                <th>الاحتياج / الهدف</th>
+                <th>الفعلي</th>
+                <th>الفرق</th>
+                <th>الحالة</th>
+                <th>توجيه مُرَبِّيك</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(r => `
+                <tr>
+                  <td>${esc(r.label || '—')}</td>
+                  <td>${esc(r.targetText || '—')}</td>
+                  <td>${esc(r.actualText || '—')}</td>
+                  <td>${esc(r.balanceText || '—')}</td>
+                  <td><span class="${badgeClass(r.status)}">${esc(r.statusText || '—')}</span></td>
+                  <td>${esc(r.note || '—')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderDecision(e){
+    const d = e?.nutrition?.reportDecision || {};
+    if (!d.title && !d.action) return '';
+
+    return `
+      <section class="card">
+        <h2 class="section-title">قراءة مُرَبِّيك</h2>
+        <div class="mini">
+          <div class="name">${esc(d.statusText || 'القرار')}</div>
+          <div class="value">${esc(d.title || '—')}</div>
+          <div class="note">${esc(d.action || '—')}</div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderOperationalBatch(e){
+    const b = e?.nutrition?.operationalBatch || {};
+    if (!b.available || !Array.isArray(b.rows) || !b.rows.length) return '';
+
+    return `
+      <section class="card">
+        <h2 class="section-title">تقرير التشغيل والخلط الجماعي</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>الخامة</th>
+                <th>كجم/رأس as-fed</th>
+                <th>كجم مادة جافة/رأس</th>
+                <th>كجم للمجموعة/يوم</th>
+                <th>كجم/نقلة</th>
+                <th>تكلفة/يوم</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${b.rows.map(r => `
+                <tr>
+                  <td>${esc(r.name || '—')}</td>
+                  <td>${esc(r.asFedKgPerHead ?? '—')}</td>
+                  <td>${esc(r.dmKgPerHead ?? '—')}</td>
+                  <td>${esc(r.asFedKgGroupDay ?? '—')}</td>
+                  <td>${esc(r.asFedKgPerDistribution ?? '—')}</td>
+                  <td>${esc(r.costGroupDay ?? '—')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        ${b.note ? `<div class="empty">${esc(b.note)}</div>` : ''}
+      </section>
+    `;
+  }
+
+  function renderEvent(e){
+    const n = e?.nutrition || {};
+    const ctx = n.context || {};
+    const rows = Array.isArray(n.reportRows) ? n.reportRows : [];
+    const grouped = rowsBySection(rows);
+    const digest = n.digestiveReading;
+
+    let html = `
+      <section class="card">
+        <h2 class="section-title">تقرير عليقة: ${esc(groupNameFromEvent(e))}</h2>
+        <div class="grid">
+          <div class="kpi"><b>${esc(stageLabel(nutritionStageFromEvent(e)))}</b><span>مرحلة المجموعة</span></div>
+          <div class="kpi"><b>${esc(ctx.species || '—')}</b><span>النوع</span></div>
+          <div class="kpi"><b>${esc(ctx.headCount ?? ctx.groupSize ?? '—')}</b><span>عدد الرؤوس</span></div>
+          <div class="kpi"><b>${esc(ctx.avgMilkKg ?? '—')}</b><span>متوسط اللبن كجم</span></div>
+        </div>
+      </section>
+      ${renderDecision(e)}
+    `;
+
+    let digestiveInserted = false;
+
+    grouped.forEach(([section, sectionRows]) => {
+      html += renderRowsTable(section, sectionRows);
+
+      const sec = String(section || '');
+      if (!digestiveInserted && /الألياف|الكربوهيدرات|الدهون|النشا/i.test(sec)) {
+        html += renderDigestiveReading(digest);
+        digestiveInserted = true;
+      }
+    });
+
+    if (!digestiveInserted) {
+      html += renderDigestiveReading(digest);
+    }
+
+    html += renderOperationalBatch(e);
+
+    return html;
+  }
+
+  function collectEvents(payload){
+    if (payload?.event) return [payload.event];
+
+    if (payload?.report?.sectioned && Array.isArray(payload.report.sections)) {
+      return payload.report.sections.flatMap(sec => sec?.report?.events || []);
+    }
+
+    if (Array.isArray(payload?.report?.events)) return payload.report.events;
+
+    return [];
+  }
+
+  async function loadReport(){
+    const statusBox = $('statusBox');
+    const content = $('content');
+    const title = $('reportTitle');
+    const sub = $('reportSub');
+
+    try {
+      const params = new URLSearchParams(location.search);
+      if (!params.has('scope')) params.set('scope', 'all');
+
+      const uid = getUserId();
+      if (uid && !params.has('userId')) params.set('userId', uid);
+
+      const url = `${API_BASE}/api/nutrition/report/latest?${params.toString()}`;
+      const headers = { 'Accept': 'application/json' };
+      if (uid) headers['X-User-Id'] = uid;
+
+      const r = await fetch(url, { headers, cache: 'no-store' });
+      const j = await r.json().catch(() => ({}));
+
+      if (!r.ok || j.ok === false) {
+        throw new Error(j.message || j.error || `HTTP ${r.status}`);
+      }
+
+      const events = collectEvents(j);
+
+      if (!events.length) {
+        throw new Error('لا توجد علائق تغذية محفوظة للعرض.');
+      }
+
+      if (title) title.textContent = params.get('scope') === 'all'
+        ? 'تقرير مُرَبِّيك الشامل للتغذية'
+        : `تقرير تغذية — ${j.groupName || groupNameFromEvent(events[0])}`;
+
+      if (sub) {
+        sub.textContent = `تم تحميل ${events.length} عليقة محفوظة من السيرفر.`;
+      }
+
+      if (statusBox) statusBox.style.display = 'none';
+      if (content) content.innerHTML = events.map(renderEvent).join('');
+
+    } catch (e) {
+      if (statusBox) {
+        statusBox.style.display = '';
+        statusBox.textContent = `تعذّر تحميل التقرير: ${e.message || e}`;
+      }
+      if (content) content.innerHTML = '';
+    }
+  }
+
+  loadReport();
+})();
+</script>
 </body>
 </html>
