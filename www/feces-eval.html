@@ -28,7 +28,7 @@
 
 <main class="mbk-vision-container">
   <div class="mbk-card">
-    <label>رقم الحيوان</label>
+   <label id="contextLabel">رقم الحيوان</label>
     <div class="mbk-score-card">
       <span class="mbk-score-badge animal-number">—</span>
     </div>
@@ -105,11 +105,11 @@
   const uploadInput = $("#uploadInput");
   const saveBtn = $("#saveBtn");
   const backBtn = $("#backBtn");
-
+  const headBackBtn = $("#headBackBtn");
   const animalIdInput = $("#animalId");
   const eventDateInput = $("#eventDate");
   const numberSpan = $(".animal-number");
-
+  const contextLabel = $("#contextLabel");
   const scoreBadge = $("#scoreBadge");
   const scoreFill = $("#scoreFill");
   const scoreNote = $("#scoreNote");
@@ -132,13 +132,45 @@
     return `${y}-${m}-${d}`;
   }
 
-  function contextFromUrl() {
-    return {
-      animalId: qs.get("animalId") || "",
-      animalNumber: qs.get("number") || qs.get("animalNumber") || "",
-      eventDate: qs.get("date") || todayCairo()
-    };
+ function contextFromUrl() {
+  const mode = qs.get("mode") === "group" ? "group" : "individual";
+
+  const groupName = qs.get("groupName") || "";
+  const groupId = qs.get("groupId") || "";
+  const groupKey = qs.get("groupKey") || "";
+  const animalType = qs.get("animalType") || "";
+
+  const hasGroup = mode === "group" && !!(groupName || groupId || groupKey);
+
+  return {
+    mode: hasGroup ? "group" : "individual",
+
+    animalId: hasGroup ? "" : (qs.get("animalId") || ""),
+    animalNumber: hasGroup ? "" : (qs.get("number") || qs.get("animalNumber") || ""),
+
+    groupName,
+    groupId,
+    groupKey,
+    animalType,
+
+    eventDate: qs.get("date") || qs.get("eventDate") || todayCairo()
+  };
+}
+
+function carryContextToUrl(u, ctx, date) {
+  u.searchParams.set("mode", ctx.mode || "individual");
+  u.searchParams.set("date", date);
+  u.searchParams.set("eventDate", date);
+
+  if (ctx.mode === "group") {
+    if (ctx.groupName) u.searchParams.set("groupName", ctx.groupName);
+    if (ctx.groupId) u.searchParams.set("groupId", ctx.groupId);
+    if (ctx.groupKey) u.searchParams.set("groupKey", ctx.groupKey);
+    if (ctx.animalType) u.searchParams.set("animalType", ctx.animalType);
+  } else if (ctx.animalNumber) {
+    u.searchParams.set("number", ctx.animalNumber);
   }
+}
 
   function getTenantUid() {
     return String(
@@ -168,7 +200,37 @@
   msgBox.className = "infobar";
   msgBox.textContent = "";
 }
+  function resetForNextGroupSample(j) {
+  state.image = null;
+  state.analysis = null;
 
+  if (uploadPreviewBox) uploadPreviewBox.style.display = "none";
+  if (uploadPreviewImg) uploadPreviewImg.removeAttribute("src");
+  if (retakeBtn) retakeBtn.disabled = true;
+
+  if (scoreBadge) {
+    const next = j.nextSampleNo || "";
+    const total = j.samplesRequired || 4;
+
+    scoreBadge.textContent = next
+      ? `بانتظار العينة ${next} من ${total}`
+      : "بانتظار العينة التالية";
+  }
+
+  if (scoreFill) {
+    scoreFill.style.width = "0%";
+    scoreFill.style.background = "#e5e7eb";
+  }
+
+  if (scoreNote) {
+    scoreNote.textContent = j.message || "تم حفظ العينة. صوّر العينة التالية.";
+  }
+
+  if (saveBtn) {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "حفظ العينة";
+  }
+}
   function setWaiting() {
     state.analysis = null;
 
@@ -335,23 +397,30 @@
     return canvas.toDataURL("image/jpeg", 0.92);
   }
 
-  async function analyzeOnServer(image) {
-    const r = await fetch("/api/feces/vision-analyze", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ image })
-    });
+ async function analyzeOnServer(image) {
+  const uid = getTenantUid();
+  const ctx = contextFromUrl();
 
-    const j = await r.json().catch(() => ({}));
+  const r = await fetch("/api/feces/vision-analyze", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(uid ? { "X-User-Id": uid } : {})
+    },
+    body: JSON.stringify({
+      image,
+      eventDate: eventDateInput?.value || ctx.eventDate || todayCairo()
+    })
+  });
 
-    if (!r.ok || !j.ok) {
-      throw new Error(j.message || "تعذّر تحليل الروث.");
-    }
+  const j = await r.json().catch(() => ({}));
 
-    renderAnalysis(j);
+  if (!r.ok || !j.ok) {
+    throw new Error(j.message || "تعذّر تحليل الروث.");
   }
+
+  renderAnalysis(j);
+}
 
   async function captureAndAnalyze() {
     try {
@@ -432,64 +501,88 @@
     }
   }
 
-  async function saveFeces() {
-    const ctx = contextFromUrl();
-    const analysis = state.analysis;
+async function saveFeces() {
+  const ctx = contextFromUrl();
+  const analysis = state.analysis;
 
-    if (!analysis || !analysis.ok || !Number.isFinite(Number(analysis.score))) {
-      showMsg("لا يمكن الحفظ قبل تحليل صورة الروث.", false);
+  if (ctx.mode === "individual" && !ctx.animalNumber) {
+    showMsg("لا يمكن حفظ تقييم فردي بدون رقم الحيوان.", false);
+    return;
+  }
+
+  if (ctx.mode === "group" && !(ctx.groupName || ctx.groupId || ctx.groupKey)) {
+    showMsg("لا يمكن حفظ تقييم مجموعة بدون بيانات المجموعة.", false);
+    return;
+  }
+
+  if (!analysis || !analysis.ok || !Number.isFinite(Number(analysis.score))) {
+    showMsg("لا يمكن الحفظ قبل تحليل صورة الروث.", false);
+    return;
+  }
+
+  const uid = getTenantUid();
+
+  try {
+    hideMsg();
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = "جارٍ الحفظ…";
+    }
+
+    const r = await fetch("/api/feces/save", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(uid ? { "X-User-Id": uid } : {})
+      },
+      body: JSON.stringify({
+        mode: ctx.mode,
+
+        animalId: ctx.mode === "individual" ? ctx.animalId : "",
+        animalNumber: ctx.mode === "individual" ? ctx.animalNumber : "",
+
+        groupName: ctx.mode === "group" ? ctx.groupName : "",
+        groupId: ctx.mode === "group" ? ctx.groupId : "",
+        groupKey: ctx.mode === "group" ? ctx.groupKey : "",
+        animalType: ctx.mode === "group" ? ctx.animalType : "",
+
+        eventDate: eventDateInput?.value || ctx.eventDate || todayCairo(),
+        score: analysis.score,
+        analysis
+      })
+    });
+
+    const j = await r.json().catch(() => ({}));
+
+    if (!r.ok || !j.ok) {
+      throw new Error(j.message || "تعذّر حفظ تقييم الروث.");
+    }
+
+    showMsg(j.message || "✅ تم حفظ تقييم الروث بنجاح", true);
+
+    if (ctx.mode === "group" && j.completed === false) {
+      resetForNextGroupSample(j);
       return;
     }
 
-    const uid = getTenantUid();
+    setTimeout(() => {
+      const dt = j.eventDate || eventDateInput?.value || ctx.eventDate || todayCairo();
+      const u = new URL("add-event.html", location.href);
+      carryContextToUrl(u, ctx, dt);
+      location.href = u.toString();
+    }, 900);
 
-    try {
-      hideMsg();
-
-      if (saveBtn) {
-        saveBtn.disabled = true;
-        saveBtn.textContent = "جارٍ الحفظ…";
-      }
-
-      const r = await fetch("/api/feces/save", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(uid ? { "X-User-Id": uid } : {})
-        },
-        body: JSON.stringify({
-          animalId: ctx.animalId,
-          animalNumber: ctx.animalNumber,
-          eventDate: eventDateInput?.value || ctx.eventDate || todayCairo(),
-          score: analysis.score,
-          analysis
-        })
-      });
-
-      const j = await r.json().catch(() => ({}));
-
-      if (!r.ok || !j.ok) {
-        throw new Error(j.message || "تعذّر حفظ تقييم الروث.");
-      }
-
-      showMsg(j.message || "✅ تم حفظ تقييم الروث بنجاح", true);
-
-      setTimeout(() => {
-        const number = j.animalNumber || ctx.animalNumber || "";
-        const dt = j.eventDate || eventDateInput?.value || ctx.eventDate || todayCairo();
-        location.href = `add-event.html?number=${encodeURIComponent(number)}&date=${encodeURIComponent(dt)}`;
-      }, 900);
-
-    } catch (e) {
-      console.error("feces save error:", e);
-      showMsg(e.message || "تعذّر حفظ تقييم الروث.", false);
-    } finally {
-      if (saveBtn) {
-        saveBtn.disabled = false;
-        saveBtn.textContent = "حفظ التقييم";
-      }
+  } catch (e) {
+    console.error("feces save error:", e);
+    showMsg(e.message || "تعذّر حفظ تقييم الروث.", false);
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = ctx.mode === "group" ? "حفظ العينة" : "حفظ التقييم";
     }
   }
+}
 
   function resetCapture() {
     state.image = null;
@@ -503,56 +596,79 @@
     hideMsg();
   }
 
-  function bindEvents() {
-    captureBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
-      captureAndAnalyze();
-    });
+function bindEvents() {
+  captureBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    captureAndAnalyze();
+  });
 
-    retakeBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
-      resetCapture();
-    });
+  retakeBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    resetCapture();
+  });
 
-    uploadBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
-      uploadInput?.click();
-    });
+  uploadBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    uploadInput?.click();
+  });
 
-    uploadInput?.addEventListener("change", (e) => {
-      uploadAndAnalyze(e.target.files?.[0]);
-    });
+  uploadInput?.addEventListener("change", (e) => {
+    uploadAndAnalyze(e.target.files?.[0]);
+  });
 
-    saveBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
-      saveFeces();
-    });
+  saveBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    saveFeces();
+  });
 
-    backBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
+  backBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
 
-      const ctx = contextFromUrl();
-      const number = ctx.animalNumber || "";
-      const dt = eventDateInput?.value || ctx.eventDate || todayCairo();
+    const ctx = contextFromUrl();
+    const dt = eventDateInput?.value || ctx.eventDate || todayCairo();
 
-      location.href = `add-event.html?number=${encodeURIComponent(number)}&date=${encodeURIComponent(dt)}`;
-    });
+    const u = new URL("add-event.html", location.href);
+    carryContextToUrl(u, ctx, dt);
+    location.href = u.toString();
+  });
 
-    window.addEventListener("resize", () => {
-      fitOverlay();
-      drawGuide();
-    });
-  }
+  window.addEventListener("resize", () => {
+    fitOverlay();
+    drawGuide();
+  });
+}
 
   async function init() {
     const ctx = contextFromUrl();
 
     if (animalIdInput) animalIdInput.value = ctx.animalId || "";
-    if (eventDateInput) eventDateInput.value = ctx.eventDate || todayCairo();
-    if (numberSpan) numberSpan.textContent = ctx.animalNumber || (ctx.animalId ? `#${ctx.animalId.slice(-5)}` : "—");
+if (eventDateInput) eventDateInput.value = ctx.eventDate || todayCairo();
 
-    setWaiting();
-    bindEvents();
+if (ctx.mode === "group") {
+  if (contextLabel) contextLabel.textContent = "المجموعة";
+  if (numberSpan) numberSpan.textContent = ctx.groupName || ctx.groupId || ctx.groupKey || "مجموعة";
+  if (saveBtn) saveBtn.textContent = "حفظ العينة";
+} else {
+  if (contextLabel) contextLabel.textContent = "رقم الحيوان";
+  if (numberSpan) numberSpan.textContent = ctx.animalNumber || (ctx.animalId ? `#${ctx.animalId.slice(-5)}` : "—");
+  if (saveBtn) saveBtn.textContent = "حفظ التقييم";
+}
+
+if (headBackBtn) {
+  const dt = eventDateInput?.value || ctx.eventDate || todayCairo();
+  const u = new URL("add-event.html", location.href);
+  carryContextToUrl(u, ctx, dt);
+  headBackBtn.href = u.toString();
+}
+
+setWaiting();
+
+if (ctx.mode === "group") {
+  if (scoreBadge) scoreBadge.textContent = "بانتظار عينة المجموعة";
+  if (scoreNote) scoreNote.textContent = "حلّل عينة روث واحدة، ثم اضغط حفظ العينة. السيرفر سيحدد العينة التالية أو اكتمال تقييم المجموعة.";
+}
+
+bindEvents();
 
     try {
       await startCamera();
