@@ -22764,7 +22764,29 @@ const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
     // 🔥 4) كاميرا
     // --------------------------------------
     const bcsVals = active.map(a => Number(a.lastBCS || 0)).filter(x=>x>0);
-    const fecesVals = active.map(a => Number(a.lastFecesScore || 0)).filter(x=>x>0);
+    let fecesVals = [];
+
+try {
+  const fecesToday = typeof cairoTodayISO === "function"
+    ? cairoTodayISO()
+    : new Date().toISOString().slice(0, 10);
+
+  const fecesSnap = await db.collection("events")
+    .where("userId", "==", uid)
+    .where("eventTypeNorm", "==", "feces_eval")
+    .limit(200)
+    .get();
+
+  fecesVals = fecesSnap.docs
+    .map(d => d.data() || {})
+    .filter(e => String(e.eventDate || e.date || "").slice(0, 10) === fecesToday)
+    .map(e => Number(e.fecesScore ?? e.score ?? e.value ?? 0))
+    .filter(x => x > 0);
+
+} catch (e) {
+  console.error("feces daily stats failed:", e.message || e);
+  fecesVals = [];
+}
 
     const bcsCamera   = bcsVals.length ? +(bcsVals.reduce((a,b)=>a+b,0)/bcsVals.length).toFixed(2) : 0;
     const fecesScore  = fecesVals.length ? +(fecesVals.reduce((a,b)=>a+b,0)/fecesVals.length).toFixed(2) : 0;
@@ -24858,8 +24880,91 @@ function fecesBuildNoteSrv(score) {
 
   return "";
 }
+const FECES_DAILY_LIMIT_SRV = 10;
 
-app.post("/api/feces/vision-analyze", async (req, res) => {
+function fecesDailyCounterIdSrv(uid, eventDate, counterType = "save") {
+  return eventsPageStableDocIdSrv(
+    uid,
+    "feces_eval_daily",
+    counterType,
+    eventDate
+  );
+}
+
+function fecesDailyEventDocIdSrv(uid, eventDate, sequence) {
+  return eventsPageStableDocIdSrv(
+    uid,
+    "feces_eval",
+    eventDate,
+    String(sequence).padStart(2, "0")
+  );
+}
+
+function fecesGroupValueSrv(...vals) {
+  for (const v of vals) {
+    const s = String(v || "").trim();
+    if (s) return s;
+  }
+  return "";
+}
+
+async function fecesConsumeDailySlotSrv({
+  uid,
+  eventDate,
+  counterType = "save",
+  limit = FECES_DAILY_LIMIT_SRV
+} = {}) {
+  const counterRef = db.collection("event_counters").doc(
+    fecesDailyCounterIdSrv(uid, eventDate, counterType)
+  );
+
+  let allowed = false;
+  let dailySequence = 0;
+  let currentDailyCount = 0;
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(counterRef);
+    const current = Number(snap.exists ? (snap.data()?.count || 0) : 0);
+
+    currentDailyCount = Number.isFinite(current) && current > 0 ? current : 0;
+
+    if (currentDailyCount >= limit) {
+      allowed = false;
+      return;
+    }
+
+    dailySequence = currentDailyCount + 1;
+    allowed = true;
+
+    const payload = {
+      userId: uid,
+      ownerUid: uid,
+      counterType,
+      eventType: "تقييم الروث",
+      eventTypeNorm: "feces_eval",
+      eventDate,
+      date: eventDate,
+      scope: "feeding_group_daily",
+      dailyLimit: limit,
+      count: dailySequence,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    if (!snap.exists) {
+      payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+
+    tx.set(counterRef, payload, { merge: true });
+  });
+
+  return {
+    allowed,
+    dailySequence,
+    currentDailyCount,
+    dailyLimit: limit
+  };
+}
+app.post("/api/feces/vision-analyze", requireUserId, async (req, res) => {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
 
@@ -24885,7 +24990,39 @@ app.post("/api/feces/vision-analyze", async (req, res) => {
         message: "❌ صورة الروث مطلوبة للتحليل."
       });
     }
+const uid = req.userId;
 
+const analysisDateRaw = String(
+  body.eventDate ||
+  body.date ||
+  (typeof cairoTodayISO === "function"
+    ? cairoTodayISO()
+    : new Date().toISOString().slice(0, 10))
+).trim().slice(0, 10);
+
+const analysisDate = /^\d{4}-\d{2}-\d{2}$/.test(analysisDateRaw)
+  ? analysisDateRaw
+  : (typeof cairoTodayISO === "function"
+    ? cairoTodayISO()
+    : new Date().toISOString().slice(0, 10));
+
+const dailyUsage = await fecesConsumeDailySlotSrv({
+  uid,
+  eventDate: analysisDate,
+  counterType: "analysis",
+  limit: FECES_DAILY_LIMIT_SRV
+});
+
+if (!dailyUsage.allowed) {
+  return res.status(429).json({
+    ok: false,
+    error: "feces_daily_analysis_limit_reached",
+    message: `🚫 تم الوصول للحد اليومي لتحليل الروث: ${FECES_DAILY_LIMIT_SRV} تقييمات في اليوم.`,
+    eventDate: analysisDate,
+    dailyLimit: FECES_DAILY_LIMIT_SRV,
+    currentDailyCount: dailyUsage.currentDailyCount || FECES_DAILY_LIMIT_SRV
+  });
+}
 const prompt = `
 You are an expert dairy cattle manure consistency evaluator.
 
@@ -25041,21 +25178,29 @@ Return JSON only:
       );
 
     return res.json({
-      ok: true,
-      score,
-      label,
-      rangeText: "1–5",
-      quality: {
-        label: qualityLabel,
-        confidence
-      },
-      reason: String(parsed.reason || "").trim(),
-      findings: {
-        visual: String(parsed.visualFindings || "").trim()
-      },
-      note: fecesBuildNoteSrv(score),
-      message: `تم تحليل الروث — الدرجة ${score} (${label})`
-    });
+  ok: true,
+  score,
+  label,
+  rangeText: "1–5",
+  quality: {
+    label: qualityLabel,
+    confidence
+  },
+  reason: String(parsed.reason || "").trim(),
+  findings: {
+    visual: String(parsed.visualFindings || "").trim()
+  },
+  note: fecesBuildNoteSrv(score),
+
+  dailySequence: dailyUsage.dailySequence,
+  dailyLimit: FECES_DAILY_LIMIT_SRV,
+  remainingToday: Math.max(
+    0,
+    FECES_DAILY_LIMIT_SRV - (dailyUsage.dailySequence || 0)
+  ),
+
+  message: `تم تحليل الروث — الدرجة ${score} (${label})`
+});
 
   } catch (e) {
     console.error("feces vision analyze error:", e);
@@ -25083,23 +25228,31 @@ app.post("/api/feces/save", requireUserId, async (req, res) => {
     const uid = req.userId;
     const body = req.body || {};
 
-    const animalIdFromPage = String(
-      body.animalId ||
-      body.id ||
-      ""
-    ).trim();
-
-    const animalNumber = calvingNormDigitsOnlySrv(
-      body.animalNumber ||
-      body.number ||
-      ""
-    );
-
     const eventDate = String(
       body.eventDate ||
       body.date ||
       ""
     ).trim().slice(0, 10);
+
+    const group = body.group && typeof body.group === "object"
+      ? body.group
+      : {};
+
+    const groupId = fecesGroupValueSrv(
+      body.groupId,
+      body.feedingGroupId,
+      body.groupKey,
+      group.groupId,
+      group.id,
+      group.groupKey
+    );
+
+    const groupName = fecesGroupValueSrv(
+      body.groupName,
+      body.feedingGroupName,
+      group.groupName,
+      group.name
+    );
 
     const analysis = body.analysis || body.result || {};
     const score = fecesClampScoreSrv(
@@ -25114,17 +25267,17 @@ app.post("/api/feces/save", requireUserId, async (req, res) => {
       ""
     ).trim();
 
-    if (!eventDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
       return res.status(400).json({
         ok: false,
         message: "❌ تاريخ تقييم الروث مطلوب."
       });
     }
 
-    if (!animalIdFromPage && !animalNumber) {
+    if (!groupId && !groupName) {
       return res.status(400).json({
         ok: false,
-        message: "❌ رقم الحيوان مطلوب لحفظ تقييم الروث."
+        message: "❌ اختر مجموعة التغذية قبل حفظ تقييم الروث."
       });
     }
 
@@ -25135,68 +25288,46 @@ app.post("/api/feces/save", requireUserId, async (req, res) => {
       });
     }
 
-    let animal = null;
-    let animalDocSnap = null;
-    let animalCollection = "animals";
-
-    if (animalIdFromPage) {
-      const snap = await db.collection("animals").doc(animalIdFromPage).get();
-
-      if (snap.exists) {
-        const data = snap.data() || {};
-        const owner = String(data.userId || data.ownerUid || "").trim();
-
-        if (owner === uid) {
-          animal = { id: snap.id, data, _collection: "animals" };
-          animalDocSnap = snap;
-          animalCollection = "animals";
-        }
-      }
-    }
-
-    if (!animal && animalNumber) {
-      const found = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
-
-      if (found) {
-        animal = found;
-        animalCollection = found._collection || "animals";
-        animalDocSnap = await db.collection(animalCollection).doc(found.id).get();
-      }
-    }
-
-    if (!animal || !animalDocSnap || !animalDocSnap.exists) {
-      return res.status(404).json({
-        ok: false,
-        message: "❌ الحيوان غير موجود في حسابك."
-      });
-    }
-
-    const animalDoc = animal.data || animalDocSnap.data() || {};
-    const st = String(animalDoc.status || "active").trim().toLowerCase();
-
-    if (st === "inactive" || st === "archived") {
-      return res.status(400).json({
-        ok: false,
-        message: "❌ لا يمكن حفظ تقييم الروث — الحيوان غير موجود بالقطيع."
-      });
-    }
-
-    const finalAnimalId = animal.id || animalDocSnap.id;
-    const finalAnimalNumber = calvingNormDigitsOnlySrv(
-      animalNumber ||
-      animalDoc.animalNumber ||
-      animalDoc.number ||
-      ""
-    );
-
     const label = fecesLabelSrv(score);
+
+    const saveUsage = await fecesConsumeDailySlotSrv({
+      uid,
+      eventDate,
+      counterType: "save",
+      limit: FECES_DAILY_LIMIT_SRV
+    });
+
+    if (!saveUsage.allowed) {
+      return res.status(429).json({
+        ok: false,
+        error: "feces_daily_save_limit_reached",
+        message: `🚫 تم الوصول للحد اليومي لتقييم الروث: ${FECES_DAILY_LIMIT_SRV} تقييمات في اليوم.`,
+        eventDate,
+        dailyLimit: FECES_DAILY_LIMIT_SRV,
+        currentDailyCount: saveUsage.currentDailyCount || FECES_DAILY_LIMIT_SRV
+      });
+    }
+
+    const dailySequence = saveUsage.dailySequence;
+
+    const eventRef = db.collection("events").doc(
+      fecesDailyEventDocIdSrv(uid, eventDate, dailySequence)
+    );
 
     const payload = {
       userId: uid,
       ownerUid: uid,
 
-      animalId: finalAnimalId,
-      animalNumber: finalAnimalNumber,
+      // تقييم الروث في الإطلاق مرتبط بمجموعة التغذية، وليس بحيوان فردي.
+      scope: "feeding_group",
+      linkedToAnimal: false,
+      animalId: null,
+      animalNumber: null,
+
+      groupId: groupId || null,
+      groupName: groupName || null,
+      feedingGroupId: groupId || null,
+      feedingGroupName: groupName || null,
 
       type: "تقييم الروث",
       eventType: "تقييم الروث",
@@ -25204,6 +25335,9 @@ app.post("/api/feces/save", requireUserId, async (req, res) => {
 
       date: eventDate,
       eventDate,
+
+      dailySequence,
+      dailyLimit: FECES_DAILY_LIMIT_SRV,
 
       score,
       value: score,
@@ -25229,39 +25363,27 @@ app.post("/api/feces/save", requireUserId, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
 
-    const eventRef = db.collection("events").doc();
-    const batch = db.batch();
-
-    batch.set(eventRef, payload);
-
-    batch.set(db.collection(animalCollection).doc(finalAnimalId), {
-      lastFecesScore: score,
-      lastFecesDate: eventDate,
-      lastFecesLabel: label,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
-    await batch.commit();
-
-    if (typeof scheduleGroupsRebuildSrv === "function") {
-      scheduleGroupsRebuildSrv(uid, "feces_eval_save");
-    }
+    await eventRef.set(payload, { merge: false });
 
     return res.json({
       ok: true,
-      message: "✅ تم حفظ تقييم الروث بنجاح",
+      message: `✅ تم حفظ تقييم الروث بنجاح (${dailySequence}/${FECES_DAILY_LIMIT_SRV})`,
       id: eventRef.id,
       eventId: eventRef.id,
-      animalId: finalAnimalId,
-      animalNumber: finalAnimalNumber,
       eventDate,
+      groupId: groupId || null,
+      groupName: groupName || null,
       score,
       label,
+      dailySequence,
+      dailyLimit: FECES_DAILY_LIMIT_SRV,
+      linkedToAnimal: false,
       saved: payload
     });
 
   } catch (e) {
     console.error("feces-save", e);
+
     return res.status(500).json({
       ok: false,
       message: "تعذّر حفظ تقييم الروث الآن."
