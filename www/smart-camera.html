@@ -66,39 +66,76 @@
     const norm = v => (v==null||v==='undefined'||v==='null'||v==='NaN')? '' : String(v).trim();
     const todayISO = ()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
 
-    // Hydrate context from query or storage
+       // Hydrate context from query
     const qs = new URLSearchParams(location.search);
-    const qNum = norm(qs.get('number'));
-    const qDate = norm(qs.get('date'));
-    const number = qNum || norm(localStorage.getItem('currentAnimalNumber')) || norm(localStorage.getItem('lastAnimalNumber')) || '';
+
+    const mode = norm(qs.get('mode')) === 'group' ? 'group' : 'individual';
+
+    const groupName = norm(qs.get('groupName'));
+    const groupId = norm(qs.get('groupId'));
+    const groupKey = norm(qs.get('groupKey'));
+    const animalType = norm(qs.get('animalType'));
+
+    const hasGroup = mode === 'group' && !!(groupName || groupId || groupKey);
+
+    const qNum = norm(qs.get('number') || qs.get('animalNumber'));
+    const qDate = norm(qs.get('date') || qs.get('eventDate'));
+
+    const number = hasGroup
+      ? ''
+      : (qNum || norm(localStorage.getItem('currentAnimalNumber')) || norm(localStorage.getItem('lastAnimalNumber')) || '');
+
     let date = qDate || norm(localStorage.getItem('lastEventDate')) || todayISO();
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayISO();
 
-    $('#chipAnimal').textContent = `🐄 الحيوان: ${ number || 'غير محدد' }`;
-    $('#chipDate').textContent   = `📅 التاريخ: ${ date }`;
+    $('#chipAnimal').textContent = hasGroup
+      ? `🐄 المجموعة: ${groupName || groupId || groupKey}`
+      : `🐄 الحيوان: ${number || 'غير محدد'}`;
+
+    $('#chipDate').textContent = `📅 التاريخ: ${date}`;
+
+    function carryContext(u){
+      u.searchParams.set('mode', hasGroup ? 'group' : 'individual');
+      u.searchParams.set('date', date);
+      u.searchParams.set('eventDate', date);
+
+      if (hasGroup) {
+        if (groupName) u.searchParams.set('groupName', groupName);
+        if (groupId) u.searchParams.set('groupId', groupId);
+        if (groupKey) u.searchParams.set('groupKey', groupKey);
+        if (animalType) u.searchParams.set('animalType', animalType);
+      } else if (number) {
+        u.searchParams.set('number', number);
+      }
+    }
 
     // Back to events page carrying context
     const backUrl = new URL('add-event.html', location.href);
-    if(number) backUrl.searchParams.set('number', number);
-    if(date)   backUrl.searchParams.set('date', date);
-   $('#backBtn').href = backUrl.toString();
+    carryContext(backUrl);
+    $('#backBtn').href = backUrl.toString();
 
     function buildUrl(page){
       const u = new URL(page, location.href);
-      if(number) u.searchParams.set('number', number);
-      if(date)   u.searchParams.set('date', date);
+      carryContext(u);
       return u.toString();
     }
+// Wire tools
+$$('[data-page]').forEach(btn=>{
+  btn.addEventListener('click', e=>{
+    e.preventDefault();
 
-    // Wire tools
-   $$('[data-page]').forEach(btn=>{
-      btn.addEventListener('click', e=>{
-        e.preventDefault();
-       
-        const target = btn.getAttribute('data-page');
-        if(target){ location.href = buildUrl(target); }
-      }, {passive:true});
-    });
+    const target = btn.getAttribute('data-page') || '';
+
+    if (hasGroup && target !== 'feces-eval.html') {
+      alert('هذه الأداة تحتاج رقم حيوان واحد. تقييم المجموعة متاح حاليًا في تقييم الروث فقط.');
+      return;
+    }
+
+    if (target) {
+      location.href = buildUrl(target);
+    }
+  }, {passive:false});
+});
 
   })();
   </script>
