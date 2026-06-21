@@ -21,6 +21,7 @@
     <a class="mbk-back" id="backBtn" href="add-event.html">رجوع</a>
   </div>
 </header>
+  <div id="sysbar" class="infobar" role="status" aria-live="polite"></div>
 <main class="smart-camera-wrap">
   <div class="smart-camera-meta">
     <div class="smart-camera-chip" id="chipAnimal">🐄 الحيوان: —</div>
@@ -65,6 +66,24 @@
     const $$ = s=>document.querySelectorAll(s);
     const norm = v => (v==null||v==='undefined'||v==='null'||v==='NaN')? '' : String(v).trim();
     const todayISO = ()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
+    const msgBox = $('#sysbar');
+
+function showMsg(text, ok){
+  if (!msgBox) return;
+
+  msgBox.textContent = text;
+  msgBox.className = 'infobar show ' + (ok ? 'success' : 'error');
+
+  try {
+    msgBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (_) {}
+}
+
+function hideMsg(){
+  if (!msgBox) return;
+  msgBox.textContent = '';
+  msgBox.className = 'infobar';
+}
 
        // Hydrate context from query
     const qs = new URLSearchParams(location.search);
@@ -124,10 +143,12 @@ $$('[data-page]').forEach(btn=>{
   btn.addEventListener('click', e=>{
     e.preventDefault();
 
+    hideMsg();
+
     const target = btn.getAttribute('data-page') || '';
 
     if (hasGroup && target !== 'feces-eval.html') {
-      alert('هذه الأداة تحتاج رقم حيوان واحد. تقييم المجموعة متاح حاليًا في تقييم الروث فقط.');
+      showMsg('هذه الأداة تحتاج رقم حيوان واحد. تقييم المجموعة متاح حاليًا في تقييم الروث فقط.', false);
       return;
     }
 
@@ -135,7 +156,7 @@ $$('[data-page]').forEach(btn=>{
       location.href = buildUrl(target);
     }
   }, {passive:false});
-});
+});;
 
   })();
   </script>
