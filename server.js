@@ -9635,6 +9635,51 @@ function reportRowSrv(section, key, label, targetText, actualText, balanceText, 
     note: note || '—'
   });
 }
+function fecesEvaluationReportRowsSrv(fe = {}) {
+  if (!fe || fe.available !== true) return [];
+
+  const isConsistent = fe.consistency === "consistent";
+  const scoreText = Number.isFinite(Number(fe.score))
+    ? `${fe.scoreLabel || "تقييم الروث"} — ${fe.score}/5`
+    : (fe.scoreLabel || "تقييم الروث");
+
+  const scoreStatus =
+    fe.scoreLabel && String(fe.scoreLabel).includes("مناسب")
+      ? "good"
+      : "warn";
+
+  const rows = [];
+
+  rows.push(reportRowSrv(
+    "تقييم روث المجموعة",
+    "feces_eval",
+    isConsistent ? "تقييم الروث" : "الغالب من 4 عينات",
+    isConsistent ? "مقياس الروث من 1 إلى 5" : "تقييم الاتجاه الغالب",
+    scoreText,
+    fe.consistencyLabel || "—",
+    isConsistent ? scoreStatus : "warn",
+    fe.guidance || "—",
+    fe.scoreLabel || "قراءة الروث"
+  ));
+
+  if (!isConsistent) {
+    rows.push(reportRowSrv(
+      "تقييم روث المجموعة",
+      "feces_inconsistency",
+      "أسباب عدم تجانس العينات",
+      "مراجعة تشغيلية داخل نفس المجموعة",
+      Array.isArray(fe.inconsistencyReasons) && fe.inconsistencyReasons.length
+        ? fe.inconsistencyReasons.join("، ")
+        : "خلط غير جيد، سيليكشن/فرز، تناول دفعات غير منتظمة، أو تفاوت وصول العليقة/الماء",
+      "—",
+      "warn",
+      "راجع جودة الخلط وشكل العليقة على المعلف ووجود فرز قبل الحكم على تركيبة العليقة.",
+      "عدم تجانس"
+    ));
+  }
+
+  return rows;
+}
 function reportBalanceStateTextSrv(status, balance = null){
   const s = String(status || '').toLowerCase();
   const b = Number(balance);
@@ -10086,7 +10131,7 @@ function buildNutritionReportDecisionSrv(e = {}, preparedRows = null){
   const rows = Array.isArray(preparedRows) ? preparedRows : buildNutritionReportRowsSrv(e);
   return buildNutritionFinalDecisionSrv(e, rows);
 }
-function buildNutritionReportRowsSrv(e = {}){
+function buildNutritionReportRowsSrv(e = {}, options = {}){
 const a = e?.nutrition?.analysis || {};
 const n = a.nutrition || {};
 const t = a.targets || {};
@@ -10288,7 +10333,11 @@ const nelReportLabel = isDryReport ? 'الطاقة الصافية' : 'الطاق
     rh.status || n.rumenStatus || 'muted',
     rh.reason || rh.instruction || n.rumenNote || '—'
   ));
+const fecesEvaluationForRows =
+  options.fecesEvaluation ||
+  buildFecesEvaluationForNutritionReportSrv(e, options.fecesEvents || []);
 
+rows.push(...fecesEvaluationReportRowsSrv(fecesEvaluationForRows));
 const dcadVal = n.dcadModel?.dcadMeqKgDM;
 if (reportStage === 'close_up' && finiteSrv(dcadVal)) {
   const isBuffaloForDcad =
@@ -10494,10 +10543,14 @@ function buildNutritionOperationalBatchSrv(e = {}, options = {}) {
   });
 }
 function attachNutritionReportPayloadSrv(e = {}, options = {}){
-  const reportRows = buildNutritionReportRowsSrv(e);
+  const fecesEvaluation = buildFecesEvaluationForNutritionReportSrv(e, options.fecesEvents || []);
+  const reportRows = buildNutritionReportRowsSrv(e, {
+    ...options,
+    fecesEvaluation
+  });
+
   const reportDecision = buildNutritionReportDecisionSrv(e, reportRows);
   const operationalBatch = buildNutritionOperationalBatchSrv(e, options);
-  const fecesEvaluation = buildFecesEvaluationForNutritionReportSrv(e, options.fecesEvents || []);
 
   return cleanObj({
     ...e,
