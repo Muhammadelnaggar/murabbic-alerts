@@ -25278,6 +25278,353 @@ Return JSON only:
     });
   }
 });
+function fecesGroupSessionDocIdSrv(uid, eventDate, groupId, groupName) {
+  return eventsPageStableDocIdSrv(
+    uid,
+    "feces_group_session",
+    eventDate,
+    groupId || groupName || "unknown_group"
+  );
+}
+
+function fecesStatsFromSamplesSrv(samples = []) {
+  const scores = samples
+    .map(s => Number(s.score))
+    .filter(n => Number.isFinite(n));
+
+  if (!scores.length) return null;
+
+  const sampleCount = scores.length;
+  const minScore = Math.min(...scores);
+  const maxScore = Math.max(...scores);
+  const variation = fecesRoundOneSrv(maxScore - minScore);
+  const avgScore = fecesRoundOneSrv(
+    scores.reduce((sum, n) => sum + n, 0) / sampleCount
+  );
+
+  return {
+    scores,
+    sampleCount,
+    minScore,
+    maxScore,
+    variation,
+    avgScore,
+    finalScore: avgScore,
+    label: fecesSessionLabelSrv(avgScore)
+  };
+}
+
+async function fecesSaveGroupSampleSessionSrv({
+  uid,
+  eventDate,
+  groupId,
+  groupName,
+  animalType,
+  sample,
+  userComment
+} = {}) {
+  const sessionRef = db.collection("feces_group_sessions").doc(
+    fecesGroupSessionDocIdSrv(uid, eventDate, groupId, groupName)
+  );
+
+  let result = null;
+
+  await db.runTransaction(async (tx) => {
+    const sessionSnap = await tx.get(sessionRef);
+    const oldData = sessionSnap.exists ? (sessionSnap.data() || {}) : {};
+
+    if (oldData.status === "completed" || oldData.completed === true) {
+      result = {
+        statusCode: 409,
+        ok: false,
+        error: "feces_group_session_already_completed",
+        message: "تم اكتمال تقييم هذه المجموعة لهذا التاريخ بالفعل.",
+        eventDate,
+        groupId: groupId || null,
+        groupName: groupName || null,
+        sampleCount: Number(oldData.sampleCount || 0),
+        samplesRequired: FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV,
+        completed: true,
+        groupComplete: true
+      };
+      return;
+    }
+
+    const oldSamples = Array.isArray(oldData.samples)
+      ? oldData.samples.filter(Boolean)
+      : [];
+
+    if (oldSamples.length >= FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV) {
+      result = {
+        statusCode: 409,
+        ok: false,
+        error: "feces_group_session_full",
+        message: "تم تسجيل كل عينات هذه المجموعة بالفعل.",
+        eventDate,
+        groupId: groupId || null,
+        groupName: groupName || null,
+        sampleCount: oldSamples.length,
+        samplesRequired: FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV,
+        completed: true,
+        groupComplete: true
+      };
+      return;
+    }
+
+    const sampleNo = oldSamples.length + 1;
+
+    const cleanSample = cleanObj({
+      ...sample,
+      sampleNo,
+      savedAtIso: new Date().toISOString()
+    });
+
+    const nextSamples = oldSamples.concat(cleanSample);
+    const nextCount = nextSamples.length;
+    const completed = nextCount >= FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV;
+
+    const baseSession = cleanObj({
+      userId: uid,
+      ownerUid: uid,
+
+      type: "تقييم الروث",
+      eventType: "تقييم الروث",
+      eventTypeNorm: "feces_eval",
+
+      scope: "feeding_group",
+      sessionType: "group_session_pending",
+
+      eventDate,
+      date: eventDate,
+
+      groupId: groupId || null,
+      groupName: groupName || null,
+      feedingGroupId: groupId || null,
+      feedingGroupName: groupName || null,
+      animalType: animalType || null,
+
+      sampleCount: nextCount,
+      samplesRequired: FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV,
+      nextSampleNo: completed ? null : nextCount + 1,
+      samples: nextSamples,
+
+      status: completed ? "completed" : "active",
+      completed,
+      notes: userComment || null,
+      comment: userComment || null,
+
+      source: "server:/api/feces/save:group-session",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    if (!sessionSnap.exists) {
+      baseSession.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+
+    if (!completed) {
+      tx.set(sessionRef, baseSession, { merge: true });
+
+      result = {
+        ok: true,
+        mode: "group",
+        completed: false,
+        groupComplete: false,
+        sessionId: sessionRef.id,
+        eventDate,
+        groupId: groupId || null,
+        groupName: groupName || null,
+        sampleNo,
+        sampleCount: nextCount,
+        samplesRequired: FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV,
+        nextSampleNo: nextCount + 1,
+        message: `✅ تم حفظ العينة ${nextCount} من ${FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV}. صوّر العينة ${nextCount + 1}.`
+      };
+      return;
+    }
+
+    const stats = fecesStatsFromSamplesSrv(nextSamples);
+
+    if (!stats) {
+      result = {
+        statusCode: 400,
+        ok: false,
+        error: "feces_group_scores_invalid",
+        message: "لا توجد درجات صالحة لحفظ تقييم المجموعة."
+      };
+      return;
+    }
+
+    const counterRef = db.collection("event_counters").doc(
+      fecesDailyCounterIdSrv(uid, eventDate, "save")
+    );
+
+    const counterSnap = await tx.get(counterRef);
+    const current = Number(counterSnap.exists ? (counterSnap.data()?.count || 0) : 0);
+    const currentDailyCount = Number.isFinite(current) && current > 0 ? current : 0;
+
+    if (currentDailyCount >= FECES_DAILY_LIMIT_SRV) {
+      result = {
+        statusCode: 429,
+        ok: false,
+        error: "feces_daily_save_limit_reached",
+        message: `🚫 تم الوصول للحد اليومي لحفظ تقييم الروث: ${FECES_DAILY_LIMIT_SRV} تقييمات في اليوم.`,
+        eventDate,
+        dailyLimit: FECES_DAILY_LIMIT_SRV,
+        currentDailyCount
+      };
+      return;
+    }
+
+    const dailySequence = currentDailyCount + 1;
+
+    const counterPayload = {
+      userId: uid,
+      ownerUid: uid,
+      counterType: "save",
+      eventType: "تقييم الروث",
+      eventTypeNorm: "feces_eval",
+      eventDate,
+      date: eventDate,
+      scope: "feeding_group_daily",
+      dailyLimit: FECES_DAILY_LIMIT_SRV,
+      count: dailySequence,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    if (!counterSnap.exists) {
+      counterPayload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+
+    tx.set(counterRef, counterPayload, { merge: true });
+
+    const eventRef = db.collection("events").doc(
+      fecesDailyEventDocIdSrv(uid, eventDate, dailySequence)
+    );
+
+    const payload = cleanObj({
+      userId: uid,
+      ownerUid: uid,
+
+      type: "تقييم الروث",
+      eventType: "تقييم الروث",
+      eventTypeNorm: "feces_eval",
+
+      date: eventDate,
+      eventDate,
+
+      scope: "feeding_group",
+      sessionType: "group_session",
+      sessionId: sessionRef.id,
+
+      linkedToAnimal: false,
+      animalId: null,
+      animalNumber: null,
+      sampleAnimalNumber: null,
+
+      groupId: groupId || null,
+      groupName: groupName || null,
+      feedingGroupId: groupId || null,
+      feedingGroupName: groupName || null,
+      animalType: animalType || null,
+
+      dailySequence,
+      dailyLimit: FECES_DAILY_LIMIT_SRV,
+
+      score: stats.finalScore,
+      value: stats.finalScore,
+      fecesScore: stats.finalScore,
+      label: stats.label,
+
+      sampleCount: stats.sampleCount,
+      samplesRequired: FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV,
+      samples: nextSamples,
+
+      avgScore: stats.avgScore,
+      minScore: stats.minScore,
+      maxScore: stats.maxScore,
+      variation: stats.variation,
+      variationLabel: stats.variation === 0
+        ? "متجانس"
+        : stats.variation <= 1
+          ? "تباين بسيط"
+          : "تباين واضح",
+
+      analysis: null,
+      sessionSummary: {
+        sampleCount: stats.sampleCount,
+        avgScore: stats.avgScore,
+        minScore: stats.minScore,
+        maxScore: stats.maxScore,
+        variation: stats.variation,
+        label: stats.label
+      },
+
+      notes: userComment || null,
+      comment: userComment || null,
+
+      source: "server:/api/feces/save",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    tx.set(eventRef, payload, { merge: false });
+
+    tx.set(sessionRef, cleanObj({
+      ...baseSession,
+      status: "completed",
+      completed: true,
+      eventId: eventRef.id,
+      dailySequence,
+      score: stats.finalScore,
+      fecesScore: stats.finalScore,
+      label: stats.label,
+      avgScore: stats.avgScore,
+      minScore: stats.minScore,
+      maxScore: stats.maxScore,
+      variation: stats.variation,
+      sessionSummary: payload.sessionSummary,
+      completedAt: admin.firestore.FieldValue.serverTimestamp()
+    }), { merge: true });
+
+    result = {
+      ok: true,
+      mode: "group",
+      completed: true,
+      groupComplete: true,
+      sessionId: sessionRef.id,
+      id: eventRef.id,
+      eventId: eventRef.id,
+      eventDate,
+
+      groupId: groupId || null,
+      groupName: groupName || null,
+
+      sampleNo,
+      sampleCount: stats.sampleCount,
+      samplesRequired: FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV,
+      samples: nextSamples,
+
+      score: stats.finalScore,
+      label: stats.label,
+      avgScore: stats.avgScore,
+      minScore: stats.minScore,
+      maxScore: stats.maxScore,
+      variation: stats.variation,
+
+      dailySequence,
+      dailyLimit: FECES_DAILY_LIMIT_SRV,
+
+      message: `✅ تم حفظ تقييم روث المجموعة (${stats.sampleCount} عينات) — المتوسط ${stats.finalScore}/5`,
+      saved: payload
+    };
+  });
+
+  return result || {
+    statusCode: 500,
+    ok: false,
+    message: "تعذّر حفظ عينة المجموعة."
+  };
+}
 app.post("/api/feces/save", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -25384,13 +25731,25 @@ app.post("/api/feces/save", requireUserId, async (req, res) => {
       });
     }
 
-    if (hasGroupScope && samples.length > FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV) {
-      return res.status(400).json({
-        ok: false,
-        message: `❌ جلسة تقييم المجموعة تقبل حتى ${FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV} عينات فقط.`
-      });
-    }
+   if (hasGroupScope && samples.length !== 1) {
+  return res.status(400).json({
+    ok: false,
+    message: "❌ حفظ تقييم المجموعة يستقبل عينة واحدة في كل مرة."
+  });
+}
+if (hasGroupScope) {
+  const groupResult = await fecesSaveGroupSampleSessionSrv({
+    uid,
+    eventDate,
+    groupId,
+    groupName,
+    animalType: String(body.animalType || body.species || "").trim(),
+    sample: samples[0],
+    userComment
+  });
 
+  return res.status(groupResult.statusCode || 200).json(groupResult);
+}
     const scores = samples
       .map(s => Number(s.score))
       .filter(n => Number.isFinite(n));
