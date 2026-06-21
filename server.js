@@ -9082,7 +9082,278 @@ function filterNutritionReportEvents(events, { type, stage, groupName } = {}) {
     .filter(e => !wantedGroup || normReportText(nutritionGroupNameFromEvent(e)) === wantedGroup)
     .sort((a, b) => eventCreatedMs(b) - eventCreatedMs(a));
 }
+function fecesNutritionRoundSrv(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n * 10) / 10 : null;
+}
 
+function isCompletedGroupFecesEventSrv(e = {}) {
+  const t = normReportText([
+    e.type,
+    e.eventType,
+    e.eventTypeNorm,
+    e.scope,
+    e.sessionType
+  ].filter(Boolean).join(" "));
+
+  const isFeces =
+    t.includes("feces") ||
+    t.includes("روث");
+
+  const isGroup =
+    t.includes("feeding_group") ||
+    e.groupId ||
+    e.groupName ||
+    e.feedingGroupId ||
+    e.feedingGroupName ||
+    e.groupKey;
+
+  const completed =
+    e.completed === true ||
+    e.status === "completed" ||
+    Number(e.sampleCount || 0) >= 4 ||
+    String(e.sessionType || "").includes("group_session");
+
+  return !!(isFeces && isGroup && completed);
+}
+
+function filterCompletedGroupFecesEventsSrv(events = []) {
+  return (events || [])
+    .filter(isCompletedGroupFecesEventSrv)
+    .sort((a, b) => eventCreatedMs(b) - eventCreatedMs(a));
+}
+
+function nutritionReportGroupTokensSrv(e = {}) {
+  const ctx = e?.nutrition?.context || {};
+
+  return [
+    ctx.groupId,
+    ctx.groupKey,
+    ctx.groupName,
+    ctx.group,
+    ctx.groupLabel,
+    e.groupId,
+    e.groupKey,
+    e.groupName,
+    nutritionGroupNameFromEvent(e)
+  ].map(normReportText).filter(Boolean);
+}
+
+function fecesReportGroupTokensSrv(e = {}) {
+  return [
+    e.groupId,
+    e.feedingGroupId,
+    e.groupKey,
+    e.groupName,
+    e.feedingGroupName
+  ].map(normReportText).filter(Boolean);
+}
+
+function sameFecesNutritionGroupSrv(nutritionEvent = {}, fecesEvent = {}) {
+  const a = nutritionReportGroupTokensSrv(nutritionEvent);
+  const b = fecesReportGroupTokensSrv(fecesEvent);
+
+  if (!a.length || !b.length) return false;
+
+  return a.some(x => b.includes(x));
+}
+
+function fecesSampleScoresForNutritionSrv(e = {}) {
+  if (Array.isArray(e.samples)) {
+    return e.samples
+      .map(s => Number(s?.score ?? s?.fecesScore ?? s?.value))
+      .filter(Number.isFinite);
+  }
+
+  const one = Number(e.avgScore ?? e.score ?? e.fecesScore ?? e.value);
+  return Number.isFinite(one) ? [one] : [];
+}
+
+function fecesScoreBandNutritionSrv(score) {
+  const s = Number(score);
+
+  if (!Number.isFinite(s)) {
+    return {
+      key: "unknown",
+      label: "غير محدد",
+      reasons: []
+    };
+  }
+
+  if (s < 2.5) {
+    return {
+      key: "loose",
+      label: "روث لين",
+      reasons: [
+        "نقص الألياف الفعالة",
+        "زيادة النشا أو الكربوهيدرات سريعة التخمر",
+        "تخمر سريع أو اضطراب بيئة الكرش",
+        "سرعة مرور العليقة",
+        "تغيير مفاجئ في العليقة"
+      ]
+    };
+  }
+
+  if (s > 3.5) {
+    return {
+      key: "dry",
+      label: "روث متماسك/جاف",
+      reasons: [
+        "نقص استهلاك الماء",
+        "ارتفاع المادة الجافة",
+        "زيادة الألياف الخشنة أو بطء الهضم",
+        "انخفاض الاستهلاك",
+        "بطء مرور العليقة"
+      ]
+    };
+  }
+
+  return {
+    key: "normal",
+    label: "روث مناسب غالبًا",
+    reasons: [
+      "قوام الروث لا يعطي إشارة قوية وحده لتعديل العليقة",
+      "يُقرأ مع اللبن والاستهلاك وTHI وتركيب العليقة"
+    ]
+  };
+}
+
+function dominantFecesBandNutritionSrv(scores = []) {
+  const rows = scores
+    .map(score => ({
+      score: Number(score),
+      band: fecesScoreBandNutritionSrv(score)
+    }))
+    .filter(x => Number.isFinite(x.score) && x.band.key !== "unknown");
+
+  const buckets = new Map();
+
+  for (const r of rows) {
+    const old = buckets.get(r.band.key) || {
+      key: r.band.key,
+      label: r.band.label,
+      reasons: r.band.reasons,
+      count: 0,
+      scores: []
+    };
+
+    old.count++;
+    old.scores.push(r.score);
+    buckets.set(r.band.key, old);
+  }
+
+  const ordered = [...buckets.values()].sort((a, b) => b.count - a.count);
+  const top = ordered[0] || null;
+  const second = ordered[1] || null;
+
+  if (!top) return null;
+
+  const tied = !!(second && second.count === top.count);
+  const avg = top.scores.reduce((sum, n) => sum + n, 0) / top.scores.length;
+
+  return {
+    key: top.key,
+    label: top.label,
+    count: top.count,
+    tied,
+    score: fecesNutritionRoundSrv(avg),
+    reasons: top.reasons
+  };
+}
+
+function buildFecesEvaluationForNutritionReportSrv(nutritionEvent = {}, fecesEvents = []) {
+  const fecesEvent = (fecesEvents || [])
+    .find(f => sameFecesNutritionGroupSrv(nutritionEvent, f));
+
+  if (!fecesEvent) {
+    return {
+      available: false,
+      message: "لا يوجد تقييم روث مجموعة مكتمل لهذه المجموعة."
+    };
+  }
+
+  const scores = fecesSampleScoresForNutritionSrv(fecesEvent);
+
+  if (!scores.length) {
+    return {
+      available: false,
+      eventId: fecesEvent.id || null,
+      message: "تقييم الروث موجود لكن لا يحتوي على درجات عينات صالحة."
+    };
+  }
+
+  const minScore = fecesNutritionRoundSrv(Math.min(...scores));
+  const maxScore = fecesNutritionRoundSrv(Math.max(...scores));
+  const avgScore = fecesNutritionRoundSrv(
+    Number(fecesEvent.avgScore ?? fecesEvent.score ?? (
+      scores.reduce((sum, n) => sum + n, 0) / scores.length
+    ))
+  );
+
+  const variation = fecesNutritionRoundSrv(
+    Number.isFinite(Number(fecesEvent.variation))
+      ? Number(fecesEvent.variation)
+      : Number(maxScore) - Number(minScore)
+  );
+
+  const isConsistent = Number(variation) <= 1;
+
+  const avgBand = fecesScoreBandNutritionSrv(avgScore);
+  const dominant = dominantFecesBandNutritionSrv(scores);
+
+  const selectedBand = isConsistent
+    ? avgBand
+    : (dominant && !dominant.tied ? fecesScoreBandNutritionSrv(dominant.score) : avgBand);
+
+  const selectedScore = isConsistent
+    ? avgScore
+    : (dominant && !dominant.tied ? dominant.score : avgScore);
+
+  const inconsistencyReasons = [
+    "خلط غير جيد للعليقة",
+    "سيليكشن / فرز في العليقة",
+    "Slug feeding أو تناول دفعات غير منتظمة",
+    "تفاوت وصول العليقة أو الماء"
+  ];
+
+  return cleanObj({
+    available: true,
+
+    eventId: fecesEvent.id || null,
+    eventDate: fecesEvent.eventDate || fecesEvent.date || null,
+
+    groupId: fecesEvent.groupId || fecesEvent.feedingGroupId || null,
+    groupName: fecesEvent.groupName || fecesEvent.feedingGroupName || null,
+
+    sampleCount: scores.length,
+    sampleScores: scores,
+
+    avgScore,
+    minScore,
+    maxScore,
+    variation,
+
+    consistency: isConsistent ? "consistent" : "not_consistent",
+    consistencyLabel: isConsistent ? "العينات متجانسة" : "العينات غير متجانسة",
+
+    score: selectedScore,
+    scoreLabel: selectedBand.label,
+    scoreSource: isConsistent ? "average" : "dominant_from_4_samples",
+
+    dominantLabel: dominant?.label || null,
+    dominantCount: dominant?.count || null,
+    dominantTied: dominant?.tied || false,
+
+    likelyReasons: selectedBand.reasons,
+    inconsistencyReasons: isConsistent ? [] : inconsistencyReasons,
+
+    guidance: isConsistent
+      ? `العينات متجانسة؛ يتم اعتماد مقياس الروث من 1 إلى 5. القراءة: ${selectedBand.label}.`
+      : `العينات غير متجانسة؛ يتم تقييم الاتجاه الغالب من الأربع عينات. راجع: ${inconsistencyReasons.join("، ")}.`,
+
+    note: "تقييم الروث مؤشر مساعد ويُقرأ مع اللبن والاستهلاك وTHI وتركيب العليقة."
+  });
+}
 function buildLactatingNutritionSummary(events = []) {
   const latestByGroup = new Map();
 
@@ -10226,15 +10497,17 @@ function attachNutritionReportPayloadSrv(e = {}, options = {}){
   const reportRows = buildNutritionReportRowsSrv(e);
   const reportDecision = buildNutritionReportDecisionSrv(e, reportRows);
   const operationalBatch = buildNutritionOperationalBatchSrv(e, options);
-  
+  const fecesEvaluation = buildFecesEvaluationForNutritionReportSrv(e, options.fecesEvents || []);
+
   return cleanObj({
     ...e,
     nutrition: {
       ...(e.nutrition || {}),
       reportDecision,
       reportStatus: reportDecision.status || reportStatusFromEventSrv(e),
-     reportRows,
-     operationalBatch
+      reportRows,
+      operationalBatch,
+      fecesEvaluation
     }
   });
 }
@@ -10651,9 +10924,15 @@ app.get('/api/nutrition/report/latest', requireUserId, async (req, res) => {
   Math.min(12, Math.round(Number(req.query.distributionsPerDay || 2) || 2))
 );
 
-const reportOptions = { distributionsPerDay };
-    const events = await fetchNutritionReportEvents(tenant);
-    const filtered = filterNutritionReportEvents(events, { type, stage, groupName });
+const events = await fetchNutritionReportEvents(tenant);
+const fecesEvents = filterCompletedGroupFecesEventsSrv(events);
+
+const reportOptions = {
+  distributionsPerDay,
+  fecesEvents
+};
+
+const filtered = filterNutritionReportEvents(events, { type, stage, groupName });
 
     if (scope === 'all') {
 const report = buildStageSeparatedNutritionReport(filtered, reportOptions);
