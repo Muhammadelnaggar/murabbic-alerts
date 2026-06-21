@@ -236,20 +236,27 @@
         || localStorage.getItem('uid')
         || '';
     }
+    let selectedGroupForCamera = null;
+   function getSelectedGroupMeta(){
+  const sel = $('#groupSelect');
+  const opt = sel?.options?.[sel.selectedIndex];
 
-    function getSelectedGroupMeta(){
-      const sel = $('#groupSelect');
-      const opt = sel?.options?.[sel.selectedIndex];
+  const meta = {
+    name: norm(opt?.dataset?.groupName || ''),
+    groupName: norm(opt?.dataset?.groupName || ''),
+    animalType: norm(opt?.dataset?.animalType || ''),
+    groupId: norm(opt?.dataset?.groupId || ''),
+    groupKey: norm(opt?.dataset?.groupKey || ''),
+    feedingEligible: opt?.dataset?.feedingEligible === '1'
+  };
 
-      return {
-        name: norm(opt?.dataset?.groupName || ''),
-        groupName: norm(opt?.dataset?.groupName || ''),
-        animalType: norm(opt?.dataset?.animalType || ''),
-        groupId: norm(opt?.dataset?.groupId || ''),
-        groupKey: norm(opt?.dataset?.groupKey || ''),
-        feedingEligible: opt?.dataset?.feedingEligible === '1'
-      };
-    }
+  if (meta.groupName || meta.groupId || meta.groupKey) {
+    selectedGroupForCamera = meta;
+    return meta;
+  }
+
+  return selectedGroupForCamera || meta;
+}
 
     function currentNumbersAndDate(){
       const numbers = parseNumbers($('#animalNumbers')?.value || '');
@@ -410,7 +417,7 @@
       const textarea = $('#animalNumbers');
 
       if (!textarea) return;
-
+      selectedGroupForCamera = getSelectedGroupMeta();
       textarea.value = list.join('\n');
 
       if (list.length === 1){
@@ -497,23 +504,98 @@
       u.searchParams.set('eventDate', date);
       location.href = u.toString();
     }
+    function openSmartCameraFromEvents(){
+  const { numbers, date } = currentNumbersAndDate();
+  const group = getSelectedGroupMeta();
+  const hasGroup = !!(group.groupName || group.name || group.groupId || group.groupKey);
+  const warn = $('#warn');
 
-    function wireButtons(){
-     $$('#eventButtons [data-page]').forEach(btn=>{
-        btn.addEventListener('click', async (e)=>{
-          e.preventDefault();
+  if (warn) warn.textContent = '';
 
-          const target = btn.getAttribute('data-page') || '';
-          const out = await resolveEventFromServer({ page: target });
+  const u = new URL('smart-camera.html', location.href);
+  u.searchParams.set('date', date);
+  u.searchParams.set('eventDate', date);
 
-          if (!out) return;
+  if (hasGroup) {
+    u.searchParams.set('mode', 'group');
+    if (group.groupName || group.name) u.searchParams.set('groupName', group.groupName || group.name);
+    if (group.groupId) u.searchParams.set('groupId', group.groupId);
+    if (group.groupKey) u.searchParams.set('groupKey', group.groupKey);
+    if (group.animalType) u.searchParams.set('animalType', group.animalType);
+    location.href = u.toString();
+    return;
+  }
 
-          if (out.redirectUrl){
-            location.href = out.redirectUrl;
+  if (numbers.length === 1) {
+    u.searchParams.set('mode', 'individual');
+    u.searchParams.set('number', numbers[0]);
+    location.href = u.toString();
+    return;
+  }
+
+  if (warn) {
+    warn.textContent = numbers.length > 1
+      ? '⚠️ الكاميرا الذكية لتقييم الروث تقبل رقمًا واحدًا أو مجموعة مختارة فقط. اختر مجموعة من القائمة ولا ترسل عدة أرقام.'
+      : '⚠️ أدخل رقم حيوان واحد أو اختر مجموعة قبل فتح الكاميرا الذكية.';
+  }
+}
+function wireButtons(){
+  $$('#eventButtons [data-page]').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      e.preventDefault();
+
+      const target = btn.getAttribute('data-page') || '';
+
+      if (target === 'smart-camera.html') {
+        const { numbers, date } = currentNumbersAndDate();
+        const group = getSelectedGroupMeta();
+        const hasGroup = !!(group.groupName || group.name || group.groupId || group.groupKey);
+
+        $('#warn').textContent = '';
+
+        const u = new URL('smart-camera.html', location.href);
+        u.searchParams.set('date', date);
+        u.searchParams.set('eventDate', date);
+
+        if (hasGroup) {
+          u.searchParams.set('mode', 'group');
+
+          if (group.groupName || group.name) {
+            u.searchParams.set('groupName', group.groupName || group.name);
           }
-        }, {passive:false});
-      });
-    }
+
+          if (group.groupId) u.searchParams.set('groupId', group.groupId);
+          if (group.groupKey) u.searchParams.set('groupKey', group.groupKey);
+          if (group.animalType) u.searchParams.set('animalType', group.animalType);
+
+          location.href = u.toString();
+          return;
+        }
+
+        if (numbers.length === 1) {
+          u.searchParams.set('mode', 'individual');
+          u.searchParams.set('number', numbers[0]);
+          location.href = u.toString();
+          return;
+        }
+
+        $('#warn').textContent = numbers.length > 1
+          ? '⚠️ الكاميرا الذكية تقبل رقمًا واحدًا أو مجموعة مختارة فقط.'
+          : '⚠️ أدخل رقم حيوان واحد أو اختر مجموعة قبل فتح الكاميرا الذكية.';
+
+        return;
+      }
+
+      const out = await resolveEventFromServer({ page: target });
+
+      if (!out) return;
+
+      if (out.redirectUrl){
+        location.href = out.redirectUrl;
+      }
+    }, {passive:false});
+  });
+}
 function wireEventListTop(){
   document.getElementById('btnEventListTop')?.addEventListener('click', async (e)=>{
     e.preventDefault();
@@ -527,15 +609,19 @@ function wireEventListTop(){
     }
   }, {passive:false});
 }
-    function wireLive(){
-      const input = $('#animalNumbers');
-      if (!input) return;
-   
-      input.addEventListener('input', ()=>{
-        refreshAnimalInfo();
-      }, {passive:true});
-    }
+function wireLive(){
+  const input = $('#animalNumbers');
+  if (!input) return;
 
+  input.addEventListener('input', ()=>{
+    selectedGroupForCamera = null;
+
+    const sel = $('#groupSelect');
+    if (sel) sel.value = '';
+
+    refreshAnimalInfo();
+  }, {passive:true});
+}
  let trimmingBusy = false;
 
 async function saveTrimmingInline(){
