@@ -25964,71 +25964,111 @@ Task:
 Evaluate only the manure/feces visible in the TARGET image.
 Return one integer feces score from 1 to 5.
 
-Core scale:
-1 = إسهال مائي شديد: الروث سائل جدًا مثل الماء، منتشر كبركة أو بقعة مائية، بلا كومة وبلا تماسك واضح.
-2 = لين جدًا أو شبه سائل: الروث مفرود أو منخفض وواسع الانتشار، لكنه ليس ماءً خالصًا وما زال له قوام أو سطح واضح.
-3 = نموذجي: قرص دائري منتظم، ارتفاع معتدل، قوام عصيدي/كريمي رطب، والحلقات أو التموجات تظهر أعلى سطح القرص.
-4 = جاف أو متماسك أو ضخم أكثر من المثالي: كتلة كبيرة/voluminous، أو شكل غير منتظم، أو ارتفاع زائد، أو قوام أثقل/أجف من المثالي، حتى لو ظهرت حلقات.
-5 = جاف جدًا/صلب أو غير طبيعي: كتل قاسية، تشققات، كرات جافة، أو روث جاف/متماسك مغطى بمخاط.
+This scoring is for adult dairy cows and buffalo only.
+Do NOT evaluate calves.
+Do NOT diagnose disease.
+Do NOT score from color alone.
+
+Quality gate:
+- Reject if manure is not clearly visible.
+- Reject if the image is too dark, blurry, too far, cropped, heavily shadowed, mixed with mud/water/bedding, or if texture, liquid spreading, loose splattering, height, pile structure, volume, or firmness cannot be judged.
+- If rejected, do not estimate a score.
+
+Official visual scale:
+
+Score 1 — Liquid / watery diarrhea:
+Manure is liquid or diarrhea-like. It spreads immediately like a fluid or puddle, with little or no fecal structure. It does not form a pile.
+Use score 1 ONLY when the manure is clearly liquid/watery.
+
+Score 2 — Runny / loose, not liquid diarrhea:
+Manure is runny and loose, but not water-like. It may splatter or scatter on impact and then flatten into a thin pad. It does not form a distinct pile. The manure pad is usually less than 1 inch high.
+It still has visible fecal consistency and is NOT liquid diarrhea.
+Important: in score 2, splatter/scatter means loose manure breaking or flattening on impact, NOT dry separated fragments.
+
+Score 3 — Optimal lactating dairy manure:
+Manure is soft and porridge-like. It forms a moderate-height, self-contained soft pile about 1 to 2 inches high.
+If rings are present, they are flat or horizontal surface rings within a soft porridge-like pile.
+The pile looks soft and spreadable, not bulky, not heavy, not dense, and not dry.
+
+Score 4 — Voluminous / firm / high-standing mound:
+Manure forms a bulky, thick, voluminous, firm mound that stands over 2 inches high.
+It holds its shape strongly and looks dense or heavy rather than soft and porridge-like.
+It may show folds or ring-like surface lines, but these are NOT the flat horizontal porridge rings of score 3.
+Score 4 is not dry fecal balls.
+
+Score 5 — Very stiff / dry / fecal balls:
+Manure is very stiff and dry, hard-looking, segmented, cracked, or formed into fecal balls. It may appear difficult to pass.
 
 Strict decision rules:
-- لا تعطِ الدرجة 1 إلا إذا كان الروث مائيًا بوضوح مثل الماء وبلا أي تماسك تقريبًا.
-- إذا كان الروث لينًا أو مفرودًا أو منتشرًا لكنه ما زال له قوام واضح، فالدرجة 2 وليست 1.
-- لا تعطِ الدرجة 3 إلا إذا اجتمعت العلامات المثالية معًا:
-  1) شكل قرص دائري منتظم.
-  2) ارتفاع معتدل، ليس مسطحًا جدًا وليس عاليًا جدًا.
-  3) قوام عصيدي/كريمي رطب وناعم.
-  4) حجم معتدل غير ضخم.
-  5) حلقات أو تموجات ظاهرة أعلى سطح القرص نفسه.
-- الحلقات وحدها لا تكفي للدرجة 3.
-- إذا ظهرت حلقات لكن الروث ضخم، أو كبير الكتلة، أو غير منتظم، أو جاف، أو متماسك زيادة، أو عالي أكثر من المثالي، فالدرجة 4 وليست 3.
-- إذا كان الروث bulky أو voluminous أو overly massive، لا تعطه الدرجة 3؛ اختر 4.
-- إذا كان الروث جافًا جدًا، صلبًا، متشققًا، كرات، أو كتل قاسية، فالدرجة 5.
-- المخاط مع الروث الجاف أو المتماسك ليس مثاليًا:
-  - إذا ظهر مخاط مع روث جاف/متماسك، فالدرجة 5.
-  - إذا ظهر مخاط مع روث متوسط التماسك، فالدرجة 4 على الأقل.
-  - لا تعطِ الدرجة 3 أبدًا لروث مغطى بمخاط.
-  ${expertCalibrationPrompt ? `
+- Score 1 = liquid/watery manure that spreads like fluid. Do not give score 1 unless watery diarrhea is visually clear.
+- Score 2 = loose/runny manure that may splatter/scatter on impact and flatten into a thin pad, but still has fecal consistency. It is not liquid diarrhea.
+- Score 3 requires porridge-like softness, moderate height, self-contained structure, and flat/horizontal surface rings if rings are visible.
+- Do not classify manure as score 3 based on rings alone.
+- If the manure is bulky, voluminous, high-standing, dense, heavy, firm, or not porridge-like, classify it as score 4 even if folds or ring-like lines are visible.
+- Score 4 is a separate firm/voluminous pattern, not merely score 3 but slightly drier.
+- Do not give score 5 unless manure is clearly very stiff, dry, hard, segmented, cracked, or formed into fecal balls.
+- Color alone must not determine the score.
+- If obvious mucus, blood, or abnormal visible material is present, mention it in the Arabic reason, but still score mainly by consistency.
 
-  Expert calibration memory:
-  ${expertCalibrationPrompt}
-  ` : ""}
+Surface and background adjustment rules:
+The same manure score can look different on concrete, soil, bedding, or grass.
+Do not change the score because of the ground surface alone. Judge the manure intrinsic consistency.
+
+On concrete:
+- Spread, edges, pad thickness, and horizontal rings may be easier to see.
+- Do not downgrade to score 2 only because a score 3 pile spreads slightly on a smooth surface, if it still remains soft, porridge-like, moderate-height, and self-contained.
+
+On grass or bedding:
+- Grass may hide the lower edge, reduce visible spread, or make the pile look less regular.
+- Do not upgrade to score 4 only because grass supports the manure or makes it look taller.
+- Focus on the visible central mass, moisture, texture, softness, pile structure, and whether it looks porridge-like or firm/bulky.
+
+A score 3 manure can appear on concrete, soil, bedding, or grass if it remains porridge-like, soft, moderate in height, self-contained, not liquid, not firm, not bulky, not dense, and not dry.
+A score 4 manure requires a firm, bulky, voluminous, high-standing mound that does not look porridge-like.
+
+${typeof expertCalibrationPrompt !== "undefined" && expertCalibrationPrompt ? `
+Expert calibration memory:
+${expertCalibrationPrompt}
+` : ""}
+
 Visual priorities:
-First judge the overall manure shape, volume, height, moisture, spread, and structure.
-Then use central rings only as supporting evidence.
-Never let rings override bulky, dry, stiff, irregular, or over-structured appearance.
-
-Ignore:
-- floor color
-- grass/background
-- shadows
-- lighting differences
-- animal breed or environment
-
-Do not diagnose disease.
-This is a visual manure consistency score only.
-
-If the image does not clearly show manure, return ok:false.
+First judge consistency, moisture, pile structure, height, volume, liquid spreading versus loose splattering, firmness, and visible texture.
+Use rings only as supporting evidence after judging the overall structure.
+Never let rings override bulky, dense, high-standing, firm, dry, or non-porridge appearance.
 
 Output rules:
 - Return JSON only.
-- Return an integer score only: 1, 2, 3, 4, or 5.
+- Return one integer score only: 1, 2, 3, 4, or 5.
 - Do not return decimals or ranges.
+- If the image is not suitable for evaluation, return ok:false and score:null.
 - All displayed text must be Arabic only.
 - Do not write English words in visualFindings, reason, qualityLabel, or message.
-- The reason must be educational, concise, and based only on visible consistency, shape, spread, moisture, pile height, volume, rings, dryness, mucus, and structure.
+- The reason must be educational, concise, and based only on visible consistency, shape, liquid spreading, loose splattering, moisture, pile height, volume, rings, dryness, mucus, and structure.
 
-Return JSON only:
-{
-  "ok": true,
-  "score": 4,
-  "confidence": "high|medium|low",
-  "qualityLabel": "صالحة للتقييم|متوسطة وتحتاج حذر|غير صالحة للتقييم",
-  "visualFindings": "وصف عربي مختصر لما يظهر في الصورة",
-  "reason": "سبب عربي تعليمي مختصر لاختيار الدرجة"
-}
+Return exactly one JSON object with these keys:
+ok
+score
+confidence
+qualityLabel
+visualFindings
+reason
+
+For accepted images:
+- ok must be true.
+- score must be one integer from 1 to 5.
+- confidence must be "high", "medium", or "low".
+- qualityLabel must be Arabic.
+- visualFindings must be Arabic.
+- reason must be Arabic.
+
+For rejected images:
+- ok must be false.
+- score must be null.
+- confidence must be "low".
+- qualityLabel must be "غير صالحة للتقييم".
+- visualFindings must explain the visible problem in Arabic.
+- reason must explain in Arabic why manure consistency cannot be evaluated reliably.
 `.trim();
-
     const content = [
       { type: "input_text", text: prompt },
       { type: "input_text", text: "TARGET manure/feces image." },
