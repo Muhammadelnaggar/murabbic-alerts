@@ -25270,6 +25270,85 @@ function fecesBuildNoteSrv(score) {
 }
 const FECES_DAILY_LIMIT_SRV = 10;
 const FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV = 4;
+const FECES_TRAINING_ADMIN_UID_SRV =
+  process.env.FECES_TRAINING_ADMIN_UID || "DEQ98faBPYSFikEMtaPTTynJ6iI2";
+
+const FECES_TRAINING_CORRECTIONS_COLLECTION_SRV = "feces_training_corrections";
+const FECES_TRAINING_SUMMARY_COLLECTION_SRV = "feces_training_summary";
+
+function fecesIsTrainingAdminSrv(uid) {
+  return String(uid || "").trim() === String(FECES_TRAINING_ADMIN_UID_SRV || "").trim();
+}
+
+function fecesShortTextSrv(v, max = 280) {
+  const s = String(v || "").trim().replace(/\s+/g, " ");
+  if (!s) return "";
+  return s.length > max ? s.slice(0, max).trim() : s;
+}
+
+function fecesImageHashSrv(image = "") {
+  const raw = String(image || "");
+  if (!raw) return "";
+
+  try {
+    const crypto = require("crypto");
+    return crypto.createHash("sha1").update(raw.slice(0, 300000)).digest("hex");
+  } catch {
+    return "";
+  }
+}
+
+async function fecesBuildExpertCalibrationPromptSrv() {
+  if (!db) return "";
+
+  try {
+    const snap = await db
+      .collection(FECES_TRAINING_CORRECTIONS_COLLECTION_SRV)
+      .orderBy("createdAt", "desc")
+      .limit(12)
+      .get();
+
+    const rows = snap.docs
+      .map(doc => doc.data() || {})
+      .filter(r => {
+        const predicted = Number(r.predictedScore);
+        const corrected = Number(r.correctedScore);
+
+        return (
+          Number.isFinite(predicted) &&
+          Number.isFinite(corrected) &&
+          predicted >= 1 && predicted <= 5 &&
+          corrected >= 1 && corrected <= 5 &&
+          predicted !== corrected
+        );
+      })
+      .slice(0, 6);
+
+    if (!rows.length) return "";
+
+    const lines = rows.map((r, idx) => {
+      const note = fecesShortTextSrv(r.expertNote || r.note || r.reason || "", 160);
+      const visual = fecesShortTextSrv(r.visualFindings || r.findings?.visual || "", 160);
+
+      return [
+        `${idx + 1}) توقع النموذج سابقًا درجة ${r.predictedScore} وصحح الخبير الدرجة إلى ${r.correctedScore}.`,
+        visual ? `العلامات البصرية المصححة: ${visual}.` : "",
+        note ? `ملاحظة الخبير: ${note}.` : ""
+      ].filter(Boolean).join(" ");
+    });
+
+    return `
+Expert correction memory from Dr. Mohamed:
+Use these recent expert corrections only as calibration guidance when similar visual signs appear.
+Do not copy a correction blindly; always score the current TARGET image from its visible manure signs.
+${lines.join("\n")}
+`.trim();
+
+  } catch (e) {
+    console.warn("feces training calibration skipped:", e.message || e);
+    return "";
+  }
+}
 
 
 function fecesDailyCounterIdSrv(uid, eventDate, counterType = "save") {
@@ -25479,6 +25558,7 @@ if (!dailyUsage.allowed) {
    currentDailyCount: dailyUsage.currentDailyCount || FECES_DAILY_LIMIT_SRV
   });
 }
+  const expertCalibrationPrompt = await fecesBuildExpertCalibrationPromptSrv();
 const prompt = `
 You are an expert dairy cattle manure consistency evaluator.
 
@@ -25510,7 +25590,11 @@ Strict decision rules:
   - إذا ظهر مخاط مع روث جاف/متماسك، فالدرجة 5.
   - إذا ظهر مخاط مع روث متوسط التماسك، فالدرجة 4 على الأقل.
   - لا تعطِ الدرجة 3 أبدًا لروث مغطى بمخاط.
+  ${expertCalibrationPrompt ? `
 
+  Expert calibration memory:
+  ${expertCalibrationPrompt}
+  ` : ""}
 Visual priorities:
 First judge the overall manure shape, volume, height, moisture, spread, and structure.
 Then use central rings only as supporting evidence.
@@ -25663,6 +25747,223 @@ Return JSON only:
     return res.status(500).json({
       ok: false,
       message: "حدث خطأ أثناء تحليل الروث بالرؤية."
+    });
+  }
+});
+app.get("/api/feces/training/gate", requireUserId, async (req, res) => {
+  try {
+    const canTrain = fecesIsTrainingAdminSrv(req.userId);
+
+    return res.json({
+      ok: true,
+      canTrain,
+      trainingEnabled: canTrain,
+      mode: canTrain ? "expert_correction" : "hidden",
+      message: canTrain
+        ? "أدوات تدريب نموذج الروث متاحة لهذا الحساب."
+        : "أدوات التدريب غير متاحة لهذا الحساب."
+    });
+  } catch (e) {
+    console.error("feces training gate failed:", e.message || e);
+    return res.status(500).json({
+      ok: false,
+      canTrain: false,
+      message: "تعذّر فتح أدوات تدريب نموذج الروث."
+    });
+  }
+});
+
+app.post("/api/feces/training/save", requireUserId, async (req, res) => {
+  try {
+    if (!fecesIsTrainingAdminSrv(req.userId)) {
+      return res.status(403).json({
+        ok: false,
+        canTrain: false,
+        error: "feces_training_forbidden",
+        message: "أدوات تدريب نموذج الروث متاحة لحساب دكتور محمد فقط."
+      });
+    }
+
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر حفظ تصحيح التدريب — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const analysis = body.analysis && typeof body.analysis === "object" ? body.analysis : {};
+
+    const predictedScore = fecesClampScoreSrv(
+      body.predictedScore ??
+      body.modelScore ??
+      analysis.score
+    );
+
+    const correctedScore = fecesClampScoreSrv(
+      body.correctedScore ??
+      body.expertScore ??
+      body.correctScore
+    );
+
+    if (!Number.isFinite(Number(predictedScore))) {
+      return res.status(400).json({
+        ok: false,
+        message: "درجة النموذج الأصلية غير صالحة."
+      });
+    }
+
+    if (!Number.isFinite(Number(correctedScore))) {
+      return res.status(400).json({
+        ok: false,
+        message: "اختر الدرجة الصحيحة من 1 إلى 5 قبل حفظ التصحيح."
+      });
+    }
+
+    const eventDateRaw = String(
+      body.eventDate ||
+      body.date ||
+      (typeof cairoTodayISO === "function"
+        ? cairoTodayISO()
+        : new Date().toISOString().slice(0, 10))
+    ).trim().slice(0, 10);
+
+    const eventDate = /^\d{4}-\d{2}-\d{2}$/.test(eventDateRaw)
+      ? eventDateRaw
+      : (typeof cairoTodayISO === "function"
+        ? cairoTodayISO()
+        : new Date().toISOString().slice(0, 10));
+
+    const group = body.group && typeof body.group === "object" ? body.group : {};
+
+    const groupId = fecesGroupValueSrv(
+      body.groupId,
+      body.feedingGroupId,
+      body.groupKey,
+      group.groupId,
+      group.id,
+      group.groupKey
+    );
+
+    const groupName = fecesGroupValueSrv(
+      body.groupName,
+      body.feedingGroupName,
+      group.groupName,
+      group.name
+    );
+
+    const animalNumber = fecesDigitsOnlySrv(
+      body.animalNumber ||
+      body.number ||
+      body.sampleAnimalNumber ||
+      ""
+    );
+
+    const mode = groupId || groupName
+      ? "group"
+      : animalNumber
+        ? "individual"
+        : String(body.mode || "unknown").trim() || "unknown";
+
+    const visualFindings = fecesShortTextSrv(
+      body.visualFindings ||
+      analysis.visualFindings ||
+      analysis.findings?.visual ||
+      "",
+      500
+    );
+
+    const expertNote = fecesShortTextSrv(
+      body.expertNote ||
+      body.note ||
+      body.trainingNote ||
+      "",
+      700
+    );
+
+    const image = String(body.image || body.imageData || body.photo || "");
+    const imageHash = fecesImageHashSrv(image);
+
+    const payload = cleanObj({
+      userId: uid,
+      ownerUid: uid,
+      adminUid: uid,
+
+      eventType: "تدريب نموذج الروث",
+      eventTypeNorm: "feces_training_correction",
+      date: eventDate,
+      eventDate,
+
+      mode,
+      animalNumber: mode === "individual" ? (animalNumber || null) : null,
+      groupId: mode === "group" ? (groupId || null) : null,
+      groupName: mode === "group" ? (groupName || null) : null,
+      animalType: String(body.animalType || body.species || "").trim() || null,
+
+      predictedScore,
+      predictedLabel: fecesLabelSrv(predictedScore),
+      correctedScore,
+      correctedLabel: fecesLabelSrv(correctedScore),
+      delta: correctedScore - predictedScore,
+
+      modelReason: fecesShortTextSrv(analysis.reason || body.modelReason || "", 700),
+      visualFindings,
+      expertNote,
+
+      modelQuality: analysis.quality || null,
+      modelAnalysis: cleanObj({
+        score: analysis.score ?? predictedScore,
+        label: analysis.label || fecesLabelSrv(predictedScore),
+        quality: analysis.quality || null,
+        reason: analysis.reason || null,
+        findings: analysis.findings || null,
+        note: analysis.note || null,
+        rangeText: analysis.rangeText || "1–5"
+      }),
+
+      imageHash: imageHash || null,
+      imageReceived: Boolean(image),
+      imageStored: false,
+
+      status: "accepted",
+      source: "server:/api/feces/training/save",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    const ref = await db
+      .collection(FECES_TRAINING_CORRECTIONS_COLLECTION_SRV)
+      .add(payload);
+
+    await db
+      .collection(FECES_TRAINING_SUMMARY_COLLECTION_SRV)
+      .doc("global")
+      .set({
+        lastCorrectionAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastCorrectionId: ref.id,
+        lastPredictedScore: predictedScore,
+        lastCorrectedScore: correctedScore,
+        totalCorrections: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+    return res.json({
+      ok: true,
+      canTrain: true,
+      id: ref.id,
+      correctionId: ref.id,
+      predictedScore,
+      correctedScore,
+      message: `✅ تم حفظ تصحيح التدريب: النموذج ${predictedScore} → الصحيح ${correctedScore}.`
+    });
+
+  } catch (e) {
+    console.error("feces training save failed:", e.message || e);
+    return res.status(500).json({
+      ok: false,
+      message: "تعذّر حفظ تصحيح تدريب نموذج الروث."
     });
   }
 });
