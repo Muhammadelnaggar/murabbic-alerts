@@ -25993,7 +25993,8 @@ If rings are present, they are flat or horizontal surface rings within the soft 
 The manure looks soft and spreadable, not bulky, not heavy, not dense, not compact, not doughy, and not dry.
 Score 3 must look like a soft porridge-like disc, not like a compact mud/clay mound, bulky mass, raised mound, or thick doughy mass.
 If the manure forms one thick bulky mass with raised sides, deep folds, or compact mound appearance, it is NOT score 3.
-
+Do NOT call it a pat/disc unless it has a low, broad, flat profile with a relatively flat top and no raised bulky center.
+If the manure has a raised central mass, domed shape, stacked appearance, raised sides, or mound-like body, it is NOT score 3.
 
 Score 4 — Voluminous / pasty / doughy mound:
 Manure forms a voluminous, bulky, thick, pasty or doughy mound.
@@ -26014,10 +26015,12 @@ Strict decision rules:
 - Score 4 is a separate firm/voluminous pattern, not merely score 3 but slightly drier.
 - Score 3 shape must be a soft round/oval pat or disc, not a mound.
 Mandatory 3 vs 4 boundary check:
-Before assigning score 3, ask: does this look like soft porridge or like a voluminous pasty/doughy mound?
-If it looks voluminous, bulky, thick, pasty, doughy, clay-like, compact, heavy, raised, or deeply folded, choose score 4.
-Score 3 is allowed only when the manure is clearly soft porridge-like, moderate-height, spreadable, not bulky, not compact, and has flat horizontal surface rings if rings are visible.
-When uncertain between score 3 and score 4, choose score 4 if the pile is thick, voluminous, pasty/doughy, or not clearly porridge-like.
+Before assigning score 3, first decide the visible shape:
+- Low flat pat/disc = possible score 3.
+- Raised mound, domed mass, bulky mass, stacked mass, raised center, raised sides, or doughy lump = score 4.
+
+Never describe score 3 as a disc unless the manure is visibly low, broad, flat, and porridge-like.
+If uncertain whether it is a flat disc or raised mound, choose score 4.
 - Do not give score 5 unless manure is clearly very stiff, dry, hard, segmented, cracked, or formed into fecal balls.
 - Color alone must not determine the score.
 - If obvious mucus, blood, or abnormal visible material is present, mention it in the Arabic reason, but still score mainly by consistency.
@@ -26057,6 +26060,8 @@ Output rules:
 - Do not write English words in visualFindings, reason, qualityLabel, or message.
 - The reason must be educational, concise, and based only on visible consistency, shape, liquid spreading, loose splattering, moisture, pile height, volume, rings, dryness, mucus, and structure.
 - For score 3, describe the shape in Arabic as "قرص عصيدي لين" or "بقعة/قرص متماسك لين"; do not describe score 3 as "كومة".
+For score 3, do not say "قرص" unless the shape is visibly low, broad, flat, and not raised.
+If the visible shape has a raised center or mound-like body, do not describe it as "قرص"; classify it as score 4.
 Return exactly one JSON object with these keys:
 ok
 score
