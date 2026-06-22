@@ -25987,12 +25987,13 @@ Important: in score 2, splatter/scatter means loose manure breaking or flattenin
 
 Score 3 — Optimal lactating dairy manure:
 Manure is soft and porridge-like, like a thick soft mash.
-It forms a moderate-height, self-contained pile about 1 to 2 inches high.
-If rings are present, they must be flat, horizontal surface rings in a soft porridge-like pile.
-Score 3 must NOT look bulky, voluminous, dense, heavy, tall, stiff, cracked, or clay-like.
-Do NOT give score 3 to a thick mound with deep folds, vertical grooves, bulky mass, or non-porridge structure.
-Score 3 must look like soft porridge, not like a compact mud/clay mound.
-If the manure forms one thick bulky mass with raised sides, deep folds, or a compact mound appearance, it is NOT score 3.
+It forms a soft, round or oval pat/disc about 1 to 2 inches high, not a bulky mound.
+The overall shape is a moderate-height disc with a broad base and relatively flat/horizontal surface.
+If rings are present, they are flat or horizontal surface rings within the soft porridge-like disc.
+The manure looks soft and spreadable, not bulky, not heavy, not dense, not compact, not doughy, and not dry.
+Score 3 must look like a soft porridge-like disc, not like a compact mud/clay mound, bulky mass, raised mound, or thick doughy mass.
+If the manure forms one thick bulky mass with raised sides, deep folds, or compact mound appearance, it is NOT score 3.
+
 
 Score 4 — Voluminous / pasty / doughy mound:
 Manure forms a voluminous, bulky, thick, pasty or doughy mound.
@@ -26011,6 +26012,7 @@ Strict decision rules:
 - Do not classify manure as score 3 based on rings alone.
 - If the manure is bulky, voluminous, high-standing, dense, heavy, firm, or not porridge-like, classify it as score 4 even if folds or ring-like lines are visible.
 - Score 4 is a separate firm/voluminous pattern, not merely score 3 but slightly drier.
+- Score 3 shape must be a soft round/oval pat or disc, not a mound.
 Mandatory 3 vs 4 boundary check:
 Before assigning score 3, ask: does this look like soft porridge or like a voluminous pasty/doughy mound?
 If it looks voluminous, bulky, thick, pasty, doughy, clay-like, compact, heavy, raised, or deeply folded, choose score 4.
@@ -26054,7 +26056,7 @@ Output rules:
 - All displayed text must be Arabic only.
 - Do not write English words in visualFindings, reason, qualityLabel, or message.
 - The reason must be educational, concise, and based only on visible consistency, shape, liquid spreading, loose splattering, moisture, pile height, volume, rings, dryness, mucus, and structure.
-
+- For score 3, describe the shape in Arabic as "قرص عصيدي لين" or "بقعة/قرص متماسك لين"; do not describe score 3 as "كومة".
 Return exactly one JSON object with these keys:
 ok
 score
