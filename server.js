@@ -24958,6 +24958,37 @@ ${lines.join("\n")}
     return "";
   }
 }
+async function bcsFindExactImageCorrectionSrv(captures = {}, kind = "") {
+  if (!db) return null;
+
+  try {
+    const captureHash = bcsCaptureHashSrv(captures);
+    if (!captureHash) return null;
+
+   const snap = await db
+  .collection(BCS_TRAINING_CORRECTIONS_COLLECTION_SRV)
+  .where("captureHash", "==", captureHash)
+  .limit(5)
+  .get();
+
+    if (snap.empty) return null;
+
+    const r = snap.docs[0].data() || {};
+    const correctedScore = bcsClampScoreSrv(r.correctedScore, kind || r.kind || "cow");
+
+    if (!Number.isFinite(Number(correctedScore))) return null;
+
+    return {
+      correctionId: snap.docs[0].id,
+      correctedScore,
+      correctedLabel: bcsLabelSrv(correctedScore),
+      expertNote: bcsShortTextSrv(r.expertNote || "", 500)
+    };
+  } catch (e) {
+    console.warn("BCS exact correction lookup skipped:", e.message || e);
+    return null;
+  }
+}
 app.post("/api/bcs/vision-analyze", async (req, res) => {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -25008,6 +25039,35 @@ if (kind === "cow" && !sideImage) {
   return res.status(400).json({
     ok: false,
     message: "❌ الأبقار تحتاج لقطة خلفية ولقطة جانبية لتقييم نهائي دقيق."
+  });
+}
+
+const exactCorrection = await bcsFindExactImageCorrectionSrv(
+  { rear: rearImage, side: sideImage },
+  kind
+);
+
+if (exactCorrection) {
+  return res.json({
+    ok: true,
+    score: exactCorrection.correctedScore,
+    label: exactCorrection.correctedLabel,
+    kind,
+    species: bcsKindArabicSrv(kind),
+    animalType,
+    rangeText: "1–5",
+    quality: {
+      label: "معايرة مباشرة من تصحيح الخبير",
+      confidence: "high"
+    },
+    reason: exactCorrection.expertNote || "تم تطبيق تصحيح خبير محفوظ لنفس صورة تقييم حالة الجسم.",
+    findings: {
+      visual: exactCorrection.expertNote || ""
+    },
+    note: "تم تطبيق تصحيح تدريب محفوظ لنفس الصورة.",
+    trainingApplied: true,
+    correctionId: exactCorrection.correctionId,
+    message: `تم تحليل حالة الجسم — BCS ${exactCorrection.correctedScore} (${exactCorrection.correctedLabel})`
   });
 }
 
