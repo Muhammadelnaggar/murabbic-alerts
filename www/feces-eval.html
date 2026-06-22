@@ -72,6 +72,30 @@
   صوّر من مسافة قريبة مع أقل قدر ممكن من الأرضية حوله.
 </div>
         </div>
+
+        <div id="trainingPanel" class="mbk-card" style="display:none;margin-top:12px">
+          <div style="font-weight:900;color:#0f172a;margin-bottom:8px">تدريب نموذج الروث — خاص بدكتور محمد</div>
+
+          <label>
+            الدرجة الصحيحة بعد المراجعة
+            <select id="correctedScore" class="input">
+              <option value="">اختر الدرجة الصحيحة</option>
+              <option value="1">1 — إسهال شديد</option>
+              <option value="2">2 — لين زيادة</option>
+              <option value="3">3 — نموذجي</option>
+              <option value="4">4 — جاف زيادة</option>
+              <option value="5">5 — جاف جدًا</option>
+            </select>
+          </label>
+
+          <label>
+            ملاحظة التصحيح
+            <textarea id="trainingNote" class="input" rows="3" placeholder="مثال: النموذج أعطى 3 لكن الروث ضخم/مرتفع فيستحق 4"></textarea>
+          </label>
+
+          <button id="trainingSaveBtn" class="save" type="button" disabled>حفظ التصحيح للتدريب</button>
+          <div id="trainingStatus" class="mbk-score-note" style="margin-top:8px"></div>
+        </div>
       </div>
 
 <div class="mbk-save-panel">
@@ -117,12 +141,18 @@
   const uploadPreviewBox = $("#uploadPreviewBox");
   const uploadPreviewImg = $("#uploadPreviewImg");
   const msgBox = $("#sysbar");
+  const trainingPanel = $("#trainingPanel");
+  const correctedScoreInput = $("#correctedScore");
+  const trainingNoteInput = $("#trainingNote");
+  const trainingSaveBtn = $("#trainingSaveBtn");
+  const trainingStatus = $("#trainingStatus");
 
   const state = {
-    stream: null,
-    image: null,
-    analysis: null
-  };
+  stream: null,
+  image: null,
+  analysis: null,
+  canTrain: false
+};
 
   function todayCairo() {
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
@@ -200,9 +230,51 @@ function carryContextToUrl(u, ctx, date) {
   msgBox.className = "infobar";
   msgBox.textContent = "";
 }
+
+function showTrainingStatus(text, ok) {
+  if (!trainingStatus) return;
+  trainingStatus.textContent = text || "";
+  trainingStatus.style.color = ok ? "#166534" : "#b91c1c";
+}
+
+function refreshTrainingButton() {
+  if (!trainingSaveBtn) return;
+  trainingSaveBtn.disabled = !(state.canTrain && state.analysis && Number.isFinite(Number(state.analysis.score)));
+}
+
+async function initTrainingGate() {
+  const uid = getTenantUid();
+  if (!uid) return;
+
+  try {
+    const r = await fetch("/api/feces/training/gate", {
+      headers: { "X-User-Id": uid }
+    });
+
+    const j = await r.json().catch(() => ({}));
+    state.canTrain = Boolean(r.ok && j.ok && j.canTrain);
+
+    if (trainingPanel) {
+      trainingPanel.style.display = state.canTrain ? "block" : "none";
+    }
+
+    refreshTrainingButton();
+  } catch (e) {
+    state.canTrain = false;
+    if (trainingPanel) trainingPanel.style.display = "none";
+    refreshTrainingButton();
+  }
+}
+
+ 
   function resetForNextGroupSample(j) {
-  state.image = null;
-  state.analysis = null;
+ state.image = null;
+state.analysis = null;
+
+if (correctedScoreInput) correctedScoreInput.value = "";
+if (trainingNoteInput) trainingNoteInput.value = "";
+showTrainingStatus("", true);
+refreshTrainingButton();
 
   if (uploadPreviewBox) uploadPreviewBox.style.display = "none";
   if (uploadPreviewImg) uploadPreviewImg.removeAttribute("src");
@@ -234,6 +306,10 @@ function carryContextToUrl(u, ctx, date) {
   function setWaiting() {
     state.analysis = null;
 
+if (correctedScoreInput) correctedScoreInput.value = "";
+showTrainingStatus("", true);
+refreshTrainingButton();
+
     if (scoreBadge) scoreBadge.textContent = "بانتظار التقييم";
 
     if (scoreFill) {
@@ -261,13 +337,20 @@ function carryContextToUrl(u, ctx, date) {
       scoreFill.style.background = score === 3 ? "#22c55e" : "#f59e0b";
     }
 
-    if (scoreNote) {
+        if (scoreNote) {
       scoreNote.textContent = [
         result.note || "",
         result.reason ? `السبب: ${result.reason}` : "",
         result.quality?.label ? `جودة التحليل: ${result.quality.label}` : ""
       ].filter(Boolean).join("\n");
     }
+
+    if (correctedScoreInput && Number.isFinite(score)) {
+      correctedScoreInput.value = String(Math.max(1, Math.min(5, Math.round(score))));
+    }
+
+    showTrainingStatus("", true);
+    refreshTrainingButton();
   }
 
   function showPreview(dataUrl) {
@@ -583,10 +666,79 @@ async function saveFeces() {
     }
   }
 }
+ async function saveTrainingCorrection() {
+  if (!state.canTrain) return;
 
+  const analysis = state.analysis;
+  const correctedScore = Number(correctedScoreInput?.value || 0);
+
+  if (!analysis || !Number.isFinite(Number(analysis.score))) {
+    showTrainingStatus("حلّل صورة الروث أولًا قبل حفظ التصحيح.", false);
+    return;
+  }
+
+  if (!Number.isFinite(correctedScore) || correctedScore < 1 || correctedScore > 5) {
+    showTrainingStatus("اختر الدرجة الصحيحة من 1 إلى 5.", false);
+    return;
+  }
+
+  const ctx = contextFromUrl();
+  const uid = getTenantUid();
+
+  try {
+    showTrainingStatus("جارٍ حفظ التصحيح…", true);
+
+    if (trainingSaveBtn) {
+      trainingSaveBtn.disabled = true;
+      trainingSaveBtn.textContent = "جارٍ حفظ التصحيح…";
+    }
+
+    const r = await fetch("/api/feces/training/save", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(uid ? { "X-User-Id": uid } : {})
+      },
+      body: JSON.stringify({
+        mode: ctx.mode,
+        animalNumber: ctx.mode === "individual" ? ctx.animalNumber : "",
+        groupName: ctx.mode === "group" ? ctx.groupName : "",
+        groupId: ctx.mode === "group" ? ctx.groupId : "",
+        groupKey: ctx.mode === "group" ? ctx.groupKey : "",
+        animalType: ctx.mode === "group" ? ctx.animalType : "",
+        eventDate: eventDateInput?.value || ctx.eventDate || todayCairo(),
+        predictedScore: analysis.score,
+        correctedScore,
+        expertNote: trainingNoteInput?.value || "",
+        analysis,
+        image: state.image || ""
+      })
+    });
+
+    const j = await r.json().catch(() => ({}));
+
+    if (!r.ok || !j.ok) {
+      throw new Error(j.message || "تعذّر حفظ تصحيح التدريب.");
+    }
+
+    showTrainingStatus(j.message || "تم حفظ التصحيح للتدريب.", true);
+  } catch (e) {
+    console.warn("feces training save error:", e);
+    showTrainingStatus(e.message || "تعذّر حفظ تصحيح التدريب.", false);
+  } finally {
+    if (trainingSaveBtn) {
+      trainingSaveBtn.textContent = "حفظ التصحيح للتدريب";
+    }
+    refreshTrainingButton();
+  }
+}
   function resetCapture() {
     state.image = null;
     state.analysis = null;
+
+    if (correctedScoreInput) correctedScoreInput.value = "";
+    showTrainingStatus("", true);
+    refreshTrainingButton();
 
     if (uploadPreviewBox) uploadPreviewBox.style.display = "none";
     if (uploadPreviewImg) uploadPreviewImg.removeAttribute("src");
@@ -620,7 +772,10 @@ function bindEvents() {
     e.preventDefault();
     saveFeces();
   });
-
+    trainingSaveBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    saveTrainingCorrection();
+  });
   backBtn?.addEventListener("click", (e) => {
     e.preventDefault();
 
@@ -662,6 +817,7 @@ if (headBackBtn) {
 }
 
 setWaiting();
+initTrainingGate();
 
 if (ctx.mode === "group") {
   if (scoreBadge) scoreBadge.textContent = "بانتظار عينة المجموعة";
