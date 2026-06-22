@@ -24857,7 +24857,107 @@ function bcsOpenAIOutputTextSrv(j = {}) {
 
   return parts.join("\n").trim();
 }
+const BCS_TRAINING_ADMIN_UID_SRV =
+  process.env.BCS_TRAINING_ADMIN_UID || "DEQ98faBPYSFikEMtaPTTynJ6iI2";
 
+const BCS_TRAINING_CORRECTIONS_COLLECTION_SRV = "bcs_training_corrections";
+const BCS_TRAINING_SUMMARY_COLLECTION_SRV = "bcs_training_summary";
+
+function bcsIsTrainingAdminSrv(uid) {
+  return String(uid || "").trim() === String(BCS_TRAINING_ADMIN_UID_SRV || "").trim();
+}
+
+function bcsShortTextSrv(v, max = 300) {
+  const s = String(v || "").trim().replace(/\s+/g, " ");
+  if (!s) return "";
+  return s.length > max ? s.slice(0, max).trim() : s;
+}
+
+function bcsDigitsOnlySrv(v) {
+  const map = {
+    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+  };
+
+  return String(v || "")
+    .trim()
+    .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
+    .replace(/[^0-9]/g, "");
+}
+
+function bcsCaptureHashSrv(captures = {}) {
+  try {
+    const crypto = require("crypto");
+
+    const rear = String(captures.rear || captures.rearImage || "").slice(0, 300000);
+    const side = String(captures.side || captures.sideImage || "").slice(0, 300000);
+
+    if (!rear && !side) return "";
+
+    return crypto
+      .createHash("sha1")
+      .update(JSON.stringify({ rear, side }))
+      .digest("hex");
+  } catch {
+    return "";
+  }
+}
+
+async function bcsBuildExpertCalibrationPromptSrv() {
+  if (!db) return "";
+
+  try {
+    const snap = await db
+      .collection(BCS_TRAINING_CORRECTIONS_COLLECTION_SRV)
+      .orderBy("createdAt", "desc")
+      .limit(12)
+      .get();
+
+    const rows = snap.docs
+      .map(doc => doc.data() || {})
+      .filter(r => {
+        const predicted = Number(r.predictedScore);
+        const corrected = Number(r.correctedScore);
+
+        return (
+          Number.isFinite(predicted) &&
+          Number.isFinite(corrected) &&
+          predicted >= 1 && predicted <= 5 &&
+          corrected >= 1 && corrected <= 5 &&
+          predicted !== corrected
+        );
+      })
+      .slice(0, 6);
+
+    if (!rows.length) return "";
+
+    const lines = rows.map((r, idx) => {
+      const kind = r.kind ? `النوع: ${r.kind}.` : "";
+      const rear = bcsShortTextSrv(r.rearFindings || r.modelAnalysis?.rearFindings || "", 180);
+      const side = bcsShortTextSrv(r.sideFindings || r.modelAnalysis?.sideFindings || "", 180);
+      const note = bcsShortTextSrv(r.expertNote || "", 180);
+
+      return [
+        `${idx + 1}) توقع النموذج سابقًا BCS ${r.predictedScore} وصحح الخبير الدرجة إلى BCS ${r.correctedScore}.`,
+        kind,
+        rear ? `الخلفية: ${rear}.` : "",
+        side ? `الجانبية: ${side}.` : "",
+        note ? `ملاحظة الخبير: ${note}.` : ""
+      ].filter(Boolean).join(" ");
+    });
+
+    return `
+Expert BCS correction memory from Dr. Mohamed:
+Use these recent expert corrections only as calibration guidance when similar anatomical signs appear.
+Do not copy a correction blindly; always score the current TARGET animal from its visible BCS anatomy.
+${lines.join("\n")}
+`.trim();
+
+  } catch (e) {
+    console.warn("BCS training calibration skipped:", e.message || e);
+    return "";
+  }
+}
 app.post("/api/bcs/vision-analyze", async (req, res) => {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -24904,12 +25004,15 @@ app.post("/api/bcs/vision-analyze", async (req, res) => {
       });
     }
 
-    if (kind === "cow" && !sideImage) {
-      return res.status(400).json({
-        ok: false,
-        message: "❌ الأبقار تحتاج لقطة خلفية ولقطة جانبية لتقييم نهائي دقيق."
-      });
-    }
+if (kind === "cow" && !sideImage) {
+  return res.status(400).json({
+    ok: false,
+    message: "❌ الأبقار تحتاج لقطة خلفية ولقطة جانبية لتقييم نهائي دقيق."
+  });
+}
+
+const expertCalibrationPrompt = await bcsBuildExpertCalibrationPromptSrv();
+
 const prompt = `
 You are an expert evaluator of BODY CONDITION SCORE (BCS) for DAIRY COWS.
 
@@ -25014,6 +25117,13 @@ Quarter-score guidance:
 - Use .50 when the cow is clearly between two adjacent main classes.
 - Use .75 when the cow is close to the next higher class but not fully there.
 - The quarter score must be justified by visible anatomical signs, not by uncertainty.
+
+${expertCalibrationPrompt ? `
+
+Expert calibration memory:
+${expertCalibrationPrompt}
+
+` : ""}
 
 Critical consistency rules:
 - The final score must match the anatomical findings.
@@ -25209,7 +25319,7 @@ findings: {
   visual: String(parsed.visualFindings || "").trim()
 },
 note: "",
-message: `تم تحليل الروث — الدرجة ${score} (${label})`
+message: `تم تحليل حالة الجسم — BCS ${score} (${label})`
     });
 
   } catch (e) {
@@ -25217,6 +25327,234 @@ message: `تم تحليل الروث — الدرجة ${score} (${label})`
     return res.status(500).json({
       ok: false,
       message: "حدث خطأ أثناء تحليل حالة الجسم بالرؤية."
+    });
+  }
+});
+app.get("/api/bcs/training/gate", requireUserId, async (req, res) => {
+  try {
+    const canTrain = bcsIsTrainingAdminSrv(req.userId);
+
+    return res.json({
+      ok: true,
+      canTrain,
+      trainingEnabled: canTrain,
+      mode: canTrain ? "expert_bcs_correction" : "hidden",
+      message: canTrain
+        ? "أدوات تدريب نموذج حالة الجسم متاحة لهذا الحساب."
+        : "أدوات تدريب نموذج حالة الجسم غير متاحة لهذا الحساب."
+    });
+  } catch (e) {
+    console.error("bcs training gate failed:", e.message || e);
+    return res.status(500).json({
+      ok: false,
+      canTrain: false,
+      message: "تعذّر فتح أدوات تدريب نموذج حالة الجسم."
+    });
+  }
+});
+
+app.post("/api/bcs/training/save", requireUserId, async (req, res) => {
+  try {
+    if (!bcsIsTrainingAdminSrv(req.userId)) {
+      return res.status(403).json({
+        ok: false,
+        canTrain: false,
+        error: "bcs_training_forbidden",
+        message: "أدوات تدريب نموذج حالة الجسم متاحة لحساب دكتور محمد فقط."
+      });
+    }
+
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "تعذّر حفظ تصحيح التدريب — قاعدة البيانات غير متاحة."
+      });
+    }
+
+    const uid = req.userId;
+    const body = req.body || {};
+    const analysis = body.analysis && typeof body.analysis === "object" ? body.analysis : {};
+
+    const kind = bcsNormalizeKindSrv(
+      body.kind ||
+      analysis.kind ||
+      body.animalKind ||
+      body.species
+    );
+
+    const animalType = String(
+      body.animalType ||
+      analysis.animalType ||
+      body.typeLabel ||
+      ""
+    ).trim();
+
+    const predictedScore = bcsClampScoreSrv(
+      body.predictedScore ??
+      body.modelScore ??
+      analysis.score,
+      kind
+    );
+
+    const correctedScore = bcsClampScoreSrv(
+      body.correctedScore ??
+      body.expertScore ??
+      body.correctScore,
+      kind
+    );
+
+    if (!Number.isFinite(Number(predictedScore))) {
+      return res.status(400).json({
+        ok: false,
+        message: "درجة النموذج الأصلية غير صالحة."
+      });
+    }
+
+    if (!Number.isFinite(Number(correctedScore))) {
+      return res.status(400).json({
+        ok: false,
+        message: "اختر درجة BCS الصحيحة من 1.00 إلى 5.00."
+      });
+    }
+
+    const eventDateRaw = String(
+      body.eventDate ||
+      body.date ||
+      (typeof cairoTodayISO === "function"
+        ? cairoTodayISO()
+        : new Date().toISOString().slice(0, 10))
+    ).trim().slice(0, 10);
+
+    const eventDate = /^\d{4}-\d{2}-\d{2}$/.test(eventDateRaw)
+      ? eventDateRaw
+      : (typeof cairoTodayISO === "function"
+        ? cairoTodayISO()
+        : new Date().toISOString().slice(0, 10));
+
+    const animalNumber = bcsDigitsOnlySrv(
+      body.animalNumber ||
+      body.number ||
+      body.sampleAnimalNumber ||
+      ""
+    );
+
+    const captures = body.captures && typeof body.captures === "object"
+      ? body.captures
+      : {};
+
+    const captureHash = bcsCaptureHashSrv(captures);
+
+    const rearFindings = bcsShortTextSrv(
+      body.rearFindings ||
+      analysis.rearFindings ||
+      analysis.findings?.rear ||
+      "",
+      600
+    );
+
+    const sideFindings = bcsShortTextSrv(
+      body.sideFindings ||
+      analysis.sideFindings ||
+      analysis.findings?.side ||
+      "",
+      600
+    );
+
+    const expertNote = bcsShortTextSrv(
+      body.expertNote ||
+      body.note ||
+      body.trainingNote ||
+      "",
+      800
+    );
+
+    const payload = cleanObj({
+      userId: uid,
+      ownerUid: uid,
+      adminUid: uid,
+
+      eventType: "تدريب نموذج حالة الجسم",
+      eventTypeNorm: "bcs_training_correction",
+      date: eventDate,
+      eventDate,
+
+      mode: "individual",
+      animalNumber: animalNumber || null,
+
+      kind,
+      species: bcsKindArabicSrv(kind),
+      animalType: animalType || null,
+
+      predictedScore,
+      predictedLabel: bcsLabelSrv(predictedScore),
+      correctedScore,
+      correctedLabel: bcsLabelSrv(correctedScore),
+      delta: Number((correctedScore - predictedScore).toFixed(2)),
+
+      modelReason: bcsShortTextSrv(analysis.reason || body.modelReason || "", 800),
+      rearFindings,
+      sideFindings,
+      expertNote,
+
+      modelQuality: analysis.quality || null,
+      modelAnalysis: cleanObj({
+        score: analysis.score ?? predictedScore,
+        label: analysis.label || bcsLabelSrv(predictedScore),
+        kind: analysis.kind || kind,
+        species: analysis.species || bcsKindArabicSrv(kind),
+        animalType: analysis.animalType || animalType || null,
+        quality: analysis.quality || null,
+        rangeText: analysis.rangeText || "1–5",
+        reason: analysis.reason || null,
+        rearFindings: analysis.rearFindings || null,
+        sideFindings: analysis.sideFindings || null,
+        findings: analysis.findings || null,
+        note: analysis.note || null
+      }),
+
+      captureHash: captureHash || null,
+      rearImageReceived: Boolean(captures.rear),
+      sideImageReceived: Boolean(captures.side),
+      imageStored: false,
+
+      status: "accepted",
+      source: "server:/api/bcs/training/save",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    const ref = await db
+      .collection(BCS_TRAINING_CORRECTIONS_COLLECTION_SRV)
+      .add(payload);
+
+    await db
+      .collection(BCS_TRAINING_SUMMARY_COLLECTION_SRV)
+      .doc("global")
+      .set({
+        lastCorrectionAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastCorrectionId: ref.id,
+        lastPredictedScore: predictedScore,
+        lastCorrectedScore: correctedScore,
+        totalCorrections: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+    return res.json({
+      ok: true,
+      canTrain: true,
+      id: ref.id,
+      correctionId: ref.id,
+      predictedScore,
+      correctedScore,
+      message: `✅ تم حفظ تصحيح تدريب BCS: النموذج ${predictedScore} → الصحيح ${correctedScore}.`
+    });
+
+  } catch (e) {
+    console.error("bcs training save failed:", e.message || e);
+    return res.status(500).json({
+      ok: false,
+      message: "تعذّر حفظ تصحيح تدريب نموذج حالة الجسم."
     });
   }
 });
