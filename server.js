@@ -25994,13 +25994,12 @@ Do NOT give score 3 to a thick mound with deep folds, vertical grooves, bulky ma
 Score 3 must look like soft porridge, not like a compact mud/clay mound.
 If the manure forms one thick bulky mass with raised sides, deep folds, or a compact mound appearance, it is NOT score 3.
 
-Score 4 — Voluminous / firm / high-standing mound:
-Manure forms a bulky, thick, voluminous, firm mound.
-It looks dense, heavy, clay-like, or compact rather than soft and porridge-like.
-It may have deep folds, curved lines, vertical grooves, cracks, or ring-like surface marks, but these are NOT the flat horizontal porridge rings of score 3.
-Choose score 4 when the manure is a thick mound or bulky mass that holds shape strongly, even if it is still moist and not fully dry.
+Score 4 — Voluminous / pasty / doughy mound:
+Manure forms a voluminous, bulky, thick, pasty or doughy mound.
+It looks like a heavy paste or soft clay mass rather than soft porridge.
+It holds its shape strongly and may be moist or shiny; dryness is NOT required for score 4.
+It may show folds, curved lines, cracks, or ring-like surface marks, but these are NOT the flat horizontal porridge rings of score 3.
 Score 4 is not dry fecal balls.
-Score 4 can still be moist and shiny; dryness is NOT required for score 4.
 
 Score 5 — Very stiff / dry / fecal balls:
 Manure is very stiff and dry, hard-looking, segmented, cracked, or formed into fecal balls. It may appear difficult to pass.
@@ -26013,10 +26012,10 @@ Strict decision rules:
 - If the manure is bulky, voluminous, high-standing, dense, heavy, firm, or not porridge-like, classify it as score 4 even if folds or ring-like lines are visible.
 - Score 4 is a separate firm/voluminous pattern, not merely score 3 but slightly drier.
 Mandatory 3 vs 4 boundary check:
-Before assigning score 3, ask: does this look like soft porridge or like a thick compact mound?
-If it looks like a thick compact mound, bulky mass, mud/clay-like mound, raised mound, dense mound, or has deep folds/raised sides, choose score 4.
-Score 3 is allowed only when the manure is clearly soft porridge-like, moderate-height, not bulky, not compact, and has flat horizontal surface rings if rings are visible.
-When uncertain between score 3 and score 4, choose score 4 if the pile is thick, bulky, compact, or not clearly porridge-like.
+Before assigning score 3, ask: does this look like soft porridge or like a voluminous pasty/doughy mound?
+If it looks voluminous, bulky, thick, pasty, doughy, clay-like, compact, heavy, raised, or deeply folded, choose score 4.
+Score 3 is allowed only when the manure is clearly soft porridge-like, moderate-height, spreadable, not bulky, not compact, and has flat horizontal surface rings if rings are visible.
+When uncertain between score 3 and score 4, choose score 4 if the pile is thick, voluminous, pasty/doughy, or not clearly porridge-like.
 - Do not give score 5 unless manure is clearly very stiff, dry, hard, segmented, cracked, or formed into fecal balls.
 - Color alone must not determine the score.
 - If obvious mucus, blood, or abnormal visible material is present, mention it in the Arabic reason, but still score mainly by consistency.
