@@ -68,8 +68,29 @@
   </div>
 <div id="scoreWidget" class="mbk-score-card">
   <div class="mbk-score-badge" id="scoreBadge">—</div>
-  <div class="mbk-score-bar"><div class="mbk-score-fill" id="scoreFill" style="width:0%"></div></div>
+  <div class="mbk-score-bar">
+    <div class="mbk-score-fill" id="scoreFill" style="width:0%"></div>
+  </div>
   <div class="mbk-score-note" id="scoreNote">المدى يعتمد على النوع.</div>
+</div>
+
+<div id="trainingPanel" class="mbk-card" style="display:none;margin-top:12px">
+  <div style="font-weight:900;color:#0f172a;margin-bottom:8px">
+    تدريب نموذج BCS — خاص بدكتور محمد
+  </div>
+
+  <label>
+    الدرجة الصحيحة بعد المراجعة
+    <input id="correctedScore" class="input" type="number" min="1" max="5" step="0.25" placeholder="مثال: 3.25" />
+  </label>
+
+  <label>
+    ملاحظة التصحيح
+    <textarea id="trainingNote" class="input" rows="3" placeholder="مثال: النموذج أعطى 3.00 لكن الحوض وقاعدة الذيل أقرب إلى 3.50"></textarea>
+  </label>
+
+  <button id="trainingSaveBtn" class="save" type="button" disabled>حفظ التصحيح للتدريب</button>
+  <div id="trainingStatus" class="mbk-score-note" style="margin-top:8px"></div>
 </div>
 </div>
 
@@ -83,9 +104,9 @@
   <input id="commentInput" class="input" placeholder="تعليق (اختياري)" />
 
   <div class="actions-bar inline">
-  <button id="saveBtn" class="save" type="button">حفظ التقييم</button>
-  <button id="backEventsBtn" class="ghost" type="button">رجوع للأحداث</button>
-</div>
+    <button id="saveBtn" class="save" type="button">حفظ التقييم</button>
+    <button id="backEventsBtn" class="ghost" type="button">رجوع للأحداث</button>
+  </div>
 </div>
       </div>
     </section>
@@ -123,17 +144,23 @@
   const animalTypeSel = { value: "" };
   const commentInput = $("#commentInput");
   const formBar = $(".mbk-save-panel");
+  const trainingPanel = $("#trainingPanel");
+  const correctedScoreInput = $("#correctedScore");
+  const trainingNoteInput = $("#trainingNote");
+  const trainingSaveBtn = $("#trainingSaveBtn");
+  const trainingStatus = $("#trainingStatus");
   const anglesOrder = ["rear", "side"];
   const angleLabels = { rear: "خلفية", side: "جانبية" };
 
-  const state = {
-    currentAngle: "rear",
-    stream: null,
-    track: null,
-    torchOn: false,
-    captures: { rear: null, side: null },
-    analysis: null
-   };
+ const state = {
+  currentAngle: "rear",
+  stream: null,
+  track: null,
+  torchOn: false,
+  captures: { rear: null, side: null },
+  analysis: null,
+  canTrain: false
+ };
 
   const msgBox = document.createElement("div");
   Object.assign(msgBox.style, {
@@ -153,6 +180,54 @@
     msgBox.textContent = text;
     msgBox.scrollIntoView({ behavior: "smooth", block: "center" });
   }
+
+function showTrainingStatus(text, ok) {
+  if (!trainingStatus) return;
+  trainingStatus.textContent = text || "";
+  trainingStatus.style.color = ok ? "#166534" : "#b91c1c";
+}
+
+function refreshTrainingButton() {
+  if (!trainingSaveBtn) return;
+  trainingSaveBtn.disabled = !(state.canTrain && state.analysis && Number.isFinite(Number(state.analysis.score)));
+}
+
+function resetTrainingCorrection(clearNote = false) {
+  if (correctedScoreInput) correctedScoreInput.value = "";
+  if (clearNote && trainingNoteInput) trainingNoteInput.value = "";
+  showTrainingStatus("", true);
+  refreshTrainingButton();
+}
+
+function roundQuarterScore(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  return String(Math.max(1, Math.min(5, Math.round(n * 4) / 4)).toFixed(2));
+}
+
+async function initTrainingGate() {
+  const uid = getTenantUid();
+  if (!uid) return;
+
+  try {
+    const r = await fetch("/api/bcs/training/gate", {
+      headers: { "X-User-Id": uid }
+    });
+
+    const j = await r.json().catch(() => ({}));
+    state.canTrain = Boolean(r.ok && j.ok && j.canTrain);
+
+    if (trainingPanel) {
+      trainingPanel.style.display = state.canTrain ? "block" : "none";
+    }
+
+    refreshTrainingButton();
+  } catch (e) {
+    state.canTrain = false;
+    if (trainingPanel) trainingPanel.style.display = "none";
+    refreshTrainingButton();
+  }
+}
 
   function todayCairo() {
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
@@ -458,6 +533,8 @@ function showUploadPreview(url) {
       scoreNote.textContent = currentKind() === "buffalo"
         ? "التقط اللقطة الخلفية لتحليل حالة الجسم."
         : "التقط الخلفية والجانبية لتحليل حالة الجسم.";
+
+      resetTrainingCorrection(false);
       return;
     }
 
@@ -472,8 +549,14 @@ function showUploadPreview(url) {
     scoreNote.textContent = analysis.quality?.label
       ? `جودة التحليل: ${analysis.quality.label}`
       : "النتيجة من السيرفر.";
-  }
 
+    if (correctedScoreInput && Number.isFinite(score)) {
+      correctedScoreInput.value = roundQuarterScore(score);
+    }
+
+    showTrainingStatus("", true);
+    refreshTrainingButton();
+  }
   async function analyzeOnServer() {
     const kind = currentKind();
 
@@ -487,9 +570,14 @@ function showUploadPreview(url) {
       return;
     }
 
+    const uid = getTenantUid();
+
     const r = await fetch("/api/bcs/vision-analyze", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(uid ? { "X-User-Id": uid } : {})
+      },
       body: JSON.stringify({
         kind,
         animalType: animalTypeSel.value || "",
@@ -508,7 +596,6 @@ function showUploadPreview(url) {
 
     showAnalysis(j);
   }
-
   async function captureCurrentAngle() {
     try {
       
@@ -523,6 +610,7 @@ function showUploadPreview(url) {
 
       state.captures[state.currentAngle] = url;
       state.analysis = null;
+      resetTrainingCorrection(true);
       showUploadPreview(url);
 
       renderThumbs();
@@ -551,6 +639,7 @@ function showUploadPreview(url) {
 
     state.captures[state.currentAngle] = url;
     state.analysis = null;
+    resetTrainingCorrection(true);
     showUploadPreview(url);
 
     renderThumbs();
@@ -569,6 +658,88 @@ function getTenantUid() {
     ""
   ).trim();
 }
+
+async function saveTrainingCorrection() {
+  if (!state.canTrain) return;
+
+  const analysis = state.analysis;
+  const correctedScore = Number(correctedScoreInput?.value || 0);
+
+  if (!analysis || !Number.isFinite(Number(analysis.score))) {
+    showTrainingStatus("حلّل صور حالة الجسم أولًا قبل حفظ التصحيح.", false);
+    return;
+  }
+
+  if (!Number.isFinite(correctedScore) || correctedScore < 1 || correctedScore > 5) {
+    showTrainingStatus("اختر درجة BCS الصحيحة من 1.00 إلى 5.00.", false);
+    return;
+  }
+
+  const normalizedCorrected = Number(roundQuarterScore(correctedScore));
+  const ctx = contextFromUrl();
+  const uid = getTenantUid();
+
+  try {
+    showTrainingStatus("جارٍ حفظ تصحيح BCS…", true);
+
+    if (trainingSaveBtn) {
+      trainingSaveBtn.disabled = true;
+      trainingSaveBtn.textContent = "جارٍ حفظ التصحيح…";
+    }
+
+    const visualText = String(
+      analysis.reason ||
+      analysis.findings?.visual ||
+      ""
+    ).trim();
+
+    const r = await fetch("/api/bcs/training/save", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(uid ? { "X-User-Id": uid } : {})
+      },
+      body: JSON.stringify({
+        eventDate: eventDateInput?.value || ctx.eventDate || todayCairo(),
+        animalId: ctx.animalId,
+        animalNumber: ctx.animalNumber,
+
+        kind: analysis.kind || currentKind(),
+        animalType: analysis.animalType || animalTypeSel.value || "",
+
+        predictedScore: analysis.score,
+        correctedScore: normalizedCorrected,
+
+        rearFindings: visualText,
+        sideFindings: "",
+        expertNote: trainingNoteInput?.value || "",
+
+        analysis,
+        captures: {
+          rear: state.captures.rear || null,
+          side: state.captures.side || null
+        }
+      })
+    });
+
+    const j = await r.json().catch(() => ({}));
+
+    if (!r.ok || !j.ok) {
+      throw new Error(j.message || "تعذّر حفظ تصحيح تدريب BCS.");
+    }
+
+    showTrainingStatus(j.message || "تم حفظ تصحيح BCS للتدريب.", true);
+  } catch (e) {
+    console.warn("BCS training save error:", e);
+    showTrainingStatus(e.message || "تعذّر حفظ تصحيح تدريب BCS.", false);
+  } finally {
+    if (trainingSaveBtn) {
+      trainingSaveBtn.textContent = "حفظ التصحيح للتدريب";
+    }
+    refreshTrainingButton();
+  }
+}
+
   async function saveBCS() {
     msgBox.style.display = "none";
 
@@ -636,6 +807,7 @@ const r = await fetch("/api/bcs/save", {
     retakeBtn?.addEventListener("click", () => {
       state.captures[state.currentAngle] = null;
       state.analysis = null;
+      resetTrainingCorrection(true);
 
       renderThumbs();
       updateButtons();
@@ -677,9 +849,14 @@ const r = await fetch("/api/bcs/save", {
       }
     });
 
-    saveBtn?.addEventListener("click", e => {
+     saveBtn?.addEventListener("click", e => {
       e.preventDefault();
       saveBCS();
+    });
+
+    trainingSaveBtn?.addEventListener("click", e => {
+      e.preventDefault();
+      saveTrainingCorrection();
     });
 
     backEventsBtn?.addEventListener("click", e => {
@@ -709,6 +886,7 @@ const r = await fetch("/api/bcs/save", {
     renderThumbs();
     updateButtons();
     showAnalysis(null);
+    initTrainingGate();
     initEvents();
 
     if (!navigator.mediaDevices?.getUserMedia) {
