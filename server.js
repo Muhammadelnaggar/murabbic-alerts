@@ -25986,14 +25986,17 @@ It still has visible fecal consistency and is NOT liquid diarrhea.
 Important: in score 2, splatter/scatter means loose manure breaking or flattening on impact, NOT dry separated fragments.
 
 Score 3 — Optimal lactating dairy manure:
-Manure is soft and porridge-like. It forms a moderate-height, self-contained soft pile about 1 to 2 inches high.
-If rings are present, they are flat or horizontal surface rings within a soft porridge-like pile.
-The pile looks soft and spreadable, not bulky, not heavy, not dense, and not dry.
+Manure is soft and porridge-like, like a thick soft mash.
+It forms a moderate-height, self-contained pile about 1 to 2 inches high.
+If rings are present, they must be flat, horizontal surface rings in a soft porridge-like pile.
+Score 3 must NOT look bulky, voluminous, dense, heavy, tall, stiff, cracked, or clay-like.
+Do NOT give score 3 to a thick mound with deep folds, vertical grooves, bulky mass, or non-porridge structure.
 
 Score 4 — Voluminous / firm / high-standing mound:
-Manure forms a bulky, thick, voluminous, firm mound that stands over 2 inches high.
-It holds its shape strongly and looks dense or heavy rather than soft and porridge-like.
-It may show folds or ring-like surface lines, but these are NOT the flat horizontal porridge rings of score 3.
+Manure forms a bulky, thick, voluminous, firm mound.
+It looks dense, heavy, clay-like, or compact rather than soft and porridge-like.
+It may have deep folds, curved lines, vertical grooves, cracks, or ring-like surface marks, but these are NOT the flat horizontal porridge rings of score 3.
+Choose score 4 when the manure is a thick mound or bulky mass that holds shape strongly, even if it is still moist and not fully dry.
 Score 4 is not dry fecal balls.
 
 Score 5 — Very stiff / dry / fecal balls:
@@ -26006,6 +26009,10 @@ Strict decision rules:
 - Do not classify manure as score 3 based on rings alone.
 - If the manure is bulky, voluminous, high-standing, dense, heavy, firm, or not porridge-like, classify it as score 4 even if folds or ring-like lines are visible.
 - Score 4 is a separate firm/voluminous pattern, not merely score 3 but slightly drier.
+Mandatory 3 vs 4 boundary check:
+Before assigning score 3, actively check if the manure is bulky, voluminous, dense, heavy, clay-like, thick-mounded, deeply folded, vertically grooved, or not porridge-like.
+If any of these are visible, choose score 4, not score 3.
+Score 3 is allowed only when the pile looks soft, porridge-like, moderate-height, and has flat/horizontal rings if rings are present.
 - Do not give score 5 unless manure is clearly very stiff, dry, hard, segmented, cracked, or formed into fecal balls.
 - Color alone must not determine the score.
 - If obvious mucus, blood, or abnormal visible material is present, mention it in the Arabic reason, but still score mainly by consistency.
