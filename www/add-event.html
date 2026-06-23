@@ -230,12 +230,27 @@
       return [...new Set(list)];
     }
 
-    function getCurrentUid(){
-      return window.mbk?.userId
-        || localStorage.getItem('userId')
-        || localStorage.getItem('uid')
-        || '';
-    }
+   async function sessionFetch(url, options = {}){
+  const headers = Object.assign(
+    { 'Accept': 'application/json' },
+    options.headers || {}
+  );
+
+  const r = await fetch(url, Object.assign({}, options, {
+    headers,
+    credentials: 'same-origin',
+    cache: options.cache || 'no-store'
+  }));
+
+  const j = await r.json().catch(() => null);
+
+  if (r.status === 401 || j?.error === 'auth_required'){
+    $('#warn').textContent = j?.message || '⚠️ سجّل الدخول أولًا.';
+    return { r, j, authRequired: true };
+  }
+
+  return { r, j, authRequired: false };
+}
     let selectedGroupForCamera = null;
    function getSelectedGroupMeta(){
   const sel = $('#groupSelect');
@@ -282,69 +297,58 @@
       }
     }
 
-    async function hydrate(){
-      const uid = getCurrentUid();
-      const qs = new URLSearchParams(location.search);
+   async function hydrate(){
+  const qs = new URLSearchParams(location.search);
 
-      const rawNumbers =
-        qs.get('numbers') ||
-        qs.get('bulk') ||
-        qs.get('number') ||
-        qs.get('animalNumber') ||
-        '';
+  const rawNumbers =
+    qs.get('numbers') ||
+    qs.get('bulk') ||
+    qs.get('number') ||
+    qs.get('animalNumber') ||
+    '';
 
-      const rawDate =
-        qs.get('eventDate') ||
-        qs.get('date') ||
-        '';
+  const rawDate =
+    qs.get('eventDate') ||
+    qs.get('date') ||
+    '';
 
-      let date = todayISO();
+  let date = todayISO();
 
-      if (uid) {
-        try {
-          const q = new URLSearchParams();
-          if (rawNumbers) q.set('numbers', rawNumbers);
-          if (rawDate) q.set('eventDate', rawDate);
+  try {
+    const q = new URLSearchParams();
+    if (rawNumbers) q.set('numbers', rawNumbers);
+    if (rawDate) q.set('eventDate', rawDate);
 
-          const r = await fetch('/api/events-page/context?' + q.toString(), {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'X-User-Id': uid
-            },
-            cache: 'no-store'
-          });
+    const { r, j, authRequired } = await sessionFetch('/api/events-page/context?' + q.toString(), {
+      method: 'GET'
+    });
 
-          const j = await r.json().catch(() => null);
+    if (authRequired) return;
 
-          if (r.ok && j && j.ok !== false) {
-            date = j.eventDate || date;
+    if (r.ok && j && j.ok !== false) {
+      date = j.eventDate || date;
 
-            if (Array.isArray(j.numbers) && j.numbers.length) {
-              $('#animalNumbers').value = j.numbers.join('\n');
-            } else {
-              $('#animalNumbers').value = '';
-            }
-
-            $('#animalInfo').textContent = j.animalInfoText || '🐄 الحيوان الحالي: غير محدد';
-          } else {
-            $('#animalNumbers').value = '';
-          }
-
-        } catch (e) {
-          console.error('events context failed', e);
-          $('#animalNumbers').value = '';
-        }
+      if (Array.isArray(j.numbers) && j.numbers.length) {
+        $('#animalNumbers').value = j.numbers.join('\n');
       } else {
-        const one = toDigitsOnly(qs.get('number') || qs.get('animalNumber') || '');
-        $('#animalNumbers').value = one || '';
+        $('#animalNumbers').value = '';
       }
 
-      $('#dateInfo').textContent = `📅 التاريخ الحالي: ${date}`;
-      if (!norm($('#eventDate').value)) $('#eventDate').value = date;
-
-      refreshAnimalInfo();
+      $('#animalInfo').textContent = j.animalInfoText || '🐄 الحيوان الحالي: غير محدد';
+    } else {
+      $('#animalNumbers').value = '';
     }
+
+  } catch (e) {
+    console.error('events context failed', e);
+    $('#animalNumbers').value = '';
+  }
+
+  $('#dateInfo').textContent = `📅 التاريخ الحالي: ${date}`;
+  if (!norm($('#eventDate').value)) $('#eventDate').value = date;
+
+  refreshAnimalInfo();
+}
 
     async function loadGroupsIntoSelect(){
       const select = $('#groupSelect');
@@ -353,12 +357,7 @@
 
       if (!select) return;
 
-      const uid = getCurrentUid();
-
-      if (!uid){
-        warn.textContent = '⚠️ تعذر تحميل المجموعات الآن.';
-        return;
-      }
+      
 
       try{
         warn.textContent = '';
@@ -366,16 +365,11 @@
         select.style.display = 'block';
         if (hint) hint.style.display = 'block';
 
-        const r = await fetch('/api/events-page/groups', {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'X-User-Id': uid
-          },
-          cache: 'no-store'
-        });
+       const { r, j, authRequired } = await sessionFetch('/api/events-page/groups', {
+  method: 'GET'
+});
 
-        const j = await r.json().catch(() => null);
+if (authRequired) return;
 
         if (!r.ok || !j || j.ok === false){
           warn.textContent = j?.message || '⚠️ فشل تحميل المجموعات من السيرفر.';
@@ -448,49 +442,41 @@
       }, {passive:true});
     }
 
-    async function resolveEventFromServer({ page = '', action = '' } = {}){
-      const uid = getCurrentUid();
-      const { numbers, date } = currentNumbersAndDate();
+async function resolveEventFromServer({ page = '', action = '' } = {}){
+  const { numbers, date } = currentNumbersAndDate();
 
-      if (!uid){
-        $('#warn').textContent = '⚠️ تعذر تحديد المستخدم الحالي.';
-        return null;
-      }
+  try{
+    $('#warn').textContent = '';
 
-      try{
-        $('#warn').textContent = '';
+    const { r, j, authRequired } = await sessionFetch('/api/events-page/resolve', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        page,
+        action,
+        numbers,
+        eventDate: date,
+        group: getSelectedGroupMeta()
+      })
+    });
 
-        const r = await fetch('/api/events-page/resolve', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-User-Id': uid
-          },
-          body: JSON.stringify({
-            page,
-            action,
-            numbers,
-            eventDate: date,
-            group: getSelectedGroupMeta()
-          })
-        });
+    if (authRequired) return null;
 
-        const j = await r.json().catch(() => null);
-
-        if (!r.ok || !j || j.ok === false || j.allowed === false){
-          $('#warn').textContent = j?.message || '⚠️ تعذر تجهيز الحدث من السيرفر.';
-          return null;
-        }
-
-        return j;
-
-      } catch(err){
-        console.error('events resolve failed', err);
-        $('#warn').textContent = '⚠️ تعذر الاتصال بالسيرفر.';
-        return null;
-      }
+    if (!r.ok || !j || j.ok === false || j.allowed === false){
+      $('#warn').textContent = j?.message || '⚠️ تعذر تجهيز الحدث من السيرفر.';
+      return null;
     }
+
+    return j;
+
+  } catch(err){
+    console.error('events resolve failed', err);
+    $('#warn').textContent = '⚠️ تعذر الاتصال بالسيرفر.';
+    return null;
+  }
+}
 
     function openMilkImport(){
       let date = norm($('#eventDate').value) || todayISO();
@@ -637,25 +623,21 @@ async function saveTrimmingInline(){
     const out = await resolveEventFromServer({ action: 'trimming' });
     if (!out) return;
 
-    const uid = getCurrentUid();
     const { numbers, date } = currentNumbersAndDate();
 
-    const r = await fetch('/api/hoof-trimming/save', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-User-Id': uid
-      },
-      body: JSON.stringify({
-        numbers,
-        eventDate: date,
-        source: location.pathname
-      })
-    });
+   const { r, j, authRequired } = await sessionFetch('/api/hoof-trimming/save', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    numbers,
+    eventDate: date,
+    source: location.pathname
+  })
+});
 
-    const j = await r.json().catch(() => null);
-
+if (authRequired) return;
     if (!box) return;
 
     if (!r.ok || !j || j.ok === false){
