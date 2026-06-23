@@ -400,17 +400,33 @@ function setEntryMode(mode){
   const msgDiv = document.getElementById("msg");
   const infoBar = document.getElementById("addAnimalInfoBar");
   const primaryActionBtn = document.getElementById("primaryActionBtn");
+  const API_BASE = window.API_BASE || "https://murabbic-alerts.onrender.com";
+let currentUser = null;
+let currentUserId = null;
 
-  if (!form) return;
+async function loadServerSession(){
+  const res = await fetch(API_BASE + "/api/auth/me", {
+    method: "GET",
+    headers: {
+      "Accept": "application/json",
+      "Cache-Control": "no-store"
+    },
+    credentials: "include",
+    cache: "no-store"
+  });
 
-  function getUidDirect(){
-    return String(
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      ""
-    ).trim();
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || data.ok !== true || !data.userId) {
+    location.replace("login.html?next=add-animal.html");
+    throw new Error("auth_required");
   }
+
+  currentUser = data.user || {};
+  currentUserId = data.userId;
+  return data;
+}
+  if (!form) return;
 
 function showServerMessage(text, ok){
   const msg = String(text || "").trim() || (ok ? "✅ تم بنجاح" : "تعذّر تنفيذ العملية.");
@@ -454,52 +470,53 @@ function showServerMessage(text, ok){
     return out;
   }
 
-  async function postToServer(path, payload){
-    const uid = getUidDirect();
-
-    if (!uid) {
-      return {
-        status: 400,
-        data: {
-          ok: false,
-          message: "لم يتم العثور على معرف المستخدم. سجّل الدخول مرة أخرى."
-        }
-      };
-    }
-
-    const r = await fetch(path, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": uid
-      },
-      body: JSON.stringify(payload || {})
-    });
-
-    const data = await r.json().catch(() => ({
-      ok: false,
-      message: "تعذّر قراءة رد السيرفر."
-    }));
-
-    return { status: r.status, data };
+async function postToServer(path, payload){
+  if (!currentUserId) {
+    await loadServerSession();
   }
-async function getFromServer(path){
-  const uid = getUidDirect();
 
-  if (!uid) {
+  const r = await fetch(API_BASE + path, {
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Cache-Control": "no-store"
+    },
+    body: JSON.stringify(payload || {})
+  });
+
+  const data = await r.json().catch(() => ({
+    ok: false,
+    message: "تعذّر قراءة رد السيرفر."
+  }));
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    location.replace("login.html?next=add-animal.html");
     return {
-      status: 400,
+      status: r.status,
       data: {
         ok: false,
-        message: "لم يتم العثور على معرف المستخدم. سجّل الدخول مرة أخرى."
+        message: "انتهت الجلسة. سجّل الدخول مرة أخرى."
       }
     };
   }
 
-  const r = await fetch(path, {
+  return { status: r.status, data };
+}
+async function getFromServer(path){
+  if (!currentUserId) {
+    await loadServerSession();
+  }
+
+  const r = await fetch(API_BASE + path, {
     method: "GET",
+    cache: "no-store",
+    credentials: "include",
     headers: {
-      "X-User-Id": uid
+      "Accept": "application/json",
+      "Cache-Control": "no-store"
     }
   });
 
@@ -507,6 +524,17 @@ async function getFromServer(path){
     ok: false,
     message: "تعذّر قراءة رد السيرفر."
   }));
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    location.replace("login.html?next=add-animal.html");
+    return {
+      status: r.status,
+      data: {
+        ok: false,
+        message: "انتهت الجلسة. سجّل الدخول مرة أخرى."
+      }
+    };
+  }
 
   return { status: r.status, data };
 }
@@ -560,7 +588,9 @@ function watchAnimalNumberAvailability(){
     }, 350);
   });
 }
-
+loadServerSession().catch(err => {
+  console.warn("add-animal auth failed:", err);
+});
 watchAnimalNumberAvailability();
 function setValue(id, value){
   const el = document.getElementById(id);
