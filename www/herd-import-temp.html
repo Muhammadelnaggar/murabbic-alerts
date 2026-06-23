@@ -97,7 +97,31 @@
 <script>
 (function(){
   const API_BASE = "https://murabbic-alerts.onrender.com";
+  let currentUser = null;
+let currentUserId = null;
 
+async function loadServerSession(){
+  const res = await fetch(API_BASE + "/api/auth/me", {
+    method: "GET",
+    headers: {
+      "Accept": "application/json",
+      "Cache-Control": "no-store"
+    },
+    credentials: "include",
+    cache: "no-store"
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || data.ok !== true || !data.userId) {
+    location.replace("login.html?next=herd-import-temp.html");
+    throw new Error("auth_required");
+  }
+
+  currentUser = data.user || {};
+  currentUserId = data.userId;
+  return data;
+}
   const $ = id => document.getElementById(id);
 
   const herdFile = $("herdFile");
@@ -114,15 +138,7 @@
   let lastFilePayload = null;
   let lastPreviewOk = false;
 
-  function getUid(){
-    return (
-      localStorage.getItem("murabbik_uid") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("userId") ||
-      localStorage.getItem("currentUserId") ||
-      ""
-    ).trim();
-  }
+  
 
   function showMessage(text, type){
   const cls =
@@ -205,26 +221,40 @@ function renderRows(rows){
     resultsBox.style.display = "block";
   }
 
-  async function callHerdImport(path){
-    const uid = getUid();
-
-    if (!uid) {
-      throw new Error("لم يتم العثور على X-User-Id في localStorage.");
+async function callHerdImport(path){
+    if (!currentUserId) {
+      await loadServerSession();
     }
 
     const r = await fetch(API_BASE + path, {
       method: "POST",
+      cache: "no-store",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        "X-User-Id": uid
+        "Accept": "application/json",
+        "Cache-Control": "no-store"
       },
-     body: JSON.stringify({
-  ...(lastFilePayload || {}),
-  defaultAnimalType: String(defaultAnimalType?.value || "").trim()
-})
+      body: JSON.stringify({
+        ...(lastFilePayload || {}),
+        defaultAnimalType: String(defaultAnimalType?.value || "").trim()
+      })
     });
 
-    return r.json();
+    const data = await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+
+    if (r.status === 401 || data?.error === "auth_required") {
+      location.replace("login.html?next=herd-import-temp.html");
+      return {
+        ok: false,
+        message: "انتهت الجلسة. سجّل الدخول مرة أخرى."
+      };
+    }
+
+    return data;
   }
 
   btnPreview.addEventListener("click", async () => {
@@ -313,6 +343,9 @@ const j = await callHerdImport("/api/herd-import-v2/save-operational");
       btnSave.disabled = false;
     }
   });
+  loadServerSession().catch(err => {
+  console.warn("herd-import auth failed:", err);
+});
 })();
 </script>
 </body>
