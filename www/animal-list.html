@@ -66,36 +66,32 @@
   const $ = id => document.getElementById(id);
   let animalsData = [];
   let searchTimer = null;
+const API_BASE = window.API_BASE || "https://murabbic-alerts.onrender.com";
+let currentUser = null;
+let currentUserId = null;
 
-  function readStoredUid() {
-    const keys = [
-      'murabbik_uid',
-      'mbk_uid',
-      'uid',
-      'userId',
-      'ownerUid',
-      'currentUserId'
-    ];
+async function loadServerSession(){
+  const res = await fetch(API_BASE + "/api/auth/me", {
+    method: "GET",
+    headers: {
+      "Accept": "application/json",
+      "Cache-Control": "no-store"
+    },
+    credentials: "include",
+    cache: "no-store"
+  });
 
-    for (const k of keys) {
-      const v = (localStorage.getItem(k) || sessionStorage.getItem(k) || '').trim();
-      if (v) return v;
-    }
+  const data = await res.json().catch(() => ({}));
 
-    const jsonKeys = ['murabbik_user', 'mbk_user', 'user', 'currentUser'];
-    for (const k of jsonKeys) {
-      const raw = localStorage.getItem(k) || sessionStorage.getItem(k) || '';
-      if (!raw) continue;
-
-      try {
-        const obj = JSON.parse(raw);
-        const v = String(obj.uid || obj.userId || obj.ownerUid || obj.id || '').trim();
-        if (v) return v;
-      } catch (_) {}
-    }
-
-    return '';
+  if (!res.ok || data.ok !== true || !data.userId) {
+    location.replace("login.html?next=animal-list.html");
+    throw new Error("auth_required");
   }
+
+  currentUser = data.user || {};
+  currentUserId = data.userId;
+  return data;
+}
 
   function setMessage(text) {
     const noData = $('noData');
@@ -130,32 +126,34 @@
     return qs ? `/api/animals?${qs}` : '/api/animals';
   }
 
-  async function apiLoadAnimals() {
-    const uid = readStoredUid();
-
-    if (!uid) {
-      location.href = 'login.html?next=animal-list.html';
-      return null;
-    }
-
-    const res = await fetch(buildAnimalsUrl(), {
-      method: 'GET',
-      cache: 'no-store',
-      headers: {
-        'Accept': 'application/json',
-        'X-User-Id': uid
-      }
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok || data.ok === false) {
-      throw new Error(data.message || data.error || 'تعذّر تحميل قائمة الحيوانات.');
-    }
-
-    return data;
+async function apiLoadAnimals() {
+  if (!currentUserId) {
+    await loadServerSession();
   }
 
+  const res = await fetch(API_BASE + buildAnimalsUrl(), {
+    method: 'GET',
+    cache: 'no-store',
+    credentials: 'include',
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-store'
+    }
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (res.status === 401 || data.error === "auth_required") {
+    location.replace("login.html?next=animal-list.html");
+    return null;
+  }
+
+  if (!res.ok || data.ok === false) {
+    throw new Error(data.message || data.error || 'تعذّر تحميل قائمة الحيوانات.');
+  }
+
+  return data;
+}
   function updateTypeOptions(types = []) {
     const typeSelector = $('typeSelector');
     if (!typeSelector) return;
@@ -265,7 +263,14 @@ $('resetFilterBtn')?.addEventListener('click', function(){
   $('typeSelector').value = '';
   loadAnimals();
 });
-  document.addEventListener('DOMContentLoaded', loadAnimals);
+ document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await loadServerSession();
+    await loadAnimals();
+  } catch (e) {
+    console.warn('animal-list auth failed:', e);
+  }
+});
 </script>
 
 
