@@ -26,7 +26,6 @@ const EVENT_SYNONYMS = {
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
-app.set('trust proxy', 1);
 
 // ===== Local storage (fallback) =====
 const dataDir     = path.join(__dirname, 'data');
@@ -42,7 +41,7 @@ function readJson(p, fallback = []) {
 }
 
 // ===== Middleware =====
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -75,239 +74,7 @@ db = firestore;
 } catch (e) {
   console.log("⚠️ Firestore disabled:", e.message);
 }
-// ============================================================
-//                  AUTH / SESSION — server-first login
-// ============================================================
-const AUTH_COOKIE_NAME = process.env.MURABBIK_AUTH_COOKIE || "mbk_session";
-const AUTH_SESSION_DAYS = Number(process.env.MURABBIK_SESSION_DAYS || 7);
-const AUTH_SESSION_EXPIRES_MS = Math.max(1, AUTH_SESSION_DAYS) * 24 * 60 * 60 * 1000;
 
-function authNormDigitsSrv(raw) {
-  const map = {
-    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
-    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
-  };
-
-  return String(raw || "")
-    .trim()
-    .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
-    .replace(/\D/g, "");
-}
-
-function authCookieValueSrv(req, name) {
-  const raw = String(req.headers.cookie || "");
-  if (!raw) return "";
-
-  for (const part of raw.split(";")) {
-    const i = part.indexOf("=");
-    if (i < 0) continue;
-
-    const k = part.slice(0, i).trim();
-    if (k !== name) continue;
-
-    try {
-      return decodeURIComponent(part.slice(i + 1).trim());
-    } catch (_) {
-      return part.slice(i + 1).trim();
-    }
-  }
-
-  return "";
-}
-
-function authIsHttpsReqSrv(req) {
-  return Boolean(
-    req.secure ||
-    String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "https"
-  );
-}
-
-function authSetSessionCookieSrv(req, res, sessionCookie) {
-  res.cookie(AUTH_COOKIE_NAME, sessionCookie, {
-    httpOnly: true,
-    secure: authIsHttpsReqSrv(req),
-    sameSite: "lax",
-    path: "/",
-    maxAge: AUTH_SESSION_EXPIRES_MS
-  });
-}
-
-function authClearSessionCookieSrv(req, res) {
-  res.clearCookie(AUTH_COOKIE_NAME, {
-    httpOnly: true,
-    secure: authIsHttpsReqSrv(req),
-    sameSite: "lax",
-    path: "/"
-  });
-}
-
-function authPublicUserSrv(profile = {}, uid = "", tenant = "") {
-  return {
-    uid,
-    userId: tenant,
-    name: profile.name || profile.displayName || profile.fullName || "",
-    phone: profile.phone || profile.phoneNumber || "",
-    role: profile.role || profile.accountRole || "",
-    farmName: profile.farmName || profile.farm || ""
-  };
-}
-
-async function authUserProfileSrv(uid) {
-  if (!db || !uid) return {};
-
-  try {
-    const snap = await db.collection("users").doc(uid).get();
-    return snap.exists ? (snap.data() || {}) : {};
-  } catch (e) {
-    console.warn("auth user profile read failed:", e.message || e);
-    return {};
-  }
-}
-
-async function authSessionFromRequestSrv(req) {
-  try {
-    const sessionCookie = authCookieValueSrv(req, AUTH_COOKIE_NAME);
-    if (!sessionCookie || !admin.apps.length) return null;
-
-    const decoded = await admin.auth().verifySessionCookie(sessionCookie, true);
-    const uid = String(decoded.uid || "").trim();
-    if (!uid) return null;
-
-    const profile = await authUserProfileSrv(uid);
-    const tenant = tenantKey(profile.userId || profile.tenantId || profile.ownerUid || uid);
-
-    return {
-      uid,
-      userId: tenant,
-      decoded,
-      user: authPublicUserSrv(profile, uid, tenant)
-    };
-  } catch (_) {
-    return null;
-  }
-}
-
-async function authPasswordLoginSrv(email, password) {
-  const apiKey =
-    process.env.FIREBASE_WEB_API_KEY ||
-    process.env.FIREBASE_API_KEY ||
-    process.env.MURABBIK_FIREBASE_API_KEY ||
-    "";
-
-  if (!apiKey) {
-    const err = new Error("firebase_web_api_key_missing");
-    err.publicMessage = "إعداد تسجيل الدخول غير مكتمل على السيرفر.";
-    throw err;
-  }
-
-  const r = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        password,
-        returnSecureToken: true
-      })
-    }
-  );
-
-  const data = await r.json().catch(() => ({}));
-
-  if (!r.ok || !data.idToken) {
-    const err = new Error(data?.error?.message || "login_failed");
-    err.publicMessage = "رقم الهاتف أو كلمة المرور غير صحيحة.";
-    throw err;
-  }
-
-  return data;
-}
-
-app.post("/api/auth/login", async (req, res) => {
-  try {
-    if (!admin.apps.length) {
-      return res.status(503).json({
-        ok: false,
-        error: "firebase_admin_disabled",
-        message: "خدمة تسجيل الدخول غير متاحة الآن."
-      });
-    }
-
-    const phoneKey = authNormDigitsSrv(req.body?.phone || req.body?.phoneNumber || "");
-    const password = String(req.body?.password || "");
-
-    if (!phoneKey || !password) {
-      return res.status(400).json({
-        ok: false,
-        error: "login_fields_required",
-        message: "أدخل رقم الهاتف وكلمة المرور."
-      });
-    }
-
-    const pseudoEmail = `${phoneKey}@murabbik.local`;
-    const login = await authPasswordLoginSrv(pseudoEmail, password);
-    const decoded = await admin.auth().verifyIdToken(login.idToken);
-    const uid = String(decoded.uid || login.localId || "").trim();
-
-    if (!uid) {
-      return res.status(401).json({
-        ok: false,
-        error: "login_failed",
-        message: "رقم الهاتف أو كلمة المرور غير صحيحة."
-      });
-    }
-
-    const profile = await authUserProfileSrv(uid);
-    const tenant = tenantKey(profile.userId || profile.tenantId || profile.ownerUid || uid);
-
-    const sessionCookie = await admin.auth().createSessionCookie(login.idToken, {
-      expiresIn: AUTH_SESSION_EXPIRES_MS
-    });
-
-    authSetSessionCookieSrv(req, res, sessionCookie);
-
-    return res.json({
-      ok: true,
-      message: "✅ تم تسجيل الدخول بنجاح",
-      uid,
-      userId: tenant,
-      user: authPublicUserSrv(profile, uid, tenant),
-      redirectUrl: "dashboard.html"
-    });
-  } catch (e) {
-    console.warn("auth login failed:", e.message || e);
-    return res.status(401).json({
-      ok: false,
-      error: "login_failed",
-      message: e.publicMessage || "رقم الهاتف أو كلمة المرور غير صحيحة."
-    });
-  }
-});
-
-app.get("/api/auth/me", async (req, res) => {
-  const session = await authSessionFromRequestSrv(req);
-
-  if (!session?.userId) {
-    return res.status(401).json({
-      ok: false,
-      error: "auth_required",
-      message: "سجّل الدخول أولًا."
-    });
-  }
-
-  return res.json({
-    ok: true,
-    uid: session.uid,
-    userId: session.userId,
-    user: session.user
-  });
-});
-
-app.post("/api/auth/logout", async (req, res) => {
-  authClearSessionCookieSrv(req, res);
-  return res.json({ ok: true, message: "تم تسجيل الخروج." });
-});
 
 
 // ===== Helpers =====
@@ -326,8 +93,6 @@ const tenantKey = v => String(v || '').trim();
 
 function resolveTenant(req) {
   const uid =
-    req.userId ||
-    req.authSession?.userId ||
     req.get("X-User-Id") ||
     req.headers["x-user-id"] ||
     req.query.userId ||
@@ -404,39 +169,11 @@ function belongs(rec, tenant){
   return tenantKey(t) === tenantKey(tenant);
 }
 
-async function requireUserId(req, res, next){
-  try {
-    const session = await authSessionFromRequestSrv(req);
-    if (session?.userId) {
-      req.authSession = session;
-      req.userId = session.userId;
-      return next();
-    }
-
-    // توافق مؤقت مع الصفحات القديمة فقط.
-    // بعد نقل باقي الواجهات للجلسة، اجعل MURABBIK_ALLOW_LEGACY_USER_HEADER=0.
-    const legacyAllowed = process.env.MURABBIK_ALLOW_LEGACY_USER_HEADER !== "0";
-    const t = legacyAllowed ? resolveTenant(req) : null;
-
-    if (!t) {
-      return res.status(401).json({
-        ok: false,
-        error: 'auth_required',
-        message: 'سجّل الدخول أولًا.'
-      });
-    }
-
-    req.userId = t;
-    req.authMode = 'legacy-header';
-    return next();
-  } catch (e) {
-    console.error('requireUserId failed:', e.message || e);
-    return res.status(401).json({
-      ok: false,
-      error: 'auth_required',
-      message: 'سجّل الدخول أولًا.'
-    });
-  }
+function requireUserId(req, res, next){
+  const t = resolveTenant(req);
+  if (!t) return res.status(400).json({ ok:false, error:'userId_required' });
+  req.userId = t;
+  next();
 }
 function eventTextSrv(e = {}) {
   return [
