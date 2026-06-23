@@ -188,23 +188,6 @@
   const speciesEl = document.getElementById("species");
   const saveBtn = document.getElementById("saveBtn");
 
-  function getUid() {
-    return String(
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      localStorage.getItem("ownerUid") ||
-      ""
-    ).trim();
-  }
-
-  function apiBase() {
-    return String(
-      window.API_BASE ||
-      localStorage.getItem("API_BASE") ||
-      ""
-    ).replace(/\/$/, "");
-  }
 
   function toISO(s) {
     const v = String(s || "").trim();
@@ -227,7 +210,31 @@
       .replace(/[^\d]/g, "")
       .trim();
   }
+  async function sessionPostJson(path, payload, fallbackMessage) {
+  const r = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify(payload || {})
+  });
 
+  const data = await r.json().catch(() => ({
+    ok: false,
+    allowed: false,
+    message: "تعذّر قراءة رد السيرفر."
+  }));
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    showSysbar(data?.message || "سجّل الدخول أولًا.", "error");
+    return { data, authRequired: true };
+  }
+
+  return { data, authRequired: false };
+}
   function readRadio(name) {
     return String(form.querySelector(`input[name="${name}"]:checked`)?.value || "").trim();
   }
@@ -464,7 +471,6 @@
   let lastGateKey = "";
 
   async function runGateNow() {
-    const uid = getUid();
     const payload = collectPayload();
 
     const gateKey = JSON.stringify({
@@ -475,34 +481,23 @@
     if (gateKey === lastGateKey) return;
     lastGateKey = gateKey;
 
-    if (!uid || !payload.animalNumber || !payload.eventDate) {
+   if (!payload.animalNumber || !payload.eventDate) {
       setDetailsDisabled(true);
       if (sysbar) sysbar.style.display = "none";
       return;
     }
 
-    const endpoint = "/api/calving/gate";
-    const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
-
     try {
       setDetailsDisabled(true);
       showSysbar("جارِ التحقق من أهلية الولادة…", "info");
 
-      const r = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify(payload)
-      });
+      const { data, authRequired } = await sessionPostJson(
+  "/api/calving/gate",
+  payload,
+  "تعذّر قراءة رد السيرفر."
+);
 
-      const data = await r.json().catch(() => ({
-        ok: false,
-        allowed: false,
-        message: "تعذّر قراءة رد السيرفر."
-      }));
-
+if (authRequired) return;
       renderServerMessage(data, "تعذّر التحقق من أهلية الولادة.", true);
 
       if (data?.allowed) {
@@ -527,39 +522,24 @@
 
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
-
-    const uid = getUid();
     const payload = collectPayload();
-
-    const endpoint = "/api/calving/save";
-    const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
 
     try {
       if (saveBtn) saveBtn.disabled = true;
 
       showSysbar("جارِ حفظ الولادة…", "info");
 
-      const r = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify(payload)
-      });
+     const { data, authRequired } = await sessionPostJson(
+  "/api/calving/save",
+  payload,
+  "تعذّر قراءة رد السيرفر."
+);
 
-      const data = await r.json().catch(() => ({
-        ok: false,
-        message: "تعذّر قراءة رد السيرفر."
-      }));
+if (authRequired) return;
 
       renderServerMessage(data, "تعذّر حفظ الولادة.", false);
 
       if (data?.ok) {
-        try {
-          localStorage.setItem("lastAnimalId", data.animalNumber || payload.animalNumber || "");
-          localStorage.setItem("lastEventDate", data.eventDate || payload.eventDate || "");
-        } catch (_) {}
 
         if (data.redirectUrl) {
           setTimeout(() => {
@@ -596,8 +576,8 @@
   });
 
   document.addEventListener("DOMContentLoaded", () => {
-    const n = qp.get("animalNumber") || qp.get("number") || qp.get("animalId") || localStorage.getItem("lastAnimalId") || "";
-    const d = qp.get("eventDate") || qp.get("date") || qp.get("dt") || localStorage.getItem("lastEventDate") || "";
+  const n = qp.get("animalNumber") || qp.get("number") || qp.get("animalId") || "";
+  const d = qp.get("eventDate") || qp.get("date") || qp.get("dt") || "";
 
     if (animalEl) animalEl.value = normalizeDigits(n);
     if (dateEl) dateEl.value = toISO(d) || new Date().toISOString().slice(0, 10);
