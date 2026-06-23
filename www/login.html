@@ -214,67 +214,75 @@
     © 2026 Murabbik. All rights reserved.
   </footer>
 
-<script type="module">
-  import { db } from "./js/firebase-config.js";
-  import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import { getAuth, signInWithEmailAndPassword }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
+<script>
   const form = document.getElementById("loginForm");
   const btn  = document.getElementById("submitBtn");
   const msg  = document.getElementById("formMsg");
 
-  function setMsg(t, ok=false){
+  function setMsg(t, ok = false) {
     msg.textContent = t;
-    msg.className   = "msg " + (ok ? "ok" : "err");
+    msg.className = "msg " + (ok ? "ok" : "err");
     msg.style.display = "block";
   }
 
-  function phoneKeyOf(raw){
-    const s = (raw||"").trim()
-      .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d))
-      .replace(/\D/g,'');
-    return s;
+  function authUrl(path) {
+    const apiBase = String(window.API_BASE || "").replace(/\/$/, "");
+    return apiBase ? `${apiBase}${path}` : path;
   }
 
-  form.addEventListener("submit", async (e)=>{
-    e.preventDefault(); 
-    msg.style.display="none";
-    const prev = btn.textContent; 
-    btn.disabled=true; 
-    btn.textContent="جارٍ التحقق…";
+  function authCredentialsMode() {
+    return window.API_BASE ? "include" : "same-origin";
+  }
 
-    try{
-      const phoneIn = document.getElementById("phone").value;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    msg.style.display = "none";
+
+    const prev = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "جارٍ التحقق…";
+
+    try {
+      const phoneIn = document.getElementById("phone").value.trim();
       const passIn  = document.getElementById("password").value;
-      const phoneKey = phoneKeyOf(phoneIn);
 
-      if (!phoneKey || !passIn){ 
-        setMsg("أدخل رقم الهاتف وكلمة المرور."); 
-        return; 
+      if (!phoneIn || !passIn) {
+        setMsg("أدخل رقم الهاتف وكلمة المرور.");
+        return;
       }
 
-      const auth = getAuth();
-      const pseudoEmail = `${phoneKey}@murabbik.local`;
+      const r = await fetch(authUrl("/api/auth/login"), {
+        method: "POST",
+        credentials: authCredentialsMode(),
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          phone: phoneIn,
+          password: passIn
+        })
+      });
 
-      const cred = await signInWithEmailAndPassword(auth, pseudoEmail, passIn);
-      const uid  = cred.user.uid;
+      const data = await r.json().catch(() => null);
 
-      const snap = await getDoc(doc(db,"users", uid));
-      const u = snap.exists() ? snap.data() : {};
-      const tenant = u.userId || uid;
+      if (!r.ok || !data || data.ok !== true) {
+        setMsg(data?.message || "رقم الهاتف أو كلمة المرور غير صحيحة.");
+        return;
+      }
 
-      localStorage.setItem("userId", tenant);
+      setMsg(data.message || "✅ تم تسجيل الدخول — تحويل…", true);
 
-      setMsg("✅ تم تسجيل الدخول — تحويل…", true);
-     setTimeout(()=> location.replace("dashboard.html"), 600);
+      setTimeout(() => {
+        location.replace(data.redirectUrl || "dashboard.html");
+      }, 600);
 
-
-    }catch(err){
-      setMsg("رقم الهاتف أو كلمة المرور غير صحيحة.");
-    }finally{
-      btn.disabled=false; 
-      btn.textContent=prev;
+    } catch (err) {
+      setMsg("تعذّر الاتصال بالسيرفر الآن. حاول مرة أخرى.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prev;
     }
   });
 </script>
