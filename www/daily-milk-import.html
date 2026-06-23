@@ -10,12 +10,6 @@
  
 </head>
 <body>
-  <script type="module">
-    import { protectPage, lockBackButton } from "/js/nav-guard.js";
-    protectPage();
-    lockBackButton();
-  </script>
-
   <header>
     <div class="mbk-head">
       <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
@@ -127,17 +121,6 @@
     return d.toISOString().slice(0, 10);
   }
 
-  function getUserId() {
-    return String(
-      window.__tenant?.userId ||
-      window.MURABBIK_USER_ID ||
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      ""
-    ).trim();
-  }
-
   function showBar(status, text) {
     const cls =
       status === "success" || status === "ok" ? "success" :
@@ -157,43 +140,69 @@
     sysbar.style.display = "none";
   }
 
-  async function postJson(path, payload) {
-    const res = await fetch(path, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": getUserId()
-      },
-      body: JSON.stringify(payload || {})
-    });
+ async function postJson(path, payload) {
+  const res = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify(payload || {})
+  });
 
-    return await res.json().catch(() => ({
+  const data = await res.json().catch(() => ({
+    ok: false,
+    ui: {
+      status: "error",
+      message: "تعذّر قراءة رد السيرفر."
+    }
+  }));
+
+  if (res.status === 401 || data?.error === "auth_required") {
+    return {
       ok: false,
       ui: {
         status: "error",
-        message: "تعذّر قراءة رد السيرفر."
+        message: data?.message || "سجّل الدخول أولًا."
       }
-    }));
+    };
   }
 
-  async function postForm(path, formData) {
-    const res = await fetch(path, {
-      method: "POST",
-      headers: {
-        "X-User-Id": getUserId()
-      },
-      body: formData
-    });
+  return data;
+}
+ async function postForm(path, formData) {
+  const res = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Accept": "application/json"
+    },
+    body: formData
+  });
 
-    return await res.json().catch(() => ({
+  const data = await res.json().catch(() => ({
+    ok: false,
+    ui: {
+      status: "error",
+      message: "تعذّر قراءة رد السيرفر."
+    }
+  }));
+
+  if (res.status === 401 || data?.error === "auth_required") {
+    return {
       ok: false,
       ui: {
         status: "error",
-        message: "تعذّر قراءة رد السيرفر."
+        message: data?.message || "سجّل الدخول أولًا."
       }
-    }));
+    };
   }
 
+  return data;
+}
   function renderUi(ui) {
     const rows = Array.isArray(ui?.rows) ? ui.rows : [];
     lastPreviewRows = rows;
