@@ -95,7 +95,29 @@
 <script>
 const $ = (s, p = document) => p.querySelector(s);
 const $$ = (s, p = document) => [...p.querySelectorAll(s)];
+const API_BASE = window.API_BASE || "https://murabbic-alerts.onrender.com";
 
+async function loadServerSession(){
+  const res = await fetch(API_BASE + "/api/auth/me", {
+    method: "GET",
+    headers: {
+      "Accept": "application/json",
+      "Cache-Control": "no-store"
+    },
+    credentials: "include",
+    cache: "no-store"
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || data.ok !== true || !data.userId) {
+    location.replace("/login.html?next=groups.html");
+    throw new Error("auth_required");
+  }
+
+  state.userId = data.userId;
+  return data;
+}
 const state = {
   userId: null,
   groups: [],
@@ -106,70 +128,63 @@ const state = {
   selectedAnimalId: ""
 };
 
-function getUidDirect(){
-  return String(
-    localStorage.getItem("userId") ||
-    localStorage.getItem("uid") ||
-    localStorage.getItem("tenantId") ||
-    window.MBK_USER_ID ||
-    window.mbkUserId ||
-    window.mbk?.userId ||
-    ""
-  ).trim();
-}
-
 async function apiGetDirect(url){
-  const uid = state.userId || getUidDirect();
-  if (!uid) throw new Error("userId_required");
+  if (!state.userId) {
+    await loadServerSession();
+  }
 
-  const r = await fetch(url, {
+  const r = await fetch(API_BASE + url, {
     method: "GET",
     cache: "no-store",
+    credentials: "include",
     headers: {
       "Accept": "application/json",
-      "X-User-Id": uid
+      "Cache-Control": "no-store"
     }
   });
 
   const j = await r.json().catch(() => ({}));
+
+  if (r.status === 401 || j?.error === "auth_required") {
+    location.replace("/login.html?next=groups.html");
+    return null;
+  }
+
   if (!r.ok || j?.ok === false) {
     throw new Error(j.message || j.error || "server_request_failed");
   }
 
   return j;
 }
-
 async function apiPostDirect(url, body){
-  const uid = state.userId || getUidDirect();
-  if (!uid) throw new Error("userId_required");
+  if (!state.userId) {
+    await loadServerSession();
+  }
 
-  const r = await fetch(url, {
+  const r = await fetch(API_BASE + url, {
     method: "POST",
     cache: "no-store",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       "Accept": "application/json",
-      "X-User-Id": uid
+      "Cache-Control": "no-store"
     },
     body: JSON.stringify(body || {})
   });
 
   const j = await r.json().catch(() => ({}));
+
+  if (r.status === 401 || j?.error === "auth_required") {
+    location.replace("/login.html?next=groups.html");
+    return null;
+  }
+
   if (!r.ok || j?.ok === false) {
     throw new Error(j.message || j.error || "server_request_failed");
   }
 
   return j;
-}
-
-function ensureUser(){
-  const uid = getUidDirect();
-  if (!uid) {
-    location.href = "/login.html?next=groups.html";
-    return false;
-  }
-  state.userId = uid;
-  return true;
 }
 
 function ensureDisplayHost(){
@@ -456,9 +471,10 @@ function renderCurrentGroup(){
 }
 
 async function loadGroupsPage(){
-  const res = await apiGetDirect("/api/groups/page");
+const res = await apiGetDirect("/api/groups/page");
+if (!res) return;
 
-  if (res.source !== "server_groups_page") {
+if (res.source !== "server_groups_page") {
     throw new Error("groups_page_not_server_source");
   }
 
@@ -494,7 +510,9 @@ function bindEvents(){
 
   $("#saveSettings")?.addEventListener("click", async () => {
     state.thresholds = readThresholdsFromInputs();
-    await apiPostDirect("/api/groups/settings", { thresholds: state.thresholds });
+    const saved = await apiPostDirect("/api/groups/settings", { thresholds: state.thresholds });
+    if (!saved) return;
+
     await loadGroupsPage();
     $("#settings")?.setAttribute("hidden", "");
   });
@@ -514,7 +532,7 @@ window.addEventListener("unhandledrejection", e => console.error("Promise Reject
 
 (async function start(){
   try {
-    if (!ensureUser()) return;
+    await loadServerSession();
 
     ensureSettingsExtraInputs();
     ensureDisplayHost();
