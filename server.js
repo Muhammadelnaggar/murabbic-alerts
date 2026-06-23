@@ -23059,11 +23059,10 @@ app.get('/api/animal-timeline', async (req, res) => {
 // =============================================
 //   /api/herd-stats  —  Murabbik Full Edition
 // =============================================
-app.get("/api/herd-stats", async (req, res) => {
+app.get("/api/herd-stats", requireUserId, async (req, res) => {
   try {
-    const uid = req.headers["x-user-id"];
+    const uid = req.userId;
     const herdType = String(req.query.type || '').trim().toLowerCase();
-    if (!uid) return res.json({ ok:false, error:"NO_USER" });
 
     // --------------------------------------
     // 🔥 1) جلب الحيوانات
