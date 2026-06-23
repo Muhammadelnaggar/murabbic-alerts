@@ -1052,12 +1052,20 @@ const payload = await apiGetDirect(`/api/animal-card?${qs.toString()}`);
 
       renderCard(payload);
 
-    }catch(e){
-      console.error('animal card error:', e);
-      const title = $('cardTitle');
-      if (title) title.textContent = 'تعذّر تحميل بطاقة الحيوان';
-      showNotice(e?.message || 'تعذّر تحميل بطاقة الحيوان.');
-    }
+   }catch(e){
+  console.error('animal card error:', e);
+
+  const msg = String(
+    e?.data?.message ||
+    e?.message ||
+    'تعذّر تحميل بطاقة الحيوان.'
+  ).trim();
+
+  const title = $('cardTitle');
+  if (title) title.textContent = msg;
+
+  showNotice(msg);
+}
   }
 
   const numberParam = pageUrl.searchParams.get('number') || pageUrl.searchParams.get('animalNumber') || '';
