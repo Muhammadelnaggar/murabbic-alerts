@@ -171,7 +171,7 @@ async function authSessionFromRequestBridgeSrv(req) {
     const sessionCookie = authCookieValueBridgeSrv(req, AUTH_COOKIE_NAME);
     if (!sessionCookie || !admin.apps.length) return null;
 
-    const decoded = await admin.auth().verifySessionCookie(sessionCookie, true);
+    const decoded = await admin.auth().verifySessionCookie(sessionCookie, false);
     const uid = String(decoded.uid || "").trim();
     if (!uid) return null;
 
