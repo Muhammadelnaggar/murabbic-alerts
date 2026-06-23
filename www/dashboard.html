@@ -670,14 +670,7 @@
   </style>
 </head>
 <body>
-<script>
-  // منع الرجوع بعد Logout
-  try{
-    if (sessionStorage.getItem("mbkLoggedOut") === "1"){
-      location.replace("login.html");
-    }
-  }catch(e){}
-</script>
+
 
 <script>
   window.API_BASE = "https://murabbic-alerts.onrender.com";
@@ -756,12 +749,6 @@
 </div>
 
 <div id="statusBar" class="card">جارٍ تحميل بيانات القطيع...</div>
-<script src="/js/tenant-bootstrap.js"></script>
-<script type="module" src="/js/api.js"></script>
-<script type="module" src="/js/app-core.js"></script>
-<script src="/js/alerts-ui.js"></script>
-
-
 
 
 <script>
@@ -812,42 +799,53 @@ function buildMilkCauses({ thi, mastitisPct, lamenessPct }){
   if (Number(mastitisPct) > 0 || Number(lamenessPct) > 0) causes.push('صحة');
   return causes.length ? causes.join(' + ') : 'غير واضح';
 } 
-// ============ هوية المستخدم ============
-function getTenantId() {
-  try {
-    const T = window.__TENANT__ || {};
-    const fromObj = T.userId || T.uid || T.id || T.tenantId;
-    const fromStorage =
-      localStorage.getItem('userId') ||
-      localStorage.getItem('uid') ||
-      localStorage.getItem('tenantId');
-    return fromObj || fromStorage || null;
-  } catch (e) {
-    return null;
-  }
-}
+// ============ جلسة المستخدم من السيرفر ============
+let currentUser = null;
+let currentUserId = null;
 
-async function waitForTenant(maxMs = 2000) {
-  const start = Date.now();
-  while (Date.now() - start < maxMs) {
-    const id = getTenantId();
-    if (id) return id;
-    await new Promise(r => setTimeout(r, 150));
+async function loadServerSession(){
+  const res = await fetch(API_BASE + '/api/auth/me', {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-store'
+    },
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || data.ok !== true || !data.userId) {
+    try {
+      sessionStorage.setItem("mbkLoggedOut", "1");
+    } catch(e) {}
+
+    location.replace("login.html");
+    throw new Error("auth_required");
   }
-  return getTenantId();
+
+  try {
+    sessionStorage.removeItem("mbkLoggedOut");
+  } catch(e) {}
+
+  currentUser = data.user || {};
+  currentUserId = data.userId;
+
+  return data;
 }
 
 async function fetchJSON(path){
-  let uid = getTenantId();
-  if (!uid && location.hostname !== 'localhost') {
-    uid = await waitForTenant();
-  }
-  if (!uid) uid = 'demo-user';
+  const res = await fetch(API_BASE + path, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-store'
+    },
+    credentials: 'include',
+    cache: 'no-store'
+  });
 
-  const headers = { 'Cache-Control':'no-store' };
-  if (uid) headers['X-User-Id'] = uid;
-
-  const res = await fetch(API_BASE + path, { headers, cache:'no-store' });
   if (!res.ok) throw new Error(path + ' ' + res.status);
   return res.json();
 }
@@ -1784,17 +1782,17 @@ function renderMiniGauge(id, percent){
 }
   async function loadOvsynchDashboardAlerts(){
   try{
-    const uid = getTenantId();
-    if (!uid) return;
+    if (!currentUserId) return;
 
-    const r = await fetch(API_BASE + '/api/ovsynch/dashboard-alerts', {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'X-User-Id': uid
-      },
-      cache: 'no-store'
-    });
+const r = await fetch(API_BASE + '/api/ovsynch/dashboard-alerts', {
+  method: 'GET',
+  headers: {
+    'Accept': 'application/json',
+    'Cache-Control': 'no-store'
+  },
+  credentials: 'include',
+  cache: 'no-store'
+});
 
     const data = await r.json().catch(() => null);
     const alerts = Array.isArray(data?.alerts) ? data.alerts : [];
@@ -1821,17 +1819,17 @@ function renderMiniGauge(id, percent){
 }
   async function loadVaccinationDashboardAlerts(){
   try{
-    const uid = getTenantId();
-    if (!uid) return;
+    if (!currentUserId) return;
 
-    const r = await fetch(API_BASE + '/api/vaccination/dashboard-alerts', {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'X-User-Id': uid
-      },
-      cache: 'no-store'
-    });
+const r = await fetch(API_BASE + '/api/vaccination/dashboard-alerts', {
+  method: 'GET',
+  headers: {
+    'Accept': 'application/json',
+    'Cache-Control': 'no-store'
+  },
+  credentials: 'include',
+  cache: 'no-store'
+});
 
     const data = await r.json().catch(() => null);
     const alerts = Array.isArray(data?.alerts) ? data.alerts : [];
@@ -1857,14 +1855,21 @@ function renderMiniGauge(id, percent){
   }
 }
   // ============ تشغيل ============
-document.addEventListener('DOMContentLoaded', () => {
-  loadWeatherTHI();
-  loadHerdKPIs();
-  loadOvsynchDashboardAlerts();
-  loadVaccinationDashboardAlerts();
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await loadServerSession();
 
-  setInterval(loadOvsynchDashboardAlerts, 10 * 60 * 1000);
-  setInterval(loadVaccinationDashboardAlerts, 10 * 60 * 1000);
+    loadWeatherTHI();
+    loadHerdKPIs();
+    loadOvsynchDashboardAlerts();
+    loadVaccinationDashboardAlerts();
+
+    setInterval(loadOvsynchDashboardAlerts, 10 * 60 * 1000);
+    setInterval(loadVaccinationDashboardAlerts, 10 * 60 * 1000);
+
+  } catch (e) {
+    console.warn('dashboard auth failed', e);
+  }
 });
 
 </script>
@@ -1874,11 +1879,49 @@ document.addEventListener('DOMContentLoaded', () => {
   <div class="logout-floating">
   <button id="logoutBtn">تسجيل الخروج</button>
 </div>
-<script type="module">
-  import { protectPage, lockBackButton, bindLogout } from "/js/nav-guard.js";
-  protectPage();
-  lockBackButton();     // ✅ تعطيل الرجوع على الداش فقط
-  bindLogout();         // ✅ إصلاح زر Logout حتى لو الزر آخر الصفحة
+<script>
+  function lockBackButton(){
+    try {
+      history.pushState(null, "", location.href);
+      window.addEventListener("popstate", () => {
+        history.pushState(null, "", location.href);
+      });
+    } catch(e) {}
+  }
+
+  function bindServerLogout(){
+    const btn = document.getElementById("logoutBtn");
+    if (!btn) return;
+
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      btn.textContent = "جارٍ تسجيل الخروج...";
+
+      try {
+        await fetch(API_BASE + "/api/auth/logout", {
+          method: "POST",
+          headers: {
+            "Accept": "application/json",
+            "Cache-Control": "no-store"
+          },
+          credentials: "include",
+          cache: "no-store"
+        });
+      } catch(e) {}
+
+      try {
+        localStorage.removeItem("userId");
+        localStorage.removeItem("uid");
+        localStorage.removeItem("tenantId");
+        sessionStorage.setItem("mbkLoggedOut", "1");
+      } catch(e) {}
+
+      location.replace("login.html");
+    });
+  }
+
+  lockBackButton();
+  bindServerLogout();
 </script>
 
 </body>
