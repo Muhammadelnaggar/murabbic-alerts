@@ -18,8 +18,6 @@
   <img class="mbk-logo" src="images/logo.png" alt="مُرَبِّيك">
 </header>
 <div id="lookupBar" class="lookup-bar" hidden>
-
-<div id="lookupBar" class="lookup-bar hidden">
   <input id="animalNumberInput" class="lookup-input" type="text" inputmode="numeric" placeholder="اكتب رقم العجل" />
   <button id="openAnimalBtn" class="lookup-btn" type="button">فتح البطاقة</button>
 </div>
@@ -90,7 +88,32 @@
 (function(){
   const $ = id => document.getElementById(id);
   const pageUrl = new URL(location.href);
+  const API_BASE = window.API_BASE || "https://murabbic-alerts.onrender.com";
+let currentUser = null;
+let currentUserId = null;
 
+async function loadServerSession(){
+  const res = await fetch(API_BASE + "/api/auth/me", {
+    method: "GET",
+    headers: {
+      "Accept": "application/json",
+      "Cache-Control": "no-store"
+    },
+    credentials: "include",
+    cache: "no-store"
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || data.ok !== true || !data.userId) {
+    location.replace("login.html?next=calf-card.html");
+    throw new Error("auth_required");
+  }
+
+  currentUser = data.user || {};
+  currentUserId = data.userId;
+  return data;
+}
   const els = {
     statusBar: $('statusBar'),
     lookupBar: $('lookupBar'),
@@ -126,46 +149,30 @@
     summaryBody: $('summaryBody')
   };
 
-  function safeStorageGet(storageName, key){
-    try{
-      const store = window[storageName];
-      return store ? String(store.getItem(key) || '').trim() : '';
-    }catch(_){
-      return '';
+  
+
+async function apiGetDirect(path){
+    if (!currentUserId) {
+      await loadServerSession();
     }
-  }
 
-  function currentUid(){
-    return String(
-      window.__tenant?.userId ||
-      window.MURABBIK_USER_ID ||
-      window.currentUserId ||
-      pageUrl.searchParams.get('userId') ||
-      safeStorageGet('sessionStorage', 'murabbik_uid') ||
-      safeStorageGet('sessionStorage', 'userId') ||
-      safeStorageGet('sessionStorage', 'ownerUid') ||
-      safeStorageGet('localStorage', 'murabbik_uid') ||
-      safeStorageGet('localStorage', 'userId') ||
-      safeStorageGet('localStorage', 'ownerUid') ||
-      safeStorageGet('localStorage', 'uid') ||
-      ''
-    ).trim();
-  }
-
-  async function apiGetDirect(path){
-    const uid = currentUid();
-
-    const res = await fetch(path, {
+    const res = await fetch(API_BASE + path, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        ...(uid ? { 'X-User-Id': uid } : {})
+        'Cache-Control': 'no-store'
       },
+      credentials: 'include',
       cache: 'no-store'
     });
 
     let data = null;
     try { data = await res.json(); } catch (_) {}
+
+    if (res.status === 401 || data?.error === "auth_required") {
+      location.replace("login.html?next=calf-card.html");
+      return null;
+    }
 
     if (!res.ok) {
       const err = new Error(data?.message || `HTTP ${res.status}`);
@@ -431,11 +438,6 @@
         return;
       }
 
-      if (!currentUid()) {
-        setBar('تعذر تحديد المستخدم الحالي.', 'error-box');
-        return;
-      }
-
       showCardOnly();
       setBar('جارِ تحميل بطاقة العجل...');
 
@@ -443,7 +445,8 @@
       if (number) qs.set('number', number);
       if (calfId) qs.set('calfId', calfId);
 
-      const payload = await apiGetDirect(`/api/calf-card?${qs.toString()}`);
+const payload = await apiGetDirect(`/api/calf-card?${qs.toString()}`);
+      if (!payload) return;
 
       if (payload?.redirectUrl) {
         location.href = payload.redirectUrl;
@@ -457,10 +460,17 @@
       renderCard(payload);
       hideBar();
 
-    }catch(err){
-      console.error('calf card error:', err);
-      setBar(err?.message || 'تعذّر تحميل بطاقة العجل.', 'error-box');
-    }
+   }catch(err){
+  console.error('calf card error:', err);
+
+  const msg = String(
+    err?.data?.message ||
+    err?.message ||
+    'تعذّر تحميل بطاقة العجل.'
+  ).trim();
+
+  setBar(msg, 'error-box');
+}
   }
 
   els.openAnimalBtn?.addEventListener('click', openCardByInput);
@@ -472,7 +482,16 @@
     document.querySelectorAll('.timeline-dot.active').forEach(x => x.classList.remove('active'));
   });
 
-  loadCard();
+ async function startCalfCard(){
+  try {
+    await loadServerSession();
+    await loadCard();
+  } catch (e) {
+    console.warn('calf-card auth failed:', e);
+  }
+}
+
+startCalfCard();
 })();
 </script>
 </body>
