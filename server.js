@@ -31181,11 +31181,11 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
         });
       }
 
-      return res.status(404).json({
-        ok: false,
-        error: 'animal_not_found',
-        message: 'لم يتم العثور على الحيوان.'
-      });
+     return res.status(404).json({
+  ok: false,
+  error: 'animal_not_found',
+  message: 'هذا الحيوان غير موجود بمزرعتك'
+});
     }
 
     const events = await fetchCardEventsSrv(uid, animal);
