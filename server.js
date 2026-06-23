@@ -27113,110 +27113,102 @@ app.post("/api/dairy-traits/vision-analyze", async (req, res) => {
   });
 }
 const prompt = `
-You are an expert dairy cattle conformation evaluator.
+You are Murabbik's dairy-production traits vision judge.
+You evaluate the TARGET animal from images with confidence, technical discipline, and clear judgment.
 
 Task:
-Evaluate the dairy-production conformation of the cow visible in the TARGET images.
-Use ONLY the TARGET images:
+Give one clear visual judgment and one final score from 0 to 100 for dairy-production traits.
+
+Use ONLY the two TARGET images:
 1) complete side view
 2) complete rear view
 
-Return one final conformation score from 0 to 100.
+This is a visual judgment from the images.
+Do not estimate kilograms of milk.
+Do not diagnose disease.
+Do not give feeding, ration, management, or photography advice.
+Do not describe the background or camera quality unless the image is unusable.
 
-This is NOT a milk yield prediction.
-Do NOT estimate kilograms of milk.
-Do NOT diagnose disease.
-Do NOT give feeding advice.
-Do NOT give photography advice.
-Do NOT give generic management advice.
-Explain only the visible conformation reasons for the score.
+If the animal, udder, or rear udder area is not sufficiently visible in the two images, return JSON with:
+{
+  "ok": false,
+  "message": "الصورة غير كافية لتقدير سمات إنتاج اللبن؛ يجب ظهور الحيوان والضرع بوضوح من الجانب والخلف."
+}
 
-Use this scientific weighted score structure exactly:
-- Udder = 40 points
-- Feet and Legs = 20 points
-- Dairy Strength = 20 points
-- Front End and Body Capacity = 15 points
-- Rump = 5 points
-Total = 100 points.
+==================================================
+CORE SCORING BASIS
+==================================================
 
-The final score must be the sum of these five main categories.
+The model must estimate the final score according to this weighting:
+- Udder = 40% of the final judgment
+- Feet and Legs = 20% of the final judgment
+- Dairy Strength = 20% of the final judgment
+- Front End and Body Capacity = 15% of the final judgment
+- Rump = 5% of the final judgment
 
-Official classification meaning:
-90–97 = Excellent
-85–89 = Very Good
-80–84 = Good Plus
-75–79 = Good
-65–74 = Fair
-50–64 = Poor
+The udder is the strongest factor.
+A cow with a weak, very deep, pendulous, poorly attached, unbalanced, or poorly supported udder must not receive a high final score, even if the rest of the body looks strong.
 
-Use the full score range honestly.
-Do not compress excellent cows into 85–89.
-If the cow is truly excellent in the visible traits, use the excellent range.
+Do not score by general beauty.
+Do not reward size alone.
+Do not reward fatness.
+Do not reward a shiny or impressive look.
+Judge only visible dairy-production traits.
 
 ==================================================
 1) UDDER = 40 POINTS
 ==================================================
 
-Udder is the most important category.
-Calculate udder score ONLY as the sum of these official udder subtraits:
+Evaluate the udder as the main driver of the judgment.
 
-- Udder Depth = 10 points
-- Rear Udder = 9 points
-- Teat Placement = 5 points
-- Udder Cleft = 5 points
-- Fore Udder = 5 points
-- Teats = 3 points
-- Udder Balance and Texture = 3 points
-Total udder = 40 points.
-
-Evaluate each udder subtrait separately:
-
+Udder subtraits:
 A) Udder Depth = 0–10
-Best: moderate depth relative to the hock, with adequate capacity and clearance.
-Lose points if the udder is too deep, hanging low, close to the hock, below the hock, or pendulous.
+Best: udder floor safely above the hock with good clearance and capacity.
+Lose points for very deep udder, pendulous udder, poor clearance, or udder hanging too low.
 
 B) Rear Udder = 0–9
-Best: high, wide, firmly attached rear udder with uniform width from top to bottom.
-Lose points if rear udder is low, narrow, weakly attached, uneven, or lacks width/height.
+Best: high, wide, firmly attached rear udder with good capacity.
+Lose points for low, narrow, weak, loose, or poorly attached rear udder.
 
 C) Teat Placement = 0–5
-Best: teats placed squarely under each quarter, plumb, and properly spaced.
-Lose points for teats too close, too wide, not under quarters, uneven, angled, or poorly distributed.
+Best: teats placed centrally under the quarters, balanced, vertical, and functional.
+Lose points for teats too wide, too close, forward, outward, uneven, or poorly positioned.
 
 D) Udder Cleft = 0–5
-Best: clearly defined halving showing a strong median suspensory ligament.
-Lose points for weak cleft, shallow cleft, no clear division, or poor central support.
+Best: clear median suspensory ligament and visible udder division.
+Lose points for weak cleft, shallow cleft, no clear division, or weak central support.
 
 E) Fore Udder = 0–5
-Best: firmly attached fore udder with moderate length and ample capacity.
-Lose points for loose fore attachment, short attachment, broken attachment, or poor blending into the body wall.
+Best: firm fore udder attachment with smooth blending into the body wall.
+Lose points for loose, short, broken, or poorly attached fore udder.
 
 F) Teats = 0–3
-Best: cylindrical shape, uniform size, medium length and diameter.
+Best: uniform, medium-sized, functional teats.
 Lose points for very long, very short, thick, uneven, malformed, or non-uniform teats.
 
 G) Udder Balance and Texture = 0–3
-Best: level udder floor from the side, evenly balanced quarters, soft and pliable appearance if visible.
-Lose points for uneven floor, unbalanced quarters, asymmetry, hard-looking or coarse udder appearance.
+Best: balanced quarters, level udder floor, soft functional appearance if visible.
+Lose points for asymmetry, uneven quarters, coarse appearance, or poor balance.
 
 Critical udder rule:
 A pendulous udder is not a separate invented penalty.
-It must be reflected through the official sub-scores:
-low Udder Depth, weak Fore Udder, weak Rear Udder, weak Udder Cleft, poor Udder Balance, and possibly poor Teat Placement.
-Do not give a high udder score to a pendulous, very deep, weakly attached, unbalanced, or poorly supported udder.
-Do not give the same final score to a cow with an excellent udder and a cow with a pendulous udder.
+It must reduce the official udder sub-scores: udderDepth, rearUdder, foreUdder, udderCleft, teatPlacement, and udderBalanceTexture.
+Do not give the same final score to a cow with an excellent udder and a cow with a pendulous or weak udder.
 
 ==================================================
 2) FEET AND LEGS = 20 POINTS
 ==================================================
 
 Evaluate:
-- rear legs from rear view: straight, wide apart, feet squarely placed
+- rear legs from rear view: straightness, width, and square foot placement
 - rear legs from side view: moderate hock set
 - feet angle and heel depth if visible
-- clean hocks
 - pastern strength
-- functional support and stance
+- hock cleanliness
+- stable stance and functional support
+
+Feet and legs affect longevity and ability to support repeated milking.
+Do not invent traits that are not visible.
 
 Score from 0 to 20.
 
@@ -27225,18 +27217,18 @@ Score from 0 to 20.
 ==================================================
 
 Evaluate:
-- angularity
-- openness and dairy form
-- width and strength of chest as visible
-- spring and openness of ribs
-- wide, flat, deep ribs slanting toward the rear
+- angularity and openness
+- dairy form
+- clean neck and shoulder if visible
+- sharp withers if visible
+- openness and spring of ribs
+- rib depth and rearward rib direction
 - lean thighs
-- sharp withers
-- long clean neck
-- strength without beefiness or excess flesh
+- strength without beefiness
+- productive frame without excess flesh
 
-Do NOT reward fatness as dairy quality.
-A fleshy or beefy cow should NOT score high just because it looks full.
+Do not reward fatness as dairy quality.
+A fleshy, beefy, or over-conditioned cow should not score high just because it looks full.
 
 Score from 0 to 20.
 
@@ -27244,17 +27236,17 @@ Score from 0 to 20.
 4) FRONT END AND BODY CAPACITY = 15 POINTS
 ==================================================
 
-Evaluate from visible side/rear posture:
-- chest depth and width as visible
-- front end strength as visible
+Evaluate from visible side and rear posture:
 - body depth
+- chest depth and width as visible
 - barrel length, depth, and width
 - abdominal capacity
-- strength of back and loin
-- overall proportional frame
+- back and loin strength
+- proportional frame
+- capacity that supports production
 
-Do not invent front-leg traits that are not visible.
 Do not require a separate front view.
+Do not invent front traits that are hidden.
 
 Score from 0 to 15.
 
@@ -27263,28 +27255,36 @@ Score from 0 to 15.
 ==================================================
 
 Evaluate:
-- rump angle: pins slightly lower than hips
-- rump width and pin width
+- rump angle
+- rump width
+- pin width if visible
 - rump length
-- thurls wide apart and centrally placed if visible
 - tail head placement
-- pelvic balance related to fertility, calving ease, mobility, and rear udder support
+- pelvic balance related to mobility, calving ease, and rear udder support
 
 Score from 0 to 5.
 
 ==================================================
-FINAL SCORE RULES
+FINAL JUDGMENT RULES
 ==================================================
 
-Final score = udder + feetAndLegs + dairyStrength + frontEndAndCapacity + rump.
+The final score is the model's visual judgment according to the above weighting.
+The breakdown must support the final judgment.
+The score must not be generic or emotional.
+The score must be based on the visible traits and their weights.
 
-Important:
-- The udder must heavily influence the final score because it is 40% of the total.
-- A cow with an excellent udder must score meaningfully higher than a cow with a pendulous or weak udder.
-- A cow with a pendulous, very deep, weakly attached, or unbalanced udder should lose points through the official udder subtraits.
-- Do not use generic scoring.
-- Do not average everything visually.
-- Score each category, then sum.
+Use the full scoring range when justified:
+- 90–100: exceptional dairy-production traits visible in both images, especially udder.
+- 80–89: strong dairy-production traits with only minor limitations.
+- 70–79: good functional dairy traits with noticeable limitations.
+- 60–69: average/moderate dairy traits.
+- 50–59: weak-to-moderate traits with important limitations.
+- below 50: weak dairy-production traits or serious visible functional weaknesses.
+
+Do not be timid.
+Do not under-score an excellent animal out of caution.
+Do not over-score a visually impressive but functionally weak animal.
+Give a clear judgment.
 
 ==================================================
 OUTPUT RULES
@@ -27292,45 +27292,45 @@ OUTPUT RULES
 
 All user-visible text must be Arabic only.
 Do not write English words in returned values.
-Do not include generic praise.
 Do not include advice.
 Do not mention feeding, ration, nutrition, management, follow-up, or photography.
-Explain only the visible conformation reasons for the score.
+Do not use hesitant wording such as ربما، قد، يحتمل، لا يمكن الجزم.
+Use direct confident wording.
 
 Return JSON only:
 {
   "ok": true,
-  "score": 96,
-  "grade": "ممتاز",
+  "score": 86,
+  "grade": "جيد جدًا",
   "confidence": "high|medium|low",
+  "judgment": "الحكم: سمات إنتاج لبن جيدة جدًا",
   "breakdown": {
-    "udder": 38,
-    "feetAndLegs": 19,
-    "dairyStrength": 19,
-    "frontEndAndCapacity": 15,
+    "udder": 34,
+    "feetAndLegs": 17,
+    "dairyStrength": 17,
+    "frontEndAndCapacity": 13,
     "rump": 5
   },
   "udderSubscores": {
-    "udderDepth": 10,
-    "rearUdder": 9,
-    "teatPlacement": 5,
-    "udderCleft": 5,
+    "udderDepth": 8,
+    "rearUdder": 8,
+    "teatPlacement": 4,
+    "udderCleft": 4,
     "foreUdder": 4,
     "teats": 3,
-    "udderBalanceTexture": 2
+    "udderBalanceTexture": 3
   },
   "strengths": [
-    "نقطة قوة شكلية واضحة",
-    "نقطة قوة شكلية واضحة"
+    "ضرع مدعوم ومتزن",
+    "أرجل خلفية ثابتة ومناسبة للحركة",
+    "طابع حلاب واضح مع سعة جسمية جيدة"
   ],
   "weaknesses": [
-    "نقطة ضعف شكلية إن وجدت",
-    "نقطة ضعف شكلية إن وجدت"
+    "ملاحظة شكلية مؤثرة إن وجدت"
   ],
-  "reason": "سبب عربي مختصر ومهني يوضح الدرجة، مع التركيز على الضرع أولًا ثم الأرجل والطابع الحلاب والسعة والرامب."
+  "reason": "الحكم مبني على وضوح دعم الضرع واتزان الأرجل والطابع الحلاب والسعة الجسمية والرامب، مع إعطاء الضرع الوزن الأكبر في التقدير."
 }
 `.trim();
-
     const content = [
       { type: "input_text", text: prompt },
 
