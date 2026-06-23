@@ -135,47 +135,55 @@
   const $ = id => document.getElementById(id);
   const NF = new Intl.NumberFormat('ar-EG');
   const pageUrl = new URL(location.href);
+  const API_BASE = window.API_BASE || "https://murabbic-alerts.onrender.com";
+let currentUser = null;
+let currentUserId = null;
 
-  function safeStorageGet(storageName, key){
-    try{
-      const store = window[storageName];
-      return store ? String(store.getItem(key) || '').trim() : '';
-    }catch(_){
-      return '';
+async function loadServerSession(){
+  const res = await fetch(API_BASE + "/api/auth/me", {
+    method: "GET",
+    headers: {
+      "Accept": "application/json",
+      "Cache-Control": "no-store"
+    },
+    credentials: "include",
+    cache: "no-store"
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || data.ok !== true || !data.userId) {
+    location.replace("login.html?next=cow-card.html");
+    throw new Error("auth_required");
+  }
+
+  currentUser = data.user || {};
+  currentUserId = data.userId;
+  return data;
+}
+
+async function apiGetDirect(path){
+    if (!currentUserId) {
+      await loadServerSession();
     }
-  }
 
-  function currentUid(){
-    return String(
-      window.__tenant?.userId ||
-      window.MURABBIK_USER_ID ||
-      window.currentUserId ||
-      pageUrl.searchParams.get('userId') ||
-      safeStorageGet('sessionStorage', 'murabbik_uid') ||
-      safeStorageGet('sessionStorage', 'userId') ||
-      safeStorageGet('sessionStorage', 'ownerUid') ||
-      safeStorageGet('localStorage', 'murabbik_uid') ||
-      safeStorageGet('localStorage', 'userId') ||
-      safeStorageGet('localStorage', 'ownerUid') ||
-      safeStorageGet('localStorage', 'uid') ||
-      ''
-    ).trim();
-  }
-
-  async function apiGetDirect(path){
-    const uid = currentUid();
-
-    const res = await fetch(path, {
+    const res = await fetch(API_BASE + path, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        ...(uid ? { 'X-User-Id': uid } : {})
+        'Cache-Control': 'no-store'
       },
+      credentials: 'include',
       cache: 'no-store'
     });
 
     let data = null;
     try { data = await res.json(); } catch (_) {}
+
+    if (res.status === 401 || data?.error === "auth_required") {
+      location.replace("login.html?next=cow-card.html");
+      return null;
+    }
 
     if (!res.ok) {
       const err = new Error(data?.message || `HTTP ${res.status}`);
@@ -1030,7 +1038,8 @@ function renderMilkChart(series = [], herdCurve = []){
       if (number) qs.set('number', number);
       if (animalId) qs.set('animalId', animalId);
 
-      const payload = await apiGetDirect(`/api/animal-card?${qs.toString()}`);
+const payload = await apiGetDirect(`/api/animal-card?${qs.toString()}`);
+      if (!payload) return;
 
       if (payload?.redirectUrl) {
         location.href = payload.redirectUrl;
@@ -1058,16 +1067,27 @@ function renderMilkChart(series = [], herdCurve = []){
   const openInput = $('openNumber');
   const openBtn = $('openBtn');
 
-  if (numberParam || idParam) {
-    if (openbar) openbar.style.display = 'none';
-    loadCard({ number: numberParam, animalId: idParam });
-  } else if (openBtn) {
-    openBtn.addEventListener('click', () => {
-      const n = String(openInput?.value || '').trim();
-      if (!n) return;
-      location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
-    });
+ async function startCowCard(){
+    try {
+      await loadServerSession();
+
+      if (numberParam || idParam) {
+        if (openbar) openbar.style.display = 'none';
+        await loadCard({ number: numberParam, animalId: idParam });
+      } else if (openBtn) {
+        openBtn.addEventListener('click', () => {
+          const n = String(openInput?.value || '').trim();
+          if (!n) return;
+          location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
+        });
+      }
+
+    } catch (e) {
+      console.warn('cow-card auth failed:', e);
+    }
   }
+
+  startCowCard();
 })();
 </script>
 </body>
