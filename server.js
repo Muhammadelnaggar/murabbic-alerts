@@ -47,7 +47,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 
 
-// ===== Firebase Admin (best-effort) =====
+
 // ===== Firebase Admin (best-effort) =====
 let db = null;
 try {
@@ -75,7 +75,132 @@ db = firestore;
   console.log("⚠️ Firestore disabled:", e.message);
 }
 
+// ============================================================
+//          AUTH LOGIN BRIDGE — server login + legacy userId
+//          دخول من السيرفر مع إبقاء localStorage للصفحات الحالية
+// ============================================================
 
+function authDigitsBridgeSrv(raw) {
+  const map = {
+    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+  };
+
+  return String(raw || "")
+    .trim()
+    .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
+    .replace(/\D/g, "");
+}
+
+async function authReadUserProfileBridgeSrv(uid) {
+  if (!db || !uid) return {};
+
+  try {
+    const snap = await db.collection("users").doc(uid).get();
+    return snap.exists ? (snap.data() || {}) : {};
+  } catch (e) {
+    console.warn("auth bridge user profile read failed:", e.message || e);
+    return {};
+  }
+}
+
+async function authPasswordLoginBridgeSrv(email, password) {
+  const apiKey =
+    process.env.FIREBASE_WEB_API_KEY ||
+    process.env.FIREBASE_API_KEY ||
+    process.env.MURABBIK_FIREBASE_API_KEY ||
+    "";
+
+  if (!apiKey) {
+    const err = new Error("firebase_web_api_key_missing");
+    err.publicMessage = "إعداد تسجيل الدخول غير مكتمل على السيرفر.";
+    throw err;
+  }
+
+  const r = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password,
+        returnSecureToken: true
+      })
+    }
+  );
+
+  const data = await r.json().catch(() => ({}));
+
+  if (!r.ok || !data.idToken) {
+    const err = new Error(data?.error?.message || "login_failed");
+    err.publicMessage = "رقم الهاتف أو كلمة المرور غير صحيحة.";
+    throw err;
+  }
+
+  return data;
+}
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    if (!admin.apps.length) {
+      return res.status(503).json({
+        ok: false,
+        error: "firebase_admin_disabled",
+        message: "خدمة تسجيل الدخول غير متاحة الآن."
+      });
+    }
+
+    const phoneKey = authDigitsBridgeSrv(req.body?.phone || req.body?.phoneNumber || "");
+    const password = String(req.body?.password || "");
+
+    if (!phoneKey || !password) {
+      return res.status(400).json({
+        ok: false,
+        error: "login_fields_required",
+        message: "أدخل رقم الهاتف وكلمة المرور."
+      });
+    }
+
+    const pseudoEmail = `${phoneKey}@murabbik.local`;
+
+    const login = await authPasswordLoginBridgeSrv(pseudoEmail, password);
+    const decoded = await admin.auth().verifyIdToken(login.idToken);
+    const uid = String(decoded.uid || login.localId || "").trim();
+
+    if (!uid) {
+      return res.status(401).json({
+        ok: false,
+        error: "login_failed",
+        message: "رقم الهاتف أو كلمة المرور غير صحيحة."
+      });
+    }
+
+    const profile = await authReadUserProfileBridgeSrv(uid);
+
+    // مهم جدًا:
+    // نرجّع نفس userId القديم الذي كانت صفحة الدخول تحفظه
+    // حتى تظل كل الصفحات الحالية التي ترسل X-User-Id تعمل كما هي.
+    const userId = tenantKey(profile.userId || uid);
+
+    return res.json({
+      ok: true,
+      message: "✅ تم تسجيل الدخول بنجاح",
+      uid,
+      userId,
+      redirectUrl: "dashboard.html"
+    });
+
+  } catch (e) {
+    console.warn("auth bridge login failed:", e.message || e);
+
+    return res.status(401).json({
+      ok: false,
+      error: "login_failed",
+      message: e.publicMessage || "رقم الهاتف أو كلمة المرور غير صحيحة."
+    });
+  }
+});
 
 // ===== Helpers =====
 const dayMs = 86400000;
