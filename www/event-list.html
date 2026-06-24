@@ -84,17 +84,31 @@
     }
     return '';
   };
+  async function sessionGetJson(path) {
+  const r = await fetch(path, {
+    method: 'GET',
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: {
+      'Accept': 'application/json'
+    }
+  });
 
-  function currentUserId(){
-    return (
-      window.mbk?.userId ||
-      getParam('userId','uid') ||
-      localStorage.getItem('userId') ||
-      localStorage.getItem('uid') ||
-      ''
-    );
+  const j = await r.json().catch(() => null);
+
+  if (r.status === 401 || j?.error === 'auth_required') {
+    return {
+      r,
+      j: j || {
+        ok: false,
+        message: 'سجّل الدخول أولًا.'
+      },
+      authRequired: true
+    };
   }
 
+  return { r, j, authRequired: false };
+}
   function renderRows(rows){
     if(!evBody) return;
 
@@ -148,14 +162,13 @@
   }
 
   async function loadAndFilter(){
-    const uid = currentUserId();
+    
 
     const inputNumber = fNum.value.trim();
 
 const fixedNumber =
   inputNumber ||
   getParam('number','animalNumber','num','n') ||
-  localStorage.getItem('currentAnimalNumber') ||
   '';
 
     const type = (fType.value || '').trim();
@@ -165,11 +178,7 @@ const fixedNumber =
       return;
     }
 
-    if(!uid){
-      renderRows([]);
-      return;
-    }
-
+   
     try{
       evBody.innerHTML = '<tr><td colspan="3" class="empty">جاري تحميل الأحداث…</td></tr>';
 
@@ -177,16 +186,12 @@ const fixedNumber =
       qs.set('number', fixedNumber);
       if(type) qs.set('type', type);
 
-      const r = await fetch('/api/events-page/list?' + qs.toString(), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'X-User-Id': uid
-        },
-        cache: 'no-store'
-      });
+const { r, j, authRequired } = await sessionGetJson('/api/events-page/list?' + qs.toString());
 
-      const j = await r.json().catch(() => null);
+if (authRequired) {
+  evBody.innerHTML = `<tr><td colspan="3" class="empty">${j?.message || 'سجّل الدخول أولًا.'}</td></tr>`;
+  return;
+}
 
       if(!r.ok || !j || j.ok === false){
         evBody.innerHTML = `<tr><td colspan="3" class="empty">${j?.message || 'تعذّر تحميل قائمة الأحداث.'}</td></tr>`;
@@ -209,9 +214,8 @@ const fixedNumber =
 
   window.addEventListener('DOMContentLoaded', () => {
     const fixedNumber =
-      getParam('number','animalNumber','num','n') ||
-      localStorage.getItem('currentAnimalNumber') ||
-      '';
+  getParam('number','animalNumber','num','n') ||
+  '';
 
     const cowBtn = document.getElementById('btn-cow-card');
 
