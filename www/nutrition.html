@@ -5,9 +5,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <link rel="stylesheet" href="css/forms.css">
- 
- <title>التغذية الذكية</title>
+<link rel="stylesheet" href="css/forms.css">
+<title>التغذية الذكية</title>
 
 
   <style>
@@ -259,7 +258,7 @@ padding: 6px 0;
 #feedInputBox #tbl tbody tr{
   display:grid;
   grid-template-columns: 1fr 1fr;
-  gap:10px 8px;
+  gap:10px8px;
   padding:8px;
   margin:10px 0;
   border:1px solid rgba(14,160,90,.20);
@@ -546,10 +545,8 @@ padding: 6px 0;
 .mbk-premix-note{font-size:12px;font-weight:800;line-height:1.6;color:#475569;background:#f8fafc;border:1px solid #eef2f7;border-radius:14px;padding:9px;margin:8px 0}
 .mbk-premix-section{font-weight:900;color:#0b7f47;margin:12px 0 6px;border-top:1px dashed #d7e7dd;padding-top:10px}
 @media (max-width:640px){.mbk-premix-grid{grid-template-columns:1fr}.mbk-modal{border-radius:18px}}
-/* ===== Murabbik Nutrition visual restore — local page only ===== */
+/* ===== Nutrition page-only visual cleanup — CSS only ===== */
 body[data-page="nutrition"]{
-  overflow-x:hidden;
-  background:#fff;
   padding-bottom:92px;
 }
 
@@ -557,7 +554,7 @@ body[data-page="nutrition"] .mbk-form{
   width:100%;
   max-width:860px;
   margin:0 auto;
-  padding:0 10px 96px;
+  padding-bottom:96px;
 }
 
 body[data-page="nutrition"] .mbk-card,
@@ -569,31 +566,7 @@ body[data-page="nutrition"] #analysisSection{
   margin-right:auto;
 }
 
-body[data-page="nutrition"] .animal-strip{
-  width:100%;
-  max-width:860px;
-  margin-left:auto;
-  margin-right:auto;
-}
-
-body[data-page="nutrition"] .controls-box{
-  background:#fff;
-  border:1px solid rgba(0,0,0,.06);
-  border-radius:16px;
-  padding:8px;
-}
-
-body[data-page="nutrition"] .row.controls{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-}
-
-body[data-page="nutrition"] .row.controls .grow{
-  min-width:0;
-  flex:1 1 100%;
-}
-
+/* قائمة العليقة */
 body[data-page="nutrition"] #feedSummaryBox.feed-summary{
   margin-top:10px;
   background:#f3fbf5;
@@ -662,6 +635,7 @@ body[data-page="nutrition"] #feedSummaryBox .feed-item .b{
   direction:rtl;
 }
 
+/* فورم الخامة */
 body[data-page="nutrition"] #feedInputBox{
   background:rgba(14,160,90,.10);
   border:1px solid rgba(14,160,90,.25);
@@ -678,156 +652,11 @@ body[data-page="nutrition"] #feedInputBox #tbl{
   background:transparent;
 }
 
-body[data-page="nutrition"] #feedInputBox #tbl thead{
-  display:none;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl tbody{
-  display:block;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl tbody tr{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px 8px;
-  padding:8px;
-  margin:10px 0;
-  border:1px solid rgba(14,160,90,.20);
-  border-radius:16px;
-  background:#fff;
-  grid-template-areas:
-    "name name"
-    "cat  pTon"
-    "dm   cp"
-    "pTonDM pTonDM"
-    "pct  kg"
-    "kgDM kgDM";
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl td{
-  display:flex !important;
-  flex-direction:column !important;
-  gap:6px !important;
-  padding:0 !important;
-  border:0 !important;
-  background:transparent !important;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl td::before{
-  content:attr(data-label);
-  font-weight:900;
-  font-size:13px;
-  color:#0b7f47;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="name"]{grid-area:name}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="cat"]{grid-area:cat}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="dm"]{grid-area:dm}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="cp"]{grid-area:cp}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="pTon"]{grid-area:pTon}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="pTonDM"]{grid-area:pTonDM}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="pct"]{grid-area:pct}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="kg"]{grid-area:kg}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="kgDM"]{grid-area:kgDM}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="cost"]{display:none !important}
-
-body[data-page="nutrition"] #feedInputBox #tbl input,
-body[data-page="nutrition"] #feedInputBox #tbl select{
-  width:100%;
-  height:42px;
-  min-height:42px;
-  border-radius:12px;
-  border:1px solid #d7e7dd;
-  padding:8px 10px;
-  font-weight:800;
-  background:#f9fdfb;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl input:focus,
-body[data-page="nutrition"] #feedInputBox #tbl select:focus{
-  outline:none;
-  border-color:#0ea05a;
-  background:#fff;
-  box-shadow:0 0 0 2px rgba(14,160,90,.14);
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl .pTonDM,
-body[data-page="nutrition"] #feedInputBox #tbl .kgDM,
-body[data-page="nutrition"] #feedInputBox #tbl .cost{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  height:40px;
-  border-radius:12px;
-  border:1px dashed rgba(14,160,90,.25);
-  background:rgba(14,160,90,.06);
-  font-weight:900;
-  color:#0b7f47;
-}
-
-@media (max-width:380px){
-  body[data-page="nutrition"] #feedInputBox #tbl tbody tr{
-    grid-template-columns:1fr;
-    grid-template-areas:
-      "name"
-      "cat"
-      "pTon"
-      "dm"
-      "cp"
-      "pTonDM"
-      "pct"
-      "kg"
-      "kgDM";
-  }
-}
-
-body[data-page="nutrition"] #nutritionKPIs,
-body[data-page="nutrition"] #economicKPIs{
+/* التحليل */
+body[data-page="nutrition"] #nutritionKPIs{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
   gap:8px;
-}
-
-body[data-page="nutrition"] #advancedKPIs{
-  margin-top:12px;
-}
-
-body[data-page="nutrition"] #advancedKPIs:not([style*="display: none"]){
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px;
-}
-
-body[data-page="nutrition"] .kpi{
-  min-width:0;
-  border-radius:14px;
-  padding:10px;
-  background:#fff !important;
-  border:1px solid rgba(0,0,0,.06) !important;
-  box-shadow:0 6px 18px rgba(15,23,42,.06);
-}
-
-body[data-page="nutrition"] .kpi .k{
-  font-size:11px;
-  font-weight:900;
-  color:#334155;
-  line-height:1.25;
-  min-height:28px;
-}
-
-body[data-page="nutrition"] .kpi .v{
-  font-size:16px;
-  font-weight:900;
-  line-height:1.25;
-  margin-top:4px;
-}
-
-body[data-page="nutrition"] .kpi-hint{
-  margin-top:6px;
-  font-size:11px;
-  font-weight:800;
-  color:#475569;
-  line-height:1.35;
 }
 
 body[data-page="nutrition"] #nutritionKPIs .kpi.rumen-feature,
@@ -839,13 +668,18 @@ body[data-page="nutrition"] #nutritionKPIs .kpi[data-key="rumen"]{
   border:1px solid rgba(14,160,90,.24) !important;
 }
 
-body[data-page="nutrition"] .mbk-field input,
-body[data-page="nutrition"] .mbk-field select{
-  width:100%;
-  background:#f9fdfb;
-  font-weight:800;
+/* العرض المتقدم — شكل فقط */
+body[data-page="nutrition"] #advancedKPIs{
+  margin-top:12px;
 }
 
+body[data-page="nutrition"] #advancedKPIs .kpi,
+body[data-page="nutrition"] #advancedKPIs .advanced-gauge-card{
+  border-radius:18px;
+  box-shadow:0 8px 22px rgba(15,23,42,.07);
+}
+
+/* زر الحفظ Sticky */
 body[data-page="nutrition"] #nutritionForm{
   position:fixed;
   left:0;
@@ -868,246 +702,6 @@ body[data-page="nutrition"] #saveEvent{
   font-size:16px;
 }
 
-@media (max-width:420px){
-  body[data-page="nutrition"] .mbk-form{
-    padding-left:8px;
-    padding-right:8px;
-  }
-
-  body[data-page="nutrition"] .strip-item .lbl{
-    font-size:9.5px;
-  }
-
-  body[data-page="nutrition"] .strip-item .val{
-    font-size:13px;
-  }
-
-  body[data-page="nutrition"] #nutritionKPIs,
-  body[data-page="nutrition"] #economicKPIs,
-  body[data-page="nutrition"] #advancedKPIs:not([style*="display: none"]){
-    gap:8px;
-  }
-
-  body[data-page="nutrition"] .kpi{
-    padding:9px;
-  }
-
-  body[data-page="nutrition"] .kpi .v{
-    font-size:16px;
-  }
-}
- /* ===== Murabbik Nutrition analysis restore — local only ===== */
-body[data-page="nutrition"] #analysisSection{
-  width:100%;
-  max-width:860px;
-  margin:14px auto 22px;
-  padding:0;
-}
-
-body[data-page="nutrition"] #analysisSection .mbk-card{
-  background:#fff;
-  border:1px solid rgba(15,23,42,.07);
-  border-radius:20px;
-  padding:12px;
-  margin:10px 0;
-  box-shadow:0 8px 24px rgba(15,23,42,.06);
-}
-
-body[data-page="nutrition"] #analysisSection h3{
-  margin:0 0 12px;
-  font-size:16px;
-  font-weight:900;
-  color:#0f172a;
-}
-
-body[data-page="nutrition"] #nutritionKPIs,
-body[data-page="nutrition"] #economicKPIs,
-body[data-page="nutrition"] #advancedKPIs{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px;
-}
-
-body[data-page="nutrition"] .kpi{
-  position:relative;
-  overflow:hidden;
-  min-width:0;
-  min-height:126px;
-  border-radius:18px !important;
-  padding:12px !important;
-  background:#fff !important;
-  border:1px solid rgba(15,23,42,.08) !important;
-  box-shadow:0 8px 22px rgba(15,23,42,.07) !important;
-}
-
-body[data-page="nutrition"] .kpi::before{
-  content:"";
-  position:absolute;
-  inset:0 auto 0 0;
-  width:5px;
-  background:var(--kpi-accent, #cbd5e1);
-}
-
-body[data-page="nutrition"] .kpi.ok{--kpi-accent:#12a05c}
-body[data-page="nutrition"] .kpi.warn{--kpi-accent:#f59e0b}
-body[data-page="nutrition"] .kpi.bad{--kpi-accent:#ef4444}
-
-body[data-page="nutrition"] .kpi .k{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:8px;
-  min-height:34px;
-  font-size:13px;
-  font-weight:900;
-  color:#172033;
-  line-height:1.25;
-}
-
-body[data-page="nutrition"] .kpi .v{
-  margin-top:8px;
-  font-size:20px;
-  font-weight:1000;
-  color:#0f172a;
-  line-height:1.2;
-}
-
-body[data-page="nutrition"] .kpi-badge{
-  flex:0 0 auto;
-  display:inline-flex;
-  align-items:center;
-  gap:5px;
-  padding:4px 8px;
-  border-radius:999px;
-  font-size:11px;
-  font-weight:900;
-  white-space:nowrap;
-  background:rgba(15,23,42,.06);
-  color:#334155;
-}
-
-body[data-page="nutrition"] .kpi.ok .kpi-badge{
-  background:rgba(18,160,92,.10);
-  color:#0b7f47;
-}
-
-body[data-page="nutrition"] .kpi.warn .kpi-badge{
-  background:rgba(245,158,11,.13);
-  color:#92400e;
-}
-
-body[data-page="nutrition"] .kpi.bad .kpi-badge{
-  background:rgba(239,68,68,.11);
-  color:#991b1b;
-}
-
-body[data-page="nutrition"] .kpi-badge .dot{
-  width:8px;
-  height:8px;
-  border-radius:50%;
-  background:var(--kpi-accent, #cbd5e1);
-  box-shadow:0 0 0 3px rgba(15,23,42,.06);
-}
-
-body[data-page="nutrition"] .kpi-meter{
-  margin-top:10px;
-  height:8px;
-  border-radius:999px;
-  background:#edf1f5;
-  overflow:hidden;
-}
-
-body[data-page="nutrition"] .kpi-meter > span{
-  display:block;
-  height:100%;
-  width:0;
-  border-radius:999px;
-  background:var(--kpi-accent, #cbd5e1);
-}
-
-body[data-page="nutrition"] .kpi-hint{
-  margin-top:8px;
-  font-size:12px;
-  font-weight:800;
-  line-height:1.45;
-  color:#475569;
-}
-
-body[data-page="nutrition"] #nutritionKPIs .kpi.rumen-feature,
-body[data-page="nutrition"] #nutritionKPIs .kpi[data-key*="rumen"]{
-  grid-column:1 / -1;
-  min-height:145px;
-  background:linear-gradient(180deg,#ffffff 0%,#f3fff8 100%) !important;
-  border:1px solid rgba(18,160,92,.25) !important;
-}
-
-body[data-page="nutrition"] .nutrition-advanced-toggle{
-  width:100%;
-  min-height:56px;
-  margin:12px 0 8px !important;
-  border-radius:18px;
-  background:#0ea05a !important;
-  color:#fff !important;
-  border:0 !important;
-  font-size:17px;
-  font-weight:1000;
-}
-
-body[data-page="nutrition"] .nutrition-advanced-card{
-  background:#fbfefc !important;
-  border-color:rgba(18,160,92,.18) !important;
-}
-
-body[data-page="nutrition"] #advancedKPIs .kpi{
-  min-height:118px;
-  background:#fcfffd !important;
-}
-
-body[data-page="nutrition"] #economicAnalysisCard{
-  margin-top:12px;
-}
-
-@media (max-width:420px){
-  body[data-page="nutrition"] #analysisSection{
-    margin-top:12px;
-  }
-
-  body[data-page="nutrition"] #analysisSection .mbk-card{
-    padding:10px;
-    border-radius:18px;
-  }
-
-  body[data-page="nutrition"] #nutritionKPIs,
-  body[data-page="nutrition"] #economicKPIs,
-  body[data-page="nutrition"] #advancedKPIs{
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:8px;
-  }
-
-  body[data-page="nutrition"] .kpi{
-    min-height:118px;
-    padding:10px !important;
-    border-radius:16px !important;
-  }
-
-  body[data-page="nutrition"] .kpi .k{
-    font-size:12px;
-    min-height:32px;
-  }
-
-  body[data-page="nutrition"] .kpi .v{
-    font-size:18px;
-  }
-
-  body[data-page="nutrition"] .kpi-hint{
-    font-size:11px;
-  }
-
-  body[data-page="nutrition"] .nutrition-advanced-toggle{
-    min-height:54px;
-    font-size:16px;
-  }
-} 
 /* ===== Murabbik Advanced Gauges — local nutrition only ===== */
 body[data-page="nutrition"] .nutrition-advanced-card{
   background:#fff !important;
@@ -1525,10 +1119,10 @@ body[data-page="nutrition"] .advanced-gauge-needle{
   }
 }
 
+
 </style>
 </head>
 <body data-page="nutrition">
-  
 <div class="mbk-form">
  <header class="mbk-head">
   <a href="/dashboard.html" class="mbk-back">←</a>
@@ -1576,7 +1170,7 @@ body[data-page="nutrition"] .advanced-gauge-needle{
   <div class="strip-item"><span class="lbl">الحالة الجسمانية BCS</span><span class="val" id="ctxBCS_txt">—</span></div>
   <div class="strip-item"><span class="lbl">رقم الموسم</span><span class="val" id="ctxParity_txt">—</span></div>
 </div>
-  <!-- حقول مخفية يستخدمها السكريبت الداخلي للحفظ والتحليل -->
+  <!-- حقول مخفية يستخدمها سكريبت الصفحة الحالي -->
 
     <input id="ctxDIM" type="number" inputmode="numeric" step="1" min="0" style="display:none">
     <select id="ctxSpecies" style="display:none"><option value="">—</option><option value="بقر">بقر</option><option value="جاموس">جاموس</option></select>
@@ -1871,6 +1465,12 @@ body[data-page="nutrition"] .advanced-gauge-needle{
   </div>
 </div>
 
+<!-- ===== سكريبت الصفحة الحالي: جلسة السيرفر فقط ===== -->
+
+<!-- الأساس التحليلي + الذكاء (لا تلمس ترتيبها) -->
+
+
+<!-- الكور + تتبّع + منطق الحفظ (لا تغيّر واجهتك) -->
 <script>
 (() => {
   "use strict";
@@ -2508,7 +2108,47 @@ function advValueText(v, unit = '', d = 1) {
   return `${fmt(n, digits)}${unit ? ' ' + unit : ''}`;
 }
 
+function advRuleKind(rule) {
+  const r = clean(rule || 'match').toLowerCase();
+
+  if (r.includes('max') || r.includes('safe') || r.includes('starch') || r.includes('fat')) return 'max';
+  if (r.includes('min') || r.includes('ndf') || r.includes('fiber') || r.includes('rough')) return 'min';
+
+  return 'match';
+}
+
+function advSideLabels(rule) {
+  const kind = advRuleKind(rule);
+
+  if (kind === 'min') {
+    return { supply: 'القيمة الحالية', need: 'الحد الأدنى' };
+  }
+
+  if (kind === 'max') {
+    return { supply: 'القيمة الحالية', need: 'الحد الآمن' };
+  }
+
+  return { supply: 'الإمداد', need: 'الاحتياج' };
+}
+
+function advLiveNote(rule, stat) {
+  const kind = advRuleKind(rule);
+
+  if (!stat.hasData) return 'الجوج ينتظر بيانات التحليل الفعلية.';
+
+  if (kind === 'min') {
+    return `القيمة الحالية = ${stat.ratioText} من الحد الأدنى.`;
+  }
+
+  if (kind === 'max') {
+    return `القيمة الحالية = ${stat.ratioText} من الحد الآمن.`;
+  }
+
+  return `تغطية الإمداد للاحتياج: ${stat.ratioText}`;
+}
+
 function advStatus(rule, supply, need) {
+  const kind = advRuleKind(rule);
   const s = firstNumber(supply);
   const n = firstNumber(need);
 
@@ -2527,21 +2167,23 @@ function advStatus(rule, supply, need) {
   let cls = 'ok';
   let label = 'مناسب';
 
-  if (rule === 'max') {
-    if (ratio <= 100) {
-      cls = 'ok'; label = 'مناسب';
+  if (kind === 'max') {
+    if (ratio <= 85) {
+      cls = 'ok'; label = 'آمن';
+    } else if (ratio <= 100) {
+      cls = 'warn'; label = 'قريب من الحد';
     } else if (ratio <= 115) {
-      cls = 'warn'; label = 'مرتفع';
+      cls = 'warn'; label = 'فوق الحد';
     } else {
       cls = 'bad'; label = 'خطر';
     }
-  } else if (rule === 'min') {
+  } else if (kind === 'min') {
     if (ratio < 80) {
-      cls = 'bad'; label = 'ناقص جدًا';
-    } else if (ratio < 95) {
-      cls = 'warn'; label = 'ناقص';
+      cls = 'bad'; label = 'أقل من الحد';
+    } else if (ratio < 100) {
+      cls = 'warn'; label = 'قريب من الحد';
     } else {
-      cls = 'ok'; label = 'مناسب';
+      cls = 'ok'; label = 'مستوفي الحد';
     }
   } else {
     if (ratio < 80) {
@@ -2600,7 +2242,8 @@ function advancedMetricCards(analysis = {}, panels = {}) {
       supply: nutrition.ndfPctActual,
       need: targets.ndfTarget,
       unit: '%',
-      note: 'الألياف الكلية تُقرأ كحد أمان أدنى للكرش.'
+      needText: targets.ndfTarget !== null && targets.ndfTarget !== undefined ? `حد أدنى ${advValueText(targets.ndfTarget, '%', 1)}` : '',
+      note: 'NDF ليست احتياجًا ثابتًا؛ تُقرأ كحد أدنى آمن لدعم الكرش.'
     },
     {
       key: 'penDF',
@@ -2609,7 +2252,8 @@ function advancedMetricCards(analysis = {}, panels = {}) {
       supply: nutrition.peNDFPctActual,
       need: targets.peNDFMin,
       unit: '%',
-      note: 'مؤشر داعم لاكتمال تأثير الألياف في الاجترار.'
+      needText: targets.peNDFMin !== null && targets.peNDFMin !== undefined ? `حد أدنى ${advValueText(targets.peNDFMin, '%', 1)}` : '',
+      note: 'peNDF تُقرأ كحد أدنى للألياف المؤثرة والاجترار، وليست احتياج إنتاج مباشر.'
     },
     {
       key: 'roughage',
@@ -2618,7 +2262,8 @@ function advancedMetricCards(analysis = {}, panels = {}) {
       supply: nutrition.roughPctDM,
       need: targets.roughageMin,
       unit: '%',
-      note: 'الخشن يُقرأ كحد أدنى داخل العليقة.'
+      needText: targets.roughageMin !== null && targets.roughageMin !== undefined ? `حد أدنى ${advValueText(targets.roughageMin, '%', 1)}` : '',
+      note: 'الخشن يُقرأ كحد أدنى داعم لصحة الكرش.'
     },
     {
       key: 'starch',
@@ -2627,7 +2272,8 @@ function advancedMetricCards(analysis = {}, panels = {}) {
       supply: nutrition.starchPctActual,
       need: targets.starchMax,
       unit: '%',
-      note: 'النشا يُقرأ كحد أقصى لحماية الكرش.'
+      needText: targets.starchMax !== null && targets.starchMax !== undefined ? `حد آمن ${advValueText(targets.starchMax, '%', 1)}` : '',
+      note: 'النشا ليس احتياجًا؛ هو حد آمن يتأثر بصحة الكرش ومستوى الألياف.'
     },
     {
       key: 'fat',
@@ -2636,8 +2282,8 @@ function advancedMetricCards(analysis = {}, panels = {}) {
       supply: nutrition.fatPctActual,
       need: 7,
       unit: '%',
-      needText: '6–7 % من المادة الجافة',
-      note: 'الدهون تُقرأ كحد مسموح لا كاحتياج إلزامي.'
+      needText: 'حد آمن 6–7 % من المادة الجافة',
+      note: 'دهون العليقة ليست احتياجًا؛ تُقرأ كحد آمن/أقصى حسب نوع الدهن وجودة العليقة.'
     },
     {
       key: 'energy',
@@ -2665,7 +2311,9 @@ function advancedMetricCards(analysis = {}, panels = {}) {
 }
 
 function advancedGaugeHtml(card = {}) {
-  const stat = advStatus(card.rule || 'match', card.supply, card.need);
+  const rule = card.rule || 'match';
+  const stat = advStatus(rule, card.supply, card.need);
+  const sideLabels = advSideLabels(rule);
 
   const title = card.title || card.name || card.key || 'مؤشر';
   const key = clean(card.key || card.metric || card.id || '');
@@ -2680,12 +2328,10 @@ function advancedGaugeHtml(card = {}) {
 
   const note = card.note || card.balanceText || card.diffText || card.message || card.hint || card.reason || '';
 
-  const liveNote = stat.hasData
-    ? `تغطية الإمداد للاحتياج: ${stat.ratioText}`
-    : 'الجوج ينتظر بيانات الإمداد والاحتياج من التحليل.';
+  const liveNote = advLiveNote(rule, stat);
 
   return `
-    <div class="advanced-gauge-card ${stat.cls}" data-key="${escapeHtml(key)}" data-live="true" data-ratio="${stat.ratio === null ? '' : fmt(stat.ratio, 2)}" style="--needle:${stat.needle}">
+    <div class="advanced-gauge-card ${stat.cls} rule-${escapeHtml(advRuleKind(rule))}" data-key="${escapeHtml(key)}" data-live="true" data-ratio="${stat.ratio === null ? '' : fmt(stat.ratio, 2)}" style="--needle:${stat.needle}">
       <div class="advanced-gauge-head">
         <div class="advanced-gauge-title">${escapeHtml(title)}</div>
         <div class="advanced-gauge-badge">${escapeHtml(card.stateLabel || card.badge || stat.label)}</div>
@@ -2693,7 +2339,7 @@ function advancedGaugeHtml(card = {}) {
 
       <div class="advanced-gauge-body">
         <div class="advanced-side supply-side">
-          <div class="advanced-side-label">الإمداد</div>
+          <div class="advanced-side-label">${escapeHtml(sideLabels.supply)}</div>
           <div class="advanced-side-value">${escapeHtml(supplyText)}</div>
         </div>
 
@@ -2705,7 +2351,7 @@ function advancedGaugeHtml(card = {}) {
         </div>
 
         <div class="advanced-side need-side">
-          <div class="advanced-side-label">الاحتياج</div>
+          <div class="advanced-side-label">${escapeHtml(sideLabels.need)}</div>
           <div class="advanced-side-value">${escapeHtml(needText)}</div>
         </div>
       </div>
@@ -2956,6 +2602,5 @@ $("toggleAdvancedBtn")?.addEventListener("click", () => {
   document.addEventListener("DOMContentLoaded", start);
 })();
 </script>
-
 </body>
 </html>
