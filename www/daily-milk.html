@@ -131,35 +131,38 @@
     return new URL(location.href).searchParams.get(name) || "";
   }
 
-  function userIdHeader() {
-    return String(
-      window.__tenant?.userId ||
-      window.MURABBIK_USER_ID ||
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      ""
-    ).trim();
-  }
+async function postServer(path, payload) {
+  const res = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify(payload || {})
+  });
 
-  async function postServer(path, payload) {
-    const res = await fetch(path, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": userIdHeader()
-      },
-      body: JSON.stringify(payload || {})
-    });
+  const data = await res.json().catch(() => ({
+    ok: false,
+    ui: {
+      status: "error",
+      message: "تعذّر قراءة رد السيرفر."
+    }
+  }));
 
-    return await res.json().catch(() => ({
+  if (res.status === 401 || data?.error === "auth_required") {
+    return {
       ok: false,
       ui: {
         status: "error",
-        message: "تعذّر قراءة رد السيرفر."
+        message: data?.message || "سجّل الدخول أولًا."
       }
-    }));
+    };
   }
+
+  return data;
+}
 let previewTimer = null;
 
 async function runPreview() {
