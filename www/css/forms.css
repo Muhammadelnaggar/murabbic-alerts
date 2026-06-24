@@ -3853,3 +3853,70 @@ html[data-page="calf-card"] .calf-list-meta{
     width:100%;
   }
 }
+/* =========================================================
+   Nutrition Page Isolation — scoped fix only
+   لا يؤثر على أي صفحة أخرى في مُرَبِّيك
+   ========================================================= */
+
+body[data-page="nutrition"] .mbk-form{
+  max-width:1080px !important;
+  margin:0 auto !important;
+  padding:0 10px 96px !important;
+  display:block !important;
+}
+
+body[data-page="nutrition"] .mbk-card,
+body[data-page="nutrition"] .card{
+  max-width:none !important;
+  overflow:visible !important;
+}
+
+body[data-page="nutrition"] .row{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  align-items:center !important;
+  gap:8px !important;
+  grid-template-columns:none !important;
+}
+
+body[data-page="nutrition"] .row > .grow{
+  flex:1 1 auto !important;
+  min-width:0 !important;
+}
+
+body[data-page="nutrition"] .row.stack > *{
+  flex:1 1 100% !important;
+}
+
+body[data-page="nutrition"] .wrap{
+  max-width:1080px !important;
+}
+
+body[data-page="nutrition"] #analysisSection{
+  max-width:860px !important;
+  margin:14px auto 22px !important;
+}
+
+body[data-page="nutrition"] #nutritionKPIs,
+body[data-page="nutrition"] #economicKPIs{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:10px !important;
+  margin-top:0 !important;
+}
+
+body[data-page="nutrition"] #advancedKPIs{
+  margin-top:10px !important;
+}
+
+body[data-page="nutrition"] table{
+  min-width:1020px;
+}
+
+body[data-page="nutrition"] .table-wrap{
+  overflow-x:auto !important;
+}
+
+body[data-page="nutrition"] #nutritionForm{
+  max-width:none !important;
+}
