@@ -896,6 +896,218 @@ body[data-page="nutrition"] #saveEvent{
     font-size:16px;
   }
 }
+ /* ===== Murabbik Nutrition analysis restore — local only ===== */
+body[data-page="nutrition"] #analysisSection{
+  width:100%;
+  max-width:860px;
+  margin:14px auto 22px;
+  padding:0;
+}
+
+body[data-page="nutrition"] #analysisSection .mbk-card{
+  background:#fff;
+  border:1px solid rgba(15,23,42,.07);
+  border-radius:20px;
+  padding:12px;
+  margin:10px 0;
+  box-shadow:0 8px 24px rgba(15,23,42,.06);
+}
+
+body[data-page="nutrition"] #analysisSection h3{
+  margin:0 0 12px;
+  font-size:16px;
+  font-weight:900;
+  color:#0f172a;
+}
+
+body[data-page="nutrition"] #nutritionKPIs,
+body[data-page="nutrition"] #economicKPIs,
+body[data-page="nutrition"] #advancedKPIs{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+
+body[data-page="nutrition"] .kpi{
+  position:relative;
+  overflow:hidden;
+  min-width:0;
+  min-height:126px;
+  border-radius:18px !important;
+  padding:12px !important;
+  background:#fff !important;
+  border:1px solid rgba(15,23,42,.08) !important;
+  box-shadow:0 8px 22px rgba(15,23,42,.07) !important;
+}
+
+body[data-page="nutrition"] .kpi::before{
+  content:"";
+  position:absolute;
+  inset:0 auto 0 0;
+  width:5px;
+  background:var(--kpi-accent, #cbd5e1);
+}
+
+body[data-page="nutrition"] .kpi.ok{--kpi-accent:#12a05c}
+body[data-page="nutrition"] .kpi.warn{--kpi-accent:#f59e0b}
+body[data-page="nutrition"] .kpi.bad{--kpi-accent:#ef4444}
+
+body[data-page="nutrition"] .kpi .k{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:8px;
+  min-height:34px;
+  font-size:13px;
+  font-weight:900;
+  color:#172033;
+  line-height:1.25;
+}
+
+body[data-page="nutrition"] .kpi .v{
+  margin-top:8px;
+  font-size:20px;
+  font-weight:1000;
+  color:#0f172a;
+  line-height:1.2;
+}
+
+body[data-page="nutrition"] .kpi-badge{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  padding:4px 8px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:900;
+  white-space:nowrap;
+  background:rgba(15,23,42,.06);
+  color:#334155;
+}
+
+body[data-page="nutrition"] .kpi.ok .kpi-badge{
+  background:rgba(18,160,92,.10);
+  color:#0b7f47;
+}
+
+body[data-page="nutrition"] .kpi.warn .kpi-badge{
+  background:rgba(245,158,11,.13);
+  color:#92400e;
+}
+
+body[data-page="nutrition"] .kpi.bad .kpi-badge{
+  background:rgba(239,68,68,.11);
+  color:#991b1b;
+}
+
+body[data-page="nutrition"] .kpi-badge .dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--kpi-accent, #cbd5e1);
+  box-shadow:0 0 0 3px rgba(15,23,42,.06);
+}
+
+body[data-page="nutrition"] .kpi-meter{
+  margin-top:10px;
+  height:8px;
+  border-radius:999px;
+  background:#edf1f5;
+  overflow:hidden;
+}
+
+body[data-page="nutrition"] .kpi-meter > span{
+  display:block;
+  height:100%;
+  width:0;
+  border-radius:999px;
+  background:var(--kpi-accent, #cbd5e1);
+}
+
+body[data-page="nutrition"] .kpi-hint{
+  margin-top:8px;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.45;
+  color:#475569;
+}
+
+body[data-page="nutrition"] #nutritionKPIs .kpi.rumen-feature,
+body[data-page="nutrition"] #nutritionKPIs .kpi[data-key*="rumen"]{
+  grid-column:1 / -1;
+  min-height:145px;
+  background:linear-gradient(180deg,#ffffff 0%,#f3fff8 100%) !important;
+  border:1px solid rgba(18,160,92,.25) !important;
+}
+
+body[data-page="nutrition"] .nutrition-advanced-toggle{
+  width:100%;
+  min-height:56px;
+  margin:12px 0 8px !important;
+  border-radius:18px;
+  background:#0ea05a !important;
+  color:#fff !important;
+  border:0 !important;
+  font-size:17px;
+  font-weight:1000;
+}
+
+body[data-page="nutrition"] .nutrition-advanced-card{
+  background:#fbfefc !important;
+  border-color:rgba(18,160,92,.18) !important;
+}
+
+body[data-page="nutrition"] #advancedKPIs .kpi{
+  min-height:118px;
+  background:#fcfffd !important;
+}
+
+body[data-page="nutrition"] #economicAnalysisCard{
+  margin-top:12px;
+}
+
+@media (max-width:420px){
+  body[data-page="nutrition"] #analysisSection{
+    margin-top:12px;
+  }
+
+  body[data-page="nutrition"] #analysisSection .mbk-card{
+    padding:10px;
+    border-radius:18px;
+  }
+
+  body[data-page="nutrition"] #nutritionKPIs,
+  body[data-page="nutrition"] #economicKPIs,
+  body[data-page="nutrition"] #advancedKPIs{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+
+  body[data-page="nutrition"] .kpi{
+    min-height:118px;
+    padding:10px !important;
+    border-radius:16px !important;
+  }
+
+  body[data-page="nutrition"] .kpi .k{
+    font-size:12px;
+    min-height:32px;
+  }
+
+  body[data-page="nutrition"] .kpi .v{
+    font-size:18px;
+  }
+
+  body[data-page="nutrition"] .kpi-hint{
+    font-size:11px;
+  }
+
+  body[data-page="nutrition"] .nutrition-advanced-toggle{
+    min-height:54px;
+    font-size:16px;
+  }
+}   
 </style>
 </head>
 <body data-page="nutrition">
@@ -1203,16 +1415,23 @@ body[data-page="nutrition"] #saveEvent{
     <div class="row stack">
        <!-- ===== Analysis (Bottom) ===== -->
 <div id="analysisSection">
-  <div class="mbk-card" id="nutritionAnalysisCard">
+  <div class="mbk-card analysis-main-card" id="nutritionAnalysisCard">
     <h3>📊 التحليل الغذائي للعليقة</h3>
-    <div id="nutritionKPIs" class="kpi-grid"></div>
-    <button id="toggleAdvancedBtn" class="btn btn-ghost" type="button" style="margin-top:10px">عرض متقدم</button>
-<div id="advancedKPIs" style="display:none"></div>
+    <div id="nutritionKPIs" class="kpi-grid nutrition-main-grid"></div>
   </div>
-     
-  <div class="mbk-card" id="economicAnalysisCard">
+
+  <button id="toggleAdvancedBtn" class="btn btn-ghost nutrition-advanced-toggle" type="button">
+    عرض متقدم
+  </button>
+
+  <div class="mbk-card nutrition-advanced-card" id="advancedCard" style="display:none">
+    <h3>🔬 العرض المتقدم</h3>
+    <div id="advancedKPIs" class="advanced-grid"></div>
+  </div>
+
+  <div class="mbk-card economic-main-card" id="economicAnalysisCard">
     <h3>💰 التحليل الاقتصادي</h3>
-    <div id="economicKPIs" class="kpi-grid"></div>
+    <div id="economicKPIs" class="kpi-grid economic-main-grid"></div>
   </div>
 </div>
 </div>
@@ -1743,27 +1962,67 @@ body[data-page="nutrition"] #saveEvent{
     }
   }
 
-  function cardHtml(card = {}) {
-    const status = clean(card.status || card.level || "ok");
+ function cardHtml(card = {}) {
+  const rawState = clean(card.status || card.state || card.level || "ok").toLowerCase();
 
-    const cls =
-      status.includes("bad") || status.includes("danger") || status.includes("error")
-        ? "bad"
-        : (status.includes("warn") || status.includes("watch")
+  const cls =
+    rawState.includes("bad") ||
+    rawState.includes("danger") ||
+    rawState.includes("critical") ||
+    rawState.includes("error")
+      ? "bad"
+      : (
+        rawState.includes("warn") ||
+        rawState.includes("watch") ||
+        rawState.includes("alert")
           ? "warn"
-          : "ok");
+          : "ok"
+      );
 
-    return `
-      <div class="kpi ${cls}">
-        <div class="k">
-          <span>${escapeHtml(card.title || card.key || "مؤشر")}</span>
-          <span class="kpi-badge"><span class="dot"></span>${cls === "ok" ? "مناسب" : cls === "warn" ? "متابعة" : "خطر"}</span>
-        </div>
-        <div class="v">${escapeHtml(card.value ?? card.actual ?? "—")}</div>
-        ${card.targetText ? `<div class="kpi-hint">${escapeHtml(card.targetText)}</div>` : ""}
+  const key = clean(card.key || card.metric || card.id || "");
+  const isRumen =
+    key.includes("rumen") ||
+    clean(card.title).includes("الكرش") ||
+    clean(card.title).includes("الألياف");
+
+  const label =
+    card.stateLabel ||
+    card.badge ||
+    (cls === "ok" ? "مناسب" : cls === "warn" ? "متابعة" : "خطر");
+
+  const value =
+    card.valueText ??
+    card.value ??
+    card.actual ??
+    card.message ??
+    "—";
+
+  const hint =
+    card.targetText ||
+    card.message ||
+    card.subText ||
+    card.hint ||
+    card.reason ||
+    "";
+
+  const pointer = num(card.pointerPct);
+  const meterWidth = pointer === null ? 0 : Math.max(0, Math.min(100, pointer));
+
+  return `
+    <div class="kpi ${cls}${isRumen ? " rumen-feature" : ""}" data-key="${escapeHtml(key)}">
+      <div class="k">
+        <span>${escapeHtml(card.title || card.name || key || "مؤشر")}</span>
+        <span class="kpi-badge"><span class="dot"></span>${escapeHtml(label)}</span>
       </div>
-    `;
-  }
+
+      <div class="v">${escapeHtml(value)}</div>
+
+      <div class="kpi-meter"><span style="width:${meterWidth}%"></span></div>
+
+      ${hint ? `<div class="kpi-hint">${escapeHtml(hint)}</div>` : ""}
+    </div>
+  `;
+}
 
   function paintAnalysis(analysis = {}, panels = {}) {
     const totals = analysis.totals || {};
@@ -1800,9 +2059,25 @@ body[data-page="nutrition"] #saveEvent{
     const eCards = panels.economicsCards || panels.economicCards || [];
     const aCards = panels.advancedCards || [];
 
-    if ($("nutritionKPIs")) $("nutritionKPIs").innerHTML = nCards.length ? nCards.map(cardHtml).join("") : "";
-    if ($("economicKPIs")) $("economicKPIs").innerHTML = eCards.length ? eCards.map(cardHtml).join("") : "";
-    if ($("advancedKPIs")) $("advancedKPIs").innerHTML = aCards.length ? aCards.map(cardHtml).join("") : "";
+   if ($("nutritionKPIs")) {
+  $("nutritionKPIs").innerHTML = nCards.length ? nCards.map(cardHtml).join("") : "";
+}
+
+if ($("economicKPIs")) {
+  $("economicKPIs").innerHTML = eCards.length ? eCards.map(cardHtml).join("") : "";
+}
+
+if ($("advancedKPIs")) {
+  $("advancedKPIs").innerHTML = aCards.length ? aCards.map(cardHtml).join("") : "";
+}
+
+if ($("toggleAdvancedBtn")) {
+  $("toggleAdvancedBtn").style.display = aCards.length ? "block" : "none";
+}
+
+if ($("advancedCard") && !aCards.length) {
+  $("advancedCard").style.display = "none";
+}
   }
 
   async function saveEvent(ev) {
@@ -1945,17 +2220,15 @@ body[data-page="nutrition"] #saveEvent{
     $("closeCustomPremix")?.addEventListener("click", closePremix);
     $("saveCustomPremix")?.addEventListener("click", savePremix);
 
-    $("toggleAdvancedBtn")?.addEventListener("click", () => {
-      const box = $("advancedKPIs");
-      if (!box) return;
+$("toggleAdvancedBtn")?.addEventListener("click", () => {
+  const card = $("advancedCard");
+  const btn = $("toggleAdvancedBtn");
+  if (!card || !btn) return;
 
-      const hidden = box.style.display === "none" || !box.style.display;
-      box.style.display = hidden ? "block" : "none";
-
-      if ($("toggleAdvancedBtn")) {
-        $("toggleAdvancedBtn").textContent = hidden ? "إخفاء المتقدم" : "عرض متقدم";
-      }
-    });
+  const hidden = card.style.display === "none" || !card.style.display;
+  card.style.display = hidden ? "block" : "none";
+  btn.textContent = hidden ? "إخفاء العرض المتقدم" : "عرض متقدم";
+});
 
     $("msgYes")?.addEventListener("click", () => {
       location.href =
