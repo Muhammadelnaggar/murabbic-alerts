@@ -8902,6 +8902,259 @@ return res.json({
     });
   }
 });
+// ============================================================
+//                  API: NUTRITION PAGE CONTEXT
+// ============================================================
+app.get('/api/nutrition/context', requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: 'firestore_unavailable',
+        message: 'قاعدة البيانات غير متاحة الآن.'
+      });
+    }
+
+    const tenant = req.userId;
+    const eventDate = asYMD(req.query.eventDate || req.query.date) || toYYYYMMDD(Date.now());
+    const rawNumbers = req.query.numbers || req.query.bulk || req.query.groupNumbers || req.query.number || req.query.animalNumber || '';
+    const numbers = String(rawNumbers || '').match(/\d+/g)?.map(x => String(x).trim()).filter(Boolean) || [];
+
+    if (!numbers.length) {
+      return res.status(400).json({
+        ok: false,
+        error: 'animal_number_required',
+        message: 'رقم الحيوان أو أرقام المجموعة مطلوبة.'
+      });
+    }
+
+    const toNum = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const speciesOf = (a = {}) => {
+      const s = String(a.species || a.animalTypeAr || a.animaltype || a.animalType || '').trim();
+      if (/جاموس|buffalo/i.test(s)) return 'جاموس';
+      if (/بقر|بقرة|cow|cattle/i.test(s)) return 'بقر';
+      return s || null;
+    };
+
+    const dateOnly = (v) => String(v || '').trim().slice(0, 10);
+    const daysFrom = (iso) => /^\d{4}-\d{2}-\d{2}$/.test(String(iso || '')) ? diffDaysISO(iso, eventDate) : null;
+
+    const oneContext = (docSnap) => {
+      const a = docSnap.data() || {};
+      const species = speciesOf(a);
+      const lastCalvingDate = dateOnly(a.lastCalvingDate || a.calvingDate || '');
+      const lastInseminationDate = dateOnly(a.lastInseminationDate || '');
+      const productionStatus = String(a.productionStatus || '').trim();
+      const reproductiveStatus = String(a.reproductiveStatus || '').trim();
+
+      const pregnancyDays = reproductiveStatus === 'عشار'
+        ? (toNum(a.pregnancyDays) ?? daysFrom(lastInseminationDate))
+        : (toNum(a.pregnancyDays) || 0);
+
+      const daysToCalving = pregnancyDays > 0
+        ? Math.max(0, (species === 'جاموس' ? 315 : 280) - pregnancyDays)
+        : null;
+
+      const daysInMilk = productionStatus === 'جاف'
+        ? null
+        : (toNum(a.daysInMilk) ?? daysFrom(lastCalvingDate));
+
+      return {
+        animalId: docSnap.id,
+        animalNumber: String(a.animalNumber ?? a.number ?? '').trim(),
+        species,
+        breed: a.breed || null,
+        productionStatus: productionStatus || null,
+        pregnancyStatus: reproductiveStatus || null,
+        reproductiveStatus: reproductiveStatus || null,
+        daysInMilk,
+        avgMilkKg: toNum(a.dailyMilk ?? a.milkTodayKg ?? a.avgMilkKg),
+        pregnancyDays,
+        daysToCalving,
+        bodyWeightKg: toNum(a.bodyWeightKg ?? a.bodyWeight ?? a.weightKg),
+        bcs: toNum(a.bcs ?? a.bodyConditionScore),
+        parity: toNum(a.parity ?? a.lactationNumber),
+        lactationNumber: toNum(a.lactationNumber ?? a.parity),
+        milkFatPct: toNum(a.milkFatPct),
+        milkProteinPct: toNum(a.milkProteinPct),
+        milkPrice: toNum(a.milkPrice)
+      };
+    };
+
+    const docs = [];
+    for (const n of numbers) {
+      const d = await findAnimalDocRefByNumberForTenant(tenant, n);
+      if (d) docs.push(d);
+    }
+
+    if (!docs.length) {
+      return res.status(404).json({
+        ok: false,
+        error: 'animal_not_found',
+        message: 'لم يتم العثور على الحيوان داخل حسابك.'
+      });
+    }
+
+    if (numbers.length === 1) {
+      const ctx = oneContext(docs[0]);
+      return res.json({
+        ok: true,
+        mode: 'single',
+        eventDate,
+        animalId: ctx.animalId,
+        animalNumber: ctx.animalNumber || numbers[0],
+        context: ctx
+      });
+    }
+
+    const items = docs.map(oneContext);
+
+    const avg = (field) => {
+      const vals = items.map(x => Number(x[field])).filter(Number.isFinite);
+      return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
+    };
+
+    const speciesCounts = items.reduce((m, x) => {
+      const k = x.species || '';
+      if (k) m[k] = (m[k] || 0) + 1;
+      return m;
+    }, {});
+
+    const species = Object.entries(speciesCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    const groupName = String(req.query.groupName || req.query.group || req.query.groupLabel || '').trim() || null;
+
+    return res.json({
+      ok: true,
+      mode: 'group',
+      eventDate,
+      numbers,
+      context: {
+        groupMode: 'group',
+        groupName,
+        group: groupName,
+        groupLabel: groupName,
+        groupNumbers: numbers,
+        headCount: numbers.length,
+        species,
+        daysInMilk: avg('daysInMilk'),
+        avgMilkKg: avg('avgMilkKg'),
+        pregnancyDays: avg('pregnancyDays'),
+        daysToCalving: avg('daysToCalving'),
+        bodyWeightKg: avg('bodyWeightKg'),
+        groupBodyWeightKg: avg('bodyWeightKg'),
+        bcs: avg('bcs'),
+        groupBcs: avg('bcs'),
+        milkFatPct: avg('milkFatPct'),
+        milkProteinPct: avg('milkProteinPct'),
+        milkPrice: avg('milkPrice')
+      }
+    });
+  } catch (e) {
+    console.error('nutrition.context error:', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'nutrition_context_failed',
+      message: 'تعذّر تحميل سياق التغذية.'
+    });
+  }
+});
+
+// ============================================================
+//                  API: NUTRITION FEED ITEMS
+// ============================================================
+app.get('/api/nutrition/feed-items', requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: 'firestore_unavailable',
+        message: 'قاعدة البيانات غير متاحة الآن.',
+        feeds: []
+      });
+    }
+
+    const feeds = [];
+    const seen = new Set();
+
+    const pushDoc = (doc, custom = false) => {
+      const d = doc.data() || {};
+      if (d.enabled === false) return;
+
+      const id = doc.id;
+      if (seen.has(id)) return;
+      seen.add(id);
+
+      feeds.push({
+        id,
+        feedId: id,
+        custom,
+        name: d.name || d.nameAr || d.userLabel || id,
+        nameAr: d.nameAr || d.userLabel || d.name || id,
+        userLabel: d.userLabel || '',
+        cat: d.cat || d.category || 'conc',
+        category: d.cat || d.category || 'conc',
+        dmPct: d.dmPct ?? d.dm ?? null,
+        cpPct: d.cpPct ?? d.cp ?? null,
+        pricePerTon: d.pricePerTon ?? d.pTon ?? d.price ?? null,
+        pricePerTonDM: d.pricePerTonDM ?? d.pTonDM ?? null,
+        nelMcalPerKgDM: d.nelMcalPerKgDM ?? d.nel ?? null,
+        mpGPerKgDM: d.mpGPerKgDM ?? d.mp ?? null,
+        ndfPct: d.ndfPct ?? d.ndf ?? null,
+        adfPct: d.adfPct ?? d.adf ?? null,
+        fatPct: d.fatPct ?? d.fat ?? null,
+        starchPct: d.starchPct ?? d.starch ?? null,
+        caPct: d.caPct ?? null,
+        pPct: d.pPct ?? null,
+        mgPct: d.mgPct ?? null,
+        naPct: d.naPct ?? null,
+        kPct: d.kPct ?? null,
+        clPct: d.clPct ?? null,
+        sPct: d.sPct ?? null,
+        znMgKgDM: d.znMgKgDM ?? null,
+        cuMgKgDM: d.cuMgKgDM ?? null,
+        mnMgKgDM: d.mnMgKgDM ?? null,
+        seMgKgDM: d.seMgKgDM ?? null,
+        iMgKgDM: d.iMgKgDM ?? null,
+        coMgKgDM: d.coMgKgDM ?? null,
+        feMgKgDM: d.feMgKgDM ?? null,
+        vitAIUPerKgDM: d.vitAIUPerKgDM ?? null,
+        vitDIUPerKgDM: d.vitDIUPerKgDM ?? null,
+        vitEIUPerKgDM: d.vitEIUPerKgDM ?? null,
+        biotinMgKgDM: d.biotinMgKgDM ?? null,
+        niacinMgKgDM: d.niacinMgKgDM ?? null,
+        cholineMgKgDM: d.cholineMgKgDM ?? null
+      });
+    };
+
+    const publicSnap = await db.collection('feed_items').get();
+    publicSnap.forEach(d => pushDoc(d, false));
+
+    const customSnap = await db.collection('custom_feed_items')
+      .where('userId', '==', req.userId)
+      .get();
+
+    customSnap.forEach(d => pushDoc(d, true));
+
+    feeds.sort((a, b) =>
+      String(a.cat || '').localeCompare(String(b.cat || ''), 'ar') ||
+      String(a.nameAr || a.name || '').localeCompare(String(b.nameAr || b.name || ''), 'ar')
+    );
+
+    return res.json({ ok: true, feeds });
+  } catch (e) {
+    console.error('nutrition.feed-items error:', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'nutrition_feed_items_failed',
+      message: 'تعذّر تحميل خامات التغذية.',
+      feeds: []
+    });
+  }
+});
 app.get('/api/nutrition/custom-feeds', requireUserId, async (req, res) => {
   try {
     if (!db) return res.status(503).json({ ok:false, error:'firestore_unavailable' });
