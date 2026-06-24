@@ -5,110 +5,81 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<link rel="stylesheet" href="css/forms.css">
-<title>التغذية الذكية</title>
+  <link rel="stylesheet" href="css/forms.css">
+ 
+ <title>التغذية الذكية</title>
 
 
   <style>
-    *{box-sizing:border-box}
-   body{
+/* ========= Nutrition page local style — cleaned, single source ========= */
+:root{
+  --green: var(--brand, #0ea05a);
+  --green-600: var(--brand-600, #0b7f47);
+  --card: #fff;
+  --nutrition-border: #e0ebd3;
+}
+
+*{box-sizing:border-box}
+
+body{
   direction:rtl;
   margin:0;
+  background:#f7faf7;
+  color:#0f172a;
   font-family:system-ui,"Cairo","Segoe UI",Tahoma,Arial,sans-serif;
 }
-    h1{margin:0 0 8px;text-align:center;color:var(--green);font-size:22px}
-    .wrap{max-width:1080px;margin:0 auto}
-    .info{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
-    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#dcedc8;color:#1b5e20;font-size:13px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px;margin-top:10px}
-    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .row>.grow{flex:1}
-    select,input,button{font-size:14px}
-    input,select{padding:10px;border:1px solid #ccc;border-radius:10px}
-    input,select,button{min-height:44px}
-    button{appearance:none;border:0;border-radius:10px;padding:10px 12px;font-weight:bold;cursor:pointer}
-    .btn{background:#fff;border:1px solid var(--green);color:var(--green)}
-    .btn-primary{background:var(--green);color:#fff}
-    .warning{color:#c62828;text-align:center;min-height:22px;margin-top:6px}
-    .table-wrap{width:100%;overflow-x:auto}
-    table{width:100%;border-collapse:collapse;margin-top:10px;min-width:1020px}
-    th,td{border:1px solid #e0ebd3;padding:8px;text-align:center}
-    th{background:#eafbe7;color:#1b5e20}
-    tbody tr:nth-child(odd){background:#fcfff5}
-    .total{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px}
-    .total .pill{background:#fff}
-    @media (max-width: 640px){
-      .row.stack > *{flex:1 1 100%}
-      /* ===== Murabbik Nutrition Mobile polish (Simple/Effective/Creative) ===== */
-.info{display:grid;gap:8px;margin:10px auto;max-width:860px;padding:0 12px}
-.info .pill{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:10px 12px;border-radius:14px;line-height:1.1}
-.info .pill b{font-size:15px}
-.info .pill .k{font-size:12px;opacity:.75}
 
-/* Hide template + search buttons (keep DOM for safety) */
-#tpl, #applyTpl, #addBySearch{display:none !important}
-/* Make controls row wrap nicely on mobile */
-.row.controls{flex-wrap:wrap;gap:6px}
-.row.controls .grow{min-width:160px}
- .controls-box{
-  background:#fff;
-  border:1px solid rgba(0,0,0,.06);
-  border-radius:16px;
-  padding:8px;   /* كان 12 */
+.mbk-form{
+  width:100%;
+  max-width:1080px;
+  margin:0 auto;
+  padding:0 10px 96px;
+  display:block;
 }
-.controls-box .controls{margin:0}   
-/* Hide per-item DM-kg and cost columns (we compute totals in analysis cards) */
-th[data-col="dmkg"], td[data-col="dmkg"],
-th[data-col="cost"], td[data-col="cost"]{display:none !important}
-/* Analysis cards bottom */
-#analysisSection{max-width:860px;margin:14px auto 22px;padding:0 12px}
 
+.wrap{max-width:1080px;margin:0 auto}
+h1{margin:0 0 8px;text-align:center;color:var(--green);font-size:22px}
+
+.card,
 .mbk-card{
-  background:#fff;
-  border:1px solid rgba(0,0,0,.06);
+  width:100%;
+  max-width:none;
+  background:var(--card);
+  border:1px solid var(--border, #e2e8f0);
   border-radius:16px;
   padding:10px;
   margin:8px 0;
+  box-shadow:0 1px 0 rgba(15,23,42,.04);
+  overflow:visible;
 }
-.mbk-card h3{margin:0 0 10px;font-size:15px}
-.kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.kpi{background:#f8fafc;border:1px solid rgba(0,0,0,.05);border-radius:14px;padding:10px}
-.kpi .k{font-size:12px;opacity:.75}
-.kpi .v{font-weight:800;font-size:15px;margin-top:2px}
-.kpi-row{display:flex;gap:8px;flex-wrap:wrap}
+
+.card{margin-top:10px}
+.mbk-card h3{margin:0 0 10px;font-size:15px;color:#0f172a}
+
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;min-width:0}
+.row>.grow{flex:1;min-width:0}
+.row.stack > *{min-width:0}
+
+select,input,button{font-size:14px;font-family:inherit}
+input,select{padding:10px;border:1px solid #ccc;border-radius:10px;background:#fff;color:#0f172a}
+input,select,button{min-height:44px}
+button{appearance:none;border:0;border-radius:10px;padding:10px 12px;font-weight:bold;cursor:pointer}
+.btn{background:#fff;border:1px solid var(--green);color:var(--green)}
+.btn-primary{background:var(--green);color:#fff}
 .btn-ghost{background:transparent;border:1px solid rgba(0,0,0,.12)}
-.kpi{ border-radius:14px; padding:12px; background:#fff; border:1px solid #eef2f7; }
-.kpi .vrow{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.kpi .arr{ font-size:18px; line-height:1; }      
-#advancedKPIs{margin-top:10px}
+.warning{color:#c62828;text-align:center;min-height:22px;margin-top:6px}
 
-/* === Murabbik Nutrition KPI cards: compact, mobile-first (surgical) === */
-.kpi-grid{gap:8px}
-.kpi{padding:10px}
-.kpi .k{
-  font-size:11px;
-  font-weight:900;
-  color:#334155;
-  opacity:1;
-  line-height:1.2;
-  min-height:28px;
-  display:-webkit-box;
-  -webkit-line-clamp:2;
-  -webkit-box-orient:vertical;
-  overflow:hidden;
-}
-.kpi .v{font-weight:900;font-size:16px;margin-top:0}
-@media (max-width:420px){
-  .kpi{padding:9px}
-  .kpi .v{font-size:16px}
-}
+.table-wrap{width:100%;overflow-x:auto}
+table{width:100%;border-collapse:collapse;margin-top:10px;min-width:1020px}
+th,td{border:1px solid var(--nutrition-border);padding:8px;text-align:center}
+th{background:#eafbe7;color:#1b5e20}
+tbody tr:nth-child(odd){background:#fcfff5}
+.total{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px}
+.total .pill{background:#fff}
 
+.info{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--border, #e2e8f0);background:#dcedc8;color:#1b5e20;font-size:13px}
 
-
-   }
-  
-
-    /* ===== Animal / Group compact strip (2 rows, mobile-first) ===== */
 /* ===== Animal / Group compact strip ===== */
 .animal-strip{
   padding:6px 8px;
@@ -117,425 +88,116 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   border:1px solid #eef2f7;
   border-radius:12px;
 }
+.animal-strip.top-strip{margin-top:8px}
+.strip-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.strip-row-main{grid-template-columns:repeat(2,minmax(0,1fr))}
+.strip-row + .strip-row{margin-top:6px}
+.strip-item{min-width:0;text-align:center;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:8px 6px}
+.strip-item-main{padding:10px 8px}
+.strip-item .lbl{display:block;font-size:10px;line-height:1.1;color:#475569;font-weight:800;letter-spacing:0}
+.strip-item .val{display:block;margin-top:3px;font-size:14px;line-height:1.15;font-weight:900;color:#0b7f47;letter-spacing:0}
+.strip-item-main .val{font-size:15px}
 
-.animal-strip.top-strip{
-  margin-top:8px;
-}
+/* ===== Context and controls ===== */
+.controls-box{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:16px;padding:8px}
+.controls-box .controls{margin:0}
+.row.controls{flex-wrap:wrap;gap:6px}
+.row.controls .grow{min-width:160px}
+#tpl,#applyTpl,#addBySearch{display:none !important}
 
-.strip-row{
-  display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:6px;
-}
+#feedInputBox{background:rgba(14,160,90,.10);border:1px solid rgba(14,160,90,.25);border-radius:16px;padding:10px;margin-top:10px}
+.mini-actions{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-top:10px}
+.mini-btn{background:#fff;color:var(--green);border:1px solid var(--green);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:800;min-height:40px}
 
-.strip-row-main{
-  grid-template-columns:repeat(2,minmax(0,1fr));
-}
-
-.strip-row + .strip-row{
-  margin-top:6px;
-}
-
-.strip-item{
-  min-width:0;
-  text-align:center;
-  background:#f8fafc;
-  border:1px solid #eef2f7;
-  border-radius:10px;
-  padding:8px 6px;
-}
-
-.strip-item-main{
-  padding:10px 8px;
-}
-
-.strip-item .lbl{
-  display:block;
-  font-size:10px;
-  line-height:1.1;
-  color:#475569;
-  font-weight:800;
-  letter-spacing:0;
-}
-
-.strip-item .val{
-  display:block;
-  margin-top:3px;
-  font-size:14px;
-  line-height:1.15;
-  font-weight:900;
-  color:#0b7f47;
-  letter-spacing:0;
-}
-
-.strip-item-main .val{
-  font-size:15px;
-}
-@media (max-width:420px){
-  .strip-item .lbl{font-size:9.5px}
-  .strip-item .val{font-size:13px}
-}
- 
-/* ===== Nutrition UX tweaks (Murabbik) ===== */
-#feedInputBox{
-  background: rgba(14,160,90,.10);
-  border: 1px solid rgba(14,160,90,.25);
-  border-radius: 16px;
-  padding: 10px;
-  margin-top: 10px;
-}
-
-.mini-actions{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  justify-content:flex-start;
-  margin-top:10px;
-}
-
-.mini-btn{
-  background:#fff;
-  color:var(--green);
-  border:1px solid var(--green);
-  border-radius:10px;
-  padding:8px 12px;
-  font-size:13px;
-  font-weight:800;
-  min-height:40px;
-}
-
-.feed-summary{
-  margin-top:10px;
-  background:#f3fbf5;
-  border:1px dashed rgba(14,160,90,.35);
-  border-radius:14px;
-padding: 6px 0;
-  font-size:13px;
-}
-
-
-.feed-item{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:6px 0;        /* صغّر البادينج */
-  line-height:1.3;      /* مهم جداً */
-  border-bottom:1px solid #e6e6e6;
-}
+.feed-summary{margin-top:10px;background:#f3fbf5;border:1px dashed rgba(14,160,90,.35);border-radius:14px;padding:6px 0;font-size:13px}
+.feed-item{display:flex;align-items:center;justify-content:space-between;padding:6px 0;line-height:1.3;border-bottom:1px solid #e6e6e6}
 .feed-item:last-child{border-bottom:none}
-.feed-item label{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex:1;
-  min-width:0;
-  margin:0;
-}
-.rationPick{
-  width:18px;
-  height:18px;
-  margin:0;
-  accent-color:#0ea05a;
-  flex:0 0 auto;
-}
-.feed-item .a{
-  font-weight:800;
-  color:#0b7f47;
-  flex:1;
-  min-width:0;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-.feed-item .b{
-  opacity:.9;
-  white-space:nowrap;
-}
-/* ===== Feed Input (Premium Grid) — ONE clean version ===== */
-#feedInputBox #tbl{ border:0; background:transparent; min-width:unset; }
-#feedInputBox #tbl thead{ display:none; }
-#feedInputBox #tbl tbody{ display:block; }
+.feed-item label{display:flex;align-items:center;gap:8px;flex:1;min-width:0;margin:0}
+.rationPick{width:18px;height:18px;margin:0;accent-color:#0ea05a;flex:0 0 auto}
+.feed-item .a{font-weight:800;color:#0b7f47;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed-item .b{opacity:.9;white-space:nowrap}
+
+/* ===== Feed Input Grid ===== */
+#feedInputBox #tbl{border:0;background:transparent;min-width:unset}
+#feedInputBox #tbl thead{display:none}
+#feedInputBox #tbl tbody{display:block}
 #feedInputBox #tbl tbody tr{
   display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap:10px8px;
+  grid-template-columns:1fr 1fr;
+  gap:10px 8px;
   padding:8px;
   margin:10px 0;
   border:1px solid rgba(14,160,90,.20);
   border-radius:16px;
   background:#fff;
-
- grid-template-areas:
-  "name name"
-  "cat  pTon"
-  "dm   cp"
-  "pTonDM pTonDM"
- "pct  kg"
-"kgDM kgDM";
+  grid-template-areas:
+    "name name"
+    "cat pTon"
+    "dm cp"
+    "pTonDM pTonDM"
+    "pct kg"
+    "kgDM kgDM";
 }
-
-#feedInputBox #tbl td{
-  display:flex !important;
-  flex-direction:column !important;
-  gap:6px !important;
-  padding:0 !important;
-  border:0 !important;
-  background:transparent !important;
-}
-
-#feedInputBox #tbl td::before{
-  content:attr(data-label);
-  font-weight:900;
-  font-size:13px;
-  color:#0b7f47;
-}
-
-#feedInputBox #tbl td[data-col="name"]   { grid-area:name; }
-#feedInputBox #tbl td[data-col="cat"]    { grid-area:cat; }
-#feedInputBox #tbl td[data-col="dm"]     { grid-area:dm; }
-#feedInputBox #tbl td[data-col="cp"]     { grid-area:cp; }
-#feedInputBox #tbl td[data-col="pTon"]   { grid-area:pTon; }
-#feedInputBox #tbl td[data-col="pTonDM"] { grid-area:pTonDM; }
-#feedInputBox #tbl td[data-col="pct"]    { grid-area:pct; }
-#feedInputBox #tbl td[data-col="kg"]     { grid-area:kg; }
-#feedInputBox #tbl td[data-col="kgDM"]   { grid-area:kgDM; }
-#feedInputBox #tbl td[data-col="cost"]{display:none !important;}    
+#feedInputBox #tbl td{display:flex !important;flex-direction:column !important;gap:6px !important;padding:0 !important;border:0 !important;background:transparent !important}
+#feedInputBox #tbl td::before{content:attr(data-label);font-weight:900;font-size:13px;color:#0b7f47}
+#feedInputBox #tbl td[data-col="name"]{grid-area:name}
+#feedInputBox #tbl td[data-col="cat"]{grid-area:cat}
+#feedInputBox #tbl td[data-col="dm"]{grid-area:dm}
+#feedInputBox #tbl td[data-col="cp"]{grid-area:cp}
+#feedInputBox #tbl td[data-col="pTon"]{grid-area:pTon}
+#feedInputBox #tbl td[data-col="pTonDM"]{grid-area:pTonDM}
+#feedInputBox #tbl td[data-col="pct"]{grid-area:pct}
+#feedInputBox #tbl td[data-col="kg"]{grid-area:kg}
+#feedInputBox #tbl td[data-col="kgDM"]{grid-area:kgDM}
+#feedInputBox #tbl td[data-col="cost"]{display:none !important}
 #feedInputBox #tbl input,
-#feedInputBox #tbl select{
-
-  width:100%;
-  height:42px;
-  border-radius:12px;
-  border:1px solid #d7e7dd;
-  padding:8px 10px;
-  font-weight:800;
-  background:#f9fdfb;
-}
-
+#feedInputBox #tbl select{width:100%;height:42px;border-radius:12px;border:1px solid #d7e7dd;padding:8px 10px;font-weight:800;background:#f9fdfb}
 #feedInputBox #tbl input:focus,
-#feedInputBox #tbl select:focus{
-  outline:none;
-  border-color:#0ea05a;
-  background:#fff;
-  box-shadow:0 0 0 2px rgba(14,160,90,.14);
-}
-
+#feedInputBox #tbl select:focus{outline:none;border-color:#0ea05a;background:#fff;box-shadow:0 0 0 2px rgba(14,160,90,.14)}
 #feedInputBox #tbl .pTonDM,
 #feedInputBox #tbl .kgDM,
-#feedInputBox #tbl .cost{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  height:40px;
-  border-radius:12px;
-  border:1px dashed rgba(14,160,90,.25);
-  background:rgba(14,160,90,.06);
-  font-weight:900;
-  color:#0b7f47;
-}
+#feedInputBox #tbl .cost{display:flex;align-items:center;justify-content:center;height:40px;border-radius:12px;border:1px dashed rgba(14,160,90,.25);background:rgba(14,160,90,.06);font-weight:900;color:#0b7f47}
 
-@media (max-width:380px){
-  #feedInputBox #tbl tbody tr{
-    grid-template-columns:1fr;
-    grid-template-areas:
-      "name"
-      "cat"
-      "pTon"
-      "dm"
-      "cp"
-      "pTonDM"
-      "pct"
-      "kg"
-      "kgDM";
-  }
-}
+/* ===== Analysis cards ===== */
+#analysisSection{max-width:860px;margin:14px auto 22px;padding:0 12px}
+.kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:0}
+.kpi{position:relative;background:#fff !important;border:1px solid rgba(0,0,0,.06) !important;border-radius:14px;padding:10px;box-shadow:0 6px 18px rgba(15,23,42,.06);transition:transform .12s ease, box-shadow .12s ease;overflow:hidden}
+.kpi::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--kpi-accent,rgba(15,23,42,.18))}
+.kpi:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(15,23,42,.10)}
+.kpi .k{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;font-weight:900;color:#334155;line-height:1.2;min-height:28px;overflow:hidden}
+.kpi .v{font-weight:900;font-size:16px;margin-top:0;color:#0f172a}
+.kpi .vrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.kpi .arr{font-size:18px;line-height:1}
+.kpi-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:900;padding:4px 8px;border-radius:999px;background:rgba(15,23,42,.06);color:#0f172a;white-space:nowrap;flex:0 0 auto}
+.kpi-badge .dot{width:8px;height:8px;border-radius:50%;background:var(--kpi-accent,rgba(15,23,42,.18));box-shadow:0 0 0 3px rgba(15,23,42,.06)}
+.kpi.ok{--kpi-accent:#0ea05a}
+.kpi.warn{--kpi-accent:#f59e0b}
+.kpi.bad{--kpi-accent:#ef4444}
+.kpi.ok .kpi-badge{background:rgba(14,160,90,.10);color:#0b7f47}
+.kpi.warn .kpi-badge{background:rgba(245,158,11,.12);color:#92400e}
+.kpi.bad .kpi-badge{background:rgba(239,68,68,.10);color:#991b1b}
+.kpi-meter{margin-top:8px;height:7px;background:rgba(15,23,42,.07);border-radius:999px;overflow:hidden}
+.kpi-meter > span{display:block;height:100%;width:0%;background:var(--kpi-accent,rgba(15,23,42,.18));border-radius:999px;transition:width .18s ease}
+.kpi-hint{margin-top:6px;font-size:11px;font-weight:800;color:#334155;opacity:.9;line-height:1.2}
+#advancedKPIs{margin-top:10px}
+#nutritionKPIs .kpi.rumen-feature{grid-column:1 / -1;padding:14px 14px 12px;border-radius:18px;background:linear-gradient(180deg,#fff 0%,#f7fff9 100%) !important;border:1px solid rgba(14,160,90,.24) !important;box-shadow:0 10px 26px rgba(15,23,42,.08)}
+#nutritionKPIs .kpi.rumen-feature .k{font-size:13px;color:#0b7f47}
+#nutritionKPIs .kpi.rumen-feature .v{font-size:18px;line-height:1.25;color:#0f172a}
+#nutritionKPIs .kpi.rumen-feature .kpi-hint{margin-top:8px;font-size:12px;line-height:1.55;font-weight:800;color:#475569}
+#nutritionKPIs .kpi.rumen-feature .kpi-meter{margin-top:10px}
 
+/* ===== Milk and animal inputs ===== */
+.milk-inline-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;align-items:start}
+.milk-inline-row .grow{min-width:0}
+.milk-inline-row label{display:block;margin-bottom:4px;font-size:11px;font-weight:800;color:#334155;line-height:1.15;min-height:24px}
+.milk-inline-row input{width:100%;min-height:40px;padding:8px;border-radius:12px}
 
-/* === Murabbik KPI Visual Intelligence (surgical, no new buttons) === */
-.kpi{
-  position:relative;
-  background:#fff !important;
-  border:1px solid rgba(0,0,0,.06) !important;
-  box-shadow:0 6px 18px rgba(15,23,42,.06);
-  transition:transform .12s ease, box-shadow .12s ease;
-}
-.kpi::before{
-  content:"";
-  position:absolute;
-  inset:0 auto 0 0;
-  width:5px;
-  background:var(--kpi-accent, rgba(15,23,42,.18));
-}
-.kpi:hover{ transform:translateY(-1px); box-shadow:0 10px 24px rgba(15,23,42,.10); }
-.kpi .k{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:8px;
-}
-.kpi-badge{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  font-size:11px;
-  font-weight:900;
-  padding:4px 8px;
-  border-radius:999px;
-  background:rgba(15,23,42,.06);
-  color:#0f172a;
-  white-space:nowrap;
-}
-.kpi-badge .dot{
-  width:8px;height:8px;border-radius:50%;
-  background:var(--kpi-accent, rgba(15,23,42,.18));
-  box-shadow:0 0 0 3px rgba(15,23,42,.06);
-}
-.kpi.ok{ --kpi-accent:#0ea05a; }
-.kpi.warn{ --kpi-accent:#f59e0b; }
-.kpi.bad{ --kpi-accent:#ef4444; }
-.kpi.ok .kpi-badge{ background:rgba(14,160,90,.10); color:#0b7f47; }
-.kpi.warn .kpi-badge{ background:rgba(245,158,11,.12); color:#92400e; }
-.kpi.bad .kpi-badge{ background:rgba(239,68,68,.10); color:#991b1b; }
-
-.kpi-meter{
-  margin-top:8px;
-  height:7px;
-  background:rgba(15,23,42,.07);
-  border-radius:999px;
-  overflow:hidden;
-}
-.kpi-meter > span{
-  display:block;
-  height:100%;
-  width:0%;
-  background:var(--kpi-accent, rgba(15,23,42,.18));
-  border-radius:999px;
-  transition:width .18s ease;
-}
-.kpi-hint{
-  margin-top:6px;
-  font-size:11px;
-  font-weight:800;
-  color:#334155;
-  opacity:.9;
-  line-height:1.2;
-}
-.milk-inline-row{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:6px;
-  align-items:start;
-}
-
-.milk-inline-row .grow{
-  min-width:0;
-}
-
-.milk-inline-row label{
-  display:block;
-  margin-bottom:4px;
-  font-size:11px;
-  font-weight:800;
-  color:#334155;
-  line-height:1.15;
-  min-height:24px;
-}
-
-.milk-inline-row input{
-  width:100%;
-  min-height:40px;
-  padding:8px 8px;
-  border-radius:12px;
-}
-
-@media (max-width:420px){
-  .milk-inline-row{
-    grid-template-columns:repeat(3,minmax(0,1fr));
-    gap:5px;
-  }
-
-  .milk-inline-row label{
-    font-size:10px;
-    min-height:22px;
-  }
-
-  .milk-inline-row input{
-    min-height:38px;
-    padding:7px 7px;
-  }
-}
-/* ===== Murabbik Signature Rumen Health Card ===== */
-#nutritionKPIs .kpi.rumen-feature{
-  grid-column:1 / -1;
-  padding:14px 14px 12px;
-  border-radius:18px;
-  background:linear-gradient(180deg,#ffffff 0%,#f7fff9 100%) !important;
-  border:1px solid rgba(14,160,90,.24) !important;
-  box-shadow:0 10px 26px rgba(15,23,42,.08);
-}
-
-#nutritionKPIs .kpi.rumen-feature .k{
-  font-size:13px;
-  color:#0b7f47;
-}
-
-#nutritionKPIs .kpi.rumen-feature .v{
-  font-size:18px;
-  line-height:1.25;
-  color:#0f172a;
-}
-
-#nutritionKPIs .kpi.rumen-feature .kpi-hint{
-  margin-top:8px;
-  font-size:12px;
-  line-height:1.55;
-  font-weight:800;
-  color:#475569;
-}
-
-#nutritionKPIs .kpi.rumen-feature .kpi-meter{
-  margin-top:10px;
-}    
-
-
-/* ===== Murabbik Custom Premix Modal ===== */
-.mbk-premix-btn{
-  width:100%;
-  min-height:44px;
-  border-radius:12px;
-  border:1px solid rgba(14,160,90,.35);
-  background:#f3fbf5;
-  color:#0b7f47;
-  font-weight:900;
-}
-.mbk-modal-backdrop{
-  position:fixed;
-  inset:0;
-  z-index:9999;
-  background:rgba(15,23,42,.42);
-  display:none;
-  align-items:flex-end;
-  justify-content:center;
-  padding:12px;
-}
+/* ===== Custom Premix Modal ===== */
+.mbk-premix-btn{width:100%;min-height:44px;border-radius:12px;border:1px solid rgba(14,160,90,.35);background:#f3fbf5;color:#0b7f47;font-weight:900}
+.mbk-modal-backdrop{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.42);display:none;align-items:flex-end;justify-content:center;padding:12px}
 .mbk-modal-backdrop.show{display:flex}
-.mbk-modal{
-  width:min(760px,100%);
-  max-height:88vh;
-  overflow:auto;
-  background:#fff;
-  border-radius:20px;
-  border:1px solid #e5e7eb;
-  box-shadow:0 20px 60px rgba(15,23,42,.24);
-  padding:14px;
-}
-.mbk-modal-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
-  margin-bottom:10px;
-}
+.mbk-modal{width:min(760px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:20px;border:1px solid #e5e7eb;box-shadow:0 20px 60px rgba(15,23,42,.24);padding:14px}
+.mbk-modal-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
 .mbk-modal-title{font-weight:900;color:#0b7f47;font-size:17px}
 .mbk-modal-close{background:#fff;border:1px solid #e5e7eb;color:#334155;min-height:38px;padding:6px 10px}
 .mbk-premix-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -544,585 +206,44 @@ padding: 6px 0;
 .mbk-field input,.mbk-field select{width:100%;background:#f9fdfb;font-weight:800}
 .mbk-premix-note{font-size:12px;font-weight:800;line-height:1.6;color:#475569;background:#f8fafc;border:1px solid #eef2f7;border-radius:14px;padding:9px;margin:8px 0}
 .mbk-premix-section{font-weight:900;color:#0b7f47;margin:12px 0 6px;border-top:1px dashed #d7e7dd;padding-top:10px}
-@media (max-width:640px){.mbk-premix-grid{grid-template-columns:1fr}.mbk-modal{border-radius:18px}}
-/* ===== Nutrition page-only visual cleanup — CSS only ===== */
-body[data-page="nutrition"]{
-  padding-bottom:92px;
-}
 
-body[data-page="nutrition"] .mbk-form{
-  width:100%;
-  max-width:860px;
-  margin:0 auto;
-  padding-bottom:96px;
-}
-
-body[data-page="nutrition"] .mbk-card,
-body[data-page="nutrition"] .card,
-body[data-page="nutrition"] #analysisSection{
-  width:100%;
-  max-width:860px;
-  margin-left:auto;
-  margin-right:auto;
-}
-
-/* قائمة العليقة */
-body[data-page="nutrition"] #feedSummaryBox.feed-summary{
-  margin-top:10px;
-  background:#f3fbf5;
-  border:1px dashed rgba(14,160,90,.35);
-  border-radius:14px;
-  padding:0;
-  overflow:hidden;
-  font-size:13px;
-}
-
-body[data-page="nutrition"] #feedSummaryBox.feed-summary:empty{
-  display:none !important;
-}
-
-body[data-page="nutrition"] #feedSummaryBox .feed-item{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  min-height:48px;
-  padding:8px 12px;
-  line-height:1.35;
-  border-bottom:1px solid rgba(14,160,90,.13);
-  background:#f3fbf5;
-}
-
-body[data-page="nutrition"] #feedSummaryBox .feed-item:last-child{
-  border-bottom:none;
-}
-
-body[data-page="nutrition"] #feedSummaryBox .feed-item label{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex:1;
-  min-width:0;
-  margin:0;
-}
-
-body[data-page="nutrition"] #feedSummaryBox .rationPick{
-  width:18px;
-  height:18px;
-  min-height:18px;
-  margin:0;
-  accent-color:#0ea05a;
-  flex:0 0 auto;
-}
-
-body[data-page="nutrition"] #feedSummaryBox .feed-item .a{
-  flex:1;
-  min-width:0;
-  font-size:13px;
-  font-weight:900;
-  color:#0b7f47;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-
-body[data-page="nutrition"] #feedSummaryBox .feed-item .b{
-  flex:0 0 auto;
-  font-size:13px;
-  font-weight:900;
-  color:#334155;
-  white-space:nowrap;
-  direction:rtl;
-}
-
-/* فورم الخامة */
-body[data-page="nutrition"] #feedInputBox{
-  background:rgba(14,160,90,.10);
-  border:1px solid rgba(14,160,90,.25);
-  border-radius:16px;
-  padding:10px;
-  margin-top:10px;
-  overflow-x:hidden;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl{
-  width:100%;
-  min-width:unset;
-  border:0;
-  background:transparent;
-}
-
-/* التحليل */
-body[data-page="nutrition"] #nutritionKPIs{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:8px;
-}
-
-body[data-page="nutrition"] #nutritionKPIs .kpi.rumen-feature,
-body[data-page="nutrition"] #nutritionKPIs .kpi[data-key="rumen"]{
-  grid-column:1 / -1;
-  padding:14px;
-  border-radius:18px;
-  background:linear-gradient(180deg,#fff 0%,#f7fff9 100%) !important;
-  border:1px solid rgba(14,160,90,.24) !important;
-}
-
-/* العرض المتقدم — شكل فقط */
-body[data-page="nutrition"] #advancedKPIs{
-  margin-top:12px;
-}
-
-body[data-page="nutrition"] #advancedKPIs .kpi,
-body[data-page="nutrition"] #advancedKPIs .advanced-gauge-card{
-  border-radius:18px;
-  box-shadow:0 8px 22px rgba(15,23,42,.07);
-}
-
-/* زر الحفظ Sticky */
-body[data-page="nutrition"] #nutritionForm{
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:0;
-  z-index:9998;
-  background:#fff;
-  border-top:1px solid #e2e8f0;
-  padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-  margin:0 !important;
-}
-
-body[data-page="nutrition"] #saveEvent{
-  width:min(860px,100%) !important;
-  max-width:860px;
-  margin:0 auto;
-  display:block;
-  min-height:52px;
-  border-radius:16px;
-  font-size:16px;
-}
-
-/* ===== Murabbik Advanced Gauges — local nutrition only ===== */
-body[data-page="nutrition"] .nutrition-advanced-card{
-  background:#fff !important;
-  border:1px solid rgba(18,160,92,.18) !important;
-  border-radius:20px !important;
-  padding:12px !important;
-  box-shadow:0 8px 24px rgba(15,23,42,.06) !important;
-}
-
-body[data-page="nutrition"] .nutrition-advanced-card h3{
-  margin:0 0 12px;
-  font-size:16px;
-  font-weight:1000;
-  color:#0f172a;
-}
-
-body[data-page="nutrition"] #advancedKPIs{
-  display:block !important;
-  margin:0 !important;
-}
-
-body[data-page="nutrition"] .advanced-gauge-card{
-  position:relative;
-  overflow:hidden;
-  background:#fff;
-  border:1px solid rgba(15,23,42,.08);
-  border-radius:22px;
-  padding:14px 12px 12px;
-  margin:12px 0;
-  box-shadow:0 8px 24px rgba(15,23,42,.07);
-}
-
-body[data-page="nutrition"] .advanced-gauge-card::before{
-  content:"";
-  position:absolute;
-  top:0;
-  bottom:0;
-  right:0;
-  width:6px;
-  background:var(--adv-accent,#cbd5e1);
-}
-
-body[data-page="nutrition"] .advanced-gauge-card.ok{--adv-accent:#12a05c}
-body[data-page="nutrition"] .advanced-gauge-card.warn{--adv-accent:#f59e0b}
-body[data-page="nutrition"] .advanced-gauge-card.bad{--adv-accent:#ef4444}
-
-body[data-page="nutrition"] .advanced-gauge-head{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  margin-bottom:10px;
-}
-
-body[data-page="nutrition"] .advanced-gauge-title{
-  font-size:16px;
-  font-weight:1000;
-  color:#0f172a;
-  line-height:1.25;
-}
-
-body[data-page="nutrition"] .advanced-gauge-badge{
-  flex:0 0 auto;
-  padding:6px 10px;
-  border-radius:999px;
-  font-size:13px;
-  font-weight:1000;
-  background:rgba(15,23,42,.06);
-  color:#334155;
-}
-
-body[data-page="nutrition"] .advanced-gauge-card.ok .advanced-gauge-badge{
-  background:rgba(18,160,92,.10);
-  color:#0b7f47;
-}
-
-body[data-page="nutrition"] .advanced-gauge-card.warn .advanced-gauge-badge{
-  background:rgba(245,158,11,.13);
-  color:#92400e;
-}
-
-body[data-page="nutrition"] .advanced-gauge-card.bad .advanced-gauge-badge{
-  background:rgba(239,68,68,.11);
-  color:#991b1b;
-}
-
-body[data-page="nutrition"] .advanced-gauge-body{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 150px minmax(0,1fr);
-  align-items:end;
-  gap:10px;
-  direction:ltr;
-}
-
-body[data-page="nutrition"] .advanced-side{
-  direction:rtl;
-  min-width:0;
-  text-align:center;
-  padding-bottom:4px;
-}
-
-body[data-page="nutrition"] .advanced-side-label{
-  font-size:12px;
-  font-weight:900;
-  color:#64748b;
-  margin-bottom:5px;
-}
-
-body[data-page="nutrition"] .advanced-side-value{
-  font-size:17px;
-  font-weight:1000;
-  color:#0f172a;
-  line-height:1.25;
-  word-break:break-word;
-}
-
-body[data-page="nutrition"] .supply-side{
-  grid-column:1;
-}
-
-body[data-page="nutrition"] .need-side{
-  grid-column:3;
-}
-
-body[data-page="nutrition"] .advanced-gauge{
-  grid-column:2;
-  position:relative;
-  width:150px;
-  height:88px;
-  margin:0 auto;
-}
-
-body[data-page="nutrition"] .advanced-gauge-arc{
-  position:absolute;
-  left:0;
-  right:0;
-  bottom:0;
-  height:76px;
-  border-radius:150px 150px 0 0;
-  background:
-    conic-gradient(
-      from 270deg at 50% 100%,
-      #ef4444 0deg 38deg,
-      #f59e0b 38deg 72deg,
-      #22c55e 72deg 108deg,
-      #fbbf24 108deg 144deg,
-      #dc2626 144deg 180deg,
-      transparent 180deg 360deg
-    );
-  box-shadow:inset 0 -8px 14px rgba(15,23,42,.10);
-}
-
-body[data-page="nutrition"] .advanced-gauge-arc::after{
-  content:"";
-  position:absolute;
-  left:22px;
-  right:22px;
-  bottom:0;
-  height:50px;
-  border-radius:110px 110px 0 0;
-  background:#fff;
-}
-
-body[data-page="nutrition"] .advanced-gauge-needle{
-  position:absolute;
-  left:50%;
-  bottom:4px;
-  width:4px;
-  height:66px;
-  border-radius:999px;
-  background:#0f172a;
-  transform-origin:50% 100%;
-  transform:
-    translateX(-50%)
-    rotate(calc((var(--needle, 50) * 1.8deg) - 90deg));
-  box-shadow:0 2px 8px rgba(15,23,42,.22);
-  z-index:3;
-}
-
-body[data-page="nutrition"] .advanced-gauge-hub{
-  position:absolute;
-  left:50%;
-  bottom:0;
-  width:18px;
-  height:18px;
-  border-radius:50%;
-  background:#0f172a;
-  border:4px solid #fff;
-  transform:translateX(-50%);
-  z-index:4;
-  box-shadow:0 2px 8px rgba(15,23,42,.22);
-}
-
-body[data-page="nutrition"] .advanced-gauge-note{
-  margin-top:10px;
-  padding:9px 10px;
-  border-radius:14px;
-  background:#f8fafc;
-  color:#475569;
-  font-size:12px;
-  font-weight:800;
-  line-height:1.55;
-}
-
-body[data-page="nutrition"] .nutrition-advanced-toggle{
-  width:100%;
-  min-height:56px;
-  margin:12px 0 8px !important;
-  border-radius:18px;
-  background:#0ea05a !important;
-  color:#fff !important;
-  border:0 !important;
-  font-size:17px;
-  font-weight:1000;
+@media (max-width:640px){
+  .mbk-form{padding-inline:0}
+  .row.stack > *{flex:1 1 100%}
+  .info{display:grid;gap:8px;margin:10px auto;max-width:860px;padding:0 12px}
+  .info .pill{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:10px 12px;border-radius:14px;line-height:1.1}
+  .info .pill b{font-size:15px}
+  .info .pill .k{font-size:12px;opacity:.75}
+  .kpi{padding:10px}
+  .mbk-premix-grid{grid-template-columns:1fr}
+  .mbk-modal{border-radius:18px}
 }
 
 @media (max-width:420px){
-  body[data-page="nutrition"] .advanced-gauge-card{
-    padding:12px 10px 10px;
-    border-radius:20px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-title{
-    font-size:15px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-badge{
-    font-size:12px;
-    padding:5px 9px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-body{
-    grid-template-columns:minmax(0,1fr) 132px minmax(0,1fr);
-    gap:7px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge{
-    width:132px;
-    height:82px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-arc{
-    height:70px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-arc::after{
-    left:20px;
-    right:20px;
-    height:46px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-needle{
-    height:60px;
-  }
-
-  body[data-page="nutrition"] .advanced-side-label{
-    font-size:11px;
-  }
-
-  body[data-page="nutrition"] .advanced-side-value{
-    font-size:15px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-note{
-    font-size:11px;
-  }
-}    
-
-/* ===== Advanced one-card final override ===== */
-body[data-page="nutrition"] #advancedKPIs{
-  display:flex !important;
-  flex-direction:column !important;
-  gap:12px !important;
-  margin:0 !important;
+  .strip-item .lbl{font-size:9.5px}
+  .strip-item .val{font-size:13px}
+  .kpi{padding:9px}
+  .kpi .v{font-size:16px}
+  .milk-inline-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+  .milk-inline-row label{font-size:10px;min-height:22px}
+  .milk-inline-row input{min-height:38px;padding:7px}
 }
 
-body[data-page="nutrition"] .advanced-gauge-card{
-  display:block !important;
-  width:100% !important;
-  box-sizing:border-box !important;
-  background:#fff !important;
-}
-
-body[data-page="nutrition"] .advanced-gauge-body{
-  display:grid !important;
-  grid-template-columns:minmax(70px,1fr) minmax(118px,138px) minmax(70px,1fr) !important;
-  align-items:end !important;
-  gap:8px !important;
-  direction:ltr !important;
-}
-
-body[data-page="nutrition"] .advanced-side{
-  background:transparent !important;
-  border:0 !important;
-  box-shadow:none !important;
-  padding:0 0 4px !important;
-  min-width:0 !important;
-}
-
-body[data-page="nutrition"] .advanced-side-label{
-  font-size:11px !important;
-  font-weight:900 !important;
-  color:#64748b !important;
-  margin-bottom:4px !important;
-}
-
-body[data-page="nutrition"] .advanced-side-value{
-  font-size:14px !important;
-  font-weight:1000 !important;
-  line-height:1.25 !important;
-  color:#0f172a !important;
-}
-
-body[data-page="nutrition"] .advanced-gauge{
-  width:132px !important;
-  height:82px !important;
-}
-
-body[data-page="nutrition"] .advanced-gauge-arc{
-  height:70px !important;
-}
-
-body[data-page="nutrition"] .advanced-gauge-arc::after{
-  left:20px !important;
-  right:20px !important;
-  height:46px !important;
-}
-
-body[data-page="nutrition"] .advanced-gauge-needle{
-  height:60px !important;
-}
-
-@media (max-width:390px){
-  body[data-page="nutrition"] .advanced-gauge-body{
-    grid-template-columns:minmax(58px,1fr) minmax(108px,122px) minmax(58px,1fr) !important;
-    gap:5px !important;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge{
-    width:116px !important;
-    height:76px !important;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-arc{
-    height:64px !important;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-arc::after{
-    left:18px !important;
-    right:18px !important;
-    height:42px !important;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-needle{
-    height:55px !important;
-  }
-
-  body[data-page="nutrition"] .advanced-side-value{
-    font-size:13px !important;
+@media (max-width:380px){
+  #feedInputBox #tbl tbody tr{
+    grid-template-columns:1fr 1fr;
+    grid-template-areas:
+      "name name"
+      "cat pTon"
+      "dm cp"
+      "pTonDM pct"
+      "kg kgDM";
   }
 }
-
-
-/* ===== Murabbik Advanced Gauges live behavior ===== */
-body[data-page="nutrition"] .advanced-gauge-card{
-  transition:border-color .2s ease, box-shadow .2s ease, background .2s ease;
-}
-
-body[data-page="nutrition"] .advanced-gauge-card.missing{
-  --adv-accent:#94a3b8;
-}
-
-body[data-page="nutrition"] .advanced-gauge-card.missing .advanced-gauge-badge{
-  background:rgba(148,163,184,.16);
-  color:#475569;
-}
-
-body[data-page="nutrition"] .advanced-gauge-card.missing .advanced-gauge-arc{
-  filter:grayscale(.65);
-  opacity:.62;
-}
-
-body[data-page="nutrition"] .advanced-gauge-card.missing .advanced-gauge-needle{
-  opacity:.55;
-}
-
-body[data-page="nutrition"] .advanced-gauge-readout{
-  position:absolute;
-  left:50%;
-  bottom:24px;
-  transform:translateX(-50%);
-  z-index:5;
-  min-width:46px;
-  text-align:center;
-  font-size:12px;
-  font-weight:1000;
-  color:#0f172a;
-  background:rgba(255,255,255,.92);
-  border:1px solid rgba(15,23,42,.08);
-  border-radius:999px;
-  padding:3px 7px;
-  box-shadow:0 4px 12px rgba(15,23,42,.10);
-}
-
-body[data-page="nutrition"] .advanced-gauge-needle{
-  transition:transform .28s ease;
-}
-
-@media (max-width:420px){
-  body[data-page="nutrition"] .advanced-gauge-readout{
-    bottom:22px;
-    font-size:11px;
-    min-width:42px;
-    padding:3px 6px;
-  }
-}
-
 
 </style>
 </head>
-<body data-page="nutrition">
+<body>
 <div class="mbk-form">
  <header class="mbk-head">
   <a href="/dashboard.html" class="mbk-back">←</a>
@@ -1170,7 +291,7 @@ body[data-page="nutrition"] .advanced-gauge-needle{
   <div class="strip-item"><span class="lbl">الحالة الجسمانية BCS</span><span class="val" id="ctxBCS_txt">—</span></div>
   <div class="strip-item"><span class="lbl">رقم الموسم</span><span class="val" id="ctxParity_txt">—</span></div>
 </div>
-  <!-- حقول مخفية يستخدمها سكريبت الصفحة الحالي -->
+  <!-- حقول مخفية يستخدمها السكريبت الداخلي للحفظ والتحليل -->
 
     <input id="ctxDIM" type="number" inputmode="numeric" step="1" min="0" style="display:none">
     <select id="ctxSpecies" style="display:none"><option value="">—</option><option value="بقر">بقر</option><option value="جاموس">جاموس</option></select>
@@ -1426,23 +547,16 @@ body[data-page="nutrition"] .advanced-gauge-needle{
     <div class="row stack">
        <!-- ===== Analysis (Bottom) ===== -->
 <div id="analysisSection">
-  <div class="mbk-card analysis-main-card" id="nutritionAnalysisCard">
+  <div class="mbk-card" id="nutritionAnalysisCard">
     <h3>📊 التحليل الغذائي للعليقة</h3>
-    <div id="nutritionKPIs" class="kpi-grid nutrition-main-grid"></div>
+    <div id="nutritionKPIs" class="kpi-grid"></div>
+    <button id="toggleAdvancedBtn" class="btn btn-ghost" type="button" style="margin-top:10px">عرض متقدم</button>
+<div id="advancedKPIs" style="display:none"></div>
   </div>
-
-  <button id="toggleAdvancedBtn" class="btn btn-ghost nutrition-advanced-toggle" type="button">
-    عرض متقدم
-  </button>
-
-  <div class="mbk-card nutrition-advanced-card" id="advancedCard" style="display:none">
-    <h3>🔬 العرض المتقدم</h3>
-    <div id="advancedKPIs" class="advanced-grid"></div>
-  </div>
-
-  <div class="mbk-card economic-main-card" id="economicAnalysisCard">
+     
+  <div class="mbk-card" id="economicAnalysisCard">
     <h3>💰 التحليل الاقتصادي</h3>
-    <div id="economicKPIs" class="kpi-grid economic-main-grid"></div>
+    <div id="economicKPIs" class="kpi-grid"></div>
   </div>
 </div>
 </div>
@@ -1465,12 +579,6 @@ body[data-page="nutrition"] .advanced-gauge-needle{
   </div>
 </div>
 
-<!-- ===== سكريبت الصفحة الحالي: جلسة السيرفر فقط ===== -->
-
-<!-- الأساس التحليلي + الذكاء (لا تلمس ترتيبها) -->
-
-
-<!-- الكور + تتبّع + منطق الحفظ (لا تغيّر واجهتك) -->
 <script>
 (() => {
   "use strict";
@@ -1979,387 +1087,27 @@ body[data-page="nutrition"] .advanced-gauge-needle{
     }
   }
 
-function latinDigits(v) {
-  const map = {
-    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
-    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
-  };
+  function cardHtml(card = {}) {
+    const status = clean(card.status || card.level || "ok");
 
-  return clean(v).replace(/[٠-٩۰-۹]/g, d => map[d] || d);
-}
-
-function firstNumber(v) {
-  if (v === null || v === undefined || v === "") return null;
-  if (Number.isFinite(Number(v))) return Number(v);
-
-  const s = latinDigits(v).replace(/,/g, "");
-  const m = s.match(/-?\d+(?:\.\d+)?/);
-
-  return m ? Number(m[0]) : null;
-}
-
-function statusClassFrom(card = {}, ratio = null) {
-  const raw = clean(card.status || card.state || card.level || "").toLowerCase();
-
-  if (ratio !== null) {
-    if (ratio < 80) return "bad";
-    if (ratio < 95) return "warn";
-    if (ratio <= 110) return "ok";
-    if (ratio <= 130) return "warn";
-    return "bad";
-  }
-
-  if (
-    raw.includes("bad") ||
-    raw.includes("danger") ||
-    raw.includes("critical") ||
-    raw.includes("error")
-  ) return "bad";
-
-  if (
-    raw.includes("warn") ||
-    raw.includes("watch") ||
-    raw.includes("alert")
-  ) return "warn";
-
-  return "ok";
-}
-
-function statusLabelFrom(cls, ratio = null) {
-  if (ratio !== null) {
-    if (ratio < 80) return "ناقص جدًا";
-    if (ratio < 95) return "ناقص";
-    if (ratio <= 110) return "مناسب";
-    if (ratio <= 130) return "زائد";
-    return "زائد جدًا";
-  }
-
-  if (cls === "bad") return "خطر";
-  if (cls === "warn") return "متابعة";
-  return "مناسب";
-}
-
-function cardHtml(card = {}) {
-  const key = clean(card.key || card.metric || card.id || "");
-  const rawState = clean(card.status || card.state || card.level || "ok").toLowerCase();
-
-  const cls =
-    rawState.includes("bad") ||
-    rawState.includes("danger") ||
-    rawState.includes("critical") ||
-    rawState.includes("error")
-      ? "bad"
-      : (
-        rawState.includes("warn") ||
-        rawState.includes("watch") ||
-        rawState.includes("alert")
+    const cls =
+      status.includes("bad") || status.includes("danger") || status.includes("error")
+        ? "bad"
+        : (status.includes("warn") || status.includes("watch")
           ? "warn"
-          : "ok"
-      );
+          : "ok");
 
-  const isRumen =
-    key.includes("rumen") ||
-    clean(card.title).includes("الكرش") ||
-    clean(card.title).includes("الألياف");
-
-  const label =
-    card.stateLabel ||
-    card.badge ||
-    (cls === "ok" ? "مناسب" : cls === "warn" ? "متابعة" : "خطر");
-
-  const value =
-    card.valueText ??
-    card.value ??
-    card.actual ??
-    card.message ??
-    "—";
-
-  const hint =
-    card.targetText ||
-    card.message ||
-    card.subText ||
-    card.hint ||
-    card.reason ||
-    "";
-
-  const pointer = num(card.pointerPct);
-  const meterWidth = pointer === null ? 0 : Math.max(0, Math.min(100, pointer));
-
-  return `
-    <div class="kpi ${cls}${isRumen ? " rumen-feature" : ""}" data-key="${escapeHtml(key)}">
-      <div class="k">
-        <span>${escapeHtml(card.title || card.name || key || "مؤشر")}</span>
-        <span class="kpi-badge"><span class="dot"></span>${escapeHtml(label)}</span>
-      </div>
-
-      <div class="v">${escapeHtml(value)}</div>
-
-      <div class="kpi-meter"><span style="width:${meterWidth}%"></span></div>
-
-      ${hint ? `<div class="kpi-hint">${escapeHtml(hint)}</div>` : ""}
-    </div>
-  `;
-}
-
-function advValueText(v, unit = '', d = 1) {
-  const n = firstNumber(v);
-  if (n === null) return clean(v) || '—';
-  const digits = Math.abs(n) >= 100 ? 0 : d;
-  return `${fmt(n, digits)}${unit ? ' ' + unit : ''}`;
-}
-
-function advRuleKind(rule) {
-  const r = clean(rule || 'match').toLowerCase();
-
-  if (r.includes('max') || r.includes('safe') || r.includes('starch') || r.includes('fat')) return 'max';
-  if (r.includes('min') || r.includes('ndf') || r.includes('fiber') || r.includes('rough')) return 'min';
-
-  return 'match';
-}
-
-function advSideLabels(rule) {
-  const kind = advRuleKind(rule);
-
-  if (kind === 'min') {
-    return { supply: 'القيمة الحالية', need: 'الحد الأدنى' };
-  }
-
-  if (kind === 'max') {
-    return { supply: 'القيمة الحالية', need: 'الحد الآمن' };
-  }
-
-  return { supply: 'الإمداد', need: 'الاحتياج' };
-}
-
-function advLiveNote(rule, stat) {
-  const kind = advRuleKind(rule);
-
-  if (!stat.hasData) return 'الجوج ينتظر بيانات التحليل الفعلية.';
-
-  if (kind === 'min') {
-    return `القيمة الحالية = ${stat.ratioText} من الحد الأدنى.`;
-  }
-
-  if (kind === 'max') {
-    return `القيمة الحالية = ${stat.ratioText} من الحد الآمن.`;
-  }
-
-  return `تغطية الإمداد للاحتياج: ${stat.ratioText}`;
-}
-
-function advStatus(rule, supply, need) {
-  const kind = advRuleKind(rule);
-  const s = firstNumber(supply);
-  const n = firstNumber(need);
-
-  if (s === null || n === null || n <= 0) {
-    return {
-      hasData: false,
-      ratio: null,
-      ratioText: 'لا بيانات',
-      cls: 'missing',
-      label: 'بيانات غير كافية',
-      needle: 50
-    };
-  }
-
-  const ratio = (s / n) * 100;
-  let cls = 'ok';
-  let label = 'مناسب';
-
-  if (kind === 'max') {
-    if (ratio <= 85) {
-      cls = 'ok'; label = 'آمن';
-    } else if (ratio <= 100) {
-      cls = 'warn'; label = 'قريب من الحد';
-    } else if (ratio <= 115) {
-      cls = 'warn'; label = 'فوق الحد';
-    } else {
-      cls = 'bad'; label = 'خطر';
-    }
-  } else if (kind === 'min') {
-    if (ratio < 80) {
-      cls = 'bad'; label = 'أقل من الحد';
-    } else if (ratio < 100) {
-      cls = 'warn'; label = 'قريب من الحد';
-    } else {
-      cls = 'ok'; label = 'مستوفي الحد';
-    }
-  } else {
-    if (ratio < 80) {
-      cls = 'bad'; label = 'ناقص جدًا';
-    } else if (ratio < 95) {
-      cls = 'warn'; label = 'ناقص';
-    } else if (ratio <= 110) {
-      cls = 'ok'; label = 'مناسب';
-    } else if (ratio <= 130) {
-      cls = 'warn'; label = 'زائد';
-    } else {
-      cls = 'bad'; label = 'زائد جدًا';
-    }
-  }
-
-  return {
-    hasData: true,
-    ratio,
-    ratioText: `${fmt(ratio, 0)}%`,
-    cls,
-    label,
-    needle: Math.max(0, Math.min(100, ratio / 2))
-  };
-}
-
-function advancedMetricCards(analysis = {}, panels = {}) {
-  const totals = analysis.totals || {};
-  const nutrition = analysis.nutrition || {};
-  const targets = analysis.targets || {};
-
-  const cards = [
-    {
-      key: 'dmi',
-      title: 'المادة الجافة',
-      rule: 'match',
-      supply: totals.dmKg ?? totals.totalDMKg,
-      need: targets.dmiTarget,
-      unit: 'كجم',
-      note: 'مقارنة المادة الجافة المقدمة مع الاحتياج المتوقع.'
-    },
-    {
-      key: 'mp',
-      title: 'البروتين الممثل MP',
-      rule: 'match',
-      supply: nutrition.mpSupplyG,
-      need: targets.mpTargetG,
-      unit: 'جم/يوم',
-      note: nutrition.mpBalanceG !== null && nutrition.mpBalanceG !== undefined
-        ? `الفرق التقريبي: ${advValueText(nutrition.mpBalanceG, 'جم', 0)}`
-        : ''
-    },
-    {
-      key: 'ndf',
-      title: 'ألياف NDF',
-      rule: 'min',
-      supply: nutrition.ndfPctActual,
-      need: targets.ndfTarget,
-      unit: '%',
-      needText: targets.ndfTarget !== null && targets.ndfTarget !== undefined ? `حد أدنى ${advValueText(targets.ndfTarget, '%', 1)}` : '',
-      note: 'NDF ليست احتياجًا ثابتًا؛ تُقرأ كحد أدنى آمن لدعم الكرش.'
-    },
-    {
-      key: 'penDF',
-      title: 'الألياف المؤثرة peNDF',
-      rule: 'min',
-      supply: nutrition.peNDFPctActual,
-      need: targets.peNDFMin,
-      unit: '%',
-      needText: targets.peNDFMin !== null && targets.peNDFMin !== undefined ? `حد أدنى ${advValueText(targets.peNDFMin, '%', 1)}` : '',
-      note: 'peNDF تُقرأ كحد أدنى للألياف المؤثرة والاجترار، وليست احتياج إنتاج مباشر.'
-    },
-    {
-      key: 'roughage',
-      title: 'الخشن في العليقة',
-      rule: 'min',
-      supply: nutrition.roughPctDM,
-      need: targets.roughageMin,
-      unit: '%',
-      needText: targets.roughageMin !== null && targets.roughageMin !== undefined ? `حد أدنى ${advValueText(targets.roughageMin, '%', 1)}` : '',
-      note: 'الخشن يُقرأ كحد أدنى داعم لصحة الكرش.'
-    },
-    {
-      key: 'starch',
-      title: 'النشا',
-      rule: 'max',
-      supply: nutrition.starchPctActual,
-      need: targets.starchMax,
-      unit: '%',
-      needText: targets.starchMax !== null && targets.starchMax !== undefined ? `حد آمن ${advValueText(targets.starchMax, '%', 1)}` : '',
-      note: 'النشا ليس احتياجًا؛ هو حد آمن يتأثر بصحة الكرش ومستوى الألياف.'
-    },
-    {
-      key: 'fat',
-      title: 'دهن العليقة',
-      rule: 'max',
-      supply: nutrition.fatPctActual,
-      need: 7,
-      unit: '%',
-      needText: 'حد آمن 6–7 % من المادة الجافة',
-      note: 'دهون العليقة ليست احتياجًا؛ تُقرأ كحد آمن/أقصى حسب نوع الدهن وجودة العليقة.'
-    },
-    {
-      key: 'energy',
-      title: 'الطاقة NEL',
-      rule: 'match',
-      supply: nutrition.nelActual,
-      need: targets.nelTarget,
-      unit: 'ميجاكال',
-      note: 'مقارنة إمداد الطاقة باحتياجات الإنتاج والحالة.'
-    }
-  ].filter(c => firstNumber(c.supply) !== null || firstNumber(c.need) !== null || clean(c.needText));
-
-  if (cards.length) return cards;
-
-  return (panels.advancedCards || []).map(c => ({
-    key: c.key || c.metric || c.id || '',
-    title: c.title || c.name || c.key || 'مؤشر',
-    rule: 'match',
-    supply: c.supply ?? c.current ?? c.actual ?? c.value,
-    need: c.need ?? c.required ?? c.target,
-    supplyText: c.supplyText || c.currentText || c.actualText || c.valueText || c.value || c.actual || '—',
-    needText: c.needText || c.requiredText || c.targetText || c.target || c.need || '—',
-    note: c.message || c.hint || c.reason || ''
-  }));
-}
-
-function advancedGaugeHtml(card = {}) {
-  const rule = card.rule || 'match';
-  const stat = advStatus(rule, card.supply, card.need);
-  const sideLabels = advSideLabels(rule);
-
-  const title = card.title || card.name || card.key || 'مؤشر';
-  const key = clean(card.key || card.metric || card.id || '');
-
-  const supplyText =
-    card.supplyText ||
-    advValueText(card.supply, card.unit || '', card.unit === 'جم/يوم' ? 0 : 1);
-
-  const needText =
-    card.needText ||
-    advValueText(card.need, card.unit || '', card.unit === 'جم/يوم' ? 0 : 1);
-
-  const note = card.note || card.balanceText || card.diffText || card.message || card.hint || card.reason || '';
-
-  const liveNote = advLiveNote(rule, stat);
-
-  return `
-    <div class="advanced-gauge-card ${stat.cls} rule-${escapeHtml(advRuleKind(rule))}" data-key="${escapeHtml(key)}" data-live="true" data-ratio="${stat.ratio === null ? '' : fmt(stat.ratio, 2)}" style="--needle:${stat.needle}">
-      <div class="advanced-gauge-head">
-        <div class="advanced-gauge-title">${escapeHtml(title)}</div>
-        <div class="advanced-gauge-badge">${escapeHtml(card.stateLabel || card.badge || stat.label)}</div>
-      </div>
-
-      <div class="advanced-gauge-body">
-        <div class="advanced-side supply-side">
-          <div class="advanced-side-label">${escapeHtml(sideLabels.supply)}</div>
-          <div class="advanced-side-value">${escapeHtml(supplyText)}</div>
+    return `
+      <div class="kpi ${cls}">
+        <div class="k">
+          <span>${escapeHtml(card.title || card.key || "مؤشر")}</span>
+          <span class="kpi-badge"><span class="dot"></span>${cls === "ok" ? "مناسب" : cls === "warn" ? "متابعة" : "خطر"}</span>
         </div>
-
-        <div class="advanced-gauge" aria-label="${escapeHtml(liveNote)}">
-          <div class="advanced-gauge-arc"></div>
-          <div class="advanced-gauge-needle"></div>
-          <div class="advanced-gauge-hub"></div>
-          <div class="advanced-gauge-readout">${escapeHtml(stat.ratioText)}</div>
-        </div>
-
-        <div class="advanced-side need-side">
-          <div class="advanced-side-label">${escapeHtml(sideLabels.need)}</div>
-          <div class="advanced-side-value">${escapeHtml(needText)}</div>
-        </div>
+        <div class="v">${escapeHtml(card.value ?? card.actual ?? "—")}</div>
+        ${card.targetText ? `<div class="kpi-hint">${escapeHtml(card.targetText)}</div>` : ""}
       </div>
-
-      <div class="advanced-gauge-note">${escapeHtml(note ? note + ' — ' + liveNote : liveNote)}</div>
-    </div>
-  `;
-}
+    `;
+  }
 
   function paintAnalysis(analysis = {}, panels = {}) {
     const totals = analysis.totals || {};
@@ -2396,27 +1144,9 @@ function advancedGaugeHtml(card = {}) {
     const eCards = panels.economicsCards || panels.economicCards || [];
     const aCards = panels.advancedCards || [];
 
-   if ($("nutritionKPIs")) {
-  $("nutritionKPIs").innerHTML = nCards.length ? nCards.map(cardHtml).join("") : "";
-}
-
-if ($("economicKPIs")) {
-  $("economicKPIs").innerHTML = eCards.length ? eCards.map(cardHtml).join("") : "";
-}
-
-const advancedItems = advancedMetricCards(analysis, panels);
-
-if ($("advancedKPIs")) {
-  $("advancedKPIs").innerHTML = advancedItems.length ? advancedItems.map(advancedGaugeHtml).join("") : "";
-}
-
-if ($("toggleAdvancedBtn")) {
-  $("toggleAdvancedBtn").style.display = advancedItems.length ? "block" : "none";
-}
-
-if ($("advancedCard") && !advancedItems.length) {
-  $("advancedCard").style.display = "none";
-}
+    if ($("nutritionKPIs")) $("nutritionKPIs").innerHTML = nCards.length ? nCards.map(cardHtml).join("") : "";
+    if ($("economicKPIs")) $("economicKPIs").innerHTML = eCards.length ? eCards.map(cardHtml).join("") : "";
+    if ($("advancedKPIs")) $("advancedKPIs").innerHTML = aCards.length ? aCards.map(cardHtml).join("") : "";
   }
 
   async function saveEvent(ev) {
@@ -2559,15 +1289,17 @@ if ($("advancedCard") && !advancedItems.length) {
     $("closeCustomPremix")?.addEventListener("click", closePremix);
     $("saveCustomPremix")?.addEventListener("click", savePremix);
 
-$("toggleAdvancedBtn")?.addEventListener("click", () => {
-  const card = $("advancedCard");
-  const btn = $("toggleAdvancedBtn");
-  if (!card || !btn) return;
+    $("toggleAdvancedBtn")?.addEventListener("click", () => {
+      const box = $("advancedKPIs");
+      if (!box) return;
 
-  const hidden = card.style.display === "none" || !card.style.display;
-  card.style.display = hidden ? "block" : "none";
-  btn.textContent = hidden ? "إخفاء العرض المتقدم" : "عرض متقدم";
-});
+      const hidden = box.style.display === "none" || !box.style.display;
+      box.style.display = hidden ? "block" : "none";
+
+      if ($("toggleAdvancedBtn")) {
+        $("toggleAdvancedBtn").textContent = hidden ? "إخفاء المتقدم" : "عرض متقدم";
+      }
+    });
 
     $("msgYes")?.addEventListener("click", () => {
       location.href =
@@ -2602,5 +1334,6 @@ $("toggleAdvancedBtn")?.addEventListener("click", () => {
   document.addEventListener("DOMContentLoaded", start);
 })();
 </script>
+
 </body>
 </html>
