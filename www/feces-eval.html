@@ -202,17 +202,6 @@ function carryContextToUrl(u, ctx, date) {
   }
 }
 
-  function getTenantUid() {
-    return String(
-      window.MBK_USER_ID ||
-      window.mbkUserId ||
-      window.mbk?.userId ||
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      ""
-    ).trim();
-  }
 
  function showMsg(text, ok) {
   if (!msgBox) return;
@@ -224,7 +213,28 @@ function carryContextToUrl(u, ctx, date) {
     msgBox.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (_) {}
 }
+async function sessionFetchJson(path, options = {}) {
+  const r = await fetch(path, {
+    method: options.method || "GET",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Accept": "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers || {})
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
 
+  const data = await r.json().catch(() => ({}));
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    showMsg(data?.message || "سجّل الدخول أولًا.", false);
+    return { r, data, authRequired: true };
+  }
+
+  return { r, data, authRequired: false };
+}
  function hideMsg() {
   if (!msgBox) return;
   msgBox.className = "infobar";
@@ -243,16 +253,17 @@ function refreshTrainingButton() {
 }
 
 async function initTrainingGate() {
-  const uid = getTenantUid();
-  if (!uid) return;
-
   try {
-    const r = await fetch("/api/feces/training/gate", {
-      headers: { "X-User-Id": uid }
-    });
+    const { r, data, authRequired } = await sessionFetchJson("/api/feces/training/gate");
 
-    const j = await r.json().catch(() => ({}));
-    state.canTrain = Boolean(r.ok && j.ok && j.canTrain);
+    if (authRequired) {
+      state.canTrain = false;
+      if (trainingPanel) trainingPanel.style.display = "none";
+      refreshTrainingButton();
+      return;
+    }
+
+    state.canTrain = Boolean(r.ok && data?.ok && data?.canTrain);
 
     if (trainingPanel) {
       trainingPanel.style.display = state.canTrain ? "block" : "none";
@@ -265,7 +276,6 @@ async function initTrainingGate() {
     refreshTrainingButton();
   }
 }
-
  
   function resetForNextGroupSample(j) {
  state.image = null;
@@ -480,29 +490,26 @@ refreshTrainingButton();
     return canvas.toDataURL("image/jpeg", 0.92);
   }
 
- async function analyzeOnServer(image) {
-  const uid = getTenantUid();
+async function analyzeOnServer(image) {
   const ctx = contextFromUrl();
 
-  const r = await fetch("/api/feces/vision-analyze", {
+  const { r, data, authRequired } = await sessionFetchJson("/api/feces/vision-analyze", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(uid ? { "X-User-Id": uid } : {})
-    },
-    body: JSON.stringify({
+    body: {
       image,
       eventDate: eventDateInput?.value || ctx.eventDate || todayCairo()
-    })
+    }
   });
 
-  const j = await r.json().catch(() => ({}));
-
-  if (!r.ok || !j.ok) {
-    throw new Error(j.message || "تعذّر تحليل الروث.");
+  if (authRequired) {
+    throw new Error(data?.message || "سجّل الدخول أولًا.");
   }
 
-  renderAnalysis(j);
+  if (!r.ok || !data?.ok) {
+    throw new Error(data?.message || "تعذّر تحليل الروث.");
+  }
+
+  renderAnalysis(data);
 }
 
   async function captureAndAnalyze() {
@@ -603,8 +610,6 @@ async function saveFeces() {
     return;
   }
 
-  const uid = getTenantUid();
-
   try {
     hideMsg();
 
@@ -613,31 +618,26 @@ async function saveFeces() {
       saveBtn.textContent = "جارٍ الحفظ…";
     }
 
-    const r = await fetch("/api/feces/save", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(uid ? { "X-User-Id": uid } : {})
-      },
-      body: JSON.stringify({
-        mode: ctx.mode,
+   const { r, data: j, authRequired } = await sessionFetchJson("/api/feces/save", {
+  method: "POST",
+  body: {
+    mode: ctx.mode,
 
-        animalId: ctx.mode === "individual" ? ctx.animalId : "",
-        animalNumber: ctx.mode === "individual" ? ctx.animalNumber : "",
+    animalId: ctx.mode === "individual" ? ctx.animalId : "",
+    animalNumber: ctx.mode === "individual" ? ctx.animalNumber : "",
 
-        groupName: ctx.mode === "group" ? ctx.groupName : "",
-        groupId: ctx.mode === "group" ? ctx.groupId : "",
-        groupKey: ctx.mode === "group" ? ctx.groupKey : "",
-        animalType: ctx.mode === "group" ? ctx.animalType : "",
+    groupName: ctx.mode === "group" ? ctx.groupName : "",
+    groupId: ctx.mode === "group" ? ctx.groupId : "",
+    groupKey: ctx.mode === "group" ? ctx.groupKey : "",
+    animalType: ctx.mode === "group" ? ctx.animalType : "",
 
-        eventDate: eventDateInput?.value || ctx.eventDate || todayCairo(),
-        score: analysis.score,
-        analysis
-      })
-    });
+    eventDate: eventDateInput?.value || ctx.eventDate || todayCairo(),
+    score: analysis.score,
+    analysis
+  }
+});
 
-    const j = await r.json().catch(() => ({}));
-
+if (authRequired) return;
     if (!r.ok || !j.ok) {
       throw new Error(j.message || "تعذّر حفظ تقييم الروث.");
     }
@@ -683,7 +683,7 @@ async function saveFeces() {
   }
 
   const ctx = contextFromUrl();
-  const uid = getTenantUid();
+ 
 
   try {
     showTrainingStatus("جارٍ حفظ التصحيح…", true);
@@ -693,29 +693,25 @@ async function saveFeces() {
       trainingSaveBtn.textContent = "جارٍ حفظ التصحيح…";
     }
 
-    const r = await fetch("/api/feces/training/save", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(uid ? { "X-User-Id": uid } : {})
-      },
-      body: JSON.stringify({
-        mode: ctx.mode,
-        animalNumber: ctx.mode === "individual" ? ctx.animalNumber : "",
-        groupName: ctx.mode === "group" ? ctx.groupName : "",
-        groupId: ctx.mode === "group" ? ctx.groupId : "",
-        groupKey: ctx.mode === "group" ? ctx.groupKey : "",
-        animalType: ctx.mode === "group" ? ctx.animalType : "",
-        eventDate: eventDateInput?.value || ctx.eventDate || todayCairo(),
-        predictedScore: analysis.score,
-        correctedScore,
-        expertNote: trainingNoteInput?.value || "",
-        analysis,
-        image: state.image || ""
-      })
-    });
+   const { r, data: j, authRequired } = await sessionFetchJson("/api/feces/training/save", {
+  method: "POST",
+  body: {
+    mode: ctx.mode,
+    animalNumber: ctx.mode === "individual" ? ctx.animalNumber : "",
+    groupName: ctx.mode === "group" ? ctx.groupName : "",
+    groupId: ctx.mode === "group" ? ctx.groupId : "",
+    groupKey: ctx.mode === "group" ? ctx.groupKey : "",
+    animalType: ctx.mode === "group" ? ctx.animalType : "",
+    eventDate: eventDateInput?.value || ctx.eventDate || todayCairo(),
+    predictedScore: analysis.score,
+    correctedScore,
+    expertNote: trainingNoteInput?.value || "",
+    analysis,
+    image: state.image || ""
+  }
+});
 
-    const j = await r.json().catch(() => ({}));
+if (authRequired) return;
 
     if (!r.ok || !j.ok) {
       throw new Error(j.message || "تعذّر حفظ تصحيح التدريب.");
