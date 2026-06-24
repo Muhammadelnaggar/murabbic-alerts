@@ -5,18 +5,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<link rel="stylesheet" href="css/forms.css">
- 
+  <link rel="stylesheet" href="css/forms.css">
  <title>التغذية الذكية</title>
 
 
-
-<style>
+  <style>
     *{box-sizing:border-box}
     :root{
-  --green:var(--brand,#0ea05a);
-  --card:#fff;
-}
+      --green:var(--brand,#0ea05a);
+      --card:#fff;
+    }
    body{
   direction:rtl;
   margin:0;
@@ -181,7 +179,6 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   .strip-item .lbl{font-size:9.5px}
   .strip-item .val{font-size:13px}
 }
-   
  
 /* ===== Nutrition UX tweaks (Murabbik) ===== */
 #feedInputBox{
@@ -552,151 +549,19 @@ padding: 6px 0;
 .mbk-premix-note{font-size:12px;font-weight:800;line-height:1.6;color:#475569;background:#f8fafc;border:1px solid #eef2f7;border-radius:14px;padding:9px;margin:8px 0}
 .mbk-premix-section{font-weight:900;color:#0b7f47;margin:12px 0 6px;border-top:1px dashed #d7e7dd;padding-top:10px}
 @media (max-width:640px){.mbk-premix-grid{grid-template-columns:1fr}.mbk-modal{border-radius:18px}}
-/* ===== Nutrition local isolation before central move ===== */
-body[data-page="nutrition"]{
-  --green:var(--brand,#0ea05a);
-  --card:#fff;
-  background:#f7faf7;
-}
 
-/* صفحة التغذية أوسع من فورم الأحداث العادي */
-body[data-page="nutrition"] .mbk-form{
-  width:100%;
-  max-width:860px;
-  margin:0 auto 24px;
-  padding:0 12px 28px;
-  display:block;
-}
-
-/* كروت التغذية لا تتبع تضييق mbk-card العام */
-body[data-page="nutrition"] .mbk-card,
-body[data-page="nutrition"] .card{
-  width:100%;
-  max-width:860px;
-  margin:10px auto;
-  background:#fff;
-  border:1px solid #e2e8f0;
-  border-radius:16px;
-  padding:10px;
-  box-shadow:0 1px 0 rgba(15,23,42,.04);
-  overflow:hidden;
-}
-
-/* row في التغذية Flex مش Grid */
-body[data-page="nutrition"] .row{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  align-items:center;
-  min-width:0;
-}
-
-body[data-page="nutrition"] .row > .grow,
-body[data-page="nutrition"] .grow{
-  flex:1;
-  min-width:0;
-}
-
-/* أزرار التغذية القديمة */
-body[data-page="nutrition"] .btn{
-  background:#fff;
-  border:1px solid var(--green);
-  color:var(--green);
-}
-
-body[data-page="nutrition"] .btn-primary{
-  background:var(--green);
-  color:#fff;
-}
-
-/* شرائح الملخص */
-body[data-page="nutrition"] .pill{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding:6px 10px;
-  border-radius:999px;
-  border:1px solid #e2e8f0;
-  background:#dcedc8;
-  color:#1b5e20;
-  font-size:13px;
-  font-weight:800;
-}
-
-/* كروت التحليل */
-body[data-page="nutrition"] #analysisSection{
-  max-width:860px;
-  margin:14px auto 22px;
-  padding:0;
-}
-
-body[data-page="nutrition"] .kpi-grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:8px;
-  margin-top:0;
-}
-
-body[data-page="nutrition"] .kpi{
-  position:relative;
-  background:#fff !important;
-  border:1px solid #eef2f7 !important;
-  border-radius:14px;
-  padding:10px;
-  box-shadow:0 6px 18px rgba(15,23,42,.06);
-}
-
-body[data-page="nutrition"] .kpi .k{
-  font-size:11px;
-  font-weight:900;
-  color:#334155;
-  opacity:1;
-  line-height:1.2;
-}
-
-body[data-page="nutrition"] .kpi .v{
-  font-weight:900;
-  font-size:16px;
-  margin-top:2px;
-}
-
-/* العرض المتقدم منفصل بصريًا */
-body[data-page="nutrition"] #advancedKPIs{
-  margin-top:12px;
-  padding-top:12px;
-  border-top:1px dashed #d7e7dd;
-}
-
-/* موبايل */
-@media (max-width:640px){
-  body[data-page="nutrition"] .mbk-form,
-  body[data-page="nutrition"] .mbk-card,
-  body[data-page="nutrition"] .card{
-    max-width:520px;
-  }
-
-  body[data-page="nutrition"] .row.stack > *{
-    flex:1 1 100%;
-  }
-
-  body[data-page="nutrition"] .kpi-grid{
-    grid-template-columns:repeat(2,minmax(0,1fr));
-  }
-}
 </style>
-
 </head>
-<body data-page="nutrition">
-<header class="mbk-head">
+<body>
+<div class="mbk-form">
+ <header class="mbk-head">
   <a href="/dashboard.html" class="mbk-back">←</a>
   <div class="mbk-center">
-    <div class="mbk-page-title">التغذية الذكية</div>
+   <div class="mbk-page-title">التغذية الذكية</div>
     <div class="mbk-app-name">مُرَبِّيك</div>
   </div>
   <img src="/logo.png" class="mbk-logo" alt="Murabbik">
 </header>
-
-<div class="mbk-form">
 
  <div class="animal-strip top-strip animal-strip-main">
   <div class="strip-row strip-row-main">
@@ -735,7 +600,7 @@ body[data-page="nutrition"] #advancedKPIs{
   <div class="strip-item"><span class="lbl">الحالة الجسمانية BCS</span><span class="val" id="ctxBCS_txt">—</span></div>
   <div class="strip-item"><span class="lbl">رقم الموسم</span><span class="val" id="ctxParity_txt">—</span></div>
 </div>
-  <!-- حقول مخفية يستخدمها السكريبت الداخلي للحفظ والتحليل -->
+  <!-- الحقول الأصلية (مخفية) للحفاظ على منطق الحفظ الحالي في nutrition.js -->
 
     <input id="ctxDIM" type="number" inputmode="numeric" step="1" min="0" style="display:none">
     <select id="ctxSpecies" style="display:none"><option value="">—</option><option value="بقر">بقر</option><option value="جاموس">جاموس</option></select>
@@ -1532,7 +1397,7 @@ body[data-page="nutrition"] #advancedKPIs{
   }
 
   function cardHtml(card = {}) {
-    const status = clean(card.status || card.level || "ok");
+    const status = clean(card.status || card.level || card.state || "ok").toLowerCase();
 
     const cls =
       status.includes("bad") || status.includes("danger") || status.includes("error")
@@ -1541,14 +1406,25 @@ body[data-page="nutrition"] #advancedKPIs{
           ? "warn"
           : "ok");
 
+    const title = card.title || card.key || "مؤشر";
+    const value = card.valueText ?? card.value ?? card.actual ?? "—";
+    const badge = card.stateLabel || card.statusText || (cls === "ok" ? "مناسب" : cls === "warn" ? "متابعة" : "خطر");
+    const hint = card.message || card.targetText || card.subText || "";
+    const scale = card.scaleText || "";
+    const pctRaw = Number(card.pointerPct ?? card.meterPct ?? card.percent ?? NaN);
+    const pct = Number.isFinite(pctRaw) ? Math.max(0, Math.min(100, pctRaw)) : null;
+    const extraClass = card.key === "rumen" || title.includes("الكرش") ? " rumen-feature" : "";
+
     return `
-      <div class="kpi ${cls}">
+      <div class="kpi ${cls}${extraClass}">
         <div class="k">
-          <span>${escapeHtml(card.title || card.key || "مؤشر")}</span>
-          <span class="kpi-badge"><span class="dot"></span>${cls === "ok" ? "مناسب" : cls === "warn" ? "متابعة" : "خطر"}</span>
+          <span>${escapeHtml(title)}</span>
+          <span class="kpi-badge"><span class="dot"></span>${escapeHtml(badge)}</span>
         </div>
-        <div class="v">${escapeHtml(card.value ?? card.actual ?? "—")}</div>
-        ${card.targetText ? `<div class="kpi-hint">${escapeHtml(card.targetText)}</div>` : ""}
+        <div class="v">${escapeHtml(value)}</div>
+        ${pct !== null ? `<div class="kpi-meter"><span style="width:${pct}%"></span></div>` : ""}
+        ${hint ? `<div class="kpi-hint">${escapeHtml(hint)}</div>` : ""}
+        ${scale ? `<div class="kpi-hint">${escapeHtml(scale)}</div>` : ""}
       </div>
     `;
   }
