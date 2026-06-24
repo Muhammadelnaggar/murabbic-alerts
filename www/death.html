@@ -80,15 +80,6 @@
 
   let deathGateAllowed = false;
 
-  function getUid() {
-    return String(
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      ""
-    ).trim();
-  }
-
   function msg(text, type = "info") {
     if (!info) return;
 
@@ -104,115 +95,117 @@
 
     try { info.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
   }
+  async function sessionFetchJson(path, options = {}) {
+  const r = await fetch(path, {
+    method: options.method || "GET",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Accept": "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers || {})
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
 
+  const data = await r.json().catch(() => null);
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    msg(data?.message || "❌ سجّل الدخول أولًا.", "error");
+    return { r, data, authRequired: true };
+  }
+
+  return { r, data, authRequired: false };
+}
   function getReason() {
     return String(reasonInput?.value || "").trim();
   }
+function initFromUrl() {
+  const p = new URLSearchParams(location.search);
 
-  function initFromUrl() {
-    const p = new URLSearchParams(location.search);
+  const num = (
+    p.get("number") ||
+    p.get("animalNumber") ||
+    p.get("animalId") ||
+    p.get("id") ||
+    ""
+  ).toString().trim();
 
-    const num = (
-      p.get("number") ||
-      p.get("animalNumber") ||
-      p.get("animalId") ||
-      p.get("id") ||
-      localStorage.getItem("lastAnimalNumber") ||
-      localStorage.getItem("lastAnimalId") ||
-      localStorage.getItem("currentAnimalNumber") ||
-      ""
-    ).toString().trim();
+  const dt = (
+    p.get("date") ||
+    p.get("eventDate") ||
+    new Date().toISOString().slice(0,10)
+  ).toString().slice(0,10);
 
-    const dt = (
-      p.get("date") ||
-      p.get("eventDate") ||
-      localStorage.getItem("lastEventDate") ||
-      new Date().toISOString().slice(0,10)
-    ).toString().slice(0,10);
+  $("animalNumber").value = num;
+  $("eventDate").value = dt;
+}
+async function loadDeathReasons() {
+  if (!reasonsList) return;
 
-    $("animalNumber").value = num;
-    $("eventDate").value = dt;
+  try {
+    const { r, data, authRequired } = await sessionFetchJson("/api/death-reasons/options");
+
+    if (authRequired) return;
+
+    const items = Array.isArray(data?.reasons) ? data.reasons : [];
+
+    reasonsList.innerHTML = "";
+
+    items.forEach((label) => {
+      const opt = document.createElement("option");
+      opt.value = String(label || "").trim();
+      reasonsList.appendChild(opt);
+    });
+
+  } catch (e) {
+    console.error("loadDeathReasons failed", e);
+  }
+}
+
+async function runDeathGate() {
+  const animalNumber = String($("animalNumber")?.value || "").trim();
+
+  deathGateAllowed = false;
+  if (saveBtn) saveBtn.disabled = true;
+
+  if (!animalNumber) {
+    msg("❌ رقم الحيوان مطلوب.", "error");
+    return false;
   }
 
-  async function loadDeathReasons() {
-    const uid = getUid();
-    if (!uid || !reasonsList) return;
+  try {
+    msg("جارِ التحقق من الحيوان...", "info");
 
-    try {
-      const r = await fetch("/api/death-reasons/options", {
-        method: "GET",
-        headers: { "X-User-Id": uid }
-      });
-
-      const data = await r.json().catch(() => null);
-      const items = Array.isArray(data?.reasons) ? data.reasons : [];
-
-      reasonsList.innerHTML = "";
-
-      items.forEach((label) => {
-        const opt = document.createElement("option");
-        opt.value = String(label || "").trim();
-        reasonsList.appendChild(opt);
-      });
-    } catch (e) {
-      console.error("loadDeathReasons failed", e);
-    }
-  }
-
-  async function runDeathGate() {
-    const uid = getUid();
-    const animalNumber = String($("animalNumber")?.value || "").trim();
-
-    deathGateAllowed = false;
-    if (saveBtn) saveBtn.disabled = true;
-
-    if (!uid) {
-      msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
-      return false;
-    }
-
-    if (!animalNumber) {
-      msg("❌ رقم الحيوان مطلوب.", "error");
-      return false;
-    }
-
-    try {
-      msg("جارِ التحقق من الحيوان...", "info");
-
-      const r = await fetch("/api/animals/archive/gate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify({
-          animalNumber,
-          archiveReason: "death"
-        })
-      });
-
-      const data = await r.json().catch(() => null);
-
-      if (!r.ok || data?.allowed !== true) {
-        msg(data?.message || "❌ لا يمكن تسجيل نفوق لهذا الحيوان.", "error");
-        return false;
+    const { r, data, authRequired } = await sessionFetchJson("/api/animals/archive/gate", {
+      method: "POST",
+      body: {
+        animalNumber,
+        archiveReason: "death"
       }
+    });
 
-      deathGateAllowed = true;
-      if (saveBtn) saveBtn.disabled = false;
+    if (authRequired) return false;
 
-      msg(data.message || "✅ الحيوان مؤهل لتسجيل النفوق.", "success");
-      return true;
-
-    } catch (e) {
-      console.error("death gate failed", e);
-      msg("❌ فشل الاتصال بالسيرفر أثناء التحقق من الحيوان.", "error");
+    if (!r.ok || data?.allowed !== true) {
+      msg(data?.message || "❌ لا يمكن تسجيل نفوق لهذا الحيوان.", "error");
       return false;
     }
-  }
 
+    deathGateAllowed = true;
+    if (saveBtn) saveBtn.disabled = false;
+
+    msg(data.message || "✅ الحيوان مؤهل لتسجيل النفوق.", "success");
+    return true;
+
+  } catch (e) {
+    console.error("death gate failed", e);
+    msg("❌ فشل الاتصال بالسيرفر أثناء التحقق من الحيوان.", "error");
+    return false;
+  }
+}
   async function saveDeath() {
-    const uid = getUid();
+   
 
     if (!deathGateAllowed) {
       msg("❌ لا يمكن الحفظ قبل نجاح التحقق من الحيوان.", "error");
@@ -229,10 +222,7 @@
     };
 
     try {
-      if (!uid) {
-        msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
-        return;
-      }
+     
 
       if (saveBtn) {
         saveBtn.disabled = true;
@@ -241,17 +231,12 @@
 
       msg("جارِ أرشفة الحيوان بعد النفوق...", "info");
 
-      const r = await fetch("/api/animals/archive", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify(payload)
-      });
+     const { r, data, authRequired } = await sessionFetchJson("/api/animals/archive", {
+  method: "POST",
+  body: payload
+});
 
-      const data = await r.json().catch(() => null);
-
+if (authRequired) return;
       if (!r.ok || data?.ok !== true) {
         msg(data?.message || "❌ فشل أرشفة الحيوان بعد النفوق.", "error");
         if (saveBtn) {
@@ -260,9 +245,6 @@
         }
         return;
       }
-
-      localStorage.setItem("lastAnimalNumber", payload.animalNumber);
-      localStorage.setItem("lastEventDate", payload.eventDate);
 
       msg(data.message || "✅ تم أرشفة الحيوان وأحداثه بعد النفوق.", "success");
 
