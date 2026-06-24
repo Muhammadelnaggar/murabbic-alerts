@@ -94,24 +94,6 @@
   const notesEl = document.getElementById("notes");
   const saveBtn = document.getElementById("saveBtn");
 
-  function getUid() {
-    return String(
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      localStorage.getItem("ownerUid") ||
-      ""
-    ).trim();
-  }
-
-  function apiBase() {
-    return String(
-      window.API_BASE ||
-      localStorage.getItem("API_BASE") ||
-      ""
-    ).replace(/\/$/, "");
-  }
-
   function normalizeDigits(raw) {
     const map = {
       "٠": "0","١": "1","٢": "2","٣": "3","٤": "4","٥": "5","٦": "6","٧": "7","٨": "8","٩": "9",
@@ -123,7 +105,31 @@
       .replace(/[^\d]/g, "")
       .trim();
   }
+  async function sessionPostJson(path, payload) {
+  const r = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify(payload || {})
+  });
 
+  const data = await r.json().catch(() => ({
+    ok: false,
+    allowed: false,
+    message: "تعذّر قراءة رد السيرفر."
+  }));
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    showSysbar(data?.message || "سجّل الدخول أولًا.", "error");
+    return { data, authRequired: true };
+  }
+
+  return { data, authRequired: false };
+}
   function toISO(s) {
     const v = String(s || "").trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
@@ -290,7 +296,7 @@
   let lastGateKey = "";
 
   async function runGateNow() {
-    const uid = getUid();
+   
     const payload = collectPayload();
 
     const gateKey = JSON.stringify({
@@ -301,33 +307,22 @@
     if (gateKey === lastGateKey) return;
     lastGateKey = gateKey;
 
-    if (!uid || !payload.animalNumber || !payload.eventDate) {
+    if (!payload.animalNumber || !payload.eventDate) {
       setDetailsDisabled(true);
       if (sysbar) sysbar.style.display = "none";
       return;
     }
 
-    const endpoint = "/api/abortion/gate";
-    const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
-
     try {
       setDetailsDisabled(true);
       showSysbar("جارِ التحقق من أهلية الإجهاض…", "info");
 
-      const r = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify(payload)
-      });
+      const { data, authRequired } = await sessionPostJson(
+  "/api/abortion/gate",
+  payload
+);
 
-      const data = await r.json().catch(() => ({
-        ok: false,
-        allowed: false,
-        message: "تعذّر قراءة رد السيرفر."
-      }));
+if (authRequired) return;
 
       renderServerMessage(data, "تعذّر التحقق من أهلية الإجهاض.", true);
 
@@ -350,57 +345,38 @@
     gateTimer = setTimeout(runGateNow, 350);
   }
 
-  form?.addEventListener("submit", async (e) => {
-    e.preventDefault();
+ form?.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-    const uid = getUid();
-    const payload = collectPayload();
+  const payload = collectPayload();
 
-    const endpoint = "/api/abortion/save";
-    const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
+  try {
+    if (saveBtn) saveBtn.disabled = true;
 
-    try {
-      if (saveBtn) saveBtn.disabled = true;
+    showSysbar("جارِ حفظ الإجهاض…", "info");
 
-      showSysbar("جارِ حفظ الإجهاض…", "info");
+    const { data, authRequired } = await sessionPostJson(
+      "/api/abortion/save",
+      payload
+    );
 
-      const r = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify(payload)
-      });
+    if (authRequired) return;
 
-      const data = await r.json().catch(() => ({
-        ok: false,
-        message: "تعذّر قراءة رد السيرفر."
-      }));
+    renderServerMessage(data, "تعذّر حفظ الإجهاض.", false);
 
-      renderServerMessage(data, "تعذّر حفظ الإجهاض.", false);
-
-      if (data?.ok) {
-        try {
-          localStorage.setItem("lastAnimalId", data.animalNumber || payload.animalNumber || "");
-          localStorage.setItem("lastEventDate", data.eventDate || payload.eventDate || "");
-        } catch (_) {}
-
-        if (data.redirectUrl) {
-          setTimeout(() => {
-            location.href = data.redirectUrl;
-          }, 1100);
-        }
-      }
-
-    } catch (err) {
-      console.error("abortion save failed", err);
-      showSysbar("❌ تعذّر حفظ الإجهاض الآن.", "error");
-    } finally {
-      if (saveBtn) saveBtn.disabled = false;
+    if (data?.ok && data.redirectUrl) {
+      setTimeout(() => {
+        location.href = data.redirectUrl;
+      }, 1100);
     }
-  });
 
+  } catch (err) {
+    console.error("abortion save failed", err);
+    showSysbar("❌ تعذّر حفظ الإجهاض الآن.", "error");
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
+});
   animalEl?.addEventListener("input", scheduleGate);
   animalEl?.addEventListener("change", scheduleGate);
   dateEl?.addEventListener("change", scheduleGate);
@@ -417,18 +393,16 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     const n =
-      qp.get("animalNumber") ||
-      qp.get("number") ||
-      qp.get("animalId") ||
-      localStorage.getItem("lastAnimalId") ||
-      "";
+  qp.get("animalNumber") ||
+  qp.get("number") ||
+  qp.get("animalId") ||
+  "";
 
-    const d =
-      qp.get("eventDate") ||
-      qp.get("date") ||
-      qp.get("dt") ||
-      localStorage.getItem("lastEventDate") ||
-      "";
+const d =
+  qp.get("eventDate") ||
+  qp.get("date") ||
+  qp.get("dt") ||
+  "";
 
     if (animalEl) animalEl.value = normalizeDigits(n);
     if (dateEl) dateEl.value = toISO(d) || new Date().toISOString().slice(0, 10);
