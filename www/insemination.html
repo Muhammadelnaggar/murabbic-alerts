@@ -80,13 +80,6 @@
     </form>
 
   </main>
-
-  <!-- Firebase & النظام -->
-  
-  <script src="/js/tenant-bootstrap.js"></script>
-  <script src="/js/app-core.js"></script>
-
-  <!-- منطق الحفظ بعد الفاليديشن -->
 <!-- تهيئة الصفحة فقط — الحفظ والتحديث أصبحا في السيرفر عبر forms-init.js -->
 <script>
   const qp = new URLSearchParams(location.search);
@@ -96,41 +89,20 @@
   const dateEl = document.querySelector('[data-field="eventDate"]');
   const gateBox = document.getElementById("gateBox");
 
-  if (animalEl) {
-    animalEl.value =
-      qp.get("animalNumber") ||
-      qp.get("number") ||
-      qp.get("animalId") ||
-      localStorage.getItem("lastAnimalId") ||
-      "";
-  }
+ if (animalEl) {
+  animalEl.value =
+    qp.get("animalNumber") ||
+    qp.get("number") ||
+    qp.get("animalId") ||
+    "";
+}
 
-  if (dateEl) {
-    dateEl.value =
-      qp.get("eventDate") ||
-      qp.get("date") ||
-      localStorage.getItem("lastEventDate") ||
-      new Date().toISOString().slice(0, 10);
-  }
-
-  function getUid() {
-    return String(
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      localStorage.getItem("ownerUid") ||
-      ""
-    ).trim();
-  }
-
-  function apiBase() {
-    return String(
-      window.API_BASE ||
-      localStorage.getItem("API_BASE") ||
-      ""
-    ).replace(/\/$/, "");
-  }
-
+if (dateEl) {
+  dateEl.value =
+    qp.get("eventDate") ||
+    qp.get("date") ||
+    new Date().toISOString().slice(0, 10);
+}
   function parseNumbers(raw) {
     const map = {
       "٠": "0","١": "1","٢": "2","٣": "3","٤": "4","٥": "5","٦": "6","٧": "7","٨": "8","٩": "9",
@@ -183,7 +155,31 @@
 
     try { box.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
   }
+  async function sessionFetchJson(url, options = {}) {
+  const r = await fetch(url, {
+    method: options.method || "GET",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Accept": "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers || {})
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
 
+  const data = await r.json().catch(() => ({
+    ok: false,
+    message: ""
+  }));
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    showGate(data?.message || "سجّل الدخول أولًا.", "error");
+    return { r, data, authRequired: true };
+  }
+
+  return { r, data, authRequired: false };
+}
   function collectPayload() {
     const animalNumber = String(animalEl?.value || "").trim();
     const eventDate = String(dateEl?.value || "").trim();
@@ -265,57 +261,49 @@
   let gateTimer = null;
   let lastGateKey = "";
 
-  async function runGateNow() {
-    if (!form) return;
+async function runGateNow() {
+  if (!form) return;
 
-    const uid = getUid();
-    const payload = collectPayload();
-    const nums = parseNumbers(payload.animalNumber);
+  const payload = collectPayload();
+  const nums = parseNumbers(payload.animalNumber);
 
-    const gateKey = JSON.stringify({
-      n: nums.join(","),
-      d: payload.eventDate
+  const gateKey = JSON.stringify({
+    n: nums.join(","),
+    d: payload.eventDate
+  });
+
+  if (gateKey === lastGateKey) return;
+  lastGateKey = gateKey;
+
+  if (!nums.length || !payload.eventDate) {
+    setDetailsDisabled(true);
+    if (gateBox) gateBox.style.display = "none";
+    return;
+  }
+
+  try {
+    setDetailsDisabled(true);
+    showGate("جارِ التحقق من أهلية التلقيح…", "info");
+
+    const { r, data, authRequired } = await sessionFetchJson("/api/insemination/gate", {
+      method: "POST",
+      body: payload
     });
 
-    if (gateKey === lastGateKey) return;
-    lastGateKey = gateKey;
+    if (authRequired) return;
 
-    if (!uid || !nums.length || !payload.eventDate) {
-      setDetailsDisabled(true);
-      if (gateBox) gateBox.style.display = "none";
-      return;
+    if (!r.ok && !data?.message && !data?.error) {
+      data.message = "تعذّر التحقق من أهلية التلقيح الآن.";
     }
 
-    const endpoint = "/api/insemination/gate";
-    const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
+    renderGateResult(data);
 
-    try {
-      setDetailsDisabled(true);
-      showGate("جارِ التحقق من أهلية التلقيح…", "info");
-
-      const r = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await r.json().catch(() => ({
-        ok: false,
-        allowed: false,
-        message: ""
-      }));
-
-      renderGateResult(data);
-
-    } catch (err) {
-      console.error("insemination gate failed", err);
-      showGate("❌ تعذّر التحقق من أهلية التلقيح الآن.", "error");
-      setDetailsDisabled(true);
-    }
+  } catch (err) {
+    console.error("insemination gate failed", err);
+    showGate("❌ تعذّر التحقق من أهلية التلقيح الآن.", "error");
+    setDetailsDisabled(true);
   }
+}
 
   function scheduleGate() {
     clearTimeout(gateTimer);
@@ -326,76 +314,70 @@
   animalEl?.addEventListener("change", scheduleGate);
   dateEl?.addEventListener("change", scheduleGate);
 
-  form?.addEventListener("submit", async (e) => {
-    e.preventDefault();
+ form?.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-    const uid = getUid();
-    const payload = collectPayload();
-    const nums = parseNumbers(payload.animalNumber);
-    const isBulk =
-      new URLSearchParams(location.search).get("mode") === "bulk" ||
-      nums.length > 1;
+  const payload = collectPayload();
+  const nums = parseNumbers(payload.animalNumber);
+  const isBulk =
+    new URLSearchParams(location.search).get("mode") === "bulk" ||
+    nums.length > 1;
 
-    const endpoint = isBulk
-      ? "/api/insemination/bulk-save"
-      : "/api/insemination/save";
+  const endpoint = isBulk
+    ? "/api/insemination/bulk-save"
+    : "/api/insemination/save";
 
-    const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
-    const btn = form.querySelector('button[type="submit"]');
+  const btn = form.querySelector('button[type="submit"]');
 
-    try {
-      if (btn) btn.disabled = true;
+  try {
+    if (btn) btn.disabled = true;
 
-      const r = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify(payload)
-      });
+    const { r, data, authRequired } = await sessionFetchJson(endpoint, {
+      method: "POST",
+      body: payload
+    });
 
-      const data = await r.json().catch(() => ({
-        ok: false,
-        message: ""
-      }));
+    if (authRequired) return;
 
-      const mainMsg = String(data.message || data.error || "").trim();
-      const mainClean = compactReason(mainMsg);
-
-      const rejectedLines = Array.isArray(data.rejected) && data.rejected.length
-        ? data.rejected.slice(0, 8).map(x => {
-            const n = String(x.animalNumber || "").trim();
-            const reason = compactReason(x.reason || "");
-            if (!reason) return "";
-            if (reason === mainClean) return "";
-            return `${n}: ${reason}`;
-          }).filter(Boolean).join("\n")
-        : "";
-
-      const serverMessage = [
-        mainMsg,
-        rejectedLines
-      ].filter(Boolean).join("\n\n");
-
-      if (serverMessage.trim()) {
-        showGate(serverMessage, data.ok ? "success" : "error");
-      }
-
-      if (data.ok && data.redirectUrl) {
-        setTimeout(() => {
-          location.href = data.redirectUrl;
-        }, 1100);
-      }
-
-    } catch (err) {
-      console.error("insemination save failed", err);
-      showGate("❌ تعذّر حفظ التلقيح الآن.", "error");
-    } finally {
-      if (btn) btn.disabled = false;
+    if (!r.ok && !data?.message && !data?.error) {
+      data.message = "تعذّر حفظ التلقيح الآن.";
     }
-  });
 
+    const mainMsg = String(data.message || data.error || "").trim();
+    const mainClean = compactReason(mainMsg);
+
+    const rejectedLines = Array.isArray(data.rejected) && data.rejected.length
+      ? data.rejected.slice(0, 8).map(x => {
+          const n = String(x.animalNumber || "").trim();
+          const reason = compactReason(x.reason || "");
+          if (!reason) return "";
+          if (reason === mainClean) return "";
+          return `${n}: ${reason}`;
+        }).filter(Boolean).join("\n")
+      : "";
+
+    const serverMessage = [
+      mainMsg,
+      rejectedLines
+    ].filter(Boolean).join("\n\n");
+
+    if (serverMessage.trim()) {
+      showGate(serverMessage, data.ok ? "success" : "error");
+    }
+
+    if (data.ok && data.redirectUrl) {
+      setTimeout(() => {
+        location.href = data.redirectUrl;
+      }, 1100);
+    }
+
+  } catch (err) {
+    console.error("insemination save failed", err);
+    showGate("❌ تعذّر حفظ التلقيح الآن.", "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
   const openBtn = document.getElementById("openCowCardBtn");
   openBtn?.addEventListener("click", () => {
     const n = String(animalEl?.value || "").trim();
@@ -407,41 +389,35 @@
     location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
   });
 
-  async function loadInseminationSavedOptions() {
-    const uid = getUid();
-    if (!uid) return;
+async function loadInseminationSavedOptions() {
+  try {
+    const { r, data, authRequired } = await sessionFetchJson("/api/insemination/options");
 
-    try {
-      const r = await fetch("/api/insemination/options", {
-        headers: { "X-User-Id": uid }
+    if (authRequired) return;
+    if (!r.ok || data?.ok !== true) return;
+
+    const semenList = document.getElementById("semenCodeOptions");
+    const inseminatorList = document.getElementById("inseminatorOptions");
+
+    if (semenList) {
+      semenList.innerHTML = "";
+      (data.semenCodes || []).forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v;
+        semenList.appendChild(opt);
       });
+    }
 
-      const data = await r.json().catch(() => null);
-      if (!data || data.ok !== true) return;
-
-      const semenList = document.getElementById("semenCodeOptions");
-      const inseminatorList = document.getElementById("inseminatorOptions");
-
-      if (semenList) {
-        semenList.innerHTML = "";
-        (data.semenCodes || []).forEach(v => {
-          const opt = document.createElement("option");
-          opt.value = v;
-          semenList.appendChild(opt);
-        });
-      }
-
-      if (inseminatorList) {
-        inseminatorList.innerHTML = "";
-        (data.inseminators || []).forEach(v => {
-          const opt = document.createElement("option");
-          opt.value = v;
-          inseminatorList.appendChild(opt);
-        });
-      }
-    } catch (_) {}
-  }
-
+    if (inseminatorList) {
+      inseminatorList.innerHTML = "";
+      (data.inseminators || []).forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v;
+        inseminatorList.appendChild(opt);
+      });
+    }
+  } catch (_) {}
+}
   setDetailsDisabled(true);
   loadInseminationSavedOptions();
   scheduleGate();
