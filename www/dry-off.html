@@ -97,35 +97,6 @@
   let gateOk = false;
   let gateTimer = null;
 
-  function getUid() {
-    try {
-      return String(
-        localStorage.getItem("userId") ||
-        localStorage.getItem("uid") ||
-        localStorage.getItem("tenantId") ||
-        ""
-      ).trim();
-    } catch (_) {
-      return "";
-    }
-  }
-
-  function apiBase() {
-    try {
-      return String(
-        window.API_BASE ||
-        localStorage.getItem("API_BASE") ||
-        ""
-      ).replace(/\/$/, "");
-    } catch (_) {
-      return "";
-    }
-  }
-
-  function apiUrl(path) {
-    const base = apiBase();
-    return base ? `${base}${path}` : path;
-  }
 
   function todayYYYYMMDD() {
     const d = new Date();
@@ -164,7 +135,27 @@
       info.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (_) {}
   }
+  async function sessionPostJson(path, payload) {
+  const r = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify(payload || {})
+  });
 
+  const data = await r.json().catch(() => null);
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    showMsg(data?.message || "❌ سجّل الدخول أولًا.", "error");
+    return { r, data, authRequired: true };
+  }
+
+  return { r, data, authRequired: false };
+}
   function normalizeDigits(s) {
     const map = {
       "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
@@ -252,16 +243,10 @@ function renderGateResult(data) {
   showMsg(msg, gateOk ? "success" : "error");
 }
   async function runDryOffGate({ silent = false } = {}) {
-    const uid = getUid();
     const animalNumbers = animalEl.value.trim();
     const eventDate = dateEl.value;
 
     resetGateResult();
-
-    if (!uid) {
-      if (!silent) showMsg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
-      return false;
-    }
 
     if (!animalNumbers || !eventDate) {
       if (!silent) showMsg("أدخل رقم الحيوان وتاريخ التجفيف أولًا.", "warning");
@@ -271,19 +256,12 @@ function renderGateResult(data) {
     try {
       if (!silent) showMsg("جارِ التحقق من أهلية التجفيف...", "info");
 
-      const r = await fetch(apiUrl("/api/dry-off/gate"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify({
-          animalNumbers,
-          eventDate
-        })
-      });
+     const { data, authRequired } = await sessionPostJson("/api/dry-off/gate", {
+  animalNumbers,
+  eventDate
+});
 
-      const data = await r.json().catch(() => null);
+if (authRequired) return false;
 
       if (!data || data.ok !== true || data.allowed !== true) {
         renderGateResult(data || {
@@ -312,15 +290,10 @@ function renderGateResult(data) {
   }
 
   async function saveDryOff() {
-    const uid = getUid();
     const eventDate = dateEl.value;
     const pregnancyStatus = selectedRadio("pregnancyStatus");
     const usedDryingAntibiotics = selectedRadio("usedDryingAntibiotics");
 
-    if (!uid) {
-      showMsg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
-      return;
-    }
 
     if (!eventDate) {
       showMsg("❌ تاريخ التجفيف مطلوب.", "error");
@@ -346,22 +319,15 @@ function renderGateResult(data) {
       setButtonLoading(true);
       showMsg("جارِ حفظ التجفيف...", "info");
 
-      const r = await fetch(apiUrl("/api/dry-off/save"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify({
-          eventDate,
-          pregnancyStatus,
-          usedDryingAntibiotics,
-          accepted: acceptedRows,
-          tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
-        })
-      });
+     const { data, authRequired } = await sessionPostJson("/api/dry-off/save", {
+  eventDate,
+  pregnancyStatus,
+  usedDryingAntibiotics,
+  accepted: acceptedRows,
+  tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+});
 
-      const data = await r.json().catch(() => null);
+if (authRequired) return;
 
       if (!data || data.ok !== true) {
         const msg = data?.message || "❌ لم يتم حفظ التجفيف.";
@@ -382,11 +348,6 @@ function renderGateResult(data) {
       }
 
       showMsg(msg, "success");
-
-      try {
-        const first = data?.saved?.[0]?.animalNumber || acceptedRows?.[0]?.animalNumber || "";
-        if (first) localStorage.setItem("lastAnimalId", first);
-      } catch (_) {}
 
       setTimeout(() => {
         if (data.redirectUrl) {
@@ -412,9 +373,7 @@ function renderGateResult(data) {
   window.addEventListener("load", () => {
     const qp = new URLSearchParams(location.search);
     const qpNum = qp.get("number") || qp.get("animalNumber") || qp.get("animalId") || "";
-    const stored = localStorage.getItem("lastAnimalId") || "";
-
-    const startNumber = qpNum || stored || "";
+    const startNumber = qpNum || "";
     if (startNumber) {
       animalEl.value = startNumber;
     }
