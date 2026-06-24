@@ -552,7 +552,137 @@ padding: 6px 0;
 .mbk-premix-note{font-size:12px;font-weight:800;line-height:1.6;color:#475569;background:#f8fafc;border:1px solid #eef2f7;border-radius:14px;padding:9px;margin:8px 0}
 .mbk-premix-section{font-weight:900;color:#0b7f47;margin:12px 0 6px;border-top:1px dashed #d7e7dd;padding-top:10px}
 @media (max-width:640px){.mbk-premix-grid{grid-template-columns:1fr}.mbk-modal{border-radius:18px}}
+/* ===== Nutrition local isolation before central move ===== */
+body[data-page="nutrition"]{
+  --green:var(--brand,#0ea05a);
+  --card:#fff;
+  background:#f7faf7;
+}
 
+/* صفحة التغذية أوسع من فورم الأحداث العادي */
+body[data-page="nutrition"] .mbk-form{
+  width:100%;
+  max-width:860px;
+  margin:0 auto 24px;
+  padding:0 12px 28px;
+  display:block;
+}
+
+/* كروت التغذية لا تتبع تضييق mbk-card العام */
+body[data-page="nutrition"] .mbk-card,
+body[data-page="nutrition"] .card{
+  width:100%;
+  max-width:860px;
+  margin:10px auto;
+  background:#fff;
+  border:1px solid #e2e8f0;
+  border-radius:16px;
+  padding:10px;
+  box-shadow:0 1px 0 rgba(15,23,42,.04);
+  overflow:hidden;
+}
+
+/* row في التغذية Flex مش Grid */
+body[data-page="nutrition"] .row{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  min-width:0;
+}
+
+body[data-page="nutrition"] .row > .grow,
+body[data-page="nutrition"] .grow{
+  flex:1;
+  min-width:0;
+}
+
+/* أزرار التغذية القديمة */
+body[data-page="nutrition"] .btn{
+  background:#fff;
+  border:1px solid var(--green);
+  color:var(--green);
+}
+
+body[data-page="nutrition"] .btn-primary{
+  background:var(--green);
+  color:#fff;
+}
+
+/* شرائح الملخص */
+body[data-page="nutrition"] .pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid #e2e8f0;
+  background:#dcedc8;
+  color:#1b5e20;
+  font-size:13px;
+  font-weight:800;
+}
+
+/* كروت التحليل */
+body[data-page="nutrition"] #analysisSection{
+  max-width:860px;
+  margin:14px auto 22px;
+  padding:0;
+}
+
+body[data-page="nutrition"] .kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin-top:0;
+}
+
+body[data-page="nutrition"] .kpi{
+  position:relative;
+  background:#fff !important;
+  border:1px solid #eef2f7 !important;
+  border-radius:14px;
+  padding:10px;
+  box-shadow:0 6px 18px rgba(15,23,42,.06);
+}
+
+body[data-page="nutrition"] .kpi .k{
+  font-size:11px;
+  font-weight:900;
+  color:#334155;
+  opacity:1;
+  line-height:1.2;
+}
+
+body[data-page="nutrition"] .kpi .v{
+  font-weight:900;
+  font-size:16px;
+  margin-top:2px;
+}
+
+/* العرض المتقدم منفصل بصريًا */
+body[data-page="nutrition"] #advancedKPIs{
+  margin-top:12px;
+  padding-top:12px;
+  border-top:1px dashed #d7e7dd;
+}
+
+/* موبايل */
+@media (max-width:640px){
+  body[data-page="nutrition"] .mbk-form,
+  body[data-page="nutrition"] .mbk-card,
+  body[data-page="nutrition"] .card{
+    max-width:520px;
+  }
+
+  body[data-page="nutrition"] .row.stack > *{
+    flex:1 1 100%;
+  }
+
+  body[data-page="nutrition"] .kpi-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
 </style>
 
 </head>
@@ -865,7 +995,7 @@ padding: 6px 0;
     <h3>📊 التحليل الغذائي للعليقة</h3>
     <div id="nutritionKPIs" class="kpi-grid"></div>
     <button id="toggleAdvancedBtn" class="btn btn-ghost" type="button" style="margin-top:10px">عرض متقدم</button>
-<div id="advancedKPIs" style="display:none"></div>
+<div id="advancedKPIs" class="kpi-grid" style="display:none"></div>
   </div>
      
   <div class="mbk-card" id="economicAnalysisCard">
@@ -1608,8 +1738,7 @@ padding: 6px 0;
       if (!box) return;
 
       const hidden = box.style.display === "none" || !box.style.display;
-      box.style.display = hidden ? "block" : "none";
-
+     box.style.display = hidden ? "grid" : "none";
       if ($("toggleAdvancedBtn")) {
         $("toggleAdvancedBtn").textContent = hidden ? "إخفاء المتقدم" : "عرض متقدم";
       }
