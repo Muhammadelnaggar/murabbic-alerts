@@ -66,14 +66,7 @@
   let cullGateAllowed = false;
   let cullOptions = {};
 
-  function getUid() {
-    return String(
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      ""
-    ).trim();
-  }
+ 
 
   function msg(text, type = "info") {
     if (!info) return;
@@ -90,21 +83,40 @@
 
     try { info.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
   }
+async function sessionFetchJson(path, options = {}) {
+  const r = await fetch(path, {
+    method: options.method || "GET",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Accept": "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers || {})
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
 
+  const data = await r.json().catch(() => null);
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    msg(data?.message || "❌ سجّل الدخول أولًا.", "error");
+    return { r, data, authRequired: true };
+  }
+
+  return { r, data, authRequired: false };
+}
   function initFromUrl() {
     const p = new URLSearchParams(location.search);
 
-    const num =
-      p.get("number") ||
-      p.get("animalNumber") ||
-      localStorage.getItem("lastAnimalNumber") ||
-      "";
+   const num =
+  p.get("number") ||
+  p.get("animalNumber") ||
+  "";
 
-    const dt =
-      p.get("date") ||
-      p.get("eventDate") ||
-      localStorage.getItem("lastEventDate") ||
-      new Date().toISOString().slice(0, 10);
+   const dt =
+  p.get("date") ||
+  p.get("eventDate") ||
+  new Date().toISOString().slice(0, 10);
 
     $("animalNumber").value = String(num || "").trim();
     $("eventDate").value = String(dt || "").slice(0, 10);
@@ -148,94 +160,73 @@
     });
   }
 
-  async function loadCullOptions() {
-    const uid = getUid();
+async function loadCullOptions() {
+  try {
+    const { r, data, authRequired } = await sessionFetchJson("/api/cull/options");
 
-    if (!uid) {
-      msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
+    if (authRequired) return false;
+
+    if (!r.ok || data?.ok !== true || !data?.options) {
+      msg(data?.message || "❌ تعذّر تحميل أسباب الاستبعاد.", "error");
       return false;
     }
 
-    try {
-      const r = await fetch("/api/cull/options", {
-        method: "GET",
-        headers: { "X-User-Id": uid }
-      });
+    cullOptions = data.options || {};
+    fillMainOptions();
+    fillDetails();
+    return true;
 
-      const data = await r.json().catch(() => null);
+  } catch (e) {
+    console.error("load cull options failed", e);
+    msg("❌ فشل الاتصال بالسيرفر أثناء تحميل أسباب الاستبعاد.", "error");
+    return false;
+  }
+}
 
-      if (!r.ok || data?.ok !== true || !data?.options) {
-        msg(data?.message || "❌ تعذّر تحميل أسباب الاستبعاد.", "error");
-        return false;
-      }
+async function runCullGate() {
+  const animalNumber = String($("animalNumber")?.value || "").trim();
 
-      cullOptions = data.options || {};
-      fillMainOptions();
-      fillDetails();
-      return true;
+  cullGateAllowed = false;
+  if (btn) btn.disabled = true;
 
-    } catch (e) {
-      console.error("load cull options failed", e);
-      msg("❌ فشل الاتصال بالسيرفر أثناء تحميل أسباب الاستبعاد.", "error");
-      return false;
-    }
+  if (!animalNumber) {
+    msg("❌ رقم الحيوان مطلوب.", "error");
+    return false;
   }
 
-  async function runCullGate() {
-    const uid = getUid();
-    const animalNumber = String($("animalNumber")?.value || "").trim();
+  try {
+    msg("جارِ التحقق من الحيوان...", "info");
 
-    cullGateAllowed = false;
-    if (btn) btn.disabled = true;
+    const { r, data, authRequired } = await sessionFetchJson("/api/cull/gate", {
+      method: "POST",
+      body: { animalNumber }
+    });
 
-    if (!uid) {
-      msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
-      return false;
-    }
+    if (authRequired) return false;
 
-    if (!animalNumber) {
-      msg("❌ رقم الحيوان مطلوب.", "error");
-      return false;
-    }
-
-    try {
-      msg("جارِ التحقق من الحيوان...", "info");
-
-      const r = await fetch("/api/cull/gate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify({ animalNumber })
-      });
-
-      const data = await r.json().catch(() => null);
-
-      if (!r.ok || data?.allowed !== true) {
-        cullGateAllowed = false;
-        if (btn) btn.disabled = true;
-        msg(data?.message || "❌ لا يمكن تسجيل استبعاد لهذا الحيوان.", "error");
-        return false;
-      }
-
-      cullGateAllowed = true;
-      if (btn) btn.disabled = false;
-
-      msg(data.message || "✅ الحيوان مؤهل لتسجيل الاستبعاد.", "success");
-      return true;
-
-    } catch (e) {
-      console.error("cull gate failed", e);
+    if (!r.ok || data?.allowed !== true) {
       cullGateAllowed = false;
       if (btn) btn.disabled = true;
-      msg("❌ فشل الاتصال بالسيرفر أثناء التحقق من الحيوان.", "error");
+      msg(data?.message || "❌ لا يمكن تسجيل استبعاد لهذا الحيوان.", "error");
       return false;
     }
+
+    cullGateAllowed = true;
+    if (btn) btn.disabled = false;
+
+    msg(data.message || "✅ الحيوان مؤهل لتسجيل الاستبعاد.", "success");
+    return true;
+
+  } catch (e) {
+    console.error("cull gate failed", e);
+    cullGateAllowed = false;
+    if (btn) btn.disabled = true;
+    msg("❌ فشل الاتصال بالسيرفر أثناء التحقق من الحيوان.", "error");
+    return false;
   }
+}
 
   async function saveCull() {
-    const uid = getUid();
 
     if (!cullGateAllowed) {
       msg("❌ لا يمكن الحفظ قبل نجاح التحقق من الحيوان.", "error");
@@ -261,10 +252,6 @@
     }
 
     try {
-      if (!uid) {
-        msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.", "error");
-        return;
-      }
 
       if (btn) {
         btn.disabled = true;
@@ -273,16 +260,12 @@
 
       msg("جارِ حفظ الاستبعاد...", "info");
 
-      const r = await fetch("/api/cull/save", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify(payload)
-      });
+     const { r, data, authRequired } = await sessionFetchJson("/api/cull/save", {
+  method: "POST",
+  body: payload
+});
 
-      const data = await r.json().catch(() => null);
+if (authRequired) return;
 
       if (!r.ok || data?.ok !== true) {
         msg(data?.message || "❌ فشل حفظ الاستبعاد.", "error");
@@ -293,8 +276,6 @@
         return;
       }
 
-      localStorage.setItem("lastAnimalNumber", payload.animalNumber);
-      localStorage.setItem("lastEventDate", payload.eventDate);
 
       msg(data.message || "✅ تم حفظ الاستبعاد بنجاح", "success");
 
