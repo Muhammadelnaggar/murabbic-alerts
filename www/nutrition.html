@@ -85,6 +85,7 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
 .kpi .vrow{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .kpi .arr{ font-size:18px; line-height:1; }      
 #advancedKPIs{margin-top:10px}
+#advancedAnalysisCard{border-top:3px solid rgba(14,160,90,.35)}
 
 /* === Murabbik Nutrition KPI cards: compact, mobile-first (surgical) === */
 .kpi-grid{gap:8px}
@@ -550,6 +551,15 @@ padding: 6px 0;
 .mbk-premix-section{font-weight:900;color:#0b7f47;margin:12px 0 6px;border-top:1px dashed #d7e7dd;padding-top:10px}
 @media (max-width:640px){.mbk-premix-grid{grid-template-columns:1fr}.mbk-modal{border-radius:18px}}
 
+
+/* Advanced cards are rendered from server panels.advancedCards only */
+#advancedAnalysisCard .kpi[data-section="advanced"]{
+  box-shadow:none;
+}
+#advancedAnalysisCard .kpi[data-section="advanced"] .kpi-badge{
+  display:none;
+}
+
 </style>
 </head>
 <body>
@@ -729,7 +739,7 @@ padding: 6px 0;
         <tbody></tbody>
       </table>
     </div>
- <div class="mini-actions" id="miniActions" style="display:none">
+ <div class="mini-actions" id="miniActions" style="display:flex">
   <button id="addPreset" class="mini-btn" type="button">إضافة خامة</button>
   <button id="clearAll" class="mini-btn" type="button">مسح التركيبة</button>
 </div>  
@@ -860,7 +870,11 @@ padding: 6px 0;
     <h3>📊 التحليل الغذائي للعليقة</h3>
     <div id="nutritionKPIs" class="kpi-grid"></div>
     <button id="toggleAdvancedBtn" class="btn btn-ghost" type="button" style="margin-top:10px">عرض متقدم</button>
-<div id="advancedKPIs" class="kpi-grid" style="display:none"></div>
+  </div>
+
+  <div class="mbk-card" id="advancedAnalysisCard" style="display:none">
+    <h3>🧪 العرض المتقدم</h3>
+    <div id="advancedKPIs" class="kpi-grid"></div>
   </div>
      
   <div class="mbk-card" id="economicAnalysisCard">
@@ -1305,7 +1319,7 @@ padding: 6px 0;
     box.innerHTML = state.rows.map((r, i) => `
       <div class="feed-item">
         <label>
-          <input class="rationPick" type="radio" name="rationPick" ${i === state.selectedIndex ? "checked" : ""} data-i="${i}">
+          <input class="rationPick" type="checkbox" ${i === state.selectedIndex ? "checked" : ""} data-i="${i}">
           <span class="a">${escapeHtml(r.name)}</span>
         </label>
         <span class="b">${r.asFedKg ?? r.pct ?? "—"}</span>
@@ -1396,7 +1410,32 @@ padding: 6px 0;
     }
   }
 
-  function cardHtml(card = {}) {
+  function cardGaugePct(card = {}, section = "analysis") {
+    if (section === "advanced") return null;
+
+    const explicit = Number(card.pointerPct ?? card.meterPct ?? card.percent ?? NaN);
+    if (Number.isFinite(explicit)) return Math.max(0, Math.min(100, explicit));
+
+    const actual = Number(card.actual);
+    const target = Number(card.target);
+    const key = clean(card.key || card.metric || "").toLowerCase();
+
+    if (key === "decision" || key === "priority") return null;
+
+    if (key === "rumen" && Number.isFinite(actual)) {
+      return Math.max(0, Math.min(100, actual));
+    }
+
+    if (!Number.isFinite(actual) || !Number.isFinite(target) || target <= 0) return null;
+
+    if (key === "starch" || key === "fat") {
+      return Math.max(0, Math.min(100, (actual / target) * 100));
+    }
+
+    return Math.max(0, Math.min(100, (actual / target) * 100));
+  }
+
+  function cardHtml(card = {}, section = "analysis") {
     const status = clean(card.status || card.level || card.state || "ok").toLowerCase();
 
     const cls =
@@ -1409,14 +1448,13 @@ padding: 6px 0;
     const title = card.title || card.key || "مؤشر";
     const value = card.valueText ?? card.value ?? card.actual ?? "—";
     const badge = card.stateLabel || card.statusText || (cls === "ok" ? "مناسب" : cls === "warn" ? "متابعة" : "خطر");
-    const hint = card.message || card.targetText || card.subText || "";
+    const hint = card.message || card.uiHint || card.targetText || card.subText || "";
     const scale = card.scaleText || "";
-    const pctRaw = Number(card.pointerPct ?? card.meterPct ?? card.percent ?? NaN);
-    const pct = Number.isFinite(pctRaw) ? Math.max(0, Math.min(100, pctRaw)) : null;
-    const extraClass = card.key === "rumen" || title.includes("الكرش") ? " rumen-feature" : "";
+    const pct = cardGaugePct(card, section);
+    const extraClass = card.key === "rumen" || clean(title).includes("الكرش") ? " rumen-feature" : "";
 
     return `
-      <div class="kpi ${cls}${extraClass}">
+      <div class="kpi ${cls}${extraClass}" data-section="${escapeHtml(section)}" data-key="${escapeHtml(card.key || "")}">
         <div class="k">
           <span>${escapeHtml(title)}</span>
           <span class="kpi-badge"><span class="dot"></span>${escapeHtml(badge)}</span>
@@ -1464,9 +1502,11 @@ padding: 6px 0;
     const eCards = panels.economicsCards || panels.economicCards || [];
     const aCards = panels.advancedCards || [];
 
-    if ($("nutritionKPIs")) $("nutritionKPIs").innerHTML = nCards.length ? nCards.map(cardHtml).join("") : "";
-    if ($("economicKPIs")) $("economicKPIs").innerHTML = eCards.length ? eCards.map(cardHtml).join("") : "";
-    if ($("advancedKPIs")) $("advancedKPIs").innerHTML = aCards.length ? aCards.map(cardHtml).join("") : "";
+    if ($("nutritionKPIs")) $("nutritionKPIs").innerHTML = nCards.length ? nCards.map(c => cardHtml(c, "analysis")).join("") : "";
+    if ($("economicKPIs")) $("economicKPIs").innerHTML = eCards.length ? eCards.map(c => cardHtml(c, "economics")).join("") : "";
+    if ($("advancedKPIs")) $("advancedKPIs").innerHTML = aCards.length ? aCards.map(c => cardHtml(c, "advanced")).join("") : "";
+    if ($("toggleAdvancedBtn")) $("toggleAdvancedBtn").style.display = aCards.length ? "inline-flex" : "none";
+    if ($("advancedAnalysisCard") && !aCards.length) $("advancedAnalysisCard").style.display = "none";
   }
 
   async function saveEvent(ev) {
@@ -1591,9 +1631,18 @@ padding: 6px 0;
 
   function bind() {
     $("feedTypeFilter")?.addEventListener("change", renderFeedOptions);
-    $("preset")?.addEventListener("change", addSelectedFeed);
+    $("preset")?.addEventListener("change", () => {
+      if ($("miniActions")) $("miniActions").style.display = "flex";
+    });
     $("mode")?.addEventListener("change", syncModeUI);
 
+    $("addPreset")?.addEventListener("click", addSelectedFeed);
+    $("clearAll")?.addEventListener("click", () => {
+      state.rows = [];
+      state.selectedIndex = -1;
+      renderRows();
+      showMsg("");
+    });
     $("rationRemove")?.addEventListener("click", removeSelectedFeed);
 
     $("concKgInput")?.addEventListener("input", analyzeSoon);
@@ -1610,11 +1659,11 @@ padding: 6px 0;
     $("saveCustomPremix")?.addEventListener("click", savePremix);
 
     $("toggleAdvancedBtn")?.addEventListener("click", () => {
-      const box = $("advancedKPIs");
-      if (!box) return;
+      const card = $("advancedAnalysisCard");
+      if (!card) return;
 
-      const hidden = box.style.display === "none" || !box.style.display;
-     box.style.display = hidden ? "grid" : "none";
+      const hidden = card.style.display === "none" || !card.style.display;
+      card.style.display = hidden ? "block" : "none";
       if ($("toggleAdvancedBtn")) {
         $("toggleAdvancedBtn").textContent = hidden ? "إخفاء المتقدم" : "عرض متقدم";
       }
