@@ -11,6 +11,11 @@
 
 
   <style>
+:root{
+  --green:var(--brand,#0ea05a);
+  --card:#fff;
+}
+
     *{box-sizing:border-box}
    body{
   direction:rtl;
@@ -337,17 +342,15 @@ padding: 6px 0;
 
 @media (max-width:380px){
   #feedInputBox #tbl tbody tr{
-    grid-template-columns:1fr;
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+    grid-template-columns: 1fr;
     grid-template-areas:
-      "name"
-      "cat"
-      "pTon"
-      "dm"
-      "cp"
-      "pTonDM"
-      "pct"
-      "kg"
-      "kgDM";
+ grid-template-areas:
+  "name name"
+  "cat  pTon"
+  "dm   cp"
+  "pTonDM pct"
+  "kg   kgDM";
   }
 }
 
@@ -546,568 +549,9 @@ padding: 6px 0;
 .mbk-premix-note{font-size:12px;font-weight:800;line-height:1.6;color:#475569;background:#f8fafc;border:1px solid #eef2f7;border-radius:14px;padding:9px;margin:8px 0}
 .mbk-premix-section{font-weight:900;color:#0b7f47;margin:12px 0 6px;border-top:1px dashed #d7e7dd;padding-top:10px}
 @media (max-width:640px){.mbk-premix-grid{grid-template-columns:1fr}.mbk-modal{border-radius:18px}}
-/* ===== Murabbik Nutrition visual restore — local page only ===== */
-body[data-page="nutrition"]{
-  overflow-x:hidden;
-  background:#fff;
-  padding-bottom:92px;
-}
 
-body[data-page="nutrition"] .mbk-form{
-  width:100%;
-  max-width:860px;
-  margin:0 auto;
-  padding:0 10px 96px;
-}
 
-body[data-page="nutrition"] .mbk-card,
-body[data-page="nutrition"] .card,
-body[data-page="nutrition"] #analysisSection{
-  width:100%;
-  max-width:860px;
-  margin-left:auto;
-  margin-right:auto;
-}
 
-body[data-page="nutrition"] .animal-strip{
-  width:100%;
-  max-width:860px;
-  margin-left:auto;
-  margin-right:auto;
-}
-
-body[data-page="nutrition"] .controls-box{
-  background:#fff;
-  border:1px solid rgba(0,0,0,.06);
-  border-radius:16px;
-  padding:8px;
-}
-
-body[data-page="nutrition"] .row.controls{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-}
-
-body[data-page="nutrition"] .row.controls .grow{
-  min-width:0;
-  flex:1 1 100%;
-}
-
-body[data-page="nutrition"] #feedSummaryBox.feed-summary{
-  margin-top:10px;
-  background:#f3fbf5;
-  border:1px dashed rgba(14,160,90,.35);
-  border-radius:14px;
-  padding:0;
-  overflow:hidden;
-  font-size:13px;
-}
-
-body[data-page="nutrition"] #feedSummaryBox.feed-summary:empty{
-  display:none !important;
-}
-
-body[data-page="nutrition"] #feedSummaryBox .feed-item{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  min-height:48px;
-  padding:8px 12px;
-  line-height:1.35;
-  border-bottom:1px solid rgba(14,160,90,.13);
-  background:#f3fbf5;
-}
-
-body[data-page="nutrition"] #feedSummaryBox .feed-item:last-child{
-  border-bottom:none;
-}
-
-body[data-page="nutrition"] #feedSummaryBox .feed-item label{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex:1;
-  min-width:0;
-  margin:0;
-}
-
-body[data-page="nutrition"] #feedSummaryBox .rationPick{
-  width:18px;
-  height:18px;
-  min-height:18px;
-  margin:0;
-  accent-color:#0ea05a;
-  flex:0 0 auto;
-}
-
-body[data-page="nutrition"] #feedSummaryBox .feed-item .a{
-  flex:1;
-  min-width:0;
-  font-size:13px;
-  font-weight:900;
-  color:#0b7f47;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-
-body[data-page="nutrition"] #feedSummaryBox .feed-item .b{
-  flex:0 0 auto;
-  font-size:13px;
-  font-weight:900;
-  color:#334155;
-  white-space:nowrap;
-  direction:rtl;
-}
-
-body[data-page="nutrition"] #feedInputBox{
-  background:rgba(14,160,90,.10);
-  border:1px solid rgba(14,160,90,.25);
-  border-radius:16px;
-  padding:10px;
-  margin-top:10px;
-  overflow-x:hidden;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl{
-  width:100%;
-  min-width:unset;
-  border:0;
-  background:transparent;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl thead{
-  display:none;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl tbody{
-  display:block;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl tbody tr{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px 8px;
-  padding:8px;
-  margin:10px 0;
-  border:1px solid rgba(14,160,90,.20);
-  border-radius:16px;
-  background:#fff;
-  grid-template-areas:
-    "name name"
-    "cat  pTon"
-    "dm   cp"
-    "pTonDM pTonDM"
-    "pct  kg"
-    "kgDM kgDM";
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl td{
-  display:flex !important;
-  flex-direction:column !important;
-  gap:6px !important;
-  padding:0 !important;
-  border:0 !important;
-  background:transparent !important;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl td::before{
-  content:attr(data-label);
-  font-weight:900;
-  font-size:13px;
-  color:#0b7f47;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="name"]{grid-area:name}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="cat"]{grid-area:cat}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="dm"]{grid-area:dm}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="cp"]{grid-area:cp}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="pTon"]{grid-area:pTon}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="pTonDM"]{grid-area:pTonDM}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="pct"]{grid-area:pct}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="kg"]{grid-area:kg}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="kgDM"]{grid-area:kgDM}
-body[data-page="nutrition"] #feedInputBox #tbl td[data-col="cost"]{display:none !important}
-
-body[data-page="nutrition"] #feedInputBox #tbl input,
-body[data-page="nutrition"] #feedInputBox #tbl select{
-  width:100%;
-  height:42px;
-  min-height:42px;
-  border-radius:12px;
-  border:1px solid #d7e7dd;
-  padding:8px 10px;
-  font-weight:800;
-  background:#f9fdfb;
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl input:focus,
-body[data-page="nutrition"] #feedInputBox #tbl select:focus{
-  outline:none;
-  border-color:#0ea05a;
-  background:#fff;
-  box-shadow:0 0 0 2px rgba(14,160,90,.14);
-}
-
-body[data-page="nutrition"] #feedInputBox #tbl .pTonDM,
-body[data-page="nutrition"] #feedInputBox #tbl .kgDM,
-body[data-page="nutrition"] #feedInputBox #tbl .cost{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  height:40px;
-  border-radius:12px;
-  border:1px dashed rgba(14,160,90,.25);
-  background:rgba(14,160,90,.06);
-  font-weight:900;
-  color:#0b7f47;
-}
-
-@media (max-width:380px){
-  body[data-page="nutrition"] #feedInputBox #tbl tbody tr{
-    grid-template-columns:1fr;
-    grid-template-areas:
-      "name"
-      "cat"
-      "pTon"
-      "dm"
-      "cp"
-      "pTonDM"
-      "pct"
-      "kg"
-      "kgDM";
-  }
-}
-
-body[data-page="nutrition"] #nutritionKPIs,
-body[data-page="nutrition"] #economicKPIs{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:8px;
-}
-
-body[data-page="nutrition"] #advancedKPIs{
-  margin-top:12px;
-}
-
-body[data-page="nutrition"] #advancedKPIs:not([style*="display: none"]){
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px;
-}
-
-body[data-page="nutrition"] .kpi{
-  min-width:0;
-  border-radius:14px;
-  padding:10px;
-  background:#fff !important;
-  border:1px solid rgba(0,0,0,.06) !important;
-  box-shadow:0 6px 18px rgba(15,23,42,.06);
-}
-
-body[data-page="nutrition"] .kpi .k{
-  font-size:11px;
-  font-weight:900;
-  color:#334155;
-  line-height:1.25;
-  min-height:28px;
-}
-
-body[data-page="nutrition"] .kpi .v{
-  font-size:16px;
-  font-weight:900;
-  line-height:1.25;
-  margin-top:4px;
-}
-
-body[data-page="nutrition"] .kpi-hint{
-  margin-top:6px;
-  font-size:11px;
-  font-weight:800;
-  color:#475569;
-  line-height:1.35;
-}
-
-body[data-page="nutrition"] #nutritionKPIs .kpi.rumen-feature,
-body[data-page="nutrition"] #nutritionKPIs .kpi[data-key="rumen"]{
-  grid-column:1 / -1;
-  padding:14px;
-  border-radius:18px;
-  background:linear-gradient(180deg,#fff 0%,#f7fff9 100%) !important;
-  border:1px solid rgba(14,160,90,.24) !important;
-}
-
-body[data-page="nutrition"] .mbk-field input,
-body[data-page="nutrition"] .mbk-field select{
-  width:100%;
-  background:#f9fdfb;
-  font-weight:800;
-}
-
-body[data-page="nutrition"] #nutritionForm{
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:0;
-  z-index:9998;
-  background:#fff;
-  border-top:1px solid #e2e8f0;
-  padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-  margin:0 !important;
-}
-
-body[data-page="nutrition"] #saveEvent{
-  width:min(860px,100%) !important;
-  max-width:860px;
-  margin:0 auto;
-  display:block;
-  min-height:52px;
-  border-radius:16px;
-  font-size:16px;
-}
-
-@media (max-width:420px){
-  body[data-page="nutrition"] .mbk-form{
-    padding-left:8px;
-    padding-right:8px;
-  }
-
-  body[data-page="nutrition"] .strip-item .lbl{
-    font-size:9.5px;
-  }
-
-  body[data-page="nutrition"] .strip-item .val{
-    font-size:13px;
-  }
-
-  body[data-page="nutrition"] #nutritionKPIs,
-  body[data-page="nutrition"] #economicKPIs,
-  body[data-page="nutrition"] #advancedKPIs:not([style*="display: none"]){
-    gap:8px;
-  }
-
-  body[data-page="nutrition"] .kpi{
-    padding:9px;
-  }
-
-  body[data-page="nutrition"] .kpi .v{
-    font-size:16px;
-  }
-}
- /* ===== Murabbik Nutrition analysis restore — local only ===== */
-body[data-page="nutrition"] #analysisSection{
-  width:100%;
-  max-width:860px;
-  margin:14px auto 22px;
-  padding:0;
-}
-
-body[data-page="nutrition"] #analysisSection .mbk-card{
-  background:#fff;
-  border:1px solid rgba(15,23,42,.07);
-  border-radius:20px;
-  padding:12px;
-  margin:10px 0;
-  box-shadow:0 8px 24px rgba(15,23,42,.06);
-}
-
-body[data-page="nutrition"] #analysisSection h3{
-  margin:0 0 12px;
-  font-size:16px;
-  font-weight:900;
-  color:#0f172a;
-}
-
-body[data-page="nutrition"] #nutritionKPIs,
-body[data-page="nutrition"] #economicKPIs,
-body[data-page="nutrition"] #advancedKPIs{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px;
-}
-
-body[data-page="nutrition"] .kpi{
-  position:relative;
-  overflow:hidden;
-  min-width:0;
-  min-height:126px;
-  border-radius:18px !important;
-  padding:12px !important;
-  background:#fff !important;
-  border:1px solid rgba(15,23,42,.08) !important;
-  box-shadow:0 8px 22px rgba(15,23,42,.07) !important;
-}
-
-body[data-page="nutrition"] .kpi::before{
-  content:"";
-  position:absolute;
-  inset:0 auto 0 0;
-  width:5px;
-  background:var(--kpi-accent, #cbd5e1);
-}
-
-body[data-page="nutrition"] .kpi.ok{--kpi-accent:#12a05c}
-body[data-page="nutrition"] .kpi.warn{--kpi-accent:#f59e0b}
-body[data-page="nutrition"] .kpi.bad{--kpi-accent:#ef4444}
-
-body[data-page="nutrition"] .kpi .k{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:8px;
-  min-height:34px;
-  font-size:13px;
-  font-weight:900;
-  color:#172033;
-  line-height:1.25;
-}
-
-body[data-page="nutrition"] .kpi .v{
-  margin-top:8px;
-  font-size:20px;
-  font-weight:1000;
-  color:#0f172a;
-  line-height:1.2;
-}
-
-body[data-page="nutrition"] .kpi-badge{
-  flex:0 0 auto;
-  display:inline-flex;
-  align-items:center;
-  gap:5px;
-  padding:4px 8px;
-  border-radius:999px;
-  font-size:11px;
-  font-weight:900;
-  white-space:nowrap;
-  background:rgba(15,23,42,.06);
-  color:#334155;
-}
-
-body[data-page="nutrition"] .kpi.ok .kpi-badge{
-  background:rgba(18,160,92,.10);
-  color:#0b7f47;
-}
-
-body[data-page="nutrition"] .kpi.warn .kpi-badge{
-  background:rgba(245,158,11,.13);
-  color:#92400e;
-}
-
-body[data-page="nutrition"] .kpi.bad .kpi-badge{
-  background:rgba(239,68,68,.11);
-  color:#991b1b;
-}
-
-body[data-page="nutrition"] .kpi-badge .dot{
-  width:8px;
-  height:8px;
-  border-radius:50%;
-  background:var(--kpi-accent, #cbd5e1);
-  box-shadow:0 0 0 3px rgba(15,23,42,.06);
-}
-
-body[data-page="nutrition"] .kpi-meter{
-  margin-top:10px;
-  height:8px;
-  border-radius:999px;
-  background:#edf1f5;
-  overflow:hidden;
-}
-
-body[data-page="nutrition"] .kpi-meter > span{
-  display:block;
-  height:100%;
-  width:0;
-  border-radius:999px;
-  background:var(--kpi-accent, #cbd5e1);
-}
-
-body[data-page="nutrition"] .kpi-hint{
-  margin-top:8px;
-  font-size:12px;
-  font-weight:800;
-  line-height:1.45;
-  color:#475569;
-}
-
-body[data-page="nutrition"] #nutritionKPIs .kpi.rumen-feature,
-body[data-page="nutrition"] #nutritionKPIs .kpi[data-key*="rumen"]{
-  grid-column:1 / -1;
-  min-height:145px;
-  background:linear-gradient(180deg,#ffffff 0%,#f3fff8 100%) !important;
-  border:1px solid rgba(18,160,92,.25) !important;
-}
-
-body[data-page="nutrition"] .nutrition-advanced-toggle{
-  width:100%;
-  min-height:56px;
-  margin:12px 0 8px !important;
-  border-radius:18px;
-  background:#0ea05a !important;
-  color:#fff !important;
-  border:0 !important;
-  font-size:17px;
-  font-weight:1000;
-}
-
-body[data-page="nutrition"] .nutrition-advanced-card{
-  background:#fbfefc !important;
-  border-color:rgba(18,160,92,.18) !important;
-}
-
-body[data-page="nutrition"] #advancedKPIs .kpi{
-  min-height:118px;
-  background:#fcfffd !important;
-}
-
-body[data-page="nutrition"] #economicAnalysisCard{
-  margin-top:12px;
-}
-
-@media (max-width:420px){
-  body[data-page="nutrition"] #analysisSection{
-    margin-top:12px;
-  }
-
-  body[data-page="nutrition"] #analysisSection .mbk-card{
-    padding:10px;
-    border-radius:18px;
-  }
-
-  body[data-page="nutrition"] #nutritionKPIs,
-  body[data-page="nutrition"] #economicKPIs,
-  body[data-page="nutrition"] #advancedKPIs{
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:8px;
-  }
-
-  body[data-page="nutrition"] .kpi{
-    min-height:118px;
-    padding:10px !important;
-    border-radius:16px !important;
-  }
-
-  body[data-page="nutrition"] .kpi .k{
-    font-size:12px;
-    min-height:32px;
-  }
-
-  body[data-page="nutrition"] .kpi .v{
-    font-size:18px;
-  }
-
-  body[data-page="nutrition"] .kpi-hint{
-    font-size:11px;
-  }
-
-  body[data-page="nutrition"] .nutrition-advanced-toggle{
-    min-height:54px;
-    font-size:16px;
-  }
-} 
 /* ===== Murabbik Advanced Gauges — local nutrition only ===== */
 body[data-page="nutrition"] .nutrition-advanced-card{
   background:#fff !important;
@@ -1127,6 +571,8 @@ body[data-page="nutrition"] .nutrition-advanced-card h3{
 body[data-page="nutrition"] #advancedKPIs{
   display:block !important;
   margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
 }
 
 body[data-page="nutrition"] .advanced-gauge-card{
@@ -1224,13 +670,8 @@ body[data-page="nutrition"] .advanced-side-value{
   word-break:break-word;
 }
 
-body[data-page="nutrition"] .supply-side{
-  grid-column:1;
-}
-
-body[data-page="nutrition"] .need-side{
-  grid-column:3;
-}
+body[data-page="nutrition"] .supply-side{grid-column:1}
+body[data-page="nutrition"] .need-side{grid-column:3}
 
 body[data-page="nutrition"] .advanced-gauge{
   grid-column:2;
@@ -1280,9 +721,7 @@ body[data-page="nutrition"] .advanced-gauge-needle{
   border-radius:999px;
   background:#0f172a;
   transform-origin:50% 100%;
-  transform:
-    translateX(-50%)
-    rotate(calc((var(--needle, 50) * 1.8deg) - 90deg));
+  transform:translateX(-50%) rotate(calc((var(--needle, 50) * 1.8deg) - 90deg));
   box-shadow:0 2px 8px rgba(15,23,42,.22);
   z-index:3;
 }
@@ -1314,13 +753,13 @@ body[data-page="nutrition"] .advanced-gauge-note{
 
 body[data-page="nutrition"] .nutrition-advanced-toggle{
   width:100%;
-  min-height:56px;
+  min-height:52px;
   margin:12px 0 8px !important;
-  border-radius:18px;
+  border-radius:16px;
   background:#0ea05a !important;
   color:#fff !important;
   border:0 !important;
-  font-size:17px;
+  font-size:16px;
   font-weight:1000;
 }
 
@@ -1330,51 +769,22 @@ body[data-page="nutrition"] .nutrition-advanced-toggle{
     border-radius:20px;
   }
 
-  body[data-page="nutrition"] .advanced-gauge-title{
-    font-size:15px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-badge{
-    font-size:12px;
-    padding:5px 9px;
-  }
+  body[data-page="nutrition"] .advanced-gauge-title{font-size:15px}
+  body[data-page="nutrition"] .advanced-gauge-badge{font-size:12px;padding:5px 9px}
 
   body[data-page="nutrition"] .advanced-gauge-body{
     grid-template-columns:minmax(0,1fr) 132px minmax(0,1fr);
     gap:7px;
   }
 
-  body[data-page="nutrition"] .advanced-gauge{
-    width:132px;
-    height:82px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-arc{
-    height:70px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-arc::after{
-    left:20px;
-    right:20px;
-    height:46px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-needle{
-    height:60px;
-  }
-
-  body[data-page="nutrition"] .advanced-side-label{
-    font-size:11px;
-  }
-
-  body[data-page="nutrition"] .advanced-side-value{
-    font-size:15px;
-  }
-
-  body[data-page="nutrition"] .advanced-gauge-note{
-    font-size:11px;
-  }
-}    
+  body[data-page="nutrition"] .advanced-gauge{width:132px;height:82px}
+  body[data-page="nutrition"] .advanced-gauge-arc{height:70px}
+  body[data-page="nutrition"] .advanced-gauge-arc::after{left:20px;right:20px;height:46px}
+  body[data-page="nutrition"] .advanced-gauge-needle{height:60px}
+  body[data-page="nutrition"] .advanced-side-label{font-size:11px}
+  body[data-page="nutrition"] .advanced-side-value{font-size:15px}
+  body[data-page="nutrition"] .advanced-gauge-note{font-size:11px}
+}
 </style>
 </head>
 <body data-page="nutrition">
