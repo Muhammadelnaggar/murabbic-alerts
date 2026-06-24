@@ -122,17 +122,7 @@
     return new URL(location.href).searchParams.get(name) || "";
   }
 
-  function getUid(){
-    return String(
-      window.MBK_USER_ID ||
-      window.mbkUserId ||
-      window.mbk?.userId ||
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      ""
-    ).trim();
-  }
+  
 
   function msg(text, ok=false){
     if (!bar) return;
@@ -152,44 +142,51 @@
     return form.querySelector('input[name="heatTime"]:checked')?.value || "";
   }
 
-  async function postJson(url, body){
-    const uid = getUid();
+async function postJson(url, body){
+  const r = await fetch(url, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify(body || {})
+  });
 
-    const r = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(uid ? { "X-User-Id": uid } : {})
-      },
-      body: JSON.stringify(body || {})
-    });
+  const j = await r.json().catch(() => ({}));
 
-    const j = await r.json().catch(() => ({}));
+  if (r.status === 401 || j?.error === "auth_required") {
+    const err = new Error(j.message || "سجّل الدخول أولًا.");
+    err.payload = j;
+    throw err;
+  }
 
-    if (!r.ok) {
-      const err = new Error(j.message || "تعذّر الاتصال بالسيرفر.");
-      err.payload = j;
-      throw err;
+  if (!r.ok) {
+    const err = new Error(j.message || "تعذّر الاتصال بالسيرفر.");
+    err.payload = j;
+    throw err;
+  }
+
+  return j;
+}
+
+async function getContextSingle(number, eventDate){
+  const q =
+    `/api/heat/context?animalNumber=${encodeURIComponent(number)}` +
+    `&eventDate=${encodeURIComponent(eventDate)}`;
+
+  const r = await fetch(q, {
+    method: "GET",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Accept": "application/json"
     }
+  });
 
-    return j;
-  }
-
-  async function getContextSingle(number, eventDate){
-    const uid = getUid();
-    const q =
-      `/api/heat/context?animalNumber=${encodeURIComponent(number)}` +
-      `&eventDate=${encodeURIComponent(eventDate)}`;
-
-    const r = await fetch(q, {
-      headers: {
-        ...(uid ? { "X-User-Id": uid } : {})
-      }
-    });
-
-    return await r.json().catch(() => ({}));
-  }
-
+  return await r.json().catch(() => ({}));
+}
   function clearContextFields(){
     if ($("animalId")) $("animalId").value = "";
     if ($("reproStatus")) $("reproStatus").value = "";
@@ -320,12 +317,6 @@ async function saveHeat(e){
 
     const savedNums = Array.isArray(res.animalNumbers) ? res.animalNumbers : [];
 
-    localStorage.setItem("lastEventDate", eventDate);
-
-    if (savedNums.length === 1) {
-      localStorage.setItem("lastAnimalNumber", savedNums[0]);
-    }
-
     msg(res.message || "✅ تم حفظ الشياع بنجاح", true);
 
     if (res.redirectUrl) {
@@ -348,14 +339,13 @@ async function saveHeat(e){
   const mode = String(p.get("mbkMode") || "").trim().toLowerCase();
   const bulk = String(p.get("bulk") || "").trim();
 
-  const num =
-    (mode === "group" && bulk ? bulk : "") ||
-    String(p.get("number") || p.get("animalNumber") || "").trim() ||
-    String(localStorage.getItem("lastAnimalNumber") || "").trim();
+const num =
+  (mode === "group" && bulk ? bulk : "") ||
+  String(p.get("number") || p.get("animalNumber") || "").trim();
 
-  const dt =
-    String(p.get("date") || p.get("eventDate") || localStorage.getItem("lastEventDate") || todayISO())
-      .slice(0,10);
+const dt =
+  String(p.get("date") || p.get("eventDate") || todayISO())
+    .slice(0,10);
 
   if (animalEl) animalEl.value = num;
   if (dateEl) dateEl.value = dt;
