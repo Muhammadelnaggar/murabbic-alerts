@@ -101,18 +101,7 @@
     return vals.find(v => String(v || "").trim() !== "") || "";
   }
 
-  function getUid(){
-    return String(
-      window.MBK_USER_ID ||
-      window.mbkUserId ||
-      window.mbk?.userId ||
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      ""
-    ).trim();
-  }
-
+ 
   function buildUrl(path, params){
     const u = new URL(path, location.origin);
     Object.entries(params || {}).forEach(([k,v]) => {
@@ -137,13 +126,36 @@
   function getRadio(name){
     return form.querySelector(`input[name="${name}"]:checked`)?.value || "";
   }
+  async function sessionPostJson(path, payload){
+  const r = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify(payload || {})
+  });
 
+  const j = await r.json().catch(() => ({
+    ok: false,
+    allowed: false,
+    message: "تعذّر قراءة رد السيرفر."
+  }));
+
+  if (r.status === 401 || j?.error === "auth_required") {
+    showMsg(j?.message || "سجّل الدخول أولًا.", false);
+    return { r, j, authRequired: true };
+  }
+
+  return { r, j, authRequired: false };
+}
   function setSaveEnabled(v){
     if (saveBtn) saveBtn.disabled = !v;
   }
 
   async function runGate(){
-    const uid = getUid();
     const animalNumber = normDigits(inputAnimal.value);
     const eventDate = String(inputDate.value || "").trim();
 
@@ -156,16 +168,12 @@
     }
 
     try {
-      const r = await fetch("/api/close-up/gate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(uid ? {"X-User-Id": uid} : {})
-        },
-        body: JSON.stringify({ animalNumber, eventDate })
-      });
+      const { r, j, authRequired } = await sessionPostJson("/api/close-up/gate", {
+  animalNumber,
+  eventDate
+});
 
-      const j = await r.json().catch(() => ({}));
+if (authRequired) return;
 
       if (!r.ok || !j.ok || !j.allowed) {
         showMsg(j.message || "❌ الحيوان غير مؤهل لتسجيل التحضير.", false);
@@ -190,7 +198,7 @@
   async function saveCloseup(e){
     e.preventDefault();
 
-    const uid = getUid();
+  
     const animalNumber = normDigits(inputAnimal.value);
     const eventDate = String(inputDate.value || "").trim();
     const ration = getRadio("ration");
@@ -210,30 +218,17 @@
         if (!gateOk) return;
       }
 
-      const r = await fetch("/api/close-up/save", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(uid ? {"X-User-Id": uid} : {})
-        },
-        body: JSON.stringify({
-          animalNumber,
-          eventDate,
-          ration,
-          anionicSalts
-        })
-      });
+     const { r, j, authRequired } = await sessionPostJson("/api/close-up/save", {
+  animalNumber,
+  eventDate,
+  ration,
+  anionicSalts
+});
 
-      const j = await r.json().catch(() => ({}));
-
+if (authRequired) return;
       if (!r.ok || !j.ok) {
         throw new Error(j.message || "تعذّر حفظ تحضير الولادة.");
       }
-
-      localStorage.setItem("lastAnimalId", animalNumber);
-      localStorage.setItem("currentAnimalId", animalNumber);
-      localStorage.setItem("eventDate", eventDate);
-      localStorage.setItem("lastEventDate", eventDate);
 
       showMsg(j.message || "✅ تم حفظ تحضير الولادة بنجاح", true);
 
@@ -254,21 +249,17 @@
     }
   }
 
-  const qsAnimal = firstNonEmpty(
-    getQS("animalId"),
-    getQS("number"),
-    getQS("animalNumber"),
-    localStorage.getItem("lastAnimalId"),
-    localStorage.getItem("currentAnimalId")
-  );
+const qsAnimal = firstNonEmpty(
+  getQS("animalId"),
+  getQS("number"),
+  getQS("animalNumber")
+);
 
   const qsDate = firstNonEmpty(
-    getQS("date"),
-    getQS("eventDate"),
-    localStorage.getItem("eventDate"),
-    localStorage.getItem("lastEventDate"),
-    todayISO()
-  );
+  getQS("date"),
+  getQS("eventDate"),
+  todayISO()
+);
 
   if (inputAnimal && qsAnimal) inputAnimal.value = normDigits(qsAnimal);
   if (inputDate && qsDate) inputDate.value = qsDate;
