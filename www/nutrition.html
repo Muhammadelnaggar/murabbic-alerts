@@ -6,15 +6,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <link rel="stylesheet" href="css/forms.css">
+ 
  <title>التغذية الذكية</title>
 
 
   <style>
     *{box-sizing:border-box}
     :root{
-      --green:var(--brand,#0ea05a);
-      --card:#fff;
-    }
+  --green:var(--brand,#0ea05a);
+  --card:#fff;
+}
    body{
   direction:rtl;
   margin:0;
@@ -85,7 +86,6 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
 .kpi .vrow{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .kpi .arr{ font-size:18px; line-height:1; }      
 #advancedKPIs{margin-top:10px}
-#advancedAnalysisCard{border-top:3px solid rgba(14,160,90,.35)}
 
 /* === Murabbik Nutrition KPI cards: compact, mobile-first (surgical) === */
 .kpi-grid{gap:8px}
@@ -180,6 +180,7 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   .strip-item .lbl{font-size:9.5px}
   .strip-item .val{font-size:13px}
 }
+   
  
 /* ===== Nutrition UX tweaks (Murabbik) ===== */
 #feedInputBox{
@@ -551,27 +552,19 @@ padding: 6px 0;
 .mbk-premix-section{font-weight:900;color:#0b7f47;margin:12px 0 6px;border-top:1px dashed #d7e7dd;padding-top:10px}
 @media (max-width:640px){.mbk-premix-grid{grid-template-columns:1fr}.mbk-modal{border-radius:18px}}
 
-
-/* Advanced cards are rendered from server panels.advancedCards only */
-#advancedAnalysisCard .kpi[data-section="advanced"]{
-  box-shadow:none;
-}
-#advancedAnalysisCard .kpi[data-section="advanced"] .kpi-badge{
-  display:none;
-}
-
 </style>
 </head>
-<body>
-<div class="mbk-form">
- <header class="mbk-head">
+<body data-page="nutrition">
+<header class="mbk-head">
   <a href="/dashboard.html" class="mbk-back">←</a>
   <div class="mbk-center">
-   <div class="mbk-page-title">التغذية الذكية</div>
+    <div class="mbk-page-title">التغذية الذكية</div>
     <div class="mbk-app-name">مُرَبِّيك</div>
   </div>
   <img src="/logo.png" class="mbk-logo" alt="Murabbik">
 </header>
+
+<div class="mbk-form">
 
  <div class="animal-strip top-strip animal-strip-main">
   <div class="strip-row strip-row-main">
@@ -610,7 +603,7 @@ padding: 6px 0;
   <div class="strip-item"><span class="lbl">الحالة الجسمانية BCS</span><span class="val" id="ctxBCS_txt">—</span></div>
   <div class="strip-item"><span class="lbl">رقم الموسم</span><span class="val" id="ctxParity_txt">—</span></div>
 </div>
-  <!-- الحقول الأصلية (مخفية) للحفاظ على منطق الحفظ الحالي في nutrition.js -->
+  <!-- حقول مخفية يستخدمها السكريبت الداخلي للحفظ والتحليل -->
 
     <input id="ctxDIM" type="number" inputmode="numeric" step="1" min="0" style="display:none">
     <select id="ctxSpecies" style="display:none"><option value="">—</option><option value="بقر">بقر</option><option value="جاموس">جاموس</option></select>
@@ -739,7 +732,7 @@ padding: 6px 0;
         <tbody></tbody>
       </table>
     </div>
- <div class="mini-actions" id="miniActions" style="display:flex">
+ <div class="mini-actions" id="miniActions" style="display:none">
   <button id="addPreset" class="mini-btn" type="button">إضافة خامة</button>
   <button id="clearAll" class="mini-btn" type="button">مسح التركيبة</button>
 </div>  
@@ -870,11 +863,7 @@ padding: 6px 0;
     <h3>📊 التحليل الغذائي للعليقة</h3>
     <div id="nutritionKPIs" class="kpi-grid"></div>
     <button id="toggleAdvancedBtn" class="btn btn-ghost" type="button" style="margin-top:10px">عرض متقدم</button>
-  </div>
-
-  <div class="mbk-card" id="advancedAnalysisCard" style="display:none">
-    <h3>🧪 العرض المتقدم</h3>
-    <div id="advancedKPIs" class="kpi-grid"></div>
+<div id="advancedKPIs" style="display:none"></div>
   </div>
      
   <div class="mbk-card" id="economicAnalysisCard">
@@ -1319,7 +1308,7 @@ padding: 6px 0;
     box.innerHTML = state.rows.map((r, i) => `
       <div class="feed-item">
         <label>
-          <input class="rationPick" type="checkbox" ${i === state.selectedIndex ? "checked" : ""} data-i="${i}">
+          <input class="rationPick" type="radio" name="rationPick" ${i === state.selectedIndex ? "checked" : ""} data-i="${i}">
           <span class="a">${escapeHtml(r.name)}</span>
         </label>
         <span class="b">${r.asFedKg ?? r.pct ?? "—"}</span>
@@ -1410,33 +1399,8 @@ padding: 6px 0;
     }
   }
 
-  function cardGaugePct(card = {}, section = "analysis") {
-    if (section === "advanced") return null;
-
-    const explicit = Number(card.pointerPct ?? card.meterPct ?? card.percent ?? NaN);
-    if (Number.isFinite(explicit)) return Math.max(0, Math.min(100, explicit));
-
-    const actual = Number(card.actual);
-    const target = Number(card.target);
-    const key = clean(card.key || card.metric || "").toLowerCase();
-
-    if (key === "decision" || key === "priority") return null;
-
-    if (key === "rumen" && Number.isFinite(actual)) {
-      return Math.max(0, Math.min(100, actual));
-    }
-
-    if (!Number.isFinite(actual) || !Number.isFinite(target) || target <= 0) return null;
-
-    if (key === "starch" || key === "fat") {
-      return Math.max(0, Math.min(100, (actual / target) * 100));
-    }
-
-    return Math.max(0, Math.min(100, (actual / target) * 100));
-  }
-
-  function cardHtml(card = {}, section = "analysis") {
-    const status = clean(card.status || card.level || card.state || "ok").toLowerCase();
+  function cardHtml(card = {}, section = "") {
+    const status = clean(card.status || card.level || "ok").toLowerCase();
 
     const cls =
       status.includes("bad") || status.includes("danger") || status.includes("error")
@@ -1445,24 +1409,38 @@ padding: 6px 0;
           ? "warn"
           : "ok");
 
-    const title = card.title || card.key || "مؤشر";
-    const value = card.valueText ?? card.value ?? card.actual ?? "—";
-    const badge = card.stateLabel || card.statusText || (cls === "ok" ? "مناسب" : cls === "warn" ? "متابعة" : "خطر");
-    const hint = card.message || card.uiHint || card.targetText || card.subText || "";
-    const scale = card.scaleText || "";
-    const pct = cardGaugePct(card, section);
-    const extraClass = card.key === "rumen" || clean(title).includes("الكرش") ? " rumen-feature" : "";
+    const actual = Number(card.actual);
+    const target = Number(card.target);
+    const directPct = Number(card.pointerPct ?? card.meterPct ?? card.percent ?? card.pct);
+
+    let meterPct = null;
+
+    if (Number.isFinite(directPct)) {
+      meterPct = directPct;
+    } else if (Number.isFinite(actual) && Number.isFinite(target) && target > 0) {
+      meterPct = (actual / target) * 100;
+    }
+
+    if (Number.isFinite(meterPct)) {
+      meterPct = Math.max(0, Math.min(100, meterPct));
+    } else {
+      meterPct = null;
+    }
+
+    const hint = card.targetText || card.uiHint || card.hint || "";
+    const badge = cls === "ok" ? "مناسب" : cls === "warn" ? "متابعة" : "خطر";
+    const keyClass = clean(card.key || "") === "rumen" ? " rumen-feature" : "";
+    const sectionAttr = section ? ` data-section="${escapeHtml(section)}"` : "";
 
     return `
-      <div class="kpi ${cls}${extraClass}" data-section="${escapeHtml(section)}" data-key="${escapeHtml(card.key || "")}">
+      <div class="kpi ${cls}${keyClass}"${sectionAttr}>
         <div class="k">
-          <span>${escapeHtml(title)}</span>
-          <span class="kpi-badge"><span class="dot"></span>${escapeHtml(badge)}</span>
+          <span>${escapeHtml(card.title || card.key || "مؤشر")}</span>
+          <span class="kpi-badge"><span class="dot"></span>${badge}</span>
         </div>
-        <div class="v">${escapeHtml(value)}</div>
-        ${pct !== null ? `<div class="kpi-meter"><span style="width:${pct}%"></span></div>` : ""}
+        <div class="v">${escapeHtml(card.value ?? card.actual ?? "—")}</div>
+        ${meterPct !== null ? `<div class="kpi-meter"><span style="width:${meterPct}%"></span></div>` : ""}
         ${hint ? `<div class="kpi-hint">${escapeHtml(hint)}</div>` : ""}
-        ${scale ? `<div class="kpi-hint">${escapeHtml(scale)}</div>` : ""}
       </div>
     `;
   }
@@ -1498,15 +1476,21 @@ padding: 6px 0;
     const sumPct = state.rows.reduce((s, r) => s + (num(r.pct) || 0), 0);
     setText("sumPct", `${fmt(sumPct, 1)}%`);
 
-    const nCards = panels.analysisCards || panels.nutritionCards || [];
-    const eCards = panels.economicsCards || panels.economicCards || [];
-    const aCards = panels.advancedCards || [];
+    const nCards = Array.isArray(panels.analysisCards) ? panels.analysisCards : (panels.nutritionCards || []);
+    const eCards = Array.isArray(panels.economicsCards) ? panels.economicsCards : (panels.economicCards || []);
+    const aCards = Array.isArray(panels.advancedCards) ? panels.advancedCards : [];
 
-    if ($("nutritionKPIs")) $("nutritionKPIs").innerHTML = nCards.length ? nCards.map(c => cardHtml(c, "analysis")).join("") : "";
-    if ($("economicKPIs")) $("economicKPIs").innerHTML = eCards.length ? eCards.map(c => cardHtml(c, "economics")).join("") : "";
-    if ($("advancedKPIs")) $("advancedKPIs").innerHTML = aCards.length ? aCards.map(c => cardHtml(c, "advanced")).join("") : "";
-    if ($("toggleAdvancedBtn")) $("toggleAdvancedBtn").style.display = aCards.length ? "inline-flex" : "none";
-    if ($("advancedAnalysisCard") && !aCards.length) $("advancedAnalysisCard").style.display = "none";
+    if ($("nutritionKPIs")) $("nutritionKPIs").innerHTML = nCards.map(c => cardHtml(c, "analysis")).join("");
+    if ($("economicKPIs")) $("economicKPIs").innerHTML = eCards.map(c => cardHtml(c, "economics")).join("");
+    if ($("advancedKPIs")) {
+      $("advancedKPIs").innerHTML = aCards.map(c => cardHtml(c, "advanced")).join("");
+      $("advancedKPIs").style.display = "none";
+    }
+
+    if ($("toggleAdvancedBtn")) {
+      $("toggleAdvancedBtn").style.display = aCards.length ? "inline-flex" : "none";
+      $("toggleAdvancedBtn").textContent = "عرض متقدم";
+    }
   }
 
   async function saveEvent(ev) {
@@ -1659,11 +1643,12 @@ padding: 6px 0;
     $("saveCustomPremix")?.addEventListener("click", savePremix);
 
     $("toggleAdvancedBtn")?.addEventListener("click", () => {
-      const card = $("advancedAnalysisCard");
-      if (!card) return;
+      const box = $("advancedKPIs");
+      if (!box) return;
 
-      const hidden = card.style.display === "none" || !card.style.display;
-      card.style.display = hidden ? "block" : "none";
+      const hidden = box.style.display === "none" || !box.style.display;
+      box.style.display = hidden ? "grid" : "none";
+
       if ($("toggleAdvancedBtn")) {
         $("toggleAdvancedBtn").textContent = hidden ? "إخفاء المتقدم" : "عرض متقدم";
       }
