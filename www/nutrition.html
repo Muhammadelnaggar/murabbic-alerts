@@ -1107,7 +1107,274 @@ body[data-page="nutrition"] #economicAnalysisCard{
     min-height:54px;
     font-size:16px;
   }
-}   
+} 
+/* ===== Murabbik Advanced Gauges — local nutrition only ===== */
+body[data-page="nutrition"] .nutrition-advanced-card{
+  background:#fff !important;
+  border:1px solid rgba(18,160,92,.18) !important;
+  border-radius:20px !important;
+  padding:12px !important;
+  box-shadow:0 8px 24px rgba(15,23,42,.06) !important;
+}
+
+body[data-page="nutrition"] .nutrition-advanced-card h3{
+  margin:0 0 12px;
+  font-size:16px;
+  font-weight:1000;
+  color:#0f172a;
+}
+
+body[data-page="nutrition"] #advancedKPIs{
+  display:block !important;
+  margin:0 !important;
+}
+
+body[data-page="nutrition"] .advanced-gauge-card{
+  position:relative;
+  overflow:hidden;
+  background:#fff;
+  border:1px solid rgba(15,23,42,.08);
+  border-radius:22px;
+  padding:14px 12px 12px;
+  margin:12px 0;
+  box-shadow:0 8px 24px rgba(15,23,42,.07);
+}
+
+body[data-page="nutrition"] .advanced-gauge-card::before{
+  content:"";
+  position:absolute;
+  top:0;
+  bottom:0;
+  right:0;
+  width:6px;
+  background:var(--adv-accent,#cbd5e1);
+}
+
+body[data-page="nutrition"] .advanced-gauge-card.ok{--adv-accent:#12a05c}
+body[data-page="nutrition"] .advanced-gauge-card.warn{--adv-accent:#f59e0b}
+body[data-page="nutrition"] .advanced-gauge-card.bad{--adv-accent:#ef4444}
+
+body[data-page="nutrition"] .advanced-gauge-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+body[data-page="nutrition"] .advanced-gauge-title{
+  font-size:16px;
+  font-weight:1000;
+  color:#0f172a;
+  line-height:1.25;
+}
+
+body[data-page="nutrition"] .advanced-gauge-badge{
+  flex:0 0 auto;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:13px;
+  font-weight:1000;
+  background:rgba(15,23,42,.06);
+  color:#334155;
+}
+
+body[data-page="nutrition"] .advanced-gauge-card.ok .advanced-gauge-badge{
+  background:rgba(18,160,92,.10);
+  color:#0b7f47;
+}
+
+body[data-page="nutrition"] .advanced-gauge-card.warn .advanced-gauge-badge{
+  background:rgba(245,158,11,.13);
+  color:#92400e;
+}
+
+body[data-page="nutrition"] .advanced-gauge-card.bad .advanced-gauge-badge{
+  background:rgba(239,68,68,.11);
+  color:#991b1b;
+}
+
+body[data-page="nutrition"] .advanced-gauge-body{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 150px minmax(0,1fr);
+  align-items:end;
+  gap:10px;
+  direction:ltr;
+}
+
+body[data-page="nutrition"] .advanced-side{
+  direction:rtl;
+  min-width:0;
+  text-align:center;
+  padding-bottom:4px;
+}
+
+body[data-page="nutrition"] .advanced-side-label{
+  font-size:12px;
+  font-weight:900;
+  color:#64748b;
+  margin-bottom:5px;
+}
+
+body[data-page="nutrition"] .advanced-side-value{
+  font-size:17px;
+  font-weight:1000;
+  color:#0f172a;
+  line-height:1.25;
+  word-break:break-word;
+}
+
+body[data-page="nutrition"] .supply-side{
+  grid-column:1;
+}
+
+body[data-page="nutrition"] .need-side{
+  grid-column:3;
+}
+
+body[data-page="nutrition"] .advanced-gauge{
+  grid-column:2;
+  position:relative;
+  width:150px;
+  height:88px;
+  margin:0 auto;
+}
+
+body[data-page="nutrition"] .advanced-gauge-arc{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  height:76px;
+  border-radius:150px 150px 0 0;
+  background:
+    conic-gradient(
+      from 270deg at 50% 100%,
+      #ef4444 0deg 38deg,
+      #f59e0b 38deg 72deg,
+      #22c55e 72deg 108deg,
+      #fbbf24 108deg 144deg,
+      #dc2626 144deg 180deg,
+      transparent 180deg 360deg
+    );
+  box-shadow:inset 0 -8px 14px rgba(15,23,42,.10);
+}
+
+body[data-page="nutrition"] .advanced-gauge-arc::after{
+  content:"";
+  position:absolute;
+  left:22px;
+  right:22px;
+  bottom:0;
+  height:50px;
+  border-radius:110px 110px 0 0;
+  background:#fff;
+}
+
+body[data-page="nutrition"] .advanced-gauge-needle{
+  position:absolute;
+  left:50%;
+  bottom:4px;
+  width:4px;
+  height:66px;
+  border-radius:999px;
+  background:#0f172a;
+  transform-origin:50% 100%;
+  transform:
+    translateX(-50%)
+    rotate(calc((var(--needle, 50) * 1.8deg) - 90deg));
+  box-shadow:0 2px 8px rgba(15,23,42,.22);
+  z-index:3;
+}
+
+body[data-page="nutrition"] .advanced-gauge-hub{
+  position:absolute;
+  left:50%;
+  bottom:0;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#0f172a;
+  border:4px solid #fff;
+  transform:translateX(-50%);
+  z-index:4;
+  box-shadow:0 2px 8px rgba(15,23,42,.22);
+}
+
+body[data-page="nutrition"] .advanced-gauge-note{
+  margin-top:10px;
+  padding:9px 10px;
+  border-radius:14px;
+  background:#f8fafc;
+  color:#475569;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.55;
+}
+
+body[data-page="nutrition"] .nutrition-advanced-toggle{
+  width:100%;
+  min-height:56px;
+  margin:12px 0 8px !important;
+  border-radius:18px;
+  background:#0ea05a !important;
+  color:#fff !important;
+  border:0 !important;
+  font-size:17px;
+  font-weight:1000;
+}
+
+@media (max-width:420px){
+  body[data-page="nutrition"] .advanced-gauge-card{
+    padding:12px 10px 10px;
+    border-radius:20px;
+  }
+
+  body[data-page="nutrition"] .advanced-gauge-title{
+    font-size:15px;
+  }
+
+  body[data-page="nutrition"] .advanced-gauge-badge{
+    font-size:12px;
+    padding:5px 9px;
+  }
+
+  body[data-page="nutrition"] .advanced-gauge-body{
+    grid-template-columns:minmax(0,1fr) 132px minmax(0,1fr);
+    gap:7px;
+  }
+
+  body[data-page="nutrition"] .advanced-gauge{
+    width:132px;
+    height:82px;
+  }
+
+  body[data-page="nutrition"] .advanced-gauge-arc{
+    height:70px;
+  }
+
+  body[data-page="nutrition"] .advanced-gauge-arc::after{
+    left:20px;
+    right:20px;
+    height:46px;
+  }
+
+  body[data-page="nutrition"] .advanced-gauge-needle{
+    height:60px;
+  }
+
+  body[data-page="nutrition"] .advanced-side-label{
+    font-size:11px;
+  }
+
+  body[data-page="nutrition"] .advanced-side-value{
+    font-size:15px;
+  }
+
+  body[data-page="nutrition"] .advanced-gauge-note{
+    font-size:11px;
+  }
+}    
 </style>
 </head>
 <body data-page="nutrition">
@@ -1962,7 +2229,68 @@ body[data-page="nutrition"] #economicAnalysisCard{
     }
   }
 
- function cardHtml(card = {}) {
+function latinDigits(v) {
+  const map = {
+    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+  };
+
+  return clean(v).replace(/[٠-٩۰-۹]/g, d => map[d] || d);
+}
+
+function firstNumber(v) {
+  if (v === null || v === undefined || v === "") return null;
+  if (Number.isFinite(Number(v))) return Number(v);
+
+  const s = latinDigits(v).replace(/,/g, "");
+  const m = s.match(/-?\d+(?:\.\d+)?/);
+
+  return m ? Number(m[0]) : null;
+}
+
+function statusClassFrom(card = {}, ratio = null) {
+  const raw = clean(card.status || card.state || card.level || "").toLowerCase();
+
+  if (ratio !== null) {
+    if (ratio < 80) return "bad";
+    if (ratio < 95) return "warn";
+    if (ratio <= 110) return "ok";
+    if (ratio <= 130) return "warn";
+    return "bad";
+  }
+
+  if (
+    raw.includes("bad") ||
+    raw.includes("danger") ||
+    raw.includes("critical") ||
+    raw.includes("error")
+  ) return "bad";
+
+  if (
+    raw.includes("warn") ||
+    raw.includes("watch") ||
+    raw.includes("alert")
+  ) return "warn";
+
+  return "ok";
+}
+
+function statusLabelFrom(cls, ratio = null) {
+  if (ratio !== null) {
+    if (ratio < 80) return "ناقص جدًا";
+    if (ratio < 95) return "ناقص";
+    if (ratio <= 110) return "مناسب";
+    if (ratio <= 130) return "زائد";
+    return "زائد جدًا";
+  }
+
+  if (cls === "bad") return "خطر";
+  if (cls === "warn") return "متابعة";
+  return "مناسب";
+}
+
+function cardHtml(card = {}) {
+  const key = clean(card.key || card.metric || card.id || "");
   const rawState = clean(card.status || card.state || card.level || "ok").toLowerCase();
 
   const cls =
@@ -1979,7 +2307,6 @@ body[data-page="nutrition"] #economicAnalysisCard{
           : "ok"
       );
 
-  const key = clean(card.key || card.metric || card.id || "");
   const isRumen =
     key.includes("rumen") ||
     clean(card.title).includes("الكرش") ||
@@ -2024,6 +2351,93 @@ body[data-page="nutrition"] #economicAnalysisCard{
   `;
 }
 
+function advancedGaugeHtml(card = {}) {
+  const title = card.title || card.name || card.key || "مؤشر";
+  const key = clean(card.key || card.metric || card.id || "");
+
+  const supplyText =
+    card.supplyText ??
+    card.currentText ??
+    card.actualText ??
+    card.valueText ??
+    card.value ??
+    card.actual ??
+    "—";
+
+  const needText =
+    card.needText ??
+    card.requiredText ??
+    card.targetText ??
+    card.target ??
+    card.need ??
+    card.required ??
+    "—";
+
+  const supplyNum = firstNumber(supplyText);
+  const needNum = firstNumber(needText);
+
+  let ratio = null;
+
+  if (supplyNum !== null && needNum !== null && needNum > 0) {
+    ratio = (supplyNum / needNum) * 100;
+  } else {
+    const fallbackRatio = firstNumber(
+      card.coveragePct ??
+      card.ratioPct ??
+      card.percent ??
+      card.pointerPct ??
+      card.coverage
+    );
+
+    if (fallbackRatio !== null) {
+      ratio = fallbackRatio <= 2 ? fallbackRatio * 100 : fallbackRatio;
+    }
+  }
+
+  const cls = statusClassFrom(card, ratio);
+  const label = card.stateLabel || card.badge || statusLabelFrom(cls, ratio);
+
+  const pos = ratio === null
+    ? 50
+    : Math.max(0, Math.min(100, ratio / 2));
+
+  const balance =
+    card.balanceText ||
+    card.diffText ||
+    card.message ||
+    card.hint ||
+    card.reason ||
+    "";
+
+  return `
+    <div class="advanced-gauge-card ${cls}" data-key="${escapeHtml(key)}" style="--needle:${pos}">
+      <div class="advanced-gauge-head">
+        <div class="advanced-gauge-title">${escapeHtml(title)}</div>
+        <div class="advanced-gauge-badge">${escapeHtml(label)}</div>
+      </div>
+
+      <div class="advanced-gauge-body">
+        <div class="advanced-side supply-side">
+          <div class="advanced-side-label">الإمداد</div>
+          <div class="advanced-side-value">${escapeHtml(supplyText)}</div>
+        </div>
+
+        <div class="advanced-gauge">
+          <div class="advanced-gauge-arc"></div>
+          <div class="advanced-gauge-needle"></div>
+          <div class="advanced-gauge-hub"></div>
+        </div>
+
+        <div class="advanced-side need-side">
+          <div class="advanced-side-label">الاحتياج</div>
+          <div class="advanced-side-value">${escapeHtml(needText)}</div>
+        </div>
+      </div>
+
+      ${balance ? `<div class="advanced-gauge-note">${escapeHtml(balance)}</div>` : ""}
+    </div>
+  `;
+}
   function paintAnalysis(analysis = {}, panels = {}) {
     const totals = analysis.totals || {};
     const nutrition = analysis.nutrition || {};
@@ -2068,7 +2482,7 @@ if ($("economicKPIs")) {
 }
 
 if ($("advancedKPIs")) {
-  $("advancedKPIs").innerHTML = aCards.length ? aCards.map(cardHtml).join("") : "";
+  $("advancedKPIs").innerHTML = aCards.length ? aCards.map(advancedGaugeHtml).join("") : "";
 }
 
 if ($("toggleAdvancedBtn")) {
