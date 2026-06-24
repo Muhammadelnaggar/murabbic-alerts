@@ -12,6 +12,10 @@
 
   <style>
     *{box-sizing:border-box}
+    :root{
+  --green:var(--brand,#0ea05a);
+  --card:#fff;
+}
    body{
   direction:rtl;
   margin:0;
@@ -176,9 +180,7 @@ th[data-col="cost"], td[data-col="cost"]{display:none !important}
   .strip-item .lbl{font-size:9.5px}
   .strip-item .val{font-size:13px}
 }
-  height:38px;
-  padding:4px 10px;
-}   
+   
  
 /* ===== Nutrition UX tweaks (Murabbik) ===== */
 #feedInputBox{
@@ -262,7 +264,7 @@ padding: 6px 0;
 #feedInputBox #tbl tbody tr{
   display:grid;
   grid-template-columns: 1fr 1fr;
-  gap:10px8px;
+  gap:10px 8px;
   padding:8px;
   margin:10px 0;
   border:1px solid rgba(14,160,90,.20);
@@ -340,15 +342,17 @@ padding: 6px 0;
 
 @media (max-width:380px){
   #feedInputBox #tbl tbody tr{
-    grid-template-columns: minmax(0,1fr) minmax(0,1fr);
-    grid-template-columns: 1fr;
+    grid-template-columns:1fr;
     grid-template-areas:
- grid-template-areas:
-  "name name"
-  "cat  pTon"
-  "dm   cp"
-  "pTonDM pct"
-  "kg   kgDM";
+      "name"
+      "cat"
+      "pTon"
+      "dm"
+      "cp"
+      "pTonDM"
+      "pct"
+      "kg"
+      "kgDM";
   }
 }
 
@@ -550,16 +554,17 @@ padding: 6px 0;
 
 </style>
 </head>
-<body>
-<div class="mbk-form">
- <header class="mbk-head">
+<body data-page="nutrition">
+<header class="mbk-head">
   <a href="/dashboard.html" class="mbk-back">←</a>
   <div class="mbk-center">
-   <div class="mbk-page-title">التغذية الذكية</div>
+    <div class="mbk-page-title">التغذية الذكية</div>
     <div class="mbk-app-name">مُرَبِّيك</div>
   </div>
   <img src="/logo.png" class="mbk-logo" alt="Murabbik">
 </header>
+
+<div class="mbk-form">
 
  <div class="animal-strip top-strip animal-strip-main">
   <div class="strip-row strip-row-main">
