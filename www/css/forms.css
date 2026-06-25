@@ -3927,3 +3927,25 @@ html[data-page="calf-card"] .calf-list-meta{
     max-width:none !important;
   }
 }
+/* ===== Nutrition page only: sticky save button ===== */
+body.nutrition-page{
+  padding-bottom:90px;
+}
+
+body.nutrition-page #saveEvent,
+body.nutrition-page .nutrition-save-btn{
+  position:fixed;
+  left:50%;
+  bottom:calc(10px + env(safe-area-inset-bottom, 0px));
+  transform:translateX(-50%);
+  z-index:999;
+  width:min(94vw, 520px);
+  min-height:52px;
+  border-radius:18px;
+  box-shadow:0 12px 28px rgba(15,23,42,.22);
+}
+
+body.nutrition-page #saveEvent:active,
+body.nutrition-page .nutrition-save-btn:active{
+  transform:translateX(-50%) translateY(1px);
+}
