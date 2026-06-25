@@ -408,7 +408,76 @@ function classifyTHI(thi) {
     severity: 3
   };
 }
+function buildThiInstructionsSrv(thi, status = {}) {
+  const n = Number(thi);
+  const level = String(status.level || '').trim();
 
+  const sourceLabel = 'US dairy extension guidance: Wisconsin Extension / Minnesota Extension / Penn State Extension';
+
+  if (!Number.isFinite(n)) {
+    return {
+      title: 'تعليمات THI غير متاحة',
+      summary: 'قراءة الحرارة والرطوبة غير مكتملة؛ لا يتم إصدار توصية THI الآن.',
+      actions: [
+        'اعتمد على العلامات الحيوانية: اللهاث، تجمع الأبقار، انخفاض المأكول، وزيادة الوقوف.',
+        'راجع التهوية والمياه خصوصًا في ساعات الظهيرة.'
+      ],
+      sourceLabel
+    };
+  }
+
+  if (n < 68) {
+    return {
+      title: 'THI مريح',
+      summary: 'لا توجد دلالة إجهاد حراري مؤثر حسب قراءة THI الحالية.',
+      actions: [
+        'استمر على التهوية الطبيعية وتوفر مياه نظيفة كافية.',
+        'لا تعدّل العليقة بسبب THI وحده.'
+      ],
+      sourceLabel
+    };
+  }
+
+  if (n < 72) {
+    return {
+      title: 'THI بداية إجهاد حراري',
+      summary: 'بداية منطقة متابعة؛ الأبقار عالية الإنتاج قد تتأثر مبكرًا.',
+      actions: [
+        'زِد مراقبة المأكول وبقايا العليقة خلال ساعات الحر.',
+        'تأكد من توافر مياه باردة ونظيفة وسهلة الوصول.',
+        'شغّل مراوح التهوية في مناطق التغذية والانتظار إن وجدت.'
+      ],
+      sourceLabel
+    };
+  }
+
+  if (n < 78) {
+    return {
+      title: 'THI إجهاد حراري متوسط',
+      summary: 'الإجهاد الحراري قد يخفض المأكول والإنتاج ويزيد ضغط الكرش.',
+      actions: [
+        'فعّل التهوية القوية فوق المعالف ومناطق الانتظار.',
+        'استخدم الرش/التبليل المتقطع مع تهوية جيدة لتبخير الماء من جلد الحيوان.',
+        'قدّم العليقة في الأوقات الأبرد، وادفع العلف مرات أكثر.',
+        'راقب المادة الجافة المأكولة وصحة الكرش قبل رفع المركزات.'
+      ],
+      sourceLabel
+    };
+  }
+
+  return {
+    title: 'THI إجهاد حراري عالٍ',
+    summary: 'خطر واضح على المأكول والإنتاج وصحة الحيوان؛ يلزم تدخل تبريد وتشغيل.',
+    actions: [
+      'فعّل مراوح ورش/تبليل متقطع في المعالف والانتظار فورًا.',
+      'قلّل حركة الحيوانات والعمل المجهد إلى أبرد وقت في اليوم.',
+      'راجع توفر المياه وعدد نقاط الشرب ونظافتها.',
+      'ادفع العليقة أكثر من مرة، وركّز التقديم في الأوقات الأبرد.',
+      'لا ترفع الحبوب لتعويض انخفاض المأكول بدون مراجعة النشا والألياف وصحة الكرش.'
+    ],
+    sourceLabel
+  };
+}
 function belongs(rec, tenant){
   const t = rec && rec.userId ? rec.userId : '';
   return tenantKey(t) === tenantKey(tenant);
@@ -847,17 +916,22 @@ app.get('/api/weather/thi', async (req, res) => {
     const humidity = Number(j?.current?.relative_humidity_2m);
     const thi = calcTHI(tempC, humidity);
     const status = classifyTHI(thi);
+    const instructions = buildThiInstructionsSrv(thi, status);
 
     const data = {
-      tempC: Number.isFinite(tempC) ? Math.round(tempC) : null,
-      humidity: Number.isFinite(humidity) ? Math.round(humidity) : null,
-      thi,
-      status,
-      source: 'open-meteo',
-      lat,
-      lon,
-      updatedAt: new Date().toISOString()
-    };
+  tempC: Number.isFinite(tempC) ? Math.round(tempC) : null,
+  humidity: Number.isFinite(humidity) ? Math.round(humidity) : null,
+  thi,
+  status,
+  instructions,
+  thiRecommendations: instructions,
+  recommendations: instructions.actions,
+  advice: instructions.summary,
+  source: 'open-meteo',
+  lat,
+  lon,
+  updatedAt: new Date().toISOString()
+};
 
     weatherThiCache = {
       at: now,
@@ -870,8 +944,14 @@ app.get('/api/weather/thi', async (req, res) => {
       ...data
     });
 
-  } catch (e) {
+   } catch (e) {
     console.error('weather.thi fatal error:', e.message || e);
+
+    const instructions = buildThiInstructionsSrv(null, {
+      level: 'unknown',
+      label: 'غير متاح',
+      severity: 0
+    });
 
     return res.json({
       ok: true,
@@ -886,6 +966,10 @@ app.get('/api/weather/thi', async (req, res) => {
         label: 'غير متاح',
         severity: 0
       },
+      instructions,
+      thiRecommendations: instructions,
+      recommendations: instructions.actions,
+      advice: instructions.summary,
       source: 'weather-fallback',
       lat: WEATHER_DEFAULT_LAT,
       lon: WEATHER_DEFAULT_LON,
