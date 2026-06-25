@@ -1870,39 +1870,66 @@ padding: 6px 0;
     return [...new Set(candidates.map(x => clean(x)).filter(Boolean))].join(" — ");
   }
 
-  function gaugeMeta(actual, ref, mode = "target") {
+  function gaugeMeta(actual, ref, mode = "target", gauge = {}) {
+    const needlePct = Number(gauge?.needlePct);
+    const referencePct = Number(gauge?.referencePct);
+
+    const toAngle = (pct) => -90 + (Math.max(0, Math.min(100, pct)) / 100) * 180;
+
+    if (Number.isFinite(needlePct)) {
+      return {
+        angle: toAngle(needlePct),
+        referenceAngle: Number.isFinite(referencePct) ? toAngle(referencePct) : 0
+      };
+    }
+
     const a = Number(actual);
     const r = Number(ref);
 
     if (!Number.isFinite(a) || !Number.isFinite(r) || r <= 0) {
-      return { angle: -90 };
+      return {
+        angle: -90,
+        referenceAngle: mode === "target" ? 0 : mode === "min" ? 22.5 : 54
+      };
     }
 
-    const maxRatio = mode === "target" ? 1.25 : 1.40;
+    const maxRatio =
+      mode === "target"
+        ? 2
+        : mode === "min"
+          ? 1.6
+          : 1.25;
+
     const ratio = Math.max(0, Math.min(maxRatio, a / r));
 
     return {
-      angle: -90 + (ratio / maxRatio) * 180
+      angle: -90 + (ratio / maxRatio) * 180,
+      referenceAngle:
+        mode === "target"
+          ? 0
+          : -90 + ((1 / maxRatio) * 180)
     };
   }
-
-  function polar(cx, cy, radius, degree) {
-    const rad = (degree - 90) * Math.PI / 180;
+    function polar(cx, cy, r, angleDeg) {
+    const rad = (angleDeg - 90) * Math.PI / 180;
     return {
-      x: cx + radius * Math.cos(rad),
-      y: cy + radius * Math.sin(rad)
+      x: cx + r * Math.cos(rad),
+      y: cy + r * Math.sin(rad)
     };
   }
 
-  function arcPath(cx, cy, radius, startDegree, endDegree) {
-    const s = polar(cx, cy, radius, endDegree);
-    const e = polar(cx, cy, radius, startDegree);
-    const large = Math.abs(endDegree - startDegree) > 180 ? 1 : 0;
-    return `M ${s.x} ${s.y} A ${radius} ${radius} 0 ${large} 0 ${e.x} ${e.y}`;
-  }
+  function arcPath(cx, cy, r, startAngle, endAngle) {
+    const start = polar(cx, cy, r, endAngle);
+    const end = polar(cx, cy, r, startAngle);
+    const largeArc = Math.abs(endAngle - startAngle) <= 180 ? 0 : 1;
 
-  function gaugeSvg(actual, ref, mode = "target") {
-    const { angle } = gaugeMeta(actual, ref, mode);
+    return [
+      "M", start.x, start.y,
+      "A", r, r, 0, largeArc, 0, end.x, end.y
+    ].join(" ");
+  }
+  function gaugeSvg(actual, ref, mode = "target", gauge = {}) {
+    const { angle, referenceAngle } = gaugeMeta(actual, ref, mode, gauge);
     const cx = 110;
     const cy = 110;
     const radius = 78;
@@ -1929,9 +1956,16 @@ padding: 6px 0;
 
     const tip = polar(cx, cy, radius - 10, angle);
 
+    const refOuter = polar(cx, cy, radius + 13, referenceAngle);
+    const refInner = polar(cx, cy, radius - 20, referenceAngle);
+
     return `
       <svg viewBox="0 0 220 135" width="220" height="135" aria-hidden="true">
         ${segments.map(seg => `<path d="${arcPath(cx, cy, radius, seg.s, seg.e)}" fill="none" stroke="${seg.c}" stroke-width="18" stroke-linecap="round"></path>`).join("")}
+
+        <line x1="${refOuter.x}" y1="${refOuter.y}" x2="${refInner.x}" y2="${refInner.y}" stroke="#111827" stroke-width="4" stroke-linecap="round"></line>
+        <circle cx="${refOuter.x}" cy="${refOuter.y}" r="4" fill="#111827"></circle>
+
         <line x1="${cx}" y1="${cy}" x2="${tip.x}" y2="${tip.y}" stroke="#111827" stroke-width="5" stroke-linecap="round"></line>
         <circle cx="${cx}" cy="${cy}" r="8" fill="#111827"></circle>
         <circle cx="${cx}" cy="${cy}" r="4" fill="#fff"></circle>
@@ -1939,34 +1973,65 @@ padding: 6px 0;
     `;
   }
 
-  function advancedGaugeCardHtml({ title, actualCard, refCard, refLabel, sourceCard, mode = "target", extra = "" }) {
-    const actual = firstNumberFromCard(actualCard);
-    const ref = mode === "max" ? maxNumberFromCard(refCard) : firstNumberFromCard(refCard);
-    const cls = statusClassFromServerCard(sourceCard || {});
-    const badge = mode === "max" ? "حد أقصى" : mode === "min" ? "حد أدنى" : "احتياج";
-    const serverGuidance = guidanceText(sourceCard, actualCard, refCard);
-    const guidance = [serverGuidance, clean(extra)].filter(Boolean).join(" — ");
+  function murabbikGuidanceText(...cards) {
+    const txt = guidanceText(...cards);
+    if (!txt) return "";
+
+    const cleanTxt = clean(txt)
+      .replace(/(?:Penn State Extension|Wisconsin Extension|Ohio State Extension|MSD\/Merck Veterinary Manual|Merck Veterinary Manual|US Dairy Extension)/gi, "مُرَبِّيك")
+      .replace(/\s+—\s+مُرَبِّيك\s*$/g, "");
+
+    return /^مُرَبِّيك[:：]/.test(cleanTxt)
+      ? cleanTxt
+      : `مُرَبِّيك: ${cleanTxt}`;
+  }
+
+  function advancedGaugeCardHtml({ title, actualCard, refCard, refLabel, sourceCard, serverCard = null, mode = "target", extra = "" }) {
+    const actual = serverCard?.actual ?? firstNumberFromCard(actualCard);
+    const ref = serverCard?.reference ?? (mode === "max" ? maxNumberFromCard(refCard) : firstNumberFromCard(refCard));
+
+    const gauge = serverCard?.gauge || {};
+    const cls = statusClassFromServerCard(serverCard || sourceCard || {});
+    const badge = serverCard?.referenceTypeLabel || (mode === "max" ? "حد أقصى" : mode === "min" ? "حد أدنى" : "احتياج");
+
+    const comment =
+      serverCard?.balanceComment ||
+      serverCard?.comment ||
+      serverCard?.guidance ||
+      sourceCard?.balanceComment ||
+      sourceCard?.comment ||
+      sourceCard?.guidance ||
+      "";
+
+    const guidance = [
+      murabbikGuidanceText({ guidance: comment }, sourceCard, actualCard, refCard),
+      clean(extra)
+    ].filter(Boolean).join(" — ");
+
+    const actualText = serverCard?.actualText || actualCard?.value || "—";
+    const referenceText = serverCard?.referenceText || refCard?.value || "—";
+    const referenceTitle = serverCard?.referenceLabel || refLabel || "الاحتياج / الحد";
 
     return `
       <div class="kpi ${cls}" style="grid-column:1/-1;padding:14px 12px">
         <div class="k" style="min-height:0;margin-bottom:10px">
           <span>${escapeHtml(title)}</span>
-          <span class="kpi-badge"><span class="dot"></span>${badge}</span>
+          <span class="kpi-badge"><span class="dot"></span>${escapeHtml(badge)}</span>
         </div>
 
         <div style="display:grid;grid-template-columns:minmax(0,1fr) 220px minmax(0,1fr);gap:10px;align-items:center">
           <div style="text-align:center;min-width:0">
             <div class="kpi-hint" style="margin-top:0">الإمداد / الفعلي</div>
-            <div class="v">${escapeHtml(actualCard?.value ?? "—")}</div>
+            <div class="v">${escapeHtml(actualText)}</div>
           </div>
 
           <div style="display:flex;justify-content:center;align-items:center">
-            ${gaugeSvg(actual, ref, mode)}
+            ${gaugeSvg(actual, ref, mode, gauge)}
           </div>
 
           <div style="text-align:center;min-width:0">
-            <div class="kpi-hint" style="margin-top:0">${escapeHtml(refLabel || "الاحتياج / الحد")}</div>
-            <div class="v">${escapeHtml(refCard?.value ?? "—")}</div>
+            <div class="kpi-hint" style="margin-top:0">${escapeHtml(referenceTitle)}</div>
+            <div class="v">${escapeHtml(referenceText)}</div>
           </div>
         </div>
 
@@ -2112,6 +2177,7 @@ function thiRecommendationsHtml() {
         refCard: dmiTargetCard,
         refLabel: "المتوقع",
         sourceCard: a("totDM") || n("dm"),
+        serverCard: a("dmi") || a("totDM") || n("dm"),
         mode: "target"
       }));
     }
@@ -2122,7 +2188,8 @@ function thiRecommendationsHtml() {
         actualCard: nelActualCard,
         refCard: nelTargetCard,
         refLabel: "الاحتياجات",
-        sourceCard: a("nelActual") || n("nel"),
+                sourceCard: a("nelActual") || n("nel"),
+        serverCard: a("nel") || a("nelActual") || n("nel"),
         mode: "target"
       }));
     }
@@ -2133,7 +2200,8 @@ function thiRecommendationsHtml() {
         actualCard: mpActualCard,
         refCard: mpTargetCard,
         refLabel: "الاحتياجات",
-        sourceCard: a("mpSupplyG") || n("mp"),
+                sourceCard: a("mpSupplyG") || n("mp"),
+        serverCard: a("mp") || a("mpSupplyG") || n("mp"),
         mode: "target"
       }));
     }
@@ -2144,8 +2212,9 @@ function thiRecommendationsHtml() {
         actualCard: starchActualCard,
         refCard: starchMaxCard,
         refLabel: "الحد الأقصى",
-        sourceCard: a("starchPctActual") || n("starch"),
-        mode: "max"
+                sourceCard: a("mpSupplyG") || n("mp"),
+        serverCard: a("mp") || a("mpSupplyG") || n("mp"),
+        mode: "target"
       }));
     }
 
@@ -2155,7 +2224,8 @@ function thiRecommendationsHtml() {
         actualCard: fatActualCard,
         refCard: fatLimitCard,
         refLabel: "الحد الأقصى",
-        sourceCard: a("fatPctActual") || n("fat"),
+                sourceCard: a("fatPctActual") || n("fat"),
+        serverCard: a("fat") || a("fatPctActual") || n("fat"),
         mode: "max"
       }));
     }
@@ -2171,7 +2241,8 @@ function thiRecommendationsHtml() {
         actualCard: ndfActualCard,
         refCard: ndfMinCard,
         refLabel: "الحد الأدنى",
-        sourceCard: a("ndfPctActual") || n("ndf"),
+                sourceCard: a("ndfPctActual") || n("ndf"),
+        serverCard: a("ndf") || a("ndfPctActual") || n("ndf"),
         mode: "min",
         extra
       }));
