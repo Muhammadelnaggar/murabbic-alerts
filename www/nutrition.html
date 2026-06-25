@@ -1394,7 +1394,7 @@ padding: 6px 0;
     }
   }
 
-  function cardHtml(card = {}) {
+  function cardHtml(card = {}, options = {}) {
     const status = clean(card.status || card.level || "ok");
 
     const cls =
@@ -1404,13 +1404,21 @@ padding: 6px 0;
           ? "warn"
           : "ok");
 
+    const wideClass = options.wide ? " rumen-feature" : "";
+    const actual = num(card.actual);
+    const target = num(card.target);
+    const pct = (actual !== null && target !== null && target > 0)
+      ? Math.max(0, Math.min(100, (actual / target) * 100))
+      : null;
+
     return `
-      <div class="kpi ${cls}">
+      <div class="kpi ${cls}${wideClass}" data-key="${escapeHtml(card.key || "")}">
         <div class="k">
           <span>${escapeHtml(card.title || card.key || "مؤشر")}</span>
           <span class="kpi-badge"><span class="dot"></span>${cls === "ok" ? "مناسب" : cls === "warn" ? "متابعة" : "خطر"}</span>
         </div>
         <div class="v">${escapeHtml(card.value ?? card.actual ?? "—")}</div>
+        ${pct !== null ? `<div class="kpi-meter"><span style="width:${pct.toFixed(1)}%"></span></div>` : ""}
         ${card.targetText ? `<div class="kpi-hint">${escapeHtml(card.targetText)}</div>` : ""}
       </div>
     `;
@@ -1451,6 +1459,7 @@ padding: 6px 0;
     const nelCard = byKey("nel");
     const mpCard = byKey("mp");
     const dmCard = byKey("dm");
+    const rumenCard = byKey("rumen");
 
     const energyActual = num(nelCard?.actual ?? nutrition.nelActual);
     const energyTarget = num(nelCard?.target ?? targets.nelTarget);
@@ -1466,7 +1475,7 @@ padding: 6px 0;
 
     const asFedActual = num(totals.asFedKg ?? totals.totalAsFedKg ?? totals.totAsFed);
 
-    return [
+    const cards = [
       infoCardHtml({
         key: "nel",
         title: "الطاقة",
@@ -1501,16 +1510,21 @@ padding: 6px 0;
         value: asFedActual !== null ? `${fmt(asFedActual, 2)} كجم as-fed` : "—",
         actual: asFedActual,
         target: null
-      }),
-      infoCardHtml({
+      })
+    ];
+
+    if (rumenCard) {
+      cards.push(cardHtml(rumenCard, { wide: true }));
+    } else {
+      cards.push(infoCardHtml({
         key: "rumen",
         title: "صحة الكرش",
-        value: byKey("rumen")?.value ?? "—",
-        actual: null,
-        target: null,
+        value: "—",
         wide: true
-      })
-    ].join("");
+      }));
+    }
+
+    return cards.join("");
   }
 
   function statusClassFromServerCard(card = {}) {
@@ -1576,11 +1590,45 @@ padding: 6px 0;
     `;
   }
 
-  function advancedCardsHtml(advancedCards = [], analysisCards = []) {
+  function thiAdvancedCardHtml(analysis = {}) {
+    const inputs = analysis.inputs || {};
+    const thi = num(inputs.thiUsed ?? state.context?.thi ?? state.context?.thiUsed);
+
+    if (thi === null) return "";
+
+    const status = thi < 68 ? "ok" : (thi < 72 ? "warn" : "bad");
+    const label = thi < 68 ? "مريح" : (thi < 72 ? "متابعة" : "إجهاد حراري");
+
+    return `
+      <div class="kpi ${status}" style="grid-column:1/-1" data-key="thi">
+        <div class="k">
+          <span>THI</span>
+          <span class="kpi-badge"><span class="dot"></span>${label}</span>
+        </div>
+        <div class="v">${fmt(thi, 0)}</div>
+        <div class="kpi-hint">يُعرض في الأعلى كعامل بيئي مساعد، ولا يبدّل حكم السيرفر في كروت التحليل أو توصيات مُرَبِّيك.</div>
+      </div>
+    `;
+  }
+
+  function serverAdviceCardsHtml(analysisCards = []) {
+    return ["decision", "priority", "dcad"]
+      .map(k => cardByKey(analysisCards, k))
+      .filter(Boolean)
+      .map(card => cardHtml(card, { wide: true }))
+      .join("");
+  }
+
+  function advancedCardsHtml(advancedCards = [], analysisCards = [], analysis = {}) {
     const a = (key) => cardByKey(advancedCards, key);
     const n = (key) => cardByKey(analysisCards, key);
 
     const out = [];
+    const thiCard = thiAdvancedCardHtml(analysis);
+    const adviceCards = serverAdviceCardsHtml(analysisCards);
+
+    if (thiCard) out.push(thiCard);
+    if (adviceCards) out.push(adviceCards);
 
     if (a("totDM") || a("dmiTarget")) {
       out.push(advancedGaugeCardHtml({
@@ -1693,7 +1741,7 @@ padding: 6px 0;
 
     if ($("nutritionKPIs")) $("nutritionKPIs").innerHTML = nutritionBasicCardsHtml(analysis, nCards);
     if ($("economicKPIs")) $("economicKPIs").innerHTML = eCards.length ? eCards.map(cardHtml).join("") : "";
-    if ($("advancedKPIs")) $("advancedKPIs").innerHTML = aCards.length ? advancedCardsHtml(aCards, nCards) : "";
+    if ($("advancedKPIs")) $("advancedKPIs").innerHTML = aCards.length ? advancedCardsHtml(aCards, nCards, analysis) : "";
   }
 
   async function saveEvent(ev) {
