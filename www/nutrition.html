@@ -997,6 +997,7 @@ padding: 6px 0;
     rows: [],
     selectedIndex: -1,
     editorRow: null,
+    weatherThi: null,
     lastAnalysis: null,
     lastPanels: null,
     eventId: clean(qs.get("eventId") || qs.get("id"))
@@ -1175,6 +1176,33 @@ padding: 6px 0;
     setText("ctxBodyWeight_txt", state.context.bodyWeightKg ?? "—");
     setText("ctxBCS_txt", state.context.bcs ?? "—");
     setText("ctxParity_txt", state.context.lactationNumber ?? state.context.parity ?? "—");
+  }
+
+  async function loadWeatherThi() {
+    try {
+      const p = new URLSearchParams();
+      const lat = num(qs.get("lat") || qs.get("latitude") || state.context.lat || state.context.latitude);
+      const lon = num(qs.get("lon") || qs.get("lng") || qs.get("longitude") || state.context.lon || state.context.lng || state.context.longitude);
+
+      if (lat !== null) p.set("lat", String(lat));
+      if (lon !== null) p.set("lon", String(lon));
+
+      const data = await api(`/api/weather/thi${p.toString() ? "?" + p.toString() : ""}`);
+
+      state.weatherThi = data || null;
+
+      if (data && data.thi !== null && data.thi !== undefined) {
+        state.context.thi = data.thi;
+        state.context.thiUsed = data.thi;
+        state.context.thiStatus = data.status || null;
+        state.context.thiSource = data.source || null;
+        state.context.thiUpdatedAt = data.updatedAt || null;
+        state.context.thiTempC = data.tempC ?? null;
+        state.context.thiHumidity = data.humidity ?? null;
+      }
+    } catch (_) {
+      state.weatherThi = null;
+    }
   }
 
   function contextFromPage() {
@@ -1779,31 +1807,51 @@ padding: 6px 0;
 
   function thiAdvancedCardHtml(analysis = {}) {
     const inputs = analysis.inputs || {};
-    const thi = num(inputs.thiUsed ?? state.context?.thi ?? state.context?.thiUsed);
+    const thi = num(
+      inputs.thiUsed ??
+      state.weatherThi?.thi ??
+      state.context?.thi ??
+      state.context?.thiUsed
+    );
 
     if (thi === null) return "";
 
-    const status = thi < 68 ? "ok" : (thi < 72 ? "warn" : "bad");
-    const label = thi < 68 ? "مريح" : (thi < 72 ? "متابعة" : "إجهاد حراري");
+    const serverStatus = state.weatherThi?.status || state.context?.thiStatus || {};
+    const level = clean(serverStatus.level || "");
+    const label = clean(serverStatus.label || "");
+
+    const status = level.includes("danger") || level.includes("high")
+      ? "bad"
+      : (level.includes("warn") || level.includes("watch") ? "warn" : (thi < 68 ? "ok" : thi < 72 ? "warn" : "bad"));
+
+    const text = label || (thi < 68 ? "مريح" : (thi < 72 ? "متابعة" : "إجهاد حراري"));
+    const temp = state.weatherThi?.tempC ?? state.context?.thiTempC;
+    const hum = state.weatherThi?.humidity ?? state.context?.thiHumidity;
+    const source = clean(state.weatherThi?.source || state.context?.thiSource || "server");
+    const placeText = state.weatherThi?.fallback
+      ? "قراءة السيرفر الاحتياطية"
+      : "قراءة السيرفر حسب الموقع";
+    const details = [
+      temp !== null && temp !== undefined ? `حرارة ${escapeHtml(temp)}°C` : "",
+      hum !== null && hum !== undefined ? `رطوبة ${escapeHtml(hum)}%` : "",
+      source ? `المصدر: ${escapeHtml(source)}` : ""
+    ].filter(Boolean).join(" — ");
 
     return `
-      <div class="kpi ${status}" style="grid-column:1/-1" data-key="thi">
+      <div class="kpi ${status} thi-advanced-card" style="grid-column:1/-1" data-key="thi">
         <div class="k">
-          <span>THI</span>
-          <span class="kpi-badge"><span class="dot"></span>${label}</span>
+          <span>THI — مؤشر الإجهاد الحراري</span>
+          <span class="kpi-badge"><span class="dot"></span>${escapeHtml(text)}</span>
         </div>
         <div class="v">${fmt(thi, 0)}</div>
-        <div class="kpi-hint">يُعرض في الأعلى كعامل بيئي مساعد، ولا يبدّل حكم السيرفر في كروت التحليل أو توصيات مُرَبِّيك.</div>
+        <div class="kpi-hint">${placeText}${details ? " — " + details : ""}</div>
       </div>
     `;
   }
 
   function serverAdviceCardsHtml(analysisCards = []) {
-    return ["decision", "priority", "dcad"]
-      .map(k => cardByKey(analysisCards, k))
-      .filter(Boolean)
-      .map(card => cardHtml(card, { wide: true }))
-      .join("");
+    const dcad = cardByKey(analysisCards, "dcad");
+    return dcad ? cardHtml(dcad, { wide: true }) : "";
   }
 
   function advancedCardsHtml(advancedCards = [], analysisCards = [], analysis = {}) {
@@ -2105,6 +2153,7 @@ padding: 6px 0;
     try {
       await api("/api/auth/me");
       await loadContext();
+      await loadWeatherThi();
       await loadFeeds();
       showMsg("");
     } catch (e) {
