@@ -5,10 +5,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <script type="module" src="/js/animal-update.js"></script>
-
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
+ 
  <title>التغذية الذكية</title>
 
 
@@ -600,7 +598,7 @@ padding: 6px 0;
   <div class="strip-item"><span class="lbl">الحالة الجسمانية BCS</span><span class="val" id="ctxBCS_txt">—</span></div>
   <div class="strip-item"><span class="lbl">رقم الموسم</span><span class="val" id="ctxParity_txt">—</span></div>
 </div>
-  <!-- الحقول الأصلية (مخفية) للحفاظ على منطق الحفظ الحالي في nutrition.js -->
+  <!-- حقول مخفية يستخدمها السكريبت الداخلي للحفظ والتحليل -->
 
     <input id="ctxDIM" type="number" inputmode="numeric" step="1" min="0" style="display:none">
     <select id="ctxSpecies" style="display:none"><option value="">—</option><option value="بقر">بقر</option><option value="جاموس">جاموس</option></select>
@@ -888,17 +886,761 @@ padding: 6px 0;
   </div>
 </div>
 
-<!-- ===== منطق الحسابات والـUI نُقل إلى /js/nutrition.js ===== -->
+<script>
+(() => {
+  "use strict";
 
-<!-- الأساس التحليلي + الذكاء (لا تلمس ترتيبها) -->
-<script src="/js/app-core.js" defer></script>
-<script type="module" src="/js/timeline.js"></script>
-<script type="module" src="/js/smart-checks.js"></script>
-<!-- الكور + تتبّع + منطق الحفظ (لا تغيّر واجهتك) -->
-<script type="module" src="/js/event-core.js"></script>
-<script type="module" src="/js/track-core.js"></script>
-<script type="module" src="/js/track-nutrition.js"></script>
-<script type="module" src="/js/nutrition.js"></script>
+  const $ = (id) => document.getElementById(id);
+  const qs = new URLSearchParams(location.search);
+
+  const state = {
+    context: {},
+    feeds: [],
+    rows: [],
+    selectedIndex: -1,
+    lastAnalysis: null,
+    lastPanels: null,
+    eventId: clean(qs.get("eventId") || qs.get("id"))
+  };
+
+  function clean(v) {
+    return String(v ?? "").trim();
+  }
+
+  function num(v) {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function fmt(v, d = 1) {
+    return Number.isFinite(Number(v)) ? Number(v).toFixed(d) : "—";
+  }
+
+  function todayISO() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function splitNumbers(v) {
+    return clean(v).match(/\d+/g)?.map(x => clean(x)).filter(Boolean) || [];
+  }
+
+  function escapeHtml(v) {
+    return clean(v).replace(/[&<>"]/g, c => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;"
+    }[c]));
+  }
+
+  async function api(path, options = {}) {
+    const hasBody = options.body !== undefined;
+
+    const r = await fetch(path, {
+      ...options,
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        ...(hasBody ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {})
+      }
+    });
+
+    const data = await r.json().catch(() => ({}));
+
+    if (!r.ok || data.ok === false) {
+      const err = new Error(data.message || data.error || "تعذّر تنفيذ الطلب.");
+      err.status = r.status;
+      err.data = data;
+      throw err;
+    }
+
+    return data;
+  }
+
+  function setText(id, value) {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = value === null || value === undefined || value === "" ? "—" : String(value);
+  }
+
+  function setVal(id, value) {
+    const el = $(id);
+    if (!el) return;
+    el.value = value === null || value === undefined ? "" : String(value);
+  }
+
+  function showMsg(message, kind = "ok") {
+    const warn = $("warn");
+    if (warn) {
+      warn.textContent = message || "";
+      warn.style.color = kind === "bad" ? "#c62828" : "#1b5e20";
+    }
+  }
+
+  function eventDate() {
+    return clean(qs.get("eventDate") || qs.get("date")) || todayISO();
+  }
+
+  function pageNumbers() {
+    const many = splitNumbers(
+      qs.get("numbers") ||
+      qs.get("bulk") ||
+      qs.get("groupNumbers") ||
+      qs.get("animals") ||
+      ""
+    );
+
+    if (many.length) return many;
+
+    const one = clean(
+      qs.get("number") ||
+      qs.get("animalNumber") ||
+      qs.get("animalId") ||
+      ""
+    );
+
+    return one ? [one] : [];
+  }
+
+  async function loadContext() {
+    const numbers = pageNumbers();
+    const p = new URLSearchParams();
+
+    if (numbers.length > 1) {
+      p.set("numbers", numbers.join(","));
+    } else if (numbers[0]) {
+      p.set("number", numbers[0]);
+    }
+
+    p.set("eventDate", eventDate());
+
+    if (clean(qs.get("groupName"))) p.set("groupName", clean(qs.get("groupName")));
+    if (clean(qs.get("groupKey"))) p.set("groupKey", clean(qs.get("groupKey")));
+
+    const data = await api(`/api/nutrition/context?${p.toString()}`);
+    state.context = data.context || {};
+
+    const isGroup = data.mode === "group";
+
+    setText(
+      "animalInfo",
+      isGroup
+        ? `مجموعة: ${state.context.groupName || state.context.group || numbers.length + " رأس"}`
+        : (data.animalNumber || numbers[0] || "—")
+    );
+
+    setText("dateInfo", data.eventDate || eventDate());
+
+    setVal("animalNumber", data.animalNumber || numbers[0] || "");
+    setVal("eventDate", data.eventDate || eventDate());
+    setVal("animalId", data.animalId || data.animalNumber || numbers[0] || "");
+
+    setVal("ctxSpecies", state.context.species || "");
+    setVal("ctxDIM", state.context.daysInMilk ?? "");
+    setVal("ctxAvgMilk", state.context.avgMilkKg ?? "");
+    setVal("ctxDCC", state.context.pregnancyDays ?? "");
+    setVal("ctxPreg", state.context.pregnancyStatus || state.context.reproductiveStatus || "");
+    setVal("ctxBreed", state.context.breed || "");
+    setVal("ctxParity", state.context.lactationNumber ?? state.context.parity ?? "");
+    setVal("ctxBodyWeight", state.context.bodyWeightKg ?? "");
+    setVal("ctxBCS", state.context.bcs ?? "");
+    setVal("ctxMilkFat", state.context.milkFatPct ?? "");
+    setVal("ctxMilkProtein", state.context.milkProteinPct ?? "");
+    setVal("ctxMilkPrice", state.context.milkPrice ?? "");
+
+    setVal("milkFatInput", state.context.milkFatPct ?? "");
+    setVal("milkProteinInput", state.context.milkProteinPct ?? "");
+    setVal("milkPriceInput", state.context.milkPrice ?? "");
+
+    const earlyDry = state.context.earlyDry === true;
+    const closeUp = state.context.closeUp === true;
+
+    if ($("ctxEarlyDry")) $("ctxEarlyDry").checked = earlyDry;
+    if ($("ctxCloseUp")) $("ctxCloseUp").checked = closeUp;
+
+    setText("ctxDIM_txt", state.context.daysInMilk ?? "—");
+    setText("ctxSpecies_txt", state.context.species || "—");
+    setText("ctxAvgMilk_txt", state.context.avgMilkKg ?? "—");
+    setText("ctxDCC_txt", state.context.pregnancyDays ?? 0);
+    setText("dtcVal", state.context.daysToCalving ?? "—");
+    setText("ctxPreg_txt", state.context.pregnancyStatus || state.context.reproductiveStatus || "فارغة");
+    setText("ctxEarlyDry_txt", earlyDry ? "نعم" : "—");
+    setText("ctxCloseUp_txt", closeUp ? "نعم" : "—");
+    setText("ctxMilkFat_txt", state.context.milkFatPct ?? "—");
+    setText("ctxMilkProtein_txt", state.context.milkProteinPct ?? "—");
+    setText("ctxMilkPrice_txt", state.context.milkPrice ?? "—");
+    setText("ctxBreed_txt", state.context.breed || "—");
+    setText("ctxBodyWeight_txt", state.context.bodyWeightKg ?? "—");
+    setText("ctxBCS_txt", state.context.bcs ?? "—");
+    setText("ctxParity_txt", state.context.lactationNumber ?? state.context.parity ?? "—");
+  }
+
+  function contextFromPage() {
+    return {
+      ...state.context,
+
+      species: clean($("ctxSpecies")?.value || state.context.species),
+      breed: clean($("ctxBreed")?.value || state.context.breed),
+      daysInMilk: num($("ctxDIM")?.value ?? state.context.daysInMilk),
+      avgMilkKg: num($("ctxAvgMilk")?.value ?? state.context.avgMilkKg),
+      pregnancyStatus: clean($("ctxPreg")?.value || state.context.pregnancyStatus || state.context.reproductiveStatus),
+      reproductiveStatus: clean($("ctxPreg")?.value || state.context.reproductiveStatus || state.context.pregnancyStatus),
+      pregnancyDays: num($("ctxDCC")?.value ?? state.context.pregnancyDays),
+      daysToCalving: num(state.context.daysToCalving),
+
+      bodyWeightKg: num($("ctxBodyWeight")?.value ?? state.context.bodyWeightKg),
+      bcs: num($("ctxBCS")?.value ?? state.context.bcs),
+      parity: num($("ctxParity")?.value ?? state.context.parity),
+      lactationNumber: num($("ctxParity")?.value ?? state.context.lactationNumber),
+
+      milkFatPct: num($("milkFatInput")?.value ?? $("ctxMilkFat")?.value ?? state.context.milkFatPct),
+      milkProteinPct: num($("milkProteinInput")?.value ?? $("ctxMilkProtein")?.value ?? state.context.milkProteinPct),
+      milkPrice: num($("milkPriceInput")?.value ?? $("ctxMilkPrice")?.value ?? state.context.milkPrice),
+
+      earlyDry: $("ctxEarlyDry")?.checked === true || state.context.earlyDry === true,
+      closeUp: $("ctxCloseUp")?.checked === true || state.context.closeUp === true
+    };
+  }
+
+  async function loadFeeds() {
+    const data = await api("/api/nutrition/feed-items");
+    state.feeds = Array.isArray(data.feeds) ? data.feeds : [];
+    renderFeedOptions();
+  }
+
+  function renderFeedOptions() {
+    const select = $("preset");
+    if (!select) return;
+
+    const filter = clean($("feedTypeFilter")?.value || "all");
+
+    select.innerHTML = `<option value="" selected disabled>اختر خامة</option>`;
+
+    state.feeds
+      .filter(f => filter === "all" || !filter || clean(f.cat || f.category) === filter)
+      .forEach((f) => {
+        const idx = state.feeds.indexOf(f);
+        const opt = document.createElement("option");
+        opt.value = String(idx);
+        opt.textContent = f.nameAr || f.userLabel || f.name || `خامة ${idx + 1}`;
+        select.appendChild(opt);
+      });
+  }
+
+  function currentMode() {
+    return clean($("mode")?.value || "tmr_asfed") || "tmr_asfed";
+  }
+
+  function rowFromFeed(feed = {}) {
+    return {
+      id: feed.id || feed.feedId || null,
+      feedId: feed.feedId || feed.id || null,
+      name: feed.nameAr || feed.userLabel || feed.name || "خامة",
+      cat: feed.cat || feed.category || "conc",
+
+      dmPct: num(feed.dmPct ?? feed.dm) ?? 90,
+      cpPct: num(feed.cpPct ?? feed.cp),
+      pricePerTon: num(feed.pricePerTon ?? feed.pTon ?? feed.price),
+      pricePerTonDM: num(feed.pricePerTonDM ?? feed.pTonDM),
+
+      pct: null,
+      asFedKg: null,
+
+      ndfPct: num(feed.ndfPct ?? feed.ndf),
+      adfPct: num(feed.adfPct ?? feed.adf),
+      fatPct: num(feed.fatPct ?? feed.fat),
+      starchPct: num(feed.starchPct ?? feed.starch),
+      nelMcalPerKgDM: num(feed.nelMcalPerKgDM ?? feed.nel),
+      mpGPerKgDM: num(feed.mpGPerKgDM ?? feed.mp),
+
+      caPct: num(feed.caPct),
+      pPct: num(feed.pPct),
+      mgPct: num(feed.mgPct),
+      naPct: num(feed.naPct),
+      kPct: num(feed.kPct),
+      clPct: num(feed.clPct),
+      sPct: num(feed.sPct),
+
+      znMgKgDM: num(feed.znMgKgDM),
+      cuMgKgDM: num(feed.cuMgKgDM),
+      mnMgKgDM: num(feed.mnMgKgDM),
+      seMgKgDM: num(feed.seMgKgDM),
+      iMgKgDM: num(feed.iMgKgDM),
+      coMgKgDM: num(feed.coMgKgDM),
+      feMgKgDM: num(feed.feMgKgDM),
+
+      vitAIUPerKgDM: num(feed.vitAIUPerKgDM),
+      vitDIUPerKgDM: num(feed.vitDIUPerKgDM),
+      vitEIUPerKgDM: num(feed.vitEIUPerKgDM),
+
+      biotinMgKgDM: num(feed.biotinMgKgDM),
+      niacinMgKgDM: num(feed.niacinMgKgDM),
+      cholineMgKgDM: num(feed.cholineMgKgDM)
+    };
+  }
+
+  function rowCells(row) {
+    const mode = currentMode();
+
+    const dmKg =
+      mode === "tmr_percent"
+        ? null
+        : ((num(row.asFedKg) || 0) * ((num(row.dmPct) || 0) / 100));
+
+    const cost =
+      (num(row.asFedKg) || 0) * ((num(row.pricePerTon) || 0) / 1000);
+
+    const pTonDM =
+      num(row.pricePerTonDM) ||
+      ((num(row.pricePerTon) && num(row.dmPct))
+        ? num(row.pricePerTon) / (num(row.dmPct) / 100)
+        : null);
+
+    return `
+      <td data-label="الخامة" data-col="name">
+        <input data-k="name" value="${escapeHtml(row.name)}">
+      </td>
+
+      <td data-label="الفئة" data-col="cat">
+        <select data-k="cat">
+          <option value="rough" ${row.cat === "rough" ? "selected" : ""}>خشن</option>
+          <option value="conc" ${row.cat === "conc" ? "selected" : ""}>مركزات</option>
+          <option value="add" ${row.cat === "add" ? "selected" : ""}>إضافات</option>
+        </select>
+      </td>
+
+      <td data-label="المادة الجافة %" data-col="dm">
+        <input type="number" inputmode="decimal" step="0.01" data-k="dmPct" value="${row.dmPct ?? ""}">
+      </td>
+
+      <td data-label="البروتين %" data-col="cp">
+        <input type="number" inputmode="decimal" step="0.01" data-k="cpPct" value="${row.cpPct ?? ""}">
+      </td>
+
+      <td data-label="سعر الطن" data-col="pTon">
+        <input type="number" inputmode="decimal" step="0.01" data-k="pricePerTon" value="${row.pricePerTon ?? ""}">
+      </td>
+
+      <td data-label="سعر/طن DM" data-col="pTonDM">
+        <span class="pTonDM">${fmt(pTonDM, 0)}</span>
+      </td>
+
+      <td data-label="نسبة as-fed %" data-col="pct">
+        <input type="number" inputmode="decimal" step="0.01" data-k="pct" value="${row.pct ?? ""}" ${mode === "tmr_asfed" ? "disabled" : ""}>
+      </td>
+
+      <td data-label="كجم as-fed/رأس" data-col="kg">
+        <input type="number" inputmode="decimal" step="0.01" data-k="asFedKg" value="${row.asFedKg ?? ""}" ${mode === "tmr_percent" ? "disabled" : ""}>
+      </td>
+
+      <td data-label="كجم DM/رأس" data-col="kgDM">
+        <span class="kgDM">${fmt(dmKg, 2)}</span>
+      </td>
+
+      <td data-label="تكلفة/رأس/يوم" data-col="cost">
+        <span class="cost">${fmt(cost, 2)}</span>
+      </td>
+    `;
+  }
+
+  function renderRows() {
+    const box = $("feedInputBox");
+    const tbody = document.querySelector("#tbl tbody");
+
+    if (!tbody) return;
+
+    if (box) box.style.display = state.rows.length ? "block" : "none";
+
+    tbody.innerHTML = "";
+
+    state.rows.forEach((row, index) => {
+      const tr = document.createElement("tr");
+      tr.dataset.index = String(index);
+      tr.innerHTML = rowCells(row);
+
+      tr.addEventListener("click", () => {
+        state.selectedIndex = index;
+        renderSummary();
+      });
+
+      tr.querySelectorAll("input,select").forEach(el => {
+        const update = () => {
+          const k = el.dataset.k;
+          state.rows[index][k] = el.type === "number" ? num(el.value) : el.value;
+          renderSummary();
+          analyzeSoon();
+        };
+
+        el.addEventListener("input", update);
+        el.addEventListener("change", update);
+      });
+
+      tbody.appendChild(tr);
+    });
+
+    renderSummary();
+    analyzeSoon();
+  }
+
+  function renderSummary() {
+    const box = $("feedSummaryBox");
+    const actions = $("rationActions");
+
+    if (!box) return;
+
+    if (!state.rows.length) {
+      box.style.display = "none";
+      if (actions) actions.style.display = "none";
+      return;
+    }
+
+    box.style.display = "block";
+    if (actions) actions.style.display = "flex";
+
+    box.innerHTML = state.rows.map((r, i) => `
+      <div class="feed-item">
+        <label>
+          <input class="rationPick" type="radio" name="rationPick" ${i === state.selectedIndex ? "checked" : ""} data-i="${i}">
+          <span class="a">${escapeHtml(r.name)}</span>
+        </label>
+        <span class="b">${r.asFedKg ?? r.pct ?? "—"}</span>
+      </div>
+    `).join("");
+
+    box.querySelectorAll(".rationPick").forEach(el => {
+      el.addEventListener("change", () => {
+        state.selectedIndex = Number(el.dataset.i);
+        renderSummary();
+      });
+    });
+
+    const hasPick = state.selectedIndex >= 0 && state.selectedIndex < state.rows.length;
+
+    if ($("rationEdit")) $("rationEdit").disabled = !hasPick;
+    if ($("rationRemove")) $("rationRemove").disabled = !hasPick;
+  }
+
+  function syncModeUI() {
+    const mode = currentMode();
+
+    if ($("splitBox")) $("splitBox").style.display = mode === "split" ? "flex" : "none";
+    if ($("pillSumPct")) $("pillSumPct").style.display = mode === "tmr_percent" || mode === "split" ? "inline-flex" : "none";
+    if ($("totalsBase")) $("totalsBase").style.display = mode === "split" ? "none" : "flex";
+    if ($("totalsSplit")) $("totalsSplit").style.display = mode === "split" ? "flex" : "none";
+
+    renderRows();
+  }
+
+  function addSelectedFeed() {
+    const idx = Number($("preset")?.value);
+    const feed = state.feeds[idx];
+
+    if (!feed) {
+      showMsg("اختر خامة أولًا.", "bad");
+      return;
+    }
+
+    state.rows.push(rowFromFeed(feed));
+    state.selectedIndex = state.rows.length - 1;
+
+    if ($("preset")) $("preset").value = "";
+
+    renderRows();
+  }
+
+  function removeSelectedFeed() {
+    if (state.selectedIndex < 0 || state.selectedIndex >= state.rows.length) return;
+
+    state.rows.splice(state.selectedIndex, 1);
+    state.selectedIndex = -1;
+
+    renderRows();
+  }
+
+  let analyzeTimer = null;
+
+  function analyzeSoon() {
+    clearTimeout(analyzeTimer);
+    analyzeTimer = setTimeout(analyzeNow, 350);
+  }
+
+  async function analyzeNow() {
+    if (!state.rows.length) return;
+
+    try {
+      const context = contextFromPage();
+
+      const data = await api("/api/nutrition/analyze-ration", {
+        method: "POST",
+        body: JSON.stringify({
+          rows: state.rows,
+          context,
+          mode: currentMode(),
+          concKg: num($("concKgInput")?.value),
+          milkPrice: num($("milkPriceInput")?.value ?? context.milkPrice)
+        })
+      });
+
+      state.lastAnalysis = data.analysis || null;
+      state.lastPanels = data.panels || null;
+
+      paintAnalysis(data.analysis || {}, data.panels || {});
+      showMsg("");
+    } catch (e) {
+      showMsg(e.message || "تعذّر تحليل العليقة.", "bad");
+    }
+  }
+
+  function cardHtml(card = {}) {
+    const status = clean(card.status || card.level || "ok");
+
+    const cls =
+      status.includes("bad") || status.includes("danger") || status.includes("error")
+        ? "bad"
+        : (status.includes("warn") || status.includes("watch")
+          ? "warn"
+          : "ok");
+
+    return `
+      <div class="kpi ${cls}">
+        <div class="k">
+          <span>${escapeHtml(card.title || card.key || "مؤشر")}</span>
+          <span class="kpi-badge"><span class="dot"></span>${cls === "ok" ? "مناسب" : cls === "warn" ? "متابعة" : "خطر"}</span>
+        </div>
+        <div class="v">${escapeHtml(card.value ?? card.actual ?? "—")}</div>
+        ${card.targetText ? `<div class="kpi-hint">${escapeHtml(card.targetText)}</div>` : ""}
+      </div>
+    `;
+  }
+
+  function paintAnalysis(analysis = {}, panels = {}) {
+    const totals = analysis.totals || {};
+    const nutrition = analysis.nutrition || {};
+    const targets = analysis.targets || {};
+    const economics = analysis.economics || {};
+
+    setText("totDM", fmt(totals.dmKg ?? totals.totalDMKg, 2));
+    setText("totCost", fmt(totals.costPerHead ?? economics.costPerHead, 2));
+    setText("totAsFed", fmt(totals.asFedKg ?? totals.totalAsFedKg, 2));
+    setText("mixPriceDM", fmt(totals.pricePerTonDM ?? nutrition.mixPriceDM, 0));
+    setText("mixPriceAsFed", fmt(totals.pricePerTonAsFed, 0));
+
+    setText("nelActual", fmt(nutrition.nelActual, 2));
+    setText("cpPctTotal", fmt(nutrition.cpPctActual, 1));
+    setText("ndfPctActual", fmt(nutrition.ndfPctActual, 1));
+    setText("fatPctActual", fmt(nutrition.fatPctActual, 1));
+
+    setText("dmiTarget", fmt(targets.dmiTarget, 1));
+    setText("nelTarget", fmt(targets.nelTarget, 2));
+    setText("cpTarget", fmt(targets.cpReferencePct ?? targets.cpTarget, 1));
+    setText("ndfTarget", fmt(targets.ndfTarget, 1));
+    setText("starchMax", fmt(targets.starchMax, 1));
+
+    setText("costPerKgMilk", fmt(economics.costPerKgMilk, 2));
+    setText("dmPerKgMilk", fmt(economics.dmPerKgMilk, 2));
+    setText("milkRevenue", fmt(economics.milkRevenue, 2));
+    setText("milkMargin", fmt(economics.milkMargin, 2));
+
+    const sumPct = state.rows.reduce((s, r) => s + (num(r.pct) || 0), 0);
+    setText("sumPct", `${fmt(sumPct, 1)}%`);
+
+    const nCards = panels.analysisCards || panels.nutritionCards || [];
+    const eCards = panels.economicsCards || panels.economicCards || [];
+    const aCards = panels.advancedCards || [];
+
+    if ($("nutritionKPIs")) $("nutritionKPIs").innerHTML = nCards.length ? nCards.map(cardHtml).join("") : "";
+    if ($("economicKPIs")) $("economicKPIs").innerHTML = eCards.length ? eCards.map(cardHtml).join("") : "";
+    if ($("advancedKPIs")) $("advancedKPIs").innerHTML = aCards.length ? aCards.map(cardHtml).join("") : "";
+  }
+
+  async function saveEvent(ev) {
+    ev.preventDefault();
+
+    if (!state.rows.length) {
+      showMsg("أضف خامة واحدة على الأقل قبل الحفظ.", "bad");
+      return;
+    }
+
+    const numbers = pageNumbers();
+    const isGroup =
+      numbers.length > 1 ||
+      Array.isArray(state.context.groupNumbers) ||
+      !!state.context.groupName ||
+      !!state.context.group ||
+      !!state.context.groupLabel;
+
+    const body = {
+      eventId: state.eventId || undefined,
+      isGroup,
+
+      animalNumber: isGroup
+        ? undefined
+        : (clean($("animalNumber")?.value) || numbers[0] || ""),
+
+      groupNumbers: isGroup
+        ? (state.context.groupNumbers || numbers)
+        : undefined,
+
+      eventDate: clean($("eventDate")?.value) || eventDate(),
+
+      nutrition: {
+        mode: currentMode(),
+        concKg: num($("concKgInput")?.value),
+        milkPrice: num($("milkPriceInput")?.value),
+        rows: state.rows,
+        context: contextFromPage()
+      }
+    };
+
+    try {
+      const out = await api("/api/nutrition/save", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+
+      const msg = $("inlineMsg");
+
+      if (msg) {
+        msg.style.display = "block";
+        const t = msg.querySelector(".text");
+        if (t) t.textContent = out.updated ? "✅ تم تحديث عليقة التغذية." : "✅ تم حفظ عليقة التغذية.";
+      }
+
+      showMsg("✅ تم الحفظ بنجاح");
+    } catch (e) {
+      showMsg(e.message || "تعذّر حفظ التغذية.", "bad");
+    }
+  }
+
+  function premixPayload() {
+    const type = clean($("customPremixType")?.value || "full_custom_additive");
+    const label = clean($("customPremixUserLabel")?.value || "بريمكس مزرعتي");
+
+    const body = {
+      type,
+      userLabel: label,
+      name: label,
+      nameAr: label,
+      cat: "add",
+      dmPct: 95,
+      cpPct: 0,
+      pricePerTon: 0
+    };
+
+    [
+      "caPct", "pPct", "mgPct", "naPct", "kPct", "clPct", "sPct",
+      "znMgKgDM", "cuMgKgDM", "mnMgKgDM", "seMgKgDM", "iMgKgDM", "coMgKgDM", "feMgKgDM",
+      "vitAIUPerKgDM", "vitDIUPerKgDM", "vitEIUPerKgDM",
+      "biotinMgKgDM", "niacinMgKgDM", "cholineMgKgDM"
+    ].forEach(k => {
+      const v = num($("premix_" + k)?.value);
+      if (v !== null) body[k] = v;
+    });
+
+    return body;
+  }
+
+  async function savePremix() {
+    try {
+      const data = await api("/api/nutrition/custom-feed", {
+        method: "POST",
+        body: JSON.stringify(premixPayload())
+      });
+
+      if (data.feed) state.feeds.push(data.feed);
+
+      renderFeedOptions();
+      closePremix();
+      showMsg("✅ تم حفظ البريمكس وإضافته للقائمة.");
+    } catch (e) {
+      showMsg(e.message || "تعذّر حفظ البريمكس.", "bad");
+    }
+  }
+
+  function openPremix() {
+    const modal = $("customPremixModal");
+    if (!modal) return;
+
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden", "false");
+  }
+
+  function closePremix() {
+    const modal = $("customPremixModal");
+    if (!modal) return;
+
+    modal.classList.remove("show");
+    modal.setAttribute("aria-hidden", "true");
+  }
+
+  function bind() {
+    $("feedTypeFilter")?.addEventListener("change", renderFeedOptions);
+    $("preset")?.addEventListener("change", addSelectedFeed);
+    $("mode")?.addEventListener("change", syncModeUI);
+
+    $("rationRemove")?.addEventListener("click", removeSelectedFeed);
+
+    $("concKgInput")?.addEventListener("input", analyzeSoon);
+    $("milkFatInput")?.addEventListener("input", analyzeSoon);
+    $("milkProteinInput")?.addEventListener("input", analyzeSoon);
+    $("milkPriceInput")?.addEventListener("input", analyzeSoon);
+    $("ctxBodyWeight")?.addEventListener("input", analyzeSoon);
+    $("ctxBCS")?.addEventListener("input", analyzeSoon);
+
+    $("nutritionForm")?.addEventListener("submit", saveEvent);
+
+    $("openCustomPremix")?.addEventListener("click", openPremix);
+    $("closeCustomPremix")?.addEventListener("click", closePremix);
+    $("saveCustomPremix")?.addEventListener("click", savePremix);
+
+    $("toggleAdvancedBtn")?.addEventListener("click", () => {
+      const box = $("advancedKPIs");
+      if (!box) return;
+
+      const hidden = box.style.display === "none" || !box.style.display;
+      box.style.display = hidden ? "block" : "none";
+
+      if ($("toggleAdvancedBtn")) {
+        $("toggleAdvancedBtn").textContent = hidden ? "إخفاء المتقدم" : "عرض متقدم";
+      }
+    });
+
+    $("msgYes")?.addEventListener("click", () => {
+      location.href =
+        `/add-event.html?number=${encodeURIComponent(clean($("animalNumber")?.value))}` +
+        `&date=${encodeURIComponent(clean($("eventDate")?.value) || eventDate())}`;
+    });
+
+    $("msgNo")?.addEventListener("click", () => {
+      location.href = "/dashboard.html";
+    });
+  }
+
+  async function start() {
+    bind();
+    syncModeUI();
+
+    try {
+      await api("/api/auth/me");
+      await loadContext();
+      await loadFeeds();
+      showMsg("");
+    } catch (e) {
+      showMsg(
+        e.status === 401
+          ? "سجّل الدخول أولًا."
+          : (e.message || "تعذّر تحميل صفحة التغذية."),
+        "bad"
+      );
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", start);
+})();
+</script>
 
 </body>
 </html>
