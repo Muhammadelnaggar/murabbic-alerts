@@ -1416,6 +1416,103 @@ padding: 6px 0;
     `;
   }
 
+  function trendArrow(actual, target) {
+    const a = Number(actual);
+    const t = Number(target);
+    if (!Number.isFinite(a) || !Number.isFinite(t) || t <= 0) return "";
+
+    const pct = (a / t) * 100;
+    if (pct > 105) return "↑";
+    if (pct < 95) return "↓";
+    return "↔";
+  }
+
+  function infoCardHtml({ key, title, value, actual, target, wide = false }) {
+    const arr = trendArrow(actual, target);
+    const wideClass = wide ? " rumen-feature" : "";
+
+    return `
+      <div class="kpi nutrition-info-card${wideClass}" data-key="${escapeHtml(key || "")}">
+        <div class="k">
+          <span>${escapeHtml(title || "مؤشر")}</span>
+          ${arr ? `<span class="arr">${arr}</span>` : ""}
+        </div>
+        <div class="v">${escapeHtml(value ?? "—")}</div>
+      </div>
+    `;
+  }
+
+  function nutritionBasicCardsHtml(analysis = {}, analysisCards = []) {
+    const totals = analysis.totals || {};
+    const nutrition = analysis.nutrition || {};
+    const targets = analysis.targets || {};
+    const byKey = (key) => cardByKey(analysisCards, key);
+
+    const nelCard = byKey("nel");
+    const mpCard = byKey("mp");
+    const dmCard = byKey("dm");
+
+    const energyActual = num(nelCard?.actual ?? nutrition.nelActual);
+    const energyTarget = num(nelCard?.target ?? targets.nelTarget);
+
+    const cpActual = num(nutrition.cpPctTotal ?? nutrition.cpPctActual);
+    const cpTarget = num(targets.cpReferencePct ?? targets.cpTarget);
+
+    const mpActual = num(mpCard?.actual ?? nutrition.mpSupplyG);
+    const mpTarget = num(mpCard?.target ?? targets.mpTargetG);
+
+    const dmActual = num(dmCard?.actual ?? totals.dmKg ?? totals.totalDMKg);
+    const dmTarget = num(dmCard?.target ?? targets.dmiTarget);
+
+    const asFedActual = num(totals.asFedKg ?? totals.totalAsFedKg ?? totals.totAsFed);
+
+    return [
+      infoCardHtml({
+        key: "nel",
+        title: "الطاقة",
+        value: nelCard?.value ?? fmt(energyActual, 2),
+        actual: energyActual,
+        target: energyTarget
+      }),
+      infoCardHtml({
+        key: "cp",
+        title: "البروتين الخام في العليقة",
+        value: cpActual !== null ? `${fmt(cpActual, 1)} %` : "—",
+        actual: cpActual,
+        target: cpTarget
+      }),
+      infoCardHtml({
+        key: "mp",
+        title: "البروتين الممثل",
+        value: mpCard?.value ?? (mpActual !== null ? `${fmt(mpActual, 0)} جم/يوم` : "—"),
+        actual: mpActual,
+        target: mpTarget
+      }),
+      infoCardHtml({
+        key: "dm",
+        title: "المادة الجافة المأكولة",
+        value: dmCard?.value ?? (dmActual !== null ? `${fmt(dmActual, 2)} كجم` : "—"),
+        actual: dmActual,
+        target: dmTarget
+      }),
+      infoCardHtml({
+        key: "asFed",
+        title: "المأكول الكلي",
+        value: asFedActual !== null ? `${fmt(asFedActual, 2)} كجم as-fed` : "—",
+        actual: asFedActual,
+        target: null
+      }),
+      infoCardHtml({
+        key: "rumen",
+        title: "صحة الكرش",
+        value: byKey("rumen")?.value ?? "—",
+        actual: null,
+        target: null,
+        wide: true
+      })
+    ].join("");
+  }
+
   function statusClassFromServerCard(card = {}) {
     const status = clean(card.status || card.level || "ok").toLowerCase();
     if (status.includes("bad") || status.includes("danger") || status.includes("error")) return "bad";
@@ -1594,7 +1691,7 @@ padding: 6px 0;
     const eCards = panels.economicsCards || panels.economicCards || [];
     const aCards = panels.advancedCards || [];
 
-    if ($("nutritionKPIs")) $("nutritionKPIs").innerHTML = nCards.length ? nCards.map(cardHtml).join("") : "";
+    if ($("nutritionKPIs")) $("nutritionKPIs").innerHTML = nutritionBasicCardsHtml(analysis, nCards);
     if ($("economicKPIs")) $("economicKPIs").innerHTML = eCards.length ? eCards.map(cardHtml).join("") : "";
     if ($("advancedKPIs")) $("advancedKPIs").innerHTML = aCards.length ? advancedCardsHtml(aCards, nCards) : "";
   }
