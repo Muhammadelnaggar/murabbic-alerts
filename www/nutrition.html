@@ -255,6 +255,67 @@ padding: 6px 0;
   opacity:.9;
   white-space:nowrap;
 }
+
+/* ===== Feed Editor — single add/remove form ===== */
+.feed-editor{
+  margin-top:10px;
+  background:#fff;
+  border:1px solid rgba(14,160,90,.22);
+  border-radius:16px;
+  padding:10px;
+}
+.feed-editor-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+.feed-editor-grid .full{grid-column:1/-1}
+.feed-editor label{
+  display:block;
+  margin:0 0 4px;
+  font-size:12px;
+  font-weight:900;
+  color:#334155;
+}
+.feed-editor input,
+.feed-editor select{
+  width:100%;
+  min-height:40px;
+  border-radius:12px;
+  border:1px solid #d7e7dd;
+  padding:8px 10px;
+  font-weight:800;
+  background:#f9fdfb;
+}
+.feed-editor input:focus,
+.feed-editor select:focus{
+  outline:none;
+  border-color:#0ea05a;
+  background:#fff;
+  box-shadow:0 0 0 2px rgba(14,160,90,.14);
+}
+.feed-editor-actions{
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+  align-items:center;
+  margin-top:10px;
+}
+.feed-editor-actions .mini-btn{
+  flex:1;
+}
+.feed-editor-note{
+  margin-top:8px;
+  font-size:12px;
+  font-weight:800;
+  color:#475569;
+  line-height:1.5;
+}
+@media (max-width:420px){
+  .feed-editor-grid{grid-template-columns:1fr 1fr;gap:7px}
+  .feed-editor-grid .full{grid-column:1/-1}
+}
+
 /* ===== Feed Input (Premium Grid) — ONE clean version ===== */
 #feedInputBox #tbl{ border:0; background:transparent; min-width:unset; }
 #feedInputBox #tbl thead{ display:none; }
@@ -689,12 +750,52 @@ padding: 6px 0;
     </div>
   </div>
   
-  <div id="feedSummaryBox" class="feed-summary" style="display:none"></div>
+  <div id="feedEditorBox" class="feed-editor" style="display:none">
+    <div class="feed-editor-grid">
+      <div class="full">
+        <label>الخامة المختارة</label>
+        <input id="feedEditName" type="text" readonly placeholder="اختر خامة من القائمة">
+      </div>
 
-  <div id="rationActions" class="mini-actions" style="display:none;justify-content:flex-end;margin-top:8px">
-    <button id="rationEdit" class="mini-btn" type="button" disabled>تعديل</button>
-    <button id="rationRemove" class="mini-btn" type="button" disabled>إزالة</button>
+      <div>
+        <label>الفئة</label>
+        <select id="feedEditCat">
+          <option value="rough">خشن</option>
+          <option value="conc">مركزات</option>
+          <option value="add">إضافات</option>
+        </select>
+      </div>
+
+      <div>
+        <label>سعر الطن as-fed</label>
+        <input id="feedEditPrice" type="number" inputmode="decimal" step="0.01" min="0" placeholder="السعر">
+      </div>
+
+      <div>
+        <label>المادة الجافة %</label>
+        <input id="feedEditDM" type="number" inputmode="decimal" step="0.01" min="0" max="100" placeholder="DM">
+      </div>
+
+      <div>
+        <label>البروتين الخام %</label>
+        <input id="feedEditCP" type="number" inputmode="decimal" step="0.01" min="0" placeholder="CP">
+      </div>
+
+      <div>
+        <label id="feedEditAmountLabel">كجم as-fed/رأس</label>
+        <input id="feedEditAmount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="الكمية">
+      </div>
+    </div>
+
+    <div class="feed-editor-actions">
+      <button id="addPreset" class="mini-btn" type="button">إضافة خامة</button>
+      <button id="rationRemove" class="mini-btn" type="button" disabled>إزالة المختارة</button>
+    </div>
+
+    <div class="feed-editor-note" id="feedEditorNote">الخامة لا تدخل العليقة إلا بعد ملء البيانات والضغط على إضافة خامة.</div>
   </div>
+
+  <div id="feedSummaryBox" class="feed-summary" style="display:none"></div>
 
     <div id="splitBox" class="row stack" style="margin-top:8px;display:none">
       <div class="grow">
@@ -727,10 +828,7 @@ padding: 6px 0;
         <tbody></tbody>
       </table>
     </div>
- <div class="mini-actions" id="miniActions" style="display:none">
-  <button id="addPreset" class="mini-btn" type="button">إضافة خامة</button>
-  <button id="clearAll" class="mini-btn" type="button">مسح التركيبة</button>
-</div>  
+
     <div class="total" id="totalsBase">
       <span class="pill" id="pillSumPct" style="display:none">مجموع النِّسب: <b id="sumPct">0%</b></span>
       <span class="pill" id="pillMix">سعر طن TMR (DM): <b id="mixPriceDM">—</b></span>
@@ -898,6 +996,7 @@ padding: 6px 0;
     feeds: [],
     rows: [],
     selectedIndex: -1,
+    editorRow: null,
     lastAnalysis: null,
     lastPanels: null,
     eventId: clean(qs.get("eventId") || qs.get("id"))
@@ -1182,6 +1281,112 @@ padding: 6px 0;
     };
   }
 
+
+  function syncEditorAmountLabel() {
+    const label = $("feedEditAmountLabel");
+    const amount = $("feedEditAmount");
+    if (!label || !amount) return;
+
+    const mode = currentMode();
+    const cat = clean($("feedEditCat")?.value || state.editorRow?.cat || "conc");
+
+    if (mode === "tmr_percent" || (mode === "split" && cat !== "rough")) {
+      label.textContent = "نسبة as-fed %";
+      amount.placeholder = "النسبة";
+    } else {
+      label.textContent = "كجم as-fed/رأس";
+      amount.placeholder = "الكمية";
+    }
+  }
+
+  function clearFeedEditor(keepOpen = true) {
+    state.editorRow = null;
+
+    ["feedEditName", "feedEditPrice", "feedEditDM", "feedEditCP", "feedEditAmount"].forEach(id => setVal(id, ""));
+    setVal("feedEditCat", "conc");
+
+    if ($("preset")) $("preset").value = "";
+    if ($("feedEditorBox")) $("feedEditorBox").style.display = keepOpen ? "block" : "none";
+
+    syncEditorAmountLabel();
+  }
+
+  function openFeedEditorFromPreset() {
+    const idx = Number($("preset")?.value);
+    const feed = state.feeds[idx];
+
+    if (!feed) return;
+
+    const row = rowFromFeed(feed);
+    state.editorRow = row;
+
+    if ($("feedEditorBox")) $("feedEditorBox").style.display = "block";
+
+    setVal("feedEditName", row.name || "");
+    setVal("feedEditCat", row.cat || "conc");
+    setVal("feedEditPrice", row.pricePerTon ?? "");
+    setVal("feedEditDM", row.dmPct ?? "");
+    setVal("feedEditCP", row.cpPct ?? "");
+    setVal("feedEditAmount", "");
+
+    syncEditorAmountLabel();
+
+    setTimeout(() => {
+      const price = $("feedEditPrice");
+      if (price) {
+        price.focus();
+        price.select?.();
+      }
+    }, 0);
+  }
+
+  function editorAmountKind() {
+    const mode = currentMode();
+    const cat = clean($("feedEditCat")?.value || state.editorRow?.cat || "conc");
+
+    return (mode === "tmr_percent" || (mode === "split" && cat !== "rough")) ? "pct" : "asFedKg";
+  }
+
+  function editorRowFromForm() {
+    const base = state.editorRow ? { ...state.editorRow } : null;
+    if (!base) return null;
+
+    const amountKind = editorAmountKind();
+    const amount = num($("feedEditAmount")?.value);
+
+    const row = {
+      ...base,
+      name: clean($("feedEditName")?.value || base.name),
+      cat: clean($("feedEditCat")?.value || base.cat || "conc"),
+      dmPct: num($("feedEditDM")?.value),
+      cpPct: num($("feedEditCP")?.value),
+      pricePerTon: num($("feedEditPrice")?.value),
+      pricePerTonDM: null,
+      pct: null,
+      asFedKg: null
+    };
+
+    if (amountKind === "pct") row.pct = amount;
+    else row.asFedKg = amount;
+
+    return row;
+  }
+
+  function validateEditorRow(row) {
+    if (!row) return "اختر خامة أولًا.";
+    if (!clean(row.name)) return "اسم الخامة مطلوب.";
+    if (!clean(row.cat)) return "فئة الخامة مطلوبة.";
+    if (!(num(row.pricePerTon) > 0)) return "سعر الطن مطلوب قبل إضافة الخامة.";
+    if (!(num(row.dmPct) > 0)) return "نسبة المادة الجافة مطلوبة.";
+    if (num(row.cpPct) === null) return "نسبة البروتين الخام مطلوبة.";
+
+    const amountKind = editorAmountKind();
+    if (amountKind === "pct" && !(num(row.pct) > 0)) return "نسبة الخامة مطلوبة قبل الإضافة.";
+    if (amountKind === "asFedKg" && !(num(row.asFedKg) > 0)) return "كمية الخامة مطلوبة قبل الإضافة.";
+
+    return "";
+  }
+
   function rowCells(row) {
     const mode = currentMode();
 
@@ -1250,36 +1455,8 @@ padding: 6px 0;
     const box = $("feedInputBox");
     const tbody = document.querySelector("#tbl tbody");
 
-    if (!tbody) return;
-
-    if (box) box.style.display = state.rows.length ? "block" : "none";
-
-    tbody.innerHTML = "";
-
-    state.rows.forEach((row, index) => {
-      const tr = document.createElement("tr");
-      tr.dataset.index = String(index);
-      tr.innerHTML = rowCells(row);
-
-      tr.addEventListener("click", () => {
-        state.selectedIndex = index;
-        renderSummary();
-      });
-
-      tr.querySelectorAll("input,select").forEach(el => {
-        const update = () => {
-          const k = el.dataset.k;
-          state.rows[index][k] = el.type === "number" ? num(el.value) : el.value;
-          renderSummary();
-          analyzeSoon();
-        };
-
-        el.addEventListener("input", update);
-        el.addEventListener("change", update);
-      });
-
-      tbody.appendChild(tr);
-    });
+    if (box) box.style.display = "none";
+    if (tbody) tbody.innerHTML = "";
 
     renderSummary();
     analyzeSoon();
@@ -1287,40 +1464,45 @@ padding: 6px 0;
 
   function renderSummary() {
     const box = $("feedSummaryBox");
-    const actions = $("rationActions");
 
     if (!box) return;
 
     if (!state.rows.length) {
       box.style.display = "none";
-      if (actions) actions.style.display = "none";
+      state.selectedIndex = -1;
+      if ($("rationRemove")) $("rationRemove").disabled = true;
       return;
     }
 
     box.style.display = "block";
-    if (actions) actions.style.display = "flex";
 
     box.innerHTML = state.rows.map((r, i) => `
       <div class="feed-item">
         <label>
-          <input class="rationPick" type="radio" name="rationPick" ${i === state.selectedIndex ? "checked" : ""} data-i="${i}">
+          <input class="rationPick" type="checkbox" ${i === state.selectedIndex ? "checked" : ""} data-i="${i}">
           <span class="a">${escapeHtml(r.name)}</span>
         </label>
-        <span class="b">${r.asFedKg ?? r.pct ?? "—"}</span>
+        <span class="b">${amountSummary(r)}</span>
       </div>
     `).join("");
 
     box.querySelectorAll(".rationPick").forEach(el => {
       el.addEventListener("change", () => {
-        state.selectedIndex = Number(el.dataset.i);
+        const i = Number(el.dataset.i);
+        state.selectedIndex = el.checked ? i : -1;
+        if ($("feedEditorBox")) $("feedEditorBox").style.display = "block";
         renderSummary();
       });
     });
 
     const hasPick = state.selectedIndex >= 0 && state.selectedIndex < state.rows.length;
-
-    if ($("rationEdit")) $("rationEdit").disabled = !hasPick;
     if ($("rationRemove")) $("rationRemove").disabled = !hasPick;
+  }
+
+  function amountSummary(row = {}) {
+    if (num(row.asFedKg) !== null) return `${fmt(row.asFedKg, 2)} كجم`;
+    if (num(row.pct) !== null) return `${fmt(row.pct, 2)}%`;
+    return "—";
   }
 
   function syncModeUI() {
@@ -1331,32 +1513,37 @@ padding: 6px 0;
     if ($("totalsBase")) $("totalsBase").style.display = mode === "split" ? "none" : "flex";
     if ($("totalsSplit")) $("totalsSplit").style.display = mode === "split" ? "flex" : "none";
 
+    syncEditorAmountLabel();
     renderRows();
   }
 
   function addSelectedFeed() {
-    const idx = Number($("preset")?.value);
-    const feed = state.feeds[idx];
+    const row = editorRowFromForm();
+    const err = validateEditorRow(row);
 
-    if (!feed) {
-      showMsg("اختر خامة أولًا.", "bad");
+    if (err) {
+      showMsg(err, "bad");
       return;
     }
 
-    state.rows.push(rowFromFeed(feed));
+    state.rows.push(row);
     state.selectedIndex = state.rows.length - 1;
 
-    if ($("preset")) $("preset").value = "";
-
+    clearFeedEditor(true);
     renderRows();
+    showMsg("✅ تمت إضافة الخامة للعليقة.");
   }
 
   function removeSelectedFeed() {
-    if (state.selectedIndex < 0 || state.selectedIndex >= state.rows.length) return;
+    if (state.selectedIndex < 0 || state.selectedIndex >= state.rows.length) {
+      showMsg("اختر خامة من القائمة أولًا.", "bad");
+      return;
+    }
 
     state.rows.splice(state.selectedIndex, 1);
     state.selectedIndex = -1;
 
+    clearFeedEditor(true);
     renderRows();
   }
 
@@ -1865,10 +2052,14 @@ padding: 6px 0;
   }
 
   function bind() {
-    $("feedTypeFilter")?.addEventListener("change", renderFeedOptions);
-    $("preset")?.addEventListener("change", addSelectedFeed);
+    $("feedTypeFilter")?.addEventListener("change", () => {
+      renderFeedOptions();
+      clearFeedEditor(false);
+    });
+    $("preset")?.addEventListener("change", openFeedEditorFromPreset);
     $("mode")?.addEventListener("change", syncModeUI);
-
+    $("feedEditCat")?.addEventListener("change", syncEditorAmountLabel);
+    $("addPreset")?.addEventListener("click", addSelectedFeed);
     $("rationRemove")?.addEventListener("click", removeSelectedFeed);
 
     $("concKgInput")?.addEventListener("input", analyzeSoon);
