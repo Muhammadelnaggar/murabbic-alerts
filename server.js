@@ -7381,6 +7381,25 @@ const peNDFMinForRumen =
 const starchActual = Number(rationCore?.nutrition?.starchPct || 0);
 const ndfActual = Number(rationCore?.nutrition?.ndfPctActual || 0);
 const peNDFActual = Number(rationCore?.nutrition?.peNDFPctActual || 0);
+const carbSafetyModelForDisplay = rationCore?.nutrition?.carbohydrateSafetyModel || null;
+const carbNdfMinForDisplay = Number(carbSafetyModelForDisplay?.minTotalNDFPctDM);
+const ndfTargetRawForDisplay = Number(targetsCore?.ndfTarget);
+const roughageMinRawForDisplay = Number(targetsCore?.roughageMin);
+
+const ndfTargetForDisplay =
+  Number.isFinite(carbNdfMinForDisplay) && carbNdfMinForDisplay > 0
+    ? round2(carbNdfMinForDisplay)
+    : (
+        Number.isFinite(ndfTargetRawForDisplay) &&
+        ndfTargetRawForDisplay > 0 &&
+        !(Number.isFinite(roughageMinRawForDisplay) && ndfTargetRawForDisplay === roughageMinRawForDisplay && ndfTargetRawForDisplay >= 40)
+          ? round2(ndfTargetRawForDisplay)
+          : null
+      );
+
+const hasScientificPeNDFActual =
+  Number.isFinite(Number(rationCore?.nutrition?.peNDFPctActual)) &&
+  Number(rationCore.nutrition.peNDFPctActual) > 0;
 
 const rumenHealthModel = buildRumenHealthModel({
   roughPctDM,
@@ -7525,7 +7544,7 @@ dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
   nelTarget: targetsCore?.nel ?? null,
   cpReferencePct: targetsCore?.cpReferencePct ?? targetsCore?.cpTarget ?? null,
   mpTargetG: targetsCore?.mpTargetG ?? null,
-  ndfTarget: targetsCore?.ndfTarget ?? null,
+  ndfTarget: ndfTargetForDisplay,
   fatTarget: null,
   starchMax: targetsCore?.starchMax ?? null,
   roughageMin: targetsCore?.roughageMin ?? null,
@@ -7866,13 +7885,10 @@ function buildEconomicDecision({
         dangerBelow: 40
       }
     },
-    sourceBasis: [
-      'PENN_STATE_IOFC_FEED_COST_40_PERCENT_OR_LESS_OF_MILK_INCOME',
-      'VIRGINIA_TECH_IOFC_MILK_INCOME_MINUS_FEED_COST',
-      'JDS_IOFC_NOT_FEED_COST_ALONE',
-      'WISCONSIN_FEED_EFFICIENCY_READ_WITH_IOFC',
-      'MURABBIK_NUTRITION_SAFETY_GATE'
-    ]
+   sourceBasis: [
+  'MURABBIK_ECONOMIC_DECISION_IOFC_V1',
+  'MURABBIK_NUTRITION_SAFETY_GATE'
+]
   };
 }
 
@@ -8045,6 +8061,10 @@ const starchActual = num(nutrition.starchPctActual, 1);
 
   const fatActual = num(nutrition.fatPctActual, 1);
   const fatMax = 7;
+  const hasScientificPeNDFActual =
+  Number.isFinite(Number(nutrition.peNDFPctActual)) &&
+  Number(nutrition.peNDFPctActual) > 0;
+  
 
   const rough = num(nutrition.roughPctDM, 0);
   const conc = num(nutrition.concPctDM, 0);
@@ -8090,7 +8110,12 @@ const starchActual = num(nutrition.starchPctActual, 1);
   nutrition?.rumenHealthModel?.indicators?.carbohydrateSafety ||
   {};
 
-const ndfSafetyMin = num(carbohydrateSafety?.minTotalNDFPctDM, 1);
+const ndfSafetyMin = num(
+  Number.isFinite(Number(carbohydrateSafety?.minTotalNDFPctDM)) && Number(carbohydrateSafety.minTotalNDFPctDM) > 0
+    ? carbohydrateSafety.minTotalNDFPctDM
+    : targets.ndfTarget,
+  1
+);
 const ndfActualForCard = num(nutrition.ndfPctActual, 1);
 
 const ndfState =
@@ -8751,13 +8776,13 @@ const advancedCards = [
     decimals: 1,
     guidanceKey: 'ndf',
     stage: reportStage,
-    extra: {
+ extra: hasScientificPeNDFActual && Number.isFinite(Number(targets.peNDFMin)) && Number(targets.peNDFMin) > 0
+  ? {
       peNDFActual: nutrition.peNDFPctActual,
       peNDFMin: targets.peNDFMin,
-      peNDFText: `${txt(nutrition.peNDFPctActual, '%', 1)} / الحد الأدنى ${txt(targets.peNDFMin, '%', 1)}`,
-      roughageMin: targets.roughageMin,
-      roughageMinText: txt(targets.roughageMin, '%', 1)
+      peNDFText: `${txt(nutrition.peNDFPctActual, '%', 1)} / الحد الأدنى ${txt(targets.peNDFMin, '%', 1)}`
     }
+  : null
   }),
 
   nutritionAdvancedDisplayCardSrv({
@@ -8805,6 +8830,7 @@ const advancedCards = [
     actual: nutrition.ndfPctActual,
     target: targets.ndfTarget
   },
+...(hasScientificPeNDFActual ? [
   {
     key: 'peNDFMin',
     title: 'الحد الأدنى للألياف المؤثرة',
@@ -8819,6 +8845,7 @@ const advancedCards = [
     actual: nutrition.peNDFPctActual,
     target: targets.peNDFMin
   }
+] : [])
 );
   return {
     analysisCards,
@@ -8963,6 +8990,18 @@ app.post('/api/nutrition/targets', requireUserId, async (req, res) => {
 const built = buildNutritionCentralTargets(ctx);
 const publicTargets = { ...built.targetsCore };
 publicTargets.cpReferencePct = publicTargets.cpReferencePct ?? publicTargets.cpTarget ?? null;
+
+const publicNdfTarget = Number(publicTargets.ndfTarget);
+const publicRoughageMin = Number(publicTargets.roughageMin);
+if (
+  Number.isFinite(publicNdfTarget) &&
+  Number.isFinite(publicRoughageMin) &&
+  publicNdfTarget === publicRoughageMin &&
+  publicNdfTarget >= 40
+) {
+  publicTargets.ndfTarget = null;
+}
+
 delete publicTargets.cpTarget;
 
 return res.json({
@@ -10320,21 +10359,23 @@ function nutritionGaugeScaleSrv(actual, reference, mode = 'target') {
     };
   }
 
-  const m = String(mode || 'target');
+const m = String(mode || 'target');
 
-  const scaleMax =
-    m === 'min'
-      ? r * 1.6
-      : m === 'max'
-        ? r * 1.25
-        : r * 2;
+const maxReferencePct = 60; // نهاية اللون الأخضر في جوج الحد الأقصى
 
-  const referencePct =
-    m === 'min'
-      ? (r / scaleMax) * 100
-      : m === 'max'
-        ? (r / scaleMax) * 100
-        : 50;
+const scaleMax =
+  m === 'min'
+    ? r * 1.6
+    : m === 'max'
+      ? r / (maxReferencePct / 100)
+      : r * 2;
+
+const referencePct =
+  m === 'min'
+    ? (r / scaleMax) * 100
+    : m === 'max'
+      ? maxReferencePct
+      : 50;
 
   const needlePct = Math.max(0, Math.min(100, (a / scaleMax) * 100));
 
@@ -10404,7 +10445,7 @@ function nutritionBalanceCommentSrv(key, mode, status, diff) {
     if (Number.isFinite(d) && d > 0) {
       return {
         text: 'المأكول أعلى من المتوقع؛ راجع دقة الوزن وبقايا المعلف.',
-        sourceLabel: 'Penn State Extension'
+        sourceLabel: 'مُرَبِّيك'
       };
     }
 
