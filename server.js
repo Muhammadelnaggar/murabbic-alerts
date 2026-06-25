@@ -412,8 +412,7 @@ function buildThiInstructionsSrv(thi, status = {}) {
   const n = Number(thi);
   const level = String(status.level || '').trim();
 
-  const sourceLabel =
-    'US dairy extension guidance: Wisconsin Extension / Minnesota Extension / Penn State Extension';
+  const sourceLabel = 'مُرَبِّيك';
 
   if (!Number.isFinite(n)) {
     return {
@@ -10309,6 +10308,159 @@ function reportRowSrv(section, key, label, targetText, actualText, balanceText, 
     note: note || '—'
   });
 }
+function nutritionGaugeScaleSrv(actual, reference, mode = 'target') {
+  const a = Number(actual);
+  const r = Number(reference);
+
+  if (!Number.isFinite(a) || !Number.isFinite(r) || r <= 0) {
+    return {
+      needlePct: null,
+      referencePct: null,
+      scaleMax: null
+    };
+  }
+
+  const m = String(mode || 'target');
+
+  const scaleMax =
+    m === 'min'
+      ? r * 1.6
+      : m === 'max'
+        ? r * 1.25
+        : r * 2;
+
+  const referencePct =
+    m === 'min'
+      ? (r / scaleMax) * 100
+      : m === 'max'
+        ? (r / scaleMax) * 100
+        : 50;
+
+  const needlePct = Math.max(0, Math.min(100, (a / scaleMax) * 100));
+
+  return {
+    needlePct,
+    referencePct,
+    scaleMax
+  };
+}
+
+function nutritionBalanceCommentSrv(key, mode, status, diff) {
+  const k = String(key || '').toLowerCase();
+  const m = String(mode || 'target');
+  const s = String(status || '').toLowerCase();
+  const d = Number(diff);
+
+  if (k === 'ndf') {
+    if (s.includes('warn')) {
+      return {
+        text: 'الألياف أقل من الحد الأدنى؛ قد يقل المضغ وتنظيم حموضة الكرش.',
+       sourceLabel: 'مُرَبِّيك'
+      };
+    }
+
+    return {
+      text: 'الألياف فوق الحد الأدنى؛ اقرأها مع النشا والمأكول وصحة الكرش.',
+     sourceLabel: 'مُرَبِّيك'
+    };
+  }
+
+  if (k === 'starch') {
+    if (m === 'max' && s.includes('warn')) {
+      return {
+        text: 'النشا أعلى من الحد؛ يزيد ضغط التخمر إذا لم تكفِ الألياف.',
+       sourceLabel: 'مُرَبِّيك'
+      };
+    }
+
+    return {
+      text: 'النشا داخل الحد؛ راقبه مع NDF وصحة الكرش.',
+     sourceLabel: 'مُرَبِّيك'
+    };
+  }
+
+  if (k === 'fat') {
+    if (m === 'max' && s.includes('warn')) {
+      return {
+        text: 'الدهون أعلى من الحد؛ قد تضغط هضم الألياف وصحة الكرش.',
+       sourceLabel: 'مُرَبِّيك'
+      };
+    }
+
+    return {
+      text: 'الدهون داخل الحد؛ راقبها مع الطاقة والمأكول.',
+      sourceLabel: 'مُرَبِّيك'
+    };
+  }
+
+  if (k === 'dmi') {
+    if (Number.isFinite(d) && d < 0) {
+      return {
+        text: 'المأكول أقل من المتوقع؛ راجع بقايا المعلف وتجانس الخلطة.',
+       sourceLabel: 'مُرَبِّيك'
+      };
+    }
+
+    if (Number.isFinite(d) && d > 0) {
+      return {
+        text: 'المأكول أعلى من المتوقع؛ راجع دقة الوزن وبقايا المعلف.',
+        sourceLabel: 'Penn State Extension'
+      };
+    }
+
+    return {
+      text: 'المأكول قريب من المتوقع؛ استمر في متابعة بقايا المعلف.',
+     sourceLabel: 'مُرَبِّيك'
+    };
+  }
+
+  if (k === 'nel') {
+    if (Number.isFinite(d) && d < 0) {
+      return {
+        text: 'الطاقة أقل من الاحتياج؛ قد تضغط الإنتاج والحالة الجسمية.',
+       sourceLabel: 'مُرَبِّيك'
+      };
+    }
+
+    if (Number.isFinite(d) && d > 0) {
+      return {
+        text: 'الطاقة أعلى من الاحتياج؛ راجعها مع التكلفة وحالة الجسم.',
+       sourceLabel: 'مُرَبِّيك'
+      };
+    }
+
+    return {
+      text: 'الطاقة قريبة من الاحتياج؛ اقرأها مع المأكول والإنتاج.',
+     sourceLabel: 'مُرَبِّيك'
+    };
+  }
+
+  if (k === 'mp') {
+    if (Number.isFinite(d) && d < 0) {
+      return {
+        text: 'البروتين أقل من الاحتياج؛ راجعه بعد التأكد من الطاقة والمأكول.',
+        sourceLabel: 'مُرَبِّيك'
+      };
+    }
+
+    if (Number.isFinite(d) && d > 0) {
+      return {
+        text: 'البروتين أعلى من الاحتياج؛ راجع الاتزان قبل رفع التكلفة.',
+       sourceLabel: 'مُرَبِّيك'
+      };
+    }
+
+    return {
+      text: 'البروتين قريب من الاحتياج؛ اقرأه مع الطاقة والإنتاج.',
+      sourceLabel: 'مُرَبِّيك'
+    };
+  }
+
+  return {
+    text: 'الاتزان يحتاج قراءة مع التقرير التفصيلي.',
+   sourceLabel: 'مُرَبِّيك'
+  };
+}
 function nutritionAdvancedDisplayCardSrv(o = {}) {
   const key = String(o.key || '').trim();
   const mode = String(o.mode || 'target').trim();
@@ -10357,17 +10509,22 @@ function nutritionAdvancedDisplayCardSrv(o = {}) {
       ? reportMurabbikGuidanceSrv(o.guidanceKey || key, status, diff, o.stage || '')
       : '';
 
-  const needleBase =
-    mode === 'min'
-      ? reference * 1.6
-      : mode === 'max'
-        ? reference * 1.25
-        : reference * 1.25;
+   const gaugeScale = nutritionGaugeScaleSrv(actual, reference, mode);
+  const balanceCommentObj = nutritionBalanceCommentSrv(key, mode, status, diff);
 
-  const needlePct =
-    hasNumbers && needleBase > 0
-      ? Math.max(0, Math.min(100, (actual / needleBase) * 100))
-      : null;
+  const referenceType =
+    mode === 'min'
+      ? 'minimum'
+      : mode === 'max'
+        ? 'maximum'
+        : 'requirement';
+
+  const referenceTypeLabel =
+    mode === 'min'
+      ? 'الحد الأدنى'
+      : mode === 'max'
+        ? 'الحد الأقصى'
+        : 'الاحتياج';
 
   return {
     key,
@@ -10388,18 +10545,26 @@ function nutritionAdvancedDisplayCardSrv(o = {}) {
     status,
     statusText: reportStatusTextSrv(status),
     balanceText,
-
+    balanceComment: balanceCommentObj.text,
+    comment: balanceCommentObj.text,
+    sourceLabel: 'مُرَبِّيك',
+    referenceType,
+    referenceTypeLabel,
     guidance,
     instruction: guidance,
     instructions: guidance,
     hint: guidance,
     note: guidance,
 
-    gauge: {
+        gauge: {
       mode,
       actual,
       reference,
-      needlePct
+      needlePct: gaugeScale.needlePct,
+      referencePct: gaugeScale.referencePct,
+      referenceLabel: referenceTypeLabel,
+      referenceType,
+      scaleMax: gaugeScale.scaleMax
     },
 
     extra: o.extra || null
