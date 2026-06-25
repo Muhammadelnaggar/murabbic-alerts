@@ -1872,62 +1872,66 @@ padding: 6px 0;
       </div>
     `;
   }
+function thiAdvancedCardHtml(analysis = {}) {
+  const inputs = analysis.inputs || {};
+  const thiData = state.thi || {};
+  const thi = num(thiData.thi ?? inputs.thiUsed ?? state.context?.thi ?? state.context?.thiUsed);
 
-  function thiAdvancedCardHtml(analysis = {}) {
-    const inputs = analysis.inputs || {};
-    const thiData = state.thi || {};
-    const thi = num(thiData.thi ?? inputs.thiUsed ?? state.context?.thi ?? state.context?.thiUsed);
+  if (thi === null) return "";
 
-    if (thi === null) return "";
+  const statusObj = thiData.status || state.context?.thiStatus || {};
+  const status =
+    statusObj.level === "high"
+      ? "bad"
+      : (statusObj.level === "moderate" || statusObj.level === "mild")
+        ? "warn"
+        : (thi < 68 ? "ok" : (thi < 72 ? "warn" : "bad"));
 
-    const statusObj = thiData.status || state.context?.thiStatus || {};
-    const status = statusObj.level === "high" ? "bad" : (statusObj.level === "moderate" || statusObj.level === "mild" ? "warn" : (thi < 68 ? "ok" : (thi < 72 ? "warn" : "bad")));
-    const label = clean(statusObj.label) || (thi < 68 ? "راحة" : (thi < 72 ? "إجهاد خفيف" : "إجهاد حراري"));
-    const temp = thiData.tempC !== null && thiData.tempC !== undefined ? `${thiData.tempC}°C` : "—";
-    const hum = thiData.humidity !== null && thiData.humidity !== undefined ? `${thiData.humidity}%` : "—";
+  const label = clean(statusObj.label) || (thi < 68 ? "راحة" : (thi < 72 ? "إجهاد خفيف" : "إجهاد حراري"));
+  const temp = thiData.tempC !== null && thiData.tempC !== undefined ? `${thiData.tempC}°C` : "—";
+  const hum = thiData.humidity !== null && thiData.humidity !== undefined ? `${thiData.humidity}%` : "—";
 
-    return `
-      <div class="thi-panel ${status}" data-key="thi">
-        <div style="min-width:0">
-          <div class="thi-title">THI — مؤشر الإجهاد الحراري</div>
-          <div class="thi-sub">عامل بيئي مساعد من السيرفر، منفصل عن كروت تحليل العليقة.</div>
-          <div class="thi-sub">الحرارة: ${escapeHtml(temp)} — الرطوبة: ${escapeHtml(hum)}</div>
-        </div>
-        <div class="thi-main">${fmt(thi, 0)}</div>
-        <div class="thi-badge">${escapeHtml(label)}</div>
+  return `
+    <div class="thi-panel ${status}" data-key="thi">
+      <div style="min-width:0">
+        <div class="thi-title">THI — مؤشر الإجهاد الحراري</div>
+        <div class="thi-sub">الحرارة: ${escapeHtml(temp)} — الرطوبة: ${escapeHtml(hum)}</div>
       </div>
-    `;
-  }
+      <div class="thi-main">${fmt(thi, 0)}</div>
+      <div class="thi-badge">${escapeHtml(label)}</div>
+    </div>
+  `;
+}
 
-  function thiRecommendationsHtml() {
-    const thiData = state.thi || {};
-    const statusObj = thiData.status || state.context?.thiStatus || {};
+function thiRecommendationsHtml() {
+  const thiData = state.thi || {};
+  const statusObj = thiData.status || state.context?.thiStatus || {};
+  const instructions = thiData.instructions || thiData.thiRecommendations || statusObj.instructions || {};
 
-    const raw =
-      thiData.recommendations ||
-      statusObj.recommendations ||
-      thiData.thiRecommendations ||
-      thiData.advice ||
-      statusObj.advice ||
-      statusObj.guidance ||
-      [];
+  const raw =
+    thiData.recommendations ||
+    instructions.actions ||
+    thiData.advice ||
+    instructions.summary ||
+    statusObj.advice ||
+    statusObj.guidance ||
+    [];
 
-    const recommendations = (Array.isArray(raw) ? raw : [raw])
-      .map(x => clean(x))
-      .filter(Boolean);
+  const recommendations = (Array.isArray(raw) ? raw : [raw])
+    .map(x => clean(x))
+    .filter(Boolean);
 
-    if (!recommendations.length) return "";
+  if (!recommendations.length) return "";
 
-    return `
-      <div class="murabbik-advice-panel" data-key="thi-recommendations">
-        <div class="murabbik-advice-title">توصيات THI</div>
-        <div class="murabbik-advice-sub">توصيات الإجهاد الحراري كما يرسلها السيرفر من قراءة THI، وليست كروت تحليل عليقة.</div>
-        <div class="murabbik-advice-list">
-          ${recommendations.map(x => `<div class="murabbik-advice-item">${escapeHtml(x)}</div>`).join("")}
-        </div>
+  return `
+    <div class="murabbik-advice-panel" data-key="thi-recommendations">
+      <div class="murabbik-advice-title">توصيات الإجهاد الحراري</div>
+      <div class="murabbik-advice-list">
+        ${recommendations.map(x => `<div class="murabbik-advice-item">${escapeHtml(x)}</div>`).join("")}
       </div>
-    `;
-  }
+    </div>
+  `;
+}
 
   function advancedCardsHtml(advancedCards = [], analysisCards = [], analysis = {}) {
     const a = (key) => cardByKey(advancedCards, key);
