@@ -878,10 +878,6 @@ padding: 6px 0;
         <label class="muted">كمية المركز as-fed كجم/رأس/يوم</label>
         <input id="concKgInput" type="number" inputmode="decimal" step="0.01" placeholder="مثال: 6.0" style="width:160px">
       </div>
-      <div class="grow">
-        <label class="muted">ملاحظة</label>
-        <div class="pill">صفوف الفئة = خشن تُكتب بالكجم/رأس. صفوف الفئة = مركز تُكتب نسب as-fed للطن.</div>
-      </div>
     </div>
 
    <div class="table-wrap" id="feedInputBox" style="display:none">
@@ -1887,12 +1883,22 @@ padding: 6px 0;
       return { angle: -90, refAngle: null };
     }
 
+    if (mode === "max") {
+      const refPct = 60; // نهاية اللون الأخضر في جوج الحد الأقصى
+      const scaleMax = r / (refPct / 100);
+      const pct = Math.max(0, Math.min(100, (a / scaleMax) * 100));
+      return {
+        angle: toAngle(pct),
+        refAngle: toAngle(refPct)
+      };
+    }
+
     const maxRatio =
       mode === "target"
         ? 2
         : mode === "min"
           ? 1.6
-          : 1.25;
+          : 2;
 
     const ratio = Math.max(0, Math.min(maxRatio, a / r));
     const angle = -90 + (ratio / maxRatio) * 180;
@@ -2071,6 +2077,52 @@ padding: 6px 0;
       </div>
     `;
   }
+
+  function advancedDmiIntakeCardHtml({ actualCard, refCard, sourceCard, serverCard = null }) {
+    const actual = cardNumberByKeys(serverCard, ["actual", "valueActual", "supply", "current"]) ?? firstNumberFromCard(actualCard);
+    const expected = referenceNumberFromCard(serverCard, refCard, "target");
+
+    if (!Number.isFinite(Number(actual)) || !Number.isFinite(Number(expected)) || Number(expected) <= 0) {
+      return "";
+    }
+
+    const pct = (Number(actual) / Number(expected)) * 100;
+    const pctText = `${fmt(pct, 0)}% من المتوقع`;
+    const cls = pct < 80 || pct > 125 ? "bad" : (pct < 95 || pct > 110 ? "warn" : "ok");
+
+    const actualText = serverCard?.actualText || actualCard?.value || valueTextFromNumber(actual, "كجم", 2);
+    const expectedText = serverCard?.referenceText || refCard?.value || valueTextFromNumber(expected, "كجم", 2);
+
+    const comment = pct < 95
+      ? `مُرَبِّيك: المأكول أقل من المتوقع (${fmt(pct, 0)}%). راجع بقايا المعلف والتزاحم وجودة الخلط.`
+      : pct > 110
+        ? `مُرَبِّيك: المأكول أعلى من المتوقع (${fmt(pct, 0)}%). راجع دقة الوزن والمتبقي قبل اعتبارها مشكلة.`
+        : `مُرَبِّيك: المأكول قريب من المتوقع (${fmt(pct, 0)}%). اقرأ الحكم الغذائي من الطاقة والبروتين وNDF والنشا والدهون.`;
+
+    return `
+      <div class="kpi ${cls}" style="grid-column:1/-1;padding:14px 12px;overflow:hidden">
+        <div class="k" style="min-height:0;margin-bottom:10px">
+          <span>المادة الجافة المأكولة</span>
+          <span class="kpi-badge"><span class="dot"></span>مأكول/متوقع</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center;align-items:stretch">
+          <div class="kpi" style="box-shadow:none;padding:10px;border-radius:14px">
+            <div class="kpi-hint" style="margin-top:0;font-size:10px">الفعلي</div>
+            <div class="v" style="font-size:13px;line-height:1.25">${escapeHtml(actualText)}</div>
+          </div>
+          <div class="kpi" style="box-shadow:none;padding:10px;border-radius:14px">
+            <div class="kpi-hint" style="margin-top:0;font-size:10px">النسبة</div>
+            <div class="v" style="font-size:18px;line-height:1.25">${escapeHtml(pctText)}</div>
+          </div>
+          <div class="kpi" style="box-shadow:none;padding:10px;border-radius:14px">
+            <div class="kpi-hint" style="margin-top:0;font-size:10px">المتوقع</div>
+            <div class="v" style="font-size:13px;line-height:1.25">${escapeHtml(expectedText)}</div>
+          </div>
+        </div>
+        <div class="kpi-hint" style="margin-top:10px;text-align:center;line-height:1.5">${escapeHtml(comment)}</div>
+      </div>
+    `;
+  }
 function thiAdvancedCardHtml(analysis = {}) {
   const inputs = analysis.inputs || {};
   const thiData = state.thi || {};
@@ -2192,8 +2244,9 @@ function thiRecommendationsHtml() {
     const starchActualCard = a("starchPctActual") || makeCard(nutrition.starchPctActual, "%", 1);
     const starchMaxCard = a("starchMax") || makeCard(targets.starchMax, "%", 1);
 
+    const fatServerCard = a("fat") || a("fatPctActual") || n("fat");
     const fatActualCard = a("fatPctActual") || makeCard(nutrition.fatPctActual, "%", 1);
-    const fatLimitCard = a("fatLimit") || makeCard(targets.fatLimit ?? targets.fatMax ?? 7, "%", 1);
+    const fatLimitCard = a("fatLimit") || fatServerCard || makeCard(targets.fatLimit ?? targets.fatMax ?? targets.fatTarget, "%", 1);
 
     const ndfActualCard = a("ndfPctActual") || makeCard(nutrition.ndfPctActual, "%", 1);
     let ndfMinCard = a("ndfTarget") || makeCard(targets.ndfTarget, "%", 1);
@@ -2206,20 +2259,16 @@ function thiRecommendationsHtml() {
 
     const peNdfActualCard = a("peNDFPctActual") || makeCard(nutrition.peNDFPctActual, "%", 1);
     const peNdfMinCard = a("peNDFMin") || makeCard(targets.peNDFMin, "%", 1);
-    const roughageMinCard = a("roughageMin") || makeCard(targets.roughageMin, "%", 1);
 
     if (firstNumberFromCard(totDMCard) !== null && firstNumberFromCard(dmiTargetCard) !== null) {
-      out.push(advancedGaugeCardHtml({
-        title: "المادة الجافة المأكولة",
+      const dmiServerCard = a("dmi") || a("totDM") || n("dm");
+      const dmiHtml = advancedDmiIntakeCardHtml({
         actualCard: totDMCard,
         refCard: dmiTargetCard,
-        refLabel: "المتوقع",
-        sourceCard: a("dmi") || a("totDM") || n("dm"),
-        serverCard: a("dmi") || a("totDM") || n("dm"),
-        mode: "target",
-        unit: "كجم",
-        digits: 2
-      }));
+        sourceCard: dmiServerCard,
+        serverCard: dmiServerCard
+      });
+      if (dmiHtml) out.push(dmiHtml);
     }
 
     if (firstNumberFromCard(nelActualCard) !== null && firstNumberFromCard(nelTargetCard) !== null) {
@@ -2270,8 +2319,8 @@ function thiRecommendationsHtml() {
         actualCard: fatActualCard,
         refCard: fatLimitCard,
         refLabel: "الحد الأقصى",
-        sourceCard: a("fat") || a("fatPctActual") || n("fat"),
-        serverCard: a("fat") || a("fatPctActual") || n("fat"),
+        sourceCard: fatServerCard,
+        serverCard: fatServerCard,
         mode: "max",
         unit: "%",
         digits: 1
@@ -2282,18 +2331,13 @@ function thiRecommendationsHtml() {
       const extraParts = [];
       const peActual = firstNumberFromCard(peNdfActualCard);
       const peMin = firstNumberFromCard(peNdfMinCard);
-      const roughMin = firstNumberFromCard(roughageMinCard);
+      const serverPeActual = num(ndfServerCard?.extra?.peNDFActual);
+      const serverPeMin = num(ndfServerCard?.extra?.peNDFMin);
 
-      if (ndfServerCard?.extra?.peNDFText) {
+      if (serverPeActual > 0 && serverPeMin > 0 && ndfServerCard?.extra?.peNDFText) {
         extraParts.push(ndfServerCard.extra.peNDFText);
       } else if (peActual > 0 && peMin > 0) {
         extraParts.push(`الألياف المؤثرة: ${peNdfActualCard.value} / الحد الأدنى ${peNdfMinCard.value}`);
-      }
-
-      if (ndfServerCard?.extra?.roughageMinText) {
-        extraParts.push(`الخشن: الحد الأدنى ${ndfServerCard.extra.roughageMinText}`);
-      } else if (roughMin > 0) {
-        extraParts.push(`الخشن: الحد الأدنى ${roughageMinCard.value}`);
       }
 
       out.push(advancedGaugeCardHtml({
