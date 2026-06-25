@@ -758,6 +758,26 @@ padding: 6px 0;
   border-radius:16px;
   font-size:15px;
 }
+  /* ===== Sticky Save Button — Nutrition only ===== */
+body{
+  padding-bottom:90px;
+}
+
+#saveEvent{
+  position:fixed;
+  left:50%;
+  bottom:calc(10px + env(safe-area-inset-bottom, 0px));
+  transform:translateX(-50%);
+  z-index:999;
+  width:min(94vw, 520px);
+  min-height:52px;
+  border-radius:18px;
+  box-shadow:0 12px 28px rgba(15,23,42,.22);
+}
+
+#saveEvent:active{
+  transform:translateX(-50%) translateY(1px);
+}
 </style>
 </head>
 <body>
