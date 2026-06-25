@@ -1416,6 +1416,149 @@ padding: 6px 0;
     `;
   }
 
+  function statusClassFromServerCard(card = {}) {
+    const status = clean(card.status || card.level || "ok").toLowerCase();
+    if (status.includes("bad") || status.includes("danger") || status.includes("error")) return "bad";
+    if (status.includes("warn") || status.includes("watch")) return "warn";
+    return "ok";
+  }
+
+  function cardByKey(cards = [], key) {
+    return cards.find(c => clean(c.key) === key) || null;
+  }
+
+  function numbersFromText(v) {
+    return clean(v).replace(/,/g, "").match(/-?\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) || [];
+  }
+
+  function firstNumberFromCard(card) {
+    const direct = num(card?.actual ?? card?.target);
+    if (direct !== null) return direct;
+    return numbersFromText(card?.value)[0] ?? null;
+  }
+
+  function maxNumberFromCard(card) {
+    const ns = numbersFromText(card?.value);
+    if (!ns.length) return firstNumberFromCard(card);
+    return Math.max(...ns);
+  }
+
+  function ratioPct(actual, ref) {
+    const a = Number(actual);
+    const r = Number(ref);
+    if (!Number.isFinite(a) || !Number.isFinite(r) || r <= 0) return 0;
+    return Math.max(0, Math.min(100, (a / r) * 100));
+  }
+
+  function advancedGaugeCardHtml({ title, actualCard, refCard, refLabel, sourceCard, mode = "target", extra = "" }) {
+    const actual = firstNumberFromCard(actualCard);
+    const ref = mode === "max" ? maxNumberFromCard(refCard) : firstNumberFromCard(refCard);
+    const pct = ratioPct(actual, ref);
+    const cls = statusClassFromServerCard(sourceCard || {});
+    const badge = mode === "max" ? "حد أقصى" : mode === "min" ? "حد أدنى" : "مقارنة";
+
+    return `
+      <div class="kpi ${cls}" style="grid-column:1/-1">
+        <div class="k">
+          <span>${escapeHtml(title)}</span>
+          <span class="kpi-badge"><span class="dot"></span>${badge}</span>
+        </div>
+        <div class="vrow" style="margin-top:8px">
+          <div style="text-align:right;min-width:0">
+            <div class="kpi-hint" style="margin-top:0">الإمداد / الفعلي</div>
+            <div class="v">${escapeHtml(actualCard?.value ?? "—")}</div>
+          </div>
+          <div style="text-align:left;min-width:0">
+            <div class="kpi-hint" style="margin-top:0">${escapeHtml(refLabel || "المرجع")}</div>
+            <div class="v">${escapeHtml(refCard?.value ?? "—")}</div>
+          </div>
+        </div>
+        <div class="kpi-meter"><span style="width:${pct.toFixed(1)}%"></span></div>
+        ${extra ? `<div class="kpi-hint">${extra}</div>` : ""}
+      </div>
+    `;
+  }
+
+  function advancedCardsHtml(advancedCards = [], analysisCards = []) {
+    const a = (key) => cardByKey(advancedCards, key);
+    const n = (key) => cardByKey(analysisCards, key);
+
+    const out = [];
+
+    if (a("totDM") || a("dmiTarget")) {
+      out.push(advancedGaugeCardHtml({
+        title: "المادة الجافة المأكولة",
+        actualCard: a("totDM"),
+        refCard: a("dmiTarget"),
+        refLabel: "المتوقع",
+        sourceCard: n("dm"),
+        mode: "target"
+      }));
+    }
+
+    if (a("nelActual") || a("nelTarget")) {
+      out.push(advancedGaugeCardHtml({
+        title: "الطاقة",
+        actualCard: a("nelActual"),
+        refCard: a("nelTarget"),
+        refLabel: "الاحتياجات",
+        sourceCard: n("nel"),
+        mode: "target"
+      }));
+    }
+
+    if (a("mpSupplyG") || a("mpTargetG")) {
+      out.push(advancedGaugeCardHtml({
+        title: "البروتين الممثل",
+        actualCard: a("mpSupplyG"),
+        refCard: a("mpTargetG"),
+        refLabel: "الاحتياجات",
+        sourceCard: n("mp"),
+        mode: "target"
+      }));
+    }
+
+    if (a("starchPctActual") || a("starchMax")) {
+      out.push(advancedGaugeCardHtml({
+        title: "النشا",
+        actualCard: a("starchPctActual"),
+        refCard: a("starchMax"),
+        refLabel: "الحد الأقصى",
+        sourceCard: n("starch"),
+        mode: "max"
+      }));
+    }
+
+    if (a("fatPctActual") || a("fatLimit")) {
+      out.push(advancedGaugeCardHtml({
+        title: "الدهون",
+        actualCard: a("fatPctActual"),
+        refCard: a("fatLimit"),
+        refLabel: "الحد الأقصى",
+        sourceCard: n("fat"),
+        mode: "max"
+      }));
+    }
+
+    if (a("ndfPctActual") || a("ndfTarget") || a("peNDFPctActual") || a("peNDFMin")) {
+      const peText = a("peNDFPctActual") || a("peNDFMin")
+        ? `الألياف المؤثرة: ${escapeHtml(a("peNDFPctActual")?.value ?? "—")} / الحد الأدنى ${escapeHtml(a("peNDFMin")?.value ?? "—")}`
+        : "";
+
+      out.push(advancedGaugeCardHtml({
+        title: "الألياف",
+        actualCard: a("ndfPctActual"),
+        refCard: a("ndfTarget"),
+        refLabel: "الحد الأدنى / المرجع",
+        sourceCard: n("ndf"),
+        mode: "min",
+        extra: peText
+      }));
+    }
+
+    return out.length ? out.join("") : advancedCards.map(cardHtml).join("");
+  }
+
   function paintAnalysis(analysis = {}, panels = {}) {
     const totals = analysis.totals || {};
     const nutrition = analysis.nutrition || {};
@@ -1453,7 +1596,7 @@ padding: 6px 0;
 
     if ($("nutritionKPIs")) $("nutritionKPIs").innerHTML = nCards.length ? nCards.map(cardHtml).join("") : "";
     if ($("economicKPIs")) $("economicKPIs").innerHTML = eCards.length ? eCards.map(cardHtml).join("") : "";
-    if ($("advancedKPIs")) $("advancedKPIs").innerHTML = aCards.length ? aCards.map(cardHtml).join("") : "";
+    if ($("advancedKPIs")) $("advancedKPIs").innerHTML = aCards.length ? advancedCardsHtml(aCards, nCards) : "";
   }
 
   async function saveEvent(ev) {
