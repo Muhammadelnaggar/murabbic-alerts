@@ -1906,28 +1906,54 @@ function thiAdvancedCardHtml(analysis = {}) {
 function thiRecommendationsHtml() {
   const thiData = state.thi || {};
   const statusObj = thiData.status || state.context?.thiStatus || {};
-  const instructions = thiData.instructions || thiData.thiRecommendations || statusObj.instructions || {};
 
-  const raw =
+  const source =
+    thiData.thiInstructions ||
+    thiData.instructions ||
+    thiData.thiRecommendations ||
     thiData.recommendations ||
-    instructions.actions ||
     thiData.advice ||
-    instructions.summary ||
+    thiData.guidance ||
+    statusObj.thiInstructions ||
+    statusObj.instructions ||
+    statusObj.recommendations ||
     statusObj.advice ||
     statusObj.guidance ||
-    [];
+    null;
 
-  const recommendations = (Array.isArray(raw) ? raw : [raw])
+  if (!source) return "";
+
+  let title = "";
+  let summary = "";
+  let actions = [];
+
+  if (Array.isArray(source)) {
+    actions = source;
+  } else if (typeof source === "object") {
+    title = clean(source.title || source.label || "");
+    summary = clean(source.summary || source.message || source.advice || "");
+    actions = Array.isArray(source.actions)
+      ? source.actions
+      : Array.isArray(source.recommendations)
+        ? source.recommendations
+        : Array.isArray(source.items)
+          ? source.items
+          : [];
+  } else {
+    summary = clean(source);
+  }
+
+  const lines = [summary, ...actions]
     .map(x => clean(x))
     .filter(Boolean);
 
-  if (!recommendations.length) return "";
+  if (!title && !lines.length) return "";
 
   return `
     <div class="murabbik-advice-panel" data-key="thi-recommendations">
-      <div class="murabbik-advice-title">توصيات الإجهاد الحراري</div>
+      <div class="murabbik-advice-title">${escapeHtml(title || "توصيات الإجهاد الحراري")}</div>
       <div class="murabbik-advice-list">
-        ${recommendations.map(x => `<div class="murabbik-advice-item">${escapeHtml(x)}</div>`).join("")}
+        ${lines.map(x => `<div class="murabbik-advice-item">${escapeHtml(x)}</div>`).join("")}
       </div>
     </div>
   `;
