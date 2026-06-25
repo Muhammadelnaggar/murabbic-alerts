@@ -561,6 +561,82 @@ padding: 6px 0;
 }    
 
 
+
+/* ===== THI Panel + THI Recommendations — not analysis cards ===== */
+.thi-panel,
+.murabbik-advice-panel{
+  grid-column:1 / -1;
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  padding:12px 14px;
+  box-shadow:0 4px 14px rgba(15,23,42,.05);
+}
+.thi-panel{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border-inline-start:5px solid #94a3b8;
+}
+.thi-panel.ok{border-inline-start-color:#0ea05a;background:linear-gradient(180deg,#fff,#f7fff9)}
+.thi-panel.warn{border-inline-start-color:#f59e0b;background:linear-gradient(180deg,#fff,#fffbeb)}
+.thi-panel.bad{border-inline-start-color:#ef4444;background:linear-gradient(180deg,#fff,#fff7f7)}
+.thi-title,
+.murabbik-advice-title{
+  font-size:13px;
+  font-weight:900;
+  color:#0b7f47;
+  margin-bottom:4px;
+}
+.thi-main{
+  font-size:24px;
+  font-weight:900;
+  color:#0f172a;
+  line-height:1;
+  white-space:nowrap;
+}
+.thi-sub,
+.murabbik-advice-sub{
+  font-size:12px;
+  font-weight:800;
+  color:#475569;
+  line-height:1.55;
+}
+.thi-badge{
+  flex:0 0 auto;
+  padding:7px 10px;
+  border-radius:999px;
+  background:#f1f5f9;
+  color:#0f172a;
+  font-size:12px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.murabbik-advice-panel{
+  border-inline-start:5px solid #0ea05a;
+  background:linear-gradient(180deg,#fff,#f8fffa);
+}
+.murabbik-advice-list{
+  display:grid;
+  gap:8px;
+  margin-top:8px;
+}
+.murabbik-advice-item{
+  padding:9px 10px;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  background:#fff;
+  font-size:13px;
+  font-weight:900;
+  color:#0f172a;
+  line-height:1.6;
+}
+@media (max-width:420px){
+  .thi-panel{align-items:flex-start;flex-direction:column}
+  .thi-main{font-size:22px}
+}
+
 /* ===== Murabbik Custom Premix Modal ===== */
 .mbk-premix-btn{
   width:100%;
@@ -997,9 +1073,9 @@ padding: 6px 0;
     rows: [],
     selectedIndex: -1,
     editorRow: null,
-    weatherThi: null,
     lastAnalysis: null,
     lastPanels: null,
+    thi: null,
     eventId: clean(qs.get("eventId") || qs.get("id"))
   };
 
@@ -1178,33 +1254,6 @@ padding: 6px 0;
     setText("ctxParity_txt", state.context.lactationNumber ?? state.context.parity ?? "—");
   }
 
-  async function loadWeatherThi() {
-    try {
-      const p = new URLSearchParams();
-      const lat = num(qs.get("lat") || qs.get("latitude") || state.context.lat || state.context.latitude);
-      const lon = num(qs.get("lon") || qs.get("lng") || qs.get("longitude") || state.context.lon || state.context.lng || state.context.longitude);
-
-      if (lat !== null) p.set("lat", String(lat));
-      if (lon !== null) p.set("lon", String(lon));
-
-      const data = await api(`/api/weather/thi${p.toString() ? "?" + p.toString() : ""}`);
-
-      state.weatherThi = data || null;
-
-      if (data && data.thi !== null && data.thi !== undefined) {
-        state.context.thi = data.thi;
-        state.context.thiUsed = data.thi;
-        state.context.thiStatus = data.status || null;
-        state.context.thiSource = data.source || null;
-        state.context.thiUpdatedAt = data.updatedAt || null;
-        state.context.thiTempC = data.tempC ?? null;
-        state.context.thiHumidity = data.humidity ?? null;
-      }
-    } catch (_) {
-      state.weatherThi = null;
-    }
-  }
-
   function contextFromPage() {
     return {
       ...state.context,
@@ -1230,6 +1279,25 @@ padding: 6px 0;
       earlyDry: $("ctxEarlyDry")?.checked === true || state.context.earlyDry === true,
       closeUp: $("ctxCloseUp")?.checked === true || state.context.closeUp === true
     };
+  }
+
+
+  async function loadThi() {
+    try {
+      const p = new URLSearchParams();
+      if (clean(qs.get("lat"))) p.set("lat", clean(qs.get("lat")));
+      if (clean(qs.get("lon"))) p.set("lon", clean(qs.get("lon")));
+
+      const data = await api(`/api/weather/thi${p.toString() ? "?" + p.toString() : ""}`);
+      state.thi = data || null;
+
+      if (state.thi && state.thi.thi !== null && state.thi.thi !== undefined) {
+        state.context.thi = state.thi.thi;
+        state.context.thiStatus = state.thi.status || null;
+      }
+    } catch (_) {
+      state.thi = null;
+    }
   }
 
   async function loadFeeds() {
@@ -1807,51 +1875,58 @@ padding: 6px 0;
 
   function thiAdvancedCardHtml(analysis = {}) {
     const inputs = analysis.inputs || {};
-    const thi = num(
-      inputs.thiUsed ??
-      state.weatherThi?.thi ??
-      state.context?.thi ??
-      state.context?.thiUsed
-    );
+    const thiData = state.thi || {};
+    const thi = num(thiData.thi ?? inputs.thiUsed ?? state.context?.thi ?? state.context?.thiUsed);
 
     if (thi === null) return "";
 
-    const serverStatus = state.weatherThi?.status || state.context?.thiStatus || {};
-    const level = clean(serverStatus.level || "");
-    const label = clean(serverStatus.label || "");
-
-    const status = level.includes("danger") || level.includes("high")
-      ? "bad"
-      : (level.includes("warn") || level.includes("watch") ? "warn" : (thi < 68 ? "ok" : thi < 72 ? "warn" : "bad"));
-
-    const text = label || (thi < 68 ? "مريح" : (thi < 72 ? "متابعة" : "إجهاد حراري"));
-    const temp = state.weatherThi?.tempC ?? state.context?.thiTempC;
-    const hum = state.weatherThi?.humidity ?? state.context?.thiHumidity;
-    const source = clean(state.weatherThi?.source || state.context?.thiSource || "server");
-    const placeText = state.weatherThi?.fallback
-      ? "قراءة السيرفر الاحتياطية"
-      : "قراءة السيرفر حسب الموقع";
-    const details = [
-      temp !== null && temp !== undefined ? `حرارة ${escapeHtml(temp)}°C` : "",
-      hum !== null && hum !== undefined ? `رطوبة ${escapeHtml(hum)}%` : "",
-      source ? `المصدر: ${escapeHtml(source)}` : ""
-    ].filter(Boolean).join(" — ");
+    const statusObj = thiData.status || state.context?.thiStatus || {};
+    const status = statusObj.level === "high" ? "bad" : (statusObj.level === "moderate" || statusObj.level === "mild" ? "warn" : (thi < 68 ? "ok" : (thi < 72 ? "warn" : "bad")));
+    const label = clean(statusObj.label) || (thi < 68 ? "راحة" : (thi < 72 ? "إجهاد خفيف" : "إجهاد حراري"));
+    const temp = thiData.tempC !== null && thiData.tempC !== undefined ? `${thiData.tempC}°C` : "—";
+    const hum = thiData.humidity !== null && thiData.humidity !== undefined ? `${thiData.humidity}%` : "—";
 
     return `
-      <div class="kpi ${status} thi-advanced-card" style="grid-column:1/-1" data-key="thi">
-        <div class="k">
-          <span>THI — مؤشر الإجهاد الحراري</span>
-          <span class="kpi-badge"><span class="dot"></span>${escapeHtml(text)}</span>
+      <div class="thi-panel ${status}" data-key="thi">
+        <div style="min-width:0">
+          <div class="thi-title">THI — مؤشر الإجهاد الحراري</div>
+          <div class="thi-sub">عامل بيئي مساعد من السيرفر، منفصل عن كروت تحليل العليقة.</div>
+          <div class="thi-sub">الحرارة: ${escapeHtml(temp)} — الرطوبة: ${escapeHtml(hum)}</div>
         </div>
-        <div class="v">${fmt(thi, 0)}</div>
-        <div class="kpi-hint">${placeText}${details ? " — " + details : ""}</div>
+        <div class="thi-main">${fmt(thi, 0)}</div>
+        <div class="thi-badge">${escapeHtml(label)}</div>
       </div>
     `;
   }
 
-  function serverAdviceCardsHtml(analysisCards = []) {
-    const dcad = cardByKey(analysisCards, "dcad");
-    return dcad ? cardHtml(dcad, { wide: true }) : "";
+  function thiRecommendationsHtml() {
+    const thiData = state.thi || {};
+    const statusObj = thiData.status || state.context?.thiStatus || {};
+
+    const raw =
+      thiData.recommendations ||
+      statusObj.recommendations ||
+      thiData.thiRecommendations ||
+      thiData.advice ||
+      statusObj.advice ||
+      statusObj.guidance ||
+      [];
+
+    const recommendations = (Array.isArray(raw) ? raw : [raw])
+      .map(x => clean(x))
+      .filter(Boolean);
+
+    if (!recommendations.length) return "";
+
+    return `
+      <div class="murabbik-advice-panel" data-key="thi-recommendations">
+        <div class="murabbik-advice-title">توصيات THI</div>
+        <div class="murabbik-advice-sub">توصيات الإجهاد الحراري كما يرسلها السيرفر من قراءة THI، وليست كروت تحليل عليقة.</div>
+        <div class="murabbik-advice-list">
+          ${recommendations.map(x => `<div class="murabbik-advice-item">${escapeHtml(x)}</div>`).join("")}
+        </div>
+      </div>
+    `;
   }
 
   function advancedCardsHtml(advancedCards = [], analysisCards = [], analysis = {}) {
@@ -1860,7 +1935,7 @@ padding: 6px 0;
 
     const out = [];
     const thiCard = thiAdvancedCardHtml(analysis);
-    const adviceCards = serverAdviceCardsHtml(analysisCards);
+    const adviceCards = thiRecommendationsHtml();
 
     if (thiCard) out.push(thiCard);
     if (adviceCards) out.push(adviceCards);
@@ -2153,7 +2228,7 @@ padding: 6px 0;
     try {
       await api("/api/auth/me");
       await loadContext();
-      await loadWeatherThi();
+      await loadThi();
       await loadFeeds();
       showMsg("");
     } catch (e) {
