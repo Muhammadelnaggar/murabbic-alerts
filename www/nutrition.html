@@ -684,7 +684,80 @@ padding: 6px 0;
 .mbk-premix-note{font-size:12px;font-weight:800;line-height:1.6;color:#475569;background:#f8fafc;border:1px solid #eef2f7;border-radius:14px;padding:9px;margin:8px 0}
 .mbk-premix-section{font-weight:900;color:#0b7f47;margin:12px 0 6px;border-top:1px dashed #d7e7dd;padding-top:10px}
 @media (max-width:640px){.mbk-premix-grid{grid-template-columns:1fr}.mbk-modal{border-radius:18px}}
+/* ===== Murabbik Nutrition Buttons — surgical page fix ===== */
+.mbk-form button,
+.mbk-form .btn,
+.mbk-form .btn-primary,
+.mbk-form .mini-btn,
+.mbk-form .mbk-premix-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  min-height:44px;
+  border-radius:14px;
+  padding:10px 14px;
+  font-weight:900;
+  line-height:1.2;
+  box-shadow:0 6px 16px rgba(15,23,42,.08);
+  transition:transform .12s ease, box-shadow .12s ease, opacity .12s ease;
+}
 
+.mbk-form button:active,
+.mbk-form .btn:active,
+.mbk-form .btn-primary:active,
+.mbk-form .mini-btn:active,
+.mbk-form .mbk-premix-btn:active{
+  transform:translateY(1px);
+  box-shadow:0 3px 10px rgba(15,23,42,.08);
+}
+
+.mbk-form .btn,
+.mbk-form .mini-btn,
+.mbk-form .mbk-modal-close{
+  background:#fff;
+  color:var(--green, #0ea05a);
+  border:1px solid rgba(14,160,90,.45);
+}
+
+.mbk-form .btn-primary,
+.mbk-form #saveEvent,
+.mbk-form #saveCustomPremix,
+.mbk-form #msgYes{
+  background:var(--green, #0ea05a);
+  color:#fff;
+  border:1px solid var(--green, #0ea05a);
+}
+
+.mbk-form .btn-ghost,
+.mbk-form #toggleAdvancedBtn,
+.mbk-form #msgNo{
+  background:#f8fafc;
+  color:#0b7f47;
+  border:1px solid rgba(14,160,90,.35);
+}
+
+.mbk-form .mbk-premix-btn{
+  width:100%;
+  background:linear-gradient(180deg,#ffffff 0%,#f3fbf5 100%);
+  color:#0b7f47;
+  border:1px solid rgba(14,160,90,.38);
+}
+
+.mbk-form button:disabled,
+.mbk-form .mini-btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+  box-shadow:none;
+  transform:none;
+}
+
+.mbk-form #saveEvent{
+  width:100%;
+  min-height:50px;
+  border-radius:16px;
+  font-size:15px;
+}
 </style>
 </head>
 <body>
