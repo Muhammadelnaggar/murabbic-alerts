@@ -1844,31 +1844,133 @@ padding: 6px 0;
     return Math.max(0, Math.min(100, (a / r) * 100));
   }
 
+  function guidanceText(...cards) {
+    const candidates = [];
+
+    cards.filter(Boolean).forEach(card => {
+      if (typeof card.targetText === "string") candidates.push(card.targetText);
+      if (typeof card.hint === "string") candidates.push(card.hint);
+      if (typeof card.advice === "string") candidates.push(card.advice);
+      if (typeof card.recommendation === "string") candidates.push(card.recommendation);
+      if (typeof card.instruction === "string") candidates.push(card.instruction);
+      if (typeof card.instructions === "string") candidates.push(card.instructions);
+      if (typeof card.guidance === "string") candidates.push(card.guidance);
+
+      if (Array.isArray(card.recommendations)) candidates.push(...card.recommendations);
+      if (Array.isArray(card.instructions)) candidates.push(...card.instructions);
+      if (Array.isArray(card.actions)) candidates.push(...card.actions);
+
+      if (card.instructions && typeof card.instructions === "object") {
+        if (typeof card.instructions.summary === "string") candidates.push(card.instructions.summary);
+        if (Array.isArray(card.instructions.actions)) candidates.push(...card.instructions.actions);
+        if (Array.isArray(card.instructions.recommendations)) candidates.push(...card.instructions.recommendations);
+      }
+    });
+
+    return [...new Set(candidates.map(x => clean(x)).filter(Boolean))].join(" — ");
+  }
+
+  function gaugeMeta(actual, ref, mode = "target") {
+    const a = Number(actual);
+    const r = Number(ref);
+
+    if (!Number.isFinite(a) || !Number.isFinite(r) || r <= 0) {
+      return { angle: -90 };
+    }
+
+    const maxRatio = mode === "target" ? 1.25 : 1.40;
+    const ratio = Math.max(0, Math.min(maxRatio, a / r));
+
+    return {
+      angle: -90 + (ratio / maxRatio) * 180
+    };
+  }
+
+  function polar(cx, cy, radius, degree) {
+    const rad = (degree - 90) * Math.PI / 180;
+    return {
+      x: cx + radius * Math.cos(rad),
+      y: cy + radius * Math.sin(rad)
+    };
+  }
+
+  function arcPath(cx, cy, radius, startDegree, endDegree) {
+    const s = polar(cx, cy, radius, endDegree);
+    const e = polar(cx, cy, radius, startDegree);
+    const large = Math.abs(endDegree - startDegree) > 180 ? 1 : 0;
+    return `M ${s.x} ${s.y} A ${radius} ${radius} 0 ${large} 0 ${e.x} ${e.y}`;
+  }
+
+  function gaugeSvg(actual, ref, mode = "target") {
+    const { angle } = gaugeMeta(actual, ref, mode);
+    const cx = 110;
+    const cy = 110;
+    const radius = 78;
+
+    const segments = mode === "min"
+      ? [
+          { s: -90, e: -42, c: "#ef4444" },
+          { s: -42, e: -12, c: "#f59e0b" },
+          { s: -12, e: 90, c: "#16a34a" }
+        ]
+      : mode === "max"
+        ? [
+            { s: -90, e: 18, c: "#16a34a" },
+            { s: 18, e: 46, c: "#f59e0b" },
+            { s: 46, e: 90, c: "#ef4444" }
+          ]
+        : [
+            { s: -90, e: -38, c: "#ef4444" },
+            { s: -38, e: -12, c: "#f59e0b" },
+            { s: -12, e: 12, c: "#16a34a" },
+            { s: 12, e: 38, c: "#f59e0b" },
+            { s: 38, e: 90, c: "#ef4444" }
+          ];
+
+    const tip = polar(cx, cy, radius - 10, angle);
+
+    return `
+      <svg viewBox="0 0 220 135" width="220" height="135" aria-hidden="true">
+        ${segments.map(seg => `<path d="${arcPath(cx, cy, radius, seg.s, seg.e)}" fill="none" stroke="${seg.c}" stroke-width="18" stroke-linecap="round"></path>`).join("")}
+        <line x1="${cx}" y1="${cy}" x2="${tip.x}" y2="${tip.y}" stroke="#111827" stroke-width="5" stroke-linecap="round"></line>
+        <circle cx="${cx}" cy="${cy}" r="8" fill="#111827"></circle>
+        <circle cx="${cx}" cy="${cy}" r="4" fill="#fff"></circle>
+      </svg>
+    `;
+  }
+
   function advancedGaugeCardHtml({ title, actualCard, refCard, refLabel, sourceCard, mode = "target", extra = "" }) {
     const actual = firstNumberFromCard(actualCard);
     const ref = mode === "max" ? maxNumberFromCard(refCard) : firstNumberFromCard(refCard);
-    const pct = ratioPct(actual, ref);
     const cls = statusClassFromServerCard(sourceCard || {});
-    const badge = mode === "max" ? "حد أقصى" : mode === "min" ? "حد أدنى" : "مقارنة";
+    const badge = mode === "max" ? "حد أقصى" : mode === "min" ? "حد أدنى" : "احتياج";
+    const serverGuidance = guidanceText(sourceCard, actualCard, refCard);
+    const guidance = [serverGuidance, clean(extra)].filter(Boolean).join(" — ");
 
     return `
-      <div class="kpi ${cls}" style="grid-column:1/-1">
-        <div class="k">
+      <div class="kpi ${cls}" style="grid-column:1/-1;padding:14px 12px">
+        <div class="k" style="min-height:0;margin-bottom:10px">
           <span>${escapeHtml(title)}</span>
           <span class="kpi-badge"><span class="dot"></span>${badge}</span>
         </div>
-        <div class="vrow" style="margin-top:8px">
-          <div style="text-align:right;min-width:0">
+
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 220px minmax(0,1fr);gap:10px;align-items:center">
+          <div style="text-align:center;min-width:0">
             <div class="kpi-hint" style="margin-top:0">الإمداد / الفعلي</div>
             <div class="v">${escapeHtml(actualCard?.value ?? "—")}</div>
           </div>
-          <div style="text-align:left;min-width:0">
-            <div class="kpi-hint" style="margin-top:0">${escapeHtml(refLabel || "المرجع")}</div>
+
+          <div style="display:flex;justify-content:center;align-items:center">
+            ${gaugeSvg(actual, ref, mode)}
+          </div>
+
+          <div style="text-align:center;min-width:0">
+            <div class="kpi-hint" style="margin-top:0">${escapeHtml(refLabel || "الاحتياج / الحد")}</div>
             <div class="v">${escapeHtml(refCard?.value ?? "—")}</div>
           </div>
         </div>
-        <div class="kpi-meter"><span style="width:${pct.toFixed(1)}%"></span></div>
-        ${extra ? `<div class="kpi-hint">${extra}</div>` : ""}
+
+        ${guidance ? `<div class="kpi-hint" style="margin-top:10px;text-align:center;line-height:1.5">${escapeHtml(guidance)}</div>` : ""}
       </div>
     `;
   }
@@ -1962,6 +2064,17 @@ function thiRecommendationsHtml() {
   function advancedCardsHtml(advancedCards = [], analysisCards = [], analysis = {}) {
     const a = (key) => cardByKey(advancedCards, key);
     const n = (key) => cardByKey(analysisCards, key);
+    const makeCard = (value, unit = "", digits = 1) => ({
+      value: value === null || value === undefined || !Number.isFinite(Number(value))
+        ? "—"
+        : `${fmt(Number(value), digits)}${unit ? ` ${unit}` : ""}`,
+      actual: Number.isFinite(Number(value)) ? Number(value) : null,
+      target: Number.isFinite(Number(value)) ? Number(value) : null
+    });
+
+    const totals = analysis.totals || {};
+    const nutrition = analysis.nutrition || {};
+    const targets = analysis.targets || {};
 
     const out = [];
     const thiCard = thiAdvancedCardHtml(analysis);
@@ -1970,74 +2083,97 @@ function thiRecommendationsHtml() {
     if (thiCard) out.push(thiCard);
     if (adviceCards) out.push(adviceCards);
 
-    if (a("totDM") || a("dmiTarget")) {
+    const totDMCard = a("totDM") || makeCard(totals.dmKg ?? totals.totalDMKg, "كجم", 2);
+    const dmiTargetCard = a("dmiTarget") || makeCard(targets.dmiTarget, "كجم", 2);
+
+    const nelActualCard = a("nelActual") || makeCard(nutrition.nelActual, "ميجاكال/يوم", 2);
+    const nelTargetCard = a("nelTarget") || makeCard(targets.nelTarget, "ميجاكال/يوم", 2);
+
+    const mpActualCard = a("mpSupplyG") || makeCard(nutrition.mpSupplyG, "جم/يوم", 0);
+    const mpTargetCard = a("mpTargetG") || makeCard(targets.mpTargetG, "جم/يوم", 0);
+
+    const starchActualCard = a("starchPctActual") || makeCard(nutrition.starchPctActual, "%", 1);
+    const starchMaxCard = a("starchMax") || makeCard(targets.starchMax, "%", 1);
+
+    const fatActualCard = a("fatPctActual") || makeCard(nutrition.fatPctActual, "%", 1);
+    const fatLimitCard = a("fatLimit") || makeCard(targets.fatLimit ?? targets.fatMax ?? 7, "%", 1);
+
+    const ndfActualCard = a("ndfPctActual") || makeCard(nutrition.ndfPctActual, "%", 1);
+    const ndfMinCard = a("ndfTarget") || makeCard(targets.ndfTarget, "%", 1);
+
+    const peNdfActualCard = a("peNDFPctActual") || makeCard(nutrition.peNDFPctActual, "%", 1);
+    const peNdfMinCard = a("peNDFMin") || makeCard(targets.peNDFMin, "%", 1);
+    const roughageMinCard = a("roughageMin") || makeCard(targets.roughageMin, "%", 1);
+
+    if (firstNumberFromCard(totDMCard) !== null && firstNumberFromCard(dmiTargetCard) !== null) {
       out.push(advancedGaugeCardHtml({
         title: "المادة الجافة المأكولة",
-        actualCard: a("totDM"),
-        refCard: a("dmiTarget"),
+        actualCard: totDMCard,
+        refCard: dmiTargetCard,
         refLabel: "المتوقع",
-        sourceCard: n("dm"),
+        sourceCard: a("totDM") || n("dm"),
         mode: "target"
       }));
     }
 
-    if (a("nelActual") || a("nelTarget")) {
+    if (firstNumberFromCard(nelActualCard) !== null && firstNumberFromCard(nelTargetCard) !== null) {
       out.push(advancedGaugeCardHtml({
         title: "الطاقة",
-        actualCard: a("nelActual"),
-        refCard: a("nelTarget"),
+        actualCard: nelActualCard,
+        refCard: nelTargetCard,
         refLabel: "الاحتياجات",
-        sourceCard: n("nel"),
+        sourceCard: a("nelActual") || n("nel"),
         mode: "target"
       }));
     }
 
-    if (a("mpSupplyG") || a("mpTargetG")) {
+    if (firstNumberFromCard(mpActualCard) !== null && firstNumberFromCard(mpTargetCard) !== null) {
       out.push(advancedGaugeCardHtml({
         title: "البروتين الممثل",
-        actualCard: a("mpSupplyG"),
-        refCard: a("mpTargetG"),
+        actualCard: mpActualCard,
+        refCard: mpTargetCard,
         refLabel: "الاحتياجات",
-        sourceCard: n("mp"),
+        sourceCard: a("mpSupplyG") || n("mp"),
         mode: "target"
       }));
     }
 
-    if (a("starchPctActual") || a("starchMax")) {
+    if (firstNumberFromCard(starchActualCard) !== null && firstNumberFromCard(starchMaxCard) !== null) {
       out.push(advancedGaugeCardHtml({
         title: "النشا",
-        actualCard: a("starchPctActual"),
-        refCard: a("starchMax"),
+        actualCard: starchActualCard,
+        refCard: starchMaxCard,
         refLabel: "الحد الأقصى",
-        sourceCard: n("starch"),
+        sourceCard: a("starchPctActual") || n("starch"),
         mode: "max"
       }));
     }
 
-    if (a("fatPctActual") || a("fatLimit")) {
+    if (firstNumberFromCard(fatActualCard) !== null && firstNumberFromCard(fatLimitCard) !== null) {
       out.push(advancedGaugeCardHtml({
         title: "الدهون",
-        actualCard: a("fatPctActual"),
-        refCard: a("fatLimit"),
+        actualCard: fatActualCard,
+        refCard: fatLimitCard,
         refLabel: "الحد الأقصى",
-        sourceCard: n("fat"),
+        sourceCard: a("fatPctActual") || n("fat"),
         mode: "max"
       }));
     }
 
-    if (a("ndfPctActual") || a("ndfTarget") || a("peNDFPctActual") || a("peNDFMin")) {
-      const peText = a("peNDFPctActual") || a("peNDFMin")
-        ? `الألياف المؤثرة: ${escapeHtml(a("peNDFPctActual")?.value ?? "—")} / الحد الأدنى ${escapeHtml(a("peNDFMin")?.value ?? "—")}`
-        : "";
+    if (firstNumberFromCard(ndfActualCard) !== null && firstNumberFromCard(ndfMinCard) !== null) {
+      const extra = [
+        `الألياف المؤثرة: ${peNdfActualCard?.value ?? "—"} / الحد الأدنى ${peNdfMinCard?.value ?? "—"}`,
+        `الخشن: الحد الأدنى ${roughageMinCard?.value ?? "—"}`
+      ].join(" — ");
 
       out.push(advancedGaugeCardHtml({
-        title: "الألياف",
-        actualCard: a("ndfPctActual"),
-        refCard: a("ndfTarget"),
-        refLabel: "الحد الأدنى / المرجع",
-        sourceCard: n("ndf"),
+        title: "الألياف المتعادلة NDF",
+        actualCard: ndfActualCard,
+        refCard: ndfMinCard,
+        refLabel: "الحد الأدنى",
+        sourceCard: a("ndfPctActual") || n("ndf"),
         mode: "min",
-        extra: peText
+        extra
       }));
     }
 
