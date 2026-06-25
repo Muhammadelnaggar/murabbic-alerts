@@ -408,7 +408,81 @@ function classifyTHI(thi) {
     severity: 3
   };
 }
+function buildThiInstructionsSrv(thi, status = {}) {
+  const n = Number(thi);
+  const level = String(status.level || '').trim();
 
+  const sourceLabel =
+    'US dairy extension guidance: Wisconsin Extension / Minnesota Extension / Penn State Extension';
+
+  if (!Number.isFinite(n)) {
+    return {
+      title: 'تعليمات مُرَبِّيك للـ THI',
+      summary: 'قراءة الحرارة والرطوبة غير مكتملة؛ لا يتم إصدار توصية تشغيلية دقيقة من THI وحده الآن.',
+      actions: [
+        'اعتمد على العلامات الحيوانية: اللهاث، تجمع الحيوانات، انخفاض المأكول، زيادة الوقوف، وانخفاض اللبن.',
+        'راجع التهوية والمياه خصوصًا وقت الظهيرة وساعات الانتظار قبل الحلب.'
+      ],
+      sourceLabel
+    };
+  }
+
+  if (n < 68 || level === 'comfort') {
+    return {
+      title: 'تعليمات مُرَبِّيك للـ THI',
+      summary: 'THI في نطاق مريح؛ لا توجد دلالة إجهاد حراري مؤثر حاليًا.',
+      actions: [
+        'استمر على التهوية الطبيعية وتوفير مياه نظيفة كافية.',
+        'لا تعدّل العليقة بسبب THI وحده.',
+        'استمر في متابعة المأكول وبقايا العليقة كروتين يومي.'
+      ],
+      sourceLabel
+    };
+  }
+
+  if (n < 72 || level === 'mild') {
+    return {
+      title: 'تعليمات مُرَبِّيك للـ THI',
+      summary: 'بداية إجهاد حراري؛ الأبقار عالية الإنتاج قد تتأثر مبكرًا.',
+      actions: [
+        'زِد مراقبة المأكول وبقايا العليقة خلال ساعات الحر.',
+        'تأكد من توافر مياه باردة ونظيفة وسهلة الوصول.',
+        'شغّل مراوح التهوية في مناطق التغذية والانتظار إن وجدت.',
+        'ادفع العلف مرات أكثر للحفاظ على الإقبال وعدم سخونة العليقة.'
+      ],
+      sourceLabel
+    };
+  }
+
+  if (n < 78 || level === 'moderate') {
+    return {
+      title: 'تعليمات مُرَبِّيك للـ THI',
+      summary: 'إجهاد حراري متوسط؛ متوقع انخفاض المأكول واللبن وزيادة ضغط الكرش.',
+      actions: [
+        'فعّل التهوية القوية فوق المعالف ومناطق الانتظار والرقاد.',
+        'استخدم الرش أو التبليل المتقطع مع تهوية جيدة لتبخير الماء من جسم الحيوان.',
+        'قدّم العليقة في الأوقات الأبرد وادفع العلف أكثر من مرة.',
+        'راجع المادة الجافة المأكولة وصحة الكرش قبل رفع المركزات.',
+        'راقب NDF والنشا والدهون حتى لا يتحول تعويض نقص المأكول إلى حماض.'
+      ],
+      sourceLabel
+    };
+  }
+
+  return {
+    title: 'تعليمات مُرَبِّيك للـ THI',
+    summary: 'إجهاد حراري عالٍ؛ خطر واضح على المأكول والإنتاج وصحة الحيوان ويحتاج تدخل تبريد فوري.',
+    actions: [
+      'فعّل المراوح والرش/التبليل المتقطع في المعالف والانتظار فورًا.',
+      'قلّل حركة الحيوانات والعمل المجهد إلى أبرد وقت في اليوم.',
+      'راجع عدد نقاط الشرب وسرعة ملئها ونظافتها.',
+      'ادفع العليقة أكثر من مرة وركّز التقديم في الأوقات الأبرد.',
+      'لا ترفع الحبوب لتعويض نقص المأكول بدون مراجعة النشا وNDF وصحة الكرش.',
+      'تابع الحيوانات عالية الإنتاج والحديثة الولادة أولًا لأنها الأكثر حساسية للإجهاد.'
+    ],
+    sourceLabel
+  };
+}
 function belongs(rec, tenant){
   const t = rec && rec.userId ? rec.userId : '';
   return tenantKey(t) === tenantKey(tenant);
@@ -847,12 +921,18 @@ app.get('/api/weather/thi', async (req, res) => {
     const humidity = Number(j?.current?.relative_humidity_2m);
     const thi = calcTHI(tempC, humidity);
     const status = classifyTHI(thi);
+    const instructions = buildThiInstructionsSrv(thi, status);
 
 const data = {
   tempC: Number.isFinite(tempC) ? Math.round(tempC) : null,
   humidity: Number.isFinite(humidity) ? Math.round(humidity) : null,
   thi,
   status,
+  instructions,
+  thiInstructions: instructions,
+  thiRecommendations: instructions,
+  recommendations: instructions.actions,
+  advice: instructions.summary,
   source: 'open-meteo',
   lat,
   lon,
@@ -871,9 +951,16 @@ const data = {
     });
 
     } catch (e) {
-    console.error('weather.thi fatal error:', e.message || e);
+ console.error('weather.thi fatal error:', e.message || e);
 
-    return res.json({
+const instructions = buildThiInstructionsSrv(null, {
+  level: 'unknown',
+  label: 'غير متاح',
+  severity: 0
+});
+
+return res.json({
+   
       ok: true,
       cached: false,
       fallback: true,
@@ -881,11 +968,16 @@ const data = {
       tempC: null,
       humidity: null,
       thi: null,
-      status: {
-        level: 'unknown',
-        label: 'غير متاح',
-        severity: 0
-      },
+     status: {
+  level: 'unknown',
+  label: 'غير متاح',
+  severity: 0
+},
+instructions,
+thiInstructions: instructions,
+thiRecommendations: instructions,
+recommendations: instructions.actions,
+advice: instructions.summary,
       source: 'weather-fallback',
       lat: WEATHER_DEFAULT_LAT,
       lon: WEATHER_DEFAULT_LON,
@@ -8594,88 +8686,141 @@ if (isDryEconomics) {
     )
   ];
 
-  const advancedCards = [
-    {
-      key: 'dmiTarget',
-      title: 'المأكول المتوقع للمادة الجافة',
-      value: txt(targets.dmiTarget, 'كجم', 2)
-    },
-    {
-      key: 'totDM',
-      title: 'المادة الجافة المقدمة/المأكولة',
-      value: txt(totals.dmKg, 'كجم', 2)
-    },
+ const reportStage =
+  context?.stage ||
+  context?.nutritionStage ||
+  context?.productionStage ||
+  '';
 
-    {
-      key: 'mpTargetG',
-      title: 'احتياجات البروتين الممثل',
-      value: txt(targets.mpTargetG, 'جم/يوم', 0)
-    },
-    {
-      key: 'mpSupplyG',
-      title: 'العليقة الحالية — البروتين الممثل',
-      value: txt(nutrition.mpSupplyG, 'جم/يوم', 0)
-    },
+const advancedCards = [
+  nutritionAdvancedDisplayCardSrv({
+    key: 'dmi',
+    title: 'المادة الجافة المأكولة',
+    actual: totals.dmKg,
+    reference: targets.dmiTarget,
+    actualText: txt(totals.dmKg, 'كجم', 2),
+    referenceText: txt(targets.dmiTarget, 'كجم', 2),
+    referenceLabel: 'المتوقع',
+    mode: 'target',
+    unit: 'كجم',
+    decimals: 2,
+    guidanceKey: 'dmi',
+    stage: reportStage
+  }),
 
-    {
-      key: 'ndfTarget',
-      title: 'احتياجات الألياف NDF',
-      value: txt(targets.ndfTarget, '%', 0)
-    },
-    {
-      key: 'ndfPctActual',
-      title: 'العليقة الحالية — ألياف NDF',
-      value: txt(nutrition.ndfPctActual, '%', 1)
-    },
-    {
-      key: 'peNDFMin',
-      title: 'الحد الأدنى للألياف المؤثرة',
-      value: txt(targets.peNDFMin, '%', 0)
-    },
-    {
-      key: 'peNDFPctActual',
-      title: 'العليقة الحالية — ألياف مؤثرة',
-      value: txt(nutrition.peNDFPctActual, '%', 1)
-    },
-    {
-      key: 'starchMax',
-      title: 'الحد الأقصى للنشا',
-      value: txt(targets.starchMax, '%', 0)
-    },
-    {
-      key: 'starchPctActual',
-      title: 'العليقة الحالية — نشا',
-      value: txt(nutrition.starchPctActual, '%', 1)
-    },
-    {
-      key: 'roughageMin',
-      title: 'الحد الأدنى للخشن',
-      value: txt(targets.roughageMin, '%', 0)
-    },
+  nutritionAdvancedDisplayCardSrv({
+    key: 'nel',
+    title: 'الطاقة',
+    actual: nutrition.nelActual,
+    reference: targets.nelTarget,
+    actualText: txt(nutrition.nelActual, 'ميجاكال NEL/يوم', 2),
+    referenceText: txt(targets.nelTarget, 'ميجاكال NEL/يوم', 2),
+    referenceLabel: 'الاحتياج',
+    mode: 'target',
+    unit: 'ميجاكال/يوم',
+    decimals: 2,
+    guidanceKey: 'nel',
+    stage: reportStage
+  }),
 
-    {
-      key: 'fatLimit',
-      title: 'الحد المسموح به لدهن العليقة',
-      value: '6–7 % من المادة الجافة'
-    },
-    {
-      key: 'fatPctActual',
-      title: 'العليقة الحالية — دهن',
-      value: txt(nutrition.fatPctActual, '%', 1)
-    },
+  nutritionAdvancedDisplayCardSrv({
+    key: 'mp',
+    title: 'البروتين الممثل',
+    actual: nutrition.mpSupplyG,
+    reference: targets.mpTargetG,
+    actualText: txt(nutrition.mpSupplyG, 'جم/يوم', 0),
+    referenceText: txt(targets.mpTargetG, 'جم/يوم', 0),
+    referenceLabel: 'الاحتياج',
+    mode: 'target',
+    unit: 'جم/يوم',
+    decimals: 0,
+    guidanceKey: 'mp',
+    stage: reportStage
+  }),
 
-    {
-      key: 'nelTarget',
-      title: 'احتياجات الطاقة',
-      value: txt(targets.nelTarget, 'ميجاكال NEL/يوم', 2)
-    },
-    {
-      key: 'nelActual',
-      title: 'العليقة الحالية — طاقة',
-      value: txt(nutrition.nelActual, 'ميجاكال NEL/يوم', 2)
+  nutritionAdvancedDisplayCardSrv({
+    key: 'ndf',
+    title: 'الألياف المتعادلة NDF',
+    actual: nutrition.ndfPctActual,
+    reference: targets.ndfTarget,
+    actualText: txt(nutrition.ndfPctActual, '% من المادة الجافة', 1),
+    referenceText: txt(targets.ndfTarget, '% من المادة الجافة', 1),
+    actualLabel: 'الإمداد الفعلي',
+    referenceLabel: 'الحد الأدنى للألياف المتعادلة NDF',
+    mode: 'min',
+    unit: '%',
+    decimals: 1,
+    guidanceKey: 'ndf',
+    stage: reportStage,
+    extra: {
+      peNDFActual: nutrition.peNDFPctActual,
+      peNDFMin: targets.peNDFMin,
+      peNDFText: `${txt(nutrition.peNDFPctActual, '%', 1)} / الحد الأدنى ${txt(targets.peNDFMin, '%', 1)}`,
+      roughageMin: targets.roughageMin,
+      roughageMinText: txt(targets.roughageMin, '%', 1)
     }
-  ];
+  }),
 
+  nutritionAdvancedDisplayCardSrv({
+    key: 'starch',
+    title: 'النشا',
+    actual: nutrition.starchPctActual,
+    reference: targets.starchMax,
+    actualText: txt(nutrition.starchPctActual, '% من المادة الجافة', 1),
+    referenceText: txt(targets.starchMax, '% من المادة الجافة', 1),
+    referenceLabel: 'الحد الأقصى للنشا',
+    mode: 'max',
+    unit: '%',
+    decimals: 1,
+    guidanceKey: 'starch',
+    stage: reportStage
+  }),
+
+  nutritionAdvancedDisplayCardSrv({
+    key: 'fat',
+    title: 'الدهون',
+    actual: nutrition.fatPctActual,
+    reference: 7,
+    actualText: txt(nutrition.fatPctActual, '% من المادة الجافة', 1),
+    referenceText: '6–7 % من المادة الجافة',
+    referenceLabel: 'الحد الأقصى للدهون',
+    mode: 'max',
+    unit: '%',
+    decimals: 1,
+    guidanceKey: 'fat',
+    stage: reportStage
+  })
+].filter(c => c && c.actualText !== '—' && c.referenceText !== '—');
+  advancedCards.push(
+  {
+    key: 'ndfTarget',
+    title: 'الحد الأدنى للألياف المتعادلة NDF',
+    value: txt(targets.ndfTarget, '% من المادة الجافة', 1),
+    actual: targets.ndfTarget,
+    target: targets.ndfTarget
+  },
+  {
+    key: 'ndfPctActual',
+    title: 'الإمداد الفعلي من الألياف المتعادلة NDF',
+    value: txt(nutrition.ndfPctActual, '% من المادة الجافة', 1),
+    actual: nutrition.ndfPctActual,
+    target: targets.ndfTarget
+  },
+  {
+    key: 'peNDFMin',
+    title: 'الحد الأدنى للألياف المؤثرة',
+    value: txt(targets.peNDFMin, '% من المادة الجافة', 1),
+    actual: targets.peNDFMin,
+    target: targets.peNDFMin
+  },
+  {
+    key: 'peNDFPctActual',
+    title: 'الإمداد الفعلي من الألياف المؤثرة',
+    value: txt(nutrition.peNDFPctActual, '% من المادة الجافة', 1),
+    actual: nutrition.peNDFPctActual,
+    target: targets.peNDFMin
+  }
+);
   return {
     analysisCards,
     economicsCards,
@@ -10163,6 +10308,102 @@ function reportRowSrv(section, key, label, targetText, actualText, balanceText, 
     statusText: statusTextOverride || reportStatusTextSrv(status),
     note: note || '—'
   });
+}
+function nutritionAdvancedDisplayCardSrv(o = {}) {
+  const key = String(o.key || '').trim();
+  const mode = String(o.mode || 'target').trim();
+
+  const actual = Number(o.actual);
+  const reference = Number(o.reference);
+
+  const hasNumbers =
+    Number.isFinite(actual) &&
+    Number.isFinite(reference) &&
+    reference > 0;
+
+  const status = !hasNumbers
+    ? 'muted'
+    : mode === 'min'
+      ? reportMinStatusSrv(actual, reference)
+      : mode === 'max'
+        ? reportMaxStatusSrv(actual, reference)
+        : reportRatioStatusSrv(actual, reference, 5);
+
+  const diff = hasNumbers ? actual - reference : null;
+  const sign = Number(diff) > 0 ? '+' : '';
+
+  let balanceText = 'الاتزان: غير مكتمل';
+
+  if (hasNumbers) {
+    if (mode === 'min') {
+      balanceText = diff < 0
+        ? `الاتزان: ناقص ${fmtSrv(Math.abs(diff), o.decimals ?? 1, o.unit || '')}`
+        : `الاتزان: زائد/آمن ${sign}${fmtSrv(diff, o.decimals ?? 1, o.unit || '')}`;
+    } else if (mode === 'max') {
+      balanceText = diff > 0
+        ? `الاتزان: زائد عن الحد ${sign}${fmtSrv(diff, o.decimals ?? 1, o.unit || '')}`
+        : `الاتزان: داخل الحد ${fmtSrv(Math.abs(diff), o.decimals ?? 1, o.unit || '')}`;
+    } else {
+      balanceText = Math.abs(diff) < 0.0001
+        ? 'الاتزان: متزن'
+        : diff < 0
+          ? `الاتزان: ناقص ${fmtSrv(Math.abs(diff), o.decimals ?? 1, o.unit || '')}`
+          : `الاتزان: زائد ${sign}${fmtSrv(diff, o.decimals ?? 1, o.unit || '')}`;
+    }
+  }
+
+  const guidance =
+    typeof reportMurabbikGuidanceSrv === 'function'
+      ? reportMurabbikGuidanceSrv(o.guidanceKey || key, status, diff, o.stage || '')
+      : '';
+
+  const needleBase =
+    mode === 'min'
+      ? reference * 1.6
+      : mode === 'max'
+        ? reference * 1.25
+        : reference * 1.25;
+
+  const needlePct =
+    hasNumbers && needleBase > 0
+      ? Math.max(0, Math.min(100, (actual / needleBase) * 100))
+      : null;
+
+  return {
+    key,
+    title: o.title || key,
+
+    actual,
+    reference,
+
+    actualLabel: o.actualLabel || 'الإمداد الفعلي',
+    actualText: o.actualText || fmtSrv(actual, o.decimals ?? 1, o.unit || ''),
+
+    referenceLabel: o.referenceLabel || 'المرجع',
+    referenceText: o.referenceText || fmtSrv(reference, o.decimals ?? 1, o.unit || ''),
+
+    value: o.actualText || fmtSrv(actual, o.decimals ?? 1, o.unit || ''),
+
+    mode,
+    status,
+    statusText: reportStatusTextSrv(status),
+    balanceText,
+
+    guidance,
+    instruction: guidance,
+    instructions: guidance,
+    hint: guidance,
+    note: guidance,
+
+    gauge: {
+      mode,
+      actual,
+      reference,
+      needlePct
+    },
+
+    extra: o.extra || null
+  };
 }
 function rumenDecisionRowForReportSrv(e = {}) {
   const a = e?.nutrition?.analysis || {};
