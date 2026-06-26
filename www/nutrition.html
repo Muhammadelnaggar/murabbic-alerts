@@ -1988,7 +1988,9 @@ function thiRecommendationsHtml() {
     if (loadBtn) loadBtn.style.display = events.length ? "inline-flex" : "none";
   }
 
-  async function loadSavedRations() {
+  async function loadSavedRations(options = {}) {
+    const silent = options.silent === true;
+
     try {
       const data = await api(savedRationsListUrl());
       state.savedRations = Array.isArray(data.events)
@@ -2001,13 +2003,15 @@ function thiRecommendationsHtml() {
 
       renderSavedRationsList(state.savedRations);
 
-      showMsg(
-        state.savedRations.length
-          ? `تم تحميل ${state.savedRations.length} عليقة محفوظة من Firestore.`
-          : "لا توجد علائق محفوظة في Firestore لهذا الحساب."
-      );
+      if (!silent) {
+        showMsg(
+          state.savedRations.length
+            ? `تم تحميل ${state.savedRations.length} عليقة محفوظة من السيرفر.`
+            : "لا توجد علائق محفوظة لهذا الحساب."
+        );
+      }
     } catch (e) {
-      showMsg(e.message || "تعذّر تحميل العلائق المحفوظة من Firestore.", "bad");
+      if (!silent) showMsg(e.message || "تعذّر تحميل العلائق المحفوظة من السيرفر.", "bad");
     }
   }
 
@@ -2182,19 +2186,33 @@ function thiRecommendationsHtml() {
         body: JSON.stringify(body)
       });
 
-      if (out.firestoreId) {
-        state.eventId = clean(out.firestoreId);
-        state.openedRationEvent = {
-          ...(state.openedRationEvent || {}),
-          id: state.eventId,
-          eventDate: body.eventDate,
-          nutrition: body.nutrition
-        };
+      const savedId = clean(out.firestoreId || out.eventId || out.id);
+      const isEdit = !!editEventId;
+
+      if (!savedId) {
+        throw new Error("السيرفر لم يرجع رقم وثيقة Firestore؛ لم يتم اعتماد الحفظ.");
       }
 
-      updateOpenedRationUI();
+      if (isEdit && out.updated !== true) {
+        throw new Error("السيرفر لم يؤكد تحديث العليقة المفتوحة؛ لم يتم اعتماد التعديل.");
+      }
 
-      showMsg(out.updated ? "✅ تم حفظ التعديل على نفس العليقة." : "✅ تم التسجيل بنجاح.");
+      if (!isEdit && out.updated === true) {
+        throw new Error("السيرفر رد كتحديث رغم أن المطلوب حفظ عليقة جديدة؛ لم يتم اعتماد الحفظ.");
+      }
+
+      state.eventId = savedId;
+      state.openedRationEvent = {
+        ...(state.openedRationEvent || {}),
+        id: state.eventId,
+        eventDate: body.eventDate,
+        nutrition: body.nutrition
+      };
+
+      updateOpenedRationUI();
+      await loadSavedRations({ silent: true });
+
+      showMsg(isEdit ? "✅ تم حفظ التعديل على نفس العليقة في السيرفر." : "✅ تم حفظ عليقة جديدة في السيرفر.");
     } catch (e) {
       showMsg(e.message || "تعذّر حفظ التغذية.", "bad");
     }
