@@ -577,9 +577,9 @@
 
     setText("dateInfo", data.eventDate || eventDate());
 
-    setVal("animalNumber", data.animalNumber || numbers[0] || "");
+    setVal("animalNumber", isGroup ? "" : (data.animalNumber || numbers[0] || ""));
     setVal("eventDate", data.eventDate || eventDate());
-    setVal("animalId", data.animalId || data.animalNumber || numbers[0] || "");
+    setVal("animalId", isGroup ? "" : (data.animalId || data.animalNumber || numbers[0] || ""));
 
     setVal("ctxSpecies", state.context.species || "");
     setVal("ctxDIM", state.context.daysInMilk ?? "");
@@ -2046,16 +2046,19 @@ function thiRecommendationsHtml() {
       setVal("animalNumber", animalNumber);
       setVal("animalId", event.animalId || animalNumber);
       setText("animalInfo", animalNumber);
-    } else {
-      const groupName =
-        context.groupName ||
-        context.group ||
-        context.groupLabel ||
-        event.groupName ||
-        (Array.isArray(event.groupNumbers) ? `${event.groupNumbers.length} رأس` : "مجموعة");
+   } else {
+  setVal("animalNumber", "");
+  setVal("animalId", "");
 
-      setText("animalInfo", `مجموعة: ${groupName}`);
-    }
+  const groupName =
+    context.groupName ||
+    context.group ||
+    context.groupLabel ||
+    event.groupName ||
+    (Array.isArray(event.groupNumbers) ? `${event.groupNumbers.length} رأس` : "مجموعة");
+
+  setText("animalInfo", `مجموعة: ${groupName}`);
+}
 
     setVal("ctxSpecies", context.species || "");
     setVal("ctxDIM", context.daysInMilk ?? "");
@@ -2142,79 +2145,10 @@ function thiRecommendationsHtml() {
     return [];
   }
 
-  function currentSaveScope() {
-    const numbers = pageNumbers();
-    const contextGroupNumbers = groupNumbersFromContext();
-
-    const urlHasGroup =
-      numbers.length > 1 ||
-      !!clean(qs.get("groupName")) ||
-      !!clean(qs.get("groupKey"));
-
-    const openedEvent = state.openedRationEvent || {};
-    const contextGroupName = clean(
-      state.context?.groupName ||
-      state.context?.group ||
-      state.context?.groupLabel ||
-      openedEvent.groupName ||
-      ""
-    );
-
-    const openedAsGroup =
-      !!clean(state.eventId) &&
-      !clean(openedEvent.animalNumber) &&
-      (
-        contextGroupNumbers.length > 1 ||
-        Array.isArray(openedEvent.groupNumbers) ||
-        !!contextGroupName
-      );
-
-    const animalNumber = clean(
-      $("animalNumber")?.value ||
-      state.context?.animalNumber ||
-      openedEvent.animalNumber ||
-      (numbers.length === 1 ? numbers[0] : "") ||
-      qs.get("number") ||
-      qs.get("animalNumber") ||
-      qs.get("animalId") ||
-      ""
-    );
-
-    // الرقم الفردي الصريح في الرابط أو الحقل المخفي يغلب وجود groupNumbers فارغة/موروثة في الكونتكست.
-    const explicitSingleAnimal =
-      !!animalNumber &&
-      numbers.length <= 1 &&
-      !urlHasGroup &&
-      !openedAsGroup;
-
-    const isGroup = explicitSingleAnimal
-      ? false
-      : (
-          openedAsGroup ||
-          urlHasGroup ||
-          contextGroupNumbers.length > 1 ||
-          !!contextGroupName
-        );
-
-    return {
-      isGroup,
-      animalNumber: isGroup ? "" : animalNumber,
-      groupNumbers: isGroup
-        ? (contextGroupNumbers.length ? contextGroupNumbers : numbers)
-        : []
-    };
-  }
-
-async function saveNutrition(ev, options = {}) {
-  ev?.preventDefault?.();
-
-  if (!state.rows.length) {
-    showMsg("أضف خامة واحدة على الأقل قبل الحفظ.", "bad");
-    return;
-  }
-
+ function currentSaveScope() {
   const numbers = pageNumbers();
-  const editEventId = options.forceNew ? "" : clean(state.eventId);
+  const contextGroupNumbers = groupNumbersFromContext();
+  const openedEvent = state.openedRationEvent || {};
 
   const queryGroupNumbers = splitNumbers(
     qs.get("numbers") ||
@@ -2224,89 +2158,190 @@ async function saveNutrition(ev, options = {}) {
     ""
   );
 
-  const explicitAnimalNumber =
-    clean($("animalNumber")?.value) ||
-    clean(qs.get("number")) ||
-    clean(qs.get("animalNumber")) ||
-    clean(qs.get("animalId")) ||
-    (numbers.length === 1 ? numbers[0] : "");
+  const contextGroupName = clean(
+    state.context?.groupName ||
+    state.context?.group ||
+    state.context?.groupLabel ||
+    openedEvent.groupName ||
+    openedEvent.group ||
+    openedEvent.groupLabel ||
+    qs.get("groupName") ||
+    ""
+  );
 
-  let isGroup = false;
-  let groupNumbers = [];
+  const contextGroupKey = clean(
+    state.context?.groupKey ||
+    state.context?.groupId ||
+    openedEvent.groupKey ||
+    openedEvent.groupId ||
+    qs.get("groupKey") ||
+    ""
+  );
 
-  if (editEventId && state.openedRationEvent) {
-    const opened = state.openedRationEvent || {};
-    const openedTypeText = [
-      opened.type,
-      opened.eventTypeNorm,
-      opened.eventType
-    ].map(x => String(x || "").toLowerCase()).join(" ");
+  const openedGroupNumbers = Array.isArray(openedEvent.groupNumbers)
+    ? openedEvent.groupNumbers.map(x => clean(x)).filter(Boolean)
+    : [];
 
-    const openedGroupNumbers = Array.isArray(opened.groupNumbers)
-      ? opened.groupNumbers.map(x => clean(x)).filter(Boolean)
-      : [];
+  const openedAnimalNumber = clean(
+    openedEvent.animalNumber ||
+    openedEvent.number ||
+    openedEvent.animalId ||
+    ""
+  );
 
-    const openedAnimalNumber = clean(opened.animalNumber || opened.animalId || "");
+  const openedTypeText = [
+    openedEvent.type,
+    openedEvent.eventTypeNorm,
+    openedEvent.eventType
+  ].map(x => String(x || "").toLowerCase()).join(" ");
 
-    if (openedAnimalNumber) {
-      isGroup = false;
-    } else if (
-      openedGroupNumbers.length > 1 ||
+  const openedAsGroup =
+    !!clean(state.eventId) &&
+    !openedAnimalNumber &&
+    (
+      openedGroupNumbers.length > 0 ||
+      contextGroupNumbers.length > 0 ||
+      !!contextGroupName ||
+      !!contextGroupKey ||
       openedTypeText.includes("nutrition_group") ||
       openedTypeText.includes("تغذية مجموعة")
-    ) {
-      isGroup = true;
-      groupNumbers = openedGroupNumbers;
-    }
-  } else {
-    // الحفظ الجديد: رقم الحيوان الصريح يغلب أي groupNumbers موروثة من الكونتكست
-    isGroup =
-      !explicitAnimalNumber &&
-      (
-        queryGroupNumbers.length > 1 ||
-        !!clean(qs.get("groupName")) ||
-        !!clean(qs.get("groupKey"))
-      );
+    );
 
-    groupNumbers = isGroup
-      ? (
-          queryGroupNumbers.length
-            ? queryGroupNumbers
-            : (
-                Array.isArray(state.context.groupNumbers)
-                  ? state.context.groupNumbers.map(x => clean(x)).filter(Boolean)
-                  : numbers
-              )
-        )
-      : [];
+  const urlHasGroup =
+    numbers.length > 1 ||
+    queryGroupNumbers.length > 1 ||
+    !!clean(qs.get("groupName")) ||
+    !!clean(qs.get("groupKey"));
+
+  const explicitUrlAnimal = clean(
+    qs.get("number") ||
+    qs.get("animalNumber") ||
+    qs.get("animalId") ||
+    ""
+  );
+
+  const animalNumber = clean(
+    explicitUrlAnimal ||
+    $("animalNumber")?.value ||
+    state.context?.animalNumber ||
+    openedAnimalNumber ||
+    (
+      numbers.length === 1 && !urlHasGroup
+        ? numbers[0]
+        : ""
+    )
+  );
+
+  const isGroup =
+    openedAsGroup ||
+    urlHasGroup ||
+    (
+      !animalNumber &&
+      (
+        contextGroupNumbers.length > 0 ||
+        openedGroupNumbers.length > 0 ||
+        !!contextGroupName ||
+        !!contextGroupKey
+      )
+    );
+
+  if (isGroup) {
+    const groupNumbers =
+      contextGroupNumbers.length ? contextGroupNumbers :
+      openedGroupNumbers.length ? openedGroupNumbers :
+      queryGroupNumbers.length ? queryGroupNumbers :
+      numbers;
+
+    return {
+      isGroup: true,
+      animalNumber: "",
+      groupNumbers: groupNumbers.map(x => clean(x)).filter(Boolean),
+      groupName: contextGroupName,
+      groupKey: contextGroupKey
+    };
   }
 
-  if (!isGroup && !explicitAnimalNumber) {
+  return {
+    isGroup: false,
+    animalNumber,
+    groupNumbers: [],
+    groupName: "",
+    groupKey: ""
+  };
+}
+async function saveNutrition(ev, options = {}) {
+  ev?.preventDefault?.();
+
+  if (!state.rows.length) {
+    showMsg("أضف خامة واحدة على الأقل قبل الحفظ.", "bad");
+    return;
+  }
+
+  const editEventId = options.forceNew ? "" : clean(state.eventId);
+  const scope = currentSaveScope();
+
+  if (!scope.isGroup && !clean(scope.animalNumber)) {
     showMsg("رقم الحيوان مطلوب لحفظ عليقة فردية.", "bad");
     return;
   }
 
-  if (isGroup && !groupNumbers.length) {
+  if (scope.isGroup && !scope.groupNumbers.length) {
     showMsg("أرقام المجموعة مطلوبة لحفظ عليقة مجموعة.", "bad");
     return;
   }
 
   const context = contextFromPage();
 
-  if (isGroup) {
+  if (scope.isGroup) {
+    const groupName = clean(
+      scope.groupName ||
+      context.groupName ||
+      context.group ||
+      context.groupLabel ||
+      qs.get("groupName") ||
+      ""
+    );
+
+    const groupKey = clean(
+      scope.groupKey ||
+      context.groupKey ||
+      context.groupId ||
+      qs.get("groupKey") ||
+      ""
+    );
+
     context.animalNumber = null;
-    context.groupNumbers = groupNumbers;
+    context.groupNumbers = scope.groupNumbers;
+    context.groupMode = "group";
+
+    if (groupName) {
+      context.groupName = groupName;
+      context.group = groupName;
+      context.groupLabel = groupName;
+    }
+
+    if (groupKey) {
+      context.groupKey = groupKey;
+    }
   } else {
-    context.animalNumber = explicitAnimalNumber;
+    context.animalNumber = scope.animalNumber;
     context.groupNumbers = [];
+    context.groupMode = "individual";
+    context.groupName = "";
+    context.group = "";
+    context.groupLabel = "";
+    context.groupKey = "";
+    context.groupId = "";
   }
 
   const body = {
     eventId: editEventId || undefined,
-    isGroup,
+    isGroup: scope.isGroup,
 
-    animalNumber: isGroup ? undefined : explicitAnimalNumber,
-    groupNumbers: isGroup ? groupNumbers : undefined,
+    animalNumber: scope.isGroup ? undefined : scope.animalNumber,
+    groupNumbers: scope.isGroup ? scope.groupNumbers : undefined,
+    groupName: scope.isGroup ? context.groupName : undefined,
+    groupKey: scope.isGroup ? context.groupKey : undefined,
 
     eventDate: clean($("eventDate")?.value) || eventDate(),
 
@@ -2342,8 +2377,10 @@ async function saveNutrition(ev, options = {}) {
     state.openedRationEvent = {
       ...(state.openedRationEvent || {}),
       id: savedId,
-      animalNumber: isGroup ? null : explicitAnimalNumber,
-      groupNumbers: isGroup ? groupNumbers : null,
+      animalNumber: scope.isGroup ? null : scope.animalNumber,
+      groupNumbers: scope.isGroup ? scope.groupNumbers : null,
+      groupName: scope.isGroup ? context.groupName : "",
+      groupKey: scope.isGroup ? context.groupKey : "",
       eventDate: body.eventDate,
       nutrition: body.nutrition
     };
@@ -2355,7 +2392,6 @@ async function saveNutrition(ev, options = {}) {
     showMsg(e.message || "تعذّر حفظ التغذية.", "bad");
   }
 }
-
   function saveEditedRation(ev) {
     if (!clean(state.eventId)) {
       showMsg("افتح عليقة محفوظة أولًا قبل حفظ التعديل.", "bad");
