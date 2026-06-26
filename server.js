@@ -9217,16 +9217,40 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
         : null;
     };
 
-    const commonText = (field) => {
-      const vals = [...new Set(
-        items
-          .map(x => String(x[field] || '').trim())
-          .filter(Boolean)
-      )];
+const commonText = (field) => {
+  const vals = [...new Set(
+    items
+      .map(x => String(x[field] || '').trim())
+      .filter(Boolean)
+  )];
 
-      if (!vals.length) return null;
-      return vals.length === 1 ? vals[0] : 'مختلط';
-    };
+  if (!vals.length) return null;
+  return vals.length === 1 ? vals[0] : 'مختلط';
+};
+
+const dominantText = (field) => {
+  const counts = new Map();
+
+  for (const x of items) {
+    const v = String(x[field] || '').trim();
+    if (!v) continue;
+
+    if (!counts.has(v)) counts.set(v, 0);
+    counts.set(v, counts.get(v) + 1);
+  }
+
+  let best = null;
+  let bestCount = 0;
+
+  for (const [v, count] of counts.entries()) {
+    if (count > bestCount) {
+      best = v;
+      bestCount = count;
+    }
+  }
+
+  return best;
+};
     const speciesCounts = items.reduce((m, x) => {
       const k = x.species || '';
       if (k) m[k] = (m[k] || 0) + 1;
@@ -9241,7 +9265,7 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
     const groupId = String(req.query.groupId || '').trim() || commonText('groupId');
     const groupKey = String(req.query.groupKey || '').trim() || commonText('groupKey');
 
-        const breed = commonText('breed');
+    const breed = dominantText('breed');
 
     const groupParityValues = items
       .map(x => Number(x.lactationNumber ?? x.parity))
