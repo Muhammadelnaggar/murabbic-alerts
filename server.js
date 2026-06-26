@@ -9028,6 +9028,87 @@ return res.json({
     });
   }
 });
+function nutritionBoolSrv(v) {
+  if (v === true) return true;
+
+  const s = String(v ?? "").trim().toLowerCase();
+  return s === "true" || s === "1" || s === "yes" || s === "on" || s === "target";
+}
+
+function nutritionMilkScenarioContextSrv(rawContext = {}) {
+  const context = rawContext && typeof rawContext === "object"
+    ? { ...rawContext }
+    : {};
+
+  const actualMilkKg = toNumOrNull(
+    context.actualMilkKg ??
+    context.observedAvgMilkKg ??
+    context.avgMilkKg
+  );
+
+  const targetMilkKg = toNumOrNull(
+    context.targetMilkKg ??
+    context.targetAvgMilkKg
+  );
+
+  const useTargetMilkForRation = nutritionBoolSrv(
+    context.useTargetMilkForRation ??
+    context.useTargetMilk ??
+    context.useTargetMilkKg ??
+    (context.milkMode === "target" ? true : false)
+  );
+
+  if (useTargetMilkForRation && !(Number(targetMilkKg) > 0)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "target_milk_required",
+      message: "أدخل إنتاج اللبن المستهدف لإعادة تركيب ووزن العليقة."
+    };
+  }
+
+  const milkKgUsed = useTargetMilkForRation ? targetMilkKg : actualMilkKg;
+
+  return {
+    ok: true,
+    actualMilkKg,
+    targetMilkKg,
+    useTargetMilkForRation,
+    milkMode: useTargetMilkForRation ? "target" : "actual",
+    milkKgUsed,
+    context: {
+      ...context,
+
+      // حفظ الفعلي كمرجع
+      actualMilkKg,
+      observedAvgMilkKg: actualMilkKg,
+
+      // حفظ المستهدف كهدف
+      targetMilkKg,
+      useTargetMilkForRation,
+      milkMode: useTargetMilkForRation ? "target" : "actual",
+
+      // الرقم الوحيد الذي تتغير عليه الاحتياجات
+      milkKgUsed,
+      avgMilkKg: milkKgUsed
+    }
+  };
+}
+
+function nutritionAttachMilkScenarioInputsSrv(analysis, scenario) {
+  if (!analysis || !scenario?.ok) return analysis;
+
+  analysis.inputs = {
+    ...(analysis.inputs || {}),
+    actualMilkKg: scenario.actualMilkKg,
+    targetMilkKg: scenario.targetMilkKg,
+    useTargetMilkForRation: scenario.useTargetMilkForRation,
+    milkMode: scenario.milkMode,
+    milkKgUsed: scenario.milkKgUsed
+  };
+
+  return analysis;
+}
 app.post('/api/nutrition/analyze-ration', requireUserId, async (req, res) => {
   try {
     const body = req.body || {};
@@ -9040,7 +9121,18 @@ app.post('/api/nutrition/analyze-ration', requireUserId, async (req, res) => {
       });
     }
 
-   const context = normalizeNutritionContext(body.context || {});
+const rawContext = normalizeNutritionContext(body.context || {});
+const milkScenario = nutritionMilkScenarioContextSrv(rawContext);
+
+if (!milkScenario.ok) {
+  return res.status(milkScenario.status || 400).json({
+    ok: false,
+    error: milkScenario.error,
+    message: milkScenario.message
+  });
+}
+
+const context = milkScenario.context;
 const mode = body.mode || 'tmr_asfed';
 const concKg = toNumOrNull(body.concKg);
 const milkPrice = toNumOrNull(body.milkPrice);
@@ -9067,7 +9159,7 @@ const analysis = buildNutritionCentralAnalysis({
   concKg,
   milkPrice
 });
-
+nutritionAttachMilkScenarioInputsSrv(analysis, milkScenario);
 const panels = buildNutritionPanels(analysis, context);
 
 const inputsUsed = cleanObj({
@@ -9075,7 +9167,12 @@ const inputsUsed = cleanObj({
   breedUsed: context.breed || null,
 
   daysInMilkUsed: toNumOrNull(context.daysInMilk),
-  avgMilkKgUsed: toNumOrNull(context.avgMilkKg),
+ actualMilkKg: toNumOrNull(milkScenario.actualMilkKg),
+targetMilkKg: toNumOrNull(milkScenario.targetMilkKg),
+useTargetMilkForRation: milkScenario.useTargetMilkForRation,
+milkMode: milkScenario.milkMode,
+milkKgUsed: toNumOrNull(milkScenario.milkKgUsed),
+avgMilkKgUsed: toNumOrNull(milkScenario.milkKgUsed),
   pregnancyDaysUsed: toNumOrNull(context.pregnancyDays),
   daysToCalvingUsed: toNumOrNull(context.daysToCalving),
 
@@ -9641,14 +9738,30 @@ if (!isDrySave && (!Number.isFinite(Number(milkPrice)) || Number(milkPrice) <= 0
 if (Number.isFinite(Number(milkPrice)) && Number(milkPrice) > 0) {
   context.milkPrice = milkPrice;
 }
+
+const milkScenario = nutritionMilkScenarioContextSrv(context);
+
+if (!milkScenario.ok) {
+  return res.status(milkScenario.status || 400).json({
+    ok: false,
+    error: milkScenario.error,
+    message: milkScenario.message
+  });
+}
+
+const analysisContext = milkScenario.context;
+
 const centralAnalysis = buildNutritionCentralAnalysis({
   rows,
-  context,
+  context: analysisContext,
   mode,
   concKg,
   milkPrice
 });
-    const centralPanels = buildNutritionPanels(centralAnalysis, context);
+
+nutritionAttachMilkScenarioInputsSrv(centralAnalysis, milkScenario);
+
+const centralPanels = buildNutritionPanels(centralAnalysis, analysisContext);
    let animalDoc = null;
 let animalDocId = '';
 
@@ -9686,7 +9799,7 @@ if (!isGroup && db) {
 nutrition: {
   mode: nutrition.mode || 'tmr_asfed',
   rows,
-  context,
+  context: analysisContext,
   milkPrice,
   analysis: centralAnalysis,
   panels: centralPanels
