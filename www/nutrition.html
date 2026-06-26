@@ -234,6 +234,7 @@
 
     <div class="feed-editor-actions">
       <button id="addPreset" class="mini-btn" type="button">إضافة خامة</button>
+      <button id="updateSelectedFeed" class="mini-btn" type="button" disabled>تعديل المختارة</button>
       <button id="rationRemove" class="mini-btn" type="button" disabled>إزالة المختارة</button>
     </div>
 
@@ -855,6 +856,8 @@ function contextFromPage() {
 
     if ($("preset")) $("preset").value = "";
     if ($("feedEditorBox")) $("feedEditorBox").style.display = keepOpen ? "block" : "none";
+    if ($("updateSelectedFeed")) $("updateSelectedFeed").disabled = true;
+    if ($("rationRemove")) $("rationRemove").disabled = true;
 
     syncEditorAmountLabel();
   }
@@ -1019,6 +1022,7 @@ function contextFromPage() {
       box.style.display = "none";
       state.selectedIndex = -1;
       if ($("rationRemove")) $("rationRemove").disabled = true;
+      if ($("updateSelectedFeed")) $("updateSelectedFeed").disabled = true;
       return;
     }
 
@@ -1037,14 +1041,21 @@ function contextFromPage() {
     box.querySelectorAll(".rationPick").forEach(el => {
       el.addEventListener("change", () => {
         const i = Number(el.dataset.i);
-        state.selectedIndex = el.checked ? i : -1;
-        if ($("feedEditorBox")) $("feedEditorBox").style.display = "block";
+
+        if (el.checked) {
+          openExistingRowEditor(i);
+        } else {
+          state.selectedIndex = -1;
+          clearFeedEditor(true);
+        }
+
         renderSummary();
       });
     });
 
     const hasPick = state.selectedIndex >= 0 && state.selectedIndex < state.rows.length;
     if ($("rationRemove")) $("rationRemove").disabled = !hasPick;
+    if ($("updateSelectedFeed")) $("updateSelectedFeed").disabled = !hasPick;
   }
 
   function amountSummary(row = {}) {
@@ -1065,6 +1076,67 @@ function contextFromPage() {
     renderRows();
   }
 
+  function setEditorAmountFromRow(row = {}) {
+    const amountKind = editorAmountKind();
+
+    if (amountKind === "pct") {
+      setVal("feedEditAmount", row.pct ?? "");
+    } else {
+      setVal("feedEditAmount", row.asFedKg ?? "");
+    }
+  }
+
+  function openExistingRowEditor(index) {
+    const i = Number(index);
+    const row = state.rows[i];
+
+    if (!row) {
+      state.selectedIndex = -1;
+      clearFeedEditor(true);
+      return;
+    }
+
+    state.selectedIndex = i;
+    state.editorRow = { ...row };
+
+    if ($("feedEditorBox")) $("feedEditorBox").style.display = "block";
+
+    setVal("feedEditName", row.name || "");
+    setVal("feedEditCat", row.cat || "conc");
+    setVal("feedEditPrice", row.pricePerTon ?? "");
+    setVal("feedEditDM", row.dmPct ?? "");
+    setVal("feedEditCP", row.cpPct ?? "");
+
+    syncEditorAmountLabel();
+    setEditorAmountFromRow(row);
+
+    if ($("updateSelectedFeed")) $("updateSelectedFeed").disabled = false;
+    if ($("rationRemove")) $("rationRemove").disabled = false;
+  }
+
+  function updateSelectedFeed() {
+    if (state.selectedIndex < 0 || state.selectedIndex >= state.rows.length) {
+      showMsg("اختر خامة من العليقة أولًا.", "bad");
+      return;
+    }
+
+    const row = editorRowFromForm();
+    const err = validateEditorRow(row);
+
+    if (err) {
+      showMsg(err, "bad");
+      return;
+    }
+
+    state.rows[state.selectedIndex] = {
+      ...state.rows[state.selectedIndex],
+      ...row
+    };
+
+    renderRows();
+    showMsg("✅ تم تعديل الخامة المختارة.");
+  }
+
   function addSelectedFeed() {
     const row = editorRowFromForm();
     const err = validateEditorRow(row);
@@ -1075,7 +1147,7 @@ function contextFromPage() {
     }
 
     state.rows.push(row);
-    state.selectedIndex = state.rows.length - 1;
+    state.selectedIndex = -1;
 
     clearFeedEditor(true);
     renderRows();
@@ -2231,8 +2303,14 @@ function thiRecommendationsHtml() {
     });
     $("preset")?.addEventListener("change", openFeedEditorFromPreset);
     $("mode")?.addEventListener("change", syncModeUI);
-    $("feedEditCat")?.addEventListener("change", syncEditorAmountLabel);
+    $("feedEditCat")?.addEventListener("change", () => {
+      syncEditorAmountLabel();
+      if (state.selectedIndex >= 0 && state.rows[state.selectedIndex]) {
+        setEditorAmountFromRow(state.rows[state.selectedIndex]);
+      }
+    });
     $("addPreset")?.addEventListener("click", addSelectedFeed);
+    $("updateSelectedFeed")?.addEventListener("click", updateSelectedFeed);
     $("rationRemove")?.addEventListener("click", removeSelectedFeed);
 
     $("concKgInput")?.addEventListener("input", analyzeSoon);
