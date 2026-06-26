@@ -9070,10 +9070,42 @@ const analysis = buildNutritionCentralAnalysis({
 
 const panels = buildNutritionPanels(analysis, context);
 
+const inputsUsed = cleanObj({
+  speciesUsed: context.species || null,
+  breedUsed: context.breed || null,
+
+  daysInMilkUsed: toNumOrNull(context.daysInMilk),
+  avgMilkKgUsed: toNumOrNull(context.avgMilkKg),
+  pregnancyDaysUsed: toNumOrNull(context.pregnancyDays),
+  daysToCalvingUsed: toNumOrNull(context.daysToCalving),
+
+  bodyWeightKgUsed: toNumOrNull(analysis?.inputs?.bodyWeightKgUsed),
+  bodyWeightSource: analysis?.inputs?.bodyWeightSource || null,
+
+  bcsUsed: toNumOrNull(analysis?.inputs?.bcsUsed),
+  bcsSource: analysis?.inputs?.bcsSource || null,
+
+  milkFatPctUsed: toNumOrNull(analysis?.inputs?.milkFatPctUsed),
+  milkProteinPctUsed: toNumOrNull(analysis?.inputs?.milkProteinPctUsed),
+
+  parityUsed: toNumOrNull(analysis?.inputs?.lactationNumberUsed),
+  lactationNumberUsed: toNumOrNull(analysis?.inputs?.lactationNumberUsed),
+
+  thiUsed: toNumOrNull(analysis?.inputs?.thiUsed),
+
+  dietNDFPctUsed: toNumOrNull(analysis?.targets?.dietNDFPct || context.dietNDFPct),
+  mineralDmiUsed: toNumOrNull(context.mineralDmi),
+
+  milkPriceUsed: toNumOrNull(analysis?.inputs?.milkPriceUsed || milkPrice || context.milkPrice),
+
+  representativeWarning: analysis?.inputs?.representativeWarning || null
+});
+
 return res.json({
   ok: true,
   analysis,
-  panels
+  panels,
+  inputsUsed
 });
 
   } catch (e) {
