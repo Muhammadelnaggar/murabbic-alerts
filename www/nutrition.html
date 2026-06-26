@@ -1988,9 +1988,7 @@ function thiRecommendationsHtml() {
     if (loadBtn) loadBtn.style.display = events.length ? "inline-flex" : "none";
   }
 
-  async function loadSavedRations(options = {}) {
-    const silent = options.silent === true;
-
+  async function loadSavedRations() {
     try {
       const data = await api(savedRationsListUrl());
       state.savedRations = Array.isArray(data.events)
@@ -2003,15 +2001,13 @@ function thiRecommendationsHtml() {
 
       renderSavedRationsList(state.savedRations);
 
-      if (!silent) {
-        showMsg(
-          state.savedRations.length
-            ? `تم تحميل ${state.savedRations.length} عليقة محفوظة من السيرفر.`
-            : "لا توجد علائق محفوظة لهذا الحساب."
-        );
-      }
+      showMsg(
+        state.savedRations.length
+          ? `تم تحميل ${state.savedRations.length} عليقة محفوظة من Firestore.`
+          : "لا توجد علائق محفوظة في Firestore لهذا الحساب."
+      );
     } catch (e) {
-      if (!silent) showMsg(e.message || "تعذّر تحميل العلائق المحفوظة من السيرفر.", "bad");
+      showMsg(e.message || "تعذّر تحميل العلائق المحفوظة من Firestore.", "bad");
     }
   }
 
@@ -2139,6 +2135,76 @@ function thiRecommendationsHtml() {
     loadNutritionEventById(id);
   }
 
+  function groupNumbersFromContext() {
+    const raw = state.context?.groupNumbers;
+    if (Array.isArray(raw)) return raw.map(x => clean(x)).filter(Boolean);
+    if (typeof raw === "string") return splitNumbers(raw);
+    return [];
+  }
+
+  function currentSaveScope() {
+    const numbers = pageNumbers();
+    const contextGroupNumbers = groupNumbersFromContext();
+
+    const urlHasGroup =
+      numbers.length > 1 ||
+      !!clean(qs.get("groupName")) ||
+      !!clean(qs.get("groupKey"));
+
+    const openedEvent = state.openedRationEvent || {};
+    const contextGroupName = clean(
+      state.context?.groupName ||
+      state.context?.group ||
+      state.context?.groupLabel ||
+      openedEvent.groupName ||
+      ""
+    );
+
+    const openedAsGroup =
+      !!clean(state.eventId) &&
+      !clean(openedEvent.animalNumber) &&
+      (
+        contextGroupNumbers.length > 1 ||
+        Array.isArray(openedEvent.groupNumbers) ||
+        !!contextGroupName
+      );
+
+    const animalNumber = clean(
+      $("animalNumber")?.value ||
+      state.context?.animalNumber ||
+      openedEvent.animalNumber ||
+      (numbers.length === 1 ? numbers[0] : "") ||
+      qs.get("number") ||
+      qs.get("animalNumber") ||
+      qs.get("animalId") ||
+      ""
+    );
+
+    // الرقم الفردي الصريح في الرابط أو الحقل المخفي يغلب وجود groupNumbers فارغة/موروثة في الكونتكست.
+    const explicitSingleAnimal =
+      !!animalNumber &&
+      numbers.length <= 1 &&
+      !urlHasGroup &&
+      !openedAsGroup;
+
+    const isGroup = explicitSingleAnimal
+      ? false
+      : (
+          openedAsGroup ||
+          urlHasGroup ||
+          contextGroupNumbers.length > 1 ||
+          !!contextGroupName
+        );
+
+    return {
+      isGroup,
+      animalNumber: isGroup ? "" : animalNumber,
+      groupNumbers: isGroup
+        ? (contextGroupNumbers.length ? contextGroupNumbers : numbers)
+        : []
+    };
+  }
+
   async function saveNutrition(ev, options = {}) {
     ev?.preventDefault?.();
 
@@ -2147,26 +2213,29 @@ function thiRecommendationsHtml() {
       return;
     }
 
-    const numbers = pageNumbers();
-    const isGroup =
-      numbers.length > 1 ||
-      Array.isArray(state.context.groupNumbers) ||
-      !!state.context.groupName ||
-      !!state.context.group ||
-      !!state.context.groupLabel;
+    const scope = currentSaveScope();
+
+    if (!scope.isGroup && !clean(scope.animalNumber)) {
+      showMsg("رقم الحيوان غير واضح؛ افتح التغذية من بطاقة الحيوان أو قائمة الأحداث ثم أعد الحفظ.", "bad");
+      return;
+    }
 
     const editEventId = options.forceNew ? "" : clean(state.eventId);
+    const context = {
+      ...contextFromPage(),
+      isGroup: scope.isGroup,
+      animalNumber: scope.isGroup ? null : scope.animalNumber,
+      groupNumbers: scope.isGroup ? scope.groupNumbers : []
+    };
 
     const body = {
       eventId: editEventId || undefined,
-      isGroup,
+      isGroup: scope.isGroup,
 
-      animalNumber: isGroup
-        ? undefined
-        : (clean($("animalNumber")?.value) || numbers[0] || ""),
+      animalNumber: scope.isGroup ? undefined : scope.animalNumber,
 
-      groupNumbers: isGroup
-        ? (state.context.groupNumbers || numbers)
+      groupNumbers: scope.isGroup
+        ? scope.groupNumbers
         : undefined,
 
       eventDate: clean($("eventDate")?.value) || eventDate(),
@@ -2176,7 +2245,7 @@ function thiRecommendationsHtml() {
         concKg: num($("concKgInput")?.value),
         milkPrice: num($("milkPriceInput")?.value),
         rows: state.rows,
-        context: contextFromPage()
+        context
       }
     };
 
@@ -2186,33 +2255,24 @@ function thiRecommendationsHtml() {
         body: JSON.stringify(body)
       });
 
-      const savedId = clean(out.firestoreId || out.eventId || out.id);
-      const isEdit = !!editEventId;
+      const savedId = clean(out.firestoreId || out.eventId || out.id || out.docId || editEventId);
 
-      if (!savedId) {
-        throw new Error("السيرفر لم يرجع رقم وثيقة Firestore؛ لم يتم اعتماد الحفظ.");
+      if (savedId) {
+        state.eventId = savedId;
+        state.openedRationEvent = {
+          ...(state.openedRationEvent || {}),
+          id: state.eventId,
+          animalNumber: scope.isGroup ? "" : scope.animalNumber,
+          groupNumbers: scope.isGroup ? scope.groupNumbers : undefined,
+          eventDate: body.eventDate,
+          nutrition: body.nutrition
+        };
       }
-
-      if (isEdit && out.updated !== true) {
-        throw new Error("السيرفر لم يؤكد تحديث العليقة المفتوحة؛ لم يتم اعتماد التعديل.");
-      }
-
-      if (!isEdit && out.updated === true) {
-        throw new Error("السيرفر رد كتحديث رغم أن المطلوب حفظ عليقة جديدة؛ لم يتم اعتماد الحفظ.");
-      }
-
-      state.eventId = savedId;
-      state.openedRationEvent = {
-        ...(state.openedRationEvent || {}),
-        id: state.eventId,
-        eventDate: body.eventDate,
-        nutrition: body.nutrition
-      };
 
       updateOpenedRationUI();
-      await loadSavedRations({ silent: true });
+      await loadSavedRations().catch(() => {});
 
-      showMsg(isEdit ? "✅ تم حفظ التعديل على نفس العليقة في السيرفر." : "✅ تم حفظ عليقة جديدة في السيرفر.");
+      showMsg(out.updated ? "✅ تم حفظ التعديل على نفس العليقة." : `✅ تم حفظ عليقة ${scope.isGroup ? "المجموعة" : "الحيوان " + scope.animalNumber} بنجاح.`);
     } catch (e) {
       showMsg(e.message || "تعذّر حفظ التغذية.", "bad");
     }
@@ -2375,3 +2435,4 @@ function thiRecommendationsHtml() {
 
 </body>
 </html>
+
