@@ -515,18 +515,24 @@
     el.value = value === null || value === undefined ? "" : String(value);
   }
 
- function showMsg(msg, type = "ok", opts = {}) {
+function showMsg(msg, type = "ok", opts = {}) {
   const w = $("warn");
   if (!w) return;
 
   w.textContent = msg || "";
   w.className = type === "bad" ? "warning bad" : "warning";
 
-  if (opts.scroll && msg) {
+  const shouldScroll = opts.scroll !== false && msg;
+
+  if (shouldScroll) {
     requestAnimationFrame(() => {
-      w.scrollIntoView({
-        behavior: "smooth",
-        block: "center"
+      const header = document.querySelector(".mbk-head");
+      const headerH = header ? header.getBoundingClientRect().height : 0;
+      const y = w.getBoundingClientRect().top + window.scrollY - headerH - 12;
+
+      window.scrollTo({
+        top: Math.max(0, y),
+        behavior: "smooth"
       });
     });
   }
