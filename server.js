@@ -9921,10 +9921,16 @@ return res.json({
   ok: true,
   saved: true,
   updated: updatedExisting,
-  eventType: 'nutrition',
-  animalNumber,
+  eventType: isGroup ? 'nutrition_group' : 'nutrition',
+  animalNumber: isGroup ? null : animalNumber,
+  groupNumbers: isGroup ? groupNumbers : null,
   eventDate,
-  firestoreId
+  firestoreId,
+  message: updatedExisting
+    ? '✅ تم حفظ تعديل عليقة التغذية بنجاح.'
+    : (isGroup
+        ? '✅ تم حفظ عليقة المجموعة بنجاح.'
+        : '✅ تم حفظ عليقة الحيوان بنجاح.')
 });
 
   } catch (e) {
