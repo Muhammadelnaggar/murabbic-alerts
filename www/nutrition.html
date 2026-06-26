@@ -571,7 +571,9 @@
     setText("ctxBreed_txt", state.context.breed || "—");
     setText("ctxBodyWeight_txt", state.context.bodyWeightKg ?? "—");
     setText("ctxBCS_txt", state.context.bcs ?? "—");
-    setText("ctxParity_txt", state.context.lactationNumber ?? state.context.parity ?? "—");
+       setText("ctxParity_txt", state.context.lactationNumber ?? state.context.parity ?? "—");
+
+    syncManualContextInputs();
   }
 
   function contextFromPage() {
@@ -600,7 +602,46 @@
       closeUp: $("ctxCloseUp")?.checked === true || state.context.closeUp === true
     };
   }
+   function syncManualContextInputs() {
+    const milkFat = num($("milkFatInput")?.value);
+    const milkProtein = num($("milkProteinInput")?.value);
+    const milkPrice = num($("milkPriceInput")?.value);
+    const bodyWeight = num($("ctxBodyWeight")?.value);
+    const bcs = num($("ctxBCS")?.value);
 
+    if (milkFat !== null) {
+      state.context.milkFatPct = milkFat;
+      setVal("ctxMilkFat", milkFat);
+      setText("ctxMilkFat_txt", milkFat);
+    }
+
+    if (milkProtein !== null) {
+      state.context.milkProteinPct = milkProtein;
+      setVal("ctxMilkProtein", milkProtein);
+      setText("ctxMilkProtein_txt", milkProtein);
+    }
+
+    if (milkPrice !== null) {
+      state.context.milkPrice = milkPrice;
+      setVal("ctxMilkPrice", milkPrice);
+      setText("ctxMilkPrice_txt", milkPrice);
+    }
+
+    if (bodyWeight !== null) {
+      state.context.bodyWeightKg = bodyWeight;
+      setText("ctxBodyWeight_txt", bodyWeight);
+    }
+
+    if (bcs !== null) {
+      state.context.bcs = bcs;
+      setText("ctxBCS_txt", bcs);
+    }
+  }
+
+  function manualContextChanged() {
+    syncManualContextInputs();
+    analyzeSoon();
+  }
 
   async function loadThi() {
     try {
@@ -1853,11 +1894,10 @@ function thiRecommendationsHtml() {
     $("rationRemove")?.addEventListener("click", removeSelectedFeed);
 
     $("concKgInput")?.addEventListener("input", analyzeSoon);
-    $("milkFatInput")?.addEventListener("input", analyzeSoon);
-    $("milkProteinInput")?.addEventListener("input", analyzeSoon);
-    $("milkPriceInput")?.addEventListener("input", analyzeSoon);
-    $("ctxBodyWeight")?.addEventListener("input", analyzeSoon);
-    $("ctxBCS")?.addEventListener("input", analyzeSoon);
+       ["milkFatInput", "milkProteinInput", "milkPriceInput", "ctxBodyWeight", "ctxBCS"].forEach(id => {
+      $(id)?.addEventListener("input", manualContextChanged);
+      $(id)?.addEventListener("change", manualContextChanged);
+    });
 
     $("nutritionForm")?.addEventListener("submit", saveEvent);
 
