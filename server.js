@@ -6104,9 +6104,34 @@ function normalizeNutritionContext(ctx = {}) {
     bcs: toNumOrNull(ctx.bcs),
     groupBcs: toNumOrNull(ctx.groupBcs ?? ctx.representativeBcs),
 
-    observedAvgMilkKg: toNumOrNull(ctx.observedAvgMilkKg),
-    milkMin: toNumOrNull(ctx.milkMin),
-    milkMax: toNumOrNull(ctx.milkMax),
+   observedAvgMilkKg: toNumOrNull(ctx.observedAvgMilkKg ?? ctx.actualMilkKg ?? ctx.avgMilkKg),
+actualMilkKg: toNumOrNull(ctx.actualMilkKg ?? ctx.observedAvgMilkKg ?? ctx.avgMilkKg),
+
+targetMilkKg: toNumOrNull(ctx.targetMilkKg ?? ctx.targetAvgMilkKg),
+targetAvgMilkKg: toNumOrNull(ctx.targetAvgMilkKg ?? ctx.targetMilkKg),
+
+useTargetMilkForRation:
+  ctx.useTargetMilkForRation === true ||
+  String(
+    ctx.useTargetMilkForRation ??
+    ctx.useTargetMilk ??
+    ctx.useTargetMilkKg ??
+    ''
+  ).trim().toLowerCase() === 'true' ||
+  String(
+    ctx.useTargetMilkForRation ??
+    ctx.useTargetMilk ??
+    ctx.useTargetMilkKg ??
+    ''
+  ).trim() === '1' ||
+  String(ctx.milkMode || '').trim().toLowerCase() === 'target',
+
+milkMode: String(ctx.milkMode || '').trim().toLowerCase() === 'target'
+  ? 'target'
+  : 'actual',
+
+milkMin: toNumOrNull(ctx.milkMin),
+milkMax: toNumOrNull(ctx.milkMax),
     milkSd: toNumOrNull(ctx.milkSd),
     milkCvPct: toNumOrNull(ctx.milkCvPct),
 
