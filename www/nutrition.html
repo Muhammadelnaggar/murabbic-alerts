@@ -22,6 +22,8 @@
   <img src="/logo.png" class="mbk-logo" alt="Murabbik">
 </header>
 
+  <div class="warning" id="warn"></div>
+
  <div class="animal-strip top-strip animal-strip-main">
   <div class="strip-row strip-row-main">
     <div class="strip-item strip-item-main">
@@ -74,7 +76,6 @@
 <input id="ctxBreed" type="text" style="display:none">
   </div>
 
-  <div class="warning" id="warn"></div>
   <div class="mbk-card" id="milkTargetCard">
   <div class="milk-inline-row" style="grid-template-columns:repeat(2,minmax(0,1fr));">
     <div class="grow">
@@ -147,6 +148,7 @@
     <div id="openedRationInfo" class="muted" style="margin-top:8px;line-height:1.7">
       لم يتم فتح عليقة محفوظة بعد.
     </div>
+
   </div>
 
 <div class="mbk-card">
@@ -415,19 +417,11 @@
 <input type="hidden" id="ctxParity">
 <input type="hidden" id="ctxDietNDFPct">
 
- <div class="mini-actions" style="justify-content:flex-end;margin-top:10px">
-   <button id="saveEditedRation" class="mini-btn" type="button" disabled>💾 حفظ التعديل</button>
-   <button id="saveAsNewRation" class="mini-btn" type="button">نسخة جديدة</button>
-   <button id="saveEvent" class="btn-primary nutrition-save-btn" type="submit">🧾 تسجيل كحدث تغذية جديد</button>
+ <div id="nutritionBottomActions" class="actions-bar" style="left:50%;right:auto;transform:translateX(-50%);width:min(94vw,520px);z-index:999">
+   <button id="saveEditedRation" class="ghost" type="button" disabled style="position:static;transform:none;width:auto;min-height:52px;box-shadow:none;flex:1">💾 حفظ التعديل</button>
+   <button id="saveEvent" class="save" type="submit" style="position:static;left:auto;bottom:auto;transform:none;width:auto;min-height:52px;box-shadow:none;flex:1">🧾 تسجيل كحدث تغذية جديد</button>
  </div>
 </form>
-    <div id="inlineMsg" class="notice" role="status" aria-live="polite" style="display:none;margin-top:10px">
-      <div class="text" style="font-weight:bold"></div>
-      <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-        <button type="button" class="btn btn-primary" id="msgYes" style="flex:1">تسجيل أحداث أخرى</button>
-        <button type="button" class="btn" id="msgNo" style="flex:1">لوحة التحكم</button>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -2200,18 +2194,6 @@ function thiRecommendationsHtml() {
 
       updateOpenedRationUI();
 
-      const msg = $("inlineMsg");
-
-      if (msg) {
-        msg.style.display = "block";
-        const t = msg.querySelector(".text");
-        if (t) {
-          t.textContent = out.updated
-            ? "✅ تم حفظ التعديل على نفس العليقة."
-            : "✅ تم تسجيل حدث تغذية جديد.";
-        }
-      }
-
       showMsg(out.updated ? "✅ تم حفظ التعديل على نفس العليقة." : "✅ تم التسجيل بنجاح.");
     } catch (e) {
       showMsg(e.message || "تعذّر حفظ التغذية.", "bad");
@@ -2227,9 +2209,6 @@ function thiRecommendationsHtml() {
     return saveNutrition(ev, { forceNew: false });
   }
 
-  function saveAsNewRation(ev) {
-    return saveNutrition(ev, { forceNew: true });
-  }
 
   function saveEvent(ev) {
     return saveNutrition(ev, { forceNew: true });
@@ -2324,7 +2303,6 @@ function thiRecommendationsHtml() {
     $("openSavedRations")?.addEventListener("click", loadSavedRations);
     $("loadSelectedRation")?.addEventListener("click", loadSelectedSavedRation);
     $("saveEditedRation")?.addEventListener("click", saveEditedRation);
-    $("saveAsNewRation")?.addEventListener("click", saveAsNewRation);
 
     $("nutritionForm")?.addEventListener("submit", saveEvent);
 
@@ -2344,15 +2322,6 @@ function thiRecommendationsHtml() {
       }
     });
 
-    $("msgYes")?.addEventListener("click", () => {
-      location.href =
-        `/add-event.html?number=${encodeURIComponent(clean($("animalNumber")?.value))}` +
-        `&date=${encodeURIComponent(clean($("eventDate")?.value) || eventDate())}`;
-    });
-
-    $("msgNo")?.addEventListener("click", () => {
-      location.href = "/dashboard.html";
-    });
   }
 
   async function start() {
