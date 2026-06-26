@@ -9241,8 +9241,15 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
     const groupId = String(req.query.groupId || '').trim() || commonText('groupId');
     const groupKey = String(req.query.groupKey || '').trim() || commonText('groupKey');
 
-    const breed = commonText('breed');
-    const lactationNumber = avgPositive('lactationNumber') ?? avgPositive('parity') ?? null;
+        const breed = commonText('breed');
+
+    const groupParityValues = items
+      .map(x => Number(x.lactationNumber ?? x.parity))
+      .filter(n => Number.isFinite(n) && n > 0);
+
+    const parityFactor = groupParityValues.length
+      ? Math.round((groupParityValues.filter(n => n >= 2).length / groupParityValues.length) * 1000) / 1000
+      : null;
 
     return res.json({
       ok: true,
@@ -9260,8 +9267,9 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
         groupKey,
         species,
         breed,
-        parity: lactationNumber,
-        lactationNumber,
+        parity: parityFactor,
+        parityFactor,
+        lactationNumber: parityFactor,
         daysInMilk: avg('daysInMilk'),
         avgMilkKg: avg('avgMilkKg'),
         pregnancyDays: avg('pregnancyDays'),
