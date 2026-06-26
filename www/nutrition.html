@@ -515,13 +515,22 @@
     el.value = value === null || value === undefined ? "" : String(value);
   }
 
-  function showMsg(message, kind = "ok") {
-    const warn = $("warn");
-    if (warn) {
-      warn.textContent = message || "";
-      warn.style.color = kind === "bad" ? "#c62828" : "#1b5e20";
-    }
+ function showMsg(msg, type = "ok", opts = {}) {
+  const w = $("warn");
+  if (!w) return;
+
+  w.textContent = msg || "";
+  w.className = type === "bad" ? "warning bad" : "warning";
+
+  if (opts.scroll && msg) {
+    requestAnimationFrame(() => {
+      w.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    });
   }
+}
 
   function eventDate() {
     return clean(qs.get("eventDate") || qs.get("date")) || todayISO();
@@ -2387,7 +2396,7 @@ async function saveNutrition(ev, options = {}) {
 
     updateOpenedRationUI();
 
-    showMsg(out.updated ? "✅ تم حفظ التعديل على نفس العليقة." : "✅ تم حفظ العليقة في Firestore.");
+    showMsg(out.message || "✅ تم الحفظ بنجاح.", "ok", { scroll: true });
   } catch (e) {
     showMsg(e.message || "تعذّر حفظ التغذية.", "bad");
   }
