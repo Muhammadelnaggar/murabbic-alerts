@@ -75,6 +75,28 @@
   </div>
 
   <div class="warning" id="warn"></div>
+  <div class="mbk-card" id="milkTargetCard">
+  <div class="milk-inline-row" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+    <div class="grow">
+      <label class="muted">إنتاج اللبن الفعلي/رأس</label>
+      <input id="actualMilkKgInput" type="number" inputmode="decimal" step="0.1" min="0" readonly style="width:100%">
+    </div>
+
+    <div class="grow">
+      <label class="muted">إنتاج اللبن المستهدف/رأس</label>
+      <input id="targetMilkKgInput" type="number" inputmode="decimal" step="0.1" min="0" placeholder="مثال: 22" style="width:100%">
+    </div>
+  </div>
+
+  <label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:10px;font-weight:700">
+    <input id="useTargetMilkForRation" type="checkbox">
+    <span>استخدم المستهدف في إعادة تركيب ووزن العليقة</span>
+  </label>
+
+  <div id="milkModeHint" class="muted" style="margin-top:8px;line-height:1.7">
+    يقيّم مُرَبِّيك العليقة الحالية على إنتاج اللبن الفعلي.
+  </div>
+</div>
   <div class="mbk-card" id="milkInputsCard">
  <div class="milk-inline-row">
     <div class="grow">
@@ -550,7 +572,14 @@
     setVal("milkFatInput", state.context.milkFatPct ?? "");
     setVal("milkProteinInput", state.context.milkProteinPct ?? "");
     setVal("milkPriceInput", state.context.milkPrice ?? "");
+    setVal("actualMilkKgInput", state.context.avgMilkKg ?? "");
+    setVal("targetMilkKgInput", state.context.targetMilkKg ?? "");
 
+    if ($("useTargetMilkForRation")) {
+    $("useTargetMilkForRation").checked = state.context.useTargetMilkForRation === true;
+  }
+
+syncMilkTargetDisplay();
     const earlyDry = state.context.earlyDry === true;
     const closeUp = state.context.closeUp === true;
 
@@ -575,33 +604,64 @@
 
     syncManualContextInputs();
   }
+  function syncMilkTargetDisplay() {
+  const actualMilkKg = num($("ctxAvgMilk")?.value ?? state.context.avgMilkKg);
+  const targetMilkKg = num($("targetMilkKgInput")?.value);
+  const useTarget = $("useTargetMilkForRation")?.checked === true;
 
-  function contextFromPage() {
-    return {
-      ...state.context,
+  setVal("actualMilkKgInput", actualMilkKg ?? "");
 
-      species: clean($("ctxSpecies")?.value || state.context.species),
-      breed: clean($("ctxBreed")?.value || state.context.breed),
-      daysInMilk: num($("ctxDIM")?.value ?? state.context.daysInMilk),
-      avgMilkKg: num($("ctxAvgMilk")?.value ?? state.context.avgMilkKg),
-      pregnancyStatus: clean($("ctxPreg")?.value || state.context.pregnancyStatus || state.context.reproductiveStatus),
-      reproductiveStatus: clean($("ctxPreg")?.value || state.context.reproductiveStatus || state.context.pregnancyStatus),
-      pregnancyDays: num($("ctxDCC")?.value ?? state.context.pregnancyDays),
-      daysToCalving: num(state.context.daysToCalving),
+  if (!$("milkModeHint")) return;
 
-      bodyWeightKg: num($("ctxBodyWeight")?.value ?? state.context.bodyWeightKg),
-      bcs: num($("ctxBCS")?.value ?? state.context.bcs),
-      parity: num($("ctxParity")?.value ?? state.context.parity),
-      lactationNumber: num($("ctxParity")?.value ?? state.context.lactationNumber),
-
-      milkFatPct: num($("milkFatInput")?.value ?? $("ctxMilkFat")?.value ?? state.context.milkFatPct),
-      milkProteinPct: num($("milkProteinInput")?.value ?? $("ctxMilkProtein")?.value ?? state.context.milkProteinPct),
-      milkPrice: num($("milkPriceInput")?.value ?? $("ctxMilkPrice")?.value ?? state.context.milkPrice),
-
-      earlyDry: $("ctxEarlyDry")?.checked === true || state.context.earlyDry === true,
-      closeUp: $("ctxCloseUp")?.checked === true || state.context.closeUp === true
-    };
+  if (useTarget) {
+    $("milkModeHint").textContent =
+      targetMilkKg && targetMilkKg > 0
+        ? `سيعيد مُرَبِّيك حساب الاحتياجات على ${targetMilkKg} كجم لبن/رأس، مع بقاء باقي السياق كما هو. عدّل كميات الخامات حتى تضبط المؤشرات.`
+        : "أدخل إنتاج اللبن المستهدف ليعيد مُرَبِّيك حساب الاحتياجات.";
+  } else {
+    $("milkModeHint").textContent =
+      `يقيّم مُرَبِّيك العليقة الحالية على الإنتاج الفعلي ${actualMilkKg ?? "—"} كجم لبن/رأس.`;
   }
+}
+function contextFromPage() {
+  const actualMilkKg = num($("ctxAvgMilk")?.value ?? state.context.avgMilkKg);
+  const targetMilkKg = num($("targetMilkKgInput")?.value);
+  const useTargetMilkForRation = $("useTargetMilkForRation")?.checked === true;
+
+  return {
+    ...state.context,
+
+    species: clean($("ctxSpecies")?.value || state.context.species),
+    breed: clean($("ctxBreed")?.value || state.context.breed),
+    daysInMilk: num($("ctxDIM")?.value ?? state.context.daysInMilk),
+
+    // مهم:
+    // avgMilkKg يظل الفعلي القادم من الكونتكست.
+    // السيرفر وحده يقرر هل يستخدم الفعلي أو المستهدف في الحساب.
+    avgMilkKg: actualMilkKg,
+    actualMilkKg,
+    targetMilkKg,
+    useTargetMilkForRation,
+    milkMode: useTargetMilkForRation ? "target" : "actual",
+
+    pregnancyStatus: clean($("ctxPreg")?.value || state.context.pregnancyStatus || state.context.reproductiveStatus),
+    reproductiveStatus: clean($("ctxPreg")?.value || state.context.reproductiveStatus || state.context.pregnancyStatus),
+    pregnancyDays: num($("ctxDCC")?.value ?? state.context.pregnancyDays),
+    daysToCalving: num(state.context.daysToCalving),
+
+    bodyWeightKg: num($("ctxBodyWeight")?.value ?? state.context.bodyWeightKg),
+    bcs: num($("ctxBCS")?.value ?? state.context.bcs),
+    parity: num($("ctxParity")?.value ?? state.context.parity),
+    lactationNumber: num($("ctxParity")?.value ?? state.context.lactationNumber),
+
+    milkFatPct: num($("milkFatInput")?.value ?? $("ctxMilkFat")?.value ?? state.context.milkFatPct),
+    milkProteinPct: num($("milkProteinInput")?.value ?? $("ctxMilkProtein")?.value ?? state.context.milkProteinPct),
+    milkPrice: num($("milkPriceInput")?.value ?? $("ctxMilkPrice")?.value ?? state.context.milkPrice),
+
+    earlyDry: $("ctxEarlyDry")?.checked === true || state.context.earlyDry === true,
+    closeUp: $("ctxCloseUp")?.checked === true || state.context.closeUp === true
+  };
+}
    function syncManualContextInputs() {
     const milkFat = num($("milkFatInput")?.value);
     const milkProtein = num($("milkProteinInput")?.value);
@@ -639,9 +699,10 @@
   }
 
   function manualContextChanged() {
-    syncManualContextInputs();
-    analyzeSoon();
-  }
+  syncManualContextInputs();
+  syncMilkTargetDisplay();
+  analyzeSoon();
+}
 
   async function loadThi() {
     try {
@@ -1016,6 +1077,12 @@
 
     try {
       const context = contextFromPage();
+      syncMilkTargetDisplay();
+
+     if (context.useTargetMilkForRation && !(Number(context.targetMilkKg) > 0)) {
+     showMsg("أدخل إنتاج اللبن المستهدف لإعادة تركيب ووزن العليقة.", "bad");
+     return;
+    }
 
       const data = await api("/api/nutrition/analyze-ration", {
         method: "POST",
@@ -1894,7 +1961,8 @@ function thiRecommendationsHtml() {
     $("rationRemove")?.addEventListener("click", removeSelectedFeed);
 
     $("concKgInput")?.addEventListener("input", analyzeSoon);
-       ["milkFatInput", "milkProteinInput", "milkPriceInput", "ctxBodyWeight", "ctxBCS"].forEach(id => {
+      ["milkFatInput", "milkProteinInput", "milkPriceInput", "ctxBodyWeight", "ctxBCS", "targetMilkKgInput"].forEach(id => {
+        $("useTargetMilkForRation")?.addEventListener("change", manualContextChanged);
       $(id)?.addEventListener("input", manualContextChanged);
       $(id)?.addEventListener("change", manualContextChanged);
     });
