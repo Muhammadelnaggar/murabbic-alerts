@@ -384,13 +384,39 @@
 </div>
 </div>
     </div>
+  <div class="mbk-card" id="savedRationCard">
+    <h3>📁 العلائق المحفوظة</h3>
+
+    <div class="milk-inline-row" style="align-items:end">
+      <button id="openSavedRations" class="mini-btn" type="button">فتح عليقة محفوظة</button>
+
+      <div class="grow">
+        <label class="muted">اختر عليقة محفوظة</label>
+        <select id="savedRationSelect" style="width:100%;display:none">
+          <option value="">—</option>
+        </select>
+      </div>
+
+      <button id="loadSelectedRation" class="mini-btn" type="button" style="display:none">تحميل للتعديل</button>
+    </div>
+
+    <div id="openedRationInfo" class="muted" style="margin-top:8px;line-height:1.7">
+      لم يتم فتح عليقة محفوظة بعد.
+    </div>
+  </div>
+
    <form id="nutritionForm" data-event="تغذية" data-redirect="/dashboard.html" style="width:100%">
  <input type="hidden" id="animalNumber" data-field="animalNumber">
 <input type="hidden" id="eventDate" data-field="eventDate">
 <input type="hidden" id="animalId" data-field="animalId">
 <input type="hidden" id="ctxParity">
 <input type="hidden" id="ctxDietNDFPct">
- <button id="saveEvent" class="btn-primary nutrition-save-btn">💾 حفظ التركيبة كحدث تغذية</button>
+
+ <div class="mini-actions" style="justify-content:flex-end;margin-top:10px">
+   <button id="saveEditedRation" class="mini-btn" type="button" disabled>💾 حفظ التعديل</button>
+   <button id="saveAsNewRation" class="mini-btn" type="button">نسخة جديدة</button>
+   <button id="saveEvent" class="btn-primary nutrition-save-btn" type="submit">🧾 تسجيل كحدث تغذية جديد</button>
+ </div>
 </form>
     <div id="inlineMsg" class="notice" role="status" aria-live="polite" style="display:none;margin-top:10px">
       <div class="text" style="font-weight:bold"></div>
@@ -418,6 +444,8 @@
     lastAnalysis: null,
     lastPanels: null,
     thi: null,
+    savedRations: [],
+    openedRationEvent: null,
     eventId: clean(qs.get("eventId") || qs.get("id"))
   };
 
@@ -1829,8 +1857,221 @@ function thiRecommendationsHtml() {
     if ($("advancedKPIs")) $("advancedKPIs").innerHTML = aCards.length ? advancedCardsHtml(aCards, nCards, analysis) : "";
   }
 
-  async function saveEvent(ev) {
-    ev.preventDefault();
+  function updateOpenedRationUI() {
+    const info = $("openedRationInfo");
+    const btn = $("saveEditedRation");
+
+    if (btn) btn.disabled = !clean(state.eventId);
+
+    if (!info) return;
+
+    if (!clean(state.eventId)) {
+      info.textContent = "لم يتم فتح عليقة محفوظة بعد.";
+      return;
+    }
+
+    const e = state.openedRationEvent || {};
+    const n = e.nutrition || {};
+    const ctx = n.context || state.context || {};
+
+    const name =
+      ctx.groupName ||
+      ctx.group ||
+      ctx.groupLabel ||
+      e.groupName ||
+      e.animalNumber ||
+      "عليقة محفوظة";
+
+    const d = e.eventDate || e.date || clean($("eventDate")?.value) || eventDate();
+
+    info.textContent = `العليقة المفتوحة للتعديل: ${name} — تاريخ ${d}`;
+  }
+
+  function savedRationsListUrl() {
+    const p = new URLSearchParams();
+    const numbers = pageNumbers();
+
+    if (numbers.length === 1) {
+      p.set("number", numbers[0]);
+    }
+
+    const groupName = clean(
+      state.context.groupName ||
+      state.context.group ||
+      state.context.groupLabel ||
+      qs.get("groupName") ||
+      qs.get("group")
+    );
+
+    if (groupName) p.set("groupName", groupName);
+
+    const url = `/api/nutrition/events/list${p.toString() ? "?" + p.toString() : ""}`;
+    return url;
+  }
+
+  function renderSavedRationsList(events = []) {
+    const select = $("savedRationSelect");
+    const loadBtn = $("loadSelectedRation");
+
+    if (!select) return;
+
+    select.innerHTML = `<option value="">اختر عليقة محفوظة</option>`;
+
+    events.forEach(e => {
+      const opt = document.createElement("option");
+      opt.value = clean(e.id);
+
+      const parts = [
+        e.groupName || e.animalNumber || "عليقة محفوظة",
+        e.eventDate || "",
+        e.stageLabel || "",
+        e.avgMilkKg ? `${e.avgMilkKg} كجم لبن` : ""
+      ].filter(Boolean);
+
+      opt.textContent = parts.join(" — ");
+      select.appendChild(opt);
+    });
+
+    select.style.display = events.length ? "block" : "none";
+    if (loadBtn) loadBtn.style.display = events.length ? "inline-flex" : "none";
+  }
+
+  async function loadSavedRations() {
+    try {
+      const data = await api(savedRationsListUrl());
+      state.savedRations = Array.isArray(data.events) ? data.events : [];
+
+      renderSavedRationsList(state.savedRations);
+
+      showMsg(
+        state.savedRations.length
+          ? `تم تحميل ${state.savedRations.length} عليقة محفوظة.`
+          : "لا توجد علائق محفوظة مطابقة لهذا الحيوان/المجموعة."
+      );
+    } catch (e) {
+      showMsg(e.message || "تعذّر تحميل العلائق المحفوظة.", "bad");
+    }
+  }
+
+  async function loadNutritionEventById(id) {
+    const eventId = clean(id);
+
+    if (!eventId) {
+      showMsg("اختر عليقة محفوظة أولًا.", "bad");
+      return;
+    }
+
+    const data = await api(`/api/nutrition/event/${encodeURIComponent(eventId)}`);
+    const event = data.event || {};
+    const nutrition = event.nutrition || {};
+    const context = nutrition.context || {};
+
+    state.eventId = clean(event.id || eventId);
+    state.openedRationEvent = event;
+    state.context = { ...context };
+
+    if ($("mode")) $("mode").value = clean(nutrition.mode || "tmr_asfed") || "tmr_asfed";
+    setVal("concKgInput", nutrition.concKg ?? "");
+
+    setVal("eventDate", event.eventDate || event.date || eventDate());
+    setText("dateInfo", event.eventDate || event.date || eventDate());
+
+    const animalNumber = clean(event.animalNumber || context.animalNumber || "");
+    if (animalNumber) {
+      setVal("animalNumber", animalNumber);
+      setVal("animalId", event.animalId || animalNumber);
+      setText("animalInfo", animalNumber);
+    } else {
+      const groupName =
+        context.groupName ||
+        context.group ||
+        context.groupLabel ||
+        event.groupName ||
+        (Array.isArray(event.groupNumbers) ? `${event.groupNumbers.length} رأس` : "مجموعة");
+
+      setText("animalInfo", `مجموعة: ${groupName}`);
+    }
+
+    setVal("ctxSpecies", context.species || "");
+    setVal("ctxDIM", context.daysInMilk ?? "");
+    setVal("ctxAvgMilk", context.actualMilkKg ?? context.observedAvgMilkKg ?? context.avgMilkKg ?? "");
+    setVal("ctxDCC", context.pregnancyDays ?? "");
+    setVal("ctxPreg", context.pregnancyStatus || context.reproductiveStatus || "");
+    setVal("ctxBreed", context.breed || "");
+    setVal("ctxParity", context.lactationNumber ?? context.parity ?? "");
+    setVal("ctxBodyWeight", context.bodyWeightKg ?? context.bodyWeight ?? "");
+    setVal("ctxBCS", context.bcs ?? "");
+    setVal("ctxMilkFat", context.milkFatPct ?? "");
+    setVal("ctxMilkProtein", context.milkProteinPct ?? "");
+    setVal("ctxMilkPrice", nutrition.milkPrice ?? context.milkPrice ?? "");
+
+    setVal("milkFatInput", context.milkFatPct ?? "");
+    setVal("milkProteinInput", context.milkProteinPct ?? "");
+    setVal("milkPriceInput", nutrition.milkPrice ?? context.milkPrice ?? "");
+    setVal("actualMilkKgInput", context.actualMilkKg ?? context.observedAvgMilkKg ?? context.avgMilkKg ?? "");
+    setVal("targetMilkKgInput", context.targetMilkKg ?? "");
+
+    if ($("useTargetMilkForRation")) {
+      $("useTargetMilkForRation").checked =
+        context.useTargetMilkForRation === true ||
+        clean(context.milkMode).toLowerCase() === "target";
+    }
+
+    const earlyDry = context.earlyDry === true;
+    const closeUp = context.closeUp === true;
+
+    if ($("ctxEarlyDry")) $("ctxEarlyDry").checked = earlyDry;
+    if ($("ctxCloseUp")) $("ctxCloseUp").checked = closeUp;
+
+    setText("ctxDIM_txt", context.daysInMilk ?? "—");
+    setText("ctxSpecies_txt", context.species || "—");
+    setText("ctxAvgMilk_txt", context.actualMilkKg ?? context.observedAvgMilkKg ?? context.avgMilkKg ?? "—");
+    setText("ctxDCC_txt", context.pregnancyDays ?? 0);
+    setText("dtcVal", context.daysToCalving ?? "—");
+    setText("ctxPreg_txt", context.pregnancyStatus || context.reproductiveStatus || "فارغة");
+    setText("ctxEarlyDry_txt", earlyDry ? "نعم" : "—");
+    setText("ctxCloseUp_txt", closeUp ? "نعم" : "—");
+    setText("ctxMilkFat_txt", context.milkFatPct ?? "—");
+    setText("ctxMilkProtein_txt", context.milkProteinPct ?? "—");
+    setText("ctxMilkPrice_txt", nutrition.milkPrice ?? context.milkPrice ?? "—");
+    setText("ctxBreed_txt", context.breed || "—");
+    setText("ctxBodyWeight_txt", context.bodyWeightKg ?? context.bodyWeight ?? "—");
+    setText("ctxBCS_txt", context.bcs ?? "—");
+    setText("ctxParity_txt", context.lactationNumber ?? context.parity ?? "—");
+
+    state.rows = Array.isArray(nutrition.rows)
+      ? nutrition.rows.map(r => ({ ...r }))
+      : [];
+
+    state.selectedIndex = -1;
+    state.lastAnalysis = nutrition.analysis || null;
+    state.lastPanels = nutrition.panels || null;
+
+    syncMilkTargetDisplay();
+    syncModeUI();
+    renderRows();
+    updateOpenedRationUI();
+
+    if (state.lastAnalysis || state.lastPanels) {
+      paintAnalysis(state.lastAnalysis || {}, state.lastPanels || {});
+    }
+
+    analyzeSoon();
+    showMsg("✅ تم تحميل العليقة للتعديل.");
+  }
+
+  function loadSelectedSavedRation() {
+    const id = clean($("savedRationSelect")?.value);
+    if (!id) {
+      showMsg("اختر عليقة محفوظة من القائمة.", "bad");
+      return;
+    }
+
+    loadNutritionEventById(id);
+  }
+
+  async function saveNutrition(ev, options = {}) {
+    ev?.preventDefault?.();
 
     if (!state.rows.length) {
       showMsg("أضف خامة واحدة على الأقل قبل الحفظ.", "bad");
@@ -1845,8 +2086,10 @@ function thiRecommendationsHtml() {
       !!state.context.group ||
       !!state.context.groupLabel;
 
+    const editEventId = options.forceNew ? "" : clean(state.eventId);
+
     const body = {
-      eventId: state.eventId || undefined,
+      eventId: editEventId || undefined,
       isGroup,
 
       animalNumber: isGroup
@@ -1874,18 +2117,51 @@ function thiRecommendationsHtml() {
         body: JSON.stringify(body)
       });
 
+      if (out.firestoreId) {
+        state.eventId = clean(out.firestoreId);
+        state.openedRationEvent = {
+          ...(state.openedRationEvent || {}),
+          id: state.eventId,
+          eventDate: body.eventDate,
+          nutrition: body.nutrition
+        };
+      }
+
+      updateOpenedRationUI();
+
       const msg = $("inlineMsg");
 
       if (msg) {
         msg.style.display = "block";
         const t = msg.querySelector(".text");
-        if (t) t.textContent = out.updated ? "✅ تم تحديث عليقة التغذية." : "✅ تم حفظ عليقة التغذية.";
+        if (t) {
+          t.textContent = out.updated
+            ? "✅ تم حفظ التعديل على نفس العليقة."
+            : "✅ تم تسجيل حدث تغذية جديد.";
+        }
       }
 
-      showMsg("✅ تم الحفظ بنجاح");
+      showMsg(out.updated ? "✅ تم حفظ التعديل على نفس العليقة." : "✅ تم التسجيل بنجاح.");
     } catch (e) {
       showMsg(e.message || "تعذّر حفظ التغذية.", "bad");
     }
+  }
+
+  function saveEditedRation(ev) {
+    if (!clean(state.eventId)) {
+      showMsg("افتح عليقة محفوظة أولًا قبل حفظ التعديل.", "bad");
+      return;
+    }
+
+    return saveNutrition(ev, { forceNew: false });
+  }
+
+  function saveAsNewRation(ev) {
+    return saveNutrition(ev, { forceNew: true });
+  }
+
+  function saveEvent(ev) {
+    return saveNutrition(ev, { forceNew: true });
   }
 
   function premixPayload() {
@@ -1961,11 +2237,17 @@ function thiRecommendationsHtml() {
     $("rationRemove")?.addEventListener("click", removeSelectedFeed);
 
     $("concKgInput")?.addEventListener("input", analyzeSoon);
-      ["milkFatInput", "milkProteinInput", "milkPriceInput", "ctxBodyWeight", "ctxBCS", "targetMilkKgInput"].forEach(id => {
-        $("useTargetMilkForRation")?.addEventListener("change", manualContextChanged);
+
+    $("useTargetMilkForRation")?.addEventListener("change", manualContextChanged);
+    ["milkFatInput", "milkProteinInput", "milkPriceInput", "ctxBodyWeight", "ctxBCS", "targetMilkKgInput"].forEach(id => {
       $(id)?.addEventListener("input", manualContextChanged);
       $(id)?.addEventListener("change", manualContextChanged);
     });
+
+    $("openSavedRations")?.addEventListener("click", loadSavedRations);
+    $("loadSelectedRation")?.addEventListener("click", loadSelectedSavedRation);
+    $("saveEditedRation")?.addEventListener("click", saveEditedRation);
+    $("saveAsNewRation")?.addEventListener("click", saveAsNewRation);
 
     $("nutritionForm")?.addEventListener("submit", saveEvent);
 
@@ -2005,6 +2287,13 @@ function thiRecommendationsHtml() {
       await loadContext();
       await loadThi();
       await loadFeeds();
+
+      if (state.eventId) {
+        await loadNutritionEventById(state.eventId);
+      } else {
+        updateOpenedRationUI();
+      }
+
       showMsg("");
     } catch (e) {
       showMsg(
