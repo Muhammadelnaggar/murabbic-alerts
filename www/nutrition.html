@@ -128,6 +128,27 @@
 </div>
 
 
+  <div class="mbk-card" id="savedRationCard">
+    <h3>📁 العلائق المحفوظة</h3>
+
+    <div class="milk-inline-row" style="align-items:end">
+      <button id="openSavedRations" class="mini-btn" type="button">فتح عليقة محفوظة</button>
+
+      <div class="grow">
+        <label class="muted">اختر عليقة محفوظة</label>
+        <select id="savedRationSelect" style="width:100%;display:none">
+          <option value="">—</option>
+        </select>
+      </div>
+
+      <button id="loadSelectedRation" class="mini-btn" type="button" style="display:none">تحميل للتعديل</button>
+    </div>
+
+    <div id="openedRationInfo" class="muted" style="margin-top:8px;line-height:1.7">
+      لم يتم فتح عليقة محفوظة بعد.
+    </div>
+  </div>
+
 <div class="mbk-card">
   <div class="controls-box">
     <div class="row stack controls">
@@ -384,26 +405,7 @@
 </div>
 </div>
     </div>
-  <div class="mbk-card" id="savedRationCard">
-    <h3>📁 العلائق المحفوظة</h3>
 
-    <div class="milk-inline-row" style="align-items:end">
-      <button id="openSavedRations" class="mini-btn" type="button">فتح عليقة محفوظة</button>
-
-      <div class="grow">
-        <label class="muted">اختر عليقة محفوظة</label>
-        <select id="savedRationSelect" style="width:100%;display:none">
-          <option value="">—</option>
-        </select>
-      </div>
-
-      <button id="loadSelectedRation" class="mini-btn" type="button" style="display:none">تحميل للتعديل</button>
-    </div>
-
-    <div id="openedRationInfo" class="muted" style="margin-top:8px;line-height:1.7">
-      لم يتم فتح عليقة محفوظة بعد.
-    </div>
-  </div>
 
    <form id="nutritionForm" data-event="تغذية" data-redirect="/dashboard.html" style="width:100%">
  <input type="hidden" id="animalNumber" data-field="animalNumber">
@@ -1888,25 +1890,9 @@ function thiRecommendationsHtml() {
   }
 
   function savedRationsListUrl() {
-    const p = new URLSearchParams();
-    const numbers = pageNumbers();
-
-    if (numbers.length === 1) {
-      p.set("number", numbers[0]);
-    }
-
-    const groupName = clean(
-      state.context.groupName ||
-      state.context.group ||
-      state.context.groupLabel ||
-      qs.get("groupName") ||
-      qs.get("group")
-    );
-
-    if (groupName) p.set("groupName", groupName);
-
-    const url = `/api/nutrition/events/list${p.toString() ? "?" + p.toString() : ""}`;
-    return url;
+    // مهم: فتح العلائق المحفوظة يجب أن يقرأ كل علائق المستخدم من Firestore.
+    // لا نفلتر بالحيوان أو المجموعة هنا حتى لا تختفي علائق محفوظة بسبب اختلاف اسم المجموعة أو رابط الصفحة.
+    return "/api/nutrition/events/list";
   }
 
   function renderSavedRationsList(events = []) {
@@ -1919,12 +1905,12 @@ function thiRecommendationsHtml() {
 
     events.forEach(e => {
       const opt = document.createElement("option");
-      opt.value = clean(e.id);
+      opt.value = clean(e.id || e.firestoreId || e.eventId);
 
       const parts = [
-        e.groupName || e.animalNumber || "عليقة محفوظة",
-        e.eventDate || "",
-        e.stageLabel || "",
+        e.rationName || e.name || e.groupName || e.animalNumber || "عليقة محفوظة",
+        e.eventDate || e.date || "",
+        e.stageLabel || e.stage || "",
         e.avgMilkKg ? `${e.avgMilkKg} كجم لبن` : ""
       ].filter(Boolean);
 
@@ -1939,17 +1925,23 @@ function thiRecommendationsHtml() {
   async function loadSavedRations() {
     try {
       const data = await api(savedRationsListUrl());
-      state.savedRations = Array.isArray(data.events) ? data.events : [];
+      state.savedRations = Array.isArray(data.events)
+        ? data.events
+        : Array.isArray(data.rations)
+          ? data.rations
+          : Array.isArray(data.items)
+            ? data.items
+            : [];
 
       renderSavedRationsList(state.savedRations);
 
       showMsg(
         state.savedRations.length
-          ? `تم تحميل ${state.savedRations.length} عليقة محفوظة.`
-          : "لا توجد علائق محفوظة مطابقة لهذا الحيوان/المجموعة."
+          ? `تم تحميل ${state.savedRations.length} عليقة محفوظة من Firestore.`
+          : "لا توجد علائق محفوظة في Firestore لهذا الحساب."
       );
     } catch (e) {
-      showMsg(e.message || "تعذّر تحميل العلائق المحفوظة.", "bad");
+      showMsg(e.message || "تعذّر تحميل العلائق المحفوظة من Firestore.", "bad");
     }
   }
 
@@ -1961,8 +1953,15 @@ function thiRecommendationsHtml() {
       return;
     }
 
-    const data = await api(`/api/nutrition/event/${encodeURIComponent(eventId)}`);
-    const event = data.event || {};
+    let data = null;
+    try {
+      data = await api(`/api/nutrition/event/${encodeURIComponent(eventId)}`);
+    } catch (e) {
+      // دعم احتياطي لو كان السيرفر عنده مسار rations مستقل في بعض النسخ.
+      data = await api(`/api/nutrition/rations/${encodeURIComponent(eventId)}`);
+    }
+
+    const event = data.event || data.ration || data.item || {};
     const nutrition = event.nutrition || {};
     const context = nutrition.context || {};
 
