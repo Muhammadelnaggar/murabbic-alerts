@@ -9146,9 +9146,16 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
         ? null
         : (toNum(a.daysInMilk) ?? daysFrom(lastCalvingDate));
 
-      return {
+           return {
         animalId: docSnap.id,
         animalNumber: String(a.animalNumber ?? a.number ?? '').trim(),
+
+        groupName: String(a.groupName || a.group || a.groupLabel || '').trim() || null,
+        group: String(a.group || a.groupName || a.groupLabel || '').trim() || null,
+        groupLabel: String(a.groupLabel || a.groupName || a.group || '').trim() || null,
+        groupId: String(a.groupId || '').trim() || null,
+        groupKey: String(a.groupKey || '').trim() || null,
+
         species,
         breed: a.breed || null,
         productionStatus: productionStatus || null,
@@ -9200,15 +9207,42 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
       const vals = items.map(x => Number(x[field])).filter(Number.isFinite);
       return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
     };
+        const avgPositive = (field) => {
+      const vals = items
+        .map(x => Number(x[field]))
+        .filter(n => Number.isFinite(n) && n > 0);
 
+      return vals.length
+        ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
+        : null;
+    };
+
+    const commonText = (field) => {
+      const vals = [...new Set(
+        items
+          .map(x => String(x[field] || '').trim())
+          .filter(Boolean)
+      )];
+
+      if (!vals.length) return null;
+      return vals.length === 1 ? vals[0] : 'مختلط';
+    };
     const speciesCounts = items.reduce((m, x) => {
       const k = x.species || '';
       if (k) m[k] = (m[k] || 0) + 1;
       return m;
     }, {});
 
-    const species = Object.entries(speciesCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-    const groupName = String(req.query.groupName || req.query.group || req.query.groupLabel || '').trim() || null;
+        const species = Object.entries(speciesCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+    const queryGroupName = String(req.query.groupName || req.query.group || req.query.groupLabel || '').trim() || null;
+    const groupName = queryGroupName || commonText('groupName') || commonText('group') || commonText('groupLabel');
+
+    const groupId = String(req.query.groupId || '').trim() || commonText('groupId');
+    const groupKey = String(req.query.groupKey || '').trim() || commonText('groupKey');
+
+    const breed = commonText('breed');
+    const lactationNumber = avgPositive('lactationNumber') ?? avgPositive('parity') ?? null;
 
     return res.json({
       ok: true,
@@ -9222,18 +9256,23 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
         groupLabel: groupName,
         groupNumbers: numbers,
         headCount: numbers.length,
+        groupId,
+        groupKey,
         species,
+        breed,
+        parity: lactationNumber,
+        lactationNumber,
         daysInMilk: avg('daysInMilk'),
         avgMilkKg: avg('avgMilkKg'),
         pregnancyDays: avg('pregnancyDays'),
         daysToCalving: avg('daysToCalving'),
-        bodyWeightKg: avg('bodyWeightKg'),
-        groupBodyWeightKg: avg('bodyWeightKg'),
-        bcs: avg('bcs'),
-        groupBcs: avg('bcs'),
-        milkFatPct: avg('milkFatPct'),
-        milkProteinPct: avg('milkProteinPct'),
-        milkPrice: avg('milkPrice')
+        bodyWeightKg: avgPositive('bodyWeightKg'),
+        groupBodyWeightKg: avgPositive('bodyWeightKg'),
+        bcs: avgPositive('bcs'),
+        groupBcs: avgPositive('bcs'),
+        milkFatPct: avgPositive('milkFatPct'),
+        milkProteinPct: avgPositive('milkProteinPct'),
+        milkPrice: avgPositive('milkPrice')
       }
     });
   } catch (e) {
