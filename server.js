@@ -28777,7 +28777,7 @@ function dairyTraitsGradeSrv(score) {
   return "ضعيف جدًا";
 }
 
-app.post("/api/dairy-traits/vision-analyze", async (req, res) => {
+app.post("/api/dairy-traits/vision-analyze", requireUserId, async (req, res) => {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
 
