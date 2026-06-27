@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>تقرير اللبن — مُرَبِّك</title>
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
   <style>
     :root{ --green:#0ea05a; --green-600:#0b7f47; --bg:#f6faf7; --text:#0f172a; --muted:#64748b; --card:#fff; --border:#e2e8f0; }
     *{box-sizing:border-box}
@@ -124,465 +123,418 @@
   </div>
 </main>
 
-<script type="module" src="/js/firebase-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-<script type="module">
-  import { db, auth } from '/js/firebase-config.js';
-  import {
-    collection, query, where, orderBy, limit, getDocs,
-    startAt, endBefore
-  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-  import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-  // ---------- Helpers ----------
+
+<script>
+(function(){
   const $ = id => document.getElementById(id);
-  const TYPES = ['لبن يومي','milk','daily_milk'];
-  const CALVING_TYPES = ['ولادة','calving','Calving','birth','Birth','ولاده','ولادة طبيعية'];
-  const chunk = (arr, n=10)=>{ const out=[]; for(let i=0;i<arr.length;i+=n) out.push(arr.slice(i,i+n)); return out; };
 
-  function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
-  const ymd = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayISO();
-  function daysBetweenISO(a,b){ const A=new Date(a), B=new Date(b); A.setHours(0,0,0,0); B.setHours(0,0,0,0); return Math.round((B-A)/86400000); }
-  function addDaysISO(iso, n){ const d=new Date(iso); d.setDate(d.getDate()+n); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
-  function monthBounds(dISO){ const d=new Date(dISO); d.setDate(1); const start = new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); const n=new Date(d); n.setMonth(n.getMonth()+1); n.setDate(1); const end=new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString().slice(0,10); return {start,end}; }
-  function yearBounds(dISO){ const y=dISO.slice(0,4); return {start:`${y}-01-01`, end:`${+y+1}-01-01`}; }
-  const normKind = v => /buffalo|جاموس/i.test(v)? 'جاموس':'أبقار';
-  function show(msg, ok=false){ const el=$('msg'); el.style.display='block'; el.className='notice ' + (ok?'ok':''); el.textContent=msg; }
-  function hideMsg(){ $('msg').style.display='none'; }
-
-  async function getUid(){
-    if (auth.currentUser) return auth.currentUser.uid;
-    const u = await new Promise(res=>onAuthStateChanged(auth, x=>res(x)));
-    return u?.uid || '';
-  }
-
-  // ---------- Milk queries ----------
-  async function qLatestDate(uid){
-    for (const withUser of [true,false]){
-      for (const t of TYPES){
-        const q1 = withUser && uid
-          ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==',t), orderBy('eventDate','desc'), limit(1))
-          : query(collection(db,'events'), where('eventType','==',t), orderBy('eventDate','desc'), limit(1));
-        const s = await getDocs(q1);
-        if (!s.empty) return s.docs[0].data().eventDate;
-      }
-    }
-    return null;
-  }
-
-  async function qByDate(uid, dateISO){
-    for (const withUser of [true,false]){
-      let bag=[];
-      for (const t of TYPES){
-        const q1 = withUser && uid
-          ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==',t), where('eventDate','==',dateISO), limit(500))
-          : query(collection(db,'events'), where('eventType','==',t), where('eventDate','==',dateISO), limit(500));
-        const s = await getDocs(q1);
-        s.forEach(d=>bag.push(d.data()));
-      }
-      if (bag.length) return bag;
-    }
-    return [];
-  }
-
-  async function qByRange(uid, startISO, endISO){
-    for (const withUser of [true,false]){
-      let bag=[];
-      for (const t of TYPES){
-        const q1 = withUser && uid
-          ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==',t), orderBy('eventDate'), startAt(startISO), endBefore(endISO))
-          : query(collection(db,'events'), where('eventType','==',t), orderBy('eventDate'), startAt(startISO), endBefore(endISO));
-        const s = await getDocs(q1);
-        s.forEach(d=>bag.push(d.data()));
-      }
-      if (bag.length) return bag;
-    }
-    return [];
-  }
-
-  // ---------- آخر ولادة (بالجملة) ----------
-  function toISOAny(v){
-    if (!v) return null;
-    if (typeof v==='string'){ const m = v.match(/^(\d{4}-\d{2}-\d{2})/); if (m) return m[1]; const d=new Date(v); if(!isNaN(d)) return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); return null; }
-    if (typeof v==='number'){ const d=new Date(v); if(!isNaN(d)) return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
-    if (v?.seconds){ const d=new Date(v.seconds*1000); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
-    return null;
-  }
-
-  async function bulkAnimalsCalving(numbers){
-    const out = new Map();
-    const fields = ['animalNumber','number','animalNo'];
-    for (const f of fields){
-      for (const grp of chunk(numbers,10)){
-        const q1 = query(collection(db,'animals'), where(f,'in', grp));
-        const s = await getDocs(q1);
-        s.forEach(doc=>{
-          const data = doc.data()||{};
-          const candidates = [data.lastCalving, data.lastCalvingDate, data.calvingDate, data.lastBirthDate, data.calvingAt, data.lastCalvingAt, data.calvingISO, data.lastCalvingISO];
-          for (const c of candidates){
-            const iso = toISOAny(c);
-            if (iso){
-              const num = String(data.animalNumber || data.number || data.animalNo || '').trim();
-              if (num) {
-                const prev = out.get(num);
-                if (!prev || prev < iso) out.set(num, iso);
-              }
-              break;
-            }
-          }
-        });
-      }
-    }
-    return out;
-  }
-
-  async function bulkEventsCalving(uid, numbers){
-    const out = new Map();
-    for (const grp of chunk(numbers,10)){
-      for (const t of CALVING_TYPES){
-        const q1 = uid
-          ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==',t), where('animalNumber','in', grp))
-          : query(collection(db,'events'), where('eventType','==',t), where('animalNumber','in', grp));
-        const s = await getDocs(q1);
-        s.forEach(d=>{
-          const ev = d.data()||{};
-          const num = String(ev.animalNumber || ev.number || '').trim();
-          const iso = ev.eventDate;
-          if (num && iso){
-            const prev = out.get(num);
-            if (!prev || prev < iso) out.set(num, iso);
-          }
-        });
-      }
-    }
-    return out;
-  }
-
-  async function buildDIMMap(uid, numbers){
-    const nums = Array.from(new Set(numbers.filter(Boolean)));
-    if (!nums.length) return new Map();
-    const m1 = await bulkAnimalsCalving(nums);
-    const missing = nums.filter(n => !m1.has(n));
-    if (!missing.length) return m1;
-    const m2 = await bulkEventsCalving(uid, missing);
-    m2.forEach((v,k)=> m1.set(k,v));
-    return m1;
-  }
-
-  // ---------- خريطة “القيمة السابقة” لقياس التغيير ----------
-  async function buildPrevMap(uid, dateISO, numbers){
-    const start = addDaysISO(dateISO, -7);
-    const rows = await qByRange(uid, start, dateISO); // أقل من اليوم
-    const map = new Map(); // number -> {kg, date}
-    for (const r of rows){
-      const num = String(r.animalNumber || r.number || '').trim();
-      const kg  = Number(r.milkKg || r.milk || 0) || 0;
-      const dt  = r.eventDate;
-      if (!num || !dt) continue;
-      const cur = map.get(num);
-      if (!cur || cur.date < dt) map.set(num, { kg, date: dt });
-    }
-    numbers.forEach(n => { if (!map.has(n)) map.set(n, null); });
-    return map;
-  }
-
-  // ---------- Scatter + هِنت (مختصر فوق/بجوار النقطة) ----------
-  let scatterChart;
-  const hintEl = document.getElementById('pointHint');
-  let lastMeta = null;
+  let scatterChart = null;
+  const hintEl = $("pointHint");
   let hintPinned = false;
-  let hideT;
+  let hideT = null;
+
+  function todayISO(){
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
+  }
+
+  function ymd(v){
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(v || "")) ? String(v).slice(0, 10) : todayISO();
+  }
+
+  function kg(v){
+    const n = Number(v || 0);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function show(msg, ok = false){
+    const el = $("msg");
+    if (!el) return;
+    el.style.display = "block";
+    el.className = "notice " + (ok ? "ok" : "");
+    el.textContent = msg || "";
+  }
+
+  function hideMsg(){
+    const el = $("msg");
+    if (!el) return;
+    el.style.display = "none";
+    el.textContent = "";
+  }
+
+  function setDeltaBadge(todayTotal, prevTotal, prevDate){
+    const el = $("sumDayDelta");
+    if (!el) return;
+
+    if (!prevTotal || prevTotal <= 0) {
+      el.textContent = "—";
+      el.className = "delta neutral";
+      el.title = "لا يوجد يوم سابق للمقارنة";
+      return;
+    }
+
+    const pct = ((todayTotal - prevTotal) / prevTotal) * 100;
+    el.textContent = `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
+    el.className = "delta " + (pct > 0 ? "up" : (pct < 0 ? "down" : "neutral"));
+    el.title = `مقارنةً بيوم ${prevDate || "—"}`;
+  }
+
+  function putKpis(data){
+    const k = data.kpis || {};
+    const day = k.day || {};
+    const month = k.month || {};
+    const year = k.year || {};
+    const prev = k.prevDay || {};
+
+    $("sumDay").firstChild.nodeValue = `${kg(day.all).toLocaleString()} كجم`;
+    setDeltaBadge(kg(day.all), kg(prev.all), k.prevDate);
+
+    $("sumDayBreak").textContent = `أبقار: ${kg(day.cow)} • جاموس: ${kg(day.buffalo)}`;
+    $("sumMonth").textContent = `${kg(month.all).toLocaleString()} كجم`;
+    $("sumMonthBreak").textContent = `أبقار: ${kg(month.cow)} • جاموس: ${kg(month.buffalo)}`;
+    $("sumYear").textContent = `${kg(year.all).toLocaleString()} كجم`;
+    $("sumYearBreak").textContent = `أبقار: ${kg(year.cow)} • جاموس: ${kg(year.buffalo)}`;
+
+    $("avgHerd").textContent = k.avgHerdKg ? `${k.avgHerdKg} كجم/رأس` : "— كجم/رأس";
+    $("milkersCount").textContent = `عدد الحلّاب: ${k.milkersCount || 0} / إجمالي: ${k.totalAnimals ?? "—"}`;
+
+    $("feedCostPerKg").textContent = k.feedCostPerKg ? `${k.feedCostPerKg} ج.م/كجم` : "— ج.م/كجم";
+    $("feedNote").textContent = k.feedNote || "لا توجد تغذية لهذا اليوم";
+  }
 
   function fillHint(meta){
-    const num = meta.number ?? '—';
-    const kg  = meta.kg != null ? `${meta.kg} كجم/اليوم` : '— كجم/اليوم';
-    const dim = meta.dim != null ? `${meta.dim} يوم` : '— يوم';
-    document.getElementById('hNo').textContent  = `#${num}`;
-    document.getElementById('hKg').textContent  = kg;
-    document.getElementById('hDim').textContent = dim;
+    $("hNo").textContent = `#${meta.number || "—"}`;
+    $("hKg").textContent = `${meta.kg ?? "—"} كجم/اليوم`;
+    $("hDim").textContent = `${meta.dim ?? "—"} يوم`;
 
     const d = meta.deltaPct;
-    const deltaEl = document.getElementById('hDelta');
-    if (d==null || Number.isNaN(d)) { deltaEl.textContent='—'; deltaEl.className='delta neutral'; }
-    else {
-      const trend = d>0?'up':(d<0?'down':'neutral');
-      deltaEl.textContent = `${d>0?'+':''}${d.toFixed(1)}%`;
-      deltaEl.className   = `delta ${trend}`;
+    const deltaEl = $("hDelta");
+
+    if (d == null || Number.isNaN(Number(d))) {
+      deltaEl.textContent = "—";
+      deltaEl.className = "delta neutral";
+    } else {
+      const n = Number(d);
+      deltaEl.textContent = `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
+      deltaEl.className = "delta " + (n > 0 ? "up" : (n < 0 ? "down" : "neutral"));
     }
 
     const parts = [];
-    if (meta.group)  parts.push(meta.group);
-    if (meta.repro)  parts.push(meta.repro);
+    if (meta.group) parts.push(meta.group);
+    if (meta.repro) parts.push(meta.repro);
     if (meta.season) parts.push(meta.season);
-    const l2 = document.getElementById('hLine2');
-    if (parts.length){ l2.textContent = parts.join(' • '); l2.style.display='block'; }
-    else { l2.textContent = ''; l2.style.display='none'; }
+
+    $("hLine2").textContent = parts.join(" • ");
+    $("hLine2").style.display = parts.length ? "block" : "none";
   }
 
   function placeHintAtPoint(chart, x, y){
-    const prevVis = hintEl.style.visibility;
-    hintEl.style.visibility = 'hidden';
+    if (!hintEl) return;
+
+    hintEl.style.visibility = "hidden";
     hintEl.hidden = false;
 
     const rect = chart.canvas.getBoundingClientRect();
-    const W = hintEl.offsetWidth, H = hintEl.offsetHeight;
+    const W = hintEl.offsetWidth;
+    const H = hintEl.offsetHeight;
 
-    let left = rect.left + window.scrollX + x - W/2;
-    let top  = rect.top  + window.scrollY + y - H - 12;
+    let left = rect.left + window.scrollX + x - W / 2;
+    let top = rect.top + window.scrollY + y - H - 12;
 
     const minLeft = rect.left + window.scrollX + 4;
     const maxLeft = rect.right + window.scrollX - W - 4;
     left = Math.min(Math.max(left, minLeft), maxLeft);
 
     const minTop = rect.top + window.scrollY + 4;
-    if (top < minTop) { top = rect.top + window.scrollY + y + 12; }
+    if (top < minTop) top = rect.top + window.scrollY + y + 12;
 
-    hintEl.style.left = left + 'px';
-    hintEl.style.top  = top  + 'px';
-    hintEl.style.visibility = prevVis;
+    hintEl.style.left = left + "px";
+    hintEl.style.top = top + "px";
+    hintEl.style.visibility = "visible";
   }
-
-  hintEl.addEventListener('mouseenter', ()=>{ hintPinned = true; clearTimeout(hideT); });
-  hintEl.addEventListener('mouseleave', ()=>{ hintPinned = false; clearTimeout(hideT);
-    hideT = setTimeout(()=>{ if(!hintPinned) hintEl.hidden = true; }, 200);
-  });
-  document.getElementById('btnCloseHint')?.addEventListener('click', ()=>{ hintPinned = false; hintEl.hidden = true; });
 
   function externalTooltipHandler(ctx){
     const { chart, tooltip } = ctx;
-    if (!tooltip || tooltip.opacity === 0){
+
+    if (!tooltip || tooltip.opacity === 0) {
       clearTimeout(hideT);
-      hideT = setTimeout(()=>{ if(!hintPinned) hintEl.hidden = true; }, 200);
+      hideT = setTimeout(() => {
+        if (!hintPinned && hintEl) hintEl.hidden = true;
+      }, 200);
       return;
     }
+
     const dp = tooltip.dataPoints?.[0];
     if (!dp) return;
 
     const meta = dp.raw?._meta || {};
-    lastMeta = meta;
     fillHint(meta);
 
-    const { x, y } = dp.element;
-    placeHintAtPoint(chart, x, y);
+    placeHintAtPoint(chart, dp.element.x, dp.element.y);
     hintEl.hidden = false;
   }
 
   function drawScatter(points){
-    const canvas = document.getElementById('scatter');
+    const canvas = $("scatter");
     if (!canvas) return;
 
-    if (scatterChart){ try{ scatterChart.destroy(); }catch{} scatterChart = null; }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    const maxY = Math.max(0, ...points.map(p => Number(p.kg)  || 0));
-    const yMax = Math.max(10, Math.ceil((maxY + 1) / 5) * 5);
-    const maxX = Math.max(0, ...points.map(p => Number(p.dim) || 0));
-    const xMax = Math.max(30, Math.ceil((maxX + 1) / 30) * 30);
+    const wrap = canvas.parentElement;
+    const ratio = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
 
-    scatterChart = new Chart(canvas, {
-      type: 'scatter',
-      data: {
-        datasets: [{
-          label: 'أفراد القطيع',
-          data: points.map(p => ({ x: p.dim, y: p.kg, _meta: p })),
-          pointRadius: 5,
-          pointHoverRadius: 10,
-          pointHitRadius: 28
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        parsing: false,
-        interaction: { mode: 'nearest', intersect: false, axis: 'xy' },
-        plugins: {
-          legend: { display: false },
-          tooltip: { enabled: false, external: externalTooltipHandler }
-        },
-        scales: {
-          x: { title: { display: true, text: 'أيام الحليب (من آخر ولادة)' },
-               beginAtZero: true, min: 0, suggestedMax: xMax,
-               ticks: { stepSize: 30, precision: 0 } },
-          y: { beginAtZero: true, min: 0, suggestedMax: yMax,
-               ticks: { stepSize: 5, precision: 0, callback: v => `${v} كجم` } }
-        },
-        onHover: (evt, els) => {
-          const el = evt?.native?.target;
-          if (el) el.style.cursor = els?.length ? 'pointer' : 'default';
+    const cssW = Math.max(320, Math.floor(rect.width || wrap?.clientWidth || 320));
+    const cssH = Math.max(280, Math.floor(rect.height || 320));
+
+    canvas.width = Math.floor(cssW * ratio);
+    canvas.height = Math.floor(cssH * ratio);
+    canvas.style.width = cssW + "px";
+    canvas.style.height = cssH + "px";
+
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    const styles = getComputedStyle(document.documentElement);
+    const green = styles.getPropertyValue("--green").trim() || "#0ea05a";
+    const text = styles.getPropertyValue("--text").trim() || "#0f172a";
+    const muted = styles.getPropertyValue("--muted").trim() || "#64748b";
+    const border = styles.getPropertyValue("--border").trim() || "#e2e8f0";
+
+    const pad = { left: 48, right: 18, top: 18, bottom: 46 };
+    const plotW = Math.max(10, cssW - pad.left - pad.right);
+    const plotH = Math.max(10, cssH - pad.top - pad.bottom);
+
+    const clean = (points || [])
+      .map(p => ({
+        ...p,
+        dim: Number(p.dim),
+        kg: Number(p.kg)
+      }))
+      .filter(p => Number.isFinite(p.dim) && Number.isFinite(p.kg));
+
+    const maxY = Math.max(10, Math.ceil((Math.max(0, ...clean.map(p => p.kg)) + 1) / 5) * 5);
+    const maxX = Math.max(30, Math.ceil((Math.max(0, ...clean.map(p => p.dim)) + 1) / 30) * 30);
+
+    const xPos = x => pad.left + (Math.max(0, Math.min(maxX, x)) / maxX) * plotW;
+    const yPos = y => pad.top + plotH - (Math.max(0, Math.min(maxY, y)) / maxY) * plotH;
+
+    ctx.font = "12px Cairo, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 1;
+
+    for (let x = 0; x <= maxX; x += 30) {
+      const px = xPos(x);
+      ctx.beginPath();
+      ctx.moveTo(px, pad.top);
+      ctx.lineTo(px, pad.top + plotH);
+      ctx.stroke();
+
+      ctx.fillStyle = muted;
+      ctx.fillText(String(x), px, pad.top + plotH + 18);
+    }
+
+    const yStep = maxY <= 20 ? 5 : 10;
+    ctx.textAlign = "right";
+
+    for (let y = 0; y <= maxY; y += yStep) {
+      const py = yPos(y);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, py);
+      ctx.lineTo(pad.left + plotW, py);
+      ctx.stroke();
+
+      ctx.fillStyle = muted;
+      ctx.fillText(String(y), pad.left - 8, py);
+    }
+
+    ctx.strokeStyle = text;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, pad.top);
+    ctx.lineTo(pad.left, pad.top + plotH);
+    ctx.lineTo(pad.left + plotW, pad.top + plotH);
+    ctx.stroke();
+
+    ctx.fillStyle = text;
+    ctx.textAlign = "center";
+    ctx.fillText("أيام الحليب", pad.left + plotW / 2, cssH - 16);
+
+    ctx.save();
+    ctx.translate(14, pad.top + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("كجم اللبن/اليوم", 0, 0);
+    ctx.restore();
+
+    const drawn = clean.map(p => ({
+      meta: p,
+      x: xPos(p.dim),
+      y: yPos(p.kg)
+    }));
+
+    for (const p of drawn) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = green;
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    if (!clean.length) {
+      ctx.fillStyle = muted;
+      ctx.textAlign = "center";
+      ctx.font = "14px Cairo, system-ui, sans-serif";
+      ctx.fillText("لا توجد نقاط لعرضها في هذا اليوم.", cssW / 2, cssH / 2);
+    }
+
+    function nearestPoint(ev){
+      const r = canvas.getBoundingClientRect();
+      const mx = ev.clientX - r.left;
+      const my = ev.clientY - r.top;
+
+      let best = null;
+      let bestD = Infinity;
+
+      for (const p of drawn) {
+        const dx = mx - p.x;
+        const dy = my - p.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+
+        if (d < bestD) {
+          bestD = d;
+          best = p;
         }
       }
-    });
 
-    // دعم اللمس + الضغط للتثبيت
-    const handlePointer = (e, pin=false) => {
-      if (e.cancelable) e.preventDefault();
-      const pts = scatterChart.getElementsAtEventForMode(e, 'nearest', {intersect:false}, true);
-      if (!pts?.length){ if(!hintPinned) hintEl.hidden = true; return; }
+      return bestD <= 18 ? best : null;
+    }
 
-      const p = pts[0];
-      const raw  = scatterChart.data.datasets[p.datasetIndex].data[p.index];
-      const meta = raw?._meta || {};
-      lastMeta = meta; fillHint(meta);
-      placeHintAtPoint(scatterChart, p.element.x, p.element.y);
-      hintEl.hidden = false; if (pin) hintPinned = true;
+    if (canvas._mbkMove) canvas.removeEventListener("pointermove", canvas._mbkMove);
+    if (canvas._mbkClick) canvas.removeEventListener("click", canvas._mbkClick);
+    if (canvas._mbkLeave) canvas.removeEventListener("pointerleave", canvas._mbkLeave);
+
+    canvas._mbkMove = ev => {
+      const p = nearestPoint(ev);
+      canvas.style.cursor = p ? "pointer" : "default";
+
+      if (!p) {
+        if (!hintPinned && hintEl) hintEl.hidden = true;
+        return;
+      }
+
+      fillHint(p.meta);
+      placeHintAtPoint({ canvas }, p.x, p.y);
+      if (hintEl) hintEl.hidden = false;
     };
 
-    canvas.addEventListener('touchstart', e => handlePointer(e, false), {passive:false});
-    canvas.addEventListener('touchmove',  e => handlePointer(e, false), {passive:false});
-    canvas.addEventListener('click',      e => handlePointer(e, true));
-    canvas.addEventListener('mouseleave', () => { if(!hintPinned) hintEl.hidden = true; }, {passive:true});
-    canvas.addEventListener('touchend',   () => { if(!hintPinned) hintEl.hidden = true; }, {passive:true});
+    canvas._mbkClick = ev => {
+      const p = nearestPoint(ev);
+      if (!p) return;
+
+      hintPinned = true;
+      fillHint(p.meta);
+      placeHintAtPoint({ canvas }, p.x, p.y);
+      if (hintEl) hintEl.hidden = false;
+    };
+
+    canvas._mbkLeave = () => {
+      if (!hintPinned && hintEl) hintEl.hidden = true;
+    };
+
+    canvas.addEventListener("pointermove", canvas._mbkMove);
+    canvas.addEventListener("click", canvas._mbkClick);
+    canvas.addEventListener("pointerleave", canvas._mbkLeave);
   }
 
-  // ---------- KPIs ----------
-  function splitByKind(rows){
-    const o={all:0,cow:0,buff:0};
-    for (const r of rows){
-      const kg = Number(r.milkKg || r.milk || 0) || 0;
-      const k  = normKind(r.kind || r.species || r.animalType || r.animalTypeAr || '');
-      o.all += kg; if (k==='جاموس') o.buff += kg; else o.cow += kg;
-    }
-    return o;
-  }
+  async function loadReport(){
+    hideMsg();
+    if (hintEl) hintEl.hidden = true;
 
-  function setDayDeltaBadge(todayTotal, prevTotal, prevDate){
-    const el = $('sumDayDelta');
-    if (!prevTotal || prevTotal<=0){ el.textContent='—'; el.className='delta neutral'; el.title='لا يوجد يوم سابق للمقارنة'; return; }
-    const pct = ((todayTotal - prevTotal) / prevTotal) * 100;
-    const txt = (pct>0?'+':'') + pct.toFixed(1) + '%';
-    el.textContent = txt;
-    el.title = `مقارنةً بيوم ${prevDate}`;
-    el.className = 'delta ' + (pct>0 ? 'up' : (pct<0 ? 'down' : 'neutral'));
-  }
+    const date = ymd($("reportDate")?.value || todayISO());
 
-  function putKpis(dayRows, monthRows, yearRows, totalAnimals, prevTotal, prevDate){
-    const d = splitByKind(dayRows), m = splitByKind(monthRows), y = splitByKind(yearRows);
-    $('sumDay').firstChild.nodeValue = `${(d.all||0).toLocaleString()} كجم`;
-    setDayDeltaBadge(d.all||0, prevTotal||0, prevDate||'—');
-
-    $('sumDayBreak').textContent = `أبقار: ${d.cow||0} • جاموس: ${d.buff||0}`;
-    $('sumMonth').textContent    = `${(m.all||0).toLocaleString()} كجم`;
-    $('sumMonthBreak').textContent = `أبقار: ${m.cow||0} • جاموس: ${m.buff||0}`;
-    $('sumYear').textContent     = `${(y.all||0).toLocaleString()} كجم`;
-    $('sumYearBreak').textContent  = `أبقار: ${y.cow||0} • جاموس: ${y.buff||0}`;
-
-    const milkers = dayRows.length;
-    $('avgHerd').textContent = milkers ? `${(d.all/milkers).toFixed(1)} كجم/رأس` : '— كجم/رأس';
-    $('milkersCount').textContent = `عدد الحلّاب: ${milkers} / إجمالي: ${totalAnimals ?? '—'}`;
-  }
-
-  // ---------- بناء الرسم ----------
-  async function buildScatter(uid, dateISO, rows, prevMap, dimMap){
-    let skipped = 0;
-    const pts=[];
-    for (const r of rows){
-      const number = String(r.animalNumber || r.number || '').trim();
-      const kg = Number(r.milkKg || r.milk || 0) || 0;
-
-      const dimISO = dimMap.get(number);
-      if (!dimISO){ skipped++; continue; }
-      const dim = daysBetweenISO(dimISO, dateISO);
-
-      const prev = prevMap.get(number);
-      const prevKg = prev?.kg ?? null;
-      const deltaPct = (prevKg && prevKg>0) ? ((kg - prevKg) / prevKg) * 100 : null;
-
-      const repro = (r.reproStatus || r.reproductiveStatus || r.repro || '—');
-      const group = (r.group || r.groupName || '—');
-      const m = dateISO.slice(5,7);
-      const season = (['12','01','02'].includes(m))? 'شتاء' : (['03','04','05'].includes(m)?'ربيع': (['06','07','08'].includes(m)?'صيف':'خريف'));
-
-      pts.push({number, kg, dim, repro, season, group, deltaPct});
-    }
-    $('skipNote').textContent = skipped ? `تم إخفاء ${skipped} حيوان/حيوانات لعدم توفر تاريخ ولادة لديهم.` : '';
-    drawScatter(pts);
-  }
-
-  // ---------- تغذية ----------
-  async function qFeedForDay(uid, dateISO){
-    for (const withUser of [true,false]){
-      const q1 = withUser && uid
-        ? query(collection(db,'events'), where('userId','==',uid), where('eventType','==','تغذية'), where('eventDate','==',dateISO), limit(50))
-        : query(collection(db,'events'), where('eventType','==','تغذية'), where('eventDate','==',dateISO), limit(50));
-      const s = await getDocs(q1); const rows=[]; s.forEach(d=>rows.push(d.data()));
-      if (rows.length) return rows;
-    }
-    return [];
-  }
-  async function calcFeedCost(uid, dateISO, dayRows){
-    const milkTotal = dayRows.reduce((s,r)=>s + (Number(r.milkKg||r.milk||0)||0), 0);
-    const feeds = await qFeedForDay(uid, dateISO);
-    if (!milkTotal || !feeds.length){ $('feedCostPerKg').textContent='— ج.م/كجم'; $('feedNote').textContent='لا توجد تغذية لهذا اليوم'; return; }
-    let totalCost = 0; feeds.forEach(f=> totalCost += Number(f.totalCost || f.cost || f.feedCost || 0) || 0);
-    if (!totalCost){ $('feedCostPerKg').textContent='— ج.م/كجم'; $('feedNote').textContent='يُلزم توفر تكلفة التغذية (totalCost)'; return; }
-    $('feedCostPerKg').textContent = `${(totalCost/milkTotal).toFixed(2)} ج.م/كجم`;
-    $('feedNote').textContent = `إجمالي تكلفة تغذية اليوم: ${totalCost.toFixed(0)} ج.م`;
-  }
-
-  // ---------- تحميل ----------
-  async function loadAll(){
-    hintEl.hidden = true; hideMsg();
-    const uid = await getUid();
-    const requested = ymd($('reportDate').value || todayISO());
-    let dayRows = await qByDate(uid, requested);
-
-    if (!dayRows.length){
-      const last = await qLatestDate(uid);
-      if (last){
-        $('reportDate').value = last;
-        dayRows = await qByDate(uid, last);
-        show(`لا توجد سجلات لبن لليوم ${requested}. تم عرض آخر يوم متاح: ${last}.`);
-      }else{
-        show('لا توجد سجلات لبن محفوظة حتى الآن.');
+    const r = await fetch(`/api/milk-reports/summary?date=${encodeURIComponent(date)}`, {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        "Accept": "application/json"
       }
-    }
-
-    const dateISO = $('reportDate').value || requested;
-
-    // إجمالي اليوم السابق (حتى 7 أيام للخلف)
-    let prevDate = addDaysISO(dateISO, -1);
-    let prevRows = await qByDate(uid, prevDate);
-    for (let i=2; i<=7 && !prevRows.length; i++){
-      prevDate = addDaysISO(dateISO, -i);
-      prevRows = await qByDate(uid, prevDate);
-    }
-    const prevTotal = prevRows.reduce((s,r)=> s + (Number(r.milkKg||r.milk||0)||0), 0);
-
-    // الشهر والسنة
-    const {start:ms, end:me} = monthBounds(dateISO);
-    const {start:ys, end:ye} = yearBounds(dateISO);
-    const monthRows = await qByRange(uid, ms, me);
-    const yearRows  = await qByRange(uid, ys, ye);
-
-    // خرائط DIM والقيَم السابقة
-    const numbers = dayRows.map(r => String(r.animalNumber || r.number || '').trim()).filter(Boolean);
-    const [dimMap, prevMap] = await Promise.all([
-      buildDIMMap(uid, numbers),
-      buildPrevMap(uid, dateISO, numbers)
-    ]);
-
-    putKpis(dayRows, monthRows, yearRows, undefined, prevTotal, prevDate);
-    await buildScatter(uid, dateISO, dayRows, prevMap, dimMap);
-    await calcFeedCost(uid, dateISO, dayRows);
-
-    $('lastUpdate').textContent = `آخر تحديث: ${new Date().toLocaleTimeString()}`;
-  }
-
-  (function init(){
-    const qs = new URLSearchParams(location.search);
-    const dt = qs.get('date') || qs.get('eventDate') || todayISO();
-    $('reportDate').value = ymd(dt);
-    $('reportDate').addEventListener('change', loadAll, {passive:true});
-    $('btnRefresh').addEventListener('click', loadAll, {passive:true});
-
-    // إغلاق الهِنت
-    $('btnCloseHint')?.addEventListener('click', ()=>{
-      hintPinned = false;
-      hintEl.hidden = true;
     });
 
-    loadAll();
-  })();
+    const data = await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+
+    if (r.status === 401 || data?.error === "auth_required") {
+      location.href = "login.html?next=milk-reports.html";
+      return;
+    }
+
+    if (!r.ok || !data.ok) {
+      show(data.message || "تعذّر تحميل تقرير اللبن.");
+      return;
+    }
+
+    if (data.reportDate && $("reportDate")) {
+      $("reportDate").value = data.reportDate;
+    }
+
+    if (data.message) show(data.message);
+    else hideMsg();
+
+    putKpis(data);
+
+    const points = data.scatter?.points || [];
+    $("skipNote").textContent = data.scatter?.skippedNoCalving
+      ? `تم إخفاء ${data.scatter.skippedNoCalving} حيوان/حيوانات لعدم توفر تاريخ ولادة لديهم.`
+      : "";
+
+    drawScatter(points);
+
+    $("lastUpdate").textContent = `آخر تحديث: ${new Date().toLocaleTimeString("ar-EG")}`;
+  }
+
+  function init(){
+    const qs = new URLSearchParams(location.search);
+    const dt = qs.get("date") || qs.get("eventDate") || todayISO();
+
+    $("reportDate").value = ymd(dt);
+    $("reportDate").addEventListener("change", loadReport);
+    $("btnRefresh").addEventListener("click", loadReport);
+
+    $("btnCloseHint")?.addEventListener("click", () => {
+      hintPinned = false;
+      if (hintEl) hintEl.hidden = true;
+    });
+
+    hintEl?.addEventListener("mouseenter", () => {
+      hintPinned = true;
+      clearTimeout(hideT);
+    });
+
+    hintEl?.addEventListener("mouseleave", () => {
+      hintPinned = false;
+      clearTimeout(hideT);
+      hideT = setTimeout(() => {
+        if (!hintPinned && hintEl) hintEl.hidden = true;
+      }, 200);
+    });
+
+    loadReport();
+  }
+
+  init();
+})();
 </script>
 </body>
 </html>
