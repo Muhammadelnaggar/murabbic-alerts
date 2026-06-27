@@ -162,17 +162,6 @@
     };
   }
 
-  function getTenantUid() {
-    return String(
-      window.MBK_USER_ID ||
-      window.mbkUserId ||
-      window.mbk?.userId ||
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      ""
-    ).trim();
-  }
 
   function showMsg(text, ok) {
     if (!msgBox) return;
@@ -428,10 +417,13 @@
       return;
     }
 
-    const r = await fetch("/api/dairy-traits/vision-analyze", {
+       const r = await fetch("/api/dairy-traits/vision-analyze", {
       method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Accept": "application/json"
       },
       body: JSON.stringify({
  captures: {
@@ -527,7 +519,7 @@
     }
   }
 
-  async function saveDairyTraits() {
+   async function saveDairyTraits() {
     const ctx = contextFromUrl();
     const analysis = state.analysis;
 
@@ -536,17 +528,17 @@
       return;
     }
 
-    const uid = getTenantUid();
-
     try {
       saveBtn.disabled = true;
       saveBtn.textContent = "جارٍ الحفظ…";
 
       const r = await fetch("/api/dairy-traits/save", {
         method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
         headers: {
           "Content-Type": "application/json",
-          ...(uid ? { "X-User-Id": uid } : {})
+          "Accept": "application/json"
         },
         body: JSON.stringify({
           animalId: ctx.animalId,
@@ -579,7 +571,6 @@
       saveBtn.textContent = "حفظ التقييم";
     }
   }
-
   function bindEvents() {
     $$(".mbk-vision-tab").forEach(btn => {
       btn.addEventListener("click", () => setAngle(btn.dataset.angle));
