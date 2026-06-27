@@ -87,16 +87,7 @@
     return new Date().toISOString().slice(0, 10);
   }
 
-  function getUid(){
-    return String(
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("ownerUid") ||
-      sessionStorage.getItem("userId") ||
-      sessionStorage.getItem("uid") ||
-      ""
-    ).trim();
-  }
+
 
   const initialRaw = String(
     qs.get("numbers") ||
@@ -159,21 +150,13 @@
   }
 
   async function apiPost(path, payload){
-    const uid = getUid();
-
-    if (!uid) {
-      return {
-        ok: false,
-        canSave: false,
-        message: "❌ لم يتم التعرف على المستخدم. سجّل الدخول مرة أخرى."
-      };
-    }
-
     const r = await fetch(path, {
       method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
       headers: {
         "Content-Type": "application/json",
-        "X-User-Id": uid
+        "Accept": "application/json"
       },
       body: JSON.stringify(payload || {})
     });
@@ -183,6 +166,18 @@
       canSave: false,
       message: "❌ رد السيرفر غير صالح."
     }));
+
+    if (r.status === 401 || j?.error === "auth_required") {
+      return {
+        httpStatus: r.status,
+        ok: false,
+        canSave: false,
+        error: "auth_required",
+        message: j?.message || "❌ سجّل الدخول أولًا.",
+        accepted: [],
+        rejected: []
+      };
+    }
 
     return { httpStatus: r.status, ...j };
   }
