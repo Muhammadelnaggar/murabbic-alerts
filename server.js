@@ -227,7 +227,189 @@ async function authPasswordLoginBridgeSrv(email, password) {
 
   return data;
 }
+function authRegisterTextBridgeSrv(v) {
+  return String(v || "").trim().replace(/\s+/g, " ");
+}
 
+function authRegisterValidateBridgeSrv(body = {}) {
+  const fullName = authRegisterTextBridgeSrv(body.fullName || body.name || body.displayName);
+  const phoneRaw = authRegisterTextBridgeSrv(body.phone || body.phoneNumber);
+  const phoneKey = authDigitsBridgeSrv(phoneRaw);
+  const country = authRegisterTextBridgeSrv(body.country);
+  const region = authRegisterTextBridgeSrv(body.region || body.governorate || body.area);
+  const role = authRegisterTextBridgeSrv(body.role);
+  const password = String(body.password || "");
+  const confirmPassword = String(body.confirmPassword || body.passwordConfirm || "");
+
+  if (!fullName || !phoneRaw || !country || !region || !role || !password || !confirmPassword) {
+    return {
+      ok: false,
+      status: 400,
+      error: "register_fields_required",
+      message: "جميع الحقول مطلوبة."
+    };
+  }
+
+  if (!phoneKey) {
+    return {
+      ok: false,
+      status: 400,
+      error: "register_phone_invalid",
+      message: "رقم هاتف غير صالح."
+    };
+  }
+
+  if (country === "مصر" && !/^01\d{9}$/.test(phoneKey)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "register_phone_country_invalid",
+      message: "رقم الهاتف غير مطابق لتنسيق الدولة المختارة."
+    };
+  }
+
+  if (country !== "مصر" && !/^\d{7,15}$/.test(phoneKey)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "register_phone_country_invalid",
+      message: "رقم الهاتف غير مطابق لتنسيق الدولة المختارة."
+    };
+  }
+
+  if (password.length < 6) {
+    return {
+      ok: false,
+      status: 400,
+      error: "register_password_short",
+      message: "كلمة المرور يجب أن تكون ٦ أحرف أو أكثر."
+    };
+  }
+
+  if (password !== confirmPassword) {
+    return {
+      ok: false,
+      status: 400,
+      error: "register_password_mismatch",
+      message: "كلمة المرور وتأكيدها غير متطابقة."
+    };
+  }
+
+  return {
+    ok: true,
+    fullName,
+    phoneRaw,
+    phoneKey,
+    country,
+    region,
+    role,
+    password
+  };
+}
+
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    if (!admin.apps.length || !db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firebase_admin_disabled",
+        message: "خدمة التسجيل غير متاحة الآن."
+      });
+    }
+
+    const v = authRegisterValidateBridgeSrv(req.body || {});
+
+    if (!v.ok) {
+      return res.status(v.status || 400).json({
+        ok: false,
+        error: v.error || "register_invalid",
+        message: v.message || "راجع بيانات التسجيل."
+      });
+    }
+
+    const pseudoEmail = `${v.phoneKey}@murabbik.local`;
+
+    try {
+      await admin.auth().getUserByEmail(pseudoEmail);
+      return res.status(409).json({
+        ok: false,
+        error: "phone_already_registered",
+        message: "رقم الهاتف مسجّل بالفعل."
+      });
+    } catch (e) {
+      if (e?.code && e.code !== "auth/user-not-found") {
+        throw e;
+      }
+    }
+
+    const created = await admin.auth().createUser({
+      email: pseudoEmail,
+      password: v.password,
+      displayName: v.fullName,
+      disabled: false
+    });
+
+    const uid = String(created.uid || "").trim();
+
+    const profile = {
+      uid,
+      ownerUid: uid,
+      userId: uid,
+      fullName: v.fullName,
+      name: v.fullName,
+      displayName: v.fullName,
+      phone: v.phoneRaw,
+      phoneKey: v.phoneKey,
+      country: v.country,
+      region: v.region,
+      role: v.role,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      source: "server:/api/auth/register"
+    };
+
+    await db.collection("users").doc(uid).set(profile, { merge: true });
+
+    const login = await authPasswordLoginBridgeSrv(pseudoEmail, v.password);
+    const sessionCookie = await admin.auth().createSessionCookie(login.idToken, {
+      expiresIn: AUTH_SESSION_EXPIRES_MS
+    });
+
+    authSetSessionCookieBridgeSrv(req, res, sessionCookie);
+
+    return res.json({
+      ok: true,
+      message: "✅ تم إنشاء الحساب بنجاح",
+      uid,
+      userId: uid,
+      user: authPublicUserBridgeSrv(profile, uid, uid),
+      redirectUrl: "dashboard.html"
+    });
+
+  } catch (e) {
+    console.warn("auth bridge register failed:", e.message || e);
+
+    let message = "تعذّر التسجيل، تأكّد من البيانات وحاول مرة أخرى.";
+    let error = "register_failed";
+    let status = 500;
+
+    if (e?.code === "auth/email-already-exists") {
+      status = 409;
+      error = "phone_already_registered";
+      message = "رقم الهاتف مسجّل بالفعل.";
+    } else if (e?.code === "auth/invalid-password" || e?.code === "auth/weak-password") {
+      status = 400;
+      error = "register_password_invalid";
+      message = "كلمة المرور يجب أن تكون ٦ أحرف أو أكثر.";
+    }
+
+    return res.status(status).json({
+      ok: false,
+      error,
+      message
+    });
+  }
+});
 app.post("/api/auth/login", async (req, res) => {
   try {
     if (!admin.apps.length) {
