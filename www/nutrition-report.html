@@ -594,7 +594,7 @@
 </div>
 
 <script>
-  window.API_BASE = window.API_BASE || 'https://murabbic-alerts.onrender.com';
+
   (function(){
     var el = document.getElementById('printDate');
     if(el){
@@ -610,8 +610,6 @@
 </script>
 <script>
 (function(){
-  const API_BASE = window.API_BASE || 'https://murabbic-alerts.onrender.com';
-
   const $ = (id) => document.getElementById(id);
 
   function esc(v){
@@ -621,19 +619,6 @@
       .replace(/>/g,'&gt;')
       .replace(/"/g,'&quot;')
       .replace(/'/g,'&#039;');
-  }
-
-  function getUserId(){
-    const q = new URLSearchParams(location.search);
-    return (
-      q.get('userId') ||
-      q.get('uid') ||
-      localStorage.getItem('murabbik:userId') ||
-      localStorage.getItem('murabbik_uid') ||
-      localStorage.getItem('userId') ||
-      localStorage.getItem('uid') ||
-      ''
-    ).trim();
   }
 
   function badgeClass(status){
@@ -888,16 +873,22 @@
       const params = new URLSearchParams(location.search);
       if (!params.has('scope')) params.set('scope', 'all');
 
-      const uid = getUserId();
-      if (uid && !params.has('userId')) params.set('userId', uid);
+       params.delete('userId');
+      params.delete('uid');
 
-      const url = `${API_BASE}/api/nutrition/report/latest?${params.toString()}`;
-      const headers = { 'Accept': 'application/json' };
-      if (uid) headers['X-User-Id'] = uid;
+      const url = `/api/nutrition/report/latest?${params.toString()}`;
 
-      const r = await fetch(url, { headers, cache: 'no-store' });
+      const r = await fetch(url, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' }
+      });
+
       const j = await r.json().catch(() => ({}));
 
+      if (r.status === 401 || j?.error === 'auth_required') {
+        throw new Error(j.message || 'سجّل الدخول أولًا.');
+      }
       if (!r.ok || j.ok === false) {
         throw new Error(j.message || j.error || `HTTP ${r.status}`);
       }
