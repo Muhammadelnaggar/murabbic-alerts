@@ -121,36 +121,6 @@
   let pageMode = "single";
   let lastGateAllowed = false;
 
-  function getUid() {
-    try {
-      return String(
-        localStorage.getItem("userId") ||
-        localStorage.getItem("uid") ||
-        localStorage.getItem("tenantId") ||
-        ""
-      ).trim();
-    } catch (_) {
-      return "";
-    }
-  }
-
-  function apiBase() {
-    try {
-      return String(
-        window.API_BASE ||
-        localStorage.getItem("API_BASE") ||
-        ""
-      ).replace(/\/$/, "");
-    } catch (_) {
-      return "";
-    }
-  }
-
-  function apiUrl(path) {
-    const base = apiBase();
-    return base ? `${base}${path}` : path;
-  }
-
   function msg(text, type = "warning") {
     let bar =
       document.getElementById("mbk-infobar") ||
@@ -275,13 +245,13 @@ function clearWarn() {
     }
   }
 async function postJson(path, body) {
-  const uid = getUid();
-
-  const r = await fetch(apiUrl(path), {
+  const r = await fetch(path, {
     method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
-      "X-User-Id": uid
+      "Accept": "application/json"
     },
     body: JSON.stringify(body || {})
   });
@@ -290,6 +260,17 @@ async function postJson(path, body) {
     ok: false,
     message: "تعذّر قراءة رد السيرفر."
   }));
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    return {
+      ok: false,
+      allowed: false,
+      error: "auth_required",
+      message: data?.message || "❌ سجّل الدخول أولًا.",
+      accepted: [],
+      rejected: []
+    };
+  }
 
   if (!r.ok && data.ok !== true) {
     data.ok = false;
@@ -517,7 +498,7 @@ const numbersFromUrl =
 const numberFromUrl =
   numbersFromUrl
     ? ""
-    : (rawNumberParam || localStorage.getItem("lastAnimalId") || "");
+    : rawNumberParam;
     const vaccine = String(qp.get("vaccine") || "").trim();
     const doseType = String(qp.get("doseType") || "").toLowerCase();
 
