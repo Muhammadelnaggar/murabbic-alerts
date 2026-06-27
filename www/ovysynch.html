@@ -133,39 +133,29 @@
     return d.toISOString().slice(0,10);
   }
 
-  function getUserId(){
-    return String(
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("ownerUid") ||
-      ""
-    ).trim();
-  }
-
-  async function mbkApi(path, options = {}){
-    const uid = getUserId();
-
-    if (!uid) {
-      const err = new Error("⚠️ سجّل الدخول أولًا.");
-      err.code = "login_required";
-      throw err;
-    }
-
-    const headers = {
-      "Content-Type": "application/json",
-      "X-User-Id": uid,
-      ...(options.headers || {})
-    };
-
+   async function mbkApi(path, options = {}){
     const res = await fetch(path, {
       ...options,
-      headers
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        "Accept": "application/json",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {})
+      }
     });
 
     let data = {};
     try { data = await res.json(); } catch (_) {}
 
-    if (!res.ok) {
+    if (res.status === 401 || data?.error === "auth_required") {
+      const err = new Error(data?.message || "⚠️ سجّل الدخول أولًا.");
+      err.code = "auth_required";
+      err.data = data;
+      throw err;
+    }
+
+    if (!res.ok || data?.ok === false) {
       const err = new Error(data?.message || "تعذّر الاتصال بالسيرفر.");
       err.data = data;
       throw err;
@@ -233,9 +223,6 @@ function showInfoMessage(msg, cls = "ok"){
     modeBulkBox.hidden = false;
     modeSingleBox.hidden = true;
 
-    try {
-      localStorage.setItem("mbk_ov_mode", isGroup ? "group" : "single");
-    } catch {}
 
     clearWarn();
     syncCentral();
@@ -556,7 +543,7 @@ showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
       return;
     }
 
-    const saved = (localStorage.getItem("mbk_ov_mode") || "single");
+ 
     const m = (qp.get("mbkMode") || "").trim().toLowerCase();
 
     const bulkRaw = (qp.get("bulk") || qp.get("numbers") || qp.get("list") || "").trim();
@@ -565,7 +552,7 @@ showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
 
     if (bulkRaw) {
       setMode("group");
-      try { localStorage.setItem("mbk_ov_mode", "group"); } catch {}
+
 
       const cleaned = bulkRaw
         .replace(/[،;,]+/g, " ")
@@ -579,14 +566,14 @@ showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
 
     else if (numRaw && !/[\s،,;\n]/.test(numRaw)) {
       setMode("group");
-      try { localStorage.setItem("mbk_ov_mode", "group"); } catch {}
+
       bulkEl.value = numRaw;
       animalUI.value = "";
     }
 
     else if (numRaw && /[\s،,;\n]/.test(numRaw)) {
       setMode("group");
-      try { localStorage.setItem("mbk_ov_mode", "group"); } catch {}
+
 
       const cleaned = numRaw
         .replace(/[،,;]+/g, " ")
@@ -602,8 +589,8 @@ showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
       setMode(m);
     }
 
-    else {
-      setMode(saved === "group" ? "group" : "single");
+       else {
+      setMode("group");
     }
 
     if (dt) {
