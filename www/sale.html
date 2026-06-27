@@ -67,23 +67,38 @@
   const $ = (id) => document.getElementById(id);
 
   const p = new URLSearchParams(location.search);
-  const num = p.get("number") || p.get("animalNumber") || localStorage.getItem("lastAnimalNumber") || "";
-  const dt  = p.get("date") || p.get("eventDate") || localStorage.getItem("lastEventDate") || new Date().toISOString().slice(0,10);
+  const num = p.get("number") || p.get("animalNumber") || "";
+  const dt  = p.get("date") || p.get("eventDate") || new Date().toISOString().slice(0,10);
 
   $("animalNumber").value = String(num || "");
   $("eventDate").value = dt;
   let saleGateAllowed = false;
+async function sessionPostJson(path, payload) {
+  const r = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify(payload || {})
+  });
 
+  const data = await r.json().catch(() => null);
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    msg(data?.message || "❌ سجّل الدخول أولًا.");
+    return { r, data, authRequired: true };
+  }
+
+  return { r, data, authRequired: false };
+}
 async function runSaleGate() {
-  const uid = getUid();
   const animalNumber = String($("animalNumber")?.value || "").trim();
 
   $("saveBtn").disabled = true;
-
-  if (!uid) {
-    msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.");
-    return false;
-  }
+  saleGateAllowed = false;
 
   if (!animalNumber) {
     msg("❌ رقم الحيوان مطلوب.");
@@ -93,19 +108,12 @@ async function runSaleGate() {
   try {
     msg("جارِ التحقق من الحيوان...");
 
-    const r = await fetch("/api/animals/archive/gate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": uid
-      },
-      body: JSON.stringify({
-        animalNumber,
-        archiveReason: "sale"
-      })
+    const { r, data, authRequired } = await sessionPostJson("/api/animals/archive/gate", {
+      animalNumber,
+      archiveReason: "sale"
     });
 
-    const data = await r.json().catch(() => null);
+    if (authRequired) return false;
 
     if (!r.ok || data?.allowed !== true) {
       saleGateAllowed = false;
@@ -134,14 +142,7 @@ async function runSaleGate() {
 }
 
 runSaleGate();
-  function getUid() {
-    return String(
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("tenantId") ||
-      ""
-    ).trim();
-  }
+ 
 
   function msg(t, ok = false) {
     const bar = document.getElementById("sysbar");
@@ -193,7 +194,6 @@ runSaleGate();
       return;
     }
 
-    const uid = getUid();
     const payload = {
       animalNumber: String($("animalNumber")?.value || "").trim(),
       eventDate: String($("eventDate")?.value || "").trim(),
@@ -205,33 +205,19 @@ runSaleGate();
     };
 
     try {
-      if (!uid) {
-        msg("❌ لم يتم العثور على المستخدم. سجّل الدخول مرة أخرى.");
-        return;
-      }
+     
 
       msg("جارِ أرشفة الحيوان بعد البيع...");
 
-      const r = await fetch("/api/animals/archive", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
-        },
-        body: JSON.stringify(payload)
-      });
+         const { r, data, authRequired } = await sessionPostJson("/api/animals/archive", payload);
 
-      const data = await r.json().catch(() => null);
-
+      if (authRequired) return;
       if (!r.ok || data?.ok !== true) {
         msg(data?.message || "❌ فشل أرشفة الحيوان بعد البيع.");
         return;
       }
 
       msg(data.message || "✅ تم أرشفة الحيوان وأحداثه بعد البيع.", true);
-
-      localStorage.setItem("lastAnimalNumber", String(payload.animalNumber));
-      localStorage.setItem("lastEventDate", String(payload.eventDate));
 
       setTimeout(() => {
         location.href = "add-event.html";
