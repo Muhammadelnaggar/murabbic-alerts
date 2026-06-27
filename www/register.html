@@ -237,12 +237,19 @@
       </select>
 
       <label for="password">كلمة المرور *</label>
-      <input id="password" type="password" required minlength="6" />
+      <input id="password" type="password" required minlength="8" />
+<div class="hint">٨ أحرف على الأقل، وتحتوي على حرف ورقم.</div>
 
       <label for="confirmPassword">تأكيد كلمة المرور *</label>
-     <input id="confirmPassword" type="password" required minlength="6" />
+    <input id="confirmPassword" type="password" required minlength="8" />
 
-      <button id="submitBtn" type="submit">تسجيل</button>
+<div id="otpBox" style="display:none;margin-top:12px;">
+  <label for="otpCode">كود التحقق *</label>
+  <input id="otpCode" type="text" inputmode="numeric" maxlength="6" placeholder="أدخل كود التحقق" />
+  <div class="hint">أدخل الكود المكوّن من ٦ أرقام.</div>
+</div>
+
+<button id="submitBtn" type="submit">تسجيل</button>
     </form>
 
     <div class="link muted">لديك حساب؟ <a href="login.html">ادخل إلى حسابك</a></div>
@@ -256,6 +263,20 @@
   const countrySel = document.getElementById('country');
   const regionSel  = document.getElementById('region');
   const phoneInp   = document.getElementById('phone');
+  const otpBox = document.getElementById('otpBox');
+  const otpInp = document.getElementById('otpCode');
+
+  let registerOtpRequestId = "";
+  let registerOtpPassword = "";
+  let registerOtpConfirmPassword = "";
+  let registerOtpUser = null;
+
+  function setRegisterFieldsDisabled(disabled){
+  ['name','phone','country','region','role','password','confirmPassword'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = disabled;
+  });
+}
 
   // المناطق
   const REGIONS = {
@@ -328,7 +349,7 @@
   ov.setAttribute('aria-hidden','false');
 }
  
- form.addEventListener('submit', async (e)=>{
+form.addEventListener('submit', async (e)=>{
   e.preventDefault();
   clearMessage();
   btn.disabled = true;
@@ -342,33 +363,83 @@
   const confirmPassword = document.getElementById('confirmPassword').value;
 
   try{
-    const r = await fetch('/api/auth/register', {
+    if (!registerOtpRequestId) {
+      const r = await fetch('/api/auth/register/start', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName,
+          phone: phoneRaw,
+          country,
+          region,
+          role,
+          password,
+          confirmPassword
+        })
+      });
+
+      const data = await r.json().catch(() => ({}));
+
+      if (!r.ok || !data.ok) {
+        showMessage(data.message || 'تعذّر إرسال كود التحقق.');
+        return;
+      }
+
+      registerOtpRequestId = data.requestId || "";
+      registerOtpPassword = password;
+      registerOtpConfirmPassword = confirmPassword;
+      registerOtpUser = { fullName, role };
+
+      otpBox.style.display = 'block';
+      otpInp.focus();
+      setRegisterFieldsDisabled(true);
+      btn.textContent = 'تأكيد الكود';
+
+      showMessage(
+        data.devOtp
+          ? `تم إرسال كود التحقق. كود التجربة: ${data.devOtp}`
+          : 'تم إرسال كود التحقق إلى رقم الهاتف.',
+        'success'
+      );
+
+      return;
+    }
+
+    const otp = otpInp.value.trim();
+
+    if (!otp) {
+      showMessage('أدخل كود التحقق.');
+      return;
+    }
+
+    const r = await fetch('/api/auth/register/verify', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fullName,
-        phone: phoneRaw,
-        country,
-        region,
-        role,
-        password,
-        confirmPassword
+        requestId: registerOtpRequestId,
+        otp,
+        password: registerOtpPassword,
+        confirmPassword: registerOtpConfirmPassword
       })
     });
 
     const data = await r.json().catch(() => ({}));
 
     if (!r.ok || !data.ok) {
-      showMessage(data.message || 'تعذّر التسجيل، تأكّد من البيانات وحاول مرة أخرى');
+      showMessage(data.message || 'كود التحقق غير صحيح.');
       return;
     }
 
     const user = data.user || {};
-    showWelcomeOverlay(user.name || fullName, user.role || role);
+    showWelcomeOverlay(
+      user.name || registerOtpUser?.fullName || fullName,
+      user.role || registerOtpUser?.role || role
+    );
 
     setTimeout(() => {
-     location.href = data.redirectUrl || 'add-animal.html';
+      location.href = data.redirectUrl || 'add-animal.html';
     }, 1800);
 
   }catch(err){
