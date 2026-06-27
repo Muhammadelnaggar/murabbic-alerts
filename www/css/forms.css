@@ -4432,3 +4432,31 @@ body.nutrition-page #saveEvent:active,
 body.nutrition-page .nutrition-save-btn:active{
   transform:translateX(-50%) translateY(1px);
 }
+/* ===== Nutrition THI collapsible advice ===== */
+body.nutrition-page .thi-advice-details{
+  margin-top:8px;
+}
+
+body.nutrition-page .thi-advice-summary{
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  list-style:none;
+}
+
+body.nutrition-page .thi-advice-summary::-webkit-details-marker{
+  display:none;
+}
+
+body.nutrition-page .thi-advice-summary small{
+  font-size:11px;
+  font-weight:800;
+  opacity:.7;
+}
+
+body.nutrition-page .thi-advice-main{
+  margin-top:8px;
+  font-weight:900;
+}
