@@ -1737,22 +1737,27 @@ function thiRecommendationsHtml() {
     summary = clean(source);
   }
 
-  const lines = [summary, ...actions]
+  const lines = actions
     .map(x => clean(x))
     .filter(Boolean);
 
-  if (!title && !lines.length) return "";
+  if (!title && !summary && !lines.length) return "";
 
   return `
-    <div class="murabbik-advice-panel" data-key="thi-recommendations">
-      <div class="murabbik-advice-title">${escapeHtml(title || "توصيات الإجهاد الحراري")}</div>
+    <details class="murabbik-advice-panel thi-advice-details" data-key="thi-recommendations">
+      <summary class="murabbik-advice-title thi-advice-summary">
+        <span>${escapeHtml(title || "تعليمات مُرَبِّيك للـ THI")}</span>
+        <small>اضغط لعرض التعليمات</small>
+      </summary>
+
+      ${summary ? `<div class="murabbik-advice-item thi-advice-main">${escapeHtml(summary)}</div>` : ""}
+
       <div class="murabbik-advice-list">
         ${lines.map(x => `<div class="murabbik-advice-item">${escapeHtml(x)}</div>`).join("")}
       </div>
-    </div>
+    </details>
   `;
 }
-
   function advancedCardsHtml(advancedCards = [], analysisCards = [], analysis = {}) {
     const a = (key) => cardByKey(advancedCards, key);
     const n = (key) => cardByKey(analysisCards, key);
