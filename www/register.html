@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="css/forms.css">
-  <script type="module" src="js/forms-init.js"></script>
   <title>مربي جديد؟</title>
   <style>
     :root{--bg1:#eeffdd;--bg2:#fffedc;--green:#2e7d32;--border:#c5e1a5;--card:#ffffff}
@@ -238,22 +237,17 @@
       </select>
 
       <label for="password">كلمة المرور *</label>
-      <input id="password" type="password" required minlength="4" />
+      <input id="password" type="password" required minlength="6" />
 
       <label for="confirmPassword">تأكيد كلمة المرور *</label>
-      <input id="confirmPassword" type="password" required minlength="4" />
+     <input id="confirmPassword" type="password" required minlength="6" />
 
       <button id="submitBtn" type="submit">تسجيل</button>
     </form>
 
     <div class="link muted">لديك حساب؟ <a href="login.html">ادخل إلى حسابك</a></div>
   </div>
-
-<script type="module">
-  import { db, ensureAuth } from './js/firebase-config.js';
-  import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-    import { getAuth, createUserWithEmailAndPassword }
-    from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+<script>
 
   // عناصر DOM
   const form = document.getElementById('registerForm');
@@ -333,20 +327,11 @@
   ov.style.display = 'flex';
   ov.setAttribute('aria-hidden','false');
 }
-  async function hashPassword(password){
-    const enc = new TextEncoder();
-    const buf = await crypto.subtle.digest('SHA-256', enc.encode(password));
-    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-  }
-  function validatePhoneByCountry(phone,country){
-    const p = phone.replace(/\s|-/g,'');
-    if (country==='مصر') return /^01\d{9}$/.test(p);
-    return /^\+?\d{7,15}$/.test(p);
-  }
-
-  // الحفظ (محاولة مباشرة، ولو فشلت بالصلاحيات نجرب ensureAuth ثم نعيد)
-form.addEventListener('submit', async (e)=>{
-  e.preventDefault(); clearMessage(); btn.disabled = true;
+ 
+ form.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  clearMessage();
+  btn.disabled = true;
 
   const fullName = document.getElementById('name').value.trim();
   const phoneRaw = phoneInp.value.trim();
@@ -354,57 +339,44 @@ form.addEventListener('submit', async (e)=>{
   const region   = regionSel.value.trim();
   const role     = document.getElementById('role').value.trim();
   const password = document.getElementById('password').value;
-  const confirm  = document.getElementById('confirmPassword').value;
-
-  if (!fullName || !phoneRaw || !country || !region || !role || !password || !confirm){
-    showMessage('جميع الحقول مطلوبة'); btn.disabled=false; return;
-  }
-  if (!validatePhoneByCountry(phoneRaw, country)){
-    showMessage('رقم الهاتف غير مطابق لتنسيق الدولة المختارة'); btn.disabled=false; return;
-  }
-  if (password.length < 4){ showMessage('كلمة المرور يجب أن تكون ٤ أحرف أو أكثر'); btn.disabled=false; return; }
-  if (password !== confirm){ showMessage('كلمة المرور وتأكيدها غير متطابقة'); btn.disabled=false; return; }
-
-  // تحويل الأرقام العربية وإبقاء الأرقام فقط لبناء بريد داخلي
-  const phoneKey = (phoneRaw||'')
-    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
-    .replace(/\D/g,'');
-  if (!phoneKey){ showMessage('رقم هاتف غير صالح'); btn.disabled=false; return; }
-
-  const auth = getAuth();
-  const pseudoEmail = `${phoneKey}@murabbik.local`; // بريد داخلي مشتق من الهاتف
+  const confirmPassword = document.getElementById('confirmPassword').value;
 
   try{
-    // إنشاء الحساب وتوليد uid آمن
-    const cred = await createUserWithEmailAndPassword(auth, pseudoEmail, password);
-    const uid  = cred.user.uid;
-
-    // حجز المستند users/{uid}
-    const userRef = doc(db,'users', uid);
-    if ((await getDoc(userRef)).exists()){
-      showMessage('حدث تعارض في التسجيل، حاول برقم مختلف'); btn.disabled=false; return;
-    }
-
-    await setDoc(userRef, {
-      fullName, phone: phoneRaw, country, region, role,
-      createdAt: serverTimestamp()
+    const r = await fetch('/api/auth/register', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fullName,
+        phone: phoneRaw,
+        country,
+        region,
+        role,
+        password,
+        confirmPassword
+      })
     });
 
-    localStorage.setItem('userId', uid);
-    localStorage.setItem('phone', phoneRaw);
-    localStorage.setItem('country', country);
-    localStorage.setItem('region', region);
+    const data = await r.json().catch(() => ({}));
 
-   showWelcomeOverlay(fullName, role);
-setTimeout(()=> location.href='login.html', 1800);
+    if (!r.ok || !data.ok) {
+      showMessage(data.message || 'تعذّر التسجيل، تأكّد من البيانات وحاول مرة أخرى');
+      return;
+    }
+
+    const user = data.user || {};
+    showWelcomeOverlay(user.name || fullName, user.role || role);
+
+    setTimeout(() => {
+      location.href = data.redirectUrl || 'dashboard.html';
+    }, 1800);
 
   }catch(err){
-    showMessage('تعذّر التسجيل، تأكّد من البيانات وحاول مرة أخرى');
+    showMessage('تعذّر الاتصال بالسيرفر الآن.');
   }finally{
-    btn.disabled=false;
+    btn.disabled = false;
   }
 });
-
 </script>
 
 
