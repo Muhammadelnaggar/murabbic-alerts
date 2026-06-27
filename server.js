@@ -2,6 +2,7 @@
 // ----------------------------------------------
 const path    = require('path');
 const fs      = require('fs');
+const crypto  = require('crypto');
 const express = require('express');
 const cors    = require('cors');
 const admin   = require('firebase-admin');
@@ -230,7 +231,96 @@ async function authPasswordLoginBridgeSrv(email, password) {
 function authRegisterTextBridgeSrv(v) {
   return String(v || "").trim().replace(/\s+/g, " ");
 }
+const AUTH_OTP_TTL_MS = Number(process.env.MURABBIK_OTP_TTL_MS || 10 * 60 * 1000);
+const AUTH_OTP_MAX_ATTEMPTS = Number(process.env.MURABBIK_OTP_MAX_ATTEMPTS || 5);
+const AUTH_OTP_DEV_RETURN = process.env.MURABBIK_OTP_DEV_RETURN === "1";
 
+function authSha256BridgeSrv(v) {
+  return crypto.createHash("sha256").update(String(v || "")).digest("hex");
+}
+
+function authOtpCodeBridgeSrv() {
+  return String(crypto.randomInt(100000, 1000000));
+}
+
+function authOtpHashBridgeSrv(code, salt) {
+  return authSha256BridgeSrv(`${salt}:${code}`);
+}
+
+function authRegisterPasswordIssueBridgeSrv(password, ctx = {}) {
+  const p = String(password || "");
+  const phoneKey = String(ctx.phoneKey || "").trim();
+  const fullName = String(ctx.fullName || "").trim().toLowerCase();
+
+  if (p.length < 8) return "كلمة المرور يجب أن تكون ٨ أحرف أو أكثر.";
+  if (!/[A-Za-z\u0600-\u06FF]/.test(p)) return "كلمة المرور يجب أن تحتوي على حرف واحد على الأقل.";
+  if (!/[0-9٠-٩۰-۹]/.test(p)) return "كلمة المرور يجب أن تحتوي على رقم واحد على الأقل.";
+
+  const passDigits = authDigitsBridgeSrv(p);
+  if (phoneKey && (passDigits === phoneKey || p.includes(phoneKey))) {
+    return "لا تستخدم رقم الهاتف داخل كلمة المرور.";
+  }
+
+  const weakList = ["12345678", "11111111", "00000000", "password", "qwerty", "murabbik", "مربيك"];
+  if (weakList.includes(p.toLowerCase())) return "كلمة المرور ضعيفة جدًا، اختر كلمة أقوى.";
+
+  const nameParts = fullName.split(/\s+/).map(s => s.trim()).filter(s => s.length >= 3);
+  for (const part of nameParts) {
+    if (part && p.toLowerCase().includes(part)) return "لا تستخدم اسمك داخل كلمة المرور.";
+  }
+
+  if (/^(.)\1{7,}$/.test(p)) {
+    return "كلمة المرور ضعيفة جدًا، لا تستخدم نفس الحرف أو الرقم مكررًا.";
+  }
+
+  return "";
+}
+
+async function authSendOtpBridgeSrv(phoneRaw, code) {
+  const webhook = String(process.env.MURABBIK_SMS_WEBHOOK_URL || "").trim();
+
+  if (!webhook) {
+    if (AUTH_OTP_DEV_RETURN) return { ok: true, dev: true };
+    return {
+      ok: false,
+      error: "sms_provider_missing",
+      message: "خدمة إرسال كود التحقق غير مفعّلة على السيرفر."
+    };
+  }
+
+  const text = `كود التحقق من مُرَبِّيك: ${code}. صالح لمدة 10 دقائق.`;
+
+  try {
+    const r = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: phoneRaw,
+        message: text,
+        code,
+        purpose: "register"
+      })
+    });
+
+    if (!r.ok) {
+      return {
+        ok: false,
+        error: "sms_send_failed",
+        message: "تعذّر إرسال كود التحقق الآن."
+      };
+    }
+
+    return { ok: true };
+
+  } catch (e) {
+    console.warn("otp sms send failed:", e.message || e);
+    return {
+      ok: false,
+      error: "sms_send_failed",
+      message: "تعذّر إرسال كود التحقق الآن."
+    };
+  }
+}
 function authRegisterValidateBridgeSrv(body = {}) {
   const fullName = authRegisterTextBridgeSrv(body.fullName || body.name || body.displayName);
   const phoneRaw = authRegisterTextBridgeSrv(body.phone || body.phoneNumber);
@@ -277,14 +367,19 @@ function authRegisterValidateBridgeSrv(body = {}) {
     };
   }
 
-  if (password.length < 6) {
-    return {
-      ok: false,
-      status: 400,
-      error: "register_password_short",
-      message: "كلمة المرور يجب أن تكون ٦ أحرف أو أكثر."
-    };
-  }
+ const passwordIssue = authRegisterPasswordIssueBridgeSrv(password, {
+  fullName,
+  phoneKey
+});
+
+if (passwordIssue) {
+  return {
+    ok: false,
+    status: 400,
+    error: "register_password_weak",
+    message: passwordIssue
+  };
+}
 
   if (password !== confirmPassword) {
     return {
@@ -307,7 +402,7 @@ function authRegisterValidateBridgeSrv(body = {}) {
   };
 }
 
-app.post("/api/auth/register", async (req, res) => {
+async function authRegisterStartHandlerBridgeSrv(req, res) {
   try {
     if (!admin.apps.length || !db) {
       return res.status(503).json({
@@ -337,15 +432,207 @@ app.post("/api/auth/register", async (req, res) => {
         message: "رقم الهاتف مسجّل بالفعل."
       });
     } catch (e) {
-      if (e?.code && e.code !== "auth/user-not-found") {
-        throw e;
-      }
+      if (e?.code && e.code !== "auth/user-not-found") throw e;
+    }
+
+    const code = authOtpCodeBridgeSrv();
+    const otpSalt = crypto.randomBytes(16).toString("hex");
+    const passwordSalt = crypto.randomBytes(16).toString("hex");
+    const requestId = crypto.randomBytes(18).toString("hex");
+
+    const sent = await authSendOtpBridgeSrv(v.phoneRaw, code);
+
+    if (!sent.ok) {
+      return res.status(503).json({
+        ok: false,
+        error: sent.error || "otp_send_failed",
+        message: sent.message || "تعذّر إرسال كود التحقق الآن."
+      });
+    }
+
+    await db.collection("auth_register_otps").doc(requestId).set({
+      type: "register",
+      phoneRaw: v.phoneRaw,
+      phoneKey: v.phoneKey,
+      fullName: v.fullName,
+      country: v.country,
+      region: v.region,
+      role: v.role,
+
+      otpHash: authOtpHashBridgeSrv(code, otpSalt),
+      otpSalt,
+
+      passwordHash: authOtpHashBridgeSrv(v.password, passwordSalt),
+      passwordSalt,
+
+      attempts: 0,
+      maxAttempts: AUTH_OTP_MAX_ATTEMPTS,
+      usedAt: null,
+      expiresAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + AUTH_OTP_TTL_MS)),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      source: "server:/api/auth/register/start"
+    }, { merge: false });
+
+    const out = {
+      ok: true,
+      otpRequired: true,
+      requestId,
+      expiresInSeconds: Math.floor(AUTH_OTP_TTL_MS / 1000),
+      message: "تم إرسال كود التحقق إلى رقم الهاتف."
+    };
+
+    if (AUTH_OTP_DEV_RETURN) out.devOtp = code;
+
+    return res.json(out);
+
+  } catch (e) {
+    console.warn("auth register start failed:", e.message || e);
+    return res.status(500).json({
+      ok: false,
+      error: "register_start_failed",
+      message: "تعذّر بدء التسجيل الآن."
+    });
+  }
+}
+
+app.post("/api/auth/register/start", authRegisterStartHandlerBridgeSrv);
+
+app.post("/api/auth/register", async (req, res) => {
+  return res.status(409).json({
+    ok: false,
+    error: "otp_flow_required",
+    message: "تم تفعيل كود التحقق. حدّث الصفحة ثم حاول التسجيل."
+  });
+});
+
+app.post("/api/auth/register/verify", async (req, res) => {
+  try {
+    if (!admin.apps.length || !db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firebase_admin_disabled",
+        message: "خدمة التسجيل غير متاحة الآن."
+      });
+    }
+
+    const requestId = String(req.body?.requestId || "").trim();
+    const otp = authDigitsBridgeSrv(req.body?.otp || req.body?.code || "");
+    const password = String(req.body?.password || "");
+    const confirmPassword = String(req.body?.confirmPassword || req.body?.passwordConfirm || "");
+
+    if (!requestId || !otp || !password || !confirmPassword) {
+      return res.status(400).json({
+        ok: false,
+        error: "otp_fields_required",
+        message: "أدخل كود التحقق وكلمة المرور."
+      });
+    }
+
+    const ref = db.collection("auth_register_otps").doc(requestId);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      return res.status(404).json({
+        ok: false,
+        error: "otp_not_found",
+        message: "كود التحقق غير صالح أو انتهت صلاحيته."
+      });
+    }
+
+    const p = snap.data() || {};
+
+    if (p.usedAt) {
+      return res.status(409).json({
+        ok: false,
+        error: "otp_already_used",
+        message: "تم استخدام كود التحقق من قبل."
+      });
+    }
+
+    const expiresAt = p.expiresAt?.toDate ? p.expiresAt.toDate() : null;
+    if (!expiresAt || expiresAt.getTime() < Date.now()) {
+      return res.status(410).json({
+        ok: false,
+        error: "otp_expired",
+        message: "انتهت صلاحية كود التحقق. اطلب كودًا جديدًا."
+      });
+    }
+
+    const attempts = Number(p.attempts || 0);
+    const maxAttempts = Number(p.maxAttempts || AUTH_OTP_MAX_ATTEMPTS);
+
+    if (attempts >= maxAttempts) {
+      return res.status(429).json({
+        ok: false,
+        error: "otp_attempts_exceeded",
+        message: "تم تجاوز عدد محاولات التحقق. اطلب كودًا جديدًا."
+      });
+    }
+
+    const otpHash = authOtpHashBridgeSrv(otp, p.otpSalt || "");
+
+    if (otpHash !== p.otpHash) {
+      await ref.set({
+        attempts: attempts + 1,
+        lastAttemptAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      return res.status(400).json({
+        ok: false,
+        error: "otp_invalid",
+        attemptsLeft: Math.max(0, maxAttempts - attempts - 1),
+        message: "كود التحقق غير صحيح."
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        ok: false,
+        error: "register_password_mismatch",
+        message: "كلمة المرور وتأكيدها غير متطابقة."
+      });
+    }
+
+    const passwordIssue = authRegisterPasswordIssueBridgeSrv(password, {
+      fullName: p.fullName,
+      phoneKey: p.phoneKey
+    });
+
+    if (passwordIssue) {
+      return res.status(400).json({
+        ok: false,
+        error: "register_password_weak",
+        message: passwordIssue
+      });
+    }
+
+    const passwordHash = authOtpHashBridgeSrv(password, p.passwordSalt || "");
+
+    if (passwordHash !== p.passwordHash) {
+      return res.status(400).json({
+        ok: false,
+        error: "register_password_changed",
+        message: "أعد إدخال نفس كلمة المرور التي بدأت بها التسجيل."
+      });
+    }
+
+    const pseudoEmail = `${p.phoneKey}@murabbik.local`;
+
+    try {
+      await admin.auth().getUserByEmail(pseudoEmail);
+      return res.status(409).json({
+        ok: false,
+        error: "phone_already_registered",
+        message: "رقم الهاتف مسجّل بالفعل."
+      });
+    } catch (e) {
+      if (e?.code && e.code !== "auth/user-not-found") throw e;
     }
 
     const created = await admin.auth().createUser({
       email: pseudoEmail,
-      password: v.password,
-      displayName: v.fullName,
+      password,
+      displayName: p.fullName,
       disabled: false
     });
 
@@ -355,22 +642,29 @@ app.post("/api/auth/register", async (req, res) => {
       uid,
       ownerUid: uid,
       userId: uid,
-      fullName: v.fullName,
-      name: v.fullName,
-      displayName: v.fullName,
-      phone: v.phoneRaw,
-      phoneKey: v.phoneKey,
-      country: v.country,
-      region: v.region,
-      role: v.role,
+      fullName: p.fullName,
+      name: p.fullName,
+      displayName: p.fullName,
+      phone: p.phoneRaw,
+      phoneKey: p.phoneKey,
+      country: p.country,
+      region: p.region,
+      role: p.role,
+      phoneVerified: true,
+      phoneVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      source: "server:/api/auth/register"
+      source: "server:/api/auth/register/verify"
     };
 
     await db.collection("users").doc(uid).set(profile, { merge: true });
 
-    const login = await authPasswordLoginBridgeSrv(pseudoEmail, v.password);
+    await ref.set({
+      usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      verifiedUid: uid
+    }, { merge: true });
+
+    const login = await authPasswordLoginBridgeSrv(pseudoEmail, password);
     const sessionCookie = await admin.auth().createSessionCookie(login.idToken, {
       expiresIn: AUTH_SESSION_EXPIRES_MS
     });
@@ -379,18 +673,18 @@ app.post("/api/auth/register", async (req, res) => {
 
     return res.json({
       ok: true,
-      message: "✅ تم إنشاء الحساب بنجاح",
+      message: "✅ تم إنشاء الحساب وتأكيد رقم الهاتف بنجاح",
       uid,
       userId: uid,
       user: authPublicUserBridgeSrv(profile, uid, uid),
-     redirectUrl: "add-animal.html"
+      redirectUrl: "add-animal.html"
     });
 
   } catch (e) {
-    console.warn("auth bridge register failed:", e.message || e);
+    console.warn("auth register verify failed:", e.message || e);
 
-    let message = "تعذّر التسجيل، تأكّد من البيانات وحاول مرة أخرى.";
-    let error = "register_failed";
+    let message = "تعذّر إتمام التسجيل الآن.";
+    let error = "register_verify_failed";
     let status = 500;
 
     if (e?.code === "auth/email-already-exists") {
@@ -400,7 +694,7 @@ app.post("/api/auth/register", async (req, res) => {
     } else if (e?.code === "auth/invalid-password" || e?.code === "auth/weak-password") {
       status = 400;
       error = "register_password_invalid";
-      message = "كلمة المرور يجب أن تكون ٦ أحرف أو أكثر.";
+      message = "كلمة المرور يجب أن تكون ٨ أحرف أو أكثر وتحتوي على حرف ورقم.";
     }
 
     return res.status(status).json({
