@@ -4,402 +4,265 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>مُرَبِّيك</title>
-<link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#0b7f47">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-<style>
-  :root{
-    --green:#0b7f47;
-    --green-dark:#064f31;
-    --green-soft:#e9f7ee;
-    --sky:#dff5ff;
-    --cream:#fff9e8;
-    --soil:#7a5a32;
-    --text:#123522;
-    --muted:#4d6a59;
-    --white:#ffffff;
-  }
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0b7f47">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-  *{box-sizing:border-box}
-
-  body{
-    margin:0;
-    min-height:100vh;
-    overflow:hidden;
-    font-family:'Cairo',Tahoma,sans-serif;
-    color:var(--text);
-    background:linear-gradient(180deg,var(--sky) 0%,#f8ffe8 42%,#d8f0c8 43%,#0b7f47 100%);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    text-align:center;
-    position:relative;
-  }
-
-  .farm-scene{
-    position:absolute;
-    inset:0;
-    overflow:hidden;
-    pointer-events:none;
-  }
-
-  .sun{
-    position:absolute;
-    width:108px;
-    height:108px;
-    top:8%;
-    left:10%;
-    border-radius:50%;
-    background:radial-gradient(circle,#fff6bd 0%,#ffd36d 65%,rgba(255,211,109,.10) 100%);
-    box-shadow:0 0 55px rgba(255,190,70,.45);
-  }
-
-  .horizon{
-    position:absolute;
-    left:-10%;
-    right:-10%;
-    bottom:30%;
-    height:26%;
-    background:
-      linear-gradient(135deg, rgba(255,255,255,.20) 0 2px, transparent 2px 42px),
-      linear-gradient(180deg,#65bd72,#14854f);
-    border-radius:55% 55% 0 0 / 24% 24% 0 0;
-  }
-
-  .barn{
-    position:absolute;
-    right:9%;
-    bottom:37%;
-    width:92px;
-    height:64px;
-    background:#8b3f2f;
-    border-radius:8px 8px 4px 4px;
-    opacity:.22;
-  }
-
-  .barn::before{
-    content:"";
-    position:absolute;
-    right:0;
-    left:0;
-    top:-34px;
-    margin:auto;
-    width:76px;
-    height:76px;
-    background:#8b3f2f;
-    transform:rotate(45deg);
-    border-radius:6px;
-  }
-
-  .barn::after{
-    content:"";
-    position:absolute;
-    left:50%;
-    bottom:0;
-    width:30px;
-    height:38px;
-    transform:translateX(-50%);
-    background:rgba(255,255,255,.28);
-    border-radius:8px 8px 0 0;
-  }
-
-  .fence{
-    position:absolute;
-    left:5%;
-    right:5%;
-    bottom:29%;
-    height:30px;
-    border-top:4px solid rgba(122,90,50,.35);
-    border-bottom:4px solid rgba(122,90,50,.30);
-  }
-
-  .fence::before{
-    content:"";
-    position:absolute;
-    inset:-15px 0 0 0;
-    background:repeating-linear-gradient(
-      90deg,
-      rgba(122,90,50,.36) 0 5px,
-      transparent 5px 70px
-    );
-  }
-
-  .splash-shell{
-    position:relative;
-    z-index:2;
-    width:min(92vw,455px);
-    padding:18px;
-  }
-
-  .splash-card{
-    background:rgba(255,255,255,.94);
-    border:1px solid rgba(11,127,71,.16);
-    border-radius:28px;
-    padding:30px 22px 24px;
-    box-shadow:0 22px 55px rgba(11,79,49,.24);
-  }
-
-  .logo{
-    width:150px;
-    max-width:70%;
-    height:auto;
-    object-fit:contain;
-    margin:0 auto 18px;
-    display:block;
-    animation:logoRise .9s ease forwards;
-  }
-
-  @keyframes logoRise{
-    from{transform:translateY(14px);opacity:0}
-    to{transform:translateY(0);opacity:1}
-  }
-
-  .field-label{
-    display:inline-flex;
-    justify-content:center;
-    align-items:center;
-    padding:7px 15px;
-    border-radius:999px;
-    background:var(--green-soft);
-    border:1px solid rgba(11,127,71,.18);
-    color:var(--green-dark);
-    font-size:13px;
-    font-weight:900;
-    margin-bottom:14px;
-  }
-
-  .main-line{
-    max-width:340px;
-    margin:0 auto;
-    font-size:18px;
-    line-height:1.9;
-    color:var(--text);
-    font-weight:900;
-    opacity:0;
-    animation:fadeInUp .9s ease .18s forwards;
-  }
-
-  .sub-line{
-    max-width:340px;
-    margin:10px auto 0;
-    font-size:14px;
-    line-height:1.9;
-    color:var(--muted);
-    font-weight:800;
-    opacity:0;
-    animation:fadeInUp .9s ease .32s forwards;
-  }
-
-  .feature-grid{
-    display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:8px;
-    margin:20px 0 16px;
-  }
-
-  .feature-card{
-    min-height:66px;
-    border-radius:16px;
-    background:#fbfff8;
-    border:1px solid rgba(11,127,71,.14);
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    gap:5px;
-    box-shadow:0 6px 14px rgba(11,127,71,.06);
-  }
-
-  .feature-icon{
-    width:30px;
-    height:30px;
-    border-radius:11px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background:var(--green-soft);
-    color:var(--green-dark);
-    font-size:14px;
-    font-weight:900;
-    line-height:1;
-  }
-
-  .feature-card span{
-    color:#365b43;
-    font-size:11px;
-    font-weight:900;
-    white-space:nowrap;
-  }
-
-  .feature-wide{
-    grid-column:span 2;
-  }
-
-  .status-row{
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:11px;
-    padding-top:14px;
-    border-top:1px solid rgba(11,127,71,.13);
-    color:var(--green-dark);
-    font-size:14px;
-    font-weight:900;
-    opacity:0;
-    animation:fadeInUp .9s ease .46s forwards;
-  }
-
-  .loader{
-    width:22px;
-    height:22px;
-    border-radius:50%;
-    border:3px solid rgba(11,127,71,.18);
-    border-top-color:var(--green);
-    animation:spin .9s linear infinite;
-    flex:0 0 auto;
-  }
-
-  @keyframes spin{
-    to{transform:rotate(360deg)}
-  }
-
-  @keyframes fadeInUp{
-    from{transform:translateY(14px);opacity:0}
-    to{transform:translateY(0);opacity:1}
-  }
-
-  @media(max-width:480px){
-    .splash-card{
-      padding:28px 18px 22px;
-      border-radius:24px;
+  <style>
+    :root{
+      --green:#0b7f47;
+      --green-dark:#064f31;
+      --sky:#dff5ff;
+      --text:#123522;
     }
 
-    .logo{
-      width:138px;
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      min-height:100vh;
+      overflow:hidden;
+      font-family:'Cairo',Tahoma,sans-serif;
+      background:linear-gradient(180deg,var(--sky) 0%,#f8ffe8 42%,#d8f0c8 43%,#0b7f47 100%);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      position:relative;
     }
 
-    .main-line{
-      font-size:16px;
-      max-width:305px;
-    }
-
-    .sub-line{
-      font-size:13px;
-      max-width:305px;
-    }
-
-    .feature-grid{
-      grid-template-columns:repeat(3,1fr);
-      gap:7px;
-    }
-
-    .feature-card{
-      min-height:62px;
-    }
-
-    .feature-wide{
-      grid-column:span 1;
-    }
-
-    .feature-icon{
-      width:28px;
-      height:28px;
-      font-size:13px;
-    }
-
-    .feature-card span{
-      font-size:10.5px;
+    .farm-scene{
+      position:absolute;
+      inset:0;
+      overflow:hidden;
+      pointer-events:none;
     }
 
     .sun{
-      width:86px;
-      height:86px;
+      position:absolute;
+      width:108px;
+      height:108px;
       top:8%;
-      left:7%;
+      left:10%;
+      border-radius:50%;
+      background:radial-gradient(circle,#fff6bd 0%,#ffd36d 65%,rgba(255,211,109,.10) 100%);
+      box-shadow:0 0 55px rgba(255,190,70,.45);
     }
-  }
-</style>
+
+    .horizon{
+      position:absolute;
+      left:-10%;
+      right:-10%;
+      bottom:30%;
+      height:26%;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.20) 0 2px, transparent 2px 42px),
+        linear-gradient(180deg,#65bd72,#14854f);
+      border-radius:55% 55% 0 0 / 24% 24% 0 0;
+    }
+
+    .barn{
+      position:absolute;
+      right:9%;
+      bottom:37%;
+      width:92px;
+      height:64px;
+      background:#8b3f2f;
+      border-radius:8px 8px 4px 4px;
+      opacity:.22;
+    }
+
+    .barn::before{
+      content:"";
+      position:absolute;
+      right:0;
+      left:0;
+      top:-34px;
+      margin:auto;
+      width:76px;
+      height:76px;
+      background:#8b3f2f;
+      transform:rotate(45deg);
+      border-radius:6px;
+    }
+
+    .barn::after{
+      content:"";
+      position:absolute;
+      left:50%;
+      bottom:0;
+      width:30px;
+      height:38px;
+      transform:translateX(-50%);
+      background:rgba(255,255,255,.28);
+      border-radius:8px 8px 0 0;
+    }
+
+    .fence{
+      position:absolute;
+      left:5%;
+      right:5%;
+      bottom:29%;
+      height:30px;
+      border-top:4px solid rgba(122,90,50,.35);
+      border-bottom:4px solid rgba(122,90,50,.30);
+    }
+
+    .fence::before{
+      content:"";
+      position:absolute;
+      inset:-15px 0 0 0;
+      background:repeating-linear-gradient(
+        90deg,
+        rgba(122,90,50,.36) 0 5px,
+        transparent 5px 70px
+      );
+    }
+
+    .symbol-splash{
+      position:relative;
+      z-index:2;
+      width:min(92vw,360px);
+      height:360px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .symbol-splash::before{
+      content:"";
+      position:absolute;
+      inset:52px;
+      border:1px dashed rgba(6,79,49,.25);
+      border-radius:50%;
+      animation:slowSpin 18s linear infinite;
+    }
+
+    .symbol-splash::after{
+      content:"";
+      position:absolute;
+      width:210px;
+      height:210px;
+      border-radius:50%;
+      background:rgba(255,255,255,.42);
+      box-shadow:0 22px 55px rgba(11,79,49,.20);
+      z-index:-1;
+    }
+
+    .splash-logo{
+      width:150px;
+      max-width:58%;
+      height:auto;
+      object-fit:contain;
+      display:block;
+      animation:logoRise .9s ease forwards;
+    }
+
+    .splash-symbol{
+      position:absolute;
+      color:var(--green-dark);
+      font-size:29px;
+      font-weight:900;
+      line-height:1;
+      text-shadow:0 8px 20px rgba(6,79,49,.18);
+      animation:symbolFloat 2.8s ease-in-out infinite alternate;
+      user-select:none;
+    }
+
+    .s-ai{top:22px;left:50%;transform:translateX(-50%)}
+    .s-record{top:78px;right:42px}
+    .s-alert{bottom:78px;right:42px}
+    .s-report{bottom:22px;left:50%;transform:translateX(-50%)}
+    .s-cow{bottom:78px;left:42px}
+    .s-buffalo{top:78px;left:42px}
+    .s-profit{top:50%;right:12px;transform:translateY(-50%)}
+
+    @keyframes logoRise{
+      from{transform:translateY(14px);opacity:0}
+      to{transform:translateY(0);opacity:1}
+    }
+
+    @keyframes symbolFloat{
+      from{margin-top:0}
+      to{margin-top:-8px}
+    }
+
+    @keyframes slowSpin{
+      to{transform:rotate(360deg)}
+    }
+
+    @media(max-width:480px){
+      .symbol-splash{
+        width:320px;
+        height:320px;
+      }
+
+      .symbol-splash::before{
+        inset:46px;
+      }
+
+      .symbol-splash::after{
+        width:190px;
+        height:190px;
+      }
+
+      .splash-logo{
+        width:138px;
+      }
+
+      .splash-symbol{
+        font-size:25px;
+      }
+
+      .s-record{right:34px}
+      .s-alert{right:34px}
+      .s-cow{left:34px}
+      .s-buffalo{left:34px}
+
+      .sun{
+        width:86px;
+        height:86px;
+        top:8%;
+        left:7%;
+      }
+    }
+  </style>
 </head>
 
 <body>
 
-<div class="farm-scene" aria-hidden="true">
-  <span class="sun"></span>
-  <span class="horizon"></span>
-  <span class="barn"></span>
-  <span class="fence"></span>
-</div>
-
-<div class="splash-shell">
-  <div class="splash-card">
-    <img src="images/logo.png" alt="شعار مُرَبِّيك" class="logo">
-
-    <div class="field-label">إدارة القطيع للأبقار والجاموس</div>
-
-    <div class="main-line">
-      تابع مزرعتك، سجّل أحداث القطيع، وخد القرار في وقته.
-    </div>
-
-    <div class="sub-line">
-      ذكاء صناعي، تنبيهات، تقارير، تغذية، إنتاج لبن، وتكاليف في مسار واحد واضح.
-    </div>
-
-    <div class="feature-grid">
-      <div class="feature-card">
-        <div class="feature-icon">AI</div>
-        <span>ذكاء</span>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">✓</div>
-        <span>تسجيل</span>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">!</div>
-        <span>تنبيهات</span>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">▦</div>
-        <span>تقارير</span>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">ب</div>
-        <span>أبقار</span>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">ج</div>
-        <span>جاموس</span>
-      </div>
-
-      <div class="feature-card feature-wide">
-        <div class="feature-icon">EGP</div>
-        <span>أرباح وتكاليف</span>
-      </div>
-    </div>
-
-    <div class="status-row">
-      <div class="loader" aria-hidden="true"></div>
-      <span>جارٍ تجهيز مُرَبِّيك…</span>
-    </div>
+  <div class="farm-scene" aria-hidden="true">
+    <span class="sun"></span>
+    <span class="horizon"></span>
+    <span class="barn"></span>
+    <span class="fence"></span>
   </div>
-</div>
+
+  <div class="symbol-splash" aria-label="مُرَبِّيك">
+    <img src="images/logo.png" alt="مُرَبِّيك" class="splash-logo">
+
+    <span class="splash-symbol s-ai" title="الذكاء الصناعي">AI</span>
+    <span class="splash-symbol s-record" title="التسجيل">✓</span>
+    <span class="splash-symbol s-alert" title="التنبيهات">!</span>
+    <span class="splash-symbol s-report" title="التقارير">▦</span>
+    <span class="splash-symbol s-cow" title="الأبقار">🐄</span>
+    <span class="splash-symbol s-buffalo" title="الجاموس">🐃</span>
+    <span class="splash-symbol s-profit" title="الأرباح">↗</span>
+  </div>
+
   <script>
     setTimeout(() => {
-  window.location.replace("login.html");
-}, 3000);
+      window.location.replace("login.html");
+    }, 3000);
   </script>
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(()=>{});
-  }
-</script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(()=>{});
+    }
+  </script>
 
 </body>
 </html>
