@@ -87,12 +87,7 @@
   const msg  = document.getElementById('msg');
   const btn  = document.getElementById('saveBtn');
 
-  function getUid(){
-    return localStorage.getItem("uid") ||
-           localStorage.getItem("userId") ||
-           localStorage.getItem("murabbik_uid") ||
-           "";
-  }
+
 
   function todayLocal(){
     const d = new Date();
@@ -100,10 +95,16 @@
     return d.toISOString().slice(0,10);
   }
 
-  function showMsg(text, ok){
+   function showMsg(text, ok){
+    if (!msg) return;
+
     msg.textContent = text || "";
-    msg.className = ok ? "success" : "error";
+    msg.className = text
+      ? `infobar mbk-infobar show ${ok ? "success" : "error"}`
+      : "infobar";
+
     msg.style.display = text ? "block" : "none";
+
     try { msg.scrollIntoView({ behavior:"smooth", block:"center" }); } catch {}
   }
 
@@ -123,19 +124,23 @@ return {
   }
 
   async function apiPost(url, payload){
-    const uid = getUid();
-
     const r = await fetch(url, {
       method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
       headers: {
         "Content-Type": "application/json",
-        "X-User-Id": uid
+        "Accept": "application/json"
       },
       body: JSON.stringify(payload || {})
     });
 
     let data = {};
     try { data = await r.json(); } catch {}
+
+    if (r.status === 401 || data?.error === "auth_required") {
+      throw new Error(data.message || "❌ سجّل الدخول أولًا.");
+    }
 
     if (!r.ok || data.ok === false) {
       throw new Error(data.message || "تعذّر تنفيذ الطلب.");
