@@ -9902,10 +9902,12 @@ if (db) {
       });
     }
 
-    await ref.set({
-      ...fireDoc,
-      createdAt: old.createdAt || admin.firestore.Timestamp.fromMillis(nowMs)
-    }, { merge: true });
+ await ref.set({
+  ...fireDoc,
+  createdAt: old.createdAt || admin.firestore.Timestamp.fromMillis(nowMs),
+  editedAt: admin.firestore.Timestamp.fromMillis(nowMs),
+  editedAtMs: nowMs
+}, { merge: true });
 
     firestoreId = editEventId;
     updatedExisting = true;
