@@ -21822,6 +21822,356 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
     });
   }
 });
+function milkReportIsDateSrv(v) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(v || "").trim());
+}
+
+function milkReportTodaySrv() {
+  const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function milkReportAddDaysSrv(iso, n) {
+  const d = new Date(String(iso || "").slice(0, 10));
+  d.setDate(d.getDate() + Number(n || 0));
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function milkReportMonthBoundsSrv(iso) {
+  const d = new Date(String(iso || "").slice(0, 10));
+  d.setDate(1);
+  const start = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const n = new Date(d);
+  n.setMonth(n.getMonth() + 1);
+  n.setDate(1);
+  const end = new Date(n.getTime() - n.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  return { start, end };
+}
+
+function milkReportYearBoundsSrv(iso) {
+  const y = String(iso || milkReportTodaySrv()).slice(0, 4);
+  return { start: `${y}-01-01`, end: `${Number(y) + 1}-01-01` };
+}
+
+function milkReportIsMilkEventSrv(ev = {}) {
+  const t = String(ev.eventType || ev.type || ev.eventTypeNorm || "").trim().toLowerCase();
+  return (
+    t === "لبن يومي" ||
+    t === "daily_milk" ||
+    t === "milk" ||
+    t === "daily milk" ||
+    String(ev.eventTypeNorm || "").trim() === "daily_milk"
+  );
+}
+
+function milkReportIsCalvingEventSrv(ev = {}) {
+  const t = String(ev.eventType || ev.type || ev.eventTypeNorm || "").trim().toLowerCase();
+  return (
+    t === "ولادة" ||
+    t === "ولاده" ||
+    t === "calving" ||
+    t === "birth" ||
+    String(ev.eventTypeNorm || "").trim() === "calving"
+  );
+}
+
+function milkReportIsFeedEventSrv(ev = {}) {
+  const t = String(ev.eventType || ev.type || ev.eventTypeNorm || "").trim().toLowerCase();
+  return (
+    t === "تغذية" ||
+    t === "nutrition" ||
+    t === "feeding" ||
+    String(ev.eventTypeNorm || "").trim() === "nutrition"
+  );
+}
+
+function milkReportKindSrv(v) {
+  const s = String(v || "").trim();
+  return /buffalo|جاموس/i.test(s) ? "buffalo" : "cow";
+}
+
+function milkReportKgSrv(ev = {}) {
+  const n = Number(
+    ev.milkKg ??
+    ev.dailyMilk ??
+    ev.totalMilk ??
+    ev.milk ??
+    ev.details?.milkKg ??
+    ev.details?.dailyMilk ??
+    0
+  );
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function milkReportNumberSrv(v) {
+  return String(v ?? "").trim();
+}
+
+function milkReportDaysBetweenSrv(a, b) {
+  const A = new Date(String(a || "").slice(0, 10));
+  const B = new Date(String(b || "").slice(0, 10));
+  A.setHours(0, 0, 0, 0);
+  B.setHours(0, 0, 0, 0);
+  const n = Math.round((B - A) / 86400000);
+  return Number.isFinite(n) ? n : null;
+}
+
+async function milkReportFetchUserEventsSrv(uid, limitN = 8000) {
+  const snap = await db.collection("events")
+    .where("userId", "==", uid)
+    .limit(limitN)
+    .get();
+
+  const rows = [];
+  snap.forEach(doc => rows.push({ id: doc.id, ...(doc.data() || {}) }));
+  return rows;
+}
+
+async function milkReportFetchUserAnimalsSrv(uid, limitN = 3000) {
+  const snap = await db.collection("animals")
+    .where("userId", "==", uid)
+    .limit(limitN)
+    .get();
+
+  const rows = [];
+  snap.forEach(doc => rows.push({ id: doc.id, ...(doc.data() || {}) }));
+  return rows;
+}
+
+function milkReportSplitByKindSrv(rows = []) {
+  const out = { all: 0, cow: 0, buffalo: 0 };
+
+  for (const r of rows) {
+    const kg = milkReportKgSrv(r);
+    const kind = milkReportKindSrv(r.kind || r.species || r.animalType || r.animalTypeAr);
+    out.all += kg;
+    if (kind === "buffalo") out.buffalo += kg;
+    else out.cow += kg;
+  }
+
+  out.all = Number(out.all.toFixed(1));
+  out.cow = Number(out.cow.toFixed(1));
+  out.buffalo = Number(out.buffalo.toFixed(1));
+  return out;
+}
+
+function milkReportSeasonSrv(dateISO) {
+  const m = String(dateISO || "").slice(5, 7);
+  if (["12", "01", "02"].includes(m)) return "شتاء";
+  if (["03", "04", "05"].includes(m)) return "ربيع";
+  if (["06", "07", "08"].includes(m)) return "صيف";
+  return "خريف";
+}
+
+function milkReportDateInRangeSrv(date, start, end) {
+  const d = String(date || "").slice(0, 10);
+  return d >= start && d < end;
+}
+
+app.get("/api/milk-reports/summary", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+    const requestedDate = milkReportIsDateSrv(req.query.date)
+      ? String(req.query.date).slice(0, 10)
+      : milkReportTodaySrv();
+
+    const [allEvents, animals] = await Promise.all([
+      milkReportFetchUserEventsSrv(uid),
+      milkReportFetchUserAnimalsSrv(uid)
+    ]);
+
+    const milkEvents = allEvents
+      .filter(milkReportIsMilkEventSrv)
+      .filter(ev => milkReportIsDateSrv(ev.eventDate || ev.date));
+
+    let reportDate = requestedDate;
+    let dayRows = milkEvents.filter(ev => String(ev.eventDate || ev.date).slice(0, 10) === requestedDate);
+
+    let message = "";
+    if (!dayRows.length && milkEvents.length) {
+      const dates = [...new Set(milkEvents.map(ev => String(ev.eventDate || ev.date).slice(0, 10)).filter(milkReportIsDateSrv))]
+        .sort()
+        .reverse();
+
+      reportDate = dates[0] || requestedDate;
+      dayRows = milkEvents.filter(ev => String(ev.eventDate || ev.date).slice(0, 10) === reportDate);
+
+      if (reportDate !== requestedDate) {
+        message = `لا توجد سجلات لبن ليوم ${requestedDate}. تم عرض آخر يوم متاح: ${reportDate}.`;
+      }
+    }
+
+    const mb = milkReportMonthBoundsSrv(reportDate);
+    const yb = milkReportYearBoundsSrv(reportDate);
+
+    const monthRows = milkEvents.filter(ev => milkReportDateInRangeSrv(ev.eventDate || ev.date, mb.start, mb.end));
+    const yearRows = milkEvents.filter(ev => milkReportDateInRangeSrv(ev.eventDate || ev.date, yb.start, yb.end));
+
+    let prevDate = milkReportAddDaysSrv(reportDate, -1);
+    let prevRows = milkEvents.filter(ev => String(ev.eventDate || ev.date).slice(0, 10) === prevDate);
+
+    for (let i = 2; i <= 7 && !prevRows.length; i++) {
+      prevDate = milkReportAddDaysSrv(reportDate, -i);
+      prevRows = milkEvents.filter(ev => String(ev.eventDate || ev.date).slice(0, 10) === prevDate);
+    }
+
+    const day = milkReportSplitByKindSrv(dayRows);
+    const month = milkReportSplitByKindSrv(monthRows);
+    const year = milkReportSplitByKindSrv(yearRows);
+    const prev = milkReportSplitByKindSrv(prevRows);
+
+    const animalsByNumber = new Map();
+    for (const a of animals) {
+      const n = milkReportNumberSrv(a.animalNumber || a.number || a.animalNo);
+      if (n) animalsByNumber.set(n, a);
+    }
+
+    const calvingMap = new Map();
+
+    for (const a of animals) {
+      const n = milkReportNumberSrv(a.animalNumber || a.number || a.animalNo);
+      const d = String(
+        a.lastCalvingDate ||
+        a.lastCalving ||
+        a.calvingDate ||
+        a.lastBirthDate ||
+        ""
+      ).slice(0, 10);
+
+      if (n && milkReportIsDateSrv(d)) {
+        calvingMap.set(n, d);
+      }
+    }
+
+    for (const ev of allEvents.filter(milkReportIsCalvingEventSrv)) {
+      const n = milkReportNumberSrv(ev.animalNumber || ev.number);
+      const d = String(ev.eventDate || ev.date || "").slice(0, 10);
+      if (!n || !milkReportIsDateSrv(d)) continue;
+
+      const prevCalving = calvingMap.get(n);
+      if (!prevCalving || prevCalving < d) {
+        calvingMap.set(n, d);
+      }
+    }
+
+    const prevByNumber = new Map();
+    for (const ev of milkEvents) {
+      const d = String(ev.eventDate || ev.date || "").slice(0, 10);
+      if (!(d < reportDate && d >= milkReportAddDaysSrv(reportDate, -7))) continue;
+
+      const n = milkReportNumberSrv(ev.animalNumber || ev.number);
+      if (!n) continue;
+
+      const current = prevByNumber.get(n);
+      if (!current || current.date < d) {
+        prevByNumber.set(n, { kg: milkReportKgSrv(ev), date: d });
+      }
+    }
+
+    let skippedNoCalving = 0;
+    const points = [];
+
+    for (const ev of dayRows) {
+      const number = milkReportNumberSrv(ev.animalNumber || ev.number);
+      const kg = milkReportKgSrv(ev);
+      const animal = animalsByNumber.get(number) || {};
+      const lastCalvingDate = calvingMap.get(number);
+
+      if (!number || !lastCalvingDate) {
+        skippedNoCalving++;
+        continue;
+      }
+
+      const dim = milkReportDaysBetweenSrv(lastCalvingDate, reportDate);
+      const prevOne = prevByNumber.get(number);
+      const prevKg = Number(prevOne?.kg || 0);
+      const deltaPct = prevKg > 0 ? Number((((kg - prevKg) / prevKg) * 100).toFixed(1)) : null;
+
+      points.push({
+        number,
+        kg,
+        dim,
+        deltaPct,
+        group: animal.groupName || animal.group || ev.groupName || ev.group || "—",
+        repro: animal.reproductiveStatus || ev.reproductiveStatus || ev.reproStatus || "—",
+        season: milkReportSeasonSrv(reportDate),
+        kind: milkReportKindSrv(animal.kind || animal.species || animal.animalType || ev.kind || ev.species)
+      });
+    }
+
+    const feeds = allEvents.filter(ev =>
+      milkReportIsFeedEventSrv(ev) &&
+      String(ev.eventDate || ev.date || "").slice(0, 10) === reportDate
+    );
+
+    let feedCostTotal = 0;
+    for (const f of feeds) {
+      feedCostTotal += Number(
+        f.totalCost ??
+        f.cost ??
+        f.feedCost ??
+        f.details?.totalCost ??
+        f.details?.cost ??
+        0
+      ) || 0;
+    }
+
+    const feedCostPerKg = day.all > 0 && feedCostTotal > 0
+      ? Number((feedCostTotal / day.all).toFixed(2))
+      : null;
+
+    const activeAnimals = animals.filter(a => {
+      const status = String(a.status || "").toLowerCase();
+      const inactiveReason = String(a.inactiveReason || "").toLowerCase();
+      return status !== "archived" && inactiveReason !== "sale" && inactiveReason !== "death";
+    });
+
+    return res.json({
+      ok: true,
+      message,
+      requestedDate,
+      reportDate,
+      usedFallbackDate: reportDate !== requestedDate,
+      kpis: {
+        day,
+        month,
+        year,
+        prevDay: prev,
+        prevDate,
+        milkersCount: dayRows.length,
+        totalAnimals: activeAnimals.length,
+        avgHerdKg: dayRows.length ? Number((day.all / dayRows.length).toFixed(1)) : null,
+        feedCostPerKg,
+        feedCostTotal: feedCostTotal || 0,
+        feedNote: feedCostPerKg
+          ? `إجمالي تكلفة تغذية اليوم: ${Math.round(feedCostTotal)} ج.م`
+          : "لا توجد تغذية بتكلفة لهذا اليوم"
+      },
+      scatter: {
+        points,
+        skippedNoCalving
+      },
+      updatedAt: new Date().toISOString()
+    });
+
+  } catch (e) {
+    console.error("milk report summary failed:", e);
+    return res.status(500).json({
+      ok: false,
+      message: "تعذّر تحميل تقرير اللبن الآن."
+    });
+  }
+});
 // ============================================================
 //                 API: VACCINATION DASHBOARD ALERTS ONLY
 //                 تنبيهات التحصين من السيرفر فقط — للداشبورد
