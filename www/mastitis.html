@@ -71,7 +71,6 @@
 
 <script>
 (function(){
-  const API_BASE = "";
 
   const els = {
     sysbar: document.getElementById("sysbar"),
@@ -92,17 +91,6 @@
     return d.toISOString().slice(0, 10);
   }
 
-  function getUserId(){
-    const qs = new URLSearchParams(location.search);
-    return (
-      qs.get("userId") ||
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uid") ||
-      localStorage.getItem("ownerUid") ||
-      localStorage.getItem("tenantId") ||
-      ""
-    ).trim();
-  }
 
   function escapeHtml(v){
     return String(v ?? "")
@@ -130,31 +118,29 @@
   }
 
   async function apiPost(path, body){
-    const uid = getUserId();
-
-    if (!uid) {
-      throw new Error("يلزم تسجيل الدخول أولًا.");
-    }
-
-    const r = await fetch(API_BASE + path, {
+    const r = await fetch(path, {
       method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
       headers: {
         "Content-Type": "application/json",
-        "X-User-Id": uid
+        "Accept": "application/json"
       },
       body: JSON.stringify(body || {})
     });
 
-    let j = null;
-    try {
-      j = await r.json();
-    } catch {
-      j = null;
+    const j = await r.json().catch(() => ({
+      ok: false,
+      message: "❌ رد السيرفر غير صالح."
+    }));
+
+    if (r.status === 401 || j?.error === "auth_required") {
+      location.href = "login.html?next=mastitis.html";
+      throw new Error(j?.message || "سجّل الدخول أولًا.");
     }
 
     if (!r.ok) {
-      const msg = j?.message || "تعذّر تنفيذ الطلب من السيرفر.";
-      const err = new Error(msg);
+      const err = new Error(j?.message || "تعذّر تنفيذ الطلب من السيرفر.");
       err.response = j;
       err.status = r.status;
       throw err;
