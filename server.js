@@ -383,7 +383,7 @@ app.post("/api/auth/register", async (req, res) => {
       uid,
       userId: uid,
       user: authPublicUserBridgeSrv(profile, uid, uid),
-      redirectUrl: "dashboard.html"
+     redirectUrl: "add-animal.html"
     });
 
   } catch (e) {
