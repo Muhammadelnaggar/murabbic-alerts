@@ -77,8 +77,8 @@ db = firestore;
 }
 
 // ============================================================
-//          AUTH SESSION BRIDGE — server session + legacy userId
-//          جلسة سيرفر مع إبقاء X-User-Id مؤقتًا للصفحات الحالية
+//          AUTH SESSION BRIDGE — server session cookie only
+//          جلسة سيرفر عبر mbk_session فقط
 // ============================================================
 
 const AUTH_COOKIE_NAME = process.env.MURABBIK_AUTH_COOKIE || "mbk_session";
@@ -965,20 +965,9 @@ function belongs(rec, tenant){
 
 async function requireUserId(req, res, next){
   try {
-    // الجديد: جلسة السيرفر أولًا
     const session = await authSessionFromRequestBridgeSrv(req);
 
-    if (session?.userId) {
-      req.authSession = session;
-      req.userId = session.userId;
-      return next();
-    }
-
-    // مؤقتًا فقط: الصفحات القديمة التي ما زالت ترسل X-User-Id
-    const legacyAllowed = process.env.MURABBIK_ALLOW_LEGACY_USER_HEADER !== "0";
-    const t = legacyAllowed ? resolveTenant(req) : null;
-
-    if (!t) {
+    if (!session?.userId) {
       return res.status(401).json({
         ok: false,
         error: 'auth_required',
@@ -986,8 +975,8 @@ async function requireUserId(req, res, next){
       });
     }
 
-    req.userId = t;
-    req.authMode = 'legacy-header';
+    req.authSession = session;
+    req.userId = session.userId;
     return next();
 
   } catch (e) {
