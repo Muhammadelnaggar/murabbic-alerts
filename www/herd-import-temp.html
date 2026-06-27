@@ -96,19 +96,17 @@
 
 <script>
 (function(){
-  const API_BASE = "https://murabbic-alerts.onrender.com";
   let currentUser = null;
 let currentUserId = null;
 
 async function loadServerSession(){
-  const res = await fetch(API_BASE + "/api/auth/me", {
+  const res = await fetch("/api/auth/me", {
     method: "GET",
+    credentials: "same-origin",
+    cache: "no-store",
     headers: {
-      "Accept": "application/json",
-      "Cache-Control": "no-store"
-    },
-    credentials: "include",
-    cache: "no-store"
+      "Accept": "application/json"
+    }
   });
 
   const data = await res.json().catch(() => ({}));
@@ -222,40 +220,39 @@ function renderRows(rows){
   }
 
 async function callHerdImport(path){
-    if (!currentUserId) {
-      await loadServerSession();
-    }
-
-    const r = await fetch(API_BASE + path, {
-      method: "POST",
-      cache: "no-store",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "Cache-Control": "no-store"
-      },
-      body: JSON.stringify({
-        ...(lastFilePayload || {}),
-        defaultAnimalType: String(defaultAnimalType?.value || "").trim()
-      })
-    });
-
-    const data = await r.json().catch(() => ({
-      ok: false,
-      message: "تعذّر قراءة رد السيرفر."
-    }));
-
-    if (r.status === 401 || data?.error === "auth_required") {
-      location.replace("login.html?next=herd-import-temp.html");
-      return {
-        ok: false,
-        message: "انتهت الجلسة. سجّل الدخول مرة أخرى."
-      };
-    }
-
-    return data;
+  if (!currentUserId) {
+    await loadServerSession();
   }
+
+  const r = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify({
+      ...(lastFilePayload || {}),
+      defaultAnimalType: String(defaultAnimalType?.value || "").trim()
+    })
+  });
+
+  const data = await r.json().catch(() => ({
+    ok: false,
+    message: "تعذّر قراءة رد السيرفر."
+  }));
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    location.replace("login.html?next=herd-import-temp.html");
+    return {
+      ok: false,
+      message: "انتهت الجلسة. سجّل الدخول مرة أخرى."
+    };
+  }
+
+  return data;
+}
 
   btnPreview.addEventListener("click", async () => {
     try {
