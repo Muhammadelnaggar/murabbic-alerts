@@ -671,10 +671,6 @@
 </head>
 <body>
 
-
-<script>
-  window.API_BASE = "https://murabbic-alerts.onrender.com";
-</script>
 <header class="mbk-top">
   <div class="mbk-head">
     <div class="mbk-title">
@@ -753,7 +749,7 @@
 
 <script>
 // ============ API BASE ============
-const API_BASE = "https://murabbic-alerts.onrender.com";
+const API_BASE = "";
 let currentType = '';
  let currentTHI = null;
 
@@ -810,25 +806,16 @@ async function loadServerSession(){
       'Accept': 'application/json',
       'Cache-Control': 'no-store'
     },
-    credentials: 'include',
+    credentials: 'same-origin',
     cache: 'no-store'
   });
 
   const data = await res.json().catch(() => ({}));
 
-  if (!res.ok || data.ok !== true || !data.userId) {
-    try {
-      sessionStorage.setItem("mbkLoggedOut", "1");
-    } catch(e) {}
-
+    if (!res.ok || data.ok !== true || !data.userId) {
     location.replace("login.html");
     throw new Error("auth_required");
   }
-
-  try {
-    sessionStorage.removeItem("mbkLoggedOut");
-  } catch(e) {}
-
   currentUser = data.user || {};
   currentUserId = data.userId;
 
@@ -842,7 +829,7 @@ async function fetchJSON(path){
       'Accept': 'application/json',
       'Cache-Control': 'no-store'
     },
-    credentials: 'include',
+    credentials: 'same-origin',
     cache: 'no-store'
   });
 
@@ -1790,7 +1777,7 @@ const r = await fetch(API_BASE + '/api/ovsynch/dashboard-alerts', {
     'Accept': 'application/json',
     'Cache-Control': 'no-store'
   },
-  credentials: 'include',
+  credentials: 'same-origin',
   cache: 'no-store'
 });
 
@@ -1827,7 +1814,7 @@ const r = await fetch(API_BASE + '/api/vaccination/dashboard-alerts', {
     'Accept': 'application/json',
     'Cache-Control': 'no-store'
   },
-  credentials: 'include',
+  credentials: 'same-origin',
   cache: 'no-store'
 });
 
@@ -1904,16 +1891,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             "Accept": "application/json",
             "Cache-Control": "no-store"
           },
-          credentials: "include",
+          credentials: "same-origin",
           cache: "no-store"
         });
-      } catch(e) {}
-
-      try {
-        localStorage.removeItem("userId");
-        localStorage.removeItem("uid");
-        localStorage.removeItem("tenantId");
-        sessionStorage.setItem("mbkLoggedOut", "1");
       } catch(e) {}
 
       location.replace("login.html");
