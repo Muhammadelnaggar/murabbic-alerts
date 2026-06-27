@@ -13,13 +13,13 @@
 <style>
   :root{
     --green:#0b7f47;
-    --green-dark:#075f36;
-    --field:#1f8a4c;
-    --field-light:#49b86f;
-    --cream:#fff7df;
-    --sun:#ffd36a;
-    --brown:#6b4f2a;
-    --text:#173b24;
+    --green-dark:#064f31;
+    --green-soft:#e9f7ee;
+    --sky:#dff5ff;
+    --cream:#fff9e8;
+    --soil:#7a5a32;
+    --text:#123522;
+    --muted:#4d6a59;
     --white:#ffffff;
   }
 
@@ -28,11 +28,10 @@
   body{
     margin:0;
     min-height:100vh;
-    font-family:'Cairo',Tahoma,sans-serif;
     overflow:hidden;
+    font-family:'Cairo',Tahoma,sans-serif;
     color:var(--text);
-    background:
-      linear-gradient(180deg, #dff7ff 0%, #f8ffe8 42%, #d9f4cf 43%, #0b7f47 100%);
+    background:linear-gradient(180deg,var(--sky) 0%,#f8ffe8 42%,#d8f0c8 43%,#0b7f47 100%);
     display:flex;
     align-items:center;
     justify-content:center;
@@ -40,7 +39,7 @@
     position:relative;
   }
 
-  .farm-bg{
+  .farm-scene{
     position:absolute;
     inset:0;
     overflow:hidden;
@@ -49,191 +48,215 @@
 
   .sun{
     position:absolute;
-    width:110px;
-    height:110px;
-    top:9%;
-    left:12%;
+    width:108px;
+    height:108px;
+    top:8%;
+    left:10%;
     border-radius:50%;
-    background:radial-gradient(circle, #fff1a8 0%, var(--sun) 62%, rgba(255,211,106,.25) 100%);
-    box-shadow:0 0 55px rgba(255,211,106,.55);
+    background:radial-gradient(circle,#fff6bd 0%,#ffd36d 65%,rgba(255,211,109,.10) 100%);
+    box-shadow:0 0 55px rgba(255,190,70,.45);
   }
 
-  .field{
+  .horizon{
     position:absolute;
-    left:-8%;
-    right:-8%;
-    bottom:-4%;
-    height:43%;
+    left:-10%;
+    right:-10%;
+    bottom:30%;
+    height:26%;
     background:
-      repeating-linear-gradient(
-        112deg,
-        rgba(255,255,255,.16) 0 2px,
-        transparent 2px 34px
-      ),
-      linear-gradient(180deg, var(--field-light), var(--field));
-    border-radius:50% 50% 0 0 / 18% 18% 0 0;
+      linear-gradient(135deg, rgba(255,255,255,.20) 0 2px, transparent 2px 42px),
+      linear-gradient(180deg,#65bd72,#14854f);
+    border-radius:55% 55% 0 0 / 24% 24% 0 0;
   }
 
-  .field::before{
+  .barn{
+    position:absolute;
+    right:9%;
+    bottom:37%;
+    width:92px;
+    height:64px;
+    background:#8b3f2f;
+    border-radius:8px 8px 4px 4px;
+    opacity:.22;
+  }
+
+  .barn::before{
     content:"";
     position:absolute;
-    inset:18px 0 auto 0;
-    height:42px;
-    background:rgba(255,255,255,.10);
-    border-radius:50%;
-    filter:blur(10px);
+    right:0;
+    left:0;
+    top:-34px;
+    margin:auto;
+    width:76px;
+    height:76px;
+    background:#8b3f2f;
+    transform:rotate(45deg);
+    border-radius:6px;
+  }
+
+  .barn::after{
+    content:"";
+    position:absolute;
+    left:50%;
+    bottom:0;
+    width:30px;
+    height:38px;
+    transform:translateX(-50%);
+    background:rgba(255,255,255,.28);
+    border-radius:8px 8px 0 0;
   }
 
   .fence{
     position:absolute;
-    right:7%;
-    bottom:28%;
-    width:86%;
-    height:26px;
-    border-top:4px solid rgba(107,79,42,.55);
-    border-bottom:4px solid rgba(107,79,42,.45);
+    left:5%;
+    right:5%;
+    bottom:29%;
+    height:30px;
+    border-top:4px solid rgba(122,90,50,.35);
+    border-bottom:4px solid rgba(122,90,50,.30);
   }
 
   .fence::before{
     content:"";
     position:absolute;
-    inset:-14px 0 0 0;
-    background:
-      repeating-linear-gradient(
-        90deg,
-        rgba(107,79,42,.55) 0 5px,
-        transparent 5px 78px
-      );
+    inset:-15px 0 0 0;
+    background:repeating-linear-gradient(
+      90deg,
+      rgba(122,90,50,.36) 0 5px,
+      transparent 5px 70px
+    );
   }
 
   .splash-shell{
     position:relative;
     z-index:2;
-    width:min(92vw,460px);
+    width:min(92vw,455px);
     padding:18px;
   }
 
   .splash-card{
-    background:rgba(255,255,255,.88);
-    border:1px solid rgba(11,127,71,.18);
-    border-radius:26px;
-    padding:28px 22px 24px;
-    box-shadow:0 18px 45px rgba(16,72,38,.22);
-  }
-
-  .logo-wrap{
-    width:104px;
-    height:104px;
-    margin:0 auto 16px;
-    border-radius:24px;
-    background:linear-gradient(180deg,#ffffff,#eef9ef);
-    border:1px solid rgba(11,127,71,.18);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    box-shadow:0 10px 24px rgba(11,127,71,.15);
+    background:rgba(255,255,255,.94);
+    border:1px solid rgba(11,127,71,.16);
+    border-radius:28px;
+    padding:30px 22px 24px;
+    box-shadow:0 22px 55px rgba(11,79,49,.24);
   }
 
   .logo{
-    width:74px;
-    height:74px;
+    width:150px;
+    max-width:70%;
+    height:auto;
     object-fit:contain;
-    animation:float 2.8s ease-in-out infinite alternate;
+    margin:0 auto 18px;
+    display:block;
+    animation:logoRise .9s ease forwards;
   }
 
-  @keyframes float{
-    from{transform:translateY(0)}
-    to{transform:translateY(-7px)}
+  @keyframes logoRise{
+    from{transform:translateY(14px);opacity:0}
+    to{transform:translateY(0);opacity:1}
   }
 
-  .farm-tag{
+  .field-label{
     display:inline-flex;
-    align-items:center;
     justify-content:center;
-    gap:8px;
-    padding:7px 14px;
+    align-items:center;
+    padding:7px 15px;
     border-radius:999px;
-    background:#eef9ef;
-    border:1px solid rgba(11,127,71,.20);
+    background:var(--green-soft);
+    border:1px solid rgba(11,127,71,.18);
     color:var(--green-dark);
     font-size:13px;
     font-weight:900;
-    margin-bottom:12px;
+    margin-bottom:14px;
   }
 
-  .brand{
-    font-size:42px;
-    font-weight:900;
-    line-height:1.1;
-    color:var(--green-dark);
-    margin:0;
-    opacity:0;
-    animation:fadeInUp .9s ease .1s forwards;
-  }
-
-  .slogan{
-    max-width:330px;
-    margin:14px auto 0;
-    font-size:16px;
+  .main-line{
+    max-width:340px;
+    margin:0 auto;
+    font-size:18px;
     line-height:1.9;
-    color:#31533a;
+    color:var(--text);
+    font-weight:900;
+    opacity:0;
+    animation:fadeInUp .9s ease .18s forwards;
+  }
+
+  .sub-line{
+    max-width:340px;
+    margin:10px auto 0;
+    font-size:14px;
+    line-height:1.9;
+    color:var(--muted);
     font-weight:800;
     opacity:0;
-    animation:fadeInUp .9s ease .25s forwards;
+    animation:fadeInUp .9s ease .32s forwards;
   }
 
-  .animal-row{
+  .feature-grid{
     display:grid;
-    grid-template-columns:1fr 1fr 1fr;
+    grid-template-columns:repeat(4,1fr);
     gap:8px;
-    margin:18px 0 16px;
+    margin:20px 0 16px;
   }
 
-  .animal-chip{
-    min-height:54px;
+  .feature-card{
+    min-height:66px;
     border-radius:16px;
-    background:#f6fff4;
-    border:1px solid rgba(11,127,71,.16);
+    background:#fbfff8;
+    border:1px solid rgba(11,127,71,.14);
     display:flex;
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    gap:3px;
-    font-weight:900;
-    color:var(--green-dark);
-    box-shadow:0 6px 14px rgba(11,127,71,.07);
+    gap:5px;
+    box-shadow:0 6px 14px rgba(11,127,71,.06);
   }
 
-  .animal-chip span{
-    font-size:20px;
+  .feature-icon{
+    width:30px;
+    height:30px;
+    border-radius:11px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--green-soft);
+    color:var(--green-dark);
+    font-size:14px;
+    font-weight:900;
     line-height:1;
   }
 
-  .animal-chip small{
-    font-size:12px;
-    color:#45614d;
-    font-weight:800;
+  .feature-card span{
+    color:#365b43;
+    font-size:11px;
+    font-weight:900;
+    white-space:nowrap;
+  }
+
+  .feature-wide{
+    grid-column:span 2;
   }
 
   .status-row{
     display:flex;
-    justify-content:center;
     align-items:center;
-    gap:12px;
-    padding-top:12px;
+    justify-content:center;
+    gap:11px;
+    padding-top:14px;
     border-top:1px solid rgba(11,127,71,.13);
+    color:var(--green-dark);
     font-size:14px;
     font-weight:900;
-    color:var(--green-dark);
     opacity:0;
-    animation:fadeInUp .9s ease .42s forwards;
+    animation:fadeInUp .9s ease .46s forwards;
   }
 
   .loader{
     width:22px;
     height:22px;
     border-radius:50%;
-    border:3px solid rgba(11,127,71,.20);
+    border:3px solid rgba(11,127,71,.18);
     border-top-color:var(--green);
     animation:spin .9s linear infinite;
     flex:0 0 auto;
@@ -244,47 +267,58 @@
   }
 
   @keyframes fadeInUp{
-    from{transform:translateY(16px);opacity:0}
+    from{transform:translateY(14px);opacity:0}
     to{transform:translateY(0);opacity:1}
   }
 
   @media(max-width:480px){
     .splash-card{
-      border-radius:22px;
-      padding:26px 18px 22px;
-    }
-
-    .brand{
-      font-size:36px;
-    }
-
-    .slogan{
-      font-size:15px;
-    }
-
-    .animal-row{
-      gap:7px;
-    }
-
-    .animal-chip{
-      min-height:50px;
-    }
-
-    .logo-wrap{
-      width:96px;
-      height:96px;
+      padding:28px 18px 22px;
+      border-radius:24px;
     }
 
     .logo{
-      width:66px;
-      height:66px;
+      width:138px;
+    }
+
+    .main-line{
+      font-size:16px;
+      max-width:305px;
+    }
+
+    .sub-line{
+      font-size:13px;
+      max-width:305px;
+    }
+
+    .feature-grid{
+      grid-template-columns:repeat(3,1fr);
+      gap:7px;
+    }
+
+    .feature-card{
+      min-height:62px;
+    }
+
+    .feature-wide{
+      grid-column:span 1;
+    }
+
+    .feature-icon{
+      width:28px;
+      height:28px;
+      font-size:13px;
+    }
+
+    .feature-card span{
+      font-size:10.5px;
     }
 
     .sun{
-      width:88px;
-      height:88px;
+      width:86px;
+      height:86px;
       top:8%;
-      left:8%;
+      left:7%;
     }
   }
 </style>
@@ -292,52 +326,61 @@
 
 <body>
 
-<div class="splash-bg" aria-hidden="true">
-  <span class="orb orb-1"></span>
-  <span class="orb orb-2"></span>
-  <span class="orb orb-3"></span>
-</div>
-
-<div class="splash-shell">
-  <div class="splash-card">
-    <div class="logo-wrap">
-      <img src="images/logo.png" alt="شعار مُرَبِّيك" class="logo">
-    </div>
-
-    <div class="eyebrow">منصة إدارة القطيع الذكية</div>
-
-   <div class="farm-bg" aria-hidden="true">
+<div class="farm-scene" aria-hidden="true">
   <span class="sun"></span>
-  <span class="field"></span>
+  <span class="horizon"></span>
+  <span class="barn"></span>
   <span class="fence"></span>
 </div>
 
 <div class="splash-shell">
   <div class="splash-card">
-    <div class="logo-wrap">
-      <img src="images/logo.png" alt="شعار مُرَبِّيك" class="logo">
+    <img src="images/logo.png" alt="شعار مُرَبِّيك" class="logo">
+
+    <div class="field-label">إدارة القطيع للأبقار والجاموس</div>
+
+    <div class="main-line">
+      تابع مزرعتك، سجّل أحداث القطيع، وخد القرار في وقته.
     </div>
 
-    <div class="farm-tag">أبقار • جاموس • مزارع</div>
-
-    <div class="brand">مُرَبِّيك</div>
-
-    <div class="slogan">
-      نظام خبير لمتابعة القطيع، تنظيم الأحداث، وتنبيه المربي قبل فوات القرار.
+    <div class="sub-line">
+      ذكاء صناعي، تنبيهات، تقارير، تغذية، إنتاج لبن، وتكاليف في مسار واحد واضح.
     </div>
 
-    <div class="animal-row">
-      <div class="animal-chip">
-        <span>🐄</span>
-        <small>أبقار</small>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">AI</div>
+        <span>ذكاء</span>
       </div>
-      <div class="animal-chip">
-        <span>🐃</span>
-        <small>جاموس</small>
+
+      <div class="feature-card">
+        <div class="feature-icon">✓</div>
+        <span>تسجيل</span>
       </div>
-      <div class="animal-chip">
-        <span>🥛</span>
-        <small>لبن وتنبيهات</small>
+
+      <div class="feature-card">
+        <div class="feature-icon">!</div>
+        <span>تنبيهات</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">▦</div>
+        <span>تقارير</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">ب</div>
+        <span>أبقار</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">ج</div>
+        <span>جاموس</span>
+      </div>
+
+      <div class="feature-card feature-wide">
+        <div class="feature-icon">EGP</div>
+        <span>أرباح وتكاليف</span>
       </div>
     </div>
 
@@ -347,7 +390,6 @@
     </div>
   </div>
 </div>
-
   <script>
     setTimeout(() => {
   window.location.replace("login.html");
