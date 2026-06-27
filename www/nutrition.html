@@ -520,11 +520,13 @@ function showMsg(msg, type = "ok", opts = {}) {
   if (!w) return;
 
   w.textContent = msg || "";
-  w.className = type === "bad" ? "warning bad" : "warning";
 
-  const shouldScroll = opts.scroll !== false && msg;
+  w.className =
+    type === "bad"  ? "warning bad" :
+    type === "warn" ? "warning warn" :
+                      "warning ok";
 
-  if (shouldScroll) {
+  if (opts.scroll === true && msg) {
     requestAnimationFrame(() => {
       const header = document.querySelector(".mbk-head");
       const headerH = header ? header.getBoundingClientRect().height : 0;
