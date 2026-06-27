@@ -6845,6 +6845,15 @@ const iofcPctOfMilkIncome =
   };
 }
 function buildDashboardFeedAdviceSrv(overall = {}) {
+  if (overall.coverageComplete === false) {
+    const covered = Number(overall.coverageHeadCount || 0);
+    const required = Number(overall.coverageRequiredHeadCount || 0);
+
+    return required > 0
+      ? `بيانات التغذية غير مكتملة كمزرعة حلاب: محفوظ ${covered} من ${required} رأس حلاب. احفظ علائق كل مجموعات الحلاب ليظهر متوسط غرفة التحكم.`
+      : 'بيانات التغذية غير مكتملة كمزرعة حلاب؛ احفظ علائق الحلاب كلها لتظهر قراءة غرفة التحكم.';
+  }
+
   const fe = Number(overall.feedEfficiency || 0);
   const iofcPct = Number(overall.iofcPctOfMilkIncome || 0);
   const costPct = Number(overall.feedCostPctOfMilkIncome || 0);
@@ -6935,7 +6944,24 @@ function buildDashboardFeedGaugeCardsSrv(overall = {}) {
     pointerPct: 0,
     reference: 'Feed efficiency = ECM / DMI'
   };
+    if (overall.coverageComplete === false) {
+    const covered = Number(overall.coverageHeadCount || 0);
+    const required = Number(overall.coverageRequiredHeadCount || 0);
+    const msg = required > 0
+      ? `القراءة غير مكتملة كمزرعة حلاب: محفوظ ${covered} من ${required} رأس حلاب.`
+      : 'القراءة غير مكتملة كمزرعة حلاب.';
 
+    iofcCard.message = msg;
+    iofcCard.subText = 'لا يتم عرض اقتصاد مجموعة واحدة في غرفة التحكم.';
+
+    feCard.message = msg;
+    feCard.subText = 'لا يتم عرض كفاءة مجموعة واحدة في غرفة التحكم.';
+
+    return {
+      iofc: iofcCard,
+      feedEfficiency: feCard
+    };
+  }
   if (Number.isFinite(fe) && fe > 0) {
     if (fe > 1.8) {
       feCard.state = 'watch';
@@ -25466,7 +25492,7 @@ extraFertility = { scPlus, hdr21, cr21, pr21, firstServicePct };
       console.error("FERTILITY EVENT ERROR", e);
     }
     // --------------------------------------
-    // 🔥 5.5) التغذية — إجمالي + عالي/متوسط/منخفض
+// 🔥 5.5) التغذية — غرفة التحكم تعرض مزرعة الحلاب فقط
     // --------------------------------------
 let feedBands = {
   overall: emptyFeedBand(),
@@ -25551,18 +25577,21 @@ const nutritionEvents = evNutAll
   isLactatingNutritionEventForDashboard(e)
 );
       const latestByBand = new Map();
+      const lactatingBandKeys = ['fresh', 'high', 'medium', 'low'];
 
       for (const e of nutritionEvents) {
         const rawGroup =
           e?.nutrition?.context?.group ||
+          e?.nutrition?.context?.groupKey ||
+          e?.nutrition?.context?.groupName ||
           e?.group ||
           e?.groupName ||
           '';
 
-        const band =
-          String(e.type || '').toLowerCase() === 'nutrition_group'
-            ? feedBandKey(rawGroup)
-            : (rawGroup ? feedBandKey(rawGroup) : 'overall');
+        const band = feedBandKey(rawGroup);
+
+        // غرفة التحكم لا تعرض عليقة عامة ولا حدث تغذية بلا مجموعة إنتاجية واضحة
+        if (!lactatingBandKeys.includes(band)) continue;
 
         const prev = latestByBand.get(band);
         if (!prev || Number(e._ms || 0) > Number(prev._ms || 0)) {
@@ -25570,30 +25599,56 @@ const nutritionEvents = evNutAll
         }
       }
 
-      if (latestByBand.has('high')) {
-        feedBands.high = buildFeedBandFromEvent(latestByBand.get('high'), officialFeedBandCounts?.high);
+      for (const key of lactatingBandKeys) {
+        if (latestByBand.has(key)) {
+          feedBands[key] = buildFeedBandFromEvent(
+            latestByBand.get(key),
+            officialFeedBandCounts?.[key]
+          );
+        }
       }
-      if (latestByBand.has('medium')) {
-        feedBands.medium = buildFeedBandFromEvent(latestByBand.get('medium'), officialFeedBandCounts?.medium);
+
+      const lactatingCards = lactatingBandKeys
+        .map(key => feedBands[key])
+        .filter(x => x && Number(x.headCount || 0) > 0);
+
+      const coveredHeads = lactatingCards
+        .reduce((sum, x) => sum + Number(x.headCount || 0), 0);
+
+      const farmLactatingHeadCount = Number(inMilkCount || 0);
+      const minRequiredHeads = farmLactatingHeadCount > 0
+        ? Math.max(1, Math.round(farmLactatingHeadCount * 0.95))
+        : 0;
+
+      const bandCoverageCoversFarm =
+        lactatingCards.length > 0 &&
+        (!minRequiredHeads || coveredHeads >= minRequiredHeads);
+
+      if (bandCoverageCoversFarm) {
+        feedBands.overall = {
+          ...weightedFeedBands(lactatingCards),
+          scope: 'lactating_farm',
+          coverageComplete: true,
+          coverageHeadCount: coveredHeads,
+          coverageRequiredHeadCount: farmLactatingHeadCount,
+          source: 'weighted_lactating_feed_bands'
+        };
+          } else {
+        feedBands.overall = {
+          ...emptyFeedBand(),
+          headCount: farmLactatingHeadCount || coveredHeads || 0,
+          scope: 'lactating_farm',
+          coverageComplete: false,
+          coverageHeadCount: coveredHeads,
+          coverageRequiredHeadCount: farmLactatingHeadCount,
+          source: 'incomplete_lactating_feed_coverage'
+        };
       }
-      if (latestByBand.has('low')) {
-        feedBands.low = buildFeedBandFromEvent(latestByBand.get('low'), officialFeedBandCounts?.low);
-      }
-      if (latestByBand.has('fresh')) {
-        feedBands.fresh = buildFeedBandFromEvent(latestByBand.get('fresh'), officialFeedBandCounts?.fresh);
-      }
-feedBands.overall = weightedFeedBands([
-  feedBands.high,
-  feedBands.medium,
-  feedBands.low,
-  feedBands.fresh
-]);
     } catch (e) {
       console.error("FEED BANDS ERROR:", e.message || e);
     }
     // --------------------------------------
     // 🔥 6) RETURN — النتيجة النهائية للداشبورد
-    // --------------------------------------
 return res.json({
   ok: true,
 
