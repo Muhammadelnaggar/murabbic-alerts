@@ -239,14 +239,12 @@
     qp.get("animalNumber") ||
     qp.get("number") ||
     qp.get("animalId") ||
-    localStorage.getItem("lastAnimalId") ||
     "";
 
   const dateFromURL =
     qp.get("date") ||
-    localStorage.getItem("lastEventDate") ||
+    qp.get("eventDate") ||
     "";
-
   const animalEl = document.getElementById("animalNumber");
   const dateEl = document.getElementById("eventDate");
 
@@ -257,22 +255,6 @@
   if (dateEl) {
     dateEl.value = dateFromURL || new Date().toISOString().slice(0, 10);
   }
-  function getUid() {
-  return String(
-    localStorage.getItem("userId") ||
-    localStorage.getItem("uid") ||
-    localStorage.getItem("tenantId") ||
-    ""
-  ).trim();
-}
-
-function apiBase() {
-  return String(
-    window.API_BASE ||
-    localStorage.getItem("API_BASE") ||
-    ""
-  ).replace(/\/$/, "");
-}
 
 function parseNumbers(raw) {
   const map = {
@@ -332,6 +314,37 @@ function collectPayload(form) {
     result: readRadio(form, "result"),
     vet
   };
+}
+  async function sessionPostJson(endpoint, payload) {
+  const r = await fetch(endpoint, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify(payload || {})
+  });
+
+  const data = await r.json().catch(() => ({
+    ok: false,
+    message: ""
+  }));
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    return {
+      r,
+      data: {
+        ok: false,
+        message: data?.message || "❌ سجّل الدخول أولًا.",
+        error: "auth_required"
+      },
+      authRequired: true
+    };
+  }
+
+  return { r, data, authRequired: false };
 }
 let gateTimer = null;
 let lastGateKey = "";
@@ -427,8 +440,6 @@ function renderGateResult(data, nums) {
 async function runGateNow() {
   const form = document.getElementById("diagnosisForm");
   if (!form) return;
-
-  const uid = getUid();
   const payload = collectPayload(form);
   const nums = parseNumbers(payload.animalNumber);
 
@@ -442,24 +453,17 @@ const gateKey = JSON.stringify({
   lastGateKey = gateKey;
 
   const endpoint = "/api/pregnancy-diagnosis/gate";
-  const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
+  
 
   try {
     
 
-    const r = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": uid
-      },
-      body: JSON.stringify(payload)
-    });
+      const { data, authRequired } = await sessionPostJson(endpoint, payload);
 
-const data = await r.json().catch(() => ({
-  ok: false,
-  message: ""
-}));
+    if (authRequired) {
+      showMsg(data.message || "❌ سجّل الدخول أولًا.", "error");
+      return;
+    }
 
     renderGateResult(data, nums);
 
@@ -485,10 +489,9 @@ document.getElementById("diagnosisForm")?.addEventListener("submit", async (e) =
   e.preventDefault();
 
   const form = e.currentTarget;
-  const uid = getUid();
+  const payload = collectPayload(form);
+  const nums = parseNumbers(payload.animalNumber);
 
-const payload = collectPayload(form);
-const nums = parseNumbers(payload.animalNumber);
   const isBulk =
     new URLSearchParams(location.search).get("mode") === "bulk" ||
     nums.length > 1;
@@ -497,63 +500,54 @@ const nums = parseNumbers(payload.animalNumber);
     ? "/api/pregnancy-diagnosis/bulk-save"
     : "/api/pregnancy-diagnosis/save";
 
-  const url = apiBase() ? `${apiBase()}${endpoint}` : endpoint;
-
   const btn = document.getElementById("saveBtn");
 
   try {
     if (btn) btn.disabled = true;
 
-    const r = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": uid
-      },
-      body: JSON.stringify(payload)
-    });
+    const { data, authRequired } = await sessionPostJson(endpoint, payload);
 
-const data = await r.json().catch(() => ({
-  ok: false,
-  message: ""
-}));
+    if (authRequired) {
+      showMsg(data.message || "❌ سجّل الدخول أولًا.", "error");
+      return;
+    }
 
-const mainMsg = String(data.message || data.error || "").trim();
-const mainClean = compactReason(mainMsg);
+    const mainMsg = String(data.message || data.error || "").trim();
+    const mainClean = compactReason(mainMsg);
 
-const rejectedLines = Array.isArray(data.rejected) && data.rejected.length
-  ? data.rejected.slice(0, 8).map(x => {
-      const n = String(x.animalNumber || "").trim();
-      const reason = compactReason(x.reason || "");
-      if (!reason) return "";
-      if (reason === mainClean) return "";
-      return `${n}: ${reason}`;
-    }).filter(Boolean).join("\n")
-  : "";
+    const rejectedLines = Array.isArray(data.rejected) && data.rejected.length
+      ? data.rejected.slice(0, 8).map(x => {
+          const n = String(x.animalNumber || "").trim();
+          const reason = compactReason(x.reason || "");
+          if (!reason) return "";
+          if (reason === mainClean) return "";
+          return `${n}: ${reason}`;
+        }).filter(Boolean).join("\n")
+      : "";
 
-const serverMessage = [
-  mainMsg,
-  rejectedLines
-].filter(Boolean).join("\n\n");
+    const serverMessage = [
+      mainMsg,
+      rejectedLines
+    ].filter(Boolean).join("\n\n");
 
-if (serverMessage.trim()) {
-  showMsg(
-    serverMessage,
-    data.ok ? "success" : "error"
-  );
-}
+    if (serverMessage.trim()) {
+      showMsg(
+        serverMessage,
+        data.ok ? "success" : "error"
+      );
+    }
 
-if (data.ok && data.redirectUrl) {
-  setTimeout(() => {
-    location.href = data.redirectUrl;
-  }, 1100);
-}
+    if (data.ok && data.redirectUrl) {
+      setTimeout(() => {
+        location.href = data.redirectUrl;
+      }, 1100);
+    }
 
-return;
-} catch (err) {
-  console.error("pregnancy diagnosis save failed", err);
+  } catch (err) {
+    console.error("pregnancy diagnosis save failed", err);
+    showMsg("❌ فشل الاتصال بالسيرفر أثناء حفظ تشخيص الحمل.", "error");
 
-} finally {
+  } finally {
     if (btn) btn.disabled = false;
   }
 });
