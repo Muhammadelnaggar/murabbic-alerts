@@ -1033,10 +1033,12 @@ function fillHint(meta = {}){
       ctx.fillText("لا توجد نقاط لعرضها في هذا اليوم.", cssW / 2, cssH / 2);
     }
 
-   function eventXY(ev){
+
+
+function eventXY(ev){
   const src =
-    ev.touches?.[0] ||
-    ev.changedTouches?.[0] ||
+    (ev.touches && ev.touches[0]) ||
+    (ev.changedTouches && ev.changedTouches[0]) ||
     ev;
 
   const r = canvas.getBoundingClientRect();
@@ -1131,6 +1133,8 @@ canvas.addEventListener("click", canvas._mbkClick);
 canvas.addEventListener("pointerdown", canvas._mbkDown);
 canvas.addEventListener("touchstart", canvas._mbkTouch, { passive:false });
 canvas.addEventListener("pointerleave", canvas._mbkLeave);
+  }
+
   async function loadReport(){
     hideMsg();
     if (hintEl) hintEl.hidden = true;
