@@ -826,32 +826,38 @@ if (
 
     renderFarmReading(data);
   }
-  function fillHint(meta){
-    $("hNo").textContent = `#${meta.number || "—"}`;
-    $("hKg").textContent = `${meta.kg ?? "—"} كجم/اليوم`;
-    $("hDim").textContent = `${meta.dim ?? "—"} يوم`;
+function fillHint(meta = {}){
+  const number = meta.number || "—";
+  const milkKg = Number(meta.kg);
+  const dim = Number(meta.dim);
+  const season = meta.season || "الموسم غير مسجل";
 
-    const d = meta.deltaPct;
-    const deltaEl = $("hDelta");
+  $("hNo").textContent = `#${number}`;
+  $("hKg").textContent = Number.isFinite(milkKg)
+    ? `${milkKg.toFixed(1)} كجم لبن`
+    : "— كجم لبن";
 
-    if (d == null || Number.isNaN(Number(d))) {
-      deltaEl.textContent = "—";
-      deltaEl.className = "delta neutral";
-    } else {
-      const n = Number(d);
-      deltaEl.textContent = `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
-      deltaEl.className = "delta " + (n > 0 ? "up" : (n < 0 ? "down" : "neutral"));
-    }
+  $("hDim").textContent = Number.isFinite(dim)
+    ? `${Math.round(dim)} يوم حليب`
+    : "— يوم حليب";
 
-    const parts = [];
-    if (meta.group) parts.push(meta.group);
-    if (meta.repro) parts.push(meta.repro);
-    if (meta.season) parts.push(meta.season);
+  const d = meta.deltaPct;
+  const deltaEl = $("hDelta");
 
-    $("hLine2").textContent = parts.join(" • ");
-    $("hLine2").style.display = parts.length ? "block" : "none";
+  if (d == null || Number.isNaN(Number(d))) {
+    deltaEl.textContent = "—";
+    deltaEl.className = "delta neutral";
+    deltaEl.title = "لا توجد مقارنة قريبة";
+  } else {
+    const n = Number(d);
+    deltaEl.textContent = `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
+    deltaEl.className = "delta " + (n > 0 ? "up" : (n < 0 ? "down" : "neutral"));
+    deltaEl.title = "تغير عن آخر قراءة قريبة";
   }
 
+  $("hLine2").textContent = season;
+  $("hLine2").style.display = "block";
+}
   function placeHintAtPoint(chart, x, y){
     if (!hintEl) return;
 
@@ -1002,7 +1008,7 @@ if (
 
     for (const p of drawn) {
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
       ctx.fillStyle = green;
       ctx.fill();
       ctx.strokeStyle = "#ffffff";
@@ -1036,12 +1042,13 @@ if (
         }
       }
 
-      return bestD <= 18 ? best : null;
+      return bestD <= 28 ? best : null;
     }
 
     if (canvas._mbkMove) canvas.removeEventListener("pointermove", canvas._mbkMove);
     if (canvas._mbkClick) canvas.removeEventListener("click", canvas._mbkClick);
     if (canvas._mbkLeave) canvas.removeEventListener("pointerleave", canvas._mbkLeave);
+    if (canvas._mbkDown) canvas.removeEventListener("pointerdown", canvas._mbkDown);
 
     canvas._mbkMove = ev => {
       const p = nearestPoint(ev);
@@ -1066,7 +1073,15 @@ if (
       placeHintAtPoint({ canvas }, p.x, p.y);
       if (hintEl) hintEl.hidden = false;
     };
+    canvas._mbkDown = ev => {
+  const p = nearestPoint(ev);
+  if (!p) return;
 
+  hintPinned = true;
+  fillHint(p.meta);
+  placeHintAtPoint({ canvas }, p.x, p.y);
+  if (hintEl) hintEl.hidden = false;
+};
     canvas._mbkLeave = () => {
       if (!hintPinned && hintEl) hintEl.hidden = true;
     };
