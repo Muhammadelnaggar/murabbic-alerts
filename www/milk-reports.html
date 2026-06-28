@@ -47,6 +47,246 @@
     .delta.up{color:#065f46;background:#ecfdf5;border-color:#bbf7d0}
     .delta.down{color:#991b1b;background:#fef2f2;border-color:#fecaca}
     .delta.neutral{color:#64748b;background:#f1f5f9;border-color:#e2e8f0}
+       .section-head{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+      flex-wrap:wrap;
+    }
+
+    .section-head h3{
+      margin:0;
+      color:var(--green-600);
+      font-size:17px;
+      font-weight:900;
+    }
+
+    .section-head small{
+      color:var(--muted);
+      line-height:1.6;
+    }
+
+    .groups-grid{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:12px;
+    }
+
+    @media(min-width:760px){
+      .groups-grid{
+        grid-template-columns:repeat(2,1fr);
+      }
+    }
+
+    .group-card{
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:12px;
+      background:#fff;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .group-card.good{
+      border-color:#bbf7d0;
+      background:#f7fef9;
+    }
+
+    .group-card.warn{
+      border-color:#fed7aa;
+      background:#fffaf3;
+    }
+
+    .group-head{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+    }
+
+    .group-head h4{
+      margin:0 0 4px 0;
+      font-size:16px;
+      font-weight:900;
+    }
+
+    .status-pill{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:5px 9px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:900;
+      border:1px solid var(--border);
+      white-space:nowrap;
+      background:#f8fafc;
+    }
+
+    .status-pill.good{
+      color:#065f46;
+      background:#ecfdf5;
+      border-color:#bbf7d0;
+    }
+
+    .status-pill.warn{
+      color:#9a3412;
+      background:#fff7ed;
+      border-color:#fed7aa;
+    }
+
+    .status-pill.ok{
+      color:#334155;
+      background:#f1f5f9;
+      border-color:#e2e8f0;
+    }
+
+    .group-metrics{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:8px;
+    }
+
+    @media(min-width:520px){
+      .group-metrics{
+        grid-template-columns:repeat(4,1fr);
+      }
+    }
+
+    .metric{
+      border:1px solid var(--border);
+      background:#fff;
+      border-radius:12px;
+      padding:9px;
+    }
+
+    .metric strong{
+      display:block;
+      font-size:16px;
+      font-weight:900;
+      margin-bottom:2px;
+    }
+
+    .metric span{
+      color:var(--muted);
+      font-size:12px;
+      font-weight:700;
+    }
+
+    .group-reading{
+      margin:0;
+      color:#334155;
+      font-weight:800;
+      line-height:1.7;
+    }
+
+    .mini-panels{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:8px;
+    }
+
+    @media(min-width:520px){
+      .mini-panels{
+        grid-template-columns:repeat(2,1fr);
+      }
+    }
+
+    .mini-box{
+      border:1px dashed var(--border);
+      border-radius:12px;
+      padding:9px;
+      background:#fff;
+    }
+
+    .mini-title{
+      font-size:12px;
+      font-weight:900;
+      color:var(--green-600);
+      margin-bottom:6px;
+    }
+
+    .mini-list,
+    .smart-list{
+      margin:0;
+      padding:0;
+      list-style:none;
+      display:flex;
+      flex-direction:column;
+      gap:7px;
+    }
+
+    .mini-list li,
+    .smart-list li{
+      position:relative;
+      padding-inline-start:14px;
+      color:#334155;
+      line-height:1.7;
+      font-weight:700;
+    }
+
+    .mini-list li::before,
+    .smart-list li::before{
+      content:"";
+      width:6px;
+      height:6px;
+      border-radius:50%;
+      background:var(--green);
+      position:absolute;
+      inset-inline-start:0;
+      top:.75em;
+    }
+
+    .smart-grid{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:12px;
+      margin-top:12px;
+    }
+
+    @media(min-width:760px){
+      .smart-grid{
+        grid-template-columns:repeat(3,1fr);
+      }
+    }
+
+    .smart-card h3{
+      margin:0 0 8px 0;
+      font-size:16px;
+      font-weight:900;
+      color:var(--green-600);
+    }
+
+    .farm-title-card{
+      margin-top:12px;
+    }
+
+    .farm-title-card h3{
+      margin:0 0 6px 0;
+      color:var(--green-600);
+      font-size:17px;
+      font-weight:900;
+    }
+
+    .farm-title-card p{
+      margin:0;
+      color:var(--muted);
+      font-weight:700;
+      line-height:1.7;
+    }
+
+    .empty{
+      color:var(--muted);
+      font-weight:800;
+      line-height:1.7;
+    }
+
+    .muted{
+      color:var(--muted);
+    } 
   </style>
 </head>
 <body>
@@ -71,7 +311,46 @@
   </div>
 
   <div id="msg" class="notice"></div>
+  <section class="card" id="groupsSection">
+    <div class="section-head">
+      <div>
+        <h3>مجموعات الحلّاب</h3>
+        <small>قراءة مُرَبِّيك حسب المجموعة: الإنتاج، المتوسط، التغير، وأهم الأفراد.</small>
+      </div>
+    </div>
 
+    <div class="groups-grid" id="smartGroups">
+      <div class="empty">جاري تحميل قراءة المجموعات…</div>
+    </div>
+  </section>
+
+  <div class="smart-grid">
+    <section class="card smart-card">
+      <h3>نقاط القوة</h3>
+      <ul class="smart-list" id="strengthsList">
+        <li class="empty">جاري التحميل…</li>
+      </ul>
+    </section>
+
+    <section class="card smart-card">
+      <h3>نقاط تحتاج متابعة</h3>
+      <ul class="smart-list" id="watchList">
+        <li class="empty">جاري التحميل…</li>
+      </ul>
+    </section>
+
+    <section class="card smart-card">
+      <h3>توجيهات مُرَبِّيك</h3>
+      <ul class="smart-list" id="guidanceList">
+        <li class="empty">جاري التحميل…</li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="card farm-title-card">
+    <h3>إجماليات ومتوسطات المزرعة</h3>
+    <p id="farmReading">إجمالي اليوم والشهر والسنة ومتوسط القطيع وتكلفة كجم اللبن.</p>
+  </section>
   <div class="row" id="kpis">
     <div class="card kpi">
       <h3>إجمالي اليوم</h3>
@@ -204,7 +483,221 @@
     $("feedCostPerKg").textContent = k.feedCostPerKg ? `${k.feedCostPerKg} ج.م/كجم` : "— ج.م/كجم";
     $("feedNote").textContent = k.feedNote || "لا توجد تغذية لهذا اليوم";
   }
+    function escapeHtml(v){
+    return String(v ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
 
+  function arr(v){
+    return Array.isArray(v) ? v : [];
+  }
+
+  function fmtNumber(v, digits = 1){
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "—";
+
+    return n.toLocaleString("ar-EG", {
+      maximumFractionDigits: digits
+    });
+  }
+
+  function fmtKg(v){
+    const n = Number(v);
+    return Number.isFinite(n) ? `${fmtNumber(n)} كجم` : "—";
+  }
+
+  function fmtPct(v){
+    if (v === null || v === undefined || v === "") return "—";
+
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "—";
+
+    return `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
+  }
+
+  function statusClass(type){
+    const t = String(type || "").trim();
+
+    if (t === "warn") return "warn";
+    if (t === "good") return "good";
+
+    return "ok";
+  }
+
+  function renderList(id, items, fallback){
+    const el = $(id);
+    if (!el) return;
+
+    const clean = arr(items).filter(Boolean);
+    el.innerHTML = "";
+
+    if (!clean.length) {
+      const li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = fallback;
+      el.appendChild(li);
+      return;
+    }
+
+    for (const item of clean) {
+      const li = document.createElement("li");
+      li.textContent = String(item);
+      el.appendChild(li);
+    }
+  }
+
+  function renderAnimalItems(items, emptyText, mode){
+    const clean = arr(items).slice(0, 3);
+
+    if (!clean.length) {
+      return `<li class="muted">${escapeHtml(emptyText)}</li>`;
+    }
+
+    return clean.map(a => {
+      const number = escapeHtml(a.number || "—");
+      const kgText = escapeHtml(fmtKg(a.kg));
+      const deltaText = a.deltaPct == null ? "" : ` • ${escapeHtml(fmtPct(a.deltaPct))}`;
+      const prevText = mode === "drop" && a.prevKg
+        ? ` • السابق ${escapeHtml(fmtKg(a.prevKg))}`
+        : "";
+
+      return `<li>#${number} — ${kgText}${deltaText}${prevText}</li>`;
+    }).join("");
+  }
+
+  function renderGroups(data){
+    const el = $("smartGroups");
+    if (!el) return;
+
+    const groups = arr(data.groupsSummary || data.smartReport?.groupsSummary);
+    el.innerHTML = "";
+
+    if (!groups.length) {
+      el.innerHTML = `<div class="empty">لا توجد مجموعات حلّاب كافية للعرض في هذا اليوم.</div>`;
+      return;
+    }
+
+    for (const g of groups) {
+      const cls = statusClass(g.statusType);
+
+      const card = document.createElement("article");
+      card.className = `group-card ${cls}`;
+
+      card.innerHTML = `
+        <div class="group-head">
+          <div>
+            <h4>${escapeHtml(g.groupName || "بدون مجموعة")}</h4>
+            <small class="muted">${escapeHtml(g.kind === "buffalo" ? "جاموس" : "أبقار")}</small>
+          </div>
+
+          <span class="status-pill ${cls}">${escapeHtml(g.status || "مستقرة")}</span>
+        </div>
+
+        <div class="group-metrics">
+          <div class="metric">
+            <strong>${escapeHtml(fmtKg(g.totalKg))}</strong>
+            <span>إجمالي المجموعة</span>
+          </div>
+
+          <div class="metric">
+            <strong>${escapeHtml(fmtKg(g.avgKg))}</strong>
+            <span>متوسط الرأس</span>
+          </div>
+
+          <div class="metric">
+            <strong>${escapeHtml(g.milkersCount ?? 0)}</strong>
+            <span>عدد الحلّاب</span>
+          </div>
+
+          <div class="metric">
+            <strong>${escapeHtml(fmtPct(g.deltaPct))}</strong>
+            <span>عن آخر يوم</span>
+          </div>
+        </div>
+
+        <p class="group-reading">${escapeHtml(g.reading || "لا توجد قراءة تفصيلية لهذه المجموعة.")}</p>
+
+        <div class="mini-panels">
+          <div class="mini-box">
+            <div class="mini-title">أعلى الأفراد</div>
+            <ul class="mini-list">
+              ${renderAnimalItems(g.topAnimals, "لا توجد بيانات أفراد.", "top")}
+            </ul>
+          </div>
+
+          <div class="mini-box">
+            <div class="mini-title">انخفاضات تحتاج مراجعة</div>
+            <ul class="mini-list">
+              ${renderAnimalItems(g.dropAnimals, "لا توجد انخفاضات فردية واضحة.", "drop")}
+            </ul>
+          </div>
+        </div>
+      `;
+
+      el.appendChild(card);
+    }
+  }
+
+  function renderFarmReading(data){
+    const el = $("farmReading");
+    if (!el) return;
+
+    const fs = data.farmSummary || data.smartReport?.farmSummary || {};
+    const trend = data.trend || data.smartReport?.trend || {};
+    const parts = [];
+
+    if (trend.label) {
+      const pct = trend.dayDeltaPct == null ? "" : ` (${fmtPct(trend.dayDeltaPct)})`;
+      parts.push(`اتجاه اليوم: ${trend.label}${pct}`);
+    }
+
+    if (fs.bestGroup?.groupName) {
+      parts.push(`أفضل مجموعة: ${fs.bestGroup.groupName} بمتوسط ${fmtKg(fs.bestGroup.avgKg)}/رأس`);
+    }
+
+    if (
+      fs.weakestGroup?.groupName &&
+      fs.weakestGroup.groupName !== fs.bestGroup?.groupName
+    ) {
+      parts.push(`أقل متوسط: ${fs.weakestGroup.groupName} بمتوسط ${fmtKg(fs.weakestGroup.avgKg)}/رأس`);
+    }
+
+    if (fs.dropAnimalsCount != null) {
+      parts.push(`حالات انخفاض فردي: ${fs.dropAnimalsCount}`);
+    }
+
+    el.textContent = parts.length
+      ? parts.join(" • ")
+      : "إجمالي اليوم والشهر والسنة ومتوسط القطيع وتكلفة كجم اللبن.";
+  }
+
+  function renderSmartReport(data){
+    renderGroups(data);
+
+    renderList(
+      "strengthsList",
+      data.strengths || data.smartReport?.strengths,
+      "لا توجد نقاط قوة واضحة مسجلة لهذا اليوم."
+    );
+
+    renderList(
+      "watchList",
+      data.watchPoints || data.smartReport?.watchPoints,
+      "لا توجد نقاط تحتاج متابعة واضحة لهذا اليوم."
+    );
+
+    renderList(
+      "guidanceList",
+      data.murabbikGuidance || data.smartReport?.murabbikGuidance,
+      "لا توجد توجيهات إضافية حاليًا."
+    );
+
+    renderFarmReading(data);
+  }
   function fillHint(meta){
     $("hNo").textContent = `#${meta.number || "—"}`;
     $("hKg").textContent = `${meta.kg ?? "—"} كجم/اليوم`;
@@ -492,7 +985,8 @@
     if (data.message) show(data.message);
     else hideMsg();
 
-    putKpis(data);
+      putKpis(data);
+    renderSmartReport(data);
 
     const points = data.scatter?.points || [];
     $("skipNote").textContent = data.scatter?.skippedNoCalving
