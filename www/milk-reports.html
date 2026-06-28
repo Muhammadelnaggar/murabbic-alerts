@@ -287,6 +287,19 @@
     .muted{
       color:var(--muted);
     } 
+    .print-actions{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.print-actions small{
+  color:var(--muted);
+  font-weight:700;
+  line-height:1.6;
+}
     @media print{
   @page{
     size:A4 portrait;
@@ -319,14 +332,15 @@
   }
 
   .actions,
-  .chip,
-  #btnRefresh,
-  #btnPrint,
-  .milk-hint,
-  #pointHint,
-  #btnCloseHint{
-    display:none !important;
-  }
+.chip,
+#btnRefresh,
+#btnPrint,
+.print-actions,
+.milk-hint,
+#pointHint,
+#btnCloseHint{
+  display:none !important;
+}
 
   .title{
     font-size:18px;
@@ -390,7 +404,7 @@
       <a class="chip" href="daily-milk.html">إدخال يومي</a>
       <a class="chip" href="add-event.html">الأحداث</a>
       <button id="btnRefresh" class="chip primary">تحديث</button>
-<button id="btnPrint" class="chip">طباعة / PDF</button>
+<button id="btnPrint" class="chip js-print-report" type="button">🖨️ طباعة / PDF</button>
     </div>
   </div>
 </header>
@@ -403,7 +417,10 @@
     </div>
     <div id="lastUpdate" class="inline" style="color:var(--muted);font-size:13px"></div>
   </div>
-
+<div class="card print-actions">
+  <button class="btn primary js-print-report" type="button">🖨️ طباعة التقرير / حفظ PDF</button>
+  <small>من نافذة الطباعة اختر Save as PDF لحفظ التقرير.</small>
+</div>
   <div id="msg" class="notice"></div>
   <section class="card" id="groupsSection">
     <div class="section-head">
@@ -1126,9 +1143,9 @@ const r = await fetch(`/api/milk-reports/summary?${params.toString()}`, {
     $("reportDate").value = ymd(dt);
     $("reportDate").addEventListener("change", loadReport);
     $("btnRefresh").addEventListener("click", loadReport);
-    $("btnPrint")?.addEventListener("click", () => {
-    window.print();
-    });
+   document.querySelectorAll(".js-print-report").forEach(btn => {
+  btn.addEventListener("click", () => window.print());
+});
     $("btnCloseHint")?.addEventListener("click", () => {
       hintPinned = false;
       if (hintEl) hintEl.hidden = true;
