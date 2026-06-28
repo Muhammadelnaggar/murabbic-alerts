@@ -1065,7 +1065,17 @@ if (
 
     const date = ymd($("reportDate")?.value || todayISO());
 
-    const r = await fetch(`/api/milk-reports/summary?date=${encodeURIComponent(date)}`, {
+  const sourceQs = new URLSearchParams(location.search);
+const params = new URLSearchParams();
+
+params.set("date", date);
+
+["type", "species", "view"].forEach(key => {
+  const v = sourceQs.get(key);
+  if (v) params.set(key, v);
+});
+
+const r = await fetch(`/api/milk-reports/summary?${params.toString()}`, {
       method: "GET",
       credentials: "same-origin",
       cache: "no-store",
