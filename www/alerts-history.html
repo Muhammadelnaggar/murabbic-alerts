@@ -1,69 +1,180 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>التنبيهات السابقة</title>
-  <style>
-    body {
-      direction: rtl;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #fff8f0;
-      padding: 30px;
-    }
-    h1 {
-      color: #333;
-      margin-bottom: 20px;
-    }
-    .alert-card {
-      border: 1px solid #ccc;
-      background-color: #fff;
-      padding: 15px;
-      margin-bottom: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .alert-card h3 {
-      margin: 0 0 10px;
-      color: #d9534f;
-    }
-    .alert-card p {
-      margin: 5px 0;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>أرشيف التنبيهات — مُرَبِّيك</title>
+  <link rel="stylesheet" href="css/forms.css">
 </head>
 <body>
-  <h1>🕓 التنبيهات السابقة</h1>
-  <div id="alertsContainer">
-    <!-- يتم ملء هذه المنطقة تلقائياً بالتنبيهات -->
+<header>
+  <div class="mbk-head">
+    <a class="mbk-back" href="dashboard.html">رجوع</a>
+
+    <div class="mbk-center">
+      <div class="mbk-page-title">أرشيف التنبيهات</div>
+      <div class="mbk-app-name">مُرَبِّك — التنبيهات السابقة</div>
+    </div>
+
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّك" />
+  </div>
+</header>
+
+<main>
+  <div id="statusBox" class="infobar info show">
+    جاري تحميل أرشيف التنبيهات...
   </div>
 
-  <script>
-    // المستخدم الحالي (تجريبي)
-    const userId = 1;
+  <div class="card grid">
+    <div class="row">
+      <div>
+        <label>الفترة</label>
+        <select id="daysFilter">
+          <option value="30">آخر 30 يوم</option>
+          <option value="90">آخر 90 يوم</option>
+          <option value="180">آخر 180 يوم</option>
+          <option value="365">آخر سنة</option>
+          <option value="0">كل المتاح</option>
+        </select>
+      </div>
+      <div>
+        <label>عدد النتائج</label>
+        <select id="limitFilter">
+          <option value="100">100 تنبيه</option>
+          <option value="300">300 تنبيه</option>
+          <option value="500">500 تنبيه</option>
+        </select>
+      </div>
+    </div>
+  </div>
 
-    fetch(`/alerts/${userId}`)
-      .then(res => res.json())
-      .then(data => {
-        const container = document.getElementById('alertsContainer');
-        if (!data.alerts || data.alerts.length === 0) {
-          container.innerHTML = '<p>لا توجد تنبيهات حالياً.</p>';
-          return;
-        }
-        data.alerts.forEach(alert => {
-          const card = document.createElement('div');
-          card.className = 'alert-card';
-          card.innerHTML = `
-            <h3>🔔 ${alert.title}</h3>
-            <p><strong>التاريخ:</strong> ${alert.date}</p>
-            <p><strong>الوصف:</strong> ${alert.message}</p>
-          `;
-          container.appendChild(card);
-        });
-      })
-      .catch(err => {
-        console.error('فشل في تحميل التنبيهات:', err);
-        document.getElementById('alertsContainer').innerHTML = '<p>تعذر تحميل التنبيهات.</p>';
+  <div id="alertsContainer" class="grid"></div>
+</main>
+
+<script>
+(function(){
+  const API_BASE = location.origin;
+  const statusBox = document.getElementById("statusBox");
+  const alertsContainer = document.getElementById("alertsContainer");
+  const daysFilter = document.getElementById("daysFilter");
+  const limitFilter = document.getElementById("limitFilter");
+
+  function setBar(text, type){
+    statusBox.textContent = text || "";
+    statusBox.className = "infobar show " + (type || "info");
+  }
+
+  function safeText(v, fallback = "—"){
+    const s = String(v ?? "").trim();
+    return s || fallback;
+  }
+
+  function formatDate(alert){
+    const raw =
+      alert.date ||
+      alert.dueDate ||
+      alert.eventDate ||
+      alert.createdAt ||
+      alert.ts ||
+      "";
+
+    if (typeof raw === "number" && raw > 0) {
+      return new Date(raw).toLocaleDateString("ar-EG");
+    }
+
+    if (raw && raw._seconds) {
+      return new Date(raw._seconds * 1000).toLocaleDateString("ar-EG");
+    }
+
+    const s = String(raw || "").slice(0, 10);
+    return s || "—";
+  }
+
+  function handleAuthRequired(j, status){
+    if (status === 401 || j?.error === "auth_required") {
+      location.replace("login.html");
+      return true;
+    }
+    return false;
+  }
+
+  function renderAlerts(alerts){
+    alertsContainer.innerHTML = "";
+
+    if (!Array.isArray(alerts) || !alerts.length) {
+      alertsContainer.innerHTML = '<div class="infobar warning show">لا توجد تنبيهات سابقة في الفترة المختارة.</div>';
+      return;
+    }
+
+    alerts.forEach(alert => {
+      const card = document.createElement("div");
+      card.className = "card grid";
+
+      const title = document.createElement("h3");
+      title.textContent = "🔔 " + safeText(alert.title || alert.name || alert.code, "تنبيه");
+
+      const date = document.createElement("div");
+      date.className = "form-hint";
+      date.textContent = "التاريخ: " + formatDate(alert);
+
+      const msg = document.createElement("div");
+      msg.textContent = safeText(alert.message || alert.summary || alert.description, "لا يوجد وصف.");
+
+      card.appendChild(title);
+      card.appendChild(date);
+      card.appendChild(msg);
+
+      alertsContainer.appendChild(card);
+    });
+  }
+
+  async function loadAlerts(){
+    const days = Number(daysFilter.value || 30);
+    const limit = Number(limitFilter.value || 100);
+
+    setBar("جاري تحميل أرشيف التنبيهات...", "info");
+    alertsContainer.innerHTML = "";
+
+    try {
+      const qs = new URLSearchParams();
+      qs.set("limit", String(limit));
+      if (days > 0) qs.set("days", String(days));
+
+      const r = await fetch(API_BASE + "/api/alerts?" + qs.toString(), {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "Cache-Control": "no-store"
+        },
+        credentials: "same-origin",
+        cache: "no-store"
       });
-  </script>
+
+      const j = await r.json().catch(() => ({}));
+
+      if (handleAuthRequired(j, r.status)) return;
+
+      if (!r.ok || j.ok !== true) {
+        setBar(j.message || "تعذّر تحميل أرشيف التنبيهات.", "error");
+        renderAlerts([]);
+        return;
+      }
+
+      setBar(`تم تحميل ${j.count || 0} تنبيه.`, "success");
+      renderAlerts(j.alerts || []);
+
+    } catch (e) {
+      console.error("alerts history failed", e);
+      setBar("تعذّر الاتصال بالسيرفر.", "error");
+      renderAlerts([]);
+    }
+  }
+
+  daysFilter.addEventListener("change", loadAlerts);
+  limitFilter.addEventListener("change", loadAlerts);
+
+  loadAlerts();
+})();
+</script>
 </body>
 </html>
