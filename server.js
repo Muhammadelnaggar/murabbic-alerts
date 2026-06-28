@@ -23247,11 +23247,21 @@ const rawGroupsSummary = milkReportBuildOfficialGroupSummariesSrv({
   prevByNumber,
   reportDate
 });
-    const groupsSummary = milkReportAddEconomicsToGroupsSrv(
-      rawGroupsSummary,
-      nutritionEvents,
-      reportDate
-    );
+
+const typedGroupsSummary = selectedKind
+  ? rawGroupsSummary.filter(g => {
+      const k = String(g.kind || "cow").trim();
+      return selectedKind === "buffalo"
+        ? k === "buffalo"
+        : k !== "buffalo";
+    })
+  : rawGroupsSummary;
+
+const groupsSummary = milkReportAddEconomicsToGroupsSrv(
+  typedGroupsSummary,
+  nutritionEvents,
+  reportDate
+);
 
     const economicTotals = milkReportEconomicTotalsSrv(groupsSummary);
 
