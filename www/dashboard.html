@@ -91,7 +91,8 @@
 // ============ API BASE ============
 const API_BASE = "";
 let currentType = '';
- let currentTHI = null;
+let currentTHI = null;
+let herdStatsRequestSeq = 0;
 
 function prodState(deltaPct){
   const a = Math.abs(Number(deltaPct || 0));
@@ -634,8 +635,23 @@ const cullGrid   = document.getElementById('cullGrid');
 const feedGrid   = document.getElementById('feedGrid');
 const healthGrid = document.getElementById('healthGrid');
 
+const requestSeq = ++herdStatsRequestSeq;
+const requestedType = currentType === 'buffalo' ? 'buffalo' : 'cows';
+const requestedLabel = requestedType === 'buffalo' ? 'الجاموس' : 'الأبقار';
+
+statusBar.textContent = `جارٍ تحميل بيانات ${requestedLabel}...`;
+
+// مهم: نمسح كروت الروابط القديمة فورًا حتى لا يضغط المستخدم على رابط أبقار بعد اختيار الجاموس
+prodGrid.innerHTML = '';
+prodCauseWrap.innerHTML = '';
+feedGrid.innerHTML = '';
+
   try{
-const stats = await fetchJSON(`/api/herd-stats?type=${currentType || 'cows'}`);
+const stats = await fetchJSON(`/api/herd-stats?type=${requestedType}`);
+
+if (requestSeq !== herdStatsRequestSeq) return;
+
+currentType = stats.selectedType || requestedType;
 
 setupTypeSwitch({
   hasCows: !!stats.hasCows,
