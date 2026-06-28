@@ -1103,23 +1103,53 @@ if (canvas._mbkMouseDown) canvas.removeEventListener("mousedown", canvas._mbkMou
 if (canvas._mbkMouseLeave) canvas.removeEventListener("mouseleave", canvas._mbkMouseLeave);
 
 canvas._mbkMove = ev => {
+  const p = nearestPoint(ev, 46);
+  canvas.style.cursor = p ? "pointer" : "crosshair";
+
+  if (!p) {
+    if (!hintPinned && hintEl) hintEl.hidden = true;
+    return;
+  }
+
+  showScatterPoint(p, false);
+};
+
+canvas._mbkMouseMove = ev => {
+  const p = nearestPoint(ev, 52);
+  canvas.style.cursor = p ? "pointer" : "crosshair";
+
+  if (!p) {
+    if (!hintPinned && hintEl) hintEl.hidden = true;
+    return;
+  }
+
+  showScatterPoint(p, false);
+};
+
 canvas._mbkClick = ev => {
-  const p = nearestPoint(ev, 44);
+  const p = nearestPoint(ev, 52);
   if (!p) return;
 
   showScatterPoint(p, true);
 };
 
 canvas._mbkDown = ev => {
-  const p = nearestPoint(ev, 48);
+  const p = nearestPoint(ev, 56);
   if (!p) return;
 
   ev.preventDefault();
   showScatterPoint(p, true);
 };
 
+canvas._mbkMouseDown = ev => {
+  const p = nearestPoint(ev, 56);
+  if (!p) return;
+
+  showScatterPoint(p, true);
+};
+
 canvas._mbkTouch = ev => {
-  const p = nearestPoint(ev, 52);
+  const p = nearestPoint(ev, 60);
   if (!p) return;
 
   ev.preventDefault();
@@ -1130,7 +1160,18 @@ canvas._mbkLeave = () => {
   if (!hintPinned && hintEl) hintEl.hidden = true;
 };
 
+canvas._mbkMouseLeave = () => {
+  if (!hintPinned && hintEl) hintEl.hidden = true;
+};
+
 canvas.addEventListener("pointermove", canvas._mbkMove);
+canvas.addEventListener("mousemove", canvas._mbkMouseMove);
+canvas.addEventListener("click", canvas._mbkClick);
+canvas.addEventListener("pointerdown", canvas._mbkDown);
+canvas.addEventListener("mousedown", canvas._mbkMouseDown);
+canvas.addEventListener("touchstart", canvas._mbkTouch, { passive:false });
+canvas.addEventListener("pointerleave", canvas._mbkLeave);
+canvas.addEventListener("mouseleave", canvas._mbkMouseLeave);
 canvas.addEventListener("click", canvas._mbkClick);
 canvas.addEventListener("pointerdown", canvas._mbkDown);
 canvas.addEventListener("touchstart", canvas._mbkTouch, { passive:false });
