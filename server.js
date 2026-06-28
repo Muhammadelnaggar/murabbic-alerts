@@ -22097,7 +22097,148 @@ function milkReportOfficialMilkingGroupIdsSrv() {
     "buffalo_low"
   ];
 }
+function milkReportEmptyOfficialGroupsMapSrv() {
+  const out = {};
+  for (const id of milkReportOfficialMilkingGroupIdsSrv()) {
+    out[id] = [];
+  }
+  return out;
+}
 
+function milkReportDecorateOfficialGroupAnimalSrv(an = {}, groupId = "") {
+  const def = GROUP_DEF_BY_ID_SRV[groupId] || {};
+  const n = milkReportAnimalNumberFromAnimalSrv(an);
+
+  return {
+    ...an,
+    animalNumber: n || an.animalNumber || an.number || "",
+    number: n || an.number || an.animalNumber || "",
+    groupId,
+    group: def.label || groupId,
+    groupName: def.label || groupId,
+    groupKey: def.baseKey || groupId,
+    kind: def.species || (groupId.startsWith("buffalo_") ? "buffalo" : "cow"),
+    species: def.species || an.species || an.kind || ""
+  };
+}
+
+async function milkReportLoadOfficialGroupsMapFromFirestoreSrv(uid, animals = [], allowRebuild = true) {
+  const userId = String(uid || "").trim();
+  const officialIds = milkReportOfficialMilkingGroupIdsSrv();
+  const officialSet = new Set(officialIds);
+
+  const animalsByNumber = new Map();
+  for (const an of Array.isArray(animals) ? animals : []) {
+    const n = milkReportAnimalNumberFromAnimalSrv(an);
+    if (n) animalsByNumber.set(n, an);
+  }
+
+  async function readOnce() {
+    const numbersByGroup = new Map();
+    for (const id of officialIds) {
+      numbersByGroup.set(id, new Set());
+    }
+
+    try {
+      const groupsSnap = await db.collection("groups")
+        .where("userId", "==", userId)
+        .get();
+
+      groupsSnap.forEach(ds => {
+        const g = ds.data() || {};
+        const groupId = String(g.groupId || g.id || "").trim();
+        if (!officialSet.has(groupId)) return;
+
+        const nums = [];
+
+        if (Array.isArray(g.animalNumbers)) {
+          nums.push(...g.animalNumbers);
+        }
+
+        if (Array.isArray(g.animals)) {
+          nums.push(...g.animals.map(x => x?.animalNumber ?? x?.number));
+        }
+
+        for (const raw of nums) {
+          const n = milkReportNumberSrv(raw);
+          if (n) numbersByGroup.get(groupId).add(n);
+        }
+      });
+    } catch (e) {
+      console.warn("milk report read groups docs failed:", e.message || e);
+    }
+
+    try {
+      const membersSnap = await db.collection("groups_members")
+        .where("userId", "==", userId)
+        .get();
+
+      membersSnap.forEach(ds => {
+        const m = ds.data() || {};
+
+        let groupId = String(m.groupId || m.id || "").trim();
+
+        if (!groupId || !officialSet.has(groupId)) {
+          const docId = String(ds.id || "");
+          groupId = officialIds.find(id => docId.includes(`_${id}_`)) || "";
+        }
+
+        if (!officialSet.has(groupId)) return;
+
+        const n = milkReportNumberSrv(
+          m.animalNumber ??
+          m.number ??
+          m.animalNo ??
+          m.cowNumber ??
+          ""
+        );
+
+        if (n) numbersByGroup.get(groupId).add(n);
+      });
+    } catch (e) {
+      console.warn("milk report read group members failed:", e.message || e);
+    }
+
+    const groupsMap = milkReportEmptyOfficialGroupsMapSrv();
+    let membersCount = 0;
+
+    for (const groupId of officialIds) {
+      const nums = [...(numbersByGroup.get(groupId) || new Set())];
+
+      groupsMap[groupId] = nums.map(n => {
+        const an = animalsByNumber.get(n) || {
+          animalNumber: n,
+          number: n
+        };
+
+        return milkReportDecorateOfficialGroupAnimalSrv(an, groupId);
+      });
+
+      membersCount += groupsMap[groupId].length;
+    }
+
+    return {
+      ok: membersCount > 0,
+      source: membersCount > 0 ? "firestore_groups" : "empty_firestore_groups",
+      membersCount,
+      groupsMap
+    };
+  }
+
+  let result = await readOnce();
+
+  if (!result.ok && allowRebuild && typeof rebuildGroupsForTenantSrv === "function") {
+    try {
+      await rebuildGroupsForTenantSrv(userId, { reason: "milk_report_groups_missing" });
+      result = await milkReportLoadOfficialGroupsMapFromFirestoreSrv(userId, animals, false);
+      result.source = result.ok ? "firestore_groups_after_rebuild" : result.source;
+    } catch (e) {
+      console.warn("milk report groups rebuild fallback failed:", e.message || e);
+    }
+  }
+
+  return result;
+}
 function milkReportGroupDailyAverageByNumbersSrv(milkEvents = [], groupNumbers = new Set(), reportDate = "", days = 7) {
   const start = milkReportAddDaysSrv(reportDate, -Math.max(0, Number(days || 7) - 1));
   const byDate = new Map();
@@ -22126,13 +22267,16 @@ function milkReportGroupDailyAverageByNumbersSrv(milkEvents = [], groupNumbers =
 function milkReportBuildOfficialGroupSummariesSrv({
   activeAnimals = [],
   thresholds = {},
+  groupsMapOverride = null,
   dayRows = [],
   prevRows = [],
   milkEvents = [],
   prevByNumber = new Map(),
   reportDate = ""
 } = {}) {
-  const groupsMap = splitGroupsServerSrv(activeAnimals, thresholds);
+  const groupsMap = groupsMapOverride && typeof groupsMapOverride === "object"
+    ? groupsMapOverride
+    : splitGroupsServerSrv(activeAnimals, thresholds);
   const officialIds = milkReportOfficialMilkingGroupIdsSrv();
 
   const dayByNumber = new Map();
@@ -22276,6 +22420,8 @@ function milkReportBuildOfficialGroupSummariesSrv({
       groupName,
       groupId,
       kind,
+      groupNumbers: [...groupNumbers],
+      animalsCount: milkersCount,
       animalsCount: milkersCount,
       groupNumbers: [...groupNumbers],
       milkersCount,
@@ -23003,17 +23149,20 @@ app.get("/api/milk-reports/summary", requireUserId, async (req, res) => {
       const inactiveReason = String(a.inactiveReason || "").toLowerCase();
       return status !== "archived" && inactiveReason !== "sale" && inactiveReason !== "death";
     });
-
-         const rawGroupsSummary = milkReportBuildOfficialGroupSummariesSrv({
-      activeAnimals,
-      thresholds,
-      dayRows,
-      prevRows,
-      milkEvents,
-      prevByNumber,
-      reportDate
-    });
-
+      const officialGroups = await milkReportLoadOfficialGroupsMapFromFirestoreSrv(
+  uid,
+  activeAnimals
+);
+const rawGroupsSummary = milkReportBuildOfficialGroupSummariesSrv({
+  activeAnimals,
+  thresholds,
+  groupsMapOverride: officialGroups.ok ? officialGroups.groupsMap : null,
+  dayRows,
+  prevRows,
+  milkEvents,
+  prevByNumber,
+  reportDate
+});
     const groupsSummary = milkReportAddEconomicsToGroupsSrv(
       rawGroupsSummary,
       nutritionEvents,
