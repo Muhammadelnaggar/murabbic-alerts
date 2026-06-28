@@ -23197,7 +23197,21 @@ const nutritionEvents = allEvents
         deltaPct,
         group: animal.groupName || animal.group || ev.groupName || ev.group || "—",
         repro: animal.reproductiveStatus || ev.reproductiveStatus || ev.reproStatus || "—",
-        season: milkReportSeasonSrv(reportDate),
+       season: (() => {
+  const lact =
+    animal.lactationNumber ??
+    animal.lactationNo ??
+    animal.lactation ??
+    ev.lactationNumber ??
+    ev.lactationNo ??
+    ev.lactation ??
+    null;
+
+  const n = Number(lact);
+  return Number.isFinite(n) && n > 0
+    ? `الموسم ${Math.round(n)}`
+    : "الموسم غير مسجل";
+})(),
         kind: milkReportKindSrv(animal.kind || animal.species || animal.animalType || ev.kind || ev.species)
       });
     }
