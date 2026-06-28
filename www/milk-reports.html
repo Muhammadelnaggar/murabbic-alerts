@@ -287,6 +287,99 @@
     .muted{
       color:var(--muted);
     } 
+    @media print{
+  @page{
+    size:A4 portrait;
+    margin:10mm;
+  }
+
+  *{
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+
+  body{
+    background:#fff !important;
+    color:#111827 !important;
+    font-size:12px;
+  }
+
+  header{
+    position:static !important;
+    border-bottom:2px solid #111827;
+    margin-bottom:8px;
+  }
+
+  .bar,
+  main{
+    max-width:none !important;
+    width:100% !important;
+    margin:0 !important;
+    padding:0 !important;
+  }
+
+  .actions,
+  .chip,
+  #btnRefresh,
+  #btnPrint,
+  .milk-hint,
+  #pointHint,
+  #btnCloseHint{
+    display:none !important;
+  }
+
+  .title{
+    font-size:18px;
+    color:#111827 !important;
+  }
+
+  .card{
+    box-shadow:none !important;
+    border:1px solid #cbd5e1 !important;
+    border-radius:8px !important;
+    padding:8px !important;
+    margin-bottom:8px !important;
+    break-inside:avoid;
+    page-break-inside:avoid;
+  }
+
+  .section-head h3,
+  .smart-card h3,
+  .farm-title-card h3{
+    color:#111827 !important;
+    font-size:14px !important;
+  }
+
+  .smart-grid{
+    grid-template-columns:1fr !important;
+    gap:8px !important;
+  }
+
+  .row{
+    grid-template-columns:repeat(2,1fr) !important;
+    gap:8px !important;
+  }
+
+  .kpi .num{
+    font-size:17px !important;
+  }
+
+  #scatterWrap{
+    break-before:page;
+    page-break-before:always;
+  }
+
+  canvas{
+    height:260px !important;
+    max-height:260px !important;
+  }
+
+  input[type="date"]{
+    border:0 !important;
+    padding:0 !important;
+    font-weight:900 !important;
+  }
+}
   </style>
 </head>
 <body>
@@ -297,6 +390,7 @@
       <a class="chip" href="daily-milk.html">إدخال يومي</a>
       <a class="chip" href="add-event.html">الأحداث</a>
       <button id="btnRefresh" class="chip primary">تحديث</button>
+<button id="btnPrint" class="chip">طباعة / PDF</button>
     </div>
   </div>
 </header>
@@ -481,7 +575,7 @@
     $("milkersCount").textContent = `عدد الحلّاب: ${k.milkersCount || 0} / إجمالي: ${k.totalAnimals ?? "—"}`;
 
     $("feedCostPerKg").textContent = k.feedCostPerKg ? `${k.feedCostPerKg} ج.م/كجم` : "— ج.م/كجم";
-    $("feedNote").textContent = k.feedNote || "لا توجد تغذية لهذا اليوم";
+   $("feedNote").textContent = k.feedNote || "لا توجد علائق تغذية محفوظة كافية لحساب الاقتصاد";
   }
     function escapeHtml(v){
     return String(v ?? "")
@@ -655,17 +749,34 @@
       parts.push(`اتجاه اليوم: ${trend.label}${pct}`);
     }
 
-    if (fs.bestGroup?.groupName) {
-      parts.push(`أفضل مجموعة: ${fs.bestGroup.groupName} بمتوسط ${fmtKg(fs.bestGroup.avgKg)}/رأس`);
-    }
+if (fs.bestGroup?.groupName) {
+  const margin = fs.bestGroup.marginPerHead;
+  const cost = fs.bestGroup.costPerKgMilk;
+  const feedDate = fs.bestGroup.feedEventDate;
 
-    if (
-      fs.weakestGroup?.groupName &&
-      fs.weakestGroup.groupName !== fs.bestGroup?.groupName
-    ) {
-      parts.push(`أقل متوسط: ${fs.weakestGroup.groupName} بمتوسط ${fmtKg(fs.weakestGroup.avgKg)}/رأس`);
-    }
+  parts.push(
+    `أفضل هامش لبن/علف: ${fs.bestGroup.groupName}` +
+    `${margin != null ? ` ${fmtNumber(margin, 2)} ج.م/رأس` : ""}` +
+    `${cost != null ? ` • تكلفة كجم اللبن ${fmtNumber(cost, 2)} ج.م` : ""}` +
+    `${feedDate ? ` • آخر عليقة ${feedDate}` : ""}`
+  );
+}
 
+if (
+  fs.weakestGroup?.groupName &&
+  fs.weakestGroup.groupName !== fs.bestGroup?.groupName
+) {
+  const margin = fs.weakestGroup.marginPerHead;
+  const cost = fs.weakestGroup.costPerKgMilk;
+  const feedDate = fs.weakestGroup.feedEventDate;
+
+  parts.push(
+    `أقل هامش لبن/علف: ${fs.weakestGroup.groupName}` +
+    `${margin != null ? ` ${fmtNumber(margin, 2)} ج.م/رأس` : ""}` +
+    `${cost != null ? ` • تكلفة كجم اللبن ${fmtNumber(cost, 2)} ج.م` : ""}` +
+    `${feedDate ? ` • آخر عليقة ${feedDate}` : ""}`
+  );
+}
     if (fs.dropAnimalsCount != null) {
       parts.push(`حالات انخفاض فردي: ${fs.dropAnimalsCount}`);
     }
@@ -1005,7 +1116,9 @@
     $("reportDate").value = ymd(dt);
     $("reportDate").addEventListener("change", loadReport);
     $("btnRefresh").addEventListener("click", loadReport);
-
+    $("btnPrint")?.addEventListener("click", () => {
+    window.print();
+    });
     $("btnCloseHint")?.addEventListener("click", () => {
       hintPinned = false;
       if (hintEl) hintEl.hidden = true;
