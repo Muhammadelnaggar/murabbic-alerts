@@ -443,7 +443,7 @@
 
   <section class="card farm-title-card">
     <h3>إجماليات ومتوسطات المزرعة</h3>
-    <p id="farmReading">إجمالي اليوم والشهر والسنة ومتوسط القطيع وتكلفة كجم اللبن.</p>
+    <p id="farmReading">الأرقام الشهرية والسنوية تعني إجمالي اللبن المسجل حتى تاريخ العرض، وليست تقديرًا لإنتاج شهر أو سنة كاملة.</p>
   </section>
   <div class="row" id="kpis">
     <div class="card kpi">
@@ -454,12 +454,12 @@
       <small id="sumDayBreak">أبقار: — • جاموس: —</small>
     </div>
     <div class="card kpi">
-      <h3>إجمالي الشهر</h3>
+     <h3>إجمالي اللبن المسجل هذا الشهر</h3>
       <div class="num" id="sumMonth">— كجم</div>
       <small id="sumMonthBreak">أبقار: — • جاموس: —</small>
     </div>
     <div class="card kpi">
-      <h3>إجمالي السنة</h3>
+     <h3>إجمالي اللبن المسجل هذا العام</h3>
       <div class="num" id="sumYear">— كجم</div>
       <small id="sumYearBreak">أبقار: — • جاموس: —</small>
     </div>
@@ -567,9 +567,9 @@
 
     $("sumDayBreak").textContent = `أبقار: ${kg(day.cow)} • جاموس: ${kg(day.buffalo)}`;
     $("sumMonth").textContent = `${kg(month.all).toLocaleString()} كجم`;
-    $("sumMonthBreak").textContent = `أبقار: ${kg(month.cow)} • جاموس: ${kg(month.buffalo)}`;
+    $("sumMonthBreak").textContent = `المسجل من بداية الشهر حتى تاريخ العرض • أبقار: ${kg(month.cow)} • جاموس: ${kg(month.buffalo)}`;
     $("sumYear").textContent = `${kg(year.all).toLocaleString()} كجم`;
-    $("sumYearBreak").textContent = `أبقار: ${kg(year.cow)} • جاموس: ${kg(year.buffalo)}`;
+    $("sumYearBreak").textContent = `المسجل من بداية العام حتى تاريخ العرض • أبقار: ${kg(year.cow)} • جاموس: ${kg(year.buffalo)}`;
 
     $("avgHerd").textContent = k.avgHerdKg ? `${k.avgHerdKg} كجم/رأس` : "— كجم/رأس";
     $("milkersCount").textContent = `عدد الحلّاب: ${k.milkersCount || 0} / إجمالي: ${k.totalAnimals ?? "—"}`;
@@ -783,7 +783,7 @@ if (
 
     el.textContent = parts.length
       ? parts.join(" • ")
-      : "إجمالي اليوم والشهر والسنة ومتوسط القطيع وتكلفة كجم اللبن.";
+      : "الأرقام الشهرية والسنوية تعني إجمالي اللبن المسجل حتى تاريخ العرض، وليست تقديرًا لإنتاج شهر أو سنة كاملة.";
   }
 
   function renderSmartReport(data){
