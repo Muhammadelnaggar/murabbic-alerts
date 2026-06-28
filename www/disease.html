@@ -83,53 +83,19 @@
       .trim();
   }
 
-  function getTenantId(){
-    try {
-      const p = new URLSearchParams(location.search);
-      const T = window.__TENANT__ || window.__MURABBIK_USER__ || {};
-
-      const direct =
-        T.userId ||
-        T.uid ||
-        T.id ||
-        p.get("userId") ||
-        p.get("uid") ||
-        localStorage.getItem("userId") ||
-        localStorage.getItem("uid") ||
-        localStorage.getItem("ownerUid") ||
-        sessionStorage.getItem("userId") ||
-        sessionStorage.getItem("uid") ||
-        "";
-
-      if (direct && direct !== "null" && direct !== "undefined") {
-        return String(direct).trim();
-      }
-
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i) || "";
-        const v = localStorage.getItem(k) || "";
-
-        if (!k.includes("firebase") && !v.includes("uid")) continue;
-
-        try {
-          const j = JSON.parse(v);
-          const uid = j.uid || j.user?.uid || j.stsTokenManager?.uid || "";
-          if (uid) return String(uid).trim();
-        } catch {}
-      }
-
-      return "";
-    } catch {
-      return "";
-    }
-  }
 
   function setBar(el, text, type){
     if (!el) return;
     el.textContent = text || "";
     el.className = "infobar show " + (type || "info");
   }
-
+  function handleAuthRequired(j){
+    if (j && (j.error === "auth_required" || j.message === "سجّل الدخول أولًا.")) {
+      location.replace("login.html");
+      return true;
+    }
+    return false;
+  }
   function renderSummary(animal){
     if (!animalSummary) return;
 
@@ -147,7 +113,6 @@
     animalSummary.textContent = parts.join(" — ");
   }
 async function saveDiseaseItem(item, btn){
-  const uid = getTenantId();
   const animalNumber = digitsOnly(animalNumberEl.value);
   const eventDate = eventDateEl.value || todayLocal();
   const notes = notesEl ? notesEl.value : "";
@@ -161,12 +126,12 @@ async function saveDiseaseItem(item, btn){
  setBar(gateBox, "جاري حفظ التشخيص...", "info");
 
   try {
-    const r = await fetch(API_BASE + "/api/disease/save", {
+          const r = await fetch(API_BASE + "/api/disease/save", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": uid
+        "Content-Type": "application/json"
       },
+      credentials: "same-origin",
       body: JSON.stringify({
         animalNumber,
         eventDate,
@@ -175,7 +140,8 @@ async function saveDiseaseItem(item, btn){
       })
     });
 
-const j = await r.json();
+const j = await r.json().catch(() => ({}));
+if (r.status === 401 || handleAuthRequired(j)) return;
 
 if (!r.ok || !j.ok) {
   setBar(gateBox, j.message || "❌ تعذّر حفظ التشخيص الصحي.", "error");
@@ -243,17 +209,12 @@ setTimeout(() => {
   }
 
   async function runGate(){
-    const uid = getTenantId();
     const animalNumber = digitsOnly(animalNumberEl.value);
     const eventDate = eventDateEl.value;
 
     dz.innerHTML = "";
     renderSummary(null);
 
-    if (!uid) {
-      setBar(gateBox, "❌ لم يتم العثور على هوية المستخدم.", "error");
-      return;
-    }
 
     if (!animalNumber || !eventDate) {
       setBar(gateBox, "أدخل رقم الحيوان وتاريخ التشخيص لعرض التشخيصات المناسبة.", "info");
@@ -263,16 +224,17 @@ setTimeout(() => {
     setBar(gateBox, "جاري التحقق من السيرفر...", "info");
 
     try {
-      const r = await fetch(API_BASE + "/api/disease/gate", {
+           const r = await fetch(API_BASE + "/api/disease/gate", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": uid
+          "Content-Type": "application/json"
         },
+        credentials: "same-origin",
         body: JSON.stringify({ animalNumber, eventDate })
       });
 
-      const j = await r.json();
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 401 || handleAuthRequired(j)) return;
 
       setBar(gateBox, j.message || "تم التحقق.", j.allowed ? "success" : "error");
 
