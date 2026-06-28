@@ -24774,33 +24774,63 @@ app.post('/api/events', requireUserId, async (req, res) => {
 // ============================================================
 //                       API: ALERTS
 // ============================================================
-app.get('/api/alerts', async (req, res) => {
+app.get('/api/alerts', requireUserId, async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok:false, error:'sensors_api_disabled' });
-    const tenant   = resolveTenant(req);
-    const animalId = req.query.animalId || null;
-    const sinceMs  = Number(req.query.since || 0);
-    const days     = Number(req.query.days || 0);
-    const limit    = Math.min(Number(req.query.limit || 100), 2000);
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: 'alerts_api_disabled',
+        message: 'قاعدة البيانات غير متاحة الآن.'
+      });
+    }
 
-   let q = db.collection('alerts').where('userId','==', tenant);
+    const tenant = req.userId;
+    const animalId = String(req.query.animalId || '').trim();
+    const sinceMs = Number(req.query.since || 0);
+    const days = Number(req.query.days || 0);
+    const limit = Math.min(Number(req.query.limit || 100), 2000);
 
-    if (animalId) q = q.where('subject.animalId', '==', animalId);
+    let q = db.collection('alerts').where('userId', '==', tenant);
+
+    if (animalId) {
+      q = q.where('subject.animalId', '==', animalId);
+    }
 
     let since = sinceMs;
     if (!since && days > 0) since = Date.now() - days * dayMs;
     if (since) q = q.where('ts', '>=', since);
 
     q = q.orderBy('ts', 'desc').limit(limit);
+
     const snap = await q.get();
-    const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    res.json({ ok:true, count: arr.length, alerts: arr });
+
+    const alerts = snap.docs.map(d => {
+      const a = d.data() || {};
+      return {
+        id: d.id,
+        ...a,
+        title: a.title || a.name || a.code || 'تنبيه',
+        message: a.message || a.summary || a.description || '',
+        date: a.date || a.dueDate || a.eventDate || null,
+        ts: a.ts || 0
+      };
+    });
+
+    return res.json({
+      ok: true,
+      count: alerts.length,
+      alerts
+    });
+
   } catch (e) {
     console.error('alerts', e);
-    res.status(500).json({ ok:false, error:'alerts_failed' });
+    return res.status(500).json({
+      ok: false,
+      error: 'alerts_failed',
+      message: 'تعذّر تحميل أرشيف التنبيهات.'
+    });
   }
 });
-
 // ============================================================
 //                       API: ANIMAL TIMELINE
 // ============================================================
