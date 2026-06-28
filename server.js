@@ -25934,7 +25934,14 @@ app.get('/api/animal-timeline', async (req, res) => {
 app.get("/api/herd-stats", requireUserId, async (req, res) => {
   try {
     const uid = req.userId;
-    const herdType = String(req.query.type || '').trim().toLowerCase();
+   const herdTypeRaw = String(req.query.type || req.query.species || '').trim().toLowerCase();
+
+const herdType =
+  herdTypeRaw === 'buffalo' || herdTypeRaw === 'جاموس'
+    ? 'buffalo'
+    : (herdTypeRaw === 'cow' || herdTypeRaw === 'cows' || herdTypeRaw === 'cattle' || herdTypeRaw === 'أبقار' || herdTypeRaw === 'ابقار')
+      ? 'cows'
+      : '';
 
     // --------------------------------------
     // 🔥 1) جلب الحيوانات
@@ -26018,15 +26025,47 @@ const singleHerdType =
   hasCows && !hasBuffalo ? 'cows' :
   hasBuffalo && !hasCows ? 'buffalo' :
   null;
+const selectedDashboardType =
+  herdType === 'buffalo'
+    ? 'buffalo'
+    : herdType === 'cows'
+      ? 'cows'
+      : singleHerdType || (hasCows ? 'cows' : (hasBuffalo ? 'buffalo' : 'cows'));
 
+const selectedDashboardSpecies =
+  selectedDashboardType === 'buffalo' ? 'buffalo' : 'cow';
+
+const selectedDashboardLabel =
+  selectedDashboardType === 'buffalo' ? 'جاموس' : 'أبقار';
+
+const reportTypeQuery =
+  `type=${encodeURIComponent(selectedDashboardType)}&species=${encodeURIComponent(selectedDashboardSpecies)}`;
+
+const milkReportBase = `milk-reports.html?${reportTypeQuery}`;
+const nutritionReportBase = `nutrition-report.html?${reportTypeQuery}`;
+
+const dashboardLinks = {
+  milkReport: milkReportBase,
+  milkDailyAvg: `${milkReportBase}&view=daily_avg`,
+  milk7Days: `${milkReportBase}&view=7days`,
+  milkDailyTotal: `${milkReportBase}&view=daily_total`,
+  milkMonthly: `${milkReportBase}&view=monthly`,
+  milkCauses: `${milkReportBase}&view=causes`,
+
+  nutritionReport: nutritionReportBase,
+  nutritionIofc: `${nutritionReportBase}&view=iofc`,
+  nutritionFeedEfficiency: `${nutritionReportBase}&view=feed_efficiency`,
+  nutritionCostLiter: `${nutritionReportBase}&view=cost_liter`,
+  nutritionTotalFeedCost: `${nutritionReportBase}&view=total_feed_cost`
+};
 const animalsByType = animalsAll.filter(a => {
   const at = String(a.animaltype || '').trim().toLowerCase();
   const ar = String(a.animalTypeAr || '').trim();
 
-  if (herdType === 'cows') {
+  if (selectedDashboardType === 'cows') {
     return at === 'cow' || ar.includes('بقار') || ar.includes('ابقار');
   }
-  if (herdType === 'buffalo') {
+ if (selectedDashboardType === 'buffalo') {
     return at === 'buffalo' || ar.includes('جاموس');
   }
   return true;
@@ -26042,7 +26081,7 @@ let officialInMilkCount = null;
 let officialFeedBandCounts = null;
 
 try {
-  const groupPrefix = herdType === 'buffalo' ? 'buffalo_' : 'cow_';
+  const groupPrefix = selectedDashboardType === 'buffalo' ? 'buffalo_' : 'cow_';
 
   const getOfficialGroupCount = async (baseKey) => {
     const groupId = `${groupPrefix}${baseKey}`;
@@ -26638,12 +26677,12 @@ const nutritionEvents = evNutAll
       ''
     ).trim().toLowerCase();
 
-    const matchesType =
-      herdType === 'cows'
-        ? (ctxSpecies.includes('بقر') || ctxSpecies.includes('cow'))
-        : herdType === 'buffalo'
-          ? (ctxSpecies.includes('جاموس') || ctxSpecies.includes('buffalo'))
-          : true;
+ const matchesType =
+  selectedDashboardType === 'cows'
+    ? (ctxSpecies.includes('بقر') || ctxSpecies.includes('cow'))
+    : selectedDashboardType === 'buffalo'
+      ? (ctxSpecies.includes('جاموس') || ctxSpecies.includes('buffalo'))
+      : true;
 
     return { ...e, _txt: txt, _ms: ms, _matchesType: matchesType };
   })
@@ -26812,7 +26851,10 @@ dailyMilkDeltaPct,
 avgHeadDeltaPct,
 bcsCamera,
 fecesScore,
-
+selectedType: selectedDashboardType,
+selectedSpecies: selectedDashboardSpecies,
+selectedTypeLabel: selectedDashboardLabel,
+dashboardLinks,
 hasCows,
 hasBuffalo,
 availableTypes,
