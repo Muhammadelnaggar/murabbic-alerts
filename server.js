@@ -21907,7 +21907,68 @@ function milkReportKindSrv(v) {
   const s = String(v || "").trim();
   return /buffalo|جاموس/i.test(s) ? "buffalo" : "cow";
 }
+function milkReportRequestedKindSrv(query = {}) {
+  const raw = String(query.species || query.type || "").trim().toLowerCase();
 
+  if (raw === "buffalo" || raw === "جاموس") return "buffalo";
+
+  if (
+    raw === "cow" ||
+    raw === "cows" ||
+    raw === "cattle" ||
+    raw === "أبقار" ||
+    raw === "ابقار"
+  ) {
+    return "cow";
+  }
+
+  return "";
+}
+
+function milkReportKindFromRecordSrv(rec = {}, animalsByNumber = new Map()) {
+  const number = milkReportNumberSrv(rec.animalNumber || rec.number || rec.animalNo);
+  const animal = number ? (animalsByNumber.get(number) || {}) : {};
+
+  const raw = String(
+    rec.kind ||
+    rec.species ||
+    rec.animaltype ||
+    rec.animalType ||
+    rec.animalTypeAr ||
+    animal.kind ||
+    animal.species ||
+    animal.animaltype ||
+    animal.animalType ||
+    animal.animalTypeAr ||
+    ""
+  ).trim();
+
+  if (!raw) return "";
+
+  return milkReportKindSrv(raw);
+}
+
+function milkReportDecorateMilkEventKindSrv(ev = {}, animalsByNumber = new Map()) {
+  const kind = milkReportKindFromRecordSrv(ev, animalsByNumber);
+  return kind ? { ...ev, kind } : { ...ev };
+}
+
+function milkReportAnimalMatchesKindSrv(an = {}, selectedKind = "") {
+  if (!selectedKind) return true;
+
+  const raw = String(
+    an.kind ||
+    an.species ||
+    an.animaltype ||
+    an.animalType ||
+    an.animalTypeAr ||
+    ""
+  ).trim();
+
+  if (!raw) return false;
+
+  return milkReportKindSrv(raw) === selectedKind;
+}
 function milkReportKgSrv(ev = {}) {
   const n = Number(
     ev.milkKg ??
@@ -22991,21 +23052,46 @@ app.get("/api/milk-reports/summary", requireUserId, async (req, res) => {
       });
     }
 
-    const uid = req.userId;
-    const requestedDate = milkReportIsDateSrv(req.query.date)
-      ? String(req.query.date).slice(0, 10)
-      : milkReportTodaySrv();
+const uid = req.userId;
+const requestedDate = milkReportIsDateSrv(req.query.date)
+  ? String(req.query.date).slice(0, 10)
+  : milkReportTodaySrv();
 
-       const [allEvents, animals, thresholds] = await Promise.all([
-      milkReportFetchUserEventsSrv(uid),
-      milkReportFetchUserAnimalsSrv(uid),
-      loadGroupThresholdsSrv(uid)
-    ]);
+const selectedKind = milkReportRequestedKindSrv(req.query);
+const selectedType =
+  selectedKind === "buffalo" ? "buffalo" :
+  selectedKind === "cow" ? "cows" :
+  "";
 
-    const milkEvents = allEvents
-      .filter(milkReportIsMilkEventSrv)
-      .filter(ev => milkReportIsDateSrv(ev.eventDate || ev.date));
-    const nutritionEvents = allEvents
+const selectedSpecies =
+  selectedKind === "buffalo" ? "buffalo" :
+  selectedKind === "cow" ? "cow" :
+  "";
+
+const selectedTypeLabel =
+  selectedKind === "buffalo" ? "جاموس" :
+  selectedKind === "cow" ? "أبقار" :
+  "الكل";
+
+const [allEvents, animals, thresholds] = await Promise.all([
+  milkReportFetchUserEventsSrv(uid),
+  milkReportFetchUserAnimalsSrv(uid),
+  loadGroupThresholdsSrv(uid)
+]);
+
+const animalsByNumber = new Map();
+for (const a of animals) {
+  const n = milkReportNumberSrv(a.animalNumber || a.number || a.animalNo);
+  if (n) animalsByNumber.set(n, a);
+}
+
+const milkEvents = allEvents
+  .filter(milkReportIsMilkEventSrv)
+  .filter(ev => milkReportIsDateSrv(ev.eventDate || ev.date))
+  .map(ev => milkReportDecorateMilkEventKindSrv(ev, animalsByNumber))
+  .filter(ev => !selectedKind || ev.kind === selectedKind);
+
+const nutritionEvents = allEvents
   .filter(milkReportIsNutritionEventSrv)
   .filter(ev => milkReportIsDateSrv(ev.eventDate || ev.date));
     let reportDate = requestedDate;
@@ -23043,13 +23129,6 @@ app.get("/api/milk-reports/summary", requireUserId, async (req, res) => {
     const month = milkReportSplitByKindSrv(monthRows);
     const year = milkReportSplitByKindSrv(yearRows);
     const prev = milkReportSplitByKindSrv(prevRows);
-
-    const animalsByNumber = new Map();
-    for (const a of animals) {
-      const n = milkReportNumberSrv(a.animalNumber || a.number || a.animalNo);
-      if (n) animalsByNumber.set(n, a);
-    }
-
     const calvingMap = new Map();
 
     for (const a of animals) {
@@ -23144,11 +23223,16 @@ app.get("/api/milk-reports/summary", requireUserId, async (req, res) => {
       ? Number((feedCostTotal / day.all).toFixed(2))
       : null;
 
-       const activeAnimals = animals.filter(a => {
-      const status = String(a.status || "").toLowerCase();
-      const inactiveReason = String(a.inactiveReason || "").toLowerCase();
-      return status !== "archived" && inactiveReason !== "sale" && inactiveReason !== "death";
-    });
+const activeAnimals = animals.filter(a => {
+  const status = String(a.status || "").toLowerCase();
+  const inactiveReason = String(a.inactiveReason || "").toLowerCase();
+
+  if (status === "archived" || inactiveReason === "sale" || inactiveReason === "death") {
+    return false;
+  }
+
+  return milkReportAnimalMatchesKindSrv(a, selectedKind);
+});
       const officialGroups = await milkReportLoadOfficialGroupsMapFromFirestoreSrv(
   uid,
   activeAnimals
@@ -23198,6 +23282,10 @@ const rawGroupsSummary = milkReportBuildOfficialGroupSummariesSrv({
       requestedDate,
       reportDate,
       usedFallbackDate: reportDate !== requestedDate,
+      selectedType,
+      selectedSpecies,
+      selectedKind,
+      selectedTypeLabel,
            kpis: {
         day: reportDay,
         month,
