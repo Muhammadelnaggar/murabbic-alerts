@@ -21985,7 +21985,324 @@ function milkReportDateInRangeSrv(date, start, end) {
   const d = String(date || "").slice(0, 10);
   return d >= start && d < end;
 }
+function milkReportRoundSrv(v, digits = 1) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  const m = Math.pow(10, Number(digits || 0));
+  return Math.round(n * m) / m;
+}
 
+function milkReportDeltaPctSrv(now, prev) {
+  const a = Number(now || 0);
+  const b = Number(prev || 0);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b <= 0) return null;
+  return Number((((a - b) / b) * 100).toFixed(1));
+}
+
+function milkReportGroupNameSrv(animal = {}, ev = {}) {
+  const raw = String(
+    animal.groupName ||
+    animal.group ||
+    animal.groupLabel ||
+    ev.groupName ||
+    ev.group ||
+    ev.groupLabel ||
+    animal.groupId ||
+    ev.groupId ||
+    ""
+  ).trim();
+
+  return raw && raw !== "—" ? raw : "بدون مجموعة";
+}
+
+function milkReportGroupIdSrv(animal = {}, ev = {}) {
+  return String(
+    animal.groupId ||
+    ev.groupId ||
+    animal.groupKey ||
+    ev.groupKey ||
+    ""
+  ).trim() || null;
+}
+
+function milkReportAnimalEntrySrv(ev = {}, animalsByNumber = new Map(), prevByNumber = new Map()) {
+  const number = milkReportNumberSrv(ev.animalNumber || ev.number);
+  const animal = animalsByNumber.get(number) || {};
+  const kg = milkReportKgSrv(ev);
+  const prevOne = prevByNumber.get(number);
+  const prevKg = Number(prevOne?.kg || 0);
+  const deltaPct = milkReportDeltaPctSrv(kg, prevKg);
+
+  return {
+    number,
+    kg,
+    prevKg: prevKg || null,
+    deltaPct,
+    groupName: milkReportGroupNameSrv(animal, ev),
+    groupId: milkReportGroupIdSrv(animal, ev),
+    kind: milkReportKindSrv(animal.kind || animal.species || animal.animalType || ev.kind || ev.species),
+    reproductiveStatus: animal.reproductiveStatus || ev.reproductiveStatus || ev.reproStatus || "—",
+    daysInMilk: Number(animal.daysInMilk ?? animal.dim ?? null),
+    lactationNumber: Number(animal.lactationNumber ?? animal.lactation ?? null)
+  };
+}
+
+function milkReportGroupDailyAverageSrv(milkEvents = [], animalsByNumber = new Map(), groupName = "", reportDate = "", days = 7) {
+  const start = milkReportAddDaysSrv(reportDate, -Math.max(0, Number(days || 7) - 1));
+  const wanted = String(groupName || "بدون مجموعة").trim();
+  const byDate = new Map();
+
+  for (const ev of milkEvents) {
+    const d = String(ev.eventDate || ev.date || "").slice(0, 10);
+    if (!milkReportIsDateSrv(d) || d < start || d > reportDate) continue;
+
+    const number = milkReportNumberSrv(ev.animalNumber || ev.number);
+    const animal = animalsByNumber.get(number) || {};
+    const g = milkReportGroupNameSrv(animal, ev);
+    if (g !== wanted) continue;
+
+    byDate.set(d, (byDate.get(d) || 0) + milkReportKgSrv(ev));
+  }
+
+  const recordedDays = [...byDate.values()].filter(v => Number(v) > 0);
+  if (!recordedDays.length) return null;
+
+  const total = recordedDays.reduce((sum, v) => sum + Number(v || 0), 0);
+
+  return {
+    avgKg: milkReportRoundSrv(total / recordedDays.length, 1),
+    recordedDaysCount: recordedDays.length
+  };
+}
+
+function milkReportBuildGroupSummariesSrv({
+  dayRows = [],
+  prevRows = [],
+  milkEvents = [],
+  animalsByNumber = new Map(),
+  prevByNumber = new Map(),
+  reportDate = ""
+} = {}) {
+  const groups = new Map();
+  const prevTotals = new Map();
+
+  for (const ev of prevRows) {
+    const number = milkReportNumberSrv(ev.animalNumber || ev.number);
+    const animal = animalsByNumber.get(number) || {};
+    const g = milkReportGroupNameSrv(animal, ev);
+    prevTotals.set(g, (prevTotals.get(g) || 0) + milkReportKgSrv(ev));
+  }
+
+  for (const ev of dayRows) {
+    const entry = milkReportAnimalEntrySrv(ev, animalsByNumber, prevByNumber);
+    if (!entry.number || entry.kg <= 0) continue;
+
+    const g = entry.groupName || "بدون مجموعة";
+
+    if (!groups.has(g)) {
+      groups.set(g, {
+        groupName: g,
+        groupId: entry.groupId,
+        kind: entry.kind,
+        milkers: new Set(),
+        totalKg: 0,
+        animals: []
+      });
+    }
+
+    const one = groups.get(g);
+    one.milkers.add(entry.number);
+    one.totalKg += entry.kg;
+    one.animals.push(entry);
+  }
+
+  const out = [];
+
+  for (const g of groups.values()) {
+    const milkersCount = g.milkers.size;
+    const totalKg = milkReportRoundSrv(g.totalKg, 1);
+    const avgKg = milkersCount ? milkReportRoundSrv(totalKg / milkersCount, 1) : 0;
+    const prevTotalKg = milkReportRoundSrv(prevTotals.get(g.groupName) || 0, 1);
+    const deltaPct = milkReportDeltaPctSrv(totalKg, prevTotalKg);
+    const sevenDays = milkReportGroupDailyAverageSrv(milkEvents, animalsByNumber, g.groupName, reportDate, 7);
+
+    const topAnimals = [...g.animals]
+      .sort((a, b) => Number(b.kg || 0) - Number(a.kg || 0))
+      .slice(0, 5)
+      .map(a => ({
+        number: a.number,
+        kg: milkReportRoundSrv(a.kg, 1),
+        deltaPct: a.deltaPct,
+        reproductiveStatus: a.reproductiveStatus
+      }));
+
+    const dropAnimals = [...g.animals]
+      .filter(a => a.deltaPct != null && Number(a.deltaPct) <= -15)
+      .sort((a, b) => Number(a.deltaPct || 0) - Number(b.deltaPct || 0))
+      .slice(0, 5)
+      .map(a => ({
+        number: a.number,
+        kg: milkReportRoundSrv(a.kg, 1),
+        prevKg: milkReportRoundSrv(a.prevKg || 0, 1),
+        deltaPct: a.deltaPct,
+        reproductiveStatus: a.reproductiveStatus
+      }));
+
+    let status = "مستقرة";
+    let statusType = "ok";
+    let reading = `مجموعة ${g.groupName} مستقرة إجمالًا بمتوسط ${avgKg} كجم/رأس.`;
+
+    if (deltaPct != null && deltaPct <= -7) {
+      status = "تحتاج متابعة";
+      statusType = "warn";
+      reading = `مجموعة ${g.groupName} منخفضة ${Math.abs(deltaPct).toFixed(1)}% عن آخر يوم متاح.`;
+    } else if (dropAnimals.length >= 3) {
+      status = "تحتاج متابعة فردية";
+      statusType = "warn";
+      reading = `إجمالي مجموعة ${g.groupName} ليس بالضرورة ضعيفًا، لكن توجد ${dropAnimals.length} حالات انخفاض فردي واضحة.`;
+    } else if (deltaPct != null && deltaPct >= 5) {
+      status = "تحسن واضح";
+      statusType = "good";
+      reading = `مجموعة ${g.groupName} تحسنت ${deltaPct.toFixed(1)}% عن آخر يوم متاح.`;
+    }
+
+    out.push({
+      groupName: g.groupName,
+      groupId: g.groupId,
+      kind: g.kind,
+      milkersCount,
+      totalKg,
+      avgKg,
+      prevTotalKg,
+      deltaPct,
+      sevenDaysAvgKg: sevenDays?.avgKg ?? null,
+      sevenDaysRecordedCount: sevenDays?.recordedDaysCount ?? 0,
+      status,
+      statusType,
+      reading,
+      topAnimals,
+      dropAnimals
+    });
+  }
+
+  return out.sort((a, b) => Number(b.avgKg || 0) - Number(a.avgKg || 0));
+}
+
+function milkReportBuildSmartReportSrv({
+  groupsSummary = [],
+  day = {},
+  prev = {},
+  prevDate = "",
+  reportDate = "",
+  feedCostPerKg = null,
+  feedCostTotal = 0,
+  activeAnimalsCount = 0
+} = {}) {
+  const totalKg = milkReportRoundSrv(day.all || 0, 1);
+  const prevKg = milkReportRoundSrv(prev.all || 0, 1);
+  const dayDeltaPct = milkReportDeltaPctSrv(totalKg, prevKg);
+  const totalMilkers = groupsSummary.reduce((sum, g) => sum + Number(g.milkersCount || 0), 0);
+  const avgHerdKg = totalMilkers ? milkReportRoundSrv(totalKg / totalMilkers, 1) : null;
+
+  const bestGroup = groupsSummary[0] || null;
+  const weakestGroup = [...groupsSummary].sort((a, b) => Number(a.avgKg || 0) - Number(b.avgKg || 0))[0] || null;
+  const watchGroups = groupsSummary.filter(g => g.statusType === "warn");
+
+  const topAnimals = groupsSummary
+    .flatMap(g => (g.topAnimals || []).map(a => ({ ...a, groupName: g.groupName })))
+    .sort((a, b) => Number(b.kg || 0) - Number(a.kg || 0))
+    .slice(0, 10);
+
+  const dropAnimals = groupsSummary
+    .flatMap(g => (g.dropAnimals || []).map(a => ({ ...a, groupName: g.groupName })))
+    .sort((a, b) => Number(a.deltaPct || 0) - Number(b.deltaPct || 0))
+    .slice(0, 10);
+
+  const strengths = [];
+  const watchPoints = [];
+  const murabbikGuidance = [];
+
+  if (!groupsSummary.length) {
+    watchPoints.push("لا توجد بيانات لبن كافية لتكوين قراءة ذكية للمجموعات في هذا اليوم.");
+    murabbikGuidance.push("ابدأ بتسجيل اللبن اليومي للحلاب مجموعة مجموعة حتى يصبح التقرير الذكي أدق في المقارنة والتوجيه.");
+  } else {
+    if (bestGroup) {
+      strengths.push(`أفضل متوسط حاليًا في مجموعة ${bestGroup.groupName}: ${bestGroup.avgKg} كجم/رأس.`);
+    }
+
+    if (dayDeltaPct != null && dayDeltaPct >= 3) {
+      strengths.push(`إجمالي اللبن أعلى من آخر يوم متاح بنسبة ${dayDeltaPct.toFixed(1)}%.`);
+    } else if (dayDeltaPct != null && Math.abs(dayDeltaPct) < 3) {
+      strengths.push("إجمالي اللبن مستقر تقريبًا مقارنة بآخر يوم متاح.");
+    }
+
+    if (!dropAnimals.length) {
+      strengths.push("لا توجد حالات انخفاض فردي حاد مقارنة بآخر تسجيل متاح خلال الأسبوع.");
+    }
+
+    if (dayDeltaPct != null && dayDeltaPct <= -5) {
+      watchPoints.push(`إجمالي اللبن أقل من آخر يوم متاح بنسبة ${Math.abs(dayDeltaPct).toFixed(1)}%.`);
+    }
+
+    if (watchGroups.length) {
+      watchPoints.push(`توجد ${watchGroups.length} مجموعة تحتاج متابعة: ${watchGroups.map(g => g.groupName).join("، ")}.`);
+    }
+
+    if (dropAnimals.length) {
+      watchPoints.push(`توجد ${dropAnimals.length} حالة انخفاض فردي واضح؛ أهمها: ${dropAnimals.slice(0, 3).map(a => `#${a.number}`).join("، ")}.`);
+    }
+
+    if (!watchPoints.length) {
+      watchPoints.push("لا توجد مؤشرات سلبية واضحة في قراءة اللبن لهذا اليوم.");
+    }
+
+    if (dropAnimals.length) {
+      murabbikGuidance.push("ابدأ بمراجعة الحيوانات ذات الانخفاض الفردي قبل الحكم على المجموعة كلها: افحص الشهية، الضرع، العرج، والحرارة.");
+    }
+
+    if (watchGroups.length) {
+      murabbikGuidance.push(`راجع إدارة مجموعة ${watchGroups[0].groupName} أولًا: عدد الحلاب، المأكول، الراحة، وسجل الأمراض الأخيرة.`);
+    }
+
+    if (dayDeltaPct != null && dayDeltaPct <= -5 && !dropAnimals.length) {
+      murabbikGuidance.push("الانخفاض يبدو عامًا أكثر من كونه فرديًا؛ راجع الحرارة، المياه، توقيت الحلب، وبقايا العليقة قبل تعديل التركيبة.");
+    }
+
+    if (feedCostPerKg) {
+      murabbikGuidance.push(`اربط قراءة اللبن بتقرير التغذية: تكلفة كجم اللبن اليوم ${feedCostPerKg} ج.م/كجم من إجمالي تكلفة ${Math.round(Number(feedCostTotal || 0))} ج.م.`);
+    } else {
+      murabbikGuidance.push("لإكمال التحليل الاقتصادي للبن، سجّل تكلفة تغذية الحلاب لنفس اليوم أو راجع تقرير التغذية.");
+    }
+  }
+
+  return {
+    title: "تقرير اللبن الذكي",
+    reportDate,
+    prevDate,
+    trend: {
+      totalKg,
+      prevKg,
+      dayDeltaPct,
+      label: dayDeltaPct == null ? "لا توجد مقارنة" : (dayDeltaPct > 3 ? "صاعد" : (dayDeltaPct < -3 ? "هابط" : "مستقر"))
+    },
+    farmSummary: {
+      totalKg,
+      avgHerdKg,
+      milkersCount: totalMilkers,
+      activeAnimalsCount,
+      groupsCount: groupsSummary.length,
+      bestGroup: bestGroup ? { groupName: bestGroup.groupName, avgKg: bestGroup.avgKg, totalKg: bestGroup.totalKg } : null,
+      weakestGroup: weakestGroup ? { groupName: weakestGroup.groupName, avgKg: weakestGroup.avgKg, totalKg: weakestGroup.totalKg } : null,
+      dropAnimalsCount: dropAnimals.length
+    },
+    groupsSummary,
+    strengths,
+    watchPoints,
+    murabbikGuidance,
+    topAnimals,
+    dropAnimals
+  };
+}
 app.get("/api/milk-reports/summary", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -22145,10 +22462,30 @@ app.get("/api/milk-reports/summary", requireUserId, async (req, res) => {
       ? Number((feedCostTotal / day.all).toFixed(2))
       : null;
 
-    const activeAnimals = animals.filter(a => {
+       const activeAnimals = animals.filter(a => {
       const status = String(a.status || "").toLowerCase();
       const inactiveReason = String(a.inactiveReason || "").toLowerCase();
       return status !== "archived" && inactiveReason !== "sale" && inactiveReason !== "death";
+    });
+
+    const groupsSummary = milkReportBuildGroupSummariesSrv({
+      dayRows,
+      prevRows,
+      milkEvents,
+      animalsByNumber,
+      prevByNumber,
+      reportDate
+    });
+
+    const smartReport = milkReportBuildSmartReportSrv({
+      groupsSummary,
+      day,
+      prev,
+      prevDate,
+      reportDate,
+      feedCostPerKg,
+      feedCostTotal,
+      activeAnimalsCount: activeAnimals.length
     });
 
     return res.json({
@@ -22172,10 +22509,19 @@ app.get("/api/milk-reports/summary", requireUserId, async (req, res) => {
           ? `إجمالي تكلفة تغذية اليوم: ${Math.round(feedCostTotal)} ج.م`
           : "لا توجد تغذية بتكلفة لهذا اليوم"
       },
-      scatter: {
+           scatter: {
         points,
         skippedNoCalving
       },
+      smartReport,
+      groupsSummary: smartReport.groupsSummary,
+      farmSummary: smartReport.farmSummary,
+      strengths: smartReport.strengths,
+      watchPoints: smartReport.watchPoints,
+      murabbikGuidance: smartReport.murabbikGuidance,
+      topAnimals: smartReport.topAnimals,
+      dropAnimals: smartReport.dropAnimals,
+      trend: smartReport.trend,
       updatedAt: new Date().toISOString()
     });
 
