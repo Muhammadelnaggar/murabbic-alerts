@@ -580,23 +580,8 @@ function abortionBox(count, pct){
     'health'
   );
 }
-function detectAnimalType(an){
-  const ar = norm(an.animalTypeAr || '');
-  const en = String(an.animaltype || '').trim().toLowerCase();
 
-  if (ar.includes('جاموس') || en === 'buffalo') return 'buffalo';
-  if (ar.includes('بقار') || ar.includes('ابقار') || en === 'cow' || en === 'cattle') return 'cows';
 
-  return '';
-}
-
-function getTypeLabelByKey(typeKey){
-  return typeKey === 'buffalo' ? 'جاموس' : 'أبقار';
-}
-
-function filterAnimalsByType(animals, typeKey){
-  return (animals || []).filter(an => detectAnimalType(an) === typeKey);
-}
 
 function setupTypeSwitch(meta = {}){
   const wrap = document.getElementById('typeSwitch');
@@ -657,10 +642,11 @@ setupTypeSwitch({
   hasBuffalo: !!stats.hasBuffalo,
   singleHerdType: stats.singleHerdType || null
 });
+    const links = stats.dashboardLinks || {};
     const t     = stats.totals || {};
     const fert  = stats.fertility || {};
 
-    const typeLabel = getTypeLabelByKey(currentType);
+    const typeLabel = stats.selectedTypeLabel || 'أبقار';
 
     const totalActive = Number(t.totalActive ?? 0);
     const pregPct = Number(t?.pregnant?.pct ?? 0);
@@ -797,40 +783,40 @@ prodGrid.innerHTML =
     avgHeadToday,
     prodDeltaText(avgHeadDeltaPct),
     avgHeadState,
-    'milk-reports.html?view=daily_avg'
+    links.milkDailyAvg || 'milk-reports.html'
   ) +
   prodCard(
     'متوسط الرأس / 7 أيام',
     avgHead7Days,
     '',
     'ok',
-    'milk-reports.html?view=7days'
+    links.milk7Days || 'milk-reports.html'
   ) +
   prodCard(
     'إجمالي إنتاج اللبن اليومي',
     totalDailyMilk,
     prodDeltaText(dailyMilkDeltaPct),
     dailyMilkState,
-    'milk-reports.html?view=daily_total'
+    links.milkDailyTotal || 'milk-reports.html'
   ) +
-   prodCard(
+  prodCard(
     'متوسط عدد أيام الحليب للقطيع',
     avgDIM,
     '',
     'ok',
-    'milk-reports.html'
+    links.milkReport || 'milk-reports.html'
   ) +
   prodCard(
     'إجمالي إنتاج اللبن الشهري',
     monthlyMilkTotal,
     '',
     'ok',
-    'milk-reports.html?view=monthly'
+    links.milkMonthly || 'milk-reports.html'
   );
 prodCauseWrap.innerHTML = showCausesCard
   ? `
     <div class="kpi prod prod-cause-card ${causesState === 'danger' ? 'prod-danger' : causesState === 'warn' ? 'prod-warn' : 'prod-ok'}"
-         onclick="location.href='milk-reports.html?view=causes'">
+    onclick="location.href='${links.milkCauses || 'milk-reports.html'}'">
       <div class="kpi-label">أسباب تغير إنتاج اللبن</div>
       <div class="kpi-value">${causesText}</div>
     </div>
@@ -854,35 +840,34 @@ cullGrid.innerHTML =
 feedGrid.innerHTML =
   feedSmartGaugeCard(
     feedGaugeCards.iofc,
-    `nutrition-report.html?view=iofc&type=${currentType || 'cows'}`
+    links.nutritionIofc || 'nutrition-report.html'
   ) +
   feedSmartGaugeCard(
     feedGaugeCards.feedEfficiency,
-    `nutrition-report.html?view=feed_efficiency&type=${currentType || 'cows'}`
+    links.nutritionFeedEfficiency || 'nutrition-report.html'
   ) +
   feedInfoBox({
     title: 'تكلفة كجم اللبن من التغذية',
     value: feedCostPerLiter,
     unit: 'جنيه / كجم لبن',
     sub: 'رقم تشغيلي داعم يُقرأ مع IOFC وسعر اللبن.',
-    href: `nutrition-report.html?view=cost_liter&type=${currentType || 'cows'}`
+    href: links.nutritionCostLiter || 'nutrition-report.html'
   }) +
   feedInfoBox({
     title: 'إجمالي تكاليف التغذية / يوم',
     value: totalFeedCostPerDay,
     unit: 'جنيه / يوم',
-   sub: 'إجمالي تكلفة التغذية اليومية للمزرعة/القطيع.',
-    href: `nutrition-report.html?view=total_feed_cost&type=${currentType || 'cows'}`
+    sub: 'إجمالي تكلفة التغذية اليومية للمزرعة/القطيع.',
+    href: links.nutritionTotalFeedCost || 'nutrition-report.html'
   }) +
   (
     feedAdvice
-      ? `<div class="kpi feed feed-advice-card" onclick="location.href='nutrition-report.html?type=${currentType || 'cows'}'">
+      ? `<div class="kpi feed feed-advice-card" onclick="location.href='${links.nutritionReport || 'nutrition-report.html'}'">
           <div class="kpi-label">توجيه مُرَبِّيك</div>
           <div class="kpi-sub">${feedAdvice}</div>
         </div>`
       : ''
   );
-
 healthGrid.innerHTML =
       mastitisBox(mastitisCount, mastitisPct) +
       lamenessBox(lamenessCount, lamenessPct) +
