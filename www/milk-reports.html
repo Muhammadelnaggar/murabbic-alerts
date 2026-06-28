@@ -1098,19 +1098,11 @@ if (canvas._mbkClick) canvas.removeEventListener("click", canvas._mbkClick);
 if (canvas._mbkLeave) canvas.removeEventListener("pointerleave", canvas._mbkLeave);
 if (canvas._mbkDown) canvas.removeEventListener("pointerdown", canvas._mbkDown);
 if (canvas._mbkTouch) canvas.removeEventListener("touchstart", canvas._mbkTouch);
+if (canvas._mbkMouseMove) canvas.removeEventListener("mousemove", canvas._mbkMouseMove);
+if (canvas._mbkMouseDown) canvas.removeEventListener("mousedown", canvas._mbkMouseDown);
+if (canvas._mbkMouseLeave) canvas.removeEventListener("mouseleave", canvas._mbkMouseLeave);
 
 canvas._mbkMove = ev => {
-  const p = nearestPoint(ev, 34);
-  canvas.style.cursor = p ? "pointer" : "crosshair";
-
-  if (!p) {
-    if (!hintPinned && hintEl) hintEl.hidden = true;
-    return;
-  }
-
-  showScatterPoint(p, false);
-};
-
 canvas._mbkClick = ev => {
   const p = nearestPoint(ev, 44);
   if (!p) return;
@@ -1143,6 +1135,9 @@ canvas.addEventListener("click", canvas._mbkClick);
 canvas.addEventListener("pointerdown", canvas._mbkDown);
 canvas.addEventListener("touchstart", canvas._mbkTouch, { passive:false });
 canvas.addEventListener("pointerleave", canvas._mbkLeave);
+canvas.addEventListener("mousemove", canvas._mbkMouseMove);
+canvas.addEventListener("mousedown", canvas._mbkMouseDown);
+canvas.addEventListener("mouseleave", canvas._mbkMouseLeave);
   }
 
   async function loadReport(){
