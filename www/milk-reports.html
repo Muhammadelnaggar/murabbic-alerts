@@ -868,30 +868,40 @@ function fillHint(meta = {}){
   $("hLine2").textContent = season;
   $("hLine2").style.display = "block";
 }
-  function placeHintAtPoint(chart, x, y){
-    if (!hintEl) return;
+function placeHintAtPoint(chart, x, y){
+  if (!hintEl || !chart?.canvas) return;
 
-    hintEl.style.visibility = "hidden";
-    hintEl.hidden = false;
+  const canvas = chart.canvas;
+  const wrap = canvas.parentElement || $("scatterWrap");
+  if (!wrap) return;
 
-    const rect = chart.canvas.getBoundingClientRect();
-    const W = hintEl.offsetWidth;
-    const H = hintEl.offsetHeight;
+  hintEl.style.visibility = "hidden";
+  hintEl.hidden = false;
 
-    let left = rect.left + window.scrollX + x - W / 2;
-    let top = rect.top + window.scrollY + y - H - 12;
+  const canvasRect = canvas.getBoundingClientRect();
+  const wrapRect = wrap.getBoundingClientRect();
 
-    const minLeft = rect.left + window.scrollX + 4;
-    const maxLeft = rect.right + window.scrollX - W - 4;
-    left = Math.min(Math.max(left, minLeft), maxLeft);
+  const W = hintEl.offsetWidth || 220;
+  const H = hintEl.offsetHeight || 52;
 
-    const minTop = rect.top + window.scrollY + 4;
-    if (top < minTop) top = rect.top + window.scrollY + y + 12;
+  const baseLeft = canvasRect.left - wrapRect.left;
+  const baseTop = canvasRect.top - wrapRect.top;
 
-    hintEl.style.left = left + "px";
-    hintEl.style.top = top + "px";
-    hintEl.style.visibility = "visible";
+  let left = baseLeft + x - W / 2;
+  let top = baseTop + y - H - 12;
+
+  const minLeft = 4;
+  const maxLeft = Math.max(4, wrap.clientWidth - W - 4);
+  left = Math.min(Math.max(left, minLeft), maxLeft);
+
+  if (top < 4) {
+    top = baseTop + y + 12;
   }
+
+  hintEl.style.left = left + "px";
+  hintEl.style.top = top + "px";
+  hintEl.style.visibility = "visible";
+}
 
   function externalTooltipHandler(ctx){
     const { chart, tooltip } = ctx;
