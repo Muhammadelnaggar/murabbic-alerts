@@ -300,6 +300,16 @@
   font-weight:700;
   line-height:1.6;
 }
+    #scatter{
+  display:block;
+  width:100%;
+  touch-action:manipulation;
+  cursor:crosshair;
+}
+
+#scatterWrap{
+  user-select:none;
+}
     @media print{
   @page{
     size:A4 portrait;
@@ -1023,74 +1033,104 @@ function fillHint(meta = {}){
       ctx.fillText("لا توجد نقاط لعرضها في هذا اليوم.", cssW / 2, cssH / 2);
     }
 
-    function nearestPoint(ev){
-      const r = canvas.getBoundingClientRect();
-      const mx = ev.clientX - r.left;
-      const my = ev.clientY - r.top;
+   function eventXY(ev){
+  const src =
+    ev.touches?.[0] ||
+    ev.changedTouches?.[0] ||
+    ev;
 
-      let best = null;
-      let bestD = Infinity;
+  const r = canvas.getBoundingClientRect();
 
-      for (const p of drawn) {
-        const dx = mx - p.x;
-        const dy = my - p.y;
-        const d = Math.sqrt(dx * dx + dy * dy);
+  return {
+    x: Number(src.clientX) - r.left,
+    y: Number(src.clientY) - r.top
+  };
+}
 
-        if (d < bestD) {
-          bestD = d;
-          best = p;
-        }
-      }
+function nearestPoint(ev, radius = 44){
+  const pos = eventXY(ev);
+  const mx = pos.x;
+  const my = pos.y;
 
-      return bestD <= 28 ? best : null;
+  if (!Number.isFinite(mx) || !Number.isFinite(my)) return null;
+
+  let best = null;
+  let bestD = Infinity;
+
+  for (const p of drawn) {
+    const dx = mx - p.x;
+    const dy = my - p.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+
+    if (d < bestD) {
+      bestD = d;
+      best = p;
     }
-
-    if (canvas._mbkMove) canvas.removeEventListener("pointermove", canvas._mbkMove);
-    if (canvas._mbkClick) canvas.removeEventListener("click", canvas._mbkClick);
-    if (canvas._mbkLeave) canvas.removeEventListener("pointerleave", canvas._mbkLeave);
-    if (canvas._mbkDown) canvas.removeEventListener("pointerdown", canvas._mbkDown);
-
-    canvas._mbkMove = ev => {
-      const p = nearestPoint(ev);
-      canvas.style.cursor = p ? "pointer" : "default";
-
-      if (!p) {
-        if (!hintPinned && hintEl) hintEl.hidden = true;
-        return;
-      }
-
-      fillHint(p.meta);
-      placeHintAtPoint({ canvas }, p.x, p.y);
-      if (hintEl) hintEl.hidden = false;
-    };
-
-    canvas._mbkClick = ev => {
-      const p = nearestPoint(ev);
-      if (!p) return;
-
-      hintPinned = true;
-      fillHint(p.meta);
-      placeHintAtPoint({ canvas }, p.x, p.y);
-      if (hintEl) hintEl.hidden = false;
-    };
-    canvas._mbkDown = ev => {
-  const p = nearestPoint(ev);
-  if (!p) return;
-
-  hintPinned = true;
-  fillHint(p.meta);
-  placeHintAtPoint({ canvas }, p.x, p.y);
-  if (hintEl) hintEl.hidden = false;
-};
-    canvas._mbkLeave = () => {
-      if (!hintPinned && hintEl) hintEl.hidden = true;
-    };
-
-    canvas.addEventListener("pointermove", canvas._mbkMove);
-    canvas.addEventListener("click", canvas._mbkClick);
-    canvas.addEventListener("pointerleave", canvas._mbkLeave);
   }
 
+  return best && bestD <= radius ? best : null;
+}
+
+function showScatterPoint(p, pinned = false){
+  if (!p) return;
+
+  hintPinned = pinned;
+  fillHint(p.meta);
+  placeHintAtPoint({ canvas }, p.x, p.y);
+
+  if (hintEl) hintEl.hidden = false;
+}
+
+if (canvas._mbkMove) canvas.removeEventListener("pointermove", canvas._mbkMove);
+if (canvas._mbkClick) canvas.removeEventListener("click", canvas._mbkClick);
+if (canvas._mbkLeave) canvas.removeEventListener("pointerleave", canvas._mbkLeave);
+if (canvas._mbkDown) canvas.removeEventListener("pointerdown", canvas._mbkDown);
+if (canvas._mbkTouch) canvas.removeEventListener("touchstart", canvas._mbkTouch);
+
+canvas._mbkMove = ev => {
+  const p = nearestPoint(ev, 34);
+  canvas.style.cursor = p ? "pointer" : "crosshair";
+
+  if (!p) {
+    if (!hintPinned && hintEl) hintEl.hidden = true;
+    return;
+  }
+
+  showScatterPoint(p, false);
+};
+
+canvas._mbkClick = ev => {
+  const p = nearestPoint(ev, 44);
+  if (!p) return;
+
+  showScatterPoint(p, true);
+};
+
+canvas._mbkDown = ev => {
+  const p = nearestPoint(ev, 48);
+  if (!p) return;
+
+  ev.preventDefault();
+  showScatterPoint(p, true);
+};
+
+canvas._mbkTouch = ev => {
+  const p = nearestPoint(ev, 52);
+  if (!p) return;
+
+  ev.preventDefault();
+  showScatterPoint(p, true);
+};
+
+canvas._mbkLeave = () => {
+  if (!hintPinned && hintEl) hintEl.hidden = true;
+};
+
+canvas.addEventListener("pointermove", canvas._mbkMove);
+canvas.addEventListener("click", canvas._mbkClick);
+canvas.addEventListener("pointerdown", canvas._mbkDown);
+canvas.addEventListener("touchstart", canvas._mbkTouch, { passive:false });
+canvas.addEventListener("pointerleave", canvas._mbkLeave);
   async function loadReport(){
     hideMsg();
     if (hintEl) hintEl.hidden = true;
