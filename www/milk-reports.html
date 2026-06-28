@@ -9,12 +9,41 @@
     :root{ --green:#0ea05a; --green-600:#0b7f47; --bg:#f6faf7; --text:#0f172a; --muted:#64748b; --card:#fff; --border:#e2e8f0; }
     *{box-sizing:border-box}
     body{margin:0;font-family:'Cairo',system-ui,Segoe UI,Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
-    header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--border)}
-    .bar{max-width:960px;margin:0 auto;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between}
-    .title{font-weight:800;color:var(--green-600)}
-    .actions{display:flex;gap:8px;flex-wrap:wrap}
-    .chip{padding:8px 12px;border-radius:999px;border:1px solid var(--border);background:#fff;font-weight:700;cursor:pointer}
-    .chip.primary{background:var(--green);color:#fff;border-color:var(--green)}
+    header{
+  position:sticky;
+  top:0;
+  z-index:20;
+  background:#fff;
+  border-bottom:1px solid var(--border);
+}
+
+.report-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:center;
+}
+
+.chip{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:8px 12px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:#fff;
+  color:var(--text);
+  font-weight:800;
+  cursor:pointer;
+  text-decoration:none;
+}
+
+.chip.primary{
+  background:var(--green);
+  color:#fff;
+  border-color:var(--green);
+}
     main{max-width:960px;margin:14px auto;padding:10px}
     .row{display:grid;grid-template-columns:1fr;gap:12px}
     @media(min-width:640px){ .row{grid-template-columns:repeat(2,1fr)} }
@@ -408,18 +437,25 @@
 </head>
 <body>
 <header>
-  <div class="bar">
-    <div class="title">📊 تقرير اللبن</div>
-    <div class="actions">
-      <a class="chip" href="daily-milk.html">إدخال يومي</a>
-      <a class="chip" href="add-event.html">الأحداث</a>
-      <button id="btnRefresh" class="chip primary">تحديث</button>
-<button id="btnPrint" class="chip js-print-report" type="button">🖨️ طباعة / PDF</button>
+  <div class="mbk-head">
+    <a class="mbk-back" href="dashboard.html" title="رجوع">رجوع</a>
+
+    <div class="mbk-center">
+      <div class="mbk-page-title">تقرير اللبن</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
     </div>
+
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
   </div>
 </header>
 
 <main>
+  <div class="card report-actions">
+    <a class="chip" href="daily-milk.html">إدخال يومي</a>
+    <a class="chip" href="add-event.html">الأحداث</a>
+    <button id="btnRefresh" class="chip primary" type="button">تحديث</button>
+  </div>
+
   <div class="card inline" style="justify-content:space-between">
     <div class="inline">
       <label for="reportDate" style="font-weight:700">تاريخ العرض:</label>
