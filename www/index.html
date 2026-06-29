@@ -293,79 +293,103 @@
     <button id="installBtn" class="install-btn" type="button">تثبيت مُرَبِّيك</button>
     <div class="install-note">اضغط مرة واحدة لتثبيت التطبيق على الموبايل</div>
   </div>
-  <script>
-    let deferredInstallPrompt = null;
-    let installPromptSeen = false;
+ <script>
+  let deferredInstallPrompt = null;
+  let installPromptSeen = false;
+  let installDone = false;
 
-    const installBox = document.getElementById('installBox');
-    const installBtn = document.getElementById('installBtn');
+  const installBox = document.getElementById('installBox');
+  const installBtn = document.getElementById('installBtn');
+  const installNote = installBox ? installBox.querySelector('.install-note') : null;
 
-    function isStandaloneApp(){
-      return window.matchMedia('(display-mode: standalone)').matches ||
-             window.navigator.standalone === true;
-    }
+  function isStandaloneApp(){
+    return window.matchMedia('(display-mode: standalone)').matches ||
+           window.navigator.standalone === true;
+  }
 
-    function goLogin(delay){
-      setTimeout(() => {
-        window.location.replace("login.html");
-      }, delay);
-    }
+  function goLogin(delay){
+    setTimeout(() => {
+      window.location.replace("login.html");
+    }, delay);
+  }
 
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
-      });
-    }
-
-    window.addEventListener('beforeinstallprompt', function (event) {
-      event.preventDefault();
-      deferredInstallPrompt = event;
-      installPromptSeen = true;
-
-      if (installBox) {
-        installBox.hidden = false;
-      }
-    });
-
-  if (installBtn) {
-  installBtn.addEventListener('click', async function () {
-    if (!deferredInstallPrompt) {
-      goLogin(300);
-      return;
-    }
-
-    const promptEvent = deferredInstallPrompt;
-    deferredInstallPrompt = null;
-
-    try {
-      promptEvent.prompt();
-      await promptEvent.userChoice;
-    } catch (_) {}
+  function showInstalledMessage(){
+    installDone = true;
 
     if (installBox) {
-      installBox.hidden = true;
+      installBox.hidden = false;
     }
 
-    goLogin(700);
-  });
-}
-    window.addEventListener('appinstalled', function () {
-      if (installBox) {
-        installBox.hidden = true;
-      }
-      goLogin(700);
+    if (installBtn) {
+      installBtn.disabled = true;
+      installBtn.textContent = 'تم تثبيت مُرَبِّيك بنجاح';
+      installBtn.style.opacity = '0.9';
+      installBtn.style.cursor = 'default';
+    }
+
+    if (installNote) {
+      installNote.textContent = 'افتح مُرَبِّيك الآن من الأيقونة الجديدة على شاشة الموبايل';
+    }
+  }
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
     });
+  }
 
-    if (isStandaloneApp()) {
-      goLogin(1800);
-    } else {
-      setTimeout(function () {
-        if (!installPromptSeen) {
-          goLogin(3000);
-        }
-      }, 2500);
+  window.addEventListener('beforeinstallprompt', function (event) {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    installPromptSeen = true;
+
+    if (installBox) {
+      installBox.hidden = false;
     }
-  </script>
+  });
 
+  if (installBtn) {
+    installBtn.addEventListener('click', async function () {
+      if (!deferredInstallPrompt) {
+        goLogin(300);
+        return;
+      }
+
+      const promptEvent = deferredInstallPrompt;
+      deferredInstallPrompt = null;
+
+      try {
+        promptEvent.prompt();
+        const choice = await promptEvent.userChoice;
+
+        if (choice && choice.outcome === 'accepted') {
+          showInstalledMessage();
+          return;
+        }
+      } catch (_) {}
+
+      if (!installDone) {
+        if (installBox) {
+          installBox.hidden = true;
+        }
+        goLogin(700);
+      }
+    });
+  }
+
+  window.addEventListener('appinstalled', function () {
+    showInstalledMessage();
+  });
+
+  if (isStandaloneApp()) {
+    goLogin(1200);
+  } else {
+    setTimeout(function () {
+      if (!installPromptSeen && !installDone) {
+        goLogin(3000);
+      }
+    }, 2500);
+  }
+</script>
 </body>
 </html>
