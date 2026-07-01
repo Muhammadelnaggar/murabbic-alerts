@@ -5209,3 +5209,34 @@ body[data-page="dashboard"] .prod-subtle{
     max-width:100%;
   }
 }
+/* =========================================================
+   Murabbik Central Infobar Close Fix
+   إصلاح مركزي لإغلاق رسائل التحقق بدون منطق داخل الصفحات
+   ========================================================= */
+
+.infobar[style*="display: none"],
+.mbk-infobar[style*="display: none"],
+#gateBox[style*="display: none"]{
+  display:none !important;
+}
+
+.infobar button[id="gateOkBtn"],
+.mbk-infobar button[id="gateOkBtn"],
+#gateBox button[id="gateOkBtn"],
+.infobar .okbtn,
+.mbk-infobar .okbtn{
+  width:auto !important;
+  min-width:110px;
+  max-width:180px;
+  margin:8px auto 0 !important;
+  padding:8px 18px !important;
+  border-radius:999px !important;
+  border:2px solid var(--brand-600, #0b7f47) !important;
+  background:#fff !important;
+  color:var(--brand-600, #0b7f47) !important;
+  font-weight:900 !important;
+  cursor:pointer !important;
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
+}
