@@ -24578,8 +24578,7 @@ async function updateAnimalAfterCloseupSaveSrv(ev = {}) {
 
   await db.collection("animals").doc(animalId).set({
     lastCloseUpDate: eventDate,
-    productionStatus: "close_up",
-    reproductiveStatus: "تحضير للولادة",
+    productionStatus: "انتظار ولادة",
     closeUpRation: String(ev.ration || "").trim(),
     anionicSalts: String(ev.anionicSalts || "").trim(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
