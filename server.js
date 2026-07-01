@@ -18095,7 +18095,53 @@ function parsePregnancyBulkNumbersSrv(raw) {
 
   return [...new Set(arr)];
 }
+function pregnancyBulkResultsMapSrv(body = {}) {
+  let rows =
+    body.bulkResults ||
+    body.resultsByAnimal ||
+    body.perAnimalResults ||
+    body.results ||
+    [];
 
+  if (typeof rows === "string") {
+    try {
+      rows = JSON.parse(rows);
+    } catch (_) {
+      rows = [];
+    }
+  }
+
+  if (rows && !Array.isArray(rows) && typeof rows === "object") {
+    rows = Object.entries(rows).map(([animalNumber, result]) => ({ animalNumber, result }));
+  }
+
+  const out = new Map();
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const animalNumber = calvingNormDigitsOnlySrv(
+      row?.animalNumber ||
+      row?.number ||
+      row?.animalId ||
+      row?.id ||
+      ""
+    );
+
+    const result = normalizePregnancyResultSrv(row?.result || row?.value || row?.status || "");
+
+    if (animalNumber && result) {
+      out.set(animalNumber, result);
+    }
+  }
+
+  return out;
+}
+
+function pregnancyBulkResultForNumberSrv(resultMap, animalNumber, fallbackResult = "") {
+  const key = calvingNormDigitsOnlySrv(animalNumber);
+  return normalizePregnancyResultSrv(
+    (resultMap instanceof Map ? resultMap.get(key) : "") || fallbackResult || ""
+  );
+}
 app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -18123,9 +18169,10 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
       ""
     ).trim().slice(0, 10);
 
-    const method = normalizePregnancyMethodSrv(body.method);
-    const result = normalizePregnancyResultSrv(body.result);
-    const vet = String(body.vet || "").trim() || null;
+ const method = normalizePregnancyMethodSrv(body.method);
+ const resultMap = pregnancyBulkResultsMapSrv(body);
+ const fallbackResult = normalizePregnancyResultSrv(body.result);
+ const vet = String(body.vet || "").trim() || null;
 
     if (!numbers.length) {
       return res.status(400).json({
@@ -18154,15 +18201,15 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
       });
     }
 
-    if (!result) {
-      return res.status(400).json({
-        ok: false,
-        message: "❌ نتيجة التشخيص مطلوبة.",
-        fieldErrors: {
-          result: "نتيجة التشخيص مطلوبة."
-        }
-      });
+ if (!fallbackResult && !resultMap.size) {
+  return res.status(400).json({
+    ok: false,
+    message: "❌ نتيجة التشخيص مطلوبة لكل حيوان.",
+    fieldErrors: {
+      result: "اختر نتيجة التشخيص لكل حيوان."
     }
+  });
+}
 
     const saved = [];
     const rejected = [];
@@ -18188,7 +18235,15 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
         });
         continue;
       }
+      const result = pregnancyBulkResultForNumberSrv(resultMap, animalNumber, fallbackResult);
 
+      if (!result) {
+      rejected.push({
+      animalNumber,
+      reason: "اختر نتيجة التشخيص لهذا الحيوان."
+     });
+     continue;
+     }
       const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
 
       if (!animal) {
