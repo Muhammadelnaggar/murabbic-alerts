@@ -27459,11 +27459,6 @@ function heatDecisionSrv({ animal = {}, species = "", reproductiveStatus = "" } 
     return "❌ تعذّر العثور على الحيوان.";
   }
 
-  const st = String(animal.status ?? "").trim().toLowerCase();
-  if (st === "inactive" || st === "archived") {
-    return "❌ الحيوان خارج القطيع.";
-  }
-
   const sp = heatPickSpeciesSrv(animal, { species });
   const aw = heatAnimalWordSrv(sp);
 
@@ -27471,11 +27466,7 @@ function heatDecisionSrv({ animal = {}, species = "", reproductiveStatus = "" } 
   const cat = heatReproCategorySrv(rsRaw);
 
   if (animal.breedingBlocked === true || cat === "blocked") {
-    return `❌ هذه ${aw} مستبعدة تناسليًا — لا تُلقّح مرة أخرى.`;
-  }
-
-  if (cat === "pregnant") {
-    return `❌ هذه ${aw} عِشار — لا يمكن تسجيل شياع.`;
+    return `❌ هذه ${aw} مستبعدة تناسليًا — لا يمكن تسجيل شياع لها.`;
   }
 
   return null;
@@ -27595,17 +27586,32 @@ async function buildHeatContextSrv(uid, animalNumber, eventDate){
     reproductiveStatus
   });
 
-  const duplicateMsg = await heatDuplicateCheckSrv(uid, num, dt, 3);
+  const reproductiveCategory = heatReproCategorySrv(reproductiveStatus);
+  const requiresPregnancyConfirmation = reproductiveCategory === "pregnant";
+  const pregnancyConfirmationRedirectUrl =
+    `pregnancy-diagnosis.html?number=${encodeURIComponent(num)}` +
+    `&date=${encodeURIComponent(dt)}` +
+    `&checkType=pregnancy_confirmation_120` +
+    `&returnTo=heat`;
 
   return {
     ok: true,
-    allowed: !decisionMsg && !duplicateMsg,
-    message: decisionMsg || duplicateMsg || "✅ تم التحقق — يمكن تسجيل الشياع.",
+    allowed: !decisionMsg && !requiresPregnancyConfirmation,
+    message: decisionMsg || (
+      requiresPregnancyConfirmation
+        ? "⚠️ الحيوان مسجل عِشار وظهر عليه شياع. أكّد الحمل أولًا من صفحة تشخيص الحمل؛ لن يتم تسجيل الشياع الآن."
+        : "✅ تم التحقق — يمكن تسجيل الشياع."
+    ),
     animal,
     animalId: String(animal.id || animal.animalId || num),
     animalNumber: String(animal.animalNumber || animal.number || num),
     species,
     reproductiveStatus,
+    reproductiveCategory,
+    requiresPregnancyConfirmation,
+    actionRequired: requiresPregnancyConfirmation ? "pregnancy_confirmation" : "",
+    pregnancyConfirmationRedirectUrl: requiresPregnancyConfirmation ? pregnancyConfirmationRedirectUrl : "",
+    redirectUrl: requiresPregnancyConfirmation ? pregnancyConfirmationRedirectUrl : "",
     dimAtEvent,
     lastEventType,
     lastEventDate,
@@ -27629,7 +27635,7 @@ app.get('/api/heat/context', requireUserId, async (req, res) => {
       return res.status(ctx.status || 400).json(ctx);
     }
 
-    return res.json({
+        return res.json({
       ok: true,
       allowed: ctx.allowed,
       message: ctx.message,
@@ -27637,6 +27643,11 @@ app.get('/api/heat/context', requireUserId, async (req, res) => {
       animalNumber: ctx.animalNumber,
       species: ctx.species,
       reproductiveStatus: ctx.reproductiveStatus,
+      reproductiveCategory: ctx.reproductiveCategory || "",
+      requiresPregnancyConfirmation: ctx.requiresPregnancyConfirmation === true,
+      actionRequired: ctx.actionRequired || "",
+      pregnancyConfirmationRedirectUrl: ctx.pregnancyConfirmationRedirectUrl || "",
+      redirectUrl: ctx.redirectUrl || "",
       dimAtEvent: ctx.dimAtEvent,
       lastEventType: ctx.lastEventType,
       lastEventDate: ctx.lastEventDate,
@@ -27689,6 +27700,11 @@ app.post('/api/heat/gate', requireUserId, async (req, res) => {
         animalId: ctx.animalId || "",
         species: ctx.species || "",
         reproductiveStatus: ctx.reproductiveStatus || "",
+        reproductiveCategory: ctx.reproductiveCategory || "",
+        requiresPregnancyConfirmation: ctx.requiresPregnancyConfirmation === true,
+        actionRequired: ctx.actionRequired || "",
+        pregnancyConfirmationRedirectUrl: ctx.pregnancyConfirmationRedirectUrl || "",
+        redirectUrl: ctx.redirectUrl || "",
         dimAtEvent: ctx.dimAtEvent ?? null,
         lastEventType: ctx.lastEventType || null,
         lastEventDate: ctx.lastEventDate || null,
@@ -27698,6 +27714,10 @@ app.post('/api/heat/gate', requireUserId, async (req, res) => {
 
     const allowedNumbers = results.filter(x => x.allowed).map(x => x.animalNumber);
     const rejected = results.filter(x => !x.allowed);
+    const pregnancyItem = rejected.find(x =>
+  x.requiresPregnancyConfirmation === true ||
+  x.actionRequired === "pregnancy_confirmation"
+);
 
     return res.json({
       ok: true,
@@ -27705,6 +27725,10 @@ app.post('/api/heat/gate', requireUserId, async (req, res) => {
       animalNumbers: allowedNumbers,
       rejected,
       results,
+      actionRequired: pregnancyItem ? "pregnancy_confirmation" : "",
+      requiresPregnancyConfirmation: !!pregnancyItem,
+      pregnancyConfirmationRedirectUrl: pregnancyItem?.pregnancyConfirmationRedirectUrl || "",
+      redirectUrl: pregnancyItem?.redirectUrl || pregnancyItem?.pregnancyConfirmationRedirectUrl || "",
       message: rejected.length
         ? `تم التحقق — صالح: ${allowedNumbers.length} / مرفوض: ${rejected.length}`
         : "✅ تم التحقق — يمكن تسجيل الشياع."
@@ -27788,14 +27812,29 @@ app.post('/api/heat/save', requireUserId, async (req, res) => {
       try {
         const ctx = await buildHeatContextSrv(uid, animalNumber, eventDate);
 
-        if (!ctx?.ok || !ctx?.allowed) {
+        if (ctx?.requiresPregnancyConfirmation) {
           rejected.push({
             animalNumber,
-            message: ctx?.message || ctx?.error || "❌ الحيوان غير مؤهل لتسجيل الشياع."
+            message: ctx.message || "⚠️ الحيوان مسجل عِشار — أكّد الحمل أولًا قبل تسجيل الشياع.",
+            actionRequired: "pregnancy_confirmation",
+            requiresPregnancyConfirmation: true,
+            pregnancyConfirmationRedirectUrl: ctx.pregnancyConfirmationRedirectUrl || "",
+            redirectUrl: ctx.redirectUrl || ctx.pregnancyConfirmationRedirectUrl || ""
           });
           continue;
         }
 
+        if (!ctx?.ok || !ctx?.allowed) {
+          rejected.push({
+            animalNumber,
+            message: ctx?.message || ctx?.error || "❌ الحيوان غير مؤهل لتسجيل الشياع.",
+            actionRequired: ctx?.actionRequired || "",
+            requiresPregnancyConfirmation: ctx?.requiresPregnancyConfirmation === true,
+            pregnancyConfirmationRedirectUrl: ctx?.pregnancyConfirmationRedirectUrl || "",
+            redirectUrl: ctx?.redirectUrl || ""
+          });
+          continue;
+        }
         const animal = ctx.animal || {};
 
         const payload = {
@@ -27821,8 +27860,7 @@ app.post('/api/heat/save', requireUserId, async (req, res) => {
         const evRef = await db.collection('events').add(payload);
 
         const animalRef = await findAnimalDocRefByNumberForTenant(uid, animalNumber);
-
-        if (animalRef) {
+        if (animalRef && heatReproCategorySrv(ctx.reproductiveStatus || "") !== "pregnant") {
           await animalRef.ref.set({
             lastHeatDate: eventDate,
             lastHeatTime: heatTime,
@@ -27853,14 +27891,20 @@ app.post('/api/heat/save', requireUserId, async (req, res) => {
       scheduleGroupsRebuildSrv(uid, "heat_save");
     }
 
-    if (!saved.length) {
-      return res.status(400).json({
+       if (!saved.length) {
+      const pregnancyItem = rejected.find(x => x.requiresPregnancyConfirmation || x.actionRequired === "pregnancy_confirmation");
+
+      return res.status(pregnancyItem ? 409 : 400).json({
         ok:false,
         allowed:false,
         savedCount:0,
         rejectedCount:rejected.length,
         saved,
         rejected,
+        actionRequired: pregnancyItem ? "pregnancy_confirmation" : "",
+        requiresPregnancyConfirmation: !!pregnancyItem,
+        pregnancyConfirmationRedirectUrl: pregnancyItem?.pregnancyConfirmationRedirectUrl || "",
+        redirectUrl: pregnancyItem?.redirectUrl || pregnancyItem?.pregnancyConfirmationRedirectUrl || "",
         message: rejected.length
           ? rejected.slice(0,5).map(x => `${x.animalNumber}: ${x.message}`).join(" — ")
           : "❌ لا يوجد أي رقم مؤهل لتسجيل الشياع."
