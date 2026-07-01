@@ -18447,7 +18447,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
       const lastCalving = String(doc.lastCalvingDate || "").trim();
 
       if (lastCalving && calvingIsDateSrv(lastCalving)) {
-        const minAfterCalving = sp === "جاموس" ? 45 : 60;
+       const minAfterCalving = sp === "جاموس" ? 35 : 45;
         const sinceCalving = calvingDaysBetweenSrv(lastCalving, fd.eventDate);
 
         if (
@@ -18455,7 +18455,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
           sinceCalving >= 0 &&
           sinceCalving < minAfterCalving
         ) {
-          return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — حديثة الولادة (منذ ${sinceCalving} يوم).`;
+         return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — حديثة الولادة: مرّ ${sinceCalving} يوم فقط، والحد الأدنى ${minAfterCalving} يوم.`;
         }
       }
 
@@ -18849,7 +18849,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
       const lastCalving = String(doc.lastCalvingDate || "").trim();
 
       if (lastCalving && calvingIsDateSrv(lastCalving)) {
-        const minAfterCalving = sp === "جاموس" ? 45 : 60;
+       const minAfterCalving = sp === "جاموس" ? 35 : 45;
         const sinceCalving = calvingDaysBetweenSrv(lastCalving, fd.eventDate);
 
         if (
@@ -18857,7 +18857,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
           sinceCalving >= 0 &&
           sinceCalving < minAfterCalving
         ) {
-         return `❌ لا يمكن بدء بروتوكول التزامن لحيوان حديث الولادة منذ ${sinceCalving} يوم.`;
+         return `❌ لا يمكن بدء بروتوكول التزامن — الحيوان حديث الولادة: مرّ ${sinceCalving} يوم فقط، والحد الأدنى ${minAfterCalving} يوم.`;
         }
       }
 
