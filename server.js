@@ -1104,8 +1104,34 @@ function reproAutoOpenThresholdDaysSrv(a = {}) {
 }
 
 function buildReproAutoOpenPatchSrv(a = {}, todayISO = "") {
-  if (!isFreshReproStatusForAutoOpenSrv(a.reproductiveStatus)) return null;
+  const reproNorm = reproAutoNormArSrv(a.reproductiveStatus);
+
+  const isFresh = isFreshReproStatusForAutoOpenSrv(a.reproductiveStatus);
+  const isAbortion = reproNorm.includes("اجهاض");
+
+  if (!isFresh && !isAbortion) return null;
   if (a.breedingBlocked === true) return null;
+
+  if (isAbortion) {
+    const lad = String(
+      a.lastAbortionDate ||
+      a.abortionDate ||
+      ""
+    ).trim().slice(0, 10);
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(lad)) return null;
+
+    const daysAfterAbortion = diffDaysISO(lad, todayISO);
+    if (!Number.isFinite(daysAfterAbortion) || daysAfterAbortion < 40) return null;
+
+    return {
+      reproductiveStatus: "مفتوحة",
+      reproAutoUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      reproAutoReason: "AutoOpenAfter40DaysFromAbortion",
+      reproAutoDaysAfterAbortion: daysAfterAbortion,
+      reproAutoSource: "server:daily_maintenance"
+    };
+  }
 
   const lcd = String(
     a.lastCalvingDate ||
@@ -25269,15 +25295,6 @@ app.post("/api/abortion/save", requireUserId, async (req, res) => {
       });
     }
 
-    const duplicated = await existsAbortionSameDaySrv(uid, animalNumber, eventDate);
-
-    if (duplicated) {
-      return res.status(409).json({
-        ok: false,
-        message: `❌ تم تسجيل إجهاض لهذا الحيوان في نفس اليوم (${eventDate}) من قبل.`
-      });
-    }
-
     const derived = calcAbortionAgeAndCauseSrv(lastInseminationDate, eventDate);
 
     const payload = {
@@ -25444,23 +25461,20 @@ async function updateAnimalByAbortionSrv(ev) {
     return;
   }
 
-  const date = String(ev.eventDate || "").trim();
+  const date = String(ev.eventDate || "").trim().slice(0, 10);
   const m = Number(ev.abortionAgeMonths);
 
   const upd = {
     lastAbortionDate: date,
     abortionAgeMonths: Number.isFinite(m) ? Number(m) : null,
-    reproductiveStatus: "مفتوحة",
+    reproductiveStatus: "إجهاض",
     lastPregnancyLossClass: (Number.isFinite(m) && m >= 5) ? "late" : "early",
-    status: "active"
+    status: "active",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
   };
 
   const wantIncLactationFromAbortion = Number.isFinite(m) && m >= 5;
 
-  // ------------------------------------------------------
-  // البحث المركزي عن وثيقة الحيوان
-  // يستخدم userId/ownerUid + number/animalNumber
-  // ------------------------------------------------------
   const animal = await findAnimalDocByNumberSrv(tenant, num);
 
   if (!animal || !animal.id) {
@@ -25471,7 +25485,6 @@ async function updateAnimalByAbortionSrv(ev) {
   const cur = animal || {};
   const updFinal = { ...upd };
 
-  // ✅ زيادة lactationNumber عند الإجهاض المتأخر (>=5 شهور)
   if (wantIncLactationFromAbortion) {
     const curL = Number(cur.lactationNumber || 0);
     updFinal.lactationNumber = (Number.isFinite(curL) ? curL : 0) + 1;
