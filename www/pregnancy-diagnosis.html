@@ -406,19 +406,35 @@ function applyAcceptedNumbers(data, originalNums) {
     ? data.accepted.map(x => String(x.animalNumber || "").trim()).filter(Boolean)
     : [];
 
-  if (!acceptedNums.length) return;
+  const input = document.getElementById("animalNumber");
+  if (!input) return;
 
-  const current = parseNumbers(document.getElementById("animalNumber")?.value || "");
+  const isBulk = Array.isArray(originalNums) && originalNums.length > 1;
+  if (!isBulk) return;
+
+  if (!acceptedNums.length) {
+    input.value = "";
+    bulkResultState.clear();
+    renderBulkResultTable();
+    return;
+  }
+
+  const current = parseNumbers(input.value || "");
   const same =
     current.length === acceptedNums.length &&
     current.every((x, i) => x === acceptedNums[i]);
 
-  if (same) return;
-
-  const animalEl = document.getElementById("animalNumber");
-  if (animalEl) {
-    animalEl.value = acceptedNums.join(",");
+  if (!same) {
+    input.value = acceptedNums.join(",");
   }
+
+  for (const key of [...bulkResultState.keys()]) {
+    if (!acceptedNums.includes(key)) {
+      bulkResultState.delete(key);
+    }
+  }
+
+  renderBulkResultTable();
 }
 function renderGateResult(data, nums) {
   const msg = String(data?.message || data?.error || "").trim();
@@ -427,7 +443,7 @@ function renderGateResult(data, nums) {
   const rejectedItems = Array.isArray(data?.rejected) ? data.rejected : [];
 
   const rejectedLines = rejectedItems
-    .slice(0, 8)
+    .slice(0, 12)
     .map(x => {
       const n = String(x.animalNumber || "").trim();
       const reason = compactReason(x.reason || "");
@@ -437,19 +453,27 @@ function renderGateResult(data, nums) {
     })
     .filter(Boolean);
 
+  const acceptedCount = Array.isArray(data?.accepted) ? data.accepted.length : 0;
+  const rejectedCount = rejectedItems.length;
+
+  const summaryLine = nums.length > 1
+    ? `المؤهل: ${acceptedCount} — المرفوض: ${rejectedCount}`
+    : "";
+
   const fullMsg = [
     msg,
+    summaryLine,
     rejectedLines.length ? rejectedLines.join("\n") : ""
   ].filter(Boolean).join("\n\n");
 
   if (fullMsg) {
     showGate(
       fullMsg,
-     data?.allowed ? "success" : "error"
+      data?.allowed ? "success" : "error"
     );
   }
 
-  if (data?.stage === "pre_gate" && Array.isArray(data.accepted) && data.accepted.length) {
+  if (nums.length > 1 && Array.isArray(data?.accepted)) {
     applyAcceptedNumbers(data, nums);
   }
 }
@@ -460,17 +484,6 @@ async function runGateNow() {
   const nums = parseNumbers(payload.animalNumber);
   renderBulkResultTable();
 
-if (nums.length > 1) {
-  const missing = missingBulkResultNumbers(nums);
-
-  if (missing.length) {
-    showGate(
-      `اختر نتيجة التشخيص لكل رقم في الجدول.\nأرقام بدون نتيجة: ${missing.join(", ")}`,
-      "info"
-    );
-    return;
-  }
-}
 
 const gateKey = JSON.stringify({
   n: nums.join(","),
