@@ -13165,14 +13165,103 @@ function validateInseminationFieldsSrv(fd = {}) {
 
   return fieldErrors;
 }
+function inseminationBoolSrv(v) {
+  const s = String(v ?? "").trim().toLowerCase();
 
+  return (
+    v === true ||
+    s === "true" ||
+    s === "1" ||
+    s === "yes" ||
+    s === "y" ||
+    s === "نعم" ||
+    s === "مؤكد" ||
+    s === "تم" ||
+    s === "confirmed"
+  );
+}
+
+function inseminationIsPregnantStatusSrv(v) {
+  const s = calvingStripArSrv(String(v || "").trim());
+  return s.includes("عشار") || s.includes("حامل");
+}
+
+function inseminationConfirmEmbryonicLossSrv(fd = {}) {
+  return inseminationBoolSrv(
+    fd.confirmEmbryonicLoss ||
+    fd.embryonicLossConfirmed ||
+    fd.confirmPregnancyLoss ||
+    fd.pregnancyLossConfirmed ||
+    fd.confirmNegativePregnancyCheck ||
+    fd.forceInseminationAfterPregnancyCheck
+  );
+}
+
+function inseminationEventTypeIsAISrv(ev = {}) {
+  const t = String(
+    ev.eventTypeNorm ||
+    ev.eventType ||
+    ev.type ||
+    ev.name ||
+    ""
+  ).trim().toLowerCase();
+
+  return (
+    t === "insemination" ||
+    t.includes("insemination") ||
+    t.includes("تلقيح")
+  );
+}
+
+async function countInseminationsSameDaySrv(uid, animalNumber, eventDate) {
+  const num = calvingNormDigitsOnlySrv(animalNumber || "");
+  const dt = String(eventDate || "").trim().slice(0, 10);
+
+  if (!db || !uid || !num || !calvingIsDateSrv(dt)) return 0;
+
+  const vals = typeof findAnimalNumberMatches === "function"
+    ? findAnimalNumberMatches(num)
+    : [num, Number(num)].filter(v => v !== "" && v !== null && v !== undefined);
+
+  const seen = new Set();
+
+  for (const field of ["animalNumber", "number"]) {
+    for (const v of vals) {
+      try {
+        const snap = await db.collection("events")
+          .where("userId", "==", uid)
+          .where(field, "==", v)
+          .limit(120)
+          .get();
+
+        snap.docs.forEach(d => {
+          const ev = d.data() || {};
+          const evDate = String(ev.eventDate || ev.date || "").trim().slice(0, 10);
+
+          if (evDate === dt && inseminationEventTypeIsAISrv(ev)) {
+            seen.add(d.id);
+          }
+        });
+
+      } catch (e) {
+        console.warn("countInseminationsSameDaySrv failed:", e.message || e);
+      }
+    }
+  }
+
+  return seen.size;
+}
 function inseminationDecisionSrv(fd) {
   const doc = fd.documentData;
   if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
 
+  const warnings = [];
+
   // ❌ خارج القطيع
   const st = String(doc.status ?? "").trim().toLowerCase();
-  if (st === "inactive") return "❌ لا يمكن تسجيل تلقيح — الحيوان خارج القطيع.";
+  if (st === "inactive" || st === "archived") {
+    return "❌ لا يمكن تسجيل تلقيح — الحيوان خارج القطيع.";
+  }
 
   // ✅ تحديد النوع
   let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
@@ -13181,27 +13270,43 @@ function inseminationDecisionSrv(fd) {
 
   const minPostCalving = { "أبقار": 60, "جاموس": 45 };
 
-  // ❌ عشار
-  const repro = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
-  if (repro.includes("عشار")) {
-    return "❌ الحيوان مسجل عِشار — لا يمكن تلقيحه.";
+  // ⚠️ العشار لا يُرفض مباشرة — يحتاج تأكيد فقد جنيني/فحص
+  const repro = String(fd.reproStatusFromEvents || fd.reproductiveStatus || doc.reproductiveStatus || "").trim();
+
+  if (inseminationIsPregnantStatusSrv(repro)) {
+    if (!inseminationConfirmEmbryonicLossSrv(fd)) {
+      return "CONFIRM_EMBRYONIC_LOSS|⚠️ الحيوان مسجل عِشار. لا يتم التلقيح إلا بعد تأكيد الفحص/الفقد الجنيني. عند التأكيد سيحفظ مُرَبِّيك حدث فقد جنيني أولًا ثم يسجل التلقيح.";
+    }
+
+    warnings.push("⚠️ تم تأكيد الفحص/الفقد الجنيني؛ سيتم حفظ حدث فقد جنيني قبل التلقيح.");
   }
 
-  // ❌ لازم تاريخ ولادة
+  // ⚠️ آخر ولادة: تنبيه وليس منع
   const lastCalving =
     String(doc.lastCalvingDate || "").trim() ||
     (String(fd.lastBoundaryType || "").trim() === "ولادة" ? String(fd.lastBoundary || "").trim() : "");
 
-  if (!lastCalving) return "❌ لا يوجد تاريخ آخر ولادة.";
+  if (!lastCalving) {
+    warnings.push("⚠️ لا يوجد تاريخ آخر ولادة؛ لا يمكن حساب عدد الأيام بعد الولادة بدقة.");
+  } else {
+    const gapCalving = inseminationDaysBetweenSrv(lastCalving, fd.eventDate);
 
-  const gapCalving = inseminationDaysBetweenSrv(lastCalving, fd.eventDate);
-
-  if (!Number.isFinite(gapCalving)) {
-    return "❌ تعذّر حساب الأيام منذ آخر ولادة.";
+    if (!Number.isFinite(gapCalving)) {
+      warnings.push("⚠️ تعذّر حساب الأيام منذ آخر ولادة.");
+    } else if (gapCalving < minPostCalving[sp]) {
+      warnings.push(`⚠️ تلقيح مبكر بعد الولادة: مرّ ${gapCalving} يوم فقط. الحد الإرشادي: ${minPostCalving[sp]} يوم.`);
+    }
   }
 
-  if (gapCalving < minPostCalving[sp]) {
-    return `❌ لا يمكن التلقيح الآن — مرّ ${gapCalving} يوم فقط بعد آخر ولادة.\nالحد الأدنى: ${minPostCalving[sp]} يوم.`;
+  // ✅ تلقيح نفس اليوم: مرة إعادة واحدة فقط
+  const sameDayCount = Number(fd.sameDayInseminationCount || 0);
+
+  if (sameDayCount >= 2) {
+    return "❌ تم تسجيل تلقيحين لهذا الحيوان في نفس اليوم بالفعل؛ لا يُسمح بمحاولة ثالثة.";
+  }
+
+  if (sameDayCount === 1) {
+    warnings.push("⚠️ يوجد تلقيح سابق لنفس الحيوان في نفس اليوم؛ مسموح بإعادة واحدة فقط، تأكد أن التسجيل مقصود.");
   }
 
   // ✅ آخر تلقيح: من الأحداث أولًا ثم الوثيقة
@@ -13210,18 +13315,12 @@ function inseminationDecisionSrv(fd) {
   if (lastAI) {
     const gapAI = inseminationDaysBetweenSrv(lastAI, fd.eventDate);
 
-    // ❌ منع تكرار نفس اليوم
-    if (gapAI === 0) {
-      return "❌ لا يمكن تسجيل تلقيح مرتين في نفس اليوم.";
-    }
-
-    // ⚠️ تحذير لو أقل من 11 يوم
-    if (gapAI < 11) {
-      return `WARN|⚠️ تنبيه: آخر تلقيح منذ ${gapAI} يوم فقط (أقل من 11 يوم).`;
+    if (Number.isFinite(gapAI) && gapAI > 0 && gapAI < 11) {
+      warnings.push(`⚠️ آخر تلقيح منذ ${gapAI} يوم فقط؛ الفاصل قصير جدًا بين تلقيحين.`);
     }
   }
 
-  return null;
+  return warnings.length ? `WARN|${warnings.join("\n")}` : null;
 }
 // ============================================================
 //                 ABORTION DECISION — moved from form-rules.js
@@ -13900,6 +13999,12 @@ app.post("/api/insemination/gate", requireUserId, async (req, res) => {
           ""
         ).trim();
 
+        const sameDayInseminationCount = await countInseminationsSameDaySrv(
+          uid,
+          animalNumber,
+          eventDate
+        );
+
         const gateData = {
           animalNumber,
           eventDate,
@@ -13909,6 +14014,11 @@ app.post("/api/insemination/gate", requireUserId, async (req, res) => {
           reproductiveStatus: reproStatus,
           reproStatusFromEvents: reproFromEvents,
           lastInseminationDate,
+          sameDayInseminationCount,
+          confirmEmbryonicLoss: body.confirmEmbryonicLoss,
+          embryonicLossConfirmed: body.embryonicLossConfirmed,
+          confirmPregnancyLoss: body.confirmPregnancyLoss,
+          pregnancyLossConfirmed: body.pregnancyLossConfirmed,
           lastBoundary: String(signals.lastBoundary || "").trim(),
           lastBoundaryType: String(signals.lastBoundaryType || "").trim()
         };
@@ -13918,9 +14028,15 @@ app.post("/api/insemination/gate", requireUserId, async (req, res) => {
         if (errMsg) {
           const raw = String(errMsg || "");
           const isWarn = raw.startsWith("WARN|");
-          const message = isWarn ? raw.replace(/^WARN\|/, "") : raw;
+          const needsEmbryonicConfirm = raw.startsWith("CONFIRM_EMBRYONIC_LOSS|");
 
-          if (!isWarn) {
+          const message = needsEmbryonicConfirm
+            ? raw.replace(/^CONFIRM_EMBRYONIC_LOSS\|/, "")
+            : isWarn
+              ? raw.replace(/^WARN\|/, "")
+              : raw;
+
+          if (!isWarn && !needsEmbryonicConfirm) {
             rejected.push({
               animalNumber,
               reason: message
@@ -13935,11 +14051,12 @@ app.post("/api/insemination/gate", requireUserId, async (req, res) => {
             reproductiveStatus: reproStatus,
             warning: true,
             message,
+            requiresEmbryonicLossConfirmation: needsEmbryonicConfirm,
+            sameDayInseminationCount,
             stage: "pre_gate"
           });
           continue;
         }
-
         accepted.push({
           animalNumber,
           animalId: animal.id || "",
@@ -14101,6 +14218,12 @@ app.post("/api/insemination/save", requireUserId, async (req, res) => {
       ""
     ).trim();
 
+    const sameDayInseminationCount = await countInseminationsSameDaySrv(
+      uid,
+      animalNumber,
+      eventDate
+    );
+
     const gateData = {
       ...formData,
       animalNumber,
@@ -14111,6 +14234,11 @@ app.post("/api/insemination/save", requireUserId, async (req, res) => {
       reproductiveStatus: reproStatus,
       reproStatusFromEvents: reproFromEvents,
       lastInseminationDate,
+      sameDayInseminationCount,
+      confirmEmbryonicLoss: formData.confirmEmbryonicLoss,
+      embryonicLossConfirmed: formData.embryonicLossConfirmed,
+      confirmPregnancyLoss: formData.confirmPregnancyLoss,
+      pregnancyLossConfirmed: formData.pregnancyLossConfirmed,
       lastBoundary: String(signals.lastBoundary || "").trim(),
       lastBoundaryType: String(signals.lastBoundaryType || "").trim()
     };
@@ -14133,11 +14261,26 @@ app.post("/api/insemination/save", requireUserId, async (req, res) => {
     }
 
     const decision = inseminationDecisionSrv(gateData);
+    let warningMessage = "";
 
     if (decision) {
       const raw = String(decision || "");
       const isWarn = raw.startsWith("WARN|");
-      const message = isWarn ? raw.replace(/^WARN\|/, "") : raw;
+      const needsEmbryonicConfirm = raw.startsWith("CONFIRM_EMBRYONIC_LOSS|");
+
+      const message = needsEmbryonicConfirm
+        ? raw.replace(/^CONFIRM_EMBRYONIC_LOSS\|/, "")
+        : isWarn
+          ? raw.replace(/^WARN\|/, "")
+          : raw;
+
+      if (needsEmbryonicConfirm) {
+        return res.status(409).json({
+          ok: false,
+          requiresEmbryonicLossConfirmation: true,
+          message
+        });
+      }
 
       if (!isWarn) {
         return res.status(400).json({
@@ -14146,9 +14289,14 @@ app.post("/api/insemination/save", requireUserId, async (req, res) => {
         });
       }
 
-      // التحذير لا يمنع الحفظ — مطابق للمنطق القديم
+      warningMessage = message;
     }
 
+      // التحذير لا يمنع الحفظ — مطابق للمنطق القديم
+  
+        const needsEmbryonicLoss =
+      inseminationIsPregnantStatusSrv(reproStatus) &&
+      inseminationConfirmEmbryonicLossSrv(formData);
     const payload = {
       userId: uid,
       animalId: animal.id || "",
@@ -14176,18 +14324,57 @@ const nextServices = Number.isFinite(prevServices) ? prevServices + 1 : 1;
 
 const animalCol = animal._collection || "animals";
 const eventRef = db.collection("events").doc();
+const embryonicLossRef = needsEmbryonicLoss ? db.collection("events").doc() : null;
 const animalRef = db.collection(animalCol).doc(animal.id);
 
 const batch = db.batch();
 
+if (needsEmbryonicLoss && embryonicLossRef) {
+  batch.set(embryonicLossRef, {
+    userId: uid,
+    animalId: animal.id || "",
+    animalNumber,
+    eventDate,
+
+    eventType: "embryonic_loss",
+    type: "embryonic_loss",
+    eventTypeNorm: "embryonic_loss",
+    eventName: "فقد جنيني",
+
+    previousReproductiveStatus: reproStatus || "عشار",
+    reproductiveStatusAfter: "مفتوحة",
+    linkedInseminationEventId: eventRef.id,
+    sequenceInOperation: 1,
+
+    notes: String(formData.embryonicLossNotes || formData.notes || "").trim() || null,
+    source: "server:/api/insemination/save:auto-embryonic-loss",
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+if (needsEmbryonicLoss && embryonicLossRef) {
+  payload.linkedEmbryonicLossEventId = embryonicLossRef.id;
+  payload.sequenceInOperation = 2;
+  payload.smartWarning = warningMessage || null;
+}
+
 batch.set(eventRef, payload);
 
-batch.set(animalRef, {
+const animalUpdate = {
   reproductiveStatus: "ملقحة",
   lastInseminationDate: eventDate,
   servicesCount: nextServices,
   updatedAt: admin.firestore.FieldValue.serverTimestamp()
-}, { merge: true });
+};
+
+if (needsEmbryonicLoss && embryonicLossRef) {
+  animalUpdate.lastEmbryonicLossDate = eventDate;
+  animalUpdate.lastPregnancyLossType = "embryonic_loss";
+  animalUpdate.lastPregnancyLossEventId = embryonicLossRef.id;
+  animalUpdate.reproductiveTransitionBeforeInsemination = "عشار -> مفتوحة -> ملقحة";
+}
+
+batch.set(animalRef, animalUpdate, { merge: true });
 
 // ✅ حفظ اختيارات التلقيح المستخدمة داخل حساب المستخدم
 // تُستخدم لاحقًا في صفحة التلقيح للاختيار بدل الكتابة كل مرة
@@ -14379,11 +14566,17 @@ app.post("/api/insemination/bulk-save", requireUserId, async (req, res) => {
         const reproFromDoc = String(doc.reproductiveStatus || "").trim();
         const reproStatus = reproFromEvents || reproFromDoc || "";
 
-        const lastInseminationDate = String(
+         const lastInseminationDate = String(
           signals.lastInseminationDateFromEvents ||
           doc.lastInseminationDate ||
           ""
         ).trim();
+
+        const sameDayInseminationCount = await countInseminationsSameDaySrv(
+          uid,
+          animalNumber,
+          eventDate
+        );
 
         const gateData = {
           ...formData,
@@ -14395,6 +14588,11 @@ app.post("/api/insemination/bulk-save", requireUserId, async (req, res) => {
           reproductiveStatus: reproStatus,
           reproStatusFromEvents: reproFromEvents,
           lastInseminationDate,
+          sameDayInseminationCount,
+          confirmEmbryonicLoss: formData.confirmEmbryonicLoss,
+          embryonicLossConfirmed: formData.embryonicLossConfirmed,
+          confirmPregnancyLoss: formData.confirmPregnancyLoss,
+          pregnancyLossConfirmed: formData.pregnancyLossConfirmed,
           lastBoundary: String(signals.lastBoundary || "").trim(),
           lastBoundaryType: String(signals.lastBoundaryType || "").trim()
         };
@@ -14420,10 +14618,25 @@ app.post("/api/insemination/bulk-save", requireUserId, async (req, res) => {
         const decision = inseminationDecisionSrv(gateData);
         let warningMessage = "";
 
-        if (decision) {
+                if (decision) {
           const raw = String(decision || "");
           const isWarn = raw.startsWith("WARN|");
-          const message = isWarn ? raw.replace(/^WARN\|/, "") : raw;
+          const needsEmbryonicConfirm = raw.startsWith("CONFIRM_EMBRYONIC_LOSS|");
+
+          const message = needsEmbryonicConfirm
+            ? raw.replace(/^CONFIRM_EMBRYONIC_LOSS\|/, "")
+            : isWarn
+              ? raw.replace(/^WARN\|/, "")
+              : raw;
+
+          if (needsEmbryonicConfirm) {
+            rejected.push({
+              animalNumber,
+              reason: message,
+              requiresEmbryonicLossConfirmation: true
+            });
+            continue;
+          }
 
           if (!isWarn) {
             rejected.push({
@@ -14437,6 +14650,13 @@ app.post("/api/insemination/bulk-save", requireUserId, async (req, res) => {
         }
 
         const eventRef = db.collection("events").doc();
+                const needsEmbryonicLoss =
+          inseminationIsPregnantStatusSrv(reproStatus) &&
+          inseminationConfirmEmbryonicLossSrv(formData);
+
+        const embryonicLossRef = needsEmbryonicLoss
+          ? db.collection("events").doc()
+          : null;
 
         const payload = {
           userId: uid,
@@ -14468,13 +14688,48 @@ app.post("/api/insemination/bulk-save", requireUserId, async (req, res) => {
 
         batch.set(eventRef, payload);
         ops++;
+                if (needsEmbryonicLoss && embryonicLossRef) {
+          batch.set(embryonicLossRef, {
+            userId: uid,
+            animalId: animal.id || "",
+            animalNumber,
+            eventDate,
 
-        batch.set(animalRef, {
+            eventType: "embryonic_loss",
+            type: "embryonic_loss",
+            eventTypeNorm: "embryonic_loss",
+            eventName: "فقد جنيني",
+
+            previousReproductiveStatus: reproStatus || "عشار",
+            reproductiveStatusAfter: "مفتوحة",
+            linkedInseminationEventId: eventRef.id,
+            sequenceInOperation: 1,
+
+            notes: String(formData.embryonicLossNotes || formData.notes || "").trim() || null,
+            source: "server:/api/insemination/bulk-save:auto-embryonic-loss",
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          ops++;
+
+          payload.linkedEmbryonicLossEventId = embryonicLossRef.id;
+          payload.sequenceInOperation = 2;
+          payload.smartWarning = warningMessage || null;
+        }
+        const animalUpdate = {
           reproductiveStatus: "ملقحة",
           lastInseminationDate: eventDate,
           servicesCount: nextServices,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        };
+
+        if (needsEmbryonicLoss && embryonicLossRef) {
+          animalUpdate.lastEmbryonicLossDate = eventDate;
+          animalUpdate.lastPregnancyLossType = "embryonic_loss";
+          animalUpdate.lastPregnancyLossEventId = embryonicLossRef.id;
+          animalUpdate.reproductiveTransitionBeforeInsemination = "عشار -> مفتوحة -> ملقحة";
+        }
+
+        batch.set(animalRef, animalUpdate, { merge: true });
         ops++;
 
         saved.push({
@@ -14483,6 +14738,8 @@ app.post("/api/insemination/bulk-save", requireUserId, async (req, res) => {
           reproductiveStatus: "ملقحة",
           lastInseminationDate: eventDate,
           servicesCount: nextServices,
+          embryonicLossCreated: !!needsEmbryonicLoss,
+          embryonicLossEventId: embryonicLossRef ? embryonicLossRef.id : null,
           warning: warningMessage || ""
         });
 
