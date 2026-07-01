@@ -66,7 +66,15 @@
             </div>
           </div>
         </div>
-      </fieldset>
+ </fieldset>
+
+<div id="bulkResultBox" class="preview-scroll" style="display:none; margin-top:14px;">
+  <div class="sub-title" id="bulkResultTitle">نتيجة كل حيوان</div>
+  <div style="font-size:13px; color:#555; margin-bottom:8px; line-height:1.7;">
+    في التسجيل الجماعي اختر نتيجة مستقلة لكل رقم.
+  </div>
+  <div id="bulkResultRows"></div>
+</div>
 
       <label for="vet">اسم الطبيب البيطري (اختياري)</label>
       <input type="text" id="vet" name="vet" data-field="vet">
@@ -83,12 +91,13 @@
 
   const qp = new URLSearchParams(location.search);
 
-  const animalFromURL =
-    qp.get("animalNumber") ||
-    qp.get("number") ||
-    qp.get("animalId") ||
-    "";
-
+ const animalFromURL =
+  qp.get("numbers") ||
+  qp.get("animalNumbers") ||
+  qp.get("animalNumber") ||
+  qp.get("number") ||
+  qp.get("animalId") ||
+  "";
   const dateFromURL =
     qp.get("date") ||
     qp.get("eventDate") ||
@@ -103,7 +112,18 @@
   if (dateEl) {
     dateEl.value = dateFromURL || new Date().toISOString().slice(0, 10);
   }
+  const checkTypeFromURL =
+  qp.get("checkType") ||
+  qp.get("pregnancyCheckType") ||
+  "";
 
+if (checkTypeFromURL) {
+  document.querySelectorAll('input[name="checkType"]').forEach(el => {
+    if (el.value === checkTypeFromURL) {
+      el.checked = true;
+    }
+  });
+}
 function parseNumbers(raw) {
   const map = {
     "٠": "0","١": "1","٢": "2","٣": "3","٤": "4","٥": "5","٦": "6","٧": "7","٨": "8","٩": "9",
@@ -113,7 +133,118 @@ function parseNumbers(raw) {
   const s = String(raw || "").replace(/[٠-٩۰-۹]/g, d => map[d] || d);
   return [...new Set((s.match(/\d+/g) || []).map(x => x.trim()).filter(Boolean))];
 }
+const bulkResultState = new Map();
 
+function escHtml(v) {
+  return String(v ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function bulkPositiveLabel() {
+  return currentCheckType() === "pregnancy_confirmation_120"
+    ? "مؤكد عشار"
+    : "عشار";
+}
+
+function bulkNegativeLabel() {
+  return currentCheckType() === "pregnancy_confirmation_120"
+    ? "غير عشار / فقد أجنة"
+    : "فارغة";
+}
+
+function syncBulkResultStateFromDom() {
+  document.querySelectorAll('input[data-bulk-result="1"]:checked').forEach(el => {
+    const n = String(el.dataset.number || "").trim();
+    const v = String(el.value || "").trim();
+    if (n && v) bulkResultState.set(n, v);
+  });
+}
+
+function bulkResultsForNumbers(nums = []) {
+  syncBulkResultStateFromDom();
+
+  return nums
+    .map(n => ({
+      animalNumber: String(n || "").trim(),
+      result: String(bulkResultState.get(String(n || "").trim()) || "").trim()
+    }))
+    .filter(x => x.animalNumber && x.result);
+}
+
+function missingBulkResultNumbers(nums = []) {
+  syncBulkResultStateFromDom();
+
+  return nums.filter(n => !String(bulkResultState.get(String(n || "").trim()) || "").trim());
+}
+
+function renderBulkResultTable() {
+  const input = document.getElementById("animalNumber");
+  const nums = parseNumbers(input?.value || "");
+
+  const box = document.getElementById("bulkResultBox");
+  const rows = document.getElementById("bulkResultRows");
+  const resultGroup = document.getElementById("resultGroup");
+  const resultBlock = resultGroup?.closest("div");
+
+  const isBulk = nums.length > 1;
+
+  if (resultBlock) {
+    resultBlock.style.display = isBulk ? "none" : "";
+  }
+
+  if (!box || !rows) return;
+
+  if (!isBulk) {
+    box.style.display = "none";
+    rows.innerHTML = "";
+    return;
+  }
+
+  const allowed = new Set(nums);
+  for (const key of [...bulkResultState.keys()]) {
+    if (!allowed.has(key)) bulkResultState.delete(key);
+  }
+
+  box.style.display = "block";
+
+  const posLabel = bulkPositiveLabel();
+  const negLabel = bulkNegativeLabel();
+
+  rows.innerHTML = `
+    <div style="display:grid; gap:8px;">
+      ${nums.map(n => {
+        const current = String(bulkResultState.get(n) || "").trim();
+
+        return `
+          <div style="display:grid; grid-template-columns:80px 1fr; gap:8px; align-items:center; padding:10px; border:1px solid #ddd; border-radius:14px; background:#fff;">
+            <div style="font-weight:900; text-align:center;">${escHtml(n)}</div>
+            <div class="radio-group" style="margin:0;">
+              <label>
+                <input type="radio" data-bulk-result="1" data-number="${escHtml(n)}" name="bulkResult_${escHtml(n)}" value="عشار" ${current === "عشار" ? "checked" : ""}>
+                ${escHtml(posLabel)}
+              </label>
+              <label>
+                <input type="radio" data-bulk-result="1" data-number="${escHtml(n)}" name="bulkResult_${escHtml(n)}" value="فارغة" ${current === "فارغة" ? "checked" : ""}>
+                ${escHtml(negLabel)}
+              </label>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+
+  rows.querySelectorAll('input[data-bulk-result="1"]').forEach(el => {
+    el.addEventListener("change", () => {
+      const n = String(el.dataset.number || "").trim();
+      const v = String(el.value || "").trim();
+      if (n && v) bulkResultState.set(n, v);
+      scheduleGate();
+    });
+  });
+}
 function showMsg(msg, type = "info") {
   let bar =
     document.getElementById("mbk-infobar") ||
@@ -171,15 +302,22 @@ function applyCheckTypeUI() {
   if (saveBtn) {
     saveBtn.textContent = isConfirmation120 ? "تسجيل تأكيد الحمل" : "تسجيل التشخيص";
   }
+ renderBulkResultTable();
 }
 function collectPayload(form) {
   const animalNumber = String(document.getElementById("animalNumber")?.value || "").trim();
   const eventDate = String(document.getElementById("eventDate")?.value || "").trim();
-const vet = String(document.getElementById("vet")?.value || "").trim();
-const checkType = currentCheckType(form);
+  const vet = String(document.getElementById("vet")?.value || "").trim();
+  const checkType = currentCheckType(form);
 
-return {
-  animalNumber,
+  const nums = parseNumbers(animalNumber);
+  const isBulk = nums.length > 1 || qp.get("mode") === "bulk";
+  const bulkResults = isBulk ? bulkResultsForNumbers(nums) : [];
+  const singleResult = readRadio(form, "result");
+  const firstBulkResult = bulkResults[0]?.result || "";
+
+  return {
+    animalNumber,
     animalNumbers: animalNumber,
     number: animalNumber,
     numbers: animalNumber,
@@ -187,7 +325,9 @@ return {
     checkType,
     pregnancyCheckType: checkType,
     method: readRadio(form, "method"),
-    result: readRadio(form, "result"),
+    result: isBulk ? firstBulkResult : singleResult,
+    bulkResults,
+    resultsByAnimal: bulkResults,
     vet
   };
 }
@@ -318,12 +458,28 @@ async function runGateNow() {
   if (!form) return;
   const payload = collectPayload(form);
   const nums = parseNumbers(payload.animalNumber);
+  renderBulkResultTable();
+
+if (nums.length > 1) {
+  const missing = missingBulkResultNumbers(nums);
+
+  if (missing.length) {
+    showGate(
+      `اختر نتيجة التشخيص لكل رقم في الجدول.\nأرقام بدون نتيجة: ${missing.join(", ")}`,
+      "info"
+    );
+    return;
+  }
+}
 
 const gateKey = JSON.stringify({
   n: nums.join(","),
   d: payload.eventDate,
   m: payload.method || "",
   r: payload.result || "",
+  br: Array.isArray(payload.bulkResults)
+    ? payload.bulkResults.map(x => `${x.animalNumber}:${x.result}`).join("|")
+    : "",
   c: payload.checkType || ""
 });
 
@@ -354,7 +510,10 @@ function scheduleGate() {
   clearTimeout(gateTimer);
   gateTimer = setTimeout(runGateNow, 350);
 }
-  document.getElementById("animalNumber")?.addEventListener("input", scheduleGate);
+  document.getElementById("animalNumber")?.addEventListener("input", () => {
+  renderBulkResultTable();
+  scheduleGate();
+});
 document.getElementById("eventDate")?.addEventListener("change", scheduleGate);
 
 document.querySelectorAll('input[name="method"], input[name="result"], input[name="checkType"]').forEach(el => {
@@ -376,7 +535,23 @@ document.getElementById("diagnosisForm")?.addEventListener("submit", async (e) =
   const isBulk =
     new URLSearchParams(location.search).get("mode") === "bulk" ||
     nums.length > 1;
+  if (isBulk) {
+  renderBulkResultTable();
 
+  const missing = missingBulkResultNumbers(nums);
+
+  if (missing.length) {
+    showMsg(
+      `❌ اختر نتيجة التشخيص لكل رقم قبل الحفظ.\nأرقام بدون نتيجة: ${missing.join(", ")}`,
+      "error"
+    );
+    return;
+  }
+
+  payload.bulkResults = bulkResultsForNumbers(nums);
+  payload.resultsByAnimal = payload.bulkResults;
+  payload.result = payload.bulkResults[0]?.result || "";
+}
   const endpoint = isBulk
     ? "/api/pregnancy-diagnosis/bulk-save"
     : "/api/pregnancy-diagnosis/save";
