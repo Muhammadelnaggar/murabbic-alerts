@@ -201,9 +201,23 @@
       <input type="date" id="eventDate" name="eventDate" data-field="eventDate">
      
       <fieldset>
-        <legend>تشخيص الحمل</legend>
+<legend>تشخيص الحمل</legend>
 
-        <div class="row">
+<div style="margin-bottom:12px">
+  <div class="sub-title">نوع الفحص</div>
+  <div class="radio-group" id="checkTypeGroup">
+    <label>
+      <input type="radio" name="checkType" data-field="checkType" value="initial_pregnancy_diagnosis" checked>
+      تشخيص حمل أولي
+    </label>
+    <label>
+      <input type="radio" name="checkType" data-field="checkType" value="pregnancy_confirmation_120">
+      تأكيد حمل 120 يوم
+    </label>
+  </div>
+</div>
+
+<div class="row">
           <div>
             <div class="sub-title">طريقة التشخيص</div>
             <div class="radio-group" id="methodGroup">
@@ -215,8 +229,8 @@
           <div>
             <div class="sub-title">النتيجة</div>
             <div class="radio-group" id="resultGroup">
-             <label><input type="radio" name="result" data-field="result" value="عشار"> عشار</label>
-              <label><input type="radio" name="result" data-field="result" value="فارغة"> فارغة</label>
+            <label><input type="radio" name="result" data-field="result" value="عشار"> <span id="positiveResultLabel">عشار</span></label>
+            <label><input type="radio" name="result" data-field="result" value="فارغة"> <span id="negativeResultLabel">فارغة</span></label>
             </div>
           </div>
         </div>
@@ -298,18 +312,46 @@ function showMsg(msg, type = "info") {
 function readRadio(form, name) {
   return String(form.querySelector(`input[name="${name}"]:checked`)?.value || "").trim();
 }
+function currentCheckType(form = document.getElementById("diagnosisForm")) {
+  return readRadio(form, "checkType") || "initial_pregnancy_diagnosis";
+}
 
+function applyCheckTypeUI() {
+  const form = document.getElementById("diagnosisForm");
+  if (!form) return;
+
+  const isConfirmation120 = currentCheckType(form) === "pregnancy_confirmation_120";
+
+  const positiveLabel = document.getElementById("positiveResultLabel");
+  const negativeLabel = document.getElementById("negativeResultLabel");
+  const saveBtn = document.getElementById("saveBtn");
+
+  if (positiveLabel) {
+    positiveLabel.textContent = isConfirmation120 ? "مؤكد عشار" : "عشار";
+  }
+
+  if (negativeLabel) {
+    negativeLabel.textContent = isConfirmation120 ? "غير عشار / فقد أجنة" : "فارغة";
+  }
+
+  if (saveBtn) {
+    saveBtn.textContent = isConfirmation120 ? "تسجيل تأكيد الحمل" : "تسجيل التشخيص";
+  }
+}
 function collectPayload(form) {
   const animalNumber = String(document.getElementById("animalNumber")?.value || "").trim();
   const eventDate = String(document.getElementById("eventDate")?.value || "").trim();
-  const vet = String(document.getElementById("vet")?.value || "").trim();
+const vet = String(document.getElementById("vet")?.value || "").trim();
+const checkType = currentCheckType(form);
 
-  return {
-    animalNumber,
+return {
+  animalNumber,
     animalNumbers: animalNumber,
     number: animalNumber,
     numbers: animalNumber,
     eventDate,
+    checkType,
+    pregnancyCheckType: checkType,
     method: readRadio(form, "method"),
     result: readRadio(form, "result"),
     vet
@@ -446,7 +488,9 @@ async function runGateNow() {
 const gateKey = JSON.stringify({
   n: nums.join(","),
   d: payload.eventDate,
-  m: payload.method || ""
+  m: payload.method || "",
+  r: payload.result || "",
+  c: payload.checkType || ""
 });
 
   if (gateKey === lastGateKey) return;
@@ -479,10 +523,13 @@ function scheduleGate() {
   document.getElementById("animalNumber")?.addEventListener("input", scheduleGate);
 document.getElementById("eventDate")?.addEventListener("change", scheduleGate);
 
-document.querySelectorAll('input[name="method"], input[name="result"]').forEach(el => {
-  el.addEventListener("change", scheduleGate);
+document.querySelectorAll('input[name="method"], input[name="result"], input[name="checkType"]').forEach(el => {
+  el.addEventListener("change", () => {
+    applyCheckTypeUI();
+    scheduleGate();
+  });
 });
-
+applyCheckTypeUI();
 // أول رسالة تحقق عند فتح الصفحة
 scheduleGate();
 document.getElementById("diagnosisForm")?.addEventListener("submit", async (e) => {
