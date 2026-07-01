@@ -39,7 +39,7 @@
   <div class="sub-title">نوع الفحص</div>
   <div class="radio-group" id="checkTypeGroup">
     <label>
-      <input type="radio" name="checkType" data-field="checkType" value="initial_pregnancy_diagnosis" checked>
+     <input type="radio" name="checkType" data-field="checkType" value="initial_pregnancy_diagnosis">
       تشخيص حمل أولي
     </label>
     <label>
@@ -278,7 +278,7 @@ function readRadio(form, name) {
   return String(form.querySelector(`input[name="${name}"]:checked`)?.value || "").trim();
 }
 function currentCheckType(form = document.getElementById("diagnosisForm")) {
-  return readRadio(form, "checkType") || "initial_pregnancy_diagnosis";
+  return readRadio(form, "checkType");
 }
 
 function applyCheckTypeUI() {
@@ -483,7 +483,10 @@ async function runGateNow() {
   const payload = collectPayload(form);
   const nums = parseNumbers(payload.animalNumber);
   renderBulkResultTable();
-
+  if (!payload.checkType) {
+  showGate("اختر نوع الفحص أولًا، ثم يبدأ التحقق.", "info");
+  return;
+}
 
 const gateKey = JSON.stringify({
   n: nums.join(","),
@@ -544,7 +547,10 @@ document.getElementById("diagnosisForm")?.addEventListener("submit", async (e) =
   const form = e.currentTarget;
   const payload = collectPayload(form);
   const nums = parseNumbers(payload.animalNumber);
-
+ if (!payload.checkType) {
+  showMsg("❌ اختر نوع الفحص أولًا.", "error");
+  return;
+}
   const isBulk =
     new URLSearchParams(location.search).get("mode") === "bulk" ||
     nums.length > 1;
