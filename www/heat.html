@@ -124,14 +124,50 @@
 
   
 
-  function msg(text, ok=false){
-    if (!bar) return;
-    bar.className = "infobar show " + (ok ? "success" : "error");
-    bar.style.display = "block";
-    bar.textContent = text || "";
-    try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_){}
+function msg(text, ok=false, actionUrl=""){
+  if (!bar) return;
+
+  bar.className = "infobar show " + (ok ? "success" : "error");
+  bar.style.display = "block";
+
+  const safeText = String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  bar.innerHTML = `
+    <div style="display:grid;gap:10px;text-align:center;line-height:1.7;font-weight:900">
+      <div style="white-space:pre-line">${safeText}</div>
+      ${
+        actionUrl
+          ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+                <button type="button" id="heatGateActionBtn"
+                  style="width:auto;min-width:170px;padding:9px 18px;border-radius:999px;border:2px solid #0b7f47;background:#fff;color:#0b7f47;font-weight:900;cursor:pointer">
+                  الذهاب لتأكيد الحمل الآن
+                </button>
+
+                <button type="button" id="heatGateLaterBtn"
+                  style="width:auto;min-width:110px;padding:9px 18px;border-radius:999px;border:2px solid #777;background:#fff;color:#555;font-weight:900;cursor:pointer">
+                  لاحقًا
+                </button>
+             </div>`
+          : ""
+      }
+    </div>
+  `;
+
+  if (actionUrl) {
+    bar.querySelector("#heatGateActionBtn")?.addEventListener("click", () => {
+      location.href = actionUrl;
+    });
+
+    bar.querySelector("#heatGateLaterBtn")?.addEventListener("click", () => {
+      bar.style.display = "none";
+    });
   }
 
+  try { bar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_){}
+}
   function clearMsg(){
     if (!bar) return;
     bar.className = "infobar";
@@ -256,16 +292,13 @@ if (!res.allowed) {
     .map(x => `${x.animalNumber}: ${x.message}`)
     .join(" — ");
 
-  msg(preview || res.message || "❌ لا يوجد أي رقم مؤهل لتسجيل الشياع.", false);
-  clearContextFields();
-
-  if (res.redirectUrl) {
-    setTimeout(() => {
-      location.href = res.redirectUrl;
-    }, 900);
-  }
-
-  return;
+ msg(
+  preview || res.message || "❌ لا يوجد أي رقم مؤهل لتسجيل الشياع.",
+  false,
+  res.redirectUrl || ""
+);
+clearContextFields();
+return;
 }
      // لا نغيّر أرقام المستخدم هنا؛ السيرفر وحده يقرر المقبول والمرفوض.
 
@@ -283,17 +316,16 @@ if (!res.allowed) {
   console.error("heat gate failed:", e);
 
   const payload = e?.payload || {};
-  msg(payload.message || e.message || "تعذّر التحقق من الشياع الآن.", false);
+
+  msg(
+    payload.message || e.message || "تعذّر التحقق من الشياع الآن.",
+    false,
+    payload.redirectUrl || ""
+  );
+
   clearContextFields();
-
-  if (payload.redirectUrl) {
-    setTimeout(() => {
-      location.href = payload.redirectUrl;
-    }, 900);
-  }
 }
-  }
-
+}
   function scheduleGate(){
     clearTimeout(gateTimer);
     gateTimer = setTimeout(runGate, 350);
