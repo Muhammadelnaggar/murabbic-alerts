@@ -134,6 +134,11 @@ function parseNumbers(raw) {
   return [...new Set((s.match(/\d+/g) || []).map(x => x.trim()).filter(Boolean))];
 }
 const bulkResultState = new Map();
+  let serverAcceptedNumbers = null;
+
+function resetServerAcceptedNumbers() {
+  serverAcceptedNumbers = null;
+}
 
 function escHtml(v) {
   return String(v ?? "")
@@ -180,15 +185,18 @@ function missingBulkResultNumbers(nums = []) {
 }
 
 function renderBulkResultTable() {
-  const input = document.getElementById("animalNumber");
-  const nums = parseNumbers(input?.value || "");
+const input = document.getElementById("animalNumber");
+const originalNums = parseNumbers(input?.value || "");
+const isBulk = originalNums.length > 1 || qp.get("mode") === "bulk";
 
-  const box = document.getElementById("bulkResultBox");
-  const rows = document.getElementById("bulkResultRows");
-  const resultGroup = document.getElementById("resultGroup");
-  const resultBlock = resultGroup?.closest("div");
+const nums = isBulk && Array.isArray(serverAcceptedNumbers)
+  ? serverAcceptedNumbers
+  : originalNums;
 
-  const isBulk = nums.length > 1;
+const box = document.getElementById("bulkResultBox");
+const rows = document.getElementById("bulkResultRows");
+const resultGroup = document.getElementById("resultGroup");
+const resultBlock = resultGroup?.closest("div");
 
   if (resultBlock) {
     resultBlock.style.display = isBulk ? "none" : "";
@@ -208,6 +216,14 @@ function renderBulkResultTable() {
   }
 
   box.style.display = "block";
+  if (isBulk && !Array.isArray(serverAcceptedNumbers)) {
+  rows.innerHTML = `
+    <div style="padding:12px;border:1px dashed #bbb;border-radius:12px;background:#fff;text-align:center;font-weight:900;line-height:1.7">
+      سيظهر جدول الحيوانات المؤهلة بعد التحقق من السيرفر.
+    </div>
+  `;
+  return;
+}
 
   const posLabel = bulkPositiveLabel();
   const negLabel = bulkNegativeLabel();
@@ -241,7 +257,7 @@ function renderBulkResultTable() {
       const n = String(el.dataset.number || "").trim();
       const v = String(el.value || "").trim();
       if (n && v) bulkResultState.set(n, v);
-      scheduleGate();
+     
     });
   });
 }
@@ -406,30 +422,15 @@ function applyAcceptedNumbers(data, originalNums) {
     ? data.accepted.map(x => String(x.animalNumber || "").trim()).filter(Boolean)
     : [];
 
-  const input = document.getElementById("animalNumber");
-  if (!input) return;
-
   const isBulk = Array.isArray(originalNums) && originalNums.length > 1;
   if (!isBulk) return;
 
-  if (!acceptedNums.length) {
-    input.value = "";
-    bulkResultState.clear();
-    renderBulkResultTable();
-    return;
-  }
+  serverAcceptedNumbers = acceptedNums;
 
-  const current = parseNumbers(input.value || "");
-  const same =
-    current.length === acceptedNums.length &&
-    current.every((x, i) => x === acceptedNums[i]);
-
-  if (!same) {
-    input.value = acceptedNums.join(",");
-  }
+  const allowed = new Set(acceptedNums);
 
   for (const key of [...bulkResultState.keys()]) {
-    if (!acceptedNums.includes(key)) {
+    if (!allowed.has(key)) {
       bulkResultState.delete(key);
     }
   }
@@ -492,10 +493,6 @@ const gateKey = JSON.stringify({
   n: nums.join(","),
   d: payload.eventDate,
   m: payload.method || "",
-  r: payload.result || "",
-  br: Array.isArray(payload.bulkResults)
-    ? payload.bulkResults.map(x => `${x.animalNumber}:${x.result}`).join("|")
-    : "",
   c: payload.checkType || ""
 });
 
@@ -527,15 +524,28 @@ function scheduleGate() {
   gateTimer = setTimeout(runGateNow, 350);
 }
   document.getElementById("animalNumber")?.addEventListener("input", () => {
+  resetServerAcceptedNumbers();
   renderBulkResultTable();
   scheduleGate();
 });
-document.getElementById("eventDate")?.addEventListener("change", scheduleGate);
 
-document.querySelectorAll('input[name="method"], input[name="result"], input[name="checkType"]').forEach(el => {
+document.getElementById("eventDate")?.addEventListener("change", () => {
+  resetServerAcceptedNumbers();
+  renderBulkResultTable();
+  scheduleGate();
+});
+
+document.querySelectorAll('input[name="method"], input[name="checkType"]').forEach(el => {
   el.addEventListener("change", () => {
+    resetServerAcceptedNumbers();
     applyCheckTypeUI();
     scheduleGate();
+  });
+});
+
+document.querySelectorAll('input[name="result"]').forEach(el => {
+  el.addEventListener("change", () => {
+    applyCheckTypeUI();
   });
 });
 applyCheckTypeUI();
@@ -554,10 +564,18 @@ document.getElementById("diagnosisForm")?.addEventListener("submit", async (e) =
   const isBulk =
     new URLSearchParams(location.search).get("mode") === "bulk" ||
     nums.length > 1;
+  const saveNums = isBulk
+  ? (Array.isArray(serverAcceptedNumbers) ? serverAcceptedNumbers : [])
+  : nums;
+
+if (isBulk && !Array.isArray(serverAcceptedNumbers)) {
+  showMsg("❌ انتظر نتيجة التحقق من السيرفر أولًا.", "error");
+  return;
+}
   if (isBulk) {
   renderBulkResultTable();
 
-  const missing = missingBulkResultNumbers(nums);
+ const missing = missingBulkResultNumbers(saveNums);
 
   if (missing.length) {
     showMsg(
@@ -567,9 +585,14 @@ document.getElementById("diagnosisForm")?.addEventListener("submit", async (e) =
     return;
   }
 
-  payload.bulkResults = bulkResultsForNumbers(nums);
-  payload.resultsByAnimal = payload.bulkResults;
-  payload.result = payload.bulkResults[0]?.result || "";
+  payload.animalNumber = saveNums.join(",");
+payload.animalNumbers = saveNums.join(",");
+payload.number = saveNums.join(",");
+payload.numbers = saveNums.join(",");
+
+payload.bulkResults = bulkResultsForNumbers(saveNums);
+payload.resultsByAnimal = payload.bulkResults;
+payload.result = payload.bulkResults[0]?.result || "";
 }
   const endpoint = isBulk
     ? "/api/pregnancy-diagnosis/bulk-save"
