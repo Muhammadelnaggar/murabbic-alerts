@@ -250,18 +250,24 @@ async function getContextSingle(number, eventDate){
         results: Array.isArray(res.results) ? res.results : []
       };
 
-      if (!res.allowed) {
-        const preview = gateState.results
-          .slice(0,5)
-          .map(x => `${x.animalNumber}: ${x.message}`)
-          .join(" — ");
+if (!res.allowed) {
+  const preview = gateState.results
+    .slice(0,5)
+    .map(x => `${x.animalNumber}: ${x.message}`)
+    .join(" — ");
 
-        msg(preview || res.message || "❌ لا يوجد أي رقم مؤهل لتسجيل الشياع.", false);
-        clearContextFields();
-        return;
-      }
+  msg(preview || res.message || "❌ لا يوجد أي رقم مؤهل لتسجيل الشياع.", false);
+  clearContextFields();
 
-      animalEl.value = gateState.animalNumbers.join(",");
+  if (res.redirectUrl) {
+    setTimeout(() => {
+      location.href = res.redirectUrl;
+    }, 900);
+  }
+
+  return;
+}
+     // لا نغيّر أرقام المستخدم هنا؛ السيرفر وحده يقرر المقبول والمرفوض.
 
       const rejected = Array.isArray(res.rejected) ? res.rejected : [];
       const suffix = rejected.length
@@ -335,13 +341,24 @@ async function saveHeat(e){
     }
   }
 }
-  const p = new URLSearchParams(location.search);
-  const mode = String(p.get("mbkMode") || "").trim().toLowerCase();
-  const bulk = String(p.get("bulk") || "").trim();
+const p = new URLSearchParams(location.search);
+
+const bulk =
+  String(
+    p.get("bulk") ||
+    p.get("numbers") ||
+    p.get("animalNumbers") ||
+    ""
+  ).trim();
 
 const num =
-  (mode === "group" && bulk ? bulk : "") ||
-  String(p.get("number") || p.get("animalNumber") || "").trim();
+  bulk ||
+  String(
+    p.get("number") ||
+    p.get("animalNumber") ||
+    p.get("animalId") ||
+    ""
+  ).trim();
 
 const dt =
   String(p.get("date") || p.get("eventDate") || todayISO())
