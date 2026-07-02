@@ -19972,7 +19972,162 @@ async function vaccinationHasSameDaySrv(uid, animalNumber, eventDate, vaccine) {
 
   return found;
 }
+function vaccinationDoseNormSrv(v) {
+  const s = String(v || "").trim().toLowerCase();
 
+  if (
+    s === "prime" ||
+    s === "primary" ||
+    s.includes("primary") ||
+    s.includes("أساسي") ||
+    s.includes("اساسي") ||
+    s.includes("أولى") ||
+    s.includes("اولى") ||
+    s.includes("أولية") ||
+    s.includes("اولية")
+  ) {
+    return "primary";
+  }
+
+  if (
+    s === "booster" ||
+    s === "periodic" ||
+    s.includes("booster") ||
+    s.includes("periodic") ||
+    s.includes("منشط") ||
+    s.includes("دوري")
+  ) {
+    return "booster";
+  }
+
+  return s;
+}
+
+function vaccinationTextKeySrv(v) {
+  return String(v || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/[^\p{L}\p{N}]+/gu, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function vaccinationTaskPendingSrv(t = {}) {
+  const st = String(t.status || "").trim().toLowerCase();
+
+  return (
+    t.done !== true &&
+    !t.completedAt &&
+    st !== "done" &&
+    st !== "completed" &&
+    st !== "cancelled" &&
+    st !== "canceled"
+  );
+}
+
+function vaccinationSameVaccineKeySrv(a, b) {
+  const x = vaccinationTextKeySrv(a);
+  const y = vaccinationTextKeySrv(b);
+
+  if (!x || !y) return false;
+  if (x === y) return true;
+
+  return (
+    x.length >= 3 &&
+    y.length >= 3 &&
+    (x.includes(y) || y.includes(x))
+  );
+}
+
+async function vaccinationDueWarningSrv({
+  uid,
+  animalNumber,
+  eventDate,
+  vaccine,
+  doseType
+} = {}) {
+  const num = calvingNormDigitsOnlySrv(animalNumber);
+  const dt = String(eventDate || "").trim().slice(0, 10);
+  const vx = String(vaccine || "").trim();
+  const incomingDose = vaccinationDoseNormSrv(doseType);
+
+  if (!db || !uid || !num || !dt || !vx) return null;
+
+  const snap = await db.collection("tasks")
+    .where("userId", "==", uid)
+    .where("animalNumber", "==", num)
+    .limit(120)
+    .get();
+
+  let nearest = null;
+
+  snap.forEach(ds => {
+    const t = ds.data() || {};
+
+    const taskType = String(t.taskType || t.type || "").trim().toLowerCase();
+    const isVaccinationTask =
+      taskType === "vaccination" ||
+      taskType.includes("vaccination") ||
+      taskType.includes("تحصين");
+
+    if (!isVaccinationTask) return;
+    if (!vaccinationTaskPendingSrv(t)) return;
+
+    const taskVaccine = String(t.vaccine || t.vaccineKey || "").trim();
+    if (!vaccinationSameVaccineKeySrv(taskVaccine, vx)) return;
+
+    const taskDose = vaccinationDoseNormSrv(t.doseType || "");
+    if (taskDose && incomingDose && taskDose !== incomingDose) return;
+
+    const dueDate = String(t.dueDate || "").trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return;
+
+    if (!nearest || dueDate < nearest.dueDate) {
+      nearest = {
+        taskId: ds.id,
+        dueDate,
+        windowStart: String(t.windowStart || dueDate).slice(0, 10),
+        windowEnd: String(t.windowEnd || dueDate).slice(0, 10),
+        doseType: taskDose,
+        cycle: t.cycle || ""
+      };
+    }
+  });
+
+  if (!nearest) return null;
+
+  if (dt < nearest.dueDate) {
+    return {
+      level: "warn",
+      code: "vaccination_early",
+      dueDate: nearest.dueDate,
+      taskId: nearest.taskId,
+      message: `⚠️ هذه الجرعة مبكرة عن موعدها المتوقع. الموعد القادم المسجل: ${nearest.dueDate}.`
+    };
+  }
+
+  const windowEnd = String(nearest.windowEnd || "").slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(windowEnd) && dt > windowEnd) {
+    return {
+      level: "warn",
+      code: "vaccination_overdue",
+      dueDate: nearest.dueDate,
+      windowEnd,
+      taskId: nearest.taskId,
+      message: `⚠️ هذه الجرعة متأخرة عن نافذة التحصين المتوقعة. كانت مستحقة من ${nearest.dueDate}.`
+    };
+  }
+
+  return {
+    level: "info",
+    code: "vaccination_due_ok",
+    dueDate: nearest.dueDate,
+    taskId: nearest.taskId,
+    message: `✅ الجرعة داخل موعدها المتوقع.`
+  };
+}
 app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -20012,7 +20167,11 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
       body.vaccineName ||
       ""
     ).trim();
-
+    const doseType = String(
+  body.doseType ||
+  body.vaccineDoseType ||
+  ""
+).trim();
     const numbers = vaccinationParseNumbersSrv(rawNumbers);
 
     if (!numbers.length || !eventDate || !vaccine) {
@@ -20095,14 +20254,24 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
         continue;
       }
 
-      accepted.push({
-        animalNumber,
-        animalId: animal.id || "",
-        species: doc.species || doc.animalTypeAr || doc.animalType || "",
-        status
-      });
-    }
+const dueWarning = await vaccinationDueWarningSrv({
+  uid,
+  animalNumber,
+  eventDate,
+  vaccine,
+  doseType
+});
 
+accepted.push({
+  animalNumber,
+  animalId: animal.id || "",
+  species: doc.species || doc.animalTypeAr || doc.animalType || "",
+  status,
+  warnings: dueWarning ? [dueWarning] : [],
+  warning: dueWarning?.message || "",
+  dueDate: dueWarning?.dueDate || ""
+});
+}
 const firstReason = rejected[0]?.reason || "";
 
 return res.json({
@@ -20528,7 +20697,13 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
         });
         continue;
       }
-
+      const dueWarning = await vaccinationDueWarningSrv({
+  uid,
+  animalNumber,
+  eventDate,
+  vaccine,
+  doseType
+});
 const payload = {
   userId: uid,
 
@@ -20554,7 +20729,11 @@ if (notes) {
 if (campaignId) {
   payload.campaignId = campaignId;
 }
-
+if (dueWarning) {
+  payload.warnings = [dueWarning];
+  payload.warning = dueWarning.message || "";
+  payload.warningFlags = [dueWarning.code || "vaccination_due_timing"];
+}
 const vaccineKeyForDoc = String(vaccine || "")
   .trim()
   .replace(/[^\p{L}\p{N}]+/gu, "_")
@@ -20600,16 +20779,18 @@ await eventRef.set(payload);
         eventId: eventRef.id
       });
 
-      saved.push({
-        animalNumber,
-        animalId,
-        eventId: eventRef.id,
-        eventDate,
-        vaccine,
-        doseType,
-        tasksCount: tasks.length,
-        tasks
-      });
+saved.push({
+  animalNumber,
+  animalId,
+  eventId: eventRef.id,
+  eventDate,
+  vaccine,
+  doseType,
+  warning: dueWarning?.message || "",
+  warnings: dueWarning ? [dueWarning] : [],
+  tasksCount: tasks.length,
+  tasks
+});
     }
 
     return res.json({
