@@ -5274,17 +5274,26 @@ body[data-page="add-event"] .mbk-event-card::after{
 }
 
 body[data-page="add-event"] .mbk-event-icon{
-  width:52px;
-  height:52px;
-  border-radius:18px;
+  width:54px !important;
+  height:54px !important;
+  max-width:54px !important;
+  max-height:54px !important;
+  border-radius:50%;
   display:flex;
   align-items:center;
   justify-content:center;
-  background:#ecfdf5;
-  border:1px solid #bbf7d0;
-  font-size:30px;
-  line-height:1;
-  flex:0 0 auto;
+  overflow:hidden;
+  flex:0 0 54px;
+}
+
+body[data-page="add-event"] .mbk-event-icon img{
+  width:54px !important;
+  height:54px !important;
+  max-width:54px !important;
+  max-height:54px !important;
+  display:block;
+  object-fit:contain;
+  border-radius:50%;
 }
 
 body[data-page="add-event"] .mbk-event-label{
