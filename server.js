@@ -15205,14 +15205,14 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
 
       const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
       const reproFromDoc = String(doc.reproductiveStatus || "").trim();
-      const reproStatus = reproFromEvents || reproFromDoc || "";
-const reproNorm = calvingStripArSrv(reproStatus);
-const isConfirmation120 = pregnancyDiagnosisIsConfirmation120Srv(body);
+      const reproStatus = reproFromDoc || reproFromEvents || "";
+      const reproNorm = calvingStripArSrv(reproStatus);
+      const isConfirmation120 = pregnancyDiagnosisIsConfirmation120Srv(body);
 
-if (isConfirmation120) {
-  if (!pregnancyDiagnosisIsPregnantStatusSrv(reproStatus)) {
-    const shown = reproStatus ? `«${reproStatus}»` : "غير معروفة";
-    rejected.push({
+      if (isConfirmation120) {
+      if (!pregnancyDiagnosisIsPregnantStatusSrv(reproStatus)) {
+      const shown = reproStatus ? `«${reproStatus}»` : "غير معروفة";
+      rejected.push({
       animalNumber,
       animalId: animal.id || "",
       reason: `❌ لا يمكن تأكيد الحمل 120 يوم — ${animalLabel} ليست مسجلة عِشار. الحالة الحالية: ${shown}.`
@@ -15455,7 +15455,7 @@ app.post("/api/pregnancy-diagnosis/save", requireUserId, async (req, res) => {
 
     const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
     const reproFromDoc = String(doc.reproductiveStatus || "").trim();
-    const reproStatus = reproFromEvents || reproFromDoc || "";
+    const reproStatus = reproFromDoc || reproFromEvents || "";
 
     const lastInseminationDate = String(
       signals.lastInseminationDateFromEvents ||
@@ -18272,8 +18272,7 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
 
       const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
       const reproFromDoc = String(doc.reproductiveStatus || "").trim();
-      const reproStatus = reproFromEvents || reproFromDoc || "";
-
+     const reproStatus = reproFromDoc || reproFromEvents || "";
       const lastInseminationDate = String(
         signals.lastInseminationDateFromEvents ||
         doc.lastInseminationDate ||
