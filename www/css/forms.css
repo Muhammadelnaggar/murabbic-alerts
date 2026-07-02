@@ -5241,35 +5241,24 @@ body[data-page="dashboard"] .prod-subtle{
   justify-content:center;
 }
 /* =========================================================
-   Add Event Page — Icon Grid Layout
-   تنظيم بصري حديث لصفحة الأحداث
+   Add Event Page — scoped icon grid only
    ========================================================= */
 
-.mbk-event-hub{
+body[data-page="add-event"] .mbk-event-hub{
   max-width:920px;
   margin:12px auto 84px;
   padding:0 12px;
   gap:14px;
 }
 
-.mbk-event-hub .mbk-action-section{
-  border-radius:20px;
-  padding:14px;
-}
-
-.mbk-event-hub .mbk-action-section-title{
-  margin-bottom:12px;
-  font-size:15px;
-}
-
-.mbk-event-grid{
+body[data-page="add-event"] .mbk-event-grid{
   display:grid;
   grid-template-columns:repeat(2, minmax(0, 1fr));
   gap:10px;
 }
 
-.mbk-event-card{
-  min-height:104px;
+body[data-page="add-event"] .mbk-event-card{
+  min-height:112px;
   padding:12px 8px;
   border-radius:18px;
   display:flex;
@@ -5280,45 +5269,28 @@ body[data-page="dashboard"] .prod-subtle{
   text-align:center;
 }
 
-.mbk-event-card::after{
+body[data-page="add-event"] .mbk-event-card::after{
   content:none !important;
 }
 
-.mbk-event-icon{
-  width:48px;
-  height:48px;
+body[data-page="add-event"] .mbk-event-icon{
+  width:52px;
+  height:52px;
   border-radius:18px;
   display:flex;
   align-items:center;
   justify-content:center;
   background:#ecfdf5;
   border:1px solid #bbf7d0;
-  font-size:28px;
+  font-size:30px;
   line-height:1;
   flex:0 0 auto;
 }
 
-.mbk-event-label{
+body[data-page="add-event"] .mbk-event-label{
   display:block;
   color:var(--ink, #0f172a);
   font-size:14px;
   font-weight:900;
   line-height:1.35;
-}
-
-.mbk-event-card:hover .mbk-event-icon{
-  border-color:rgba(14,160,90,.45);
-  background:#f0fdf4;
-}
-
-@media(min-width:640px){
-  .mbk-event-grid{
-    grid-template-columns:repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media(min-width:920px){
-  .mbk-event-grid{
-    grid-template-columns:repeat(4, minmax(0, 1fr));
-  }
 }
