@@ -279,11 +279,19 @@ if (!res.allowed) {
       if (saveBtn) saveBtn.disabled = false;
       await loadContextAfterGate();
 
-    } catch(e) {
-      console.error("heat gate failed:", e);
-      msg(e.message || "تعذّر التحقق من الشياع الآن.", false);
-      clearContextFields();
-    }
+} catch(e) {
+  console.error("heat gate failed:", e);
+
+  const payload = e?.payload || {};
+  msg(payload.message || e.message || "تعذّر التحقق من الشياع الآن.", false);
+  clearContextFields();
+
+  if (payload.redirectUrl) {
+    setTimeout(() => {
+      location.href = payload.redirectUrl;
+    }, 900);
+  }
+}
   }
 
   function scheduleGate(){
