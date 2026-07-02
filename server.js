@@ -14951,11 +14951,11 @@ function pregnancyDiagnosisDecisionSrv(fd) {
   }
 
   const rsRaw = String(
-    fd.reproStatusFromEvents ||
-    fd.reproductiveStatus ||
-    doc.reproductiveStatus ||
-    ""
-  ).trim();
+  doc.reproductiveStatus ||
+  fd.reproductiveStatus ||
+  fd.reproStatusFromEvents ||
+  ""
+).trim();
 
   const speciesRaw = String(
     fd.species ||
