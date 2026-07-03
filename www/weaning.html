@@ -140,11 +140,11 @@ function setMessageWithOk(text, type = "success", okLabel = "حسنًا", onOk =
   msg.style.whiteSpace = "pre-line";
 
   const actions = document.createElement("div");
-  actions.style.marginTop = "10px";
+  actions.className = "mbk-weaning-ok-actions";
 
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "ghost";
+  btn.className = "ghost mbk-weaning-ok-btn";
   btn.textContent = okLabel;
 
   btn.addEventListener("click", () => {
@@ -166,40 +166,7 @@ function setBusy(busy){
 }
 
 function responseText(j = {}){
-  const lines = [];
-  if (j.message) lines.push(j.message);
-
-  const warnings = Array.isArray(j.warnings) ? j.warnings : [];
-  if (warnings.length) {
-    lines.push(
-      warnings.slice(0, 8)
-        .map(w => `⚠️ ${w.message || w.reason || w}`)
-        .join("\n")
-    );
-
-    if (warnings.length > 8) {
-      lines.push(`… وعدد ${warnings.length - 8} تحذيرات أخرى.`);
-    }
-  }
-
-  if (j.warning) {
-    lines.push(`⚠️ ${j.warning}`);
-  }
-
-  const rejected = Array.isArray(j.rejected) ? j.rejected : [];
-  if (rejected.length) {
-    lines.push(
-      rejected.slice(0, 8)
-        .map(r => `رقم ${r.animalNumber || r.number || "—"}: ${r.reason || "غير مقبول"}`)
-        .join("\n")
-    );
-
-    if (rejected.length > 8) {
-      lines.push(`… وعدد ${rejected.length - 8} أرقام أخرى.`);
-    }
-  }
-
-  return lines.filter(Boolean).join("\n");
+  return String(j?.message || j?.ui?.message || "").trim();
 }
   async function apiPost(path, payload){
     const r = await fetch(path, {
