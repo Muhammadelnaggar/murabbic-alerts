@@ -16740,7 +16740,23 @@ function dehorningEventDateSrv(body = {}) {
 function dehorningNotesSrv(body = {}) {
   return dehorningStrSrv(body.notes || body.note || "");
 }
+function dehorningAgeDaysSrv(birthDate, eventDate) {
+  const b = String(birthDate || "").trim().slice(0, 10);
+  const e = String(eventDate || "").trim().slice(0, 10);
 
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(b) || !/^\d{4}-\d{2}-\d{2}$/.test(e)) {
+    return null;
+  }
+
+  const [by, bm, bd] = b.split("-").map(Number);
+  const [ey, em, ed] = e.split("-").map(Number);
+
+  const days = Math.floor(
+    (Date.UTC(ey, em - 1, ed) - Date.UTC(by, bm - 1, bd)) / 86400000
+  );
+
+  return Number.isFinite(days) && days >= 0 ? days : null;
+}
 function dehorningIsOutSrv(doc = {}) {
   const txt = [
     doc.status,
@@ -16942,6 +16958,8 @@ if (!superTeatIsFemaleSrv(doc)) {
     ref: calf.ref,
     calfNumber: String(doc.calfNumber || num).trim(),
     birthDate: String(doc.birthDate || "").trim().slice(0, 10),
+    ageDays: dehorningAgeDaysSrv(doc.birthDate, eventDate),
+    dehorningAgeDays: dehorningAgeDaysSrv(doc.birthDate, eventDate),
     sex: String(doc.sex || "").trim(),
     eventDate
   };
@@ -17043,12 +17061,14 @@ app.post("/api/dehorning/gate", requireUserId, async (req, res) => {
       rejectedCount: checked.rejected.length,
       message: dehorningGateMessageSrv(checked.accepted, checked.rejected),
       accepted: checked.accepted.map(r => ({
-        animalNumber: r.animalNumber,
-        animalId: r.animalId,
-        calfNumber: r.calfNumber,
-        sex: r.sex,
-        birthDate: r.birthDate
-      })),
+      animalNumber: r.animalNumber,
+      animalId: r.animalId,
+      calfNumber: r.calfNumber,
+      sex: r.sex,
+      birthDate: r.birthDate,
+      ageDays: r.ageDays,
+      dehorningAgeDays: r.dehorningAgeDays
+   })),
       rejected: checked.rejected.map(r => ({
         animalNumber: r.animalNumber,
         animalId: r.animalId || "",
@@ -17124,6 +17144,9 @@ app.post("/api/dehorning/save", requireUserId, async (req, res) => {
 
     for (const row of checked.accepted) {
       const animalNumber = row.animalNumber;
+      const ageDays = Number.isFinite(Number(row.ageDays))
+       ? Number(row.ageDays)
+       : dehorningAgeDaysSrv(row.birthDate, eventDate);
       const eventId = dehorningEventIdSrv(uid, animalNumber);
       const eventRef = db.collection("events").doc(eventId);
 
@@ -17157,6 +17180,8 @@ app.post("/api/dehorning/save", requireUserId, async (req, res) => {
         sex: row.sex || "",
         birthDate: row.birthDate || "",
         notes,
+        ageDays,
+        dehorningAgeDays: ageDays,
 
         animalCollection: "calves",
         source: "server:/api/dehorning/save",
@@ -17166,23 +17191,26 @@ app.post("/api/dehorning/save", requireUserId, async (req, res) => {
       });
 
       if (row.ref) {
-        batch.set(row.ref, {
-          dehorned: true,
-          dehorningDate: eventDate,
-          lastDehorningDate: eventDate,
-          lastEventDate: eventDate,
-          updatedAt: now
-        }, { merge: true });
+       batch.set(row.ref, {
+  dehorned: true,
+  dehorningDate: eventDate,
+  lastDehorningDate: eventDate,
+  lastDehorningAgeDays: ageDays,
+  lastEventDate: eventDate,
+  updatedAt: now
+}, { merge: true });
       }
 
       await batch.commit();
 
       saved.push({
-        animalNumber,
-        animalId: row.animalId || "",
-        eventId,
-        eventDate
-      });
+  animalNumber,
+  animalId: row.animalId || "",
+  eventId,
+  eventDate,
+  ageDays,
+  dehorningAgeDays: ageDays
+});
     }
 
     return res.status(saved.length ? 200 : 400).json({
