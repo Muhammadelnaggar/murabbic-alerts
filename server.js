@@ -24257,6 +24257,7 @@ async function weaningFindAnimalSrv(uid, rawNumber) {
   const num = calvingNormDigitsOnlySrv(rawNumber);
   if (!db || !uid || !num) return null;
 
+  const key = `${uid}#${num}`;
   const nNum = Number(num);
   const values = [num];
   if (Number.isFinite(nNum)) values.push(nNum);
@@ -24273,6 +24274,15 @@ async function weaningFindAnimalSrv(uid, rawNumber) {
       collection: "calves"
     };
   }
+
+  try {
+    const snap = await db.collection("calves")
+      .where("userId_number", "==", key)
+      .limit(1)
+      .get();
+
+    if (!snap.empty) return pack(snap.docs[0]);
+  } catch (_) {}
 
   for (const ownerField of ["userId", "ownerUid"]) {
     for (const field of ["calfNumber", "animalNumber", "number"]) {
