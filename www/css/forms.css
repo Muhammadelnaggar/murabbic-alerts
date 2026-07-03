@@ -5303,3 +5303,54 @@ body[data-page="add-event"] .mbk-event-label{
   font-weight:900;
   line-height:1.35;
 }
+body[data-page="add-event"] .mbk-page-warn {
+  display: none;
+}
+
+body[data-page="add-event"] .mbk-page-warn.mbk-infobar-on {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 12px;
+  padding: 12px 14px;
+  border: 1px solid #b7e4c7;
+  border-radius: 16px;
+  background: #f0fff4;
+  color: #14532d;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.6;
+  box-shadow: 0 6px 18px rgba(20, 83, 45, 0.08);
+}
+
+body[data-page="add-event"] .mbk-infobar-text {
+  flex: 1;
+  min-width: 0;
+}
+
+body[data-page="add-event"] .mbk-infobar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+body[data-page="add-event"] .mbk-infobar-btn {
+  border: 1px solid #b7e4c7;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #14532d;
+  padding: 7px 13px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+body[data-page="add-event"] .mbk-infobar-btn-primary {
+  background: #15803d;
+  border-color: #15803d;
+  color: #ffffff;
+}
