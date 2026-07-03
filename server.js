@@ -24489,39 +24489,66 @@ function weaningPublicAcceptedSrv(row = {}) {
 
 function weaningBuildGateResponseSrv({ accepted = [], rejected = [], eventDate = "" } = {}) {
   const acceptedPublic = accepted.map(weaningPublicAcceptedSrv);
+  const safeRejected = Array.isArray(rejected) ? rejected : [];
   const canSave = acceptedPublic.length > 0;
 
+  function rejectedLine(r = {}) {
+    const n = String(r.animalNumber || r.number || "").trim();
+    const reason = String(r.reason || r.message || "غير مؤهل لتسجيل الفطام.").trim();
+    return n ? `❌ الحيوان رقم ${n}: ${reason}` : `❌ ${reason}`;
+  }
+
   let message = "";
-  if (canSave && rejected.length) {
-    message = `✅ تم قبول ${acceptedPublic.length} رقم للفطام، مع استبعاد ${rejected.length} رقم.`;
+
+  if (canSave && safeRejected.length) {
+    message = [
+      `✅ تم قبول ${acceptedPublic.length} رقم للفطام، مع استبعاد ${safeRejected.length} رقم.`,
+      "",
+      "الأرقام غير المقبولة:",
+      ...safeRejected.slice(0, 8).map(rejectedLine),
+      safeRejected.length > 8 ? `… وعدد ${safeRejected.length - 8} أرقام أخرى.` : ""
+    ].filter(Boolean).join("\n");
+
   } else if (canSave) {
     message = acceptedPublic.length === 1
       ? "✅ تم التحقق — يمكن تسجيل الفطام."
       : `✅ تم التحقق — يمكن تسجيل الفطام لعدد ${acceptedPublic.length} حيوان.`;
+
+  } else if (safeRejected.length) {
+    message = safeRejected.length === 1
+      ? rejectedLine(safeRejected[0])
+      : [
+          "❌ لا يوجد رقم مؤهل لتسجيل الفطام.",
+          "",
+          "الأسباب:",
+          ...safeRejected.slice(0, 8).map(rejectedLine),
+          safeRejected.length > 8 ? `… وعدد ${safeRejected.length - 8} أرقام أخرى.` : ""
+        ].filter(Boolean).join("\n");
+
   } else {
     message = "❌ لا يوجد رقم مؤهل لتسجيل الفطام.";
   }
 
   return {
-    ok:true,
-    allowed:canSave,
+    ok: true,
+    allowed: canSave,
     canSave,
-    eventDate:String(eventDate || "").slice(0, 10),
-    mode:(acceptedPublic.length + rejected.length) > 1 ? "bulk" : "single",
-    acceptedCount:acceptedPublic.length,
-    rejectedCount:rejected.length,
-    accepted:acceptedPublic,
-    valid:acceptedPublic,
-    rejected,
+    eventDate: String(eventDate || "").slice(0, 10),
+    mode: (acceptedPublic.length + safeRejected.length) > 1 ? "bulk" : "single",
+    acceptedCount: acceptedPublic.length,
+    rejectedCount: safeRejected.length,
+    accepted: acceptedPublic,
+    valid: acceptedPublic,
+    rejected: safeRejected,
     message,
-    ui:{
-      screen:"weaning",
-      status:canSave ? "success" : "error",
+    ui: {
+      screen: "weaning",
+      status: canSave ? "success" : "error",
       message,
       canSave,
-      eventDate:String(eventDate || "").slice(0, 10),
-      accepted:acceptedPublic,
-      rejected
+      eventDate: String(eventDate || "").slice(0, 10),
+      accepted: acceptedPublic,
+      rejected: safeRejected
     }
   };
 }
@@ -24903,6 +24930,8 @@ const patch = {
   weaningDate: eventDate,
   weaningAgeDays: row.weaningAgeDays,
   ageDaysAtWeaning: row.ageDays,
+  followerStatus: "فطام",
+  status: "فطام",
   lastEventDate: eventDate,
   updatedAt: now
 };
