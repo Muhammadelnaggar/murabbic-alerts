@@ -5354,3 +5354,23 @@ body[data-page="add-event"] .mbk-infobar-btn-primary {
   border-color: #15803d;
   color: #ffffff;
 }
+html[data-page="weaning"] .infobar .mbk-weaning-ok-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 12px;
+}
+
+html[data-page="weaning"] .infobar .mbk-weaning-ok-btn {
+  border: 1px solid #15803d;
+  border-radius: 999px;
+  background: #15803d;
+  color: #ffffff;
+  padding: 8px 20px;
+  min-width: 96px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.4;
+  cursor: pointer;
+}
