@@ -24512,26 +24512,83 @@ function weaningBuildGateResponseSrv({ accepted = [], rejected = [], eventDate =
   };
 }
 
-function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [], eventDate = "" } = {}) {
-  const savedCount = saved.length;
-  const rejectedCount = rejected.length;
-  const warningsCount = warnings.length;
-  const first = saved[0] || null;
+function weaningMsgTextSrv(v) {
+  return String(v || "").trim();
+}
 
-  let message = "";
+function weaningWarningTextSrv(w = {}) {
+  const animalNumber = weaningMsgTextSrv(w.animalNumber || w.number || "");
+  const body = weaningMsgTextSrv(w.message || w.reason || w.code || w);
+
+  if (!body) return "";
+
+  return animalNumber && !body.includes(animalNumber)
+    ? `الحيوان رقم ${animalNumber}: ${body}`
+    : body;
+}
+
+function weaningRejectedTextSrv(r = {}) {
+  const animalNumber = weaningMsgTextSrv(r.animalNumber || r.number || "");
+  const reason = weaningMsgTextSrv(r.reason || r.message || "غير مقبول.");
+
+  return animalNumber
+    ? `رقم ${animalNumber}: ${reason}`
+    : reason;
+}
+
+function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [], eventDate = "" } = {}) {
+  const safeSaved = Array.isArray(saved) ? saved : [];
+  const safeRejected = Array.isArray(rejected) ? rejected : [];
+  const safeWarnings = Array.isArray(warnings) ? warnings : [];
+
+  const savedCount = safeSaved.length;
+  const rejectedCount = safeRejected.length;
+  const warningsCount = safeWarnings.length;
+  const first = safeSaved[0] || null;
+
+  const lines = [];
+
   if (savedCount && rejectedCount) {
-    message = `✅ تم حفظ الفطام لعدد ${savedCount} حيوان، وتعذّر حفظ ${rejectedCount} رقم.`;
+    lines.push(`✅ تم حفظ الفطام لعدد ${savedCount} حيوان، وتعذّر حفظ ${rejectedCount} رقم.`);
   } else if (savedCount > 1) {
-    message = `✅ تم حفظ الفطام لعدد ${savedCount} حيوان بنجاح.`;
+    lines.push(`✅ تم حفظ الفطام لعدد ${savedCount} حيوان بنجاح.`);
   } else if (savedCount === 1) {
-    message = "✅ تم حفظ الفطام بنجاح.";
+    lines.push("✅ تم حفظ الفطام بنجاح.");
   } else {
-    message = "❌ لم يتم حفظ أي فطام.";
+    lines.push("❌ لم يتم حفظ أي فطام.");
   }
 
   if (savedCount && warningsCount) {
-    message += ` توجد ${warningsCount} ملاحظة تحتاج متابعة.`;
+    lines.push("");
+    lines.push("⚠️ ملاحظات بعد الحفظ — لا تمنع التسجيل:");
+
+    safeWarnings
+      .slice(0, 10)
+      .map(weaningWarningTextSrv)
+      .filter(Boolean)
+      .forEach(x => lines.push(`- ${x}`));
+
+    if (warningsCount > 10) {
+      lines.push(`… وعدد ${warningsCount - 10} ملاحظات أخرى.`);
+    }
   }
+
+  if (rejectedCount) {
+    lines.push("");
+    lines.push(savedCount ? "الأرقام التي لم تُحفظ:" : "سبب عدم الحفظ:");
+
+    safeRejected
+      .slice(0, 10)
+      .map(weaningRejectedTextSrv)
+      .filter(Boolean)
+      .forEach(x => lines.push(`- ${x}`));
+
+    if (rejectedCount > 10) {
+      lines.push(`… وعدد ${rejectedCount - 10} أرقام أخرى.`);
+    }
+  }
+
+  const message = lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 
   const redirectUrl = savedCount === 1
     ? `event-list.html?number=${encodeURIComponent(first.animalNumber)}&date=${encodeURIComponent(eventDate)}`
@@ -24543,9 +24600,9 @@ function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [],
     savedCount,
     rejectedCount,
     warningsCount,
-    saved,
-    rejected,
-    warnings,
+    saved: safeSaved,
+    rejected: safeRejected,
+    warnings: safeWarnings,
     eventDate: String(eventDate || "").slice(0, 10),
     redirectUrl: savedCount > 0 ? redirectUrl : "",
     ui: {
@@ -24555,9 +24612,9 @@ function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [],
       savedCount,
       rejectedCount,
       warningsCount,
-      saved,
-      rejected,
-      warnings,
+      saved: safeSaved,
+      rejected: safeRejected,
+      warnings: safeWarnings,
       redirectUrl: savedCount > 0 ? redirectUrl : ""
     }
   };
