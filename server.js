@@ -5608,7 +5608,10 @@ app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "تعذّر حفظ تقليم الحوافر — قاعدة البيانات غير متاحة."
+        message: "تعذّر حفظ تقليم الحوافر — قاعدة البيانات غير متاحة.",
+        saved: [],
+        failed: [],
+        rejected: []
       });
     }
 
@@ -5632,32 +5635,22 @@ app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
         error: "animal_number_required",
         message: "اكتب رقم الحيوان أو اختر مجموعة أولًا.",
         saved: [],
+        failed: [],
         rejected: []
       });
     }
 
     const saved = [];
-    const rejected = [];
+    const failed = [];
 
     for (const animalNumber of numbers) {
       const animal = await eventsPageFindAnimalByNumberSrv(uid, animalNumber);
 
       if (!animal) {
-        rejected.push({
+        failed.push({
           animalNumber,
           reason: "animal_not_found",
           message: `الحيوان رقم ${animalNumber} غير موجود في القطيع.`
-        });
-        continue;
-      }
-
-      const already = await existsHoofTrimmingSameDaySrv(uid, animalNumber, eventDate);
-
-      if (already) {
-        rejected.push({
-          animalNumber,
-          reason: "duplicate_same_day",
-          message: `تم تسجيل تقليم الحوافر للحيوان رقم ${animalNumber} في نفس التاريخ من قبل.`
         });
         continue;
       }
@@ -5681,60 +5674,59 @@ app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
-     const idempotencyKey = `${uid}|${animalNumber}|hoof_trimming|${eventDate}`;
-const eventDocId = eventsPageStableDocIdSrv(uid, "hoof_trimming", animalNumber, eventDate);
+      const idempotencyKey = `${uid}|${animalNumber}|hoof_trimming|${eventDate}`;
+      const eventDocId = eventsPageStableDocIdSrv(uid, "hoof_trimming", animalNumber, eventDate);
 
-const eventRef = db.collection("events").doc(eventDocId);
-const animalRef = db.collection("animals").doc(animal.id);
+      const eventRef = db.collection("events").doc(eventDocId);
+      const animalRef = db.collection("animals").doc(animal.id);
 
-payload.idempotencyKey = idempotencyKey;
+      payload.idempotencyKey = idempotencyKey;
 
-let created = false;
+      let created = false;
 
-await db.runTransaction(async (tx) => {
-  const existing = await tx.get(eventRef);
+      await db.runTransaction(async (tx) => {
+        const existing = await tx.get(eventRef);
 
-  if (existing.exists) {
-    return;
-  }
+        if (existing.exists) {
+          return;
+        }
 
-  tx.set(eventRef, payload);
+        tx.set(eventRef, payload);
 
-  tx.set(animalRef, {
-    lastHoofTrimmingDate: eventDate,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
+        tx.set(animalRef, {
+          lastHoofTrimmingDate: eventDate,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
 
-  created = true;
-});
+        created = true;
+      });
 
-if (!created) {
-  rejected.push({
-    animalNumber,
-    reason: "duplicate_same_day",
-    message: `تم تسجيل تقليم الحوافر للحيوان رقم ${animalNumber} في نفس التاريخ من قبل.`
-  });
-  continue;
-}
-
-saved.push({
-  animalNumber,
-  animalId: animal.id,
-  eventId: eventRef.id,
-  message: `تم تسجيل تقليم الحوافر للحيوان رقم ${animalNumber}.`
-});
+      saved.push({
+        animalNumber,
+        animalId: animal.id,
+        eventId: eventRef.id,
+        alreadyExists: !created,
+        message: created
+          ? `تم تسجيل تقليم الحوافر للحيوان رقم ${animalNumber}.`
+          : `تقليم الحوافر مسجل بالفعل للحيوان رقم ${animalNumber} في نفس التاريخ.`
+      });
     }
+
+    const redirectUrl = numbers.length === 1 && saved.length === 1
+      ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}&eventDate=${encodeURIComponent(eventDate)}`
+      : null;
 
     return res.json({
       ok: saved.length > 0,
-      partial: saved.length > 0 && rejected.length > 0,
+      partial: false,
       message: saved.length
-        ? `✅ تم تسجيل تقليم الحوافر لعدد ${saved.length} حيوان.`
+        ? `✅ تم تسجيل/تأكيد تقليم الحوافر لعدد ${saved.length} حيوان.`
         : "لم يتم تسجيل تقليم الحوافر لأي حيوان.",
       saved,
-      rejected,
+      failed,
+      rejected: [],
       eventDate,
-      redirectUrl: "/event-list.html"
+      redirectUrl
     });
 
   } catch (e) {
@@ -5745,6 +5737,7 @@ saved.push({
       error: "hoof_trimming_save_failed",
       message: "تعذّر حفظ تقليم الحوافر الآن.",
       saved: [],
+      failed: [],
       rejected: []
     });
   }
