@@ -24512,9 +24512,10 @@ function weaningBuildGateResponseSrv({ accepted = [], rejected = [], eventDate =
   };
 }
 
-function weaningBuildSaveResponseSrv({ saved = [], rejected = [], eventDate = "" } = {}) {
+function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [], eventDate = "" } = {}) {
   const savedCount = saved.length;
   const rejectedCount = rejected.length;
+  const warningsCount = warnings.length;
   const first = saved[0] || null;
 
   let message = "";
@@ -24528,32 +24529,121 @@ function weaningBuildSaveResponseSrv({ saved = [], rejected = [], eventDate = ""
     message = "❌ لم يتم حفظ أي فطام.";
   }
 
+  if (savedCount && warningsCount) {
+    message += ` توجد ${warningsCount} ملاحظة تحتاج متابعة.`;
+  }
+
   const redirectUrl = savedCount === 1
     ? `event-list.html?number=${encodeURIComponent(first.animalNumber)}&date=${encodeURIComponent(eventDate)}`
-    : `event-list.html?date=${encodeURIComponent(eventDate)}`;
+    : "";
 
   return {
-    ok:savedCount > 0,
+    ok: savedCount > 0,
     message,
     savedCount,
     rejectedCount,
+    warningsCount,
     saved,
     rejected,
-    eventDate:String(eventDate || "").slice(0, 10),
-    redirectUrl:savedCount > 0 ? redirectUrl : "",
-    ui:{
-      screen:"weaning",
-      status:savedCount > 0 ? "success" : "error",
+    warnings,
+    eventDate: String(eventDate || "").slice(0, 10),
+    redirectUrl: savedCount > 0 ? redirectUrl : "",
+    ui: {
+      screen: "weaning",
+      status: savedCount > 0 ? "success" : "error",
       message,
       savedCount,
       rejectedCount,
+      warningsCount,
       saved,
       rejected,
-      redirectUrl:savedCount > 0 ? redirectUrl : ""
+      warnings,
+      redirectUrl: savedCount > 0 ? redirectUrl : ""
     }
   };
 }
+function weaningWeightFromBodySrv(body = {}) {
+  const raw = String(
+    body.weaningWeightKg ??
+    body.weaningWeight ??
+    body.weight ??
+    ""
+  ).trim().replace(",", ".");
 
+  if (!raw) return { ok: true, value: null };
+
+  const n = Number(raw);
+
+  if (!Number.isFinite(n) || n < 0) {
+    return {
+      ok: false,
+      value: null,
+      message: "وزن الفطام غير صالح."
+    };
+  }
+
+  return {
+    ok: true,
+    value: Number(n.toFixed(1))
+  };
+}
+
+async function weaningPreSaveWarningsSrv(uid, row = {}) {
+  const animalNumber = calvingNormDigitsOnlySrv(row.animalNumber || row.calfNumber || "");
+  const warnings = [];
+
+  if (!db || !uid || !animalNumber) return warnings;
+
+  let doc = {};
+
+  try {
+    if (row.ref) {
+      const snap = await row.ref.get();
+      doc = snap.exists ? (snap.data() || {}) : {};
+    }
+  } catch (_) {}
+
+  let hasDehorning =
+    doc.dehorned === true ||
+    doc.hornsRemoved === true ||
+    !!String(doc.dehorningDate || doc.lastDehorningDate || doc.hornRemovalDate || "").trim();
+
+  let hasSuperTeatRemoval =
+    doc.supernumeraryTeatRemoved === true ||
+    !!String(doc.supernumeraryTeatRemovalDate || doc.lastSupernumeraryTeatRemovalDate || "").trim();
+
+  if (!hasDehorning && typeof dehorningEventIdSrv === "function") {
+    try {
+      const snap = await db.collection("events").doc(dehorningEventIdSrv(uid, animalNumber)).get();
+      hasDehorning = snap.exists;
+    } catch (_) {}
+  }
+
+  if (!hasSuperTeatRemoval && typeof superTeatEventIdSrv === "function") {
+    try {
+      const snap = await db.collection("events").doc(superTeatEventIdSrv(uid, animalNumber)).get();
+      hasSuperTeatRemoval = snap.exists;
+    } catch (_) {}
+  }
+
+  if (!hasDehorning) {
+    warnings.push({
+      animalNumber,
+      code: "missing_dehorning_before_weaning",
+      message: `الحيوان رقم ${animalNumber}: لم يتم العثور على سجل إزالة القرون قبل الفطام.`
+    });
+  }
+
+  if (!hasSuperTeatRemoval) {
+    warnings.push({
+      animalNumber,
+      code: "missing_supernumerary_teat_removal_before_weaning",
+      message: `الحيوان رقم ${animalNumber}: لم يتم العثور على سجل إزالة الحلمات الزائدة قبل الفطام.`
+    });
+  }
+
+  return warnings;
+}
 app.post("/api/weaning/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -24641,7 +24731,20 @@ app.post("/api/weaning/save", requireUserId, async (req, res) => {
     const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
     const notes = String(body.notes || body.note || "").trim();
     const numbers = weaningNumbersFromBodySrv(body);
+    const weightResult = weaningWeightFromBodySrv(body);
 
+if (!weightResult.ok) {
+  return res.status(400).json(weaningBuildSaveResponseSrv({
+    saved: [],
+    rejected: numbers.map(n => ({
+      animalNumber: n,
+      reason: weightResult.message || "وزن الفطام غير صالح."
+    })),
+    eventDate
+  }));
+}
+
+const weaningWeightKg = weightResult.value;
     if (!numbers.length) {
       return res.status(400).json(weaningBuildSaveResponseSrv({
         saved:[],
@@ -24659,11 +24762,12 @@ app.post("/api/weaning/save", requireUserId, async (req, res) => {
     }
 
     const checked = await weaningEvaluateManySrv(uid, numbers, eventDate);
-const saved = [];
+    const saved = [];
 
 // مهم: لا نعيد مرفوضات الـ Gate في رسالة الحفظ.
 // الحفظ يعرض فقط ما تم حفظه، وأي فشل حفظ حقيقي يحدث أثناء الحفظ.
-const rejected = [];
+    const rejected = [];
+    const warnings = [];
 
     for (const row of checked.accepted) {
       const animalNumber = row.animalNumber;
@@ -24681,62 +24785,84 @@ const rejected = [];
 
       const now = admin.firestore.FieldValue.serverTimestamp();
       const batch = db.batch();
+     const rowWarnings = await weaningPreSaveWarningsSrv(uid, row);
+warnings.push(...rowWarnings);
 
-      batch.set(eventRef, {
-        userId:uid,
-        ownerUid:uid,
+const eventPayload = {
+  userId: uid,
+  ownerUid: uid,
 
-        animalId:row.animalId || "",
-        animalNumber,
-        number:animalNumber,
-        calfNumber:row.calfNumber || animalNumber,
-        damNumber:row.damNumber || "",
+  animalId: row.animalId || "",
+  animalNumber,
+  number: animalNumber,
+  calfNumber: row.calfNumber || animalNumber,
+  damNumber: row.damNumber || "",
 
-        eventDate,
-        date:eventDate,
-        eventType:"فطام",
-        eventTypeNorm:"weaning",
-        type:"weaning",
+  eventDate,
+  date: eventDate,
+  eventType: "فطام",
+  eventTypeNorm: "weaning",
+  type: "weaning",
 
-        birthDate:row.birthDate || "",
-        weaningDate:eventDate,
-        weaningAgeDays:row.weaningAgeDays,
-        ageDays:row.ageDays,
-        notes,
+  birthDate: row.birthDate || "",
+  weaningDate: eventDate,
+  weaningAgeDays: row.weaningAgeDays,
+  ageDays: row.ageDays,
+  notes,
 
-        createdAt:now,
-        updatedAt:now,
-        source:"server:/api/weaning/save"
-      });
-
-     const patch = {
-  weaningDate:eventDate,
-  weaningAgeDays:row.weaningAgeDays,
-  ageDaysAtWeaning:row.ageDays,
-  lastEventDate:eventDate,
-  updatedAt:now
+  createdAt: now,
+  updatedAt: now,
+  source: "server:/api/weaning/save"
 };
+
+if (weaningWeightKg !== null) {
+  eventPayload.weaningWeightKg = weaningWeightKg;
+  eventPayload.weaningWeight = weaningWeightKg;
+  eventPayload.weight = weaningWeightKg;
+}
+
+if (rowWarnings.length) {
+  eventPayload.warnings = rowWarnings;
+  eventPayload.warning = rowWarnings.map(w => w.message).join(" ");
+  eventPayload.warningFlags = rowWarnings.map(w => w.code);
+}
+
+batch.set(eventRef, eventPayload);
+const patch = {
+  weaningDate: eventDate,
+  weaningAgeDays: row.weaningAgeDays,
+  ageDaysAtWeaning: row.ageDays,
+  lastEventDate: eventDate,
+  updatedAt: now
+};
+
+if (weaningWeightKg !== null) {
+  patch.weaningWeightKg = weaningWeightKg;
+  patch.weaningWeight = weaningWeightKg;
+  patch.weightAtWeaningKg = weaningWeightKg;
+}
       if (row.ref) {
         batch.set(row.ref, patch, { merge:true });
       }
 
       await batch.commit();
 
-      saved.push({
-        animalNumber,
-        animalId:row.animalId || "",
-        eventId,
-        eventDate,
-        weaningAgeDays:row.weaningAgeDays,
-        ageDays:row.ageDays
-      });
-    }
-
+     saved.push({
+       animalNumber,
+       animalId: row.animalId || "",
+       eventId,
+       eventDate,
+       weaningAgeDays: row.weaningAgeDays,
+       ageDays: row.ageDays,
+       weaningWeightKg,
+       warnings: rowWarnings
+    });
+  }
     if (saved.length && typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "weaning_save");
     }
 
-    const payload = weaningBuildSaveResponseSrv({ saved, rejected, eventDate });
+   const payload = weaningBuildSaveResponseSrv({ saved, rejected, warnings, eventDate });
 
     return res.status(saved.length ? 200 : 400).json(payload);
 
