@@ -118,20 +118,52 @@
     return startsBulk || getCurrentNumbers().length > 1;
   }
 
-  function setMessage(text, type = "info"){
-    info.className = `infobar show ${type}`;
-    info.textContent = String(text || "");
-  }
+function setMessage(text, type = "info"){
+  info.className = `infobar show ${type}`;
+  info.textContent = String(text || "");
+  info.style.whiteSpace = "pre-line";
+}
 
-  function clearMessage(){
-    info.className = "infobar";
-    info.textContent = "";
-  }
+function clearMessage(){
+  info.className = "infobar";
+  info.textContent = "";
+  info.innerHTML = "";
+}
 
-  function setBusy(busy){
-    if (saveBtn) saveBtn.disabled = !!busy || !lastGate?.canSave;
-    if (cardBtn) cardBtn.disabled = !!busy || getCurrentNumbers().length !== 1;
-  }
+function setMessageWithOk(text, type = "success", okLabel = "حسنًا", onOk = null){
+  info.className = `infobar show ${type}`;
+  info.innerHTML = "";
+  info.style.whiteSpace = "normal";
+
+  const msg = document.createElement("div");
+  msg.textContent = String(text || "");
+  msg.style.whiteSpace = "pre-line";
+
+  const actions = document.createElement("div");
+  actions.style.marginTop = "10px";
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "ghost";
+  btn.textContent = okLabel;
+
+  btn.addEventListener("click", () => {
+    if (typeof onOk === "function") {
+      onOk();
+    } else {
+      clearMessage();
+    }
+  }, { once:true });
+
+  actions.appendChild(btn);
+  info.appendChild(msg);
+  info.appendChild(actions);
+}
+
+function setBusy(busy){
+  if (saveBtn) saveBtn.disabled = !!busy || !lastGate?.canSave;
+  if (cardBtn) cardBtn.disabled = !!busy || getCurrentNumbers().length !== 1;
+}
 
 function responseText(j = {}){
   const lines = [];
@@ -290,42 +322,53 @@ function responseText(j = {}){
   $("eventDate").addEventListener("input", scheduleGate);
   $("eventDate").addEventListener("change", () => runGate({ silent:false }));
 
-  form.addEventListener("submit", async (ev) => {
-    ev.preventDefault();
+form.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
 
-    const numbers = getCurrentNumbers();
-    const eventDate = String($("eventDate").value || "").slice(0, 10);
-    const notes = String($("notes").value || "").trim();
-    const weaningWeightKg = String($("weaningWeightKg")?.value || "").trim();
+  const numbers = getCurrentNumbers();
+  const eventDate = String($("eventDate").value || "").slice(0, 10);
+  const notes = String($("notes").value || "").trim();
+  const weaningWeightKg = String($("weaningWeightKg")?.value || "").trim();
 
-    setMessage("جاري الحفظ من السيرفر…", "info");
-    setBusy(true);
+  setMessage("جاري الحفظ من السيرفر…", "info");
+  setBusy(true);
 
-    try {
-      const j = await apiPost("/api/weaning/save", {
-        numbers,
-        animalNumbers: numbers,
-        eventDate,
-        notes,
-        weaningWeightKg
-      });
+  try {
+    const j = await apiPost("/api/weaning/save", {
+      numbers,
+      animalNumbers: numbers,
+      eventDate,
+      notes,
+      weaningWeightKg
+    });
 
-      setMessage(responseText(j) || j.message || "تمت المعالجة.", j.ok ? "success" : "error");
+    const text = responseText(j) || j.message || "تمت المعالجة.";
 
-      if (j.ok && j.redirectUrl) {
-        setTimeout(() => {
+    if (j.ok && j.redirectUrl) {
+      setMessageWithOk(
+        text || "✅ تم حفظ الفطام بنجاح.",
+        "success",
+        "حسنًا",
+        () => {
           location.href = j.redirectUrl;
-        }, 900);
-      } else {
-        await runGate({ silent:true });
-      }
-    } catch (e) {
-      console.error(e);
-      setMessage("❌ فشل حفظ الفطام من السيرفر.", "error");
-    } finally {
-      setBusy(false);
+        }
+      );
+      return;
     }
-  });
+
+    setMessage(text, j.ok ? "success" : "error");
+
+    if (!j.ok) {
+      await runGate({ silent:true });
+    }
+
+  } catch (e) {
+    console.error(e);
+    setMessage("❌ فشل حفظ الفطام من السيرفر.", "error");
+  } finally {
+    setBusy(false);
+  }
+});
 
   hydrateUI();
   runGate({ silent:true });
