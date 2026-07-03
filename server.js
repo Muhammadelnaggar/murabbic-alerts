@@ -24557,15 +24557,79 @@ function weaningMsgTextSrv(v) {
   return String(v || "").trim();
 }
 
-function weaningWarningTextSrv(w = {}) {
+function weaningWarningReasonSrv(w = {}) {
+  const code = weaningMsgTextSrv(w.code);
+
+  if (code === "missing_dehorning_before_weaning") {
+    return "dehorning";
+  }
+
+  if (code === "missing_supernumerary_teat_removal_before_weaning") {
+    return "super_teat";
+  }
+
+  return "other";
+}
+
+function weaningCleanWarningTextSrv(w = {}) {
   const animalNumber = weaningMsgTextSrv(w.animalNumber || w.number || "");
-  const body = weaningMsgTextSrv(w.message || w.reason || w.code || w);
+  let text = weaningMsgTextSrv(w.message || w.reason || w.code || w);
 
-  if (!body) return "";
+  if (animalNumber) {
+    text = text
+      .replace(new RegExp(`^الحيوان\\s+رقم\\s+${animalNumber}\\s*[:：-]?\\s*`), "")
+      .replace(new RegExp(`^رقم\\s+${animalNumber}\\s*[:：-]?\\s*`), "")
+      .trim();
+  }
 
-  return animalNumber && !body.includes(animalNumber)
-    ? `الحيوان رقم ${animalNumber}: ${body}`
-    : body;
+  return text;
+}
+
+function weaningWarningLinesSrv(warnings = []) {
+  const map = new Map();
+  const other = [];
+
+  for (const w of Array.isArray(warnings) ? warnings : []) {
+    const animalNumber = weaningMsgTextSrv(w.animalNumber || w.number || "");
+    const kind = weaningWarningReasonSrv(w);
+
+    if (!animalNumber || kind === "other") {
+      const text = weaningCleanWarningTextSrv(w);
+      if (text) other.push(text);
+      continue;
+    }
+
+    if (!map.has(animalNumber)) {
+      map.set(animalNumber, {
+        animalNumber,
+        dehorning: false,
+        superTeat: false
+      });
+    }
+
+    const row = map.get(animalNumber);
+
+    if (kind === "dehorning") row.dehorning = true;
+    if (kind === "super_teat") row.superTeat = true;
+  }
+
+  const lines = [];
+
+  for (const row of map.values()) {
+    if (row.dehorning && row.superTeat) {
+      lines.push(`رقم ${row.animalNumber}: لم يتم تسجيل إزالة القرون ولا إزالة الحلمات الزائدة قبل الفطام.`);
+    } else if (row.dehorning) {
+      lines.push(`رقم ${row.animalNumber}: لم يتم تسجيل إزالة القرون قبل الفطام.`);
+    } else if (row.superTeat) {
+      lines.push(`رقم ${row.animalNumber}: لم يتم تسجيل إزالة الحلمات الزائدة قبل الفطام.`);
+    }
+  }
+
+  for (const text of other) {
+    lines.push(text);
+  }
+
+  return lines;
 }
 
 function weaningRejectedTextSrv(r = {}) {
@@ -24584,8 +24648,10 @@ function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [],
 
   const savedCount = safeSaved.length;
   const rejectedCount = safeRejected.length;
-  const warningsCount = safeWarnings.length;
   const first = safeSaved[0] || null;
+
+  const warningLines = weaningWarningLinesSrv(safeWarnings);
+  const warningsCount = warningLines.length;
 
   const lines = [];
 
@@ -24599,18 +24665,16 @@ function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [],
     lines.push("❌ لم يتم حفظ أي فطام.");
   }
 
-  if (savedCount && warningsCount) {
+  if (savedCount && warningLines.length) {
     lines.push("");
     lines.push("⚠️ ملاحظات بعد الحفظ — لا تمنع التسجيل:");
 
-    safeWarnings
+    warningLines
       .slice(0, 10)
-      .map(weaningWarningTextSrv)
-      .filter(Boolean)
       .forEach(x => lines.push(`- ${x}`));
 
-    if (warningsCount > 10) {
-      lines.push(`… وعدد ${warningsCount - 10} ملاحظات أخرى.`);
+    if (warningLines.length > 10) {
+      lines.push(`… وعدد ${warningLines.length - 10} ملاحظات أخرى.`);
     }
   }
 
@@ -24644,6 +24708,7 @@ function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [],
     saved: safeSaved,
     rejected: safeRejected,
     warnings: safeWarnings,
+    warningLines,
     eventDate: String(eventDate || "").slice(0, 10),
     redirectUrl: savedCount > 0 ? redirectUrl : "",
     ui: {
@@ -24656,6 +24721,7 @@ function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [],
       saved: safeSaved,
       rejected: safeRejected,
       warnings: safeWarnings,
+      warningLines,
       redirectUrl: savedCount > 0 ? redirectUrl : ""
     }
   };
