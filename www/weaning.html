@@ -144,7 +144,7 @@ function setMessageWithOk(text, type = "success", okLabel = "حسنًا", onOk =
 
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "ghost mbk-weaning-ok-btn";
+  btn.className = "mbk-weaning-ok-btn";
   btn.textContent = okLabel;
 
   btn.addEventListener("click", () => {
@@ -159,7 +159,6 @@ function setMessageWithOk(text, type = "success", okLabel = "حسنًا", onOk =
   info.appendChild(msg);
   info.appendChild(actions);
 }
-
 function setBusy(busy){
   if (saveBtn) saveBtn.disabled = !!busy || !lastGate?.canSave;
   if (cardBtn) cardBtn.disabled = !!busy || getCurrentNumbers().length !== 1;
@@ -282,7 +281,7 @@ function responseText(j = {}){
   cardBtn.addEventListener("click", () => {
     const nums = getCurrentNumbers();
     if (nums.length !== 1) return;
-    location.href = `cow-card.html?number=${encodeURIComponent(nums[0])}`;
+   location.href = `calf-card.html?number=${encodeURIComponent(nums[0])}`;
   });
 
   $("animalNumber").addEventListener("input", scheduleGate);
@@ -309,26 +308,26 @@ form.addEventListener("submit", async (ev) => {
       weaningWeightKg
     });
 
-    const text = responseText(j) || j.message || "تمت المعالجة.";
+const text = responseText(j) || "تمت المعالجة.";
 
-    if (j.ok && j.redirectUrl) {
-      setMessageWithOk(
-        text || "✅ تم حفظ الفطام بنجاح.",
-        "success",
-        "حسنًا",
-        () => {
-          location.href = j.redirectUrl;
-        }
-      );
-      return;
+if (j.ok) {
+  setMessageWithOk(
+    text || "✅ تم حفظ الفطام بنجاح.",
+    "success",
+    "حسنًا",
+    () => {
+      if (j.redirectUrl) {
+        location.href = j.redirectUrl;
+      } else {
+        clearMessage();
+      }
     }
+  );
+  return;
+}
 
-    setMessage(text, j.ok ? "success" : "error");
-
-    if (!j.ok) {
-      await runGate({ silent:true });
-    }
-
+setMessage(text, "error");
+await runGate({ silent:true });
   } catch (e) {
     console.error(e);
     setMessage("❌ فشل حفظ الفطام من السيرفر.", "error");
