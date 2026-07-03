@@ -24262,7 +24262,7 @@ async function weaningFindAnimalSrv(uid, rawNumber) {
   if (Number.isFinite(nNum)) values.push(nNum);
 
   function ownerOk(data = {}) {
-    return String(data.userId || "").trim() === uid;
+    return String(data.userId || data.ownerUid || "").trim() === uid;
   }
 
   function pack(docSnap) {
@@ -24274,16 +24274,20 @@ async function weaningFindAnimalSrv(uid, rawNumber) {
     };
   }
 
-  for (const value of values) {
-    try {
-      const snap = await db.collection("calves")
-        .where("userId", "==", uid)
-        .where("calfNumber", "==", value)
-        .limit(1)
-        .get();
+  for (const ownerField of ["userId", "ownerUid"]) {
+    for (const field of ["calfNumber", "animalNumber", "number"]) {
+      for (const value of values) {
+        try {
+          const snap = await db.collection("calves")
+            .where(ownerField, "==", uid)
+            .where(field, "==", value)
+            .limit(1)
+            .get();
 
-      if (!snap.empty) return pack(snap.docs[0]);
-    } catch (_) {}
+          if (!snap.empty) return pack(snap.docs[0]);
+        } catch (_) {}
+      }
+    }
   }
 
   try {
