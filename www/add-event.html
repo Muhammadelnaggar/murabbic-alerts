@@ -656,28 +656,52 @@ function resetInlineBox(){
   box.style.display = 'none';
 }
 
-function showTopInfobar(message){
+function clearTopInfobar(){
   const warn = document.getElementById('warn');
   if (!warn) return;
 
   warn.innerHTML = '';
-  warn.style.display = 'block';
+  warn.classList.remove('mbk-infobar-on');
+  warn.style.display = 'none';
+}
+
+function showTopInfobar(message, actions = []){
+  const warn = document.getElementById('warn');
+  if (!warn) return;
+
+  warn.innerHTML = '';
+  warn.classList.add('mbk-infobar-on');
+  warn.style.display = 'flex';
 
   const text = document.createElement('div');
+  text.className = 'mbk-infobar-text';
   text.textContent = message || '';
 
-  const ok = document.createElement('button');
-  ok.type = 'button';
-  ok.textContent = 'حسنًا';
-  ok.className = 'mbk-infobar-ok';
+  const actionWrap = document.createElement('div');
+  actionWrap.className = 'mbk-infobar-actions';
 
-  ok.addEventListener('click', ()=>{
-    warn.innerHTML = '';
-    warn.style.display = 'none';
-  }, { once:true });
+  const finalActions = actions.length
+    ? actions
+    : [{ label: 'حسنًا', primary: false, onClick: clearTopInfobar }];
+
+  finalActions.forEach(action => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = action.label || 'حسنًا';
+    btn.className = 'mbk-infobar-btn' + (action.primary ? ' mbk-infobar-btn-primary' : '');
+
+    if (action.id) btn.id = action.id;
+
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      if (typeof action.onClick === 'function') action.onClick();
+    }, { once:true });
+
+    actionWrap.appendChild(btn);
+  });
 
   warn.appendChild(text);
-  warn.appendChild(ok);
+  warn.appendChild(actionWrap);
 
   warn.scrollIntoView({
     behavior: 'smooth',
@@ -687,47 +711,31 @@ function showTopInfobar(message){
 
 function showTrimmingConfirm(){
   const { numbers, date } = currentNumbersAndDate();
-  const warn = document.getElementById('warn');
-  const box = document.getElementById('inlineMsg');
 
-  if (warn) {
-    warn.innerHTML = '';
-    warn.style.display = 'none';
-  }
+  resetInlineBox();
+  clearTopInfobar();
 
   if (!numbers.length){
     showTopInfobar('⚠️ اكتب رقم حيوان واحد أو عدة أرقام قبل تسجيل تقليم الحوافر.');
     return;
   }
 
-  if (!box) return;
-
-  const targetText = numbers.length === 1
-    ? `للحيوان رقم ${numbers[0]}`
-    : `لعدد ${numbers.length} حيوان`;
-
-  box.innerHTML = `
-    <div class="text">
-      <b>تأكيد تسجيل تقليم الحوافر</b><br>
-      هل تريد تسجيل تقليم الحوافر ${targetText} بتاريخ ${date}؟
-      <div style="display:grid; gap:8px; margin-top:12px;">
-        <button type="button" class="mbk-action-tile" id="btnConfirmTrimming">✅ تأكيد التسجيل</button>
-        <button type="button" class="mbk-action-tile" id="btnCancelTrimming">إلغاء</button>
-      </div>
-    </div>
-  `;
-
-  box.style.display = 'block';
-
-  document.getElementById('btnCancelTrimming')?.addEventListener('click', (e)=>{
-    e.preventDefault();
-    resetInlineBox();
-  }, { once:true });
-
-  document.getElementById('btnConfirmTrimming')?.addEventListener('click', (e)=>{
-    e.preventDefault();
-    saveTrimmingAfterConfirm();
-  }, { once:true });
+  showTopInfobar(
+    `هل تريد تسجيل تقليم الحوافر لعدد ${numbers.length} حيوان بتاريخ ${date}؟`,
+    [
+      {
+        id: 'btnConfirmTrimming',
+        label: 'تأكيد التسجيل',
+        primary: true,
+        onClick: saveTrimmingAfterConfirm
+      },
+      {
+        label: 'إلغاء',
+        primary: false,
+        onClick: clearTopInfobar
+      }
+    ]
+  );
 }
 
 async function saveTrimmingAfterConfirm(){
@@ -739,6 +747,7 @@ async function saveTrimmingAfterConfirm(){
   const { numbers, date } = currentNumbersAndDate();
 
   trimmingBusy = true;
+
   if (mainBtn) mainBtn.disabled = true;
   if (confirmBtn) {
     confirmBtn.disabled = true;
