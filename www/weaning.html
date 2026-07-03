@@ -37,7 +37,10 @@
         <label for="weaningAgeDays">عمر الفطام (يوم)</label>
         <input id="weaningAgeDays" data-field="weaningAgeDays" type="number" readonly />
       </div>
-
+      <div class="field" id="weaningWeightWrap">
+  <label for="weaningWeightKg">وزن الفطام (كجم)</label>
+  <input id="weaningWeightKg" data-field="weaningWeightKg" type="number" min="0" step="0.1" placeholder="اختياري" />
+</div>
       <div class="field" id="bulkAgeHint" style="display:none;">
         <label>عمر الفطام</label>
        <div class="form-hint">سيتم حساب عمر الفطام تلقائيًا من السيرفر لكل حيوان حسب تاريخ الميلاد المسجل.</div>
@@ -130,25 +133,42 @@
     if (cardBtn) cardBtn.disabled = !!busy || getCurrentNumbers().length !== 1;
   }
 
-  function responseText(j = {}){
-    const lines = [];
-    if (j.message) lines.push(j.message);
+function responseText(j = {}){
+  const lines = [];
+  if (j.message) lines.push(j.message);
 
-    const rejected = Array.isArray(j.rejected) ? j.rejected : [];
-    if (rejected.length) {
-      lines.push(
-        rejected.slice(0, 8)
-          .map(r => `رقم ${r.animalNumber || r.number || "—"}: ${r.reason || "غير مقبول"}`)
-          .join("\n")
-      );
-      if (rejected.length > 8) {
-        lines.push(`… وعدد ${rejected.length - 8} أرقام أخرى.`);
-      }
+  const warnings = Array.isArray(j.warnings) ? j.warnings : [];
+  if (warnings.length) {
+    lines.push(
+      warnings.slice(0, 8)
+        .map(w => `⚠️ ${w.message || w.reason || w}`)
+        .join("\n")
+    );
+
+    if (warnings.length > 8) {
+      lines.push(`… وعدد ${warnings.length - 8} تحذيرات أخرى.`);
     }
-
-    return lines.filter(Boolean).join("\n");
   }
 
+  if (j.warning) {
+    lines.push(`⚠️ ${j.warning}`);
+  }
+
+  const rejected = Array.isArray(j.rejected) ? j.rejected : [];
+  if (rejected.length) {
+    lines.push(
+      rejected.slice(0, 8)
+        .map(r => `رقم ${r.animalNumber || r.number || "—"}: ${r.reason || "غير مقبول"}`)
+        .join("\n")
+    );
+
+    if (rejected.length > 8) {
+      lines.push(`… وعدد ${rejected.length - 8} أرقام أخرى.`);
+    }
+  }
+
+  return lines.filter(Boolean).join("\n");
+}
   async function apiPost(path, payload){
     const r = await fetch(path, {
       method: "POST",
@@ -276,6 +296,7 @@
     const numbers = getCurrentNumbers();
     const eventDate = String($("eventDate").value || "").slice(0, 10);
     const notes = String($("notes").value || "").trim();
+    const weaningWeightKg = String($("weaningWeightKg")?.value || "").trim();
 
     setMessage("جاري الحفظ من السيرفر…", "info");
     setBusy(true);
@@ -285,7 +306,8 @@
         numbers,
         animalNumbers: numbers,
         eventDate,
-        notes
+        notes,
+        weaningWeightKg
       });
 
       setMessage(responseText(j) || j.message || "تمت المعالجة.", j.ok ? "success" : "error");
