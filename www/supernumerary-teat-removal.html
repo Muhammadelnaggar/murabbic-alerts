@@ -33,7 +33,15 @@
         <label for="eventDate">تاريخ إزالة الحلمات الزائدة</label>
         <input id="eventDate" data-field="eventDate" type="date" />
       </div>
+     <div class="field" id="singleAgeWrap" style="display:none;">
+  <label for="superTeatAgeDays">عمر العجل يوم إزالة الحلمات الزائدة (يوم)</label>
+  <input id="superTeatAgeDays" data-field="superTeatAgeDays" type="number" readonly />
+</div>
 
+<div class="field" id="bulkAgeHint" style="display:none;">
+  <label>عمر العجول</label>
+  <div class="form-hint">سيتم حساب العمر تلقائيًا من السيرفر لكل عجل حسب تاريخ الميلاد المسجل.</div>
+</div>
       <div class="field">
         <label for="notes">ملاحظات</label>
         <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
@@ -107,7 +115,9 @@
   function getCurrentNumbers(){
     return parseNumbers($("animalNumber").value || "");
   }
-
+  function isBulkNow(){
+  return startsBulk || getCurrentNumbers().length > 1;
+}
   function setMessage(text, type = "info"){
     info.className = `infobar show ${type}`;
     info.style.display = "block";
@@ -119,32 +129,44 @@
     info.style.display = "";
     info.textContent = "";
   }
+  function setMessageWithOk(text, type = "success", okLabel = "حسنًا", onOk = null){
+  info.className = `infobar show ${type}`;
+  info.style.display = "block";
+  info.innerHTML = "";
+  info.style.whiteSpace = "normal";
 
+  const msg = document.createElement("div");
+  msg.textContent = String(text || "");
+  msg.style.whiteSpace = "pre-line";
+
+  const actions = document.createElement("div");
+  actions.className = "mbk-super-teat-ok-actions";
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "mbk-super-teat-ok-btn";
+  btn.textContent = okLabel;
+
+  btn.addEventListener("click", () => {
+    if (typeof onOk === "function") {
+      onOk();
+    } else {
+      clearMessage();
+    }
+  }, { once:true });
+
+  actions.appendChild(btn);
+  info.appendChild(msg);
+  info.appendChild(actions);
+}
   function setBusy(busy){
     if (saveBtn) saveBtn.disabled = !!busy || !lastGate?.canSave;
     if (cardBtn) cardBtn.disabled = !!busy || getCurrentNumbers().length !== 1;
   }
 
-  function responseText(j = {}){
-    const lines = [];
-
-    if (j.message) lines.push(j.message);
-
-    const rejected = Array.isArray(j.rejected) ? j.rejected : [];
-    if (rejected.length) {
-      lines.push(
-        rejected.slice(0, 8)
-          .map(r => `رقم ${r.animalNumber || r.number || "—"}: ${r.reason || "غير مقبول"}`)
-          .join("\n")
-      );
-
-      if (rejected.length > 8) {
-        lines.push(`… وعدد ${rejected.length - 8} أرقام أخرى.`);
-      }
-    }
-
-    return lines.filter(Boolean).join("\n");
-  }
+function responseText(j = {}){
+  return String(j?.message || j?.ui?.message || "").trim();
+}
 
   async function apiPost(path, payload){
     const r = await fetch(path, {
@@ -179,23 +201,38 @@
     return { httpStatus: r.status, ...j };
   }
 
-  function renderGate(j = {}){
-    lastGate = j;
+function renderGate(j = {}){
+  lastGate = j;
 
-    if (saveBtn) saveBtn.disabled = !j.canSave;
+  const accepted = Array.isArray(j.accepted) ? j.accepted : [];
+  const first = accepted[0] || null;
+  const bulk = isBulkNow();
 
-    const nums = getCurrentNumbers();
-    if (cardBtn) {
-      cardBtn.disabled = nums.length !== 1;
-      cardBtn.style.opacity = nums.length === 1 ? "1" : ".6";
-      cardBtn.style.pointerEvents = nums.length === 1 ? "auto" : "none";
-    }
+  $("singleAgeWrap").style.display = bulk ? "none" : "";
+  $("bulkAgeHint").style.display = bulk ? "" : "none";
 
-    const text = responseText(j);
-    if (text) setMessage(text, j.canSave ? "success" : "error");
-    else clearMessage();
+  const age = first
+    ? Number(first.supernumeraryTeatRemovalAgeDays ?? first.superTeatAgeDays ?? first.ageDays)
+    : NaN;
+
+  $("superTeatAgeDays").value =
+    !bulk && Number.isFinite(age)
+      ? String(age)
+      : "";
+
+  if (saveBtn) saveBtn.disabled = !j.canSave;
+
+  const nums = getCurrentNumbers();
+  if (cardBtn) {
+    cardBtn.disabled = nums.length !== 1;
+    cardBtn.style.opacity = nums.length === 1 ? "1" : ".6";
+    cardBtn.style.pointerEvents = nums.length === 1 ? "auto" : "none";
   }
 
+  const text = responseText(j);
+  if (text) setMessage(text, j.canSave ? "success" : "error");
+  else clearMessage();
+}
   async function runGate({ silent = false } = {}){
     const numbers = getCurrentNumbers();
     const eventDate = String($("eventDate").value || "").slice(0, 10);
@@ -237,6 +274,8 @@
     $("eventDate").value = initialDate;
     $("animalNumber").value = initialNumbers.join(startsBulk ? "\n" : "");
     $("animalNumber").rows = startsBulk ? Math.max(3, initialNumbers.length) : 1;
+    $("singleAgeWrap").style.display = startsBulk ? "none" : "";
+    $("bulkAgeHint").style.display = startsBulk ? "" : "none";
 
     if (saveBtn) saveBtn.disabled = true;
     if (cardBtn) cardBtn.disabled = initialNumbers.length !== 1;
@@ -245,56 +284,58 @@
   cardBtn.addEventListener("click", () => {
     const nums = getCurrentNumbers();
     if (nums.length !== 1) return;
-    location.href = `cow-card.html?number=${encodeURIComponent(nums[0])}`;
+    location.href = `calf-card.html?number=${encodeURIComponent(nums[0])}`;
   });
 
   $("animalNumber").addEventListener("input", scheduleGate);
   $("eventDate").addEventListener("input", scheduleGate);
   $("eventDate").addEventListener("change", () => runGate({ silent:false }));
 
-  form.addEventListener("submit", async (ev) => {
-    ev.preventDefault();
+form.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
 
-    const numbers = getCurrentNumbers();
-    const eventDate = String($("eventDate").value || "").slice(0, 10);
-    const notes = String($("notes").value || "").trim();
+  const numbers = getCurrentNumbers();
+  const eventDate = String($("eventDate").value || "").slice(0, 10);
+  const notes = String($("notes").value || "").trim();
 
-    if (!numbers.length) {
-      setMessage("❌ رقم العجل مطلوب.", "error");
+  setMessage("جاري الحفظ من السيرفر…", "info");
+  setBusy(true);
+
+  try {
+    const j = await apiPost("/api/supernumerary-teat-removal/save", {
+      numbers,
+      animalNumbers: numbers,
+      eventDate,
+      notes
+    });
+
+    const text = responseText(j) || "تمت المعالجة.";
+
+    if (j.ok) {
+      setMessageWithOk(
+        text,
+        "success",
+        "حسنًا",
+        () => {
+          if (j.redirectUrl) {
+            location.href = j.redirectUrl;
+          } else {
+            clearMessage();
+          }
+        }
+      );
       return;
     }
 
-    if (!eventDate) {
-      setMessage("❌ تاريخ إزالة الحلمات الزائدة مطلوب.", "error");
-      return;
-    }
+    setMessage(text, "error");
 
-    setMessage("جاري الحفظ من السيرفر…", "info");
-    setBusy(true);
-
-    try {
-      const j = await apiPost("/api/supernumerary-teat-removal/save", {
-        numbers,
-        animalNumbers: numbers,
-        eventDate,
-        notes
-      });
-
-      setMessage(responseText(j) || j.message || "تمت المعالجة.", j.ok ? "success" : "error");
-
-      if (j.ok && j.redirectUrl) {
-        setTimeout(() => {
-          location.href = j.redirectUrl;
-        }, 900);
-      }
-    } catch (e) {
-      console.error(e);
-      setMessage("❌ فشل حفظ إزالة الحلمات الزائدة من السيرفر.", "error");
-    } finally {
-      setBusy(false);
-    }
-  });
-
+  } catch (e) {
+    console.error(e);
+    setMessage("❌ فشل حفظ إزالة الحلمات الزائدة من السيرفر.", "error");
+  } finally {
+    setBusy(false);
+  }
+});
   hydrateUI();
   runGate({ silent:true });
 </script>
