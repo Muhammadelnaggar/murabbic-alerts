@@ -24001,50 +24001,8 @@ const nutritionEvents = allEvents
       }
     }
 
-    let skippedNoCalving = 0;
-    const points = [];
-
-    for (const ev of dayRows) {
-      const number = milkReportNumberSrv(ev.animalNumber || ev.number);
-      const kg = milkReportKgSrv(ev);
-      const animal = animalsByNumber.get(number) || {};
-      const lastCalvingDate = calvingMap.get(number);
-
-      if (!number || !lastCalvingDate) {
-        skippedNoCalving++;
-        continue;
-      }
-
-      const dim = milkReportDaysBetweenSrv(lastCalvingDate, reportDate);
-      const prevOne = prevByNumber.get(number);
-      const prevKg = Number(prevOne?.kg || 0);
-      const deltaPct = prevKg > 0 ? Number((((kg - prevKg) / prevKg) * 100).toFixed(1)) : null;
-
-      points.push({
-        number,
-        kg,
-        dim,
-        deltaPct,
-        group: animal.groupName || animal.group || ev.groupName || ev.group || "—",
-        repro: animal.reproductiveStatus || ev.reproductiveStatus || ev.reproStatus || "—",
-       season: (() => {
-  const lact =
-    animal.lactationNumber ??
-    animal.lactationNo ??
-    animal.lactation ??
-    ev.lactationNumber ??
-    ev.lactationNo ??
-    ev.lactation ??
-    null;
-
-  const n = Number(lact);
-  return Number.isFinite(n) && n > 0
-    ? `الموسم ${Math.round(n)}`
-    : "الموسم غير مسجل";
-})(),
-        kind: milkReportKindSrv(animal.kind || animal.species || animal.animalType || ev.kind || ev.species)
-      });
-    }
+let skippedNoCalving = 0;
+let points = [];
 
     const feeds = allEvents.filter(ev =>
       milkReportIsFeedEventSrv(ev) &&
@@ -24077,10 +24035,91 @@ const activeAnimals = animals.filter(a => {
 
   return milkReportAnimalMatchesKindSrv(a, selectedKind);
 });
-      const officialGroups = await milkReportLoadOfficialGroupsMapFromFirestoreSrv(
+const officialGroups = await milkReportLoadOfficialGroupsMapFromFirestoreSrv(
   uid,
   activeAnimals
 );
+const scatterDayByNumber = new Map();
+
+for (const ev of dayRows) {
+  const n = milkReportNumberSrv(ev.animalNumber || ev.number);
+  if (n) scatterDayByNumber.set(n, ev);
+}
+
+const scatterGroupsMap =
+  officialGroups.ok && officialGroups.groupsMap
+    ? officialGroups.groupsMap
+    : splitGroupsServerSrv(activeAnimals, thresholds);
+
+const scatterSeenNumbers = new Set();
+points = [];
+
+for (const groupId of milkReportOfficialMilkingGroupIdsSrv()) {
+  const def = GROUP_DEF_BY_ID_SRV[groupId] || {};
+  const members = Array.isArray(scatterGroupsMap[groupId])
+    ? scatterGroupsMap[groupId]
+    : [];
+
+  for (const an of members) {
+    const number = milkReportAnimalNumberFromAnimalSrv(an);
+    if (!number || scatterSeenNumbers.has(number)) continue;
+
+    scatterSeenNumbers.add(number);
+
+    const ev = scatterDayByNumber.get(number) || {};
+    const lastCalvingDate = calvingMap.get(number);
+
+    if (!lastCalvingDate) {
+      skippedNoCalving++;
+      continue;
+    }
+
+    const dim = milkReportDaysBetweenSrv(lastCalvingDate, reportDate);
+
+    if (!Number.isFinite(Number(dim)) || Number(dim) < 0) {
+      skippedNoCalving++;
+      continue;
+    }
+
+    const recordedToday = scatterDayByNumber.has(number);
+    const kg = recordedToday
+      ? milkReportKgSrv(ev)
+      : getMilkKgSrv(an);
+
+    const prevOne = prevByNumber.get(number);
+    const prevKg = Number(prevOne?.kg || 0);
+    const deltaPct = prevKg > 0
+      ? Number((((kg - prevKg) / prevKg) * 100).toFixed(1))
+      : null;
+
+    const lact =
+      an.lactationNumber ??
+      an.lactationNo ??
+      an.lactation ??
+      ev.lactationNumber ??
+      ev.lactationNo ??
+      ev.lactation ??
+      null;
+
+    const lactNo = Number(lact);
+
+    points.push({
+      number,
+      kg: milkReportRoundSrv(kg, 1),
+      dim,
+      deltaPct,
+      group: an.groupName || an.group || ev.groupName || ev.group || def.label || groupId || "—",
+      repro: an.reproductiveStatus || ev.reproductiveStatus || ev.reproStatus || "—",
+      season: Number.isFinite(lactNo) && lactNo > 0
+        ? `الموسم ${Math.round(lactNo)}`
+        : "الموسم غير مسجل",
+      kind: def.species || milkReportKindSrv(an.kind || an.species || an.animalType || ev.kind || ev.species),
+      recordedToday
+    });
+  }
+}
+
+points.sort((a, b) => Number(a.dim || 0) - Number(b.dim || 0));
 const rawGroupsSummary = milkReportBuildOfficialGroupSummariesSrv({
   activeAnimals,
   thresholds,
