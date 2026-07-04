@@ -5374,3 +5374,23 @@ html[data-page="weaning"] .infobar .mbk-weaning-ok-btn {
   line-height: 1.4;
   cursor: pointer;
 }
+html[data-page="supernumerary-teat-removal"] .mbk-super-teat-ok-actions{
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+}
+
+html[data-page="supernumerary-teat-removal"] .mbk-super-teat-ok-btn{
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 22px;
+  font-weight: 800;
+  cursor: pointer;
+  background: #16a34a;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(22, 163, 74, .18);
+}
+
+html[data-page="supernumerary-teat-removal"] .mbk-super-teat-ok-btn:active{
+  transform: translateY(1px);
+}
