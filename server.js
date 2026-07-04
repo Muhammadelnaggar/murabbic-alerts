@@ -16189,7 +16189,41 @@ function superTeatEventDateSrv(body = {}) {
 function superTeatNotesSrv(body = {}) {
   return superTeatStrSrv(body.notes || body.note || "");
 }
+function superTeatAgeDaysSrv(birthDate, eventDate) {
+  const b = String(birthDate || "").trim().slice(0, 10);
+  const e = String(eventDate || "").trim().slice(0, 10);
 
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(b) || !/^\d{4}-\d{2}-\d{2}$/.test(e)) {
+    return null;
+  }
+
+  const [by, bm, bd] = b.split("-").map(Number);
+  const [ey, em, ed] = e.split("-").map(Number);
+
+  const days = Math.floor(
+    (Date.UTC(ey, em - 1, ed) - Date.UTC(by, bm - 1, bd)) / 86400000
+  );
+
+  return Number.isFinite(days) && days >= 0 ? days : null;
+}
+
+function superTeatRejectedTextSrv(r = {}) {
+  const n = String(r.animalNumber || r.number || r.calfNumber || "").trim() || "—";
+  const reason = String(r.reason || r.message || "غير مؤهل لتسجيل إزالة الحلمات الزائدة.").trim();
+
+  return `رقم ${n}: ${reason}`;
+}
+
+function superTeatRejectedLinesSrv(rejected = []) {
+  const safe = Array.isArray(rejected) ? rejected : [];
+  const lines = safe.slice(0, 8).map(superTeatRejectedTextSrv);
+
+  if (safe.length > 8) {
+    lines.push(`… وعدد ${safe.length - 8} أرقام أخرى.`);
+  }
+
+  return lines;
+}
 function superTeatSexTextSrv(doc = {}) {
   return superTeatStrSrv(
     doc.sex ||
@@ -16412,16 +16446,22 @@ async function superTeatEvaluateOneSrv(uid, rawNumber, eventDate) {
     };
   }
 
-  return {
-    ok: true,
-    animalNumber: num,
-    animalId: calf.id,
-    ref: calf.ref,
-    calfNumber: String(doc.calfNumber || num).trim(),
-    birthDate: String(doc.birthDate || "").trim().slice(0, 10),
-    sex: superTeatSexTextSrv(doc),
-    eventDate
-  };
+  const birthDate = String(doc.birthDate || "").trim().slice(0, 10);
+const ageDays = superTeatAgeDaysSrv(birthDate, eventDate);
+
+return {
+  ok: true,
+  animalNumber: num,
+  animalId: calf.id,
+  ref: calf.ref,
+  calfNumber: String(doc.calfNumber || num).trim(),
+  birthDate,
+  ageDays,
+  superTeatAgeDays: ageDays,
+  supernumeraryTeatRemovalAgeDays: ageDays,
+  sex: superTeatSexTextSrv(doc),
+  eventDate
+};
 }
 
 async function superTeatEvaluateManySrv(uid, numbers = [], eventDate = "") {
@@ -16439,27 +16479,63 @@ async function superTeatEvaluateManySrv(uid, numbers = [], eventDate = "") {
 }
 
 function superTeatGateMessageSrv(accepted = [], rejected = []) {
-  if (accepted.length && rejected.length) {
-    return `✅ مؤهل للتسجيل: ${accepted.length}. غير مؤهل: ${rejected.length}.`;
+  const safeAccepted = Array.isArray(accepted) ? accepted : [];
+  const safeRejected = Array.isArray(rejected) ? rejected : [];
+  const rejectedLines = superTeatRejectedLinesSrv(safeRejected);
+
+  if (safeAccepted.length && safeRejected.length) {
+    return [
+      `✅ مؤهل لتسجيل إزالة الحلمات الزائدة: ${safeAccepted.length}.`,
+      `❌ غير مؤهل: ${safeRejected.length}.`,
+      ...rejectedLines
+    ].join("\n");
   }
 
-  if (accepted.length) {
-    return accepted.length === 1
+  if (safeAccepted.length) {
+    return safeAccepted.length === 1
       ? "✅ العجل مؤهل لتسجيل إزالة الحلمات الزائدة."
-      : `✅ عدد ${accepted.length} عجول مؤهلة لتسجيل إزالة الحلمات الزائدة.`;
+      : `✅ عدد ${safeAccepted.length} عجول مؤهلة لتسجيل إزالة الحلمات الزائدة.`;
+  }
+
+  if (safeRejected.length === 1) {
+    return `❌ ${superTeatRejectedTextSrv(safeRejected[0])}`;
+  }
+
+  if (safeRejected.length > 1) {
+    return [
+      "❌ لا توجد أرقام مؤهلة لتسجيل إزالة الحلمات الزائدة.",
+      ...rejectedLines
+    ].join("\n");
   }
 
   return "❌ لا توجد أرقام مؤهلة لتسجيل إزالة الحلمات الزائدة.";
 }
 
-function superTeatSaveMessageSrv(saved = []) {
-  if (saved.length === 1) {
-    return "✅ تم تسجيل إزالة الحلمات الزائدة بنجاح.";
+function superTeatSaveMessageSrv(saved = [], rejected = []) {
+  const safeSaved = Array.isArray(saved) ? saved : [];
+  const safeRejected = Array.isArray(rejected) ? rejected : [];
+  const rejectedLines = superTeatRejectedLinesSrv(safeRejected);
+
+  const lines = [];
+
+  if (safeSaved.length && safeRejected.length) {
+    lines.push(`✅ تم تسجيل إزالة الحلمات الزائدة لعدد ${safeSaved.length} عجل، وتعذّر حفظ ${safeRejected.length} رقم.`);
+  } else if (safeSaved.length === 1) {
+    lines.push("✅ تم تسجيل إزالة الحلمات الزائدة بنجاح.");
+  } else if (safeSaved.length > 1) {
+    lines.push(`✅ تم تسجيل إزالة الحلمات الزائدة لعدد ${safeSaved.length} عجل بنجاح.`);
+  } else {
+    lines.push("❌ لم يتم حفظ أي سجل إزالة حلمات زائدة.");
   }
 
-  return `✅ تم تسجيل إزالة الحلمات الزائدة لعدد ${saved.length} عجل بنجاح.`;
-}
+  if (safeRejected.length) {
+    lines.push("");
+    lines.push(safeSaved.length ? "الأرقام التي لم تُحفظ:" : "سبب عدم الحفظ:");
+    rejectedLines.forEach(x => lines.push(`- ${x}`));
+  }
 
+  return lines.join("\n").trim();
+}
 app.post("/api/supernumerary-teat-removal/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -16520,12 +16596,15 @@ app.post("/api/supernumerary-teat-removal/gate", requireUserId, async (req, res)
       rejectedCount: checked.rejected.length,
       message: superTeatGateMessageSrv(checked.accepted, checked.rejected),
       accepted: checked.accepted.map(r => ({
-        animalNumber: r.animalNumber,
-        animalId: r.animalId,
-        calfNumber: r.calfNumber,
-        sex: r.sex,
-        birthDate: r.birthDate
-      })),
+      animalNumber: r.animalNumber,
+      animalId: r.animalId,
+      calfNumber: r.calfNumber,
+      sex: r.sex,
+      birthDate: r.birthDate,
+      ageDays: r.ageDays,
+      superTeatAgeDays: r.superTeatAgeDays,
+      supernumeraryTeatRemovalAgeDays: r.supernumeraryTeatRemovalAgeDays
+    })),
       rejected: checked.rejected.map(r => ({
         animalNumber: r.animalNumber,
         animalId: r.animalId || "",
@@ -16601,6 +16680,9 @@ app.post("/api/supernumerary-teat-removal/save", requireUserId, async (req, res)
 
     for (const row of checked.accepted) {
       const animalNumber = row.animalNumber;
+      const ageDays = Number.isFinite(Number(row.ageDays))
+       ? Number(row.ageDays)
+       : superTeatAgeDaysSrv(row.birthDate, eventDate);
       const eventId = superTeatEventIdSrv(uid, animalNumber);
       const eventRef = db.collection("events").doc(eventId);
 
@@ -16634,6 +16716,9 @@ app.post("/api/supernumerary-teat-removal/save", requireUserId, async (req, res)
         sex: row.sex || "",
         birthDate: row.birthDate || "",
         notes,
+        ageDays,
+        superTeatAgeDays: ageDays,
+        supernumeraryTeatRemovalAgeDays: ageDays,
 
         animalCollection: "calves",
         source: "server:/api/supernumerary-teat-removal/save",
@@ -16643,38 +16728,42 @@ app.post("/api/supernumerary-teat-removal/save", requireUserId, async (req, res)
       });
 
       if (row.ref) {
-        batch.set(row.ref, {
-          supernumeraryTeatRemoved: true,
-          supernumeraryTeatRemovalDate: eventDate,
-          lastSupernumeraryTeatRemovalDate: eventDate,
-          lastEventDate: eventDate,
-          updatedAt: now
-        }, { merge: true });
+       batch.set(row.ref, {
+       supernumeraryTeatRemoved: true,
+       supernumeraryTeatRemovalDate: eventDate,
+       lastSupernumeraryTeatRemovalDate: eventDate,
+       lastSupernumeraryTeatRemovalAgeDays: ageDays,
+       lastEventDate: eventDate,
+       updatedAt: now
+  }, { merge: true });
       }
 
       await batch.commit();
 
-      saved.push({
-        animalNumber,
-        animalId: row.animalId || "",
-        eventId,
-        eventDate
-      });
+saved.push({
+  animalNumber,
+  animalId: row.animalId || "",
+  eventId,
+  eventDate,
+  ageDays,
+  superTeatAgeDays: ageDays,
+  supernumeraryTeatRemovalAgeDays: ageDays
+});
     }
 
-    return res.status(saved.length ? 200 : 400).json({
-      ok: saved.length > 0,
-      message: saved.length
-        ? superTeatSaveMessageSrv(saved)
-        : "❌ لم يتم حفظ أي سجل إزالة حلمات زائدة.",
-      savedCount: saved.length,
-      rejectedCount: saved.length ? saveErrors.length : checked.rejected.length + saveErrors.length,
-      saved,
-      rejected: saved.length ? saveErrors : [...checked.rejected, ...saveErrors],
-      redirectUrl: saved.length
-        ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
-        : ""
-    });
+const allRejected = [...checked.rejected, ...saveErrors];
+
+return res.status(saved.length ? 200 : 400).json({
+  ok: saved.length > 0,
+  message: superTeatSaveMessageSrv(saved, allRejected),
+  savedCount: saved.length,
+  rejectedCount: allRejected.length,
+  saved,
+  rejected: allRejected,
+  redirectUrl: saved.length
+    ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
+    : ""
+});
 
   } catch (e) {
     console.error("supernumerary-teat-removal save failed", e);
