@@ -24211,9 +24211,7 @@ function milkReportBuildConsultantReportSrv({
       }
     },
 
-    groups,
-
-       groups,
+      groups,
 
     recommendations: milkReportBuildRecommendationEngineV2Srv({
       smartReport,
@@ -24223,16 +24221,6 @@ function milkReportBuildConsultantReportSrv({
       economicTotals,
       thi
     }),
-
-      dataQuality: milkReportBuildDataQualityNotesSrv({
-        points,
-        skippedNoCalving
-      }),
-
-      whatToReview: smartReport.strengths || [],
-      followUpPriority: smartReport.watchPoints || [],
-      murabbikDecision: smartReport.murabbikGuidance || []
-    },
 
     dataQualityNotes: milkReportBuildDataQualityNotesSrv({
       points,
