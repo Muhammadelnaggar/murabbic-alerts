@@ -23855,7 +23855,266 @@ function milkReportBuildDataQualityNotesSrv({
 
   return notes;
 }
+function milkReportBuildRecommendationEngineV2Srv({
+  smartReport = {},
+  groups = [],
+  points = [],
+  skippedNoCalving = 0,
+  economicTotals = {},
+  thi = null
+} = {}) {
+  const out = {
+    priority: [],
+    production: [],
+    nutrition: [],
+    transition: [],
+    heatStress: [],
+    individualAnimals: [],
+    dataQuality: [],
 
+    whatToReview: [],
+    followUpPriority: [],
+    murabbikDecision: []
+  };
+
+  const add = (section, item = {}) => {
+    const rec = {
+      level: item.level || "medium",
+      domain: item.domain || section,
+      title: item.title || "توصية متابعة",
+      evidence: Array.isArray(item.evidence) ? item.evidence.filter(Boolean) : [],
+      interpretation: item.interpretation || "",
+      action: item.action || "",
+      confidence: item.confidence || "medium"
+    };
+
+    out[section].push(rec);
+    return rec;
+  };
+
+  const asLine = rec => [
+    rec.title,
+    rec.evidence?.length ? `الدليل: ${rec.evidence.join("، ")}` : "",
+    rec.interpretation ? `القراءة: ${rec.interpretation}` : "",
+    rec.action ? `الإجراء: ${rec.action}` : ""
+  ].filter(Boolean).join(" — ");
+
+  const trend = smartReport.trend || {};
+  const farm = smartReport.farmSummary || {};
+
+  const dayDeltaPct = Number(trend.dayDeltaPct);
+  const watchGroups = (groups || []).filter(g => String(g.statusType || "") === "warn");
+
+  const freshGroups = (groups || []).filter(g => {
+    const name = String(g.groupName || g.groupId || "").toLowerCase();
+    return name.includes("حديث") || name.includes("فريش") || name.includes("fresh");
+  });
+
+  const watchAnimals = (groups || [])
+    .flatMap(g => (g.watchAnimals || g.dropAnimals || []).map(a => ({ ...a, groupName: g.groupName })))
+    .slice(0, 8);
+
+  const missingMilkCount = (points || []).filter(p => p.recordedToday === false).length;
+  const pointsCount = (points || []).length;
+  const missingMilkRate = pointsCount ? missingMilkCount / pointsCount : 0;
+
+  const thiValue = Number(thi?.thi);
+  const thiSeverity = Number(thi?.status?.severity || 0);
+  const thiLabel = thi?.status?.label || "غير متاح";
+
+  const totalFeedCost = Number(economicTotals.totalFeedCost);
+  const costPerKgMilk = Number(economicTotals.costPerKgMilk);
+  const weakestGroup = farm.weakestGroup || null;
+
+  if (Number(skippedNoCalving || 0) > 0) {
+    add("dataQuality", {
+      level: "high",
+      domain: "dataQuality",
+      title: "استكمال تواريخ الولادة قبل تفسير أيام الحليب",
+      evidence: [`${skippedNoCalving} حيوان بلا تاريخ ولادة واضح`],
+      interpretation: "قراءة DIM ومنحنى اللبن تضعف عندما تكون تواريخ الولادة ناقصة.",
+      action: "استكمل تواريخ الولادة الناقصة قبل الحكم النهائي على أداء المجموعات.",
+      confidence: "high"
+    });
+  }
+
+  if (missingMilkRate >= 0.25) {
+    add("dataQuality", {
+      level: "high",
+      domain: "dataQuality",
+      title: "تسجيل اللبن غير مكتمل",
+      evidence: [`${missingMilkCount} حيوان بلا تسجيل لبن مباشر من أصل ${pointsCount}`],
+      interpretation: "التقرير يصلح للمتابعة، لكنه لا يصلح كحكم إنتاجي نهائي قبل اكتمال التسجيل.",
+      action: "راجع إدخال اللبن أو ملف الاستيراد قبل اتخاذ قرار على مستوى المجموعة.",
+      confidence: "high"
+    });
+  }
+
+  if (thiSeverity >= 2) {
+    const milkDrop = Number.isFinite(dayDeltaPct) && dayDeltaPct <= -3;
+
+    add("heatStress", {
+      level: thiSeverity >= 3 ? "high" : "medium",
+      domain: "heatStress",
+      title: thiSeverity >= 3 ? "ضغط حراري مؤثر محتمل" : "مراقبة تأثير THI على اللبن",
+      evidence: [
+        Number.isFinite(thiValue) ? `THI = ${thiValue}` : "",
+        `تصنيف THI: ${thiLabel}`,
+        Number.isFinite(dayDeltaPct) ? `تغير اللبن ${milkReportDisplayPctSrv(dayDeltaPct)}` : ""
+      ],
+      interpretation: milkDrop
+        ? "ارتفاع THI مع انخفاض اللبن يجعل الإجهاد الحراري احتمالًا تشغيليًا مهمًا."
+        : "THI مرتفع، لكنه لا يكفي وحده لإثبات سبب انخفاض اللبن بدون نمط إنتاجي واضح.",
+      action: "ابدأ بالتهوية، الرش/التبريد، مياه الشرب، تقليل وقت الانتظار قبل الحلب، وتقديم العليقة في الأوقات الأبرد.",
+      confidence: milkDrop ? "high" : "medium"
+    });
+
+    if (thiSeverity >= 3) {
+      add("priority", {
+        level: "high",
+        domain: "heatStress",
+        title: "الأولوية الأولى: التبريد والمياه",
+        evidence: [
+          Number.isFinite(thiValue) ? `THI = ${thiValue}` : "",
+          `الحالة: ${thiLabel}`
+        ],
+        interpretation: "رفع المركزات أثناء الإجهاد الحراري قبل ضبط التبريد والمياه قد يزيد ضغط الكرش.",
+        action: "ابدأ بالتبريد والمياه وتقليل وقت الانتظار، ثم افتح تقرير التغذية لمراجعة المادة الجافة وNDF والنشا.",
+        confidence: "high"
+      });
+    }
+  }
+
+  for (const g of watchGroups.slice(0, 3)) {
+    add("production", {
+      level: "high",
+      domain: "production",
+      title: `متابعة مجموعة ${g.groupName}`,
+      evidence: [
+        `متوسط المجموعة ${g.avgMilkText || "—"}`,
+        `إجمالي اللبن ${g.totalMilkText || "—"}`,
+        `متوسط أيام الحليب ${g.avgDaysInMilkText || "غير متاح"}`,
+        g.reading || ""
+      ],
+      interpretation: "المشكلة تظهر على مستوى مجموعة، لذلك تُراجع كتشغيل مجموعة قبل اعتبارها حالات فردية فقط.",
+      action: "راجع اكتمال التسجيل، المأكول، البواقي، المياه، الراحة، الزحام، ثم افحص الأفراد الأقل إنتاجًا.",
+      confidence: "medium"
+    });
+  }
+
+  for (const g of freshGroups.slice(0, 2)) {
+    add("transition", {
+      level: String(g.statusType || "") === "warn" ? "high" : "medium",
+      domain: "transition",
+      title: `متابعة حديث الولادة في ${g.groupName}`,
+      evidence: [
+        `متوسط المجموعة ${g.avgMilkText || "—"}`,
+        `متوسط أيام الحليب ${g.avgDaysInMilkText || "غير متاح"}`,
+        `${g.milkersCount || 0} حلّاب`
+      ],
+      interpretation: "حديث الولادة لا يُفسر مثل نهاية الموسم؛ الأولوية للصحة والانتقال والمأكول.",
+      action: "راجع الشهية، الكيتوزس، التهاب الرحم، الحرارة، بواقي العليقة، الزحام، ومياه الشرب قبل تعديل التركيبة.",
+      confidence: String(g.statusType || "") === "warn" ? "high" : "medium"
+    });
+  }
+
+  if (!Number.isFinite(totalFeedCost) || totalFeedCost <= 0) {
+    add("nutrition", {
+      level: "medium",
+      domain: "nutrition",
+      title: "لا توجد بيانات تغذية كافية لقرار اقتصادي",
+      evidence: ["تكلفة التغذية اليومية غير متاحة"],
+      interpretation: "لا يصح الحكم على كفاءة اللبن/العلف بدون عليقة محفوظة وتكلفة واضحة.",
+      action: "احفظ عليقة الحلاب أو آخر عليقة فعالة للمجموعة، ثم راجع تقرير التغذية قبل تعديل التركيبة.",
+      confidence: "high"
+    });
+  } else if (weakestGroup?.groupName) {
+    add("nutrition", {
+      level: "medium",
+      domain: "nutrition",
+      title: `مراجعة اقتصاد اللبن/العلف في ${weakestGroup.groupName}`,
+      evidence: [
+        weakestGroup.costPerKgMilk != null ? `تكلفة كجم اللبن ${milkReportDisplayMoneySrv(weakestGroup.costPerKgMilk)} / كجم` : "",
+        weakestGroup.marginPerHead != null ? `الهامش/رأس ${milkReportDisplayMoneySrv(weakestGroup.marginPerHead)}` : "",
+        weakestGroup.feedEventDate ? `آخر عليقة ${weakestGroup.feedEventDate}` : ""
+      ],
+      interpretation: "الأولوية ليست رفع العليقة مباشرة، بل مراجعة المأكول والبواقي والفرز وتكلفة التركيبة.",
+      action: "افتح تقرير التغذية لهذه المجموعة وراجع المادة الجافة، NDF، النشا، الدهون، البواقي، ودفع العلف.",
+      confidence: "medium"
+    });
+  } else if (Number.isFinite(costPerKgMilk) && costPerKgMilk > 0) {
+    add("nutrition", {
+      level: "low",
+      domain: "nutrition",
+      title: "متابعة تكلفة كجم اللبن",
+      evidence: [`متوسط تكلفة كجم اللبن ${milkReportDisplayMoneySrv(costPerKgMilk)} / كجم`],
+      interpretation: "الاقتصاد متاح، لكن لا توجد مجموعة أضعف واضحة من السيرفر.",
+      action: "استمر في مقارنة تكلفة كجم اللبن بين المجموعات عند توفر علائق منفصلة.",
+      confidence: "medium"
+    });
+  }
+
+  if (watchAnimals.length) {
+    add("individualAnimals", {
+      level: watchAnimals.length >= 5 ? "high" : "medium",
+      domain: "individualAnimals",
+      title: "حيوانات تحتاج متابعة فردية",
+      evidence: watchAnimals.slice(0, 5).map(a => {
+        const number = a.animalNumber || a.number || "—";
+        const milk = a.milkText || milkReportDisplayKgSrv(a.milkKg ?? a.kg);
+        return `#${number} ${milk}`;
+      }),
+      interpretation: "الانخفاض الفردي لا يعني مشكلة عليقة عامة إلا إذا تكرر داخل نفس المجموعة.",
+      action: "ابدأ بفحص الضرع، العرج، الحرارة، الشهية، وموعد آخر حلب للحيوانات الأكثر انخفاضًا.",
+      confidence: "medium"
+    });
+  }
+
+  if (!out.priority.length) {
+    if (watchGroups.length) {
+      const g = watchGroups[0];
+
+      add("priority", {
+        level: "high",
+        domain: "production",
+        title: `الأولوية الأولى: ${g.groupName}`,
+        evidence: [
+          `حالة المجموعة: ${g.status || "تحتاج متابعة"}`,
+          `متوسط المجموعة ${g.avgMilkText || "—"}`
+        ],
+        interpretation: "أضعف مجموعة في التقرير هي نقطة البداية قبل التوسع لباقي القطيع.",
+        action: "ابدأ بجودة التسجيل، ثم تشغيل المجموعة، ثم الأفراد.",
+        confidence: "medium"
+      });
+    } else {
+      add("priority", {
+        level: "low",
+        domain: "routine",
+        title: "لا توجد أولوية حرجة واضحة اليوم",
+        evidence: ["لا توجد مجموعات مصنفة كتحذير من السيرفر"],
+        interpretation: "التقرير أقرب للمتابعة الدورية بشرط اكتمال التسجيل.",
+        action: "استمر في متابعة التسجيل اليومي ومقارنة المجموعات مع أيام الحليب.",
+        confidence: "medium"
+      });
+    }
+  }
+
+  out.whatToReview = [
+    ...out.dataQuality,
+    ...out.production,
+    ...out.nutrition,
+    ...out.heatStress
+  ].slice(0, 5).map(asLine);
+
+  out.followUpPriority = out.priority.slice(0, 5).map(asLine);
+
+  out.murabbikDecision = [
+    ...out.transition,
+    ...out.individualAnimals
+  ].slice(0, 5).map(asLine);
+
+  return out;
+}
 function milkReportBuildConsultantReportSrv({
   req,
   smartReport = {},
@@ -23954,44 +24213,16 @@ function milkReportBuildConsultantReportSrv({
 
     groups,
 
-    recommendations: {
-      priority: [
-        ...((groups || []).filter(g => g.statusType === "warn").slice(0, 1).map(g =>
-          `الأولوية الأولى إنتاجيًا: ${g.groupName}. الدليل: ${g.status || "تحتاج متابعة"} ومتوسط المجموعة ${g.avgMilkText || "—"}.`
-        ))
-      ],
+       groups,
 
-      production: (groups || [])
-        .filter(g => g.statusType === "warn")
-        .map(g =>
-          `متابعة ${g.groupName}: متوسط المجموعة ${g.avgMilkText || "—"}، إجمالي اللبن ${g.totalMilkText || "—"}، ومتوسط أيام الحليب ${g.avgDaysInMilkText || "غير متاح"}. راجع التسجيل، المأكول، المياه، الراحة، الزحام، ثم الأفراد الأقل إنتاجًا.`
-        ),
-
-      nutrition: Number(economicTotals.totalFeedCost || 0) > 0
-        ? [
-            `اقتصاد اللبن/العلف متاح: تكلفة التغذية اليومية ${milkReportDisplayMoneySrv(economicTotals.totalFeedCost)}، وتكلفة كجم اللبن ${milkReportDisplayMoneySrv(economicTotals.costPerKgMilk)} / كجم. لا تغيّر الخلطة من تقرير اللبن وحده؛ افتح تقرير التغذية للمجموعة الأعلى تكلفة أو الأقل كفاءة.`
-          ]
-        : [
-            "لا توجد بيانات تغذية كافية لقرار اقتصادي. احفظ عليقة الحلاب أو آخر عليقة فعالة للمجموعة حتى يربط تقرير اللبن الإنتاج بتكلفة التغذية."
-          ],
-
-      transition: (groups || [])
-        .filter(g => String(g.groupName || "").includes("حديث"))
-        .map(g =>
-          `حديث الولادة في ${g.groupName}: متوسط المجموعة ${g.avgMilkText || "—"} ومتوسط أيام الحليب ${g.avgDaysInMilkText || "غير متاح"}. لا يُفسر مثل نهاية الموسم؛ راجع الشهية، الكيتوزس، التهاب الرحم، الحرارة، بواقي العليقة، الزحام، ومياه الشرب.`
-        ),
-
-      heatStress: Number(weatherThiCache?.data?.status?.severity || 0) >= 2
-        ? [
-            `THI اليوم ${weatherThiCache?.data?.thi ?? "غير متاح"} (${weatherThiCache?.data?.status?.label || "غير متاح"}). عند ارتفاع THI ابدأ بالتهوية، الرش/التبريد، مياه الشرب، تقليل وقت الانتظار قبل الحلب، وتقديم العليقة في الساعات الأبرد قبل رفع المركزات.`
-          ]
-        : [],
-
-      individualAnimals: (smartReport.dropAnimals || [])
-        .slice(0, 5)
-        .map(a =>
-          `الحيوان #${a.number || "—"} انخفض إلى ${a.kg ?? "—"} كجم. افحص الضرع، العرج، الحرارة، الشهية، وموعد آخر حلب قبل اعتباره مشكلة عليقة.`
-        ),
+    recommendations: milkReportBuildRecommendationEngineV2Srv({
+      smartReport,
+      groups,
+      points,
+      skippedNoCalving,
+      economicTotals,
+      thi
+    }),
 
       dataQuality: milkReportBuildDataQualityNotesSrv({
         points,
@@ -24505,9 +24736,9 @@ const groupsSummary = milkReportAddEconomicsToGroupsSrv(
       reportDate,
       requestedDate,
       selectedTypeLabel,
-      economicTotals
+      economicTotals,
+      thi: milkReportThi
     });
-
     return res.json({
       ok: true,
       message,
