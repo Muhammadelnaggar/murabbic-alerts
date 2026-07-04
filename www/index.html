@@ -291,7 +291,7 @@
   </div>
    <div id="installBox" class="install-box" hidden>
     <button id="installBtn" class="install-btn" type="button">تثبيت مُرَبِّيك</button>
-    <div class="install-note">اضغط مرة واحدة لتثبيت التطبيق على الموبايل</div>
+    <div class="install-note">اضغط مرة واحدة لتثبيت التطبيق على جهازك</div>
   </div>
  <script>
   let deferredInstallPrompt = null;
@@ -301,6 +301,57 @@
   const installBox = document.getElementById('installBox');
   const installBtn = document.getElementById('installBtn');
   const installNote = installBox ? installBox.querySelector('.install-note') : null;
+   function mbkInstallDeviceText(state = 'ready'){
+  const ua = String(navigator.userAgent || '').toLowerCase();
+  const platform = String(navigator.platform || '').toLowerCase();
+  const touch = Number(navigator.maxTouchPoints || 0);
+
+  const isIpad =
+    ua.includes('ipad') ||
+    (platform.includes('mac') && touch > 1);
+
+  const isMobile =
+    /iphone|ipod|android.*mobile|windows phone/.test(ua);
+
+  const isTablet =
+    isIpad ||
+    ua.includes('tablet') ||
+    (ua.includes('android') && !ua.includes('mobile'));
+
+  const deviceText = isMobile
+    ? 'موبايلك'
+    : isTablet
+      ? 'التابلت'
+      : 'الكمبيوتر';
+
+  const openText = isMobile || isTablet
+    ? 'الشاشة الرئيسية'
+    : 'سطح المكتب أو قائمة Start';
+
+  if (state === 'installed') {
+    return {
+      button: 'تم تثبيت مُرَبِّيك بنجاح',
+      note: `افتح مُرَبِّيك الآن من الأيقونة الجديدة على ${openText}.`
+    };
+  }
+
+  return {
+    button: `تثبيت مُرَبِّيك على ${deviceText}`,
+    note: `اضغط مرة واحدة لتثبيت التطبيق على ${deviceText}.`
+  };
+}
+
+function applyInstallDeviceText(state = 'ready'){
+  const t = mbkInstallDeviceText(state);
+
+  if (installBtn) {
+    installBtn.textContent = t.button;
+  }
+
+  if (installNote) {
+    installNote.textContent = t.note;
+  }
+}
 
   function isStandaloneApp(){
     return window.matchMedia('(display-mode: standalone)').matches ||
@@ -313,24 +364,26 @@
     }, delay);
   }
 
-  function showInstalledMessage(){
-    installDone = true;
+function showInstalledMessage(){
+  installDone = true;
 
-    if (installBox) {
-      installBox.hidden = false;
-    }
-
-    if (installBtn) {
-      installBtn.disabled = true;
-      installBtn.textContent = 'تم تثبيت مُرَبِّيك بنجاح';
-      installBtn.style.opacity = '0.9';
-      installBtn.style.cursor = 'default';
-    }
-
-    if (installNote) {
-      installNote.textContent = 'افتح مُرَبِّيك الآن من الأيقونة الجديدة على شاشة الموبايل';
-    }
+  if (installBox) {
+    installBox.hidden = false;
   }
+
+  const t = mbkInstallDeviceText('installed');
+
+  if (installBtn) {
+    installBtn.disabled = true;
+    installBtn.textContent = t.button;
+    installBtn.style.opacity = '0.9';
+    installBtn.style.cursor = 'default';
+  }
+
+  if (installNote) {
+    installNote.textContent = t.note;
+  }
+}
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
@@ -343,9 +396,11 @@
     deferredInstallPrompt = event;
     installPromptSeen = true;
 
-    if (installBox) {
-      installBox.hidden = false;
-    }
+    applyInstallDeviceText('ready');
+
+if (installBox) {
+  installBox.hidden = false;
+}
   });
 
   if (installBtn) {
