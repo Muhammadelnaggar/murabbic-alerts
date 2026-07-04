@@ -250,13 +250,13 @@ if (installBox) {
   });
 
  if (isStandaloneApp()) {
-  goLogin(8000);
+  goLogin(6000);
 } else {
   setTimeout(function () {
     if (!installPromptSeen && !installDone) {
       window.location.replace("login.html");
     }
-  }, 8000);
+  }, 6000);
 }
 </script>
 </body>
