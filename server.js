@@ -23954,19 +23954,54 @@ function milkReportBuildConsultantReportSrv({
 
     groups,
 
-   recommendations: {
-  priority: [],
-  production: [],
-  nutrition: [],
-  transition: [],
-  heatStress: [],
-  individualAnimals: [],
-  dataQuality: [],
+    recommendations: {
+      priority: [
+        ...((groups || []).filter(g => g.statusType === "warn").slice(0, 1).map(g =>
+          `الأولوية الأولى إنتاجيًا: ${g.groupName}. الدليل: ${g.status || "تحتاج متابعة"} ومتوسط المجموعة ${g.avgMilkText || "—"}.`
+        ))
+      ],
 
-  whatToReview: [],
-  followUpPriority: [],
-  murabbikDecision: []
-}
+      production: (groups || [])
+        .filter(g => g.statusType === "warn")
+        .map(g =>
+          `متابعة ${g.groupName}: متوسط المجموعة ${g.avgMilkText || "—"}، إجمالي اللبن ${g.totalMilkText || "—"}، ومتوسط أيام الحليب ${g.avgDaysInMilkText || "غير متاح"}. راجع التسجيل، المأكول، المياه، الراحة، الزحام، ثم الأفراد الأقل إنتاجًا.`
+        ),
+
+      nutrition: Number(economicTotals.totalFeedCost || 0) > 0
+        ? [
+            `اقتصاد اللبن/العلف متاح: تكلفة التغذية اليومية ${milkReportDisplayMoneySrv(economicTotals.totalFeedCost)}، وتكلفة كجم اللبن ${milkReportDisplayMoneySrv(economicTotals.costPerKgMilk)} / كجم. لا تغيّر الخلطة من تقرير اللبن وحده؛ افتح تقرير التغذية للمجموعة الأعلى تكلفة أو الأقل كفاءة.`
+          ]
+        : [
+            "لا توجد بيانات تغذية كافية لقرار اقتصادي. احفظ عليقة الحلاب أو آخر عليقة فعالة للمجموعة حتى يربط تقرير اللبن الإنتاج بتكلفة التغذية."
+          ],
+
+      transition: (groups || [])
+        .filter(g => String(g.groupName || "").includes("حديث"))
+        .map(g =>
+          `حديث الولادة في ${g.groupName}: متوسط المجموعة ${g.avgMilkText || "—"} ومتوسط أيام الحليب ${g.avgDaysInMilkText || "غير متاح"}. لا يُفسر مثل نهاية الموسم؛ راجع الشهية، الكيتوزس، التهاب الرحم، الحرارة، بواقي العليقة، الزحام، ومياه الشرب.`
+        ),
+
+      heatStress: Number(weatherThiCache?.data?.status?.severity || 0) >= 2
+        ? [
+            `THI اليوم ${weatherThiCache?.data?.thi ?? "غير متاح"} (${weatherThiCache?.data?.status?.label || "غير متاح"}). عند ارتفاع THI ابدأ بالتهوية، الرش/التبريد، مياه الشرب، تقليل وقت الانتظار قبل الحلب، وتقديم العليقة في الساعات الأبرد قبل رفع المركزات.`
+          ]
+        : [],
+
+      individualAnimals: (smartReport.dropAnimals || [])
+        .slice(0, 5)
+        .map(a =>
+          `الحيوان #${a.number || "—"} انخفض إلى ${a.kg ?? "—"} كجم. افحص الضرع، العرج، الحرارة، الشهية، وموعد آخر حلب قبل اعتباره مشكلة عليقة.`
+        ),
+
+      dataQuality: milkReportBuildDataQualityNotesSrv({
+        points,
+        skippedNoCalving
+      }),
+
+      whatToReview: smartReport.strengths || [],
+      followUpPriority: smartReport.watchPoints || [],
+      murabbikDecision: smartReport.murabbikGuidance || []
+    },
 
     dataQualityNotes: milkReportBuildDataQualityNotesSrv({
       points,
