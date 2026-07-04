@@ -23865,7 +23865,8 @@ function milkReportBuildConsultantReportSrv({
   reportDate = "",
   requestedDate = "",
   selectedTypeLabel = "الكل",
-  economicTotals = {}
+  economicTotals = {},
+  thi = null
 } = {}) {
   const farmName =
     req?.authSession?.user?.farmName ||
@@ -23953,11 +23954,19 @@ function milkReportBuildConsultantReportSrv({
 
     groups,
 
-    recommendations: {
-      whatToReview: smartReport.strengths || [],
-      followUpPriority: smartReport.watchPoints || [],
-      murabbikDecision: smartReport.murabbikGuidance || []
-    },
+   recommendations: {
+  priority: [],
+  production: [],
+  nutrition: [],
+  transition: [],
+  heatStress: [],
+  individualAnimals: [],
+  dataQuality: [],
+
+  whatToReview: [],
+  followUpPriority: [],
+  murabbikDecision: []
+}
 
     dataQualityNotes: milkReportBuildDataQualityNotesSrv({
       points,
@@ -23973,11 +23982,15 @@ function milkReportBuildSmartReportSrv({
   reportDate = "",
   feedCostPerKg = null,
   feedCostTotal = 0,
-  activeAnimalsCount = 0
+  activeAnimalsCount = 0,
+  thi = null
 } = {}) {
   const totalKg = milkReportRoundSrv(day.all || 0, 1);
   const prevKg = milkReportRoundSrv(prev.all || 0, 1);
   const dayDeltaPct = milkReportDeltaPctSrv(totalKg, prevKg);
+  const thiValue = Number(thi?.thi);
+  const thiSeverity = Number(thi?.status?.severity || 0);
+  const thiLabel = thi?.status?.label || "غير متاح";
   const totalMilkers = groupsSummary.reduce((sum, g) => sum + Number(g.milkersCount || 0), 0);
   const avgHerdKg = totalMilkers ? milkReportRoundSrv(totalKg / totalMilkers, 1) : null;
 
@@ -24067,22 +24080,40 @@ if (watchGroups.length) {
       watchPoints.push("لا توجد مؤشرات سلبية واضحة في قراءة اللبن لهذا اليوم.");
     }
 
-    if (dropAnimals.length) {
-      murabbikGuidance.push("ابدأ بمراجعة الحيوانات ذات الانخفاض الفردي قبل الحكم على المجموعة كلها: افحص الشهية، الضرع، العرج، والحرارة.");
+    if (thiSeverity >= 2) {
+      murabbikGuidance.push(
+        `THI اليوم ${Number.isFinite(thiValue) ? thiValue : "غير متاح"} (${thiLabel}). عند ارتفاع THI لا تبدأ برفع المركزات؛ ابدأ بمراجعة التهوية، الرش/التبريد، مياه الشرب، وقت الانتظار قبل الحلب، وتقديم العليقة في الساعات الأبرد.`
+      );
     }
 
     if (watchGroups.length) {
-      murabbikGuidance.push(`راجع إدارة مجموعة ${watchGroups[0].groupName} أولًا: عدد الحلاب، المأكول، الراحة، وسجل الأمراض الأخيرة.`);
+      const g = watchGroups[0];
+
+      murabbikGuidance.push(
+        `الأولوية الأولى: مجموعة ${g.groupName}. الدليل: حالة المجموعة ${g.status || "تحتاج متابعة"} ومتوسطها ${g.avgKg ?? "—"} كجم/رأس. ابدأ بجودة التسجيل، ثم المأكول والبواقي والمياه والراحة، ثم افحص الأفراد المنخفضة داخل المجموعة.`
+      );
+    }
+
+    if (dropAnimals.length) {
+      murabbikGuidance.push(
+        `يوجد انخفاض فردي في ${dropAnimals.length} حيوان/حيوانات. لا تعتبرها مشكلة عليقة عامة إلا إذا تكررت داخل نفس المجموعة؛ ابدأ بفحص الضرع، العرج، الحرارة، الشهية، وموعد آخر حلب للحيوانات: ${dropAnimals.slice(0, 3).map(a => `#${a.number}`).join("، ")}.`
+      );
     }
 
     if (dayDeltaPct != null && dayDeltaPct <= -5 && !dropAnimals.length) {
-      murabbikGuidance.push("الانخفاض يبدو عامًا أكثر من كونه فرديًا؛ راجع الحرارة، المياه، توقيت الحلب، وبقايا العليقة قبل تعديل التركيبة.");
+      murabbikGuidance.push(
+        `الانخفاض اليومي ${dayDeltaPct.toFixed(1)}% يبدو جماعيًا أكثر من كونه فرديًا. راجع THI، المياه، وقت الانتظار قبل الحلب، انتظام الحلب، وبواقي العليقة قبل تعديل التركيبة.`
+      );
     }
 
     if (feedCostPerKg) {
-      murabbikGuidance.push(`اربط قراءة اللبن بتقرير التغذية: تكلفة كجم اللبن اليوم ${feedCostPerKg} ج.م/كجم من إجمالي تكلفة ${Math.round(Number(feedCostTotal || 0))} ج.م.`);
+      murabbikGuidance.push(
+        `اقتصاد اللبن/العلف متاح: تكلفة كجم اللبن من التغذية ${feedCostPerKg} ج.م/كجم. لا تغيّر الخلطة من تقرير اللبن وحده؛ افتح تقرير التغذية وابدأ بالمجموعة الأعلى تكلفة أو الأقل كفاءة.`
+      );
     } else {
-     murabbikGuidance.push("لإكمال التحليل الاقتصادي للبن، سجّل عليقة تغذية واحدة للمجموعة؛ وسيستخدم تقرير اللبن آخر عليقة محفوظة حتى تاريخ التقرير.");
+      murabbikGuidance.push(
+        "لا توجد بيانات تغذية كافية لقرار اقتصادي. احفظ عليقة الحلاب أو آخر عليقة فعالة للمجموعة حتى يربط تقرير اللبن الإنتاج بتكلفة التغذية."
+      );
     }
   }
 
@@ -24167,6 +24198,7 @@ const [allEvents, animals, thresholds] = await Promise.all([
   milkReportFetchUserAnimalsSrv(uid),
   loadGroupThresholdsSrv(uid)
 ]);
+ const milkReportThi = weatherThiCache?.data || null;   
 
 const animalsByNumber = new Map();
 for (const a of animals) {
@@ -24425,7 +24457,8 @@ const groupsSummary = milkReportAddEconomicsToGroupsSrv(
       reportDate,
       feedCostPerKg: reportFeedCostPerKg,
       feedCostTotal: economicTotals.totalFeedCost,
-      activeAnimalsCount: activeAnimals.length
+      activeAnimalsCount: activeAnimals.length,
+      thi: milkReportThi
     });
 
     const consultantReport = milkReportBuildConsultantReportSrv({
