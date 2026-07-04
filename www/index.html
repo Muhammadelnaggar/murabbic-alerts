@@ -21,213 +21,37 @@
 
     *{box-sizing:border-box}
 
-    body{
-      margin:0;
-      min-height:100vh;
-      overflow:hidden;
-      font-family:'Cairo',Tahoma,sans-serif;
-      background:linear-gradient(180deg,var(--sky) 0%,#f8ffe8 42%,#d8f0c8 43%,#0b7f47 100%);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      position:relative;
-    }
+   body{
+  margin:0;
+  min-height:100vh;
+  overflow:hidden;
+  font-family:'Cairo',Tahoma,sans-serif;
+  background:#f4faf6;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+}
 
-    .farm-scene{
-      position:absolute;
-      inset:0;
-      overflow:hidden;
-      pointer-events:none;
-    }
+.splash-art{
+  position:fixed;
+  inset:0;
+  z-index:1;
+  overflow:hidden;
+  background:#f4faf6;
+}
 
-    .sun{
-      position:absolute;
-      width:108px;
-      height:108px;
-      top:8%;
-      left:10%;
-      border-radius:50%;
-      background:radial-gradient(circle,#fff6bd 0%,#ffd36d 65%,rgba(255,211,109,.10) 100%);
-      box-shadow:0 0 55px rgba(255,190,70,.45);
-    }
+.splash-art picture,
+.splash-art img{
+  display:block;
+  width:100%;
+  height:100%;
+}
 
-    .horizon{
-      position:absolute;
-      left:-10%;
-      right:-10%;
-      bottom:30%;
-      height:26%;
-      background:
-        linear-gradient(135deg, rgba(255,255,255,.20) 0 2px, transparent 2px 42px),
-        linear-gradient(180deg,#65bd72,#14854f);
-      border-radius:55% 55% 0 0 / 24% 24% 0 0;
-    }
-
-    .barn{
-      position:absolute;
-      right:9%;
-      bottom:37%;
-      width:92px;
-      height:64px;
-      background:#8b3f2f;
-      border-radius:8px 8px 4px 4px;
-      opacity:.22;
-    }
-
-    .barn::before{
-      content:"";
-      position:absolute;
-      right:0;
-      left:0;
-      top:-34px;
-      margin:auto;
-      width:76px;
-      height:76px;
-      background:#8b3f2f;
-      transform:rotate(45deg);
-      border-radius:6px;
-    }
-
-    .barn::after{
-      content:"";
-      position:absolute;
-      left:50%;
-      bottom:0;
-      width:30px;
-      height:38px;
-      transform:translateX(-50%);
-      background:rgba(255,255,255,.28);
-      border-radius:8px 8px 0 0;
-    }
-
-    .fence{
-      position:absolute;
-      left:5%;
-      right:5%;
-      bottom:29%;
-      height:30px;
-      border-top:4px solid rgba(122,90,50,.35);
-      border-bottom:4px solid rgba(122,90,50,.30);
-    }
-
-    .fence::before{
-      content:"";
-      position:absolute;
-      inset:-15px 0 0 0;
-      background:repeating-linear-gradient(
-        90deg,
-        rgba(122,90,50,.36) 0 5px,
-        transparent 5px 70px
-      );
-    }
-
-    .symbol-splash{
-      position:relative;
-      z-index:2;
-      width:min(92vw,360px);
-      height:360px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-    }
-
-    .symbol-splash::before{
-      content:"";
-      position:absolute;
-      inset:52px;
-      border:1px dashed rgba(6,79,49,.25);
-      border-radius:50%;
-      animation:slowSpin 18s linear infinite;
-    }
-
-    .symbol-splash::after{
-      content:"";
-      position:absolute;
-      width:210px;
-      height:210px;
-      border-radius:50%;
-      background:rgba(255,255,255,.42);
-      box-shadow:0 22px 55px rgba(11,79,49,.20);
-      z-index:-1;
-    }
-
-    .splash-logo{
-      width:150px;
-      max-width:58%;
-      height:auto;
-      object-fit:contain;
-      display:block;
-      animation:logoRise .9s ease forwards;
-    }
-
-    .splash-symbol{
-      position:absolute;
-      color:var(--green-dark);
-      font-size:29px;
-      font-weight:900;
-      line-height:1;
-      text-shadow:0 8px 20px rgba(6,79,49,.18);
-      animation:symbolFloat 2.8s ease-in-out infinite alternate;
-      user-select:none;
-    }
-
-    .s-ai{top:22px;left:50%;transform:translateX(-50%)}
-    .s-record{top:78px;right:42px}
-    .s-alert{bottom:78px;right:42px}
-    .s-report{bottom:22px;left:50%;transform:translateX(-50%)}
-    .s-cow{bottom:78px;left:42px}
-    .s-buffalo{top:78px;left:42px}
-    .s-profit{top:50%;right:12px;transform:translateY(-50%)}
-
-    @keyframes logoRise{
-      from{transform:translateY(14px);opacity:0}
-      to{transform:translateY(0);opacity:1}
-    }
-
-    @keyframes symbolFloat{
-      from{margin-top:0}
-      to{margin-top:-8px}
-    }
-
-    @keyframes slowSpin{
-      to{transform:rotate(360deg)}
-    }
-
-    @media(max-width:480px){
-      .symbol-splash{
-        width:320px;
-        height:320px;
-      }
-
-      .symbol-splash::before{
-        inset:46px;
-      }
-
-      .symbol-splash::after{
-        width:190px;
-        height:190px;
-      }
-
-      .splash-logo{
-        width:138px;
-      }
-
-      .splash-symbol{
-        font-size:25px;
-      }
-
-      .s-record{right:34px}
-      .s-alert{right:34px}
-      .s-cow{left:34px}
-      .s-buffalo{left:34px}
-
-      .sun{
-        width:86px;
-        height:86px;
-        top:8%;
-        left:7%;
-      }
-    }
+.splash-art img{
+  object-fit:cover;
+  object-position:center;
+}
     .install-box{
   position:fixed;
   left:18px;
@@ -271,24 +95,12 @@
 
 <body>
 
-  <div class="farm-scene" aria-hidden="true">
-    <span class="sun"></span>
-    <span class="horizon"></span>
-    <span class="barn"></span>
-    <span class="fence"></span>
-  </div>
-
-  <div class="symbol-splash" aria-label="مُرَبِّيك">
-    <img src="images/logo.png" alt="مُرَبِّيك" class="splash-logo">
-
-    <span class="splash-symbol s-ai" title="الذكاء الصناعي">AI</span>
-    <span class="splash-symbol s-record" title="التسجيل">✓</span>
-    <span class="splash-symbol s-alert" title="التنبيهات">!</span>
-    <span class="splash-symbol s-report" title="التقارير">▦</span>
-    <span class="splash-symbol s-cow" title="الأبقار">🐄</span>
-    <span class="splash-symbol s-buffalo" title="الجاموس">🐃</span>
-    <span class="splash-symbol s-profit" title="الأرباح">↗</span>
-  </div>
+ <div class="splash-art" aria-label="مُرَبِّيك">
+  <picture>
+    <source media="(min-width: 768px)" srcset="/images/murabbik-splash-desktop.png">
+    <img src="/images/murabbik-splash-mobile.png" alt="مُرَبِّيك — إدارة ذكية للقطيع والإنتاج">
+  </picture>
+</div>
    <div id="installBox" class="install-box" hidden>
     <button id="installBtn" class="install-btn" type="button">تثبيت مُرَبِّيك</button>
     <div class="install-note">اضغط مرة واحدة لتثبيت التطبيق على جهازك</div>
