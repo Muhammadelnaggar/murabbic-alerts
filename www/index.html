@@ -52,13 +52,7 @@
   object-fit:cover;
   object-position:center;
 }
- @media(max-width:767px){
-  .splash-art img{
-    object-fit:contain;
-    object-position:center;
-    background:#f4faf6;
-  }
-}
+
     .install-box{
   position:fixed;
   left:18px;
@@ -255,15 +249,15 @@ if (installBox) {
     showInstalledMessage();
   });
 
-  if (isStandaloneApp()) {
-    goLogin(1200);
-  } else {
-   setTimeout(function () {
-  if (!installPromptSeen && !installDone) {
-    goLogin(8000);
-  }
-}, 4000);
-  }
+ if (isStandaloneApp()) {
+  goLogin(8000);
+} else {
+  setTimeout(function () {
+    if (!installPromptSeen && !installDone) {
+      window.location.replace("login.html");
+    }
+  }, 8000);
+}
 </script>
 </body>
 </html>
