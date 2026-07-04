@@ -16980,19 +16980,46 @@ async function dehorningEvaluateManySrv(uid, numbers = [], eventDate = "") {
 }
 
 function dehorningGateMessageSrv(accepted = [], rejected = []) {
-  if (accepted.length && rejected.length) {
-    return `✅ مؤهل للتسجيل: ${accepted.length}. غير مؤهل: ${rejected.length}.`;
+  const safeAccepted = Array.isArray(accepted) ? accepted : [];
+  const safeRejected = Array.isArray(rejected) ? rejected : [];
+
+  const rejectedLines = safeRejected.slice(0, 8).map(r => {
+    const n = String(r.animalNumber || r.number || r.calfNumber || "").trim() || "—";
+    const reason = String(r.reason || "غير مؤهل لتسجيل إزالة القرون.").trim();
+    return `رقم ${n}: ${reason}`;
+  });
+
+  if (safeRejected.length > 8) {
+    rejectedLines.push(`… وعدد ${safeRejected.length - 8} أرقام أخرى.`);
   }
 
-  if (accepted.length) {
-    return accepted.length === 1
+  if (safeAccepted.length && safeRejected.length) {
+    return [
+      `✅ مؤهل لتسجيل إزالة القرون: ${safeAccepted.length}.`,
+      `❌ غير مؤهل: ${safeRejected.length}.`,
+      ...rejectedLines
+    ].join("\n");
+  }
+
+  if (safeAccepted.length) {
+    return safeAccepted.length === 1
       ? "✅ العجل مؤهل لتسجيل إزالة القرون."
-      : `✅ عدد ${accepted.length} عجول مؤهلة لتسجيل إزالة القرون.`;
+      : `✅ عدد ${safeAccepted.length} عجول مؤهلة لتسجيل إزالة القرون.`;
+  }
+
+  if (safeRejected.length === 1) {
+    return rejectedLines[0] ? `❌ ${rejectedLines[0]}` : "❌ العجل غير مؤهل لتسجيل إزالة القرون.";
+  }
+
+  if (safeRejected.length > 1) {
+    return [
+      "❌ لا توجد أرقام مؤهلة لتسجيل إزالة القرون.",
+      ...rejectedLines
+    ].join("\n");
   }
 
   return "❌ لا توجد أرقام مؤهلة لتسجيل إزالة القرون.";
 }
-
 function dehorningSaveMessageSrv(saved = []) {
   if (saved.length === 1) {
     return "✅ تم تسجيل إزالة القرون بنجاح.";
