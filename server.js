@@ -25279,15 +25279,24 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
   reportDate
 );
 
-      const hasEconomics = !!latestNutrition;
+      const hasEconomics =
+        !!latestNutrition &&
+        groupRecordedCount > 0 &&
+        Number(groupMilkKg || 0) > 0;
 
       const milkPrice = hasEconomics ? milkPriceUsed : null;
+
       const feedCostPerHeadPerDay = hasEconomics
         ? money(latestNutrition.feedCostPerHeadPerDay)
         : null;
 
+      // مهم:
+      // اقتصاد كجم اللبن يُحسب على الحيوانات التي لها لبن مسجل فقط،
+      // لأن حيوانًا قد يفوت الحلب أو لا يُسجل لبنه في هذا اليوم.
+      const economicHeadsCount = hasEconomics ? groupRecordedCount : 0;
+
       const feedCost = hasEconomics
-        ? money(Number(feedCostPerHeadPerDay || 0) * members.length)
+        ? money(Number(feedCostPerHeadPerDay || 0) * economicHeadsCount)
         : null;
 
       const milkIncome = hasEconomics
@@ -25403,6 +25412,12 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
           milkPriceUsed: milkPrice,
           milkPriceSource: hasEconomics ? "report_input" : null,
           feedCostPerHeadPerDay,
+          economicHeadsCount,
+          milkRecordedCount: groupRecordedCount,
+          milkExpectedCount: members.length,
+          milkMissingCount: groupMissingCount,
+          recordingRate:
+            members.length > 0 ? round((groupRecordedCount / members.length) * 100, 1) : null,
           milkIncome,
           feedCost,
           otherOperatingCostRate: OTHER_COST_RATE,
@@ -25421,8 +25436,8 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
         murabbik: {
           evidence: [
             groupDeltaPct != null ? `التغير ${groupDeltaPct}%` : "",
-            avgDim != null ? `DIM ${avgDim}` : "",
-            avgDcc != null ? `DCC ${avgDcc}` : "",
+            avgDim != null ? `أيام الحليب ${avgDim}` : "",
+            avgDcc != null ? `أيام الحمل ${avgDcc}` : "",
             productionCostPerKgMilk != null ? `تكلفة الكجم ${productionCostPerKgMilk}` : ""
           ].filter(Boolean),
           action:
@@ -25430,7 +25445,7 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
               ? "راجع تكلفة العليقة والمأكول والبواقي لهذه المجموعة اليوم."
               : status === "watch"
                 ? "راجع المياه والتبريد وجودة التسجيل والحالات الفردية المنخفضة."
-                : "استمر في المتابعة وقارن الأداء بمرحلة DIM."
+                : "استمر في المتابعة وقارن الأداء بمرحلة أيام الحليب."
         }
       });
     }
