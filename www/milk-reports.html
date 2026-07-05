@@ -218,6 +218,8 @@
     .empty{padding:24px;text-align:center;color:var(--muted);font-weight:900;bacكجمround:white;border:1px dashed #cbd5e1;border-radius:18px}
     .footer-note{text-align:center;color:var(--muted);font-size:12px;font-weight:750;margin-top:18px}
 
+    .print-report-header{display:none}
+
     @media(max-width:980px){
       .hero-grid,.hero-summary,.grid-2,.group-list,.recommendations,.group-main,.group-econ,.kpi-row,.econ-row{grid-template-columns:1fr}
       .controls{width:100%}.field{flex:1 1 140px}.field input,.field select{width:100%;min-width:0}
@@ -225,21 +227,348 @@
       .chart svg{height:250px}.chart{min-height:250px}
     }
     @media print{
-      @page{size:A4;margin:10mm}
+      @page{size:A4 portrait;margin:12mm 10mm}
       *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      body{background:white!important;color:#000!important}
-      .topbar,.controls,.btn,.print-section-btn,.hero-print-row{display:none!important}
-      .wrap{width:100%!important;margin:0!important;padding:0!important}
-      #loading{display:none!important}
+      html,body{
+        background:#fff!important;
+        color:#111827!important;
+        font-family:Tahoma,Arial,sans-serif!important;
+        font-size:11pt!important;
+        line-height:1.45!important;
+      }
+      .topbar,.controls,.btn,.print-section-btn,.hero-print-row,#loading{display:none!important}
+      .wrap{
+        width:100%!important;
+        max-width:none!important;
+        margin:0!important;
+        padding:0!important;
+      }
       #report{display:block!important}
-      .card,.group-card,.hero,.rec,.scientific,.kpi-card,.econ-card{box-shadow:none!important;break-inside:avoid;page-break-inside:avoid}
-      .section{break-inside:avoid;page-break-inside:avoid;margin-top:14px}
-      .section-head{margin:14px 0 8px}
-      .hero{break-inside:avoid;page-break-inside:avoid}
-      .chart-card{min-height:auto}
-      .chart svg{height:180px}
+
+      .print-report-header{
+        display:flex!important;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:12px;
+        border:2px solid #0f766e;
+        border-radius:10px;
+        padding:10px 12px;
+        margin:0 0 10px 0;
+        background:#f0fdfa!important;
+        page-break-inside:avoid;
+      }
+      .print-report-header h1{
+        margin:0;
+        font-size:20pt;
+        color:#0f172a!important;
+        font-weight:950;
+      }
+      .print-report-header p{
+        margin:4px 0 0;
+        color:#334155!important;
+        font-size:10pt;
+        font-weight:800;
+      }
+      .print-meta{
+        min-width:170px;
+        text-align:left;
+        direction:rtl;
+        color:#334155!important;
+        font-size:9.5pt;
+        font-weight:800;
+        line-height:1.7;
+      }
+
       body[data-print-mode="section"] #report > [data-print-block]:not([data-print-active="1"]){display:none!important}
       body[data-print-mode="section"] #report > .footer-note{display:none!important}
+      body[data-print-mode="section"] .print-report-header{margin-bottom:12px!important}
+
+      .hero,.section,.card,.group-card,.rec,.scientific,.kpi-card,.econ-card{
+        box-shadow:none!important;
+        page-break-inside:avoid!important;
+        break-inside:avoid!important;
+      }
+
+      .hero{
+        border:1.5px solid #0f766e!important;
+        border-radius:10px!important;
+        padding:10px!important;
+        margin-bottom:10px!important;
+        background:#ffffff!important;
+        color:#111827!important;
+      }
+      .hero-grid{
+        display:grid!important;
+        grid-template-columns:1.5fr .7fr!important;
+        gap:8px!important;
+        align-items:stretch!important;
+      }
+      .hero h2{
+        font-size:18pt!important;
+        margin:0 0 4px!important;
+        color:#0f172a!important;
+      }
+      .hero-line{
+        font-size:11.5pt!important;
+        color:#334155!important;
+        margin-top:4px!important;
+      }
+      .hero-summary{
+        display:grid!important;
+        grid-template-columns:repeat(3,1fr)!important;
+        gap:6px!important;
+        margin-top:8px!important;
+      }
+      .hero-summary-card,.hero-panel{
+        border:1px solid #cbd5e1!important;
+        background:#f8fafc!important;
+        border-radius:8px!important;
+        padding:7px!important;
+      }
+      .hero-summary-card .hs-label,.hero-panel .label{
+        color:#475569!important;
+        font-size:8.5pt!important;
+        font-weight:900!important;
+      }
+      .hero-summary-card .hs-value,.hero-panel .value{
+        color:#0f172a!important;
+        font-size:14pt!important;
+        font-weight:950!important;
+        margin-top:3px!important;
+      }
+      .hero-summary-card .hs-sub,.hero-panel .sub{
+        color:#475569!important;
+        font-size:8.5pt!important;
+        margin-top:2px!important;
+      }
+
+      .notice.show{
+        display:block!important;
+        border:1px solid #f59e0b!important;
+        background:#fffbeb!important;
+        color:#92400e!important;
+        border-radius:8px!important;
+        padding:7px!important;
+        margin:8px 0!important;
+        font-size:9pt!important;
+      }
+
+      .section{
+        margin-top:10px!important;
+        padding-top:0!important;
+        border-top:1px solid #e5e7eb!important;
+      }
+      .section-head{
+        display:flex!important;
+        justify-content:space-between!important;
+        align-items:flex-end!important;
+        gap:8px!important;
+        margin:8px 0 6px!important;
+      }
+      .section-head h3{
+        font-size:15pt!important;
+        margin:0!important;
+        color:#0f172a!important;
+      }
+      .section-head p{
+        font-size:9pt!important;
+        margin:2px 0 0!important;
+        color:#475569!important;
+      }
+
+      .kpi-row,.econ-row{
+        display:grid!important;
+        grid-template-columns:repeat(3,1fr)!important;
+        gap:6px!important;
+      }
+      .kpi-card,.econ-card{
+        border:1px solid #cbd5e1!important;
+        border-radius:8px!important;
+        background:#ffffff!important;
+        padding:7px!important;
+      }
+      .kpi-card .k-label,.econ-card .e-label{
+        color:#475569!important;
+        font-size:8.5pt!important;
+        font-weight:900!important;
+      }
+      .kpi-card .k-value,.econ-card .e-value{
+        color:#0f172a!important;
+        font-size:14pt!important;
+        margin-top:3px!important;
+        font-weight:950!important;
+      }
+      .kpi-card .k-sub,.econ-card .e-sub{
+        color:#64748b!important;
+        font-size:8pt!important;
+        margin-top:2px!important;
+      }
+
+      .table-scroll{overflow:visible!important}
+      .report-table{
+        width:100%!important;
+        min-width:0!important;
+        border-collapse:collapse!important;
+        font-size:9pt!important;
+      }
+      .report-table th{
+        background:#f1f5f9!important;
+        color:#0f172a!important;
+        border:1px solid #cbd5e1!important;
+        padding:6px!important;
+        font-size:9pt!important;
+      }
+      .report-table td{
+        border:1px solid #dbe3ec!important;
+        padding:6px!important;
+        font-size:9pt!important;
+      }
+
+      .grid-2{
+        display:grid!important;
+        grid-template-columns:1fr 1fr!important;
+        gap:7px!important;
+      }
+      .chart-card{
+        min-height:auto!important;
+        border:1px solid #cbd5e1!important;
+        border-radius:8px!important;
+        padding:8px!important;
+        background:#fff!important;
+      }
+      .chart-title{margin-bottom:4px!important}
+      .chart-title strong{font-size:10pt!important;color:#0f172a!important}
+      .chart-title span{font-size:8pt!important;color:#475569!important}
+      .chart{min-height:auto!important}
+      .chart svg{height:135px!important;max-height:135px!important}
+      .chart-note{
+        background:#f8fafc!important;
+        border:1px solid #e2e8f0!important;
+        color:#334155!important;
+        font-size:8pt!important;
+        padding:5px!important;
+        margin-top:5px!important;
+      }
+
+      .group-list{
+        display:grid!important;
+        grid-template-columns:1fr 1fr!important;
+        gap:7px!important;
+      }
+      .group-card{
+        border:1px solid #cbd5e1!important;
+        border-radius:8px!important;
+        background:#fff!important;
+        padding:8px!important;
+      }
+      .group-head h4{
+        font-size:12pt!important;
+        color:#0f172a!important;
+      }
+      .muted{font-size:8pt!important;color:#475569!important}
+      .status{
+        border:1px solid #cbd5e1!important;
+        background:#f8fafc!important;
+        color:#0f172a!important;
+        font-size:8pt!important;
+        padding:3px 6px!important;
+      }
+      .group-main,.group-econ{
+        display:grid!important;
+        grid-template-columns:1fr 1fr!important;
+        gap:5px!important;
+      }
+      .group-big,.group-small{
+        border:1px solid #e2e8f0!important;
+        border-radius:7px!important;
+        background:#f8fafc!important;
+        padding:6px!important;
+      }
+      .group-big .g-label,.group-small .s-label{
+        font-size:8pt!important;
+        color:#475569!important;
+      }
+      .group-big .g-value{
+        font-size:13pt!important;
+        color:#0f172a!important;
+      }
+      .group-small .s-value{
+        font-size:10pt!important;
+        color:#0f172a!important;
+      }
+      .meaning,.group-note{
+        border:1px solid #dbe3ec!important;
+        background:#f8fafc!important;
+        color:#334155!important;
+        border-radius:7px!important;
+        padding:6px!important;
+        font-size:8.5pt!important;
+      }
+      .chip-row{gap:3px!important}
+      .chip{
+        border:1px solid #cbd5e1!important;
+        background:#fff!important;
+        color:#334155!important;
+        font-size:7.5pt!important;
+        padding:3px 5px!important;
+      }
+
+      .recommendations{
+        display:grid!important;
+        grid-template-columns:1fr 1fr!important;
+        gap:7px!important;
+      }
+      .rec{
+        border:1px solid #cbd5e1!important;
+        border-radius:8px!important;
+        background:#fff!important;
+        padding:8px!important;
+      }
+      .rec h4{font-size:11pt!important;color:#0f172a!important;margin:5px 0!important}
+      .rec ul{font-size:8.5pt!important;color:#334155!important}
+      .rec .action{
+        border:1px solid #e2e8f0!important;
+        background:#f8fafc!important;
+        color:#334155!important;
+        font-size:8.5pt!important;
+        padding:5px!important;
+      }
+
+      .thi-card{
+        display:grid!important;
+        grid-template-columns:auto 1fr!important;
+        gap:8px!important;
+        border:1px solid #cbd5e1!important;
+        border-radius:8px!important;
+        padding:8px!important;
+        background:#fff!important;
+      }
+      .thi-circle{
+        width:58px!important;
+        height:58px!important;
+        font-size:18pt!important;
+        border-width:4px!important;
+      }
+      .thi-card h4{font-size:12pt!important;color:#0f172a!important}
+      .thi-card p{font-size:9pt!important;color:#334155!important}
+
+      .scientific{
+        background:#ffffff!important;
+        color:#0f172a!important;
+        border:1.5px solid #0f766e!important;
+        border-radius:8px!important;
+        padding:9px!important;
+      }
+      .scientific h3{color:#0f172a!important;font-size:14pt!important}
+      .scientific ul{color:#334155!important;font-size:9pt!important}
+
+      .footer-note{
+        color:#64748b!important;
+        border-top:1px solid #e5e7eb!important;
+        padding-top:6px!important;
+        margin-top:10px!important;
+        font-size:8pt!important;
+      }
     }
   </style>
 </head>
@@ -268,6 +597,13 @@
     <div id="loading" class="loading">جاري تحميل تقرير اللبن...</div>
 
     <section id="report" style="display:none;">
+      <div class="print-report-header">
+        <div>
+          <h1 id="printTitle">تقرير إنتاج اللبن</h1>
+          <p id="printSubtitle">مُرَبِّيك — تقرير مطبوع</p>
+        </div>
+        <div class="print-meta" id="printMeta"></div>
+      </div>
       <section class="hero" id="summaryBlock" data-print-block>
         <div class="hero-grid">
           <div>
@@ -715,6 +1051,13 @@
       );
       $("productionSectionTitle").textContent = `إنتاج ${dayLabel}`;
       renderHeroSummary(j);
+      $("printTitle").textContent = arClean(j.headline?.title || "تقرير إنتاج اللبن");
+      $("printSubtitle").textContent = arClean(j.headline?.text || "مُرَبِّيك — تقرير إنتاج اللبن");
+      $("printMeta").innerHTML = [
+        `تاريخ التقرير: ${esc($("reportDate").value || yesterdayISO())}`,
+        `سعر كجم اللبن: ${money0(getMilkPriceRequired())}`,
+        `نوع القطيع: ${esc(j.meta?.selectedTypeLabel || (getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل"))}`
+      ].join("<br>");
       $("heroNet").textContent = money(j.economics?.netOperatingResult);
       if(j.message){$("serverMessage").textContent=j.message;$("serverMessage").classList.add("show")}else{$("serverMessage").classList.remove("show")}
       renderProduction(j); renderEconomy(j); renderComparisons(j); renderCharts(j); renderGroups(j); renderThi(j); renderRecommendations(j); renderScientific(j);
@@ -759,6 +1102,12 @@
         heroSummaryCard("تاريخ التقرير", esc($("reportDate").value || yesterdayISO()), "الافتراضي هو إنتاج أمس"),
         heroSummaryCard("نوع القطيع", esc(getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل"), "قادم من الداشبورد")
       ].join("");
+      $("printTitle").textContent = "تقرير إنتاج اللبن";
+      $("printSubtitle").textContent = "أدخل سعر كجم اللبن ثم اطبع التقرير بعد التحميل";
+      $("printMeta").innerHTML = [
+        `تاريخ التقرير: ${esc($("reportDate").value || yesterdayISO())}`,
+        `نوع القطيع: ${esc(getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل")}`
+      ].join("<br>");
       $("heroNet").textContent="—";
 
       $("productionCards").innerHTML=`<div class="empty">سعر كجم اللبن مطلوب قبل تحميل التقرير.</div>`;
