@@ -24908,353 +24908,915 @@ app.get("/api/milk-reports/summary", requireUserId, async (req, res) => {
       });
     }
 
-const uid = req.userId;
-const requestedDate = milkReportIsDateSrv(req.query.date)
-  ? String(req.query.date).slice(0, 10)
-  : milkReportTodaySrv();
+    const uid = req.userId;
+    const OTHER_COST_RATE = 0.20;
 
-const selectedKind = milkReportRequestedKindSrv(req.query);
-const selectedType =
-  selectedKind === "buffalo" ? "buffalo" :
-  selectedKind === "cow" ? "cows" :
-  "";
+    const requestedDate = milkReportIsDateSrv(req.query.date)
+      ? String(req.query.date).slice(0, 10)
+      : milkReportTodaySrv();
 
-const selectedSpecies =
-  selectedKind === "buffalo" ? "buffalo" :
-  selectedKind === "cow" ? "cow" :
-  "";
+    const selectedKind = milkReportRequestedKindSrv(req.query);
+    const selectedTypeLabel =
+      selectedKind === "buffalo" ? "جاموس" :
+      selectedKind === "cow" ? "أبقار" :
+      "الكل";
 
-const selectedTypeLabel =
-  selectedKind === "buffalo" ? "جاموس" :
-  selectedKind === "cow" ? "أبقار" :
-  "الكل";
+    const eventDate = ev => String(ev.eventDate || ev.date || "").slice(0, 10);
+    const isDate = v => milkReportIsDateSrv(String(v || "").slice(0, 10));
+    const round = (v, d = 1) => milkReportRoundSrv(v, d);
 
-const [allEvents, animals, thresholds] = await Promise.all([
-  milkReportFetchUserEventsSrv(uid),
-  milkReportFetchUserAnimalsSrv(uid),
-  loadGroupThresholdsSrv(uid)
-]);
-const milkReportThi = await weatherBuildFarmThiSrv(req.authSession?.uid || uid);
+    const money = v =>
+      Number.isFinite(Number(v)) ? Number(Number(v).toFixed(2)) : null;
 
-const animalsByNumber = new Map();
-for (const a of animals) {
-  const n = milkReportNumberSrv(a.animalNumber || a.number || a.animalNo);
-  if (n) animalsByNumber.set(n, a);
-}
+    const safeDiv = (a, b, d = 2) => {
+      const x = Number(a);
+      const y = Number(b);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || y <= 0) return null;
+      return Number((x / y).toFixed(d));
+    };
 
-const milkEvents = allEvents
-  .filter(milkReportIsMilkEventSrv)
-  .filter(ev => milkReportIsDateSrv(ev.eventDate || ev.date))
-  .map(ev => milkReportDecorateMilkEventKindSrv(ev, animalsByNumber))
-  .filter(ev => !selectedKind || ev.kind === selectedKind);
+    const sumMilk = rows =>
+      round(rows.reduce((sum, ev) => sum + milkReportKgSrv(ev), 0), 1);
 
-const nutritionEvents = allEvents
-  .filter(milkReportIsNutritionEventSrv)
-  .filter(ev => milkReportIsDateSrv(ev.eventDate || ev.date));
-    let reportDate = requestedDate;
-    let dayRows = milkEvents.filter(ev => String(ev.eventDate || ev.date).slice(0, 10) === requestedDate);
+    const uniqueCount = rows =>
+      new Set(rows.map(ev => milkReportNumberSrv(ev.animalNumber || ev.number)).filter(Boolean)).size;
 
-    let message = "";
-    if (!dayRows.length && milkEvents.length) {
-      const dates = [...new Set(milkEvents.map(ev => String(ev.eventDate || ev.date).slice(0, 10)).filter(milkReportIsDateSrv))]
-        .sort()
-        .reverse();
+    const rowsOnDate = (rows, iso) =>
+      rows.filter(ev => eventDate(ev) === iso);
 
-      reportDate = dates[0] || requestedDate;
-      dayRows = milkEvents.filter(ev => String(ev.eventDate || ev.date).slice(0, 10) === reportDate);
+    const rowsInRange = (rows, start, endInclusive) =>
+      rows.filter(ev => {
+        const d = eventDate(ev);
+        return isDate(d) && d >= start && d <= endInclusive;
+      });
 
-      if (reportDate !== requestedDate) {
-        message = `لا توجد سجلات لبن ليوم ${requestedDate}. تم عرض آخر يوم متاح: ${reportDate}.`;
+    const avg = values => {
+      const clean = values.map(Number).filter(Number.isFinite);
+      if (!clean.length) return null;
+      return round(clean.reduce((a, b) => a + b, 0) / clean.length, 1);
+    };
+
+    const addRecommendation = (list, level, title, evidence, action) => {
+      list.push({
+        level,
+        title,
+        evidence: Array.isArray(evidence) ? evidence.filter(Boolean).slice(0, 3) : [],
+        action
+      });
+    };
+
+    const isActiveMilker = an => {
+      if (!milkReportAnimalMatchesKindSrv(an, selectedKind)) return false;
+
+      const status = String(an.status || "").toLowerCase();
+      const inactiveReason = String(an.inactiveReason || "").toLowerCase();
+
+      if (status === "archived" || inactiveReason === "sale" || inactiveReason === "death") {
+        return false;
       }
-    }
 
-    const mb = milkReportMonthBoundsSrv(reportDate);
-    const yb = milkReportYearBoundsSrv(reportDate);
+      if (typeof shouldAppearInGroupsSrv === "function" && !shouldAppearInGroupsSrv(an)) {
+        return false;
+      }
 
-    const monthRows = milkEvents.filter(ev => milkReportDateInRangeSrv(ev.eventDate || ev.date, mb.start, mb.end));
-    const yearRows = milkEvents.filter(ev => milkReportDateInRangeSrv(ev.eventDate || ev.date, yb.start, yb.end));
+      if (typeof hasCalvedBeforeGroupSrv === "function" && !hasCalvedBeforeGroupSrv(an)) {
+        return false;
+      }
 
-    let prevDate = milkReportAddDaysSrv(reportDate, -1);
-    let prevRows = milkEvents.filter(ev => String(ev.eventDate || ev.date).slice(0, 10) === prevDate);
+      if (typeof isDryGroupSrv === "function" && isDryGroupSrv(an)) {
+        return false;
+      }
 
-    for (let i = 2; i <= 7 && !prevRows.length; i++) {
-      prevDate = milkReportAddDaysSrv(reportDate, -i);
-      prevRows = milkEvents.filter(ev => String(ev.eventDate || ev.date).slice(0, 10) === prevDate);
-    }
+      return true;
+    };
 
-    const day = milkReportSplitByKindSrv(dayRows);
-    const month = milkReportSplitByKindSrv(monthRows);
-    const year = milkReportSplitByKindSrv(yearRows);
-    const prev = milkReportSplitByKindSrv(prevRows);
-    const calvingMap = new Map();
+    const [allEvents, animals, thresholds, milkReportThi] = await Promise.all([
+      milkReportFetchUserEventsSrv(uid),
+      milkReportFetchUserAnimalsSrv(uid),
+      loadGroupThresholdsSrv(uid),
+      weatherBuildFarmThiSrv(req.authSession?.uid || uid)
+    ]);
+
+    const animalsByNumber = new Map();
 
     for (const a of animals) {
-      const n = milkReportNumberSrv(a.animalNumber || a.number || a.animalNo);
-      const d = String(
-        a.lastCalvingDate ||
-        a.lastCalving ||
-        a.calvingDate ||
-        a.lastBirthDate ||
-        ""
-      ).slice(0, 10);
+      const n = milkReportAnimalNumberFromAnimalSrv(a);
+      if (n) animalsByNumber.set(n, a);
+    }
 
-      if (n && milkReportIsDateSrv(d)) {
-        calvingMap.set(n, d);
+    const milkEvents = allEvents
+      .filter(milkReportIsMilkEventSrv)
+      .filter(ev => isDate(eventDate(ev)))
+      .map(ev => milkReportDecorateMilkEventKindSrv(ev, animalsByNumber))
+      .filter(ev => !selectedKind || ev.kind === selectedKind)
+      .sort((a, b) => eventDate(a).localeCompare(eventDate(b)));
+
+    const nutritionEvents = allEvents
+      .filter(milkReportIsNutritionEventSrv)
+      .filter(ev => isDate(eventDate(ev)));
+
+    let reportDate = requestedDate;
+    let dayRows = rowsOnDate(milkEvents, requestedDate);
+    let message = "";
+
+    if (!dayRows.length && milkEvents.length) {
+      const availableDates = [...new Set(milkEvents.map(eventDate).filter(isDate))].sort();
+      const beforeOrEqual = availableDates.filter(d => d <= requestedDate);
+
+      reportDate = beforeOrEqual.length
+        ? beforeOrEqual[beforeOrEqual.length - 1]
+        : availableDates[availableDates.length - 1];
+
+      dayRows = rowsOnDate(milkEvents, reportDate);
+
+      if (reportDate !== requestedDate) {
+        message = `لا توجد سجلات لبن ليوم ${requestedDate}. تم عرض أقرب يوم متاح: ${reportDate}.`;
       }
     }
 
-    for (const ev of allEvents.filter(milkReportIsCalvingEventSrv)) {
-      const n = milkReportNumberSrv(ev.animalNumber || ev.number);
-      const d = String(ev.eventDate || ev.date || "").slice(0, 10);
-      if (!n || !milkReportIsDateSrv(d)) continue;
+    const previousDates = [...new Set(
+      milkEvents.map(eventDate).filter(d => isDate(d) && d < reportDate)
+    )].sort();
 
-      const prevCalving = calvingMap.get(n);
-      if (!prevCalving || prevCalving < d) {
-        calvingMap.set(n, d);
-      }
-    }
+    const prevDate = previousDates.length ? previousDates[previousDates.length - 1] : "";
+    const prevRows = prevDate ? rowsOnDate(milkEvents, prevDate) : [];
 
     const prevByNumber = new Map();
+
     for (const ev of milkEvents) {
-      const d = String(ev.eventDate || ev.date || "").slice(0, 10);
-      if (!(d < reportDate && d >= milkReportAddDaysSrv(reportDate, -7))) continue;
+      const d = eventDate(ev);
+      if (!isDate(d) || d >= reportDate) continue;
 
       const n = milkReportNumberSrv(ev.animalNumber || ev.number);
       if (!n) continue;
 
-      const current = prevByNumber.get(n);
-      if (!current || current.date < d) {
-        prevByNumber.set(n, { kg: milkReportKgSrv(ev), date: d });
+      const old = prevByNumber.get(n);
+
+      if (!old || old.date < d) {
+        prevByNumber.set(n, {
+          date: d,
+          kg: milkReportKgSrv(ev)
+        });
       }
     }
 
-let skippedNoCalving = 0;
-let points = [];
+    const activeMilkers = animals.filter(isActiveMilker);
 
-    const feeds = allEvents.filter(ev =>
-      milkReportIsFeedEventSrv(ev) &&
-      String(ev.eventDate || ev.date || "").slice(0, 10) === reportDate
+    const officialGroups = await milkReportLoadOfficialGroupsMapFromFirestoreSrv(
+      uid,
+      activeMilkers
     );
 
-    let feedCostTotal = 0;
-    for (const f of feeds) {
-      feedCostTotal += Number(
-        f.totalCost ??
-        f.cost ??
-        f.feedCost ??
-        f.details?.totalCost ??
-        f.details?.cost ??
-        0
-      ) || 0;
-    }
+    const groupsMap =
+      officialGroups.ok && officialGroups.groupsMap
+        ? officialGroups.groupsMap
+        : splitGroupsServerSrv(activeMilkers, thresholds);
 
-    const feedCostPerKg = day.all > 0 && feedCostTotal > 0
-      ? Number((feedCostTotal / day.all).toFixed(2))
-      : null;
+    const dccDays = an => {
+      const explicit = Number(
+        an.dccDays ??
+        an.DCC ??
+        an.daysCarryingCalf ??
+        an.pregnancyDays ??
+        an.pregDays ??
+        an.daysPregnant
+      );
 
-const activeAnimals = animals.filter(a => {
-  const status = String(a.status || "").toLowerCase();
-  const inactiveReason = String(a.inactiveReason || "").toLowerCase();
+      if (Number.isFinite(explicit) && explicit >= 0) {
+        return Math.floor(explicit);
+      }
 
-  if (status === "archived" || inactiveReason === "sale" || inactiveReason === "death") {
-    return false;
-  }
+      if (typeof isPregnantGroupSrv === "function" && !isPregnantGroupSrv(an)) {
+        return null;
+      }
 
-  return milkReportAnimalMatchesKindSrv(a, selectedKind);
-});
-const officialGroups = await milkReportLoadOfficialGroupsMapFromFirestoreSrv(
-  uid,
-  activeAnimals
-);
-const scatterDayByNumber = new Map();
+      const aiDate = String(
+        an.lastInseminationDate ||
+        an.inseminationDate ||
+        an.lastServiceDate ||
+        an.serviceDate ||
+        ""
+      ).slice(0, 10);
 
-for (const ev of dayRows) {
-  const n = milkReportNumberSrv(ev.animalNumber || ev.number);
-  if (n) scatterDayByNumber.set(n, ev);
-}
+      if (!isDate(aiDate)) return null;
 
-const scatterGroupsMap =
-  officialGroups.ok && officialGroups.groupsMap
-    ? officialGroups.groupsMap
-    : splitGroupsServerSrv(activeAnimals, thresholds);
+      const days = milkReportDaysBetweenSrv(aiDate, reportDate);
 
-const scatterSeenNumbers = new Set();
-points = [];
-
-for (const groupId of milkReportOfficialMilkingGroupIdsSrv()) {
-  const def = GROUP_DEF_BY_ID_SRV[groupId] || {};
-  const members = Array.isArray(scatterGroupsMap[groupId])
-    ? scatterGroupsMap[groupId]
-    : [];
-
-  for (const an of members) {
-    const number = milkReportAnimalNumberFromAnimalSrv(an);
-    if (!number || scatterSeenNumbers.has(number)) continue;
-
-    scatterSeenNumbers.add(number);
-
-    const ev = scatterDayByNumber.get(number) || {};
-    const lastCalvingDate = calvingMap.get(number);
-
-    if (!lastCalvingDate) {
-      skippedNoCalving++;
-      continue;
-    }
-
-    const dim = milkReportDaysBetweenSrv(lastCalvingDate, reportDate);
-
-    if (!Number.isFinite(Number(dim)) || Number(dim) < 0) {
-      skippedNoCalving++;
-      continue;
-    }
-
-    const recordedToday = scatterDayByNumber.has(number);
-    const kg = recordedToday
-      ? milkReportKgSrv(ev)
-      : getMilkKgSrv(an);
-
-    const prevOne = prevByNumber.get(number);
-    const prevKg = Number(prevOne?.kg || 0);
-    const deltaPct = prevKg > 0
-      ? Number((((kg - prevKg) / prevKg) * 100).toFixed(1))
-      : null;
-
-    const lact =
-      an.lactationNumber ??
-      an.lactationNo ??
-      an.lactation ??
-      ev.lactationNumber ??
-      ev.lactationNo ??
-      ev.lactation ??
-      null;
-
-    const lactNo = Number(lact);
-
-    points.push({
-      number,
-      kg: milkReportRoundSrv(kg, 1),
-      dim,
-      deltaPct,
-      group: an.groupName || an.group || ev.groupName || ev.group || def.label || groupId || "—",
-      repro: an.reproductiveStatus || ev.reproductiveStatus || ev.reproStatus || "—",
-      season: Number.isFinite(lactNo) && lactNo > 0
-        ? `الموسم ${Math.round(lactNo)}`
-        : "الموسم غير مسجل",
-      kind: def.species || milkReportKindSrv(an.kind || an.species || an.animalType || ev.kind || ev.species),
-      recordedToday
-    });
-  }
-}
-
-points.sort((a, b) => Number(a.dim || 0) - Number(b.dim || 0));
-const rawGroupsSummary = milkReportBuildOfficialGroupSummariesSrv({
-  activeAnimals,
-  thresholds,
-  groupsMapOverride: officialGroups.ok ? officialGroups.groupsMap : null,
-  dayRows,
-  prevRows,
-  milkEvents,
-  prevByNumber,
-  reportDate
-});
-
-const typedGroupsSummary = selectedKind
-  ? rawGroupsSummary.filter(g => {
-      const k = String(g.kind || "cow").trim();
-      return selectedKind === "buffalo"
-        ? k === "buffalo"
-        : k !== "buffalo";
-    })
-  : rawGroupsSummary;
-
-const groupsSummary = milkReportAddEconomicsToGroupsSrv(
-  typedGroupsSummary,
-  nutritionEvents,
-  reportDate
-);
-
-    const economicTotals = milkReportEconomicTotalsSrv(groupsSummary);
-
-    const reportDayFromGroups = {
-      all: milkReportRoundSrv(groupsSummary.reduce((sum, g) => sum + Number(g.totalKg || 0), 0), 1),
-      cow: milkReportRoundSrv(groupsSummary.filter(g => g.kind !== "buffalo").reduce((sum, g) => sum + Number(g.totalKg || 0), 0), 1),
-      buffalo: milkReportRoundSrv(groupsSummary.filter(g => g.kind === "buffalo").reduce((sum, g) => sum + Number(g.totalKg || 0), 0), 1)
+      return Number.isFinite(Number(days)) && Number(days) >= 0
+        ? Math.floor(Number(days))
+        : null;
     };
 
-    const reportDay = reportDayFromGroups.all > 0 ? reportDayFromGroups : day;
+    const dimStage = dim => {
+      const d = Number(dim);
 
-        const reportFeedCostPerKg = economicTotals.costPerKgMilk;
+      if (!Number.isFinite(d)) {
+        return { id: "unknown", label: "DIM غير مكتمل", order: 99 };
+      }
 
-        const smartReport = milkReportBuildSmartReportSrv({
-      groupsSummary,
-      day: reportDay,
-      prev,
-      prevDate,
-      reportDate,
-      feedCostPerKg: reportFeedCostPerKg,
-      feedCostTotal: economicTotals.totalFeedCost,
-      activeAnimalsCount: activeAnimals.length,
-      thi: milkReportThi
+      if (d <= 40) return { id: "dim_0_40", label: "0–40 يوم", order: 1 };
+      if (d <= 100) return { id: "dim_41_100", label: "41–100 يوم", order: 2 };
+      if (d <= 199) return { id: "dim_101_199", label: "101–199 يوم", order: 3 };
+      if (d <= 305) return { id: "dim_200_305", label: "200–305 يوم", order: 4 };
+
+      return { id: "dim_over_305", label: "أكثر من 305 يوم", order: 5 };
+    };
+
+    const dayTotalKg = sumMilk(dayRows);
+    const prevDayTotalKg = sumMilk(prevRows);
+    const recordedCount = uniqueCount(dayRows);
+    const milkersCount = activeMilkers.length;
+    const missingCount = Math.max(0, milkersCount - recordedCount);
+
+    const recordingRate =
+      milkersCount > 0 ? round((recordedCount / milkersCount) * 100, 1) : null;
+
+    const memberGroupByNumber = new Map();
+    const groupSummaries = [];
+    const exceptionRows = [];
+
+    for (const groupId of milkReportOfficialMilkingGroupIdsSrv()) {
+      const def = GROUP_DEF_BY_ID_SRV[groupId] || {};
+      const groupKind =
+        def.species || (groupId.startsWith("buffalo_") ? "buffalo" : "cow");
+
+      if (selectedKind && groupKind !== selectedKind) continue;
+
+      const members = Array.isArray(groupsMap[groupId]) ? groupsMap[groupId] : [];
+      if (!members.length) continue;
+
+      const groupName = def.label || groupId;
+
+      const groupNumbers = new Set(
+        members.map(milkReportAnimalNumberFromAnimalSrv).filter(Boolean)
+      );
+
+      for (const n of groupNumbers) {
+        memberGroupByNumber.set(n, {
+          groupId,
+          groupName,
+          groupKind
+        });
+      }
+
+      const groupDayRows = dayRows.filter(ev =>
+        groupNumbers.has(milkReportNumberSrv(ev.animalNumber || ev.number))
+      );
+
+      const groupPrevRows = prevRows.filter(ev =>
+        groupNumbers.has(milkReportNumberSrv(ev.animalNumber || ev.number))
+      );
+
+      const groupMilkKg = sumMilk(groupDayRows);
+      const groupPrevKg = sumMilk(groupPrevRows);
+      const groupRecordedCount = uniqueCount(groupDayRows);
+      const groupMissingCount = Math.max(0, members.length - groupRecordedCount);
+      const groupDeltaPct = milkReportDeltaPctSrv(groupMilkKg, groupPrevKg);
+
+      const avgDim = avg(members.map(getDimSrv));
+      const avgDcc = avg(members.map(dccDays).filter(v => v !== null));
+
+      const latestNutrition = milkReportLatestNutritionForGroupSrv(
+        nutritionEvents,
+        {
+          groupName,
+          groupNumbers: [...groupNumbers]
+        },
+        reportDate
+      );
+
+      const hasEconomics = !!latestNutrition;
+
+      const milkPrice = hasEconomics ? money(latestNutrition.milkPrice) : null;
+      const feedCostPerHeadPerDay = hasEconomics
+        ? money(latestNutrition.feedCostPerHeadPerDay)
+        : null;
+
+      const feedCost = hasEconomics
+        ? money(Number(feedCostPerHeadPerDay || 0) * members.length)
+        : null;
+
+      const milkIncome = hasEconomics
+        ? money(groupMilkKg * Number(milkPrice || 0))
+        : null;
+
+      const otherOperatingCost = hasEconomics
+        ? money(Number(feedCost || 0) * OTHER_COST_RATE)
+        : null;
+
+      const totalProductionCost = hasEconomics
+        ? money(Number(feedCost || 0) + Number(otherOperatingCost || 0))
+        : null;
+
+      const incomeOverFeedCost = hasEconomics
+        ? money(Number(milkIncome || 0) - Number(feedCost || 0))
+        : null;
+
+      const netOperatingResult = hasEconomics
+        ? money(Number(milkIncome || 0) - Number(totalProductionCost || 0))
+        : null;
+
+      const feedCostPerKgMilk = hasEconomics
+        ? safeDiv(feedCost, groupMilkKg, 2)
+        : null;
+
+      const productionCostPerKgMilk = hasEconomics
+        ? safeDiv(totalProductionCost, groupMilkKg, 2)
+        : null;
+
+      const marginPerKgMilk =
+        hasEconomics && productionCostPerKgMilk != null
+          ? money(Number(milkPrice || 0) - Number(productionCostPerKgMilk))
+          : null;
+
+      const groupAnimalRows = groupDayRows.map(ev => {
+        const number = milkReportNumberSrv(ev.animalNumber || ev.number);
+        const kg = milkReportKgSrv(ev);
+        const prevOne = prevByNumber.get(number);
+        const prevKg = Number(prevOne?.kg || 0);
+
+        return {
+          number,
+          kg: round(kg, 1),
+          prevKg: prevKg > 0 ? round(prevKg, 1) : null,
+          deltaPct: milkReportDeltaPctSrv(kg, prevKg)
+        };
+      });
+
+      const topAnimals = [...groupAnimalRows]
+        .filter(x => Number(x.kg || 0) > 0)
+        .sort((a, b) => Number(b.kg || 0) - Number(a.kg || 0))
+        .slice(0, 5);
+
+      const watchAnimals = [...groupAnimalRows]
+        .filter(x => x.deltaPct != null && Number(x.deltaPct) <= -15)
+        .sort((a, b) => Number(a.deltaPct || 0) - Number(b.deltaPct || 0))
+        .slice(0, 5);
+
+      for (const x of watchAnimals) {
+        exceptionRows.push({
+          type: "milk_drop",
+          animalNumber: x.number,
+          groupName,
+          milkKg: x.kg,
+          previousMilkKg: x.prevKg,
+          deltaPct: x.deltaPct,
+          action: "افحص الضرع والعرج والشهية قبل تعديل عليقة المجموعة."
+        });
+      }
+
+      let status = "ok";
+      let statusText = "مستقرة";
+
+      if (hasEconomics && Number(netOperatingResult) < 0) {
+        status = "loss";
+        statusText = "خسارة تشغيلية";
+      } else if (groupDeltaPct != null && Number(groupDeltaPct) <= -7) {
+        status = "watch";
+        statusText = "تحتاج متابعة";
+      } else if (groupDeltaPct != null && Number(groupDeltaPct) >= 5) {
+        status = "good";
+        statusText = "تحسن واضح";
+      }
+
+      groupSummaries.push({
+        groupId,
+        groupName,
+        species: groupKind,
+
+        milkersCount: members.length,
+        recordedCount: groupRecordedCount,
+        missingCount: groupMissingCount,
+        recordingRate:
+          members.length > 0 ? round((groupRecordedCount / members.length) * 100, 1) : null,
+
+        totalMilkKg: groupMilkKg,
+        avgMilkKgRecorded: safeDiv(groupMilkKg, groupRecordedCount, 1),
+        avgMilkKgMilker: safeDiv(groupMilkKg, members.length, 1),
+
+        previousMilkKg: groupPrevKg,
+        deltaPct: groupDeltaPct,
+
+        avgDim,
+        avgDcc,
+
+        status,
+        statusText,
+
+        economics: {
+          hasData: hasEconomics,
+          sourceDate: latestNutrition?.eventDate || null,
+          milkPrice,
+          feedCostPerHeadPerDay,
+          milkIncome,
+          feedCost,
+          otherOperatingCostRate: OTHER_COST_RATE,
+          otherOperatingCost,
+          totalProductionCost,
+          incomeOverFeedCost,
+          netOperatingResult,
+          feedCostPerKgMilk,
+          productionCostPerKgMilk,
+          marginPerKgMilk
+        },
+
+        topAnimals,
+        watchAnimals,
+
+        murabbik: {
+          evidence: [
+            groupDeltaPct != null ? `التغير ${groupDeltaPct}%` : "",
+            avgDim != null ? `DIM ${avgDim}` : "",
+            avgDcc != null ? `DCC ${avgDcc}` : "",
+            productionCostPerKgMilk != null ? `تكلفة الكجم ${productionCostPerKgMilk}` : ""
+          ].filter(Boolean),
+          action:
+            status === "loss"
+              ? "راجع تكلفة العليقة والمأكول والبواقي لهذه المجموعة اليوم."
+              : status === "watch"
+                ? "راجع المياه والتبريد وجودة التسجيل والحالات الفردية المنخفضة."
+                : "استمر في المتابعة وقارن الأداء بمرحلة DIM."
+        }
+      });
+    }
+
+    const ungroupedRows = dayRows.filter(ev => {
+      const n = milkReportNumberSrv(ev.animalNumber || ev.number);
+      return n && !memberGroupByNumber.has(n);
     });
 
-    const consultantReport = milkReportBuildConsultantReportSrv({
-      req,
-      smartReport,
-      groupsSummary: smartReport.groupsSummary || groupsSummary,
-      points,
-      skippedNoCalving,
-      reportDate,
-      requestedDate,
-      selectedTypeLabel,
-      economicTotals,
-      thi: milkReportThi
-    });
+    if (ungroupedRows.length) {
+      const total = sumMilk(ungroupedRows);
+      const count = uniqueCount(ungroupedRows);
+
+      groupSummaries.push({
+        groupId: "ungrouped",
+        groupName: "غير مصنف إنتاجيًا",
+        species: selectedKind || "mixed",
+
+        milkersCount: count,
+        recordedCount: count,
+        missingCount: 0,
+        recordingRate: 100,
+
+        totalMilkKg: total,
+        avgMilkKgRecorded: safeDiv(total, count, 1),
+        avgMilkKgMilker: safeDiv(total, count, 1),
+
+        previousMilkKg: 0,
+        deltaPct: null,
+        avgDim: null,
+        avgDcc: null,
+
+        status: "watch",
+        statusText: "يحتاج تصنيف",
+
+        economics: {
+          hasData: false,
+          message: "لا يمكن ربط الاقتصاد قبل تصنيف المجموعة."
+        },
+
+        topAnimals: [],
+        watchAnimals: [],
+
+        murabbik: {
+          evidence: [`${count} رأس مسجلة لبن بدون مجموعة إنتاجية`],
+          action: "صنّف هذه الحيوانات داخل مجموعاتها الإنتاجية ليكتمل التقرير."
+        }
+      });
+    }
+
+    groupSummaries.sort((a, b) => Number(b.totalMilkKg || 0) - Number(a.totalMilkKg || 0));
+
+    const economicTotals = groupSummaries
+      .filter(g => g.economics?.hasData)
+      .reduce((acc, g) => {
+        acc.groupsCount += 1;
+        acc.milkersCount += Number(g.milkersCount || 0);
+        acc.totalMilkKg += Number(g.totalMilkKg || 0);
+        acc.milkIncome += Number(g.economics.milkIncome || 0);
+        acc.feedCost += Number(g.economics.feedCost || 0);
+        acc.otherOperatingCost += Number(g.economics.otherOperatingCost || 0);
+        acc.totalProductionCost += Number(g.economics.totalProductionCost || 0);
+        acc.incomeOverFeedCost += Number(g.economics.incomeOverFeedCost || 0);
+        acc.netOperatingResult += Number(g.economics.netOperatingResult || 0);
+        return acc;
+      }, {
+        hasData: false,
+        groupsCount: 0,
+        milkersCount: 0,
+        totalMilkKg: 0,
+        milkIncome: 0,
+        feedCost: 0,
+        otherOperatingCostRate: OTHER_COST_RATE,
+        otherOperatingCost: 0,
+        totalProductionCost: 0,
+        incomeOverFeedCost: 0,
+        netOperatingResult: 0,
+        feedCostPerKgMilk: null,
+        productionCostPerKgMilk: null,
+        marginPerKgMilk: null
+      });
+
+    economicTotals.hasData = economicTotals.groupsCount > 0;
+
+    for (const k of [
+      "totalMilkKg",
+      "milkIncome",
+      "feedCost",
+      "otherOperatingCost",
+      "totalProductionCost",
+      "incomeOverFeedCost",
+      "netOperatingResult"
+    ]) {
+      economicTotals[k] = money(economicTotals[k]) || 0;
+    }
+
+    economicTotals.feedCostPerKgMilk =
+      safeDiv(economicTotals.feedCost, economicTotals.totalMilkKg, 2);
+
+    economicTotals.productionCostPerKgMilk =
+      safeDiv(economicTotals.totalProductionCost, economicTotals.totalMilkKg, 2);
+
+    economicTotals.marginPerKgMilk =
+      safeDiv(economicTotals.netOperatingResult, economicTotals.totalMilkKg, 2);
+
+    const current7Start = milkReportAddDaysSrv(reportDate, -6);
+    const previous7End = milkReportAddDaysSrv(current7Start, -1);
+    const previous7Start = milkReportAddDaysSrv(previous7End, -6);
+
+    const current7Kg = sumMilk(rowsInRange(milkEvents, current7Start, reportDate));
+    const previous7Kg = sumMilk(rowsInRange(milkEvents, previous7Start, previous7End));
+    const weeklyDelta = milkReportDeltaPctSrv(current7Kg, previous7Kg);
+
+    const monthBounds = milkReportMonthBoundsSrv(reportDate);
+    const monthEnd = milkReportAddDaysSrv(monthBounds.end, -1);
+
+    const previousMonthEnd = milkReportAddDaysSrv(monthBounds.start, -1);
+    const previousMonthBounds = milkReportMonthBoundsSrv(previousMonthEnd);
+
+    const monthKg = sumMilk(rowsInRange(milkEvents, monthBounds.start, monthEnd));
+
+    const previousMonthKg = sumMilk(
+      rowsInRange(
+        milkEvents,
+        previousMonthBounds.start,
+        milkReportAddDaysSrv(previousMonthBounds.end, -1)
+      )
+    );
+
+    const rolling305Start = milkReportAddDaysSrv(reportDate, -304);
+    const previous305End = milkReportAddDaysSrv(rolling305Start, -1);
+    const previous305Start = milkReportAddDaysSrv(previous305End, -304);
+
+    const rolling305Kg = sumMilk(rowsInRange(milkEvents, rolling305Start, reportDate));
+    const previous305Kg = sumMilk(rowsInRange(milkEvents, previous305Start, previous305End));
+
+    const dailyTrend = [];
+
+    for (let i = 29; i >= 0; i--) {
+      const d = milkReportAddDaysSrv(reportDate, -i);
+      const rows = rowsOnDate(milkEvents, d);
+      const total = sumMilk(rows);
+      const count = uniqueCount(rows);
+
+      dailyTrend.push({
+        date: d,
+        totalMilkKg: total,
+        recordedCount: count,
+        avgMilkKg: safeDiv(total, count, 1)
+      });
+    }
+
+    const weeklyTrend = [];
+
+    for (let i = 7; i >= 0; i--) {
+      const end = milkReportAddDaysSrv(reportDate, -(i * 7));
+      const start = milkReportAddDaysSrv(end, -6);
+      const rows = rowsInRange(milkEvents, start, end);
+      const total = sumMilk(rows);
+
+      weeklyTrend.push({
+        label: `${start} / ${end}`,
+        start,
+        end,
+        totalMilkKg: total,
+        avgDailyMilkKg: safeDiv(total, 7, 1)
+      });
+    }
+
+    const monthlyTrend = [];
+
+    for (let i = 11; i >= 0; i--) {
+      const cursor = new Date(`${monthBounds.start}T00:00:00Z`);
+      cursor.setUTCMonth(cursor.getUTCMonth() - i);
+
+      const start = cursor.toISOString().slice(0, 10);
+      const bounds = milkReportMonthBoundsSrv(start);
+      const end = milkReportAddDaysSrv(bounds.end, -1);
+      const total = sumMilk(rowsInRange(milkEvents, bounds.start, end));
+
+      monthlyTrend.push({
+        label: bounds.start.slice(0, 7),
+        start: bounds.start,
+        end,
+        totalMilkKg: total
+      });
+    }
+
+    const rolling305Trend = [];
+
+    for (let i = 11; i >= 0; i--) {
+      const end = milkReportAddDaysSrv(reportDate, -(i * 30));
+      const start = milkReportAddDaysSrv(end, -304);
+
+      rolling305Trend.push({
+        endDate: end,
+        startDate: start,
+        totalMilkKg: sumMilk(rowsInRange(milkEvents, start, end))
+      });
+    }
+
+    const dimStagesMap = new Map();
+
+    for (const ev of dayRows) {
+      const n = milkReportNumberSrv(ev.animalNumber || ev.number);
+      const an = animalsByNumber.get(n) || {};
+      const stage = dimStage(getDimSrv(an));
+
+      if (!dimStagesMap.has(stage.id)) {
+        dimStagesMap.set(stage.id, {
+          id: stage.id,
+          label: stage.label,
+          order: stage.order,
+          totalMilkKg: 0,
+          recordedCount: 0
+        });
+      }
+
+      const one = dimStagesMap.get(stage.id);
+      one.totalMilkKg += milkReportKgSrv(ev);
+      one.recordedCount += 1;
+    }
+
+    const dimStages = [...dimStagesMap.values()]
+      .sort((a, b) => a.order - b.order)
+      .map(x => ({
+        id: x.id,
+        label: x.label,
+        totalMilkKg: round(x.totalMilkKg, 1),
+        recordedCount: x.recordedCount,
+        avgMilkKg: safeDiv(x.totalMilkKg, x.recordedCount, 1)
+      }));
+
+    const thiValue = Number(milkReportThi?.thi);
+    const thiSeverity = Number(milkReportThi?.status?.severity || 0);
+    const thiLabel = milkReportThi?.status?.label || "غير متاح";
+
+    const recommendations = [];
+
+    if (recordingRate != null && recordingRate < 90) {
+      addRecommendation(
+        recommendations,
+        "high",
+        "اكتمال التسجيل قبل القرار",
+        [`نسبة التسجيل ${recordingRate}%`, `${missingCount} رأس بلا تسجيل اليوم`],
+        "أكمل تسجيل اللبن أو الاستيراد قبل أي قرار تغذية أو فرز."
+      );
+    }
+
+    if (economicTotals.hasData && economicTotals.netOperatingResult < 0) {
+      addRecommendation(
+        recommendations,
+        "high",
+        "صافي التشغيل سالب",
+        [
+          `الصافي ${economicTotals.netOperatingResult} ج`,
+          `تكلفة الكجم ${economicTotals.productionCostPerKgMilk ?? "—"} ج`
+        ],
+        "ابدأ بالمجموعة الأسوأ اقتصاديًا: تكلفة العليقة، المأكول، البواقي، واللبن المسجل."
+      );
+    }
+
+    if (!economicTotals.hasData) {
+      addRecommendation(
+        recommendations,
+        "medium",
+        "اقتصاد اللبن غير مكتمل",
+        ["لا توجد عليقة محفوظة مطابقة للمجموعات"],
+        "احفظ عليقة الحلاب من صفحة التغذية ليظهر الدخل والصافي تلقائيًا."
+      );
+    }
+
+    if (thiSeverity >= 2) {
+      addRecommendation(
+        recommendations,
+        thiSeverity >= 3 ? "high" : "medium",
+        weeklyDelta != null && weeklyDelta <= -3
+          ? "THI يفسر جزءًا من نزول اللبن"
+          : "THI يحتاج متابعة",
+        [
+          Number.isFinite(thiValue) ? `THI ${thiValue}` : "",
+          thiLabel,
+          weeklyDelta != null ? `الأسبوع ${weeklyDelta}%` : ""
+        ],
+        "راجع التهوية، الرش/التبريد، مياه الشرب، وقت الانتظار، وتقديم العليقة في الوقت الأبرد."
+      );
+    }
+
+    const weakestEconomicGroup = [...groupSummaries]
+      .filter(g => g.economics?.hasData && g.economics.netOperatingResult != null)
+      .sort((a, b) =>
+        Number(a.economics.netOperatingResult || 0) -
+        Number(b.economics.netOperatingResult || 0)
+      )[0];
+
+    if (weakestEconomicGroup) {
+      addRecommendation(
+        recommendations,
+        Number(weakestEconomicGroup.economics.netOperatingResult) < 0 ? "high" : "medium",
+        `أولوية المراجعة: ${weakestEconomicGroup.groupName}`,
+        [
+          `الصافي ${weakestEconomicGroup.economics.netOperatingResult} ج`,
+          weakestEconomicGroup.economics.productionCostPerKgMilk != null
+            ? `تكلفة الكجم ${weakestEconomicGroup.economics.productionCostPerKgMilk} ج`
+            : "",
+          weakestEconomicGroup.deltaPct != null
+            ? `التغير ${weakestEconomicGroup.deltaPct}%`
+            : ""
+        ],
+        "راجع هذه المجموعة أولًا لأنها الأكثر تأثيرًا على فلوس الإنتاج."
+      );
+    }
+
+    if (exceptionRows.length) {
+      addRecommendation(
+        recommendations,
+        "medium",
+        "حالات فردية لا تعني مشكلة عليقة عامة",
+        exceptionRows.slice(0, 3).map(x => `#${x.animalNumber} ${x.deltaPct}%`),
+        "افحص الضرع والعرج والشهية للحالات قبل تعديل عليقة المجموعة."
+      );
+    }
+
+    const headline =
+      economicTotals.hasData
+        ? economicTotals.netOperatingResult >= 0
+          ? `صافي تشغيل اللبن اليوم ${economicTotals.netOperatingResult} ج بعد التغذية و20% تشغيل.`
+          : `تنبيه: صافي تشغيل اللبن سالب ${economicTotals.netOperatingResult} ج بعد التغذية و20% تشغيل.`
+        : `إنتاج اليوم ${dayTotalKg} كجم. الاقتصاد ينتظر بيانات التغذية.`;
+
     return res.json({
       ok: true,
       message,
-      requestedDate,
-      reportDate,
-      usedFallbackDate: reportDate !== requestedDate,
-      selectedType,
-      selectedSpecies,
-      selectedKind,
-      selectedTypeLabel,
-           kpis: {
-        day: reportDay,
-        month,
-        year,
-        prevDay: prev,
-        prevDate,
-        milkersCount: smartReport.farmSummary?.milkersCount || 0,
-        totalAnimals: activeAnimals.length,
-        avgHerdKg: smartReport.farmSummary?.avgHerdKg ?? null,
-        feedCostPerKg: reportFeedCostPerKg,
-                feedCostTotal: economicTotals.totalFeedCost || 0,
-        economicTotals,
-        feedNote: reportFeedCostPerKg
-          ? `محسوبة من آخر عليقة محفوظة للمجموعات: ${Math.round(economicTotals.totalFeedCost)} ج.م`
-          : "لا توجد علائق تغذية محفوظة كافية لحساب الاقتصاد"
-     
+
+      meta: {
+        reportDate,
+        requestedDate,
+        usedFallbackDate: reportDate !== requestedDate,
+        selectedKind,
+        selectedTypeLabel,
+        generatedAt: new Date().toISOString(),
+        method: "murabbik_professional_milk_report_v1",
+        otherOperatingCostRate: OTHER_COST_RATE
       },
-           scatter: {
-        points,
-        skippedNoCalving
+
+      headline: {
+        title: "تقرير إنتاج اللبن",
+        text: headline,
+        tone: economicTotals.hasData && economicTotals.netOperatingResult < 0 ? "danger" : "ok"
       },
-      smartReport,
-      groupsSummary: smartReport.groupsSummary,
-      farmSummary: smartReport.farmSummary,
-      strengths: smartReport.strengths,
-      watchPoints: smartReport.watchPoints,
-      murabbikGuidance: smartReport.murabbikGuidance,
-      topAnimals: smartReport.topAnimals,
-      dropAnimals: smartReport.dropAnimals,
-      trend: smartReport.trend,
-      consultantReport,
-      updatedAt: new Date().toISOString()
+
+      production: {
+        totalMilkKg: dayTotalKg,
+        previousMilkKg: prevDayTotalKg,
+        dailyDeltaPct: milkReportDeltaPctSrv(dayTotalKg, prevDayTotalKg),
+
+        milkersCount,
+        recordedCount,
+        missingCount,
+        recordingRate,
+
+        avgMilkKgRecorded: safeDiv(dayTotalKg, recordedCount, 1),
+        avgMilkKgMilker: safeDiv(dayTotalKg, milkersCount, 1),
+
+        avgDim: avg(activeMilkers.map(getDimSrv)),
+        avgDcc: avg(activeMilkers.map(dccDays).filter(v => v !== null)),
+
+        speciesSplit: milkReportSplitByKindSrv(dayRows)
+      },
+
+      economics: {
+        ...economicTotals,
+        labels: {
+          milkIncome: "دخل اللبن",
+          feedCost: "تكلفة التغذية",
+          otherOperatingCost: "تكاليف أخرى 20% من التغذية",
+          totalProductionCost: "إجمالي تكلفة الإنتاج",
+          incomeOverFeedCost: "الدخل فوق تكلفة التغذية",
+          netOperatingResult: "صافي التشغيل",
+          productionCostPerKgMilk: "تكلفة إنتاج كجم اللبن",
+          marginPerKgMilk: "هامش كجم اللبن"
+        }
+      },
+
+      comparisons: {
+        daily: {
+          currentDate: reportDate,
+          previousDate: prevDate || null,
+          currentKg: dayTotalKg,
+          previousKg: prevDayTotalKg,
+          deltaPct: milkReportDeltaPctSrv(dayTotalKg, prevDayTotalKg)
+        },
+
+        weekly: {
+          currentStart: current7Start,
+          currentEnd: reportDate,
+          previousStart: previous7Start,
+          previousEnd: previous7End,
+          currentKg: current7Kg,
+          previousKg: previous7Kg,
+          deltaPct: weeklyDelta
+        },
+
+        monthly: {
+          currentStart: monthBounds.start,
+          currentEnd: monthEnd,
+          previousStart: previousMonthBounds.start,
+          previousEnd: milkReportAddDaysSrv(previousMonthBounds.end, -1),
+          currentKg: monthKg,
+          previousKg: previousMonthKg,
+          deltaPct: milkReportDeltaPctSrv(monthKg, previousMonthKg)
+        },
+
+        rolling305: {
+          currentStart: rolling305Start,
+          currentEnd: reportDate,
+          previousStart: previous305Start,
+          previousEnd: previous305End,
+          currentKg: rolling305Kg,
+          previousKg: previous305Kg,
+          deltaPct: milkReportDeltaPctSrv(rolling305Kg, previous305Kg)
+        }
+      },
+
+      groups: groupSummaries,
+
+      exceptions: exceptionRows.slice(0, 15),
+
+      charts: {
+        dailyTrend,
+        weeklyTrend,
+        monthlyTrend,
+        rolling305Trend,
+
+        groupProduction: groupSummaries.map(g => ({
+          groupId: g.groupId,
+          groupName: g.groupName,
+          totalMilkKg: g.totalMilkKg,
+          avgMilkKgMilker: g.avgMilkKgMilker,
+          avgDim: g.avgDim,
+          avgDcc: g.avgDcc
+        })),
+
+        groupEconomics: groupSummaries.map(g => ({
+          groupId: g.groupId,
+          groupName: g.groupName,
+          milkIncome: g.economics?.milkIncome ?? null,
+          feedCost: g.economics?.feedCost ?? null,
+          otherOperatingCost: g.economics?.otherOperatingCost ?? null,
+          netOperatingResult: g.economics?.netOperatingResult ?? null,
+          productionCostPerKgMilk: g.economics?.productionCostPerKgMilk ?? null
+        })),
+
+        dimStages
+      },
+
+      thi: {
+        value: Number.isFinite(thiValue) ? thiValue : null,
+        label: thiLabel,
+        severity: thiSeverity,
+        action:
+          thiSeverity >= 2
+            ? "راجع التبريد والمياه ووقت الانتظار وتوقيت تقديم العليقة."
+            : "لا توجد دلالة THI قوية على ضغط حراري مؤثر الآن."
+      },
+
+      recommendations: recommendations.slice(0, 6),
+
+      scientificReport: {
+        title: "التقرير العلمي المختصر",
+        position: "last_section",
+        notes: [
+          "قراءة اللبن مبنية على القطيع والمجموعات، وليس جدول أفراد كامل.",
+          "اقتصاد الإنتاج يستخدم سعر اللبن من التغذية، تكلفة التغذية، و20% تكاليف تشغيل أخرى.",
+          "DIM وDCC و305 يوم وTHI تُستخدم لتفسير الأداء لا لإصدار توصية بلا مؤشر."
+        ]
+      }
     });
 
   } catch (e) {
-    console.error("milk report summary failed:", e);
+    console.error("professional milk report failed:", e);
     return res.status(500).json({
       ok: false,
       message: "تعذّر تحميل تقرير اللبن الآن."
