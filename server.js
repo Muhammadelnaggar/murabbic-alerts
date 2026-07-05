@@ -24492,46 +24492,82 @@ function milkReportBuildConsultantReportSrv({
   const trend = smartReport.trend || {};
 
   const totalMilkKg = Number(fs.totalKg || trend.totalKg || 0);
+  const milkersCount = Number(fs.milkersCount || 0);
+  const activeAnimalsCount = Number(fs.activeAnimalsCount || 0);
   const avgMilkKg = Number(fs.avgHerdKg);
   const avgDaysInMilk = milkReportAvgSrv((points || []).map(p => p.dim));
+
+  const dayDeltaPct = Number(trend.dayDeltaPct);
+  const hasTrend = Number.isFinite(dayDeltaPct);
 
   const feedDailyCost = Number(economicTotals.totalFeedCost);
   const feedCostPerKgMilk = Number(economicTotals.costPerKgMilk);
   const grossMargin = Number(economicTotals.totalMargin);
+  const hasFeedEconomics = Number.isFinite(feedDailyCost) && feedDailyCost > 0;
 
-  const trendText = trend.dayDeltaPct == null
-    ? "لا توجد مقارنة كافية مع فترة سابقة."
-    : `التغير عن آخر يوم متاح: ${milkReportDisplayPctSrv(trend.dayDeltaPct)}.`;
+  const thiValue = Number(thi?.thi);
+  const thiSeverity = Number(thi?.status?.severity || 0);
+  const thiLabel = thi?.status?.label || "غير متاح";
 
-  const feedText = Number.isFinite(feedDailyCost) && feedDailyCost > 0
-    ? `بيانات التغذية متاحة: تكلفة التغذية اليومية ${milkReportDisplayMoneySrv(feedDailyCost)}، وتكلفة التغذية لكل كجم لبن ${milkReportDisplayMoneySrv(feedCostPerKgMilk)} / كجم${Number.isFinite(grossMargin) ? `، والهامش الأولي ${milkReportDisplayMoneySrv(grossMargin)}` : ""}.`
-    : "لا توجد بيانات تغذية كافية لربط إنتاج اللبن بتكلفة التغذية في هذا التقرير.";
+  const trendText = !hasTrend
+    ? "لا توجد مقارنة كافية مع يوم سابق قريب."
+    : dayDeltaPct > 3
+      ? `الإنتاج أعلى من آخر يوم متاح بنسبة ${milkReportDisplayPctSrv(dayDeltaPct)}.`
+      : dayDeltaPct < -3
+        ? `الإنتاج أقل من آخر يوم متاح بنسبة ${milkReportDisplayPctSrv(dayDeltaPct)}.`
+        : `الإنتاج مستقر تقريبًا مقارنة بآخر يوم متاح (${milkReportDisplayPctSrv(dayDeltaPct)}).`;
 
-  const groups = (groupsSummary || []).map(g => {
+  const climateText = Number.isFinite(thiValue)
+    ? `قراءة THI الحالية ${thiValue} وتصنيفها: ${thiLabel}.`
+    : "لا توجد قراءة THI كافية داخل هذا التقرير.";
+
+  const feedText = hasFeedEconomics
+    ? `بيانات التغذية متاحة: تكلفة التغذية اليومية ${milkReportDisplayMoneySrv(feedDailyCost)}، تكلفة التغذية لكل كجم لبن ${milkReportDisplayMoneySrv(feedCostPerKgMilk)} / كجم، والهامش الأولي ${Number.isFinite(grossMargin) ? milkReportDisplayMoneySrv(grossMargin) : "غير متاح"}.`
+    : "لا توجد بيانات تغذية كافية لربط إنتاج اللبن بتكلفة التغذية والهامش في هذا التقرير.";
+
+  const groupCards = (groupsSummary || []).map(g => {
     const groupPoints = milkReportPointsForGroupSrv(g, points);
     const avgDim = milkReportAvgSrv(groupPoints.map(p => p.dim));
-
     const economics = g.economics || {};
-    const economicsText = economics.hasEconomicData
-      ? `${economics.message || "تم حساب اقتصاد المجموعة من آخر عليقة محفوظة."} تكلفة التغذية اليومية ${milkReportDisplayMoneySrv(economics.totalFeedCost)}، وتكلفة كجم اللبن ${milkReportDisplayMoneySrv(economics.costPerKgMilk)} / كجم${Number.isFinite(Number(economics.totalMargin)) ? `، والهامش الأولي ${milkReportDisplayMoneySrv(economics.totalMargin)}` : ""}.`
+
+    const hasEco = economics.hasEconomicData === true;
+    const economicsText = hasEco
+      ? [
+          economics.message || "تم حساب اقتصاد المجموعة من آخر عليقة محفوظة.",
+          `تكلفة التغذية اليومية ${milkReportDisplayMoneySrv(economics.totalFeedCost)}.`,
+          `تكلفة كجم اللبن ${milkReportDisplayMoneySrv(economics.costPerKgMilk)} / كجم.`,
+          Number.isFinite(Number(economics.totalMargin))
+            ? `الهامش الأولي ${milkReportDisplayMoneySrv(economics.totalMargin)}.`
+            : ""
+        ].filter(Boolean).join(" ")
       : (economics.message || "لا توجد بيانات تغذية كافية لهذه المجموعة.");
+
+    const groupDelta = Number(g.deltaPct);
+    const groupTrendText = Number.isFinite(groupDelta)
+      ? `التغير عن آخر يوم متاح: ${milkReportDisplayPctSrv(groupDelta)}.`
+      : "لا توجد مقارنة كافية لهذه المجموعة.";
 
     return {
       groupName: g.groupName || "بدون مجموعة",
       groupId: g.groupId || "",
       kind: g.kind || "",
       kindText: g.kind === "buffalo" ? "جاموس" : "أبقار",
+
       status: g.status || "مستقرة",
       statusType: g.statusType || "ok",
+
       milkersCount: Number(g.milkersCount || 0),
-      totalMilkKg: Number(g.totalKg || 0),
+      totalMilkKg: milkReportRoundSrv(g.totalKg || 0, 1),
       totalMilkText: milkReportDisplayKgSrv(g.totalKg),
-      avgMilkKg: Number(g.avgKg || 0),
+      avgMilkKg: milkReportRoundSrv(g.avgKg || 0, 1),
       avgMilkText: milkReportDisplayKgSrv(g.avgKg),
       avgDaysInMilk: avgDim == null ? null : Math.round(avgDim),
       avgDaysInMilkText: avgDim == null ? "—" : `${Math.round(avgDim)} يوم`,
+
+      trendText: groupTrendText,
       reading: g.reading || "لا توجد قراءة تفصيلية لهذه المجموعة.",
       economicsText,
+
       top5: (g.topAnimals || []).slice(0, 5).map(milkReportAnimalDisplaySrv),
       low5: milkReportBuildLow5Srv(groupPoints),
       watchAnimals: (g.dropAnimals || []).slice(0, 5).map(milkReportAnimalDisplaySrv),
@@ -24539,48 +24575,139 @@ function milkReportBuildConsultantReportSrv({
     };
   });
 
+  const recommendations = milkReportBuildRecommendationEngineV2Srv({
+    smartReport,
+    groups: groupCards,
+    points,
+    skippedNoCalving,
+    economicTotals,
+    thi
+  });
+
+  const dataQualityNotes = milkReportBuildDataQualityNotesSrv({
+    points,
+    skippedNoCalving
+  });
+
+  const watchGroups = groupCards.filter(g => g.statusType === "warn");
+  const weakGroup = groupCards.find(g => g.statusType === "warn") || null;
+
+  const executiveParagraph =
+    `يعرض هذا التقرير قراءة استشارية لأداء اللبن في ${farmName} بتاريخ ${reportDate || requestedDate || "—"}. ` +
+    `إجمالي اللبن المسجل ${milkReportDisplayKgSrv(totalMilkKg)} من ${milkersCount || "—"} حلّاب، ` +
+    `بمتوسط ${Number.isFinite(avgMilkKg) ? milkReportDisplayKgSrv(avgMilkKg) + " / رأس / يوم" : "غير متاح"}، ` +
+    `ومتوسط أيام حليب ${avgDaysInMilk == null ? "غير متاح" : Math.round(avgDaysInMilk) + " يوم"}. ` +
+    `${trendText} ${climateText} ${feedText}`;
+
+  const professionalConclusion =
+    watchGroups.length
+      ? `الأولوية التشغيلية في هذا التقرير هي مراجعة ${weakGroup?.groupName || "المجموعات التي تحتاج متابعة"} قبل اتخاذ قرار عام على مستوى القطيع. ابدأ بجودة التسجيل، ثم المأكول والبواقي والمياه والراحة ووقت الانتظار، ثم الحالات الفردية الأقل إنتاجًا.`
+      : "لا توجد مجموعة حرجة واضحة في قراءة اليوم. يستمر التقرير كمتابعة دورية بشرط اكتمال تسجيل اللبن وربط بيانات التغذية بالمجموعات.";
+
   return {
+    version: "milk_consultant_report_v2",
+
     header: {
-      title: "تقرير أداء اللبن",
+      title: "تقرير اللبن الاستشاري",
+      subtitle: "قراءة علمية تشغيلية لأداء اللبن حسب القطيع والمجموعات والأفراد",
       periodText: `الفترة: يوم ${reportDate || requestedDate || "—"}`,
       issuedAtText: `تاريخ الإصدار: ${new Date().toLocaleDateString("ar-EG")} — ${new Date().toLocaleTimeString("ar-EG")}`,
       farmNameText: `المزرعة/القطيع: ${farmName}`,
       scopeText: `نطاق التقرير: ${selectedTypeLabel || "الكل"}`
     },
 
-    herdSummary: {
-      text:
-        `إجمالي إنتاج القطيع في فترة التقرير ${milkReportDisplayKgSrv(totalMilkKg)}، ` +
-        `ومتوسط القطيع ${Number.isFinite(avgMilkKg) ? milkReportDisplayKgSrv(avgMilkKg) + " / رأس / يوم" : "غير متاح"}، ` +
-        `ومتوسط أيام الحليب ${avgDaysInMilk == null ? "غير متاح" : Math.round(avgDaysInMilk) + " يوم"}. ` +
-        `${trendText} ${feedText}`,
+    executiveSummary: {
+      title: "الملخص التنفيذي للقطيع",
+      text: executiveParagraph,
+      conclusion: professionalConclusion,
+      metrics: [
+        {
+          label: "إجمالي إنتاج القطيع",
+          value: milkReportDisplayKgSrv(totalMilkKg)
+        },
+        {
+          label: "متوسط اللبن / رأس / يوم",
+          value: Number.isFinite(avgMilkKg) ? `${milkReportDisplayKgSrv(avgMilkKg)} / رأس / يوم` : "—"
+        },
+        {
+          label: "متوسط أيام الحليب",
+          value: avgDaysInMilk == null ? "—" : `${Math.round(avgDaysInMilk)} يوم`
+        },
+        {
+          label: "التغير عن الفترة السابقة",
+          value: hasTrend ? milkReportDisplayPctSrv(dayDeltaPct) : "لا توجد مقارنة"
+        },
+        {
+          label: "تكلفة التغذية اليومية",
+          value: hasFeedEconomics ? milkReportDisplayMoneySrv(feedDailyCost) : "غير متاح"
+        },
+        {
+          label: "تكلفة التغذية / كجم لبن",
+          value: Number.isFinite(feedCostPerKgMilk) && feedCostPerKgMilk > 0
+            ? `${milkReportDisplayMoneySrv(feedCostPerKgMilk)} / كجم`
+            : "غير متاح"
+        },
+        {
+          label: "الهامش الأولي",
+          value: Number.isFinite(grossMargin) ? milkReportDisplayMoneySrv(grossMargin) : "غير متاح"
+        }
+      ]
+    },
 
+    herdSummary: {
+      text: executiveParagraph,
       metrics: {
         totalMilkText: milkReportDisplayKgSrv(totalMilkKg),
         avgMilkText: Number.isFinite(avgMilkKg) ? `${milkReportDisplayKgSrv(avgMilkKg)} / رأس / يوم` : "—",
         avgDaysInMilkText: avgDaysInMilk == null ? "—" : `${Math.round(avgDaysInMilk)} يوم`,
-        changeVsPreviousText: trend.dayDeltaPct == null ? "لا توجد مقارنة" : milkReportDisplayPctSrv(trend.dayDeltaPct),
-        feedDailyCostText: Number.isFinite(feedDailyCost) && feedDailyCost > 0 ? milkReportDisplayMoneySrv(feedDailyCost) : "غير متاح",
-        feedCostPerKgMilkText: Number.isFinite(feedCostPerKgMilk) && feedCostPerKgMilk > 0 ? `${milkReportDisplayMoneySrv(feedCostPerKgMilk)} / كجم` : "غير متاح",
-        grossMarginText: Number.isFinite(grossMargin) ? milkReportDisplayMoneySrv(grossMargin) : "غير متاح"
+        milkersCountText: milkersCount ? String(milkersCount) : "—",
+        activeAnimalsCountText: activeAnimalsCount ? String(activeAnimalsCount) : "—",
+        changeVsPreviousText: hasTrend ? milkReportDisplayPctSrv(dayDeltaPct) : "لا توجد مقارنة",
+        feedDailyCostText: hasFeedEconomics ? milkReportDisplayMoneySrv(feedDailyCost) : "غير متاح",
+        feedCostPerKgMilkText: Number.isFinite(feedCostPerKgMilk) && feedCostPerKgMilk > 0
+          ? `${milkReportDisplayMoneySrv(feedCostPerKgMilk)} / كجم`
+          : "غير متاح",
+        grossMarginText: Number.isFinite(grossMargin) ? milkReportDisplayMoneySrv(grossMargin) : "غير متاح",
+        thiText: Number.isFinite(thiValue) ? `${thiValue} — ${thiLabel}` : "غير متاح"
       }
     },
 
-      groups,
+    productionAssessment: {
+      title: "قراءة الإنتاج",
+      text: trendText,
+      level: !hasTrend ? "info" : dayDeltaPct <= -5 ? "warn" : "ok"
+    },
 
-    recommendations: milkReportBuildRecommendationEngineV2Srv({
-      smartReport,
-      groups,
-      points,
-      skippedNoCalving,
-      economicTotals,
-      thi
-    }),
+    climateAssessment: {
+      title: "قراءة الإجهاد الحراري THI",
+      text: climateText,
+      level: thiSeverity >= 3 ? "high" : thiSeverity >= 2 ? "medium" : "low",
+      action:
+        thiSeverity >= 2
+          ? "عند ارتفاع THI لا يبدأ القرار برفع المركزات؛ تبدأ المراجعة من التبريد، المياه، التهوية، وقت الانتظار، وتوقيت تقديم العليقة."
+          : "لا توجد دلالة حرارية قوية من THI وحده داخل هذا التقرير."
+    },
 
-    dataQualityNotes: milkReportBuildDataQualityNotesSrv({
-      points,
-      skippedNoCalving
-    })
+    nutritionEconomicsAssessment: {
+      title: "ربط الإنتاج بالتغذية والاقتصاد",
+      text: feedText,
+      level: hasFeedEconomics ? "available" : "missing",
+      action:
+        hasFeedEconomics
+          ? "تُراجع تكلفة كجم اللبن والهامش بين المجموعات قبل تعديل الخلطة."
+          : "احفظ عليقة الحلاب أو آخر عليقة فعالة للمجموعة حتى يربط مُرَبِّيك الإنتاج بتكلفة التغذية."
+    },
+
+    groups: groupCards,
+
+    recommendations,
+
+    dataQualityNotes,
+
+    printHints: {
+      report: "يمكن طباعة التقرير كاملًا أو حفظه PDF.",
+      group: "كل مجموعة يمكن طباعتها منفصلة عند دعم زر طباعة المجموعة في الواجهة."
+    }
   };
 }
 function milkReportBuildSmartReportSrv({
