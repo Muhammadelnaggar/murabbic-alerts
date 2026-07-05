@@ -272,7 +272,7 @@
       <div class="notice" id="serverMessage"></div>
 
       <section class="section">
-        <div class="section-head"><div><h3>إنتاج اليوم</h3><p>قراءة سريعة واضحة لصاحب المزرعة.</p></div></div>
+        <div class="section-head"><div><h3 id="productionSectionTitle">إنتاج أمس</h3><p>قراءة سريعة واضحة لصاحب المزرعة.</p></div></div>
         <div class="kpi-row" id="productionCards"></div>
       </section>
 
@@ -346,6 +346,20 @@
       const d = new Date(), z = d.getTimezoneOffset() * 60000;
       return new Date(d.getTime() - z).toISOString().slice(0,10);
     }
+
+    function yesterdayISO(){
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      const z = d.getTimezoneOffset() * 60000;
+      return new Date(d.getTime() - z).toISOString().slice(0,10);
+    }
+
+    function reportDayLabel(date){
+      const d = String(date || "").slice(0,10);
+      if (d === yesterdayISO()) return "أمس";
+      if (d === todayISO()) return "اليوم";
+      return "يوم التقرير";
+    }
     function num(v,d=1){const x=Number(v);return Number.isFinite(x)?x.toLocaleString("ar-EG",{minimumFractionDigits:d,maximumFractionDigits:d}):"—"}
     function int(v){const x=Number(v);return Number.isFinite(x)?x.toLocaleString("ar-EG",{maximumFractionDigits:0}):"—"}
     function money(v){const x=Number(v);return Number.isFinite(x)?x.toLocaleString("ar-EG",{minimumFractionDigits:0,maximumFractionDigits:2})+" ج":"—"}
@@ -376,7 +390,7 @@
     function renderHeroSummary(j){
       const p = j.production || {};
       const e = j.economics || {};
-      const actualDate = j.meta?.actualDate || j.meta?.reportDate || j.date || "";
+      const actualDate = j.meta?.actualDate || j.meta?.reportDate || j.date || $("reportDate").value || yesterdayISO();
       $("heroSummary").innerHTML = [
         heroSummaryCard("تاريخ التقرير", esc(actualDate || "—"), j.message ? arClean(j.message) : "اليوم المعروض في التقرير"),
         heroSummaryCard("إنتاج القطيع", `${num(p.totalMilkKg,1)} كجم`, `متوسط الحلاب ${num(p.avgMilkKgRecorded ?? p.avgMilkKgMilker,1)} كجم`),
@@ -397,7 +411,7 @@
       const recTone = Number(p.recordingRate)>=90 ? "good" : Number(p.recordingRate)>=75 ? "warn" : "warn";
 
       $("productionCards").innerHTML = [
-        kpiCard("إجمالي إنتاج اللبن للقطيع", `${num(p.totalMilkKg,1)} كجم`, "إجمالي اللبن المسجل في يوم التقرير", "blue"),
+        kpiCard("إجمالي إنتاج اللبن للقطيع", `${num(p.totalMilkKg,1)} كجم`, "إجمالي اللبن المسجل في تاريخ التقرير", "blue"),
         kpiCard("متوسط الرأس/يوم للقطيع", `${num(p.avgMilkKgMilker,1)} كجم`, `على ${int(p.milkersCount)} حلاب`, "good"),
         kpiCard("نسبة تسجيل اللبن للقطيع", `${num(p.recordingRate,1)}%`, `${int(p.recordedCount)} مسجل · ${int(p.missingCount)} غير مسجل`, recTone),
         kpiCard("متوسط أيام الحليب للقطيع", `${num(p.avgDim,0)} يوم`, "متوسط أيام الحليب للقطيع", "blue"),
@@ -674,11 +688,14 @@
 
     function renderAll(j){
       $("loading").style.display="none"; $("report").style.display="block";
+      const selectedReportDate = $("reportDate").value || yesterdayISO();
+      const dayLabel = reportDayLabel(selectedReportDate);
       $("heroTitle").textContent = arClean(j.headline?.title || "تقرير إنتاج اللبن");
       $("heroLine").textContent = arClean(
         j.headline?.text ||
-        `إنتاج اليوم ${num(j.production?.totalMilkKg,1)} كجم · متوسط الحلاب ${num(j.production?.avgMilkKgRecorded,1)} كجم · ${j.meta?.selectedTypeLabel || "الكل"}`
+        `إنتاج ${dayLabel} ${num(j.production?.totalMilkKg,1)} كجم · متوسط الحلاب ${num(j.production?.avgMilkKgRecorded,1)} كجم · ${j.meta?.selectedTypeLabel || "الكل"}`
       );
+      $("productionSectionTitle").textContent = `إنتاج ${dayLabel}`;
       renderHeroSummary(j);
       $("heroNet").textContent = money(j.economics?.netOperatingResult);
       if(j.message){$("serverMessage").textContent=j.message;$("serverMessage").classList.add("show")}else{$("serverMessage").classList.remove("show")}
@@ -721,7 +738,7 @@
       $("heroLine").textContent="أدخل سعر كجم اللبن بجانب تاريخ التقرير لحساب الاقتصاد بدقة.";
       $("heroSummary").innerHTML=[
         heroSummaryCard("حالة التقرير", "في انتظار السعر", "اكتب سعر كجم اللبن ثم يتم تحميل التقرير تلقائيًا"),
-        heroSummaryCard("تاريخ التقرير", esc($("reportDate").value || todayISO()), "التاريخ المختار من أعلى الصفحة"),
+        heroSummaryCard("تاريخ التقرير", esc($("reportDate").value || yesterdayISO()), "الافتراضي هو إنتاج أمس"),
         heroSummaryCard("نوع القطيع", esc(getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل"), "قادم من الداشبورد")
       ].join("");
       $("heroNet").textContent="—";
@@ -750,7 +767,7 @@
       if(!milkPrice){showPriceRequired();return}
 
       $("loading").style.display="grid"; $("report").style.display="none"; $("loading").textContent="جاري تحميل تقرير اللبن...";
-      const date=$("reportDate").value||todayISO(), kind=getKindFromQuery();
+      const date=$("reportDate").value||yesterdayISO(), kind=getKindFromQuery();
       const params=new URLSearchParams({date,milkPrice:String(milkPrice)});
       if(kind){params.set("kind",kind);params.set("species",kind)}
       try{
@@ -775,7 +792,7 @@
       window.__milkPriceTimer=setTimeout(loadReport,450);
     });
     $("milkPriceInput").addEventListener("change",loadReport);
-    $("reportDate").value = getQueryDate() || todayISO();
+    $("reportDate").value = getQueryDate() || yesterdayISO();
     showPriceRequired();
   </script>
 </body>
