@@ -23741,9 +23741,28 @@ function milkReportNutritionGroupNameSrv(e = {}) {
 
   return String(
     ctx.groupName ||
-    ctx.group ||
     ctx.groupLabel ||
+    ctx.productionGroupName ||
+    ctx.groupTitle ||
+    ctx.group ||
     e.groupName ||
+    e.group ||
+    ""
+  ).trim();
+}
+
+function milkReportNutritionGroupIdSrv(e = {}) {
+  const ctx = e.nutrition?.context || {};
+
+  return String(
+    ctx.groupId ||
+    ctx.groupKey ||
+    ctx.groupCode ||
+    ctx.productionGroupId ||
+    ctx.milkGroupId ||
+    e.groupId ||
+    e.groupKey ||
+    e.groupCode ||
     ""
   ).trim();
 }
@@ -23798,8 +23817,36 @@ function milkReportNutritionMilkPriceSrv(e = {}) {
 }
 
 function milkReportLatestNutritionForGroupSrv(nutritionEvents = [], group = {}, reportDate = "") {
-  const groupNameNorm = milkReportNormTextSrv(group.groupName);
-  const groupNumbers = new Set((group.groupNumbers || []).map(v => milkReportNumberSrv(v)).filter(Boolean));
+  const norm = v => milkReportNormTextSrv(v);
+
+  const simplifyGroupText = v => norm(v)
+    .replace(/ابقار|بقر|جاموسه|جاموس|cow|cows|buffalo/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const textMatch = (a, b) => {
+    const x = norm(a);
+    const y = norm(b);
+
+    if (!x || !y) return false;
+    if (x === y) return true;
+    if (x.includes(y) || y.includes(x)) return true;
+
+    const sx = simplifyGroupText(x);
+    const sy = simplifyGroupText(y);
+
+    if (!sx || !sy) return false;
+    return sx === sy || sx.includes(sy) || sy.includes(sx);
+  };
+
+  const groupIdNorm = norm(group.groupId);
+  const groupNameNorm = norm(group.groupName);
+
+  const groupNumbers = new Set(
+    (group.groupNumbers || [])
+      .map(v => milkReportNumberSrv(v))
+      .filter(Boolean)
+  );
 
   const candidates = [];
 
@@ -23807,13 +23854,18 @@ function milkReportLatestNutritionForGroupSrv(nutritionEvents = [], group = {}, 
     const d = milkReportEventDateSrv(ev);
     if (!milkReportIsDateSrv(d) || d > reportDate) continue;
 
-    const eventGroupNameNorm = milkReportNormTextSrv(milkReportNutritionGroupNameSrv(ev));
+    const eventGroupIdNorm = norm(milkReportNutritionGroupIdSrv(ev));
+    const eventGroupNameNorm = norm(milkReportNutritionGroupNameSrv(ev));
     const eventNumbers = milkReportNutritionNumbersSetSrv(ev);
 
     let matchScore = 0;
 
-    if (groupNameNorm && eventGroupNameNorm && groupNameNorm === eventGroupNameNorm) {
-      matchScore += 1000;
+    if (groupIdNorm && eventGroupIdNorm && groupIdNorm === eventGroupIdNorm) {
+      matchScore += 4000;
+    }
+
+    if (textMatch(groupNameNorm, eventGroupNameNorm)) {
+      matchScore += 1500;
     }
 
     let overlap = 0;
@@ -23822,7 +23874,7 @@ function milkReportLatestNutritionForGroupSrv(nutritionEvents = [], group = {}, 
     }
 
     if (overlap > 0) {
-      matchScore += overlap;
+      matchScore += Math.min(800, overlap * 20);
     }
 
     if (matchScore <= 0) continue;
@@ -25176,14 +25228,15 @@ app.get("/api/milk-reports/summary", requireUserId, async (req, res) => {
       const avgDim = avg(members.map(getDimSrv));
       const avgDcc = avg(members.map(dccDays).filter(v => v !== null));
 
-      const latestNutrition = milkReportLatestNutritionForGroupSrv(
-        nutritionEvents,
-        {
-          groupName,
-          groupNumbers: [...groupNumbers]
-        },
-        reportDate
-      );
+const latestNutrition = milkReportLatestNutritionForGroupSrv(
+  nutritionEvents,
+  {
+    groupId,
+    groupName,
+    groupNumbers: [...groupNumbers]
+  },
+  reportDate
+);
 
       const hasEconomics = !!latestNutrition;
 
