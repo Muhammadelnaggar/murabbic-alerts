@@ -52,6 +52,21 @@
     .grid{display:grid;gap:12px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
     .card{background:white;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:15px;overflow:hidden}
 
+    .kpi-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+    .kpi-card{
+      background:white;
+      border:1px solid var(--line);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+      padding:14px;
+    }
+    .kpi-card .k-label{color:var(--muted);font-size:12px;font-weight:900}
+    .kpi-card .k-value{margin-top:8px;font-size:25px;font-weight:950;color:#0f172a;line-height:1.25}
+    .kpi-card .k-sub{margin-top:6px;color:#64748b;font-size:12px;line-height:1.55;font-weight:800}
+    .kpi-card.good .k-value{color:var(--ok)}
+    .kpi-card.warn .k-value{color:var(--warn)}
+    .kpi-card.blue .k-value{color:var(--blue)}
+
     .table-card{padding:0}
     .report-table{width:100%;border-collapse:collapse;overflow:hidden}
     .report-table th{background:#f8fafc;color:#475569;font-size:12px;text-align:right;padding:12px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -157,7 +172,7 @@
     .footer-note{text-align:center;color:var(--muted);font-size:12px;font-weight:750;margin-top:18px}
 
     @media(max-width:980px){
-      .hero-grid,.grid-2,.group-list,.recommendations,.group-main,.group-econ{grid-template-columns:1fr}
+      .hero-grid,.grid-2,.group-list,.recommendations,.group-main,.group-econ,.kpi-row{grid-template-columns:1fr}
       .controls{width:100%}.field{flex:1 1 140px}.field input,.field select{width:100%;min-width:0}
       .table-scroll{overflow-x:auto}.report-table{min-width:650px}
       .chart svg{height:300px}.chart{min-height:300px}
@@ -205,8 +220,8 @@
       <div class="notice" id="serverMessage"></div>
 
       <section class="section">
-        <div class="section-head"><div><h3>إنتاج اليوم</h3><p>الأرقام الأساسية في جدول واحد مختصر.</p></div></div>
-        <div class="card table-card table-scroll"><table class="report-table" id="productionTable"></table></div>
+        <div class="section-head"><div><h3>إنتاج اليوم</h3><p>قراءة سريعة واضحة لصاحب المزرعة.</p></div></div>
+        <div class="kpi-row" id="productionCards"></div>
       </section>
 
       <section class="section">
@@ -289,18 +304,25 @@
     function toneByValue(v, goodPositive=true){const x=Number(v); if(!Number.isFinite(x)||x===0)return"blue"; return (goodPositive ? x>0 : x<0) ? "ok" : "danger"}
     function row(a,b,c,d){return `<tr><td>${a}</td><td class="num">${b}</td><td>${c||""}</td><td>${d||""}</td></tr>`}
 
+    function kpiCard(label, value, sub, tone=""){
+      return `<div class="kpi-card ${tone}">
+        <div class="k-label">${esc(label)}</div>
+        <div class="k-value">${value}</div>
+        <div class="k-sub">${esc(sub || "")}</div>
+      </div>`;
+    }
+
     function renderProduction(j){
       const p=j.production||{};
-      const totalTone=toneByValue(p.dailyDeltaPct,true);
-      const regTone=Number(p.recordingRate)>=90?"ok":Number(p.recordingRate)>=70?"warn":"danger";
-      $("productionTable").innerHTML=`
-        <thead><tr><th>المؤشر</th><th>القيمة</th><th>الاتجاه</th><th>الحالة</th></tr></thead>
-        <tbody>
-          ${row("إجمالي اللبن",`${num(p.totalMilkKg,1)} كجم`,`${arrow(p.dailyDeltaPct)} ${pct(p.dailyDeltaPct)} عن السابق`,status(totalTone==="danger"?"انخفاض":"متابعة",""+totalTone))}
-          ${row("متوسط المسجل",`${num(p.avgMilkKgRecorded,1)} كجم/رأس`,`المسجل: ${int(p.recordedCount)} رأس`,status("مسجل","blue"))}
-          ${row("نسبة التسجيل",`${num(p.recordingRate,1)}%`,`غير مسجل: ${int(p.missingCount)} رأس`,status(Number(p.recordingRate)>=90?"جيد":"راجع التسجيل",regTone))}
-          ${row("متوسط DIM",`${num(p.avgDim,0)} يوم`,`DCC: ${num(p.avgDcc,0)} يوم`,status("مرحلة إنتاج","blue"))}
-        </tbody>`;
+      const recTone = Number(p.recordingRate)>=90 ? "good" : Number(p.recordingRate)>=75 ? "warn" : "warn";
+
+      $("productionCards").innerHTML = [
+        kpiCard("إجمالي إنتاج اللبن للقطيع", `${num(p.totalMilkKg,1)} كجم`, "إجمالي اللبن المسجل في يوم التقرير", "blue"),
+        kpiCard("متوسط الرأس/يوم للقطيع", `${num(p.avgMilkKgMilker,1)} كجم`, `على ${int(p.milkersCount)} حلاب`, "good"),
+        kpiCard("نسبة تسجيل اللبن للقطيع", `${num(p.recordingRate,1)}%`, `${int(p.recordedCount)} مسجل · ${int(p.missingCount)} غير مسجل`, recTone),
+        kpiCard("متوسط أيام الحليب للقطيع", `${num(p.avgDim,0)} يوم`, "متوسط DIM للقطيع", "blue"),
+        kpiCard("متوسط أيام الحمل للقطيع", `${num(p.avgDcc,0)} يوم`, "متوسط DCC للحيوانات المتاح لها بيانات", "blue")
+      ].join("");
     }
 
     function renderEconomy(j){
