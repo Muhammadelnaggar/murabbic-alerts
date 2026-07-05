@@ -316,6 +316,124 @@
     .muted{
       color:var(--muted);
     } 
+ .consultant-head-card h2{
+  margin:0 0 8px 0;
+  color:var(--green-600);
+  font-size:22px;
+  font-weight:900;
+}
+
+.consultant-subtitle{
+  margin:0;
+  color:#334155;
+  font-weight:800;
+  line-height:1.7;
+}
+
+.consultant-meta{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:8px;
+  margin-top:12px;
+}
+
+@media(min-width:720px){
+  .consultant-meta{
+    grid-template-columns:repeat(2,1fr);
+  }
+}
+
+.consultant-meta div,
+.consultant-metric{
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fff;
+  padding:10px;
+  font-weight:800;
+  color:#334155;
+}
+
+.consultant-summary{
+  margin:0;
+  color:#334155;
+  font-weight:800;
+  line-height:1.9;
+}
+
+.consultant-conclusion{
+  margin:10px 0 0 0;
+  padding:10px;
+  border-radius:12px;
+  border:1px solid #bbf7d0;
+  background:#f7fef9;
+  color:#065f46;
+  font-weight:900;
+  line-height:1.8;
+}
+
+.consultant-metrics{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+  margin-top:12px;
+}
+
+@media(min-width:720px){
+  .consultant-metrics{
+    grid-template-columns:repeat(3,1fr);
+  }
+}
+
+.consultant-metric strong{
+  display:block;
+  font-size:18px;
+  margin-top:4px;
+  color:#0f172a;
+}
+
+.assessment-grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+  margin-top:12px;
+}
+
+@media(min-width:760px){
+  .assessment-grid{
+    grid-template-columns:repeat(3,1fr);
+  }
+}
+
+.assessment-card h3{
+  margin:0 0 8px 0;
+  color:var(--green-600);
+  font-size:16px;
+  font-weight:900;
+}
+
+.assessment-card p{
+  margin:0;
+  color:#334155;
+  font-weight:800;
+  line-height:1.8;
+}
+
+.assessment-action{
+  margin-top:8px;
+  color:#64748b;
+  font-weight:800;
+  line-height:1.7;
+}
+
+.group-extra{
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:9px;
+  background:#fff;
+  color:#334155;
+  font-weight:800;
+  line-height:1.7;
+} 
     .print-actions{
   display:flex;
   align-items:center;
@@ -467,12 +585,61 @@
   <button class="btn primary js-print-report" type="button">🖨️ طباعة التقرير / حفظ PDF</button>
   <small>من نافذة الطباعة اختر Save as PDF لحفظ التقرير.</small>
 </div>
-  <div id="msg" class="notice"></div>
+   <div id="msg" class="notice"></div>
+
+  <section class="card consultant-head-card" id="consultantHeader">
+    <h2 id="consultantTitle">تقرير اللبن الاستشاري</h2>
+    <p class="consultant-subtitle" id="consultantSubtitle">
+      قراءة علمية تشغيلية لأداء اللبن حسب القطيع والمجموعات والأفراد.
+    </p>
+
+    <div class="consultant-meta">
+      <div id="consultantFarm">المزرعة/القطيع: —</div>
+      <div id="consultantPeriod">الفترة: —</div>
+      <div id="consultantIssuedAt">تاريخ الإصدار: —</div>
+      <div id="consultantScope">نطاق التقرير: —</div>
+    </div>
+  </section>
+
+  <section class="card" id="executiveSummaryCard">
+    <div class="section-head">
+      <div>
+        <h3 id="executiveTitle">الملخص التنفيذي للقطيع</h3>
+        <small>قراءة مُرَبِّيك الاستشارية لنتيجة اليوم وربطها بالإنتاج، THI، والتغذية عند توفرها.</small>
+      </div>
+    </div>
+
+    <p class="consultant-summary" id="executiveText">جاري تحميل الملخص التنفيذي…</p>
+    <p class="consultant-conclusion" id="executiveConclusion">—</p>
+
+    <div class="consultant-metrics" id="executiveMetrics"></div>
+  </section>
+
+  <div class="assessment-grid">
+    <section class="card assessment-card">
+      <h3 id="productionTitle">قراءة الإنتاج</h3>
+      <p id="productionText">جاري التحميل…</p>
+      <div class="assessment-action" id="productionAction"></div>
+    </section>
+
+    <section class="card assessment-card">
+      <h3 id="climateTitle">قراءة الإجهاد الحراري THI</h3>
+      <p id="climateText">جاري التحميل…</p>
+      <div class="assessment-action" id="climateAction"></div>
+    </section>
+
+    <section class="card assessment-card">
+      <h3 id="nutritionTitle">ربط الإنتاج بالتغذية والاقتصاد</h3>
+      <p id="nutritionText">جاري التحميل…</p>
+      <div class="assessment-action" id="nutritionAction"></div>
+    </section>
+  </div>
+
   <section class="card" id="groupsSection">
     <div class="section-head">
       <div>
         <h3>مجموعات الحلّاب</h3>
-        <small>قراءة مُرَبِّيك حسب المجموعة: الإنتاج، المتوسط، التغير، وأهم الأفراد.</small>
+        <small>كل مجموعة تُعرض كقراءة مستقلة: الإنتاج، المتوسط، أيام الحليب، الاقتصاد، وأهم الأفراد.</small>
       </div>
     </div>
 
@@ -481,63 +648,19 @@
     </div>
   </section>
 
-  <div class="smart-grid">
-    <section class="card smart-card">
-      <h3>نقاط القوة</h3>
-      <ul class="smart-list" id="strengthsList">
-        <li class="empty">جاري التحميل…</li>
-      </ul>
-    </section>
-
-    <section class="card smart-card">
-      <h3>نقاط تحتاج متابعة</h3>
-      <ul class="smart-list" id="watchList">
-        <li class="empty">جاري التحميل…</li>
-      </ul>
-    </section>
-
-    <section class="card smart-card">
-      <h3>توجيهات مُرَبِّيك</h3>
-      <ul class="smart-list" id="guidanceList">
-        <li class="empty">جاري التحميل…</li>
-      </ul>
-    </section>
-  </div>
-
-  <section class="card farm-title-card">
-    <h3>إجماليات ومتوسطات المزرعة</h3>
-    <p id="farmReading">الأرقام الشهرية والسنوية تعني إجمالي اللبن المسجل حتى تاريخ العرض، وليست تقديرًا لإنتاج شهر أو سنة كاملة.</p>
+  <section class="card smart-card">
+    <h3>توصيات مُرَبِّيك المهنية</h3>
+    <ul class="smart-list" id="recommendationsList">
+      <li class="empty">جاري التحميل…</li>
+    </ul>
   </section>
-  <div class="row" id="kpis">
-    <div class="card kpi">
-      <h3>إجمالي اليوم</h3>
-      <div class="num" id="sumDay">— كجم
-        <span id="sumDayDelta" class="delta neutral" title="التغير عن آخر يوم متاح">—</span>
-      </div>
-      <small id="sumDayBreak">أبقار: — • جاموس: —</small>
-    </div>
-    <div class="card kpi">
-     <h3>إجمالي اللبن المسجل هذا الشهر</h3>
-      <div class="num" id="sumMonth">— كجم</div>
-      <small id="sumMonthBreak">أبقار: — • جاموس: —</small>
-    </div>
-    <div class="card kpi">
-     <h3>إجمالي اللبن المسجل هذا العام</h3>
-      <div class="num" id="sumYear">— كجم</div>
-      <small id="sumYearBreak">أبقار: — • جاموس: —</small>
-    </div>
-    <div class="card kpi">
-      <h3>متوسط القطيع اليومي</h3>
-      <div class="num" id="avgHerd">— كجم/رأس</div>
-      <small id="milkersCount">عدد الحلّاب: — / إجمالي: —</small>
-    </div>
-    <div class="card kpi">
-      <h3>متوسط تكلفة كجم اللبن (تغذية)</h3>
-      <div class="num" id="feedCostPerKg">— ج.م/كجم</div>
-      <small id="feedNote">يتطلب حدث تغذية لليوم</small>
-    </div>
-  </div>
 
+  <section class="card smart-card">
+    <h3>ملاحظات جودة البيانات</h3>
+    <ul class="smart-list" id="dataQualityList">
+      <li class="empty">جاري التحميل…</li>
+    </ul>
+  </section>
   <div class="card" id="scatterWrap" style="position:relative">
     <h3 style="margin:0 0 8px 0">خريطة الأفراد (Scatter): <span>أيام الحليب (من آخر ولادة)</span> × <span>كجم/اليوم</span></h3>
     <canvas id="scatter"></canvas>
@@ -601,46 +724,7 @@
     el.textContent = "";
   }
 
-  function setDeltaBadge(todayTotal, prevTotal, prevDate){
-    const el = $("sumDayDelta");
-    if (!el) return;
-
-    if (!prevTotal || prevTotal <= 0) {
-      el.textContent = "—";
-      el.className = "delta neutral";
-      el.title = "لا يوجد يوم سابق للمقارنة";
-      return;
-    }
-
-    const pct = ((todayTotal - prevTotal) / prevTotal) * 100;
-    el.textContent = `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
-    el.className = "delta " + (pct > 0 ? "up" : (pct < 0 ? "down" : "neutral"));
-    el.title = `مقارنةً بيوم ${prevDate || "—"}`;
-  }
-
-  function putKpis(data){
-    const k = data.kpis || {};
-    const day = k.day || {};
-    const month = k.month || {};
-    const year = k.year || {};
-    const prev = k.prevDay || {};
-
-    $("sumDay").firstChild.nodeValue = `${kg(day.all).toLocaleString()} كجم`;
-    setDeltaBadge(kg(day.all), kg(prev.all), k.prevDate);
-
-    $("sumDayBreak").textContent = `أبقار: ${kg(day.cow)} • جاموس: ${kg(day.buffalo)}`;
-    $("sumMonth").textContent = `${kg(month.all).toLocaleString()} كجم`;
-    $("sumMonthBreak").textContent = `المسجل من بداية الشهر حتى تاريخ العرض • أبقار: ${kg(month.cow)} • جاموس: ${kg(month.buffalo)}`;
-    $("sumYear").textContent = `${kg(year.all).toLocaleString()} كجم`;
-    $("sumYearBreak").textContent = `المسجل من بداية العام حتى تاريخ العرض • أبقار: ${kg(year.cow)} • جاموس: ${kg(year.buffalo)}`;
-
-    $("avgHerd").textContent = k.avgHerdKg ? `${k.avgHerdKg} كجم/رأس` : "— كجم/رأس";
-    $("milkersCount").textContent = `عدد الحلّاب: ${k.milkersCount || 0} / إجمالي: ${k.totalAnimals ?? "—"}`;
-
-    $("feedCostPerKg").textContent = k.feedCostPerKg ? `${k.feedCostPerKg} ج.م/كجم` : "— ج.م/كجم";
-   $("feedNote").textContent = k.feedNote || "لا توجد علائق تغذية محفوظة كافية لحساب الاقتصاد";
-  }
-    function escapeHtml(v){
+  function escapeHtml(v){
     return String(v ?? "")
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
@@ -653,27 +737,10 @@
     return Array.isArray(v) ? v : [];
   }
 
-  function fmtNumber(v, digits = 1){
-    const n = Number(v);
-    if (!Number.isFinite(n)) return "—";
-
-    return n.toLocaleString("ar-EG", {
-      maximumFractionDigits: digits
-    });
-  }
-
-  function fmtKg(v){
-    const n = Number(v);
-    return Number.isFinite(n) ? `${fmtNumber(n)} كجم` : "—";
-  }
-
-  function fmtPct(v){
-    if (v === null || v === undefined || v === "") return "—";
-
-    const n = Number(v);
-    if (!Number.isFinite(n)) return "—";
-
-    return `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
+  function setText(id, value, fallback = "—"){
+    const el = $(id);
+    if (!el) return;
+    el.textContent = value || fallback;
   }
 
   function statusClass(type){
@@ -685,7 +752,7 @@
     return "ok";
   }
 
-  function renderList(id, items, fallback){
+  function renderServerList(id, items, fallback){
     const el = $(id);
     if (!el) return;
 
@@ -702,35 +769,84 @@
 
     for (const item of clean) {
       const li = document.createElement("li");
-      li.textContent = String(item);
+      li.textContent = typeof item === "string"
+        ? item
+        : (item.text || item.message || item.title || JSON.stringify(item));
       el.appendChild(li);
     }
   }
 
-  function renderAnimalItems(items, emptyText, mode){
-    const clean = arr(items).slice(0, 3);
+  function renderExecutiveMetrics(metrics){
+    const el = $("executiveMetrics");
+    if (!el) return;
+
+    const clean = arr(metrics);
+    el.innerHTML = "";
+
+    if (!clean.length) {
+      el.innerHTML = `<div class="empty">لا توجد مؤشرات تنفيذية كافية.</div>`;
+      return;
+    }
+
+    for (const m of clean) {
+      const div = document.createElement("div");
+      div.className = "consultant-metric";
+      div.innerHTML = `
+        <span>${escapeHtml(m.label || "مؤشر")}</span>
+        <strong>${escapeHtml(m.value || "—")}</strong>
+      `;
+      el.appendChild(div);
+    }
+  }
+
+  function renderAssessment(prefix, section = {}){
+    setText(`${prefix}Title`, section.title || "");
+    setText(`${prefix}Text`, section.text || "—");
+    setText(`${prefix}Action`, section.action || "");
+  }
+
+  function renderTextItems(items, emptyText){
+    const clean = arr(items).slice(0, 5).filter(Boolean);
 
     if (!clean.length) {
       return `<li class="muted">${escapeHtml(emptyText)}</li>`;
     }
 
-    return clean.map(a => {
-      const number = escapeHtml(a.number || "—");
-      const kgText = escapeHtml(fmtKg(a.kg));
-      const deltaText = a.deltaPct == null ? "" : ` • ${escapeHtml(fmtPct(a.deltaPct))}`;
-      const prevText = mode === "drop" && a.prevKg
-        ? ` • السابق ${escapeHtml(fmtKg(a.prevKg))}`
-        : "";
+    return clean.map(item => {
+      const text = typeof item === "string"
+        ? item
+        : (item.text || item.message || item.label || item.number || JSON.stringify(item));
 
-      return `<li>#${number} — ${kgText}${deltaText}${prevText}</li>`;
+      return `<li>${escapeHtml(text)}</li>`;
     }).join("");
   }
 
-  function renderGroups(data){
+  function renderGroupRows(rows){
+    const clean = arr(rows).slice(0, 8);
+
+    if (!clean.length) return "";
+
+    const items = clean.map(r => {
+      const no = r.number || r.animalNumber || r.id || "—";
+      const milk = r.milkText || r.kgText || r.kg || "—";
+      const dim = r.daysInMilkText || r.dimText || r.dim || "—";
+
+      return `<li>#${escapeHtml(no)} — ${escapeHtml(milk)} • DIM: ${escapeHtml(dim)}</li>`;
+    }).join("");
+
+    return `
+      <div class="mini-box">
+        <div class="mini-title">جدول مختصر للأفراد</div>
+        <ul class="mini-list">${items}</ul>
+      </div>
+    `;
+  }
+
+  function renderConsultantGroups(report = {}){
     const el = $("smartGroups");
     if (!el) return;
 
-    const groups = arr(data.groupsSummary || data.smartReport?.groupsSummary);
+    const groups = arr(report.groups);
     el.innerHTML = "";
 
     if (!groups.length) {
@@ -748,7 +864,7 @@
         <div class="group-head">
           <div>
             <h4>${escapeHtml(g.groupName || "بدون مجموعة")}</h4>
-            <small class="muted">${escapeHtml(g.kind === "buffalo" ? "جاموس" : "أبقار")}</small>
+            <small class="muted">${escapeHtml(g.kindText || "")}</small>
           </div>
 
           <span class="status-pill ${cls}">${escapeHtml(g.status || "مستقرة")}</span>
@@ -756,42 +872,54 @@
 
         <div class="group-metrics">
           <div class="metric">
-            <strong>${escapeHtml(fmtKg(g.totalKg))}</strong>
+            <strong>${escapeHtml(g.totalMilkText || "—")}</strong>
             <span>إجمالي المجموعة</span>
           </div>
 
           <div class="metric">
-            <strong>${escapeHtml(fmtKg(g.avgKg))}</strong>
+            <strong>${escapeHtml(g.avgMilkText || "—")}</strong>
             <span>متوسط الرأس</span>
           </div>
 
           <div class="metric">
-            <strong>${escapeHtml(g.milkersCount ?? 0)}</strong>
+            <strong>${escapeHtml(g.milkersCount ?? "—")}</strong>
             <span>عدد الحلّاب</span>
           </div>
 
           <div class="metric">
-            <strong>${escapeHtml(fmtPct(g.deltaPct))}</strong>
-            <span>عن آخر يوم</span>
+            <strong>${escapeHtml(g.avgDaysInMilkText || "—")}</strong>
+            <span>متوسط أيام الحليب</span>
           </div>
         </div>
 
         <p class="group-reading">${escapeHtml(g.reading || "لا توجد قراءة تفصيلية لهذه المجموعة.")}</p>
 
+        <div class="group-extra">${escapeHtml(g.trendText || "")}</div>
+        <div class="group-extra">${escapeHtml(g.economicsText || "")}</div>
+
         <div class="mini-panels">
           <div class="mini-box">
-            <div class="mini-title">أعلى الأفراد</div>
+            <div class="mini-title">أفضل 5</div>
             <ul class="mini-list">
-              ${renderAnimalItems(g.topAnimals, "لا توجد بيانات أفراد.", "top")}
+              ${renderTextItems(g.top5, "لا توجد بيانات كافية.")}
             </ul>
           </div>
 
           <div class="mini-box">
-            <div class="mini-title">انخفاضات تحتاج مراجعة</div>
+            <div class="mini-title">أقل 5</div>
             <ul class="mini-list">
-              ${renderAnimalItems(g.dropAnimals, "لا توجد انخفاضات فردية واضحة.", "drop")}
+              ${renderTextItems(g.low5, "لا توجد بيانات كافية.")}
             </ul>
           </div>
+
+          <div class="mini-box">
+            <div class="mini-title">حيوانات تحتاج متابعة</div>
+            <ul class="mini-list">
+              ${renderTextItems(g.watchAnimals, "لا توجد حالات متابعة واضحة.")}
+            </ul>
+          </div>
+
+          ${renderGroupRows(g.animals)}
         </div>
       `;
 
@@ -799,78 +927,42 @@
     }
   }
 
-  function renderFarmReading(data){
-    const el = $("farmReading");
-    if (!el) return;
+  function renderConsultantReport(data){
+    const report = data.consultantReport || {};
 
-    const fs = data.farmSummary || data.smartReport?.farmSummary || {};
-    const trend = data.trend || data.smartReport?.trend || {};
-    const parts = [];
+    const header = report.header || {};
+    const executive = report.executiveSummary || {};
 
-    if (trend.label) {
-      const pct = trend.dayDeltaPct == null ? "" : ` (${fmtPct(trend.dayDeltaPct)})`;
-      parts.push(`اتجاه اليوم: ${trend.label}${pct}`);
-    }
+    setText("consultantTitle", header.title || "تقرير اللبن الاستشاري");
+    setText("consultantSubtitle", header.subtitle || "قراءة علمية تشغيلية لأداء اللبن حسب القطيع والمجموعات والأفراد.");
+    setText("consultantFarm", header.farmNameText || "المزرعة/القطيع: —");
+    setText("consultantPeriod", header.periodText || "الفترة: —");
+    setText("consultantIssuedAt", header.issuedAtText || "تاريخ الإصدار: —");
+    setText("consultantScope", header.scopeText || "نطاق التقرير: —");
 
-if (fs.bestGroup?.groupName) {
-  const margin = fs.bestGroup.marginPerHead;
-  const cost = fs.bestGroup.costPerKgMilk;
-  const feedDate = fs.bestGroup.feedEventDate;
+    setText("executiveTitle", executive.title || "الملخص التنفيذي للقطيع");
+    setText("executiveText", executive.text || "لا توجد قراءة تنفيذية كافية.");
+    setText("executiveConclusion", executive.conclusion || "—");
 
-  parts.push(
-    `أفضل هامش لبن/علف: ${fs.bestGroup.groupName}` +
-    `${margin != null ? ` ${fmtNumber(margin, 2)} ج.م/رأس` : ""}` +
-    `${cost != null ? ` • تكلفة كجم اللبن ${fmtNumber(cost, 2)} ج.م` : ""}` +
-    `${feedDate ? ` • آخر عليقة ${feedDate}` : ""}`
-  );
-}
+    renderExecutiveMetrics(executive.metrics);
 
-if (
-  fs.weakestGroup?.groupName &&
-  fs.weakestGroup.groupName !== fs.bestGroup?.groupName
-) {
-  const margin = fs.weakestGroup.marginPerHead;
-  const cost = fs.weakestGroup.costPerKgMilk;
-  const feedDate = fs.weakestGroup.feedEventDate;
+    renderAssessment("production", report.productionAssessment || {});
+    renderAssessment("climate", report.climateAssessment || {});
+    renderAssessment("nutrition", report.nutritionEconomicsAssessment || {});
 
-  parts.push(
-    `أقل هامش لبن/علف: ${fs.weakestGroup.groupName}` +
-    `${margin != null ? ` ${fmtNumber(margin, 2)} ج.م/رأس` : ""}` +
-    `${cost != null ? ` • تكلفة كجم اللبن ${fmtNumber(cost, 2)} ج.م` : ""}` +
-    `${feedDate ? ` • آخر عليقة ${feedDate}` : ""}`
-  );
-}
-    if (fs.dropAnimalsCount != null) {
-      parts.push(`حالات انخفاض فردي: ${fs.dropAnimalsCount}`);
-    }
+    renderConsultantGroups(report);
 
-    el.textContent = parts.length
-      ? parts.join(" • ")
-      : "الأرقام الشهرية والسنوية تعني إجمالي اللبن المسجل حتى تاريخ العرض، وليست تقديرًا لإنتاج شهر أو سنة كاملة.";
-  }
-
-  function renderSmartReport(data){
-    renderGroups(data);
-
-    renderList(
-      "strengthsList",
-      data.strengths || data.smartReport?.strengths,
-      "لا توجد نقاط قوة واضحة مسجلة لهذا اليوم."
+    renderServerList(
+      "recommendationsList",
+      report.recommendations,
+      "لا توجد توصيات إضافية حاليًا."
     );
 
-    renderList(
-      "watchList",
-      data.watchPoints || data.smartReport?.watchPoints,
-      "لا توجد نقاط تحتاج متابعة واضحة لهذا اليوم."
+    renderServerList(
+      "dataQualityList",
+      report.dataQualityNotes,
+      "لا توجد ملاحظات جودة بيانات لهذا التقرير."
     );
-
-    renderList(
-      "guidanceList",
-      data.murabbikGuidance || data.smartReport?.murabbikGuidance,
-      "لا توجد توجيهات إضافية حاليًا."
-    );
-
-    renderFarmReading(data);
   }
 function fillHint(meta = {}){
   const number = meta.number || "—";
@@ -1264,8 +1356,8 @@ const r = await fetch(`/api/milk-reports/summary?${params.toString()}`, {
     if (data.message) show(data.message);
     else hideMsg();
 
-      putKpis(data);
-    renderSmartReport(data);
+    
+    renderConsultantReport(data);
 
     const points = data.scatter?.points || [];
     $("skipNote").textContent = data.scatter?.skippedNoCalving
