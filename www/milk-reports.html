@@ -36,6 +36,37 @@
     .hero-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:14px;align-items:center}
     .hero h2{margin:0;font-size:clamp(23px,4vw,36px)}
     .hero-line{margin-top:10px;font-size:17px;font-weight:950;line-height:1.65}
+    .hero-summary{
+      margin-top:12px;
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:10px;
+    }
+    .hero-summary-card{
+      background:rgba(255,255,255,.13);
+      border:1px solid rgba(255,255,255,.22);
+      border-radius:16px;
+      padding:11px;
+    }
+    .hero-summary-card .hs-label{
+      font-size:12px;
+      font-weight:900;
+      color:rgba(255,255,255,.82);
+    }
+    .hero-summary-card .hs-value{
+      margin-top:5px;
+      font-size:22px;
+      line-height:1.25;
+      font-weight:950;
+      color:white;
+    }
+    .hero-summary-card .hs-sub{
+      margin-top:4px;
+      font-size:11px;
+      line-height:1.45;
+      font-weight:800;
+      color:rgba(255,255,255,.84);
+    }
     .hero-meta{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
     .pill{display:inline-flex;border-radius:999px;padding:7px 11px;bacكجمround:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);font-size:12px;font-weight:900}
     .hero-panel{bacكجمround:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:15px}
@@ -188,7 +219,7 @@
     .footer-note{text-align:center;color:var(--muted);font-size:12px;font-weight:750;margin-top:18px}
 
     @media(max-width:980px){
-      .hero-grid,.grid-2,.group-list,.recommendations,.group-main,.group-econ,.kpi-row,.econ-row{grid-template-columns:1fr}
+      .hero-grid,.hero-summary,.grid-2,.group-list,.recommendations,.group-main,.group-econ,.kpi-row,.econ-row{grid-template-columns:1fr}
       .controls{width:100%}.field{flex:1 1 140px}.field input,.field select{width:100%;min-width:0}
       .table-scroll{overflow-x:auto}.report-table{min-width:650px}
       .chart svg{height:250px}.chart{min-height:250px}
@@ -228,6 +259,7 @@
           <div>
             <h2 id="heroTitle">تقرير إنتاج اللبن</h2>
             <div class="hero-line" id="heroLine">—</div>
+            <div class="hero-summary" id="heroSummary"></div>
           </div>
           <div class="hero-panel">
             <div class="label">صافي ربح اللبن</div>
@@ -324,6 +356,33 @@
     function status(text,tone){return `<span class="status ${tone||""}">${esc(text)}</span>`}
     function toneByValue(v, goodPositive=true){const x=Number(v); if(!Number.isFinite(x)||x===0)return"blue"; return (goodPositive ? x>0 : x<0) ? "ok" : "danger"}
     function row(a,b,c,d){return `<tr><td>${a}</td><td class="num">${b}</td><td>${c||""}</td><td>${d||""}</td></tr>`}
+
+    function arClean(v){
+      return String(v || "")
+        .replace(/DIM/g,"أيام الحليب")
+        .replace(/DCC/g,"أيام الحمل")
+        .replace(/THI/g,"الإجهاد الحراري")
+        .replace(/\bkg\b/gi,"كجم");
+    }
+
+    function heroSummaryCard(label, value, sub){
+      return `<div class="hero-summary-card">
+        <div class="hs-label">${esc(label)}</div>
+        <div class="hs-value">${value}</div>
+        <div class="hs-sub">${esc(sub || "")}</div>
+      </div>`;
+    }
+
+    function renderHeroSummary(j){
+      const p = j.production || {};
+      const e = j.economics || {};
+      const actualDate = j.meta?.actualDate || j.meta?.reportDate || j.date || "";
+      $("heroSummary").innerHTML = [
+        heroSummaryCard("تاريخ التقرير", esc(actualDate || "—"), j.message ? arClean(j.message) : "اليوم المعروض في التقرير"),
+        heroSummaryCard("إنتاج القطيع", `${num(p.totalMilkKg,1)} كجم`, `متوسط الحلاب ${num(p.avgMilkKgRecorded ?? p.avgMilkKgMilker,1)} كجم`),
+        heroSummaryCard("صافي النتيجة", money(e.netOperatingResult), "بعد التغذية والتشغيل")
+      ].join("");
+    }
 
     function kpiCard(label, value, sub, tone=""){
       return `<div class="kpi-card ${tone}">
@@ -615,9 +674,12 @@
 
     function renderAll(j){
       $("loading").style.display="none"; $("report").style.display="block";
-      $("heroTitle").textContent = "تقرير إنتاج اللبن";
-      $("heroLine").textContent =
-        `إنتاج اليوم ${num(j.production?.totalMilkKg,1)} كجم · متوسط الحلاب ${num(j.production?.avgMilkKgRecorded,1)} كجم · ${j.meta?.selectedTypeLabel || "الكل"}`;
+      $("heroTitle").textContent = arClean(j.headline?.title || "تقرير إنتاج اللبن");
+      $("heroLine").textContent = arClean(
+        j.headline?.text ||
+        `إنتاج اليوم ${num(j.production?.totalMilkKg,1)} كجم · متوسط الحلاب ${num(j.production?.avgMilkKgRecorded,1)} كجم · ${j.meta?.selectedTypeLabel || "الكل"}`
+      );
+      renderHeroSummary(j);
       $("heroNet").textContent = money(j.economics?.netOperatingResult);
       if(j.message){$("serverMessage").textContent=j.message;$("serverMessage").classList.add("show")}else{$("serverMessage").classList.remove("show")}
       renderProduction(j); renderEconomy(j); renderComparisons(j); renderCharts(j); renderGroups(j); renderThi(j); renderRecommendations(j); renderScientific(j);
@@ -657,6 +719,7 @@
       $("report").style.display="block";
       $("heroTitle").textContent="تقرير إنتاج اللبن";
       $("heroLine").textContent="أدخل سعر كجم اللبن بجانب تاريخ التقرير لحساب الاقتصاد بدقة.";
+      $("heroSummary").innerHTML="";
       $("heroNet").textContent="—";
 
       $("productionCards").innerHTML=`<div class="empty">سعر كجم اللبن مطلوب قبل تحميل التقرير.</div>`;
