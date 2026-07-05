@@ -632,15 +632,24 @@
       $("heroTitle").textContent="تقرير إنتاج اللبن";
       $("heroLine").textContent="أدخل سعر كجم اللبن بجانب تاريخ التقرير لحساب الاقتصاد بدقة.";
       $("heroNet").textContent="—";
+
       $("productionCards").innerHTML=`<div class="empty">سعر كجم اللبن مطلوب قبل تحميل التقرير.</div>`;
       $("economyCards").innerHTML="";
-      $("comparisonsTable").innerHTML="";
-      $("chartsWrap").innerHTML="";
+      $("comparisonTable").innerHTML="";
+
+      $("dailyTrendChart").innerHTML="";
+      $("dailyTrendNote").textContent="";
+      $("groupProductionChart").innerHTML="";
+      $("groupProductionNote").textContent="";
+      $("groupEconomyChart").innerHTML="";
+      $("groupEconomyNote").textContent="";
+      $("dimStageChart").innerHTML="";
+      $("dimStageNote").textContent="";
+
       $("groupsList").innerHTML="";
-      $("recommendations").innerHTML="";
+      $("thiCard").innerHTML="";
+      $("recommendationsList").innerHTML="";
       $("scientificNotes").innerHTML="";
-      $("thiBox").innerHTML="";
-      $("dataQualityBox").innerHTML="";
     }
 
     async function loadReport(){
