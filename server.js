@@ -25004,9 +25004,11 @@ if (!Number.isInteger(milkPriceUsed) || milkPriceUsed <= 0) {
   });
 }
 
+       const defaultReportDate = milkReportAddDaysSrv(milkReportTodaySrv(), -1);
+
     const requestedDate = milkReportIsDateSrv(req.query.date)
       ? String(req.query.date).slice(0, 10)
-      : milkReportTodaySrv();
+      : defaultReportDate;
 
     const selectedKind = milkReportRequestedKindSrv(req.query);
     const selectedTypeLabel =
