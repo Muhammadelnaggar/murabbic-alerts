@@ -177,82 +177,146 @@ async function fetchJSON(path){
   if (!res.ok) throw new Error(path + ' ' + res.status);
   return res.json();
 }
+function renderWeatherTHIFromServer(j = {}) {
+  const ui = j.ui || {};
 
-// ============ THI ============
-async function loadWeatherTHI(){
   const tEl = document.getElementById('wxTemp');
   const hEl = document.getElementById('wxHum');
   const thiEl = document.getElementById('wxTHI');
   const statusEl = document.getElementById('thiStatus');
   const circle = document.getElementById('thiCircle');
 
-  try{
-   let weatherPath = '/api/weather/thi';
+  if (tEl) tEl.textContent = ui.tempText || '--';
+  if (hEl) hEl.textContent = ui.humidityText || '--';
+  if (thiEl) thiEl.textContent = ui.thiText || '--';
+  if (circle) circle.textContent = ui.circleText || '--';
 
-try {
-  if (navigator.geolocation) {
+  if (statusEl) {
+    statusEl.textContent = ui.statusText || j.message || 'غير متاح حالياً';
+    if (ui.statusColor) statusEl.style.color = ui.statusColor;
+  }
+
+  if (circle) {
+    if (ui.circleBackground) circle.style.background = ui.circleBackground;
+    if (ui.circleBorderColor) circle.style.borderColor = ui.circleBorderColor;
+    if (ui.circleColor) circle.style.color = ui.circleColor;
+  }
+}
+
+function bindThiBarServerAction(action) {
+  const thiBar = document.getElementById('thiBar');
+  if (!thiBar) return;
+
+  thiBar.onclick = null;
+  thiBar.style.cursor = '';
+
+  if (action === 'save_farm_location') {
+    thiBar.style.cursor = 'pointer';
+    thiBar.onclick = saveFarmLocationFromThiBar;
+  }
+}
+
+async function saveFarmLocationFromThiBar() {
+  const thiBar = document.getElementById('thiBar');
+  const statusEl = document.getElementById('thiStatus');
+
+  if (thiBar) {
+    thiBar.onclick = null;
+    thiBar.style.cursor = '';
+  }
+
+  if (statusEl) {
+    statusEl.textContent = 'جارٍ تحديد موقع المزرعة...';
+  }
+
+  if (!navigator.geolocation) {
+    if (statusEl) statusEl.textContent = 'هذا الجهاز لا يدعم تحديد الموقع.';
+    return;
+  }
+
+  try {
     const pos = await new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(resolve, reject, {
         enableHighAccuracy: true,
-        timeout: 6000,
-        maximumAge: 10 * 60 * 1000
+        timeout: 15000,
+        maximumAge: 0
       });
     });
 
-    const lat = pos.coords.latitude;
-    const lon = pos.coords.longitude;
+    const r = await fetch(API_BASE + '/api/farm-location/save', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Cache-Control': 'no-store'
+      },
+      cache: 'no-store',
+      body: JSON.stringify({
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+        accuracy: pos.coords.accuracy
+      })
+    });
 
-    weatherPath = `/api/weather/thi?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+    const j = await r.json().catch(() => ({}));
+
+    if (!r.ok || j.ok !== true) {
+      throw new Error(j.message || 'farm_location_save_failed');
+    }
+
+    if (statusEl) {
+      statusEl.textContent = j.message || '✅ تم حفظ موقع المزرعة بنجاح';
+    }
+
+    await loadWeatherTHI();
+    await loadHerdKPIs();
+
+  } catch (e) {
+    console.warn('farm location save failed', e);
+
+    if (statusEl) {
+      statusEl.textContent = 'لم يتم حفظ موقع المزرعة. اضغط للمحاولة مرة أخرى.';
+    }
+
+    bindThiBarServerAction('save_farm_location');
   }
-} catch (_) {
-  // لو المستخدم رفض الموقع أو فشل تحديده، نستخدم الافتراضي من السيرفر
 }
+// ============ THI ============
+async function loadWeatherTHI(){
+  try {
+    bindThiBarServerAction(null);
 
-const j = await fetchJSON(weatherPath);
+    const j = await fetchJSON('/api/weather/thi');
 
     if (!j || j.ok === false) {
       throw new Error(j?.error || 'weather_thi_failed');
     }
 
-    const t = Number(j.tempC);
-    const h = Number(j.humidity);
-    const thi = Number(j.thi);
+    currentTHI = Number.isFinite(Number(j.thi)) ? Number(j.thi) : null;
 
-    currentTHI = Number.isFinite(thi) ? thi : null;
+    renderWeatherTHIFromServer(j);
+    bindThiBarServerAction(j?.ui?.barAction || null);
 
-    tEl.textContent = Number.isFinite(t) ? Math.round(t) : '--';
-    hEl.textContent = Number.isFinite(h) ? Math.round(h) : '--';
-    thiEl.textContent = Number.isFinite(thi) ? Math.round(thi) : '--';
-    circle.textContent = Number.isFinite(thi) ? Math.round(thi) : '--';
-
-    const level = String(j?.status?.level || '');
-    const label = String(j?.status?.label || 'غير متاح');
-
-    let bg = '#c8e6c9';
-    let color = '#2e7d32';
-
-    if (level === 'mild') {
-      bg = '#fff9c4';
-      color = '#f9a825';
-    } else if (level === 'moderate') {
-      bg = '#ffe0b2';
-      color = '#fb8c00';
-    } else if (level === 'high') {
-      bg = '#ffcdd2';
-      color = '#e53935';
-    }
-
-    statusEl.textContent = label;
-    statusEl.style.color = color;
-    circle.style.background = bg;
-    circle.style.borderColor = color;
-    circle.style.color = color;
-
-  }catch(e){
+  } catch (e) {
     currentTHI = null;
-    statusEl.textContent = 'غير متاح حالياً';
-    statusEl.style.color = '#e53935';
-    circle.textContent = '--';
+
+    renderWeatherTHIFromServer({
+      message: 'غير متاح حالياً',
+      ui: {
+        tempText: '--',
+        humidityText: '--',
+        thiText: '--',
+        circleText: '--',
+        statusText: 'غير متاح حالياً',
+        statusColor: '#e53935',
+        circleBackground: '#fee2e2',
+        circleBorderColor: '#e53935',
+        circleColor: '#e53935'
+      }
+    });
+
+    bindThiBarServerAction(null);
   }
 }
 // ============ مساعدات ============
