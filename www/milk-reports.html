@@ -94,17 +94,17 @@
     .status.ok{background:#dcfce7;color:var(--ok)} .status.warn{background:#fef3c7;color:var(--warn)} .status.danger{background:#fee2e2;color:var(--danger)} .status.blue{background:#dbeafe;color:var(--blue)}
     .arrow{font-weight:950;font-size:16px}.up{color:var(--ok)}.down{color:var(--danger)}.flat{color:var(--blue)}
 
-    .chart-card{min-height:350px}
-    .chart-title{display:flex;align-items:start;justify-content:space-between;gap:10px;margin-bottom:8px}
-    .chart-title strong{font-size:15px}.chart-title span{color:var(--muted);font-size:12px;font-weight:850}
-    .chart{width:100%;min-height:270px;direction:ltr}
-    .chart svg{width:100%;height:270px;display:block}
-    .chart-note{margin-top:8px;padding:9px 10px;border-radius:13px;background:#f8fafc;color:#334155;line-height:1.6;font-size:12px;font-weight:850}
+    .chart-card{min-height:260px}
+    .chart-title{display:flex;align-items:start;justify-content:space-between;gap:10px;margin-bottom:6px}
+    .chart-title strong{font-size:15px}.chart-title span{color:var(--muted);font-size:11px;font-weight:850}
+    .chart{width:100%;min-height:190px;direction:ltr}
+    .chart svg{width:100%;height:190px;display:block}
+    .chart-note{margin-top:8px;padding:8px 10px;border-radius:13px;background:#f8fafc;color:#334155;line-height:1.55;font-size:12px;font-weight:850}
     .axis{stroke:#cbd5e1;stroke-width:1}.gridline{stroke:#eef2f7;stroke-width:1}
     .line-path{fill:none;stroke:#0f766e;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
     .dot{fill:#0f766e}.bar{fill:#0f766e}.bar-blue{fill:#2563eb}.bar-red{fill:#dc2626}
-    .svg-label{font:700 12px Tahoma,Arial;fill:#334155}.svg-small{font:700 10px Tahoma,Arial;fill:#64748b}.svg-value{font:900 12px Tahoma,Arial;fill:#0f172a}
-    .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;direction:rtl}
+    .svg-label{font:700 12px Tahoma,Arial;fill:#334155}.svg-small{font:700 11px Tahoma,Arial;fill:#64748b}.svg-value{font:900 13px Tahoma,Arial;fill:#0f172a}
+    .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;direction:rtl}
     .legend span{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;font-weight:850}.legend i{width:10px;height:10px;border-radius:3px;background:#0f766e;display:inline-block}.legend .blue i{background:#2563eb}.legend .red i{background:#dc2626}
 
     .group-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -191,7 +191,7 @@
       .hero-grid,.grid-2,.group-list,.recommendations,.group-main,.group-econ,.kpi-row,.econ-row{grid-template-columns:1fr}
       .controls{width:100%}.field{flex:1 1 140px}.field input,.field select{width:100%;min-width:0}
       .table-scroll{overflow-x:auto}.report-table{min-width:650px}
-      .chart svg{height:300px}.chart{min-height:300px}
+      .chart svg{height:210px}.chart{min-height:210px}
     }
     @media print{
       .topbar,.controls,.btn{display:none!important}body{background:white}.wrap{width:100%;padding:0}.card,.group-card,.hero,.rec,.scientific{box-shadow:none;break-inside:avoid}.section{break-inside:avoid}
@@ -396,17 +396,18 @@
     function svgLineChart(rows,key,labelKey){
       rows=Array.isArray(rows)?rows:[];
       if(!rows.length)return `<div class="empty">لا توجد بيانات للرسم.</div>`;
-      const w=900,h=280,p=38,values=rows.map(r=>Number(r[key]||0)),max=Math.max(...values,1),min=Math.min(...values,0);
+      const w=900,h=190,p=28,values=rows.map(r=>Number(r[key]||0)),max=Math.max(...values,1),min=Math.min(...values,0);
       const span=Math.max(1,max-min),step=rows.length>1?(w-p*2)/(rows.length-1):0;
       const pts=rows.map((r,i)=>{const x=p+i*step;const y=h-p-((Number(r[key]||0)-min)/span)*(h-p*2);return{x,y,r}});
       const points=pts.map(o=>`${o.x},${o.y}`).join(" ");
-      const every=Math.max(1,Math.ceil(rows.length/8));
-      const labels=pts.filter((_,i)=>i%every===0||i===pts.length-1).map(o=>`<text class="svg-small" x="${o.x}" y="${h-8}" text-anchor="middle">${esc(String(o.r[labelKey]||o.r.date||"").slice(5))}</text>`).join("");
-      const valLabels=pts.filter((_,i)=>i%every===0||i===pts.length-1).map(o=>`<text class="svg-value" x="${o.x}" y="${Math.max(14,o.y-8)}" text-anchor="middle">${num(o.r[key],0)}</text>`).join("");
-      const dots=pts.map(o=>`<circle class="dot" cx="${o.x}" cy="${o.y}" r="3"><title>${esc(o.r[labelKey]||o.r.date||"")}: ${num(o.r[key],1)} كجم</title></circle>`).join("");
+      const labelIdx = new Set([0, Math.floor((pts.length-1)/2), pts.length-1]);
+      const labels=pts.filter((_,i)=>labelIdx.has(i)).map(o=>`<text class="svg-small" x="${o.x}" y="${h-6}" text-anchor="middle">${esc(String(o.r[labelKey]||o.r.date||"").slice(5))}</text>`).join("");
+      const valLabels=pts.filter((_,i)=>labelIdx.has(i)).map(o=>`<text class="svg-value" x="${o.x}" y="${Math.max(14,o.y-8)}" text-anchor="middle">${num(o.r[key],0)}</text>`).join("");
+      const dots=pts.map(o=>`<circle class="dot" cx="${o.x}" cy="${o.y}" r="2.8"><title>${esc(o.r[labelKey]||o.r.date||"")}: ${num(o.r[key],1)} كجم</title></circle>`).join("");
       return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-        <line class="gridline" x1="${p}" y1="${p}" x2="${w-p}" y2="${p}"></line><line class="gridline" x1="${p}" y1="${h/2}" x2="${w-p}" y2="${h/2}"></line>
-        <line class="axis" x1="${p}" y1="${h-p}" x2="${w-p}" y2="${h-p}"></line><line class="axis" x1="${p}" y1="${p}" x2="${p}" y2="${h-p}"></line>
+        <line class="gridline" x1="${p}" y1="${p}" x2="${w-p}" y2="${p}"></line>
+        <line class="gridline" x1="${p}" y1="${h/2}" x2="${w-p}" y2="${h/2}"></line>
+        <line class="axis" x1="${p}" y1="${h-p}" x2="${w-p}" y2="${h-p}"></line>
         <polyline class="line-path" points="${points}"></polyline>${dots}${valLabels}${labels}
       </svg>`;
     }
@@ -414,31 +415,51 @@
     function svgBarChart(rows,valueKey,labelKey,unit="كجم",allowNegative=false){
       rows=Array.isArray(rows)?rows:[];
       if(!rows.length)return `<div class="empty">لا توجد بيانات للرسم.</div>`;
-      const w=900,h=300,p=42,gap=10;
+
+      rows = rows.slice(0, 5);
+      const w=900,rowH=30,topPad=12,bottomPad=8,leftPad=200,rightPad=110;
+      const h=topPad + bottomPad + rows.length*rowH;
       const vals=rows.map(r=>Number(r[valueKey]||0)).filter(Number.isFinite);
-      const maxAbs=Math.max(...vals.map(Math.abs),1);
-      const mid=allowNegative?h/2:h-p;
-      const bw=Math.max(18,((w-p*2)/rows.length)-gap);
-      const bars=rows.map((r,i)=>{
-        const val=Number(r[valueKey]||0);
-        const x=p+i*(bw+gap);
-        const bh=allowNegative?Math.abs(val)/maxAbs*(h/2-p):Math.max(0,val)/maxAbs*(h-p*2);
-        const y=allowNegative?(val>=0?mid-bh:mid):(h-p-bh);
-        const cls=allowNegative?(val>=0?"bar":"bar-red"):"bar";
+      const maxAbs=Math.max(...vals.map(v=>Math.abs(v)),1);
+      const zeroX=allowNegative ? leftPad + ((w-leftPad-rightPad)/2) : leftPad;
+      const fullW=allowNegative ? (w-leftPad-rightPad)/2 : (w-leftPad-rightPad);
+
+      const bars = rows.map((r,i)=>{
+        const rawVal=Number(r[valueKey]||0);
+        const y=topPad + i*rowH;
         const label=abbrev(r[labelKey]||"");
-        return `<rect class="${cls}" x="${x}" y="${y}" width="${bw}" height="${bh}" rx="5"><title>${esc(label)}: ${unit==="ج"?money(val):num(val,1)+" "+unit}</title></rect>
-          <text class="svg-value" x="${x+bw/2}" y="${val>=0?Math.max(14,y-7):Math.min(h-10,y+bh+14)}" text-anchor="middle">${unit==="ج"?num(val,0):num(val,0)}</text>
-          <text class="svg-small" x="${x+bw/2}" y="${h-8}" text-anchor="middle">${esc(label.slice(0,12))}</text>`;
+        const barW=Math.max(6, Math.abs(rawVal)/maxAbs * fullW);
+        const x=allowNegative
+          ? (rawVal >= 0 ? zeroX : zeroX - barW)
+          : leftPad;
+        const cls=allowNegative ? (rawVal>=0 ? "bar" : "bar-red") : "bar";
+        const valueText = unit==="ج" ? money(rawVal) : `${num(rawVal,1)} ${unit}`;
+        const valueX = allowNegative
+          ? (rawVal >= 0 ? x + barW + 8 : x - 8)
+          : Math.min(w-rightPad+50, x + barW + 8);
+        const anchor = allowNegative ? (rawVal >= 0 ? "start" : "end") : "start";
+
+        return `
+          <text class="svg-label" x="${leftPad-10}" y="${y+19}" text-anchor="end">${esc(label)}</text>
+          <rect class="${cls}" x="${x}" y="${y+5}" width="${barW}" height="18" rx="5"></rect>
+          <text class="svg-value" x="${valueX}" y="${y+19}" text-anchor="${anchor}">${esc(valueText)}</text>
+        `;
       }).join("");
+
+      const zeroLine = allowNegative
+        ? `<line class="axis" x1="${zeroX}" y1="0" x2="${zeroX}" y2="${h}"></line>`
+        : '';
+
       return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-        <line class="axis" x1="${p}" y1="${mid}" x2="${w-p}" y2="${mid}"></line><line class="axis" x1="${p}" y1="${p}" x2="${p}" y2="${h-p}"></line>${bars}
+        ${zeroLine}
+        ${bars}
       </svg>`;
     }
 
     function chartNotes(j){
       const daily=(j.charts?.dailyTrend||[]).filter(x=>Number(x.totalMilkKg)>0);
       const first=daily[0], last=daily[daily.length-1];
-      $("dailyTrendNote").textContent = daily.length ? `قراءة مُرَبِّيك: آخر قراءة ${num(last?.totalMilkKg,1)} كجم. الرسم يوضح الاتجاه اليومي وليس حكمًا منفردًا.` : "لا توجد قراءات كافية لآخر 30 يوم.";
+      $("dailyTrendNote").textContent = daily.length ? `آخر قراءة ${num(last?.totalMilkKg,1)} كجم. يبين الاتجاه اليومي.` : "لا توجد قراءات كافية لآخر 30 يوم.";
       const gp=(j.charts?.groupProduction||[]).filter(x=>Number(x.totalMilkKg)>0).sort((a,b)=>Number(b.totalMilkKg)-Number(a.totalMilkKg));
       $("groupProductionNote").textContent = gp.length ? `أعلى مساهمة: ${gp[0].groupName} (${num(gp[0].totalMilkKg,1)} كجم).` : "لا توجد بيانات إنتاج مجموعات.";
       const ge=(j.charts?.groupEconomics||[]).filter(x=>Number.isFinite(Number(x.netOperatingResult))).sort((a,b)=>Number(a.netOperatingResult)-Number(b.netOperatingResult));
