@@ -225,7 +225,21 @@
       .chart svg{height:250px}.chart{min-height:250px}
     }
     @media print{
-      .topbar,.controls,.btn{display:none!important}body{bacكجمround:white}.wrap{width:100%;padding:0}.card,.group-card,.hero,.rec,.scientific{box-shadow:none;break-inside:avoid}.section{break-inside:avoid}
+      @page{size:A4;margin:10mm}
+      *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      body{background:white!important;color:#000!important}
+      .topbar,.controls,.btn,.print-section-btn,.hero-print-row{display:none!important}
+      .wrap{width:100%!important;margin:0!important;padding:0!important}
+      #loading{display:none!important}
+      #report{display:block!important}
+      .card,.group-card,.hero,.rec,.scientific,.kpi-card,.econ-card{box-shadow:none!important;break-inside:avoid;page-break-inside:avoid}
+      .section{break-inside:avoid;page-break-inside:avoid;margin-top:14px}
+      .section-head{margin:14px 0 8px}
+      .hero{break-inside:avoid;page-break-inside:avoid}
+      .chart-card{min-height:auto}
+      .chart svg{height:180px}
+      body[data-print-mode="section"] #report > [data-print-block]:not([data-print-active="1"]){display:none!important}
+      body[data-print-mode="section"] #report > .footer-note{display:none!important}
     }
   </style>
 </head>
@@ -245,7 +259,7 @@
           <label for="milkPriceInput">سعر كجم اللبن <b style="color:#dc2626">*</b></label>
           <input id="milkPriceInput" type="number" inputmode="numeric" min="1" step="1" placeholder="مثال: 20" required>
         </div>
-        <button class="btn btn-ghost" id="printBtn">طباعة</button>
+        <button class="btn btn-ghost" id="printBtn">طباعة التقرير كاملًا</button>
       </div>
     </div>
   </div>
@@ -254,7 +268,7 @@
     <div id="loading" class="loading">جاري تحميل تقرير اللبن...</div>
 
     <section id="report" style="display:none;">
-      <section class="hero">
+      <section class="hero" id="summaryBlock" data-print-block>
         <div class="hero-grid">
           <div>
             <h2 id="heroTitle">تقرير إنتاج اللبن</h2>
@@ -267,27 +281,30 @@
             <div class="sub">بعد التغذية + 20% من تكلفة التغذية كمصاريف تشغيل</div>
           </div>
         </div>
+        <div class="hero-print-row">
+          <button class="print-section-btn" data-print-target="summaryBlock">طباعة الملخص</button>
+        </div>
       </section>
 
       <div class="notice" id="serverMessage"></div>
 
-      <section class="section">
-        <div class="section-head"><div><h3 id="productionSectionTitle">إنتاج أمس</h3><p>قراءة سريعة واضحة لصاحب المزرعة.</p></div></div>
+      <section class="section" id="productionBlock" data-print-block>
+        <div class="section-head"><div><h3 id="productionSectionTitle">إنتاج أمس</h3><p>قراءة سريعة واضحة لصاحب المزرعة.</p></div><button class="print-section-btn" data-print-target="productionBlock">طباعة هذا الجزء</button></div>
         <div class="kpi-row" id="productionCards"></div>
       </section>
 
-      <section class="section">
-        <div class="section-head"><div><h3>اقتصاد إنتاج اللبن</h3><p>الأرقام الاقتصادية الأساسية للقطيع.</p></div></div>
+      <section class="section" id="economyBlock" data-print-block>
+        <div class="section-head"><div><h3>اقتصاد إنتاج اللبن</h3><p>الأرقام الاقتصادية الأساسية للقطيع.</p></div><button class="print-section-btn" data-print-target="economyBlock">طباعة هذا الجزء</button></div>
         <div class="econ-row" id="economyCards"></div>
       </section>
 
-      <section class="section">
-        <div class="section-head"><div><h3>المقارنات</h3><p>يومي، أسبوعي، شهري، و305 يوم في جدول واحد.</p></div></div>
+      <section class="section" id="comparisonBlock" data-print-block>
+        <div class="section-head"><div><h3>المقارنات</h3><p>يومي، أسبوعي، شهري، و305 يوم في جدول واحد.</p></div><button class="print-section-btn" data-print-target="comparisonBlock">طباعة هذا الجزء</button></div>
         <div class="card table-card table-scroll"><table class="report-table" id="comparisonTable"></table></div>
       </section>
 
-      <section class="section">
-        <div class="section-head"><div><h3>الرسوم البيانية</h3><p>كل رسم عليه أرقام واضحة وقراءة قصيرة.</p></div></div>
+      <section class="section" id="chartsBlock" data-print-block>
+        <div class="section-head"><div><h3>الرسوم البيانية</h3><p>كل رسم عليه أرقام واضحة وقراءة قصيرة.</p></div><button class="print-section-btn" data-print-target="chartsBlock">طباعة هذا الجزء</button></div>
         <div class="grid grid-2">
           <div class="card chart-card">
             <div class="chart-title"><strong>منحنى آخر 30 يوم</strong><span>كجم لبن / يوم</span></div>
@@ -313,22 +330,23 @@
         </div>
       </section>
 
-      <section class="section">
-        <div class="section-head"><div><h3>المجموعات الإنتاجية</h3></div></div>
+      <section class="section" id="groupsBlock" data-print-block>
+        <div class="section-head"><div><h3>المجموعات الإنتاجية</h3></div><button class="print-section-btn" data-print-target="groupsBlock">طباعة هذا الجزء</button></div>
         <div class="group-list" id="groupsList"></div>
       </section>
 
-      <section class="section">
-        <div class="section-head"><div><h3>الإجهاد الحراري</h3><p>تفسير مساعد لانخفاض اللبن عند وجود ضغط حراري.</p></div></div>
+      <section class="section" id="thiBlock" data-print-block>
+        <div class="section-head"><div><h3>الإجهاد الحراري</h3><p>تفسير مساعد لانخفاض اللبن عند وجود ضغط حراري.</p></div><button class="print-section-btn" data-print-target="thiBlock">طباعة هذا الجزء</button></div>
         <div class="card thi-card" id="thiCard"></div>
       </section>
 
-      <section class="section">
-        <div class="section-head"><div><h3>توصيات مُرَبِّيك</h3><p>مختصرة، بدليل، وبإجراء واضح.</p></div></div>
+      <section class="section" id="recommendationsBlock" data-print-block>
+        <div class="section-head"><div><h3>توصيات مُرَبِّيك</h3><p>مختصرة، بدليل، وبإجراء واضح.</p></div><button class="print-section-btn" data-print-target="recommendationsBlock">طباعة هذا الجزء</button></div>
         <div class="recommendations" id="recommendationsList"></div>
       </section>
 
-      <section class="section">
+      <section class="section" id="scientificBlock" data-print-block>
+        <div class="section-head"><div><h3>التقرير العلمي المختصر</h3></div><button class="print-section-btn" data-print-target="scientificBlock">طباعة هذا الجزء</button></div>
         <div class="scientific">
           <h3 id="scientificTitle">التقرير العلمي المختصر</h3>
           <ul id="scientificNotes"></ul>
@@ -784,7 +802,34 @@
       }catch(e){$("loading").style.display="grid";$("loading").textContent=e.message||"تعذّر تحميل تقرير اللبن."}
     }
 
-    $("printBtn").addEventListener("click",()=>window.print());
+    function clearPrintMode(){
+      document.body.removeAttribute("data-print-mode");
+      document.querySelectorAll("[data-print-active]").forEach(el => el.removeAttribute("data-print-active"));
+    }
+
+    function printReportFull(){
+      clearPrintMode();
+      document.body.setAttribute("data-print-mode", "all");
+      requestAnimationFrame(() => window.print());
+    }
+
+    function printReportSection(targetId){
+      const el = document.getElementById(targetId);
+      if (!el) return;
+      clearPrintMode();
+      document.body.setAttribute("data-print-mode", "section");
+      el.setAttribute("data-print-active", "1");
+      requestAnimationFrame(() => window.print());
+    }
+
+    window.addEventListener("afterprint", clearPrintMode);
+
+    $("printBtn").addEventListener("click", printReportFull);
+    document.addEventListener("click", e => {
+      const btn = e.target.closest("[data-print-target]");
+      if (!btn) return;
+      printReportSection(btn.dataset.printTarget);
+    });
     $("reportDate").addEventListener("change", loadReport);
     $("milkPriceInput").addEventListener("input",()=>{
       getMilkPriceRequired();
