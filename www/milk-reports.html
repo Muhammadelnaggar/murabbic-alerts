@@ -174,13 +174,11 @@
         <div class="brand-mark">م</div>
         <div>
           <h1>تقرير إنتاج اللبن</h1>
-          <p>مُرَبِّيك — تقرير بسيط، مؤثر، وعملي</p>
+          <p>مُرَبِّيك — نوع القطيع يأتي من الداشبورد</p>
         </div>
       </div>
       <div class="controls">
         <div class="field"><label for="reportDate">تاريخ التقرير</label><input id="reportDate" type="date"></div>
-        <div class="field"><label for="reportKind">نوع القطيع</label><select id="reportKind"><option value="">الكل</option><option value="cow">أبقار</option><option value="buffalo">جاموس</option></select></div>
-        <button class="btn btn-primary" id="refreshBtn">تحديث</button>
         <button class="btn btn-ghost" id="printBtn">طباعة</button>
       </div>
     </div>
@@ -195,16 +193,11 @@
           <div>
             <h2 id="heroTitle">تقرير إنتاج اللبن</h2>
             <div class="hero-line" id="heroLine">—</div>
-            <div class="hero-meta">
-              <span class="pill" id="metaDate">التاريخ: —</span>
-              <span class="pill" id="metaKind">النوع: —</span>
-              <span class="pill" id="metaGenerated">تم التحديث: —</span>
-            </div>
           </div>
           <div class="hero-panel">
-            <div class="label">صافي ربح/خسارة اللبن اليوم</div>
+            <div class="label">صافي ربح اللبن</div>
             <div class="value" id="heroNet">—</div>
-            <div class="sub">دخل اللبن - التغذية - 20% تكاليف تشغيل أخرى</div>
+            <div class="sub">بعد التغذية + 20% من تكلفة التغذية كمصاريف تشغيل</div>
           </div>
         </div>
       </section>
@@ -318,9 +311,9 @@
         <tbody>
           ${row("دخل اللبن",money(e.milkIncome),"سعر اللبن مأخوذ من التغذية",status("دخل","ok"))}
           ${row("تكلفة التغذية",money(e.feedCost),`محسوبة على ${int(e.groupsCount)} مجموعة`,status("تكلفة","warn"))}
-          ${row("تكاليف أخرى 20%",money(e.otherOperatingCost),"20% فوق تكلفة التغذية",status("تشغيل","warn"))}
+          ${row("مصاريف تشغيل 20%",money(e.otherOperatingCost),"20% من تكلفة التغذية",status("تشغيل","warn"))}
           ${row("إجمالي تكلفة الإنتاج",money(e.totalProductionCost),"تغذية + تشغيل",status("تكلفة كلية","warn"))}
-          ${row("صافي ربح/خسارة اللبن",money(e.netOperatingResult),Number(e.netOperatingResult)>=0?"ربح تشغيلي":"خسارة تشغيلية",status(Number(e.netOperatingResult)>=0?"رابح":"خاسر",netTone))}
+          ${row("صافي ربح اللبن",money(e.netOperatingResult),"دخل اللبن - التغذية - 20% من التغذية",status(Number(e.netOperatingResult)>=0?"رابح":"خاسر",netTone))}
           ${row("تكلفة كجم اللبن",money(e.productionCostPerKgMilk),"إجمالي التكلفة ÷ كجم اللبن",status("تكلفة/كجم","blue"))}
           ${row("هامش كجم اللبن",money(e.marginPerKgMilk),"الصافي ÷ كجم اللبن",status(Number(e.marginPerKgMilk)>=0?"موجب":"سالب",Number(e.marginPerKgMilk)>=0?"ok":"danger"))}
         </tbody>`;
@@ -545,19 +538,33 @@
 
     function renderAll(j){
       $("loading").style.display="none"; $("report").style.display="block";
-      $("heroTitle").textContent=j.headline?.title||"تقرير إنتاج اللبن";
-      $("heroLine").textContent=j.headline?.text||"—";
-      $("heroNet").textContent=money(j.economics?.netOperatingResult);
-      $("metaDate").textContent="التاريخ: "+(j.meta?.reportDate||"—");
-      $("metaKind").textContent="النوع: "+(j.meta?.selectedTypeLabel||"الكل");
-      $("metaGenerated").textContent="تم التحديث: "+new Date(j.meta?.generatedAt||Date.now()).toLocaleString("ar-EG");
+      $("heroTitle").textContent = "تقرير إنتاج اللبن";
+      $("heroLine").textContent =
+        `إنتاج اليوم ${num(j.production?.totalMilkKg,1)} كجم · متوسط الحلاب ${num(j.production?.avgMilkKgRecorded,1)} كجم · ${j.meta?.selectedTypeLabel || "الكل"}`;
+      $("heroNet").textContent = money(j.economics?.netOperatingResult);
       if(j.message){$("serverMessage").textContent=j.message;$("serverMessage").classList.add("show")}else{$("serverMessage").classList.remove("show")}
       renderProduction(j); renderEconomy(j); renderComparisons(j); renderCharts(j); renderGroups(j); renderThi(j); renderRecommendations(j); renderScientific(j);
     }
 
+    function getQueryDate(){
+      const q = new URLSearchParams(location.search);
+      const raw = String(q.get("date") || q.get("reportDate") || "").trim().slice(0,10);
+      return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
+    }
+
+    function getKindFromQuery(){
+      const q = new URLSearchParams(location.search);
+      const raw = String(q.get("species") || q.get("type") || q.get("kind") || "").trim().toLowerCase();
+
+      if (raw === "cow" || raw === "cows" || raw === "أبقار" || raw === "ابقار") return "cow";
+      if (raw === "buffalo" || raw === "buffaloes" || raw === "جاموس") return "buffalo";
+
+      return "";
+    }
+
     async function loadReport(){
       $("loading").style.display="grid"; $("report").style.display="none"; $("loading").textContent="جاري تحميل تقرير اللبن...";
-      const date=$("reportDate").value||todayISO(), kind=$("reportKind").value||"";
+      const date=$("reportDate").value||todayISO(), kind=getKindFromQuery();
       const params=new URLSearchParams({date}); if(kind){params.set("kind",kind);params.set("species",kind)}
       try{
         const res=await fetch("/api/milk-reports/summary?"+params.toString(),{credentials:"include"});
@@ -567,9 +574,9 @@
       }catch(e){$("loading").style.display="grid";$("loading").textContent=e.message||"تعذّر تحميل تقرير اللبن."}
     }
 
-    $("refreshBtn").addEventListener("click",loadReport);
     $("printBtn").addEventListener("click",()=>window.print());
-    $("reportDate").value=todayISO();
+    $("reportDate").addEventListener("change", loadReport);
+    $("reportDate").value = getQueryDate() || todayISO();
     loadReport();
   </script>
 </body>
