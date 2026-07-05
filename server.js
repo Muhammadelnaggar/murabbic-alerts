@@ -1532,14 +1532,6 @@ app.get('/api/weather/thi', async (req, res) => {
   try {
     const now = Date.now();
 
-    if (weatherThiCache.data && (now - weatherThiCache.at) < WEATHER_CACHE_MS) {
-      return res.json({
-        ok: true,
-        cached: true,
-        ...weatherThiCache.data
-      });
-    }
-
        let lat = Number(req.query.lat);
     let lon = Number(req.query.lon);
     let resolvedLocation = null;
@@ -1547,8 +1539,10 @@ app.get('/api/weather/thi', async (req, res) => {
     if (!weatherValidCoordSrv(lat, lon)) {
       const session = await authSessionFromRequestBridgeSrv(req);
 
-      if (session?.userId) {
-        resolvedLocation = await weatherResolveFarmLocationSrv(session.userId);
+      const weatherProfileUid = session?.uid || session?.userId || "";
+
+      if (weatherProfileUid) {
+        resolvedLocation = await weatherResolveFarmLocationSrv(weatherProfileUid);
       }
 
       if (resolvedLocation && weatherValidCoordSrv(resolvedLocation.lat, resolvedLocation.lon)) {
@@ -1606,16 +1600,6 @@ app.get('/api/weather/thi', async (req, res) => {
       j = await r.json();
     } catch (e) {
       console.warn('weather.thi upstream failed:', e.message || e);
-
-      if (weatherThiCache.data) {
-        return res.json({
-          ok: true,
-          cached: true,
-          stale: true,
-          warning: 'weather_upstream_failed',
-          ...weatherThiCache.data
-        });
-      }
 
            return res.json({
         ok: true,
@@ -24681,7 +24665,7 @@ const [allEvents, animals, thresholds] = await Promise.all([
   milkReportFetchUserAnimalsSrv(uid),
   loadGroupThresholdsSrv(uid)
 ]);
-const milkReportThi = await weatherBuildFarmThiSrv(uid);
+const milkReportThi = await weatherBuildFarmThiSrv(req.authSession?.uid || uid);
 
 const animalsByNumber = new Map();
 for (const a of animals) {
