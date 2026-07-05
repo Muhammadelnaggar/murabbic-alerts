@@ -23880,17 +23880,14 @@ function milkReportLatestNutritionForGroupSrv(nutritionEvents = [], group = {}, 
     if (matchScore <= 0) continue;
 
     const feedCostPerHeadPerDay = milkReportNutritionCostPerHeadSrv(ev);
-    const milkPrice = milkReportNutritionMilkPriceSrv(ev);
-
-    if (!feedCostPerHeadPerDay || !milkPrice) continue;
+    if (!feedCostPerHeadPerDay) continue;
 
     candidates.push({
       event: ev,
       eventDate: d,
       eventMs: milkReportEventTimeMsSrv(ev),
       matchScore,
-      feedCostPerHeadPerDay,
-      milkPrice
+      feedCostPerHeadPerDay
     });
   }
 
@@ -23903,7 +23900,19 @@ function milkReportLatestNutritionForGroupSrv(nutritionEvents = [], group = {}, 
   return candidates[0] || null;
 }
 
-function milkReportAddEconomicsToGroupsSrv(groupsSummary = [], nutritionEvents = [], reportDate = "") {
+function milkReportAddEconomicsToGroupsSrv(groupsSummary = [], nutritionEvents = [], reportDate = "", milkPriceUsed = null) {
+  const OTHER_COST_RATE = 0.20;
+
+  const money = v =>
+    Number.isFinite(Number(v)) ? Number(Number(v).toFixed(2)) : 0;
+
+  const safeDiv = (a, b, d = 2) => {
+    const x = Number(a);
+    const y = Number(b);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || y <= 0) return null;
+    return Number((x / y).toFixed(d));
+  };
+
   return groupsSummary.map(g => {
     const latest = milkReportLatestNutritionForGroupSrv(nutritionEvents, g, reportDate);
 
@@ -23912,33 +23921,29 @@ function milkReportAddEconomicsToGroupsSrv(groupsSummary = [], nutritionEvents =
         ...g,
         economics: {
           hasEconomicData: false,
+          hasData: false,
           message: "لا توجد عليقة محفوظة سابقة لهذه المجموعة."
         }
       };
     }
 
     const heads = Number(g.milkersCount || g.animalsCount || 0);
-    const milkKg = Number(g.totalKg || 0);
+    const milkKg = Number(g.totalKg || g.totalMilkKg || 0);
     const feedCostPerHeadPerDay = Number(latest.feedCostPerHeadPerDay || 0);
-    const milkPrice = Number(latest.milkPrice || 0);
+    const milkPrice = Number(milkPriceUsed || 0);
 
-    const totalFeedCost = heads > 0
-      ? Number((heads * feedCostPerHeadPerDay).toFixed(2))
+    const feedCost = heads > 0
+      ? money(heads * feedCostPerHeadPerDay)
       : 0;
 
-    const totalMilkRevenue = milkKg > 0
-      ? Number((milkKg * milkPrice).toFixed(2))
+    const milkIncome = milkKg > 0
+      ? money(milkKg * milkPrice)
       : 0;
 
-    const totalMargin = Number((totalMilkRevenue - totalFeedCost).toFixed(2));
-
-    const marginPerHead = heads > 0
-      ? Number((totalMargin / heads).toFixed(2))
-      : null;
-
-    const costPerKgMilk = milkKg > 0
-      ? Number((totalFeedCost / milkKg).toFixed(2))
-      : null;
+    const otherOperatingCost = money(feedCost * OTHER_COST_RATE);
+    const totalProductionCost = money(feedCost + otherOperatingCost);
+    const incomeOverFeedCost = money(milkIncome - feedCost);
+    const netOperatingResult = money(milkIncome - totalProductionCost);
 
     const feedDate = latest.eventDate;
     const ageDays = milkReportIsDateSrv(feedDate) && milkReportIsDateSrv(reportDate)
@@ -23949,18 +23954,38 @@ function milkReportAddEconomicsToGroupsSrv(groupsSummary = [], nutritionEvents =
       ...g,
       economics: {
         hasEconomicData: true,
+        hasData: true,
+
+        milkPriceUsed: milkPrice,
+        milkPriceSource: "report_input",
+
         feedEventDate: feedDate,
         feedAgeDays: ageDays,
-        milkPrice,
         feedCostPerHeadPerDay,
-        totalFeedCost,
-        totalMilkRevenue,
-        totalMargin,
-        marginPerHead,
-        costPerKgMilk,
+
+        milkIncome,
+        feedCost,
+        otherOperatingCostRate: OTHER_COST_RATE,
+        otherOperatingCost,
+        totalProductionCost,
+        incomeOverFeedCost,
+        netOperatingResult,
+
+        feedCostPerKgMilk: safeDiv(feedCost, milkKg, 2),
+        productionCostPerKgMilk: safeDiv(totalProductionCost, milkKg, 2),
+        marginPerKgMilk: safeDiv(netOperatingResult, milkKg, 2),
+
+        // توافق مع أي أجزاء قديمة في التقرير
+        milkPrice,
+        totalMilkRevenue: milkIncome,
+        totalFeedCost: feedCost,
+        totalMargin: incomeOverFeedCost,
+        marginPerHead: safeDiv(incomeOverFeedCost, heads, 2),
+        costPerKgMilk: safeDiv(feedCost, milkKg, 2),
+
         message: ageDays === 0
-          ? "محسوبة من عليقة محفوظة اليوم."
-          : `محسوبة من آخر عليقة محفوظة منذ ${ageDays} يوم.`
+          ? "محسوبة من عليقة محفوظة اليوم وسعر لبن مدخل في التقرير."
+          : `محسوبة من آخر عليقة محفوظة منذ ${ageDays} يوم وسعر لبن مدخل في التقرير.`
       }
     };
   });
@@ -24961,7 +24986,23 @@ app.get("/api/milk-reports/summary", requireUserId, async (req, res) => {
     }
 
     const uid = req.userId;
-    const OTHER_COST_RATE = 0.20;
+const OTHER_COST_RATE = 0.20;
+
+const milkPriceRaw = String(req.query.milkPrice || "")
+  .trim()
+  .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d))
+  .replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))
+  .replace(/[^\d]/g, "");
+
+const milkPriceUsed = Number(milkPriceRaw);
+
+if (!Number.isInteger(milkPriceUsed) || milkPriceUsed <= 0) {
+  return res.status(400).json({
+    ok: false,
+    error: "milk_price_required",
+    message: "سعر كجم اللبن مطلوب لحساب اقتصاد تقرير اللبن."
+  });
+}
 
     const requestedDate = milkReportIsDateSrv(req.query.date)
       ? String(req.query.date).slice(0, 10)
@@ -25240,7 +25281,7 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
 
       const hasEconomics = !!latestNutrition;
 
-      const milkPrice = hasEconomics ? money(latestNutrition.milkPrice) : null;
+      const milkPrice = hasEconomics ? milkPriceUsed : null;
       const feedCostPerHeadPerDay = hasEconomics
         ? money(latestNutrition.feedCostPerHeadPerDay)
         : null;
@@ -25250,7 +25291,7 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
         : null;
 
       const milkIncome = hasEconomics
-        ? money(groupMilkKg * Number(milkPrice || 0))
+        ? money(groupMilkKg * milkPriceUsed)
         : null;
 
       const otherOperatingCost = hasEconomics
@@ -25277,10 +25318,9 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
         ? safeDiv(totalProductionCost, groupMilkKg, 2)
         : null;
 
-      const marginPerKgMilk =
-        hasEconomics && productionCostPerKgMilk != null
-          ? money(Number(milkPrice || 0) - Number(productionCostPerKgMilk))
-          : null;
+      const marginPerKgMilk = hasEconomics
+        ? safeDiv(netOperatingResult, groupMilkKg, 2)
+        : null;
 
       const groupAnimalRows = groupDayRows.map(ev => {
         const number = milkReportNumberSrv(ev.animalNumber || ev.number);
@@ -25360,6 +25400,8 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
           hasData: hasEconomics,
           sourceDate: latestNutrition?.eventDate || null,
           milkPrice,
+          milkPriceUsed: milkPrice,
+          milkPriceSource: hasEconomics ? "report_input" : null,
           feedCostPerHeadPerDay,
           milkIncome,
           feedCost,
@@ -25472,6 +25514,8 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
       });
 
     economicTotals.hasData = economicTotals.groupsCount > 0;
+    economicTotals.milkPriceUsed = milkPriceUsed;
+    economicTotals.milkPriceSource = "report_input";
 
     for (const k of [
       "totalMilkKg",
@@ -25862,7 +25906,7 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
         position: "last_section",
         notes: [
           "قراءة اللبن مبنية على القطيع والمجموعات، وليس جدول أفراد كامل.",
-          "اقتصاد الإنتاج يستخدم سعر اللبن من التغذية، تكلفة التغذية، و20% تكاليف تشغيل أخرى.",
+          "اقتصاد الإنتاج يستخدم سعر كجم اللبن المدخل في تقرير اللبن، وتكلفة التغذية من آخر عليقة محفوظة، و20% تكاليف تشغيل.",
           "DIM وDCC و305 يوم وTHI تُستخدم لتفسير الأداء لا لإصدار توصية بلا مؤشر."
         ]
       }
