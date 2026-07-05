@@ -832,7 +832,7 @@ let weatherThiCache = {
   at: 0,
   data: null
 };
-
+const weatherThiFarmCache = new Map();
 function calcTHI(tempC, humidityPct) {
   const t = Number(tempC);
   const h = Number(humidityPct);
@@ -957,6 +957,211 @@ function buildThiInstructionsSrv(thi, status = {}) {
     ],
     sourceLabel
   };
+}
+function weatherValidCoordSrv(lat, lon) {
+  const a = Number(lat);
+  const b = Number(lon);
+
+  return (
+    Number.isFinite(a) &&
+    Number.isFinite(b) &&
+    a >= -90 &&
+    a <= 90 &&
+    b >= -180 &&
+    b <= 180
+  );
+}
+
+function weatherDirectFarmCoordsSrv(profile = {}) {
+  const lat =
+    profile.farmLat ??
+    profile.farmLatitude ??
+    profile.latitude ??
+    profile.lat ??
+    profile.location?.lat ??
+    profile.location?.latitude ??
+    profile.farmLocation?.lat ??
+    profile.farmLocation?.latitude;
+
+  const lon =
+    profile.farmLon ??
+    profile.farmLng ??
+    profile.farmLongitude ??
+    profile.longitude ??
+    profile.lng ??
+    profile.lon ??
+    profile.location?.lon ??
+    profile.location?.lng ??
+    profile.location?.longitude ??
+    profile.farmLocation?.lon ??
+    profile.farmLocation?.lng ??
+    profile.farmLocation?.longitude;
+
+  if (!weatherValidCoordSrv(lat, lon)) return null;
+
+  return {
+    lat: Number(lat),
+    lon: Number(lon),
+    label: profile.farmName || profile.region || profile.governorate || profile.country || "موقع المزرعة",
+    source: "farm_profile_coordinates"
+  };
+}
+
+function weatherLocationTextSrv(profile = {}) {
+  return [
+    profile.farmLocationText,
+    profile.farmAddress,
+    profile.farmArea,
+    profile.area,
+    profile.city,
+    profile.region,
+    profile.governorate,
+    profile.country
+  ]
+    .map(v => String(v || "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+async function weatherGeocodeFarmLocationSrv(profile = {}) {
+  const name = weatherLocationTextSrv(profile);
+  if (!name) return null;
+
+  try {
+    const url =
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}` +
+      `&count=1&language=ar&format=json`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4500);
+
+    const r = await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal,
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "Murabbik/1.0"
+      }
+    });
+
+    clearTimeout(timer);
+
+    if (!r.ok) throw new Error(`open_meteo_geocode_${r.status}`);
+
+    const j = await r.json();
+    const hit = Array.isArray(j?.results) ? j.results[0] : null;
+
+    if (!hit || !weatherValidCoordSrv(hit.latitude, hit.longitude)) {
+      return null;
+    }
+
+    return {
+      lat: Number(hit.latitude),
+      lon: Number(hit.longitude),
+      label: [hit.name, hit.admin1, hit.country].filter(Boolean).join("، "),
+      source: "farm_profile_geocoding"
+    };
+
+  } catch (e) {
+    console.warn("farm location geocode failed:", e.message || e);
+    return null;
+  }
+}
+
+async function weatherResolveFarmLocationSrv(uid) {
+  if (!uid) return null;
+
+  const profile = await authReadUserProfileBridgeSrv(uid);
+
+  const direct = weatherDirectFarmCoordsSrv(profile);
+  if (direct) return direct;
+
+  return await weatherGeocodeFarmLocationSrv(profile);
+}
+
+async function weatherFetchThiForCoordsSrv(location = {}) {
+  const lat = Number(location.lat);
+  const lon = Number(location.lon);
+
+  if (!weatherValidCoordSrv(lat, lon)) return null;
+
+  const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+  const cached = weatherThiFarmCache.get(key);
+  const now = Date.now();
+
+  if (cached?.data && (now - Number(cached.at || 0)) < WEATHER_CACHE_MS) {
+    return {
+      ...cached.data,
+      cached: true
+    };
+  }
+
+  try {
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}` +
+      `&longitude=${encodeURIComponent(lon)}` +
+      `&current=temperature_2m,relative_humidity_2m&timezone=auto`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4500);
+
+    const r = await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal,
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "Murabbik/1.0"
+      }
+    });
+
+    clearTimeout(timer);
+
+    if (!r.ok) throw new Error(`open_meteo_${r.status}`);
+
+    const j = await r.json();
+
+    const tempC = Number(j?.current?.temperature_2m);
+    const humidity = Number(j?.current?.relative_humidity_2m);
+    const thi = calcTHI(tempC, humidity);
+    const status = classifyTHI(thi);
+    const instructions = buildThiInstructionsSrv(thi, status);
+
+    const data = {
+      tempC: Number.isFinite(tempC) ? Math.round(tempC) : null,
+      humidity: Number.isFinite(humidity) ? Math.round(humidity) : null,
+      thi,
+      status,
+      instructions,
+      thiInstructions: instructions,
+      thiRecommendations: instructions,
+      recommendations: instructions.actions,
+      advice: instructions.summary,
+      source: "open-meteo",
+      locationSource: location.source || "farm_location",
+      locationLabel: location.label || "موقع المزرعة",
+      lat,
+      lon,
+      updatedAt: new Date().toISOString()
+    };
+
+    weatherThiFarmCache.set(key, {
+      at: now,
+      data
+    });
+
+    return data;
+
+  } catch (e) {
+    console.warn("farm THI fetch failed:", e.message || e);
+    return null;
+  }
+}
+
+async function weatherBuildFarmThiSrv(uid) {
+  const location = await weatherResolveFarmLocationSrv(uid);
+  if (!location) return null;
+
+  return await weatherFetchThiForCoordsSrv(location);
 }
 function belongs(rec, tenant){
   const t = rec && rec.userId ? rec.userId : '';
@@ -1335,17 +1540,42 @@ app.get('/api/weather/thi', async (req, res) => {
       });
     }
 
-    let lat = Number(req.query.lat);
+       let lat = Number(req.query.lat);
     let lon = Number(req.query.lon);
+    let resolvedLocation = null;
 
-    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
-      lat = WEATHER_DEFAULT_LAT;
+    if (!weatherValidCoordSrv(lat, lon)) {
+      const session = await authSessionFromRequestBridgeSrv(req);
+
+      if (session?.userId) {
+        resolvedLocation = await weatherResolveFarmLocationSrv(session.userId);
+      }
+
+      if (resolvedLocation && weatherValidCoordSrv(resolvedLocation.lat, resolvedLocation.lon)) {
+        lat = Number(resolvedLocation.lat);
+        lon = Number(resolvedLocation.lon);
+      } else {
+        return res.json({
+          ok: true,
+          cached: false,
+          tempC: null,
+          humidity: null,
+          thi: null,
+          status: {
+            level: "unknown",
+            label: "غير متاح",
+            severity: 0
+          },
+          instructions: null,
+          thiInstructions: null,
+          thiRecommendations: null,
+          recommendations: [],
+          advice: "",
+          source: "farm-location-required",
+          updatedAt: new Date().toISOString()
+        });
+      }
     }
-
-    if (!Number.isFinite(lon) || lon < -180 || lon > 180) {
-      lon = WEATHER_DEFAULT_LON;
-    }
-
     const url =
       `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}` +
       `&longitude=${encodeURIComponent(lon)}` +
@@ -1387,11 +1617,10 @@ app.get('/api/weather/thi', async (req, res) => {
         });
       }
 
-      return res.json({
+           return res.json({
         ok: true,
         cached: false,
-        fallback: true,
-        warning: 'weather_unavailable',
+        warning: 'weather_upstream_unavailable',
         tempC: null,
         humidity: null,
         thi: null,
@@ -1400,7 +1629,7 @@ app.get('/api/weather/thi', async (req, res) => {
           label: 'غير متاح',
           severity: 0
         },
-        source: 'weather-fallback',
+        source: 'weather-upstream-unavailable',
         lat,
         lon,
         updatedAt: new Date().toISOString()
@@ -1424,11 +1653,12 @@ const data = {
   recommendations: instructions.actions,
   advice: instructions.summary,
   source: 'open-meteo',
+  locationSource: resolvedLocation?.source || "query_coordinates",
+  locationLabel: resolvedLocation?.label || "موقع محدد",
   lat,
   lon,
   updatedAt: new Date().toISOString()
 };
-
     weatherThiCache = {
       at: now,
       data
@@ -1453,7 +1683,6 @@ return res.json({
    
       ok: true,
       cached: false,
-      fallback: true,
       warning: 'weather_route_failed',
       tempC: null,
       humidity: null,
@@ -1468,9 +1697,9 @@ thiInstructions: instructions,
 thiRecommendations: instructions,
 recommendations: instructions.actions,
 advice: instructions.summary,
-      source: 'weather-fallback',
-      lat: WEATHER_DEFAULT_LAT,
-      lon: WEATHER_DEFAULT_LON,
+source: 'weather-route-failed',
+      lat: null,
+      lon: null,
       updatedAt: new Date().toISOString()
     });
   }
@@ -24452,7 +24681,7 @@ const [allEvents, animals, thresholds] = await Promise.all([
   milkReportFetchUserAnimalsSrv(uid),
   loadGroupThresholdsSrv(uid)
 ]);
- const milkReportThi = weatherThiCache?.data || null;   
+const milkReportThi = await weatherBuildFarmThiSrv(uid);
 
 const animalsByNumber = new Map();
 for (const a of animals) {
