@@ -67,6 +67,22 @@
     .kpi-card.warn .k-value{color:var(--warn)}
     .kpi-card.blue .k-value{color:var(--blue)}
 
+    .econ-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .econ-card{
+      background:white;
+      border:1px solid var(--line);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+      padding:14px;
+    }
+    .econ-card .e-label{color:var(--muted);font-size:12px;font-weight:900}
+    .econ-card .e-value{margin-top:8px;font-size:24px;font-weight:950;color:#0f172a;line-height:1.25}
+    .econ-card .e-sub{margin-top:6px;color:#64748b;font-size:12px;line-height:1.55;font-weight:800}
+    .econ-card.good .e-value{color:var(--ok)}
+    .econ-card.warn .e-value{color:var(--warn)}
+    .econ-card.blue .e-value{color:var(--blue)}
+    .econ-card.danger .e-value{color:var(--danger)}
+
     .table-card{padding:0}
     .report-table{width:100%;border-collapse:collapse;overflow:hidden}
     .report-table th{background:#f8fafc;color:#475569;font-size:12px;text-align:right;padding:12px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -172,7 +188,7 @@
     .footer-note{text-align:center;color:var(--muted);font-size:12px;font-weight:750;margin-top:18px}
 
     @media(max-width:980px){
-      .hero-grid,.grid-2,.group-list,.recommendations,.group-main,.group-econ,.kpi-row{grid-template-columns:1fr}
+      .hero-grid,.grid-2,.group-list,.recommendations,.group-main,.group-econ,.kpi-row,.econ-row{grid-template-columns:1fr}
       .controls{width:100%}.field{flex:1 1 140px}.field input,.field select{width:100%;min-width:0}
       .table-scroll{overflow-x:auto}.report-table{min-width:650px}
       .chart svg{height:300px}.chart{min-height:300px}
@@ -225,8 +241,8 @@
       </section>
 
       <section class="section">
-        <div class="section-head"><div><h3>اقتصاد إنتاج اللبن</h3><p>الفلوس أولًا: دخل، تكلفة، صافي، وتكلفة الكيلو.</p></div></div>
-        <div class="card table-card table-scroll"><table class="report-table" id="economyTable"></table></div>
+        <div class="section-head"><div><h3>اقتصاد إنتاج اللبن</h3><p>الأرقام الاقتصادية الأساسية للقطيع.</p></div></div>
+        <div class="econ-row" id="economyCards"></div>
       </section>
 
       <section class="section">
@@ -297,6 +313,7 @@
     function num(v,d=1){const x=Number(v);return Number.isFinite(x)?x.toLocaleString("ar-EG",{minimumFractionDigits:d,maximumFractionDigits:d}):"—"}
     function int(v){const x=Number(v);return Number.isFinite(x)?x.toLocaleString("ar-EG",{maximumFractionDigits:0}):"—"}
     function money(v){const x=Number(v);return Number.isFinite(x)?x.toLocaleString("ar-EG",{minimumFractionDigits:0,maximumFractionDigits:2})+" ج":"—"}
+    function money0(v){const x=Number(v);return Number.isFinite(x)?x.toLocaleString("ar-EG",{minimumFractionDigits:0,maximumFractionDigits:0})+" ج":"—"}
     function pct(v){const x=Number(v);if(!Number.isFinite(x))return"—";return(x>0?"+":"")+x.toLocaleString("ar-EG",{minimumFractionDigits:1,maximumFractionDigits:1})+"%"}
     function esc(v){return String(v??"").replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[s]))}
     function arrow(v){const x=Number(v); if(!Number.isFinite(x)||x===0)return `<span class="arrow flat">↔</span>`; return x>0?`<span class="arrow up">↑</span>`:`<span class="arrow down">↓</span>`}
@@ -325,20 +342,30 @@
       ].join("");
     }
 
+    function econCard(label, value, sub, tone=""){
+      return `<div class="econ-card ${tone}">
+        <div class="e-label">${esc(label)}</div>
+        <div class="e-value">${value}</div>
+        <div class="e-sub">${esc(sub || "")}</div>
+      </div>`;
+    }
+
     function renderEconomy(j){
       const e=j.economics||{};
-      const netTone=Number(e.netOperatingResult)>=0?"ok":"danger";
-      $("economyTable").innerHTML=`
-        <thead><tr><th>البند</th><th>القيمة</th><th>القراءة</th><th>الحالة</th></tr></thead>
-        <tbody>
-          ${row("دخل اللبن",money(e.milkIncome),"سعر اللبن مأخوذ من التغذية",status("دخل","ok"))}
-          ${row("تكلفة التغذية",money(e.feedCost),`محسوبة على ${int(e.groupsCount)} مجموعة`,status("تكلفة","warn"))}
-          ${row("مصاريف تشغيل 20%",money(e.otherOperatingCost),"20% من تكلفة التغذية",status("تشغيل","warn"))}
-          ${row("إجمالي تكلفة الإنتاج",money(e.totalProductionCost),"تغذية + تشغيل",status("تكلفة كلية","warn"))}
-          ${row("صافي ربح اللبن",money(e.netOperatingResult),"دخل اللبن - التغذية - 20% من التغذية",status(Number(e.netOperatingResult)>=0?"رابح":"خاسر",netTone))}
-          ${row("تكلفة كجم اللبن",money(e.productionCostPerKgMilk),"إجمالي التكلفة ÷ كجم اللبن",status("تكلفة/كجم","blue"))}
-          ${row("هامش كجم اللبن",money(e.marginPerKgMilk),"الصافي ÷ كجم اللبن",status(Number(e.marginPerKgMilk)>=0?"موجب":"سالب",Number(e.marginPerKgMilk)>=0?"ok":"danger"))}
-        </tbody>`;
+      const totalMilkKg = Number(e.totalMilkKg || 0);
+      const milkIncome = Number(e.milkIncome || 0);
+      const milkPricePerKg = totalMilkKg > 0 ? Math.round(milkIncome / totalMilkKg) : null;
+      const netTone = Number(e.netOperatingResult) >= 0 ? "good" : "danger";
+
+      $("economyCards").innerHTML = [
+        econCard("سعر كجم اللبن", money0(milkPricePerKg), "سعر بيع كجم اللبن", "blue"),
+        econCard("إجمالي تكاليف التغذية للقطيع", money(e.feedCost), `محسوبة على ${int(e.groupsCount)} مجموعة`, "warn"),
+        econCard("تكاليف التشغيل", money(e.otherOperatingCost), "20% من تكلفة التغذية", "warn"),
+        econCard("إجمالي تكاليف الإنتاج", money(e.totalProductionCost), "تغذية + تشغيل", "warn"),
+        econCard("صافي ربح إنتاج اللبن", money(e.netOperatingResult), "بعد التغذية والتشغيل", netTone),
+        econCard("متوسط إجمالي تكلفة إنتاج كجم لبن", money(e.productionCostPerKgMilk), "إجمالي التكلفة ÷ كجم اللبن", "blue"),
+        econCard("صافي هامش ربح كجم اللبن", money(e.marginPerKgMilk), "الصافي ÷ كجم اللبن", Number(e.marginPerKgMilk) >= 0 ? "good" : "danger")
+      ].join("");
     }
 
     function renderComparisons(j){
