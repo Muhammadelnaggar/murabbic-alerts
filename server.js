@@ -1071,6 +1071,59 @@ function buildThiInstructionsSrv(thi, status = {}) {
     sourceLabel
   };
 }
+function weatherThiUiSrv(data = {}) {
+  const tempC = Number(data.tempC);
+  const humidity = Number(data.humidity);
+  const thi = Number(data.thi);
+  const status = data.status || {};
+  const level = String(status.level || "unknown");
+  const message = String(data.message || status.label || "غير متاح").trim();
+
+  if (data.needsFarmLocation === true) {
+    return {
+      tempText: "--",
+      humidityText: "--",
+      thiText: "--",
+      circleText: "📍",
+      statusText: message || "اضغط هنا لتحديد موقع المزرعة",
+      statusColor: "#f59e0b",
+      circleBackground: "#fff7ed",
+      circleBorderColor: "#f59e0b",
+      circleColor: "#f59e0b",
+      barAction: "save_farm_location"
+    };
+  }
+
+  let bg = "#c8e6c9";
+  let color = "#2e7d32";
+
+  if (level === "mild") {
+    bg = "#fff9c4";
+    color = "#f9a825";
+  } else if (level === "moderate") {
+    bg = "#ffe0b2";
+    color = "#fb8c00";
+  } else if (level === "high") {
+    bg = "#ffcdd2";
+    color = "#e53935";
+  } else if (level === "unknown") {
+    bg = "#eef2f7";
+    color = "#64748b";
+  }
+
+  return {
+    tempText: Number.isFinite(tempC) ? String(Math.round(tempC)) : "--",
+    humidityText: Number.isFinite(humidity) ? String(Math.round(humidity)) : "--",
+    thiText: Number.isFinite(thi) ? String(Math.round(thi)) : "--",
+    circleText: Number.isFinite(thi) ? String(Math.round(thi)) : "--",
+    statusText: message,
+    statusColor: color,
+    circleBackground: bg,
+    circleBorderColor: color,
+    circleColor: color,
+    barAction: null
+  };
+}
 function weatherValidCoordSrv(lat, lon) {
   const a = Number(lat);
   const b = Number(lon);
@@ -1189,7 +1242,7 @@ async function weatherResolveFarmLocationSrv(uid) {
   const direct = weatherDirectFarmCoordsSrv(profile);
   if (direct) return direct;
 
-  return await weatherGeocodeFarmLocationSrv(profile);
+  return null;
 }
 
 async function weatherFetchThiForCoordsSrv(location = {}) {
@@ -1641,162 +1694,138 @@ async function ensureAdmin(req, res, next) {
 // ============================================================
 //                  API: WEATHER / THI
 // ============================================================
-app.get('/api/weather/thi', async (req, res) => {
+app.get('/api/weather/thi', requireUserId, async (req, res) => {
   try {
-    const now = Date.now();
+    const profileUid = req.authSession?.uid || req.userId || "";
+    const resolvedLocation = await weatherResolveFarmLocationSrv(profileUid);
 
-       let lat = Number(req.query.lat);
-    let lon = Number(req.query.lon);
-    let resolvedLocation = null;
+    if (!resolvedLocation || !weatherValidCoordSrv(resolvedLocation.lat, resolvedLocation.lon)) {
+      const message = "اضغط هنا لتحديد موقع المزرعة لتفعيل THI والتنبيهات المناخية.";
 
-    if (!weatherValidCoordSrv(lat, lon)) {
-      const session = await authSessionFromRequestBridgeSrv(req);
-
-      const weatherProfileUid = session?.uid || session?.userId || "";
-
-      if (weatherProfileUid) {
-        resolvedLocation = await weatherResolveFarmLocationSrv(weatherProfileUid);
-      }
-
-      if (resolvedLocation && weatherValidCoordSrv(resolvedLocation.lat, resolvedLocation.lon)) {
-        lat = Number(resolvedLocation.lat);
-        lon = Number(resolvedLocation.lon);
-      } else {
-        return res.json({
-          ok: true,
-          cached: false,
-          tempC: null,
-          humidity: null,
-          thi: null,
-          status: {
-            level: "unknown",
-            label: "غير متاح",
-            severity: 0
-          },
-          instructions: null,
-          thiInstructions: null,
-          thiRecommendations: null,
-          recommendations: [],
-          advice: "",
-          source: "farm-location-required",
-          updatedAt: new Date().toISOString()
-        });
-      }
-    }
-    const url =
-      `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}` +
-      `&longitude=${encodeURIComponent(lon)}` +
-      `&current=temperature_2m,relative_humidity_2m&timezone=auto`;
-
-    let r = null;
-    let j = null;
-
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4500);
-
-      r = await fetch(url, {
-        cache: 'no-store',
-        signal: controller.signal,
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Murabbik/1.0'
-        }
-      });
-
-      clearTimeout(timer);
-
-      if (!r.ok) {
-        throw new Error(`open_meteo_${r.status}`);
-      }
-
-      j = await r.json();
-    } catch (e) {
-      console.warn('weather.thi upstream failed:', e.message || e);
-
-           return res.json({
+      return res.json({
         ok: true,
         cached: false,
-        warning: 'weather_upstream_unavailable',
+        needsFarmLocation: true,
+        message,
         tempC: null,
         humidity: null,
         thi: null,
         status: {
-          level: 'unknown',
-          label: 'غير متاح',
+          level: "unknown",
+          label: "غير متاح",
           severity: 0
         },
-        source: 'weather-upstream-unavailable',
-        lat,
-        lon,
+        instructions: null,
+        thiInstructions: null,
+        thiRecommendations: null,
+        recommendations: [],
+        advice: "",
+        source: "farm-location-required",
+        ui: weatherThiUiSrv({
+          needsFarmLocation: true,
+          message
+        }),
         updatedAt: new Date().toISOString()
       });
     }
 
-    const tempC = Number(j?.current?.temperature_2m);
-    const humidity = Number(j?.current?.relative_humidity_2m);
-    const thi = calcTHI(tempC, humidity);
-    const status = classifyTHI(thi);
-    const instructions = buildThiInstructionsSrv(thi, status);
+    const data = await weatherFetchThiForCoordsSrv(resolvedLocation);
 
-const data = {
-  tempC: Number.isFinite(tempC) ? Math.round(tempC) : null,
-  humidity: Number.isFinite(humidity) ? Math.round(humidity) : null,
-  thi,
-  status,
-  instructions,
-  thiInstructions: instructions,
-  thiRecommendations: instructions,
-  recommendations: instructions.actions,
-  advice: instructions.summary,
-  source: 'open-meteo',
-  locationSource: resolvedLocation?.source || "query_coordinates",
-  locationLabel: resolvedLocation?.label || "موقع محدد",
-  lat,
-  lon,
-  updatedAt: new Date().toISOString()
-};
-    weatherThiCache = {
-      at: now,
-      data
+    if (!data) {
+      const status = {
+        level: "unknown",
+        label: "غير متاح",
+        severity: 0
+      };
+
+      const instructions = buildThiInstructionsSrv(null, status);
+      const message = "تعذّر تحميل قراءة THI الآن. حاول لاحقًا.";
+
+      return res.json({
+        ok: true,
+        cached: false,
+        warning: "weather_upstream_unavailable",
+        needsFarmLocation: false,
+        message,
+        tempC: null,
+        humidity: null,
+        thi: null,
+        status,
+        instructions,
+        thiInstructions: instructions,
+        thiRecommendations: instructions,
+        recommendations: instructions.actions,
+        advice: instructions.summary,
+        source: "weather-upstream-unavailable",
+        locationSource: resolvedLocation.source || "farm_location",
+        locationLabel: resolvedLocation.label || "موقع المزرعة",
+        lat: resolvedLocation.lat,
+        lon: resolvedLocation.lon,
+        ui: weatherThiUiSrv({
+          tempC: null,
+          humidity: null,
+          thi: null,
+          status,
+          message
+        }),
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    const message = String(data?.status?.label || "غير متاح");
+
+    return res.json({
+      ok: true,
+      cached: Boolean(data.cached),
+      needsFarmLocation: false,
+      message,
+      ...data,
+      ui: weatherThiUiSrv({
+        tempC: data.tempC,
+        humidity: data.humidity,
+        thi: data.thi,
+        status: data.status,
+        message
+      })
+    });
+
+  } catch (e) {
+    console.error("weather.thi fatal error:", e.message || e);
+
+    const status = {
+      level: "unknown",
+      label: "غير متاح",
+      severity: 0
     };
+
+    const instructions = buildThiInstructionsSrv(null, status);
+    const message = "تعذّر تحميل THI الآن.";
 
     return res.json({
       ok: true,
       cached: false,
-      ...data
-    });
-
-    } catch (e) {
- console.error('weather.thi fatal error:', e.message || e);
-
-const instructions = buildThiInstructionsSrv(null, {
-  level: 'unknown',
-  label: 'غير متاح',
-  severity: 0
-});
-
-return res.json({
-   
-      ok: true,
-      cached: false,
-      warning: 'weather_route_failed',
+      warning: "weather_route_failed",
+      needsFarmLocation: false,
+      message,
       tempC: null,
       humidity: null,
       thi: null,
-     status: {
-  level: 'unknown',
-  label: 'غير متاح',
-  severity: 0
-},
-instructions,
-thiInstructions: instructions,
-thiRecommendations: instructions,
-recommendations: instructions.actions,
-advice: instructions.summary,
-source: 'weather-route-failed',
+      status,
+      instructions,
+      thiInstructions: instructions,
+      thiRecommendations: instructions,
+      recommendations: instructions.actions,
+      advice: instructions.summary,
+      source: "weather-route-failed",
       lat: null,
       lon: null,
+      ui: weatherThiUiSrv({
+        tempC: null,
+        humidity: null,
+        thi: null,
+        status,
+        message
+      }),
       updatedAt: new Date().toISOString()
     });
   }
