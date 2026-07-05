@@ -132,8 +132,8 @@
     .chart svg{width:100%;height:230px;display:block}
     .chart-note{margin-top:8px;padding:8px 10px;border-radius:13px;bacكجمround:#f8fafc;color:#334155;line-height:1.55;font-size:12px;font-weight:850}
     .axis{stroke:#cbd5e1;stroke-width:1}.gridline{stroke:#eef2f7;stroke-width:1}
-    .line-path{fill:none;stroke:#0f766e;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
-    .dot{fill:#0f766e}.bar{fill:#0f766e}.bar-blue{fill:#2563eb}.bar-red{fill:#dc2626}
+    .line-path{fill:none;stroke:#0f766e;stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round}
+    .dot,.scatter-dot{fill:#0f766e;stroke:#ffffff;stroke-width:2.2}.bar{fill:#0f766e}.bar-blue{fill:#2563eb}.bar-red{fill:#dc2626}
     .svg-label{font:800 15px Arial,Tahoma,sans-serif;fill:#334155}.svg-small{font:800 13px Arial,Tahoma,sans-serif;fill:#64748b}.svg-value{font:950 16px Arial,Tahoma,sans-serif;fill:#0f172a}
     .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;direction:rtl}
     .legend span{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;font-weight:850}.legend i{width:10px;height:10px;border-radius:3px;bacكجمround:#0f766e;display:inline-block}.legend .blue i{bacكجمround:#2563eb}.legend .red i{bacكجمround:#dc2626}
@@ -644,6 +644,7 @@
         <div class="grid grid-2">
           <div class="card chart-card">
             <div class="chart-title"><strong>منحنى آخر 30 يوم</strong><span>كجم لبن / يوم</span></div>
+            <div class="legend"><span><i></i>نقاط القراءات اليومية</span></div>
             <div class="chart" id="dailyTrendChart"></div>
             <div class="chart-note" id="dailyTrendNote"></div>
           </div>
@@ -830,7 +831,7 @@
       const labelIdx = new Set([0, Math.floor((pts.length-1)/2), pts.length-1]);
       const labels=pts.filter((_,i)=>labelIdx.has(i)).map(o=>`<text class="svg-small" x="${o.x}" y="${h-8}" text-anchor="middle">${esc(String(o.r[labelKey]||o.r.date||"").slice(5))}</text>`).join("");
       const valLabels=pts.filter((_,i)=>labelIdx.has(i)).map(o=>`<text class="svg-value" x="${o.x}" y="${Math.max(18,o.y-9)}" text-anchor="middle">${num(o.r[key],0)}</text>`).join("");
-      const dots=pts.map(o=>`<circle class="dot" cx="${o.x}" cy="${o.y}" r="3.2"><title>${esc(o.r[labelKey]||o.r.date||"")}: ${num(o.r[key],1)} كجم</title></circle>`).join("");
+      const dots=pts.map(o=>`<circle class="scatter-dot" cx="${o.x}" cy="${o.y}" r="5.2"><title>${esc(o.r[labelKey]||o.r.date||"")}: ${num(o.r[key],1)} كجم</title></circle>`).join("");
       return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
         <line class="gridline" x1="${p}" y1="${p}" x2="${w-p}" y2="${p}"></line>
         <line class="gridline" x1="${p}" y1="${h/2}" x2="${w-p}" y2="${h/2}"></line>
