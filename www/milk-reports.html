@@ -33,9 +33,9 @@
     .loading{min-height:240px;display:grid;place-items:center;bacكجمround:white;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);font-weight:950;color:var(--muted)}
 
     .hero{border-radius:26px;padding:20px;bacكجمround:linear-gradient(135deg,#0f766e,#115e59);color:white;box-shadow:var(--shadow)}
-    .hero-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:14px;align-items:center}
-    .hero h2{margin:0;font-size:clamp(23px,4vw,36px)}
-    .hero-line{margin-top:10px;font-size:17px;font-weight:950;line-height:1.65}
+    .hero-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:14px;align-items:stretch}
+    .hero h2{margin:0;font-size:clamp(23px,4vw,36px);color:#0f172a}
+    .hero-line{margin-top:10px;font-size:17px;font-weight:950;line-height:1.65;color:#334155}
     .hero-summary{
       margin-top:12px;
       display:grid;
@@ -43,29 +43,29 @@
       gap:10px;
     }
     .hero-summary-card{
-      background:rgba(255,255,255,.13);
-      border:1px solid rgba(255,255,255,.22);
+      background:#f8fafc;
+      border:1px solid #e5eaf0;
       border-radius:16px;
       padding:11px;
     }
     .hero-summary-card .hs-label{
       font-size:12px;
       font-weight:900;
-      color:rgba(255,255,255,.82);
+      color:var(--muted);
     }
     .hero-summary-card .hs-value{
       margin-top:5px;
       font-size:22px;
       line-height:1.25;
       font-weight:950;
-      color:white;
+      color:#0f172a;
     }
     .hero-summary-card .hs-sub{
       margin-top:4px;
       font-size:11px;
       line-height:1.45;
       font-weight:800;
-      color:rgba(255,255,255,.84);
+      color:#64748b;
     }
     .hero-meta{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
     .pill{display:inline-flex;border-radius:999px;padding:7px 11px;bacكجمround:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);font-size:12px;font-weight:900}
@@ -719,7 +719,11 @@
       $("report").style.display="block";
       $("heroTitle").textContent="تقرير إنتاج اللبن";
       $("heroLine").textContent="أدخل سعر كجم اللبن بجانب تاريخ التقرير لحساب الاقتصاد بدقة.";
-      $("heroSummary").innerHTML="";
+      $("heroSummary").innerHTML=[
+        heroSummaryCard("حالة التقرير", "في انتظار السعر", "اكتب سعر كجم اللبن ثم يتم تحميل التقرير تلقائيًا"),
+        heroSummaryCard("تاريخ التقرير", esc($("reportDate").value || todayISO()), "التاريخ المختار من أعلى الصفحة"),
+        heroSummaryCard("نوع القطيع", esc(getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل"), "قادم من الداشبورد")
+      ].join("");
       $("heroNet").textContent="—";
 
       $("productionCards").innerHTML=`<div class="empty">سعر كجم اللبن مطلوب قبل تحميل التقرير.</div>`;
