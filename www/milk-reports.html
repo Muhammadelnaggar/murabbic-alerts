@@ -205,11 +205,15 @@
         <div class="brand-mark">م</div>
         <div>
           <h1>تقرير إنتاج اللبن</h1>
-          <p>مُرَبِّيك — نوع القطيع يأتي من الداشبورد</p>
+          <p>مُرَبِّيك — نوع القطيع من الداشبورد، وسعر اللبن من التقرير</p>
         </div>
       </div>
       <div class="controls">
         <div class="field"><label for="reportDate">تاريخ التقرير</label><input id="reportDate" type="date"></div>
+        <div class="field">
+          <label for="milkPriceInput">سعر كجم اللبن <b style="color:#dc2626">*</b></label>
+          <input id="milkPriceInput" type="number" inputmode="numeric" min="1" step="1" placeholder="مثال: 20" required>
+        </div>
         <button class="btn btn-ghost" id="printBtn">طباعة</button>
       </div>
     </div>
@@ -352,13 +356,11 @@
 
     function renderEconomy(j){
       const e=j.economics||{};
-      const totalMilkKg = Number(e.totalMilkKg || 0);
-      const milkIncome = Number(e.milkIncome || 0);
-      const milkPricePerKg = totalMilkKg > 0 ? Math.round(milkIncome / totalMilkKg) : null;
+      const milkPricePerKg = Number(e.milkPriceUsed || getMilkPriceRequired());
       const netTone = Number(e.netOperatingResult) >= 0 ? "good" : "danger";
 
       $("economyCards").innerHTML = [
-        econCard("سعر كجم اللبن", money0(milkPricePerKg), "سعر بيع كجم اللبن", "blue"),
+        econCard("سعر كجم اللبن", money0(milkPricePerKg), "مدخل في تقرير اللبن", "blue"),
         econCard("إجمالي تكاليف التغذية للقطيع", money(e.feedCost), `محسوبة على ${int(e.groupsCount)} مجموعة`, "warn"),
         econCard("تكاليف التشغيل", money(e.otherOperatingCost), "20% من تكلفة التغذية", "warn"),
         econCard("إجمالي تكاليف الإنتاج", money(e.totalProductionCost), "تغذية + تشغيل", "warn"),
@@ -611,22 +613,68 @@
       return "";
     }
 
+    function normalizeDigits(v){
+      const map={"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9","۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"};
+      return String(v||"").trim().replace(/[٠-٩۰-۹]/g,d=>map[d]||d);
+    }
+
+    function getMilkPriceRequired(){
+      const el=$("milkPriceInput");
+      const raw=normalizeDigits(el.value).replace(/[^\d]/g,"");
+      if(raw && el.value!==raw) el.value=raw;
+      const n=Number(raw);
+      return Number.isFinite(n) && n>0 ? Math.round(n) : null;
+    }
+
+    function showPriceRequired(){
+      $("loading").style.display="none";
+      $("report").style.display="block";
+      $("heroTitle").textContent="تقرير إنتاج اللبن";
+      $("heroLine").textContent="أدخل سعر كجم اللبن بجانب تاريخ التقرير لحساب الاقتصاد بدقة.";
+      $("heroNet").textContent="—";
+      $("productionCards").innerHTML=`<div class="empty">سعر كجم اللبن مطلوب قبل تحميل التقرير.</div>`;
+      $("economyCards").innerHTML="";
+      $("comparisonsTable").innerHTML="";
+      $("chartsWrap").innerHTML="";
+      $("groupsList").innerHTML="";
+      $("recommendations").innerHTML="";
+      $("scientificNotes").innerHTML="";
+      $("thiBox").innerHTML="";
+      $("dataQualityBox").innerHTML="";
+    }
+
     async function loadReport(){
+      const milkPrice=getMilkPriceRequired();
+      if(!milkPrice){showPriceRequired();return}
+
       $("loading").style.display="grid"; $("report").style.display="none"; $("loading").textContent="جاري تحميل تقرير اللبن...";
       const date=$("reportDate").value||todayISO(), kind=getKindFromQuery();
-      const params=new URLSearchParams({date}); if(kind){params.set("kind",kind);params.set("species",kind)}
+      const params=new URLSearchParams({date,milkPrice:String(milkPrice)});
+      if(kind){params.set("kind",kind);params.set("species",kind)}
       try{
         const res=await fetch("/api/milk-reports/summary?"+params.toString(),{credentials:"include"});
         const j=await res.json().catch(()=>({}));
         if(!res.ok||!j.ok)throw new Error(j.message||"تعذّر تحميل تقرير اللبن.");
+
+        const serverMilkPrice=Number(j.economics?.milkPriceUsed);
+        if(!Number.isFinite(serverMilkPrice) || Math.round(serverMilkPrice)!==milkPrice){
+          throw new Error("السيرفر لم يعتمد سعر اللبن المدخل في التقرير بعد. حدّث مسار التقرير في السيرفر أولًا.");
+        }
+
         renderAll(j);
       }catch(e){$("loading").style.display="grid";$("loading").textContent=e.message||"تعذّر تحميل تقرير اللبن."}
     }
 
     $("printBtn").addEventListener("click",()=>window.print());
     $("reportDate").addEventListener("change", loadReport);
+    $("milkPriceInput").addEventListener("input",()=>{
+      getMilkPriceRequired();
+      clearTimeout(window.__milkPriceTimer);
+      window.__milkPriceTimer=setTimeout(loadReport,450);
+    });
+    $("milkPriceInput").addEventListener("change",loadReport);
     $("reportDate").value = getQueryDate() || todayISO();
-    loadReport();
+    showPriceRequired();
   </script>
 </body>
 </html>
