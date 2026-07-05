@@ -23981,8 +23981,8 @@ function milkReportAddEconomicsToGroupsSrv(groupsSummary = [], nutritionEvents =
         totalFeedCost: feedCost,
         totalMargin: incomeOverFeedCost,
         marginPerHead: safeDiv(incomeOverFeedCost, heads, 2),
-        costPerKgMilk: safeDiv(feedCost, milkKg, 2),
-
+        costPerKgMilk: safeDiv(totalProductionCost, milkKg, 2),
+        feedOnlyCostPerKgMilk: safeDiv(feedCost, milkKg, 2),
         message: ageDays === 0
           ? "محسوبة من عليقة محفوظة اليوم وسعر لبن مدخل في التقرير."
           : `محسوبة من آخر عليقة محفوظة منذ ${ageDays} يوم وسعر لبن مدخل في التقرير.`
