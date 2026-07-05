@@ -78,11 +78,66 @@
 
     .group-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
     .group-card{background:white;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:14px}
-    .group-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:10px}
-    .group-head h4{margin:0;font-size:17px}
-    .mini-table{width:100%;border-collapse:collapse;margin-top:8px}
-    .mini-table td{border-bottom:1px solid #eef2f7;padding:8px;font-size:13px;font-weight:800}
-    .mini-table tr:last-child td{border-bottom:0}
+    .group-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:12px}
+    .group-head h4{margin:0;font-size:17px;line-height:1.35}
+    .group-main{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+      margin-top:8px;
+    }
+    .group-big{
+      border:1px solid #e8eef5;
+      background:#f8fafc;
+      border-radius:16px;
+      padding:12px;
+    }
+    .group-big .g-label{
+      color:var(--muted);
+      font-size:12px;
+      font-weight:900;
+      margin-bottom:5px;
+    }
+    .group-big .g-value{
+      font-size:22px;
+      font-weight:950;
+      color:#0f172a;
+      line-height:1.25;
+    }
+    .group-big .g-sub{
+      margin-top:4px;
+      color:#64748b;
+      font-size:12px;
+      font-weight:800;
+      line-height:1.45;
+    }
+    .group-econ{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:8px;
+      margin-top:10px;
+    }
+    .group-small{
+      border:1px solid #edf2f7;
+      border-radius:14px;
+      padding:9px;
+      background:white;
+    }
+    .group-small .s-label{font-size:11px;color:var(--muted);font-weight:900}
+    .group-small .s-value{margin-top:4px;font-size:15px;font-weight:950;color:#0f172a}
+    .meaning{
+      margin-top:10px;
+      border-radius:15px;
+      padding:11px;
+      background:#ecfdf5;
+      border:1px solid #bbf7d0;
+      color:#14532d;
+      line-height:1.7;
+      font-size:13px;
+      font-weight:900;
+    }
+    .meaning.warn{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
+    .meaning.danger{background:#fef2f2;border-color:#fecaca;color:#991b1b}
     .chip-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
     .chip{background:#f1f5f9;color:#475569;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:850}
     .group-note{margin-top:10px;background:#f8fafc;border:1px solid #eef2f7;border-radius:14px;padding:10px;line-height:1.65;font-size:13px;font-weight:850;color:#334155}
@@ -102,7 +157,7 @@
     .footer-note{text-align:center;color:var(--muted);font-size:12px;font-weight:750;margin-top:18px}
 
     @media(max-width:980px){
-      .hero-grid,.grid-2,.group-list,.recommendations{grid-template-columns:1fr}
+      .hero-grid,.grid-2,.group-list,.recommendations,.group-main,.group-econ{grid-template-columns:1fr}
       .controls{width:100%}.field{flex:1 1 140px}.field input,.field select{width:100%;min-width:0}
       .table-scroll{overflow-x:auto}.report-table{min-width:650px}
       .chart svg{height:300px}.chart{min-height:300px}
@@ -356,24 +411,112 @@
       chartNotes(j);
     }
 
+    function econHasData(e){
+      return Number.isFinite(Number(e?.milkIncome)) && Number(e.milkIncome) > 0;
+    }
+
+    function groupMeaning(g){
+      const e = g.economics || {};
+      const has = econHasData(e);
+      const net = Number(e.netOperatingResult);
+      const rate = Number(g.recordingRate);
+      const delta = Number(g.deltaPct);
+
+      if (!has) {
+        return {
+          tone: "warn",
+          text: "الإنتاج ظاهر، لكن حساب الربح غير مكتمل لأن التغذية أو سعر اللبن غير مرتبطين بهذه المجموعة."
+        };
+      }
+
+      if (Number.isFinite(net) && net < 0) {
+        return {
+          tone: "danger",
+          text: `هذه المجموعة خاسرة تشغيليًا اليوم (${money(net)}). راجع تكلفة التغذية، سعر اللبن، ومتوسط الإنتاج.`
+        };
+      }
+
+      if (Number.isFinite(rate) && rate < 90) {
+        return {
+          tone: "warn",
+          text: `الاقتصاد محسوب، لكن التسجيل غير مكتمل (${num(rate,1)}%). أكمل تسجيل اللبن قبل الحكم النهائي.`
+        };
+      }
+
+      if (Number.isFinite(delta) && delta < -5) {
+        return {
+          tone: "warn",
+          text: `المجموعة رابحة، لكن الإنتاج منخفض عن السابق ${pct(delta)}. راقب المأكول، الحرارة، وصحة المجموعة.`
+        };
+      }
+
+      return {
+        tone: "",
+        text: `المجموعة رابحة تشغيليًا اليوم (${money(net)}). استمر في المتابعة وقارن الأداء بمرحلة DIM.`
+      };
+    }
+
     function renderGroups(j){
       const groups=Array.isArray(j.groups)?j.groups:[];
       if(!groups.length){$("groupsList").innerHTML=`<div class="empty">لا توجد مجموعات إنتاجية.</div>`;return}
+
       $("groupsList").innerHTML=groups.map(g=>{
-        const e=g.economics||{}, tone=g.status==="loss"?"danger":g.status==="watch"?"warn":g.status==="good"?"blue":"ok";
-        const top=(g.topAnimals||[]).slice(0,3), watch=(g.watchAnimals||[]).slice(0,3);
+        const e=g.economics||{};
+        const tone=g.status==="loss"?"danger":g.status==="watch"?"warn":g.status==="good"?"blue":"ok";
+        const top=(g.topAnimals||[]).slice(0,3);
+        const watch=(g.watchAnimals||[]).slice(0,3);
+        const meaning=groupMeaning(g);
+        const hasEcon=econHasData(e);
+
         return `<article class="group-card">
-          <div class="group-head"><div><h4>${esc(g.groupName)}</h4><div class="muted">${g.species==="buffalo"?"جاموس":"أبقار"} · تسجيل ${num(g.recordingRate,1)}%</div></div>${status(g.statusText||"مستقرة",tone)}</div>
-          <table class="mini-table">
-            <tr><td>اللبن</td><td class="num">${num(g.totalMilkKg,1)} كجم</td><td>متوسط/حلاب</td><td class="num">${num(g.avgMilkKgMilker,1)}</td></tr>
-            <tr><td>DIM / DCC</td><td class="num">${num(g.avgDim,0)} / ${num(g.avgDcc,0)}</td><td>التغير</td><td class="num">${arrow(g.deltaPct)} ${pct(g.deltaPct)}</td></tr>
-            <tr><td>دخل اللبن</td><td class="num">${money(e.milkIncome)}</td><td>صافي</td><td class="num">${money(e.netOperatingResult)}</td></tr>
-            <tr><td>تكلفة الكجم</td><td class="num">${money(e.productionCostPerKgMilk)}</td><td>هامش الكجم</td><td class="num">${money(e.marginPerKgMilk)}</td></tr>
-          </table>
-          <div class="group-note"><strong>مُرَبِّيك:</strong> ${esc(g.murabbik?.action||"متابعة روتينية.")}</div>
+          <div class="group-head">
+            <div>
+              <h4>${esc(g.groupName)}</h4>
+              <div class="muted">${g.species==="buffalo"?"جاموس":"أبقار"} · التسجيل ${num(g.recordingRate,1)}% · ${int(g.recordedCount)} مسجل من ${int(g.milkersCount)} حلاب</div>
+            </div>
+            ${status(g.statusText||"مستقرة",tone)}
+          </div>
+
+          <div class="group-main">
+            <div class="group-big">
+              <div class="g-label">إنتاج المجموعة</div>
+              <div class="g-value">${num(g.totalMilkKg,1)} كجم</div>
+              <div class="g-sub">متوسط ${num(g.avgMilkKgMilker,1)} كجم/حلاب</div>
+            </div>
+
+            <div class="group-big">
+              <div class="g-label">مرحلة المجموعة</div>
+              <div class="g-value">DIM ${num(g.avgDim,0)}</div>
+              <div class="g-sub">DCC ${num(g.avgDcc,0)} · التغير ${arrow(g.deltaPct)} ${pct(g.deltaPct)}</div>
+            </div>
+          </div>
+
+          <div class="group-econ">
+            <div class="group-small">
+              <div class="s-label">دخل اللبن</div>
+              <div class="s-value">${hasEcon ? money(e.milkIncome) : "غير مكتمل"}</div>
+            </div>
+            <div class="group-small">
+              <div class="s-label">صافي ربح/خسارة</div>
+              <div class="s-value">${hasEcon ? money(e.netOperatingResult) : "غير مكتمل"}</div>
+            </div>
+            <div class="group-small">
+              <div class="s-label">تكلفة كجم اللبن</div>
+              <div class="s-value">${hasEcon ? money(e.productionCostPerKgMilk) : "غير مكتمل"}</div>
+            </div>
+            <div class="group-small">
+              <div class="s-label">هامش كجم اللبن</div>
+              <div class="s-value">${hasEcon ? money(e.marginPerKgMilk) : "غير مكتمل"}</div>
+            </div>
+          </div>
+
+          <div class="meaning ${meaning.tone}"><strong>معنى الرقم:</strong> ${esc(meaning.text)}</div>
+
+          <div class="group-note"><strong>توصية مُرَبِّيك:</strong> ${esc(g.murabbik?.action||"متابعة روتينية بدون إجراء عاجل.")}</div>
+
           <div class="chip-row">
             ${(g.murabbik?.evidence||[]).map(x=>`<span class="chip">${esc(x)}</span>`).join("")}
-            ${top.length?`<span class="chip">أفضل: ${top.map(x=>"#"+esc(x.number)+" "+num(x.kg,1)).join("، ")}</span>`:""}
+            ${top.length?`<span class="chip">أفضل 3: ${top.map(x=>"#"+esc(x.number)+" "+num(x.kg,1)+" كجم").join("، ")}</span>`:""}
             ${watch.length?`<span class="chip">متابعة: ${watch.map(x=>"#"+esc(x.number)+" "+pct(x.deltaPct)).join("، ")}</span>`:""}
           </div>
         </article>`;
