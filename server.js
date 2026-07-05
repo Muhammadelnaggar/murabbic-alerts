@@ -789,7 +789,97 @@ app.get("/api/auth/me", async (req, res) => {
     user: session.user
   });
 });
+app.post("/api/farm-location/save", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
 
+    const uid = req.authSession?.uid || req.userId;
+    const userId = req.userId;
+
+    const lat = farmLocationNumberSrv(
+      req.body?.lat ??
+      req.body?.latitude ??
+      req.body?.farmLat ??
+      req.body?.farmLocation?.lat
+    );
+
+    const lon = farmLocationNumberSrv(
+      req.body?.lon ??
+      req.body?.lng ??
+      req.body?.longitude ??
+      req.body?.farmLon ??
+      req.body?.farmLocation?.lon ??
+      req.body?.farmLocation?.lng
+    );
+
+    const accuracy = farmLocationAccuracySrv(
+      req.body?.accuracy ??
+      req.body?.gpsAccuracy ??
+      req.body?.farmLocation?.accuracy
+    );
+
+    if (!farmLocationValidSrv(lat, lon)) {
+      return res.status(400).json({
+        ok: false,
+        error: "farm_location_invalid",
+        message: "إحداثيات موقع المزرعة غير صالحة."
+      });
+    }
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    const patch = {
+      farmLat: lat,
+      farmLon: lon,
+      farmLocation: {
+        lat,
+        lon,
+        accuracy,
+        source: "mobile_gps",
+        updatedAt: now
+      },
+      farmLocationUpdatedAt: now,
+      updatedAt: now,
+      source: "server:/api/farm-location/save"
+    };
+
+    await db.collection("users").doc(uid).set(patch, { merge: true });
+
+    if (userId && userId !== uid) {
+      try {
+        await db.collection("users").doc(userId).set(patch, { merge: true });
+      } catch (e) {
+        console.warn("farm location tenant mirror failed:", e.message || e);
+      }
+    }
+
+    return res.json({
+      ok: true,
+      message: "✅ تم حفظ موقع المزرعة بنجاح",
+      farmLocation: {
+        lat,
+        lon,
+        accuracy,
+        source: "mobile_gps"
+      }
+    });
+
+  } catch (e) {
+    console.error("farm-location-save failed:", e.message || e);
+
+    return res.status(500).json({
+      ok: false,
+      error: "farm_location_save_failed",
+      message: "تعذّر حفظ موقع المزرعة الآن."
+    });
+  }
+});
 app.post("/api/auth/logout", async (req, res) => {
   authClearSessionCookieBridgeSrv(req, res);
   return res.json({ ok: true, message: "تم تسجيل الخروج." });
@@ -827,7 +917,30 @@ function resolveTenant(req) {
 const WEATHER_DEFAULT_LAT = Number(process.env.WEATHER_LAT || 30.0444);
 const WEATHER_DEFAULT_LON = Number(process.env.WEATHER_LON || 31.2357);
 const WEATHER_CACHE_MS = 5 * 60 * 1000;
+function farmLocationNumberSrv(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
 
+function farmLocationValidSrv(lat, lon) {
+  const a = farmLocationNumberSrv(lat);
+  const b = farmLocationNumberSrv(lon);
+
+  return (
+    a !== null &&
+    b !== null &&
+    a >= -90 &&
+    a <= 90 &&
+    b >= -180 &&
+    b <= 180
+  );
+}
+
+function farmLocationAccuracySrv(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n);
+}
 let weatherThiCache = {
   at: 0,
   data: null
