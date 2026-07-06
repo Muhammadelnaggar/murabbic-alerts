@@ -360,12 +360,15 @@ function getDIM(an){
   return Math.max(0, daysBetween(new Date(), calv));
 }
 
-function box(label, value, sub='', gaugeId=null, cls=''){
+function box(label, value, sub='', gaugeId=null, cls='', href=''){
   const gaugeHTML = gaugeId
     ? `<div id="${gaugeId}" class="mini-gauge"></div>`
     : '';
+
+  const go = href ? `onclick="location.href='${href}'"` : '';
+
   return `
-    <div class="kpi ${cls}">
+    <div class="kpi ${cls}" ${go}>
       <div class="kpi-label">${label}</div>
       <div class="kpi-value">${value ?? '--'}</div>
       ${gaugeHTML}
@@ -389,11 +392,12 @@ function metricScalePositionInverse(v, best, worst){
   return clamp(pct, 0, 100);
 }
 
-function scaleMetricBox(label, displayValue, positionPct, cls='repro'){
+function scaleMetricBox(label, displayValue, positionPct, cls='repro', href=''){
   const pos = Number.isFinite(positionPct) ? positionPct : 0;
+  const go = href ? `onclick="location.href='${href}'"` : '';
 
   return `
-    <div class="kpi ${cls}">
+    <div class="kpi ${cls}" ${go}>
       <div class="kpi-label">${label}</div>
       <div class="kpi-value">${displayValue}</div>
 
@@ -411,7 +415,6 @@ function scaleMetricBox(label, displayValue, positionPct, cls='repro'){
     </div>
   `;
 }
-
 function pr21Box(value){
   const v = Number(value);
   return scaleMetricBox(
@@ -422,13 +425,14 @@ function pr21Box(value){
   );
 }
 
-function conceptionBox(value){
+function conceptionBox(value, href=''){
   const v = Number(value);
   return scaleMetricBox(
-    'معدل الإخصاب',
+    'معدل الإخصاب العام',
     Number.isFinite(v) ? `${Math.round(v)}%` : '--',
     metricScalePositionDirect(v, 35, 60),
-    'repro'
+    'repro',
+    href
   );
 }
 
@@ -462,16 +466,25 @@ function openDaysBox(value){
   );
 }
 
-function firstServiceBox(value){
+function firstServiceBox(value, href=''){
   const v = Number(value);
   return scaleMetricBox(
-    'نسبة نجاح أول تلقيح',
+    'نسبة الحمل من أول تلقيحة',
     Number.isFinite(v) ? `${Math.round(v)}%` : '--',
     metricScalePositionDirect(v, 40, 60),
-    'repro'
+    'repro',
+    href
   );
 }
-
+function fertilityReportOpenBox(typeLabel, href){
+  return `
+    <div class="kpi repro" onclick="location.href='${href}'">
+      <div class="kpi-label">تقرير الخصوبة الكامل</div>
+      <div class="kpi-value">فتح التقرير</div>
+      <div class="kpi-sub">تقرير ${typeLabel} حسب اختيار الداشبورد</div>
+    </div>
+  `;
+}
 function cullTotalBox(count, pct){
   const v = Number(pct);
   return scaleMetricBox(
@@ -902,15 +915,29 @@ prodCauseWrap.innerHTML = showCausesCard
     </div>
   `
   : '';
+const fertilityReportHref =
+  `fertility-report.html?type=${encodeURIComponent(currentType || requestedType)}`;
+
 reproGrid.innerHTML =
-      box(`عدد ${typeLabel} العشار في القطيع`, pregCount, `نسبتهم من القطيع ${pregPct}%`, 'g_preg', 'repro') +
-      box(`عدد ${typeLabel} الملقحة في القطيع`, bredCount, `نسبتهم من القطيع ${bredPct}%`, 'g_bred', 'repro') +
-      pr21Box(pregRate21d) +
-      conceptionBox(conceptionRatePct) +
-      hdrBox(heatDetectionRatePct) +
-      spcBox(servicesPerConception) +
-      openDaysBox(openDaysAvg) +
-      firstServiceBox(firstServiceConceptionPct);
+  box(
+    `عدد ${typeLabel} العشار في القطيع`,
+    pregCount,
+    `نسبتهم من القطيع ${pregPct}%`,
+    'g_preg',
+    'repro',
+    fertilityReportHref
+  ) +
+  box(
+    `عدد ${typeLabel} الملقحة في القطيع`,
+    bredCount,
+    `نسبتهم من القطيع ${bredPct}%`,
+    'g_bred',
+    'repro',
+    fertilityReportHref
+  ) +
+  firstServiceBox(firstServiceConceptionPct, fertilityReportHref) +
+  conceptionBox(conceptionRatePct, fertilityReportHref) +
+  fertilityReportOpenBox(typeLabel, fertilityReportHref);
     
 cullGrid.innerHTML =
       cullTotalBox(cullTotalCount, cullTotalPct) +
