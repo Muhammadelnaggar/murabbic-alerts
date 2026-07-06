@@ -534,3 +534,9 @@
         content:"مُرَبِّيك — تقرير تغذية مطبوع";
       }
     }
+  /* ===== Report mobile single-column utility ===== */
+@media (max-width:760px){
+  body[data-report-page] .report-stack-mobile{
+    grid-template-columns:1fr !important;
+  }
+}
