@@ -29987,7 +29987,76 @@ function fertilityReportPctSrv(num, den) {
   if (!Number.isFinite(n) || !Number.isFinite(d) || d <= 0) return null;
   return Math.round((n * 1000) / d) / 10;
 }
+function fertilityReportHerdCompositionSrv({
+  totalActive = 0,
+  pregnantCount = 0,
+  openCount = 0,
+  inseminatedCount = 0,
+  freshCount = 0,
+  dryCount = 0
+} = {}) {
+  const total = Number(totalActive || 0);
 
+  function pctText(pct) {
+    return pct === null ? "--" : `${pct}%`;
+  }
+
+  function card(key, label, count, read) {
+    const pct = fertilityReportPctSrv(count, total);
+
+    return {
+      key,
+      label,
+      count: Number(count || 0),
+      pct,
+      pctText: pctText(pct),
+      read
+    };
+  }
+
+  const cards = [
+    card(
+      "pregnant",
+      "عشار",
+      pregnantCount,
+      "رصيد الحمل الحالي في القطيع. هذه قراءة وصفية لبنية القطيع، ولا تُستخدم وحدها للحكم على كفاءة الخصوبة إلا مع معدل الحمل 21 يوم، ومعدل رصد الشياع، والأيام المفتوحة."
+    ),
+
+    card(
+      "open",
+      "مفتوحة",
+      openCount,
+      "حجم الحيوانات غير الحامل حاليًا. أهميته الفنية تظهر عند ربطه بمتوسط الأيام المفتوحة، وكفاءة إدخال الحيوانات للتلقيح، ونتائج تشخيص الحمل."
+    ),
+
+    card(
+      "inseminated",
+      "ملقحة",
+      inseminatedCount,
+      "حيوانات بين التلقيح والحكم على الحمل. تُقرأ كخط انتظار تناسلي، وليس كنجاح أو فشل، حتى تظهر نتيجة التشخيص أو رجوع الشياع."
+    ),
+
+    card(
+      "fresh",
+      "حديثة الولادة",
+      freshCount,
+      "مرحلة ما بعد الولادة. لا تُدان تناسليًا قبل تجاوز فترة الانتظار الطوعي وفحص جاهزية الرحم والحالة العامة."
+    ),
+
+    card(
+      "dry",
+      "جافة",
+      dryCount,
+      "مرحلة مرتبطة بدورة الحمل والولادة القادمة. تُقرأ مع العشار والتحضير للولادة، وليست مؤشر فشل خصوبة منفرد."
+    )
+  ];
+
+  return {
+    title: "بنية القطيع التناسلية الحالية",
+    read: "هذا القسم يصف توزيع الحالات التناسلية داخل القطيع الآن. الحكم الفني الحقيقي يأتي من مؤشرات الخصوبة: الحمل 21 يوم، رصد الشياع، الإخصاب، الأيام المفتوحة، فقد الحمل، والتلقيح المتكرر.",
+    cards
+  };
+}
 function fertilityReportEventTypeSrv(e = {}) {
   return normalizeEventType(
     e.eventTypeNorm ||
@@ -31114,7 +31183,14 @@ const repeatBreederAnalysis = fertilityReportRepeatBreederAnalysisSrv(
     const inseminatedCount = activeAnimals.filter(a => fertilityReportReproKindSrv(a.reproductiveStatus || "") === "inseminated").length;
     const freshCount = activeAnimals.filter(a => fertilityReportReproKindSrv(a.reproductiveStatus || "") === "fresh").length;
     const dryCount = activeAnimals.filter(a => /جاف|dry/i.test(String(a.productionStatus || ""))).length;
-
+    const herdComposition = fertilityReportHerdCompositionSrv({
+    totalActive: activeAnimals.length,
+    pregnantCount,
+    openCount,
+    inseminatedCount,
+    freshCount,
+    dryCount
+  });
    const overallStatus = fertilityReportKpiStatusSrv(overallCr, 35, "higher");
 const firstStatus = fertilityReportKpiStatusSrv(firstServiceCr, 40, "higher");
 
@@ -31175,15 +31251,17 @@ const headline = expertReport.headline;
         ]
       },
 
-      herdSummary: {
-        totalActive: activeAnimals.length,
-        pregnantCount,
-        openCount,
-        inseminatedCount,
-        freshCount,
-        dryCount
-      },
+herdSummary: {
+  totalActive: activeAnimals.length,
+  pregnantCount,
+  openCount,
+  inseminatedCount,
+  freshCount,
+  dryCount
+},
 
+herdComposition,
+herdReproductiveComposition: herdComposition,
       conception: {
         firstService: {
           label: "نسبة الحمل من أول تلقيحة",
