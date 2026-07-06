@@ -7,484 +7,66 @@
 
   <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
   <link rel="stylesheet" href="/css/forms.css">
-  <style>
-    body[data-page="fertility-report"] .mbk-top {
-    position: sticky;
-    top: 0;
-    z-index: 50;
-    background: #ffffff;
-    border-bottom: 1px solid #e5e7eb;
-  }
+  <link rel="stylesheet" href="/css/reports.css">
 
-  body[data-page="fertility-report"] .mbk-head {
-    max-width: 980px;
-    margin: 0 auto;
-    min-height: 72px;
-    padding: 8px 12px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  body[data-page="fertility-report"] .mbk-logo {
-    width: 46px;
-    height: 46px;
-    object-fit: contain;
-    flex: 0 0 46px;
-  }
-
-  body[data-page="fertility-report"] .mbk-center {
-    flex: 1;
-    min-width: 0;
-    text-align: center;
-    line-height: 1.25;
-  }
-
-  body[data-page="fertility-report"] .mbk-page-title {
-    font-size: 19px;
-    font-weight: 950;
-    color: #0f172a;
-    white-space: normal;
-  }
-
-  body[data-page="fertility-report"] .mbk-app-name {
-    margin-top: 2px;
-    font-size: 13px;
-    font-weight: 900;
-    color: #047857;
-  }
-
-  body[data-page="fertility-report"] .mbk-back {
-    flex: 0 0 auto;
-    text-decoration: none;
-    border: 1px solid #dbe3ea;
-    background: #f8fafc;
-    color: #0f172a;
-    border-radius: 12px;
-    padding: 9px 12px;
-    font-size: 14px;
-    font-weight: 900;
-  }
-
-  @media (max-width: 520px) {
-    body[data-page="fertility-report"] .mbk-head {
-      min-height: 66px;
-      padding: 8px 10px;
-      gap: 8px;
-    }
-
-    body[data-page="fertility-report"] .mbk-logo {
-      width: 40px;
-      height: 40px;
-      flex-basis: 40px;
-    }
-
-    body[data-page="fertility-report"] .mbk-page-title {
-      font-size: 17px;
-    }
-
-    body[data-page="fertility-report"] .mbk-app-name {
-      font-size: 12px;
-    }
-
-    body[data-page="fertility-report"] .mbk-back {
-      padding: 8px 10px;
-      font-size: 13px;
-    }
-  }
-  body[data-page="fertility-report"] #summaryGrid,
-  body[data-page="fertility-report"] #herdGrid,
-  body[data-page="fertility-report"] #conceptionGrid,
-  body[data-page="fertility-report"] #advisoryWrap {
-    display: block;
-  }
-
-  body[data-page="fertility-report"] .fert-panel {
-    border: 1px solid #e5e7eb;
-    border-radius: 20px;
-    background: #ffffff;
-    padding: 16px;
-    margin-bottom: 12px;
-  }
-
-  body[data-page="fertility-report"] .fert-hero {
-    border-right: 5px solid #047857;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  }
-
-  body[data-page="fertility-report"] .fert-title {
-    font-size: 1.06rem;
-    font-weight: 900;
-    color: #0f172a;
-    line-height: 1.8;
-  }
-
-  body[data-page="fertility-report"] .fert-read {
-    margin-top: 8px;
-    font-size: .94rem;
-    line-height: 1.95;
-    color: #334155;
-  }
-
-  body[data-page="fertility-report"] .fert-advice {
-    margin-top: 10px;
-    border-right: 4px solid #047857;
-    background: #ecfdf5;
-    border-radius: 12px;
-    padding: 10px 12px;
-    font-size: .93rem;
-    line-height: 1.9;
-    color: #065f46;
-    font-weight: 800;
-  }
-
-  body[data-page="fertility-report"] .fert-stats {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    margin-top: 14px;
-  }
-
-  body[data-page="fertility-report"] .fert-stat {
-    background: #f8fafc;
-    border: 1px solid #eef2f7;
-    border-radius: 14px;
-    padding: 10px;
-  }
-
-  body[data-page="fertility-report"] .fert-stat-label {
-    font-size: .76rem;
-    color: #64748b;
-    font-weight: 800;
-  }
-
-  body[data-page="fertility-report"] .fert-stat-value {
-    margin-top: 4px;
-    font-size: 1.14rem;
-    color: #047857;
-    font-weight: 950;
-    line-height: 1.35;
-  }
-
-  body[data-page="fertility-report"] .fert-row {
-    display: grid;
-    grid-template-columns: 135px 1fr;
-    gap: 14px;
-    padding: 14px 0;
-    border-top: 1px solid #eef2f7;
-  }
-
-  body[data-page="fertility-report"] .fert-row:first-child {
-    border-top: 0;
-    padding-top: 0;
-  }
-
-  body[data-page="fertility-report"] .fert-row-label {
-    font-size: .84rem;
-    font-weight: 900;
-    color: #475569;
-    line-height: 1.6;
-  }
-
-  body[data-page="fertility-report"] .fert-row-value {
-    margin-top: 6px;
-    font-size: 1.48rem;
-    font-weight: 950;
-    color: #047857;
-    line-height: 1.15;
-  }
-
-  body[data-page="fertility-report"] .fert-row-sub {
-    margin-top: 6px;
-    font-size: .78rem;
-    font-weight: 800;
-    color: #64748b;
-    line-height: 1.6;
-  }
-
-  body[data-page="fertility-report"] .fert-table-title {
-    margin: 14px 0 8px;
-    font-size: .9rem;
-    font-weight: 900;
-    color: #0f172a;
-  }
-  body[data-page="fertility-report"] .page {
-  padding-bottom: 110px;
-}
-
-body[data-page="fertility-report"] #statusBar.is-done {
-  display: none;
-}
-
-body[data-page="fertility-report"] .actions-bar {
-  z-index: 30;
-}
-body[data-page="fertility-report"] .fert-card-list {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-
-body[data-page="fertility-report"] .fert-mini-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  background: #ffffff;
-  padding: 12px;
-}
-
-body[data-page="fertility-report"] .fert-mini-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-body[data-page="fertility-report"] .fert-mini-title {
-  font-size: .98rem;
-  font-weight: 950;
-  color: #0f172a;
-  line-height: 1.5;
-}
-
-body[data-page="fertility-report"] .fert-mini-badge {
-  flex: 0 0 auto;
-}
-
-body[data-page="fertility-report"] .fert-mini-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-body[data-page="fertility-report"] .fert-mini-item {
-  background: #f8fafc;
-  border: 1px solid #eef2f7;
-  border-radius: 12px;
-  padding: 9px;
-}
-
-body[data-page="fertility-report"] .fert-mini-label {
-  font-size: .72rem;
-  font-weight: 850;
-  color: #64748b;
-  line-height: 1.5;
-}
-
-body[data-page="fertility-report"] .fert-mini-value {
-  margin-top: 4px;
-  font-size: 1rem;
-  font-weight: 950;
-  color: #047857;
-  line-height: 1.35;
-  word-break: break-word;
-}
-
-@media (max-width: 520px) {
-  body[data-page="fertility-report"] .fert-mini-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  body[data-page="fertility-report"] .fert-mini-head {
-    display: block;
-  }
-
-  body[data-page="fertility-report"] .fert-mini-badge {
-    margin-top: 8px;
-  }
-}
-body[data-page="fertility-report"] .fert-action-list {
-  margin: 10px 0 0;
-  padding: 0 18px 0 0;
-  color: #334155;
-  font-size: .93rem;
-  line-height: 1.9;
-}
-
-body[data-page="fertility-report"] .fert-action-list li {
-  margin: 4px 0;
-}
-@media print {
-  body[data-page="fertility-report"] .actions-bar,
-  body[data-page="fertility-report"] #statusBar {
-    display: none !important;
-  }
-
-  body[data-page="fertility-report"] .page {
-    padding-bottom: 0 !important;
-  }
-}
-  @media (max-width: 520px) {
-    body[data-page="fertility-report"] .fert-stats {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    body[data-page="fertility-report"] .fert-row {
-      grid-template-columns: 1fr;
-      gap: 8px;
-    }
-  }
-    .print-cover {
-  display: none;
-}
-
-@media print {
-  @page {
-    size: A4 portrait;
-    margin: 12mm;
-  }
-
-  body[data-page="fertility-report"] {
-    background: #fff !important;
-    color: #0f172a !important;
-    font-family: Arial, Tahoma, sans-serif;
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
-  }
-
-  body[data-page="fertility-report"] .mbk-top,
-  body[data-page="fertility-report"] .actions-bar,
-  body[data-page="fertility-report"] #statusBar {
-    display: none !important;
-  }
-
-  body[data-page="fertility-report"] .print-cover {
-    display: block !important;
-    border: 1px solid #dbe3ea;
-    border-radius: 14px;
-    padding: 12mm;
-    margin-bottom: 8mm;
-    break-inside: avoid;
-  }
-
-  body[data-page="fertility-report"] .print-brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border-bottom: 2px solid #047857;
-    padding-bottom: 6mm;
-    margin-bottom: 6mm;
-  }
-
-  body[data-page="fertility-report"] .print-brand img {
-    width: 18mm;
-    height: 18mm;
-    object-fit: contain;
-  }
-
-  body[data-page="fertility-report"] .print-brand strong {
-    display: block;
-    font-size: 20pt;
-    color: #047857;
-    font-weight: 950;
-  }
-
-  body[data-page="fertility-report"] .print-brand span {
-    display: block;
-    font-size: 10pt;
-    color: #475569;
-    font-weight: 700;
-  }
-
-  body[data-page="fertility-report"] .print-cover h1 {
-    margin: 0 0 5mm;
-    font-size: 18pt;
-    font-weight: 950;
-  }
-
-  body[data-page="fertility-report"] .print-cover p {
-    margin: 0 0 6mm;
-    font-size: 10.5pt;
-    line-height: 1.8;
-    color: #334155;
-  }
-
-  body[data-page="fertility-report"] .print-meta {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4mm;
-  }
-
-  body[data-page="fertility-report"] .print-meta span {
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 3mm;
-    background: #f8fafc;
-    font-size: 9.5pt;
-    font-weight: 800;
-  }
-
-  body[data-page="fertility-report"] .page {
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  body[data-page="fertility-report"] .card {
-    box-shadow: none !important;
-    border: 1px solid #dbe3ea !important;
-    border-radius: 12px !important;
-    padding: 6mm !important;
-    margin-bottom: 6mm !important;
-    break-inside: avoid;
-  }
-}
-</style>
 </head>
 
-<body data-page="fertility-report">
+<body data-page="fertility-report" data-report-page>
 
-<header class="mbk-top">
-  <div class="mbk-head">
-    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
-
-    <div class="mbk-center">
-      <div class="mbk-page-title" id="pageTitle">تقرير الخصوبة</div>
-      <div class="mbk-app-name">مُرَبِّيك</div>
+<header class="screen-top">
+  <div class="screen-head">
+    <div>
+      <div class="screen-title" id="pageTitle">تقرير الخصوبة</div>
+      <div class="screen-brand">مُرَبِّيك</div>
     </div>
-
-    <a class="mbk-back" href="dashboard.html">رجوع</a>
+    <img class="screen-logo" src="/images/logo.png" alt="مُرَبِّيك">
   </div>
 </header>
-<section class="print-cover">
-  <div class="print-brand">
-    <img src="/images/logo.png" alt="مُرَبِّيك">
-    <div>
-      <strong>مُرَبِّيك</strong>
-      <span>نظام إدارة القطيع والتحليل الاستشاري</span>
+
+<main class="page report-page">
+  <section class="report-cover">
+    <div class="report-head">
+      <div class="report-logo-box">
+        <img src="/images/logo.png" alt="مُرَبِّيك">
+      </div>
+
+      <div>
+        <div class="report-kicker">مُرَبِّيك لإدارة مزارع الألبان</div>
+        <h1 id="printTitle" class="title">تقرير الخصوبة</h1>
+        <div class="sub">
+          تقرير استشاري مبني على بيانات القطيع المسجلة داخل مُرَبِّيك
+          لقراءة حالة الخصوبة ومؤشرات التلقيح ودعم قرارات المتابعة.
+        </div>
+      </div>
+
+      <div class="report-stamp">
+        <b>تقرير خصوبة</b>
+        <span>نسخة قابلة للطباعة PDF</span>
+      </div>
     </div>
-  </div>
 
-  <h1 id="printTitle">تقرير الخصوبة</h1>
-
-  <p>
-    تقرير استشاري مبني على بيانات القطيع المسجلة داخل مُرَبِّيك
-    لقراءة حالة الخصوبة ومؤشرات التلقيح ودعم قرارات المتابعة.
-  </p>
-
-  <div class="print-meta">
-    <span id="printType">نوع القطيع: --</span>
-    <span id="printPeriod">فترة التحليل: --</span>
-    <span id="printDate">تاريخ الطباعة: --</span>
-  </div>
-</section>
-<div class="page">
-
+    <div class="report-meta">
+      <div class="meta-pill"><span>نوع القطيع</span><b id="printType">--</b></div>
+      <div class="meta-pill"><span>فترة التحليل</span><b id="printPeriod">--</b></div>
+      <div class="meta-pill"><span>تاريخ الطباعة</span><b id="printDate">--</b></div>
+      <div class="meta-pill"><span>إعداد</span><b>مُرَبِّيك</b></div>
+    </div>
+  </section>
   <div id="statusBar" class="card">جارٍ تحميل تقرير الخصوبة...</div>
 
   <div class="card">
     <div class="section-title">🌿 ملخص تقرير الخصوبة</div>
-    <div id="summaryGrid" class="kpi-grid"></div>
+   <div id="summaryGrid" class="grid"></div>
   </div>
 
   <div class="card">
     <div class="section-title">📌 الحالة التناسلية للقطيع</div>
-    <div id="herdGrid" class="kpi-grid"></div>
+    <div id="herdGrid" class="grid"></div>
   </div>
 
   <div class="card">
    <div class="section-title">🧠 المؤشرات التناسلية الفنية للقطيع</div>
-    <div id="conceptionGrid" class="kpi-grid"></div>
+   <div id="conceptionGrid" class="grid"></div>
   </div>
 
   <div class="card">
@@ -507,11 +89,13 @@ body[data-page="fertility-report"] .fert-action-list li {
     <div id="advisoryWrap"></div>
   </div>
 
-</div>
+</main>
 
-<div class="actions-bar">
-  <button type="button" class="btn secondary" onclick="location.href='dashboard.html'">الرجوع لغرفة التحكم</button>
-  <button type="button" class="btn primary" onclick="window.print()">طباعة التقرير</button>
+<div class="print-footer"></div>
+
+<div class="actions report-actions">
+  <a class="ghost" href="dashboard.html">لوحة التحكم</a>
+  <button type="button" class="primary" onclick="window.print()">طباعة / PDF</button>
 </div>
 
 <script>
@@ -550,9 +134,9 @@ function fmtPct(v){
 function box(label, value, sub = "", cls = ""){
   return `
     <div class="kpi ${cls}">
-      <div class="kpi-label">${esc(label)}</div>
-      <div class="kpi-value">${esc(value ?? "--")}</div>
-      ${sub ? `<div class="kpi-sub">${esc(sub)}</div>` : ""}
+      <span>${esc(label)}</span>
+      <b>${esc(value ?? "--")}</b>
+      ${sub ? `<span>${esc(sub)}</span>` : ""}
     </div>
   `;
 }
@@ -567,33 +151,30 @@ function linesHtml(items = []){
 function boxRich(label, value, subHtml = "", cls = ""){
   return `
     <div class="kpi ${cls}">
-      <div class="kpi-label">${esc(label)}</div>
-      <div class="kpi-value">${esc(value ?? "--")}</div>
-      ${subHtml ? `<div class="kpi-sub">${subHtml}</div>` : ""}
+      <span>${esc(label)}</span>
+      <b>${esc(value ?? "--")}</b>
+      ${subHtml ? `<span>${subHtml}</span>` : ""}
     </div>
   `;
 }
 function badge(text, status){
   const s = String(status || "muted");
   const cls =
-    s === "good" ? "status-ok" :
-    s === "warn" ? "status-warn" :
-    s === "danger" ? "status-error" :
-    "status-muted";
+    s === "danger" ? "badge danger" :
+    s === "warn" ? "badge warn" :
+    "badge";
 
   return `<span class="${cls}">${esc(text || "غير مكتمل")}</span>`;
 }
-
 function emptyMsg(text){
-  return `<div class="kpi-sub">${esc(text)}</div>`;
+  return `<div class="empty">${esc(text)}</div>`;
 }
-
 function table(headers, rows){
   if (!rows.length) return emptyMsg("لا توجد بيانات كافية حاليًا.");
 
   return `
-    <div class="preview-scroll">
-      <table class="mbk-table">
+  <div class="table-wrap">
+    <table>
         <thead>
           <tr>${headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr>
         </thead>
@@ -625,44 +206,28 @@ async function fetchReport(){
   return data;
 }
 
+function noteMini(title, value, note = ""){
+  return `
+    <div class="mini">
+      <div class="name">${esc(title || "—")}</div>
+      <div class="value">${esc(value ?? "—")}</div>
+      ${note ? `<div class="note">${note}</div>` : ""}
+    </div>
+  `;
+}
+
 function renderSummary(j){
   const h = j.herdSummary || {};
   const rb = j.repeatBreederAnalysis || j.repeatBreeders || {};
 
-  el("summaryGrid").innerHTML = `
-    <div class="fert-panel fert-hero">
-      <div class="fert-title">
-        نطاق تقرير الخصوبة
-      </div>
-
-      <div class="fert-read">
-        هذا القسم يعرض بيانات التقرير الأساسية فقط. القراءة الفنية وتقييم مُرَبِّيك موجودان في نهاية التقرير بعد عرض المؤشرات والجداول.
-      </div>
-
-      <div class="fert-stats">
-        <div class="fert-stat">
-          <div class="fert-stat-label">نوع القطيع</div>
-          <div class="fert-stat-value">${esc(reportTypeLabel)}</div>
-        </div>
-
-        <div class="fert-stat">
-          <div class="fert-stat-label">فترة التحليل</div>
-          <div class="fert-stat-value">${fmtNum(j.periodDays || 180)} يوم</div>
-        </div>
-
-        <div class="fert-stat">
-          <div class="fert-stat-label">إجمالي نشط</div>
-          <div class="fert-stat-value">${fmtNum(h.totalActive)}</div>
-        </div>
-
-        <div class="fert-stat">
-          <div class="fert-stat-label">Repeat Breeder</div>
-          <div class="fert-stat-value">${fmtNum(rb.count || 0)} — ${fmtPct(rb.ratePct)}</div>
-        </div>
-      </div>
-    </div>
-  `;
+  el("summaryGrid").innerHTML = [
+    box("نوع القطيع", reportTypeLabel),
+    box("فترة التحليل", `${fmtNum(j.periodDays || 180)} يوم`),
+    box("إجمالي نشط", fmtNum(h.totalActive)),
+    box("Repeat Breeder", `${fmtNum(rb.count || 0)} — ${fmtPct(rb.ratePct)}`)
+  ].join("");
 }
+
 function renderHerd(j){
   const hc = j.herdComposition || j.herdReproductiveComposition || {};
   const cards = Array.isArray(hc.cards) ? hc.cards : [];
@@ -673,22 +238,20 @@ function renderHerd(j){
   }
 
   el("herdGrid").innerHTML = `
-    <div class="fert-panel">
-      <div class="fert-title">${esc(hc.title || "بنية القطيع التناسلية الحالية")}</div>
-      <div class="fert-read">${esc(hc.read || "")}</div>
+    ${noteMini(
+      hc.title || "بنية القطيع التناسلية الحالية",
+      "قراءة القطيع",
+      esc(hc.read || "يعرض هذا القسم توزيع الحالة التناسلية الحالية للقطيع.")
+    )}
 
-      ${cards.map(c => `
-        <div class="fert-row">
-          <div>
-            <div class="fert-row-label">${esc(c.label)}</div>
-            <div class="fert-row-value">${fmtNum(c.count)}</div>
-            <div class="fert-row-sub">${esc(c.pctText || "--")}</div>
-          </div>
-
-          <div class="fert-read">${esc(c.read || "")}</div>
-        </div>
-      `).join("")}
-    </div>
+    ${cards.map(c => noteMini(
+      c.label,
+      `${fmtNum(c.count)} رأس`,
+      `
+        <b>النسبة:</b> ${esc(c.pctText || "--")}<br>
+        ${esc(c.read || "")}
+      `
+    )).join("")}
   `;
 }
 
@@ -706,26 +269,18 @@ function renderConception(j){
     return;
   }
 
-  el("conceptionGrid").innerHTML = `
-    <div class="fert-panel">
-      ${indicators.map(x => `
-        <div class="fert-row">
-          <div>
-            <div class="fert-row-label">${esc(x.title || x.key || "--")}</div>
-            <div class="fert-row-value">${esc(x.valueText || "--")}</div>
-            ${x.benchmarkText ? `<div class="fert-row-sub">${esc(x.benchmarkText)}</div>` : ""}
-          </div>
-
-          <div>
-            ${badge(x.rating || "غير مكتمل", x.status)}
-            <div class="fert-read">${esc(x.read || "")}</div>
-            ${x.advice ? `<div class="fert-advice">${esc(x.advice)}</div>` : ""}
-          </div>
-        </div>
-      `).join("")}
-    </div>
-  `;
+  el("conceptionGrid").innerHTML = indicators.map(x => noteMini(
+    x.title || x.key || "--",
+    x.valueText || "--",
+    `
+      ${x.benchmarkText ? `<b>المعيار:</b> ${esc(x.benchmarkText)}<br>` : ""}
+      ${badge(x.rating || "غير مكتمل", x.status)}<br>
+      ${esc(x.read || "")}
+      ${x.advice ? `<br><b>التوجيه:</b> ${esc(x.advice)}` : ""}
+    `
+  )).join("");
 }
+
 function renderInseminators(j){
   const rows = Array.isArray(j.inseminators) ? j.inseminators : [];
 
@@ -735,47 +290,23 @@ function renderInseminators(j){
   }
 
   el("inseminatorsWrap").innerHTML = `
-    <div class="fert-panel">
-      <div class="fert-card-list">
-        ${rows.map(r => `
-          <div class="fert-mini-card">
-            <div class="fert-mini-head">
-              <div class="fert-mini-title">${esc(r.inseminator || "غير محدد")}</div>
-              <div class="fert-mini-badge">${badge(r.evaluation, r.status)}</div>
-            </div>
-
-            <div class="fert-mini-grid">
-              <div class="fert-mini-item">
-                <div class="fert-mini-label">تلقيحات الفترة</div>
-                <div class="fert-mini-value">${fmtNum(r.totalAiInPeriod)}</div>
-              </div>
-
-              <div class="fert-mini-item">
-                <div class="fert-mini-label">محكوم عليها</div>
-                <div class="fert-mini-value">${fmtNum(r.totalJudged)}</div>
-              </div>
-
-              <div class="fert-mini-item">
-                <div class="fert-mini-label">حمل مثبت</div>
-                <div class="fert-mini-value">${fmtNum(r.pregnancies)}</div>
-              </div>
-
-              <div class="fert-mini-item">
-                <div class="fert-mini-label">CR</div>
-                <div class="fert-mini-value">${fmtPct(r.conceptionRatePct)}</div>
-              </div>
-
-              <div class="fert-mini-item">
-                <div class="fert-mini-label">متوسط THI</div>
-                <div class="fert-mini-value">${r.avgThi == null ? "--" : fmtNum(r.avgThi)}</div>
-              </div>
-            </div>
-          </div>
-        `).join("")}
-      </div>
+    <div class="cards">
+      ${rows.map(r => noteMini(
+        r.inseminator || "غير محدد",
+        r.evaluation || "تقييم الملقح",
+        `
+          ${badge(r.evaluation, r.status)}<br>
+          <b>تلقيحات الفترة:</b> ${fmtNum(r.totalAiInPeriod)}<br>
+          <b>محكوم عليها:</b> ${fmtNum(r.totalJudged)}<br>
+          <b>حمل مثبت:</b> ${fmtNum(r.pregnancies)}<br>
+          <b>CR:</b> ${fmtPct(r.conceptionRatePct)}<br>
+          <b>متوسط THI:</b> ${r.avgThi == null ? "--" : fmtNum(r.avgThi)}
+        `
+      )).join("")}
     </div>
   `;
 }
+
 function renderThi(j){
   const advice =
     j.fertilityThiAdvice ||
@@ -787,46 +318,33 @@ function renderThi(j){
   const actions = Array.isArray(advice.actions) ? advice.actions : [];
 
   el("thiWrap").innerHTML = `
-    <div class="fert-panel">
-      <div class="fert-title">
-        ${esc(advice.title || "THI الحالي ونصيحة توقيت التلقيح")}
-      </div>
+    <div class="grid">
+      ${box("THI الحالي", current.thiText || "--")}
+      ${box("الحالة", current.levelLabel || "غير متاح")}
+      ${box("الحرارة", current.tempC == null ? "--" : `${fmtNum(current.tempC)}°`)}
+      ${box("الرطوبة", current.humidity == null ? "--" : `${fmtNum(current.humidity)}%`)}
+    </div>
 
-      <div class="fert-stats">
-        <div class="fert-stat">
-          <div class="fert-stat-label">THI الحالي</div>
-          <div class="fert-stat-value">${esc(current.thiText || "--")}</div>
-        </div>
-
-        <div class="fert-stat">
-          <div class="fert-stat-label">الحالة</div>
-          <div class="fert-stat-value">${esc(current.levelLabel || "غير متاح")}</div>
-        </div>
-
-        <div class="fert-stat">
-          <div class="fert-stat-label">الحرارة</div>
-          <div class="fert-stat-value">${current.tempC == null ? "--" : `${fmtNum(current.tempC)}°`}</div>
-        </div>
-
-        <div class="fert-stat">
-          <div class="fert-stat-label">الرطوبة</div>
-          <div class="fert-stat-value">${current.humidity == null ? "--" : `${fmtNum(current.humidity)}%`}</div>
-        </div>
-      </div>
-
-      <div class="fert-read">
-        ${esc(advice.summary || "لا توجد قراءة THI حالية كافية.")}
-      </div>
+    <div class="cards">
+      ${noteMini(
+        advice.title || "THI الحالي ونصيحة توقيت التلقيح",
+        "قراءة مُرَبِّيك",
+        esc(advice.summary || "لا توجد قراءة THI حالية كافية.")
+      )}
 
       ${
         advice.timingAdvice
-          ? `<div class="fert-advice">${esc(advice.timingAdvice)}</div>`
+          ? noteMini("نصيحة توقيت التلقيح", "توجيه عملي", esc(advice.timingAdvice))
           : ""
       }
 
       ${
         actions.length
-          ? `<ul class="fert-action-list">${actions.map(a => `<li>${esc(a)}</li>`).join("")}</ul>`
+          ? noteMini(
+              "إجراءات مقترحة",
+              `${fmtNum(actions.length)} إجراء`,
+              actions.map(a => `• ${esc(a)}`).join("<br>")
+            )
           : ""
       }
     </div>
@@ -847,36 +365,27 @@ function renderRepeatBreeders(j){
   });
 
   const head = `
-    <div class="fert-panel">
-      <div class="fert-title">ضغط التلقيح المتكرر في القطيع</div>
+    <div class="grid">
+      ${box("الحالات", fmtNum(rb.count || 0))}
+      ${box("المؤهلون للتلقيح", fmtNum(rb.eligibleCount))}
+      ${box("النسبة", fmtPct(rb.ratePct))}
+      ${box("التقييم", rb.severityLabel || "--")}
+    </div>
 
-      <div class="fert-stats">
-        <div class="fert-stat">
-          <div class="fert-stat-label">الحالات</div>
-          <div class="fert-stat-value">${fmtNum(rb.count || 0)}</div>
-        </div>
-
-        <div class="fert-stat">
-          <div class="fert-stat-label">المؤهلون للتلقيح</div>
-          <div class="fert-stat-value">${fmtNum(rb.eligibleCount)}</div>
-        </div>
-
-        <div class="fert-stat">
-          <div class="fert-stat-label">النسبة</div>
-          <div class="fert-stat-value">${fmtPct(rb.ratePct)}</div>
-        </div>
-
-        <div class="fert-stat">
-          <div class="fert-stat-label">التقييم</div>
-          <div class="fert-stat-value">${esc(rb.severityLabel || "--")}</div>
-        </div>
-      </div>
-
-      <div class="fert-read">${esc(rb.herdRead || "")}</div>
+    <div class="cards">
+      ${noteMini(
+        "ضغط التلقيح المتكرر في القطيع",
+        "قراءة مُرَبِّيك",
+        esc(rb.herdRead || "")
+      )}
 
       ${
         driverLines.length
-          ? `<div class="fert-advice">${driverLines.map(x => `• ${esc(x)}`).join("<br>")}</div>`
+          ? noteMini(
+              "الأسباب المحتملة",
+              `${fmtNum(driverLines.length)} سبب`,
+              driverLines.map(x => `• ${esc(x)}`).join("<br>")
+            )
           : ""
       }
     </div>
@@ -904,7 +413,7 @@ function renderRepeatBreeders(j){
 
   el("repeatBreedersWrap").innerHTML =
     head +
-    `<div class="fert-table-title">الحالات الفردية المحققة للشروط</div>` +
+    noteMini("الحالات الفردية المحققة للشروط", `${fmtNum(rows.length)} حالة`, "") +
     table(
       ["رقم الحيوان", "عدد التلقيحات", "آخر تلقيح", "انتظام الدورة", "التوقيت", "THI", "الأسباب المحتملة", "قراءة مُرَبِّيك"],
       htmlRows
@@ -923,19 +432,20 @@ function renderAdvisory(j){
       );
 
   el("advisoryWrap").innerHTML = `
-    <div class="fert-panel">
-      <div class="fert-title">
-        ${esc(expert.headline || j.advisory?.headline || "لا توجد قراءة كافية بعد.")}
-      </div>
-
-      <div class="fert-read">
-        ${main.title ? `<strong>${esc(main.title)}</strong><br>` : ""}
-        ${esc(main.read || "")}
-      </div>
+    <div class="cards">
+      ${noteMini(
+        expert.headline || j.advisory?.headline || "لا توجد قراءة كافية بعد.",
+        main.title || "قراءة مُرَبِّيك",
+        esc(main.read || "")
+      )}
 
       ${
         recs.length
-          ? `<div class="fert-advice">${recs.map(r => `• ${esc(r)}`).join("<br>")}</div>`
+          ? noteMini(
+              "توصيات المتابعة",
+              `${fmtNum(recs.length)} توصية`,
+              recs.map(r => `• ${esc(r)}`).join("<br>")
+            )
           : ""
       }
     </div>
@@ -957,17 +467,17 @@ function renderAdvisory(j){
     title.textContent = `تقرير الخصوبة — ${reportTypeLabel}`;
   }
 
-  if (type) {
-    type.textContent = `نوع القطيع: ${reportTypeLabel}`;
-  }
+ if (type) {
+  type.textContent = reportTypeLabel;
+}
 
-  if (period) {
-    period.textContent = `فترة التحليل: ${fmtNum(j.periodDays || 180)} يوم`;
-  }
+if (period) {
+  period.textContent = `${fmtNum(j.periodDays || 180)} يوم`;
+}
 
-  if (date) {
-    date.textContent = `تاريخ الطباعة: ${today}`;
-  }
+if (date) {
+  date.textContent = today;
+}
 }
 async function main(){
   el("pageTitle").textContent = `تقرير الخصوبة — ${reportTypeLabel}`;
@@ -983,11 +493,11 @@ async function main(){
     renderRepeatBreeders(j);
     renderAdvisory(j);
 
-    el("statusBar").classList.add("is-done");
+      el("statusBar").style.display = "none";
 
   } catch (e) {
     console.error(e);
-    el("statusBar").classList.remove("is-done");
+    el("statusBar").style.display = "";
     el("statusBar").textContent = e.message || "تعذّر تحميل تقرير الخصوبة.";
   }
 }
