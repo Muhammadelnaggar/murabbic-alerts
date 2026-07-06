@@ -30214,7 +30214,369 @@ function fertilityReportKpiStatusSrv(value, benchmark, direction = "higher") {
   if (v >= b * 0.8) return { status: "warn", label: "متابعة" };
   return { status: "danger", label: "يحتاج تدخل" };
 }
+function fertilityReportRound1Srv(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n * 10) / 10 : null;
+}
 
+function fertilityReportAvgSrv(values = []) {
+  const nums = (Array.isArray(values) ? values : [])
+    .map(Number)
+    .filter(Number.isFinite);
+
+  if (!nums.length) return null;
+  return fertilityReportRound1Srv(nums.reduce((s, n) => s + n, 0) / nums.length);
+}
+
+function fertilityReportTopValueSrv(values = []) {
+  const arr = (Array.isArray(values) ? values : [])
+    .map(v => String(v || "").trim())
+    .filter(Boolean);
+
+  if (!arr.length) return { value: "", count: 0, pct: null };
+
+  const m = new Map();
+  for (const v of arr) m.set(v, (m.get(v) || 0) + 1);
+
+  const [value, count] = [...m.entries()]
+    .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))[0];
+
+  return {
+    value,
+    count,
+    pct: fertilityReportPctSrv(count, arr.length)
+  };
+}
+
+function fertilityReportExpertIndicatorSrv({
+  key = "",
+  title = "",
+  value = null,
+  unit = "%",
+  benchmark = null,
+  direction = "higher",
+  goodText = "",
+  warnText = "",
+  dangerText = "",
+  advice = ""
+} = {}) {
+  const n = Number(value);
+  const b = Number(benchmark);
+  const base = fertilityReportKpiStatusSrv(value, benchmark, direction);
+
+  let read = "البيانات غير كافية لإصدار قراءة فنية على هذا المؤشر.";
+
+  if (base.status === "good") read = goodText || "المؤشر داخل النطاق المقبول فنيًا.";
+  if (base.status === "warn") read = warnText || "المؤشر قريب من الحد الفني ويحتاج متابعة مع باقي المؤشرات.";
+  if (base.status === "danger") read = dangerText || "المؤشر خارج النطاق المطلوب ويحتاج تفسير سبب الخلل.";
+
+  return {
+    key,
+    title,
+    value: Number.isFinite(n) ? fertilityReportRound1Srv(n) : null,
+    valueText: Number.isFinite(n) ? `${fertilityReportRound1Srv(n)}${unit ? " " + unit : ""}` : "غير مكتمل",
+    benchmark: Number.isFinite(b) ? b : null,
+    benchmarkText: Number.isFinite(b)
+      ? `${direction === "lower" ? "المستهدف ≤" : "المستهدف ≥"} ${b}${unit ? " " + unit : ""}`
+      : "",
+    status: base.status,
+    rating: base.label,
+    read,
+    advice
+  };
+}
+
+function fertilityReportRepeatBreederAnalysisSrv(repeatBreeders = [], eligibleCount = 0) {
+  const rows = Array.isArray(repeatBreeders) ? repeatBreeders : [];
+  const count = rows.length;
+  const den = Number(eligibleCount || 0);
+  const ratePct = fertilityReportPctSrv(count, den);
+
+  const causeLabels = {
+    timing_protocol: "توقيت التلقيح/تطبيق قاعدة صباح-مساء",
+    possible_delayed_ovulation: "تأخر إباضة أو فشل إخصاب مع دورة منتظمة",
+    irregular_return: "كشف شياع غير منتظم أو فقد حمل مبكر/مشكلة رحمية",
+    heat_stress: "إجهاد حراري وقت التلقيح",
+    inseminator_signal: "تركز الحالات مع ملقح محدد",
+    semen_signal: "تركز الحالات مع سائل/طلوقة محددة"
+  };
+
+  const causeCounts = new Map();
+
+  for (const r of rows) {
+    const codes = Array.isArray(r.likelyCauseCodes) ? r.likelyCauseCodes : [];
+    for (const c of codes) causeCounts.set(c, (causeCounts.get(c) || 0) + 1);
+  }
+
+  const likelyDrivers = [...causeCounts.entries()]
+    .map(([key, value]) => ({
+      key,
+      title: causeLabels[key] || key,
+      count: value,
+      pct: fertilityReportPctSrv(value, count),
+      strength: value >= Math.ceil(count * 0.5)
+        ? "قوي"
+        : value >= Math.ceil(count * 0.25)
+          ? "متوسط"
+          : "ضعيف"
+    }))
+    .sort((a, b) => Number(b.count || 0) - Number(a.count || 0));
+
+  const mainDriver = likelyDrivers[0] || null;
+  const avgServices = fertilityReportAvgSrv(rows.map(r => r.servicesCount));
+
+  let severity = "good";
+  let severityLabel = "لا يظهر ضغط واضح";
+
+  if (count > 0) {
+    if ((ratePct !== null && ratePct >= 20) || count >= 10) {
+      severity = "danger";
+      severityLabel = "ضغط Repeat Breeder واضح";
+    } else if ((ratePct !== null && ratePct >= 10) || count >= 4) {
+      severity = "warn";
+      severityLabel = "ضغط Repeat Breeder يحتاج قراءة";
+    } else {
+      severity = "good";
+      severityLabel = "ضغط محدود";
+    }
+  }
+
+  const herdRead = count === 0
+    ? "لا تظهر حالات Repeat Breeder واضحة في القطيع حسب البيانات الحالية."
+    : mainDriver
+      ? `يوجد ${count} حالة Repeat Breeder تمثل ${ratePct ?? "--"}% من الحيوانات الداخلة في برنامج التلقيح. السبب الأقوى حسب نمط القطيع: ${mainDriver.title}.`
+      : `يوجد ${count} حالة Repeat Breeder، لكن البيانات غير كافية لترجيح سبب واحد مسيطر.`;
+
+  return {
+    count,
+    eligibleCount: den || null,
+    ratePct,
+    severity,
+    severityLabel,
+    avgServices,
+    mainDriver,
+    likelyDrivers,
+    herdRead,
+    rows: rows.slice(0, 80)
+  };
+}
+
+function fertilityReportBuildExpertReportSrv({
+  overallCr = null,
+  firstServiceCr = null,
+  pregnancyRate21d = null,
+  heatDetectionRatePct = null,
+  servicesPerConception = null,
+  openDaysAvg = null,
+  abortionLossRatePct = null,
+  repeatBreederAnalysis = null,
+  thiGroups = []
+} = {}) {
+  const indicators = [
+    fertilityReportExpertIndicatorSrv({
+      key: "pregnancy_rate_21d",
+      title: "معدل الحمل 21 يوم",
+      value: pregnancyRate21d,
+      benchmark: 20,
+      goodText: "معدل الحمل 21 يوم مقبول؛ برنامج الخصوبة يحقق حملًا بمعدل عملي.",
+      warnText: "معدل الحمل 21 يوم متوسط؛ اقرأه مع كشف الشياع والإخصاب لتحديد موضع الخلل.",
+      dangerText: "معدل الحمل 21 يوم منخفض؛ غالبًا توجد مشكلة في كشف الشياع أو الإخصاب أو كليهما.",
+      advice: "هذا هو مؤشر إدارة الخصوبة الأشمل على مستوى القطيع."
+    }),
+    fertilityReportExpertIndicatorSrv({
+      key: "heat_detection_rate",
+      title: "معدل رصد الشياع المسجل",
+      value: heatDetectionRatePct,
+      benchmark: 50,
+      goodText: "رصد الشياع المسجل مقبول؛ القطيع يدخل برنامج التلقيح بمعدل مناسب.",
+      warnText: "رصد الشياع متوسط؛ قد توجد شياعات مفقودة أو تسجيل غير منتظم.",
+      dangerText: "رصد الشياع منخفض؛ نقطة الضعف المرجحة هي اكتشاف الشياع وإدخال الحيوانات للتلقيح.",
+      advice: "راجع نظام الملاحظة ودقة التسجيل قبل اتهام الإخصاب وحده."
+    }),
+    fertilityReportExpertIndicatorSrv({
+      key: "first_service_conception",
+      title: "نسبة الحمل من أول تلقيحة",
+      value: firstServiceCr,
+      benchmark: 40,
+      goodText: "أداء أول تلقيحة مقبول؛ جاهزية الحيوانات بعد الولادة غالبًا مناسبة.",
+      warnText: "أداء أول تلقيحة قريب من الحد الأدنى؛ يحتاج قراءة مع VWP والرحم وBCS.",
+      dangerText: "أداء أول تلقيحة منخفض؛ يرجّح مشكلة جاهزية أول خدمة بعد الولادة أو توقيتها.",
+      advice: "راجع فترة الانتظار الطوعي وفحص الرحم والحالة الجسمية وTHI."
+    }),
+    fertilityReportExpertIndicatorSrv({
+      key: "overall_conception",
+      title: "معدل الإخصاب العام",
+      value: overallCr,
+      benchmark: 35,
+      goodText: "معدل الإخصاب العام مقبول فنيًا على مستوى القطيع.",
+      warnText: "معدل الإخصاب قريب من الحد الأدنى؛ يحتاج قراءة مع التوقيت والملقحين وTHI.",
+      dangerText: "معدل الإخصاب منخفض؛ راجع توقيت التلقيح وجودة السائل والملقحين وTHI والحالة الرحمية.",
+      advice: "لا يُحكم على الملقح منفردًا قبل فصل أثر THI وعدد الحالات."
+    }),
+    fertilityReportExpertIndicatorSrv({
+      key: "services_per_conception",
+      title: "عدد الخدمات للحمل",
+      value: servicesPerConception,
+      unit: "",
+      benchmark: 2,
+      direction: "lower",
+      goodText: "عدد الخدمات للحمل مقبول؛ لا يظهر ضغط واضح في تكرار التلقيح.",
+      warnText: "عدد الخدمات للحمل أعلى من المثالي؛ راقب بداية نمط Repeat Breeder.",
+      dangerText: "عدد الخدمات للحمل مرتفع؛ يرجّح ضغط تكرار تلقيح أو خلل توقيت/إباضة/رحم/حرارة.",
+      advice: "اقرأه مع Repeat Breeder وانتظام الدورات وTHI."
+    }),
+    fertilityReportExpertIndicatorSrv({
+      key: "days_open",
+      title: "متوسط الأيام المفتوحة",
+      value: openDaysAvg,
+      unit: "يوم",
+      benchmark: 115,
+      direction: "lower",
+      goodText: "الأيام المفتوحة ضمن نطاق مقبول؛ التأخير الاقتصادي التناسلي غير ظاهر بقوة.",
+      warnText: "الأيام المفتوحة تحتاج متابعة؛ قد يبدأ أثر اقتصادي من تأخر الحمل.",
+      dangerText: "الأيام المفتوحة مرتفعة؛ يوجد تأخير تناسلي مؤثر على دورة الإنتاج والربحية.",
+      advice: "اقرأها مع سرعة العودة للتلقيح وكفاءة كشف الشياع."
+    }),
+    fertilityReportExpertIndicatorSrv({
+      key: "repeat_breeder_pressure",
+      title: "ضغط Repeat Breeder",
+      value: repeatBreederAnalysis?.ratePct ?? null,
+      benchmark: 10,
+      direction: "lower",
+      goodText: "ضغط Repeat Breeder محدود على مستوى القطيع.",
+      warnText: "يوجد ضغط Repeat Breeder يحتاج تحليل أسباب القطيع.",
+      dangerText: "ضغط Repeat Breeder واضح ومؤثر على الخصوبة العامة للقطيع.",
+      advice: repeatBreederAnalysis?.herdRead || "اقرأ الحالات المتكررة مع انتظام الدورة والتوقيت وTHI والملقحين."
+    }),
+    fertilityReportExpertIndicatorSrv({
+      key: "pregnancy_loss",
+      title: "معدل الإجهاض/فقد الحمل",
+      value: abortionLossRatePct,
+      benchmark: 3,
+      direction: "lower",
+      goodText: "فقد الحمل لا يظهر كمشكلة قطيع واضحة حسب البيانات الحالية.",
+      warnText: "فقد الحمل يحتاج متابعة فنية مع توقيت التشخيص وسجلات الإجهاض.",
+      dangerText: "معدل فقد الحمل مرتفع؛ يحتاج مراجعة صحية وتناسلية على مستوى القطيع.",
+      advice: "راجع التحصينات والأمراض التناسلية والتغذية والحرارة وتوقيت تشخيص الحمل."
+    })
+  ];
+
+  const bottlenecks = [];
+  const pr = Number(pregnancyRate21d);
+  const hdr = Number(heatDetectionRatePct);
+  const cr = Number(overallCr);
+  const first = Number(firstServiceCr);
+  const spc = Number(servicesPerConception);
+
+  if (Number.isFinite(pr) && Number.isFinite(cr) && pr < 20 && cr >= 35) {
+    bottlenecks.push({
+      key: "heat_detection_bottleneck",
+      title: "الخلل المرجح: كشف الشياع وإدخال الحيوانات للتلقيح",
+      read: "الإخصاب مقبول لكن معدل الحمل 21 يوم منخفض؛ الحيوانات التي تُلقح تحمل بمعدل مقبول، لكن دخول الحيوانات للتلقيح غير كافٍ.",
+      weight: 90
+    });
+  }
+
+  if (Number.isFinite(cr) && Number.isFinite(hdr) && cr < 35 && hdr >= 50) {
+    bottlenecks.push({
+      key: "conception_bottleneck",
+      title: "الخلل المرجح: الإخصاب أو توقيت التلقيح",
+      read: "رصد الشياع ليس نقطة الضعف الأكبر، لكن الإخصاب منخفض؛ راجع التوقيت والسائل والملقحين وTHI والرحم.",
+      weight: 85
+    });
+  }
+
+  if (Number.isFinite(first) && first < 32) {
+    bottlenecks.push({
+      key: "first_service_bottleneck",
+      title: "الخلل المرجح: جاهزية أول تلقيحة بعد الولادة",
+      read: "انخفاض الحمل من أول تلقيحة يشير إلى دخول الحيوان للتلقيح قبل الجاهزية المثلى أو وجود ضغط رحم/BCS/حرارة.",
+      weight: 80
+    });
+  }
+
+  if (Number.isFinite(spc) && spc > 2.5) {
+    bottlenecks.push({
+      key: "repeat_breeding_pressure",
+      title: "الخلل المرجح: ضغط تكرار التلقيح",
+      read: "ارتفاع عدد الخدمات للحمل يشير إلى ضغط Repeat Breeder أو خلل توقيت/إباضة/رحم/حرارة.",
+      weight: 78
+    });
+  }
+
+  if (repeatBreederAnalysis?.mainDriver) {
+    bottlenecks.push({
+      key: `repeat_breeder_${repeatBreederAnalysis.mainDriver.key}`,
+      title: `Repeat Breeder: ${repeatBreederAnalysis.mainDriver.title}`,
+      read: repeatBreederAnalysis.herdRead,
+      weight: 76
+    });
+  }
+
+  const thiHigh = (Array.isArray(thiGroups) ? thiGroups : []).some(g =>
+    (g.level === "moderate" || g.level === "high") &&
+    Number(g.judged || 0) > 0 &&
+    Number(g.conceptionRatePct || 0) < 35
+  );
+
+  if (thiHigh) {
+    bottlenecks.push({
+      key: "heat_stress_pressure",
+      title: "عامل ضاغط محتمل: الإجهاد الحراري",
+      read: "انخفاض الإخصاب تحت THI مرتفع يجعل الحرارة عاملًا ضاغطًا؛ لا يصح الحكم على الملقحين بمعزل عن THI.",
+      weight: 70
+    });
+  }
+
+  const mainBottleneck = bottlenecks
+    .sort((a, b) => Number(b.weight || 0) - Number(a.weight || 0))[0] || {
+      key: "balanced_or_insufficient",
+      title: "لا يظهر خلل واحد مسيطر بوضوح",
+      read: "المؤشرات لا تُظهر سببًا واحدًا واضحًا؛ اقرأ الحمل 21 يوم مع كشف الشياع والإخصاب والحرارة وRepeat Breeder قبل اتخاذ قرار."
+    };
+
+  const goodCount = indicators.filter(x => x.status === "good").length;
+  const dangerCount = indicators.filter(x => x.status === "danger").length;
+
+  let overallStatus = "warn";
+  let overallRating = "متوسط يحتاج متابعة فنية";
+
+  if (dangerCount >= 2) {
+    overallStatus = "danger";
+    overallRating = "ضعيف ويحتاج مراجعة فنية";
+  } else if (goodCount >= 4 && dangerCount === 0) {
+    overallStatus = "good";
+    overallRating = "جيد فنيًا";
+  }
+
+  const recommendations = [];
+
+  if (mainBottleneck.key === "heat_detection_bottleneck") {
+    recommendations.push("الأولوية الفنية: تحسين كشف الشياع وانتظام التسجيل قبل تغيير السائل أو الحكم على الملقحين.");
+  } else if (mainBottleneck.key === "conception_bottleneck") {
+    recommendations.push("الأولوية الفنية: مراجعة توقيت التلقيح، قاعدة صباح/مساء، جودة السائل، وتوزيع النتائج حسب الملقحين وTHI.");
+  } else if (mainBottleneck.key === "first_service_bottleneck") {
+    recommendations.push("الأولوية الفنية: مراجعة جاهزية أول تلقيحة بعد الولادة، VWP، فحص الرحم، والحالة الجسمية.");
+  } else if (String(mainBottleneck.key || "").startsWith("repeat_breeder_")) {
+    recommendations.push("الأولوية الفنية: قراءة حالات Repeat Breeder مع التوقيت، انتظام الدورة، THI، الملقحين، والسائل المستخدم.");
+  } else if (mainBottleneck.key === "heat_stress_pressure") {
+    recommendations.push("الأولوية الفنية: فصل قراءة الخصوبة في أيام THI المرتفع عن الأيام المريحة قبل تقييم الملقحين.");
+  }
+
+  if (!recommendations.length) {
+    recommendations.push("استمر في قراءة المؤشرات كمنظومة: الحمل 21 يوم، كشف الشياع، الإخصاب، الخدمات للحمل، وRepeat Breeder.");
+  }
+
+  return {
+    overallStatus,
+    overallRating,
+    headline: `تقييم مُرَبِّيك لحالة الخصوبة في القطيع: ${overallRating}.`,
+    mainBottleneck,
+    indicators,
+    bottlenecks,
+    recommendations
+  };
+}
 app.get("/api/fertility-report", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -30583,65 +30945,141 @@ app.get("/api/fertility-report", requireUserId, async (req, res) => {
       conceptionRatePct: fertilityReportPctSrv(g.pregnancies, g.judged)
     }));
 
-    const repeatBreeders = [];
+   const repeatBreeders = [];
 
-    for (const [number, arr] of aiByAnimal.entries()) {
-      const animal = animalsByNumber.get(number) || {};
-      const reproKind = fertilityReportReproKindSrv(animal.reproductiveStatus || animal.reproStatus || "");
+for (const [number, arr] of aiByAnimal.entries()) {
+  const animal = animalsByNumber.get(number) || {};
+  const reproKind = fertilityReportReproKindSrv(animal.reproductiveStatus || animal.reproStatus || "");
 
-      if (reproKind === "pregnant") continue;
+  if (reproKind === "pregnant") continue;
 
-      const lastCalvingDate = fertilityReportDateSrv(animal.lastCalvingDate || "");
-      const lastCalvingMs = fertilityReportMsSrv(lastCalvingDate);
+  const lastCalvingDate = fertilityReportDateSrv(animal.lastCalvingDate || "");
+  const lastCalvingMs = fertilityReportMsSrv(lastCalvingDate);
 
-      const seasonAis = [...arr]
-        .filter(ai => !Number.isFinite(lastCalvingMs) || ai._ms >= lastCalvingMs)
-        .sort((a, b) => a._ms - b._ms);
+  const seasonAis = [...arr]
+    .filter(ai => !Number.isFinite(lastCalvingMs) || ai._ms >= lastCalvingMs)
+    .sort((a, b) => a._ms - b._ms);
 
-      if (seasonAis.length < 3) continue;
+  if (seasonAis.length < 3) continue;
 
-      const intervals = [];
-      for (let i = 1; i < seasonAis.length; i++) {
-        const d = fertilityReportDaysBetweenSrv(seasonAis[i - 1]._date, seasonAis[i]._date);
-        if (d !== null) intervals.push(d);
-      }
+  const intervals = [];
+  for (let i = 1; i < seasonAis.length; i++) {
+    const d = fertilityReportDaysBetweenSrv(seasonAis[i - 1]._date, seasonAis[i]._date);
+    if (d !== null) intervals.push(d);
+  }
 
-      const regularCount = intervals.filter(d => d >= 18 && d <= 24).length;
-      const regularCycle = intervals.length > 0 && regularCount >= Math.ceil(intervals.length * 0.6);
+  const regularCount = intervals.filter(d => d >= 18 && d <= 24).length;
+  const regularCycle = intervals.length > 0 && regularCount >= Math.ceil(intervals.length * 0.6);
 
-      const lastAi = seasonAis[seasonAis.length - 1];
-      const lastAiRow = aiRows.find(x => x.id === lastAi.id) || null;
+  const lastAi = seasonAis[seasonAis.length - 1];
+  const lastAiRow = aiRows.find(x => x.id === lastAi.id) || null;
+  const seasonRows = seasonAis
+    .map(ai => aiRows.find(x => x.id === ai.id))
+    .filter(Boolean);
 
-      let reproductiveSuspicion = "يحتاج مراجعة";
-      let suspicionCode = "review";
+  const timingKnown = seasonRows.filter(r => r.timing?.code && r.timing.code !== "unknown");
+  const timingProblemCount = timingKnown.filter(r => r.timing.code !== "ideal").length;
+  const timingProblemPct = fertilityReportPctSrv(timingProblemCount, timingKnown.length);
 
-      if (regularCycle && lastAiRow?.timing?.code && lastAiRow.timing.code !== "ideal") {
-        reproductiveSuspicion = "رجوع منتظم مع توقيت تلقيح غير مثالي — راجع بروتوكول صباح/مساء أولًا";
-        suspicionCode = "timing_protocol";
-      } else if (regularCycle) {
-        reproductiveSuspicion = "رجوع منتظم — احتمال فشل إخصاب أو تأخر إباضة/عدم توافق توقيت الإباضة";
-        suspicionCode = "possible_delayed_ovulation";
-      } else {
-        reproductiveSuspicion = "رجوع غير منتظم — راجع كشف الشياع أو فقد حمل مبكر أو مشكلة رحمية";
-        suspicionCode = "irregular_return";
-      }
+  const thiKnownRows = seasonRows.filter(r => Number.isFinite(Number(r.thi?.value)));
+  const highThiCount = thiKnownRows.filter(r => r.thi.level === "moderate" || r.thi.level === "high").length;
+  const highThiPct = fertilityReportPctSrv(highThiCount, thiKnownRows.length);
 
-      repeatBreeders.push({
-        animalNumber: number,
-        servicesCount: seasonAis.length,
-        lastInseminationDate: lastAi._date,
-        daysInMilk: Number(animal.daysInMilk ?? null),
-        cycleIntervalsDays: intervals,
-        cycleRegularity: regularCycle ? "منتظمة غالبًا" : "غير منتظمة/غير مكتملة",
-        lastTimingAssessment: lastAiRow?.timing || null,
-        lastInseminator: lastAiRow?.inseminator || String(lastAi.inseminator || "").trim(),
-        reproductiveSuspicion,
-        suspicionCode
-      });
-    }
+  const topInseminator = fertilityReportTopValueSrv(seasonRows.map(r => r.inseminator));
+  const topSemen = fertilityReportTopValueSrv(seasonRows.map(r => r.semenCode));
 
-    repeatBreeders.sort((a, b) => Number(b.servicesCount || 0) - Number(a.servicesCount || 0));
+  const likelyCauseCodes = [];
+  const likelyCauses = [];
 
+  let reproductiveSuspicion = "يحتاج مراجعة";
+  let suspicionCode = "review";
+
+  if (regularCycle && timingProblemCount > 0 && (timingProblemPct === null || timingProblemPct >= 40)) {
+    reproductiveSuspicion = "رجوع منتظم مع نسبة واضحة من التلقيحات خارج توقيت صباح/مساء";
+    suspicionCode = "timing_protocol";
+    likelyCauseCodes.push("timing_protocol");
+    likelyCauses.push("توقيت التلقيح/تطبيق قاعدة صباح-مساء");
+  } else if (regularCycle) {
+    reproductiveSuspicion = "رجوع منتظم — احتمال فشل إخصاب أو تأخر إباضة/عدم توافق توقيت الإباضة";
+    suspicionCode = "possible_delayed_ovulation";
+    likelyCauseCodes.push("possible_delayed_ovulation");
+    likelyCauses.push("تأخر إباضة أو فشل إخصاب مع دورة منتظمة");
+  } else {
+    reproductiveSuspicion = "رجوع غير منتظم — راجع كشف الشياع أو فقد حمل مبكر أو مشكلة رحمية";
+    suspicionCode = "irregular_return";
+    likelyCauseCodes.push("irregular_return");
+    likelyCauses.push("كشف شياع غير منتظم أو فقد حمل مبكر/مشكلة رحمية");
+  }
+
+  if (highThiPct !== null && highThiPct >= 50) {
+    likelyCauseCodes.push("heat_stress");
+    likelyCauses.push("إجهاد حراري وقت التلقيح");
+  }
+
+  if (topInseminator.count >= 3 && topInseminator.pct !== null && topInseminator.pct >= 60) {
+    likelyCauseCodes.push("inseminator_signal");
+    likelyCauses.push("تركّز التلقيحات مع ملقح محدد — قراءة اتجاهية لا حكم منفرد");
+  }
+
+  if (topSemen.count >= 3 && topSemen.pct !== null && topSemen.pct >= 60) {
+    likelyCauseCodes.push("semen_signal");
+    likelyCauses.push("تركّز التلقيحات مع سائل/طلوقة محددة — تحتاج مقارنة بعدد كافٍ");
+  }
+
+  const timingPattern = timingKnown.length
+    ? `${timingProblemCount} من ${timingKnown.length} تلقيحات بتوقيت يحتاج مراجعة`
+    : "بيانات التوقيت غير مكتملة";
+
+  const thiPattern = thiKnownRows.length
+    ? `${highThiCount} من ${thiKnownRows.length} تلقيحات تحت THI متوسط/عالٍ`
+    : "THI غير متاح لمعظم التلقيحات";
+
+  const mbkRead = `${reproductiveSuspicion}. ${likelyCauses.length ? "العوامل المحتملة: " + likelyCauses.join("، ") + "." : ""}`;
+
+  repeatBreeders.push({
+    animalNumber: number,
+    servicesCount: seasonAis.length,
+    lastInseminationDate: lastAi._date,
+    daysInMilk: Number(animal.daysInMilk ?? null),
+    cycleIntervalsDays: intervals,
+    cycleRegularity: regularCycle ? "منتظمة غالبًا" : "غير منتظمة/غير مكتملة",
+    lastTimingAssessment: lastAiRow?.timing || null,
+    lastInseminator: lastAiRow?.inseminator || String(lastAi.inseminator || "").trim(),
+    dominantInseminator: topInseminator.value || "",
+    dominantSemenCode: topSemen.value || "",
+    timingPattern,
+    timingProblemPct,
+    thiPattern,
+    highThiPct,
+    likelyCauseCodes,
+    likelyCauses,
+    reproductiveSuspicion,
+    suspicionCode,
+    mbkRead
+  });
+}
+
+repeatBreeders.sort((a, b) => Number(b.servicesCount || 0) - Number(a.servicesCount || 0));
+
+const repeatBreederEligibleAnimals = activeAnimals.filter(a => {
+  const repro = fertilityReportReproKindSrv(a.reproductiveStatus || a.reproStatus || "");
+  if (repro === "pregnant" || repro === "fresh") return false;
+
+  const arr = aiByAnimal.get(a._number) || [];
+  const lastCalvingDate = fertilityReportDateSrv(a.lastCalvingDate || a.calvingDate || "");
+  const lastCalvingMs = fertilityReportMsSrv(lastCalvingDate);
+  const seasonAis = arr.filter(ai => !Number.isFinite(lastCalvingMs) || ai._ms >= lastCalvingMs);
+
+  const minDim = a._speciesKey === "buffalo" ? 45 : 60;
+  const dim = Number(a.daysInMilk);
+
+  return seasonAis.length > 0 || (repro === "open" && Number.isFinite(dim) && dim >= minDim);
+});
+
+const repeatBreederAnalysis = fertilityReportRepeatBreederAnalysisSrv(
+  repeatBreeders,
+  repeatBreederEligibleAnimals.length
+);
     const duePregnancyDiagnosis = aiRows
       .filter(x => !x.outcome.judged && x.outcome.outcome === "due_diagnosis")
       .map(x => ({
@@ -30677,17 +31115,44 @@ app.get("/api/fertility-report", requireUserId, async (req, res) => {
     const freshCount = activeAnimals.filter(a => fertilityReportReproKindSrv(a.reproductiveStatus || "") === "fresh").length;
     const dryCount = activeAnimals.filter(a => /جاف|dry/i.test(String(a.productionStatus || ""))).length;
 
-    const overallStatus = fertilityReportKpiStatusSrv(overallCr, 35, "higher");
-    const firstStatus = fertilityReportKpiStatusSrv(firstServiceCr, 40, "higher");
+   const overallStatus = fertilityReportKpiStatusSrv(overallCr, 35, "higher");
+const firstStatus = fertilityReportKpiStatusSrv(firstServiceCr, 40, "higher");
 
-    const headline =
-      overallCr === null
-        ? "بيانات الخصوبة غير كافية للحكم بعد."
-        : (
-            overallCr >= 35
-              ? "معدل الإخصاب العام جيد، مع متابعة القوائم العملية."
-              : "معدل الإخصاب العام أقل من المستهدف؛ راجع التوقيت، الملقحين، وحرارة البيئة."
-          );
+const fertilityEligibleCount = repeatBreederEligibleAnimals.length || activeAnimals.length;
+const cyclesInPeriod = Math.max(1, periodDays / 21);
+const cycleOpportunities = Math.max(1, fertilityEligibleCount * cyclesInPeriod);
+const heatsInPeriod = heats.filter(h => h._ms >= periodStartMs && h._ms <= todayMs);
+const lossesInPeriod = losses.filter(x => x._ms >= periodStartMs && x._ms <= todayMs);
+
+const heatDetectionRateReport = fertilityReportPctSrv(heatsInPeriod.length, cycleOpportunities);
+const pregnancyRate21Report = fertilityReportPctSrv(successfulAi.length, cycleOpportunities);
+
+const servicesPerConceptionReport = successfulAi.length
+  ? fertilityReportRound1Srv(judgedAi.length / successfulAi.length)
+  : null;
+
+const openDaysAvgReport = fertilityReportAvgSrv(
+  activeAnimals
+    .filter(a => fertilityReportReproKindSrv(a.reproductiveStatus || "") === "open")
+    .map(a => Number(a.daysInMilk))
+    .filter(n => Number.isFinite(n) && n > 0)
+);
+
+const abortionLossRateReport = fertilityReportPctSrv(lossesInPeriod.length, activeAnimals.length);
+
+const expertReport = fertilityReportBuildExpertReportSrv({
+  overallCr,
+  firstServiceCr,
+  pregnancyRate21d: pregnancyRate21Report,
+  heatDetectionRatePct: heatDetectionRateReport,
+  servicesPerConception: servicesPerConceptionReport,
+  openDaysAvg: openDaysAvgReport,
+  abortionLossRatePct: abortionLossRateReport,
+  repeatBreederAnalysis,
+  thiGroups
+});
+
+const headline = expertReport.headline;
 
     return res.json({
       ok: true,
@@ -30740,28 +31205,24 @@ app.get("/api/fertility-report", requireUserId, async (req, res) => {
         }
       },
 
-      inseminators,
-      thiConception: thiGroups,
+     expertReport,
+fertilityIndicators: expertReport.indicators,
+bottleneckAnalysis: {
+  main: expertReport.mainBottleneck,
+  all: expertReport.bottlenecks
+},
+farmRecommendations: expertReport.recommendations,
 
-      repeatBreeders: {
-        count: repeatBreeders.length,
-        rows: repeatBreeders.slice(0, 80)
-      },
+inseminators,
+thiConception: thiGroups,
 
-      actionLists: {
-        duePregnancyDiagnosis,
-        delayedFirstBreeding
-      },
+repeatBreederAnalysis,
+repeatBreeders: repeatBreederAnalysis,
 
-      advisory: {
-        headline,
-        notes: [
-          "لا يتم الحكم على الملقّح إذا كان عدد الحالات المحكوم عليها قليلًا.",
-          "عند وجود THI مرتفع، لا يُحمّل انخفاض الخصوبة للملقّح وحده.",
-          "Repeat Breeder مع رجوع منتظم يبدأ بتحليل توقيت صباح/مساء قبل ترجيح تأخر الإباضة.",
-          "الواجهة تعرض التقرير فقط؛ الحساب والترجيح من السيرفر."
-        ]
-      }
+advisory: {
+  headline,
+  notes: expertReport.recommendations
+}
     });
 
   } catch (e) {
