@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>تقرير إنتاج اللبن | مُرَبِّيك</title>
-  <!-- milk-report-version: v28 -->
+  <!-- milk-report-version: v30 -->
   <style>
     :root{
       --bg:#f5f7fb; --card:#fff; --text:#172033; --muted:#667085; --line:#e5eaf0;
@@ -251,6 +251,7 @@
     .scientific li{margin:7px 0;padding:8px 10px;background:#f8fafc;border:1px solid #e8eef5;border-radius:12px}
     .empty{padding:24px;text-align:center;color:var(--muted);font-weight:900;background:white;border:1px dashed #cbd5e1;border-radius:18px}
     .footer-note{text-align:center;color:var(--muted);font-size:12px;font-weight:750;margin-top:18px}
+    .no-print-section{}
 
     .print-report-header{display:none}
 
@@ -270,7 +271,7 @@
         font-size:11pt!important;
         line-height:1.45!important;
       }
-      .topbar,.controls,.btn,.print-section-btn,.hero-print-row,#loading,#animalPointBlock{display:none!important}
+      .topbar,.controls,.btn,.print-section-btn,.hero-print-row,#loading,#animalPointBlock,#herdScatterBlock,.no-print-section{display:none!important}
       .wrap{
         width:100%!important;
         max-width:none!important;
@@ -669,16 +670,9 @@
       </section>
 
       <section class="section" id="chartsBlock" data-print-block>
-        <div class="section-head"><div><h3>الرسوم البيانية</h3><p>كل رسم عليه أرقام واضحة وقراءة قصيرة.</p></div></div>
+        <div class="section-head"><div><h3>الرسوم البيانية</h3><p>منحنى الإنتاج ورسوم المجموعات ومراحل أيام الحليب.</p></div></div>
         <div class="grid grid-2">
-          <div class="card chart-card">
-            <div class="chart-title"><strong>سكاتر القطيع</strong><span>كل نقطة = حيوان</span></div>
-            <div class="legend"><span><i></i>اللبن حسب أيام الحليب</span></div>
-            <div class="chart" id="herdScatterChart"></div>
-            <div class="chart-note" id="herdScatterNote"></div>
-          </div>
-
-          <div class="card chart-card">
+<div class="card chart-card">
             <div class="chart-title"><strong>منحنى آخر 30 يوم</strong><span>كجم لبن / يوم</span></div>
             <div class="chart" id="dailyTrendChart"></div>
             <div class="chart-note" id="dailyTrendNote"></div>
@@ -725,7 +719,22 @@
         </div>
       </section>
 
-      <section class="section" id="animalPointBlock">
+      <section class="section no-print-section" id="herdScatterBlock">
+        <div class="section-head">
+          <div>
+            <h3>سكاتر القطيع</h3>
+            <p>كل نقطة = حيوان. المحور الأفقي أيام الحليب، والمحور الرأسي كجم اللبن.</p>
+          </div>
+        </div>
+        <div class="card chart-card">
+          <div class="chart-title"><strong>سكاتر القطيع</strong><span>كل نقطة = حيوان</span></div>
+          <div class="legend"><span><i></i>اللبن حسب أيام الحليب</span></div>
+          <div class="chart" id="herdScatterChart"></div>
+          <div class="chart-note" id="herdScatterNote"></div>
+        </div>
+      </section>
+
+      <section class="section no-print-section" id="animalPointBlock">
         <div class="section-head">
           <div>
             <h3>بطاقة الحيوان من السكاتر</h3>
