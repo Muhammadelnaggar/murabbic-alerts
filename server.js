@@ -14645,6 +14645,14 @@ app.post("/api/insemination/save", requireUserId, async (req, res) => {
         const needsEmbryonicLoss =
       inseminationIsPregnantStatusSrv(reproStatus) &&
       inseminationConfirmEmbryonicLossSrv(formData);
+        let thiAtInsemination = null;
+
+    try {
+      thiAtInsemination = await weatherBuildFarmThiSrv(req.authSession?.uid || uid);
+    } catch (e) {
+      console.warn("insemination thi snapshot failed:", e.message || e);
+      thiAtInsemination = null;
+    }
     const payload = {
       userId: uid,
       animalId: animal.id || "",
@@ -14660,6 +14668,22 @@ app.post("/api/insemination/save", requireUserId, async (req, res) => {
       inseminator: String(formData.inseminator || "").trim(),
       inseminationTime: String(formData.inseminationTime || "").trim(),
       heatStatus: String(formData.heatStatus || "").trim(),
+            thiAtInsemination: thiAtInsemination ? {
+        thi: thiAtInsemination.thi ?? null,
+        tempC: thiAtInsemination.tempC ?? null,
+        humidity: thiAtInsemination.humidity ?? null,
+        status: thiAtInsemination.status || null,
+        level: thiAtInsemination.status?.level || "",
+        label: thiAtInsemination.status?.label || "",
+        severity: thiAtInsemination.status?.severity ?? null,
+        source: thiAtInsemination.source || "",
+        locationSource: thiAtInsemination.locationSource || "",
+        locationLabel: thiAtInsemination.locationLabel || "",
+        capturedAt: new Date().toISOString()
+      } : null,
+      thiValue: thiAtInsemination?.thi ?? null,
+      thiLevel: thiAtInsemination?.status?.level || "",
+      thiLabel: thiAtInsemination?.status?.label || "",
       notes: String(formData.notes || "").trim() || null,
 
       species,
@@ -29917,6 +29941,820 @@ singleHerdType
   } catch (e) {
     console.error("HERD-STATS ERROR:", e);
     return res.json({ ok:false, error:e.message });
+  }
+});
+// ============================================================
+//                 API: FERTILITY REPORT
+//                 تقرير الخصوبة — Server-first
+// ============================================================
+
+function fertilityReportDigitsSrv(v) {
+  const map = {
+    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+  };
+
+  return String(v ?? "")
+    .trim()
+    .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+function fertilityReportDateSrv(v) {
+  const s = String(v || "").trim();
+  const m = s.match(/\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : "";
+}
+
+function fertilityReportMsSrv(v) {
+  const iso = fertilityReportDateSrv(v);
+  if (!iso) return null;
+  const ms = new Date(`${iso}T00:00:00Z`).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function fertilityReportDaysBetweenSrv(a, b) {
+  const ams = fertilityReportMsSrv(a);
+  const bms = fertilityReportMsSrv(b);
+  if (!Number.isFinite(ams) || !Number.isFinite(bms)) return null;
+  return Math.round((bms - ams) / 86400000);
+}
+
+function fertilityReportPctSrv(num, den) {
+  const n = Number(num);
+  const d = Number(den);
+  if (!Number.isFinite(n) || !Number.isFinite(d) || d <= 0) return null;
+  return Math.round((n * 1000) / d) / 10;
+}
+
+function fertilityReportEventTypeSrv(e = {}) {
+  return normalizeEventType(
+    e.eventTypeNorm ||
+    e.eventType ||
+    e.type ||
+    e.name ||
+    ""
+  );
+}
+
+function fertilityReportAnimalNumberSrv(x = {}) {
+  return fertilityReportDigitsSrv(
+    x.animalNumber ??
+    x.number ??
+    x.calfNumber ??
+    x.animalId ??
+    ""
+  );
+}
+
+function fertilityReportSpeciesKeySrv(v) {
+  const s = String(v || "").trim().toLowerCase();
+  if (s.includes("buffalo") || s.includes("جاموس")) return "buffalo";
+  if (s.includes("cow") || s.includes("cattle") || s.includes("بقر") || s.includes("ابقار") || s.includes("أبقار")) return "cows";
+  return "";
+}
+
+function fertilityReportAnimalSpeciesSrv(a = {}) {
+  return fertilityReportSpeciesKeySrv(
+    a.species ||
+    a.animalTypeAr ||
+    a.animalType ||
+    a.animaltype ||
+    a.type ||
+    ""
+  );
+}
+
+function fertilityReportIsActiveAnimalSrv(a = {}) {
+  const st = String(a.status || a.lifeStatus || "").trim().toLowerCase();
+  return !["dead", "died", "sold", "archived", "inactive", "nafaq", "نافق", "مباع"].includes(st);
+}
+
+function fertilityReportReproKindSrv(v) {
+  const s = String(v || "").trim();
+
+  if (/عشار|حامل|preg/i.test(s)) return "pregnant";
+  if (/ملقح|ملقحة|inseminated|bred/i.test(s)) return "inseminated";
+  if (/حديث|ولاد|fresh/i.test(s)) return "fresh";
+  if (/مفتوح|فارغ|فارغة|open/i.test(s)) return "open";
+  return "unknown";
+}
+
+function fertilityReportPregResultSrv(v) {
+  const s = String(v || "").trim().toLowerCase();
+
+  if (s.includes("عشار") || s.includes("حامل") || s.includes("positive") || s.includes("pregnant")) {
+    return "positive";
+  }
+
+  if (
+    s.includes("فارغة") ||
+    s.includes("فارغ") ||
+    s.includes("غير حامل") ||
+    s.includes("negative") ||
+    s.includes("open") ||
+    s.includes("empty")
+  ) {
+    return "negative";
+  }
+
+  return "unknown";
+}
+
+function fertilityReportTimeBucketSrv(v) {
+  const s = String(v || "").trim().toLowerCase();
+
+  if (!s) return "";
+
+  if (
+    s.includes("صباح") ||
+    s.includes("morning") ||
+    s === "am" ||
+    s.includes("a.m")
+  ) return "am";
+
+  if (
+    s.includes("مساء") ||
+    s.includes("evening") ||
+    s === "pm" ||
+    s.includes("p.m")
+  ) return "pm";
+
+  const m = s.match(/(\d{1,2})(?::(\d{2}))?/);
+  if (m) {
+    const h = Number(m[1]);
+    if (Number.isFinite(h)) {
+      return h < 12 ? "am" : "pm";
+    }
+  }
+
+  return "";
+}
+
+function fertilityReportTimingAssessmentSrv(ai = {}, heatBefore = null) {
+  const aiBucket = fertilityReportTimeBucketSrv(
+    ai.inseminationTime ||
+    ai.timeOfDay ||
+    ai.time ||
+    ""
+  );
+
+  const heatBucket = fertilityReportTimeBucketSrv(
+    heatBefore?.heatTime ||
+    ai.heatTime ||
+    ai.heatStatus ||
+    ""
+  );
+
+  if (!aiBucket || !heatBucket) {
+    return {
+      code: "unknown",
+      label: "غير مكتمل",
+      note: "لا توجد بيانات كافية للحكم على توقيت التلقيح."
+    };
+  }
+
+  const aiDate = fertilityReportDateSrv(ai.eventDate);
+  const heatDate = fertilityReportDateSrv(heatBefore?.eventDate || ai.heatDate || ai.eventDate);
+  const gapDays = fertilityReportDaysBetweenSrv(heatDate, aiDate);
+
+  if (heatBucket === "am" && aiBucket === "pm" && gapDays === 0) {
+    return {
+      code: "ideal",
+      label: "مناسب",
+      note: "شياع صباحًا وتلقيح مساءً — مطابق لقاعدة صباح/مساء."
+    };
+  }
+
+  if (heatBucket === "pm" && aiBucket === "am" && gapDays === 1) {
+    return {
+      code: "ideal",
+      label: "مناسب",
+      note: "شياع مساءً وتلقيح صباح اليوم التالي — مطابق لقاعدة صباح/مساء."
+    };
+  }
+
+  if (heatBucket === aiBucket && gapDays === 0) {
+    return {
+      code: "early",
+      label: "غالبًا مبكر",
+      note: "الشياع والتلقيح في نفس الفترة؛ راجع تطبيق قاعدة صباح/مساء."
+    };
+  }
+
+  if ((heatBucket === "am" && aiBucket === "am" && gapDays >= 1) || gapDays > 1) {
+    return {
+      code: "late",
+      label: "غالبًا متأخر",
+      note: "التلقيح يبدو متأخرًا عن نافذة صباح/مساء."
+    };
+  }
+
+  return {
+    code: "review",
+    label: "يحتاج مراجعة",
+    note: "توقيت التلقيح يحتاج مراجعة مع وقت رؤية الشياع."
+  };
+}
+
+function fertilityReportThiInfoSrv(e = {}) {
+  const src = e.thiAtInsemination || {};
+  const value = Number(e.thiValue ?? src.thi);
+  const level = String(e.thiLevel || src.level || src.status?.level || "unknown").trim() || "unknown";
+  const label = String(e.thiLabel || src.label || src.status?.label || "").trim();
+
+  return {
+    value: Number.isFinite(value) ? Math.round(value) : null,
+    level,
+    label: label || (
+      level === "comfort" ? "راحة" :
+      level === "mild" ? "إجهاد خفيف" :
+      level === "moderate" ? "إجهاد متوسط" :
+      level === "high" ? "إجهاد عالي" :
+      "غير متاح"
+    )
+  };
+}
+
+function fertilityReportKpiStatusSrv(value, benchmark, direction = "higher") {
+  const v = Number(value);
+  const b = Number(benchmark);
+
+  if (!Number.isFinite(v) || !Number.isFinite(b)) {
+    return {
+      status: "muted",
+      label: "غير مكتمل"
+    };
+  }
+
+  if (direction === "lower") {
+    if (v <= b) return { status: "good", label: "جيد" };
+    if (v <= b * 1.15) return { status: "warn", label: "متابعة" };
+    return { status: "danger", label: "يحتاج تدخل" };
+  }
+
+  if (v >= b) return { status: "good", label: "جيد" };
+  if (v >= b * 0.8) return { status: "warn", label: "متابعة" };
+  return { status: "danger", label: "يحتاج تدخل" };
+}
+
+app.get("/api/fertility-report", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firestore_disabled",
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+    const todayISO = cairoTodayISO();
+    const todayMs = fertilityReportMsSrv(todayISO) || Date.now();
+
+    const typeRaw = String(req.query.type || req.query.species || "").trim().toLowerCase();
+    const selectedType =
+      typeRaw === "buffalo" || typeRaw === "جاموس"
+        ? "buffalo"
+        : (
+            typeRaw === "cow" ||
+            typeRaw === "cows" ||
+            typeRaw === "cattle" ||
+            typeRaw === "أبقار" ||
+            typeRaw === "ابقار"
+              ? "cows"
+              : ""
+          );
+
+    const periodDaysRaw = Number(req.query.days || req.query.periodDays || 180);
+    const periodDays = Number.isFinite(periodDaysRaw)
+      ? Math.max(30, Math.min(730, Math.round(periodDaysRaw)))
+      : 180;
+
+    const periodStartMs = todayMs - (periodDays * 86400000);
+
+    const animalSnap = await db.collection("animals")
+      .where("userId", "==", uid)
+      .get();
+
+    const animalsRaw = animalSnap.docs.map(d => ({
+      id: d.id,
+      ...(d.data() || {})
+    }));
+
+    const animalsByNumber = new Map();
+
+    for (const a of animalsRaw) {
+      const num = fertilityReportAnimalNumberSrv(a);
+      if (!num) continue;
+
+      if (!fertilityReportIsActiveAnimalSrv(a)) continue;
+
+      const speciesKey = fertilityReportAnimalSpeciesSrv(a);
+
+      if (selectedType && speciesKey && speciesKey !== selectedType) continue;
+
+      animalsByNumber.set(num, {
+        ...a,
+        _number: num,
+        _speciesKey: speciesKey
+      });
+    }
+
+    const activeAnimals = [...animalsByNumber.values()];
+
+    const eventSnap = await db.collection("events")
+      .where("userId", "==", uid)
+      .limit(8000)
+      .get();
+
+    const allEvents = eventSnap.docs.map(d => {
+      const raw = d.data() || {};
+      const date = computeEventDateFromDoc(raw);
+      const num = fertilityReportAnimalNumberSrv(raw);
+      const animal = animalsByNumber.get(num) || null;
+      const speciesKey = fertilityReportSpeciesKeySrv(raw.species || raw.animalTypeAr || raw.animaltype) || animal?._speciesKey || "";
+
+      return {
+        id: d.id,
+        ...raw,
+        _type: fertilityReportEventTypeSrv(raw),
+        _date: date,
+        _ms: fertilityReportMsSrv(date),
+        _number: num,
+        _animal: animal,
+        _speciesKey: speciesKey
+      };
+    }).filter(e => {
+      if (!e._date || !Number.isFinite(e._ms)) return false;
+      if (!e._number) return false;
+      if (!animalsByNumber.has(e._number)) return false;
+      if (selectedType && e._speciesKey && e._speciesKey !== selectedType) return false;
+      return true;
+    });
+
+    const inseminationsAll = allEvents
+      .filter(e => e._type === "insemination")
+      .sort((a, b) => a._ms - b._ms);
+
+    const inseminations = inseminationsAll
+      .filter(e => e._ms >= periodStartMs && e._ms <= todayMs);
+
+    const diagnoses = allEvents
+      .filter(e => e._type === "pregnancy_diagnosis")
+      .sort((a, b) => a._ms - b._ms);
+
+    const heats = allEvents
+      .filter(e => e._type === "heat")
+      .sort((a, b) => a._ms - b._ms);
+
+    const losses = allEvents
+      .filter(e =>
+        e._type === "embryonic_loss" ||
+        String(e.eventType || e.type || "").includes("إجهاض") ||
+        String(e.eventType || e.type || "").includes("فقد")
+      );
+
+    const groupByAnimal = (items) => {
+      const m = new Map();
+      for (const x of items) {
+        if (!m.has(x._number)) m.set(x._number, []);
+        m.get(x._number).push(x);
+      }
+      return m;
+    };
+
+    const aiByAnimal = groupByAnimal(inseminationsAll);
+    const dxByAnimal = groupByAnimal(diagnoses);
+    const heatByAnimal = groupByAnimal(heats);
+
+    const outcomeForAi = (ai) => {
+      const number = ai._number;
+      const aiMs = ai._ms;
+      const maxMs = aiMs + (120 * 86400000);
+
+      const dxArr = (dxByAnimal.get(number) || [])
+        .filter(x => x._ms >= aiMs && x._ms <= maxMs)
+        .sort((a, b) => a._ms - b._ms);
+
+      const positiveDx = dxArr.find(x => fertilityReportPregResultSrv(x.result) === "positive");
+      if (positiveDx) {
+        return {
+          outcome: "pregnant",
+          judged: true,
+          success: true,
+          by: "pregnancy_diagnosis",
+          diagnosisDate: positiveDx._date,
+          daysToDiagnosis: fertilityReportDaysBetweenSrv(ai._date, positiveDx._date)
+        };
+      }
+
+      const negativeDx = dxArr.find(x => fertilityReportPregResultSrv(x.result) === "negative");
+      if (negativeDx) {
+        return {
+          outcome: "open",
+          judged: true,
+          success: false,
+          by: "pregnancy_diagnosis",
+          diagnosisDate: negativeDx._date,
+          daysToDiagnosis: fertilityReportDaysBetweenSrv(ai._date, negativeDx._date)
+        };
+      }
+
+      const nextHeat = (heatByAnimal.get(number) || [])
+        .find(x => {
+          const d = fertilityReportDaysBetweenSrv(ai._date, x._date);
+          return d !== null && d >= 16 && d <= 35;
+        });
+
+      if (nextHeat) {
+        return {
+          outcome: "returned_heat",
+          judged: true,
+          success: false,
+          by: "heat_return",
+          heatDate: nextHeat._date,
+          daysToHeat: fertilityReportDaysBetweenSrv(ai._date, nextHeat._date)
+        };
+      }
+
+      const nextAi = (aiByAnimal.get(number) || [])
+        .find(x => x.id !== ai.id && x._ms > aiMs && x._ms <= maxMs);
+
+      if (nextAi) {
+        return {
+          outcome: "re_inseminated",
+          judged: true,
+          success: false,
+          by: "next_insemination",
+          nextInseminationDate: nextAi._date,
+          daysToNextInsemination: fertilityReportDaysBetweenSrv(ai._date, nextAi._date)
+        };
+      }
+
+      const daysSinceAi = Math.floor((todayMs - aiMs) / 86400000);
+
+      return {
+        outcome: daysSinceAi >= 35 ? "due_diagnosis" : "waiting",
+        judged: false,
+        success: false,
+        by: "",
+        daysSinceAi
+      };
+    };
+
+    const lastHeatBeforeAi = (ai) => {
+      const arr = heatByAnimal.get(ai._number) || [];
+      return [...arr]
+        .filter(h => h._ms <= ai._ms && (ai._ms - h._ms) <= (3 * 86400000))
+        .sort((a, b) => b._ms - a._ms)[0] || null;
+    };
+
+    const aiRows = inseminations.map(ai => {
+      const outcome = outcomeForAi(ai);
+      const heatBefore = lastHeatBeforeAi(ai);
+      const timing = fertilityReportTimingAssessmentSrv(ai, heatBefore);
+      const thi = fertilityReportThiInfoSrv(ai);
+
+      return {
+        id: ai.id,
+        animalNumber: ai._number,
+        eventDate: ai._date,
+        inseminator: String(ai.inseminator || "غير محدد").trim() || "غير محدد",
+        semenCode: String(ai.semenCode || "").trim(),
+        inseminationTime: String(ai.inseminationTime || ai.timeOfDay || "").trim(),
+        heatStatus: String(ai.heatStatus || "").trim(),
+        heatDate: heatBefore?._date || "",
+        heatTime: heatBefore?.heatTime || "",
+        timing,
+        thi,
+        outcome,
+        isFirstService: false
+      };
+    });
+
+    const firstAiIds = new Set();
+
+    for (const [number, arr] of aiByAnimal.entries()) {
+      const animal = animalsByNumber.get(number) || {};
+      const lastCalvingDate = fertilityReportDateSrv(animal.lastCalvingDate || animal.calvingDate || "");
+      const lastCalvingMs = fertilityReportMsSrv(lastCalvingDate);
+
+      const seasonAis = [...arr]
+        .filter(ai => !Number.isFinite(lastCalvingMs) || ai._ms >= lastCalvingMs)
+        .sort((a, b) => a._ms - b._ms);
+
+      if (seasonAis[0]) firstAiIds.add(seasonAis[0].id);
+    }
+
+    for (const row of aiRows) {
+      row.isFirstService = firstAiIds.has(row.id);
+    }
+
+    const judgedAi = aiRows.filter(x => x.outcome.judged);
+    const successfulAi = judgedAi.filter(x => x.outcome.success);
+
+    const firstServiceRows = aiRows.filter(x => x.isFirstService && x.outcome.judged);
+    const firstServiceSuccess = firstServiceRows.filter(x => x.outcome.success);
+
+    const overallCr = fertilityReportPctSrv(successfulAi.length, judgedAi.length);
+    const firstServiceCr = fertilityReportPctSrv(firstServiceSuccess.length, firstServiceRows.length);
+
+    const inseminatorMap = new Map();
+
+    for (const row of judgedAi) {
+      const key = row.inseminator || "غير محدد";
+
+      if (!inseminatorMap.has(key)) {
+        inseminatorMap.set(key, {
+          inseminator: key,
+          totalJudged: 0,
+          pregnancies: 0,
+          totalAiInPeriod: 0,
+          timingProblems: 0,
+          thiKnown: 0,
+          thiSum: 0,
+          highThiCount: 0
+        });
+      }
+
+      const g = inseminatorMap.get(key);
+      g.totalJudged++;
+      if (row.outcome.success) g.pregnancies++;
+      if (row.timing.code && row.timing.code !== "ideal" && row.timing.code !== "unknown") g.timingProblems++;
+
+      if (Number.isFinite(Number(row.thi.value))) {
+        g.thiKnown++;
+        g.thiSum += Number(row.thi.value);
+        if (row.thi.level === "moderate" || row.thi.level === "high") g.highThiCount++;
+      }
+    }
+
+    for (const row of aiRows) {
+      const key = row.inseminator || "غير محدد";
+      if (!inseminatorMap.has(key)) {
+        inseminatorMap.set(key, {
+          inseminator: key,
+          totalJudged: 0,
+          pregnancies: 0,
+          totalAiInPeriod: 0,
+          timingProblems: 0,
+          thiKnown: 0,
+          thiSum: 0,
+          highThiCount: 0
+        });
+      }
+      inseminatorMap.get(key).totalAiInPeriod++;
+    }
+
+    const inseminators = [...inseminatorMap.values()]
+      .map(g => {
+        const cr = fertilityReportPctSrv(g.pregnancies, g.totalJudged);
+        const avgThi = g.thiKnown ? Math.round(g.thiSum / g.thiKnown) : null;
+        const highThiPct = fertilityReportPctSrv(g.highThiCount, g.thiKnown);
+
+        let evaluation = "غير مكتمل";
+        let status = "muted";
+
+        if (g.totalJudged < 10) {
+          evaluation = "عدد حالات قليل — قراءة اتجاهية فقط";
+          status = "warn";
+        } else if (cr !== null && cr >= 35) {
+          evaluation = "جيد حسب المؤشر العام";
+          status = "good";
+        } else if (g.thiKnown && highThiPct !== null && highThiPct >= 50) {
+          evaluation = "منخفض مع أثر حراري محتمل — لا يُحكم منفردًا";
+          status = "warn";
+        } else {
+          evaluation = "يحتاج مراجعة";
+          status = "danger";
+        }
+
+        return {
+          ...g,
+          conceptionRatePct: cr,
+          avgThi,
+          highThiPct,
+          status,
+          evaluation
+        };
+      })
+      .sort((a, b) => Number(b.totalJudged || 0) - Number(a.totalJudged || 0));
+
+    const thiGroupsMap = new Map();
+
+    for (const row of judgedAi) {
+      const key = row.thi.level || "unknown";
+      const label = row.thi.label || "غير متاح";
+
+      if (!thiGroupsMap.has(key)) {
+        thiGroupsMap.set(key, {
+          level: key,
+          label,
+          judged: 0,
+          pregnancies: 0
+        });
+      }
+
+      const g = thiGroupsMap.get(key);
+      g.judged++;
+      if (row.outcome.success) g.pregnancies++;
+    }
+
+    const thiGroups = [...thiGroupsMap.values()].map(g => ({
+      ...g,
+      conceptionRatePct: fertilityReportPctSrv(g.pregnancies, g.judged)
+    }));
+
+    const repeatBreeders = [];
+
+    for (const [number, arr] of aiByAnimal.entries()) {
+      const animal = animalsByNumber.get(number) || {};
+      const reproKind = fertilityReportReproKindSrv(animal.reproductiveStatus || animal.reproStatus || "");
+
+      if (reproKind === "pregnant") continue;
+
+      const lastCalvingDate = fertilityReportDateSrv(animal.lastCalvingDate || "");
+      const lastCalvingMs = fertilityReportMsSrv(lastCalvingDate);
+
+      const seasonAis = [...arr]
+        .filter(ai => !Number.isFinite(lastCalvingMs) || ai._ms >= lastCalvingMs)
+        .sort((a, b) => a._ms - b._ms);
+
+      if (seasonAis.length < 3) continue;
+
+      const intervals = [];
+      for (let i = 1; i < seasonAis.length; i++) {
+        const d = fertilityReportDaysBetweenSrv(seasonAis[i - 1]._date, seasonAis[i]._date);
+        if (d !== null) intervals.push(d);
+      }
+
+      const regularCount = intervals.filter(d => d >= 18 && d <= 24).length;
+      const regularCycle = intervals.length > 0 && regularCount >= Math.ceil(intervals.length * 0.6);
+
+      const lastAi = seasonAis[seasonAis.length - 1];
+      const lastAiRow = aiRows.find(x => x.id === lastAi.id) || null;
+
+      let reproductiveSuspicion = "يحتاج مراجعة";
+      let suspicionCode = "review";
+
+      if (regularCycle && lastAiRow?.timing?.code && lastAiRow.timing.code !== "ideal") {
+        reproductiveSuspicion = "رجوع منتظم مع توقيت تلقيح غير مثالي — راجع بروتوكول صباح/مساء أولًا";
+        suspicionCode = "timing_protocol";
+      } else if (regularCycle) {
+        reproductiveSuspicion = "رجوع منتظم — احتمال فشل إخصاب أو تأخر إباضة/عدم توافق توقيت الإباضة";
+        suspicionCode = "possible_delayed_ovulation";
+      } else {
+        reproductiveSuspicion = "رجوع غير منتظم — راجع كشف الشياع أو فقد حمل مبكر أو مشكلة رحمية";
+        suspicionCode = "irregular_return";
+      }
+
+      repeatBreeders.push({
+        animalNumber: number,
+        servicesCount: seasonAis.length,
+        lastInseminationDate: lastAi._date,
+        daysInMilk: Number(animal.daysInMilk ?? null),
+        cycleIntervalsDays: intervals,
+        cycleRegularity: regularCycle ? "منتظمة غالبًا" : "غير منتظمة/غير مكتملة",
+        lastTimingAssessment: lastAiRow?.timing || null,
+        lastInseminator: lastAiRow?.inseminator || String(lastAi.inseminator || "").trim(),
+        reproductiveSuspicion,
+        suspicionCode
+      });
+    }
+
+    repeatBreeders.sort((a, b) => Number(b.servicesCount || 0) - Number(a.servicesCount || 0));
+
+    const duePregnancyDiagnosis = aiRows
+      .filter(x => !x.outcome.judged && x.outcome.outcome === "due_diagnosis")
+      .map(x => ({
+        animalNumber: x.animalNumber,
+        lastInseminationDate: x.eventDate,
+        daysSinceInsemination: x.outcome.daysSinceAi,
+        inseminator: x.inseminator
+      }))
+      .slice(0, 50);
+
+    const delayedFirstBreeding = activeAnimals
+      .filter(a => {
+        const repro = fertilityReportReproKindSrv(a.reproductiveStatus || "");
+        if (repro === "pregnant" || repro === "inseminated") return false;
+
+        const sp = a._speciesKey;
+        const minDim = sp === "buffalo" ? 45 : 60;
+        const dim = Number(a.daysInMilk);
+
+        return Number.isFinite(dim) && dim >= minDim;
+      })
+      .map(a => ({
+        animalNumber: a._number,
+        daysInMilk: Number(a.daysInMilk),
+        reproductiveStatus: String(a.reproductiveStatus || "").trim() || "غير محدد"
+      }))
+      .sort((a, b) => Number(b.daysInMilk || 0) - Number(a.daysInMilk || 0))
+      .slice(0, 50);
+
+    const pregnantCount = activeAnimals.filter(a => fertilityReportReproKindSrv(a.reproductiveStatus || "") === "pregnant").length;
+    const openCount = activeAnimals.filter(a => fertilityReportReproKindSrv(a.reproductiveStatus || "") === "open").length;
+    const inseminatedCount = activeAnimals.filter(a => fertilityReportReproKindSrv(a.reproductiveStatus || "") === "inseminated").length;
+    const freshCount = activeAnimals.filter(a => fertilityReportReproKindSrv(a.reproductiveStatus || "") === "fresh").length;
+    const dryCount = activeAnimals.filter(a => /جاف|dry/i.test(String(a.productionStatus || ""))).length;
+
+    const overallStatus = fertilityReportKpiStatusSrv(overallCr, 35, "higher");
+    const firstStatus = fertilityReportKpiStatusSrv(firstServiceCr, 40, "higher");
+
+    const headline =
+      overallCr === null
+        ? "بيانات الخصوبة غير كافية للحكم بعد."
+        : (
+            overallCr >= 35
+              ? "معدل الإخصاب العام جيد، مع متابعة القوائم العملية."
+              : "معدل الإخصاب العام أقل من المستهدف؛ راجع التوقيت، الملقحين، وحرارة البيئة."
+          );
+
+    return res.json({
+      ok: true,
+      reportName: "fertility_report",
+      title: "تقرير الخصوبة",
+      generatedAt: new Date().toISOString(),
+      today: todayISO,
+      periodDays,
+      selectedType: selectedType || "all",
+
+      benchmarks: {
+        firstServiceConceptionRatePct: 40,
+        overallConceptionRatePct: 35,
+        cycleRegularMinDays: 18,
+        cycleRegularMaxDays: 24,
+        sourceBasis: [
+          "Merck/MSD dairy herd reproductive monitoring benchmarks",
+          "AM-PM artificial insemination timing rule",
+          "THI heat-stress context when available"
+        ]
+      },
+
+      herdSummary: {
+        totalActive: activeAnimals.length,
+        pregnantCount,
+        openCount,
+        inseminatedCount,
+        freshCount,
+        dryCount
+      },
+
+      conception: {
+        firstService: {
+          label: "نسبة الحمل من أول تلقيحة",
+          valuePct: firstServiceCr,
+          pregnancies: firstServiceSuccess.length,
+          judged: firstServiceRows.length,
+          benchmarkPct: 40,
+          status: firstStatus.status,
+          read: firstStatus.label
+        },
+        overallHerd: {
+          label: "نسبة الحمل العامة للقطيع",
+          valuePct: overallCr,
+          pregnancies: successfulAi.length,
+          judged: judgedAi.length,
+          benchmarkPct: 35,
+          status: overallStatus.status,
+          read: overallStatus.label
+        }
+      },
+
+      inseminators,
+      thiConception: thiGroups,
+
+      repeatBreeders: {
+        count: repeatBreeders.length,
+        rows: repeatBreeders.slice(0, 80)
+      },
+
+      actionLists: {
+        duePregnancyDiagnosis,
+        delayedFirstBreeding
+      },
+
+      advisory: {
+        headline,
+        notes: [
+          "لا يتم الحكم على الملقّح إذا كان عدد الحالات المحكوم عليها قليلًا.",
+          "عند وجود THI مرتفع، لا يُحمّل انخفاض الخصوبة للملقّح وحده.",
+          "Repeat Breeder مع رجوع منتظم يبدأ بتحليل توقيت صباح/مساء قبل ترجيح تأخر الإباضة.",
+          "الواجهة تعرض التقرير فقط؛ الحساب والترجيح من السيرفر."
+        ]
+      }
+    });
+
+  } catch (e) {
+    console.error("FERTILITY-REPORT ERROR:", e.message || e);
+    return res.status(500).json({
+      ok: false,
+      error: "fertility_report_failed",
+      message: "تعذّر تحميل تقرير الخصوبة الآن."
+    });
   }
 });
 // ============================================================
