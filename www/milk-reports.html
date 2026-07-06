@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>تقرير إنتاج اللبن | مُرَبِّيك</title>
+  <!-- milk-report-version: v28 -->
   <style>
     :root{
       --bg:#f5f7fb; --card:#fff; --text:#172033; --muted:#667085; --line:#e5eaf0;
@@ -32,10 +33,10 @@
     .btn-ghost{background:white;color:var(--brand2);border:1px solid var(--line)}
     .loading{min-height:240px;display:grid;place-items:center;background:white;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);font-weight:950;color:var(--muted)}
 
-    .hero{border-radius:26px;padding:20px;background:linear-gradient(135deg,#0f766e,#115e59);color:white;box-shadow:var(--shadow)}
-    .hero-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:14px;align-items:stretch}
+    .hero{border-radius:22px;padding:18px;background:white!important;color:var(--text);border:1px solid var(--line);border-top:6px solid var(--brand);box-shadow:var(--shadow)}
+    .hero-grid{display:grid;grid-template-columns:1fr;gap:14px;align-items:stretch}
     .hero h2{margin:0;font-size:clamp(23px,4vw,36px);color:#0f172a}
-    .hero-line{margin-top:10px;font-size:17px;font-weight:950;line-height:1.65;color:#334155}
+    .hero-line{display:none!important}
     .hero-summary{
       margin-top:12px;
       display:grid;
@@ -311,9 +312,7 @@
         line-height:1.7;
       }
 
-      body[data-print-mode="section"] #report > [data-print-block]:not([data-print-active="1"]){display:none!important}
-      body[data-print-mode="section"] #report > .footer-note{display:none!important}
-      body[data-print-mode="section"] .print-report-header{margin-bottom:12px!important}
+
 
       .hero,.section,.card,.group-card,.rec,.scientific,.kpi-card,.econ-card{
         box-shadow:none!important;
@@ -602,6 +601,7 @@
         font-size:8pt!important;
       }
     }
+      .print-section-btn,.hero-print-row{display:none!important}
   </style>
 </head>
 <body>
@@ -611,7 +611,6 @@
         <div class="brand-mark">م</div>
         <div>
           <h1>تقرير إنتاج اللبن</h1>
-          <p>مُرَبِّيك — نوع القطيع من الداشبورد، وسعر اللبن من التقرير</p>
         </div>
       </div>
       <div class="controls">
@@ -643,36 +642,28 @@
             <div class="hero-line" id="heroLine">—</div>
             <div class="hero-summary" id="heroSummary"></div>
           </div>
-          <div class="hero-panel">
-            <div class="label">صافي ربح اللبن</div>
-            <div class="value" id="heroNet">—</div>
-            <div class="sub">بعد التغذية + 20% من تكلفة التغذية كمصاريف تشغيل</div>
-          </div>
-        </div>
-        <div class="hero-print-row">
-          <button class="print-section-btn" data-print-target="summaryBlock">طباعة الملخص</button>
         </div>
       </section>
 
       <div class="notice" id="serverMessage"></div>
 
       <section class="section" id="productionBlock" data-print-block>
-        <div class="section-head"><div><h3 id="productionSectionTitle">إنتاج أمس</h3><p>قراءة سريعة واضحة لصاحب المزرعة.</p></div><button class="print-section-btn" data-print-target="productionBlock">طباعة هذا الجزء</button></div>
+        <div class="section-head"><div><h3 id="productionSectionTitle">إنتاج أمس</h3><p>قراءة سريعة واضحة لصاحب المزرعة.</p></div></div>
         <div class="kpi-row" id="productionCards"></div>
       </section>
 
       <section class="section" id="economyBlock" data-print-block>
-        <div class="section-head"><div><h3>اقتصاد إنتاج اللبن</h3><p>الأرقام الاقتصادية الأساسية للقطيع.</p></div><button class="print-section-btn" data-print-target="economyBlock">طباعة هذا الجزء</button></div>
+        <div class="section-head"><div><h3>اقتصاد إنتاج اللبن</h3><p>الأرقام الاقتصادية الأساسية للقطيع.</p></div></div>
         <div class="econ-row" id="economyCards"></div>
       </section>
 
       <section class="section" id="comparisonBlock" data-print-block>
-        <div class="section-head"><div><h3>المقارنات</h3><p>يومي، أسبوعي، شهري، و305 يوم في جدول واحد.</p></div><button class="print-section-btn" data-print-target="comparisonBlock">طباعة هذا الجزء</button></div>
+        <div class="section-head"><div><h3>المقارنات</h3><p>يومي، أسبوعي، شهري، و305 يوم في جدول واحد.</p></div></div>
         <div class="card table-card table-scroll"><table class="report-table" id="comparisonTable"></table></div>
       </section>
 
       <section class="section" id="chartsBlock" data-print-block>
-        <div class="section-head"><div><h3>الرسوم البيانية</h3><p>كل رسم عليه أرقام واضحة وقراءة قصيرة.</p></div><button class="print-section-btn" data-print-target="chartsBlock">طباعة هذا الجزء</button></div>
+        <div class="section-head"><div><h3>الرسوم البيانية</h3><p>كل رسم عليه أرقام واضحة وقراءة قصيرة.</p></div></div>
         <div class="grid grid-2">
           <div class="card chart-card">
             <div class="chart-title"><strong>سكاتر القطيع</strong><span>كل نقطة = حيوان</span></div>
@@ -706,22 +697,22 @@
       </section>
 
       <section class="section" id="groupsBlock" data-print-block>
-        <div class="section-head"><div><h3>المجموعات الإنتاجية</h3></div><button class="print-section-btn" data-print-target="groupsBlock">طباعة هذا الجزء</button></div>
+        <div class="section-head"><div><h3>المجموعات الإنتاجية</h3></div></div>
         <div class="group-list" id="groupsList"></div>
       </section>
 
       <section class="section" id="thiBlock" data-print-block>
-        <div class="section-head"><div><h3>الإجهاد الحراري</h3><p>تفسير مساعد لانخفاض اللبن عند وجود ضغط حراري.</p></div><button class="print-section-btn" data-print-target="thiBlock">طباعة هذا الجزء</button></div>
+        <div class="section-head"><div><h3>الإجهاد الحراري</h3><p>تفسير مساعد لانخفاض اللبن عند وجود ضغط حراري.</p></div></div>
         <div class="card thi-card" id="thiCard"></div>
       </section>
 
       <section class="section" id="recommendationsBlock" data-print-block>
-        <div class="section-head"><div><h3>توصيات مُرَبِّيك</h3><p>مختصرة، بدليل، وبإجراء واضح.</p></div><button class="print-section-btn" data-print-target="recommendationsBlock">طباعة هذا الجزء</button></div>
+        <div class="section-head"><div><h3>توصيات مُرَبِّيك</h3><p>مختصرة، بدليل، وبإجراء واضح.</p></div></div>
         <div class="recommendations" id="recommendationsList"></div>
       </section>
 
       <section class="section" id="scientificBlock" data-print-block>
-        <div class="section-head"><div><h3>التقرير العلمي المختصر</h3></div><button class="print-section-btn" data-print-target="scientificBlock">طباعة هذا الجزء</button></div>
+        <div class="section-head"><div><h3>التقرير العلمي المختصر</h3></div></div>
         <div class="scientific">
           <h3 id="scientificTitle">التقرير العلمي المختصر</h3>
           <ul id="scientificNotes"></ul>
@@ -792,12 +783,10 @@
 
     function renderHeroSummary(j){
       const p = j.production || {};
-      const e = j.economics || {};
       const actualDate = j.meta?.actualDate || j.meta?.reportDate || j.date || $("reportDate").value || yesterdayISO();
       $("heroSummary").innerHTML = [
         heroSummaryCard("تاريخ التقرير", esc(actualDate || "—"), j.message ? arClean(j.message) : "اليوم المعروض في التقرير"),
-        heroSummaryCard("إنتاج القطيع", `${num(p.totalMilkKg,1)} كجم`, `متوسط الحلاب ${num(p.avgMilkKgRecorded ?? p.avgMilkKgMilker,1)} كجم`),
-        heroSummaryCard("صافي النتيجة", money(e.netOperatingResult), "بعد التغذية والتشغيل")
+        heroSummaryCard("إنتاج القطيع", `${num(p.totalMilkKg,1)} كجم`, `متوسط الحلاب ${num(p.avgMilkKgRecorded ?? p.avgMilkKgMilker,1)} كجم`)
       ].join("");
     }
 
@@ -1295,10 +1284,7 @@
       const selectedReportDate = $("reportDate").value || yesterdayISO();
       const dayLabel = reportDayLabel(selectedReportDate);
       $("heroTitle").textContent = arClean(j.headline?.title || "تقرير إنتاج اللبن");
-      $("heroLine").textContent = arClean(
-        j.headline?.text ||
-        `إنتاج ${dayLabel} ${num(j.production?.totalMilkKg,1)} كجم · متوسط الحلاب ${num(j.production?.avgMilkKgRecorded,1)} كجم · ${j.meta?.selectedTypeLabel || "الكل"}`
-      );
+      $("heroLine").textContent = "";
       $("productionSectionTitle").textContent = `إنتاج ${dayLabel}`;
       renderHeroSummary(j);
       $("printTitle").textContent = arClean(j.headline?.title || "تقرير إنتاج اللبن");
@@ -1308,7 +1294,6 @@
         `سعر كجم اللبن: ${money0(getMilkPriceRequired())}`,
         `نوع القطيع: ${esc(j.meta?.selectedTypeLabel || (getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل"))}`
       ].join("<br>");
-      $("heroNet").textContent = money(j.economics?.netOperatingResult);
       if(j.message){$("serverMessage").textContent=j.message;$("serverMessage").classList.add("show")}else{$("serverMessage").classList.remove("show")}
       renderProduction(j); renderEconomy(j); renderComparisons(j); renderCharts(j); renderGroups(j); renderThi(j); renderRecommendations(j); renderScientific(j);
     }
@@ -1346,9 +1331,8 @@
       $("loading").style.display="none";
       $("report").style.display="block";
       $("heroTitle").textContent="تقرير إنتاج اللبن";
-      $("heroLine").textContent="أدخل سعر كجم اللبن بجانب تاريخ التقرير لحساب الاقتصاد بدقة.";
+      $("heroLine").textContent="";
       $("heroSummary").innerHTML=[
-        heroSummaryCard("حالة التقرير", "في انتظار السعر", "اكتب سعر كجم اللبن ثم يتم تحميل التقرير تلقائيًا"),
         heroSummaryCard("تاريخ التقرير", esc($("reportDate").value || yesterdayISO()), "الافتراضي هو إنتاج أمس"),
         heroSummaryCard("نوع القطيع", esc(getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل"), "قادم من الداشبورد")
       ].join("");
@@ -1358,7 +1342,6 @@
         `تاريخ التقرير: ${esc($("reportDate").value || yesterdayISO())}`,
         `نوع القطيع: ${esc(getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل")}`
       ].join("<br>");
-      $("heroNet").textContent="—";
 
       $("productionCards").innerHTML=`<div class="empty">سعر كجم اللبن مطلوب قبل تحميل التقرير.</div>`;
       $("economyCards").innerHTML="";
@@ -1431,12 +1414,7 @@
       const point = e.target.closest(".herd-scatter-point");
       if (point) {
         renderAnimalPointReport(decodePoint(point), true);
-        return;
       }
-
-      const btn = e.target.closest("[data-print-target]");
-      if (!btn) return;
-      printReportSection(btn.dataset.printTarget);
     });
 
     document.addEventListener("keydown", e => {
