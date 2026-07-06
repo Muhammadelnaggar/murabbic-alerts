@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>تقرير إنتاج اللبن | مُرَبِّيك</title>
-  <!-- milk-report-version: v30 -->
+  <!-- milk-report-version: v31 -->
   <style>
     :root{
       --bg:#f5f7fb; --card:#fff; --text:#172033; --muted:#667085; --line:#e5eaf0;
@@ -139,7 +139,7 @@
     .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;direction:rtl}
     .legend span{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;font-weight:850}.legend i{width:10px;height:10px;border-radius:3px;background:#0f766e;display:inline-block}.legend .blue i{background:#2563eb}.legend .red i{background:#dc2626}
     .dot,.scatter-dot{fill:#0f766e;stroke:#fff;stroke-width:2.2}
-    .herd-scatter-point{cursor:pointer}
+    .herd-scatter-point,.herd-scatter-hit{cursor:pointer;pointer-events:all;touch-action:manipulation}.herd-scatter-hit{fill:transparent;stroke:transparent}
     .herd-scatter-point:hover,.herd-scatter-point:focus{stroke:#0f172a;stroke-width:3;outline:none}
     .animal-point-report{
       background:white;
@@ -723,7 +723,7 @@
         <div class="section-head">
           <div>
             <h3>سكاتر القطيع</h3>
-            <p>كل نقطة = حيوان. المحور الأفقي أيام الحليب، والمحور الرأسي كجم اللبن.</p>
+            <p>كل نقطة = حيوان. اضغط أو المس النقطة لفتح بطاقة مختصرة أسفل الرسم.</p>
           </div>
         </div>
         <div class="card chart-card">
@@ -741,7 +741,7 @@
             <p>تظهر هنا عند لمس نقطة من سكاتر القطيع، وليست مخصصة للطباعة.</p>
           </div>
         </div>
-        <div class="animal-point-report placeholder" id="animalPointReport">المس نقطة من سكاتر القطيع لعرض رقم الحيوان، اللبن، أيام الحليب، وأيام الحمل.</div>
+        <div class="animal-point-report placeholder" id="animalPointReport">اضغط أو المس نقطة من سكاتر القطيع لعرض رقم الحيوان، اللبن، أيام الحليب، وأيام الحمل.</div>
       </section>
 
       <div class="footer-note">مُرَبِّيك — قرار أسرع، رقم أوضح، وتوصية مفيدة.</div>
@@ -998,7 +998,8 @@
 
     function decodePoint(node){
       try{
-        return JSON.parse(decodeURIComponent(node.getAttribute("data-point") || ""));
+        const holder = node?.closest?.("[data-point]") || node;
+        return JSON.parse(decodeURIComponent(holder?.getAttribute("data-point") || ""));
       }catch(_){
         return null;
       }
@@ -1018,9 +1019,12 @@
         const x = p + (Number(pt.dim) / maxX) * (w - p*2);
         const y = h - p - (Number(pt.milk) / maxY) * (h - p*2);
         const title = `${pt.number ? "رقم " + pt.number + " — " : ""}${num(pt.milk,1)} كجم · ${num(pt.dim,0)} يوم حليب${Number.isFinite(Number(pt.dcc)) ? " · " + num(pt.dcc,0) + " يوم حمل" : ""}`;
-        return `<circle class="scatter-dot herd-scatter-point" cx="${x}" cy="${y}" r="5.8" tabindex="0" role="button" data-point="${encodePoint(pt)}">
+        const payload = encodePoint(pt);
+        return `<g class="herd-scatter-target" data-herd-point="1" data-point="${payload}" tabindex="0" role="button" aria-label="${esc(title)}">
+          <circle class="herd-scatter-hit" cx="${x}" cy="${y}" r="14"></circle>
+          <circle class="scatter-dot herd-scatter-point" cx="${x}" cy="${y}" r="5.8"></circle>
           <title>${esc(title)}</title>
-        </circle>`;
+        </g>`;
       }).join("");
 
       return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
@@ -1043,7 +1047,7 @@
 
       if(!pt){
         box.className = "animal-point-report placeholder";
-        box.innerHTML = "المس نقطة من سكاتر القطيع لعرض رقم الحيوان، اللبن، أيام الحليب، وأيام الحمل.";
+        box.innerHTML = "اضغط أو المس نقطة من سكاتر القطيع لعرض رقم الحيوان، اللبن، أيام الحليب، وأيام الحمل.";
         return;
       }
 
@@ -1471,19 +1475,38 @@
     window.addEventListener("afterprint", clearPrintMode);
 
     $("printBtn").addEventListener("click", printReportFull);
-    document.addEventListener("click", e => {
-      const point = e.target.closest(".herd-scatter-point");
-      if (point) {
-        renderAnimalPointReport(decodePoint(point), true);
+    function handleHerdScatterPick(target, ev){
+      const point = target?.closest?.("[data-herd-point],.herd-scatter-point");
+      if (!point) return false;
+
+      if (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
       }
-    });
+
+      const data = decodePoint(point);
+      if (!data) return false;
+
+      renderAnimalPointReport(data, true);
+      return true;
+    }
+
+    document.addEventListener("pointerup", e => {
+      handleHerdScatterPick(e.target, e);
+    }, true);
+
+    document.addEventListener("click", e => {
+      handleHerdScatterPick(e.target, e);
+    }, true);
+
+    document.addEventListener("touchend", e => {
+      handleHerdScatterPick(e.target, e);
+    }, {passive:false, capture:true});
 
     document.addEventListener("keydown", e => {
-      const point = e.target.closest?.(".herd-scatter-point");
-      if (!point || (e.key !== "Enter" && e.key !== " ")) return;
-      e.preventDefault();
-      renderAnimalPointReport(decodePoint(point), true);
-    });
+      if (e.key !== "Enter" && e.key !== " ") return;
+      handleHerdScatterPick(e.target, e);
+    }, true);
     $("reportDate").addEventListener("change", loadReport);
     $("milkPriceInput").addEventListener("input",()=>{
       getMilkPriceRequired();
