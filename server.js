@@ -25201,6 +25201,45 @@ if (!Number.isInteger(milkPriceUsed) || milkPriceUsed <= 0) {
         ? Math.floor(Number(days))
         : null;
     };
+        const milkReportHerdScatterPointSrv = ({
+      number,
+      kg,
+      groupId = "",
+      groupName = "",
+      species = ""
+    } = {}) => {
+      const animal = animalsByNumber.get(number) || {};
+      const milkKg = round(kg, 1);
+
+      const daysInMilkRaw = getDimSrv(animal);
+      const daysInMilk = Number.isFinite(Number(daysInMilkRaw))
+        ? Math.floor(Number(daysInMilkRaw))
+        : null;
+
+      if (!number || !Number.isFinite(Number(milkKg)) || milkKg <= 0 || !Number.isFinite(Number(daysInMilk))) {
+        return null;
+      }
+
+      const daysCarryingCalfRaw = dccDays(animal);
+      const daysCarryingCalf =
+        daysCarryingCalfRaw !== null && Number.isFinite(Number(daysCarryingCalfRaw))
+          ? Math.floor(Number(daysCarryingCalfRaw))
+          : null;
+
+      return {
+        number,
+        animalNumber: number,
+        milkKg,
+        kg: milkKg,
+        daysInMilk,
+        dim: daysInMilk,
+        daysCarryingCalf,
+        dcc: daysCarryingCalf,
+        groupId,
+        groupName,
+        species
+      };
+    };
 
     const dimStage = dim => {
       const d = Number(dim);
@@ -25226,9 +25265,10 @@ if (!Number.isInteger(milkPriceUsed) || milkPriceUsed <= 0) {
     const recordingRate =
       milkersCount > 0 ? round((recordedCount / milkersCount) * 100, 1) : null;
 
-    const memberGroupByNumber = new Map();
+     const memberGroupByNumber = new Map();
     const groupSummaries = [];
     const exceptionRows = [];
+    const herdScatterPoints = [];
 
     for (const groupId of milkReportOfficialMilkingGroupIdsSrv()) {
       const def = GROUP_DEF_BY_ID_SRV[groupId] || {};
@@ -25333,15 +25373,33 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
         ? safeDiv(netOperatingResult, groupMilkKg, 2)
         : null;
 
-      const groupAnimalRows = groupDayRows.map(ev => {
+       const groupAnimalRows = groupDayRows.map(ev => {
         const number = milkReportNumberSrv(ev.animalNumber || ev.number);
         const kg = milkReportKgSrv(ev);
         const prevOne = prevByNumber.get(number);
         const prevKg = Number(prevOne?.kg || 0);
 
+        const point = milkReportHerdScatterPointSrv({
+          number,
+          kg,
+          groupId,
+          groupName,
+          species: groupKind
+        });
+
+        if (point) herdScatterPoints.push(point);
+
         return {
           number,
           kg: round(kg, 1),
+          milkKg: round(kg, 1),
+          daysInMilk: point?.daysInMilk ?? null,
+          dim: point?.daysInMilk ?? null,
+          daysCarryingCalf: point?.daysCarryingCalf ?? null,
+          dcc: point?.daysCarryingCalf ?? null,
+          groupId,
+          groupName,
+          species: groupKind,
           prevKg: prevKg > 0 ? round(prevKg, 1) : null,
           deltaPct: milkReportDeltaPctSrv(kg, prevKg)
         };
@@ -25460,6 +25518,21 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
     if (ungroupedRows.length) {
       const total = sumMilk(ungroupedRows);
       const count = uniqueCount(ungroupedRows);
+
+      for (const ev of ungroupedRows) {
+        const number = milkReportNumberSrv(ev.animalNumber || ev.number);
+        const kg = milkReportKgSrv(ev);
+
+        const point = milkReportHerdScatterPointSrv({
+          number,
+          kg,
+          groupId: "ungrouped",
+          groupName: "غير مصنف إنتاجيًا",
+          species: selectedKind || "mixed"
+        });
+
+        if (point) herdScatterPoints.push(point);
+      }
 
       groupSummaries.push({
         groupId: "ungrouped",
@@ -25779,7 +25852,17 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
           ? `صافي تشغيل اللبن اليوم ${economicTotals.netOperatingResult} ج بعد التغذية و20% تشغيل.`
           : `تنبيه: صافي تشغيل اللبن سالب ${economicTotals.netOperatingResult} ج بعد التغذية و20% تشغيل.`
         : `إنتاج اليوم ${dayTotalKg} كجم. الاقتصاد ينتظر بيانات التغذية.`;
-
+        const herdScatterSorted = [...new Map(
+      herdScatterPoints
+        .filter(p =>
+          p?.number &&
+          Number.isFinite(Number(p.milkKg)) &&
+          Number.isFinite(Number(p.daysInMilk))
+        )
+        .map(p => [String(p.number), p])
+    ).values()].sort((a, b) =>
+      Number(a.daysInMilk || 0) - Number(b.daysInMilk || 0)
+    );
     return res.json({
       ok: true,
       message,
@@ -25876,13 +25959,23 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
 
       groups: groupSummaries,
 
-      exceptions: exceptionRows.slice(0, 15),
+       exceptions: exceptionRows.slice(0, 15),
+
+      scatter: {
+        points: herdScatterSorted
+      },
+
+      herdScatter: {
+        points: herdScatterSorted
+      },
 
       charts: {
         dailyTrend,
         weeklyTrend,
         monthlyTrend,
         rolling305Trend,
+
+        herdScatter: herdScatterSorted,
 
         groupProduction: groupSummaries.map(g => ({
           groupId: g.groupId,
