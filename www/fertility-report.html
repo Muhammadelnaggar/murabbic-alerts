@@ -36,7 +36,7 @@
   </div>
 
   <div class="card">
-    <div class="section-title">🎯 مؤشرات الإخصاب الأساسية</div>
+   <div class="section-title">🧠 المؤشرات التناسلية الفنية للقطيع</div>
     <div id="conceptionGrid" class="kpi-grid"></div>
   </div>
 
@@ -51,13 +51,8 @@
   </div>
 
   <div class="card">
-    <div class="section-title">🔁 حيوانات تحتاج مراجعة خصوبة — Repeat Breeder</div>
+  <div class="section-title">🔁 تحليل التلقيح المتكرر</div>
     <div id="repeatBreedersWrap"></div>
-  </div>
-
-  <div class="card">
-    <div class="section-title">🧭 قوائم المتابعة العملية</div>
-    <div id="actionsWrap"></div>
   </div>
 
   <div class="card">
@@ -114,7 +109,23 @@ function box(label, value, sub = "", cls = ""){
     </div>
   `;
 }
+function linesHtml(items = []){
+  return items
+    .map(v => String(v || "").trim())
+    .filter(Boolean)
+    .map(v => `<div>${esc(v)}</div>`)
+    .join("");
+}
 
+function boxRich(label, value, subHtml = "", cls = ""){
+  return `
+    <div class="kpi ${cls}">
+      <div class="kpi-label">${esc(label)}</div>
+      <div class="kpi-value">${esc(value ?? "--")}</div>
+      ${subHtml ? `<div class="kpi-sub">${subHtml}</div>` : ""}
+    </div>
+  `;
+}
 function badge(text, status){
   const s = String(status || "muted");
   const cls =
@@ -168,23 +179,34 @@ async function fetchReport(){
 }
 
 function renderSummary(j){
-  const c = j.conception || {};
-  const fs = c.firstService || {};
-  const overall = c.overallHerd || {};
-  const rb = j.repeatBreeders || {};
-  const actions = j.actionLists || {};
-
-  const dueDx = Array.isArray(actions.duePregnancyDiagnosis) ? actions.duePregnancyDiagnosis.length : 0;
-  const delayed = Array.isArray(actions.delayedFirstBreeding) ? actions.delayedFirstBreeding.length : 0;
+  const expert = j.expertReport || {};
+  const main = expert.mainBottleneck || j.bottleneckAnalysis?.main || {};
+  const rb = j.repeatBreederAnalysis || j.repeatBreeders || {};
+  const recs = Array.isArray(j.farmRecommendations) ? j.farmRecommendations : [];
 
   el("summaryGrid").innerHTML =
     box("نوع القطيع", reportTypeLabel) +
     box("الفترة", `${fmtNum(j.periodDays || 180)} يوم`) +
-    box("نسبة الحمل من أول تلقيحة", fmtPct(fs.valuePct), `المستهدف ${fmtPct(fs.benchmarkPct)}`) +
-    box("معدل الإخصاب العام", fmtPct(overall.valuePct), `المستهدف ${fmtPct(overall.benchmarkPct)}`) +
-    box("مطلوب تشخيص حمل", fmtNum(dueDx)) +
-    box("متأخرات عن أول تلقيح", fmtNum(delayed)) +
-    box("Repeat Breeder", fmtNum(rb.count || 0));
+    boxRich(
+      "تقييم مُرَبِّيك العام",
+      expert.overallRating || "--",
+      linesHtml([expert.headline])
+    ) +
+    boxRich(
+      "الخلل المرجح",
+      main.title || "--",
+      linesHtml([main.read])
+    ) +
+    box(
+      "Repeat Breeder",
+      `${fmtNum(rb.count || 0)} حالة`,
+      `النسبة ${fmtPct(rb.ratePct)} من المؤهلين للتلقيح`
+    ) +
+    boxRich(
+      "التوصية الفنية الأولى",
+      recs[0] || "--",
+      ""
+    );
 }
 
 function renderHerd(j){
@@ -200,17 +222,38 @@ function renderHerd(j){
 }
 
 function renderConception(j){
-  const c = j.conception || {};
-  const fs = c.firstService || {};
-  const overall = c.overallHerd || {};
+  const indicators = Array.isArray(j.fertilityIndicators)
+    ? j.fertilityIndicators
+    : (
+        Array.isArray(j.expertReport?.indicators)
+          ? j.expertReport.indicators
+          : []
+      );
 
-  el("conceptionGrid").innerHTML =
-    box("نسبة الحمل من أول تلقيحة", fmtPct(fs.valuePct), `${fmtNum(fs.pregnancies)} حمل / ${fmtNum(fs.judged)} حالة`) +
-    box("تقييم أول تلقيحة", fs.read || "--", `المستهدف ${fmtPct(fs.benchmarkPct)}`) +
-    box("معدل الإخصاب العام", fmtPct(overall.valuePct), `${fmtNum(overall.pregnancies)} حمل / ${fmtNum(overall.judged)} حالة`) +
-    box("تقييم الإخصاب العام", overall.read || "--", `المستهدف ${fmtPct(overall.benchmarkPct)}`);
+  if (!indicators.length) {
+    el("conceptionGrid").innerHTML = emptyMsg("لا توجد مؤشرات تناسلية كافية حاليًا.");
+    return;
+  }
+
+  el("conceptionGrid").innerHTML = indicators.map(x => {
+    const cls =
+      x.status === "danger" ? "health" :
+      x.status === "warn" ? "repro" :
+      "";
+
+    return boxRich(
+      x.title || x.key || "--",
+      x.valueText || "--",
+      linesHtml([
+        x.benchmarkText || "",
+        x.rating ? `التقييم: ${x.rating}` : "",
+        x.read || "",
+        x.advice ? `توصية مُرَبِّيك: ${x.advice}` : ""
+      ]),
+      cls
+    );
+  }).join("");
 }
-
 function renderInseminators(j){
   const rows = Array.isArray(j.inseminators) ? j.inseminators : [];
 
@@ -251,23 +294,55 @@ function renderThi(j){
 }
 
 function renderRepeatBreeders(j){
-  const rb = j.repeatBreeders || {};
+  const rb = j.repeatBreederAnalysis || j.repeatBreeders || {};
   const rows = Array.isArray(rb.rows) ? rb.rows : [];
+  const drivers = Array.isArray(rb.likelyDrivers) ? rb.likelyDrivers : [];
+
+  const driversText = drivers.length
+    ? drivers.map(d => `${d.title}: ${fmtNum(d.count)} حالة (${fmtPct(d.pct)}) — ${d.strength}`).join(" | ")
+    : "";
+
+  const headHtml =
+    boxRich(
+      "ضغط Repeat Breeder في القطيع",
+      rb.severityLabel || "--",
+      linesHtml([
+        `عدد الحالات: ${fmtNum(rb.count || 0)}`,
+        `المؤهلون للتلقيح: ${fmtNum(rb.eligibleCount)}`,
+        `النسبة: ${fmtPct(rb.ratePct)}`,
+        rb.avgServices != null ? `متوسط عدد التلقيحات في الحالات المتكررة: ${fmtNum(rb.avgServices)}` : "",
+        rb.herdRead || "",
+        driversText ? `الأسباب المرجحة: ${driversText}` : ""
+      ]),
+      rb.severity === "danger" ? "health" : "repro"
+    );
+
+  if (!rows.length) {
+    el("repeatBreedersWrap").innerHTML =
+      headHtml +
+      emptyMsg("لا توجد حيوانات Repeat Breeder محققة للشروط حاليًا.");
+    return;
+  }
 
   const htmlRows = rows.map(r => `
     <tr>
       <td>${esc(r.animalNumber)}</td>
       <td>${fmtNum(r.servicesCount)}</td>
       <td>${esc(r.lastInseminationDate || "--")}</td>
-      <td>${r.daysInMilk == null ? "--" : fmtNum(r.daysInMilk)}</td>
       <td>${esc(r.cycleRegularity || "--")}</td>
-      <td>${esc(r.reproductiveSuspicion || "--")}</td>
+      <td>${esc(r.timingPattern || "--")}</td>
+      <td>${esc(r.thiPattern || "--")}</td>
+      <td>${esc(Array.isArray(r.likelyCauses) ? r.likelyCauses.join("، ") : "")}</td>
+      <td>${esc(r.mbkRead || r.reproductiveSuspicion || "--")}</td>
     </tr>
   `);
 
-  el("repeatBreedersWrap").innerHTML = rows.length
-    ? table(["رقم الحيوان", "عدد التلقيحات", "آخر تلقيح", "أيام الحليب", "انتظام الدورة", "الترجيح"], htmlRows)
-    : emptyMsg("لا توجد حيوانات Repeat Breeder محققة للشروط حاليًا.");
+  el("repeatBreedersWrap").innerHTML =
+    headHtml +
+    table(
+      ["رقم الحيوان", "عدد التلقيحات", "آخر تلقيح", "انتظام الدورة", "التوقيت", "THI", "الأسباب المحتملة", "قراءة مُرَبِّيك"],
+      htmlRows
+    );
 }
 
 function renderActions(j){
@@ -306,22 +381,27 @@ function renderActions(j){
 }
 
 function renderAdvisory(j){
-  const a = j.advisory || {};
-  const notes = Array.isArray(a.notes) ? a.notes : [];
+  const expert = j.expertReport || {};
+  const main = expert.mainBottleneck || j.bottleneckAnalysis?.main || {};
+  const recs = Array.isArray(j.farmRecommendations)
+    ? j.farmRecommendations
+    : (
+        Array.isArray(j.advisory?.notes)
+          ? j.advisory.notes
+          : []
+      );
 
-  el("advisoryWrap").innerHTML = `
-    <div class="kpi">
-      <div class="kpi-label">القراءة العامة</div>
-      <div class="kpi-value">${esc(a.headline || "لا توجد قراءة كافية بعد.")}</div>
-      ${
-        notes.length
-          ? `<div class="kpi-sub">${notes.map(n => `• ${esc(n)}`).join("<br>")}</div>`
-          : ""
-      }
-    </div>
-  `;
+  el("advisoryWrap").innerHTML =
+    boxRich(
+      "القراءة العامة",
+      expert.headline || j.advisory?.headline || "لا توجد قراءة كافية بعد.",
+      linesHtml([
+        main.title ? `الخلل المرجح: ${main.title}` : "",
+        main.read || "",
+        ...recs.map(r => `• ${r}`)
+      ])
+    );
 }
-
 async function main(){
   el("pageTitle").textContent = `تقرير الخصوبة — ${reportTypeLabel}`;
 
@@ -334,7 +414,6 @@ async function main(){
     renderInseminators(j);
     renderThi(j);
     renderRepeatBreeders(j);
-    renderActions(j);
     renderAdvisory(j);
 
     el("statusBar").textContent = `تم تحميل تقرير الخصوبة — ${reportTypeLabel}.`;
