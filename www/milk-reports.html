@@ -287,6 +287,39 @@
         background:#f0fdfa!important;
         page-break-inside:avoid;
       }
+            .print-brand{
+        display:flex!important;
+        align-items:center!important;
+        gap:8px!important;
+        min-width:170px!important;
+      }
+
+      .print-logo{
+        display:block!important;
+        width:42px!important;
+        height:42px!important;
+        object-fit:contain!important;
+      }
+
+      .print-brand-name{
+        color:#0f766e!important;
+        font-size:17pt!important;
+        font-weight:950!important;
+        line-height:1.1!important;
+      }
+
+      .print-brand-tag{
+        color:#334155!important;
+        font-size:8.5pt!important;
+        font-weight:800!important;
+        line-height:1.5!important;
+        margin-top:3px!important;
+      }
+
+      .print-title-box{
+        flex:1!important;
+        text-align:center!important;
+      }
       .print-report-header h1{
         margin:0;
         font-size:20pt;
@@ -628,13 +661,22 @@
     <div id="loading" class="loading">جاري تحميل تقرير اللبن...</div>
 
     <section id="report" style="display:none;">
-      <div class="print-report-header">
-        <div>
-          <h1 id="printTitle">تقرير إنتاج اللبن</h1>
-          <p id="printSubtitle">مُرَبِّيك — تقرير مطبوع</p>
-        </div>
-        <div class="print-meta" id="printMeta"></div>
-      </div>
+     <div class="print-report-header">
+  <div class="print-brand">
+    <img class="print-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div>
+      <div class="print-brand-name">مُرَبِّيك</div>
+      <div class="print-brand-tag">تقرير إنتاج صادر من نظام مُرَبِّيك لإدارة القطيع</div>
+    </div>
+  </div>
+
+  <div class="print-title-box">
+    <h1 id="printTitle">تقرير إنتاج اللبن</h1>
+    <p id="printSubtitle">تقرير تشغيلي واستشاري لإنتاج اللبن</p>
+  </div>
+
+  <div class="print-meta" id="printMeta"></div>
+</div>
       <section class="hero" id="summaryBlock" data-print-block>
         <div class="hero-grid">
           <div>
