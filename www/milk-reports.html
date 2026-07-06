@@ -34,7 +34,7 @@
     .loading{min-height:240px;display:grid;place-items:center;background:white;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);font-weight:950;color:var(--muted)}
 
     .hero{border-radius:22px;padding:18px;background:white!important;color:var(--text);border:1px solid var(--line);border-top:6px solid var(--brand);box-shadow:var(--shadow)}
-    .hero-grid{display:grid;grid-template-columns:1fr;gap:14px;align-items:stretch}
+    .hero-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:14px;align-items:stretch}
     .hero h2{margin:0;font-size:clamp(23px,4vw,36px);color:#0f172a}
     .hero-line{display:none!important}
     .hero-summary{
@@ -70,10 +70,10 @@
     }
     .hero-meta{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
     .pill{display:inline-flex;border-radius:999px;padding:7px 11px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);font-size:12px;font-weight:900}
-    .hero-panel{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:15px}
-    .hero-panel .label{font-size:13px;font-weight:900;color:rgba(255,255,255,.84)}
-    .hero-panel .value{margin-top:5px;font-size:32px;font-weight:950}
-    .hero-panel .sub{margin-top:5px;font-size:12px;line-height:1.6;color:rgba(255,255,255,.86);font-weight:750}
+    .hero-panel{background:#ecfdf5;border:1px solid #bbf7d0;border-radius:20px;padding:15px}
+    .hero-panel .label{font-size:13px;font-weight:900;color:#047857}
+    .hero-panel .value{margin-top:5px;font-size:32px;font-weight:950;color:#0f172a}
+    .hero-panel .sub{margin-top:5px;font-size:12px;line-height:1.6;color:#475569;font-weight:750}
     .notice{display:none;margin-top:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:15px;padding:11px 13px;font-weight:900}
     .notice.show{display:block}
 
@@ -246,8 +246,9 @@
     .thi-circle{width:82px;height:82px;border-radius:999px;display:grid;place-items:center;background:#fee2e2;color:var(--danger);font-size:29px;font-weight:950;border:7px solid white;box-shadow:0 0 0 1px #fecaca}
     .thi-card h4{margin:0;font-size:18px}.thi-card p{margin:7px 0 0;color:var(--muted);line-height:1.65;font-weight:750}
 
-    .scientific{background:#0f172a;color:white;border-radius:22px;padding:17px;box-shadow:var(--shadow)}
-    .scientific h3{margin:0 0 10px}.scientific ul{margin:0;padding:0 20px 0 0;line-height:1.9;color:rgba(255,255,255,.86);font-weight:750}
+    .scientific{background:white;border:1px solid var(--line);border-top:6px solid var(--brand);color:var(--text);border-radius:22px;padding:17px;box-shadow:var(--shadow)}
+    .scientific h3{margin:0 0 10px;color:#0f172a}.scientific ul{margin:0;padding:0 20px 0 0;line-height:1.95;color:#334155;font-weight:850}
+    .scientific li{margin:7px 0;padding:8px 10px;background:#f8fafc;border:1px solid #e8eef5;border-radius:12px}
     .empty{padding:24px;text-align:center;color:var(--muted);font-weight:900;background:white;border:1px dashed #cbd5e1;border-radius:18px}
     .footer-note{text-align:center;color:var(--muted);font-size:12px;font-weight:750;margin-top:18px}
 
@@ -642,6 +643,11 @@
             <div class="hero-line" id="heroLine">—</div>
             <div class="hero-summary" id="heroSummary"></div>
           </div>
+          <div class="hero-panel">
+            <div class="label">صافي ربح اللبن</div>
+            <div class="value" id="heroNet">—</div>
+            <div class="sub">بعد التغذية + 20% من تكلفة التغذية كمصاريف تشغيل</div>
+          </div>
         </div>
       </section>
 
@@ -712,7 +718,7 @@
       </section>
 
       <section class="section" id="scientificBlock" data-print-block>
-        <div class="section-head"><div><h3>التقرير العلمي المختصر</h3></div></div>
+        <div class="section-head"><div><h3>التقرير العلمي المختصر</h3><p>قراءة تشغيلية مبنية على الإنتاج، مرحلة الحليب، الحمل، الاقتصاد، والإجهاد الحراري.</p></div></div>
         <div class="scientific">
           <h3 id="scientificTitle">التقرير العلمي المختصر</h3>
           <ul id="scientificNotes"></ul>
@@ -1227,55 +1233,99 @@
       }).join(""):`<div class="empty">لا توجد توصيات حرجة الآن.</div>`;
     }
 
-    function fallbackScientificNotes(j){
+    function bestOrWorstGroup(j){
+      const groups = Array.isArray(j.groups) ? j.groups : [];
+      if(!groups.length) return null;
+
+      const withNet = groups
+        .filter(g => Number.isFinite(Number(g.economics?.netOperatingResult)))
+        .sort((a,b)=>Number(a.economics.netOperatingResult)-Number(b.economics.netOperatingResult));
+      if(withNet.length) return withNet[0];
+
+      return [...groups]
+        .filter(g => Number.isFinite(Number(g.avgMilkKgMilker ?? g.avgMilkKgRecorded)))
+        .sort((a,b)=>Number(a.avgMilkKgMilker ?? a.avgMilkKgRecorded)-Number(b.avgMilkKgMilker ?? b.avgMilkKgRecorded))[0] || null;
+    }
+
+    function buildScientificOperationalNotes(j){
       const p = j.production || {};
       const e = j.economics || {};
+      const c = j.comparisons || {};
+      const t = j.thi || {};
       const notes = [];
 
-      if (Number.isFinite(Number(p.totalMilkKg))) {
-        notes.push(`إجمالي اللبن المسجل ${num(p.totalMilkKg,1)} كجم، بمتوسط ${num(p.avgMilkKgRecorded ?? p.avgMilkKgMilker,1)} كجم للحلاب المسجل.`);
+      const totalMilk = Number(p.totalMilkKg);
+      const avgMilk = Number(p.avgMilkKgRecorded ?? p.avgMilkKgMilker);
+      const recorded = Number(p.recordedCount);
+      const missing = Number(p.missingCount);
+      const rate = Number(p.recordingRate);
+      const milkers = Number(p.milkersCount);
+      const avgDim = Number(p.avgDim);
+      const avgDcc = Number(p.avgDcc);
+
+      if (Number.isFinite(totalMilk)) {
+        notes.push(`قراءة الإنتاج: القطيع سجل ${num(totalMilk,1)} كجم لبن، بمتوسط ${num(avgMilk,1)} كجم للحلاب المسجل من إجمالي ${int(milkers)} حلاب. هذه القراءة تُفسَّر كمؤشر إنتاج يومي، وليست حكمًا نهائيًا إلا بعد اكتمال تسجيل الحلبات.`);
       }
 
-      if (Number.isFinite(Number(p.recordingRate))) {
-        notes.push(`نسبة تسجيل اللبن ${num(p.recordingRate,1)}%؛ اكتمال التسجيل مهم قبل الحكم النهائي على الإنتاج.`);
+      if (Number.isFinite(rate)) {
+        const quality = rate >= 95 ? "جيدة جدًا" : rate >= 85 ? "مقبولة وتحتاج مراجعة بسيطة" : "ناقصة ولا تصلح للحكم النهائي";
+        notes.push(`جودة التسجيل: نسبة التسجيل ${num(rate,1)}% (${int(recorded)} مسجل، ${int(missing)} غير مسجل). جودة البيانات ${quality}؛ أي نقص تسجيل يخفض دقة المتوسطات، المقارنات، وسكاتر القطيع.`);
       }
 
-      if (Number.isFinite(Number(p.avgDim))) {
-        notes.push(`متوسط أيام الحليب ${num(p.avgDim,0)} يوم، ويجب تفسير الإنتاج حسب مرحلة الحليب وليس الرقم المطلق فقط.`);
+      if (Number.isFinite(avgDim)) {
+        notes.push(`تفسير مرحلة الحليب: متوسط أيام الحليب ${num(avgDim,0)} يوم. لا تُقارن الأبقار في بداية الحليب والمتوسط والمتأخر كرقم واحد؛ انخفاض مجموعة في مرحلة متأخرة قد يكون طبيعيًا، أما انخفاض مبكر أو مفاجئ فيحتاج مراجعة مأكول وصحة وحرارة.`);
       }
 
-      if (Number.isFinite(Number(p.avgDcc))) {
-        notes.push(`متوسط أيام الحمل ${num(p.avgDcc,0)} يوم للحيوانات المتاح لها بيانات حمل.`);
+      if (Number.isFinite(avgDcc) && avgDcc > 0) {
+        notes.push(`تفسير الحمل: متوسط أيام الحمل ${num(avgDcc,0)} يوم للحيوانات المتاح لها بيانات. ارتفاع أيام الحمل داخل مجموعة حلاب قد يفسر انخفاض اللبن، لذلك يجب قراءة الإنتاج مع أيام الحمل وليس كجم اللبن فقط.`);
       }
 
       if (Number.isFinite(Number(e.productionCostPerKgMilk))) {
-        notes.push(`إجمالي تكلفة إنتاج كجم اللبن ${money(e.productionCostPerKgMilk)} محسوبة من التغذية والتشغيل.`);
+        notes.push(`الاقتصاد التشغيلي: إجمالي تكلفة إنتاج كجم اللبن ${money(e.productionCostPerKgMilk)}، وهامش كجم اللبن ${money(e.marginPerKgMilk)}. لو الهامش منخفض، راجع تكلفة كجم المادة الجافة، الهدر، وتركيز العليقة قبل الحكم على الحيوان وحده.`);
       }
 
-      if (Number.isFinite(Number(e.marginPerKgMilk))) {
-        notes.push(`هامش كجم اللبن ${money(e.marginPerKgMilk)}، وهو مؤشر سريع على كفاءة التحويل الاقتصادي للبن.`);
+      const dailyDelta = Number(c.daily?.deltaPct);
+      if (Number.isFinite(dailyDelta) && Math.abs(dailyDelta) >= 5) {
+        notes.push(`المقارنة اليومية: التغير عن القراءة السابقة ${pct(dailyDelta)}. التغير أكبر من 5% يحتاج مراجعة سبب تشغيلي: نقص تسجيل، تغيير عليقة، إجهاد حراري، التهاب ضرع، أو انتقال حيوانات بين المجموعات.`);
       }
 
-      const thi = j.thi || {};
-      if (thi.label || Number.isFinite(Number(thi.value))) {
-        notes.push(`الإجهاد الحراري: ${thi.label || "غير محدد"}${Number.isFinite(Number(thi.value)) ? " عند قيمة " + num(thi.value,0) : ""}.`);
+      const worst = bestOrWorstGroup(j);
+      if (worst) {
+        const net = Number(worst.economics?.netOperatingResult);
+        const avg = Number(worst.avgMilkKgMilker ?? worst.avgMilkKgRecorded);
+        const reason = Number.isFinite(net)
+          ? `صافيها ${money(net)}`
+          : `متوسطها ${num(avg,1)} كجم/حلاب`;
+        notes.push(`أولوية المتابعة: مجموعة ${worst.groupName || "غير محددة"} هي أول مجموعة للمراجعة اليوم لأن ${reason}. ابدأ بمراجعة اكتمال تسجيل اللبن، عدد الرؤوس المحسوبة اقتصاديًا، ثم المأكول الفعلي وتكلفة التغذية.`);
       }
 
-      return notes.length ? notes : ["لا توجد بيانات كافية لبناء تقرير علمي مختصر لهذا اليوم."];
+      const thiValue = Number(t.value);
+      if (Number.isFinite(thiValue) || t.label) {
+        notes.push(`الإجهاد الحراري: الحالة ${t.label || "غير محددة"}${Number.isFinite(thiValue) ? " عند قيمة " + num(thiValue,0) : ""}. عند ارتفاع الحرارة، الأولوية تكون للتبريد، إتاحة المياه، توقيت التغذية، وتقليل تزاحم المجموعة قبل تعديل العليقة.`);
+      }
+
+      notes.push("إجراء اليوم المقترح: ابدأ بالمجموعات الأقل هامشًا أو الأقل تسجيلًا، ثم افتح سكاتر القطيع لتحديد الحيوانات الخارجة عن نمط الإنتاج حسب أيام الحليب، وليس حسب رقم اللبن وحده.");
+
+      return notes;
     }
 
     function renderScientific(j){
       const s=j.scientificReport||{};
       $("scientificTitle").textContent=s.title||"التقرير العلمي المختصر";
-      let notes = Array.isArray(s.notes) ? s.notes.filter(x => String(x||"").trim()) : [];
-      if(!notes.length) notes = fallbackScientificNotes(j);
 
-      const clean = notes.map(x => String(x||"")
+      const serverNotes = Array.isArray(s.notes)
+        ? s.notes.filter(x => String(x||"").trim())
+        : [];
+
+      const operationalNotes = buildScientificOperationalNotes(j);
+
+      const clean = operationalNotes.concat(serverNotes.slice(0,2)).map(x => String(x||"")
         .replace(/DIM/g,"أيام الحليب")
         .replace(/DCC/g,"أيام الحمل")
         .replace(/THI/g,"الإجهاد الحراري")
         .replace(/\bkg\b/gi,"كجم")
       );
+
       $("scientificNotes").innerHTML=clean.map(x=>`<li>${esc(x)}</li>`).join("");
     }
 
@@ -1294,6 +1344,7 @@
         `سعر كجم اللبن: ${money0(getMilkPriceRequired())}`,
         `نوع القطيع: ${esc(j.meta?.selectedTypeLabel || (getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل"))}`
       ].join("<br>");
+      $("heroNet").textContent = money(j.economics?.netOperatingResult);
       if(j.message){$("serverMessage").textContent=j.message;$("serverMessage").classList.add("show")}else{$("serverMessage").classList.remove("show")}
       renderProduction(j); renderEconomy(j); renderComparisons(j); renderCharts(j); renderGroups(j); renderThi(j); renderRecommendations(j); renderScientific(j);
     }
@@ -1342,6 +1393,7 @@
         `تاريخ التقرير: ${esc($("reportDate").value || yesterdayISO())}`,
         `نوع القطيع: ${esc(getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل")}`
       ].join("<br>");
+      $("heroNet").textContent="—";
 
       $("productionCards").innerHTML=`<div class="empty">سعر كجم اللبن مطلوب قبل تحميل التقرير.</div>`;
       $("economyCards").innerHTML="";
