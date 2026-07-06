@@ -345,41 +345,6 @@ function renderRepeatBreeders(j){
     );
 }
 
-function renderActions(j){
-  const actions = j.actionLists || {};
-  const dueDx = Array.isArray(actions.duePregnancyDiagnosis) ? actions.duePregnancyDiagnosis : [];
-  const delayed = Array.isArray(actions.delayedFirstBreeding) ? actions.delayedFirstBreeding : [];
-
-  const rows = [];
-
-  dueDx.forEach(r => {
-    rows.push(`
-      <tr>
-        <td>تشخيص حمل</td>
-        <td>${esc(r.animalNumber)}</td>
-        <td>${esc(r.lastInseminationDate || "--")}</td>
-        <td>${fmtNum(r.daysSinceInsemination)} يوم بعد التلقيح</td>
-      </tr>
-    `);
-  });
-
-  delayed.forEach(r => {
-    rows.push(`
-      <tr>
-        <td>تأخر أول تلقيح</td>
-        <td>${esc(r.animalNumber)}</td>
-        <td>${fmtNum(r.daysInMilk)} يوم حليب</td>
-        <td>${esc(r.reproductiveStatus || "--")}</td>
-      </tr>
-    `);
-  });
-
-  el("actionsWrap").innerHTML = table(
-    ["القائمة", "رقم الحيوان", "التاريخ/الأيام", "ملاحظة"],
-    rows
-  );
-}
-
 function renderAdvisory(j){
   const expert = j.expertReport || {};
   const main = expert.mainBottleneck || j.bottleneckAnalysis?.main || {};
