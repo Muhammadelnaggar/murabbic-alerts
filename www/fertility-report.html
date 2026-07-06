@@ -293,6 +293,17 @@ body[data-page="fertility-report"] .fert-mini-value {
     margin-top: 8px;
   }
 }
+body[data-page="fertility-report"] .fert-action-list {
+  margin: 10px 0 0;
+  padding: 0 18px 0 0;
+  color: #334155;
+  font-size: .93rem;
+  line-height: 1.9;
+}
+
+body[data-page="fertility-report"] .fert-action-list li {
+  margin: 4px 0;
+}
 @media print {
   body[data-page="fertility-report"] .actions-bar,
   body[data-page="fertility-report"] #statusBar {
@@ -356,7 +367,7 @@ body[data-page="fertility-report"] .fert-mini-value {
   </div>
 
   <div class="card">
-    <div class="section-title">🔥 تأثير THI / الإجهاد الحراري</div>
+    <div class="section-title">🔥 THI الحالي ونصيحة توقيت التلقيح</div>
     <div id="thiWrap"></div>
   </div>
 
@@ -640,41 +651,58 @@ function renderInseminators(j){
   `;
 }
 function renderThi(j){
-  const rows = Array.isArray(j.thiConception) ? j.thiConception : [];
+  const advice =
+    j.fertilityThiAdvice ||
+    j.breedingThiAdvice ||
+    j.thiBreedingAdvice ||
+    {};
 
-  if (!rows.length) {
-    el("thiWrap").innerHTML = emptyMsg("لا توجد بيانات كافية حاليًا.");
-    return;
-  }
+  const current = advice.current || {};
+  const actions = Array.isArray(advice.actions) ? advice.actions : [];
 
   el("thiWrap").innerHTML = `
     <div class="fert-panel">
-      <div class="fert-card-list">
-        ${rows.map(r => `
-          <div class="fert-mini-card">
-            <div class="fert-mini-head">
-              <div class="fert-mini-title">${esc(r.label || r.level || "غير متاح")}</div>
-            </div>
-
-            <div class="fert-mini-grid">
-              <div class="fert-mini-item">
-                <div class="fert-mini-label">تلقيحات محكوم عليها</div>
-                <div class="fert-mini-value">${fmtNum(r.judged)}</div>
-              </div>
-
-              <div class="fert-mini-item">
-                <div class="fert-mini-label">حمل مثبت</div>
-                <div class="fert-mini-value">${fmtNum(r.pregnancies)}</div>
-              </div>
-
-              <div class="fert-mini-item">
-                <div class="fert-mini-label">CR</div>
-                <div class="fert-mini-value">${fmtPct(r.conceptionRatePct)}</div>
-              </div>
-            </div>
-          </div>
-        `).join("")}
+      <div class="fert-title">
+        ${esc(advice.title || "THI الحالي ونصيحة توقيت التلقيح")}
       </div>
+
+      <div class="fert-stats">
+        <div class="fert-stat">
+          <div class="fert-stat-label">THI الحالي</div>
+          <div class="fert-stat-value">${esc(current.thiText || "--")}</div>
+        </div>
+
+        <div class="fert-stat">
+          <div class="fert-stat-label">الحالة</div>
+          <div class="fert-stat-value">${esc(current.levelLabel || "غير متاح")}</div>
+        </div>
+
+        <div class="fert-stat">
+          <div class="fert-stat-label">الحرارة</div>
+          <div class="fert-stat-value">${current.tempC == null ? "--" : `${fmtNum(current.tempC)}°`}</div>
+        </div>
+
+        <div class="fert-stat">
+          <div class="fert-stat-label">الرطوبة</div>
+          <div class="fert-stat-value">${current.humidity == null ? "--" : `${fmtNum(current.humidity)}%`}</div>
+        </div>
+      </div>
+
+      <div class="fert-read">
+        ${esc(advice.summary || "لا توجد قراءة THI حالية كافية.")}
+      </div>
+
+      ${
+        advice.timingAdvice
+          ? `<div class="fert-advice">${esc(advice.timingAdvice)}</div>`
+          : ""
+      }
+
+      ${
+        actions.length
+          ? `<ul class="fert-action-list">${actions.map(a => `<li>${esc(a)}</li>`).join("")}</ul>`
+          : ""
+      }
     </div>
   `;
 }
