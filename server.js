@@ -1329,6 +1329,104 @@ async function weatherBuildFarmThiSrv(uid) {
 
   return await weatherFetchThiForCoordsSrv(location);
 }
+function fertilityReportCurrentThiAdviceSrv(weather = null) {
+  const thi = Number(weather?.thi);
+  const tempC = Number(weather?.tempC);
+  const humidity = Number(weather?.humidity);
+  const status = weather?.status || classifyTHI(thi);
+  const level = String(status?.level || "unknown");
+
+  const current = {
+    available: Number.isFinite(thi),
+    thi: Number.isFinite(thi) ? Math.round(thi) : null,
+    thiText: Number.isFinite(thi) ? String(Math.round(thi)) : "--",
+    tempC: Number.isFinite(tempC) ? Math.round(tempC) : null,
+    humidity: Number.isFinite(humidity) ? Math.round(humidity) : null,
+    level,
+    levelLabel: status?.label || "غير متاح",
+    locationLabel: weather?.locationLabel || "",
+    updatedAt: weather?.updatedAt || ""
+  };
+
+  if (!Number.isFinite(thi)) {
+    return {
+      available: false,
+      title: "THI الحالي ونصيحة توقيت التلقيح",
+      summary: "لا توجد قراءة THI حالية كافية للمزرعة. فعّل موقع المزرعة حتى يستطيع مُرَبِّيك ربط توقيت التلقيح بالإجهاد الحراري الحالي.",
+      current,
+      timingAdvice: "لا يتم تعديل توقيت التلقيح بناءً على THI في هذه اللحظة لغياب القراءة الحالية.",
+      actions: [
+        "تأكد من حفظ موقع المزرعة من حساب المستخدم.",
+        "استمر في توقيت التلقيح حسب شدة الشياع ووقت بدايته حتى تتوفر قراءة THI.",
+        "راقب الحيوانات عالية الإنتاج والحديثة الولادة يدويًا في أيام الحر."
+      ]
+    };
+  }
+
+  if (thi < 68 || level === "comfort") {
+    return {
+      available: true,
+      title: "THI الحالي ونصيحة توقيت التلقيح",
+      summary: "THI الحالي في نطاق مريح؛ لا توجد دلالة إجهاد حراري مؤثر على قرار توقيت التلقيح الآن.",
+      current,
+      timingAdvice: "نفّذ التلقيح حسب توقيت الشياع المعتاد وجودة العلامات، ولا تؤجل تلقيحة مؤكدة بسبب الحرارة.",
+      actions: [
+        "اعتمد على بداية الشياع ودرجة الوقوف لتحديد توقيت التلقيح.",
+        "استمر في توفير مياه نظيفة وظل وتهوية جيدة كروتين.",
+        "تابع رجوع الشياع وتشخيص الحمل كجزء من تقييم الخصوبة."
+      ]
+    };
+  }
+
+  if (thi < 72 || level === "mild") {
+    return {
+      available: true,
+      title: "THI الحالي ونصيحة توقيت التلقيح",
+      summary: "THI الحالي يشير إلى بداية ضغط حراري خفيف؛ الخصوبة قد تتأثر في الحيوانات الحساسة أو عالية الإنتاج.",
+      current,
+      timingAdvice: "الأفضل تنفيذ التلقيح في الساعات الأبرد عند الإمكان، مع عدم تفويت نافذة الشياع المؤكدة.",
+      actions: [
+        "فضّل التلقيح صباحًا أو مساءً إذا كان ذلك لا يضيع توقيت الشياع.",
+        "قلّل مدة انتظار الحيوان قبل التلقيح.",
+        "وفّر ظلًا ومياهًا وتهوية في مكان الانتظار.",
+        "راقب الحيوانات التي تعود للشياع بعد 18–24 يوم."
+      ]
+    };
+  }
+
+  if (thi < 78 || level === "moderate") {
+    return {
+      available: true,
+      title: "THI الحالي ونصيحة توقيت التلقيح",
+      summary: "THI الحالي في نطاق إجهاد حراري متوسط؛ توقيت التلقيح وإدارة الانتظار والتبريد تصبح مؤثرة على فرص الحمل.",
+      current,
+      timingAdvice: "نفّذ التلقيح في أبرد نافذة ممكنة حول توقيت الشياع، وتجنب إدخال الحيوان في انتظار طويل أو حركة زائدة وقت الظهيرة.",
+      actions: [
+        "قدّم التلقيح إلى الصباح المبكر أو أخّره للمساء حسب توقيت الشياع.",
+        "لا تترك الحيوان في الشمس أو الانتظار المزدحم قبل التلقيح.",
+        "استخدم تهوية أو تبريد قبل وبعد التلقيح عند توفره.",
+        "اقرأ نتائج الحمل في هذه الفترة منفصلة عن الأيام المريحة قبل الحكم على الملقحين.",
+        "زِد دقة تسجيل بداية الشياع ووقت التلقيح."
+      ]
+    };
+  }
+
+  return {
+    available: true,
+    title: "THI الحالي ونصيحة توقيت التلقيح",
+    summary: "THI الحالي مرتفع؛ يوجد ضغط حراري واضح قد يقلل إظهار الشياع وفرص الإخصاب ويحتاج إدارة توقيت وتبريد بجدية.",
+    current,
+    timingAdvice: "لا تُضيّع تلقيحة الشياع المؤكد، لكن اجعل الإجراء في أبرد ساعة ممكنة مع تبريد وتقليل حركة الحيوان لأقصى درجة.",
+    actions: [
+      "تجنب التلقيح في وقت الظهيرة إلا للضرورة القصوى.",
+      "اجعل التلقيح صباحًا مبكرًا أو مساءً حسب نافذة الشياع.",
+      "برّد الحيوان ومنطقة الانتظار قبل التلقيح وبعده.",
+      "قلّل المشي والزحام والوقوف الطويل.",
+      "لا تحكم على الملقح أو السائل من نتائج أيام الإجهاد العالي وحدها.",
+      "راجع برنامج التزامن إذا تكررت أيام THI العالي خلال موسم التلقيح."
+    ]
+  };
+}
 function belongs(rec, tenant){
   const t = rec && rec.userId ? rec.userId : '';
   return tenantKey(t) === tenantKey(tenant);
@@ -31191,6 +31289,15 @@ const repeatBreederAnalysis = fertilityReportRepeatBreederAnalysisSrv(
     freshCount,
     dryCount
   });
+    let fertilityCurrentThiRaw = null;
+
+try {
+  fertilityCurrentThiRaw = await weatherBuildFarmThiSrv(req.authSession?.uid || uid);
+} catch (e) {
+  console.warn("fertility current THI failed:", e.message || e);
+}
+
+const fertilityThiAdvice = fertilityReportCurrentThiAdviceSrv(fertilityCurrentThiRaw);
    const overallStatus = fertilityReportKpiStatusSrv(overallCr, 35, "higher");
 const firstStatus = fertilityReportKpiStatusSrv(firstServiceCr, 40, "higher");
 
@@ -31293,6 +31400,11 @@ farmRecommendations: expertReport.recommendations,
 
 inseminators,
 thiConception: thiGroups,
+
+currentThi: fertilityThiAdvice.current,
+fertilityThiAdvice,
+breedingThiAdvice: fertilityThiAdvice,
+thiBreedingAdvice: fertilityThiAdvice,
 
 repeatBreederAnalysis,
 repeatBreeders: repeatBreederAnalysis,
