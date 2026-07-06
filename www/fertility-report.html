@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تقرير الخصوبة - مُرَبِّيك</title>
+
+  <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
+  <link rel="stylesheet" href="/css/forms.css">
+</head>
+
+<body data-page="fertility-report">
+
+<header class="mbk-top">
+  <div class="mbk-head">
+    <div class="mbk-title">
+      <div class="mbk-page" id="pageTitle">تقرير الخصوبة</div>
+      <div class="mbk-app">مُرَبِّيك</div>
+    </div>
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+  </div>
+</header>
+
+<div class="page">
+
+  <div id="statusBar" class="card">جارٍ تحميل تقرير الخصوبة...</div>
+
+  <div class="card">
+    <div class="section-title">🌿 ملخص تقرير الخصوبة</div>
+    <div id="summaryGrid" class="kpi-grid"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">📌 الحالة التناسلية للقطيع</div>
+    <div id="herdGrid" class="kpi-grid"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">🎯 مؤشرات الإخصاب الأساسية</div>
+    <div id="conceptionGrid" class="kpi-grid"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">👨‍⚕️ كفاءة الملقحين</div>
+    <div id="inseminatorsWrap"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">🔥 تأثير THI / الإجهاد الحراري</div>
+    <div id="thiWrap"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">🔁 حيوانات تحتاج مراجعة خصوبة — Repeat Breeder</div>
+    <div id="repeatBreedersWrap"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">🧭 قوائم المتابعة العملية</div>
+    <div id="actionsWrap"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">🧠 قراءة مُرَبِّيك</div>
+    <div id="advisoryWrap"></div>
+  </div>
+
+</div>
+
+<div class="actions-bar">
+  <button type="button" class="btn secondary" onclick="location.href='dashboard.html'">الرجوع لغرفة التحكم</button>
+  <button type="button" class="btn primary" onclick="window.print()">طباعة التقرير</button>
+</div>
+
+<script>
+const API_BASE = "";
+
+function qs(name){
+  return new URLSearchParams(location.search).get(name);
+}
+
+const rawType = String(qs("type") || "cows").toLowerCase();
+const reportType = rawType === "buffalo" ? "buffalo" : "cows";
+const reportTypeLabel = reportType === "buffalo" ? "الجاموس" : "الأبقار";
+
+function el(id){
+  return document.getElementById(id);
+}
+
+function esc(v){
+  return String(v ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function fmtNum(v){
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toLocaleString("ar-EG") : "--";
+}
+
+function fmtPct(v){
+  const n = Number(v);
+  return Number.isFinite(n) ? `${n.toFixed(1).replace(".0", "")}%` : "--";
+}
+
+function box(label, value, sub = "", cls = ""){
+  return `
+    <div class="kpi ${cls}">
+      <div class="kpi-label">${esc(label)}</div>
+      <div class="kpi-value">${esc(value ?? "--")}</div>
+      ${sub ? `<div class="kpi-sub">${esc(sub)}</div>` : ""}
+    </div>
+  `;
+}
+
+function badge(text, status){
+  const s = String(status || "muted");
+  const cls =
+    s === "good" ? "status-ok" :
+    s === "warn" ? "status-warn" :
+    s === "danger" ? "status-error" :
+    "status-muted";
+
+  return `<span class="${cls}">${esc(text || "غير مكتمل")}</span>`;
+}
+
+function emptyMsg(text){
+  return `<div class="kpi-sub">${esc(text)}</div>`;
+}
+
+function table(headers, rows){
+  if (!rows.length) return emptyMsg("لا توجد بيانات كافية حاليًا.");
+
+  return `
+    <div class="preview-scroll">
+      <table class="mbk-table">
+        <thead>
+          <tr>${headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr>
+        </thead>
+        <tbody>
+          ${rows.join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function fetchReport(){
+  const res = await fetch(`${API_BASE}/api/fertility-report?type=${encodeURIComponent(reportType)}`, {
+    method: "GET",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Accept": "application/json",
+      "Cache-Control": "no-store"
+    }
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || data.ok !== true) {
+    throw new Error(data.message || data.error || "تعذّر تحميل تقرير الخصوبة.");
+  }
+
+  return data;
+}
+
+function renderSummary(j){
+  const c = j.conception || {};
+  const fs = c.firstService || {};
+  const overall = c.overallHerd || {};
+  const rb = j.repeatBreeders || {};
+  const actions = j.actionLists || {};
+
+  const dueDx = Array.isArray(actions.duePregnancyDiagnosis) ? actions.duePregnancyDiagnosis.length : 0;
+  const delayed = Array.isArray(actions.delayedFirstBreeding) ? actions.delayedFirstBreeding.length : 0;
+
+  el("summaryGrid").innerHTML =
+    box("نوع القطيع", reportTypeLabel) +
+    box("الفترة", `${fmtNum(j.periodDays || 180)} يوم`) +
+    box("نسبة الحمل من أول تلقيحة", fmtPct(fs.valuePct), `المستهدف ${fmtPct(fs.benchmarkPct)}`) +
+    box("معدل الإخصاب العام", fmtPct(overall.valuePct), `المستهدف ${fmtPct(overall.benchmarkPct)}`) +
+    box("مطلوب تشخيص حمل", fmtNum(dueDx)) +
+    box("متأخرات عن أول تلقيح", fmtNum(delayed)) +
+    box("Repeat Breeder", fmtNum(rb.count || 0));
+}
+
+function renderHerd(j){
+  const h = j.herdSummary || {};
+
+  el("herdGrid").innerHTML =
+    box("إجمالي نشط", fmtNum(h.totalActive)) +
+    box("عشار", fmtNum(h.pregnantCount)) +
+    box("مفتوحة", fmtNum(h.openCount)) +
+    box("ملقحة", fmtNum(h.inseminatedCount)) +
+    box("حديثة الولادة", fmtNum(h.freshCount)) +
+    box("جافة", fmtNum(h.dryCount));
+}
+
+function renderConception(j){
+  const c = j.conception || {};
+  const fs = c.firstService || {};
+  const overall = c.overallHerd || {};
+
+  el("conceptionGrid").innerHTML =
+    box("نسبة الحمل من أول تلقيحة", fmtPct(fs.valuePct), `${fmtNum(fs.pregnancies)} حمل / ${fmtNum(fs.judged)} حالة`) +
+    box("تقييم أول تلقيحة", fs.read || "--", `المستهدف ${fmtPct(fs.benchmarkPct)}`) +
+    box("معدل الإخصاب العام", fmtPct(overall.valuePct), `${fmtNum(overall.pregnancies)} حمل / ${fmtNum(overall.judged)} حالة`) +
+    box("تقييم الإخصاب العام", overall.read || "--", `المستهدف ${fmtPct(overall.benchmarkPct)}`);
+}
+
+function renderInseminators(j){
+  const rows = Array.isArray(j.inseminators) ? j.inseminators : [];
+
+  const htmlRows = rows.map(r => `
+    <tr>
+      <td>${esc(r.inseminator || "غير محدد")}</td>
+      <td>${fmtNum(r.totalAiInPeriod)}</td>
+      <td>${fmtNum(r.totalJudged)}</td>
+      <td>${fmtNum(r.pregnancies)}</td>
+      <td>${fmtPct(r.conceptionRatePct)}</td>
+      <td>${r.avgThi == null ? "--" : fmtNum(r.avgThi)}</td>
+      <td>${badge(r.evaluation, r.status)}</td>
+    </tr>
+  `);
+
+  el("inseminatorsWrap").innerHTML = table(
+    ["الملقح", "تلقيحات الفترة", "محكوم عليها", "حمل مثبت", "CR", "متوسط THI", "التقييم"],
+    htmlRows
+  );
+}
+
+function renderThi(j){
+  const rows = Array.isArray(j.thiConception) ? j.thiConception : [];
+
+  const htmlRows = rows.map(r => `
+    <tr>
+      <td>${esc(r.label || r.level || "غير متاح")}</td>
+      <td>${fmtNum(r.judged)}</td>
+      <td>${fmtNum(r.pregnancies)}</td>
+      <td>${fmtPct(r.conceptionRatePct)}</td>
+    </tr>
+  `);
+
+  el("thiWrap").innerHTML = table(
+    ["مستوى THI", "تلقيحات محكوم عليها", "حمل مثبت", "CR"],
+    htmlRows
+  );
+}
+
+function renderRepeatBreeders(j){
+  const rb = j.repeatBreeders || {};
+  const rows = Array.isArray(rb.rows) ? rb.rows : [];
+
+  const htmlRows = rows.map(r => `
+    <tr>
+      <td>${esc(r.animalNumber)}</td>
+      <td>${fmtNum(r.servicesCount)}</td>
+      <td>${esc(r.lastInseminationDate || "--")}</td>
+      <td>${r.daysInMilk == null ? "--" : fmtNum(r.daysInMilk)}</td>
+      <td>${esc(r.cycleRegularity || "--")}</td>
+      <td>${esc(r.reproductiveSuspicion || "--")}</td>
+    </tr>
+  `);
+
+  el("repeatBreedersWrap").innerHTML = rows.length
+    ? table(["رقم الحيوان", "عدد التلقيحات", "آخر تلقيح", "أيام الحليب", "انتظام الدورة", "الترجيح"], htmlRows)
+    : emptyMsg("لا توجد حيوانات Repeat Breeder محققة للشروط حاليًا.");
+}
+
+function renderActions(j){
+  const actions = j.actionLists || {};
+  const dueDx = Array.isArray(actions.duePregnancyDiagnosis) ? actions.duePregnancyDiagnosis : [];
+  const delayed = Array.isArray(actions.delayedFirstBreeding) ? actions.delayedFirstBreeding : [];
+
+  const rows = [];
+
+  dueDx.forEach(r => {
+    rows.push(`
+      <tr>
+        <td>تشخيص حمل</td>
+        <td>${esc(r.animalNumber)}</td>
+        <td>${esc(r.lastInseminationDate || "--")}</td>
+        <td>${fmtNum(r.daysSinceInsemination)} يوم بعد التلقيح</td>
+      </tr>
+    `);
+  });
+
+  delayed.forEach(r => {
+    rows.push(`
+      <tr>
+        <td>تأخر أول تلقيح</td>
+        <td>${esc(r.animalNumber)}</td>
+        <td>${fmtNum(r.daysInMilk)} يوم حليب</td>
+        <td>${esc(r.reproductiveStatus || "--")}</td>
+      </tr>
+    `);
+  });
+
+  el("actionsWrap").innerHTML = table(
+    ["القائمة", "رقم الحيوان", "التاريخ/الأيام", "ملاحظة"],
+    rows
+  );
+}
+
+function renderAdvisory(j){
+  const a = j.advisory || {};
+  const notes = Array.isArray(a.notes) ? a.notes : [];
+
+  el("advisoryWrap").innerHTML = `
+    <div class="kpi">
+      <div class="kpi-label">القراءة العامة</div>
+      <div class="kpi-value">${esc(a.headline || "لا توجد قراءة كافية بعد.")}</div>
+      ${
+        notes.length
+          ? `<div class="kpi-sub">${notes.map(n => `• ${esc(n)}`).join("<br>")}</div>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+async function main(){
+  el("pageTitle").textContent = `تقرير الخصوبة — ${reportTypeLabel}`;
+
+  try {
+    const j = await fetchReport();
+
+    renderSummary(j);
+    renderHerd(j);
+    renderConception(j);
+    renderInseminators(j);
+    renderThi(j);
+    renderRepeatBreeders(j);
+    renderActions(j);
+    renderAdvisory(j);
+
+    el("statusBar").textContent = `تم تحميل تقرير الخصوبة — ${reportTypeLabel}.`;
+
+  } catch (e) {
+    console.error(e);
+    el("statusBar").textContent = e.message || "تعذّر تحميل تقرير الخصوبة.";
+  }
+}
+
+main();
+</script>
+
+</body>
+</html>
