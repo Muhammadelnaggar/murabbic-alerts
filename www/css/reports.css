@@ -1,1 +1,536 @@
 
+    :root{
+      --green:#0b7f47;
+      --brand:#0ea05a;
+      --brand-soft:#eefaf2;
+      --bg:#f6fbf7;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --border:#dfe9e2;
+      --line:#e7efe9;
+      --warn:#c2410c;
+      --danger:#b91c1c;
+      --ink:#17231d;
+    }
+
+    *{box-sizing:border-box}
+    html,body{max-width:100%;overflow-x:hidden}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:'Cairo',Tahoma,Arial,sans-serif;
+      direction:rtl;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+    }
+
+    /* ===== شاشة عادية ===== */
+    .screen-top{
+      position:sticky;
+      top:0;
+      z-index:20;
+      background:#fff;
+      border-bottom:1px solid var(--border);
+      box-shadow:0 4px 16px rgba(15,23,42,.04);
+    }
+    .screen-head{
+      max-width:1080px;
+      margin:0 auto;
+      padding:10px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .screen-title{
+      font-size:18px;
+      font-weight:950;
+      color:var(--ink);
+      line-height:1.2;
+    }
+    .screen-brand{
+      font-size:13px;
+      font-weight:950;
+      color:var(--green);
+      opacity:.95;
+      margin-top:2px;
+    }
+    .screen-logo{
+      height:48px;
+      width:auto;
+      object-fit:contain;
+      opacity:.92;
+    }
+
+    .page{
+      max-width:1080px;
+      margin:14px auto 90px;
+      padding:0 12px;
+    }
+
+    /* ===== هيدر التقرير المحترف ===== */
+    .report-cover{
+      background:
+        linear-gradient(135deg, rgba(14,160,90,.12), rgba(255,255,255,.96) 45%),
+        #fff;
+      border:1px solid var(--border);
+      border-radius:28px;
+      padding:20px;
+      margin-bottom:14px;
+      box-shadow:0 10px 30px rgba(15,23,42,.05);
+      overflow:hidden;
+      position:relative;
+    }
+    .report-cover::after{
+      content:"";
+      position:absolute;
+      inset:auto -35px -45px auto;
+      width:170px;
+      height:170px;
+      border-radius:50%;
+      background:rgba(14,160,90,.08);
+      pointer-events:none;
+    }
+    .report-head{
+      display:grid;
+      grid-template-columns:92px 1fr auto;
+      gap:16px;
+      align-items:center;
+      position:relative;
+      z-index:1;
+    }
+    .report-logo-box{
+      width:82px;
+      height:82px;
+      border-radius:24px;
+      border:1px solid var(--border);
+      background:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:0 8px 18px rgba(15,23,42,.05);
+    }
+    .report-logo-box img{
+      width:64px;
+      max-height:64px;
+      object-fit:contain;
+      opacity:.95;
+    }
+    .report-kicker{
+      font-size:13px;
+      font-weight:950;
+      color:var(--green);
+      letter-spacing:.2px;
+      margin-bottom:4px;
+    }
+    .title{
+      font-size:28px;
+      font-weight:950;
+      color:#123d2a;
+      margin:0 0 6px;
+      line-height:1.22;
+    }
+    .sub{
+      font-size:13px;
+      font-weight:800;
+      color:var(--muted);
+      line-height:1.8;
+    }
+    .report-stamp{
+      min-width:170px;
+      border:1px solid rgba(14,160,90,.25);
+      background:rgba(255,255,255,.72);
+      border-radius:20px;
+      padding:12px;
+      text-align:center;
+    }
+    .report-stamp b{
+      display:block;
+      color:var(--green);
+      font-size:18px;
+      font-weight:950;
+    }
+    .report-stamp span{
+      display:block;
+      margin-top:4px;
+      color:#476454;
+      font-size:12px;
+      font-weight:850;
+    }
+    .report-meta{
+      position:relative;
+      z-index:1;
+      margin-top:16px;
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:8px;
+    }
+    .meta-pill{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:10px 12px;
+      min-height:58px;
+    }
+    .meta-pill span{
+      display:block;
+      color:#6b7f72;
+      font-size:11px;
+      font-weight:900;
+      margin-bottom:4px;
+    }
+    .meta-pill b{
+      display:block;
+      color:#173126;
+      font-size:14px;
+      font-weight:950;
+      line-height:1.35;
+    }
+
+    .card{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:14px;
+      margin-bottom:12px;
+      box-shadow:0 8px 24px rgba(15,23,42,.04);
+      break-inside:avoid;
+      page-break-inside:avoid;
+    }
+    .section-title{
+      font-weight:950;
+      color:#134e2f;
+      margin:0 0 10px;
+      font-size:17px;
+      border-bottom:1px solid #edf3ee;
+      padding-bottom:9px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:9px;
+    }
+    .kpi{
+      border:1px solid #e6efe8;
+      border-radius:18px;
+      padding:12px;
+      background:#fff;
+      break-inside:avoid;
+    }
+    .kpi b{
+      display:block;
+      font-size:22px;
+      color:var(--green);
+      line-height:1.12;
+      font-weight:950;
+    }
+    .kpi span{
+      display:block;
+      font-size:11px;
+      font-weight:950;
+      color:#315f49;
+      margin-top:6px;
+      line-height:1.35;
+    }
+
+    .cards{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:10px;
+    }
+    .mini{
+      border:1px solid #e6efe8;
+      border-radius:18px;
+      padding:12px;
+      background:#fbfdfb;
+      break-inside:avoid;
+    }
+    .mini .name{
+      font-size:13px;
+      font-weight:950;
+      color:#1f5136;
+      margin-bottom:5px;
+    }
+    .mini .value{
+      font-size:20px;
+      font-weight:950;
+      color:#0b7f47;
+      line-height:1.25;
+    }
+    .mini .note{
+      font-size:12px;
+      font-weight:800;
+      color:#64748b;
+      line-height:1.55;
+      margin-top:5px;
+    }
+    .badge{
+      display:inline-flex;
+      border-radius:999px;
+      padding:5px 10px;
+      font-size:11px;
+      font-weight:950;
+      background:#ecfdf3;
+      color:#166534;
+      border:1px solid #bbf7d0;
+      vertical-align:middle;
+    }
+    .badge.warn{
+      background:#fff7ed;
+      color:#c2410c;
+      border-color:#fed7aa;
+    }
+    .badge.danger{
+      background:#fff1f2;
+      color:#b91c1c;
+      border-color:#fecdd3;
+    }
+
+    .table-wrap{
+      overflow:auto;
+      border-radius:18px;
+    }
+    table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0 8px;
+      min-width:760px;
+    }
+    th{
+      font-size:12px;
+      color:#475569;
+      text-align:right;
+      padding:8px;
+      font-weight:950;
+      white-space:nowrap;
+    }
+    td{
+      background:#fff;
+      border-top:1px solid #e6efe8;
+      border-bottom:1px solid #e6efe8;
+      padding:10px;
+      font-size:13px;
+      font-weight:850;
+      line-height:1.55;
+      vertical-align:top;
+    }
+    td:first-child{
+      border-right:1px solid #e6efe8;
+      border-radius:0 14px 14px 0;
+    }
+    td:last-child{
+      border-left:1px solid #e6efe8;
+      border-radius:14px 0 0 14px;
+    }
+    thead{display:table-header-group}
+    tr{break-inside:avoid;page-break-inside:avoid}
+    .click{cursor:pointer}
+    .click:hover td{background:#f7fcf8}
+    .empty{
+      font-size:14px;
+      font-weight:900;
+      color:#64748b;
+      line-height:1.7;
+    }
+
+    .actions{
+      position:fixed;
+      bottom:12px;
+      left:50%;
+      transform:translateX(-50%);
+      width:min(92%,460px);
+      display:flex;
+      gap:8px;
+      background:rgba(255,255,255,.86);
+      backdrop-filter:blur(8px);
+      border:1px solid rgba(0,0,0,.06);
+      border-radius:18px;
+      padding:8px;
+      z-index:30;
+      box-shadow:0 10px 28px rgba(15,23,42,.10);
+    }
+    .actions button,
+    .actions a{
+      flex:1;
+      text-align:center;
+      text-decoration:none;
+      border:none;
+      border-radius:13px;
+      padding:12px;
+      font-weight:950;
+      cursor:pointer;
+      font-family:inherit;
+      font-size:14px;
+    }
+    .primary{background:#0ea05a;color:white}
+    .ghost{background:#eef7f0;color:#134e2f}
+
+    .print-only{display:none}
+    .print-footer{display:none}
+
+    @media(max-width:760px){
+      .report-head{grid-template-columns:70px 1fr}
+      .report-stamp{grid-column:1 / -1;text-align:right}
+      .report-logo-box{width:64px;height:64px;border-radius:18px}
+      .report-logo-box img{width:50px;max-height:50px}
+      .title{font-size:21px}
+      .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .cards{grid-template-columns:1fr}
+      .report-meta{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .kpi b{font-size:19px}
+      .page{margin-bottom:96px}
+    }
+
+    /* ===== طباعة PDF متعدد الصفحات ===== */
+    @page{
+      size:A4;
+      margin:13mm 10mm 15mm;
+    }
+
+    @media print{
+      :root{
+        --bg:#fff;
+        --card:#fff;
+        --border:#d7e3da;
+        --line:#dfe9e2;
+      }
+      html,body{
+        width:210mm;
+        background:#fff !important;
+        color:#111827;
+        overflow:visible !important;
+      }
+      .screen-top,
+      .actions,
+      .no-print{
+        display:none !important;
+      }
+      .print-only{display:block}
+      .page{
+        max-width:none;
+        width:100%;
+        margin:0;
+        padding:0;
+      }
+      .report-cover{
+        border-radius:0;
+        border:2px solid #d7e3da;
+        box-shadow:none;
+        margin:0 0 7mm;
+        padding:10mm 9mm 8mm;
+        break-after:avoid;
+        page-break-after:avoid;
+      }
+      .report-head{
+        grid-template-columns:78px 1fr 160px;
+      }
+      .report-logo-box{
+        width:70px;
+        height:70px;
+        border-radius:18px;
+        box-shadow:none;
+      }
+      .report-logo-box img{
+        width:56px;
+        max-height:56px;
+      }
+      .title{
+        font-size:24pt;
+        color:#123d2a;
+      }
+      .report-meta{
+        grid-template-columns:repeat(4,1fr);
+        gap:5mm;
+        margin-top:7mm;
+      }
+      .meta-pill{
+        border-radius:0;
+        min-height:0;
+        padding:4mm;
+      }
+      .card{
+        border-radius:0;
+        box-shadow:none;
+        border:1px solid #dfe9e2;
+        padding:6mm;
+        margin:0 0 6mm;
+        break-inside:avoid;
+        page-break-inside:avoid;
+      }
+      .section-title{
+        font-size:14pt;
+        padding-bottom:3mm;
+        margin-bottom:4mm;
+      }
+      .grid{
+        grid-template-columns:repeat(4,1fr);
+        gap:3mm;
+      }
+      .cards{
+        grid-template-columns:repeat(2,1fr);
+        gap:3mm;
+      }
+      .kpi,
+      .mini{
+        border-radius:0;
+        padding:4mm;
+        box-shadow:none;
+        break-inside:avoid;
+        page-break-inside:avoid;
+      }
+      .kpi b{font-size:17pt}
+      .mini .value{font-size:15pt}
+      .table-wrap{
+        overflow:visible;
+        border-radius:0;
+      }
+      table{
+        min-width:0;
+        border-collapse:collapse;
+        border-spacing:0;
+        page-break-inside:auto;
+      }
+      th{
+        background:#eef7f0 !important;
+        color:#143d2b;
+        border:1px solid #cfe0d2;
+        padding:2.6mm;
+        font-size:9pt;
+      }
+      td{
+        border:1px solid #dfe9e2 !important;
+        border-radius:0 !important;
+        padding:2.6mm;
+        font-size:9pt;
+        background:#fff !important;
+      }
+      thead{display:table-header-group}
+      tfoot{display:table-footer-group}
+      tr{
+        break-inside:avoid;
+        page-break-inside:avoid;
+      }
+      .badge{
+        border-radius:0;
+        padding:1mm 2mm;
+        font-size:8pt;
+      }
+      .print-footer{
+        display:block;
+        position:fixed;
+        bottom:4mm;
+        left:10mm;
+        right:10mm;
+        border-top:1px solid #d7e3da;
+        padding-top:2mm;
+        font-size:8pt;
+        color:#64748b;
+        text-align:center;
+      }
+      .print-footer::after{
+        content:"مُرَبِّيك — تقرير تغذية مطبوع";
+      }
+    }
