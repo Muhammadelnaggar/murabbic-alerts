@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>تقرير إنتاج اللبن | مُرَبِّيك</title>
+  <link rel="stylesheet" href="css/forms.css">
   <!-- milk-report-version: v31 -->
   <style>
     :root{
@@ -18,12 +19,6 @@
     }
     button,input,select{font-family:inherit}
     .wrap{width:min(1280px,calc(100% - 28px)); margin:auto; padding:16px 0 48px}
-    .topbar{position:sticky;top:0;z-index:20;background:rgba(245,247,251,.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
-    .topbar-inner{width:min(1280px,calc(100% - 28px));margin:auto;padding:12px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-    .brand{display:flex;align-items:center;gap:10px}
-    .brand-mark{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,var(--brand),#14b8a6);font-weight:950}
-    .brand h1{margin:0;font-size:18px}
-    .brand p{margin:3px 0 0;color:var(--muted);font-size:12px;font-weight:750}
     .controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
     .field{display:flex;flex-direction:column;gap:4px}
     .field label{font-size:11px;font-weight:900;color:var(--muted)}
@@ -607,14 +602,20 @@
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <div class="topbar-inner">
-      <div class="brand">
-        <div class="brand-mark">م</div>
-        <div>
-          <h1>تقرير إنتاج اللبن</h1>
-        </div>
-      </div>
+<header class="no-print-section">
+  <div class="mbk-head">
+    <a class="mbk-back" href="dashboard.html" title="الرجوع إلى غرفة التحكم">غرفة التحكم</a>
+
+    <div class="mbk-center">
+      <div class="mbk-page-title">تقرير إنتاج اللبن</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
+    </div>
+
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+  </div>
+</header>
+   <main class="wrap">
+    <section class="card no-print-section" id="reportTools">
       <div class="controls">
         <div class="field"><label for="reportDate">تاريخ التقرير</label><input id="reportDate" type="date"></div>
         <div class="field">
@@ -623,10 +624,7 @@
         </div>
         <button class="btn btn-ghost" id="printBtn">طباعة التقرير كاملًا</button>
       </div>
-    </div>
-  </div>
-
-  <main class="wrap">
+    </section>
     <div id="loading" class="loading">جاري تحميل تقرير اللبن...</div>
 
     <section id="report" style="display:none;">
