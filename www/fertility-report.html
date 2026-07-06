@@ -324,6 +324,111 @@ body[data-page="fertility-report"] .fert-action-list li {
       gap: 8px;
     }
   }
+    .print-cover {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  body[data-page="fertility-report"] {
+    background: #fff !important;
+    color: #0f172a !important;
+    font-family: Arial, Tahoma, sans-serif;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  body[data-page="fertility-report"] .mbk-top,
+  body[data-page="fertility-report"] .actions-bar,
+  body[data-page="fertility-report"] #statusBar {
+    display: none !important;
+  }
+
+  body[data-page="fertility-report"] .print-cover {
+    display: block !important;
+    border: 1px solid #dbe3ea;
+    border-radius: 14px;
+    padding: 12mm;
+    margin-bottom: 8mm;
+    break-inside: avoid;
+  }
+
+  body[data-page="fertility-report"] .print-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 2px solid #047857;
+    padding-bottom: 6mm;
+    margin-bottom: 6mm;
+  }
+
+  body[data-page="fertility-report"] .print-brand img {
+    width: 18mm;
+    height: 18mm;
+    object-fit: contain;
+  }
+
+  body[data-page="fertility-report"] .print-brand strong {
+    display: block;
+    font-size: 20pt;
+    color: #047857;
+    font-weight: 950;
+  }
+
+  body[data-page="fertility-report"] .print-brand span {
+    display: block;
+    font-size: 10pt;
+    color: #475569;
+    font-weight: 700;
+  }
+
+  body[data-page="fertility-report"] .print-cover h1 {
+    margin: 0 0 5mm;
+    font-size: 18pt;
+    font-weight: 950;
+  }
+
+  body[data-page="fertility-report"] .print-cover p {
+    margin: 0 0 6mm;
+    font-size: 10.5pt;
+    line-height: 1.8;
+    color: #334155;
+  }
+
+  body[data-page="fertility-report"] .print-meta {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4mm;
+  }
+
+  body[data-page="fertility-report"] .print-meta span {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 3mm;
+    background: #f8fafc;
+    font-size: 9.5pt;
+    font-weight: 800;
+  }
+
+  body[data-page="fertility-report"] .page {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body[data-page="fertility-report"] .card {
+    box-shadow: none !important;
+    border: 1px solid #dbe3ea !important;
+    border-radius: 12px !important;
+    padding: 6mm !important;
+    margin-bottom: 6mm !important;
+    break-inside: avoid;
+  }
+}
 </style>
 </head>
 
@@ -341,7 +446,28 @@ body[data-page="fertility-report"] .fert-action-list li {
     <a class="mbk-back" href="dashboard.html">رجوع</a>
   </div>
 </header>
+<section class="print-cover">
+  <div class="print-brand">
+    <img src="/images/logo.png" alt="مُرَبِّيك">
+    <div>
+      <strong>مُرَبِّيك</strong>
+      <span>نظام إدارة القطيع والتحليل الاستشاري</span>
+    </div>
+  </div>
 
+  <h1 id="printTitle">تقرير الخصوبة</h1>
+
+  <p>
+    تقرير استشاري مبني على بيانات القطيع المسجلة داخل مُرَبِّيك
+    لقراءة حالة الخصوبة ومؤشرات التلقيح ودعم قرارات المتابعة.
+  </p>
+
+  <div class="print-meta">
+    <span id="printType">نوع القطيع: --</span>
+    <span id="printPeriod">فترة التحليل: --</span>
+    <span id="printDate">تاريخ الطباعة: --</span>
+  </div>
+</section>
 <div class="page">
 
   <div id="statusBar" class="card">جارٍ تحميل تقرير الخصوبة...</div>
@@ -815,12 +941,40 @@ function renderAdvisory(j){
     </div>
   `;
 }
+ function renderPrintMeta(j){
+  const today = new Date().toLocaleDateString("ar-EG", {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+
+  const title = el("printTitle");
+  const type = el("printType");
+  const period = el("printPeriod");
+  const date = el("printDate");
+
+  if (title) {
+    title.textContent = `تقرير الخصوبة — ${reportTypeLabel}`;
+  }
+
+  if (type) {
+    type.textContent = `نوع القطيع: ${reportTypeLabel}`;
+  }
+
+  if (period) {
+    period.textContent = `فترة التحليل: ${fmtNum(j.periodDays || 180)} يوم`;
+  }
+
+  if (date) {
+    date.textContent = `تاريخ الطباعة: ${today}`;
+  }
+}
 async function main(){
   el("pageTitle").textContent = `تقرير الخصوبة — ${reportTypeLabel}`;
 
   try {
     const j = await fetchReport();
-
+    renderPrintMeta(j);
     renderSummary(j);
     renderHerd(j);
     renderConception(j);
