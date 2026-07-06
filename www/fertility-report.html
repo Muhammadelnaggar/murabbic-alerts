@@ -8,6 +8,90 @@
   <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
   <link rel="stylesheet" href="/css/forms.css">
   <style>
+    body[data-page="fertility-report"] .mbk-top {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  body[data-page="fertility-report"] .mbk-head {
+    max-width: 980px;
+    margin: 0 auto;
+    min-height: 72px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  body[data-page="fertility-report"] .mbk-logo {
+    width: 46px;
+    height: 46px;
+    object-fit: contain;
+    flex: 0 0 46px;
+  }
+
+  body[data-page="fertility-report"] .mbk-center {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    line-height: 1.25;
+  }
+
+  body[data-page="fertility-report"] .mbk-page-title {
+    font-size: 19px;
+    font-weight: 950;
+    color: #0f172a;
+    white-space: normal;
+  }
+
+  body[data-page="fertility-report"] .mbk-app-name {
+    margin-top: 2px;
+    font-size: 13px;
+    font-weight: 900;
+    color: #047857;
+  }
+
+  body[data-page="fertility-report"] .mbk-back {
+    flex: 0 0 auto;
+    text-decoration: none;
+    border: 1px solid #dbe3ea;
+    background: #f8fafc;
+    color: #0f172a;
+    border-radius: 12px;
+    padding: 9px 12px;
+    font-size: 14px;
+    font-weight: 900;
+  }
+
+  @media (max-width: 520px) {
+    body[data-page="fertility-report"] .mbk-head {
+      min-height: 66px;
+      padding: 8px 10px;
+      gap: 8px;
+    }
+
+    body[data-page="fertility-report"] .mbk-logo {
+      width: 40px;
+      height: 40px;
+      flex-basis: 40px;
+    }
+
+    body[data-page="fertility-report"] .mbk-page-title {
+      font-size: 17px;
+    }
+
+    body[data-page="fertility-report"] .mbk-app-name {
+      font-size: 12px;
+    }
+
+    body[data-page="fertility-report"] .mbk-back {
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+  }
   body[data-page="fertility-report"] #summaryGrid,
   body[data-page="fertility-report"] #herdGrid,
   body[data-page="fertility-report"] #conceptionGrid,
@@ -135,7 +219,80 @@ body[data-page="fertility-report"] #statusBar.is-done {
 body[data-page="fertility-report"] .actions-bar {
   z-index: 30;
 }
+body[data-page="fertility-report"] .fert-card-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
 
+body[data-page="fertility-report"] .fert-mini-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+body[data-page="fertility-report"] .fert-mini-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+body[data-page="fertility-report"] .fert-mini-title {
+  font-size: .98rem;
+  font-weight: 950;
+  color: #0f172a;
+  line-height: 1.5;
+}
+
+body[data-page="fertility-report"] .fert-mini-badge {
+  flex: 0 0 auto;
+}
+
+body[data-page="fertility-report"] .fert-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+body[data-page="fertility-report"] .fert-mini-item {
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+  border-radius: 12px;
+  padding: 9px;
+}
+
+body[data-page="fertility-report"] .fert-mini-label {
+  font-size: .72rem;
+  font-weight: 850;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+body[data-page="fertility-report"] .fert-mini-value {
+  margin-top: 4px;
+  font-size: 1rem;
+  font-weight: 950;
+  color: #047857;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+@media (max-width: 520px) {
+  body[data-page="fertility-report"] .fert-mini-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  body[data-page="fertility-report"] .fert-mini-head {
+    display: block;
+  }
+
+  body[data-page="fertility-report"] .fert-mini-badge {
+    margin-top: 8px;
+  }
+}
 @media print {
   body[data-page="fertility-report"] .actions-bar,
   body[data-page="fertility-report"] #statusBar {
@@ -163,11 +320,14 @@ body[data-page="fertility-report"] .actions-bar {
 
 <header class="mbk-top">
   <div class="mbk-head">
-    <div class="mbk-title">
-      <div class="mbk-page" id="pageTitle">تقرير الخصوبة</div>
-      <div class="mbk-app">مُرَبِّيك</div>
-    </div>
     <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+
+    <div class="mbk-center">
+      <div class="mbk-page-title" id="pageTitle">تقرير الخصوبة</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
+    </div>
+
+    <a class="mbk-back" href="dashboard.html">رجوع</a>
   </div>
 </header>
 
@@ -329,24 +489,18 @@ async function fetchReport(){
 }
 
 function renderSummary(j){
-  const expert = j.expertReport || {};
-  const main = expert.mainBottleneck || j.bottleneckAnalysis?.main || {};
-  const rb = j.repeatBreederAnalysis || j.repeatBreeders || {};
-  const recs = Array.isArray(j.farmRecommendations) ? j.farmRecommendations : [];
   const h = j.herdSummary || {};
+  const rb = j.repeatBreederAnalysis || j.repeatBreeders || {};
 
   el("summaryGrid").innerHTML = `
     <div class="fert-panel fert-hero">
       <div class="fert-title">
-        ${esc(expert.headline || "تقرير الخصوبة غير مكتمل القراءة بعد.")}
+        نطاق تقرير الخصوبة
       </div>
 
       <div class="fert-read">
-        ${main.title ? `<strong>${esc(main.title)}</strong><br>` : ""}
-        ${esc(main.read || "")}
+        هذا القسم يعرض بيانات التقرير الأساسية فقط. القراءة الفنية وتقييم مُرَبِّيك موجودان في نهاية التقرير بعد عرض المؤشرات والجداول.
       </div>
-
-      ${recs[0] ? `<div class="fert-advice">${esc(recs[0])}</div>` : ""}
 
       <div class="fert-stats">
         <div class="fert-stat">
@@ -438,40 +592,91 @@ function renderConception(j){
 function renderInseminators(j){
   const rows = Array.isArray(j.inseminators) ? j.inseminators : [];
 
-  const htmlRows = rows.map(r => `
-    <tr>
-      <td>${esc(r.inseminator || "غير محدد")}</td>
-      <td>${fmtNum(r.totalAiInPeriod)}</td>
-      <td>${fmtNum(r.totalJudged)}</td>
-      <td>${fmtNum(r.pregnancies)}</td>
-      <td>${fmtPct(r.conceptionRatePct)}</td>
-      <td>${r.avgThi == null ? "--" : fmtNum(r.avgThi)}</td>
-      <td>${badge(r.evaluation, r.status)}</td>
-    </tr>
-  `);
+  if (!rows.length) {
+    el("inseminatorsWrap").innerHTML = emptyMsg("لا توجد بيانات كافية حاليًا.");
+    return;
+  }
 
-  el("inseminatorsWrap").innerHTML = table(
-    ["الملقح", "تلقيحات الفترة", "محكوم عليها", "حمل مثبت", "CR", "متوسط THI", "التقييم"],
-    htmlRows
-  );
+  el("inseminatorsWrap").innerHTML = `
+    <div class="fert-panel">
+      <div class="fert-card-list">
+        ${rows.map(r => `
+          <div class="fert-mini-card">
+            <div class="fert-mini-head">
+              <div class="fert-mini-title">${esc(r.inseminator || "غير محدد")}</div>
+              <div class="fert-mini-badge">${badge(r.evaluation, r.status)}</div>
+            </div>
+
+            <div class="fert-mini-grid">
+              <div class="fert-mini-item">
+                <div class="fert-mini-label">تلقيحات الفترة</div>
+                <div class="fert-mini-value">${fmtNum(r.totalAiInPeriod)}</div>
+              </div>
+
+              <div class="fert-mini-item">
+                <div class="fert-mini-label">محكوم عليها</div>
+                <div class="fert-mini-value">${fmtNum(r.totalJudged)}</div>
+              </div>
+
+              <div class="fert-mini-item">
+                <div class="fert-mini-label">حمل مثبت</div>
+                <div class="fert-mini-value">${fmtNum(r.pregnancies)}</div>
+              </div>
+
+              <div class="fert-mini-item">
+                <div class="fert-mini-label">CR</div>
+                <div class="fert-mini-value">${fmtPct(r.conceptionRatePct)}</div>
+              </div>
+
+              <div class="fert-mini-item">
+                <div class="fert-mini-label">متوسط THI</div>
+                <div class="fert-mini-value">${r.avgThi == null ? "--" : fmtNum(r.avgThi)}</div>
+              </div>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
 }
-
 function renderThi(j){
   const rows = Array.isArray(j.thiConception) ? j.thiConception : [];
 
-  const htmlRows = rows.map(r => `
-    <tr>
-      <td>${esc(r.label || r.level || "غير متاح")}</td>
-      <td>${fmtNum(r.judged)}</td>
-      <td>${fmtNum(r.pregnancies)}</td>
-      <td>${fmtPct(r.conceptionRatePct)}</td>
-    </tr>
-  `);
+  if (!rows.length) {
+    el("thiWrap").innerHTML = emptyMsg("لا توجد بيانات كافية حاليًا.");
+    return;
+  }
 
-  el("thiWrap").innerHTML = table(
-    ["مستوى THI", "تلقيحات محكوم عليها", "حمل مثبت", "CR"],
-    htmlRows
-  );
+  el("thiWrap").innerHTML = `
+    <div class="fert-panel">
+      <div class="fert-card-list">
+        ${rows.map(r => `
+          <div class="fert-mini-card">
+            <div class="fert-mini-head">
+              <div class="fert-mini-title">${esc(r.label || r.level || "غير متاح")}</div>
+            </div>
+
+            <div class="fert-mini-grid">
+              <div class="fert-mini-item">
+                <div class="fert-mini-label">تلقيحات محكوم عليها</div>
+                <div class="fert-mini-value">${fmtNum(r.judged)}</div>
+              </div>
+
+              <div class="fert-mini-item">
+                <div class="fert-mini-label">حمل مثبت</div>
+                <div class="fert-mini-value">${fmtNum(r.pregnancies)}</div>
+              </div>
+
+              <div class="fert-mini-item">
+                <div class="fert-mini-label">CR</div>
+                <div class="fert-mini-value">${fmtPct(r.conceptionRatePct)}</div>
+              </div>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
 }
 
 function renderRepeatBreeders(j){
