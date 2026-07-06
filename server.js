@@ -30032,12 +30032,28 @@ function fertilityReportIsActiveAnimalSrv(a = {}) {
 }
 
 function fertilityReportReproKindSrv(v) {
-  const s = String(v || "").trim();
+  const s = String(v || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي");
 
-  if (/عشار|حامل|preg/i.test(s)) return "pregnant";
-  if (/ملقح|ملقحة|inseminated|bred/i.test(s)) return "inseminated";
+  // تحضير الولادة = عشار قرب الولادة، وليست متأخرة عن التلقيح
+  if (
+    /عشار|حامل|preg/i.test(s) ||
+    s.includes("تحضير") ||
+    s.includes("انتظار الولاده") ||
+    s.includes("قرب الولاده") ||
+    /close[\s_-]*up|prepartum|pre-partum/i.test(s)
+  ) {
+    return "pregnant";
+  }
+
+  if (/ملقح|ملقحة|ملقحه|inseminated|bred/i.test(s)) return "inseminated";
   if (/حديث|ولاد|fresh/i.test(s)) return "fresh";
-  if (/مفتوح|فارغ|فارغة|open/i.test(s)) return "open";
+  if (/مفتوح|مفتوحه|فارغ|فارغه|open/i.test(s)) return "open";
+
   return "unknown";
 }
 
