@@ -12,27 +12,27 @@
     }
     *{box-sizing:border-box}
     body{
-      margin:0; color:var(--text); bacكجمround:linear-gradient(180deg,#f8fafc,var(--bg));
+      margin:0; color:var(--text); background:linear-gradient(180deg,#f8fafc,var(--bg));
       font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif;
     }
     button,input,select{font-family:inherit}
     .wrap{width:min(1280px,calc(100% - 28px)); margin:auto; padding:16px 0 48px}
-    .topbar{position:sticky;top:0;z-index:20;bacكجمround:rgba(245,247,251,.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+    .topbar{position:sticky;top:0;z-index:20;background:rgba(245,247,251,.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
     .topbar-inner{width:min(1280px,calc(100% - 28px));margin:auto;padding:12px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
     .brand{display:flex;align-items:center;gap:10px}
-    .brand-mark{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;color:#fff;bacكجمround:linear-gradient(135deg,var(--brand),#14b8a6);font-weight:950}
+    .brand-mark{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,var(--brand),#14b8a6);font-weight:950}
     .brand h1{margin:0;font-size:18px}
     .brand p{margin:3px 0 0;color:var(--muted);font-size:12px;font-weight:750}
     .controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
     .field{display:flex;flex-direction:column;gap:4px}
     .field label{font-size:11px;font-weight:900;color:var(--muted)}
-    .field input,.field select{height:42px;min-width:150px;border:1px solid var(--line);border-radius:13px;padding:0 12px;bacكجمround:white}
+    .field input,.field select{height:42px;min-width:150px;border:1px solid var(--line);border-radius:13px;padding:0 12px;background:white}
     .btn{height:42px;border:0;border-radius:13px;padding:0 16px;cursor:pointer;font-weight:950}
-    .btn-primary{bacكجمround:linear-gradient(135deg,var(--brand),var(--brand2));color:white}
-    .btn-ghost{bacكجمround:white;color:var(--brand2);border:1px solid var(--line)}
-    .loading{min-height:240px;display:grid;place-items:center;bacكجمround:white;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);font-weight:950;color:var(--muted)}
+    .btn-primary{background:linear-gradient(135deg,var(--brand),var(--brand2));color:white}
+    .btn-ghost{background:white;color:var(--brand2);border:1px solid var(--line)}
+    .loading{min-height:240px;display:grid;place-items:center;background:white;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);font-weight:950;color:var(--muted)}
 
-    .hero{border-radius:26px;padding:20px;bacكجمround:linear-gradient(135deg,#0f766e,#115e59);color:white;box-shadow:var(--shadow)}
+    .hero{border-radius:26px;padding:20px;background:linear-gradient(135deg,#0f766e,#115e59);color:white;box-shadow:var(--shadow)}
     .hero-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:14px;align-items:stretch}
     .hero h2{margin:0;font-size:clamp(23px,4vw,36px);color:#0f172a}
     .hero-line{margin-top:10px;font-size:17px;font-weight:950;line-height:1.65;color:#334155}
@@ -68,12 +68,12 @@
       color:#64748b;
     }
     .hero-meta{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
-    .pill{display:inline-flex;border-radius:999px;padding:7px 11px;bacكجمround:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);font-size:12px;font-weight:900}
-    .hero-panel{bacكجمround:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:15px}
+    .pill{display:inline-flex;border-radius:999px;padding:7px 11px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);font-size:12px;font-weight:900}
+    .hero-panel{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:15px}
     .hero-panel .label{font-size:13px;font-weight:900;color:rgba(255,255,255,.84)}
     .hero-panel .value{margin-top:5px;font-size:32px;font-weight:950}
     .hero-panel .sub{margin-top:5px;font-size:12px;line-height:1.6;color:rgba(255,255,255,.86);font-weight:750}
-    .notice{display:none;margin-top:12px;bacكجمround:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:15px;padding:11px 13px;font-weight:900}
+    .notice{display:none;margin-top:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:15px;padding:11px 13px;font-weight:900}
     .notice.show{display:block}
 
     .section{margin-top:20px}
@@ -81,11 +81,11 @@
     .section-head h3{margin:0;font-size:20px}
     .section-head p{margin:5px 0 0;color:var(--muted);font-size:13px;font-weight:750}
     .grid{display:grid;gap:12px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
-    .card{bacكجمround:white;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:15px;overflow:hidden}
+    .card{background:white;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:15px;overflow:hidden}
 
     .kpi-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
     .kpi-card{
-      bacكجمround:white;
+      background:white;
       border:1px solid var(--line);
       border-radius:18px;
       box-shadow:var(--shadow);
@@ -100,7 +100,7 @@
 
     .econ-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
     .econ-card{
-      bacكجمround:white;
+      background:white;
       border:1px solid var(--line);
       border-radius:18px;
       box-shadow:var(--shadow);
@@ -116,13 +116,13 @@
 
     .table-card{padding:0}
     .report-table{width:100%;border-collapse:collapse;overflow:hidden}
-    .report-table th{bacكجمround:#f8fafc;color:#475569;font-size:12px;text-align:right;padding:12px;border-bottom:1px solid var(--line);white-space:nowrap}
+    .report-table th{background:#f8fafc;color:#475569;font-size:12px;text-align:right;padding:12px;border-bottom:1px solid var(--line);white-space:nowrap}
     .report-table td{padding:12px;border-bottom:1px solid #eef2f7;font-size:14px;font-weight:800;vertical-align:middle}
     .report-table tr:last-child td{border-bottom:0}
     .muted{color:var(--muted);font-weight:750;font-size:12px}
     .num{direction:ltr;text-align:right;white-space:nowrap}
-    .status{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:950;bacكجمround:#f1f5f9;color:#475569}
-    .status.ok{bacكجمround:#dcfce7;color:var(--ok)} .status.warn{bacكجمround:#fef3c7;color:var(--warn)} .status.danger{bacكجمround:#fee2e2;color:var(--danger)} .status.blue{bacكجمround:#dbeafe;color:var(--blue)}
+    .status{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:950;background:#f1f5f9;color:#475569}
+    .status.ok{background:#dcfce7;color:var(--ok)} .status.warn{background:#fef3c7;color:var(--warn)} .status.danger{background:#fee2e2;color:var(--danger)} .status.blue{background:#dbeafe;color:var(--blue)}
     .arrow{font-weight:950;font-size:16px}.up{color:var(--ok)}.down{color:var(--danger)}.flat{color:var(--blue)}
 
     .chart-card{min-height:300px}
@@ -130,16 +130,48 @@
     .chart-title strong{font-size:15px}.chart-title span{color:var(--muted);font-size:11px;font-weight:850}
     .chart{width:100%;min-height:230px;direction:ltr}
     .chart svg{width:100%;height:230px;display:block}
-    .chart-note{margin-top:8px;padding:8px 10px;border-radius:13px;bacكجمround:#f8fafc;color:#334155;line-height:1.55;font-size:12px;font-weight:850}
+    .chart-note{margin-top:8px;padding:8px 10px;border-radius:13px;background:#f8fafc;color:#334155;line-height:1.55;font-size:12px;font-weight:850}
     .axis{stroke:#cbd5e1;stroke-width:1}.gridline{stroke:#eef2f7;stroke-width:1}
     .line-path{fill:none;stroke:#0f766e;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
     .dot{fill:#0f766e}.bar{fill:#0f766e}.bar-blue{fill:#2563eb}.bar-red{fill:#dc2626}
     .svg-label{font:800 15px Arial,Tahoma,sans-serif;fill:#334155}.svg-small{font:800 13px Arial,Tahoma,sans-serif;fill:#64748b}.svg-value{font:950 16px Arial,Tahoma,sans-serif;fill:#0f172a}
     .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;direction:rtl}
-    .legend span{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;font-weight:850}.legend i{width:10px;height:10px;border-radius:3px;bacكجمround:#0f766e;display:inline-block}.legend .blue i{bacكجمround:#2563eb}.legend .red i{bacكجمround:#dc2626}
+    .legend span{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;font-weight:850}.legend i{width:10px;height:10px;border-radius:3px;background:#0f766e;display:inline-block}.legend .blue i{background:#2563eb}.legend .red i{background:#dc2626}
+    .dot,.scatter-dot{fill:#0f766e;stroke:#fff;stroke-width:2.2}
+    .herd-scatter-point{cursor:pointer}
+    .herd-scatter-point:hover,.herd-scatter-point:focus{stroke:#0f172a;stroke-width:3;outline:none}
+    .animal-point-report{
+      background:white;
+      border:1px solid var(--line);
+      border-radius:20px;
+      box-shadow:var(--shadow);
+      padding:14px;
+    }
+    .animal-point-report.placeholder{
+      border-style:dashed;
+      color:var(--muted);
+      font-weight:900;
+      text-align:center;
+      background:#f8fafc;
+    }
+    .animal-point-title{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+      margin-bottom:10px;
+      flex-wrap:wrap;
+    }
+    .animal-point-title h4{margin:0;font-size:18px;color:#0f172a}
+    .animal-point-title p{margin:4px 0 0;color:var(--muted);font-size:12px;font-weight:850}
+    .animal-point-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+    .animal-point-item{background:#f8fafc;border:1px solid #e8eef5;border-radius:14px;padding:10px}
+    .animal-point-item .label{font-size:11px;color:var(--muted);font-weight:900}
+    .animal-point-item .value{margin-top:5px;font-size:17px;color:#0f172a;font-weight:950}
+    .no-print-note{font-size:11px;color:#64748b;font-weight:850}
 
     .group-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-    .group-card{bacكجمround:white;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:14px}
+    .group-card{background:white;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:14px}
     .group-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:12px}
     .group-head h4{margin:0;font-size:17px;line-height:1.35}
     .group-main{
@@ -150,7 +182,7 @@
     }
     .group-big{
       border:1px solid #e8eef5;
-      bacكجمround:#f8fafc;
+      background:#f8fafc;
       border-radius:16px;
       padding:12px;
     }
@@ -183,7 +215,7 @@
       border:1px solid #edf2f7;
       border-radius:14px;
       padding:9px;
-      bacكجمround:white;
+      background:white;
     }
     .group-small .s-label{font-size:11px;color:var(--muted);font-weight:900}
     .group-small .s-value{margin-top:4px;font-size:15px;font-weight:950;color:#0f172a}
@@ -191,37 +223,37 @@
       margin-top:10px;
       border-radius:15px;
       padding:11px;
-      bacكجمround:#ecfdf5;
+      background:#ecfdf5;
       border:1px solid #bbf7d0;
       color:#14532d;
       line-height:1.7;
       font-size:13px;
       font-weight:900;
     }
-    .meaning.warn{bacكجمround:#fff7ed;border-color:#fed7aa;color:#9a3412}
-    .meaning.danger{bacكجمround:#fef2f2;border-color:#fecaca;color:#991b1b}
+    .meaning.warn{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
+    .meaning.danger{background:#fef2f2;border-color:#fecaca;color:#991b1b}
     .chip-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-    .chip{bacكجمround:#f1f5f9;color:#475569;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:850}
-    .group-note{margin-top:10px;bacكجمround:#f8fafc;border:1px solid #eef2f7;border-radius:14px;padding:10px;line-height:1.65;font-size:13px;font-weight:850;color:#334155}
+    .chip{background:#f1f5f9;color:#475569;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:850}
+    .group-note{margin-top:10px;background:#f8fafc;border:1px solid #eef2f7;border-radius:14px;padding:10px;line-height:1.65;font-size:13px;font-weight:850;color:#334155}
 
     .recommendations{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-    .rec{bacكجمround:white;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:14px}
+    .rec{background:white;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:14px}
     .rec h4{margin:8px 0;font-size:16px}.rec ul{margin:8px 0 0;padding:0 18px 0 0;color:var(--muted);font-size:12px;line-height:1.7;font-weight:750}
-    .rec .action{margin-top:10px;padding:10px;border-radius:13px;bacكجمround:#f8fafc;font-size:13px;line-height:1.65;font-weight:850;color:#334155}
+    .rec .action{margin-top:10px;padding:10px;border-radius:13px;background:#f8fafc;font-size:13px;line-height:1.65;font-weight:850;color:#334155}
 
     .thi-card{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center}
-    .thi-circle{width:82px;height:82px;border-radius:999px;display:grid;place-items:center;bacكجمround:#fee2e2;color:var(--danger);font-size:29px;font-weight:950;border:7px solid white;box-shadow:0 0 0 1px #fecaca}
+    .thi-circle{width:82px;height:82px;border-radius:999px;display:grid;place-items:center;background:#fee2e2;color:var(--danger);font-size:29px;font-weight:950;border:7px solid white;box-shadow:0 0 0 1px #fecaca}
     .thi-card h4{margin:0;font-size:18px}.thi-card p{margin:7px 0 0;color:var(--muted);line-height:1.65;font-weight:750}
 
-    .scientific{bacكجمround:#0f172a;color:white;border-radius:22px;padding:17px;box-shadow:var(--shadow)}
+    .scientific{background:#0f172a;color:white;border-radius:22px;padding:17px;box-shadow:var(--shadow)}
     .scientific h3{margin:0 0 10px}.scientific ul{margin:0;padding:0 20px 0 0;line-height:1.9;color:rgba(255,255,255,.86);font-weight:750}
-    .empty{padding:24px;text-align:center;color:var(--muted);font-weight:900;bacكجمround:white;border:1px dashed #cbd5e1;border-radius:18px}
+    .empty{padding:24px;text-align:center;color:var(--muted);font-weight:900;background:white;border:1px dashed #cbd5e1;border-radius:18px}
     .footer-note{text-align:center;color:var(--muted);font-size:12px;font-weight:750;margin-top:18px}
 
     .print-report-header{display:none}
 
     @media(max-width:980px){
-      .hero-grid,.hero-summary,.grid-2,.group-list,.recommendations,.group-main,.group-econ,.kpi-row,.econ-row{grid-template-columns:1fr}
+      .hero-grid,.hero-summary,.grid-2,.group-list,.recommendations,.group-main,.group-econ,.kpi-row,.econ-row,.animal-point-grid{grid-template-columns:1fr}
       .controls{width:100%}.field{flex:1 1 140px}.field input,.field select{width:100%;min-width:0}
       .table-scroll{overflow-x:auto}.report-table{min-width:650px}
       .chart svg{height:250px}.chart{min-height:250px}
@@ -236,7 +268,7 @@
         font-size:11pt!important;
         line-height:1.45!important;
       }
-      .topbar,.controls,.btn,.print-section-btn,.hero-print-row,#loading{display:none!important}
+      .topbar,.controls,.btn,.print-section-btn,.hero-print-row,#loading,#animalPointBlock{display:none!important}
       .wrap{
         width:100%!important;
         max-width:none!important;
@@ -643,6 +675,13 @@
         <div class="section-head"><div><h3>الرسوم البيانية</h3><p>كل رسم عليه أرقام واضحة وقراءة قصيرة.</p></div><button class="print-section-btn" data-print-target="chartsBlock">طباعة هذا الجزء</button></div>
         <div class="grid grid-2">
           <div class="card chart-card">
+            <div class="chart-title"><strong>سكاتر القطيع</strong><span>كل نقطة = حيوان</span></div>
+            <div class="legend"><span><i></i>اللبن حسب أيام الحليب</span></div>
+            <div class="chart" id="herdScatterChart"></div>
+            <div class="chart-note" id="herdScatterNote"></div>
+          </div>
+
+          <div class="card chart-card">
             <div class="chart-title"><strong>منحنى آخر 30 يوم</strong><span>كجم لبن / يوم</span></div>
             <div class="chart" id="dailyTrendChart"></div>
             <div class="chart-note" id="dailyTrendNote"></div>
@@ -687,6 +726,16 @@
           <h3 id="scientificTitle">التقرير العلمي المختصر</h3>
           <ul id="scientificNotes"></ul>
         </div>
+      </section>
+
+      <section class="section" id="animalPointBlock">
+        <div class="section-head">
+          <div>
+            <h3>بطاقة الحيوان من السكاتر</h3>
+            <p>تظهر هنا عند لمس نقطة من سكاتر القطيع، وليست مخصصة للطباعة.</p>
+          </div>
+        </div>
+        <div class="animal-point-report placeholder" id="animalPointReport">المس نقطة من سكاتر القطيع لعرض رقم الحيوان، اللبن، أيام الحليب، وأيام الحمل.</div>
       </section>
 
       <div class="footer-note">مُرَبِّيك — قرار أسرع، رقم أوضح، وتوصية مفيدة.</div>
@@ -883,7 +932,165 @@
       </svg>`;
     }
 
+    function firstArray(){
+      for (const a of arguments){
+        if (Array.isArray(a) && a.length) return a;
+      }
+      return [];
+    }
+
+    function valueFrom(obj, keys){
+      for (const k of keys){
+        const v = obj?.[k];
+        if (v !== undefined && v !== null && v !== "") return v;
+      }
+      return null;
+    }
+
+    function numberFrom(obj, keys){
+      const v = valueFrom(obj, keys);
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function textFrom(obj, keys){
+      const v = valueFrom(obj, keys);
+      return v === null ? "" : String(v).trim();
+    }
+
+    function herdScatterPoints(j){
+      const raw = firstArray(
+        j?.scatter?.points,
+        j?.herdScatter?.points,
+        j?.charts?.herdScatter,
+        j?.charts?.scatter,
+        j?.charts?.animalScatter,
+        j?.production?.animals,
+        j?.production?.animalRecords,
+        j?.animals,
+        j?.animalRecords,
+        j?.records,
+        j?.individuals
+      );
+
+      return raw.map(p => {
+        const milk = numberFrom(p, ["milkKg","kg","dailyMilk","totalMilkKg","totalMilk","milk","y","كجم اللبن","اللبن"]);
+        const dim = numberFrom(p, ["daysInMilk","dim","DIM","milkDays","x","أيام الحليب"]);
+        const dcc = numberFrom(p, ["daysCarryingCalf","dcc","DCC","daysPregnant","pregnancyDays","gestationDays","daysInPregnancy","أيام الحمل"]);
+        const number = textFrom(p, ["animalNumber","number","animalNo","cowNumber","buffaloNumber","id","رقم الحيوان","رقم"]);
+        const groupName = textFrom(p, ["groupName","group","productionGroup","مجموعة","المجموعة"]);
+        return { milk, dim, dcc, number, groupName };
+      }).filter(p =>
+        Number.isFinite(p.milk) &&
+        Number.isFinite(p.dim) &&
+        p.milk > 0 &&
+        p.dim >= 0
+      );
+    }
+
+    function encodePoint(pt){
+      return encodeURIComponent(JSON.stringify(pt));
+    }
+
+    function decodePoint(node){
+      try{
+        return JSON.parse(decodeURIComponent(node.getAttribute("data-point") || ""));
+      }catch(_){
+        return null;
+      }
+    }
+
+    function svgHerdScatter(points){
+      points = Array.isArray(points) ? points : [];
+      if(!points.length){
+        return `<div class="empty">لا توجد بيانات فردية كافية لسكاتر القطيع من السيرفر.</div>`;
+      }
+
+      const w=390,h=230,p=38;
+      const maxX=Math.max(...points.map(x=>Number(x.dim)||0),1);
+      const maxY=Math.max(...points.map(x=>Number(x.milk)||0),1);
+
+      const dots = points.map(pt => {
+        const x = p + (Number(pt.dim) / maxX) * (w - p*2);
+        const y = h - p - (Number(pt.milk) / maxY) * (h - p*2);
+        const title = `${pt.number ? "رقم " + pt.number + " — " : ""}${num(pt.milk,1)} كجم · ${num(pt.dim,0)} يوم حليب${Number.isFinite(Number(pt.dcc)) ? " · " + num(pt.dcc,0) + " يوم حمل" : ""}`;
+        return `<circle class="scatter-dot herd-scatter-point" cx="${x}" cy="${y}" r="5.8" tabindex="0" role="button" data-point="${encodePoint(pt)}">
+          <title>${esc(title)}</title>
+        </circle>`;
+      }).join("");
+
+      return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
+        <line class="gridline" x1="${p}" y1="${p}" x2="${w-p}" y2="${p}"></line>
+        <line class="gridline" x1="${p}" y1="${h/2}" x2="${w-p}" y2="${h/2}"></line>
+        <line class="axis" x1="${p}" y1="${h-p}" x2="${w-p}" y2="${h-p}"></line>
+        <line class="axis" x1="${p}" y1="${p}" x2="${p}" y2="${h-p}"></line>
+        <text class="svg-small" x="${p}" y="${h-8}" text-anchor="middle">0</text>
+        <text class="svg-small" x="${w-p}" y="${h-8}" text-anchor="middle">${num(maxX,0)} يوم</text>
+        <text class="svg-small" x="${p-6}" y="${p+4}" text-anchor="end">${num(maxY,0)} كجم</text>
+        <text class="svg-small" x="${w/2}" y="${h-8}" text-anchor="middle">أيام الحليب</text>
+        ${dots}
+      </svg>`;
+    }
+
+    function renderAnimalPointReport(pt, shouldScroll=false){
+      const box = $("animalPointReport");
+      const block = $("animalPointBlock");
+      if(!box || !block) return;
+
+      if(!pt){
+        box.className = "animal-point-report placeholder";
+        box.innerHTML = "المس نقطة من سكاتر القطيع لعرض رقم الحيوان، اللبن، أيام الحليب، وأيام الحمل.";
+        return;
+      }
+
+      box.className = "animal-point-report";
+      box.innerHTML = `
+        <div class="animal-point-title">
+          <div>
+            <h4>بطاقة مختصرة للحيوان ${pt.number ? "رقم " + esc(pt.number) : ""}</h4>
+            <p>ناتجة من لمس نقطة في سكاتر القطيع</p>
+          </div>
+          <div class="no-print-note">ليست للطباعة</div>
+        </div>
+        <div class="animal-point-grid">
+          <div class="animal-point-item">
+            <div class="label">رقم الحيوان</div>
+            <div class="value">${esc(pt.number || "—")}</div>
+          </div>
+          <div class="animal-point-item">
+            <div class="label">اللبن</div>
+            <div class="value">${num(pt.milk,1)} كجم</div>
+          </div>
+          <div class="animal-point-item">
+            <div class="label">أيام الحليب</div>
+            <div class="value">${num(pt.dim,0)} يوم</div>
+          </div>
+          <div class="animal-point-item">
+            <div class="label">أيام الحمل</div>
+            <div class="value">${Number.isFinite(Number(pt.dcc)) ? num(pt.dcc,0) + " يوم" : "—"}</div>
+          </div>
+          <div class="animal-point-item">
+            <div class="label">المجموعة</div>
+            <div class="value">${esc(pt.groupName || "—")}</div>
+          </div>
+        </div>
+      `;
+
+      if(shouldScroll) block.scrollIntoView({behavior:"smooth",block:"start"});
+    }
+
     function chartNotes(j){
+      const herdPts = herdScatterPoints(j);
+      if ($("herdScatterNote")) {
+        if (herdPts.length) {
+          const maxMilk = [...herdPts].sort((a,b)=>Number(b.milk)-Number(a.milk))[0];
+          $("herdScatterNote").textContent =
+            `سكاتر القطيع يعرض ${int(herdPts.length)} حيوان. أعلى نقطة ${maxMilk.number ? "رقم " + maxMilk.number + " " : ""}${num(maxMilk.milk,1)} كجم عند ${num(maxMilk.dim,0)} يوم حليب.`;
+        } else {
+          $("herdScatterNote").textContent = "السكاتر يحتاج من السيرفر بيانات فردية: رقم الحيوان، كجم اللبن، أيام الحليب، وأيام الحمل.";
+        }
+      }
+
       const daily=(j.charts?.dailyTrend||[]).filter(x=>Number(x.totalMilkKg)>0);
       const first=daily[0], last=daily[daily.length-1];
       $("dailyTrendNote").textContent = daily.length ? `آخر قراءة ${num(last?.totalMilkKg,1)} كجم. يبين الاتجاه اليومي.` : "لا توجد قراءات كافية لآخر 30 يوم.";
@@ -896,6 +1103,8 @@
     }
 
     function renderCharts(j){
+      if ($("herdScatterChart")) $("herdScatterChart").innerHTML = svgHerdScatter(herdScatterPoints(j));
+      renderAnimalPointReport(null);
       $("dailyTrendChart").innerHTML=svgLineChart(j.charts?.dailyTrend||[],"totalMilkKg","date");
       $("groupProductionChart").innerHTML=svgBarChart(j.charts?.groupProduction||[],"totalMilkKg","groupName","كجم",false);
       $("groupEconomyChart").innerHTML=svgBarChart(j.charts?.groupEconomics||[],"netOperatingResult","groupName","ج",true);
@@ -1008,7 +1217,7 @@
 
           <div class="chip-row">
             ${(g.murabbik?.evidence||[]).map(x=>`<span class="chip">${esc(x)}</span>`).join("")}
-            ${top.length?`<span class="chip">أفضل 3: ${top.map(x=>"#"+esc(x.number)+" "+num(x.كجم,1)+" كجم").join("، ")}</span>`:""}
+            ${top.length?`<span class="chip">أفضل 3: ${top.map(x=>"#"+esc(x.number)+" "+num(x.kg ?? x.milkKg ?? x.dailyMilk ?? x.totalMilk,1)+" كجم").join("، ")}</span>`:""}
             ${watch.length?`<span class="chip">متابعة: ${watch.map(x=>"#"+esc(x.number)+" "+pct(x.deltaPct)).join("، ")}</span>`:""}
           </div>
         </article>`;
@@ -1017,7 +1226,7 @@
 
     function renderThi(j){
       const t=j.thi||{}, val=Number.isFinite(Number(t.value))?Number(t.value):null, sev=Number(t.severity||0);
-      $("thiCard").innerHTML=`<div class="thi-circle" style="color:${sev>=3?"var(--danger)":sev>=2?"var(--warn)":"var(--ok)"};bacكجمround:${sev>=2?"#fee2e2":"#dcfce7"}">${val??"—"}</div>
+      $("thiCard").innerHTML=`<div class="thi-circle" style="color:${sev>=3?"var(--danger)":sev>=2?"var(--warn)":"var(--ok)"};background:${sev>=2?"#fee2e2":"#dcfce7"}">${val??"—"}</div>
       <div><h4>${esc(t.label||"غير متاح")}</h4><p>${esc(t.action||"حدّد موقع المزرعة لتفعيل تفسير الإجهاد الحراري.")}</p></div>`;
     }
 
@@ -1029,13 +1238,54 @@
       }).join(""):`<div class="empty">لا توجد توصيات حرجة الآن.</div>`;
     }
 
+    function fallbackScientificNotes(j){
+      const p = j.production || {};
+      const e = j.economics || {};
+      const notes = [];
+
+      if (Number.isFinite(Number(p.totalMilkKg))) {
+        notes.push(`إجمالي اللبن المسجل ${num(p.totalMilkKg,1)} كجم، بمتوسط ${num(p.avgMilkKgRecorded ?? p.avgMilkKgMilker,1)} كجم للحلاب المسجل.`);
+      }
+
+      if (Number.isFinite(Number(p.recordingRate))) {
+        notes.push(`نسبة تسجيل اللبن ${num(p.recordingRate,1)}%؛ اكتمال التسجيل مهم قبل الحكم النهائي على الإنتاج.`);
+      }
+
+      if (Number.isFinite(Number(p.avgDim))) {
+        notes.push(`متوسط أيام الحليب ${num(p.avgDim,0)} يوم، ويجب تفسير الإنتاج حسب مرحلة الحليب وليس الرقم المطلق فقط.`);
+      }
+
+      if (Number.isFinite(Number(p.avgDcc))) {
+        notes.push(`متوسط أيام الحمل ${num(p.avgDcc,0)} يوم للحيوانات المتاح لها بيانات حمل.`);
+      }
+
+      if (Number.isFinite(Number(e.productionCostPerKgMilk))) {
+        notes.push(`إجمالي تكلفة إنتاج كجم اللبن ${money(e.productionCostPerKgMilk)} محسوبة من التغذية والتشغيل.`);
+      }
+
+      if (Number.isFinite(Number(e.marginPerKgMilk))) {
+        notes.push(`هامش كجم اللبن ${money(e.marginPerKgMilk)}، وهو مؤشر سريع على كفاءة التحويل الاقتصادي للبن.`);
+      }
+
+      const thi = j.thi || {};
+      if (thi.label || Number.isFinite(Number(thi.value))) {
+        notes.push(`الإجهاد الحراري: ${thi.label || "غير محدد"}${Number.isFinite(Number(thi.value)) ? " عند قيمة " + num(thi.value,0) : ""}.`);
+      }
+
+      return notes.length ? notes : ["لا توجد بيانات كافية لبناء تقرير علمي مختصر لهذا اليوم."];
+    }
+
     function renderScientific(j){
       const s=j.scientificReport||{};
       $("scientificTitle").textContent=s.title||"التقرير العلمي المختصر";
-      const clean = (s.notes||[]).map(x => String(x||"")
+      let notes = Array.isArray(s.notes) ? s.notes.filter(x => String(x||"").trim()) : [];
+      if(!notes.length) notes = fallbackScientificNotes(j);
+
+      const clean = notes.map(x => String(x||"")
         .replace(/DIM/g,"أيام الحليب")
         .replace(/DCC/g,"أيام الحمل")
         .replace(/THI/g,"الإجهاد الحراري")
+        .replace(/\bkg\b/gi,"كجم")
       );
       $("scientificNotes").innerHTML=clean.map(x=>`<li>${esc(x)}</li>`).join("");
     }
@@ -1114,6 +1364,9 @@
       $("economyCards").innerHTML="";
       $("comparisonTable").innerHTML="";
 
+      if ($("herdScatterChart")) $("herdScatterChart").innerHTML="";
+      if ($("herdScatterNote")) $("herdScatterNote").textContent="";
+      renderAnimalPointReport(null);
       $("dailyTrendChart").innerHTML="";
       $("dailyTrendNote").textContent="";
       $("groupProductionChart").innerHTML="";
@@ -1175,9 +1428,22 @@
 
     $("printBtn").addEventListener("click", printReportFull);
     document.addEventListener("click", e => {
+      const point = e.target.closest(".herd-scatter-point");
+      if (point) {
+        renderAnimalPointReport(decodePoint(point), true);
+        return;
+      }
+
       const btn = e.target.closest("[data-print-target]");
       if (!btn) return;
       printReportSection(btn.dataset.printTarget);
+    });
+
+    document.addEventListener("keydown", e => {
+      const point = e.target.closest?.(".herd-scatter-point");
+      if (!point || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
+      renderAnimalPointReport(decodePoint(point), true);
     });
     $("reportDate").addEventListener("change", loadReport);
     $("milkPriceInput").addEventListener("input",()=>{
