@@ -124,7 +124,28 @@
     font-weight: 900;
     color: #0f172a;
   }
+  body[data-page="fertility-report"] .page {
+  padding-bottom: 110px;
+}
 
+body[data-page="fertility-report"] #statusBar.is-done {
+  display: none;
+}
+
+body[data-page="fertility-report"] .actions-bar {
+  z-index: 30;
+}
+
+@media print {
+  body[data-page="fertility-report"] .actions-bar,
+  body[data-page="fertility-report"] #statusBar {
+    display: none !important;
+  }
+
+  body[data-page="fertility-report"] .page {
+    padding-bottom: 0 !important;
+  }
+}
   @media (max-width: 520px) {
     body[data-page="fertility-report"] .fert-stats {
       grid-template-columns: repeat(2, 1fr);
@@ -575,10 +596,11 @@ async function main(){
     renderRepeatBreeders(j);
     renderAdvisory(j);
 
-    el("statusBar").textContent = `تم تحميل تقرير الخصوبة — ${reportTypeLabel}.`;
+    el("statusBar").classList.add("is-done");
 
   } catch (e) {
     console.error(e);
+    el("statusBar").classList.remove("is-done");
     el("statusBar").textContent = e.message || "تعذّر تحميل تقرير الخصوبة.";
   }
 }
