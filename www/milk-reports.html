@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>تقرير إنتاج اللبن | مُرَبِّيك</title>
-  <link rel="stylesheet" href="css/forms.css">
-  <!-- milk-report-version: v31 -->
+  <link rel="stylesheet" href="/css/forms.css">
+<!-- milk-report-version: v31 -->
   <style>
     :root{
       --bg:#f5f7fb; --card:#fff; --text:#172033; --muted:#667085; --line:#e5eaf0;
@@ -631,35 +631,39 @@
     }
       .print-section-btn,.hero-print-row{display:none!important}
   </style>
+  <link rel="stylesheet" href="/css/reports.css">
 </head>
-<body>
-<header class="no-print-section">
-  <div class="mbk-head">
-    <a class="mbk-back" href="dashboard.html" title="الرجوع إلى غرفة التحكم">غرفة التحكم</a>
-
-    <div class="mbk-center">
-      <div class="mbk-page-title">تقرير إنتاج اللبن</div>
-      <div class="mbk-app-name">مُرَبِّيك</div>
+<body data-page="milk-report" data-report-page>
+<header class="screen-top no-print-section">
+  <div class="screen-head">
+    <div>
+      <div class="screen-title">تقرير إنتاج اللبن</div>
+      <div class="screen-brand">مُرَبِّيك</div>
     </div>
-
-    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <img class="screen-logo" src="/images/logo.png" alt="مُرَبِّيك">
   </div>
 </header>
-   <main class="wrap">
-    <section class="card no-print-section" id="reportTools">
-      <div class="controls">
-        <div class="field"><label for="reportDate">تاريخ التقرير</label><input id="reportDate" type="date"></div>
-        <div class="field">
-          <label for="milkPriceInput">سعر كجم اللبن <b style="color:#dc2626">*</b></label>
-          <input id="milkPriceInput" type="number" inputmode="numeric" min="1" step="1" placeholder="مثال: 20" required>
-        </div>
-        <button class="btn btn-ghost" id="printBtn">طباعة التقرير كاملًا</button>
-      </div>
-    </section>
+
+<main class="page report-page">
+   <section class="card report-tools no-print-section" id="reportTools">
+  <div class="controls">
+    <div class="field">
+      <label for="reportDate">تاريخ التقرير</label>
+      <input id="reportDate" type="date">
+    </div>
+
+    <div class="field">
+      <label for="milkPriceInput">سعر كجم اللبن <b style="color:#dc2626">*</b></label>
+      <input id="milkPriceInput" type="number" inputmode="numeric" min="1" step="1" placeholder="مثال: 20" required>
+    </div>
+
+    <button class="btn btn-ghost" id="printBtn">طباعة / PDF</button>
+  </div>
+</section>
     <div id="loading" class="loading">جاري تحميل تقرير اللبن...</div>
 
     <section id="report" style="display:none;">
-     <div class="print-report-header">
+     <div class="print-report-header report-cover">
   <div class="print-brand">
     <img class="print-logo" src="/images/logo.png" alt="مُرَبِّيك">
     <div>
