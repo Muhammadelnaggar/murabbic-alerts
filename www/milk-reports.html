@@ -679,37 +679,44 @@
 
   <div class="print-meta" id="printMeta"></div>
 </div>
-      <section class="hero" id="summaryBlock" data-print-block>
-        <div class="hero-grid">
-          <div>
-            <h2 id="heroTitle">تقرير إنتاج اللبن</h2>
-            <div class="hero-line" id="heroLine">—</div>
-            <div class="hero-summary" id="heroSummary"></div>
-          </div>
-          <div class="hero-panel">
-            <div class="label">صافي ربح اللبن</div>
-            <div class="value" id="heroNet">—</div>
-            <div class="sub">بعد التغذية + 20% من تكلفة التغذية كمصاريف تشغيل</div>
-          </div>
-        </div>
-      </section>
+      <section class="card" id="summaryBlock" data-print-block>
+  <div class="section-title">🌿 ملخص تقرير اللبن</div>
+
+  <div id="heroTitle" hidden>تقرير إنتاج اللبن</div>
+  <div id="heroLine" hidden>—</div>
+
+  <div class="grid report-stack-mobile" id="heroSummary"></div>
+
+  <div class="cards report-extra">
+    <div class="mini">
+      <div class="name">صافي ربح اللبن</div>
+      <div class="value" id="heroNet">—</div>
+      <div class="note">بعد التغذية + 20% من تكلفة التغذية كمصاريف تشغيل</div>
+    </div>
+  </div>
+</section>
 
       <div class="notice" id="serverMessage"></div>
 
-      <section class="section" id="productionBlock" data-print-block>
-        <div class="section-head"><div><h3 id="productionSectionTitle">إنتاج أمس</h3><p>قراءة سريعة واضحة لصاحب المزرعة.</p></div></div>
-        <div class="kpi-row" id="productionCards"></div>
-      </section>
+      <section class="card" id="productionBlock" data-print-block>
+  <div class="section-title" id="productionSectionTitle">إنتاج أمس</div>
+  <div class="sub">قراءة سريعة واضحة لصاحب المزرعة.</div>
+  <div class="grid report-extra" id="productionCards"></div>
+</section>
 
-      <section class="section" id="economyBlock" data-print-block>
-        <div class="section-head"><div><h3>اقتصاد إنتاج اللبن</h3><p>الأرقام الاقتصادية الأساسية للقطيع.</p></div></div>
-        <div class="econ-row" id="economyCards"></div>
-      </section>
+     <section class="card" id="economyBlock" data-print-block>
+  <div class="section-title">اقتصاد إنتاج اللبن</div>
+  <div class="sub">الأرقام الاقتصادية الأساسية للقطيع.</div>
+  <div class="grid report-extra" id="economyCards"></div>
+</section>
 
-      <section class="section" id="comparisonBlock" data-print-block>
-        <div class="section-head"><div><h3>المقارنات</h3><p>يومي، أسبوعي، شهري، و305 يوم في جدول واحد.</p></div></div>
-        <div class="card table-card table-scroll"><table class="report-table" id="comparisonTable"></table></div>
-      </section>
+      <section class="card" id="comparisonBlock" data-print-block>
+  <div class="section-title">المقارنات</div>
+  <div class="sub">يومي، أسبوعي، شهري، و305 يوم في جدول واحد.</div>
+  <div class="table-wrap report-extra">
+    <table id="comparisonTable"></table>
+  </div>
+</section>
 
       <section class="section" id="chartsBlock" data-print-block>
         <div class="section-head"><div><h3>الرسوم البيانية</h3><p>منحنى الإنتاج ورسوم المجموعات ومراحل أيام الحليب.</p></div></div>
@@ -743,15 +750,17 @@
         <div class="group-list" id="groupsList"></div>
       </section>
 
-      <section class="section" id="thiBlock" data-print-block>
-        <div class="section-head"><div><h3>الإجهاد الحراري</h3><p>تفسير مساعد لانخفاض اللبن عند وجود ضغط حراري.</p></div></div>
-        <div class="card thi-card" id="thiCard"></div>
-      </section>
+      <section class="card" id="thiBlock" data-print-block>
+  <div class="section-title">الإجهاد الحراري</div>
+  <div class="sub">تفسير مساعد لانخفاض اللبن عند وجود ضغط حراري.</div>
+  <div class="cards report-extra" id="thiCard"></div>
+</section>
 
-      <section class="section" id="recommendationsBlock" data-print-block>
-        <div class="section-head"><div><h3>توصيات مُرَبِّيك</h3><p>مختصرة، بدليل، وبإجراء واضح.</p></div></div>
-        <div class="recommendations" id="recommendationsList"></div>
-      </section>
+     <section class="card" id="recommendationsBlock" data-print-block>
+  <div class="section-title">توصيات مُرَبِّيك</div>
+  <div class="sub">مختصرة، بدليل، وبإجراء واضح.</div>
+  <div class="cards report-extra" id="recommendationsList"></div>
+</section>
 
       <section class="section" id="scientificBlock" data-print-block>
         <div class="section-head"><div><h3>التقرير العلمي المختصر</h3><p>قراءة تشغيلية مبنية على الإنتاج، مرحلة الحليب، الحمل، الاقتصاد، والإجهاد الحراري.</p></div></div>
@@ -818,42 +827,80 @@
     function pct(v){const x=Number(v);if(!Number.isFinite(x))return"—";return(x>0?"+":"")+x.toLocaleString("ar-EG",{minimumFractionDigits:1,maximumFractionDigits:1})+"%"}
     function esc(v){return String(v??"").replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[s]))}
     function arrow(v){const x=Number(v); if(!Number.isFinite(x)||x===0)return `<span class="arrow flat">↔</span>`; return x>0?`<span class="arrow up">↑</span>`:`<span class="arrow down">↓</span>`}
-    function status(text,tone){return `<span class="status ${tone||""}">${esc(text)}</span>`}
-    function toneByValue(v, goodPositive=true){const x=Number(v); if(!Number.isFinite(x)||x===0)return"blue"; return (goodPositive ? x>0 : x<0) ? "ok" : "danger"}
-    function row(a,b,c,d){return `<tr><td>${a}</td><td class="num">${b}</td><td>${c||""}</td><td>${d||""}</td></tr>`}
+   function status(text,tone){
+  const t = String(tone || "").toLowerCase();
+  const cls =
+    t === "danger" || t === "high" || t === "loss" ? "badge danger" :
+    t === "warn" || t === "medium" || t === "watch" ? "badge warn" :
+    "badge";
 
-    function arClean(v){
-      return String(v || "")
-        .replace(/DIM/g,"أيام الحليب")
-        .replace(/DCC/g,"أيام الحمل")
-        .replace(/THI/g,"الإجهاد الحراري")
-        .replace(/\bkg\b/gi,"كجم");
-    }
+  return `<span class="${cls}">${esc(text || "معلومة")}</span>`;
+}
 
-    function heroSummaryCard(label, value, sub){
-      return `<div class="hero-summary-card">
-        <div class="hs-label">${esc(label)}</div>
-        <div class="hs-value">${value}</div>
-        <div class="hs-sub">${esc(sub || "")}</div>
-      </div>`;
-    }
+function toneByValue(v, goodPositive=true){
+  const x = Number(v);
+  if (!Number.isFinite(x) || x === 0) return "blue";
+  return (goodPositive ? x > 0 : x < 0) ? "good" : "danger";
+}
 
-    function renderHeroSummary(j){
-      const p = j.production || {};
-      const actualDate = j.meta?.actualDate || j.meta?.reportDate || j.date || $("reportDate").value || yesterdayISO();
-      $("heroSummary").innerHTML = [
-        heroSummaryCard("تاريخ التقرير", esc(actualDate || "—"), j.message ? arClean(j.message) : "اليوم المعروض في التقرير"),
-        heroSummaryCard("إنتاج القطيع", `${num(p.totalMilkKg,1)} كجم`, `متوسط الحلاب ${num(p.avgMilkKgRecorded ?? p.avgMilkKgMilker,1)} كجم`)
-      ].join("");
-    }
+function row(a,b,c,d){
+  return `<tr><td>${a}</td><td class="num">${b}</td><td>${c || ""}</td><td>${d || ""}</td></tr>`;
+}
 
-    function kpiCard(label, value, sub, tone=""){
-      return `<div class="kpi-card ${tone}">
-        <div class="k-label">${esc(label)}</div>
-        <div class="k-value">${value}</div>
-        <div class="k-sub">${esc(sub || "")}</div>
-      </div>`;
-    }
+function arClean(v){
+  return String(v || "")
+    .replace(/DIM/g,"أيام الحليب")
+    .replace(/DCC/g,"أيام الحمل")
+    .replace(/THI/g,"الإجهاد الحراري")
+    .replace(/\bkg\b/gi,"كجم");
+}
+
+function reportToneClass(tone){
+  const t = String(tone || "").toLowerCase();
+  if (t === "danger" || t === "high" || t === "loss") return "report-tone-danger";
+  if (t === "warn" || t === "medium" || t === "watch") return "report-tone-warn";
+  if (t === "blue") return "report-tone-blue";
+  if (t === "good" || t === "ok") return "report-tone-good";
+  return "";
+}
+
+function reportKpi(label, value, sub = "", tone = ""){
+  return `
+    <div class="kpi ${reportToneClass(tone)}">
+      <span>${esc(label)}</span>
+      <b>${value ?? "—"}</b>
+      ${sub ? `<span>${esc(sub)}</span>` : ""}
+    </div>
+  `;
+}
+
+function reportMini(title, value, note = "", tone = ""){
+  return `
+    <div class="mini ${reportToneClass(tone)}">
+      <div class="name">${esc(title || "—")}</div>
+      <div class="value">${value ?? "—"}</div>
+      ${note ? `<div class="note">${note}</div>` : ""}
+    </div>
+  `;
+}
+
+function heroSummaryCard(label, value, sub){
+  return reportKpi(label, value, sub, "blue");
+}
+
+function renderHeroSummary(j){
+  const p = j.production || {};
+  const actualDate = j.meta?.actualDate || j.meta?.reportDate || j.date || $("reportDate").value || yesterdayISO();
+
+  $("heroSummary").innerHTML = [
+    heroSummaryCard("تاريخ التقرير", esc(actualDate || "—"), j.message ? arClean(j.message) : "اليوم المعروض في التقرير"),
+    heroSummaryCard("إنتاج القطيع", `${num(p.totalMilkKg,1)} كجم`, `متوسط الحلاب ${num(p.avgMilkKgRecorded ?? p.avgMilkKgMilker,1)} كجم`)
+  ].join("");
+}
+
+function kpiCard(label, value, sub, tone=""){
+  return reportKpi(label, value, sub, tone);
+}
 
     function renderProduction(j){
       const p=j.production||{};
@@ -868,13 +915,9 @@
       ].join("");
     }
 
-    function econCard(label, value, sub, tone=""){
-      return `<div class="econ-card ${tone}">
-        <div class="e-label">${esc(label)}</div>
-        <div class="e-value">${value}</div>
-        <div class="e-sub">${esc(sub || "")}</div>
-      </div>`;
-    }
+   function econCard(label, value, sub, tone=""){
+  return reportKpi(label, value, sub, tone);
+}
 
     function renderEconomy(j){
       const e=j.economics||{};
@@ -1275,18 +1318,41 @@
     }
 
     function renderThi(j){
-      const t=j.thi||{}, val=Number.isFinite(Number(t.value))?Number(t.value):null, sev=Number(t.severity||0);
-      $("thiCard").innerHTML=`<div class="thi-circle" style="color:${sev>=3?"var(--danger)":sev>=2?"var(--warn)":"var(--ok)"};background:${sev>=2?"#fee2e2":"#dcfce7"}">${val??"—"}</div>
-      <div><h4>${esc(t.label||"غير متاح")}</h4><p>${esc(t.action||"حدّد موقع المزرعة لتفعيل تفسير الإجهاد الحراري.")}</p></div>`;
-    }
+  const t = j.thi || {};
+  const val = Number.isFinite(Number(t.value)) ? Number(t.value) : null;
+  const sev = Number(t.severity || 0);
+  const tone = sev >= 3 ? "danger" : sev >= 2 ? "warn" : "good";
 
-    function renderRecommendations(j){
-      const list=Array.isArray(j.recommendations)?j.recommendations:[];
-      $("recommendationsList").innerHTML=list.length?list.map(r=>{
-        const tone=r.level==="high"?"danger":r.level==="medium"?"warn":"ok";
-        return `<article class="rec">${status(r.level||"info",tone)}<h4>${esc(r.title)}</h4><ul>${(r.evidence||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul><div class="action">${esc(r.action||"")}</div></article>`;
-      }).join(""):`<div class="empty">لا توجد توصيات حرجة الآن.</div>`;
-    }
+  $("thiCard").innerHTML = reportMini(
+    "حالة الإجهاد الحراري",
+    val == null ? "—" : esc(String(val)),
+    `
+      ${status(t.label || "غير متاح", tone)}<br>
+      ${esc(t.action || "حدّد موقع المزرعة لتفعيل تفسير الإجهاد الحراري.")}
+    `,
+    tone
+  );
+}
+
+   function renderRecommendations(j){
+  const list = Array.isArray(j.recommendations) ? j.recommendations : [];
+
+  $("recommendationsList").innerHTML = list.length
+    ? list.map(r => {
+        const tone = r.level === "high" ? "danger" : r.level === "medium" ? "warn" : "good";
+        const evidence = Array.isArray(r.evidence) && r.evidence.length
+          ? `<br><b>الدليل:</b><br>${r.evidence.map(x => `• ${esc(x)}`).join("<br>")}`
+          : "";
+
+        return reportMini(
+          r.title || "توصية",
+          status(r.level || "info", tone),
+          `${evidence}${r.action ? `<br><b>الإجراء:</b> ${esc(r.action)}` : ""}`,
+          tone
+        );
+      }).join("")
+    : `<div class="empty">لا توجد توصيات حرجة الآن.</div>`;
+}
 
     function bestOrWorstGroup(j){
       const groups = Array.isArray(j.groups) ? j.groups : [];
