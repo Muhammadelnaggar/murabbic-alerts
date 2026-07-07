@@ -531,12 +531,200 @@
         text-align:center;
       }
       .print-footer::after{
-        content:"مُرَبِّيك — تقرير تغذية مطبوع";
-      }
+  content:"مُرَبِّيك — تقرير مطبوع";
+}
     }
   /* ===== Report mobile single-column utility ===== */
 @media (max-width:760px){
   body[data-report-page] .report-stack-mobile{
     grid-template-columns:1fr !important;
+  }
+}
+/* ===== Shared report controls and charts ===== */
+body[data-report-page] button,
+body[data-report-page] input,
+body[data-report-page] select{
+  font-family:inherit;
+}
+
+body[data-report-page] .report-tools{
+  margin-bottom:12px;
+}
+
+body[data-report-page] .controls{
+  display:flex;
+  gap:8px;
+  align-items:end;
+  flex-wrap:wrap;
+}
+
+body[data-report-page] .field{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+body[data-report-page] .field label{
+  font-size:11px;
+  font-weight:900;
+  color:var(--muted);
+}
+
+body[data-report-page] .field input,
+body[data-report-page] .field select{
+  height:42px;
+  min-width:150px;
+  border:1px solid var(--line);
+  border-radius:13px;
+  padding:0 12px;
+  background:#fff;
+}
+
+body[data-report-page] .btn{
+  height:42px;
+  border:0;
+  border-radius:13px;
+  padding:0 16px;
+  cursor:pointer;
+  font-weight:950;
+}
+
+body[data-report-page] .btn-primary{
+  background:var(--brand);
+  color:#fff;
+}
+
+body[data-report-page] .btn-ghost{
+  background:#fff;
+  color:#134e2f;
+  border:1px solid var(--line);
+}
+
+body[data-report-page] .loading{
+  min-height:240px;
+  display:grid;
+  place-items:center;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:22px;
+  box-shadow:0 8px 24px rgba(15,23,42,.04);
+  font-weight:950;
+  color:var(--muted);
+}
+
+body[data-report-page] .grid-2{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+
+body[data-report-page] .chart-card{
+  min-height:300px;
+}
+
+body[data-report-page] .chart-title{
+  display:flex;
+  align-items:start;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:6px;
+}
+
+body[data-report-page] .chart-title strong{
+  font-size:15px;
+}
+
+body[data-report-page] .chart-title span{
+  color:var(--muted);
+  font-size:11px;
+  font-weight:850;
+}
+
+body[data-report-page] .chart{
+  width:100%;
+  min-height:230px;
+  direction:ltr;
+}
+
+body[data-report-page] .chart svg{
+  width:100%;
+  height:230px;
+  display:block;
+}
+
+body[data-report-page] .chart-note{
+  margin-top:8px;
+  padding:8px 10px;
+  border-radius:13px;
+  background:#f8fafc;
+  color:#334155;
+  line-height:1.55;
+  font-size:12px;
+  font-weight:850;
+}
+
+body[data-report-page] .legend{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:4px;
+  direction:rtl;
+}
+
+body[data-report-page] .legend span{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:850;
+}
+
+body[data-report-page] .legend i{
+  width:10px;
+  height:10px;
+  border-radius:3px;
+  background:var(--green);
+  display:inline-block;
+}
+
+body[data-report-page] .legend .red i{
+  background:var(--danger);
+}
+
+body[data-report-page] .axis{stroke:#cbd5e1;stroke-width:1}
+body[data-report-page] .gridline{stroke:#eef2f7;stroke-width:1}
+body[data-report-page] .line-path{fill:none;stroke:var(--green);stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
+body[data-report-page] .dot{fill:var(--green)}
+body[data-report-page] .bar{fill:var(--green)}
+body[data-report-page] .bar-blue{fill:#2563eb}
+body[data-report-page] .bar-red{fill:var(--danger)}
+body[data-report-page] .svg-label{font:800 15px Arial,Tahoma,sans-serif;fill:#334155}
+body[data-report-page] .svg-small{font:800 13px Arial,Tahoma,sans-serif;fill:#64748b}
+body[data-report-page] .svg-value{font:950 16px Arial,Tahoma,sans-serif;fill:#0f172a}
+
+@media(max-width:760px){
+  body[data-report-page] .controls{
+    width:100%;
+  }
+
+  body[data-report-page] .field{
+    flex:1 1 140px;
+  }
+
+  body[data-report-page] .field input,
+  body[data-report-page] .field select{
+    width:100%;
+    min-width:0;
+  }
+
+  body[data-report-page] .grid-2{
+    grid-template-columns:1fr;
+  }
+
+  body[data-report-page] .chart svg{
+    height:250px;
+  }
+
+  body[data-report-page] .chart{
+    min-height:250px;
   }
 }
