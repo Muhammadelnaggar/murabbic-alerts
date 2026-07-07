@@ -6,635 +6,11 @@
   <title>تقرير إنتاج اللبن | مُرَبِّيك</title>
   <link rel="stylesheet" href="/css/forms.css">
 <!-- milk-report-version: v31 -->
-  <style>
-    :root{
-      --bg:#f5f7fb; --card:#fff; --text:#172033; --muted:#667085; --line:#e5eaf0;
-      --brand:#0f766e; --brand2:#115e59; --ok:#15803d; --warn:#b45309; --danger:#b91c1c; --blue:#1d4ed8;
-      --soft:#ecfdf5; --shadow:0 10px 28px rgba(15,23,42,.08); --radius:18px;
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0; color:var(--text); background:linear-gradient(180deg,#f8fafc,var(--bg));
-      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif;
-    }
-    button,input,select{font-family:inherit}
-    .wrap{width:min(1280px,calc(100% - 28px)); margin:auto; padding:16px 0 48px}
-    .controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
-    .field{display:flex;flex-direction:column;gap:4px}
-    .field label{font-size:11px;font-weight:900;color:var(--muted)}
-    .field input,.field select{height:42px;min-width:150px;border:1px solid var(--line);border-radius:13px;padding:0 12px;background:white}
-    .btn{height:42px;border:0;border-radius:13px;padding:0 16px;cursor:pointer;font-weight:950}
-    .btn-primary{background:linear-gradient(135deg,var(--brand),var(--brand2));color:white}
-    .btn-ghost{background:white;color:var(--brand2);border:1px solid var(--line)}
-    .loading{min-height:240px;display:grid;place-items:center;background:white;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);font-weight:950;color:var(--muted)}
 
-    .hero{border-radius:22px;padding:18px;background:white!important;color:var(--text);border:1px solid var(--line);border-top:6px solid var(--brand);box-shadow:var(--shadow)}
-    .hero-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:14px;align-items:stretch}
-    .hero h2{display:none!important}
-    .hero-line{display:none!important}
-    .hero-summary{
-      margin-top:12px;
-      display:grid;
-      grid-template-columns:repeat(3,minmax(0,1fr));
-      gap:10px;
-    }
-    .hero-summary-card{
-      background:#f8fafc;
-      border:1px solid #e5eaf0;
-      border-radius:16px;
-      padding:11px;
-    }
-    .hero-summary-card .hs-label{
-      font-size:12px;
-      font-weight:900;
-      color:var(--muted);
-    }
-    .hero-summary-card .hs-value{
-      margin-top:5px;
-      font-size:22px;
-      line-height:1.25;
-      font-weight:950;
-      color:#0f172a;
-    }
-    .hero-summary-card .hs-sub{
-      margin-top:4px;
-      font-size:11px;
-      line-height:1.45;
-      font-weight:800;
-      color:#64748b;
-    }
-    .hero-meta{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
-    .pill{display:inline-flex;border-radius:999px;padding:7px 11px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);font-size:12px;font-weight:900}
-    .hero-panel{background:#ecfdf5;border:1px solid #bbf7d0;border-radius:20px;padding:15px}
-    .hero-panel .label{font-size:13px;font-weight:900;color:#047857}
-    .hero-panel .value{margin-top:5px;font-size:32px;font-weight:950;color:#0f172a}
-    .hero-panel .sub{margin-top:5px;font-size:12px;line-height:1.6;color:#475569;font-weight:750}
-    .notice{display:none;margin-top:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:15px;padding:11px 13px;font-weight:900}
-    .notice.show{display:block}
-
-    .section{margin-top:20px}
-    .section-head{display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:22px 0 10px}
-    .section-head h3{margin:0;font-size:20px}
-    .section-head p{margin:5px 0 0;color:var(--muted);font-size:13px;font-weight:750}
-    .grid{display:grid;gap:12px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
-    .card{background:white;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:15px;overflow:hidden}
-
-    .kpi-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
-    .kpi-card{
-      background:white;
-      border:1px solid var(--line);
-      border-radius:18px;
-      box-shadow:var(--shadow);
-      padding:14px;
-    }
-    .kpi-card .k-label{color:var(--muted);font-size:12px;font-weight:900}
-    .kpi-card .k-value{margin-top:8px;font-size:25px;font-weight:950;color:#0f172a;line-height:1.25}
-    .kpi-card .k-sub{margin-top:6px;color:#64748b;font-size:12px;line-height:1.55;font-weight:800}
-    .kpi-card.good .k-value{color:var(--ok)}
-    .kpi-card.warn .k-value{color:var(--warn)}
-    .kpi-card.blue .k-value{color:var(--blue)}
-
-    .econ-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-    .econ-card{
-      background:white;
-      border:1px solid var(--line);
-      border-radius:18px;
-      box-shadow:var(--shadow);
-      padding:14px;
-    }
-    .econ-card .e-label{color:var(--muted);font-size:12px;font-weight:900}
-    .econ-card .e-value{margin-top:8px;font-size:24px;font-weight:950;color:#0f172a;line-height:1.25}
-    .econ-card .e-sub{margin-top:6px;color:#64748b;font-size:12px;line-height:1.55;font-weight:800}
-    .econ-card.good .e-value{color:var(--ok)}
-    .econ-card.warn .e-value{color:var(--warn)}
-    .econ-card.blue .e-value{color:var(--blue)}
-    .econ-card.danger .e-value{color:var(--danger)}
-
-    .table-card{padding:0}
-    .report-table{width:100%;border-collapse:collapse;overflow:hidden}
-    .report-table th{background:#f8fafc;color:#475569;font-size:12px;text-align:right;padding:12px;border-bottom:1px solid var(--line);white-space:nowrap}
-    .report-table td{padding:12px;border-bottom:1px solid #eef2f7;font-size:14px;font-weight:800;vertical-align:middle}
-    .report-table tr:last-child td{border-bottom:0}
-    .muted{color:var(--muted);font-weight:750;font-size:12px}
-    .num{direction:ltr;text-align:right;white-space:nowrap}
-    .status{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:950;background:#f1f5f9;color:#475569}
-    .status.ok{background:#dcfce7;color:var(--ok)} .status.warn{background:#fef3c7;color:var(--warn)} .status.danger{background:#fee2e2;color:var(--danger)} .status.blue{background:#dbeafe;color:var(--blue)}
-    .arrow{font-weight:950;font-size:16px}.up{color:var(--ok)}.down{color:var(--danger)}.flat{color:var(--blue)}
-
-    .chart-card{min-height:300px}
-    .chart-title{display:flex;align-items:start;justify-content:space-between;gap:10px;margin-bottom:6px}
-    .chart-title strong{font-size:15px}.chart-title span{color:var(--muted);font-size:11px;font-weight:850}
-    .chart{width:100%;min-height:230px;direction:ltr}
-    .chart svg{width:100%;height:230px;display:block}
-    .chart-note{margin-top:8px;padding:8px 10px;border-radius:13px;background:#f8fafc;color:#334155;line-height:1.55;font-size:12px;font-weight:850}
-    .axis{stroke:#cbd5e1;stroke-width:1}.gridline{stroke:#eef2f7;stroke-width:1}
-    .line-path{fill:none;stroke:#0f766e;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
-    .dot{fill:#0f766e}.bar{fill:#0f766e}.bar-blue{fill:#2563eb}.bar-red{fill:#dc2626}
-    .svg-label{font:800 15px Arial,Tahoma,sans-serif;fill:#334155}.svg-small{font:800 13px Arial,Tahoma,sans-serif;fill:#64748b}.svg-value{font:950 16px Arial,Tahoma,sans-serif;fill:#0f172a}
-    .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;direction:rtl}
-    .legend span{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;font-weight:850}.legend i{width:10px;height:10px;border-radius:3px;background:#0f766e;display:inline-block}.legend .blue i{background:#2563eb}.legend .red i{background:#dc2626}
-    .dot,.scatter-dot{fill:#0f766e;stroke:#fff;stroke-width:2.2}
-    .herd-scatter-point,.herd-scatter-hit{cursor:pointer;pointer-events:all;touch-action:manipulation}.herd-scatter-hit{fill:transparent;stroke:transparent}
-    .herd-scatter-point:hover,.herd-scatter-point:focus{stroke:#0f172a;stroke-width:3;outline:none}
-    .animal-point-report{
-      background:white;
-      border:1px solid var(--line);
-      border-radius:20px;
-      box-shadow:var(--shadow);
-      padding:14px;
-    }
-    .animal-point-report.placeholder{
-      border-style:dashed;
-      color:var(--muted);
-      font-weight:900;
-      text-align:center;
-      background:#f8fafc;
-    }
-    .animal-point-title{
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      align-items:flex-start;
-      margin-bottom:10px;
-      flex-wrap:wrap;
-    }
-    .animal-point-title h4{margin:0;font-size:18px;color:#0f172a}
-    .animal-point-title p{margin:4px 0 0;color:var(--muted);font-size:12px;font-weight:850}
-    .animal-point-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
-    .animal-point-item{background:#f8fafc;border:1px solid #e8eef5;border-radius:14px;padding:10px}
-    .animal-point-item .label{font-size:11px;color:var(--muted);font-weight:900}
-    .animal-point-item .value{margin-top:5px;font-size:17px;color:#0f172a;font-weight:950}
-    .no-print-note{font-size:11px;color:#64748b;font-weight:850}
-
-    .group-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-    .group-card{background:white;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:14px}
-    .group-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:12px}
-    .group-head h4{margin:0;font-size:17px;line-height:1.35}
-    .group-main{
-      display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:10px;
-      margin-top:8px;
-    }
-    .group-big{
-      border:1px solid #e8eef5;
-      background:#f8fafc;
-      border-radius:16px;
-      padding:12px;
-    }
-    .group-big .g-label{
-      color:var(--muted);
-      font-size:12px;
-      font-weight:900;
-      margin-bottom:5px;
-    }
-    .group-big .g-value{
-      font-size:22px;
-      font-weight:950;
-      color:#0f172a;
-      line-height:1.25;
-    }
-    .group-big .g-sub{
-      margin-top:4px;
-      color:#64748b;
-      font-size:12px;
-      font-weight:800;
-      line-height:1.45;
-    }
-    .group-econ{
-      display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:8px;
-      margin-top:10px;
-    }
-    .group-small{
-      border:1px solid #edf2f7;
-      border-radius:14px;
-      padding:9px;
-      background:white;
-    }
-    .group-small .s-label{font-size:11px;color:var(--muted);font-weight:900}
-    .group-small .s-value{margin-top:4px;font-size:15px;font-weight:950;color:#0f172a}
-    .meaning{
-      margin-top:10px;
-      border-radius:15px;
-      padding:11px;
-      background:#ecfdf5;
-      border:1px solid #bbf7d0;
-      color:#14532d;
-      line-height:1.7;
-      font-size:13px;
-      font-weight:900;
-    }
-    .meaning.warn{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
-    .meaning.danger{background:#fef2f2;border-color:#fecaca;color:#991b1b}
-    .chip-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-    .chip{background:#f1f5f9;color:#475569;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:850}
-    .group-note{margin-top:10px;background:#f8fafc;border:1px solid #eef2f7;border-radius:14px;padding:10px;line-height:1.65;font-size:13px;font-weight:850;color:#334155}
-
-    .recommendations{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-    .rec{background:white;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:14px}
-    .rec h4{margin:8px 0;font-size:16px}.rec ul{margin:8px 0 0;padding:0 18px 0 0;color:var(--muted);font-size:12px;line-height:1.7;font-weight:750}
-    .rec .action{margin-top:10px;padding:10px;border-radius:13px;background:#f8fafc;font-size:13px;line-height:1.65;font-weight:850;color:#334155}
-
-    .thi-card{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center}
-    .thi-circle{width:82px;height:82px;border-radius:999px;display:grid;place-items:center;background:#fee2e2;color:var(--danger);font-size:29px;font-weight:950;border:7px solid white;box-shadow:0 0 0 1px #fecaca}
-    .thi-card h4{margin:0;font-size:18px}.thi-card p{margin:7px 0 0;color:var(--muted);line-height:1.65;font-weight:750}
-
-    .scientific{background:white;border:1px solid var(--line);border-top:6px solid var(--brand);color:var(--text);border-radius:22px;padding:17px;box-shadow:var(--shadow)}
-    .scientific h3{margin:0 0 10px;color:#0f172a}.scientific ul{margin:0;padding:0 20px 0 0;line-height:1.95;color:#334155;font-weight:850}
-    .scientific li{margin:7px 0;padding:8px 10px;background:#f8fafc;border:1px solid #e8eef5;border-radius:12px}
-    .empty{padding:24px;text-align:center;color:var(--muted);font-weight:900;background:white;border:1px dashed #cbd5e1;border-radius:18px}
-    .footer-note{text-align:center;color:var(--muted);font-size:12px;font-weight:750;margin-top:18px}
-    .no-print-section{}
-
-    .print-report-header{display:none}
-
-    @media(max-width:980px){
-      .hero-grid,.hero-summary,.grid-2,.group-list,.recommendations,.group-main,.group-econ,.kpi-row,.econ-row,.animal-point-grid{grid-template-columns:1fr}
-      .controls{width:100%}.field{flex:1 1 140px}.field input,.field select{width:100%;min-width:0}
-      .table-scroll{overflow-x:auto}.report-table{min-width:650px}
-      .chart svg{height:250px}.chart{min-height:250px}
-    }
-    @media print{
-      @page{size:A4 portrait;margin:12mm 10mm}
-      *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      html,body{
-        background:#fff!important;
-        color:#111827!important;
-        font-family:Tahoma,Arial,sans-serif!important;
-        font-size:11pt!important;
-        line-height:1.45!important;
-      }
-      .topbar,.controls,.btn,.print-section-btn,.hero-print-row,#loading,#animalPointBlock,#herdScatterBlock,.no-print-section{display:none!important}
-      .wrap{
-        width:100%!important;
-        max-width:none!important;
-        margin:0!important;
-        padding:0!important;
-      }
-      #report{display:block!important}
-
-      .print-report-header{
-        display:flex!important;
-        justify-content:space-between;
-        align-items:flex-start;
-        gap:12px;
-        border:2px solid #0f766e;
-        border-radius:10px;
-        padding:10px 12px;
-        margin:0 0 10px 0;
-        background:#f0fdfa!important;
-        page-break-inside:avoid;
-      }
-            .print-brand{
-        display:flex!important;
-        align-items:center!important;
-        gap:8px!important;
-        min-width:170px!important;
-      }
-
-      .print-logo{
-        display:block!important;
-        width:42px!important;
-        height:42px!important;
-        object-fit:contain!important;
-      }
-
-      .print-brand-name{
-        color:#0f766e!important;
-        font-size:17pt!important;
-        font-weight:950!important;
-        line-height:1.1!important;
-      }
-
-      .print-brand-tag{
-        color:#334155!important;
-        font-size:8.5pt!important;
-        font-weight:800!important;
-        line-height:1.5!important;
-        margin-top:3px!important;
-      }
-
-      .print-title-box{
-        flex:1!important;
-        text-align:center!important;
-      }
-      .print-report-header h1{
-        margin:0;
-        font-size:20pt;
-        color:#0f172a!important;
-        font-weight:950;
-      }
-      .print-report-header p{
-        margin:4px 0 0;
-        color:#334155!important;
-        font-size:10pt;
-        font-weight:800;
-      }
-      .print-meta{
-        min-width:170px;
-        text-align:left;
-        direction:rtl;
-        color:#334155!important;
-        font-size:9.5pt;
-        font-weight:800;
-        line-height:1.7;
-      }
-
-
-
-      .hero,.section,.card,.group-card,.rec,.scientific,.kpi-card,.econ-card{
-        box-shadow:none!important;
-        page-break-inside:avoid!important;
-        break-inside:avoid!important;
-      }
-
-      .hero{
-        border:1.5px solid #0f766e!important;
-        border-radius:10px!important;
-        padding:10px!important;
-        margin-bottom:10px!important;
-        background:#ffffff!important;
-        color:#111827!important;
-      }
-      .hero-grid{
-        display:grid!important;
-        grid-template-columns:1.5fr .7fr!important;
-        gap:8px!important;
-        align-items:stretch!important;
-      }
-        .hero h2{
-        display:none!important;
-      }
-      .hero-line{
-        font-size:11.5pt!important;
-        color:#334155!important;
-        margin-top:4px!important;
-      }
-      .hero-summary{
-        display:grid!important;
-        grid-template-columns:repeat(3,1fr)!important;
-        gap:6px!important;
-        margin-top:8px!important;
-      }
-      .hero-summary-card,.hero-panel{
-        border:1px solid #cbd5e1!important;
-        background:#f8fafc!important;
-        border-radius:8px!important;
-        padding:7px!important;
-      }
-      .hero-summary-card .hs-label,.hero-panel .label{
-        color:#475569!important;
-        font-size:8.5pt!important;
-        font-weight:900!important;
-      }
-      .hero-summary-card .hs-value,.hero-panel .value{
-        color:#0f172a!important;
-        font-size:14pt!important;
-        font-weight:950!important;
-        margin-top:3px!important;
-      }
-      .hero-summary-card .hs-sub,.hero-panel .sub{
-        color:#475569!important;
-        font-size:8.5pt!important;
-        margin-top:2px!important;
-      }
-
-      .notice.show{
-        display:block!important;
-        border:1px solid #f59e0b!important;
-        background:#fffbeb!important;
-        color:#92400e!important;
-        border-radius:8px!important;
-        padding:7px!important;
-        margin:8px 0!important;
-        font-size:9pt!important;
-      }
-
-      .section{
-        margin-top:10px!important;
-        padding-top:0!important;
-        border-top:1px solid #e5e7eb!important;
-      }
-      .section-head{
-        display:flex!important;
-        justify-content:space-between!important;
-        align-items:flex-end!important;
-        gap:8px!important;
-        margin:8px 0 6px!important;
-      }
-      .section-head h3{
-        font-size:15pt!important;
-        margin:0!important;
-        color:#0f172a!important;
-      }
-      .section-head p{
-        font-size:9pt!important;
-        margin:2px 0 0!important;
-        color:#475569!important;
-      }
-
-      .kpi-row,.econ-row{
-        display:grid!important;
-        grid-template-columns:repeat(3,1fr)!important;
-        gap:6px!important;
-      }
-      .kpi-card,.econ-card{
-        border:1px solid #cbd5e1!important;
-        border-radius:8px!important;
-        background:#ffffff!important;
-        padding:7px!important;
-      }
-      .kpi-card .k-label,.econ-card .e-label{
-        color:#475569!important;
-        font-size:8.5pt!important;
-        font-weight:900!important;
-      }
-      .kpi-card .k-value,.econ-card .e-value{
-        color:#0f172a!important;
-        font-size:14pt!important;
-        margin-top:3px!important;
-        font-weight:950!important;
-      }
-      .kpi-card .k-sub,.econ-card .e-sub{
-        color:#64748b!important;
-        font-size:8pt!important;
-        margin-top:2px!important;
-      }
-
-      .table-scroll{overflow:visible!important}
-      .report-table{
-        width:100%!important;
-        min-width:0!important;
-        border-collapse:collapse!important;
-        font-size:9pt!important;
-      }
-      .report-table th{
-        background:#f1f5f9!important;
-        color:#0f172a!important;
-        border:1px solid #cbd5e1!important;
-        padding:6px!important;
-        font-size:9pt!important;
-      }
-      .report-table td{
-        border:1px solid #dbe3ec!important;
-        padding:6px!important;
-        font-size:9pt!important;
-      }
-
-      .grid-2{
-        display:grid!important;
-        grid-template-columns:1fr 1fr!important;
-        gap:7px!important;
-      }
-      .chart-card{
-        min-height:auto!important;
-        border:1px solid #cbd5e1!important;
-        border-radius:8px!important;
-        padding:8px!important;
-        background:#fff!important;
-      }
-      .chart-title{margin-bottom:4px!important}
-      .chart-title strong{font-size:10pt!important;color:#0f172a!important}
-      .chart-title span{font-size:8pt!important;color:#475569!important}
-      .chart{min-height:auto!important}
-      .chart svg{height:135px!important;max-height:135px!important}
-      .chart-note{
-        background:#f8fafc!important;
-        border:1px solid #e2e8f0!important;
-        color:#334155!important;
-        font-size:8pt!important;
-        padding:5px!important;
-        margin-top:5px!important;
-      }
-
-      .group-list{
-        display:grid!important;
-        grid-template-columns:1fr 1fr!important;
-        gap:7px!important;
-      }
-      .group-card{
-        border:1px solid #cbd5e1!important;
-        border-radius:8px!important;
-        background:#fff!important;
-        padding:8px!important;
-      }
-      .group-head h4{
-        font-size:12pt!important;
-        color:#0f172a!important;
-      }
-      .muted{font-size:8pt!important;color:#475569!important}
-      .status{
-        border:1px solid #cbd5e1!important;
-        background:#f8fafc!important;
-        color:#0f172a!important;
-        font-size:8pt!important;
-        padding:3px 6px!important;
-      }
-      .group-main,.group-econ{
-        display:grid!important;
-        grid-template-columns:1fr 1fr!important;
-        gap:5px!important;
-      }
-      .group-big,.group-small{
-        border:1px solid #e2e8f0!important;
-        border-radius:7px!important;
-        background:#f8fafc!important;
-        padding:6px!important;
-      }
-      .group-big .g-label,.group-small .s-label{
-        font-size:8pt!important;
-        color:#475569!important;
-      }
-      .group-big .g-value{
-        font-size:13pt!important;
-        color:#0f172a!important;
-      }
-      .group-small .s-value{
-        font-size:10pt!important;
-        color:#0f172a!important;
-      }
-      .meaning,.group-note{
-        border:1px solid #dbe3ec!important;
-        background:#f8fafc!important;
-        color:#334155!important;
-        border-radius:7px!important;
-        padding:6px!important;
-        font-size:8.5pt!important;
-      }
-      .chip-row{gap:3px!important}
-      .chip{
-        border:1px solid #cbd5e1!important;
-        background:#fff!important;
-        color:#334155!important;
-        font-size:7.5pt!important;
-        padding:3px 5px!important;
-      }
-
-      .recommendations{
-        display:grid!important;
-        grid-template-columns:1fr 1fr!important;
-        gap:7px!important;
-      }
-      .rec{
-        border:1px solid #cbd5e1!important;
-        border-radius:8px!important;
-        background:#fff!important;
-        padding:8px!important;
-      }
-      .rec h4{font-size:11pt!important;color:#0f172a!important;margin:5px 0!important}
-      .rec ul{font-size:8.5pt!important;color:#334155!important}
-      .rec .action{
-        border:1px solid #e2e8f0!important;
-        background:#f8fafc!important;
-        color:#334155!important;
-        font-size:8.5pt!important;
-        padding:5px!important;
-      }
-
-      .thi-card{
-        display:grid!important;
-        grid-template-columns:auto 1fr!important;
-        gap:8px!important;
-        border:1px solid #cbd5e1!important;
-        border-radius:8px!important;
-        padding:8px!important;
-        background:#fff!important;
-      }
-      .thi-circle{
-        width:58px!important;
-        height:58px!important;
-        font-size:18pt!important;
-        border-width:4px!important;
-      }
-      .thi-card h4{font-size:12pt!important;color:#0f172a!important}
-      .thi-card p{font-size:9pt!important;color:#334155!important}
-
-      .scientific{
-        background:#ffffff!important;
-        color:#0f172a!important;
-        border:1.5px solid #0f766e!important;
-        border-radius:8px!important;
-        padding:9px!important;
-      }
-      .scientific h3{color:#0f172a!important;font-size:14pt!important}
-      .scientific ul{color:#334155!important;font-size:9pt!important}
-
-      .footer-note{
-        color:#64748b!important;
-        border-top:1px solid #e5e7eb!important;
-        padding-top:6px!important;
-        margin-top:10px!important;
-        font-size:8pt!important;
-      }
-    }
-      .print-section-btn,.hero-print-row{display:none!important}
-  </style>
   <link rel="stylesheet" href="/css/reports.css">
 </head>
 <body data-page="milk-report" data-report-page>
-<header class="screen-top no-print-section">
+<header class="screen-top no-print">
   <div class="screen-head">
     <div>
       <div class="screen-title">تقرير إنتاج اللبن</div>
@@ -645,7 +21,7 @@
 </header>
 
 <main class="page report-page">
-   <section class="card report-tools no-print-section" id="reportTools">
+   <section class="card report-tools no-print" id="reportTools">
   <div class="controls">
     <div class="field">
       <label for="reportDate">تاريخ التقرير</label>
@@ -653,7 +29,7 @@
     </div>
 
     <div class="field">
-      <label for="milkPriceInput">سعر كجم اللبن <b style="color:#dc2626">*</b></label>
+      <label for="milkPriceInput">سعر كجم اللبن <span aria-hidden="true">*</span></label>
       <input id="milkPriceInput" type="number" inputmode="numeric" min="1" step="1" placeholder="مثال: 20" required>
     </div>
 
@@ -662,23 +38,27 @@
 </section>
     <div id="loading" class="loading">جاري تحميل تقرير اللبن...</div>
 
-    <section id="report" style="display:none;">
-     <div class="print-report-header report-cover">
-  <div class="print-brand">
-    <img class="print-logo" src="/images/logo.png" alt="مُرَبِّيك">
-    <div>
-      <div class="print-brand-name">مُرَبِّيك</div>
-      <div class="print-brand-tag">تقرير إنتاج صادر من نظام مُرَبِّيك لإدارة القطيع</div>
+  <section id="report" hidden>
+  <section class="report-cover">
+    <div class="report-head">
+      <div class="report-logo-box">
+        <img src="/images/logo.png" alt="مُرَبِّيك">
+      </div>
+
+      <div>
+        <div class="report-kicker">مُرَبِّيك لإدارة مزارع الألبان</div>
+        <h1 id="printTitle" class="title">تقرير إنتاج اللبن</h1>
+        <div id="printSubtitle" class="sub">تقرير تشغيلي واستشاري لإنتاج اللبن</div>
+      </div>
+
+      <div class="report-stamp">
+        <b>تقرير لبن</b>
+        <span>نسخة قابلة للطباعة PDF</span>
+      </div>
     </div>
-  </div>
 
-  <div class="print-title-box">
-    <h1 id="printTitle">تقرير إنتاج اللبن</h1>
-    <p id="printSubtitle">تقرير تشغيلي واستشاري لإنتاج اللبن</p>
-  </div>
-
-  <div class="print-meta" id="printMeta"></div>
-</div>
+    <div class="report-meta" id="printMeta"></div>
+  </section>
       <section class="card" id="summaryBlock" data-print-block>
   <div class="section-title">🌿 ملخص تقرير اللبن</div>
 
@@ -696,7 +76,7 @@
   </div>
 </section>
 
-      <div class="notice" id="serverMessage"></div>
+     <div class="card empty" id="serverMessage" hidden></div>
 
       <section class="card" id="productionBlock" data-print-block>
   <div class="section-title" id="productionSectionTitle">إنتاج أمس</div>
@@ -718,9 +98,10 @@
   </div>
 </section>
 
-      <section class="section" id="chartsBlock" data-print-block>
-        <div class="section-head"><div><h3>الرسوم البيانية</h3><p>منحنى الإنتاج ورسوم المجموعات ومراحل أيام الحليب.</p></div></div>
-        <div class="grid grid-2">
+ <section class="card" id="chartsBlock" data-print-block>
+  <div class="section-title">الرسوم البيانية</div>
+  <div class="sub">منحنى الإنتاج ورسوم المجموعات ومراحل أيام الحليب.</div>
+  <div class="grid grid-2">
 <div class="card chart-card">
             <div class="chart-title"><strong>منحنى آخر 30 يوم</strong><span>كجم لبن / يوم</span></div>
             <div class="chart" id="dailyTrendChart"></div>
@@ -745,10 +126,10 @@
         </div>
       </section>
 
-      <section class="section" id="groupsBlock" data-print-block>
-        <div class="section-head"><div><h3>المجموعات الإنتاجية</h3></div></div>
-        <div class="group-list" id="groupsList"></div>
-      </section>
+     <section class="card" id="groupsBlock" data-print-block>
+  <div class="section-title">المجموعات الإنتاجية</div>
+  <div class="cards" id="groupsList"></div>
+</section>
 
       <section class="card" id="thiBlock" data-print-block>
   <div class="section-title">الإجهاد الحراري</div>
@@ -762,22 +143,16 @@
   <div class="cards report-extra" id="recommendationsList"></div>
 </section>
 
-      <section class="section" id="scientificBlock" data-print-block>
-        <div class="section-head"><div><h3>التقرير العلمي المختصر</h3><p>قراءة تشغيلية مبنية على الإنتاج، مرحلة الحليب، الحمل، الاقتصاد، والإجهاد الحراري.</p></div></div>
-        <div class="scientific">
-          <h3 id="scientificTitle">التقرير العلمي المختصر</h3>
-          <ul id="scientificNotes"></ul>
-        </div>
-      </section>
+     <section class="card" id="scientificBlock" data-print-block>
+  <div class="section-title" id="scientificTitle">التقرير العلمي المختصر</div>
+  <div class="sub">قراءة تشغيلية مبنية على الإنتاج، مرحلة الحليب، الحمل، الاقتصاد، والإجهاد الحراري.</div>
+  <div class="cards" id="scientificNotes"></div>
+</section>
 
-      <section class="section no-print-section" id="herdScatterBlock">
-        <div class="section-head">
-          <div>
-            <h3>سكاتر القطيع</h3>
-            <p>كل نقطة = حيوان. اضغط أو المس النقطة لفتح بطاقة مختصرة أسفل الرسم.</p>
-          </div>
-        </div>
-        <div class="card chart-card">
+     <section class="card no-print" id="herdScatterBlock">
+  <div class="section-title">سكاتر القطيع</div>
+  <div class="sub">كل نقطة = حيوان. اضغط أو المس النقطة لفتح بطاقة مختصرة أسفل الرسم.</div>
+  <div class="card chart-card">
           <div class="chart-title"><strong>سكاتر القطيع</strong><span>كل نقطة = حيوان</span></div>
           <div class="legend"><span><i></i>اللبن حسب أيام الحليب</span></div>
           <div class="chart" id="herdScatterChart"></div>
@@ -785,20 +160,16 @@
         </div>
       </section>
 
-      <section class="section no-print-section" id="animalPointBlock">
-        <div class="section-head">
-          <div>
-            <h3>بطاقة الحيوان من السكاتر</h3>
-            <p>تظهر هنا عند لمس نقطة من سكاتر القطيع، وليست مخصصة للطباعة.</p>
-          </div>
-        </div>
-        <div class="animal-point-report placeholder" id="animalPointReport">اضغط أو المس نقطة من سكاتر القطيع لعرض رقم الحيوان، اللبن، أيام الحليب، وأيام الحمل.</div>
-      </section>
+     <section class="card no-print" id="animalPointBlock">
+  <div class="section-title">بطاقة الحيوان من السكاتر</div>
+  <div class="sub">تظهر هنا عند لمس نقطة من سكاتر القطيع، وليست مخصصة للطباعة.</div>
+  <div class="empty" id="animalPointReport">اضغط أو المس نقطة من سكاتر القطيع لعرض رقم الحيوان، اللبن، أيام الحليب، وأيام الحمل.</div>
+</section>
 
-      <div class="footer-note">مُرَبِّيك — قرار أسرع، رقم أوضح، وتوصية مفيدة.</div>
+    <div class="card empty">مُرَبِّيك — قرار أسرع، رقم أوضح، وتوصية مفيدة.</div>
     </section>
   </main>
-
+  <div class="print-footer"></div>
   <script>
     const $ = id => document.getElementById(id);
 
@@ -855,18 +226,9 @@ function arClean(v){
     .replace(/\bkg\b/gi,"كجم");
 }
 
-function reportToneClass(tone){
-  const t = String(tone || "").toLowerCase();
-  if (t === "danger" || t === "high" || t === "loss") return "report-tone-danger";
-  if (t === "warn" || t === "medium" || t === "watch") return "report-tone-warn";
-  if (t === "blue") return "report-tone-blue";
-  if (t === "good" || t === "ok") return "report-tone-good";
-  return "";
-}
-
 function reportKpi(label, value, sub = "", tone = ""){
   return `
-    <div class="kpi ${reportToneClass(tone)}">
+    <div class="kpi">
       <span>${esc(label)}</span>
       <b>${value ?? "—"}</b>
       ${sub ? `<span>${esc(sub)}</span>` : ""}
@@ -876,10 +238,19 @@ function reportKpi(label, value, sub = "", tone = ""){
 
 function reportMini(title, value, note = "", tone = ""){
   return `
-    <div class="mini ${reportToneClass(tone)}">
+    <div class="mini">
       <div class="name">${esc(title || "—")}</div>
       <div class="value">${value ?? "—"}</div>
       ${note ? `<div class="note">${note}</div>` : ""}
+    </div>
+  `;
+}
+
+function reportNote(title, note){
+  return `
+    <div class="mini">
+      <div class="name">${esc(title || "—")}</div>
+      <div class="note">${note || ""}</div>
     </div>
   `;
 }
@@ -1090,87 +461,61 @@ function kpiCard(label, value, sub, tone=""){
       }
     }
 
-    function svgHerdScatter(points){
-      points = Array.isArray(points) ? points : [];
-      if(!points.length){
-        return `<div class="empty">لا توجد بيانات فردية كافية لسكاتر القطيع من السيرفر.</div>`;
-      }
+function svgHerdScatter(points){
+  points = Array.isArray(points) ? points : [];
+  if(!points.length){
+    return `<div class="empty">لا توجد بيانات فردية كافية لسكاتر القطيع من السيرفر.</div>`;
+  }
 
-      const w=390,h=230,p=38;
-      const maxX=Math.max(...points.map(x=>Number(x.dim)||0),1);
-      const maxY=Math.max(...points.map(x=>Number(x.milk)||0),1);
+  const w=390,h=230,p=38;
+  const maxX=Math.max(...points.map(x=>Number(x.dim)||0),1);
+  const maxY=Math.max(...points.map(x=>Number(x.milk)||0),1);
 
-      const dots = points.map(pt => {
-        const x = p + (Number(pt.dim) / maxX) * (w - p*2);
-        const y = h - p - (Number(pt.milk) / maxY) * (h - p*2);
-        const title = `${pt.number ? "رقم " + pt.number + " — " : ""}${num(pt.milk,1)} كجم · ${num(pt.dim,0)} يوم حليب${Number.isFinite(Number(pt.dcc)) ? " · " + num(pt.dcc,0) + " يوم حمل" : ""}`;
-        const payload = encodePoint(pt);
-        return `<g class="herd-scatter-target" data-herd-point="1" data-point="${payload}" tabindex="0" role="button" aria-label="${esc(title)}">
-          <circle class="herd-scatter-hit" cx="${x}" cy="${y}" r="14"></circle>
-          <circle class="scatter-dot herd-scatter-point" cx="${x}" cy="${y}" r="5.8"></circle>
-          <title>${esc(title)}</title>
-        </g>`;
-      }).join("");
+  const dots = points.map(pt => {
+    const x = p + (Number(pt.dim) / maxX) * (w - p*2);
+    const y = h - p - (Number(pt.milk) / maxY) * (h - p*2);
+    const title = `${pt.number ? "رقم " + pt.number + " — " : ""}${num(pt.milk,1)} كجم · ${num(pt.dim,0)} يوم حليب${Number.isFinite(Number(pt.dcc)) ? " · " + num(pt.dcc,0) + " يوم حمل" : ""}`;
+    const payload = encodePoint(pt);
 
-      return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
-        <line class="gridline" x1="${p}" y1="${p}" x2="${w-p}" y2="${p}"></line>
-        <line class="gridline" x1="${p}" y1="${h/2}" x2="${w-p}" y2="${h/2}"></line>
-        <line class="axis" x1="${p}" y1="${h-p}" x2="${w-p}" y2="${h-p}"></line>
-        <line class="axis" x1="${p}" y1="${p}" x2="${p}" y2="${h-p}"></line>
-        <text class="svg-small" x="${p}" y="${h-8}" text-anchor="middle">0</text>
-        <text class="svg-small" x="${w-p}" y="${h-8}" text-anchor="middle">${num(maxX,0)} يوم</text>
-        <text class="svg-small" x="${p-6}" y="${p+4}" text-anchor="end">${num(maxY,0)} كجم</text>
-        <text class="svg-small" x="${w/2}" y="${h-8}" text-anchor="middle">أيام الحليب</text>
-        ${dots}
-      </svg>`;
-    }
+    return `<g data-herd-point="1" data-point="${payload}" tabindex="0" role="button" aria-label="${esc(title)}">
+      <circle cx="${x}" cy="${y}" r="14" fill="transparent" stroke="transparent"></circle>
+      <circle class="dot" cx="${x}" cy="${y}" r="5.8"><title>${esc(title)}</title></circle>
+    </g>`;
+  }).join("");
 
-    function renderAnimalPointReport(pt, shouldScroll=false){
-      const box = $("animalPointReport");
-      const block = $("animalPointBlock");
-      if(!box || !block) return;
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
+    <line class="gridline" x1="${p}" y1="${p}" x2="${w-p}" y2="${p}"></line>
+    <line class="gridline" x1="${p}" y1="${h/2}" x2="${w-p}" y2="${h/2}"></line>
+    <line class="axis" x1="${p}" y1="${h-p}" x2="${w-p}" y2="${h-p}"></line>
+    <line class="axis" x1="${p}" y1="${p}" x2="${p}" y2="${h-p}"></line>
+    <text class="svg-small" x="${p}" y="${h-8}" text-anchor="middle">0</text>
+    <text class="svg-small" x="${w-p}" y="${h-8}" text-anchor="middle">${num(maxX,0)} يوم</text>
+    <text class="svg-small" x="${p-6}" y="${p+4}" text-anchor="end">${num(maxY,0)} كجم</text>
+    <text class="svg-small" x="${w/2}" y="${h-8}" text-anchor="middle">أيام الحليب</text>
+    ${dots}
+  </svg>`;
+}
+function renderAnimalPointReport(pt, shouldScroll=false){
+  const box = $("animalPointReport");
+  const block = $("animalPointBlock");
+  if(!box || !block) return;
 
-      if(!pt){
-        box.className = "animal-point-report placeholder";
-        box.innerHTML = "اضغط أو المس نقطة من سكاتر القطيع لعرض رقم الحيوان، اللبن، أيام الحليب، وأيام الحمل.";
-        return;
-      }
+  if(!pt){
+    box.className = "empty";
+    box.innerHTML = "اضغط أو المس نقطة من سكاتر القطيع لعرض رقم الحيوان، اللبن، أيام الحليب، وأيام الحمل.";
+    return;
+  }
 
-      box.className = "animal-point-report";
-      box.innerHTML = `
-        <div class="animal-point-title">
-          <div>
-            <h4>بطاقة مختصرة للحيوان ${pt.number ? "رقم " + esc(pt.number) : ""}</h4>
-            <p>ناتجة من لمس نقطة في سكاتر القطيع</p>
-          </div>
-          <div class="no-print-note">ليست للطباعة</div>
-        </div>
-        <div class="animal-point-grid">
-          <div class="animal-point-item">
-            <div class="label">رقم الحيوان</div>
-            <div class="value">${esc(pt.number || "—")}</div>
-          </div>
-          <div class="animal-point-item">
-            <div class="label">اللبن</div>
-            <div class="value">${num(pt.milk,1)} كجم</div>
-          </div>
-          <div class="animal-point-item">
-            <div class="label">أيام الحليب</div>
-            <div class="value">${num(pt.dim,0)} يوم</div>
-          </div>
-          <div class="animal-point-item">
-            <div class="label">أيام الحمل</div>
-            <div class="value">${Number.isFinite(Number(pt.dcc)) ? num(pt.dcc,0) + " يوم" : "—"}</div>
-          </div>
-          <div class="animal-point-item">
-            <div class="label">المجموعة</div>
-            <div class="value">${esc(pt.groupName || "—")}</div>
-          </div>
-        </div>
-      `;
+  box.className = "grid report-stack-mobile";
+  box.innerHTML = [
+    reportKpi("رقم الحيوان", esc(pt.number || "—"), pt.groupName ? `المجموعة: ${esc(pt.groupName)}` : "—"),
+    reportKpi("اللبن", `${num(pt.milk,1)} كجم`, "قراءة النقطة المختارة"),
+    reportKpi("أيام الحليب", `${num(pt.dim,0)} يوم`, "DIM بالعربي داخل التقرير"),
+    reportKpi("أيام الحمل", Number.isFinite(Number(pt.dcc)) ? `${num(pt.dcc,0)} يوم` : "—", "DCC بالعربي داخل التقرير")
+  ].join("");
 
-      if(shouldScroll) block.scrollIntoView({behavior:"smooth",block:"start"});
-    }
+  if(shouldScroll) block.scrollIntoView({behavior:"smooth",block:"start"});
+}
 
     function chartNotes(j){
       const herdPts = herdScatterPoints(j);
@@ -1250,72 +595,55 @@ function kpiCard(label, value, sub, tone=""){
       };
     }
 
-    function renderGroups(j){
-      const groups=Array.isArray(j.groups)?j.groups:[];
-      if(!groups.length){$("groupsList").innerHTML=`<div class="empty">لا توجد مجموعات إنتاجية.</div>`;return}
+function renderGroups(j){
+  const groups = Array.isArray(j.groups) ? j.groups : [];
+  if(!groups.length){
+    $("groupsList").innerHTML = `<div class="empty">لا توجد مجموعات إنتاجية.</div>`;
+    return;
+  }
 
-      $("groupsList").innerHTML=groups.map(g=>{
-        const e=g.economics||{};
-        const tone=g.status==="loss"?"danger":g.status==="watch"?"warn":g.status==="good"?"blue":"ok";
-        const top=(g.topAnimals||[]).slice(0,3);
-        const watch=(g.watchAnimals||[]).slice(0,3);
-        const meaning=groupMeaning(g);
-        const hasEcon=econHasData(e);
+  $("groupsList").innerHTML = groups.map(g => {
+    const e = g.economics || {};
+    const tone = g.status === "loss" ? "danger" : g.status === "watch" ? "warn" : g.status === "good" ? "blue" : "ok";
+    const top = (g.topAnimals || []).slice(0,3);
+    const watch = (g.watchAnimals || []).slice(0,3);
+    const meaning = groupMeaning(g);
+    const hasEcon = econHasData(e);
+    const evidence = (g.murabbik?.evidence || []).map(x => status(x, "info")).join(" ");
+    const topText = top.length ? `أفضل 3: ${top.map(x => "#" + esc(x.number) + " " + num(x.kg ?? x.milkKg ?? x.dailyMilk ?? x.totalMilk,1) + " كجم").join("، ")}` : "";
+    const watchText = watch.length ? `متابعة: ${watch.map(x => "#" + esc(x.number) + " " + pct(x.deltaPct)).join("، ")}` : "";
 
-        return `<article class="group-card">
-          <div class="group-head">
-            <div>
-              <h4>${esc(g.groupName)}</h4>
-              <div class="muted">${g.species==="buffalo"?"جاموس":"أبقار"} · التسجيل ${num(g.recordingRate,1)}% · ${int(g.recordedCount)} مسجل من ${int(g.milkersCount)} حلاب</div>
-            </div>
-            ${status(g.statusText||"مستقرة",tone)}
-          </div>
+    return `<article class="mini">
+      <div class="name">${esc(g.groupName || "مجموعة إنتاجية")}</div>
+      <div class="note">
+        ${g.species === "buffalo" ? "جاموس" : "أبقار"} ·
+        التسجيل ${num(g.recordingRate,1)}% ·
+        ${int(g.recordedCount)} مسجل من ${int(g.milkersCount)} حلاب ·
+        ${status(g.statusText || "مستقرة", tone)}
+      </div>
 
-          <div class="group-main">
-            <div class="group-big">
-              <div class="g-label">إنتاج المجموعة</div>
-              <div class="g-value">${num(g.totalMilkKg,1)} كجم</div>
-              <div class="g-sub">متوسط ${num(g.avgMilkKgMilker,1)} كجم/حلاب</div>
-            </div>
+      <div class="grid report-stack-mobile">
+        ${reportKpi("إنتاج المجموعة", `${num(g.totalMilkKg,1)} كجم`, `متوسط ${num(g.avgMilkKgMilker,1)} كجم/حلاب`)}
+        ${reportKpi("مرحلة المجموعة", `${num(g.avgDim,0)} يوم حليب`, `${num(g.avgDcc,0)} يوم حمل · التغير ${arrow(g.deltaPct)} ${pct(g.deltaPct)}`)}
+        ${reportKpi("دخل اللبن", hasEcon ? money(e.milkIncome) : "غير مكتمل", "حسب سعر اللبن المدخل")}
+        ${reportKpi("صافي ربح/خسارة", hasEcon ? money(e.netOperatingResult) : "غير مكتمل", "بعد التغذية والتشغيل")}
+        ${reportKpi("تكلفة كجم اللبن", hasEcon ? money(e.productionCostPerKgMilk) : "غير مكتمل", "تكلفة إنتاج كجم اللبن")}
+        ${reportKpi("هامش كجم اللبن", hasEcon ? money(e.marginPerKgMilk) : "غير مكتمل", "الهامش الصافي لكل كجم")}
+      </div>
 
-            <div class="group-big">
-              <div class="g-label">مرحلة المجموعة</div>
-              <div class="g-value">${num(g.avgDim,0)} يوم حليب</div>
-              <div class="g-sub">${num(g.avgDcc,0)} يوم حمل · التغير ${arrow(g.deltaPct)} ${pct(g.deltaPct)}</div>
-            </div>
-          </div>
+      <div class="cards">
+        ${reportNote("معنى الرقم", esc(meaning.text))}
+        ${reportNote("توصية مُرَبِّيك", esc(g.murabbik?.action || "متابعة روتينية بدون إجراء عاجل."))}
+      </div>
 
-          <div class="group-econ">
-            <div class="group-small">
-              <div class="s-label">دخل اللبن</div>
-              <div class="s-value">${hasEcon ? money(e.milkIncome) : "غير مكتمل"}</div>
-            </div>
-            <div class="group-small">
-              <div class="s-label">صافي ربح/خسارة</div>
-              <div class="s-value">${hasEcon ? money(e.netOperatingResult) : "غير مكتمل"}</div>
-            </div>
-            <div class="group-small">
-              <div class="s-label">إجمالي تكلفة كجم اللبن</div>
-              <div class="s-value">${hasEcon ? money(e.productionCostPerKgMilk) : "غير مكتمل"}</div>
-            </div>
-            <div class="group-small">
-              <div class="s-label">هامش كجم اللبن</div>
-              <div class="s-value">${hasEcon ? money(e.marginPerKgMilk) : "غير مكتمل"}</div>
-            </div>
-          </div>
-
-          <div class="meaning ${meaning.tone}"><strong>معنى الرقم:</strong> ${esc(meaning.text)}</div>
-
-          <div class="group-note"><strong>توصية مُرَبِّيك:</strong> ${esc(g.murabbik?.action||"متابعة روتينية بدون إجراء عاجل.")}</div>
-
-          <div class="chip-row">
-            ${(g.murabbik?.evidence||[]).map(x=>`<span class="chip">${esc(x)}</span>`).join("")}
-            ${top.length?`<span class="chip">أفضل 3: ${top.map(x=>"#"+esc(x.number)+" "+num(x.kg ?? x.milkKg ?? x.dailyMilk ?? x.totalMilk,1)+" كجم").join("، ")}</span>`:""}
-            ${watch.length?`<span class="chip">متابعة: ${watch.map(x=>"#"+esc(x.number)+" "+pct(x.deltaPct)).join("، ")}</span>`:""}
-          </div>
-        </article>`;
-      }).join("");
-    }
+      ${(evidence || topText || watchText) ? `<div class="cards">
+        ${evidence ? reportNote("الدليل", evidence) : ""}
+        ${topText ? reportNote("أفضل الحيوانات", esc(topText)) : ""}
+        ${watchText ? reportNote("حيوانات للمتابعة", esc(watchText)) : ""}
+      </div>` : ""}
+    </article>`;
+  }).join("");
+}
 
     function renderThi(j){
   const t = j.thi || {};
@@ -1447,29 +775,53 @@ function kpiCard(label, value, sub, tone=""){
         .replace(/\bkg\b/gi,"كجم")
       );
 
-      $("scientificNotes").innerHTML=clean.map(x=>`<li>${esc(x)}</li>`).join("");
+      $("scientificNotes").innerHTML = clean.length
+  ? clean.map((x, i) => reportNote(`نقطة ${i + 1}`, esc(x))).join("")
+  : `<div class="empty">لا توجد ملاحظات علمية كافية لهذا التقرير.</div>`;
     }
 
-    function renderAll(j){
-      $("loading").style.display="none"; $("report").style.display="block";
-      const selectedReportDate = $("reportDate").value || yesterdayISO();
-      const dayLabel = reportDayLabel(selectedReportDate);
-      $("heroTitle").textContent = arClean(j.headline?.title || "تقرير إنتاج اللبن");
-      $("heroLine").textContent = "";
-      $("productionSectionTitle").textContent = `إنتاج ${dayLabel}`;
-      renderHeroSummary(j);
-      $("printTitle").textContent = arClean(j.headline?.title || "تقرير إنتاج اللبن");
-      $("printSubtitle").textContent = arClean(j.headline?.text || "مُرَبِّيك — تقرير إنتاج اللبن");
-      $("printMeta").innerHTML = [
-        `تاريخ التقرير: ${esc($("reportDate").value || yesterdayISO())}`,
-        `سعر كجم اللبن: ${money0(getMilkPriceRequired())}`,
-        `نوع القطيع: ${esc(j.meta?.selectedTypeLabel || (getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل"))}`
-      ].join("<br>");
-      $("heroNet").textContent = money(j.economics?.netOperatingResult);
-      if(j.message){$("serverMessage").textContent=j.message;$("serverMessage").classList.add("show")}else{$("serverMessage").classList.remove("show")}
-      renderProduction(j); renderEconomy(j); renderComparisons(j); renderCharts(j); renderGroups(j); renderThi(j); renderRecommendations(j); renderScientific(j);
-    }
+function renderAll(j){
+  $("loading").style.display = "none";
+  $("report").style.display = "";
+  $("report").hidden = false;
 
+  const selectedReportDate = $("reportDate").value || yesterdayISO();
+  const dayLabel = reportDayLabel(selectedReportDate);
+
+  $("heroTitle").textContent = arClean(j.headline?.title || "تقرير إنتاج اللبن");
+  $("heroLine").textContent = "";
+  $("productionSectionTitle").textContent = `إنتاج ${dayLabel}`;
+
+  renderHeroSummary(j);
+
+  $("printTitle").textContent = arClean(j.headline?.title || "تقرير إنتاج اللبن");
+  $("printSubtitle").textContent = arClean(j.headline?.text || "مُرَبِّيك — تقرير إنتاج اللبن");
+
+  $("printMeta").innerHTML = [
+    `<div class="meta-pill"><span>تاريخ التقرير</span><b>${esc($("reportDate").value || yesterdayISO())}</b></div>`,
+    `<div class="meta-pill"><span>سعر كجم اللبن</span><b>${money0(getMilkPriceRequired())}</b></div>`,
+    `<div class="meta-pill"><span>نوع القطيع</span><b>${esc(j.meta?.selectedTypeLabel || (getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل"))}</b></div>`,
+    `<div class="meta-pill"><span>إعداد</span><b>مُرَبِّيك</b></div>`
+  ].join("");
+
+  $("heroNet").textContent = money(j.economics?.netOperatingResult);
+
+  if(j.message){
+    $("serverMessage").textContent = j.message;
+    $("serverMessage").hidden = false;
+  }else{
+    $("serverMessage").hidden = true;
+  }
+
+  renderProduction(j);
+  renderEconomy(j);
+  renderComparisons(j);
+  renderCharts(j);
+  renderGroups(j);
+  renderThi(j);
+  renderRecommendations(j);
+  renderScientific(j);
+}
     function getQueryDate(){
       const q = new URLSearchParams(location.search);
       const raw = String(q.get("date") || q.get("reportDate") || "").trim().slice(0,10);
@@ -1501,7 +853,7 @@ function kpiCard(label, value, sub, tone=""){
 
     function showPriceRequired(){
       $("loading").style.display="none";
-      $("report").style.display="block";
+      $("report").hidden=false;
       $("heroTitle").textContent="تقرير إنتاج اللبن";
       $("heroLine").textContent="";
       $("heroSummary").innerHTML=[
@@ -1510,10 +862,12 @@ function kpiCard(label, value, sub, tone=""){
       ].join("");
       $("printTitle").textContent = "تقرير إنتاج اللبن";
       $("printSubtitle").textContent = "أدخل سعر كجم اللبن ثم اطبع التقرير بعد التحميل";
-      $("printMeta").innerHTML = [
-        `تاريخ التقرير: ${esc($("reportDate").value || yesterdayISO())}`,
-        `نوع القطيع: ${esc(getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل")}`
-      ].join("<br>");
+     $("printMeta").innerHTML = [
+  `<div class="meta-pill"><span>تاريخ التقرير</span><b>${esc($("reportDate").value || yesterdayISO())}</b></div>`,
+  `<div class="meta-pill"><span>سعر كجم اللبن</span><b>مطلوب</b></div>`,
+  `<div class="meta-pill"><span>نوع القطيع</span><b>${esc(getKindFromQuery()==="buffalo" ? "جاموس" : getKindFromQuery()==="cow" ? "أبقار" : "الكل")}</b></div>`,
+  `<div class="meta-pill"><span>إعداد</span><b>مُرَبِّيك</b></div>`
+].join("");
       $("heroNet").textContent="—";
 
       $("productionCards").innerHTML=`<div class="empty">سعر كجم اللبن مطلوب قبل تحميل التقرير.</div>`;
@@ -1542,7 +896,7 @@ function kpiCard(label, value, sub, tone=""){
       const milkPrice=getMilkPriceRequired();
       if(!milkPrice){showPriceRequired();return}
 
-      $("loading").style.display="grid"; $("report").style.display="none"; $("loading").textContent="جاري تحميل تقرير اللبن...";
+      $("loading").style.display="grid"; $("report").hidden=true; $("report").style.display=""; $("loading").textContent="جاري تحميل تقرير اللبن...";
       const date=$("reportDate").value||yesterdayISO(), kind=getKindFromQuery();
       const params=new URLSearchParams({date,milkPrice:String(milkPrice)});
       if(kind){params.set("kind",kind);params.set("species",kind)}
@@ -1584,7 +938,7 @@ function kpiCard(label, value, sub, tone=""){
 
     $("printBtn").addEventListener("click", printReportFull);
     function handleHerdScatterPick(target, ev){
-      const point = target?.closest?.("[data-herd-point],.herd-scatter-point");
+     const point = target?.closest?.("[data-herd-point]");
       if (!point) return false;
 
       if (ev) {
