@@ -40334,6 +40334,12 @@ calvesSnap.forEach(doc => {
         date,
         details
       };
+      const isPregnancyDiagnosisEvent =
+  normType === 'pregnancy_diagnosis' ||
+  text.includes('pregnancy_diagnosis') ||
+  text.includes('تشخيص حمل');
+
+if (isPregnancyDiagnosisEvent) return;
 
       if (normType === 'mastitis' || text.includes('mastitis') || text.includes('التهاب الضرع')) {
         mastitisEvents.push(row);
