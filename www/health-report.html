@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>تقرير الصحة | مُرَبِّيك</title>
+
+  <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
+  <link rel="stylesheet" href="/css/reports.css">
+</head>
+
+<body data-page="health-report" data-report-page>
+
+<header class="screen-top no-print">
+  <div class="screen-head">
+    <div>
+      <div class="screen-title">تقرير الصحة</div>
+      <div class="screen-brand">مُرَبِّيك</div>
+    </div>
+    <img class="screen-logo" src="/images/logo.png" alt="مُرَبِّيك">
+  </div>
+</header>
+
+<main class="page report-page">
+
+  <section class="card no-print">
+    <div class="controls">
+      <div class="field">
+        <label for="herdType">نوع القطيع</label>
+        <select id="herdType">
+          <option value="cows">الأبقار</option>
+          <option value="buffalo">الجاموس</option>
+          <option value="all">كل القطيع</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="days">فترة التقرير</label>
+        <select id="days">
+          <option value="30">آخر 30 يوم</option>
+          <option value="60">آخر 60 يوم</option>
+          <option value="90" selected>آخر 90 يوم</option>
+          <option value="180">آخر 180 يوم</option>
+          <option value="365">آخر سنة</option>
+        </select>
+      </div>
+
+      <button class="btn btn-primary" type="button" id="reloadBtn">تحديث التقرير</button>
+      <button class="btn btn-ghost" type="button" id="printBtn">طباعة / PDF</button>
+    </div>
+  </section>
+
+  <div id="loading" class="loading">جاري تحميل تقرير الصحة...</div>
+
+  <section id="report" hidden>
+
+    <section class="report-cover">
+      <div class="report-head">
+        <div class="report-logo-box">
+          <img src="/images/logo.png" alt="مُرَبِّيك">
+        </div>
+
+        <div>
+          <div class="report-kicker">مُرَبِّيك لإدارة مزارع الألبان</div>
+          <h1 class="title">تقرير الصحة</h1>
+          <div class="sub">
+            قراءة صحية استشارية للقطيع تشمل الأمراض، التهاب الضرع، العرج،
+            التحصينات، العلاجات، الحيوانات متكررة المشاكل، والتنبيهات العملية.
+          </div>
+        </div>
+
+        <div class="report-stamp">
+          <b>تقرير صحي</b>
+          <span>Server-first</span>
+        </div>
+      </div>
+
+      <div class="report-meta" id="reportMeta"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">🌿 ملخص صحة القطيع</div>
+      <div class="grid" id="summaryCards"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">🧠 قراءة مُرَبِّيك الصحية</div>
+      <div class="cards" id="alerts"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">🦠 الأمراض والحالات الصحية</div>
+      <div class="cards">
+        <div>
+          <div class="section-title">أكثر الحالات تكرارًا</div>
+          <div id="topDiseases"></div>
+        </div>
+
+        <div>
+          <div class="section-title">مجموعات الأمراض</div>
+          <div id="diseaseGroups"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">🥛 التهاب الضرع</div>
+      <div class="grid" id="mastitisSummary"></div>
+
+      <div class="cards">
+        <div>
+          <div class="section-title">أنواع التهاب الضرع</div>
+          <div id="mastitisTypes"></div>
+        </div>
+
+        <div>
+          <div class="section-title">الأرباع المصابة</div>
+          <div id="mastitisQuarters"></div>
+        </div>
+      </div>
+
+      <div class="section-title">آخر حالات التهاب الضرع</div>
+      <div id="mastitisRecent"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">🐾 العرج والحوافر</div>
+      <div class="grid" id="lamenessSummary"></div>
+
+      <div class="cards">
+        <div>
+          <div class="section-title">أنواع العرج</div>
+          <div id="lamenessTypes"></div>
+        </div>
+
+        <div>
+          <div class="section-title">الأطراف المصابة</div>
+          <div id="lamenessLegs"></div>
+        </div>
+      </div>
+
+      <div class="section-title">آخر حالات العرج</div>
+      <div id="lamenessRecent"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">💉 التحصينات</div>
+      <div class="grid" id="vaccinationSummary"></div>
+
+      <div class="section-title">تحصينات متأخرة</div>
+      <div id="vaccinationOverdue"></div>
+
+      <div class="section-title">تحصينات اليوم</div>
+      <div id="vaccinationToday"></div>
+
+      <div class="section-title">تحصينات الغد</div>
+      <div id="vaccinationTomorrow"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">💊 العلاجات المسجلة</div>
+      <div id="treatments"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">🔁 الحيوانات متكررة المشاكل</div>
+      <div id="repeatedAnimals"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">📌 توصيات عملية للمربي</div>
+      <div class="cards" id="recommendations"></div>
+    </section>
+
+  </section>
+
+</main>
+
+<div class="actions report-actions no-print">
+  <a class="ghost" href="dashboard.html">لوحة التحكم</a>
+  <button class="primary" type="button" onclick="window.print()">طباعة / PDF</button>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  function esc(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function dateText(value) {
+    const text = String(value || '').slice(0, 10);
+    if (!text) return '—';
+
+    try {
+      return new Date(text + 'T00:00:00').toLocaleDateString('ar-EG', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (_) {
+      return text;
+    }
+  }
+
+  function badgeClass(level) {
+    if (level === 'danger') return 'badge danger';
+    if (level === 'warn') return 'badge warn';
+    return 'badge';
+  }
+
+  function levelText(level) {
+    if (level === 'danger') return 'عاجل';
+    if (level === 'warn') return 'متابعة';
+    return 'مطمئن';
+  }
+
+  function renderKpi(card) {
+    return `
+      <div class="kpi">
+        <span>${esc(card.label)}</span>
+        <b>${esc(card.value)}</b>
+        <span>${esc(card.note || '')}</span>
+        <div>
+          <span class="${badgeClass(card.level)}">${levelText(card.level)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderMini(item) {
+    return `
+      <div class="mini">
+        <div class="name">
+          ${esc(item.title || '—')}
+          <span class="${badgeClass(item.level)}">${levelText(item.level)}</span>
+        </div>
+        <div class="note">${esc(item.text || '')}</div>
+      </div>
+    `;
+  }
+
+  function empty(message) {
+    return `<div class="empty">${esc(message || 'لا توجد بيانات في هذا القسم خلال فترة التقرير.')}</div>`;
+  }
+
+  function renderTable(headers, rows, emptyMessage) {
+    if (!rows.length) return empty(emptyMessage);
+
+    let html = '<div class="table-wrap"><table><thead><tr>';
+
+    for (const header of headers) {
+      html += `<th>${esc(header)}</th>`;
+    }
+
+    html += '</tr></thead><tbody>';
+
+    for (const row of rows) {
+      html += row;
+    }
+
+    html += '</tbody></table></div>';
+
+    return html;
+  }
+
+  function renderCountTable(items, nameTitle, countTitle) {
+    const rows = [];
+
+    for (const item of items || []) {
+      rows.push(`
+        <tr>
+          <td>${esc(item.name || '—')}</td>
+          <td>${esc(item.count ?? 0)}</td>
+        </tr>
+      `);
+    }
+
+    return renderTable([nameTitle, countTitle], rows, 'لا توجد حالات مسجلة.');
+  }
+
+  function renderTaskTable(items) {
+    const rows = [];
+
+    for (const item of items || []) {
+      rows.push(`
+        <tr>
+          <td>${esc(item.animalNumber || '—')}</td>
+          <td>${esc(dateText(item.dueDate))}</td>
+          <td>${esc(item.title || 'تحصين مستحق')}</td>
+        </tr>
+      `);
+    }
+
+    return renderTable(
+      ['رقم الحيوان', 'تاريخ الاستحقاق', 'التحصين'],
+      rows,
+      'لا توجد تحصينات في هذا القسم.'
+    );
+  }
+
+  function renderMeta(report) {
+    const meta = report.meta || {};
+
+    $('reportMeta').innerHTML = `
+      <div class="meta-pill"><span>نوع القطيع</span><b>${esc(meta.herdLabel || '—')}</b></div>
+      <div class="meta-pill"><span>فترة التقرير</span><b>${esc(meta.periodDays || '—')} يوم</b></div>
+      <div class="meta-pill"><span>من / إلى</span><b>${dateText(meta.startDate)} — ${dateText(meta.endDate)}</b></div>
+      <div class="meta-pill"><span>تاريخ الطباعة</span><b>${dateText(new Date().toISOString())}</b></div>
+    `;
+  }
+
+  function renderMastitis(report) {
+    const mastitis = report.mastitis || {};
+
+    $('mastitisSummary').innerHTML = [
+      {
+        label: 'عدد الحالات',
+        value: mastitis.count || 0,
+        note: 'خلال فترة التقرير',
+        level: mastitis.count ? 'warn' : 'ok'
+      },
+      {
+        label: 'أكثر نوع',
+        value: mastitis.byType?.[0]?.name || '—',
+        note: (mastitis.byType?.[0]?.count || 0) + ' حالة',
+        level: mastitis.byType?.length ? 'warn' : 'ok'
+      },
+      {
+        label: 'أكثر ربع',
+        value: mastitis.byQuarter?.[0]?.name || '—',
+        note: (mastitis.byQuarter?.[0]?.count || 0) + ' حالة',
+        level: mastitis.byQuarter?.length ? 'warn' : 'ok'
+      }
+    ].map(renderKpi).join('');
+
+    $('mastitisTypes').innerHTML = renderCountTable(mastitis.byType || [], 'النوع', 'العدد');
+    $('mastitisQuarters').innerHTML = renderCountTable(mastitis.byQuarter || [], 'الربع', 'العدد');
+
+    const rows = [];
+
+    for (const item of mastitis.recent || []) {
+      rows.push(`
+        <tr>
+          <td>${esc(item.animalNumber || '—')}</td>
+          <td>${esc(dateText(item.date))}</td>
+          <td>${esc(item.type || '—')}</td>
+          <td>${esc(item.quarters || '—')}</td>
+        </tr>
+      `);
+    }
+
+    $('mastitisRecent').innerHTML = renderTable(
+      ['رقم الحيوان', 'التاريخ', 'النوع', 'الأرباع'],
+      rows,
+      'لا توجد حالات التهاب ضرع خلال فترة التقرير.'
+    );
+  }
+
+  function renderLameness(report) {
+    const lameness = report.lameness || {};
+
+    $('lamenessSummary').innerHTML = [
+      {
+        label: 'عدد الحالات',
+        value: lameness.count || 0,
+        note: 'خلال فترة التقرير',
+        level: lameness.count ? 'warn' : 'ok'
+      },
+      {
+        label: 'أكثر نوع',
+        value: lameness.byType?.[0]?.name || '—',
+        note: (lameness.byType?.[0]?.count || 0) + ' حالة',
+        level: lameness.byType?.length ? 'warn' : 'ok'
+      },
+      {
+        label: 'أكثر طرف',
+        value: lameness.byLeg?.[0]?.name || '—',
+        note: (lameness.byLeg?.[0]?.count || 0) + ' حالة',
+        level: lameness.byLeg?.length ? 'warn' : 'ok'
+      }
+    ].map(renderKpi).join('');
+
+    $('lamenessTypes').innerHTML = renderCountTable(lameness.byType || [], 'النوع', 'العدد');
+    $('lamenessLegs').innerHTML = renderCountTable(lameness.byLeg || [], 'الطرف', 'العدد');
+
+    const rows = [];
+
+    for (const item of lameness.recent || []) {
+      rows.push(`
+        <tr>
+          <td>${esc(item.animalNumber || '—')}</td>
+          <td>${esc(dateText(item.date))}</td>
+          <td>${esc(item.type || '—')}</td>
+          <td>${esc(item.leg || '—')}</td>
+        </tr>
+      `);
+    }
+
+    $('lamenessRecent').innerHTML = renderTable(
+      ['رقم الحيوان', 'التاريخ', 'النوع', 'الطرف'],
+      rows,
+      'لا توجد حالات عرج خلال فترة التقرير.'
+    );
+  }
+
+  function renderVaccinations(report) {
+    const vaccinations = report.vaccinations || {};
+
+    $('vaccinationSummary').innerHTML = [
+      {
+        label: 'مسجلة بالفترة',
+        value: vaccinations.recordedInPeriod || 0,
+        note: 'أحداث تحصين محفوظة',
+        level: 'ok'
+      },
+      {
+        label: 'متأخرة',
+        value: vaccinations.overdueCount || 0,
+        note: 'تحتاج تنفيذ',
+        level: vaccinations.overdueCount ? 'danger' : 'ok'
+      },
+      {
+        label: 'اليوم',
+        value: vaccinations.todayCount || 0,
+        note: 'مستحقة اليوم',
+        level: vaccinations.todayCount ? 'warn' : 'ok'
+      },
+      {
+        label: 'غدًا',
+        value: vaccinations.tomorrowCount || 0,
+        note: 'تحضير مسبق',
+        level: vaccinations.tomorrowCount ? 'warn' : 'ok'
+      }
+    ].map(renderKpi).join('');
+
+    $('vaccinationOverdue').innerHTML = renderTaskTable(vaccinations.overdue || []);
+    $('vaccinationToday').innerHTML = renderTaskTable(vaccinations.today || []);
+    $('vaccinationTomorrow').innerHTML = renderTaskTable(vaccinations.tomorrow || []);
+  }
+
+  function renderTreatments(report) {
+    const treatments = report.treatments || {};
+    const rows = [];
+
+    for (const item of treatments.recent || []) {
+      rows.push(`
+        <tr>
+          <td>${esc(item.animalNumber || '—')}</td>
+          <td>${esc(dateText(item.date))}</td>
+          <td>${esc(item.diagnosis || '—')}</td>
+          <td>${esc(item.treatment || '—')}</td>
+        </tr>
+      `);
+    }
+
+    $('treatments').innerHTML = renderTable(
+      ['رقم الحيوان', 'التاريخ', 'الحالة', 'العلاج'],
+      rows,
+      'لا توجد علاجات مسجلة خلال فترة التقرير.'
+    );
+  }
+
+  function renderRepeatedAnimals(report) {
+    const rows = [];
+
+    for (const item of report.repeatedAnimals || []) {
+      rows.push(`
+        <tr>
+          <td>${esc(item.animalNumber || '—')}</td>
+          <td>${esc(item.total || 0)}</td>
+          <td>${esc(item.mastitis || 0)}</td>
+          <td>${esc(item.lameness || 0)}</td>
+          <td>${esc(item.disease || 0)}</td>
+          <td>${esc(dateText(item.lastDate))}</td>
+          <td>${esc((item.mainProblems || []).join('، ') || '—')}</td>
+        </tr>
+      `);
+    }
+
+    $('repeatedAnimals').innerHTML = renderTable(
+      ['رقم الحيوان', 'الإجمالي', 'ضرع', 'عرج', 'مرض عام', 'آخر تاريخ', 'أهم المشاكل'],
+      rows,
+      'لا توجد حيوانات متكررة المشاكل خلال فترة التقرير.'
+    );
+  }
+
+  function renderReport(report) {
+    renderMeta(report);
+
+    $('summaryCards').innerHTML = (report.summaryCards || []).map(renderKpi).join('');
+    $('alerts').innerHTML = (report.alerts || []).map(renderMini).join('');
+
+    $('topDiseases').innerHTML = renderCountTable(report.diseases?.topDiseases || [], 'الحالة', 'العدد');
+    $('diseaseGroups').innerHTML = renderCountTable(report.diseases?.groups || [], 'المجموعة', 'العدد');
+
+    renderMastitis(report);
+    renderLameness(report);
+    renderVaccinations(report);
+    renderTreatments(report);
+    renderRepeatedAnimals(report);
+
+    $('recommendations').innerHTML = (report.recommendations || []).map(renderMini).join('');
+
+    $('loading').hidden = true;
+    $('report').hidden = false;
+  }
+
+  async function loadReport() {
+    $('loading').hidden = false;
+    $('report').hidden = true;
+    $('loading').textContent = 'جاري تحميل تقرير الصحة...';
+
+    const herdType = $('herdType').value || 'cows';
+    const days = $('days').value || '90';
+
+    try {
+      const response = await fetch(
+        `/api/health-report?type=${encodeURIComponent(herdType)}&days=${encodeURIComponent(days)}`,
+        {
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { Accept: 'application/json' }
+        }
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (response.status === 401 || data.error === 'auth_required') {
+        location.href = 'login.html?next=health-report.html';
+        return;
+      }
+
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.message || 'تعذّر تحميل تقرير الصحة.');
+      }
+
+      renderReport(data.report || {});
+
+    } catch (error) {
+      $('loading').hidden = false;
+      $('loading').textContent = error.message || 'تعذّر تحميل تقرير الصحة.';
+    }
+  }
+
+  $('reloadBtn').addEventListener('click', loadReport);
+  $('printBtn').addEventListener('click', () => window.print());
+  $('herdType').addEventListener('change', loadReport);
+  $('days').addEventListener('change', loadReport);
+
+  loadReport();
+})();
+</script>
+
+</body>
+</html>
