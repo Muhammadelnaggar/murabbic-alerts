@@ -40125,89 +40125,137 @@ app.get('/api/health-report', requireUserId, async (req, res) => {
       return list.slice(0, limit);
     }
 
-    // ------------------------------------------------------------
-    // 2) قراءة الحيوانات النشطة
-    // ------------------------------------------------------------
+// ------------------------------------------------------------
+// 2) قراءة الحيوانات النشطة + التوابع
+// ------------------------------------------------------------
 
-    const animalsSnap = await db.collection('animals')
-      .where('userId', '==', uid)
-      .limit(8000)
-      .get();
+const activeAnimals = [];
+const activeNumbers = new Set();
+const activeSeen = new Set();
 
-    const activeAnimals = [];
-    const activeNumbers = new Set();
-
-    animalsSnap.forEach(doc => {
-      const animal = doc.data() || {};
-
-      const status = String(animal.status || '').toLowerCase();
-      const inactiveReason = String(animal.inactiveReason || animal.archiveReason || '').toLowerCase();
-
-      const archived =
-        status.includes('archived') ||
-        status.includes('مؤرشف') ||
-        status.includes('مباع') ||
-        status.includes('نافق') ||
-        inactiveReason.includes('sale') ||
-        inactiveReason.includes('death') ||
-        inactiveReason.includes('بيع') ||
-        inactiveReason.includes('نفوق');
-
-      if (archived) return;
-
-     const animalTypeText = [
-  animal.species,
-  animal.animalType,
-  animal.animaltype,
-  animal.animalTypeAr,
-  animal.type,
-  animal.groupSpecies,
-  animal.groupId,
-  animal.group,
-  animal.breed
-].filter(Boolean).join(' ').toLowerCase();
-
-let species = '';
-
-if (
-  animalTypeText.includes('buffalo') ||
-  animalTypeText.includes('جاموس') ||
-  animalTypeText.includes('buff_')
-) {
-  species = 'buffalo';
+function healthAnimalNumber(row = {}) {
+  return clean(
+    row.animalNumber ||
+    row.number ||
+    row.calfNumber ||
+    row.calfId ||
+    row.animalId
+  );
 }
 
-if (
-  animalTypeText.includes('cow') ||
-  animalTypeText.includes('cows') ||
-  animalTypeText.includes('cattle') ||
-  animalTypeText.includes('بقر') ||
-  animalTypeText.includes('أبقار') ||
-  animalTypeText.includes('ابقار') ||
-  animalTypeText.includes('cow_')
-) {
-  species = 'cows';
+function healthSpecies(row = {}) {
+  const text = [
+    row.species,
+    row.animalType,
+    row.animaltype,
+    row.animalTypeAr,
+    row.type,
+    row.groupSpecies,
+    row.groupId,
+    row.group
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  if (
+    text.includes('buffalo') ||
+    text.includes('جاموس') ||
+    text.includes('buff_')
+  ) {
+    return 'buffalo';
+  }
+
+  if (
+    text.includes('cow') ||
+    text.includes('cows') ||
+    text.includes('cattle') ||
+    text.includes('بقر') ||
+    text.includes('أبقار') ||
+    text.includes('ابقار') ||
+    text.includes('cow_')
+  ) {
+    return 'cows';
+  }
+
+  return '';
 }
 
-     // تقرير الجاموس: لا يدخل إلا الجاموس المؤكد
-if (herdType === 'buffalo' && species !== 'buffalo') return;
+function healthArchived(row = {}) {
+  const status = String(row.status || row.lifeStatus || '').toLowerCase();
+  const inactiveReason = String(row.inactiveReason || row.archiveReason || '').toLowerCase();
 
-// تقرير الأبقار: نستبعد الجاموس المؤكد فقط
-// ونسمح بالحيوانات غير المصنفة حتى لا تضيع بيانات الأبقار القديمة
-if (herdType === 'cows' && species === 'buffalo') return;
-      const number = clean(animal.animalNumber || animal.number);
-      if (!number) return;
+  return (
+    status.includes('archived') ||
+    status.includes('inactive') ||
+    status.includes('مؤرشف') ||
+    status.includes('مباع') ||
+    status.includes('نافق') ||
+    inactiveReason.includes('sale') ||
+    inactiveReason.includes('death') ||
+    inactiveReason.includes('بيع') ||
+    inactiveReason.includes('نفوق')
+  );
+}
 
-      activeAnimals.push({
-        id: doc.id,
-        ...animal,
-        number,
-        species
-      });
+function healthIncludeByType(species) {
+  if (herdType === 'all') return true;
+  if (herdType === 'cows') return species === 'cows';
+  if (herdType === 'buffalo') return species === 'buffalo';
+  return true;
+}
 
-      activeNumbers.add(number);
-    });
+function healthAddAnimal(docId, row = {}, sourceCollection = 'animals') {
+  if (healthArchived(row)) return;
 
+  const number = healthAnimalNumber(row);
+  if (!number) return;
+
+  const species = healthSpecies(row);
+  if (!healthIncludeByType(species)) return;
+
+  const entryType = clean(row.entryType).toLowerCase();
+
+  const ageClass =
+    sourceCollection === 'calves' ||
+    entryType === 'followers' ||
+    entryType === 'calves' ||
+    clean(row.followerStatus) ||
+    clean(row.followerSex)
+      ? 'follower'
+      : 'adult';
+
+  const key = `${sourceCollection}:${number}`;
+  if (activeSeen.has(key)) return;
+
+  activeSeen.add(key);
+
+  activeAnimals.push({
+    id: docId,
+    ...row,
+    number,
+    species,
+    ageClass,
+    sourceCollection
+  });
+
+  activeNumbers.add(number);
+}
+
+const animalsSnap = await db.collection('animals')
+  .where('userId', '==', uid)
+  .limit(8000)
+  .get();
+
+animalsSnap.forEach(doc => {
+  healthAddAnimal(doc.id, doc.data() || {}, 'animals');
+});
+
+const calvesSnap = await db.collection('calves')
+  .where('userId', '==', uid)
+  .limit(8000)
+  .get();
+
+calvesSnap.forEach(doc => {
+  healthAddAnimal(doc.id, doc.data() || {}, 'calves');
+});
     // ------------------------------------------------------------
     // 3) قراءة أحداث الصحة داخل فترة التقرير
     // ------------------------------------------------------------
@@ -40227,7 +40275,13 @@ if (herdType === 'cows' && species === 'buffalo') return;
     eventsSnap.forEach(doc => {
       const event = doc.data() || {};
 
-      const number = clean(event.animalNumber || event.number);
+      const number = clean(
+        event.animalNumber ||
+        event.number ||
+        event.calfNumber ||
+        event.calfId ||
+        event.animalId
+     );
       if (!number || !activeNumbers.has(number)) return;
 
       let date = '';
@@ -40576,7 +40630,13 @@ if (herdType === 'cows' && species === 'buffalo') return;
       const dueDate = simpleDate(task.dueDate || task.date || task.eventDate || task.windowStart);
       if (!dueDate) return;
 
-      const number = clean(task.animalNumber || task.number);
+      const number = clean(
+  task.animalNumber ||
+  task.number ||
+  task.calfNumber ||
+  task.calfId ||
+  task.animalId
+);
 
       if (number && !activeNumbers.has(number)) return;
 
@@ -40678,8 +40738,20 @@ if (herdType === 'cows' && species === 'buffalo') return;
     // 10) الملخص والتنبيهات والتوصيات
     // ------------------------------------------------------------
 
-    const activeCount = activeAnimals.length;
-    const affectedNumbers = new Set();
+   const activeCount = activeAnimals.length;
+
+let adultAnimalsCount = 0;
+let followerAnimalsCount = 0;
+
+for (const animal of activeAnimals) {
+  if (animal.ageClass === 'follower') {
+    followerAnimalsCount += 1;
+  } else {
+    adultAnimalsCount += 1;
+  }
+}
+
+const affectedNumbers = new Set();
 
     for (const event of healthEvents) {
       affectedNumbers.add(event.number);
@@ -40687,6 +40759,8 @@ if (herdType === 'cows' && species === 'buffalo') return;
 
     const summary = {
       activeAnimals: activeCount,
+      adultAnimals: adultAnimalsCount,
+      followerAnimals: followerAnimalsCount,
       healthEvents: healthEvents.length,
       affectedAnimals: affectedNumbers.size,
       affectedPct: percent(affectedNumbers.size, activeCount),
@@ -40705,12 +40779,24 @@ if (herdType === 'cows' && species === 'buffalo') return;
     };
 
     const summaryCards = [
-      {
-        label: 'الحيوانات النشطة',
-        value: summary.activeAnimals,
-        note: herdLabel,
-        level: 'ok'
-      },
+     {
+  label: 'إجمالي المشمول صحيًا',
+  value: summary.activeAnimals,
+  note: herdLabel,
+  level: 'ok'
+},
+{
+  label: 'الأمهات / التشغيل',
+  value: summary.adultAnimals,
+  note: 'حيوانات كبيرة',
+  level: 'ok'
+},
+{
+  label: 'العجول / التوابع',
+  value: summary.followerAnimals,
+  note: 'داخلة في تقرير الصحة',
+  level: summary.followerAnimals ? 'ok' : 'warn'
+},
       {
         label: 'الأحداث الصحية',
         value: summary.healthEvents,
