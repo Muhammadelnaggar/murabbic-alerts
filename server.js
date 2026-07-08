@@ -40432,10 +40432,26 @@ if (isPregnancyDiagnosisEvent) return;
       addCount(diseaseGroupCount, group);
     }
 
-    const diseases = {
-      topDiseases: mapToTopList(diseaseCount, 12),
-      groups: mapToTopList(diseaseGroupCount, 8)
+   function healthReportWithPercent(list = []) {
+  const total = healthEvents.length;
+
+  return (list || []).map(item => {
+    const count = Number(item.count || 0);
+    const pct = total ? Number(((count * 100) / total).toFixed(1)) : 0;
+
+    return {
+      ...item,
+      count,
+      pct,
+      pctText: `${pct}%`
     };
+  });
+}
+
+const diseases = {
+  topDiseases: healthReportWithPercent(mapToTopList(diseaseCount, 12)),
+  groups: healthReportWithPercent(mapToTopList(diseaseGroupCount, 8))
+};
 
     // ------------------------------------------------------------
     // 5) بناء قسم التهاب الضرع
