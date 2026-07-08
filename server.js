@@ -16210,6 +16210,57 @@ function diseaseListForAnimalSrv(animal = {}){
       specialPage: x.specialPage || ""
     }));
 }
+async function diseaseFindSubjectByNumberSrv(uid, number) {
+  const n = calvingNormDigitsOnlySrv(number);
+  if (!db || !uid || !n) return null;
+
+  const values = [...new Set([
+    n,
+    String(Number(n)),
+    Number(n)
+  ].filter(v => v !== '' && !(typeof v === 'number' && Number.isNaN(v))))];
+
+  const collections = ['animals', 'calves'];
+  const ownerFields = ['userId', 'ownerUid', 'tenantId'];
+  const numberFields = ['userId_number', 'animalNumber', 'number', 'calfNumber', 'tag', 'no'];
+
+  for (const col of collections) {
+    try {
+      const keySnap = await db.collection(col)
+        .where('userId_number', '==', `${uid}#${n}`)
+        .limit(1)
+        .get();
+
+      if (!keySnap.empty) {
+        const d = keySnap.docs[0];
+        return { id: d.id, data: d.data() || {}, _collection: col };
+      }
+    } catch (_) {}
+
+    for (const ownerField of ownerFields) {
+      for (const field of numberFields) {
+        if (field === 'userId_number') continue;
+
+        for (const value of values) {
+          try {
+            const snap = await db.collection(col)
+              .where(ownerField, '==', uid)
+              .where(field, '==', value)
+              .limit(1)
+              .get();
+
+            if (!snap.empty) {
+              const d = snap.docs[0];
+              return { id: d.id, data: d.data() || {}, _collection: col };
+            }
+          } catch (_) {}
+        }
+      }
+    }
+  }
+
+  return null;
+}
 function diseaseSpecialUrlSrv(code, number, date){
   const x = DISEASE_CATALOG_SRV[code];
   if (!x || !x.specialPage) return "";
@@ -16251,7 +16302,9 @@ app.post("/api/disease/gate", requireUserId, async (req, res) => {
       });
     }
 
-    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+       const animal =
+      await diseaseFindSubjectByNumberSrv(uid, animalNumber) ||
+      await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
 
     if (!animal) {
       return res.status(404).json({
@@ -16493,7 +16546,9 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
       });
     }
 
-    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+       const animal =
+      await diseaseFindSubjectByNumberSrv(uid, animalNumber) ||
+      await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
 
     if (!animal) {
       return res.status(404).json({
