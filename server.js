@@ -40189,8 +40189,12 @@ if (
   species = 'cows';
 }
 
-      if (herdType !== 'all' && species !== herdType) return;
+     // تقرير الجاموس: لا يدخل إلا الجاموس المؤكد
+if (herdType === 'buffalo' && species !== 'buffalo') return;
 
+// تقرير الأبقار: نستبعد الجاموس المؤكد فقط
+// ونسمح بالحيوانات غير المصنفة حتى لا تضيع بيانات الأبقار القديمة
+if (herdType === 'cows' && species === 'buffalo') return;
       const number = clean(animal.animalNumber || animal.number);
       if (!number) return;
 
