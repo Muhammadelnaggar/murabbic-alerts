@@ -185,7 +185,11 @@
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-
+  function show(id, yes) {
+  const el = $(id);
+  if (!el) return;
+  el.style.display = yes ? '' : 'none';
+}
   function esc(value) {
     return String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -509,13 +513,13 @@
 
     $('recommendations').innerHTML = (report.recommendations || []).map(renderMini).join('');
 
-    $('loading').hidden = true;
-    $('report').hidden = false;
+   show('loading', false);
+   show('report', true);
   }
 
   async function loadReport() {
-    $('loading').hidden = false;
-    $('report').hidden = true;
+    show('loading', true);
+    show('report', false);
     $('loading').textContent = 'جاري تحميل تقرير الصحة...';
 
     const herdType = $('herdType').value || 'cows';
@@ -544,9 +548,10 @@
 
       renderReport(data.report || {});
 
-    } catch (error) {
-      $('loading').hidden = false;
-      $('loading').textContent = error.message || 'تعذّر تحميل تقرير الصحة.';
+    } 
+   show('loading', true);
+   show('report', false);
+   $('loading').textContent = error.message || 'تعذّر تحميل تقرير الصحة.';
     }
   }
 
