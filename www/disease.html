@@ -96,6 +96,9 @@
   ];
 
   let gateTimer = null;
+  let gateAllowed = false;
+  let gateKey = "";
+  let gateMessage = "لم يتم التحقق من الحيوان بعد.";
  
 
   function todayLocal(){
@@ -149,21 +152,47 @@ async function saveDiseaseItem(item, btn){
   const animalNumber = digitsOnly(animalNumberEl.value);
   const eventDate = eventDateEl.value || todayLocal();
   const notes = notesEl ? notesEl.value : "";
-    if (!animalNumber || !eventDate) {
-    setBar(gateBox, "أدخل رقم الحيوان وتاريخ التشخيص قبل الحفظ.", "error");
+
+  if (!animalNumber || !eventDate) {
+    setBar(gateBox, "أدخل رقم الحيوان وتاريخ التشخيص أولًا.", "error");
     window.scrollTo({ top: 0, behavior: "smooth" });
     return;
   }
+
+  // الأمراض التي لها صفحة خاصة تمرر الرقم والتاريخ مثل صفحات الأحداث
   if (item.specialPage) {
-    location.href = `${item.specialPage}?number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(eventDate)}`;
+    const qs = new URLSearchParams({
+      number: animalNumber,
+      animalNumber: animalNumber,
+      date: eventDate,
+      eventDate: eventDate
+    });
+
+    if (notes) qs.set("notes", notes);
+
+    location.href = `${item.specialPage}?${qs.toString()}`;
+    return;
+  }
+
+  // الأمراض التي تُحفظ من نفس الصفحة لا تُحفظ إلا بعد Gate ناجح
+  const currentGateKey = animalNumber + "|" + eventDate;
+
+  if (!gateAllowed || gateKey !== currentGateKey) {
+    setBar(
+      gateBox,
+      gateMessage || "يلزم نجاح التحقق من الحيوان قبل تسجيل التشخيص.",
+      "error"
+    );
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    runGate();
     return;
   }
 
   btn.disabled = true;
- setBar(gateBox, "جاري حفظ التشخيص...", "info");
+  setBar(gateBox, "جاري حفظ التشخيص...", "info");
 
   try {
-          const r = await fetch(API_BASE + "/api/disease/save", {
+    const r = await fetch(API_BASE + "/api/disease/save", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -177,22 +206,22 @@ async function saveDiseaseItem(item, btn){
       })
     });
 
-const j = await r.json().catch(() => ({}));
-if (r.status === 401 || handleAuthRequired(j)) return;
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401 || handleAuthRequired(j)) return;
 
-if (!r.ok || !j.ok) {
-  setBar(gateBox, j.message || "❌ تعذّر حفظ التشخيص الصحي.", "error");
-  window.scrollTo({ top: 0, behavior: "smooth" });
-  btn.disabled = false;
-  return;
-}
+    if (!r.ok || !j.ok) {
+      setBar(gateBox, j.message || "❌ تعذّر حفظ التشخيص الصحي.", "error");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      btn.disabled = false;
+      return;
+    }
 
-setBar(gateBox, j.message || "✅ تم حفظ التشخيص الصحي بنجاح.", "success");
-window.scrollTo({ top: 0, behavior: "smooth" });
+    setBar(gateBox, j.message || "✅ تم حفظ التشخيص الصحي بنجاح.", "success");
+    window.scrollTo({ top: 0, behavior: "smooth" });
 
-setTimeout(() => {
-  location.href = j.redirectUrl || `event-list.html?number=${encodeURIComponent(animalNumber)}`;
-}, 2500);
+    setTimeout(() => {
+      location.href = j.redirectUrl || `event-list.html?number=${encodeURIComponent(animalNumber)}`;
+    }, 2500);
 
   } catch (e) {
     console.error("disease save failed", e);
@@ -246,7 +275,11 @@ setTimeout(() => {
     const animalNumber = digitsOnly(animalNumberEl.value);
     const eventDate = eventDateEl.value;
 
-        renderSummary(null);
+    gateAllowed = false;
+    gateKey = "";
+    gateMessage = "لم يتم التحقق من الحيوان بعد.";
+
+    renderSummary(null);
     renderDiseases(DISEASE_OPTIONS);
 
 
@@ -270,23 +303,33 @@ setTimeout(() => {
       const j = await r.json().catch(() => ({}));
       if (r.status === 401 || handleAuthRequired(j)) return;
 
-      setBar(
-        gateBox,
-        j.message || "تم التحقق.",
-        j.allowed ? "success" : (j.silent ? "info" : "error")
-      );
+           if (!r.ok || !j.allowed) {
+        gateAllowed = false;
+        gateKey = "";
+        gateMessage = j.message || "لم يمر الحيوان من التحقق.";
 
-      if (!j.allowed) {
+        setBar(gateBox, gateMessage, "error");
         renderSummary(null);
+        renderDiseases(DISEASE_OPTIONS);
         return;
       }
 
-      renderSummary(j.animal || null);
-     renderDiseases(DISEASE_OPTIONS);
+      gateAllowed = true;
+      gateKey = animalNumber + "|" + eventDate;
+      gateMessage = j.message || "✅ الحيوان صالح لتسجيل التشخيص.";
 
-    } catch (e) {
+      setBar(gateBox, gateMessage, "success");
+      renderSummary(j.animal || null);
+      renderDiseases(DISEASE_OPTIONS);
+
+       } catch (e) {
       console.error("disease gate failed", e);
-      setBar(gateBox, "❌ تعذّر الاتصال بالسيرفر.", "error");
+
+      gateAllowed = false;
+      gateKey = "";
+      gateMessage = "❌ تعذّر التحقق من السيرفر. لا يمكن حفظ التشخيص المباشر قبل نجاح التحقق.";
+
+      setBar(gateBox, gateMessage, "error");
       renderDiseases(DISEASE_OPTIONS);
       renderSummary(null);
     }
