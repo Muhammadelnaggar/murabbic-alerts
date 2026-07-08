@@ -415,6 +415,10 @@ function scaleMetricBox(label, displayValue, positionPct, cls='repro', href=''){
     </div>
   `;
 }
+function healthReportHref(){
+  const type = currentType === 'buffalo' ? 'buffalo' : 'cows';
+  return `health-report.html?type=${encodeURIComponent(type)}&days=90`;
+}
 function pr21Box(value){
   const v = Number(value);
   return scaleMetricBox(
@@ -635,7 +639,8 @@ function mastitisBox(count, pct){
     'عدد التهاب الضرع في القطيع',
     Number.isFinite(count) ? String(count) : '--',
     metricScalePositionInverse(v, 1, 6),
-    'health'
+    'health',
+    healthReportHref()
   );
 }
 
@@ -645,7 +650,8 @@ function lamenessBox(count, pct){
     'عدد حالات العرج في القطيع',
     Number.isFinite(count) ? String(count) : '--',
     metricScalePositionInverse(v, 1, 4),
-    'health'
+    'health',
+    healthReportHref()
   );
 }
 
@@ -655,10 +661,10 @@ function abortionBox(count, pct){
     'عدد الإجهاض في القطيع',
     Number.isFinite(count) ? String(count) : '--',
     metricScalePositionInverse(v, 2, 6),
-    'health'
+    'health',
+    healthReportHref()
   );
 }
-
 
 
 function setupTypeSwitch(meta = {}){
@@ -975,12 +981,14 @@ feedGrid.innerHTML =
         </div>`
       : ''
   );
+const healthReportLink = healthReportHref();
+
 healthGrid.innerHTML =
       mastitisBox(mastitisCount, mastitisPct) +
       lamenessBox(lamenessCount, lamenessPct) +
       abortionBox(abortionCount, abortionRatePct) +
-      box('تقييم الروث في القطيع', fecesScore, 'متوسط / درجة / حالة', 'g_feces', 'health') +
-      box('تقييم الحالة الجسمية في القطيع', bcsCamera, 'متوسط / درجة / حالة', 'g_bcs', 'health');
+      box('تقييم الروث في القطيع', fecesScore, 'متوسط / درجة / حالة', 'g_feces', 'health', healthReportLink) +
+      box('تقييم الحالة الجسمية في القطيع', bcsCamera, 'متوسط / درجة / حالة', 'g_bcs', 'health', healthReportLink);
     
     // الجوجز
    renderMiniGauge("g_active", totalActive ? 100 : 0);
