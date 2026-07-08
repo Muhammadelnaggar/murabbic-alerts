@@ -167,7 +167,7 @@ setTimeout(() => {
     dz.innerHTML = "";
    
     if (!Array.isArray(list) || !list.length) {
-      dz.innerHTML = '<div class="infobar warning show">لا توجد تشخيصات مناسبة للعرض الآن.</div>';
+     dz.innerHTML = '<div class="infobar warning show">لا توجد اختيارات تشخيص معرفة من السيرفر الآن.</div>';
       return;
     }
 
@@ -236,10 +236,15 @@ setTimeout(() => {
       const j = await r.json().catch(() => ({}));
       if (r.status === 401 || handleAuthRequired(j)) return;
 
-      setBar(gateBox, j.message || "تم التحقق.", j.allowed ? "success" : "error");
+      setBar(
+        gateBox,
+        j.message || "تم التحقق.",
+        j.allowed ? "success" : (j.silent ? "info" : "error")
+      );
 
       if (!j.allowed) {
-        renderDiseases([]);
+        dz.innerHTML = "";
+        renderSummary(null);
         return;
       }
 
@@ -249,7 +254,8 @@ setTimeout(() => {
     } catch (e) {
       console.error("disease gate failed", e);
       setBar(gateBox, "❌ تعذّر الاتصال بالسيرفر.", "error");
-      renderDiseases([]);
+      dz.innerHTML = "";
+      renderSummary(null);
     }
   }
 
