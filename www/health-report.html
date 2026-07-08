@@ -298,7 +298,37 @@
 
     return renderTable([nameTitle, countTitle], rows, 'لا توجد حالات مسجلة.');
   }
+    function renderDistributionCards(items, emptyMessage) {
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) return empty(emptyMessage || 'لا توجد حالات مسجلة.');
 
+    return list.map(item => {
+      const name = item.name || item.title || item.label || '—';
+      const count = item.count ?? item.total ?? 0;
+
+      const pctText =
+        item.pctText ||
+        (
+          item.pct !== undefined &&
+          item.pct !== null &&
+          item.pct !== ''
+            ? `${item.pct}%`
+            : ''
+        );
+
+      return `
+        <div class="mini">
+          <div class="name">
+            <span>${esc(name)}</span>
+            <span class="badge">${esc(count)} حالة</span>
+          </div>
+          <div class="note">
+            ${pctText ? `${esc(pctText)} من إجمالي الأحداث الصحية` : 'النسبة غير مرسلة من السيرفر'}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
   function renderTaskTable(items) {
     const rows = [];
 
@@ -511,8 +541,15 @@
     $('summaryCards').innerHTML = (report.summaryCards || []).map(renderKpi).join('');
     $('alerts').innerHTML = (report.alerts || []).map(renderMini).join('');
 
-    $('topDiseases').innerHTML = renderCountTable(report.diseases?.topDiseases || [], 'الحالة', 'العدد');
-    $('diseaseGroups').innerHTML = renderCountTable(report.diseases?.groups || [], 'المجموعة', 'العدد');
+        $('topDiseases').innerHTML = renderDistributionCards(
+      report.diseases?.topDiseases || [],
+      'لا توجد حالات مرضية مسجلة خلال فترة التقرير.'
+    );
+
+    $('diseaseGroups').innerHTML = renderDistributionCards(
+      report.diseases?.groups || [],
+      'لا توجد مجموعات مرضية مسجلة خلال فترة التقرير.'
+    );
 
     renderMastitis(report);
     renderLameness(report);
