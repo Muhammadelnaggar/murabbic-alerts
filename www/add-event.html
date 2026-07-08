@@ -571,6 +571,31 @@ function wireButtons(){
 
       const target = btn.getAttribute('data-page') || '';
 
+      if (target === 'mastitis.html' || target === 'lameness.html') {
+        const { numbers, date } = currentNumbersAndDate();
+
+        $('#warn').textContent = '';
+
+        if (!numbers.length) {
+          $('#warn').textContent = '⚠️ اكتب رقم الحيوان وتاريخ الحدث أولًا.';
+          return;
+        }
+
+        if (numbers.length > 1) {
+          $('#warn').textContent = '⚠️ التهاب الضرع والعرج يتم تسجيلهما لحيوان واحد في كل مرة.';
+          return;
+        }
+
+        const u = new URL(target, location.href);
+        u.searchParams.set('number', numbers[0]);
+        u.searchParams.set('animalNumber', numbers[0]);
+        u.searchParams.set('date', date);
+        u.searchParams.set('eventDate', date);
+
+        location.href = u.toString();
+        return;
+      }
+
       if (target === 'smart-camera.html') {
         const { numbers, date } = currentNumbersAndDate();
         const group = getSelectedGroupMeta();
