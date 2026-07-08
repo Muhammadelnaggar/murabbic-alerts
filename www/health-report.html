@@ -185,10 +185,19 @@
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-  function show(id, yes) {
+ function show(id, yes) {
   const el = $(id);
   if (!el) return;
-  el.style.display = yes ? '' : 'none';
+
+  if (yes) {
+    el.hidden = false;
+    el.removeAttribute('hidden');
+    el.style.display = '';
+  } else {
+    el.hidden = true;
+    el.setAttribute('hidden', '');
+    el.style.display = 'none';
+  }
 }
   function esc(value) {
     return String(value ?? '')
