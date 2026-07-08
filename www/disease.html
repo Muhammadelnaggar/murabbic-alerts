@@ -61,6 +61,39 @@
   const dz = $("dz");
   const animalSummary = $("animalSummary");
   const notesEl = $("notes");
+    const DISEASE_OPTIONS = [
+    { code: "milk_fever", name: "حمى اللبن", group: "تمثيل وإنتاج" },
+    { code: "ketosis", name: "كيتوزس", group: "تمثيل وإنتاج" },
+    { code: "displaced_abomasum", name: "انقلاب المنفحة", group: "تمثيل وإنتاج" },
+    { code: "rumen_acidosis", name: "حموضة الكرش", group: "تمثيل وإنتاج" },
+    { code: "phosphorus_def", name: "نقص فوسفور", group: "تمثيل وإنتاج" },
+    { code: "magnesium_def", name: "نقص ماغنيسيوم", group: "تمثيل وإنتاج" },
+
+    { code: "mastitis", name: "التهاب ضرع", group: "صحة الضرع", specialPage: "mastitis.html" },
+
+    { code: "retained_placenta", name: "احتباس مشيمة", group: "تناسل" },
+    { code: "metritis_endometritis", name: "التهاب رحم / التهاب بطانة الرحم", group: "تناسل" },
+    { code: "ovarian_cysts", name: "تكيسات مبيضية", group: "تناسل" },
+    { code: "brucellosis", name: "بروسيلا", group: "تناسل" },
+
+    { code: "lameness", name: "عرج / مشاكل حافر", group: "حركة وعرج", specialPage: "lameness.html" },
+
+    { code: "bovine_respiratory_disease", name: "مرض تنفسي بقري", group: "معدية / جهازية" },
+    { code: "johnes_disease", name: "جونز", group: "معدية / جهازية" },
+    { code: "bovine_viral_diarrhea", name: "BVD / الإسهال الفيروسي البقري", group: "معدية / جهازية" },
+    { code: "fmd", name: "حمى قلاعية", group: "معدية / جهازية" },
+    { code: "three_day_sickness", name: "حمى الثلاث أيام", group: "معدية / جهازية" },
+    { code: "lumpy_skin", name: "جلد عقدي", group: "معدية / جهازية" },
+    { code: "septicemia", name: "تسمم دموي", group: "معدية / جهازية" },
+    { code: "blood_parasites", name: "طفيليات دم", group: "معدية / جهازية" },
+    { code: "pinkeye", name: "التهاب العين", group: "معدية / جهازية" },
+
+    { code: "calf_scours", name: "سكاور / إسهال عجول", group: "أمراض العجول" },
+    { code: "calf_pneumonia", name: "نيمونيا عجول", group: "أمراض العجول" },
+    { code: "navel_infection", name: "التهاب سرة", group: "أمراض العجول" },
+    { code: "joint_ill", name: "التهاب مفاصل عجول", group: "أمراض العجول" },
+    { code: "calf_coccidiosis", name: "كوكسيديا عجول", group: "أمراض العجول" }
+  ];
 
   let gateTimer = null;
  
@@ -116,7 +149,11 @@ async function saveDiseaseItem(item, btn){
   const animalNumber = digitsOnly(animalNumberEl.value);
   const eventDate = eventDateEl.value || todayLocal();
   const notes = notesEl ? notesEl.value : "";
-
+    if (!animalNumber || !eventDate) {
+    setBar(gateBox, "أدخل رقم الحيوان وتاريخ التشخيص قبل الحفظ.", "error");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
   if (item.specialPage) {
     location.href = `${item.specialPage}?number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(eventDate)}`;
     return;
@@ -165,15 +202,12 @@ setTimeout(() => {
 }
   function renderDiseases(list){
     dz.innerHTML = "";
-   
-    if (!Array.isArray(list) || !list.length) {
-     dz.innerHTML = '<div class="infobar warning show">لا توجد اختيارات تشخيص معرفة من السيرفر الآن.</div>';
-      return;
-    }
+
+    const source = Array.isArray(list) && list.length ? list : DISEASE_OPTIONS;
 
     const groups = new Map();
 
-    list.forEach(item => {
+    source.forEach(item => {
       const g = item.group || "عام";
       if (!groups.has(g)) groups.set(g, []);
       groups.get(g).push(item);
@@ -197,7 +231,7 @@ setTimeout(() => {
         btn.dataset.code = item.code || "";
         btn.textContent = item.name || "";
 
-      btn.addEventListener("click", () => saveDiseaseItem(item, btn));
+        btn.addEventListener("click", () => saveDiseaseItem(item, btn));
 
         wrap.appendChild(btn);
       });
@@ -212,8 +246,8 @@ setTimeout(() => {
     const animalNumber = digitsOnly(animalNumberEl.value);
     const eventDate = eventDateEl.value;
 
-    dz.innerHTML = "";
-    renderSummary(null);
+        renderSummary(null);
+    renderDiseases(DISEASE_OPTIONS);
 
 
     if (!animalNumber || !eventDate) {
@@ -243,18 +277,17 @@ setTimeout(() => {
       );
 
       if (!j.allowed) {
-        dz.innerHTML = "";
         renderSummary(null);
         return;
       }
 
       renderSummary(j.animal || null);
-      renderDiseases(j.diseases || []);
+     renderDiseases(DISEASE_OPTIONS);
 
     } catch (e) {
       console.error("disease gate failed", e);
       setBar(gateBox, "❌ تعذّر الاتصال بالسيرفر.", "error");
-      dz.innerHTML = "";
+      renderDiseases(DISEASE_OPTIONS);
       renderSummary(null);
     }
   }
@@ -286,7 +319,8 @@ setTimeout(() => {
   animalNumberEl.addEventListener("input", scheduleGate);
   eventDateEl.addEventListener("change", scheduleGate);
 
-  hydrate();
+   hydrate();
+  renderDiseases(DISEASE_OPTIONS);
   runGate();
 })();
 </script>
