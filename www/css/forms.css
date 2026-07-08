@@ -5394,3 +5394,17 @@ html[data-page="supernumerary-teat-removal"] .mbk-super-teat-ok-btn{
 html[data-page="supernumerary-teat-removal"] .mbk-super-teat-ok-btn:active{
   transform: translateY(1px);
 }
+/* Murabbik header logo final size */
+.mbk-head .mbk-logo{
+  width:68px !important;
+  height:68px !important;
+  max-width:68px !important;
+  max-height:68px !important;
+  object-fit:contain !important;
+  opacity:1 !important;
+  filter:none !important;
+}
+
+.mbk-head{
+  min-height:88px;
+}
