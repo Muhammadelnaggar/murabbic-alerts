@@ -40155,26 +40155,39 @@ app.get('/api/health-report', requireUserId, async (req, res) => {
 
       if (archived) return;
 
-      const animalTypeText = String(
-        animal.species ||
-        animal.animalType ||
-        animal.type ||
-        ''
-      ).toLowerCase();
+     const animalTypeText = [
+  animal.species,
+  animal.animalType,
+  animal.animaltype,
+  animal.animalTypeAr,
+  animal.type,
+  animal.groupSpecies,
+  animal.groupId,
+  animal.group,
+  animal.breed
+].filter(Boolean).join(' ').toLowerCase();
 
-      let species = '';
-      if (animalTypeText.includes('buffalo') || animalTypeText.includes('جاموس')) {
-        species = 'buffalo';
-      }
-      if (
-        animalTypeText.includes('cow') ||
-        animalTypeText.includes('cattle') ||
-        animalTypeText.includes('بقر') ||
-        animalTypeText.includes('أبقار') ||
-        animalTypeText.includes('ابقار')
-      ) {
-        species = 'cows';
-      }
+let species = '';
+
+if (
+  animalTypeText.includes('buffalo') ||
+  animalTypeText.includes('جاموس') ||
+  animalTypeText.includes('buff_')
+) {
+  species = 'buffalo';
+}
+
+if (
+  animalTypeText.includes('cow') ||
+  animalTypeText.includes('cows') ||
+  animalTypeText.includes('cattle') ||
+  animalTypeText.includes('بقر') ||
+  animalTypeText.includes('أبقار') ||
+  animalTypeText.includes('ابقار') ||
+  animalTypeText.includes('cow_')
+) {
+  species = 'cows';
+}
 
       if (herdType !== 'all' && species !== herdType) return;
 
