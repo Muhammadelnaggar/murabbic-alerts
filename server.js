@@ -31892,7 +31892,167 @@ async function heatDuplicateCheckSrv(uid, animalNumber, eventDate, windowDays = 
 
   return `❌ تم تسجيل شياع للحيوان رقم ${num} بتاريخ ${bestDate}. لا يمكن تكرار التسجيل خلال ${windowDays} أيام.`;
 }
+function heatNormalizeDayPartForInseminationSrv(v) {
+  const raw = String(v || "").trim();
+  const s = heatStripArSrv(raw).toLowerCase();
 
+  if (s === "ص" || s.includes("صباح")) return "صباحا";
+  if (s === "م" || s.includes("مساء")) return "مساءا";
+
+  return raw;
+}
+
+function heatBuildInseminationRedirectUrlSrv({ animalNumbers = [], eventDate = "", heatTime = "" } = {}) {
+  const nums = animalNumbers
+    .map(x => normalizeDigitsSrv(x))
+    .filter(Boolean);
+
+  if (!nums.length) return "";
+
+  const heatStatus = heatNormalizeDayPartForInseminationSrv(heatTime);
+  const joined = nums.join(",");
+
+  const q = new URLSearchParams();
+  q.set("fromHeat", "1");
+  q.set("mode", nums.length > 1 ? "bulk" : "single");
+  q.set("animalNumbers", joined);
+  q.set("numbers", joined);
+  q.set("animalNumber", joined);
+  q.set("eventDate", eventDate);
+  q.set("date", eventDate);
+  q.set("heatDate", eventDate);
+
+  if (heatStatus) {
+    q.set("heatTime", heatStatus);
+    q.set("heatStatus", heatStatus);
+  }
+
+  return `insemination.html?${q.toString()}`;
+}
+
+async function heatBuildInseminationCandidatesSrv(uid, saved = [], eventDate = "", heatTime = "") {
+  const candidates = [];
+  const rejected = [];
+
+  for (const item of saved || []) {
+    const animalNumber = normalizeDigitsSrv(item?.animalNumber || "");
+
+    if (!animalNumber) continue;
+
+    try {
+      const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+
+      if (!animal) {
+        rejected.push({
+          animalNumber,
+          reason: "الحيوان غير موجود في حسابك."
+        });
+        continue;
+      }
+
+      const doc = animal.data || {};
+      const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+
+      let species = String(
+        doc.species ||
+        doc.animalTypeAr ||
+        doc.animalType ||
+        doc.animaltype ||
+        doc.type ||
+        ""
+      ).trim();
+
+      if (/cow|بقر/i.test(species)) species = "أبقار";
+      if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+
+      const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+      const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+      const reproStatus = reproFromEvents || reproFromDoc || "";
+
+      const lastInseminationDate = String(
+        signals.lastInseminationDateFromEvents ||
+        doc.lastInseminationDate ||
+        ""
+      ).trim();
+
+      const sameDayInseminationCount = await countInseminationsSameDaySrv(
+        uid,
+        animalNumber,
+        eventDate
+      );
+
+      const decision = inseminationDecisionSrv({
+        animalNumber,
+        eventDate,
+        animalId: animal.id || "",
+        species,
+        documentData: doc,
+        reproductiveStatus: reproStatus,
+        reproStatusFromEvents: reproFromEvents,
+        lastInseminationDate,
+        sameDayInseminationCount,
+        lastBoundary: String(signals.lastBoundary || "").trim(),
+        lastBoundaryType: String(signals.lastBoundaryType || "").trim()
+      });
+
+      if (decision) {
+        const raw = String(decision || "");
+        const isWarn = raw.startsWith("WARN|");
+        const needsEmbryonicConfirm = raw.startsWith("CONFIRM_EMBRYONIC_LOSS|");
+
+        const message = needsEmbryonicConfirm
+          ? raw.replace(/^CONFIRM_EMBRYONIC_LOSS\|/, "")
+          : isWarn
+            ? raw.replace(/^WARN\|/, "")
+            : raw;
+
+        if (!isWarn || needsEmbryonicConfirm) {
+          rejected.push({
+            animalNumber,
+            reason: message
+          });
+          continue;
+        }
+
+        candidates.push({
+          animalNumber,
+          warning: message
+        });
+        continue;
+      }
+
+      candidates.push({
+        animalNumber,
+        warning: ""
+      });
+
+    } catch (e) {
+      console.error("heat-build-insemination-candidate", animalNumber, e);
+
+      rejected.push({
+        animalNumber,
+        reason: "تعذّر فحص أهلية التلقيح بعد الشياع."
+      });
+    }
+  }
+
+  const animalNumbers = candidates
+    .map(x => String(x.animalNumber || "").trim())
+    .filter(Boolean);
+
+  return {
+    ok: true,
+    animalNumbers,
+    candidateCount: animalNumbers.length,
+    candidates,
+    rejected,
+    redirectUrl: heatBuildInseminationRedirectUrlSrv({
+      animalNumbers,
+      eventDate,
+      heatTime
+    })
+  };
+}
 async function buildHeatContextSrv(uid, animalNumber, eventDate){
   const num = normalizeDigitsSrv(animalNumber || "");
   const dt = String(eventDate || "").slice(0,10);
@@ -32267,6 +32427,22 @@ app.post('/api/heat/save', requireUserId, async (req, res) => {
       });
     }
 
+    const inseminationLink = await heatBuildInseminationCandidatesSrv(
+      uid,
+      saved,
+      eventDate,
+      heatTime
+    );
+
+    const hasInseminationCandidates =
+      Array.isArray(inseminationLink.animalNumbers) &&
+      inseminationLink.animalNumbers.length > 0 &&
+      !!inseminationLink.redirectUrl;
+
+    const baseMessage = rejected.length
+      ? `✅ تم حفظ الشياع لـ ${saved.length} حيوان — وتعذّر حفظ ${rejected.length}.`
+      : (saved.length === 1 ? "✅ تم حفظ شياع بنجاح" : `✅ تم حفظ الشياع لـ ${saved.length} حيوان.`);
+
     return res.json({
       ok:true,
       allowed:true,
@@ -32275,9 +32451,24 @@ app.post('/api/heat/save', requireUserId, async (req, res) => {
       saved,
       rejected,
       animalNumbers:saved.map(x => x.animalNumber),
-      message: rejected.length
-        ? `✅ تم حفظ الشياع لـ ${saved.length} حيوان — وتعذّر حفظ ${rejected.length}.`
-        : (saved.length === 1 ? "✅ تم حفظ شياع بنجاح" : `✅ تم حفظ الشياع لـ ${saved.length} حيوان.`),
+
+      insemination: inseminationLink,
+      inseminationCandidateCount: inseminationLink.candidateCount || 0,
+      inseminationAnimalNumbers: inseminationLink.animalNumbers || [],
+      inseminationRedirectUrl: hasInseminationCandidates ? inseminationLink.redirectUrl : "",
+
+      postSaveAction: hasInseminationCandidates
+        ? {
+            key: "insemination_now",
+            label: "تسجيل التلقيح الآن",
+            url: inseminationLink.redirectUrl
+          }
+        : null,
+
+      message: hasInseminationCandidates
+        ? `${baseMessage}\n\nهل تريد تسجيل التلقيح الآن؟`
+        : baseMessage,
+
       redirectUrl: saved.length === 1
         ? `event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
         : ""
