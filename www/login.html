@@ -170,7 +170,17 @@
       font-size:14px;
       color:var(--muted);
     }
+.forgot-line{
+  text-align:left;
+  margin:-4px 2px 12px;
+  font-size:13px;
+  font-weight:900;
+}
 
+.forgot-line a{
+  color:#1F5C3A;
+  text-decoration:none;
+}
   </style>
 </head>
 
@@ -195,6 +205,9 @@
     <form id="loginForm">
       <input type="text" id="phone" placeholder="رقم الهاتف" required />
       <input type="password" id="password" placeholder="كلمة المرور" required />
+      <div class="forgot-line">
+  <a href="forgot-password.html">نسيت كلمة المرور؟</a>
+</div>
       <button id="submitBtn" type="submit">دخول</button>
     </form>
 
