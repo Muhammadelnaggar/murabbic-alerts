@@ -704,6 +704,289 @@ app.post("/api/auth/register/verify", async (req, res) => {
     });
   }
 });
+async function authPasswordResetSendOtpBridgeSrv(phoneRaw, code) {
+  const webhook = String(process.env.MURABBIK_SMS_WEBHOOK_URL || "").trim();
+
+  if (!webhook) {
+    if (AUTH_OTP_DEV_RETURN) return { ok: true, dev: true };
+    return {
+      ok: false,
+      error: "sms_provider_missing",
+      message: "خدمة إرسال كود التحقق غير مفعّلة على السيرفر."
+    };
+  }
+
+  const text = `كود استعادة كلمة المرور في مُرَبِّيك: ${code}. صالح لمدة 10 دقائق.`;
+
+  try {
+    const r = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: phoneRaw,
+        message: text,
+        code,
+        purpose: "password_reset"
+      })
+    });
+
+    if (!r.ok) {
+      return {
+        ok: false,
+        error: "sms_send_failed",
+        message: "تعذّر إرسال كود التحقق الآن."
+      };
+    }
+
+    return { ok: true };
+
+  } catch (e) {
+    console.warn("password reset otp send failed:", e.message || e);
+    return {
+      ok: false,
+      error: "sms_send_failed",
+      message: "تعذّر إرسال كود التحقق الآن."
+    };
+  }
+}
+
+app.post("/api/auth/password-reset/start", async (req, res) => {
+  try {
+    if (!admin.apps.length || !db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firebase_admin_disabled",
+        message: "خدمة استعادة كلمة المرور غير متاحة الآن."
+      });
+    }
+
+    const phoneRaw = authRegisterTextBridgeSrv(req.body?.phone || req.body?.phoneNumber || "");
+    const phoneKey = authDigitsBridgeSrv(phoneRaw);
+
+    if (!phoneKey) {
+      return res.status(400).json({
+        ok: false,
+        error: "password_reset_phone_required",
+        message: "أدخل رقم الهاتف."
+      });
+    }
+
+    const pseudoEmail = `${phoneKey}@murabbik.local`;
+
+    let userRecord = null;
+    try {
+      userRecord = await admin.auth().getUserByEmail(pseudoEmail);
+    } catch (e) {
+      if (e?.code === "auth/user-not-found") {
+        return res.status(404).json({
+          ok: false,
+          error: "password_reset_user_not_found",
+          message: "رقم الهاتف غير مسجّل."
+        });
+      }
+      throw e;
+    }
+
+    const uid = String(userRecord?.uid || "").trim();
+    if (!uid) {
+      return res.status(404).json({
+        ok: false,
+        error: "password_reset_user_not_found",
+        message: "رقم الهاتف غير مسجّل."
+      });
+    }
+
+    const profile = await authReadUserProfileBridgeSrv(uid);
+
+    const code = authOtpCodeBridgeSrv();
+    const otpSalt = crypto.randomBytes(16).toString("hex");
+    const requestId = crypto.randomBytes(18).toString("hex");
+
+    const sent = await authPasswordResetSendOtpBridgeSrv(phoneRaw || phoneKey, code);
+
+    if (!sent.ok) {
+      return res.status(503).json({
+        ok: false,
+        error: sent.error || "otp_send_failed",
+        message: sent.message || "تعذّر إرسال كود التحقق الآن."
+      });
+    }
+
+    await db.collection("auth_password_reset_otps").doc(requestId).set({
+      type: "password_reset",
+      uid,
+      phoneRaw: profile.phone || phoneRaw,
+      phoneKey,
+      fullName: profile.fullName || profile.name || profile.displayName || userRecord.displayName || "",
+
+      otpHash: authOtpHashBridgeSrv(code, otpSalt),
+      otpSalt,
+
+      attempts: 0,
+      maxAttempts: AUTH_OTP_MAX_ATTEMPTS,
+      usedAt: null,
+      expiresAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + AUTH_OTP_TTL_MS)),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      source: "server:/api/auth/password-reset/start"
+    }, { merge: false });
+
+    const out = {
+      ok: true,
+      otpRequired: true,
+      requestId,
+      expiresInSeconds: Math.floor(AUTH_OTP_TTL_MS / 1000),
+      message: "تم إرسال كود التحقق إلى رقم الهاتف."
+    };
+
+    if (AUTH_OTP_DEV_RETURN) out.devOtp = code;
+
+    return res.json(out);
+
+  } catch (e) {
+    console.warn("password reset start failed:", e.message || e);
+    return res.status(500).json({
+      ok: false,
+      error: "password_reset_start_failed",
+      message: "تعذّر بدء استعادة كلمة المرور الآن."
+    });
+  }
+});
+
+app.post("/api/auth/password-reset/verify", async (req, res) => {
+  try {
+    if (!admin.apps.length || !db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firebase_admin_disabled",
+        message: "خدمة استعادة كلمة المرور غير متاحة الآن."
+      });
+    }
+
+    const requestId = String(req.body?.requestId || "").trim();
+    const otp = authDigitsBridgeSrv(req.body?.otp || req.body?.code || "");
+    const password = String(req.body?.password || "");
+    const confirmPassword = String(req.body?.confirmPassword || req.body?.passwordConfirm || "");
+
+    if (!requestId || !otp || !password || !confirmPassword) {
+      return res.status(400).json({
+        ok: false,
+        error: "password_reset_fields_required",
+        message: "أدخل كود التحقق وكلمة المرور الجديدة."
+      });
+    }
+
+    const ref = db.collection("auth_password_reset_otps").doc(requestId);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      return res.status(404).json({
+        ok: false,
+        error: "otp_not_found",
+        message: "كود التحقق غير صالح أو انتهت صلاحيته."
+      });
+    }
+
+    const p = snap.data() || {};
+
+    if (p.usedAt) {
+      return res.status(409).json({
+        ok: false,
+        error: "otp_already_used",
+        message: "تم استخدام كود التحقق من قبل."
+      });
+    }
+
+    const expiresAt = p.expiresAt?.toDate ? p.expiresAt.toDate() : null;
+    if (!expiresAt || expiresAt.getTime() < Date.now()) {
+      return res.status(410).json({
+        ok: false,
+        error: "otp_expired",
+        message: "انتهت صلاحية كود التحقق. اطلب كودًا جديدًا."
+      });
+    }
+
+    const attempts = Number(p.attempts || 0);
+    const maxAttempts = Number(p.maxAttempts || AUTH_OTP_MAX_ATTEMPTS);
+
+    if (attempts >= maxAttempts) {
+      return res.status(429).json({
+        ok: false,
+        error: "otp_attempts_exceeded",
+        message: "تم تجاوز عدد محاولات التحقق. اطلب كودًا جديدًا."
+      });
+    }
+
+    const otpHash = authOtpHashBridgeSrv(otp, p.otpSalt || "");
+
+    if (otpHash !== p.otpHash) {
+      await ref.set({
+        attempts: attempts + 1,
+        lastAttemptAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      return res.status(400).json({
+        ok: false,
+        error: "otp_invalid",
+        attemptsLeft: Math.max(0, maxAttempts - attempts - 1),
+        message: "كود التحقق غير صحيح."
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        ok: false,
+        error: "password_reset_mismatch",
+        message: "كلمة المرور وتأكيدها غير متطابقة."
+      });
+    }
+
+    const passwordIssue = authRegisterPasswordIssueBridgeSrv(password, {
+      fullName: p.fullName,
+      phoneKey: p.phoneKey
+    });
+
+    if (passwordIssue) {
+      return res.status(400).json({
+        ok: false,
+        error: "password_reset_weak_password",
+        message: passwordIssue
+      });
+    }
+
+    const uid = String(p.uid || "").trim();
+    if (!uid) {
+      return res.status(400).json({
+        ok: false,
+        error: "password_reset_uid_missing",
+        message: "طلب استعادة كلمة المرور غير مكتمل."
+      });
+    }
+
+    await admin.auth().updateUser(uid, { password });
+    await admin.auth().revokeRefreshTokens(uid);
+
+    await ref.set({
+      usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      resetUid: uid
+    }, { merge: true });
+
+    authClearSessionCookieBridgeSrv(req, res);
+
+    return res.json({
+      ok: true,
+      message: "✅ تم تغيير كلمة المرور بنجاح. سجّل الدخول بكلمة المرور الجديدة.",
+      redirectUrl: "login.html"
+    });
+
+  } catch (e) {
+    console.warn("password reset verify failed:", e.message || e);
+    return res.status(500).json({
+      ok: false,
+      error: "password_reset_verify_failed",
+      message: "تعذّر تغيير كلمة المرور الآن."
+    });
+  }
+});
 app.post("/api/auth/login", async (req, res) => {
   try {
     if (!admin.apps.length) {
