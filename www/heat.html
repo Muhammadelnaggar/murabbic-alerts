@@ -40,16 +40,16 @@
 
       <label>تاريخ الشياع</label>
       <input id="eventDate" data-field="eventDate" type="date" />
-     <label>وقت ملاحظة الشياع</label>
+<label>وقت ملاحظة الشياع</label>
 <div class="radio-group">
   <label>
-    <input type="radio" name="heatTime" data-field="heatTime" value="ص" />
-    ص
+    <input type="radio" name="heatTime" data-field="heatTime" value="صباحا" />
+    صباحًا
   </label>
 
   <label>
-    <input type="radio" name="heatTime" data-field="heatTime" value="م" />
-    م
+    <input type="radio" name="heatTime" data-field="heatTime" value="مساءا" />
+    مساءً
   </label>
 </div>
 
@@ -124,13 +124,18 @@
 
   
 
-function msg(text, ok=false, actionUrl=""){
+function msg(text, ok=false, actionUrl="", actionLabel="الذهاب لتأكيد الحمل الآن"){
   if (!bar) return;
 
   bar.className = "infobar show " + (ok ? "success" : "error");
   bar.style.display = "block";
 
   const safeText = String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  const safeActionLabel = String(actionLabel || "متابعة")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
@@ -143,7 +148,7 @@ function msg(text, ok=false, actionUrl=""){
           ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
                 <button type="button" id="heatGateActionBtn"
                   style="width:auto;min-width:170px;padding:9px 18px;border-radius:999px;border:2px solid #0b7f47;background:#fff;color:#0b7f47;font-weight:900;cursor:pointer">
-                  الذهاب لتأكيد الحمل الآن
+                  ${safeActionLabel}
                 </button>
 
                 <button type="button" id="heatGateLaterBtn"
@@ -361,15 +366,21 @@ async function saveHeat(e){
       notes: notes || null
     });
 
-    const savedNums = Array.isArray(res.animalNumbers) ? res.animalNumbers : [];
+    const action = res.postSaveAction || {};
+    const actionUrl = String(action.url || res.inseminationRedirectUrl || "").trim();
+    const actionLabel = String(action.label || "تسجيل التلقيح الآن").trim();
+
+    if (actionUrl) {
+      msg(
+        res.message || "✅ تم حفظ الشياع بنجاح\n\nهل تريد تسجيل التلقيح الآن؟",
+        true,
+        actionUrl,
+        actionLabel
+      );
+      return;
+    }
 
     msg(res.message || "✅ تم حفظ الشياع بنجاح", true);
-
-    if (res.redirectUrl) {
-      setTimeout(() => {
-        location.href = res.redirectUrl;
-      }, 900);
-    }
 
   } catch(err) {
     console.error(err);
