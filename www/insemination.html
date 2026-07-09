@@ -91,6 +91,8 @@
 
  if (animalEl) {
   animalEl.value =
+    qp.get("animalNumbers") ||
+    qp.get("numbers") ||
     qp.get("animalNumber") ||
     qp.get("number") ||
     qp.get("animalId") ||
@@ -101,8 +103,17 @@ if (dateEl) {
   dateEl.value =
     qp.get("eventDate") ||
     qp.get("date") ||
+    qp.get("inseminationDate") ||
+    qp.get("heatDate") ||
     new Date().toISOString().slice(0, 10);
 }
+  const heatTimeFromQuery =
+  qp.get("heatStatus") ||
+  qp.get("heatTime") ||
+  qp.get("observedHeatTime") ||
+  "";
+
+setRadioValue("heatStatus", heatTimeFromQuery);
   function parseNumbers(raw) {
     const map = {
       "٠": "0","١": "1","٢": "2","٣": "3","٤": "4","٥": "5","٦": "6","٧": "7","٨": "8","٩": "9",
@@ -116,7 +127,27 @@ if (dateEl) {
   function readRadio(form, name) {
     return String(form.querySelector(`input[name="${name}"]:checked`)?.value || "").trim();
   }
+    function normalizeDayPart(v) {
+    const s = String(v || "")
+      .trim()
+      .replace(/[ًٌٍَُِّْ]/g, "")
+      .replace(/\s+/g, "");
 
+    if (s === "ص" || s.includes("صباح")) return "صباحا";
+    if (s === "م" || s.includes("مساء")) return "مساءا";
+
+    return String(v || "").trim();
+  }
+
+  function setRadioValue(name, value) {
+    const wanted = normalizeDayPart(value);
+    if (!wanted) return;
+
+    const radios = [...form.querySelectorAll(`input[name="${name}"]`)];
+    const target = radios.find(r => normalizeDayPart(r.value) === wanted);
+
+    if (target) target.checked = true;
+  }
   function compactReason(reason) {
     return String(reason || "")
       .replace(/^❌\s*/, "")
