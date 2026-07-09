@@ -5394,36 +5394,25 @@ html[data-page="supernumerary-teat-removal"] .mbk-super-teat-ok-btn{
 html[data-page="supernumerary-teat-removal"] .mbk-super-teat-ok-btn:active{
   transform: translateY(1px);
 }
-/* Murabbik header logo final size */
-.mbk-head .mbk-logo{
-  width:68px !important;
-  height:68px !important;
-  max-width:68px !important;
-  max-height:68px !important;
-  object-fit:contain !important;
-  opacity:1 !important;
-  filter:none !important;
-}
 
-.mbk-head{
-  min-height:88px;
-}
 /* =========================================================
-   Murabbik Header — Final Unified Contract
-   توحيد هيدر مُرَبِّيك في كل الصفحات
+   Murabbik Header — Final Hard Override
+   توحيد نهائي للهيدر في كل صفحات مُرَبِّيك
    ========================================================= */
 
 .mbk-top,
 body > header{
-  position:sticky;
-  top:0;
-  z-index:50;
-  background:#fff;
-  border-bottom:1px solid var(--border, #e2e8f0);
-  box-shadow:0 2px 6px rgba(15,23,42,.05);
+  position:sticky !important;
+  top:0 !important;
+  z-index:100 !important;
+  background:#fff !important;
+  border-bottom:1px solid var(--border, #e2e8f0) !important;
+  box-shadow:0 2px 6px rgba(15,23,42,.05) !important;
 }
 
+/* الهيدر نفسه: نجبر الترتيب بصريًا */
 .mbk-head{
+  direction:ltr !important;
   max-width:980px !important;
   min-height:88px !important;
   margin:0 auto !important;
@@ -5436,14 +5425,30 @@ body > header{
   position:relative !important;
 }
 
-/* كتلة العنوان — سواء بالاسم الجديد أو القديم */
+/* اللوجو دائمًا شمال */
+.mbk-head .mbk-logo{
+  order:1 !important;
+  width:68px !important;
+  height:68px !important;
+  max-width:68px !important;
+  max-height:68px !important;
+  object-fit:contain !important;
+  opacity:1 !important;
+  filter:none !important;
+  flex:0 0 68px !important;
+}
+
+/* كتلة العنوان في المنتصف/يمين المحتوى */
 .mbk-head .mbk-title,
 .mbk-head .mbk-center,
 .mbk-head .mbk-head-text{
+  order:2 !important;
+  direction:rtl !important;
   flex:1 1 auto !important;
   min-width:0 !important;
   text-align:right !important;
   line-height:1.12 !important;
+
   position:static !important;
   left:auto !important;
   top:auto !important;
@@ -5452,10 +5457,9 @@ body > header{
   max-width:none !important;
 }
 
-/* عنوان الصفحة دائمًا غامق */
+/* عنوان الصفحة غامق دائمًا */
 .mbk-head .mbk-page,
-.mbk-head .mbk-page-title,
-.mbk-head .mbk-head-text > .mbk-title{
+.mbk-head .mbk-page-title{
   color:#0f172a !important;
   font-size:22px !important;
   font-weight:900 !important;
@@ -5463,7 +5467,7 @@ body > header{
   margin:0 !important;
 }
 
-/* اسم مربيك دائمًا أخضر تحت العنوان */
+/* اسم مربيك أخضر دائمًا */
 .mbk-head .mbk-app,
 .mbk-head .mbk-app-name,
 .mbk-head .mbk-sub{
@@ -5475,22 +5479,36 @@ body > header{
   opacity:1 !important;
 }
 
-/* اللوجو ثابت وواضح */
-.mbk-head .mbk-logo{
-  width:68px !important;
-  height:68px !important;
-  max-width:68px !important;
-  max-height:68px !important;
-  object-fit:contain !important;
-  opacity:1 !important;
-  filter:none !important;
-  flex:0 0 68px !important;
+/* زر الرجوع دائمًا يمين وشكله موحد */
+.mbk-head .mbk-back,
+.mbk-head .back-btn,
+.mbk-head .mbk-head-btn{
+  order:3 !important;
+  direction:rtl !important;
+  width:44px !important;
+  height:44px !important;
+  min-width:44px !important;
+  min-height:44px !important;
+  max-width:44px !important;
+  max-height:44px !important;
+  padding:0 !important;
+  border-radius:999px !important;
+  border:1px solid #cbd5e1 !important;
+  background:#f8fafc !important;
+  color:#0f172a !important;
+  text-decoration:none !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  font-size:12px !important;
+  font-weight:900 !important;
+  box-shadow:0 2px 8px rgba(15,23,42,.06) !important;
+  flex:0 0 44px !important;
 }
 
-/* زر الرجوع لو موجود */
-.mbk-head .mbk-back,
-.mbk-head .back-btn{
-  flex:0 0 44px !important;
+/* لو الهيدر مفيهوش زر رجوع: العنوان يفضل يمين واللوجو شمال */
+.mbk-head .mbk-logo:last-child{
+  margin-inline-start:auto !important;
 }
 
 /* موبايل صغير */
@@ -5498,6 +5516,7 @@ body > header{
   .mbk-head{
     min-height:82px !important;
     padding:9px 12px !important;
+    gap:10px !important;
   }
 
   .mbk-head .mbk-logo{
@@ -5509,8 +5528,67 @@ body > header{
   }
 
   .mbk-head .mbk-page,
-  .mbk-head .mbk-page-title,
-  .mbk-head .mbk-head-text > .mbk-title{
+  .mbk-head .mbk-page-title{
+    font-size:20px !important;
+  }
+
+  .mbk-head .mbk-app,
+  .mbk-head .mbk-app-name,
+  .mbk-head .mbk-sub{
+    font-size:14px !important;
+  }
+
+  .mbk-head .mbk-back,
+  .mbk-head .back-btn,
+  .mbk-head .mbk-head-btn{
+    width:42px !important;
+    height:42px !important;
+    min-width:42px !important;
+    min-height:42px !important;
+    max-width:42px !important;
+    max-height:42px !important;
+    flex-basis:42px !important;
+    font-size:11px !important;
+  }
+}
+/* =========================================================
+   Murabbik Header — Unified Typography
+   توحيد خطوط الهيدر في كل صفحات مُرَبِّيك
+   ========================================================= */
+
+.mbk-head,
+.mbk-head *{
+  font-family: "Cairo", system-ui, "Segoe UI", Tahoma, Arial, sans-serif !important;
+}
+
+.mbk-head .mbk-page,
+.mbk-head .mbk-page-title{
+  font-size:22px !important;
+  font-weight:900 !important;
+  letter-spacing:0 !important;
+  color:#0f172a !important;
+}
+
+.mbk-head .mbk-app,
+.mbk-head .mbk-app-name,
+.mbk-head .mbk-sub{
+  font-size:15px !important;
+  font-weight:900 !important;
+  letter-spacing:0 !important;
+  color:var(--brand-600, #0b7f47) !important;
+}
+
+.mbk-head .mbk-back,
+.mbk-head .back-btn,
+.mbk-head .mbk-head-btn{
+  font-family:"Cairo", system-ui, "Segoe UI", Tahoma, Arial, sans-serif !important;
+  font-size:12px !important;
+  font-weight:900 !important;
+}
+
+@media(max-width:420px){
+  .mbk-head .mbk-page,
+  .mbk-head .mbk-page-title{
     font-size:20px !important;
   }
 
