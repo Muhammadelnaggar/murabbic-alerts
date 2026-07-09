@@ -14011,9 +14011,10 @@ function inseminationDecisionSrv(fd) {
   }
 
   // ❌ آخر ولادة: منع قبل الحد الأدنى للتلقيح
-  const lastCalving =
-    String(doc.lastCalvingDate || "").trim() ||
-    (String(fd.lastBoundaryType || "").trim() === "ولادة" ? String(fd.lastBoundary || "").trim() : "");
+ const lastCalving =
+  String(fd.lastCalvingDate || "").trim() ||
+  String(doc.lastCalvingDate || "").trim() ||
+  (String(fd.lastBoundaryType || "").trim() === "ولادة" ? String(fd.lastBoundary || "").trim() : "");
 
   const minDaysAfterCalving = Number(minPostCalving[sp] || 56);
   const dimFallback = Number(
@@ -28606,7 +28607,11 @@ app.post("/api/abortion/gate", requireUserId, async (req, res) => {
 
     const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
     const reproFromDoc = String(doc.reproductiveStatus || "").trim();
-    const reproStatus = reproFromEvents || reproFromDoc || "";
+    const reproStatus =
+    String(item?.reproductiveStatusSnapshot || "").trim() ||
+    reproFromEvents ||
+    reproFromDoc ||
+    "";
 
     const lastInseminationDate = String(
       signals.lastInseminationDateFromEvents ||
@@ -31980,10 +31985,27 @@ async function heatBuildInseminationCandidatesSrv(uid, saved = [], eventDate = "
 
       if (/cow|بقر/i.test(species)) species = "أبقار";
       if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+            const dimAtHeat = Number(item?.dimAtEvent);
+      const minPostCalving = species === "جاموس" ? 45 : 56;
 
+      if (
+        Number.isFinite(dimAtHeat) &&
+        dimAtHeat >= 0 &&
+        dimAtHeat < minPostCalving
+      ) {
+        rejected.push({
+          animalNumber,
+          reason: `الحيوان حديث الولادة: مرّ ${Math.round(dimAtHeat)} يوم فقط بعد الولادة. الحد الأدنى للتلقيح: ${minPostCalving} يوم.`
+        });
+        continue;
+      }
       const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
       const reproFromDoc = String(doc.reproductiveStatus || "").trim();
-      const reproStatus = reproFromEvents || reproFromDoc || "";
+      const reproStatus =
+  String(item?.reproductiveStatusSnapshot || "").trim() ||
+  reproFromEvents ||
+  reproFromDoc ||
+  "";
 
       const lastInseminationDate = String(
         signals.lastInseminationDateFromEvents ||
@@ -32007,6 +32029,8 @@ async function heatBuildInseminationCandidatesSrv(uid, saved = [], eventDate = "
         reproStatusFromEvents: reproFromEvents,
         lastInseminationDate,
         sameDayInseminationCount,
+        dimAtEvent: item?.dimAtEvent ?? null,
+        lastCalvingDate: item?.lastCalvingDate || "",
         lastBoundary: String(signals.lastBoundary || "").trim(),
         lastBoundaryType: String(signals.lastBoundaryType || "").trim()
       });
@@ -32421,11 +32445,17 @@ app.post('/api/heat/save', requireUserId, async (req, res) => {
           }, { merge:true });
         }
 
-        saved.push({
-          animalNumber: payload.animalNumber,
-          animalId: payload.animalId,
-          eventId: evRef.id
-        });
+saved.push({
+  animalNumber: payload.animalNumber,
+  animalId: payload.animalId,
+  eventId: evRef.id,
+
+  species: ctx.species || "",
+  reproductiveStatusSnapshot: payload.reproductiveStatusSnapshot || "",
+  dimAtEvent: payload.dimAtEvent ?? null,
+  daysSinceLastHeatOrAI: payload.daysSinceLastHeatOrAI ?? null,
+  lastCalvingDate: String(animal.lastCalvingDate || "").slice(0, 10)
+});
 
       } catch (oneErr) {
         console.error('heat-save-one', animalNumber, oneErr);
