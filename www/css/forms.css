@@ -5408,3 +5408,115 @@ html[data-page="supernumerary-teat-removal"] .mbk-super-teat-ok-btn:active{
 .mbk-head{
   min-height:88px;
 }
+/* =========================================================
+   Murabbik Header — Final Unified Contract
+   توحيد هيدر مُرَبِّيك في كل الصفحات
+   ========================================================= */
+
+.mbk-top,
+body > header{
+  position:sticky;
+  top:0;
+  z-index:50;
+  background:#fff;
+  border-bottom:1px solid var(--border, #e2e8f0);
+  box-shadow:0 2px 6px rgba(15,23,42,.05);
+}
+
+.mbk-head{
+  max-width:980px !important;
+  min-height:88px !important;
+  margin:0 auto !important;
+  padding:10px 14px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:12px !important;
+  background:#fff !important;
+  position:relative !important;
+}
+
+/* كتلة العنوان — سواء بالاسم الجديد أو القديم */
+.mbk-head .mbk-title,
+.mbk-head .mbk-center,
+.mbk-head .mbk-head-text{
+  flex:1 1 auto !important;
+  min-width:0 !important;
+  text-align:right !important;
+  line-height:1.12 !important;
+  position:static !important;
+  left:auto !important;
+  top:auto !important;
+  transform:none !important;
+  width:auto !important;
+  max-width:none !important;
+}
+
+/* عنوان الصفحة دائمًا غامق */
+.mbk-head .mbk-page,
+.mbk-head .mbk-page-title,
+.mbk-head .mbk-head-text > .mbk-title{
+  color:#0f172a !important;
+  font-size:22px !important;
+  font-weight:900 !important;
+  line-height:1.15 !important;
+  margin:0 !important;
+}
+
+/* اسم مربيك دائمًا أخضر تحت العنوان */
+.mbk-head .mbk-app,
+.mbk-head .mbk-app-name,
+.mbk-head .mbk-sub{
+  color:var(--brand-600, #0b7f47) !important;
+  font-size:15px !important;
+  font-weight:900 !important;
+  line-height:1.2 !important;
+  margin-top:4px !important;
+  opacity:1 !important;
+}
+
+/* اللوجو ثابت وواضح */
+.mbk-head .mbk-logo{
+  width:68px !important;
+  height:68px !important;
+  max-width:68px !important;
+  max-height:68px !important;
+  object-fit:contain !important;
+  opacity:1 !important;
+  filter:none !important;
+  flex:0 0 68px !important;
+}
+
+/* زر الرجوع لو موجود */
+.mbk-head .mbk-back,
+.mbk-head .back-btn{
+  flex:0 0 44px !important;
+}
+
+/* موبايل صغير */
+@media(max-width:420px){
+  .mbk-head{
+    min-height:82px !important;
+    padding:9px 12px !important;
+  }
+
+  .mbk-head .mbk-logo{
+    width:62px !important;
+    height:62px !important;
+    max-width:62px !important;
+    max-height:62px !important;
+    flex-basis:62px !important;
+  }
+
+  .mbk-head .mbk-page,
+  .mbk-head .mbk-page-title,
+  .mbk-head .mbk-head-text > .mbk-title{
+    font-size:20px !important;
+  }
+
+  .mbk-head .mbk-app,
+  .mbk-head .mbk-app-name,
+  .mbk-head .mbk-sub{
+    font-size:14px !important;
+  }
+}
