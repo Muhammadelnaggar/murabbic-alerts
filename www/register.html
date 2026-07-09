@@ -5,485 +5,155 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="css/forms.css">
   <title>مربي جديد؟</title>
-<style>
-:root{
-  --mbk-green:#1F5C3A;
-  --mbk-green-2:#2f7d4a;
-  --mbk-gold:#B08A2E;
-  --mbk-ink:#0f172a;
-  --mbk-muted:#64748b;
-  --mbk-soft:#f4f8f3;
-  --mbk-line:#dbe7d6;
-  --mbk-card:#ffffff;
-}
-
-*{box-sizing:border-box}
-
-body.register-page{
+  <style>
+    :root{--bg1:#eeffdd;--bg2:#fffedc;--green:#2e7d32;--border:#c5e1a5;--card:#ffffff}
+    *{box-sizing:border-box}
+   body{
+  font-family:'Cairo',sans-serif;
+  background:#f7faf7;
   margin:0;
-  min-height:100vh;
-  padding:18px 14px 24px;
-  font-family:'Cairo',system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  color:var(--mbk-ink);
-  background:
-    radial-gradient(circle at top right, rgba(176,138,46,.16), transparent 34%),
-    radial-gradient(circle at top left, rgba(31,92,58,.14), transparent 38%),
-    linear-gradient(180deg,#f8fbf6 0%,#eef6ea 100%);
+  padding:20px;
   display:flex;
   flex-direction:column;
   align-items:center;
+  min-height:100vh;
 }
-
-.reg-header,
-.container{
+      display:flex;align-items:center;justify-content:center;min-height:100vh;
+      margin:0;padding:16px;color:#1b5e20;
+    }
+  
+    .container{
+      width:100%;max-width:460px;background:var(--card);
+      border:1px solid var(--border);border-radius:14px;padding:24px;
+      box-shadow:0 4px 20px rgba(0,0,0,.08);
+    }
+    h2{margin:0 0 16px;color:var(--green);text-align:center;font-weight:bold}
+    label{display:block;font-weight:bold;margin:.35rem 0 .35rem}
+    input,select,button{width:100%;font-size:16px;min-height:44px}
+    input,select{border:1px solid #ccc;border-radius:10px;padding:10px}
+    .row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .hint{font-size:12px;color:var(--green);margin-top:-4px;margin-bottom:8px}
+    button{
+      background:var(--green);color:#fff;border:0;border-radius:10px;
+      padding:12px;font-weight:bold;cursor:pointer;transition:.2s ease background;
+    }
+    button:hover{background:#256a28}
+    .message{display:none;padding:12px;border-radius:10px;font-weight:bold;text-align:center;margin-bottom:10px}
+    .message.success{display:block;background:#d1e7dd;color:#0f5132}
+    .message.error{display:block;background:#f8d7da;color:#842029}
+    .muted{font-size:13px;opacity:.85}
+    .link{margin-top:6px;text-align:center}
+    .link a{color:var(--green);text-decoration:none;font-weight:bold}
+    .mbk-head{
   width:100%;
-  max-width:480px;
-}
-
-.reg-header{
-  margin:0 0 14px;
-}
-
-.reg-brand{
-  position:relative;
-  overflow:hidden;
-  border-radius:24px;
-  padding:20px 18px;
+  background:linear-gradient(135deg,#0ea05a,#0b7f47);
+  padding:18px 16px;
+  border-radius:16px;
+  margin-bottom:18px;
   color:#fff;
-  background:
-    linear-gradient(135deg, rgba(15,23,42,.14), transparent 36%),
-    linear-gradient(135deg, var(--mbk-green), var(--mbk-green-2));
-  box-shadow:0 18px 40px rgba(31,92,58,.24);
-  border:1px solid rgba(255,255,255,.22);
+  box-shadow:0 6px 18px rgba(0,0,0,.15);
 }
-
-.reg-brand::after{
-  content:"";
-  position:absolute;
-  width:170px;
-  height:170px;
-  left:-72px;
-  top:-62px;
-  border-radius:999px;
-  background:rgba(176,138,46,.22);
-}
-
-.reg-brand-top{
-  position:relative;
-  z-index:1;
+.mbk-brand{
   display:flex;
   align-items:center;
-  justify-content:space-between;
-  gap:14px;
+  gap:12px;
 }
-
-.reg-title{
-  font-size:24px;
-  font-weight:900;
-  line-height:1.25;
+.mbk-logo{
+  width:48px;
+  height:48px;
 }
-
-.reg-sub{
-  margin-top:4px;
-  font-size:15px;
-  font-weight:800;
-  color:#f7e8b8;
+.mbk-title{
+  font-size:22px;
+  font-weight:bold;
 }
-
-.reg-brand img{
-  position:relative;
-  z-index:1;
-  width:66px;
-  height:66px;
-  object-fit:contain;
-  filter:drop-shadow(0 8px 14px rgba(0,0,0,.18));
-}
-
-.reg-promise{
-  position:relative;
-  z-index:1;
-  margin:16px 0 0;
+.mbk-sub{
   font-size:14px;
-  line-height:1.9;
-  font-weight:800;
-  color:rgba(255,255,255,.96);
+  opacity:.9;
 }
-
-.reg-pills{
-  position:relative;
-  z-index:1;
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin-top:14px;
-}
-
-.reg-pills span{
-  border:1px solid rgba(255,255,255,.28);
-  background:rgba(255,255,255,.13);
-  color:#fff;
-  border-radius:999px;
-  padding:7px 10px;
-  font-size:12px;
-  font-weight:800;
-  white-space:nowrap;
-}
-
-.container{
-  background:var(--mbk-card);
-  border:1px solid var(--mbk-line);
-  border-radius:22px;
-  padding:20px 18px 18px;
-  box-shadow:0 18px 42px rgba(15,23,42,.09);
-}
-
 .hero-text{
   text-align:center;
   font-size:15px;
-  margin:0 0 16px;
-  line-height:1.8;
-  font-weight:900;
-  color:var(--mbk-green);
-}
-
-.hero-text small{
-  display:block;
-  margin-top:6px;
-  color:var(--mbk-muted);
-  font-size:12px;
-  font-weight:800;
-}
-
-label{
-  display:block;
-  font-weight:900;
-  margin:10px 0 6px;
-  color:var(--mbk-ink);
-  font-size:14px;
-}
-
-input,
-select,
-button{
-  width:100%;
-  font-family:inherit;
-  font-size:16px;
-  min-height:46px;
-}
-
-input,
-select{
-  border:1px solid #cfdccd;
-  background:#fff;
-  border-radius:14px;
-  padding:11px 12px;
-  outline:none;
-  color:var(--mbk-ink);
-}
-
-input:focus,
-select:focus{
-  border-color:var(--mbk-green);
-  box-shadow:0 0 0 3px rgba(31,92,58,.12);
-}
-
-.row-2{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-}
-
-.hint{
-  font-size:12px;
-  color:var(--mbk-muted);
-  margin:5px 0 8px;
+  margin-bottom:18px;
   line-height:1.6;
-  font-weight:700;
+  font-weight:bold;
 }
-
-button{
-  margin-top:14px;
-  border:0;
-  border-radius:999px;
-  background:linear-gradient(135deg,var(--mbk-green),#2f7d4a);
-  color:#fff;
-  padding:13px 16px;
-  font-weight:900;
-  cursor:pointer;
-  box-shadow:0 12px 24px rgba(31,92,58,.22);
-}
-
-button:hover{
-  filter:brightness(.98);
-}
-
-button:disabled{
-  opacity:.68;
-  cursor:not-allowed;
-}
-
-.message{
-  display:none;
-  padding:12px;
-  border-radius:14px;
-  font-weight:900;
-  text-align:center;
-  margin-bottom:12px;
-  line-height:1.7;
-}
-
-.message.success{
-  display:block;
-  background:#dcfce7;
-  color:#14532d;
-  border:1px solid #bbf7d0;
-}
-
-.message.error{
-  display:block;
-  background:#fee2e2;
-  color:#7f1d1d;
-  border:1px solid #fecaca;
-}
-
-.muted{
-  font-size:13px;
-  color:var(--mbk-muted);
-  line-height:1.7;
-}
-
-.link{
-  margin-top:12px;
-  text-align:center;
-  font-weight:800;
-}
-
-.link a{
-  color:var(--mbk-green);
-  text-decoration:none;
-  font-weight:900;
-}
-
-.reg-safe{
-  margin-top:12px;
-  padding:10px 12px;
-  border-radius:16px;
-  background:var(--mbk-soft);
-  border:1px solid var(--mbk-line);
-  color:var(--mbk-muted);
-  font-size:12px;
-  font-weight:800;
-  line-height:1.8;
-  text-align:center;
-}
-
+/* ===== مُرَبِّيك: شاشة ترحيب انتقالية بعد التسجيل ===== */
 .welcome-overlay{
-  position:fixed;
-  inset:0;
-  background:
-    radial-gradient(circle at top left, rgba(176,138,46,.24), transparent 35%),
-    linear-gradient(135deg,var(--mbk-green),#0b7f47);
+  position:fixed; inset:0;
+  background:linear-gradient(135deg,#0ea05a,#0b7f47);
   display:none;
-  align-items:center;
-  justify-content:center;
+  align-items:center; justify-content:center;
   padding:24px;
   z-index:9999;
   color:#fff;
   text-align:center;
 }
-
 .welcome-card{
   width:100%;
   max-width:520px;
-  background:rgba(255,255,255,.13);
-  border:1px solid rgba(255,255,255,.24);
-  border-radius:24px;
-  padding:24px 20px;
-  box-shadow:0 18px 44px rgba(0,0,0,.25);
-  backdrop-filter:blur(7px);
+  background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:18px;
+  padding:22px 18px;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+  backdrop-filter: blur(6px);
 }
-
 .welcome-title{
-  font-size:24px;
-  font-weight:900;
+  font-size:22px;
+  font-weight:800;
   margin:0 0 10px;
 }
-
 .welcome-body{
   font-size:15px;
-  line-height:1.9;
-  font-weight:800;
-  opacity:.98;
+  line-height:1.8;
+  font-weight:700;
+  opacity:.96;
   margin:0;
   white-space:pre-line;
 }
-
 .welcome-foot{
-  margin-top:16px;
+  margin-top:14px;
   font-size:13px;
-  opacity:.92;
-  font-weight:800;
+  opacity:.9;
+  font-weight:700;
 }
-
-@media(max-width:520px){
-  body.register-page{
-    padding:14px 10px 22px;
-  }
-
-  .reg-brand{
-    border-radius:22px;
-    padding:18px 15px;
-  }
-
-  .reg-title{
-    font-size:22px;
-  }
-
-  .reg-brand img{
-    width:60px;
-    height:60px;
-  }
-
-  .container{
-    border-radius:20px;
-    padding:18px 14px;
-  }
-
-  .row-2{
-    grid-template-columns:1fr;
-  }
-}
-  /* Register — Premium Minimal First Impression */
-body.register-page{
-  background:
-    radial-gradient(circle at top, rgba(176,138,46,.10), transparent 34%),
-    linear-gradient(180deg,#f8fbf5 0%,#eef6e9 100%) !important;
-  padding:20px 12px 28px !important;
-}
-
 .reg-header{
   width:100%;
-  max-width:480px;
-  margin:0 0 14px !important;
+  max-width:460px;
+  margin-bottom:18px;
 }
 
-.reg-signature{
-  text-align:center;
-  padding:18px 10px 10px;
-}
-
-.reg-logo{
-  display:block;
-  width:92px;
-  height:92px;
-  object-fit:contain;
-  margin:0 auto 8px;
-  filter:drop-shadow(0 12px 18px rgba(31,92,58,.14));
-}
-
-.reg-word{
-  color:#1F5C3A;
-  font-size:34px;
-  line-height:1.15;
-  font-weight:900;
-  letter-spacing:-.5px;
-}
-
-.reg-line{
-  margin-top:7px;
-  color:#64748b;
-  font-size:14px;
-  font-weight:800;
-}
-
-.container{
-  border-radius:26px !important;
-  padding:22px 18px 18px !important;
-  border:1px solid rgba(31,92,58,.13) !important;
-  box-shadow:0 18px 44px rgba(15,23,42,.08) !important;
-}
-
-.hero-text{
-  margin:0 0 18px !important;
-  color:#0f172a !important;
-  font-size:16px !important;
-  line-height:1.8 !important;
-  font-weight:900 !important;
-}
-
-.hero-text small{
-  display:block;
-  margin-top:6px;
-  color:#64748b;
-  font-size:12px;
-  font-weight:800;
-}
-  /* Register — clean compact header fix */
-body.register-page{
-  padding:12px 10px 22px !important;
-}
-
-.reg-header{
-  width:100%;
-  max-width:480px;
-  margin:0 0 10px !important;
-}
-
-.reg-compact-head{
-  min-height:74px;
-  padding:10px 14px;
-  border-radius:20px;
-  background:#ffffff;
-  border:1px solid rgba(31,92,58,.14);
-  box-shadow:0 10px 28px rgba(15,23,42,.07);
+.reg-brand{
   display:flex;
+  justify-content:space-between;
   align-items:center;
-  gap:12px;
+  background:linear-gradient(135deg,#0ea05a,#0b7f47);
+  padding:16px 18px;
+  border-radius:18px;
+  color:#fff;
+  box-shadow:0 8px 22px rgba(0,0,0,.12);
 }
 
-.reg-logo{
-  width:52px !important;
-  height:52px !important;
-  object-fit:contain;
-  flex:0 0 auto;
-  margin:0 !important;
-  filter:none !important;
-}
-
-.reg-head-text{
-  flex:1;
-  text-align:right;
-}
-
-.reg-page-title{
-  color:#0f172a;
+.reg-title{
   font-size:20px;
-  line-height:1.35;
+  font-weight:800;
+}
+
+.reg-sub{
+  font-size:16px;
   font-weight:900;
+  opacity:.9;
 }
 
-.reg-app-name{
-  margin-top:2px;
-  color:#1F5C3A;
-  font-size:14px;
-  font-weight:900;
+.reg-brand img{
+  width:48px;
+  height:48px;
+  object-fit:contain;
 }
 
-.hero-text{
-  margin:0 0 14px !important;
-  color:#0f172a !important;
-  font-size:15px !important;
-  line-height:1.7 !important;
-  font-weight:900 !important;
-  text-align:center;
-}
-
-.container{
-  margin-top:0 !important;
-}
-</style>
+  </style>
 </head>
-<body class="register-page">
+<body>
   <!-- ✅ مُرَبِّيك: شاشة ترحيب انتقالية -->
 <div id="welcomeOverlay" class="welcome-overlay" role="status" aria-live="polite" aria-hidden="true">
   <div class="welcome-card">
@@ -493,18 +163,19 @@ body.register-page{
   </div>
 </div>
 <header class="reg-header">
-  <div class="reg-compact-head">
-    <img class="reg-logo" src="/images/logo.png" alt="مُرَبِّيك">
-
-    <div class="reg-head-text">
-      <div class="reg-page-title">تسجيل حساب جديد</div>
-      <div class="reg-app-name">مُرَبِّيك</div>
+  <div class="reg-brand">
+    <div class="reg-text">
+      <div class="reg-title">تسجيل</div>
+      <div class="reg-sub">مُرَبِّيك</div>
     </div>
+    <img src="/images/logo.png" alt="مُرَبِّيك">
   </div>
 </header>
+
   <div class="container">
-  <p class="hero-text">
-  أدخل بياناتك الأساسية لإنشاء الحساب.
+    <p class="hero-text">
+أنت لا تسجل في تطبيق…  
+أنت تدخل غرفة التحكم في مزرعتك.
 </p>
 
     <div id="msg" class="message" role="status" aria-live="polite"></div>
@@ -578,11 +249,7 @@ body.register-page{
   <div class="hint">أدخل الكود المكوّن من ٦ أرقام.</div>
 </div>
 
-<button id="submitBtn" type="submit">إنشاء حساب مُرَبِّيك</button>
-
-<div class="reg-safe">
-  بياناتك محفوظة داخل حسابك، ولن تبدأ المزرعة إلا بعد تأكيد رقم الهاتف.
-</div>
+<button id="submitBtn" type="submit">تسجيل</button>
     </form>
 
     <div class="link muted">لديك حساب؟ <a href="login.html">ادخل إلى حسابك</a></div>
@@ -668,15 +335,16 @@ body.register-page{
     'مربي القطيع';
 
   title.textContent = `مرحبًا بك يا ${fullName}`;
-body.textContent =
-`✅ ${roleTitle}… أهلًا بك في مُرَبِّيك.
+  body.textContent =
+`✅ ${roleTitle}… مُرَبِّيك الآن في صفّك.
 
-من هنا تبدأ إدارة القطيع بشكل أوضح:
-• تسجيل الحيوانات والأحداث
-• تنبيهات مهمة في وقتها
-• تقارير تساعدك في القرار
+من هذه اللحظة:
+• قرارات التلقيح في وقتها
+• تنبيهات الولادة قبل الموعد
+• تقارير اللبن واضحة… للأبقار والجاموس
 
-جارٍ فتح أول خطوة لإضافة القطيع.`;
+مزرعتك أصبحت تحت السيطرة.`;
+
   ov.style.display = 'flex';
   ov.setAttribute('aria-hidden','false');
 }
@@ -788,7 +456,6 @@ form.addEventListener('submit', async (e)=>{
 
   
   
-
 
 
 
