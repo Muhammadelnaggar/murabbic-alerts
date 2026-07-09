@@ -353,6 +353,71 @@ button:disabled{
     grid-template-columns:1fr;
   }
 }
+  /* Register — Premium Minimal First Impression */
+body.register-page{
+  background:
+    radial-gradient(circle at top, rgba(176,138,46,.10), transparent 34%),
+    linear-gradient(180deg,#f8fbf5 0%,#eef6e9 100%) !important;
+  padding:20px 12px 28px !important;
+}
+
+.reg-header{
+  width:100%;
+  max-width:480px;
+  margin:0 0 14px !important;
+}
+
+.reg-signature{
+  text-align:center;
+  padding:18px 10px 10px;
+}
+
+.reg-logo{
+  display:block;
+  width:92px;
+  height:92px;
+  object-fit:contain;
+  margin:0 auto 8px;
+  filter:drop-shadow(0 12px 18px rgba(31,92,58,.14));
+}
+
+.reg-word{
+  color:#1F5C3A;
+  font-size:34px;
+  line-height:1.15;
+  font-weight:900;
+  letter-spacing:-.5px;
+}
+
+.reg-line{
+  margin-top:7px;
+  color:#64748b;
+  font-size:14px;
+  font-weight:800;
+}
+
+.container{
+  border-radius:26px !important;
+  padding:22px 18px 18px !important;
+  border:1px solid rgba(31,92,58,.13) !important;
+  box-shadow:0 18px 44px rgba(15,23,42,.08) !important;
+}
+
+.hero-text{
+  margin:0 0 18px !important;
+  color:#0f172a !important;
+  font-size:16px !important;
+  line-height:1.8 !important;
+  font-weight:900 !important;
+}
+
+.hero-text small{
+  display:block;
+  margin-top:6px;
+  color:#64748b;
+  font-size:12px;
+  font-weight:800;
+}
 </style>
 </head>
 <body class="register-page">
@@ -365,34 +430,18 @@ button:disabled{
   </div>
 </div>
 <header class="reg-header">
-  <div class="reg-brand">
-    <div class="reg-brand-top">
-      <div class="reg-text">
-        <div class="reg-title">ابدأ مزرعتك على مُرَبِّيك</div>
-        <div class="reg-sub">نظام عربي ذكي لإدارة الأبقار والجاموس</div>
-      </div>
-
-      <img src="/images/logo.png" alt="مُرَبِّيك">
-    </div>
-
-    <p class="reg-promise">
-      سجّل حسابك، ثم أضف القطيع، واترك مُرَبِّيك يساعدك في الأحداث والتنبيهات والتقارير اليومية.
-    </p>
-
-    <div class="reg-pills" aria-label="مزايا مُرَبِّيك">
-      <span>تنبيهات ولادة</span>
-      <span>تلقيح وتشخيص حمل</span>
-      <span>لبن وتغذية</span>
-      <span>أبقار وجاموس</span>
-    </div>
+  <div class="reg-signature">
+    <img class="reg-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div class="reg-word">مُرَبِّيك</div>
+    <div class="reg-line">إدارة القطيع تبدأ من هنا</div>
   </div>
 </header>
 
   <div class="container">
-    <p class="hero-text">
-      أنشئ حسابك وابدأ غرفة التحكم في مزرعتك.
-      <small>بيانات بسيطة الآن… وبعد التحقق تبدأ بإضافة أول حيوان.</small>
-    </p>
+   <p class="hero-text">
+  أنشئ حسابك، ثم أضف أول حيوان.
+  <small>بعد التحقق ستبدأ مزرعتك داخل لوحة التحكم.</small>
+</p>
 
     <div id="msg" class="message" role="status" aria-live="polite"></div>
 
