@@ -13997,7 +13997,7 @@ function inseminationDecisionSrv(fd) {
   if (/cow|بقر/i.test(sp)) sp = "أبقار";
   if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
 
-  const minPostCalving = { "أبقار": 60, "جاموس": 45 };
+  const minPostCalving = { "أبقار": 56, "جاموس": 45 };
 
   // ⚠️ العشار لا يُرفض مباشرة — يحتاج تأكيد فقد جنيني/فحص
   const repro = String(fd.reproStatusFromEvents || fd.reproductiveStatus || doc.reproductiveStatus || "").trim();
@@ -14010,20 +14010,36 @@ function inseminationDecisionSrv(fd) {
     warnings.push("⚠️ تم تأكيد الفحص/الفقد الجنيني؛ سيتم حفظ حدث فقد جنيني قبل التلقيح.");
   }
 
-  // ⚠️ آخر ولادة: تنبيه وليس منع
+  // ❌ آخر ولادة: منع قبل الحد الأدنى للتلقيح
   const lastCalving =
     String(doc.lastCalvingDate || "").trim() ||
     (String(fd.lastBoundaryType || "").trim() === "ولادة" ? String(fd.lastBoundary || "").trim() : "");
 
+  const minDaysAfterCalving = Number(minPostCalving[sp] || 56);
+  const dimFallback = Number(
+    fd.dimAtEvent ??
+    doc.daysInMilk ??
+    doc.dimAtEvent ??
+    doc.DIM
+  );
+
   if (!lastCalving) {
+    if (
+      Number.isFinite(dimFallback) &&
+      dimFallback >= 0 &&
+      dimFallback < minDaysAfterCalving
+    ) {
+      return `❌ لا يمكن تسجيل التلقيح — الحيوان حديث الولادة: مرّ ${Math.round(dimFallback)} يوم فقط بعد الولادة. الحد الأدنى للتلقيح: ${minDaysAfterCalving} يوم.`;
+    }
+
     warnings.push("⚠️ لا يوجد تاريخ آخر ولادة؛ لا يمكن حساب عدد الأيام بعد الولادة بدقة.");
   } else {
     const gapCalving = inseminationDaysBetweenSrv(lastCalving, fd.eventDate);
 
     if (!Number.isFinite(gapCalving)) {
       warnings.push("⚠️ تعذّر حساب الأيام منذ آخر ولادة.");
-    } else if (gapCalving < minPostCalving[sp]) {
-      warnings.push(`⚠️ تلقيح مبكر بعد الولادة: مرّ ${gapCalving} يوم فقط. الحد الإرشادي: ${minPostCalving[sp]} يوم.`);
+    } else if (gapCalving < minDaysAfterCalving) {
+      return `❌ لا يمكن تسجيل التلقيح — الحيوان حديث الولادة: مرّ ${gapCalving} يوم فقط بعد الولادة. الحد الأدنى للتلقيح: ${minDaysAfterCalving} يوم.`;
     }
   }
 
