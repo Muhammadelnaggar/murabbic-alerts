@@ -32085,7 +32085,25 @@ async function buildHeatContextSrv(uid, animalNumber, eventDate){
   if (!animal) {
     return { ok:false, status:404, error:"animal_not_found", message:"❌ رقم الحيوان غير موجود في حسابك." };
   }
+    const duplicateMsg = await heatDuplicateCheckSrv(uid, num, dt, 0);
 
+  if (duplicateMsg) {
+    const reproductiveStatus = heatCurrentReproStatusSrv(animal);
+
+    return {
+      ok: true,
+      allowed: false,
+      status: 409,
+      error: "heat_duplicate_same_day",
+      message: duplicateMsg,
+      animalId: animal.id || "",
+      species: heatPickSpeciesSrv(animal),
+      reproductiveStatus,
+      reproductiveCategory: heatReproCategorySrv(reproductiveStatus),
+      actionRequired: "",
+      redirectUrl: ""
+    };
+  }
   const species = heatPickSpeciesSrv(animal);
   const reproductiveStatus = heatCurrentReproStatusSrv(animal);
 
