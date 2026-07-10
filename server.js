@@ -13997,7 +13997,8 @@ function inseminationDecisionSrv(fd) {
   if (/cow|بقر/i.test(sp)) sp = "أبقار";
   if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
 
-  const minPostCalving = { "أبقار": 56, "جاموس": 45 };
+  const recommendedPostCalving = { "أبقار": 56, "جاموس": 45 };
+  const hardBlockPostCalving = { "أبقار": 45, "جاموس": 35 };
 
   // ⚠️ العشار لا يُرفض مباشرة — يحتاج تأكيد فقد جنيني/فحص
   const repro = String(fd.reproStatusFromEvents || fd.reproductiveStatus || doc.reproductiveStatus || "").trim();
@@ -14010,13 +14011,17 @@ function inseminationDecisionSrv(fd) {
     warnings.push("⚠️ تم تأكيد الفحص/الفقد الجنيني؛ سيتم حفظ حدث فقد جنيني قبل التلقيح.");
   }
 
-  // ❌ آخر ولادة: منع قبل الحد الأدنى للتلقيح
+  // ⚠️ آخر ولادة:
+  // المنع الصلب فقط قبل 45 يوم في الأبقار و35 يوم في الجاموس.
+  // من بعد المنع الصلب حتى الحد التشغيلي المفضل → تحذير فقط ويسمح بالتسجيل.
  const lastCalving =
   String(fd.lastCalvingDate || "").trim() ||
   String(doc.lastCalvingDate || "").trim() ||
   (String(fd.lastBoundaryType || "").trim() === "ولادة" ? String(fd.lastBoundary || "").trim() : "");
 
-  const minDaysAfterCalving = Number(minPostCalving[sp] || 56);
+  const recommendedDaysAfterCalving = Number(recommendedPostCalving[sp] || 56);
+  const hardBlockDaysAfterCalving = Number(hardBlockPostCalving[sp] || 45);
+
   const dimFallback = Number(
     fd.dimAtEvent ??
     doc.daysInMilk ??
@@ -14024,26 +14029,40 @@ function inseminationDecisionSrv(fd) {
     doc.DIM
   );
 
-  if (!lastCalving) {
-    if (
-      Number.isFinite(dimFallback) &&
-      dimFallback >= 0 &&
-      dimFallback < minDaysAfterCalving
-    ) {
-      return `❌ لا يمكن تسجيل التلقيح — الحيوان حديث الولادة: مرّ ${Math.round(dimFallback)} يوم فقط بعد الولادة. الحد الأدنى للتلقيح: ${minDaysAfterCalving} يوم.`;
+  function inseminationPostCalvingDecisionSrv(daysAfterCalving) {
+    const d = Math.round(Number(daysAfterCalving));
+    if (!Number.isFinite(d) || d < 0) return "";
+
+    if (d < hardBlockDaysAfterCalving) {
+      return `❌ الحيوان حديث الولادة: مرّ ${d} يوم فقط بعد الولادة. المنع الصلب للتلقيح قبل ${hardBlockDaysAfterCalving} يوم، والحد التشغيلي المفضل ${recommendedDaysAfterCalving} يوم.`;
     }
 
-    warnings.push("⚠️ لا يوجد تاريخ آخر ولادة؛ لا يمكن حساب عدد الأيام بعد الولادة بدقة.");
+    if (d < recommendedDaysAfterCalving) {
+      warnings.push(
+        `⚠️ الحيوان حديث الولادة: مرّ ${d} يوم بعد الولادة. الحد التشغيلي المفضل للتلقيح ${recommendedDaysAfterCalving} يوم، لكن المنع الصلب قبل ${hardBlockDaysAfterCalving} يوم فقط؛ يمكن التسجيل مع التنبيه.`
+      );
+    }
+
+    return "";
+  }
+
+  if (!lastCalving) {
+    const blockReason = inseminationPostCalvingDecisionSrv(dimFallback);
+    if (blockReason) return blockReason;
+
+    if (!Number.isFinite(dimFallback)) {
+      warnings.push("⚠️ لا يوجد تاريخ آخر ولادة؛ لا يمكن حساب عدد الأيام بعد الولادة بدقة.");
+    }
   } else {
     const gapCalving = inseminationDaysBetweenSrv(lastCalving, fd.eventDate);
 
     if (!Number.isFinite(gapCalving)) {
       warnings.push("⚠️ تعذّر حساب الأيام منذ آخر ولادة.");
-    } else if (gapCalving < minDaysAfterCalving) {
-      return `❌ لا يمكن تسجيل التلقيح — الحيوان حديث الولادة: مرّ ${gapCalving} يوم فقط بعد الولادة. الحد الأدنى للتلقيح: ${minDaysAfterCalving} يوم.`;
+    } else {
+      const blockReason = inseminationPostCalvingDecisionSrv(gapCalving);
+      if (blockReason) return blockReason;
     }
   }
-
   // ✅ تلقيح نفس اليوم: مرة إعادة واحدة فقط
   const sameDayCount = Number(fd.sameDayInseminationCount || 0);
 
@@ -14632,6 +14651,8 @@ function inseminationCleanReasonTextSrv(v = "") {
   return String(v || "")
     .trim()
     .replace(/^[✅❌⚠️🚫\s]+/gu, "")
+    .replace(/^لا يمكن تسجيل التلقيح\s*[—\-:]\s*/u, "")
+    .replace(/^لم يتم تسجيل التلقيح\s*[—\-:]\s*/u, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -32170,20 +32191,21 @@ async function heatBuildInseminationCandidatesSrv(uid, saved = [], eventDate = "
 
       if (/cow|بقر/i.test(species)) species = "أبقار";
       if (/buffalo|جاموس/i.test(species)) species = "جاموس";
-            const dimAtHeat = Number(item?.dimAtEvent);
-      const minPostCalving = species === "جاموس" ? 45 : 56;
+    const dimAtHeat = Number(item?.dimAtEvent);
+const recommendedPostCalving = species === "جاموس" ? 45 : 56;
+const hardBlockPostCalving = species === "جاموس" ? 35 : 45;
 
-      if (
-        Number.isFinite(dimAtHeat) &&
-        dimAtHeat >= 0 &&
-        dimAtHeat < minPostCalving
-      ) {
-        rejected.push({
-          animalNumber,
-          reason: `الحيوان حديث الولادة: مرّ ${Math.round(dimAtHeat)} يوم فقط بعد الولادة. الحد الأدنى للتلقيح: ${minPostCalving} يوم.`
-        });
-        continue;
-      }
+if (
+  Number.isFinite(dimAtHeat) &&
+  dimAtHeat >= 0 &&
+  dimAtHeat < hardBlockPostCalving
+) {
+  rejected.push({
+    animalNumber,
+    reason: `الحيوان حديث الولادة: مرّ ${Math.round(dimAtHeat)} يوم فقط بعد الولادة. المنع الصلب للتلقيح قبل ${hardBlockPostCalving} يوم، والحد التشغيلي المفضل ${recommendedPostCalving} يوم.`
+  });
+  continue;
+}
       const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
       const reproFromDoc = String(doc.reproductiveStatus || "").trim();
       const reproStatus =
