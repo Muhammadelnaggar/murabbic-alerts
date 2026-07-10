@@ -14033,15 +14033,15 @@ function inseminationDecisionSrv(fd) {
     const d = Math.round(Number(daysAfterCalving));
     if (!Number.isFinite(d) || d < 0) return "";
 
-    if (d < hardBlockDaysAfterCalving) {
-      return `❌ الحيوان حديث الولادة: مرّ ${d} يوم فقط بعد الولادة. المنع الصلب للتلقيح قبل ${hardBlockDaysAfterCalving} يوم، والحد التشغيلي المفضل ${recommendedDaysAfterCalving} يوم.`;
-    }
+   if (d < hardBlockDaysAfterCalving) {
+  return "❌ الحيوان حديث الولادة ولا يمكن تسجيل التلقيح له الآن.";
+}
 
-    if (d < recommendedDaysAfterCalving) {
-      warnings.push(
-        `⚠️ الحيوان حديث الولادة: مرّ ${d} يوم بعد الولادة. الحد التشغيلي المفضل للتلقيح ${recommendedDaysAfterCalving} يوم، لكن المنع الصلب قبل ${hardBlockDaysAfterCalving} يوم فقط؛ يمكن التسجيل مع التنبيه.`
-      );
-    }
+if (d < recommendedDaysAfterCalving) {
+  warnings.push(
+    `⚠️ الحيوان حديث الولادة، أيام الحليب ${d} يوم. يفضّل التلقيح بعد ${recommendedDaysAfterCalving} يوم من الولادة.`
+  );
+}
 
     return "";
   }
