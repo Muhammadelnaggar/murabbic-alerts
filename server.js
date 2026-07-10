@@ -32236,7 +32236,34 @@ app.get('/api/heat/context', requireUserId, async (req, res) => {
       message:"تعذّر التحقق من الشياع الآن."
     });
   }
-});
+});function heatRejectedReasonsTextSrv(list = [], title = "الأرقام المرفوضة وسبب الرفض") {
+  const items = Array.isArray(list) ? list : [];
+  if (!items.length) return "";
+
+  const lines = items
+    .slice(0, 8)
+    .map(x => {
+      const n = String(x.animalNumber || x.number || "").trim();
+      const reason = String(x.message || x.reason || x.error || "غير مؤهل.").trim();
+      return n ? `${n}: ${reason}` : reason;
+    })
+    .filter(Boolean);
+
+  if (!lines.length) return "";
+
+  const more = items.length > 8
+    ? `\n… و${items.length - 8} رقم آخر`
+    : "";
+
+  return `${title}:\n${lines.join("\n")}${more}`;
+}
+
+function heatJoinMessageSrv(...parts) {
+  return parts
+    .map(x => String(x || "").trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
 // ============================================================
 //                 API: HEAT GATE (server-only)
 // ============================================================
@@ -32292,7 +32319,14 @@ app.post('/api/heat/gate', requireUserId, async (req, res) => {
   x.requiresPregnancyConfirmation === true ||
   x.actionRequired === "pregnancy_confirmation"
 );
+const gateBaseMessage = rejected.length
+  ? `تم التحقق — صالح: ${allowedNumbers.length} / مرفوض: ${rejected.length}`
+  : "✅ تم التحقق — يمكن تسجيل الشياع.";
 
+const gateRejectedMessage = heatRejectedReasonsTextSrv(
+  rejected,
+  "الأرقام المرفوضة وسبب الرفض"
+);
     return res.json({
       ok: true,
       allowed: allowedNumbers.length > 0,
@@ -32303,9 +32337,7 @@ app.post('/api/heat/gate', requireUserId, async (req, res) => {
       requiresPregnancyConfirmation: !!pregnancyItem,
       pregnancyConfirmationRedirectUrl: pregnancyItem?.pregnancyConfirmationRedirectUrl || "",
       redirectUrl: pregnancyItem?.redirectUrl || pregnancyItem?.pregnancyConfirmationRedirectUrl || "",
-      message: rejected.length
-        ? `تم التحقق — صالح: ${allowedNumbers.length} / مرفوض: ${rejected.length}`
-        : "✅ تم التحقق — يمكن تسجيل الشياع."
+message: heatJoinMessageSrv(gateBaseMessage, gateRejectedMessage)
     });
 
   } catch (e) {
@@ -32506,7 +32538,15 @@ saved.push({
     const baseMessage = rejected.length
       ? `✅ تم حفظ الشياع لـ ${saved.length} حيوان — وتعذّر حفظ ${rejected.length}.`
       : (saved.length === 1 ? "✅ تم حفظ شياع بنجاح" : `✅ تم حفظ الشياع لـ ${saved.length} حيوان.`);
+ const saveRejectedMessage = heatRejectedReasonsTextSrv(
+  rejected,
+  "لم يتم حفظ الشياع لهذه الأرقام"
+);
 
+const finalBaseMessage = heatJoinMessageSrv(
+  baseMessage,
+  saveRejectedMessage
+);
     return res.json({
       ok:true,
       allowed:true,
@@ -32529,9 +32569,9 @@ saved.push({
           }
         : null,
 
-      message: hasInseminationCandidates
-        ? `${baseMessage}\n\nهل تريد تسجيل التلقيح الآن؟`
-        : baseMessage,
+     message: hasInseminationCandidates
+  ? heatJoinMessageSrv(finalBaseMessage, "هل تريد تسجيل التلقيح الآن؟")
+  : finalBaseMessage,
 
       redirectUrl: saved.length === 1
         ? `event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
