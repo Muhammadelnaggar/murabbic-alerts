@@ -28925,8 +28925,10 @@ app.post("/api/abortion/gate", requireUserId, async (req, res) => {
 
     const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
     const reproFromDoc = String(doc.reproductiveStatus || "").trim();
-    const reproStatus =
-   /api/abortion/gate.
+   const reproStatus =
+  reproFromEvents ||
+  reproFromDoc ||
+  "";
 
     const lastInseminationDate = String(
       signals.lastInseminationDateFromEvents ||
