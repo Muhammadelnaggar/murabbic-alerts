@@ -13630,14 +13630,37 @@ function calvingIsOddSrv(n) {
 function calvingIsEvenSrv(n) {
   return Number(n) % 2 === 0;
 }
+function calvingSavedMessageSrv(animalNumber, calvesCount = 0) {
+  const num = String(animalNumber || "").trim();
+  const animalText = num ? `الحيوان رقم ${num}` : "الحيوان";
+  const count = Number(calvesCount || 0);
 
+  if (count === 1) {
+    return `✅ تم تسجيل ولادة ${animalText} بنجاح، وتم تسجيل العجل.`;
+  }
+
+  if (count === 2) {
+    return `✅ تم تسجيل ولادة ${animalText} بنجاح، وتم تسجيل العجلين.`;
+  }
+
+  if (count >= 3) {
+    return `✅ تم تسجيل ولادة ${animalText} بنجاح، وتم تسجيل ${count} عجول.`;
+  }
+
+  return `✅ تم تسجيل ولادة ${animalText} بنجاح.`;
+}
 function calvingDecisionSrv(fd) {
   const doc = fd.documentData;
-  if (!doc) return "تعذّر العثور على الحيوان — تحقق من الرقم.";
+  const animalNumber = calvingNormDigitsOnlySrv(fd.animalNumber || "");
+  const animalText = animalNumber ? `الحيوان رقم ${animalNumber}` : "الحيوان";
+
+  if (!doc) {
+    return `❌ لم أجد ${animalText}. راجع الرقم ثم حاول مرة أخرى.`;
+  }
 
   const st = String(doc.status ?? "").trim().toLowerCase();
   if (st === "inactive" || st === "archived") {
-    return "❌ لا يمكن تسجيل ولادة — الحيوان خارج القطيع.";
+    return `❌ لم أجد ${animalText}. راجع الرقم ثم حاول مرة أخرى.`;
   }
 
   let sp = String(fd.species || doc.species || doc.animalTypeAr || doc.animalType || "").trim();
@@ -13645,7 +13668,9 @@ function calvingDecisionSrv(fd) {
   if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
 
   const th = CALVING_THRESHOLDS_SRV[sp]?.minGestationDays;
-  if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
+  if (!th) {
+    return `❌ لا أستطيع تحديد نوع ${animalText}. راجع بيانات الحيوان أولًا.`;
+  }
 
   const rsRaw = String(doc.reproductiveStatus || doc.reproStatus || "").trim();
 
@@ -13656,11 +13681,10 @@ function calvingDecisionSrv(fd) {
     .replace(/ة/g, "ه")
     .replace(/ى/g, "ي");
 
-  const animalWord = (sp === "جاموس") ? "جاموسة" : "بقرة";
-  const shownStatus = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+  const shownStatus = rsRaw ? rsRaw : "غير معروفة";
 
   if (!rsNorm.includes("عشار")) {
-    return `❌ لا يمكن تسجيل ولادة لـ${animalWord} حالتها التناسلية ${shownStatus}.`;
+    return `❌ لا يمكن تسجيل الولادة لـ${animalText} لأنه غير عِشار.\nالحالة الحالية: ${shownStatus}.`;
   }
 
   const lf = String(
@@ -13673,18 +13697,20 @@ function calvingDecisionSrv(fd) {
   ).trim();
 
   if (!calvingIsDateSrv(lf)) {
-    return '❌ "آخر تلقيح مُخصِّب" مطلوب لتسجيل الولادة.';
+    return `❌ لا يمكن تسجيل الولادة لـ${animalText} لأن آخر تلقيح مُخصِّب غير مسجل.`;
   }
 
   if (!calvingIsDateSrv(fd.eventDate)) {
-    return "تاريخ الولادة غير صالح.";
+    return "❌ تاريخ الولادة غير صالح.";
   }
 
   const gDays = calvingDaysBetweenSrv(lf, fd.eventDate);
-  if (Number.isNaN(gDays)) return "تعذّر حساب عمر الحمل.";
+  if (Number.isNaN(gDays)) {
+    return "❌ لا أستطيع حساب عمر الحمل. راجع تاريخ آخر تلقيح وتاريخ الولادة.";
+  }
 
   if (gDays < th) {
-    return `OFFER_ABORT|لا يُسمح بتسجيل الولادة: عمر الحمل ${gDays} يوم أقل من الحد الأدنى ${th} يوم للـ${sp}.`;
+    return `OFFER_ABORT|التاريخ مبكر للولادة — عمر الحمل ${gDays} يوم فقط.`;
   }
 
   return null;
@@ -14364,7 +14390,7 @@ async function uniqueCalfNumbersSrv(ctx) {
   // منع تكرار داخل نفس الطلب
   const s = new Set();
   for (const n of cleaned){
-    if (s.has(n)) return { ok:false, msg:`⚠️ رقم العجل "${n}" مكرر داخل نفس الولادة.` };
+    if (s.has(n)) return { ok:false, msg:`❌ رقم العجل ${n} مكرر داخل نفس الولادة.` };
     s.add(n);
   }
 
@@ -14377,7 +14403,7 @@ async function uniqueCalfNumbersSrv(ctx) {
       .get();
 
     if (!snap.empty){
-      return { ok:false, msg:`⚠️ رقم العجل "${n}" موجود بالفعل في حسابك — اختر رقمًا آخر.` };
+      return { ok:false, msg:`❌ رقم العجل ${n} مسجل من قبل. اختر رقمًا آخر.` };
     }
   }
 
@@ -14473,14 +14499,14 @@ app.post("/api/calving/gate", requireUserId, async (req, res) => {
 
     const doc = animal.data || {};
 
-    const st = String(doc.status ?? "").trim().toLowerCase();
-    if (st === "inactive") {
-      return res.status(400).json({
-        ok: false,
-        allowed: false,
-        message: "❌ هذا الحيوان خارج القطيع (بيع/نفوق/استبعاد) — لا يمكن تسجيل أحداث له."
-      });
-    }
+const st = String(doc.status ?? "").trim().toLowerCase();
+if (st === "inactive" || st === "archived") {
+  return res.status(400).json({
+    ok: false,
+    allowed: false,
+    message: `❌ لم أجد الحيوان رقم ${n}. راجع الرقم ثم حاول مرة أخرى.`
+  });
+}
 
     const sig = await fetchCalvingSignalsFromEventsSrv(uid, n);
 
@@ -14545,10 +14571,10 @@ if (g) {
     ] : []
   });
 }
-    return res.json({
+   return res.json({
       ok: true,
       allowed: true,
-      message: "✅ تم التحقق — أكمل تسجيل الولادة.",
+      message: `✅ الحيوان رقم ${n} مؤهل لتسجيل الولادة. أكمل البيانات.`,
       animalId: animal.id || "",
       species: sp,
       lastInseminationDate: lastAI,
@@ -29342,14 +29368,16 @@ if (gateErr) {
         calfNumbers: calfNums
       });
 
-      if (!uniqueCheck || uniqueCheck.ok === false) {
-        return res.status(400).json({
-          ok: false,
-          message: uniqueCheck?.msg || "⚠️ رقم عجل مكرر في حسابك.",
-          errors: [uniqueCheck?.msg || "⚠️ رقم عجل مكرر في حسابك."],
-          fieldErrors: {}
-        });
-      }
+if (!uniqueCheck || uniqueCheck.ok === false) {
+  const calfNumberMsg = uniqueCheck?.msg || "❌ رقم العجل غير متاح. اختر رقمًا آخر.";
+
+  return res.status(400).json({
+    ok: false,
+    message: calfNumberMsg,
+    errors: [calfNumberMsg],
+    fieldErrors: {}
+  });
+}
     }
 
     // حفظ حدث الولادة
@@ -29362,43 +29390,47 @@ if (gateErr) {
       eventType: "calving"
     });
 
-    // حفظ العجول في calves (لو مش نافقة)
-    if (!isDead) {
-      const damId = payload.animalId;
-      const damNumber = payload.animalNumber;
-      const birthDate = payload.eventDate;
-      const species = payload.species;
+// حفظ العجول في calves (لو مش نافقة)
+let savedCalvesCount = 0;
 
-      const calvesToSave = [];
-      const count = parseInt(payload.calfCount || "1", 10) || 1;
+if (!isDead) {
+  const damId = payload.animalId;
+  const damNumber = payload.animalNumber;
+  const birthDate = payload.eventDate;
+  const species = payload.species;
 
-      const pushCalf = (calfIdField, calfSexField, calfFateField) => {
-        const id = String(formData[calfIdField] || "").trim();
-        const sex = String(formData[calfSexField] || "").trim();
-        const fate = String(formData[calfFateField] || "").trim();
-        if (!id || !sex) return;
+  const calvesToSave = [];
+  const count = parseInt(payload.calfCount || "1", 10) || 1;
 
-        calvesToSave.push({
-          userId: uid,
-          damId,
-          damNumber,
-          birthDate,
-          calfNumber: id,
-          sex,
-          fate,
-          species,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      };
+  const pushCalf = (calfIdField, calfSexField, calfFateField) => {
+    const id = String(formData[calfIdField] || "").trim();
+    const sex = String(formData[calfSexField] || "").trim();
+    const fate = String(formData[calfFateField] || "").trim();
+    if (!id || !sex || !fate) return;
 
-      pushCalf("calfId", "calf1Sex", "calf1Fate");
-      if (count >= 2) pushCalf("calf2Id", "calf2Sex", "calf2Fate");
-      if (count >= 3) pushCalf("calf3Id", "calf3Sex", "calf3Fate");
+    calvesToSave.push({
+      userId: uid,
+      damId,
+      damNumber,
+      birthDate,
+      calfNumber: id,
+      sex,
+      fate,
+      species,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  };
 
-      for (const calf of calvesToSave) {
-        await db.collection("calves").add(calf);
-      }
-    }
+  pushCalf("calfId", "calf1Sex", "calf1Fate");
+  if (count >= 2) pushCalf("calf2Id", "calf2Sex", "calf2Fate");
+  if (count >= 3) pushCalf("calf3Id", "calf3Sex", "calf3Fate");
+
+  for (const calf of calvesToSave) {
+    await db.collection("calves").add(calf);
+  }
+
+  savedCalvesCount = calvesToSave.length;
+}
         // ✅ بعد الولادة: أعد بناء الجروبات تلقائيًا
     // الولادة تنقل الحيوان من الجاف/انتظار الولادة إلى حديث الولادة Fresh
     if (typeof scheduleGroupsRebuildSrv === "function") {
@@ -29407,7 +29439,7 @@ if (gateErr) {
    
 return res.json({
   ok: true,
-  message: "✅ تم حفظ الولادة وتسجيل العجول بنجاح",
+  message: calvingSavedMessageSrv(payload.animalNumber, savedCalvesCount),
   redirectUrl: `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`,
   id: eventRef.id,
   eventId: eventRef.id,
@@ -29423,7 +29455,7 @@ return res.json({
     return res.status(500).json({
       ok: false,
       error: "calving_save_failed",
-      message: "تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات."
+     message: "❌ تعذّر تسجيل الولادة الآن. حاول مرة أخرى، وإذا استمرت المشكلة راجع الاتصال."
     });
   }
 });
