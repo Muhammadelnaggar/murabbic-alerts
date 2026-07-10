@@ -14628,6 +14628,117 @@ app.get("/api/insemination/options", requireUserId, async (req, res) => {
     });
   }
 });
+function inseminationCleanReasonTextSrv(v = "") {
+  return String(v || "")
+    .trim()
+    .replace(/^[✅❌⚠️🚫\s]+/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function inseminationNumbersTextSrv(list = []) {
+  const nums = (Array.isArray(list) ? list : [])
+    .map(x => String(x?.animalNumber || x?.number || x || "").trim())
+    .filter(Boolean);
+
+  if (!nums.length) return "";
+
+  return nums.slice(0, 12).join("، ") + (
+    nums.length > 12 ? `، … و${nums.length - 12} رقم آخر` : ""
+  );
+}
+
+function inseminationFieldErrorsTextSrv(fieldErrors = {}) {
+  return Object.values(fieldErrors || {})
+    .map(v => inseminationCleanReasonTextSrv(v))
+    .filter(Boolean)
+    .join("، ");
+}
+
+function inseminationRejectReasonSrv(x = {}) {
+  const fieldsText = inseminationFieldErrorsTextSrv(x.fieldErrors);
+  if (fieldsText) return fieldsText;
+
+  return inseminationCleanReasonTextSrv(
+    x.message ||
+    x.reason ||
+    x.error ||
+    "غير مؤهل لتسجيل التلقيح."
+  );
+}
+
+function inseminationRejectedReasonsTextSrv(list = [], title = "الأرقام المرفوضة وسبب الرفض") {
+  const items = Array.isArray(list) ? list : [];
+  if (!items.length) return "";
+
+  const lines = items
+    .slice(0, 12)
+    .map(x => {
+      const n = String(x.animalNumber || x.number || "").trim();
+      const reason = inseminationRejectReasonSrv(x);
+      return n
+        ? `تم رفض رقم ${n} بسبب ${reason}`
+        : `تم الرفض بسبب ${reason}`;
+    })
+    .filter(Boolean);
+
+  if (!lines.length) return "";
+
+  const more = items.length > 12
+    ? `\n… و${items.length - 12} رقم آخر`
+    : "";
+
+  return `${title}:\n${lines.join("\n")}${more}`;
+}
+
+function inseminationSavedNumbersMessageSrv(saved = [], rejected = []) {
+  const savedItems = Array.isArray(saved) ? saved : [];
+  const rejectedItems = Array.isArray(rejected) ? rejected : [];
+  const numsText = inseminationNumbersTextSrv(savedItems);
+
+  if (!savedItems.length) {
+    return "❌ لم يتم تسجيل التلقيح لأي حيوان.";
+  }
+
+  const base =
+    `✅ تم تسجيل التلقيح لعدد ${savedItems.length} حيوان` +
+    (numsText ? ` — الأرقام: ${numsText}.` : ".");
+
+  if (!rejectedItems.length) return base;
+
+  return `${base}\nتعذّر تسجيل التلقيح لعدد ${rejectedItems.length} حيوان.`;
+}
+
+function inseminationAcceptedWarningsTextSrv(accepted = []) {
+  const items = (Array.isArray(accepted) ? accepted : [])
+    .filter(x => String(x.message || x.warning || "").trim());
+
+  if (!items.length) return "";
+
+  const lines = items
+    .slice(0, 12)
+    .map(x => {
+      const n = String(x.animalNumber || x.number || "").trim();
+      const msg = inseminationCleanReasonTextSrv(x.message || x.warning || "");
+      return n ? `تنبيه رقم ${n}: ${msg}` : `تنبيه: ${msg}`;
+    })
+    .filter(Boolean);
+
+  if (!lines.length) return "";
+
+  const more = items.length > 12
+    ? `\n… و${items.length - 12} تنبيه آخر`
+    : "";
+
+  return `تنبيهات التلقيح:\n${lines.join("\n")}${more}`;
+}
+
+function inseminationJoinMessageSrv(...parts) {
+  return parts
+    .map(x => String(x || "").trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
 // ============================================================
 //                 API: INSEMINATION GATE
 //                 تحقق التلقيح من السيرفر فقط — فردي/جماعي — بدون حفظ
@@ -14678,22 +14789,29 @@ app.post("/api/insemination/gate", requireUserId, async (req, res) => {
       });
     }
 
-    if (!calvingIsDateSrv(eventDate)) {
-      return res.status(400).json({
-        ok: false,
-        allowed: false,
-        stage: "invalid_date",
-        message: "❌ تاريخ التلقيح غير صالح.",
-        acceptedCount: 0,
-        rejectedCount: numbers.length,
-        accepted: [],
-        rejected: numbers.map(n => ({
-          animalNumber: String(n || ""),
-          reason: "تاريخ التلقيح غير صالح."
-        }))
-      });
-    }
+if (!calvingIsDateSrv(eventDate)) {
+  const invalidDateRejected = numbers.map(n => ({
+    animalNumber: String(n || ""),
+    reason: "تاريخ التلقيح غير صالح."
+  }));
 
+  return res.status(400).json({
+    ok: false,
+    allowed: false,
+    stage: "invalid_date",
+    message: inseminationJoinMessageSrv(
+      "❌ تاريخ التلقيح غير صالح.",
+      inseminationRejectedReasonsTextSrv(
+        invalidDateRejected,
+        "الأرقام المرفوضة وسبب الرفض"
+      )
+    ),
+    acceptedCount: 0,
+    rejectedCount: invalidDateRejected.length,
+    accepted: [],
+    rejected: invalidDateRejected
+  });
+}
     const accepted = [];
     const rejected = [];
 
@@ -14822,57 +14940,83 @@ app.post("/api/insemination/gate", requireUserId, async (req, res) => {
       }
     }
 
-    const acceptedCount = accepted.length;
-    const rejectedCount = rejected.length;
-    const isBulk = numbers.length > 1;
+const acceptedCount = accepted.length;
+const rejectedCount = rejected.length;
+const isBulk = numbers.length > 1;
 
-    if (!isBulk) {
-      if (!acceptedCount) {
-        const r0 = rejected[0] || {};
-        return res.status(400).json({
-          ok: false,
-          allowed: false,
-          stage: "pre_gate",
-          message: r0.reason || "❌ لا يمكن تسجيل التلقيح لهذا الحيوان.",
-          acceptedCount,
-          rejectedCount,
-          accepted,
-          rejected
-        });
-      }
+if (!isBulk) {
+  if (!acceptedCount) {
+    const r0 = rejected[0] || {};
+    const n = String(r0.animalNumber || numbers[0] || "").trim();
 
-      const a0 = accepted[0];
-
-      return res.json({
-        ok: true,
-        allowed: true,
-        stage: "pre_gate",
-        message: "✅ تم فحص الشروط الأساسية — الحيوان مؤهل للتلقيح.",
-        animalId: a0.animalId || "",
-        animalNumber: a0.animalNumber || "",
-        species: a0.species || "",
-        reproductiveStatus: a0.reproductiveStatus || "",
-        lastInseminationDate: a0.lastInseminationDate || "",
-        acceptedCount,
-        rejectedCount,
-        accepted,
-        rejected
-      });
-    }
-
-    return res.json({
-      ok: true,
-      allowed: acceptedCount > 0,
-      stage: "pre_gate",
-      message: acceptedCount
-        ? `✅ تم فحص الشروط الأساسية للقائمة — المؤهل للتلقيح: ${acceptedCount}، المرفوض: ${rejectedCount}.`
-        : "❌ لا يوجد أي رقم صالح لاستكمال تسجيل التلقيح.",
+    return res.status(400).json({
+      ok: false,
+      allowed: false,
+      stage: "not_eligible",
+      message: inseminationJoinMessageSrv(
+        n
+          ? `❌ لا يمكن تسجيل التلقيح للحيوان رقم ${n}.`
+          : "❌ لا يمكن تسجيل التلقيح لهذا الحيوان.",
+        inseminationRejectedReasonsTextSrv(
+          rejected,
+          "الأرقام المرفوضة وسبب الرفض"
+        )
+      ),
       acceptedCount,
       rejectedCount,
       accepted,
       rejected
     });
+  }
 
+  const a0 = accepted[0];
+
+  return res.json({
+    ok: true,
+    allowed: true,
+    stage: "pre_gate",
+    message: inseminationJoinMessageSrv(
+      `✅ تم التحقق — الحيوان رقم ${a0.animalNumber || ""} مؤهل لتسجيل التلقيح.`,
+      inseminationAcceptedWarningsTextSrv(accepted)
+    ),
+    animalId: a0.animalId || "",
+    animalNumber: a0.animalNumber || "",
+    species: a0.species || "",
+    reproductiveStatus: a0.reproductiveStatus || "",
+    lastInseminationDate: a0.lastInseminationDate || "",
+    acceptedCount,
+    rejectedCount,
+    accepted,
+    rejected
+  });
+}
+
+const acceptedNumbersMessage = acceptedCount
+  ? `الأرقام المؤهلة لتسجيل التلقيح: ${inseminationNumbersTextSrv(accepted)}.`
+  : "";
+
+const gateBaseMessage = acceptedCount
+  ? `تم التحقق من التلقيح — صالح: ${acceptedCount} / مرفوض: ${rejectedCount}.`
+  : "❌ لا يوجد أي رقم صالح لاستكمال تسجيل التلقيح.";
+
+return res.json({
+  ok: true,
+  allowed: acceptedCount > 0,
+  stage: "pre_gate",
+  message: inseminationJoinMessageSrv(
+    gateBaseMessage,
+    acceptedNumbersMessage,
+    inseminationRejectedReasonsTextSrv(
+      rejected,
+      "الأرقام المرفوضة وسبب الرفض"
+    ),
+    inseminationAcceptedWarningsTextSrv(accepted)
+  ),
+  acceptedCount,
+  rejectedCount,
+  accepted,
+  rejected
+});
   } catch (e) {
     console.error("insemination-gate", e);
 
@@ -14998,13 +15142,22 @@ app.post("/api/insemination/save", requireUserId, async (req, res) => {
       }
     }
 
-    if (Object.keys(cleanFieldErrors).length) {
-      return res.status(400).json({
-        ok: false,
-        message: "❌ راجع بيانات التلقيح المطلوبة.",
-        fieldErrors: cleanFieldErrors
-      });
-    }
+if (Object.keys(cleanFieldErrors).length) {
+  return res.status(400).json({
+    ok: false,
+    message: inseminationJoinMessageSrv(
+      `❌ لم يتم تسجيل التلقيح للحيوان رقم ${animalNumber}.`,
+      inseminationRejectedReasonsTextSrv(
+        [{
+          animalNumber,
+          fieldErrors: cleanFieldErrors
+        }],
+        "الأرقام المرفوضة وسبب الرفض"
+      )
+    ),
+    fieldErrors: cleanFieldErrors
+  });
+}
 
     const decision = inseminationDecisionSrv(gateData);
     let warningMessage = "";
@@ -15020,20 +15173,38 @@ app.post("/api/insemination/save", requireUserId, async (req, res) => {
           ? raw.replace(/^WARN\|/, "")
           : raw;
 
-      if (needsEmbryonicConfirm) {
-        return res.status(409).json({
-          ok: false,
-          requiresEmbryonicLossConfirmation: true,
-          message
-        });
-      }
+if (needsEmbryonicConfirm) {
+  return res.status(409).json({
+    ok: false,
+    requiresEmbryonicLossConfirmation: true,
+    message: inseminationJoinMessageSrv(
+      `❌ لم يتم تسجيل التلقيح للحيوان رقم ${animalNumber}.`,
+      inseminationRejectedReasonsTextSrv(
+        [{
+          animalNumber,
+          reason: message
+        }],
+        "الأرقام المرفوضة وسبب الرفض"
+      )
+    )
+  });
+}
 
-      if (!isWarn) {
-        return res.status(400).json({
-          ok: false,
-          message
-        });
-      }
+if (!isWarn) {
+  return res.status(400).json({
+    ok: false,
+    message: inseminationJoinMessageSrv(
+      `❌ لم يتم تسجيل التلقيح للحيوان رقم ${animalNumber}.`,
+      inseminationRejectedReasonsTextSrv(
+        [{
+          animalNumber,
+          reason: message
+        }],
+        "الأرقام المرفوضة وسبب الرفض"
+      )
+    )
+  });
+}
 
       warningMessage = message;
     }
@@ -15176,10 +15347,13 @@ await batch.commit();
     if (typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "insemination_save");
     }
-
-    return res.json({
-      ok: true,
-      message: "✅ تم حفظ التلقيح بنجاح",
+ 
+  return res.json({
+  ok: true,
+  message: inseminationSavedNumbersMessageSrv(
+    [{ animalNumber }],
+    []
+  ),
       id: eventRef.id,
       eventId: eventRef.id,
       optionsSaved: !!(semenOption || inseminatorOption),
@@ -15376,15 +15550,14 @@ app.post("/api/insemination/bulk-save", requireUserId, async (req, res) => {
           }
         }
 
-        if (Object.keys(cleanFieldErrors).length) {
-          rejected.push({
-            animalNumber,
-            reason: "راجع بيانات التلقيح المطلوبة.",
-            fieldErrors: cleanFieldErrors
-          });
-          continue;
-        }
-
+if (Object.keys(cleanFieldErrors).length) {
+  rejected.push({
+    animalNumber,
+    reason: inseminationFieldErrorsTextSrv(cleanFieldErrors) || "راجع بيانات التلقيح المطلوبة.",
+    fieldErrors: cleanFieldErrors
+  });
+  continue;
+}
         const decision = inseminationDecisionSrv(gateData);
         let warningMessage = "";
 
@@ -15556,10 +15729,16 @@ app.post("/api/insemination/bulk-save", requireUserId, async (req, res) => {
       scheduleGroupsRebuildSrv(uid, "insemination_bulk_save");
     }
 
-   if (!saved.length) {
+if (!saved.length) {
   return res.status(400).json({
     ok: false,
-    message: "❌ لم يتم حفظ أي تلقيح — كل الأرقام غير مؤهلة أو بيانات التلقيح غير مكتملة.",
+    message: inseminationJoinMessageSrv(
+      "❌ لم يتم تسجيل التلقيح لأي حيوان.",
+      inseminationRejectedReasonsTextSrv(
+        rejected,
+        "الأرقام المرفوضة وسبب الرفض"
+      )
+    ),
     redirectUrl: "",
     savedCount: 0,
     rejectedCount: rejected.length,
@@ -15570,7 +15749,13 @@ app.post("/api/insemination/bulk-save", requireUserId, async (req, res) => {
 
 return res.json({
   ok: true,
-  message: `✅ تم حفظ التلقيح لعدد ${saved.length} حيوان.`,
+  message: inseminationJoinMessageSrv(
+    inseminationSavedNumbersMessageSrv(saved, rejected),
+    inseminationRejectedReasonsTextSrv(
+      rejected,
+      "الأرقام التي لم يتم تسجيل التلقيح لها"
+    )
+  ),
   redirectUrl: "/event-list.html",
   savedCount: saved.length,
   rejectedCount: rejected.length,
