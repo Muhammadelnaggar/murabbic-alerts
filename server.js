@@ -6705,27 +6705,39 @@ function eventsPageFormatMilkSessionsSrv(ev = {}) {
 }
 
 function eventsPageFormatCalvesSrv(ev = {}) {
-  const calves = Array.isArray(ev.calves) ? ev.calves : [];
+  const rows = [
+    {
+      no: ev.calfId ?? "",
+      sex: ev.calf1Sex ?? "",
+      fate: ev.calf1Fate ?? ""
+    },
+    {
+      no: ev.calf2Id ?? "",
+      sex: ev.calf2Sex ?? "",
+      fate: ev.calf2Fate ?? ""
+    },
+    {
+      no: ev.calf3Id ?? "",
+      sex: ev.calf3Sex ?? "",
+      fate: ev.calf3Fate ?? ""
+    }
+  ]
+    .map((c, i) => {
+      const no = eventsPageDetailTextSrv(c.no);
+      const sex = eventsPageDetailTextSrv(c.sex);
+      const fate = eventsPageDetailTextSrv(c.fate);
 
-  if (calves.length) {
-    return calves
-      .map((c, i) => {
-        const no = eventsPageDetailTextSrv(c?.calfNumber ?? c?.number ?? c?.animalNumber ?? "");
-        const sex = eventsPageDetailTextSrv(c?.sex ?? c?.calfSex ?? "");
-        const weight = eventsPageDetailTextSrv(c?.birthWeight ?? c?.weight ?? "");
+      if (!no && !sex && !fate) return "";
 
-        return eventsPageJoinDetailsSrv([
-          no ? `عجل ${i + 1}: ${no}` : `عجل ${i + 1}`,
-          sex ? `الجنس ${sex}` : "",
-          weight ? `الوزن ${weight} كجم` : ""
-        ], "");
-      })
-      .filter(Boolean)
-      .join("، ");
-  }
+      return eventsPageJoinDetailsSrv([
+        no ? `عجل ${i + 1}: ${no}` : `عجل ${i + 1}`,
+        sex ? `الجنس ${sex}` : "",
+        fate ? `المصير ${fate}` : ""
+      ], "");
+    })
+    .filter(Boolean);
 
-  const calfNo = eventsPagePickSrv(ev, ["calfNumber", "calfNumbers", "newbornNumber", "newbornNumbers"], "");
-  return eventsPageDetailTextSrv(calfNo);
+  return rows.join("، ");
 }
 function eventsPageDetailsSrv(ev = {}) {
   const key = eventsPageNormalizeTypeKeySrv(ev);
@@ -6789,22 +6801,19 @@ function eventsPageDetailsSrv(ev = {}) {
   }
 
   if (key === "calving") {
-    add("نوع الولادة", ["birthType", "calvingType", "deliveryType"]);
-    add("سهولة الولادة", ["calvingEase", "difficulty", "assistance"]);
-    add("عدد المواليد", ["calvesCount", "calfCount", "newbornCount"]);
+  add("نوع الولادة", ["calvingKind"]);
+  add("سهولة الولادة", ["calvingEase"]);
+  add("عدد المواليد", ["calfCount"]);
 
-    const calvesText = eventsPageFormatCalvesSrv(ev);
-    if (calvesText) eventsPagePushDetailSrv(parts, "المواليد", calvesText);
+  const calvesText = eventsPageFormatCalvesSrv(ev);
+  if (calvesText) eventsPagePushDetailSrv(parts, "المواليد", calvesText);
 
-    add("الجنس", ["calfSex", "sex"]);
-    add("وزن الميلاد", ["birthWeight", "calfWeight"], " كجم");
-    add("حالة المشيمة", ["placentaStatus", "retainedPlacenta"]);
-    add("السرسوب", ["colostrumStatus", "colostrum"]);
-    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+  add("آخر تلقيح مخصب", ["lastFertileInseminationDate"]);
 
-    return eventsPageJoinDetailsSrv(parts);
-  }
+  if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
 
+  return eventsPageJoinDetailsSrv(parts);
+}
   if (key === "abortion") {
     add("عمر الحمل عند الإجهاض", ["abortionAgeDays", "gestationDays", "pregnancyDays", "daysPregnant"], " يوم");
     add("مرحلة الإجهاض", ["stage", "abortionStage"]);
