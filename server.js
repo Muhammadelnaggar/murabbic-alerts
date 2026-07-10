@@ -32236,26 +32236,78 @@ app.get('/api/heat/context', requireUserId, async (req, res) => {
       message:"تعذّر التحقق من الشياع الآن."
     });
   }
-});function heatRejectedReasonsTextSrv(list = [], title = "الأرقام المرفوضة وسبب الرفض") {
+});
+function heatCleanReasonTextSrv(v = "") {
+  return String(v || "")
+    .trim()
+    .replace(/^[✅❌⚠️\s]+/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function heatNumbersTextSrv(list = []) {
+  const nums = (Array.isArray(list) ? list : [])
+    .map(x => String(x?.animalNumber || x?.number || x || "").trim())
+    .filter(Boolean);
+
+  if (!nums.length) return "";
+
+  return nums.slice(0, 12).join("، ") + (
+    nums.length > 12 ? `، … و${nums.length - 12} رقم آخر` : ""
+  );
+}
+
+function heatRejectedReasonsTextSrv(list = [], title = "الأرقام المرفوضة وسبب الرفض") {
   const items = Array.isArray(list) ? list : [];
   if (!items.length) return "";
 
   const lines = items
-    .slice(0, 8)
+    .slice(0, 12)
     .map(x => {
       const n = String(x.animalNumber || x.number || "").trim();
-      const reason = String(x.message || x.reason || x.error || "غير مؤهل.").trim();
-      return n ? `${n}: ${reason}` : reason;
+      const reason = heatCleanReasonTextSrv(x.message || x.reason || x.error || "غير مؤهل.");
+      return n
+        ? `تم رفض رقم ${n} بسبب ${reason}`
+        : `تم الرفض بسبب ${reason}`;
     })
     .filter(Boolean);
 
   if (!lines.length) return "";
 
-  const more = items.length > 8
-    ? `\n… و${items.length - 8} رقم آخر`
+  const more = items.length > 12
+    ? `\n… و${items.length - 12} رقم آخر`
     : "";
 
   return `${title}:\n${lines.join("\n")}${more}`;
+}
+
+function heatSavedNumbersMessageSrv(saved = [], rejected = []) {
+  const savedItems = Array.isArray(saved) ? saved : [];
+  const rejectedItems = Array.isArray(rejected) ? rejected : [];
+  const numsText = heatNumbersTextSrv(savedItems);
+
+  if (!savedItems.length) {
+    return "❌ لم يتم تسجيل الشياع لأي حيوان.";
+  }
+
+  const base =
+    `✅ تم تسجيل شياع لعدد ${savedItems.length} حيوان` +
+    (numsText ? ` — الأرقام: ${numsText}.` : ".");
+
+  if (!rejectedItems.length) return base;
+
+  return `${base}\nتعذّر تسجيل الشياع لعدد ${rejectedItems.length} حيوان.`;
+}
+
+function heatInseminationCandidatesMessageSrv(inseminationLink = {}) {
+  const nums = Array.isArray(inseminationLink.animalNumbers)
+    ? inseminationLink.animalNumbers
+    : [];
+
+  const numsText = heatNumbersTextSrv(nums);
+  if (!numsText) return "";
+
+  return `الحيوانات المؤهلة للتلقيح الآن بعد الشياع: ${numsText}.\nهل تريد تسجيل التلقيح الآن؟`;
 }
 
 function heatJoinMessageSrv(...parts) {
@@ -32319,9 +32371,13 @@ app.post('/api/heat/gate', requireUserId, async (req, res) => {
   x.requiresPregnancyConfirmation === true ||
   x.actionRequired === "pregnancy_confirmation"
 );
+const gateAllowedNumbersMessage = allowedNumbers.length
+  ? `الأرقام المؤهلة لتسجيل الشياع: ${heatNumbersTextSrv(allowedNumbers)}.`
+  : "";
+
 const gateBaseMessage = rejected.length
-  ? `تم التحقق — صالح: ${allowedNumbers.length} / مرفوض: ${rejected.length}`
-  : "✅ تم التحقق — يمكن تسجيل الشياع.";
+  ? `تم التحقق من الشياع — صالح: ${allowedNumbers.length} / مرفوض: ${rejected.length}.`
+  : `✅ تم التحقق — يمكن تسجيل الشياع${gateAllowedNumbersMessage ? `.\n${gateAllowedNumbersMessage}` : "."}`;
 
 const gateRejectedMessage = heatRejectedReasonsTextSrv(
   rejected,
@@ -32517,9 +32573,13 @@ saved.push({
         requiresPregnancyConfirmation: !!pregnancyItem,
         pregnancyConfirmationRedirectUrl: pregnancyItem?.pregnancyConfirmationRedirectUrl || "",
         redirectUrl: pregnancyItem?.redirectUrl || pregnancyItem?.pregnancyConfirmationRedirectUrl || "",
-        message: rejected.length
-          ? rejected.slice(0,5).map(x => `${x.animalNumber}: ${x.message}`).join(" — ")
-          : "❌ لا يوجد أي رقم مؤهل لتسجيل الشياع."
+        message: heatJoinMessageSrv(
+        "❌ لم يتم تسجيل الشياع لأي حيوان.",
+        heatRejectedReasonsTextSrv(
+        rejected,
+        "الأرقام المرفوضة وسبب الرفض"
+        )
+      )
       });
     }
 
@@ -32535,13 +32595,16 @@ saved.push({
       inseminationLink.animalNumbers.length > 0 &&
       !!inseminationLink.redirectUrl;
 
-    const baseMessage = rejected.length
-      ? `✅ تم حفظ الشياع لـ ${saved.length} حيوان — وتعذّر حفظ ${rejected.length}.`
-      : (saved.length === 1 ? "✅ تم حفظ شياع بنجاح" : `✅ تم حفظ الشياع لـ ${saved.length} حيوان.`);
- const saveRejectedMessage = heatRejectedReasonsTextSrv(
+const baseMessage = heatSavedNumbersMessageSrv(saved, rejected);
+
+const saveRejectedMessage = heatRejectedReasonsTextSrv(
   rejected,
-  "لم يتم حفظ الشياع لهذه الأرقام"
+  "الأرقام التي لم يتم تسجيل الشياع لها"
 );
+
+const inseminationCandidatesMessage = hasInseminationCandidates
+  ? heatInseminationCandidatesMessageSrv(inseminationLink)
+  : "";
 
 const finalBaseMessage = heatJoinMessageSrv(
   baseMessage,
@@ -32569,9 +32632,10 @@ const finalBaseMessage = heatJoinMessageSrv(
           }
         : null,
 
-     message: hasInseminationCandidates
-  ? heatJoinMessageSrv(finalBaseMessage, "هل تريد تسجيل التلقيح الآن؟")
-  : finalBaseMessage,
+message: heatJoinMessageSrv(
+  finalBaseMessage,
+  inseminationCandidatesMessage
+),
 
       redirectUrl: saved.length === 1
         ? `event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
