@@ -15915,28 +15915,27 @@ function validatePregnancyDiagnosisFieldsSrv(fd = {}) {
   const fieldErrors = {};
 
   if (!String(fd.animalNumber || "").trim()) {
-    fieldErrors.animalNumber = "رقم الحيوان مطلوب.";
+    fieldErrors.animalNumber = "أدخل رقم الحيوان.";
   }
 
   if (!String(fd.eventDate || "").trim() || !calvingIsDateSrv(fd.eventDate)) {
-    fieldErrors.eventDate = "تاريخ التشخيص غير صالح.";
+    fieldErrors.eventDate = "أدخل تاريخ تشخيص صحيحًا.";
   }
 
   if (!fd.documentData) {
-    fieldErrors.documentData = "تعذّر العثور على الحيوان.";
+    fieldErrors.documentData = "لم أجد الحيوان المسجل بهذا الرقم.";
   }
 
   if (!String(fd.method || "").trim()) {
-    fieldErrors.method = "طريقة التشخيص مطلوبة.";
+    fieldErrors.method = "اختر طريقة التشخيص.";
   }
 
   if (!String(fd.result || "").trim()) {
-    fieldErrors.result = "نتيجة التشخيص مطلوبة.";
+    fieldErrors.result = "اختر نتيجة التشخيص.";
   }
 
   return fieldErrors;
 }
-
 function normalizePregnancyMethodSrv(v) {
   const s = String(v || "").trim();
 
@@ -16031,11 +16030,11 @@ function pregnancyDiagnosisIsInseminatedStatusSrv(v) {
 }
 function pregnancyDiagnosisDecisionSrv(fd) {
   const doc = fd.documentData;
-  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+ if (!doc) return "❌ تعذّر قراءة بيانات الحيوان الآن.";
 
   const st = String(doc.status ?? "").trim().toLowerCase();
   if (st === "inactive" || st === "archived") {
-    return "❌ لا يمكن تسجيل تشخيص حمل — الحيوان خارج القطيع.";
+    return "❌ الحيوان خارج القطيع، لذلك لا يمكن تسجيل تشخيص حمل له.";
   }
 
   const rsRaw = String(
@@ -16066,7 +16065,7 @@ function pregnancyDiagnosisDecisionSrv(fd) {
   const isManual = method === "جس يدوي";
 
   if (!isSono && !isManual) {
-    return "❌ طريقة التشخيص غير معروفة.";
+   return "❌ اختر طريقة تشخيص صحيحة.";
   }
 
   const lastAI = String(
@@ -16078,11 +16077,11 @@ function pregnancyDiagnosisDecisionSrv(fd) {
   ).trim();
 
   if (!calvingIsDateSrv(lastAI)) {
-    return '❌ لا يمكن تشخيص الحمل — لا يوجد "آخر تلقيح" صحيح.';
+   return "❌ لا يوجد تاريخ صحيح لآخر تلقيح، لذلك لا يمكن تسجيل تشخيص الحمل.";
   }
 
   if (!calvingIsDateSrv(fd.eventDate)) {
-    return "❌ تاريخ التشخيص غير صالح.";
+   return "❌ أدخل تاريخ تشخيص صحيحًا.";
   }
 
   const diff = calvingDaysBetweenSrv(lastAI, fd.eventDate);
@@ -16096,11 +16095,11 @@ function pregnancyDiagnosisDecisionSrv(fd) {
   if (isConfirmation120) {
     if (!pregnancyDiagnosisIsPregnantStatusSrv(rsRaw)) {
       const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
-      return `❌ لا يمكن تأكيد الحمل 120 يوم — ${animalLabel} ليست مسجلة عِشار. الحالة الحالية: ${shown}.`;
+     return `❌ لا يمكن تأكيد الحمل بعد 120 يومًا لأن ${animalLabel} ليست مسجلة عِشار. الحالة الحالية: ${shown}.`;
     }
 
     if (diff < 120) {
-      return `❌ لا يمكن تأكيد الحمل 120 يوم — مرّ ${diff} يوم فقط منذ آخر تلقيح، والحد الأدنى 120 يوم.`;
+     return `❌ مرّ ${diff} يومًا فقط منذ آخر تلقيح. يمكن تأكيد الحمل بعد مرور 120 يومًا.`;
     }
 
     return null;
@@ -16108,13 +16107,13 @@ function pregnancyDiagnosisDecisionSrv(fd) {
 
   if (!pregnancyDiagnosisIsInseminatedStatusSrv(rsRaw)) {
     const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
-    return `❌ لا يمكن تشخيص الحمل — ${animalLabel} ${shown}.`;
+   return `❌ لا يمكن تشخيص الحمل لأن ${animalLabel} ليست مسجلة ملقحة. الحالة الحالية: ${shown}.`;
   }
 
   const minDays = isSono ? 26 : 40;
 
   if (diff < minDays) {
-    return `❌ لا يمكن تشخيص الحمل — ${animalLabel} مرّ عليها ${diff} يوم فقط منذ آخر تلقيح.\nالحد الأدنى لتشخيص الحمل: 26 يوم للسونار و40 يوم لليدوي.`;
+   return `❌ مرّ ${diff} يومًا فقط منذ آخر تلقيح. الحد الأدنى لهذه الطريقة ${minDays} يومًا.`;
   }
 
   return null;
@@ -16182,7 +16181,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "firestore_disabled",
-        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة."
+       message: "❌ تعذّر التحقق من تشخيص الحمل الآن. حاول مرة أخرى."
       });
     }
 
@@ -16215,7 +16214,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
         allowed: false,
         silent: true,
         stage: "missing_basic",
-        message: "أدخل رقم الحيوان والتاريخ لبدء التحقق.",
+        message: "أدخل رقم الحيوان وتاريخ التشخيص.",
         acceptedCount: 0,
         rejectedCount: 0,
         accepted: [],
@@ -16228,13 +16227,13 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         stage: "invalid_date",
-        message: "❌ تاريخ التشخيص غير صالح.",
+       message: "❌ أدخل تاريخ تشخيص صحيحًا.",
         acceptedCount: 0,
         rejectedCount: numbers.length,
         accepted: [],
         rejected: numbers.map(n => ({
           animalNumber: String(n || ""),
-          reason: "تاريخ التشخيص غير صالح."
+         reason: "أدخل تاريخ تشخيص صحيحًا."
         }))
       });
     }
@@ -16248,7 +16247,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
       if (!animalNumber) {
         rejected.push({
           animalNumber: String(rawNum || ""),
-          reason: "رقم غير صالح."
+         reason: "أدخل رقم حيوان صحيحًا."
         });
         continue;
       }
@@ -16258,7 +16257,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
       if (!animal) {
         rejected.push({
           animalNumber,
-          reason: "الحيوان غير موجود في حسابك."
+          reason: "لم أجد الحيوان المسجل بهذا الرقم."
         });
         continue;
       }
@@ -16286,7 +16285,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
         rejected.push({
           animalNumber,
           animalId: animal.id || "",
-          reason: "❌ لا يمكن تسجيل تشخيص حمل — الحيوان خارج القطيع."
+         reason: "❌ الحيوان خارج القطيع، لذلك لا يمكن تسجيل تشخيص حمل له."
         });
         continue;
       }
@@ -16303,7 +16302,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
       rejected.push({
       animalNumber,
       animalId: animal.id || "",
-      reason: `❌ لا يمكن تأكيد الحمل 120 يوم — ${animalLabel} ليست مسجلة عِشار. الحالة الحالية: ${shown}.`
+     reason: `❌ لا يمكن تأكيد الحمل بعد 120 يومًا لأن ${animalLabel} ليست مسجلة عِشار. الحالة الحالية: ${shown}.`
     });
     continue;
   }
@@ -16313,7 +16312,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
     rejected.push({
       animalNumber,
       animalId: animal.id || "",
-      reason: `❌ لا يمكن تشخيص الحمل — ${animalLabel} ${shown}.`
+     reason: `❌ لا يمكن تشخيص الحمل لأن ${animalLabel} ليست مسجلة ملقحة. الحالة الحالية: ${shown}.`
     });
     continue;
   }
@@ -16331,7 +16330,7 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
         rejected.push({
           animalNumber,
           animalId: animal.id || "",
-          reason: '❌ لا يمكن تشخيص الحمل — لا يوجد "آخر تلقيح" صحيح.'
+         reason: "❌ لا يوجد تاريخ صحيح لآخر تلقيح، لذلك لا يمكن تسجيل تشخيص الحمل."
         });
         continue;
       }
@@ -16352,9 +16351,9 @@ if (!hasMethod && diff < minPreGateDays) {
   rejected.push({
     animalNumber,
     animalId: animal.id || "",
-    reason: isConfirmation120
-      ? `❌ لا يمكن تأكيد الحمل 120 يوم — مرّ ${diff} يوم فقط منذ آخر تلقيح، والحد الأدنى 120 يوم.`
-      : `❌ لا يمكن تشخيص الحمل — ${animalLabel} ملقحة منذ ${diff} يوم فقط.`
+   reason: isConfirmation120
+  ? `❌ مرّ ${diff} يومًا فقط منذ آخر تلقيح. يمكن تأكيد الحمل بعد مرور 120 يومًا.`
+  : `❌ مرّ ${diff} يومًا فقط منذ آخر تلقيح. يمكن إجراء السونار بعد 26 يومًا.`
   });
   continue;
 }
@@ -16367,7 +16366,7 @@ if (!hasMethod && diff < minPreGateDays) {
           rejected.push({
             animalNumber,
             animalId: animal.id || "",
-            reason: "❌ طريقة التشخيص غير معروفة."
+           reason: "❌ اختر طريقة تشخيص صحيحة."
           });
           continue;
         }
@@ -16378,9 +16377,9 @@ if (diff < minDays) {
   rejected.push({
     animalNumber,
     animalId: animal.id || "",
-    reason: isConfirmation120
-      ? `❌ لا يمكن تأكيد الحمل 120 يوم — مرّ ${diff} يوم فقط منذ آخر تلقيح، والحد الأدنى 120 يوم.`
-      : `❌ لا يمكن تشخيص الحمل — ${animalLabel} ملقحة منذ ${diff} يوم فقط.`
+ reason: isConfirmation120
+  ? `❌ مرّ ${diff} يومًا فقط منذ آخر تلقيح. يمكن تأكيد الحمل بعد مرور 120 يومًا.`
+  : `❌ مرّ ${diff} يومًا فقط منذ آخر تلقيح. الحد الأدنى لطريقة ${method} هو ${minDays} يومًا.`
   });
   continue;
 }
@@ -16424,9 +16423,9 @@ if (diff < minDays) {
         ok: true,
         allowed: true,
         stage: hasMethod ? "method_gate" : "pre_gate",
-       message: hasMethod
-         ? "✅ تم التحقق — الحيوان مؤهل للتسجيل."
-         : "✅ تم فحص الشروط الأساسية — اختر طريقة التشخيص لاستكمال تحقق الأهلية.",
+  message: hasMethod
+  ? "✅ تم التحقق. يمكنك تسجيل تشخيص الحمل الآن."
+  : "✅ تم التحقق من الحيوان. اختر طريقة التشخيص.",
         animalId: a0.animalId || "",
         animalNumber: a0.animalNumber || "",
         species: a0.species || "",
@@ -16446,13 +16445,13 @@ if (diff < minDays) {
       ok: true,
       allowed: acceptedCount > 0,
       stage: hasMethod ? "method_gate" : "pre_gate",
-     message: acceptedCount
+message: acceptedCount
   ? (
       hasMethod
-        ? `✅ تم التحقق — المؤهل: ${acceptedCount}، غير المؤهل: ${rejectedCount}.`
-        : `✅ تم فحص الشروط الأساسية للقائمة — المتبقي لاستكمال تحقق الأهلية: ${acceptedCount}، المرفوض: ${rejectedCount}.`
+        ? `✅ تم التحقق. جاهز للتسجيل: ${acceptedCount}، غير جاهز: ${rejectedCount}.`
+        : `✅ تم التحقق من القائمة. اختر طريقة التشخيص لـ ${acceptedCount}، وتعذّر قبول ${rejectedCount}.`
     )
-  : "❌ لا يوجد أي رقم صالح لاستكمال تحقق تشخيص الحمل.",
+  : "❌ لا يوجد حيوان يمكن تسجيل تشخيص الحمل له الآن.",
       acceptedCount,
       rejectedCount,
       accepted,
@@ -16466,7 +16465,7 @@ if (diff < minDays) {
       ok: false,
       allowed: false,
       error: "pregnancy_diagnosis_gate_failed",
-      message: "❌ تعذّر التحقق من أهلية تشخيص الحمل الآن."
+    message: "❌ تعذّر التحقق من تشخيص الحمل الآن. حاول مرة أخرى."
     });
   }
 });// ============================================================
@@ -16480,7 +16479,7 @@ app.post("/api/pregnancy-diagnosis/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "تعذّر حفظ تشخيص الحمل – قاعدة البيانات غير متاحة."
+        message: "❌ تعذّر حفظ تشخيص الحمل الآن. حاول مرة أخرى."
       });
     }
 
@@ -16505,11 +16504,11 @@ app.post("/api/pregnancy-diagnosis/save", requireUserId, async (req, res) => {
     if (!animalNumber || !eventDate) {
       return res.status(400).json({
         ok: false,
-        message: "❌ رقم الحيوان وتاريخ التشخيص مطلوبان.",
-        fieldErrors: {
-          animalNumber: !animalNumber ? "رقم الحيوان مطلوب." : undefined,
-          eventDate: !eventDate ? "تاريخ التشخيص غير صالح." : undefined
-        }
+   message: "❌ أدخل رقم الحيوان وتاريخ التشخيص.",
+fieldErrors: {
+  animalNumber: !animalNumber ? "أدخل رقم الحيوان." : undefined,
+  eventDate: !eventDate ? "أدخل تاريخ تشخيص صحيحًا." : undefined
+}
       });
     }
 
@@ -16518,10 +16517,10 @@ app.post("/api/pregnancy-diagnosis/save", requireUserId, async (req, res) => {
     if (!animal) {
       return res.status(404).json({
         ok: false,
-        message: "❌ رقم الحيوان غير موجود في حسابك. اكتب الرقم الصحيح أولًا.",
-        fieldErrors: {
-          animalNumber: "تعذّر العثور على الحيوان."
-        }
+       message: `❌ لم أجد الحيوان رقم ${animalNumber}. راجع الرقم.`,
+       fieldErrors: {
+       animalNumber: "لم أجد الحيوان المسجل بهذا الرقم."
+       }
       });
     }
 
@@ -16579,7 +16578,7 @@ app.post("/api/pregnancy-diagnosis/save", requireUserId, async (req, res) => {
     if (Object.keys(cleanFieldErrors).length) {
       return res.status(400).json({
         ok: false,
-        message: "❌ راجع بيانات تشخيص الحمل المطلوبة.",
+        message: "❌ أكمل بيانات تشخيص الحمل.",
         fieldErrors: cleanFieldErrors
       });
     }
@@ -16702,7 +16701,11 @@ const embryonicLossRef = needsEmbryonicLoss
 
     return res.json({
       ok: true,
-      message: "✅ تم حفظ تشخيص الحمل بنجاح",
+message: isConfirmation120
+  ? (result === "فارغة"
+      ? `✅ تم حفظ نتيجة تأكيد الحمل للحيوان رقم ${animalNumber} وتسجيل فقد أجنة.`
+      : `✅ تم تأكيد الحمل بعد 120 يومًا للحيوان رقم ${animalNumber}.`)
+  : `✅ تم حفظ تشخيص الحمل للحيوان رقم ${animalNumber}: ${result}.`,
       id: eventRef.id,
       eventId: eventRef.id,
 
