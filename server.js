@@ -22463,7 +22463,7 @@ function dailyMilkPreviewRowSrv(row = {}, kind = "cow") {
       ok: false,
       milkKg: null,
       totalText: "—",
-      reason: "كمية اللبن غير صالحة."
+      reason: "أدخل كمية لبن رقمية صحيحة."
     };
   }
 
@@ -22472,7 +22472,7 @@ function dailyMilkPreviewRowSrv(row = {}, kind = "cow") {
       ok: false,
       milkKg: null,
       totalText: "—",
-      reason: "كمية اللبن لا يمكن أن تكون سالبة."
+     message: "❌ تعذّر حساب إجمالي اللبن الآن. حاول مرة أخرى.",
     };
   }
 
@@ -22509,7 +22509,7 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
       const ui = dailyMilkBuildGateUiSrv({
-        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة."
+       message: "❌ تعذّر فحص بيانات اللبن اليومي الآن. حاول مرة أخرى."
       });
 
       return res.status(503).json({
@@ -22549,7 +22549,7 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
 
     if (!numbers.length || !eventDate) {
       const ui = dailyMilkBuildGateUiSrv({
-        message: "أدخل رقم الحيوان والتاريخ لبدء التحقق.",
+        message: "أدخل رقم الحيوان وتاريخ تسجيل اللبن.",
         eventDate
       });
 
@@ -22571,12 +22571,12 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
     if (!calvingIsDateSrv(eventDate)) {
       const rejected = numbers.map(n => ({
         animalNumber: String(n || ""),
-        reason: "تاريخ اللبن غير صالح."
+        reason: "أدخل تاريخ تسجيل لبن صحيحًا."
       }));
 
       const ui = dailyMilkBuildGateUiSrv({
         rejected,
-        message: "❌ تاريخ اللبن غير صالح.",
+        message: "❌ أدخل تاريخ تسجيل لبن صحيحًا.",
         eventDate
       });
 
@@ -22603,7 +22603,7 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
       if (!animalNumber) {
         rejected.push({
           animalNumber: String(rawNum || ""),
-          reason: "رقم غير صالح."
+          reason: "رقم الحيوان غير صحيح."
         });
         continue;
       }
@@ -22613,7 +22613,7 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
       if (!animal) {
         rejected.push({
           animalNumber,
-          reason: "الحيوان غير موجود في حسابك."
+          reason: "لم أجد الحيوان في حسابك. راجع الرقم."
         });
         continue;
       }
@@ -22623,7 +22623,7 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
       if (dailyMilkIsOutOfHerdSrv(doc)) {
         rejected.push({
           animalNumber,
-          reason: "❌ لا يمكن تسجيل لبن — الحيوان غير موجود بالقطيع."
+          reason: "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له."
         });
         continue;
       }
@@ -22633,7 +22633,7 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
       if (duplicated) {
         rejected.push({
           animalNumber,
-          reason: "❌ تم تسجيل لبن اليوم لهذا الحيوان بالفعل."
+          reason: "سبق تسجيل اللبن لهذا الحيوان في التاريخ نفسه."
         });
         continue;
       }
@@ -22655,9 +22655,14 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
     const allowed = acceptedCount > 0;
 
     const message = allowed
-      ? `✅ تم التحقق — جاهز لتسجيل اللبن لعدد ${acceptedCount}.`
-      : (rejected[0]?.reason || "❌ لا يوجد أي رقم صالح لتسجيل اللبن.");
-
+  ? (
+      rejectedCount
+        ? `راجعت ${numbers.length} حيوانًا: يمكن تسجيل اللبن لـ${acceptedCount}، ولا يمكن تسجيله لـ${rejectedCount}.`
+        : acceptedCount === 1
+          ? `✅ راجعت بيانات الحيوان رقم ${accepted[0].animalNumber}، ويمكنك إدخال كميات اللبن الآن.`
+          : `✅ راجعت البيانات، ويمكن تسجيل اللبن لعدد ${acceptedCount} حيوانات.`
+    )
+  : (rejected[0]?.reason || "❌ لا يمكن تسجيل اللبن لأي من الأرقام المدخلة.");
     const ui = dailyMilkBuildGateUiSrv({
       accepted,
       rejected,
@@ -22688,7 +22693,7 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
     console.error("daily-milk-gate", e);
 
     const ui = dailyMilkBuildGateUiSrv({
-      message: "تعذّر التحقق من اللبن اليومي الآن — تحقّق من الاتصال والصلاحيات."
+      message: "❌ تعذّر فحص بيانات اللبن اليومي الآن. حاول مرة أخرى."
     });
 
     return res.status(500).json({
@@ -22714,7 +22719,7 @@ app.post("/api/daily-milk/preview", requireUserId, async (req, res) => {
   try {
     if (!db) {
       const ui = dailyMilkBuildPreviewUiSrv({
-        message: "تعذّر حساب الإجمالي الآن — قاعدة البيانات غير متاحة.",
+       message: "❌ تعذّر حساب إجمالي اللبن الآن. حاول مرة أخرى.",
         rows: []
       });
 
@@ -22753,7 +22758,7 @@ app.post("/api/daily-milk/preview", requireUserId, async (req, res) => {
           milkKg: null,
           totalText: "—",
           ok: false,
-          reason: "رقم الحيوان مطلوب."
+          reason: "أدخل رقم الحيوان."
         });
         continue;
       }
@@ -22766,7 +22771,7 @@ app.post("/api/daily-milk/preview", requireUserId, async (req, res) => {
           milkKg: null,
           totalText: "—",
           ok: false,
-          reason: "الحيوان غير موجود في حسابك."
+          reason: "لم أجد الحيوان في حسابك. راجع الرقم."
         });
         continue;
       }
@@ -22805,7 +22810,7 @@ app.post("/api/daily-milk/preview", requireUserId, async (req, res) => {
     console.error("daily-milk-preview", e);
 
     const ui = dailyMilkBuildPreviewUiSrv({
-      message: "تعذّر حساب إجمالي اللبن الآن.",
+      message: "❌ تعذّر حساب إجمالي اللبن الآن. حاول مرة أخرى.",
       rows: []
     });
 
@@ -23212,7 +23217,7 @@ function dailyMilkImportCalcSrv(row = {}, kind = "cow") {
   const s3 = dailyMilkNumStrictSrv(row.milkS3);
 
   if (![s1, s2, s3].every(Number.isFinite)) {
-    return { ok: false, milkKg: 0, totalText: "—", reason: "كمية اللبن غير صالحة." };
+    return { ok: false, milkKg: 0, totalText: "—", reason: "أدخل كمية لبن رقمية صحيحة." };
   }
 
   if (s1 < 0 || s2 < 0 || s3 < 0) {
@@ -23252,7 +23257,15 @@ function dailyMilkImportBuildUiSrv({ rows = [], message = "" } = {}) {
   return {
     screen: "daily_milk_import",
     status: validRows.length ? "success" : "warning",
-    message: message || (validRows.length ? "✅ تمت المعاينة — راجع الصفوف ثم احفظ." : "لا توجد صفوف صالحة للحفظ."),
+    message: message || (
+  validRows.length
+    ? (
+        invalidRows.length
+          ? `راجعت ${safeRows.length} سجلًا: ${validRows.length} جاهز للحفظ، و${invalidRows.length} يحتاج مراجعة.`
+          : `✅ تمت معاينة ${validRows.length} سجلًا، وكلها جاهزة للحفظ.`
+      )
+    : "❌ لا توجد سجلات صالحة للحفظ."
+),
     canSave: validRows.length > 0,
     rows: safeRows,
     kpi: {
@@ -23271,21 +23284,21 @@ async function dailyMilkImportPreviewRowsSrv(uid, eventDate, inputRows = []) {
     const animalNumber = calvingNormDigitsOnlySrv(rawRow.animalNumber || rawRow.number || "");
 
     if (!animalNumber) {
-      rows.push({ ...rawRow, animalNumber: "", valid: false, reason: "رقم الحيوان غير صالح.", totalText: "—" });
+      rows.push({ ...rawRow, animalNumber: "", valid: false, reason: "رقم الحيوان غير صحيح.", totalText: "—" });
       continue;
     }
 
     const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
 
     if (!animal) {
-      rows.push({ ...rawRow, animalNumber, valid: false, reason: "الحيوان غير موجود في حسابك.", totalText: "—" });
+      rows.push({ ...rawRow, animalNumber, valid: false, reason: "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له.", totalText: "—" });
       continue;
     }
 
     const animalDoc = animal.data || {};
 
     if (dailyMilkIsOutOfHerdSrv(animalDoc)) {
-      rows.push({ ...rawRow, animalNumber, valid: false, reason: "الحيوان غير موجود بالقطيع.", totalText: "—" });
+      rows.push({ ...rawRow, animalNumber, valid: false, reason: "سبق تسجيل اللبن لهذا الحيوان في التاريخ نفسه.", totalText: "—" });
       continue;
     }
 
@@ -23326,7 +23339,7 @@ app.post("/api/daily-milk/import/preview", requireUserId, dailyMilkImportRawPars
     if (!db) {
       const ui = dailyMilkImportBuildUiSrv({
         rows: [],
-        message: "تعذّر المعاينة — قاعدة البيانات غير متاحة."
+       message: "❌ تعذّرت معاينة بيانات المحلب الآن. حاول مرة أخرى."
       });
 
       return res.status(503).json({ ok: false, message: ui.message, ui });
@@ -23348,7 +23361,7 @@ app.post("/api/daily-milk/import/preview", requireUserId, dailyMilkImportRawPars
     if (!calvingIsDateSrv(eventDate)) {
       const ui = dailyMilkImportBuildUiSrv({
         rows: [],
-        message: "❌ تاريخ اللبن غير صالح."
+        message: "❌ أدخل تاريخ تسجيل لبن صحيحًا."
       });
 
       return res.status(400).json({ ok: false, message: ui.message, ui });
@@ -23359,7 +23372,7 @@ app.post("/api/daily-milk/import/preview", requireUserId, dailyMilkImportRawPars
     if (!inputRows.length) {
       const ui = dailyMilkImportBuildUiSrv({
         rows: [],
-        message: "ألصق بيانات المحلب أو ارفع ملف المحلب أولًا."
+        message: "أَلصق بيانات المحلب أو ارفع ملفًا للمعاينة."
       });
 
       return res.json({ ok: true, message: ui.message, ui });
@@ -23380,7 +23393,7 @@ app.post("/api/daily-milk/import/preview", requireUserId, dailyMilkImportRawPars
 
     const ui = dailyMilkImportBuildUiSrv({
       rows: [],
-      message: e?.message || "تعذّرت معاينة استيراد اللبن الآن."
+      message: "❌ تعذّرت معاينة بيانات المحلب الآن. حاول مرة أخرى."
     });
 
     return res.status(500).json({
@@ -23400,7 +23413,7 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
     if (!db) {
       const ui = dailyMilkImportBuildUiSrv({
         rows: [],
-        message: "تعذّر الحفظ — قاعدة البيانات غير متاحة."
+        message: "❌ تعذّر حفظ بيانات المحلب الآن. حاول مرة أخرى."
       });
 
       return res.status(503).json({
@@ -23422,7 +23435,7 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
     if (!calvingIsDateSrv(eventDate)) {
       const ui = dailyMilkImportBuildUiSrv({
         rows: [],
-        message: "❌ تاريخ اللبن غير صالح."
+       message: "❌ أدخل تاريخ تسجيل لبن صحيحًا."
       });
 
       return res.status(400).json({
@@ -23441,7 +23454,7 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
     if (!inputRows.length) {
       const ui = dailyMilkImportBuildUiSrv({
         rows: [],
-        message: "لا توجد صفوف جاهزة للحفظ."
+        message: "❌ لا توجد سجلات جاهزة للحفظ. راجع بيانات المعاينة."
       });
 
       return res.status(400).json({
@@ -23464,7 +23477,7 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
       if (row.valid !== true) {
         rejected.push({
           animalNumber: row.animalNumber || "",
-          reason: row.reason || "غير صالح للحفظ."
+          reason: row.reason || "راجع بيانات هذا الحيوان قبل الحفظ."
         });
         continue;
       }
@@ -23482,7 +23495,7 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
       if (!calc.ok) {
         rejected.push({
           animalNumber,
-          reason: calc.reason || "كمية اللبن غير صالحة."
+          reason: calc.reason || "أدخل كمية لبن رقمية صحيحة."
         });
         continue;
       }
@@ -23503,7 +23516,7 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
       if (existing.exists) {
         rejected.push({
           animalNumber,
-          reason: "تم تسجيل لبن اليوم لهذا الحيوان بالفعل."
+         reason: "سبق تسجيل اللبن لهذا الحيوان في التاريخ نفسه."
         });
         continue;
       }
@@ -23579,9 +23592,13 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
 
     const ui = dailyMilkImportBuildUiSrv({
       rows: [...saved, ...rejectedRows],
-      message: saved.length
-        ? `✅ تم حفظ ${saved.length} سجل لبن بنجاح.`
-        : "❌ لم يتم حفظ أي سجل لبن."
+     message: saved.length
+  ? (
+      rejected.length
+        ? `✅ تم حفظ ${saved.length} سجل لبن، ولم يتم حفظ ${rejected.length} سجل يحتاج مراجعة.`
+        : `✅ تم حفظ ${saved.length} سجل لبن بنجاح.`
+    )
+  : "❌ لم يتم حفظ أي سجل لبن. راجع أسباب الرفض الظاهرة."
     });
 
     return res.json({
@@ -23599,7 +23616,7 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
 
     const ui = dailyMilkImportBuildUiSrv({
       rows: [],
-      message: "تعذّر حفظ استيراد اللبن الآن."
+      message: "❌ تعذّر حفظ بيانات المحلب الآن. حاول مرة أخرى."
     });
 
     return res.status(500).json({
@@ -23622,7 +23639,7 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
   try {
     if (!db) {
       const ui = dailyMilkBuildSaveUiSrv({
-        message: "تعذّر حفظ اللبن اليومي — قاعدة البيانات غير متاحة."
+        message: "❌ تعذّر حفظ اللبن اليومي الآن. حاول مرة أخرى."
       });
 
       return res.status(503).json({
@@ -23649,7 +23666,7 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
 
     if (!rows.length) {
       const ui = dailyMilkBuildSaveUiSrv({
-        message: "❌ رقم الحيوان مطلوب.",
+        message: "❌ أدخل رقم حيوان واحدًا على الأقل.",
         eventDate
       });
 
@@ -23667,12 +23684,12 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
     if (!calvingIsDateSrv(eventDate)) {
       const rejected = rows.map(r => ({
         animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || r.number || ""),
-        reason: "تاريخ اللبن غير صالح."
+        reason: "أدخل تاريخ تسجيل لبن صحيحًا."
       }));
 
       const ui = dailyMilkBuildSaveUiSrv({
         rejected,
-        message: "❌ تاريخ اللبن غير صالح.",
+       message: "❌ أدخل تاريخ تسجيل لبن صحيحًا.",
         eventDate
       });
 
@@ -23696,7 +23713,7 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
       if (!animalNumber) {
         rejected.push({
           animalNumber: "",
-          reason: "رقم الحيوان مطلوب."
+          reason: "رقم الحيوان غير صحيح."
         });
         continue;
       }
@@ -23706,7 +23723,7 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
       if (!animal) {
         rejected.push({
           animalNumber,
-          reason: "الحيوان غير موجود في حسابك."
+          reason: "لم أجد الحيوان في حسابك. راجع الرقم."
         });
         continue;
       }
@@ -23717,7 +23734,7 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
       if (dailyMilkIsOutOfHerdSrv(animalDoc)) {
         rejected.push({
           animalNumber,
-          reason: "❌ لا يمكن تسجيل لبن — الحيوان غير موجود بالقطيع."
+         reason: "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له."
         });
         continue;
       }
@@ -23727,7 +23744,7 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
       if (duplicated) {
         rejected.push({
           animalNumber,
-          reason: "❌ تم تسجيل لبن اليوم لهذا الحيوان بالفعل."
+          reason: "سبق تسجيل اللبن لهذا الحيوان في التاريخ نفسه."
         });
         continue;
       }
@@ -23742,7 +23759,7 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
       if (![s1, s2, s3].every(Number.isFinite)) {
         rejected.push({
           animalNumber,
-          reason: "❌ كمية اللبن غير صالحة."
+         reason: "أدخل كمية لبن رقمية صحيحة."
         });
         continue;
       }
@@ -23750,7 +23767,7 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
       if (s1 < 0 || s2 < 0 || s3 < 0) {
         rejected.push({
           animalNumber,
-          reason: "❌ كمية اللبن لا يمكن أن تكون سالبة."
+          reason: "كمية اللبن لا يمكن أن تكون سالبة."
         });
         continue;
       }
@@ -23762,7 +23779,7 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
       if (!Number.isFinite(milkKg) || milkKg <= 0) {
         rejected.push({
           animalNumber,
-          reason: "❌ أدخل كمية اللبن — لا يمكن الحفظ بإجمالي صفر."
+          reason: "أدخل كمية اللبن؛ لا يمكن الحفظ عندما يكون الإجمالي صفرًا."
         });
         continue;
       }
@@ -23784,7 +23801,7 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
       if (existingEventSnap.exists) {
         rejected.push({
           animalNumber,
-          reason: "❌ تم تسجيل لبن اليوم لهذا الحيوان بالفعل."
+          reason: "سبق تسجيل اللبن لهذا الحيوان في التاريخ نفسه."
         });
         continue;
       }
@@ -23848,8 +23865,14 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
     }
 
     const message = saved.length
-      ? "✅ تم حفظ اللبن اليومي بنجاح"
-      : "❌ لم يتم حفظ أي سجل لبن.";
+  ? (
+      rejected.length
+        ? `✅ سجلت اللبن لعدد ${saved.length} حيوانات، ولم أتمكن من تسجيله لعدد ${rejected.length}.`
+        : saved.length === 1
+          ? `✅ سجلت اللبن اليومي للحيوان رقم ${saved[0].animalNumber} بنجاح.`
+          : `✅ سجلت اللبن اليومي لعدد ${saved.length} حيوانات بنجاح.`
+    )
+  : "❌ لم أتمكن من تسجيل اللبن لأي حيوان.";
 
     const ui = dailyMilkBuildSaveUiSrv({
       saved,
@@ -23875,7 +23898,7 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
     console.error("daily-milk-save", e);
 
     const ui = dailyMilkBuildSaveUiSrv({
-      message: "تعذّر حفظ اللبن اليومي — تحقّق من الاتصال والصلاحيات."
+      message: "❌ تعذّر حفظ اللبن اليومي الآن. حاول مرة أخرى."
     });
 
     return res.status(500).json({
