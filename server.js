@@ -13651,7 +13651,7 @@ function calvingDecisionSrv(fd) {
 
   const st = String(doc.status ?? "").trim().toLowerCase();
   if (st === "inactive" || st === "archived") {
-    return `❌ لم أجد ${animalText}. راجع الرقم ثم حاول مرة أخرى.`;
+    return `❌ ${animalText} خارج القطيع، لذلك لا يمكن تسجيل ولادة له.`;
   }
 
   let sp = String(fd.species || doc.species || doc.animalTypeAr || doc.animalType || "").trim();
@@ -13675,7 +13675,7 @@ function calvingDecisionSrv(fd) {
   const shownStatus = rsRaw ? rsRaw : "غير معروفة";
 
   if (!rsNorm.includes("عشار")) {
-    return `❌ لا يمكن تسجيل الولادة لـ${animalText} لأنه غير عِشار.\nالحالة الحالية: ${shownStatus}.`;
+    return `❌ ${animalText} حالته التناسلية «${shownStatus}». تسجيل الولادة متاح للحيوانات العِشار فقط.`;
   }
 
   const lf = String(
@@ -13688,16 +13688,16 @@ function calvingDecisionSrv(fd) {
   ).trim();
 
   if (!calvingIsDateSrv(lf)) {
-    return `❌ لا يمكن تسجيل الولادة لـ${animalText} لأن آخر تلقيح مُخصِّب غير مسجل.`;
+    return `❌ لا يوجد لـ${animalText} تاريخ مسجل لآخر تلقيح مُخصِّب، لذلك لا أستطيع حساب عمر الحمل. راجع بيانات التلقيح أولًا.`;
   }
 
   if (!calvingIsDateSrv(fd.eventDate)) {
-    return "❌ تاريخ الولادة غير صالح.";
+    return "❌ أدخل تاريخ ولادة صحيحًا.";
   }
 
   const gDays = calvingDaysBetweenSrv(lf, fd.eventDate);
   if (Number.isNaN(gDays)) {
-    return "❌ لا أستطيع حساب عمر الحمل. راجع تاريخ آخر تلقيح وتاريخ الولادة.";
+    return "❌ لم أستطع حساب عمر الحمل. راجع تاريخ آخر تلقيح وتاريخ الولادة.";
   }
 
   if (gDays < th) {
@@ -13708,57 +13708,57 @@ function calvingDecisionSrv(fd) {
 }
 function calvingRequiredFieldsSrv(fd) {
   const kind = String(fd.calvingKind || "").trim();
-  if (!kind) return "❌ نوع الولادة مطلوب.";
+ if (!kind) return "❌ اختر نوع الولادة.";
 
   const lf = String(fd.lastInseminationDate || "").trim();
   if (!calvingIsDateSrv(lf)) {
-    return '❌ "آخر تلقيح مُخصِّب" مطلوب (تاريخ صحيح).';
+   return "❌ تعذّر تأكيد تاريخ آخر تلقيح مُخصِّب. أعد التحقق من الحيوان.";
   }
 
   if (kind === "نافقة") return null;
 
   const count = Number(String(fd.calfCount || "").trim());
   if (!(count === 1 || count === 2 || count === 3)) {
-    return { field: "calfCount", msg: "❌ عدد المواليد مطلوب (1 أو 2 أو 3)." };
+    return { field: "calfCount", msg: "❌ اختر عدد المواليد: 1 أو 2 أو 3." };
   }
 
   if (!String(fd.calf1Sex || "").trim()) {
-    return { field: "calf1Sex", msg: "❌ جنس المولود (1) مطلوب." };
+  return { field: "calf1Sex", msg: "❌ اختر جنس المولود الأول." };
   }
 
   if (!String(fd.calfId || "").trim()) {
-    return { field: "calfId", msg: "❌ رقم العجل (1) مطلوب." };
+    return { field: "calfId", msg: "❌ أدخل رقم المولود الأول." };
   }
 
   if (!String(fd.calf1Fate || "").trim()) {
-    return { field: "calf1Fate", msg: "❌ مصير العجل (1) مطلوب." };
+   return { field: "calf1Fate", msg: "❌ اختر مصير المولود الأول." };
   }
 
   if (count >= 2) {
     if (!String(fd.calf2Sex || "").trim()) {
-      return { field: "calf2Sex", msg: "❌ جنس المولود (2) مطلوب." };
+    return { field: "calf2Sex", msg: "❌ اختر جنس المولود الثاني." };
     }
 
     if (!String(fd.calf2Id || "").trim()) {
-      return { field: "calf2Id", msg: "❌ رقم العجل (2) مطلوب." };
+     return { field: "calf2Id", msg: "❌ أدخل رقم المولود الثاني." };
     }
 
     if (!String(fd.calf2Fate || "").trim()) {
-      return { field: "calf2Fate", msg: "❌ مصير العجل (2) مطلوب." };
+      return { field: "calf2Fate", msg: "❌ اختر مصير المولود الثاني." };
     }
   }
 
   if (count >= 3) {
     if (!String(fd.calf3Sex || "").trim()) {
-      return { field: "calf3Sex", msg: "❌ جنس المولود (3) مطلوب." };
+      return { field: "calf3Sex", msg: "❌ اختر جنس المولود الثالث." };
     }
 
     if (!String(fd.calf3Id || "").trim()) {
-      return { field: "calf3Id", msg: "❌ رقم العجل (3) مطلوب." };
+   return { field: "calf3Id", msg: "❌ أدخل رقم المولود الثالث." };
     }
 
     if (!String(fd.calf3Fate || "").trim()) {
-      return { field: "calf3Fate", msg: "❌ مصير العجل (3) مطلوب." };
+      return { field: "calf3Fate", msg: "❌ اختر مصير المولود الثالث." };
     }
   }
 
@@ -13769,12 +13769,12 @@ function calvingRequiredFieldsSrv(fd) {
   ].filter(Boolean);
 
   if (nums.length !== count) {
-    return { field: "calfId", msg: "❌ رقم العجل غير صالح." };
+   return { field: "calfId", msg: "❌ أحد أرقام المواليد غير صحيح. راجع الأرقام." };
   }
 
   const s = new Set(nums);
   if (s.size !== nums.length) {
-    return { field: "calfId", msg: "❌ لا يجوز تكرار رقم العجل داخل نفس الولادة." };
+   return { field: "calfId", msg: "❌ لا يمكن استخدام نفس الرقم لأكثر من مولود. أدخل رقمًا مختلفًا لكل مولود." };
   }
 
   return null;
@@ -14557,7 +14557,14 @@ async function fetchAnimalByNumberForCalvingGateSrv(uid, number) {
 
 app.post("/api/calving/gate", requireUserId, async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok:false, error:"firestore_disabled" });
+   if (!db) {
+  return res.status(503).json({
+    ok: false,
+    allowed: false,
+    error: "firestore_disabled",
+    message: "❌ تعذّر فحص بيانات الولادة الآن. حاول مرة أخرى."
+  });
+}
 
     const uid = req.userId;
     const body = req.body || {};
@@ -14579,7 +14586,7 @@ app.post("/api/calving/gate", requireUserId, async (req, res) => {
       return res.status(404).json({
         ok: false,
         allowed: false,
-       message: `❌ لم أجد الحيوان رقم ${n}. راجع الرقم ثم حاول مرة أخرى.`
+      message: `❌ الحيوان رقم ${n} خارج القطيع، لذلك لا يمكن تسجيل ولادة له.`
       });
     }
 
@@ -14633,7 +14640,7 @@ if (g) {
     const ageMatch = cleaned.match(/عمر الحمل\s+(\d+)\s+يوم/);
     const ageText = ageMatch ? ` — عمر الحمل ${ageMatch[1]} يوم فقط` : "";
 
-    cleaned = `❌ التاريخ مبكر للولادة${ageText}.\nعدّل التاريخ أو سجّل الحالة كإجهاض.`;
+  cleaned = `❌ التاريخ مبكر للولادة${ageText}.\nعدّل التاريخ أو سجّل الحالة كإجهاض.`;
   }
 
   return res.status(400).json({
@@ -14660,7 +14667,7 @@ if (g) {
     return res.json({
       ok: true,
       allowed: true,
-      message: `✅ الحيوان رقم ${n} مؤهل لتسجيل الولادة. أكمل البيانات.`,
+      message: `✅ راجعت بيانات الحيوان رقم ${n}، ويمكنك تسجيل الولادة الآن. أكمل البيانات ثم احفظ.`,
       animalId: animal.id || "",
       species: sp,
       lastInseminationDate: lastAI,
@@ -14673,7 +14680,7 @@ if (g) {
       ok: false,
       allowed: false,
       error: "calving_gate_failed",
-      message: "❌ تعذّر التحقق من أهلية الولادة الآن."
+      message: "❌ تعذّر التحقق من بيانات الولادة الآن. حاول مرة أخرى."
     });
   }
 });
@@ -29316,7 +29323,7 @@ app.post("/api/calving/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات."
+       message: "❌ تعذّر حفظ الولادة الآن. حاول مرة أخرى."
       });
     }
 
@@ -29409,7 +29416,7 @@ if (gateErr) {
     const ageMatch = cleaned.match(/عمر الحمل\s+(\d+)\s+يوم/);
     const ageText = ageMatch ? ` — عمر الحمل ${ageMatch[1]} يوم فقط` : "";
 
-    cleaned = `❌ التاريخ مبكر للولادة${ageText}.\nعدّل التاريخ أو سجّل الحالة كإجهاض.`;
+   cleaned = `❌ التاريخ مبكر للولادة${ageText}.\nعدّل التاريخ أو سجّل الحالة كإجهاض.`;
   }
 
   return res.status(400).json({
@@ -29549,9 +29556,9 @@ if (!uniqueCheck || uniqueCheck.ok === false) {
    
 return res.json({
   ok: true,
- message: isDead
-  ? `✅ تم تسجيل ولادة الحيوان رقم ${payload.animalNumber} بنجاح.`
-  : `✅ تم تسجيل ولادة الحيوان رقم ${payload.animalNumber} بنجاح، وتم تسجيل بيانات العجول.`,
+message: isDead
+  ? `✅ سجلت ولادة الحيوان رقم ${payload.animalNumber} بنجاح.`
+  : `✅ سجلت ولادة الحيوان رقم ${payload.animalNumber} بنجاح، وحفظت بيانات المواليد.`,
   redirectUrl: `/event-list.html?number=${encodeURIComponent(payload.animalNumber)}`,
   id: eventRef.id,
   eventId: eventRef.id,
@@ -29567,7 +29574,7 @@ return res.json({
     return res.status(500).json({
       ok: false,
       error: "calving_save_failed",
-      message: "❌ تعذّر تسجيل الولادة الآن. حاول مرة أخرى، وإذا استمرت المشكلة راجع الاتصال."
+     message: "❌ تعذّر حفظ الولادة الآن. حاول مرة أخرى."
     });
   }
 });
