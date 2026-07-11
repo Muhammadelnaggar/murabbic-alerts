@@ -14111,34 +14111,53 @@ if (d < recommendedDaysAfterCalving) {
 
 function abortionDecisionSrv(fd) {
   const doc = fd.documentData;
-  if (!doc) return "تعذّر قراءة وثيقة الحيوان.";
+
+  if (!doc) {
+    return "❌ لم أجد بيانات الحيوان. راجع الرقم وحاول مرة أخرى.";
+  }
 
   // ✅ خارج القطيع
   const st = String(doc?.status ?? "").trim().toLowerCase();
+
   if (st === "inactive") {
-    return "❌ لا يمكن تسجيل إجهاض — الحيوان خارج القطيع.";
+    return "❌ هذا الحيوان خارج القطيع، لذلك لا يمكن تسجيل إجهاض له.";
   }
 
   // ✅ تاريخ صالح
   if (!calvingIsDateSrv(fd.eventDate)) {
-    return "❌ تاريخ الإجهاض غير صالح.";
+    return "❌ أدخل تاريخ إجهاض صحيحًا.";
   }
 
   // ✅ تحديد النوع
-  let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
+  let sp = String(
+    fd.species ||
+    doc.species ||
+    doc.animalTypeAr ||
+    ""
+  ).trim();
+
   if (/cow|بقر/i.test(sp)) sp = "أبقار";
   if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
 
   const th = CALVING_THRESHOLDS_SRV[sp]?.minGestationDays;
-  if (!th) return "نوع القطيع غير معروف لحساب عمر الحمل.";
+
+  if (!th) {
+    return "❌ لم أتعرف على نوع الحيوان، لذلك لا أستطيع حساب عمر الحمل. راجع بيانات الحيوان.";
+  }
 
   // ✅ لازم يكون عشار
-  const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
+  const rsRaw = String(
+    fd.reproStatusFromEvents ||
+    doc.reproductiveStatus ||
+    ""
+  ).trim();
+
   const rsNorm = calvingStripArSrv(rsRaw);
 
   if (!rsNorm.includes("عشار")) {
     const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
-    return `❌ الحيوان ليس عِشار — الحالة التناسلية الحالية: ${shown}.`;
+
+    return `❌ الحالة التناسلية الحالية للحيوان هي ${shown}. تسجيل الإجهاض متاح للحيوانات العِشار فقط.`;
   }
 
   // ✅ لازم آخر تلقيح
@@ -14151,28 +14170,33 @@ function abortionDecisionSrv(fd) {
     "";
 
   if (!calvingIsDateSrv(lf)) {
-    return '❌ لا يمكن تسجيل إجهاض — لا يوجد "آخر تلقيح".';
+    return "❌ لم أجد تاريخ آخر تلقيح مُخصِّب، لذلك لا أستطيع حساب عمر الحمل. راجع بيانات التلقيح أولًا.";
   }
 
   // ✅ لو في ولادة/إجهاض بعد آخر تلقيح يبقى الحمل انتهى
   const boundary = String(fd.lastBoundary || "").trim();
+
   if (boundary && calvingIsDateSrv(boundary)) {
-    const b = new Date(boundary); b.setHours(0,0,0,0);
-    const l = new Date(lf);       l.setHours(0,0,0,0);
+    const b = new Date(boundary);
+    b.setHours(0, 0, 0, 0);
+
+    const l = new Date(lf);
+    l.setHours(0, 0, 0, 0);
 
     if (b.getTime() >= l.getTime()) {
-      return `❌ لا يُسمح بتسجيل الإجهاض: آخر حدث (${boundary}) يلغي أي حمل حالي.`;
+      return `❌ يوجد حدث أنهى الحمل مسجل بتاريخ ${boundary}، لذلك لا يوجد حمل حالي يمكن تسجيل إجهاض له.`;
     }
   }
 
   // ✅ عمر الحمل أقل من حد الولادة
   const gDays = calvingDaysBetweenSrv(lf, fd.eventDate);
+
   if (Number.isNaN(gDays)) {
-    return "تعذّر حساب عمر الحمل.";
+    return "❌ لم أستطع حساب عمر الحمل. راجع تاريخ آخر تلقيح وتاريخ الإجهاض.";
   }
 
   if (gDays >= th) {
-    return `❌ عمر الحمل ${gDays} يوم — هذا أقرب لولادة وليس إجهاض (الحد الأدنى للولادة ${th} يوم).`;
+    return `❌ عمر الحمل حتى التاريخ المختار ${gDays} يومًا، وهو ضمن نطاق الولادة لأن الحد الأدنى ${th} يومًا. راجع التاريخ أو سجّل ولادة بدلًا من الإجهاض.`;
   }
 
   return null;
@@ -28902,7 +28926,7 @@ app.post("/api/abortion/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "firestore_disabled",
-        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة."
+       message: "❌ تعذّر فحص بيانات الإجهاض الآن. حاول مرة أخرى."
       });
     }
 
@@ -28926,7 +28950,7 @@ app.post("/api/abortion/gate", requireUserId, async (req, res) => {
       return res.status(404).json({
         ok: false,
         allowed: false,
-        message: "❌ رقم الحيوان غير موجود في حسابك. اكتب الرقم الصحيح أولًا."
+       message: `❌ لم أجد الحيوان رقم ${animalNumber} في حسابك. راجع الرقم وحاول مرة أخرى.`
       });
     }
 
@@ -28937,7 +28961,7 @@ app.post("/api/abortion/gate", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         allowed: false,
-        message: "❌ هذا الحيوان خارج القطيع (بيع/نفوق/استبعاد) — لا يمكن تسجيل أحداث له."
+       message: `❌ الحيوان رقم ${animalNumber} خارج القطيع، لذلك لا يمكن تسجيل إجهاض له.`
       });
     }
 
@@ -28990,7 +29014,7 @@ app.post("/api/abortion/gate", requireUserId, async (req, res) => {
     return res.json({
       ok: true,
       allowed: true,
-      message: "✅ تم التحقق — أكمل تسجيل الإجهاض.",
+      message: `✅ راجعت بيانات الحيوان رقم ${animalNumber}، ويمكنك تسجيل الإجهاض الآن. أكمل البيانات ثم احفظ.`,
       animalId: animal.id || "",
       animalNumber,
       species,
@@ -29011,7 +29035,7 @@ gestationDays: derived.gestationDays,
       ok: false,
       allowed: false,
       error: "abortion_gate_failed",
-      message: "❌ تعذّر التحقق من أهلية الإجهاض الآن."
+      message: "❌ تعذّر فحص بيانات الإجهاض الآن. حاول مرة أخرى."
     });
   }
 });
@@ -29026,7 +29050,7 @@ app.post("/api/abortion/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "تعذّر حفظ الحدث – تحقّق من الاتصال والصلاحيات."
+      message: "❌ تعذّر حفظ الإجهاض الآن. حاول مرة أخرى."
       });
     }
 
@@ -29048,7 +29072,7 @@ app.post("/api/abortion/save", requireUserId, async (req, res) => {
     if (!animalNumber || !eventDate) {
       return res.status(400).json({
         ok: false,
-        message: "❌ رقم الحيوان وتاريخ الإجهاض مطلوبان."
+       message: "❌ أدخل رقم الحيوان وتاريخ الإجهاض."
       });
     }
 
@@ -29057,7 +29081,7 @@ app.post("/api/abortion/save", requireUserId, async (req, res) => {
     if (!animal) {
       return res.status(404).json({
         ok: false,
-        message: "❌ رقم الحيوان غير موجود في حسابك. اكتب الرقم الصحيح أولًا."
+        message: `❌ لم أجد الحيوان رقم ${animalNumber} في حسابك. راجع الرقم وحاول مرة أخرى.`
       });
     }
 
@@ -29067,7 +29091,7 @@ app.post("/api/abortion/save", requireUserId, async (req, res) => {
     if (st === "inactive") {
       return res.status(400).json({
         ok: false,
-        message: "❌ هذا الحيوان خارج القطيع (بيع/نفوق/استبعاد) — لا يمكن تسجيل أحداث له."
+        message: `❌ الحيوان رقم ${animalNumber} خارج القطيع، لذلك لا يمكن تسجيل إجهاض له.`
       });
     }
 
@@ -29157,7 +29181,7 @@ if (typeof scheduleGroupsRebuildSrv === "function") {
 
 return res.json({
   ok: true,
-  message: "✅ تم حفظ الإجهاض بنجاح",
+  message: `✅ سجلت الإجهاض للحيوان رقم ${animalNumber} بنجاح، وأصبحت حالته التناسلية الآن «إجهاض».`,
   redirectUrl: `/event-list.html?number=${encodeURIComponent(animalNumber)}`,
   eventId: evRef.id,
 
@@ -29179,7 +29203,7 @@ return res.json({
     return res.status(500).json({
       ok: false,
       error: "abortion_save_failed",
-      message: "تعذّر حفظ الإجهاض – تحقّق من الاتصال والصلاحيات."
+      message: "❌ تعذّر حفظ الإجهاض الآن. حاول مرة أخرى."
     });
   }
 });
