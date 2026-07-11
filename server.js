@@ -21424,7 +21424,7 @@ async function vaccinationDueWarningSrv({
       code: "vaccination_early",
       dueDate: nearest.dueDate,
       taskId: nearest.taskId,
-      message: `⚠️ هذه الجرعة مبكرة عن موعدها المتوقع. الموعد القادم المسجل: ${nearest.dueDate}.`
+     message: `⚠️ موعد هذه الجرعة المسجل هو ${nearest.dueDate}، والتاريخ المختار أبكر منه. يمكنك الحفظ إذا كان تقديم الجرعة مقصودًا.`
     };
   }
 
@@ -21436,7 +21436,7 @@ async function vaccinationDueWarningSrv({
       dueDate: nearest.dueDate,
       windowEnd,
       taskId: nearest.taskId,
-      message: `⚠️ هذه الجرعة متأخرة عن نافذة التحصين المتوقعة. كانت مستحقة من ${nearest.dueDate}.`
+     message: `⚠️ موعد هذه الجرعة كان ${nearest.dueDate} وانتهت نافذتها المتوقعة. يمكنك الحفظ، لكن الجرعة متأخرة عن موعدها.`
     };
   }
 
@@ -21445,7 +21445,7 @@ async function vaccinationDueWarningSrv({
     code: "vaccination_due_ok",
     dueDate: nearest.dueDate,
     taskId: nearest.taskId,
-    message: `✅ الجرعة داخل موعدها المتوقع.`
+    message: "✅ توقيت الجرعة داخل موعد التحصين المتوقع."
   };
 }
 app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
@@ -21455,7 +21455,7 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         stage: "firestore_disabled",
-        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة.",
+        message: "❌ تعذّر فحص بيانات التحصين الآن. حاول مرة أخرى.",
         acceptedCount: 0,
         rejectedCount: 0,
         accepted: [],
@@ -21500,7 +21500,7 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
         allowed: false,
         silent: true,
         stage: "missing_basic",
-        message: "أدخل رقم الحيوان والتاريخ ونوع التحصين لبدء التحقق.",
+        message: "أدخل رقم الحيوان وتاريخ التحصين ونوع التحصين.",
         acceptedCount: 0,
         rejectedCount: 0,
         accepted: [],
@@ -21513,13 +21513,13 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         stage: "invalid_date",
-        message: "❌ تاريخ التحصين غير صالح.",
+        message: "❌ أدخل تاريخ تحصين صحيحًا.",
         acceptedCount: 0,
         rejectedCount: numbers.length,
         accepted: [],
         rejected: numbers.map(n => ({
           animalNumber: String(n || ""),
-          reason: "تاريخ التحصين غير صالح."
+          reason: "أدخل تاريخ تحصين صحيحًا."
         }))
       });
     }
@@ -21533,7 +21533,7 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
       if (!animalNumber) {
         rejected.push({
           animalNumber: String(rawNum || ""),
-          reason: "رقم غير صالح."
+          reason: "رقم الحيوان غير صحيح."
         });
         continue;
       }
@@ -21543,7 +21543,7 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
       if (!animal) {
         rejected.push({
           animalNumber,
-          reason: "الحيوان غير موجود في حسابك."
+          reason: "لم أجد الحيوان في حسابك. راجع الرقم."
         });
         continue;
       }
@@ -21554,7 +21554,7 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
       if (status === "inactive" || status === "archived") {
         rejected.push({
           animalNumber,
-          reason: "❌ لا يمكن تسجيل تحصين — الحيوان غير موجود بالقطيع."
+          reason: "الحيوان خارج القطيع، لذلك لا يمكن تسجيل تحصين له."
         });
         continue;
       }
@@ -21569,7 +21569,7 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
       if (duplicated) {
         rejected.push({
           animalNumber,
-          reason: "🚫 تم تسجيل نفس التحصين لهذا الحيوان في نفس اليوم."
+          reason: "سبق تسجيل التحصين نفسه لهذا الحيوان في التاريخ نفسه."
         });
         continue;
       }
@@ -21599,8 +21599,14 @@ return res.json({
   allowed: accepted.length > 0,
   stage: "vaccination_gate",
   message: accepted.length
-    ? `✅ تم التحقق — جاهز لتسجيل التحصين لعدد ${accepted.length}.`
-    : (firstReason || "❌ لا يوجد أي رقم صالح لتسجيل التحصين."),
+    ? (
+        rejected.length
+          ? `راجعت ${numbers.length} حيوانًا: يمكن تسجيل التحصين لـ${accepted.length}، ولا يمكن تسجيله لـ${rejected.length}.`
+          : accepted.length === 1
+            ? `✅ راجعت بيانات الحيوان رقم ${accepted[0].animalNumber}، ويمكنك تسجيل التحصين الآن.`
+            : `✅ راجعت البيانات، ويمكن تسجيل التحصين لعدد ${accepted.length} حيوانات.`
+      )
+    : (firstReason || "❌ لا يمكن تسجيل التحصين لأي من الأرقام المدخلة."),
   acceptedCount: accepted.length,
   rejectedCount: rejected.length,
   accepted,
@@ -21614,7 +21620,7 @@ return res.json({
       ok: false,
       allowed: false,
       stage: "vaccination_gate_failed",
-      message: "تعذّر التحقق من التحصين الآن — تحقّق من الاتصال والصلاحيات.",
+      message: "❌ تعذّر فحص بيانات التحصين الآن. حاول مرة أخرى.",
       acceptedCount: 0,
       rejectedCount: 0,
       accepted: [],
@@ -21873,7 +21879,7 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
     if (!db) {
       return res.status(503).json({
         ok: false,
-        message: "تعذّر حفظ التحصين — قاعدة البيانات غير متاحة.",
+       message: "❌ تعذّر حفظ التحصين الآن. حاول مرة أخرى.",
         savedCount: 0,
         rejectedCount: 0,
         saved: [],
@@ -21905,7 +21911,7 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
     if (!rows.length) {
       return res.status(400).json({
         ok: false,
-        message: "❌ رقم الحيوان مطلوب.",
+        message: "❌ أدخل رقم حيوان واحدًا على الأقل.",
         savedCount: 0,
         rejectedCount: 0,
         saved: [],
@@ -21916,13 +21922,13 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
     if (!calvingIsDateSrv(eventDate)) {
       return res.status(400).json({
         ok: false,
-        message: "❌ تاريخ التحصين غير صالح.",
+        message: "❌ أدخل تاريخ تحصين صحيحًا.",
         savedCount: 0,
         rejectedCount: rows.length,
         saved: [],
         rejected: rows.map(r => ({
           animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || ""),
-          reason: "تاريخ التحصين غير صالح."
+          reason: "أدخل تاريخ تحصين صحيحًا."
         }))
       });
     }
@@ -21930,13 +21936,13 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
     if (!vaccinationRequiredSrv(vaccine)) {
       return res.status(400).json({
         ok: false,
-        message: "❌ نوع التحصين مطلوب.",
+       message: "❌ اختر نوع التحصين.",
         savedCount: 0,
         rejectedCount: rows.length,
         saved: [],
         rejected: rows.map(r => ({
           animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || ""),
-          reason: "نوع التحصين مطلوب."
+          reason: "اختر نوع التحصين."
         }))
       });
     }
@@ -21944,13 +21950,13 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
     if (!vaccinationRequiredSrv(doseType)) {
       return res.status(400).json({
         ok: false,
-        message: "❌ نوع الجرعة مطلوب.",
+        message: "❌ اختر نوع الجرعة.",
         savedCount: 0,
         rejectedCount: rows.length,
         saved: [],
         rejected: rows.map(r => ({
-          animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || ""),
-          reason: "نوع الجرعة مطلوب."
+        animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || ""),
+        reason: "اختر نوع الجرعة."
         }))
       });
     }
@@ -21964,7 +21970,7 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
       if (!animalNumber) {
         rejected.push({
           animalNumber: "",
-          reason: "رقم غير صالح."
+          reason: "رقم الحيوان غير صحيح."
         });
         continue;
       }
@@ -21984,7 +21990,7 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
         if (!animal) {
           rejected.push({
             animalNumber,
-            reason: "الحيوان غير موجود في حسابك."
+            reason: "لم أجد الحيوان في حسابك. راجع الرقم."
           });
           continue;
         }
@@ -21998,7 +22004,7 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
       if (status === "inactive" || status === "archived") {
         rejected.push({
           animalNumber,
-          reason: "❌ لا يمكن تسجيل تحصين — الحيوان غير موجود بالقطيع."
+          reason: "الحيوان خارج القطيع، لذلك لا يمكن تسجيل تحصين له."
         });
         continue;
       }
@@ -22013,7 +22019,7 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
       if (duplicated) {
         rejected.push({
           animalNumber,
-          reason: "🚫 تم تسجيل نفس التحصين لهذا الحيوان في نفس اليوم."
+          reason: "سبق تسجيل التحصين نفسه لهذا الحيوان في التاريخ نفسه."
         });
         continue;
       }
@@ -22074,7 +22080,7 @@ const existingEventSnap = await eventRef.get();
 if (existingEventSnap.exists) {
   rejected.push({
     animalNumber,
-    reason: "🚫 تم تسجيل نفس التحصين لهذا الحيوان في نفس اليوم."
+    reason: "سبق تسجيل التحصين نفسه لهذا الحيوان في التاريخ نفسه."
   });
   continue;
 }
@@ -22115,9 +22121,15 @@ saved.push({
 
     return res.json({
       ok: saved.length > 0,
-      message: saved.length
-        ? `✅ تم حفظ التحصين بنجاح لعدد ${saved.length}.`
-        : "❌ لم يتم حفظ أي تحصين.",
+ message: saved.length
+  ? (
+      rejected.length
+        ? `✅ سجلت التحصين لعدد ${saved.length} حيوانات، ولم أتمكن من تسجيله لعدد ${rejected.length}.`
+        : saved.length === 1
+          ? `✅ سجلت التحصين للحيوان رقم ${saved[0].animalNumber} بنجاح.`
+          : `✅ سجلت التحصين لعدد ${saved.length} حيوانات بنجاح.`
+    )
+  : "❌ لم أتمكن من تسجيل التحصين لأي حيوان.",
       savedCount: saved.length,
       rejectedCount: rejected.length,
       saved,
@@ -22132,7 +22144,7 @@ saved.push({
 
     return res.status(500).json({
       ok: false,
-      message: "تعذّر حفظ التحصين — تحقّق من الاتصال والصلاحيات.",
+      message: "❌ تعذّر حفظ التحصين الآن. حاول مرة أخرى.",
       savedCount: 0,
       rejectedCount: 0,
       saved: [],
@@ -26870,7 +26882,7 @@ app.get("/api/vaccination/dashboard-alerts", requireUserId, async (req, res) => 
         ok: false,
         count: 0,
         alerts: [],
-        message: "تعذّر تحميل تنبيهات التحصين — قاعدة البيانات غير متاحة."
+        message: "❌ تعذّر تحميل تنبيهات التحصين الآن. حاول مرة أخرى."
       });
     }
 
@@ -26949,9 +26961,9 @@ app.get("/api/vaccination/dashboard-alerts", requireUserId, async (req, res) => 
 
         title: isToday ? "تحصين مستحق اليوم" : "تحصين مستحق غدًا",
 
-        message: `${isToday ? "⏰ اليوم" : "📌 غدًا"} ${g.vaccineKey}\nللحيوانات أرقام: ${nums.join("، ")}`,
+       message: `${isToday ? "⏰ مستحق اليوم" : "📌 مستحق غدًا"}: ${g.vaccineKey}\nالحيوانات: ${nums.join("، ")}`,
 
-        actionText: "فتح صفحة التحصين",
+        actionText: "تسجيل التحصين",
         actionUrl:
           `vaccination.html?entryMode=bulk` +
           `&date=${encodeURIComponent(g.dueDate)}` +
@@ -26988,7 +27000,7 @@ app.get("/api/vaccination/dashboard-alerts", requireUserId, async (req, res) => 
       ok: false,
       count: 0,
       alerts: [],
-      message: "تعذّر تحميل تنبيهات التحصين."
+     message: "❌ تعذّر تحميل تنبيهات التحصين الآن. حاول مرة أخرى."
     });
   }
 });
