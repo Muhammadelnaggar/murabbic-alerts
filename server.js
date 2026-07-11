@@ -10331,7 +10331,7 @@ return res.json({
     return res.status(500).json({
       ok: false,
       error: 'nutrition_targets_failed',
-      message: e.message || String(e)
+     message: "❌ تعذّر حساب احتياجات الحيوان الآن. حاول مرة أخرى."
     });
   }
 });
@@ -10422,11 +10422,12 @@ app.post('/api/nutrition/analyze-ration', requireUserId, async (req, res) => {
     const rows = Array.isArray(body.rows) ? body.rows : [];
 
     if (!rows.length) {
-      return res.status(400).json({
-        ok: false,
-        error: 'nutrition_rows_required'
-      });
-    }
+     return res.status(400).json({
+     ok: false,
+     error: 'nutrition_rows_required',
+     message: "❌ أضف خامة واحدة على الأقل إلى العليقة قبل التحليل."
+   });
+      }
 
 const rawContext = normalizeNutritionContext(body.context || {});
 const milkScenario = nutritionMilkScenarioContextSrv(rawContext);
@@ -10448,11 +10449,11 @@ const enrichedRows = await enrichNutritionRowsFromFeedItems(req.userId, rows);
 const normalizedRows = normalizeNutritionRows(enrichedRows);
 const missingPriceRows = findMissingNutritionPrices(normalizedRows);
 if (missingPriceRows.length) {
-  return res.status(400).json({
-    ok: false,
-    error: 'feed_price_required',
-    message: 'سعر كل خامة داخل التركيبة إجباري لحساب التحليل الاقتصادي بدقة',
-    missingRows: missingPriceRows.map(r => r.name || r.nameAr || r.feedName || r.id).slice(0, 10)
+return res.status(400).json({
+  ok: false,
+  error: 'feed_price_required',
+  message: "❌ أدخل سعر كل خامة مستخدمة حتى يكتمل التحليل الاقتصادي للعليقة.",
+  missingRows: missingPriceRows.map(r => r.name || r.nameAr || r.feedName || r.id).slice(0, 10)
   });
 }
 console.log('NUTRITION ANALYZE rawRows[0] =', rows[0] || null);
@@ -10517,7 +10518,7 @@ return res.json({
     return res.status(500).json({
       ok: false,
       error: 'nutrition_analyze_failed',
-      message: e.message || String(e)
+     message: "❌ تعذّر تحليل العليقة الآن. راجع البيانات وحاول مرة أخرى."
     });
   }
 });
@@ -10530,7 +10531,7 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: 'firestore_unavailable',
-        message: 'قاعدة البيانات غير متاحة الآن.'
+        message: "❌ تعذّر تحميل بيانات التغذية الآن. حاول مرة أخرى."
       });
     }
 
@@ -10543,7 +10544,7 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: 'animal_number_required',
-        message: 'رقم الحيوان أو أرقام المجموعة مطلوبة.'
+        message: "❌ اختر حيوانًا أو مجموعة تغذية أولًا."
       });
     }
 
@@ -10621,7 +10622,7 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
       return res.status(404).json({
         ok: false,
         error: 'animal_not_found',
-        message: 'لم يتم العثور على الحيوان داخل حسابك.'
+        message: "❌ لم أجد الحيوان أو حيوانات المجموعة في حسابك. راجع الأرقام."
       });
     }
 
@@ -10748,7 +10749,7 @@ const dominantText = (field) => {
     return res.status(500).json({
       ok: false,
       error: 'nutrition_context_failed',
-      message: 'تعذّر تحميل سياق التغذية.'
+     message: "❌ تعذّر تحميل بيانات الحيوان أو المجموعة للتغذية. حاول مرة أخرى."
     });
   }
 });
@@ -10762,7 +10763,7 @@ app.get('/api/nutrition/feed-items', requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: 'firestore_unavailable',
-        message: 'قاعدة البيانات غير متاحة الآن.',
+       message: "❌ تعذّر تحميل خامات التغذية الآن. حاول مرة أخرى.",
         feeds: []
       });
     }
@@ -10840,14 +10841,21 @@ app.get('/api/nutrition/feed-items', requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: 'nutrition_feed_items_failed',
-      message: 'تعذّر تحميل خامات التغذية.',
+     message: "❌ تعذّر تحميل خامات التغذية الآن. حاول مرة أخرى.",
       feeds: []
     });
   }
 });
 app.get('/api/nutrition/custom-feeds', requireUserId, async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok:false, error:'firestore_unavailable' });
+   if (!db) {
+  return res.status(503).json({
+    ok: false,
+    error: 'firestore_unavailable',
+    message: "❌ تعذّر تحميل خامات المزرعة الخاصة الآن.",
+    feeds: []
+  });
+}
 
     const snap = await db.collection('custom_feed_items')
       .where('userId', '==', req.userId)
@@ -10868,13 +10876,24 @@ app.get('/api/nutrition/custom-feeds', requireUserId, async (req, res) => {
     return res.json({ ok:true, feeds });
   } catch (e) {
     console.error('custom feeds list failed:', e.message || e);
-    return res.status(500).json({ ok:false, error:'custom_feeds_list_failed' });
+   return res.status(500).json({
+  ok: false,
+  error: 'custom_feeds_list_failed',
+  message: "❌ تعذّر تحميل خامات المزرعة الخاصة الآن.",
+  feeds: []
+});
   }
 });
 
 app.post('/api/nutrition/custom-feed', requireUserId, async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok:false, error:'firestore_unavailable' });
+   if (!db) {
+  return res.status(503).json({
+    ok: false,
+    error: 'firestore_unavailable',
+    message: "❌ تعذّر حفظ البريمكس المخصص الآن."
+  });
+}
 
     const body = req.body || {};
     const customType = String(body.customType || 'mineral_vitamin_premix').trim();
@@ -10935,6 +10954,7 @@ app.post('/api/nutrition/custom-feed', requireUserId, async (req, res) => {
 
     return res.json({
       ok:true,
+      message: `✅ تم حفظ ${nameAr} ضمن خامات المزرعة الخاصة.`,
       feed: {
         id: ref.id,
         ...feed
@@ -10945,7 +10965,7 @@ app.post('/api/nutrition/custom-feed', requireUserId, async (req, res) => {
     return res.status(500).json({
       ok:false,
       error:'custom_feed_save_failed',
-      message:'تعذر حفظ البريمكس المخصص.'
+     message: "❌ تعذّر حفظ البريمكس المخصص الآن. حاول مرة أخرى."
     });
   }
 });
@@ -10973,11 +10993,19 @@ const groupNumbers = Array.isArray(body.groupNumbers)
   : [];
 
 if (!isGroup && !animalNumber) {
-  return res.status(400).json({ ok:false, error:'animalNumber_required' });
+  return res.status(400).json({
+  ok: false,
+  error: 'animalNumber_required',
+  message: "❌ اختر الحيوان الذي تريد حفظ العليقة له."
+});
 }
 
 if (isGroup && !groupNumbers.length) {
-  return res.status(400).json({ ok:false, error:'groupNumbers_required' });
+ return res.status(400).json({
+  ok: false,
+  error: 'groupNumbers_required',
+  message: "❌ مجموعة التغذية لا تحتوي على حيوانات صالحة للحفظ."
+});
 }
 
 const nutrition = body.nutrition || {};
@@ -11007,11 +11035,12 @@ if (!rows.length) {
   return res.status(400).json({
     ok:false,
     error:'nutrition_rows_required',
+    message: "❌ أضف خامة واحدة على الأقل إلى العليقة قبل الحفظ.",
     debug: {
-      rawRowsLength: rawRows.length,
-      firstRawRow: rawRows[0] || null,
-      normalizedRowsLength: rows.length,
-      firstNormalizedRow: rows[0] || null
+    rawRowsLength: rawRows.length,
+    firstRawRow: rawRows[0] || null,
+    normalizedRowsLength: rows.length,
+    firstNormalizedRow: rows[0] || null
     }
   });
 }
@@ -11038,7 +11067,7 @@ if (!isDrySave && (!Number.isFinite(Number(milkPrice)) || Number(milkPrice) <= 0
   return res.status(400).json({
     ok: false,
     error: 'milk_price_required',
-    message: 'سعر اللبن إجباري للحلاب فقط لحساب الهامش و IOFC في تقرير التغذية.'
+    message: "❌ أدخل سعر اللبن للحيوانات الحلاب حتى يكتمل حساب الهامش الاقتصادي للعليقة."
   });
 }
 
@@ -11075,7 +11104,11 @@ let animalDocId = '';
 if (!isGroup && db) {
   animalDoc = await findAnimalDocRefByNumberForTenant(tenant, animalNumber);
   if (!animalDoc) {
-    return res.status(404).json({ ok:false, error:'animal_not_found' });
+    return res.status(404).json({
+  ok: false,
+  error: 'animal_not_found',
+  message: `❌ لم أجد الحيوان رقم ${animalNumber} في حسابك.`
+});
   }
   animalDocId = animalDoc.id;
 }
@@ -11151,7 +11184,7 @@ if (db) {
       return res.status(404).json({
         ok: false,
         error: 'nutrition_event_not_found',
-        message: 'العليقة المحفوظة غير موجودة.'
+        message: "❌ العليقة التي تحاول تعديلها غير موجودة."
       });
     }
 
@@ -11162,7 +11195,7 @@ if (db) {
       return res.status(403).json({
         ok: false,
         error: 'nutrition_event_forbidden',
-        message: 'لا يمكن تعديل عليقة لا تخص هذا المستخدم.'
+        message: "❌ لا يمكنك تعديل عليقة لا تخص حسابك."
       });
     }
 
@@ -11180,7 +11213,7 @@ if (db) {
       return res.status(400).json({
         ok: false,
         error: 'not_nutrition_event',
-        message: 'هذه الوثيقة ليست عليقة تغذية.'
+        message: "❌ السجل المطلوب ليس عليقة تغذية صالحة للتعديل."
       });
     }
 
@@ -11210,16 +11243,26 @@ return res.json({
   groupNumbers: isGroup ? groupNumbers : null,
   eventDate,
   firestoreId,
-  message: updatedExisting
-    ? '✅ تم حفظ تعديل عليقة التغذية بنجاح.'
-    : (isGroup
-        ? '✅ تم حفظ عليقة المجموعة بنجاح.'
-        : '✅ تم حفظ عليقة الحيوان بنجاح.')
+ message: updatedExisting
+  ? (
+      isGroup
+        ? `✅ تم حفظ تعديلات عليقة المجموعة لعدد ${groupNumbers.length} حيوانًا بنجاح.`
+        : `✅ تم حفظ تعديلات عليقة الحيوان رقم ${animalNumber} بنجاح.`
+    )
+  : (
+      isGroup
+        ? `✅ تم حفظ عليقة المجموعة لعدد ${groupNumbers.length} حيوانًا بنجاح.`
+        : `✅ تم حفظ عليقة الحيوان رقم ${animalNumber} بنجاح.`
+    )
 });
 
   } catch (e) {
     console.error('nutrition.save error:', e);
-    return res.status(500).json({ ok:false, error:'nutrition_save_failed', message: e.message || String(e) });
+   return res.status(500).json({
+  ok: false,
+  error: 'nutrition_save_failed',
+  message: "❌ تعذّر حفظ العليقة الآن. راجع البيانات وحاول مرة أخرى."
+});
   }
 });
 
