@@ -2326,27 +2326,27 @@ function addAnimalBasicFieldsDecisionSrv(fd = {}) {
   const errors = {};
 
   if (!addAnimalDigitsSrv(fd.animalNumber || fd.number || fd.calfNumber)) {
-    errors.animalNumber = "رقم الحيوان مطلوب.";
+    errors.animalNumber = "أدخل رقم الحيوان.";
   }
 
   if (!addAnimalStrSrv(fd.animalType || fd.animalTypeAr)) {
-    errors.animalType = "نوع الحيوان مطلوب.";
+    errors.animalType = "اختر نوع الحيوان.";
   }
 
   if (!addAnimalStrSrv(fd.breed)) {
-    errors.breed = "السلالة مطلوبة.";
+    errors.breed = "اختر السلالة.";
   }
 
   if (!addAnimalStrSrv(fd.entryType)) {
-    errors.entryType = "نوع الإدخال غير محدد.";
+    errors.entryType = "اختر نوع الإدخال.";
   }
 
   const dateFields = [
-    ["birthDate", "تاريخ الميلاد غير صالح."],
-    ["lastCalvingDate", "تاريخ آخر ولادة غير صالح."],
-    ["lastInseminationDate", "تاريخ آخر تلقيح غير صالح."],
-    ["weaningDate", "تاريخ الفطام غير صالح."],
-    ["followerLastInseminationDate", "تاريخ آخر تلقيح غير صالح."]
+    ["birthDate", "أدخل تاريخ ميلاد صحيحًا."],
+    ["lastCalvingDate", "أدخل تاريخ آخر ولادة صحيحًا."],
+    ["lastInseminationDate", "أدخل تاريخ آخر تلقيح صحيحًا."],
+    ["weaningDate", "أدخل تاريخ فطام صحيحًا."],
+    ["followerLastInseminationDate", "أدخل تاريخ آخر تلقيح صحيحًا."]
   ];
 
   for (const [field, msg] of dateFields) {
@@ -2356,17 +2356,18 @@ function addAnimalBasicFieldsDecisionSrv(fd = {}) {
   }
 
   const numFields = [
-    ["dailyMilk", "إنتاج اللبن غير صالح."],
-    ["servicesCount", "عدد مرات التلقيح غير صالح."],
-    ["lactationNumber", "رقم موسم الحليب غير صالح."],
-    ["daysInMilk", "عدد أيام الحليب غير صالح."],
-    ["pregnancyDays", "عدد أيام الحمل غير صالح."],
-    ["followerServicesCount", "عدد مرات التلقيح غير صالح."],
-    ["followerPregnancyDays", "عدد أيام الحمل غير صالح."]
+    ["dailyMilk", "أدخل إنتاج اللبن بقيمة رقمية صحيحة."],
+    ["servicesCount", "أدخل عدد مرات التلقيح بقيمة رقمية صحيحة."],
+    ["lactationNumber", "أدخل رقم موسم حليب صحيحًا."],
+    ["daysInMilk", "أدخل عدد أيام الحليب بقيمة رقمية صحيحة."],
+    ["pregnancyDays", "أدخل عدد أيام الحمل بقيمة رقمية صحيحة."],
+    ["followerServicesCount", "أدخل عدد مرات التلقيح بقيمة رقمية صحيحة."],
+    ["followerPregnancyDays", "أدخل عدد أيام الحمل بقيمة رقمية صحيحة."]
   ];
 
   for (const [field, msg] of numFields) {
     const val = addAnimalStrSrv(fd[field]);
+
     if (val && !Number.isFinite(Number(val))) {
       errors[field] = msg;
     }
@@ -2380,15 +2381,18 @@ function addAnimalDecisionSrv(fd = {}) {
 
   if (mode === "mothers") {
     if (!addAnimalStrSrv(fd.productionStatus)) {
-      return "❌ الحالة الإنتاجية مطلوبة.";
+      return "❌ اختر الحالة الإنتاجية للحيوان.";
     }
 
     if (!addAnimalStrSrv(fd.reproductiveStatus)) {
-      return "❌ الحالة التناسلية مطلوبة.";
+      return "❌ اختر الحالة التناسلية للحيوان.";
     }
 
-    if (addAnimalStrSrv(fd.productionStatus) === "حلاب" && !addAnimalStrSrv(fd.dailyMilk)) {
-      return "❌ إنتاج اللبن اليومي مطلوب للحيوان الحلاب.";
+    if (
+      addAnimalStrSrv(fd.productionStatus) === "حلاب" &&
+      !addAnimalStrSrv(fd.dailyMilk)
+    ) {
+      return "❌ أدخل إنتاج اللبن اليومي للحيوان الحلاب.";
     }
 
     const repro = addAnimalStrSrv(fd.reproductiveStatus);
@@ -2400,14 +2404,19 @@ function addAnimalDecisionSrv(fd = {}) {
       repro === "عشار";
 
     if (needsSireNumber && !addAnimalSireNumberSrv(fd)) {
-      return "❌ رقم الطلوقة مطلوب للحيوان العشار أو الملقح.";
+      return "❌ أدخل رقم الطلوقة للحيوان العشار أو الملقح.";
     }
 
     if (
-      (repro === "ملقحة" || repro === "ملقح" || repro === "عشار" || services > 0) &&
+      (
+        repro === "ملقحة" ||
+        repro === "ملقح" ||
+        repro === "عشار" ||
+        services > 0
+      ) &&
       !addAnimalStrSrv(fd.lastInseminationDate)
     ) {
-      return "❌ تاريخ آخر تلقيح مطلوب للحيوان العشار أو الملقح أو الذي له تلقيح سابق في الموسم.";
+      return "❌ أدخل تاريخ آخر تلقيح للحيوان العشار أو الملقح أو الذي سبق تلقيحه في الموسم.";
     }
 
     return null;
@@ -2415,42 +2424,48 @@ function addAnimalDecisionSrv(fd = {}) {
 
   if (mode === "followers") {
     if (!addAnimalStrSrv(fd.birthDate)) {
-      return "❌ تاريخ الميلاد مطلوب للتابع.";
+      return "❌ أدخل تاريخ ميلاد التابع.";
     }
 
     if (!addAnimalStrSrv(fd.followerSex)) {
-      return "❌ جنس التابع مطلوب.";
+      return "❌ اختر جنس التابع.";
     }
 
     if (!addAnimalStrSrv(fd.followerStatus)) {
-      return "❌ الحالة الحالية للتابع مطلوبة.";
+      return "❌ اختر الحالة الحالية للتابع.";
     }
 
     if (!addAnimalStrSrv(fd.damNumber)) {
-      return "❌ رقم الأم مطلوب.";
+      return "❌ أدخل رقم أم التابع.";
     }
 
-    if (addAnimalStrSrv(fd.followerStatus) === "فطام" && !addAnimalStrSrv(fd.weaningDate)) {
-      return "❌ تاريخ الفطام مطلوب.";
+    if (
+      addAnimalStrSrv(fd.followerStatus) === "فطام" &&
+      !addAnimalStrSrv(fd.weaningDate)
+    ) {
+      return "❌ أدخل تاريخ فطام التابع.";
     }
 
     const st = addAnimalStrSrv(fd.followerStatus);
 
-    if ((st === "ملقح" || st === "عشار") && !addAnimalStrSrv(fd.followerLastInseminationDate)) {
-      return "❌ تاريخ آخر تلقيح مطلوب.";
+    if (
+      (st === "ملقح" || st === "عشار") &&
+      !addAnimalStrSrv(fd.followerLastInseminationDate)
+    ) {
+      return "❌ أدخل تاريخ آخر تلقيح للتابع.";
     }
 
     return null;
   }
 
-  return "❌ نوع الإدخال غير معروف.";
+  return "❌ اختر نوع الإدخال: حيوان رئيسي أو تابع.";
 }
 
 async function addAnimalDuplicateCheckSrv(uid, numberStr) {
   if (!db || !uid || !numberStr) {
     return {
       ok: false,
-      message: "⚠️ تعذّر التحقق من رقم الحيوان الآن."
+     message: "❌ تعذّر فحص رقم الحيوان الآن. حاول مرة أخرى."
     };
   }
 
@@ -2469,7 +2484,7 @@ async function addAnimalDuplicateCheckSrv(uid, numberStr) {
         ok: false,
         duplicate: true,
         collection: colName,
-        message: `⚠️ يوجد حيوان مسجَّل بالفعل برقم ${numberStr} في حسابك.`
+        message: `❌ الرقم ${numberStr} مسجل بالفعل لحيوان في حسابك.`
       };
     }
 
@@ -2484,7 +2499,7 @@ async function addAnimalDuplicateCheckSrv(uid, numberStr) {
         ok: false,
         duplicate: true,
         collection: colName,
-        message: `⚠️ يوجد حيوان مسجَّل بالفعل برقم ${numberStr} في حسابك.`
+        message: `❌ الرقم ${numberStr} مسجل بالفعل لحيوان في حسابك.`
       };
     }
 
@@ -2500,7 +2515,7 @@ async function addAnimalDuplicateCheckSrv(uid, numberStr) {
           ok: false,
           duplicate: true,
           collection: colName,
-          message: `⚠️ يوجد حيوان مسجَّل بالفعل برقم ${numberStr} في حسابك.`
+          message: `❌ الرقم ${numberStr} مسجل بالفعل لحيوان في حسابك.`
         };
       }
     }
@@ -2514,7 +2529,7 @@ app.get("/api/add-animal/check-number", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن."
+        message: "❌ تعذّر فحص رقم الحيوان الآن. حاول مرة أخرى."
       });
     }
 
@@ -2531,7 +2546,7 @@ app.get("/api/add-animal/check-number", requireUserId, async (req, res) => {
         ok: false,
         error: "animal_number_required",
         available: false,
-        message: "رقم الحيوان مطلوب."
+       message: "❌ أدخل رقم الحيوان أولًا."
       });
     }
 
@@ -2544,7 +2559,7 @@ app.get("/api/add-animal/check-number", requireUserId, async (req, res) => {
         duplicate: true,
         animalNumber: numberStr,
         collection: duplicate.collection || null,
-        message: duplicate.message || `⚠️ يوجد حيوان مسجَّل بالفعل برقم ${numberStr} في حسابك.`
+        message: duplicate.message || `❌ الرقم ${numberStr} مسجل بالفعل لحيوان في حسابك.`
       });
     }
 
@@ -2554,7 +2569,7 @@ app.get("/api/add-animal/check-number", requireUserId, async (req, res) => {
         available: false,
         error: "duplicate_check_failed",
         animalNumber: numberStr,
-        message: duplicate.message || "تعذّر التحقق من رقم الحيوان الآن."
+        message: duplicate.message || "❌ تعذّر فحص رقم الحيوان الآن. حاول مرة أخرى."
       });
     }
 
@@ -2563,7 +2578,7 @@ app.get("/api/add-animal/check-number", requireUserId, async (req, res) => {
       available: true,
       duplicate: false,
       animalNumber: numberStr,
-      message: `✅ الرقم ${numberStr} متاح للتسجيل.`
+      message: `✅ الرقم ${numberStr} متاح ويمكن تسجيل الحيوان به.`
     });
 
   } catch (e) {
@@ -2573,7 +2588,7 @@ app.get("/api/add-animal/check-number", requireUserId, async (req, res) => {
       ok: false,
       available: false,
       error: "add_animal_check_number_failed",
-      message: "تعذّر التحقق من رقم الحيوان الآن."
+      message: "❌ تعذّر فحص رقم الحيوان الآن. حاول مرة أخرى."
     });
   }
 });
@@ -2720,7 +2735,7 @@ app.post("/api/add-animal/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن."
+        message: "❌ تعذّر تسجيل الحيوان الآن. حاول مرة أخرى."
       });
     }
 
@@ -2738,7 +2753,7 @@ app.post("/api/add-animal/save", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "add_animal_fields_invalid",
-        message: "راجع بيانات الحيوان المطلوبة.",
+        message: "❌ راجع الحقول الموضحة وأكمل بيانات الحيوان.",
         fieldErrors
       });
     }
@@ -2774,7 +2789,9 @@ app.post("/api/add-animal/save", requireUserId, async (req, res) => {
 
     return res.json({
       ok: true,
-      message: "✅ تم تسجيل الحيوان بنجاح",
+      message: payload.entryType === "followers"
+  ? `✅ تم تسجيل التابع رقم ${numberStr} بنجاح.`
+  : `✅ تم تسجيل الحيوان رقم ${numberStr} بنجاح.`,
       animalId: ref.id,
       animalNumber: numberStr,
       number: numberStr,
@@ -2789,7 +2806,7 @@ app.post("/api/add-animal/save", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "add_animal_save_failed",
-      message: "حدث خطأ أثناء تسجيل الحيوان."
+      message: "❌ تعذّر تسجيل الحيوان الآن. حاول مرة أخرى."
     });
   }
 });
@@ -2841,7 +2858,7 @@ app.post("/api/add-animal/preview", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "add_animal_preview_failed",
-      message: "تعذّر حساب المعاينة الآن."
+      message: "❌ تعذّر حساب بيانات الحيوان الآن. حاول مرة أخرى."
     });
   }
 });
@@ -3542,7 +3559,7 @@ app.post("/api/add-animal/import-preview", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن.",
+        message: "❌ تعذّرت معاينة ملف الحيوانات الآن. حاول مرة أخرى.",
         rows: []
       });
     }
@@ -3556,7 +3573,7 @@ app.post("/api/add-animal/import-preview", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "import_rows_required",
-        message: "لا توجد صفوف صالحة للمعاينة.",
+        message: "❌ لم أجد بيانات قابلة للقراءة في الملف. راجع الملف وحاول مرة أخرى.",
         importKind,
         rows: []
       });
@@ -3581,7 +3598,7 @@ app.post("/api/add-animal/import-preview", requireUserId, async (req, res) => {
         status: "ready",
         ok: true,
         reason: null,
-        message: "جاهز للحفظ.",
+        message: "جاهز للاستيراد.",
         data: fd
       };
 
@@ -3589,7 +3606,7 @@ app.post("/api/add-animal/import-preview", requireUserId, async (req, res) => {
         item.status = "rejected";
         item.ok = false;
         item.reason = "animal_number_required";
-        item.message = `السطر ${rowNumber}: رقم الحيوان مطلوب.`;
+        item.message = `السطر ${rowNumber}: أدخل رقم الحيوان.`;
         previewRows.push(item);
         rejectedCount++;
         continue;
@@ -3599,7 +3616,7 @@ app.post("/api/add-animal/import-preview", requireUserId, async (req, res) => {
         item.status = "rejected";
         item.ok = false;
         item.reason = "duplicate_in_file";
-        item.message = `السطر ${rowNumber}: الرقم ${numberStr} مكرر داخل ملف الاستيراد.`;
+        item.message = `السطر ${rowNumber}: رقم الحيوان ${numberStr} مكرر داخل الملف.`;
         previewRows.push(item);
         rejectedCount++;
         continue;
@@ -3613,7 +3630,7 @@ app.post("/api/add-animal/import-preview", requireUserId, async (req, res) => {
         item.status = "rejected";
         item.ok = false;
         item.reason = "fields_invalid";
-        item.message = `السطر ${rowNumber}: راجع بيانات الحيوان المطلوبة.`;
+        item.message = `السطر ${rowNumber}: راجع الحقول المطلوبة لهذا الحيوان.`;
         item.fieldErrors = fieldErrors;
         previewRows.push(item);
         rejectedCount++;
@@ -3656,7 +3673,13 @@ app.post("/api/add-animal/import-preview", requireUserId, async (req, res) => {
       readyCount,
       rejectedCount,
       partial: readyCount > 0 && rejectedCount > 0,
-      message: `تمت معاينة ${rows.length} سجل: ${readyCount} جاهز، ${rejectedCount} مرفوض.`,
+     message: readyCount > 0
+  ? (
+      rejectedCount > 0
+        ? `راجعت ${rows.length} سجلًا: ${readyCount} جاهز للاستيراد، و${rejectedCount} يحتاج مراجعة.`
+        : `✅ تمت معاينة ${rows.length} سجلًا، وكلها جاهزة للاستيراد.`
+    )
+  : `❌ تمت معاينة ${rows.length} سجلًا، ولا يوجد أي سجل جاهز للاستيراد.`,
       rows: previewRows
     });
 
@@ -3666,7 +3689,7 @@ app.post("/api/add-animal/import-preview", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "add_animal_import_preview_failed",
-      message: "حدث خطأ أثناء معاينة ملف الاستيراد.",
+     message: "❌ تعذّرت معاينة ملف الحيوانات الآن. حاول مرة أخرى.",
       rows: []
     });
   }
@@ -3677,7 +3700,7 @@ app.post("/api/add-animal/import", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن.",
+        message: "❌ تعذّر استيراد الحيوانات الآن. حاول مرة أخرى.",
         saved: [],
         rejected: []
       });
@@ -3692,7 +3715,7 @@ app.post("/api/add-animal/import", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "import_rows_required",
-        message: "لا توجد صفوف صالحة للاستيراد.",
+        message: "❌ لم أجد بيانات صالحة للاستيراد في الملف.",
         saved: [],
         rejected: []
       });
@@ -3716,7 +3739,7 @@ app.post("/api/add-animal/import", requireUserId, async (req, res) => {
           row: rowNumber,
           animalNumber: "",
           reason: "animal_number_required",
-          message: `السطر ${rowNumber}: رقم الحيوان مطلوب.`
+          message: `السطر ${rowNumber}: أدخل رقم الحيوان.`
         });
         continue;
       }
@@ -3726,7 +3749,7 @@ app.post("/api/add-animal/import", requireUserId, async (req, res) => {
           row: rowNumber,
           animalNumber: numberStr,
           reason: "duplicate_in_file",
-          message: `السطر ${rowNumber}: الرقم ${numberStr} مكرر داخل ملف الاستيراد.`
+          message: `السطر ${rowNumber}: رقم الحيوان ${numberStr} مكرر داخل الملف.`
         });
         continue;
       }
@@ -3740,7 +3763,7 @@ app.post("/api/add-animal/import", requireUserId, async (req, res) => {
           row: rowNumber,
           animalNumber: numberStr,
           reason: "fields_invalid",
-          message: `السطر ${rowNumber}: راجع بيانات الحيوان المطلوبة.`,
+          message: `السطر ${rowNumber}: راجع الحقول المطلوبة لهذا الحيوان.`,
           fieldErrors
         });
         continue;
@@ -3782,7 +3805,7 @@ app.post("/api/add-animal/import", requireUserId, async (req, res) => {
         animalNumber: numberStr,
         animalId: ref.id,
         collection: collectionName,
-        message: `تم تجهيز الحيوان رقم ${numberStr} للحفظ.`
+        message: `تم استيراد الحيوان رقم ${numberStr} بنجاح.`
       });
 
       if (ops >= 400) {
@@ -3803,9 +3826,13 @@ app.post("/api/add-animal/import", requireUserId, async (req, res) => {
     return res.status(saved.length ? 200 : 400).json({
       ok: saved.length > 0,
       partial: saved.length > 0 && rejected.length > 0,
-      message: saved.length
-        ? `✅ تم استيراد ${saved.length} حيوان بنجاح.`
-        : "لم يتم استيراد أي حيوان.",
+ message: saved.length
+  ? (
+      rejected.length
+        ? `✅ تم استيراد ${saved.length} حيوان، ولم يتم استيراد ${rejected.length} سجل يحتاج مراجعة.`
+        : `✅ تم استيراد ${saved.length} حيوان بنجاح.`
+    )
+  : "❌ لم يتم استيراد أي حيوان. راجع أسباب الرفض الظاهرة.",
       importKind,
       savedCount: saved.length,
       rejectedCount: rejected.length,
@@ -3819,7 +3846,7 @@ app.post("/api/add-animal/import", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "add_animal_import_failed",
-      message: "حدث خطأ أثناء استيراد الحيوانات.",
+     message: "❌ تعذّر استيراد الحيوانات الآن. حاول مرة أخرى.",
       saved: [],
       rejected: []
     });
