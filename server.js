@@ -28249,28 +28249,16 @@ function dryOffSaveRequiredSrv(v) {
 function closeupDecisionSrv(fd = {}) {
   const doc = fd.documentData || {};
   if (!doc || !Object.keys(doc).length) {
-    return "❌ تعذّر العثور على الحيوان.";
+   return "❌ لم أجد بيانات الحيوان. راجع الرقم وحاول مرة أخرى.";
   }
 
-  // منع تكرار "تحضير للولادة" داخل نفس الموسم
-  const lastCloseUp = String(doc.lastCloseUpDate || "").trim();
-  const lastCalving = String(doc.lastCalvingDate || "").trim();
-
-  if (calvingIsDateSrv(lastCloseUp)) {
-    if (!calvingIsDateSrv(lastCalving)) {
-      return `❌ تم تسجيل تحضير للولادة مسبقًا بتاريخ ${lastCloseUp} — لا يمكن تكراره في نفس الموسم.`;
-    }
-
-    const gapFromCalvingToCloseUp = calvingDaysBetweenSrv(lastCalving, lastCloseUp);
-    if (Number.isFinite(gapFromCalvingToCloseUp) && gapFromCalvingToCloseUp >= 0) {
-      return `❌ تم تسجيل تحضير للولادة مسبقًا في هذا الموسم بتاريخ ${lastCloseUp} — لا يمكن تكراره.`;
-    }
-  }
+const lastCloseUp = String(doc.lastCloseUpDate || "").trim();
+const lastCalving = String(doc.lastCalvingDate || "").trim();
 
   // خارج القطيع
   const st = String(doc.status ?? "").trim().toLowerCase();
   if (st === "inactive" || st === "archived") {
-    return "❌ لا يمكن تسجيل التحضير — الحيوان خارج القطيع.";
+    return "❌ هذا الحيوان خارج القطيع، لذلك لا يمكن تسجيل تحضير الولادة له.";
   }
 
   // آخر تلقيح
@@ -28296,7 +28284,7 @@ function closeupDecisionSrv(fd = {}) {
       calvingAfterService >= 0 &&
       eventAfterCalving >= 0
     ) {
-      return `❌ لا يمكن تسجيل التحضير — آخر ولادة بتاريخ ${lastCalving} أنهت الحمل الحالي.`;
+      return `❌ آخر ولادة مسجلة للحيوان كانت بتاريخ ${lastCalving}، ولذلك لا يوجد حمل حالي يمكن تحضيره للولادة.`;
     }
   }
 
@@ -28310,7 +28298,7 @@ function closeupDecisionSrv(fd = {}) {
       abortionAfterService >= 0 &&
       eventAfterAbortion >= 0
     ) {
-      return `❌ لا يمكن تسجيل التحضير — آخر إجهاض بتاريخ ${lastAbortion} أنهى الحمل الحالي.`;
+     return `❌ آخر إجهاض مسجل للحيوان كان بتاريخ ${lastAbortion}، ولذلك لا يوجد حمل حالي يمكن تحضيره للولادة.`;
     }
   }
 
@@ -28324,7 +28312,7 @@ function closeupDecisionSrv(fd = {}) {
     psNorm.includes("فريش")
   ) {
     const shown = psRaw ? `«${psRaw}»` : "حديث الولادة";
-    return `❌ لا يمكن تسجيل التحضير — الحالة الحالية: ${shown}.`;
+   return `❌ الحيوان مسجّل حاليًا ${shown}، لذلك ليس في مرحلة تحضير الولادة.`;
   }
 
   // الحالة التناسلية — وثيقة الحيوان الحالية أولًا
@@ -28336,19 +28324,35 @@ function closeupDecisionSrv(fd = {}) {
     ""
   ).trim();
 
-  const rsNorm = calvingStripArSrv(rsRaw);
+ const rsNorm = calvingStripArSrv(rsRaw);
 
-  if (!rsNorm.includes("عشار")) {
+const alreadyInCloseUp =
+  rsNorm.includes("عشار") &&
+  (
+    (psNorm.includes("تحضير") && psNorm.includes("ولاد")) ||
+    (psNorm.includes("انتظار") && psNorm.includes("ولاد")) ||
+    psNorm.includes("closeup")
+  );
+
+if (alreadyInCloseUp) {
+  const dateText = calvingIsDateSrv(lastCloseUp)
+    ? ` بتاريخ ${lastCloseUp}`
+    : "";
+
+  return `❌ سبق أن سجلت تحضير الولادة لهذا الحيوان${dateText}.`;
+}
+
+if (!rsNorm.includes("عشار")) {
     const shown = rsRaw ? `«${rsRaw}»` : "غير معروفة";
-    return `❌ لا يمكن تسجيل التحضير — الحالة التناسلية الحالية: ${shown}.`;
+   return `❌ الحالة التناسلية للحيوان الآن ${shown}. تحضير الولادة متاح للحيوانات العِشار فقط.`;
   }
 
   if (!calvingIsDateSrv(lf)) {
-    return '❌ لا يمكن تسجيل التحضير — لا يوجد "آخر تلقيح مُخصِّب".';
+    return "❌ لم أجد تاريخ آخر تلقيح مُخصِّب، لذلك لا أستطيع حساب موعد الولادة. راجع بيانات التلقيح أولًا.";
   }
 
   if (!calvingIsDateSrv(fd.eventDate)) {
-    return "❌ تاريخ التحضير غير صالح.";
+   return "❌ أدخل تاريخ تحضير صحيحًا.";
   }
 
   // نوع الحيوان — بعد التأكد من الحالة والتلقيح
@@ -28364,18 +28368,18 @@ function closeupDecisionSrv(fd = {}) {
 
   const th = CALVING_THRESHOLDS_SRV[sp]?.minGestationDays;
   if (!th) {
-    return "❌ نوع القطيع غير معروف لحساب عمر الحمل.";
+   return "❌ لم أتعرف على نوع الحيوان، لذلك لا أستطيع حساب عمر الحمل. راجع بيانات الحيوان أولًا.";
   }
 
   const gDays = calvingDaysBetweenSrv(lf, fd.eventDate);
   if (!Number.isFinite(gDays)) {
-    return "❌ تعذّر حساب عمر الحمل.";
+    return "❌ لم أستطع حساب عمر الحمل. راجع تاريخ آخر تلقيح وتاريخ التحضير.";
   }
 
   const remaining = th - gDays;
 
   if (remaining > 40) {
-    return `❌ لا يمكن تسجيل التحضير — المتبقي على أقل موعد ولادة ${remaining} يوم (أكثر من 40 يوم).`;
+   return `❌ ما زال أمام الحيوان ${remaining} يومًا على أول موعد متوقع للولادة. سجّل التحضير عندما يتبقى 40 يومًا أو أقل.`;
   }
 
   return null;
@@ -28412,7 +28416,7 @@ app.post("/api/close-up/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "firestore_disabled",
-        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة."
+       message: "❌ تعذّر فحص بيانات الحيوان الآن. حاول مرة أخرى."
       });
     }
 
@@ -28436,7 +28440,7 @@ app.post("/api/close-up/gate", requireUserId, async (req, res) => {
       return res.status(404).json({
         ok: false,
         allowed: false,
-        message: "❌ رقم الحيوان غير موجود في حسابك. اكتب الرقم الصحيح أولًا."
+       message: `❌ لم أجد الحيوان رقم ${animalNumber} في حسابك. راجع الرقم وحاول مرة أخرى.`
       });
     }
 
@@ -28489,7 +28493,7 @@ app.post("/api/close-up/gate", requireUserId, async (req, res) => {
     return res.json({
       ok: true,
       allowed: true,
-      message: "✅ تم التحقق — أكمل تسجيل تحضير الولادة.",
+     message: `✅ راجعت بيانات الحيوان رقم ${animalNumber}، وهو جاهز لتحضير الولادة. أكمل البيانات ثم احفظ.`,
       animalId: animal.id || "",
       animalNumber,
       eventDate,
@@ -28504,7 +28508,7 @@ app.post("/api/close-up/gate", requireUserId, async (req, res) => {
       ok: false,
       allowed: false,
       error: "close_up_gate_failed",
-      message: "تعذّر التحقق من تحضير الولادة الآن."
+     message: "❌ تعذّر التحقق من تحضير الولادة الآن. حاول مرة أخرى."
     });
   }
 });
@@ -28514,7 +28518,7 @@ app.post("/api/close-up/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "تعذّر حفظ تحضير الولادة — قاعدة البيانات غير متاحة."
+       message: "❌ تعذّر حفظ تحضير الولادة الآن. حاول مرة أخرى."
       });
     }
 
@@ -28529,28 +28533,28 @@ app.post("/api/close-up/save", requireUserId, async (req, res) => {
     if (!animalNumber) {
       return res.status(400).json({
         ok: false,
-        message: "❌ رقم الحيوان مطلوب."
+       message: "❌ أدخل رقم الحيوان."
       });
     }
 
     if (!calvingIsDateSrv(eventDate)) {
       return res.status(400).json({
         ok: false,
-        message: "❌ تاريخ التحضير غير صالح."
+       message: "❌ أدخل تاريخ تحضير صحيحًا."
       });
     }
 
     if (!ration) {
       return res.status(400).json({
         ok: false,
-        message: "❌ يجب تحديد هل تم تقديم عليقة التحضير."
+        message: "❌ أخبرني: هل بدأت تقديم عليقة التحضير؟"
       });
     }
 
     if (!anionicSalts) {
       return res.status(400).json({
         ok: false,
-        message: "❌ يجب تحديد هل تم استخدام الأملاح الأنيونية."
+      message: "❌ أخبرني: هل استخدمت الأملاح الأنيونية؟"
       });
     }
 
@@ -28559,7 +28563,7 @@ app.post("/api/close-up/save", requireUserId, async (req, res) => {
     if (!animal) {
       return res.status(404).json({
         ok: false,
-        message: "❌ رقم الحيوان غير موجود في حسابك."
+       message: `❌ لم أجد الحيوان رقم ${animalNumber} في حسابك. راجع الرقم وحاول مرة أخرى.`
       });
     }
 
@@ -28640,7 +28644,7 @@ if (typeof scheduleGroupsRebuildSrv === "function") {
 
 return res.json({
       ok: true,
-      message: "✅ تم حفظ تحضير الولادة بنجاح",
+     message: `✅ حفظت تحضير الولادة للحيوان رقم ${animalNumber}، وأصبحت حالته الإنتاجية الآن «انتظار ولادة».`,
       eventId: eventRef.id,
       animalId: animal.id || "",
       animalNumber,
@@ -28655,7 +28659,7 @@ return res.json({
     return res.status(500).json({
       ok: false,
       error: "close_up_save_failed",
-      message: "تعذّر حفظ تحضير الولادة — تحقّق من الاتصال والصلاحيات."
+      message: "❌ تعذّر حفظ تحضير الولادة الآن. حاول مرة أخرى."
     });
   }
 });
