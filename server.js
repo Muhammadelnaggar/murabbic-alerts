@@ -16995,7 +16995,7 @@ app.post("/api/disease/gate", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok:false,
         allowed:false,
-        message:"قاعدة البيانات غير متاحة الآن.",
+        message:"❌ تعذّر تحميل بيانات التشخيص الصحي الآن. حاول مرة أخرى.",
         diseases:[]
       });
     }
@@ -17010,7 +17010,7 @@ app.post("/api/disease/gate", requireUserId, async (req, res) => {
         ok:true,
         allowed:false,
         silent:true,
-        message:"أدخل رقم الحيوان وتاريخ التشخيص.",
+        message:"أدخل رقم الحيوان وتاريخ التشخيص الصحي.",
         diseases:[]
       });
     }
@@ -17019,7 +17019,7 @@ app.post("/api/disease/gate", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok:false,
         allowed:false,
-        message:"❌ تاريخ التشخيص لا يمكن أن يكون في المستقبل.",
+        message:"❌ تاريخ التشخيص الصحي لا يمكن أن يكون في المستقبل.",
         diseases:[]
       });
     }
@@ -17032,7 +17032,7 @@ app.post("/api/disease/gate", requireUserId, async (req, res) => {
       return res.status(404).json({
         ok:false,
         allowed:false,
-        message:"❌ رقم الحيوان غير موجود في حسابك.",
+        message:"❌ لم أجد الحيوان في القطيع المسجل بحسابك.",
         diseases:[]
       });
     }
@@ -17041,7 +17041,7 @@ app.post("/api/disease/gate", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok:false,
         allowed:false,
-        message:"❌ لا يمكن تسجيل تشخيص — الحيوان خارج القطيع.",
+        message:"❌ لا يمكن تسجيل التشخيص الصحي؛ الحيوان خارج القطيع.",
         diseases:[]
       });
     }
@@ -17049,7 +17049,7 @@ app.post("/api/disease/gate", requireUserId, async (req, res) => {
     return res.json({
       ok:true,
       allowed:true,
-      message:"✅ تم التحقق — اختر التشخيص المناسب.",
+      message:`✅ راجعت بيانات الحيوان رقم ${animalNumber}، اختر التشخيص المناسب.`,
       animalNumber,
       eventDate,
       animalClass: diseaseAnimalClassSrv(animal),
@@ -17068,7 +17068,7 @@ app.post("/api/disease/gate", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok:false,
       allowed:false,
-      message:"❌ تعذّر التحقق من التشخيص الآن.",
+      message:"❌ تعذّر فحص بيانات التشخيص الصحي الآن. حاول مرة أخرى.",
       diseases:[]
     });
   }
@@ -17233,7 +17233,7 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
     if (!db) {
       return res.status(503).json({
         ok:false,
-        message:"قاعدة البيانات غير متاحة الآن."
+        message:"❌ تعذّر تسجيل التشخيص الصحي الآن. حاول مرة أخرى.",
       });
     }
 
@@ -17248,14 +17248,14 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
     if (!animalNumber || !eventDate) {
       return res.status(400).json({
         ok:false,
-        message:"❌ رقم الحيوان وتاريخ التشخيص مطلوبان."
+        message:"❌ أدخل رقم الحيوان وتاريخ التشخيص الصحي.",
       });
     }
 
     if (eventDate > diseaseTodaySrv()) {
       return res.status(400).json({
         ok:false,
-        message:"❌ تاريخ التشخيص لا يمكن أن يكون في المستقبل."
+        message:"❌ تاريخ التشخيص الصحي لا يمكن أن يكون في المستقبل.",
       });
     }
 
@@ -17264,7 +17264,7 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
     if (!disease) {
       return res.status(400).json({
         ok:false,
-        message:"❌ التشخيص غير معروف."
+        message:"❌ اختر التشخيص من القائمة.",
       });
     }
 
@@ -17275,14 +17275,14 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
     if (!animal) {
       return res.status(404).json({
         ok:false,
-        message:"❌ رقم الحيوان غير موجود في حسابك."
+        message:"❌ لم أجد الحيوان في القطيع المسجل بحسابك.",
       });
     }
 
     if (diseaseIsArchivedSrv(animal.data || {})) {
       return res.status(400).json({
         ok:false,
-        message:"❌ لا يمكن تسجيل تشخيص — الحيوان خارج القطيع."
+        message:"❌ لا يمكن تسجيل التشخيص الصحي؛ الحيوان خارج القطيع.",
       });
     }
 
@@ -17291,7 +17291,7 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
     if (!allowedCodes.has(diseaseCode)) {
       return res.status(400).json({
         ok:false,
-        message:"❌ هذا التشخيص غير مناسب لهذا الحيوان حسب بياناته الحالية."
+        message:"❌ هذا التشخيص غير مناسب لهذا الحيوان حسب بياناته الحالية.",
       });
     }
 
@@ -17301,7 +17301,7 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
   return res.status(409).json({
     ok:false,
     error:"page_redirect_required",
-    message:`⚠️ ${disease.name} يتم تسجيله من صفحته المخصصة.`,
+    message:`⚠️ تسجيل ${disease.name} يتم من صفحته المخصصة.`,
     redirectUrl
   });
 }
@@ -17317,7 +17317,7 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok:false,
         error: duplicateHealth.error,
-        message: "⚠️ تعذّر التحقق من وجود تسجيل عرج مماثل الآن. حاول مرة أخرى.",
+        message: "⚠️ تعذّر التحقق من وجود تشخيص صحي مماثل الآن. حاول مرة أخرى.",
       });
     }
 
@@ -17327,7 +17327,7 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
         duplicate:true,
         error:"duplicate_health_event_same_day_details",
         eventId: duplicateHealth.eventId || null,
-        message: duplicateHealth.message
+        message: `❌ سبق تسجيل تشخيص ${disease.name} للحيوان رقم ${animalNumber} في هذا اليوم.`,
       });
     }
 
@@ -17374,7 +17374,7 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
 
     return res.json({
       ok:true,
-      message:"✅ تم حفظ التشخيص الصحي بنجاح",
+      message:`✅ سجلت تشخيص ${disease.name} للحيوان رقم ${animalNumber} بنجاح.`,
       eventId: eventRef.id,
       animalNumber,
       eventDate,
@@ -17387,7 +17387,7 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
     console.error("disease save failed", e);
     return res.status(500).json({
       ok:false,
-      message:"❌ تعذّر حفظ التشخيص الصحي الآن."
+      message:"❌ تعذّر تسجيل التشخيص الصحي الآن. حاول مرة أخرى.",
     });
   }
 });
