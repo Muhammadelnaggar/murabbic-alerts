@@ -36204,7 +36204,7 @@ app.post("/api/dairy-traits/vision-analyze", requireUserId, async (req, res) => 
     if (!apiKey) {
       return res.status(500).json({
         ok: false,
-        message: "❌ مفتاح OpenAI غير موجود على السيرفر."
+        message: "❌ خدمة تحليل صور سمات إنتاج اللبن غير متاحة الآن. حاول مرة أخرى لاحقًا."
       });
     }
 
@@ -36229,7 +36229,7 @@ app.post("/api/dairy-traits/vision-analyze", requireUserId, async (req, res) => 
   if (!sideImage || !rearImage) {
   return res.status(400).json({
     ok: false,
-    message: "❌ تقييم سمات إنتاج اللبن يحتاج لقطتين كاملتين: جانبية وخلفية."
+    message: "❌ التقط صورتين كاملتين للحيوان: صورة جانبية وصورة خلفية يظهر فيها الضرع بوضوح."
   });
 }
 const prompt = `
@@ -36500,8 +36500,8 @@ Return JSON only:
 
       return res.status(500).json({
         ok: false,
-        message: "تعذّر تحليل سمات إنتاج اللبن عبر نموذج الرؤية.",
-        debug: {
+          message: "❌ تعذّر تحليل صور سمات إنتاج اللبن الآن. حاول مرة أخرى.",
+          debug: {
           status: r.status,
           message: openaiMessage,
           type: j?.error?.type || null,
@@ -36516,7 +36516,7 @@ Return JSON only:
     if (!parsed || parsed.ok === false) {
       return res.status(400).json({
         ok: false,
-        message: parsed?.message || "الصورة غير صالحة لتقييم سمات إنتاج اللبن بدقة."
+        message: parsed?.message || "❌ الصور غير كافية لتقييم سمات إنتاج اللبن بدقة. أعد التصوير من الجانب والخلف بوضوح."
       });
     }
 
@@ -36566,7 +36566,7 @@ const breakdown = {
     if (!Number.isFinite(Number(score))) {
       return res.status(400).json({
         ok: false,
-        message: "تعذّر استخراج درجة صالحة لسمات إنتاج اللبن."
+        message: "❌ لم أتمكن من استخراج درجة صحيحة من التحليل. أعد المحاولة بصورتين واضحتين."
       });
     }
 
@@ -36584,14 +36584,14 @@ const breakdown = {
       strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 4) : [],
       weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses.slice(0, 4) : [],
       reason: String(parsed.reason || "").trim(),
-      message: `تم تحليل سمات إنتاج اللبن — الدرجة ${score} (${grade})`
+      message: `✅ اكتمل تحليل سمات إنتاج اللبن — الدرجة ${score}/100 (${grade}).`
     });
 
   } catch (e) {
     console.error("dairy traits vision analyze error:", e);
     return res.status(500).json({
       ok: false,
-      message: "حدث خطأ أثناء تحليل سمات إنتاج اللبن بالرؤية."
+      message: "❌ تعذّر تحليل صور سمات إنتاج اللبن الآن. حاول مرة أخرى."
     });
   }
 });
@@ -36606,7 +36606,7 @@ app.post("/api/dairy-traits/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "تعذّر حفظ تقييم سمات إنتاج اللبن — قاعدة البيانات غير متاحة."
+        message: "❌ تعذّر تسجيل تقييم سمات إنتاج اللبن الآن. حاول مرة أخرى."
       });
     }
 
@@ -36647,21 +36647,21 @@ app.post("/api/dairy-traits/save", requireUserId, async (req, res) => {
     if (!eventDate) {
       return res.status(400).json({
         ok: false,
-        message: "❌ تاريخ تقييم سمات إنتاج اللبن مطلوب."
+        message: "❌ أدخل تاريخ تقييم سمات إنتاج اللبن."
       });
     }
 
     if (!animalIdFromPage && !animalNumber) {
       return res.status(400).json({
         ok: false,
-        message: "❌ رقم الحيوان مطلوب لحفظ تقييم سمات إنتاج اللبن."
+        message: "❌ أدخل رقم الحيوان لتسجيل تقييم سمات إنتاج اللبن."
       });
     }
 
     if (!Number.isFinite(Number(score))) {
       return res.status(400).json({
         ok: false,
-        message: "❌ حلّل صور الحيوان أولًا قبل الحفظ."
+        message: "❌ حلّل صور الحيوان أولًا، ثم احفظ التقييم."
       });
     }
 
@@ -36697,7 +36697,7 @@ app.post("/api/dairy-traits/save", requireUserId, async (req, res) => {
     if (!animal || !animalDocSnap || !animalDocSnap.exists) {
       return res.status(404).json({
         ok: false,
-        message: "❌ الحيوان غير موجود في حسابك."
+        message: "❌ لم أجد الحيوان في القطيع المسجل بحسابك."
       });
     }
 
@@ -36707,7 +36707,7 @@ app.post("/api/dairy-traits/save", requireUserId, async (req, res) => {
     if (st === "inactive" || st === "archived") {
       return res.status(400).json({
         ok: false,
-        message: "❌ لا يمكن حفظ تقييم سمات إنتاج اللبن — الحيوان غير موجود بالقطيع."
+        message: "❌ لا يمكن تسجيل تقييم سمات إنتاج اللبن؛ الحيوان خارج القطيع."
       });
     }
 
@@ -36783,7 +36783,7 @@ app.post("/api/dairy-traits/save", requireUserId, async (req, res) => {
 
     return res.json({
       ok: true,
-      message: "✅ تم حفظ تقييم سمات إنتاج اللبن بنجاح",
+      message: `✅ سجلت تقييم سمات إنتاج اللبن للحيوان رقم ${finalAnimalNumber} بنجاح بدرجة ${score}/100.`,
       id: eventRef.id,
       eventId: eventRef.id,
       animalId: finalAnimalId,
@@ -36798,7 +36798,7 @@ app.post("/api/dairy-traits/save", requireUserId, async (req, res) => {
     console.error("dairy-traits-save", e);
     return res.status(500).json({
       ok: false,
-      message: "تعذّر حفظ تقييم سمات إنتاج اللبن الآن."
+      message: "❌ تعذّر تسجيل تقييم سمات إنتاج اللبن الآن. حاول مرة أخرى."
     });
   }
 });
