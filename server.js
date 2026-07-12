@@ -19895,7 +19895,7 @@ function ovsynchActiveProtocolBlockMessageSrv(doc = {}, eventDate = "") {
   }
 
   if (!calvingIsDateSrv(protoStart) || !calvingIsDateSrv(eventDate)) {
-    return "❌ لا يمكن بدء بروتوكول جديد — الحيوان داخل بروتوكول تزامن نشط.";
+    return "❌ لا يمكن بدء برنامج تزامن جديد؛ الحيوان مسجل حاليًا في برنامج تزامن نشط."
   }
 
   const program = resolveOvsynchProgramFromAnimalSrv(doc);
@@ -19903,12 +19903,12 @@ function ovsynchActiveProtocolBlockMessageSrv(doc = {}, eventDate = "") {
   const activeDays = calvingDaysBetweenSrv(protoStart, eventDate);
 
   if (!Number.isFinite(activeDays)) {
-    return "❌ لا يمكن بدء بروتوكول جديد — الحيوان داخل بروتوكول تزامن نشط.";
+   return "❌ لا يمكن بدء برنامج تزامن جديد؛ الحيوان مسجل حاليًا في برنامج تزامن نشط.";
   }
 
   // لو لم تنته مدة البرنامج بعد، يمنع.
   if (activeDays >= 0 && activeDays <= durationDays) {
-    return "❌ لا يمكن بدء بروتوكول جديد — الحيوان داخل بروتوكول تزامن نشط.";
+    return "❌ لا يمكن بدء برنامج تزامن جديد؛ الحيوان مسجل حاليًا في برنامج تزامن نشط.";
   }
 
   // لو تعدى مدة البرنامج، لا يمنع؛ يعتبر منتهيًا منطقيًا.
@@ -19926,7 +19926,7 @@ app.post("/api/ovsynch/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "firestore_disabled",
-        message: "تعذّر التحقق الآن — قاعدة البيانات غير متاحة.",
+        message: "❌ تعذّر فحص أهلية الحيوانات لبرنامج التزامن الآن. حاول مرة أخرى.",
         acceptedCount: 0,
         rejectedCount: 0,
         accepted: [],
@@ -19983,7 +19983,7 @@ const numbers = parseOvsynchNumbers(rawNumbers);
         allowed: false,
         silent: true,
         stage: "missing_context",
-        message: "سياق التزامن غير مكتمل من صفحة الأحداث.",
+        message: "بيانات برنامج التزامن لم تكتمل بعد.",
         acceptedCount: 0,
         rejectedCount: 0,
         accepted: [],
@@ -19996,13 +19996,13 @@ const numbers = parseOvsynchNumbers(rawNumbers);
         ok: false,
         allowed: false,
         stage: "invalid_date",
-        message: "❌ تاريخ بدء البروتوكول غير صالح.",
+        message: "❌ أدخل تاريخ بدء صحيحًا لبرنامج التزامن.",
         acceptedCount: 0,
         rejectedCount: numbers.length,
         accepted: [],
         rejected: numbers.map(n => ({
           animalNumber: String(n || ""),
-          reason: "تاريخ بدء البروتوكول غير صالح."
+          reason: "أدخل تاريخ بدء صحيحًا لبرنامج التزامن."
         }))
       });
     }
@@ -20078,16 +20078,18 @@ const numbers = parseOvsynchNumbers(rawNumbers);
 
     function ovsynchEligibilityDecision(fd = {}) {
       const doc = fd.documentData;
-      if (!doc) return "تعذّر قراءة بيانات الحيوان.";
+      if (!doc) return "❌ تعذّر قراءة بيانات الحيوان الآن.";
 
       const st = String(doc.status ?? "").trim().toLowerCase();
-      if (st === "inactive") return "❌ الحيوان خارج القطيع.";
+     if (st === "inactive") {
+  return "❌ الحيوان خارج القطيع، لذلك لا يمكن بدء برنامج التزامن له.";
+}
 
       const reproDocRaw = String(doc.reproductiveStatus || "").trim();
       const reproDocCat = ovsynchReproCategory(reproDocRaw);
 
       if (doc.breedingBlocked === true || reproDocCat === "blocked") {
-        return "❌ الحيوان مستبعد (لا تُلقّح مرة أخرى).";
+        return "❌ الحيوان مستبعد من التلقيح، لذلك لا يمكن بدء برنامج التزامن له.";
       }
 
      const activeProtocolMsg = ovsynchActiveProtocolBlockMessageSrv(doc, fd.eventDate);
@@ -20101,15 +20103,15 @@ if (activeProtocolMsg) return activeProtocolMsg;
       const shownStatus = rsRaw ? `«${rsRaw}»` : "غير معروفة";
 
       if (cat === "pregnant" || cat === "inseminated" || cat === "blocked") {
-        return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — الحالة: ${shownStatus}.`;
+        return `❌ لا يمكن بدء برنامج التزامن؛ حالة ${w} التناسلية الحالية هي ${shownStatus}.`;
       }
 
       if (cat !== "open") {
-        return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — المسموح فقط للحيوانات المفتوحة.\nالحالة الحالية: ${shownStatus}.`;
+       return `❌ لا يمكن بدء برنامج التزامن؛ حالة ${w} التناسلية الحالية هي ${shownStatus}، والبرنامج متاح للحيوانات المفتوحة فقط.`;
       }
 
       if (!calvingIsDateSrv(fd.eventDate)) {
-        return "❌ تاريخ بدء البروتوكول غير صالح.";
+        return "❌ أدخل تاريخ بدء صحيحًا لبرنامج التزامن.";
       }
 
       const lastCalving = String(doc.lastCalvingDate || "").trim();
@@ -20123,7 +20125,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
           sinceCalving >= 0 &&
           sinceCalving < minAfterCalving
         ) {
-         return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — حديثة الولادة: مرّ ${sinceCalving} يوم فقط، والحد الأدنى ${minAfterCalving} يوم.`;
+         return `❌ لا يمكن بدء برنامج التزامن الآن؛ مرّ على ولادة ${w} ${sinceCalving} يومًا فقط، والحد الأدنى ${minAfterCalving} يومًا.`;
         }
       }
 
@@ -20165,7 +20167,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
       if (!animalNumber) {
         rejected.push({
           animalNumber: String(rawNum || ""),
-          reason: "رقم غير صالح."
+          reason: "رقم الحيوان غير صحيح."
         });
         continue;
       }
@@ -20175,7 +20177,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
       if (!animal) {
         rejected.push({
           animalNumber,
-          reason: "الحيوان غير موجود في حسابك."
+          reason: "لم أجد الحيوان في القطيع المسجل بحسابك."
         });
         continue;
       }
@@ -20213,7 +20215,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
         if (Number.isFinite(g14) && g14 >= 0 && g14 < 14) {
           rejected.push({
             animalNumber,
-            reason: `${ovsynchAnimalLabel(doc)} رقم ${animalNumber}: مسجّلة بالفعل في برنامج تزامن بدأ بتاريخ ${last.eventDate}.`
+            reason: `سبق تسجيل برنامج تزامن بدأ بتاريخ ${last.eventDate}.`
           });
           continue;
         }
@@ -20242,7 +20244,7 @@ if (!isBulk) {
       stage: "no_eligible_animals",
       message: (() => {
   const n = String(r0.animalNumber || "").trim();
-  const reason = compactOvsynchReason(r0.reason || "❌ الحيوان غير مؤهل لبدء برنامج التزامن.").replace(/^❌\s*/, "");
+  const reason = compactOvsynchReason(r0.reason || "❌ لا يمكن بدء برنامج التزامن لهذا الحيوان.").replace(/^❌\s*/, "");
   return n ? `❌ الحيوان رقم ${n}: ${reason}` : `❌ ${reason}`;
 })(),
       acceptedCount,
@@ -20256,7 +20258,7 @@ if (!isBulk) {
     ok: true,
     allowed: true,
     stage: "eligible",
-    message: "✅ الحيوان مؤهل لبدء برنامج التزامن.",
+    message: `✅ راجعت بيانات الحيوان رقم ${accepted[0].animalNumber}، ويمكنك بدء برنامج التزامن الآن.`,
     acceptedCount,
     rejectedCount,
     accepted,
@@ -20270,7 +20272,7 @@ if (!acceptedCount) {
     allowed: false,
     stage: "no_eligible_animals",
 message:
-  "لا يوجد أرقام مؤهلة لبدء برنامج التزامن حاليًا.\n\n" +
+  "❌ لا يمكن بدء برنامج التزامن لأي من الحيوانات المدخلة.\n\nالأسباب:\n" +
   rejected.map(r => {
     const n = String(r.animalNumber || "").trim();
     const reason = compactOvsynchReason(r.reason).replace(/^❌\s*/, "");
@@ -20288,8 +20290,7 @@ return res.json({
   allowed: true,
   stage: "eligible",
 message:
-  `✅ مؤهل: ${acceptedCount}\n` +
-  `🚫 غير مؤهل: ${rejectedCount}` +
+  `راجعت ${numbers.length} حيوانًا: يمكن بدء برنامج التزامن لعدد ${acceptedCount}، ولا يمكن بدءه لعدد ${rejectedCount}.` +
   (
     rejectedCount
       ? "\n\n" + rejected.map(r => {
@@ -20311,7 +20312,7 @@ message:
       ok: false,
       allowed: false,
       error: "ovsynch_gate_failed",
-      message: "❌ تعذّر فحص أهلية أرقام التزامن الآن.",
+      message: "❌ تعذّر فحص أهلية الحيوانات لبرنامج التزامن الآن. حاول مرة أخرى.",
       acceptedCount: 0,
       rejectedCount: 0,
       accepted: [],
@@ -20330,7 +20331,7 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "تعذّر حفظ بروتوكول التزامن — قاعدة البيانات غير متاحة."
+        message: "❌ تعذّر حفظ برنامج التزامن الآن. حاول مرة أخرى."
       });
     }
 
@@ -20396,10 +20397,21 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
 
     // حماية طلب الحفظ فقط — لا كتابة قبل اكتمال هذه البيانات
     const missing = {};
-    if (!numbers.length) missing.animalNumbers = "أرقام الحيوانات غير متاحة من صفحة الأحداث.";
-    if (!eventDate || !calvingIsDateSrv(eventDate)) missing.eventDate = "تاريخ بدء البروتوكول غير متاح أو غير صالح.";
-    if (!program) missing.program = "اختر نوع برنامج التزامن.";
-    if (!steps.length) missing.steps = "اختر البرنامج ليظهر جدول الخطوات.";
+    if (!numbers.length) {
+  missing.animalNumbers = "اختر حيوانًا واحدًا على الأقل.";
+}
+
+if (!eventDate || !calvingIsDateSrv(eventDate)) {
+  missing.eventDate = "أدخل تاريخ بدء صحيحًا لبرنامج التزامن.";
+}
+
+if (!program) {
+  missing.program = "اختر برنامج التزامن.";
+}
+
+if (!steps.length) {
+  missing.steps = "اختر البرنامج أولًا حتى تظهر خطواته.";
+}
 
     if (Object.keys(missing).length) {
       return res.status(400).json({
@@ -20409,7 +20421,7 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
         rejectedCount: 0,
         rejected: [],
         fieldErrors: missing,
-        message: "❌ بيانات حفظ بروتوكول التزامن غير مكتملة."
+        message: "❌ أكمل بيانات برنامج التزامن قبل الحفظ."
       });
     }
 
@@ -20478,59 +20490,81 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
       return "❌ " + s;
     }
 
-    function ovsynchEligibilityDecisionForSave(fd = {}) {
-      const doc = fd.documentData;
-      if (!doc) return "تعذّر قراءة بيانات الحيوان.";
+function ovsynchEligibilityDecisionForSave(fd = {}) {
+  const doc = fd.documentData;
 
-      const st = String(doc.status ?? "").trim().toLowerCase();
-    if (st === "inactive") return "❌ الحيوان غير موجود في القطيع/حسابك.";
+  if (!doc) {
+    return "❌ تعذّر قراءة بيانات الحيوان الآن.";
+  }
 
-      const reproDocRaw = String(doc.reproductiveStatus || "").trim();
-      const reproDocCat = ovsynchReproCategoryForSave(reproDocRaw);
+  const st = String(doc.status ?? "").trim().toLowerCase();
 
-      if (doc.breedingBlocked === true || reproDocCat === "blocked") {
-        return "❌ الحيوان مستبعد (لا تُلقّح مرة أخرى).";
-      }
+  if (st === "inactive") {
+    return "❌ الحيوان خارج القطيع، لذلك لا يمكن بدء برنامج التزامن له.";
+  }
 
-     const activeProtocolMsg = ovsynchActiveProtocolBlockMessageSrv(doc, fd.eventDate);
-if (activeProtocolMsg) return activeProtocolMsg;
+  const reproDocRaw = String(doc.reproductiveStatus || "").trim();
+  const reproDocCat = ovsynchReproCategoryForSave(reproDocRaw);
 
-      const sp = normalizeOvsynchSpeciesForSave(doc, fd.species);
-      const w = ovsynchAnimalWordForSave(sp);
+  if (doc.breedingBlocked === true || reproDocCat === "blocked") {
+    return "❌ الحيوان مستبعد من التلقيح، لذلك لا يمكن بدء برنامج التزامن له.";
+  }
 
-      const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
-      const cat = ovsynchReproCategoryForSave(rsRaw);
-      const shownStatus = rsRaw ? `«${rsRaw}»` : "غير معروفة";
+  const activeProtocolMsg = ovsynchActiveProtocolBlockMessageSrv(
+    doc,
+    fd.eventDate
+  );
 
-      if (cat === "pregnant" || cat === "inseminated" || cat === "blocked") {
-        return `❌ لا يمكن بدء بروتوكول تزامن لـ${w} — الحالة: ${shownStatus}.`;
-      }
+  if (activeProtocolMsg) return activeProtocolMsg;
 
-      if (cat !== "open") {
-        return `❌ لا يمكن بدء بروتوكول التزامن — الحالة التناسلية الحالية: ${shownStatus}.`;
-      }
+  const sp = normalizeOvsynchSpeciesForSave(doc, fd.species);
+  const w = ovsynchAnimalWordForSave(sp);
 
-      if (!calvingIsDateSrv(fd.eventDate)) {
-        return "❌ تاريخ بدء البروتوكول غير صالح.";
-      }
+  const rsRaw = String(
+    fd.reproStatusFromEvents ||
+    doc.reproductiveStatus ||
+    ""
+  ).trim();
 
-      const lastCalving = String(doc.lastCalvingDate || "").trim();
+  const cat = ovsynchReproCategoryForSave(rsRaw);
+  const shownStatus = rsRaw ? `«${rsRaw}»` : "غير معروفة";
 
-      if (lastCalving && calvingIsDateSrv(lastCalving)) {
-       const minAfterCalving = sp === "جاموس" ? 35 : 45;
-        const sinceCalving = calvingDaysBetweenSrv(lastCalving, fd.eventDate);
+  if (
+    cat === "pregnant" ||
+    cat === "inseminated" ||
+    cat === "blocked"
+  ) {
+    return `❌ لا يمكن بدء برنامج التزامن؛ حالة ${w} التناسلية الحالية هي ${shownStatus}.`;
+  }
 
-        if (
-          Number.isFinite(sinceCalving) &&
-          sinceCalving >= 0 &&
-          sinceCalving < minAfterCalving
-        ) {
-         return `❌ لا يمكن بدء بروتوكول التزامن — الحيوان حديث الولادة: مرّ ${sinceCalving} يوم فقط، والحد الأدنى ${minAfterCalving} يوم.`;
-        }
-      }
+  if (cat !== "open") {
+    return `❌ لا يمكن بدء برنامج التزامن؛ حالة ${w} التناسلية الحالية هي ${shownStatus}، والبرنامج متاح للحيوانات المفتوحة فقط.`;
+  }
 
-      return null;
+  if (!calvingIsDateSrv(fd.eventDate)) {
+    return "❌ أدخل تاريخ بدء صحيحًا لبرنامج التزامن.";
+  }
+
+  const lastCalving = String(doc.lastCalvingDate || "").trim();
+
+  if (lastCalving && calvingIsDateSrv(lastCalving)) {
+    const minAfterCalving = sp === "جاموس" ? 35 : 45;
+    const sinceCalving = calvingDaysBetweenSrv(
+      lastCalving,
+      fd.eventDate
+    );
+
+    if (
+      Number.isFinite(sinceCalving) &&
+      sinceCalving >= 0 &&
+      sinceCalving < minAfterCalving
+    ) {
+      return `❌ لا يمكن بدء برنامج التزامن الآن؛ مرّ على ولادة ${w} ${sinceCalving} يومًا فقط، والحد الأدنى ${minAfterCalving} يومًا.`;
     }
+  }
+
+  return null;
+}
 
     async function getLastOvsynchEventForSave(animalNumber) {
       const num = calvingNormDigitsOnlySrv(animalNumber);
@@ -20628,7 +20662,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
       if (!animal) {
         rejected.push({
           animalNumber,
-          reason: `❌ الحيوان رقم ${animalNumber}: غير موجود في القطيع/حسابك.`
+          reason: "❌ لم أجد الحيوان في القطيع المسجل بحسابك."
         });
         continue;
       }
@@ -20643,7 +20677,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
         if (Number.isFinite(g14) && g14 >= 0 && g14 < 14) {
           rejected.push({
             animalNumber,
-            reason: `❌ الحيوان رقم ${animalNumber}: مسجّل بالفعل في برنامج تزامن بدأ بتاريخ ${last.eventDate}.`
+            reason: `❌ سبق تسجيل برنامج تزامن بدأ بتاريخ ${last.eventDate}.`
           });
           continue;
         }
@@ -20670,7 +20704,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
       const x = rejected[0] || {};
       const n = String(x.animalNumber || "").trim();
       const reason = compactOvsynchReasonForSave(
-        x.reason || "❌ الحيوان غير مؤهل لتسجيل بروتوكول التزامن."
+        x.reason || "❌ لا يمكن تسجيل برنامج التزامن لهذا الحيوان."
       ).replace(/^❌\s*/, "");
 
       return n ? `❌ الحيوان رقم ${n}: ${reason}` : `❌ ${reason}`;
@@ -20684,8 +20718,8 @@ if (activeProtocolMsg) return activeProtocolMsg;
     )
   : (
       numbers.length === 1
-        ? "❌ الحيوان غير مؤهل لتسجيل بروتوكول التزامن."
-        : "❌ لا يوجد أي رقم مؤهل لتسجيل بروتوكول التزامن."
+        ? "❌ لا يمكن تسجيل برنامج التزامن لهذا الحيوان."
+        : "❌ لا يمكن تسجيل برنامج التزامن لأي من الحيوانات المدخلة."
     )
       });
     }
@@ -20766,11 +20800,18 @@ const savedNumbers = saved
 let message = "";
 
 if (savedNumbers.length === 1) {
-  message = `✅ تم تسجيل بروتوكول التزامن للحيوان رقم ${savedNumbers[0]}`;
+  message = `✅ سجلت برنامج التزامن للحيوان رقم ${savedNumbers[0]} بنجاح.`;
+
 } else if (savedNumbers.length > 1) {
-  message = `✅ تم تسجيل بروتوكول التزامن للحيوانات أرقام: ${savedNumbers.join("، ")}`;
+  message = `✅ سجلت برنامج التزامن لعدد ${savedNumbers.length} من الحيوانات بنجاح.`;
+
+} else if (alreadyCount > 0) {
+  message = alreadyCount === 1
+    ? "سبق تسجيل برنامج التزامن لهذا الحيوان."
+    : `سبق تسجيل برنامج التزامن لعدد ${alreadyCount} من الحيوانات.`;
+
 } else {
-  message = "❌ لم يتم تسجيل بروتوكول التزامن.";
+  message = "❌ لم أتمكن من تسجيل برنامج التزامن لأي حيوان.";
 }
     return res.json({
       ok: true,
@@ -20788,7 +20829,7 @@ if (savedNumbers.length === 1) {
     return res.status(500).json({
       ok: false,
       error: "ovsynch_save_failed",
-      message: "❌ تعذّر حفظ بروتوكول التزامن الآن."
+      message: "❌ تعذّر حفظ برنامج التزامن الآن. حاول مرة أخرى."
     });
   }
 });
@@ -20803,7 +20844,7 @@ app.get("/api/ovsynch/dashboard-alerts", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         alerts: [],
-        message: "تعذّر تحميل تنبيهات بروتوكول التزامن — قاعدة البيانات غير متاحة."
+       message: "❌ تعذّر تحميل تنبيهات برنامج التزامن الآن. حاول مرة أخرى."
       });
     }
 
@@ -20857,7 +20898,7 @@ app.get("/api/ovsynch/dashboard-alerts", requireUserId, async (req, res) => {
 
       const stepIndex = Number(t.stepIndex ?? 0) || 0;
       const stepDay = Number(t.stepDay ?? 0) || 0;
-      const stepName = String(t.stepName || t.title || "خطوة بروتوكول").trim();
+      const stepName = String(t.stepName || t.title || "خطوة التزامن").trim();
       const plannedTime = String(t.plannedTime || "08:00").trim();
       const program = String(t.program || t.protocolProgram || "ovsynch").trim();
       const protocolStartDate = String(t.protocolStartDate || "").trim().slice(0, 10);
@@ -20896,13 +20937,13 @@ app.get("/api/ovsynch/dashboard-alerts", requireUserId, async (req, res) => {
 
       const isToday = g.dueDate === today;
       const title = isToday
-        ? "خطوة بروتوكول التزامن اليوم"
-        : "خطوة بروتوكول التزامن غدًا";
+        ? "خطوة برنامج التزامن اليوم"
+        : "خطوة برنامج التزامن غدًا";
 
       const prefix = isToday ? "⏰ اليوم" : "📌 غدًا";
 
       const message =
-        `${prefix} خطوة بروتوكول التزامن: ${g.stepName}\n` +
+        `${prefix} خطوة برنامج التزامن: ${g.stepName}\n` +
         `للحيوانات أرقام: ${nums.join("، ")}\n` +
         `الموعد: ${g.plannedTime}`;
 
@@ -20956,7 +20997,7 @@ app.get("/api/ovsynch/dashboard-alerts", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       alerts: [],
-      message: "❌ تعذّر تحميل تنبيهات بروتوكول التزامن الآن."
+     message: "❌ تعذّر تحميل تنبيهات برنامج التزامن الآن. حاول مرة أخرى."
     });
   }
 });
@@ -20970,7 +21011,7 @@ app.get("/api/ovsynch/step-targets", requireUserId, async (req, res) => {
     if (!db) {
       return res.status(503).json({
         ok: false,
-        message: "تعذّر تحميل مهام بروتوكول التزامن — قاعدة البيانات غير متاحة.",
+        message: "❌ تعذّر تحميل الحيوانات المستحقة لخطوة التزامن الآن. حاول مرة أخرى.",
         animalNumbers: [],
         count: 0,
         meta: null
@@ -21046,7 +21087,7 @@ app.get("/api/ovsynch/step-targets", requireUserId, async (req, res) => {
     if (!animalNumbers.length) {
       return res.json({
         ok: true,
-        message: "✅ لا يوجد حيوانات مطلوبة لهذه الخطوة اليوم.",
+       message: "لا توجد حيوانات مستحقة لتنفيذ هذه الخطوة اليوم.",
         dueDate,
         stepIndex,
         animalNumbers: [],
@@ -21056,9 +21097,9 @@ app.get("/api/ovsynch/step-targets", requireUserId, async (req, res) => {
     }
 
     const stepName = String(meta?.stepName || ("الخطوة رقم " + stepIndex));
-const message = animalNumbers.length === 1
-  ? `اليوم خطوة بروتوكول: ${stepName} للحيوان رقم ${animalNumbers[0]}`
-  : `اليوم خطوة بروتوكول: ${stepName} للحيوانات أرقام: ${animalNumbers.join("، ")}`;
+    const message = animalNumbers.length === 1
+    ? `موعد اليوم تنفيذ خطوة «${stepName}» للحيوان رقم ${animalNumbers[0]}.`
+    : `موعد اليوم تنفيذ خطوة «${stepName}» لعدد ${animalNumbers.length} من الحيوانات.`;
 
     return res.json({
       ok: true,
@@ -21075,7 +21116,7 @@ const message = animalNumbers.length === 1
 
     return res.status(500).json({
       ok: false,
-      message: "❌ تعذّر تحميل مهام خطوة التزامن الآن.",
+      message: "❌ تعذّر تحميل الحيوانات المستحقة لخطوة التزامن الآن. حاول مرة أخرى.",
       animalNumbers: [],
       count: 0,
       meta: null
@@ -21092,7 +21133,7 @@ app.post("/api/ovsynch/confirm-step", requireUserId, async (req, res) => {
     if (!db) {
       return res.status(503).json({
         ok: false,
-        message: "تعذّر تأكيد خطوة بروتوكول التزامن — قاعدة البيانات غير متاحة.",
+        message: "❌ تعذّر تأكيد تنفيذ خطوة التزامن الآن. حاول مرة أخرى.",
         doneCount: 0,
         rejectedCount: 0,
         saved: [],
@@ -21165,20 +21206,27 @@ app.post("/api/ovsynch/confirm-step", requireUserId, async (req, res) => {
     const stepName = String(body.stepName || "").trim();
 
     const missing = {};
-    if (!numbers.length) missing.animalNumbers = "قائمة الحيوانات غير متاحة.";
-    if (!program) missing.program = "برنامج التزامن غير متاح.";
+    if (!numbers.length) {
+  missing.animalNumbers = "اختر الحيوان أو الحيوانات التي نُفذت لها الخطوة.";
+}
+
+if (!program) {
+  missing.program = "برنامج التزامن غير محدد.";
+}
     if (!protocolStartDate || !calvingIsDateSrv(protocolStartDate)) {
-      missing.protocolStartDate = "تاريخ بداية البروتوكول غير متاح أو غير صالح.";
+      missing.protocolStartDate = "تاريخ بداية برنامج التزامن غير صحيح.";
     }
     if (!eventDate || !calvingIsDateSrv(eventDate)) {
-      missing.eventDate = "تاريخ تنفيذ الخطوة غير صالح.";
+      missing.eventDate = "أدخل تاريخ تنفيذ صحيحًا للخطوة.";
     }
-    if (!stepName) missing.stepName = "اسم الخطوة غير متاح.";
+    if (!stepName) {
+  missing.stepName = "خطوة التزامن غير محددة.";
+}
 
     if (Object.keys(missing).length) {
       return res.status(400).json({
         ok: false,
-        message: "❌ بيانات تأكيد خطوة التزامن غير مكتملة.",
+        message: "❌ أكمل بيانات خطوة التزامن قبل التأكيد.",
         fieldErrors: missing,
         doneCount: 0,
         rejectedCount: 0,
@@ -21199,7 +21247,7 @@ app.post("/api/ovsynch/confirm-step", requireUserId, async (req, res) => {
       if (!animal) {
         rejected.push({
           animalNumber,
-          reason: `❌ الحيوان رقم ${animalNumber}: غير موجود في القطيع/حسابك.`
+          reason: "❌ لم أجد الحيوان في القطيع المسجل بحسابك."
         });
         continue;
       }
@@ -21282,9 +21330,11 @@ app.post("/api/ovsynch/confirm-step", requireUserId, async (req, res) => {
 
     return res.json({
       ok: true,
-      message: doneCount
-  ? `✅ تم تأكيد تنفيذ الخطوة لـ ${doneCount} حيوان.`
-  : "❌ لم يتم تأكيد أي خطوة.",
+message: doneCount === 1
+  ? `✅ تم تأكيد تنفيذ خطوة «${stepName}» للحيوان رقم ${saved[0].animalNumber}.`
+  : doneCount > 1
+    ? `✅ تم تأكيد تنفيذ خطوة «${stepName}» لعدد ${doneCount} من الحيوانات.`
+    : "❌ لم أتمكن من تأكيد تنفيذ الخطوة لأي حيوان.",
       doneCount,
       rejectedCount: rejected.length,
       saved,
@@ -21296,7 +21346,7 @@ app.post("/api/ovsynch/confirm-step", requireUserId, async (req, res) => {
 
     return res.status(500).json({
       ok: false,
-      message: "❌ تعذّر تأكيد خطوة بروتوكول التزامن الآن.",
+      message: "❌ تعذّر تأكيد تنفيذ خطوة التزامن الآن. حاول مرة أخرى.",
       doneCount: 0,
       rejectedCount: 0,
       saved: [],
