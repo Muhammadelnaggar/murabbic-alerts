@@ -19157,7 +19157,7 @@ async function mastitisDuplicateSameDaySrv(uid, fd = {}) {
         return {
           found: false,
           error: "mastitis_duplicate_check_failed",
-          message: "⚠️ تعذّر التحقق من تكرار التهاب الضرع الآن."
+          message: "⚠️ تعذّر التحقق من وجود تسجيل التهاب ضرع مماثل الآن. حاول مرة أخرى.",
         };
       }
     }
@@ -19179,7 +19179,7 @@ async function mastitisDuplicateSameDaySrv(uid, fd = {}) {
       return {
         found: true,
         eventId: item.id,
-        message: `❌ تم تسجيل نفس التهاب الضرع للحيوان رقم ${animalNumber} في نفس اليوم بنفس التفاصيل.`
+        message: `❌ سبق تسجيل نفس حالة التهاب الضرع للحيوان رقم ${animalNumber} في هذا اليوم بنفس الأرباع ونوع الالتهاب.`,
       };
     }
   }
@@ -19194,7 +19194,7 @@ app.post("/api/mastitis/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن.",
+        message: "❌ تعذّر تحميل بيانات تسجيل التهاب الضرع الآن. حاول مرة أخرى.",
         options: {
           quarters: MASTITIS_QUARTERS_SRV,
           mastitisTypes: MASTITIS_TYPES_SRV
@@ -19211,7 +19211,7 @@ app.post("/api/mastitis/gate", requireUserId, async (req, res) => {
         ok: true,
         allowed: false,
         silent: true,
-        message: "أدخل رقم الحيوان وتاريخ التشخيص.",
+        message: "أدخل رقم الحيوان وتاريخ التهاب الضرع.",
         options: {
           quarters: MASTITIS_QUARTERS_SRV,
           mastitisTypes: MASTITIS_TYPES_SRV
@@ -19224,7 +19224,7 @@ app.post("/api/mastitis/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "invalid_date",
-        message: "❌ تاريخ التشخيص غير صالح."
+        message: "❌ أدخل تاريخ التهاب ضرع صحيحًا.",
       });
     }
 
@@ -19233,7 +19233,7 @@ app.post("/api/mastitis/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "future_date",
-        message: "❌ تاريخ التشخيص لا يمكن أن يكون في المستقبل."
+        message: "❌ تاريخ التهاب الضرع لا يمكن أن يكون في المستقبل.",
       });
     }
 
@@ -19244,7 +19244,7 @@ app.post("/api/mastitis/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "animal_not_found",
-        message: "❌ رقم الحيوان غير موجود في حسابك."
+        message: "❌ لم أجد الحيوان في القطيع المسجل بحسابك.",
       });
     }
 
@@ -19253,14 +19253,14 @@ app.post("/api/mastitis/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "animal_archived",
-        message: "❌ لا يمكن تسجيل التهاب ضرع — الحيوان خارج القطيع."
+        message: "❌ لا يمكن تسجيل التهاب الضرع؛ الحيوان خارج القطيع.",
       });
     }
 
     return res.json({
       ok: true,
       allowed: true,
-      message: "✅ تم التحقق — جاهز لتسجيل التهاب الضرع.",
+      message: `✅ راجعت بيانات الحيوان رقم ${fd.animalNumber}، ويمكنك تسجيل التهاب الضرع الآن.`,
       animalNumber: fd.animalNumber,
       eventDate: fd.eventDate,
       animal: {
@@ -19283,7 +19283,7 @@ app.post("/api/mastitis/gate", requireUserId, async (req, res) => {
       ok: false,
       allowed: false,
       error: "mastitis_gate_failed",
-      message: "❌ تعذّر التحقق من التهاب الضرع الآن."
+      message: "❌ تعذّر فحص بيانات التهاب الضرع الآن. حاول مرة أخرى.",
     });
   }
 });
@@ -19294,7 +19294,7 @@ app.post("/api/mastitis/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن."
+        message: "❌ تعذّر تسجيل التهاب الضرع الآن. حاول مرة أخرى.",
       });
     }
 
@@ -19306,7 +19306,7 @@ app.post("/api/mastitis/save", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "missing_required_fields",
-        message: "❌ رقم الحيوان وتاريخ التشخيص والربع المصاب ونوع الالتهاب مطلوبة."
+        message: "❌ أكمل رقم الحيوان وتاريخ التهاب الضرع، واختر الربع أو الأرباع المصابة ونوع الالتهاب.",
       });
     }
 
@@ -19314,7 +19314,7 @@ app.post("/api/mastitis/save", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "invalid_date",
-        message: "❌ تاريخ التشخيص غير صالح."
+        message: "❌ أدخل تاريخ التهاب ضرع صحيحًا.",
       });
     }
 
@@ -19322,7 +19322,7 @@ app.post("/api/mastitis/save", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "future_date",
-        message: "❌ تاريخ التشخيص لا يمكن أن يكون في المستقبل."
+        message: "❌ تاريخ التهاب الضرع لا يمكن أن يكون في المستقبل.",
       });
     }
 
@@ -19333,7 +19333,7 @@ app.post("/api/mastitis/save", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "invalid_quarter",
-        message: "❌ اختر ربعًا مصابًا صحيحًا."
+        message: "❌ اختر الربع أو الأرباع المصابة من القائمة.",
       });
     }
 
@@ -19341,7 +19341,7 @@ app.post("/api/mastitis/save", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "invalid_mastitis_type",
-        message: "❌ نوع التهاب الضرع غير معروف."
+        message: "❌ اختر نوع التهاب الضرع من القائمة.",
       });
     }
 
@@ -19351,7 +19351,7 @@ app.post("/api/mastitis/save", requireUserId, async (req, res) => {
       return res.status(404).json({
         ok: false,
         error: "animal_not_found",
-        message: "❌ رقم الحيوان غير موجود في حسابك."
+        message: "❌ لم أجد الحيوان في القطيع المسجل بحسابك.",
       });
     }
 
@@ -19359,7 +19359,7 @@ app.post("/api/mastitis/save", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "animal_archived",
-        message: "❌ لا يمكن تسجيل التهاب ضرع — الحيوان خارج القطيع."
+        message: "❌ لا يمكن تسجيل التهاب الضرع؛ الحيوان خارج القطيع.",
       });
     }
 
@@ -19448,7 +19448,7 @@ app.post("/api/mastitis/save", requireUserId, async (req, res) => {
 
     return res.json({
       ok: true,
-      message: "✅ تم حفظ التهاب الضرع بنجاح",
+      message: `✅ سجلت حالة التهاب الضرع للحيوان رقم ${fd.animalNumber} بنجاح.`,
       eventId: eventRef.id,
       animalNumber: fd.animalNumber,
       eventDate: fd.eventDate,
@@ -19461,7 +19461,7 @@ app.post("/api/mastitis/save", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "mastitis_save_failed",
-      message: "❌ تعذّر حفظ التهاب الضرع الآن."
+      message: "❌ تعذّر تسجيل التهاب الضرع الآن. حاول مرة أخرى.",
     });
   }
 });
