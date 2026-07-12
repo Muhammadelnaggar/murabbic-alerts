@@ -27289,17 +27289,17 @@ async function weaningEvaluateOneSrv(uid, animalNumber, eventDate) {
   const num = calvingNormDigitsOnlySrv(animalNumber);
 
   if (!num) {
-    return { ok:false, animalNumber:"", reason:"رقم الحيوان مطلوب." };
+    return { ok:false, animalNumber:"", reason:"أدخل رقم العجل." };
   }
 
   if (!calvingIsDateSrv(eventDate)) {
-    return { ok:false, animalNumber:num, reason:"تاريخ الفطام غير صالح." };
+    return { ok:false, animalNumber:num, reason:"أدخل تاريخ فطام صحيحًا." };
   }
 
   const animal = await weaningFindAnimalSrv(uid, num);
 
    if (!animal) {
-    return { ok:false, animalNumber:num, reason:"العجل غير موجود في سجل العجول." };
+    return { ok:false, animalNumber:num, reason:"لم أجد العجل في سجل العجول بحسابك. راجع الرقم." };
   }
 
   const doc = animal.data || {};
@@ -27309,7 +27309,7 @@ async function weaningEvaluateOneSrv(uid, animalNumber, eventDate) {
       ok:false,
       animalNumber:num,
       animalId:animal.id,
-      reason:"هذا العجل خارج القطيع — لا يمكن تسجيل الفطام."
+      reason:"العجل خارج القطيع، لذلك لا يمكن تسجيل الفطام له."
     };
   }
 
@@ -27318,7 +27318,7 @@ async function weaningEvaluateOneSrv(uid, animalNumber, eventDate) {
       ok:false,
       animalNumber:num,
       animalId:animal.id,
-      reason:"تم تسجيل الفطام لهذا العجل من قبل."
+      reason:"سبق تسجيل الفطام لهذا العجل."
     };
   }
 
@@ -27328,7 +27328,7 @@ async function weaningEvaluateOneSrv(uid, animalNumber, eventDate) {
       ok:false,
       animalNumber:num,
       animalId:animal.id,
-      reason:`العجل غير مؤهل للفطام — الجروب/الحالة الحالية: ${currentGroup}.`
+     reason:`الحالة الحالية للعجل هي «${currentGroup}»، ولذلك لا يمكن تسجيل الفطام له.`
     };
   }
 
@@ -27337,7 +27337,7 @@ async function weaningEvaluateOneSrv(uid, animalNumber, eventDate) {
       ok:false,
       animalNumber:num,
       animalId:animal.id,
-      reason:"تم تسجيل الفطام لهذا الحيوان من قبل."
+      reason:"سبق تسجيل الفطام لهذا العجل."
     };
   }
 
@@ -27348,7 +27348,7 @@ async function weaningEvaluateOneSrv(uid, animalNumber, eventDate) {
       ok:false,
       animalNumber:num,
       animalId:animal.id,
-      reason:"تاريخ الميلاد غير مسجل."
+      reason:"لا يوجد تاريخ ميلاد مسجل للعجل، لذلك لا يمكن حساب عمر الفطام."
     };
   }
 
@@ -27360,7 +27360,7 @@ async function weaningEvaluateOneSrv(uid, animalNumber, eventDate) {
       animalNumber:num,
       animalId:animal.id,
       birthDate,
-      reason:"تاريخ الفطام لا يصح أن يكون قبل تاريخ الميلاد."
+      reason:"تاريخ الفطام لا يمكن أن يسبق تاريخ ميلاد العجل."
     };
   }
 
@@ -27391,7 +27391,7 @@ async function weaningEvaluateManySrv(uid, numbers = [], eventDate = "") {
     } else {
       rejected.push({
         animalNumber: r.animalNumber || calvingNormDigitsOnlySrv(n),
-        reason: r.reason || "غير مؤهل لتسجيل الفطام."
+        reason: r.reason || "لا يمكن تسجيل الفطام لهذا العجل."
       });
     }
   }
@@ -27417,42 +27417,56 @@ function weaningBuildGateResponseSrv({ accepted = [], rejected = [], eventDate =
   const acceptedPublic = accepted.map(weaningPublicAcceptedSrv);
   const safeRejected = Array.isArray(rejected) ? rejected : [];
   const canSave = acceptedPublic.length > 0;
+  const totalCount = acceptedPublic.length + safeRejected.length;
 
   function rejectedLine(r = {}) {
     const n = String(r.animalNumber || r.number || "").trim();
-    const reason = String(r.reason || r.message || "غير مؤهل لتسجيل الفطام.").trim();
-    return n ? `❌ الحيوان رقم ${n}: ${reason}` : `❌ ${reason}`;
+
+    const reason = String(
+      r.reason ||
+      r.message ||
+      "لا يمكن تسجيل الفطام لهذا العجل."
+    ).trim();
+
+    return n
+      ? `❌ العجل رقم ${n}: ${reason}`
+      : `❌ ${reason}`;
   }
 
   let message = "";
 
   if (canSave && safeRejected.length) {
     message = [
-      `✅ تم قبول ${acceptedPublic.length} رقم للفطام، مع استبعاد ${safeRejected.length} رقم.`,
+      `راجعت ${totalCount} من العجول: يمكن تسجيل الفطام لعدد ${acceptedPublic.length}، ولا يمكن تسجيله لعدد ${safeRejected.length}.`,
       "",
-      "الأرقام غير المقبولة:",
+      "العجول التي لا يمكن تسجيل الفطام لها:",
       ...safeRejected.slice(0, 8).map(rejectedLine),
-      safeRejected.length > 8 ? `… وعدد ${safeRejected.length - 8} أرقام أخرى.` : ""
+      safeRejected.length > 8
+        ? `… وعدد ${safeRejected.length - 8} من العجول الأخرى.`
+        : ""
     ].filter(Boolean).join("\n");
 
   } else if (canSave) {
     message = acceptedPublic.length === 1
-      ? "✅ تم التحقق — يمكن تسجيل الفطام."
-      : `✅ تم التحقق — يمكن تسجيل الفطام لعدد ${acceptedPublic.length} حيوان.`;
+      ? `✅ راجعت بيانات العجل رقم ${acceptedPublic[0].animalNumber}، ويمكنك تسجيل الفطام الآن.`
+      : `✅ راجعت البيانات، ويمكن تسجيل الفطام لعدد ${acceptedPublic.length} من العجول.`;
 
-  } else if (safeRejected.length) {
-    message = safeRejected.length === 1
-      ? rejectedLine(safeRejected[0])
-      : [
-          "❌ لا يوجد رقم مؤهل لتسجيل الفطام.",
-          "",
-          "الأسباب:",
-          ...safeRejected.slice(0, 8).map(rejectedLine),
-          safeRejected.length > 8 ? `… وعدد ${safeRejected.length - 8} أرقام أخرى.` : ""
-        ].filter(Boolean).join("\n");
+  } else if (safeRejected.length === 1) {
+    message = rejectedLine(safeRejected[0]);
+
+  } else if (safeRejected.length > 1) {
+    message = [
+      "❌ لا يمكن تسجيل الفطام لأي من العجول المدخلة.",
+      "",
+      "الأسباب:",
+      ...safeRejected.slice(0, 8).map(rejectedLine),
+      safeRejected.length > 8
+        ? `… وعدد ${safeRejected.length - 8} من العجول الأخرى.`
+        : ""
+    ].filter(Boolean).join("\n");
 
   } else {
-    message = "❌ لا يوجد رقم مؤهل لتسجيل الفطام.";
+    message = "❌ لا يمكن تسجيل الفطام لأي من العجول المدخلة.";
   }
 
   return {
@@ -27460,7 +27474,7 @@ function weaningBuildGateResponseSrv({ accepted = [], rejected = [], eventDate =
     allowed: canSave,
     canSave,
     eventDate: String(eventDate || "").slice(0, 10),
-    mode: (acceptedPublic.length + safeRejected.length) > 1 ? "bulk" : "single",
+    mode: totalCount > 1 ? "bulk" : "single",
     acceptedCount: acceptedPublic.length,
     rejectedCount: safeRejected.length,
     accepted: acceptedPublic,
@@ -27478,7 +27492,6 @@ function weaningBuildGateResponseSrv({ accepted = [], rejected = [], eventDate =
     }
   };
 }
-
 function weaningMsgTextSrv(v) {
   return String(v || "").trim();
 }
@@ -27543,11 +27556,11 @@ function weaningWarningLinesSrv(warnings = []) {
 
   for (const row of map.values()) {
     if (row.dehorning && row.superTeat) {
-      lines.push(`رقم ${row.animalNumber}: لم يتم تسجيل إزالة القرون ولا إزالة الحلمات الزائدة قبل الفطام.`);
+      lines.push(`العجل رقم ${row.animalNumber}: لا يوجد سجل لإزالة القرون أو إزالة الحلمات الزائدة قبل الفطام.`);
     } else if (row.dehorning) {
-      lines.push(`رقم ${row.animalNumber}: لم يتم تسجيل إزالة القرون قبل الفطام.`);
+      lines.push(`العجل رقم ${row.animalNumber}: لا يوجد سجل لإزالة القرون قبل الفطام.`);
     } else if (row.superTeat) {
-      lines.push(`رقم ${row.animalNumber}: لم يتم تسجيل إزالة الحلمات الزائدة قبل الفطام.`);
+      lines.push(`العجل رقم ${row.animalNumber}: لا يوجد سجل لإزالة الحلمات الزائدة قبل الفطام.`);
     }
   }
 
@@ -27560,10 +27573,15 @@ function weaningWarningLinesSrv(warnings = []) {
 
 function weaningRejectedTextSrv(r = {}) {
   const animalNumber = weaningMsgTextSrv(r.animalNumber || r.number || "");
-  const reason = weaningMsgTextSrv(r.reason || r.message || "غير مقبول.");
+
+  const reason = weaningMsgTextSrv(
+    r.reason ||
+    r.message ||
+    "لا يمكن تسجيل الفطام لهذا العجل."
+  );
 
   return animalNumber
-    ? `رقم ${animalNumber}: ${reason}`
+    ? `العجل رقم ${animalNumber}: ${reason}`
     : reason;
 }
 
@@ -27582,31 +27600,45 @@ function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [],
   const lines = [];
 
   if (savedCount && rejectedCount) {
-    lines.push(`✅ تم حفظ الفطام لعدد ${savedCount} حيوان، وتعذّر حفظ ${rejectedCount} رقم.`);
+    lines.push(
+      `✅ سجلت الفطام لعدد ${savedCount} من العجول، ولم أتمكن من تسجيله لعدد ${rejectedCount}.`
+    );
+
   } else if (savedCount > 1) {
-    lines.push(`✅ تم حفظ الفطام لعدد ${savedCount} حيوان بنجاح.`);
+    lines.push(
+      `✅ سجلت الفطام لعدد ${savedCount} من العجول بنجاح.`
+    );
+
   } else if (savedCount === 1) {
-    lines.push("✅ تم حفظ الفطام بنجاح.");
+    lines.push(
+      `✅ سجلت الفطام للعجل رقم ${first.animalNumber} بنجاح.`
+    );
+
   } else {
-    lines.push("❌ لم يتم حفظ أي فطام.");
+    lines.push("❌ لم أتمكن من تسجيل الفطام لأي عجل.");
   }
 
   if (savedCount && warningLines.length) {
     lines.push("");
-    lines.push("⚠️ ملاحظات بعد الحفظ — لا تمنع التسجيل:");
+    lines.push("⚠️ ملاحظات بعد الحفظ — لم تمنع تسجيل الفطام:");
 
     warningLines
       .slice(0, 10)
       .forEach(x => lines.push(`- ${x}`));
 
     if (warningLines.length > 10) {
-      lines.push(`… وعدد ${warningLines.length - 10} ملاحظات أخرى.`);
+      lines.push(`… وعدد ${warningLines.length - 10} من الملاحظات الأخرى.`);
     }
   }
 
   if (rejectedCount) {
     lines.push("");
-    lines.push(savedCount ? "الأرقام التي لم تُحفظ:" : "سبب عدم الحفظ:");
+
+    lines.push(
+      savedCount
+        ? "العجول التي لم يُسجل لها الفطام:"
+        : "سبب عدم تسجيل الفطام:"
+    );
 
     safeRejected
       .slice(0, 10)
@@ -27615,11 +27647,14 @@ function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [],
       .forEach(x => lines.push(`- ${x}`));
 
     if (rejectedCount > 10) {
-      lines.push(`… وعدد ${rejectedCount - 10} أرقام أخرى.`);
+      lines.push(`… وعدد ${rejectedCount - 10} من العجول الأخرى.`);
     }
   }
 
-  const message = lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  const message = lines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   const redirectUrl = savedCount === 1
     ? `event-list.html?number=${encodeURIComponent(first.animalNumber)}&date=${encodeURIComponent(eventDate)}`
@@ -27668,7 +27703,7 @@ function weaningWeightFromBodySrv(body = {}) {
     return {
       ok: false,
       value: null,
-      message: "وزن الفطام غير صالح."
+      message: "أدخل وزن فطام رقميًا صحيحًا أو اترك الحقل فارغًا."
     };
   }
 
@@ -27741,7 +27776,7 @@ app.post("/api/weaning/gate", requireUserId, async (req, res) => {
         ok:false,
         allowed:false,
         canSave:false,
-        message:"تعذّر التحقق الآن — قاعدة البيانات غير متاحة.",
+        message:"❌ تعذّر فحص بيانات الفطام الآن. حاول مرة أخرى.",
         acceptedCount:0,
         rejectedCount:0,
         accepted:[],
@@ -27761,7 +27796,7 @@ app.post("/api/weaning/gate", requireUserId, async (req, res) => {
         allowed:false,
         canSave:false,
         silent:true,
-        message:"رقم الحيوان مطلوب.",
+        message:"أدخل رقم العجل.",
         acceptedCount:0,
         rejectedCount:0,
         accepted:[],
@@ -27773,11 +27808,15 @@ app.post("/api/weaning/gate", requireUserId, async (req, res) => {
     if (!calvingIsDateSrv(eventDate)) {
       const payload = weaningBuildGateResponseSrv({
         accepted:[],
-        rejected:numbers.map(n => ({ animalNumber:n, reason:"تاريخ الفطام غير صالح." })),
-        eventDate
+        rejected:numbers.map(n => ({
+        animalNumber:n,
+        reason:"أدخل تاريخ فطام صحيحًا."
+       })),
+eventDate
+       
       });
 
-      payload.message = "❌ تاريخ الفطام غير صالح.";
+      payload.message = "❌ أدخل تاريخ فطام صحيحًا.";
       payload.ui.message = payload.message;
 
       return res.status(400).json(payload);
@@ -27797,7 +27836,7 @@ app.post("/api/weaning/gate", requireUserId, async (req, res) => {
       ok:false,
       allowed:false,
       canSave:false,
-      message:"تعذّر التحقق من الفطام الآن.",
+      message:"❌ تعذّر فحص بيانات الفطام الآن. حاول مرة أخرى.",
       acceptedCount:0,
       rejectedCount:0,
       accepted:[],
@@ -27812,7 +27851,10 @@ app.post("/api/weaning/save", requireUserId, async (req, res) => {
     if (!db) {
       return res.status(503).json(weaningBuildSaveResponseSrv({
         saved:[],
-        rejected:[{ animalNumber:"", reason:"قاعدة البيانات غير متاحة." }]
+        rejected:[{
+        animalNumber:"",
+        reason:"تعذّر حفظ الفطام الآن. حاول مرة أخرى."
+      }]
       }));
     }
 
@@ -27828,7 +27870,7 @@ if (!weightResult.ok) {
     saved: [],
     rejected: numbers.map(n => ({
       animalNumber: n,
-      reason: weightResult.message || "وزن الفطام غير صالح."
+     reason: weightResult.message || "أدخل وزن فطام رقميًا صحيحًا أو اترك الحقل فارغًا."
     })),
     eventDate
   }));
@@ -27838,15 +27880,21 @@ const weaningWeightKg = weightResult.value;
     if (!numbers.length) {
       return res.status(400).json(weaningBuildSaveResponseSrv({
         saved:[],
-        rejected:[{ animalNumber:"", reason:"رقم الحيوان مطلوب." }],
-        eventDate
+     rejected:[{
+  animalNumber:"",
+  reason:"أدخل رقم العجل."
+}],
+eventDate
       }));
     }
 
     if (!calvingIsDateSrv(eventDate)) {
       return res.status(400).json(weaningBuildSaveResponseSrv({
         saved:[],
-        rejected:numbers.map(n => ({ animalNumber:n, reason:"تاريخ الفطام غير صالح." })),
+        rejected:numbers.map(n => ({
+        animalNumber:n,
+        reason:"أدخل تاريخ فطام صحيحًا."
+     })),
         eventDate
       }));
     }
@@ -27868,7 +27916,7 @@ const weaningWeightKg = weightResult.value;
       if (exists.exists) {
         rejected.push({
           animalNumber,
-          reason:"تم تسجيل الفطام لهذا الحيوان من قبل."
+          reason:"سبق تسجيل الفطام لهذا العجل."
         });
         continue;
       }
@@ -27962,7 +28010,7 @@ if (weaningWeightKg !== null) {
     console.error("weaning.save", e);
     return res.status(500).json({
       ok:false,
-      message:"فشل حفظ الفطام.",
+      message:"❌ تعذّر حفظ الفطام الآن. حاول مرة أخرى.",
       savedCount:0,
       rejectedCount:0,
       saved:[],
