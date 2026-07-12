@@ -35024,7 +35024,7 @@ app.post("/api/feces/vision-analyze", requireUserId, async (req, res) => {
     if (!apiKey) {
       return res.status(500).json({
         ok: false,
-        message: "❌ مفتاح OpenAI غير موجود على السيرفر."
+        message: "❌ خدمة تحليل صور الروث غير متاحة الآن. حاول مرة أخرى لاحقًا."
       });
     }
 
@@ -35040,7 +35040,7 @@ app.post("/api/feces/vision-analyze", requireUserId, async (req, res) => {
     if (!image) {
       return res.status(400).json({
         ok: false,
-        message: "❌ صورة الروث مطلوبة للتحليل."
+        message: "❌ التقط صورة واضحة للروث قبل بدء التحليل."
       });
     }
 const uid = req.userId;
@@ -35070,7 +35070,7 @@ if (!dailyUsage.allowed) {
   return res.status(429).json({
     ok: false,
     error: "feces_daily_analysis_limit_reached",
-   message: `🚫 تم الوصول للحد اليومي لتحليل صور الروث: ${FECES_DAILY_LIMIT_SRV} صورة في اليوم.`,
+   message: `🚫 وصلت إلى الحد اليومي لتحليل صور الروث: ${FECES_DAILY_LIMIT_SRV} صورة. يمكنك المحاولة غدًا.`,
    eventDate: analysisDate,
    dailyLimit: FECES_DAILY_LIMIT_SRV,
    currentDailyCount: dailyUsage.currentDailyCount || FECES_DAILY_LIMIT_SRV
@@ -35250,7 +35250,7 @@ For rejected images:
 
       return res.status(500).json({
         ok: false,
-        message: "تعذّر تحليل الروث عبر نموذج الرؤية.",
+        message: "❌ تعذّر تحليل صورة الروث الآن. حاول مرة أخرى.",
         debug: {
           status: r.status,
           message: openaiMessage,
@@ -35266,7 +35266,7 @@ For rejected images:
     if (!parsed || parsed.ok === false) {
       return res.status(400).json({
         ok: false,
-        message: parsed?.message || "الصورة غير صالحة لتقييم الروث بدقة."
+        message: parsed?.message || "❌ الصورة غير كافية لتقييم الروث بدقة. أعد التصوير بوضوح ومن مسافة قريبة."
       });
     }
 
@@ -35275,7 +35275,7 @@ For rejected images:
     if (!Number.isFinite(Number(score))) {
       return res.status(400).json({
         ok: false,
-        message: "تعذّر استخراج درجة روث صالحة من تحليل الرؤية."
+        message: "❌ لم أتمكن من استخراج درجة صحيحة من التحليل. أعد المحاولة بصورة أوضح."
       });
     }
 
@@ -35314,14 +35314,14 @@ For rejected images:
   FECES_DAILY_LIMIT_SRV - (dailyUsage.dailySequence || 0)
 ),
 
-  message: `تم تحليل الروث — الدرجة ${score} (${label})`
+  message: `✅ اكتمل تحليل الروث — الدرجة ${score}/5 (${label}).`
 });
 
   } catch (e) {
     console.error("feces vision analyze error:", e);
     return res.status(500).json({
       ok: false,
-      message: "حدث خطأ أثناء تحليل الروث بالرؤية."
+      message: "❌ تعذّر تحليل صورة الروث الآن. حاول مرة أخرى."
     });
   }
 });
@@ -35335,7 +35335,7 @@ app.get("/api/feces/training/gate", requireUserId, async (req, res) => {
       trainingEnabled: canTrain,
       mode: canTrain ? "expert_correction" : "hidden",
       message: canTrain
-        ? "أدوات تدريب نموذج الروث متاحة لهذا الحساب."
+       ? "✅ أدوات تدريب نموذج الروث متاحة لهذا الحساب."
         : "أدوات التدريب غير متاحة لهذا الحساب."
     });
   } catch (e) {
@@ -35343,7 +35343,7 @@ app.get("/api/feces/training/gate", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       canTrain: false,
-      message: "تعذّر فتح أدوات تدريب نموذج الروث."
+      message: "❌ تعذّر فتح أدوات تدريب نموذج الروث الآن. حاول مرة أخرى."
     });
   }
 });
@@ -35363,7 +35363,7 @@ app.post("/api/feces/training/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "تعذّر حفظ تصحيح التدريب — قاعدة البيانات غير متاحة."
+       message: "❌ تعذّر تسجيل تصحيح تدريب نموذج الروث الآن. حاول مرة أخرى."
       });
     }
 
@@ -35386,14 +35386,14 @@ app.post("/api/feces/training/save", requireUserId, async (req, res) => {
     if (!Number.isFinite(Number(predictedScore))) {
       return res.status(400).json({
         ok: false,
-        message: "درجة النموذج الأصلية غير صالحة."
+        message: "❌ درجة النموذج الأصلية غير صالحة. أعد تحليل الصورة أولًا."
       });
     }
 
     if (!Number.isFinite(Number(correctedScore))) {
       return res.status(400).json({
         ok: false,
-        message: "اختر الدرجة الصحيحة من 1 إلى 5 قبل حفظ التصحيح."
+        message: "❌ اختر الدرجة الصحيحة من 1 إلى 5 قبل تسجيل التصحيح."
       });
     }
 
@@ -35531,14 +35531,14 @@ app.post("/api/feces/training/save", requireUserId, async (req, res) => {
       correctionId: ref.id,
       predictedScore,
       correctedScore,
-      message: `✅ تم حفظ تصحيح التدريب: النموذج ${predictedScore} → الصحيح ${correctedScore}.`
+      message: `✅ سجلت تصحيح تدريب نموذج الروث: تقدير النموذج ${predictedScore}/5، والتصحيح ${correctedScore}/5.`
     });
 
   } catch (e) {
     console.error("feces training save failed:", e.message || e);
     return res.status(500).json({
       ok: false,
-      message: "تعذّر حفظ تصحيح تدريب نموذج الروث."
+      message: "❌ تعذّر تسجيل تصحيح تدريب نموذج الروث الآن. حاول مرة أخرى."
     });
   }
 });
@@ -35602,7 +35602,7 @@ async function fecesSaveGroupSampleSessionSrv({
         statusCode: 409,
         ok: false,
         error: "feces_group_session_already_completed",
-        message: "تم اكتمال تقييم هذه المجموعة لهذا التاريخ بالفعل.",
+        message: "ℹ️ تقييم روث هذه المجموعة مكتمل لهذا التاريخ بالفعل.",
         eventDate,
         groupId: groupId || null,
         groupName: groupName || null,
@@ -35623,7 +35623,7 @@ async function fecesSaveGroupSampleSessionSrv({
         statusCode: 409,
         ok: false,
         error: "feces_group_session_full",
-        message: "تم تسجيل كل عينات هذه المجموعة بالفعل.",
+        message: `ℹ️ تم تسجيل جميع عينات هذه المجموعة (${FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV}) بالفعل.`,
         eventDate,
         groupId: groupId || null,
         groupName: groupName || null,
@@ -35701,7 +35701,7 @@ async function fecesSaveGroupSampleSessionSrv({
         sampleCount: nextCount,
         samplesRequired: FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV,
         nextSampleNo: nextCount + 1,
-        message: `✅ تم حفظ العينة ${nextCount} من ${FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV}. صوّر العينة ${nextCount + 1}.`
+       message: `✅ سجلت العينة ${nextCount} من ${FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV}. صوّر العينة رقم ${nextCount + 1}.`
       };
       return;
     }
@@ -35713,7 +35713,7 @@ async function fecesSaveGroupSampleSessionSrv({
         statusCode: 400,
         ok: false,
         error: "feces_group_scores_invalid",
-        message: "لا توجد درجات صالحة لحفظ تقييم المجموعة."
+        message: "❌ لا توجد درجات صالحة لإكمال تقييم روث المجموعة."
       };
       return;
     }
@@ -35731,7 +35731,7 @@ async function fecesSaveGroupSampleSessionSrv({
         statusCode: 429,
         ok: false,
         error: "feces_daily_save_limit_reached",
-        message: `🚫 تم الوصول للحد اليومي لحفظ تقييم الروث: ${FECES_DAILY_LIMIT_SRV} تقييمات في اليوم.`,
+        message: `🚫 وصلت إلى الحد اليومي لحفظ تقييمات الروث: ${FECES_DAILY_LIMIT_SRV} تقييمات. يمكنك المحاولة غدًا.`,
         eventDate,
         dailyLimit: FECES_DAILY_LIMIT_SRV,
         currentDailyCount
@@ -35878,7 +35878,7 @@ async function fecesSaveGroupSampleSessionSrv({
       dailySequence,
       dailyLimit: FECES_DAILY_LIMIT_SRV,
 
-      message: `✅ تم حفظ تقييم روث المجموعة (${stats.sampleCount} عينات) — المتوسط ${stats.finalScore}/5`,
+     message: `✅ اكتمل تقييم روث المجموعة بعد ${stats.sampleCount} عينات — المتوسط ${stats.finalScore}/5.`,
       saved: payload
     };
   });
@@ -35886,7 +35886,7 @@ async function fecesSaveGroupSampleSessionSrv({
   return result || {
     statusCode: 500,
     ok: false,
-    message: "تعذّر حفظ عينة المجموعة."
+    message: "❌ تعذّر تسجيل عينة المجموعة الآن. حاول مرة أخرى."
   };
 }
 app.post("/api/feces/save", requireUserId, async (req, res) => {
@@ -35895,7 +35895,7 @@ app.post("/api/feces/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "تعذّر حفظ تقييم الروث — قاعدة البيانات غير متاحة."
+        message: "❌ تعذّر تسجيل تقييم الروث الآن. حاول مرة أخرى."
       });
     }
 
@@ -35963,28 +35963,28 @@ app.post("/api/feces/save", requireUserId, async (req, res) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
       return res.status(400).json({
         ok: false,
-        message: "❌ تاريخ تقييم الروث مطلوب."
+        message: "❌ أدخل تاريخ تقييم الروث."
       });
     }
 
     if (hasGroupScope && hasIndividualScope) {
       return res.status(400).json({
         ok: false,
-        message: "❌ اختر إما حيوانًا فرديًا أو مجموعة تغذية، وليس الاثنين معًا."
+        message: "❌ اختر حيوانًا فرديًا أو مجموعة تغذية فقط، وليس كليهما."
       });
     }
 
     if (!hasGroupScope && !hasIndividualScope) {
       return res.status(400).json({
         ok: false,
-        message: "❌ اختر حيوانًا أو مجموعة تغذية قبل حفظ تقييم الروث."
+       message: "❌ اختر حيوانًا أو مجموعة تغذية قبل تسجيل تقييم الروث."
       });
     }
 
     if (!samples.length) {
       return res.status(400).json({
         ok: false,
-        message: "❌ حلّل صورة روث واحدة على الأقل قبل الحفظ."
+        message: "❌ حلّل صورة روث واحدة على الأقل، ثم احفظ التقييم."
       });
     }
 
@@ -35998,7 +35998,7 @@ app.post("/api/feces/save", requireUserId, async (req, res) => {
    if (hasGroupScope && samples.length !== 1) {
   return res.status(400).json({
     ok: false,
-    message: "❌ حفظ تقييم المجموعة يستقبل عينة واحدة في كل مرة."
+    message: "❌ سجّل عينة واحدة في كل مرة لإكمال تقييم المجموعة."
   });
 }
 if (hasGroupScope) {
@@ -36021,7 +36021,7 @@ if (hasGroupScope) {
     if (!scores.length) {
       return res.status(400).json({
         ok: false,
-        message: "❌ لا توجد درجة صالحة للحفظ."
+        message: "❌ لا توجد درجة صالحة لتسجيل تقييم الروث."
       });
     }
 
@@ -36048,7 +36048,7 @@ if (hasGroupScope) {
       return res.status(429).json({
         ok: false,
         error: "feces_daily_save_limit_reached",
-        message: `🚫 تم الوصول للحد اليومي لحفظ تقييم الروث: ${FECES_DAILY_LIMIT_SRV} تقييمات في اليوم.`,
+        message: `🚫 وصلت إلى الحد اليومي لحفظ تقييمات الروث: ${FECES_DAILY_LIMIT_SRV} تقييمات. يمكنك المحاولة غدًا.`,
         eventDate,
         dailyLimit: FECES_DAILY_LIMIT_SRV,
         currentDailyCount: saveUsage.currentDailyCount || FECES_DAILY_LIMIT_SRV
@@ -36128,9 +36128,9 @@ if (hasGroupScope) {
 
     return res.json({
       ok: true,
-      message: hasGroupScope
-        ? `✅ تم حفظ جلسة تقييم الروث للمجموعة (${sampleCount} عينات) — المتوسط ${finalScore}/5`
-        : `✅ تم حفظ تقييم الروث الفردي — الدرجة ${finalScore}/5`,
+     message: hasGroupScope
+  ? `✅ سجلت جلسة تقييم الروث للمجموعة (${sampleCount} عينات) بمتوسط ${finalScore}/5.`
+  : `✅ سجلت تقييم الروث الفردي بنجاح — الدرجة ${finalScore}/5.`,
       id: eventRef.id,
       eventId: eventRef.id,
       eventDate,
@@ -36163,7 +36163,7 @@ if (hasGroupScope) {
 
     return res.status(500).json({
       ok: false,
-      message: "تعذّر حفظ تقييم الروث الآن."
+      message: "❌ تعذّر تسجيل تقييم الروث الآن. حاول مرة أخرى."
     });
   }
 });
