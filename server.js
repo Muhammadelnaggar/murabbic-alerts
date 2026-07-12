@@ -17316,7 +17316,7 @@ app.post("/api/disease/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok:false,
         error: duplicateHealth.error,
-        message: duplicateHealth.message
+        message: "⚠️ تعذّر التحقق من وجود تسجيل عرج مماثل الآن. حاول مرة أخرى.",
       });
     }
 
@@ -18695,7 +18695,7 @@ app.post("/api/lameness/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن.",
+        message: "❌ تعذّر تحميل بيانات تسجيل العرج الآن. حاول مرة أخرى.",
         options: {
           affectedLegs: LAMENESS_AFFECTED_LEGS_SRV,
           lamenessTypes: LAMENESS_TYPES_SRV
@@ -18725,7 +18725,7 @@ app.post("/api/lameness/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "invalid_date",
-        message: "❌ تاريخ العرج غير صالح."
+        message: "❌ أدخل تاريخ عرج صحيحًا.",
       });
     }
 
@@ -18745,7 +18745,7 @@ app.post("/api/lameness/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "animal_not_found",
-        message: "❌ رقم الحيوان غير موجود في حسابك."
+        message: "❌ لم أجد الحيوان في القطيع المسجل بحسابك.",
       });
     }
 
@@ -18754,14 +18754,14 @@ app.post("/api/lameness/gate", requireUserId, async (req, res) => {
         ok: false,
         allowed: false,
         error: "animal_archived",
-        message: "❌ لا يمكن تسجيل عرج — الحيوان خارج القطيع."
+        message: "❌ لا يمكن تسجيل العرج؛ الحيوان خارج القطيع.",
       });
     }
 
     return res.json({
       ok: true,
       allowed: true,
-      message: "✅ تم التحقق — جاهز لتسجيل حالة العرج.",
+      message: `✅ راجعت بيانات الحيوان رقم ${fd.animalNumber}، ويمكنك تسجيل حالة العرج الآن.`,
       animalNumber: fd.animalNumber,
       eventDate: fd.eventDate,
       animal: {
@@ -18784,7 +18784,7 @@ app.post("/api/lameness/gate", requireUserId, async (req, res) => {
       ok: false,
       allowed: false,
       error: "lameness_gate_failed",
-      message: "❌ تعذّر التحقق من العرج الآن."
+      message: "❌ تعذّر فحص بيانات العرج الآن. حاول مرة أخرى.",
     });
   }
 });
@@ -18795,7 +18795,7 @@ app.post("/api/lameness/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن."
+        message: "❌ تعذّر تسجيل العرج الآن. حاول مرة أخرى.",
       });
     }
 
@@ -18807,7 +18807,7 @@ app.post("/api/lameness/save", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "missing_required_fields",
-        message: "❌ رقم الحيوان وتاريخ العرج والحافر المصاب ونوع العرج مطلوبة."
+        message: "❌ أكمل رقم الحيوان وتاريخ العرج، واختر الحافر المصاب ونوع العرج.",
       });
     }
 
@@ -18815,7 +18815,7 @@ app.post("/api/lameness/save", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "invalid_date",
-        message: "❌ تاريخ العرج غير صالح."
+        message: "❌ أدخل تاريخ عرج صحيحًا.",
       });
     }
 
@@ -18834,7 +18834,7 @@ if (!fd.affectedLegs?.length || invalidAffectedLegs.length) {
   return res.status(400).json({
     ok: false,
     error: "invalid_affected_leg",
-    message: "❌ اختر حافرًا مصابًا واحدًا على الأقل."
+    message: "❌ اختر حافرًا مصابًا واحدًا على الأقل من القائمة.",
   });
 }
 
@@ -18842,7 +18842,7 @@ if (!fd.affectedLegs?.length || invalidAffectedLegs.length) {
       return res.status(400).json({
         ok: false,
         error: "invalid_lameness_type",
-        message: "❌ نوع العرج غير معروف."
+        message: "❌ اختر نوع العرج من القائمة.",
       });
     }
 
@@ -18852,7 +18852,7 @@ if (!fd.affectedLegs?.length || invalidAffectedLegs.length) {
       return res.status(404).json({
         ok: false,
         error: "animal_not_found",
-        message: "❌ رقم الحيوان غير موجود في حسابك."
+        message: "❌ لم أجد الحيوان في القطيع المسجل بحسابك.",
       });
     }
 
@@ -18860,7 +18860,7 @@ if (!fd.affectedLegs?.length || invalidAffectedLegs.length) {
       return res.status(400).json({
         ok: false,
         error: "animal_archived",
-        message: "❌ لا يمكن تسجيل عرج — الحيوان خارج القطيع."
+        message: "❌ لا يمكن تسجيل العرج؛ الحيوان خارج القطيع.",
       });
     }
 
@@ -18877,7 +18877,7 @@ if (!fd.affectedLegs?.length || invalidAffectedLegs.length) {
       return res.status(503).json({
         ok: false,
         error: duplicateHealth.error,
-        message: duplicateHealth.message
+        message: "⚠️ تعذّر التحقق من وجود تسجيل عرج مماثل الآن. حاول مرة أخرى.",
       });
     }
 
@@ -18887,7 +18887,7 @@ if (!fd.affectedLegs?.length || invalidAffectedLegs.length) {
         duplicate: true,
         error: "duplicate_health_event_same_day_details",
         eventId: duplicateHealth.eventId || null,
-        message: duplicateHealth.message
+        message: `❌ سبق تسجيل نفس حالة العرج للحيوان رقم ${fd.animalNumber} في هذا اليوم بنفس الحافر ونوع العرج.`,
       });
     }
 
@@ -18955,7 +18955,7 @@ details: {
 
     return res.json({
       ok: true,
-      message: "✅ تم حفظ العرج بنجاح",
+      message: `✅ سجلت حالة العرج للحيوان رقم ${fd.animalNumber} بنجاح.`,
       eventId: eventRef.id,
       animalNumber: fd.animalNumber,
       eventDate: fd.eventDate,
@@ -18968,7 +18968,7 @@ details: {
     return res.status(500).json({
       ok: false,
       error: "lameness_save_failed",
-      message: "❌ تعذّر حفظ العرج الآن."
+      message: "❌ تعذّر تسجيل حالة العرج الآن. حاول مرة أخرى.",
     });
   }
 });
