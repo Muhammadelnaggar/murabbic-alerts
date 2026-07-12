@@ -6226,7 +6226,7 @@ if (action === "trimming") {
       ok: false,
       allowed: false,
       error: "animal_number_required",
-      message: "اكتب رقم الحيوان أو اختر مجموعة أولًا."
+      message: "أدخل رقم الحيوان أو اختر مجموعة لتسجيل تقليم الحوافر.",
     });
   }
 
@@ -6371,7 +6371,7 @@ app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "تعذّر حفظ تقليم الحوافر — قاعدة البيانات غير متاحة.",
+        message: "❌ تعذّر تسجيل تقليم الحوافر الآن. حاول مرة أخرى.",
         saved: [],
         failed: [],
         rejected: []
@@ -6396,7 +6396,7 @@ app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "animal_number_required",
-        message: "اكتب رقم الحيوان أو اختر مجموعة أولًا.",
+        message: "أدخل رقم الحيوان أو اختر مجموعة لتسجيل تقليم الحوافر.",
         saved: [],
         failed: [],
         rejected: []
@@ -6413,7 +6413,7 @@ app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
         failed.push({
           animalNumber,
           reason: "animal_not_found",
-          message: `الحيوان رقم ${animalNumber} غير موجود في القطيع.`
+          message: `❌ لم أجد الحيوان رقم ${animalNumber} في القطيع المسجل بحسابك.`,
         });
         continue;
       }
@@ -6470,8 +6470,9 @@ app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
         eventId: eventRef.id,
         alreadyExists: !created,
         message: created
-          ? `تم تسجيل تقليم الحوافر للحيوان رقم ${animalNumber}.`
-          : `تقليم الحوافر مسجل بالفعل للحيوان رقم ${animalNumber} في نفس التاريخ.`
+          ? `✅ سجلت تقليم الحوافر للحيوان رقم ${animalNumber} بنجاح.`
+         : `ℹ️ تقليم الحوافر مسجل بالفعل للحيوان رقم ${animalNumber} في هذا التاريخ.`
+        
       });
     }
 
@@ -6483,8 +6484,8 @@ app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
       ok: saved.length > 0,
       partial: false,
       message: saved.length
-        ? `✅ تم تسجيل/تأكيد تقليم الحوافر لعدد ${saved.length} حيوان.`
-        : "لم يتم تسجيل تقليم الحوافر لأي حيوان.",
+  ? `✅ اكتمل تسجيل تقليم الحوافر لعدد ${saved.length} حيوان.`
+  : "❌ لم يتم تسجيل تقليم الحوافر لأي حيوان.",
       saved,
       failed,
       rejected: [],
@@ -6498,7 +6499,7 @@ app.post("/api/hoof-trimming/save", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "hoof_trimming_save_failed",
-      message: "تعذّر حفظ تقليم الحوافر الآن.",
+     message: "❌ تعذّر تسجيل تقليم الحوافر الآن. حاول مرة أخرى.",
       saved: [],
       failed: [],
       rejected: []
