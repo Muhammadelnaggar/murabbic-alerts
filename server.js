@@ -40859,7 +40859,7 @@ app.post("/api/animals/archive/gate", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         allowed: false,
-        message: "قاعدة البيانات غير متاحة الآن."
+        message: String(req.body?.archiveReason || "").trim() === "death" ? "❌ تعذّر فحص بيانات النفوق الآن. حاول مرة أخرى." : "❌ تعذّر فحص بيانات البيع الآن. حاول مرة أخرى.",
       });
     }
 
@@ -40873,7 +40873,7 @@ app.post("/api/animals/archive/gate", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         allowed: false,
-        message: "رقم الحيوان مطلوب."
+        message: "أدخل رقم الحيوان.",
       });
     }
 
@@ -40881,7 +40881,7 @@ app.post("/api/animals/archive/gate", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         allowed: false,
-        message: "سبب الأرشفة غير صالح."
+        message: "تعذّر تحديد نوع العملية من الصفحة. أعد فتحها وحاول مرة أخرى.",
       });
     }
 
@@ -40891,7 +40891,7 @@ app.post("/api/animals/archive/gate", requireUserId, async (req, res) => {
       return res.status(404).json({
         ok: false,
         allowed: false,
-        message: "❌ الحيوان غير موجود في القطيع."
+        message: "❌ لم أجد الحيوان في القطيع المسجل بحسابك.",
       });
     }
 
@@ -40902,17 +40902,15 @@ app.post("/api/animals/archive/gate", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         allowed: false,
-        message: "❌ الحيوان غير موجود في القطيع."
+       message: "❌ الحيوان خارج القطيع أو سبق تسجيل خروجه.",
       });
     }
 
     return res.json({
-      ok: true,
-      allowed: true,
-      message: archiveReason === "sale"
-        ? "✅ الحيوان مؤهل لتسجيل البيع."
-        : "✅ الحيوان مؤهل لتسجيل النفوق.",
-      animal: {
+        ok: true,
+        allowed: true,
+        message: archiveReason === "sale" ? `✅ راجعت بيانات الحيوان رقم ${animalNumber}، ويمكنك تسجيل البيع الآن.` : `✅ راجعت بيانات الحيوان رقم ${animalNumber}، ويمكنك تسجيل النفوق الآن.`,
+        animal: {
         id: animal.id,
         animalNumber,
         number: String(doc.number || animalNumber),
@@ -40931,7 +40929,7 @@ app.post("/api/animals/archive/gate", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       allowed: false,
-      message: "فشل التحقق من الحيوان."
+      message: String(req.body?.archiveReason || "").trim() === "death" ? "❌ تعذّر فحص بيانات النفوق الآن. حاول مرة أخرى." : "❌ تعذّر فحص بيانات البيع الآن. حاول مرة أخرى.",
     });
   }
 });
@@ -40940,7 +40938,7 @@ app.post("/api/animals/archive", requireUserId, async (req, res) => {
     if (!db) {
       return res.status(503).json({
         ok: false,
-        message: "قاعدة البيانات غير متاحة الآن."
+        message: String(req.body?.archiveReason || "").trim() === "death" ? "❌ تعذّر تسجيل النفوق الآن. حاول مرة أخرى." : "❌ تعذّر تسجيل البيع الآن. حاول مرة أخرى.",
       });
     }
 
@@ -40953,14 +40951,14 @@ app.post("/api/animals/archive", requireUserId, async (req, res) => {
     if (!animalNumber) {
       return res.status(400).json({
         ok: false,
-        message: "رقم الحيوان مطلوب."
+        message: "أدخل رقم الحيوان.",
       });
     }
 
     if (!["sale", "death"].includes(archiveReason)) {
       return res.status(400).json({
         ok: false,
-        message: "سبب الأرشفة غير صالح."
+        message: "تعذّر تحديد نوع العملية من الصفحة. أعد فتحها وحاول مرة أخرى.",
       });
     }
 const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
@@ -40968,9 +40966,7 @@ const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
 if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
   return res.status(400).json({
     ok: false,
-    message: archiveReason === "sale"
-      ? "تاريخ البيع غير صالح."
-      : "تاريخ النفوق غير صالح."
+    message: archiveReason === "sale" ? "أدخل تاريخ بيع صحيحًا." : "أدخل تاريخ نفوق صحيحًا.",
   });
 }
 
@@ -40980,7 +40976,7 @@ if (archiveReason === "sale") {
   if (!saleReason) {
     return res.status(400).json({
       ok: false,
-      message: "سبب البيع مطلوب."
+      message: "أدخل سبب البيع.",
     });
   }
 }
@@ -40990,7 +40986,7 @@ if (archiveReason === "sale") {
   if (!deathReason) {
     return res.status(400).json({
       ok: false,
-      message: "سبب النفوق مطلوب."
+      message: "أدخل سبب النفوق.",
     });
   }
 }
@@ -40999,7 +40995,7 @@ if (archiveReason === "sale") {
     if (!animal) {
       return res.status(404).json({
         ok: false,
-        message: "تعذّر العثور على الحيوان في القطيع."
+        message: "❌ لم أجد الحيوان في القطيع المسجل بحسابك.",
       });
     }
 
@@ -41092,16 +41088,14 @@ if (typeof scheduleGroupsRebuildSrv === "function") {
       animalNumber,
       archivedAnimalId: archiveId,
       archivedEventsCount: events.length,
-      message: archiveReason === "sale"
-        ? "✅ تم أرشفة الحيوان وأحداثه بعد البيع."
-        : "✅ تم أرشفة الحيوان وأحداثه بعد النفوق."
+      message: archiveReason === "sale" ? `✅ سجلت بيع الحيوان رقم ${animalNumber} بنجاح، ونقلت بياناته وأحداثه إلى الأرشيف.` : `✅ سجلت نفوق الحيوان رقم ${animalNumber} بنجاح، ونقلت بياناته وأحداثه إلى الأرشيف.`,
     });
 
   } catch (e) {
     console.error("animals.archive", e);
     return res.status(500).json({
       ok: false,
-      message: "فشل أرشفة الحيوان وأحداثه."
+      message: String(req.body?.archiveReason || "").trim() === "death" ? "❌ تعذّر تسجيل النفوق الآن. حاول مرة أخرى." : "❌ تعذّر تسجيل البيع الآن. حاول مرة أخرى.",
     });
   }
 });
