@@ -6133,7 +6133,7 @@ app.get("/api/events-page/context", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "events_page_context_failed",
-      message: "تعذّر تحميل سياق صفحة الأحداث."
+     message: "❌ تعذّر تجهيز صفحة الأحداث الآن. حاول مرة أخرى."
     });
   }
 });
@@ -6144,7 +6144,7 @@ app.get("/api/events-page/groups", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "تعذّر تحميل المجموعات — قاعدة البيانات غير متاحة.",
+        message: "❌ تعذّر تحميل مجموعات القطيع الآن. حاول مرة أخرى لاحقًا.",
         groups: []
       });
     }
@@ -6188,7 +6188,7 @@ app.get("/api/events-page/groups", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "events_page_groups_failed",
-      message: "فشل تحميل المجموعات من السيرفر.",
+      message: "❌ تعذّر تحميل مجموعات القطيع الآن. حاول مرة أخرى.",
       groups: []
     });
   }
@@ -6216,7 +6216,7 @@ app.post("/api/events-page/resolve", requireUserId, async (req, res) => {
     ok: false,
     allowed: false,
     error: "event_page_required",
-    message: "لم يتم تحديد نوع الحدث."
+    message: "❌ اختر نوع الحدث أولًا."
   });
 }
 
@@ -6245,7 +6245,7 @@ if (action === "trimming") {
         ok: false,
         allowed: false,
         error: "unknown_event_page",
-        message: "نوع الحدث غير معروف في مُرَبِّيك."
+        message: "❌ نوع الحدث المحدد غير متاح."
       });
     }
 
@@ -6254,7 +6254,7 @@ if (action === "trimming") {
         ok: false,
         allowed: false,
         error: "animal_number_required",
-        message: "اكتب رقم الحيوان أو اختر مجموعة أولًا."
+        message: "❌ أدخل رقم الحيوان أو اختر مجموعة أولًا."
       });
     }
 
@@ -6263,7 +6263,7 @@ if (action === "trimming") {
         ok: false,
         allowed: false,
         error: "bulk_not_allowed",
-        message: "هذا الحدث لا يقبل الإدخال الجماعي من صفحة الأحداث."
+        message: "ℹ️ هذا الحدث يُسجل لحيوان واحد في كل مرة."
       });
     }
 
@@ -6275,7 +6275,7 @@ if (action === "trimming") {
           ok: false,
           allowed: false,
           error: "nutrition_group_required",
-          message: "اختر مجموعة تغذية أولًا."
+          message: "❌ اختر مجموعة التغذية أولًا."
         });
       }
 
@@ -6313,7 +6313,7 @@ if (action === "trimming") {
       ok: false,
       allowed: false,
       error: "events_page_resolve_failed",
-      message: "تعذّر تجهيز الحدث من السيرفر."
+      message: "❌ تعذّر فتح الحدث الآن. حاول مرة أخرى."
     });
   }
 });
