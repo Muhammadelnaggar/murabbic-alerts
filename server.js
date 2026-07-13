@@ -18378,7 +18378,7 @@ app.post("/api/dehorning/gate", requireUserId, async (req, res) => {
         ok: false,
         canSave: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن.",
+        message: "❌ تعذّر التحقق من إمكانية تسجيل إزالة القرون الآن. حاول مرة أخرى لاحقًا.",
         accepted: [],
         rejected: []
       });
@@ -18394,7 +18394,7 @@ app.post("/api/dehorning/gate", requireUserId, async (req, res) => {
         ok: true,
         canSave: false,
         silent: true,
-        message: "أدخل رقم العجل وتاريخ إزالة القرون.",
+        message: "❌ أدخل رقم العجل وتاريخ إزالة القرون.",
         accepted: [],
         rejected: []
       });
@@ -18453,7 +18453,7 @@ app.post("/api/dehorning/gate", requireUserId, async (req, res) => {
       ok: false,
       canSave: false,
       error: "dehorning_gate_failed",
-      message: "❌ تعذّر التحقق من إزالة القرون الآن.",
+      message: "❌ تعذّر التحقق من إمكانية تسجيل إزالة القرون الآن. حاول مرة أخرى.",
       accepted: [],
       rejected: []
     });
@@ -18466,7 +18466,7 @@ app.post("/api/dehorning/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن.",
+        message: "❌ تعذّر تسجيل إزالة القرون الآن. حاول مرة أخرى لاحقًا.",
         saved: [],
         rejected: []
       });
@@ -18482,7 +18482,7 @@ app.post("/api/dehorning/save", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "missing_required_fields",
-        message: "❌ رقم العجل وتاريخ إزالة القرون مطلوبان.",
+        message: "❌ أدخل رقم العجل وتاريخ إزالة القرون.",
         saved: [],
         rejected: []
       });
@@ -18587,7 +18587,7 @@ app.post("/api/dehorning/save", requireUserId, async (req, res) => {
       ok: saved.length > 0,
       message: saved.length
         ? dehorningSaveMessageSrv(saved)
-        : "❌ لم يتم حفظ أي سجل إزالة قرون.",
+       : "❌ لم يتم تسجيل إزالة القرون لأي عجل.",
       savedCount: saved.length,
       rejectedCount: saved.length ? saveErrors.length : checked.rejected.length + saveErrors.length,
       saved,
@@ -18603,7 +18603,7 @@ app.post("/api/dehorning/save", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "dehorning_save_failed",
-      message: "❌ تعذّر حفظ إزالة القرون الآن.",
+      message: "❌ تعذّر تسجيل إزالة القرون الآن. حاول مرة أخرى.",
       saved: [],
       rejected: []
     });
