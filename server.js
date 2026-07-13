@@ -712,7 +712,7 @@ async function authPasswordResetSendOtpBridgeSrv(phoneRaw, code) {
     return {
       ok: false,
       error: "sms_provider_missing",
-      message: "خدمة إرسال كود التحقق غير مفعّلة على السيرفر."
+      message: "❌ تعذّر إرسال كود التحقق الآن. حاول مرة أخرى لاحقًا."
     };
   }
 
@@ -734,7 +734,7 @@ async function authPasswordResetSendOtpBridgeSrv(phoneRaw, code) {
       return {
         ok: false,
         error: "sms_send_failed",
-        message: "تعذّر إرسال كود التحقق الآن."
+        message: "❌ تعذّر إرسال كود التحقق الآن. حاول مرة أخرى."
       };
     }
 
@@ -745,7 +745,7 @@ async function authPasswordResetSendOtpBridgeSrv(phoneRaw, code) {
     return {
       ok: false,
       error: "sms_send_failed",
-      message: "تعذّر إرسال كود التحقق الآن."
+      message: "❌ تعذّر إرسال كود التحقق الآن. حاول مرة أخرى."
     };
   }
 }
@@ -756,7 +756,7 @@ app.post("/api/auth/password-reset/start", async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firebase_admin_disabled",
-        message: "خدمة استعادة كلمة المرور غير متاحة الآن."
+        message: "❌ خدمة استعادة كلمة المرور غير متاحة الآن. حاول مرة أخرى لاحقًا."
       });
     }
 
@@ -767,7 +767,7 @@ app.post("/api/auth/password-reset/start", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "password_reset_phone_required",
-        message: "أدخل رقم الهاتف."
+       message: "❌ أدخل رقم الهاتف المسجّل في مُرَبِّيك."
       });
     }
 
@@ -781,7 +781,7 @@ app.post("/api/auth/password-reset/start", async (req, res) => {
         return res.status(404).json({
           ok: false,
           error: "password_reset_user_not_found",
-          message: "رقم الهاتف غير مسجّل."
+         message: "❌ رقم الهاتف غير مسجّل في مُرَبِّيك."
         });
       }
       throw e;
@@ -792,7 +792,7 @@ app.post("/api/auth/password-reset/start", async (req, res) => {
       return res.status(404).json({
         ok: false,
         error: "password_reset_user_not_found",
-        message: "رقم الهاتف غير مسجّل."
+        message: "❌ رقم الهاتف غير مسجّل في مُرَبِّيك."
       });
     }
 
@@ -808,7 +808,7 @@ app.post("/api/auth/password-reset/start", async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: sent.error || "otp_send_failed",
-        message: sent.message || "تعذّر إرسال كود التحقق الآن."
+        message: sent.message || "❌ تعذّر إرسال كود التحقق الآن. حاول مرة أخرى."
       });
     }
 
@@ -835,7 +835,7 @@ app.post("/api/auth/password-reset/start", async (req, res) => {
       otpRequired: true,
       requestId,
       expiresInSeconds: Math.floor(AUTH_OTP_TTL_MS / 1000),
-      message: "تم إرسال كود التحقق إلى رقم الهاتف."
+      message: "✅ تم إرسال كود التحقق إلى رقم الهاتف. الكود صالح لمدة 10 دقائق."
     };
 
     if (AUTH_OTP_DEV_RETURN) out.devOtp = code;
@@ -847,7 +847,7 @@ app.post("/api/auth/password-reset/start", async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "password_reset_start_failed",
-      message: "تعذّر بدء استعادة كلمة المرور الآن."
+      message: "❌ تعذّر بدء استعادة كلمة المرور الآن. حاول مرة أخرى."
     });
   }
 });
@@ -858,7 +858,7 @@ app.post("/api/auth/password-reset/verify", async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firebase_admin_disabled",
-        message: "خدمة استعادة كلمة المرور غير متاحة الآن."
+        message: "❌ خدمة استعادة كلمة المرور غير متاحة الآن. حاول مرة أخرى لاحقًا."
       });
     }
 
@@ -871,7 +871,7 @@ app.post("/api/auth/password-reset/verify", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "password_reset_fields_required",
-        message: "أدخل كود التحقق وكلمة المرور الجديدة."
+        message: "❌ أدخل كود التحقق وكلمة المرور الجديدة وتأكيدها."
       });
     }
 
@@ -882,7 +882,7 @@ app.post("/api/auth/password-reset/verify", async (req, res) => {
       return res.status(404).json({
         ok: false,
         error: "otp_not_found",
-        message: "كود التحقق غير صالح أو انتهت صلاحيته."
+        message: "❌ كود التحقق غير صالح أو انتهت صلاحيته. اطلب كودًا جديدًا."
       });
     }
 
@@ -892,7 +892,7 @@ app.post("/api/auth/password-reset/verify", async (req, res) => {
       return res.status(409).json({
         ok: false,
         error: "otp_already_used",
-        message: "تم استخدام كود التحقق من قبل."
+        message: "ℹ️ تم استخدام كود التحقق بالفعل. اطلب كودًا جديدًا."
       });
     }
 
@@ -901,7 +901,7 @@ app.post("/api/auth/password-reset/verify", async (req, res) => {
       return res.status(410).json({
         ok: false,
         error: "otp_expired",
-        message: "انتهت صلاحية كود التحقق. اطلب كودًا جديدًا."
+        message: "❌ انتهت صلاحية كود التحقق. اطلب كودًا جديدًا."
       });
     }
 
@@ -912,7 +912,7 @@ app.post("/api/auth/password-reset/verify", async (req, res) => {
       return res.status(429).json({
         ok: false,
         error: "otp_attempts_exceeded",
-        message: "تم تجاوز عدد محاولات التحقق. اطلب كودًا جديدًا."
+        message: "🚫 انتهت محاولات التحقق. اطلب كودًا جديدًا."
       });
     }
 
@@ -928,7 +928,7 @@ app.post("/api/auth/password-reset/verify", async (req, res) => {
         ok: false,
         error: "otp_invalid",
         attemptsLeft: Math.max(0, maxAttempts - attempts - 1),
-        message: "كود التحقق غير صحيح."
+        message: `❌ كود التحقق غير صحيح. متبقي ${Math.max(0, maxAttempts - attempts - 1)} محاولة.`
       });
     }
 
@@ -936,7 +936,7 @@ app.post("/api/auth/password-reset/verify", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "password_reset_mismatch",
-        message: "كلمة المرور وتأكيدها غير متطابقة."
+        message: "❌ تأكيد كلمة المرور لا يطابق كلمة المرور الجديدة."
       });
     }
 
@@ -958,7 +958,7 @@ app.post("/api/auth/password-reset/verify", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "password_reset_uid_missing",
-        message: "طلب استعادة كلمة المرور غير مكتمل."
+        message: "❌ تعذّر إكمال طلب استعادة كلمة المرور. ابدأ الطلب من جديد."
       });
     }
 
@@ -983,7 +983,7 @@ app.post("/api/auth/password-reset/verify", async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "password_reset_verify_failed",
-      message: "تعذّر تغيير كلمة المرور الآن."
+      message: "❌ تعذّر تغيير كلمة المرور الآن. حاول مرة أخرى."
     });
   }
 });
