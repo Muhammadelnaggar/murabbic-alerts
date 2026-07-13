@@ -284,7 +284,7 @@ async function authSendOtpBridgeSrv(phoneRaw, code) {
     return {
       ok: false,
       error: "sms_provider_missing",
-      message: "خدمة إرسال كود التحقق غير مفعّلة على السيرفر."
+      message: "❌ تعذّر إرسال كود التحقق الآن. حاول مرة أخرى لاحقًا."
     };
   }
 
@@ -306,7 +306,7 @@ async function authSendOtpBridgeSrv(phoneRaw, code) {
       return {
         ok: false,
         error: "sms_send_failed",
-        message: "تعذّر إرسال كود التحقق الآن."
+        message: "❌ تعذّر إرسال كود التحقق الآن. حاول مرة أخرى."
       };
     }
 
@@ -317,7 +317,7 @@ async function authSendOtpBridgeSrv(phoneRaw, code) {
     return {
       ok: false,
       error: "sms_send_failed",
-      message: "تعذّر إرسال كود التحقق الآن."
+      message: "❌ تعذّر إرسال كود التحقق الآن. حاول مرة أخرى."
     };
   }
 }
@@ -336,7 +336,7 @@ function authRegisterValidateBridgeSrv(body = {}) {
       ok: false,
       status: 400,
       error: "register_fields_required",
-      message: "جميع الحقول مطلوبة."
+      message: "❌ أكمل جميع بيانات إنشاء الحساب."
     };
   }
 
@@ -345,7 +345,7 @@ function authRegisterValidateBridgeSrv(body = {}) {
       ok: false,
       status: 400,
       error: "register_phone_invalid",
-      message: "رقم هاتف غير صالح."
+      message: "❌ أدخل رقم هاتف صحيحًا."
     };
   }
 
@@ -354,7 +354,7 @@ function authRegisterValidateBridgeSrv(body = {}) {
       ok: false,
       status: 400,
       error: "register_phone_country_invalid",
-      message: "رقم الهاتف غير مطابق لتنسيق الدولة المختارة."
+      message: "❌ رقم الهاتف لا يطابق الدولة المختارة."
     };
   }
 
@@ -363,7 +363,7 @@ function authRegisterValidateBridgeSrv(body = {}) {
       ok: false,
       status: 400,
       error: "register_phone_country_invalid",
-      message: "رقم الهاتف غير مطابق لتنسيق الدولة المختارة."
+      message: "❌ رقم الهاتف لا يطابق الدولة المختارة."
     };
   }
 
@@ -386,7 +386,7 @@ if (passwordIssue) {
       ok: false,
       status: 400,
       error: "register_password_mismatch",
-      message: "كلمة المرور وتأكيدها غير متطابقة."
+      message: "❌ تأكيد كلمة المرور لا يطابق كلمة المرور."
     };
   }
 
@@ -408,7 +408,7 @@ async function authRegisterStartHandlerBridgeSrv(req, res) {
       return res.status(503).json({
         ok: false,
         error: "firebase_admin_disabled",
-        message: "خدمة التسجيل غير متاحة الآن."
+        message: "❌ خدمة إنشاء الحساب غير متاحة الآن. حاول مرة أخرى لاحقًا."
       });
     }
 
@@ -418,7 +418,7 @@ async function authRegisterStartHandlerBridgeSrv(req, res) {
       return res.status(v.status || 400).json({
         ok: false,
         error: v.error || "register_invalid",
-        message: v.message || "راجع بيانات التسجيل."
+        message: v.message || "راجع بيانات إنشاء الحساب."
       });
     }
 
@@ -429,7 +429,7 @@ async function authRegisterStartHandlerBridgeSrv(req, res) {
       return res.status(409).json({
         ok: false,
         error: "phone_already_registered",
-        message: "رقم الهاتف مسجّل بالفعل."
+        message: "ℹ️ رقم الهاتف مسجّل بالفعل. سجّل الدخول أو استعد كلمة المرور."
       });
     } catch (e) {
       if (e?.code && e.code !== "auth/user-not-found") throw e;
@@ -446,7 +446,7 @@ async function authRegisterStartHandlerBridgeSrv(req, res) {
       return res.status(503).json({
         ok: false,
         error: sent.error || "otp_send_failed",
-        message: sent.message || "تعذّر إرسال كود التحقق الآن."
+        message: sent.message || "❌ تعذّر إرسال كود التحقق الآن. حاول مرة أخرى."
       });
     }
 
@@ -478,7 +478,7 @@ async function authRegisterStartHandlerBridgeSrv(req, res) {
       otpRequired: true,
       requestId,
       expiresInSeconds: Math.floor(AUTH_OTP_TTL_MS / 1000),
-      message: "تم إرسال كود التحقق إلى رقم الهاتف."
+      message: "✅ أرسلنا كود التحقق إلى رقم الهاتف. الكود صالح لمدة 10 دقائق."
     };
 
     if (AUTH_OTP_DEV_RETURN) out.devOtp = code;
@@ -490,7 +490,7 @@ async function authRegisterStartHandlerBridgeSrv(req, res) {
     return res.status(500).json({
       ok: false,
       error: "register_start_failed",
-      message: "تعذّر بدء التسجيل الآن."
+      message: "❌ تعذّر بدء إنشاء الحساب الآن. حاول مرة أخرى."
     });
   }
 }
@@ -501,7 +501,7 @@ app.post("/api/auth/register", async (req, res) => {
   return res.status(409).json({
     ok: false,
     error: "otp_flow_required",
-    message: "تم تفعيل كود التحقق. حدّث الصفحة ثم حاول التسجيل."
+    message: "ℹ️ تم تفعيل التحقق برقم الهاتف. حدّث الصفحة ثم أعد المحاولة."
   });
 });
 
@@ -511,7 +511,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firebase_admin_disabled",
-        message: "خدمة التسجيل غير متاحة الآن."
+        message: "❌ خدمة إنشاء الحساب غير متاحة الآن. حاول مرة أخرى لاحقًا."
       });
     }
 
@@ -524,7 +524,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "otp_fields_required",
-        message: "أدخل كود التحقق وكلمة المرور."
+        message: "❌ أدخل كود التحقق وكلمة المرور وتأكيدها."
       });
     }
 
@@ -535,7 +535,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
       return res.status(404).json({
         ok: false,
         error: "otp_not_found",
-        message: "كود التحقق غير صالح أو انتهت صلاحيته."
+        message: "❌ كود التحقق غير صالح أو انتهت صلاحيته. اطلب كودًا جديدًا."
       });
     }
 
@@ -545,7 +545,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
       return res.status(409).json({
         ok: false,
         error: "otp_already_used",
-        message: "تم استخدام كود التحقق من قبل."
+        message: "ℹ️ تم استخدام كود التحقق بالفعل. اطلب كودًا جديدًا."
       });
     }
 
@@ -554,7 +554,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
       return res.status(410).json({
         ok: false,
         error: "otp_expired",
-        message: "انتهت صلاحية كود التحقق. اطلب كودًا جديدًا."
+        message: "❌ انتهت صلاحية كود التحقق. اطلب كودًا جديدًا."
       });
     }
 
@@ -565,7 +565,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
       return res.status(429).json({
         ok: false,
         error: "otp_attempts_exceeded",
-        message: "تم تجاوز عدد محاولات التحقق. اطلب كودًا جديدًا."
+        message: "🚫 انتهت محاولات التحقق. اطلب كودًا جديدًا."
       });
     }
 
@@ -581,7 +581,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
         ok: false,
         error: "otp_invalid",
         attemptsLeft: Math.max(0, maxAttempts - attempts - 1),
-        message: "كود التحقق غير صحيح."
+        message: `❌ كود التحقق غير صحيح. متبقي ${Math.max(0, maxAttempts - attempts - 1)} محاولة.`
       });
     }
 
@@ -589,7 +589,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "register_password_mismatch",
-        message: "كلمة المرور وتأكيدها غير متطابقة."
+        message: "❌ تأكيد كلمة المرور لا يطابق كلمة المرور."
       });
     }
 
@@ -612,7 +612,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "register_password_changed",
-        message: "أعد إدخال نفس كلمة المرور التي بدأت بها التسجيل."
+        message: "❌ أدخل نفس كلمة المرور التي استخدمتها عند بدء إنشاء الحساب."
       });
     }
 
@@ -623,7 +623,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
       return res.status(409).json({
         ok: false,
         error: "phone_already_registered",
-        message: "رقم الهاتف مسجّل بالفعل."
+        message: "ℹ️ رقم الهاتف مسجّل بالفعل. سجّل الدخول أو استعد كلمة المرور."
       });
     } catch (e) {
       if (e?.code && e.code !== "auth/user-not-found") throw e;
@@ -673,7 +673,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
 
     return res.json({
       ok: true,
-      message: "✅ تم إنشاء الحساب وتأكيد رقم الهاتف بنجاح",
+      message: "✅ تم إنشاء حسابك وتأكيد رقم الهاتف بنجاح.",
       uid,
       userId: uid,
       user: authPublicUserBridgeSrv(profile, uid, uid),
@@ -683,14 +683,14 @@ app.post("/api/auth/register/verify", async (req, res) => {
   } catch (e) {
     console.warn("auth register verify failed:", e.message || e);
 
-    let message = "تعذّر إتمام التسجيل الآن.";
+    let message = "❌ تعذّر إتمام إنشاء الحساب الآن. حاول مرة أخرى.";
     let error = "register_verify_failed";
     let status = 500;
 
     if (e?.code === "auth/email-already-exists") {
       status = 409;
       error = "phone_already_registered";
-      message = "رقم الهاتف مسجّل بالفعل.";
+      message = "ℹ️ رقم الهاتف مسجّل بالفعل. سجّل الدخول أو استعد كلمة المرور.";
     } else if (e?.code === "auth/invalid-password" || e?.code === "auth/weak-password") {
       status = 400;
       error = "register_password_invalid";
