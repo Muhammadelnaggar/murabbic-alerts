@@ -38783,7 +38783,13 @@ function buildGroupsPagePayloadSrv(tenant, groupsMap = {}, thresholds = {}, anim
 }
 
 async function buildGroupsPageForTenantSrv(tenant) {
-  if (!db) return { ok: false, error: 'firestore_disabled' };
+  if (!db) {
+  return {
+    ok: false,
+    error: 'firestore_disabled',
+    message: "❌ تعذّر تحميل مجموعات القطيع الآن. حاول مرة أخرى لاحقًا."
+  };
+}
 
   const uid = String(tenant || '').trim();
   if (!uid) return { ok: false, error: 'userId_required' };
@@ -38807,7 +38813,7 @@ app.get('/api/groups/page', requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: 'groups_page_failed',
-      message: e.message || String(e)
+      message: "❌ تعذّر تحميل مجموعات القطيع الآن. حاول مرة أخرى."
     });
   }
 });
@@ -38934,7 +38940,13 @@ app.get('/api/groups/settings', requireUserId, async (req, res) => {
 
 app.post('/api/groups/settings', requireUserId, async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
+    if (!db) {
+  return res.status(503).json({
+    ok: false,
+    error: 'firestore_disabled',
+    message: "❌ تعذّر حفظ إعدادات المجموعات الآن. حاول مرة أخرى لاحقًا."
+  });
+}
 
     const tenant = req.userId;
     const thresholds = req.body?.thresholds || {};
@@ -38949,10 +38961,18 @@ app.post('/api/groups/settings', requireUserId, async (req, res) => {
       await rebuildGroupsForTenantSrv(tenant, { reason:'groups_settings' });
     }
 
-    return res.json({ ok:true, saved:true });
+    return res.json({
+  ok: true,
+  saved: true,
+  message: "✅ تم حفظ إعدادات المجموعات وتحديث توزيع الحيوانات بنجاح."
+});
   } catch (e) {
     console.error('groups.settings.save', e);
-    return res.status(500).json({ ok:false, error:'groups_settings_save_failed' });
+   return res.status(500).json({
+  ok: false,
+  error: 'groups_settings_save_failed',
+  message: "❌ تعذّر حفظ إعدادات المجموعات الآن. حاول مرة أخرى."
+});
   }
 });
 
