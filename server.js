@@ -17773,18 +17773,18 @@ function superTeatSaveMessageSrv(saved = [], rejected = []) {
   const lines = [];
 
   if (safeSaved.length && safeRejected.length) {
-    lines.push(`✅ تم تسجيل إزالة الحلمات الزائدة لعدد ${safeSaved.length} عجل، وتعذّر حفظ ${safeRejected.length} رقم.`);
+   lines.push(`✅ تم تسجيل إزالة الحلمات الزائدة لعدد ${safeSaved.length} عجل، ولم يتم التسجيل لعدد ${safeRejected.length} رقم.`);
   } else if (safeSaved.length === 1) {
     lines.push("✅ تم تسجيل إزالة الحلمات الزائدة بنجاح.");
   } else if (safeSaved.length > 1) {
     lines.push(`✅ تم تسجيل إزالة الحلمات الزائدة لعدد ${safeSaved.length} عجل بنجاح.`);
   } else {
-    lines.push("❌ لم يتم حفظ أي سجل إزالة حلمات زائدة.");
+    lines.push("❌ لم يتم تسجيل إزالة الحلمات الزائدة لأي عجل.");
   }
 
   if (safeRejected.length) {
     lines.push("");
-    lines.push(safeSaved.length ? "الأرقام التي لم تُحفظ:" : "سبب عدم الحفظ:");
+    lines.push(safeSaved.length ? "الأرقام التي لم تُسجل:" : "سبب عدم التسجيل:");
     rejectedLines.forEach(x => lines.push(`- ${x}`));
   }
 
@@ -17797,7 +17797,7 @@ app.post("/api/supernumerary-teat-removal/gate", requireUserId, async (req, res)
         ok: false,
         canSave: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن.",
+        message: "❌ تعذّر التحقق من إمكانية تسجيل إزالة الحلمات الزائدة الآن. حاول مرة أخرى لاحقًا.",
         accepted: [],
         rejected: []
       });
@@ -17813,7 +17813,7 @@ app.post("/api/supernumerary-teat-removal/gate", requireUserId, async (req, res)
         ok: true,
         canSave: false,
         silent: true,
-        message: "أدخل رقم العجل وتاريخ إزالة الحلمات الزائدة.",
+        message: "❌ أدخل رقم العجل وتاريخ إزالة الحلمات الزائدة.",
         accepted: [],
         rejected: []
       });
@@ -17873,7 +17873,7 @@ app.post("/api/supernumerary-teat-removal/gate", requireUserId, async (req, res)
       ok: false,
       canSave: false,
       error: "super_teat_gate_failed",
-      message: "❌ تعذّر التحقق من إزالة الحلمات الزائدة الآن.",
+      message: "❌ تعذّر التحقق من إمكانية تسجيل إزالة الحلمات الزائدة الآن. حاول مرة أخرى.",
       accepted: [],
       rejected: []
     });
@@ -17886,7 +17886,7 @@ app.post("/api/supernumerary-teat-removal/save", requireUserId, async (req, res)
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن.",
+        message: "❌ تعذّر تسجيل إزالة الحلمات الزائدة الآن. حاول مرة أخرى لاحقًا.",
         saved: [],
         rejected: []
       });
@@ -17902,7 +17902,7 @@ app.post("/api/supernumerary-teat-removal/save", requireUserId, async (req, res)
       return res.status(400).json({
         ok: false,
         error: "missing_required_fields",
-        message: "❌ رقم العجل وتاريخ إزالة الحلمات الزائدة مطلوبان.",
+        message: "❌ أدخل رقم العجل وتاريخ إزالة الحلمات الزائدة.",
         saved: [],
         rejected: []
       });
@@ -18025,7 +18025,7 @@ return res.status(saved.length ? 200 : 400).json({
     return res.status(500).json({
       ok: false,
       error: "super_teat_save_failed",
-      message: "❌ تعذّر حفظ إزالة الحلمات الزائدة الآن.",
+      message: "❌ تعذّر تسجيل إزالة الحلمات الزائدة الآن. حاول مرة أخرى.",
       saved: [],
       rejected: []
     });
