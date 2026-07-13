@@ -30980,9 +30980,14 @@ availableTypes,
 singleHerdType
 });
   } catch (e) {
-    console.error("HERD-STATS ERROR:", e);
-    return res.json({ ok:false, error:e.message });
-  }
+  console.error("HERD-STATS ERROR:", e);
+
+  return res.json({
+    ok: false,
+    error: "herd_stats_failed",
+    message: "❌ تعذّر تحميل بيانات لوحة التحكم الآن. حاول مرة أخرى."
+  });
+}
 });
 // ============================================================
 //                 API: FERTILITY REPORT
