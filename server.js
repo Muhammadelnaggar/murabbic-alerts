@@ -201,7 +201,7 @@ async function authPasswordLoginBridgeSrv(email, password) {
 
   if (!apiKey) {
     const err = new Error("firebase_web_api_key_missing");
-    err.publicMessage = "إعداد تسجيل الدخول غير مكتمل على السيرفر.";
+    err.publicMessage = "❌ خدمة تسجيل الدخول غير متاحة الآن. حاول مرة أخرى لاحقًا.";
     throw err;
   }
 
@@ -222,7 +222,7 @@ async function authPasswordLoginBridgeSrv(email, password) {
 
   if (!r.ok || !data.idToken) {
     const err = new Error(data?.error?.message || "login_failed");
-    err.publicMessage = "رقم الهاتف أو كلمة المرور غير صحيحة.";
+    err.publicMessage = "❌ رقم الهاتف أو كلمة المرور غير صحيحة.";
     throw err;
   }
 
@@ -993,7 +993,7 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firebase_admin_disabled",
-        message: "خدمة تسجيل الدخول غير متاحة الآن."
+        message: "❌ خدمة تسجيل الدخول غير متاحة الآن. حاول مرة أخرى لاحقًا."
       });
     }
 
@@ -1004,7 +1004,7 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "login_fields_required",
-        message: "أدخل رقم الهاتف وكلمة المرور."
+        message: "❌ أدخل رقم الهاتف وكلمة المرور."
       });
     }
 
@@ -1018,7 +1018,7 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(401).json({
         ok: false,
         error: "login_failed",
-        message: "رقم الهاتف أو كلمة المرور غير صحيحة."
+        message: "❌ رقم الهاتف أو كلمة المرور غير صحيحة."
       });
     }
 
@@ -1036,7 +1036,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     return res.json({
       ok: true,
-      message: "✅ تم تسجيل الدخول بنجاح",
+      message: "✅ تم تسجيل الدخول بنجاح.",
       uid,
       userId,
       user: authPublicUserBridgeSrv(profile, uid, userId),
@@ -1049,7 +1049,7 @@ app.post("/api/auth/login", async (req, res) => {
     return res.status(401).json({
       ok: false,
       error: "login_failed",
-      message: e.publicMessage || "رقم الهاتف أو كلمة المرور غير صحيحة."
+      message: e.publicMessage || "❌ رقم الهاتف أو كلمة المرور غير صحيحة."
     });
   }
 });
@@ -1061,7 +1061,7 @@ app.get("/api/auth/me", async (req, res) => {
     return res.status(401).json({
       ok: false,
       error: "auth_required",
-      message: "سجّل الدخول أولًا."
+      message: '❌ يلزم تسجيل الدخول أولًا.'
     });
   }
 
@@ -1165,7 +1165,7 @@ app.post("/api/farm-location/save", requireUserId, async (req, res) => {
 });
 app.post("/api/auth/logout", async (req, res) => {
   authClearSessionCookieBridgeSrv(req, res);
-  return res.json({ ok: true, message: "تم تسجيل الخروج." });
+  return res.json({ ok: true, message: "✅ تم تسجيل الخروج بنجاح." });
 });
 
 // ===== Helpers =====
@@ -1723,7 +1723,7 @@ async function requireUserId(req, res, next){
       return res.status(401).json({
         ok: false,
         error: 'auth_required',
-        message: 'سجّل الدخول أولًا.'
+        message: '❌ يلزم تسجيل الدخول أولًا.'
       });
     }
 
@@ -1737,7 +1737,7 @@ async function requireUserId(req, res, next){
     return res.status(401).json({
       ok: false,
       error: 'auth_required',
-      message: 'سجّل الدخول أولًا.'
+      message: '❌ يلزم تسجيل الدخول أولًا.'
     });
   }
 }
