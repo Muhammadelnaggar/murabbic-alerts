@@ -1078,7 +1078,7 @@ app.post("/api/farm-location/save", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         error: "firestore_disabled",
-        message: "قاعدة البيانات غير متاحة الآن."
+        message: "❌ تعذّر حفظ موقع المزرعة الآن. حاول مرة أخرى لاحقًا."
       });
     }
 
@@ -1111,7 +1111,7 @@ app.post("/api/farm-location/save", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: "farm_location_invalid",
-        message: "إحداثيات موقع المزرعة غير صالحة."
+       message: "❌ تعذّر قراءة موقع المزرعة. فعّل تحديد الموقع ثم حاول مرة أخرى."
       });
     }
 
@@ -1144,7 +1144,7 @@ app.post("/api/farm-location/save", requireUserId, async (req, res) => {
 
     return res.json({
       ok: true,
-      message: "✅ تم حفظ موقع المزرعة بنجاح",
+      message: "✅ تم حفظ موقع المزرعة بنجاح.",
       farmLocation: {
         lat,
         lon,
@@ -1159,7 +1159,7 @@ app.post("/api/farm-location/save", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "farm_location_save_failed",
-      message: "تعذّر حفظ موقع المزرعة الآن."
+      message: "❌ تعذّر حفظ موقع المزرعة الآن. حاول مرة أخرى."
     });
   }
 });
@@ -2081,7 +2081,7 @@ app.get('/api/weather/thi', requireUserId, async (req, res) => {
     const resolvedLocation = await weatherResolveFarmLocationSrv(profileUid);
 
     if (!resolvedLocation || !weatherValidCoordSrv(resolvedLocation.lat, resolvedLocation.lon)) {
-      const message = "اضغط هنا لتحديد موقع المزرعة لتفعيل THI والتنبيهات المناخية.";
+     const message = "📍 حدّد موقع المزرعة لتفعيل قراءة THI والتنبيهات المناخية.";
 
       return res.json({
         ok: true,
@@ -2120,7 +2120,7 @@ app.get('/api/weather/thi', requireUserId, async (req, res) => {
       };
 
       const instructions = buildThiInstructionsSrv(null, status);
-      const message = "تعذّر تحميل قراءة THI الآن. حاول لاحقًا.";
+      const message = "⚠️ تعذّر تحديث قراءة THI الآن. حاول مرة أخرى لاحقًا.";
 
       return res.json({
         ok: true,
@@ -2180,7 +2180,7 @@ app.get('/api/weather/thi', requireUserId, async (req, res) => {
     };
 
     const instructions = buildThiInstructionsSrv(null, status);
-    const message = "تعذّر تحميل THI الآن.";
+    const message = "⚠️ تعذّر تحديث قراءة THI الآن. حاول مرة أخرى.";
 
     return res.json({
       ok: true,
