@@ -41143,7 +41143,7 @@ app.post("/api/cull/gate", requireUserId, async (req, res) => {
       return res.status(503).json({
         ok: false,
         allowed: false,
-        message: "قاعدة البيانات غير متاحة الآن."
+        message: "❌ تعذّر فحص بيانات الاستبعاد الآن. حاول مرة أخرى لاحقًا."
       });
     }
 
@@ -41155,7 +41155,7 @@ app.post("/api/cull/gate", requireUserId, async (req, res) => {
       return res.status(400).json({
         ok: false,
         allowed: false,
-        message: "رقم الحيوان مطلوب."
+        message: "❌ أدخل رقم الحيوان."
       });
     }
 
@@ -41181,10 +41181,10 @@ app.post("/api/cull/gate", requireUserId, async (req, res) => {
     }
 
     return res.json({
-      ok: true,
-      allowed: true,
-      message: "✅ الحيوان مؤهل لتسجيل الاستبعاد.",
-      animal: {
+        ok: true,
+        allowed: true,
+        message: `✅ راجعت بيانات الحيوان رقم ${animalNumber}، ويمكنك تسجيل الاستبعاد الآن.`,
+        animal: {
         id: animal.id,
         animalNumber,
         number: String(doc.number || animalNumber),
@@ -41199,7 +41199,7 @@ app.post("/api/cull/gate", requireUserId, async (req, res) => {
     return res.status(500).json({
       ok: false,
       allowed: false,
-      message: "فشل التحقق من الحيوان."
+      message: "❌ تعذّر فحص بيانات الاستبعاد الآن. حاول مرة أخرى."
     });
   }
 });
@@ -41209,7 +41209,7 @@ app.post("/api/cull/save", requireUserId, async (req, res) => {
     if (!db) {
       return res.status(503).json({
         ok: false,
-        message: "قاعدة البيانات غير متاحة الآن."
+        message: "❌ تعذّر تسجيل الاستبعاد الآن. حاول مرة أخرى لاحقًا."
       });
     }
 
@@ -41225,28 +41225,28 @@ app.post("/api/cull/save", requireUserId, async (req, res) => {
     if (!animalNumber) {
       return res.status(400).json({
         ok: false,
-        message: "رقم الحيوان مطلوب."
+        message: "❌ أدخل رقم الحيوان."
       });
     }
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
       return res.status(400).json({
         ok: false,
-        message: "تاريخ الاستبعاد غير صالح."
+        message: "❌ أدخل تاريخ استبعاد صحيحًا."
       });
     }
 
     if (!cullMain || !CULL_OPTIONS_SRV[cullMain]) {
       return res.status(400).json({
         ok: false,
-        message: "سبب الاستبعاد الرئيسي مطلوب."
+        message: "❌ اختر سبب الاستبعاد الرئيسي."
       });
     }
 
     if (!cullDetail || !CULL_OPTIONS_SRV[cullMain].includes(cullDetail)) {
       return res.status(400).json({
         ok: false,
-        message: "تفصيل سبب الاستبعاد مطلوب."
+        message: "❌ اختر تفصيل سبب الاستبعاد."
       });
     }
 
@@ -41309,7 +41309,7 @@ app.post("/api/cull/save", requireUserId, async (req, res) => {
 
     return res.json({
       ok: true,
-      message: "✅ تم حفظ الاستبعاد بنجاح",
+      message: `✅ تم تسجيل استبعاد الحيوان رقم ${animalNumber} بنجاح.`,
       eventId: eventRef.id,
       animalNumber,
       redirectUrl: `cow-card.html?number=${encodeURIComponent(animalNumber)}`
@@ -41319,7 +41319,7 @@ app.post("/api/cull/save", requireUserId, async (req, res) => {
     console.error("cull.save", e);
     return res.status(500).json({
       ok: false,
-      message: "فشل حفظ الاستبعاد."
+      message: "❌ تعذّر تسجيل الاستبعاد الآن. حاول مرة أخرى."
     });
   }
 });
