@@ -189,9 +189,196 @@
   </div>
 </fieldset>
 
-       
-      </form>
+        </form>
     </div>
+
+    <section
+      id="farmProgramSection"
+      class="card hidden-block"
+      aria-labelledby="farmProgramTitle"
+    >
+      <h2 id="farmProgramTitle" class="mbk-vax-program-title">
+        برنامج تحصينات المزرعة
+      </h2>
+
+      <div
+        id="farmProgramMeta"
+        class="form-hint"
+        aria-live="polite"
+      ></div>
+
+      <details>
+        <summary>
+          <strong>إدارة جدول برنامج المزرعة</strong>
+        </summary>
+
+        <div class="row row-2">
+          <div>
+            <label for="farmProgramName">اسم البرنامج</label>
+            <input
+              id="farmProgramName"
+              type="text"
+              placeholder="مثال: برنامج تحصينات المزرعة"
+            />
+          </div>
+
+          <div>
+            <label for="farmProgramNotes">ملاحظات عامة</label>
+            <textarea
+              id="farmProgramNotes"
+              rows="3"
+              placeholder="ملاحظات اختيارية"
+            ></textarea>
+          </div>
+        </div>
+
+        <div id="farmProgramRows"></div>
+
+        <div class="row row-2">
+          <button
+            id="addFarmProgramRowBtn"
+            class="ghost"
+            type="button"
+          >
+            ＋ إضافة تحصين
+          </button>
+
+          <button
+            id="saveFarmProgramBtn"
+            class="save"
+            type="button"
+          >
+            💾 حفظ جدول البرنامج
+          </button>
+        </div>
+
+        <template id="farmProgramRowTemplate">
+          <fieldset data-farm-program-row>
+            <legend>تحصين داخل البرنامج</legend>
+
+            <input
+              type="hidden"
+              data-farm-field="rowId"
+            />
+
+            <div class="row row-2">
+              <div>
+                <label>اسم التحصين</label>
+                <input
+                  type="text"
+                  data-farm-field="vaccineName"
+                  placeholder="مثال: الحمى القلاعية"
+                />
+              </div>
+
+              <div>
+                <label>النوع المستهدف</label>
+                <select data-farm-field="species">
+                  <option value="">اختر النوع</option>
+                  <option value="cow">أبقار</option>
+                  <option value="buffalo">جاموس</option>
+                  <option value="both">أبقار وجاموس</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row row-2">
+              <div>
+                <label>الفئة المستهدفة</label>
+                <input
+                  type="text"
+                  data-farm-field="targetGroup"
+                  placeholder="مثال: جميع القطيع أو العجلات"
+                />
+              </div>
+
+              <div>
+                <label>نوع الجرعة</label>
+                <select data-farm-field="doseType">
+                  <option value="">اختر نوع الجرعة</option>
+                  <option value="prime">تأسيس لأول مرة</option>
+                  <option value="booster">جرعة منشطة</option>
+                  <option value="periodic">جرعة دورية</option>
+                  <option value="campaign">حملة تحصين</option>
+                  <option value="other">أخرى</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row row-2">
+              <div>
+                <label>تاريخ بداية البرنامج</label>
+                <input
+                  type="date"
+                  data-farm-field="startDate"
+                />
+              </div>
+
+              <div>
+                <label>التكرار كل</label>
+                <input
+                  type="number"
+                  data-farm-field="repeatEvery"
+                  placeholder="0 يعني مرة واحدة"
+                />
+              </div>
+            </div>
+
+            <div class="row row-2">
+              <div>
+                <label>وحدة التكرار</label>
+                <select data-farm-field="repeatUnit">
+                  <option value="">بدون تكرار</option>
+                  <option value="day">يوم</option>
+                  <option value="week">أسبوع</option>
+                  <option value="month">شهر</option>
+                  <option value="year">سنة</option>
+                </select>
+              </div>
+
+              <div>
+                <label>التنبيه قبل الموعد بالأيام</label>
+                <input
+                  type="number"
+                  data-farm-field="advanceNoticeDays"
+                  placeholder="مثال: 14"
+                />
+              </div>
+            </div>
+
+            <div class="row">
+              <div>
+                <label>ملاحظات التحصين</label>
+                <textarea
+                  data-farm-field="notes"
+                  rows="2"
+                  placeholder="ملاحظات اختيارية"
+                ></textarea>
+              </div>
+            </div>
+
+            <div class="row row-2">
+              <label>
+                <input
+                  type="checkbox"
+                  data-farm-field="active"
+                  checked
+                />
+                التحصين فعّال داخل البرنامج
+              </label>
+
+              <button
+                class="ghost"
+                type="button"
+                data-action="remove-farm-program-row"
+              >
+                حذف التحصين
+              </button>
+            </div>
+          </fieldset>
+        </template>
+      </details>
+    </section>
   </main>
 
  <div class="actions-bar">
@@ -236,7 +423,29 @@ const programChoiceOptions =
   document.querySelector(
     "#programChoiceSection .mbk-vax-program-options"
   );
- 
+ const farmProgramSection =
+  document.getElementById("farmProgramSection");
+
+const farmProgramMeta =
+  document.getElementById("farmProgramMeta");
+
+const farmProgramName =
+  document.getElementById("farmProgramName");
+
+const farmProgramNotes =
+  document.getElementById("farmProgramNotes");
+
+const farmProgramRows =
+  document.getElementById("farmProgramRows");
+
+const farmProgramRowTemplate =
+  document.getElementById("farmProgramRowTemplate");
+
+const addFarmProgramRowBtn =
+  document.getElementById("addFarmProgramRowBtn");
+
+const saveFarmProgramBtn =
+  document.getElementById("saveFarmProgramBtn");
 
   const bulkBox       = document.getElementById("bulkBox");
   const bulkList      = document.getElementById("bulkList");
@@ -505,7 +714,8 @@ function renderProgramContext(result = {}) {
       return;
     }
 
-    renderProgramContext(result);
+       renderProgramContext(result);
+    await loadFarmProgram();
     await runServerGate("program_saved");
 
   } catch (err) {
@@ -587,7 +797,332 @@ async function postJson(path, body) {
 
   return data;
 }
+async function getJson(path) {
+  const r = await fetch(path, {
+    method: "GET",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Accept": "application/json"
+    }
+  });
 
+  const data = await r.json().catch(() => ({
+    ok: false,
+    message: "تعذّر قراءة رد السيرفر."
+  }));
+
+  if (
+    r.status === 401 ||
+    data?.error === "auth_required"
+  ) {
+    return {
+      ok: false,
+      error: "auth_required",
+      message:
+        data?.message ||
+        "❌ سجّل الدخول أولًا."
+    };
+  }
+
+  if (!r.ok && data.ok !== true) {
+    data.ok = false;
+  }
+
+  return data;
+}
+
+function setFarmProgramControlsDisabled(disabled) {
+  farmProgramSection
+    ?.querySelectorAll(
+      "input, select, textarea, button"
+    )
+    .forEach(control => {
+      control.disabled = disabled;
+    });
+}
+
+function appendFarmProgramRow(row = {}) {
+  if (
+    !farmProgramRows ||
+    !farmProgramRowTemplate
+  ) {
+    return;
+  }
+
+  const fragment =
+    farmProgramRowTemplate
+      .content
+      .cloneNode(true);
+
+  const rowElement =
+    fragment.querySelector(
+      "[data-farm-program-row]"
+    );
+
+  if (!rowElement) return;
+
+  const field = name =>
+    rowElement.querySelector(
+      `[data-farm-field="${name}"]`
+    );
+
+  field("rowId").value =
+    row.rowId ?? "";
+
+  field("vaccineName").value =
+    row.vaccineName ?? "";
+
+  field("species").value =
+    row.species ?? "";
+
+  field("targetGroup").value =
+    row.targetGroup ?? "";
+
+  field("doseType").value =
+    row.doseType ?? "";
+
+  field("startDate").value =
+    row.startDate ?? "";
+
+  field("repeatEvery").value =
+    row.repeatEvery ?? "";
+
+  field("repeatUnit").value =
+    row.repeatUnit ?? "";
+
+  field("advanceNoticeDays").value =
+    row.advanceNoticeDays ?? "";
+
+  field("notes").value =
+    row.notes ?? "";
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      row,
+      "active"
+    )
+  ) {
+    field("active").checked =
+      row.active === true;
+  }
+
+  farmProgramRows.appendChild(fragment);
+}
+
+function renderFarmProgramResponse(result = {}) {
+  renderProgramContext(result);
+
+  const editable =
+    result.editable === true;
+
+  if (farmProgramSection) {
+    farmProgramSection.classList.toggle(
+      "hidden-block",
+      !editable
+    );
+  }
+
+  if (!editable) return;
+
+  const program =
+    result.program &&
+    typeof result.program === "object"
+      ? result.program
+      : {};
+
+  if (farmProgramName) {
+    farmProgramName.value =
+      program.programName ?? "";
+  }
+
+  if (farmProgramNotes) {
+    farmProgramNotes.value =
+      program.programNotes ?? "";
+  }
+
+  if (farmProgramRows) {
+    farmProgramRows.innerHTML = "";
+  }
+
+  const rows =
+    Array.isArray(program.rows)
+      ? program.rows
+      : [];
+
+  rows.forEach(row => {
+    appendFarmProgramRow(row);
+  });
+
+  if (farmProgramMeta) {
+    const parts = [
+      result.message ?? ""
+    ];
+
+    if (program.exists === true) {
+      parts.push(
+        `الإصدار ${program.version} — عدد التحصينات: ${program.rowCount}.`
+      );
+    }
+
+    farmProgramMeta.textContent =
+      parts.filter(Boolean).join(" ");
+  }
+
+  setFarmProgramControlsDisabled(false);
+}
+
+async function loadFarmProgram() {
+  try {
+    const result = await getJson(
+      "/api/vaccination/farm-program"
+    );
+
+    if (!result.ok) {
+      msg(
+        result.message ||
+        "تعذّر تحميل برنامج المزرعة.",
+        "error"
+      );
+
+      return;
+    }
+
+    renderFarmProgramResponse(result);
+
+  } catch (err) {
+    console.error(
+      "vaccination farm program load failed:",
+      err
+    );
+
+    msg(
+      "تعذّر تحميل برنامج المزرعة الآن.",
+      "error"
+    );
+  }
+}
+
+function collectFarmProgramRows() {
+  return [
+    ...farmProgramRows.querySelectorAll(
+      "[data-farm-program-row]"
+    )
+  ].map(row => {
+    const value = name =>
+      row.querySelector(
+        `[data-farm-field="${name}"]`
+      )?.value ?? "";
+
+    return {
+      rowId:
+        value("rowId"),
+
+      vaccineName:
+        value("vaccineName"),
+
+      species:
+        value("species"),
+
+      targetGroup:
+        value("targetGroup"),
+
+      doseType:
+        value("doseType"),
+
+      startDate:
+        value("startDate"),
+
+      repeatEvery:
+        value("repeatEvery"),
+
+      repeatUnit:
+        value("repeatUnit"),
+
+      advanceNoticeDays:
+        value("advanceNoticeDays"),
+
+      notes:
+        value("notes"),
+
+      active:
+        row.querySelector(
+          '[data-farm-field="active"]'
+        )?.checked === true
+    };
+  });
+}
+
+async function saveFarmProgram() {
+  try {
+    if (saveFarmProgramBtn) {
+      saveFarmProgramBtn.disabled = true;
+    }
+
+    msg(
+      "جارِ حفظ جدول برنامج المزرعة…",
+      "info"
+    );
+
+    const result = await postJson(
+      "/api/vaccination/farm-program",
+      {
+        programName:
+          farmProgramName?.value ?? "",
+
+        programNotes:
+          farmProgramNotes?.value ?? "",
+
+        rows:
+          collectFarmProgramRows()
+      }
+    );
+
+    if (!result.ok) {
+      const serverErrors =
+        Array.isArray(result.errors)
+          ? result.errors
+              .map(item => item?.message)
+              .filter(Boolean)
+          : [];
+
+      msg(
+        [
+          result.message ||
+          "تعذّر حفظ برنامج المزرعة.",
+          ...serverErrors
+        ].join("\n"),
+        "error"
+      );
+
+      return;
+    }
+
+    msg(
+      result.message ||
+      "تم حفظ برنامج المزرعة.",
+      "success"
+    );
+
+    await loadFarmProgram();
+
+  } catch (err) {
+    console.error(
+      "vaccination farm program save failed:",
+      err
+    );
+
+    msg(
+      "تعذّر حفظ برنامج المزرعة الآن.",
+      "error"
+    );
+
+  } finally {
+    if (saveFarmProgramBtn) {
+      saveFarmProgramBtn.disabled = false;
+    }
+  }
+}
   function collectPayload() {
     const numbers = getSelectedNumbers();
     const eventDate = String(eventDateEl?.value || "").trim().slice(0, 10);
@@ -890,7 +1425,8 @@ const numberFromUrl =
    applyModeUI();
    updateContext();
    renderProgramChoice();
-   runServerGate("page_load");
+      runServerGate("page_load");
+   loadFarmProgram();
   }
 
   dashBtn?.addEventListener("click", () => {
@@ -920,7 +1456,33 @@ document
       await saveProgramMode();
     });
   });
+addFarmProgramRowBtn?.addEventListener(
+  "click",
+  () => {
+    appendFarmProgramRow({});
+  }
+);
 
+farmProgramRows?.addEventListener(
+  "click",
+  event => {
+    const removeButton =
+      event.target.closest(
+        '[data-action="remove-farm-program-row"]'
+      );
+
+    if (!removeButton) return;
+
+    removeButton
+      .closest("[data-farm-program-row]")
+      ?.remove();
+  }
+);
+
+saveFarmProgramBtn?.addEventListener(
+  "click",
+  saveFarmProgram
+);
  const backBtn = document.getElementById("backToEventsBtn");
 backBtn?.addEventListener("click", () => {
   location.href = "add-event.html";
