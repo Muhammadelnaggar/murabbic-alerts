@@ -5598,3 +5598,232 @@ body > header{
     font-size:14px !important;
   }
 }
+/* =========================================================
+   Murabbik Vaccination Program Choice
+   اختيار مصدر برنامج التحصينات — صفحة التحصين فقط
+   ========================================================= */
+
+#programChoiceSection{
+  margin:0 0 22px;
+  padding:18px;
+  border:1px solid rgba(14,160,90,.20);
+  border-radius:20px;
+  background:
+    linear-gradient(135deg, rgba(14,160,90,.07), rgba(255,255,255,.98)),
+    #fff;
+  box-shadow:0 10px 26px rgba(15,23,42,.06);
+}
+
+#programChoiceSection .mbk-vax-program-head{
+  margin-bottom:16px;
+  text-align:center;
+}
+
+#programChoiceSection .mbk-vax-program-title{
+  margin:0;
+  color:#0f172a;
+  font-size:20px;
+  font-weight:900;
+  line-height:1.4;
+}
+
+#programChoiceSection .mbk-vax-program-subtitle{
+  margin:7px auto 0;
+  max-width:620px;
+  color:var(--muted, #64748b);
+  font-size:14px;
+  font-weight:700;
+  line-height:1.7;
+}
+
+#programChoiceSection .mbk-vax-program-options{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+}
+
+#programChoiceSection .mbk-vax-program-option{
+  position:relative;
+  display:block;
+  margin:0;
+  cursor:pointer;
+}
+
+#programChoiceSection .mbk-vax-program-option input{
+  position:absolute;
+  width:1px;
+  height:1px;
+  min-height:0;
+  padding:0;
+  margin:0;
+  opacity:0;
+  pointer-events:none;
+}
+
+#programChoiceSection .mbk-vax-program-option-body{
+  min-height:190px;
+  padding:17px;
+  border:2px solid #dce8df;
+  border-radius:18px;
+  background:#fff;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:7px;
+  transition:
+    border-color .18s ease,
+    box-shadow .18s ease,
+    transform .18s ease,
+    background .18s ease;
+}
+
+#programChoiceSection .mbk-vax-program-option:hover
+.mbk-vax-program-option-body{
+  transform:translateY(-2px);
+  border-color:rgba(14,160,90,.45);
+  box-shadow:0 12px 24px rgba(14,160,90,.10);
+}
+
+#programChoiceSection .mbk-vax-program-option.is-selected
+.mbk-vax-program-option-body,
+#programChoiceSection .mbk-vax-program-option input:checked
++ .mbk-vax-program-option-body{
+  border-color:var(--brand, #0ea05a);
+  background:linear-gradient(135deg,#f0fdf4,#fff);
+  box-shadow:
+    0 0 0 3px rgba(14,160,90,.10),
+    0 12px 26px rgba(14,160,90,.12);
+}
+
+#programChoiceSection .mbk-vax-program-option:focus-within
+.mbk-vax-program-option-body{
+  outline:3px solid rgba(14,160,90,.16);
+  outline-offset:2px;
+}
+
+#programChoiceSection .mbk-vax-program-option-kicker{
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:4px 10px;
+  border-radius:999px;
+  background:#f1f5f9;
+  color:#475569;
+  font-size:12px;
+  font-weight:900;
+}
+
+#programChoiceSection .mbk-vax-program-option.is-selected
+.mbk-vax-program-option-kicker,
+#programChoiceSection .mbk-vax-program-option input:checked
++ .mbk-vax-program-option-body
+.mbk-vax-program-option-kicker{
+  background:#dcfce7;
+  color:#166534;
+}
+
+#programChoiceSection .mbk-vax-program-option-title{
+  display:block;
+  color:#0f172a;
+  font-size:17px;
+  font-weight:900;
+  line-height:1.45;
+}
+
+#programChoiceSection .mbk-vax-program-option-text{
+  display:block;
+  flex:1;
+  color:#64748b;
+  font-size:13px;
+  font-weight:700;
+  line-height:1.75;
+}
+
+#programChoiceSection .mbk-vax-program-option-action{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  min-height:42px;
+  margin-top:6px;
+  padding:9px 12px;
+  border:1px solid #cfe8d4;
+  border-radius:13px;
+  background:#f8fff9;
+  color:var(--brand-600, #0b7f47);
+  font-size:13px;
+  font-weight:900;
+}
+
+#programChoiceSection .mbk-vax-program-option.is-selected
+.mbk-vax-program-option-action,
+#programChoiceSection .mbk-vax-program-option input:checked
++ .mbk-vax-program-option-body
+.mbk-vax-program-option-action{
+  border-color:var(--brand, #0ea05a);
+  background:var(--brand, #0ea05a);
+  color:#fff;
+}
+
+#programChoiceSection .mbk-vax-program-status{
+  min-height:22px;
+  margin-top:14px;
+  text-align:center;
+  color:#475569;
+  font-size:13px;
+  font-weight:800;
+}
+
+#programChoiceSection .mbk-vax-program-current{
+  margin-top:14px;
+  padding:14px 16px;
+  border:1px solid #bbf7d0;
+  border-radius:16px;
+  background:#ecfdf5;
+  text-align:right;
+}
+
+#programChoiceSection .mbk-vax-program-current-label{
+  display:block;
+  margin-bottom:4px;
+  color:#047857;
+  font-size:12px;
+  font-weight:800;
+}
+
+#programChoiceSection .mbk-vax-program-current-name{
+  display:block;
+  color:#065f46;
+  font-size:16px;
+  font-weight:900;
+}
+
+#programChoiceSection .mbk-vax-program-current-message{
+  margin:5px 0 0;
+  color:#166534;
+  font-size:13px;
+  font-weight:700;
+  line-height:1.65;
+}
+
+@media(min-width:720px){
+  #programChoiceSection .mbk-vax-program-options{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media(max-width:480px){
+  #programChoiceSection{
+    padding:14px;
+    border-radius:17px;
+  }
+
+  #programChoiceSection .mbk-vax-program-title{
+    font-size:18px;
+  }
+
+  #programChoiceSection .mbk-vax-program-option-body{
+    min-height:auto;
+    padding:15px;
+  }
+}
