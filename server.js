@@ -21569,6 +21569,191 @@ async function vaccinationDueWarningSrv({
     message: "✅ توقيت الجرعة داخل موعد التحصين المتوقع."
   };
 }
+function vaccinationProgramModeNormSrv(raw) {
+  const mode = String(raw || "").trim().toLowerCase();
+
+  if (mode === "farm") return "farm";
+  if (mode === "murabbik_default") return "murabbik_default";
+
+  return "";
+}
+
+function vaccinationProgramContextSrv(mode, saved = false) {
+  const programMode = vaccinationProgramModeNormSrv(mode);
+
+  return {
+    programMode,
+
+    programLabel:
+      programMode === "farm"
+        ? "برنامج المزرعة"
+        : programMode === "murabbik_default"
+          ? "برنامج مُرَبِّيك الخبير"
+          : "",
+
+    message:
+      programMode === "farm"
+        ? (
+            saved
+              ? "برنامج المزرعة هو البرنامج التشغيلي المعتمد للتحصينات."
+              : "تم اختيار برنامج المزرعة."
+          )
+        : programMode === "murabbik_default"
+          ? (
+              saved
+                ? "برنامج مُرَبِّيك الخبير هو البرنامج التشغيلي المعتمد للتحصينات."
+                : "تم اختيار برنامج مُرَبِّيك الخبير."
+            )
+          : "اختر برنامج المزرعة أو برنامج مُرَبِّيك الخبير.",
+
+    saved: Boolean(saved && programMode)
+  };
+}
+
+async function vaccinationReadProgramContextSrv(
+  uid,
+  requestedMode = ""
+) {
+  const requested =
+    vaccinationProgramModeNormSrv(requestedMode);
+
+  if (!db || !uid) {
+    return vaccinationProgramContextSrv(
+      requested,
+      false
+    );
+  }
+
+  const snap = await db
+    .collection("vaccination_program_settings")
+    .doc(uid)
+    .get();
+
+  const stored = snap.exists
+    ? (snap.data() || {})
+    : {};
+
+  const storedMode =
+    vaccinationProgramModeNormSrv(
+      stored.programMode
+    );
+
+  const activeMode =
+    requested ||
+    storedMode;
+
+  return vaccinationProgramContextSrv(
+    activeMode,
+    Boolean(
+      storedMode &&
+      storedMode === activeMode
+    )
+  );
+}
+
+async function vaccinationSaveProgramContextSrv(
+  uid,
+  rawMode
+) {
+  const programMode =
+    vaccinationProgramModeNormSrv(rawMode);
+
+  if (!db || !uid || !programMode) {
+    const err =
+      new Error("vaccination_program_required");
+
+    err.publicMessage =
+      "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك الخبير.";
+
+    throw err;
+  }
+
+  const ref = db
+    .collection("vaccination_program_settings")
+    .doc(uid);
+
+  const snap = await ref.get();
+
+  const old = snap.exists
+    ? (snap.data() || {})
+    : {};
+
+  const previousMode =
+    vaccinationProgramModeNormSrv(
+      old.programMode
+    );
+
+  await ref.set({
+    userId: uid,
+
+    programMode,
+
+    programLabel:
+      programMode === "farm"
+        ? "برنامج المزرعة"
+        : "برنامج مُرَبِّيك الخبير",
+
+    previousMode,
+
+    source:
+      "server:/api/vaccination/program-mode",
+
+    updatedAt:
+      admin.firestore.FieldValue.serverTimestamp(),
+
+    ...(snap.exists
+      ? {}
+      : {
+          createdAt:
+            admin.firestore.FieldValue.serverTimestamp()
+        })
+  }, { merge: true });
+
+  return vaccinationProgramContextSrv(
+    programMode,
+    true
+  );
+}
+
+app.post(
+  "/api/vaccination/program-mode",
+  requireUserId,
+  async (req, res) => {
+    try {
+      const programContext =
+        await vaccinationSaveProgramContextSrv(
+          req.userId,
+          req.body?.programMode
+        );
+
+      return res.json({
+        ok: true,
+
+        message:
+          "✅ تم اعتماد برنامج التحصينات بنجاح.",
+
+        programContext
+      });
+
+    } catch (e) {
+      console.error(
+        "vaccination-program-mode-save",
+        e
+      );
+
+      return res.status(400).json({
+        ok: false,
+
+        message:
+          e.publicMessage ||
+          "❌ تعذّر حفظ اختيار برنامج التحصينات.",
+
+        programContext:
+          vaccinationProgramContextSrv("")
+      });
+    }
+  }
+);
 app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -21584,8 +21769,14 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
       });
     }
 
-    const uid = req.userId;
+        const uid = req.userId;
     const body = req.body || {};
+
+    const programContext =
+      await vaccinationReadProgramContextSrv(
+        uid,
+        body.programMode
+      );
 
     const rawNumbers =
       body.animalNumbers ||
@@ -21615,13 +21806,37 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
 ).trim();
     const numbers = vaccinationParseNumbersSrv(rawNumbers);
 
-    if (!numbers.length || !eventDate || !vaccine) {
+        if (!numbers.length || !eventDate || !vaccine) {
       return res.json({
         ok: true,
         allowed: false,
         silent: true,
         stage: "missing_basic",
-        message: "أدخل رقم الحيوان وتاريخ التحصين ونوع التحصين.",
+
+        message: programContext.programMode
+          ? "أدخل رقم الحيوان وتاريخ التحصين ونوع التحصين."
+          : "اختر برنامج المزرعة أو برنامج مُرَبِّيك الخبير، ثم أكمل بيانات التحصين.",
+
+        programContext,
+
+        acceptedCount: 0,
+        rejectedCount: 0,
+        accepted: [],
+        rejected: []
+      });
+    }
+
+    if (!programContext.programMode) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        stage: "vaccination_program_required",
+
+        message:
+          "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك الخبير.",
+
+        programContext,
+
         acceptedCount: 0,
         rejectedCount: 0,
         accepted: [],
@@ -21695,14 +21910,7 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
         continue;
       }
 
-const dueWarning = await vaccinationDueWarningSrv({
-  uid,
-  animalNumber,
-  eventDate,
-  vaccine,
-  doseType
-});
-
+const dueWarning = null;
 accepted.push({
   animalNumber,
   animalId: animal.id || "",
@@ -21728,12 +21936,14 @@ return res.json({
             : `✅ راجعت البيانات، ويمكن تسجيل التحصين لعدد ${accepted.length} حيوانات.`
       )
     : (firstReason || "❌ لا يمكن تسجيل التحصين لأي من الأرقام المدخلة."),
+  programContext,
+
   acceptedCount: accepted.length,
   rejectedCount: rejected.length,
+
   accepted,
   rejected
 });
-
   } catch (e) {
     console.error("vaccination-gate", e);
 
@@ -22008,8 +22218,39 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
       });
     }
 
-    const uid = req.userId;
+        const uid = req.userId;
     const body = req.body || {};
+
+    const requestedProgramMode =
+      vaccinationProgramModeNormSrv(
+        body.programMode
+      );
+
+    const programContext =
+      requestedProgramMode
+        ? await vaccinationSaveProgramContextSrv(
+            uid,
+            requestedProgramMode
+          )
+        : await vaccinationReadProgramContextSrv(
+            uid
+          );
+
+    if (!programContext.programMode) {
+      return res.status(400).json({
+        ok: false,
+
+        message:
+          "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك الخبير.",
+
+        programContext,
+
+        savedCount: 0,
+        rejectedCount: 0,
+        saved: [],
+        rejected: []
+      });
+    }
 
     const eventDate = String(
       body.eventDate ||
@@ -22144,13 +22385,7 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
         });
         continue;
       }
-      const dueWarning = await vaccinationDueWarningSrv({
-  uid,
-  animalNumber,
-  eventDate,
-  vaccine,
-  doseType
-});
+      const dueWarning = null;
 const payload = {
   userId: uid,
 
@@ -22159,9 +22394,15 @@ const payload = {
 
   createdAt: admin.firestore.FieldValue.serverTimestamp(),
 
-  date: eventDate,
+    date: eventDate,
   doseType,
   eventDate,
+
+  vaccinationProgramMode:
+    programContext.programMode,
+
+  vaccinationProgramLabel:
+    programContext.programLabel,
 
   eventType: "تحصين",
   source: "server:/api/vaccination/save",
@@ -22216,23 +22457,22 @@ await eventRef.set(payload);
         }, { merge: true });
       }
 
-      const tasks = await vaccinationUpsertTasksForEventSrv({
-        uid,
-        animalNumber,
-        eventDate,
-        vaccine,
-        doseType,
-        campaignId,
-        eventId: eventRef.id
-      });
+      const tasks = [];
 
 saved.push({
   animalNumber,
   animalId,
   eventId: eventRef.id,
   eventDate,
-  vaccine,
+   vaccine,
   doseType,
+
+  vaccinationProgramMode:
+    programContext.programMode,
+
+  vaccinationProgramLabel:
+    programContext.programLabel,
+
   warning: dueWarning?.message || "",
   warnings: dueWarning ? [dueWarning] : [],
   tasksCount: tasks.length,
@@ -22251,8 +22491,11 @@ saved.push({
           : `✅ سجلت التحصين لعدد ${saved.length} حيوانات بنجاح.`
     )
   : "❌ لم أتمكن من تسجيل التحصين لأي حيوان.",
+           programContext,
+
       savedCount: saved.length,
       rejectedCount: rejected.length,
+
       saved,
       rejected,
       redirectUrl: saved.length === 1
@@ -27030,11 +27273,20 @@ app.get("/api/vaccination/dashboard-alerts", requireUserId, async (req, res) => 
       });
     }
 
-    const uid = req.userId;
+        const uid = req.userId;
 
     const today = cairoTodayISO();
     const tomorrow = vaccinationYmdAddDaysSrv(today, 1);
 
+    return res.json({
+      ok: true,
+      today,
+      tomorrow,
+      count: 0,
+      alerts: [],
+      paused: true,
+      message: "تنبيهات التحصين متوقفة مؤقتًا لحين اكتمال برنامج المزرعة وبرنامج مُرَبِّيك العلمي."
+    });
     const snap = await db.collection("tasks")
       .where("userId", "==", uid)
       .where("status", "==", "pending")
