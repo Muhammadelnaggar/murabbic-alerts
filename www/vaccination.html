@@ -224,8 +224,18 @@
   const programCurrentName =
     document.getElementById("programCurrentName");
 
-  const programCurrentMessage =
-    document.getElementById("programCurrentMessage");
+ const programCurrentMessage =
+  document.getElementById("programCurrentMessage");
+
+const programChoiceHead =
+  document.querySelector(
+    "#programChoiceSection .mbk-vax-program-head"
+  );
+
+const programChoiceOptions =
+  document.querySelector(
+    "#programChoiceSection .mbk-vax-program-options"
+  );
  
 
   const bulkBox       = document.getElementById("bulkBox");
@@ -362,60 +372,83 @@ function clearWarn() {
       "اختر البرنامج الذي ستُدار عليه تحصينات المزرعة.";
   }
 
-  function renderProgramContext(result = {}) {
-    const context =
-      result?.programContext &&
-      typeof result.programContext === "object"
-        ? result.programContext
-        : null;
+function renderProgramContext(result = {}) {
+  const context =
+    result?.programContext &&
+    typeof result.programContext === "object"
+      ? result.programContext
+      : null;
 
-    if (!context) return;
+  if (!context) return;
 
-    const serverMode = String(
-      context.programMode ||
-      context.mode ||
-      ""
-    ).trim();
+  const serverMode = String(
+    context.programMode ||
+    context.mode ||
+    ""
+  ).trim();
 
-    if (
-      serverMode === "farm" ||
-      serverMode === "murabbik_default"
-    ) {
-      const radio = document.querySelector(
-        `input[name="programMode"][value="${serverMode}"]`
-      );
+  const isSaved = context.saved === true;
 
-      if (radio) radio.checked = true;
-    }
+  if (
+    serverMode === "farm" ||
+    serverMode === "murabbik_default"
+  ) {
+    const radio = document.querySelector(
+      `input[name="programMode"][value="${serverMode}"]`
+    );
 
-    const programLabel = String(
-      context.programLabel ||
-      context.label ||
-      ""
-    ).trim();
-
-    const programMessage = String(
-      context.message ||
-      ""
-    ).trim();
-
-    if (programCurrentName) {
-      programCurrentName.textContent = programLabel || "—";
-    }
-
-    if (programCurrentMessage) {
-      programCurrentMessage.textContent = programMessage;
-    }
-
-    if (programCurrentCard) {
-      programCurrentCard.classList.toggle(
-        "hidden-block",
-        !programLabel && !programMessage
-      );
-    }
-
-    renderProgramChoice();
+    if (radio) radio.checked = true;
   }
+
+  const programLabel = String(
+    context.programLabel ||
+    context.label ||
+    ""
+  ).trim();
+
+  const programMessage = String(
+    context.message ||
+    ""
+  ).trim();
+
+  if (programCurrentName) {
+    programCurrentName.textContent = programLabel || "—";
+  }
+
+  if (programCurrentMessage) {
+    programCurrentMessage.textContent = programMessage;
+  }
+
+  if (programChoiceHead) {
+    programChoiceHead.classList.toggle(
+      "hidden-block",
+      isSaved
+    );
+  }
+
+  if (programChoiceOptions) {
+    programChoiceOptions.classList.toggle(
+      "hidden-block",
+      isSaved
+    );
+  }
+
+  if (programSelectionStatus) {
+    programSelectionStatus.classList.toggle(
+      "hidden-block",
+      isSaved
+    );
+  }
+
+  if (programCurrentCard) {
+    programCurrentCard.classList.toggle(
+      "hidden-block",
+      !isSaved || (!programLabel && !programMessage)
+    );
+  }
+
+  renderProgramChoice();
+}
  function getMode() {
   return pageMode;
 }
@@ -427,7 +460,77 @@ function clearWarn() {
 
     return parseNumbers(animalNumberEl?.value || "");
   }
+  async function saveProgramMode() {
+  const programMode = getProgramMode();
 
+  if (!programMode) return;
+
+  const radios = [
+    ...document.querySelectorAll(
+      'input[name="programMode"]'
+    )
+  ];
+
+  try {
+    radios.forEach(input => {
+      input.disabled = true;
+    });
+
+    if (programSelectionStatus) {
+      programSelectionStatus.textContent =
+        "جارِ اعتماد برنامج التحصينات…";
+    }
+
+    const result = await postJson(
+      "/api/vaccination/program-mode",
+      { programMode }
+    );
+
+    if (
+      !result.ok ||
+      result?.programContext?.saved !== true
+    ) {
+      radios.forEach(input => {
+        input.checked = false;
+      });
+
+      renderProgramChoice();
+
+      msg(
+        result.message ||
+        "تعذّر اعتماد برنامج التحصينات.",
+        "error"
+      );
+
+      return;
+    }
+
+    renderProgramContext(result);
+    await runServerGate("program_saved");
+
+  } catch (err) {
+    console.error(
+      "vaccination program mode save failed:",
+      err
+    );
+
+    radios.forEach(input => {
+      input.checked = false;
+    });
+
+    renderProgramChoice();
+
+    msg(
+      "تعذّر اعتماد برنامج التحصينات الآن.",
+      "error"
+    );
+
+  } finally {
+    radios.forEach(input => {
+      input.disabled = false;
+    });
+  }
+}
   function updateContext() {
     const nums = getSelectedNumbers();
     const first = nums[0] || animalNumberEl?.value || "";
@@ -812,9 +915,9 @@ vaccineEl?.addEventListener("change", () => {
 document
   .querySelectorAll('input[name="programMode"]')
   .forEach(input => {
-    input.addEventListener("change", () => {
+    input.addEventListener("change", async () => {
       renderProgramChoice();
-      runServerGate("program_change");
+      await saveProgramMode();
     });
   });
 
