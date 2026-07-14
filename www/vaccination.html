@@ -551,6 +551,25 @@ function renderServerResult(result = {}) {
 if (!gate.ok || !gate.allowed) {
   lastGateAllowed = false;
 
+  if (gate.silent === true) {
+    const bar =
+      document.getElementById("mbk-infobar") ||
+      document.getElementById("sysbar") ||
+      document.getElementById("infobar") ||
+      document.querySelector(".infobar");
+
+    if (bar) {
+      bar.className = "infobar mbk-infobar";
+      bar.style.display = "none";
+      bar.textContent = "";
+    }
+
+    renderServerResult(gate);
+
+    if (saveBtn) saveBtn.disabled = true;
+    return;
+  }
+
   msg(gate.message || "تعذّر عرض رد السيرفر.", "error");
   renderServerResult(gate);
 
@@ -635,8 +654,27 @@ async function runServerGate(reason = "page_load") {
 
     renderProgramContext(gate);
 
-   if (!gate.ok || !gate.allowed) {
+if (!gate.ok || !gate.allowed) {
   lastGateAllowed = false;
+
+  if (gate.silent === true) {
+    const bar =
+      document.getElementById("mbk-infobar") ||
+      document.getElementById("sysbar") ||
+      document.getElementById("infobar") ||
+      document.querySelector(".infobar");
+
+    if (bar) {
+      bar.className = "infobar mbk-infobar";
+      bar.style.display = "none";
+      bar.textContent = "";
+    }
+
+    renderServerResult(gate);
+
+    if (saveBtn) saveBtn.disabled = true;
+    return;
+  }
 
   msg(gate.message || "تعذّر عرض رد السيرفر.", "error");
   renderServerResult(gate);
