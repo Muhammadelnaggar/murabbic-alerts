@@ -21793,11 +21793,68 @@ function vaccinationFarmProgramOptionsSrv() {
       label: formLabels[value]
     }));
 
-  return {
-    catalogVersion: "vaccination-catalog-2026-07-14-01",
+   return {
+    catalogVersion: "vaccination-catalog-2026-07-14-02",
+
+    doseTypes: [
+      {
+        value: "prime",
+        label: "تأسيس لأول مرة (Primary)"
+      },
+      {
+        value: "booster",
+        label: "جرعة منشطة (Booster)"
+      },
+      {
+        value: "periodic",
+        label: "جرعة دورية (Periodic)"
+      },
+      {
+        value: "campaign",
+        label: "حملة تحصين (Campaign)"
+      },
+      {
+        value: "other",
+        label: "أخرى (Other)"
+      }
+    ],
+
+    repeatUnits: [
+      {
+        value: "day",
+        label: "يوم (Day)"
+      },
+      {
+        value: "week",
+        label: "أسبوع (Week)"
+      },
+      {
+        value: "month",
+        label: "شهر (Month)"
+      },
+      {
+        value: "year",
+        label: "سنة (Year)"
+      }
+    ],
+
+    calfAgeUnits: [
+      {
+        value: "day",
+        label: "يوم (Day)"
+      },
+      {
+        value: "week",
+        label: "أسبوع (Week)"
+      },
+      {
+        value: "month",
+        label: "شهر (Month)"
+      }
+    ],
 
     vaccines: [
-      {
+       {
         value: "fmd",
         label: "الحمى القلاعية (Foot-and-Mouth Disease — FMD)",
         formOptions: forms(
@@ -21986,6 +22043,26 @@ function vaccinationFarmProgramNormalizeRowsSrv(
   const rows = [];
   const errors = [];
 
+  const options =
+    vaccinationFarmProgramOptionsSrv();
+
+  const findOption = (list, raw) => {
+    const value =
+      String(raw || "").trim();
+
+    if (!value || !Array.isArray(list)) {
+      return null;
+    }
+
+    return (
+      list.find(item =>
+        String(item?.value || "") === value ||
+        String(item?.label || "") === value
+      ) ||
+      null
+    );
+  };
+
   rawRows.forEach((raw, index) => {
     if (
       !raw ||
@@ -22002,29 +22079,41 @@ function vaccinationFarmProgramNormalizeRowsSrv(
       return;
     }
 
-    const vaccineName =
-      vaccinationFarmProgramTextSrv(
+    const vaccine =
+      findOption(
+        options.vaccines,
+        raw.vaccineCode ||
         raw.vaccineName ||
-        raw.vaccine ||
-        raw.name
+        raw.vaccine
       );
 
-    const species =
-      String(raw.species || "")
-        .trim()
-        .toLowerCase();
+    const rawVaccineForm =
+      raw.vaccineForm ||
+      raw.vaccineType ||
+      raw.formType ||
+      "";
 
-    const targetGroup =
-      vaccinationFarmProgramTextSrv(
-        raw.targetGroup ||
-        raw.targetCategory ||
-        raw.target
-      );
+    const vaccineForm =
+      vaccine
+        ? (
+            findOption(
+              vaccine.formOptions,
+              rawVaccineForm
+            ) ||
+            (
+              !rawVaccineForm &&
+              vaccine.formOptions?.length === 1
+                ? vaccine.formOptions[0]
+                : null
+            )
+          )
+        : null;
 
     const doseType =
-      String(raw.doseType || "")
-        .trim()
-        .toLowerCase();
+      findOption(
+        options.doseTypes,
+        raw.doseType
+      );
 
     const startDate =
       vaccinationFarmProgramDateSrv(
@@ -22040,10 +22129,42 @@ function vaccinationFarmProgramNormalizeRowsSrv(
 
     const repeatUnit =
       repeatEvery > 0
-        ? String(raw.repeatUnit || "")
-            .trim()
-            .toLowerCase()
-        : "";
+        ? findOption(
+            options.repeatUnits,
+            raw.repeatUnit
+          )
+        : null;
+
+    const calfAgeRaw =
+      raw.calfAgeValue ??
+      raw.calfAge ??
+      raw.ageAtVaccination ??
+      "";
+
+    const calfAgeUnitRaw =
+      raw.calfAgeUnit ??
+      raw.ageUnit ??
+      "";
+
+    const hasCalfAge =
+      String(calfAgeRaw ?? "").trim() !== "" ||
+      String(calfAgeUnitRaw || "").trim() !== "";
+
+    const calfAgeValue =
+      hasCalfAge
+        ? vaccinationFarmProgramIntSrv(
+            calfAgeRaw,
+            NaN
+          )
+        : null;
+
+    const calfAgeUnit =
+      hasCalfAge
+        ? findOption(
+            options.calfAgeUnits,
+            calfAgeUnitRaw
+          )
+        : null;
 
     const advanceNoticeDays =
       vaccinationFarmProgramIntSrv(
@@ -22056,68 +22177,81 @@ function vaccinationFarmProgramNormalizeRowsSrv(
         raw.notes
       );
 
-    if (
-      !vaccineName ||
-      vaccineName.length > 120
-    ) {
+    if (!vaccine) {
       errors.push({
         rowIndex: index,
-        field: "vaccineName",
+        field: "vaccineCode",
         message:
-          `أدخل اسم تحصين صحيحًا في السطر رقم ${index + 1}.`
+          `اختر اسم التحصين من القائمة في السطر رقم ${index + 1}.`
       });
     }
 
-    if (
-      ![
-        "cow",
-        "buffalo",
-        "both"
-      ].includes(species)
-    ) {
+    if (vaccine && !vaccineForm) {
       errors.push({
         rowIndex: index,
-        field: "species",
+        field: "vaccineForm",
         message:
-          `حدد أبقار أو جاموس أو النوعين في السطر رقم ${index + 1}.`
+          `اختر نوع اللقاح في السطر رقم ${index + 1}.`
       });
     }
 
-    if (
-      !targetGroup ||
-      targetGroup.length > 100
-    ) {
-      errors.push({
-        rowIndex: index,
-        field: "targetGroup",
-        message:
-          `حدد الفئة المستهدفة في السطر رقم ${index + 1}.`
-      });
-    }
-
-    if (
-      ![
-        "prime",
-        "booster",
-        "periodic",
-        "campaign",
-        "other"
-      ].includes(doseType)
-    ) {
+    if (!doseType) {
       errors.push({
         rowIndex: index,
         field: "doseType",
         message:
-          `حدد نوع الجرعة في السطر رقم ${index + 1}.`
+          `اختر نوع الجرعة في السطر رقم ${index + 1}.`
       });
     }
 
-    if (!startDate) {
+    if (
+      hasCalfAge &&
+      (
+        !Number.isInteger(calfAgeValue) ||
+        calfAgeValue <= 0
+      )
+    ) {
+      errors.push({
+        rowIndex: index,
+        field: "calfAgeValue",
+        message:
+          `أدخل عمر تحصين صحيحًا للعجول في السطر رقم ${index + 1}.`
+      });
+    }
+
+    if (
+      hasCalfAge &&
+      !calfAgeUnit
+    ) {
+      errors.push({
+        rowIndex: index,
+        field: "calfAgeUnit",
+        message:
+          `اختر وحدة عمر العجول في السطر رقم ${index + 1}.`
+      });
+    }
+
+    if (
+      hasCalfAge &&
+      repeatEvery > 0
+    ) {
+      errors.push({
+        rowIndex: index,
+        field: "repeatEvery",
+        message:
+          `تحصين العجول يُحدد بالعمر فقط في السطر رقم ${index + 1}.`
+      });
+    }
+
+    if (
+      !hasCalfAge &&
+      !startDate
+    ) {
       errors.push({
         rowIndex: index,
         field: "startDate",
         message:
-          `أدخل تاريخ بداية صحيحًا في السطر رقم ${index + 1}.`
+          `أدخل تاريخ بداية البرنامج في السطر رقم ${index + 1}.`
       });
     }
 
@@ -22130,29 +22264,26 @@ function vaccinationFarmProgramNormalizeRowsSrv(
         rowIndex: index,
         field: "repeatEvery",
         message:
-          `قيمة التكرار في السطر رقم ${index + 1} يجب أن تكون من 0 إلى 120.`
+          `قيمة التكرار غير صحيحة في السطر رقم ${index + 1}.`
       });
     }
 
     if (
       repeatEvery > 0 &&
-      ![
-        "day",
-        "week",
-        "month",
-        "year"
-      ].includes(repeatUnit)
+      !repeatUnit
     ) {
       errors.push({
         rowIndex: index,
         field: "repeatUnit",
         message:
-          `حدد وحدة التكرار في السطر رقم ${index + 1}.`
+          `اختر وحدة التكرار في السطر رقم ${index + 1}.`
       });
     }
 
     if (
-      !Number.isInteger(advanceNoticeDays) ||
+      !Number.isInteger(
+        advanceNoticeDays
+      ) ||
       advanceNoticeDays < 0 ||
       advanceNoticeDays > 90
     ) {
@@ -22160,7 +22291,7 @@ function vaccinationFarmProgramNormalizeRowsSrv(
         rowIndex: index,
         field: "advanceNoticeDays",
         message:
-          `التنبيه المسبق في السطر رقم ${index + 1} يجب أن يكون من 0 إلى 90 يومًا.`
+          `مدة التنبيه غير صحيحة في السطر رقم ${index + 1}.`
       });
     }
 
@@ -22197,15 +22328,72 @@ function vaccinationFarmProgramNormalizeRowsSrv(
 
     rows.push({
       rowId,
-      vaccineName,
-      species,
-      targetGroup,
-      doseType,
-      startDate,
-      repeatEvery,
-      repeatUnit,
+
+      vaccineCode:
+        vaccine.value,
+
+      vaccineName:
+        vaccine.label,
+
+      vaccineForm:
+        vaccineForm.value,
+
+      vaccineFormLabel:
+        vaccineForm.label,
+
+      doseType:
+        doseType.value,
+
+      doseTypeLabel:
+        doseType.label,
+
+      startDate:
+        hasCalfAge
+          ? ""
+          : startDate,
+
+      repeatEvery:
+        hasCalfAge
+          ? 0
+          : repeatEvery,
+
+      repeatUnit:
+        hasCalfAge
+          ? ""
+          : (
+              repeatUnit?.value ||
+              ""
+            ),
+
+      repeatUnitLabel:
+        hasCalfAge
+          ? ""
+          : (
+              repeatUnit?.label ||
+              ""
+            ),
+
+      calfSchedule:
+        hasCalfAge,
+
+      calfAgeValue:
+        hasCalfAge
+          ? calfAgeValue
+          : null,
+
+      calfAgeUnit:
+        hasCalfAge
+          ? calfAgeUnit.value
+          : "",
+
+      calfAgeUnitLabel:
+        hasCalfAge
+          ? calfAgeUnit.label
+          : "",
+
       advanceNoticeDays,
       notes,
+
       active:
         raw.active !== false
     });
@@ -22216,7 +22404,6 @@ function vaccinationFarmProgramNormalizeRowsSrv(
     errors
   };
 }
-
 function vaccinationFarmProgramResponseSrv(
   data = {},
   exists = false
