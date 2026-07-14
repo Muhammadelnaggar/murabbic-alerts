@@ -21757,7 +21757,179 @@ app.post(
 // ============================================================
 //      VACCINATION FARM PROGRAM — VERSIONED SERVER SOURCE
 // ============================================================
+function vaccinationFarmProgramOptionsSrv() {
+  const formLabels = {
+    live_attenuated_virus:
+      "حي مُضعّف (Live Attenuated Virus)",
 
+    modified_live_virus:
+      "حي مُعدّل (Modified Live Virus)",
+
+    killed_virus:
+      "ميت/غير نشط (Killed / Inactivated Virus)",
+
+    modified_live_and_killed_virus:
+      "مركب حي مُعدّل وميت (Modified Live & Killed Virus)",
+
+    live_attenuated_bacterial:
+      "بكتيري حي مُضعّف (Live Attenuated Bacterial Vaccine)",
+
+    avirulent_live_culture:
+      "مزرعة حية غير ممرضة (Avirulent Live Culture)",
+
+    bacterin:
+      "بكتيرين (Bacterin)",
+
+    bacterin_toxoid:
+      "بكتيرين/توكسويد (Bacterin-Toxoid)",
+
+    killed_virus_bacterin_toxoid:
+      "فيروسات ميتة + بكتيرين/توكسويد (Killed Virus + Bacterin-Toxoid)"
+  };
+
+  const forms = (...values) =>
+    values.map((value) => ({
+      value,
+      label: formLabels[value]
+    }));
+
+  return {
+    catalogVersion: "vaccination-catalog-2026-07-14-01",
+
+    vaccines: [
+      {
+        value: "fmd",
+        label: "الحمى القلاعية (Foot-and-Mouth Disease — FMD)",
+        formOptions: forms(
+          "killed_virus"
+        )
+      },
+
+      {
+        value: "lsd",
+        label: "التهاب الجلد العقدي (Lumpy Skin Disease — LSD)",
+        formOptions: forms(
+          "live_attenuated_virus",
+          "killed_virus"
+        )
+      },
+
+      {
+        value: "bef",
+        label: "حمى الثلاثة أيام (Bovine Ephemeral Fever — BEF)",
+        formOptions: forms(
+          "live_attenuated_virus",
+          "killed_virus"
+        )
+      },
+
+      {
+        value: "pasteurella_hs",
+        label:
+          "الباستريلا / التسمم الدموي (Pasteurellosis / Haemorrhagic Septicaemia)",
+        formOptions: forms(
+          "bacterin_toxoid",
+          "avirulent_live_culture"
+        )
+      },
+
+      {
+        value: "ibr_bvd_pi3_brsv",
+        label:
+          "اللقاح التنفسي المركب (IBR + BVD + PI3 + BRSV)",
+        formOptions: forms(
+          "modified_live_virus",
+          "killed_virus",
+          "modified_live_and_killed_virus"
+        )
+      },
+
+      {
+        value: "ibr",
+        label:
+          "التهاب الأنف والقصبة الهوائية المعدي (Infectious Bovine Rhinotracheitis — IBR)",
+        formOptions: forms(
+          "modified_live_virus",
+          "killed_virus"
+        )
+      },
+
+      {
+        value: "bvd",
+        label:
+          "الإسهال الفيروسي البقري (Bovine Viral Diarrhea — BVD)",
+        formOptions: forms(
+          "modified_live_virus",
+          "killed_virus"
+        )
+      },
+
+      {
+        value: "pi3_brsv",
+        label:
+          "نظير الإنفلونزا النوع الثالث + الفيروس التنفسي المخلوي البقري (PI3 + BRSV)",
+        formOptions: forms(
+          "modified_live_virus",
+          "killed_virus"
+        )
+      },
+
+      {
+        value: "brucella_rb51",
+        label:
+          "البروسيلا عترة RB51 (Brucella abortus RB51)",
+        formOptions: forms(
+          "live_attenuated_bacterial"
+        )
+      },
+
+      {
+        value: "brucella_s19",
+        label:
+          "البروسيلا عترة S19 (Brucella abortus S19)",
+        formOptions: forms(
+          "live_attenuated_bacterial"
+        )
+      },
+
+      {
+        value: "leptospira",
+        label: "الليبتوسبيرا (Leptospirosis)",
+        formOptions: forms(
+          "bacterin"
+        )
+      },
+
+      {
+        value: "rvf",
+        label:
+          "حمى الوادي المتصدع (Rift Valley Fever — RVF)",
+        formOptions: forms(
+          "live_attenuated_virus",
+          "killed_virus"
+        )
+      },
+
+      {
+        value: "clostridial",
+        label:
+          "الكلوستريديا / اللاهوائيات (Clostridial Diseases)",
+        formOptions: forms(
+          "bacterin_toxoid"
+        )
+      },
+
+      {
+        value: "maternal_calf_scour",
+        label:
+          "لقاح الأمهات ضد إسهالات العجول (Rotavirus + Coronavirus + E. coli K99)",
+        formOptions: forms(
+          "killed_virus_bacterin_toxoid"
+        )
+      }
+    ]
+  };
+}
 function vaccinationFarmProgramTextSrv(raw) {
   return String(raw || "").trim().replace(/\s+/g, " ");
 }
@@ -22138,7 +22310,10 @@ app.get(
               "farm"
           ),
 
-        programContext,
+         programContext,
+
+        options:
+          vaccinationFarmProgramOptionsSrv(),
 
         program:
           vaccinationFarmProgramResponseSrv(
