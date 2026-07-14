@@ -158,37 +158,27 @@
           </div>
         </div>
 
-        <div class="row">
+               <div class="row row-2">
           <div>
             <label for="vaccine">نوع التحصين</label>
+
             <select id="vaccine" data-field="vaccine">
-              <option value="" selected disabled>اختر نوع التحصين</option>
-              <option value="الحمى القلاعية (FMD)">الحمى القلاعية (FMD)</option>
-              <option value="الجلد العقدي (LSD)">الجلد العقدي (LSD)</option>
-              <option value="التسمم المعوي (Clostridial)">التسمم المعوي (Clostridial)</option>
-              <option value="البروسيلا (Brucella)">البروسيلا (Brucella)</option>
-              <option value="IBR">IBR</option>
-              <option value="BVD">BVD</option>
-              <option value="الجمرة الخبيثة (Anthrax)">الجمرة الخبيثة (Anthrax)</option>
-              <option value="الباستريلا/التهاب رئوي (HS/Pasteurella)">الباستريلا/التهاب رئوي (HS/Pasteurella)</option>
+              <option value="">
+                جارِ تحميل قائمة التحصينات…
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label for="doseType">نوع الجرعة</label>
+
+            <select id="doseType" data-field="doseType">
+              <option value="">
+                جارِ تحميل أنواع الجرعات…
+              </option>
             </select>
           </div>
         </div>
-
-<fieldset>
-  <legend>نوع الجرعة</legend>
-  <div class="radio-group">
-    <label>
-      <input type="radio" name="doseType" data-field="doseType" value="prime"/>
-      تأسيس لأول مرة
-    </label>
-    <label>
-      <input type="radio" name="doseType" data-field="doseType" value="periodic"/>
-      جرعة دورية (متابعة)
-    </label>
-  </div>
-</fieldset>
-
         </form>
     </div>
 
@@ -252,7 +242,7 @@
           </button>
         </div>
 
-        <template id="farmProgramRowTemplate">
+               <template id="farmProgramRowTemplate">
           <fieldset data-farm-program-row>
             <legend>تحصين داخل البرنامج</legend>
 
@@ -264,80 +254,94 @@
             <div class="row row-2">
               <div>
                 <label>اسم التحصين</label>
-                <input
-                  type="text"
-                  data-farm-field="vaccineName"
-                  placeholder="مثال: الحمى القلاعية"
-                />
+
+                <select data-farm-field="vaccineCode">
+                  <option value="">
+                    اختر التحصين
+                  </option>
+                </select>
               </div>
 
               <div>
-                <label>النوع المستهدف</label>
-                <select data-farm-field="species">
-                  <option value="">اختر النوع</option>
-                  <option value="cow">أبقار</option>
-                  <option value="buffalo">جاموس</option>
-                  <option value="both">أبقار وجاموس</option>
+                <label>نوع اللقاح</label>
+
+                <select data-farm-field="vaccineForm">
+                  <option value="">
+                    اختر نوع اللقاح
+                  </option>
                 </select>
               </div>
             </div>
 
             <div class="row row-2">
-              <div>
-                <label>الفئة المستهدفة</label>
-                <input
-                  type="text"
-                  data-farm-field="targetGroup"
-                  placeholder="مثال: جميع القطيع أو العجلات"
-                />
-              </div>
-
               <div>
                 <label>نوع الجرعة</label>
+
                 <select data-farm-field="doseType">
-                  <option value="">اختر نوع الجرعة</option>
-                  <option value="prime">تأسيس لأول مرة</option>
-                  <option value="booster">جرعة منشطة</option>
-                  <option value="periodic">جرعة دورية</option>
-                  <option value="campaign">حملة تحصين</option>
-                  <option value="other">أخرى</option>
+                  <option value="">
+                    اختر نوع الجرعة
+                  </option>
                 </select>
               </div>
-            </div>
 
-            <div class="row row-2">
               <div>
                 <label>تاريخ بداية البرنامج</label>
+
                 <input
                   type="date"
                   data-farm-field="startDate"
                 />
               </div>
+            </div>
 
+            <div class="row row-2">
               <div>
                 <label>التكرار كل</label>
+
                 <input
                   type="number"
                   data-farm-field="repeatEvery"
                   placeholder="0 يعني مرة واحدة"
                 />
               </div>
+
+              <div>
+                <label>وحدة التكرار</label>
+
+                <select data-farm-field="repeatUnit">
+                  <option value="">
+                    بدون تكرار
+                  </option>
+                </select>
+              </div>
             </div>
 
             <div class="row row-2">
               <div>
-                <label>وحدة التكرار</label>
-                <select data-farm-field="repeatUnit">
-                  <option value="">بدون تكرار</option>
-                  <option value="day">يوم</option>
-                  <option value="week">أسبوع</option>
-                  <option value="month">شهر</option>
-                  <option value="year">سنة</option>
-                </select>
+                <label>عمر تحصين العجول — اختياري</label>
+
+                <input
+                  type="number"
+                  data-farm-field="calfAgeValue"
+                  placeholder="اتركه فارغًا لغير العجول"
+                />
               </div>
 
               <div>
+                <label>وحدة عمر العجول</label>
+
+                <select data-farm-field="calfAgeUnit">
+                  <option value="">
+                    اختر الوحدة
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row">
+              <div>
                 <label>التنبيه قبل الموعد بالأيام</label>
+
                 <input
                   type="number"
                   data-farm-field="advanceNoticeDays"
@@ -349,6 +353,7 @@
             <div class="row">
               <div>
                 <label>ملاحظات التحصين</label>
+
                 <textarea
                   data-farm-field="notes"
                   rows="2"
@@ -399,7 +404,15 @@
   const animalNumberEl = document.getElementById("animalNumber");
   const eventDateEl = document.getElementById("eventDate");
   const vaccineEl  = document.getElementById("vaccine");
+  const doseTypeEl = document.getElementById("doseType");
   const saveBtn    = document.getElementById("saveBtn");
+
+  let farmProgramOptions = {
+    vaccines: [],
+    doseTypes: [],
+    repeatUnits: [],
+    calfAgeUnits: []
+  };
   const dashBtn    = document.getElementById("dashBtn");
 
   const programSelectionStatus =
@@ -539,7 +552,9 @@ function clearWarn() {
   }
 
   function getDoseType() {
-    return document.querySelector('input[name="doseType"]:checked')?.value || "";
+    return String(
+      doseTypeEl?.value || ""
+    ).trim();
   }
    function getProgramMode() {
     return document.querySelector(
@@ -842,6 +857,141 @@ function setFarmProgramControlsDisabled(disabled) {
     });
 }
 
+function fillServerSelect(
+  select,
+  items = [],
+  placeholder = "",
+  selectedValue = ""
+) {
+  if (!select) return;
+
+  const selected =
+    String(selectedValue || "").trim();
+
+  select.innerHTML = "";
+
+  const firstOption =
+    document.createElement("option");
+
+  firstOption.value = "";
+  firstOption.textContent = placeholder;
+  select.appendChild(firstOption);
+
+  for (
+    const item of Array.isArray(items)
+      ? items
+      : []
+  ) {
+    const value =
+      String(item?.value || "").trim();
+
+    const label =
+      String(
+        item?.label ||
+        item?.value ||
+        ""
+      ).trim();
+
+    if (!value) continue;
+
+    const option =
+      document.createElement("option");
+
+    option.value = value;
+    option.textContent = label;
+
+    select.appendChild(option);
+  }
+
+  if (
+    selected &&
+    [...select.options].some(
+      option => option.value === selected
+    )
+  ) {
+    select.value = selected;
+  }
+}
+
+function findFarmVaccineOption(
+  rawValue = ""
+) {
+  const value =
+    String(rawValue || "").trim();
+
+  return (
+    farmProgramOptions.vaccines.find(
+      item =>
+        String(item?.value || "") === value ||
+        String(item?.label || "") === value
+    ) ||
+    null
+  );
+}
+
+function renderEventProgramOptions() {
+  const currentVaccine =
+    String(vaccineEl?.value || "").trim();
+
+  const currentDoseType =
+    String(doseTypeEl?.value || "").trim();
+
+  fillServerSelect(
+    vaccineEl,
+    farmProgramOptions.vaccines.map(
+      item => ({
+        value: item.label,
+        label: item.label
+      })
+    ),
+    "اختر نوع التحصين",
+    currentVaccine
+  );
+
+  fillServerSelect(
+    doseTypeEl,
+    farmProgramOptions.doseTypes,
+    "اختر نوع الجرعة",
+    currentDoseType
+  );
+}
+
+function renderFarmVaccineForms(
+  rowElement,
+  vaccineCode,
+  selectedForm = ""
+) {
+  const vaccine =
+    findFarmVaccineOption(vaccineCode);
+
+  const formSelect =
+    rowElement.querySelector(
+      '[data-farm-field="vaccineForm"]'
+    );
+
+  const formOptions =
+    Array.isArray(vaccine?.formOptions)
+      ? vaccine.formOptions
+      : [];
+
+  const defaultForm =
+    selectedForm ||
+    (
+      formOptions.length === 1
+        ? formOptions[0].value
+        : ""
+    );
+
+  fillServerSelect(
+    formSelect,
+    formOptions,
+    vaccine
+      ? "اختر نوع اللقاح"
+      : "اختر التحصين أولًا",
+    defaultForm
+  );
+}
+
 function appendFarmProgramRow(row = {}) {
   if (
     !farmProgramRows ||
@@ -867,20 +1017,55 @@ function appendFarmProgramRow(row = {}) {
       `[data-farm-field="${name}"]`
     );
 
+  const vaccine =
+    findFarmVaccineOption(
+      row.vaccineCode ||
+      row.vaccineName
+    );
+
+  const vaccineCode =
+    String(
+      vaccine?.value ||
+      row.vaccineCode ||
+      ""
+    ).trim();
+
   field("rowId").value =
     row.rowId ?? "";
 
-  field("vaccineName").value =
-    row.vaccineName ?? "";
+  fillServerSelect(
+    field("vaccineCode"),
+    farmProgramOptions.vaccines,
+    "اختر التحصين",
+    vaccineCode
+  );
 
-  field("species").value =
-    row.species ?? "";
+  renderFarmVaccineForms(
+    rowElement,
+    vaccineCode,
+    row.vaccineForm ?? ""
+  );
 
-  field("targetGroup").value =
-    row.targetGroup ?? "";
+  fillServerSelect(
+    field("doseType"),
+    farmProgramOptions.doseTypes,
+    "اختر نوع الجرعة",
+    row.doseType ?? ""
+  );
 
-  field("doseType").value =
-    row.doseType ?? "";
+  fillServerSelect(
+    field("repeatUnit"),
+    farmProgramOptions.repeatUnits,
+    "بدون تكرار",
+    row.repeatUnit ?? ""
+  );
+
+  fillServerSelect(
+    field("calfAgeUnit"),
+    farmProgramOptions.calfAgeUnits,
+    "اختر الوحدة",
+    row.calfAgeUnit ?? ""
+  );
 
   field("startDate").value =
     row.startDate ?? "";
@@ -888,8 +1073,8 @@ function appendFarmProgramRow(row = {}) {
   field("repeatEvery").value =
     row.repeatEvery ?? "";
 
-  field("repeatUnit").value =
-    row.repeatUnit ?? "";
+  field("calfAgeValue").value =
+    row.calfAgeValue ?? "";
 
   field("advanceNoticeDays").value =
     row.advanceNoticeDays ?? "";
@@ -907,11 +1092,53 @@ function appendFarmProgramRow(row = {}) {
       row.active === true;
   }
 
+  field("vaccineCode")
+    ?.addEventListener(
+      "change",
+      event => {
+        renderFarmVaccineForms(
+          rowElement,
+          event.target.value,
+          ""
+        );
+      }
+    );
+
   farmProgramRows.appendChild(fragment);
 }
 
 function renderFarmProgramResponse(result = {}) {
-  renderProgramContext(result);
+    renderProgramContext(result);
+
+  const options =
+    result.options &&
+    typeof result.options === "object"
+      ? result.options
+      : {};
+
+  farmProgramOptions = {
+    vaccines:
+      Array.isArray(options.vaccines)
+        ? options.vaccines
+        : [],
+
+    doseTypes:
+      Array.isArray(options.doseTypes)
+        ? options.doseTypes
+        : [],
+
+    repeatUnits:
+      Array.isArray(options.repeatUnits)
+        ? options.repeatUnits
+        : [],
+
+    calfAgeUnits:
+      Array.isArray(options.calfAgeUnits)
+        ? options.calfAgeUnits
+        : []
+  };
+
+  renderEventProgramOptions();
 
   const editable =
     result.editable === true;
@@ -1018,14 +1245,11 @@ function collectFarmProgramRows() {
       rowId:
         value("rowId"),
 
-      vaccineName:
-        value("vaccineName"),
+      vaccineCode:
+        value("vaccineCode"),
 
-      species:
-        value("species"),
-
-      targetGroup:
-        value("targetGroup"),
+      vaccineForm:
+        value("vaccineForm"),
 
       doseType:
         value("doseType"),
@@ -1038,6 +1262,12 @@ function collectFarmProgramRows() {
 
       repeatUnit:
         value("repeatUnit"),
+
+      calfAgeValue:
+        value("calfAgeValue"),
+
+      calfAgeUnit:
+        value("calfAgeUnit"),
 
       advanceNoticeDays:
         value("advanceNoticeDays"),
@@ -1368,7 +1598,7 @@ function renderBulkList() {
     bulkList.appendChild(row);
   }
 }
-  function hydrate() {
+   async function hydrate() {
     const qp = new URLSearchParams(location.search);
 
 const rawNumberParam =
@@ -1400,18 +1630,23 @@ const numberFromUrl =
 
    pageMode = (entryMode === "bulk" || numbersFromUrl) ? "bulk" : "single";
 
-    if (eventDateEl) eventDateEl.value = dt;
+        if (eventDateEl) eventDateEl.value = dt;
+
+    await loadFarmProgram();
 
     if (vaccineEl && vaccine) {
       const found = [...vaccineEl.options].some(o => o.value === vaccine);
       if (found) vaccineEl.value = vaccine;
     }
 
-    if (doseType === "prime" || doseType === "periodic") {
-      const r = document.querySelector(`input[name="doseType"][value="${doseType}"]`);
-      if (r) r.checked = true;
+       if (
+      doseTypeEl &&
+      [...doseTypeEl.options].some(
+        option => option.value === doseType
+      )
+    ) {
+      doseTypeEl.value = doseType;
     }
-
     if (numbersFromUrl) {
       for (const n of parseNumbers(numbersFromUrl)) {
         bulkSelected.add(n);
@@ -1426,7 +1661,7 @@ const numberFromUrl =
    updateContext();
    renderProgramChoice();
       runServerGate("page_load");
-   loadFarmProgram();
+
   }
 
   dashBtn?.addEventListener("click", () => {
@@ -1447,7 +1682,9 @@ const numberFromUrl =
 vaccineEl?.addEventListener("change", () => {
   runServerGate("vaccine_change");
 });
-
+doseTypeEl?.addEventListener("change", () => {
+  runServerGate("dose_type_change");
+});
 document
   .querySelectorAll('input[name="programMode"]')
   .forEach(input => {
