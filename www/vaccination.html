@@ -31,6 +31,111 @@
 
     <div class="card">
       <form id="vaccinationForm" data-event="تحصين" novalidate>
+
+        <section
+          id="programChoiceSection"
+          class="mbk-vax-program"
+          aria-labelledby="programChoiceTitle"
+        >
+          <div class="mbk-vax-program-head">
+            <h2 id="programChoiceTitle" class="mbk-vax-program-title">
+              كيف تريد إدارة تحصينات مزرعتك؟
+            </h2>
+
+            <p class="mbk-vax-program-subtitle">
+              هل لديك برنامج تحصين للمزرعة أم تستخدم برنامج مُرَبِّيك الخبير؟
+            </p>
+          </div>
+
+          <div class="mbk-vax-program-options">
+
+            <label class="mbk-vax-program-option">
+              <input
+                type="radio"
+                name="programMode"
+                data-field="programMode"
+                value="farm"
+              />
+
+              <span class="mbk-vax-program-option-body">
+                <span class="mbk-vax-program-option-kicker">
+                  لدي برنامج جاهز
+                </span>
+
+                <strong class="mbk-vax-program-option-title">
+                  استخدام برنامج المزرعة
+                </strong>
+
+                <span class="mbk-vax-program-option-text">
+                  سجّل البرنامج الذي تعتمد عليه مزرعتك، وسيتابع مُرَبِّيك مواعيده بالتنبيهات الذكية دون تغيير البرنامج.
+                </span>
+
+                <span class="mbk-vax-program-option-action">
+                  اختيار برنامج المزرعة
+                </span>
+              </span>
+            </label>
+
+            <label class="mbk-vax-program-option">
+              <input
+                type="radio"
+                name="programMode"
+                data-field="programMode"
+                value="murabbik_default"
+              />
+
+              <span class="mbk-vax-program-option-body">
+                <span class="mbk-vax-program-option-kicker">
+                  أحتاج إلى الدعم
+                </span>
+
+                <strong class="mbk-vax-program-option-title">
+                  استخدام برنامج مُرَبِّيك الخبير
+                </strong>
+
+                <span class="mbk-vax-program-option-text">
+                  يجهّز السيرفر برنامج مُرَبِّيك العلمي الافتراضي للقطيع، ويتابع الجرعات والمواعيد والتنبيهات.
+                </span>
+
+                <span class="mbk-vax-program-option-action">
+                  استخدام برنامج مُرَبِّيك
+                </span>
+              </span>
+            </label>
+
+          </div>
+
+          <div
+            id="programSelectionStatus"
+            class="form-hint mbk-vax-program-status"
+            aria-live="polite"
+          >
+            اختر البرنامج الذي ستُدار عليه تحصينات المزرعة.
+          </div>
+
+          <div
+            id="programCurrentCard"
+            class="mbk-vax-program-current hidden-block"
+            aria-live="polite"
+          >
+            <span class="mbk-vax-program-current-label">
+              برنامج التحصينات الحالي
+            </span>
+
+            <strong
+              id="programCurrentName"
+              class="mbk-vax-program-current-name"
+            >
+              —
+            </strong>
+
+            <p
+              id="programCurrentMessage"
+              class="mbk-vax-program-current-message"
+            ></p>
+          </div>
+        </section>
+
         <div class="row row-2">
           <div>
             <label for="animalNumber">رقم الحيوان</label>
@@ -109,6 +214,18 @@
   const vaccineEl  = document.getElementById("vaccine");
   const saveBtn    = document.getElementById("saveBtn");
   const dashBtn    = document.getElementById("dashBtn");
+
+  const programSelectionStatus =
+    document.getElementById("programSelectionStatus");
+
+  const programCurrentCard =
+    document.getElementById("programCurrentCard");
+
+  const programCurrentName =
+    document.getElementById("programCurrentName");
+
+  const programCurrentMessage =
+    document.getElementById("programCurrentMessage");
  
 
   const bulkBox       = document.getElementById("bulkBox");
@@ -205,7 +322,100 @@ function clearWarn() {
   function getDoseType() {
     return document.querySelector('input[name="doseType"]:checked')?.value || "";
   }
+   function getProgramMode() {
+    return document.querySelector(
+      'input[name="programMode"]:checked'
+    )?.value || "";
+  }
 
+  function renderProgramChoice() {
+    const mode = getProgramMode();
+
+    document
+      .querySelectorAll(".mbk-vax-program-option")
+      .forEach(option => {
+        const input = option.querySelector(
+          'input[name="programMode"]'
+        );
+
+        option.classList.toggle(
+          "is-selected",
+          Boolean(input?.checked)
+        );
+      });
+
+    if (!programSelectionStatus) return;
+
+    if (mode === "farm") {
+      programSelectionStatus.textContent =
+        "تم اختيار برنامج المزرعة. سيعرض السيرفر البرنامج المسجل أو خطوات إدخاله.";
+      return;
+    }
+
+    if (mode === "murabbik_default") {
+      programSelectionStatus.textContent =
+        "تم اختيار برنامج مُرَبِّيك الخبير. سيعرض السيرفر البرنامج الافتراضي المعتمد للقطيع.";
+      return;
+    }
+
+    programSelectionStatus.textContent =
+      "اختر البرنامج الذي ستُدار عليه تحصينات المزرعة.";
+  }
+
+  function renderProgramContext(result = {}) {
+    const context =
+      result?.programContext &&
+      typeof result.programContext === "object"
+        ? result.programContext
+        : null;
+
+    if (!context) return;
+
+    const serverMode = String(
+      context.programMode ||
+      context.mode ||
+      ""
+    ).trim();
+
+    if (
+      serverMode === "farm" ||
+      serverMode === "murabbik_default"
+    ) {
+      const radio = document.querySelector(
+        `input[name="programMode"][value="${serverMode}"]`
+      );
+
+      if (radio) radio.checked = true;
+    }
+
+    const programLabel = String(
+      context.programLabel ||
+      context.label ||
+      ""
+    ).trim();
+
+    const programMessage = String(
+      context.message ||
+      ""
+    ).trim();
+
+    if (programCurrentName) {
+      programCurrentName.textContent = programLabel || "—";
+    }
+
+    if (programCurrentMessage) {
+      programCurrentMessage.textContent = programMessage;
+    }
+
+    if (programCurrentCard) {
+      programCurrentCard.classList.toggle(
+        "hidden-block",
+        !programLabel && !programMessage
+      );
+    }
+
+    renderProgramChoice();
+  }
  function getMode() {
   return pageMode;
 }
@@ -278,8 +488,9 @@ async function postJson(path, body) {
   function collectPayload() {
     const numbers = getSelectedNumbers();
     const eventDate = String(eventDateEl?.value || "").trim().slice(0, 10);
-    const vaccine = String(vaccineEl?.value || "").trim();
+     const vaccine = String(vaccineEl?.value || "").trim();
     const doseType = getDoseType();
+    const programMode = getProgramMode();
 
     return {
       animalNumbers: numbers,
@@ -287,7 +498,8 @@ async function postJson(path, body) {
       eventDate,
       date: eventDate,
       vaccine,
-      doseType
+      doseType,
+      programMode
     };
   }
 function renderServerResult(result = {}) {
@@ -334,6 +546,8 @@ function renderServerResult(result = {}) {
 
       const gate = await postJson("/api/vaccination/gate", payload);
 
+      renderProgramContext(gate);
+
 if (!gate.ok || !gate.allowed) {
   lastGateAllowed = false;
 
@@ -361,6 +575,8 @@ if (!gate.ok || !gate.allowed) {
       msg("جارِ حفظ التحصين…", "info");
 
       const saved = await postJson("/api/vaccination/save", savePayload);
+
+      renderProgramContext(saved);
 
 if (!saved.ok) {
   msg(saved.message || "تعذّر حفظ التحصين.", "error");
@@ -400,9 +616,15 @@ async function runServerGate(reason = "page_load") {
   const payload = collectPayload();
 
   // الصفحة لا تقرر. فقط لا ترسل Gate ناقص بلا رقم أو تاريخ.
-  if (!payload.animalNumbers.length && !payload.eventDate && !payload.vaccine && !payload.doseType) {
-  return;
-}
+    if (
+    !payload.animalNumbers.length &&
+    !payload.eventDate &&
+    !payload.vaccine &&
+    !payload.doseType &&
+    !payload.programMode
+  ) {
+    return;
+  }
 
   try {
     if (saveBtn) saveBtn.disabled = true;
@@ -410,6 +632,8 @@ async function runServerGate(reason = "page_load") {
     msg("جارِ التحقق من بيانات التحصين…", "info");
 
     const gate = await postJson("/api/vaccination/gate", payload);
+
+    renderProgramContext(gate);
 
    if (!gate.ok || !gate.allowed) {
   lastGateAllowed = false;
@@ -524,6 +748,7 @@ const numberFromUrl =
 
    applyModeUI();
    updateContext();
+   renderProgramChoice();
    runServerGate("page_load");
   }
 
@@ -545,6 +770,16 @@ const numberFromUrl =
 vaccineEl?.addEventListener("change", () => {
   runServerGate("vaccine_change");
 });
+
+document
+  .querySelectorAll('input[name="programMode"]')
+  .forEach(input => {
+    input.addEventListener("change", () => {
+      renderProgramChoice();
+      runServerGate("program_change");
+    });
+  });
+
  const backBtn = document.getElementById("backToEventsBtn");
 backBtn?.addEventListener("click", () => {
   location.href = "add-event.html";
