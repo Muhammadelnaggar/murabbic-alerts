@@ -21754,6 +21754,759 @@ app.post(
     }
   }
 );
+// ============================================================
+//      VACCINATION FARM PROGRAM — VERSIONED SERVER SOURCE
+// ============================================================
+
+function vaccinationFarmProgramTextSrv(raw) {
+  return String(raw || "").trim().replace(/\s+/g, " ");
+}
+
+function vaccinationFarmProgramDateSrv(raw) {
+  const value = String(raw || "").trim().slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return "";
+  }
+
+  const ms = Date.parse(`${value}T00:00:00Z`);
+
+  if (!Number.isFinite(ms)) {
+    return "";
+  }
+
+  return new Date(ms).toISOString().slice(0, 10) === value
+    ? value
+    : "";
+}
+
+function vaccinationFarmProgramIntSrv(raw, fallback = 0) {
+  if (
+    raw === "" ||
+    raw === null ||
+    raw === undefined
+  ) {
+    return fallback;
+  }
+
+  const n = Number(raw);
+
+  return Number.isInteger(n)
+    ? n
+    : NaN;
+}
+
+function vaccinationFarmProgramRowsSrv(body = {}) {
+  const rows =
+    body.rows ??
+    body.items ??
+    body.schedule ??
+    body.programRows;
+
+  return Array.isArray(rows)
+    ? rows
+    : null;
+}
+
+function vaccinationFarmProgramNormalizeRowsSrv(
+  rawRows = []
+) {
+  const rows = [];
+  const errors = [];
+
+  rawRows.forEach((raw, index) => {
+    if (
+      !raw ||
+      typeof raw !== "object" ||
+      Array.isArray(raw)
+    ) {
+      errors.push({
+        rowIndex: index,
+        field: "row",
+        message:
+          `السطر رقم ${index + 1} غير صالح.`
+      });
+
+      return;
+    }
+
+    const vaccineName =
+      vaccinationFarmProgramTextSrv(
+        raw.vaccineName ||
+        raw.vaccine ||
+        raw.name
+      );
+
+    const species =
+      String(raw.species || "")
+        .trim()
+        .toLowerCase();
+
+    const targetGroup =
+      vaccinationFarmProgramTextSrv(
+        raw.targetGroup ||
+        raw.targetCategory ||
+        raw.target
+      );
+
+    const doseType =
+      String(raw.doseType || "")
+        .trim()
+        .toLowerCase();
+
+    const startDate =
+      vaccinationFarmProgramDateSrv(
+        raw.startDate ||
+        raw.date
+      );
+
+    const repeatEvery =
+      vaccinationFarmProgramIntSrv(
+        raw.repeatEvery,
+        0
+      );
+
+    const repeatUnit =
+      repeatEvery > 0
+        ? String(raw.repeatUnit || "")
+            .trim()
+            .toLowerCase()
+        : "";
+
+    const advanceNoticeDays =
+      vaccinationFarmProgramIntSrv(
+        raw.advanceNoticeDays,
+        0
+      );
+
+    const notes =
+      vaccinationFarmProgramTextSrv(
+        raw.notes
+      );
+
+    if (
+      !vaccineName ||
+      vaccineName.length > 120
+    ) {
+      errors.push({
+        rowIndex: index,
+        field: "vaccineName",
+        message:
+          `أدخل اسم تحصين صحيحًا في السطر رقم ${index + 1}.`
+      });
+    }
+
+    if (
+      ![
+        "cow",
+        "buffalo",
+        "both"
+      ].includes(species)
+    ) {
+      errors.push({
+        rowIndex: index,
+        field: "species",
+        message:
+          `حدد أبقار أو جاموس أو النوعين في السطر رقم ${index + 1}.`
+      });
+    }
+
+    if (
+      !targetGroup ||
+      targetGroup.length > 100
+    ) {
+      errors.push({
+        rowIndex: index,
+        field: "targetGroup",
+        message:
+          `حدد الفئة المستهدفة في السطر رقم ${index + 1}.`
+      });
+    }
+
+    if (
+      ![
+        "prime",
+        "booster",
+        "periodic",
+        "campaign",
+        "other"
+      ].includes(doseType)
+    ) {
+      errors.push({
+        rowIndex: index,
+        field: "doseType",
+        message:
+          `حدد نوع الجرعة في السطر رقم ${index + 1}.`
+      });
+    }
+
+    if (!startDate) {
+      errors.push({
+        rowIndex: index,
+        field: "startDate",
+        message:
+          `أدخل تاريخ بداية صحيحًا في السطر رقم ${index + 1}.`
+      });
+    }
+
+    if (
+      !Number.isInteger(repeatEvery) ||
+      repeatEvery < 0 ||
+      repeatEvery > 120
+    ) {
+      errors.push({
+        rowIndex: index,
+        field: "repeatEvery",
+        message:
+          `قيمة التكرار في السطر رقم ${index + 1} يجب أن تكون من 0 إلى 120.`
+      });
+    }
+
+    if (
+      repeatEvery > 0 &&
+      ![
+        "day",
+        "week",
+        "month",
+        "year"
+      ].includes(repeatUnit)
+    ) {
+      errors.push({
+        rowIndex: index,
+        field: "repeatUnit",
+        message:
+          `حدد وحدة التكرار في السطر رقم ${index + 1}.`
+      });
+    }
+
+    if (
+      !Number.isInteger(advanceNoticeDays) ||
+      advanceNoticeDays < 0 ||
+      advanceNoticeDays > 90
+    ) {
+      errors.push({
+        rowIndex: index,
+        field: "advanceNoticeDays",
+        message:
+          `التنبيه المسبق في السطر رقم ${index + 1} يجب أن يكون من 0 إلى 90 يومًا.`
+      });
+    }
+
+    if (notes.length > 500) {
+      errors.push({
+        rowIndex: index,
+        field: "notes",
+        message:
+          `ملاحظات السطر رقم ${index + 1} أطول من المسموح.`
+      });
+    }
+
+    if (
+      errors.some(
+        item => item.rowIndex === index
+      )
+    ) {
+      return;
+    }
+
+    const rowId =
+      String(
+        raw.rowId ||
+        raw.id ||
+        ""
+      )
+        .trim()
+        .replace(
+          /[^A-Za-z0-9_-]/g,
+          "_"
+        )
+        .slice(0, 80) ||
+      crypto.randomUUID();
+
+    rows.push({
+      rowId,
+      vaccineName,
+      species,
+      targetGroup,
+      doseType,
+      startDate,
+      repeatEvery,
+      repeatUnit,
+      advanceNoticeDays,
+      notes,
+      active:
+        raw.active !== false
+    });
+  });
+
+  return {
+    rows,
+    errors
+  };
+}
+
+function vaccinationFarmProgramResponseSrv(
+  data = {},
+  exists = false
+) {
+  const rows =
+    Array.isArray(data.rows)
+      ? data.rows
+      : [];
+
+  return {
+    exists:
+      Boolean(exists),
+
+    version:
+      Number(data.version || 0),
+
+    previousVersion:
+      Number(
+        data.previousVersion || 0
+      ),
+
+    programName:
+      vaccinationFarmProgramTextSrv(
+        data.programName ||
+        "برنامج المزرعة"
+      ),
+
+    programNotes:
+      vaccinationFarmProgramTextSrv(
+        data.programNotes
+      ),
+
+    rowCount:
+      rows.length,
+
+    rows,
+
+    contentHash:
+      String(
+        data.contentHash || ""
+      )
+  };
+}
+
+app.get(
+  "/api/vaccination/farm-program",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+
+          message:
+            "تعذّر تحميل برنامج المزرعة الآن. حاول مرة أخرى.",
+
+          program:
+            vaccinationFarmProgramResponseSrv(
+              {},
+              false
+            )
+        });
+      }
+
+      const uid =
+        req.userId;
+
+      const [
+        programContext,
+        snap
+      ] = await Promise.all([
+        vaccinationReadProgramContextSrv(
+          uid
+        ),
+
+        db
+          .collection(
+            "vaccination_farm_programs"
+          )
+          .doc(uid)
+          .get()
+      ]);
+
+      return res.json({
+        ok: true,
+
+        editable:
+          Boolean(
+            programContext.saved === true &&
+            programContext.programMode ===
+              "farm"
+          ),
+
+        programContext,
+
+        program:
+          vaccinationFarmProgramResponseSrv(
+            snap.exists
+              ? (snap.data() || {})
+              : {},
+            snap.exists
+          ),
+
+        message:
+          snap.exists
+            ? "تم تحميل برنامج المزرعة."
+            : "لم يتم إدخال جدول برنامج المزرعة بعد."
+      });
+
+    } catch (e) {
+      console.error(
+        "vaccination-farm-program-read",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+
+        message:
+          "تعذّر تحميل برنامج المزرعة الآن. حاول مرة أخرى.",
+
+        program:
+          vaccinationFarmProgramResponseSrv(
+            {},
+            false
+          )
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/vaccination/farm-program",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+
+          message:
+            "تعذّر حفظ برنامج المزرعة الآن. حاول مرة أخرى."
+        });
+      }
+
+      const uid =
+        req.userId;
+
+      const body =
+        req.body || {};
+
+      const programContext =
+        await vaccinationReadProgramContextSrv(
+          uid
+        );
+
+      if (
+        programContext.saved !== true ||
+        programContext.programMode !==
+          "farm"
+      ) {
+        return res.status(409).json({
+          ok: false,
+
+          error:
+            "farm_program_not_active",
+
+          message:
+            "فعّل برنامج المزرعة أولًا قبل إدخال جدول التحصينات.",
+
+          programContext
+        });
+      }
+
+      const rawRows =
+        vaccinationFarmProgramRowsSrv(
+          body
+        );
+
+      if (
+        !rawRows ||
+        !rawRows.length ||
+        rawRows.length > 100
+      ) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "farm_program_rows_count",
+
+          message:
+            !rawRows
+              ? "أرسل جدول التحصينات في صورة قائمة صفوف."
+              : !rawRows.length
+                ? "أضف تحصينًا واحدًا على الأقل قبل حفظ البرنامج."
+                : "الحد الأقصى لجدول برنامج المزرعة هو 100 سطر.",
+
+          errors: []
+        });
+      }
+
+      const programName =
+        vaccinationFarmProgramTextSrv(
+          body.programName ||
+          "برنامج المزرعة"
+        );
+
+      const programNotes =
+        vaccinationFarmProgramTextSrv(
+          body.programNotes ||
+          body.notes
+        );
+
+      const normalized =
+        vaccinationFarmProgramNormalizeRowsSrv(
+          rawRows
+        );
+
+      const errors = [
+        ...normalized.errors
+      ];
+
+      if (
+        !programName ||
+        programName.length > 120
+      ) {
+        errors.unshift({
+          rowIndex: -1,
+
+          field:
+            "programName",
+
+          message:
+            "اسم برنامج المزرعة مطلوب وبحد أقصى 120 حرفًا."
+        });
+      }
+
+      if (
+        programNotes.length > 1000
+      ) {
+        errors.unshift({
+          rowIndex: -1,
+
+          field:
+            "programNotes",
+
+          message:
+            "ملاحظات برنامج المزرعة أطول من المسموح."
+        });
+      }
+
+      if (errors.length) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "farm_program_invalid",
+
+          message:
+            "راجع بيانات جدول التحصينات قبل الحفظ.",
+
+          errors
+        });
+      }
+
+      const rows =
+        normalized.rows;
+
+      const currentRef =
+        db
+          .collection(
+            "vaccination_farm_programs"
+          )
+          .doc(uid);
+
+      const settingsRef =
+        db
+          .collection(
+            "vaccination_program_settings"
+          )
+          .doc(uid);
+
+      const contentHash =
+        crypto
+          .createHash("sha256")
+          .update(
+            JSON.stringify({
+              programName,
+              programNotes,
+              rows
+            })
+          )
+          .digest("hex");
+
+      const savedMeta =
+        await db.runTransaction(
+          async tx => {
+            const currentSnap =
+              await tx.get(
+                currentRef
+              );
+
+            const old =
+              currentSnap.exists
+                ? (
+                    currentSnap.data() ||
+                    {}
+                  )
+                : {};
+
+            const previousVersion =
+              Math.max(
+                0,
+                Number(
+                  old.version || 0
+                )
+              );
+
+            const version =
+              previousVersion + 1;
+
+            const versionId =
+              String(version)
+                .padStart(
+                  6,
+                  "0"
+                );
+
+            const now =
+              admin
+                .firestore
+                .FieldValue
+                .serverTimestamp();
+
+            const payload = {
+              userId:
+                uid,
+
+              programMode:
+                "farm",
+
+              programName,
+
+              programNotes,
+
+              version,
+
+              previousVersion,
+
+              rowCount:
+                rows.length,
+
+              rows,
+
+              contentHash,
+
+              source:
+                "server:/api/vaccination/farm-program",
+
+              createdAt:
+                old.createdAt ||
+                now,
+
+              updatedAt:
+                now
+            };
+
+            tx.set(
+              currentRef,
+              payload
+            );
+
+            tx.set(
+              currentRef
+                .collection(
+                  "versions"
+                )
+                .doc(
+                  versionId
+                ),
+              {
+                ...payload,
+
+                versionId,
+
+                savedAt:
+                  now
+              }
+            );
+
+            tx.set(
+              settingsRef,
+              {
+                farmProgramVersion:
+                  version,
+
+                farmProgramRowCount:
+                  rows.length,
+
+                farmProgramUpdatedAt:
+                  now,
+
+                updatedAt:
+                  now
+              },
+              {
+                merge: true
+              }
+            );
+
+            return {
+              version,
+
+              previousVersion,
+
+              rowCount:
+                rows.length
+            };
+          }
+        );
+
+      const savedSnap =
+        await currentRef.get();
+
+      return res.json({
+        ok: true,
+
+        message:
+          "تم حفظ جدول برنامج المزرعة بنجاح.",
+
+        programContext,
+
+        savedMeta,
+
+        program:
+          vaccinationFarmProgramResponseSrv(
+            savedSnap.exists
+              ? (
+                  savedSnap.data() ||
+                  {}
+                )
+              : {},
+            savedSnap.exists
+          )
+      });
+
+    } catch (e) {
+      console.error(
+        "vaccination-farm-program-save",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+
+        message:
+          "تعذّر حفظ برنامج المزرعة الآن. حاول مرة أخرى."
+      });
+    }
+  }
+);
+
 app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
