@@ -22457,6 +22457,216 @@ function vaccinationFarmProgramResponseSrv(
       )
   };
 }
+function vaccinationFarmProgramExecutionRowsSrv(
+  data = {}
+) {
+  const rows =
+    Array.isArray(data.rows)
+      ? data.rows
+      : [];
+
+  return rows
+    .filter(row =>
+      row &&
+      typeof row === "object" &&
+      row.active !== false &&
+      String(row.rowId || "").trim() &&
+      String(row.vaccineCode || "").trim()
+    )
+    .map(row => ({
+      programRowId:
+        String(row.rowId || "").trim(),
+
+      vaccineCode:
+        String(row.vaccineCode || "").trim(),
+
+      vaccine:
+        String(row.vaccineName || "").trim(),
+
+      programSection:
+        String(row.programSection || "").trim(),
+
+      programSectionLabel:
+        String(row.programSectionLabel || "").trim(),
+
+      vaccineForm:
+        String(row.vaccineForm || "").trim(),
+
+      vaccineFormLabel:
+        String(row.vaccineFormLabel || "").trim(),
+
+      doseType:
+        String(row.doseType || "").trim(),
+
+      doseTypeLabel:
+        String(row.doseTypeLabel || "").trim(),
+
+      repeatEvery:
+        Number(row.repeatEvery || 0),
+
+      repeatUnit:
+        String(row.repeatUnit || "").trim(),
+
+      repeatUnitLabel:
+        String(row.repeatUnitLabel || "").trim()
+    }));
+}
+
+async function vaccinationReadFarmProgramExecutionSrv(
+  uid
+) {
+  if (!db || !uid) {
+    return {
+      exists: false,
+      version: 0,
+      rows: []
+    };
+  }
+
+  const snap = await db
+    .collection("vaccination_farm_programs")
+    .doc(uid)
+    .get();
+
+  const data = snap.exists
+    ? (snap.data() || {})
+    : {};
+
+  return {
+    exists: snap.exists,
+    version: Number(data.version || 0),
+
+    rows:
+      vaccinationFarmProgramExecutionRowsSrv(
+        data
+      )
+  };
+}
+
+async function vaccinationResolveProgramRowSrv({
+  uid,
+  programContext = {},
+  body = {}
+} = {}) {
+  const programMode =
+    vaccinationProgramModeNormSrv(
+      programContext.programMode
+    );
+
+  if (programMode !== "farm") {
+    return {
+      ok: true,
+      linked: false,
+      programMode
+    };
+  }
+
+  const programRowId =
+    String(
+      body.programRowId ||
+      body.vaccinationProgramRowId ||
+      ""
+    ).trim();
+
+  const vaccineCode =
+    String(
+      body.vaccineCode ||
+      body.vaccinationVaccineCode ||
+      ""
+    ).trim();
+
+  if (!programRowId && !vaccineCode) {
+    return {
+      ok: true,
+      linked: false,
+      programMode
+    };
+  }
+
+  const program =
+    await vaccinationReadFarmProgramExecutionSrv(
+      uid
+    );
+
+  if (!program.exists || !program.rows.length) {
+    return {
+      ok: false,
+      linked: false,
+      error: "farm_program_missing",
+
+      message:
+        "❌ لم يتم حفظ برنامج تحصينات المزرعة بعد."
+    };
+  }
+
+  let matches = program.rows;
+
+  if (programRowId) {
+    matches = matches.filter(row =>
+      row.programRowId === programRowId
+    );
+  }
+
+  if (vaccineCode) {
+    matches = matches.filter(row =>
+      row.vaccineCode === vaccineCode
+    );
+  }
+
+  if (!matches.length) {
+    return {
+      ok: false,
+      linked: false,
+      error: "farm_program_row_not_found",
+
+      message:
+        "❌ التحصين المختار غير موجود داخل برنامج المزرعة الحالي."
+    };
+  }
+
+  if (matches.length > 1) {
+    return {
+      ok: false,
+      linked: false,
+      error: "farm_program_row_ambiguous",
+
+      message:
+        "❌ اختر سطر التحصين المحدد من برنامج المزرعة."
+    };
+  }
+
+  const row = matches[0];
+
+  const requestedDoseType =
+    String(
+      body.doseType ||
+      body.vaccineDoseType ||
+      ""
+    ).trim();
+
+  if (
+    requestedDoseType &&
+    row.doseType &&
+    requestedDoseType !== row.doseType
+  ) {
+    return {
+      ok: false,
+      linked: false,
+      error: "farm_program_dose_mismatch",
+
+      message:
+        "❌ نوع الجرعة لا يطابق سطر التحصين المختار في برنامج المزرعة."
+    };
+  }
+
+  return {
+    ok: true,
+    linked: true,
+    programMode,
+    farmProgramVersion: program.version,
+    ...row
+  };
+}
 app.get(
   "/api/vaccination/options",
   requireUserId,
@@ -22467,10 +22677,23 @@ app.get(
           req.userId
         );
 
+      const executionProgram =
+        programContext.programMode === "farm"
+          ? await vaccinationReadFarmProgramExecutionSrv(
+              req.userId
+            )
+          : {
+              exists: false,
+              version: 0,
+              rows: []
+            };
+
       return res.json({
         ok: true,
 
         programContext,
+
+        executionProgram,
 
         options:
           vaccinationFarmProgramOptionsSrv()
@@ -22935,7 +23158,34 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
         uid,
         body.programMode
       );
+    const programLink =
+  await vaccinationResolveProgramRowSrv({
+    uid,
+    programContext,
+    body
+  });
 
+if (!programLink.ok) {
+  return res.status(409).json({
+    ok: false,
+    allowed: false,
+
+    stage:
+      programLink.error ||
+      "vaccination_program_link_failed",
+
+    message:
+      programLink.message ||
+      "❌ تعذّر ربط التحصين ببرنامج المزرعة.",
+
+    programContext,
+
+    acceptedCount: 0,
+    rejectedCount: 0,
+    accepted: [],
+    rejected: []
+  });
+}
     const rawNumbers =
       body.animalNumbers ||
       body.numbers ||
@@ -22952,15 +23202,32 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
       ""
     ).trim().slice(0, 10);
 
-    const vaccine = String(
-      body.vaccine ||
-      body.vaccineName ||
-      ""
-    ).trim();
-    const doseType = String(
-  body.doseType ||
-  body.vaccineDoseType ||
+const vaccine = String(
+  programLink.linked
+    ? programLink.vaccine
+    : (
+        body.vaccine ||
+        body.vaccineName ||
+        ""
+      )
+).trim();
+
+const vaccineCode = String(
+  programLink.vaccineCode ||
+  body.vaccineCode ||
   ""
+).trim();
+
+const programRowId = String(
+  programLink.programRowId ||
+  body.programRowId ||
+  ""
+).trim();
+
+const doseType = String(
+  programLink.linked
+    ? programLink.doseType
+    : (body.doseType || "")
 ).trim();
     const numbers = vaccinationParseNumbersSrv(rawNumbers);
 
@@ -23074,6 +23341,16 @@ accepted.push({
   animalId: animal.id || "",
   species: doc.species || doc.animalTypeAr || doc.animalType || "",
   status,
+  vaccineCode,
+  programRowId,
+
+  programSection:
+  programLink.programSection || "",
+
+farmProgramVersion:
+  Number(
+    programLink.farmProgramVersion || 0
+  ),
   warnings: dueWarning ? [dueWarning] : [],
   warning: dueWarning?.message || "",
   dueDate: dueWarning?.dueDate || ""
@@ -23314,7 +23591,7 @@ async function vaccinationUpsertTasksForEventSrv({
       source: "server:/api/vaccination/save",
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-
+   
     const snap = await ref.get();
 
     if (!snap.exists) {
@@ -23409,20 +23686,62 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
         rejected: []
       });
     }
+    const programLink =
+  await vaccinationResolveProgramRowSrv({
+    uid,
+    programContext,
+    body
+  });
 
+if (!programLink.ok) {
+  return res.status(409).json({
+    ok: false,
+
+    message:
+      programLink.message ||
+      "❌ تعذّر ربط التحصين ببرنامج المزرعة.",
+
+    programContext,
+
+    savedCount: 0,
+    rejectedCount: 0,
+    saved: [],
+    rejected: []
+  });
+}
     const eventDate = String(
       body.eventDate ||
       body.date ||
       ""
     ).trim().slice(0, 10);
 
-    const vaccine = String(
-      body.vaccine ||
-      body.vaccineName ||
-      ""
-    ).trim();
+  const vaccine = String(
+  programLink.linked
+    ? programLink.vaccine
+    : (
+        body.vaccine ||
+        body.vaccineName ||
+        ""
+      )
+).trim();
 
-    const doseType = String(body.doseType || "").trim();
+const vaccineCode = String(
+  programLink.vaccineCode ||
+  body.vaccineCode ||
+  ""
+).trim();
+
+const programRowId = String(
+  programLink.programRowId ||
+  body.programRowId ||
+  ""
+).trim();
+
+    const doseType = String(
+  programLink.linked
+    ? programLink.doseType
+    : (body.doseType || "")
+).trim();
     const notes = String(body.notes || "").trim();
     const campaignId = String(body.campaignId || "").trim();
 
@@ -23567,7 +23886,21 @@ const payload = {
   type: "vaccination",
   vaccine
 };
-
+if (programLink.linked) {
+  payload.programRowId = programRowId;
+  payload.vaccineCode = vaccineCode;
+  payload.programSection =
+    programLink.programSection || "";
+  payload.programSectionLabel =
+    programLink.programSectionLabel || "";
+  payload.vaccineForm =
+    programLink.vaccineForm || "";
+  payload.vaccineFormLabel =
+    programLink.vaccineFormLabel || "";
+  payload.farmProgramVersion = Number(
+    programLink.farmProgramVersion || 0
+  );
+}
 if (notes) {
   payload.notes = notes;
 }
@@ -23607,12 +23940,24 @@ if (existingEventSnap.exists) {
 
 await eventRef.set(payload);
       if (animalId) {
-        await db.collection("animals").doc(animalId).set({
-          lastVaccinationDate: eventDate,
-          lastVaccine: vaccine,
-          lastVaccinationDoseType: doseType,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+       await db.collection("animals").doc(animalId).set({
+  lastVaccinationDate: eventDate,
+  lastVaccine: vaccine,
+  lastVaccinationDoseType: doseType,
+
+  ...(programLink.linked
+    ? {
+        lastVaccineCode:
+          vaccineCode,
+
+        lastVaccinationProgramRowId:
+          programRowId
+      }
+    : {}),
+
+  updatedAt:
+    admin.firestore.FieldValue.serverTimestamp()
+}, { merge: true });
       }
 
       const tasks = [];
