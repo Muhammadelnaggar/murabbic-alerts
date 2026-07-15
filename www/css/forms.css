@@ -6041,11 +6041,27 @@ body > header{
     font-size:12px;
   }
 }
+#farmProgramSection #farmProgramRows .step-item{
+  gap:8px;
+  align-items:center;
+}
+
 #farmProgramSection #farmProgramRows .step-item .name{
+  flex:1 1 auto;
   min-width:0;
-  white-space:nowrap;
-  font-size:15px;
-  font-weight:800;
-  line-height:1.5;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  font-size:13px;
+  font-weight:700;
+  line-height:1.45;
   color:#172033;
+}
+
+#farmProgramSection #farmProgramRows .step-item .ghost{
+  flex:0 0 auto;
+  min-height:36px;
+  padding:6px 10px;
+  font-size:12px;
+  font-weight:800;
+  white-space:nowrap;
 }
