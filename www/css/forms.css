@@ -6041,3 +6041,11 @@ body > header{
     font-size:12px;
   }
 }
+#farmProgramSection #farmProgramRows .step-item .name{
+  min-width:0;
+  white-space:nowrap;
+  font-size:15px;
+  font-weight:800;
+  line-height:1.5;
+  color:#172033;
+}
