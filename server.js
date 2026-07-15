@@ -21838,7 +21838,7 @@ function vaccinationFarmProgramOptionsSrv() {
       }
     ],
 
-    calfAgeUnits: [
+     calfAgeUnits: [
       {
         value: "day",
         label: "يوم (Day)"
@@ -21850,6 +21850,21 @@ function vaccinationFarmProgramOptionsSrv() {
       {
         value: "month",
         label: "شهر (Month)"
+      }
+    ],
+
+    programSections: [
+      {
+        value: "herd",
+        label: "تحصينات القطيع"
+      },
+      {
+        value: "mothers",
+        label: "تحصينات الأمهات"
+      },
+      {
+        value: "calves",
+        label: "تحصينات العجول"
       }
     ],
 
@@ -22086,7 +22101,13 @@ function vaccinationFarmProgramNormalizeRowsSrv(
         raw.vaccineName ||
         raw.vaccine
       );
-
+        const programSection =
+      findOption(
+        options.programSections,
+        raw.programSection ||
+        raw.section ||
+        raw.programGroup
+      );
     const rawVaccineForm =
       raw.vaccineForm ||
       raw.vaccineType ||
@@ -22176,7 +22197,14 @@ function vaccinationFarmProgramNormalizeRowsSrv(
       vaccinationFarmProgramTextSrv(
         raw.notes
       );
-
+        if (!programSection) {
+      errors.push({
+        rowIndex: index,
+        field: "programSection",
+        message:
+          `اختر قسم التحصين في السطر رقم ${index + 1}.`
+      });
+    }
     if (!vaccine) {
       errors.push({
         rowIndex: index,
@@ -22326,8 +22354,14 @@ function vaccinationFarmProgramNormalizeRowsSrv(
         .slice(0, 80) ||
       crypto.randomUUID();
 
-    rows.push({
+       rows.push({
       rowId,
+
+      programSection:
+        programSection.value,
+
+      programSectionLabel:
+        programSection.label,
 
       vaccineCode:
         vaccine.value,
