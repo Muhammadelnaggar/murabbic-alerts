@@ -22457,7 +22457,40 @@ function vaccinationFarmProgramResponseSrv(
       )
   };
 }
+app.get(
+  "/api/vaccination/options",
+  requireUserId,
+  async (req, res) => {
+    try {
+      const programContext =
+        await vaccinationReadProgramContextSrv(
+          req.userId
+        );
 
+      return res.json({
+        ok: true,
+
+        programContext,
+
+        options:
+          vaccinationFarmProgramOptionsSrv()
+      });
+
+    } catch (e) {
+      console.error(
+        "vaccination-options-read",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+
+        message:
+          "تعذّر تحميل قوائم التحصين الآن."
+      });
+    }
+  }
+);
 app.get(
   "/api/vaccination/farm-program",
   requireUserId,
