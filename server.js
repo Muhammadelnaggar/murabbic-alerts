@@ -21991,12 +21991,39 @@ function vaccinationFarmProgramOptionsSrv() {
         )
       },
 
-      {
+           {
         value: "maternal_calf_scour",
         label:
           "لقاح الأمهات ضد إسهالات العجول (Rotavirus + Coronavirus + E. coli K99)",
         formOptions: forms(
           "killed_virus_bacterin_toxoid"
+        )
+      },
+
+      {
+        value: "rotavac_corona",
+        label:
+          "روتافاك كورونا للأمهات (RotaVac Corona)",
+        formOptions: forms(
+          "killed_virus_bacterin_toxoid"
+        )
+      },
+
+      {
+        value: "scourguard",
+        label:
+          "سكاور جارد للأمهات (ScourGuard)",
+        formOptions: forms(
+          "killed_virus_bacterin_toxoid"
+        )
+      },
+
+      {
+        value: "lysigin",
+        label:
+          "ليسيجين ضد التهاب الضرع (Lysigin)",
+        formOptions: forms(
+          "bacterin"
         )
       }
     ]
@@ -22542,7 +22569,935 @@ async function vaccinationReadFarmProgramExecutionSrv(
       )
   };
 }
+function vaccinationMurabbikDefaultProgramSrv() {
+  const options =
+    vaccinationFarmProgramOptionsSrv();
 
+  const vaccineByCode =
+    new Map(
+      options.vaccines.map(item => [
+        item.value,
+        item
+      ])
+    );
+
+  const sectionByCode =
+    new Map(
+      options.programSections.map(item => [
+        item.value,
+        item
+      ])
+    );
+
+  const doseByCode =
+    new Map(
+      options.doseTypes.map(item => [
+        item.value,
+        item
+      ])
+    );
+
+  const repeatUnitByCode =
+    new Map(
+      options.repeatUnits.map(item => [
+        item.value,
+        item
+      ])
+    );
+
+  const dose = (
+    doseType,
+    timingBasis,
+    timingValue = 0,
+    timingUnit = "",
+    extra = {}
+  ) => ({
+    doseType,
+    timingBasis,
+
+    ...(timingValue
+      ? { timingValue }
+      : {}),
+
+    ...(timingUnit
+      ? { timingUnit }
+      : {}),
+
+    ...extra
+  });
+
+  const row = ({
+    programRowId,
+    vaccineCode,
+    programSection,
+    vaccineForm,
+    targetGroup,
+    doseSchedule,
+    repeatEvery = 0,
+    repeatUnit = "",
+    ageMinValue = 0,
+    ageMinUnit = "",
+    ageMaxValue = 0,
+    ageMaxUnit = "",
+    alternativeGroup = "",
+    alternativePath = "",
+    advanceNoticeDays = 14,
+    notes = ""
+  }) => {
+    const vaccine =
+      vaccineByCode.get(vaccineCode);
+
+    const section =
+      sectionByCode.get(
+        programSection
+      );
+
+    const form =
+      vaccine?.formOptions?.find(
+        item =>
+          item.value === vaccineForm
+      );
+
+    const enrichedDoseSchedule =
+      doseSchedule.map(step => ({
+        ...step,
+
+        doseTypeLabel:
+          doseByCode.get(
+            step.doseType
+          )?.label || ""
+      }));
+
+    const allowedDoseTypes =
+      [
+        ...new Set(
+          enrichedDoseSchedule.map(
+            step => step.doseType
+          )
+        )
+      ];
+
+    const fixedDoseType =
+      allowedDoseTypes.length === 1
+        ? allowedDoseTypes[0]
+        : "";
+
+    return {
+      programRowId,
+      vaccineCode,
+
+      vaccine:
+        vaccine?.label || "",
+
+      programSection,
+
+      programSectionLabel:
+        section?.label || "",
+
+      vaccineForm,
+
+      vaccineFormLabel:
+        form?.label || "",
+
+      doseType:
+        fixedDoseType,
+
+      doseTypeLabel:
+        fixedDoseType
+          ? (
+              doseByCode.get(
+                fixedDoseType
+              )?.label || ""
+            )
+          : "",
+
+      allowedDoseTypes,
+
+      doseSchedule:
+        enrichedDoseSchedule,
+
+      repeatEvery,
+      repeatUnit,
+
+      repeatUnitLabel:
+        repeatUnitByCode.get(
+          repeatUnit
+        )?.label || "",
+
+      targetGroup,
+
+      ageMinValue,
+      ageMinUnit,
+      ageMaxValue,
+      ageMaxUnit,
+
+      alternativeGroup,
+      alternativePath,
+
+      advanceNoticeDays,
+      notes,
+
+      active: true
+    };
+  };
+
+  const rows = [
+    row({
+      programRowId:
+        "murabbik_fmd_herd",
+      vaccineCode: "fmd",
+      programSection: "herd",
+      vaccineForm: "killed_virus",
+      targetGroup: "herd_all",
+      repeatEvery: 6,
+      repeatUnit: "month",
+      doseSchedule: [
+        dose("prime", "any_time"),
+        dose(
+          "booster",
+          "after_previous_dose",
+          14,
+          "day"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          6,
+          "month"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_fmd_calves",
+      vaccineCode: "fmd",
+      programSection: "calves",
+      vaccineForm: "killed_virus",
+      targetGroup: "calves",
+      ageMinValue: 3,
+      ageMinUnit: "month",
+      repeatEvery: 6,
+      repeatUnit: "month",
+      doseSchedule: [
+        dose(
+          "prime",
+          "calf_age",
+          3,
+          "month"
+        ),
+        dose(
+          "booster",
+          "after_previous_dose",
+          14,
+          "day"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          6,
+          "month",
+          {
+            joinHerdSchedule: true
+          }
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_respiratory_combined_herd",
+      vaccineCode:
+        "ibr_bvd_pi3_brsv",
+      programSection: "herd",
+      vaccineForm: "killed_virus",
+      targetGroup: "herd_all",
+      repeatEvery: 8,
+      repeatUnit: "month",
+      alternativeGroup:
+        "respiratory_program",
+      alternativePath: "combined",
+      doseSchedule: [
+        dose("prime", "any_time"),
+        dose(
+          "booster",
+          "after_previous_dose",
+          1,
+          "month"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          8,
+          "month"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_respiratory_combined_calves",
+      vaccineCode:
+        "ibr_bvd_pi3_brsv",
+      programSection: "calves",
+      vaccineForm: "killed_virus",
+      targetGroup: "calves",
+      ageMinValue: 5,
+      ageMinUnit: "month",
+      repeatEvery: 8,
+      repeatUnit: "month",
+      alternativeGroup:
+        "respiratory_program",
+      alternativePath: "combined",
+      doseSchedule: [
+        dose(
+          "prime",
+          "calf_age",
+          5,
+          "month"
+        ),
+        dose(
+          "booster",
+          "after_previous_dose",
+          1,
+          "month"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          8,
+          "month",
+          {
+            joinHerdSchedule: true
+          }
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_bef_herd",
+      vaccineCode: "bef",
+      programSection: "herd",
+      vaccineForm: "killed_virus",
+      targetGroup: "herd_all",
+      repeatEvery: 1,
+      repeatUnit: "year",
+      doseSchedule: [
+        dose("prime", "any_time"),
+        dose(
+          "periodic",
+          "repeat",
+          1,
+          "year"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_bef_calves",
+      vaccineCode: "bef",
+      programSection: "calves",
+      vaccineForm: "killed_virus",
+      targetGroup: "calves",
+      ageMinValue: 12,
+      ageMinUnit: "month",
+      repeatEvery: 1,
+      repeatUnit: "year",
+      doseSchedule: [
+        dose(
+          "prime",
+          "calf_age",
+          12,
+          "month"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          1,
+          "year"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_lsd_herd",
+      vaccineCode: "lsd",
+      programSection: "herd",
+      vaccineForm:
+        "live_attenuated_virus",
+      targetGroup: "herd_all",
+      repeatEvery: 1,
+      repeatUnit: "year",
+      doseSchedule: [
+        dose("prime", "any_time"),
+        dose(
+          "periodic",
+          "repeat",
+          1,
+          "year"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_lsd_calves",
+      vaccineCode: "lsd",
+      programSection: "calves",
+      vaccineForm:
+        "live_attenuated_virus",
+      targetGroup: "calves",
+      ageMinValue: 12,
+      ageMinUnit: "month",
+      repeatEvery: 1,
+      repeatUnit: "year",
+      doseSchedule: [
+        dose(
+          "prime",
+          "calf_age",
+          12,
+          "month"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          1,
+          "year"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_rotavac_corona_mothers",
+      vaccineCode:
+        "rotavac_corona",
+      programSection: "mothers",
+      vaccineForm:
+        "killed_virus_bacterin_toxoid",
+      targetGroup:
+        "pregnant_mothers",
+      advanceNoticeDays: 10,
+      doseSchedule: [
+        dose(
+          "periodic",
+          "before_expected_calving",
+          40,
+          "day",
+          {
+            cycle:
+              "each_pregnancy"
+          }
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_scourguard_mothers",
+      vaccineCode: "scourguard",
+      programSection: "mothers",
+      vaccineForm:
+        "killed_virus_bacterin_toxoid",
+      targetGroup:
+        "pregnant_mothers",
+      advanceNoticeDays: 10,
+      doseSchedule: [
+        dose(
+          "prime",
+          "before_expected_calving",
+          45,
+          "day",
+          {
+            cycle:
+              "each_pregnancy"
+          }
+        ),
+        dose(
+          "booster",
+          "before_expected_calving",
+          30,
+          "day",
+          {
+            cycle:
+              "each_pregnancy"
+          }
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_pasteurella_herd",
+      vaccineCode:
+        "pasteurella_hs",
+      programSection: "herd",
+      vaccineForm:
+        "bacterin_toxoid",
+      targetGroup: "herd_all",
+      repeatEvery: 1,
+      repeatUnit: "year",
+      doseSchedule: [
+        dose("prime", "any_time"),
+        dose(
+          "booster",
+          "after_previous_dose",
+          1,
+          "month"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          1,
+          "year"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_pasteurella_calves",
+      vaccineCode:
+        "pasteurella_hs",
+      programSection: "calves",
+      vaccineForm:
+        "bacterin_toxoid",
+      targetGroup: "calves",
+      ageMinValue: 12,
+      ageMinUnit: "month",
+      repeatEvery: 1,
+      repeatUnit: "year",
+      doseSchedule: [
+        dose(
+          "prime",
+          "calf_age",
+          12,
+          "month"
+        ),
+        dose(
+          "booster",
+          "after_previous_dose",
+          1,
+          "month"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          1,
+          "year"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_clostridial_mothers",
+      vaccineCode: "clostridial",
+      programSection: "mothers",
+      vaccineForm:
+        "bacterin_toxoid",
+      targetGroup: "mothers",
+      repeatEvery: 6,
+      repeatUnit: "month",
+      doseSchedule: [
+        dose("prime", "any_time"),
+        dose(
+          "booster",
+          "after_previous_dose",
+          21,
+          "day"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          6,
+          "month"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_clostridial_calves",
+      vaccineCode: "clostridial",
+      programSection: "calves",
+      vaccineForm:
+        "bacterin_toxoid",
+      targetGroup: "calves",
+      ageMinValue: 6,
+      ageMinUnit: "month",
+      ageMaxValue: 12,
+      ageMaxUnit: "month",
+      repeatEvery: 6,
+      repeatUnit: "month",
+      doseSchedule: [
+        dose(
+          "prime",
+          "calf_age",
+          6,
+          "month"
+        ),
+        dose(
+          "booster",
+          "after_previous_dose",
+          21,
+          "day"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          6,
+          "month",
+          {
+            stopAtAgeValue: 12,
+            stopAtAgeUnit:
+              "month"
+          }
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_lysigin_mothers",
+      vaccineCode: "lysigin",
+      programSection: "mothers",
+      vaccineForm: "bacterin",
+      targetGroup: "mothers",
+      repeatEvery: 6,
+      repeatUnit: "month",
+      doseSchedule: [
+        dose("prime", "any_time"),
+        dose(
+          "booster",
+          "after_previous_dose",
+          30,
+          "day"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          6,
+          "month"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_brucella_s19_heifers",
+      vaccineCode:
+        "brucella_s19",
+      programSection: "calves",
+      vaccineForm:
+        "live_attenuated_bacterial",
+      targetGroup: "heifers",
+      ageMinValue: 3,
+      ageMinUnit: "month",
+      ageMaxValue: 6,
+      ageMaxUnit: "month",
+      notes:
+        "جرعة واحدة للعجلات من عمر 3 إلى 6 أشهر.",
+      doseSchedule: [
+        dose(
+          "prime",
+          "calf_age_window",
+          0,
+          "",
+          {
+            ageMinValue: 3,
+            ageMinUnit: "month",
+            ageMaxValue: 6,
+            ageMaxUnit: "month",
+            cycle:
+              "once_lifetime"
+          }
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_ibr_herd",
+      vaccineCode: "ibr",
+      programSection: "herd",
+      vaccineForm: "killed_virus",
+      targetGroup: "herd_all",
+      repeatEvery: 4,
+      repeatUnit: "month",
+      alternativeGroup:
+        "respiratory_program",
+      alternativePath: "separate",
+      doseSchedule: [
+        dose("prime", "any_time"),
+        dose(
+          "booster",
+          "after_previous_dose",
+          21,
+          "day"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          4,
+          "month"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_ibr_calves",
+      vaccineCode: "ibr",
+      programSection: "calves",
+      vaccineForm: "killed_virus",
+      targetGroup: "calves",
+      ageMinValue: 4,
+      ageMinUnit: "month",
+      repeatEvery: 4,
+      repeatUnit: "month",
+      alternativeGroup:
+        "respiratory_program",
+      alternativePath: "separate",
+      doseSchedule: [
+        dose(
+          "prime",
+          "calf_age",
+          4,
+          "month"
+        ),
+        dose(
+          "booster",
+          "after_previous_dose",
+          21,
+          "day"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          4,
+          "month"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_bvd_herd",
+      vaccineCode: "bvd",
+      programSection: "herd",
+      vaccineForm: "killed_virus",
+      targetGroup: "herd_all",
+      repeatEvery: 4,
+      repeatUnit: "month",
+      alternativeGroup:
+        "respiratory_program",
+      alternativePath: "separate",
+      doseSchedule: [
+        dose("prime", "any_time"),
+        dose(
+          "booster",
+          "after_previous_dose",
+          22,
+          "day"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          4,
+          "month"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_bvd_calves",
+      vaccineCode: "bvd",
+      programSection: "calves",
+      vaccineForm: "killed_virus",
+      targetGroup: "calves",
+      ageMinValue: 5,
+      ageMinUnit: "month",
+      repeatEvery: 4,
+      repeatUnit: "month",
+      alternativeGroup:
+        "respiratory_program",
+      alternativePath: "separate",
+      doseSchedule: [
+        dose(
+          "prime",
+          "calf_age",
+          5,
+          "month"
+        ),
+        dose(
+          "booster",
+          "after_previous_dose",
+          22,
+          "day"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          4,
+          "month",
+          {
+            joinHerdSchedule: true
+          }
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_pi3_brsv_herd",
+      vaccineCode: "pi3_brsv",
+      programSection: "herd",
+      vaccineForm: "killed_virus",
+      targetGroup: "herd_all",
+      repeatEvery: 6,
+      repeatUnit: "month",
+      alternativeGroup:
+        "respiratory_program",
+      alternativePath: "separate",
+      doseSchedule: [
+        dose("prime", "any_time"),
+        dose(
+          "booster",
+          "after_previous_dose",
+          1,
+          "month"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          6,
+          "month"
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
+        "murabbik_pi3_brsv_calves",
+      vaccineCode: "pi3_brsv",
+      programSection: "calves",
+      vaccineForm: "killed_virus",
+      targetGroup: "calves",
+      ageMinValue: 6,
+      ageMinUnit: "month",
+      repeatEvery: 6,
+      repeatUnit: "month",
+      alternativeGroup:
+        "respiratory_program",
+      alternativePath: "separate",
+      doseSchedule: [
+        dose(
+          "prime",
+          "calf_age",
+          6,
+          "month"
+        ),
+        dose(
+          "booster",
+          "after_previous_dose",
+          1,
+          "month"
+        ),
+        dose(
+          "periodic",
+          "repeat",
+          6,
+          "month"
+        )
+      ]
+    })
+  ];
+
+  return {
+    exists: true,
+
+    programMode:
+      "murabbik_default",
+
+    version: 1,
+
+    programName:
+      "برنامج مُرَبِّيك ",
+
+    programLabel:
+      "برنامج مُرَبِّيك ",
+
+    source:
+      "server:vaccination-murabbik-default-v1",
+
+    defaultAlternatives: {
+      respiratory_program:
+        "combined"
+    },
+
+    alternativeGroups: [
+      {
+        value:
+          "respiratory_program",
+
+        label:
+          "برنامج التحصينات التنفسية",
+
+        defaultPath:
+          "combined",
+
+        paths: [
+          {
+            value: "combined",
+            label:
+              "اللقاح التنفسي المركب"
+          },
+          {
+            value: "separate",
+            label:
+              "اللقاحات التنفسية المنفصلة"
+          }
+        ]
+      }
+    ],
+
+    rows
+  };
+}
+
+async function vaccinationReadExecutionProgramSrv(
+  uid,
+  rawProgramMode
+) {
+  const programMode =
+    vaccinationProgramModeNormSrv(
+      rawProgramMode
+    );
+
+  if (programMode === "farm") {
+    return vaccinationReadFarmProgramExecutionSrv(
+      uid
+    );
+  }
+
+  if (
+    programMode ===
+      "murabbik_default"
+  ) {
+    return vaccinationMurabbikDefaultProgramSrv();
+  }
+
+  return {
+    exists: false,
+    version: 0,
+    rows: []
+  };
+}
 async function vaccinationResolveProgramRowSrv({
   uid,
   programContext = {},
@@ -22553,7 +23508,11 @@ async function vaccinationResolveProgramRowSrv({
       programContext.programMode
     );
 
-  if (programMode !== "farm") {
+  if (
+    programMode !== "farm" &&
+    programMode !==
+      "murabbik_default"
+  ) {
     return {
       ok: true,
       linked: false,
@@ -22584,18 +23543,28 @@ async function vaccinationResolveProgramRowSrv({
   }
 
   const program =
-    await vaccinationReadFarmProgramExecutionSrv(
-      uid
+    await vaccinationReadExecutionProgramSrv(
+      uid,
+      programMode
     );
+
+  const programLabel =
+    programMode === "farm"
+      ? "برنامج المزرعة"
+      : "برنامج مُرَبِّيك";
 
   if (!program.exists || !program.rows.length) {
     return {
       ok: false,
       linked: false,
-      error: "farm_program_missing",
+
+      error:
+        programMode === "farm"
+          ? "farm_program_missing"
+          : "murabbik_program_missing",
 
       message:
-        "❌ لم يتم حفظ برنامج تحصينات المزرعة بعد."
+        `❌ لا توجد تحصينات جاهزة داخل ${programLabel}.`
     };
   }
 
@@ -22617,10 +23586,11 @@ async function vaccinationResolveProgramRowSrv({
     return {
       ok: false,
       linked: false,
-      error: "farm_program_row_not_found",
+      error:
+        "vaccination_program_row_not_found",
 
       message:
-        "❌ التحصين المختار غير موجود داخل برنامج المزرعة الحالي."
+        `❌ التحصين المختار غير موجود داخل ${programLabel} الحالي.`
     };
   }
 
@@ -22628,10 +23598,11 @@ async function vaccinationResolveProgramRowSrv({
     return {
       ok: false,
       linked: false,
-      error: "farm_program_row_ambiguous",
+      error:
+        "vaccination_program_row_ambiguous",
 
       message:
-        "❌ اختر سطر التحصين المحدد من برنامج المزرعة."
+        `❌ اختر سطر التحصين المحدد من ${programLabel}.`
     };
   }
 
@@ -22644,27 +23615,119 @@ async function vaccinationResolveProgramRowSrv({
       ""
     ).trim();
 
+  const fixedDoseType =
+    String(
+      row.doseType || ""
+    ).trim();
+
+  const allowedDoseTypes =
+    Array.isArray(
+      row.allowedDoseTypes
+    )
+      ? row.allowedDoseTypes
+          .map(value =>
+            String(value || "").trim()
+          )
+          .filter(Boolean)
+      : [];
+
   if (
+    fixedDoseType &&
     requestedDoseType &&
-    row.doseType &&
-    requestedDoseType !== row.doseType
+    requestedDoseType !== fixedDoseType
   ) {
     return {
       ok: false,
       linked: false,
-      error: "farm_program_dose_mismatch",
+      error:
+        "vaccination_program_dose_mismatch",
 
       message:
-        "❌ نوع الجرعة لا يطابق سطر التحصين المختار في برنامج المزرعة."
+        `❌ نوع الجرعة لا يطابق سطر التحصين المختار في ${programLabel}.`
     };
   }
+
+  if (
+    !fixedDoseType &&
+    allowedDoseTypes.length &&
+    !requestedDoseType
+  ) {
+    return {
+      ok: false,
+      linked: false,
+      error:
+        "vaccination_program_dose_required",
+
+      message:
+        "❌ اختر نوع الجرعة المطلوب تسجيلها."
+    };
+  }
+
+  if (
+    requestedDoseType &&
+    allowedDoseTypes.length &&
+    !allowedDoseTypes.includes(
+      requestedDoseType
+    )
+  ) {
+    return {
+      ok: false,
+      linked: false,
+      error:
+        "vaccination_program_dose_not_allowed",
+
+      message:
+        `❌ نوع الجرعة غير موجود في نظام هذا التحصين داخل ${programLabel}.`
+    };
+  }
+
+  const resolvedDoseType =
+    fixedDoseType ||
+    requestedDoseType;
+
+  const doseTypeLabel =
+    String(
+      row.doseTypeLabel || ""
+    ).trim() ||
+    String(
+      row.doseSchedule?.find(
+        step =>
+          step.doseType ===
+          resolvedDoseType
+      )?.doseTypeLabel || ""
+    ).trim();
 
   return {
     ok: true,
     linked: true,
     programMode,
-    farmProgramVersion: program.version,
-    ...row
+
+    ...row,
+
+    doseType:
+      resolvedDoseType,
+
+    doseTypeLabel,
+
+    vaccinationProgramVersion:
+      Number(
+        program.version || 0
+      ),
+
+    farmProgramVersion:
+      programMode === "farm"
+        ? Number(
+            program.version || 0
+          )
+        : 0,
+
+    murabbikProgramVersion:
+      programMode ===
+        "murabbik_default"
+        ? Number(
+            program.version || 0
+          )
+        : 0
   };
 }
 app.get(
@@ -22677,16 +23740,11 @@ app.get(
           req.userId
         );
 
-      const executionProgram =
-        programContext.programMode === "farm"
-          ? await vaccinationReadFarmProgramExecutionSrv(
-              req.userId
-            )
-          : {
-              exists: false,
-              version: 0,
-              rows: []
-            };
+       const executionProgram =
+        await vaccinationReadExecutionProgramSrv(
+          req.userId,
+          programContext.programMode
+        );
 
       return res.json({
         ok: true,
@@ -23176,7 +24234,7 @@ if (!programLink.ok) {
 
     message:
       programLink.message ||
-      "❌ تعذّر ربط التحصين ببرنامج المزرعة.",
+      "❌ تعذّر ربط التحصين بالبرنامج المختار.",
 
     programContext,
 
@@ -23347,10 +24405,21 @@ accepted.push({
   programSection:
   programLink.programSection || "",
 
+vaccinationProgramVersion:
+  Number(
+    programLink.vaccinationProgramVersion || 0
+  ),
+
 farmProgramVersion:
   Number(
     programLink.farmProgramVersion || 0
   ),
+
+murabbikProgramVersion:
+  Number(
+    programLink.murabbikProgramVersion || 0
+  ),
+
   warnings: dueWarning ? [dueWarning] : [],
   warning: dueWarning?.message || "",
   dueDate: dueWarning?.dueDate || ""
@@ -23699,7 +24768,7 @@ if (!programLink.ok) {
 
     message:
       programLink.message ||
-      "❌ تعذّر ربط التحصين ببرنامج المزرعة.",
+     "❌ تعذّر ربط التحصين بالبرنامج المختار.",
 
     programContext,
 
@@ -23897,9 +24966,26 @@ if (programLink.linked) {
     programLink.vaccineForm || "";
   payload.vaccineFormLabel =
     programLink.vaccineFormLabel || "";
-  payload.farmProgramVersion = Number(
-    programLink.farmProgramVersion || 0
+   payload.vaccinationProgramVersion = Number(
+    programLink.vaccinationProgramVersion || 0
   );
+
+  if (
+    programLink.programMode === "farm"
+  ) {
+    payload.farmProgramVersion = Number(
+      programLink.farmProgramVersion || 0
+    );
+  }
+
+  if (
+    programLink.programMode ===
+      "murabbik_default"
+  ) {
+    payload.murabbikProgramVersion = Number(
+      programLink.murabbikProgramVersion || 0
+    );
+  }
 }
 if (notes) {
   payload.notes = notes;
