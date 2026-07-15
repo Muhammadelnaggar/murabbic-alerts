@@ -445,12 +445,14 @@
   const saveBtn    = document.getElementById("saveBtn");
 
   let farmProgramOptions = {
-    vaccines: [],
-    doseTypes: [],
-    repeatUnits: [],
-    calfAgeUnits: [],
-    programSections: []
-  };
+  vaccines: [],
+  doseTypes: [],
+  repeatUnits: [],
+  calfAgeUnits: [],
+  programSections: []
+};
+
+let executionProgramRows = [];
   const dashBtn    = document.getElementById("dashBtn");
 
   const programSelectionStatus =
@@ -771,9 +773,10 @@ function renderProgramContext(result = {}) {
       return;
     }
 
-       renderProgramContext(result);
-    await loadFarmProgram();
-    await runServerGate("program_saved");
+renderProgramContext(result);
+await loadVaccinationOptions();
+await loadFarmProgram();
+await runServerGate("program_saved");
 
   } catch (err) {
     console.error(
@@ -971,12 +974,102 @@ function findFarmVaccineOption(
   );
 }
 
+function getSelectedExecutionProgramRow() {
+  const programRowId =
+    String(vaccineEl?.value || "").trim();
+
+  return (
+    executionProgramRows.find(row =>
+      String(row?.programRowId || "").trim() ===
+      programRowId
+    ) || null
+  );
+}
+
+function executionProgramRowLabel(row = {}) {
+  const vaccineArabic =
+    String(
+      row.vaccine ||
+      row.vaccineCode ||
+      ""
+    )
+      .split("(")[0]
+      .trim();
+
+  const section =
+    String(row.programSectionLabel || "")
+      .replace(/^تحصينات\s+/, "")
+      .trim();
+
+  return [
+    vaccineArabic,
+    section
+  ]
+    .filter(Boolean)
+    .join(" — ");
+}
+
+function syncExecutionProgramSelection() {
+  if (!doseTypeEl) return;
+
+  if (getProgramMode() !== "farm") {
+    doseTypeEl.disabled = false;
+    return;
+  }
+
+  const row =
+    getSelectedExecutionProgramRow();
+
+  doseTypeEl.value =
+    String(row?.doseType || "").trim();
+
+  doseTypeEl.disabled = true;
+}
+
 function renderEventProgramOptions() {
   const currentVaccine =
     String(vaccineEl?.value || "").trim();
 
   const currentDoseType =
     String(doseTypeEl?.value || "").trim();
+
+  fillServerSelect(
+    doseTypeEl,
+    farmProgramOptions.doseTypes,
+    "اختر نوع الجرعة",
+    currentDoseType
+  );
+
+  if (getProgramMode() === "farm") {
+    fillServerSelect(
+      vaccineEl,
+      executionProgramRows.map(row => ({
+        value:
+          String(
+            row?.programRowId || ""
+          ).trim(),
+
+        label:
+          executionProgramRowLabel(row)
+      })),
+      executionProgramRows.length
+        ? "اختر التحصين من برنامج المزرعة"
+        : "لا توجد تحصينات فعالة في برنامج المزرعة",
+      currentVaccine
+    );
+
+    if (vaccineEl) {
+      vaccineEl.disabled =
+        executionProgramRows.length === 0;
+    }
+
+    syncExecutionProgramSelection();
+    return;
+  }
+
+  if (vaccineEl) {
+    vaccineEl.disabled = false;
+  }
 
   fillServerSelect(
     vaccineEl,
@@ -990,12 +1083,7 @@ function renderEventProgramOptions() {
     currentVaccine
   );
 
-  fillServerSelect(
-    doseTypeEl,
-    farmProgramOptions.doseTypes,
-    "اختر نوع الجرعة",
-    currentDoseType
-  );
+  doseTypeEl.disabled = false;
 }
 
 function renderFarmVaccineForms(
@@ -1527,7 +1615,87 @@ function renderFarmProgramResponse(result = {}) {
 
   setFarmProgramControlsDisabled(false);
 }
+async function loadVaccinationOptions() {
+  try {
+    const result = await getJson(
+      "/api/vaccination/options"
+    );
 
+    if (!result.ok) {
+      msg(
+        result.message ||
+        "تعذّر تحميل قوائم التحصين.",
+        "error"
+      );
+
+      return result;
+    }
+
+    renderProgramContext(result);
+
+    const options =
+      result.options &&
+      typeof result.options === "object"
+        ? result.options
+        : {};
+
+    farmProgramOptions = {
+      vaccines:
+        Array.isArray(options.vaccines)
+          ? options.vaccines
+          : [],
+
+      doseTypes:
+        Array.isArray(options.doseTypes)
+          ? options.doseTypes
+          : [],
+
+      repeatUnits:
+        Array.isArray(options.repeatUnits)
+          ? options.repeatUnits
+          : [],
+
+      calfAgeUnits:
+        Array.isArray(options.calfAgeUnits)
+          ? options.calfAgeUnits
+          : [],
+
+      programSections:
+        Array.isArray(options.programSections)
+          ? options.programSections
+          : []
+    };
+
+    executionProgramRows =
+      Array.isArray(
+        result?.executionProgram?.rows
+      )
+        ? result.executionProgram.rows.map(
+            row => ({ ...row })
+          )
+        : [];
+
+    renderEventProgramOptions();
+    return result;
+
+  } catch (err) {
+    console.error(
+      "vaccination options load failed:",
+      err
+    );
+
+    msg(
+      "تعذّر تحميل قوائم التحصين الآن.",
+      "error"
+    );
+
+    return {
+      ok: false,
+      message:
+        "تعذّر تحميل قوائم التحصين الآن."
+    };
+  }
+}
 async function loadFarmProgram() {
   try {
     const result = await getJson(
@@ -1616,6 +1784,7 @@ async function saveFarmProgram() {
     );
 
     await loadFarmProgram();
+    await loadVaccinationOptions();
 
   } catch (err) {
     console.error(
@@ -1634,23 +1803,58 @@ async function saveFarmProgram() {
     }
   }
 }
-  function collectPayload() {
-    const numbers = getSelectedNumbers();
-    const eventDate = String(eventDateEl?.value || "").trim().slice(0, 10);
-     const vaccine = String(vaccineEl?.value || "").trim();
-    const doseType = getDoseType();
-    const programMode = getProgramMode();
+function collectPayload() {
+  const numbers = getSelectedNumbers();
 
-    return {
-      animalNumbers: numbers,
-      animalNumber: numbers.join(","),
-      eventDate,
-      date: eventDate,
-      vaccine,
-      doseType,
-      programMode
-    };
-  }
+  const eventDate =
+    String(eventDateEl?.value || "")
+      .trim()
+      .slice(0, 10);
+
+  const programMode =
+    getProgramMode();
+
+  const programRow =
+    programMode === "farm"
+      ? getSelectedExecutionProgramRow()
+      : null;
+
+  const vaccine =
+    programMode === "farm"
+      ? String(
+          programRow?.vaccine || ""
+        ).trim()
+      : String(
+          vaccineEl?.value || ""
+        ).trim();
+
+  const doseType =
+    programMode === "farm"
+      ? String(
+          programRow?.doseType || ""
+        ).trim()
+      : getDoseType();
+
+  return {
+    animalNumbers: numbers,
+    animalNumber: numbers.join(","),
+    eventDate,
+    date: eventDate,
+    vaccine,
+    doseType,
+    programMode,
+
+    programRowId:
+      String(
+        programRow?.programRowId || ""
+      ).trim(),
+
+    vaccineCode:
+      String(
+        programRow?.vaccineCode || ""
+      ).trim()
+  };
+}
 function renderServerResult(result = {}) {
   const accepted = Array.isArray(result.accepted)
     ? result.accepted
@@ -1913,6 +2117,7 @@ const numberFromUrl =
 
         if (eventDateEl) eventDateEl.value = dt;
 
+    await loadVaccinationOptions();
     await loadFarmProgram();
 
     if (vaccineEl && vaccine) {
@@ -1961,6 +2166,7 @@ const numberFromUrl =
   runServerGate("date_change");
 });
 vaccineEl?.addEventListener("change", () => {
+  syncExecutionProgramSelection();
   runServerGate("vaccine_change");
 });
 doseTypeEl?.addEventListener("change", () => {
