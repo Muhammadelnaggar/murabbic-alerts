@@ -22100,14 +22100,17 @@ function vaccinationFarmProgramNormalizeRowsSrv(
         raw.vaccineCode ||
         raw.vaccineName ||
         raw.vaccine
-      );
-        const programSection =
+         );
+     const programSection =
       findOption(
         options.programSections,
         raw.programSection ||
         raw.section ||
         raw.programGroup
       );
+
+    const isCalves =
+      programSection?.value === "calves";
     const rawVaccineForm =
       raw.vaccineForm ||
       raw.vaccineType ||
@@ -22232,8 +22235,8 @@ function vaccinationFarmProgramNormalizeRowsSrv(
       });
     }
 
-    if (
-      hasCalfAge &&
+      if (
+      isCalves &&
       (
         !Number.isInteger(calfAgeValue) ||
         calfAgeValue <= 0
@@ -22248,7 +22251,7 @@ function vaccinationFarmProgramNormalizeRowsSrv(
     }
 
     if (
-      hasCalfAge &&
+      isCalves &&
       !calfAgeUnit
     ) {
       errors.push({
@@ -22260,19 +22263,7 @@ function vaccinationFarmProgramNormalizeRowsSrv(
     }
 
     if (
-      hasCalfAge &&
-      repeatEvery > 0
-    ) {
-      errors.push({
-        rowIndex: index,
-        field: "repeatEvery",
-        message:
-          `تحصين العجول يُحدد بالعمر فقط في السطر رقم ${index + 1}.`
-      });
-    }
-
-    if (
-      !hasCalfAge &&
+      !isCalves &&
       !startDate
     ) {
       errors.push({
@@ -22285,29 +22276,28 @@ function vaccinationFarmProgramNormalizeRowsSrv(
 
     if (
       !Number.isInteger(repeatEvery) ||
-      repeatEvery < 0 ||
+      repeatEvery <= 0 ||
       repeatEvery > 120
     ) {
       errors.push({
         rowIndex: index,
         field: "repeatEvery",
         message:
-          `قيمة التكرار غير صحيحة في السطر رقم ${index + 1}.`
+          `أدخل مدة تكرار صحيحة في السطر رقم ${index + 1}.`
       });
     }
 
-    if (
-      repeatEvery > 0 &&
-      !repeatUnit
-    ) {
+    if (!repeatUnit) {
       errors.push({
         rowIndex: index,
         field: "repeatUnit",
         message:
-          `اختر وحدة التكرار في السطر رقم ${index + 1}.`
+          `اختر فترة التكرار في السطر رقم ${index + 1}.`
       });
     }
 
+
+  
     if (
       !Number.isInteger(
         advanceNoticeDays
@@ -22381,50 +22371,36 @@ function vaccinationFarmProgramNormalizeRowsSrv(
       doseTypeLabel:
         doseType.label,
 
-      startDate:
-        hasCalfAge
+          startDate:
+        isCalves
           ? ""
           : startDate,
 
-      repeatEvery:
-        hasCalfAge
-          ? 0
-          : repeatEvery,
+      repeatEvery,
 
       repeatUnit:
-        hasCalfAge
-          ? ""
-          : (
-              repeatUnit?.value ||
-              ""
-            ),
+        repeatUnit.value,
 
       repeatUnitLabel:
-        hasCalfAge
-          ? ""
-          : (
-              repeatUnit?.label ||
-              ""
-            ),
+        repeatUnit.label,
 
       calfSchedule:
-        hasCalfAge,
+        isCalves,
 
       calfAgeValue:
-        hasCalfAge
+        isCalves
           ? calfAgeValue
           : null,
 
       calfAgeUnit:
-        hasCalfAge
+        isCalves
           ? calfAgeUnit.value
           : "",
 
       calfAgeUnitLabel:
-        hasCalfAge
+        isCalves
           ? calfAgeUnit.label
           : "",
-
       advanceNoticeDays,
       notes,
 
