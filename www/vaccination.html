@@ -222,7 +222,16 @@
           </div>
         </div>
 
-        <div id="farmProgramRows"></div>
+       <div
+  id="farmProgramRows"
+  class="steps-list"
+  aria-live="polite"
+></div>
+
+<div
+  id="farmProgramEditor"
+  class="hidden-block"
+></div>
 
         <div class="row row-2">
           <button
@@ -380,24 +389,34 @@
       </div>
     </div>
 
-    <div class="row row-2">
-      <label>
-        <input
-          type="checkbox"
-          data-farm-field="active"
-          checked
-        />
-        التحصين فعّال داخل البرنامج
-      </label>
+   <div class="row row-2">
+  <label>
+    <input
+      type="checkbox"
+      data-farm-field="active"
+      checked
+    />
+    التحصين فعّال داخل البرنامج
+  </label>
 
-      <button
-        class="ghost"
-        type="button"
-        data-action="remove-farm-program-row"
-      >
-        حذف التحصين
-      </button>
-    </div>
+  <div class="row row-2">
+    <button
+      class="save"
+      type="button"
+      data-action="save-farm-program-row"
+    >
+      💾 حفظ التحصين
+    </button>
+
+    <button
+      class="ghost"
+      type="button"
+      data-action="cancel-farm-program-row"
+    >
+      إلغاء
+    </button>
+  </div>
+</div>
   </fieldset>
 </template>
       </details>
@@ -470,6 +489,9 @@ const farmProgramNotes =
 const farmProgramRows =
   document.getElementById("farmProgramRows");
 
+const farmProgramEditor =
+  document.getElementById("farmProgramEditor");
+
 const farmProgramRowTemplate =
   document.getElementById("farmProgramRowTemplate");
 
@@ -484,6 +506,7 @@ const saveFarmProgramBtn =
   const bulkSelected = new Set();
   let pageMode = "single";
   let lastGateAllowed = false;
+  let farmProgramDraftRows = [];
 
   function msg(text, type = "warning") {
     let bar =
@@ -1045,13 +1068,202 @@ function renderFarmProgramSectionFields(
       );
     });
 }
-function appendFarmProgramRow(row = {}) {
+function farmProgramOptionLabel(
+  items = [],
+  rawValue = ""
+) {
+  const value =
+    String(rawValue || "").trim();
+
+  const found =
+    (Array.isArray(items) ? items : [])
+      .find(item =>
+        String(item?.value || "") === value ||
+        String(item?.label || "") === value
+      );
+
+  return String(
+    found?.label ||
+    value ||
+    "—"
+  ).trim();
+}
+
+function closeFarmProgramEditor() {
+  if (farmProgramEditor) {
+    farmProgramEditor.innerHTML = "";
+    farmProgramEditor.classList.add(
+      "hidden-block"
+    );
+  }
+
+  if (addFarmProgramRowBtn) {
+    addFarmProgramRowBtn.disabled = false;
+  }
+}
+
+function renderFarmProgramRows() {
+  if (!farmProgramRows) return;
+
+  farmProgramRows.innerHTML = "";
+
+  if (!farmProgramDraftRows.length) {
+    const empty =
+      document.createElement("div");
+
+    empty.className = "form-hint";
+    empty.textContent =
+      "لم تتم إضافة تحصينات إلى البرنامج بعد.";
+
+    farmProgramRows.appendChild(empty);
+    return;
+  }
+
+  farmProgramDraftRows.forEach(
+    (row, index) => {
+      const item =
+        document.createElement("div");
+
+      item.className = "step-item";
+
+      const name =
+        document.createElement("div");
+
+      name.className = "name";
+
+      const vaccineLabel =
+        String(
+          row.vaccineName ||
+          farmProgramOptionLabel(
+            farmProgramOptions.vaccines,
+            row.vaccineCode
+          )
+        ).trim();
+
+      const sectionLabel =
+        String(
+          row.programSectionLabel ||
+          farmProgramOptionLabel(
+            farmProgramOptions.programSections,
+            row.programSection
+          )
+        ).trim();
+
+      const repeatUnitLabel =
+        String(
+          row.repeatUnitLabel ||
+          farmProgramOptionLabel(
+            farmProgramOptions.repeatUnits,
+            row.repeatUnit
+          )
+        ).trim();
+
+      name.textContent = [
+        vaccineLabel,
+        sectionLabel,
+        row.repeatEvery
+          ? `كل ${row.repeatEvery} ${repeatUnitLabel}`
+          : ""
+      ]
+        .filter(Boolean)
+        .join(" — ");
+
+      const removeButton =
+        document.createElement("button");
+
+      removeButton.type = "button";
+      removeButton.className = "ghost";
+      removeButton.dataset.action =
+        "remove-farm-program-row";
+      removeButton.dataset.rowIndex =
+        String(index);
+      removeButton.textContent =
+        "حذف";
+
+      item.appendChild(name);
+      item.appendChild(removeButton);
+      farmProgramRows.appendChild(item);
+    }
+  );
+}
+
+function readFarmProgramEditorRow() {
+  const rowElement =
+    farmProgramEditor?.querySelector(
+      "[data-farm-program-row]"
+    );
+
+  if (!rowElement) return null;
+
+  const value = name =>
+    rowElement.querySelector(
+      `[data-farm-field="${name}"]`
+    )?.value ?? "";
+
+  return {
+    rowId:
+      value("rowId"),
+
+    programSection:
+      value("programSection"),
+
+    vaccineCode:
+      value("vaccineCode"),
+
+    vaccineForm:
+      value("vaccineForm"),
+
+    doseType:
+      value("doseType"),
+
+    startDate:
+      value("startDate"),
+
+    repeatEvery:
+      value("repeatEvery"),
+
+    repeatUnit:
+      value("repeatUnit"),
+
+    calfAgeValue:
+      value("calfAgeValue"),
+
+    calfAgeUnit:
+      value("calfAgeUnit"),
+
+    advanceNoticeDays:
+      value("advanceNoticeDays"),
+
+    notes:
+      value("notes"),
+
+    active:
+      rowElement.querySelector(
+        '[data-farm-field="active"]'
+      )?.checked === true
+  };
+}
+
+function saveFarmProgramEditorRow() {
+  const row =
+    readFarmProgramEditorRow();
+
+  if (!row) return;
+
+  farmProgramDraftRows.push(row);
+  renderFarmProgramRows();
+  closeFarmProgramEditor();
+}
+
+function openFarmProgramEditor(row = {}) {
   if (
-    !farmProgramRows ||
+    !farmProgramEditor ||
     !farmProgramRowTemplate
   ) {
     return;
   }
+
+  farmProgramEditor.innerHTML = "";
 
   const fragment =
     farmProgramRowTemplate
@@ -1142,9 +1354,15 @@ function appendFarmProgramRow(row = {}) {
   field("notes").value =
     row.notes ?? "";
 
-  renderFarmProgramSectionFields(
-    rowElement
-  );
+  if (
+    Object.prototype.hasOwnProperty.call(
+      row,
+      "active"
+    )
+  ) {
+    field("active").checked =
+      row.active === true;
+  }
 
   field("programSection")
     ?.addEventListener(
@@ -1155,16 +1373,6 @@ function appendFarmProgramRow(row = {}) {
         );
       }
     );
-
-  if (
-    Object.prototype.hasOwnProperty.call(
-      row,
-      "active"
-    )
-  ) {
-    field("active").checked =
-      row.active === true;
-  }
 
   field("vaccineCode")
     ?.addEventListener(
@@ -1178,7 +1386,25 @@ function appendFarmProgramRow(row = {}) {
       }
     );
 
-  farmProgramRows.appendChild(fragment);
+  farmProgramEditor.appendChild(fragment);
+  farmProgramEditor.classList.remove(
+    "hidden-block"
+  );
+
+  renderFarmProgramSectionFields(
+    rowElement
+  );
+
+  if (addFarmProgramRowBtn) {
+    addFarmProgramRowBtn.disabled = true;
+  }
+
+  try {
+    farmProgramEditor.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  } catch (_) {}
 }
 function renderFarmProgramResponse(result = {}) {
     renderProgramContext(result);
@@ -1246,18 +1472,16 @@ function renderFarmProgramResponse(result = {}) {
       program.programNotes ?? "";
   }
 
-  if (farmProgramRows) {
-    farmProgramRows.innerHTML = "";
-  }
-
   const rows =
     Array.isArray(program.rows)
       ? program.rows
       : [];
 
-  rows.forEach(row => {
-    appendFarmProgramRow(row);
-  });
+  farmProgramDraftRows =
+    rows.map(row => ({ ...row }));
+
+  closeFarmProgramEditor();
+  renderFarmProgramRows();
 
   if (farmProgramMeta) {
     const parts = [
@@ -1309,59 +1533,9 @@ async function loadFarmProgram() {
 }
 
 function collectFarmProgramRows() {
-  return [
-    ...farmProgramRows.querySelectorAll(
-      "[data-farm-program-row]"
-    )
-  ].map(row => {
-    const value = name =>
-      row.querySelector(
-        `[data-farm-field="${name}"]`
-      )?.value ?? "";
-
-    return {
-      rowId:
-        value("rowId"),
-
-      programSection:
-        value("programSection"),
-
-      vaccineCode:
-        value("vaccineCode"),
-
-      vaccineForm:
-        value("vaccineForm"),
-
-      doseType:
-        value("doseType"),
-
-      startDate:
-        value("startDate"),
-
-      repeatEvery:
-        value("repeatEvery"),
-
-      repeatUnit:
-        value("repeatUnit"),
-
-      calfAgeValue:
-        value("calfAgeValue"),
-
-      calfAgeUnit:
-        value("calfAgeUnit"),
-
-      advanceNoticeDays:
-        value("advanceNoticeDays"),
-
-      notes:
-        value("notes"),
-
-      active:
-        row.querySelector(
-          '[data-farm-field="active"]'
-        )?.checked === true
-    };
-  });
+  return farmProgramDraftRows.map(
+    row => ({ ...row })
+  );
 }
 async function saveFarmProgram() {
   try {
@@ -1776,7 +1950,31 @@ document
 addFarmProgramRowBtn?.addEventListener(
   "click",
   () => {
-    appendFarmProgramRow({});
+    openFarmProgramEditor({});
+  }
+);
+
+farmProgramEditor?.addEventListener(
+  "click",
+  event => {
+    const saveRowButton =
+      event.target.closest(
+        '[data-action="save-farm-program-row"]'
+      );
+
+    if (saveRowButton) {
+      saveFarmProgramEditorRow();
+      return;
+    }
+
+    const cancelButton =
+      event.target.closest(
+        '[data-action="cancel-farm-program-row"]'
+      );
+
+    if (cancelButton) {
+      closeFarmProgramEditor();
+    }
   }
 );
 
@@ -1790,12 +1988,19 @@ farmProgramRows?.addEventListener(
 
     if (!removeButton) return;
 
-    removeButton
-      .closest("[data-farm-program-row]")
-      ?.remove();
+    const rowIndex =
+      Number(removeButton.dataset.rowIndex);
+
+    if (!Number.isInteger(rowIndex)) return;
+
+    farmProgramDraftRows.splice(
+      rowIndex,
+      1
+    );
+
+    renderFarmProgramRows();
   }
 );
-
 saveFarmProgramBtn?.addEventListener(
   "click",
   saveFarmProgram
