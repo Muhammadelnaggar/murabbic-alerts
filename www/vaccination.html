@@ -24,6 +24,13 @@
 </header>
 
   <main class="mbk-main">
+    <button
+  id="changeProgramModeBtn"
+  class="ghost hidden-block"
+  type="button"
+>
+  تغيير برنامج التحصينات
+</button>
     <div class="context">
       <span id="ctxAnimal" class="pill">الحيوان: غير محدد</span>
       <span id="ctxDate" class="pill">التاريخ: —</span>
@@ -466,6 +473,8 @@ let executionProgramRows = [];
 
  const programCurrentMessage =
   document.getElementById("programCurrentMessage");
+   const changeProgramModeBtn =
+  document.getElementById("changeProgramModeBtn");
 
 const programChoiceHead =
   document.querySelector(
@@ -509,6 +518,8 @@ const saveFarmProgramBtn =
   let pageMode = "single";
   let lastGateAllowed = false;
   let farmProgramDraftRows = [];
+  let programSwitchOpen = false;
+  let currentProgramContext = null;
 
   function msg(text, type = "warning") {
     let bar =
@@ -659,13 +670,18 @@ function renderProgramContext(result = {}) {
 
   if (!context) return;
 
+  currentProgramContext = {
+    ...context
+  };
+
   const serverMode = String(
     context.programMode ||
     context.mode ||
     ""
   ).trim();
 
-  const isSaved = context.saved === true;
+  const isSaved =
+    context.saved === true;
 
   if (
     serverMode === "farm" ||
@@ -675,7 +691,9 @@ function renderProgramContext(result = {}) {
       `input[name="programMode"][value="${serverMode}"]`
     );
 
-    if (radio) radio.checked = true;
+    if (radio) {
+      radio.checked = true;
+    }
   }
 
   const programLabel = String(
@@ -690,42 +708,72 @@ function renderProgramContext(result = {}) {
   ).trim();
 
   if (programCurrentName) {
-    programCurrentName.textContent = programLabel || "—";
+    programCurrentName.textContent =
+      programLabel || "—";
   }
 
   if (programCurrentMessage) {
-    programCurrentMessage.textContent = programMessage;
+    programCurrentMessage.textContent =
+      programMessage;
   }
+
+  const showProgramChoices =
+    !isSaved ||
+    programSwitchOpen;
+
+  const showCurrentProgram =
+    isSaved &&
+    !programSwitchOpen &&
+    Boolean(
+      programLabel ||
+      programMessage
+    );
 
   if (programChoiceHead) {
     programChoiceHead.classList.toggle(
       "hidden-block",
-      isSaved
+      !showProgramChoices
     );
   }
 
   if (programChoiceOptions) {
     programChoiceOptions.classList.toggle(
       "hidden-block",
-      isSaved
+      !showProgramChoices
     );
   }
 
   if (programSelectionStatus) {
     programSelectionStatus.classList.toggle(
       "hidden-block",
-      isSaved
+      !showProgramChoices
     );
   }
 
   if (programCurrentCard) {
     programCurrentCard.classList.toggle(
       "hidden-block",
-      !isSaved || (!programLabel && !programMessage)
+      !showCurrentProgram
+    );
+  }
+
+  if (changeProgramModeBtn) {
+    changeProgramModeBtn.classList.toggle(
+      "hidden-block",
+      !isSaved ||
+      programSwitchOpen
     );
   }
 
   renderProgramChoice();
+
+  if (
+    programSwitchOpen &&
+    programSelectionStatus
+  ) {
+    programSelectionStatus.textContent =
+      "اختر برنامج المزرعة أو برنامج مُرَبِّيك.";
+  }
 }
  function getMode() {
   return pageMode;
@@ -783,7 +831,10 @@ function renderProgramContext(result = {}) {
       return;
     }
 
+programSwitchOpen = false;
+
 renderProgramContext(result);
+
 await loadVaccinationOptions();
 await loadFarmProgram();
 await runServerGate("program_saved");
@@ -2358,6 +2409,22 @@ saveFarmProgramBtn?.addEventListener(
   "click",
   saveFarmProgram
 );
+   changeProgramModeBtn?.addEventListener(
+  "click",
+  () => {
+    if (!currentProgramContext) {
+      return;
+    }
+
+    programSwitchOpen = true;
+
+    renderProgramContext({
+      programContext:
+        currentProgramContext
+    });
+  }
+);
+   
  const backBtn = document.getElementById("backToEventsBtn");
 backBtn?.addEventListener("click", () => {
   location.href = "add-event.html";
