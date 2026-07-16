@@ -2122,12 +2122,11 @@ if (!gate.ok || !gate.allowed) {
     return;
   }
 
-  msg(gate.message || "تعذّر عرض رد السيرفر.", "error");
-  renderServerResult(gate);
+msg(gate.message || "تعذّر عرض رد السيرفر.", "error");
 
-  if (saveBtn) saveBtn.disabled = true;
-  return;
-}
+if (saveBtn) saveBtn.disabled = true;
+return;
+   }
       const acceptedNumbers = Array.isArray(gate.accepted)
         ? gate.accepted.map(x => String(x.animalNumber || "").trim()).filter(Boolean)
         : [];
@@ -2229,8 +2228,6 @@ if (!gate.ok || !gate.allowed) {
   }
 
   msg(gate.message || "تعذّر عرض رد السيرفر.", "error");
-  renderServerResult(gate);
-
   if (saveBtn) saveBtn.disabled = true;
   return;
 }
