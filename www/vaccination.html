@@ -24,12 +24,21 @@
 </header>
 
   <main class="mbk-main">
-    <button
+<button
   id="changeProgramModeBtn"
-  class="ghost hidden-block"
+  class="mbk-vax-program-switch hidden-block"
   type="button"
 >
-  تغيير برنامج التحصينات
+  <span
+    class="mbk-vax-program-switch-icon"
+    aria-hidden="true"
+  >
+    ⇄
+  </span>
+
+  <span id="changeProgramModeLabel">
+    تغيير برنامج التحصينات
+  </span>
 </button>
     <div class="context">
       <span id="ctxAnimal" class="pill">الحيوان: غير محدد</span>
@@ -475,6 +484,8 @@ let executionProgramRows = [];
   document.getElementById("programCurrentMessage");
    const changeProgramModeBtn =
   document.getElementById("changeProgramModeBtn");
+   const changeProgramModeLabel =
+  document.getElementById("changeProgramModeLabel");
 
 const programChoiceHead =
   document.querySelector(
@@ -757,13 +768,30 @@ function renderProgramContext(result = {}) {
     );
   }
 
-  if (changeProgramModeBtn) {
-    changeProgramModeBtn.classList.toggle(
-      "hidden-block",
-      !isSaved ||
-      programSwitchOpen
-    );
-  }
+ if (changeProgramModeBtn) {
+  const targetMode =
+    serverMode === "farm"
+      ? "murabbik_default"
+      : "farm";
+
+  const targetLabel =
+    targetMode === "murabbik_default"
+      ? "برنامج مُرَبِّيك"
+      : "برنامج المزرعة";
+
+  changeProgramModeBtn.dataset.targetMode =
+    targetMode;
+
+ if (changeProgramModeLabel) {
+  changeProgramModeLabel.textContent =
+    `الانتقال إلى ${targetLabel}`;
+}
+
+  changeProgramModeBtn.classList.toggle(
+    "hidden-block",
+    !isSaved
+  );
+}
 
   renderProgramChoice();
 
@@ -2409,19 +2437,29 @@ saveFarmProgramBtn?.addEventListener(
   "click",
   saveFarmProgram
 );
-   changeProgramModeBtn?.addEventListener(
+  changeProgramModeBtn?.addEventListener(
   "click",
-  () => {
-    if (!currentProgramContext) {
-      return;
-    }
+  async () => {
+    const targetMode =
+      String(
+        changeProgramModeBtn.dataset.targetMode ||
+        ""
+      ).trim();
 
-    programSwitchOpen = true;
+    if (!targetMode) return;
 
-    renderProgramContext({
-      programContext:
-        currentProgramContext
-    });
+    const targetRadio =
+      document.querySelector(
+        `input[name="programMode"][value="${targetMode}"]`
+      );
+
+    if (!targetRadio) return;
+
+    targetRadio.checked = true;
+
+    renderProgramChoice();
+
+    await saveProgramMode();
   }
 );
    
