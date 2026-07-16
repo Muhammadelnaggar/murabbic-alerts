@@ -43,7 +43,7 @@
             </h2>
 
             <p class="mbk-vax-program-subtitle">
-              هل لديك برنامج تحصين للمزرعة أم تستخدم برنامج مُرَبِّيك الخبير؟
+              هل لديك برنامج تحصين للمزرعة أم تستخدم برنامج تحصين مُرَبِّيك ؟
             </p>
           </div>
 
@@ -90,7 +90,7 @@
                 </span>
 
                 <strong class="mbk-vax-program-option-title">
-                  استخدام برنامج مُرَبِّيك الخبير
+                  استخدام برنامج مُرَبِّيك
                 </strong>
 
                 <span class="mbk-vax-program-option-text">
@@ -605,7 +605,17 @@ function clearWarn() {
       'input[name="programMode"]:checked'
     )?.value || "";
   }
+  function usesExecutionProgramMode(
+  programMode = getProgramMode()
+) {
+  const mode =
+    String(programMode || "").trim();
 
+  return (
+    mode === "farm" ||
+    mode === "murabbik_default"
+  );
+}
   function renderProgramChoice() {
     const mode = getProgramMode();
 
@@ -632,7 +642,7 @@ function clearWarn() {
 
     if (mode === "murabbik_default") {
       programSelectionStatus.textContent =
-        "تم اختيار برنامج مُرَبِّيك الخبير. سيعرض السيرفر البرنامج الافتراضي المعتمد للقطيع.";
+        "تم اختيار برنامج مُرَبِّيك . سيعرض السيرفر البرنامج الافتراضي المعتمد للقطيع.";
       return;
     }
 
@@ -1012,7 +1022,21 @@ function executionProgramRowLabel(row = {}) {
 function syncExecutionProgramSelection() {
   if (!doseTypeEl) return;
 
-  if (getProgramMode() !== "farm") {
+  const programMode =
+    getProgramMode();
+
+  if (
+    !usesExecutionProgramMode(
+      programMode
+    )
+  ) {
+    fillServerSelect(
+      doseTypeEl,
+      farmProgramOptions.doseTypes,
+      "اختر نوع الجرعة",
+      getDoseType()
+    );
+
     doseTypeEl.disabled = false;
     return;
   }
@@ -1020,10 +1044,89 @@ function syncExecutionProgramSelection() {
   const row =
     getSelectedExecutionProgramRow();
 
-  doseTypeEl.value =
-    String(row?.doseType || "").trim();
+  if (!row) {
+    fillServerSelect(
+      doseTypeEl,
+      [],
+      "اختر التحصين أولًا",
+      ""
+    );
 
-  doseTypeEl.disabled = true;
+    doseTypeEl.disabled = true;
+    return;
+  }
+
+  const fixedDoseType =
+    String(
+      row?.doseType || ""
+    ).trim();
+
+  const allowedDoseTypes =
+    [
+      ...new Set(
+        (
+          Array.isArray(
+            row?.allowedDoseTypes
+          )
+            ? row.allowedDoseTypes
+            : []
+        )
+          .map(value =>
+            String(value || "").trim()
+          )
+          .filter(Boolean)
+      )
+    ];
+
+  const doseValues =
+    fixedDoseType
+      ? [fixedDoseType]
+      : allowedDoseTypes;
+
+  const doseItems =
+    doseValues.map(value => {
+      const catalogItem =
+        farmProgramOptions.doseTypes
+          .find(item =>
+            String(
+              item?.value || ""
+            ).trim() === value
+          );
+
+      return (
+        catalogItem || {
+          value,
+          label: value
+        }
+      );
+    });
+
+  const currentDoseType =
+    String(
+      doseTypeEl.value || ""
+    ).trim();
+
+  const selectedDoseType =
+    fixedDoseType ||
+    (
+      doseValues.includes(
+        currentDoseType
+      )
+        ? currentDoseType
+        : ""
+    );
+
+  fillServerSelect(
+    doseTypeEl,
+    doseItems,
+    fixedDoseType
+      ? "نوع الجرعة"
+      : "اختر نوع الجرعة",
+    selectedDoseType
+  );
+
+  doseTypeEl.disabled =
+    Boolean(fixedDoseType);
 }
 
 function renderEventProgramOptions() {
@@ -1033,14 +1136,19 @@ function renderEventProgramOptions() {
   const currentDoseType =
     String(doseTypeEl?.value || "").trim();
 
-  fillServerSelect(
-    doseTypeEl,
-    farmProgramOptions.doseTypes,
-    "اختر نوع الجرعة",
-    currentDoseType
-  );
+  const programMode =
+    getProgramMode();
 
-  if (getProgramMode() === "farm") {
+  if (
+    usesExecutionProgramMode(
+      programMode
+    )
+  ) {
+    const programLabel =
+      programMode === "farm"
+        ? "برنامج المزرعة"
+        : "تحصينات مُرَبِّيك";
+
     fillServerSelect(
       vaccineEl,
       executionProgramRows.map(row => ({
@@ -1053,8 +1161,8 @@ function renderEventProgramOptions() {
           executionProgramRowLabel(row)
       })),
       executionProgramRows.length
-        ? "اختر التحصين من برنامج المزرعة"
-        : "لا توجد تحصينات فعالة في برنامج المزرعة",
+        ? `اختر التحصين من ${programLabel}`
+        : `لا توجد تحصينات فعالة في ${programLabel}`,
       currentVaccine
     );
 
@@ -1083,9 +1191,15 @@ function renderEventProgramOptions() {
     currentVaccine
   );
 
+  fillServerSelect(
+    doseTypeEl,
+    farmProgramOptions.doseTypes,
+    "اختر نوع الجرعة",
+    currentDoseType
+  );
+
   doseTypeEl.disabled = false;
 }
-
 function renderFarmVaccineForms(
   rowElement,
   vaccineCode,
@@ -1814,13 +1928,18 @@ function collectPayload() {
   const programMode =
     getProgramMode();
 
+  const isExecutionProgram =
+    usesExecutionProgramMode(
+      programMode
+    );
+
   const programRow =
-    programMode === "farm"
+    isExecutionProgram
       ? getSelectedExecutionProgramRow()
       : null;
 
   const vaccine =
-    programMode === "farm"
+    isExecutionProgram
       ? String(
           programRow?.vaccine || ""
         ).trim()
@@ -1829,9 +1948,10 @@ function collectPayload() {
         ).trim();
 
   const doseType =
-    programMode === "farm"
+    isExecutionProgram
       ? String(
-          programRow?.doseType || ""
+          programRow?.doseType ||
+          getDoseType()
         ).trim()
       : getDoseType();
 
