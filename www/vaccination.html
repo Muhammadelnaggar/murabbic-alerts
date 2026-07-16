@@ -2159,22 +2159,20 @@ if (!gate.ok || !gate.allowed) {
 function renderBulkList() {
   if (!bulkList) return;
 
-  const list = [...bulkSelected].map(String).filter(Boolean);
+  const list =
+    [...bulkSelected]
+      .map(String)
+      .filter(Boolean);
 
   bulkList.innerHTML = "";
+  bulkList.classList.add(
+    "mbk-vax-bulk-inline"
+  );
 
-  for (const num of list) {
-    const row = document.createElement("div");
-   row.className = "step-item";
-    row.setAttribute("role", "option");
-
-    const left = document.createElement("div");
-    left.className = "name";
-    left.textContent = num;
-
-    row.appendChild(left);
-    bulkList.appendChild(row);
-  }
+  bulkList.textContent =
+    list.length
+      ? list.join("، ")
+      : "لا توجد أرقام محددة.";
 }
    async function hydrate() {
     const qp = new URLSearchParams(location.search);
