@@ -1101,111 +1101,14 @@ function executionProgramRowLabel(row = {}) {
 function syncExecutionProgramSelection() {
   if (!doseTypeEl) return;
 
-  const programMode =
-    getProgramMode();
-
-  if (
-    !usesExecutionProgramMode(
-      programMode
-    )
-  ) {
-    fillServerSelect(
-      doseTypeEl,
-      farmProgramOptions.doseTypes,
-      "اختر نوع الجرعة",
-      getDoseType()
-    );
-
-    doseTypeEl.disabled = false;
-    return;
-  }
-
-  const row =
-    getSelectedExecutionProgramRow();
-
-  if (!row) {
-    fillServerSelect(
-      doseTypeEl,
-      [],
-      "اختر التحصين أولًا",
-      ""
-    );
-
-    doseTypeEl.disabled = true;
-    return;
-  }
-
-  const fixedDoseType =
-    String(
-      row?.doseType || ""
-    ).trim();
-
-  const allowedDoseTypes =
-    [
-      ...new Set(
-        (
-          Array.isArray(
-            row?.allowedDoseTypes
-          )
-            ? row.allowedDoseTypes
-            : []
-        )
-          .map(value =>
-            String(value || "").trim()
-          )
-          .filter(Boolean)
-      )
-    ];
-
-  const doseValues =
-    fixedDoseType
-      ? [fixedDoseType]
-      : allowedDoseTypes;
-
-  const doseItems =
-    doseValues.map(value => {
-      const catalogItem =
-        farmProgramOptions.doseTypes
-          .find(item =>
-            String(
-              item?.value || ""
-            ).trim() === value
-          );
-
-      return (
-        catalogItem || {
-          value,
-          label: value
-        }
-      );
-    });
-
-  const currentDoseType =
-    String(
-      doseTypeEl.value || ""
-    ).trim();
-
-  const selectedDoseType =
-    fixedDoseType ||
-    (
-      doseValues.includes(
-        currentDoseType
-      )
-        ? currentDoseType
-        : ""
-    );
-
   fillServerSelect(
     doseTypeEl,
-    doseItems,
-    fixedDoseType
-      ? "نوع الجرعة"
-      : "اختر نوع الجرعة",
-    selectedDoseType
+    farmProgramOptions.doseTypes,
+    "اختر نوع الجرعة",
+    getDoseType()
   );
 
-  doseTypeEl.disabled =
-    Boolean(fixedDoseType);
+  doseTypeEl.disabled = false;
 }
 
 function renderEventProgramOptions() {
@@ -2026,13 +1929,7 @@ function collectPayload() {
           vaccineEl?.value || ""
         ).trim();
 
-  const doseType =
-    isExecutionProgram
-      ? String(
-          programRow?.doseType ||
-          getDoseType()
-        ).trim()
-      : getDoseType();
+   const doseType = getDoseType();
 
   return {
     animalNumbers: numbers,
