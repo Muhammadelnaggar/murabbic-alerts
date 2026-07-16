@@ -23,8 +23,7 @@
 
 <div class="page">
   <div id="serverAlertsBar" aria-live="polite">
-    <div id="ovsynchAlerts"></div>
-    <div id="vaccinationAlerts"></div>
+    <div id="smartAlertHost"></div>
   </div>
 
 <!-- شريط THI أعلى الصفحة -->
@@ -1213,105 +1212,291 @@ function renderMiniGauge(id, percent){
   el.style.color = gaugeColor;
   el.textContent = gaugeDisplayValue(id, n);
 }
-  function renderServerAlerts(targetId, alerts = []){
-  const host = document.getElementById(targetId);
+  const dashboardAlertSources = {
+  ovsynch: [],
+  vaccination: []
+};
+
+const dashboardAlertDismissed = new Set();
+const dashboardAlertSnoozedUntil = new Map();
+let dashboardAlertActiveKey = '';
+
+function dashboardAlertKey(alert = {}){
+  return String(
+    alert.id ||
+    `${alert.type || 'alert'}__${alert.actionUrl || ''}__${alert.message || ''}`
+  );
+}
+
+function dashboardAlertPriority(alert = {}){
+  const level = String(alert.level || 'info').toLowerCase();
+
+  if (level === 'danger' || level === 'error') return 0;
+  if (level === 'warn' || level === 'warning') return 1;
+  return 2;
+}
+
+function refreshDashboardSmartAlert(){
+  const host = document.getElementById('smartAlertHost');
   if (!host) return;
 
+  const now = Date.now();
+
+  const alerts = [
+    ...dashboardAlertSources.ovsynch,
+    ...dashboardAlertSources.vaccination
+  ]
+    .filter(alert => alert?.message)
+    .filter(alert => {
+      const key = dashboardAlertKey(alert);
+      const snoozedUntil = Number(
+        dashboardAlertSnoozedUntil.get(key) || 0
+      );
+
+      return (
+        !dashboardAlertDismissed.has(key) &&
+        snoozedUntil <= now
+      );
+    })
+    .sort(
+      (a, b) =>
+        dashboardAlertPriority(a) -
+        dashboardAlertPriority(b)
+    );
+
+  const alert = alerts[0] || null;
+
+  if (!alert) {
+    dashboardAlertActiveKey = '';
+    host.replaceChildren();
+    return;
+  }
+
+  const key = dashboardAlertKey(alert);
+
+  if (
+    dashboardAlertActiveKey === key &&
+    host.firstElementChild
+  ) {
+    return;
+  }
+
+  dashboardAlertActiveKey = key;
   host.replaceChildren();
 
-  alerts.forEach(alert => {
-    if (!alert?.message) return;
+  const level = String(
+    alert.level || 'info'
+  ).toLowerCase();
 
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.dataset.alertId = String(alert.id || '');
-    card.dataset.alertLevel = String(alert.level || 'info');
+  const modal = document.createElement('section');
+  modal.className = 'mbk-smart-alert';
+  modal.dataset.alertId = key;
+  modal.dataset.alertLevel = level;
+  modal.setAttribute('role', 'alertdialog');
 
-    const title = document.createElement('div');
-    title.className = 'section-title';
-    title.textContent = String(alert.title || 'تنبيه');
+  const titleId = `smartAlertTitle_${Math.abs(
+    Array.from(key).reduce(
+      (acc, ch) =>
+        ((acc * 31) + ch.charCodeAt(0)) | 0,
+      0
+    )
+  )}`;
 
-    const message = document.createElement('div');
+  const messageId = `${titleId}_message`;
 
-    String(alert.message || '')
-      .split(/\r?\n/)
-      .forEach(line => {
-        const row = document.createElement('div');
-        row.textContent = line;
-        message.appendChild(row);
-      });
+  modal.setAttribute('aria-labelledby', titleId);
+  modal.setAttribute('aria-describedby', messageId);
 
-    card.appendChild(title);
-    card.appendChild(message);
+  const head = document.createElement('div');
+  head.className = 'mbk-smart-alert-head';
 
-    if (alert.actionText && alert.actionUrl) {
-      const actions = document.createElement('div');
-      actions.className = 'switch-wrap';
+  const icon = document.createElement('div');
+  icon.className = 'mbk-smart-alert-icon';
+  icon.setAttribute('aria-hidden', 'true');
 
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'type-btn active';
-      button.textContent = String(alert.actionText);
+  icon.textContent =
+    level === 'danger' ||
+    level === 'error' ||
+    level === 'warn' ||
+    level === 'warning'
+      ? '⚠️'
+      : '🔔';
 
-      button.addEventListener('click', () => {
-        location.href = String(alert.actionUrl);
-      });
+  const copy = document.createElement('div');
+  copy.className = 'mbk-smart-alert-copy';
 
-      actions.appendChild(button);
-      card.appendChild(actions);
-    }
+  const title = document.createElement('h2');
+  title.id = titleId;
+  title.className = 'mbk-smart-alert-title';
+  title.textContent = String(
+    alert.title || 'تنبيه'
+  );
 
-    host.appendChild(card);
+  const message = document.createElement('div');
+  message.id = messageId;
+  message.className = 'mbk-smart-alert-message';
+  message.textContent = String(
+    alert.message || ''
+  );
+
+  copy.append(title, message);
+
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'mbk-smart-alert-close';
+  closeButton.setAttribute(
+    'aria-label',
+    'إغلاق التنبيه'
+  );
+  closeButton.textContent = '×';
+
+  closeButton.addEventListener('click', () => {
+    dashboardAlertDismissed.add(key);
+    dashboardAlertActiveKey = '';
+    refreshDashboardSmartAlert();
   });
+
+  head.append(
+    icon,
+    copy,
+    closeButton
+  );
+
+  modal.appendChild(head);
+
+  const actions = document.createElement('div');
+  actions.className = 'mbk-smart-alert-actions';
+
+  if (alert.actionText && alert.actionUrl) {
+    const primaryButton =
+      document.createElement('button');
+
+    primaryButton.type = 'button';
+    primaryButton.className =
+      'mbk-smart-alert-primary';
+
+    primaryButton.textContent = String(
+      alert.actionText
+    );
+
+    primaryButton.addEventListener(
+      'click',
+      () => {
+        location.href = String(
+          alert.actionUrl
+        );
+      }
+    );
+
+    actions.appendChild(primaryButton);
+  }
+
+  const laterButton =
+    document.createElement('button');
+
+  laterButton.type = 'button';
+  laterButton.className =
+    'mbk-smart-alert-later';
+
+ laterButton.textContent = 'لاحقًا';
+
+  laterButton.addEventListener('click', () => {
+    const snoozeMs = 30 * 60 * 1000;
+
+    dashboardAlertSnoozedUntil.set(
+      key,
+      Date.now() + snoozeMs
+    );
+
+    dashboardAlertActiveKey = '';
+    refreshDashboardSmartAlert();
+
+    window.setTimeout(() => {
+      refreshDashboardSmartAlert();
+    }, snoozeMs + 250);
+  });
+
+  actions.appendChild(laterButton);
+  modal.appendChild(actions);
+  host.appendChild(modal);
 }
- async function loadOvsynchDashboardAlerts(){
+
+async function loadOvsynchDashboardAlerts(){
   try {
     if (!currentUserId) return;
 
-    const r = await fetch(API_BASE + '/api/ovsynch/dashboard-alerts', {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Cache-Control': 'no-store'
-      },
-      credentials: 'same-origin',
-      cache: 'no-store'
-    });
+    const r = await fetch(
+      API_BASE +
+        '/api/ovsynch/dashboard-alerts',
+      {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-store'
+        },
+        credentials: 'same-origin',
+        cache: 'no-store'
+      }
+    );
 
-    const data = await r.json().catch(() => null);
-    const alerts = Array.isArray(data?.alerts) ? data.alerts : [];
+    const data = await r
+      .json()
+      .catch(() => null);
 
-    renderServerAlerts('ovsynchAlerts', alerts);
+    dashboardAlertSources.ovsynch =
+      Array.isArray(data?.alerts)
+        ? data.alerts
+        : [];
 
   } catch (e) {
-    console.warn('ovsynch dashboard alerts failed', e);
-    renderServerAlerts('ovsynchAlerts', []);
+    console.warn(
+      'ovsynch dashboard alerts failed',
+      e
+    );
+
+    dashboardAlertSources.ovsynch = [];
   }
+
+  refreshDashboardSmartAlert();
 }
 
 async function loadVaccinationDashboardAlerts(){
   try {
     if (!currentUserId) return;
 
-    const r = await fetch(API_BASE + '/api/vaccination/dashboard-alerts', {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Cache-Control': 'no-store'
-      },
-      credentials: 'same-origin',
-      cache: 'no-store'
-    });
+    const r = await fetch(
+      API_BASE +
+        '/api/vaccination/dashboard-alerts',
+      {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-store'
+        },
+        credentials: 'same-origin',
+        cache: 'no-store'
+      }
+    );
 
-    const data = await r.json().catch(() => null);
-    const alerts = Array.isArray(data?.alerts) ? data.alerts : [];
+    const data = await r
+      .json()
+      .catch(() => null);
 
-    renderServerAlerts('vaccinationAlerts', alerts);
+    dashboardAlertSources.vaccination =
+      Array.isArray(data?.alerts)
+        ? data.alerts
+        : [];
 
   } catch (e) {
-    console.warn('vaccination dashboard alerts failed', e);
-    renderServerAlerts('vaccinationAlerts', []);
+    console.warn(
+      'vaccination dashboard alerts failed',
+      e
+    );
+
+    dashboardAlertSources.vaccination = [];
   }
+
+  refreshDashboardSmartAlert();
 }
   // ============ تشغيل ============
 document.addEventListener('DOMContentLoaded', async () => {
