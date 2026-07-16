@@ -30581,130 +30581,578 @@ app.get("/api/vaccination/dashboard-alerts", requireUserId, async (req, res) => 
       });
     }
 
-        const uid = req.userId;
-
+    const uid = req.userId;
     const today = cairoTodayISO();
     const tomorrow = vaccinationYmdAddDaysSrv(today, 1);
 
-    return res.json({
-      ok: true,
-      today,
-      tomorrow,
-      count: 0,
-      alerts: [],
-      paused: true,
-      message: "تنبيهات التحصين متوقفة مؤقتًا لحين اكتمال برنامج المزرعة وبرنامج مُرَبِّيك العلمي."
-    });
-    const snap = await db.collection("tasks")
-      .where("userId", "==", uid)
-      .where("status", "==", "pending")
-      .limit(500)
-      .get();
+    const programContext =
+      await vaccinationReadProgramContextSrv(uid);
 
-    const groups = new Map();
+    const activeProgramMode =
+      vaccinationProgramModeNormSrv(
+        programContext.programMode
+      );
 
-    snap.forEach(ds => {
-      const t = ds.data() || {};
+    if (
+      programContext.saved !== true ||
+      !activeProgramMode
+    ) {
+      return res.json({
+        ok: true,
+        today,
+        tomorrow,
+        count: 0,
+        alerts: [],
+        paused: false,
+        programContext,
 
-      if (String(t.taskType || "").trim() !== "vaccination") return;
-      if (t.done === true) return;
+        summary: {
+          overdue: 0,
+          due: 0,
+          upcoming: 0,
+          needsData: 0
+        },
 
-      const dueDate = String(t.dueDate || "").trim().slice(0, 10);
-      if (dueDate !== today && dueDate !== tomorrow) return;
-
-      const animalNumber = calvingNormDigitsOnlySrv(t.animalNumber || "");
-      if (!animalNumber) return;
-
-      const vaccineKey = String(
-        t.vaccineKey ||
-        t.vaccine ||
-        "تحصين"
-      ).trim();
-
-      const doseType = String(
-        t.doseType ||
-        "booster"
-      ).trim();
-
-      const key = `${dueDate}__${vaccineKey}__${doseType}`;
-
-      if (!groups.has(key)) {
-        groups.set(key, {
-          dueDate,
-          vaccineKey,
-          doseType,
-          animalNumbers: []
-        });
-      }
-
-      groups.get(key).animalNumbers.push(animalNumber);
-    });
-
-    const alerts = [];
-
-    for (const g of groups.values()) {
-      const nums = [...new Set(g.animalNumbers)]
-        .filter(Boolean)
-        .sort((a, b) => Number(a) - Number(b));
-
-      if (!nums.length) continue;
-
-      const isToday = g.dueDate === today;
-
-      const doseQuery =
-        g.doseType === "booster" ? "periodic" :
-        g.doseType === "primary" ? "prime" :
-        g.doseType;
-
-      alerts.push({
-        id: `vaccination_${g.dueDate}_${g.vaccineKey}_${g.doseType}`.replace(/\s+/g, "_"),
-        source: "server:/api/vaccination/dashboard-alerts",
-
-        type: "vaccination",
-        level: isToday ? "warn" : "info",
-
-        title: isToday ? "تحصين مستحق اليوم" : "تحصين مستحق غدًا",
-
-       message: `${isToday ? "⏰ مستحق اليوم" : "📌 مستحق غدًا"}: ${g.vaccineKey}\nالحيوانات: ${nums.join("، ")}`,
-
-        actionText: "تسجيل التحصين",
-        actionUrl:
-          `vaccination.html?entryMode=bulk` +
-          `&date=${encodeURIComponent(g.dueDate)}` +
-          `&vaccine=${encodeURIComponent(g.vaccineKey)}` +
-          `&doseType=${encodeURIComponent(doseQuery)}` +
-          `&numbers=${encodeURIComponent(nums.join(","))}`,
-
-        dueDate: g.dueDate,
-        vaccineKey: g.vaccineKey,
-        doseType: g.doseType,
-        animalNumbers: nums,
-        count: nums.length
+        message:
+          "اختر برنامج المزرعة أو برنامج مُرَبِّيك لتفعيل تنبيهات التحصين."
       });
     }
 
+    const [
+      pendingSnap,
+      needsDataSnap
+    ] = await Promise.all([
+      db.collection("tasks")
+        .where("userId", "==", uid)
+        .where("status", "==", "pending")
+        .limit(500)
+        .get(),
+
+      db.collection("tasks")
+        .where("userId", "==", uid)
+        .where("status", "==", "needs_data")
+        .limit(500)
+        .get()
+    ]);
+
+    const groups = new Map();
+
+    for (
+      const ds of [
+        ...pendingSnap.docs,
+        ...needsDataSnap.docs
+      ]
+    ) {
+      const t = ds.data() || {};
+
+      if (
+        String(
+          t.taskType || ""
+        ).trim() !== "vaccination" ||
+        String(
+          t.engine || ""
+        ).trim() !==
+          "vaccination_program_v1" ||
+        t.done === true
+      ) {
+        continue;
+      }
+
+      const programMode =
+        vaccinationProgramModeNormSrv(
+          t.programMode
+        );
+
+      if (
+        programMode !==
+        activeProgramMode
+      ) {
+        continue;
+      }
+
+      const taskStatus =
+        String(t.status || "")
+          .trim()
+          .toLowerCase();
+
+      const dueDate =
+        String(t.dueDate || "")
+          .trim()
+          .slice(0, 10);
+
+      const alertFromDate =
+        String(
+          t.alertFromDate ||
+          dueDate
+        )
+          .trim()
+          .slice(0, 10);
+
+      const windowEnd =
+        String(
+          t.windowEnd ||
+          dueDate
+        )
+          .trim()
+          .slice(0, 10);
+
+      let alertStatus = "";
+
+      if (
+        taskStatus === "needs_data"
+      ) {
+        alertStatus = "needs_data";
+
+      } else if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          dueDate
+        )
+      ) {
+        continue;
+
+      } else if (
+        /^\d{4}-\d{2}-\d{2}$/.test(
+          windowEnd
+        ) &&
+        today > windowEnd
+      ) {
+        alertStatus = "overdue";
+
+      } else if (
+        today >= dueDate
+      ) {
+        alertStatus = "due";
+
+      } else if (
+        /^\d{4}-\d{2}-\d{2}$/.test(
+          alertFromDate
+        ) &&
+        today >= alertFromDate
+      ) {
+        alertStatus = "upcoming";
+
+      } else {
+        continue;
+      }
+
+      const animalNumber =
+        calvingNormDigitsOnlySrv(
+          t.animalNumber || ""
+        );
+
+      if (!animalNumber) continue;
+
+      const programRowId =
+        String(
+          t.programRowId || ""
+        ).trim();
+
+      const vaccineCode =
+        String(
+          t.vaccineCode ||
+          t.vaccineKey ||
+          ""
+        ).trim();
+
+      const vaccine =
+        String(
+          t.vaccine ||
+          vaccineCode ||
+          "تحصين"
+        ).trim();
+
+      const doseType =
+        String(
+          t.doseType || ""
+        ).trim();
+
+      const attentionCode =
+        String(
+          t.attentionCode || ""
+        ).trim();
+
+      const key = [
+        alertStatus,
+        programMode,
+        programRowId,
+        vaccineCode,
+        doseType,
+        dueDate,
+        attentionCode
+      ].join("__");
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          alertStatus,
+          programMode,
+
+          programLabel:
+            String(
+              t.programLabel ||
+              programContext
+                .programLabel ||
+              ""
+            ).trim(),
+
+          programRowId,
+          vaccineCode,
+          vaccine,
+          doseType,
+
+          doseTypeLabel:
+            String(
+              t.doseTypeLabel || ""
+            ).trim(),
+
+          dueDate,
+          alertFromDate,
+          windowEnd,
+          attentionCode,
+
+          attentionMessage:
+            String(
+              t.attentionMessage || ""
+            ).trim(),
+
+          requiredField:
+            String(
+              t.requiredField || ""
+            ).trim(),
+
+          animalNumbers: [],
+          taskIds: []
+        });
+      }
+
+      groups
+        .get(key)
+        .animalNumbers
+        .push(animalNumber);
+
+      groups
+        .get(key)
+        .taskIds
+        .push(ds.id);
+    }
+
+    const alerts = [];
+
+    const summary = {
+      overdue: 0,
+      due: 0,
+      upcoming: 0,
+      needsData: 0
+    };
+
+    for (
+      const g of groups.values()
+    ) {
+      const nums = [
+        ...new Set(
+          g.animalNumbers
+        )
+      ]
+        .filter(Boolean)
+        .sort(
+          (a, b) =>
+            Number(a) - Number(b)
+        );
+
+      if (!nums.length) continue;
+
+      let level = "info";
+      let title =
+        "تنبيه تحصين";
+      let message = "";
+      let actionText =
+        "فتح صفحة التحصين";
+      let actionUrl =
+        "vaccination.html";
+
+      if (
+        g.alertStatus === "overdue"
+      ) {
+        const lateDays =
+          Math.max(
+            1,
+            diffDaysISO(
+              g.windowEnd ||
+              g.dueDate,
+              today
+            )
+          );
+
+        level = "warn";
+        title =
+          "تحصين متأخر";
+
+        message =
+          `🚨 تحصين متأخر: ${g.vaccine}\n` +
+          `تجاوز نافذة التنفيذ منذ ${lateDays} يومًا.\n` +
+          `الحيوانات: ${nums.join("، ")}`;
+
+        actionText =
+          "تسجيل التحصين الآن";
+
+      } else if (
+        g.alertStatus === "due"
+      ) {
+        const isToday =
+          g.dueDate === today;
+
+        level = "warn";
+
+        title = isToday
+          ? "تحصين مستحق اليوم"
+          : "تحصين داخل نافذة التنفيذ";
+
+        message = isToday
+          ? (
+              `⏰ مستحق اليوم: ${g.vaccine}\n` +
+              `الحيوانات: ${nums.join("، ")}`
+            )
+          : (
+              `⏰ داخل نافذة التنفيذ: ${g.vaccine}\n` +
+              `الموعد الأصلي: ${g.dueDate}\n` +
+              `آخر يوم في النافذة: ${g.windowEnd}\n` +
+              `الحيوانات: ${nums.join("، ")}`
+            );
+
+        actionText =
+          "تسجيل التحصين";
+
+      } else if (
+        g.alertStatus ===
+          "upcoming"
+      ) {
+        const daysUntil =
+          Math.max(
+            1,
+            diffDaysISO(
+              today,
+              g.dueDate
+            )
+          );
+
+        title =
+          "موعد تحصين قادم";
+
+        message =
+          `📌 موعد تحصين قادم بعد ${daysUntil} يومًا: ${g.vaccine}\n` +
+          `الموعد: ${g.dueDate}\n` +
+          `الحيوانات: ${nums.join("، ")}`;
+
+        actionText =
+          "مراجعة برنامج التحصينات";
+
+      } else {
+        level = "warn";
+
+        title =
+          "بيانات مطلوبة لحساب التحصين";
+
+        message =
+          `⚠️ لا يمكن حساب الموعد التالي لـ ${g.vaccine}.\n` +
+          `${g.attentionMessage || "راجع بيانات البرنامج والحيوان."}\n` +
+          `الحيوانات: ${nums.join("، ")}`;
+
+        actionText =
+          "مراجعة بيانات التحصين";
+      }
+
+    if (
+  (
+    g.alertStatus === "due" ||
+    g.alertStatus ===
+      "overdue"
+  ) &&
+  g.programRowId
+) {
+  const executionQuery =
+    `&date=${encodeURIComponent(today)}` +
+    `&vaccine=${encodeURIComponent(g.programRowId)}` +
+    `&doseType=${encodeURIComponent(g.doseType)}`;
+
+  if (nums.length === 1) {
+    actionUrl =
+      `vaccination.html?number=${encodeURIComponent(nums[0])}` +
+      executionQuery;
+  } else {
+    actionUrl =
+      `vaccination.html?entryMode=bulk` +
+      executionQuery +
+      `&numbers=${encodeURIComponent(nums.join(","))}`;
+  }
+}
+      const id = [
+        "vaccination",
+        g.alertStatus,
+        g.programMode,
+
+        g.programRowId ||
+        g.vaccineCode ||
+        "row",
+
+        g.dueDate ||
+        g.attentionCode ||
+        "attention",
+
+        g.doseType ||
+        "dose"
+      ]
+        .join("__")
+        .replace(
+          /[^\p{L}\p{N}_-]+/gu,
+          "_"
+        );
+
+      const summaryKey =
+        g.alertStatus ===
+          "needs_data"
+          ? "needsData"
+          : g.alertStatus;
+
+      summary[summaryKey] +=
+        nums.length;
+
+      alerts.push({
+        id,
+
+        source:
+          "server:/api/vaccination/dashboard-alerts",
+
+        type: "vaccination",
+        level,
+        status:
+          g.alertStatus,
+
+        title,
+        message,
+        actionText,
+        actionUrl,
+
+        dueDate:
+          g.dueDate,
+
+        alertFromDate:
+          g.alertFromDate,
+
+        windowEnd:
+          g.windowEnd,
+
+        programMode:
+          g.programMode,
+
+        programLabel:
+          g.programLabel,
+
+        programRowId:
+          g.programRowId,
+
+        vaccineCode:
+          g.vaccineCode,
+
+        vaccine:
+          g.vaccine,
+
+        vaccineKey:
+          g.vaccineCode ||
+          g.vaccine,
+
+        doseType:
+          g.doseType,
+
+        doseTypeLabel:
+          g.doseTypeLabel,
+
+        attentionCode:
+          g.attentionCode,
+
+        attentionMessage:
+          g.attentionMessage,
+
+        requiredField:
+          g.requiredField,
+
+        animalNumbers: nums,
+
+        taskIds: [
+          ...new Set(g.taskIds)
+        ],
+
+        count:
+          nums.length
+      });
+    }
+
+    const statusRank = {
+      overdue: 0,
+      needs_data: 1,
+      due: 2,
+      upcoming: 3
+    };
+
     alerts.sort((a, b) => {
-      const d = String(a.dueDate || "").localeCompare(String(b.dueDate || ""));
-      if (d !== 0) return d;
-      return String(a.vaccineKey || "").localeCompare(String(b.vaccineKey || ""));
+      const rank =
+        Number(
+          statusRank[a.status] ?? 99
+        ) -
+        Number(
+          statusRank[b.status] ?? 99
+        );
+
+      if (rank !== 0) {
+        return rank;
+      }
+
+      const dateCompare =
+        String(
+          a.dueDate || ""
+        ).localeCompare(
+          String(
+            b.dueDate || ""
+          )
+        );
+
+      if (dateCompare !== 0) {
+        return dateCompare;
+      }
+
+      return String(
+        a.vaccine || ""
+      ).localeCompare(
+        String(
+          b.vaccine || ""
+        )
+      );
     });
 
     return res.json({
       ok: true,
       today,
       tomorrow,
-      count: alerts.length,
-      alerts
+
+      count:
+        alerts.length,
+
+      alerts,
+
+      paused: false,
+      programContext,
+      summary
     });
 
   } catch (e) {
-    console.error("vaccination-dashboard-alerts", e);
+    console.error(
+      "vaccination-dashboard-alerts",
+      e
+    );
 
     return res.status(500).json({
       ok: false,
       count: 0,
       alerts: [],
-     message: "❌ تعذّر تحميل تنبيهات التحصين الآن. حاول مرة أخرى."
+      message: "❌ تعذّر تحميل تنبيهات التحصين الآن. حاول مرة أخرى."
     });
   }
 });
