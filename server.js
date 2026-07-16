@@ -23662,9 +23662,42 @@ async function vaccinationResolveProgramRowSrv({
           .filter(Boolean)
       : [];
 
+  const doseTypeOption =
+    vaccinationFarmProgramOptionsSrv()
+      .doseTypes
+      .find(item =>
+        String(item?.value || "").trim() ===
+        requestedDoseType
+      ) ||
+    null;
+
+  if (!requestedDoseType) {
+    return {
+      ok: false,
+      linked: false,
+      error:
+        "vaccination_program_dose_required",
+
+      message:
+        "❌ اختر نوع الجرعة المطلوب تسجيلها."
+    };
+  }
+
+  if (!doseTypeOption) {
+    return {
+      ok: false,
+      linked: false,
+      error:
+        "vaccination_program_dose_invalid",
+
+      message:
+        "❌ اختر نوع الجرعة من القائمة المعتمدة."
+    };
+  }
+
   if (
+    programMode !== "farm" &&
     fixedDoseType &&
-    requestedDoseType &&
     requestedDoseType !== fixedDoseType
   ) {
     return {
@@ -23679,23 +23712,7 @@ async function vaccinationResolveProgramRowSrv({
   }
 
   if (
-    !fixedDoseType &&
-    allowedDoseTypes.length &&
-    !requestedDoseType
-  ) {
-    return {
-      ok: false,
-      linked: false,
-      error:
-        "vaccination_program_dose_required",
-
-      message:
-        "❌ اختر نوع الجرعة المطلوب تسجيلها."
-    };
-  }
-
-  if (
-    requestedDoseType &&
+    programMode !== "farm" &&
     allowedDoseTypes.length &&
     !allowedDoseTypes.includes(
       requestedDoseType
@@ -23713,28 +23730,25 @@ async function vaccinationResolveProgramRowSrv({
   }
 
   const resolvedDoseType =
-    fixedDoseType ||
     requestedDoseType;
 
   const doseTypeLabel =
     String(
-      row.doseTypeLabel || ""
-    ).trim() ||
-    String(
-      row.doseSchedule?.find(
-        step =>
-          step.doseType ===
-          resolvedDoseType
-      )?.doseTypeLabel || ""
+      doseTypeOption.label || ""
     ).trim();
-
   return {
     ok: true,
     linked: true,
     programMode,
 
     ...row,
+         programDoseType:
+      fixedDoseType,
 
+    programDoseTypeLabel:
+      String(
+        row.doseTypeLabel || ""
+      ).trim(),
     doseType:
       resolvedDoseType,
 
@@ -24771,14 +24785,30 @@ function vaccinationProgramNextTaskSrv({
       programLink.repeatUnit || ""
     ).trim()
   ) {
-    nextStep = {
+       nextStep = {
       doseType:
+        (
+          programLink.programMode === "farm"
+            ? String(
+                programLink.programDoseType ||
+                ""
+              ).trim()
+            : ""
+        ) ||
         currentDoseType ||
         String(
           programLink.doseType || ""
         ).trim(),
 
       doseTypeLabel:
+        (
+          programLink.programMode === "farm"
+            ? String(
+                programLink.programDoseTypeLabel ||
+                ""
+              ).trim()
+            : ""
+        ) ||
         String(
           programLink.doseTypeLabel || ""
         ).trim(),
