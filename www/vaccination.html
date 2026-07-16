@@ -2316,19 +2316,25 @@ const numberFromUrl =
     await loadVaccinationOptions();
     await loadFarmProgram();
 
-    if (vaccineEl && vaccine) {
-      const found = [...vaccineEl.options].some(o => o.value === vaccine);
-      if (found) vaccineEl.value = vaccine;
-    }
+   if (vaccineEl && vaccine) {
+  const found = [...vaccineEl.options].some(
+    option => option.value === vaccine
+  );
 
-       if (
-      doseTypeEl &&
-      [...doseTypeEl.options].some(
-        option => option.value === doseType
-      )
-    ) {
-      doseTypeEl.value = doseType;
-    }
+  if (found) {
+    vaccineEl.value = vaccine;
+    syncExecutionProgramSelection();
+  }
+}
+
+if (
+  doseTypeEl &&
+  [...doseTypeEl.options].some(
+    option => option.value === doseType
+  )
+) {
+  doseTypeEl.value = doseType;
+}
     if (numbersFromUrl) {
       for (const n of parseNumbers(numbersFromUrl)) {
         bulkSelected.add(n);
