@@ -20,7 +20,13 @@
     <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
   </div>
 </header>
+
 <div class="page">
+  <div id="serverAlertsBar" aria-live="polite">
+    <div id="ovsynchAlerts"></div>
+    <div id="vaccinationAlerts"></div>
+  </div>
+
 <!-- شريط THI أعلى الصفحة -->
 <div id="thiBar" class="card">
   <div>
@@ -1207,78 +1213,104 @@ function renderMiniGauge(id, percent){
   el.style.color = gaugeColor;
   el.textContent = gaugeDisplayValue(id, n);
 }
-  async function loadOvsynchDashboardAlerts(){
-  try{
+  function renderServerAlerts(targetId, alerts = []){
+  const host = document.getElementById(targetId);
+  if (!host) return;
+
+  host.replaceChildren();
+
+  alerts.forEach(alert => {
+    if (!alert?.message) return;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.alertId = String(alert.id || '');
+    card.dataset.alertLevel = String(alert.level || 'info');
+
+    const title = document.createElement('div');
+    title.className = 'section-title';
+    title.textContent = String(alert.title || 'تنبيه');
+
+    const message = document.createElement('div');
+
+    String(alert.message || '')
+      .split(/\r?\n/)
+      .forEach(line => {
+        const row = document.createElement('div');
+        row.textContent = line;
+        message.appendChild(row);
+      });
+
+    card.appendChild(title);
+    card.appendChild(message);
+
+    if (alert.actionText && alert.actionUrl) {
+      const actions = document.createElement('div');
+      actions.className = 'switch-wrap';
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'type-btn active';
+      button.textContent = String(alert.actionText);
+
+      button.addEventListener('click', () => {
+        location.href = String(alert.actionUrl);
+      });
+
+      actions.appendChild(button);
+      card.appendChild(actions);
+    }
+
+    host.appendChild(card);
+  });
+}
+ async function loadOvsynchDashboardAlerts(){
+  try {
     if (!currentUserId) return;
 
-const r = await fetch(API_BASE + '/api/ovsynch/dashboard-alerts', {
-  method: 'GET',
-  headers: {
-    'Accept': 'application/json',
-    'Cache-Control': 'no-store'
-  },
-  credentials: 'same-origin',
-  cache: 'no-store'
-});
+    const r = await fetch(API_BASE + '/api/ovsynch/dashboard-alerts', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Cache-Control': 'no-store'
+      },
+      credentials: 'same-origin',
+      cache: 'no-store'
+    });
 
     const data = await r.json().catch(() => null);
     const alerts = Array.isArray(data?.alerts) ? data.alerts : [];
-    if (!alerts.length) return;
 
-    alerts.forEach(a => {
-      if (!a?.message) return;
+    renderServerAlerts('ovsynchAlerts', alerts);
 
-      window.mbk?.alertsUI?.show?.({
-        ruleId: 'ovsynch_dashboard_step',
-        severity: a.level === 'warn' ? 'warn' : 'info',
-        title: a.title || 'تنبيه بروتوكول التزامن',
-        message: a.message,
-        actionText: a.actionText || 'فتح صفحة التزامن',
-        actionUrl: a.actionUrl || 'ovysynch.html',
-        animalNumbers: a.animalNumbers || [],
-        count: a.count || 0
-      });
-    });
-
-  }catch(e){
+  } catch (e) {
     console.warn('ovsynch dashboard alerts failed', e);
+    renderServerAlerts('ovsynchAlerts', []);
   }
 }
-  async function loadVaccinationDashboardAlerts(){
-  try{
+
+async function loadVaccinationDashboardAlerts(){
+  try {
     if (!currentUserId) return;
 
-const r = await fetch(API_BASE + '/api/vaccination/dashboard-alerts', {
-  method: 'GET',
-  headers: {
-    'Accept': 'application/json',
-    'Cache-Control': 'no-store'
-  },
-  credentials: 'same-origin',
-  cache: 'no-store'
-});
+    const r = await fetch(API_BASE + '/api/vaccination/dashboard-alerts', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Cache-Control': 'no-store'
+      },
+      credentials: 'same-origin',
+      cache: 'no-store'
+    });
 
     const data = await r.json().catch(() => null);
     const alerts = Array.isArray(data?.alerts) ? data.alerts : [];
-    if (!alerts.length) return;
 
-    alerts.forEach(a => {
-      if (!a?.message) return;
+    renderServerAlerts('vaccinationAlerts', alerts);
 
-      window.mbk?.alertsUI?.show?.({
-        ruleId: `${a.id || 'vaccination_dashboard_alert'}__${(a.animalNumbers || []).join('_')}__${a.count || 0}`,
-        severity: a.level === 'warn' ? 'warn' : 'info',
-        title: a.title || 'تنبيه تحصين',
-        message: a.message,
-        actionText: a.actionText || 'فتح صفحة التحصين',
-        actionUrl: a.actionUrl || 'vaccination.html',
-        animalNumbers: a.animalNumbers || [],
-        count: a.count || 0
-      });
-    });
-
-  }catch(e){
+  } catch (e) {
     console.warn('vaccination dashboard alerts failed', e);
+    renderServerAlerts('vaccinationAlerts', []);
   }
 }
   // ============ تشغيل ============
