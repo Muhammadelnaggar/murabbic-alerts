@@ -6175,6 +6175,28 @@ body > header{
   }
 }
 /* =========================================================
+   Murabbik Vaccination Bulk Numbers — Inline
+   عرض أرقام التحصين الجماعي في سطر مدمج
+   ========================================================= */
+
+#bulkList.mbk-vax-bulk-inline{
+  display:block;
+  margin-top:8px;
+  padding:9px 12px;
+  border:1px solid #dce8df;
+  border-radius:12px;
+  background:#f8fcf9;
+  color:#334155;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.8;
+  text-align:center;
+  direction:ltr;
+  unicode-bidi:plaintext;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+/* =========================================================
    Murabbik Vaccination Farm Program — Compact
    جدول برنامج تحصينات المزرعة — صفحة التحصين فقط
    ========================================================= */
