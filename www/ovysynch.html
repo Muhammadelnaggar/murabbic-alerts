@@ -229,10 +229,49 @@ function showInfoMessage(msg, cls = "ok"){
     scheduleGatePreview();
   }
 
-  const qp = new URLSearchParams(location.search);
-  const stepParam = (qp.get("step") || qp.get("stepIndex") || "").trim();
-  const STEP_MODE = !!stepParam;
-  const STEP_INDEX = STEP_MODE ? Math.max(0, parseInt(stepParam, 10) || 0) : -1;
+ const qp =
+  new URLSearchParams(
+    location.search
+  );
+
+const stepParam =
+  String(
+    qp.get("step") ||
+    qp.get("stepIndex") ||
+    ""
+  ).trim();
+
+const STEP_MODE =
+  Boolean(stepParam);
+
+const STEP_INDEX =
+  STEP_MODE
+    ? Math.max(
+        0,
+        parseInt(stepParam, 10) || 0
+      )
+    : -1;
+
+const STEP_DUE_DATE =
+  String(
+    qp.get("dueDate") ||
+    qp.get("date") ||
+    ""
+  ).trim().slice(0, 10);
+
+const STEP_PROGRAM =
+  String(
+    qp.get("program") ||
+    qp.get("protocolProgram") ||
+    ""
+  ).trim();
+
+const STEP_PROTOCOL_START_DATE =
+  String(
+    qp.get("protocolStartDate") ||
+    qp.get("startDate") ||
+    ""
+  ).trim().slice(0, 10);
 
   const PROGRAMS = {
     ovsynch: [
@@ -386,12 +425,41 @@ showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
     openCowCard.textContent = "رجوع للداشبورد";
 
     try {
-      const due = todayISO();
+      const params =
+  new URLSearchParams();
 
-      const data = await mbkApi(
-        `/api/ovsynch/step-targets?stepIndex=${encodeURIComponent(STEP_INDEX)}&dueDate=${encodeURIComponent(due)}`,
-        { method: "GET" }
-      );
+params.set(
+  "stepIndex",
+  String(STEP_INDEX)
+);
+
+if (STEP_DUE_DATE) {
+  params.set(
+    "dueDate",
+    STEP_DUE_DATE
+  );
+}
+
+if (STEP_PROGRAM) {
+  params.set(
+    "program",
+    STEP_PROGRAM
+  );
+}
+
+if (STEP_PROTOCOL_START_DATE) {
+  params.set(
+    "protocolStartDate",
+    STEP_PROTOCOL_START_DATE
+  );
+}
+
+const data = await mbkApi(
+  `/api/ovsynch/step-targets?${params.toString()}`,
+  {
+    method: "GET"
+  }
+);
 
       const nums = Array.isArray(data.animalNumbers) ? data.animalNumbers : [];
 
@@ -460,8 +528,19 @@ showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
     }
 
     const st = stepsState[STEP_INDEX] || {};
-    const program = (programEl.value || "").trim();
-    const startISO = (startDateEl.value || "").trim() || todayISO();
+    const program =
+  String(
+    programEl.value ||
+    STEP_PROGRAM ||
+    ""
+  ).trim();
+
+const startISO =
+  String(
+    startDateEl.value ||
+    STEP_PROTOCOL_START_DATE ||
+    ""
+  ).trim();
 
     try {
       const data = await mbkApi("/api/ovsynch/confirm-step", {
@@ -472,7 +551,6 @@ showInfoMessage(data.message || "", data.allowed ? "ok" : "err");
           program,
           protocolProgram: program,
           protocolStartDate: startISO,
-          date: todayISO(),
           stepIndex: STEP_INDEX,
           stepDay: Number(st.day ?? 0),
           stepName: String(st.name || "")
