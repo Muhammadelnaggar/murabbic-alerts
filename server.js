@@ -1114,19 +1114,62 @@ app.post("/api/farm-location/save", requireUserId, async (req, res) => {
        message: "❌ تعذّر قراءة موقع المزرعة. فعّل تحديد الموقع ثم حاول مرة أخرى."
       });
     }
+    const farmWeatherContext =
+  await weatherFetchThiForCoordsSrv({
+    lat,
+    lon,
+    label: "موقع المزرعة",
+    source: "mobile_gps"
+  });
 
+const farmTimeZone =
+  String(
+    farmWeatherContext?.timeZone || ""
+  ).trim();
+
+const farmUtcOffsetSeconds =
+  Number(
+    farmWeatherContext?.utcOffsetSeconds
+  );
     const now = admin.firestore.FieldValue.serverTimestamp();
 
     const patch = {
       farmLat: lat,
-      farmLon: lon,
-      farmLocation: {
-        lat,
-        lon,
-        accuracy,
-        source: "mobile_gps",
-        updatedAt: now
-      },
+farmLon: lon,
+
+...(farmTimeZone
+  ? {
+      farmTimeZone
+    }
+  : {}),
+
+...(Number.isFinite(farmUtcOffsetSeconds)
+  ? {
+      farmUtcOffsetSeconds
+    }
+  : {}),
+
+farmLocation: {
+  lat,
+  lon,
+  accuracy,
+
+  ...(farmTimeZone
+    ? {
+        timeZone: farmTimeZone
+      }
+    : {}),
+
+  ...(Number.isFinite(farmUtcOffsetSeconds)
+    ? {
+        utcOffsetSeconds:
+          farmUtcOffsetSeconds
+      }
+    : {}),
+
+  source: "mobile_gps",
+  updatedAt: now
+},
       farmLocationUpdatedAt: now,
       updatedAt: now,
       source: "server:/api/farm-location/save"
@@ -1588,8 +1631,19 @@ async function weatherFetchThiForCoordsSrv(location = {}) {
       source: "open-meteo",
       locationSource: location.source || "farm_location",
       locationLabel: location.label || "موقع المزرعة",
-      lat,
+            lat,
       lon,
+
+      timeZone:
+        String(
+          j?.timezone || ""
+        ).trim(),
+
+      utcOffsetSeconds:
+        Number(
+          j?.utc_offset_seconds || 0
+        ),
+
       updatedAt: new Date().toISOString()
     };
 
@@ -1605,7 +1659,200 @@ async function weatherFetchThiForCoordsSrv(location = {}) {
     return null;
   }
 }
+function farmDateISOInTimeZoneSrv(
+  timeZone = "",
+  date = new Date()
+) {
+  const zone =
+    String(timeZone || "").trim();
 
+  if (!zone) return "";
+
+  try {
+    return new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone: zone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }
+    ).format(date);
+  } catch (_) {
+    return "";
+  }
+}
+
+async function farmTimeContextSrv(
+  profileUid = ""
+) {
+  const uid =
+    String(profileUid || "").trim();
+
+  const utcFallback = {
+    timeZone: "UTC",
+    utcOffsetSeconds: 0,
+    source: "utc_fallback"
+  };
+
+  if (!uid) return utcFallback;
+
+  const profile =
+    await authReadUserProfileBridgeSrv(uid);
+
+  const savedTimeZone =
+    String(
+      profile.farmTimeZone ||
+      profile.farmLocation?.timeZone ||
+      ""
+    ).trim();
+
+  const savedUtcOffsetSeconds =
+    Number(
+      profile.farmUtcOffsetSeconds ??
+      profile.farmLocation?.utcOffsetSeconds
+    );
+
+  if (
+    farmDateISOInTimeZoneSrv(
+      savedTimeZone
+    )
+  ) {
+    return {
+      timeZone: savedTimeZone,
+
+      utcOffsetSeconds:
+        Number.isFinite(
+          savedUtcOffsetSeconds
+        )
+          ? savedUtcOffsetSeconds
+          : null,
+
+      source: "farm_profile"
+    };
+  }
+
+  const location =
+    weatherDirectFarmCoordsSrv(profile);
+
+  if (!location) {
+    return utcFallback;
+  }
+
+  const weather =
+    await weatherFetchThiForCoordsSrv(
+      location
+    );
+
+  const resolvedTimeZone =
+    String(
+      weather?.timeZone || ""
+    ).trim();
+
+  const resolvedUtcOffsetSeconds =
+    Number(
+      weather?.utcOffsetSeconds
+    );
+
+  if (
+    !farmDateISOInTimeZoneSrv(
+      resolvedTimeZone
+    )
+  ) {
+    return utcFallback;
+  }
+
+  if (db) {
+    try {
+      await db
+        .collection("users")
+        .doc(uid)
+        .set(
+          {
+            farmTimeZone:
+              resolvedTimeZone,
+
+            ...(Number.isFinite(
+              resolvedUtcOffsetSeconds
+            )
+              ? {
+                  farmUtcOffsetSeconds:
+                    resolvedUtcOffsetSeconds
+                }
+              : {}),
+
+            farmLocation: {
+              ...(
+                profile.farmLocation &&
+                typeof profile.farmLocation ===
+                  "object"
+                  ? profile.farmLocation
+                  : {}
+              ),
+
+              timeZone:
+                resolvedTimeZone,
+
+              ...(Number.isFinite(
+                resolvedUtcOffsetSeconds
+              )
+                ? {
+                    utcOffsetSeconds:
+                      resolvedUtcOffsetSeconds
+                  }
+                : {})
+            },
+
+            updatedAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp()
+          },
+          {
+            merge: true
+          }
+        );
+    } catch (e) {
+      console.warn(
+        "farm timezone profile save failed:",
+        e.message || e
+      );
+    }
+  }
+
+  return {
+    timeZone:
+      resolvedTimeZone,
+
+    utcOffsetSeconds:
+      Number.isFinite(
+        resolvedUtcOffsetSeconds
+      )
+        ? resolvedUtcOffsetSeconds
+        : null,
+
+    source:
+      "farm_coordinates"
+  };
+}
+
+async function farmTodayISOSrv(
+  profileUid = ""
+) {
+  const context =
+    await farmTimeContextSrv(
+      profileUid
+    );
+
+  return (
+    farmDateISOInTimeZoneSrv(
+      context.timeZone
+    ) ||
+    new Date()
+      .toISOString()
+      .slice(0, 10)
+  );
+}
 async function weatherBuildFarmThiSrv(uid) {
   const location = await weatherResolveFarmLocationSrv(uid);
   if (!location) return null;
@@ -20867,7 +21114,11 @@ app.get("/api/ovsynch/dashboard-alerts", requireUserId, async (req, res) => {
       return String(v || "").replace(/[^\d]/g, "").trim();
     }
 
-    const today = cairoTodayISO();
+   const today =
+  await farmTodayISOSrv(
+    req.authSession?.uid ||
+    req.userId
+  );
     const tomorrow = addDaysISOForOvsynchAlerts(today, 1);
 
     const snap = await db.collection("tasks")
@@ -21031,11 +21282,30 @@ app.get("/api/ovsynch/step-targets", requireUserId, async (req, res) => {
       ) || 0
     );
 
-    const dueDate = String(
-      req.query.dueDate ||
-      req.query.date ||
-      cairoTodayISO()
-    ).trim().slice(0, 10);
+   const farmToday =
+  await farmTodayISOSrv(
+    req.authSession?.uid ||
+    req.userId
+  );
+
+const dueDate = String(
+  req.query.dueDate ||
+  req.query.date ||
+  farmToday
+).trim().slice(0, 10);
+
+const requestedProgram = String(
+  req.query.program ||
+  req.query.protocolProgram ||
+  ""
+).trim();
+
+const requestedProtocolStartDate =
+  String(
+    req.query.protocolStartDate ||
+    req.query.startDate ||
+    ""
+  ).trim().slice(0, 10);
 
     const snap = await db.collection("tasks")
       .where("userId", "==", uid)
@@ -21057,10 +21327,39 @@ app.get("/api/ovsynch/step-targets", requireUserId, async (req, res) => {
           String(t.protocol || "").trim() === "ovsynch"
         );
 
-      if (!isOvsynchTask) return;
-      if (Number(t.stepIndex) !== stepIndex) return;
+     if (!isOvsynchTask) return;
+if (Number(t.stepIndex) !== stepIndex) return;
 
-      const n = calvingNormDigitsOnlySrv(t.animalNumber || "");
+const taskProgram = String(
+  t.program ||
+  t.protocolProgram ||
+  ""
+).trim();
+
+const taskProtocolStartDate =
+  String(
+    t.protocolStartDate || ""
+  ).trim().slice(0, 10);
+
+if (
+  requestedProgram &&
+  taskProgram !== requestedProgram
+) {
+  return;
+}
+
+if (
+  requestedProtocolStartDate &&
+  taskProtocolStartDate !==
+    requestedProtocolStartDate
+) {
+  return;
+}
+
+const n =
+  calvingNormDigitsOnlySrv(
+    t.animalNumber || ""
+  );
       if (!n) return;
 
       nums.push(n);
@@ -21191,12 +21490,18 @@ app.post("/api/ovsynch/confirm-step", requireUserId, async (req, res) => {
       ""
     ).trim().slice(0, 10);
 
-    const eventDate = String(
-      body.confirmedOn ||
-      body.doneDate ||
-      body.date ||
-      cairoTodayISO()
-    ).trim().slice(0, 10);
+    const farmToday =
+  await farmTodayISOSrv(
+    req.authSession?.uid ||
+    req.userId
+  );
+
+const eventDate = String(
+  body.confirmedOn ||
+  body.doneDate ||
+  body.date ||
+  farmToday
+).trim().slice(0, 10);
 
     const stepIndex = Math.max(
       0,
