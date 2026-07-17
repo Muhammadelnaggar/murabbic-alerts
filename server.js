@@ -30917,8 +30917,18 @@ app.get("/api/vaccination/dashboard-alerts", requireUserId, async (req, res) => 
     }
 
     const uid = req.userId;
-    const today = cairoTodayISO();
-    const tomorrow = vaccinationYmdAddDaysSrv(today, 1);
+
+const today =
+  await farmTodayISOSrv(
+    req.authSession?.uid ||
+    req.userId
+  );
+
+const tomorrow =
+  vaccinationYmdAddDaysSrv(
+    today,
+    1
+  );
 
     const programContext =
       await vaccinationReadProgramContextSrv(uid);
