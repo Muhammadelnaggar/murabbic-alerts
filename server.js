@@ -35549,8 +35549,8 @@ const hasOverdue = overdueCount > 0;
         `dry-off.html?number=${encodeURIComponent(animalNumbers.join(","))}`
     },
 
-    snoozeMinutes:
-      MURABBIK_DRY_OFF_SNOOZE_MINUTES
+  snoozeMinutes:
+  MURABBIK_DRY_OFF_SNOOZE_MINUTES
   }];
 }
 
@@ -35787,8 +35787,8 @@ async function murabbikCalvingOverdueAlertSourceSrv(
           `calving.html?number=${encodeURIComponent(animalNumber)}`
       },
 
-      snoozeMinutes:
-        MURABBIK_CALVING_OVERDUE_SNOOZE_MINUTES
+snoozeMinutes:
+  MURABBIK_CALVING_OVERDUE_SNOOZE_MINUTES
     });
   }
 
@@ -35800,28 +35800,84 @@ murabbikSmartAlertRegisterSourceSrv(
   murabbikCalvingOverdueAlertSourceSrv
 );
 // ============================================================
-//       SMART ALERT SOURCE: UTERINE CHECK — DAY 14 / DAY 30
-//       تنبيهات فحص الرحم الأولي والمتابعة بعد الولادة
+//       SMART ALERT SOURCE: UTERINE CHECK — DIM 14 / DIM 30
+//       تنبيهات فحص الرحم حسب أيام الحليب فقط
 // ============================================================
 
 const MURABBIK_UTERINE_CHECK_DAY_14 = 14;
 const MURABBIK_UTERINE_CHECK_DAY_30 = 30;
+const MURABBIK_UTERINE_CHECK_WINDOW_DAYS = 3;
 const MURABBIK_UTERINE_CHECK_SNOOZE_MINUTES = 24 * 60;
 
-function murabbikUterineCheckCurrentCycleDateSrv(
-  value,
-  lastCalvingDate
-) {
-  const date =
-    murabbikCalvingOverdueDateSrv(
-      value
-    );
+function murabbikUterineCheckDimSrv(doc = {}) {
+  const raw = doc.daysInMilk;
+
+  if (
+    raw === null ||
+    raw === undefined ||
+    raw === ""
+  ) {
+    return null;
+  }
+
+  const dim = Number(raw);
 
   return (
-    date &&
-    date >= lastCalvingDate
+    Number.isFinite(dim) &&
+    Number.isInteger(dim) &&
+    dim >= 0
   )
-    ? date
+    ? dim
+    : null;
+}
+
+function murabbikUterineCheckRecordedSrv(
+  doc = {},
+  stage = ""
+) {
+  if (stage === "day14") {
+    return Boolean(
+      murabbikSmartAlertTextSrv(
+        doc.lastUterineCheck14Date
+      ) ||
+      murabbikSmartAlertTextSrv(
+        doc.lastUterineCheck14EventId
+      )
+    );
+  }
+
+  if (stage === "day30") {
+    return Boolean(
+      murabbikSmartAlertTextSrv(
+        doc.lastUterineCheck30Date
+      ) ||
+      murabbikSmartAlertTextSrv(
+        doc.lastUterineCheck30EventId
+      )
+    );
+  }
+
+  return false;
+}
+
+function murabbikUterineCheckCycleKeySrv(doc = {}) {
+  const raw = doc.lactationNumber;
+
+  if (
+    raw === null ||
+    raw === undefined ||
+    raw === ""
+  ) {
+    return "";
+  }
+
+  const lactationNumber = Number(raw);
+
+  return (
+    Number.isInteger(lactationNumber) &&
+    lactationNumber > 0
+  )
+    ? `lactation-${lactationNumber}`
     : "";
 }
 
@@ -35841,15 +35897,17 @@ async function murabbikUterineCheckAlertSourceSrv(
 
     const status =
       murabbikSmartAlertTextSrv(
-        doc.status || "active"
+        doc.status
+      ).toLowerCase();
+
+    const productionStatus =
+      murabbikSmartAlertTextSrv(
+        doc.productionStatus
       ).toLowerCase();
 
     if (!animalNumber) continue;
 
-    if (
-      ["inactive", "archived"]
-        .includes(status)
-    ) {
+    if (status !== "active") {
       continue;
     }
 
@@ -35859,66 +35917,70 @@ async function murabbikUterineCheckAlertSourceSrv(
       continue;
     }
 
-    const lastCalvingDate =
-      murabbikCalvingOverdueDateSrv(
-        doc.lastCalvingDate ||
-        doc.calvingDate ||
-        doc.lastCalving
-      );
-
-    if (!lastCalvingDate) continue;
-
-    const postpartumDays =
-      calvingDaysBetweenSrv(
-        lastCalvingDate,
-        context.today
-      );
-
     if (
-      !Number.isFinite(postpartumDays) ||
-      postpartumDays <
-        MURABBIK_UTERINE_CHECK_DAY_14
+      doc.inMilk === false ||
+      ["dry", "جاف"]
+        .includes(productionStatus)
     ) {
       continue;
     }
 
-    const day14Date =
-      murabbikUterineCheckCurrentCycleDateSrv(
-        doc.lastUterineCheck14Date,
-        lastCalvingDate
+    const daysInMilk =
+      murabbikUterineCheckDimSrv(doc);
+
+    if (daysInMilk === null) continue;
+
+    const day14Window =
+      daysInMilk >=
+        MURABBIK_UTERINE_CHECK_DAY_14 &&
+      daysInMilk <
+        MURABBIK_UTERINE_CHECK_DAY_14 +
+        MURABBIK_UTERINE_CHECK_WINDOW_DAYS;
+
+    const day30Window =
+      daysInMilk >=
+        MURABBIK_UTERINE_CHECK_DAY_30 &&
+      daysInMilk <
+        MURABBIK_UTERINE_CHECK_DAY_30 +
+        MURABBIK_UTERINE_CHECK_WINDOW_DAYS;
+
+    if (!day14Window && !day30Window) {
+      continue;
+    }
+
+    const day14Recorded =
+      murabbikUterineCheckRecordedSrv(
+        doc,
+        "day14"
       );
 
-    const day30Date =
-      murabbikUterineCheckCurrentCycleDateSrv(
-        doc.lastUterineCheck30Date,
-        lastCalvingDate
+    const day30Recorded =
+      murabbikUterineCheckRecordedSrv(
+        doc,
+        "day30"
       );
 
-    const day14Result =
-      day14Date
-        ? murabbikSmartAlertTextSrv(
+    const day14ResultOption =
+      day14Recorded
+        ? uterineCheckResultSrv(
             doc.lastUterineCheck14Result
-          ).toLowerCase()
-        : "";
+          )
+        : null;
 
-    if (
-      postpartumDays <
-      MURABBIK_UTERINE_CHECK_DAY_30
-    ) {
-      if (day14Date) continue;
+    const cycleKey =
+      murabbikUterineCheckCycleKeySrv(doc);
 
-      const dueDate =
-        addDaysToIsoDateSrv(
-          lastCalvingDate,
-          MURABBIK_UTERINE_CHECK_DAY_14
-        );
+    if (!cycleKey) continue;
+
+    if (day14Window) {
+      if (day14Recorded) continue;
 
       alerts.push({
         identityKey:
-          `uterine-check-day14:${animalNumber}`,
+          `uterine-check-day14:${animalNumber}:${cycleKey}`,
 
         revisionKey:
-          `${animalNumber}:${lastCalvingDate}:day14`,
+          `${animalNumber}:${cycleKey}:day14`,
 
         kind: "operational",
         domain: "health",
@@ -35933,26 +35995,26 @@ async function murabbikUterineCheckAlertSourceSrv(
           "فحص الرحم الأولي مستحق",
 
         message:
-          `الحيوان رقم ${animalNumber} وصل إلى ${postpartumDays} يومًا بعد الولادة ولم يُسجّل له الفحص الأولي للرحم.`,
+          `الحيوان رقم ${animalNumber} عند ${daysInMilk} يومًا في الحليب، ولم يُسجّل له فحص الرحم الأولي.`,
 
         details: {
           observation:
-            `آخر ولادة مسجّلة بتاريخ ${lastCalvingDate}، ولم يُسجّل فحص الرحم الأولي حتى الآن.`,
+            `أيام الحليب المسجّلة للحيوان: ${daysInMilk}، ولا يوجد فحص رحم أولي محفوظ.`,
 
           meaning:
-            "الفحص الأولي يساعد على اكتشاف تأخر رجوع الرحم أو الإفرازات غير الطبيعية مبكرًا.",
+            "هذه نافذة التذكير القصيرة للفحص الأولي، ولا تُنشئ التزامًا بعد انتهائها.",
 
           recommendation:
-            "راجع الحيوان وسجّل نتيجة فحص الرحم، أو اختر التذكير لاحقًا إذا لم يكن الفحص مناسبًا الآن.",
+            "سجّل نتيجة الفحص إذا تم، أو اختر التذكير لاحقًا خلال نافذة الأيام الثلاثة.",
 
           evidence: [
             `رقم الحيوان: ${animalNumber}`,
-            `الأيام بعد الولادة: ${postpartumDays}`,
-            `تاريخ آخر ولادة: ${lastCalvingDate}`
+            `أيام الحليب: ${daysInMilk}`,
+            "فحص اليوم 14: غير مسجّل"
           ]
         },
 
-        dueDate,
+        dueDate: context.today,
         affectedCount: 1,
         animalNumbers: [
           animalNumber
@@ -35965,48 +36027,46 @@ async function murabbikUterineCheckAlertSourceSrv(
             `uterine-check.html?number=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(context.today)}`
         },
 
-        snoozeMinutes:
-          MURABBIK_UTERINE_CHECK_SNOOZE_MINUTES
+       snoozeMinutes:
+  daysInMilk === 16
+    ? 3 * 60
+    : MURABBIK_UTERINE_CHECK_SNOOZE_MINUTES
       });
 
       continue;
     }
 
-    if (day30Date) continue;
+    if (day30Recorded) continue;
 
     if (
-      day14Date &&
-      day14Result === "normal"
+      day14Recorded &&
+      !day14ResultOption
     ) {
       continue;
     }
 
-    const day14ResultOption =
-      uterineCheckResultSrv(
-        day14Result
-      );
+    if (
+      day14ResultOption?.value ===
+      "normal"
+    ) {
+      continue;
+    }
 
     const initialMissing =
-      !day14Date;
-
-    const dueDate =
-      addDaysToIsoDateSrv(
-        lastCalvingDate,
-        MURABBIK_UTERINE_CHECK_DAY_30
-      );
+      !day14Recorded;
 
     alerts.push({
       identityKey:
-        `uterine-check-day30:${animalNumber}`,
+        `uterine-check-day30:${animalNumber}:${cycleKey}`,
 
       revisionKey:
-        `${animalNumber}:${lastCalvingDate}:day30`,
+        `${animalNumber}:${cycleKey}:day30`,
 
       kind: "operational",
       domain: "health",
       code: "uterine_check_day_30_followup",
 
-      priority: "high",
+      priority: "normal",
       urgency: "today",
 
       certainty:
@@ -36021,35 +36081,34 @@ async function murabbikUterineCheckAlertSourceSrv(
 
       message:
         initialMissing
-          ? `الحيوان رقم ${animalNumber} وصل إلى ${postpartumDays} يومًا بعد الولادة ولم يُسجّل له فحص اليوم 14؛ لذلك يحتاج فحص متابعة للرحم الآن.`
-          : `الحيوان رقم ${animalNumber} يحتاج فحص متابعة للرحم بعد أن كانت نتيجة الفحص الأولي: ${day14ResultOption?.label || "غير طبيعية"}.`,
+          ? `الحيوان رقم ${animalNumber} عند ${daysInMilk} يومًا في الحليب، ولم يُسجّل له فحص اليوم 14؛ لذلك ظهرت متابعة الرحم خلال نافذتها الحالية.`
+          : `الحيوان رقم ${animalNumber} عند ${daysInMilk} يومًا في الحليب، ونتيجة الفحص الأولي كانت: ${day14ResultOption.label}.`,
 
       details: {
         observation:
           initialMissing
-            ? `لم يُسجّل فحص الرحم الأولي بعد الولادة المسجّلة بتاريخ ${lastCalvingDate}.`
-            : `الفحص الأولي سُجّل بتاريخ ${day14Date} بنتيجة: ${day14ResultOption?.label || "غير طبيعية"}.`,
+            ? "فحص اليوم 14 غير مسجّل، وفحص المتابعة غير مسجّل."
+            : `نتيجة فحص اليوم 14: ${day14ResultOption.label}، وفحص المتابعة غير مسجّل.`,
 
         meaning:
-          initialMissing
-            ? "غياب نتيجة الفحص الأولي يعني أن رجوع الرحم الطبيعي لم يُثبت، لذلك تُعامل الحالة كحالة تحتاج متابعة."
-            : "النتيجة غير الطبيعية في الفحص الأولي تحتاج متابعة لتقييم التحسن أو استمرار المشكلة.",
+          "هذا تذكير قصير لفحص المتابعة، وينتهي تلقائيًا بعد نافذة الأيام الثلاثة.",
 
         recommendation:
-          "راجع الحيوان وسجّل فحص المتابعة، أو اختر التذكير لاحقًا حسب ظروف العمل.",
+          "سجّل فحص المتابعة إذا تم، أو اختر التذكير لاحقًا خلال النافذة الحالية.",
 
         evidence: [
           `رقم الحيوان: ${animalNumber}`,
-          `الأيام بعد الولادة: ${postpartumDays}`,
-          `تاريخ آخر ولادة: ${lastCalvingDate}`,
+          `أيام الحليب: ${daysInMilk}`,
 
           initialMissing
             ? "فحص اليوم 14: غير مسجّل"
-            : `فحص اليوم 14: ${day14ResultOption?.label || day14Result}`
+            : `فحص اليوم 14: ${day14ResultOption.label}`,
+
+          "فحص اليوم 30: غير مسجّل"
         ]
       },
 
-      dueDate,
+      dueDate: context.today,
       affectedCount: 1,
       animalNumbers: [
         animalNumber
@@ -36062,8 +36121,10 @@ async function murabbikUterineCheckAlertSourceSrv(
           `uterine-check.html?number=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(context.today)}`
       },
 
-      snoozeMinutes:
-        MURABBIK_UTERINE_CHECK_SNOOZE_MINUTES
+     snoozeMinutes:
+  daysInMilk === 32
+    ? 3 * 60
+    : MURABBIK_UTERINE_CHECK_SNOOZE_MINUTES
     });
   }
 
