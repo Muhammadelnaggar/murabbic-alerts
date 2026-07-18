@@ -32458,16 +32458,52 @@ function dryOffIsBlockedSrv(doc = {}) {
   );
 }
 
+function dryOffSpeciesKeySrv(doc = {}) {
+  const species = calvingNormalizeSpeciesSrv(
+    doc.species ||
+    doc.animalTypeAr ||
+    doc.animalType ||
+    doc.animaltype ||
+    doc.type ||
+    ""
+  );
+
+  return species === "جاموس"
+    ? "buffalo"
+    : "cow";
+}
+
 function dryOffReasonFromDaysSrv({ doc = {}, gestationDays }) {
   if (dryOffIsBlockedSrv(doc)) {
     return "تجفيف للبيع";
   }
 
   const g = Number(gestationDays);
-  const months = g / 30;
 
-  if (months >= 6.5 && months <= 7.5) return "تجفيف طبيعي";
-  if (months < 6.5) return "تجفيف اضطراري";
+  if (!Number.isFinite(g) || g < 0) {
+    return "";
+  }
+
+  const speciesKey = dryOffSpeciesKeySrv(doc);
+
+  const naturalStart =
+    speciesKey === "buffalo"
+      ? 228
+      : 198;
+
+  const naturalEnd =
+    speciesKey === "buffalo"
+      ? 258
+      : 228;
+
+  if (g < naturalStart) {
+    return "تجفيف اضطراري";
+  }
+
+  if (g <= naturalEnd) {
+    return "تجفيف طبيعي";
+  }
+
   return "تجفيف متأخر";
 }
 
@@ -32531,20 +32567,6 @@ function dryOffGateEligibilitySrv(fd = {}) {
 
   if (!Number.isFinite(g) || g < 0) {
     return "❌ تعذّر حساب أيام الحمل. راجع تاريخ التجفيف وآخر تلقيح.";
-  }
-
-  const reason = String(fd.reason || "").trim();
-
-  if (g < 198 && reason !== "تجفيف اضطراري") {
-    return "❌ سبب التجفيف المناسب لهذا العمر من الحمل هو «تجفيف اضطراري».";
-  }
-
-  if (g >= 198 && g <= 228 && reason !== "تجفيف طبيعي") {
-    return "❌ سبب التجفيف المناسب لهذا العمر من الحمل هو «تجفيف طبيعي».";
-  }
-
-  if (g > 228 && reason !== "تجفيف متأخر") {
-    return "❌ سبب التجفيف المناسب لهذا العمر من الحمل هو «تجفيف متأخر».";
   }
 
   return null;
