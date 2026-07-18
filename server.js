@@ -11,6 +11,7 @@ const { analyzeRation } = require('./server/ration-engine.js');
 const EVENT_SYNONYMS = {
   insemination: ['insemination', 'تلقيح'],
   pregnancy_diagnosis: ['pregnancy diagnosis', 'pregnancy_diagnosis', 'تشخيص حمل', 'سونار', 'جس'],
+  uterine_check: ['uterine check', 'uterine_check', 'فحص الرحم'],
   calving: ['calving', 'birth', 'ولادة'],
   dry_off: ['dry_off', 'dry-off', 'تجفيف', 'dry', 'جاف'],
   close_up: ['close-up', 'close_up', 'تحضير ولادة', 'تحضير'],
@@ -17091,6 +17092,629 @@ message: isConfirmation120
   }
 });
 // ============================================================
+//                 API: UTERINE CHECK — OPTIONS/GATE/SAVE
+// ============================================================
+
+const UTERINE_CHECK_STAGES_SRV = Object.freeze([
+  {
+    value: "day_14_initial",
+    label: "الفحص الأولي — 14 يومًا بعد الولادة",
+    dueDay: 14
+  },
+  {
+    value: "day_30_followup",
+    label: "فحص المتابعة — 30 يومًا بعد الولادة",
+    dueDay: 30
+  }
+]);
+
+const UTERINE_CHECK_RESULTS_SRV = Object.freeze([
+  {
+    value: "normal",
+    label: "الرحم طبيعي"
+  },
+  {
+    value: "delayed_involution",
+    label: "تأخر ارتداد الرحم"
+  },
+  {
+    value: "abnormal_discharge",
+    label: "إفرازات رحمية غير طبيعية"
+  },
+  {
+    value: "suspected_endometritis",
+    label: "التهاب رحم أو بطانة رحم مشتبه"
+  },
+  {
+    value: "confirmed_endometritis",
+    label: "التهاب رحم أو بطانة رحم مؤكد"
+  },
+  {
+    value: "needs_recheck",
+    label: "يحتاج إعادة فحص"
+  }
+]);
+
+function uterineCheckOptionsSrv() {
+  return {
+    stages: UTERINE_CHECK_STAGES_SRV,
+    results: UTERINE_CHECK_RESULTS_SRV
+  };
+}
+
+function uterineCheckBodySrv(body = {}) {
+  return {
+    animalNumber: calvingNormDigitsOnlySrv(
+      body.animalNumber ||
+      body.number ||
+      ""
+    ),
+
+    eventDate: String(
+      body.eventDate ||
+      body.date ||
+      ""
+    ).trim().slice(0, 10),
+
+    checkStage: String(
+      body.checkStage ||
+      body.stage ||
+      ""
+    ).trim(),
+
+    result: String(
+      body.result ||
+      body.uterineResult ||
+      ""
+    ).trim(),
+
+    vet: String(
+      body.vet ||
+      body.examiner ||
+      ""
+    ).trim(),
+
+    notes: String(
+      body.notes ||
+      ""
+    ).trim()
+  };
+}
+
+function uterineCheckStageSrv(value) {
+  return UTERINE_CHECK_STAGES_SRV.find(
+    item => item.value === value
+  ) || null;
+}
+
+function uterineCheckResultSrv(value) {
+  return UTERINE_CHECK_RESULTS_SRV.find(
+    item => item.value === value
+  ) || null;
+}
+
+function uterineCheckIsFollowerSrv(animal = {}) {
+  const entryType = String(
+    animal.entryType || ""
+  ).trim().toLowerCase();
+
+  return [
+    "followers",
+    "follower",
+    "calf",
+    "calves"
+  ].includes(entryType);
+}
+
+async function uterineCheckContextSrv(req, fd) {
+  const uid = req.userId;
+
+  if (!calvingIsDateSrv(fd.eventDate)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "invalid_date",
+      message: "❌ أدخل تاريخ فحص رحم صحيحًا."
+    };
+  }
+
+  const today = await farmTodayISOSrv(
+    req.authSession?.uid ||
+    uid
+  );
+
+  if (fd.eventDate > today) {
+    return {
+      ok: false,
+      status: 400,
+      error: "future_date",
+      message:
+        "❌ تاريخ فحص الرحم لا يمكن أن يكون في المستقبل."
+    };
+  }
+
+  const animal =
+    await fetchAnimalByNumberForCalvingGateSrv(
+      uid,
+      fd.animalNumber
+    );
+
+  if (!animal) {
+    return {
+      ok: false,
+      status: 404,
+      error: "animal_not_found",
+      message:
+        "❌ لم أجد الحيوان في القطيع المسجل بحسابك."
+    };
+  }
+
+  const animalData =
+    animal.data || {};
+
+  if (
+    diseaseIsArchivedSrv(animalData) ||
+    uterineCheckIsFollowerSrv(animalData)
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "animal_not_eligible",
+      message:
+        "❌ فحص الرحم متاح للأمهات الموجودة في القطيع فقط."
+    };
+  }
+
+  const lastCalvingDate = String(
+    animalData.lastCalvingDate ||
+    animalData.calvingDate ||
+    animalData.lastCalving ||
+    ""
+  ).trim().slice(0, 10);
+
+  if (!calvingIsDateSrv(lastCalvingDate)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "last_calving_date_missing",
+      message:
+        "❌ لا يوجد تاريخ ولادة مسجّل لهذا الحيوان، لذلك لا يمكن تحديد مرحلة فحص الرحم."
+    };
+  }
+
+  const postpartumDays = diffDaysISO(
+    lastCalvingDate,
+    fd.eventDate
+  );
+
+  if (
+    !Number.isFinite(postpartumDays) ||
+    postpartumDays < 0
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "check_before_calving",
+      message:
+        "❌ تاريخ فحص الرحم لا يمكن أن يسبق آخر ولادة مسجّلة."
+    };
+  }
+
+  return {
+    ok: true,
+    animal,
+    animalData,
+    lastCalvingDate,
+    postpartumDays
+  };
+}
+
+app.get(
+  "/api/uterine-check/options",
+  requireUserId,
+  (req, res) => {
+    return res.json({
+      ok: true,
+      options: uterineCheckOptionsSrv()
+    });
+  }
+);
+
+app.post(
+  "/api/uterine-check/gate",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          allowed: false,
+          error: "firestore_disabled",
+          message:
+            "❌ تعذّر تحميل بيانات فحص الرحم الآن. حاول مرة أخرى.",
+          options: uterineCheckOptionsSrv()
+        });
+      }
+
+      const fd = uterineCheckBodySrv(
+        req.body || {}
+      );
+
+      if (
+        !fd.animalNumber ||
+        !fd.eventDate
+      ) {
+        return res.json({
+          ok: true,
+          allowed: false,
+          silent: true,
+          message:
+            "أدخل رقم الحيوان وتاريخ الفحص.",
+          options: uterineCheckOptionsSrv()
+        });
+      }
+
+      if (
+        fd.checkStage &&
+        !uterineCheckStageSrv(fd.checkStage)
+      ) {
+        return res.status(400).json({
+          ok: false,
+          allowed: false,
+          error: "invalid_check_stage",
+          message:
+            "❌ اختر مرحلة فحص الرحم من القائمة.",
+          options: uterineCheckOptionsSrv()
+        });
+      }
+
+      const context =
+        await uterineCheckContextSrv(
+          req,
+          fd
+        );
+
+      if (!context.ok) {
+        return res
+          .status(context.status)
+          .json({
+            ok: false,
+            allowed: false,
+            error: context.error,
+            message: context.message,
+            options:
+              uterineCheckOptionsSrv()
+          });
+      }
+
+      const suggestedStage =
+        context.postpartumDays < 30
+          ? "day_14_initial"
+          : "day_30_followup";
+
+      const advisory =
+        context.postpartumDays < 14
+          ? "الفحص قبل موعد المتابعة الروتيني عند 14 يومًا، ويمكن تسجيله إذا تم بالفعل لحاجة سريرية."
+          : context.postpartumDays < 30
+            ? "هذا التوقيت يقع ضمن متابعة الفحص الأولي بعد الولادة."
+            : "هذا التوقيت مناسب لفحص المتابعة بعد 30 يومًا من الولادة.";
+
+      return res.json({
+        ok: true,
+        allowed: true,
+
+        message:
+          `✅ الحيوان رقم ${fd.animalNumber} عمره بعد الولادة ${context.postpartumDays} يومًا، ويمكن تسجيل فحص الرحم الآن.`,
+
+        advisory,
+        animalNumber: fd.animalNumber,
+        eventDate: fd.eventDate,
+
+        lastCalvingDate:
+          context.lastCalvingDate,
+
+        postpartumDays:
+          context.postpartumDays,
+
+        suggestedStage,
+        options:
+          uterineCheckOptionsSrv()
+      });
+
+    } catch (e) {
+      console.error(
+        "uterine check gate failed",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        allowed: false,
+        error:
+          "uterine_check_gate_failed",
+        message:
+          "❌ تعذّر فحص بيانات الرحم الآن. حاول مرة أخرى.",
+        options:
+          uterineCheckOptionsSrv()
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/uterine-check/save",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error: "firestore_disabled",
+          message:
+            "❌ تعذّر حفظ فحص الرحم الآن. حاول مرة أخرى."
+        });
+      }
+
+      const uid = req.userId;
+
+      const fd = uterineCheckBodySrv(
+        req.body || {}
+      );
+
+      const stage =
+        uterineCheckStageSrv(
+          fd.checkStage
+        );
+
+      const result =
+        uterineCheckResultSrv(
+          fd.result
+        );
+
+      if (
+        !fd.animalNumber ||
+        !fd.eventDate ||
+        !fd.checkStage ||
+        !fd.result
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "missing_required_fields",
+          message:
+            "❌ أكمل رقم الحيوان وتاريخ الفحص، واختر مرحلة الفحص والنتيجة."
+        });
+      }
+
+      if (!stage || !result) {
+        return res.status(400).json({
+          ok: false,
+          error: "invalid_option",
+          message:
+            "❌ اختر مرحلة فحص الرحم والنتيجة من القوائم."
+        });
+      }
+
+      const context =
+        await uterineCheckContextSrv(
+          req,
+          fd
+        );
+
+      if (!context.ok) {
+        return res
+          .status(context.status)
+          .json({
+            ok: false,
+            error: context.error,
+            message: context.message
+          });
+      }
+
+      const duplicate =
+        await healthDuplicateSameDayDetailsSrv(
+          uid,
+          {
+            animalNumber:
+              fd.animalNumber,
+
+            eventDate:
+              fd.eventDate,
+
+            diseaseCode:
+              "uterine_check",
+
+            eventTypeNorm:
+              "uterine_check",
+
+            checkStage:
+              fd.checkStage
+          }
+        );
+
+      if (duplicate.error) {
+        return res.status(503).json({
+          ok: false,
+          error: duplicate.error,
+          message: duplicate.message
+        });
+      }
+
+      if (duplicate.found) {
+        return res.status(409).json({
+          ok: false,
+          error:
+            "uterine_check_duplicate",
+          message:
+            `❌ سبق تسجيل ${stage.label} للحيوان رقم ${fd.animalNumber} في هذا التاريخ.`
+        });
+      }
+
+      const eventRef =
+        db.collection("events").doc();
+
+      const animalRef = db
+        .collection(
+          context.animal._collection ||
+          "animals"
+        )
+        .doc(context.animal.id);
+
+      const now =
+        admin.firestore
+          .FieldValue
+          .serverTimestamp();
+
+      const animalPatch = {
+        lastUterineCheckDate:
+          fd.eventDate,
+
+        lastUterineCheckStage:
+          stage.value,
+
+        lastUterineCheckResult:
+          result.value,
+
+        lastUterineCheckEventId:
+          eventRef.id,
+
+        updatedAt: now
+      };
+
+      if (
+        stage.value ===
+        "day_14_initial"
+      ) {
+        animalPatch
+          .lastUterineCheck14Date =
+            fd.eventDate;
+
+        animalPatch
+          .lastUterineCheck14Result =
+            result.value;
+
+        animalPatch
+          .lastUterineCheck14EventId =
+            eventRef.id;
+      } else {
+        animalPatch
+          .lastUterineCheck30Date =
+            fd.eventDate;
+
+        animalPatch
+          .lastUterineCheck30Result =
+            result.value;
+
+        animalPatch
+          .lastUterineCheck30EventId =
+            eventRef.id;
+      }
+
+      const batch = db.batch();
+
+      batch.set(eventRef, {
+        userId: uid,
+
+        animalId:
+          context.animal.id,
+
+        animalNumber:
+          fd.animalNumber,
+
+        number:
+          fd.animalNumber,
+
+        eventDate:
+          fd.eventDate,
+
+        date:
+          fd.eventDate,
+
+        type:
+          "uterine_check",
+
+        eventType:
+          "فحص الرحم",
+
+        eventTypeNorm:
+          "uterine_check",
+
+        eventName:
+          "فحص الرحم",
+
+        diseaseCode:
+          "uterine_check",
+
+        checkStage:
+          stage.value,
+
+        checkStageLabel:
+          stage.label,
+
+        result:
+          result.value,
+
+        resultLabel:
+          result.label,
+
+        lastCalvingDate:
+          context.lastCalvingDate,
+
+        postpartumDays:
+          context.postpartumDays,
+
+        vet:
+          fd.vet || null,
+
+        notes:
+          fd.notes || null,
+
+        source:
+          "server:/api/uterine-check/save",
+
+        createdAt: now
+      });
+
+      batch.set(
+        animalRef,
+        animalPatch,
+        {
+          merge: true
+        }
+      );
+
+      await batch.commit();
+
+      return res.json({
+        ok: true,
+
+        message:
+          `✅ تم حفظ ${stage.label} للحيوان رقم ${fd.animalNumber} بنتيجة: ${result.label}.`,
+
+        eventId:
+          eventRef.id,
+
+        redirectUrl:
+          "add-event.html"
+      });
+
+    } catch (e) {
+      console.error(
+        "uterine check save failed",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error:
+          "uterine_check_save_failed",
+        message:
+          "❌ تعذّر حفظ فحص الرحم الآن. حاول مرة أخرى."
+      });
+    }
+  }
+);
+// ============================================================
 //                 API: DISEASE — SMART GATE/SAVE
 //                 صفحة disease.html — السيرفر مصدر القرار والحفظ
 // ============================================================
@@ -17359,7 +17983,22 @@ function healthEventSignatureSrv(e = {}) {
     eventTypeNorm.includes("lameness") ||
     eventTypeNorm.includes("عرج") ||
     diseaseName === "عرج";
+  const isUterineCheck =
+    diseaseCode === "uterine_check" ||
+    eventTypeNorm.includes("uterine_check") ||
+    eventTypeNorm.includes("فحص الرحم");
 
+if (isUterineCheck) {
+  const checkStage = healthDupStrSrv(
+    e.checkStage ||
+    e.uterineCheckStage ||
+    e.details?.checkStage ||
+    e.details?.uterineCheckStage ||
+    ""
+  );
+
+  return `uterine_check|${checkStage}`;
+}
   if (isLameness) {
    const rawLegs =
   e.affectedLegs ||
