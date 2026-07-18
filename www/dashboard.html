@@ -1343,8 +1343,16 @@ function refreshDashboardSmartAlert(){
   message.textContent = String(
     alert.message || ''
   );
-
+  const observation = document.createElement('div');
+  observation.className = 'mbk-smart-alert-message';
+  observation.textContent = String(
+  alert?.details?.observation || ''
+);
   copy.append(title, message);
+
+if (observation.textContent) {
+  copy.appendChild(observation);
+}
 
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
