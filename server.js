@@ -17546,7 +17546,7 @@ app.post(
           error:
             "uterine_check_duplicate",
           message:
-            `❌ سبق تسجيل ${stage.label} للحيوان رقم ${fd.animalNumber} في هذا التاريخ.`
+  `❌ سبق تسجيل فحص رحم للحيوان رقم ${fd.animalNumber} في هذا التاريخ، لذلك لن يتكرر التسجيل.`
         });
       }
 
@@ -17989,15 +17989,7 @@ function healthEventSignatureSrv(e = {}) {
     eventTypeNorm.includes("فحص الرحم");
 
 if (isUterineCheck) {
-  const checkStage = healthDupStrSrv(
-    e.checkStage ||
-    e.uterineCheckStage ||
-    e.details?.checkStage ||
-    e.details?.uterineCheckStage ||
-    ""
-  );
-
-  return `uterine_check|${checkStage}`;
+  return "uterine_check";
 }
   if (isLameness) {
    const rawLegs =
