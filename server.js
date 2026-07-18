@@ -34293,7 +34293,321 @@ app.post('/api/events', requireUserId, async (req, res) => {
 });
 
 
+// ============================================================
+//          MURABBIK SMART ALERTS — CORE CONTRACT V1
+//          عقد نواة تنبيهات مُرَبِّيك الذكية
+// ============================================================
 
+const MURABBIK_SMART_ALERT_KIND_RANK = { operational: 0, technical: 1 };
+const MURABBIK_SMART_ALERT_PRIORITY_RANK = { urgent: 0, high: 1, normal: 2, low: 3 };
+const MURABBIK_SMART_ALERT_URGENCY_RANK = { now: 0, today: 1, soon: 2, review: 3 };
+const MURABBIK_SMART_ALERT_CERTAINTY = new Set([
+  "confirmed",
+  "probable",
+  "suspected",
+  "data_gap"
+]);
+const murabbikSmartAlertSourcesSrv = new Map();
+
+function murabbikSmartAlertTextSrv(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function murabbikSmartAlertHashSrv(value) {
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(value))
+    .digest("hex")
+    .slice(0, 24);
+}
+
+function murabbikSmartAlertRegisterSourceSrv(name, builder) {
+  const sourceName = murabbikSmartAlertTextSrv(name);
+
+  if (!sourceName || typeof builder !== "function") {
+    throw new Error("murabbik_smart_alert_source_invalid");
+  }
+
+  if (murabbikSmartAlertSourcesSrv.has(sourceName)) {
+    throw new Error(`murabbik_smart_alert_source_duplicate:${sourceName}`);
+  }
+
+  murabbikSmartAlertSourcesSrv.set(sourceName, builder);
+}
+
+function murabbikSmartAlertNormalizeSrv(sourceName, raw = {}) {
+  const source = murabbikSmartAlertTextSrv(sourceName);
+  const identityKey = murabbikSmartAlertTextSrv(raw.identityKey);
+  const revisionKey = murabbikSmartAlertTextSrv(raw.revisionKey);
+  const kind = murabbikSmartAlertTextSrv(raw.kind).toLowerCase();
+  const priority = murabbikSmartAlertTextSrv(raw.priority || "normal").toLowerCase();
+  const urgency = murabbikSmartAlertTextSrv(raw.urgency || "review").toLowerCase();
+  const certainty = murabbikSmartAlertTextSrv(raw.certainty || "confirmed").toLowerCase();
+  const title = murabbikSmartAlertTextSrv(raw.title);
+  const message = murabbikSmartAlertTextSrv(raw.message);
+  const snoozeMinutes = Math.round(Number(raw.snoozeMinutes));
+
+  const valid =
+    source &&
+    identityKey &&
+    revisionKey &&
+    title &&
+    message &&
+    Object.prototype.hasOwnProperty.call(MURABBIK_SMART_ALERT_KIND_RANK, kind) &&
+    Object.prototype.hasOwnProperty.call(MURABBIK_SMART_ALERT_PRIORITY_RANK, priority) &&
+    Object.prototype.hasOwnProperty.call(MURABBIK_SMART_ALERT_URGENCY_RANK, urgency) &&
+    MURABBIK_SMART_ALERT_CERTAINTY.has(certainty) &&
+    Number.isFinite(snoozeMinutes) &&
+    snoozeMinutes > 0;
+
+  if (!valid) {
+    throw new Error(`murabbik_smart_alert_contract_invalid:${source || "unknown"}`);
+  }
+
+  const actionType = murabbikSmartAlertTextSrv(raw.action?.type || "none").toLowerCase();
+  const actionLabel = murabbikSmartAlertTextSrv(raw.action?.label);
+  const actionUrl = murabbikSmartAlertTextSrv(raw.action?.url);
+
+  if (
+    !["none", "navigate"].includes(actionType) ||
+    (actionType === "navigate" && (!actionLabel || !actionUrl))
+  ) {
+    throw new Error(`murabbik_smart_alert_action_invalid:${source}`);
+  }
+
+  const animalNumbers = [...new Set(
+    (Array.isArray(raw.animalNumbers) ? raw.animalNumbers : [])
+      .map(murabbikSmartAlertTextSrv)
+      .filter(Boolean)
+  )];
+
+  const affectedRaw = Number(raw.affectedCount);
+  const affectedCount = Number.isFinite(affectedRaw)
+    ? Math.max(0, Math.round(affectedRaw))
+    : animalNumbers.length;
+
+  return {
+    id: `msa_${murabbikSmartAlertHashSrv({ source, identityKey })}`,
+    revision: `msr_${murabbikSmartAlertHashSrv({ source, identityKey, revisionKey })}`,
+    source,
+    kind,
+    domain: murabbikSmartAlertTextSrv(raw.domain),
+    code: murabbikSmartAlertTextSrv(raw.code),
+    priority,
+    urgency,
+    certainty,
+    status: murabbikSmartAlertTextSrv(raw.status),
+    title,
+    message,
+
+    details: {
+      observation: murabbikSmartAlertTextSrv(raw.details?.observation),
+      meaning: murabbikSmartAlertTextSrv(raw.details?.meaning),
+      recommendation: murabbikSmartAlertTextSrv(raw.details?.recommendation),
+
+      evidence: Array.isArray(raw.details?.evidence)
+        ? raw.details.evidence
+            .map(murabbikSmartAlertTextSrv)
+            .filter(Boolean)
+        : []
+    },
+
+    dueDate: murabbikSmartAlertTextSrv(raw.dueDate).slice(0, 10),
+    affectedCount,
+    animalNumbers,
+
+    action: {
+      type: actionType,
+      label: actionLabel,
+      url: actionUrl
+    },
+
+    displayStyle: kind,
+    _snoozeMinutes: snoozeMinutes
+  };
+}
+
+function murabbikSmartAlertCompareSrv(a, b) {
+  return (
+    (MURABBIK_SMART_ALERT_KIND_RANK[a.kind] ?? 99) -
+      (MURABBIK_SMART_ALERT_KIND_RANK[b.kind] ?? 99) ||
+
+    (MURABBIK_SMART_ALERT_PRIORITY_RANK[a.priority] ?? 99) -
+      (MURABBIK_SMART_ALERT_PRIORITY_RANK[b.priority] ?? 99) ||
+
+    (MURABBIK_SMART_ALERT_URGENCY_RANK[a.urgency] ?? 99) -
+      (MURABBIK_SMART_ALERT_URGENCY_RANK[b.urgency] ?? 99) ||
+
+    String(a.dueDate || "9999-12-31").localeCompare(
+      String(b.dueDate || "9999-12-31")
+    ) ||
+
+    String(a.id).localeCompare(String(b.id))
+  );
+}
+
+function murabbikSmartAlertPublicSrv(alert) {
+  if (!alert) return null;
+
+  const {
+    _snoozeMinutes,
+    ...publicAlert
+  } = alert;
+
+  return publicAlert;
+}
+
+async function murabbikSmartAlertCollectSrv(req) {
+  const context = {
+    req,
+    userId: req.userId,
+    profileUid: req.authSession?.uid || req.userId,
+    today: await farmTodayISOSrv(req.authSession?.uid || req.userId),
+    nowMs: Date.now(),
+    memo: new Map()
+  };
+
+  context.load = async (key, loader) => {
+    const memoKey = murabbikSmartAlertTextSrv(key);
+
+    if (!context.memo.has(memoKey)) {
+      context.memo.set(
+        memoKey,
+        Promise.resolve().then(loader)
+      );
+    }
+
+    return await context.memo.get(memoKey);
+  };
+
+  const entries = [...murabbikSmartAlertSourcesSrv.entries()];
+
+  const settled = await Promise.allSettled(
+    entries.map(async ([sourceName, builder]) => ({
+      sourceName,
+      rows: await builder(context)
+    }))
+  );
+
+  const alerts = [];
+  const sourceErrors = [];
+
+  settled.forEach((result, index) => {
+    const sourceName = entries[index]?.[0] || "unknown";
+
+    if (result.status !== "fulfilled") {
+      console.error(
+        `murabbik-smart-alert-source:${sourceName}`,
+        result.reason
+      );
+
+      sourceErrors.push(sourceName);
+      return;
+    }
+
+    for (
+      const raw of
+      Array.isArray(result.value.rows)
+        ? result.value.rows
+        : []
+    ) {
+      try {
+        alerts.push(
+          murabbikSmartAlertNormalizeSrv(
+            sourceName,
+            raw
+          )
+        );
+      } catch (e) {
+        console.error(
+          `murabbik-smart-alert-normalize:${sourceName}`,
+          e
+        );
+
+        sourceErrors.push(sourceName);
+      }
+    }
+  });
+
+  const unique = new Map();
+
+  alerts
+    .sort(murabbikSmartAlertCompareSrv)
+    .forEach(alert => {
+      if (!unique.has(alert.id)) {
+        unique.set(alert.id, alert);
+      }
+    });
+
+  return {
+    context,
+    alerts: [...unique.values()],
+    sourceErrors: [...new Set(sourceErrors)]
+  };
+}
+
+app.get("/api/smart-alerts", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        currentAlert: null,
+        remainingCount: 0,
+        message: "❌ تعذّر تحميل تنبيهات مُرَبِّيك الآن. حاول مرة أخرى."
+      });
+    }
+
+    const result = await murabbikSmartAlertCollectSrv(req);
+    const currentAlert = result.alerts[0] || null;
+    const remaining = result.alerts.slice(1);
+
+    return res.json({
+      ok: true,
+      product: "murabbik_smart_alerts",
+      version: 1,
+      today: result.context.today,
+
+      currentAlert:
+        murabbikSmartAlertPublicSrv(
+          currentAlert
+        ),
+
+      remainingCount:
+        remaining.length,
+
+      remainingOperational:
+        remaining.filter(
+          alert =>
+            alert.kind === "operational"
+        ).length,
+
+      remainingTechnical:
+        remaining.filter(
+          alert =>
+            alert.kind === "technical"
+        ).length,
+
+      hasMore:
+        remaining.length > 0,
+
+      degraded:
+        result.sourceErrors.length > 0
+    });
+
+  } catch (e) {
+    console.error(
+      "murabbik-smart-alerts",
+      e
+    );
+
+    return res.status(500).json({
+      ok: false,
+      currentAlert: null,
+      remainingCount: 0,
+      message: "❌ تعذّر تحميل تنبيهات مُرَبِّيك الآن. حاول مرة أخرى."
+    });
+  }
+});
 
 // ============================================================
 //                       API: ALERTS
