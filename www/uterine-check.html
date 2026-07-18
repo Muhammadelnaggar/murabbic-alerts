@@ -1,1 +1,635 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-page="uterine-check">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
 
+  <link
+    rel="stylesheet"
+    href="css/forms.css"
+  />
+
+  <title>تسجيل فحص الرحم</title>
+</head>
+
+<body>
+  <header>
+    <div class="mbk-head">
+      <img
+        class="mbk-logo"
+        src="/images/logo.png"
+        alt="مُرَبِّيك"
+      >
+
+      <div class="mbk-center">
+        <div class="mbk-page-title">
+          تسجيل فحص الرحم
+        </div>
+
+        <div class="mbk-app-name">
+          مُرَبِّيك
+        </div>
+      </div>
+
+      <a
+        class="mbk-back"
+        href="add-event.html"
+      >
+        رجوع
+      </a>
+    </div>
+  </header>
+
+  <div
+    id="msg"
+    class="infobar"
+    role="status"
+    aria-live="polite"
+  ></div>
+
+  <main>
+    <section class="card">
+      <form
+        id="uterineCheckForm"
+        class="grid"
+      >
+        <div class="row">
+          <div>
+            <label for="animalNumber">
+              رقم الحيوان
+            </label>
+
+            <input
+              type="text"
+              id="animalNumber"
+              name="animalNumber"
+              inputmode="numeric"
+              autocomplete="off"
+            >
+          </div>
+
+          <div>
+            <label for="eventDate">
+              تاريخ الفحص
+            </label>
+
+            <input
+              type="date"
+              id="eventDate"
+              name="eventDate"
+            >
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="checkStage">
+              مرحلة الفحص
+            </label>
+
+            <select
+              id="checkStage"
+              name="checkStage"
+            >
+              <option value="">
+                جاري تحميل المراحل...
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label for="result">
+              نتيجة الفحص
+            </label>
+
+            <select
+              id="result"
+              name="result"
+            >
+              <option value="">
+                جاري تحميل النتائج...
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label for="vet">
+            اسم الطبيب أو الفاحص
+          </label>
+
+          <input
+            type="text"
+            id="vet"
+            name="vet"
+            placeholder="اختياري"
+            autocomplete="off"
+          >
+        </div>
+
+        <div>
+          <label for="notes">
+            ملاحظات الفحص
+          </label>
+
+          <textarea
+            id="notes"
+            name="notes"
+            rows="4"
+            placeholder="اختياري"
+          ></textarea>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <div class="actions-bar">
+    <button
+      type="submit"
+      form="uterineCheckForm"
+      id="saveBtn"
+      class="save"
+    >
+      تسجيل فحص الرحم
+    </button>
+  </div>
+
+  <script>
+    const form =
+      document.getElementById(
+        "uterineCheckForm"
+      );
+
+    const msg =
+      document.getElementById("msg");
+
+    const saveBtn =
+      document.getElementById("saveBtn");
+
+    const animalNumberInput =
+      document.getElementById(
+        "animalNumber"
+      );
+
+    const eventDateInput =
+      document.getElementById(
+        "eventDate"
+      );
+
+    const checkStageSelect =
+      document.getElementById(
+        "checkStage"
+      );
+
+    const resultSelect =
+      document.getElementById(
+        "result"
+      );
+
+    function todayLocal() {
+      const date = new Date();
+
+      date.setMinutes(
+        date.getMinutes() -
+        date.getTimezoneOffset()
+      );
+
+      return date
+        .toISOString()
+        .slice(0, 10);
+    }
+
+    function showMessage(
+      text = "",
+      ok = false,
+      action = null
+    ) {
+      if (!msg) return;
+
+      msg.replaceChildren();
+
+      if (!text) {
+        msg.className = "infobar";
+        msg.style.display = "none";
+        return;
+      }
+
+      const messageText =
+        document.createElement("div");
+
+      messageText.textContent =
+        String(text);
+
+      msg.appendChild(messageText);
+
+      if (action?.label) {
+        const actions =
+          document.createElement("div");
+
+        actions.className =
+          "mbk-infobar-actions";
+
+        const button =
+          document.createElement("button");
+
+        button.type = "button";
+        button.className =
+          "mbk-infobar-btn " +
+          "mbk-infobar-btn-primary";
+
+        button.textContent =
+          String(action.label);
+
+        button.addEventListener(
+          "click",
+          () => {
+            if (
+              typeof action.onClick ===
+              "function"
+            ) {
+              action.onClick();
+            }
+          }
+        );
+
+        actions.appendChild(button);
+        msg.appendChild(actions);
+      }
+
+      msg.className =
+        `infobar mbk-infobar show ${
+          ok ? "success" : "error"
+        }`;
+
+      msg.style.display = "block";
+
+      try {
+        msg.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+      } catch (_) {}
+    }
+
+    async function requestJSON(
+      url,
+      options = {}
+    ) {
+      const response = await fetch(
+        url,
+        {
+          ...options,
+
+          credentials:
+            "same-origin",
+
+          cache:
+            "no-store",
+
+          headers: {
+            "Accept":
+              "application/json",
+
+            ...(options.headers || {})
+          }
+        }
+      );
+
+      const data =
+        await response
+          .json()
+          .catch(() => ({}));
+
+      if (
+        response.status === 401 ||
+        data?.error ===
+          "auth_required"
+      ) {
+        location.replace(
+          "login.html"
+        );
+
+        throw new Error(
+          data.message ||
+          "يلزم تسجيل الدخول أولًا."
+        );
+      }
+
+      return {
+        response,
+        data
+      };
+    }
+
+    function collectPayload() {
+      return {
+        animalNumber:
+          animalNumberInput
+            .value
+            .trim(),
+
+        eventDate:
+          eventDateInput.value,
+
+        checkStage:
+          checkStageSelect.value,
+
+        result:
+          resultSelect.value,
+
+        vet:
+          document
+            .getElementById("vet")
+            .value
+            .trim(),
+
+        notes:
+          document
+            .getElementById("notes")
+            .value
+            .trim()
+      };
+    }
+
+    function fillSelect(
+      select,
+      rows = [],
+      placeholder = "اختر"
+    ) {
+      select.replaceChildren();
+
+      const first =
+        document.createElement(
+          "option"
+        );
+
+      first.value = "";
+      first.textContent =
+        placeholder;
+
+      select.appendChild(first);
+
+      rows.forEach(row => {
+        const option =
+          document.createElement(
+            "option"
+          );
+
+        option.value =
+          String(
+            row?.value || ""
+          );
+
+        option.textContent =
+          String(
+            row?.label || ""
+          );
+
+        select.appendChild(option);
+      });
+    }
+
+    async function loadOptions() {
+      const {
+        response,
+        data
+      } = await requestJSON(
+        "/api/uterine-check/options",
+        {
+          method: "GET"
+        }
+      );
+
+      if (
+        !response.ok ||
+        data.ok !== true
+      ) {
+        throw new Error(
+          data.message ||
+          "تعذّر تحميل قوائم فحص الرحم."
+        );
+      }
+
+      fillSelect(
+        checkStageSelect,
+        data?.options?.stages,
+        "اختر مرحلة الفحص"
+      );
+
+      fillSelect(
+        resultSelect,
+        data?.options?.results,
+        "اختر نتيجة الفحص"
+      );
+    }
+
+    function hydrate() {
+      const params =
+        new URLSearchParams(
+          location.search
+        );
+
+      animalNumberInput.value =
+        params.get("number") ||
+        params.get(
+          "animalNumber"
+        ) ||
+        "";
+
+      eventDateInput.value =
+        params.get("eventDate") ||
+        params.get("date") ||
+        todayLocal();
+    }
+
+    async function runGate() {
+      const payload =
+        collectPayload();
+
+      if (
+        !payload.animalNumber ||
+        !payload.eventDate
+      ) {
+        showMessage("");
+        return;
+      }
+
+      try {
+        const {
+          response,
+          data
+        } = await requestJSON(
+          "/api/uterine-check/gate",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify(
+                payload
+              )
+          }
+        );
+
+        if (
+          !response.ok ||
+          data.ok === false
+        ) {
+          showMessage(
+            data.message ||
+            "تعذّر التحقق من الحيوان.",
+            false
+          );
+
+          return;
+        }
+
+        if (
+          data.allowed === false
+        ) {
+          if (!data.silent) {
+            showMessage(
+              data.message ||
+              "لا يمكن تسجيل الفحص.",
+              false
+            );
+          }
+
+          return;
+        }
+
+        if (
+          data.suggestedStage &&
+          !checkStageSelect.value
+        ) {
+          checkStageSelect.value =
+            data.suggestedStage;
+        }
+
+        const text = [
+          data.message,
+          data.advisory
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        showMessage(
+          text,
+          true
+        );
+
+      } catch (error) {
+        showMessage(
+          error.message ||
+          "تعذّر التحقق من الحيوان.",
+          false
+        );
+      }
+    }
+
+    animalNumberInput
+      .addEventListener(
+        "change",
+        runGate
+      );
+
+    eventDateInput
+      .addEventListener(
+        "change",
+        runGate
+      );
+
+    form.addEventListener(
+      "submit",
+      async event => {
+        event.preventDefault();
+
+        showMessage("");
+        saveBtn.disabled = true;
+
+        try {
+          const {
+            response,
+            data
+          } = await requestJSON(
+            "/api/uterine-check/save",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body:
+                JSON.stringify(
+                  collectPayload()
+                )
+            }
+          );
+
+          if (
+            !response.ok ||
+            data.ok !== true
+          ) {
+            throw new Error(
+              data.message ||
+              "تعذّر حفظ فحص الرحم."
+            );
+          }
+
+          showMessage(
+            data.message ||
+            "تم حفظ فحص الرحم بنجاح.",
+            true,
+            {
+              label: "حسنًا",
+
+              onClick: () => {
+                location.href =
+                  data.redirectUrl ||
+                  "add-event.html";
+              }
+            }
+          );
+
+        } catch (error) {
+          showMessage(
+            error.message ||
+            "تعذّر حفظ فحص الرحم الآن.",
+            false
+          );
+
+          saveBtn.disabled = false;
+        }
+      }
+    );
+
+    async function init() {
+      try {
+        hydrate();
+        await loadOptions();
+        await runGate();
+
+      } catch (error) {
+        showMessage(
+          error.message ||
+          "تعذّر تجهيز صفحة فحص الرحم.",
+          false
+        );
+
+        saveBtn.disabled = true;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
