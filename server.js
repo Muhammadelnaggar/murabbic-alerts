@@ -34456,7 +34456,146 @@ function murabbikSmartAlertPublicSrv(alert) {
 
   return publicAlert;
 }
+const MURABBIK_SMART_ALERT_STATE_COLLECTION = "smart_alert_states";
 
+function murabbikSmartAlertActorUidSrv(req) {
+  return murabbikSmartAlertTextSrv(
+    req.authSession?.uid ||
+    req.userId
+  );
+}
+
+function murabbikSmartAlertStateDocIdSrv(req, alertId) {
+  return `mas_${murabbikSmartAlertHashSrv({
+    actorUid: murabbikSmartAlertActorUidSrv(req),
+    userId: req.userId,
+    alertId
+  })}`;
+}
+
+function murabbikSmartAlertStateRefSrv(req, alertId) {
+  return db
+    .collection(MURABBIK_SMART_ALERT_STATE_COLLECTION)
+    .doc(
+      murabbikSmartAlertStateDocIdSrv(
+        req,
+        alertId
+      )
+    );
+}
+
+function murabbikSmartAlertDateMsSrv(value) {
+  if (!value) return 0;
+
+  if (typeof value.toMillis === "function") {
+    return value.toMillis();
+  }
+
+  if (Number.isFinite(Number(value?._seconds))) {
+    return Number(value._seconds) * 1000;
+  }
+
+  const numeric = Number(value);
+
+  if (Number.isFinite(numeric)) {
+    return numeric;
+  }
+
+  const parsed = new Date(value).getTime();
+
+  return Number.isFinite(parsed)
+    ? parsed
+    : 0;
+}
+
+async function murabbikSmartAlertApplyUserStateSrv(
+  req,
+  alerts = [],
+  nowMs = Date.now()
+) {
+  if (!alerts.length) {
+    return {
+      visibleAlerts: [],
+      hiddenCount: 0
+    };
+  }
+
+  const refs = alerts.map(
+    alert =>
+      murabbikSmartAlertStateRefSrv(
+        req,
+        alert.id
+      )
+  );
+
+  const snapshots = [];
+
+  for (let i = 0; i < refs.length; i += 100) {
+    snapshots.push(
+      ...await db.getAll(
+        ...refs.slice(i, i + 100)
+      )
+    );
+  }
+
+  const statesByDocId = new Map(
+    snapshots.map(snap => [
+      snap.id,
+      snap.exists
+        ? (snap.data() || {})
+        : null
+    ])
+  );
+
+  const visibleAlerts = [];
+  let hiddenCount = 0;
+
+  for (const alert of alerts) {
+    const docId =
+      murabbikSmartAlertStateDocIdSrv(
+        req,
+        alert.id
+      );
+
+    const state =
+      statesByDocId.get(docId);
+
+    if (
+      !state ||
+      state.revision !== alert.revision
+    ) {
+      visibleAlerts.push(alert);
+      continue;
+    }
+
+    const decision =
+      murabbikSmartAlertTextSrv(
+        state.decision
+      ).toLowerCase();
+
+    if (decision === "acknowledged") {
+      hiddenCount++;
+      continue;
+    }
+
+    if (
+      decision === "snoozed" &&
+      murabbikSmartAlertDateMsSrv(
+        state.snoozedUntil
+      ) > nowMs
+    ) {
+      hiddenCount++;
+      continue;
+    }
+
+    visibleAlerts.push(alert);
+  }
+
+  return {
+    visibleAlerts,
+    hiddenCount
+  };
+}
 async function murabbikSmartAlertCollectSrv(req) {
   const context = {
     req,
@@ -34557,9 +34696,24 @@ app.get("/api/smart-alerts", requireUserId, async (req, res) => {
       });
     }
 
-    const result = await murabbikSmartAlertCollectSrv(req);
-    const currentAlert = result.alerts[0] || null;
-    const remaining = result.alerts.slice(1);
+    const result =
+  await murabbikSmartAlertCollectSrv(
+    req
+  );
+
+const stateResult =
+  await murabbikSmartAlertApplyUserStateSrv(
+    req,
+    result.alerts,
+    result.context.nowMs
+  );
+
+const currentAlert =
+  stateResult.visibleAlerts[0] ||
+  null;
+
+const remaining =
+  stateResult.visibleAlerts.slice(1);
 
     return res.json({
       ok: true,
@@ -34587,11 +34741,14 @@ app.get("/api/smart-alerts", requireUserId, async (req, res) => {
             alert.kind === "technical"
         ).length,
 
-      hasMore:
-        remaining.length > 0,
+  hasMore:
+  remaining.length > 0,
 
-      degraded:
-        result.sourceErrors.length > 0
+hiddenByInteractionCount:
+  stateResult.hiddenCount,
+
+degraded:
+  result.sourceErrors.length > 0
     });
 
   } catch (e) {
@@ -34608,6 +34765,216 @@ app.get("/api/smart-alerts", requireUserId, async (req, res) => {
     });
   }
 });
+app.post(
+  "/api/smart-alerts/respond",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res
+          .status(503)
+          .json({
+            ok: false,
+            message:
+              "❌ تعذّر تحديث التنبيه الآن. حاول مرة أخرى."
+          });
+      }
+
+      const alertId =
+        murabbikSmartAlertTextSrv(
+          req.body?.alertId
+        );
+
+      const revision =
+        murabbikSmartAlertTextSrv(
+          req.body?.revision
+        );
+
+      const decision =
+        murabbikSmartAlertTextSrv(
+          req.body?.decision
+        ).toLowerCase();
+
+      if (
+        !alertId ||
+        !revision ||
+        ![
+          "acknowledged",
+          "snoozed"
+        ].includes(decision)
+      ) {
+        return res
+          .status(400)
+          .json({
+            ok: false,
+            error:
+              "smart_alert_response_invalid",
+
+            message:
+              "❌ تعذّر تنفيذ اختيارك لهذا التنبيه. حدّث الصفحة ثم حاول مرة أخرى."
+          });
+      }
+
+      const result =
+        await murabbikSmartAlertCollectSrv(
+          req
+        );
+
+      const alert =
+        result.alerts.find(
+          item =>
+            item.id === alertId &&
+            item.revision === revision
+        );
+
+      if (!alert) {
+        return res
+          .status(409)
+          .json({
+            ok: false,
+            error:
+              "smart_alert_state_changed",
+
+            message:
+              "ℹ️ تغيرت حالة التنبيه. حمّل التنبيهات من جديد."
+          });
+      }
+
+      const nowMs = Date.now();
+
+      const stateRef =
+        murabbikSmartAlertStateRefSrv(
+          req,
+          alert.id
+        );
+
+      const commonState = {
+        userId: req.userId,
+
+        actorUid:
+          murabbikSmartAlertActorUidSrv(
+            req
+          ),
+
+        alertId: alert.id,
+        revision: alert.revision,
+        sourceName: alert.source,
+        kind: alert.kind,
+        domain: alert.domain,
+        code: alert.code,
+        decision,
+
+        updatedAt:
+          admin.firestore
+            .FieldValue
+            .serverTimestamp(),
+
+        source:
+          "server:/api/smart-alerts/respond"
+      };
+
+      if (
+        decision === "acknowledged"
+      ) {
+        await stateRef.set(
+          {
+            ...commonState,
+
+            acknowledgedAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp(),
+
+            snoozedAt: null,
+            snoozedUntil: null,
+            snoozeMinutes: null
+          },
+          {
+            merge: true
+          }
+        );
+
+        return res.json({
+          ok: true,
+          decision,
+          alertId: alert.id,
+          revision: alert.revision,
+
+          message:
+            "✅ تم الاطلاع على التنبيه."
+        });
+      }
+
+      const snoozeMinutes =
+        alert._snoozeMinutes;
+
+      const snoozedUntilMs =
+        nowMs +
+        (
+          snoozeMinutes *
+          60 *
+          1000
+        );
+
+      await stateRef.set(
+        {
+          ...commonState,
+
+          acknowledgedAt: null,
+
+          snoozedAt:
+            admin.firestore
+              .FieldValue
+              .serverTimestamp(),
+
+          snoozedUntil:
+            admin.firestore
+              .Timestamp
+              .fromMillis(
+                snoozedUntilMs
+              ),
+
+          snoozeMinutes
+        },
+        {
+          merge: true
+        }
+      );
+
+      return res.json({
+        ok: true,
+        decision,
+        alertId: alert.id,
+        revision: alert.revision,
+
+        snoozedUntil:
+          new Date(
+            snoozedUntilMs
+          ).toISOString(),
+
+        message:
+          "✅ سيذكّرك مُرَبِّيك بهذا التنبيه لاحقًا."
+      });
+
+    } catch (e) {
+      console.error(
+        "murabbik-smart-alert-respond",
+        e
+      );
+
+      return res
+        .status(500)
+        .json({
+          ok: false,
+          error:
+            "smart_alert_response_failed",
+
+          message:
+            "❌ تعذّر تحديث التنبيه الآن. حاول مرة أخرى."
+        });
+    }
+  }
+);
 
 // ============================================================
 //                       API: ALERTS
