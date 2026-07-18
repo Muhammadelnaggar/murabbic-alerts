@@ -139,7 +139,10 @@
        <span class="mbk-event-icon"><img src="/images/events/event-lameness.png" alt="عرج"></span>
         <span class="mbk-event-label">عرج</span>
       </button>
-
+      <button class="mbk-action-tile mbk-event-card" data-page="uterine-check.html">
+  <span class="mbk-event-icon" aria-hidden="true">🩺</span>
+  <span class="mbk-event-label">فحص الرحم</span>
+</button>
       <button class="mbk-action-tile mbk-event-card" data-page="mastitis.html">
        <span class="mbk-event-icon"><img src="/images/events/event-mastitis.png" alt="التهاب ضرع"></span>
         <span class="mbk-event-label">التهاب ضرع</span>
@@ -571,7 +574,11 @@ function wireButtons(){
 
       const target = btn.getAttribute('data-page') || '';
 
-      if (target === 'mastitis.html' || target === 'lameness.html') {
+      if (
+  target === 'mastitis.html' ||
+  target === 'lameness.html' ||
+  target === 'uterine-check.html'
+) {
         const { numbers, date } = currentNumbersAndDate();
 
         $('#warn').textContent = '';
@@ -582,7 +589,7 @@ function wireButtons(){
         }
 
         if (numbers.length > 1) {
-          $('#warn').textContent = '⚠️ التهاب الضرع والعرج يتم تسجيلهما لحيوان واحد في كل مرة.';
+         $('#warn').textContent = '⚠️ التهاب الضرع والعرج وفحص الرحم يتم تسجيلهم لحيوان واحد في كل مرة.';
           return;
         }
 
