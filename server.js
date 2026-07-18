@@ -34927,6 +34927,247 @@ murabbikSmartAlertRegisterSourceSrv(
   "dry_off_due",
   murabbikDryOffDueAlertSourceSrv
 );
+const MURABBIK_CALVING_OVERDUE_COW_DAYS = 290;
+const MURABBIK_CALVING_OVERDUE_BUFFALO_DAYS = 320;
+const MURABBIK_CALVING_OVERDUE_SNOOZE_MINUTES = 24 * 60;
+
+function murabbikCalvingOverdueDateSrv(value) {
+  const iso = murabbikSmartAlertTextSrv(
+    value
+  ).slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    return "";
+  }
+
+  const parsed = new Date(
+    `${iso}T00:00:00Z`
+  );
+
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.toISOString().slice(0, 10) !== iso
+  ) {
+    return "";
+  }
+
+  return iso;
+}
+
+function murabbikCalvingOverdueSpeciesSrv(doc = {}) {
+  const text = [
+    doc.species,
+    doc.animalTypeAr,
+    doc.animalType,
+    doc.animaltype,
+    doc.type,
+    doc.groupSpecies,
+    doc.groupId,
+    doc.group
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    text.includes("buffalo") ||
+    text.includes("جاموس") ||
+    text.includes("buff_")
+  ) {
+    return {
+      key: "buffalo",
+      label: "جاموس",
+      overdueAfterDays:
+        MURABBIK_CALVING_OVERDUE_BUFFALO_DAYS
+    };
+  }
+
+  if (
+    text.includes("cow") ||
+    text.includes("cattle") ||
+    text.includes("بقر") ||
+    text.includes("ابقار") ||
+    text.includes("أبقار") ||
+    text.includes("cow_")
+  ) {
+    return {
+      key: "cow",
+      label: "أبقار",
+      overdueAfterDays:
+        MURABBIK_CALVING_OVERDUE_COW_DAYS
+    };
+  }
+
+  return null;
+}
+
+async function murabbikCalvingOverdueAlertSourceSrv(
+  context
+) {
+  const animals =
+    await murabbikSmartAlertAnimalsSrv(
+      context
+    );
+
+  const alerts = [];
+
+  for (const doc of animals) {
+    const animalNumber =
+      murabbikDryOffAlertNumberSrv(doc);
+
+    const status =
+      murabbikSmartAlertTextSrv(
+        doc.status || "active"
+      ).toLowerCase();
+
+    if (!animalNumber) continue;
+    if (status !== "active") continue;
+
+    if (
+      murabbikSmartAlertTextSrv(
+        doc.entryType
+      ).toLowerCase() === "followers"
+    ) {
+      continue;
+    }
+
+    const reproductiveStatus =
+      calvingStripArSrv(
+        doc.reproductiveStatus || ""
+      ).toLowerCase();
+
+    const isPregnant =
+      reproductiveStatus.includes("عشار") ||
+      reproductiveStatus.includes("حامل") ||
+      reproductiveStatus.includes("pregnant");
+
+    if (!isPregnant) continue;
+
+    const species =
+      murabbikCalvingOverdueSpeciesSrv(doc);
+
+    if (!species) continue;
+
+    const lastInseminationDate =
+      murabbikCalvingOverdueDateSrv(
+        doc.lastInseminationDate
+      );
+
+    if (!lastInseminationDate) continue;
+
+    const lastCalvingDate =
+      murabbikCalvingOverdueDateSrv(
+        doc.lastCalvingDate
+      );
+
+    if (
+      lastCalvingDate &&
+      lastCalvingDate >= lastInseminationDate
+    ) {
+      continue;
+    }
+
+    const lastAbortionDate =
+      murabbikCalvingOverdueDateSrv(
+        doc.lastAbortionDate ||
+        doc.abortionDate
+      );
+
+    if (
+      lastAbortionDate &&
+      lastAbortionDate >= lastInseminationDate
+    ) {
+      continue;
+    }
+
+    const gestationDays =
+      calvingDaysBetweenSrv(
+        lastInseminationDate,
+        context.today
+      );
+
+    if (
+      !Number.isFinite(gestationDays) ||
+      gestationDays <= species.overdueAfterDays
+    ) {
+      continue;
+    }
+
+    const overdueStartDate =
+      addDaysToIsoDateSrv(
+        lastInseminationDate,
+        species.overdueAfterDays + 1
+      );
+
+    alerts.push({
+      identityKey:
+        `calving-overdue:${animalNumber}`,
+
+      revisionKey:
+        [
+          animalNumber,
+          species.key,
+          lastInseminationDate,
+          species.overdueAfterDays
+        ].join(":"),
+
+      kind: "operational",
+      domain: "reproduction",
+      code: "calving_overdue",
+
+      priority: "high",
+      urgency: "today",
+      certainty: "confirmed",
+      status: "overdue",
+
+      title: "متابعة موعد الولادة",
+
+      message:
+        `الحيوان رقم ${animalNumber} وصل إلى ${gestationDays} يومًا من الحمل حسب تاريخ التلقيح المسجّل، ولم تُسجّل له ولادة حتى الآن. راجع الحيوان وسجّل الولادة أو الحالة الفعلية.`,
+
+      details: {
+        observation:
+          `آخر تلقيح مسجّل بتاريخ ${lastInseminationDate}، وحد متابعة تأخر الولادة لهذا النوع بعد ${species.overdueAfterDays} يومًا.`,
+
+        meaning:
+          "تجاوز هذا الحد لا يثبت وحده وجود مشكلة صحية، لكنه يستدعي مراجعة الحيوان والبيانات المسجّلة.",
+
+        recommendation:
+          "راجع الحيوان ميدانيًا، ثم سجّل الولادة أو الحالة الفعلية من الصفحة المخصصة.",
+
+        evidence: [
+          `رقم الحيوان: ${animalNumber}`,
+          `النوع: ${species.label}`,
+          `عمر الحمل المسجّل: ${gestationDays} يومًا`,
+          `تاريخ آخر تلقيح: ${lastInseminationDate}`
+        ]
+      },
+
+      dueDate: overdueStartDate,
+      affectedCount: 1,
+      animalNumbers: [
+        animalNumber
+      ],
+
+      action: {
+        type: "navigate",
+        label: "تسجيل الولادة",
+        url:
+          `calving.html?number=${encodeURIComponent(animalNumber)}`
+      },
+
+      snoozeMinutes:
+        MURABBIK_CALVING_OVERDUE_SNOOZE_MINUTES
+    });
+  }
+
+  return alerts;
+}
+
+murabbikSmartAlertRegisterSourceSrv(
+  "calving_overdue",
+  murabbikCalvingOverdueAlertSourceSrv
+);
 async function murabbikSmartAlertCollectSrv(req) {
   const context = {
     req,
