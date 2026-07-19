@@ -25653,6 +25653,28 @@ const doseType = String(
       });
     }
 
+    const farmToday =
+      await farmTodayISOSrv(
+        req.authSession?.uid ||
+        req.userId
+      );
+
+    if (eventDate > farmToday) {
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        stage: "future_date",
+        message: "❌ لا يمكن تسجيل تنفيذ التحصين بتاريخ لاحق لليوم. سجّل التحصين بعد تنفيذه فعليًا.",
+        acceptedCount: 0,
+        rejectedCount: numbers.length,
+        accepted: [],
+        rejected: numbers.map(n => ({
+          animalNumber: String(n || ""),
+          reason: "لا يمكن تسجيل تنفيذ التحصين بتاريخ لاحق لليوم."
+        }))
+      });
+    }
+
     const accepted = [];
     const rejected = [];
 
@@ -26834,7 +26856,7 @@ const programRowId = String(
       });
     }
 
-    if (!calvingIsDateSrv(eventDate)) {
+        if (!calvingIsDateSrv(eventDate)) {
       return res.status(400).json({
         ok: false,
         message: "❌ أدخل تاريخ تحصين صحيحًا.",
@@ -26844,6 +26866,26 @@ const programRowId = String(
         rejected: rows.map(r => ({
           animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || ""),
           reason: "أدخل تاريخ تحصين صحيحًا."
+        }))
+      });
+    }
+
+    const farmToday =
+      await farmTodayISOSrv(
+        req.authSession?.uid ||
+        req.userId
+      );
+
+    if (eventDate > farmToday) {
+      return res.status(400).json({
+        ok: false,
+        message: "❌ لا يمكن تسجيل تنفيذ التحصين بتاريخ لاحق لليوم. سجّل التحصين بعد تنفيذه فعليًا.",
+        savedCount: 0,
+        rejectedCount: rows.length,
+        saved: [],
+        rejected: rows.map(r => ({
+          animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || ""),
+          reason: "لا يمكن تسجيل تنفيذ التحصين بتاريخ لاحق لليوم."
         }))
       });
     }
