@@ -23014,6 +23014,55 @@ function vaccinationFarmProgramOptionsSrv() {
       }
     ],
 
+    doseTimingBases: [
+      {
+        value: "any_time",
+        label: "بداية البرنامج / أول تنفيذ"
+      },
+      {
+        value: "after_previous_dose",
+        label: "بعد الجرعة السابقة"
+      },
+      {
+        value: "repeat",
+        label: "تكرار دوري بعد آخر تنفيذ"
+      },
+      {
+        value: "calf_age",
+        label: "عند عمر محدد للعجل"
+      },
+      {
+        value: "calf_age_window",
+        label: "خلال نافذة عمرية للعجل"
+      },
+      {
+        value: "before_expected_calving",
+        label: "قبل موعد الولادة المتوقع"
+      }
+    ],
+
+    doseCycles: [
+      {
+        value: "each_pregnancy",
+        label: "يتكرر مع كل حمل"
+      },
+      {
+        value: "once_lifetime",
+        label: "مرة واحدة في العمر"
+      }
+    ],
+
+    repeatUnits: [
+      {
+        value: "each_pregnancy",
+        label: "يتكرر مع كل حمل"
+      },
+      {
+        value: "once_lifetime",
+        label: "مرة واحدة في العمر"
+      }
+    ],
+
     repeatUnits: [
       {
         value: "day",
