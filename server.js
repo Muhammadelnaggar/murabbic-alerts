@@ -37379,6 +37379,9 @@ for (const a of active) {
 
   if (a.lastAbortionDate) aborts++;
 }
+
+let byAnimal = new Map();
+
 try {
   const evSnapBreed = await db.collection("events")
     .where("userId", "==", uid)
@@ -37403,7 +37406,7 @@ const inseminationEvents = evBreed
   })
   .filter(e => e._normType === "insemination" && e._eventDate);
 
-const byAnimal = new Map();
+byAnimal = new Map();
 
 for (const e of inseminationEvents) {
   const animalKey = String(
