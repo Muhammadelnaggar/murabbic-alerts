@@ -22423,86 +22423,345 @@ async function vaccinationDueWarningSrv({
   animalNumber,
   eventDate,
   vaccine,
-  doseType
+  vaccineCode = "",
+  animalDoc = {},
+  programLink = {}
 } = {}) {
   const num = calvingNormDigitsOnlySrv(animalNumber);
   const dt = String(eventDate || "").trim().slice(0, 10);
   const vx = String(vaccine || "").trim();
-  const incomingDose = vaccinationDoseNormSrv(doseType);
+  const vxCode = String(vaccineCode || "").trim();
 
   if (!db || !uid || !num || !dt || !vx) return null;
 
-  const snap = await db.collection("tasks")
-    .where("userId", "==", uid)
-    .where("animalNumber", "==", num)
-    .limit(120)
-    .get();
+  const sameVaccine = (code, name) => {
+    const codeMatch =
+      Boolean(vxCode && code) &&
+      vaccinationTextKeySrv(vxCode) ===
+        vaccinationTextKeySrv(code);
+
+    return (
+      codeMatch ||
+      vaccinationSameVaccineKeySrv(name, vx)
+    );
+  };
+
+  const [taskSnap, eventSnap] = await Promise.all([
+    db.collection("tasks")
+      .where("userId", "==", uid)
+      .where("animalNumber", "==", num)
+      .limit(120)
+      .get(),
+
+    db.collection("events")
+      .where("userId", "==", uid)
+      .where("animalNumber", "==", num)
+      .limit(120)
+      .get()
+  ]);
 
   let nearest = null;
 
-  snap.forEach(ds => {
+  taskSnap.forEach(ds => {
     const t = ds.data() || {};
 
-    const taskType = String(t.taskType || t.type || "").trim().toLowerCase();
+    const taskType = String(
+      t.taskType ||
+      t.type ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
     const isVaccinationTask =
       taskType === "vaccination" ||
       taskType.includes("vaccination") ||
       taskType.includes("تحصين");
 
-    if (!isVaccinationTask) return;
-    if (!vaccinationTaskPendingSrv(t)) return;
+    if (
+      !isVaccinationTask ||
+      !vaccinationTaskPendingSrv(t)
+    ) {
+      return;
+    }
 
-    const taskVaccine = String(t.vaccine || t.vaccineKey || "").trim();
-    if (!vaccinationSameVaccineKeySrv(taskVaccine, vx)) return;
+    if (
+      !sameVaccine(
+        String(t.vaccineCode || "").trim(),
+        String(
+          t.vaccine ||
+          t.vaccineKey ||
+          ""
+        ).trim()
+      )
+    ) {
+      return;
+    }
 
-    const taskDose = vaccinationDoseNormSrv(t.doseType || "");
-    if (taskDose && incomingDose && taskDose !== incomingDose) return;
+    const dueDate = String(
+      t.dueDate || ""
+    )
+      .trim()
+      .slice(0, 10);
 
-    const dueDate = String(t.dueDate || "").trim().slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return;
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        dueDate
+      )
+    ) {
+      return;
+    }
 
-    if (!nearest || dueDate < nearest.dueDate) {
+    if (
+      !nearest ||
+      dueDate < nearest.dueDate
+    ) {
       nearest = {
         taskId: ds.id,
         dueDate,
-        windowStart: String(t.windowStart || dueDate).slice(0, 10),
-        windowEnd: String(t.windowEnd || dueDate).slice(0, 10),
-        doseType: taskDose,
-        cycle: t.cycle || ""
+
+        taskDoseType: String(
+          t.doseType || ""
+        ).trim()
       };
     }
   });
 
-  if (!nearest) return null;
+  let latestPreviousDate = "";
 
-  if (dt < nearest.dueDate) {
+  eventSnap.forEach(ds => {
+    const ev = ds.data() || {};
+
+    const eventType = String(
+      ev.eventType ||
+      ev.type ||
+      ev.eventTypeNorm ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+    const isVaccination =
+      eventType === "تحصين" ||
+      eventType === "vaccination" ||
+      eventType.includes("تحصين") ||
+      eventType.includes("vaccination");
+
+    if (!isVaccination) return;
+
+    if (
+      !sameVaccine(
+        String(
+          ev.vaccineCode || ""
+        ).trim(),
+
+        String(
+          ev.vaccine ||
+          ev.vaccineName ||
+          ""
+        ).trim()
+      )
+    ) {
+      return;
+    }
+
+    const previousDate = String(
+      ev.eventDate ||
+      ev.date ||
+      ""
+    )
+      .trim()
+      .slice(0, 10);
+
+    if (
+      /^\d{4}-\d{2}-\d{2}$/.test(
+        previousDate
+      ) &&
+      (
+        !latestPreviousDate ||
+        previousDate >
+          latestPreviousDate
+      )
+    ) {
+      latestPreviousDate =
+        previousDate;
+    }
+  });
+
+  if (!nearest) {
+    if (!latestPreviousDate) {
+      return null;
+    }
+
+    const eachPregnancy =
+      Array.isArray(
+        programLink.doseSchedule
+      ) &&
+      programLink.doseSchedule.some(
+        step =>
+          String(
+            step?.cycle || ""
+          ).trim() ===
+          "each_pregnancy"
+      );
+
+    const lastCalvingDate = String(
+      animalDoc.lastCalvingDate ||
+      animalDoc.calvingDate ||
+      ""
+    )
+      .trim()
+      .slice(0, 10);
+
+    if (
+      eachPregnancy &&
+      /^\d{4}-\d{2}-\d{2}$/.test(
+        lastCalvingDate
+      ) &&
+      lastCalvingDate >
+        latestPreviousDate
+    ) {
+      return null;
+    }
+
     return {
-      level: "warn",
-      code: "vaccination_early",
-      dueDate: nearest.dueDate,
-      taskId: nearest.taskId,
-     message: `⚠️ موعد هذه الجرعة المسجل هو ${nearest.dueDate}، والتاريخ المختار أبكر منه. يمكنك الحفظ إذا كان تقديم الجرعة مقصودًا.`
+      allowed: false,
+      level: "block",
+
+      code:
+        "vaccination_next_task_not_available",
+
+      previousEventDate:
+        latestPreviousDate,
+
+      message:
+        "تم تسجيل هذا التحصين للحيوان من قبل، ولا توجد جرعة تالية مفتوحة له الآن. سيُنبهك مُرَبِّيك عند دخول الجرعة التالية في موعدها."
     };
   }
 
-  const windowEnd = String(nearest.windowEnd || "").slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(windowEnd) && dt > windowEnd) {
+  const earliestAllowedDate =
+    vaccinationYmdAddDaysSrv(
+      nearest.dueDate,
+      -30
+    );
+
+  if (dt < earliestAllowedDate) {
+    const daysUntilDue =
+      diffDaysISO(
+        dt,
+        nearest.dueDate
+      );
+
     return {
+      allowed: false,
+      level: "block",
+
+      code:
+        "vaccination_too_early",
+
+      dueDate:
+        nearest.dueDate,
+
+      earliestAllowedDate,
+
+      daysUntilAllowed:
+        diffDaysISO(
+          dt,
+          earliestAllowedDate
+        ),
+
+      daysUntilDue,
+
+      taskId:
+        nearest.taskId,
+
+      taskDoseType:
+        nearest.taskDoseType,
+
+      message:
+        `ما زال على موعد هذا التحصين ${daysUntilDue} يومًا. يبدأ السماح بالتسجيل من ${earliestAllowedDate}، قبل موعد المهمة بـ30 يومًا.`
+    };
+  }
+
+  if (dt < nearest.dueDate) {
+    const daysEarly =
+      diffDaysISO(
+        dt,
+        nearest.dueDate
+      );
+
+    return {
+      allowed: true,
       level: "warn",
-      code: "vaccination_overdue",
-      dueDate: nearest.dueDate,
-      windowEnd,
-      taskId: nearest.taskId,
-     message: `⚠️ موعد هذه الجرعة كان ${nearest.dueDate} وانتهت نافذتها المتوقعة. يمكنك الحفظ، لكن الجرعة متأخرة عن موعدها.`
+
+      code:
+        "vaccination_early",
+
+      dueDate:
+        nearest.dueDate,
+
+      earliestAllowedDate,
+      daysEarly,
+
+      taskId:
+        nearest.taskId,
+
+      taskDoseType:
+        nearest.taskDoseType,
+
+      message:
+        `موعد التحصين بعد ${daysEarly} يومًا. يمكنك التسجيل الآن، لكن الأفضل الالتزام بموعد البرنامج.`
+    };
+  }
+
+  if (dt > nearest.dueDate) {
+    const daysLate =
+      diffDaysISO(
+        nearest.dueDate,
+        dt
+      );
+
+    return {
+      allowed: true,
+      level: "warn",
+
+      code:
+        "vaccination_overdue",
+
+      dueDate:
+        nearest.dueDate,
+
+      daysLate,
+
+      taskId:
+        nearest.taskId,
+
+      taskDoseType:
+        nearest.taskDoseType,
+
+      message:
+        `تأخر هذا التحصين ${daysLate} يومًا عن موعد البرنامج. يمكنك تسجيل التنفيذ الآن، وسيحسب مُرَبِّيك الموعد التالي من تاريخ التنفيذ الفعلي.`
     };
   }
 
   return {
+    allowed: true,
     level: "info",
-    code: "vaccination_due_ok",
-    dueDate: nearest.dueDate,
-    taskId: nearest.taskId,
-    message: "✅ توقيت الجرعة داخل موعد التحصين المتوقع."
+
+    code:
+      "vaccination_due_ok",
+
+    dueDate:
+      nearest.dueDate,
+
+    taskId:
+      nearest.taskId,
+
+    taskDoseType:
+      nearest.taskDoseType,
+
+    message:
+      "توقيت التحصين مطابق لموعد المهمة."
   };
 }
 function vaccinationProgramModeNormSrv(raw) {
@@ -25450,10 +25709,21 @@ const dueWarning =
     animalNumber,
     eventDate,
     vaccine,
-    doseType
+    vaccineCode,
+    animalDoc: doc,
+    programLink
   });
 
+if (dueWarning?.allowed === false) {
+  rejected.push({
+    animalNumber,
+    reason: dueWarning.message
+  });
+  continue;
+}
+
 accepted.push({
+
   animalNumber,
   animalId: animal.id || "",
   species: doc.species || doc.animalTypeAr || doc.animalType || "",
@@ -26683,14 +26953,30 @@ const programRowId = String(
         });
         continue;
       }
-      const dueWarning =
-        await vaccinationDueWarningSrv({
-          uid,
-          animalNumber,
-          eventDate,
-          vaccine,
-          doseType
-        });
+const dueWarning =
+  await vaccinationDueWarningSrv({
+    uid,
+    animalNumber,
+    eventDate,
+    vaccine,
+    vaccineCode,
+    animalDoc,
+    programLink
+  });
+
+if (dueWarning?.allowed === false) {
+  rejected.push({
+    animalNumber,
+    reason: dueWarning.message
+  });
+  continue;
+}
+
+const effectiveDoseType =
+  String(
+    dueWarning?.taskDoseType ||
+    doseType
+  ).trim();
 
 const payload = {
   userId: uid,
@@ -26702,7 +26988,7 @@ const payload = {
   createdAt: admin.firestore.FieldValue.serverTimestamp(),
 
     date: eventDate,
-  doseType,
+  doseType: effectiveDoseType,
   eventDate,
 
   vaccinationProgramMode:
@@ -26801,7 +27087,7 @@ const taskWrite =
 
     programContext,
     programLink,
-    doseType
+    doseType: effectiveDoseType
   });
 
 const writeBatch =
@@ -26824,8 +27110,8 @@ if (animalId) {
       lastVaccine:
         vaccine,
 
-      lastVaccinationDoseType:
-        doseType,
+     lastVaccinationDoseType:
+  effectiveDoseType,
 
       ...(programLink.linked
         ? {
@@ -26869,7 +27155,7 @@ saved.push({
   eventId: eventRef.id,
   eventDate,
    vaccine,
-  doseType,
+  doseType: effectiveDoseType,
 
   vaccinationProgramMode:
     programContext.programMode,
