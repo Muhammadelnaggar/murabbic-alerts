@@ -23237,9 +23237,9 @@ function vaccinationFarmProgramNormalizeRowsSrv(
       });
     }
 
-    if (
+       if (
       !Number.isInteger(repeatEvery) ||
-      repeatEvery <= 0 ||
+      repeatEvery < 0 ||
       repeatEvery > 120
     ) {
       errors.push({
@@ -23250,7 +23250,7 @@ function vaccinationFarmProgramNormalizeRowsSrv(
       });
     }
 
-    if (!repeatUnit) {
+    if (repeatEvery > 0 && !repeatUnit) {
       errors.push({
         rowIndex: index,
         field: "repeatUnit",
@@ -23258,7 +23258,6 @@ function vaccinationFarmProgramNormalizeRowsSrv(
           `اختر فترة التكرار في السطر رقم ${index + 1}.`
       });
     }
-
 
   
     if (
@@ -23339,13 +23338,19 @@ function vaccinationFarmProgramNormalizeRowsSrv(
           ? ""
           : startDate,
 
-      repeatEvery,
+            repeatEvery,
 
       repeatUnit:
-        repeatUnit.value,
+        repeatUnit?.value || "",
 
       repeatUnitLabel:
-        repeatUnit.label,
+        repeatUnit?.label || "",
+
+      oneTime:
+        repeatEvery === 0,
+
+      onceLifetime:
+        repeatEvery === 0,
 
       calfSchedule:
         isCalves,
@@ -23475,8 +23480,18 @@ function vaccinationFarmProgramExecutionRowsSrv(
       repeatUnit:
         String(row.repeatUnit || "").trim(),
 
-      repeatUnitLabel:
+           repeatUnitLabel:
         String(row.repeatUnitLabel || "").trim(),
+
+      oneTime:
+        row.oneTime === true ||
+        row.onceLifetime === true ||
+        Number(row.repeatEvery || 0) <= 0,
+
+      onceLifetime:
+        row.onceLifetime === true ||
+        row.oneTime === true ||
+        Number(row.repeatEvery || 0) <= 0,
 
       calfSchedule:
         row.calfSchedule === true,
@@ -24452,13 +24467,51 @@ async function vaccinationReadExecutionProgramSrv(
     );
   }
 
-  if (
+   if (
     programMode ===
       "murabbik_default"
   ) {
-    return vaccinationMurabbikDefaultProgramSrv();
-  }
+    const program =
+      vaccinationMurabbikDefaultProgramSrv();
 
+    const selectedAlternatives =
+      program.defaultAlternatives || {};
+
+    const rows =
+      program.rows.filter(row => {
+        const alternativeGroup =
+          String(
+            row.alternativeGroup || ""
+          ).trim();
+
+        if (!alternativeGroup) {
+          return true;
+        }
+
+        const selectedPath =
+          String(
+            selectedAlternatives[
+              alternativeGroup
+            ] || ""
+          ).trim();
+
+        return Boolean(
+          selectedPath &&
+          String(
+            row.alternativePath || ""
+          ).trim() === selectedPath
+        );
+      });
+
+    return {
+      ...program,
+
+      activeAlternatives:
+        selectedAlternatives,
+
+      rows
+    };
+  }
   return {
     exists: false,
     version: 0,
@@ -25234,7 +25287,7 @@ if (!programLink.ok) {
       body.animalNumber ||
       body.number ||
       "";
-
+ 
     const eventDate = String(
       body.eventDate ||
       body.date ||
@@ -25307,7 +25360,24 @@ const doseType = String(
         rejected: []
       });
     }
+        if (programLink.linked !== true) {
+      return res.status(409).json({
+        ok: false,
+        allowed: false,
+        stage:
+          "vaccination_program_row_required",
 
+        message:
+          "❌ اختر التحصين من البرنامج المعتمد.",
+
+        programContext,
+
+        acceptedCount: 0,
+        rejectedCount: 0,
+        accepted: [],
+        rejected: []
+      });
+    }
     if (!calvingIsDateSrv(eventDate)) {
       return res.status(400).json({
         ok: false,
@@ -25374,7 +25444,15 @@ const doseType = String(
         continue;
       }
 
-const dueWarning = null;
+const dueWarning =
+  await vaccinationDueWarningSrv({
+    uid,
+    animalNumber,
+    eventDate,
+    vaccine,
+    doseType
+  });
+
 accepted.push({
   animalNumber,
   animalId: animal.id || "",
@@ -26095,7 +26173,7 @@ function vaccinationBuildProgramTaskWriteSrv({
         ? doseSchedule[currentIndex]
         : null;
 
-    const isOneTimeDose =
+       const isOneTimeDose =
       programLink.oneTime === true ||
       programLink.onceLifetime === true ||
       String(
@@ -26105,7 +26183,18 @@ function vaccinationBuildProgramTaskWriteSrv({
         currentStep?.cycle || ""
       ).trim() === "once_lifetime";
 
-    if (isOneTimeDose) {
+    const isPregnancyCycleComplete =
+      String(
+        currentStep?.cycle || ""
+      ).trim() === "each_pregnancy" &&
+      currentIndex >= 0 &&
+      currentIndex ===
+        doseSchedule.length - 1;
+
+    if (
+      isOneTimeDose ||
+      isPregnancyCycleComplete
+    ) {
       return {
         taskId,
         taskRef,
@@ -26124,8 +26213,10 @@ function vaccinationBuildProgramTaskWriteSrv({
           status: "completed",
           done: true,
 
-          completionReason:
-            "once_lifetime_completed",
+                   completionReason:
+            isPregnancyCycleComplete
+              ? "each_pregnancy_cycle_completed"
+              : "once_lifetime_completed",
 
           completedByEventId:
             String(eventId || "").trim(),
@@ -26409,6 +26500,21 @@ if (!programLink.ok) {
     rejected: []
   });
 }
+   if (programLink.linked !== true) {
+  return res.status(409).json({
+    ok: false,
+
+    message:
+      "❌ اختر التحصين من البرنامج المعتمد.",
+
+    programContext,
+
+    savedCount: 0,
+    rejectedCount: 0,
+    saved: [],
+    rejected: []
+  });
+} 
     const eventDate = String(
       body.eventDate ||
       body.date ||
@@ -26514,28 +26620,43 @@ const programRowId = String(
         continue;
       }
 
-      let animalId = String(row.animalId || "").trim();
-      let animalDoc = null;
+           const animal =
+        await fetchAnimalByNumberForCalvingGateSrv(
+          uid,
+          animalNumber
+        );
 
-      if (animalId) {
-        const snap = await db.collection("animals").doc(animalId).get();
-        if (snap.exists) {
-          animalDoc = snap.data() || {};
-        }
+      if (!animal) {
+        rejected.push({
+          animalNumber,
+          reason: "لم أجد الحيوان في حسابك. راجع الرقم."
+        });
+        continue;
       }
 
-      if (!animalDoc) {
-        const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
-        if (!animal) {
-          rejected.push({
-            animalNumber,
-            reason: "لم أجد الحيوان في حسابك. راجع الرقم."
-          });
-          continue;
-        }
+      const animalId =
+        String(animal.id || "").trim();
 
-        animalId = animal.id || "";
-        animalDoc = animal.data || {};
+      const animalDoc =
+        animal.data || {};
+
+      const animalCollection =
+        animal._collection === "calves"
+          ? "calves"
+          : "animals";
+
+      const suppliedAnimalId =
+        String(row.animalId || "").trim();
+
+      if (
+        suppliedAnimalId &&
+        suppliedAnimalId !== animalId
+      ) {
+        rejected.push({
+          animalNumber,
+          reason: "بيانات الحيوان المرسلة لا تطابق رقم الحيوان داخل حسابك."
+        });
+        continue;
       }
 
       const status = String(animalDoc.status || "active").trim().toLowerCase();
@@ -26562,11 +26683,20 @@ const programRowId = String(
         });
         continue;
       }
-      const dueWarning = null;
+      const dueWarning =
+        await vaccinationDueWarningSrv({
+          uid,
+          animalNumber,
+          eventDate,
+          vaccine,
+          doseType
+        });
+
 const payload = {
   userId: uid,
 
   animalId,
+  animalCollection,
   animalNumber,
 
   createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -26684,7 +26814,7 @@ writeBatch.set(
 
 if (animalId) {
   writeBatch.set(
-    db.collection("animals").doc(
+    db.collection(animalCollection).doc(
       animalId
     ),
     {
@@ -31612,6 +31742,52 @@ const tomorrow =
     ]);
 
     const groups = new Map();
+        const activeAnimalCache =
+      new Map();
+
+    const vaccinationAlertAnimalIsActive =
+      async animalNumber => {
+        const key =
+          calvingNormDigitsOnlySrv(
+            animalNumber
+          );
+
+        if (!key) return false;
+
+        if (
+          activeAnimalCache.has(key)
+        ) {
+          return activeAnimalCache.get(
+            key
+          );
+        }
+
+        const animal =
+          await fetchAnimalByNumberForCalvingGateSrv(
+            uid,
+            key
+          );
+
+        const status =
+          String(
+            animal?.data?.status ||
+            "active"
+          )
+            .trim()
+            .toLowerCase();
+
+        const active =
+          Boolean(animal) &&
+          status !== "inactive" &&
+          status !== "archived";
+
+        activeAnimalCache.set(
+          key,
+          active
+        );
+
+        return active;
+      };
 
     for (
       const ds of [
@@ -31717,6 +31893,15 @@ const tomorrow =
         );
 
       if (!animalNumber) continue;
+            if (
+        !(
+          await vaccinationAlertAnimalIsActive(
+            animalNumber
+          )
+        )
+      ) {
+        continue;
+      }
 
       const programRowId =
         String(
