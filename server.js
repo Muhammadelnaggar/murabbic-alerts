@@ -31952,23 +31952,27 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
 //                 تنبيهات التحصين من السيرفر فقط — للداشبورد
 // ============================================================
 
-app.get("/api/vaccination/dashboard-alerts", requireUserId, async (req, res) => {
-  try {
-    if (!db) {
-      return res.status(503).json({
-        ok: false,
-        count: 0,
-        alerts: [],
-        message: "❌ تعذّر تحميل تنبيهات التحصين الآن. حاول مرة أخرى."
-      });
-    }
+async function vaccinationDashboardAlertsDataSrv({
+  userId = "",
+  profileUid = ""
+} = {}) {
+  if (!db) {
+    const error = new Error("firestore_disabled");
+    error.statusCode = 503;
+    throw error;
+  }
 
-    const uid = req.userId;
+  const uid = tenantKey(userId);
+
+  if (!uid) {
+    const error = new Error("vaccination_alerts_user_required");
+    error.statusCode = 401;
+    throw error;
+  }
 
 const today =
   await farmTodayISOSrv(
-    req.authSession?.uid ||
-    req.userId
+    profileUid || uid
   );
 
 const tomorrow =
@@ -31989,7 +31993,7 @@ const tomorrow =
       programContext.saved !== true ||
       !activeProgramMode
     ) {
-      return res.json({
+      return {
         ok: true,
         today,
         tomorrow,
@@ -32007,7 +32011,7 @@ const tomorrow =
 
         message:
           "اختر برنامج المزرعة أو برنامج مُرَبِّيك لتفعيل تنبيهات التحصين."
-      });
+      };
     }
 
     const [
@@ -32574,35 +32578,58 @@ const tomorrow =
       );
     });
 
-    return res.json({
-      ok: true,
-      today,
-      tomorrow,
+  return {
+    ok: true,
+    today,
+    tomorrow,
 
-      count:
-        alerts.length,
+    count:
+      alerts.length,
 
-      alerts,
+    alerts,
 
-      paused: false,
-      programContext,
-      summary
-    });
+    paused: false,
+    programContext,
+    summary
+  };
+}
 
-  } catch (e) {
-    console.error(
-      "vaccination-dashboard-alerts",
-      e
-    );
+app.get(
+  "/api/vaccination/dashboard-alerts",
+  requireUserId,
+  async (req, res) => {
+    try {
+      const payload =
+        await vaccinationDashboardAlertsDataSrv({
+          userId: req.userId,
+          profileUid:
+            req.authSession?.uid ||
+            req.userId
+        });
 
-    return res.status(500).json({
-      ok: false,
-      count: 0,
-      alerts: [],
-      message: "❌ تعذّر تحميل تنبيهات التحصين الآن. حاول مرة أخرى."
-    });
+      return res.json(payload);
+
+    } catch (e) {
+      console.error(
+        "vaccination-dashboard-alerts",
+        e
+      );
+
+      return res
+        .status(
+          Number(e?.statusCode) === 503
+            ? 503
+            : 500
+        )
+        .json({
+          ok: false,
+          count: 0,
+          alerts: [],
+          message: "❌ تعذّر تحميل تنبيهات التحصين الآن. حاول مرة أخرى."
+        });
+    }
   }
-});
+);
 // ============================================================
 //                 API: WEANING — GATE / SAVE
 //                 الفطام — فردي وجماعي من السيرفر فقط
@@ -36606,6 +36633,213 @@ murabbikSmartAlertRegisterSourceSrv(
   "uterine_check_followup",
   murabbikUterineCheckAlertSourceSrv
 );
+
+// ============================================================
+//       SMART ALERT SOURCE: VACCINATION PROGRAM TASKS
+//       التحصين من نفس حاسب البيانات المستخدم في الراوت القائم
+// ============================================================
+
+const MURABBIK_VACCINATION_SMART_ALERT_STATUS = {
+  overdue: {
+    priority: "high",
+    urgency: "today",
+    certainty: "confirmed",
+    snoozeMinutes: 6 * 60
+  },
+
+  due: {
+    priority: "normal",
+    urgency: "today",
+    certainty: "confirmed",
+    snoozeMinutes: 12 * 60
+  },
+
+  upcoming: {
+    priority: "low",
+    urgency: "soon",
+    certainty: "confirmed",
+    snoozeMinutes: 24 * 60
+  },
+
+  needs_data: {
+    priority: "normal",
+    urgency: "review",
+    certainty: "data_gap",
+    snoozeMinutes: 24 * 60
+  }
+};
+
+async function murabbikVaccinationProgramAlertSourceSrv(
+  context
+) {
+  const payload = await context.load(
+    "smart-alerts:vaccination-dashboard-data",
+
+    async () =>
+      await vaccinationDashboardAlertsDataSrv({
+        userId: context.userId,
+        profileUid: context.profileUid
+      })
+  );
+
+  return (
+    Array.isArray(payload.alerts)
+      ? payload.alerts
+      : []
+  ).map(alert => {
+    const status =
+      murabbikSmartAlertTextSrv(
+        alert.status
+      ).toLowerCase();
+
+    const policy =
+      MURABBIK_VACCINATION_SMART_ALERT_STATUS[
+        status
+      ] ||
+      MURABBIK_VACCINATION_SMART_ALERT_STATUS.needs_data;
+
+    const animalNumbers = [
+      ...new Set(
+        (
+          Array.isArray(alert.animalNumbers)
+            ? alert.animalNumbers
+            : []
+        )
+          .map(calvingNormDigitsOnlySrv)
+          .filter(Boolean)
+      )
+    ].sort((a, b) => Number(a) - Number(b));
+
+    const cleanText = value =>
+      murabbikSmartAlertTextSrv(value)
+        .replace(/[🚨⏰📌⚠️]/gu, "")
+        .trim();
+
+    const identityKey = [
+      "vaccination",
+      alert.programMode || "program",
+
+      alert.programRowId ||
+        alert.vaccineCode ||
+        alert.vaccine ||
+        "row",
+
+      alert.dueDate ||
+        alert.attentionCode ||
+        "attention",
+
+      alert.doseType || "dose"
+    ].join(":");
+
+    return {
+      identityKey,
+
+      revisionKey: [
+        identityKey,
+        status,
+        alert.windowEnd || "",
+        alert.requiredField || "",
+        animalNumbers.join(",")
+      ].join(":"),
+
+      kind: "operational",
+      domain: "health",
+
+      code:
+        `vaccination_program_${status || "review"}`,
+
+      priority:
+        policy.priority,
+
+      urgency:
+        policy.urgency,
+
+      certainty:
+        policy.certainty,
+
+      status:
+        status || "needs_data",
+
+      title:
+        cleanText(alert.title),
+
+      message:
+        cleanText(alert.message),
+
+      details: {
+        observation:
+          cleanText(alert.message),
+
+        meaning:
+          status === "needs_data"
+            ? "لا يمكن حساب الموعد التالي بصورة موثوقة قبل استكمال بيانات التحصين المطلوبة."
+            : "التنبيه صادر من المهمة الحالية التي أنشأها برنامج التحصينات المعتمد.",
+
+        recommendation:
+          status === "upcoming"
+            ? "راجع البرنامج واستعد للتنفيذ في موعده، ولا تسجّل الجرعة قبل إعطائها فعليًا."
+            : status === "needs_data"
+              ? "راجع بيانات البرنامج والحيوان ثم أكمل الحقل المطلوب."
+              : "سجّل التنفيذ الفعلي عند إعطاء التحصين حتى تُغلق المهمة ويُحسب الموعد التالي.",
+
+        evidence: [
+          alert.vaccine
+            ? `التحصين: ${alert.vaccine}`
+            : "",
+
+          alert.doseTypeLabel
+            ? `نوع الجرعة: ${alert.doseTypeLabel}`
+            : "",
+
+          alert.dueDate
+            ? `الموعد: ${alert.dueDate}`
+            : "",
+
+          animalNumbers.length
+            ? `الحيوانات: ${animalNumbers.join("، ")}`
+            : ""
+        ].filter(Boolean)
+      },
+
+      dueDate:
+        cleanText(
+          alert.dueDate ||
+          context.today
+        ).slice(0, 10),
+
+      affectedCount:
+        Number(alert.count) ||
+        animalNumbers.length,
+
+      animalNumbers,
+
+      action: {
+        type: "navigate",
+
+        label:
+          cleanText(
+            alert.actionText ||
+            "فتح صفحة التحصين"
+          ),
+
+        url:
+          cleanText(
+            alert.actionUrl ||
+            "vaccination.html"
+          )
+      },
+
+      snoozeMinutes:
+        policy.snoozeMinutes
+    };
+  });
+}
+
+murabbikSmartAlertRegisterSourceSrv(
+  "vaccination_program_tasks",
+  murabbikVaccinationProgramAlertSourceSrv
+);
+
 async function murabbikSmartAlertCollectSrv(req) {
   const context = {
     req,
