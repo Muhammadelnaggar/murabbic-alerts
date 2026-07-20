@@ -934,26 +934,29 @@ function syncExecutionProgramSelection() {
   const programRow =
     getSelectedExecutionProgramRow();
 
-  const allowedDoseTypes =
-    Array.isArray(
-      programRow?.allowedDoseTypes
-    )
-      ? programRow.allowedDoseTypes
-          .map(value =>
-            String(value || "").trim()
-          )
-          .filter(Boolean)
-      : [];
-
   const doseOptions =
-    farmProgramOptions.doseTypes.filter(
-      item =>
-        allowedDoseTypes.includes(
-          String(
-            item?.value || ""
-          ).trim()
-        )
-    );
+    Array.isArray(
+      programRow?.allowedDoseOptions
+    )
+      ? programRow.allowedDoseOptions
+          .map(item => ({
+            value:
+              String(
+                item?.value || ""
+              ).trim(),
+
+            label:
+              String(
+                item?.label ||
+                item?.value ||
+                ""
+              ).trim()
+          }))
+          .filter(item =>
+            item.value &&
+            item.label
+          )
+      : [];
 
   fillServerSelect(
     doseTypeEl,
