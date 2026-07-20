@@ -23323,70 +23323,93 @@ function vaccinationFarmProgramRowsSrv(body = {}) {
     : null;
 }
 
-function vaccinationFarmProgramNormalizeRowsSrv(
-  rawRows = []
-) {
+function vaccinationFarmProgramNormalizeRowsSrv(rawRows = []) {
   const rows = [];
   const errors = [];
-
-  const options =
-    vaccinationFarmProgramOptionsSrv();
+  const seenRows = new Set();
+  const options = vaccinationFarmProgramOptionsSrv();
 
   const findOption = (list, raw) => {
-    const value =
-      String(raw || "").trim();
+    const value = String(raw || "").trim();
+    if (!value || !Array.isArray(list)) return null;
 
-    if (!value || !Array.isArray(list)) {
-      return null;
-    }
-
-    return (
-      list.find(item =>
-        String(item?.value || "") === value ||
-        String(item?.label || "") === value
-      ) ||
-      null
-    );
+    return list.find(item =>
+      String(item?.value || "") === value ||
+      String(item?.label || "") === value
+    ) || null;
   };
 
-  rawRows.forEach((raw, index) => {
+  const addError = (
+    rowIndex,
+    field,
+    message,
+    doseIndex = null
+  ) => {
+    errors.push({
+      rowIndex,
+
+      ...(Number.isInteger(doseIndex)
+        ? { doseIndex }
+        : {}),
+
+      field,
+      message
+    });
+  };
+
+  const unitDays = {
+    day: 1,
+    week: 7,
+    month: 30,
+    year: 365
+  };
+
+  const asDays = (value, unit) =>
+    Number(value) *
+    Number(unitDays[unit] || 0);
+
+  rawRows.forEach((raw, rowIndex) => {
+    const rowNumber = rowIndex + 1;
+
     if (
       !raw ||
       typeof raw !== "object" ||
       Array.isArray(raw)
     ) {
-      errors.push({
-        rowIndex: index,
-        field: "row",
-        message:
-          `السطر رقم ${index + 1} غير صالح.`
-      });
+      addError(
+        rowIndex,
+        "row",
+        `السطر رقم ${rowNumber} غير صالح.`
+      );
 
       return;
     }
 
-    const vaccine =
-      findOption(
-        options.vaccines,
-        raw.vaccineCode ||
-        raw.vaccineName ||
-        raw.vaccine
-         );
-     const programSection =
+    const programSection =
       findOption(
         options.programSections,
+
         raw.programSection ||
         raw.section ||
         raw.programGroup
       );
 
-    const isCalves =
-      programSection?.value === "calves";
+    const vaccine =
+      findOption(
+        options.vaccines,
+
+        raw.vaccineCode ||
+        raw.vaccineName ||
+        raw.vaccine
+      );
+
     const rawVaccineForm =
-      raw.vaccineForm ||
-      raw.vaccineType ||
-      raw.formType ||
-      "";
+      String(
+        raw.vaccineForm ||
+        raw.vaccineType ||
+        raw.formType ||
+        ""
+      ).trim();
 
     const vaccineForm =
       vaccine
@@ -23404,62 +23427,609 @@ function vaccinationFarmProgramNormalizeRowsSrv(
           )
         : null;
 
-    const doseType =
-      findOption(
-        options.doseTypes,
-        raw.doseType
+    if (!programSection) {
+      addError(
+        rowIndex,
+        "programSection",
+        `اختر قسم التحصين في السطر رقم ${rowNumber}.`
       );
+    }
+
+    if (!vaccine) {
+      addError(
+        rowIndex,
+        "vaccineCode",
+        `اختر اسم التحصين من القائمة في السطر رقم ${rowNumber}.`
+      );
+    }
+
+    if (vaccine && !vaccineForm) {
+      addError(
+        rowIndex,
+        "vaccineForm",
+        `اختر نوع اللقاح في السطر رقم ${rowNumber}.`
+      );
+    }
+
+    const rowKey =
+      programSection && vaccine
+        ? `${programSection.value}:${vaccine.value}`
+        : "";
+
+    if (
+      rowKey &&
+      seenRows.has(rowKey)
+    ) {
+      addError(
+        rowIndex,
+        "vaccineCode",
+        "التحصين مضاف بالفعل داخل نفس القسم. أضف كل تحصين مرة واحدة وضع جميع جرعاته داخله."
+      );
+    }
+
+    const rawDoseSchedule =
+      Array.isArray(raw.doseSchedule)
+        ? raw.doseSchedule
+        : null;
+
+    if (
+      !rawDoseSchedule ||
+      !rawDoseSchedule.length ||
+      rawDoseSchedule.length > 10
+    ) {
+      addError(
+        rowIndex,
+        "doseSchedule",
+
+        !rawDoseSchedule
+          ? `أرسل جدول جرعات التحصين في السطر رقم ${rowNumber}.`
+          : !rawDoseSchedule.length
+            ? `أضف جرعة واحدة على الأقل للتحصين في السطر رقم ${rowNumber}.`
+            : "الحد الأقصى لجرعات التحصين الواحد هو 10 جرعات."
+      );
+    }
+
+    const doseSchedule = [];
+    const usedDoseTypes = new Set();
+
+    (rawDoseSchedule || []).forEach(
+      (rawStep, doseIndex) => {
+        const doseNumber =
+          doseIndex + 1;
+
+        if (
+          !rawStep ||
+          typeof rawStep !== "object" ||
+          Array.isArray(rawStep)
+        ) {
+          addError(
+            rowIndex,
+            "doseSchedule",
+            `الجرعة رقم ${doseNumber} في السطر رقم ${rowNumber} غير صالحة.`,
+            doseIndex
+          );
+
+          return;
+        }
+
+        const doseType =
+          findOption(
+            options.doseTypes,
+            rawStep.doseType
+          );
+
+        const timingBasis =
+          findOption(
+            options.doseTimingBases,
+            rawStep.timingBasis
+          );
+
+        const cycleRaw =
+          String(
+            rawStep.cycle || ""
+          ).trim();
+
+        const cycle =
+          cycleRaw
+            ? findOption(
+                options.doseCycles,
+                cycleRaw
+              )
+            : null;
+
+        if (!doseType) {
+          addError(
+            rowIndex,
+            "doseType",
+            `اختر نوع الجرعة رقم ${doseNumber}.`,
+            doseIndex
+          );
+        } else if (
+          usedDoseTypes.has(
+            doseType.value
+          )
+        ) {
+          addError(
+            rowIndex,
+            "doseType",
+            `نوع الجرعة «${doseType.label}» مكرر داخل نفس التحصين.`,
+            doseIndex
+          );
+        }
+
+        if (!timingBasis) {
+          addError(
+            rowIndex,
+            "timingBasis",
+            `اختر توقيت الجرعة رقم ${doseNumber}.`,
+            doseIndex
+          );
+        }
+
+        if (
+          cycleRaw &&
+          !cycle
+        ) {
+          addError(
+            rowIndex,
+            "cycle",
+            `اختر دورة الجرعة رقم ${doseNumber} من القائمة المعتمدة.`,
+            doseIndex
+          );
+        }
+
+        const timingValue =
+          vaccinationFarmProgramIntSrv(
+            rawStep.timingValue,
+            0
+          );
+
+        const timingUnit =
+          String(
+            rawStep.timingUnit || ""
+          ).trim()
+            ? findOption(
+                options.repeatUnits,
+                rawStep.timingUnit
+              )
+            : null;
+
+        const basis =
+          timingBasis?.value || "";
+
+        const needsDuration =
+          [
+            "after_previous_dose",
+            "repeat",
+            "calf_age",
+            "before_expected_calving"
+          ].includes(basis);
+
+        if (
+          needsDuration &&
+          (
+            !Number.isInteger(
+              timingValue
+            ) ||
+            timingValue <= 0 ||
+            timingValue > 120
+          )
+        ) {
+          addError(
+            rowIndex,
+            "timingValue",
+            `أدخل مدة صحيحة للجرعة رقم ${doseNumber}.`,
+            doseIndex
+          );
+        }
+
+        if (
+          needsDuration &&
+          !timingUnit
+        ) {
+          addError(
+            rowIndex,
+            "timingUnit",
+            `اختر وحدة توقيت الجرعة رقم ${doseNumber}.`,
+            doseIndex
+          );
+        }
+
+        if (
+          basis ===
+            "after_previous_dose" &&
+          doseIndex === 0
+        ) {
+          addError(
+            rowIndex,
+            "timingBasis",
+            "لا يمكن أن تبدأ جرعات التحصين بجرعة محسوبة بعد جرعة سابقة.",
+            doseIndex
+          );
+        }
+
+        if (
+          basis === "calf_age" &&
+          programSection?.value !==
+            "calves"
+        ) {
+          addError(
+            rowIndex,
+            "timingBasis",
+            "توقيت الجرعة حسب العمر متاح داخل قسم تحصينات العجول فقط.",
+            doseIndex
+          );
+        }
+
+        if (
+          basis ===
+            "before_expected_calving" &&
+          programSection?.value !==
+            "mothers"
+        ) {
+          addError(
+            rowIndex,
+            "timingBasis",
+            "توقيت الجرعة قبل الولادة متاح داخل قسم تحصينات الأمهات فقط.",
+            doseIndex
+          );
+        }
+
+        if (
+          basis ===
+            "before_expected_calving" &&
+          cycle?.value !==
+            "each_pregnancy"
+        ) {
+          addError(
+            rowIndex,
+            "cycle",
+            "جرعات ما قبل الولادة يجب أن تتكرر مع كل حمل.",
+            doseIndex
+          );
+        }
+
+        const ageMinValue =
+          vaccinationFarmProgramIntSrv(
+            rawStep.ageMinValue,
+            NaN
+          );
+
+        const ageMinUnit =
+          String(
+            rawStep.ageMinUnit || ""
+          ).trim()
+            ? findOption(
+                options.calfAgeUnits,
+                rawStep.ageMinUnit
+              )
+            : null;
+
+        const ageMaxValue =
+          vaccinationFarmProgramIntSrv(
+            rawStep.ageMaxValue,
+            NaN
+          );
+
+        const ageMaxUnit =
+          String(
+            rawStep.ageMaxUnit || ""
+          ).trim()
+            ? findOption(
+                options.calfAgeUnits,
+                rawStep.ageMaxUnit
+              )
+            : null;
+
+        if (
+          basis ===
+            "calf_age_window"
+        ) {
+          if (
+            programSection?.value !==
+              "calves"
+          ) {
+            addError(
+              rowIndex,
+              "timingBasis",
+              "النافذة العمرية متاحة للعجول فقط.",
+              doseIndex
+            );
+          }
+
+          if (
+            !Number.isInteger(
+              ageMinValue
+            ) ||
+            ageMinValue <= 0 ||
+            ageMinValue > 120
+          ) {
+            addError(
+              rowIndex,
+              "ageMinValue",
+              `أدخل بداية عمر صحيحة للجرعة رقم ${doseNumber}.`,
+              doseIndex
+            );
+          }
+
+          if (!ageMinUnit) {
+            addError(
+              rowIndex,
+              "ageMinUnit",
+              `اختر وحدة بداية العمر للجرعة رقم ${doseNumber}.`,
+              doseIndex
+            );
+          }
+
+          if (
+            !Number.isInteger(
+              ageMaxValue
+            ) ||
+            ageMaxValue <= 0 ||
+            ageMaxValue > 120
+          ) {
+            addError(
+              rowIndex,
+              "ageMaxValue",
+              `أدخل نهاية عمر صحيحة للجرعة رقم ${doseNumber}.`,
+              doseIndex
+            );
+          }
+
+          if (!ageMaxUnit) {
+            addError(
+              rowIndex,
+              "ageMaxUnit",
+              `اختر وحدة نهاية العمر للجرعة رقم ${doseNumber}.`,
+              doseIndex
+            );
+          }
+
+          if (
+            Number.isInteger(
+              ageMinValue
+            ) &&
+            ageMinUnit &&
+            Number.isInteger(
+              ageMaxValue
+            ) &&
+            ageMaxUnit &&
+            asDays(
+              ageMinValue,
+              ageMinUnit.value
+            ) >=
+              asDays(
+                ageMaxValue,
+                ageMaxUnit.value
+              )
+          ) {
+            addError(
+              rowIndex,
+              "ageMaxValue",
+              "نهاية النافذة العمرية يجب أن تكون بعد بدايتها.",
+              doseIndex
+            );
+          }
+
+          if (
+            cycle?.value !==
+              "once_lifetime"
+          ) {
+            addError(
+              rowIndex,
+              "cycle",
+              "جرعة النافذة العمرية يجب أن تكون مرة واحدة في العمر.",
+              doseIndex
+            );
+          }
+        }
+
+        if (
+          errors.some(item =>
+            item.rowIndex === rowIndex &&
+            item.doseIndex ===
+              doseIndex
+          )
+        ) {
+          return;
+        }
+
+        usedDoseTypes.add(
+          doseType.value
+        );
+
+        doseSchedule.push({
+          doseType:
+            doseType.value,
+
+          doseTypeLabel:
+            doseType.label,
+
+          timingBasis:
+            timingBasis.value,
+
+          timingBasisLabel:
+            timingBasis.label,
+
+          timingValue:
+            needsDuration
+              ? timingValue
+              : 0,
+
+          timingUnit:
+            needsDuration
+              ? timingUnit.value
+              : "",
+
+          timingUnitLabel:
+            needsDuration
+              ? timingUnit.label
+              : "",
+
+          ...(cycle
+            ? {
+                cycle:
+                  cycle.value,
+
+                cycleLabel:
+                  cycle.label
+              }
+            : {}),
+
+          ...(basis ===
+            "calf_age_window"
+            ? {
+                ageMinValue,
+
+                ageMinUnit:
+                  ageMinUnit.value,
+
+                ageMinUnitLabel:
+                  ageMinUnit.label,
+
+                ageMaxValue,
+
+                ageMaxUnit:
+                  ageMaxUnit.value,
+
+                ageMaxUnitLabel:
+                  ageMaxUnit.label
+              }
+            : {}),
+
+          ...(rawStep
+            .joinHerdSchedule === true
+            ? {
+                joinHerdSchedule: true
+              }
+            : {})
+        });
+      }
+    );
+
+    const repeatIndexes =
+      doseSchedule
+        .map(
+          (step, doseIndex) =>
+            step.timingBasis ===
+              "repeat"
+              ? doseIndex
+              : -1
+        )
+        .filter(
+          doseIndex =>
+            doseIndex >= 0
+        );
+
+    if (
+      repeatIndexes.length > 1
+    ) {
+      addError(
+        rowIndex,
+        "doseSchedule",
+        "لا يمكن إضافة أكثر من جرعة تكرار دوري داخل التحصين نفسه."
+      );
+    }
+
+    if (
+      repeatIndexes.length === 1 &&
+      repeatIndexes[0] !==
+        doseSchedule.length - 1
+    ) {
+      addError(
+        rowIndex,
+        "doseSchedule",
+        "جرعة التكرار الدوري يجب أن تكون آخر جرعة في التسلسل."
+      );
+    }
+
+    const preCalvingSteps =
+      doseSchedule.filter(
+        step =>
+          step.timingBasis ===
+            "before_expected_calving"
+      );
+
+    for (
+      let i = 1;
+      i < preCalvingSteps.length;
+      i += 1
+    ) {
+      const previous =
+        preCalvingSteps[i - 1];
+
+      const current =
+        preCalvingSteps[i];
+
+      if (
+        asDays(
+          current.timingValue,
+          current.timingUnit
+        ) >=
+        asDays(
+          previous.timingValue,
+          previous.timingUnit
+        )
+      ) {
+        addError(
+          rowIndex,
+          "doseSchedule",
+          "رتّب جرعات ما قبل الولادة من الأبعد عن موعد الولادة إلى الأقرب."
+        );
+
+        break;
+      }
+    }
+
+    if (
+      doseSchedule.length &&
+      !repeatIndexes.length
+    ) {
+      const finalCycle =
+        String(
+          doseSchedule[
+            doseSchedule.length - 1
+          ]?.cycle || ""
+        ).trim();
+
+      if (
+        ![
+          "once_lifetime",
+          "each_pregnancy"
+        ].includes(finalCycle)
+      ) {
+        addError(
+          rowIndex,
+          "cycle",
+          "حدّد هل تنتهي آخر جرعة مرة واحدة في العمر أو تتكرر مع كل حمل."
+        );
+      }
+    }
+
+    const startDateRaw =
+      String(
+        raw.startDate ||
+        raw.date ||
+        ""
+      ).trim();
 
     const startDate =
-      vaccinationFarmProgramDateSrv(
-        raw.startDate ||
-        raw.date
+      startDateRaw
+        ? vaccinationFarmProgramDateSrv(
+            startDateRaw
+          )
+        : "";
+
+    if (
+      startDateRaw &&
+      !startDate
+    ) {
+      addError(
+        rowIndex,
+        "startDate",
+        `تاريخ بداية البرنامج غير صحيح في السطر رقم ${rowNumber}.`
       );
-
-    const repeatEvery =
-      vaccinationFarmProgramIntSrv(
-        raw.repeatEvery,
-        0
-      );
-
-    const repeatUnit =
-      repeatEvery > 0
-        ? findOption(
-            options.repeatUnits,
-            raw.repeatUnit
-          )
-        : null;
-
-    const calfAgeRaw =
-      raw.calfAgeValue ??
-      raw.calfAge ??
-      raw.ageAtVaccination ??
-      "";
-
-    const calfAgeUnitRaw =
-      raw.calfAgeUnit ??
-      raw.ageUnit ??
-      "";
-
-    const hasCalfAge =
-      String(calfAgeRaw ?? "").trim() !== "" ||
-      String(calfAgeUnitRaw || "").trim() !== "";
-
-    const calfAgeValue =
-      hasCalfAge
-        ? vaccinationFarmProgramIntSrv(
-            calfAgeRaw,
-            NaN
-          )
-        : null;
-
-    const calfAgeUnit =
-      hasCalfAge
-        ? findOption(
-            options.calfAgeUnits,
-            calfAgeUnitRaw
-          )
-        : null;
+    }
 
     const advanceNoticeDays =
       vaccinationFarmProgramIntSrv(
@@ -23467,107 +24037,6 @@ function vaccinationFarmProgramNormalizeRowsSrv(
         0
       );
 
-    const notes =
-      vaccinationFarmProgramTextSrv(
-        raw.notes
-      );
-        if (!programSection) {
-      errors.push({
-        rowIndex: index,
-        field: "programSection",
-        message:
-          `اختر قسم التحصين في السطر رقم ${index + 1}.`
-      });
-    }
-    if (!vaccine) {
-      errors.push({
-        rowIndex: index,
-        field: "vaccineCode",
-        message:
-          `اختر اسم التحصين من القائمة في السطر رقم ${index + 1}.`
-      });
-    }
-
-    if (vaccine && !vaccineForm) {
-      errors.push({
-        rowIndex: index,
-        field: "vaccineForm",
-        message:
-          `اختر نوع اللقاح في السطر رقم ${index + 1}.`
-      });
-    }
-
-    if (!doseType) {
-      errors.push({
-        rowIndex: index,
-        field: "doseType",
-        message:
-          `اختر نوع الجرعة في السطر رقم ${index + 1}.`
-      });
-    }
-
-      if (
-      isCalves &&
-      (
-        !Number.isInteger(calfAgeValue) ||
-        calfAgeValue <= 0
-      )
-    ) {
-      errors.push({
-        rowIndex: index,
-        field: "calfAgeValue",
-        message:
-          `أدخل عمر تحصين صحيحًا للعجول في السطر رقم ${index + 1}.`
-      });
-    }
-
-    if (
-      isCalves &&
-      !calfAgeUnit
-    ) {
-      errors.push({
-        rowIndex: index,
-        field: "calfAgeUnit",
-        message:
-          `اختر وحدة عمر العجول في السطر رقم ${index + 1}.`
-      });
-    }
-
-    if (
-      !isCalves &&
-      !startDate
-    ) {
-      errors.push({
-        rowIndex: index,
-        field: "startDate",
-        message:
-          `أدخل تاريخ بداية البرنامج في السطر رقم ${index + 1}.`
-      });
-    }
-
-       if (
-      !Number.isInteger(repeatEvery) ||
-      repeatEvery < 0 ||
-      repeatEvery > 120
-    ) {
-      errors.push({
-        rowIndex: index,
-        field: "repeatEvery",
-        message:
-          `أدخل مدة تكرار صحيحة في السطر رقم ${index + 1}.`
-      });
-    }
-
-    if (repeatEvery > 0 && !repeatUnit) {
-      errors.push({
-        rowIndex: index,
-        field: "repeatUnit",
-        message:
-          `اختر فترة التكرار في السطر رقم ${index + 1}.`
-      });
-    }
-
-  
     if (
       !Number.isInteger(
         advanceNoticeDays
@@ -23575,34 +24044,43 @@ function vaccinationFarmProgramNormalizeRowsSrv(
       advanceNoticeDays < 0 ||
       advanceNoticeDays > 90
     ) {
-      errors.push({
-        rowIndex: index,
-        field: "advanceNoticeDays",
-        message:
-          `مدة التنبيه غير صحيحة في السطر رقم ${index + 1}.`
-      });
+      addError(
+        rowIndex,
+        "advanceNoticeDays",
+        `مدة التنبيه غير صحيحة في السطر رقم ${rowNumber}.`
+      );
     }
 
-    if (notes.length > 500) {
-      errors.push({
-        rowIndex: index,
-        field: "notes",
-        message:
-          `ملاحظات السطر رقم ${index + 1} أطول من المسموح.`
-      });
+    const notes =
+      vaccinationFarmProgramTextSrv(
+        raw.notes
+      );
+
+    if (
+      notes.length > 500
+    ) {
+      addError(
+        rowIndex,
+        "notes",
+        `ملاحظات السطر رقم ${rowNumber} أطول من المسموح.`
+      );
     }
 
     if (
       errors.some(
-        item => item.rowIndex === index
+        item =>
+          item.rowIndex === rowIndex
       )
     ) {
       return;
     }
 
+    seenRows.add(rowKey);
+
     const rowId =
       String(
         raw.rowId ||
+        raw.programRowId ||
         raw.id ||
         ""
       )
@@ -23614,8 +24092,95 @@ function vaccinationFarmProgramNormalizeRowsSrv(
         .slice(0, 80) ||
       crypto.randomUUID();
 
-       rows.push({
+    const allowedDoseTypes =
+      doseSchedule.map(
+        step => step.doseType
+      );
+
+    const fixedDoseType =
+      allowedDoseTypes.length === 1
+        ? allowedDoseTypes[0]
+        : "";
+
+    const fixedDoseTypeLabel =
+      fixedDoseType
+        ? (
+            options.doseTypes
+              .find(
+                item =>
+                  item.value ===
+                  fixedDoseType
+              )?.label || ""
+          )
+        : "";
+
+    const repeatStep =
+      doseSchedule.find(
+        step =>
+          step.timingBasis ===
+            "repeat"
+      ) ||
+      null;
+
+    const calfAgeStep =
+      doseSchedule.find(
+        step =>
+          step.timingBasis ===
+            "calf_age"
+      ) ||
+      null;
+
+    const calfAgeWindowStep =
+      doseSchedule.find(
+        step =>
+          step.timingBasis ===
+            "calf_age_window"
+      ) ||
+      null;
+
+    const cycles = [
+      ...new Set(
+        doseSchedule
+          .map(
+            step =>
+              String(
+                step.cycle || ""
+              ).trim()
+          )
+          .filter(Boolean)
+      )
+    ];
+
+    const rowCycle =
+      cycles.length === 1
+        ? cycles[0]
+        : "";
+
+    const singleOnceLifetime =
+      doseSchedule.length === 1 &&
+      rowCycle ===
+        "once_lifetime";
+
+    const targetGroup =
+      programSection.value ===
+        "calves"
+        ? "calves"
+        : programSection.value ===
+            "mothers"
+          ? (
+              doseSchedule.some(
+                step =>
+                  step.timingBasis ===
+                    "before_expected_calving"
+              )
+                ? "pregnant_mothers"
+                : "mothers"
+            )
+          : "herd_all";
+
+    rows.push({
       rowId,
+      programRowId: rowId,
 
       programSection:
         programSection.value,
@@ -23623,10 +24188,15 @@ function vaccinationFarmProgramNormalizeRowsSrv(
       programSectionLabel:
         programSection.label,
 
+      targetGroup,
+
       vaccineCode:
         vaccine.value,
 
       vaccineName:
+        vaccine.label,
+
+      vaccine:
         vaccine.label,
 
       vaccineForm:
@@ -23636,47 +24206,67 @@ function vaccinationFarmProgramNormalizeRowsSrv(
         vaccineForm.label,
 
       doseType:
-        doseType.value,
+        fixedDoseType,
 
       doseTypeLabel:
-        doseType.label,
+        fixedDoseTypeLabel,
 
-          startDate:
-        isCalves
-          ? ""
-          : startDate,
+      allowedDoseTypes,
+      doseSchedule,
 
-            repeatEvery,
+      cycle:
+        rowCycle,
+
+      startDate,
+
+      repeatEvery:
+        repeatStep?.timingValue || 0,
 
       repeatUnit:
-        repeatUnit?.value || "",
+        repeatStep?.timingUnit || "",
 
       repeatUnitLabel:
-        repeatUnit?.label || "",
+        repeatStep
+          ?.timingUnitLabel || "",
 
       oneTime:
-        repeatEvery === 0,
+        singleOnceLifetime,
 
       onceLifetime:
-        repeatEvery === 0,
+        singleOnceLifetime,
 
       calfSchedule:
-        isCalves,
+        programSection.value ===
+          "calves",
 
       calfAgeValue:
-        isCalves
-          ? calfAgeValue
-          : null,
+        calfAgeStep
+          ?.timingValue || null,
 
       calfAgeUnit:
-        isCalves
-          ? calfAgeUnit.value
-          : "",
+        calfAgeStep
+          ?.timingUnit || "",
 
       calfAgeUnitLabel:
-        isCalves
-          ? calfAgeUnit.label
-          : "",
+        calfAgeStep
+          ?.timingUnitLabel || "",
+
+      ageMinValue:
+        calfAgeWindowStep
+          ?.ageMinValue || 0,
+
+      ageMinUnit:
+        calfAgeWindowStep
+          ?.ageMinUnit || "",
+
+      ageMaxValue:
+        calfAgeWindowStep
+          ?.ageMaxValue || 0,
+
+      ageMaxUnit:
+        calfAgeWindowStep
+          ?.ageMaxUnit || "",
+
       advanceNoticeDays,
       notes,
 
@@ -23749,86 +24339,122 @@ function vaccinationFarmProgramExecutionRowsSrv(
       String(row.rowId || "").trim() &&
       String(row.vaccineCode || "").trim()
     )
-    .map(row => ({
-      programRowId:
-        String(row.rowId || "").trim(),
+    .map(row => {
+      const doseSchedule =
+        Array.isArray(row.doseSchedule)
+          ? row.doseSchedule
+              .filter(step =>
+                step &&
+                typeof step === "object" &&
+                !Array.isArray(step) &&
+                String(step.doseType || "").trim() &&
+                String(step.timingBasis || "").trim()
+              )
+              .map(step => ({
+                ...step,
 
-      vaccineCode:
-        String(row.vaccineCode || "").trim(),
+                doseType:
+                  String(step.doseType || "").trim(),
 
-      vaccine:
-        String(row.vaccineName || "").trim(),
+                doseTypeLabel:
+                  String(
+                    step.doseTypeLabel || ""
+                  ).trim(),
 
-      programSection:
-        String(row.programSection || "").trim(),
+                timingBasis:
+                  String(
+                    step.timingBasis || ""
+                  ).trim(),
 
-      programSectionLabel:
-        String(row.programSectionLabel || "").trim(),
+                timingValue:
+                  Number(step.timingValue || 0),
 
-      vaccineForm:
-        String(row.vaccineForm || "").trim(),
+                timingUnit:
+                  String(
+                    step.timingUnit || ""
+                  ).trim(),
 
-      vaccineFormLabel:
-        String(row.vaccineFormLabel || "").trim(),
+                cycle:
+                  String(step.cycle || "").trim()
+              }))
+          : [];
 
-      doseType:
-        String(row.doseType || "").trim(),
-
-      doseTypeLabel:
-        String(row.doseTypeLabel || "").trim(),
-
-      startDate:
-        String(row.startDate || "")
-          .trim()
-          .slice(0, 10),
-
-      repeatEvery:
-        Number(row.repeatEvery || 0),
-
-      repeatUnit:
-        String(row.repeatUnit || "").trim(),
-
-           repeatUnitLabel:
-        String(row.repeatUnitLabel || "").trim(),
-
-      oneTime:
-        row.oneTime === true ||
-        row.onceLifetime === true ||
-        Number(row.repeatEvery || 0) <= 0,
-
-      onceLifetime:
-        row.onceLifetime === true ||
-        row.oneTime === true ||
-        Number(row.repeatEvery || 0) <= 0,
-
-      calfSchedule:
-        row.calfSchedule === true,
-
-      calfAgeValue:
-        Number(row.calfAgeValue || 0),
-
-      calfAgeUnit:
-        String(row.calfAgeUnit || "").trim(),
-
-      calfAgeUnitLabel:
-        String(row.calfAgeUnitLabel || "").trim(),
-
-      advanceNoticeDays:
-        Math.max(
-          0,
-          Math.min(
-            90,
-            Number(
-              row.advanceNoticeDays || 0
-            ) || 0
+      const allowedDoseTypes =
+        [
+          ...new Set(
+            doseSchedule.map(step =>
+              step.doseType
+            )
           )
-        ),
+        ];
 
-      notes:
-        String(row.notes || "").trim()
-    }));
+      const fixedDoseType =
+        allowedDoseTypes.length === 1
+          ? allowedDoseTypes[0]
+          : "";
+
+      const fixedDoseStep =
+        fixedDoseType
+          ? doseSchedule.find(step =>
+              step.doseType === fixedDoseType
+            )
+          : null;
+
+      return {
+        ...row,
+
+        programRowId:
+          String(row.rowId || "").trim(),
+
+        vaccineCode:
+          String(row.vaccineCode || "").trim(),
+
+        vaccine:
+          String(
+            row.vaccineName ||
+            row.vaccine ||
+            ""
+          ).trim(),
+
+        doseType:
+          fixedDoseType,
+
+        doseTypeLabel:
+          String(
+            fixedDoseStep?.doseTypeLabel || ""
+          ).trim(),
+
+        allowedDoseTypes,
+        doseSchedule,
+
+        repeatEvery:
+          Number(row.repeatEvery || 0),
+
+        repeatUnit:
+          String(row.repeatUnit || "").trim(),
+
+        oneTime:
+          row.oneTime === true,
+
+        onceLifetime:
+          row.onceLifetime === true,
+
+        advanceNoticeDays:
+          Math.max(
+            0,
+            Math.min(
+              90,
+              Number(
+                row.advanceNoticeDays || 0
+              ) || 0
+            )
+          )
+      };
+    })
+    .filter(row =>
+      row.doseSchedule.length
+    );
 }
-
 async function vaccinationReadFarmProgramExecutionSrv(
   uid
 ) {
@@ -24836,18 +25462,6 @@ async function vaccinationResolveProgramRowSrv({
       programContext.programMode
     );
 
-  if (
-    programMode !== "farm" &&
-    programMode !==
-      "murabbik_default"
-  ) {
-    return {
-      ok: true,
-      linked: false,
-      programMode
-    };
-  }
-
   const programRowId =
     String(
       body.programRowId ||
@@ -24993,7 +25607,6 @@ async function vaccinationResolveProgramRowSrv({
   }
 
   if (
-    programMode !== "farm" &&
     fixedDoseType &&
     requestedDoseType !== fixedDoseType
   ) {
@@ -25008,8 +25621,7 @@ async function vaccinationResolveProgramRowSrv({
     };
   }
 
-  if (
-    programMode !== "farm" &&
+   if (
     allowedDoseTypes.length &&
     !allowedDoseTypes.includes(
       requestedDoseType
