@@ -26091,9 +26091,8 @@ app.post(
           body
         );
 
-      if (
+           if (
         !rawRows ||
-        !rawRows.length ||
         rawRows.length > 100
       ) {
         return res.status(400).json({
@@ -26105,9 +26104,7 @@ app.post(
           message:
             !rawRows
               ? "أرسل جدول التحصينات في صورة قائمة صفوف."
-              : !rawRows.length
-                ? "أضف تحصينًا واحدًا على الأقل قبل حفظ البرنامج."
-                : "الحد الأقصى لجدول برنامج المزرعة هو 100 سطر.",
+              : "الحد الأقصى لجدول برنامج المزرعة هو 100 سطر.",
 
           errors: []
         });
@@ -26339,8 +26336,10 @@ app.post(
       return res.json({
         ok: true,
 
-        message:
-          "تم حفظ جدول برنامج المزرعة بنجاح.",
+                message:
+          rows.length
+            ? "تم حفظ جدول برنامج المزرعة بنجاح."
+            : "تم حذف جميع التحصينات من برنامج المزرعة بنجاح.",
 
         programContext,
 
