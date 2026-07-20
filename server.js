@@ -23629,6 +23629,38 @@ function vaccinationFarmProgramRowsSrv(body = {}) {
     ? rows
     : null;
 }
+function vaccinationProgramDoseLabelSrv({
+  doseType = "",
+  timingBasis = "",
+  scheduleLength = 0,
+  fallbackLabel = ""
+} = {}) {
+  const type =
+    String(doseType || "").trim();
+
+  const basis =
+    String(timingBasis || "").trim();
+
+  const count =
+    Number(scheduleLength || 0);
+
+  if (
+    basis ===
+      "before_expected_calving"
+  ) {
+    if (count <= 1) {
+      return "جرعة قبل الولادة";
+    }
+
+    return type === "booster"
+      ? "الجرعة المنشطة قبل الولادة"
+      : "الجرعة الأولى قبل الولادة";
+  }
+
+  return String(
+    fallbackLabel || ""
+  ).trim();
+}
 function vaccinationFarmProgramExpandSimpleRowSrv(raw = {}) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
 
@@ -23767,9 +23799,9 @@ function vaccinationFarmProgramExpandSimpleRowSrv(raw = {}) {
             }
           )
         ]
-      : [
+          : [
           dose(
-            "periodic",
+            "prime",
             "before_expected_calving",
             programInput.motherDose1BeforeValue,
             programInput.motherDose1BeforeUnit,
@@ -24354,8 +24386,20 @@ function vaccinationFarmProgramNormalizeRowsSrv(rawRows = []) {
           doseType:
             doseType.value,
 
-          doseTypeLabel:
-            doseType.label,
+                   doseTypeLabel:
+            vaccinationProgramDoseLabelSrv({
+              doseType:
+                doseType.value,
+
+              timingBasis:
+                timingBasis.value,
+
+              scheduleLength:
+                rawDoseSchedule?.length || 0,
+
+              fallbackLabel:
+                doseType.label
+            }),
 
           timingBasis:
             timingBasis.value,
@@ -24614,16 +24658,14 @@ function vaccinationFarmProgramNormalizeRowsSrv(rawRows = []) {
         ? allowedDoseTypes[0]
         : "";
 
-    const fixedDoseTypeLabel =
+      const fixedDoseTypeLabel =
       fixedDoseType
-        ? (
-            options.doseTypes
-              .find(
-                item =>
-                  item.value ===
-                  fixedDoseType
-              )?.label || ""
-          )
+        ? String(
+            doseSchedule.find(step =>
+              step.doseType ===
+                fixedDoseType
+            )?.doseTypeLabel || ""
+          ).trim()
         : "";
 
     const repeatStep =
@@ -24888,33 +24930,65 @@ function vaccinationFarmProgramExecutionRowsSrv(
                 String(step.doseType || "").trim() &&
                 String(step.timingBasis || "").trim()
               )
-              .map(step => ({
-                ...step,
-
-                doseType:
-                  String(step.doseType || "").trim(),
-
-                doseTypeLabel:
-                  String(
-                    step.doseTypeLabel || ""
-                  ).trim(),
-
-                timingBasis:
+                           .map(step => {
+                const timingBasis =
                   String(
                     step.timingBasis || ""
-                  ).trim(),
+                  ).trim();
 
-                timingValue:
-                  Number(step.timingValue || 0),
-
-                timingUnit:
+                const rawDoseType =
                   String(
-                    step.timingUnit || ""
-                  ).trim(),
+                    step.doseType || ""
+                  ).trim();
 
-                cycle:
-                  String(step.cycle || "").trim()
-              }))
+                const scheduleLength =
+                  Array.isArray(
+                    row.doseSchedule
+                  )
+                    ? row.doseSchedule.length
+                    : 0;
+
+                const doseType =
+                  timingBasis ===
+                    "before_expected_calving" &&
+                  scheduleLength === 1 &&
+                  rawDoseType === "periodic"
+                    ? "prime"
+                    : rawDoseType;
+
+                return {
+                  ...step,
+
+                  doseType,
+
+                  doseTypeLabel:
+                    vaccinationProgramDoseLabelSrv({
+                      doseType,
+                      timingBasis,
+                      scheduleLength,
+
+                      fallbackLabel:
+                        step.doseTypeLabel || ""
+                    }),
+
+                  timingBasis,
+
+                  timingValue:
+                    Number(
+                      step.timingValue || 0
+                    ),
+
+                  timingUnit:
+                    String(
+                      step.timingUnit || ""
+                    ).trim(),
+
+                  cycle:
+                    String(
+                      step.cycle || ""
+                    ).trim()
+                };
+              })
           : [];
 
       const allowedDoseTypes =
@@ -24930,7 +25004,23 @@ function vaccinationFarmProgramExecutionRowsSrv(
         allowedDoseTypes.length === 1
           ? allowedDoseTypes[0]
           : "";
+            const allowedDoseOptions =
+        allowedDoseTypes.map(value => {
+          const step =
+            doseSchedule.find(item =>
+              item.doseType === value
+            );
 
+          return {
+            value,
+
+            label:
+              String(
+                step?.doseTypeLabel ||
+                value
+              ).trim()
+          };
+        });
       const fixedDoseStep =
         fixedDoseType
           ? doseSchedule.find(step =>
@@ -24963,6 +25053,7 @@ function vaccinationFarmProgramExecutionRowsSrv(
           ).trim(),
 
         allowedDoseTypes,
+        allowedDoseOptions,
         doseSchedule,
 
         repeatEvery:
@@ -25117,9 +25208,21 @@ function vaccinationMurabbikDefaultProgramSrv() {
         ...step,
 
         doseTypeLabel:
-          doseByCode.get(
-            step.doseType
-          )?.label || ""
+          vaccinationProgramDoseLabelSrv({
+            doseType:
+              step.doseType,
+
+            timingBasis:
+              step.timingBasis,
+
+            scheduleLength:
+              doseSchedule.length,
+
+            fallbackLabel:
+              doseByCode.get(
+                step.doseType
+              )?.label || ""
+          })
       }));
 
     const allowedDoseTypes =
@@ -25135,7 +25238,23 @@ function vaccinationMurabbikDefaultProgramSrv() {
       allowedDoseTypes.length === 1
         ? allowedDoseTypes[0]
         : "";
+        const allowedDoseOptions =
+      allowedDoseTypes.map(value => {
+        const step =
+          enrichedDoseSchedule.find(item =>
+            item.doseType === value
+          );
 
+        return {
+          value,
+
+          label:
+            String(
+              step?.doseTypeLabel ||
+              value
+            ).trim()
+        };
+      });
     return {
       programRowId,
       vaccineCode,
@@ -25158,14 +25277,17 @@ function vaccinationMurabbikDefaultProgramSrv() {
 
       doseTypeLabel:
         fixedDoseType
-          ? (
-              doseByCode.get(
-                fixedDoseType
-              )?.label || ""
-            )
+          ? String(
+              enrichedDoseSchedule
+                .find(step =>
+                  step.doseType ===
+                    fixedDoseType
+                )?.doseTypeLabel || ""
+            ).trim()
           : "",
 
       allowedDoseTypes,
+      allowedDoseOptions,
 
       doseSchedule:
         enrichedDoseSchedule,
@@ -25437,7 +25559,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
       advanceNoticeDays: 10,
       doseSchedule: [
         dose(
-          "periodic",
+          "prime",
           "before_expected_calving",
           40,
           "day",
@@ -26176,12 +26298,24 @@ async function vaccinationResolveProgramRowSrv({
     };
   }
 
-  const resolvedDoseType =
+   const resolvedDoseType =
     requestedDoseType;
+
+  const selectedDoseStep =
+    Array.isArray(row.doseSchedule)
+      ? row.doseSchedule.find(step =>
+          String(
+            step?.doseType || ""
+          ).trim() ===
+            resolvedDoseType
+        )
+      : null;
 
   const doseTypeLabel =
     String(
-      doseTypeOption.label || ""
+      selectedDoseStep?.doseTypeLabel ||
+      doseTypeOption.label ||
+      ""
     ).trim();
   return {
     ok: true,
