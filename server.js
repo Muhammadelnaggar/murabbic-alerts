@@ -22988,8 +22988,15 @@ function vaccinationFarmProgramOptionsSrv() {
       label: formLabels[value]
     }));
 
-   return {
-    catalogVersion: "vaccination-catalog-2026-07-14-02",
+      return {
+    catalogVersion: "vaccination-catalog-2026-07-20-01",
+
+    programTypes: [
+      { value: "herd", label: "القطيع" },
+      { value: "calves_to_herd", label: "العجول ثم القطيع" },
+      { value: "mothers", label: "الأمهات قبل الولادة" },
+      { value: "once_lifetime", label: "مرة واحدة في العمر" }
+    ],
 
     doseTypes: [
       {
@@ -23042,17 +23049,6 @@ function vaccinationFarmProgramOptionsSrv() {
     ],
 
     doseCycles: [
-      {
-        value: "each_pregnancy",
-        label: "يتكرر مع كل حمل"
-      },
-      {
-        value: "once_lifetime",
-        label: "مرة واحدة في العمر"
-      }
-    ],
-
-    repeatUnits: [
       {
         value: "each_pregnancy",
         label: "يتكرر مع كل حمل"
@@ -23322,7 +23318,212 @@ function vaccinationFarmProgramRowsSrv(body = {}) {
     ? rows
     : null;
 }
+function vaccinationFarmProgramExpandSimpleRowSrv(raw = {}) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
 
+  const programType = String(raw.programType || "").trim();
+  if (!programType) return raw;
+
+  const num = name => vaccinationFarmProgramIntSrv(raw[name], 0);
+  const txt = name => String(raw[name] || "").trim();
+
+  const dose = (
+    doseType,
+    timingBasis,
+    timingValue = 0,
+    timingUnit = "",
+    extra = {}
+  ) => ({
+    doseType,
+    timingBasis,
+    timingValue,
+    timingUnit,
+    ...extra
+  });
+
+  const programInput = {
+    calfStartValue: num("calfStartValue"),
+    calfStartUnit: txt("calfStartUnit"),
+
+    boosterAfterValue: num("boosterAfterValue"),
+    boosterAfterUnit: txt("boosterAfterUnit"),
+
+    periodicEveryValue: num("periodicEveryValue"),
+    periodicEveryUnit: txt("periodicEveryUnit"),
+
+    motherDose1BeforeValue: num("motherDose1BeforeValue"),
+    motherDose1BeforeUnit: txt("motherDose1BeforeUnit"),
+
+    motherDose2BeforeValue: num("motherDose2BeforeValue"),
+    motherDose2BeforeUnit: txt("motherDose2BeforeUnit"),
+
+    lifetimeAgeMinValue: num("lifetimeAgeMinValue"),
+    lifetimeAgeMinUnit: txt("lifetimeAgeMinUnit"),
+
+    lifetimeAgeMaxValue: num("lifetimeAgeMaxValue"),
+    lifetimeAgeMaxUnit: txt("lifetimeAgeMaxUnit")
+  };
+
+  let programSection = "";
+  let doseSchedule = [];
+
+  if (programType === "herd") {
+    programSection = "herd";
+
+    doseSchedule = [
+      dose("prime", "any_time"),
+
+      ...(programInput.boosterAfterValue || programInput.boosterAfterUnit
+        ? [
+            dose(
+              "booster",
+              "after_previous_dose",
+              programInput.boosterAfterValue,
+              programInput.boosterAfterUnit
+            )
+          ]
+        : []),
+
+      dose(
+        "periodic",
+        "repeat",
+        programInput.periodicEveryValue,
+        programInput.periodicEveryUnit
+      )
+    ];
+  }
+
+  if (programType === "calves_to_herd") {
+    programSection = "calves";
+
+    doseSchedule = [
+      dose(
+        "prime",
+        "calf_age",
+        programInput.calfStartValue,
+        programInput.calfStartUnit
+      ),
+
+      ...(programInput.boosterAfterValue || programInput.boosterAfterUnit
+        ? [
+            dose(
+              "booster",
+              "after_previous_dose",
+              programInput.boosterAfterValue,
+              programInput.boosterAfterUnit
+            )
+          ]
+        : []),
+
+      dose(
+        "periodic",
+        "repeat",
+        programInput.periodicEveryValue,
+        programInput.periodicEveryUnit,
+        {
+          joinHerdSchedule: true
+        }
+      )
+    ];
+  }
+
+  if (programType === "mothers") {
+    programSection = "mothers";
+
+    const hasBooster =
+      programInput.motherDose2BeforeValue ||
+      programInput.motherDose2BeforeUnit;
+
+    doseSchedule = hasBooster
+      ? [
+          dose(
+            "prime",
+            "before_expected_calving",
+            programInput.motherDose1BeforeValue,
+            programInput.motherDose1BeforeUnit,
+            {
+              cycle: "each_pregnancy"
+            }
+          ),
+
+          dose(
+            "booster",
+            "before_expected_calving",
+            programInput.motherDose2BeforeValue,
+            programInput.motherDose2BeforeUnit,
+            {
+              cycle: "each_pregnancy"
+            }
+          )
+        ]
+      : [
+          dose(
+            "periodic",
+            "before_expected_calving",
+            programInput.motherDose1BeforeValue,
+            programInput.motherDose1BeforeUnit,
+            {
+              cycle: "each_pregnancy"
+            }
+          )
+        ];
+  }
+
+  if (programType === "once_lifetime") {
+    programSection = "calves";
+
+    const hasAgeWindow =
+      programInput.lifetimeAgeMaxValue ||
+      programInput.lifetimeAgeMaxUnit;
+
+    doseSchedule = [
+      hasAgeWindow
+        ? dose(
+            "prime",
+            "calf_age_window",
+            0,
+            "",
+            {
+              ageMinValue:
+                programInput.lifetimeAgeMinValue,
+
+              ageMinUnit:
+                programInput.lifetimeAgeMinUnit,
+
+              ageMaxValue:
+                programInput.lifetimeAgeMaxValue,
+
+              ageMaxUnit:
+                programInput.lifetimeAgeMaxUnit,
+
+              cycle:
+                "once_lifetime"
+            }
+          )
+        : dose(
+            "prime",
+            "calf_age",
+            programInput.lifetimeAgeMinValue,
+            programInput.lifetimeAgeMinUnit,
+            {
+              cycle:
+                "once_lifetime"
+            }
+          )
+    ];
+  }
+
+  return {
+    ...raw,
+
+    programType,
+    programSection,
+    programInput,
+    doseSchedule,
+
+    startDate: ""
+  };
+}
 function vaccinationFarmProgramNormalizeRowsSrv(rawRows = []) {
   const rows = [];
   const errors = [];
@@ -23368,7 +23569,11 @@ function vaccinationFarmProgramNormalizeRowsSrv(rawRows = []) {
     Number(value) *
     Number(unitDays[unit] || 0);
 
-  rawRows.forEach((raw, rowIndex) => {
+    rawRows.forEach((raw, rowIndex) => {
+    raw = vaccinationFarmProgramExpandSimpleRowSrv(
+      raw
+    );
+
     const rowNumber = rowIndex + 1;
 
     if (
@@ -24181,8 +24386,34 @@ function vaccinationFarmProgramNormalizeRowsSrv(rawRows = []) {
       programSection:
         programSection.value,
 
-      programSectionLabel:
+        programSectionLabel:
         programSection.label,
+
+      programType:
+        String(
+          raw.programType ||
+          (
+            programSection.value === "mothers"
+              ? "mothers"
+              : programSection.value === "calves"
+                ? (
+                    doseSchedule.some(step =>
+                      String(step.cycle || "") ===
+                        "once_lifetime"
+                    )
+                      ? "once_lifetime"
+                      : "calves_to_herd"
+                  )
+                : "herd"
+          )
+        ).trim(),
+
+      programInput:
+        raw.programInput &&
+        typeof raw.programInput === "object" &&
+        !Array.isArray(raw.programInput)
+          ? raw.programInput
+          : {},
 
       targetGroup,
 
