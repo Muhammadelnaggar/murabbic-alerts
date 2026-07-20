@@ -267,276 +267,7 @@
           </button>
         </div>
 
-<template id="farmProgramRowTemplate">
-  <fieldset data-farm-program-row>
-    <legend>تحصين داخل البرنامج</legend>
 
-    <input
-      type="hidden"
-      data-farm-field="rowId"
-    />
-
-    <div class="row">
-      <div>
-        <label>قسم التحصين</label>
-
-        <select data-farm-field="programSection">
-          <option value="">
-            اختر القسم
-          </option>
-        </select>
-      </div>
-    </div>
-
-    <div class="row row-2">
-      <div>
-        <label>اسم التحصين</label>
-
-        <select data-farm-field="vaccineCode">
-          <option value="">
-            اختر التحصين
-          </option>
-        </select>
-      </div>
-
-      <div>
-        <label>نوع اللقاح</label>
-
-        <select data-farm-field="vaccineForm">
-          <option value="">
-            اختر نوع اللقاح
-          </option>
-        </select>
-      </div>
-    </div>
-
-      <div
-      class="row"
-      data-farm-section-block="dated"
-    >
-      <div>
-        <label>تاريخ بداية البرنامج</label>
-
-        <input
-          type="date"
-          data-farm-field="startDate"
-        />
-      </div>
-    </div>
-
-    <fieldset>
-      <legend>تسلسل الجرعات</legend>
-
-      <div
-        data-farm-dose-list
-        class="steps-list"
-        aria-live="polite"
-      ></div>
-
-      <button
-        class="ghost"
-        type="button"
-        data-action="add-farm-dose-step"
-      >
-        ＋ إضافة جرعة
-      </button>
-    </fieldset>
-
-    <div class="row">
-      <div>
-        <label>التنبيه قبل الموعد بالأيام</label>
-
-        <input
-          type="number"
-          data-farm-field="advanceNoticeDays"
-          placeholder="مثال: 14"
-        />
-      </div>
-    </div>
-
-    <div class="row">
-      <div>
-        <label>ملاحظات التحصين</label>
-
-        <textarea
-          data-farm-field="notes"
-          rows="2"
-          placeholder="ملاحظات اختيارية"
-        ></textarea>
-      </div>
-    </div>
-
-   <div class="row row-2">
-  <label>
-    <input
-      type="checkbox"
-      data-farm-field="active"
-      checked
-    />
-    التحصين فعّال داخل البرنامج
-  </label>
-
-  <div class="row row-2">
-    <button
-      class="save"
-      type="button"
-      data-action="save-farm-program-row"
-    >
-      💾 حفظ التحصين
-    </button>
-
-    <button
-      class="ghost"
-      type="button"
-      data-action="cancel-farm-program-row"
-    >
-      إلغاء
-    </button>
-  </div>
-</div>
-  </fieldset>
-</template>
-
-<template id="farmProgramDoseTemplate">
-  <fieldset data-farm-dose-step>
-    <legend data-farm-dose-title>
-      جرعة داخل التسلسل
-    </legend>
-
-    <div class="row row-2">
-      <div>
-        <label>نوع الجرعة</label>
-
-        <select data-dose-field="doseType">
-          <option value="">
-            اختر نوع الجرعة
-          </option>
-        </select>
-      </div>
-
-      <div>
-        <label>توقيت الجرعة</label>
-
-        <select data-dose-field="timingBasis">
-          <option value="">
-            اختر توقيت الجرعة
-          </option>
-        </select>
-      </div>
-    </div>
-
-    <div
-      class="row row-2 hidden-block"
-      data-dose-basis-block="duration"
-    >
-      <div>
-        <label>المدة</label>
-
-        <input
-          type="number"
-          min="1"
-          data-dose-field="timingValue"
-          placeholder="مثال: 21"
-        />
-      </div>
-
-      <div>
-        <label>وحدة المدة</label>
-
-        <select data-dose-field="timingUnit">
-          <option value="">
-            اختر الوحدة
-          </option>
-        </select>
-      </div>
-    </div>
-
-    <div
-      class="row row-2 hidden-block"
-      data-dose-basis-block="age-window"
-    >
-      <div>
-        <label>بداية العمر</label>
-
-        <input
-          type="number"
-          min="1"
-          data-dose-field="ageMinValue"
-          placeholder="مثال: 3"
-        />
-      </div>
-
-      <div>
-        <label>وحدة بداية العمر</label>
-
-        <select data-dose-field="ageMinUnit">
-          <option value="">
-            اختر الوحدة
-          </option>
-        </select>
-      </div>
-    </div>
-
-    <div
-      class="row row-2 hidden-block"
-      data-dose-basis-block="age-window"
-    >
-      <div>
-        <label>نهاية العمر</label>
-
-        <input
-          type="number"
-          min="1"
-          data-dose-field="ageMaxValue"
-          placeholder="مثال: 8"
-        />
-      </div>
-
-      <div>
-        <label>وحدة نهاية العمر</label>
-
-        <select data-dose-field="ageMaxUnit">
-          <option value="">
-            اختر الوحدة
-          </option>
-        </select>
-      </div>
-    </div>
-
-    <div class="row">
-      <div>
-        <label>دورة الجرعة</label>
-
-        <select data-dose-field="cycle">
-          <option value="">
-            اختر دورة الجرعة
-          </option>
-        </select>
-      </div>
-    </div>
-
-    <div
-      class="row hidden-block"
-      data-dose-section-block="calves"
-    >
-      <label>
-        <input
-          type="checkbox"
-          data-dose-field="joinHerdSchedule"
-        />
-        بعد هذه الجرعة ينتقل الحيوان إلى جدول القطيع
-      </label>
-    </div>
-
-    <button
-      class="ghost"
-      type="button"
-      data-action="remove-farm-dose-step"
-    >
-      حذف الجرعة
-    </button>
-  </fieldset>
-</template>
       </details>
     </section>
   </main>
@@ -563,10 +294,9 @@
   const saveBtn    = document.getElementById("saveBtn");
 
 let farmProgramOptions = {
+  programTypes: [],
   vaccines: [],
   doseTypes: [],
-  doseTimingBases: [],
-  doseCycles: [],
   repeatUnits: [],
   calfAgeUnits: [],
   programSections: []
@@ -616,9 +346,6 @@ const farmProgramRows =
 
 const farmProgramEditor =
   document.getElementById("farmProgramEditor");
-
-const farmProgramRowTemplate =
-  document.getElementById("farmProgramRowTemplate");
 
 const addFarmProgramRowBtn =
   document.getElementById("addFarmProgramRowBtn");
@@ -1204,16 +931,45 @@ function executionProgramRowLabel(row = {}) {
 function syncExecutionProgramSelection() {
   if (!doseTypeEl) return;
 
+  const programRow =
+    getSelectedExecutionProgramRow();
+
+  const allowedDoseTypes =
+    Array.isArray(
+      programRow?.allowedDoseTypes
+    )
+      ? programRow.allowedDoseTypes
+          .map(value =>
+            String(value || "").trim()
+          )
+          .filter(Boolean)
+      : [];
+
+  const doseOptions =
+    farmProgramOptions.doseTypes.filter(
+      item =>
+        allowedDoseTypes.includes(
+          String(
+            item?.value || ""
+          ).trim()
+        )
+    );
+
   fillServerSelect(
     doseTypeEl,
-    farmProgramOptions.doseTypes,
-    "اختر نوع الجرعة",
+    doseOptions,
+
+    programRow
+      ? "اختر الجرعة التي نُفذت فعليًا"
+      : "اختر التحصين أولًا",
+
     getDoseType()
   );
 
-  doseTypeEl.disabled = false;
+  doseTypeEl.disabled =
+    !programRow ||
+    doseOptions.length === 0;
 }
-
 function renderEventProgramOptions() {
   const currentVaccine =
     String(vaccineEl?.value || "").trim();
@@ -1295,9 +1051,8 @@ function renderFarmVaccineForms(
 
   const formSelect =
     rowElement.querySelector(
-      '[data-farm-field="vaccineForm"]'
+      '[data-farm-field="vaccineForm"], [data-farm-simple-field="vaccineForm"]'
     );
-
   const formOptions =
     Array.isArray(vaccine?.formOptions)
       ? vaccine.formOptions
@@ -1320,183 +1075,7 @@ function renderFarmVaccineForms(
     defaultForm
   );
 }
-function farmDoseField(stepElement, name) {
-  return stepElement?.querySelector(
-    `[data-dose-field="${name}"]`
-  ) || null;
-}
 
-function renderFarmDoseStepFields(
-  stepElement,
-  programSection = ""
-) {
-  const timingBasis = String(
-    farmDoseField(stepElement, "timingBasis")?.value || ""
-  ).trim();
-
-  const needsDuration = [
-    "after_previous_dose",
-    "repeat",
-    "calf_age",
-    "before_expected_calving"
-  ].includes(timingBasis);
-
-  stepElement
-    .querySelectorAll('[data-dose-basis-block="duration"]')
-    .forEach(block => {
-      block.classList.toggle(
-        "hidden-block",
-        !needsDuration
-      );
-    });
-
-  stepElement
-    .querySelectorAll('[data-dose-basis-block="age-window"]')
-    .forEach(block => {
-      block.classList.toggle(
-        "hidden-block",
-        timingBasis !== "calf_age_window"
-      );
-    });
-
-  stepElement
-    .querySelectorAll('[data-dose-section-block="calves"]')
-    .forEach(block => {
-      block.classList.toggle(
-        "hidden-block",
-        programSection !== "calves"
-      );
-    });
-}
-
-function renderFarmDoseTitles(rowElement) {
-  rowElement
-    .querySelectorAll("[data-farm-dose-step]")
-    .forEach((stepElement, index) => {
-      const title = stepElement.querySelector(
-        "[data-farm-dose-title]"
-      );
-
-      const doseType = String(
-        farmDoseField(stepElement, "doseType")?.value || ""
-      ).trim();
-
-      if (!title) return;
-
-      title.textContent = doseType
-        ? `الجرعة ${index + 1}: ${farmProgramOptionLabel(
-            farmProgramOptions.doseTypes,
-            doseType
-          )}`
-        : `الجرعة ${index + 1}`;
-    });
-}
-
-function renderFarmProgramSectionFields(rowElement) {
-  const programSection = String(
-    rowElement.querySelector(
-      '[data-farm-field="programSection"]'
-    )?.value || ""
-  ).trim();
-
-  rowElement
-    .querySelectorAll('[data-farm-section-block="dated"]')
-    .forEach(block => {
-      block.classList.toggle(
-        "hidden-block",
-        !programSection || programSection === "calves"
-      );
-    });
-
-  rowElement
-    .querySelectorAll("[data-farm-dose-step]")
-    .forEach(stepElement => {
-      renderFarmDoseStepFields(
-        stepElement,
-        programSection
-      );
-    });
-}
-
-function appendFarmProgramDoseStep(
-  rowElement,
-  step = {}
-) {
-  const doseList = rowElement.querySelector(
-    "[data-farm-dose-list]"
-  );
-
-  const doseTemplate = document.getElementById(
-    "farmProgramDoseTemplate"
-  );
-
-  if (!doseList || !doseTemplate) return;
-
-  const fragment = doseTemplate.content.cloneNode(true);
-
-  const stepElement = fragment.querySelector(
-    "[data-farm-dose-step]"
-  );
-
-  if (!stepElement) return;
-
-  [
-    ["doseType", farmProgramOptions.doseTypes, "اختر نوع الجرعة"],
-    ["timingBasis", farmProgramOptions.doseTimingBases, "اختر توقيت الجرعة"],
-    ["timingUnit", farmProgramOptions.repeatUnits, "اختر الوحدة"],
-    ["ageMinUnit", farmProgramOptions.calfAgeUnits, "اختر الوحدة"],
-    ["ageMaxUnit", farmProgramOptions.calfAgeUnits, "اختر الوحدة"],
-    ["cycle", farmProgramOptions.doseCycles, "اختر دورة الجرعة"]
-  ].forEach(([name, items, placeholder]) => {
-    fillServerSelect(
-      farmDoseField(stepElement, name),
-      items,
-      placeholder,
-      step[name] ?? ""
-    );
-  });
-
-  ["timingValue", "ageMinValue", "ageMaxValue"]
-    .forEach(name => {
-      const input = farmDoseField(stepElement, name);
-
-      if (input) {
-        input.value = step[name] ?? "";
-      }
-    });
-
-  const joinHerd = farmDoseField(
-    stepElement,
-    "joinHerdSchedule"
-  );
-
-  if (joinHerd) {
-    joinHerd.checked =
-      step.joinHerdSchedule === true;
-  }
-
-  farmDoseField(stepElement, "timingBasis")
-    ?.addEventListener("change", () => {
-      renderFarmProgramSectionFields(rowElement);
-    });
-
-  farmDoseField(stepElement, "doseType")
-    ?.addEventListener("change", () => {
-      renderFarmDoseTitles(rowElement);
-    });
-
-  stepElement
-    .querySelector('[data-action="remove-farm-dose-step"]')
-    ?.addEventListener("click", () => {
-      stepElement.remove();
-      renderFarmDoseTitles(rowElement);
-    });
-
-  doseList.appendChild(fragment);
-
-  renderFarmProgramSectionFields(rowElement);
-  renderFarmDoseTitles(rowElement);
-}
 function farmProgramOptionLabel(
   items = [],
   rawValue = ""
@@ -1518,6 +1097,234 @@ function farmProgramOptionLabel(
   ).trim();
 }
 
+function farmSimpleProgramType(row = {}) {
+  const explicit =
+    String(row.programType || "").trim();
+
+  if (explicit) return explicit;
+
+  if (row.programSection === "mothers") {
+    return "mothers";
+  }
+
+  if (row.programSection === "calves") {
+    return row.onceLifetime === true
+      ? "once_lifetime"
+      : "calves_to_herd";
+  }
+
+  return row.programSection
+    ? "herd"
+    : "";
+}
+
+function farmSimpleInputFromRow(row = {}) {
+  return (
+    row.programInput &&
+    typeof row.programInput === "object" &&
+    !Array.isArray(row.programInput)
+      ? row.programInput
+      : row
+  );
+}
+
+function farmSimpleConfig(programType = "") {
+  const configs = {
+    herd: {
+      hint:
+        "جرعة تأسيس، ثم منشطة، وبعدها جرعة دورية مع القطيع.",
+
+      fields: [
+        [
+          "boosterAfterValue",
+          "boosterAfterUnit",
+          "الجرعة المنشطة بعد التأسيس بـ",
+          farmProgramOptions.repeatUnits,
+          false
+        ],
+        [
+          "periodicEveryValue",
+          "periodicEveryUnit",
+          "الجرعة الدورية مع القطيع كل",
+          farmProgramOptions.repeatUnits,
+          false
+        ]
+      ]
+    },
+
+    calves_to_herd: {
+      hint:
+        "يبدأ العجل بالتأسيس، ثم المنشطة، وبعدها يدخل مع القطيع في الجرعات الدورية.",
+
+      fields: [
+        [
+          "calfStartValue",
+          "calfStartUnit",
+          "تبدأ جرعة التأسيس عند عمر",
+          farmProgramOptions.calfAgeUnits,
+          false
+        ],
+        [
+          "boosterAfterValue",
+          "boosterAfterUnit",
+          "الجرعة المنشطة بعد التأسيس بـ",
+          farmProgramOptions.repeatUnits,
+          false
+        ],
+        [
+          "periodicEveryValue",
+          "periodicEveryUnit",
+          "بعدها الجرعة الدورية مع القطيع كل",
+          farmProgramOptions.repeatUnits,
+          false
+        ]
+      ]
+    },
+
+    mothers: {
+      hint:
+        "يُحفظ تحصين الأمومة مرة واحدة، ويكرره مُرَبِّيك تلقائيًا مع كل حمل.",
+
+      fields: [
+        [
+          "motherDose1BeforeValue",
+          "motherDose1BeforeUnit",
+          "الجرعة الأولى قبل الولادة بـ",
+          farmProgramOptions.repeatUnits,
+          false
+        ],
+        [
+          "motherDose2BeforeValue",
+          "motherDose2BeforeUnit",
+          "الجرعة الثانية قبل الولادة بـ (اختياري)",
+          farmProgramOptions.repeatUnits,
+          true
+        ]
+      ]
+    },
+
+    once_lifetime: {
+      hint:
+        "يُنفذ هذا التحصين مرة واحدة فقط لكل حيوان خلال العمر المحدد.",
+
+      fields: [
+        [
+          "lifetimeAgeMinValue",
+          "lifetimeAgeMinUnit",
+          "يُعطى من عمر",
+          farmProgramOptions.calfAgeUnits,
+          false
+        ],
+        [
+          "lifetimeAgeMaxValue",
+          "lifetimeAgeMaxUnit",
+          "حتى عمر (اختياري)",
+          farmProgramOptions.calfAgeUnits,
+          true
+        ]
+      ]
+    }
+  };
+
+  return configs[
+    String(programType || "").trim()
+  ] || null;
+}
+
+function renderFarmSimpleSchedule(
+  rowElement,
+  storedInput = {}
+) {
+  const programType = String(
+    rowElement.querySelector(
+      '[data-farm-simple-field="programType"]'
+    )?.value || ""
+  ).trim();
+
+  const config =
+    farmSimpleConfig(programType);
+
+  const hint = rowElement.querySelector(
+    "[data-farm-simple-hint]"
+  );
+
+  const list = rowElement.querySelector(
+    "[data-farm-simple-schedule]"
+  );
+
+  if (hint) {
+    hint.textContent = config?.hint || "";
+    hint.classList.toggle(
+      "hidden-block",
+      !config
+    );
+  }
+
+  if (!list) return;
+
+  list.innerHTML = "";
+
+  for (const field of config?.fields || []) {
+    const [
+      valueName,
+      unitName,
+      label,
+      units,
+      optional
+    ] = field;
+
+    const block =
+      document.createElement("div");
+
+    block.className = "row row-2";
+    block.dataset.valueName = valueName;
+    block.dataset.unitName = unitName;
+
+    block.innerHTML = `
+      <div>
+        <label>${label}</label>
+
+        <input
+          type="number"
+          min="1"
+          data-farm-simple-value
+          placeholder="${optional ? "اختياري" : "مثال: 21"}"
+        />
+      </div>
+
+      <div>
+        <label>الوحدة</label>
+        <select data-farm-simple-unit></select>
+      </div>
+    `;
+
+    const valueInput = block.querySelector(
+      "[data-farm-simple-value]"
+    );
+
+    const unitSelect = block.querySelector(
+      "[data-farm-simple-unit]"
+    );
+
+    if (valueInput) {
+      valueInput.value =
+        storedInput?.[valueName] ?? "";
+    }
+
+    fillServerSelect(
+      unitSelect,
+      units,
+
+      optional
+        ? "اختياري"
+        : "اختر الوحدة",
+
+      storedInput?.[unitName] ?? ""
+    );
+
+    list.appendChild(block);
+  }
+}
 function closeFarmProgramEditor() {
   if (farmProgramEditor) {
     farmProgramEditor.innerHTML = "";
@@ -1660,57 +1467,94 @@ name.textContent = [
 function readFarmProgramEditorRow() {
   const rowElement =
     farmProgramEditor?.querySelector(
-      "[data-farm-program-row]"
+      "[data-farm-simple-row-editor]"
     );
 
   if (!rowElement) return null;
 
   const value = name =>
     rowElement.querySelector(
-      `[data-farm-field="${name}"]`
+      `[data-farm-simple-field="${name}"]`
     )?.value ?? "";
 
-  const doseSchedule = [
-    ...rowElement.querySelectorAll(
-      "[data-farm-dose-step]"
+  const programType =
+    value("programType");
+
+  const programInput = {};
+
+  rowElement
+    .querySelectorAll(
+      "[data-farm-simple-schedule] .row"
     )
-  ].map(stepElement => {
-    const doseValue = name =>
-      farmDoseField(stepElement, name)?.value ?? "";
+    .forEach(block => {
+      const valueName = String(
+        block.dataset.valueName || ""
+      ).trim();
 
-    return {
-      doseType: doseValue("doseType"),
-      timingBasis: doseValue("timingBasis"),
-      timingValue: doseValue("timingValue"),
-      timingUnit: doseValue("timingUnit"),
-      cycle: doseValue("cycle"),
-      ageMinValue: doseValue("ageMinValue"),
-      ageMinUnit: doseValue("ageMinUnit"),
-      ageMaxValue: doseValue("ageMaxValue"),
-      ageMaxUnit: doseValue("ageMaxUnit"),
+      const unitName = String(
+        block.dataset.unitName || ""
+      ).trim();
 
-      joinHerdSchedule:
-        farmDoseField(
-          stepElement,
-          "joinHerdSchedule"
-        )?.checked === true
-    };
-  });
+      if (valueName) {
+        programInput[valueName] =
+          block.querySelector(
+            "[data-farm-simple-value]"
+          )?.value ?? "";
+      }
+
+      if (unitName) {
+        programInput[unitName] =
+          block.querySelector(
+            "[data-farm-simple-unit]"
+          )?.value ?? "";
+      }
+    });
+
+  const programSection =
+    programType === "herd"
+      ? "herd"
+      : programType === "mothers"
+        ? "mothers"
+        : "calves";
 
   return {
-    rowId: value("rowId"),
-    programSection: value("programSection"),
-    vaccineCode: value("vaccineCode"),
-    vaccineForm: value("vaccineForm"),
-    startDate: value("startDate"),
-    doseSchedule,
-    advanceNoticeDays: value("advanceNoticeDays"),
-    notes: value("notes"),
+    rowId:
+      value("rowId"),
 
-    active:
-      rowElement.querySelector(
-        '[data-farm-field="active"]'
-      )?.checked === true
+    programType,
+    programSection,
+
+    vaccineCode:
+      value("vaccineCode"),
+
+    vaccineForm:
+      value("vaccineForm"),
+
+    ...programInput,
+    programInput,
+
+    repeatEvery:
+      programInput.periodicEveryValue || "",
+
+       repeatUnit:
+      programInput.periodicEveryUnit || "",
+
+    notes:
+      value("notes"),
+
+    ...(value("advanceNoticeDays") !== ""
+      ? {
+          advanceNoticeDays:
+            value("advanceNoticeDays")
+        }
+      : {}),
+
+    ...(value("active") !== ""
+      ? {
+          active:
+            value("active") === "true"
+        }
+      : {})
   };
 }
 function saveFarmProgramEditorRow() {
@@ -1743,34 +1587,113 @@ function saveFarmProgramEditorRow() {
 }
 
 function openFarmProgramEditor(row = {}) {
-  if (
-    !farmProgramEditor ||
-    !farmProgramRowTemplate
-  ) {
-    return;
-  }
+  if (!farmProgramEditor) return;
 
-  farmProgramEditor.innerHTML = "";
+  farmProgramEditor.innerHTML = `
+    <fieldset data-farm-simple-row-editor>
+      <legend>بيانات التحصين</legend>
 
-  const fragment =
-    farmProgramRowTemplate.content.cloneNode(true);
+       <input
+        type="hidden"
+        data-farm-simple-field="rowId"
+      />
+
+      <input
+        type="hidden"
+        data-farm-simple-field="advanceNoticeDays"
+      />
+
+      <input
+        type="hidden"
+        data-farm-simple-field="active"
+      />
+
+      <div class="row">
+        <div>
+          <label>يُستخدم هذا التحصين مع</label>
+
+          <select
+            data-farm-simple-field="programType"
+          ></select>
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div>
+          <label>اسم التحصين</label>
+
+          <select
+            data-farm-simple-field="vaccineCode"
+          ></select>
+        </div>
+
+        <div>
+          <label>نوع اللقاح</label>
+
+          <select
+            data-farm-simple-field="vaccineForm"
+          ></select>
+        </div>
+      </div>
+
+      <div
+        class="form-hint hidden-block"
+        data-farm-simple-hint
+      ></div>
+
+      <div
+        data-farm-simple-schedule
+      ></div>
+
+      <div class="row">
+        <div>
+          <label>ملاحظات التحصين</label>
+
+          <textarea
+            data-farm-simple-field="notes"
+            rows="2"
+            placeholder="ملاحظات اختيارية"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <button
+          class="save"
+          type="button"
+          data-action="save-farm-program-row"
+        >
+          💾 حفظ التحصين
+        </button>
+
+        <button
+          class="ghost"
+          type="button"
+          data-action="cancel-farm-program-row"
+        >
+          إلغاء
+        </button>
+      </div>
+    </fieldset>
+  `;
 
   const rowElement =
-    fragment.querySelector(
-      "[data-farm-program-row]"
+    farmProgramEditor.querySelector(
+      "[data-farm-simple-row-editor]"
     );
 
   if (!rowElement) return;
 
   const field = name =>
     rowElement.querySelector(
-      `[data-farm-field="${name}"]`
+      `[data-farm-simple-field="${name}"]`
     );
 
-  const vaccine = findFarmVaccineOption(
-    row.vaccineCode ||
-    row.vaccineName
-  );
+  const vaccine =
+    findFarmVaccineOption(
+      row.vaccineCode ||
+      row.vaccineName
+    );
 
   const vaccineCode = String(
     vaccine?.value ||
@@ -1778,16 +1701,36 @@ function openFarmProgramEditor(row = {}) {
     ""
   ).trim();
 
-  if (field("rowId")) {
-    field("rowId").value =
-      row.rowId ?? "";
-  }
+  const programType =
+    farmSimpleProgramType(row);
+
+  const storedInput =
+    farmSimpleInputFromRow(row);
+
+  field("rowId").value =
+    row.rowId ?? "";
+
+  field("advanceNoticeDays").value =
+    Object.prototype.hasOwnProperty.call(
+      row,
+      "advanceNoticeDays"
+    )
+      ? String(row.advanceNoticeDays ?? "")
+      : "";
+
+  field("active").value =
+    Object.prototype.hasOwnProperty.call(
+      row,
+      "active"
+    )
+      ? String(row.active === true)
+      : "";
 
   fillServerSelect(
-    field("programSection"),
-    farmProgramOptions.programSections,
-    "اختر القسم",
-    row.programSection ?? ""
+    field("programType"),
+    farmProgramOptions.programTypes,
+    "اختر المجموعة",
+    programType
   );
 
   fillServerSelect(
@@ -1803,80 +1746,39 @@ function openFarmProgramEditor(row = {}) {
     row.vaccineForm ?? ""
   );
 
-  if (field("startDate")) {
-    field("startDate").value =
-      row.startDate ?? "";
-  }
+  field("notes").value =
+    row.notes ?? "";
 
-  if (field("advanceNoticeDays")) {
-    field("advanceNoticeDays").value =
-      row.advanceNoticeDays ?? "";
-  }
-
-  if (field("notes")) {
-    field("notes").value =
-      row.notes ?? "";
-  }
-
-  if (
-    field("active") &&
-    Object.prototype.hasOwnProperty.call(
-      row,
-      "active"
-    )
-  ) {
-    field("active").checked =
-      row.active === true;
-  }
-
-  field("programSection")
-    ?.addEventListener("change", () => {
-      renderFarmProgramSectionFields(
-        rowElement
-      );
-    });
+  field("programType")
+    ?.addEventListener(
+      "change",
+      () => {
+        renderFarmSimpleSchedule(
+          rowElement,
+          {}
+        );
+      }
+    );
 
   field("vaccineCode")
-    ?.addEventListener("change", event => {
-      renderFarmVaccineForms(
-        rowElement,
-        event.target.value,
-        ""
-      );
-    });
-
-  rowElement
-    .querySelector(
-      '[data-action="add-farm-dose-step"]'
-    )
-    ?.addEventListener("click", () => {
-      appendFarmProgramDoseStep(
-        rowElement,
-        {}
-      );
-    });
-
-  farmProgramEditor.appendChild(fragment);
-
-  const doseSchedule =
-    Array.isArray(row.doseSchedule) &&
-    row.doseSchedule.length
-      ? row.doseSchedule
-      : [{}];
-
-  doseSchedule.forEach(step => {
-    appendFarmProgramDoseStep(
-      rowElement,
-      step
+    ?.addEventListener(
+      "change",
+      event => {
+        renderFarmVaccineForms(
+          rowElement,
+          event.target.value,
+          ""
+        );
+      }
     );
-  });
+
+  renderFarmSimpleSchedule(
+    rowElement,
+    storedInput
+  );
 
   farmProgramEditor.classList.remove(
     "hidden-block"
-  );
-
-  renderFarmProgramSectionFields(
-    rowElement
   );
 
   if (addFarmProgramRowBtn) {
@@ -1891,7 +1793,7 @@ function openFarmProgramEditor(row = {}) {
   } catch (_) {}
 }
 function renderFarmProgramResponse(result = {}) {
-    renderProgramContext(result);
+  renderProgramContext(result);
 
   const options =
     result.options &&
@@ -1899,7 +1801,12 @@ function renderFarmProgramResponse(result = {}) {
       ? result.options
       : {};
 
-  farmProgramOptions = {
+ farmProgramOptions = {
+    programTypes:
+      Array.isArray(options.programTypes)
+        ? options.programTypes
+        : [],
+
     vaccines:
       Array.isArray(options.vaccines)
         ? options.vaccines
@@ -1909,21 +1816,13 @@ function renderFarmProgramResponse(result = {}) {
       Array.isArray(options.doseTypes)
         ? options.doseTypes
         : [],
-        doseTimingBases:
-      Array.isArray(options.doseTimingBases)
-        ? options.doseTimingBases
-        : [],
 
-    doseCycles:
-      Array.isArray(options.doseCycles)
-        ? options.doseCycles
-        : [],
     repeatUnits:
       Array.isArray(options.repeatUnits)
         ? options.repeatUnits
         : [],
 
-        calfAgeUnits:
+    calfAgeUnits:
       Array.isArray(options.calfAgeUnits)
         ? options.calfAgeUnits
         : [],
@@ -2010,13 +1909,18 @@ async function loadVaccinationOptions() {
 
     renderProgramContext(result);
 
-    const options =
+       const options =
       result.options &&
       typeof result.options === "object"
         ? result.options
         : {};
 
     farmProgramOptions = {
+      programTypes:
+        Array.isArray(options.programTypes)
+          ? options.programTypes
+          : [],
+
       vaccines:
         Array.isArray(options.vaccines)
           ? options.vaccines
@@ -2026,15 +1930,7 @@ async function loadVaccinationOptions() {
         Array.isArray(options.doseTypes)
           ? options.doseTypes
           : [],
-          doseTimingBases:
-      Array.isArray(options.doseTimingBases)
-        ? options.doseTimingBases
-        : [],
 
-    doseCycles:
-      Array.isArray(options.doseCycles)
-        ? options.doseCycles
-        : [],
       repeatUnits:
         Array.isArray(options.repeatUnits)
           ? options.repeatUnits
