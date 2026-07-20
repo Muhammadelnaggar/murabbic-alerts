@@ -23474,8 +23474,7 @@ function vaccinationFarmProgramNormalizeRowsSrv(rawRows = []) {
 
     if (
       !rawDoseSchedule ||
-      !rawDoseSchedule.length ||
-      rawDoseSchedule.length > 10
+      !rawDoseSchedule.length
     ) {
       addError(
         rowIndex,
@@ -23483,12 +23482,9 @@ function vaccinationFarmProgramNormalizeRowsSrv(rawRows = []) {
 
         !rawDoseSchedule
           ? `أرسل جدول جرعات التحصين في السطر رقم ${rowNumber}.`
-          : !rawDoseSchedule.length
-            ? `أضف جرعة واحدة على الأقل للتحصين في السطر رقم ${rowNumber}.`
-            : "الحد الأقصى لجرعات التحصين الواحد هو 10 جرعات."
+          : `أضف جرعة واحدة على الأقل للتحصين في السطر رقم ${rowNumber}.`
       );
     }
-
     const doseSchedule = [];
     const usedDoseTypes = new Set();
 
