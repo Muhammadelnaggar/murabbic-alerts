@@ -33601,20 +33601,22 @@ async function vaccinationInitialAgeAlertGroupsSrv({
           eventDate: today
         });
 
-      if (
+           if (
         !advice ||
         !/^\d{4}-\d{2}-\d{2}$/.test(
           advice.windowStart || ""
         ) ||
-        today < advice.windowStart
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          advice.windowEnd || ""
+        ) ||
+        today < advice.windowStart ||
+        today > advice.windowEnd
       ) {
         continue;
       }
 
       const alertStatus =
-        today > advice.windowEnd
-          ? "overdue"
-          : "due";
+        "due";
 
       const key = [
         alertStatus,
