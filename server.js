@@ -37432,7 +37432,43 @@ function murabbikSmartAlertPublicSrv(alert) {
     ...publicAlert
   } = alert;
 
-  return publicAlert;
+  const action =
+    publicAlert.action &&
+    typeof publicAlert.action === "object"
+      ? publicAlert.action
+      : null;
+
+  return {
+    ...publicAlert,
+
+    buttons: [
+      {
+        key: "acknowledged",
+        label: "حسنًا",
+        decision: "acknowledged",
+        role: "acknowledge"
+      },
+      {
+        key: "snoozed",
+        label: "ذكّرني لاحقًا",
+        decision: "snoozed",
+        role: "snooze"
+      },
+
+      ...(action?.url
+        ? [
+            {
+              key: "direct_action",
+              label:
+                action.label ||
+                "فتح الإجراء",
+              role: "action",
+              action
+            }
+          ]
+        : [])
+    ]
+  };
 }
 const MURABBIK_SMART_ALERT_STATE_COLLECTION = "smart_alert_states";
 
