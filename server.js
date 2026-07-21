@@ -27509,12 +27509,61 @@ function vaccinationProgramNextTaskSrv({
       );
   }
 
-  if (
+   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(
       dueDate
     )
   ) {
     return null;
+  }
+
+  const stopAtAgeValue =
+    Number(
+      nextStep.stopAtAgeValue || 0
+    );
+
+  const stopAtAgeUnit =
+    String(
+      nextStep.stopAtAgeUnit || ""
+    ).trim();
+
+  const birthDate =
+    vaccinationAnimalBirthDateSrv(
+      animalDoc
+    );
+
+  const stopAtAgeDate =
+    Number.isInteger(stopAtAgeValue) &&
+    stopAtAgeValue > 0 &&
+    stopAtAgeUnit &&
+    birthDate
+      ? vaccinationYmdAddUnitSrv(
+          birthDate,
+          stopAtAgeValue,
+          stopAtAgeUnit
+        )
+      : "";
+
+  if (
+   String(
+  nextStep.doseType || ""
+).trim() === "periodic" &&
+    timingBasis === "repeat" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      stopAtAgeDate
+    ) &&
+    dueDate > stopAtAgeDate
+  ) {
+    return {
+      completed: true,
+
+      completionReason:
+        "age_schedule_completed",
+
+      stopAtAgeValue,
+      stopAtAgeUnit,
+      stopAtAgeDate
+    };
   }
 
   const advanceNoticeDays =
@@ -27753,7 +27802,64 @@ function vaccinationBuildProgramTaskWriteSrv({
       admin.firestore.FieldValue
         .serverTimestamp()
   };
+    if (
+    nextTask?.completed === true
+  ) {
+    return {
+      taskId,
+      taskRef,
 
+      payload: {
+        ...common,
+
+        dueDate: "",
+        alertFromDate: "",
+        windowStart: "",
+        windowEnd: "",
+
+        doseType: "",
+        doseTypeLabel: "",
+
+        status: "completed",
+        done: true,
+
+        completionReason:
+          String(
+            nextTask.completionReason ||
+            "program_completed"
+          ).trim(),
+
+        stopAtAgeValue:
+          Number(
+            nextTask.stopAtAgeValue || 0
+          ),
+
+        stopAtAgeUnit:
+          String(
+            nextTask.stopAtAgeUnit || ""
+          ).trim(),
+
+        stopAtAgeDate:
+          String(
+            nextTask.stopAtAgeDate || ""
+          ).trim(),
+
+        completedByEventId:
+          String(eventId || "").trim(),
+
+        completedEventDate:
+          String(eventDate || "")
+            .trim()
+            .slice(0, 10),
+
+        completedAt:
+          admin.firestore.FieldValue
+            .serverTimestamp()
+      },
+
+      publicTask: null
+    };
+  }
   if (!nextTask) {
     const currentDoseType =
       String(
