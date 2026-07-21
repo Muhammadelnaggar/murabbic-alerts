@@ -33679,7 +33679,7 @@ async function vaccinationInitialAgeAlertGroupsSrv({
         !/^\d{4}-\d{2}-\d{2}$/.test(
           advice.dueDate || ""
         ) ||
-        today < advice.dueDate
+       today !== advice.dueDate
       ) {
         continue;
       }
@@ -38661,9 +38661,11 @@ async function murabbikVaccinationProgramAlertSourceSrv(
       message:
         cleanText(alert.message),
 
-      details: {
+            details: {
         observation:
-          cleanText(alert.message),
+          isInitialAge
+            ? ""
+            : cleanText(alert.message),
 
                meaning:
           isInitialAge
