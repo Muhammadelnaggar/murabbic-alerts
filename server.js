@@ -33626,15 +33626,22 @@ async function vaccinationInitialAgeAlertGroupsSrv({
       ].join("__");
 
       if (!groups.has(key)) {
-        groups.set(key, {
+       groups.set(key, {
+          alertOrigin:
+            "program_age",
+
           alertStatus,
           programMode,
+
+          ageText:
+            String(
+              advice.ageText || ""
+            ).trim(),
 
           programLabel:
             programMode === "farm"
               ? "برنامج المزرعة"
               : "برنامج مُرَبِّيك",
-
           programRowId,
 
           vaccineCode:
@@ -33981,7 +33988,8 @@ const tomorrow =
       ].join("__");
 
       if (!groups.has(key)) {
-        groups.set(key, {
+       groups.set(key, {
+          alertOrigin: "task",
           alertStatus,
           programMode,
 
@@ -34103,27 +34111,42 @@ const tomorrow =
       let actionUrl =
         "vaccination.html";
 
+           const isProgramAgeAlert =
+        g.alertOrigin === "program_age";
+
       if (
         g.alertStatus === "overdue"
       ) {
-        const lateDays =
-          Math.max(
-            1,
-            diffDaysISO(
-              g.windowEnd ||
-              g.dueDate,
-              today
-            )
-          );
-
         level = "warn";
-        title =
-          "تحصين متأخر";
 
-        message =
-          `🚨 تحصين متأخر: ${g.vaccine}\n` +
-          `تجاوز نافذة التنفيذ منذ ${lateDays} يومًا.\n` +
-          `الحيوانات: ${nums.join("، ")}`;
+        if (isProgramAgeAlert) {
+          title =
+            "جرعة تأسيسية خارج نافذة البرنامج";
+
+          message =
+            `جرعة تأسيسية: ${g.vaccine}\n` +
+            `العمر المحدد في البرنامج: ${g.ageText || "حسب البرنامج النشط"}\n` +
+            `نافذة البرنامج: من ${g.alertFromDate} إلى ${g.windowEnd}.\n` +
+            `الحيوانات: ${nums.join("، ")}`;
+        } else {
+          const lateDays =
+            Math.max(
+              1,
+              diffDaysISO(
+                g.windowEnd ||
+                g.dueDate,
+                today
+              )
+            );
+
+          title =
+            "تحصين متأخر";
+
+          message =
+            `🚨 تحصين متأخر: ${g.vaccine}\n` +
+            `تجاوز نافذة التنفيذ منذ ${lateDays} يومًا.\n` +
+            `الحيوانات: ${nums.join("، ")}`;
+        }
 
         actionText =
           "تسجيل التحصين الآن";
@@ -34136,25 +34159,35 @@ const tomorrow =
 
         level = "warn";
 
-        title = isToday
-          ? "تحصين مستحق اليوم"
-          : "تحصين داخل نافذة التنفيذ";
+        if (isProgramAgeAlert) {
+          title =
+            "جرعة تأسيسية داخل نافذة البرنامج";
 
-        message = isToday
-          ? (
-              `⏰ مستحق اليوم: ${g.vaccine}\n` +
-              `الحيوانات: ${nums.join("، ")}`
-            )
-          : (
-              `⏰ داخل نافذة التنفيذ: ${g.vaccine}\n` +
-              `الموعد الأصلي: ${g.dueDate}\n` +
-              `آخر يوم في النافذة: ${g.windowEnd}\n` +
-              `الحيوانات: ${nums.join("، ")}`
-            );
+          message =
+            `جرعة تأسيسية: ${g.vaccine}\n` +
+            `العمر المحدد في البرنامج: ${g.ageText || "حسب البرنامج النشط"}\n` +
+            `نافذة البرنامج: من ${g.alertFromDate} إلى ${g.windowEnd}.\n` +
+            `الحيوانات: ${nums.join("، ")}`;
+        } else {
+          title = isToday
+            ? "تحصين مستحق اليوم"
+            : "تحصين داخل نافذة التنفيذ";
+
+          message = isToday
+            ? (
+                `⏰ مستحق اليوم: ${g.vaccine}\n` +
+                `الحيوانات: ${nums.join("، ")}`
+              )
+            : (
+                `⏰ داخل نافذة التنفيذ: ${g.vaccine}\n` +
+                `الموعد الأصلي: ${g.dueDate}\n` +
+                `آخر يوم في النافذة: ${g.windowEnd}\n` +
+                `الحيوانات: ${nums.join("، ")}`
+              );
+        }
 
         actionText =
           "تسجيل التحصين";
-
       } else if (
         g.alertStatus ===
           "upcoming"
@@ -34257,8 +34290,17 @@ const tomorrow =
 
         type: "vaccination",
         level,
-        status:
+               status:
           g.alertStatus,
+
+        alertOrigin:
+          g.alertOrigin ||
+          "task",
+
+        ageText:
+          String(
+            g.ageText || ""
+          ).trim(),
 
         title,
         message,
@@ -38549,21 +38591,24 @@ async function murabbikVaccinationProgramAlertSourceSrv(
       message:
         cleanText(alert.message),
 
-      details: {
-        observation:
-          cleanText(alert.message),
+           details: {
+        observation: "",
 
         meaning:
-          status === "needs_data"
-            ? "لا يمكن حساب الموعد التالي بصورة موثوقة قبل استكمال بيانات التحصين المطلوبة."
-            : "التنبيه صادر من المهمة الحالية التي أنشأها برنامج التحصينات المعتمد.",
+          alert.alertOrigin === "program_age"
+            ? "تنبيه محسوب من عمر الحيوان والبرنامج النشط، ولا توجد مهمة قبل أول تنفيذ فعلي."
+            : status === "needs_data"
+              ? "لا يمكن حساب الموعد التالي بصورة موثوقة قبل استكمال بيانات التحصين المطلوبة."
+              : "التنبيه صادر من مهمة الجرعة التالية بعد تنفيذ فعلي سابق.",
 
         recommendation:
-          status === "upcoming"
-            ? "راجع البرنامج واستعد للتنفيذ في موعده، ولا تسجّل الجرعة قبل إعطائها فعليًا."
-            : status === "needs_data"
-              ? "راجع بيانات البرنامج والحيوان ثم أكمل الحقل المطلوب."
-              : "سجّل التنفيذ الفعلي عند إعطاء التحصين حتى تُغلق المهمة ويُحسب الموعد التالي.",
+          alert.alertOrigin === "program_age"
+            ? "عند تسجيل الجرعة التأسيسية فعليًا، يبدأ مُرَبِّيك متابعة الجرعة التالية حسب البرنامج."
+            : status === "upcoming"
+              ? "راجع البرنامج واستعد للتنفيذ في موعده، ولا تسجّل الجرعة قبل إعطائها فعليًا."
+              : status === "needs_data"
+                ? "راجع بيانات البرنامج والحيوان ثم أكمل الحقل المطلوب."
+                : "سجّل التنفيذ الفعلي عند إعطاء التحصين حتى تُغلق المهمة ويُحسب الموعد التالي.",
 
         evidence: [
           alert.vaccine
