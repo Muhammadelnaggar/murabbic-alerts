@@ -33416,6 +33416,7 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
     });
   }
 });
+const VACCINATION_INITIAL_AGE_RANGE_DAYS = 15;
 async function vaccinationInitialAgeAlertGroupsSrv({
   uid = "",
   programMode = "",
@@ -33674,12 +33675,44 @@ async function vaccinationInitialAgeAlertGroupsSrv({
           eventDate: today
         });
 
-       if (
+            if (
         !advice ||
         !/^\d{4}-\d{2}-\d{2}$/.test(
           advice.dueDate || ""
+        )
+      ) {
+        continue;
+      }
+
+      const ageRangeStart =
+        advice.timingBasis === "calf_age"
+          ? vaccinationYmdAddDaysSrv(
+              advice.dueDate,
+              -VACCINATION_INITIAL_AGE_RANGE_DAYS
+            )
+          : String(
+              advice.windowStart || ""
+            ).trim();
+
+      const ageRangeEnd =
+        advice.timingBasis === "calf_age"
+          ? vaccinationYmdAddDaysSrv(
+              advice.dueDate,
+              VACCINATION_INITIAL_AGE_RANGE_DAYS
+            )
+          : String(
+              advice.windowEnd || ""
+            ).trim();
+
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          ageRangeStart
         ) ||
-       today !== advice.dueDate
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          ageRangeEnd
+        ) ||
+        today < ageRangeStart ||
+        today > ageRangeEnd
       ) {
         continue;
       }
@@ -33735,6 +33768,13 @@ async function vaccinationInitialAgeAlertGroupsSrv({
 
           eligibilityDate:
             advice.dueDate,
+          ageRangeStart,
+          ageRangeEnd,
+
+          ageRangeDays:
+            advice.timingBasis === "calf_age"
+              ? VACCINATION_INITIAL_AGE_RANGE_DAYS
+              : null,
           attentionCode: "",
           attentionMessage: "",
           requiredField: "",
@@ -34185,8 +34225,8 @@ const tomorrow =
         title =
           "الجرعة التأسيسية جاهزة";
 
-        message =
-          `بلغ${nums.length === 1 ? " الحيوان" : "ت الحيوانات"} العمر المحدد لبدء الجرعة التأسيسية لتحصين ${g.vaccine}.\n` +
+                message =
+          `${nums.length === 1 ? "أصبح الحيوان في العمر المناسب" : "توجد حيوانات في العمر المناسب"} لبدء الجرعة التأسيسية لتحصين ${g.vaccine}.\n` +
           `الحيوانات: ${nums.join("، ")}`;
 
         actionText =
@@ -38542,9 +38582,9 @@ const MURABBIK_VACCINATION_SMART_ALERT_STATUS = {
     certainty: "confirmed",
     snoozeMinutes: 24 * 60
   },
-    initial_age_ready: {
+   initial_age_ready: {
     priority: "normal",
-    urgency: "today",
+    urgency: "soon",
     certainty: "confirmed",
     snoozeMinutes: 12 * 60
   },
@@ -38669,8 +38709,7 @@ async function murabbikVaccinationProgramAlertSourceSrv(
 
                meaning:
           isInitialAge
-            ? "بلغ الحيوان العمر المحدد في برنامج التحصينات النشط لبدء الجرعة التأسيسية. هذا تنبيه ذكي وليس مهمة مجدولة."
-            : status === "needs_data"
+            ? "الحيوان داخل النطاق العمري المناسب لبدء الجرعة التأسيسية حسب برنامج التحصينات النشط. هذا تنبيه ذكي وليس مهمة مجدولة."            : status === "needs_data"
               ? "لا يمكن حساب الموعد التالي بصورة موثوقة قبل استكمال بيانات التحصين المطلوبة."
               : "التنبيه صادر من المهمة الحالية التي أنشأها برنامج التحصينات المعتمد.",
 
