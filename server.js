@@ -27411,8 +27411,7 @@ function vaccinationProgramNextTaskSrv({
           step.doseType || ""
         ).trim() === currentDoseType
     );
-
-  let nextStep =
+    let nextStep =
     currentIndex >= 0
       ? (
           doseSchedule[
@@ -27435,58 +27434,6 @@ function vaccinationProgramNextTaskSrv({
       ) ||
       null;
   }
-
-  if (
-    !nextStep &&
-    Number(
-      programLink.repeatEvery || 0
-    ) > 0 &&
-    String(
-      programLink.repeatUnit || ""
-    ).trim()
-  ) {
-       nextStep = {
-      doseType:
-        (
-          programLink.programMode === "farm"
-            ? String(
-                programLink.programDoseType ||
-                ""
-              ).trim()
-            : ""
-        ) ||
-        currentDoseType ||
-        String(
-          programLink.doseType || ""
-        ).trim(),
-
-      doseTypeLabel:
-        (
-          programLink.programMode === "farm"
-            ? String(
-                programLink.programDoseTypeLabel ||
-                ""
-              ).trim()
-            : ""
-        ) ||
-        String(
-          programLink.doseTypeLabel || ""
-        ).trim(),
-
-      timingBasis: "repeat",
-
-      timingValue:
-        Number(
-          programLink.repeatEvery || 0
-        ),
-
-      timingUnit:
-        String(
-          programLink.repeatUnit || ""
-        ).trim()
-    };
-  }
-
   if (!nextStep) {
     return null;
   }
