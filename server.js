@@ -24903,12 +24903,12 @@ function vaccinationFarmProgramResponseSrv(
       )
   };
 }
-function vaccinationFarmProgramExecutionRowsSrv(
-  data = {}
+function vaccinationProgramExecutionRowsSrv(
+  rawRows = []
 ) {
   const rows =
-    Array.isArray(data.rows)
-      ? data.rows
+    Array.isArray(rawRows)
+      ? rawRows
       : [];
 
   return rows
@@ -24916,7 +24916,11 @@ function vaccinationFarmProgramExecutionRowsSrv(
       row &&
       typeof row === "object" &&
       row.active !== false &&
-      String(row.rowId || "").trim() &&
+            String(
+        row.programRowId ||
+        row.rowId ||
+        ""
+      ).trim() &&
       String(row.vaccineCode || "").trim()
     )
     .map(row => {
@@ -25031,8 +25035,12 @@ function vaccinationFarmProgramExecutionRowsSrv(
       return {
         ...row,
 
-        programRowId:
-          String(row.rowId || "").trim(),
+         programRowId:
+          String(
+            row.programRowId ||
+            row.rowId ||
+            ""
+          ).trim(),
 
         vaccineCode:
           String(row.vaccineCode || "").trim(),
@@ -25083,6 +25091,16 @@ function vaccinationFarmProgramExecutionRowsSrv(
     .filter(row =>
       row.doseSchedule.length
     );
+}
+
+function vaccinationFarmProgramExecutionRowsSrv(
+  data = {}
+) {
+  return vaccinationProgramExecutionRowsSrv(
+    Array.isArray(data.rows)
+      ? data.rows
+      : []
+  );
 }
 async function vaccinationReadFarmProgramExecutionSrv(
   uid
@@ -26072,7 +26090,9 @@ async function vaccinationReadExecutionProgramSrv(
       program.defaultAlternatives || {};
 
     const rows =
-      program.rows.filter(row => {
+      vaccinationProgramExecutionRowsSrv(
+        program.rows
+      ).filter(row => {
         const alternativeGroup =
           String(
             row.alternativeGroup || ""
