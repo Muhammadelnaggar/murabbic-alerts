@@ -22356,8 +22356,6 @@ function vaccinationDoseNormSrv(v) {
     s === "prime" ||
     s === "primary" ||
     s.includes("primary") ||
-    s.includes("تأسيس") ||
-    s.includes("تاسيس") ||
     s.includes("أساسي") ||
     s.includes("اساسي") ||
     s.includes("أولى") ||
@@ -33603,43 +33601,40 @@ async function vaccinationInitialAgeAlertGroupsSrv({
           eventDate: today
         });
 
-         if (
+      if (
         !advice ||
         !/^\d{4}-\d{2}-\d{2}$/.test(
-          advice.dueDate || ""
+          advice.windowStart || ""
         ) ||
-        today < advice.dueDate
+        today < advice.windowStart
       ) {
         continue;
       }
 
       const alertStatus =
-        "due";
-           const key = [
+        today > advice.windowEnd
+          ? "overdue"
+          : "due";
+
+      const key = [
         alertStatus,
         programMode,
         programRowId,
         row.vaccineCode || "",
-        doseType
+        doseType,
+        advice.dueDate
       ].join("__");
 
       if (!groups.has(key)) {
-       groups.set(key, {
-          alertOrigin:
-            "program_age",
-
+        groups.set(key, {
           alertStatus,
           programMode,
-
-          ageText:
-            String(
-              advice.ageText || ""
-            ).trim(),
 
           programLabel:
             programMode === "farm"
               ? "برنامج المزرعة"
               : "برنامج مُرَبِّيك",
+
           programRowId,
 
           vaccineCode:
@@ -33664,11 +33659,11 @@ async function vaccinationInitialAgeAlertGroupsSrv({
           dueDate:
             advice.dueDate,
 
-         alertFromDate:
-            advice.dueDate,
+          alertFromDate:
+            advice.windowStart,
 
           windowEnd:
-            advice.dueDate,
+            advice.windowEnd,
 
           attentionCode: "",
           attentionMessage: "",
@@ -33679,24 +33674,8 @@ async function vaccinationInitialAgeAlertGroupsSrv({
         });
       }
 
-           const group =
-        groups.get(key);
-
-      if (
-        !group.dueDate ||
-        advice.dueDate < group.dueDate
-      ) {
-        group.dueDate =
-          advice.dueDate;
-
-        group.alertFromDate =
-          advice.dueDate;
-
-        group.windowEnd =
-          advice.dueDate;
-      }
-
-      group
+      groups
+        .get(key)
         .animalNumbers
         .push(animalNumber);
     }
@@ -34002,8 +33981,7 @@ const tomorrow =
       ].join("__");
 
       if (!groups.has(key)) {
-       groups.set(key, {
-          alertOrigin: "task",
+        groups.set(key, {
           alertStatus,
           programMode,
 
@@ -34125,14 +34103,9 @@ const tomorrow =
       let actionUrl =
         "vaccination.html";
 
-           const isProgramAgeAlert =
-        g.alertOrigin === "program_age";
-
       if (
         g.alertStatus === "overdue"
       ) {
-        level = "warn";
-
         const lateDays =
           Math.max(
             1,
@@ -34143,6 +34116,7 @@ const tomorrow =
             )
           );
 
+        level = "warn";
         title =
           "تحصين متأخر";
 
@@ -34150,6 +34124,7 @@ const tomorrow =
           `🚨 تحصين متأخر: ${g.vaccine}\n` +
           `تجاوز نافذة التنفيذ منذ ${lateDays} يومًا.\n` +
           `الحيوانات: ${nums.join("، ")}`;
+
         actionText =
           "تسجيل التحصين الآن";
 
@@ -34161,38 +34136,25 @@ const tomorrow =
 
         level = "warn";
 
-               if (isProgramAgeAlert) {
-          const animalText =
-            nums.length > 1
-              ? `الحيوانات:\n${nums.map(n => `- ${n}`).join("\n")}`
-              : `الحيوان: ${nums[0] || ""}`;
+        title = isToday
+          ? "تحصين مستحق اليوم"
+          : "تحصين داخل نافذة التنفيذ";
 
-          title =
-            "جرعة تأسيسية مستحقة";
-
-          message =
-            `${g.vaccine}\n` +
-            animalText;
-        } else {
-          title = isToday
-            ? "تحصين مستحق اليوم"
-            : "تحصين داخل نافذة التنفيذ";
-
-          message = isToday
-            ? (
-                `⏰ مستحق اليوم: ${g.vaccine}\n` +
-                `الحيوانات: ${nums.join("، ")}`
-              )
-            : (
-                `⏰ داخل نافذة التنفيذ: ${g.vaccine}\n` +
-                `الموعد الأصلي: ${g.dueDate}\n` +
-                `آخر يوم في النافذة: ${g.windowEnd}\n` +
-                `الحيوانات: ${nums.join("، ")}`
-              );
-        }
+        message = isToday
+          ? (
+              `⏰ مستحق اليوم: ${g.vaccine}\n` +
+              `الحيوانات: ${nums.join("، ")}`
+            )
+          : (
+              `⏰ داخل نافذة التنفيذ: ${g.vaccine}\n` +
+              `الموعد الأصلي: ${g.dueDate}\n` +
+              `آخر يوم في النافذة: ${g.windowEnd}\n` +
+              `الحيوانات: ${nums.join("، ")}`
+            );
 
         actionText =
           "تسجيل التحصين";
+
       } else if (
         g.alertStatus ===
           "upcoming"
@@ -34295,17 +34257,8 @@ const tomorrow =
 
         type: "vaccination",
         level,
-               status:
+        status:
           g.alertStatus,
-
-        alertOrigin:
-          g.alertOrigin ||
-          "task",
-
-        ageText:
-          String(
-            g.ageText || ""
-          ).trim(),
 
         title,
         message,
@@ -37435,43 +37388,7 @@ function murabbikSmartAlertPublicSrv(alert) {
     ...publicAlert
   } = alert;
 
-  const action =
-    publicAlert.action &&
-    typeof publicAlert.action === "object"
-      ? publicAlert.action
-      : null;
-
-  return {
-    ...publicAlert,
-
-    buttons: [
-      {
-        key: "acknowledged",
-        label: "حسنًا",
-        decision: "acknowledged",
-        role: "acknowledge"
-      },
-      {
-        key: "snoozed",
-        label: "ذكّرني لاحقًا",
-        decision: "snoozed",
-        role: "snooze"
-      },
-
-      ...(action?.url
-        ? [
-            {
-              key: "direct_action",
-              label:
-                action.label ||
-                "فتح الإجراء",
-              role: "action",
-              action
-            }
-          ]
-        : [])
-    ]
-  };
+  return publicAlert;
 }
 const MURABBIK_SMART_ALERT_STATE_COLLECTION = "smart_alert_states";
 
@@ -38581,60 +38498,33 @@ async function murabbikVaccinationProgramAlertSourceSrv(
         .replace(/[🚨⏰📌⚠️]/gu, "")
         .trim();
 
-       const alertOrigin =
-      murabbikSmartAlertTextSrv(
-        alert.alertOrigin || "task"
-      ).toLowerCase();
+    const identityKey = [
+      "vaccination",
+      alert.programMode || "program",
 
-    const identityKey =
-      alertOrigin === "program_age"
-        ? [
-            "vaccination",
-            alertOrigin,
-            alert.programMode || "program",
+      alert.programRowId ||
+        alert.vaccineCode ||
+        alert.vaccine ||
+        "row",
 
-            alert.programRowId ||
-              alert.vaccineCode ||
-              alert.vaccine ||
-              "row",
+      alert.dueDate ||
+        alert.attentionCode ||
+        "attention",
 
-            alert.doseType || "dose"
-          ].join(":")
-        : [
-            "vaccination",
-            alertOrigin,
-            alert.programMode || "program",
-
-            alert.programRowId ||
-              alert.vaccineCode ||
-              alert.vaccine ||
-              "row",
-
-            alert.dueDate ||
-              alert.attentionCode ||
-              "attention",
-
-            alert.doseType || "dose"
-          ].join(":");
-
-    const revisionKey =
-      alertOrigin === "program_age"
-        ? [
-            identityKey,
-            status
-          ].join(":")
-        : [
-            identityKey,
-            status,
-            alert.windowEnd || "",
-            alert.requiredField || "",
-            animalNumbers.join(",")
-          ].join(":");
+      alert.doseType || "dose"
+    ].join(":");
 
     return {
       identityKey,
 
-      revisionKey,
+      revisionKey: [
+        identityKey,
+        status,
+        alert.windowEnd || "",
+        alert.requiredField || "",
+        animalNumbers.join(",")
+      ].join(":"),
+
       kind: "operational",
       domain: "health",
 
@@ -38659,47 +38549,41 @@ async function murabbikVaccinationProgramAlertSourceSrv(
       message:
         cleanText(alert.message),
 
-           details:
-        alertOrigin === "program_age"
-          ? {
-              observation: "",
-              meaning: "",
-              recommendation: "",
-              evidence: []
-            }
-          : {
-              observation: "",
+      details: {
+        observation:
+          cleanText(alert.message),
 
-              meaning:
-                status === "needs_data"
-                  ? "لا يمكن حساب الموعد التالي بصورة موثوقة قبل استكمال بيانات التحصين المطلوبة."
-                  : "التنبيه صادر من مهمة الجرعة التالية بعد تنفيذ فعلي سابق.",
+        meaning:
+          status === "needs_data"
+            ? "لا يمكن حساب الموعد التالي بصورة موثوقة قبل استكمال بيانات التحصين المطلوبة."
+            : "التنبيه صادر من المهمة الحالية التي أنشأها برنامج التحصينات المعتمد.",
 
-              recommendation:
-                status === "upcoming"
-                  ? "راجع البرنامج واستعد للتنفيذ في موعده، ولا تسجّل الجرعة قبل إعطائها فعليًا."
-                  : status === "needs_data"
-                    ? "راجع بيانات البرنامج والحيوان ثم أكمل الحقل المطلوب."
-                    : "سجّل التنفيذ الفعلي عند إعطاء التحصين حتى تُغلق المهمة ويُحسب الموعد التالي.",
+        recommendation:
+          status === "upcoming"
+            ? "راجع البرنامج واستعد للتنفيذ في موعده، ولا تسجّل الجرعة قبل إعطائها فعليًا."
+            : status === "needs_data"
+              ? "راجع بيانات البرنامج والحيوان ثم أكمل الحقل المطلوب."
+              : "سجّل التنفيذ الفعلي عند إعطاء التحصين حتى تُغلق المهمة ويُحسب الموعد التالي.",
 
-              evidence: [
-                alert.vaccine
-                  ? `التحصين: ${alert.vaccine}`
-                  : "",
+        evidence: [
+          alert.vaccine
+            ? `التحصين: ${alert.vaccine}`
+            : "",
 
-                alert.doseTypeLabel
-                  ? `نوع الجرعة: ${alert.doseTypeLabel}`
-                  : "",
+          alert.doseTypeLabel
+            ? `نوع الجرعة: ${alert.doseTypeLabel}`
+            : "",
 
-                alert.dueDate
-                  ? `الموعد: ${alert.dueDate}`
-                  : "",
+          alert.dueDate
+            ? `الموعد: ${alert.dueDate}`
+            : "",
 
-                animalNumbers.length
-                  ? `الحيوانات: ${animalNumbers.join("، ")}`
-                  : ""
-              ].filter(Boolean)
-            },
+          animalNumbers.length
+            ? `الحيوانات: ${animalNumbers.join("، ")}`
+            : ""
+        ].filter(Boolean)
+      },
+
       dueDate:
         cleanText(
           alert.dueDate ||
