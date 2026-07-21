@@ -22356,6 +22356,8 @@ function vaccinationDoseNormSrv(v) {
     s === "prime" ||
     s === "primary" ||
     s.includes("primary") ||
+    s.includes("تأسيس") ||
+    s.includes("تاسيس") ||
     s.includes("أساسي") ||
     s.includes("اساسي") ||
     s.includes("أولى") ||
@@ -33601,30 +33603,24 @@ async function vaccinationInitialAgeAlertGroupsSrv({
           eventDate: today
         });
 
-           if (
+         if (
         !advice ||
         !/^\d{4}-\d{2}-\d{2}$/.test(
-          advice.windowStart || ""
+          advice.dueDate || ""
         ) ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(
-          advice.windowEnd || ""
-        ) ||
-        today < advice.windowStart ||
-        today > advice.windowEnd
+        today < advice.dueDate
       ) {
         continue;
       }
 
       const alertStatus =
         "due";
-
-      const key = [
+           const key = [
         alertStatus,
         programMode,
         programRowId,
         row.vaccineCode || "",
-        doseType,
-        advice.dueDate
+        doseType
       ].join("__");
 
       if (!groups.has(key)) {
@@ -33668,11 +33664,11 @@ async function vaccinationInitialAgeAlertGroupsSrv({
           dueDate:
             advice.dueDate,
 
-          alertFromDate:
-            advice.windowStart,
+         alertFromDate:
+            advice.dueDate,
 
           windowEnd:
-            advice.windowEnd,
+            advice.dueDate,
 
           attentionCode: "",
           attentionMessage: "",
@@ -33683,8 +33679,24 @@ async function vaccinationInitialAgeAlertGroupsSrv({
         });
       }
 
-      groups
-        .get(key)
+           const group =
+        groups.get(key);
+
+      if (
+        !group.dueDate ||
+        advice.dueDate < group.dueDate
+      ) {
+        group.dueDate =
+          advice.dueDate;
+
+        group.alertFromDate =
+          advice.dueDate;
+
+        group.windowEnd =
+          advice.dueDate;
+      }
+
+      group
         .animalNumbers
         .push(animalNumber);
     }
@@ -34121,35 +34133,23 @@ const tomorrow =
       ) {
         level = "warn";
 
-        if (isProgramAgeAlert) {
-          title =
-            "جرعة تأسيسية خارج نافذة البرنامج";
+        const lateDays =
+          Math.max(
+            1,
+            diffDaysISO(
+              g.windowEnd ||
+              g.dueDate,
+              today
+            )
+          );
 
-          message =
-            `جرعة تأسيسية: ${g.vaccine}\n` +
-            `العمر المحدد في البرنامج: ${g.ageText || "حسب البرنامج النشط"}\n` +
-            `نافذة البرنامج: من ${g.alertFromDate} إلى ${g.windowEnd}.\n` +
-            `الحيوانات: ${nums.join("، ")}`;
-        } else {
-          const lateDays =
-            Math.max(
-              1,
-              diffDaysISO(
-                g.windowEnd ||
-                g.dueDate,
-                today
-              )
-            );
+        title =
+          "تحصين متأخر";
 
-          title =
-            "تحصين متأخر";
-
-          message =
-            `🚨 تحصين متأخر: ${g.vaccine}\n` +
-            `تجاوز نافذة التنفيذ منذ ${lateDays} يومًا.\n` +
-            `الحيوانات: ${nums.join("، ")}`;
-        }
-
+        message =
+          `🚨 تحصين متأخر: ${g.vaccine}\n` +
+          `تجاوز نافذة التنفيذ منذ ${lateDays} يومًا.\n` +
+          `الحيوانات: ${nums.join("، ")}`;
         actionText =
           "تسجيل التحصين الآن";
 
@@ -34161,15 +34161,18 @@ const tomorrow =
 
         level = "warn";
 
-        if (isProgramAgeAlert) {
+               if (isProgramAgeAlert) {
+          const animalText =
+            nums.length > 1
+              ? `الحيوانات:\n${nums.map(n => `- ${n}`).join("\n")}`
+              : `الحيوان: ${nums[0] || ""}`;
+
           title =
-            "جرعة تأسيسية داخل نافذة البرنامج";
+            "جرعة تأسيسية مستحقة";
 
           message =
-            `جرعة تأسيسية: ${g.vaccine}\n` +
-            `العمر المحدد في البرنامج: ${g.ageText || "حسب البرنامج النشط"}\n` +
-            `نافذة البرنامج: من ${g.alertFromDate} إلى ${g.windowEnd}.\n` +
-            `الحيوانات: ${nums.join("، ")}`;
+            `${g.vaccine}\n` +
+            animalText;
         } else {
           title = isToday
             ? "تحصين مستحق اليوم"
@@ -38578,33 +38581,60 @@ async function murabbikVaccinationProgramAlertSourceSrv(
         .replace(/[🚨⏰📌⚠️]/gu, "")
         .trim();
 
-    const identityKey = [
-      "vaccination",
-      alert.programMode || "program",
+       const alertOrigin =
+      murabbikSmartAlertTextSrv(
+        alert.alertOrigin || "task"
+      ).toLowerCase();
 
-      alert.programRowId ||
-        alert.vaccineCode ||
-        alert.vaccine ||
-        "row",
+    const identityKey =
+      alertOrigin === "program_age"
+        ? [
+            "vaccination",
+            alertOrigin,
+            alert.programMode || "program",
 
-      alert.dueDate ||
-        alert.attentionCode ||
-        "attention",
+            alert.programRowId ||
+              alert.vaccineCode ||
+              alert.vaccine ||
+              "row",
 
-      alert.doseType || "dose"
-    ].join(":");
+            alert.doseType || "dose"
+          ].join(":")
+        : [
+            "vaccination",
+            alertOrigin,
+            alert.programMode || "program",
+
+            alert.programRowId ||
+              alert.vaccineCode ||
+              alert.vaccine ||
+              "row",
+
+            alert.dueDate ||
+              alert.attentionCode ||
+              "attention",
+
+            alert.doseType || "dose"
+          ].join(":");
+
+    const revisionKey =
+      alertOrigin === "program_age"
+        ? [
+            identityKey,
+            status
+          ].join(":")
+        : [
+            identityKey,
+            status,
+            alert.windowEnd || "",
+            alert.requiredField || "",
+            animalNumbers.join(",")
+          ].join(":");
 
     return {
       identityKey,
 
-      revisionKey: [
-        identityKey,
-        status,
-        alert.windowEnd || "",
-        alert.requiredField || "",
-        animalNumbers.join(",")
-      ].join(":"),
-
+      revisionKey,
       kind: "operational",
       domain: "health",
 
@@ -38629,44 +38659,47 @@ async function murabbikVaccinationProgramAlertSourceSrv(
       message:
         cleanText(alert.message),
 
-           details: {
-        observation: "",
+           details:
+        alertOrigin === "program_age"
+          ? {
+              observation: "",
+              meaning: "",
+              recommendation: "",
+              evidence: []
+            }
+          : {
+              observation: "",
 
-        meaning:
-          alert.alertOrigin === "program_age"
-            ? "تنبيه محسوب من عمر الحيوان والبرنامج النشط، ولا توجد مهمة قبل أول تنفيذ فعلي."
-            : status === "needs_data"
-              ? "لا يمكن حساب الموعد التالي بصورة موثوقة قبل استكمال بيانات التحصين المطلوبة."
-              : "التنبيه صادر من مهمة الجرعة التالية بعد تنفيذ فعلي سابق.",
+              meaning:
+                status === "needs_data"
+                  ? "لا يمكن حساب الموعد التالي بصورة موثوقة قبل استكمال بيانات التحصين المطلوبة."
+                  : "التنبيه صادر من مهمة الجرعة التالية بعد تنفيذ فعلي سابق.",
 
-        recommendation:
-          alert.alertOrigin === "program_age"
-            ? "عند تسجيل الجرعة التأسيسية فعليًا، يبدأ مُرَبِّيك متابعة الجرعة التالية حسب البرنامج."
-            : status === "upcoming"
-              ? "راجع البرنامج واستعد للتنفيذ في موعده، ولا تسجّل الجرعة قبل إعطائها فعليًا."
-              : status === "needs_data"
-                ? "راجع بيانات البرنامج والحيوان ثم أكمل الحقل المطلوب."
-                : "سجّل التنفيذ الفعلي عند إعطاء التحصين حتى تُغلق المهمة ويُحسب الموعد التالي.",
+              recommendation:
+                status === "upcoming"
+                  ? "راجع البرنامج واستعد للتنفيذ في موعده، ولا تسجّل الجرعة قبل إعطائها فعليًا."
+                  : status === "needs_data"
+                    ? "راجع بيانات البرنامج والحيوان ثم أكمل الحقل المطلوب."
+                    : "سجّل التنفيذ الفعلي عند إعطاء التحصين حتى تُغلق المهمة ويُحسب الموعد التالي.",
 
-        evidence: [
-          alert.vaccine
-            ? `التحصين: ${alert.vaccine}`
-            : "",
+              evidence: [
+                alert.vaccine
+                  ? `التحصين: ${alert.vaccine}`
+                  : "",
 
-          alert.doseTypeLabel
-            ? `نوع الجرعة: ${alert.doseTypeLabel}`
-            : "",
+                alert.doseTypeLabel
+                  ? `نوع الجرعة: ${alert.doseTypeLabel}`
+                  : "",
 
-          alert.dueDate
-            ? `الموعد: ${alert.dueDate}`
-            : "",
+                alert.dueDate
+                  ? `الموعد: ${alert.dueDate}`
+                  : "",
 
-          animalNumbers.length
-            ? `الحيوانات: ${animalNumbers.join("، ")}`
-            : ""
-        ].filter(Boolean)
-      },
-
+                animalNumbers.length
+                  ? `الحيوانات: ${animalNumbers.join("، ")}`
+                  : ""
+              ].filter(Boolean)
+            },
       dueDate:
         cleanText(
           alert.dueDate ||
