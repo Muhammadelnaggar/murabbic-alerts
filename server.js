@@ -22498,6 +22498,9 @@ function vaccinationAgeDoseStepSrv(
   }) || null;
 }
 
+const VACCINATION_EXECUTION_WINDOW_DAYS_SRV = 14;
+const VACCINATION_ALERT_LEAD_DAYS_SRV = 10;
+
 function vaccinationAgeTimingAdviceSrv({
   animalDoc = {},
   programLink = {},
@@ -22734,7 +22737,11 @@ async function vaccinationDueWarningSrv({
   const num = calvingNormDigitsOnlySrv(animalNumber);
   const dt = String(eventDate || "").trim().slice(0, 10);
   const vx = String(vaccine || "").trim();
-  const vxCode = String(vaccineCode || "").trim();
+    const vxCode = String(vaccineCode || "").trim();
+
+  const linkedProgramRowId = String(
+    programLink.programRowId || ""
+  ).trim();
 
   if (!db || !uid || !num || !dt || !vx) return null;
 
@@ -22789,7 +22796,18 @@ async function vaccinationDueWarningSrv({
       return;
     }
 
-    if (
+       const taskProgramRowId = String(
+      t.programRowId || ""
+    ).trim();
+
+    if (linkedProgramRowId) {
+      if (
+        taskProgramRowId !==
+        linkedProgramRowId
+      ) {
+        return;
+      }
+    } else if (
       !sameVaccine(
         String(t.vaccineCode || "").trim(),
         String(
@@ -22953,22 +22971,16 @@ async function vaccinationDueWarningSrv({
   const earliestAllowedDate =
     vaccinationYmdAddDaysSrv(
       nearest.dueDate,
-      -30
+      -VACCINATION_EXECUTION_WINDOW_DAYS_SRV
     );
 
-   if (dt < earliestAllowedDate) {
-    const daysUntilDue =
-      diffDaysISO(
-        dt,
-        nearest.dueDate
-      );
-
+  if (dt < earliestAllowedDate) {
     return {
-      allowed: true,
-      level: "warn",
+      allowed: false,
+      level: "block",
 
       code:
-        "vaccination_very_early",
+        "vaccination_before_execution_window",
 
       dueDate:
         nearest.dueDate,
@@ -22981,8 +22993,6 @@ async function vaccinationDueWarningSrv({
           earliestAllowedDate
         ),
 
-      daysUntilDue,
-
       taskId:
         nearest.taskId,
 
@@ -22990,7 +23000,7 @@ async function vaccinationDueWarningSrv({
         nearest.taskDoseType,
 
       message:
-        `ما زال على موعد هذا التحصين ${daysUntilDue} يومًا. يمكنك المتابعة إذا كان هذا قرار المزرعة، وسيحسب مُرَبِّيك الموعد التالي من تاريخ التنفيذ الفعلي.`
+        `موعد هذه الجرعة هو ${nearest.dueDate}، ويبدأ السماح بتسجيلها من ${earliestAllowedDate}. إذا أردت تقديمها أكثر، عدّل موعدها أولًا داخل برنامج التحصينات المعتمد.`
     };
   }
 
@@ -23003,10 +23013,10 @@ async function vaccinationDueWarningSrv({
 
     return {
       allowed: true,
-      level: "warn",
+      level: "info",
 
       code:
-        "vaccination_early",
+        "vaccination_execution_window_open",
 
       dueDate:
         nearest.dueDate,
@@ -23021,9 +23031,10 @@ async function vaccinationDueWarningSrv({
         nearest.taskDoseType,
 
       message:
-        `موعد التحصين بعد ${daysEarly} يومًا. يمكنك التسجيل الآن، لكن الأفضل الالتزام بموعد البرنامج.`
+        `هذه الجرعة داخل نافذة التنفيذ، وموعدها في البرنامج بعد ${daysEarly} يومًا. عند تسجيلها الآن سيُحسب موعد الجرعة التالية من تاريخ التنفيذ الفعلي.`
     };
   }
+
 
   if (dt > nearest.dueDate) {
     const daysLate =
@@ -27566,17 +27577,11 @@ function vaccinationProgramNextTaskSrv({
     };
   }
 
-  const advanceNoticeDays =
-    Math.max(
-      0,
-      Math.min(
-        90,
-        Number(
-          programLink.advanceNoticeDays ??
-          14
-        ) || 0
-      )
-    );
+   const advanceNoticeDays =
+    VACCINATION_ALERT_LEAD_DAYS_SRV;
+
+  const executionWindowDays =
+    VACCINATION_EXECUTION_WINDOW_DAYS_SRV;
 
   const nextDoseType =
     String(
@@ -27611,13 +27616,13 @@ function vaccinationProgramNextTaskSrv({
         -advanceNoticeDays
       ),
 
-    windowStart: dueDate,
-
-    windowEnd:
+    windowStart:
       vaccinationYmdAddDaysSrv(
         dueDate,
-        6
+        -executionWindowDays
       ),
+
+    windowEnd: dueDate,
 
     doseType:
       nextDoseType,
@@ -27629,10 +27634,10 @@ function vaccinationProgramNextTaskSrv({
     timingValue,
     timingUnit,
 
-    advanceNoticeDays
+    advanceNoticeDays,
+    executionWindowDays
   };
 }
-
 function vaccinationBuildProgramTaskWriteSrv({
   uid,
   animalNumber,
@@ -33974,21 +33979,37 @@ const tomorrow =
           .trim()
           .slice(0, 10);
 
-      const alertFromDate =
+           const storedAlertFromDate =
         String(
-          t.alertFromDate ||
-          dueDate
+          t.alertFromDate || ""
         )
           .trim()
           .slice(0, 10);
 
-      const windowEnd =
+      const storedWindowEnd =
         String(
-          t.windowEnd ||
-          dueDate
+          t.windowEnd || ""
         )
           .trim()
           .slice(0, 10);
+
+      const hasValidDueDate =
+        /^\d{4}-\d{2}-\d{2}$/.test(
+          dueDate
+        );
+
+      const alertFromDate =
+        hasValidDueDate
+          ? vaccinationYmdAddDaysSrv(
+              dueDate,
+              -VACCINATION_ALERT_LEAD_DAYS_SRV
+            )
+          : storedAlertFromDate;
+
+      const windowEnd =
+        hasValidDueDate
+          ? dueDate
+          : storedWindowEnd;
 
       let alertStatus = "";
 
@@ -34250,8 +34271,7 @@ const tomorrow =
           "تحصين متأخر";
 
         message =
-          `🚨 تحصين متأخر: ${g.vaccine}\n` +
-          `تجاوز نافذة التنفيذ منذ ${lateDays} يومًا.\n` +
+          `تأخر تنفيذ جرعة «${g.vaccine}» عن موعد البرنامج بـ${lateDays} يومًا.\n` +
           `الحيوانات: ${nums.join("، ")}`;
 
         actionText =
@@ -34300,13 +34320,12 @@ const tomorrow =
         title =
           "موعد تحصين قادم";
 
-        message =
-          `📌 موعد تحصين قادم بعد ${daysUntil} يومًا: ${g.vaccine}\n` +
-          `الموعد: ${g.dueDate}\n` +
+       message =
+          `موعد جرعة «${g.vaccine}» بعد ${daysUntil} أيام، ويمكن تنفيذها الآن داخل نافذة التسجيل.\n` +
           `الحيوانات: ${nums.join("، ")}`;
 
         actionText =
-          "مراجعة برنامج التحصينات";
+          "تسجيل التحصين";
 
       } else {
         level = "warn";
@@ -34324,7 +34343,8 @@ const tomorrow =
       }
 
     if (
-  (
+   (
+    g.alertStatus === "upcoming" ||
     g.alertStatus === "due" ||
     g.alertStatus ===
       "overdue" ||
