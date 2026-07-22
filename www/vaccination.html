@@ -207,13 +207,18 @@
         برنامج تحصينات المزرعة
       </h2>
 
-      <div
-        id="farmProgramMeta"
-        class="form-hint"
-        aria-live="polite"
-      ></div>
+     <div
+  id="farmProgramMeta"
+  class="form-hint"
+  aria-live="polite"
+></div>
 
-      <details>
+<div class="form-hint" role="note">
+  <strong>مهم:</strong>
+  سيلتزم مُرَبِّيك بمواعيد برنامج التحصينات التي تعتمدها، مع تنبيهك قبل موعد الجرعة بعشرة أيام. ويمكن تسجيل الجرعة خلال الأربعة عشر يومًا السابقة لموعدها. ولتقديمها أكثر من ذلك، عدّل موعدها أولًا داخل برنامج التحصينات.
+</div>
+
+<details>
         <summary>
           <strong>إدارة جدول برنامج المزرعة</strong>
         </summary>
@@ -2245,16 +2250,15 @@ if (!saved.ok) {
 
 msg(successMsg, "success");
 renderServerResult(saved);
-      const firstNumber =
-        saved?.saved?.[0]?.animalNumber ||
-        acceptedNumbers[0] ||
-        "";
+     const redirectUrl =
+  String(
+    saved.redirectUrl || ""
+  ).trim();
 
-      if (firstNumber && acceptedNumbers.length === 1) {
-        setTimeout(() => {
-          location.href = `event-list.html?number=${encodeURIComponent(firstNumber)}`;
-        }, 900);
-      }
+if (redirectUrl) {
+  location.href = redirectUrl;
+  return;
+}
 
     } catch (err) {
       console.error("vaccination server-only save failed:", err);
