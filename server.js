@@ -22500,6 +22500,32 @@ function vaccinationAgeDoseStepSrv(
 
 const VACCINATION_EXECUTION_WINDOW_DAYS_SRV = 14;
 const VACCINATION_ALERT_LEAD_DAYS_SRV = 10;
+const VACCINATION_BOOSTER_ALERT_LEAD_DAYS_SRV = 3;
+
+function vaccinationDoseTimingPolicySrv(
+  rawDoseType = ""
+) {
+  const doseType = String(
+    rawDoseType || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  const isBooster =
+    doseType === "booster";
+
+  return {
+    alertLeadDays:
+      isBooster
+        ? VACCINATION_BOOSTER_ALERT_LEAD_DAYS_SRV
+        : VACCINATION_ALERT_LEAD_DAYS_SRV,
+
+    executionWindowDays:
+      isBooster
+        ? 0
+        : VACCINATION_EXECUTION_WINDOW_DAYS_SRV
+  };
+}
 
 function vaccinationAgeTimingAdviceSrv({
   animalDoc = {},
@@ -22968,11 +22994,16 @@ async function vaccinationDueWarningSrv({
     };
   }
 
-  const earliestAllowedDate =
-    vaccinationYmdAddDaysSrv(
-      nearest.dueDate,
-      -VACCINATION_EXECUTION_WINDOW_DAYS_SRV
-    );
+  const timingPolicy =
+  vaccinationDoseTimingPolicySrv(
+    nearest.taskDoseType
+  );
+
+const earliestAllowedDate =
+  vaccinationYmdAddDaysSrv(
+    nearest.dueDate,
+    -timingPolicy.executionWindowDays
+  );
 
   if (dt < earliestAllowedDate) {
     return {
@@ -22999,8 +23030,10 @@ async function vaccinationDueWarningSrv({
       taskDoseType:
         nearest.taskDoseType,
 
-      message:
-        `موعد هذه الجرعة هو ${nearest.dueDate}، ويبدأ السماح بتسجيلها من ${earliestAllowedDate}. إذا أردت تقديمها أكثر، عدّل موعدها أولًا داخل برنامج التحصينات المعتمد.`
+     message:
+  timingPolicy.executionWindowDays === 0
+    ? `موعد الجرعة المنشطة هو ${nearest.dueDate}، ولا يُسمح بتسجيلها قبل موعدها.`
+    : `موعد هذه الجرعة هو ${nearest.dueDate}، ويبدأ السماح بتسجيلها من ${earliestAllowedDate}. إذا أردت تقديمها أكثر، عدّل موعدها أولًا داخل برنامج التحصينات المعتمد.`
     };
   }
 
@@ -27577,19 +27610,24 @@ function vaccinationProgramNextTaskSrv({
     };
   }
 
-   const advanceNoticeDays =
-    VACCINATION_ALERT_LEAD_DAYS_SRV;
+const nextDoseType =
+  String(
+    nextStep.doseType ||
+    currentDoseType ||
+    programLink.doseType ||
+    ""
+  ).trim();
 
-  const executionWindowDays =
-    VACCINATION_EXECUTION_WINDOW_DAYS_SRV;
+const timingPolicy =
+  vaccinationDoseTimingPolicySrv(
+    nextDoseType
+  );
 
-  const nextDoseType =
-    String(
-      nextStep.doseType ||
-      currentDoseType ||
-      programLink.doseType ||
-      ""
-    ).trim();
+const advanceNoticeDays =
+  timingPolicy.alertLeadDays;
+
+const executionWindowDays =
+  timingPolicy.executionWindowDays;
 
   const nextDoseTypeLabel =
     String(
@@ -33978,7 +34016,14 @@ const tomorrow =
         String(t.dueDate || "")
           .trim()
           .slice(0, 10);
+       const taskDoseType =
+  String(t.doseType || "")
+    .trim();
 
+const timingPolicy =
+  vaccinationDoseTimingPolicySrv(
+    taskDoseType
+  );
            const storedAlertFromDate =
         String(
           t.alertFromDate || ""
@@ -33998,14 +34043,13 @@ const tomorrow =
           dueDate
         );
 
-      const alertFromDate =
-        hasValidDueDate
-          ? vaccinationYmdAddDaysSrv(
-              dueDate,
-              -VACCINATION_ALERT_LEAD_DAYS_SRV
-            )
-          : storedAlertFromDate;
-
+  const alertFromDate =
+  hasValidDueDate
+    ? vaccinationYmdAddDaysSrv(
+        dueDate,
+        -timingPolicy.alertLeadDays
+      )
+    : storedAlertFromDate;
       const windowEnd =
         hasValidDueDate
           ? dueDate
@@ -34092,9 +34136,7 @@ const tomorrow =
         ).trim();
 
       const doseType =
-        String(
-          t.doseType || ""
-        ).trim();
+        taskDoseType;
 
       const attentionCode =
         String(
@@ -34320,12 +34362,23 @@ const tomorrow =
         title =
           "موعد تحصين قادم";
 
-       message =
-          `موعد جرعة «${g.vaccine}» بعد ${daysUntil} أيام، ويمكن تنفيذها الآن داخل نافذة التسجيل.\n` +
-          `الحيوانات: ${nums.join("، ")}`;
+       const isBooster =
+  String(g.doseType || "")
+    .trim() === "booster";
 
-        actionText =
-          "تسجيل التحصين";
+message = isBooster
+  ? (
+      `موعد الجرعة المنشطة «${g.vaccine}» بعد ${daysUntil} أيام، وتُنفذ في موعدها المحدد.\n` +
+      `الحيوانات: ${nums.join("، ")}`
+    )
+  : (
+      `موعد جرعة «${g.vaccine}» بعد ${daysUntil} أيام، ويمكن تنفيذها الآن داخل نافذة التسجيل.\n` +
+      `الحيوانات: ${nums.join("، ")}`
+    );
+
+actionText = isBooster
+  ? "مراجعة موعد الجرعة"
+  : "تسجيل التحصين";
 
       } else {
         level = "warn";
