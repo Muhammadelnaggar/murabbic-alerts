@@ -25705,8 +25705,13 @@ function vaccinationMurabbikDefaultProgramSrv() {
       programSection: "mothers",
       vaccineForm:
         "killed_virus_bacterin_toxoid",
-      targetGroup:
+           targetGroup:
         "pregnant_mothers",
+      alternativeGroup:
+        "maternal_calf_scour_program",
+      alternativePath:
+        "rotavac_corona",
+      advanceNoticeDays: 10,
       advanceNoticeDays: 10,
       doseSchedule: [
         dose(
@@ -25729,8 +25734,12 @@ function vaccinationMurabbikDefaultProgramSrv() {
       programSection: "mothers",
       vaccineForm:
         "killed_virus_bacterin_toxoid",
-      targetGroup:
+           targetGroup:
         "pregnant_mothers",
+      alternativeGroup:
+        "maternal_calf_scour_program",
+      alternativePath:
+        "scourguard",
       advanceNoticeDays: 10,
       doseSchedule: [
         dose(
@@ -26162,9 +26171,11 @@ function vaccinationMurabbikDefaultProgramSrv() {
     source:
       "server:vaccination-murabbik-default-v1",
 
-    defaultAlternatives: {
+      defaultAlternatives: {
       respiratory_program:
-        "combined"
+        "combined",
+      maternal_calf_scour_program:
+        "rotavac_corona"
     },
 
     alternativeGroups: [
@@ -26188,6 +26199,32 @@ function vaccinationMurabbikDefaultProgramSrv() {
             value: "separate",
             label:
               "اللقاحات التنفسية المنفصلة"
+          }
+        ]
+      }
+            ,
+      {
+        value:
+          "maternal_calf_scour_program",
+
+        label:
+          "برنامج تحصين الأمهات ضد إسهالات العجول",
+
+        defaultPath:
+          "rotavac_corona",
+
+        paths: [
+          {
+            value:
+              "rotavac_corona",
+            label:
+              "روتافاك كورونا للأمهات"
+          },
+          {
+            value:
+              "scourguard",
+            label:
+              "سكاور جارد للأمهات"
           }
         ]
       }
