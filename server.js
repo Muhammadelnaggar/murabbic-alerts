@@ -26462,6 +26462,90 @@ app.get(
     }
   }
 );
+app.post(
+  "/api/vaccination/farm-program/preview-row",
+  requireUserId,
+  async (req, res) => {
+    try {
+      const programContext =
+        await vaccinationReadProgramContextSrv(
+          req.userId
+        );
+
+      if (
+        programContext.saved !== true ||
+        programContext.programMode !==
+          "farm"
+      ) {
+        return res.status(409).json({
+          ok: false,
+
+          error:
+            "farm_program_not_active",
+
+          message:
+            "اختر برنامج المزرعة أولًا قبل إضافة التحصين."
+        });
+      }
+
+      const rawRow =
+        req.body?.row &&
+        typeof req.body.row === "object" &&
+        !Array.isArray(req.body.row)
+          ? req.body.row
+          : req.body || {};
+
+      const normalized =
+        vaccinationFarmProgramNormalizeRowsSrv([
+          rawRow
+        ]);
+
+      if (
+        normalized.errors.length ||
+        !normalized.rows.length
+      ) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "farm_program_row_invalid",
+
+          message:
+            "راجع بيانات التحصين قبل إضافته إلى القائمة.",
+
+          errors:
+            normalized.errors
+        });
+      }
+
+      return res.json({
+        ok: true,
+
+        row:
+          normalized.rows[0],
+
+        message:
+          "تم تجهيز التحصين وإضافته إلى القائمة."
+      });
+
+    } catch (e) {
+      console.error(
+        "vaccination-farm-program-row-preview",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+
+        error:
+          "farm_program_row_preview_failed",
+
+        message:
+          "تعذّر تجهيز بيانات التحصين الآن. حاول مرة أخرى."
+      });
+    }
+  }
+);
 app.get(
   "/api/vaccination/farm-program",
   requireUserId,
