@@ -23128,35 +23128,30 @@ function vaccinationProgramModeNormSrv(raw) {
   return "";
 }
 
-function vaccinationProgramContextSrv(mode, saved = false) {
-  const programMode = vaccinationProgramModeNormSrv(mode);
+function vaccinationProgramContextSrv(
+  mode,
+  saved = false
+) {
+  const programMode =
+    vaccinationProgramModeNormSrv(mode);
 
   return {
     programMode,
 
     programLabel:
       programMode === "farm"
-        ? "برنامج المزرعة"
+        ? "برنامج تحصينات المزرعة"
         : programMode === "murabbik_default"
-          ? "برنامج مُرَبِّيك الخبير"
+          ? "برنامج تحصينات مُرَبِّيك"
           : "",
 
-    message:
-      programMode === "farm"
-        ? (
-            saved
-              ? "برنامج المزرعة هو البرنامج التشغيلي المعتمد للتحصينات."
-              : "تم اختيار برنامج المزرعة."
-          )
-        : programMode === "murabbik_default"
-          ? (
-              saved
-                ? "برنامج مُرَبِّيك الخبير هو البرنامج التشغيلي المعتمد للتحصينات."
-                : "تم اختيار برنامج مُرَبِّيك الخبير."
-            )
-          : "اختر برنامج المزرعة أو برنامج مُرَبِّيك الخبير.",
+    message: "",
 
-    saved: Boolean(saved && programMode)
+    saved:
+      Boolean(
+        saved &&
+        programMode
+      )
   };
 }
 
@@ -23213,7 +23208,7 @@ async function vaccinationSaveProgramContextSrv(
       new Error("vaccination_program_required");
 
     err.publicMessage =
-      "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك الخبير.";
+  "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك.";
 
     throw err;
   }
@@ -23238,11 +23233,10 @@ async function vaccinationSaveProgramContextSrv(
 
     programMode,
 
-    programLabel:
-      programMode === "farm"
-        ? "برنامج المزرعة"
-        : "برنامج مُرَبِّيك الخبير",
-
+   programLabel:
+  programMode === "farm"
+    ? "برنامج تحصينات المزرعة"
+    : "برنامج تحصينات مُرَبِّيك",
     previousMode,
 
     source:
