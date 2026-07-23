@@ -6450,3 +6450,248 @@ body > header{
   font-weight:800;
   white-space:nowrap;
 }
+/* =========================================================
+   Murabbik Farm Vaccination Program — Detailed Compact Rows
+   عرض تحصينات برنامج المزرعة — صفحة التحصين فقط
+   ========================================================= */
+
+#farmProgramSection #farmProgramRows{
+  display:grid;
+  gap:8px;
+  margin:10px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  overflow:visible;
+}
+
+#farmProgramSection
+#farmProgramRows
+.mbk-vax-program-row{
+  min-width:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
+  align-items:start;
+  margin:0;
+  padding:10px 12px;
+  border:1px solid #dbe7de;
+  border-radius:13px;
+  background:#fff;
+  box-shadow:0 1px 3px rgba(15,23,42,.04);
+}
+
+#farmProgramSection
+#farmProgramRows
+.mbk-vax-program-row:last-child{
+  border-bottom:1px solid #dbe7de;
+}
+
+#farmProgramSection
+.mbk-vax-program-row-content{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+#farmProgramSection
+.mbk-vax-program-row-head{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:7px;
+}
+
+#farmProgramSection
+.mbk-vax-program-row-title{
+  min-width:0;
+  color:#0f172a;
+  font-size:14px;
+  font-weight:900;
+  line-height:1.45;
+  overflow-wrap:anywhere;
+}
+
+#farmProgramSection
+.mbk-vax-program-row-status{
+  min-height:22px;
+  padding:2px 7px;
+  border:1px solid #bbf7d0;
+  border-radius:999px;
+  background:#ecfdf5;
+  color:#047857;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:10px;
+  font-weight:900;
+  line-height:1;
+  white-space:nowrap;
+}
+
+#farmProgramSection
+.mbk-vax-program-row-status.is-inactive{
+  border-color:#e2e8f0;
+  background:#f1f5f9;
+  color:#64748b;
+}
+
+#farmProgramSection
+.mbk-vax-program-row-meta{
+  min-width:0;
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+}
+
+#farmProgramSection
+.mbk-vax-program-row-tag{
+  min-height:24px;
+  padding:3px 8px;
+  border:1px solid #dce8df;
+  border-radius:999px;
+  background:#f7fbf8;
+  color:#365443;
+  display:inline-flex;
+  align-items:center;
+  font-size:11px;
+  font-weight:800;
+  line-height:1.3;
+}
+
+#farmProgramSection
+.mbk-vax-program-row-schedule{
+  min-width:0;
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+}
+
+#farmProgramSection
+.mbk-vax-program-row-dose{
+  min-width:0;
+  padding:5px 8px;
+  border-right:3px solid #b7d9c2;
+  border-radius:7px;
+  background:#f8faf9;
+  color:#334155;
+  font-size:11px;
+  font-weight:750;
+  line-height:1.5;
+  overflow-wrap:anywhere;
+}
+
+#farmProgramSection
+.mbk-vax-program-row-notes{
+  min-width:0;
+  color:#64748b;
+  font-size:11px;
+  font-weight:700;
+  line-height:1.45;
+  overflow-wrap:anywhere;
+}
+
+#farmProgramSection
+.mbk-vax-program-row-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:5px;
+  align-self:center;
+}
+
+#farmProgramSection
+#farmProgramRows
+.mbk-vax-program-row-btn{
+  width:auto;
+  min-width:42px;
+  min-height:32px;
+  margin:0;
+  padding:5px 8px;
+  border:1px solid #b7d9c2;
+  border-radius:9px;
+  background:#fff;
+  color:var(--brand-600, #0b7f47);
+  font-family:inherit;
+  font-size:11px;
+  font-weight:900;
+  line-height:1;
+  white-space:nowrap;
+  cursor:pointer;
+}
+
+#farmProgramSection
+#farmProgramRows
+.mbk-vax-program-row-btn:hover{
+  background:#f0fdf4;
+  border-color:var(--brand, #0ea05a);
+}
+
+#farmProgramSection
+#farmProgramRows
+.mbk-vax-program-row-btn.is-delete{
+  width:auto;
+  min-width:42px;
+  min-height:32px;
+  padding:5px 8px;
+  border:1px solid #fecaca;
+  border-radius:9px;
+  background:#fffafa;
+  color:#b91c1c;
+}
+
+#farmProgramSection
+#farmProgramRows
+.mbk-vax-program-row-btn.is-delete:hover{
+  background:#fff1f2;
+  border-color:#fca5a5;
+}
+
+@media(max-width:520px){
+
+  #farmProgramSection #farmProgramRows{
+    gap:7px;
+    margin:8px 0;
+  }
+
+  #farmProgramSection
+  #farmProgramRows
+  .mbk-vax-program-row{
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:7px;
+    padding:9px;
+  }
+
+  #farmProgramSection
+  .mbk-vax-program-row-title{
+    font-size:13px;
+  }
+
+  #farmProgramSection
+  .mbk-vax-program-row-tag,
+  #farmProgramSection
+  .mbk-vax-program-row-dose,
+  #farmProgramSection
+  .mbk-vax-program-row-notes{
+    font-size:10.5px;
+  }
+
+  #farmProgramSection
+  .mbk-vax-program-row-actions{
+    gap:4px;
+  }
+
+  #farmProgramSection
+  #farmProgramRows
+  .mbk-vax-program-row-btn,
+  #farmProgramSection
+  #farmProgramRows
+  .mbk-vax-program-row-btn.is-delete{
+    min-width:38px;
+    min-height:30px;
+    padding:4px 6px;
+    font-size:10.5px;
+  }
+}
