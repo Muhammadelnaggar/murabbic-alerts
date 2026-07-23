@@ -217,11 +217,17 @@
   aria-live="polite"
 ></div>
 
-<details>
+<details id="farmProgramDetails">
         <summary>
           <strong>إدارة جدول برنامج المزرعة</strong>
         </summary>
-
+        <button
+  id="cancelFarmProgramManageBtn"
+  class="ghost mbk-vax-program-manage-cancel"
+  type="button"
+>
+  إلغاء إدارة البرنامج
+</button>
         <div class="row row-2">
           <div>
             <label for="farmProgramName">اسم البرنامج</label>
@@ -357,6 +363,24 @@ const addFarmProgramRowBtn =
 const saveFarmProgramBtn =
   document.getElementById("saveFarmProgramBtn");
 
+const farmProgramDetails =
+  document.getElementById("farmProgramDetails");
+
+const cancelFarmProgramManageBtn =
+  document.getElementById(
+    "cancelFarmProgramManageBtn"
+  );
+
+cancelFarmProgramManageBtn?.addEventListener(
+  "click",
+  () => {
+    closeFarmProgramEditor();
+
+    if (farmProgramDetails) {
+      farmProgramDetails.open = false;
+    }
+  }
+);
   const bulkBox       = document.getElementById("bulkBox");
   const bulkList      = document.getElementById("bulkList");
   const bulkSelected = new Set();
