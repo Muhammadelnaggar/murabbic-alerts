@@ -280,6 +280,34 @@
 
       </details>
     </section>
+    <section
+  id="programDisplaySection"
+  class="card hidden-block"
+  aria-labelledby="programDisplayTitle"
+>
+  <h2
+    id="programDisplayTitle"
+    class="mbk-vax-program-title"
+  ></h2>
+
+  <div
+    id="programDisplaySummary"
+    class="form-hint"
+    aria-live="polite"
+  ></div>
+
+  <details id="programDisplayDetails">
+    <summary>
+      <strong id="programDisplayOpenLabel"></strong>
+    </summary>
+
+    <div
+      id="programDisplayRows"
+      class="steps-list"
+      aria-live="polite"
+    ></div>
+  </details>
+</section>
   </main>
 
  <div class="actions-bar">
@@ -370,7 +398,35 @@ const cancelFarmProgramManageBtn =
   document.getElementById(
     "cancelFarmProgramManageBtn"
   );
+const programDisplaySection =
+  document.getElementById(
+    "programDisplaySection"
+  );
 
+const programDisplayTitle =
+  document.getElementById(
+    "programDisplayTitle"
+  );
+
+const programDisplaySummary =
+  document.getElementById(
+    "programDisplaySummary"
+  );
+
+const programDisplayDetails =
+  document.getElementById(
+    "programDisplayDetails"
+  );
+
+const programDisplayOpenLabel =
+  document.getElementById(
+    "programDisplayOpenLabel"
+  );
+
+const programDisplayRows =
+  document.getElementById(
+    "programDisplayRows"
+  );
 cancelFarmProgramManageBtn?.addEventListener(
   "click",
   () => {
@@ -1995,6 +2051,210 @@ function openFarmProgramEditor(row = {}) {
     });
   } catch (_) {}
 }
+   function renderProgramDisplay(result = {}) {
+  const display =
+    result?.programDisplay &&
+    typeof result.programDisplay === "object"
+      ? result.programDisplay
+      : {};
+
+  const visible =
+    display.visible === true;
+
+  if (programDisplaySection) {
+    programDisplaySection.classList.toggle(
+      "hidden-block",
+      !visible
+    );
+  }
+
+  if (!visible) {
+    if (programDisplayDetails) {
+      programDisplayDetails.open = false;
+    }
+
+    if (programDisplayTitle) {
+      programDisplayTitle.textContent = "";
+    }
+
+    if (programDisplaySummary) {
+      programDisplaySummary.textContent = "";
+    }
+
+    if (programDisplayOpenLabel) {
+      programDisplayOpenLabel.textContent = "";
+    }
+
+    if (programDisplayRows) {
+      programDisplayRows.innerHTML = "";
+    }
+
+    return;
+  }
+
+  if (programDisplayTitle) {
+    programDisplayTitle.textContent =
+      String(display.title || "").trim();
+  }
+
+  if (programDisplaySummary) {
+    programDisplaySummary.textContent =
+      String(display.summary || "").trim();
+  }
+
+  if (programDisplayOpenLabel) {
+    programDisplayOpenLabel.textContent =
+      String(display.openLabel || "").trim();
+  }
+
+  if (!programDisplayRows) return;
+
+  programDisplayRows.innerHTML = "";
+
+  for (
+    const row of Array.isArray(display.rows)
+      ? display.rows
+      : []
+  ) {
+    const item =
+      document.createElement("div");
+
+    item.className =
+      "step-item mbk-vax-program-row";
+
+    const content =
+      document.createElement("div");
+
+    content.className =
+      "mbk-vax-program-row-content";
+
+    const head =
+      document.createElement("div");
+
+    head.className =
+      "mbk-vax-program-row-head";
+
+    const title =
+      document.createElement("strong");
+
+    title.className =
+      "mbk-vax-program-row-title";
+
+    title.textContent =
+      String(row?.title || "").trim();
+
+    const status =
+      document.createElement("span");
+
+    status.className =
+      "mbk-vax-program-row-status";
+
+    const statusTone =
+      String(
+        row?.statusTone || ""
+      ).trim();
+
+    if (statusTone) {
+      status.classList.add(
+        `is-${statusTone}`
+      );
+    }
+
+    status.textContent =
+      String(
+        row?.statusText || ""
+      ).trim();
+
+    head.appendChild(title);
+
+    if (status.textContent) {
+      head.appendChild(status);
+    }
+
+    content.appendChild(head);
+
+    const meta =
+      document.createElement("div");
+
+    meta.className =
+      "mbk-vax-program-row-meta";
+
+    for (
+      const tag of Array.isArray(row?.tags)
+        ? row.tags
+        : []
+    ) {
+      const value =
+        String(tag || "").trim();
+
+      if (!value) continue;
+
+      const element =
+        document.createElement("span");
+
+      element.className =
+        "mbk-vax-program-row-tag";
+
+      element.textContent = value;
+      meta.appendChild(element);
+    }
+
+    if (meta.childElementCount) {
+      content.appendChild(meta);
+    }
+
+    const schedule =
+      document.createElement("div");
+
+    schedule.className =
+      "mbk-vax-program-row-schedule";
+
+    for (
+      const line of Array.isArray(
+        row?.scheduleLines
+      )
+        ? row.scheduleLines
+        : []
+    ) {
+      const value =
+        String(line || "").trim();
+
+      if (!value) continue;
+
+      const element =
+        document.createElement("span");
+
+      element.className =
+        "mbk-vax-program-row-dose";
+
+      element.textContent = value;
+      schedule.appendChild(element);
+    }
+
+    if (schedule.childElementCount) {
+      content.appendChild(schedule);
+    }
+
+    const notesText =
+      String(
+        row?.notesText || ""
+      ).trim();
+
+    if (notesText) {
+      const notes =
+        document.createElement("div");
+
+      notes.className =
+        "mbk-vax-program-row-notes";
+
+      notes.textContent = notesText;
+      content.appendChild(notes);
+    }
+
+    item.appendChild(content);
+    programDisplayRows.appendChild(item);
+  }
+}
 function renderFarmProgramResponse(result = {}) {
   renderProgramContext(result);
 
@@ -2110,9 +2370,10 @@ async function loadVaccinationOptions() {
       return result;
     }
 
-    renderProgramContext(result);
+      renderProgramContext(result);
+    renderProgramDisplay(result);
 
-       const options =
+    const options =
       result.options &&
       typeof result.options === "object"
         ? result.options
