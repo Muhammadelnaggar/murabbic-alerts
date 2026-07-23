@@ -23706,9 +23706,23 @@ function vaccinationProgramDoseLabelSrv({
   ).trim();
 }
 function vaccinationFarmProgramExpandSimpleRowSrv(raw = {}) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  if (
+    !raw ||
+    typeof raw !== "object" ||
+    Array.isArray(raw)
+  ) {
+    return raw;
+  }
 
-  const programType = String(raw.programType || "").trim();
+  if (
+    Array.isArray(raw.doseSchedule) &&
+    raw.doseSchedule.length
+  ) {
+    return raw;
+  }
+
+  const programType =
+    String(raw.programType || "").trim();
   if (!programType) return raw;
 
   const num = name => vaccinationFarmProgramIntSrv(raw[name], 0);
