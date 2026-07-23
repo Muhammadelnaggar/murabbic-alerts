@@ -35107,6 +35107,458 @@ async function vaccinationInitialAgeAlertGroupsSrv({
     ...groups.values()
   ];
 }
+function vaccinationMaternalEventMatchesRowSrv(
+  event = {},
+  row = {}
+) {
+  const eventRowId = String(
+    event.programRowId || ""
+  ).trim();
+
+  const rowId = String(
+    row.programRowId ||
+    row.rowId ||
+    ""
+  ).trim();
+
+  if (eventRowId) {
+    return Boolean(
+      rowId &&
+      eventRowId === rowId
+    );
+  }
+
+  const eventSection = String(
+    event.programSection || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (eventSection !== "mothers") {
+    return false;
+  }
+
+  const eventVaccineCode =
+    vaccinationTextKeySrv(
+      event.vaccineCode || ""
+    );
+
+  const rowVaccineCode =
+    vaccinationTextKeySrv(
+      row.vaccineCode || ""
+    );
+
+  if (
+    eventVaccineCode &&
+    rowVaccineCode &&
+    eventVaccineCode ===
+      rowVaccineCode
+  ) {
+    return true;
+  }
+
+  return vaccinationSameVaccineKeySrv(
+    event.vaccine ||
+      event.vaccineName ||
+      "",
+
+    row.vaccine ||
+      row.vaccineName ||
+      ""
+  );
+}
+
+async function vaccinationInitialMaternalAlertGroupsSrv({
+  uid = "",
+  programMode = "",
+  today = "",
+  excludedTaskKeys = new Set()
+} = {}) {
+  if (
+    !db ||
+    !uid ||
+    !programMode ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(today)
+  ) {
+    return [];
+  }
+
+  const program =
+    await vaccinationReadExecutionProgramSrv(
+      uid,
+      programMode
+    );
+
+  const maternalRows =
+    (
+      Array.isArray(program.rows)
+        ? program.rows
+        : []
+    )
+      .map(row => {
+        if (row?.active === false) {
+          return null;
+        }
+
+        const programSection =
+          String(
+            row?.programSection || ""
+          )
+            .trim()
+            .toLowerCase();
+
+        if (programSection !== "mothers") {
+          return null;
+        }
+
+        const firstMaternalStep =
+          (
+            Array.isArray(
+              row.doseSchedule
+            )
+              ? row.doseSchedule
+              : []
+          ).find(step =>
+            String(
+              step?.timingBasis || ""
+            ).trim() ===
+              "before_expected_calving"
+          );
+
+        return firstMaternalStep
+          ? {
+              ...row,
+              firstMaternalStep
+            }
+          : null;
+      })
+      .filter(Boolean);
+
+  if (!maternalRows.length) {
+    return [];
+  }
+
+  const [
+    animalsSnap,
+    eventsSnap
+  ] = await Promise.all([
+    db
+      .collection("animals")
+      .where("userId", "==", uid)
+      .limit(5000)
+      .get(),
+
+    db
+      .collection("events")
+      .where("userId", "==", uid)
+      .limit(5000)
+      .get()
+  ]);
+
+  const vaccinationEventsByAnimal =
+    new Map();
+
+  eventsSnap.forEach(ds => {
+    const event = ds.data() || {};
+
+    const eventType = String(
+      event.eventType ||
+      event.type ||
+      event.eventTypeNorm ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+    const isVaccination =
+      eventType === "تحصين" ||
+      eventType === "vaccination" ||
+      eventType.includes("تحصين") ||
+      eventType.includes("vaccination");
+
+    if (!isVaccination) return;
+
+    const animalNumber =
+      calvingNormDigitsOnlySrv(
+        event.animalNumber ||
+        event.number ||
+        ""
+      );
+
+    const eventDate = String(
+      event.eventDate ||
+      event.date ||
+      ""
+    )
+      .trim()
+      .slice(0, 10);
+
+    if (
+      !animalNumber ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        eventDate
+      )
+    ) {
+      return;
+    }
+
+    if (
+      !vaccinationEventsByAnimal.has(
+        animalNumber
+      )
+    ) {
+      vaccinationEventsByAnimal.set(
+        animalNumber,
+        []
+      );
+    }
+
+    vaccinationEventsByAnimal
+      .get(animalNumber)
+      .push({
+        ...event,
+        eventDate
+      });
+  });
+
+  const groups = new Map();
+
+  animalsSnap.forEach(ds => {
+    const animal = ds.data() || {};
+
+    const status = String(
+      animal.status || "active"
+    )
+      .trim()
+      .toLowerCase();
+
+    const entryType = String(
+      animal.entryType || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    if (
+      status === "inactive" ||
+      status === "archived" ||
+      entryType === "followers" ||
+      animal.isCalf === true ||
+      !isPregnantGroupSrv(animal)
+    ) {
+      return;
+    }
+
+    const animalNumber =
+      calvingNormDigitsOnlySrv(
+        animal.number ||
+        animal.animalNumber ||
+        ds.id
+      );
+
+    if (!animalNumber) return;
+
+    const expectedCalvingDate =
+      vaccinationAnimalExpectedCalvingDateSrv(
+        animal
+      );
+
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        expectedCalvingDate
+      )
+    ) {
+      return;
+    }
+
+    const maternalCycleStartDate =
+      vaccinationMaternalCycleStartDateSrv(
+        animal
+      );
+
+    const animalEvents =
+      vaccinationEventsByAnimal.get(
+        animalNumber
+      ) || [];
+
+    for (const row of maternalRows) {
+      const programRowId = String(
+        row.programRowId ||
+        row.rowId ||
+        ""
+      ).trim();
+
+      if (!programRowId) {
+        continue;
+      }
+
+      const step =
+        row.firstMaternalStep;
+
+      const doseType = String(
+        step.doseType || ""
+      ).trim();
+
+      if (!doseType) {
+        continue;
+      }
+
+      const taskKey =
+        `${animalNumber}|${programMode}|${programRowId}`;
+
+      if (
+        excludedTaskKeys.has(taskKey)
+      ) {
+        continue;
+      }
+
+      const completedInCurrentPregnancy =
+        animalEvents.some(event => {
+          if (
+            !vaccinationMaternalEventMatchesRowSrv(
+              event,
+              row
+            )
+          ) {
+            return false;
+          }
+
+          if (
+            /^\d{4}-\d{2}-\d{2}$/.test(
+              maternalCycleStartDate
+            ) &&
+            event.eventDate <
+              maternalCycleStartDate
+          ) {
+            return false;
+          }
+
+          if (
+            event.eventDate >
+              expectedCalvingDate
+          ) {
+            return false;
+          }
+
+          return true;
+        });
+
+      if (completedInCurrentPregnancy) {
+        continue;
+      }
+
+      const advice =
+        vaccinationMaternalTimingAdviceSrv({
+          animalDoc: animal,
+
+          programLink: {
+            ...row,
+            linked: true,
+            doseType
+          },
+
+          eventDate: today
+        });
+
+      const dueDate = String(
+        advice?.dueDate || ""
+      )
+        .trim()
+        .slice(0, 10);
+
+      const alertFromDate = String(
+        advice?.alertFromDate || ""
+      )
+        .trim()
+        .slice(0, 10);
+
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          dueDate
+        ) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          alertFromDate
+        ) ||
+        today < alertFromDate
+      ) {
+        continue;
+      }
+
+      const alertStatus =
+        today > dueDate
+          ? "overdue"
+          : today === dueDate
+            ? "due"
+            : "upcoming";
+
+      const key = [
+        "vaccination_initial_maternal",
+        alertStatus,
+        programMode,
+        programRowId,
+        row.vaccineCode || "",
+        doseType,
+        dueDate
+      ].join("__");
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          alertKind:
+            "vaccination_initial_maternal",
+
+          alertStatus,
+          programMode,
+
+          programLabel:
+            programMode === "farm"
+              ? "برنامج المزرعة"
+              : "برنامج مُرَبِّيك",
+
+          programRowId,
+
+          vaccineCode: String(
+            row.vaccineCode || ""
+          ).trim(),
+
+          vaccine: String(
+            row.vaccine ||
+            row.vaccineName ||
+            row.vaccineCode ||
+            "تحصين"
+          ).trim(),
+
+          doseType,
+
+          doseTypeLabel: String(
+            step.doseTypeLabel ||
+            row.doseTypeLabel ||
+            "جرعة قبل الولادة"
+          ).trim(),
+
+          dueDate,
+          alertFromDate,
+          windowEnd: dueDate,
+          expectedCalvingDate,
+
+          attentionCode: "",
+          attentionMessage: "",
+          requiredField: "",
+
+          animalNumbers: [],
+          taskIds: []
+        });
+      }
+
+      groups
+        .get(key)
+        .animalNumbers
+        .push(animalNumber);
+    }
+  });
+
+  return [
+    ...groups.values()
+  ];
+}
 // ============================================================
 //                 API: VACCINATION DASHBOARD ALERTS ONLY
 //                 تنبيهات التحصين من السيرفر فقط — للداشبورد
@@ -35489,7 +35941,7 @@ const timingPolicy =
           existingTaskKeys
       });
 
-    for (
+        for (
       const group of
       initialAgeGroups
     ) {
@@ -35502,6 +35954,42 @@ const timingPolicy =
         group.doseType,
         group.dueDate ||
           group.eligibilityDate || "",
+        group.attentionCode
+      ].join("__");
+
+      if (!groups.has(key)) {
+        groups.set(
+          key,
+          group
+        );
+      }
+    }
+
+    const initialMaternalGroups =
+      await vaccinationInitialMaternalAlertGroupsSrv({
+        uid,
+
+        programMode:
+          activeProgramMode,
+
+        today,
+
+        excludedTaskKeys:
+          existingTaskKeys
+      });
+
+    for (
+      const group of
+      initialMaternalGroups
+    ) {
+      const key = [
+        group.alertKind || "",
+        group.alertStatus,
+        group.programMode,
+        group.programRowId,
+        group.vaccineCode,
+        group.doseType,
+        group.dueDate || "",
         group.attentionCode
       ].join("__");
 
@@ -35547,7 +36035,11 @@ const timingPolicy =
         "فتح صفحة التحصين";
       let actionUrl =
         "vaccination.html";
-
+         const isInitialMaternal =
+        String(
+          g.alertKind || ""
+        ).trim() ===
+          "vaccination_initial_maternal";
            if (
         g.alertStatus ===
           "initial_age_ready"
@@ -35563,7 +36055,71 @@ const timingPolicy =
 
         actionText =
           "تسجيل الجرعة التأسيسية";
+            } else if (isInitialMaternal) {
+        const expectedCalvingLine =
+          g.expectedCalvingDate
+            ? `\nالولادة المتوقعة: ${g.expectedCalvingDate}`
+            : "";
 
+        if (
+          g.alertStatus === "overdue"
+        ) {
+          const lateDays =
+            Math.max(
+              1,
+              diffDaysISO(
+                g.dueDate,
+                today
+              )
+            );
+
+          level = "warn";
+
+          title =
+            "جرعة ما قبل الولادة متأخرة";
+
+          message =
+            `تأخر تنفيذ جرعة «${g.vaccine}» للأمهات ${lateDays} يومًا عن موعد البرنامج.${expectedCalvingLine}\n` +
+            `الحيوانات: ${nums.join("، ")}`;
+
+          actionText =
+            "تسجيل الجرعة الآن";
+
+        } else if (
+          g.alertStatus === "due"
+        ) {
+          level = "warn";
+
+          title =
+            "جرعة ما قبل الولادة مستحقة اليوم";
+
+          message =
+            `جرعة «${g.vaccine}» للأمهات مستحقة اليوم حسب البرنامج.${expectedCalvingLine}\n` +
+            `الحيوانات: ${nums.join("، ")}`;
+
+          actionText =
+            "تسجيل جرعة ما قبل الولادة";
+
+        } else {
+          const daysUntil =
+            Math.max(
+              1,
+              diffDaysISO(
+                today,
+                g.dueDate
+              )
+            );
+
+          title =
+            "تحصين أمومة قادم";
+
+          message =
+            `موعد جرعة «${g.vaccine}» للأمهات قبل الولادة بعد ${daysUntil} أيام.${expectedCalvingLine}\n` +
+            `الحيوانات: ${nums.join("، ")}`;
+
+          actionText =
+            "تسجيل جرعة ما قبل الولادة";
+        }
       } else if (
         g.alertStatus === "overdue"
       ) {
@@ -35751,8 +36307,11 @@ actionText = isBooster
         alertFromDate:
           g.alertFromDate,
 
-        windowEnd:
+               windowEnd:
           g.windowEnd,
+
+        expectedCalvingDate:
+          g.expectedCalvingDate || "",
 
         programMode:
           g.programMode,
@@ -39956,15 +40515,24 @@ async function murabbikVaccinationProgramAlertSourceSrv(
       ? payload.alerts
       : []
   ).map(alert => {
-    const status =
+       const status =
       murabbikSmartAlertTextSrv(
         alert.status
       ).toLowerCase();
-        const isInitialAge =
-      status === "initial_age_ready" ||
+
+    const alertKind =
       murabbikSmartAlertTextSrv(
         alert.alertKind
-      ) === "vaccination_initial_age";
+      );
+
+    const isInitialAge =
+      status === "initial_age_ready" ||
+      alertKind ===
+        "vaccination_initial_age";
+
+    const isInitialMaternal =
+      alertKind ===
+        "vaccination_initial_maternal";
     const policy =
       MURABBIK_VACCINATION_SMART_ALERT_STATUS[
         status
@@ -40020,10 +40588,12 @@ async function murabbikVaccinationProgramAlertSourceSrv(
       kind: "operational",
       domain: "health",
 
-           code:
+             code:
         isInitialAge
           ? "vaccination_initial_age_ready"
-          : `vaccination_program_${status || "review"}`,
+          : isInitialMaternal
+            ? `vaccination_initial_maternal_${status || "review"}`
+            : `vaccination_program_${status || "review"}`,
 
       priority:
         policy.priority,
@@ -40049,21 +40619,25 @@ async function murabbikVaccinationProgramAlertSourceSrv(
             ? ""
             : cleanText(alert.message),
 
-               meaning:
+              meaning:
           isInitialAge
-            ? "الحيوان داخل النطاق العمري المناسب لبدء الجرعة التأسيسية حسب برنامج التحصينات النشط. هذا تنبيه ذكي وليس مهمة مجدولة."            : status === "needs_data"
-              ? "لا يمكن حساب الموعد التالي بصورة موثوقة قبل استكمال بيانات التحصين المطلوبة."
-              : "التنبيه صادر من المهمة الحالية التي أنشأها برنامج التحصينات المعتمد.",
+            ? "الحيوان داخل النطاق العمري المناسب لبدء الجرعة التأسيسية حسب برنامج التحصينات النشط. هذا تنبيه ذكي وليس مهمة مجدولة."
+            : isInitialMaternal
+              ? "الأم دخلت توقيت الجرعة المحددة قبل الولادة حسب برنامج التحصينات النشط. هذا أول تنبيه في دورة الحمل الحالية وليس مهمة مبنية على جرعة سابقة."
+              : status === "needs_data"
+                ? "لا يمكن حساب الموعد التالي بصورة موثوقة قبل استكمال بيانات التحصين المطلوبة."
+                : "التنبيه صادر من المهمة الحالية التي أنشأها برنامج التحصينات المعتمد.",
 
         recommendation:
           isInitialAge
             ? "سجّل الجرعة التأسيسية عند تنفيذها فعليًا، وبعد الحفظ سيحسب مُرَبِّيك الجرعة التالية من البرنامج."
-            : status === "upcoming"
-              ? "راجع البرنامج واستعد للتنفيذ في موعده، ولا تسجّل الجرعة قبل إعطائها فعليًا."
-              : status === "needs_data"
-                ? "راجع بيانات البرنامج والحيوان ثم أكمل الحقل المطلوب."
-                : "سجّل التنفيذ الفعلي عند إعطاء التحصين حتى تُغلق المهمة ويُحسب الموعد التالي.",
-
+            : isInitialMaternal
+              ? "سجّل جرعة ما قبل الولادة عند تنفيذها فعليًا؛ وبعد الحفظ يُغلق التنبيه وتُحسب أي جرعة تالية يحددها البرنامج."
+              : status === "upcoming"
+                ? "راجع البرنامج واستعد للتنفيذ في موعده، ولا تسجّل الجرعة قبل إعطائها فعليًا."
+                : status === "needs_data"
+                  ? "راجع بيانات البرنامج والحيوان ثم أكمل الحقل المطلوب."
+                  : "سجّل التنفيذ الفعلي عند إعطاء التحصين حتى تُغلق المهمة ويُحسب الموعد التالي.",
         evidence: [
           alert.vaccine
             ? `التحصين: ${alert.vaccine}`
@@ -40077,7 +40651,10 @@ async function murabbikVaccinationProgramAlertSourceSrv(
           alert.dueDate
             ? `الموعد: ${alert.dueDate}`
             : "",
-
+                    isInitialMaternal &&
+          alert.expectedCalvingDate
+            ? `الولادة المتوقعة: ${alert.expectedCalvingDate}`
+            : "",
           animalNumbers.length
             ? `الحيوانات: ${animalNumbers.join("، ")}`
             : ""
