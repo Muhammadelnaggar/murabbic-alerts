@@ -1363,87 +1363,189 @@ function renderFarmProgramRows() {
     return;
   }
 
+  const addTextItem = (
+    container,
+    text,
+    className
+  ) => {
+    const value =
+      String(text || "").trim();
+
+    if (!value) return;
+
+    const element =
+      document.createElement("span");
+
+    element.className = className;
+    element.textContent = value;
+    container.appendChild(element);
+  };
+
   farmProgramDraftRows.forEach(
     (row, index) => {
       const item =
         document.createElement("div");
 
-      item.className = "step-item";
+      item.className =
+        "step-item mbk-vax-program-row";
 
-      const name =
+      const content =
         document.createElement("div");
 
-      name.className = "name";
+      content.className =
+        "mbk-vax-program-row-content";
 
-      const vaccineLabel =
-        String(
-          row.vaccineName ||
-          farmProgramOptionLabel(
-            farmProgramOptions.vaccines,
-            row.vaccineCode
+      const head =
+        document.createElement("div");
+
+      head.className =
+        "mbk-vax-program-row-head";
+
+      const title =
+        document.createElement("strong");
+
+      title.className =
+        "mbk-vax-program-row-title";
+
+      title.textContent = String(
+        row.vaccineName ||
+        row.vaccine ||
+        row.vaccineCode ||
+        "تحصين"
+      ).trim();
+
+      const status =
+        document.createElement("span");
+
+      status.className =
+        "mbk-vax-program-row-status";
+
+      if (row.active === false) {
+        status.classList.add("is-inactive");
+        status.textContent = "متوقف";
+      } else {
+        status.textContent = "نشط";
+      }
+
+      head.appendChild(title);
+      head.appendChild(status);
+
+      const meta =
+        document.createElement("div");
+
+      meta.className =
+        "mbk-vax-program-row-meta";
+
+      addTextItem(
+        meta,
+        row.programSectionLabel,
+        "mbk-vax-program-row-tag"
+      );
+
+      addTextItem(
+        meta,
+        row.vaccineFormLabel,
+        "mbk-vax-program-row-tag"
+      );
+
+      const schedule =
+        document.createElement("div");
+
+      schedule.className =
+        "mbk-vax-program-row-schedule";
+
+      for (
+        const step of Array.isArray(
+          row.doseSchedule
+        )
+          ? row.doseSchedule
+          : []
+      ) {
+        const parts = [
+          step?.doseTypeLabel,
+          step?.timingBasisLabel
+        ]
+          .map(value =>
+            String(value || "").trim()
           )
-        ).trim();
+          .filter(Boolean);
 
-      const sectionLabel =
-        String(
-          row.programSectionLabel ||
-          farmProgramOptionLabel(
-            farmProgramOptions.programSections,
-            row.programSection
-          )
-        ).trim();
+        const ageMinValue =
+          Number(step?.ageMinValue || 0);
 
-      const repeatUnitLabel =
-        String(
-          row.repeatUnitLabel ||
-          farmProgramOptionLabel(
-            farmProgramOptions.repeatUnits,
-            row.repeatUnit
-          )
-        ).trim();
+        const ageMaxValue =
+          Number(step?.ageMaxValue || 0);
 
-const vaccineArabic =
-  vaccineLabel
-    .split("(")[0]
-    .trim();
+        if (
+          ageMinValue > 0 &&
+          ageMaxValue > 0
+        ) {
+          parts.push(
+            `من ${ageMinValue} ${String(
+              step?.ageMinUnitLabel || ""
+            ).trim()} إلى ${ageMaxValue} ${String(
+              step?.ageMaxUnitLabel || ""
+            ).trim()}`
+          );
 
-const vaccineCode =
-  (
-    vaccineLabel.match(
-      /[—-]\s*([A-Za-z0-9+]+)\s*\)\s*$/
-    )?.[1] || ""
-  ).toUpperCase();
+        } else if (
+          Number(step?.timingValue || 0) > 0
+        ) {
+          parts.push(
+            `${Number(step.timingValue)} ${String(
+              step?.timingUnitLabel || ""
+            ).trim()}`
+          );
+        }
 
-const sectionShort =
-  sectionLabel
-    .replace(/^تحصينات\s+/, "")
-    .trim();
+        if (step?.cycleLabel) {
+          parts.push(
+            String(step.cycleLabel).trim()
+          );
+        }
 
-const repeatUnitShort =
-  repeatUnitLabel
-    .split("(")[0]
-    .trim()
-    .replace(/^شهر$/, "شهور");
+        addTextItem(
+          schedule,
+          parts.join(" — "),
+          "mbk-vax-program-row-dose"
+        );
+      }
 
-name.textContent = [
-  vaccineCode
-    ? `${vaccineArabic} - ${vaccineCode}`
-    : vaccineArabic,
+      content.appendChild(head);
 
-  sectionShort,
+      if (meta.childElementCount) {
+        content.appendChild(meta);
+      }
 
-  row.repeatEvery
-    ? `- كل ${row.repeatEvery} ${repeatUnitShort}`
-    : ""
-]
-  .filter(Boolean)
-  .join(" ");
+      if (schedule.childElementCount) {
+        content.appendChild(schedule);
+      }
+
+      if (String(row.notes || "").trim()) {
+        const notes =
+          document.createElement("div");
+
+        notes.className =
+          "mbk-vax-program-row-notes";
+
+        notes.textContent =
+          `ملاحظات: ${String(row.notes).trim()}`;
+
+        content.appendChild(notes);
+      }
+
+      const actions =
+        document.createElement("div");
+
+      actions.className =
+        "mbk-vax-program-row-actions";
 
       const editButton =
         document.createElement("button");
 
       editButton.type = "button";
-      editButton.className = "ghost";
+      editButton.className =
+        "ghost mbk-vax-program-row-btn";
       editButton.dataset.action =
         "edit-farm-program-row";
       editButton.dataset.rowIndex =
@@ -1455,7 +1557,8 @@ name.textContent = [
         document.createElement("button");
 
       removeButton.type = "button";
-      removeButton.className = "ghost";
+      removeButton.className =
+        "ghost mbk-vax-program-row-btn is-delete";
       removeButton.dataset.action =
         "remove-farm-program-row";
       removeButton.dataset.rowIndex =
@@ -1463,14 +1566,15 @@ name.textContent = [
       removeButton.textContent =
         "حذف";
 
-      item.appendChild(name);
-      item.appendChild(editButton);
-      item.appendChild(removeButton);
+      actions.appendChild(editButton);
+      actions.appendChild(removeButton);
+
+      item.appendChild(content);
+      item.appendChild(actions);
       farmProgramRows.appendChild(item);
     }
   );
 }
-
 function readFarmProgramEditorRow() {
   const rowElement =
     farmProgramEditor?.querySelector(
@@ -1564,13 +1668,18 @@ function readFarmProgramEditorRow() {
       : {})
   };
 }
-function saveFarmProgramEditorRow() {
+async function saveFarmProgramEditorRow() {
   const row =
     readFarmProgramEditorRow();
 
   if (!row) return;
 
-   const editIndexRaw = String(
+  const saveRowButton =
+    farmProgramEditor?.querySelector(
+      '[data-action="save-farm-program-row"]'
+    );
+
+  const editIndexRaw = String(
     farmProgramEditor?.dataset.editIndex || ""
   ).trim();
 
@@ -1579,18 +1688,81 @@ function saveFarmProgramEditorRow() {
       ? -1
       : Number(editIndexRaw);
 
-  if (
-    Number.isInteger(editIndex) &&
-    editIndex >= 0 &&
-    editIndex < farmProgramDraftRows.length
-  ) {
-    farmProgramDraftRows[editIndex] = row;
-  } else {
-    farmProgramDraftRows.push(row);
-  }
+  try {
+    if (saveRowButton) {
+      saveRowButton.disabled = true;
+    }
 
-  renderFarmProgramRows();
-  closeFarmProgramEditor();
+    msg(
+      "جارِ مراجعة بيانات التحصين…",
+      "info"
+    );
+
+    const result = await postJson(
+      "/api/vaccination/farm-program/preview-row",
+      { row }
+    );
+
+    if (!result.ok || !result.row) {
+      const serverErrors =
+        Array.isArray(result.errors)
+          ? result.errors
+              .map(item => item?.message)
+              .filter(Boolean)
+          : [];
+
+      msg(
+        [
+          result.message ||
+          "راجع بيانات التحصين قبل إضافته إلى القائمة.",
+          ...serverErrors
+        ].join("\n"),
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      Number.isInteger(editIndex) &&
+      editIndex >= 0 &&
+      editIndex < farmProgramDraftRows.length
+    ) {
+      farmProgramDraftRows[editIndex] = {
+        ...result.row
+      };
+
+    } else {
+      farmProgramDraftRows.push({
+        ...result.row
+      });
+    }
+
+    renderFarmProgramRows();
+    closeFarmProgramEditor();
+
+    msg(
+      result.message ||
+      "تم تجهيز التحصين وإضافته إلى القائمة.",
+      "success"
+    );
+
+  } catch (err) {
+    console.error(
+      "vaccination farm program row preview failed:",
+      err
+    );
+
+    msg(
+      "تعذّر مراجعة بيانات التحصين الآن.",
+      "error"
+    );
+
+  } finally {
+    if (saveRowButton?.isConnected) {
+      saveRowButton.disabled = false;
+    }
+  }
 }
 
 function openFarmProgramEditor(row = {}) {
@@ -2477,14 +2649,14 @@ addFarmProgramRowBtn?.addEventListener(
 
 farmProgramEditor?.addEventListener(
   "click",
-  event => {
+  async event => {
     const saveRowButton =
       event.target.closest(
         '[data-action="save-farm-program-row"]'
       );
 
     if (saveRowButton) {
-      saveFarmProgramEditorRow();
+      await saveFarmProgramEditorRow();
       return;
     }
 
