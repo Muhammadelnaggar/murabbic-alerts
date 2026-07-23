@@ -26190,6 +26190,171 @@ async function vaccinationReadExecutionProgramSrv(
     rows: []
   };
 }
+function vaccinationProgramDisplaySrv({
+  programContext = {},
+  executionProgram = {}
+} = {}) {
+  const programMode =
+    vaccinationProgramModeNormSrv(
+      programContext.programMode
+    );
+
+  if (
+    programContext.saved !== true ||
+    programMode !== "murabbik_default" ||
+    executionProgram?.exists !== true
+  ) {
+    return {
+      visible: false,
+      readOnly: true,
+      title: "",
+      summary: "",
+      openLabel: "",
+      rows: []
+    };
+  }
+
+  const rows =
+    Array.isArray(executionProgram.rows)
+      ? executionProgram.rows
+      : [];
+
+  const displayRows =
+    rows.map(row => {
+      const scheduleLines =
+        (
+          Array.isArray(row.doseSchedule)
+            ? row.doseSchedule
+            : []
+        )
+          .map(step => {
+            const parts = [
+              step?.doseTypeLabel,
+              step?.timingBasisLabel
+            ]
+              .map(value =>
+                String(value || "").trim()
+              )
+              .filter(Boolean);
+
+            const ageMinValue =
+              Number(
+                step?.ageMinValue || 0
+              );
+
+            const ageMaxValue =
+              Number(
+                step?.ageMaxValue || 0
+              );
+
+            if (
+              ageMinValue > 0 &&
+              ageMaxValue > 0
+            ) {
+              parts.push(
+                `من ${ageMinValue} ${String(
+                  step?.ageMinUnitLabel || ""
+                ).trim()} إلى ${ageMaxValue} ${String(
+                  step?.ageMaxUnitLabel || ""
+                ).trim()}`
+              );
+
+            } else if (
+              Number(
+                step?.timingValue || 0
+              ) > 0
+            ) {
+              parts.push(
+                `${Number(
+                  step.timingValue
+                )} ${String(
+                  step?.timingUnitLabel || ""
+                ).trim()}`
+              );
+            }
+
+            if (step?.cycleLabel) {
+              parts.push(
+                String(
+                  step.cycleLabel
+                ).trim()
+              );
+            }
+
+            return parts
+              .filter(Boolean)
+              .join(" — ");
+          })
+          .filter(Boolean);
+
+      const notes =
+        String(
+          row.notes || ""
+        ).trim();
+
+      return {
+        rowId:
+          String(
+            row.programRowId ||
+            row.rowId ||
+            ""
+          ).trim(),
+
+        title:
+          String(
+            row.vaccine ||
+            row.vaccineName ||
+            row.vaccineCode ||
+            "تحصين"
+          ).trim(),
+
+        statusText:
+          row.active === false
+            ? "متوقف"
+            : "نشط",
+
+        statusTone:
+          row.active === false
+            ? "inactive"
+            : "active",
+
+        tags: [
+          row.programSectionLabel,
+          row.vaccineFormLabel
+        ]
+          .map(value =>
+            String(value || "").trim()
+          )
+          .filter(Boolean),
+
+        scheduleLines,
+
+        notesText:
+          notes
+            ? `ملاحظات: ${notes}`
+            : ""
+      };
+    });
+
+  return {
+    visible: true,
+    readOnly: true,
+
+    title:
+      "برنامج تحصينات مُرَبِّيك",
+
+    openLabel:
+      "عرض جدول برنامج مُرَبِّيك",
+
+    summary:
+      `الإصدار ${Number(
+        executionProgram.version || 0
+      )} — عدد التحصينات: ${displayRows.length}.`,
+
+    rows:
+      displayRows
+  };
+}
 async function vaccinationResolveProgramRowSrv({
   uid,
   programContext = {},
@@ -26444,22 +26609,30 @@ app.get(
           req.userId
         );
 
-       const executionProgram =
-        await vaccinationReadExecutionProgramSrv(
-          req.userId,
-          programContext.programMode
-        );
+const executionProgram =
+  await vaccinationReadExecutionProgramSrv(
+    req.userId,
+    programContext.programMode
+  );
 
-      return res.json({
-        ok: true,
+const programDisplay =
+  vaccinationProgramDisplaySrv({
+    programContext,
+    executionProgram
+  });
 
-        programContext,
+return res.json({
+  ok: true,
 
-        executionProgram,
+  programContext,
 
-        options:
-          vaccinationFarmProgramOptionsSrv()
-      });
+  executionProgram,
+
+  programDisplay,
+
+  options:
+    vaccinationFarmProgramOptionsSrv()
+});
 
     } catch (e) {
       console.error(
