@@ -23253,12 +23253,21 @@ async function vaccinationSaveProgramContextSrv(
         })
   }, { merge: true });
 
-  return vaccinationProgramContextSrv(
+const programContext =
+  vaccinationProgramContextSrv(
     programMode,
     true
   );
-}
 
+return {
+  ...programContext,
+
+  previousMode,
+
+  changed:
+    previousMode !== programMode
+};
+}
 app.post(
   "/api/vaccination/program-mode",
   requireUserId,
@@ -23270,13 +23279,44 @@ app.post(
           req.body?.programMode
         );
 
+      let taskReconciliation =
+        vaccinationTaskReconciliationResultSrv(
+          "vaccination_program_mode_unchanged",
+          true
+        );
+
+      if (programContext.changed === true) {
+        try {
+          taskReconciliation =
+            await vaccinationReconcileProgramTasksSrv({
+              uid: req.userId,
+
+              reason:
+                "vaccination_program_mode_changed"
+            });
+
+        } catch (reconcileError) {
+          console.error(
+            "vaccination-program-mode-task-reconciliation",
+            reconcileError
+          );
+
+          taskReconciliation =
+            vaccinationTaskReconciliationResultSrv(
+              "vaccination_program_mode_reconciliation_failed",
+              false
+            );
+        }
+      }
+
       return res.json({
         ok: true,
 
         message:
           "✅ تم اعتماد برنامج التحصينات بنجاح.",
 
-        programContext
+        programContext,
+        taskReconciliation
       });
 
     } catch (e) {
@@ -27106,7 +27146,29 @@ app.post(
 
       const savedSnap =
         await currentRef.get();
+      let taskReconciliation;
 
+try {
+  taskReconciliation =
+    await vaccinationReconcileProgramTasksSrv({
+      uid,
+
+      reason:
+        "vaccination_farm_program_updated"
+    });
+
+} catch (reconcileError) {
+  console.error(
+    "vaccination-farm-program-task-reconciliation",
+    reconcileError
+  );
+
+  taskReconciliation =
+    vaccinationTaskReconciliationResultSrv(
+      "vaccination_farm_program_reconciliation_failed",
+      false
+    );
+}
       return res.json({
         ok: true,
 
@@ -27118,6 +27180,7 @@ app.post(
         programContext,
 
         savedMeta,
+        taskReconciliation,
 
         program:
           vaccinationFarmProgramResponseSrv(
@@ -28481,6 +28544,521 @@ function vaccinationBuildProgramTaskWriteSrv({
       doseType:
         payload.doseType
     }
+  };
+}
+function vaccinationTaskReconciliationResultSrv(
+  reason = "",
+  ok = true
+) {
+  return {
+    ok,
+    reason: String(reason || "").trim(),
+    checkedCount: 0,
+    rebuiltCount: 0,
+    closedCount: 0
+  };
+}
+
+function vaccinationReconcileDoseTypeSrv(raw) {
+  const value = String(raw || "")
+    .trim()
+    .toLowerCase();
+
+  if (
+    value === "primary" ||
+    value === "prime"
+  ) {
+    return "prime";
+  }
+
+  if (value === "booster") {
+    return "booster";
+  }
+
+  if (value === "periodic") {
+    return "periodic";
+  }
+
+  if (value === "campaign") {
+    return "campaign";
+  }
+
+  if (value === "other") {
+    return "other";
+  }
+
+  return value;
+}
+
+async function vaccinationReconcileProgramTasksSrv({
+  uid,
+  reason = "program_updated"
+} = {}) {
+  const userId = tenantKey(uid);
+
+  const result =
+    vaccinationTaskReconciliationResultSrv(
+      reason,
+      true
+    );
+
+  if (!db || !userId) {
+    return {
+      ...result,
+      ok: false
+    };
+  }
+
+  const programContext =
+    await vaccinationReadProgramContextSrv(
+      userId
+    );
+
+  const activeProgramMode =
+    vaccinationProgramModeNormSrv(
+      programContext.programMode
+    );
+
+  if (
+    programContext.saved !== true ||
+    !activeProgramMode
+  ) {
+    return result;
+  }
+
+  const executionProgram =
+    await vaccinationReadExecutionProgramSrv(
+      userId,
+      activeProgramMode
+    );
+
+  const currentRowById =
+    new Map(
+      (
+        Array.isArray(executionProgram.rows)
+          ? executionProgram.rows
+          : []
+      )
+        .filter(row =>
+          row &&
+          row.active !== false &&
+          String(
+            row.programRowId || ""
+          ).trim()
+        )
+        .map(row => [
+          String(
+            row.programRowId || ""
+          ).trim(),
+          row
+        ])
+    );
+
+  const [
+    pendingSnap,
+    needsDataSnap
+  ] = await Promise.all([
+    db.collection("tasks")
+      .where("userId", "==", userId)
+      .where("status", "==", "pending")
+      .limit(500)
+      .get(),
+
+    db.collection("tasks")
+      .where("userId", "==", userId)
+      .where("status", "==", "needs_data")
+      .limit(500)
+      .get()
+  ]);
+
+  const taskDocs = [
+    ...new Map(
+      [
+        ...pendingSnap.docs,
+        ...needsDataSnap.docs
+      ].map(ds => [ds.id, ds])
+    ).values()
+  ].filter(ds => {
+    const task = ds.data() || {};
+
+    return (
+      String(
+        task.taskType || ""
+      ).trim() === "vaccination" &&
+      String(
+        task.engine || ""
+      ).trim() ===
+        "vaccination_program_v1" &&
+      vaccinationTaskPendingSrv(task)
+    );
+  });
+
+  if (!taskDocs.length) {
+    return result;
+  }
+
+  const sourceEventIds = [
+    ...new Set(
+      taskDocs
+        .map(ds =>
+          String(
+            ds.data()?.sourceEventId || ""
+          ).trim()
+        )
+        .filter(Boolean)
+    )
+  ];
+
+  const sourceEventById =
+    new Map();
+
+  for (
+    let i = 0;
+    i < sourceEventIds.length;
+    i += 100
+  ) {
+    const ids =
+      sourceEventIds.slice(i, i + 100);
+
+    const snaps =
+      await db.getAll(
+        ...ids.map(id =>
+          db.collection("events").doc(id)
+        )
+      );
+
+    snaps.forEach(snap => {
+      if (snap.exists) {
+        sourceEventById.set(
+          snap.id,
+          snap.data() || {}
+        );
+      }
+    });
+  }
+
+  const animalCache =
+    new Map();
+
+  const rebuiltWrites =
+    new Map();
+
+  const closedWrites =
+    new Map();
+
+  const closeTask = (
+    ds,
+    closeReason
+  ) => {
+    closedWrites.set(ds.id, {
+      ref: ds.ref,
+
+      payload: {
+        status: "cancelled",
+        done: true,
+
+        dueDate: "",
+        alertFromDate: "",
+        windowStart: "",
+        windowEnd: "",
+
+        attentionCode: "",
+        attentionMessage: "",
+        requiredField: "",
+
+        cancellationReason:
+          closeReason,
+
+        supersededByProgramMode:
+          activeProgramMode,
+
+        cancelledAt:
+          admin.firestore.FieldValue
+            .serverTimestamp(),
+
+        updatedAt:
+          admin.firestore.FieldValue
+            .serverTimestamp()
+      }
+    });
+  };
+
+  for (const ds of taskDocs) {
+    const task = ds.data() || {};
+
+    const taskProgramMode =
+      vaccinationProgramModeNormSrv(
+        task.programMode
+      );
+
+    if (
+      taskProgramMode !==
+      activeProgramMode
+    ) {
+      closeTask(
+        ds,
+        "program_mode_changed"
+      );
+      continue;
+    }
+
+    const programRowId =
+      String(
+        task.programRowId || ""
+      ).trim();
+
+    const currentRow =
+      currentRowById.get(
+        programRowId
+      );
+
+    if (!currentRow) {
+      closeTask(
+        ds,
+        "program_row_removed"
+      );
+      continue;
+    }
+
+    const sourceEventId =
+      String(
+        task.sourceEventId || ""
+      ).trim();
+
+    const sourceEvent =
+      sourceEventById.get(
+        sourceEventId
+      );
+
+    if (
+      !sourceEvent ||
+      String(
+        sourceEvent.userId || ""
+      ).trim() !== userId
+    ) {
+      closeTask(
+        ds,
+        "source_event_missing"
+      );
+      continue;
+    }
+
+    const sourceDoseType =
+      vaccinationReconcileDoseTypeSrv(
+        sourceEvent.doseType || ""
+      );
+
+    const eventDate =
+      String(
+        sourceEvent.eventDate ||
+        sourceEvent.date ||
+        task.basedOnEventDate ||
+        ""
+      )
+        .trim()
+        .slice(0, 10);
+
+    const animalNumber =
+      calvingNormDigitsOnlySrv(
+        sourceEvent.animalNumber ||
+        task.animalNumber ||
+        ""
+      );
+
+    if (
+      !sourceDoseType ||
+      !animalNumber ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        eventDate
+      )
+    ) {
+      closeTask(
+        ds,
+        "source_event_incomplete"
+      );
+      continue;
+    }
+
+    const programLink =
+      await vaccinationResolveProgramRowSrv({
+        uid: userId,
+        programContext,
+
+        body: {
+          programRowId,
+
+          vaccineCode:
+            String(
+              currentRow.vaccineCode || ""
+            ).trim(),
+
+          doseType:
+            sourceDoseType
+        }
+      });
+
+    if (
+      programLink.ok !== true ||
+      programLink.linked !== true
+    ) {
+      closeTask(
+        ds,
+        "program_row_no_longer_matches"
+      );
+      continue;
+    }
+
+    let animal =
+      animalCache.get(animalNumber);
+
+    if (animal === undefined) {
+      animal =
+        await fetchAnimalByNumberForCalvingGateSrv(
+          userId,
+          animalNumber
+        );
+
+      animalCache.set(
+        animalNumber,
+        animal || null
+      );
+    }
+
+    const animalDoc =
+      animal?.data || {};
+
+    const animalStatus =
+      String(
+        animalDoc.status || "active"
+      )
+        .trim()
+        .toLowerCase();
+
+    if (
+      !animal ||
+      animalStatus === "inactive" ||
+      animalStatus === "archived"
+    ) {
+      closeTask(
+        ds,
+        "animal_not_active"
+      );
+      continue;
+    }
+
+    const taskWrite =
+      vaccinationBuildProgramTaskWriteSrv({
+        uid: userId,
+        animalNumber,
+
+        animalId:
+          String(
+            animal.id ||
+            sourceEvent.animalId ||
+            task.animalId ||
+            ""
+          ).trim(),
+
+        animalDoc,
+        eventDate,
+        eventId: sourceEventId,
+
+        campaignId:
+          String(
+            sourceEvent.campaignId ||
+            task.campaignId ||
+            ""
+          ).trim(),
+
+        programContext,
+        programLink,
+        doseType: sourceDoseType
+      });
+
+    if (!taskWrite) {
+      closeTask(
+        ds,
+        "task_rebuild_failed"
+      );
+      continue;
+    }
+
+    rebuiltWrites.set(
+      taskWrite.taskId,
+      {
+        ref: taskWrite.taskRef,
+
+        payload: {
+          attentionCode: "",
+          attentionMessage: "",
+          requiredField: "",
+          cancellationReason: "",
+          supersededByProgramMode: "",
+          cancelledAt: null,
+
+          ...taskWrite.payload,
+
+          reconciliationReason:
+            reason,
+
+          reconciledAt:
+            admin.firestore.FieldValue
+              .serverTimestamp()
+        }
+      }
+    );
+
+    if (
+      taskWrite.taskId !== ds.id
+    ) {
+      closeTask(
+        ds,
+        "task_identity_changed"
+      );
+    }
+  }
+
+  for (
+    const taskId of rebuiltWrites.keys()
+  ) {
+    closedWrites.delete(taskId);
+  }
+
+  const writes = [
+    ...rebuiltWrites.values(),
+    ...closedWrites.values()
+  ];
+
+  let batch = db.batch();
+  let operations = 0;
+
+  for (const write of writes) {
+    batch.set(
+      write.ref,
+      write.payload,
+      {
+        merge: true
+      }
+    );
+
+    operations += 1;
+
+    if (operations >= 400) {
+      await batch.commit();
+      batch = db.batch();
+      operations = 0;
+    }
+  }
+
+  if (operations > 0) {
+    await batch.commit();
+  }
+
+  return {
+    ...result,
+    checkedCount: taskDocs.length,
+    rebuiltCount: rebuiltWrites.size,
+    closedCount: closedWrites.size
   };
 }
 // ============================================================
