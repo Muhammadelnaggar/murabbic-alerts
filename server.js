@@ -22766,9 +22766,12 @@ async function vaccinationDueWarningSrv({
     const vxCode = String(vaccineCode || "").trim();
 
   const linkedProgramRowId = String(
-    programLink.programRowId || ""
-  ).trim();
+  programLink.programRowId || ""
+).trim();
 
+const linkedProgramSection = String(
+  programLink.programSection || ""
+).trim();
   if (!db || !uid || !num || !dt || !vx) return null;
 
   const sameVaccine = (code, name) => {
@@ -22897,21 +22900,52 @@ async function vaccinationDueWarningSrv({
 
     if (!isVaccination) return;
 
-    if (
-      !sameVaccine(
-        String(
-          ev.vaccineCode || ""
-        ).trim(),
+    const eventProgramRowId = String(
+  ev.programRowId || ""
+).trim();
 
-        String(
-          ev.vaccine ||
-          ev.vaccineName ||
-          ""
-        ).trim()
-      )
+const eventProgramSection = String(
+  ev.programSection || ""
+).trim();
+
+const eventMatchesVaccine =
+  sameVaccine(
+    String(
+      ev.vaccineCode || ""
+    ).trim(),
+
+    String(
+      ev.vaccine ||
+      ev.vaccineName ||
+      ""
+    ).trim()
+  );
+
+if (linkedProgramRowId) {
+  if (eventProgramRowId) {
+    if (
+      eventProgramRowId !==
+      linkedProgramRowId
     ) {
       return;
     }
+  } else {
+    if (
+      linkedProgramSection ===
+        "mothers" &&
+      eventProgramSection !==
+        "mothers"
+    ) {
+      return;
+    }
+
+    if (!eventMatchesVaccine) {
+      return;
+    }
+  }
+} else if (!eventMatchesVaccine) {
+  return;
+}
 
     const previousDate = String(
       ev.eventDate ||
@@ -22936,64 +22970,71 @@ async function vaccinationDueWarningSrv({
     }
   });
 
-  if (!nearest) {
-    if (!latestPreviousDate) {
-      const initialAgeAdvice =
-        vaccinationAgeTimingAdviceSrv({
-          animalDoc,
-          programLink,
-          eventDate: dt
-        });
+ if (!nearest) {
+  const initialAgeAdvice =
+    vaccinationAgeTimingAdviceSrv({
+      animalDoc,
+      programLink,
+      eventDate: dt
+    });
 
-      return initialAgeAdvice || null;
-    }
+  const initialMaternalAdvice =
+    vaccinationMaternalTimingAdviceSrv({
+      animalDoc,
+      programLink,
+      eventDate: dt
+    });
 
-    const eachPregnancy =
-      Array.isArray(
-        programLink.doseSchedule
-      ) &&
-      programLink.doseSchedule.some(
-        step =>
-          String(
-            step?.cycle || ""
-          ).trim() ===
-          "each_pregnancy"
-      );
-
-    const lastCalvingDate = String(
-      animalDoc.lastCalvingDate ||
-      animalDoc.calvingDate ||
-      ""
-    )
-      .trim()
-      .slice(0, 10);
-
-    if (
-      eachPregnancy &&
-      /^\d{4}-\d{2}-\d{2}$/.test(
-        lastCalvingDate
-      ) &&
-      lastCalvingDate >
-        latestPreviousDate
-    ) {
-      return null;
-    }
-
-    return {
-      allowed: false,
-      level: "block",
-
-      code:
-        "vaccination_next_task_not_available",
-
-      previousEventDate:
-        latestPreviousDate,
-
-      message:
-        "تم تسجيل هذا التحصين للحيوان من قبل، ولا توجد جرعة تالية مفتوحة له الآن. سيُنبهك مُرَبِّيك عند دخول الجرعة التالية في موعدها."
-    };
+  if (!latestPreviousDate) {
+    return (
+      initialAgeAdvice ||
+      initialMaternalAdvice ||
+      null
+    );
   }
 
+  const eachPregnancy =
+    Array.isArray(
+      programLink.doseSchedule
+    ) &&
+    programLink.doseSchedule.some(
+      step =>
+        String(
+          step?.cycle || ""
+        ).trim() ===
+        "each_pregnancy"
+    );
+
+  const maternalCycleStartDate =
+    vaccinationMaternalCycleStartDateSrv(
+      animalDoc
+    );
+
+  if (
+    eachPregnancy &&
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      maternalCycleStartDate
+    ) &&
+    maternalCycleStartDate >
+      latestPreviousDate
+  ) {
+    return initialMaternalAdvice || null;
+  }
+
+  return {
+    allowed: false,
+    level: "block",
+
+    code:
+      "vaccination_next_task_not_available",
+
+    previousEventDate:
+      latestPreviousDate,
+
+    message:
+      "تم تسجيل هذا التحصين للحيوان من قبل، ولا توجد جرعة تالية مفتوحة له الآن. سيُنبهك مُرَبِّيك عند دخول الجرعة التالية في موعدها."
+  };
+}
   const timingPolicy =
   vaccinationDoseTimingPolicySrv(
     nearest.taskDoseType
@@ -27761,10 +27802,35 @@ function vaccinationYmdSubtractUnitSrv(
   );
 }
 
+function vaccinationMaternalCycleStartDateSrv(
+  animal = {}
+) {
+  const candidates = [
+    animal.lastInseminationDate,
+    animal.lastServiceDate,
+    animal.conceptionDate,
+    animal.lastCalvingDate,
+    animal.calvingDate,
+    animal.lastAbortionDate,
+    animal.abortionDate
+  ]
+    .map(value =>
+      String(value || "")
+        .trim()
+        .slice(0, 10)
+    )
+    .filter(value =>
+      /^\d{4}-\d{2}-\d{2}$/.test(value)
+    )
+    .sort();
+
+  return candidates[candidates.length - 1] || "";
+}
+
 function vaccinationAnimalExpectedCalvingDateSrv(
   animal = {}
 ) {
-  const value =
+  const explicitValue =
     String(
       animal.expectedCalvingDate ||
       animal.expectedDateOfCalving ||
@@ -27774,11 +27840,275 @@ function vaccinationAnimalExpectedCalvingDateSrv(
       .trim()
       .slice(0, 10);
 
-  return /^\d{4}-\d{2}-\d{2}$/.test(
-    value
-  )
-    ? value
-    : "";
+  if (
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      explicitValue
+    )
+  ) {
+    return explicitValue;
+  }
+
+  const reproductiveStatus =
+    calvingStripArSrv(
+      animal.reproductiveStatus ||
+      animal.pregStatus ||
+      ""
+    ).toLowerCase();
+
+  const isPregnant =
+    animal.pregnant === true ||
+    reproductiveStatus.includes("عشار") ||
+    reproductiveStatus.includes("حامل") ||
+    reproductiveStatus.includes("pregnant");
+
+  if (!isPregnant) {
+    return "";
+  }
+
+  const lastInseminationDate =
+    String(
+      animal.lastInseminationDate ||
+      animal.lastServiceDate ||
+      animal.conceptionDate ||
+      ""
+    )
+      .trim()
+      .slice(0, 10);
+
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      lastInseminationDate
+    )
+  ) {
+    return "";
+  }
+
+  const species =
+    calvingNormalizeSpeciesSrv(
+      animal.species ||
+      animal.animalTypeAr ||
+      animal.animalType ||
+      animal.animaltype ||
+      animal.type ||
+      ""
+    );
+
+  const gestationDays =
+    species === "جاموس"
+      ? 315
+      : species === "أبقار"
+        ? 280
+        : 0;
+
+  if (!gestationDays) {
+    return "";
+  }
+
+  return vaccinationYmdAddDaysSrv(
+    lastInseminationDate,
+    gestationDays
+  );
+}
+
+function vaccinationMaternalDoseStepSrv(
+  programLink = {}
+) {
+  const requestedDoseType =
+    String(
+      programLink.doseType || ""
+    ).trim();
+
+  const doseSchedule =
+    Array.isArray(
+      programLink.doseSchedule
+    )
+      ? programLink.doseSchedule
+      : [];
+
+  return doseSchedule.find(step => {
+    const stepDoseType =
+      String(
+        step?.doseType || ""
+      ).trim();
+
+    const timingBasis =
+      String(
+        step?.timingBasis || ""
+      ).trim();
+
+    return (
+      stepDoseType ===
+        requestedDoseType &&
+      timingBasis ===
+        "before_expected_calving"
+    );
+  }) || null;
+}
+
+function vaccinationMaternalTimingAdviceSrv({
+  animalDoc = {},
+  programLink = {},
+  eventDate = ""
+} = {}) {
+  const dt =
+    String(eventDate || "")
+      .trim()
+      .slice(0, 10);
+
+  const step =
+    vaccinationMaternalDoseStepSrv(
+      programLink
+    );
+
+  if (
+    !step ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(dt)
+  ) {
+    return null;
+  }
+
+  const taskDoseType =
+    String(
+      programLink.doseType ||
+      step.doseType ||
+      ""
+    ).trim();
+
+  const expectedCalvingDate =
+    vaccinationAnimalExpectedCalvingDateSrv(
+      animalDoc
+    );
+
+  if (!expectedCalvingDate) {
+    return {
+      allowed: true,
+      level: "warn",
+
+      code:
+        "vaccination_expected_calving_date_missing",
+
+      taskDoseType,
+
+      message:
+        "لا يوجد تاريخ تلقيح أخير أو موعد ولادة متوقع صالح لهذه الأم، لذلك لم يتمكن مُرَبِّيك من حساب موعد جرعة ما قبل الولادة. يمكنك المتابعة إذا كان هذا قرار المزرعة."
+    };
+  }
+
+  const dueDate =
+    vaccinationYmdSubtractUnitSrv(
+      expectedCalvingDate,
+      Number(step.timingValue || 0),
+      String(step.timingUnit || "").trim()
+    );
+
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      dueDate
+    )
+  ) {
+    return null;
+  }
+
+  const timingPolicy =
+    vaccinationDoseTimingPolicySrv(
+      taskDoseType
+    );
+
+  const earliestAllowedDate =
+    vaccinationYmdAddDaysSrv(
+      dueDate,
+      -timingPolicy.executionWindowDays
+    );
+
+  const alertFromDate =
+    vaccinationYmdAddDaysSrv(
+      dueDate,
+      -timingPolicy.alertLeadDays
+    );
+
+  const common = {
+    allowed: true,
+    dueDate,
+    alertFromDate,
+    windowStart: earliestAllowedDate,
+    windowEnd: dueDate,
+    expectedCalvingDate,
+    taskDoseType,
+    timingBasis:
+      "before_expected_calving"
+  };
+
+  if (dt < earliestAllowedDate) {
+    return {
+      ...common,
+      allowed: false,
+      level: "block",
+
+      code:
+        "vaccination_before_execution_window",
+
+      earliestAllowedDate,
+
+      daysUntilAllowed:
+        diffDaysISO(
+          dt,
+          earliestAllowedDate
+        ),
+
+      message:
+        timingPolicy.executionWindowDays === 0
+          ? `موعد جرعة ما قبل الولادة هو ${dueDate}، ولا يُسمح بتسجيلها قبل موعدها.`
+          : `موعد جرعة ما قبل الولادة هو ${dueDate}، ويبدأ السماح بتسجيلها من ${earliestAllowedDate}.`
+    };
+  }
+
+  if (dt < dueDate) {
+    const daysEarly =
+      diffDaysISO(dt, dueDate);
+
+    return {
+      ...common,
+      level: "info",
+
+      code:
+        "vaccination_execution_window_open",
+
+      earliestAllowedDate,
+      daysEarly,
+
+      message:
+        `جرعة ما قبل الولادة داخل نافذة التنفيذ، وموعدها في البرنامج بعد ${daysEarly} يومًا.`
+    };
+  }
+
+  if (dt > dueDate) {
+    const daysLate =
+      diffDaysISO(dueDate, dt);
+
+    return {
+      ...common,
+      level: "warn",
+
+      code:
+        "vaccination_overdue",
+
+      daysLate,
+
+      message:
+        `تأخرت جرعة ما قبل الولادة ${daysLate} يومًا عن موعد البرنامج. يمكنك تسجيل التنفيذ الآن.`
+    };
+  }
+
+  return {
+    ...common,
+    level: "info",
+
+    code:
+      "vaccination_due_ok",
+
+    message:
+      "توقيت جرعة ما قبل الولادة مطابق لموعد البرنامج."
+  };
 }
 
 function vaccinationProgramTaskIdSrv({
