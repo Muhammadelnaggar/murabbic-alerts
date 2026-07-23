@@ -27162,15 +27162,45 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
       });
     }
 
-        const uid = req.userId;
-    const body = req.body || {};
+  const uid = req.userId;
+const body = req.body || {};
 
-    const programContext =
-      await vaccinationReadProgramContextSrv(
-        uid,
-        body.programMode
-      );
-    const programLink =
+const requestedProgramMode =
+  vaccinationProgramModeNormSrv(
+    body.programMode
+  );
+
+const programContext =
+  await vaccinationReadProgramContextSrv(
+    uid
+  );
+
+if (
+  requestedProgramMode &&
+  programContext.saved === true &&
+  requestedProgramMode !==
+    programContext.programMode
+) {
+  return res.status(409).json({
+    ok: false,
+    allowed: false,
+
+    stage:
+      "vaccination_program_changed",
+
+    message:
+      "تم تغيير برنامج التحصينات المعتمد منذ فتح الصفحة. حدّث الصفحة ثم اختر التحصين من البرنامج الحالي.",
+
+    programContext,
+
+    acceptedCount: 0,
+    rejectedCount: 0,
+    accepted: [],
+    rejected: []
+  });
+}
+
+const programLink =
   await vaccinationResolveProgramRowSrv({
     uid,
     programContext,
@@ -27252,7 +27282,7 @@ const doseType = String(
 
         message: programContext.programMode
           ? "أدخل رقم الحيوان وتاريخ التحصين ونوع التحصين."
-          : "اختر برنامج المزرعة أو برنامج مُرَبِّيك الخبير، ثم أكمل بيانات التحصين.",
+          : "اختر برنامج المزرعة أو برنامج مُرَبِّيك، ثم أكمل بيانات التحصين.",
 
         programContext,
 
@@ -27270,7 +27300,7 @@ const doseType = String(
         stage: "vaccination_program_required",
 
         message:
-          "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك الخبير.",
+         "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك.",
 
         programContext,
 
@@ -27404,7 +27434,31 @@ if (dueWarning?.allowed === false) {
   });
   continue;
 }
+const openTaskDoseType =
+  String(
+    dueWarning?.taskDoseType || ""
+  )
+    .trim()
+    .toLowerCase();
 
+const selectedDoseType =
+  String(doseType || "")
+    .trim()
+    .toLowerCase();
+
+if (
+  openTaskDoseType &&
+  openTaskDoseType !== selectedDoseType
+) {
+  rejected.push({
+    animalNumber,
+
+    reason:
+      "الجرعة المختارة لا تطابق الجرعة المفتوحة حاليًا في برنامج التحصينات. اختر الجرعة المطلوبة للمهمة الحالية."
+  });
+
+  continue;
+}
 accepted.push({
 
   animalNumber,
@@ -28474,36 +28528,54 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
         const uid = req.userId;
     const body = req.body || {};
 
-    const requestedProgramMode =
-      vaccinationProgramModeNormSrv(
-        body.programMode
-      );
+  const requestedProgramMode =
+  vaccinationProgramModeNormSrv(
+    body.programMode
+  );
 
-    const programContext =
-      requestedProgramMode
-        ? await vaccinationSaveProgramContextSrv(
-            uid,
-            requestedProgramMode
-          )
-        : await vaccinationReadProgramContextSrv(
-            uid
-          );
+const programContext =
+  await vaccinationReadProgramContextSrv(
+    uid
+  );
 
-    if (!programContext.programMode) {
-      return res.status(400).json({
-        ok: false,
+if (
+  programContext.saved !== true ||
+  !programContext.programMode
+) {
+  return res.status(400).json({
+    ok: false,
 
-        message:
-          "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك الخبير.",
+    message:
+      "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك.",
 
-        programContext,
+    programContext,
 
-        savedCount: 0,
-        rejectedCount: 0,
-        saved: [],
-        rejected: []
-      });
-    }
+    savedCount: 0,
+    rejectedCount: 0,
+    saved: [],
+    rejected: []
+  });
+}
+
+if (
+  requestedProgramMode &&
+  requestedProgramMode !==
+    programContext.programMode
+) {
+  return res.status(409).json({
+    ok: false,
+
+    message:
+      "تم تغيير برنامج التحصينات المعتمد منذ فتح الصفحة. حدّث الصفحة ثم اختر التحصين من البرنامج الحالي.",
+
+    programContext,
+
+    savedCount: 0,
+    rejectedCount: 0,
+    saved: [],
+    rejected: []
+  });
+}
     const programLink =
   await vaccinationResolveProgramRowSrv({
     uid,
@@ -28746,14 +28818,38 @@ if (dueWarning?.allowed === false) {
     animalNumber,
     reason: dueWarning.message
   });
+
+  continue;
+}
+
+const openTaskDoseType =
+  String(
+    dueWarning?.taskDoseType || ""
+  )
+    .trim()
+    .toLowerCase();
+
+const selectedDoseType =
+  String(doseType || "")
+    .trim()
+    .toLowerCase();
+
+if (
+  openTaskDoseType &&
+  openTaskDoseType !== selectedDoseType
+) {
+  rejected.push({
+    animalNumber,
+
+    reason:
+      "الجرعة المختارة لا تطابق الجرعة المفتوحة حاليًا في برنامج التحصينات. اختر الجرعة المطلوبة للمهمة الحالية."
+  });
+
   continue;
 }
 
 const effectiveDoseType =
-  String(
-    dueWarning?.taskDoseType ||
-    doseType
-  ).trim();
+  String(doseType || "").trim();
 
 const payload = {
   userId: uid,
