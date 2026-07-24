@@ -6329,10 +6329,14 @@ function eventsPageBuildRedirectSrv({ page, numbers, eventDate, group = {} }){
 
   const qs = new URLSearchParams();
 
-  if (isBulk) {
-    qs.set("mode", "bulk");
-    qs.set("numbers", nums.join(","));
-    qs.set("bulk", nums.join(","));
+if (isBulk) {
+  const joinedNumbers = nums.join(",");
+
+  qs.set("mode", "bulk");
+  qs.set("mbkMode", "group");
+  qs.set("numbers", joinedNumbers);
+  qs.set("animalNumbers", joinedNumbers);
+  qs.set("bulk", joinedNumbers);
 
     if (group.name || group.groupName) {
       qs.set("group", String(group.name || group.groupName || ""));
