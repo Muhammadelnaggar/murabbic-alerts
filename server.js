@@ -40469,139 +40469,166 @@ async function murabbikCloseUpDueAlertSourceSrv(
     });
   }
 
-  if (!due.length) return [];
+   if (!due.length) return [];
 
-  due.sort((a, b) =>
-    b.gestationDays - a.gestationDays ||
-    String(a.animalNumber).localeCompare(
-      String(b.animalNumber),
-      "ar",
-      { numeric: true }
-    )
-  );
+  const groupsByDueDate = new Map();
 
-  const animalNumbers = due.map(
-    item => item.animalNumber
-  );
+  for (const item of due) {
+    const dueDate =
+      calvingIsDateSrv(item.dueDate)
+        ? item.dueDate
+        : context.today;
 
-  const count = animalNumbers.length;
+    if (!groupsByDueDate.has(dueDate)) {
+      groupsByDueDate.set(dueDate, []);
+    }
 
-  const overdueCount = due.filter(
-    item => item.stage === "overdue"
-  ).length;
-
-  const hasOverdue = overdueCount > 0;
-
-  const evidence = due
-    .slice(0, 12)
-    .map(item =>
-      `الحيوان ${item.animalNumber}: ${item.gestationDays} يوم حمل، والموعد المستهدف ${item.dueDate}`
-    );
-
-  if (due.length > evidence.length) {
-    evidence.push(
-      `و${due.length - evidence.length} حيوان آخر مستحق لتحضير الولادة.`
-    );
+    groupsByDueDate.get(dueDate).push(item);
   }
 
-  const revisionKey = [...due]
-    .sort((a, b) =>
+  const alerts = [];
+
+  const sortedDueDates = [
+    ...groupsByDueDate.keys()
+  ].sort((a, b) =>
+    String(a).localeCompare(String(b))
+  );
+
+  for (const dueDate of sortedDueDates) {
+    const group =
+      groupsByDueDate.get(dueDate) || [];
+
+    group.sort((a, b) =>
+      b.gestationDays - a.gestationDays ||
       String(a.animalNumber).localeCompare(
         String(b.animalNumber),
         "ar",
         { numeric: true }
       )
-    )
-    .map(item =>
-      [
-        item.animalNumber,
-        item.lastInseminationDate,
-        item.targetGestationDay,
-        item.stage
-      ].join(":")
-    )
-    .join("|");
+    );
 
-  const earliestDueDate = due
-    .map(item => item.dueDate)
-    .filter(calvingIsDateSrv)
-    .sort()[0] || context.today;
+    const animalNumbers = group.map(
+      item => item.animalNumber
+    );
 
-  return [{
-    identityKey:
-      "close-up-due-herd",
+    const count = animalNumbers.length;
 
-    revisionKey,
+    const overdueCount = group.filter(
+      item => item.stage === "overdue"
+    ).length;
 
-    kind: "operational",
-    domain: "reproduction",
-    code: "close_up_due",
+    const hasOverdue = overdueCount > 0;
 
-    priority:
-      hasOverdue
-        ? "high"
-        : "normal",
+    const evidence = group
+      .slice(0, 12)
+      .map(item =>
+        `الحيوان ${item.animalNumber}: ${item.gestationDays} يوم حمل، والموعد المستهدف ${item.dueDate}`
+      );
 
-    urgency: "today",
-    certainty: "confirmed",
+    if (group.length > evidence.length) {
+      evidence.push(
+        `و${group.length - evidence.length} حيوان آخر له موعد التحضير نفسه.`
+      );
+    }
 
-    status:
-      hasOverdue
-        ? "overdue"
-        : "due",
+    const revisionKey = [...group]
+      .sort((a, b) =>
+        String(a.animalNumber).localeCompare(
+          String(b.animalNumber),
+          "ar",
+          { numeric: true }
+        )
+      )
+      .map(item =>
+        [
+          dueDate,
+          item.animalNumber,
+          item.lastInseminationDate,
+          item.targetGestationDay,
+          item.stage
+        ].join(":")
+      )
+      .join("|");
 
-    title:
-      count === 1
-        ? "حيوان مستحق لتحضير الولادة"
-        : "حيوانات مستحقة لتحضير الولادة",
+    alerts.push({
+      identityKey:
+        `close-up-due:${dueDate}`,
 
-    message:
-      count === 1
-        ? (
-            hasOverdue
-              ? `الحيوان رقم ${animalNumbers[0]} تجاوز موعد تحضير الولادة المستهدف ولم يُسجّل في انتظار الولادة بعد.`
-              : `الحيوان رقم ${animalNumbers[0]} وصل إلى موعد تحضير الولادة المستهدف.`
-          )
-        : (
-            hasOverdue
-              ? `يوجد ${count} حيوانات مستحقة لتحضير الولادة، منها ${overdueCount} تجاوزت الموعد المستهدف.`
-              : `يوجد ${count} حيوانات وصلت إلى موعد تحضير الولادة المستهدف اليوم.`
-          ),
+      revisionKey,
 
-    details: {
-      observation:
+      kind: "operational",
+      domain: "reproduction",
+      code: "close_up_due",
+
+      priority:
+        hasOverdue
+          ? "high"
+          : "normal",
+
+      urgency: "today",
+      certainty: "confirmed",
+
+      status:
+        hasOverdue
+          ? "overdue"
+          : "due",
+
+      title:
         count === 1
-          ? `الحيوان رقم ${animalNumbers[0]} مستحق لتحضير الولادة وفق تاريخ آخر تلقيح المسجّل.`
-          : `الحيوانات المستحقة لتحضير الولادة: ${animalNumbers.join("، ")}.`,
+          ? "حيوان مستحق لتحضير الولادة"
+          : "حيوانات مستحقة لتحضير الولادة",
 
-      meaning:
-        "مرحلة تحضير الولادة تساعد على الانتقال المنظم إلى مجموعة انتظار الولادة وتجهيز التغذية والرعاية قبل الولادة.",
-
-      recommendation:
-        "راجع كل حالة ميدانيًا، ثم سجّل تحضير الولادة للحيوانات المناسبة.",
-
-      evidence
-    },
-
-    dueDate: earliestDueDate,
-    affectedCount: count,
-    animalNumbers,
-
-    action: {
-      type: "navigate",
-
-      label:
+      message:
         count === 1
-          ? "تحضير الحيوان"
-          : "تحضير الحيوانات",
+          ? (
+              hasOverdue
+                ? `الحيوان رقم ${animalNumbers[0]} تجاوز موعد تحضير الولادة المستهدف ${dueDate} ولم يُسجّل في انتظار الولادة بعد.`
+                : `الحيوان رقم ${animalNumbers[0]} وصل اليوم إلى موعد تحضير الولادة المستهدف.`
+            )
+          : (
+              hasOverdue
+                ? `يوجد ${count} حيوانات موعد تحضيرها المستهدف ${dueDate} ولم تُسجّل في انتظار الولادة بعد.`
+                : `يوجد ${count} حيوانات وصلت اليوم إلى موعد تحضير الولادة المستهدف.`
+            ),
 
-      url:
-        `close-up.html?number=${encodeURIComponent(animalNumbers.join(","))}`
-    },
+      details: {
+        observation:
+          count === 1
+            ? `الحيوان رقم ${animalNumbers[0]} مستحق لتحضير الولادة بتاريخ ${dueDate} وفق تاريخ آخر تلقيح المسجّل.`
+            : `الحيوانات ذات موعد تحضير الولادة ${dueDate}: ${animalNumbers.join("، ")}.`,
 
-    snoozeMinutes:
-      MURABBIK_CLOSE_UP_SNOOZE_MINUTES
-  }];
+        meaning:
+          "مرحلة تحضير الولادة تساعد على الانتقال المنظم إلى مجموعة انتظار الولادة وتجهيز التغذية والرعاية قبل الولادة.",
+
+        recommendation:
+          "راجع كل حالة ميدانيًا، ثم سجّل تحضير الولادة للحيوانات المناسبة.",
+
+        evidence
+      },
+
+      dueDate,
+      affectedCount: count,
+      animalNumbers,
+
+      action: {
+        type: "navigate",
+
+        label:
+          count === 1
+            ? "تحضير الحيوان"
+            : "تحضير الحيوانات",
+
+        url:
+          `close-up.html?number=${encodeURIComponent(animalNumbers.join(","))}`
+      },
+
+      snoozeMinutes:
+        MURABBIK_CLOSE_UP_SNOOZE_MINUTES
+    });
+  }
+
+  return alerts;
+   
 }
 
 murabbikSmartAlertRegisterSourceSrv(
