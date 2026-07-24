@@ -35398,11 +35398,15 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
         animal
       );
 
-    if (
+       if (
       !/^\d{4}-\d{2}-\d{2}$/.test(
         expectedCalvingDate
       )
     ) {
+      return;
+    }
+
+    if (today > expectedCalvingDate) {
       return;
     }
 
@@ -40650,8 +40654,8 @@ async function murabbikVaccinationProgramAlertSourceSrv(
         cleanText(alert.message),
 
             details: {
-        observation:
-          isInitialAge
+              observation:
+          isInitialAge || isInitialMaternal
             ? ""
             : cleanText(alert.message),
 
