@@ -40618,8 +40618,12 @@ async function murabbikCloseUpDueAlertSourceSrv(
             ? "تحضير الحيوان"
             : "تحضير الحيوانات",
 
-        url:
-          `close-up.html?number=${encodeURIComponent(animalNumbers.join(","))}`
+       url:
+  eventsPageBuildRedirectSrv({
+    page: "close-up.html",
+    numbers: animalNumbers,
+    eventDate: context.today
+  })
       },
 
       snoozeMinutes:
