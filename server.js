@@ -40592,10 +40592,10 @@ async function murabbikCloseUpDueAlertSourceSrv(
             ),
 
       details: {
-        observation:
-          count === 1
-            ? `الحيوان رقم ${animalNumbers[0]} مستحق لتحضير الولادة بتاريخ ${dueDate} وفق تاريخ آخر تلقيح المسجّل.`
-            : `الحيوانات ذات موعد تحضير الولادة ${dueDate}: ${animalNumbers.join("، ")}.`,
+       observation:
+  count === 1
+    ? `آخر تلقيح مسجّل للحيوان بتاريخ ${group[0].lastInseminationDate}، وعمر الحمل الحالي ${group[0].gestationDays} يومًا.`
+    : `أرقام الحيوانات المستحقة: ${animalNumbers.join("، ")}.`,
 
         meaning:
           "مرحلة تحضير الولادة تساعد على الانتقال المنظم إلى مجموعة انتظار الولادة وتجهيز التغذية والرعاية قبل الولادة.",
