@@ -40255,6 +40255,359 @@ murabbikSmartAlertRegisterSourceSrv(
   "dry_off_due",
   murabbikDryOffDueAlertSourceSrv
 );
+// ============================================================
+//     SMART ALERT SOURCE: CLOSE-UP PREPARATION — GROUPED
+//     تنبيه تحضير الولادة الذكي — تنبيه واحد مجمّع
+// ============================================================
+
+const MURABBIK_CLOSE_UP_SNOOZE_MINUTES = 24 * 60;
+
+function murabbikCloseUpAlertAlreadyDoneSrv(
+  doc = {},
+  lastInseminationDate = ""
+) {
+  const production = murabbikSmartAlertTextSrv([
+    doc.productionStatus,
+    doc.lactationStatus,
+    doc.group,
+    doc.groupId
+  ].filter(Boolean).join(" ")).toLowerCase();
+
+  if (
+    (
+      production.includes("تحضير") &&
+      production.includes("ولاد")
+    ) ||
+    (
+      production.includes("انتظار") &&
+      production.includes("ولاد")
+    ) ||
+    production.includes("close_up") ||
+    production.includes("closeup")
+  ) {
+    return true;
+  }
+
+  const lastCloseUpDate =
+    murabbikSmartAlertTextSrv(
+      doc.lastCloseUpDate ||
+      doc.closeUpDate ||
+      ""
+    ).slice(0, 10);
+
+  if (
+    !calvingIsDateSrv(lastInseminationDate) ||
+    !calvingIsDateSrv(lastCloseUpDate)
+  ) {
+    return false;
+  }
+
+  const closeUpAfterService =
+    calvingDaysBetweenSrv(
+      lastInseminationDate,
+      lastCloseUpDate
+    );
+
+  return (
+    Number.isFinite(closeUpAfterService) &&
+    closeUpAfterService >= 0
+  );
+}
+
+function murabbikCloseUpAlertPregnancyEndedSrv(
+  doc = {},
+  lastInseminationDate = ""
+) {
+  if (!calvingIsDateSrv(lastInseminationDate)) {
+    return true;
+  }
+
+  const endingDates = [
+    doc.lastCalvingDate,
+    doc.calvingDate,
+    doc.lastAbortionDate,
+    doc.abortionDate
+  ]
+    .map(value =>
+      murabbikSmartAlertTextSrv(value)
+        .slice(0, 10)
+    )
+    .filter(calvingIsDateSrv);
+
+  return endingDates.some(date => {
+    const daysAfterService =
+      calvingDaysBetweenSrv(
+        lastInseminationDate,
+        date
+      );
+
+    return (
+      Number.isFinite(daysAfterService) &&
+      daysAfterService >= 0
+    );
+  });
+}
+
+async function murabbikCloseUpDueAlertSourceSrv(
+  context
+) {
+  const animals =
+    await murabbikSmartAlertAnimalsSrv(
+      context
+    );
+
+  const due = [];
+
+  for (const doc of animals) {
+    const animalNumber =
+      murabbikDryOffAlertNumberSrv(doc);
+
+    const status =
+      murabbikSmartAlertTextSrv(
+        doc.status || "active"
+      ).toLowerCase();
+
+    if (!animalNumber) continue;
+    if (["inactive", "archived"].includes(status)) continue;
+
+    if (
+      String(doc.entryType || "")
+        .trim()
+        .toLowerCase() === "followers"
+    ) {
+      continue;
+    }
+
+    const reproStatus =
+      calvingStripArSrv(
+        doc.reproductiveStatus ||
+        doc.reproStatus ||
+        ""
+      );
+
+    if (!reproStatus.includes("عشار")) continue;
+
+    const lastInseminationDate =
+      murabbikSmartAlertTextSrv(
+        doc.lastInseminationDate ||
+        doc.lastAI ||
+        doc.lastInsemination ||
+        doc.lastServiceDate ||
+        ""
+      ).slice(0, 10);
+
+    if (!calvingIsDateSrv(lastInseminationDate)) continue;
+
+    if (
+      murabbikCloseUpAlertPregnancyEndedSrv(
+        doc,
+        lastInseminationDate
+      )
+    ) {
+      continue;
+    }
+
+    if (
+      murabbikCloseUpAlertAlreadyDoneSrv(
+        doc,
+        lastInseminationDate
+      )
+    ) {
+      continue;
+    }
+
+    const policy = closeupPolicySrv(
+      doc.species ||
+      doc.animalTypeAr ||
+      doc.animalType ||
+      doc.animaltype ||
+      doc.groupSpecies ||
+      ""
+    );
+
+    if (!policy) continue;
+
+    const gestationDays =
+      calvingDaysBetweenSrv(
+        lastInseminationDate,
+        context.today
+      );
+
+    if (
+      !Number.isFinite(gestationDays) ||
+      gestationDays < policy.targetGestationDay
+    ) {
+      continue;
+    }
+
+    due.push({
+      animalNumber,
+      species: policy.species,
+      lastInseminationDate,
+      gestationDays,
+
+      targetGestationDay:
+        policy.targetGestationDay,
+
+      dueDate:
+        addDaysToIsoDateSrv(
+          lastInseminationDate,
+          policy.targetGestationDay
+        ),
+
+      expectedCalvingDate:
+        addDaysToIsoDateSrv(
+          lastInseminationDate,
+          policy.expectedGestationDays
+        ),
+
+      stage:
+        gestationDays >
+        policy.targetGestationDay
+          ? "overdue"
+          : "due"
+    });
+  }
+
+  if (!due.length) return [];
+
+  due.sort((a, b) =>
+    b.gestationDays - a.gestationDays ||
+    String(a.animalNumber).localeCompare(
+      String(b.animalNumber),
+      "ar",
+      { numeric: true }
+    )
+  );
+
+  const animalNumbers = due.map(
+    item => item.animalNumber
+  );
+
+  const count = animalNumbers.length;
+
+  const overdueCount = due.filter(
+    item => item.stage === "overdue"
+  ).length;
+
+  const hasOverdue = overdueCount > 0;
+
+  const evidence = due
+    .slice(0, 12)
+    .map(item =>
+      `الحيوان ${item.animalNumber}: ${item.gestationDays} يوم حمل، والموعد المستهدف ${item.dueDate}`
+    );
+
+  if (due.length > evidence.length) {
+    evidence.push(
+      `و${due.length - evidence.length} حيوان آخر مستحق لتحضير الولادة.`
+    );
+  }
+
+  const revisionKey = [...due]
+    .sort((a, b) =>
+      String(a.animalNumber).localeCompare(
+        String(b.animalNumber),
+        "ar",
+        { numeric: true }
+      )
+    )
+    .map(item =>
+      [
+        item.animalNumber,
+        item.lastInseminationDate,
+        item.targetGestationDay,
+        item.stage
+      ].join(":")
+    )
+    .join("|");
+
+  const earliestDueDate = due
+    .map(item => item.dueDate)
+    .filter(calvingIsDateSrv)
+    .sort()[0] || context.today;
+
+  return [{
+    identityKey:
+      "close-up-due-herd",
+
+    revisionKey,
+
+    kind: "operational",
+    domain: "reproduction",
+    code: "close_up_due",
+
+    priority:
+      hasOverdue
+        ? "high"
+        : "normal",
+
+    urgency: "today",
+    certainty: "confirmed",
+
+    status:
+      hasOverdue
+        ? "overdue"
+        : "due",
+
+    title:
+      count === 1
+        ? "حيوان مستحق لتحضير الولادة"
+        : "حيوانات مستحقة لتحضير الولادة",
+
+    message:
+      count === 1
+        ? (
+            hasOverdue
+              ? `الحيوان رقم ${animalNumbers[0]} تجاوز موعد تحضير الولادة المستهدف ولم يُسجّل في انتظار الولادة بعد.`
+              : `الحيوان رقم ${animalNumbers[0]} وصل إلى موعد تحضير الولادة المستهدف.`
+          )
+        : (
+            hasOverdue
+              ? `يوجد ${count} حيوانات مستحقة لتحضير الولادة، منها ${overdueCount} تجاوزت الموعد المستهدف.`
+              : `يوجد ${count} حيوانات وصلت إلى موعد تحضير الولادة المستهدف اليوم.`
+          ),
+
+    details: {
+      observation:
+        count === 1
+          ? `الحيوان رقم ${animalNumbers[0]} مستحق لتحضير الولادة وفق تاريخ آخر تلقيح المسجّل.`
+          : `الحيوانات المستحقة لتحضير الولادة: ${animalNumbers.join("، ")}.`,
+
+      meaning:
+        "مرحلة تحضير الولادة تساعد على الانتقال المنظم إلى مجموعة انتظار الولادة وتجهيز التغذية والرعاية قبل الولادة.",
+
+      recommendation:
+        "راجع كل حالة ميدانيًا، ثم سجّل تحضير الولادة للحيوانات المناسبة.",
+
+      evidence
+    },
+
+    dueDate: earliestDueDate,
+    affectedCount: count,
+    animalNumbers,
+
+    action: {
+      type: "navigate",
+
+      label:
+        count === 1
+          ? "تحضير الحيوان"
+          : "تحضير الحيوانات",
+
+      url:
+        `close-up.html?number=${encodeURIComponent(animalNumbers.join(","))}`
+    },
+
+    snoozeMinutes:
+      MURABBIK_CLOSE_UP_SNOOZE_MINUTES
+  }];
+}
+
+murabbikSmartAlertRegisterSourceSrv(
+  "close_up_due",
+  murabbikCloseUpDueAlertSourceSrv
+);
 const MURABBIK_CALVING_OVERDUE_COW_DAYS = 290;
 const MURABBIK_CALVING_OVERDUE_BUFFALO_DAYS = 320;
 const MURABBIK_CALVING_OVERDUE_SNOOZE_MINUTES = 24 * 60;
