@@ -38159,7 +38159,43 @@ function dryOffSaveRequiredSrv(v) {
 //                 CLOSE-UP / تحضير للولادة — SERVER SIDE
 //                 نقل منطق التحضير من form-rules.js كما هو
 // ============================================================
+const MURABBIK_CLOSE_UP_POLICY_SRV = Object.freeze({
+  "أبقار": Object.freeze({
+    expectedGestationDays: 270,
+    calvingWindowMinDays: 260,
+    calvingWindowMaxDays: 280,
+    windowOpenDaysBeforeCalving: 30,
+    targetDaysBeforeCalving: 21
+  }),
 
+  "جاموس": Object.freeze({
+    expectedGestationDays: 300,
+    calvingWindowMinDays: 290,
+    calvingWindowMaxDays: 310,
+    windowOpenDaysBeforeCalving: 30,
+    targetDaysBeforeCalving: 21
+  })
+});
+
+function closeupPolicySrv(speciesRaw = "") {
+  const species = calvingNormalizeSpeciesSrv(speciesRaw);
+  const policy = MURABBIK_CLOSE_UP_POLICY_SRV[species] || null;
+
+  if (!policy) return null;
+
+  return {
+    ...policy,
+    species,
+
+    windowOpenGestationDay:
+      policy.expectedGestationDays -
+      policy.windowOpenDaysBeforeCalving,
+
+    targetGestationDay:
+      policy.expectedGestationDays -
+      policy.targetDaysBeforeCalving
+  };
+}
 function closeupDecisionSrv(fd = {}) {
   const doc = fd.documentData || {};
   if (!doc || !Object.keys(doc).length) {
@@ -38269,34 +38305,21 @@ if (!rsNorm.includes("عشار")) {
    return "❌ أدخل تاريخ تحضير صحيحًا.";
   }
 
-  // نوع الحيوان — بعد التأكد من الحالة والتلقيح
- const sp = calvingNormalizeSpeciesSrv(
-  fd.species ||
-  doc.species ||
-  doc.animalTypeAr ||
-  doc.animalType ||
-  doc.animaltype ||
-  doc.groupSpecies ||
-  ""
-);
+  if (calvingIsDateSrv(lastCloseUp)) {
+    const closeUpAfterService = calvingDaysBetweenSrv(
+      lf,
+      lastCloseUp
+    );
 
-  const th = CALVING_THRESHOLDS_SRV[sp]?.minGestationDays;
-  if (!th) {
-   return "❌ لم أتعرف على نوع الحيوان، لذلك لا أستطيع حساب عمر الحمل. راجع بيانات الحيوان أولًا.";
+    if (
+      Number.isFinite(closeUpAfterService) &&
+      closeUpAfterService >= 0
+    ) {
+      return `❌ سبق أن سجلت تحضير الولادة لهذا الحمل بتاريخ ${lastCloseUp}.`;
+    }
   }
 
-  const gDays = calvingDaysBetweenSrv(lf, fd.eventDate);
-  if (!Number.isFinite(gDays)) {
-    return "❌ لم أستطع حساب عمر الحمل. راجع تاريخ آخر تلقيح وتاريخ التحضير.";
-  }
-
-  const remaining = th - gDays;
-
-  if (remaining > 40) {
-   return `❌ ما زال أمام الحيوان ${remaining} يومًا على أول موعد متوقع للولادة. سجّل التحضير عندما يتبقى 40 يومًا أو أقل.`;
-  }
-
-  return null;
+   return null;
 }
 async function updateAnimalAfterCloseupSaveSrv(ev = {}) {
   const uid = String(ev.userId || "").trim();
