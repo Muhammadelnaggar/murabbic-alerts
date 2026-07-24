@@ -25712,7 +25712,6 @@ function vaccinationMurabbikDefaultProgramSrv() {
       alternativePath:
         "rotavac_corona",
       advanceNoticeDays: 10,
-      advanceNoticeDays: 10,
       doseSchedule: [
         dose(
           "prime",
