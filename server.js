@@ -40433,13 +40433,13 @@ async function murabbikCloseUpDueAlertSourceSrv(
         context.today
       );
 
-    if (
+     if (
       !Number.isFinite(gestationDays) ||
-      gestationDays < policy.targetGestationDay
+      gestationDays < policy.targetGestationDay ||
+      gestationDays >= policy.expectedGestationDays
     ) {
       continue;
     }
-
     due.push({
       animalNumber,
       species: policy.species,
@@ -40635,8 +40635,12 @@ murabbikSmartAlertRegisterSourceSrv(
   "close_up_due",
   murabbikCloseUpDueAlertSourceSrv
 );
-const MURABBIK_CALVING_OVERDUE_COW_DAYS = 290;
-const MURABBIK_CALVING_OVERDUE_BUFFALO_DAYS = 320;
+const MURABBIK_CALVING_EXPECTED_COW_DAYS = 270;
+const MURABBIK_CALVING_EXPECTED_BUFFALO_DAYS = 300;
+
+const MURABBIK_CALVING_OVERDUE_COW_DAYS = 280;
+const MURABBIK_CALVING_OVERDUE_BUFFALO_DAYS = 310;
+
 const MURABBIK_CALVING_OVERDUE_SNOOZE_MINUTES = 24 * 60;
 
 function murabbikCalvingOverdueDateSrv(value) {
@@ -40682,9 +40686,13 @@ function murabbikCalvingOverdueSpeciesSrv(doc = {}) {
     text.includes("جاموس") ||
     text.includes("buff_")
   ) {
-    return {
+       return {
       key: "buffalo",
       label: "جاموس",
+
+      expectedDays:
+        MURABBIK_CALVING_EXPECTED_BUFFALO_DAYS,
+
       overdueAfterDays:
         MURABBIK_CALVING_OVERDUE_BUFFALO_DAYS
     };
@@ -40698,9 +40706,13 @@ function murabbikCalvingOverdueSpeciesSrv(doc = {}) {
     text.includes("أبقار") ||
     text.includes("cow_")
   ) {
-    return {
+        return {
       key: "cow",
       label: "أبقار",
+
+      expectedDays:
+        MURABBIK_CALVING_EXPECTED_COW_DAYS,
+
       overdueAfterDays:
         MURABBIK_CALVING_OVERDUE_COW_DAYS
     };
@@ -40794,12 +40806,23 @@ async function murabbikCalvingOverdueAlertSourceSrv(
         context.today
       );
 
-    if (
+      if (
       !Number.isFinite(gestationDays) ||
-      gestationDays <= species.overdueAfterDays
+      gestationDays < species.expectedDays
     ) {
       continue;
     }
+
+    const stage =
+      gestationDays > species.overdueAfterDays
+        ? "overdue"
+        : "due";
+
+    const expectedCalvingDate =
+      addDaysToIsoDateSrv(
+        lastInseminationDate,
+        species.expectedDays
+      );
 
     const overdueStartDate =
       addDaysToIsoDateSrv(
@@ -40816,29 +40839,42 @@ async function murabbikCalvingOverdueAlertSourceSrv(
           animalNumber,
           species.key,
           lastInseminationDate,
-          species.overdueAfterDays
+          stage
         ].join(":"),
 
       kind: "operational",
       domain: "reproduction",
       code: "calving_overdue",
 
-      priority: "high",
+      priority:
+        stage === "overdue"
+          ? "high"
+          : "normal",
+
       urgency: "today",
       certainty: "confirmed",
-      status: "overdue",
+      status: stage,
 
-      title: "متابعة موعد الولادة",
+      title:
+        stage === "overdue"
+          ? "تأخر موعد الولادة"
+          : "متابعة موعد الولادة",
 
       message:
-        `الحيوان رقم ${animalNumber} وصل إلى ${gestationDays} يومًا من الحمل حسب تاريخ التلقيح المسجّل، ولم تُسجّل له ولادة حتى الآن. راجع الحيوان وسجّل الولادة أو الحالة الفعلية.`,
+        stage === "overdue"
+          ? `الحيوان رقم ${animalNumber} وصل إلى ${gestationDays} يومًا من الحمل وتجاوز نهاية المدى الطبيعي المتوقع للولادة، ولم تُسجّل له ولادة حتى الآن. راجع الحيوان وسجّل الحالة الفعلية.`
+          : `الحيوان رقم ${animalNumber} وصل إلى موعد الولادة المتوقع، ولم تُسجّل له ولادة حتى الآن. تابع الحيوان وسجّل الولادة عند حدوثها.`,
 
       details: {
         observation:
-          `آخر تلقيح مسجّل بتاريخ ${lastInseminationDate}، وحد متابعة تأخر الولادة لهذا النوع بعد ${species.overdueAfterDays} يومًا.`,
+          stage === "overdue"
+            ? `آخر تلقيح مسجّل بتاريخ ${lastInseminationDate}، وبدأت متابعة التأخر بتاريخ ${overdueStartDate}.`
+            : `آخر تلقيح مسجّل بتاريخ ${lastInseminationDate}، وموعد الولادة المتوقع ${expectedCalvingDate}.`,
 
         meaning:
-          "تجاوز هذا الحد لا يثبت وحده وجود مشكلة صحية، لكنه يستدعي مراجعة الحيوان والبيانات المسجّلة.",
+          stage === "overdue"
+            ? "تجاوز نهاية المدى الطبيعي المتوقع لا يثبت وحده وجود مشكلة صحية، لكنه يستدعي مراجعة الحيوان والبيانات المسجّلة."
+            : "الحيوان داخل المدى الطبيعي المتوقع للولادة، وتحتاج حالته إلى المتابعة حتى تسجيل الولادة أو الحالة الفعلية.",
 
         recommendation:
           "راجع الحيوان ميدانيًا، ثم سجّل الولادة أو الحالة الفعلية من الصفحة المخصصة.",
@@ -40847,12 +40883,21 @@ async function murabbikCalvingOverdueAlertSourceSrv(
           `رقم الحيوان: ${animalNumber}`,
           `النوع: ${species.label}`,
           `عمر الحمل المسجّل: ${gestationDays} يومًا`,
-          `تاريخ آخر تلقيح: ${lastInseminationDate}`
+          `موعد الولادة المتوقع: ${expectedCalvingDate}`,
+          `نهاية المدى الطبيعي: ${addDaysToIsoDateSrv(
+            lastInseminationDate,
+            species.overdueAfterDays
+          )}`
         ]
       },
 
-      dueDate: overdueStartDate,
+      dueDate:
+        stage === "overdue"
+          ? overdueStartDate
+          : expectedCalvingDate,
+
       affectedCount: 1,
+
       animalNumbers: [
         animalNumber
       ],
@@ -40860,12 +40905,15 @@ async function murabbikCalvingOverdueAlertSourceSrv(
       action: {
         type: "navigate",
         label: "تسجيل الولادة",
+
         url:
-          `calving.html?number=${encodeURIComponent(animalNumber)}`
+          `calving.html?number=${encodeURIComponent(
+            animalNumber
+          )}`
       },
 
-snoozeMinutes:
-  MURABBIK_CALVING_OVERDUE_SNOOZE_MINUTES
+      snoozeMinutes:
+        MURABBIK_CALVING_OVERDUE_SNOOZE_MINUTES
     });
   }
 
