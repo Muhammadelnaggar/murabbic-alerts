@@ -35530,14 +35530,13 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
             ? "due"
             : "upcoming";
 
-      const key = [
+       const key = [
         "vaccination_initial_maternal",
         alertStatus,
         programMode,
         programRowId,
         row.vaccineCode || "",
-        doseType,
-        dueDate
+        doseType
       ].join("__");
 
       if (!groups.has(key)) {
@@ -36018,7 +36017,7 @@ const timingPolicy =
           existingTaskKeys
       });
 
-    for (
+      for (
       const group of
       initialMaternalGroups
     ) {
@@ -36029,7 +36028,6 @@ const timingPolicy =
         group.programRowId,
         group.vaccineCode,
         group.doseType,
-        group.dueDate || "",
         group.attentionCode
       ].join("__");
 
@@ -36038,9 +36036,23 @@ const timingPolicy =
           key,
           group
         );
+      } else {
+        const target =
+          groups.get(key);
+
+        target.animalNumbers.push(
+          ...(Array.isArray(group.animalNumbers)
+            ? group.animalNumbers
+            : [])
+        );
+
+        target.taskIds.push(
+          ...(Array.isArray(group.taskIds)
+            ? group.taskIds
+            : [])
+        );
       }
     }
-
     const alerts = [];
 
    const summary = {
@@ -36096,30 +36108,18 @@ const timingPolicy =
         actionText =
           "تسجيل الجرعة التأسيسية";
             } else if (isInitialMaternal) {
-        const expectedCalvingLine =
-          g.expectedCalvingDate
-            ? `\nالولادة المتوقعة: ${g.expectedCalvingDate}`
-            : "";
-
         if (
           g.alertStatus === "overdue"
         ) {
-          const lateDays =
-            Math.max(
-              1,
-              diffDaysISO(
-                g.dueDate,
-                today
-              )
-            );
-
           level = "warn";
 
           title =
             "جرعة ما قبل الولادة متأخرة";
 
           message =
-            `تأخر تنفيذ جرعة «${g.vaccine}» للأمهات ${lateDays} يومًا عن موعد البرنامج.${expectedCalvingLine}\n` +
+            (nums.length === 1
+              ? `توجد أم لم تُنفذ لها جرعة «${g.vaccine}» في الموعد المحدد قبل الولادة.\n`
+              : `توجد ${nums.length} أمهات لم تُنفذ لهن جرعة «${g.vaccine}» في الموعد المحدد قبل الولادة.\n`) +
             `الحيوانات: ${nums.join("، ")}`;
 
           actionText =
@@ -36134,27 +36134,22 @@ const timingPolicy =
             "جرعة ما قبل الولادة مستحقة اليوم";
 
           message =
-            `جرعة «${g.vaccine}» للأمهات مستحقة اليوم حسب البرنامج.${expectedCalvingLine}\n` +
+            (nums.length === 1
+              ? `توجد أم مستحقة لها اليوم جرعة «${g.vaccine}» قبل الولادة.\n`
+              : `توجد ${nums.length} أمهات مستحقة لهن اليوم جرعة «${g.vaccine}» قبل الولادة.\n`) +
             `الحيوانات: ${nums.join("، ")}`;
 
           actionText =
             "تسجيل جرعة ما قبل الولادة";
 
         } else {
-          const daysUntil =
-            Math.max(
-              1,
-              diffDaysISO(
-                today,
-                g.dueDate
-              )
-            );
-
           title =
             "تحصين أمومة قادم";
 
           message =
-            `موعد جرعة «${g.vaccine}» للأمهات قبل الولادة بعد ${daysUntil} أيام.${expectedCalvingLine}\n` +
+            (nums.length === 1
+              ? `دخلت أم واحدة فترة الاستعداد لتنفيذ جرعة «${g.vaccine}» قبل الولادة حسب البرنامج.\n`
+              : `دخلت ${nums.length} أمهات فترة الاستعداد لتنفيذ جرعة «${g.vaccine}» قبل الولادة حسب البرنامج.\n`) +
             `الحيوانات: ${nums.join("، ")}`;
 
           actionText =
@@ -36296,10 +36291,12 @@ actionText = isBooster
         g.vaccineCode ||
         "row",
 
-        g.dueDate ||
-        g.eligibilityDate ||
-        g.attentionCode ||
-        "attention",
+         isInitialMaternal
+          ? "maternal_group"
+          : g.dueDate ||
+            g.eligibilityDate ||
+            g.attentionCode ||
+            "attention",
 
         g.doseType ||
         "dose"
@@ -36342,16 +36339,28 @@ actionText = isBooster
         actionUrl,
 
         dueDate:
-          g.dueDate,
+          isInitialMaternal &&
+          nums.length > 1
+            ? ""
+            : g.dueDate,
 
         alertFromDate:
-          g.alertFromDate,
+          isInitialMaternal &&
+          nums.length > 1
+            ? ""
+            : g.alertFromDate,
 
-               windowEnd:
-          g.windowEnd,
+        windowEnd:
+          isInitialMaternal &&
+          nums.length > 1
+            ? ""
+            : g.windowEnd,
 
         expectedCalvingDate:
-          g.expectedCalvingDate || "",
+          isInitialMaternal &&
+          nums.length > 1
+            ? ""
+            : g.expectedCalvingDate || "",
 
         programMode:
           g.programMode,
@@ -40605,11 +40614,13 @@ async function murabbikVaccinationProgramAlertSourceSrv(
         alert.vaccine ||
         "row",
 
-           isInitialAge
+              isInitialAge
         ? "age_ready"
-        : alert.dueDate ||
-          alert.attentionCode ||
-          "attention",
+        : isInitialMaternal
+          ? "maternal_group"
+          : alert.dueDate ||
+            alert.attentionCode ||
+            "attention",
 
       alert.doseType || "dose"
     ].join(":");
@@ -40701,13 +40712,17 @@ async function murabbikVaccinationProgramAlertSourceSrv(
         ].filter(Boolean)
       },
 
-           dueDate:
-        isInitialAge
-          ? ""
-          : cleanText(
-              alert.dueDate ||
-              context.today
-            ).slice(0, 10),
+ dueDate:
+  isInitialAge ||
+  (
+    isInitialMaternal &&
+    animalNumbers.length > 1
+  )
+    ? ""
+    : cleanText(
+        alert.dueDate ||
+        context.today
+      ).slice(0, 10),
 
       affectedCount:
         Number(alert.count) ||
