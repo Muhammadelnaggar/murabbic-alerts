@@ -23035,6 +23035,95 @@ if (linkedProgramRowId) {
       "تم تسجيل هذا التحصين للحيوان من قبل، ولا توجد جرعة تالية مفتوحة له الآن. سيُنبهك مُرَبِّيك عند دخول الجرعة التالية في موعدها."
   };
 }
+    if (
+    linkedProgramSection
+      .trim()
+      .toLowerCase() === "mothers"
+  ) {
+    const selectedMaternalStep =
+      Array.isArray(
+        programLink.doseSchedule
+      )
+        ? programLink.doseSchedule.find(
+            step =>
+              String(
+                step?.doseType || ""
+              ).trim() ===
+                String(
+                  programLink.doseType ||
+                  nearest.taskDoseType ||
+                  ""
+                ).trim()
+          ) || null
+        : null;
+
+    const maternalWindow =
+      vaccinationMaternalLatestWindowSrv({
+        animalDoc,
+        programLink,
+        step:
+          selectedMaternalStep || {}
+      });
+
+    if (
+      /^\d{4}-\d{2}-\d{2}$/.test(
+        maternalWindow.latestAllowedDate
+      ) &&
+      dt >
+        maternalWindow.latestAllowedDate
+    ) {
+      return {
+        allowed: false,
+        level: "block",
+
+        code:
+          "vaccination_maternal_window_closed",
+
+        dueDate:
+          nearest.dueDate,
+
+        latestAllowedDate:
+          maternalWindow.latestAllowedDate,
+
+        latestDaysBeforeCalving:
+          maternalWindow
+            .latestDaysBeforeCalving,
+
+        expectedCalvingDate:
+          maternalWindow
+            .expectedCalvingDate,
+
+        taskId:
+          nearest.taskId,
+
+        taskDoseType:
+          nearest.taskDoseType,
+
+        message:
+          `انتهت نافذة جرعة ما قبل الولادة. كان آخر يوم مسموح للتنفيذ هو ${maternalWindow.latestAllowedDate}، أي قبل الولادة المتوقعة بـ${maternalWindow.latestDaysBeforeCalving} يومًا.`
+      };
+    }
+
+    const fixedMaternalAdvice =
+      vaccinationMaternalTimingAdviceSrv({
+        animalDoc,
+        programLink,
+        eventDate: dt
+      });
+
+    if (fixedMaternalAdvice) {
+      return {
+        ...fixedMaternalAdvice,
+
+        taskId:
+          nearest.taskId,
+
+        taskDoseType:
+          nearest.taskDoseType ||
+          fixedMaternalAdvice.taskDoseType
+      };
+    }
+  }
   const timingPolicy =
   vaccinationDoseTimingPolicySrv(
     nearest.taskDoseType
@@ -25697,7 +25786,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
       ]
     }),
 
-    row({
+      row({
       programRowId:
         "murabbik_rotavac_corona_mothers",
       vaccineCode:
@@ -25705,7 +25794,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
       programSection: "mothers",
       vaccineForm:
         "killed_virus_bacterin_toxoid",
-           targetGroup:
+      targetGroup:
         "pregnant_mothers",
       alternativeGroup:
         "maternal_calf_scour_program",
@@ -25720,7 +25809,10 @@ function vaccinationMurabbikDefaultProgramSrv() {
           "day",
           {
             cycle:
-              "each_pregnancy"
+              "each_pregnancy",
+
+            latestDaysBeforeCalving:
+              21
           }
         )
       ]
@@ -25729,11 +25821,12 @@ function vaccinationMurabbikDefaultProgramSrv() {
     row({
       programRowId:
         "murabbik_scourguard_mothers",
-      vaccineCode: "scourguard",
+      vaccineCode:
+        "scourguard",
       programSection: "mothers",
       vaccineForm:
         "killed_virus_bacterin_toxoid",
-           targetGroup:
+      targetGroup:
         "pregnant_mothers",
       alternativeGroup:
         "maternal_calf_scour_program",
@@ -25744,21 +25837,27 @@ function vaccinationMurabbikDefaultProgramSrv() {
         dose(
           "prime",
           "before_expected_calving",
-          45,
+          63,
           "day",
           {
             cycle:
-              "each_pregnancy"
+              "each_pregnancy",
+
+            latestDaysBeforeCalving:
+              42
           }
         ),
         dose(
           "booster",
-          "before_expected_calving",
-          30,
+          "after_previous_dose",
+          21,
           "day",
           {
             cycle:
-              "each_pregnancy"
+              "each_pregnancy",
+
+            latestDaysBeforeCalving:
+              21
           }
         )
       ]
@@ -27980,7 +28079,87 @@ function vaccinationMaternalDoseStepSrv(
     );
   }) || null;
 }
+function vaccinationMaternalLatestDaysBeforeCalvingSrv(
+  programLink = {},
+  step = {}
+) {
+  const configured = Number(
+    step.latestDaysBeforeCalving ??
+    programLink.maternalLatestDaysBeforeCalving ??
+    0
+  );
 
+  if (
+    Number.isInteger(configured) &&
+    configured > 0 &&
+    configured <= 120
+  ) {
+    return configured;
+  }
+
+  const vaccineCode =
+    vaccinationTextKeySrv(
+      programLink.vaccineCode || ""
+    );
+
+  const doseType = String(
+    step.doseType ||
+    programLink.doseType ||
+    ""
+  ).trim();
+
+  if (
+    vaccineCode ===
+      "rotavac_corona"
+  ) {
+    return 21;
+  }
+
+  if (
+    vaccineCode ===
+      "scourguard"
+  ) {
+    return doseType === "booster"
+      ? 21
+      : 42;
+  }
+
+  return 0;
+}
+
+function vaccinationMaternalLatestWindowSrv({
+  animalDoc = {},
+  programLink = {},
+  step = {}
+} = {}) {
+  const latestDaysBeforeCalving =
+    vaccinationMaternalLatestDaysBeforeCalvingSrv(
+      programLink,
+      step
+    );
+
+  const expectedCalvingDate =
+    vaccinationAnimalExpectedCalvingDateSrv(
+      animalDoc
+    );
+
+  const latestAllowedDate =
+    latestDaysBeforeCalving > 0 &&
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      expectedCalvingDate
+    )
+      ? vaccinationYmdAddDaysSrv(
+          expectedCalvingDate,
+          -latestDaysBeforeCalving
+        )
+      : "";
+
+  return {
+    expectedCalvingDate,
+    latestDaysBeforeCalving,
+    latestAllowedDate
+  };
+}
 function vaccinationMaternalTimingAdviceSrv({
   animalDoc = {},
   programLink = {},
@@ -28010,10 +28189,15 @@ function vaccinationMaternalTimingAdviceSrv({
       ""
     ).trim();
 
+   const maternalWindow =
+    vaccinationMaternalLatestWindowSrv({
+      animalDoc,
+      programLink,
+      step
+    });
+
   const expectedCalvingDate =
-    vaccinationAnimalExpectedCalvingDateSrv(
-      animalDoc
-    );
+    maternalWindow.expectedCalvingDate;
 
   if (!expectedCalvingDate) {
     return {
@@ -28061,19 +28245,55 @@ function vaccinationMaternalTimingAdviceSrv({
       dueDate,
       -timingPolicy.alertLeadDays
     );
+    const latestAllowedDate =
+    maternalWindow.latestAllowedDate;
 
-  const common = {
+  const latestDaysBeforeCalving =
+    maternalWindow.latestDaysBeforeCalving;
+
+  const windowEnd =
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      latestAllowedDate
+    )
+      ? latestAllowedDate
+      : dueDate;
+    const common = {
     allowed: true,
     dueDate,
     alertFromDate,
     windowStart: earliestAllowedDate,
-    windowEnd: dueDate,
+    windowEnd,
+    latestAllowedDate,
+    latestDaysBeforeCalving,
     expectedCalvingDate,
     taskDoseType,
     timingBasis:
       "before_expected_calving"
   };
+    if (
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      latestAllowedDate
+    ) &&
+    dt > latestAllowedDate
+  ) {
+    return {
+      ...common,
+      allowed: false,
+      level: "block",
 
+      code:
+        "vaccination_maternal_window_closed",
+
+      daysAfterWindow:
+        diffDaysISO(
+          latestAllowedDate,
+          dt
+        ),
+
+      message:
+        `انتهت نافذة جرعة ما قبل الولادة. كان آخر يوم مسموح للتنفيذ هو ${latestAllowedDate}، أي قبل الولادة المتوقعة بـ${latestDaysBeforeCalving} يومًا.`
+    };
+  }
   if (dt < earliestAllowedDate) {
     return {
       ...common,
@@ -28131,7 +28351,7 @@ function vaccinationMaternalTimingAdviceSrv({
       daysLate,
 
       message:
-        `تأخرت جرعة ما قبل الولادة ${daysLate} يومًا عن موعد البرنامج. يمكنك تسجيل التنفيذ الآن.`
+        `تأخرت جرعة ما قبل الولادة ${daysLate} يومًا عن موعد البرنامج، وما زالت داخل النافذة المسموحة حتى ${windowEnd}.`
     };
   }
 
@@ -28266,6 +28486,7 @@ function vaccinationProgramNextTaskSrv({
     ).trim();
 
   let dueDate = "";
+  let expectedCalvingDate = "";
 
   if (
     timingBasis ===
@@ -28284,7 +28505,7 @@ function vaccinationProgramNextTaskSrv({
     timingBasis ===
       "before_expected_calving"
   ) {
-    const expectedCalvingDate =
+       expectedCalvingDate =
       vaccinationAnimalExpectedCalvingDateSrv(
         animalDoc
       );
@@ -28308,7 +28529,42 @@ function vaccinationProgramNextTaskSrv({
   ) {
     return null;
   }
+    const nextProgramSection =
+    String(
+      programLink.programSection || ""
+    )
+      .trim()
+      .toLowerCase();
 
+  const latestDaysBeforeCalving =
+    nextProgramSection === "mothers"
+      ? vaccinationMaternalLatestDaysBeforeCalvingSrv(
+          programLink,
+          nextStep
+        )
+      : 0;
+
+  if (
+    nextProgramSection === "mothers" &&
+    latestDaysBeforeCalving > 0 &&
+    !expectedCalvingDate
+  ) {
+    expectedCalvingDate =
+      vaccinationAnimalExpectedCalvingDateSrv(
+        animalDoc
+      );
+  }
+
+  const latestAllowedDate =
+    latestDaysBeforeCalving > 0 &&
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      expectedCalvingDate
+    )
+      ? vaccinationYmdAddDaysSrv(
+          expectedCalvingDate,
+          -latestDaysBeforeCalving
+        )
+      : "";
   const stopAtAgeValue =
     Number(
       nextStep.stopAtAgeValue || 0
@@ -28408,7 +28664,16 @@ const executionWindowDays =
         -executionWindowDays
       ),
 
-    windowEnd: dueDate,
+        windowEnd:
+      /^\d{4}-\d{2}-\d{2}$/.test(
+        latestAllowedDate
+      )
+        ? latestAllowedDate
+        : dueDate,
+
+    latestAllowedDate,
+    latestDaysBeforeCalving,
+    expectedCalvingDate,
 
     doseType:
       nextDoseType,
@@ -35499,7 +35764,7 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
           eventDate: today
         });
 
-      const dueDate = String(
+          const dueDate = String(
         advice?.dueDate || ""
       )
         .trim()
@@ -35511,6 +35776,13 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
         .trim()
         .slice(0, 10);
 
+      const windowEnd = String(
+        advice?.windowEnd ||
+        dueDate
+      )
+        .trim()
+        .slice(0, 10);
+
       if (
         !/^\d{4}-\d{2}-\d{2}$/.test(
           dueDate
@@ -35518,11 +35790,16 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
         !/^\d{4}-\d{2}-\d{2}$/.test(
           alertFromDate
         ) ||
-        today < alertFromDate
+        today < alertFromDate ||
+        (
+          /^\d{4}-\d{2}-\d{2}$/.test(
+            windowEnd
+          ) &&
+          today > windowEnd
+        )
       ) {
         continue;
       }
-
       const alertStatus =
         today > dueDate
           ? "overdue"
@@ -35573,9 +35850,22 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
             "جرعة قبل الولادة"
           ).trim(),
 
-          dueDate,
+            dueDate,
           alertFromDate,
-          windowEnd: dueDate,
+          windowEnd,
+
+          latestAllowedDate:
+            String(
+              advice?.latestAllowedDate || ""
+            )
+              .trim()
+              .slice(0, 10),
+
+          latestDaysBeforeCalving:
+            Number(
+              advice?.latestDaysBeforeCalving || 0
+            ),
+
           expectedCalvingDate,
 
           attentionCode: "",
@@ -35810,10 +36100,19 @@ const timingPolicy =
         -timingPolicy.alertLeadDays
       )
     : storedAlertFromDate;
-      const windowEnd =
-        hasValidDueDate
-          ? dueDate
-          : storedWindowEnd;
+           const windowEnd =
+        /^\d{4}-\d{2}-\d{2}$/.test(
+          storedWindowEnd
+        )
+          ? storedWindowEnd
+          : dueDate;
+
+      const taskProgramSection =
+        String(
+          t.programSection || ""
+        )
+          .trim()
+          .toLowerCase();
 
       let alertStatus = "";
 
@@ -35830,15 +36129,21 @@ const timingPolicy =
         continue;
 
       } else if (
+        taskProgramSection === "mothers" &&
         /^\d{4}-\d{2}-\d{2}$/.test(
           windowEnd
         ) &&
         today > windowEnd
       ) {
+        continue;
+
+      } else if (
+        today > dueDate
+      ) {
         alertStatus = "overdue";
 
       } else if (
-        today >= dueDate
+        today === dueDate
       ) {
         alertStatus = "due";
 
@@ -35853,7 +36158,6 @@ const timingPolicy =
       } else {
         continue;
       }
-
       const animalNumber =
         calvingNormDigitsOnlySrv(
           t.animalNumber || ""
