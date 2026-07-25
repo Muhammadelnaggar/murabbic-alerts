@@ -24,8 +24,8 @@
 <div id="sysbar" class="infobar" role="status" aria-live="polite"></div>
  <main class="mbk-form">
   <form id="closeupForm" class="mbk-card">
-    <label for="animalNumber">رقم الحيوان</label>
-    <input id="animalNumber" name="animalNumber" inputmode="numeric" autocomplete="off" required />
+    <label for="animalNumber">رقم الحيوان / الحيوانات</label>
+<input id="animalNumber" name="animalNumber" inputmode="text" autocomplete="off" required />
 
     <label for="eventDate">تاريخ التحضير</label>
     <input id="eventDate" name="eventDate" type="date" required />
@@ -63,7 +63,7 @@
     </div>
   </div>
 </div>
- <script>
+<script>
 (function(){
   "use strict";
 
@@ -79,12 +79,35 @@
   const ndNo = $("nd_no");
   const sysbar = $("sysbar");
 
+  let acceptedRows = [];
+  let rejectedRows = [];
   let gateOk = false;
   let gateTimer = null;
+  let lastSavedRows = [];
 
-  function normDigits(v){
-    const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9","۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"};
-    return String(v || "").trim().replace(/[٠-٩۰-۹]/g, d => map[d] || d).replace(/[^\d]/g, "");
+  function normalizeDigits(v){
+    const map = {
+      "٠":"0","١":"1","٢":"2","٣":"3","٤":"4",
+      "٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+      "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4",
+      "۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+    };
+
+    return String(v || "")
+      .replace(/[٠-٩۰-۹]/g, d => map[d] || d);
+  }
+
+  function splitNumbers(raw){
+    return [...new Set(
+      normalizeDigits(raw)
+        .split(/[\s,،;]+/g)
+        .map(v => v.trim().replace(/[^\d]/g, ""))
+        .filter(Boolean)
+    )];
+  }
+
+  function numbersText(raw){
+    return splitNumbers(raw).join(", ");
   }
 
   function todayISO(){
@@ -101,194 +124,509 @@
     return vals.find(v => String(v || "").trim() !== "") || "";
   }
 
- 
   function buildUrl(path, params){
     const u = new URL(path, location.origin);
+
     Object.entries(params || {}).forEach(([k,v]) => {
-      if (String(v || "").trim()) u.searchParams.set(k, v);
+      if (String(v || "").trim()) {
+        u.searchParams.set(k, v);
+      }
     });
+
     return u.toString();
   }
 
   function showMsg(text, ok){
     if (!sysbar) return;
+
     sysbar.textContent = text || "";
-    sysbar.className = "infobar show " + (ok ? "success" : "error");
-    try { sysbar.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(_){}
+    sysbar.className =
+      "infobar show " +
+      (ok ? "success" : "error");
+
+    try {
+      sysbar.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    } catch(_){}
   }
 
   function hideMsg(){
     if (!sysbar) return;
+
     sysbar.textContent = "";
     sysbar.className = "infobar";
   }
 
   function getRadio(name){
-    return form.querySelector(`input[name="${name}"]:checked`)?.value || "";
+    return form.querySelector(
+      `input[name="${name}"]:checked`
+    )?.value || "";
   }
+
   async function sessionPostJson(path, payload){
-  const r = await fetch(path, {
-    method: "POST",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json"
-    },
-    body: JSON.stringify(payload || {})
-  });
+    const r = await fetch(path, {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(payload || {})
+    });
 
-  const j = await r.json().catch(() => ({
-    ok: false,
-    allowed: false,
-    message: "تعذّر قراءة رد السيرفر."
-  }));
+    const j = await r.json().catch(() => ({
+      ok: false,
+      allowed: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
 
-  if (r.status === 401 || j?.error === "auth_required") {
-    showMsg(j?.message || "سجّل الدخول أولًا.", false);
-    return { r, j, authRequired: true };
+    if (
+      r.status === 401 ||
+      j?.error === "auth_required"
+    ) {
+      showMsg(
+        j?.message || "سجّل الدخول أولًا.",
+        false
+      );
+
+      return {
+        r,
+        j,
+        authRequired: true
+      };
+    }
+
+    return {
+      r,
+      j,
+      authRequired: false
+    };
   }
 
-  return { r, j, authRequired: false };
-}
   function setSaveEnabled(v){
-    if (saveBtn) saveBtn.disabled = !v;
+    if (saveBtn) {
+      saveBtn.disabled = !v;
+    }
   }
 
-  async function runGate(){
-    const animalNumber = normDigits(inputAnimal.value);
-    const eventDate = String(inputDate.value || "").trim();
+  function setSaveLoading(v){
+    if (!saveBtn) return;
 
+    saveBtn.disabled = !!v;
+    saveBtn.textContent =
+      v
+        ? "جارٍ الحفظ…"
+        : "حفظ التحضير";
+  }
+
+  function resetGate(){
+    acceptedRows = [];
+    rejectedRows = [];
     gateOk = false;
-    setSaveEnabled(false);
 
-    if (!animalNumber || !eventDate) {
-      hideMsg();
+    setSaveEnabled(false);
+  }
+
+  function renderGateResult(j = {}){
+    acceptedRows =
+      Array.isArray(j.accepted)
+        ? j.accepted
+        : [];
+
+    rejectedRows =
+      Array.isArray(j.rejected)
+        ? j.rejected
+        : [];
+
+    gateOk = acceptedRows.length > 0;
+
+    setSaveEnabled(gateOk);
+
+    if (
+      acceptedRows.length === 1 &&
+      rejectedRows.length === 0
+    ) {
+      showMsg(
+        j.message ||
+        `✅ الحيوان رقم ${acceptedRows[0].animalNumber} مؤهل لتسجيل تحضير الولادة.`,
+        true
+      );
+
       return;
     }
 
+    if (
+      acceptedRows.length === 0 &&
+      rejectedRows.length === 1
+    ) {
+      showMsg(
+        rejectedRows[0].reason ||
+        j.message ||
+        "❌ الحيوان غير مؤهل لتسجيل تحضير الولادة.",
+        false
+      );
+
+      return;
+    }
+
+    let msg =
+      `نتيجة التحقق:\n` +
+      `المؤهل: ${acceptedRows.length}\n` +
+      `غير المؤهل: ${rejectedRows.length}`;
+
+    if (acceptedRows.length) {
+      msg += "\n\n✅ المؤهل:";
+
+      msg += "\n" + acceptedRows
+        .map(row => row.animalNumber)
+        .join("، ");
+    }
+
+    if (rejectedRows.length) {
+      msg += "\n\n❌ غير المؤهل:";
+
+      msg += "\n" + rejectedRows
+        .map(row =>
+          `${row.animalNumber || "-"} — ${row.reason || "غير مؤهل"}`
+        )
+        .join("\n");
+    }
+
+    showMsg(msg, gateOk);
+  }
+
+  async function runGate(){
+    const animalNumbers =
+      numbersText(inputAnimal.value);
+
+    const eventDate =
+      String(inputDate.value || "").trim();
+
+    resetGate();
+
+    if (!animalNumbers || !eventDate) {
+      hideMsg();
+      return false;
+    }
+
     try {
-      const { r, j, authRequired } = await sessionPostJson("/api/close-up/gate", {
-  animalNumber,
-  eventDate
-});
+      const {
+        r,
+        j,
+        authRequired
+      } = await sessionPostJson(
+        "/api/close-up/gate",
+        {
+          animalNumbers,
+          eventDate
+        }
+      );
 
-if (authRequired) return;
+      if (authRequired) return false;
 
-      if (!r.ok || !j.ok || !j.allowed) {
-        showMsg(j.message || "❌ الحيوان غير مؤهل لتسجيل التحضير.", false);
-        return;
-      }
+      renderGateResult(j || {});
 
-      gateOk = true;
-      setSaveEnabled(true);
-      showMsg(j.message || "✅ تم التحقق — أكمل تسجيل تحضير الولادة.", true);
+      return Boolean(
+        r.ok &&
+        j?.ok === true &&
+        j?.allowed === true &&
+        acceptedRows.length
+      );
 
     } catch(e) {
-      console.error("close-up gate error:", e);
-      showMsg("تعذّر التحقق من تحضير الولادة الآن.", false);
+      console.error(
+        "close-up gate error:",
+        e
+      );
+
+      resetGate();
+
+      showMsg(
+        "تعذّر التحقق من تحضير الولادة الآن.",
+        false
+      );
+
+      return false;
     }
   }
 
   function scheduleGate(){
     clearTimeout(gateTimer);
-    gateTimer = setTimeout(runGate, 350);
+
+    gateTimer =
+      setTimeout(runGate, 350);
   }
 
   async function saveCloseup(e){
     e.preventDefault();
 
-  
-    const animalNumber = normDigits(inputAnimal.value);
-    const eventDate = String(inputDate.value || "").trim();
-    const ration = getRadio("ration");
-    const anionicSalts = getRadio("anionicSalts");
+    const animalNumbers =
+      numbersText(inputAnimal.value);
 
-    if (!animalNumber) return showMsg("❌ رقم الحيوان مطلوب.", false);
-    if (!eventDate) return showMsg("❌ تاريخ التحضير مطلوب.", false);
-    if (!ration) return showMsg("❌ يجب تحديد هل تم تقديم عليقة التحضير.", false);
-    if (!anionicSalts) return showMsg("❌ يجب تحديد هل تم استخدام الأملاح الأنيونية.", false);
+    const eventDate =
+      String(inputDate.value || "").trim();
+
+    const ration =
+      getRadio("ration");
+
+    const anionicSalts =
+      getRadio("anionicSalts");
+
+    if (!animalNumbers) {
+      return showMsg(
+        "❌ رقم الحيوان مطلوب.",
+        false
+      );
+    }
+
+    if (!eventDate) {
+      return showMsg(
+        "❌ تاريخ التحضير مطلوب.",
+        false
+      );
+    }
+
+    if (!ration) {
+      return showMsg(
+        "❌ يجب تحديد هل تم تقديم عليقة التحضير.",
+        false
+      );
+    }
+
+    if (!anionicSalts) {
+      return showMsg(
+        "❌ يجب تحديد هل تم استخدام الأملاح الأنيونية.",
+        false
+      );
+    }
 
     try {
-      saveBtn.disabled = true;
-      saveBtn.textContent = "جارٍ الحفظ…";
+      setSaveLoading(true);
 
-      if (!gateOk) {
-        await runGate();
-        if (!gateOk) return;
+      if (
+        !gateOk ||
+        !acceptedRows.length
+      ) {
+        const allowed =
+          await runGate();
+
+        if (!allowed) return;
       }
 
-     const { r, j, authRequired } = await sessionPostJson("/api/close-up/save", {
-  animalNumber,
-  eventDate,
-  ration,
-  anionicSalts
-});
+      const {
+        r,
+        j,
+        authRequired
+      } = await sessionPostJson(
+        "/api/close-up/save",
+        {
+          animalNumbers,
+          accepted: acceptedRows,
+          eventDate,
+          ration,
+          anionicSalts
+        }
+      );
 
-if (authRequired) return;
+      if (authRequired) return;
+
       if (!r.ok || !j.ok) {
-        throw new Error(j.message || "تعذّر حفظ تحضير الولادة.");
+        let msg =
+          j.message ||
+          "تعذّر حفظ تحضير الولادة.";
+
+        if (
+          Array.isArray(j.rejected) &&
+          j.rejected.length
+        ) {
+          msg += "\n\nلم تُحفظ:";
+
+          msg += "\n" + j.rejected
+            .map(row =>
+              `${row.animalNumber || "-"} — ${row.reason || ""}`
+            )
+            .join("\n");
+        }
+
+        throw new Error(msg);
       }
 
-      showMsg(j.message || "✅ تم حفظ تحضير الولادة بنجاح", true);
+      lastSavedRows =
+        Array.isArray(j.saved)
+          ? j.saved
+          : [];
 
-      if (ration === "نعم") {
-       dialog.classList.remove("hide");
-      } else {
-        setTimeout(() => {
-          location.href = j.redirectUrl || `/event-list.html?number=${encodeURIComponent(animalNumber)}`;
-        }, 900);
+      let msg =
+        j.message ||
+        "✅ تم حفظ تحضير الولادة بنجاح.";
+
+      if (
+        Array.isArray(j.rejected) &&
+        j.rejected.length
+      ) {
+        msg += "\n\nلم تُحفظ:";
+
+        msg += "\n" + j.rejected
+          .map(row =>
+            `${row.animalNumber || "-"} — ${row.reason || ""}`
+          )
+          .join("\n");
       }
+
+      showMsg(msg, true);
+
+      const firstSaved =
+        lastSavedRows[0]?.animalNumber ||
+        acceptedRows[0]?.animalNumber ||
+        splitNumbers(inputAnimal.value)[0] ||
+        "";
+
+      if (
+        ration === "نعم" &&
+        lastSavedRows.length === 1
+      ) {
+        dialog.classList.remove("hide");
+        return;
+      }
+
+      setTimeout(() => {
+        if (j.redirectUrl) {
+          location.href = j.redirectUrl;
+          return;
+        }
+
+        if (
+          lastSavedRows.length === 1 &&
+          firstSaved
+        ) {
+          location.href =
+            `/event-list.html?number=${encodeURIComponent(firstSaved)}`;
+
+          return;
+        }
+
+        location.href = "dashboard.html";
+      }, 900);
 
     } catch(err) {
-      console.error("close-up save error:", err);
-      showMsg(err.message || "تعذّر حفظ تحضير الولادة.", false);
+      console.error(
+        "close-up save error:",
+        err
+      );
+
+      showMsg(
+        err.message ||
+        "تعذّر حفظ تحضير الولادة.",
+        false
+      );
+
     } finally {
-      saveBtn.disabled = false;
-      saveBtn.textContent = "حفظ التحضير";
+      setSaveLoading(false);
     }
   }
 
-const qsAnimal = firstNonEmpty(
-  getQS("animalId"),
-  getQS("number"),
-  getQS("animalNumber")
-);
+  const qsAnimal = firstNonEmpty(
+    getQS("numbers"),
+    getQS("animalNumbers"),
+    getQS("bulk"),
+    getQS("animalId"),
+    getQS("number"),
+    getQS("animalNumber")
+  );
 
   const qsDate = firstNonEmpty(
-  getQS("date"),
-  getQS("eventDate"),
-  todayISO()
-);
+    getQS("date"),
+    getQS("eventDate"),
+    todayISO()
+  );
 
-  if (inputAnimal && qsAnimal) inputAnimal.value = normDigits(qsAnimal);
-  if (inputDate && qsDate) inputDate.value = qsDate;
+  if (inputAnimal && qsAnimal) {
+    inputAnimal.value =
+      numbersText(qsAnimal);
+  }
+
+  if (inputDate && qsDate) {
+    inputDate.value = qsDate;
+  }
 
   setSaveEnabled(false);
   scheduleGate();
 
-  inputAnimal?.addEventListener("input", scheduleGate);
-  inputDate?.addEventListener("change", scheduleGate);
+  inputAnimal?.addEventListener(
+    "input",
+    scheduleGate
+  );
 
-  form?.addEventListener("submit", saveCloseup);
+  inputDate?.addEventListener(
+    "change",
+    scheduleGate
+  );
 
-  openCowCardBtn?.addEventListener("click", () => {
-    const n = normDigits(inputAnimal.value);
-    if (!n) return;
-    location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
-  });
+  form?.addEventListener(
+    "submit",
+    saveCloseup
+  );
 
-  ndYes?.addEventListener("click", () => {
-    const n = normDigits(inputAnimal.value);
-    const d = String(inputDate.value || "").trim();
-    location.href = buildUrl("/nutrition.html", { animalId: n, number: n, date: d });
-  });
+  openCowCardBtn?.addEventListener(
+    "click",
+    () => {
+      const n =
+        splitNumbers(inputAnimal.value)[0] ||
+        "";
 
-  ndNo?.addEventListener("click", () => {
-    const n = normDigits(inputAnimal.value);
-   dialog.classList.add("hide");
-    location.href = `/event-list.html?number=${encodeURIComponent(n)}`;
-  });
+      if (!n) return;
+
+      location.href =
+        `/cow-card.html?number=${encodeURIComponent(n)}`;
+    }
+  );
+
+  ndYes?.addEventListener(
+    "click",
+    () => {
+      const n =
+        lastSavedRows[0]?.animalNumber ||
+        splitNumbers(inputAnimal.value)[0] ||
+        "";
+
+      const d =
+        String(inputDate.value || "").trim();
+
+      location.href =
+        buildUrl(
+          "/nutrition.html",
+          {
+            animalId: n,
+            number: n,
+            date: d
+          }
+        );
+    }
+  );
+
+  ndNo?.addEventListener(
+    "click",
+    () => {
+      const n =
+        lastSavedRows[0]?.animalNumber ||
+        splitNumbers(inputAnimal.value)[0] ||
+        "";
+
+      dialog.classList.add("hide");
+
+      if (n) {
+        location.href =
+          `/event-list.html?number=${encodeURIComponent(n)}`;
+
+        return;
+      }
+
+      location.href = "dashboard.html";
+    }
+  );
 })();
 </script>
 </body>
