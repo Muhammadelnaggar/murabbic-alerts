@@ -38350,260 +38350,561 @@ async function updateAnimalAfterCloseupSaveSrv(ev = {}) {
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   }, { merge: true });
 }
-app.post("/api/close-up/gate", requireUserId, async (req, res) => {
-  try {
-    if (!db) {
-      return res.status(503).json({
-        ok: false,
-        allowed: false,
-        error: "firestore_disabled",
-       message: "❌ تعذّر فحص بيانات الحيوان الآن. حاول مرة أخرى."
-      });
-    }
+function closeupParseNumbersSrv(raw) {
+  const values = Array.isArray(raw)
+    ? raw
+    : String(raw || "").trim().split(/\n|,|;|،|\s+/g);
 
-    const uid = req.userId;
-    const body = req.body || {};
+  return [...new Set(
+    values
+      .map(value => {
+        if (value && typeof value === "object") {
+          return calvingNormDigitsOnlySrv(
+            value.animalNumber ||
+            value.number ||
+            value.animalId ||
+            ""
+          );
+        }
 
-    const animalNumber = calvingNormDigitsOnlySrv(body.animalNumber || body.number || "");
-    const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
-
-    if (!animalNumber || !eventDate) {
-      return res.json({
-        ok: true,
-        allowed: false,
-        silent: true
-      });
-    }
-
-    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
-
-    if (!animal) {
-      return res.status(404).json({
-        ok: false,
-        allowed: false,
-       message: `❌ لم أجد الحيوان رقم ${animalNumber} في حسابك. راجع الرقم وحاول مرة أخرى.`
-      });
-    }
-
-    const doc = animal.data || {};
-    const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
- const species = calvingNormalizeSpeciesSrv(
-  body.species ||
-  doc.species ||
-  doc.animalTypeAr ||
-  doc.animalType ||
-  doc.animaltype ||
-  doc.groupSpecies ||
-  ""
-);
-
-    const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
-    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
-
-    const lastInseminationDate = String(
-      signals.lastInseminationDateFromEvents ||
-      doc.lastInseminationDate ||
-      doc.lastAI ||
-      doc.lastInsemination ||
-      doc.lastServiceDate ||
-      ""
-    ).trim();
-
-    const gateData = {
-  animalNumber,
-  eventDate,
-  animalId: animal.id || "",
-  species,
-  documentData: doc,
-  reproductiveStatus: reproFromDoc || reproFromEvents || "",
-  reproStatusFromEvents: reproFromEvents,
-  lastInseminationDate,
-  
-};
-
-    const errMsg = closeupDecisionSrv(gateData);
-
-    if (errMsg) {
-      return res.status(400).json({
-        ok: false,
-        allowed: false,
-        message: String(errMsg)
-      });
-    }
-
-    return res.json({
-      ok: true,
-      allowed: true,
-     message: `✅ راجعت بيانات الحيوان رقم ${animalNumber}، وهو جاهز لتحضير الولادة. أكمل البيانات ثم احفظ.`,
-      animalId: animal.id || "",
-      animalNumber,
-      eventDate,
-      species,
-      lastInseminationDate,
-      reproductiveStatus: gateData.reproductiveStatus
-    });
-
-  } catch (e) {
-    console.error("close-up-gate", e);
-    return res.status(500).json({
-      ok: false,
-      allowed: false,
-      error: "close_up_gate_failed",
-     message: "❌ تعذّر التحقق من تحضير الولادة الآن. حاول مرة أخرى."
-    });
-  }
-});
-app.post("/api/close-up/save", requireUserId, async (req, res) => {
-  try {
-    if (!db) {
-      return res.status(503).json({
-        ok: false,
-        error: "firestore_disabled",
-       message: "❌ تعذّر حفظ تحضير الولادة الآن. حاول مرة أخرى."
-      });
-    }
-
-    const uid = req.userId;
-    const body = req.body || {};
-
-    const animalNumber = calvingNormDigitsOnlySrv(body.animalNumber || body.number || "");
-    const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
-    const ration = String(body.ration || "").trim();
-    const anionicSalts = String(body.anionicSalts || "").trim();
-
-    if (!animalNumber) {
-      return res.status(400).json({
-        ok: false,
-       message: "❌ أدخل رقم الحيوان."
-      });
-    }
-
-    if (!calvingIsDateSrv(eventDate)) {
-      return res.status(400).json({
-        ok: false,
-       message: "❌ أدخل تاريخ تحضير صحيحًا."
-      });
-    }
-
-    if (!ration) {
-      return res.status(400).json({
-        ok: false,
-        message: "❌ أخبرني: هل بدأت تقديم عليقة التحضير؟"
-      });
-    }
-
-    if (!anionicSalts) {
-      return res.status(400).json({
-        ok: false,
-      message: "❌ أخبرني: هل استخدمت الأملاح الأنيونية؟"
-      });
-    }
-
-    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
-
-    if (!animal) {
-      return res.status(404).json({
-        ok: false,
-       message: `❌ لم أجد الحيوان رقم ${animalNumber} في حسابك. راجع الرقم وحاول مرة أخرى.`
-      });
-    }
-
-    const doc = animal.data || {};
-    const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
-
-const species = calvingNormalizeSpeciesSrv(
-  body.species ||
-  doc.species ||
-  doc.animalTypeAr ||
-  doc.animalType ||
-  doc.animaltype ||
-  doc.groupSpecies ||
-  ""
-);
-
-    const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
-    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
-
-    const lastInseminationDate = String(
-      signals.lastInseminationDateFromEvents ||
-      doc.lastInseminationDate ||
-      doc.lastAI ||
-      doc.lastInsemination ||
-      doc.lastServiceDate ||
-      ""
-    ).trim();
-
-    const decisionData = {
-  animalNumber,
-  eventDate,
-  animalId: animal.id || "",
-  species,
-  documentData: doc,
-  reproductiveStatus: reproFromDoc || reproFromEvents || "",
-  reproStatusFromEvents: reproFromEvents,
-  lastInseminationDate,
-  
-};
-
-    const errMsg = closeupDecisionSrv(decisionData);
-
-    if (errMsg) {
-      return res.status(400).json({
-        ok: false,
-        message: String(errMsg)
-      });
-    }
-
-    const payload = {
-      userId: uid,
-
-      animalId: animal.id || "",
-      animalNumber,
-
-      eventDate,
-
-      ration,
-      anionicSalts,
-
-      lastInseminationDate,
-      species,
-
-      eventType: "تحضير للولادة",
-      type: "closeup",
-      eventTypeNorm: "close_up",
-
-      source: "server:/api/close-up/save",
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    };
-
-   const eventRef = await db.collection("events").add(payload);
-await updateAnimalAfterCloseupSaveSrv(payload);
-
-if (typeof scheduleGroupsRebuildSrv === "function") {
-  scheduleGroupsRebuildSrv(uid, "close_up_save");
+        return calvingNormDigitsOnlySrv(value);
+      })
+      .filter(Boolean)
+  )];
 }
 
-return res.json({
-      ok: true,
-     message: `✅ حفظت تحضير الولادة للحيوان رقم ${animalNumber}، وأصبحت حالته الإنتاجية الآن «انتظار ولادة».`,
-      eventId: eventRef.id,
-      animalId: animal.id || "",
-      animalNumber,
-      eventDate,
-      ration,
-      anionicSalts,
-      redirectUrl: `/event-list.html?number=${encodeURIComponent(animalNumber)}`
-    });
+async function closeupEvaluateAnimalSrv({
+  uid,
+  body = {},
+  animalNumber,
+  eventDate
+}) {
+  const animal =
+    await fetchAnimalByNumberForCalvingGateSrv(
+      uid,
+      animalNumber
+    );
 
-  } catch (e) {
-    console.error("close-up-save", e);
-    return res.status(500).json({
+  if (!animal) {
+    return {
       ok: false,
-      error: "close_up_save_failed",
-      message: "❌ تعذّر حفظ تحضير الولادة الآن. حاول مرة أخرى."
-    });
+      reason:
+        `❌ لم أجد الحيوان رقم ${animalNumber} في حسابك.`
+    };
   }
-});
+
+  const doc = animal.data || {};
+
+  const signals =
+    await fetchCalvingSignalsFromEventsSrv(
+      uid,
+      animalNumber
+    );
+
+  const species = calvingNormalizeSpeciesSrv(
+    body.species ||
+    doc.species ||
+    doc.animalTypeAr ||
+    doc.animalType ||
+    doc.animaltype ||
+    doc.groupSpecies ||
+    ""
+  );
+
+  const reproFromEvents = String(
+    signals.reproStatusFromEvents || ""
+  ).trim();
+
+  const reproFromDoc = String(
+    doc.reproductiveStatus || ""
+  ).trim();
+
+  const lastInseminationDate = String(
+    signals.lastInseminationDateFromEvents ||
+    doc.lastInseminationDate ||
+    doc.lastAI ||
+    doc.lastInsemination ||
+    doc.lastServiceDate ||
+    ""
+  ).trim();
+
+  const row = {
+    animalNumber,
+    animalId: animal.id || "",
+    eventDate,
+    species,
+    lastInseminationDate,
+
+    reproductiveStatus:
+      reproFromDoc ||
+      reproFromEvents ||
+      ""
+  };
+
+  const errMsg = closeupDecisionSrv({
+    ...row,
+    documentData: doc,
+    reproStatusFromEvents: reproFromEvents
+  });
+
+  if (errMsg) {
+    return {
+      ok: false,
+      reason: String(errMsg)
+    };
+  }
+
+  return {
+    ok: true,
+    row
+  };
+}
+
+app.post(
+  "/api/close-up/gate",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          allowed: false,
+          error: "firestore_disabled",
+
+          message:
+            "❌ تعذّر فحص بيانات الحيوانات الآن. حاول مرة أخرى.",
+
+          acceptedCount: 0,
+          rejectedCount: 0,
+          accepted: [],
+          rejected: []
+        });
+      }
+
+      const uid = req.userId;
+      const body = req.body || {};
+
+      const numbers = closeupParseNumbersSrv(
+        body.animalNumbers ||
+        body.numbers ||
+        body.bulk ||
+        body.animalNumber ||
+        body.number ||
+        ""
+      );
+
+      const eventDate = String(
+        body.eventDate ||
+        body.date ||
+        ""
+      ).trim().slice(0, 10);
+
+      if (!numbers.length || !eventDate) {
+        return res.json({
+          ok: true,
+          allowed: false,
+          silent: true,
+
+          message:
+            "أدخل رقم الحيوان وتاريخ التحضير.",
+
+          acceptedCount: 0,
+          rejectedCount: 0,
+          accepted: [],
+          rejected: []
+        });
+      }
+
+      if (!calvingIsDateSrv(eventDate)) {
+        return res.status(400).json({
+          ok: false,
+          allowed: false,
+
+          message:
+            "❌ أدخل تاريخ تحضير صحيحًا.",
+
+          acceptedCount: 0,
+          rejectedCount: numbers.length,
+          accepted: [],
+
+          rejected: numbers.map(
+            animalNumber => ({
+              animalNumber,
+
+              reason:
+                "❌ أدخل تاريخ تحضير صحيحًا."
+            })
+          )
+        });
+      }
+
+      const accepted = [];
+      const rejected = [];
+
+      for (const animalNumber of numbers) {
+        const result =
+          await closeupEvaluateAnimalSrv({
+            uid,
+            body,
+            animalNumber,
+            eventDate
+          });
+
+        if (!result.ok) {
+          rejected.push({
+            animalNumber,
+            reason: result.reason
+          });
+
+          continue;
+        }
+
+        accepted.push(result.row);
+      }
+
+      const allowed =
+        accepted.length > 0;
+
+      const acceptedCount =
+        accepted.length;
+
+      const rejectedCount =
+        rejected.length;
+
+      if (numbers.length === 1) {
+        if (!allowed) {
+          return res.status(400).json({
+            ok: false,
+            allowed: false,
+
+            message:
+              rejected[0]?.reason ||
+              "❌ الحيوان غير مؤهل لتسجيل تحضير الولادة.",
+
+            acceptedCount,
+            rejectedCount,
+            accepted,
+            rejected
+          });
+        }
+
+        const row = accepted[0];
+
+        return res.json({
+          ok: true,
+          allowed: true,
+
+          message:
+            `✅ راجعت بيانات الحيوان رقم ${row.animalNumber}، وهو جاهز لتحضير الولادة. أكمل البيانات ثم احفظ.`,
+
+          acceptedCount,
+          rejectedCount,
+          accepted,
+          rejected,
+
+          ...row
+        });
+      }
+
+      return res.json({
+        ok: true,
+        allowed,
+
+        message: allowed
+          ? `✅ تم التحقق. جاهز للتحضير: ${acceptedCount}، غير جاهز: ${rejectedCount}.`
+          : "❌ لا يوجد حيوان مؤهل لتسجيل تحضير الولادة الآن.",
+
+        acceptedCount,
+        rejectedCount,
+        accepted,
+        rejected
+      });
+
+    } catch (e) {
+      console.error(
+        "close-up-gate",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        allowed: false,
+        error: "close_up_gate_failed",
+
+        message:
+          "❌ تعذّر التحقق من تحضير الولادة الآن. حاول مرة أخرى.",
+
+        acceptedCount: 0,
+        rejectedCount: 0,
+        accepted: [],
+        rejected: []
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/close-up/save",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error: "firestore_disabled",
+
+          message:
+            "❌ تعذّر حفظ تحضير الولادة الآن. حاول مرة أخرى.",
+
+          savedCount: 0,
+          rejectedCount: 0,
+          saved: [],
+          rejected: []
+        });
+      }
+
+      const uid = req.userId;
+      const body = req.body || {};
+
+      const numbers = closeupParseNumbersSrv(
+        (
+          Array.isArray(body.accepted) &&
+          body.accepted.length
+            ? body.accepted
+            : null
+        ) ||
+        body.animalNumbers ||
+        body.numbers ||
+        body.bulk ||
+        body.animalNumber ||
+        body.number ||
+        ""
+      );
+
+      const eventDate = String(
+        body.eventDate ||
+        body.date ||
+        ""
+      ).trim().slice(0, 10);
+
+      const ration = String(
+        body.ration || ""
+      ).trim();
+
+      const anionicSalts = String(
+        body.anionicSalts || ""
+      ).trim();
+
+      const rejectAll = reason =>
+        numbers.map(animalNumber => ({
+          animalNumber,
+          reason
+        }));
+
+      if (!numbers.length) {
+        return res.status(400).json({
+          ok: false,
+          message: "❌ أدخل رقم الحيوان.",
+
+          savedCount: 0,
+          rejectedCount: 0,
+          saved: [],
+          rejected: []
+        });
+      }
+
+      if (!calvingIsDateSrv(eventDate)) {
+        return res.status(400).json({
+          ok: false,
+
+          message:
+            "❌ أدخل تاريخ تحضير صحيحًا.",
+
+          savedCount: 0,
+          rejectedCount: numbers.length,
+          saved: [],
+
+          rejected: rejectAll(
+            "❌ أدخل تاريخ تحضير صحيحًا."
+          )
+        });
+      }
+
+      if (!ration) {
+        return res.status(400).json({
+          ok: false,
+
+          message:
+            "❌ أخبرني: هل بدأت تقديم عليقة التحضير؟",
+
+          savedCount: 0,
+          rejectedCount: numbers.length,
+          saved: [],
+
+          rejected: rejectAll(
+            "❌ يجب تحديد هل تم تقديم عليقة التحضير."
+          )
+        });
+      }
+
+      if (!anionicSalts) {
+        return res.status(400).json({
+          ok: false,
+
+          message:
+            "❌ أخبرني: هل استخدمت الأملاح الأنيونية؟",
+
+          savedCount: 0,
+          rejectedCount: numbers.length,
+          saved: [],
+
+          rejected: rejectAll(
+            "❌ يجب تحديد هل تم استخدام الأملاح الأنيونية."
+          )
+        });
+      }
+
+      const saved = [];
+      const rejected = [];
+
+      for (const animalNumber of numbers) {
+        const result =
+          await closeupEvaluateAnimalSrv({
+            uid,
+            body,
+            animalNumber,
+            eventDate
+          });
+
+        if (!result.ok) {
+          rejected.push({
+            animalNumber,
+            reason: result.reason
+          });
+
+          continue;
+        }
+
+        const row = result.row;
+
+        const payload = {
+          userId: uid,
+
+          animalId:
+            row.animalId,
+
+          animalNumber:
+            row.animalNumber,
+
+          eventDate,
+          ration,
+          anionicSalts,
+
+          lastInseminationDate:
+            row.lastInseminationDate,
+
+          species:
+            row.species,
+
+          eventType:
+            "تحضير للولادة",
+
+          type:
+            "closeup",
+
+          eventTypeNorm:
+            "close_up",
+
+          source:
+            "server:/api/close-up/save",
+
+          createdAt:
+            admin.firestore
+              .FieldValue
+              .serverTimestamp()
+        };
+
+        const eventRef =
+          await db
+            .collection("events")
+            .add(payload);
+
+        await updateAnimalAfterCloseupSaveSrv(
+          payload
+        );
+
+        saved.push({
+          eventId: eventRef.id,
+
+          animalId:
+            row.animalId,
+
+          animalNumber:
+            row.animalNumber,
+
+          eventDate,
+          ration,
+          anionicSalts
+        });
+      }
+
+      if (
+        saved.length &&
+        typeof scheduleGroupsRebuildSrv ===
+          "function"
+      ) {
+        scheduleGroupsRebuildSrv(
+          uid,
+          "close_up_save"
+        );
+      }
+
+      return res.json({
+        ok: saved.length > 0,
+
+        message:
+          saved.length === 1
+            ? `✅ حفظت تحضير الولادة للحيوان رقم ${saved[0].animalNumber}، وأصبحت حالته الإنتاجية الآن «انتظار ولادة».`
+            : saved.length > 1
+              ? `✅ تم حفظ تحضير الولادة لـ ${saved.length} حيوانات بنجاح.`
+              : "❌ لم يتم حفظ تحضير الولادة. راجع الرسائل الظاهرة.",
+
+        savedCount:
+          saved.length,
+
+        rejectedCount:
+          rejected.length,
+
+        saved,
+        rejected,
+
+        redirectUrl:
+          saved.length === 1
+            ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
+            : ""
+      });
+
+    } catch (e) {
+      console.error(
+        "close-up-save",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error: "close_up_save_failed",
+
+        message:
+          "❌ تعذّر حفظ تحضير الولادة الآن. حاول مرة أخرى.",
+
+        savedCount: 0,
+        rejectedCount: 0,
+        saved: [],
+        rejected: []
+      });
+    }
+  }
+);
 async function updateAnimalAfterDryOffSaveSrv(ev = {}) {
   const uid = String(ev.userId || "").trim();
   const animalNumber = calvingNormDigitsOnlySrv(ev.animalNumber || "");
