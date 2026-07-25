@@ -40338,6 +40338,7 @@ murabbikSmartAlertRegisterSourceSrv(
 // ============================================================
 
 const MURABBIK_CLOSE_UP_SNOOZE_MINUTES = 24 * 60;
+const MURABBIK_CLOSE_UP_STOP_DAYS_BEFORE_CALVING = 10;
 
 function murabbikCloseUpAlertAlreadyDoneSrv(
   doc = {},
@@ -40510,13 +40511,15 @@ async function murabbikCloseUpDueAlertSourceSrv(
         context.today
       );
 
-     if (
-      !Number.isFinite(gestationDays) ||
-      gestationDays < policy.targetGestationDay ||
-      gestationDays >= policy.expectedGestationDays
-    ) {
-      continue;
-    }
+if (
+  !Number.isFinite(gestationDays) ||
+  gestationDays < policy.targetGestationDay ||
+  gestationDays >=
+    policy.expectedGestationDays -
+    MURABBIK_CLOSE_UP_STOP_DAYS_BEFORE_CALVING
+) {
+  continue;
+}
     due.push({
       animalNumber,
       species: policy.species,
