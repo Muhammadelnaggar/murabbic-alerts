@@ -39955,9 +39955,15 @@ async function murabbikSmartAlertApplyUserStateSrv(
 //       أول مصدر تشغيلي: استحقاق التجفيف
 // ============================================================
 
-const MURABBIK_DRY_OFF_DUE_DAYS = 210;
-const MURABBIK_DRY_OFF_SNOOZE_MINUTES = 24 * 60;
+const MURABBIK_DRY_OFF_COW_DUE_DAYS = 210;
+const MURABBIK_DRY_OFF_BUFFALO_DUE_DAYS = 240;
 
+const MURABBIK_DRY_OFF_ALERT_WINDOW_DAYS = 14;
+
+const MURABBIK_DRY_OFF_COW_EXPECTED_DAYS = 270;
+const MURABBIK_DRY_OFF_BUFFALO_EXPECTED_DAYS = 300;
+
+const MURABBIK_DRY_OFF_SNOOZE_MINUTES = 24 * 60;
 function murabbikDryOffAlertNumberSrv(doc = {}) {
   return murabbikSmartAlertTextSrv(
     doc.number ??
@@ -40017,7 +40023,39 @@ function murabbikDryOffAlertAlreadyDoneSrv(doc = {}) {
     )
   );
 }
+function murabbikDryOffAlertPregnancyEndedSrv(
+  doc = {},
+  lastInseminationDate = ""
+) {
+  if (!calvingIsDateSrv(lastInseminationDate)) {
+    return true;
+  }
 
+  const endingDates = [
+    doc.lastCalvingDate,
+    doc.calvingDate,
+    doc.lastAbortionDate,
+    doc.abortionDate
+  ]
+    .map(value =>
+      murabbikSmartAlertTextSrv(value)
+        .slice(0, 10)
+    )
+    .filter(calvingIsDateSrv);
+
+  return endingDates.some(date => {
+    const daysAfterService =
+      calvingDaysBetweenSrv(
+        lastInseminationDate,
+        date
+      );
+
+    return (
+      Number.isFinite(daysAfterService) &&
+      daysAfterService >= 0
+    );
+  });
+}
 async function murabbikSmartAlertAnimalsSrv(context) {
   return await context.load(
     "smart-alerts:animals",
@@ -40109,6 +40147,33 @@ async function murabbikDryOffDueAlertSourceSrv(context) {
 
     if (!calvingIsDateSrv(lastInseminationDate)) continue;
 
+    if (
+      murabbikDryOffAlertPregnancyEndedSrv(
+        doc,
+        lastInseminationDate
+      )
+    ) {
+      continue;
+    }
+
+    const speciesKey = dryOffSpeciesKeySrv(doc);
+
+    const dueGestationDay =
+      speciesKey === "buffalo"
+        ? MURABBIK_DRY_OFF_BUFFALO_DUE_DAYS
+        : MURABBIK_DRY_OFF_COW_DUE_DAYS;
+
+    const expectedGestationDays =
+      speciesKey === "buffalo"
+        ? MURABBIK_DRY_OFF_BUFFALO_EXPECTED_DAYS
+        : MURABBIK_DRY_OFF_COW_EXPECTED_DAYS;
+
+    const alertEndGestationDay = Math.min(
+      dueGestationDay +
+        MURABBIK_DRY_OFF_ALERT_WINDOW_DAYS,
+      expectedGestationDays
+    );
+
     const gestationDays = calvingDaysBetweenSrv(
       lastInseminationDate,
       context.today
@@ -40116,26 +40181,31 @@ async function murabbikDryOffDueAlertSourceSrv(context) {
 
     if (
       !Number.isFinite(gestationDays) ||
-      gestationDays < MURABBIK_DRY_OFF_DUE_DAYS
+      gestationDays < dueGestationDay ||
+      gestationDays >= alertEndGestationDay ||
+      gestationDays >= expectedGestationDays
     ) {
       continue;
     }
 
     due.push({
-  animalNumber,
-  lastInseminationDate,
-  gestationDays,
+      animalNumber,
+      speciesKey,
+      lastInseminationDate,
+      gestationDays,
+      dueGestationDay,
+      alertEndGestationDay,
 
-  stage:
-    gestationDays > MURABBIK_DRY_OFF_DUE_DAYS
-      ? "overdue"
-      : "due",
+      dueDate: addDaysToIsoDateSrv(
+        lastInseminationDate,
+        dueGestationDay
+      ),
 
-  dueDate: addDaysToIsoDateSrv(
-    lastInseminationDate,
-    MURABBIK_DRY_OFF_DUE_DAYS
-  )
-});
+      alertEndDate: addDaysToIsoDateSrv(
+        lastInseminationDate,
+        alertEndGestationDay
+      )
+    });
   }
 
   if (!due.length) return [];
@@ -40149,26 +40219,25 @@ async function murabbikDryOffDueAlertSourceSrv(context) {
     )
   );
 
-  const animalNumbers = due.map(
-    item => item.animalNumber
-  );
+  const animalNumbers = [
+    ...new Set(
+      due
+        .map(item => item.animalNumber)
+        .filter(Boolean)
+    )
+  ];
 
   const count = animalNumbers.length;
-  const overdueCount = due.filter(
-  item => item.stage === "overdue"
-).length;
-
-const hasOverdue = overdueCount > 0;
 
   const evidence = due
     .slice(0, 12)
     .map(item =>
-      `الحيوان ${item.animalNumber}: ${item.gestationDays} يوم حمل`
+      `الحيوان ${item.animalNumber}: ${item.gestationDays} يوم حمل، وتنتهي نافذة التذكير ${item.alertEndDate}`
     );
 
   if (due.length > evidence.length) {
     evidence.push(
-      `و${due.length - evidence.length} حيوان آخر مستحق للتجفيف.`
+      `و${due.length - evidence.length} حيوان آخر داخل نافذة تذكير التجفيف.`
     );
   }
 
@@ -40181,7 +40250,13 @@ const hasOverdue = overdueCount > 0;
       )
     )
     .map(item =>
-      `${item.animalNumber}:${item.lastInseminationDate}:${item.stage}`
+      [
+        item.animalNumber,
+        item.speciesKey,
+        item.lastInseminationDate,
+        item.dueGestationDay,
+        item.alertEndGestationDay
+      ].join(":")
     )
     .join("|");
 
@@ -40198,42 +40273,36 @@ const hasOverdue = overdueCount > 0;
     domain: "reproduction",
     code: "dry_off_due_210",
 
-    priority: hasOverdue ? "high" : "normal",
+    priority: "normal",
     urgency: "today",
     certainty: "confirmed",
-    status: hasOverdue ? "overdue" : "due",
+    status: "due",
 
     title:
       count === 1
         ? "حيوان مستحق للتجفيف"
         : "حيوانات مستحقة للتجفيف",
 
-   message:
-  count === 1
-    ? (
-        hasOverdue
-          ? `الحيوان رقم ${animalNumbers[0]} تجاوز موعد التجفيف المستهدف ولم يُسجّل جافًا بعد.`
-          : `الحيوان رقم ${animalNumbers[0]} وصل إلى 210 يوم حمل ولم يُسجّل جافًا بعد.`
-      )
-    : (
-        hasOverdue
-          ? `يوجد ${count} حيوانات مستحقة للتجفيف، منها ${overdueCount} تجاوزت موعد التجفيف المستهدف.`
-          : `يوجد ${count} حيوانات وصلت إلى 210 يوم حمل ولم يُسجّل تجفيفها بعد.`
-      ),
+    message:
+      count === 1
+        ? `الحيوان رقم ${animalNumbers[0]} داخل نافذة تذكير التجفيف ولم يُسجّل جافًا بعد.`
+        : `يوجد ${count} حيوانات داخل نافذة تذكير التجفيف ولم يُسجّل تجفيفها بعد.`,
+
     details: {
-  observation:
-    count === 1
-      ? `الحيوان رقم ${animalNumbers[0]} مستحق للتجفيف وفق تاريخ آخر تلقيح المسجّل.`
-      : `الحيوانات المستحقة للتجفيف: ${animalNumbers.join("، ")}.`,
+      observation:
+        count === 1
+          ? `عمر الحمل الحالي ${due[0].gestationDays} يومًا، وتنتهي نافذة التذكير بتاريخ ${due[0].alertEndDate}.`
+          : `أرقام الحيوانات: ${animalNumbers.join("، ")}.`,
 
-  meaning:
-    "التجفيف في هذه المرحلة يهيئ الحيوان لفترة الجفاف والاستعداد للولادة التالية.",
+      meaning:
+        "التجفيف في هذه المرحلة يهيئ الحيوان لفترة الجفاف والاستعداد للولادة التالية.",
 
-  recommendation:
-    "راجع الحيوانات وسجّل التجفيف في الوقت المناسب لكل حالة.",
+      recommendation:
+        "راجع الحالات وسجّل التجفيف في الوقت المناسب لكل حيوان.",
 
-  evidence
-},
+      evidence
+    },
+
     dueDate: earliestDueDate,
     affectedCount: count,
     animalNumbers,
@@ -40247,11 +40316,15 @@ const hasOverdue = overdueCount > 0;
           : "تجفيف الحيوانات",
 
       url:
-        `dry-off.html?number=${encodeURIComponent(animalNumbers.join(","))}`
+        eventsPageBuildRedirectSrv({
+          page: "dry-off.html",
+          numbers: animalNumbers,
+          eventDate: context.today
+        })
     },
 
-  snoozeMinutes:
-  MURABBIK_DRY_OFF_SNOOZE_MINUTES
+    snoozeMinutes:
+      MURABBIK_DRY_OFF_SNOOZE_MINUTES
   }];
 }
 
