@@ -484,13 +484,10 @@
         splitNumbers(inputAnimal.value)[0] ||
         "";
 
-      if (
-        ration === "نعم" &&
-        lastSavedRows.length === 1
-      ) {
-        dialog.classList.remove("hide");
-        return;
-      }
+     if (ration === "نعم") {
+  dialog.classList.remove("hide");
+  return;
+}
 
       setTimeout(() => {
         if (j.redirectUrl) {
