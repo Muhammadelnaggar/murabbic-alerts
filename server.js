@@ -40473,169 +40473,159 @@ async function murabbikCloseUpDueAlertSourceSrv(
     });
   }
 
-   if (!due.length) return [];
+if (!due.length) return [];
 
-  const groupsByDueDate = new Map();
+due.sort((a, b) =>
+  b.gestationDays - a.gestationDays ||
+  String(a.animalNumber).localeCompare(
+    String(b.animalNumber),
+    "ar",
+    { numeric: true }
+  )
+);
 
-  for (const item of due) {
-    const dueDate =
-      calvingIsDateSrv(item.dueDate)
-        ? item.dueDate
-        : context.today;
+const animalNumbers = [
+  ...new Set(
+    due
+      .map(item => item.animalNumber)
+      .filter(Boolean)
+  )
+];
 
-    if (!groupsByDueDate.has(dueDate)) {
-      groupsByDueDate.set(dueDate, []);
-    }
+const count = animalNumbers.length;
 
-    groupsByDueDate.get(dueDate).push(item);
-  }
+const overdueCount = due.filter(
+  item => item.stage === "overdue"
+).length;
 
-  const alerts = [];
+const dueTodayCount =
+  count - overdueCount;
 
-  const sortedDueDates = [
-    ...groupsByDueDate.keys()
-  ].sort((a, b) =>
-    String(a).localeCompare(String(b))
+const hasOverdue =
+  overdueCount > 0;
+
+const evidence = due
+  .slice(0, 12)
+  .map(item =>
+    `الحيوان ${item.animalNumber}: ${item.gestationDays} يوم حمل، والموعد المستهدف ${item.dueDate}`
   );
 
-  for (const dueDate of sortedDueDates) {
-    const group =
-      groupsByDueDate.get(dueDate) || [];
+if (due.length > evidence.length) {
+  evidence.push(
+    `و${due.length - evidence.length} حيوان آخر مستحق لتحضير الولادة.`
+  );
+}
 
-    group.sort((a, b) =>
-      b.gestationDays - a.gestationDays ||
-      String(a.animalNumber).localeCompare(
-        String(b.animalNumber),
-        "ar",
-        { numeric: true }
-      )
-    );
+const revisionKey = [...due]
+  .sort((a, b) =>
+    String(a.animalNumber).localeCompare(
+      String(b.animalNumber),
+      "ar",
+      { numeric: true }
+    )
+  )
+  .map(item =>
+    [
+      item.animalNumber,
+      item.lastInseminationDate,
+      item.dueDate,
+      item.targetGestationDay,
+      item.stage
+    ].join(":")
+  )
+  .join("|");
 
-    const animalNumbers = group.map(
-      item => item.animalNumber
-    );
+const summaryParts = [];
 
-    const count = animalNumbers.length;
+if (dueTodayCount > 0) {
+  summaryParts.push(
+    `${dueTodayCount} مستحق${dueTodayCount === 1 ? "" : "ة"}`
+  );
+}
 
-    const overdueCount = group.filter(
-      item => item.stage === "overdue"
-    ).length;
+if (overdueCount > 0) {
+  summaryParts.push(
+    `${overdueCount} متأخر${overdueCount === 1 ? "" : "ة"}`
+  );
+}
 
-    const hasOverdue = overdueCount > 0;
+return [
+  {
+    identityKey:
+      "close-up-due:current",
 
-    const evidence = group
-      .slice(0, 12)
-      .map(item =>
-        `الحيوان ${item.animalNumber}: ${item.gestationDays} يوم حمل، والموعد المستهدف ${item.dueDate}`
-      );
+    revisionKey,
 
-    if (group.length > evidence.length) {
-      evidence.push(
-        `و${group.length - evidence.length} حيوان آخر له موعد التحضير نفسه.`
-      );
-    }
+    kind: "operational",
+    domain: "reproduction",
+    code: "close_up_due",
 
-    const revisionKey = [...group]
-      .sort((a, b) =>
-        String(a.animalNumber).localeCompare(
-          String(b.animalNumber),
-          "ar",
-          { numeric: true }
-        )
-      )
-      .map(item =>
-        [
-          dueDate,
-          item.animalNumber,
-          item.lastInseminationDate,
-          item.targetGestationDay,
-          item.stage
-        ].join(":")
-      )
-      .join("|");
+    priority:
+      hasOverdue
+        ? "high"
+        : "normal",
 
-    alerts.push({
-      identityKey:
-        `close-up-due:${dueDate}`,
+    urgency: "today",
+    certainty: "confirmed",
 
-      revisionKey,
+    status:
+      hasOverdue
+        ? "overdue"
+        : "due",
 
-      kind: "operational",
-      domain: "reproduction",
-      code: "close_up_due",
+    title:
+      count === 1
+        ? "حيوان مستحق لتحضير الولادة"
+        : "حيوانات مستحقة لتحضير الولادة",
 
-      priority:
-        hasOverdue
-          ? "high"
-          : "normal",
+    message:
+      count === 1
+        ? (
+            hasOverdue
+              ? `الحيوان رقم ${animalNumbers[0]} تجاوز موعد تحضير الولادة ولم يُسجّل في انتظار الولادة بعد.`
+              : `الحيوان رقم ${animalNumbers[0]} مستحق لتحضير الولادة اليوم.`
+          )
+        : `يوجد ${count} حيوانات مطلوب تحضيرها للولادة الآن (${summaryParts.join("، ")}).`,
 
-      urgency: "today",
-      certainty: "confirmed",
-
-      status:
-        hasOverdue
-          ? "overdue"
-          : "due",
-
-      title:
+    details: {
+      observation:
         count === 1
-          ? "حيوان مستحق لتحضير الولادة"
-          : "حيوانات مستحقة لتحضير الولادة",
+          ? `آخر تلقيح مسجّل بتاريخ ${due[0].lastInseminationDate}، وعمر الحمل الحالي ${due[0].gestationDays} يومًا.`
+          : `أرقام الحيوانات: ${animalNumbers.join("، ")}.`,
 
-      message:
+      meaning:
+        "مرحلة تحضير الولادة تساعد على الانتقال المنظم إلى مجموعة انتظار الولادة وتجهيز التغذية والرعاية قبل الولادة.",
+
+      recommendation:
+        "راجع الحالات ميدانيًا، ثم سجّل تحضير الولادة للحيوانات المناسبة.",
+
+      evidence
+    },
+
+    dueDate: context.today,
+    affectedCount: count,
+    animalNumbers,
+
+    action: {
+      type: "navigate",
+
+      label:
         count === 1
-          ? (
-              hasOverdue
-                ? `الحيوان رقم ${animalNumbers[0]} تجاوز موعد تحضير الولادة المستهدف ${dueDate} ولم يُسجّل في انتظار الولادة بعد.`
-                : `الحيوان رقم ${animalNumbers[0]} وصل اليوم إلى موعد تحضير الولادة المستهدف.`
-            )
-          : (
-              hasOverdue
-                ? `يوجد ${count} حيوانات موعد تحضيرها المستهدف ${dueDate} ولم تُسجّل في انتظار الولادة بعد.`
-                : `يوجد ${count} حيوانات وصلت اليوم إلى موعد تحضير الولادة المستهدف.`
-            ),
+          ? "تحضير الحيوان"
+          : "تحضير الحيوانات",
 
-      details: {
-       observation:
-  count === 1
-    ? `آخر تلقيح مسجّل للحيوان بتاريخ ${group[0].lastInseminationDate}، وعمر الحمل الحالي ${group[0].gestationDays} يومًا.`
-    : `أرقام الحيوانات المستحقة: ${animalNumbers.join("، ")}.`,
+      url:
+        eventsPageBuildRedirectSrv({
+          page: "close-up.html",
+          numbers: animalNumbers,
+          eventDate: context.today
+        })
+    },
 
-        meaning:
-          "مرحلة تحضير الولادة تساعد على الانتقال المنظم إلى مجموعة انتظار الولادة وتجهيز التغذية والرعاية قبل الولادة.",
-
-        recommendation:
-          "راجع كل حالة ميدانيًا، ثم سجّل تحضير الولادة للحيوانات المناسبة.",
-
-        evidence
-      },
-
-      dueDate,
-      affectedCount: count,
-      animalNumbers,
-
-      action: {
-        type: "navigate",
-
-        label:
-          count === 1
-            ? "تحضير الحيوان"
-            : "تحضير الحيوانات",
-
-       url:
-  eventsPageBuildRedirectSrv({
-    page: "close-up.html",
-    numbers: animalNumbers,
-    eventDate: context.today
-  })
-      },
-
-      snoozeMinutes:
-        MURABBIK_CLOSE_UP_SNOOZE_MINUTES
-    });
+    snoozeMinutes:
+      MURABBIK_CLOSE_UP_SNOOZE_MINUTES
   }
-
-  return alerts;
+];
    
 }
 
