@@ -41300,6 +41300,426 @@ murabbikSmartAlertRegisterSourceSrv(
   murabbikCalvingOverdueAlertSourceSrv
 );
 // ============================================================
+//   SMART ALERT SOURCE: PREGNANCY DIAGNOSIS — ULTRASOUND / MANUAL
+//   تنبيهان متتابعان: سونار 26–39، وفحص يدوي من 40 يومًا
+// ============================================================
+
+const MURABBIK_PREGNANCY_ULTRASOUND_DUE_DAYS = 26;
+const MURABBIK_PREGNANCY_MANUAL_DUE_DAYS = 40;
+const MURABBIK_PREGNANCY_DIAGNOSIS_SNOOZE_MINUTES = 24 * 60;
+
+function murabbikPregnancyDiagnosisAlertDateSrv(value) {
+  const iso =
+    murabbikSmartAlertTextSrv(value)
+      .slice(0, 10);
+
+  return calvingIsDateSrv(iso)
+    ? iso
+    : "";
+}
+
+function murabbikPregnancyDiagnosisAlertUrlSrv({
+  numbers = [],
+  eventDate = "",
+  method = ""
+} = {}) {
+  const base =
+    eventsPageBuildRedirectSrv({
+      page: "pregnancy-diagnosis.html",
+      numbers,
+      eventDate
+    });
+
+  const separator =
+    base.includes("?")
+      ? "&"
+      : "?";
+
+  return (
+    `${base}${separator}` +
+    `checkType=${encodeURIComponent(
+      "initial_pregnancy_diagnosis"
+    )}` +
+    `&pregnancyCheckType=${encodeURIComponent(
+      "initial_pregnancy_diagnosis"
+    )}` +
+    `&method=${encodeURIComponent(method)}`
+  );
+}
+
+function murabbikPregnancyDiagnosisAlertClosedSrv(
+  doc = {},
+  lastInseminationDate = ""
+) {
+  if (!calvingIsDateSrv(lastInseminationDate)) {
+    return true;
+  }
+
+  const lastDiagnosisDate =
+    murabbikPregnancyDiagnosisAlertDateSrv(
+      doc.lastDiagnosisDate ||
+      doc.lastPregnancyDiagnosisDate ||
+      ""
+    );
+
+  if (lastDiagnosisDate) {
+    const diagnosisAfterService =
+      calvingDaysBetweenSrv(
+        lastInseminationDate,
+        lastDiagnosisDate
+      );
+
+    if (
+      Number.isFinite(diagnosisAfterService) &&
+      diagnosisAfterService >= 0
+    ) {
+      return true;
+    }
+  }
+
+  const lastHeatDate =
+    murabbikPregnancyDiagnosisAlertDateSrv(
+      doc.lastHeatDate ||
+      doc.heatDate ||
+      ""
+    );
+
+  if (lastHeatDate) {
+    const heatAfterService =
+      calvingDaysBetweenSrv(
+        lastInseminationDate,
+        lastHeatDate
+      );
+
+    // الشياع والتلقيح قد يُسجلان في اليوم نفسه،
+    // لذلك يغلق المسار فقط عند وجود شياع في يوم لاحق.
+    if (
+      Number.isFinite(heatAfterService) &&
+      heatAfterService > 0
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function murabbikPregnancyDiagnosisGroupedAlertSrv(
+  items = [],
+  stage = "",
+  context = {}
+) {
+  if (!items.length) return null;
+
+  const isUltrasound =
+    stage === "ultrasound";
+
+  const sorted =
+    [...items].sort((a, b) =>
+      b.daysSinceInsemination -
+        a.daysSinceInsemination ||
+
+      String(a.animalNumber).localeCompare(
+        String(b.animalNumber),
+        "ar",
+        { numeric: true }
+      )
+    );
+
+  const animalNumbers = [
+    ...new Set(
+      sorted
+        .map(item => item.animalNumber)
+        .filter(Boolean)
+    )
+  ];
+
+  const count =
+    animalNumbers.length;
+
+  const evidence =
+    sorted
+      .slice(0, 12)
+      .map(item =>
+        `الحيوان ${item.animalNumber}: ${item.daysSinceInsemination} يومًا بعد التلقيح، وآخر تلقيح ${item.lastInseminationDate}`
+      );
+
+  if (sorted.length > evidence.length) {
+    evidence.push(
+      `و${sorted.length - evidence.length} حيوان آخر مستحق لتشخيص الحمل.`
+    );
+  }
+
+  const revisionKey =
+    [...sorted]
+      .sort((a, b) =>
+        String(a.animalNumber).localeCompare(
+          String(b.animalNumber),
+          "ar",
+          { numeric: true }
+        )
+      )
+      .map(item =>
+        [
+          item.animalNumber,
+          item.lastInseminationDate,
+          stage
+        ].join(":")
+      )
+      .join("|");
+
+  const dueDays =
+    isUltrasound
+      ? MURABBIK_PREGNANCY_ULTRASOUND_DUE_DAYS
+      : MURABBIK_PREGNANCY_MANUAL_DUE_DAYS;
+
+  const earliestDueDate =
+    sorted
+      .map(item =>
+        addDaysToIsoDateSrv(
+          item.lastInseminationDate,
+          dueDays
+        )
+      )
+      .filter(calvingIsDateSrv)
+      .sort()[0] ||
+    context.today;
+
+  return {
+    identityKey:
+      isUltrasound
+        ? "pregnancy-diagnosis-ultrasound:current"
+        : "pregnancy-diagnosis-manual:current",
+
+    revisionKey,
+
+    kind: "operational",
+    domain: "reproduction",
+
+    code:
+      isUltrasound
+        ? "pregnancy_diagnosis_ultrasound_due"
+        : "pregnancy_diagnosis_manual_due",
+
+    priority:
+      isUltrasound
+        ? "normal"
+        : "high",
+
+    urgency: "today",
+    certainty: "confirmed",
+
+    status:
+      isUltrasound
+        ? "due"
+        : "overdue",
+
+    title:
+      isUltrasound
+        ? (
+            count === 1
+              ? "موعد تشخيص الحمل بالسونار"
+              : "حيوانات مستحقة للسونار"
+          )
+        : (
+            count === 1
+              ? "موعد الفحص اليدوي للحمل"
+              : "حيوانات مستحقة للفحص اليدوي"
+          ),
+
+    message:
+      isUltrasound
+        ? (
+            count === 1
+              ? `الحيوان رقم ${animalNumbers[0]} أكمل 26 يومًا بعد التلقيح ويمكن تشخيص الحمل بالسونار الآن.`
+              : `يوجد ${count} حيوانات أكملت 26 يومًا بعد التلقيح ويمكن تشخيص الحمل بالسونار الآن.`
+          )
+        : (
+            count === 1
+              ? `الحيوان رقم ${animalNumbers[0]} أكمل 40 يومًا بعد التلقيح ولم يُسجّل له تشخيص حمل حتى الآن، ويمكن فحصه يدويًا.`
+              : `يوجد ${count} حيوانات أكملت 40 يومًا أو أكثر بعد التلقيح ولم يُسجّل لها تشخيص حمل حتى الآن.`
+          ),
+
+    details: {
+      observation:
+        count === 1
+          ? `آخر تلقيح مسجّل بتاريخ ${sorted[0].lastInseminationDate}، ومرّ عليه ${sorted[0].daysSinceInsemination} يومًا.`
+          : `أرقام الحيوانات: ${animalNumbers.join("، ")}.`,
+
+      meaning:
+        isUltrasound
+          ? "التشخيص المبكر بالسونار يساعد على معرفة نتيجة التلقيح وتحديد الخطوة التالية في الوقت المناسب."
+          : "مرور 40 يومًا أو أكثر يتيح تشخيص الحمل بالفحص اليدوي عند توافر المختص.",
+
+      recommendation:
+        isUltrasound
+          ? "راجع الحيوانات وسجّل نتيجة السونار بعد الفحص."
+          : "راجع الحيوانات وسجّل نتيجة الفحص اليدوي بعد إجرائه.",
+
+      evidence
+    },
+
+    dueDate: earliestDueDate,
+    affectedCount: count,
+    animalNumbers,
+
+    action: {
+      type: "navigate",
+
+      label:
+        isUltrasound
+          ? "تسجيل السونار"
+          : "تسجيل الفحص اليدوي",
+
+      url:
+        murabbikPregnancyDiagnosisAlertUrlSrv({
+          numbers: animalNumbers,
+          eventDate: context.today,
+
+          method:
+            isUltrasound
+              ? "ultrasound"
+              : "manual"
+        })
+    },
+
+    snoozeMinutes:
+      MURABBIK_PREGNANCY_DIAGNOSIS_SNOOZE_MINUTES
+  };
+}
+
+async function murabbikPregnancyDiagnosisDueAlertSourceSrv(
+  context
+) {
+  const animals =
+    await murabbikSmartAlertAnimalsSrv(
+      context
+    );
+
+  const ultrasoundDue = [];
+  const manualDue = [];
+
+  for (const doc of animals) {
+    const animalNumber =
+      murabbikDryOffAlertNumberSrv(doc);
+
+    const status =
+      murabbikSmartAlertTextSrv(
+        doc.status || "active"
+      ).toLowerCase();
+
+    if (!animalNumber) continue;
+
+    if (
+      ["inactive", "archived"]
+        .includes(status)
+    ) {
+      continue;
+    }
+
+    if (
+      murabbikSmartAlertTextSrv(
+        doc.entryType
+      ).toLowerCase() === "followers"
+    ) {
+      continue;
+    }
+
+    const reproductiveStatus =
+      doc.reproductiveStatus ||
+      doc.reproStatus ||
+      "";
+
+    if (
+      !pregnancyDiagnosisIsInseminatedStatusSrv(
+        reproductiveStatus
+      )
+    ) {
+      continue;
+    }
+
+    const lastInseminationDate =
+      murabbikPregnancyDiagnosisAlertDateSrv(
+        doc.lastInseminationDate ||
+        doc.lastAI ||
+        doc.lastInsemination ||
+        doc.lastServiceDate ||
+        ""
+      );
+
+    if (!lastInseminationDate) continue;
+
+    if (
+      murabbikPregnancyDiagnosisAlertClosedSrv(
+        doc,
+        lastInseminationDate
+      )
+    ) {
+      continue;
+    }
+
+    const daysSinceInsemination =
+      calvingDaysBetweenSrv(
+        lastInseminationDate,
+        context.today
+      );
+
+    if (
+      !Number.isFinite(daysSinceInsemination) ||
+      daysSinceInsemination <
+        MURABBIK_PREGNANCY_ULTRASOUND_DUE_DAYS
+    ) {
+      continue;
+    }
+
+    const item = {
+      animalNumber,
+      lastInseminationDate,
+      daysSinceInsemination
+    };
+
+    if (
+      daysSinceInsemination >=
+        MURABBIK_PREGNANCY_MANUAL_DUE_DAYS
+    ) {
+      manualDue.push(item);
+    } else {
+      ultrasoundDue.push(item);
+    }
+  }
+
+  const alerts = [];
+
+  const ultrasoundAlert =
+    murabbikPregnancyDiagnosisGroupedAlertSrv(
+      ultrasoundDue,
+      "ultrasound",
+      context
+    );
+
+  if (ultrasoundAlert) {
+    alerts.push(ultrasoundAlert);
+  }
+
+  const manualAlert =
+    murabbikPregnancyDiagnosisGroupedAlertSrv(
+      manualDue,
+      "manual",
+      context
+    );
+
+  if (manualAlert) {
+    alerts.push(manualAlert);
+  }
+
+  return alerts;
+}
+
+murabbikSmartAlertRegisterSourceSrv(
+  "pregnancy_diagnosis_due",
+  murabbikPregnancyDiagnosisDueAlertSourceSrv
+);
+// ============================================================
 //       SMART ALERT SOURCE: UTERINE CHECK — DIM 14 / DIM 30
 //       تنبيهات فحص الرحم حسب أيام الحليب فقط
 // ============================================================
