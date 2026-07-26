@@ -41013,8 +41013,8 @@ murabbikSmartAlertRegisterSourceSrv(
 const MURABBIK_CALVING_EXPECTED_COW_DAYS = 270;
 const MURABBIK_CALVING_EXPECTED_BUFFALO_DAYS = 300;
 
-const MURABBIK_CALVING_OVERDUE_COW_DAYS = 280;
-const MURABBIK_CALVING_OVERDUE_BUFFALO_DAYS = 310;
+const MURABBIK_CALVING_OVERDUE_COW_DAYS = 290;
+const MURABBIK_CALVING_OVERDUE_BUFFALO_DAYS = 320;
 
 const MURABBIK_CALVING_OVERDUE_SNOOZE_MINUTES = 24 * 60;
 
@@ -41183,15 +41183,15 @@ async function murabbikCalvingOverdueAlertSourceSrv(
 
 if (
   !Number.isFinite(gestationDays) ||
-  gestationDays <= species.overdueAfterDays
+  gestationDays < species.overdueAfterDays
 ) {
   continue;
 }
 
     const stage =
-      gestationDays > species.overdueAfterDays
-        ? "overdue"
-        : "due";
+  gestationDays >= species.overdueAfterDays
+    ? "overdue"
+    : "due";
 
     const expectedCalvingDate =
       addDaysToIsoDateSrv(
