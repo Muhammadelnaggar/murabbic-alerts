@@ -41181,12 +41181,12 @@ async function murabbikCalvingOverdueAlertSourceSrv(
         context.today
       );
 
-      if (
-      !Number.isFinite(gestationDays) ||
-      gestationDays < species.expectedDays
-    ) {
-      continue;
-    }
+if (
+  !Number.isFinite(gestationDays) ||
+  gestationDays <= species.overdueAfterDays
+) {
+  continue;
+}
 
     const stage =
       gestationDays > species.overdueAfterDays
