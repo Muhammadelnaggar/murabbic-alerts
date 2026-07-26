@@ -40030,8 +40030,14 @@ function murabbikSmartAlertNormalizeSrv(sourceName, raw = {}) {
     throw new Error(`murabbik_smart_alert_action_invalid:${source}`);
   }
 
-  const animalNumbers = [...new Set(
+   const animalNumbers = [...new Set(
     (Array.isArray(raw.animalNumbers) ? raw.animalNumbers : [])
+      .map(murabbikSmartAlertTextSrv)
+      .filter(Boolean)
+  )];
+
+  const scopeKeys = [...new Set(
+    (Array.isArray(raw.scopeKeys) ? raw.scopeKeys : [])
       .map(murabbikSmartAlertTextSrv)
       .filter(Boolean)
   )];
@@ -40078,7 +40084,8 @@ function murabbikSmartAlertNormalizeSrv(sourceName, raw = {}) {
     },
 
     displayStyle: kind,
-    _snoozeMinutes: snoozeMinutes
+    _snoozeMinutes: snoozeMinutes,
+    _scopeKeys: scopeKeys
   };
 }
 
@@ -40106,6 +40113,7 @@ function murabbikSmartAlertPublicSrv(alert) {
 
   const {
     _snoozeMinutes,
+    _scopeKeys,
     ...publicAlert
   } = alert;
 
@@ -41727,6 +41735,86 @@ murabbikSmartAlertRegisterSourceSrv(
 const MURABBIK_PREGNANCY_CONFIRMATION_120_DUE_DAYS = 120;
 const MURABBIK_PREGNANCY_CONFIRMATION_120_SNOOZE_MINUTES = 24 * 60;
 
+const MURABBIK_PREGNANCY_CONFIRMATION_120_SOURCE_NAME =
+  "pregnancy_confirmation_120_due";
+
+const MURABBIK_PREGNANCY_CONFIRMATION_120_IDENTITY_KEY =
+  "pregnancy-confirmation-120:current";
+
+function murabbikPregnancyConfirmation120AlertIdSrv() {
+  return `msa_${murabbikSmartAlertHashSrv({
+    source:
+      MURABBIK_PREGNANCY_CONFIRMATION_120_SOURCE_NAME,
+
+    identityKey:
+      MURABBIK_PREGNANCY_CONFIRMATION_120_IDENTITY_KEY
+  })}`;
+}
+
+async function murabbikPregnancyConfirmation120SnoozedScopeKeysSrv(
+  context
+) {
+  return await context.load(
+    "smart-alerts:pregnancy-confirmation-120-snoozed-scopes",
+
+    async () => {
+      try {
+        const snap =
+          await murabbikSmartAlertStateRefSrv(
+            context.req,
+            murabbikPregnancyConfirmation120AlertIdSrv()
+          ).get();
+
+        if (!snap.exists) {
+          return new Set();
+        }
+
+        const state =
+          snap.data() || {};
+
+        const decision =
+          murabbikSmartAlertTextSrv(
+            state.decision
+          ).toLowerCase();
+
+        if (decision !== "snoozed") {
+          return new Set();
+        }
+
+        const snoozedUntilMs =
+          murabbikSmartAlertDateMsSrv(
+            state.snoozedUntil
+          );
+
+        if (
+          !snoozedUntilMs ||
+          snoozedUntilMs > context.nowMs
+        ) {
+          return new Set();
+        }
+
+        return new Set(
+          (
+            Array.isArray(state.scopeKeys)
+              ? state.scopeKeys
+              : []
+          )
+            .map(murabbikSmartAlertTextSrv)
+            .filter(Boolean)
+        );
+
+      } catch (e) {
+        console.warn(
+          "pregnancy confirmation 120 snoozed scopes read failed:",
+          e.message || e
+        );
+
+        return new Set();
+      }
+    }
+  );
+}
+
 function murabbikPregnancyConfirmation120AlertUrlSrv({
   numbers = [],
   eventDate = ""
@@ -41791,7 +41879,10 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
     await murabbikSmartAlertAnimalsSrv(
       context
     );
-
+    const snoozedScopeKeys =
+    await murabbikPregnancyConfirmation120SnoozedScopeKeysSrv(
+      context
+    );
   const due = [];
 
   for (const doc of animals) {
@@ -41860,9 +41951,30 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
       );
 
     if (
-      !Number.isFinite(daysSinceInsemination) ||
-      daysSinceInsemination <
-        MURABBIK_PREGNANCY_CONFIRMATION_120_DUE_DAYS
+      !Number.isFinite(
+        daysSinceInsemination
+      )
+    ) {
+      continue;
+    }
+
+    const scopeKey =
+      `${animalNumber}:${lastInseminationDate}`;
+
+    const isDueToday =
+      daysSinceInsemination ===
+        MURABBIK_PREGNANCY_CONFIRMATION_120_DUE_DAYS;
+
+    const isSnoozedFromDay120 =
+      daysSinceInsemination >
+        MURABBIK_PREGNANCY_CONFIRMATION_120_DUE_DAYS &&
+      snoozedScopeKeys.has(
+        scopeKey
+      );
+
+    if (
+      !isDueToday &&
+      !isSnoozedFromDay120
     ) {
       continue;
     }
@@ -41870,7 +41982,8 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
     due.push({
       animalNumber,
       lastInseminationDate,
-      daysSinceInsemination
+      daysSinceInsemination,
+      scopeKey
     });
   }
 
@@ -41945,7 +42058,7 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
 
   return [{
     identityKey:
-      "pregnancy-confirmation-120:current",
+      MURABBIK_PREGNANCY_CONFIRMATION_120_IDENTITY_KEY,
 
     revisionKey,
 
@@ -41984,8 +42097,13 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
     },
 
     dueDate: earliestDueDate,
-    affectedCount: count,
+      affectedCount: count,
     animalNumbers,
+
+    scopeKeys:
+      sorted
+        .map(item => item.scopeKey)
+        .filter(Boolean),
 
     action: {
       type: "navigate",
@@ -42004,7 +42122,7 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
 }
 
 murabbikSmartAlertRegisterSourceSrv(
-  "pregnancy_confirmation_120_due",
+  MURABBIK_PREGNANCY_CONFIRMATION_120_SOURCE_NAME,
   murabbikPregnancyConfirmation120AlertSourceSrv
 );
 // ============================================================
@@ -42886,7 +43004,9 @@ app.post(
 
             snoozedAt: null,
             snoozedUntil: null,
-            snoozeMinutes: null
+            snoozeMinutes: null,
+            scopeKeys: [],
+            animalNumbers: []
           },
           {
             merge: true
@@ -42933,7 +43053,17 @@ app.post(
                 snoozedUntilMs
               ),
 
-          snoozeMinutes
+            snoozeMinutes,
+
+          scopeKeys:
+            Array.isArray(alert._scopeKeys)
+              ? alert._scopeKeys
+              : [],
+
+          animalNumbers:
+            Array.isArray(alert.animalNumbers)
+              ? alert.animalNumbers
+              : []
         },
         {
           merge: true
