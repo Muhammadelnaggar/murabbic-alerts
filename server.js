@@ -41720,6 +41720,294 @@ murabbikSmartAlertRegisterSourceSrv(
   murabbikPregnancyDiagnosisDueAlertSourceSrv
 );
 // ============================================================
+//   SMART ALERT SOURCE: PREGNANCY CONFIRMATION — DAY 120
+//   تأكيد استمرار الحمل من اليوم 120 بعد آخر تلقيح
+// ============================================================
+
+const MURABBIK_PREGNANCY_CONFIRMATION_120_DUE_DAYS = 120;
+const MURABBIK_PREGNANCY_CONFIRMATION_120_SNOOZE_MINUTES = 24 * 60;
+
+function murabbikPregnancyConfirmation120AlertUrlSrv({
+  numbers = [],
+  eventDate = ""
+} = {}) {
+  const base =
+    eventsPageBuildRedirectSrv({
+      page: "pregnancy-diagnosis.html",
+      numbers,
+      eventDate
+    });
+
+  const separator =
+    base.includes("?")
+      ? "&"
+      : "?";
+
+  return (
+    `${base}${separator}` +
+    `checkType=${encodeURIComponent(
+      "pregnancy_confirmation_120"
+    )}` +
+    `&pregnancyCheckType=${encodeURIComponent(
+      "pregnancy_confirmation_120"
+    )}`
+  );
+}
+
+function murabbikPregnancyConfirmation120IsClosedSrv(
+  doc = {},
+  lastInseminationDate = ""
+) {
+  if (!calvingIsDateSrv(lastInseminationDate)) {
+    return true;
+  }
+
+  const confirmationDate =
+    murabbikPregnancyDiagnosisAlertDateSrv(
+      doc.lastPregnancyConfirmation120Date ||
+      ""
+    );
+
+  if (!confirmationDate) {
+    return false;
+  }
+
+  const confirmationAfterService =
+    calvingDaysBetweenSrv(
+      lastInseminationDate,
+      confirmationDate
+    );
+
+  return (
+    Number.isFinite(confirmationAfterService) &&
+    confirmationAfterService >= 0
+  );
+}
+
+async function murabbikPregnancyConfirmation120AlertSourceSrv(
+  context
+) {
+  const animals =
+    await murabbikSmartAlertAnimalsSrv(
+      context
+    );
+
+  const due = [];
+
+  for (const doc of animals) {
+    const animalNumber =
+      murabbikDryOffAlertNumberSrv(doc);
+
+    const status =
+      murabbikSmartAlertTextSrv(
+        doc.status || "active"
+      ).toLowerCase();
+
+    if (!animalNumber) continue;
+
+    if (
+      ["inactive", "archived"]
+        .includes(status)
+    ) {
+      continue;
+    }
+
+    if (
+      murabbikSmartAlertTextSrv(
+        doc.entryType
+      ).toLowerCase() === "followers"
+    ) {
+      continue;
+    }
+
+    const reproductiveStatus =
+      doc.reproductiveStatus ||
+      doc.reproStatus ||
+      "";
+
+    if (
+      !pregnancyDiagnosisIsPregnantStatusSrv(
+        reproductiveStatus
+      )
+    ) {
+      continue;
+    }
+
+    const lastInseminationDate =
+      murabbikPregnancyDiagnosisAlertDateSrv(
+        doc.lastInseminationDate ||
+        doc.lastAI ||
+        doc.lastInsemination ||
+        doc.lastServiceDate ||
+        ""
+      );
+
+    if (!lastInseminationDate) continue;
+
+    if (
+      murabbikPregnancyConfirmation120IsClosedSrv(
+        doc,
+        lastInseminationDate
+      )
+    ) {
+      continue;
+    }
+
+    const daysSinceInsemination =
+      calvingDaysBetweenSrv(
+        lastInseminationDate,
+        context.today
+      );
+
+    if (
+      !Number.isFinite(daysSinceInsemination) ||
+      daysSinceInsemination <
+        MURABBIK_PREGNANCY_CONFIRMATION_120_DUE_DAYS
+    ) {
+      continue;
+    }
+
+    due.push({
+      animalNumber,
+      lastInseminationDate,
+      daysSinceInsemination
+    });
+  }
+
+  if (!due.length) {
+    return [];
+  }
+
+  const sorted =
+    [...due].sort((a, b) =>
+      b.daysSinceInsemination -
+        a.daysSinceInsemination ||
+
+      String(a.animalNumber).localeCompare(
+        String(b.animalNumber),
+        "ar",
+        { numeric: true }
+      )
+    );
+
+  const animalNumbers = [
+    ...new Set(
+      sorted
+        .map(item => item.animalNumber)
+        .filter(Boolean)
+    )
+  ];
+
+  const count =
+    animalNumbers.length;
+
+  const evidence =
+    sorted
+      .slice(0, 12)
+      .map(item =>
+        `الحيوان ${item.animalNumber}: ${item.daysSinceInsemination} يومًا بعد التلقيح، وآخر تلقيح ${item.lastInseminationDate}`
+      );
+
+  if (sorted.length > evidence.length) {
+    evidence.push(
+      `و${sorted.length - evidence.length} حيوان آخر مستحق لتأكيد الحمل.`
+    );
+  }
+
+  const revisionKey =
+    [...sorted]
+      .sort((a, b) =>
+        String(a.animalNumber).localeCompare(
+          String(b.animalNumber),
+          "ar",
+          { numeric: true }
+        )
+      )
+      .map(item =>
+        [
+          item.animalNumber,
+          item.lastInseminationDate
+        ].join(":")
+      )
+      .join("|");
+
+  const earliestDueDate =
+    sorted
+      .map(item =>
+        addDaysToIsoDateSrv(
+          item.lastInseminationDate,
+          MURABBIK_PREGNANCY_CONFIRMATION_120_DUE_DAYS
+        )
+      )
+      .filter(calvingIsDateSrv)
+      .sort()[0] ||
+    context.today;
+
+  return [{
+    identityKey:
+      "pregnancy-confirmation-120:current",
+
+    revisionKey,
+
+    kind: "operational",
+    domain: "reproduction",
+    code: "pregnancy_confirmation_120_due",
+
+    priority: "normal",
+    urgency: "today",
+    certainty: "confirmed",
+    status: "due",
+
+    title:
+      count === 1
+        ? "موعد تأكيد الحمل"
+        : "حيوانات مستحقة لتأكيد الحمل",
+
+    message:
+      count === 1
+        ? `الحيوان رقم ${animalNumbers[0]} أكمل 120 يومًا بعد التلقيح، وحان موعد تأكيد استمرار الحمل.`
+        : `يوجد ${count} حيوانات أكملت 120 يومًا بعد التلقيح، وحان موعد تأكيد استمرار الحمل.`,
+
+    details: {
+      observation:
+        count === 1
+          ? `آخر تلقيح مسجّل بتاريخ ${sorted[0].lastInseminationDate}، ومرّ عليه ${sorted[0].daysSinceInsemination} يومًا.`
+          : `أرقام الحيوانات: ${animalNumbers.join("، ")}.`,
+
+      meaning:
+        "تأكيد الحمل في هذه المرحلة يساعد على الاطمئنان إلى استمراره وتحديث حالة القطيع قبل المراحل التالية.",
+
+      recommendation:
+        "راجع الحيوانات وسجّل نتيجة تأكيد الحمل بعد الفحص.",
+
+      evidence
+    },
+
+    dueDate: earliestDueDate,
+    affectedCount: count,
+    animalNumbers,
+
+    action: {
+      type: "navigate",
+      label: "تسجيل تأكيد الحمل",
+
+      url:
+        murabbikPregnancyConfirmation120AlertUrlSrv({
+          numbers: animalNumbers,
+          eventDate: context.today
+        })
+    },
+
+    snoozeMinutes:
+      MURABBIK_PREGNANCY_CONFIRMATION_120_SNOOZE_MINUTES
+  }];
+}
+
+murabbikSmartAlertRegisterSourceSrv(
+  "pregnancy_confirmation_120_due",
+  murabbikPregnancyConfirmation120AlertSourceSrv
+);
+// ============================================================
 //       SMART ALERT SOURCE: UTERINE CHECK — DIM 14 / DIM 30
 //       تنبيهات فحص الرحم حسب أيام الحليب فقط
 // ============================================================
