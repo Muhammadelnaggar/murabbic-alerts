@@ -42598,7 +42598,356 @@ murabbikSmartAlertRegisterSourceSrv(
   "vaccination_program_tasks",
   murabbikVaccinationProgramAlertSourceSrv
 );
+// ============================================================
+// SMART ALERT SOURCE: OVSYNCH STEPS — موعد باليوم والساعة
+// يظهر قبل الموعد بساعتين، و«ذكّرني لاحقًا» = 30 دقيقة
+// ============================================================
+const MURABBIK_OVSYNCH_ALERT_LEAD_MINUTES = 120;
+const MURABBIK_OVSYNCH_ALERT_SNOOZE_MINUTES = 30;
 
+function murabbikOvsynchAlertTimeSrv(value) {
+  const m = String(value || "").trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return "08:00";
+
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return "08:00";
+  }
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function murabbikOvsynchAlertDateTimeMsSrv(dateISO, timeText, timeZone) {
+  const date = String(dateISO || "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NaN;
+
+  const time = murabbikOvsynchAlertTimeSrv(timeText);
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+
+  const wallMs = Date.UTC(
+    year,
+    month - 1,
+    day,
+    hour,
+    minute,
+    0,
+    0
+  );
+
+  const zone =
+    String(timeZone || "UTC").trim() ||
+    "UTC";
+
+  try {
+    const formatter = new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone: zone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23"
+      }
+    );
+
+    const offsetAt = instantMs => {
+      const parts = Object.fromEntries(
+        formatter
+          .formatToParts(new Date(instantMs))
+          .filter(part => part.type !== "literal")
+          .map(part => [part.type, part.value])
+      );
+
+      return Date.UTC(
+        Number(parts.year),
+        Number(parts.month) - 1,
+        Number(parts.day),
+        Number(parts.hour),
+        Number(parts.minute),
+        Number(parts.second)
+      ) - instantMs;
+    };
+
+    let instantMs = wallMs;
+
+    instantMs =
+      wallMs -
+      offsetAt(instantMs);
+
+    instantMs =
+      wallMs -
+      offsetAt(instantMs);
+
+    return instantMs;
+
+  } catch (_) {
+    return wallMs;
+  }
+}
+
+async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
+  const tomorrow =
+    addDaysToIsoDateSrv(
+      context.today,
+      1
+    );
+
+  const farmClock = await context.load(
+    "smart-alerts:farm-time-context",
+    () =>
+      farmTimeContextSrv(
+        context.profileUid
+      )
+  );
+
+  const farmTimeZone =
+    String(
+      farmClock?.timeZone ||
+      "UTC"
+    ).trim() ||
+    "UTC";
+
+  const snap = await context.load(
+    "smart-alerts:ovsynch-pending-tasks",
+    () =>
+      db
+        .collection("tasks")
+        .where("userId", "==", context.userId)
+        .where("status", "==", "pending")
+        .limit(500)
+        .get()
+  );
+
+  const groups = new Map();
+
+  snap.forEach(docSnap => {
+    const task = docSnap.data() || {};
+
+    const isOvsynchTask =
+      String(task.taskType || "").trim() === "ovsynch_step" ||
+      String(task.type || "").trim() === "ovsynch_step" ||
+      (
+        String(task.type || "").trim() === "protocol_step" &&
+        String(task.protocol || "").trim() === "ovsynch"
+      );
+
+    if (!isOvsynchTask) return;
+
+    const dueDate = String(
+      task.dueDate ||
+      task.plannedDate ||
+      ""
+    )
+      .trim()
+      .slice(0, 10);
+
+    if (
+      dueDate !== context.today &&
+      dueDate !== tomorrow
+    ) {
+      return;
+    }
+
+    const plannedTime =
+      murabbikOvsynchAlertTimeSrv(
+        task.plannedTime ||
+        String(
+          task.plannedDateTime ||
+          ""
+        ).slice(11, 16)
+      );
+
+    const dueAtMs =
+      murabbikOvsynchAlertDateTimeMsSrv(
+        dueDate,
+        plannedTime,
+        farmTimeZone
+      );
+
+    const visibleFromMs =
+      dueAtMs -
+      (
+        MURABBIK_OVSYNCH_ALERT_LEAD_MINUTES *
+        60 *
+        1000
+      );
+
+    if (
+      !Number.isFinite(dueAtMs) ||
+      context.nowMs < visibleFromMs
+    ) {
+      return;
+    }
+
+    const animalNumber =
+      calvingNormDigitsOnlySrv(
+        task.animalNumber ||
+        task.number ||
+        ""
+      );
+
+    if (!animalNumber) return;
+
+    const stepIndex =
+      Number(task.stepIndex ?? 0) ||
+      0;
+
+    const stepDay =
+      Number(task.stepDay ?? 0) ||
+      0;
+
+    const stepName = String(
+      task.stepName ||
+      task.title ||
+      "خطوة التزامن"
+    ).trim();
+
+    const program = String(
+      task.program ||
+      task.protocolProgram ||
+      "ovsynch"
+    ).trim();
+
+    const protocolStartDate = String(
+      task.protocolStartDate ||
+      ""
+    )
+      .trim()
+      .slice(0, 10);
+
+    const key = [
+      dueDate,
+      plannedTime,
+      program,
+      protocolStartDate,
+      stepIndex,
+      stepDay,
+      stepName
+    ].join("__");
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        dueDate,
+        plannedTime,
+        dueAtMs,
+        program,
+        protocolStartDate,
+        stepIndex,
+        stepDay,
+        stepName,
+        animalNumbers: []
+      });
+    }
+
+    groups
+      .get(key)
+      .animalNumbers
+      .push(animalNumber);
+  });
+
+  const alerts = [];
+
+  for (const group of groups.values()) {
+    const animalNumbers = [
+      ...new Set(group.animalNumbers)
+    ]
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          (Number(a) - Number(b)) ||
+          String(a).localeCompare(
+            String(b)
+          )
+      );
+
+    if (!animalNumbers.length) continue;
+
+    const isToday =
+      group.dueDate === context.today;
+
+    const title =
+      isToday
+        ? "خطوة برنامج التزامن اليوم"
+        : "خطوة برنامج التزامن غدًا";
+
+    const prefix =
+      isToday
+        ? "⏰ اليوم"
+        : "📌 غدًا";
+
+    const message =
+      `${prefix} خطوة برنامج التزامن: ${group.stepName}\n` +
+      `للحيوانات أرقام: ${animalNumbers.join("، ")}\n` +
+      `الموعد: ${group.plannedTime}`;
+
+    const actionUrl =
+      `ovysynch.html?mode=step` +
+      `&date=${encodeURIComponent(group.dueDate)}` +
+      `&dueDate=${encodeURIComponent(group.dueDate)}` +
+      `&stepIndex=${encodeURIComponent(group.stepIndex)}` +
+      `&program=${encodeURIComponent(group.program)}` +
+      `&protocolStartDate=${encodeURIComponent(group.protocolStartDate || "")}`;
+
+    const identityKey = [
+      "ovsynch_step",
+      group.dueDate,
+      group.plannedTime,
+      group.program,
+      group.protocolStartDate || "no_start",
+      group.stepIndex,
+      group.stepDay
+    ].join("|");
+
+    alerts.push({
+      identityKey,
+
+      revisionKey:
+        `${identityKey}|${group.stepName}|${animalNumbers.join(",")}`,
+
+      kind: "operational",
+      domain: "reproduction",
+      code: "ovsynch_step_due",
+
+      priority: "high",
+      urgency: "now",
+      certainty: "confirmed",
+
+      status:
+        context.nowMs >= group.dueAtMs
+          ? "due"
+          : "upcoming",
+
+      title,
+      message,
+
+      dueDate: group.dueDate,
+      affectedCount: animalNumbers.length,
+      animalNumbers,
+
+      action: {
+        type: "navigate",
+        label: "فتح صفحة التزامن",
+        url: actionUrl
+      },
+
+      snoozeMinutes:
+        MURABBIK_OVSYNCH_ALERT_SNOOZE_MINUTES
+    });
+  }
+
+  return alerts;
+}
+
+murabbikSmartAlertRegisterSourceSrv(
+  "ovsynch_protocol_steps",
+  murabbikOvsynchStepSmartAlertSourceSrv
+);
 async function murabbikSmartAlertCollectSrv(req) {
   const context = {
     req,
