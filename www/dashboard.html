@@ -1701,20 +1701,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadWeatherTHI();
     loadHerdKPIs();
     loadMurabbikSmartAlerts();
-    loadOvsynchDashboardAlerts();
     loadVaccinationDashboardAlerts();
+
     setInterval(
-    loadMurabbikSmartAlerts,
-    10 * 60 * 1000
-   );
-    setInterval(loadOvsynchDashboardAlerts, 10 * 60 * 1000);
-    setInterval(loadVaccinationDashboardAlerts, 10 * 60 * 1000);
+      loadMurabbikSmartAlerts,
+      60 * 1000
+    );
+
+    setInterval(
+      loadVaccinationDashboardAlerts,
+      10 * 60 * 1000
+    );
 
   } catch (e) {
     console.warn('dashboard auth failed', e);
   }
 });
-
 </script>
 
 
