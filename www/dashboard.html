@@ -1400,45 +1400,53 @@ if (!isMurabbikSmart) {
   const actions = document.createElement('div');
   actions.className = 'mbk-smart-alert-actions';
 
-  if (alert.actionText && alert.actionUrl) {
-    const primaryButton =
-      document.createElement('button');
+if (alert.actionText && alert.actionUrl) {
+  const primaryButton =
+    document.createElement('button');
 
-    primaryButton.type = 'button';
-    primaryButton.className =
-      'mbk-smart-alert-primary';
+  primaryButton.type = 'button';
+  primaryButton.className =
+    'mbk-smart-alert-primary';
 
-    primaryButton.textContent = String(
-      alert.actionText
-    );
+  primaryButton.textContent = String(
+    alert.actionText
+  );
 
- primaryButton.addEventListener(
-  'click',
-  async () => {
-    primaryButton.disabled = true;
+  const actionDisabled =
+    alert.actionDisabled === true;
 
-    if (isMurabbikSmart) {
-      try {
-        await respondMurabbikSmartAlert(
-          alert,
-          'acknowledged'
-        );
-      } catch (e) {
-        console.warn(
-          'murabbik smart alert action response failed',
-          e
+  primaryButton.disabled =
+    actionDisabled;
+
+  if (!actionDisabled) {
+    primaryButton.addEventListener(
+      'click',
+      async () => {
+        primaryButton.disabled = true;
+
+        if (isMurabbikSmart) {
+          try {
+            await respondMurabbikSmartAlert(
+              alert,
+              'acknowledged'
+            );
+          } catch (e) {
+            console.warn(
+              'murabbik smart alert action response failed',
+              e
+            );
+          }
+        }
+
+        location.href = String(
+          alert.actionUrl
         );
       }
-    }
-
-    location.href = String(
-      alert.actionUrl
     );
   }
-);
 
-    actions.appendChild(primaryButton);
-  }
+  actions.appendChild(primaryButton);
+}
 
   const laterButton =
     document.createElement('button');
@@ -1521,11 +1529,14 @@ function dashboardMurabbikUiAlert(alert = {}) {
           ? 'warn'
           : 'info',
 
-    actionText:
-      alert?.action?.label || '',
+   actionText:
+  alert?.action?.label || '',
 
-    actionUrl:
-      alert?.action?.url || ''
+actionUrl:
+  alert?.action?.url || '',
+
+actionDisabled:
+  alert?.action?.type !== 'navigate'
   };
 }
 
