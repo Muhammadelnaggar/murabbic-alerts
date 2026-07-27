@@ -42203,21 +42203,21 @@ async function murabbikUterineCheckAlertSourceSrv(
         certainty: "confirmed",
         status: "due",
 
-        title:
-          "فحص الرحم الأولي مستحق",
+       title:
+  "تذكير بفحص الرحم الأولي",
 
-        message:
-          `الحيوان رقم ${animalNumber} عند ${daysInMilk} يومًا في الحليب، ولم يُسجّل له فحص الرحم الأولي.`,
+message:
+  `الحيوان رقم ${animalNumber} عند ${daysInMilk} يومًا في الحليب، وهذا توقيت مناسب للاطمئنان على تعافي الرحم بعد الولادة.`,
 
-        details: {
-          observation:
-            `أيام الحليب المسجّلة للحيوان: ${daysInMilk}، ولا يوجد فحص رحم أولي محفوظ.`,
+details: {
+  observation:
+    "لا توجد نتيجة فحص رحم أولي مسجّلة لهذه الدورة.",
 
-          meaning:
-            "هذه نافذة التذكير القصيرة للفحص الأولي، ولا تُنشئ التزامًا بعد انتهائها.",
+  meaning:
+    "هذا تذكير استشاري خلال نافذة قصيرة، ولا يفرض إجراء الفحص ولا يمنع أي إجراء آخر.",
 
-          recommendation:
-            "سجّل نتيجة الفحص إذا تم، أو اختر التذكير لاحقًا خلال نافذة الأيام الثلاثة.",
+  recommendation:
+    "يمكن تسجيل نتيجة الفحص إذا تم إجراؤه، أو اختيار «حسنًا» دون أي التزام.",
 
           evidence: [
             `رقم الحيوان: ${animalNumber}`,
@@ -42239,10 +42239,8 @@ async function murabbikUterineCheckAlertSourceSrv(
             `uterine-check.html?number=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(context.today)}`
         },
 
-       snoozeMinutes:
-  daysInMilk === 16
-    ? 3 * 60
-    : MURABBIK_UTERINE_CHECK_SNOOZE_MINUTES
+snoozeMinutes:
+  MURABBIK_UTERINE_CHECK_SNOOZE_MINUTES
       });
 
       continue;
@@ -42288,26 +42286,25 @@ async function murabbikUterineCheckAlertSourceSrv(
 
       status: "due",
 
-      title:
-        "متابعة فحص الرحم مستحقة",
+     title:
+  "تذكير بمتابعة فحص الرحم",
 
-      message:
-        initialMissing
-          ? `الحيوان رقم ${animalNumber} عند ${daysInMilk} يومًا في الحليب، ولم يُسجّل له فحص اليوم 14؛ لذلك ظهرت متابعة الرحم خلال نافذتها الحالية.`
-          : `الحيوان رقم ${animalNumber} عند ${daysInMilk} يومًا في الحليب، ونتيجة الفحص الأولي كانت: ${day14ResultOption.label}.`,
+message:
+  initialMissing
+    ? `الحيوان رقم ${animalNumber} عند ${daysInMilk} يومًا في الحليب، وهذه نافذة مناسبة لمتابعة الرحم بعد الولادة، مع عدم وجود نتيجة فحص أولي مسجّلة.`
+    : `الحيوان رقم ${animalNumber} عند ${daysInMilk} يومًا في الحليب، وكانت نتيجة الفحص الأولي: ${day14ResultOption.label}، وهذه نافذة مناسبة للمتابعة عند الحاجة.`,
 
-      details: {
-        observation:
-          initialMissing
-            ? "فحص اليوم 14 غير مسجّل، وفحص المتابعة غير مسجّل."
-            : `نتيجة فحص اليوم 14: ${day14ResultOption.label}، وفحص المتابعة غير مسجّل.`,
+details: {
+  observation:
+    initialMissing
+      ? "لا توجد نتيجة للفحص الأولي أو المتابعة مسجّلة لهذه الدورة."
+      : `نتيجة الفحص الأولي: ${day14ResultOption.label}، ولا توجد نتيجة متابعة مسجّلة.`,
 
-        meaning:
-          "هذا تذكير قصير لفحص المتابعة، وينتهي تلقائيًا بعد نافذة الأيام الثلاثة.",
+  meaning:
+    "هذا تذكير استشاري خلال نافذة قصيرة، ولا يفرض إجراء المتابعة ولا يمنع أي إجراء آخر.",
 
-        recommendation:
-          "سجّل فحص المتابعة إذا تم، أو اختر التذكير لاحقًا خلال النافذة الحالية.",
-
+  recommendation:
+    "يمكن تسجيل فحص المتابعة إذا تم إجراؤه، أو اختيار «حسنًا» دون أي التزام.",
         evidence: [
           `رقم الحيوان: ${animalNumber}`,
           `أيام الحليب: ${daysInMilk}`,
@@ -42333,10 +42330,8 @@ async function murabbikUterineCheckAlertSourceSrv(
           `uterine-check.html?number=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(context.today)}`
       },
 
-     snoozeMinutes:
-  daysInMilk === 32
-    ? 3 * 60
-    : MURABBIK_UTERINE_CHECK_SNOOZE_MINUTES
+snoozeMinutes:
+  MURABBIK_UTERINE_CHECK_SNOOZE_MINUTES
     });
   }
 
