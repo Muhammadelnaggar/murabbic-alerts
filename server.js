@@ -42342,7 +42342,403 @@ murabbikSmartAlertRegisterSourceSrv(
   "uterine_check_followup",
   murabbikUterineCheckAlertSourceSrv
 );
+// ============================================================
+//   SMART ALERT SOURCE: POSTPARTUM INSEMINATION FOLLOW-UP
+//   متابعة التلقيح بعد الولادة
+// ============================================================
 
+const MURABBIK_POSTPARTUM_AI_COW_DAYS = 60;
+const MURABBIK_POSTPARTUM_AI_BUFFALO_DAYS = 45;
+const MURABBIK_POSTPARTUM_AI_HEAT_CYCLE_MIN_DAYS = 18;
+const MURABBIK_POSTPARTUM_AI_HEAT_CYCLE_MAX_DAYS = 25;
+const MURABBIK_POSTPARTUM_AI_SNOOZE_MINUTES = 24 * 60;
+
+function murabbikPostpartumAiIsCulledSrv(doc = {}) {
+  const cullStatus = murabbikSmartAlertTextSrv(
+    doc.cullStatus
+  ).toLowerCase();
+
+  const repro = calvingStripArSrv(
+    String(
+      doc.reproductiveStatus ||
+      doc.reproStatus ||
+      ""
+    )
+      .replace(/[أإآ]/g, "ا")
+      .replace(/ة/g, "ه")
+      .replace(/ى/g, "ي")
+  );
+
+  return (
+    doc.breedingBlocked === true ||
+    cullStatus === "excluded" ||
+    cullStatus.includes("استبعاد") ||
+    repro.includes("لاتلقح") ||
+    repro.includes("استبعاد")
+  );
+}
+
+async function murabbikPostpartumAiAlertSourceSrv(context) {
+  const animals =
+    await murabbikSmartAlertAnimalsSrv(
+      context
+    );
+
+  const rows = [];
+
+  for (const doc of animals) {
+    const animalNumber =
+      murabbikDryOffAlertNumberSrv(
+        doc
+      );
+
+    if (!animalNumber) continue;
+
+    if (
+      murabbikPostpartumAiIsCulledSrv(
+        doc
+      )
+    ) {
+      continue;
+    }
+
+    const species =
+      murabbikCalvingOverdueSpeciesSrv(
+        doc
+      );
+
+    if (!species) continue;
+
+    const dueDays =
+      species.key === "buffalo"
+        ? MURABBIK_POSTPARTUM_AI_BUFFALO_DAYS
+        : MURABBIK_POSTPARTUM_AI_COW_DAYS;
+
+    const lastCalvingDate =
+      murabbikCalvingOverdueDateSrv(
+        doc.lastCalvingDate ||
+        doc.calvingDate ||
+        doc.lastCalving
+      );
+
+    if (!lastCalvingDate) continue;
+
+    const daysPostpartum =
+      calvingDaysBetweenSrv(
+        lastCalvingDate,
+        context.today
+      );
+
+    if (
+      !Number.isFinite(
+        daysPostpartum
+      ) ||
+      daysPostpartum < dueDays
+    ) {
+      continue;
+    }
+
+    const reproductiveStatus =
+      doc.reproductiveStatus ||
+      doc.reproStatus ||
+      "";
+
+    if (
+      pregnancyDiagnosisIsInseminatedStatusSrv(
+        reproductiveStatus
+      )
+    ) {
+      continue;
+    }
+
+    const lastInseminationDate =
+      murabbikCalvingOverdueDateSrv(
+        doc.lastInseminationDate ||
+        doc.lastAI ||
+        doc.lastInsemination ||
+        doc.lastServiceDate
+      );
+
+    if (
+      lastInseminationDate &&
+      lastInseminationDate >=
+        lastCalvingDate
+    ) {
+      continue;
+    }
+
+    // منع ازدواج فقط:
+    // لا نعرض إدخال التزامن لحيوان موجود
+    // بالفعل في برنامج تزامن نشط.
+    if (
+      ovsynchActiveProtocolBlockMessageSrv(
+        doc,
+        context.today
+      )
+    ) {
+      continue;
+    }
+
+    const lastHeatDate =
+      murabbikCalvingOverdueDateSrv(
+        doc.lastHeatDate ||
+        doc.heatDate ||
+        doc.lastEstrusDate
+      );
+
+    let daysSinceHeat = null;
+    let validHeatAfterCalving = "";
+
+    if (
+      lastHeatDate &&
+      lastHeatDate >=
+        lastCalvingDate
+    ) {
+      validHeatAfterCalving =
+        lastHeatDate;
+
+      daysSinceHeat =
+        calvingDaysBetweenSrv(
+          lastHeatDate,
+          context.today
+        );
+
+      const beforeReturnWindow =
+        Number.isFinite(
+          daysSinceHeat
+        ) &&
+        daysSinceHeat >= 0 &&
+        daysSinceHeat <
+          MURABBIK_POSTPARTUM_AI_HEAT_CYCLE_MIN_DAYS;
+
+      const insideReturnWindow =
+        Number.isFinite(
+          daysSinceHeat
+        ) &&
+        daysSinceHeat >=
+          MURABBIK_POSTPARTUM_AI_HEAT_CYCLE_MIN_DAYS &&
+        daysSinceHeat <=
+          MURABBIK_POSTPARTUM_AI_HEAT_CYCLE_MAX_DAYS;
+
+      // من تسجيل الشياع حتى نهاية اليوم 25
+      // لا يظهر التنبيه؛ لأن الحيوان ما زال
+      // داخل دورته ونافذة الرجوع 18–25 يومًا.
+      if (
+        beforeReturnWindow ||
+        insideReturnWindow
+      ) {
+        continue;
+      }
+    }
+
+    rows.push({
+      animalNumber,
+      dueDays,
+      lastCalvingDate,
+      daysPostpartum,
+
+      lastHeatDate:
+        validHeatAfterCalving,
+
+      daysSinceHeat:
+        Number.isFinite(
+          daysSinceHeat
+        )
+          ? daysSinceHeat
+          : null
+    });
+  }
+
+  if (!rows.length) return [];
+
+  rows.sort(
+    (a, b) =>
+      b.daysPostpartum -
+        a.daysPostpartum ||
+
+      String(
+        a.animalNumber
+      ).localeCompare(
+        String(
+          b.animalNumber
+        ),
+        "ar",
+        {
+          numeric: true
+        }
+      )
+  );
+
+  const animalNumbers = [
+    ...new Set(
+      rows.map(
+        row =>
+          row.animalNumber
+      )
+    )
+  ];
+
+  const count =
+    animalNumbers.length;
+
+  const single =
+    rows[0];
+
+  const revisionKey =
+    [...rows]
+      .sort(
+        (a, b) =>
+          String(
+            a.animalNumber
+          ).localeCompare(
+            String(
+              b.animalNumber
+            ),
+            "ar",
+            {
+              numeric: true
+            }
+          )
+      )
+      .map(row =>
+        [
+          row.animalNumber,
+          row.lastCalvingDate,
+          row.lastHeatDate ||
+            "no_heat"
+        ].join(":")
+      )
+      .join("|");
+
+  const evidence =
+    rows
+      .slice(0, 12)
+      .map(row =>
+        row.lastHeatDate &&
+        Number.isFinite(
+          row.daysSinceHeat
+        )
+          ? (
+              `الحيوان ${row.animalNumber}: ` +
+              `${row.daysPostpartum} يومًا بعد الولادة، ` +
+              `وآخر شياع منذ ${row.daysSinceHeat} يومًا.`
+            )
+          : (
+              `الحيوان ${row.animalNumber}: ` +
+              `${row.daysPostpartum} يومًا بعد الولادة، ` +
+              `ولا توجد دورة شياع مسجّلة.`
+            )
+      );
+
+  if (
+    rows.length >
+      evidence.length
+  ) {
+    evidence.push(
+      `و${rows.length - evidence.length} حيوان آخر.`
+    );
+  }
+
+  const singleHasOldHeat =
+    Boolean(
+      single.lastHeatDate
+    ) &&
+    Number.isFinite(
+      single.daysSinceHeat
+    );
+
+  const message =
+    count === 1
+      ? (
+          singleHasOldHeat
+            ? `الحيوان رقم ${single.animalNumber} وصل إلى ${single.daysPostpartum} يومًا بعد الولادة، ولم يُلقّح، ومرّ ${single.daysSinceHeat} يومًا على آخر شياع مسجّل.`
+            : `الحيوان رقم ${single.animalNumber} وصل إلى ${single.daysPostpartum} يومًا بعد الولادة، ولم يُلقّح، ولم تُسجّل له دورة شياع.`
+        )
+      : `يوجد ${count} حيوانات وصلت إلى متابعة التلقيح بعد الولادة، ولم تُلقّح، ولا توجد لها دورة شياع جارية.`;
+
+  const joinedNumbers =
+    animalNumbers.join(",");
+
+  return [{
+    identityKey:
+      "postpartum-insemination-followup",
+
+    revisionKey,
+
+    kind:
+      "operational",
+
+    domain:
+      "reproduction",
+
+    code:
+      "postpartum_insemination_followup",
+
+    priority:
+      "normal",
+
+    urgency:
+      "today",
+
+    certainty:
+      "confirmed",
+
+    status:
+      "due",
+
+    title:
+      "متابعة التلقيح بعد الولادة",
+
+    message,
+
+    details: {
+      observation:
+        count === 1
+          ? "يمكن مراجعة الحيوان وإدخاله في برنامج التزامن إذا كان مناسبًا."
+          : `الأرقام: ${animalNumbers.join("، ")}. يمكن مراجعة الحيوانات وإدخال المناسب منها في برنامج التزامن.`,
+
+      meaning:
+        "هذه متابعة تناسلية بعد الولادة، ولا تعني وجود مشكلة مؤكدة.",
+
+      recommendation:
+        count === 1
+          ? "يمكن مراجعة الحيوان وإدخاله في برنامج التزامن إذا كان مناسبًا."
+          : "يمكن مراجعة الحيوانات وإدخال المناسب منها في برنامج التزامن.",
+
+      evidence
+    },
+
+    dueDate:
+      context.today,
+
+    affectedCount:
+      count,
+
+    animalNumbers,
+
+    action: {
+      type:
+        "navigate",
+
+      label:
+        "فتح صفحة التزامن",
+
+      url:
+        `ovysynch.html?mbkMode=group` +
+        `&numbers=${encodeURIComponent(joinedNumbers)}` +
+        `&bulk=${encodeURIComponent(joinedNumbers)}` +
+        `&date=${encodeURIComponent(context.today)}`
+    },
+
+    snoozeMinutes:
+      MURABBIK_POSTPARTUM_AI_SNOOZE_MINUTES
+  }];
+}
+
+murabbikSmartAlertRegisterSourceSrv(
+  "postpartum_insemination_followup",
+  murabbikPostpartumAiAlertSourceSrv
+);
 // ============================================================
 //       SMART ALERT SOURCE: VACCINATION PROGRAM TASKS
 //       التحصين من نفس حاسب البيانات المستخدم في الراوت القائم
