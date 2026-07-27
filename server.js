@@ -42770,6 +42770,10 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
         farmTimeZone
       );
 
+    if (!Number.isFinite(dueAtMs)) {
+      return;
+    }
+
     const visibleFromMs =
       dueAtMs -
       (
@@ -42778,12 +42782,21 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
         1000
       );
 
-    if (
-      !Number.isFinite(dueAtMs) ||
-      context.nowMs < visibleFromMs
-    ) {
+    const isDayBefore =
+      dueDate === tomorrow &&
+      context.nowMs < visibleFromMs;
+
+    const isDueWindow =
+      context.nowMs >= visibleFromMs;
+
+    if (!isDayBefore && !isDueWindow) {
       return;
     }
+
+    const alertPhase =
+      isDueWindow
+        ? "due_window"
+        : "day_before";
 
     const animalNumber =
       calvingNormDigitsOnlySrv(
@@ -42822,6 +42835,7 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
       .slice(0, 10);
 
     const key = [
+      alertPhase,
       dueDate,
       plannedTime,
       program,
@@ -42833,6 +42847,7 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
 
     if (!groups.has(key)) {
       groups.set(key, {
+        alertPhase,
         dueDate,
         plannedTime,
         dueAtMs,
@@ -42871,6 +42886,9 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
     const isToday =
       group.dueDate === context.today;
 
+    const isDueWindow =
+      group.alertPhase === "due_window";
+
     const title =
       isToday
         ? "خطوة برنامج التزامن اليوم"
@@ -42896,6 +42914,7 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
 
     const identityKey = [
       "ovsynch_step",
+      group.alertPhase,
       group.dueDate,
       group.plannedTime,
       group.program,
@@ -42914,8 +42933,16 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
       domain: "reproduction",
       code: "ovsynch_step_due",
 
-      priority: "high",
-      urgency: "now",
+      priority:
+        isDueWindow
+          ? "high"
+          : "normal",
+
+      urgency:
+        isDueWindow
+          ? "now"
+          : "soon",
+
       certainty: "confirmed",
 
       status:
@@ -42930,12 +42957,15 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
       affectedCount: animalNumbers.length,
       animalNumbers,
 
-      action: {
-        type: "navigate",
-        label: "فتح صفحة التزامن",
-        url: actionUrl
-      },
+  action: {
+  type:
+    isDueWindow
+      ? "navigate"
+      : "none",
 
+  label: "فتح صفحة التزامن",
+  url: actionUrl
+},
       snoozeMinutes:
         MURABBIK_OVSYNCH_ALERT_SNOOZE_MINUTES
     });
@@ -42943,7 +42973,6 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
 
   return alerts;
 }
-
 murabbikSmartAlertRegisterSourceSrv(
   "ovsynch_protocol_steps",
   murabbikOvsynchStepSmartAlertSourceSrv
