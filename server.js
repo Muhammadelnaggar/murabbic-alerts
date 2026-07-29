@@ -42956,43 +42956,94 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
     );
   }
 
-  let message = "";
+ const postpartumNumbers =
+  rows
+    .filter(
+      row =>
+        row.reasonType ===
+          "postpartum_not_inseminated"
+    )
+    .map(
+      row =>
+        row.animalNumber
+    );
 
-  if (count === 1) {
-    if (
-      single.reasonType ===
-        "pregnancy_diagnosis_negative"
-    ) {
-      message =
-        `الحيوان رقم ${single.animalNumber} ثبت أنه فارغ بعد آخر تلقيح، ولم يبدأ له مسار تلقيح جديد أو برنامج تزامن.`;
-    } else if (
-      single.lastHeatDate &&
-      Number.isFinite(
-        single.daysSinceHeat
-      )
-    ) {
-      message =
-        `الحيوان رقم ${single.animalNumber} وصل إلى ${single.daysPostpartum} يومًا بعد الولادة، ولم يُلقّح، ومرّ ${single.daysSinceHeat} يومًا على آخر شياع مسجّل.`;
-    } else {
-      message =
-        `الحيوان رقم ${single.animalNumber} وصل إلى ${single.daysPostpartum} يومًا بعد الولادة، ولم يُلقّح، ولم تُسجّل له دورة شياع جارية.`;
-    }
-  } else if (
-    postpartumCount > 0 &&
-    diagnosisNegativeCount > 0
+const diagnosisNegativeNumbers =
+  rows
+    .filter(
+      row =>
+        row.reasonType ===
+          "pregnancy_diagnosis_negative"
+    )
+    .map(
+      row =>
+        row.animalNumber
+    );
+
+let message = "";
+
+if (count === 1) {
+  if (
+    single.reasonType ===
+      "pregnancy_diagnosis_negative"
   ) {
     message =
-      `يوجد ${count} حيوانات مفتوحة تحتاج متابعة التلقيح: ${postpartumCount} بعد الولادة دون تلقيح، و${diagnosisNegativeCount} ثبتت فارغة بعد تشخيص الحمل.`;
+      `لديك حيوان مفتوح يحتاج المتابعة لتلقيحه. ` +
+      `الحيوان رقم ${single.animalNumber} ثبت أنه فارغ في تشخيص الحمل، ` +
+      `ولم يبدأ له تلقيح جديد أو برنامج تزامن.`;
+
   } else if (
-    diagnosisNegativeCount > 0
+    single.lastHeatDate &&
+    Number.isFinite(
+      single.daysSinceHeat
+    )
   ) {
     message =
-      `يوجد ${diagnosisNegativeCount} حيوانات ثبتت فارغة بعد تشخيص الحمل، ولم يبدأ لها مسار تلقيح جديد أو برنامج تزامن.`;
+      `لديك حيوان مفتوح يحتاج المتابعة لتلقيحه. ` +
+      `الحيوان رقم ${single.animalNumber} تخطّى فترة الانتظار بعد الولادة دون تلقيح، ` +
+      `ومرّ ${single.daysSinceHeat} يومًا على آخر شياع مسجّل.`;
+
   } else {
     message =
-      `يوجد ${postpartumCount} حيوانات مفتوحة تجاوزت موعد متابعة التلقيح بعد الولادة، ولم تُلقّح.`;
+      `لديك حيوان مفتوح يحتاج المتابعة لتلقيحه. ` +
+      `الحيوان رقم ${single.animalNumber} تخطّى فترة الانتظار بعد الولادة ` +
+      `دون تسجيل تلقيح أو شياع.`;
   }
 
+} else {
+  const messageParts = [
+    `لديك ${count} حيوانات مفتوحة تحتاج المتابعة لتلقيحها.`
+  ];
+
+  if (
+    postpartumNumbers.length > 0
+  ) {
+    messageParts.push(
+      `الحيوانات ${postpartumNumbers.join("، ")} تخطّت فترة الانتظار بعد الولادة ` +
+      `دون تسجيل تلقيح، ولا توجد لها دورة شياع جارية.`
+    );
+  }
+
+  if (
+    diagnosisNegativeNumbers.length === 1
+  ) {
+    messageParts.push(
+      `${postpartumNumbers.length ? "والحيوان" : "الحيوان"} ` +
+      `${diagnosisNegativeNumbers[0]} ثبت أنه فارغ في تشخيص الحمل.`
+    );
+
+  } else if (
+    diagnosisNegativeNumbers.length > 1
+  ) {
+    messageParts.push(
+      `${postpartumNumbers.length ? "والحيوانات" : "الحيوانات"} ` +
+      `${diagnosisNegativeNumbers.join("، ")} ثبت أنها فارغة في تشخيص الحمل.`
+    );
+  }
+
+  message =
+    messageParts.join(" ");
+}
   const joinedNumbers =
     animalNumbers.join(",");
 
