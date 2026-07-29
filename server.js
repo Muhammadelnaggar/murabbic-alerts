@@ -42956,16 +42956,23 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
     );
   }
 
- const postpartumNumbers =
+const postpartumNumbers =
   rows
     .filter(
       row =>
         row.reasonType ===
-          "postpartum_not_inseminated"
+        "postpartum_not_inseminated"
     )
     .map(
       row =>
         row.animalNumber
+    )
+    .sort((a, b) =>
+      String(a).localeCompare(
+        String(b),
+        "ar",
+        { numeric: true }
+      )
     );
 
 const diagnosisNegativeNumbers =
@@ -42973,13 +42980,19 @@ const diagnosisNegativeNumbers =
     .filter(
       row =>
         row.reasonType ===
-          "pregnancy_diagnosis_negative"
+        "pregnancy_diagnosis_negative"
     )
     .map(
       row =>
         row.animalNumber
+    )
+    .sort((a, b) =>
+      String(a).localeCompare(
+        String(b),
+        "ar",
+        { numeric: true }
+      )
     );
-
 let message = "";
 
 if (count === 1) {
@@ -43041,8 +43054,8 @@ if (count === 1) {
     );
   }
 
-  message =
-    messageParts.join(" ");
+ message =
+  messageParts.join("\n");
 }
   const joinedNumbers =
     animalNumbers.join(",");
@@ -43080,10 +43093,7 @@ if (count === 1) {
     message,
 
     details: {
-      observation:
-        count === 1
-          ? evidence[0]
-          : `الأرقام: ${animalNumbers.join("، ")}.`,
+     observation: "",
 
       meaning:
         "يجمع هذا التنبيه الحيوانات المفتوحة التي تأخر تلقيحها بعد الولادة، أو ثبتت فارغة بعد تشخيص الحمل.",
