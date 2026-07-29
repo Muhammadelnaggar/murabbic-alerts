@@ -1,3 +1,4 @@
+
 // server.js — stable build, tenant-aware
 // ----------------------------------------------
 const path    = require('path');
@@ -21754,7 +21755,19 @@ app.get("/api/ovsynch/dashboard-alerts", requireUserId, async (req, res) => {
     req.authSession?.uid ||
     req.userId
   );
+        const yesterday = addDaysISOForOvsynchAlerts(today, -1);
     const tomorrow = addDaysISOForOvsynchAlerts(today, 1);
+
+    const farmClock = await farmTimeContextSrv(
+      req.authSession?.uid ||
+      req.userId
+    );
+
+    const farmTimeZone =
+      String(farmClock?.timeZone || "UTC").trim() ||
+      "UTC";
+
+    const nowMs = Date.now();
 
     const snap = await db.collection("tasks")
       .where("userId", "==", uid)
@@ -21777,8 +21790,61 @@ app.get("/api/ovsynch/dashboard-alerts", requireUserId, async (req, res) => {
 
       if (!isOvsynchTask) return;
 
-      const dueDate = String(t.dueDate || t.plannedDate || "").trim().slice(0, 10);
-      if (dueDate !== today && dueDate !== tomorrow) return;
+          const dueDate = String(t.dueDate || t.plannedDate || "").trim().slice(0, 10);
+
+      if (
+        dueDate !== yesterday &&
+        dueDate !== today &&
+        dueDate !== tomorrow
+      ) {
+        return;
+      }
+
+      const plannedTime =
+        murabbikOvsynchAlertTimeSrv(
+          t.plannedTime ||
+          String(t.plannedDateTime || "").slice(11, 16)
+        );
+
+      const dueAtMs =
+        murabbikOvsynchAlertDateTimeMsSrv(
+          dueDate,
+          plannedTime,
+          farmTimeZone
+        );
+
+      if (!Number.isFinite(dueAtMs)) return;
+
+      const visibleFromMs =
+        dueAtMs -
+        (
+          MURABBIK_OVSYNCH_ALERT_LEAD_MINUTES *
+          60 *
+          1000
+        );
+
+      const visibleUntilMs =
+        dueAtMs +
+        (
+          MURABBIK_OVSYNCH_ALERT_GRACE_MINUTES *
+          60 *
+          1000
+        );
+
+      const isDayBefore =
+        dueDate === tomorrow &&
+        nowMs < visibleFromMs;
+
+      const isDueWindow =
+        nowMs >= visibleFromMs &&
+        nowMs <= visibleUntilMs;
+
+      if (!isDayBefore && !isDueWindow) return;
+
+      const alertPhase =
+        isDueWindow
+          ? "due_window"
+          : "day_before";
 
       const animalNumber = normTaskNumberForOvsynchAlerts(t.animalNumber || t.number || "");
       if (!animalNumber) return;
@@ -21786,11 +21852,11 @@ app.get("/api/ovsynch/dashboard-alerts", requireUserId, async (req, res) => {
       const stepIndex = Number(t.stepIndex ?? 0) || 0;
       const stepDay = Number(t.stepDay ?? 0) || 0;
       const stepName = String(t.stepName || t.title || "خطوة التزامن").trim();
-      const plannedTime = String(t.plannedTime || "08:00").trim();
       const program = String(t.program || t.protocolProgram || "ovsynch").trim();
       const protocolStartDate = String(t.protocolStartDate || "").trim().slice(0, 10);
 
-      const key = [
+       const key = [
+        alertPhase,
         dueDate,
         plannedTime,
         program,
@@ -21799,9 +21865,11 @@ app.get("/api/ovsynch/dashboard-alerts", requireUserId, async (req, res) => {
         stepDay,
         stepName
       ].join("__");
-
+      
       if (!groups.has(key)) {
-        groups.set(key, {
+          groups.set(key, {
+          alertPhase,
+          dueDate,
           dueDate,
           plannedTime,
           program,
@@ -21822,12 +21890,14 @@ app.get("/api/ovsynch/dashboard-alerts", requireUserId, async (req, res) => {
       const nums = [...new Set(g.animalNumbers)].filter(Boolean).sort((a, b) => Number(a) - Number(b));
       if (!nums.length) continue;
 
-      const isToday = g.dueDate === today;
-      const title = isToday
+        const isDueWindow =
+        g.alertPhase === "due_window";
+
+      const title = isDueWindow
         ? "خطوة برنامج التزامن اليوم"
         : "خطوة برنامج التزامن غدًا";
 
-      const prefix = isToday ? "⏰ اليوم" : "📌 غدًا";
+      const prefix = isDueWindow ? "⏰ اليوم" : "📌 غدًا";
 
       const message =
         `${prefix} خطوة برنامج التزامن: ${g.stepName}\n` +
@@ -21846,7 +21916,7 @@ app.get("/api/ovsynch/dashboard-alerts", requireUserId, async (req, res) => {
         id: `ovsynch_${g.dueDate}_${g.stepIndex}_${g.protocolStartDate || "no_start"}`,
         source: "server:/api/ovsynch/dashboard-alerts",
         type: "ovsynch_step",
-        level: isToday ? "warn" : "info",
+        level: isDueWindow ? "warn" : "info",
         title,
         message,
         actionText: "فتح صفحة التزامن",
@@ -42989,11 +43059,11 @@ murabbikSmartAlertRegisterSourceSrv(
   "vaccination_program_tasks",
   murabbikVaccinationProgramAlertSourceSrv
 );
-// ============================================================
 // SMART ALERT SOURCE: OVSYNCH STEPS — موعد باليوم والساعة
-// يظهر قبل الموعد بساعتين، و«ذكّرني لاحقًا» = 30 دقيقة
+// يظهر من ساعتين قبل الموعد حتى ساعتين بعده، و«ذكّرني لاحقًا» = 30 دقيقة
 // ============================================================
 const MURABBIK_OVSYNCH_ALERT_LEAD_MINUTES = 120;
+const MURABBIK_OVSYNCH_ALERT_GRACE_MINUTES = 120;
 const MURABBIK_OVSYNCH_ALERT_SNOOZE_MINUTES = 30;
 
 function murabbikOvsynchAlertTimeSrv(value) {
@@ -43083,6 +43153,12 @@ function murabbikOvsynchAlertDateTimeMsSrv(dateISO, timeText, timeZone) {
 }
 
 async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
+  const yesterday =
+    addDaysToIsoDateSrv(
+      context.today,
+      -1
+    );
+
   const tomorrow =
     addDaysToIsoDateSrv(
       context.today,
@@ -43138,7 +43214,8 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
       .trim()
       .slice(0, 10);
 
-    if (
+      if (
+      dueDate !== yesterday &&
       dueDate !== context.today &&
       dueDate !== tomorrow
     ) {
@@ -43173,13 +43250,21 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
         1000
       );
 
+    const visibleUntilMs =
+      dueAtMs +
+      (
+        MURABBIK_OVSYNCH_ALERT_GRACE_MINUTES *
+        60 *
+        1000
+      );
+
     const isDayBefore =
       dueDate === tomorrow &&
       context.nowMs < visibleFromMs;
 
     const isDueWindow =
-      context.nowMs >= visibleFromMs;
-
+      context.nowMs >= visibleFromMs &&
+      context.nowMs <= visibleUntilMs;
     if (!isDayBefore && !isDueWindow) {
       return;
     }
@@ -43274,22 +43359,18 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
 
     if (!animalNumbers.length) continue;
 
-    const isToday =
-      group.dueDate === context.today;
-
-    const isDueWindow =
+       const isDueWindow =
       group.alertPhase === "due_window";
 
     const title =
-      isToday
+      isDueWindow
         ? "خطوة برنامج التزامن اليوم"
         : "خطوة برنامج التزامن غدًا";
 
     const prefix =
-      isToday
+      isDueWindow
         ? "⏰ اليوم"
         : "📌 غدًا";
-
     const message =
       `${prefix} خطوة برنامج التزامن: ${group.stepName}\n` +
       `للحيوانات أرقام: ${animalNumbers.join("، ")}\n` +
