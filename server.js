@@ -16496,12 +16496,21 @@ async function updateAnimalByPregnancyDiagnosisSrv(ev = {}) {
   const result = normalizePregnancyResultSrv(ev.result);
   const eventDate = String(ev.eventDate || "").trim().slice(0, 10);
 
-  const patch = {
-    lastDiagnosis: "تشخيص حمل",
-    lastDiagnosisDate: eventDate,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    status: "active"
-  };
+  const animalPatch = {
+  lastDiagnosis: "تشخيص حمل",
+  lastDiagnosisDate: eventDate,
+
+  lastPregnancyDiagnosisDate: eventDate,
+  lastPregnancyDiagnosisResult: result,
+  lastPregnancyDiagnosisEventId: eventRef.id,
+  lastPregnancyDiagnosisCheckType:
+    isConfirmation120
+      ? "pregnancy_confirmation_120"
+      : "initial_pregnancy_diagnosis",
+
+  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  status: "active"
+};
 
   if (result === "عشار") {
     patch.reproductiveStatus = "عشار";
@@ -17014,12 +17023,21 @@ const embryonicLossRef = needsEmbryonicLoss
     }
     batch.set(eventRef, payload);
 
-    const animalPatch = {
-      lastDiagnosis: "تشخيص حمل",
-      lastDiagnosisDate: eventDate,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: "active"
-    };
+  const animalPatch = {
+  lastDiagnosis: "تشخيص حمل",
+  lastDiagnosisDate: eventDate,
+
+  lastPregnancyDiagnosisDate: eventDate,
+  lastPregnancyDiagnosisResult: result,
+  lastPregnancyDiagnosisEventId: eventRef.id,
+  lastPregnancyDiagnosisCheckType:
+    isConfirmation120
+      ? "pregnancy_confirmation_120"
+      : "initial_pregnancy_diagnosis",
+
+  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  status: "active"
+};
 
     if (result === "عشار") {
       animalPatch.reproductiveStatus = "عشار";
@@ -17056,10 +17074,16 @@ const embryonicLossRef = needsEmbryonicLoss
     return res.json({
       ok: true,
 message: isConfirmation120
-  ? (result === "فارغة"
-      ? `✅ تم حفظ نتيجة تأكيد الحمل للحيوان رقم ${animalNumber} وتسجيل فقد أجنة.`
-      : `✅ تم تأكيد الحمل بعد 120 يومًا للحيوان رقم ${animalNumber}.`)
-  : `✅ تم حفظ تشخيص الحمل للحيوان رقم ${animalNumber}: ${result}.`,
+  ? (
+      result === "فارغة"
+        ? `✅ تم حفظ نتيجة تأكيد الحمل للحيوان رقم ${animalNumber} وتسجيل فقد أجنة.`
+        : `✅ تم تأكيد الحمل بعد 120 يومًا للحيوان رقم ${animalNumber}.`
+    )
+  : (
+      result === "فارغة"
+        ? `✅ تم حفظ تشخيص الحمل للحيوان رقم ${animalNumber}: فارغة، وأُضيف إلى متابعة تلقيح الحيوانات المفتوحة.`
+        : `✅ تم حفظ تشخيص الحمل للحيوان رقم ${animalNumber}: ${result}.`
+    ),
       id: eventRef.id,
       eventId: eventRef.id,
 
@@ -20714,12 +20738,20 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
     if (saved.length && typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "pregnancy_diagnosis_bulk_save");
     }
-
+    const openFollowupCount =
+  saved.filter(item =>
+    item.result === "فارغة" &&
+    item.pregnancyConfirmation120 !== true
+  ).length;
     return res.json({
       ok: true,
-      message: saved.length
-        ? `✅ تم حفظ تشخيص الحمل لعدد ${saved.length} حيوان.`
-        : "❌ لم يتم حفظ أي تشخيص حمل — كل الأرقام غير مؤهلة.",
+     message: saved.length
+  ? (
+      openFollowupCount > 0
+        ? `✅ تم حفظ تشخيص الحمل لعدد ${saved.length} حيوان، وتم تحويل الحيوانات الفارغة (${openFollowupCount}) إلى متابعة تلقيح الحيوانات المفتوحة.`
+        : `✅ تم حفظ تشخيص الحمل لعدد ${saved.length} حيوان.`
+    )
+  : "❌ لم يتم حفظ أي تشخيص حمل — كل الأرقام غير مؤهلة.",
       savedCount: saved.length,
       rejectedCount: rejected.length,
       saved,
@@ -42462,11 +42494,67 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
         doc
       );
 
+    const status =
+      murabbikSmartAlertTextSrv(
+        doc.status || "active"
+      ).toLowerCase();
+
     if (!animalNumber) continue;
+
+    if (
+      ["inactive", "archived"]
+        .includes(status)
+    ) {
+      continue;
+    }
+
+    if (
+      murabbikSmartAlertTextSrv(
+        doc.entryType
+      ).toLowerCase() === "followers"
+    ) {
+      continue;
+    }
 
     if (
       murabbikPostpartumAiIsCulledSrv(
         doc
+      )
+    ) {
+      continue;
+    }
+
+    const reproductiveStatus =
+      doc.reproductiveStatus ||
+      doc.reproStatus ||
+      "";
+
+    if (
+      pregnancyDiagnosisIsInseminatedStatusSrv(
+        reproductiveStatus
+      ) ||
+      pregnancyDiagnosisIsPregnantStatusSrv(
+        reproductiveStatus
+      )
+    ) {
+      continue;
+    }
+
+    const reproNorm =
+      calvingStripArSrv(
+        reproductiveStatus
+      );
+
+    const isOpen =
+      reproNorm.includes("مفتوح") ||
+      reproNorm.includes("فارغ");
+
+    // لا نعرض الحيوان إذا دخل فعلًا
+    // في برنامج تزامن نشط.
+    if (
+      ovsynchActiveProtocolBlockMessageSrv(
+        doc,
+        context.today
       )
     ) {
       continue;
@@ -42491,35 +42579,13 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
         doc.lastCalving
       );
 
-    if (!lastCalvingDate) continue;
-
     const daysPostpartum =
-      calvingDaysBetweenSrv(
-        lastCalvingDate,
-        context.today
-      );
-
-    if (
-      !Number.isFinite(
-        daysPostpartum
-      ) ||
-      daysPostpartum < dueDays
-    ) {
-      continue;
-    }
-
-    const reproductiveStatus =
-      doc.reproductiveStatus ||
-      doc.reproStatus ||
-      "";
-
-    if (
-      pregnancyDiagnosisIsInseminatedStatusSrv(
-        reproductiveStatus
-      )
-    ) {
-      continue;
-    }
+      lastCalvingDate
+        ? calvingDaysBetweenSrv(
+            lastCalvingDate,
+            context.today
+          )
+        : null;
 
     const lastInseminationDate =
       murabbikCalvingOverdueDateSrv(
@@ -42529,24 +42595,165 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
         doc.lastServiceDate
       );
 
-    if (
-      lastInseminationDate &&
-      lastInseminationDate >=
-        lastCalvingDate
-    ) {
-      continue;
-    }
+    const lastDiagnosisDate =
+      murabbikCalvingOverdueDateSrv(
+        doc.lastPregnancyDiagnosisDate ||
+        doc.lastDiagnosisDate
+      );
 
-    // منع ازدواج فقط:
-    // لا نعرض إدخال التزامن لحيوان موجود
-    // بالفعل في برنامج تزامن نشط.
-    if (
-      ovsynchActiveProtocolBlockMessageSrv(
-        doc,
-        context.today
-      )
-    ) {
-      continue;
+    const lastDiagnosisResult =
+      normalizePregnancyResultSrv(
+        doc.lastPregnancyDiagnosisResult ||
+        ""
+      );
+
+    const lastDiagnosisCheckType =
+      murabbikSmartAlertTextSrv(
+        doc.lastPregnancyDiagnosisCheckType
+      );
+
+    const lastConfirmationDate =
+      murabbikCalvingOverdueDateSrv(
+        doc.lastPregnancyConfirmation120Date
+      );
+
+    const lastConfirmationResult =
+      murabbikSmartAlertTextSrv(
+        doc.lastPregnancyConfirmation120Result
+      ).toLowerCase();
+
+    const lastAbortionDate =
+      murabbikCalvingOverdueDateSrv(
+        doc.lastAbortionDate ||
+        doc.abortionDate
+      );
+
+    const diagnosisAfterService =
+      lastInseminationDate &&
+      lastDiagnosisDate
+        ? calvingDaysBetweenSrv(
+            lastInseminationDate,
+            lastDiagnosisDate
+          )
+        : null;
+
+    const pregnancyEndedAfterService =
+      Boolean(
+        lastInseminationDate &&
+        (
+          (
+            lastCalvingDate &&
+            lastCalvingDate >
+              lastInseminationDate
+          ) ||
+          (
+            lastAbortionDate &&
+            lastAbortionDate >
+              lastInseminationDate
+          )
+        )
+      );
+
+    const hasExplicitDiagnosisResult =
+      Boolean(
+        murabbikSmartAlertTextSrv(
+          doc.lastPregnancyDiagnosisResult
+        )
+      );
+
+    const explicitInitialNegative =
+      isOpen &&
+      lastDiagnosisResult === "فارغة" &&
+      lastDiagnosisCheckType !==
+        "pregnancy_confirmation_120" &&
+      Number.isFinite(
+        diagnosisAfterService
+      ) &&
+      diagnosisAfterService >= 0 &&
+      !pregnancyEndedAfterService;
+
+    // توافق مع الحيوانات القديمة التي حُفظ لها
+    // تاريخ التشخيص قبل إضافة الحقول الصريحة.
+    const confirmationNegativeCoversDiagnosis =
+      lastConfirmationResult === "negative" &&
+      lastConfirmationDate &&
+      lastDiagnosisDate &&
+      lastConfirmationDate >=
+        lastDiagnosisDate;
+
+    const legacyInitialNegative =
+      !hasExplicitDiagnosisResult &&
+      isOpen &&
+      Number.isFinite(
+        diagnosisAfterService
+      ) &&
+      diagnosisAfterService >= 0 &&
+      !confirmationNegativeCoversDiagnosis &&
+      !pregnancyEndedAfterService;
+
+    const diagnosedEmpty =
+      explicitInitialNegative ||
+      legacyInitialNegative;
+
+    let reasonType = "";
+    let reasonDate = "";
+    let followupAgeDays = null;
+
+    if (diagnosedEmpty) {
+      const daysSinceDiagnosis =
+        calvingDaysBetweenSrv(
+          lastDiagnosisDate,
+          context.today
+        );
+
+      if (
+        !Number.isFinite(
+          daysSinceDiagnosis
+        ) ||
+        daysSinceDiagnosis < 0
+      ) {
+        continue;
+      }
+
+      reasonType =
+        "pregnancy_diagnosis_negative";
+
+      reasonDate =
+        lastDiagnosisDate;
+
+      followupAgeDays =
+        daysSinceDiagnosis;
+
+    } else {
+      if (!lastCalvingDate) continue;
+
+      if (
+        !Number.isFinite(
+          daysPostpartum
+        ) ||
+        daysPostpartum < dueDays
+      ) {
+        continue;
+      }
+
+      // وجود تلقيح بعد الولادة يخرج الحيوان
+      // من مسار التأخر بعد الولادة.
+      if (
+        lastInseminationDate &&
+        lastInseminationDate >=
+          lastCalvingDate
+      ) {
+        continue;
+      }
+
+      reasonType =
+        "postpartum_not_inseminated";
+
+      reasonDate =
+        lastCalvingDate;
+
+      followupAgeDays =
+        daysPostpartum - dueDays;
     }
 
     const lastHeatDate =
@@ -42557,14 +42764,14 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
       );
 
     let daysSinceHeat = null;
-    let validHeatAfterCalving = "";
+    let validHeatAfterReason = "";
 
     if (
       lastHeatDate &&
-      lastHeatDate >=
-        lastCalvingDate
+      reasonDate &&
+      lastHeatDate >= reasonDate
     ) {
-      validHeatAfterCalving =
+      validHeatAfterReason =
         lastHeatDate;
 
       daysSinceHeat =
@@ -42573,29 +42780,16 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
           context.today
         );
 
-      const beforeReturnWindow =
+      // من يوم تسجيل الشياع حتى نهاية اليوم 25:
+      // الحيوان داخل دورة شياع قائمة أو نافذة رجوع،
+      // فلا يظهر تنبيه المتابعة.
+      if (
         Number.isFinite(
           daysSinceHeat
         ) &&
         daysSinceHeat >= 0 &&
-        daysSinceHeat <
-          MURABBIK_POSTPARTUM_AI_HEAT_CYCLE_MIN_DAYS;
-
-      const insideReturnWindow =
-        Number.isFinite(
-          daysSinceHeat
-        ) &&
-        daysSinceHeat >=
-          MURABBIK_POSTPARTUM_AI_HEAT_CYCLE_MIN_DAYS &&
         daysSinceHeat <=
-          MURABBIK_POSTPARTUM_AI_HEAT_CYCLE_MAX_DAYS;
-
-      // من تسجيل الشياع حتى نهاية اليوم 25
-      // لا يظهر التنبيه؛ لأن الحيوان ما زال
-      // داخل دورته ونافذة الرجوع 18–25 يومًا.
-      if (
-        beforeReturnWindow ||
-        insideReturnWindow
+          MURABBIK_POSTPARTUM_AI_HEAT_CYCLE_MAX_DAYS
       ) {
         continue;
       }
@@ -42603,12 +42797,22 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
 
     rows.push({
       animalNumber,
+      reasonType,
+      reasonDate,
+      followupAgeDays,
+
       dueDays,
       lastCalvingDate,
-      daysPostpartum,
+      daysPostpartum:
+        Number.isFinite(daysPostpartum)
+          ? daysPostpartum
+          : null,
+
+      lastInseminationDate,
+      lastDiagnosisDate,
 
       lastHeatDate:
-        validHeatAfterCalving,
+        validHeatAfterReason,
 
       daysSinceHeat:
         Number.isFinite(
@@ -42619,12 +42823,14 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
     });
   }
 
-  if (!rows.length) return [];
+  if (!rows.length) {
+    return [];
+  }
 
   rows.sort(
     (a, b) =>
-      b.daysPostpartum -
-        a.daysPostpartum ||
+      b.followupAgeDays -
+        a.followupAgeDays ||
 
       String(
         a.animalNumber
@@ -42651,6 +42857,20 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
   const count =
     animalNumbers.length;
 
+  const postpartumCount =
+    rows.filter(
+      row =>
+        row.reasonType ===
+          "postpartum_not_inseminated"
+    ).length;
+
+  const diagnosisNegativeCount =
+    rows.filter(
+      row =>
+        row.reasonType ===
+          "pregnancy_diagnosis_negative"
+    ).length;
+
   const single =
     rows[0];
 
@@ -42673,7 +42893,8 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
       .map(row =>
         [
           row.animalNumber,
-          row.lastCalvingDate,
+          row.reasonType,
+          row.reasonDate,
           row.lastHeatDate ||
             "no_heat"
         ].join(":")
@@ -42683,22 +42904,48 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
   const evidence =
     rows
       .slice(0, 12)
-      .map(row =>
-        row.lastHeatDate &&
-        Number.isFinite(
-          row.daysSinceHeat
-        )
-          ? (
-              `الحيوان ${row.animalNumber}: ` +
-              `${row.daysPostpartum} يومًا بعد الولادة، ` +
-              `وآخر شياع منذ ${row.daysSinceHeat} يومًا.`
+      .map(row => {
+        if (
+          row.reasonType ===
+            "pregnancy_diagnosis_negative"
+        ) {
+          const heatText =
+            row.lastHeatDate &&
+            Number.isFinite(
+              row.daysSinceHeat
             )
-          : (
-              `الحيوان ${row.animalNumber}: ` +
-              `${row.daysPostpartum} يومًا بعد الولادة، ` +
-              `ولا توجد دورة شياع مسجّلة.`
-            )
-      );
+              ? `، وآخر شياع مسجّل منذ ${row.daysSinceHeat} يومًا`
+              : "";
+
+          return (
+            `الحيوان ${row.animalNumber}: ` +
+            `ثبت أنه فارغ في تشخيص الحمل بتاريخ ${row.lastDiagnosisDate}` +
+            (
+              row.lastInseminationDate
+                ? ` بعد آخر تلقيح بتاريخ ${row.lastInseminationDate}`
+                : ""
+            ) +
+            `${heatText}.`
+          );
+        }
+
+        return (
+          row.lastHeatDate &&
+          Number.isFinite(
+            row.daysSinceHeat
+          )
+            ? (
+                `الحيوان ${row.animalNumber}: ` +
+                `${row.daysPostpartum} يومًا بعد الولادة، ` +
+                `وآخر شياع مسجّل منذ ${row.daysSinceHeat} يومًا.`
+              )
+            : (
+                `الحيوان ${row.animalNumber}: ` +
+                `${row.daysPostpartum} يومًا بعد الولادة، ` +
+                `ولم يُلقّح ولم تُسجّل له دورة شياع جارية.`
+              )
+        );
+      });
 
   if (
     rows.length >
@@ -42709,22 +42956,42 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
     );
   }
 
-  const singleHasOldHeat =
-    Boolean(
-      single.lastHeatDate
-    ) &&
-    Number.isFinite(
-      single.daysSinceHeat
-    );
+  let message = "";
 
-  const message =
-    count === 1
-      ? (
-          singleHasOldHeat
-            ? `الحيوان رقم ${single.animalNumber} وصل إلى ${single.daysPostpartum} يومًا بعد الولادة، ولم يُلقّح، ومرّ ${single.daysSinceHeat} يومًا على آخر شياع مسجّل.`
-            : `الحيوان رقم ${single.animalNumber} وصل إلى ${single.daysPostpartum} يومًا بعد الولادة، ولم يُلقّح، ولم تُسجّل له دورة شياع.`
-        )
-      : `يوجد ${count} حيوانات وصلت إلى متابعة التلقيح بعد الولادة، ولم تُلقّح، ولا توجد لها دورة شياع جارية.`;
+  if (count === 1) {
+    if (
+      single.reasonType ===
+        "pregnancy_diagnosis_negative"
+    ) {
+      message =
+        `الحيوان رقم ${single.animalNumber} ثبت أنه فارغ بعد آخر تلقيح، ولم يبدأ له مسار تلقيح جديد أو برنامج تزامن.`;
+    } else if (
+      single.lastHeatDate &&
+      Number.isFinite(
+        single.daysSinceHeat
+      )
+    ) {
+      message =
+        `الحيوان رقم ${single.animalNumber} وصل إلى ${single.daysPostpartum} يومًا بعد الولادة، ولم يُلقّح، ومرّ ${single.daysSinceHeat} يومًا على آخر شياع مسجّل.`;
+    } else {
+      message =
+        `الحيوان رقم ${single.animalNumber} وصل إلى ${single.daysPostpartum} يومًا بعد الولادة، ولم يُلقّح، ولم تُسجّل له دورة شياع جارية.`;
+    }
+  } else if (
+    postpartumCount > 0 &&
+    diagnosisNegativeCount > 0
+  ) {
+    message =
+      `يوجد ${count} حيوانات مفتوحة تحتاج متابعة التلقيح: ${postpartumCount} بعد الولادة دون تلقيح، و${diagnosisNegativeCount} ثبتت فارغة بعد تشخيص الحمل.`;
+  } else if (
+    diagnosisNegativeCount > 0
+  ) {
+    message =
+      `يوجد ${diagnosisNegativeCount} حيوانات ثبتت فارغة بعد تشخيص الحمل، ولم يبدأ لها مسار تلقيح جديد أو برنامج تزامن.`;
+  } else {
+    message =
+      `يوجد ${postpartumCount} حيوانات مفتوحة تجاوزت موعد متابعة التلقيح بعد الولادة، ولم تُلقّح.`;
+  }
 
   const joinedNumbers =
     animalNumbers.join(",");
@@ -42757,23 +43024,23 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
       "due",
 
     title:
-      "متابعة التلقيح بعد الولادة",
+      "متابعة تلقيح الحيوانات المفتوحة",
 
     message,
 
     details: {
       observation:
         count === 1
-          ? "يمكن مراجعة الحيوان وإدخاله في برنامج التزامن إذا كان مناسبًا."
-          : `الأرقام: ${animalNumbers.join("، ")}. يمكن مراجعة الحيوانات وإدخال المناسب منها في برنامج التزامن.`,
+          ? evidence[0]
+          : `الأرقام: ${animalNumbers.join("، ")}.`,
 
       meaning:
-        "هذه متابعة تناسلية بعد الولادة، ولا تعني وجود مشكلة مؤكدة.",
+        "يجمع هذا التنبيه الحيوانات المفتوحة التي تأخر تلقيحها بعد الولادة، أو ثبتت فارغة بعد تشخيص الحمل.",
 
       recommendation:
         count === 1
-          ? "يمكن مراجعة الحيوان وإدخاله في برنامج التزامن إذا كان مناسبًا."
-          : "يمكن مراجعة الحيوانات وإدخال المناسب منها في برنامج التزامن.",
+          ? "راجع الحيوان، ويمكن إدخاله في برنامج التزامن إذا كان مناسبًا."
+          : "راجع الحيوانات، وأدخل المناسب منها في برنامج التزامن.",
 
       evidence
     },
@@ -42791,7 +43058,7 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
         "navigate",
 
       label:
-        "فتح صفحة التزامن",
+        "دخول برنامج تزامن",
 
       url:
         `ovysynch.html?mbkMode=group` +
@@ -42804,7 +43071,6 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
       MURABBIK_POSTPARTUM_AI_SNOOZE_MINUTES
   }];
 }
-
 murabbikSmartAlertRegisterSourceSrv(
   "postpartum_insemination_followup",
   murabbikPostpartumAiAlertSourceSrv
