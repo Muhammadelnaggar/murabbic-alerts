@@ -21512,7 +21512,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
       const sp = normalizeOvsynchSpecies(doc, fd.species);
       const w = ovsynchAnimalWord(sp);
 
-      const rsRaw = String(fd.reproStatusFromEvents || doc.reproductiveStatus || "").trim();
+      const rsRaw = String(doc.reproductiveStatus || fd.reproStatusFromEvents || "").trim();
       const cat = ovsynchReproCategory(rsRaw);
       const shownStatus = rsRaw ? `«${rsRaw}»` : "غير معروفة";
 
@@ -21639,7 +21639,7 @@ if (activeProtocolMsg) return activeProtocolMsg;
         animalNumber,
         animalId: animal.id || "",
         species,
-        reproductiveStatus: reproFromEvents || String(doc.reproductiveStatus || "").trim() || ""
+       reproductiveStatus: String(doc.reproductiveStatus || "").trim() || reproFromEvents || ""
       });
     }
 
