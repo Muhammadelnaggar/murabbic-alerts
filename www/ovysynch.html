@@ -561,7 +561,7 @@ const startISO =
 
       try {
         setTimeout(() => {
-          location.href = "/dashboard.html";
+          location.href = data.redirectUrl || "/dashboard.html";
         }, 700);
       } catch {}
 
