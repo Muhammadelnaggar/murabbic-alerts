@@ -17081,8 +17081,7 @@ const embryonicLossRef = needsEmbryonicLoss
       scheduleGroupsRebuildSrv(uid, "pregnancy_diagnosis_save");
     }
 
-   const isInitialNegative =
-  !isConfirmation120 &&
+ const isInitialNegative =
   result === "فارغة";
 
 const responseActions =
@@ -20831,8 +20830,7 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
     }
 const initialNegativeItems =
   saved.filter(item =>
-    item.result === "فارغة" &&
-    item.pregnancyConfirmation120 !== true
+    item.result === "فارغة"
   );
 
 const isConfirmationBatch =
