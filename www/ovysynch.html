@@ -602,9 +602,16 @@ const startISO =
         })
       });
 
-      showInfoMessage(data.message || "✅ تم التسجيل بنجاح", "ok");
-      clearWarn();
-      syncCentral();
+  showInfoMessage(data.message || "✅ تم التسجيل بنجاح", "ok");
+clearWarn();
+syncCentral();
+
+requestAnimationFrame(() => {
+  infoEl.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+});
 
     } catch (err) {
       const data = err?.data || {};
