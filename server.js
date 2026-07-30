@@ -42688,7 +42688,7 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
 
   if (sorted.length > evidence.length) {
     evidence.push(
-      `و${sorted.length - evidence.length} حيوان آخر ضمن دفعة السبت.`
+     `و${sorted.length - evidence.length} حيوان آخر مستحق لتأكيد الحمل.`
     );
   }
 
@@ -42713,25 +42713,24 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
     title:
       count === 1
         ? "موعد تأكيد الحمل"
-        : "دفعة تأكيد الحمل الأسبوعية",
+       : "حيوانات مستحقة لتأكيد الحمل",
 
-    message:
-      count === 1
-        ? `الحيوان رقم ${animalNumbers[0]} ضمن دفعة السبت المستحقة لتأكيد استمرار الحمل.`
-        : `يوجد ${count} حيوانات ضمن دفعة السبت المستحقة لتأكيد استمرار الحمل.`,
+   message:
+  count === 1
+    ? `الحيوان رقم ${animalNumbers[0]} مستحق لتأكيد استمرار الحمل.`
+    : `يوجد ${count} حيوانات مستحقة لتأكيد استمرار الحمل.`,
 
     details: {
-      observation:
-        count === 1
-          ? `الدفعة الأسبوعية بتاريخ ${batchSaturday}، والحيوان رقم ${animalNumbers[0]}.`
-          : `الدفعة الأسبوعية بتاريخ ${batchSaturday}.
-أرقام الحيوانات: ${animalNumbers.join("، ")}.`,
+  observation:
+  count === 1
+    ? `الحيوان رقم ${animalNumbers[0]} مستحق لتأكيد الحمل.`
+    : `أرقام الحيوانات: ${animalNumbers.join("، ")}.`,
 
       meaning:
         "تجميع تأكيدات الحمل أسبوعيًا يقلل الإزعاج ويساعد على تنفيذ الفحص في جلسة واحدة منظمة.",
 
       recommendation:
-        "راجع حيوانات دفعة السبت وسجّل نتيجة تأكيد الحمل، أو اختر التذكير لاحقًا إذا كنت ستنفذ الفحص ولم يتوفر الوقت الآن.",
+        "راجع الحيوانات المستحقة وسجّل نتيجة تأكيد الحمل، أو اختر التذكير لاحقًا إذا كنت ستنفذ الفحص ولم يتوفر الوقت الآن.",
 
       evidence
     },
