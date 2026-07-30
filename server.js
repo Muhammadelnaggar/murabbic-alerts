@@ -20855,48 +20855,57 @@ const initialPositiveNumbers =
 
 const initialPositiveMessage =
   initialPositiveItems.length
-    ? [
+    ? (
         isConfirmationBatch
           ? (
               initialPositiveItems.length === 1
-                ? "✅ تم تأكيد استمرار الحمل لحيوان واحد."
-                : `✅ تم تأكيد استمرار الحمل لـ${initialPositiveItems.length} حيوانات.`
+                ? `✅ تم تسجيل تأكيد الحمل للحيوان رقم ${initialPositiveNumbers[0]}.`
+                : [
+                    `✅ تم تسجيل تأكيد الحمل لـ${initialPositiveItems.length} حيوانات.`,
+                    `الأرقام: ${initialPositiveNumbers.join("، ")}.`
+                  ].join("\n")
             )
-          : (
+          : [
               initialPositiveItems.length === 1
                 ? "✅ تم حفظ تشخيص الحمل لحيوان واحد عشار."
-                : `✅ تم حفظ تشخيص الحمل لـ${initialPositiveItems.length} حيوانات عشار.`
-            ),
+                : `✅ تم حفظ تشخيص الحمل لـ${initialPositiveItems.length} حيوانات عشار.`,
 
-        initialPositiveNumbers.length === 1
-          ? `الرقم: ${initialPositiveNumbers[0]}.`
-          : `الأرقام: ${initialPositiveNumbers.join("، ")}.`
-      ].join("\n")
+              initialPositiveNumbers.length === 1
+                ? `الرقم: ${initialPositiveNumbers[0]}.`
+                : `الأرقام: ${initialPositiveNumbers.join("، ")}.`
+            ].join("\n")
+      )
     : "";
 
 const initialNegativeMessage =
   initialNegativeItems.length
-    ? [
+    ? (
         isConfirmationBatch
           ? (
               initialNegativeItems.length === 1
-                ? "ثبت أن حيوانًا واحدًا فارغًا في تأكيد الحمل، وتم تسجيل فقد أجنة."
-                : `ثبت أن ${initialNegativeItems.length} حيوانات فارغة في تأكيد الحمل، وتم تسجيل فقد الأجنة.`
+                ? [
+                    `لم يتأكد حمل الحيوان رقم ${initialNegativeNumbers[0]}، وتم تسجيل فقد أجنة له.`,
+                    "هل تريد بدء برنامج تزامن له؟"
+                  ].join("\n")
+                : [
+                    `لم يتأكد حمل ${initialNegativeItems.length} حيوانات، وتم تسجيل فقد أجنة لها.`,
+                    `الأرقام: ${initialNegativeNumbers.join("، ")}.`,
+                    "هل تريد بدء برنامج تزامن لها؟"
+                  ].join("\n")
             )
-          : (
+          : [
               initialNegativeItems.length === 1
                 ? "ثبت أن حيوانًا واحدًا فارغًا في تشخيص الحمل."
-                : `ثبت أن ${initialNegativeItems.length} حيوانات فارغة في تشخيص الحمل.`
-            ),
+                : `ثبت أن ${initialNegativeItems.length} حيوانات فارغة في تشخيص الحمل.`,
 
-        initialNegativeNumbers.length === 1
-          ? `الرقم: ${initialNegativeNumbers[0]}.`
-          : `الأرقام: ${initialNegativeNumbers.join("، ")}.`,
+              initialNegativeNumbers.length === 1
+                ? `الرقم: ${initialNegativeNumbers[0]}.`
+                : `الأرقام: ${initialNegativeNumbers.join("، ")}.`,
 
-        "هل تريد إدخال الحيوانات الفارغة في برنامج تزامن؟"
-      ].join("\n")
+              "هل تريد إدخال الحيوانات الفارغة في برنامج تزامن؟"
+            ].join("\n")
+      )
     : "";
-
 const joinedInitialNegativeNumbers =
   initialNegativeNumbers.join(",");
 
