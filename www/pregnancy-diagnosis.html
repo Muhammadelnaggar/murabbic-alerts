@@ -289,7 +289,153 @@ function showMsg(msg, type = "info") {
 
   try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
 }
+function renderPregnancyFollowupActions(data = {}) {
+  document
+    .getElementById("pregnancyFollowupActions")
+    ?.remove();
 
+  if (
+    data?.followupDecisionRequired !== true ||
+    !Array.isArray(data?.actions) ||
+    !data.actions.length
+  ) {
+    return;
+  }
+
+  const bar =
+    document.getElementById("mbk-infobar") ||
+    document.getElementById("sysbar");
+
+  if (!bar) return;
+
+  const wrap = document.createElement("div");
+
+  wrap.id = "pregnancyFollowupActions";
+
+  wrap.style.cssText = `
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:14px;
+  `;
+
+  data.actions.forEach(action => {
+    const label =
+      String(action?.label || "").trim();
+
+    const url =
+      String(action?.url || "").trim();
+
+    if (!label || !url) return;
+
+    const button =
+      document.createElement("button");
+
+    button.type = "button";
+    button.textContent = label;
+
+    button.style.cssText = action?.primary
+      ? `
+          min-width:170px;
+          padding:11px 18px;
+          border:2px solid #0b7f47;
+          border-radius:999px;
+          background:#0b7f47;
+          color:#fff;
+          font-weight:900;
+          cursor:pointer;
+        `
+      : `
+          min-width:120px;
+          padding:11px 18px;
+          border:2px solid #0b7f47;
+          border-radius:999px;
+          background:#fff;
+          color:#0b7f47;
+          font-weight:900;
+          cursor:pointer;
+        `;
+
+    button.addEventListener(
+      "click",
+      async () => {
+        if (
+          String(
+            action?.actionType || ""
+          ).trim() !== "post"
+        ) {
+          location.href = url;
+          return;
+        }
+
+        const buttons =
+          wrap.querySelectorAll("button");
+
+        buttons.forEach(btn => {
+          btn.disabled = true;
+        });
+
+        try {
+          const {
+            data: actionData,
+            authRequired
+          } = await sessionPostJson(
+            url,
+            action?.body || {}
+          );
+
+          if (authRequired) {
+            showMsg(
+              actionData?.message ||
+                "❌ سجّل الدخول أولًا.",
+              "error"
+            );
+
+            return;
+          }
+
+          showMsg(
+            actionData?.message ||
+              actionData?.error ||
+              "تم حفظ قرار المتابعة.",
+            actionData?.ok
+              ? "success"
+              : "error"
+          );
+
+          if (!actionData?.ok) {
+            renderPregnancyFollowupActions(
+              data
+            );
+          }
+
+        } catch (err) {
+          console.error(
+            "pregnancy follow-up action failed",
+            err
+          );
+
+          showMsg(
+            "❌ تعذّر تنفيذ قرار المتابعة الآن.",
+            "error"
+          );
+
+          renderPregnancyFollowupActions(
+            data
+          );
+        }
+      }
+    );
+
+    wrap.appendChild(button);
+  });
+
+  if (wrap.children.length) {
+    bar.appendChild(wrap);
+  }
+}
 function readRadio(form, name) {
   return String(form.querySelector(`input[name="${name}"]:checked`)?.value || "").trim();
 }
@@ -628,12 +774,19 @@ payload.result = payload.bulkResults[0]?.result || "";
       rejectedLines
     ].filter(Boolean).join("\n\n");
 
-    if (serverMessage.trim()) {
-      showMsg(
-        serverMessage,
-        data.ok ? "success" : "error"
-      );
-    }
+ if (serverMessage.trim()) {
+  showMsg(
+    serverMessage,
+    data.ok ? "success" : "error"
+  );
+}
+
+if (
+  data.ok &&
+  data.followupDecisionRequired === true
+) {
+  renderPregnancyFollowupActions(data);
+}
 
     if (data.ok && data.redirectUrl) {
       setTimeout(() => {
