@@ -20835,10 +20835,14 @@ const initialNegativeItems =
     item.pregnancyConfirmation120 !== true
   );
 
+const isConfirmationBatch =
+  saved.some(item =>
+    item.pregnancyConfirmation120 === true
+  );
+
 const initialPositiveItems =
   saved.filter(item =>
-    item.result === "عشار" &&
-    item.pregnancyConfirmation120 !== true
+    item.result === "عشار"
   );
 
 const initialNegativeNumbers =
@@ -20854,9 +20858,17 @@ const initialPositiveNumbers =
 const initialPositiveMessage =
   initialPositiveItems.length
     ? [
-        initialPositiveItems.length === 1
-          ? "✅ تم حفظ تشخيص الحمل لحيوان واحد عشار."
-          : `✅ تم حفظ تشخيص الحمل لـ${initialPositiveItems.length} حيوانات عشار.`,
+        isConfirmationBatch
+          ? (
+              initialPositiveItems.length === 1
+                ? "✅ تم تأكيد استمرار الحمل لحيوان واحد."
+                : `✅ تم تأكيد استمرار الحمل لـ${initialPositiveItems.length} حيوانات.`
+            )
+          : (
+              initialPositiveItems.length === 1
+                ? "✅ تم حفظ تشخيص الحمل لحيوان واحد عشار."
+                : `✅ تم حفظ تشخيص الحمل لـ${initialPositiveItems.length} حيوانات عشار.`
+            ),
 
         initialPositiveNumbers.length === 1
           ? `الرقم: ${initialPositiveNumbers[0]}.`
@@ -20867,9 +20879,17 @@ const initialPositiveMessage =
 const initialNegativeMessage =
   initialNegativeItems.length
     ? [
-        initialNegativeItems.length === 1
-          ? "ثبت أن حيوانًا واحدًا فارغًا في تشخيص الحمل."
-          : `ثبت أن ${initialNegativeItems.length} حيوانات فارغة في تشخيص الحمل.`,
+        isConfirmationBatch
+          ? (
+              initialNegativeItems.length === 1
+                ? "ثبت أن حيوانًا واحدًا فارغًا في تأكيد الحمل، وتم تسجيل فقد أجنة."
+                : `ثبت أن ${initialNegativeItems.length} حيوانات فارغة في تأكيد الحمل، وتم تسجيل فقد الأجنة.`
+            )
+          : (
+              initialNegativeItems.length === 1
+                ? "ثبت أن حيوانًا واحدًا فارغًا في تشخيص الحمل."
+                : `ثبت أن ${initialNegativeItems.length} حيوانات فارغة في تشخيص الحمل.`
+            ),
 
         initialNegativeNumbers.length === 1
           ? `الرقم: ${initialNegativeNumbers[0]}.`
@@ -21134,13 +21154,11 @@ app.post(
             ""
           ).trim();
 
-        if (
-          currentResult !== "فارغة" ||
-          currentCheckType ===
-            "pregnancy_confirmation_120" ||
-          !currentEventId ||
-          currentEventId !== item.eventId
-        ) {
+   if (
+  currentResult !== "فارغة" ||
+  !currentEventId ||
+  currentEventId !== item.eventId
+) {
           rejected.push({
             animalNumber:
               item.animalNumber,
@@ -43329,8 +43347,6 @@ const lastDiagnosisEventId =
 const isCurrentInitialNegative =
   isOpen &&
   lastDiagnosisResult === "فارغة" &&
-  lastDiagnosisCheckType !==
-    "pregnancy_confirmation_120" &&
   Number.isFinite(
     diagnosisAfterService
   ) &&
