@@ -17023,7 +17023,7 @@ const embryonicLossRef = needsEmbryonicLoss
     }
     batch.set(eventRef, payload);
 
-  const animalPatch = {
+ const animalPatch = {
   lastDiagnosis: "تشخيص حمل",
   lastDiagnosisDate: eventDate,
 
@@ -17035,10 +17035,20 @@ const embryonicLossRef = needsEmbryonicLoss
       ? "pregnancy_confirmation_120"
       : "initial_pregnancy_diagnosis",
 
-  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  pregnancyDiagnosisFollowupDecision:
+    admin.firestore.FieldValue.delete(),
+
+  pregnancyDiagnosisFollowupDecisionEventId:
+    admin.firestore.FieldValue.delete(),
+
+  pregnancyDiagnosisFollowupDecisionAt:
+    admin.firestore.FieldValue.delete(),
+
+  updatedAt:
+    admin.firestore.FieldValue.serverTimestamp(),
+
   status: "active"
 };
-
     if (result === "عشار") {
       animalPatch.reproductiveStatus = "عشار";
 
@@ -17071,48 +17081,110 @@ const embryonicLossRef = needsEmbryonicLoss
       scheduleGroupsRebuildSrv(uid, "pregnancy_diagnosis_save");
     }
 
-    return res.json({
-      ok: true,
-message: isConfirmation120
-  ? (
-      result === "فارغة"
-        ? `✅ تم حفظ نتيجة تأكيد الحمل للحيوان رقم ${animalNumber} وتسجيل فقد أجنة.`
-        : `✅ تم تأكيد الحمل بعد 120 يومًا للحيوان رقم ${animalNumber}.`
-    )
-  : (
-      result === "فارغة"
-        ? `✅ تم حفظ تشخيص الحمل للحيوان رقم ${animalNumber}: فارغة، وأُضيف إلى متابعة تلقيح الحيوانات المفتوحة.`
-        : `✅ تم حفظ تشخيص الحمل للحيوان رقم ${animalNumber}: ${result}.`
-    ),
-      id: eventRef.id,
-      eventId: eventRef.id,
+   const isInitialNegative =
+  !isConfirmation120 &&
+  result === "فارغة";
 
-      animalId: animal.id || "",
-      animalNumber,
-      eventDate,
-      method,
-      result,
+const responseActions =
+  isInitialNegative
+    ? [
+        {
+          key: "start_ovsynch",
+          label: "دخول برنامج تزامن",
+          primary: true,
+          actionType: "navigate",
 
-      reproductiveStatus: animalPatch.reproductiveStatus || reproStatus || "",
+          url:
+            `/ovysynch.html?mbkMode=group` +
+            `&numbers=${encodeURIComponent(animalNumber)}` +
+            `&bulk=${encodeURIComponent(animalNumber)}` +
+            `&date=${encodeURIComponent(eventDate)}`
+        },
 
-      actions: [
+        {
+          key: "later",
+          label: "لاحقًا",
+          primary: false,
+          actionType: "post",
+
+          url:
+            "/api/pregnancy-diagnosis/followup-decision",
+
+          body: {
+            decision: "later",
+
+            items: [
+              {
+                animalNumber,
+                eventId: eventRef.id
+              }
+            ]
+          }
+        }
+      ]
+    : [
         {
           key: "event_list",
           label: "فتح قائمة الأحداث",
           primary: true,
-          url: `/event-list.html?number=${encodeURIComponent(animalNumber)}`
+
+          url:
+            `/event-list.html?number=${encodeURIComponent(animalNumber)}`
         },
+
         {
           key: "cow_card",
           label: "فتح بطاقة الحيوان",
-          url: `/cow-card.html?number=${encodeURIComponent(animalNumber)}`
+
+          url:
+            `/cow-card.html?number=${encodeURIComponent(animalNumber)}`
         }
-      ]
-    });
+      ];
+
+return res.json({
+  ok: true,
+
+  message:
+    isConfirmation120
+      ? (
+          result === "فارغة"
+            ? `✅ تم حفظ نتيجة تأكيد الحمل للحيوان رقم ${animalNumber} وتسجيل فقد أجنة.`
+            : `✅ تم تأكيد الحمل بعد 120 يومًا للحيوان رقم ${animalNumber}.`
+        )
+      : (
+          isInitialNegative
+            ? (
+                `✅ تم حفظ تشخيص الحمل للحيوان رقم ${animalNumber}: فارغة.\n` +
+                "هل تريد إدخاله في برنامج تزامن؟"
+              )
+            : `✅ تم حفظ تشخيص الحمل للحيوان رقم ${animalNumber}: ${result}.`
+        ),
+
+  id: eventRef.id,
+  eventId: eventRef.id,
+
+  animalId:
+    animal.id || "",
+
+  animalNumber,
+  eventDate,
+  method,
+  result,
+
+  reproductiveStatus:
+    animalPatch.reproductiveStatus ||
+    reproStatus ||
+    "",
+
+  followupDecisionRequired:
+    isInitialNegative,
+
+  actions:
+    responseActions
+});
 
   } catch (e) {
     console.error("pregnancy-diagnosis-save", e);
-
     return res.status(500).json({
       ok: false,
       error: "pregnancy_diagnosis_save_failed",
@@ -20657,13 +20729,32 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
-      const animalPatch = {
-        lastDiagnosis: "تشخيص حمل",
-        lastDiagnosisDate: eventDate,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        status: "active"
-      };
+  const animalPatch = {
+  lastDiagnosis: "تشخيص حمل",
+  lastDiagnosisDate: eventDate,
 
+  lastPregnancyDiagnosisDate: eventDate,
+  lastPregnancyDiagnosisResult: result,
+  lastPregnancyDiagnosisEventId: eventRef.id,
+  lastPregnancyDiagnosisCheckType:
+    isConfirmation120
+      ? "pregnancy_confirmation_120"
+      : "initial_pregnancy_diagnosis",
+
+  pregnancyDiagnosisFollowupDecision:
+    admin.firestore.FieldValue.delete(),
+
+  pregnancyDiagnosisFollowupDecisionEventId:
+    admin.firestore.FieldValue.delete(),
+
+  pregnancyDiagnosisFollowupDecisionAt:
+    admin.firestore.FieldValue.delete(),
+
+  updatedAt:
+    admin.firestore.FieldValue.serverTimestamp(),
+
+  status: "active"
+};
            if (result === "عشار") {
         animalPatch.reproductiveStatus = "عشار";
 
@@ -20738,25 +20829,95 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
     if (saved.length && typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "pregnancy_diagnosis_bulk_save");
     }
-    const openFollowupCount =
+const initialNegativeItems =
   saved.filter(item =>
     item.result === "فارغة" &&
     item.pregnancyConfirmation120 !== true
-  ).length;
-    return res.json({
-      ok: true,
-     message: saved.length
-  ? (
-      openFollowupCount > 0
-        ? `✅ تم حفظ تشخيص الحمل لعدد ${saved.length} حيوان، وتم تحويل الحيوانات الفارغة (${openFollowupCount}) إلى متابعة تلقيح الحيوانات المفتوحة.`
-        : `✅ تم حفظ تشخيص الحمل لعدد ${saved.length} حيوان.`
-    )
-  : "❌ لم يتم حفظ أي تشخيص حمل — كل الأرقام غير مؤهلة.",
-      savedCount: saved.length,
-      rejectedCount: rejected.length,
-      saved,
-      rejected
-    });
+  );
+
+const initialNegativeNumbers =
+  initialNegativeItems.map(item =>
+    item.animalNumber
+  );
+
+const joinedInitialNegativeNumbers =
+  initialNegativeNumbers.join(",");
+
+const responseActions =
+  initialNegativeItems.length
+    ? [
+        {
+          key: "start_ovsynch",
+          label: "دخول برنامج تزامن",
+          primary: true,
+          actionType: "navigate",
+
+          url:
+            `ovysynch.html?mbkMode=group` +
+            `&numbers=${encodeURIComponent(joinedInitialNegativeNumbers)}` +
+            `&bulk=${encodeURIComponent(joinedInitialNegativeNumbers)}` +
+            `&date=${encodeURIComponent(eventDate)}`
+        },
+
+        {
+          key: "later",
+          label: "لاحقًا",
+          primary: false,
+          actionType: "post",
+
+          url:
+            "/api/pregnancy-diagnosis/followup-decision",
+
+          body: {
+            decision: "later",
+
+            items:
+              initialNegativeItems.map(item => ({
+                animalNumber:
+                  item.animalNumber,
+
+                eventId:
+                  item.eventId
+              }))
+          }
+        }
+      ]
+    : [];
+
+return res.json({
+  ok: true,
+
+  message:
+    saved.length
+      ? (
+          initialNegativeItems.length
+            ? (
+                `✅ تم حفظ تشخيص الحمل لعدد ${saved.length} حيوان.\n` +
+                `ثبت أن ${initialNegativeItems.length} منها فارغة.\n` +
+                "هل تريد إدخالها في برنامج تزامن؟"
+              )
+            : `✅ تم حفظ تشخيص الحمل لعدد ${saved.length} حيوان.`
+        )
+      : "❌ لم يتم حفظ أي تشخيص حمل — كل الأرقام غير مؤهلة.",
+
+  savedCount:
+    saved.length,
+
+  rejectedCount:
+    rejected.length,
+
+  followupDecisionRequired:
+    initialNegativeItems.length > 0,
+
+  followupAnimalNumbers:
+    initialNegativeNumbers,
+
+  actions:
+    responseActions,
+
+  saved,
+  rejected
+});
 
   } catch (e) {
     console.error("pregnancy-diagnosis-bulk-save", e);
@@ -20768,6 +20929,278 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
     });
   }
 });
+// ============================================================
+//      PREGNANCY DIAGNOSIS FOLLOW-UP DECISION — LATER
+//      تسجيل «لاحقًا» لآخر تشخيص حمل فارغ فقط
+// ============================================================
+
+app.post(
+  "/api/pregnancy-diagnosis/followup-decision",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error: "firestore_disabled",
+          message:
+            "❌ تعذّر حفظ قرار المتابعة الآن. حاول مرة أخرى."
+        });
+      }
+
+      const uid = req.userId;
+
+      const decision =
+        String(
+          req.body?.decision || ""
+        )
+          .trim()
+          .toLowerCase();
+
+      if (decision !== "later") {
+        return res.status(400).json({
+          ok: false,
+          error: "followup_decision_invalid",
+          message:
+            "❌ قرار متابعة تشخيص الحمل غير صحيح."
+        });
+      }
+
+      const rawItems =
+        Array.isArray(req.body?.items)
+          ? req.body.items
+          : [
+              {
+                animalNumber:
+                  req.body?.animalNumber ||
+                  req.body?.number ||
+                  "",
+
+                eventId:
+                  req.body?.eventId ||
+                  req.body?.diagnosisEventId ||
+                  ""
+              }
+            ];
+
+      const items = [];
+      const seen = new Set();
+
+      for (const raw of rawItems) {
+        const animalNumber =
+          calvingNormDigitsOnlySrv(
+            raw?.animalNumber ||
+            raw?.number ||
+            ""
+          );
+
+        const eventId =
+          String(
+            raw?.eventId ||
+            raw?.diagnosisEventId ||
+            ""
+          ).trim();
+
+        if (!animalNumber || !eventId) {
+          continue;
+        }
+
+        const key =
+          `${animalNumber}#${eventId}`;
+
+        if (seen.has(key)) continue;
+
+        seen.add(key);
+
+        items.push({
+          animalNumber,
+          eventId
+        });
+      }
+
+      if (!items.length) {
+        return res.status(400).json({
+          ok: false,
+          error: "followup_items_required",
+          message:
+            "❌ لا توجد حيوانات صالحة لحفظ قرار المتابعة."
+        });
+      }
+
+      const accepted = [];
+      const rejected = [];
+
+      let batch = db.batch();
+      let operations = 0;
+
+      async function commitIfNeeded(
+        force = false
+      ) {
+        if (!operations) return;
+
+        if (
+          !force &&
+          operations < 400
+        ) {
+          return;
+        }
+
+        await batch.commit();
+
+        batch = db.batch();
+        operations = 0;
+      }
+
+      for (const item of items) {
+        const animal =
+          await fetchAnimalByNumberForCalvingGateSrv(
+            uid,
+            item.animalNumber
+          );
+
+        if (
+          !animal ||
+          animal._collection !== "animals"
+        ) {
+          rejected.push({
+            animalNumber:
+              item.animalNumber,
+
+            reason:
+              "الحيوان غير موجود في القطيع."
+          });
+
+          continue;
+        }
+
+        const doc =
+          animal.data || {};
+
+        const currentResult =
+          String(
+            doc.lastPregnancyDiagnosisResult ||
+            ""
+          ).trim();
+
+        const currentCheckType =
+          String(
+            doc.lastPregnancyDiagnosisCheckType ||
+            ""
+          ).trim();
+
+        const currentEventId =
+          String(
+            doc.lastPregnancyDiagnosisEventId ||
+            ""
+          ).trim();
+
+        if (
+          currentResult !== "فارغة" ||
+          currentCheckType ===
+            "pregnancy_confirmation_120" ||
+          !currentEventId ||
+          currentEventId !== item.eventId
+        ) {
+          rejected.push({
+            animalNumber:
+              item.animalNumber,
+
+            reason:
+              "تشخيص الحمل الحالي لا يطابق طلب المتابعة."
+          });
+
+          continue;
+        }
+
+        batch.set(
+          db
+            .collection("animals")
+            .doc(animal.id),
+
+          {
+            pregnancyDiagnosisFollowupDecision:
+              "later",
+
+            pregnancyDiagnosisFollowupDecisionEventId:
+              currentEventId,
+
+            pregnancyDiagnosisFollowupDecisionAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp(),
+
+            pregnancyDiagnosisFollowupDecisionSource:
+              "pregnancy_diagnosis_after_save",
+
+            updatedAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp()
+          },
+
+          {
+            merge: true
+          }
+        );
+
+        operations++;
+
+        accepted.push({
+          animalNumber:
+            item.animalNumber,
+
+          eventId:
+            currentEventId
+        });
+
+        await commitIfNeeded(false);
+      }
+
+      await commitIfNeeded(true);
+
+      const ok =
+        accepted.length > 0;
+
+      return res
+        .status(ok ? 200 : 409)
+        .json({
+          ok,
+
+          message: ok
+            ? (
+                accepted.length === 1
+                  ? "✅ أُضيف الحيوان إلى متابعة تلقيح الحيوانات المفتوحة."
+                  : `✅ أُضيفت ${accepted.length} حيوانات إلى متابعة تلقيح الحيوانات المفتوحة.`
+              )
+            : "❌ لم يتم حفظ قرار المتابعة؛ تغيّرت حالة الحيوانات أو تشخيصها.",
+
+          acceptedCount:
+            accepted.length,
+
+          rejectedCount:
+            rejected.length,
+
+          accepted,
+          rejected
+        });
+
+    } catch (e) {
+      console.error(
+        "pregnancy-diagnosis-followup-decision",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error:
+          "pregnancy_diagnosis_followup_decision_failed",
+
+        message:
+          "❌ تعذّر حفظ قرار المتابعة الآن."
+      });
+    }
+  }
+);
 // ============================================================
 //                 OVSYNCH PROTOCOL DURATION HELPERS
 //                 إنهاء/تجاهل البروتوكول النشط حسب مدة البرنامج
@@ -42661,40 +43094,41 @@ async function murabbikPostpartumAiAlertSourceSrv(context) {
         )
       );
 
-    const explicitInitialNegative =
-      isOpen &&
-      lastDiagnosisResult === "فارغة" &&
-      lastDiagnosisCheckType !==
-        "pregnancy_confirmation_120" &&
-      Number.isFinite(
-        diagnosisAfterService
-      ) &&
-      diagnosisAfterService >= 0 &&
-      !pregnancyEndedAfterService;
+  const followupDecision =
+  murabbikSmartAlertTextSrv(
+    doc.pregnancyDiagnosisFollowupDecision
+  ).toLowerCase();
 
-    // توافق مع الحيوانات القديمة التي حُفظ لها
-    // تاريخ التشخيص قبل إضافة الحقول الصريحة.
-    const confirmationNegativeCoversDiagnosis =
-      lastConfirmationResult === "negative" &&
-      lastConfirmationDate &&
-      lastDiagnosisDate &&
-      lastConfirmationDate >=
-        lastDiagnosisDate;
+const followupDecisionEventId =
+  murabbikSmartAlertTextSrv(
+    doc.pregnancyDiagnosisFollowupDecisionEventId
+  );
 
-    const legacyInitialNegative =
-      !hasExplicitDiagnosisResult &&
-      isOpen &&
-      Number.isFinite(
-        diagnosisAfterService
-      ) &&
-      diagnosisAfterService >= 0 &&
-      !confirmationNegativeCoversDiagnosis &&
-      !pregnancyEndedAfterService;
+const lastDiagnosisEventId =
+  murabbikSmartAlertTextSrv(
+    doc.lastPregnancyDiagnosisEventId
+  );
 
-    const diagnosedEmpty =
-      explicitInitialNegative ||
-      legacyInitialNegative;
+const isCurrentInitialNegative =
+  isOpen &&
+  lastDiagnosisResult === "فارغة" &&
+  lastDiagnosisCheckType !==
+    "pregnancy_confirmation_120" &&
+  Number.isFinite(
+    diagnosisAfterService
+  ) &&
+  diagnosisAfterService >= 0 &&
+  !pregnancyEndedAfterService;
 
+const diagnosedEmpty =
+  isCurrentInitialNegative &&
+  followupDecision === "later" &&
+  Boolean(
+    followupDecisionEventId &&
+    lastDiagnosisEventId &&
+    followupDecisionEventId ===
+      lastDiagnosisEventId
+  );
     let reasonType = "";
     let reasonDate = "";
     let followupAgeDays = null;
