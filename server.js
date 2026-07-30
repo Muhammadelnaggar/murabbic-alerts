@@ -42401,19 +42401,71 @@ murabbikSmartAlertRegisterSourceSrv(
   murabbikPregnancyDiagnosisDueAlertSourceSrv
 );
 // ============================================================
-//   SMART ALERT SOURCE: PREGNANCY CONFIRMATION — DAY 120
-//   تأكيد استمرار الحمل من اليوم 120 بعد آخر تلقيح
+//   SMART ALERT SOURCE: WEEKLY PREGNANCY CONFIRMATION — SATURDAY
+//   دفعة أسبوعية لتأكيد الحمل يوم السبت حسب توقيت المزرعة
 // ============================================================
 
 const MURABBIK_PREGNANCY_CONFIRMATION_120_DUE_DAYS = 120;
+const MURABBIK_PREGNANCY_CONFIRMATION_120_MAX_DAYS = 127;
 const MURABBIK_PREGNANCY_CONFIRMATION_120_SNOOZE_MINUTES = 24 * 60;
 
 const MURABBIK_PREGNANCY_CONFIRMATION_120_SOURCE_NAME =
   "pregnancy_confirmation_120_due";
 
-const MURABBIK_PREGNANCY_CONFIRMATION_120_IDENTITY_KEY =
-  "pregnancy-confirmation-120:current";
+const MURABBIK_PREGNANCY_CONFIRMATION_120_IDENTITY_PREFIX =
+  "pregnancy-confirmation-120:weekly-saturday";
 
+function murabbikPregnancyConfirmation120SaturdayOnOrAfterSrv(
+  dateISO = ""
+) {
+  const date =
+    String(dateISO || "")
+      .trim()
+      .slice(0, 10);
+
+  if (!calvingIsDateSrv(date)) {
+    return "";
+  }
+
+  const dayOfWeek =
+    new Date(
+      `${date}T00:00:00Z`
+    ).getUTCDay();
+
+  const daysUntilSaturday =
+    (6 - dayOfWeek + 7) % 7;
+
+  return addDaysToIsoDateSrv(
+    date,
+    daysUntilSaturday
+  );
+}
+
+function murabbikPregnancyConfirmation120CurrentSaturdaySrv(
+  todayISO = ""
+) {
+  const today =
+    String(todayISO || "")
+      .trim()
+      .slice(0, 10);
+
+  if (!calvingIsDateSrv(today)) {
+    return "";
+  }
+
+  const dayOfWeek =
+    new Date(
+      `${today}T00:00:00Z`
+    ).getUTCDay();
+
+  const daysSinceSaturday =
+    (dayOfWeek - 6 + 7) % 7;
+
+  return addDaysToIsoDateSrv(
+    today,
+    -daysSinceSaturday
+  );
+}
 
 function murabbikPregnancyConfirmation120AlertUrlSrv({
   numbers = [],
@@ -42475,10 +42527,20 @@ function murabbikPregnancyConfirmation120IsClosedSrv(
 async function murabbikPregnancyConfirmation120AlertSourceSrv(
   context
 ) {
+  const batchSaturday =
+    murabbikPregnancyConfirmation120CurrentSaturdaySrv(
+      context.today
+    );
+
+  if (!batchSaturday) {
+    return [];
+  }
+
   const animals =
     await murabbikSmartAlertAnimalsSrv(
       context
     );
+
   const due = [];
 
   for (const doc of animals) {
@@ -42540,23 +42602,52 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
       continue;
     }
 
+    const confirmationDueDate =
+      addDaysToIsoDateSrv(
+        lastInseminationDate,
+        MURABBIK_PREGNANCY_CONFIRMATION_120_DUE_DAYS
+      );
+
+    const animalBatchSaturday =
+      murabbikPregnancyConfirmation120SaturdayOnOrAfterSrv(
+        confirmationDueDate
+      );
+
+    if (
+      animalBatchSaturday !==
+      batchSaturday
+    ) {
+      continue;
+    }
+
+    const daysAtBatch =
+      calvingDaysBetweenSrv(
+        lastInseminationDate,
+        batchSaturday
+      );
+
+    if (
+      !Number.isFinite(daysAtBatch) ||
+      daysAtBatch <
+        MURABBIK_PREGNANCY_CONFIRMATION_120_DUE_DAYS ||
+      daysAtBatch >
+        MURABBIK_PREGNANCY_CONFIRMATION_120_MAX_DAYS
+    ) {
+      continue;
+    }
+
     const daysSinceInsemination =
       calvingDaysBetweenSrv(
         lastInseminationDate,
         context.today
       );
 
-     if (
-      !Number.isFinite(daysSinceInsemination) ||
-      daysSinceInsemination <
-        MURABBIK_PREGNANCY_CONFIRMATION_120_DUE_DAYS
-    ) {
-      continue;
-    }
-
     due.push({
       animalNumber,
       lastInseminationDate,
+      confirmationDueDate,
+      batchSaturday,
+      daysAtBatch,
       daysSinceInsemination
     });
   }
@@ -42567,8 +42658,8 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
 
   const sorted =
     [...due].sort((a, b) =>
-      b.daysSinceInsemination -
-        a.daysSinceInsemination ||
+      b.daysAtBatch -
+        a.daysAtBatch ||
 
       String(a.animalNumber).localeCompare(
         String(b.animalNumber),
@@ -42592,49 +42683,23 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
     sorted
       .slice(0, 12)
       .map(item =>
-        `الحيوان ${item.animalNumber}: ${item.daysSinceInsemination} يومًا بعد التلقيح، وآخر تلقيح ${item.lastInseminationDate}`
+        `الحيوان ${item.animalNumber}: استحق التأكيد بتاريخ ${item.confirmationDueDate}، وآخر تلقيح ${item.lastInseminationDate}`
       );
 
   if (sorted.length > evidence.length) {
     evidence.push(
-      `و${sorted.length - evidence.length} حيوان آخر مستحق لتأكيد الحمل.`
+      `و${sorted.length - evidence.length} حيوان آخر ضمن دفعة السبت.`
     );
   }
 
-  const revisionKey =
-    [...sorted]
-      .sort((a, b) =>
-        String(a.animalNumber).localeCompare(
-          String(b.animalNumber),
-          "ar",
-          { numeric: true }
-        )
-      )
-      .map(item =>
-        [
-          item.animalNumber,
-          item.lastInseminationDate
-        ].join(":")
-      )
-      .join("|");
-
-  const earliestDueDate =
-    sorted
-      .map(item =>
-        addDaysToIsoDateSrv(
-          item.lastInseminationDate,
-          MURABBIK_PREGNANCY_CONFIRMATION_120_DUE_DAYS
-        )
-      )
-      .filter(calvingIsDateSrv)
-      .sort()[0] ||
-    context.today;
+  const identityKey =
+    `${MURABBIK_PREGNANCY_CONFIRMATION_120_IDENTITY_PREFIX}:${batchSaturday}`;
 
   return [{
-    identityKey:
-      MURABBIK_PREGNANCY_CONFIRMATION_120_IDENTITY_KEY,
+    identityKey,
 
-    revisionKey,
+    revisionKey:
+      batchSaturday,
 
     kind: "operational",
     domain: "reproduction",
@@ -42648,29 +42713,35 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
     title:
       count === 1
         ? "موعد تأكيد الحمل"
-        : "حيوانات مستحقة لتأكيد الحمل",
+        : "دفعة تأكيد الحمل الأسبوعية",
 
     message:
       count === 1
-        ? `الحيوان رقم ${animalNumbers[0]} أكمل 120 يومًا بعد التلقيح، وحان موعد تأكيد استمرار الحمل.`
-        : `يوجد ${count} حيوانات أكملت 120 يومًا بعد التلقيح، وحان موعد تأكيد استمرار الحمل.`,
+        ? `الحيوان رقم ${animalNumbers[0]} ضمن دفعة السبت المستحقة لتأكيد استمرار الحمل.`
+        : `يوجد ${count} حيوانات ضمن دفعة السبت المستحقة لتأكيد استمرار الحمل.`,
 
     details: {
       observation:
         count === 1
-          ? `آخر تلقيح مسجّل بتاريخ ${sorted[0].lastInseminationDate}، ومرّ عليه ${sorted[0].daysSinceInsemination} يومًا.`
-          : `أرقام الحيوانات: ${animalNumbers.join("، ")}.`,
+          ? `الدفعة الأسبوعية بتاريخ ${batchSaturday}، والحيوان رقم ${animalNumbers[0]}.`
+          : `الدفعة الأسبوعية بتاريخ ${batchSaturday}.
+أرقام الحيوانات: ${animalNumbers.join("، ")}.`,
 
       meaning:
-        "تأكيد الحمل في هذه المرحلة يساعد على الاطمئنان إلى استمراره وتحديث حالة القطيع قبل المراحل التالية.",
+        "تجميع تأكيدات الحمل أسبوعيًا يقلل الإزعاج ويساعد على تنفيذ الفحص في جلسة واحدة منظمة.",
 
       recommendation:
-        "راجع الحيوانات وسجّل نتيجة تأكيد الحمل بعد الفحص.",
+        "راجع حيوانات دفعة السبت وسجّل نتيجة تأكيد الحمل، أو اختر التذكير لاحقًا إذا كنت ستنفذ الفحص ولم يتوفر الوقت الآن.",
 
       evidence
     },
 
-     affectedCount: count,
+    dueDate:
+      batchSaturday,
+
+    affectedCount:
+      count,
+
     animalNumbers,
 
     action: {
