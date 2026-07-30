@@ -22756,6 +22756,12 @@ if (!program) {
     let doneCount = 0;
     const saved = [];
     const rejected = [];
+    const isTaiStep =
+          stepName.includes("تلقيح") ||
+          stepName.toLowerCase().includes("tai");
+
+    const taiEligibleNumbers = [];
+    const taiExcluded = [];
 
     for (const animalNumber of numbers) {
       const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
@@ -22767,7 +22773,85 @@ if (!program) {
         });
         continue;
       }
+      const animalDoc = animal.data || {};
 
+if (isTaiStep) {
+  const animalStatus =
+    String(animalDoc.status || "active")
+      .trim()
+      .toLowerCase();
+
+  const currentProtocol =
+    String(animalDoc.currentProtocol || "")
+      .trim()
+      .toLowerCase();
+
+  const protocolStatus =
+    String(animalDoc.protocolStatus || "")
+      .trim()
+      .toLowerCase();
+
+  const lastInseminationDate =
+    String(animalDoc.lastInseminationDate || "")
+      .trim()
+      .slice(0, 10);
+
+  const lastHeatDate =
+    String(
+      animalDoc.lastHeatDate ||
+      animalDoc.heatDate ||
+      animalDoc.lastEstrusDate ||
+      ""
+    )
+      .trim()
+      .slice(0, 10);
+
+  let exclusionReason = "";
+
+  if (
+    animalStatus === "inactive" ||
+    animalStatus === "sold" ||
+    animalStatus === "dead" ||
+    animalStatus === "archived"
+  ) {
+    exclusionReason =
+      "الحيوان خرج من القطيع النشط.";
+  } else if (
+    currentProtocol !== "ovsynch" ||
+    protocolStatus !== "active"
+  ) {
+    exclusionReason =
+      "الحيوان خرج من برنامج التزامن.";
+  } else if (
+    lastInseminationDate &&
+    lastInseminationDate >= protocolStartDate
+  ) {
+    exclusionReason =
+      "تم تلقيح الحيوان أثناء البرنامج.";
+  } else if (
+    lastHeatDate &&
+    lastHeatDate >= protocolStartDate
+  ) {
+    exclusionReason =
+      "سُجّل للحيوان شياع أثناء البرنامج وأصبح غير مناسب للتلقيح الموقّت.";
+  } else if (
+    animalDoc.breedingBlocked === true
+  ) {
+    exclusionReason =
+      "الحيوان غير صالح للتلقيح حاليًا.";
+  }
+
+  if (exclusionReason) {
+    taiExcluded.push({
+      animalNumber: String(animalNumber),
+      reason: exclusionReason
+    });
+  } else {
+    taiEligibleNumbers.push(
+      String(animalNumber)
+    );
+  }
+}
       const baseId = ["ovsynch", animalNumber, program, protocolStartDate].join("__");
       const stepEventId = `${baseId}__step_event_${stepIndex}`;
 
@@ -22843,6 +22927,22 @@ if (!program) {
     if (doneCount && typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "ovsynch_confirm_step");
     }
+    const taiNumbersText =
+  taiEligibleNumbers.join(",");
+
+const redirectUrl =
+  isTaiStep && taiEligibleNumbers.length
+    ? (
+        `/insemination.html?mbkMode=group` +
+        `&mode=bulk` +
+        `&bulk=1` +
+        `&numbers=${encodeURIComponent(taiNumbersText)}` +
+        `&animalNumbers=${encodeURIComponent(taiNumbersText)}` +
+        `&date=${encodeURIComponent(eventDate)}` +
+        `&eventDate=${encodeURIComponent(eventDate)}` +
+        `&source=ovsynch_tai`
+      )
+    : "";
 
     return res.json({
       ok: true,
@@ -22854,8 +22954,15 @@ message: doneCount === 1
       doneCount,
       rejectedCount: rejected.length,
       saved,
-      rejected
-    });
+      rejected,
+     redirectUrl,
+     requiresInsemination:
+     isTaiStep &&
+     taiEligibleNumbers.length > 0,
+     animalNumbers:
+     taiEligibleNumbers,
+     taiExcluded
+});
 
   } catch (e) {
     console.error("ovsynch-confirm-step", e);
