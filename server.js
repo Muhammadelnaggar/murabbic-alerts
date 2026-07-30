@@ -40963,7 +40963,7 @@ async function murabbikSmartAlertApplyUserStateSrv(
 // ============================================================
 
 const MURABBIK_DRY_OFF_COW_DUE_DAYS = 210;
-const MURABBIK_DRY_OFF_BUFFALO_DUE_DAYS = 240;
+const MURABBIK_DRY_OFF_BUFFALO_DUE_DAYS = 210;
 
 const MURABBIK_DRY_OFF_ALERT_WINDOW_DAYS = 14;
 
