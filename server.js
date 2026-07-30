@@ -20835,10 +20835,49 @@ const initialNegativeItems =
     item.pregnancyConfirmation120 !== true
   );
 
-const initialNegativeNumbers =
-  initialNegativeItems.map(item =>
-    item.animalNumber
+const initialPositiveItems =
+  saved.filter(item =>
+    item.result === "عشار" &&
+    item.pregnancyConfirmation120 !== true
   );
+
+const initialNegativeNumbers =
+  initialNegativeItems
+    .map(item => item.animalNumber)
+    .sort((a, b) => Number(a) - Number(b));
+
+const initialPositiveNumbers =
+  initialPositiveItems
+    .map(item => item.animalNumber)
+    .sort((a, b) => Number(a) - Number(b));
+
+const initialPositiveMessage =
+  initialPositiveItems.length
+    ? [
+        initialPositiveItems.length === 1
+          ? "✅ تم حفظ تشخيص الحمل لحيوان واحد عشار."
+          : `✅ تم حفظ تشخيص الحمل لـ${initialPositiveItems.length} حيوانات عشار.`,
+
+        initialPositiveNumbers.length === 1
+          ? `الرقم: ${initialPositiveNumbers[0]}.`
+          : `الأرقام: ${initialPositiveNumbers.join("، ")}.`
+      ].join("\n")
+    : "";
+
+const initialNegativeMessage =
+  initialNegativeItems.length
+    ? [
+        initialNegativeItems.length === 1
+          ? "ثبت أن حيوانًا واحدًا فارغًا في تشخيص الحمل."
+          : `ثبت أن ${initialNegativeItems.length} حيوانات فارغة في تشخيص الحمل.`,
+
+        initialNegativeNumbers.length === 1
+          ? `الرقم: ${initialNegativeNumbers[0]}.`
+          : `الأرقام: ${initialNegativeNumbers.join("، ")}.`,
+
+        "هل تريد إدخال الحيوانات الفارغة في برنامج تزامن؟"
+      ].join("\n")
+    : "";
 
 const joinedInitialNegativeNumbers =
   initialNegativeNumbers.join(",");
@@ -20887,19 +20926,20 @@ const responseActions =
 return res.json({
   ok: true,
 
-  message:
-    saved.length
-      ? (
-          initialNegativeItems.length
-            ? (
-                `✅ تم حفظ تشخيص الحمل لعدد ${saved.length} حيوان.\n` +
-                `ثبت أن ${initialNegativeItems.length} منها فارغة.\n` +
-                "هل تريد إدخالها في برنامج تزامن؟"
-              )
-            : `✅ تم حفظ تشخيص الحمل لعدد ${saved.length} حيوان.`
-        )
-      : "❌ لم يتم حفظ أي تشخيص حمل — كل الأرقام غير مؤهلة.",
-
+ message:
+  saved.length
+    ? (
+        initialPositiveItems.length ||
+        initialNegativeItems.length
+          ? [
+              initialPositiveMessage,
+              initialNegativeMessage
+            ]
+              .filter(Boolean)
+              .join("\n\n")
+          : `✅ تم حفظ تشخيص الحمل لعدد ${saved.length} حيوان.`
+      )
+    : "❌ لم يتم حفظ أي تشخيص حمل — كل الأرقام غير مؤهلة.",
   savedCount:
     saved.length,
 
