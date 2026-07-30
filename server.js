@@ -43032,30 +43032,30 @@ if (count === 1) {
     postpartumNumbers.length > 0
   ) {
     messageParts.push(
-      `الحيوانات ${postpartumNumbers.join("، ")} تخطّت فترة الانتظار بعد الولادة ` +
-      `دون تسجيل تلقيح، ولا توجد لها دورة شياع جارية.`
+      postpartumNumbers.length === 1
+        ? "تخطّى حيوان واحد فترة الانتظار بعد الولادة دون تسجيل تلقيح أو شياع."
+        : `تخطّت ${postpartumNumbers.length} حيوانات فترة الانتظار بعد الولادة دون تسجيل تلقيح أو شياع.`,
+
+      `${postpartumNumbers.length === 1 ? "الرقم" : "الأرقام"}: ` +
+      `${postpartumNumbers.join("، ")}.`
     );
   }
 
   if (
-    diagnosisNegativeNumbers.length === 1
+    diagnosisNegativeNumbers.length > 0
   ) {
     messageParts.push(
-      `${postpartumNumbers.length ? "والحيوان" : "الحيوان"} ` +
-      `${diagnosisNegativeNumbers[0]} ثبت أنه فارغ في تشخيص الحمل.`
-    );
+      diagnosisNegativeNumbers.length === 1
+        ? "ثبت أن حيوانًا واحدًا فارغ في تشخيص الحمل."
+        : `ثبت أن ${diagnosisNegativeNumbers.length} حيوانات فارغة في تشخيص الحمل.`,
 
-  } else if (
-    diagnosisNegativeNumbers.length > 1
-  ) {
-    messageParts.push(
-      `${postpartumNumbers.length ? "والحيوانات" : "الحيوانات"} ` +
-      `${diagnosisNegativeNumbers.join("، ")} ثبت أنها فارغة في تشخيص الحمل.`
+      `${diagnosisNegativeNumbers.length === 1 ? "الرقم" : "الأرقام"}: ` +
+      `${diagnosisNegativeNumbers.join("، ")}.`
     );
   }
 
- message =
-  messageParts.join("\n");
+  message =
+    messageParts.join("\n");
 }
   const joinedNumbers =
     animalNumbers.join(",");
