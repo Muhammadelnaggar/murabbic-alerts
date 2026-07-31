@@ -31122,7 +31122,198 @@ async function dailyMilkLoadComponentsSrv(uid) {
       : {}
   );
 }
+function dailyMilkComponentWasProvidedSrv(v) {
+  return !(
+    v === undefined ||
+    v === null ||
+    String(v).trim() === ""
+  );
+}
 
+function dailyMilkComponentsInputFromBodySrv(
+  body = {}
+) {
+  const root =
+    body.components &&
+    typeof body.components === "object"
+      ? body.components
+      : {};
+
+  const readKind = kind => {
+    const section =
+      root[kind] &&
+      typeof root[kind] === "object"
+        ? root[kind]
+        : {};
+
+    const fatRaw =
+      section.milkFatPct ??
+      body[`${kind}MilkFatPct`] ??
+      "";
+
+    const proteinRaw =
+      section.milkProteinPct ??
+      body[`${kind}MilkProteinPct`] ??
+      "";
+
+    const fatProvided =
+      dailyMilkComponentWasProvidedSrv(
+        fatRaw
+      );
+
+    const proteinProvided =
+      dailyMilkComponentWasProvidedSrv(
+        proteinRaw
+      );
+
+    return {
+      provided:
+        fatProvided ||
+        proteinProvided,
+
+      milkFatPct:
+        dailyMilkComponentPctOrNullSrv(
+          fatRaw
+        ),
+
+      milkProteinPct:
+        dailyMilkComponentPctOrNullSrv(
+          proteinRaw
+        )
+    };
+  };
+
+  return {
+    cow: readKind("cow"),
+    buffalo: readKind("buffalo")
+  };
+}
+
+function dailyMilkComponentIssueSrv(
+  component = {},
+  speciesLabel = ""
+) {
+  if (!component.provided) return "";
+
+  const fat =
+    Number(component.milkFatPct);
+
+  const protein =
+    Number(component.milkProteinPct);
+
+  if (
+    !Number.isFinite(fat) ||
+    !Number.isFinite(protein)
+  ) {
+    return `أدخل نسبتي الدهن والبروتين معًا للبن ${speciesLabel}.`;
+  }
+
+  if (
+    fat < 0.1 ||
+    fat > 20 ||
+    protein < 0.1 ||
+    protein > 20
+  ) {
+    return `أدخل نسبة دهن وبروتين صحيحة للبن ${speciesLabel} من 0.1% إلى 20%.`;
+  }
+
+  return "";
+}
+
+function dailyMilkFatProteinRatioSrv(
+  milkFatPct,
+  milkProteinPct
+) {
+  const fat = Number(milkFatPct);
+  const protein = Number(milkProteinPct);
+
+  if (
+    !Number.isFinite(fat) ||
+    !Number.isFinite(protein) ||
+    protein <= 0
+  ) {
+    return null;
+  }
+
+  return Number(
+    (fat / protein).toFixed(3)
+  );
+}
+
+async function dailyMilkPersistComponentsSrv({
+  uid = "",
+  submitted = {},
+  savedKinds = []
+} = {}) {
+  if (
+    !db ||
+    !uid ||
+    !Array.isArray(savedKinds) ||
+    !savedKinds.length
+  ) {
+    return false;
+  }
+
+  const current =
+    await dailyMilkLoadComponentsSrv(uid);
+
+  const next = {
+    cow: {
+      ...(current.cow || {})
+    },
+
+    buffalo: {
+      ...(current.buffalo || {})
+    }
+  };
+
+  let changed = false;
+
+  for (
+    const kind of new Set(savedKinds)
+  ) {
+    const component =
+      submitted?.[kind];
+
+    if (!component?.provided) continue;
+
+    next[kind] = {
+      milkFatPct:
+        component.milkFatPct,
+
+      milkProteinPct:
+        component.milkProteinPct
+    };
+
+    changed = true;
+  }
+
+  if (!changed) return false;
+
+  await db
+    .collection("user_event_options")
+    .doc(uid)
+    .set(
+      {
+        dailyMilkComponents: next,
+
+        dailyMilkComponentsUpdatedAt:
+          admin.firestore
+            .FieldValue
+            .serverTimestamp(),
+
+        updatedAt:
+          admin.firestore
+            .FieldValue
+            .serverTimestamp()
+      },
+      {
+        merge: true
+      }
+    );
+
+  return true;
+}
 function dailyMilkBuildComponentsUiSrv({
   accepted = [],
   defaults = {}
@@ -32665,7 +32856,10 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
 
     const uid = req.userId;
     const body = req.body || {};
-
+    const submittedComponents =
+    dailyMilkComponentsInputFromBodySrv(
+    body
+  );
     const eventDate = String(
       body.eventDate ||
       body.date ||
@@ -32716,6 +32910,9 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
 
     const saved = [];
     const rejected = [];
+
+    const savedComponentKinds =
+    new Set();
 
     for (const row of rows) {
       const animalNumber = calvingNormDigitsOnlySrv(row.animalNumber || row.number || "");
@@ -32793,7 +32990,45 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
         });
         continue;
       }
+      const componentInput =
+  submittedComponents?.[kind] || {
+    provided: false,
+    milkFatPct: null,
+    milkProteinPct: null
+  };
 
+const componentIssue =
+  dailyMilkComponentIssueSrv(
+    componentInput,
+    species
+  );
+
+if (componentIssue) {
+  rejected.push({
+    animalNumber,
+    reason: componentIssue
+  });
+
+  continue;
+}
+
+const milkFatPct =
+  componentInput.provided
+    ? componentInput.milkFatPct
+    : null;
+
+const milkProteinPct =
+  componentInput.provided
+    ? componentInput.milkProteinPct
+    : null;
+
+const fatProteinRatio =
+  componentInput.provided
+    ? dailyMilkFatProteinRatioSrv(
+        milkFatPct,
+        milkProteinPct
+      )
+    : null;
       const milkSessions = kind === "buffalo"
         ? [{ n: 1, kg: s1 }, { n: 2, kg: s2 }]
         : [{ n: 1, kg: s1 }, { n: 2, kg: s2 }, { n: 3, kg: s3 }];
@@ -32836,11 +33071,19 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
         species,
         kind,
         milkSessions,
-        milkKg,
-        dailyMilk: milkKg,
-        totalMilk: milkKg,
+  milkKg,
+dailyMilk: milkKg,
+totalMilk: milkKg,
 
-        source: "server:/api/daily-milk/save"
+...(componentInput.provided
+  ? {
+      milkFatPct,
+      milkProteinPct,
+      fatProteinRatio
+    }
+  : {}),
+
+source: "server:/api/daily-milk/save"
       };
 
       const batch = db.batch();
@@ -32858,7 +33101,9 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
       }
 
       await batch.commit();
-
+      if (componentInput.provided) {
+  savedComponentKinds.add(kind);
+}
       saved.push({
         animalNumber,
         animalId,
@@ -32869,7 +33114,23 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
         kind
       });
     }
+    if (savedComponentKinds.size) {
+  try {
+    await dailyMilkPersistComponentsSrv({
+      uid,
+      submitted:
+        submittedComponents,
 
+      savedKinds:
+        [...savedComponentKinds]
+    });
+  } catch (e) {
+    console.warn(
+      "daily milk component defaults save failed:",
+      e.message || e
+    );
+  }
+}
     if (saved.length && typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "daily_milk_save");
     }
