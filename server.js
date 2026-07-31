@@ -31042,7 +31042,171 @@ function dailyMilkSpeciesSrv(doc = {}) {
 function dailyMilkKindSrv(species) {
   return String(species || "").trim() === "جاموس" ? "buffalo" : "cow";
 }
+function dailyMilkComponentPctOrNullSrv(v) {
+  if (
+    v === undefined ||
+    v === null ||
+    String(v).trim() === ""
+  ) {
+    return null;
+  }
 
+  const n = Number(
+    String(v).trim().replace(",", ".")
+  );
+
+  return Number.isFinite(n) && n > 0
+    ? Number(n.toFixed(2))
+    : null;
+}
+
+function dailyMilkComponentsFromOptionsSrv(data = {}) {
+  const root =
+    data.dailyMilkComponents &&
+    typeof data.dailyMilkComponents === "object"
+      ? data.dailyMilkComponents
+      : {};
+
+  const cow =
+    root.cow &&
+    typeof root.cow === "object"
+      ? root.cow
+      : {};
+
+  const buffalo =
+    root.buffalo &&
+    typeof root.buffalo === "object"
+      ? root.buffalo
+      : {};
+
+  return {
+    cow: {
+      milkFatPct:
+        dailyMilkComponentPctOrNullSrv(
+          cow.milkFatPct
+        ),
+
+      milkProteinPct:
+        dailyMilkComponentPctOrNullSrv(
+          cow.milkProteinPct
+        )
+    },
+
+    buffalo: {
+      milkFatPct:
+        dailyMilkComponentPctOrNullSrv(
+          buffalo.milkFatPct
+        ),
+
+      milkProteinPct:
+        dailyMilkComponentPctOrNullSrv(
+          buffalo.milkProteinPct
+        )
+    }
+  };
+}
+
+async function dailyMilkLoadComponentsSrv(uid) {
+  if (!db || !uid) {
+    return dailyMilkComponentsFromOptionsSrv({});
+  }
+
+  const snap = await db
+    .collection("user_event_options")
+    .doc(uid)
+    .get();
+
+  return dailyMilkComponentsFromOptionsSrv(
+    snap.exists
+      ? (snap.data() || {})
+      : {}
+  );
+}
+
+function dailyMilkBuildComponentsUiSrv({
+  accepted = [],
+  defaults = {}
+} = {}) {
+  const visibleKinds = new Set(
+    (Array.isArray(accepted) ? accepted : [])
+      .map(x =>
+        String(
+          x?.kind ||
+          dailyMilkKindSrv(x?.species || "")
+        ).trim()
+      )
+      .filter(Boolean)
+  );
+
+  const buildSection = (
+    kind,
+    speciesLabel
+  ) => {
+    const values =
+      defaults?.[kind] || {};
+
+    const visible =
+      visibleKinds.has(kind);
+
+    return {
+      key: kind,
+      kind,
+      species: speciesLabel,
+      speciesLabel,
+      title: `مكونات لبن ${speciesLabel}`,
+      visible,
+
+      inputs: [
+        {
+          key: "milkFatPct",
+          name: `${kind}MilkFatPct`,
+          label: "نسبة الدهن (%)",
+          type: "number",
+          value:
+            values.milkFatPct ?? "",
+          step: "0.1",
+          min: "0.1",
+          max: "20",
+          visible,
+          disabled: !visible,
+          required: false
+        },
+
+        {
+          key: "milkProteinPct",
+          name:
+            `${kind}MilkProteinPct`,
+          label: "نسبة البروتين (%)",
+          type: "number",
+          value:
+            values.milkProteinPct ?? "",
+          step: "0.1",
+          min: "0.1",
+          max: "20",
+          visible,
+          disabled: !visible,
+          required: false
+        }
+      ]
+    };
+  };
+
+  return {
+    enabled: true,
+
+    sections: [
+      buildSection(
+        "cow",
+        "الأبقار"
+      ),
+
+      buildSection(
+        "buffalo",
+        "الجاموس"
+      )
+    ]
+  };
+}
 function dailyMilkIsOutOfHerdSrv(doc = {}) {
   const st = String(doc.status || "active").trim().toLowerCase();
   return st === "inactive" || st === "archived";
@@ -31193,8 +31357,17 @@ function dailyMilkAcceptedUiRowSrv(item = {}) {
   };
 }
 
-function dailyMilkBuildGateUiSrv({ accepted = [], rejected = [], message = "", eventDate = "" } = {}) {
-  const acceptedRows = accepted.map(dailyMilkAcceptedUiRowSrv);
+function dailyMilkBuildGateUiSrv({
+  accepted = [],
+  rejected = [],
+  message = "",
+  eventDate = "",
+  componentDefaults = {}
+} = {}) {
+  const acceptedRows =
+    accepted.map(
+      dailyMilkAcceptedUiRowSrv
+    );
   const rejectedRows = rejected.map(r => dailyMilkRejectedUiRowSrv(r.animalNumber || r.number, r.reason));
 
   const rows = [...acceptedRows, ...rejectedRows];
@@ -31209,8 +31382,16 @@ function dailyMilkBuildGateUiSrv({ accepted = [], rejected = [], message = "", e
     message: message || (canSave ? "✅ تم التحقق — أكمل إدخال اللبن." : "❌ لا يوجد رقم مؤهل لتسجيل اللبن."),
     canSave,
     acceptedCount: acceptedRows.length,
-    rejectedCount: rejectedRows.length,
+     rejectedCount:
+      rejectedRows.length,
+
     rows,
+
+    components:
+      dailyMilkBuildComponentsUiSrv({
+        accepted: acceptedRows,
+        defaults: componentDefaults
+      }),
 
     single: first ? {
       animalNumber: first.animalNumber,
@@ -31485,12 +31666,19 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
           : `✅ راجعت البيانات، ويمكن تسجيل اللبن لعدد ${acceptedCount} حيوانات.`
     )
   : (rejected[0]?.reason || "❌ لا يمكن تسجيل اللبن لأي من الأرقام المدخلة.");
-    const ui = dailyMilkBuildGateUiSrv({
-      accepted,
-      rejected,
-      message,
-      eventDate
-    });
+    const componentDefaults =
+      await dailyMilkLoadComponentsSrv(
+        uid
+      );
+
+    const ui =
+      dailyMilkBuildGateUiSrv({
+        accepted,
+        rejected,
+        message,
+        eventDate,
+        componentDefaults
+      });
 
     return res.json({
       ok: true,
