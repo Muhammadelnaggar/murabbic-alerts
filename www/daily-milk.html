@@ -80,8 +80,11 @@
             <input id="s3" data-field="milkS3" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0.0" />
           </div>
         </div>
-      </div>
-     <div id="singleTotalBox" class="muted total-line">
+          </div>
+
+<div id="milkComponentsBox" class="hide compact-section"></div>
+
+<div id="singleTotalBox" class="muted total-line">
   الإجمالي: <span data-key="singleTotalText">—</span> كجم
 </div>
 
@@ -110,7 +113,9 @@
   const bulkBox = $("bulkBox");
   const bulkDateBar = $("bulkDateBar");
   const bulkInfo = $("bulkInfo");
-  const bulkRows = $("bulkRows");
+   const bulkRows = $("bulkRows");
+  const milkComponentsBox = $("milkComponentsBox");
+  const bulkActions = $("bulkActions");
 
   const saveBulkBtn = $("saveBulkBtn");
   const cancelBulkBtn = $("cancelBulkBtn");
@@ -220,7 +225,160 @@ async function runPreview() {
       slot.wrap.classList.toggle("hide", item?.visible === false);
     }
   }
+    function renderMilkComponents(componentsUi) {
+    if (!milkComponentsBox) return;
 
+    const sections =
+      Array.isArray(componentsUi?.sections)
+        ? componentsUi.sections.filter(
+            section => section?.visible === true
+          )
+        : [];
+
+    milkComponentsBox.innerHTML = "";
+
+    if (
+      componentsUi?.enabled !== true ||
+      !sections.length
+    ) {
+      milkComponentsBox.classList.add("hide");
+      return;
+    }
+
+    sections.forEach(section => {
+      const sectionEl =
+        document.createElement("div");
+
+      sectionEl.dataset.mbkMilkComponentKind =
+        String(
+          section?.kind ||
+          section?.key ||
+          ""
+        );
+
+      const titleEl =
+        document.createElement("div");
+
+      titleEl.style.fontWeight = "900";
+      titleEl.style.marginBottom = "10px";
+      titleEl.textContent =
+        String(
+          section?.title ||
+          "مكونات اللبن"
+        );
+
+      sectionEl.appendChild(titleEl);
+
+      const rowEl =
+        document.createElement("div");
+
+      rowEl.className = "row";
+
+      const inputs =
+        Array.isArray(section?.inputs)
+          ? section.inputs.filter(
+              input => input?.visible !== false
+            )
+          : [];
+
+      inputs.forEach(item => {
+        const colEl =
+          document.createElement("div");
+
+        colEl.className = "col";
+
+        const labelEl =
+          document.createElement("label");
+
+        labelEl.textContent =
+          String(item?.label || "");
+
+        const inputEl =
+          document.createElement("input");
+
+        inputEl.type =
+          String(item?.type || "number");
+
+        inputEl.inputMode = "decimal";
+
+        inputEl.value =
+          item?.value ?? "";
+
+        inputEl.disabled =
+          item?.disabled === true;
+
+        inputEl.dataset.mbkMilkComponentKind =
+          String(
+            section?.kind ||
+            section?.key ||
+            ""
+          );
+
+        inputEl.dataset.key =
+          String(item?.key || "");
+
+        if (item?.step !== undefined) {
+          inputEl.step =
+            String(item.step);
+        }
+
+        if (item?.min !== undefined) {
+          inputEl.min =
+            String(item.min);
+        }
+
+        if (item?.max !== undefined) {
+          inputEl.max =
+            String(item.max);
+        }
+
+        colEl.appendChild(labelEl);
+        colEl.appendChild(inputEl);
+        rowEl.appendChild(colEl);
+      });
+
+      sectionEl.appendChild(rowEl);
+      milkComponentsBox.appendChild(sectionEl);
+    });
+
+    milkComponentsBox.classList.remove("hide");
+  }
+
+  function readMilkComponents() {
+    const components = {};
+
+    milkComponentsBox
+      ?.querySelectorAll(
+        "input[data-mbk-milk-component-kind][data-key]"
+      )
+      .forEach(input => {
+        if (input.disabled) return;
+
+        const kind =
+          String(
+            input.dataset
+              .mbkMilkComponentKind ||
+            ""
+          ).trim();
+
+        const key =
+          String(
+            input.dataset.key ||
+            ""
+          ).trim();
+
+        if (!kind || !key) return;
+
+        if (!components[kind]) {
+          components[kind] = {};
+        }
+
+        components[kind][key] =
+          input.value || "";
+      });
+
+    return components;
+  }
   function renderSingle(ui) {
     currentMode = "single";
 
@@ -229,6 +387,15 @@ async function runPreview() {
     singleTotalBox?.classList.remove("hide");
     singleActions?.classList.remove("hide");
     openCowCardBtn?.classList.remove("hide");
+
+    singleTotalBox?.parentNode?.insertBefore(
+      milkComponentsBox,
+      singleTotalBox
+    );
+
+    renderMilkComponents(
+      ui?.components
+    );
 
     Object.values(inputSlots).forEach(slot => {
       slot.wrap?.classList.add("hide");
@@ -254,7 +421,16 @@ async function runPreview() {
     sessionsBox?.classList.add("hide");
     singleTotalBox?.classList.add("hide");
     singleActions?.classList.add("hide");
-    openCowCardBtn?.classList.add("hide");
+        openCowCardBtn?.classList.add("hide");
+
+    bulkActions?.parentNode?.insertBefore(
+      milkComponentsBox,
+      bulkActions
+    );
+
+    renderMilkComponents(
+      ui?.components
+    );
 
     const animalCol = animalInput?.closest(".col");
     const dateCol = dateInput?.closest(".col");
@@ -346,26 +522,67 @@ async function runPreview() {
   }
 
   function savePayload() {
+    const components =
+      readMilkComponents();
+
     if (currentMode === "bulk") {
       return {
-        eventDate: dateInput?.value || "",
-        rows: Array.from(document.querySelectorAll("[data-mbk-row='daily-milk']"))
-          .filter(row => row.dataset.canSave === "1")
+        eventDate:
+          dateInput?.value || "",
+
+        components,
+
+        rows: Array.from(
+          document.querySelectorAll(
+            "[data-mbk-row='daily-milk']"
+          )
+        )
+          .filter(
+            row =>
+              row.dataset.canSave === "1"
+          )
           .map(row => ({
-            animalNumber: row.dataset.number || "",
-            milkS1: row.querySelector("[data-key='milkS1']")?.value || "",
-            milkS2: row.querySelector("[data-key='milkS2']")?.value || "",
-            milkS3: row.querySelector("[data-key='milkS3']")?.value || ""
+            animalNumber:
+              row.dataset.number || "",
+
+            milkS1:
+              row.querySelector(
+                "[data-key='milkS1']"
+              )?.value || "",
+
+            milkS2:
+              row.querySelector(
+                "[data-key='milkS2']"
+              )?.value || "",
+
+            milkS3:
+              row.querySelector(
+                "[data-key='milkS3']"
+              )?.value || ""
           }))
       };
     }
 
     return {
-      animalNumber: animalInput?.value || "",
-      eventDate: dateInput?.value || "",
-      milkS1: inputSlots.milkS1.input?.value || "",
-      milkS2: inputSlots.milkS2.input?.value || "",
-      milkS3: inputSlots.milkS3.input?.value || ""
+      animalNumber:
+        animalInput?.value || "",
+
+      eventDate:
+        dateInput?.value || "",
+
+      components,
+
+      milkS1:
+        inputSlots.milkS1.input?.value ||
+        "",
+
+      milkS2:
+        inputSlots.milkS2.input?.value ||
+        "",
+
+      milkS3:
+        inputSlots.milkS3.input?.value ||
+        ""
     };
   }
 
