@@ -40959,39 +40959,7 @@ async function murabbikSmartAlertApplyUserStateSrv(
     hiddenCount
   };
 }
-const MURABBIK_MILK_MIRROR_VISIBLE_LIMIT = 3;
 
-function murabbikSmartAlertApplyMilkMirrorLimitSrv(
-  alerts = []
-) {
-  const visibleAlerts = [];
-
-  let milkMirrorVisibleCount = 0;
-  let hiddenByLimitCount = 0;
-
-  for (const alert of alerts) {
-    if (alert?.source !== "milk_mirror") {
-      visibleAlerts.push(alert);
-      continue;
-    }
-
-    if (
-      milkMirrorVisibleCount >=
-      MURABBIK_MILK_MIRROR_VISIBLE_LIMIT
-    ) {
-      hiddenByLimitCount++;
-      continue;
-    }
-
-    milkMirrorVisibleCount++;
-    visibleAlerts.push(alert);
-  }
-
-  return {
-    visibleAlerts,
-    hiddenByLimitCount
-  };
-}
 // ============================================================
 //       SMART ALERT SOURCE: DRY-OFF DUE — 210 DAYS
 //       أول مصدر تشغيلي: استحقاق التجفيف
@@ -45385,17 +45353,12 @@ const stateResult =
     result.context.nowMs
   );
 
-const milkLimitResult =
-  murabbikSmartAlertApplyMilkMirrorLimitSrv(
-    stateResult.visibleAlerts
-  );
-
 const currentAlert =
-  milkLimitResult.visibleAlerts[0] ||
+  stateResult.visibleAlerts[0] ||
   null;
 
 const remaining =
-  milkLimitResult.visibleAlerts.slice(1);
+  stateResult.visibleAlerts.slice(1);
 
     return res.json({
       ok: true,
@@ -45429,8 +45392,7 @@ const remaining =
 hiddenByInteractionCount:
   stateResult.hiddenCount,
 
-hiddenByMilkLimitCount:
-  milkLimitResult.hiddenByLimitCount,
+hiddenByMilkLimitCount: 0,
 
 degraded:
   
