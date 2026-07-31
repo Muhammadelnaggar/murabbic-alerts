@@ -1,4 +1,6 @@
 
+
+
 // server.js — stable build, tenant-aware
 // ----------------------------------------------
 const path    = require('path');
@@ -41106,6 +41108,761 @@ const settled = await Promise.allSettled([
     }
   );
 }
+// ============================================================
+//       SMART ALERT SOURCE: MILK MIRROR — HEALTH / HERD
+//       مرآة اللبن: فردي + جماعي + تغذية + طقس
+// ============================================================
+
+const MURABBIK_MILK_MIRROR_SNOOZE_MINUTES = 24 * 60;
+const MURABBIK_MILK_MIRROR_LOOKBACK_DAYS = 7;
+const MURABBIK_MILK_MIRROR_BASELINE_MIN_DAYS = 3;
+const MURABBIK_MILK_MIRROR_BASELINE_MAX_DAYS = 5;
+const MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS = 3;
+const MURABBIK_MILK_MIRROR_GROUP_MIN_AFFECTED_PCT = 25;
+
+function murabbikMilkMirrorDateSrv(event = {}) {
+  return murabbikSmartAlertTextSrv(
+    event.eventDate ||
+    event.date ||
+    ""
+  ).slice(0, 10);
+}
+
+function murabbikMilkMirrorMedianSrv(values = []) {
+  const rows = values
+    .map(Number)
+    .filter(n => Number.isFinite(n) && n > 0)
+    .sort((a, b) => a - b);
+
+  if (!rows.length) return null;
+
+  const middle = Math.floor(rows.length / 2);
+
+  return rows.length % 2
+    ? rows[middle]
+    : (rows[middle - 1] + rows[middle]) / 2;
+}
+
+function murabbikMilkMirrorDropPctSrv(currentKg, baselineKg) {
+  const current = Number(currentKg);
+  const baseline = Number(baselineKg);
+
+  if (
+    !Number.isFinite(current) ||
+    !Number.isFinite(baseline) ||
+    current <= 0 ||
+    baseline <= 0 ||
+    current >= baseline
+  ) {
+    return 0;
+  }
+
+  return Number(
+    (((baseline - current) / baseline) * 100)
+      .toFixed(1)
+  );
+}
+
+function murabbikMilkMirrorAnimalActiveSrv(doc = {}) {
+  const status = murabbikSmartAlertTextSrv([
+    doc.status,
+    doc.lifeStatus,
+    doc.animalStatus,
+    doc.saleStatus,
+    doc.exitReason
+  ].filter(Boolean).join(" ")).toLowerCase();
+
+  if (
+    doc.active === false ||
+    doc.isActive === false ||
+    doc.inactive === true
+  ) {
+    return false;
+  }
+
+  return ![
+    "inactive",
+    "archived",
+    "dead",
+    "sold",
+    "نافق",
+    "نفوق",
+    "مباع",
+    "بيع",
+    "خارج القطيع"
+  ].some(x => status.includes(x));
+}
+
+function murabbikMilkMirrorGroupMetaSrv(doc = {}) {
+  const speciesKey = dryOffSpeciesKeySrv(doc) === "buffalo"
+    ? "buffalo"
+    : "cow";
+
+  const groupId = murabbikSmartAlertTextSrv(
+    doc.groupId ||
+    doc.groupKey ||
+    ""
+  );
+
+  const groupDef =
+    typeof GROUP_DEF_BY_ID_SRV === "object" && groupId
+      ? GROUP_DEF_BY_ID_SRV[groupId]
+      : null;
+
+  const groupName = murabbikSmartAlertTextSrv(
+    doc.groupName ||
+    doc.groupLabel ||
+    doc.group ||
+    groupDef?.label ||
+    groupId ||
+    (speciesKey === "buffalo" ? "مجموعة الجاموس الحلاب" : "مجموعة الأبقار الحلاب")
+  );
+
+  return {
+    speciesKey,
+    groupId,
+    groupName,
+    groupKey: groupId || `${speciesKey}:unassigned`
+  };
+}
+
+function murabbikMilkMirrorReportUrlSrv(speciesKey = "cow") {
+  const type = speciesKey === "buffalo" ? "buffalo" : "cows";
+  const species = speciesKey === "buffalo" ? "buffalo" : "cow";
+
+  return `nutrition-report.html?type=${encodeURIComponent(type)}&species=${encodeURIComponent(species)}`;
+}
+
+async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
+  const [animals, allEvents] = await Promise.all([
+    murabbikSmartAlertAnimalsSrv(context),
+
+    context.load(
+      "smart-alerts:milk-mirror-events",
+      async () =>
+        await milkReportFetchUserEventsSrv(
+          context.userId,
+          8000
+        )
+    )
+  ]);
+
+  const animalsByNumber = new Map();
+
+  for (const doc of animals) {
+    const animalNumber = murabbikDryOffAlertNumberSrv(doc);
+    if (!animalNumber) continue;
+
+    animalsByNumber.set(animalNumber, doc);
+  }
+
+  const earliestDate = milkReportAddDaysSrv(
+    context.today,
+    -(MURABBIK_MILK_MIRROR_LOOKBACK_DAYS + 2)
+  );
+
+  const historyByAnimal = new Map();
+
+  for (const event of allEvents) {
+    if (!milkReportIsMilkEventSrv(event)) continue;
+
+    const animalNumber = calvingNormDigitsOnlySrv(
+      event.animalNumber ||
+      event.number ||
+      ""
+    );
+
+    const eventDate = murabbikMilkMirrorDateSrv(event);
+    const milkKg = milkReportKgSrv(event);
+
+    if (
+      !animalNumber ||
+      !milkReportIsDateSrv(eventDate) ||
+      eventDate < earliestDate ||
+      eventDate > context.today ||
+      !Number.isFinite(milkKg) ||
+      milkKg <= 0
+    ) {
+      continue;
+    }
+
+    if (!historyByAnimal.has(animalNumber)) {
+      historyByAnimal.set(animalNumber, new Map());
+    }
+
+    const byDate = historyByAnimal.get(animalNumber);
+
+    if (!byDate.has(eventDate)) {
+      byDate.set(eventDate, {
+        animalNumber,
+        eventDate,
+        milkKg
+      });
+    }
+  }
+
+  const analyses = [];
+
+  for (const [animalNumber, byDate] of historyByAnimal.entries()) {
+    const doc = animalsByNumber.get(animalNumber);
+
+    if (!doc) continue;
+    if (!murabbikMilkMirrorAnimalActiveSrv(doc)) continue;
+    if (!murabbikDryOffAlertIsMilkingSrv(doc)) continue;
+
+    if (
+      String(doc.entryType || "")
+        .trim()
+        .toLowerCase() === "followers"
+    ) {
+      continue;
+    }
+
+    const rows = [...byDate.values()]
+      .sort((a, b) =>
+        String(b.eventDate).localeCompare(
+          String(a.eventDate)
+        )
+      );
+
+    const current = rows[0];
+    if (!current) continue;
+
+    const recordAgeDays = milkReportDaysBetweenSrv(
+      current.eventDate,
+      context.today
+    );
+
+    if (
+      !Number.isFinite(recordAgeDays) ||
+      recordAgeDays < 0 ||
+      recordAgeDays > 1
+    ) {
+      continue;
+    }
+
+    const baselineRows = rows
+      .slice(1)
+      .filter(row => {
+        const gap = milkReportDaysBetweenSrv(
+          row.eventDate,
+          current.eventDate
+        );
+
+        return (
+          Number.isFinite(gap) &&
+          gap >= 1 &&
+          gap <= MURABBIK_MILK_MIRROR_LOOKBACK_DAYS
+        );
+      })
+      .slice(0, MURABBIK_MILK_MIRROR_BASELINE_MAX_DAYS);
+
+    if (
+      baselineRows.length <
+      MURABBIK_MILK_MIRROR_BASELINE_MIN_DAYS
+    ) {
+      continue;
+    }
+
+    const baselineKg = murabbikMilkMirrorMedianSrv(
+      baselineRows.map(row => row.milkKg)
+    );
+
+    const dropPct = murabbikMilkMirrorDropPctSrv(
+      current.milkKg,
+      baselineKg
+    );
+
+    if (!Number.isFinite(dropPct)) {
+      continue;
+    }
+
+    const previous = rows[1] || null;
+    const olderBaselineRows = rows
+      .slice(2)
+      .filter(row => {
+        if (!previous) return false;
+
+        const gap = milkReportDaysBetweenSrv(
+          row.eventDate,
+          previous.eventDate
+        );
+
+        return (
+          Number.isFinite(gap) &&
+          gap >= 1 &&
+          gap <= MURABBIK_MILK_MIRROR_LOOKBACK_DAYS
+        );
+      })
+      .slice(0, MURABBIK_MILK_MIRROR_BASELINE_MAX_DAYS);
+
+    const previousBaselineKg =
+      olderBaselineRows.length >=
+      MURABBIK_MILK_MIRROR_BASELINE_MIN_DAYS
+        ? murabbikMilkMirrorMedianSrv(
+            olderBaselineRows.map(row => row.milkKg)
+          )
+        : null;
+
+    const previousDropPct = previous
+      ? murabbikMilkMirrorDropPctSrv(
+          previous.milkKg,
+          previousBaselineKg
+        )
+      : 0;
+
+    const previousGapDays = previous
+      ? milkReportDaysBetweenSrv(
+          previous.eventDate,
+          current.eventDate
+        )
+      : null;
+
+    const group = murabbikMilkMirrorGroupMetaSrv(doc);
+
+    analyses.push({
+      animalNumber,
+      doc,
+      group,
+      currentDate: current.eventDate,
+      currentKg: Number(current.milkKg.toFixed(1)),
+      baselineKg: Number(Number(baselineKg).toFixed(1)),
+      dropPct,
+      previousDropPct,
+      previousGapDays
+    });
+  }
+
+  if (!analyses.length) return [];
+
+  const groupRows = new Map();
+
+  for (const item of analyses) {
+    const key = [
+      item.currentDate,
+      item.group.groupKey
+    ].join("|");
+
+    if (!groupRows.has(key)) {
+      groupRows.set(key, []);
+    }
+
+    groupRows.get(key).push(item);
+  }
+
+  const qualifyingGroups = new Map();
+
+  for (const [key, rows] of groupRows.entries()) {
+    if (rows.length < MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS) {
+      continue;
+    }
+
+    const totalBaseline = rows.reduce(
+      (sum, row) => sum + Number(row.baselineKg || 0),
+      0
+    );
+
+    const totalCurrent = rows.reduce(
+      (sum, row) => sum + Number(row.currentKg || 0),
+      0
+    );
+
+    const groupDropPct = murabbikMilkMirrorDropPctSrv(
+      totalCurrent,
+      totalBaseline
+    );
+
+    const affected = rows.filter(row => row.dropPct >= 5);
+
+    const requiredAffected = Math.max(
+      MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS,
+      Math.ceil(
+        rows.length *
+        (MURABBIK_MILK_MIRROR_GROUP_MIN_AFFECTED_PCT / 100)
+      )
+    );
+
+    if (
+      groupDropPct < 5 ||
+      affected.length < requiredAffected
+    ) {
+      continue;
+    }
+
+    qualifyingGroups.set(key, {
+      rows,
+      affected,
+      groupDropPct,
+      currentDate: rows[0].currentDate,
+      group: rows[0].group
+    });
+  }
+
+  let weather = null;
+
+  if (qualifyingGroups.size) {
+    weather = await context.load(
+      "smart-alerts:milk-mirror-weather",
+      async () =>
+        await weatherBuildFarmThiSrv(
+          context.profileUid
+        )
+    );
+  }
+
+  const alerts = [];
+
+  for (const [key, groupData] of qualifyingGroups.entries()) {
+    const {
+      rows,
+      affected,
+      groupDropPct,
+      currentDate,
+      group
+    } = groupData;
+
+    const animalNumbers = affected
+      .map(row => row.animalNumber)
+      .sort((a, b) =>
+        String(a).localeCompare(
+          String(b),
+          "ar",
+          { numeric: true }
+        )
+      );
+
+    const thi = Number(weather?.thi);
+    const heatRelated = Number.isFinite(thi) && thi >= 68;
+
+    const componentRows = rows
+      .map(row => {
+        const fat = Number(row.doc.milkFatPct);
+        const protein = Number(row.doc.milkProteinPct);
+
+        if (
+          !Number.isFinite(fat) ||
+          !Number.isFinite(protein) ||
+          fat <= 0 ||
+          protein <= 0
+        ) {
+          return null;
+        }
+
+        return {
+          fat,
+          protein,
+          ratio: fat / protein
+        };
+      })
+      .filter(Boolean);
+
+    const averageFatProteinRatio = componentRows.length
+      ? componentRows.reduce(
+          (sum, row) => sum + row.ratio,
+          0
+        ) / componentRows.length
+      : null;
+
+    const saraPattern =
+      group.speciesKey === "cow" &&
+      componentRows.length >= MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS &&
+      Number.isFinite(averageFatProteinRatio) &&
+      averageFatProteinRatio < 1;
+
+    const identityKey = [
+      "milk-mirror-group",
+      currentDate,
+      group.groupKey,
+      heatRelated
+        ? "heat"
+        : saraPattern
+          ? "sara"
+          : "management"
+    ].join(":");
+
+    const revisionKey = [
+      currentDate,
+      group.groupKey,
+      groupDropPct,
+      animalNumbers.join(","),
+      Number.isFinite(thi) ? thi : "no-thi",
+      Number.isFinite(averageFatProteinRatio)
+        ? averageFatProteinRatio.toFixed(2)
+        : "no-components"
+    ].join("|");
+
+    if (heatRelated) {
+      alerts.push({
+        identityKey,
+        revisionKey,
+
+        kind: "technical",
+        domain: "production",
+        code: "milk_mirror_group_heat_drop",
+
+        priority: thi >= 78 ? "high" : "normal",
+        urgency: thi >= 78 ? "now" : "today",
+        certainty: "probable",
+        status: "review",
+
+        title: "انخفاض جماعي مرتبط بالإجهاد الحراري",
+
+        message:
+          `انخفض متوسط إنتاج ${group.groupName} بنسبة ${groupDropPct}% بالتزامن مع وصول مؤشر الإجهاد الحراري THI إلى ${Math.round(thi)}. قد يرتبط هذا النمط بتأثير الحرارة في المأكول وإنتاج اللبن. يُنصح بمراجعة كفاءة التبريد وتوافر المياه.`,
+
+        details: {
+          observation:
+            `تأثر ${animalNumbers.length} من الحيوانات المسجلة في المجموعة.` ,
+
+          meaning:
+            "الانخفاض الجماعي المتزامن مع ارتفاع THI يرجح تأثيرًا بيئيًا مشتركًا أكثر من مشكلة فردية واحدة.",
+
+          recommendation:
+            "راجع التبريد والمياه وظروف المجموعة، وافحص الحيوانات الأكثر تأثرًا بيطريًا عند الحاجة.",
+
+          evidence: [
+            `متوسط انخفاض المجموعة: ${groupDropPct}%.`,
+            `THI الحالي: ${Math.round(thi)}.`,
+            `الحيوانات الأكثر تأثرًا: ${animalNumbers.join("، ")}.`
+          ]
+        },
+
+        dueDate: currentDate,
+        affectedCount: animalNumbers.length,
+        animalNumbers,
+
+        action: {
+          type: "none",
+          label: "",
+          url: ""
+        },
+
+        snoozeMinutes: MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
+      });
+
+      continue;
+    }
+
+    if (saraPattern) {
+      alerts.push({
+        identityKey,
+        revisionKey,
+
+        kind: "technical",
+        domain: "nutrition",
+        code: "milk_mirror_group_sara_pattern",
+
+        priority: "high",
+        urgency: "today",
+        certainty: "suspected",
+        status: "review",
+
+        title: "اضطراب محتمل في تخمر الكرش",
+
+        message:
+          `انخفض إنتاج ${group.groupName} بصورة جماعية بالتزامن مع انخفاض نسبة دهن اللبن إلى البروتين. قد يتوافق هذا النمط مع الحموضة تحت الحادة للكرش «SARA»، أو نقص الألياف الفعالة، أو فرز العليقة، أو زيادة النشويات سريعة التخمر. يُنصح بمراجعة البرنامج الغذائي وفحص الحيوانات بيطريًا لتحديد السبب.`,
+
+        details: {
+          observation:
+            `انخفض متوسط إنتاج المجموعة بنسبة ${groupDropPct}%، وبلغ متوسط نسبة الدهن إلى البروتين ${averageFatProteinRatio.toFixed(2)}.`,
+
+          meaning:
+            "اجتماع الانخفاض الجماعي مع تغير مكونات اللبن يدعم الاشتباه في اضطراب تخمر الكرش، لكنه لا يثبت التشخيص.",
+
+          recommendation:
+            "راجع البرنامج الغذائي وفحص الحيوانات بيطريًا لتحديد السبب.",
+
+          evidence: [
+            `متوسط انخفاض المجموعة: ${groupDropPct}%.`,
+            `متوسط نسبة الدهن إلى البروتين: ${averageFatProteinRatio.toFixed(2)}.`,
+            `الحيوانات المتأثرة: ${animalNumbers.join("، ")}.`
+          ]
+        },
+
+        dueDate: currentDate,
+        affectedCount: animalNumbers.length,
+        animalNumbers,
+
+        action: {
+          type: "navigate",
+          label: "فتح تقرير التغذية",
+          url: murabbikMilkMirrorReportUrlSrv(group.speciesKey)
+        },
+
+        snoozeMinutes: MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
+      });
+
+      continue;
+    }
+
+    alerts.push({
+      identityKey,
+      revisionKey,
+
+      kind: "technical",
+      domain: "production",
+      code: "milk_mirror_group_management_drop",
+
+      priority: "normal",
+      urgency: "today",
+      certainty: "probable",
+      status: "review",
+
+      title: "انخفاض جماعي في إنتاج اللبن",
+
+      message:
+        `انخفض متوسط إنتاج ${group.groupName} بنسبة ${groupDropPct}% عن مستواه المعتاد. يتوافق هذا النمط أكثر مع تغير في التغذية أو المياه أو إدارة الحلب، وليس مع مشكلة فردية واحدة. يُنصح بمراجعة ظروف المجموعة والبرنامج الغذائي.`,
+
+      details: {
+        observation:
+          `تأثر ${animalNumbers.length} من الحيوانات المسجلة في المجموعة.`,
+
+        meaning:
+          "الانخفاض المتزامن في عدة حيوانات يرجح وجود عامل مشترك داخل المجموعة.",
+
+        recommendation:
+          "راجع العليقة والمياه ومواعيد الحلب وظروف المجموعة.",
+
+        evidence: [
+          `متوسط انخفاض المجموعة: ${groupDropPct}%.`,
+          `الحيوانات الأكثر تأثرًا: ${animalNumbers.join("، ")}.`
+        ]
+      },
+
+      dueDate: currentDate,
+      affectedCount: animalNumbers.length,
+      animalNumbers,
+
+      action: {
+        type: "navigate",
+        label: "فتح تقرير التغذية",
+        url: murabbikMilkMirrorReportUrlSrv(group.speciesKey)
+      },
+
+      snoozeMinutes: MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
+    });
+  }
+
+  for (const item of analyses) {
+    const groupKey = [
+      item.currentDate,
+      item.group.groupKey
+    ].join("|");
+
+    const groupQualified = qualifyingGroups.has(groupKey);
+
+    const twoDayModerate =
+      item.dropPct >= 10 &&
+      item.dropPct < 15 &&
+      item.previousDropPct >= 10 &&
+      Number.isFinite(item.previousGapDays) &&
+      item.previousGapDays >= 1 &&
+      item.previousGapDays <= 2;
+
+    const oneDayClear =
+      item.dropPct >= 15 &&
+      item.dropPct < 20;
+
+    const oneDayCritical = item.dropPct >= 20;
+
+    if (
+      !oneDayCritical &&
+      !oneDayClear &&
+      !twoDayModerate
+    ) {
+      continue;
+    }
+
+    if (groupQualified && !oneDayCritical) {
+      continue;
+    }
+
+    const code = oneDayCritical
+      ? "milk_mirror_individual_critical_drop"
+      : oneDayClear
+        ? "milk_mirror_individual_clear_drop"
+        : "milk_mirror_individual_persistent_drop";
+
+    const title = oneDayCritical
+      ? "انخفاض حاد في إنتاج اللبن"
+      : oneDayClear
+        ? "انخفاض واضح في إنتاج اللبن"
+        : "انخفاض مستمر في إنتاج اللبن";
+
+    const message = oneDayCritical
+      ? `انخفض إنتاج الحيوان رقم ${item.animalNumber} بصورة حادة ومفاجئة بنسبة ${item.dropPct}% عن مستواه المتوقع. قد يرتبط هذا النمط بمشكلة حادة في الضرع، أو اضطراب هضمي، أو جسم معدني، أو مشكلة صحية مفاجئة. يُنصح بفحص الحيوان بيطريًا في أقرب وقت.`
+      : oneDayClear
+        ? `انخفض إنتاج الحيوان رقم ${item.animalNumber} بصورة واضحة بنسبة ${item.dropPct}% عن مستواه المتوقع. قد يرتبط هذا النمط بمشكلة في الضرع، أو اضطراب هضمي، أو انخفاض المأكول، أو مشكلة صحية أخرى. يُنصح بفحص الحيوان بيطريًا لتحديد السبب.`
+        : `انخفض إنتاج الحيوان رقم ${item.animalNumber} عن مستواه المتوقع لليوم الثاني على التوالي. قد يرتبط ذلك بانخفاض المأكول أو بداية مشكلة صحية. يُنصح بفحص الحيوان بيطريًا لتحديد السبب.`;
+
+    alerts.push({
+      identityKey:
+        `milk-mirror-animal:${item.animalNumber}`,
+
+      revisionKey: [
+        item.animalNumber,
+        item.currentDate,
+        item.currentKg,
+        item.baselineKg,
+        item.dropPct,
+        item.previousDropPct,
+        code
+      ].join("|"),
+
+      kind: "technical",
+      domain: "health",
+      code,
+
+      priority: oneDayCritical ? "urgent" : "high",
+      urgency: oneDayCritical ? "now" : "today",
+      certainty: "suspected",
+      status: "review",
+
+      title,
+      message,
+
+      details: {
+        observation:
+          `الإنتاج المسجل ${item.currentKg} كجم، مقابل مستوى متوقع قدره ${item.baselineKg} كجم محسوب من وسيط آخر أيام مسجلة.`,
+
+        meaning:
+          "إنتاج اللبن مرآة مبكرة لصحة الحيوان، لكنه لا يثبت تشخيصًا بمفرده.",
+
+        recommendation:
+          oneDayCritical
+            ? "يُنصح بفحص الحيوان بيطريًا في أقرب وقت لتحديد السبب."
+            : "يُنصح بفحص الحيوان بيطريًا لتحديد السبب.",
+
+        evidence: [
+          `الانخفاض الحالي: ${item.dropPct}%.`,
+          `الإنتاج الحالي: ${item.currentKg} كجم.`,
+          `المستوى المتوقع: ${item.baselineKg} كجم.`
+        ]
+      },
+
+      dueDate: item.currentDate,
+      affectedCount: 1,
+      animalNumbers: [item.animalNumber],
+
+      action: {
+        type: "navigate",
+        label: "تسجيل فحص صحي",
+        url:
+          `disease.html?number=${encodeURIComponent(item.animalNumber)}` +
+          `&date=${encodeURIComponent(item.currentDate)}`
+      },
+
+      snoozeMinutes: MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
+    });
+  }
+
+  return alerts;
+}
+
+murabbikSmartAlertRegisterSourceSrv(
+  "milk_mirror",
+  murabbikMilkMirrorSmartAlertSourceSrv
+);
 
 async function murabbikDryOffDueAlertSourceSrv(context) {
   const animals = await murabbikSmartAlertAnimalsSrv(
