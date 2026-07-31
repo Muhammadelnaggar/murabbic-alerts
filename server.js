@@ -41193,37 +41193,74 @@ function murabbikMilkMirrorAnimalActiveSrv(doc = {}) {
   ].some(x => status.includes(x));
 }
 
-function murabbikMilkMirrorGroupMetaSrv(doc = {}) {
-  const speciesKey = dryOffSpeciesKeySrv(doc) === "buffalo"
-    ? "buffalo"
-    : "cow";
+function murabbikMilkMirrorOfficialGroupMetaSrv(groupId = "") {
+  const cleanGroupId =
+    murabbikSmartAlertTextSrv(groupId);
 
-  const groupId = murabbikSmartAlertTextSrv(
-    doc.groupId ||
-    doc.groupKey ||
-    ""
-  );
+  if (
+    !milkReportOfficialMilkingGroupIdsSrv()
+      .includes(cleanGroupId)
+  ) {
+    return null;
+  }
 
   const groupDef =
-    typeof GROUP_DEF_BY_ID_SRV === "object" && groupId
-      ? GROUP_DEF_BY_ID_SRV[groupId]
+    typeof GROUP_DEF_BY_ID_SRV === "object"
+      ? GROUP_DEF_BY_ID_SRV[cleanGroupId]
       : null;
 
-  const groupName = murabbikSmartAlertTextSrv(
-    doc.groupName ||
-    doc.groupLabel ||
-    doc.group ||
-    groupDef?.label ||
-    groupId ||
-    (speciesKey === "buffalo" ? "مجموعة الجاموس الحلاب" : "مجموعة الأبقار الحلاب")
-  );
+  if (!groupDef) return null;
+
+  const speciesKey =
+    groupDef.species === "buffalo"
+      ? "buffalo"
+      : "cow";
 
   return {
     speciesKey,
-    groupId,
-    groupName,
-    groupKey: groupId || `${speciesKey}:unassigned`
+    groupId: cleanGroupId,
+
+    groupName:
+      murabbikSmartAlertTextSrv(
+        groupDef.label || cleanGroupId
+      ),
+
+    groupKey: cleanGroupId
   };
+}
+
+function murabbikMilkMirrorOfficialGroupIndexSrv(
+  groupsMap = {}
+) {
+  const index = new Map();
+
+  for (
+    const groupId of
+    milkReportOfficialMilkingGroupIdsSrv()
+  ) {
+    const group =
+      murabbikMilkMirrorOfficialGroupMetaSrv(
+        groupId
+      );
+
+    if (!group) continue;
+
+    const members =
+      Array.isArray(groupsMap?.[groupId])
+        ? groupsMap[groupId]
+        : [];
+
+    for (const member of members) {
+      const animalNumber =
+        murabbikDryOffAlertNumberSrv(member);
+
+      if (!animalNumber) continue;
+
+      index.set(animalNumber, group);
+    }
+  }
+
+  return index;
 }
 
 function murabbikMilkMirrorReportUrlSrv(speciesKey = "cow") {
@@ -41246,7 +41283,22 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
         )
     )
   ]);
+    const officialGroupsResult =
+    await context.load(
+      "smart-alerts:milk-mirror-official-groups",
 
+      async () =>
+        await milkReportLoadOfficialGroupsMapFromFirestoreSrv(
+          context.userId,
+          animals,
+          true
+        )
+    );
+
+  const officialGroupByAnimalNumber =
+    murabbikMilkMirrorOfficialGroupIndexSrv(
+      officialGroupsResult?.groupsMap || {}
+    );
   const animalsByNumber = new Map();
 
   for (const doc of animals) {
@@ -41418,7 +41470,10 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
         )
       : null;
 
-    const group = murabbikMilkMirrorGroupMetaSrv(doc);
+    const group =
+      officialGroupByAnimalNumber.get(
+        animalNumber
+      ) || null;
 
     analyses.push({
       animalNumber,
@@ -41438,6 +41493,8 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
   const groupRows = new Map();
 
   for (const item of analyses) {
+    if (!item.group?.groupKey) continue;
+
     const key = [
       item.currentDate,
       item.group.groupKey
@@ -41743,13 +41800,19 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
     });
   }
 
-  for (const item of analyses) {
-    const groupKey = [
-      item.currentDate,
-      item.group.groupKey
-    ].join("|");
+   for (const item of analyses) {
+    const groupKey =
+      item.group?.groupKey
+        ? [
+            item.currentDate,
+            item.group.groupKey
+          ].join("|")
+        : "";
 
-    const groupQualified = qualifyingGroups.has(groupKey);
+    const groupQualified =
+      groupKey
+        ? qualifyingGroups.has(groupKey)
+        : false;
 
     const twoDayModerate =
       item.dropPct >= 10 &&
