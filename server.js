@@ -41562,30 +41562,16 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
       totalBaseline
     );
 
-    const affected = rows.filter(row => row.dropPct >= 5);
+    if (groupDropPct < 5) {
+  continue;
+}
 
-    const requiredAffected = Math.max(
-      MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS,
-      Math.ceil(
-        rows.length *
-        (MURABBIK_MILK_MIRROR_GROUP_MIN_AFFECTED_PCT / 100)
-      )
-    );
-
-    if (
-      groupDropPct < 5 ||
-      affected.length < requiredAffected
-    ) {
-      continue;
-    }
-
-    qualifyingGroups.set(key, {
-      rows,
-      affected,
-      groupDropPct,
-      currentDate: rows[0].currentDate,
-      group: rows[0].group
-    });
+qualifyingGroups.set(key, {
+  rows,
+  groupDropPct,
+  currentDate: rows[0].currentDate,
+  group: rows[0].group
+});
   }
 
   let weather = null;
@@ -41603,23 +41589,12 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
   const alerts = [];
 
   for (const [key, groupData] of qualifyingGroups.entries()) {
-    const {
-      rows,
-      affected,
-      groupDropPct,
-      currentDate,
-      group
-    } = groupData;
-
-    const animalNumbers = affected
-      .map(row => row.animalNumber)
-      .sort((a, b) =>
-        String(a).localeCompare(
-          String(b),
-          "ar",
-          { numeric: true }
-        )
-      );
+   const {
+  rows,
+  groupDropPct,
+  currentDate,
+  group
+} = groupData;
 
     const thi = Number(weather?.thi);
     const heatRelated = Number.isFinite(thi) && thi >= 68;
@@ -41674,7 +41649,7 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
       currentDate,
       group.groupKey,
       groupDropPct,
-      animalNumbers.join(","),
+      rows.length,
       Number.isFinite(thi) ? thi : "no-thi",
       Number.isFinite(averageFatProteinRatio)
         ? averageFatProteinRatio.toFixed(2)
@@ -41695,32 +41670,30 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
         certainty: "probable",
         status: "review",
 
-        title: "انخفاض جماعي مرتبط بالإجهاد الحراري",
+ title: "انخفاض مجموعة مرتبط بالإجهاد الحراري",
 
-        message:
-          `انخفض متوسط إنتاج ${group.groupName} بنسبة ${groupDropPct}% بالتزامن مع وصول مؤشر الإجهاد الحراري THI إلى ${Math.round(thi)}. قد يرتبط هذا النمط بتأثير الحرارة في المأكول وإنتاج اللبن. يُنصح بمراجعة كفاءة التبريد وتوافر المياه.`,
+message:
+  `انخفض متوسط إنتاج مجموعة ${group.groupName} بنسبة ${groupDropPct}% عن مستواها المتوقع، بالتزامن مع وصول مؤشر الإجهاد الحراري THI إلى ${Math.round(thi)}. راجع كفاءة التبريد، توافر المياه، توقيت تقديم العليقة، ووقت الانتظار قبل الحلب داخل المجموعة.`,
 
-        details: {
-          observation:
-            `تأثر ${animalNumbers.length} من الحيوانات المسجلة في المجموعة.` ,
+details: {
+  observation:
+    `انخفض متوسط إنتاج مجموعة ${group.groupName} بنسبة ${groupDropPct}% عن مستواها المتوقع.`,
 
-          meaning:
-            "الانخفاض الجماعي المتزامن مع ارتفاع THI يرجح تأثيرًا بيئيًا مشتركًا أكثر من مشكلة فردية واحدة.",
+  meaning:
+    "تزامن انخفاض متوسط المجموعة مع ارتفاع THI يرجح وجود تأثير حراري مشترك داخل المجموعة.",
 
-          recommendation:
-            "راجع التبريد والمياه وظروف المجموعة، وافحص الحيوانات الأكثر تأثرًا بيطريًا عند الحاجة.",
+  recommendation:
+    "راجع كفاءة التبريد، توافر المياه، توقيت تقديم العليقة، ووقت الانتظار قبل الحلب داخل المجموعة.",
 
-          evidence: [
-            `متوسط انخفاض المجموعة: ${groupDropPct}%.`,
-            `THI الحالي: ${Math.round(thi)}.`,
-            `الحيوانات الأكثر تأثرًا: ${animalNumbers.join("، ")}.`
-          ]
-        },
+  evidence: [
+    `انخفاض متوسط المجموعة: ${groupDropPct}%.`,
+    `THI الحالي: ${Math.round(thi)}.`
+  ]
+},
 
-        dueDate: currentDate,
-        affectedCount: animalNumbers.length,
-        animalNumbers,
-
+dueDate: currentDate,
+affectedCount: 0,
+animalNumbers: [],
         action: {
           type: "none",
           label: "",
@@ -41749,29 +41722,28 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
 
         title: "اضطراب محتمل في تخمر الكرش",
 
-        message:
-          `انخفض إنتاج ${group.groupName} بصورة جماعية بالتزامن مع انخفاض نسبة دهن اللبن إلى البروتين. قد يتوافق هذا النمط مع الحموضة تحت الحادة للكرش «SARA»، أو نقص الألياف الفعالة، أو فرز العليقة، أو زيادة النشويات سريعة التخمر. يُنصح بمراجعة البرنامج الغذائي وفحص الحيوانات بيطريًا لتحديد السبب.`,
+message:
+  `انخفض متوسط إنتاج مجموعة ${group.groupName} بنسبة ${groupDropPct}% عن مستواها المتوقع، بالتزامن مع انخفاض نسبة دهن اللبن إلى البروتين. قد يتوافق هذا النمط مع اضطراب في تخمر الكرش. راجع تركيب العليقة، الألياف الفعالة، مستوى النشا، فرز العليقة، وانتظام الخلط والتوزيع.`,
 
-        details: {
-          observation:
-            `انخفض متوسط إنتاج المجموعة بنسبة ${groupDropPct}%، وبلغ متوسط نسبة الدهن إلى البروتين ${averageFatProteinRatio.toFixed(2)}.`,
+details: {
+  observation:
+    `انخفض متوسط إنتاج مجموعة ${group.groupName} بنسبة ${groupDropPct}%، وبلغ متوسط نسبة الدهن إلى البروتين ${averageFatProteinRatio.toFixed(2)}.`,
 
-          meaning:
-            "اجتماع الانخفاض الجماعي مع تغير مكونات اللبن يدعم الاشتباه في اضطراب تخمر الكرش، لكنه لا يثبت التشخيص.",
+  meaning:
+    "اجتماع انخفاض متوسط المجموعة مع تغير مكونات اللبن يدعم الاشتباه في اضطراب تخمر الكرش، لكنه لا يثبت التشخيص.",
 
-          recommendation:
-            "راجع البرنامج الغذائي وفحص الحيوانات بيطريًا لتحديد السبب.",
+  recommendation:
+    "راجع تركيب العليقة، الألياف الفعالة، مستوى النشا، فرز العليقة، وانتظام الخلط والتوزيع.",
 
-          evidence: [
-            `متوسط انخفاض المجموعة: ${groupDropPct}%.`,
-            `متوسط نسبة الدهن إلى البروتين: ${averageFatProteinRatio.toFixed(2)}.`,
-            `الحيوانات المتأثرة: ${animalNumbers.join("، ")}.`
-          ]
-        },
+  evidence: [
+    `انخفاض متوسط المجموعة: ${groupDropPct}%.`,
+    `متوسط نسبة الدهن إلى البروتين: ${averageFatProteinRatio.toFixed(2)}.`
+  ]
+},
 
-        dueDate: currentDate,
-        affectedCount: animalNumbers.length,
-        animalNumbers,
+dueDate: currentDate,
+affectedCount: 0,
+animalNumbers: [],
 
         action: {
           type: "navigate",
@@ -41798,30 +41770,29 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
       certainty: "probable",
       status: "review",
 
-      title: "انخفاض جماعي في إنتاج اللبن",
+title: "انخفاض في إنتاج مجموعة الحلاب",
 
-      message:
-        `انخفض متوسط إنتاج ${group.groupName} بنسبة ${groupDropPct}% عن مستواه المعتاد. يتوافق هذا النمط أكثر مع تغير في التغذية أو المياه أو إدارة الحلب، وليس مع مشكلة فردية واحدة. يُنصح بمراجعة ظروف المجموعة والبرنامج الغذائي.`,
+message:
+  `انخفض متوسط إنتاج مجموعة ${group.groupName} بنسبة ${groupDropPct}% عن مستواها المتوقع. راجع استهلاك العليقة وبقاياها، انتظام الخلط والتوزيع، توافر المياه، كفاءة الحلب، والتبريد داخل المجموعة.`,
 
-      details: {
-        observation:
-          `تأثر ${animalNumbers.length} من الحيوانات المسجلة في المجموعة.`,
+details: {
+  observation:
+    `انخفض متوسط إنتاج مجموعة ${group.groupName} بنسبة ${groupDropPct}% عن مستواها المتوقع.`,
 
-        meaning:
-          "الانخفاض المتزامن في عدة حيوانات يرجح وجود عامل مشترك داخل المجموعة.",
+  meaning:
+    "يحدد هذا الانخفاض المجموعة التي ساهمت في تراجع إنتاج اللبن الظاهر في الداشبورد.",
 
-        recommendation:
-          "راجع العليقة والمياه ومواعيد الحلب وظروف المجموعة.",
+  recommendation:
+    "راجع استهلاك العليقة وبقاياها، انتظام الخلط والتوزيع، توافر المياه، كفاءة الحلب، والتبريد داخل المجموعة.",
 
-        evidence: [
-          `متوسط انخفاض المجموعة: ${groupDropPct}%.`,
-          `الحيوانات الأكثر تأثرًا: ${animalNumbers.join("، ")}.`
-        ]
-      },
+  evidence: [
+    `انخفاض متوسط المجموعة: ${groupDropPct}%.`
+  ]
+},
 
-      dueDate: currentDate,
-      affectedCount: animalNumbers.length,
-      animalNumbers,
+dueDate: currentDate,
+affectedCount: 0,
+animalNumbers: [],
 
       action: {
         type: "navigate",
