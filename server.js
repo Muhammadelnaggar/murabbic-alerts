@@ -42032,7 +42032,11 @@ const MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS = 3;
 const MURABBIK_MILK_MIRROR_GROUP_MIN_AFFECTED_PCT = 25;
 
 const MURABBIK_RUMEN_ACIDOSIS_MIN_DAYS = 5;
-const MURABBIK_RUMEN_ACIDOSIS_FLUCTUATION_PCT = 5;
+const MURABBIK_RUMEN_ACIDOSIS_MIN_DAILY_SWING_KG = 2;
+const MURABBIK_RUMEN_ACIDOSIS_MAX_DAILY_SWING_KG = 4;
+const MURABBIK_RUMEN_ACIDOSIS_BASELINE_MIN_DAYS = 3;
+const MURABBIK_RUMEN_ACIDOSIS_BASELINE_MAX_DAYS = 5;
+const MURABBIK_RUMEN_ACIDOSIS_LOOKBACK_DAYS = 12;
 
 function murabbikMilkMirrorDateSrv(event = {}) {
   return murabbikSmartAlertTextSrv(
@@ -42252,7 +42256,7 @@ function murabbikRumenAcidosisDailyGroupsSrv({
         !Number.isFinite(ageDays) ||
         ageDays < 0 ||
         ageDays >
-          MURABBIK_MILK_MIRROR_LOOKBACK_DAYS
+  MURABBIK_RUMEN_ACIDOSIS_LOOKBACK_DAYS
       ) {
         continue;
       }
@@ -42264,9 +42268,12 @@ function murabbikRumenAcidosisDailyGroupsSrv({
         );
       }
 
-      groupState.byDate
-        .get(eventDate)
-        .push(milkKg);
+ groupState.byDate
+  .get(eventDate)
+  .push({
+    animalNumber,
+    milkKg
+  });
     }
   }
 
@@ -42281,64 +42288,79 @@ function murabbikRumenAcidosisFluctuationSrv(
     return null;
   }
 
-  const days =
-    [...groupState.byDate.entries()]
-      .map(([eventDate, values]) => {
-        const valid =
-          values
-            .map(Number)
-            .filter(
-              value =>
-                Number.isFinite(value) &&
-                value > 0
-            );
+  const rawByDate = new Map();
 
-        if (
-          valid.length <
-          MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS
-        ) {
-          return null;
-        }
+  for (
+    const [eventDate, rows]
+    of groupState.byDate.entries()
+  ) {
+    const byAnimal = new Map();
 
-        const averageKg =
-          valid.reduce(
-            (sum, value) =>
-              sum + value,
-            0
-          ) / valid.length;
+    for (
+      const row
+      of Array.isArray(rows) ? rows : []
+    ) {
+      const animalNumber =
+        calvingNormDigitsOnlySrv(
+          row?.animalNumber || ""
+        );
 
-        return {
-          eventDate,
-          averageKg:
-            Number(
-              averageKg.toFixed(2)
-            ),
-          animalCount:
-            valid.length
-        };
-      })
-      .filter(Boolean)
+      const milkKg =
+        Number(row?.milkKg);
+
+      if (
+        !animalNumber ||
+        !Number.isFinite(milkKg) ||
+        milkKg <= 0
+      ) {
+        continue;
+      }
+
+      byAnimal.set(
+        animalNumber,
+        milkKg
+      );
+    }
+
+    if (
+      byAnimal.size >=
+      MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS
+    ) {
+      rawByDate.set(
+        eventDate,
+        byAnimal
+      );
+    }
+  }
+
+  const availableDates =
+    [...rawByDate.keys()]
       .sort((a, b) =>
-        String(b.eventDate)
-          .localeCompare(
-            String(a.eventDate)
-          )
-      )
-      .slice(
-        0,
-        MURABBIK_RUMEN_ACIDOSIS_MIN_DAYS
+        String(a).localeCompare(
+          String(b)
+        )
       );
 
   if (
-    days.length <
+    availableDates.length <
     MURABBIK_RUMEN_ACIDOSIS_MIN_DAYS
   ) {
     return null;
   }
 
+  const patternDates =
+    availableDates.slice(
+      -MURABBIK_RUMEN_ACIDOSIS_MIN_DAYS
+    );
+
+  const currentDate =
+    patternDates[
+      patternDates.length - 1
+    ];
+
   const latestAgeDays =
     milkReportDaysBetweenSrv(
-      days[0].eventDate,
+      currentDate,
       today
     );
 
@@ -42350,91 +42372,309 @@ function murabbikRumenAcidosisFluctuationSrv(
     return null;
   }
 
-  const chronological =
-    [...days].reverse();
-
-  const values =
-    chronological.map(
-      day => day.averageKg
-    );
-
-  const median =
-    murabbikMilkMirrorMedianSrv(
-      values
-    );
-
-  if (
-    !Number.isFinite(median) ||
-    median <= 0
-  ) {
-    return null;
-  }
-
-  const maximum =
-    Math.max(...values);
-
-  const minimum =
-    Math.min(...values);
-
-  const fluctuationPct =
-    Number(
-      (
-        (
-          (maximum - minimum) /
-          median
-        ) * 100
-      ).toFixed(1)
-    );
-
-  const directions = [];
-
   for (
     let i = 1;
-    i < chronological.length;
+    i < patternDates.length;
     i++
   ) {
-    const difference =
-      chronological[i].averageKg -
-      chronological[i - 1].averageKg;
+    const gap =
+      milkReportDaysBetweenSrv(
+        patternDates[i - 1],
+        patternDates[i]
+      );
 
-    if (difference > 0) {
-      directions.push(1);
-    } else if (difference < 0) {
-      directions.push(-1);
+    if (gap !== 1) {
+      return null;
     }
   }
 
-  const hasRise =
-    directions.includes(1);
+  let commonAnimals = null;
 
-  const hasFall =
-    directions.includes(-1);
+  for (
+    const eventDate
+    of patternDates
+  ) {
+    const animalNumbers =
+      new Set(
+        rawByDate
+          .get(eventDate)
+          ?.keys() || []
+      );
+
+    if (commonAnimals === null) {
+      commonAnimals =
+        animalNumbers;
+
+      continue;
+    }
+
+    commonAnimals =
+      new Set(
+        [...commonAnimals]
+          .filter(animalNumber =>
+            animalNumbers.has(
+              animalNumber
+            )
+          )
+      );
+  }
 
   if (
-    fluctuationPct <
-      MURABBIK_RUMEN_ACIDOSIS_FLUCTUATION_PCT ||
-    !hasRise ||
-    !hasFall
+    !commonAnimals ||
+    commonAnimals.size <
+      MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS
   ) {
     return null;
   }
+
+  const averageForDate =
+    eventDate => {
+      const byAnimal =
+        rawByDate.get(eventDate);
+
+      if (!byAnimal) {
+        return null;
+      }
+
+      const values =
+        [...commonAnimals]
+          .map(animalNumber =>
+            Number(
+              byAnimal.get(
+                animalNumber
+              )
+            )
+          )
+          .filter(value =>
+            Number.isFinite(value) &&
+            value > 0
+          );
+
+      if (
+        values.length !==
+        commonAnimals.size
+      ) {
+        return null;
+      }
+
+      return Number(
+        (
+          values.reduce(
+            (sum, value) =>
+              sum + value,
+            0
+          ) / values.length
+        ).toFixed(2)
+      );
+    };
+
+  const days =
+    patternDates.map(
+      eventDate => ({
+        eventDate,
+
+        averageKg:
+          averageForDate(
+            eventDate
+          ),
+
+        animalCount:
+          commonAnimals.size
+      })
+    );
+
+  if (
+    days.some(day =>
+      !Number.isFinite(
+        day.averageKg
+      ) ||
+      day.averageKg <= 0
+    )
+  ) {
+    return null;
+  }
+
+  const dailyChangesKg = [];
+
+  for (
+    let i = 1;
+    i < days.length;
+    i++
+  ) {
+    dailyChangesKg.push(
+      Number(
+        (
+          days[i].averageKg -
+          days[i - 1].averageKg
+        ).toFixed(2)
+      )
+    );
+  }
+
+  const allChangesWithinRange =
+    dailyChangesKg.every(
+      changeKg => {
+        const absoluteChangeKg =
+          Math.abs(changeKg);
+
+        return (
+          absoluteChangeKg >=
+            MURABBIK_RUMEN_ACIDOSIS_MIN_DAILY_SWING_KG &&
+          absoluteChangeKg <=
+            MURABBIK_RUMEN_ACIDOSIS_MAX_DAILY_SWING_KG
+        );
+      }
+    );
+
+  const directionsAlternate =
+    dailyChangesKg.every(
+      (changeKg, index) =>
+        index === 0 ||
+        Math.sign(changeKg) !==
+          Math.sign(
+            dailyChangesKg[
+              index - 1
+            ]
+          )
+    );
+
+  if (
+    !allChangesWithinRange ||
+    !directionsAlternate
+  ) {
+    return null;
+  }
+
+  const baselineDays = [];
+
+  let expectedDate =
+    milkReportAddDaysSrv(
+      patternDates[0],
+      -1
+    );
+
+  for (
+    let i = 0;
+    i <
+      MURABBIK_RUMEN_ACIDOSIS_BASELINE_MAX_DAYS;
+    i++
+  ) {
+    if (
+      !rawByDate.has(
+        expectedDate
+      )
+    ) {
+      break;
+    }
+
+    const averageKg =
+      averageForDate(
+        expectedDate
+      );
+
+    if (
+      !Number.isFinite(
+        averageKg
+      ) ||
+      averageKg <= 0
+    ) {
+      break;
+    }
+
+    baselineDays.unshift({
+      eventDate:
+        expectedDate,
+
+      averageKg,
+
+      animalCount:
+        commonAnimals.size
+    });
+
+    expectedDate =
+      milkReportAddDaysSrv(
+        expectedDate,
+        -1
+      );
+  }
+
+  if (
+    baselineDays.length <
+    MURABBIK_RUMEN_ACIDOSIS_BASELINE_MIN_DAYS
+  ) {
+    return null;
+  }
+
+  const baselineKg =
+    murabbikMilkMirrorMedianSrv(
+      baselineDays.map(
+        day => day.averageKg
+      )
+    );
+
+  const peakKg =
+    Math.max(
+      ...days.map(
+        day => day.averageKg
+      )
+    );
+
+  if (
+    !Number.isFinite(
+      baselineKg
+    ) ||
+    baselineKg <= 0 ||
+    peakKg >= baselineKg
+  ) {
+    return null;
+  }
+
+  const absoluteChangesKg =
+    dailyChangesKg.map(
+      changeKg =>
+        Math.abs(changeKg)
+    );
 
   return {
     group:
       groupState.group,
 
-    days:
-      chronological,
+    days,
+    baselineDays,
 
     startDate:
-      chronological[0].eventDate,
+      patternDates[0],
 
-    currentDate:
-      chronological[
-        chronological.length - 1
-      ].eventDate,
+    currentDate,
 
-    fluctuationPct
+    baselineKg:
+      Number(
+        baselineKg.toFixed(2)
+      ),
+
+    peakKg:
+      Number(
+        peakKg.toFixed(2)
+      ),
+
+    minDailySwingKg:
+      Number(
+        Math.min(
+          ...absoluteChangesKg
+        ).toFixed(2)
+      ),
+
+    maxDailySwingKg:
+      Number(
+        Math.max(
+          ...absoluteChangesKg
+        ).toFixed(2)
+      ),
+
+    dailyChangesKg,
+
+    animalCount:
+      commonAnimals.size
   };
 }
 function murabbikMilkMirrorReportUrlSrv(speciesKey = "cow") {
@@ -42482,10 +42722,13 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
     animalsByNumber.set(animalNumber, doc);
   }
 
-  const earliestDate = milkReportAddDaysSrv(
-    context.today,
-    -(MURABBIK_MILK_MIRROR_LOOKBACK_DAYS + 2)
-  );
+ const earliestDate = milkReportAddDaysSrv(
+  context.today,
+  -Math.max(
+    MURABBIK_MILK_MIRROR_LOOKBACK_DAYS + 2,
+    MURABBIK_RUMEN_ACIDOSIS_LOOKBACK_DAYS
+  )
+);
 
   const historyByAnimal = new Map();
 
@@ -42764,12 +43007,17 @@ qualifyingGroups.set(key, {
   of rumenAcidosisPatterns
 ) {
   const {
-    group,
-    days,
-    startDate,
-    currentDate,
-    fluctuationPct
-  } = pattern;
+  group,
+  days,
+  startDate,
+  currentDate,
+  baselineKg,
+  peakKg,
+  minDailySwingKg,
+  maxDailySwingKg,
+  dailyChangesKg,
+  animalCount
+} = pattern;
 
   alerts.push({
     identityKey: [
@@ -42783,7 +43031,9 @@ qualifyingGroups.set(key, {
       startDate,
       currentDate,
       group.groupKey,
-      fluctuationPct,
+      baselineKg,
+      peakKg,
+      dailyChangesKg.join(","),
       days
         .map(day =>
           `${day.eventDate}:${day.averageKg}`
@@ -42808,8 +43058,8 @@ qualifyingGroups.set(key, {
       "ظهر تذبذب غير معتاد في متوسط إنتاج المجموعة خلال الأيام الخمسة الأخيرة، وقد يشير هذا النمط إلى اشتباه حموضة الكرش. يُنصح بمراجعة العليقة والتأكد من جودة الخلط والتوزيع والاجترار لهذه المجموعة، انخفاض دهن اللبن يدعم الاشتباه ويساعد في تقييم الحالة.",
 
     details: {
-      observation:
-        `ظهر تذبذب بنسبة ${fluctuationPct}% في متوسط إنتاج مجموعة ${group.groupName} خلال خمسة أيام.`,
+  observation:
+  `ظهر تذبذب يومي بين ${minDailySwingKg} و${maxDailySwingKg} كجم في متوسط إنتاج الرأس داخل مجموعة ${group.groupName} خلال خمسة أيام متتالية.`,
 
       meaning:
         "التذبذب المتكرر في إنتاج المجموعة قد يرتبط باضطراب تخمر الكرش، لكنه لا يثبت التشخيص.",
@@ -42817,11 +43067,18 @@ qualifyingGroups.set(key, {
       recommendation:
         "راجع العليقة وجودة الخلط والتوزيع والاجترار داخل المجموعة، وتابع دهن اللبن عند توفر تحليل حديث.",
 
-      evidence: [
-        `فترة المتابعة: من ${startDate} إلى ${currentDate}.`,
-        `مدى تذبذب متوسط المجموعة: ${fluctuationPct}%.`,
-        "انخفاض دهن اللبن يدعم الاشتباه ويساعد في تقييم الحالة."
-      ]
+     evidence: [
+  `فترة المتابعة: من ${startDate} إلى ${currentDate}.`,
+  `عدد الرؤوس المشتركة في القياس اليومي: ${animalCount}.`,
+  `متوسط الرأس المعتاد قبل التذبذب: ${baselineKg} كجم.`,
+  `أعلى متوسط للرأس أثناء التذبذب: ${peakKg} كجم، وظل أقل من المعتاد.`,
+  `التغيرات اليومية في متوسط الرأس: ${dailyChangesKg
+    .map(value =>
+      `${value > 0 ? "+" : ""}${value}`
+    )
+    .join("، ")} كجم.`,
+  "انخفاض دهن اللبن يدعم الاشتباه ويساعد في تقييم الحالة."
+]
     },
 
     dueDate:
