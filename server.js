@@ -49405,8 +49405,22 @@ for (const [number, arr] of aiByAnimal.entries()) {
   const lastCalvingDate = fertilityReportDateSrv(animal.lastCalvingDate || "");
   const lastCalvingMs = fertilityReportMsSrv(lastCalvingDate);
 
-  const seasonAis = [...arr]
+   const seasonAisRaw = [...arr]
     .filter(ai => !Number.isFinite(lastCalvingMs) || ai._ms >= lastCalvingMs)
+    .sort((a, b) => a._ms - b._ms);
+
+  // تلقيحات اليوم نفسه تُحسب خدمة واحدة في Repeat Breeder
+  const seasonAiByDate = new Map();
+
+  for (const ai of seasonAisRaw) {
+    const serviceDate = String(ai._date || "").trim().slice(0, 10);
+    if (!serviceDate) continue;
+
+    // الاحتفاظ بآخر سجل في اليوم نفسه لعرض بياناته داخل التقرير
+    seasonAiByDate.set(serviceDate, ai);
+  }
+
+  const seasonAis = [...seasonAiByDate.values()]
     .sort((a, b) => a._ms - b._ms);
 
   if (seasonAis.length < 3) continue;
