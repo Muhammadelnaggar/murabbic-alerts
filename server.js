@@ -42031,6 +42031,9 @@ const MURABBIK_MILK_MIRROR_BASELINE_MAX_DAYS = 5;
 const MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS = 3;
 const MURABBIK_MILK_MIRROR_GROUP_MIN_AFFECTED_PCT = 25;
 
+const MURABBIK_RUMEN_ACIDOSIS_MIN_DAYS = 5;
+const MURABBIK_RUMEN_ACIDOSIS_FLUCTUATION_PCT = 5;
+
 function murabbikMilkMirrorDateSrv(event = {}) {
   return murabbikSmartAlertTextSrv(
     event.eventDate ||
@@ -42173,7 +42176,267 @@ function murabbikMilkMirrorOfficialGroupIndexSrv(
 
   return index;
 }
+function murabbikRumenAcidosisDailyGroupsSrv({
+  historyByAnimal = new Map(),
+  animalsByNumber = new Map(),
+  officialGroupByAnimalNumber = new Map(),
+  today = ""
+} = {}) {
+  const byGroup = new Map();
 
+  for (
+    const [animalNumber, byDate]
+    of historyByAnimal.entries()
+  ) {
+    const doc =
+      animalsByNumber.get(animalNumber);
+
+    if (!doc) continue;
+    if (!murabbikMilkMirrorAnimalActiveSrv(doc)) continue;
+    if (!murabbikDryOffAlertIsMilkingSrv(doc)) continue;
+
+    if (
+      String(doc.entryType || "")
+        .trim()
+        .toLowerCase() === "followers"
+    ) {
+      continue;
+    }
+
+    const group =
+      officialGroupByAnimalNumber.get(
+        animalNumber
+      ) || null;
+
+    if (
+      !group?.groupKey ||
+      group.speciesKey !== "cow"
+    ) {
+      continue;
+    }
+
+    if (!byGroup.has(group.groupKey)) {
+      byGroup.set(group.groupKey, {
+        group,
+        byDate: new Map()
+      });
+    }
+
+    const groupState =
+      byGroup.get(group.groupKey);
+
+    for (const row of byDate.values()) {
+      const eventDate =
+        String(row?.eventDate || "")
+          .slice(0, 10);
+
+      const milkKg =
+        Number(row?.milkKg);
+
+      if (
+        !milkReportIsDateSrv(eventDate) ||
+        eventDate > today ||
+        !Number.isFinite(milkKg) ||
+        milkKg <= 0
+      ) {
+        continue;
+      }
+
+      const ageDays =
+        milkReportDaysBetweenSrv(
+          eventDate,
+          today
+        );
+
+      if (
+        !Number.isFinite(ageDays) ||
+        ageDays < 0 ||
+        ageDays >
+          MURABBIK_MILK_MIRROR_LOOKBACK_DAYS
+      ) {
+        continue;
+      }
+
+      if (!groupState.byDate.has(eventDate)) {
+        groupState.byDate.set(
+          eventDate,
+          []
+        );
+      }
+
+      groupState.byDate
+        .get(eventDate)
+        .push(milkKg);
+    }
+  }
+
+  return byGroup;
+}
+
+function murabbikRumenAcidosisFluctuationSrv(
+  groupState = null,
+  today = ""
+) {
+  if (!groupState?.group?.groupKey) {
+    return null;
+  }
+
+  const days =
+    [...groupState.byDate.entries()]
+      .map(([eventDate, values]) => {
+        const valid =
+          values
+            .map(Number)
+            .filter(
+              value =>
+                Number.isFinite(value) &&
+                value > 0
+            );
+
+        if (
+          valid.length <
+          MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS
+        ) {
+          return null;
+        }
+
+        const averageKg =
+          valid.reduce(
+            (sum, value) =>
+              sum + value,
+            0
+          ) / valid.length;
+
+        return {
+          eventDate,
+          averageKg:
+            Number(
+              averageKg.toFixed(2)
+            ),
+          animalCount:
+            valid.length
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) =>
+        String(b.eventDate)
+          .localeCompare(
+            String(a.eventDate)
+          )
+      )
+      .slice(
+        0,
+        MURABBIK_RUMEN_ACIDOSIS_MIN_DAYS
+      );
+
+  if (
+    days.length <
+    MURABBIK_RUMEN_ACIDOSIS_MIN_DAYS
+  ) {
+    return null;
+  }
+
+  const latestAgeDays =
+    milkReportDaysBetweenSrv(
+      days[0].eventDate,
+      today
+    );
+
+  if (
+    !Number.isFinite(latestAgeDays) ||
+    latestAgeDays < 0 ||
+    latestAgeDays > 1
+  ) {
+    return null;
+  }
+
+  const chronological =
+    [...days].reverse();
+
+  const values =
+    chronological.map(
+      day => day.averageKg
+    );
+
+  const median =
+    murabbikMilkMirrorMedianSrv(
+      values
+    );
+
+  if (
+    !Number.isFinite(median) ||
+    median <= 0
+  ) {
+    return null;
+  }
+
+  const maximum =
+    Math.max(...values);
+
+  const minimum =
+    Math.min(...values);
+
+  const fluctuationPct =
+    Number(
+      (
+        (
+          (maximum - minimum) /
+          median
+        ) * 100
+      ).toFixed(1)
+    );
+
+  const directions = [];
+
+  for (
+    let i = 1;
+    i < chronological.length;
+    i++
+  ) {
+    const difference =
+      chronological[i].averageKg -
+      chronological[i - 1].averageKg;
+
+    if (difference > 0) {
+      directions.push(1);
+    } else if (difference < 0) {
+      directions.push(-1);
+    }
+  }
+
+  const hasRise =
+    directions.includes(1);
+
+  const hasFall =
+    directions.includes(-1);
+
+  if (
+    fluctuationPct <
+      MURABBIK_RUMEN_ACIDOSIS_FLUCTUATION_PCT ||
+    !hasRise ||
+    !hasFall
+  ) {
+    return null;
+  }
+
+  return {
+    group:
+      groupState.group,
+
+    days:
+      chronological,
+
+    startDate:
+      chronological[0].eventDate,
+
+    currentDate:
+      chronological[
+        chronological.length - 1
+      ].eventDate,
+
+    fluctuationPct
+  };
+}
 function murabbikMilkMirrorReportUrlSrv(speciesKey = "cow") {
   const type = speciesKey === "buffalo" ? "buffalo" : "cows";
   const species = speciesKey === "buffalo" ? "buffalo" : "cow";
@@ -42263,7 +42526,33 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
       });
     }
   }
+  const rumenAcidosisGroups =
+  murabbikRumenAcidosisDailyGroupsSrv({
+    historyByAnimal,
+    animalsByNumber,
+    officialGroupByAnimalNumber,
+    today:
+      context.today
+  });
 
+const rumenAcidosisPatterns = [];
+
+for (
+  const groupState
+  of rumenAcidosisGroups.values()
+) {
+  const pattern =
+    murabbikRumenAcidosisFluctuationSrv(
+      groupState,
+      context.today
+    );
+
+  if (pattern) {
+    rumenAcidosisPatterns.push(
+      pattern
+    );
+  }
+}
   const analyses = [];
 
   for (const [animalNumber, byDate] of historyByAnimal.entries()) {
@@ -42399,7 +42688,12 @@ async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
     });
   }
 
-  if (!analyses.length) return [];
+ if (
+  !analyses.length &&
+  !rumenAcidosisPatterns.length
+) {
+  return [];
+}
 
   const groupRows = new Map();
 
@@ -42465,6 +42759,91 @@ qualifyingGroups.set(key, {
   }
 
   const alerts = [];
+  for (
+  const pattern
+  of rumenAcidosisPatterns
+) {
+  const {
+    group,
+    days,
+    startDate,
+    currentDate,
+    fluctuationPct
+  } = pattern;
+
+  alerts.push({
+    identityKey: [
+      "milk-mirror",
+      "rumen-acidosis-suspected",
+      currentDate,
+      group.groupKey
+    ].join(":"),
+
+    revisionKey: [
+      startDate,
+      currentDate,
+      group.groupKey,
+      fluctuationPct,
+      days
+        .map(day =>
+          `${day.eventDate}:${day.averageKg}`
+        )
+        .join(",")
+    ].join("|"),
+
+    kind: "technical",
+    domain: "nutrition",
+    code:
+      "milk_mirror_group_rumen_acidosis_suspected",
+
+    priority: "high",
+    urgency: "today",
+    certainty: "suspected",
+    status: "review",
+
+    title:
+      "اشتباه حموضة الكرش",
+
+    message:
+      "ظهر تذبذب غير معتاد في متوسط إنتاج المجموعة خلال الأيام الخمسة الأخيرة، وقد يشير هذا النمط إلى اشتباه حموضة الكرش. يُنصح بمراجعة العليقة والتأكد من جودة الخلط والتوزيع والاجترار لهذه المجموعة، انخفاض دهن اللبن يدعم الاشتباه ويساعد في تقييم الحالة.",
+
+    details: {
+      observation:
+        `ظهر تذبذب بنسبة ${fluctuationPct}% في متوسط إنتاج مجموعة ${group.groupName} خلال خمسة أيام.`,
+
+      meaning:
+        "التذبذب المتكرر في إنتاج المجموعة قد يرتبط باضطراب تخمر الكرش، لكنه لا يثبت التشخيص.",
+
+      recommendation:
+        "راجع العليقة وجودة الخلط والتوزيع والاجترار داخل المجموعة، وتابع دهن اللبن عند توفر تحليل حديث.",
+
+      evidence: [
+        `فترة المتابعة: من ${startDate} إلى ${currentDate}.`,
+        `مدى تذبذب متوسط المجموعة: ${fluctuationPct}%.`,
+        "انخفاض دهن اللبن يدعم الاشتباه ويساعد في تقييم الحالة."
+      ]
+    },
+
+    dueDate:
+      currentDate,
+
+    affectedCount: 0,
+    animalNumbers: [],
+
+    action: {
+      type: "navigate",
+      label:
+        "فتح تقرير التغذية",
+      url:
+        murabbikMilkMirrorReportUrlSrv(
+          group.speciesKey
+        )
+    },
+
+    snoozeMinutes:
+      MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
+  });
+}
 
   for (const [key, groupData] of qualifyingGroups.entries()) {
    const {
@@ -42477,62 +42856,26 @@ qualifyingGroups.set(key, {
     const thi = Number(weather?.thi);
     const heatRelated = Number.isFinite(thi) && thi >= 68;
 
-    const componentRows = rows
-      .map(row => {
-        const fat = Number(row.doc.milkFatPct);
-        const protein = Number(row.doc.milkProteinPct);
+   
 
-        if (
-          !Number.isFinite(fat) ||
-          !Number.isFinite(protein) ||
-          fat <= 0 ||
-          protein <= 0
-        ) {
-          return null;
-        }
+ const identityKey = [
+  "milk-mirror-group",
+  currentDate,
+  group.groupKey,
+  heatRelated
+    ? "heat"
+    : "management"
+].join(":");
 
-        return {
-          fat,
-          protein,
-          ratio: fat / protein
-        };
-      })
-      .filter(Boolean);
-
-    const averageFatProteinRatio = componentRows.length
-      ? componentRows.reduce(
-          (sum, row) => sum + row.ratio,
-          0
-        ) / componentRows.length
-      : null;
-
-    const saraPattern =
-      group.speciesKey === "cow" &&
-      componentRows.length >= MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS &&
-      Number.isFinite(averageFatProteinRatio) &&
-      averageFatProteinRatio < 1;
-
-    const identityKey = [
-      "milk-mirror-group",
-      currentDate,
-      group.groupKey,
-      heatRelated
-        ? "heat"
-        : saraPattern
-          ? "sara"
-          : "management"
-    ].join(":");
-
-    const revisionKey = [
-      currentDate,
-      group.groupKey,
-      groupDropPct,
-      rows.length,
-      Number.isFinite(thi) ? thi : "no-thi",
-      Number.isFinite(averageFatProteinRatio)
-        ? averageFatProteinRatio.toFixed(2)
-        : "no-components"
-    ].join("|");
+   const revisionKey = [
+  currentDate,
+  group.groupKey,
+  groupDropPct,
+  rows.length,
+  Number.isFinite(thi)
+    ? thi
+    : "no-thi"
+].join("|");
 
     if (heatRelated) {
       alerts.push({
@@ -42583,56 +42926,7 @@ animalNumbers: [],
       continue;
     }
 
-    if (saraPattern) {
-      alerts.push({
-        identityKey,
-        revisionKey,
-
-        kind: "technical",
-        domain: "nutrition",
-        code: "milk_mirror_group_sara_pattern",
-
-        priority: "high",
-        urgency: "today",
-        certainty: "suspected",
-        status: "review",
-
-        title: "اضطراب محتمل في تخمر الكرش",
-
-message:
-  `انخفض متوسط إنتاج مجموعة ${group.groupName} بنسبة ${groupDropPct}% عن مستواها المتوقع، بالتزامن مع انخفاض نسبة دهن اللبن إلى البروتين. قد يتوافق هذا النمط مع اضطراب في تخمر الكرش. راجع تركيب العليقة، الألياف الفعالة، مستوى النشا، فرز العليقة، وانتظام الخلط والتوزيع.`,
-
-details: {
-  observation:
-    `انخفض متوسط إنتاج مجموعة ${group.groupName} بنسبة ${groupDropPct}%، وبلغ متوسط نسبة الدهن إلى البروتين ${averageFatProteinRatio.toFixed(2)}.`,
-
-  meaning:
-    "اجتماع انخفاض متوسط المجموعة مع تغير مكونات اللبن يدعم الاشتباه في اضطراب تخمر الكرش، لكنه لا يثبت التشخيص.",
-
-  recommendation:
-    "راجع تركيب العليقة، الألياف الفعالة، مستوى النشا، فرز العليقة، وانتظام الخلط والتوزيع.",
-
-  evidence: [
-    `انخفاض متوسط المجموعة: ${groupDropPct}%.`,
-    `متوسط نسبة الدهن إلى البروتين: ${averageFatProteinRatio.toFixed(2)}.`
-  ]
-},
-
-dueDate: currentDate,
-affectedCount: 0,
-animalNumbers: [],
-
-        action: {
-          type: "navigate",
-          label: "فتح تقرير التغذية",
-          url: murabbikMilkMirrorReportUrlSrv(group.speciesKey)
-        },
-
-        snoozeMinutes: MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
-      });
-
-      continue;
-    }
+   
 
     alerts.push({
       identityKey,
