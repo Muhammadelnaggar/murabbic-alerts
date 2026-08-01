@@ -88,7 +88,9 @@
         </table>
       </div>
 
-     <div class="actions-bar">
+<div id="milkComponentsBox" class="hide compact-section"></div>
+
+<div class="actions-bar">
   <button type="button" id="saveBtn" class="save">حفظ بيانات المحلب</button>
 </div>
     </div>
@@ -106,8 +108,8 @@
   const saveBtn = $("saveBtn");
   const previewWrap = $("previewWrap");
   const previewRows = $("previewRows");
+  const milkComponentsBox = $("milkComponentsBox");
   const sysbar = $("sysbar");
-
   const kpiRows = $("kpiRows");
   const kpiValid = $("kpiValid");
   const kpiInvalid = $("kpiInvalid");
@@ -203,11 +205,169 @@
 
   return data;
 }
-  function renderUi(ui) {
-    const rows = Array.isArray(ui?.rows) ? ui.rows : [];
-    lastPreviewRows = rows;
+  function renderMilkComponents(componentsUi) {
+  if (!milkComponentsBox) return;
 
-    const kpi = ui?.kpi || {};
+  const sections =
+    Array.isArray(componentsUi?.sections)
+      ? componentsUi.sections.filter(
+          section => section?.visible === true
+        )
+      : [];
+
+  milkComponentsBox.innerHTML = "";
+
+  if (
+    componentsUi?.enabled !== true ||
+    !sections.length
+  ) {
+    milkComponentsBox.classList.add("hide");
+    return;
+  }
+
+  sections.forEach(section => {
+    const sectionEl =
+      document.createElement("div");
+
+    const titleEl =
+      document.createElement("div");
+
+    titleEl.style.fontWeight = "900";
+    titleEl.style.marginBottom = "10px";
+    titleEl.textContent =
+      String(section?.title || "");
+
+    sectionEl.appendChild(titleEl);
+
+    const rowEl =
+      document.createElement("div");
+
+    rowEl.className = "row";
+
+    const inputs =
+      Array.isArray(section?.inputs)
+        ? section.inputs.filter(
+            item => item?.visible !== false
+          )
+        : [];
+
+    inputs.forEach(item => {
+      const colEl =
+        document.createElement("div");
+
+      colEl.className = "col";
+
+      const labelEl =
+        document.createElement("label");
+
+      labelEl.textContent =
+        String(item?.label || "");
+
+      const inputEl =
+        document.createElement("input");
+
+      inputEl.type =
+        String(item?.type || "number");
+
+      inputEl.name =
+        String(item?.name || "");
+
+      inputEl.value =
+        item?.value ?? "";
+
+      inputEl.disabled =
+        item?.disabled === true;
+
+      inputEl.required =
+        item?.required === true;
+
+      inputEl.inputMode = "decimal";
+
+      inputEl.dataset.mbkMilkComponentKind =
+        String(
+          section?.kind ||
+          section?.key ||
+          ""
+        );
+
+      inputEl.dataset.key =
+        String(item?.key || "");
+
+      if (item?.step !== undefined) {
+        inputEl.step =
+          String(item.step);
+      }
+
+      if (item?.min !== undefined) {
+        inputEl.min =
+          String(item.min);
+      }
+
+      if (item?.max !== undefined) {
+        inputEl.max =
+          String(item.max);
+      }
+
+      colEl.appendChild(labelEl);
+      colEl.appendChild(inputEl);
+      rowEl.appendChild(colEl);
+    });
+
+    sectionEl.appendChild(rowEl);
+    milkComponentsBox.appendChild(sectionEl);
+  });
+
+  milkComponentsBox.classList.remove("hide");
+}
+
+function readMilkComponents() {
+  const components = {};
+
+  milkComponentsBox
+    ?.querySelectorAll(
+      "input[data-mbk-milk-component-kind][data-key]"
+    )
+    .forEach(input => {
+      if (input.disabled) return;
+
+      const kind =
+        String(
+          input.dataset
+            .mbkMilkComponentKind ||
+          ""
+        ).trim();
+
+      const key =
+        String(
+          input.dataset.key ||
+          ""
+        ).trim();
+
+      if (!kind || !key) return;
+
+      if (!components[kind]) {
+        components[kind] = {};
+      }
+
+      components[kind][key] =
+        input.value || "";
+    });
+
+  return components;
+}
+  function renderUi(ui) {
+const rows =
+  Array.isArray(ui?.rows)
+    ? ui.rows
+    : [];
+
+lastPreviewRows = rows;
+
+renderMilkComponents(
+  ui?.components
+);
+
+const kpi = ui?.kpi || {};
     kpiRows.textContent = String(kpi.totalRows ?? rows.length ?? 0);
     kpiValid.textContent = String(kpi.validRows ?? rows.filter(r => r.valid === true).length);
     kpiInvalid.textContent = String(kpi.invalidRows ?? rows.filter(r => r.valid !== true).length);
@@ -309,10 +469,18 @@
     clearBtn.disabled = true;
 
     try {
-      const data = await postJson("/api/daily-milk/import/save", {
-        eventDate: date,
-        rows
-      });
+const data =
+  await postJson(
+    "/api/daily-milk/import/save",
+    {
+      eventDate: date,
+
+      components:
+        readMilkComponents(),
+
+      rows
+    }
+  );
 
       renderUi(data.ui || {
         status: data.ok ? "success" : "error",
