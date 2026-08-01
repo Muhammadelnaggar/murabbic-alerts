@@ -42031,7 +42031,7 @@ const MURABBIK_MILK_MIRROR_BASELINE_MAX_DAYS = 5;
 const MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS = 3;
 const MURABBIK_MILK_MIRROR_GROUP_MIN_AFFECTED_PCT = 25;
 
-const MURABBIK_RUMEN_ACIDOSIS_MIN_DAYS = 5;
+const MURABBIK_RUMEN_ACIDOSIS_MIN_DAYS = 4;
 const MURABBIK_RUMEN_ACIDOSIS_MIN_DAILY_SWING_KG = 2;
 const MURABBIK_RUMEN_ACIDOSIS_MAX_DAILY_SWING_KG = 4;
 const MURABBIK_RUMEN_ACIDOSIS_BASELINE_MIN_DAYS = 3;
@@ -43054,12 +43054,12 @@ qualifyingGroups.set(key, {
     title:
       "اشتباه حموضة الكرش",
 
-    message:
-      "ظهر تذبذب غير معتاد في متوسط إنتاج المجموعة خلال الأيام الخمسة الأخيرة، وقد يشير هذا النمط إلى اشتباه حموضة الكرش. يُنصح بمراجعة العليقة والتأكد من جودة الخلط والتوزيع والاجترار لهذه المجموعة، انخفاض دهن اللبن يدعم الاشتباه ويساعد في تقييم الحالة.",
+   observation:
+  `ظهر تذبذب يومي بين ${minDailySwingKg} و${maxDailySwingKg} كجم في متوسط إنتاج الرأس داخل مجموعة ${group.groupName} خلال أربعة أيام متتالية.`,
 
     details: {
-  observation:
-  `ظهر تذبذب يومي بين ${minDailySwingKg} و${maxDailySwingKg} كجم في متوسط إنتاج الرأس داخل مجموعة ${group.groupName} خلال خمسة أيام متتالية.`,
+observation:
+  `ظهر تذبذب يومي بين ${minDailySwingKg} و${maxDailySwingKg} كجم في متوسط إنتاج الرأس داخل مجموعة ${group.groupName} خلال أربعة أيام متتالية.`,
 
       meaning:
         "التذبذب المتكرر في إنتاج المجموعة قد يرتبط باضطراب تخمر الكرش، لكنه لا يثبت التشخيص.",
