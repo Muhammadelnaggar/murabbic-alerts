@@ -1417,7 +1417,13 @@ if (alert.actionText) {
 
   primaryButton.disabled =
     actionDisabled;
-
+  if (actionDisabled) {
+  primaryButton.style.opacity = '0.45';
+  primaryButton.style.cursor = 'not-allowed';
+  primaryButton.style.boxShadow = 'none';
+  primaryButton.setAttribute('aria-disabled', 'true');
+  primaryButton.title = 'لا توجد عليقة محفوظة لهذه المجموعة.';
+}
   if (!actionDisabled) {
     primaryButton.addEventListener(
       'click',
