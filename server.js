@@ -32448,32 +32448,157 @@ function dailyMilkImportCalcSrv(row = {}, kind = "cow") {
   };
 }
 
-function dailyMilkImportBuildUiSrv({ rows = [], message = "" } = {}) {
-  const safeRows = Array.isArray(rows) ? rows : [];
-  const validRows = safeRows.filter(r => r.valid === true);
-  const invalidRows = safeRows.filter(r => r.valid !== true);
+function dailyMilkImportKindStateSrv(rows = []) {
+  const kinds = [
+    ...new Set(
+      (Array.isArray(rows) ? rows : [])
+        .map(row =>
+          String(row?.kind || "").trim()
+        )
+        .filter(
+          kind =>
+            kind === "cow" ||
+            kind === "buffalo"
+        )
+    )
+  ];
 
-  const totalMilk = validRows.reduce((s, r) => s + Number(r.milkKg || 0), 0);
+  return {
+    kinds,
+    mixed: kinds.length > 1,
+    kind:
+      kinds.length === 1
+        ? kinds[0]
+        : ""
+  };
+}
+
+function dailyMilkImportBlockMixedRowsSrv(
+  rows = []
+) {
+  return (
+    Array.isArray(rows)
+      ? rows
+      : []
+  ).map(row => {
+    const kind =
+      String(row?.kind || "").trim();
+
+    if (
+      kind !== "cow" &&
+      kind !== "buffalo"
+    ) {
+      return row;
+    }
+
+    return {
+      ...row,
+      valid: false,
+      reason:
+        "لا يسمح باستيراد الأبقار والجاموس في عملية واحدة.",
+      totalText:
+        row?.totalText || "—"
+    };
+  });
+}
+
+function dailyMilkImportBuildUiSrv({
+  rows = [],
+  message = "",
+  components = null,
+  importKind = "",
+  status = ""
+} = {}) {
+  const safeRows =
+    Array.isArray(rows)
+      ? rows
+      : [];
+
+  const validRows =
+    safeRows.filter(
+      row => row.valid === true
+    );
+
+  const invalidRows =
+    safeRows.filter(
+      row => row.valid !== true
+    );
+
+  const totalMilk =
+    validRows.reduce(
+      (sum, row) =>
+        sum +
+        Number(row.milkKg || 0),
+      0
+    );
+
+  const kind =
+    importKind === "buffalo"
+      ? "buffalo"
+      : importKind === "cow"
+        ? "cow"
+        : "";
 
   return {
     screen: "daily_milk_import",
-    status: validRows.length ? "success" : "warning",
-    message: message || (
-  validRows.length
-    ? (
-        invalidRows.length
-          ? `راجعت ${safeRows.length} سجلًا: ${validRows.length} جاهز للحفظ، و${invalidRows.length} يحتاج مراجعة.`
-          : `✅ تمت معاينة ${validRows.length} سجلًا، وكلها جاهزة للحفظ.`
-      )
-    : "❌ لا توجد سجلات صالحة للحفظ."
-),
-    canSave: validRows.length > 0,
+
+    status:
+      String(status || "").trim() ||
+      (
+        validRows.length
+          ? "success"
+          : "warning"
+      ),
+
+    message:
+      message ||
+      (
+        validRows.length
+          ? (
+              invalidRows.length
+                ? `راجعت ${safeRows.length} سجلًا: ${validRows.length} جاهز للحفظ، و${invalidRows.length} يحتاج مراجعة.`
+                : `✅ تمت معاينة ${validRows.length} سجلًا، وكلها جاهزة للحفظ.`
+            )
+          : "❌ لا توجد سجلات صالحة للحفظ."
+      ),
+
+    canSave:
+      validRows.length > 0,
+
+    importKind: kind,
+
+    speciesLabel:
+      kind === "buffalo"
+        ? "الجاموس"
+        : kind === "cow"
+          ? "الأبقار"
+          : "",
+
+    components:
+      components &&
+      typeof components === "object"
+        ? components
+        : {
+            enabled: false,
+            sections: []
+          },
+
     rows: safeRows,
+
     kpi: {
-      totalRows: safeRows.length,
-      validRows: validRows.length,
-      invalidRows: invalidRows.length,
-      totalMilk: Number(totalMilk.toFixed(1))
+      totalRows:
+        safeRows.length,
+
+      validRows:
+        validRows.length,
+
+      invalidRows:
+        invalidRows.length,
+
+      totalMilk:
+        Number(
+          totalMilk.toFixed(1)
+        )
     }
   };
 }
@@ -32496,28 +32621,74 @@ async function dailyMilkImportPreviewRowsSrv(uid, eventDate, inputRows = []) {
       continue;
     }
 
-    const animalDoc = animal.data || {};
+    const animalDoc =
+  animal.data || {};
 
-    if (dailyMilkIsOutOfHerdSrv(animalDoc)) {
-      rows.push({ ...rawRow, animalNumber, valid: false, reason: "سبق تسجيل اللبن لهذا الحيوان في التاريخ نفسه.", totalText: "—" });
-      continue;
-    }
+const animalId =
+  animal.id || "";
 
-    const duplicated = await dailyMilkHasSameDaySrv(uid, animalNumber, eventDate);
+const species =
+  dailyMilkSpeciesSrv(
+    animalDoc
+  );
 
-    if (duplicated) {
-      rows.push({ ...rawRow, animalNumber, valid: false, reason: "تم تسجيل لبن اليوم لهذا الحيوان بالفعل.", totalText: "—" });
-      continue;
-    }
+const kind =
+  dailyMilkKindSrv(
+    species
+  );
 
-    const species = dailyMilkSpeciesSrv(animalDoc);
-    const kind = dailyMilkKindSrv(species);
-    const calc = dailyMilkImportCalcSrv(rawRow, kind);
+if (
+  dailyMilkIsOutOfHerdSrv(
+    animalDoc
+  )
+) {
+  rows.push({
+    ...rawRow,
+    animalNumber,
+    animalId,
+    species,
+    kind,
+    valid: false,
+    reason:
+      "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له.",
+    totalText: "—"
+  });
 
+  continue;
+}
+
+const duplicated =
+  await dailyMilkHasSameDaySrv(
+    uid,
+    animalNumber,
+    eventDate
+  );
+
+if (duplicated) {
+  rows.push({
+    ...rawRow,
+    animalNumber,
+    animalId,
+    species,
+    kind,
+    valid: false,
+    reason:
+      "تم تسجيل لبن اليوم لهذا الحيوان بالفعل.",
+    totalText: "—"
+  });
+
+  continue;
+}
+
+const calc =
+  dailyMilkImportCalcSrv(
+    rawRow,
+    kind
+  );
     rows.push({
       ...rawRow,
       animalNumber,
-      animalId: animal.id || "",
+      animalId,
       species,
       kind,
       milkKg: calc.milkKg,
@@ -32579,15 +32750,86 @@ app.post("/api/daily-milk/import/preview", requireUserId, dailyMilkImportRawPars
       return res.json({ ok: true, message: ui.message, ui });
     }
 
-    const rows = await dailyMilkImportPreviewRowsSrv(uid, eventDate, inputRows);
-    const ui = dailyMilkImportBuildUiSrv({ rows });
+ const rows =
+  await dailyMilkImportPreviewRowsSrv(
+    uid,
+    eventDate,
+    inputRows
+  );
 
-    return res.json({
-      ok: true,
-      message: ui.message,
-      rows,
+const importState =
+  dailyMilkImportKindStateSrv(
+    rows
+  );
+
+if (importState.mixed) {
+  const blockedRows =
+    dailyMilkImportBlockMixedRowsSrv(
+      rows
+    );
+
+  const ui =
+    dailyMilkImportBuildUiSrv({
+      rows: blockedRows,
+
+      message:
+        "❌ لا يسمح باستيراد الأبقار والجاموس في عملية واحدة. استورد كل نوع في عملية مستقلة.",
+
+      status: "error"
+    });
+
+  return res
+    .status(400)
+    .json({
+      ok: false,
+
+      error:
+        "daily_milk_import_mixed_species",
+
+      message:
+        ui.message,
+
+      rows:
+        blockedRows,
+
       ui
     });
+}
+
+const componentDefaults =
+  await dailyMilkLoadComponentsSrv(
+    uid
+  );
+
+const acceptedRows =
+  rows.filter(
+    row =>
+      row.valid === true
+  );
+
+const ui =
+  dailyMilkImportBuildUiSrv({
+    rows,
+
+    importKind:
+      importState.kind,
+
+    components:
+      dailyMilkBuildComponentsUiSrv({
+        accepted:
+          acceptedRows,
+
+        defaults:
+          componentDefaults
+      })
+  });
+
+return res.json({
+  ok: true,
+  message: ui.message,
+  rows,
+  ui
+});
 
   } catch (e) {
     console.error("daily-milk-import-preview", e);
@@ -32628,8 +32870,13 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
       });
     }
 
-    const uid = req.userId;
-    const body = req.body || {};
+  const uid = req.userId;
+const body = req.body || {};
+
+const submittedComponents =
+  dailyMilkComponentsInputFromBodySrv(
+    body
+  );
 
     const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
 
@@ -32669,10 +32916,173 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
       });
     }
 
-    const checkedRows = await dailyMilkImportPreviewRowsSrv(uid, eventDate, inputRows);
+ const checkedRows =
+  await dailyMilkImportPreviewRowsSrv(
+    uid,
+    eventDate,
+    inputRows
+  );
 
-    const saved = [];
-    const rejected = [];
+const importState =
+  dailyMilkImportKindStateSrv(
+    checkedRows
+  );
+
+if (importState.mixed) {
+  const blockedRows =
+    dailyMilkImportBlockMixedRowsSrv(
+      checkedRows
+    );
+
+  const ui =
+    dailyMilkImportBuildUiSrv({
+      rows: blockedRows,
+
+      message:
+        "❌ لا يسمح باستيراد الأبقار والجاموس في عملية واحدة. استورد كل نوع في عملية مستقلة.",
+
+      status: "error"
+    });
+
+  return res
+    .status(400)
+    .json({
+      ok: false,
+
+      error:
+        "daily_milk_import_mixed_species",
+
+      message:
+        ui.message,
+
+      savedCount: 0,
+
+      rejectedCount:
+        blockedRows.length,
+
+      saved: [],
+
+      rejected:
+        blockedRows,
+
+      ui
+    });
+}
+
+const importKind =
+  importState.kind;
+
+const speciesLabel =
+  importKind === "buffalo"
+    ? "الجاموس"
+    : "الأبقار";
+
+const componentDefaults =
+  await dailyMilkLoadComponentsSrv(
+    uid
+  );
+
+const componentInput =
+  submittedComponents?.[
+    importKind
+  ] || {
+    provided: false,
+    milkFatPct: null,
+    milkProteinPct: null
+  };
+
+const componentUiDefaults = {
+  ...componentDefaults,
+
+  ...(
+    componentInput.provided &&
+    importKind
+      ? {
+          [importKind]: {
+            milkFatPct:
+              componentInput
+                .milkFatPct,
+
+            milkProteinPct:
+              componentInput
+                .milkProteinPct
+          }
+        }
+      : {}
+  )
+};
+
+const componentIssue =
+  dailyMilkComponentIssueSrv(
+    componentInput,
+    speciesLabel
+  );
+
+if (componentIssue) {
+  const ui =
+    dailyMilkImportBuildUiSrv({
+      rows:
+        checkedRows,
+
+      importKind,
+
+      components:
+        dailyMilkBuildComponentsUiSrv({
+          accepted:
+            checkedRows.filter(
+              row =>
+                row.valid === true
+            ),
+
+          defaults:
+            componentUiDefaults
+        }),
+
+      message:
+        `❌ ${componentIssue}`,
+
+      status: "error"
+    });
+
+  return res
+    .status(400)
+    .json({
+      ok: false,
+
+      error:
+        "daily_milk_import_components_invalid",
+
+      message:
+        ui.message,
+
+      savedCount: 0,
+      rejectedCount: 0,
+      saved: [],
+      rejected: [],
+      ui
+    });
+}
+
+const milkFatPct =
+  componentInput.provided
+    ? componentInput.milkFatPct
+    : null;
+
+const milkProteinPct =
+  componentInput.provided
+    ? componentInput.milkProteinPct
+    : null;
+
+const fatProteinRatio =
+  componentInput.provided
+    ? dailyMilkFatProteinRatioSrv(
+        milkFatPct,
+        milkProteinPct
+      )
+    : null;
+
+const saved = [];
+const rejected = [];
 
     for (const row of checkedRows) {
       if (row.valid !== true) {
@@ -32744,11 +33154,19 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
         importMode: String(row.importMode || "").trim() || "sessions",
 
         milkSessions,
-        milkKg: calc.milkKg,
-        dailyMilk: calc.milkKg,
-        totalMilk: calc.milkKg,
+  milkKg: calc.milkKg,
+dailyMilk: calc.milkKg,
+totalMilk: calc.milkKg,
 
-        source: "server:/api/daily-milk/import/save"
+...(componentInput.provided
+  ? {
+      milkFatPct,
+      milkProteinPct,
+      fatProteinRatio
+    }
+  : {}),
+
+source: "server:/api/daily-milk/import/save"
       };
 
       const batch = db.batch();
@@ -32780,7 +33198,29 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
         reason: ""
       });
     }
+    if (
+  saved.length &&
+  componentInput.provided &&
+  importKind
+) {
+  try {
+    await dailyMilkPersistComponentsSrv({
+      uid,
 
+      submitted:
+        submittedComponents,
+
+      savedKinds: [
+        importKind
+      ]
+    });
+  } catch (e) {
+    console.warn(
+      "daily milk import component defaults save failed:",
+      e.message || e
+    );
+  }
+}
     if (saved.length && typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "daily_milk_import_save");
     }
@@ -32791,9 +33231,30 @@ app.post("/api/daily-milk/import/save", requireUserId, async (req, res) => {
       totalText: "—"
     }));
 
-    const ui = dailyMilkImportBuildUiSrv({
-      rows: [...saved, ...rejectedRows],
-     message: saved.length
+    const ui =
+  dailyMilkImportBuildUiSrv({
+    rows: [
+      ...saved,
+      ...rejectedRows
+    ],
+
+    importKind,
+
+    components:
+      dailyMilkBuildComponentsUiSrv({
+        accepted:
+          saved.length
+            ? saved
+            : checkedRows.filter(
+                row =>
+                  row.valid === true
+              ),
+
+        defaults:
+          componentUiDefaults
+      }),
+
+    message: saved.length
   ? (
       rejected.length
         ? `✅ تم حفظ ${saved.length} سجل لبن، ولم يتم حفظ ${rejected.length} سجل يحتاج مراجعة.`
