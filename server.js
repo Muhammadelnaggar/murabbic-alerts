@@ -42683,7 +42683,184 @@ function murabbikMilkMirrorReportUrlSrv(speciesKey = "cow") {
 
   return `nutrition-report.html?type=${encodeURIComponent(type)}&species=${encodeURIComponent(species)}`;
 }
+function murabbikMilkMirrorGroupRationUrlSrv(
+  allEvents = [],
+  group = {},
+  groupNumbers = [],
+  currentDate = ""
+) {
+  const wantedTokens = [
+    group.groupKey,
+    group.groupId,
+    group.groupName
+  ].map(normReportText).filter(Boolean);
 
+  const latestEvent = (Array.isArray(allEvents) ? allEvents : [])
+    .filter(isNutritionSavedEvent)
+    .filter(event =>
+      Array.isArray(event?.nutrition?.rows) &&
+      event.nutrition.rows.length
+    )
+    .filter(event => {
+      const eventDate = String(
+        event.eventDate ||
+        event.date ||
+        ""
+      ).slice(0, 10);
+
+      return (
+        !currentDate ||
+        !milkReportIsDateSrv(eventDate) ||
+        eventDate <= currentDate
+      );
+    })
+    .filter(event => {
+      const eventTokens =
+        nutritionReportGroupTokensSrv(event);
+
+      return wantedTokens.some(token =>
+        eventTokens.includes(token)
+      );
+    })
+    .sort((a, b) => {
+      const aDate = String(
+        a.eventDate ||
+        a.date ||
+        ""
+      ).slice(0, 10);
+
+      const bDate = String(
+        b.eventDate ||
+        b.date ||
+        ""
+      ).slice(0, 10);
+
+      if (aDate !== bDate) {
+        return bDate.localeCompare(aDate);
+      }
+
+      return eventCreatedMs(b) - eventCreatedMs(a);
+    })[0] || null;
+
+  const eventId =
+    String(latestEvent?.id || "").trim();
+
+  if (eventId) {
+    return `nutrition.html?eventId=${encodeURIComponent(eventId)}`;
+  }
+
+  const params = new URLSearchParams();
+
+  const groupName =
+    String(group.groupName || "").trim();
+
+  const groupKey =
+    String(
+      group.groupKey ||
+      group.groupId ||
+      ""
+    ).trim();
+
+  const numbers = [...new Set(
+    (Array.isArray(groupNumbers) ? groupNumbers : [])
+      .map(murabbikDryOffAlertNumberSrv)
+      .filter(Boolean)
+  )];
+
+  if (groupName) {
+    params.set("groupName", groupName);
+  }
+
+  if (groupKey) {
+    params.set("groupKey", groupKey);
+  }
+
+  if (numbers.length) {
+    params.set("numbers", numbers.join(","));
+  }
+
+  const query = params.toString();
+
+  return query
+    ? `nutrition.html?${query}`
+    : "nutrition.html";
+}
+function murabbikMilkMirrorGroupRationEventIdSrv(
+  allEvents = [],
+  group = {},
+  currentDate = ""
+) {
+  const wantedTokens = [
+    group.groupId,
+    group.groupKey,
+    group.groupName
+  ]
+    .map(normReportText)
+    .filter(Boolean);
+
+  if (!wantedTokens.length) return "";
+
+  const latestEvent = (Array.isArray(allEvents) ? allEvents : [])
+    .filter(event => {
+      const type = String(
+        event.type ||
+        event.eventTypeNorm ||
+        ""
+      ).trim().toLowerCase();
+
+      return type === "nutrition_group";
+    })
+    .filter(event =>
+      Array.isArray(event?.nutrition?.rows) &&
+      event.nutrition.rows.length > 0
+    )
+    .filter(event => {
+      const eventDate = String(
+        event.eventDate ||
+        event.date ||
+        ""
+      ).slice(0, 10);
+
+      return (
+        !currentDate ||
+        !milkReportIsDateSrv(eventDate) ||
+        eventDate <= currentDate
+      );
+    })
+    .filter(event => {
+      const eventTokens =
+        nutritionReportGroupTokensSrv(event);
+
+      return wantedTokens.some(token =>
+        eventTokens.includes(token)
+      );
+    })
+    .sort((a, b) => {
+      const aDate = String(
+        a.eventDate ||
+        a.date ||
+        ""
+      ).slice(0, 10);
+
+      const bDate = String(
+        b.eventDate ||
+        b.date ||
+        ""
+      ).slice(0, 10);
+
+      if (aDate !== bDate) {
+        return bDate.localeCompare(aDate);
+      }
+
+      return eventCreatedMs(b) - eventCreatedMs(a);
+    })[0] || null;
+
+  return String(
+    latestEvent?.id ||
+    latestEvent?.firestoreId ||
+    ""
+  ).trim();
+}
 async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
   const [animals, allEvents] = await Promise.all([
     murabbikSmartAlertAnimalsSrv(context),
@@ -43019,6 +43196,13 @@ qualifyingGroups.set(key, {
   animalCount
 } = pattern;
 
+  const groupRationEventId =
+    murabbikMilkMirrorGroupRationEventIdSrv(
+      allEvents,
+      group,
+      currentDate
+    );
+
   alerts.push({
     identityKey: [
       "milk-mirror",
@@ -43087,16 +43271,20 @@ details: {
     affectedCount: 0,
     animalNumbers: [],
 
-    action: {
-      type: "navigate",
-      label:
-        "فتح تقرير التغذية",
-      url:
-        murabbikMilkMirrorReportUrlSrv(
-          group.speciesKey
-        )
-    },
+action: {
+  type:
+    groupRationEventId
+      ? "navigate"
+      : "none",
 
+  label:
+    "فتح عليقة المجموعة",
+
+  url:
+    groupRationEventId
+      ? `nutrition.html?eventId=${encodeURIComponent(groupRationEventId)}`
+      : ""
+},
     snoozeMinutes:
       MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
   });
