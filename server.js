@@ -15726,6 +15726,8 @@ if (!isWarn) {
       inseminator: String(formData.inseminator || "").trim(),
       inseminationTime: String(formData.inseminationTime || "").trim(),
       heatStatus: String(formData.heatStatus || "").trim(),
+      inseminationSource:
+       inseminationSourceNormSrv(formData) || null,
             thiAtInsemination: thiAtInsemination ? {
         thi: thiAtInsemination.thi ?? null,
         tempC: thiAtInsemination.tempC ?? null,
@@ -16105,6 +16107,8 @@ rejected.push({
           inseminator: String(formData.inseminator || "").trim(),
           inseminationTime: String(formData.inseminationTime || "").trim(),
           heatStatus: String(formData.heatStatus || "").trim(),
+          inseminationSource:
+           inseminationSourceNormSrv(formData) || null,
           notes: String(formData.notes || "").trim() || null,
 
           species,
@@ -48622,7 +48626,38 @@ function fertilityReportTimingAssessmentSrv(ai = {}, heatBefore = null) {
     note: "توقيت التلقيح يحتاج مراجعة مع وقت رؤية الشياع."
   };
 }
+function inseminationSourceNormSrv(data = {}) {
+  const raw = String(
+    data.inseminationSource ||
+    data.requestSource ||
+    data.source ||
+    data.protocolSource ||
+    data.inseminationMethod ||
+    ""
+  ).trim();
 
+  return /ovsynch[_\s-]*tai|\btai\b|fixed[\s_-]*time|تزامن|إجباري|اجباري/i.test(raw)
+    ? "ovsynch_tai"
+    : "";
+}
+
+function fertilityReportInseminationSourceSrv(ai = {}) {
+  const sourceCode =
+    inseminationSourceNormSrv(ai);
+
+  return {
+    code:
+      sourceCode || "natural",
+
+    isForced:
+      sourceCode === "ovsynch_tai",
+
+    label:
+      sourceCode === "ovsynch_tai"
+        ? "تلقيح إجباري/TAI"
+        : "تلقيح مرتبط بشياع طبيعي"
+  };
+}
 function fertilityReportThiInfoSrv(e = {}) {
   const src = e.thiAtInsemination || {};
   const value = Number(e.thiValue ?? src.thi);
@@ -48736,77 +48771,124 @@ function fertilityReportExpertIndicatorSrv({
 }
 
 function fertilityReportRepeatBreederAnalysisSrv(repeatBreeders = [], eligibleCount = 0) {
-  const rows = Array.isArray(repeatBreeders) ? repeatBreeders : [];
+  const rows = Array.isArray(repeatBreeders)
+    ? repeatBreeders
+    : [];
+
   const count = rows.length;
   const den = Number(eligibleCount || 0);
   const ratePct = fertilityReportPctSrv(count, den);
 
-  const causeLabels = {
-    timing_protocol: "توقيت التلقيح/تطبيق قاعدة صباح-مساء",
-    possible_delayed_ovulation: "تأخر إباضة أو فشل إخصاب مع دورة منتظمة",
-    irregular_return: "كشف شياع غير منتظم أو فقد حمل مبكر/مشكلة رحمية",
-    heat_stress: "إجهاد حراري وقت التلقيح",
-    inseminator_signal: "تركز الحالات مع ملقح محدد",
-    semen_signal: "تركز الحالات مع سائل/طلوقة محددة"
-  };
+  const avgServices = fertilityReportAvgSrv(
+    rows.map(row => row.servicesCount)
+  );
 
-  const causeCounts = new Map();
+  // تجميع المؤشرات الفعلية التي ظهرت داخل تحليل كل حيوان.
+  // نعرض عدد الحالات فقط، دون نسب قوة أو اختيار سبب قطيع قطعي.
+  const findingCounts = new Map();
 
-  for (const r of rows) {
-    const codes = Array.isArray(r.likelyCauseCodes) ? r.likelyCauseCodes : [];
-    for (const c of codes) causeCounts.set(c, (causeCounts.get(c) || 0) + 1);
-  }
+  for (const row of rows) {
+    const findings = Array.isArray(row.findings)
+      ? row.findings
+      : [];
 
-  const likelyDrivers = [...causeCounts.entries()]
-    .map(([key, value]) => ({
-      key,
-      title: causeLabels[key] || key,
-      count: value,
-      pct: fertilityReportPctSrv(value, count),
-      strength: value >= Math.ceil(count * 0.5)
-        ? "قوي"
-        : value >= Math.ceil(count * 0.25)
-          ? "متوسط"
-          : "ضعيف"
-    }))
-    .sort((a, b) => Number(b.count || 0) - Number(a.count || 0));
+    for (const finding of findings) {
+      const code =
+        String(finding?.code || "").trim();
 
-  const mainDriver = likelyDrivers[0] || null;
-  const avgServices = fertilityReportAvgSrv(rows.map(r => r.servicesCount));
+      const title =
+        String(finding?.title || "").trim();
 
-  let severity = "good";
-  let severityLabel = "لا يظهر ضغط واضح";
+      if (!code || !title) continue;
 
-  if (count > 0) {
-    if ((ratePct !== null && ratePct >= 20) || count >= 10) {
-      severity = "danger";
-      severityLabel = "ضغط Repeat Breeder واضح";
-    } else if ((ratePct !== null && ratePct >= 10) || count >= 4) {
-      severity = "warn";
-      severityLabel = "ضغط Repeat Breeder يحتاج قراءة";
-    } else {
-      severity = "good";
-      severityLabel = "ضغط محدود";
+      const current =
+        findingCounts.get(code) || {
+          code,
+          title,
+          count: 0
+        };
+
+      current.count += 1;
+
+      findingCounts.set(
+        code,
+        current
+      );
     }
   }
 
-  const herdRead = count === 0
-    ? "لا تظهر حالات Repeat Breeder واضحة في القطيع حسب البيانات الحالية."
-    : mainDriver
-      ? `يوجد ${count} حالة Repeat Breeder تمثل ${ratePct ?? "--"}% من الحيوانات الداخلة في برنامج التلقيح. السبب الأقوى حسب نمط القطيع: ${mainDriver.title}.`
-      : `يوجد ${count} حالة Repeat Breeder، لكن البيانات غير كافية لترجيح سبب واحد مسيطر.`;
+  const findingSummary =
+    [...findingCounts.values()]
+      .sort((a, b) =>
+        Number(b.count || 0) -
+        Number(a.count || 0)
+      );
+
+  const analyzedCasesCount =
+    rows.filter(row =>
+      Array.isArray(row.findings) &&
+      row.findings.length > 0
+    ).length;
+
+  const totalFindings =
+    findingSummary.reduce(
+      (sum, item) =>
+        sum + Number(item.count || 0),
+      0
+    );
+
+  // لا نحول نسبة مزرعة صغيرة إلى حكم "ضغط قوي".
+  // التقييم هنا يصف وجود الحالات فقط.
+  let severity = "good";
+  let severityLabel = "لا توجد حالات";
+
+  if (count === 1) {
+    severity = "warn";
+    severityLabel =
+      "حالة فردية تحتاج متابعة";
+
+  } else if (count > 1) {
+    severity = "warn";
+    severityLabel =
+      "حالات متعددة تحتاج متابعة";
+  }
+
+  const rateText =
+    ratePct === null
+      ? ""
+      : ` وتمثل ${ratePct}% من الحيوانات المؤهلة للتلقيح`;
+
+  const herdRead =
+    count === 0
+      ? "لا تظهر حالات Repeat Breeder محققة للشروط حسب البيانات الحالية."
+
+      : count === 1
+        ? "توجد حالة Repeat Breeder واحدة؛ يعرض مُرَبِّيك تحليلها الفردي من سجل التلقيحات والفترات والتوقيت والسائل والملقّح وTHI."
+
+        : `توجد ${count} حالات Repeat Breeder${rateText}. حلّل مُرَبِّيك كل حالة حسب نمط بياناتها الفعلي، ويعرض المؤشرات المتكررة بين الحالات كأعداد للمراجعة دون تحويلها إلى سبب قطيع قطعي.`;
 
   return {
     count,
-    eligibleCount: den || null,
+
+    eligibleCount:
+      den || null,
+
     ratePct,
+
     severity,
     severityLabel,
+
     avgServices,
-    mainDriver,
-    likelyDrivers,
+
+    analyzedCasesCount,
+    totalFindings,
+
+    findingSummary,
+
     herdRead,
-    rows: rows.slice(0, 80)
+
+    rows:
+      rows.slice(0, 80)
   };
 }
 
@@ -48886,17 +48968,57 @@ function fertilityReportBuildExpertReportSrv({
       dangerText: "الأيام المفتوحة مرتفعة؛ يوجد تأخير تناسلي مؤثر على دورة الإنتاج والربحية.",
       advice: "اقرأها مع سرعة العودة للتلقيح وكفاءة كشف الشياع."
     }),
-    fertilityReportExpertIndicatorSrv({
-      key: "repeat_breeder_pressure",
-      title: "ضغط Repeat Breeder",
-      value: repeatBreederAnalysis?.ratePct ?? null,
-      benchmark: 10,
-      direction: "lower",
-      goodText: "ضغط Repeat Breeder محدود على مستوى القطيع.",
-      warnText: "يوجد ضغط Repeat Breeder يحتاج تحليل أسباب القطيع.",
-      dangerText: "ضغط Repeat Breeder واضح ومؤثر على الخصوبة العامة للقطيع.",
-      advice: repeatBreederAnalysis?.herdRead || "اقرأ الحالات المتكررة مع انتظام الدورة والتوقيت وTHI والملقحين."
-    }),
+ {
+  key: "repeat_breeder_pressure",
+
+  title:
+    "حالات Repeat Breeder",
+
+  value:
+    Number(
+      repeatBreederAnalysis?.count || 0
+    ),
+
+  valueText:
+    `${Number(
+      repeatBreederAnalysis?.count || 0
+    )} حالة`,
+
+  benchmark:
+    null,
+
+  benchmarkText:
+    "",
+
+  status:
+    Number(
+      repeatBreederAnalysis?.count || 0
+    ) > 0
+      ? "warn"
+      : "good",
+
+  rating:
+    Number(
+      repeatBreederAnalysis?.count || 0
+    ) === 0
+      ? "لا توجد حالات"
+      : Number(
+          repeatBreederAnalysis?.count || 0
+        ) === 1
+          ? "حالة فردية تحتاج متابعة"
+          : "حالات تحتاج متابعة",
+
+  read:
+    repeatBreederAnalysis?.herdRead ||
+    "لا توجد قراءة Repeat Breeder مكتملة حاليًا.",
+
+  advice:
+    Number(
+      repeatBreederAnalysis?.count || 0
+    ) > 0
+      ? "راجع التحليل الفردي لكل حيوان والأدلة والتوصيات المسجلة داخل قسم Repeat Breeder."
+      : "استمر في متابعة عدد الخدمات ونتائج تشخيص الحمل."
+},
     fertilityReportExpertIndicatorSrv({
       key: "pregnancy_loss",
       title: "معدل الإجهاض/فقد الحمل",
@@ -48953,15 +49075,6 @@ function fertilityReportBuildExpertReportSrv({
     });
   }
 
-  if (repeatBreederAnalysis?.mainDriver) {
-    bottlenecks.push({
-      key: `repeat_breeder_${repeatBreederAnalysis.mainDriver.key}`,
-      title: `Repeat Breeder: ${repeatBreederAnalysis.mainDriver.title}`,
-      read: repeatBreederAnalysis.herdRead,
-      weight: 76
-    });
-  }
-
   const thiHigh = (Array.isArray(thiGroups) ? thiGroups : []).some(g =>
     (g.level === "moderate" || g.level === "high") &&
     Number(g.judged || 0) > 0 &&
@@ -49006,8 +49119,6 @@ function fertilityReportBuildExpertReportSrv({
     recommendations.push("الأولوية الفنية: مراجعة توقيت التلقيح، قاعدة صباح/مساء، جودة السائل، وتوزيع النتائج حسب الملقحين وTHI.");
   } else if (mainBottleneck.key === "first_service_bottleneck") {
     recommendations.push("الأولوية الفنية: مراجعة جاهزية أول تلقيحة بعد الولادة، VWP، فحص الرحم، والحالة الجسمية.");
-  } else if (String(mainBottleneck.key || "").startsWith("repeat_breeder_")) {
-    recommendations.push("الأولوية الفنية: قراءة حالات Repeat Breeder مع التوقيت، انتظام الدورة، THI، الملقحين، والسائل المستخدم.");
   } else if (mainBottleneck.key === "heat_stress_pressure") {
     recommendations.push("الأولوية الفنية: فصل قراءة الخصوبة في أيام THI المرتفع عن الأيام المريحة قبل تقييم الملقحين.");
   }
@@ -49252,8 +49363,9 @@ app.get("/api/fertility-report", requireUserId, async (req, res) => {
         semenCode: String(ai.semenCode || "").trim(),
         inseminationTime: String(ai.inseminationTime || ai.timeOfDay || "").trim(),
         heatStatus: String(ai.heatStatus || "").trim(),
-        heatDate: heatBefore?._date || "",
+         heatDate: heatBefore?._date || "",
         heatTime: heatBefore?.heatTime || "",
+        source: fertilityReportInseminationSourceSrv(ai),
         timing,
         thi,
         outcome,
@@ -49425,100 +49537,595 @@ for (const [number, arr] of aiByAnimal.entries()) {
 
   if (seasonAis.length < 3) continue;
 
-  const intervals = [];
-  for (let i = 1; i < seasonAis.length; i++) {
-    const d = fertilityReportDaysBetweenSrv(seasonAis[i - 1]._date, seasonAis[i]._date);
-    if (d !== null) intervals.push(d);
+ 
+
+   const lastAi = seasonAis[seasonAis.length - 1];
+
+  // نبني سجل خدمات الموسم مباشرة حتى لا يتقيد بفترة التقرير.
+  const seasonRows = seasonAis.map(ai => {
+    const heatBefore = lastHeatBeforeAi(ai);
+
+    return {
+      id: ai.id,
+      eventDate: ai._date,
+
+      inseminator:
+        String(
+          ai.inseminator ||
+          "غير محدد"
+        ).trim() || "غير محدد",
+
+      semenCode:
+        String(
+          ai.semenCode || ""
+        ).trim(),
+
+      source:
+        fertilityReportInseminationSourceSrv(ai),
+
+      timing:
+        fertilityReportTimingAssessmentSrv(
+          ai,
+          heatBefore
+        ),
+
+      thi:
+        fertilityReportThiInfoSrv(ai)
+    };
+  });
+
+  const lastAiRow =
+    seasonRows[seasonRows.length - 1] ||
+    null;
+
+  const naturalSeasonRows =
+    seasonRows.filter(row =>
+      row.source?.isForced !== true
+    );
+
+  const naturalServicesCount =
+    naturalSeasonRows.length;
+
+  const forcedServicesCount =
+    seasonRows.filter(row =>
+      row.source?.isForced === true
+    ).length;
+
+  const animalHeats =
+    heatByAnimal.get(number) || [];
+
+  const intervalDetails = [];
+
+  for (
+    let i = 1;
+    i < seasonAis.length;
+    i++
+  ) {
+    const previousAi =
+      seasonAis[i - 1];
+
+    const currentAi =
+      seasonAis[i];
+
+    const previousRow =
+      seasonRows[i - 1];
+
+    const currentRow =
+      seasonRows[i];
+
+    // لا تُحسب دورة رجوع طبيعية
+    // إذا كان أحد طرفيها تلقيحًا إجباريًا.
+    if (
+      previousRow?.source?.isForced === true ||
+      currentRow?.source?.isForced === true
+    ) {
+      continue;
+    }
+
+    const days =
+      fertilityReportDaysBetweenSrv(
+        previousAi._date,
+        currentAi._date
+      );
+
+    if (
+      days === null ||
+      days <= 0
+    ) {
+      continue;
+    }
+
+    const heatBetweenCount =
+      animalHeats.filter(heat =>
+        heat._ms > previousAi._ms &&
+        heat._ms < currentAi._ms
+      ).length;
+
+    intervalDetails.push({
+      fromDate:
+        previousAi._date,
+
+      toDate:
+        currentAi._date,
+
+      days,
+
+      heatBetweenCount,
+
+      hasRecordedHeatBetween:
+        heatBetweenCount > 0
+    });
   }
 
-  const regularCount = intervals.filter(d => d >= 18 && d <= 24).length;
-  const regularCycle = intervals.length > 0 && regularCount >= Math.ceil(intervals.length * 0.6);
+  const intervals =
+    intervalDetails.map(item =>
+      item.days
+    );
 
-  const lastAi = seasonAis[seasonAis.length - 1];
-  const lastAiRow = aiRows.find(x => x.id === lastAi.id) || null;
-  const seasonRows = seasonAis
-    .map(ai => aiRows.find(x => x.id === ai.id))
-    .filter(Boolean);
+  const shortReturns =
+    intervalDetails.filter(item =>
+      item.days >= 3 &&
+      item.days <= 7
+    );
 
-  const timingKnown = seasonRows.filter(r => r.timing?.code && r.timing.code !== "unknown");
-  const timingProblemCount = timingKnown.filter(r => r.timing.code !== "ideal").length;
-  const timingProblemPct = fertilityReportPctSrv(timingProblemCount, timingKnown.length);
+  const regularReturns =
+    intervalDetails.filter(item =>
+      item.days >= 18 &&
+      item.days <= 24
+    );
 
-  const thiKnownRows = seasonRows.filter(r => Number.isFinite(Number(r.thi?.value)));
-  const highThiCount = thiKnownRows.filter(r => r.thi.level === "moderate" || r.thi.level === "high").length;
-  const highThiPct = fertilityReportPctSrv(highThiCount, thiKnownRows.length);
+  const longReturns =
+    intervalDetails.filter(item =>
+      item.days >= 36 &&
+      item.days <= 40
+    );
 
-  const topInseminator = fertilityReportTopValueSrv(seasonRows.map(r => r.inseminator));
-  const topSemen = fertilityReportTopValueSrv(seasonRows.map(r => r.semenCode));
+  const doubleCycleReturns =
+    intervalDetails.filter(item =>
+      item.days === 42 &&
+      item.hasRecordedHeatBetween === false
+    );
 
-  const likelyCauseCodes = [];
-  const likelyCauses = [];
+  const regularCycle =
+    intervals.length > 0 &&
+    regularReturns.length >=
+      Math.ceil(
+        intervals.length * 0.6
+      );
 
-  let reproductiveSuspicion = "يحتاج مراجعة";
-  let suspicionCode = "review";
+  const timingKnown =
+    naturalSeasonRows.filter(row =>
+      row.timing?.code &&
+      row.timing.code !== "unknown"
+    );
 
-  if (regularCycle && timingProblemCount > 0 && (timingProblemPct === null || timingProblemPct >= 40)) {
-    reproductiveSuspicion = "رجوع منتظم مع نسبة واضحة من التلقيحات خارج توقيت صباح/مساء";
-    suspicionCode = "timing_protocol";
-    likelyCauseCodes.push("timing_protocol");
-    likelyCauses.push("توقيت التلقيح/تطبيق قاعدة صباح-مساء");
-  } else if (regularCycle) {
-    reproductiveSuspicion = "رجوع منتظم — احتمال فشل إخصاب أو تأخر إباضة/عدم توافق توقيت الإباضة";
-    suspicionCode = "possible_delayed_ovulation";
-    likelyCauseCodes.push("possible_delayed_ovulation");
-    likelyCauses.push("تأخر إباضة أو فشل إخصاب مع دورة منتظمة");
-  } else {
-    reproductiveSuspicion = "رجوع غير منتظم — راجع كشف الشياع أو فقد حمل مبكر أو مشكلة رحمية";
-    suspicionCode = "irregular_return";
-    likelyCauseCodes.push("irregular_return");
-    likelyCauses.push("كشف شياع غير منتظم أو فقد حمل مبكر/مشكلة رحمية");
+  const timingProblemRows =
+    timingKnown.filter(row =>
+      row.timing.code !== "ideal"
+    );
+
+  const timingProblemCount =
+    timingProblemRows.length;
+
+  const timingComplete =
+    naturalSeasonRows.length > 0 &&
+    timingKnown.length ===
+      naturalSeasonRows.length;
+
+  const timingCorrect =
+    timingComplete &&
+    timingProblemCount === 0;
+
+  const thiKnownRows =
+    seasonRows.filter(row =>
+      Number.isFinite(
+        Number(row.thi?.value)
+      )
+    );
+
+  const highThiRows =
+    thiKnownRows.filter(row =>
+      row.thi.level === "moderate" ||
+      row.thi.level === "high"
+    );
+
+  const highThiCount =
+    highThiRows.length;
+
+  const topInseminator =
+    fertilityReportTopValueSrv(
+      seasonRows
+        .map(row =>
+          row.inseminator
+        )
+        .filter(value =>
+          value &&
+          value !== "غير محدد"
+        )
+    );
+
+  const topSemen =
+    fertilityReportTopValueSrv(
+      seasonRows
+        .map(row =>
+          row.semenCode
+        )
+        .filter(Boolean)
+    );
+
+  const findings = [];
+
+  const addFinding = ({
+    code,
+    title,
+    read,
+    evidence,
+    recommendation
+  }) => {
+    findings.push({
+      code,
+      title,
+      read,
+      evidence,
+      recommendation
+    });
+  };
+
+  if (timingProblemCount > 0) {
+    addFinding({
+      code:
+        "timing_problem",
+
+      title:
+        "توقيت التلقيح يحتاج مراجعة",
+
+      read:
+        "يرجّح مُرَبِّيك أن خلل توقيت التلقيح ساهم في تكرار التلقيح.",
+
+      evidence:
+        `${timingProblemCount} من ${timingKnown.length} خدمات طبيعية مسجلة بتوقيت غير مناسب.`,
+
+      recommendation:
+        "مراجعة تحديد بداية الشياع وتوقيت التلقيح القادم."
+    });
   }
 
-  if (highThiPct !== null && highThiPct >= 50) {
-    likelyCauseCodes.push("heat_stress");
-    likelyCauses.push("إجهاد حراري وقت التلقيح");
+  if (shortReturns.length > 0) {
+    addFinding({
+      code:
+        "short_return",
+
+      title:
+        "رجوع قصير جدًا",
+
+      read:
+        "يرجّح مُرَبِّيك التهاب الرحم أو تكيس المبايض.",
+
+      evidence:
+        `فترات الرجوع القصيرة: ${shortReturns
+          .map(item =>
+            `${item.days} يوم`
+          )
+          .join("، ")}.`,
+
+      recommendation:
+        "مراجعة الطبيب وفحص الرحم والمبايض."
+    });
   }
 
-  if (topInseminator.count >= 3 && topInseminator.pct !== null && topInseminator.pct >= 60) {
-    likelyCauseCodes.push("inseminator_signal");
-    likelyCauses.push("تركّز التلقيحات مع ملقح محدد — قراءة اتجاهية لا حكم منفرد");
+  if (
+    regularCycle &&
+    timingCorrect
+  ) {
+    addFinding({
+      code:
+        "delayed_ovulation",
+
+      title:
+        "دورة منتظمة مع توقيت تلقيح صحيح",
+
+      read:
+        "يرجّح مُرَبِّيك تأخر التبويض.",
+
+      evidence:
+        `الفترات المنتظمة: ${regularReturns
+          .map(item =>
+            `${item.days} يوم`
+          )
+          .join("، ")}، وتوقيت الخدمات الطبيعية المسجلة مناسب.`,
+
+      recommendation:
+        "علاج تأخر التبويض واستشارة الطبيب."
+    });
   }
 
-  if (topSemen.count >= 3 && topSemen.pct !== null && topSemen.pct >= 60) {
-    likelyCauseCodes.push("semen_signal");
-    likelyCauses.push("تركّز التلقيحات مع سائل/طلوقة محددة — تحتاج مقارنة بعدد كافٍ");
+  if (longReturns.length > 0) {
+    addFinding({
+      code:
+        "long_return",
+
+      title:
+        "رجوع طويل بعد تجاوز الدورة الطبيعية",
+
+      read:
+        "يرجّح مُرَبِّيك فقد الأجنة المبكر أو ضعف كشف الشياع أو وجود شياع صامت.",
+
+      evidence:
+        `فترات الرجوع الطويلة: ${longReturns
+          .map(item =>
+            `${item.days} يوم`
+          )
+          .join("، ")}.`,
+
+      recommendation:
+        "مراجعة كشف الشياع والشياع الصامت؛ فقد الأجنة يُرجّح من نمط الرجوع ولا يمكن فحصه مباشرة."
+    });
   }
 
-  const timingPattern = timingKnown.length
-    ? `${timingProblemCount} من ${timingKnown.length} تلقيحات بتوقيت يحتاج مراجعة`
-    : "بيانات التوقيت غير مكتملة";
+  if (
+    doubleCycleReturns.length > 0
+  ) {
+    addFinding({
+      code:
+        "double_cycle_return",
 
-  const thiPattern = thiKnownRows.length
-    ? `${highThiCount} من ${thiKnownRows.length} تلقيحات تحت THI متوسط/عالٍ`
-    : "THI غير متاح لمعظم التلقيحات";
+      title:
+        "رجوع بعد نحو دورتين دون شياع مسجل",
 
-  const mbkRead = `${reproductiveSuspicion}. ${likelyCauses.length ? "العوامل المحتملة: " + likelyCauses.join("، ") + "." : ""}`;
+      read:
+        "يرجّح مُرَبِّيك شياعًا صامتًا أو دورة شياع لم تُرصد.",
+
+      evidence:
+        "ظهرت فترة 42 يومًا دون تسجيل شياع بين الخدمتين.",
+
+      recommendation:
+        "رفع دقة كشف الشياع ومراجعة وسائل الرصد بالمزرعة."
+    });
+  }
+
+  if (highThiCount > 0) {
+    addFinding({
+      code:
+        "heat_stress",
+
+      title:
+        "إجهاد حراري وقت التلقيحات",
+
+      read:
+        "يظهر الإجهاد الحراري كعامل مؤثر في تكرار التلقيح.",
+
+      evidence:
+        `${highThiCount} من ${thiKnownRows.length} تلقيحات مسجلة تحت THI متوسط أو عالٍ.`,
+
+      recommendation:
+        "مراجعة التبريد والانتظار والحركة وتنفيذ التلقيح في الساعات الأبرد."
+    });
+  }
+
+  if (
+    topSemen.value &&
+    topSemen.count >= 2 &&
+    topSemen.count >
+      seasonRows.length / 2
+  ) {
+    addFinding({
+      code:
+        "repeated_semen",
+
+      title:
+        "تكرار نفس السائل المنوي",
+
+      read:
+        `يحدد مُرَبِّيك السائل ${topSemen.value} كسائل متكرر يحتاج المراجعة.`,
+
+      evidence:
+        `استُخدم في ${topSemen.count} من ${seasonRows.length} خدمات.`,
+
+      recommendation:
+        "مراجعة الجرعات والحفظ والإذابة أو تجربة سائل آخر وفحص السائل المنوي."
+    });
+  }
+
+  if (
+    topInseminator.value &&
+    topInseminator.count >= 2 &&
+    topInseminator.count >
+      seasonRows.length / 2
+  ) {
+    addFinding({
+      code:
+        "repeated_inseminator",
+
+      title:
+        "تكرار نفس الملقّح",
+
+      read:
+        `يحدد مُرَبِّيك الملقّح ${topInseminator.value} كملقّح متكرر يحتاج مراجعة الأداء.`,
+
+      evidence:
+        `نفّذ ${topInseminator.count} من ${seasonRows.length} خدمات.`,
+
+      recommendation:
+        "مراجعة الإذابة والتعامل مع الجرعة وطريقة ومكان ترسيب السائل."
+    });
+  }
+
+  const likelyCauseCodes =
+    findings.map(item =>
+      item.code
+    );
+
+  const likelyCauses =
+    findings.map(item =>
+      item.title
+    );
+
+  const recommendations =
+    [...new Set(
+      findings
+        .map(item =>
+          item.recommendation
+        )
+        .filter(Boolean)
+    )];
+
+  recommendations.push(
+    "استشارة الطبيب وفحص الحيوان لتأكيد السبب واختيار التدخل المناسب."
+  );
+
+  const reproductiveSuspicion =
+    findings.length
+      ? findings[0].read
+      : "لم تكشف البيانات المسجلة سببًا تشغيليًا واضحًا لتكرار التلقيح.";
+
+  const suspicionCode =
+    findings[0]?.code ||
+    "clinical_review";
+
+  const timingPattern =
+    naturalServicesCount === 0
+      ? "لا توجد خدمات طبيعية كافية لتحليل التوقيت"
+      : timingKnown.length
+        ? `${timingProblemCount} من ${timingKnown.length} خدمات طبيعية بتوقيت يحتاج مراجعة`
+        : "بيانات توقيت الخدمات الطبيعية غير مكتملة";
+
+  const thiPattern =
+    thiKnownRows.length
+      ? `${highThiCount} من ${thiKnownRows.length} تلقيحات تحت THI متوسط/عالٍ`
+      : "THI غير متاح للتلقيحات المسجلة";
+
+  const mbkRead =
+    findings.length
+      ? `${findings
+          .map(item =>
+            item.read
+          )
+          .join(" ")} التوصية: ${recommendations.join("؛ ")}`
+      : `${reproductiveSuspicion} التوصية: ${recommendations.join("؛ ")}`;
 
   repeatBreeders.push({
-    animalNumber: number,
-    servicesCount: seasonAis.length,
-    lastInseminationDate: lastAi._date,
-    daysInMilk: Number(animal.daysInMilk ?? null),
-    cycleIntervalsDays: intervals,
-    cycleRegularity: regularCycle ? "منتظمة غالبًا" : "غير منتظمة/غير مكتملة",
-    lastTimingAssessment: lastAiRow?.timing || null,
-    lastInseminator: lastAiRow?.inseminator || String(lastAi.inseminator || "").trim(),
-    dominantInseminator: topInseminator.value || "",
-    dominantSemenCode: topSemen.value || "",
+    animalNumber:
+      number,
+
+    servicesCount:
+      seasonAis.length,
+
+    naturalServicesCount,
+
+    forcedServicesCount,
+
+    lastInseminationDate:
+      lastAi._date,
+
+    daysInMilk:
+      Number(
+        animal.daysInMilk ?? null
+      ),
+
+    cycleIntervalsDays:
+      intervals,
+
+    intervalDetails,
+
+    cycleRegularity:
+      regularCycle
+        ? "منتظمة غالبًا"
+        : intervals.length
+          ? "غير منتظمة"
+          : "غير مكتملة",
+
+    lastTimingAssessment:
+      lastAiRow?.timing || null,
+
+    lastInseminator:
+      lastAiRow?.inseminator ||
+      String(
+        lastAi.inseminator || ""
+      ).trim(),
+
+    dominantInseminator:
+      topInseminator.value || "",
+
+    dominantInseminatorCount:
+      topInseminator.count || 0,
+
+    dominantSemenCode:
+      topSemen.value || "",
+
+    dominantSemenCount:
+      topSemen.count || 0,
+
     timingPattern,
-    timingProblemPct,
+
+    timingProblemCount,
+
     thiPattern,
-    highThiPct,
+
+    highThiCount,
+
     likelyCauseCodes,
+
     likelyCauses,
+
+    findings,
+
+    recommendations,
+
     reproductiveSuspicion,
+
     suspicionCode,
-    mbkRead
+
+    mbkRead,
+
+    serviceHistory:
+      seasonRows.map(row => ({
+        eventDate:
+          row.eventDate,
+
+        sourceCode:
+          row.source?.code ||
+          "natural",
+
+        sourceLabel:
+          row.source?.label ||
+          "تلقيح مرتبط بشياع طبيعي",
+
+        isForced:
+          row.source?.isForced === true,
+
+        timingCode:
+          row.timing?.code ||
+          "unknown",
+
+        timingLabel:
+          row.timing?.label ||
+          "غير مكتمل",
+
+        timingNote:
+          row.timing?.note || "",
+
+        inseminator:
+          row.inseminator ||
+          "غير محدد",
+
+        semenCode:
+          row.semenCode || "",
+
+        thiValue:
+          Number.isFinite(
+            Number(row.thi?.value)
+          )
+            ? Number(row.thi.value)
+            : null,
+
+        thiLevel:
+          row.thi?.level ||
+          "unknown",
+
+        thiLabel:
+          row.thi?.label ||
+          "غير متاح"
+      }))
   });
 }
 
