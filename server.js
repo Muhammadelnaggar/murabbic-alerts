@@ -14844,47 +14844,20 @@ async function calvingFindSireLineageForCalvesSrv({ userId, animalNumber, lastIn
       const snap = await db.collection("events")
         .where("userId", "==", uid)
         .where("animalNumber", "==", v)
-        .limit(60)
+        .where("eventDate", "==", aiDate)
+        .limit(10)
         .get();
 
       for (const d of snap.docs) {
         const e = { id: d.id, ...(d.data() || {}) };
-
-        const t = String(
-          e.eventType ||
-          e.type ||
-          e.eventTypeNorm ||
-          ""
-        )
-          .trim()
-          .toLowerCase();
+        const t = String(e.eventType || e.type || e.eventTypeNorm || "").trim();
 
         if (!(t.includes("تلقيح") || t.includes("insemination"))) continue;
 
-        const eventDate = String(
-          e.eventDate ||
-          e.date ||
-          e.inseminationDate ||
-          ""
-        ).trim().slice(0, 10);
-
-        if (eventDate !== aiDate) continue;
-
-        const lineage =
-          calvingSireLineageFromInseminationEventSrv(
-            e,
-            eventDate
-          );
-
+        const lineage = calvingSireLineageFromInseminationEventSrv(e, aiDate);
         if (lineage) return lineage;
       }
-
-    } catch (e) {
-      console.warn(
-        "calving sire lineage lookup failed:",
-        e.message || e
-      );
-    }
+    } catch (_) {}
   }
 
   return null;
