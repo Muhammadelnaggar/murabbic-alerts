@@ -14834,33 +14834,108 @@ async function calvingFindSireLineageForCalvesSrv({ userId, animalNumber, lastIn
   const damNumber = calvingNormDigitsOnlySrv(animalNumber || "");
   const aiDate = String(lastInseminationDate || "").trim().slice(0, 10);
 
-  if (!db || !uid || !damNumber || !calvingIsDateSrv(aiDate)) return null;
+  if (!db || !uid || !damNumber) return null;
 
-  const values = [damNumber, Number(damNumber)]
+  const values = [...new Set([damNumber, Number(damNumber)])]
     .filter(v => !(typeof v === "number" && Number.isNaN(v)));
 
-  for (const v of values) {
-    try {
-      const snap = await db.collection("events")
-        .where("userId", "==", uid)
-        .where("animalNumber", "==", v)
-        .where("eventDate", "==", aiDate)
-        .limit(10)
-        .get();
+  const candidates = [];
+  const seen = new Set();
 
-      for (const d of snap.docs) {
-        const e = { id: d.id, ...(d.data() || {}) };
-        const t = String(e.eventType || e.type || e.eventTypeNorm || "").trim();
+  for (const ownerField of ["userId", "ownerUid"]) {
+    for (const v of values) {
+      try {
+        const snap = await db.collection("events")
+          .where(ownerField, "==", uid)
+          .where("animalNumber", "==", v)
+          .limit(60)
+          .get();
 
-        if (!(t.includes("تلقيح") || t.includes("insemination"))) continue;
+        for (const d of snap.docs) {
+          if (seen.has(d.id)) continue;
+          seen.add(d.id);
 
-        const lineage = calvingSireLineageFromInseminationEventSrv(e, aiDate);
-        if (lineage) return lineage;
+          const e = { id: d.id, ...(d.data() || {}) };
+
+          const t = String(
+            e.eventType ||
+            e.type ||
+            e.eventTypeNorm ||
+            ""
+          )
+            .trim()
+            .toLowerCase();
+
+          if (!(t.includes("تلقيح") || t.includes("insemination"))) {
+            continue;
+          }
+
+          const rawEventDate =
+            e.eventDate ||
+            e.date ||
+            e.inseminationDate ||
+            "";
+
+          const parsedEventDate = toDate(rawEventDate);
+
+          const eventDate =
+            /^\d{4}-\d{2}-\d{2}$/.test(
+              String(rawEventDate).trim().slice(0, 10)
+            )
+              ? String(rawEventDate).trim().slice(0, 10)
+              : (
+                  parsedEventDate &&
+                  !Number.isNaN(parsedEventDate.getTime())
+                    ? parsedEventDate.toISOString().slice(0, 10)
+                    : ""
+                );
+
+          const lineage =
+            calvingSireLineageFromInseminationEventSrv(
+              e,
+              eventDate || aiDate
+            );
+
+          if (!lineage) continue;
+
+          candidates.push({
+            eventDate,
+            lineage
+          });
+        }
+
+      } catch (e) {
+        console.warn(
+          "calving sire lineage lookup failed:",
+          e.message || e
+        );
       }
-    } catch (_) {}
+    }
   }
 
-  return null;
+  if (!candidates.length) return null;
+
+  const exact = aiDate
+    ? candidates.find(row => row.eventDate === aiDate)
+    : null;
+
+  if (exact) return exact.lineage;
+
+  const eligible = aiDate
+    ? candidates.filter(
+        row =>
+          row.eventDate &&
+          row.eventDate <= aiDate
+      )
+    : candidates.filter(row => row.eventDate);
+
+  eligible.sort(
+    (a, b) =>
+      String(b.eventDate)
+        .localeCompare(String(a.eventDate))
+  );
+
+  return (eligible[0] || candidates[0]).lineage;
 }
 // ============================================================
 //                 API: CALVING GATE — moved from forms-init.js
