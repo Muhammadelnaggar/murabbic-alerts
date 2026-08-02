@@ -5505,18 +5505,13 @@ async function herdImportV2FindAnimalRefInternalSrv(uid, numberStr, collectionNa
     exists: false
   };                  
 }
-function herdImportV2BuildAnimalOperationalPayloadInternalSrv(
-  uid,
-  base = {},
-  sourceProfile = {},
-  isNew = true
-) {
+function herdImportV2FormDataInternalSrv(base = {}) {
   const numberStr = addAnimalDigitsSrv(base.animalNumber);
 
   const isFollower =
     herdImportV2OperationalCollectionNameInternalSrv(base) === "calves";
 
-  const formData = isFollower
+  return isFollower
     ? {
         entryType: "followers",
         animalNumber: numberStr,
@@ -5548,10 +5543,34 @@ function herdImportV2BuildAnimalOperationalPayloadInternalSrv(
         sireNumber: base.sireNumber,
         pregnancyDays: base.pregDays
       };
+}
 
-  // نفس الكاتب المستخدم في الإدخال اليدوي.
+function herdImportV2GateDecisionInternalSrv(base = {}) {
+  const formData = herdImportV2FormDataInternalSrv(base);
+  const fieldErrors = addAnimalBasicFieldsDecisionSrv(formData);
+
+  const guardMessage = Object.keys(fieldErrors).length
+    ? null
+    : addAnimalDecisionSrv(formData);
+
+  return {
+    ok: !Object.keys(fieldErrors).length && !guardMessage,
+    formData,
+    fieldErrors,
+    guardMessage
+  };
+}
+
+function herdImportV2BuildAnimalOperationalPayloadInternalSrv(
+  uid,
+  base = {},
+  sourceProfile = {},
+  isNew = true
+) {
+  const formData = herdImportV2FormDataInternalSrv(base);
+  const isFollower = formData.entryType === "followers";
+
   const canonical = addAnimalBuildSinglePayloadSrv(uid, formData);
-
   const payload = {
     ...canonical.payload,
 
@@ -6093,7 +6112,47 @@ if (missingAnimalTypeCount > 0) {
         }
       });
     }
+    const gateRejected = [];
 
+for (const base of baselinePreview.animalsInternal || []) {
+  const gate = herdImportV2GateDecisionInternalSrv(base);
+  const numberStr = addAnimalDigitsSrv(gate.formData.animalNumber);
+
+  if (!gate.ok) {
+    gateRejected.push({
+      animalNumber: numberStr,
+      fieldErrors: gate.fieldErrors,
+      message:
+        gate.guardMessage ||
+        "❌ راجع الحقول المطلوبة لهذا الحيوان."
+    });
+
+    continue;
+  }
+
+  const duplicate = await addAnimalDuplicateCheckSrv(uid, numberStr);
+
+  if (!duplicate.ok) {
+    gateRejected.push({
+      animalNumber: numberStr,
+      reason: duplicate.duplicate
+        ? "duplicate_animal_number"
+        : "duplicate_check_failed",
+      collection: duplicate.collection || null,
+      message: duplicate.message
+    });
+  }
+}
+
+if (gateRejected.length) {
+  return res.status(400).json({
+    ok: false,
+    error: "herd_import_v2_gate_failed",
+    message: `❌ لم يتم الاستيراد. يوجد ${gateRejected.length} حيوان لا يطابق شروط إضافة الحيوان.`,
+    rejectedCount: gateRejected.length,
+    rejected: gateRejected
+  });
+}
     let batch = db.batch();
     let ops = 0;
 
@@ -6105,26 +6164,21 @@ if (missingAnimalTypeCount > 0) {
       const numberStr = addAnimalDigitsSrv(base.animalNumber);
       if (!numberStr) continue;
 
-     const collectionName = herdImportV2OperationalCollectionNameInternalSrv(base);
+     const collectionName =
+  herdImportV2OperationalCollectionNameInternalSrv(base);
 
-const found = await herdImportV2FindAnimalRefInternalSrv(
+const ref = db.collection(collectionName).doc();
+
+const payload = herdImportV2BuildAnimalOperationalPayloadInternalSrv(
   uid,
-  numberStr,
-  collectionName
+  base,
+  sourceProfile,
+  true
 );
 
-      const payload = herdImportV2BuildAnimalOperationalPayloadInternalSrv(
-        uid,
-        base,
-        sourceProfile,
-        !found.exists
-      );
-
-      batch.set(found.ref, payload, { merge: true });
-      ops++;
-
-      if (found.exists) updatedAnimalsCount++;
-      else insertedAnimalsCount++;
+batch.set(ref, payload);
+ops++;
+insertedAnimalsCount++;
 
       if (ops >= 350) {
         await batch.commit();
