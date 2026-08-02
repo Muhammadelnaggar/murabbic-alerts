@@ -80,7 +80,7 @@
   </div>
 
   <div class="card">
-  <div class="section-title">🔁 تحليل التلقيح المتكرر</div>
+  <div class="section-title">🔁  التلقيح المتكرر</div>
     <div id="repeatBreedersWrap"></div>
   </div>
 
@@ -352,179 +352,92 @@ function renderThi(j){
 }
 
 function renderRepeatBreeders(j){
-  const rb = j.repeatBreederAnalysis || j.repeatBreeders || {};
-  const rows = Array.isArray(rb.rows) ? rb.rows : [];
-  const summary = Array.isArray(rb.findingSummary) ? rb.findingSummary : [];
+  const rb =
+    j.repeatBreederAnalysis ||
+    j.repeatBreeders ||
+    {};
 
-  const summaryLines = summary.map(item => {
-    const title = item.title || item.code || "مؤشر مسجل";
-    const count = Number(item.count || 0);
+  const rows =
+    Array.isArray(rb.rows)
+      ? rb.rows
+      : [];
 
-    return `${title}: ظهر في ${fmtNum(count)} من ${fmtNum(
-      rb.count || rows.length
-    )} حالة`;
-  });
+  const recommendation =
+    rb.recommendation ||
+    "راجع توقيت التلقيح، وانتظام دورات الشياع، وطريقة حفظ وتداول السائل المنوي، ونفّذ التلقيح في الأوقات الأبرد، مع تبريد الحيوانات عند وجود إجهاد حراري.";
 
-  const head = `
-    <div class="grid">
-      ${box("الحالات", fmtNum(rb.count || 0))}
-      ${box("المؤهلون للتلقيح", fmtNum(rb.eligibleCount))}
-      ${box("النسبة", fmtPct(rb.ratePct))}
-      ${box("التقييم", rb.severityLabel || "--")}
-    </div>
-
-    <div class="cards">
-      ${noteMini(
-        "حالات Repeat Breeder في القطيع",
-        "قراءة مُرَبِّيك",
-        esc(rb.herdRead || "")
-      )}
-
-      ${
-        summaryLines.length
-          ? noteMini(
-              "المؤشرات المتكررة بين الحالات",
-              `${fmtNum(summaryLines.length)} مؤشر`,
-              summaryLines
-                .map(line => `• ${esc(line)}`)
-                .join("<br>")
-            )
-          : ""
-      }
-    </div>
-  `;
+  const recommendationHtml =
+    noteMini(
+      "توصية مُرَبِّيك",
+      "مراجعة فنية",
+      esc(recommendation)
+    );
 
   if (!rows.length) {
     el("repeatBreedersWrap").innerHTML =
-      head +
+      recommendationHtml +
       emptyMsg(
-        "لا توجد حيوانات Repeat Breeder محققة للشروط حاليًا."
+        "لا توجد حيوانات مطابقة لشروط Repeat Breeder حاليًا."
       );
 
     return;
   }
 
-  const htmlRows = rows.map(row => {
-    const intervals =
-      Array.isArray(row.cycleIntervalsDays)
-        ? row.cycleIntervalsDays
-        : [];
+  const htmlRows =
+    rows.map(row => {
+      const intervals =
+        Array.isArray(row.cycleIntervalsDays)
+          ? row.cycleIntervalsDays
+          : [];
 
-    const findings =
-      Array.isArray(row.findings)
-        ? row.findings
-        : [];
+      const inseminators =
+        Array.isArray(row.inseminators)
+          ? row.inseminators
+          : [];
 
-    const recommendations =
-      Array.isArray(row.recommendations)
-        ? row.recommendations
-        : [];
+      const semenCodes =
+        Array.isArray(row.semenCodes)
+          ? row.semenCodes
+          : [];
 
-    const serviceNote = [
-      `${fmtNum(row.naturalServicesCount || 0)} طبيعي`,
+      return `
+        <tr>
+          <td>${esc(row.animalNumber)}</td>
 
-      Number(row.forcedServicesCount || 0) > 0
-        ? `${fmtNum(row.forcedServicesCount)} إجباري/TAI`
-        : ""
-    ]
-      .filter(Boolean)
-      .join(" + ");
+          <td>${fmtNum(row.servicesCount)}</td>
 
-    const findingsHtml =
-      findings.length
-        ? findings
-            .map(item => `
-              <div>
-                <b>${esc(
-                  item.title || "مؤشر مسجل"
-                )}</b><br>
+          <td>${
+            intervals.length
+              ? esc(
+                  intervals
+                    .map(day => `${day} يوم`)
+                    .join("، ")
+                )
+              : "--"
+          }</td>
 
-                ${esc(item.read || "")}<br>
+          <td>${esc(
+            inseminators.join("، ") ||
+            "غير محدد"
+          )}</td>
 
-                ${
-                  item.evidence
-                    ? `<span><b>الدليل:</b> ${esc(
-                        item.evidence
-                      )}</span>`
-                    : ""
-                }
-              </div>
-            `)
-            .join("<hr>")
-        : esc(
-            row.reproductiveSuspicion ||
-            "لم تكشف البيانات المسجلة سببًا تشغيليًا واضحًا."
-          );
-
-    const recommendationsHtml =
-      recommendations.length
-        ? recommendations
-            .map(item => `• ${esc(item)}`)
-            .join("<br>")
-        : "--";
-
-    return `
-      <tr>
-        <td>${esc(row.animalNumber)}</td>
-
-        <td>
-          <b>${fmtNum(row.servicesCount)}</b><br>
-          <span>${esc(serviceNote)}</span>
-        </td>
-
-        <td>${esc(
-          row.lastInseminationDate || "--"
-        )}</td>
-
-        <td>${
-          intervals.length
-            ? esc(
-                intervals
-                  .map(day => `${day} يوم`)
-                  .join("، ")
-              )
-            : "--"
-        }</td>
-
-        <td>${esc(
-          row.cycleRegularity || "--"
-        )}</td>
-
-        <td>${esc(
-          row.timingPattern || "--"
-        )}</td>
-
-        <td>${esc(
-          row.thiPattern || "--"
-        )}</td>
-
-        <td>${findingsHtml}</td>
-
-        <td>${recommendationsHtml}</td>
-      </tr>
-    `;
-  });
+          <td>${esc(
+            semenCodes.join("، ") ||
+            "غير محدد"
+          )}</td>
+        </tr>
+      `;
+    });
 
   el("repeatBreedersWrap").innerHTML =
-    head +
-
-    noteMini(
-      "الحالات الفردية المحققة للشروط",
-      `${fmtNum(rows.length)} حالة`,
-      "يعرض كل صف عدد الخدمات والفترات المسجلة والمؤشرات التي استنتجها السيرفر مع دليلها والتوصية المرتبطة بها."
-    ) +
-
+    recommendationHtml +
     table(
       [
         "رقم الحيوان",
-        "الخدمات",
-        "آخر تلقيح",
-        "الفترات",
-        "انتظام الدورة",
-        "التوقيت",
-        "THI",
-        "تحليل مُرَبِّيك والدليل",
-        "التوصية"
+        "عدد التلقيحات",
+        "الفترة بين التلقيحات",
+        "الملقّح",
+        "السائل المنوي"
       ],
       htmlRows
     );
