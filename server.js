@@ -41510,11 +41510,19 @@ if (!uniqueCheck || uniqueCheck.ok === false) {
       const birthDate = payload.eventDate;
       const species = payload.species;
 
-      const sireLineage = await calvingFindSireLineageForCalvesSrv({
-        userId: uid,
-        animalNumber: damNumber,
-        lastInseminationDate: payload.lastFertileInseminationDate || payload.lastInseminationDate
-      }) || {};
+      const sireNumber = String(doc?.sireNumber || "").trim();
+      const sireInseminationDate = String(lastAI || "").trim().slice(0, 10);
+
+      const sireLineage = sireNumber
+    ? {
+      sireNumber,
+      fatherNumber: sireNumber,
+      bullNumber: sireNumber,
+      semenCode: sireNumber,
+      sireSource: "dam_last_insemination",
+      ...(sireInseminationDate ? { sireInseminationDate } : {})
+    }
+  : {};
 
       const calvesToSave = [];
       const pushCalf = (calfIdField, calfSexField, calfFateField) => {
