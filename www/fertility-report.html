@@ -354,14 +354,15 @@ function renderThi(j){
 function renderRepeatBreeders(j){
   const rb = j.repeatBreederAnalysis || j.repeatBreeders || {};
   const rows = Array.isArray(rb.rows) ? rb.rows : [];
-  const drivers = Array.isArray(rb.likelyDrivers) ? rb.likelyDrivers : [];
+  const summary = Array.isArray(rb.findingSummary) ? rb.findingSummary : [];
 
-  const driverLines = drivers.map(d => {
-    const title = d.title || d.key || "سبب محتمل";
-    const count = d.count == null ? "--" : fmtNum(d.count);
-    const pct = d.pct == null ? "--" : fmtPct(d.pct);
-    const strength = d.strength || "";
-    return `${title}: ${count} حالة (${pct})${strength ? ` — ${strength}` : ""}`;
+  const summaryLines = summary.map(item => {
+    const title = item.title || item.code || "مؤشر مسجل";
+    const count = Number(item.count || 0);
+
+    return `${title}: ظهر في ${fmtNum(count)} من ${fmtNum(
+      rb.count || rows.length
+    )} حالة`;
   });
 
   const head = `
@@ -374,17 +375,19 @@ function renderRepeatBreeders(j){
 
     <div class="cards">
       ${noteMini(
-        "ضغط التلقيح المتكرر في القطيع",
+        "حالات Repeat Breeder في القطيع",
         "قراءة مُرَبِّيك",
         esc(rb.herdRead || "")
       )}
 
       ${
-        driverLines.length
+        summaryLines.length
           ? noteMini(
-              "الأسباب المحتملة",
-              `${fmtNum(driverLines.length)} سبب`,
-              driverLines.map(x => `• ${esc(x)}`).join("<br>")
+              "المؤشرات المتكررة بين الحالات",
+              `${fmtNum(summaryLines.length)} مؤشر`,
+              summaryLines
+                .map(line => `• ${esc(line)}`)
+                .join("<br>")
             )
           : ""
       }
@@ -394,32 +397,138 @@ function renderRepeatBreeders(j){
   if (!rows.length) {
     el("repeatBreedersWrap").innerHTML =
       head +
-      emptyMsg("لا توجد حيوانات Repeat Breeder محققة للشروط حاليًا.");
+      emptyMsg(
+        "لا توجد حيوانات Repeat Breeder محققة للشروط حاليًا."
+      );
+
     return;
   }
 
-  const htmlRows = rows.map(r => `
-    <tr>
-      <td>${esc(r.animalNumber)}</td>
-      <td>${fmtNum(r.servicesCount)}</td>
-      <td>${esc(r.lastInseminationDate || "--")}</td>
-      <td>${esc(r.cycleRegularity || "--")}</td>
-      <td>${esc(r.timingPattern || "--")}</td>
-      <td>${esc(r.thiPattern || "--")}</td>
-      <td>${esc(Array.isArray(r.likelyCauses) ? r.likelyCauses.join("، ") : "")}</td>
-      <td>${esc(r.mbkRead || r.reproductiveSuspicion || "--")}</td>
-    </tr>
-  `);
+  const htmlRows = rows.map(row => {
+    const intervals =
+      Array.isArray(row.cycleIntervalsDays)
+        ? row.cycleIntervalsDays
+        : [];
+
+    const findings =
+      Array.isArray(row.findings)
+        ? row.findings
+        : [];
+
+    const recommendations =
+      Array.isArray(row.recommendations)
+        ? row.recommendations
+        : [];
+
+    const serviceNote = [
+      `${fmtNum(row.naturalServicesCount || 0)} طبيعي`,
+
+      Number(row.forcedServicesCount || 0) > 0
+        ? `${fmtNum(row.forcedServicesCount)} إجباري/TAI`
+        : ""
+    ]
+      .filter(Boolean)
+      .join(" + ");
+
+    const findingsHtml =
+      findings.length
+        ? findings
+            .map(item => `
+              <div>
+                <b>${esc(
+                  item.title || "مؤشر مسجل"
+                )}</b><br>
+
+                ${esc(item.read || "")}<br>
+
+                ${
+                  item.evidence
+                    ? `<span><b>الدليل:</b> ${esc(
+                        item.evidence
+                      )}</span>`
+                    : ""
+                }
+              </div>
+            `)
+            .join("<hr>")
+        : esc(
+            row.reproductiveSuspicion ||
+            "لم تكشف البيانات المسجلة سببًا تشغيليًا واضحًا."
+          );
+
+    const recommendationsHtml =
+      recommendations.length
+        ? recommendations
+            .map(item => `• ${esc(item)}`)
+            .join("<br>")
+        : "--";
+
+    return `
+      <tr>
+        <td>${esc(row.animalNumber)}</td>
+
+        <td>
+          <b>${fmtNum(row.servicesCount)}</b><br>
+          <span>${esc(serviceNote)}</span>
+        </td>
+
+        <td>${esc(
+          row.lastInseminationDate || "--"
+        )}</td>
+
+        <td>${
+          intervals.length
+            ? esc(
+                intervals
+                  .map(day => `${day} يوم`)
+                  .join("، ")
+              )
+            : "--"
+        }</td>
+
+        <td>${esc(
+          row.cycleRegularity || "--"
+        )}</td>
+
+        <td>${esc(
+          row.timingPattern || "--"
+        )}</td>
+
+        <td>${esc(
+          row.thiPattern || "--"
+        )}</td>
+
+        <td>${findingsHtml}</td>
+
+        <td>${recommendationsHtml}</td>
+      </tr>
+    `;
+  });
 
   el("repeatBreedersWrap").innerHTML =
     head +
-    noteMini("الحالات الفردية المحققة للشروط", `${fmtNum(rows.length)} حالة`, "") +
+
+    noteMini(
+      "الحالات الفردية المحققة للشروط",
+      `${fmtNum(rows.length)} حالة`,
+      "يعرض كل صف عدد الخدمات والفترات المسجلة والمؤشرات التي استنتجها السيرفر مع دليلها والتوصية المرتبطة بها."
+    ) +
+
     table(
-      ["رقم الحيوان", "عدد التلقيحات", "آخر تلقيح", "انتظام الدورة", "التوقيت", "THI", "الأسباب المحتملة", "قراءة مُرَبِّيك"],
+      [
+        "رقم الحيوان",
+        "الخدمات",
+        "آخر تلقيح",
+        "الفترات",
+        "انتظام الدورة",
+        "التوقيت",
+        "THI",
+        "تحليل مُرَبِّيك والدليل",
+        "التوصية"
+      ],
       htmlRows
     );
 }
-
 function renderAdvisory(j){
   const expert = j.expertReport || {};
   const main = expert.mainBottleneck || j.bottleneckAnalysis?.main || {};
