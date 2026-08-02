@@ -14186,7 +14186,18 @@ function inseminationIsDateSrv(v) {
   const d = v instanceof Date ? v : (v ? new Date(v) : null);
   return !Number.isNaN(d?.getTime());
 }
+function inseminationDayPartSrv(v) {
+  const s = String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\u064B-\u065F\u0670]/g, "")
+    .replace(/\s+/g, "");
 
+  if (s === "صباح" || s === "صباحا") return "صباحا";
+  if (s === "مساء" || s === "مساءا") return "مساءا";
+
+  return "";
+}
 function inseminationDaysBetweenSrv(a, b) {
   const d1 = a instanceof Date ? a : (a ? new Date(a) : null);
   const d2 = b instanceof Date ? b : (b ? new Date(b) : null);
@@ -14227,12 +14238,18 @@ function validateInseminationFieldsSrv(fd = {}) {
     fieldErrors.inseminator = "أدخل اسم الملقّح.";
   }
 
-  if (!inseminationReqSrv(fd.inseminationTime)) {
+   if (!inseminationReqSrv(fd.inseminationTime)) {
     fieldErrors.inseminationTime = "اختر وقت التلقيح.";
+  } else if (!inseminationDayPartSrv(fd.inseminationTime)) {
+    fieldErrors.inseminationTime =
+      "وقت التلقيح يجب أن يكون صباحا أو مساءا.";
   }
 
   if (!inseminationReqSrv(fd.heatStatus)) {
-   fieldErrors.heatStatus = "اختر حالة الشياع.";
+    fieldErrors.heatStatus = "اختر وقت الشياع.";
+  } else if (!inseminationDayPartSrv(fd.heatStatus)) {
+    fieldErrors.heatStatus =
+      "وقت الشياع يجب أن يكون صباحا أو مساءا.";
   }
 
   return fieldErrors;
@@ -15724,8 +15741,11 @@ if (!isWarn) {
       inseminationMethod: String(formData.inseminationMethod || "").trim(),
       semenCode: String(formData.semenCode || "").trim(),
       inseminator: String(formData.inseminator || "").trim(),
-      inseminationTime: String(formData.inseminationTime || "").trim(),
-      heatStatus: String(formData.heatStatus || "").trim(),
+      inseminationTime:
+        inseminationDayPartSrv(formData.inseminationTime),
+
+      heatStatus:
+        inseminationDayPartSrv(formData.heatStatus),
       inseminationSource:
        inseminationSourceNormSrv(formData) || null,
             thiAtInsemination: thiAtInsemination ? {
@@ -16105,8 +16125,11 @@ rejected.push({
           inseminationMethod: String(formData.inseminationMethod || "").trim(),
           semenCode: String(formData.semenCode || "").trim(),
           inseminator: String(formData.inseminator || "").trim(),
-          inseminationTime: String(formData.inseminationTime || "").trim(),
-          heatStatus: String(formData.heatStatus || "").trim(),
+          inseminationTime:
+           inseminationDayPartSrv(formData.inseminationTime),
+
+          heatStatus:
+           inseminationDayPartSrv(formData.heatStatus),
           inseminationSource:
            inseminationSourceNormSrv(formData) || null,
           notes: String(formData.notes || "").trim() || null,
