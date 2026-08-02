@@ -4701,7 +4701,6 @@ function herdImportV2NormalizeReproductiveStatusInternalSrv(v) {
 
   if (!s) return "";
 
-  // غير حامل / مفتوحة أولًا
   if (
     s === "open" ||
     s === "o" ||
@@ -4716,7 +4715,7 @@ function herdImportV2NormalizeReproductiveStatusInternalSrv(v) {
     s.includes("فارغ") ||
     s.includes("فاضي")
   ) {
-   return "مفتوحة";
+    return "مفتوحة";
   }
 
   if (
@@ -4755,7 +4754,17 @@ function herdImportV2NormalizeReproductiveStatusInternalSrv(v) {
     return "حديث الولادة";
   }
 
-  return raw;
+  if (
+    s.includes("abort") ||
+    s.includes("إجهاض") ||
+    s.includes("اجهاض") ||
+    s.includes("مجهض")
+  ) {
+    return "إجهاض";
+  }
+
+  // لا نمرر أي قيمة تشغيلية مجهولة إلى reproductiveStatus.
+  return "";
 }
 
 function herdImportV2NormalizeArchiveStatusInternalSrv(v) {
@@ -4801,18 +4810,13 @@ function herdImportV2NormalizeValueInternalSrv(canonical, rawValue) {
   const raw = String(rawValue ?? "").trim();
   if (!raw) return "";
 
-if (canonical === "reproductiveStatus") {
-  return herdImportV2NormalizeReproductiveStatusInternalSrv(raw);
-}
-
   if (canonical === "productionStatus") {
     const v = addAnimalImportNormalizeProductionSrv(raw, {});
     return v || "";
   }
 
   if (canonical === "reproductiveStatus") {
-    const v = addAnimalImportNormalizeReproSrv(raw);
-    return v || "";
+    return herdImportV2NormalizeReproductiveStatusInternalSrv(raw);
   }
 
   if (canonical === "pdResult") {
@@ -4825,6 +4829,7 @@ if (canonical === "reproductiveStatus") {
 
   return raw;
 }
+
 
 function herdImportV2AnalyzeValueMappingInternalSrv(rows = [], columnMapInternal = {}) {
   const valueFields = new Set([
@@ -5486,130 +5491,80 @@ async function herdImportV2FindAnimalRefInternalSrv(uid, numberStr, collectionNa
   return {
     ref: db.collection(col).doc(),
     exists: false
-  };
+  };                  
 }
-
-function herdImportV2BuildAnimalOperationalPayloadInternalSrv(uid, base = {}, sourceProfile = {}, isNew = true) {
+function herdImportV2BuildAnimalOperationalPayloadInternalSrv(
+  uid,
+  base = {},
+  sourceProfile = {},
+  isNew = true
+) {
   const numberStr = addAnimalDigitsSrv(base.animalNumber);
-  const speciesInfo = addAnimalSpeciesFromTypeSrv(base.animalType || base.animalTypeAr);
 
-  const productionStatus = addAnimalStrSrv(base.productionStatus);
-  const reproductiveStatus = addAnimalStrSrv(base.reproductiveStatus);
-  if (herdImportV2OperationalCollectionNameInternalSrv(base) === "calves") {
-  const followerStatus = herdImportV2InferFollowerStatusInternalSrv(base);
-  const isInseminatedFollower = followerStatus === "ملقح" || followerStatus === "عشار";
+  const isFollower =
+    herdImportV2OperationalCollectionNameInternalSrv(base) === "calves";
+
+  const formData = isFollower
+    ? {
+        entryType: "followers",
+        animalNumber: numberStr,
+        animalType: base.animalType || base.animalTypeAr || "",
+        breed: base.breed,
+        followerSex: base.followerSex,
+        followerStatus: herdImportV2InferFollowerStatusInternalSrv(base),
+        birthDate: base.birthDate,
+        damNumber: base.damNumber,
+        weaningDate: base.weaningDate,
+        followerLastInseminationDate: base.lastInseminationDate,
+        followerServicesCount: base.servicesCount,
+        followerSireNumber: base.sireNumber,
+        followerPregnancyDays: base.pregDays
+      }
+    : {
+        entryType: "mothers",
+        animalNumber: numberStr,
+        animalType: base.animalType || base.animalTypeAr || "",
+        breed: base.breed,
+        productionStatus: base.productionStatus,
+        dailyMilk: base.dailyMilk,
+        reproductiveStatus: base.reproductiveStatus,
+        servicesCount: base.servicesCount,
+        lactationNumber: base.lactationNumber,
+        birthDate: base.birthDate,
+        lastCalvingDate: base.lastCalvingDate,
+        lastInseminationDate: base.lastInseminationDate,
+        sireNumber: base.sireNumber,
+        pregnancyDays: base.pregDays
+      };
+
+  // نفس الكاتب المستخدم في الإدخال اليدوي.
+  const canonical = addAnimalBuildSinglePayloadSrv(uid, formData);
 
   const payload = {
-    ownerUid: uid,
-    userId: uid,
-    userId_number: `${uid}#${numberStr}`,
-    entryType: "followers",
+    ...canonical.payload,
 
-    calfNumber: numberStr,
-    number: numberStr,
-    animalNumber: Number(numberStr),
-
-    animaltype: speciesInfo.animaltype,
-    animalTypeAr: speciesInfo.animalTypeAr,
-    species: speciesInfo.species,
-    breed: addAnimalStrSrv(base.breed),
-
-    sex: addAnimalStrSrv(base.followerSex),
-    status: followerStatus,
-    followerStatus,
-
-    birthDate: herdImportV2DateOrNullInternalSrv(base.birthDate),
-    damNumber: addAnimalStrSrv(base.damNumber) || null,
-
-    lastInseminationDate: isInseminatedFollower
-      ? herdImportV2DateOrNullInternalSrv(base.lastInseminationDate)
-      : null,
-
-    servicesCount: isInseminatedFollower && Number.isFinite(Number(base.servicesCount))
-      ? Number(base.servicesCount)
-      : 0,
-
-    sireNumber: isInseminatedFollower
-      ? (addAnimalStrSrv(base.sireNumber) || null)
-      : null,
-
-    pregnancyDays: followerStatus === "عشار"
-      ? herdImportV2PregnancyDaysForSaveInternalSrv({
-          ...base,
-          reproductiveStatus: "عشار"
-        })
-      : null,
-
-    statusInHerd: "active",
+    ...(!isFollower
+      ? {
+          dryOffDate:
+            herdImportV2DateOrNullInternalSrv(base.dryOffDate)
+        }
+      : {}),
 
     importedBy: "herd_import_v2",
     importMode: "operational_baseline",
     isImportedBaseline: true,
     sourceProfileKey: sourceProfile.key || "unknown",
 
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    source: "server:/api/herd-import-v2/save-operational"
+    updatedAt:
+      admin.firestore.FieldValue.serverTimestamp(),
+
+    source:
+      "server:/api/herd-import-v2/save-operational"
   };
 
-  if (isNew) {
-    payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
-  }
-
-  return payload;
-}
-  const payload = {
-    ownerUid: uid,
-    userId: uid,
-    userId_number: `${uid}#${numberStr}`,
-    entryType: "mothers",
-
-    number: numberStr,
-    animalNumber: Number(numberStr),
-
-    animaltype: speciesInfo.animaltype,
-    animalTypeAr: speciesInfo.animalTypeAr,
-    species: speciesInfo.species,
-    breed: addAnimalStrSrv(base.breed),
-
-    birthDate: herdImportV2DateOrNullInternalSrv(base.birthDate),
-
-    lactationNumber: Number.isFinite(Number(base.lactationNumber))
-      ? Number(base.lactationNumber)
-      : 0,
-
-    productionStatus,
-    dailyMilk: productionStatus === "حلاب" && Number.isFinite(Number(base.dailyMilk))
-      ? Number(base.dailyMilk)
-      : null,
-
-    reproductiveStatus,
-
-    lastCalvingDate: herdImportV2DateOrNullInternalSrv(base.lastCalvingDate),
-    daysInMilk: herdImportV2DaysInMilkForSaveInternalSrv(base),
-
-    lastInseminationDate: herdImportV2DateOrNullInternalSrv(base.lastInseminationDate),
-    servicesCount: Number.isFinite(Number(base.servicesCount))
-      ? Number(base.servicesCount)
-      : 0,
-
-    sireNumber: addAnimalStrSrv(base.sireNumber) || null,
-    pregnancyDays: herdImportV2PregnancyDaysForSaveInternalSrv(base),
-
-    dryOffDate: herdImportV2DateOrNullInternalSrv(base.dryOffDate),
-
-    status: "active",
-
-    importedBy: "herd_import_v2",
-    importMode: "operational_baseline",
-    isImportedBaseline: true,
-    sourceProfileKey: sourceProfile.key || "unknown",
-
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    source: "server:/api/herd-import-v2/save-operational"
-  };
-
-  if (isNew) {
-    payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+  // لا نغيّر تاريخ إنشاء وثيقة موجودة.
+  if (!isNew) {
+    delete payload.createdAt;
   }
 
   return payload;
@@ -5633,40 +5588,153 @@ function herdImportV2SeedEventDocIdInternalSrv(uid, ev = {}) {
     .slice(0, 32);
 }
 
-function herdImportV2BuildSeedEventPayloadInternalSrv(uid, ev = {}, sourceProfile = {}) {
-  const numberStr = addAnimalDigitsSrv(ev.animalNumber);
-  const eventTypeNorm = addAnimalStrSrv(ev.eventTypeNorm);
-  const eventTypeAr = addAnimalStrSrv(ev.eventTypeAr);
+function herdImportV2BuildSeedEventPayloadInternalSrv(
+  uid,
+  ev = {},
+  sourceProfile = {}
+) {
+  const numberStr =
+    addAnimalDigitsSrv(ev.animalNumber);
+
+  const eventTypeNorm =
+    addAnimalStrSrv(ev.eventTypeNorm);
+
+  const eventTypeAr =
+    addAnimalStrSrv(ev.eventTypeAr);
+
+  const speciesInfo =
+    addAnimalSpeciesFromTypeSrv(
+      ev.animalType ||
+      ev.animalTypeAr
+    );
+
+  const details =
+    ev.details &&
+    typeof ev.details === "object"
+      ? ev.details
+      : {};
+
+  const sireNumber =
+    eventTypeNorm === "insemination"
+      ? addAnimalStrSrv(
+          details.sireNumber ||
+          details.semenCode ||
+          details.bullNumber ||
+          ""
+        )
+      : "";
+
+  const eventType =
+    eventTypeNorm === "insemination" ||
+    eventTypeNorm === "dry_off"
+      ? eventTypeNorm
+      : eventTypeAr;
+
+  const type =
+    eventTypeNorm === "insemination"
+      ? "insemination"
+      : eventTypeAr;
 
   return {
     ownerUid: uid,
     userId: uid,
+
     animalNumber: Number(numberStr),
     number: numberStr,
-    animalTypeAr: addAnimalStrSrv(ev.animalType),
+
+    animaltype:
+      speciesInfo.animaltype,
+
+    animalTypeAr:
+      speciesInfo.animalTypeAr,
+
+    species:
+      speciesInfo.species,
 
     eventTypeNorm,
     eventTypeAr,
-    eventType: eventTypeAr,
-    type: eventTypeAr,
-    eventDate: herdImportV2DateOrNullInternalSrv(ev.eventDate),
+    eventType,
+    type,
+
+    eventDate:
+      herdImportV2DateOrNullInternalSrv(
+        ev.eventDate
+      ),
+
+    ...(eventTypeNorm === "insemination" &&
+    sireNumber
+      ? {
+          semenCode: sireNumber,
+          sireNumber,
+          bullNumber: sireNumber
+        }
+      : {}),
+
+    ...(eventTypeNorm ===
+      "pregnancy_diagnosis" &&
+    details.result
+      ? {
+          result:
+            addAnimalStrSrv(
+              details.result
+            )
+        }
+      : {}),
+
+    ...(eventTypeNorm === "calving" &&
+    details.lactationNumber !== undefined
+      ? {
+          lactationNumber:
+            Number.isFinite(
+              Number(
+                details.lactationNumber
+              )
+            )
+              ? Number(
+                  details.lactationNumber
+                )
+              : null
+        }
+      : {}),
 
     details: {
-      ...(ev.details || {}),
-      importedBy: "herd_import_v2",
-      importMode: "seed_history",
-      isImportedSeed: true,
-      sourceProfileKey: sourceProfile.key || "unknown"
+      ...details,
+
+      importedBy:
+        "herd_import_v2",
+
+      importMode:
+        "seed_history",
+
+      isImportedSeed:
+        true,
+
+      sourceProfileKey:
+        sourceProfile.key ||
+        "unknown"
     },
 
-    importedBy: "herd_import_v2",
-    importMode: "seed_history",
-    isImportedSeed: true,
-    sourceProfileKey: sourceProfile.key || "unknown",
+    importedBy:
+      "herd_import_v2",
 
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    source: "server:/api/herd-import-v2/save-operational"
+    importMode:
+      "seed_history",
+
+    isImportedSeed:
+      true,
+
+    sourceProfileKey:
+      sourceProfile.key ||
+      "unknown",
+
+    createdAt:
+      admin.firestore.FieldValue.serverTimestamp(),
+
+    updatedAt:
+      admin.firestore.FieldValue.serverTimestamp(),
+
+    source:
+      "server:/api/herd-import-v2/save-operational"
   };
 }
 function herdImportV2BuildSeedEventsPreviewInternalSrv(animalsInternal = []) {
@@ -14778,7 +14846,16 @@ function calvingFirstNonEmptySrv(row = {}, keys = [], fallback = "") {
 }
 
 function calvingSireLineageFromInseminationEventSrv(e = {}, aiDate = "") {
-  const sireNumber = calvingFirstNonEmptySrv(e, [
+  const source = {
+  ...(
+    e?.details &&
+    typeof e.details === "object"
+      ? e.details
+      : {}
+  ),
+  ...e
+};
+  const sireNumber = calvingFirstNonEmptySrv(source, [
     "sireNumber",
     "fatherNumber",
     "sireId",
@@ -14792,7 +14869,7 @@ function calvingSireLineageFromInseminationEventSrv(e = {}, aiDate = "") {
     "semen"
   ]);
 
-  const semenCode = calvingFirstNonEmptySrv(e, [
+  const semenCode = calvingFirstNonEmptySrv(source, [
     "semenCode",
     "semenNumber",
     "strawCode",
@@ -14806,7 +14883,7 @@ function calvingSireLineageFromInseminationEventSrv(e = {}, aiDate = "") {
     "semen"
   ]);
 
-  const sireName = calvingFirstNonEmptySrv(e, [
+  const sireName = calvingFirstNonEmptySrv(source, [
     "sireName",
     "fatherName",
     "bullName"
