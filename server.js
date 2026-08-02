@@ -14997,7 +14997,14 @@ if (st === "inactive" || st === "archived") {
 
     const sig = await fetchCalvingSignalsFromEventsSrv(uid, n);
 
-    const docSpecies = String(doc.species || doc.animalTypeAr || "").trim();
+   const docSpecies = String(
+  doc.species ||
+  doc.animalTypeAr ||
+  doc.animalType ||
+  doc.animaltype ||
+  doc.type ||
+  ""
+).trim();
 
     let sp = String(body.species || "").trim() || docSpecies;
     if (/cow|بقر/i.test(sp)) sp = "أبقار";
@@ -41253,7 +41260,14 @@ app.post("/api/calving/save", requireUserId, async (req, res) => {
           lastInseminationDateFromEvents: ""
         };
 
-    const docSpecies = String(doc?.species || doc?.animalTypeAr || "").trim();
+   const docSpecies = String(
+  doc?.species ||
+  doc?.animalTypeAr ||
+  doc?.animalType ||
+  doc?.animaltype ||
+  doc?.type ||
+  ""
+).trim();
 
     let sp = String(formData.species || "").trim() || docSpecies;
     if (/cow|بقر/i.test(sp)) sp = "أبقار";
