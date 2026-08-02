@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
  <title>استيراد القطيع</title>
   <link rel="stylesheet" href="css/forms.css" />
+  <style>
+  .herd-import-systems .system-future {
+    opacity: 0.34;
+    filter: grayscale(1);
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .herd-import-systems .system-active {
+    opacity: 1;
+    font-weight: 700;
+  }
+</style>
 </head>
 
 <body>
@@ -27,16 +40,16 @@
  <section class="card herd-import-hero">
   <div class="herd-import-title">استيراد قطيع كامل</div>
   <div class="herd-import-sub">
-   ارفع ملف القطيع كما هو، وسيقوم مُرَبِّيك بتحليل مصدر الملف وتجهيز الحيوانات وسجل الأحداث للحفظ داخل مُرَبِّيك.
+   ارفع ملف Excel باستخدام قالب مُرَبِّيك المعتمد، وسيقوم مُرَبِّيك بمراجعة البيانات قبل الحفظ.
   </div>
 
-  <div class="herd-import-systems">
-    <span>DairyComp / DC305</span>
-    <span>DelPro</span>
-    <span>AfiMilk</span>
-    <span>Uniform-Agri</span>
-    <span>Excel عربي</span>
-  </div>
+ <div class="herd-import-systems">
+  <span class="system-future">DairyComp / DC305</span>
+  <span class="system-future">DelPro</span>
+  <span class="system-future">AfiMilk</span>
+  <span class="system-future">Uniform-Agri</span>
+  <span class="system-active">Excel عربي</span>
+</div>
 
   <label for="herdFile">ملف القطيع Excel / CSV</label>
   <input id="herdFile" type="file" accept=".xlsx,.xls,.csv,.txt" />
@@ -319,18 +332,12 @@ const j = await callHerdImport("/api/herd-import-v2/save-operational");
 
       console.log("HERD SAVE:", j);
 
-      showMessage(j.message || "تم الحفظ.", j.ok ? "status-ok" : "status-error");
-      if (j.ok) {
-  rowsList.innerHTML = `
-    <div class="preview-row status-ok">
-      <div><b>حيوانات جديدة:</b> ${j.insertedAnimalsCount ?? 0}</div>
-      <div><b>حيوانات تم تحديثها:</b> ${j.updatedAnimalsCount ?? 0}</div>
-     <div><b>أحداث محفوظة:</b> ${j.savedSeedEventsCount ?? 0}</div>
-      <div><b>إجمالي الحيوانات المتأثرة:</b> ${j.totalAnimalsTouched ?? 0}</div>
-    </div>
-  `;
-  resultsBox.style.display = "block";
+if (j.redirectUrl) {
+  location.replace(j.redirectUrl);
+  return;
 }
+
+showMessage(j.message || "فشل الحفظ.", "status-error");
 
      
     } catch (e) {
