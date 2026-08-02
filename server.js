@@ -48780,119 +48780,36 @@ function fertilityReportRepeatBreederAnalysisSrv(repeatBreeders = [], eligibleCo
   const den = Number(eligibleCount || 0);
   const ratePct = fertilityReportPctSrv(count, den);
 
-  const avgServices = fertilityReportAvgSrv(
-    rows.map(row => row.servicesCount)
-  );
-
-  // تجميع المؤشرات الفعلية التي ظهرت داخل تحليل كل حيوان.
-  // نعرض عدد الحالات فقط، دون نسب قوة أو اختيار سبب قطيع قطعي.
-  const findingCounts = new Map();
-
-  for (const row of rows) {
-    const findings = Array.isArray(row.findings)
-      ? row.findings
-      : [];
-
-    for (const finding of findings) {
-      const code =
-        String(finding?.code || "").trim();
-
-      const title =
-        String(finding?.title || "").trim();
-
-      if (!code || !title) continue;
-
-      const current =
-        findingCounts.get(code) || {
-          code,
-          title,
-          count: 0
-        };
-
-      current.count += 1;
-
-      findingCounts.set(
-        code,
-        current
-      );
-    }
-  }
-
-  const findingSummary =
-    [...findingCounts.values()]
-      .sort((a, b) =>
-        Number(b.count || 0) -
-        Number(a.count || 0)
-      );
-
-  const analyzedCasesCount =
-    rows.filter(row =>
-      Array.isArray(row.findings) &&
-      row.findings.length > 0
-    ).length;
-
-  const totalFindings =
-    findingSummary.reduce(
-      (sum, item) =>
-        sum + Number(item.count || 0),
-      0
-    );
-
-  // لا نحول نسبة مزرعة صغيرة إلى حكم "ضغط قوي".
-  // التقييم هنا يصف وجود الحالات فقط.
   let severity = "good";
   let severityLabel = "لا توجد حالات";
 
   if (count === 1) {
     severity = "warn";
-    severityLabel =
-      "حالة فردية تحتاج متابعة";
-
+    severityLabel = "حالة واحدة";
   } else if (count > 1) {
     severity = "warn";
-    severityLabel =
-      "حالات متعددة تحتاج متابعة";
+    severityLabel = "حالات متعددة";
   }
-
-  const rateText =
-    ratePct === null
-      ? ""
-      : ` وتمثل ${ratePct}% من الحيوانات المؤهلة للتلقيح`;
 
   const herdRead =
     count === 0
-      ? "لا تظهر حالات Repeat Breeder محققة للشروط حسب البيانات الحالية."
+      ? "لا توجد حيوانات مطابقة لشروط Repeat Breeder حسب البيانات الحالية."
+      : `لديك ${count} حيوانات مطابقة لشروط Repeat Breeder.`;
 
-      : count === 1
-        ? "توجد حالة Repeat Breeder واحدة؛ يعرض مُرَبِّيك تحليلها الفردي من سجل التلقيحات والفترات والتوقيت والسائل والملقّح وTHI."
-
-        : `توجد ${count} حالات Repeat Breeder${rateText}. حلّل مُرَبِّيك كل حالة حسب نمط بياناتها الفعلي، ويعرض المؤشرات المتكررة بين الحالات كأعداد للمراجعة دون تحويلها إلى سبب قطيع قطعي.`;
+  const recommendation =
+    "راجع توقيت التلقيح، وانتظام دورات الشياع، وطريقة حفظ وتداول السائل المنوي. نفّذ التلقيح في الأوقات الأبرد، واهتم بتبريد الحيوانات عند وجود إجهاد حراري.";
 
   return {
     count,
-
-    eligibleCount:
-      den || null,
-
+    eligibleCount: den || null,
     ratePct,
-
     severity,
     severityLabel,
-
-    avgServices,
-
-    analyzedCasesCount,
-    totalFindings,
-
-    findingSummary,
-
     herdRead,
-
-    rows:
-      rows.slice(0, 80)
+    recommendation,
+    rows: rows.slice(0, 80)
   };
 }
-
 function fertilityReportBuildExpertReportSrv({
   overallCr = null,
   firstServiceCr = null,
@@ -48945,18 +48862,18 @@ function fertilityReportBuildExpertReportSrv({
       dangerText: "معدل الإخصاب منخفض؛ راجع توقيت التلقيح وجودة السائل والملقحين وTHI والحالة الرحمية.",
       advice: "لا يُحكم على الملقح منفردًا قبل فصل أثر THI وعدد الحالات."
     }),
-    fertilityReportExpertIndicatorSrv({
-      key: "services_per_conception",
-      title: "عدد الخدمات للحمل",
-      value: servicesPerConception,
-      unit: "",
-      benchmark: 2,
-      direction: "lower",
-      goodText: "عدد الخدمات للحمل مقبول؛ لا يظهر ضغط واضح في تكرار التلقيح.",
-      warnText: "عدد الخدمات للحمل أعلى من المثالي؛ راقب بداية نمط Repeat Breeder.",
-      dangerText: "عدد الخدمات للحمل مرتفع؛ يرجّح ضغط تكرار تلقيح أو خلل توقيت/إباضة/رحم/حرارة.",
-      advice: "اقرأه مع Repeat Breeder وانتظام الدورات وTHI."
-    }),
+ fertilityReportExpertIndicatorSrv({
+  key: "services_per_conception",
+  title: "عدد الخدمات للحمل",
+  value: servicesPerConception,
+  unit: "",
+  benchmark: 2,
+  direction: "lower",
+  goodText: "عدد الخدمات للحمل ضمن النطاق المقبول.",
+  warnText: "عدد الخدمات للحمل أعلى من المستوى المستهدف.",
+  dangerText: "عدد الخدمات للحمل مرتفع ويحتاج مراجعة إدارة التلقيح.",
+  advice: "راجع هذا المؤشر مع نتائج الحمل العامة."
+}),
     fertilityReportExpertIndicatorSrv({
       key: "days_open",
       title: "متوسط الأيام المفتوحة",
@@ -49013,11 +48930,12 @@ function fertilityReportBuildExpertReportSrv({
     repeatBreederAnalysis?.herdRead ||
     "لا توجد قراءة Repeat Breeder مكتملة حاليًا.",
 
-  advice:
+   advice:
     Number(
       repeatBreederAnalysis?.count || 0
     ) > 0
-      ? "راجع التحليل الفردي لكل حيوان والأدلة والتوصيات المسجلة داخل قسم Repeat Breeder."
+      ? repeatBreederAnalysis?.recommendation ||
+        "راجع إدارة التلقيح والظروف المصاحبة."
       : "استمر في متابعة عدد الخدمات ونتائج تشخيص الحمل."
 },
     fertilityReportExpertIndicatorSrv({
@@ -49066,16 +48984,6 @@ function fertilityReportBuildExpertReportSrv({
       weight: 80
     });
   }
-
-  if (Number.isFinite(spc) && spc > 2.5) {
-    bottlenecks.push({
-      key: "repeat_breeding_pressure",
-      title: "الخلل المرجح: ضغط تكرار التلقيح",
-      read: "ارتفاع عدد الخدمات للحمل يشير إلى ضغط Repeat Breeder أو خلل توقيت/إباضة/رحم/حرارة.",
-      weight: 78
-    });
-  }
-
   const thiHigh = (Array.isArray(thiGroups) ? thiGroups : []).some(g =>
     (g.level === "moderate" || g.level === "high") &&
     Number(g.judged || 0) > 0 &&
@@ -49095,8 +49003,7 @@ function fertilityReportBuildExpertReportSrv({
     .sort((a, b) => Number(b.weight || 0) - Number(a.weight || 0))[0] || {
       key: "balanced_or_insufficient",
       title: "لا يظهر خلل واحد مسيطر بوضوح",
-      read: "المؤشرات لا تُظهر سببًا واحدًا واضحًا؛ اقرأ الحمل 21 يوم مع كشف الشياع والإخصاب والحرارة وRepeat Breeder قبل اتخاذ قرار."
-    };
+read: "المؤشرات لا تُظهر سببًا واحدًا مسيطرًا بوضوح؛ راجع مؤشرات الخصوبة مجتمعة قبل اتخاذ القرار."    };
 
   const goodCount = indicators.filter(x => x.status === "good").length;
   const dangerCount = indicators.filter(x => x.status === "danger").length;
@@ -49125,8 +49032,7 @@ function fertilityReportBuildExpertReportSrv({
   }
 
   if (!recommendations.length) {
-    recommendations.push("استمر في قراءة المؤشرات كمنظومة: الحمل 21 يوم، كشف الشياع، الإخصاب، الخدمات للحمل، وRepeat Breeder.");
-  }
+recommendations.push("استمر في قراءة مؤشرات الحمل وكشف الشياع والإخصاب والخدمات للحمل كمنظومة واحدة.");  }
 
   return {
     overallStatus,
@@ -49507,629 +49413,111 @@ app.get("/api/fertility-report", requireUserId, async (req, res) => {
       conceptionRatePct: fertilityReportPctSrv(g.pregnancies, g.judged)
     }));
 
-   const repeatBreeders = [];
+const repeatBreeders = [];
 
 for (const [number, arr] of aiByAnimal.entries()) {
-  const animal = animalsByNumber.get(number) || {};
-  const reproKind = fertilityReportReproKindSrv(animal.reproductiveStatus || animal.reproStatus || "");
+  const animal =
+    animalsByNumber.get(number) || {};
+
+  const reproKind =
+    fertilityReportReproKindSrv(
+      animal.reproductiveStatus ||
+      animal.reproStatus ||
+      ""
+    );
 
   if (reproKind === "pregnant") continue;
 
-  const lastCalvingDate = fertilityReportDateSrv(animal.lastCalvingDate || "");
-  const lastCalvingMs = fertilityReportMsSrv(lastCalvingDate);
+  const lastCalvingDate =
+    fertilityReportDateSrv(
+      animal.lastCalvingDate || ""
+    );
 
-   const seasonAisRaw = [...arr]
-    .filter(ai => !Number.isFinite(lastCalvingMs) || ai._ms >= lastCalvingMs)
+  const lastCalvingMs =
+    fertilityReportMsSrv(
+      lastCalvingDate
+    );
+
+  const seasonAisRaw = [...arr]
+    .filter(ai =>
+      !Number.isFinite(lastCalvingMs) ||
+      ai._ms >= lastCalvingMs
+    )
     .sort((a, b) => a._ms - b._ms);
 
-  // تلقيحات اليوم نفسه تُحسب خدمة واحدة في Repeat Breeder
+  // تلقيحات اليوم نفسه تُحسب خدمة واحدة.
   const seasonAiByDate = new Map();
 
   for (const ai of seasonAisRaw) {
-    const serviceDate = String(ai._date || "").trim().slice(0, 10);
+    const serviceDate =
+      String(ai._date || "")
+        .trim()
+        .slice(0, 10);
+
     if (!serviceDate) continue;
 
-    // الاحتفاظ بآخر سجل في اليوم نفسه لعرض بياناته داخل التقرير
-    seasonAiByDate.set(serviceDate, ai);
+    seasonAiByDate.set(
+      serviceDate,
+      ai
+    );
   }
 
-  const seasonAis = [...seasonAiByDate.values()]
-    .sort((a, b) => a._ms - b._ms);
+  const seasonAis =
+    [...seasonAiByDate.values()]
+      .sort((a, b) => a._ms - b._ms);
 
   if (seasonAis.length < 3) continue;
 
- 
-
-   const lastAi = seasonAis[seasonAis.length - 1];
-
-  // نبني سجل خدمات الموسم مباشرة حتى لا يتقيد بفترة التقرير.
-  const seasonRows = seasonAis.map(ai => {
-    const heatBefore = lastHeatBeforeAi(ai);
-
-    return {
-      id: ai.id,
-      eventDate: ai._date,
-
-      inseminator:
-        String(
-          ai.inseminator ||
-          "غير محدد"
-        ).trim() || "غير محدد",
-
-      semenCode:
-        String(
-          ai.semenCode || ""
-        ).trim(),
-
-      source:
-        fertilityReportInseminationSourceSrv(ai),
-
-      timing:
-        fertilityReportTimingAssessmentSrv(
-          ai,
-          heatBefore
-        ),
-
-      thi:
-        fertilityReportThiInfoSrv(ai)
-    };
-  });
-
-  const lastAiRow =
-    seasonRows[seasonRows.length - 1] ||
-    null;
-
-  const naturalSeasonRows =
-    seasonRows.filter(row =>
-      row.source?.isForced !== true
-    );
-
-  const naturalServicesCount =
-    naturalSeasonRows.length;
-
-  const forcedServicesCount =
-    seasonRows.filter(row =>
-      row.source?.isForced === true
-    ).length;
-
-  const animalHeats =
-    heatByAnimal.get(number) || [];
-
-  const intervalDetails = [];
+  const intervals = [];
 
   for (
     let i = 1;
     i < seasonAis.length;
     i++
   ) {
-    const previousAi =
-      seasonAis[i - 1];
-
-    const currentAi =
-      seasonAis[i];
-
-    const previousRow =
-      seasonRows[i - 1];
-
-    const currentRow =
-      seasonRows[i];
-
-    // لا تُحسب دورة رجوع طبيعية
-    // إذا كان أحد طرفيها تلقيحًا إجباريًا.
-    if (
-      previousRow?.source?.isForced === true ||
-      currentRow?.source?.isForced === true
-    ) {
-      continue;
-    }
-
     const days =
       fertilityReportDaysBetweenSrv(
-        previousAi._date,
-        currentAi._date
+        seasonAis[i - 1]._date,
+        seasonAis[i]._date
       );
 
-    if (
-      days === null ||
-      days <= 0
-    ) {
-      continue;
+    if (days !== null && days > 0) {
+      intervals.push(days);
     }
-
-    const heatBetweenCount =
-      animalHeats.filter(heat =>
-        heat._ms > previousAi._ms &&
-        heat._ms < currentAi._ms
-      ).length;
-
-    intervalDetails.push({
-      fromDate:
-        previousAi._date,
-
-      toDate:
-        currentAi._date,
-
-      days,
-
-      heatBetweenCount,
-
-      hasRecordedHeatBetween:
-        heatBetweenCount > 0
-    });
   }
-
-  const intervals =
-    intervalDetails.map(item =>
-      item.days
-    );
-
-  const shortReturns =
-    intervalDetails.filter(item =>
-      item.days >= 3 &&
-      item.days <= 7
-    );
-
-  const regularReturns =
-    intervalDetails.filter(item =>
-      item.days >= 18 &&
-      item.days <= 24
-    );
-
-  const longReturns =
-    intervalDetails.filter(item =>
-      item.days >= 36 &&
-      item.days <= 40
-    );
-
-  const doubleCycleReturns =
-    intervalDetails.filter(item =>
-      item.days === 42 &&
-      item.hasRecordedHeatBetween === false
-    );
-
-  const regularCycle =
-    intervals.length > 0 &&
-    regularReturns.length >=
-      Math.ceil(
-        intervals.length * 0.6
-      );
-
-  const timingKnown =
-    naturalSeasonRows.filter(row =>
-      row.timing?.code &&
-      row.timing.code !== "unknown"
-    );
-
-  const timingProblemRows =
-    timingKnown.filter(row =>
-      row.timing.code !== "ideal"
-    );
-
-  const timingProblemCount =
-    timingProblemRows.length;
-
-  const timingComplete =
-    naturalSeasonRows.length > 0 &&
-    timingKnown.length ===
-      naturalSeasonRows.length;
-
-  const timingCorrect =
-    timingComplete &&
-    timingProblemCount === 0;
-
-  const thiKnownRows =
-    seasonRows.filter(row =>
-      Number.isFinite(
-        Number(row.thi?.value)
-      )
-    );
-
-  const highThiRows =
-    thiKnownRows.filter(row =>
-      row.thi.level === "moderate" ||
-      row.thi.level === "high"
-    );
-
-  const highThiCount =
-    highThiRows.length;
-
-  const topInseminator =
-    fertilityReportTopValueSrv(
-      seasonRows
-        .map(row =>
-          row.inseminator
-        )
-        .filter(value =>
-          value &&
-          value !== "غير محدد"
-        )
-    );
-
-  const topSemen =
-    fertilityReportTopValueSrv(
-      seasonRows
-        .map(row =>
-          row.semenCode
-        )
-        .filter(Boolean)
-    );
-
-  const findings = [];
-
-  const addFinding = ({
-    code,
-    title,
-    read,
-    evidence,
-    recommendation
-  }) => {
-    findings.push({
-      code,
-      title,
-      read,
-      evidence,
-      recommendation
-    });
-  };
-
-  if (timingProblemCount > 0) {
-    addFinding({
-      code:
-        "timing_problem",
-
-      title:
-        "توقيت التلقيح يحتاج مراجعة",
-
-      read:
-        "يرجّح مُرَبِّيك أن خلل توقيت التلقيح ساهم في تكرار التلقيح.",
-
-      evidence:
-        `${timingProblemCount} من ${timingKnown.length} خدمات طبيعية مسجلة بتوقيت غير مناسب.`,
-
-      recommendation:
-        "مراجعة تحديد بداية الشياع وتوقيت التلقيح القادم."
-    });
-  }
-
-  if (shortReturns.length > 0) {
-    addFinding({
-      code:
-        "short_return",
-
-      title:
-        "رجوع قصير جدًا",
-
-      read:
-        "يرجّح مُرَبِّيك التهاب الرحم أو تكيس المبايض.",
-
-      evidence:
-        `فترات الرجوع القصيرة: ${shortReturns
-          .map(item =>
-            `${item.days} يوم`
-          )
-          .join("، ")}.`,
-
-      recommendation:
-        "مراجعة الطبيب وفحص الرحم والمبايض."
-    });
-  }
-
-  if (
-    regularCycle &&
-    timingCorrect
-  ) {
-    addFinding({
-      code:
-        "delayed_ovulation",
-
-      title:
-        "دورة منتظمة مع توقيت تلقيح صحيح",
-
-      read:
-        "يرجّح مُرَبِّيك تأخر التبويض.",
-
-      evidence:
-        `الفترات المنتظمة: ${regularReturns
-          .map(item =>
-            `${item.days} يوم`
-          )
-          .join("، ")}، وتوقيت الخدمات الطبيعية المسجلة مناسب.`,
-
-      recommendation:
-        "علاج تأخر التبويض واستشارة الطبيب."
-    });
-  }
-
-  if (longReturns.length > 0) {
-    addFinding({
-      code:
-        "long_return",
-
-      title:
-        "رجوع طويل بعد تجاوز الدورة الطبيعية",
-
-      read:
-        "يرجّح مُرَبِّيك فقد الأجنة المبكر أو ضعف كشف الشياع أو وجود شياع صامت.",
-
-      evidence:
-        `فترات الرجوع الطويلة: ${longReturns
-          .map(item =>
-            `${item.days} يوم`
-          )
-          .join("، ")}.`,
-
-      recommendation:
-        "مراجعة كشف الشياع والشياع الصامت؛ فقد الأجنة يُرجّح من نمط الرجوع ولا يمكن فحصه مباشرة."
-    });
-  }
-
-  if (
-    doubleCycleReturns.length > 0
-  ) {
-    addFinding({
-      code:
-        "double_cycle_return",
-
-      title:
-        "رجوع بعد نحو دورتين دون شياع مسجل",
-
-      read:
-        "يرجّح مُرَبِّيك شياعًا صامتًا أو دورة شياع لم تُرصد.",
-
-      evidence:
-        "ظهرت فترة 42 يومًا دون تسجيل شياع بين الخدمتين.",
-
-      recommendation:
-        "رفع دقة كشف الشياع ومراجعة وسائل الرصد بالمزرعة."
-    });
-  }
-
-  if (highThiCount > 0) {
-    addFinding({
-      code:
-        "heat_stress",
-
-      title:
-        "إجهاد حراري وقت التلقيحات",
-
-      read:
-        "يظهر الإجهاد الحراري كعامل مؤثر في تكرار التلقيح.",
-
-      evidence:
-        `${highThiCount} من ${thiKnownRows.length} تلقيحات مسجلة تحت THI متوسط أو عالٍ.`,
-
-      recommendation:
-        "مراجعة التبريد والانتظار والحركة وتنفيذ التلقيح في الساعات الأبرد."
-    });
-  }
-
-  if (
-    topSemen.value &&
-    topSemen.count >= 2 &&
-    topSemen.count >
-      seasonRows.length / 2
-  ) {
-    addFinding({
-      code:
-        "repeated_semen",
-
-      title:
-        "تكرار نفس السائل المنوي",
-
-      read:
-        `يحدد مُرَبِّيك السائل ${topSemen.value} كسائل متكرر يحتاج المراجعة.`,
-
-      evidence:
-        `استُخدم في ${topSemen.count} من ${seasonRows.length} خدمات.`,
-
-      recommendation:
-        "مراجعة الجرعات والحفظ والإذابة أو تجربة سائل آخر وفحص السائل المنوي."
-    });
-  }
-
-  if (
-    topInseminator.value &&
-    topInseminator.count >= 2 &&
-    topInseminator.count >
-      seasonRows.length / 2
-  ) {
-    addFinding({
-      code:
-        "repeated_inseminator",
-
-      title:
-        "تكرار نفس الملقّح",
-
-      read:
-        `يحدد مُرَبِّيك الملقّح ${topInseminator.value} كملقّح متكرر يحتاج مراجعة الأداء.`,
-
-      evidence:
-        `نفّذ ${topInseminator.count} من ${seasonRows.length} خدمات.`,
-
-      recommendation:
-        "مراجعة الإذابة والتعامل مع الجرعة وطريقة ومكان ترسيب السائل."
-    });
-  }
-
-  const likelyCauseCodes =
-    findings.map(item =>
-      item.code
-    );
-
-  const likelyCauses =
-    findings.map(item =>
-      item.title
-    );
-
-  const recommendations =
-    [...new Set(
-      findings
-        .map(item =>
-          item.recommendation
-        )
-        .filter(Boolean)
-    )];
-
-  recommendations.push(
-    "استشارة الطبيب وفحص الحيوان لتأكيد السبب واختيار التدخل المناسب."
-  );
-
-  const reproductiveSuspicion =
-    findings.length
-      ? findings[0].read
-      : "لم تكشف البيانات المسجلة سببًا تشغيليًا واضحًا لتكرار التلقيح.";
-
-  const suspicionCode =
-    findings[0]?.code ||
-    "clinical_review";
-
-  const timingPattern =
-    naturalServicesCount === 0
-      ? "لا توجد خدمات طبيعية كافية لتحليل التوقيت"
-      : timingKnown.length
-        ? `${timingProblemCount} من ${timingKnown.length} خدمات طبيعية بتوقيت يحتاج مراجعة`
-        : "بيانات توقيت الخدمات الطبيعية غير مكتملة";
-
-  const thiPattern =
-    thiKnownRows.length
-      ? `${highThiCount} من ${thiKnownRows.length} تلقيحات تحت THI متوسط/عالٍ`
-      : "THI غير متاح للتلقيحات المسجلة";
-
-  const mbkRead =
-    findings.length
-      ? `${findings
-          .map(item =>
-            item.read
-          )
-          .join(" ")} التوصية: ${recommendations.join("؛ ")}`
-      : `${reproductiveSuspicion} التوصية: ${recommendations.join("؛ ")}`;
 
   repeatBreeders.push({
-    animalNumber:
-      number,
+    animalNumber: number,
 
     servicesCount:
       seasonAis.length,
 
-    naturalServicesCount,
-
-    forcedServicesCount,
-
-    lastInseminationDate:
-      lastAi._date,
-
-    daysInMilk:
-      Number(
-        animal.daysInMilk ?? null
-      ),
-
     cycleIntervalsDays:
       intervals,
 
-    intervalDetails,
-
-    cycleRegularity:
-      regularCycle
-        ? "منتظمة غالبًا"
-        : intervals.length
-          ? "غير منتظمة"
-          : "غير مكتملة",
-
-    lastTimingAssessment:
-      lastAiRow?.timing || null,
-
-    lastInseminator:
-      lastAiRow?.inseminator ||
-      String(
-        lastAi.inseminator || ""
-      ).trim(),
-
-    dominantInseminator:
-      topInseminator.value || "",
-
-    dominantInseminatorCount:
-      topInseminator.count || 0,
-
-    dominantSemenCode:
-      topSemen.value || "",
-
-    dominantSemenCount:
-      topSemen.count || 0,
-
-    timingPattern,
-
-    timingProblemCount,
-
-    thiPattern,
-
-    highThiCount,
-
-    likelyCauseCodes,
-
-    likelyCauses,
-
-    findings,
-
-    recommendations,
-
-    reproductiveSuspicion,
-
-    suspicionCode,
-
-    mbkRead,
-
-    serviceHistory:
-      seasonRows.map(row => ({
-        eventDate:
-          row.eventDate,
-
-        sourceCode:
-          row.source?.code ||
-          "natural",
-
-        sourceLabel:
-          row.source?.label ||
-          "تلقيح مرتبط بشياع طبيعي",
-
-        isForced:
-          row.source?.isForced === true,
-
-        timingCode:
-          row.timing?.code ||
-          "unknown",
-
-        timingLabel:
-          row.timing?.label ||
-          "غير مكتمل",
-
-        timingNote:
-          row.timing?.note || "",
-
-        inseminator:
-          row.inseminator ||
-          "غير محدد",
-
-        semenCode:
-          row.semenCode || "",
-
-        thiValue:
-          Number.isFinite(
-            Number(row.thi?.value)
+    inseminators:
+      [...new Set(
+        seasonAis
+          .map(ai =>
+            String(
+              ai.inseminator || ""
+            ).trim()
           )
-            ? Number(row.thi.value)
-            : null,
+          .filter(Boolean)
+      )],
 
-        thiLevel:
-          row.thi?.level ||
-          "unknown",
-
-        thiLabel:
-          row.thi?.label ||
-          "غير متاح"
-      }))
+    semenCodes:
+      [...new Set(
+        seasonAis
+          .map(ai =>
+            String(
+              ai.semenCode || ""
+            ).trim()
+          )
+          .filter(Boolean)
+      )]
   });
 }
-
 repeatBreeders.sort((a, b) => Number(b.servicesCount || 0) - Number(a.servicesCount || 0));
 
 const repeatBreederEligibleAnimals = activeAnimals.filter(a => {
