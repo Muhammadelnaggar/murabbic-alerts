@@ -3296,7 +3296,7 @@ function addAnimalImportPickAnySrv(row = {}, keys = []) {
 function addAnimalImportNormalizeAnimalTypeSrv(v) {
   const s = String(v || "").trim().toLowerCase();
 
-  if (!s) return "بقرة";
+  if (!s) return "";
 
   if (
     s.includes("buffalo") ||
@@ -3317,7 +3317,7 @@ function addAnimalImportNormalizeAnimalTypeSrv(v) {
     return "بقرة";
   }
 
-  return String(v || "").trim();
+  return "";
 }
 
 function addAnimalImportNormalizeProductionSrv(v, hint = {}) {
@@ -3351,7 +3351,7 @@ function addAnimalImportNormalizeProductionSrv(v, hint = {}) {
 
 function addAnimalImportNormalizeReproSrv(v) {
   const s0 = String(v || "").trim();
-  const s = s0.toLowerCase().replace(/\s+/g, "");
+  const s = s0.toLowerCase().replace(/[\s_\-]+/g, "");
 
   if (!s) return "";
 
@@ -3370,23 +3370,35 @@ function addAnimalImportNormalizeReproSrv(v) {
   }
 
   if (
-    s.includes("preg") ||
-    s.includes("confirmedpreg") ||
+    s === "pd" ||
+    s === "o" ||
+    s === "open" ||
+    s === "nonpreg" ||
+    s === "nonpregnant" ||
+    s.includes("notpreg") ||
+    s.includes("negative") ||
+    s.includes("empty") ||
+    s.includes("فارغ") ||
+    s.includes("فاضي") ||
+    s.includes("غيرحامل") ||
+    s.includes("مفتوح")
+  ) {
+    return "مفتوحة";
+  }
+
+  if (
+    s === "pd+" ||
+    s === "p" ||
+    s === "prg" ||
+    s === "preg" ||
+    s.includes("positive") ||
+    s.includes("confirmed") ||
     s.includes("pregnant") ||
+    s.includes("preg") ||
     s.includes("حامل") ||
     s.includes("عشار")
   ) {
     return "عشار";
-  }
-
-  if (
-    s.includes("open") ||
-    s.includes("empty") ||
-    s.includes("notpreg") ||
-    s.includes("مفتوح") ||
-    s.includes("مفتوحة")
-  ) {
-    return "مفتوحة";
   }
 
   if (
@@ -3406,7 +3418,7 @@ function addAnimalImportNormalizeReproSrv(v) {
     return "إجهاض";
   }
 
-  return s0;
+  return "";
 }
 
 function addAnimalImportNormalizeSexSrv(v) {
@@ -4660,7 +4672,7 @@ function herdImportV2NormalizePdResultInternalSrv(v) {
 
   // السالب أولًا حتى لا تتحول Non-Preg إلى Preg بالغلط
   if (
-    s === "pd-" ||
+    s === "pd" ||
     s === "-" ||
     s === "o" ||
     s === "open" ||
@@ -4704,7 +4716,7 @@ function herdImportV2NormalizeReproductiveStatusInternalSrv(v) {
   if (
     s === "open" ||
     s === "o" ||
-    s === "pd-" ||
+    s === "pd" ||
     s === "nonpreg" ||
     s === "nonpregnant" ||
     s.includes("notpreg") ||
