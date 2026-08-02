@@ -48562,6 +48562,13 @@ function fertilityReportTimeBucketSrv(v) {
 }
 
 function fertilityReportTimingAssessmentSrv(ai = {}, heatBefore = null) {
+  const heatBucket = fertilityReportTimeBucketSrv(
+    ai.heatTime ||
+    ai.heatStatus ||
+    heatBefore?.heatTime ||
+    ""
+  );
+
   const aiBucket = fertilityReportTimeBucketSrv(
     ai.inseminationTime ||
     ai.timeOfDay ||
@@ -48569,61 +48576,32 @@ function fertilityReportTimingAssessmentSrv(ai = {}, heatBefore = null) {
     ""
   );
 
-  const heatBucket = fertilityReportTimeBucketSrv(
-    heatBefore?.heatTime ||
-    ai.heatTime ||
-    ai.heatStatus ||
-    ""
-  );
-
-  if (!aiBucket || !heatBucket) {
+  if (!heatBucket || !aiBucket) {
     return {
       code: "unknown",
       label: "غير مكتمل",
-      note: "لا توجد بيانات كافية للحكم على توقيت التلقيح."
+      note: "وقت الشياع أو وقت التلقيح غير مسجل."
     };
   }
 
-  const aiDate = fertilityReportDateSrv(ai.eventDate);
-  const heatDate = fertilityReportDateSrv(heatBefore?.eventDate || ai.heatDate || ai.eventDate);
-  const gapDays = fertilityReportDaysBetweenSrv(heatDate, aiDate);
-
-  if (heatBucket === "am" && aiBucket === "pm" && gapDays === 0) {
+  if (heatBucket !== aiBucket) {
     return {
       code: "ideal",
       label: "مناسب",
-      note: "شياع صباحًا وتلقيح مساءً — مطابق لقاعدة صباح/مساء."
-    };
-  }
-
-  if (heatBucket === "pm" && aiBucket === "am" && gapDays === 1) {
-    return {
-      code: "ideal",
-      label: "مناسب",
-      note: "شياع مساءً وتلقيح صباح اليوم التالي — مطابق لقاعدة صباح/مساء."
-    };
-  }
-
-  if (heatBucket === aiBucket && gapDays === 0) {
-    return {
-      code: "early",
-      label: "غالبًا مبكر",
-      note: "الشياع والتلقيح في نفس الفترة؛ راجع تطبيق قاعدة صباح/مساء."
-    };
-  }
-
-  if ((heatBucket === "am" && aiBucket === "am" && gapDays >= 1) || gapDays > 1) {
-    return {
-      code: "late",
-      label: "غالبًا متأخر",
-      note: "التلقيح يبدو متأخرًا عن نافذة صباح/مساء."
+      note:
+        heatBucket === "am"
+          ? "شياع صباحًا وتلقيح مساءً — توقيت مناسب."
+          : "شياع مساءً وتلقيح صباحًا — توقيت مناسب."
     };
   }
 
   return {
-    code: "review",
-    label: "يحتاج مراجعة",
-    note: "توقيت التلقيح يحتاج مراجعة مع وقت رؤية الشياع."
+    code: "wrong",
+    label: "غير مناسب",
+    note:
+      heatBucket === "am"
+        ? "الشياع والتلقيح صباحًا؛ كان يجب أن يكون التلقيح مساءً."
+        : "الشياع والتلقيح مساءً؛ كان يجب أن يكون التلقيح صباحًا."
   };
 }
 function inseminationSourceNormSrv(data = {}) {
