@@ -6217,6 +6217,7 @@ insertedAnimalsCount++;
       ok: true,
       mode: "herd_import_v2",
       importMode: "save_operational_import",
+      redirectUrl: "animal-list.html",
       message: `✅ تم استيراد القطيع تشغيليًا: ${insertedAnimalsCount} حيوان جديد، ${updatedAnimalsCount} تحديث، ${savedSeedEventsCount} حدث تأسيسي.`,
       insertedAnimalsCount,
       updatedAnimalsCount,
