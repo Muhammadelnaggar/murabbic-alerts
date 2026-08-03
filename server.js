@@ -5408,7 +5408,15 @@ function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapI
       reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
     }
   }
-
+  const reviewReasonText = {
+  missing_animal_number: "رقم الحيوان غير موجود.",
+  missing_animal_type: "نوع الحيوان غير محدد.",
+  not_active_animal: "الحيوان غير نشط في الملف.",
+  missing_sire_number: "كود السائل المنوي غير موجود للحيوان الملقح أو العشار.",
+  weak_follower_identity: "بيانات التابع تحتاج رقم الأم وتاريخ الميلاد.",
+  weak_current_state: "بيانات الحالة الحالية للحيوان غير مكتملة.",
+  duplicate_in_file: "رقم الحيوان مكرر داخل الملف."
+};
   return {
     animalsInternal: built.map(x => x.base),
     totalRows: rows.length,
@@ -5424,6 +5432,34 @@ function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapI
     animalTypeCounts,
     productionStatusCounts,
     reproductiveStatusCounts,
+    previewAnimals: built.map(item => {
+  const base = item.base || {};
+
+  const reasons = (item.reviewReasons || [])
+    .map(reason =>
+      reviewReasonText[reason] ||
+      "بيانات الصف تحتاج مراجعة."
+    );
+
+  return {
+    row: base.rowIndex || null,
+    animalNumber: base.animalNumber || "",
+    animalType: base.animalType || "",
+    recordKind:
+      base.entryType === "followers"
+        ? "تابع"
+        : "أم",
+    ok: item.ok === true,
+    status:
+      item.ok === true
+        ? "جاهز"
+        : "مرفوض",
+    message:
+      item.ok === true
+        ? "✅ الحيوان جاهز للاستيراد."
+        : `❌ ${reasons.join(" ")}`
+  };
+}),
     readyForSavePreview: rows.length > 0 && readyAnimalsCount > 0 && needsReviewCount === 0
   };
 }
@@ -6062,10 +6098,10 @@ requiredInput: requiresDefaultAnimalType
       message: "الملف لا يحتوي على نوع الحيوان. اختر نوع القطيع ثم أعد المعاينة."
     }
   : null,
-
+  previewAnimals: baselinePreview.previewAnimals,
   sourceProfile: herdImportV2PublicSourceProfileSrv(sourceProfile),
 
-mappingSummary: {
+  mappingSummary: {
   mappedColumnsCount: columnMapping.mappedColumnsCount,
   unmappedColumnsCount: columnMapping.unmappedColumnsCount,
   mappingConfidence: columnMapping.mappingConfidence,
