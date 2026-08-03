@@ -2853,6 +2853,18 @@ function addAnimalBuildSinglePayloadSrv(uid, fd = {}) {
   if (entryType === "followers") {
     const followerStatus = addAnimalStrSrv(fd.followerStatus);
     const followerLastAI = addAnimalDateOrNullSrv(fd.followerLastInseminationDate);
+    const followerFatherNumber = addAnimalStrSrv(
+      fd.fatherNumber ||
+      fd.followerFatherNumber ||
+      fd.birthSireNumber ||
+      fd.parentSireNumber
+   );
+
+const followerInseminationSireNumber = addAnimalStrSrv(
+  fd.followerSireNumber ||
+  fd.inseminationSireNumber ||
+  fd.lastInseminationSireNumber
+);
     const isInseminatedFollower = followerStatus === "ملقح" || followerStatus === "عشار";
 
     const followerPregDays =
@@ -2883,6 +2895,15 @@ function addAnimalBuildSinglePayloadSrv(uid, fd = {}) {
 
         birthDate: addAnimalDateOrNullSrv(fd.birthDate),
         damNumber: addAnimalStrSrv(fd.damNumber) || null,
+        ...(followerFatherNumber
+         ? {
+            sireNumber: followerFatherNumber,
+            fatherNumber: followerFatherNumber,
+            bullNumber: followerFatherNumber,
+            semenCode: followerFatherNumber,
+            sireSource: addAnimalStrSrv(fd.sireSource) || "manual_add_animal"
+    }
+  : {}),
 
         weaningDate: followerStatus === "فطام"
           ? addAnimalDateOrNullSrv(fd.weaningDate)
@@ -2896,9 +2917,9 @@ function addAnimalBuildSinglePayloadSrv(uid, fd = {}) {
           ? addAnimalNumSrv(fd.followerServicesCount, 0)
           : 0,
 
-        sireNumber: isInseminatedFollower
-          ? (addAnimalStrSrv(fd.followerSireNumber) || null)
-          : null,
+ inseminationSireNumber: isInseminatedFollower
+  ? (followerInseminationSireNumber || null)
+  : null,
 
         pregnancyDays: followerStatus === "عشار"
           ? (Number.isFinite(Number(followerPregDays)) ? Number(followerPregDays) : null)
@@ -4445,7 +4466,27 @@ function herdImportV2MergeProfilePatchSrv(profileKey, patch = {}) {
       "ام",
       "أم"
     ],
+    fatherNumber: [
+  "fatherNumber",
+  "birthSireNumber",
+  "parentSireNumber",
+  "SIRE",
+  "Sire",
+  "رقم الأب",
+  "رقم الاب",
+  "كود الأب",
+  "كود الاب",
+  "طلوقة الأب",
+  "طلوقة الاب"
+],
 
+followerInseminationSireNumber: [
+  "followerSireNumber",
+  "inseminationSireNumber",
+  "lastInseminationSireNumber",
+  "كود سائل تلقيح التابع",
+  "طلوقة تلقيح التابع"
+],
     followerSex: [
       "SEX",
       "Sex",
@@ -5080,7 +5121,21 @@ const animalType = addAnimalStrSrv(rawAnimalType)
   const damNumber = addAnimalDigitsSrv(
   herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "damNumber")
 );
+const fatherNumber = String(
+  herdImportV2FirstValueByCanonicalInternalSrv(
+    row,
+    columnMapInternal,
+    "fatherNumber"
+  ) || ""
+).trim();
 
+const followerInseminationSireNumber = String(
+  herdImportV2FirstValueByCanonicalInternalSrv(
+    row,
+    columnMapInternal,
+    "followerInseminationSireNumber"
+  ) || ""
+).trim();
 const followerSex = addAnimalImportNormalizeSexSrv(
   herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "followerSex")
 );
@@ -5154,6 +5209,8 @@ if (
     animalType,
     entryType: "mothers",
     damNumber,
+    fatherNumber,
+    followerInseminationSireNumber,
     followerSex,
     followerStatus,
     breed: breedRawForType,
@@ -5187,8 +5244,8 @@ animalStatus
  base.entryType = herdImportV2InferEntryTypeInternalSrv(base);
 
 if (base.entryType === "followers") {
-  base.followerStatus = herdImportV2InferFollowerStatusInternalSrv(base);
-  base.productionStatus = "";
+    base.followerStatus = herdImportV2InferFollowerStatusInternalSrv(base);
+    base.productionStatus = "";
 
   if (base.followerStatus !== "ملقح" && base.followerStatus !== "عشار") {
     base.reproductiveStatus = "";
@@ -5521,11 +5578,13 @@ function herdImportV2FormDataInternalSrv(base = {}) {
         followerStatus: herdImportV2InferFollowerStatusInternalSrv(base),
         birthDate: base.birthDate,
         damNumber: base.damNumber,
+        fatherNumber: base.fatherNumber,
         weaningDate: base.weaningDate,
         followerLastInseminationDate: base.lastInseminationDate,
         followerServicesCount: base.servicesCount,
-        followerSireNumber: base.sireNumber,
-        followerPregnancyDays: base.pregDays
+        followerSireNumber: base.followerInseminationSireNumber,
+        followerPregnancyDays: base.pregDays,
+        sireSource: base.fatherNumber ? "herd_import_v2" : ""
       }
     : {
         entryType: "mothers",
@@ -6040,23 +6099,26 @@ baselineSummary: {
   reproductiveStatusCounts: baselinePreview.reproductiveStatusCounts,
   reasonCounts: baselinePreview.reasonCounts
 },
-  seedEventsSummary: {
-  calvingEventsCount: seedEventsPreview.calvingEventsCount,
-  inseminationEventsCount: seedEventsPreview.inseminationEventsCount,
-  pregnancyDiagnosisEventsCount: seedEventsPreview.pregnancyDiagnosisEventsCount,
-  dryOffEventsCount: seedEventsPreview.dryOffEventsCount,
-  heatEventsCount: seedEventsPreview.heatEventsCount,
-  totalSeedEventsCount: seedEventsPreview.totalSeedEventsCount,
-  skippedNoAnimalNumberCount: seedEventsPreview.skippedNoAnimalNumberCount,
-  skippedNoEventDateCount: seedEventsPreview.skippedNoEventDateCount,
-  seedEventsConfidence: seedEventsPreview.seedEventsConfidence,
-  animalsWithSeedEventsCount: seedEventsPreview.animalsWithSeedEventsCount,
-  seedEventsPerAnimal: seedEventsPreview.seedEventsPerAnimal,
-  seedEventsConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(
-    Math.min(1, seedEventsPreview.seedEventsConfidence)
-  ),
-  readyForSavePreview: seedEventsPreview.readyForSavePreview
-}    
+ seedEventsSummary: {
+  calvingEventsCount: 0,
+  inseminationEventsCount: 0,
+  pregnancyDiagnosisEventsCount: 0,
+  dryOffEventsCount: 0,
+  heatEventsCount: 0,
+  totalSeedEventsCount: 0,
+  skippedNoAnimalNumberCount: 0,
+  skippedNoEventDateCount: 0,
+  seedEventsConfidence: 1,
+  animalsWithSeedEventsCount: 0,
+  seedEventsPerAnimal: 0,
+
+  seedEventsConfidenceLevel:
+    herdImportV2PublicConfidenceLevelSrv(1),
+
+  readyForSavePreview:
+    !requiresDefaultAnimalType &&
+    baselinePreview.readyForSavePreview
+}
 });
 
   } catch (e) {
@@ -6228,24 +6290,6 @@ insertedAnimalsCount++;
       }
     }
 
-    for (const ev of seedEventsPreview.seedEventsInternal || []) {
-      if (!ev?.animalNumber || !ev?.eventDate || !ev?.eventTypeNorm) continue;
-
-      const eventDocId = herdImportV2SeedEventDocIdInternalSrv(uid, ev);
-      const eventRef = db.collection("events").doc(eventDocId);
-      const payload = herdImportV2BuildSeedEventPayloadInternalSrv(uid, ev, sourceProfile);
-
-      batch.set(eventRef, payload, { merge: true });
-      ops++;
-      savedSeedEventsCount++;
-
-      if (ops >= 350) {
-        await batch.commit();
-        batch = db.batch();
-        ops = 0;
-      }
-    }
-
     if (ops > 0) {
       await batch.commit();
     }
@@ -6259,7 +6303,7 @@ insertedAnimalsCount++;
       mode: "herd_import_v2",
       importMode: "save_operational_import",
       redirectUrl: "animal-list.html",
-      message: `✅ تم استيراد القطيع تشغيليًا: ${insertedAnimalsCount} حيوان جديد، ${updatedAnimalsCount} تحديث، ${savedSeedEventsCount} حدث تأسيسي.`,
+     message: `✅ تم استيراد ${insertedAnimalsCount} حيوان بنجاح.`,
       insertedAnimalsCount,
       updatedAnimalsCount,
       savedSeedEventsCount,
@@ -6277,14 +6321,13 @@ insertedAnimalsCount++;
         )
       },
 
-      seedEventsSummary: {
-        totalSeedEventsCount: seedEventsPreview.totalSeedEventsCount,
-        animalsWithSeedEventsCount: seedEventsPreview.animalsWithSeedEventsCount,
-        seedEventsPerAnimal: seedEventsPreview.seedEventsPerAnimal,
-        seedEventsConfidence: seedEventsPreview.seedEventsConfidence,
-        seedEventsConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(
-          seedEventsPreview.seedEventsConfidence
-        )
+  seedEventsSummary: {
+  totalSeedEventsCount: 0,
+  animalsWithSeedEventsCount: 0,
+  seedEventsPerAnimal: 0,
+  seedEventsConfidence: 1,
+  seedEventsConfidenceLevel:
+    herdImportV2PublicConfidenceLevelSrv(1)
       }
     });
 
