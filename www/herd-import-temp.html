@@ -226,29 +226,40 @@ function setSummary(j){
   }
 }
 
-function renderRows(rows){
-    rowsList.innerHTML = "";
+function renderRows(rows, j = {}) {
+  rowsList.innerHTML = "";
 
-    (rows || []).forEach(r => {
-      const item = document.createElement("div");
-      item.className = "preview-row " + (r.ok ? "status-ok" : "status-error");
+  const sourceItem = document.createElement("div");
+  sourceItem.className = "preview-row status-ok";
 
-      item.innerHTML = `
-        <div><b>السطر:</b> ${r.row || ""}</div>
-        <div><b>رقم الحيوان:</b> ${r.animalNumber || ""}</div>
-        <div><b>النوع:</b> ${r.recordKind || ""}</div>
-        <div><b>الحالة:</b> ${r.ok ? "جاهز" : "مرفوض"}</div>
-        <div><b>الحدث:</b> ${r.murabbikEventType || r.originalEventType || "-"}</div>
-        <div><b>الأرشفة:</b> ${r.archivedAnimal ? (r.archiveReason || "archived") : "-"}</div>
-        <div class="hint">${r.message || ""}</div>
-        <div class="hint">${r.expectedAnimalEffect || ""}</div>
-      `;
+  sourceItem.innerHTML = `
+    <div><b>مصدر الملف:</b> ${j.sourceProfile?.name || "غير محدد"}</div>
+    <div><b>مطابقة شكل الملف:</b> ${j.sourceProfile?.confidenceLevel || "-"}</div>
+  `;
 
-      rowsList.appendChild(item);
-    });
+  rowsList.appendChild(sourceItem);
 
-    resultsBox.style.display = "block";
-  }
+  (rows || []).forEach(r => {
+    const item = document.createElement("div");
+
+    item.className =
+      "preview-row " +
+      (r.ok ? "status-ok" : "status-error");
+
+    item.innerHTML = `
+      <div><b>السطر:</b> ${r.row || "-"}</div>
+      <div><b>رقم الحيوان:</b> ${r.animalNumber || "غير موجود"}</div>
+      <div><b>التصنيف:</b> ${r.recordKind || "-"}</div>
+      <div><b>نوع الحيوان:</b> ${r.animalType || "-"}</div>
+      <div><b>الحالة:</b> ${r.status || (r.ok ? "جاهز" : "مرفوض")}</div>
+      <div class="hint">${r.message || ""}</div>
+    `;
+
+    rowsList.appendChild(item);
+  });
+
+  resultsBox.style.display = "block";
+}
 function renderImportGuide(j){
   importGuideTitle.textContent =
     j.title || "كيف أجهّز ملف الاستيراد؟";
@@ -405,6 +416,7 @@ if (defaultAnimalType && defaultAnimalType.value) {
       console.log("HERD PREVIEW:", j);
 
       setSummary(j);
+      renderRows(j.previewAnimals || [], j);
      
      lastPreviewOk = !!(
   j.ok &&
