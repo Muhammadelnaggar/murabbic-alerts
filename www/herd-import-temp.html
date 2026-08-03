@@ -65,9 +65,21 @@
     <div class="hint">يظهر هذا الاختيار فقط إذا لم يستطع مُرَبِّيك تحديد نوع الحيوان من الملف.</div>
   </div>
 
-  <div class="actions-bar inline">
-  <button id="btnPreview" type="button" class="ghost">معاينة ذكية</button>
+<div class="actions-bar inline">
+  <button id="btnGuide" type="button" class="ghost">
+    كيف أجهّز ملف الاستيراد؟
+  </button>
+
+  <button id="btnPreview" type="button" class="ghost">
+    معاينة ذكية
+  </button>
 </div>
+</section>
+
+<section id="importGuideBox" class="card" style="display:none;">
+  <h2 id="importGuideTitle"></h2>
+  <div id="importGuideIntro" class="hint"></div>
+  <div id="importGuideContent" class="preview-scroll"></div>
 </section>
 
   <section id="summaryBox" class="card" style="display:none;">
@@ -137,6 +149,7 @@ async function loadServerSession(){
   const $ = id => document.getElementById(id);
 
   const herdFile = $("herdFile");
+  const btnGuide = $("btnGuide");
   const btnPreview = $("btnPreview");
   const btnSave = $("btnSave");
   const animalsListBtn = $("animalsListBtn");
@@ -146,6 +159,10 @@ async function loadServerSession(){
   const messageBox = $("messageBox");
   const resultsBox = $("resultsBox");
   const rowsList = $("rowsList");
+  const importGuideBox = $("importGuideBox");
+  const importGuideTitle = $("importGuideTitle");
+  const importGuideIntro = $("importGuideIntro");
+  const importGuideContent = $("importGuideContent");
 
   let lastFilePayload = null;
   let lastPreviewOk = false;
@@ -232,7 +249,78 @@ function renderRows(rows){
 
     resultsBox.style.display = "block";
   }
+function renderImportGuide(j){
+  importGuideTitle.textContent =
+    j.title || "كيف أجهّز ملف الاستيراد؟";
 
+  importGuideIntro.textContent =
+    j.intro || "";
+
+  importGuideContent.innerHTML = "";
+
+  for (const section of j.sections || []) {
+    const box = document.createElement("div");
+    box.className = "preview-row";
+
+    const title = document.createElement("div");
+    const strong = document.createElement("b");
+
+    strong.textContent = section.title || "";
+    title.appendChild(strong);
+    box.appendChild(title);
+
+    const list = document.createElement("ul");
+
+    for (const text of section.items || []) {
+      const item = document.createElement("li");
+      item.textContent = text;
+      list.appendChild(item);
+    }
+
+    box.appendChild(list);
+    importGuideContent.appendChild(box);
+  }
+
+  importGuideBox.style.display = "block";
+
+  importGuideBox.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
+async function loadImportGuide(){
+  if (!currentUserId) {
+    await loadServerSession();
+  }
+
+  const r = await fetch("/api/herd-import-v2/guide", {
+    method: "GET",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      "Accept": "application/json"
+    }
+  });
+
+  const data = await r.json().catch(() => ({
+    ok: false,
+    message: "تعذّر قراءة تعليمات الاستيراد."
+  }));
+
+  if (r.status === 401 || data?.error === "auth_required") {
+    location.replace("login.html?next=herd-import-temp.html");
+    return null;
+  }
+
+  if (!r.ok || data.ok !== true) {
+    throw new Error(
+      data.message || "تعذّر تحميل تعليمات الاستيراد."
+    );
+  }
+
+  return data;
+}
 async function callHerdImport(path){
   if (!currentUserId) {
     await loadServerSession();
@@ -267,7 +355,28 @@ async function callHerdImport(path){
 
   return data;
 }
+  btnGuide.addEventListener("click", async () => {
+  try {
+    btnGuide.disabled = true;
 
+    const guide = await loadImportGuide();
+
+    if (guide) {
+      renderImportGuide(guide);
+    }
+
+  } catch (e) {
+    console.error(e);
+
+    showMessage(
+      e.message || "تعذّر تحميل تعليمات الاستيراد.",
+      "status-error"
+    );
+
+  } finally {
+    btnGuide.disabled = false;
+  }
+});
   btnPreview.addEventListener("click", async () => {
     try {
       btnPreview.disabled = true;
