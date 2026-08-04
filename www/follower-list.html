@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="css/forms.css">
 </head>
-<body data-page="follower-list">
+<body data-page="animal-list">
 
 <header class="mbk-top">
   <div class="mbk-head">
@@ -37,7 +37,7 @@
 </div>
 
 <div class="table-wrapper">
-  <table id="followerTable">
+ <table id="animalTable">
     <thead>
       <tr>
         <th>رقم التابع</th>
@@ -109,7 +109,7 @@
   }
 
   function updateStickyCols() {
-    const th1 = document.querySelector("#followerTable thead th:nth-child(1)");
+   const th1 = document.querySelector("#animalTable thead th:nth-child(1)");
     if (!th1) return;
 
     document.body.style.setProperty("--sticky-col1", th1.offsetWidth + "px");
