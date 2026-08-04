@@ -419,14 +419,54 @@ btnSave.disabled = !lastPreviewOk;
 
 const j = await callHerdImport("/api/herd-import-v2/save-operational");
 
-      console.log("HERD SAVE:", j);
+console.log("HERD SAVE:", j);
 
-if (j.redirectUrl) {
+const mothersCount =
+  Number(j.insertedMothersCount || 0);
+
+const followersCount =
+  Number(j.insertedFollowersCount || 0);
+
+if (
+  j.ok === true &&
+  mothersCount > 0 &&
+  followersCount > 0
+) {
+  showMessage(
+    `✅ تم استيراد ${mothersCount} أم و${followersCount} تابع بنجاح. اختر القائمة التي تريد فتحها.`,
+    "status-ok"
+  );
+
+  document.getElementById("pageBottomBar").innerHTML = `
+    <button
+      type="button"
+      class="mbk-bottom-btn mbk-bottom-btn-primary"
+      onclick="location.href='animal-list.html'"
+    >
+      عرض الأمهات (${mothersCount})
+    </button>
+
+    <button
+      type="button"
+      class="mbk-bottom-btn mbk-bottom-btn-ghost"
+      onclick="location.href='follower-list.html'"
+    >
+      عرض التوابع (${followersCount})
+    </button>
+  `;
+
+  return;
+}
+
+if (j.ok === true && j.redirectUrl) {
   location.replace(j.redirectUrl);
   return;
 }
 
-showMessage(j.message || "فشل الحفظ.", "status-error");
+showMessage(
+  j.message || "فشل الحفظ.",
+  "status-error"
+);
 
      
     } catch (e) {
