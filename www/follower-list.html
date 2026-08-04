@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>قائمة التوابع</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="css/forms.css">
+</head>
+<body data-page="follower-list">
+
+<header class="mbk-top">
+  <div class="mbk-head">
+    <div class="mbk-title">
+      <div class="mbk-page">قائمة التوابع</div>
+      <div class="mbk-app">مُرَبِّيك</div>
+    </div>
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+  </div>
+</header>
+
+<div class="controls">
+  <input type="text" id="searchNumber" placeholder="ابحث برقم التابع">
+
+  <select id="typeSelector">
+    <option value="">عرض النوع</option>
+  </select>
+
+  <select id="sexSelector">
+    <option value="">كل الأجناس</option>
+  </select>
+
+  <select id="statusSelector">
+    <option value="">كل الحالات</option>
+  </select>
+
+  <button id="resetFilterBtn" type="button">عرض الكل</button>
+</div>
+
+<div class="table-wrapper">
+  <table id="followerTable">
+    <thead>
+      <tr>
+        <th>رقم التابع</th>
+        <th>النوع</th>
+        <th>السلالة</th>
+        <th>الجنس</th>
+        <th>الحالة الحالية</th>
+        <th>الحالة التناسلية</th>
+        <th>العمر بالأيام</th>
+        <th>عمر الحمل</th>
+        <th>تاريخ الميلاد</th>
+        <th>رقم الأم</th>
+        <th>رقم الأب</th>
+        <th>تاريخ آخر تلقيح</th>
+        <th>طلوقة آخر تلقيح</th>
+        <th>البطاقة</th>
+        <th>تسجيل حدث</th>
+      </tr>
+    </thead>
+    <tbody id="followerBody"></tbody>
+  </table>
+</div>
+
+<div id="noData" class="no-data" style="display:none;">لا توجد توابع مسجلة بعد.</div>
+<a href="dashboard.html" class="back-button">🔙 عودة إلى غرفة التحكم</a>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let followersData = [];
+  let searchTimer = null;
+
+  const API_BASE = window.API_BASE || "https://murabbic-alerts.onrender.com";
+  let currentUser = null;
+  let currentUserId = null;
+
+  async function loadServerSession() {
+    const res = await fetch(API_BASE + "/api/auth/me", {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "Cache-Control": "no-store"
+      },
+      credentials: "include",
+      cache: "no-store"
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || data.ok !== true || !data.userId) {
+      location.replace("login.html?next=follower-list.html");
+      throw new Error("auth_required");
+    }
+
+    currentUser = data.user || {};
+    currentUserId = data.userId;
+    return data;
+  }
+
+  function setMessage(text) {
+    const noData = $("noData");
+    const tbody = $("followerBody");
+
+    if (tbody) tbody.innerHTML = "";
+
+    if (noData) {
+      noData.textContent = text || "لا توجد توابع مسجلة بعد.";
+      noData.style.display = "block";
+    }
+  }
+
+  function updateStickyCols() {
+    const th1 = document.querySelector("#followerTable thead th:nth-child(1)");
+    if (!th1) return;
+
+    document.body.style.setProperty("--sticky-col1", th1.offsetWidth + "px");
+  }
+
+  window.addEventListener("resize", updateStickyCols);
+
+  function buildFollowersUrl() {
+    const params = new URLSearchParams();
+
+    const q = $("searchNumber")?.value.trim() || "";
+    const type = $("typeSelector")?.value || "";
+    const sex = $("sexSelector")?.value || "";
+    const status = $("statusSelector")?.value || "";
+
+    if (q) params.set("searchNumber", q);
+    if (type) params.set("type", type);
+    if (sex) params.set("sex", sex);
+    if (status) params.set("status", status);
+
+    const qs = params.toString();
+    return qs ? `/api/followers?${qs}` : "/api/followers";
+  }
+
+  async function apiLoadFollowers() {
+    if (!currentUserId) {
+      await loadServerSession();
+    }
+
+    const res = await fetch(API_BASE + buildFollowersUrl(), {
+      method: "GET",
+      cache: "no-store",
+      credentials: "include",
+      headers: {
+        "Accept": "application/json",
+        "Cache-Control": "no-store"
+      }
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 401 || data.error === "auth_required") {
+      location.replace("login.html?next=follower-list.html");
+      return null;
+    }
+
+    if (!res.ok || data.ok === false) {
+      throw new Error(
+        data.message || data.error || "تعذّر تحميل قائمة التوابع."
+      );
+    }
+
+    return data;
+  }
+
+  function updateSelectOptions(id, values = [], placeholder = "عرض الكل") {
+    const selector = $(id);
+    if (!selector) return;
+
+    const selected = selector.value;
+    selector.innerHTML = "";
+
+    const first = document.createElement("option");
+    first.value = "";
+    first.textContent = placeholder;
+    selector.appendChild(first);
+
+    values.forEach(value => {
+      const option = document.createElement("option");
+      option.value = value;
+
+      if (id === "typeSelector") {
+        option.textContent =
+          value === "بقرة"
+            ? "🐄 الأبقار"
+            : value === "جاموسة"
+              ? "🐃 الجاموس"
+              : value;
+      } else {
+        option.textContent = value;
+      }
+
+      selector.appendChild(option);
+    });
+
+    if (selected && values.includes(selected)) {
+      selector.value = selected;
+    }
+  }
+
+  function appendTextCell(tr, text) {
+    const td = document.createElement("td");
+    td.textContent = text ?? "---";
+    tr.appendChild(td);
+  }
+
+  function appendButtonCell(tr, label, url) {
+    const td = document.createElement("td");
+    const btn = document.createElement("button");
+
+    btn.type = "button";
+    btn.className = "button";
+    btn.textContent = label;
+    btn.disabled = !url;
+
+    btn.addEventListener("click", () => {
+      if (url) location.href = url;
+    });
+
+    td.appendChild(btn);
+    tr.appendChild(td);
+  }
+
+  function renderTable(data) {
+    const tbody = $("followerBody");
+    const noData = $("noData");
+
+    if (!tbody || !noData) return;
+
+    tbody.innerHTML = "";
+
+    if (!data || data.length === 0) {
+      noData.textContent = "لا توجد توابع مطابقة.";
+      noData.style.display = "block";
+      updateStickyCols();
+      return;
+    }
+
+    noData.style.display = "none";
+
+    data.forEach(follower => {
+      const tr = document.createElement("tr");
+      if (follower.rowClass) tr.className = follower.rowClass;
+
+      appendTextCell(tr, follower.animalNumber);
+      appendTextCell(tr, follower.animalTypeAr);
+      appendTextCell(tr, follower.breed);
+      appendTextCell(tr, follower.sex);
+      appendTextCell(tr, follower.followerStatus);
+      appendTextCell(tr, follower.reproductiveStatus);
+      appendTextCell(tr, follower.ageDays);
+      appendTextCell(tr, follower.pregnancyDays);
+      appendTextCell(tr, follower.birthDate);
+      appendTextCell(tr, follower.damNumber);
+      appendTextCell(tr, follower.fatherNumber);
+      appendTextCell(tr, follower.lastInseminationDate);
+      appendTextCell(tr, follower.inseminationSireNumber);
+      appendButtonCell(tr, "📄", follower.cardUrl);
+      appendButtonCell(tr, "📋", follower.eventUrl);
+
+      tbody.appendChild(tr);
+    });
+
+    updateStickyCols();
+  }
+
+  async function loadFollowers() {
+    try {
+      const data = await apiLoadFollowers();
+      if (!data) return;
+
+      followersData = data.followers || [];
+
+      updateSelectOptions(
+        "typeSelector",
+        data.typeOptions || [],
+        "عرض النوع"
+      );
+
+      updateSelectOptions(
+        "sexSelector",
+        data.sexOptions || [],
+        "كل الأجناس"
+      );
+
+      updateSelectOptions(
+        "statusSelector",
+        data.statusOptions || [],
+        "كل الحالات"
+      );
+
+      renderTable(followersData);
+
+    } catch (e) {
+      console.error("follower-list load failed:", e);
+      setMessage(e.message || "تعذّر تحميل قائمة التوابع.");
+    }
+  }
+
+  function scheduleLoadFollowers() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadFollowers, 250);
+  }
+
+  $("searchNumber")?.addEventListener("input", scheduleLoadFollowers);
+  $("typeSelector")?.addEventListener("change", loadFollowers);
+  $("sexSelector")?.addEventListener("change", loadFollowers);
+  $("statusSelector")?.addEventListener("change", loadFollowers);
+
+  $("resetFilterBtn")?.addEventListener("click", () => {
+    $("searchNumber").value = "";
+    $("typeSelector").value = "";
+    $("sexSelector").value = "";
+    $("statusSelector").value = "";
+    loadFollowers();
+  });
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    try {
+      await loadServerSession();
+      await loadFollowers();
+    } catch (e) {
+      console.warn("follower-list auth failed:", e);
+    }
+  });
+</script>
+
+</body>
+</html>
