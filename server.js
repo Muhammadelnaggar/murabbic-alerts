@@ -4666,7 +4666,7 @@ followerInseminationSireNumber: [
       "نوع الجنس"
     ],
 
-    followerStatus: [
+     followerStatus: [
       "Follower Status",
       "Calf Status",
       "Youngstock Status",
@@ -4675,6 +4675,15 @@ followerInseminationSireNumber: [
       "حالة العجل",
       "حالة العجلة",
       "حالة"
+    ],
+
+    weaningDate: [
+      "weaningDate",
+      "WEANDATE",
+      "Wean Date",
+      "Weaning Date",
+      "تاريخ الفطام",
+      "فطام"
     ]
   };
 
@@ -5307,6 +5316,14 @@ const followerSex = addAnimalImportNormalizeSexSrv(
 const followerStatus = addAnimalImportNormalizeFollowerStatusSrv(
   herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "followerStatus")
 );
+  const weaningDate =
+  herdImportV2NormalizeBaselineDateInternalSrv(
+    herdImportV2FirstValueByCanonicalInternalSrv(
+      row,
+      columnMapInternal,
+      "weaningDate"
+    )
+  );
   const birthDate = herdImportV2NormalizeBaselineDateInternalSrv(
     herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "birthDate")
   );
@@ -5377,6 +5394,7 @@ if (
     followerInseminationSireNumber,
     followerSex,
     followerStatus,
+    weaningDate,
     breed: breedRawForType,
     birthDate,
     lactationNumber,
