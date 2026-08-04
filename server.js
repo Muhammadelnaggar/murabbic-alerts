@@ -2498,19 +2498,7 @@ function addAnimalStrSrv(v) {
   return String(v ?? "").trim();
 }
 function addAnimalSireNumberSrv(fd = {}) {
-  return addAnimalStrSrv(
-    fd.sireNumber ||
-    fd.fatherNumber ||
-    fd.sireId ||
-    fd.bullNumber ||
-    fd.bullCode ||
-    fd.semenCode ||
-    fd.semenNumber ||
-    fd.strawCode ||
-    fd.sire ||
-    fd.bull ||
-    fd.semen
-  );
+  return addAnimalStrSrv(fd.sireNumber);
 }
 function addAnimalNumSrv(v, fallback = 0) {
   if (v === "" || v === null || v === undefined) return fallback;
@@ -2588,8 +2576,16 @@ function addAnimalBasicFieldsDecisionSrv(fd = {}) {
     errors.breed = "اختر السلالة.";
   }
 
-  if (!addAnimalStrSrv(fd.entryType)) {
+  if (!addAnimalStrSrv(fd.birthDate)) {
+    errors.birthDate = "أدخل تاريخ ميلاد الحيوان.";
+  }
+
+  const entryType = addAnimalStrSrv(fd.entryType);
+
+  if (!entryType) {
     errors.entryType = "اختر نوع الإدخال.";
+  } else if (!["mothers", "followers"].includes(entryType)) {
+    errors.entryType = "نوع الإدخال غير صحيح.";
   }
 
   const dateFields = [
@@ -2674,16 +2670,42 @@ function addAnimalDecisionSrv(fd = {}) {
   }
 
   if (mode === "followers") {
-    if (!addAnimalStrSrv(fd.birthDate)) {
-      return "❌ أدخل تاريخ ميلاد التابع.";
-    }
+    const sex = addAnimalStrSrv(fd.followerSex);
+    const st = addAnimalStrSrv(fd.followerStatus);
 
-    if (!addAnimalStrSrv(fd.followerSex)) {
+    if (!sex) {
       return "❌ اختر جنس التابع.";
     }
 
-    if (!addAnimalStrSrv(fd.followerStatus)) {
+    if (!st) {
       return "❌ اختر الحالة الحالية للتابع.";
+    }
+
+    const femaleStatuses = [
+      "رضيع",
+      "فطام",
+      "نامي",
+      "تحت التلقيح",
+      "ملقح",
+      "عشار"
+    ];
+
+    const maleStatuses = [
+      "رضيع",
+      "فطام",
+      "نامي"
+    ];
+
+    if (sex === "أنثى" && !femaleStatuses.includes(st)) {
+      return "❌ الحالة الحالية لا تتوافق مع تابع أنثى.";
+    }
+
+    if (sex === "ذكر" && !maleStatuses.includes(st)) {
+      return "❌ الحالة الحالية لا تتوافق مع تابع ذكر.";
+    }
+
+    if (sex !== "أنثى" && sex !== "ذكر") {
+      return "❌ جنس التابع غير صحيح.";
     }
 
     if (!addAnimalStrSrv(fd.damNumber)) {
@@ -2691,19 +2713,28 @@ function addAnimalDecisionSrv(fd = {}) {
     }
 
     if (
-      addAnimalStrSrv(fd.followerStatus) === "فطام" &&
+      st === "فطام" &&
       !addAnimalStrSrv(fd.weaningDate)
     ) {
       return "❌ أدخل تاريخ فطام التابع.";
     }
 
-    const st = addAnimalStrSrv(fd.followerStatus);
+    const isInseminatedFollower =
+      st === "ملقح" ||
+      st === "عشار";
 
     if (
-      (st === "ملقح" || st === "عشار") &&
+      isInseminatedFollower &&
       !addAnimalStrSrv(fd.followerLastInseminationDate)
     ) {
       return "❌ أدخل تاريخ آخر تلقيح للتابع.";
+    }
+
+    if (
+      isInseminatedFollower &&
+      !addAnimalStrSrv(fd.followerSireNumber)
+    ) {
+      return "❌ أدخل رقم طلوقة آخر تلقيح للتابع.";
     }
 
     return null;
@@ -2850,22 +2881,31 @@ function addAnimalBuildSinglePayloadSrv(uid, fd = {}) {
   const key = `${uid}#${numberStr}`;
   const today = addAnimalTodaySrv();
 
-  if (entryType === "followers") {
+   if (entryType === "followers") {
     const followerStatus = addAnimalStrSrv(fd.followerStatus);
-    const followerLastAI = addAnimalDateOrNullSrv(fd.followerLastInseminationDate);
-    const followerFatherNumber = addAnimalStrSrv(
-      fd.fatherNumber ||
-      fd.followerFatherNumber ||
-      fd.birthSireNumber ||
-      fd.parentSireNumber
-   );
+    const followerSex = addAnimalStrSrv(fd.followerSex);
+    const followerLastAI = addAnimalDateOrNullSrv(
+      fd.followerLastInseminationDate
+    );
 
-const followerInseminationSireNumber = addAnimalStrSrv(
-  fd.followerSireNumber ||
-  fd.inseminationSireNumber ||
-  fd.lastInseminationSireNumber
-);
-    const isInseminatedFollower = followerStatus === "ملقح" || followerStatus === "عشار";
+    const followerFatherNumber = addAnimalStrSrv(fd.fatherNumber);
+
+    const followerInseminationSireNumber = addAnimalStrSrv(
+      fd.followerSireNumber
+    );
+
+    const isInseminatedFollower =
+      followerStatus === "ملقح" ||
+      followerStatus === "عشار";
+
+    const followerReproductiveStatus =
+      followerStatus === "عشار"
+        ? "عشار"
+        : followerStatus === "ملقح"
+          ? "ملقحة"
+          : followerStatus === "تحت التلقيح"
+            ? "مفتوحة"
+            : "";
 
     const followerPregDays =
       followerStatus === "عشار" && followerLastAI
@@ -2874,6 +2914,7 @@ const followerInseminationSireNumber = addAnimalStrSrv(
 
     return {
       collectionName: "calves",
+
       payload: {
         ownerUid: uid,
         userId: uid,
@@ -2889,49 +2930,69 @@ const followerInseminationSireNumber = addAnimalStrSrv(
         animalTypeAr: speciesInfo.animalTypeAr,
         breed: addAnimalStrSrv(fd.breed),
 
-        sex: addAnimalStrSrv(fd.followerSex),
+        sex: followerSex,
         status: followerStatus,
         followerStatus,
 
-        birthDate: addAnimalDateOrNullSrv(fd.birthDate),
-        damNumber: addAnimalStrSrv(fd.damNumber) || null,
+        reproductiveStatus:
+          followerReproductiveStatus || null,
+
+        birthDate:
+          addAnimalDateOrNullSrv(fd.birthDate),
+
+        damNumber:
+          addAnimalStrSrv(fd.damNumber) || null,
+
         ...(followerFatherNumber
-         ? {
-            sireNumber: followerFatherNumber,
-            fatherNumber: followerFatherNumber,
-            bullNumber: followerFatherNumber,
-            semenCode: followerFatherNumber,
-            sireSource: addAnimalStrSrv(fd.sireSource) || "manual_add_animal"
-    }
-  : {}),
+          ? {
+              sireNumber: followerFatherNumber,
+              fatherNumber: followerFatherNumber,
+              sireSource:
+                addAnimalStrSrv(fd.sireSource) ||
+                "manual_add_animal"
+            }
+          : {}),
 
-        weaningDate: followerStatus === "فطام"
-          ? addAnimalDateOrNullSrv(fd.weaningDate)
-          : null,
+        weaningDate:
+          followerStatus === "فطام"
+            ? addAnimalDateOrNullSrv(fd.weaningDate)
+            : null,
 
-        lastInseminationDate: isInseminatedFollower
-          ? followerLastAI
-          : null,
+        lastInseminationDate:
+          isInseminatedFollower
+            ? followerLastAI
+            : null,
 
-        servicesCount: isInseminatedFollower
-          ? addAnimalNumSrv(fd.followerServicesCount, 0)
-          : 0,
+        servicesCount:
+          isInseminatedFollower
+            ? addAnimalNumSrv(fd.followerServicesCount, 0)
+            : 0,
 
- inseminationSireNumber: isInseminatedFollower
-  ? (followerInseminationSireNumber || null)
-  : null,
+        inseminationSireNumber:
+          isInseminatedFollower
+            ? followerInseminationSireNumber || null
+            : null,
 
-        pregnancyDays: followerStatus === "عشار"
-          ? (Number.isFinite(Number(followerPregDays)) ? Number(followerPregDays) : null)
-          : null,
+        pregnancyDays:
+          followerStatus === "عشار"
+            ? (
+                Number.isFinite(Number(followerPregDays))
+                  ? Number(followerPregDays)
+                  : null
+              )
+            : null,
 
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        source: "server:/api/add-animal/save"
+        createdAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+
+        updatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+
+        source:
+          "server:/api/add-animal/save"
       }
     };
   }
-
   const productionStatus = addAnimalStrSrv(fd.productionStatus);
   const reproductiveStatus = addAnimalStrSrv(fd.reproductiveStatus);
   const lastCalvingDate = addAnimalDateOrNullSrv(fd.lastCalvingDate);
@@ -3000,7 +3061,47 @@ const pregnancyDays =
     }
   };
 }
+async function addAnimalWriteSingleSrv(uid, fd = {}, options = {}) {
+  const canonical =
+    addAnimalBuildSinglePayloadSrv(uid, fd);
 
+  const payloadPatch =
+    options.payloadPatch &&
+    typeof options.payloadPatch === "object"
+      ? options.payloadPatch
+      : {};
+
+  const payload = {
+    ...canonical.payload,
+    ...payloadPatch
+  };
+
+  const source =
+    addAnimalStrSrv(options.source);
+
+  if (source) {
+    payload.source = source;
+  }
+
+  const ref =
+    options.ref ||
+    db.collection(canonical.collectionName).doc();
+
+  if (options.batch) {
+    options.batch.set(ref, payload);
+  } else {
+    await ref.set(payload);
+  }
+
+  return {
+    collectionName:
+      canonical.collectionName,
+
+    payload,
+    ref,
+    animalId: ref.id
+  };
+}
 app.post("/api/add-animal/save", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -3051,9 +3152,17 @@ app.post("/api/add-animal/save", requireUserId, async (req, res) => {
       });
     }
 
-    const { collectionName, payload } = addAnimalBuildSinglePayloadSrv(uid, fd);
-
-    const ref = await db.collection(collectionName).add(payload);
+    const {
+  collectionName,
+  payload,
+  ref
+} = await addAnimalWriteSingleSrv(
+  uid,
+  fd,
+  {
+    source: "server:/api/add-animal/save"
+  }
+);
 
     if (typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "add_animal_save");
@@ -3669,23 +3778,27 @@ function addAnimalImportFdSrv(row = {}, importKind = "mothers") {
         "مرات التلقيح"
       ]),
 
-      followerSireNumber: addAnimalImportPickAnySrv(row, [
-        "followerSireNumber",
+      fatherNumber: addAnimalImportPickAnySrv(row, [
+        "fatherNumber",
+        "birthSireNumber",
+        "parentSireNumber",
         "sireNumber",
         "SIRE",
+        "Sire",
         "sire",
-        "sireId",
-        "BULL",
-        "bull",
-        "bullId",
-        "bullCode",
-        "SEMEN",
-        "semen",
-        "semenCode",
-        "straw",
-        "رقم الطلوقة",
-        "كود السائل",
-        "الطلوقة"
+        "رقم الأب",
+        "رقم الاب",
+        "كود الأب",
+        "كود الاب"
+      ]),
+
+      followerSireNumber: addAnimalImportPickAnySrv(row, [
+        "followerSireNumber",
+        "inseminationSireNumber",
+        "lastInseminationSireNumber",
+        "رقم طلوقة آخر تلقيح",
+        "كود سائل تلقيح التابع",
+        "طلوقة تلقيح التابع"
       ])
     };
   }
@@ -4078,11 +4191,19 @@ app.post("/api/add-animal/import", requireUserId, async (req, res) => {
         continue;
       }
 
-      const { collectionName, payload } = addAnimalBuildSinglePayloadSrv(uid, fd);
-      const ref = db.collection(collectionName).doc();
+  const {
+  collectionName,
+  ref
+} = await addAnimalWriteSingleSrv(
+  uid,
+  fd,
+  {
+    batch,
+    source: "server:/api/add-animal/import"
+  }
+);
 
-      batch.set(ref, payload);
-      ops++;
+ops++;
 
       saved.push({
         row: rowNumber,
@@ -5656,44 +5777,39 @@ function herdImportV2GateDecisionInternalSrv(base = {}) {
   };
 }
 
-function herdImportV2BuildAnimalOperationalPayloadInternalSrv(
-  uid,
+function herdImportV2OperationalPayloadPatchInternalSrv(
   base = {},
-  sourceProfile = {},
-  isNew = true
+  sourceProfile = {}
 ) {
-  const formData = herdImportV2FormDataInternalSrv(base);
-  const isFollower = formData.entryType === "followers";
+  const isFollower =
+    herdImportV2OperationalCollectionNameInternalSrv(base) ===
+    "calves";
 
-  const canonical = addAnimalBuildSinglePayloadSrv(uid, formData);
-  const payload = {
-    ...canonical.payload,
-
+  return {
     ...(!isFollower
       ? {
           dryOffDate:
-            herdImportV2DateOrNullInternalSrv(base.dryOffDate)
+            herdImportV2DateOrNullInternalSrv(
+              base.dryOffDate
+            )
         }
       : {}),
 
-    importedBy: "herd_import_v2",
-    importMode: "operational_baseline",
-    isImportedBaseline: true,
-    sourceProfileKey: sourceProfile.key || "unknown",
+    importedBy:
+      "herd_import_v2",
+
+    importMode:
+      "operational_baseline",
+
+    isImportedBaseline:
+      true,
+
+    sourceProfileKey:
+      sourceProfile.key || "unknown",
 
     updatedAt:
-      admin.firestore.FieldValue.serverTimestamp(),
-
-    source:
-      "server:/api/herd-import-v2/save-operational"
+      admin.firestore.FieldValue.serverTimestamp()
   };
-
-  // لا نغيّر تاريخ إنشاء وثيقة موجودة.
-  if (!isNew) {
-    delete payload.createdAt;
-  }
-
-  return payload;
 }
 
 function herdImportV2SeedEventDocIdInternalSrv(uid, ev = {}) {
@@ -6303,19 +6419,26 @@ if (gateRejected.length) {
       const numberStr = addAnimalDigitsSrv(base.animalNumber);
       if (!numberStr) continue;
 
-     const collectionName =
-  herdImportV2OperationalCollectionNameInternalSrv(base);
+const gate =
+  herdImportV2GateDecisionInternalSrv(base);
 
-const ref = db.collection(collectionName).doc();
-
-const payload = herdImportV2BuildAnimalOperationalPayloadInternalSrv(
+await addAnimalWriteSingleSrv(
   uid,
-  base,
-  sourceProfile,
-  true
+  gate.formData,
+  {
+    batch,
+
+    source:
+      "server:/api/herd-import-v2/save-operational",
+
+    payloadPatch:
+      herdImportV2OperationalPayloadPatchInternalSrv(
+        base,
+        sourceProfile
+      )
+  }
 );
 
-batch.set(ref, payload);
 ops++;
 insertedAnimalsCount++;
 
@@ -17400,7 +17523,11 @@ const embryonicLossRef = needsEmbryonicLoss
       }
     }
 
-    batch.set(db.collection("animals").doc(animal.id), animalPatch, { merge: true });
+    batch.set(
+  db.collection(animal._collection || "animals").doc(animal.id),
+  animalPatch,
+  { merge: true }
+);
 
     await batch.commit();
 
@@ -21134,7 +21261,11 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
       batch.set(eventRef, payload);
       ops++;
 
-      batch.set(db.collection("animals").doc(animal.id), animalPatch, { merge: true });
+      batch.set(
+  db.collection(animal._collection || "animals").doc(animal.id),
+  animalPatch,
+  { merge: true }
+);
       ops++;
 
       saved.push({
