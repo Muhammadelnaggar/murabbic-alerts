@@ -131,8 +131,22 @@
   <option value="">اختر الحالة</option>
   </select>
 
+ <label for="damReferenceStatus">بيانات الأم:</label>
+<select id="damReferenceStatus" data-field="damReferenceStatus">
+  <option value="known">الأم معروفة</option>
+  <option value="unknown">الأم غير معروفة</option>
+  <option value="deceased">الأم نافقة ورقمها غير متاح</option>
+</select>
+
+<div id="damNumberField">
   <label for="damNumber">رقم الأم:</label>
-<input type="text" id="damNumber" placeholder="اكتب رقم الأم" data-field="damNumber" />
+  <input
+    type="text"
+    id="damNumber"
+    placeholder="اكتب رقم الأم"
+    data-field="damNumber"
+  />
+</div>
   <label for="fatherNumber">رقم الأب:</label>
 <input type="text" id="fatherNumber" placeholder="اكتب رقم الأب إن كان معروفًا" data-field="fatherNumber" />    
   <div id="weaningField" class="hidden-block">
@@ -189,6 +203,9 @@
   const openHerdImportBtn = $("openHerdImportBtn");
   const followerSex = $("followerSex");
   const followerStatus = $("followerStatus");
+  const damReferenceStatus = $("damReferenceStatus");
+  const damNumberField = $("damNumberField");
+  const damNumber = $("damNumber");
   const weaningField = $("weaningField");
   const followerInseminationField = $("followerInseminationField");
   const followerPregnancyBox = $("followerPregnancyBox");
@@ -267,25 +284,52 @@
     }
   }
 
-  function toggleFollowerFields(){
-    const st = followerStatus?.value || "";
+function toggleDamReferenceFields(){
+  const followersMode =
+    (entryType?.value || "") === "followers";
 
-    if (weaningField) {
-      weaningField.classList.toggle("hidden-block", st !== "فطام");
-    }
+  const known =
+    (damReferenceStatus?.value || "known") === "known";
 
-    if (followerInseminationField) {
-      followerInseminationField.classList.toggle(
-        "hidden-block",
-        !(st === "ملقح" || st === "عشار")
-      );
-    }
-
-    if (followerPregnancyBox) {
-      followerPregnancyBox.classList.toggle("hidden-block", st !== "عشار");
-    }
+  if (damNumberField) {
+    damNumberField.classList.toggle("hidden-block", !known);
   }
 
+  if (damNumber) {
+    damNumber.disabled = !followersMode || !known;
+
+    if (!known) {
+      damNumber.value = "";
+    }
+  }
+}
+
+function toggleFollowerFields(){
+  const st = followerStatus?.value || "";
+
+  if (weaningField) {
+    weaningField.classList.toggle(
+      "hidden-block",
+      st !== "فطام"
+    );
+  }
+
+  if (followerInseminationField) {
+    followerInseminationField.classList.toggle(
+      "hidden-block",
+      !(st === "ملقح" || st === "عشار")
+    );
+  }
+
+  if (followerPregnancyBox) {
+    followerPregnancyBox.classList.toggle(
+      "hidden-block",
+      st !== "عشار"
+    );
+  }
+
+  toggleDamReferenceFields();
+}
   function setSectionEnabled(root, enabled){
     if (!root) return;
 
@@ -346,7 +390,10 @@ function setEntryMode(mode){
     updateFollowerStatusOptions();
     toggleFollowerFields();
   });
-
+  damReferenceStatus?.addEventListener(
+  "change",
+  toggleDamReferenceFields
+);
   followerStatus?.addEventListener("change", toggleFollowerFields);
 
   dashboardBtn?.addEventListener("click", () => {
