@@ -2708,8 +2708,30 @@ function addAnimalDecisionSrv(fd = {}) {
       return "❌ جنس التابع غير صحيح.";
     }
 
-    if (!addAnimalStrSrv(fd.damNumber)) {
-      return "❌ أدخل رقم أم التابع.";
+      const damNumber =
+      addAnimalStrSrv(fd.damNumber);
+
+    const damReferenceStatus =
+      addAnimalStrSrv(
+        fd.damReferenceStatus ||
+        (damNumber ? "known" : "unknown")
+      );
+
+    if (
+      ![
+        "known",
+        "unknown",
+        "deceased"
+      ].includes(damReferenceStatus)
+    ) {
+      return "❌ اختر حالة بيانات الأم بصورة صحيحة.";
+    }
+
+    if (
+      damReferenceStatus === "known" &&
+      !damNumber
+    ) {
+      return "❌ أدخل رقم أم التابع أو اختر أن بيانات الأم غير معروفة.";
     }
 
     if (
@@ -2890,9 +2912,24 @@ function addAnimalBuildSinglePayloadSrv(uid, fd = {}) {
 
     const followerFatherNumber = addAnimalStrSrv(fd.fatherNumber);
 
-    const followerInseminationSireNumber = addAnimalStrSrv(
+     const followerInseminationSireNumber = addAnimalStrSrv(
       fd.followerSireNumber
     );
+
+    const followerDamNumber =
+      addAnimalStrSrv(fd.damNumber);
+
+    const rawDamReferenceStatus =
+      addAnimalStrSrv(fd.damReferenceStatus);
+
+    const followerDamReferenceStatus =
+      followerDamNumber
+        ? "known"
+        : ["unknown", "deceased"].includes(
+            rawDamReferenceStatus
+          )
+          ? rawDamReferenceStatus
+          : "unknown";
 
     const isInseminatedFollower =
       followerStatus === "ملقح" ||
@@ -2940,8 +2977,11 @@ function addAnimalBuildSinglePayloadSrv(uid, fd = {}) {
         birthDate:
           addAnimalDateOrNullSrv(fd.birthDate),
 
-        damNumber:
-          addAnimalStrSrv(fd.damNumber) || null,
+          damNumber:
+          followerDamNumber || null,
+
+        damReferenceStatus:
+          followerDamReferenceStatus,
 
         ...(followerFatherNumber
           ? {
@@ -5408,7 +5448,11 @@ const reviewReasons = [];
   }
 
   if (base.entryType === "followers") {
-  if (!base.damNumber || !base.birthDate) {
+  if (
+    !base.birthDate ||
+    !base.followerSex ||
+    !herdImportV2InferFollowerStatusInternalSrv(base)
+  ) {
     reviewReasons.push("weak_follower_identity");
   }
 } else if (
@@ -5438,8 +5482,14 @@ function herdImportV2OperationalCollectionNameInternalSrv(base = {}) {
 }
 
 function herdImportV2InferEntryTypeInternalSrv(base = {}) {
-  const damNumber = addAnimalDigitsSrv(base.damNumber);
-  if (!damNumber) return "mothers";
+  const damNumber =
+    addAnimalDigitsSrv(base.damNumber);
+
+  const followerSex =
+    addAnimalStrSrv(base.followerSex);
+
+  const followerStatus =
+    addAnimalStrSrv(base.followerStatus);
 
   const lact = Number(base.lactationNumber);
   const dim = Number(base.daysInMilk);
@@ -5452,7 +5502,18 @@ function herdImportV2InferEntryTypeInternalSrv(base = {}) {
     (Number.isFinite(dim) && dim > 0) ||
     (Number.isFinite(milk) && milk > 0);
 
-  return hasMotherSignals ? "mothers" : "followers";
+  if (hasMotherSignals) {
+    return "mothers";
+  }
+
+  const hasFollowerSignals =
+    !!followerStatus ||
+    !!damNumber ||
+    (!!followerSex && !!base.birthDate);
+
+  return hasFollowerSignals
+    ? "followers"
+    : "mothers";
 }
 
 function herdImportV2InferFollowerStatusInternalSrv(base = {}) {
@@ -5735,6 +5796,8 @@ function herdImportV2FormDataInternalSrv(base = {}) {
         followerStatus: herdImportV2InferFollowerStatusInternalSrv(base),
         birthDate: base.birthDate,
         damNumber: base.damNumber,
+        damReferenceStatus:
+          base.damNumber ? "known" : "unknown",
         fatherNumber: base.fatherNumber,
         weaningDate: base.weaningDate,
         followerLastInseminationDate: base.lastInseminationDate,
@@ -6412,6 +6475,8 @@ if (gateRejected.length) {
     let ops = 0;
 
     let insertedAnimalsCount = 0;
+    let insertedFollowersCount = 0;
+    let insertedMothersCount = 0;
     let updatedAnimalsCount = 0;
     let savedSeedEventsCount = 0;
 
@@ -6442,6 +6507,12 @@ await addAnimalWriteSingleSrv(
 ops++;
 insertedAnimalsCount++;
 
+if (gate.formData.entryType === "followers") {
+  insertedFollowersCount++;
+} else {
+  insertedMothersCount++;
+}
+
       if (ops >= 350) {
         await batch.commit();
         batch = db.batch();
@@ -6461,9 +6532,14 @@ insertedAnimalsCount++;
       ok: true,
       mode: "herd_import_v2",
       importMode: "save_operational_import",
-      redirectUrl: "animal-list.html",
+           redirectUrl:
+        insertedFollowersCount > 0
+          ? "follower-list.html"
+          : "animal-list.html",
      message: `✅ تم استيراد ${insertedAnimalsCount} حيوان بنجاح.`,
       insertedAnimalsCount,
+      insertedFollowersCount,
+      insertedMothersCount,
       updatedAnimalsCount,
       savedSeedEventsCount,
       totalAnimalsTouched: insertedAnimalsCount + updatedAnimalsCount,
@@ -14749,56 +14825,87 @@ function inseminationDecisionSrv(fd) {
     warnings.push("⚠️ تم تأكيد فقد الحمل. عند الحفظ سيسجل مُرَبِّيك الفقد الجنيني أولًا ثم التلقيح.");
   }
 
-  // ⚠️ آخر ولادة:
-  // المنع الصلب فقط قبل 45 يوم في الأبقار و35 يوم في الجاموس.
-  // من بعد المنع الصلب حتى الحد التشغيلي المفضل → تحذير فقط ويسمح بالتسجيل.
- const lastCalving =
-  String(fd.lastCalvingDate || "").trim() ||
-  String(doc.lastCalvingDate || "").trim() ||
-  (String(fd.lastBoundaryType || "").trim() === "ولادة" ? String(fd.lastBoundary || "").trim() : "");
+  const isFollowerRecord =
+    String(fd.animalCollection || "").trim() === "calves" ||
+    String(doc.entryType || "").trim() === "followers";
 
-  const recommendedDaysAfterCalving = Number(recommendedPostCalving[sp] || 56);
-  const hardBlockDaysAfterCalving = Number(hardBlockPostCalving[sp] || 45);
+  // قواعد ما بعد الولادة تخص الأمهات فقط.
+  // العجلة البكر داخل calves لا تحتاج تاريخ ولادة سابق.
+  if (!isFollowerRecord) {
+    const lastCalving =
+      String(fd.lastCalvingDate || "").trim() ||
+      String(doc.lastCalvingDate || "").trim() ||
+      (
+        String(fd.lastBoundaryType || "").trim() === "ولادة"
+          ? String(fd.lastBoundary || "").trim()
+          : ""
+      );
 
-  const dimFallback = Number(
-    fd.dimAtEvent ??
-    doc.daysInMilk ??
-    doc.dimAtEvent ??
-    doc.DIM
-  );
+    const recommendedDaysAfterCalving =
+      Number(recommendedPostCalving[sp] || 56);
 
-  function inseminationPostCalvingDecisionSrv(daysAfterCalving) {
-    const d = Math.round(Number(daysAfterCalving));
-    if (!Number.isFinite(d) || d < 0) return "";
+    const hardBlockDaysAfterCalving =
+      Number(hardBlockPostCalving[sp] || 45);
 
-   if (d < hardBlockDaysAfterCalving) {
-  return `❌ مرّ ${d} يومًا فقط منذ الولادة. يمكن تسجيل التلقيح بعد ${hardBlockDaysAfterCalving} يومًا على الأقل.`;
-}
+    const dimFallback = Number(
+      fd.dimAtEvent ??
+      doc.daysInMilk ??
+      doc.dimAtEvent ??
+      doc.DIM
+    );
 
-if (d < recommendedDaysAfterCalving) {
-  warnings.push(
-   `⚠️ مرّ ${d} يومًا منذ الولادة. يمكن حفظ التلقيح، لكن التوقيت المفضل بعد ${recommendedDaysAfterCalving} يومًا من الولادة.`
-  );
-}
+    function inseminationPostCalvingDecisionSrv(daysAfterCalving) {
+      const d = Math.round(Number(daysAfterCalving));
 
-    return "";
-  }
+      if (!Number.isFinite(d) || d < 0) {
+        return "";
+      }
 
-  if (!lastCalving) {
-    const blockReason = inseminationPostCalvingDecisionSrv(dimFallback);
-    if (blockReason) return blockReason;
+      if (d < hardBlockDaysAfterCalving) {
+        return `❌ مرّ ${d} يومًا فقط منذ الولادة. يمكن تسجيل التلقيح بعد ${hardBlockDaysAfterCalving} يومًا على الأقل.`;
+      }
 
-    if (!Number.isFinite(dimFallback)) {
-      warnings.push("⚠️ لم أجد تاريخ آخر ولادة، لذلك لا أستطيع حساب المدة منذ الولادة بدقة.");
+      if (d < recommendedDaysAfterCalving) {
+        warnings.push(
+          `⚠️ مرّ ${d} يومًا منذ الولادة. يمكن حفظ التلقيح، لكن التوقيت المفضل بعد ${recommendedDaysAfterCalving} يومًا من الولادة.`
+        );
+      }
+
+      return "";
     }
-  } else {
-    const gapCalving = inseminationDaysBetweenSrv(lastCalving, fd.eventDate);
 
-    if (!Number.isFinite(gapCalving)) {
-     warnings.push("⚠️ لم أستطع حساب المدة منذ آخر ولادة. راجع تاريخ الولادة.");
+    if (!lastCalving) {
+      const blockReason =
+        inseminationPostCalvingDecisionSrv(dimFallback);
+
+      if (blockReason) {
+        return blockReason;
+      }
+
+      if (!Number.isFinite(dimFallback)) {
+        warnings.push(
+          "⚠️ لم أجد تاريخ آخر ولادة، لذلك لا أستطيع حساب المدة منذ الولادة بدقة."
+        );
+      }
     } else {
-      const blockReason = inseminationPostCalvingDecisionSrv(gapCalving);
-      if (blockReason) return blockReason;
+      const gapCalving =
+        inseminationDaysBetweenSrv(
+          lastCalving,
+          fd.eventDate
+        );
+
+      if (!Number.isFinite(gapCalving)) {
+        warnings.push(
+          "⚠️ لم أستطع حساب المدة منذ آخر ولادة. راجع تاريخ الولادة."
+        );
+      } else {
+        const blockReason =
+          inseminationPostCalvingDecisionSrv(gapCalving);
+
+        if (blockReason) {
+          return blockReason;
+        }
+      }
     }
   }
   // ✅ تلقيح نفس اليوم: مرة إعادة واحدة فقط
@@ -15801,6 +15908,8 @@ if (!calvingIsDateSrv(eventDate)) {
           animalNumber,
           eventDate,
           animalId: animal.id || "",
+          animalCollection:
+          animal._collection || "animals",
           species,
           documentData: doc,
           reproductiveStatus: reproStatus,
@@ -16046,6 +16155,8 @@ app.post("/api/insemination/save", requireUserId, async (req, res) => {
       animalNumber,
       eventDate,
       animalId: animal.id || "",
+      animalCollection:
+      animal._collection || "animals",
       species,
       documentData: doc,
       reproductiveStatus: reproStatus,
@@ -16239,6 +16350,13 @@ const animalUpdate = {
   servicesCount: nextServices,
   updatedAt: admin.firestore.FieldValue.serverTimestamp()
 };
+
+if (animalCol === "calves") {
+  animalUpdate.followerStatus = "ملقح";
+  animalUpdate.status = "ملقح";
+  animalUpdate.inseminationSireNumber =
+    String(formData.semenCode || "").trim() || null;
+}
 
 if (needsEmbryonicLoss && embryonicLossRef) {
   animalUpdate.lastEmbryonicLossDate = eventDate;
@@ -16459,6 +16577,8 @@ app.post("/api/insemination/bulk-save", requireUserId, async (req, res) => {
           animalNumber,
           eventDate,
           animalId: animal.id || "",
+          animalCollection:
+          animal._collection || "animals",
           species,
           documentData: doc,
           reproductiveStatus: reproStatus,
@@ -16601,6 +16721,13 @@ rejected.push({
           servicesCount: nextServices,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         };
+
+        if (animalCol === "calves") {
+          animalUpdate.followerStatus = "ملقح";
+          animalUpdate.status = "ملقح";
+          animalUpdate.inseminationSireNumber =
+            String(formData.semenCode || "").trim() || null;
+        }
 
         if (needsEmbryonicLoss && embryonicLossRef) {
           animalUpdate.lastEmbryonicLossDate = eventDate;
@@ -54928,6 +55055,439 @@ app.get('/api/animals', requireUserId, async (req, res) => {
     });
   }
 });
+// ============================================================
+//                    API: FOLLOWERS LIST
+// ============================================================
+
+function followerListSexDisplaySrv(a = {}) {
+  const raw = animalListStrSrv(
+    a.sex ||
+    a.gender ||
+    a.followerSex
+  );
+
+  if (/female|أنث|انث/i.test(raw)) {
+    return "أنثى";
+  }
+
+  if (/male|ذكر/i.test(raw)) {
+    return "ذكر";
+  }
+
+  return raw || "---";
+}
+
+function followerListStatusDisplaySrv(a = {}) {
+  const direct = animalListStrSrv(
+    a.followerStatus ||
+    a.reproductiveStatus
+  );
+
+  const genericStatus =
+    animalListStrSrv(a.status);
+
+  if (direct) {
+    return direct;
+  }
+
+  if (
+    genericStatus &&
+    ![
+      "active",
+      "inactive"
+    ].includes(
+      genericStatus.toLowerCase()
+    )
+  ) {
+    return genericStatus;
+  }
+
+  return "---";
+}
+
+function followerListBuildRowSrv(
+  a = {},
+  todayISO = ""
+) {
+  const animalNumber =
+    animalListNumberTextSrv(a);
+
+  const typeEn =
+    animalListTypeEnSrv(a);
+
+  const birthDate =
+    animalListIsoDateSrv(a.birthDate);
+
+  const lastInseminationDate =
+    animalListIsoDateSrv(
+      a.lastInseminationDate
+    );
+
+  const reproductiveStatus =
+    animalListStrSrv(
+      a.reproductiveStatus
+    );
+
+  const damNumber =
+    animalListStrSrv(a.damNumber);
+
+  const damReferenceStatus =
+    animalListStrSrv(
+      a.damReferenceStatus
+    );
+
+  const pregnancyDays =
+    reproductiveStatus === "عشار" &&
+    lastInseminationDate
+      ? animalListDaysDisplaySrv(
+          lastInseminationDate,
+          todayISO
+        )
+      : reproductiveStatus === "عشار"
+        ? animalListNumDisplaySrv(
+            a.pregnancyDays
+          )
+        : "---";
+
+  const damDisplay =
+    damNumber ||
+    (
+      damReferenceStatus === "deceased"
+        ? "نافقة — الرقم غير متاح"
+        : "غير معروفة"
+    );
+
+  return {
+    id: a.id || null,
+
+    animalNumber,
+
+    animalTypeAr:
+      animalListTypeArSrv(a),
+
+    animaltype: typeEn,
+
+    rowClass:
+      typeEn === "cow"
+        ? "mbk-row-cow"
+        : typeEn === "buffalo"
+          ? "mbk-row-buffalo"
+          : "",
+
+    breed:
+      animalListBreedDisplaySrv(
+        a.breed
+      ),
+
+    sex:
+      followerListSexDisplaySrv(a),
+
+    followerStatus:
+      followerListStatusDisplaySrv(a),
+
+    reproductiveStatus:
+      reproductiveStatus || "---",
+
+    ageDays:
+      birthDate
+        ? animalListDaysDisplaySrv(
+            birthDate,
+            todayISO
+          )
+        : "---",
+
+    pregnancyDays,
+
+    birthDate:
+      birthDate || "---",
+
+    damNumber:
+      damDisplay,
+
+    fatherNumber:
+      animalListStrSrv(
+        a.fatherNumber ||
+        a.sireNumber
+      ) || "---",
+
+    lastInseminationDate:
+      lastInseminationDate || "---",
+
+    inseminationSireNumber:
+      animalListStrSrv(
+        a.inseminationSireNumber
+      ) || "---",
+
+    cardUrl:
+      animalNumber
+        ? `calf-card.html?number=${encodeURIComponent(animalNumber)}`
+        : "",
+
+    eventUrl:
+      animalNumber
+        ? (
+            `add-event.html?animalId=${encodeURIComponent(animalNumber)}` +
+            `&number=${encodeURIComponent(animalNumber)}` +
+            `&animalNumber=${encodeURIComponent(animalNumber)}` +
+            `&eventDate=${encodeURIComponent(todayISO)}` +
+            `&date=${encodeURIComponent(todayISO)}`
+          )
+        : ""
+  };
+}
+
+async function followerListFetchFirestoreSrv(uid) {
+  const byId = new Map();
+
+  for (
+    const ownerField of [
+      "userId",
+      "ownerUid"
+    ]
+  ) {
+    try {
+      const snap =
+        await db
+          .collection("calves")
+          .where(
+            ownerField,
+            "==",
+            uid
+          )
+          .limit(3000)
+          .get();
+
+      snap.docs.forEach(d => {
+        if (!byId.has(d.id)) {
+          byId.set(
+            d.id,
+            {
+              id: d.id,
+              ...(d.data() || {})
+            }
+          );
+        }
+      });
+
+    } catch (e) {
+      console.warn(
+        "follower-list owner query failed:",
+        ownerField,
+        e.code ||
+        e.message ||
+        e
+      );
+    }
+  }
+
+  return Array.from(
+    byId.values()
+  );
+}
+
+function followerListApplyFiltersSrv(
+  rows = [],
+  query = {}
+) {
+  const searchNumber =
+    normalizeDigitsSrv(
+      query.searchNumber ||
+      query.number ||
+      query.q ||
+      ""
+    );
+
+  const type =
+    animalListStrSrv(
+      query.type ||
+      query.animalTypeAr ||
+      ""
+    );
+
+  const sex =
+    animalListStrSrv(
+      query.sex || ""
+    );
+
+  const status =
+    animalListStrSrv(
+      query.status ||
+      query.followerStatus ||
+      ""
+    );
+
+  return rows.filter(a => {
+    if (
+      searchNumber &&
+      !String(
+        a.animalNumber || ""
+      ).includes(searchNumber)
+    ) {
+      return false;
+    }
+
+    if (
+      type &&
+      animalListStrSrv(
+        a.animalTypeAr
+      ) !== type
+    ) {
+      return false;
+    }
+
+    if (
+      sex &&
+      animalListStrSrv(
+        a.sex
+      ) !== sex
+    ) {
+      return false;
+    }
+
+    if (
+      status &&
+      animalListStrSrv(
+        a.followerStatus
+      ) !== status
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+app.get(
+  "/api/followers",
+  requireUserId,
+  async (req, res) => {
+    const uid = req.userId;
+    const todayISO = cairoTodayISO();
+
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error: "firestore_disabled",
+          message:
+            "تعذّر تحميل قائمة التوابع الآن."
+        });
+      }
+
+      const rawFollowers =
+        await followerListFetchFirestoreSrv(
+          uid
+        );
+
+      const activeRows =
+        rawFollowers
+          .filter(
+            animalListIsActiveSrv
+          )
+          .map(a =>
+            followerListBuildRowSrv(
+              a,
+              todayISO
+            )
+          )
+          .filter(
+            a => a.animalNumber
+          );
+
+      const typeOptions = [
+        ...new Set(
+          activeRows
+            .map(
+              a => a.animalTypeAr
+            )
+            .filter(Boolean)
+        )
+      ].sort(
+        (a, b) =>
+          a.localeCompare(
+            b,
+            "ar"
+          )
+      );
+
+      const sexOptions = [
+        ...new Set(
+          activeRows
+            .map(a => a.sex)
+            .filter(
+              v =>
+                v &&
+                v !== "---"
+            )
+        )
+      ].sort(
+        (a, b) =>
+          a.localeCompare(
+            b,
+            "ar"
+          )
+      );
+
+      const statusOptions = [
+        ...new Set(
+          activeRows
+            .map(
+              a =>
+                a.followerStatus
+            )
+            .filter(
+              v =>
+                v &&
+                v !== "---"
+            )
+        )
+      ].sort(
+        (a, b) =>
+          a.localeCompare(
+            b,
+            "ar"
+          )
+      );
+
+      const followers =
+        followerListApplyFiltersSrv(
+          activeRows,
+          req.query
+        ).sort(
+          animalListSortSrv
+        );
+
+      return res.json({
+        ok: true,
+        today: todayISO,
+        count:
+          followers.length,
+        totalActive:
+          activeRows.length,
+        typeOptions,
+        sexOptions,
+        statusOptions,
+        followers
+      });
+
+    } catch (e) {
+      console.error(
+        "followers fatal error:",
+        e
+      );
+
+      return res
+        .status(500)
+        .json({
+          ok: false,
+          error:
+            "followers_fatal",
+          message:
+            "تعذّر تحميل قائمة التوابع الآن."
+        });
+    }
+  }
+);
 // ===== Helper: compute eventDate from any shape =====
 function computeEventDateFromDoc(data = {}) {
   // 1) قيم جاهزة بصيغة YYYY-MM-DD
@@ -55838,8 +56398,32 @@ function hasWeaningEventGroupSrv(an = {}) {
   return an?._hasWeaningEvent === true;
 }
 
+function hasPassedWeaningStageGroupSrv(an = {}) {
+  if (hasWeaningEventGroupSrv(an)) {
+    return true;
+  }
+
+  const stage = String(
+    an?.followerStatus ||
+    an?.status ||
+    ""
+  ).trim();
+
+  return [
+    "فطام",
+    "نامي",
+    "تحت التلقيح",
+    "ملقح",
+    "ملقحة",
+    "عشار"
+  ].includes(stage);
+}
+
 function isInfantGroupSrv(an = {}) {
-  return !hasCalvedBeforeGroupSrv(an) && !hasWeaningEventGroupSrv(an);
+  return (
+    !hasCalvedBeforeGroupSrv(an) &&
+    !hasPassedWeaningStageGroupSrv(an)
+  );
 }
 
 function isCloseUpGroupSrv(an = {}) {
@@ -55895,12 +56479,23 @@ function milkBandGroupSrv(an = {}, milk = 0, thresholds = {}) {
 
 function isWeanedGroupSrv(an = {}, sp = 'cow', thresholds = {}) {
   const m = getAgeMonthsSrv(an), c = ageCfgGroupSrv(sp, thresholds);
-  return !hasCalvedBeforeGroupSrv(an) && hasWeaningEventGroupSrv(an) && m <= c.weanedMax;
+
+  return (
+    !hasCalvedBeforeGroupSrv(an) &&
+    hasPassedWeaningStageGroupSrv(an) &&
+    m <= c.weanedMax
+  );
 }
 
 function isGrowingGroupSrv(an = {}, sp = 'cow', thresholds = {}) {
   const m = getAgeMonthsSrv(an), c = ageCfgGroupSrv(sp, thresholds);
-  return !hasCalvedBeforeGroupSrv(an) && hasWeaningEventGroupSrv(an) && m > c.weanedMax && m <= c.growingMax;
+
+  return (
+    !hasCalvedBeforeGroupSrv(an) &&
+    hasPassedWeaningStageGroupSrv(an) &&
+    m > c.weanedMax &&
+    m <= c.growingMax
+  );
 }
 function groupMilkMetricAllowedSrv(groupId, def = {}) {
   const key = String(def?.baseKey || def?.groupKey || groupId || "").trim();
@@ -55990,8 +56585,21 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
 
     g[pref + 'all'].push(an);
 
-    if (isMaleSrv(an)) {
+        if (isMaleSrv(an)) {
       g[pref + 'males'].push(an);
+
+      if (isInfantGroupSrv(an)) {
+        g[pref + 'suckling'].push(an);
+      } else if (
+        isWeanedGroupSrv(an, sp, thresholds)
+      ) {
+        g[pref + 'weaned'].push(an);
+      } else if (
+        isGrowingGroupSrv(an, sp, thresholds)
+      ) {
+        g[pref + 'growing'].push(an);
+      }
+
       continue;
     }
 
@@ -56023,7 +56631,7 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
 
   // العجلات لا تدخل ملقحة/عشار إلا بعد سن التلقيح.
   // افتراضيًا: نهاية النامي 12 شهر، إذن بداية تحت التلقيح من 13 شهر.
-  if (hasWeaningEventGroupSrv(an) && m > c.growingMax) {
+   if (hasPassedWeaningStageGroupSrv(an) && m > c.growingMax) {
     g[pref + 'pregHeifers'].push(an);
     continue;
   }
@@ -56037,7 +56645,7 @@ if (isGrowingGroupSrv(an, sp, thresholds)) { g[pref + 'growing'].push(an); conti
 
 if (
   !hasCalvedBeforeGroupSrv(an) &&
-  hasWeaningEventGroupSrv(an) &&
+  hasPassedWeaningStageGroupSrv(an) &&
   !isPregnantGroupSrv(an) &&
   isBreedingStatusGroupSrv(an) &&
   m > c.growingMax
@@ -56046,7 +56654,7 @@ if (
   continue;
 }
 
-if (!hasCalvedBeforeGroupSrv(an) && hasWeaningEventGroupSrv(an) && !isPregnantGroupSrv(an) && m > c.growingMax) {
+if (!hasCalvedBeforeGroupSrv(an) && hasPassedWeaningStageGroupSrv(an) && !isPregnantGroupSrv(an) && m > c.growingMax) {
   g[pref + 'heiferOpen'].push(an);
   continue;
 }
