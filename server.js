@@ -3216,9 +3216,12 @@ app.post("/api/add-animal/save", requireUserId, async (req, res) => {
       animalId: ref.id,
       animalNumber: numberStr,
       number: numberStr,
-      entryType: payload.entryType,
+            entryType: payload.entryType,
       collection: collectionName,
-      redirectUrl: `add-event.html?number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(addAnimalTodaySrv())}`
+      redirectUrl:
+        payload.entryType === "followers"
+          ? "follower-list.html"
+          : `add-event.html?number=${encodeURIComponent(numberStr)}&date=${encodeURIComponent(addAnimalTodaySrv())}`
     });
 
   } catch (e) {
