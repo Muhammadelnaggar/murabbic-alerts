@@ -3419,6 +3419,124 @@ function addAnimalImportRowsFromBodySrv(body = {}) {
 
   return addAnimalImportParseUploadedFileSrv(body);
 }
+function herdImportV2TemplateErrorSrv(message) {
+  const err = new Error("herd_import_v2_template_invalid");
+
+  err.status = 400;
+  err.code = "herd_import_v2_template_invalid";
+  err.publicMessage = message;
+
+  return err;
+}
+
+function herdImportV2ParseApprovedTemplateSrv(body = {}) {
+  const fileName = String(
+    body.fileName ||
+    body.filename ||
+    ""
+  ).toLowerCase().trim();
+
+  const fileBase64 = String(
+    body.fileBase64 ||
+    body.base64 ||
+    ""
+  ).trim();
+
+  if (!fileName.endsWith(".xlsx") || !fileBase64) {
+    throw herdImportV2TemplateErrorSrv(
+      "❌ استخدم ملف Excel بصيغة XLSX من قالب مُرَبِّيك المعتمد."
+    );
+  }
+
+  const buf =
+    addAnimalImportDecodeBase64Srv(
+      fileBase64
+    );
+
+  if (!buf.length) {
+    throw herdImportV2TemplateErrorSrv(
+      "❌ تعذّرت قراءة ملف القالب. حمّل قالب مُرَبِّيك من الصفحة ثم أعد تعبئته."
+    );
+  }
+
+  const XLSX = require("xlsx");
+
+  const wb = XLSX.read(
+    buf,
+    {
+      type: "buffer"
+    }
+  );
+
+  const hasMothersSheet =
+    (wb.SheetNames || []).includes(
+      "الأمهات"
+    );
+
+  const hasFollowersSheet =
+    (wb.SheetNames || []).includes(
+      "التوابع"
+    );
+
+  if (
+    !hasMothersSheet ||
+    !hasFollowersSheet
+  ) {
+    throw herdImportV2TemplateErrorSrv(
+      "❌ الملف لا يطابق قالب مُرَبِّيك المعتمد. يجب أن يحتوي على شيت «الأمهات» وشيت «التوابع»."
+    );
+  }
+
+  const readSheetRows = (
+    sheetName,
+    entryType
+  ) => {
+    const sheet =
+      wb.Sheets[sheetName];
+
+    if (!sheet) return [];
+
+    const jsonRows =
+      XLSX.utils.sheet_to_json(
+        sheet,
+        {
+          defval: "",
+          raw: false
+        }
+      );
+
+    const rows =
+      addAnimalImportNormalizeSheetRowsSrv(
+        jsonRows
+      );
+
+    for (const row of rows) {
+      Object.defineProperty(
+        row,
+        "__murabbikEntryType",
+        {
+          value: entryType,
+          enumerable: false,
+          configurable: false
+        }
+      );
+    }
+
+    return rows;
+  };
+
+  return [
+    ...readSheetRows(
+      "الأمهات",
+      "mothers"
+    ),
+
+    ...readSheetRows(
+      "التوابع",
+      "followers"
+    )
+  ];
+}
 function addAnimalImportKindSrv(body = {}) {
   const raw = addAnimalStrSrv(
     body.importKind ||
@@ -4440,27 +4558,36 @@ const HERD_IMPORT_V2_SOURCE_SIGNATURES = {
 
   arabic_excel: {
     name: "Arabic Excel / manual farm sheet",
+
     requiredGroups: [
       "animalNumber",
-      "lastCalvingDate",
-      "daysInMilk",
-      "dailyMilk",
-      "reproductiveStatus",
-      "lastInseminationDate"
+      "animalType",
+      "breed",
+      "birthDate"
     ],
     groups: {
       animalNumber: ["رقم الحيوان", "رقم", "رقم البقرة", "رقم الجاموسة", "رقم الأذن", "رقم الاذن"],
       animalType: ["نوع الحيوان", "النوع", "الفصيلة"],
       breed: ["السلالة", "سلالة"],
       birthDate: ["تاريخ الميلاد", "ميلاد"],
-      lactationNumber: ["رقم الموسم", "الموسم", "موسم الحليب"],
+            lactationNumber: [
+        "رقم الموسم",
+        "الموسم",
+        "موسم الحليب",
+        "رقم موسم الحليب الحالي"
+      ],
       productionStatus: ["الحالة الإنتاجية", "الحالة الانتاجية", "حالة الإنتاج", "حالة الانتاج"],
       reproductiveStatus: ["الحالة التناسلية", "الحاله التناسليه", "حالة الحمل"],
       lastCalvingDate: ["تاريخ آخر ولادة", "تاريخ اخر ولادة", "آخر ولادة", "اخر ولادة"],
       daysInMilk: ["أيام الحليب", "ايام الحليب", "أيام اللبن", "ايام اللبن", "DIM"],
       dailyMilk: ["إنتاج اللبن", "انتاج اللبن", "إنتاج اللبن اليومي", "لبن", "حليب"],
       lastInseminationDate: ["تاريخ آخر تلقيح", "تاريخ اخر تلقيح", "آخر تلقيح", "اخر تلقيح"],
-      servicesCount: ["عدد التلقيحات", "عدد مرات التلقيح", "مرات التلقيح"],
+           servicesCount: [
+        "عدد التلقيحات",
+        "عدد مرات التلقيح",
+        "مرات التلقيح",
+        "عدد مرات التلقيح (الموسم الحالي)"
+      ],
       sireNumber: ["الطلوقة", "رقم الطلوقة", "كود السائل", "كود السائل المنوي"],
       timeBred: ["وقت التلقيح", "توقيت التلقيح", "فترة التلقيح"],
       heatDate: ["تاريخ الشياع", "تاريخ الشبق", "آخر شياع", "اخر شياع"],
@@ -4628,8 +4755,15 @@ function herdImportV2MergeProfilePatchSrv(profileKey, patch = {}) {
       "الأم",
       "الام",
       "ام",
-      "أم"
+           "أم"
     ],
+
+    damReferenceStatus: [
+      "damReferenceStatus",
+      "بيانات الأم",
+      "بيانات الام"
+    ],
+
     fatherNumber: [
   "fatherNumber",
   "birthSireNumber",
@@ -4647,7 +4781,8 @@ function herdImportV2MergeProfilePatchSrv(profileKey, patch = {}) {
 followerInseminationSireNumber: [
   "followerSireNumber",
   "inseminationSireNumber",
-  "lastInseminationSireNumber",
+    "lastInseminationSireNumber",
+  "رقم طلوقة آخر تلقيح",
   "كود سائل تلقيح التابع",
   "طلوقة تلقيح التابع"
 ],
@@ -4670,7 +4805,8 @@ followerInseminationSireNumber: [
       "Follower Status",
       "Calf Status",
       "Youngstock Status",
-      "Heifer Status",
+           "Heifer Status",
+      "الحالة الحالية",
       "حالة التابع",
       "حالة العجل",
       "حالة العجلة",
@@ -5251,7 +5387,42 @@ function herdImportV2InferAnimalTypeFromBreedInternalSrv(breedRaw) {
 
   return "";
 }
+function herdImportV2NormalizeDamReferenceStatusInternalSrv(v) {
+  const normalized =
+    addAnimalImportNormKeySrv(v);
+
+  if (!normalized) return "";
+
+  if (
+    normalized === "deceased" ||
+    normalized.includes("نافق") ||
+    normalized.includes("متوفي")
+  ) {
+    return "deceased";
+  }
+
+  if (
+    normalized === "unknown" ||
+    normalized.includes("غيرمعروف") ||
+    normalized.includes("مجهول")
+  ) {
+    return "unknown";
+  }
+
+  if (
+    normalized === "known" ||
+    normalized.includes("معروف")
+  ) {
+    return "known";
+  }
+
+  return "";
+}
 function herdImportV2BuildAnimalBaselineOneInternalSrv(row = {}, rowIndex = 0, columnMapInternal = {}, options = {}) {
+    const explicitEntryType =
+    addAnimalStrSrv(
+      row.__murabbikEntryType
+    );
   const rawAnimalNumber = herdImportV2FirstValueByCanonicalInternalSrv(
     row,
     columnMapInternal,
@@ -5291,9 +5462,36 @@ const animalType = addAnimalStrSrv(rawAnimalType)
               : ""
           )
     );
-  const damNumber = addAnimalDigitsSrv(
-  herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "damNumber")
+    const damNumber = addAnimalDigitsSrv(
+  herdImportV2FirstValueByCanonicalInternalSrv(
+    row,
+    columnMapInternal,
+    "damNumber"
+  )
 );
+
+const rawDamReferenceStatus =
+  herdImportV2FirstValueByCanonicalInternalSrv(
+    row,
+    columnMapInternal,
+    "damReferenceStatus"
+  );
+
+const normalizedDamReferenceStatus =
+  herdImportV2NormalizeDamReferenceStatusInternalSrv(
+    rawDamReferenceStatus
+  );
+
+const damReferenceStatus =
+  normalizedDamReferenceStatus ||
+  (
+    addAnimalStrSrv(
+      rawDamReferenceStatus
+    )
+      ? "__invalid__"
+      : "__missing__"
+  );
+
 const fatherNumber = String(
   herdImportV2FirstValueByCanonicalInternalSrv(
     row,
@@ -5388,8 +5586,9 @@ if (
     rowIndex: rowIndex + 1,
     animalNumber,
     animalType,
-    entryType: "mothers",
+    entryType: explicitEntryType,
     damNumber,
+    damReferenceStatus,
     fatherNumber,
     followerInseminationSireNumber,
     followerSex,
@@ -5423,7 +5622,11 @@ animalStatus
     reproductiveStatus,
     pdResult
   });
- base.entryType = herdImportV2InferEntryTypeInternalSrv(base);
+ base.entryType =
+  explicitEntryType === "mothers" ||
+  explicitEntryType === "followers"
+    ? explicitEntryType
+    : "";
 
 if (base.entryType === "followers") {
     base.followerStatus = herdImportV2InferFollowerStatusInternalSrv(base);
@@ -5452,9 +5655,32 @@ if (base.entryType === "mothers") {
 }
 
 const reviewReasons = [];
-  if (!base.animalNumber) reviewReasons.push("missing_animal_number");
-  if (!base.animalType) reviewReasons.push("missing_animal_type");
-  if (base.animalStatus && base.animalStatus !== "active") reviewReasons.push("not_active_animal");
+    if (!base.animalNumber) {
+    reviewReasons.push(
+      "missing_animal_number"
+    );
+  }
+
+  if (!base.animalType) {
+    reviewReasons.push(
+      "missing_animal_type"
+    );
+  }
+
+  if (!base.entryType) {
+    reviewReasons.push(
+      "invalid_template_sheet"
+    );
+  }
+
+  if (
+    base.animalStatus &&
+    base.animalStatus !== "active"
+  ) {
+    reviewReasons.push(
+      "not_active_animal"
+    );
+  }
 
   const herdNeedsSireNumber =
     base.entryType === "mothers" &&
@@ -5468,13 +5694,53 @@ const reviewReasons = [];
     reviewReasons.push("missing_sire_number");
   }
 
-  if (base.entryType === "followers") {
+   if (base.entryType === "followers") {
   if (
     !base.birthDate ||
     !base.followerSex ||
-    !herdImportV2InferFollowerStatusInternalSrv(base)
+    !herdImportV2InferFollowerStatusInternalSrv(
+      base
+    )
   ) {
-    reviewReasons.push("weak_follower_identity");
+    reviewReasons.push(
+      "weak_follower_identity"
+    );
+  }
+
+  if (
+    base.damReferenceStatus ===
+    "__missing__"
+  ) {
+    reviewReasons.push(
+      "missing_dam_reference_status"
+    );
+  }
+
+  if (
+    base.damReferenceStatus ===
+    "__invalid__"
+  ) {
+    reviewReasons.push(
+      "invalid_dam_reference_status"
+    );
+  }
+
+  if (
+    base.damReferenceStatus === "known" &&
+    !base.damNumber
+  ) {
+    reviewReasons.push(
+      "missing_dam_number"
+    );
+  }
+
+  if (
+    base.damReferenceStatus !== "known" &&
+    base.damNumber
+  ) {
+    reviewReasons.push(
+      "unexpected_dam_number"
+    );
   }
 } else if (
   !base.lastCalvingDate &&
@@ -5561,7 +5827,39 @@ function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapI
   const duplicateNumbers = new Set();
 
   for (let i = 0; i < rows.length; i++) {
-    const item = herdImportV2BuildAnimalBaselineOneInternalSrv(rows[i], i, columnMapInternal, options);
+       const item =
+      herdImportV2BuildAnimalBaselineOneInternalSrv(
+        rows[i],
+        i,
+        columnMapInternal,
+        options
+      );
+
+    const gate =
+      herdImportV2GateDecisionInternalSrv(
+        item.base
+      );
+
+    if (!gate.ok) {
+      item.ok = false;
+
+      item.gateMessage =
+        gate.guardMessage ||
+        Object.values(
+          gate.fieldErrors || {}
+        )[0] ||
+        "❌ راجع الحقول المطلوبة لهذا الحيوان.";
+
+      if (
+        !item.reviewReasons.includes(
+          "gate_validation_failed"
+        )
+      ) {
+        item.reviewReasons.push(
+          "gate_validation_failed"
+        );
+      }
+    }
 
     if (item.base.animalNumber) {
       if (seenNumbers.has(item.base.animalNumber)) {
@@ -5615,10 +5913,35 @@ function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapI
   missing_animal_number: "رقم الحيوان غير موجود.",
   missing_animal_type: "نوع الحيوان غير محدد.",
   not_active_animal: "الحيوان غير نشط في الملف.",
-  missing_sire_number: "كود السائل المنوي غير موجود للحيوان الملقح أو العشار.",
-  weak_follower_identity: "بيانات التابع تحتاج رقم الأم وتاريخ الميلاد.",
-  weak_current_state: "بيانات الحالة الحالية للحيوان غير مكتملة.",
-  duplicate_in_file: "رقم الحيوان مكرر داخل الملف."
+    missing_sire_number:
+    "كود السائل المنوي غير موجود للحيوان الملقح أو العشار.",
+
+  weak_follower_identity:
+    "بيانات التابع تحتاج تاريخ الميلاد والجنس والحالة الحالية.",
+
+  missing_dam_reference_status:
+    "اختر حالة بيانات الأم.",
+
+  invalid_dam_reference_status:
+    "قيمة بيانات الأم غير صحيحة.",
+
+  missing_dam_number:
+    "رقم الأم مطلوب عندما تكون الأم معروفة.",
+
+  unexpected_dam_number:
+    "اترك رقم الأم فارغًا عندما تكون بيانات الأم غير معروفة أو رقمها غير متاح.",
+
+  invalid_template_sheet:
+    "تعذّر تحديد شيت الحيوان داخل القالب.",
+
+  gate_validation_failed:
+    "الصف لا يطابق شروط إضافة الحيوان.",
+
+  weak_current_state:
+    "بيانات الحالة الحالية للحيوان غير مكتملة.",
+
+  duplicate_in_file:
+    "رقم الحيوان مكرر داخل الملف."
 };
   return {
     animalsInternal: built.map(x => x.base),
@@ -5660,7 +5983,10 @@ function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapI
     message:
       item.ok === true
         ? "✅ الحيوان جاهز للاستيراد."
-        : `❌ ${reasons.join(" ")}`
+        : (
+            item.gateMessage ||
+            `❌ ${reasons.join(" ")}`
+          )
   };
 }),
     readyForSavePreview: rows.length > 0 && readyAnimalsCount > 0 && needsReviewCount === 0
@@ -5818,7 +6144,7 @@ function herdImportV2FormDataInternalSrv(base = {}) {
         birthDate: base.birthDate,
         damNumber: base.damNumber,
         damReferenceStatus:
-          base.damNumber ? "known" : "unknown",
+        base.damReferenceStatus,
         fatherNumber: base.fatherNumber,
         weaningDate: base.weaningDate,
         followerLastInseminationDate: base.lastInseminationDate,
@@ -6202,38 +6528,48 @@ app.get("/api/herd-import-v2/guide", requireUserId, (req, res) => {
   return res.json({
     ok: true,
     title: "كيف أجهّز ملف الاستيراد؟",
-    intro: "ضع عناوين الأعمدة في الصف الأول، واجعل كل صف بعده خاصًا بحيوان واحد.",
+
+    intro:
+      "استخدم قالب مُرَبِّيك كما هو، واكتب الأمهات في شيت «الأمهات» والتوابع في شيت «التوابع».",
 
     sections: [
       {
-        title: "البيانات الأساسية",
+        title: "شيت الأمهات",
+
         items: [
-          "أدخل رقم الحيوان والسلالة.",
-          "أدخل نوع الحيوان: بقرة أو جاموسة، أو اختر نوع القطيع من الصفحة إذا كان الملف كله من نوع واحد."
+          "أدخل البيانات الأساسية والحالتين الإنتاجية والتناسلية لكل أم.",
+
+          "إذا كانت الأم حلابًا، أدخل إنتاج اللبن اليومي.",
+
+          "إذا كانت ملقحة أو عشارًا، أدخل تاريخ آخر تلقيح ورقم الطلوقة."
         ]
       },
+
       {
-        title: "الأعمدة التشغيلية",
+        title: "شيت التوابع",
+
         items: [
-          "احتفظ بعناوين: تاريخ آخر ولادة، أيام الحليب، إنتاج اللبن، الحالة التناسلية، وتاريخ آخر تلقيح، حتى لو كانت بعض القيم لا تنطبق على كل الحيوانات.",
-          "استخدم في الحالة التناسلية: مفتوحة، ملقحة، أو عشار."
+          "أدخل البيانات الأساسية والجنس والحالة الحالية وبيانات الأم لكل تابع.",
+
+          "أدخل رقم الأم فقط عندما تكون الأم معروفة.",
+
+          "إذا كانت الحالة فطامًا، أدخل تاريخ الفطام.",
+
+          "إذا كانت العجلة ملقحة أو عشارًا، أدخل تاريخ آخر تلقيح ورقم طلوقة آخر تلقيح."
         ]
       },
-      {
-        title: "حسب حالة الحيوان",
-        items: [
-          "الحيوان الحلاب: أدخل إنتاج اللبن اليومي.",
-          "الحيوان الملقح أو العشار: أدخل تاريخ آخر تلقيح وكود السائل المنوي أو رقم الطلوقة.",
-          "الحيوان الجاف: أضف تاريخ التجفيف إذا كان معروفًا."
-        ]
-      },
+
       {
         title: "قواعد مهمة",
+
         items: [
-          "ضع البيانات في أول ورقة داخل الملف.",
+          "لا تغيّر اسمي شيت «الأمهات» و«التوابع» أو عناوين الأعمدة.",
+
+          "اكتب كل حيوان في صف مستقل بدءًا من الصف الثاني.",
+
           "اكتب التواريخ بصيغة YYYY-MM-DD.",
-          "لا تكرر رقم الحيوان داخل الملف أو مع حيوان مسجل بالفعل.",
-          "نفّذ المعاينة الذكية، ثم عالج أي صف مرفوض قبل الحفظ."
+
+          "لا تكرر رقم الحيوان داخل الشيتين أو مع حيوان مسجل بالفعل."
         ]
       }
     ]
@@ -6242,7 +6578,10 @@ app.get("/api/herd-import-v2/guide", requireUserId, (req, res) => {
 app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
   try {
     const body = req.body || {};
-    const rows = addAnimalImportRowsFromBodySrv(body);
+       const rows =
+      herdImportV2ParseApprovedTemplateSrv(
+        body
+      );
 
     if (!rows.length) {
       return res.status(400).json({
@@ -6357,16 +6696,30 @@ baselineSummary: {
 }
 });
 
-  } catch (e) {
-    console.error("herd-import-v2-source-preview failed", e);
+   } catch (e) {
+    console.error(
+      "herd-import-v2-source-preview failed",
+      e
+    );
 
-    return res.status(500).json({
-      ok: false,
-      error: "herd_import_v2_source_preview_failed",
-      message: "تعذّر تحليل مصدر ملف القطيع الآن.",
-      sourceProfile: null,
-      headers: []
-    });
+    return res
+      .status(
+        Number(e?.status) || 500
+      )
+      .json({
+        ok: false,
+
+        error:
+          e?.code ||
+          "herd_import_v2_source_preview_failed",
+
+        message:
+          e?.publicMessage ||
+          "تعذّر تحليل مصدر ملف القطيع الآن.",
+
+        sourceProfile: null,
+        headers: []
+      });
   }
 });
 app.post("/api/herd-import-v2/save-operational", requireUserId, async (req, res) => {
@@ -6381,7 +6734,10 @@ app.post("/api/herd-import-v2/save-operational", requireUserId, async (req, res)
 
     const uid = req.userId;
     const body = req.body || {};
-    const rows = addAnimalImportRowsFromBodySrv(body);
+        const rows =
+      herdImportV2ParseApprovedTemplateSrv(
+        body
+      );
 
     if (!rows.length) {
       return res.status(400).json({
@@ -6587,14 +6943,27 @@ if (gate.formData.entryType === "followers") {
       }
     });
 
-  } catch (e) {
-    console.error("herd-import-v2-save-operational failed", e);
+    } catch (e) {
+    console.error(
+      "herd-import-v2-save-operational failed",
+      e
+    );
 
-    return res.status(500).json({
-      ok: false,
-      error: "herd_import_v2_save_operational_failed",
-      message: "تعذّر استيراد القطيع تشغيليًا الآن."
-    });
+    return res
+      .status(
+        Number(e?.status) || 500
+      )
+      .json({
+        ok: false,
+
+        error:
+          e?.code ||
+          "herd_import_v2_save_operational_failed",
+
+        message:
+          e?.publicMessage ||
+          "تعذّر استيراد القطيع تشغيليًا الآن."
+      });
   }
 });
 // ============================================================
