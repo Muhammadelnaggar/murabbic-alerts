@@ -52,28 +52,27 @@
   <span class="system-active">Excel عربي</span>
 </div>
 
-  <label for="herdFile">ملف القطيع Excel / CSV</label>
-  <input id="herdFile" type="file" accept=".xlsx,.xls,.csv,.txt" />
+   <label for="herdFile">ملف قالب مُرَبِّيك المعتمد (.xlsx)</label>
+  <input id="herdFile" type="file" accept=".xlsx" />
 
-  <div id="defaultAnimalTypeBox" class="hidden-block">
-    <label for="defaultAnimalType">نوع القطيع</label>
-    <select id="defaultAnimalType">
-      <option value="">اختر النوع</option>
-      <option value="بقرة">أبقار</option>
-      <option value="جاموسة">جاموس</option>
-    </select>
-    <div class="hint">يظهر هذا الاختيار فقط إذا لم يستطع مُرَبِّيك تحديد نوع الحيوان من الملف.</div>
+  <div class="actions-bar inline">
+    <a
+      href="/murabbik-herd-import-template.xlsx"
+      download="murabbik-herd-import-template.xlsx"
+      class="ghost"
+      style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;"
+    >
+      تحميل قالب مُرَبِّيك
+    </a>
+
+    <button id="btnGuide" type="button" class="ghost">
+      كيف أجهّز ملف الاستيراد؟
+    </button>
+
+    <button id="btnPreview" type="button" class="ghost">
+      معاينة ذكية
+    </button>
   </div>
-
-<div class="actions-bar inline">
-  <button id="btnGuide" type="button" class="ghost">
-    كيف أجهّز ملف الاستيراد؟
-  </button>
-
-  <button id="btnPreview" type="button" class="ghost">
-    معاينة ذكية
-  </button>
-</div>
 </section>
 
 <section id="importGuideBox" class="card" style="display:none;">
@@ -97,10 +96,7 @@
         <div id="rejectedRows" class="kpi-value">0</div>
         <div class="kpi-label">مرفوض</div>
       </div>
-      <div class="kpi-box">
-        <div id="archivedRows" class="kpi-value">0</div>
-       <div class="kpi-label">سجل الأحداث</div>
-      </div>
+     
     </div>
   </section>
 
@@ -153,8 +149,6 @@ async function loadServerSession(){
   const btnPreview = $("btnPreview");
   const btnSave = $("btnSave");
   const animalsListBtn = $("animalsListBtn");
-  const defaultAnimalTypeBox = $("defaultAnimalTypeBox");
-  const defaultAnimalType = $("defaultAnimalType");
   const summaryBox = $("summaryBox");
   const messageBox = $("messageBox");
   const resultsBox = $("resultsBox");
@@ -195,35 +189,17 @@ async function loadServerSession(){
 
 function setSummary(j){
   const baseline = j.baselineSummary || {};
-  const seeds = j.seedEventsSummary || {};
 
-  $("totalRows").textContent = baseline.totalRows ?? j.totalRows ?? 0;
-  $("readyRows").textContent = baseline.readyAnimalsCount ?? 0;
-  $("rejectedRows").textContent = baseline.needsReviewCount ?? 0;
-  $("archivedRows").textContent = seeds.totalSeedEventsCount ?? 0;
+  $("totalRows").textContent =
+    baseline.totalRows ?? j.totalRows ?? 0;
+
+  $("readyRows").textContent =
+    baseline.readyAnimalsCount ?? 0;
+
+  $("rejectedRows").textContent =
+    baseline.needsReviewCount ?? 0;
 
   summaryBox.style.display = "block";
-
-  rowsList.innerHTML = `
-    <div class="preview-row ${j.ok ? "status-ok" : "status-error"}">
-      <div><b>مصدر الملف:</b> ${j.sourceProfile?.name || "غير محدد"}</div>
-      <div><b>الثقة:</b> ${j.sourceProfile?.confidenceLevel || "-"}</div>
-      <div><b>حيوانات جاهزة:</b> ${baseline.readyAnimalsCount ?? 0}</div>
-      <div><b>تحتاج مراجعة:</b> ${baseline.needsReviewCount ?? 0}</div>
-      <div><b>سجل الأحداث:</b> ${seeds.totalSeedEventsCount ?? 0}</div>
-      <div><b>ولادات:</b> ${seeds.calvingEventsCount ?? 0}</div>
-      <div><b>تلقيحات:</b> ${seeds.inseminationEventsCount ?? 0}</div>
-      <div><b>تشخيص حمل:</b> ${seeds.pregnancyDiagnosisEventsCount ?? 0}</div>
-      <div><b>تجفيف:</b> ${seeds.dryOffEventsCount ?? 0}</div>
-      <div><b>شياع:</b> ${seeds.heatEventsCount ?? 0}</div>
-    </div>
-  `;
-
-    resultsBox.style.display = "block";
-
-  if (defaultAnimalTypeBox) {
-    defaultAnimalTypeBox.classList.toggle("hidden-block", !j.requiresDefaultAnimalType);
-  }
 }
 
 function renderRows(rows, j = {}) {
@@ -345,10 +321,7 @@ async function callHerdImport(path){
       "Content-Type": "application/json",
       "Accept": "application/json"
     },
-    body: JSON.stringify({
-      ...(lastFilePayload || {}),
-      defaultAnimalType: String(defaultAnimalType?.value || "").trim()
-    })
+       body: JSON.stringify(lastFilePayload || {})
   });
 
   const data = await r.json().catch(() => ({
@@ -400,14 +373,10 @@ async function callHerdImport(path){
         return;
       }
 
-    lastFilePayload = {
+lastFilePayload = {
   fileName: file.name,
   fileBase64: await fileToBase64(file)
 };
-
-if (defaultAnimalType && defaultAnimalType.value) {
-  lastFilePayload.defaultAnimalType = defaultAnimalType.value;
-}
 
       showMessage("جاري المعاينة من السيرفر...", "status-warn");
 
@@ -418,12 +387,10 @@ if (defaultAnimalType && defaultAnimalType.value) {
       setSummary(j);
       renderRows(j.previewAnimals || [], j);
      
-     lastPreviewOk = !!(
+lastPreviewOk = !!(
   j.ok &&
   j.baselineSummary &&
-  j.baselineSummary.readyForSavePreview &&
-  j.seedEventsSummary &&
-  j.seedEventsSummary.readyForSavePreview
+  j.baselineSummary.readyForSavePreview
 );
 
 btnSave.disabled = !lastPreviewOk;
