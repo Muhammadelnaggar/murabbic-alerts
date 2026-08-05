@@ -236,6 +236,50 @@ function renderRows(rows, j = {}) {
 
   resultsBox.style.display = "block";
 }
+ function renderEvents(events) {
+  if (
+    !Array.isArray(events) ||
+    !events.length
+  ) {
+    return;
+  }
+
+  const sectionTitle =
+    document.createElement("div");
+
+  sectionTitle.className =
+    "preview-row";
+
+  sectionTitle.innerHTML = `
+    <div><b>نتائج الأحداث</b></div>
+  `;
+
+  rowsList.appendChild(sectionTitle);
+
+  events.forEach(r => {
+    const item =
+      document.createElement("div");
+
+    item.className =
+      "preview-row " +
+      (
+        r.ok
+          ? "status-ok"
+          : "status-error"
+      );
+
+    item.innerHTML = `
+      <div><b>السطر:</b> ${r.row || "-"}</div>
+      <div><b>رقم الحيوان:</b> ${r.animalNumber || "غير موجود"}</div>
+      <div><b>نوع الحدث:</b> ${r.eventLabel || r.eventType || "-"}</div>
+      <div><b>تاريخ الحدث:</b> ${r.eventDate || "-"}</div>
+      <div><b>الحالة:</b> ${r.status || (r.ok ? "جاهز" : "مرفوض")}</div>
+      <div class="hint">${r.message || ""}</div>
+    `;
+
+    rowsList.appendChild(item);
+  });
+} 
 function renderImportGuide(j){
   importGuideTitle.textContent =
     j.title || "كيف أجهّز ملف الاستيراد؟";
@@ -385,7 +429,8 @@ lastFilePayload = {
       console.log("HERD PREVIEW:", j);
 
       setSummary(j);
-      renderRows(j.previewAnimals || [], j);
+renderRows(j.previewAnimals || [], j);
+renderEvents(j.previewEvents || []);
      
 lastPreviewOk = !!(
   j.ok &&
