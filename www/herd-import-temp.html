@@ -432,28 +432,42 @@ if (
   mothersCount > 0 &&
   followersCount > 0
 ) {
-  showMessage(
-    `✅ تم استيراد ${mothersCount} أم و${followersCount} تابع بنجاح. اختر القائمة التي تريد فتحها.`,
-    "status-ok"
-  );
+  messageBox.className = "infobar show success";
 
-  document.getElementById("pageBottomBar").innerHTML = `
-    <button
-      type="button"
-      class="mbk-bottom-btn mbk-bottom-btn-primary"
-      onclick="location.href='animal-list.html'"
-    >
-      عرض الأمهات (${mothersCount})
-    </button>
+  messageBox.innerHTML = `
+    <div style="font-weight:700; margin-bottom:8px;">
+      ✅ تم استيراد ${mothersCount} أم و${followersCount} تابع بنجاح.
+    </div>
 
-    <button
-      type="button"
-      class="mbk-bottom-btn mbk-bottom-btn-ghost"
-      onclick="location.href='follower-list.html'"
-    >
-      عرض التوابع (${followersCount})
-    </button>
+    <div style="margin-bottom:12px;">
+      اختر القائمة التي تريد فتحها:
+    </div>
+
+    <div class="actions-bar inline" style="margin-top:0;">
+      <button
+        type="button"
+        class="ghost"
+        onclick="location.href='animal-list.html'"
+      >
+        عرض الأمهات (${mothersCount})
+      </button>
+
+      <button
+        type="button"
+        class="ghost"
+        onclick="location.href='follower-list.html'"
+      >
+        عرض التوابع (${followersCount})
+      </button>
+    </div>
   `;
+
+  try {
+    messageBox.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+  } catch (_) {}
 
   return;
 }
