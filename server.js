@@ -3634,11 +3634,26 @@ function herdImportV2ParseApprovedEventsSheetSrv(
           ""
         );
 
-      const species =
+           const species =
         String(
           row.species ||
           row["نوع الحيوان"] ||
           row["الفصيلة"] ||
+          ""
+        ).trim();
+
+      const heatTime =
+        String(
+          row.heatTime ||
+          row["وقت الشياع"] ||
+          row["وقت ملاحظة الشياع"] ||
+          ""
+        ).trim();
+
+      const notes =
+        String(
+          row.notes ||
+          row["ملاحظات"] ||
           ""
         ).trim();
 
@@ -3670,11 +3685,23 @@ function herdImportV2ParseApprovedEventsSheetSrv(
 
         eventTypeNorm,
 
-        eventDate,
+               eventDate,
 
         ...(species
           ? {
               species
+            }
+          : {}),
+
+        ...(heatTime
+          ? {
+              heatTime
+            }
+          : {}),
+
+        ...(notes
+          ? {
+              notes
             }
           : {})
       };
@@ -7174,7 +7201,65 @@ async function herdImportV2PreviewEventsInternalSrv(
       savePath,
       bulkSavePath
     ] = route;
+          const heatTime =
+      String(
+        payload.heatTime || ""
+      ).trim();
 
+    if (
+      eventType === "heat" &&
+      ![
+        "صباحًا",
+        "مساءً"
+      ].includes(heatTime)
+    ) {
+      rejectedEventsCount++;
+
+      previewEvents.push({
+        row:
+          Number.isFinite(sourceRow)
+            ? sourceRow
+            : i + 1,
+
+        eventType,
+        eventLabel,
+
+        animalNumber:
+          String(
+            payload.animalNumber ||
+            payload.number ||
+            ""
+          ).trim(),
+
+        eventDate:
+          String(
+            payload.eventDate ||
+            payload.date ||
+            ""
+          ).trim(),
+
+                heatTime,
+
+        ok: false,
+        status: "مرفوض",
+
+        error:
+          heatTime
+            ? "heatTime_invalid"
+            : "heatTime_required",
+
+        message:
+          "❌ اختر وقت ملاحظة الشياع: صباحًا أو مساءً.",
+
+        gatePath,
+        savePath,
+
+        bulkSavePath:
+          bulkSavePath || null
+      });
+
+      continue;
+    }
     const gate =
       await herdImportV2CallOfficialGateInternalSrv(
         req,
@@ -7207,10 +7292,22 @@ async function herdImportV2PreviewEventsInternalSrv(
           ""
         ).trim(),
 
-      eventDate:
+           eventDate:
         String(
           payload.eventDate ||
           payload.date ||
+          ""
+        ).trim(),
+
+      heatTime:
+        String(
+          payload.heatTime ||
+          ""
+        ).trim(),
+
+      notes:
+        String(
+          payload.notes ||
           ""
         ).trim(),
 
