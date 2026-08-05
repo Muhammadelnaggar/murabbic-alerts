@@ -6575,6 +6575,544 @@ app.get("/api/herd-import-v2/guide", requireUserId, (req, res) => {
     ]
   });
 });
+// ============================================================
+// HERD IMPORT V2 - explicit events preview through official gates
+// لا حفظ هنا، ولا نسخ لمنطق الأحداث، ولا استخدام لمسار /api/events العام
+// ============================================================
+const HERD_IMPORT_V2_EVENT_ROUTES = Object.freeze({
+  calving: ["ولادة", "/api/calving/gate", "/api/calving/save"],
+
+  insemination: [
+    "تلقيح",
+    "/api/insemination/gate",
+    "/api/insemination/save",
+    "/api/insemination/bulk-save"
+  ],
+
+  pregnancy_diagnosis: [
+    "تشخيص حمل",
+    "/api/pregnancy-diagnosis/gate",
+    "/api/pregnancy-diagnosis/save",
+    "/api/pregnancy-diagnosis/bulk-save"
+  ],
+
+  uterine_check: [
+    "فحص الرحم",
+    "/api/uterine-check/gate",
+    "/api/uterine-check/save"
+  ],
+
+  disease: [
+    "مرض",
+    "/api/disease/gate",
+    "/api/disease/save"
+  ],
+
+  supernumerary_teat_removal: [
+    "إزالة الحلمات الزائدة",
+    "/api/supernumerary-teat-removal/gate",
+    "/api/supernumerary-teat-removal/save"
+  ],
+
+  dehorning: [
+    "إزالة القرون",
+    "/api/dehorning/gate",
+    "/api/dehorning/save"
+  ],
+
+  lameness: [
+    "عرج",
+    "/api/lameness/gate",
+    "/api/lameness/save"
+  ],
+
+  mastitis: [
+    "التهاب الضرع",
+    "/api/mastitis/gate",
+    "/api/mastitis/save"
+  ],
+
+  ovsynch: [
+    "تزامن",
+    "/api/ovsynch/gate",
+    "/api/ovsynch/save"
+  ],
+
+  vaccination: [
+    "تحصين",
+    "/api/vaccination/gate",
+    "/api/vaccination/save"
+  ],
+
+  daily_milk: [
+    "لبن يومي",
+    "/api/daily-milk/gate",
+    "/api/daily-milk/save"
+  ],
+
+  weaning: [
+    "فطام",
+    "/api/weaning/gate",
+    "/api/weaning/save"
+  ],
+
+  dry_off: [
+    "تجفيف",
+    "/api/dry-off/gate",
+    "/api/dry-off/save"
+  ],
+
+  close_up: [
+    "تحضير الولادة",
+    "/api/close-up/gate",
+    "/api/close-up/save"
+  ],
+
+  abortion: [
+    "إجهاض",
+    "/api/abortion/gate",
+    "/api/abortion/save"
+  ],
+
+  heat: [
+    "شياع",
+    "/api/heat/gate",
+    "/api/heat/save"
+  ],
+
+  archive: [
+    "بيع أو نفوق",
+    "/api/animals/archive/gate",
+    "/api/animals/archive"
+  ],
+
+  cull: [
+    "استبعاد",
+    "/api/cull/gate",
+    "/api/cull/save"
+  ]
+});
+
+function herdImportV2EventRowsInternalSrv(body = {}) {
+  const rows =
+    body.eventRows ||
+    body.eventsRows ||
+    body.importEventRows ||
+    body.importEvents ||
+    [];
+
+  return Array.isArray(rows)
+    ? rows.filter(Boolean)
+    : [];
+}
+
+function herdImportV2EventTypeInternalSrv(row = {}) {
+  const normalized =
+    eventsPageNormalizeTypeKeySrv(row);
+
+  if (normalized === "health") {
+    return "disease";
+  }
+
+  if (
+    normalized === "sale" ||
+    normalized === "death"
+  ) {
+    return "archive";
+  }
+
+  return normalized;
+}
+
+function herdImportV2EventPayloadInternalSrv(row = {}) {
+  const source =
+    row.payload &&
+    typeof row.payload === "object" &&
+    !Array.isArray(row.payload)
+      ? row.payload
+      : (
+          row.formData &&
+          typeof row.formData === "object" &&
+          !Array.isArray(row.formData)
+            ? row.formData
+            : row
+        );
+
+  const payload = {
+    ...source
+  };
+
+  for (const key of [
+    "row",
+    "rowIndex",
+    "sourceRow",
+    "eventType",
+    "eventTypeNorm",
+    "eventTypeAr",
+    "eventName",
+    "type",
+    "payload",
+    "formData",
+    "saveMode"
+  ]) {
+    delete payload[key];
+  }
+
+  if (
+    !payload.animalNumber &&
+    row.animalNumber
+  ) {
+    payload.animalNumber =
+      row.animalNumber;
+  }
+
+  if (
+    !payload.animalNumbers &&
+    row.animalNumbers
+  ) {
+    payload.animalNumbers =
+      row.animalNumbers;
+  }
+
+  if (
+    !payload.eventDate &&
+    !payload.date &&
+    (
+      row.eventDate ||
+      row.date
+    )
+  ) {
+    payload.eventDate =
+      String(
+        row.eventDate ||
+        row.date
+      ).trim();
+  }
+
+  if (
+    !payload.species &&
+    row.species
+  ) {
+    payload.species =
+      row.species;
+  }
+
+  return payload;
+}
+
+function herdImportV2GateAllowedInternalSrv(
+  status,
+  data = {}
+) {
+  if (
+    status < 200 ||
+    status >= 300 ||
+    data?.ok === false
+  ) {
+    return false;
+  }
+
+  for (const key of [
+    "allowed",
+    "eligible",
+    "canSave",
+    "canProceed",
+    "ready"
+  ]) {
+    if (data?.[key] === false) {
+      return false;
+    }
+  }
+
+  return !(
+    Number(data?.acceptedCount) === 0 &&
+    Number(data?.rejectedCount) > 0
+  );
+}
+
+async function herdImportV2CallOfficialGateInternalSrv(
+  req,
+  gatePath,
+  payload
+) {
+  const controller =
+    new AbortController();
+
+  const timer =
+    setTimeout(
+      () => controller.abort(),
+      20000
+    );
+
+  try {
+    const headers = {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    };
+
+    const cookie =
+      String(
+        req.headers.cookie || ""
+      ).trim();
+
+    if (cookie) {
+      headers.Cookie = cookie;
+    }
+
+    const response =
+      await fetch(
+        `http://127.0.0.1:${PORT}${gatePath}`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(
+            payload || {}
+          ),
+          signal: controller.signal
+        }
+      );
+
+    const raw =
+      await response.text();
+
+    let data = {};
+
+    try {
+      data =
+        raw
+          ? JSON.parse(raw)
+          : {};
+    } catch (_) {
+      data = {
+        ok: false,
+        error:
+          "herd_import_v2_event_gate_non_json",
+        message:
+          "تعذّر قراءة رد بوابة الحدث من السيرفر."
+      };
+    }
+
+    return {
+      httpStatus:
+        response.status,
+
+      allowed:
+        herdImportV2GateAllowedInternalSrv(
+          response.status,
+          data
+        ),
+
+      data
+    };
+  } catch (e) {
+    return {
+      httpStatus: 500,
+
+      allowed: false,
+
+      data: {
+        ok: false,
+
+        error:
+          e?.name === "AbortError"
+            ? "herd_import_v2_event_gate_timeout"
+            : "herd_import_v2_event_gate_failed",
+
+        message:
+          e?.name === "AbortError"
+            ? "تعذّر إكمال فحص الحدث في الوقت المحدد."
+            : "تعذّر الاتصال ببوابة الحدث في السيرفر."
+      }
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function herdImportV2PreviewEventsInternalSrv(
+  req,
+  body = {}
+) {
+  const rows =
+    herdImportV2EventRowsInternalSrv(
+      body
+    );
+
+  const previewEvents = [];
+
+  let readyEventsCount = 0;
+  let rejectedEventsCount = 0;
+  let unsupportedEventsCount = 0;
+
+  for (
+    let i = 0;
+    i < rows.length;
+    i++
+  ) {
+    const row =
+      rows[i] || {};
+
+    const eventType =
+      herdImportV2EventTypeInternalSrv(
+        row
+      );
+
+    const route =
+      HERD_IMPORT_V2_EVENT_ROUTES[
+        eventType
+      ];
+
+    const payload =
+      herdImportV2EventPayloadInternalSrv(
+        row
+      );
+
+    const sourceRow =
+      Number(
+        row.row ??
+        row.rowIndex ??
+        row.sourceRow ??
+        i + 1
+      );
+
+    if (!route) {
+      unsupportedEventsCount++;
+      rejectedEventsCount++;
+
+      previewEvents.push({
+        row:
+          Number.isFinite(sourceRow)
+            ? sourceRow
+            : i + 1,
+
+        eventType,
+
+        eventLabel:
+          eventsPageTypeLabelSrv(row),
+
+        animalNumber:
+          String(
+            payload.animalNumber ||
+            payload.number ||
+            ""
+          ).trim(),
+
+        eventDate:
+          String(
+            payload.eventDate ||
+            payload.date ||
+            ""
+          ).trim(),
+
+        ok: false,
+        status: "مرفوض",
+
+        error:
+          "herd_import_v2_event_type_unsupported",
+
+        message:
+          "نوع الحدث غير مرتبط ببوابة وحفظ رسميين في مُرَبِّيك."
+      });
+
+      continue;
+    }
+
+    const [
+      eventLabel,
+      gatePath,
+      savePath,
+      bulkSavePath
+    ] = route;
+
+    const gate =
+      await herdImportV2CallOfficialGateInternalSrv(
+        req,
+        gatePath,
+        payload
+      );
+
+    const ok =
+      gate.allowed === true;
+
+    if (ok) {
+      readyEventsCount++;
+    } else {
+      rejectedEventsCount++;
+    }
+
+    previewEvents.push({
+      row:
+        Number.isFinite(sourceRow)
+          ? sourceRow
+          : i + 1,
+
+      eventType,
+      eventLabel,
+
+      animalNumber:
+        String(
+          payload.animalNumber ||
+          payload.number ||
+          ""
+        ).trim(),
+
+      eventDate:
+        String(
+          payload.eventDate ||
+          payload.date ||
+          ""
+        ).trim(),
+
+      gatePath,
+      savePath,
+
+      bulkSavePath:
+        bulkSavePath || null,
+
+      ok,
+
+      status:
+        ok
+          ? "جاهز"
+          : "مرفوض",
+
+      httpStatus:
+        gate.httpStatus,
+
+      error:
+        gate.data?.error ||
+        null,
+
+      message:
+        gate.data?.message ||
+        (
+          ok
+            ? "✅ الحدث جاهز للحفظ."
+            : "❌ لا يمكن حفظ هذا الحدث."
+        ),
+
+      gateResponse:
+        gate.data
+    });
+  }
+
+  return {
+    previewEvents,
+
+    totalEventsCount:
+      rows.length,
+
+    readyEventsCount,
+
+    rejectedEventsCount,
+
+    unsupportedEventsCount,
+
+    readyForSavePreview:
+      rows.length === 0 ||
+      rejectedEventsCount === 0
+  };
+}
 app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
   try {
     const body = req.body || {};
@@ -6620,6 +7158,12 @@ const seedEventsPreview = herdImportV2BuildSeedEventsPreviewInternalSrv(
   baselinePreview.animalsInternal
 );
 
+const eventsPreview =
+  await herdImportV2PreviewEventsInternalSrv(
+    req,
+    body
+  );
+
 return res.json({
   ok: true,
   mode: "herd_import_v2",
@@ -6627,7 +7171,33 @@ return res.json({
  message: requiresDefaultAnimalType
   ? "الملف لا يحتوي على نوع الحيوان. اختر نوع القطيع ثم أعد المعاينة."
   : "تمت قراءة ملف القطيع وتحليل بنيته بنجاح. لم يتم حفظ أي بيانات.",
-  totalRows: rows.length,
+    totalRows: rows.length,
+
+  previewEvents:
+    eventsPreview.previewEvents,
+
+  eventsSummary: {
+    totalEventsCount:
+      eventsPreview.totalEventsCount,
+
+    readyEventsCount:
+      eventsPreview.readyEventsCount,
+
+    rejectedEventsCount:
+      eventsPreview.rejectedEventsCount,
+
+    unsupportedEventsCount:
+      eventsPreview.unsupportedEventsCount,
+
+    readyForSavePreview:
+      eventsPreview.readyForSavePreview
+  },
+
+  readyForSavePreview:
+    !requiresDefaultAnimalType &&
+    baselinePreview.readyForSavePreview &&
+    eventsPreview.readyForSavePreview,
+
   requiresDefaultAnimalType,
 requiredInput: requiresDefaultAnimalType
   ? {
