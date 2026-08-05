@@ -7106,7 +7106,374 @@ async function herdImportV2CallOfficialGateInternalSrv(
     clearTimeout(timer);
   }
 }
+function herdImportV2OfficialSaveOkInternalSrv(
+  status,
+  data = {}
+) {
+  const httpStatus =
+    Number(status);
 
+  if (
+    !Number.isFinite(httpStatus) ||
+    httpStatus < 200 ||
+    httpStatus >= 300 ||
+    data?.ok === false ||
+    data?.allowed === false
+  ) {
+    return false;
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      data,
+      "savedCount"
+    )
+  ) {
+    return Number(data.savedCount) > 0;
+  }
+
+  if (Array.isArray(data?.saved)) {
+    return data.saved.length > 0;
+  }
+
+  return data?.ok === true;
+}
+
+async function herdImportV2CallOfficialSaveInternalSrv(
+  req,
+  savePath,
+  payload
+) {
+  const controller =
+    new AbortController();
+
+  const timer =
+    setTimeout(
+      () => controller.abort(),
+      30000
+    );
+
+  try {
+    const headers = {
+      "Content-Type":
+        "application/json",
+
+      "Accept":
+        "application/json"
+    };
+
+    const cookie =
+      String(
+        req.headers.cookie || ""
+      ).trim();
+
+    if (cookie) {
+      headers.Cookie = cookie;
+    }
+
+    const response =
+      await fetch(
+        `http://127.0.0.1:${PORT}${savePath}`,
+        {
+          method: "POST",
+          headers,
+
+          body:
+            JSON.stringify(
+              payload || {}
+            ),
+
+          signal:
+            controller.signal
+        }
+      );
+
+    const raw =
+      await response.text();
+
+    let data = {};
+
+    try {
+      data =
+        raw
+          ? JSON.parse(raw)
+          : {};
+    } catch (_) {
+      data = {
+        ok: false,
+
+        error:
+          "herd_import_v2_event_save_non_json",
+
+        message:
+          "تعذّر قراءة رد حفظ الحدث من السيرفر."
+      };
+    }
+
+    return {
+      httpStatus:
+        response.status,
+
+      saved:
+        herdImportV2OfficialSaveOkInternalSrv(
+          response.status,
+          data
+        ),
+
+      data
+    };
+
+  } catch (e) {
+    return {
+      httpStatus: 500,
+      saved: false,
+
+      data: {
+        ok: false,
+
+        error:
+          e?.name === "AbortError"
+            ? "herd_import_v2_event_save_timeout"
+            : "herd_import_v2_event_save_failed",
+
+        message:
+          e?.name === "AbortError"
+            ? "تعذّر حفظ الحدث في الوقت المحدد."
+            : "تعذّر الاتصال بمسار حفظ الحدث في السيرفر."
+      }
+    };
+
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function herdImportV2SaveEventsInternalSrv(
+  req,
+  body = {}
+) {
+  const rows =
+    herdImportV2EventRowsInternalSrv(
+      body
+    );
+
+  if (!rows.length) {
+    return {
+      ok: true,
+      totalEventsCount: 0,
+      savedEventsCount: 0,
+      rejectedEventsCount: 0,
+      saved: [],
+      rejected: []
+    };
+  }
+
+  const preflight =
+    await herdImportV2PreviewEventsInternalSrv(
+      req,
+      body
+    );
+
+  if (!preflight.readyForSavePreview) {
+    return {
+      ok: false,
+
+      phase:
+        "official_gate",
+
+      totalEventsCount:
+        preflight.totalEventsCount,
+
+      savedEventsCount: 0,
+
+      rejectedEventsCount:
+        preflight.rejectedEventsCount,
+
+      saved: [],
+
+      rejected:
+        preflight.previewEvents.filter(
+          item => item.ok !== true
+        ),
+
+      message:
+        "❌ لم يتم حفظ الأحداث؛ توجد أحداث لا تطابق شروط التسجيل."
+    };
+  }
+
+  const saved = [];
+  const rejected = [];
+
+  for (
+    let i = 0;
+    i < rows.length;
+    i++
+  ) {
+    const row =
+      rows[i] || {};
+
+    const eventType =
+      herdImportV2EventTypeInternalSrv(
+        row
+      );
+
+    const route =
+      HERD_IMPORT_V2_EVENT_ROUTES[
+        eventType
+      ];
+
+    const sourceRow =
+      Number(
+        row.row ??
+        row.rowIndex ??
+        row.sourceRow ??
+        i + 1
+      );
+
+    if (!route) {
+      rejected.push({
+        row:
+          Number.isFinite(sourceRow)
+            ? sourceRow
+            : i + 1,
+
+        eventType,
+
+        error:
+          "herd_import_v2_event_type_unsupported",
+
+        message:
+          "نوع الحدث غير مرتبط بمسار حفظ رسمي في مُرَبِّيك."
+      });
+
+      break;
+    }
+
+    const [
+      eventLabel,
+      gatePath,
+      savePath
+    ] = route;
+
+    const payload =
+      herdImportV2EventPayloadInternalSrv(
+        row
+      );
+
+    const save =
+      await herdImportV2CallOfficialSaveInternalSrv(
+        req,
+        savePath,
+        payload
+      );
+
+    const result = {
+      row:
+        Number.isFinite(sourceRow)
+          ? sourceRow
+          : i + 1,
+
+      eventType,
+      eventLabel,
+
+      animalNumber:
+        String(
+          payload.animalNumber ||
+          payload.number ||
+          ""
+        ).trim(),
+
+      eventDate:
+        String(
+          payload.eventDate ||
+          payload.date ||
+          ""
+        ).trim(),
+
+      gatePath,
+      savePath,
+
+      httpStatus:
+        save.httpStatus,
+
+      message:
+        save.data?.message ||
+        ""
+    };
+
+    if (!save.saved) {
+      rejected.push({
+        ...result,
+
+        error:
+          save.data?.error ||
+          "herd_import_v2_event_save_rejected",
+
+        response:
+          save.data
+      });
+
+      break;
+    }
+
+    saved.push({
+      ...result,
+
+      savedCount:
+        Number(save.data?.savedCount) > 0
+          ? Number(save.data.savedCount)
+          : 1,
+
+      response:
+        save.data
+    });
+  }
+
+  const savedEventsCount =
+    saved.reduce(
+      (total, item) =>
+        total +
+        Number(
+          item.savedCount || 0
+        ),
+
+      0
+    );
+
+  return {
+    ok:
+      rejected.length === 0 &&
+      saved.length === rows.length,
+
+    phase:
+      rejected.length
+        ? "official_save"
+        : "completed",
+
+    totalEventsCount:
+      rows.length,
+
+    savedEventsCount,
+
+    rejectedEventsCount:
+      rejected.length,
+
+    saved,
+    rejected,
+
+    message:
+      rejected.length
+        ? (
+            savedEventsCount
+              ? `تم حفظ ${savedEventsCount} حدث، وتوقف الحفظ عند أول حدث مرفوض.`
+              : (
+                  rejected[0]?.message ||
+                  "❌ لم يتم حفظ الأحداث."
+                )
+          )
+        : `✅ تم حفظ ${savedEventsCount} حدث بنجاح.`
+  };
+}
 async function herdImportV2PreviewEventsInternalSrv(
   req,
   body = {}
@@ -7675,6 +8042,10 @@ if (gateRejected.length) {
     let updatedAnimalsCount = 0;
     let savedSeedEventsCount = 0;
 
+    let savedImportedEventsCount = 0;
+    let rejectedImportedEventsCount = 0;
+    let importedEventsSave = null;
+
     for (const base of baselinePreview.animalsInternal || []) {
       const numberStr = addAnimalDigitsSrv(base.animalNumber);
       if (!numberStr) continue;
@@ -7715,8 +8086,53 @@ if (gate.formData.entryType === "followers") {
       }
     }
 
-    if (ops > 0) {
+        if (ops > 0) {
       await batch.commit();
+    }
+
+    importedEventsSave =
+      await herdImportV2SaveEventsInternalSrv(
+        req,
+        body
+      );
+
+    savedImportedEventsCount =
+      Number(
+        importedEventsSave.savedEventsCount ||
+        0
+      );
+
+    rejectedImportedEventsCount =
+      Number(
+        importedEventsSave.rejectedEventsCount ||
+        0
+      );
+
+    if (!importedEventsSave.ok) {
+      return res.status(409).json({
+        ok: false,
+
+        error:
+          "herd_import_v2_event_save_failed",
+
+        partialSave:
+          insertedAnimalsCount > 0 ||
+          savedImportedEventsCount > 0,
+
+        message:
+          importedEventsSave.message ||
+          "تعذّر حفظ أحداث الاستيراد.",
+
+        insertedAnimalsCount,
+        insertedFollowersCount,
+        insertedMothersCount,
+
+        savedImportedEventsCount,
+        rejectedImportedEventsCount,
+
+        eventsSummary:
+          importedEventsSave
+      });
     }
 
     if ((insertedAnimalsCount || updatedAnimalsCount || savedSeedEventsCount) && typeof scheduleGroupsRebuildSrv === "function") {
@@ -7731,12 +8147,20 @@ if (gate.formData.entryType === "followers") {
         insertedFollowersCount > 0
           ? "follower-list.html"
           : "animal-list.html",
-     message: `✅ تم استيراد ${insertedAnimalsCount} حيوان بنجاح.`,
+         message:
+       savedImportedEventsCount > 0
+         ? `✅ تم استيراد ${insertedAnimalsCount} حيوان وحفظ ${savedImportedEventsCount} حدث بنجاح.`
+         : `✅ تم استيراد ${insertedAnimalsCount} حيوان بنجاح.`,
       insertedAnimalsCount,
       insertedFollowersCount,
       insertedMothersCount,
       updatedAnimalsCount,
       savedSeedEventsCount,
+      savedImportedEventsCount,
+      rejectedImportedEventsCount,
+
+      eventsSummary:
+        importedEventsSave,
       totalAnimalsTouched: insertedAnimalsCount + updatedAnimalsCount,
 
       sourceProfile: herdImportV2PublicSourceProfileSrv(sourceProfile),
