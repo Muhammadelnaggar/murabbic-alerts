@@ -3537,6 +3537,150 @@ function herdImportV2ParseApprovedTemplateSrv(body = {}) {
     )
   ];
 }
+function herdImportV2ParseApprovedEventsSheetSrv(
+  body = {}
+) {
+  const fileName =
+    String(
+      body.fileName ||
+      body.filename ||
+      ""
+    )
+      .toLowerCase()
+      .trim();
+
+  const fileBase64 =
+    String(
+      body.fileBase64 ||
+      body.base64 ||
+      ""
+    ).trim();
+
+  if (
+    !fileName.endsWith(".xlsx") ||
+    !fileBase64
+  ) {
+    return [];
+  }
+
+  const buf =
+    addAnimalImportDecodeBase64Srv(
+      fileBase64
+    );
+
+  if (!buf.length) {
+    return [];
+  }
+
+  const XLSX =
+    require("xlsx");
+
+  const wb =
+    XLSX.read(
+      buf,
+      {
+        type: "buffer"
+      }
+    );
+
+  const sheet =
+    wb.Sheets?.["الأحداث"];
+
+  if (!sheet) {
+    return [];
+  }
+
+  const jsonRows =
+    XLSX.utils.sheet_to_json(
+      sheet,
+      {
+        defval: "",
+        raw: false
+      }
+    );
+
+  const rows =
+    addAnimalImportNormalizeSheetRowsSrv(
+      jsonRows
+    );
+
+  return rows
+    .map((row, index) => {
+      const animalNumber =
+        addAnimalDigitsSrv(
+          row.animalNumber ||
+          row.number ||
+          row["رقم الحيوان"] ||
+          row["رقم الحيوان / التابع"] ||
+          row["رقم الأم"] ||
+          ""
+        );
+
+      const eventType =
+        String(
+          row.eventType ||
+          row.eventTypeNorm ||
+          row.type ||
+          row["نوع الحدث"] ||
+          ""
+        ).trim();
+
+      const eventDate =
+        addAnimalImportNormalizeDateSrv(
+          row.eventDate ||
+          row.date ||
+          row["تاريخ الحدث"] ||
+          row["التاريخ"] ||
+          ""
+        );
+
+      const species =
+        String(
+          row.species ||
+          row["نوع الحيوان"] ||
+          row["الفصيلة"] ||
+          ""
+        ).trim();
+
+      const eventTypeNorm =
+        eventsPageNormalizeTypeKeySrv({
+          eventType
+        });
+
+      if (
+        !animalNumber &&
+        !eventType &&
+        !eventDate
+      ) {
+        return null;
+      }
+
+      return {
+        ...row,
+
+        row:
+          index + 2,
+
+        sourceRow:
+          index + 2,
+
+        animalNumber,
+
+        eventType,
+
+        eventTypeNorm,
+
+        eventDate,
+
+        ...(species
+          ? {
+              species
+            }
+          : {})
+      };
+    })
+    .filter(Boolean);
+}
 function addAnimalImportKindSrv(body = {}) {
   const raw = addAnimalStrSrv(
     body.importKind ||
@@ -6694,16 +6838,23 @@ const HERD_IMPORT_V2_EVENT_ROUTES = Object.freeze({
 });
 
 function herdImportV2EventRowsInternalSrv(body = {}) {
-  const rows =
+  const directRows =
     body.eventRows ||
     body.eventsRows ||
     body.importEventRows ||
     body.importEvents ||
     [];
 
-  return Array.isArray(rows)
-    ? rows.filter(Boolean)
-    : [];
+  if (
+    Array.isArray(directRows) &&
+    directRows.length
+  ) {
+    return directRows.filter(Boolean);
+  }
+
+  return herdImportV2ParseApprovedEventsSheetSrv(
+    body
+  );
 }
 
 function herdImportV2EventTypeInternalSrv(row = {}) {
