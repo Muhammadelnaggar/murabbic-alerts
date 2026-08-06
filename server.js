@@ -10445,6 +10445,20 @@ const persistencePlan =
     importOptions
   });
 
+const readyMothersCount =
+  (baselinePreview.previewAnimals || []).filter(
+    item =>
+      item?.ok === true &&
+      item?.recordKind === "أم"
+  ).length;
+
+const readyFollowersCount =
+  (baselinePreview.previewAnimals || []).filter(
+    item =>
+      item?.ok === true &&
+      item?.recordKind === "تابع"
+  ).length;
+
 return res.json({
   ok: true,
   mode: "herd_import_v2",
@@ -10455,8 +10469,8 @@ message: requiresDefaultAnimalType
       eventsPreflight.rejectedEventsCount > 0
         ? `تمت قراءة القطيع، لكن يوجد ${eventsPreflight.rejectedEventsCount} صف أحداث مرفوض. لم يتم حفظ أي بيانات.`
         : eventRows.length > 0
-          ? `تمت المراجعة الموحدة بنيويًا وزمنيًا لعدد ${eventsPreflight.readyEventsCount} حدث بنجاح. لم يتم حفظ أي بيانات.`
-          : "تمت قراءة ملف القطيع وتحليل بنيته بنجاح. لم يتم حفظ أي بيانات."
+          ? `تمت المراجعة الموحدة بنيويًا وزمنيًا بنجاح — الأمهات: ${readyMothersCount}، التوابع: ${readyFollowersCount}، الأحداث: ${eventsPreflight.readyEventsCount}. جميع البيانات جاهزة للحفظ، ولم يتم حفظ أي بيانات بعد.`
+          : `تمت مراجعة القطيع بنجاح — الأمهات: ${readyMothersCount}، التوابع: ${readyFollowersCount}. جميع البيانات جاهزة للحفظ، ولم يتم حفظ أي بيانات بعد.`
     ),
 
   totalRows:
