@@ -3607,7 +3607,442 @@ function herdImportV2ParseApprovedTemplateSrv(body = {}) {
     }
   };
 }
+// ============================================================
+// HERD IMPORT V2 - EVENTS PREFLIGHT (stage 1: heat)
+// تحقق بنيوي فقط — بدون أي حفظ
+// ============================================================
 
+function herdImportV2EventPickInternalSrv(row = {}, keys = []) {
+  return addAnimalImportPickAnySrv(row, keys);
+}
+
+function herdImportV2EventTypeInternalSrv(v) {
+  const k = addAnimalImportNormKeySrv(v);
+
+  return [
+    "شياع",
+    "شبق",
+    "heat",
+    "estrus",
+    "oestrus"
+  ].includes(k)
+    ? "heat"
+    : "";
+}
+
+function herdImportV2EventDayPartInternalSrv(v) {
+  if (typeof inseminationDayPartSrv === "function") {
+    return inseminationDayPartSrv(v);
+  }
+
+  const k = addAnimalImportNormKeySrv(v);
+
+  if (["صباح", "صباحا", "am"].includes(k)) {
+    return "صباحا";
+  }
+
+  if (["مساء", "مساءا", "pm"].includes(k)) {
+    return "مساءا";
+  }
+
+  return "";
+}
+
+function herdImportV2BuildEventsPreflightInternalSrv(
+  eventRows = [],
+  animalsInternal = []
+) {
+  const rows =
+    Array.isArray(eventRows)
+      ? eventRows
+      : [];
+
+  const animalMap = new Map(
+    (animalsInternal || [])
+      .map(animal => [
+        addAnimalDigitsSrv(
+          animal?.animalNumber || ""
+        ),
+        animal
+      ])
+      .filter(([number]) => !!number)
+  );
+
+  const normalized = rows.map(
+    (row, index) => {
+      const animalNumber =
+        addAnimalDigitsSrv(
+          herdImportV2EventPickInternalSrv(
+            row,
+            [
+              "رقم الحيوان",
+              "رقم الحيوان أو التابع",
+              "animalNumber",
+              "animal number",
+              "number",
+              "cow",
+              "id"
+            ]
+          )
+        );
+
+      const rawEventType = String(
+        herdImportV2EventPickInternalSrv(
+          row,
+          [
+            "نوع الحدث",
+            "الحدث",
+            "eventType",
+            "event type",
+            "event",
+            "type"
+          ]
+        ) || ""
+      ).trim();
+
+      const eventType =
+        herdImportV2EventTypeInternalSrv(
+          rawEventType
+        );
+
+      const eventDate =
+        addAnimalImportNormalizeDateSrv(
+          herdImportV2EventPickInternalSrv(
+            row,
+            [
+              "تاريخ الحدث",
+              "التاريخ",
+              "eventDate",
+              "event date",
+              "date"
+            ]
+          )
+        );
+
+      const rawHeatTime = String(
+        herdImportV2EventPickInternalSrv(
+          row,
+          [
+            "وقت الشياع",
+            "وقت ملاحظة الشياع",
+            "وقت ملاحظة الشبق",
+            "heatTime",
+            "heat time",
+            "heatStatus"
+          ]
+        ) || ""
+      ).trim();
+
+      const heatTime =
+        herdImportV2EventDayPartInternalSrv(
+          rawHeatTime
+        );
+
+      return {
+        sheetName:
+          String(
+            row?.__murabbikSheetName ||
+            "الأحداث"
+          ),
+
+        row:
+          Number(
+            row?.__murabbikRowNumber ||
+            index + 2
+          ),
+
+        animalNumber,
+        rawEventType,
+        eventType,
+        eventDate,
+        rawHeatTime,
+        heatTime,
+
+        duplicateKey: [
+          animalNumber,
+          eventType || rawEventType,
+          eventDate,
+          heatTime
+        ].join("|")
+      };
+    }
+  );
+
+  const duplicateCounts = new Map();
+
+  for (const item of normalized) {
+    duplicateCounts.set(
+      item.duplicateKey,
+      Number(
+        duplicateCounts.get(
+          item.duplicateKey
+        ) || 0
+      ) + 1
+    );
+  }
+
+  const previewEvents = [];
+  const reasonCounts = {};
+
+  let readyEventsCount = 0;
+  let rejectedEventsCount = 0;
+
+  const pushIssue = (
+    issues,
+    code,
+    message,
+    field = ""
+  ) => {
+    issues.push({
+      code,
+      field,
+      message
+    });
+
+    reasonCounts[code] =
+      Number(
+        reasonCounts[code] || 0
+      ) + 1;
+  };
+
+  for (const item of normalized) {
+    const issues = [];
+
+    const animal =
+      item.animalNumber
+        ? animalMap.get(
+            item.animalNumber
+          ) || null
+        : null;
+
+    if (!item.animalNumber) {
+      pushIssue(
+        issues,
+        "event_animal_number_required",
+        "أدخل رقم الحيوان المرتبط بالحدث.",
+        "animalNumber"
+      );
+
+    } else if (!animal) {
+      pushIssue(
+        issues,
+        "event_animal_not_in_workbook",
+        `الحيوان رقم ${item.animalNumber} غير موجود داخل شيت «الأمهات» أو «التوابع» في نفس الملف.`,
+        "animalNumber"
+      );
+    }
+
+    if (!item.rawEventType) {
+      pushIssue(
+        issues,
+        "event_type_required",
+        "اختر نوع الحدث.",
+        "eventType"
+      );
+
+    } else if (!item.eventType) {
+      pushIssue(
+        issues,
+        "event_type_not_enabled",
+        `نوع الحدث «${item.rawEventType}» لم يُفعّل في التحقق حتى الآن.`,
+        "eventType"
+      );
+    }
+
+    if (
+      !item.eventDate ||
+      !addAnimalIsDateSrv(
+        item.eventDate
+      )
+    ) {
+      pushIssue(
+        issues,
+        "event_date_invalid",
+        "أدخل تاريخ حدث صحيحًا بصيغة YYYY-MM-DD.",
+        "eventDate"
+      );
+
+    } else if (
+      item.eventDate >
+      addAnimalTodaySrv()
+    ) {
+      pushIssue(
+        issues,
+        "event_date_future",
+        "تاريخ الحدث لا يمكن أن يكون بعد تاريخ الاستيراد.",
+        "eventDate"
+      );
+    }
+
+    if (
+      animal &&
+      item.eventDate &&
+      addAnimalIsDateSrv(
+        item.eventDate
+      )
+    ) {
+      const boundary =
+        animal.entryType ===
+        "followers"
+          ? String(
+              animal.birthDate || ""
+            ).slice(0, 10)
+          : String(
+              animal.lastCalvingDate ||
+              ""
+            ).slice(0, 10);
+
+      if (
+        !boundary ||
+        !addAnimalIsDateSrv(
+          boundary
+        )
+      ) {
+        pushIssue(
+          issues,
+
+          animal.entryType ===
+          "followers"
+            ? "follower_birth_date_required_for_event"
+            : "mother_last_calving_required_for_event",
+
+          animal.entryType ===
+          "followers"
+            ? "لا يمكن التحقق من حدث التابع دون تاريخ ميلاد صحيح."
+            : "لا يمكن استيراد أحداث الأم دون تاريخ آخر ولادة صحيح.",
+
+          "eventDate"
+        );
+
+      } else if (
+        item.eventDate < boundary
+      ) {
+        pushIssue(
+          issues,
+
+          animal.entryType ===
+          "followers"
+            ? "event_before_follower_birth"
+            : "event_before_last_calving",
+
+          animal.entryType ===
+          "followers"
+            ? `تاريخ الحدث يسبق تاريخ ميلاد التابع ${boundary}.`
+            : `تاريخ الحدث يسبق تاريخ آخر ولادة للأم ${boundary}.`,
+
+          "eventDate"
+        );
+      }
+    }
+
+    if (
+      item.eventType === "heat"
+    ) {
+      if (!item.rawHeatTime) {
+        pushIssue(
+          issues,
+          "heat_time_required",
+          "اختر وقت ملاحظة الشياع: صباحًا أو مساءً.",
+          "heatTime"
+        );
+
+      } else if (!item.heatTime) {
+        pushIssue(
+          issues,
+          "heat_time_invalid",
+          "وقت ملاحظة الشياع يجب أن يكون صباحًا أو مساءً.",
+          "heatTime"
+        );
+      }
+    }
+
+    if (
+      Number(
+        duplicateCounts.get(
+          item.duplicateKey
+        ) || 0
+      ) > 1
+    ) {
+      pushIssue(
+        issues,
+        "duplicate_event_in_file",
+        "هذا الحدث مكرر داخل شيت «الأحداث» بنفس الحيوان والتاريخ والوقت."
+      );
+    }
+
+    const ok =
+      issues.length === 0;
+
+    if (ok) {
+      readyEventsCount++;
+    } else {
+      rejectedEventsCount++;
+    }
+
+    previewEvents.push({
+      sheetName:
+        item.sheetName,
+
+      row:
+        item.row,
+
+      animalNumber:
+        item.animalNumber,
+
+      eventType:
+        item.eventType,
+
+      eventLabel:
+        item.eventType === "heat"
+          ? "شياع"
+          : item.rawEventType,
+
+      eventDate:
+        item.eventDate,
+
+      heatTime:
+        item.heatTime,
+
+      ok,
+
+      status:
+        ok
+          ? "جاهز"
+          : "مرفوض",
+
+      error:
+        issues[0]?.code ||
+        null,
+
+      message:
+        ok
+          ? "✅ حدث الشياع مكتمل بنيويًا وجاهز للمرحلة التالية من التحقق."
+          : `❌ ${issues
+              .map(x => x.message)
+              .join(" ")}`,
+
+      errors:
+        issues
+    });
+  }
+
+  return {
+    previewEvents,
+
+    totalEventsCount:
+      rows.length,
+
+    readyEventsCount,
+
+    rejectedEventsCount,
+
+    reasonCounts,
+
+    validationReady:
+      rows.length === 0 ||
+      rejectedEventsCount === 0
+  };
+}
 function addAnimalImportKindSrv(body = {}) {
   const raw = addAnimalStrSrv(
     body.importKind ||
@@ -6694,18 +7129,27 @@ const baselinePreview = herdImportV2BuildAnimalBaselinePreviewInternalSrv(
  const missingAnimalTypeCount = Number(
   baselinePreview.reasonCounts?.missing_animal_type || 0
 );
-const requiresDefaultAnimalType = missingAnimalTypeCount > 0;
+const requiresDefaultAnimalType =
+  missingAnimalTypeCount > 0;
+
+const eventsPreflight =
+  herdImportV2BuildEventsPreflightInternalSrv(
+    eventRows,
+    baselinePreview.animalsInternal
+  );
 
 return res.json({
   ok: true,
   mode: "herd_import_v2",
   importMode: "source_profile_preview_only",
- message: requiresDefaultAnimalType
+message: requiresDefaultAnimalType
   ? "الملف لا يحتوي على نوع الحيوان. اختر نوع القطيع ثم أعد المعاينة."
   : (
-      eventRows.length > 0
-        ? "تمت قراءة بيانات القطيع وشيت الأحداث بنجاح. لم يتم حفظ أي بيانات."
-        : "تمت قراءة ملف القطيع وتحليل بنيته بنجاح. لم يتم حفظ أي بيانات."
+      eventsPreflight.rejectedEventsCount > 0
+        ? `تمت قراءة القطيع، لكن يوجد ${eventsPreflight.rejectedEventsCount} صف أحداث مرفوض. لم يتم حفظ أي بيانات.`
+        : eventRows.length > 0
+          ? `تمت المراجعة البنيوية لعدد ${eventsPreflight.readyEventsCount} حدث بنجاح. لم يتم حفظ أي بيانات.`
+          : "تمت قراءة ملف القطيع وتحليل بنيته بنجاح. لم يتم حفظ أي بيانات."
     ),
 
   totalRows:
@@ -6734,8 +7178,16 @@ requiredInput: requiresDefaultAnimalType
       message: "الملف لا يحتوي على نوع الحيوان. اختر نوع القطيع ثم أعد المعاينة."
     }
   : null,
-  previewAnimals: baselinePreview.previewAnimals,
-  sourceProfile: herdImportV2PublicSourceProfileSrv(sourceProfile),
+ previewAnimals:
+  baselinePreview.previewAnimals,
+
+previewEvents:
+  eventsPreflight.previewEvents,
+
+sourceProfile:
+  herdImportV2PublicSourceProfileSrv(
+    sourceProfile
+  ),
 
   mappingSummary: {
   mappedColumnsCount: columnMapping.mappedColumnsCount,
@@ -6764,31 +7216,48 @@ baselineSummary: {
   archivedRowsCount: baselinePreview.archivedRowsCount,
   baselineConfidence: baselinePreview.baselineConfidence,
   baselineConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(baselinePreview.baselineConfidence),
-  readyForSavePreview:
-    !requiresDefaultAnimalType &&
-    baselinePreview.readyForSavePreview &&
-    eventRows.length === 0,
+ readyForSavePreview:
+  !requiresDefaultAnimalType &&
+  baselinePreview.readyForSavePreview,
 
   animalTypeCounts: baselinePreview.animalTypeCounts,
   productionStatusCounts: baselinePreview.productionStatusCounts,
   reproductiveStatusCounts: baselinePreview.reproductiveStatusCounts,
   reasonCounts: baselinePreview.reasonCounts
 },
-  eventImportSummary: {
+eventImportSummary: {
   sheetExists:
     templateData.sheets?.events?.exists === true,
 
   totalRows:
-    eventRows.length,
+    eventsPreflight.totalEventsCount,
+
+  readyEventsCount:
+    eventsPreflight.readyEventsCount,
+
+  rejectedEventsCount:
+    eventsPreflight.rejectedEventsCount,
 
   validationStatus:
-    eventRows.length > 0
-      ? "pending_server_validation"
-      : "not_provided",
+    eventRows.length === 0
+      ? "not_provided"
+      : eventsPreflight.rejectedEventsCount > 0
+        ? "rejected"
+        : "structurally_valid",
+
+  validationReady:
+    eventsPreflight.validationReady,
+
+  saveEnabled:
+    false,
 
   readyForSavePreview:
-    eventRows.length === 0
+    false,
+
+  reasonCounts:
+    eventsPreflight.reasonCounts
 },
+
  seedEventsSummary: {
   calvingEventsCount: 0,
   inseminationEventsCount: 0,
@@ -6806,9 +7275,8 @@ baselineSummary: {
     herdImportV2PublicConfidenceLevelSrv(1),
 
     readyForSavePreview:
-    !requiresDefaultAnimalType &&
-    baselinePreview.readyForSavePreview &&
-    eventRows.length === 0
+  !requiresDefaultAnimalType &&
+  baselinePreview.readyForSavePreview,
 }
 });
 
