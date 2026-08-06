@@ -485,6 +485,12 @@ const mothersCount =
 const followersCount =
   Number(j.insertedFollowersCount || 0);
 
+const serverMessage =
+  String(
+    j.message ||
+    "تمت عملية الاستيراد بنجاح."
+  );
+
 if (
   j.ok === true &&
   mothersCount > 0 &&
@@ -494,8 +500,8 @@ if (
 
   messageBox.innerHTML = `
     <div style="font-weight:700; margin-bottom:8px;">
-      ✅ تم استيراد ${mothersCount} أم و${followersCount} تابع بنجاح.
-    </div>
+  ${serverMessage}
+</div>
 
     <div style="margin-bottom:12px;">
       اختر القائمة التي تريد فتحها:
