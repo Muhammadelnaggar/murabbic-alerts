@@ -5,8 +5,23 @@
   <title>قائمة التوابع</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="css/forms.css">
+ <style>
+  #animalTable tr.mbk-import-highlight td {
+    background: #fff3bf !important;
+    box-shadow:
+      inset 0 2px 0 #f59e0b,
+      inset 0 -2px 0 #f59e0b;
+  }
+
+  #animalTable tr.mbk-import-highlight td:first-child {
+    box-shadow:
+      inset 3px 0 0 #f59e0b,
+      inset 0 2px 0 #f59e0b,
+      inset 0 -2px 0 #f59e0b;
+  }
+</style>
 </head>
-<body data-page="animal-list">
+<body data-page="follower-list">
 
 <header class="mbk-top">
   <div class="mbk-head">
@@ -68,6 +83,14 @@
   const $ = id => document.getElementById(id);
   let followersData = [];
   let searchTimer = null;
+  const highlightedImportId =
+  String(
+    new URLSearchParams(
+      location.search
+    ).get("importId") || ""
+  ).trim();
+
+let importHighlightScrolled = false;
 
   const API_BASE = window.API_BASE || "https://murabbic-alerts.onrender.com";
   let currentUser = null;
@@ -243,6 +266,20 @@
     data.forEach(follower => {
       const tr = document.createElement("tr");
       if (follower.rowClass) tr.className = follower.rowClass;
+      const isImportedRow =
+  highlightedImportId &&
+  String(
+    follower.importId || ""
+  ).trim() === highlightedImportId;
+
+if (isImportedRow) {
+  tr.classList.add(
+    "mbk-import-highlight"
+  );
+
+  tr.dataset.importHighlight =
+    "true";
+}
 
       appendTextCell(tr, follower.animalNumber);
       appendTextCell(tr, follower.animalTypeAr);
@@ -263,7 +300,29 @@
       tbody.appendChild(tr);
     });
 
-    updateStickyCols();
+   updateStickyCols();
+
+if (
+  highlightedImportId &&
+  !importHighlightScrolled
+) {
+  const firstImportedRow =
+    tbody.querySelector(
+      'tr[data-import-highlight="true"]'
+    );
+
+  if (firstImportedRow) {
+    importHighlightScrolled = true;
+
+    requestAnimationFrame(() => {
+      firstImportedRow.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest"
+      });
+    });
+  }
+}
   }
 
   async function loadFollowers() {
