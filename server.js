@@ -59620,9 +59620,13 @@ function animalListBuildRowSrv(a = {}, todayISO = '') {
     ? `add-event.html?animalId=${encodeURIComponent(animalNumber)}&number=${encodeURIComponent(animalNumber)}&animalNumber=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(todayISO)}&date=${encodeURIComponent(todayISO)}`
     : '';
 
-  return {
-    id: a.id || null,
-    animalNumber,
+ return {
+  id: a.id || null,
+  importId: animalListStrSrv(
+    a.importId ||
+    a.importJobId
+  ),
+  animalNumber,
     animalTypeAr: typeAr,
     animaltype: typeEn,
     rowClass: typeEn === 'cow'
@@ -59830,10 +59834,16 @@ function followerListBuildRowSrv(
         : "غير معروفة"
     );
 
-  return {
-    id: a.id || null,
+ return {
+  id: a.id || null,
 
-    animalNumber,
+  importId:
+    animalListStrSrv(
+      a.importId ||
+      a.importJobId
+    ),
+
+  animalNumber,
 
     animalTypeAr:
       animalListTypeArSrv(a),
