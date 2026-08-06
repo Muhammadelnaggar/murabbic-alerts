@@ -6074,7 +6074,47 @@ function herdImportV2EventPersistenceKeyInternalSrv(
     documentId
   };
 }
+function herdImportV2DerivedEventPersistenceKeyInternalSrv(
+  uid,
+  item = {},
+  derivedEventType = ""
+) {
+  const parentDuplicateKey =
+    item.duplicateKey ||
+    herdImportV2EventDuplicateKeyInternalSrv(
+      item
+    );
 
+  const eventType =
+    String(derivedEventType || "").trim();
+
+  const duplicateKey =
+    `${parentDuplicateKey}|derived|${eventType}`;
+
+  const documentId =
+    `hi2e_${herdImportV2HashInternalSrv({
+      uid,
+      duplicateKey
+    }).slice(0, 40)}`;
+
+  return {
+    animalNumber:
+      item.animalNumber || "",
+
+    eventType,
+
+    eventDate:
+      item.eventDate || "",
+
+    duplicateKey,
+    parentDuplicateKey,
+
+    collectionName:
+      "events",
+
+    documentId
+  };
+}
 function herdImportV2BuildPersistencePlanInternalSrv({
   uid = "",
   baselinePreview = {},
@@ -6113,7 +6153,7 @@ function herdImportV2BuildPersistencePlanInternalSrv({
         )
     );
 
-  const eventRefs =
+    const eventRefs =
     events.map(
       item =>
         herdImportV2EventPersistenceKeyInternalSrv(
@@ -6121,6 +6161,42 @@ function herdImportV2BuildPersistencePlanInternalSrv({
           item
         )
     );
+
+  const derivedEventRefs =
+    events.flatMap(
+      item =>
+        (Array.isArray(item.derivedEvents)
+          ? item.derivedEvents
+          : []
+        )
+          .map(
+            derivedEventType =>
+              herdImportV2DerivedEventPersistenceKeyInternalSrv(
+                uid,
+                item,
+                derivedEventType
+              )
+          )
+    );
+
+  const semenCodes = [...new Set(
+    events
+      .filter(item => item.eventType === "insemination")
+      .map(item => String(item.semenCode || "").trim())
+      .filter(Boolean)
+  )];
+
+  const inseminators = [...new Set(
+    events
+      .filter(item => item.eventType === "insemination")
+      .map(item => String(item.inseminator || "").trim())
+      .filter(Boolean)
+  )];
+
+  const eventOptionsWritesCount =
+    semenCodes.length || inseminators.length
+      ? 1
+      : 0;
 
   const workbookFingerprint =
     herdImportV2HashInternalSrv({
@@ -6142,27 +6218,48 @@ function herdImportV2BuildPersistencePlanInternalSrv({
             eventDate:
               item.eventDate || "",
 
-            duplicateKey:
+                       duplicateKey:
               item.duplicateKey ||
               herdImportV2EventDuplicateKeyInternalSrv(
                 item
+              ),
+
+            derivedEvents:
+              (Array.isArray(item.derivedEvents)
+                ? item.derivedEvents
+                : []
               )
+                .map(
+                  x =>
+                    String(x || "").trim()
+                )
+                .filter(Boolean)
+                .sort()
           })
         )
     });
 
-  const importId =
+   const importId =
     `hi2_${herdImportV2HashInternalSrv({
       uid,
       workbookFingerprint
     }).slice(0, 40)}`;
+
+    const atomicEligible =
+    animalRefs.length +
+    eventRefs.length +
+    derivedEventRefs.length +
+    eventOptionsWritesCount +
+    1 <= 430;
 
   return {
     ready,
 
     executionStatus:
       ready
-        ? "planned_not_enabled"
+        ? atomicEligible
+          ? "ready_for_atomic_persistence"
+          : "chunked_persistence_required"
         : "blocked_by_validation",
 
     importId,
@@ -6177,8 +6274,17 @@ function herdImportV2BuildPersistencePlanInternalSrv({
     animalWritesCount:
       animalRefs.length,
 
-    eventWritesCount:
+         eventWritesCount:
+      eventRefs.length +
+      derivedEventRefs.length,
+
+    sourceEventWritesCount:
       eventRefs.length,
+
+    derivedEventWritesCount:
+      derivedEventRefs.length,
+
+    eventOptionsWritesCount,
 
     importJobWritesCount:
       2,
@@ -6186,6 +6292,8 @@ function herdImportV2BuildPersistencePlanInternalSrv({
     totalPlannedWrites:
       animalRefs.length +
       eventRefs.length +
+      derivedEventRefs.length +
+      eventOptionsWritesCount +
       2,
 
     deterministicAnimalRefs:
@@ -6197,21 +6305,1040 @@ function herdImportV2BuildPersistencePlanInternalSrv({
     allRefsDeterministic:
       true,
 
-    resumeFoundationReady:
+       resumeFoundationReady:
       ready,
 
+    atomicEligible,
+
+    executionMode:
+      atomicEligible
+        ? "atomic_batch"
+        : "chunked_not_enabled_yet",
+
     persistenceEnabled:
-      false,
+      ready && atomicEligible,
 
     saveEnabled:
-      false,
+      ready && atomicEligible,
+
+    semenCodes,
+    inseminators,
 
     animalRefsPreview:
       animalRefs.slice(0, 5),
 
-    eventRefsPreview:
-      eventRefs.slice(0, 5)
+       eventRefsPreview:
+      eventRefs.slice(0, 5),
+
+    derivedEventRefsPreview:
+      derivedEventRefs.slice(0, 5)
   };
+}
+function herdImportV2PersistenceErrorInternalSrv(code, message, status = 500) {
+  const e = new Error(code || "herd_import_v2_persistence_failed");
+  e.code = code || "herd_import_v2_persistence_failed";
+  e.publicMessage = message || "تعذّر حفظ ملف القطيع الآن.";
+  e.status = Number(status) || 500;
+  return e;
+}
+
+function herdImportV2EventDaysInternalSrv(fromDate, toDate) {
+  const n = calvingDaysBetweenSrv(
+    String(fromDate || "").slice(0, 10),
+    String(toDate || "").slice(0, 10)
+  );
+
+  return Number.isFinite(Number(n)) ? Number(n) : null;
+}
+
+function herdImportV2ImportedEventPayloadInternalSrv({
+  uid,
+  item,
+  state,
+  animalEntry,
+    persistencePlan,
+  lastHeatOrAIDate = "",
+  linkedEmbryonicLossEventId = ""
+}) {
+  const eventDate = item.eventDate;
+  const notes = String(item.notes || "").trim() || null;
+
+  const common = {
+    userId: uid,
+    ownerUid: uid,
+    animalId: animalEntry.ref.id,
+    animalNumber: item.animalNumber,
+    eventDate,
+    importId: persistencePlan.importId,
+    importJobId: persistencePlan.importId,
+    workbookFingerprint: persistencePlan.workbookFingerprint,
+    importDuplicateKey: item.duplicateKey,
+    importedBy: "herd_import_v2",
+    importMode: "operational_history",
+    isImportedHistory: true,
+    sourceSheet: item.sheetName || "الأحداث",
+    sourceRow: Number(item.row || 0) || null,
+    source: "server:/api/herd-import-v2/save-operational",
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  };
+
+  if (item.eventType === "heat") {
+    return {
+      ...common,
+      type: "شياع",
+      eventType: "شياع",
+      eventTypeNorm: "heat",
+      heatTime: item.heatTime,
+      notes,
+      reproductiveStatusSnapshot: state.reproductiveStatus || null,
+      dimAtEvent: herdImportV2EventDaysInternalSrv(
+        state.lastCalvingDate,
+        eventDate
+      ),
+      daysSinceLastHeatOrAI: herdImportV2EventDaysInternalSrv(
+        lastHeatOrAIDate,
+        eventDate
+      )
+    };
+  }
+
+  if (item.eventType === "insemination") {
+    return {
+      ...common,
+      eventType: "insemination",
+      type: "insemination",
+      eventTypeNorm: "insemination",
+      inseminationMethod: item.inseminationMethod,
+      semenCode: item.semenCode,
+      inseminator: item.inseminator,
+      inseminationTime: item.inseminationTime,
+      heatStatus: item.heatStatus,
+      inseminationSource: null,
+      thiAtInsemination: null,
+      thiValue: null,
+      thiLevel: "",
+      thiLabel: "",
+      notes,
+      species: state.species || "",
+      serviceNumber: Number(state.servicesCount || 0) + 1
+    };
+  }
+
+  if (item.eventType === "pregnancy_diagnosis") {
+    const isConfirmation120 =
+      item.pregnancyCheckType === "pregnancy_confirmation_120";
+
+    return {
+      ...common,
+      type: "تشخيص حمل",
+      eventType: "تشخيص حمل",
+      eventTypeNorm: "pregnancy_diagnosis",
+      method: item.pregnancyMethod,
+      result: item.pregnancyResult,
+      vet: item.vet || null,
+      notes,
+      species: state.species || "",
+      reproductiveStatusBefore: state.reproductiveStatus || "",
+      lastInseminationDate: state.lastInseminationDate || "",
+      checkType: item.pregnancyCheckType,
+      pregnancyCheckType: item.pregnancyCheckType,
+      isPregnancyConfirmation120: isConfirmation120,
+           daysFromLastInsemination:
+        herdImportV2EventDaysInternalSrv(
+          state.lastInseminationDate,
+          eventDate
+        ),
+
+      ...(linkedEmbryonicLossEventId
+        ? {
+            linkedEmbryonicLossEventId,
+
+            sourceContext:
+              "pregnancy_confirmation_120"
+          }
+        : {})
+    };
+  }
+
+  if (item.eventType === "abortion") {
+    const derived = calcAbortionAgeAndCauseSrv(
+      state.lastInseminationDate,
+      eventDate
+    );
+
+    return {
+      ...common,
+      type: "إجهاض",
+      eventType: "إجهاض",
+      eventTypeNorm: "abortion",
+      species: state.species || "",
+      reproductiveStatusBefore: state.reproductiveStatus || "",
+      lastInseminationDate: state.lastInseminationDate || "",
+      lastFertileInseminationDate: state.lastInseminationDate || "",
+      gestationDays: derived.gestationDays,
+      abortionAgeMonths: derived.abortionAgeMonths,
+      probableCause: derived.probableCause,
+      probableCauses: derived.probableCauses || [],
+      abortionDiagnosticMatrix: derived.abortionDiagnosticMatrix || [],
+      abortionDiagnosticNote: derived.abortionDiagnosticNote || "",
+      notes: String(item.notes || "").trim(),
+      idempotencyKey: `${uid}|${item.animalNumber}|abortion|${eventDate}`
+    };
+  }
+
+  if (item.eventType === "health") {
+    const disease = DISEASE_CATALOG_SRV[item.diseaseCode] || {};
+
+    return {
+      ...common,
+      type: "تشخيص صحي",
+      eventType: "health",
+      eventTypeNorm: "health",
+      diseaseCode: item.diseaseCode,
+      diseaseName: disease.name || item.rawDisease || item.diseaseCode,
+      diseaseGroup: disease.group || "general",
+      diagnosisMode: "health_diagnosis",
+      notes,
+      animalCollection: animalEntry.collectionName,
+      animalClass: animalEntry.collectionName === "calves" ? "calf" : "adult"
+    };
+  }
+
+  if (item.eventType === "lameness") {
+    const affectedLegs = [...(item.affectedLegs || [])];
+    const affectedLeg = affectedLegs[0] || "";
+
+    return {
+      ...common,
+      date: eventDate,
+      type: "عرج",
+      eventType: "lameness",
+      eventTypeNorm: "lameness",
+      diagnosis: item.lamenessType,
+      diseaseCode: "lameness",
+      diseaseName: "عرج",
+      diseaseGroup: "حركة وعرج",
+      affectedLeg,
+      affectedLegs,
+      affectedHoof: affectedLeg,
+      affectedHooves: affectedLegs,
+      lamenessType: item.lamenessType,
+      vet: item.vet || null,
+      notes,
+      details: {
+        affectedLeg,
+        affectedLegs,
+        affectedHoof: affectedLeg,
+        affectedHooves: affectedLegs,
+        lamenessType: item.lamenessType,
+        diagnosis: item.lamenessType,
+        diseaseName: "عرج",
+        vet: item.vet || null,
+        notes
+      },
+      animalCollection: animalEntry.collectionName
+    };
+  }
+
+  if (item.eventType === "mastitis") {
+    const quarters = [...(item.quarters || [])];
+    const quartersText = quarters.join("، ");
+    const diagnosis = `التهاب الضرع - ${item.mastitisType}`;
+
+    return {
+      ...common,
+      date: eventDate,
+      type: "التهاب الضرع",
+      eventType: "mastitis",
+      eventTypeNorm: "mastitis",
+      diagnosis,
+      diseaseCode: "mastitis",
+      diseaseName: "التهاب الضرع",
+      diseaseGroup: "صحة الضرع",
+      mastitisType: item.mastitisType,
+      quarters,
+      affectedQuarter: quartersText,
+      affectedQuarters: quarters,
+      notes,
+      details: {
+        mastitisType: item.mastitisType,
+        quarters,
+        affectedQuarter: quartersText,
+        affectedQuarters: quarters,
+        diagnosis,
+        diseaseName: "التهاب الضرع",
+        notes
+      },
+      animalCollection: animalEntry.collectionName
+    };
+  }
+
+  if (item.eventType === "hoof_trimming") {
+    return {
+      ...common,
+      date: eventDate,
+      eventType: "تقليم الحوافر",
+      eventTypeNorm: "hoof_trimming",
+      type: "تقليم الحوافر",
+      notes,
+      idempotencyKey: `${uid}|${item.animalNumber}|hoof_trimming|${eventDate}`
+    };
+  }
+
+  throw herdImportV2PersistenceErrorInternalSrv(
+    "herd_import_v2_event_writer_not_supported",
+    `نوع الحدث «${item.eventType || item.rawEventType || ""}» غير مدعوم في الحفظ التشغيلي.`,
+    400
+  );
+}
+function herdImportV2ImportedEmbryonicLossPayloadInternalSrv({
+  uid,
+  item,
+  state,
+  animalEntry,
+  persistencePlan,
+  diagnosisEventId,
+  derivedKey
+}) {
+  return {
+    userId: uid,
+    ownerUid: uid,
+
+    animalId:
+      animalEntry.ref.id,
+
+    animalNumber:
+      item.animalNumber,
+
+    eventDate:
+      item.eventDate,
+
+    type:
+      "embryonic_loss",
+
+    eventType:
+      "فقد أجنة",
+
+    eventTypeNorm:
+      "embryonic_loss",
+
+    eventName:
+      "فقد أجنة",
+
+    previousReproductiveStatus:
+      state.reproductiveStatus || "عشار",
+
+    reproductiveStatusAfter:
+      "مفتوحة",
+
+    linkedPregnancyDiagnosisEventId:
+      diagnosisEventId,
+
+    source:
+      "server:/api/herd-import-v2/save-operational:pregnancy-confirmation-120-negative",
+
+    sourceContext:
+      "pregnancy_confirmation_120",
+
+    daysFromLastInsemination:
+      herdImportV2EventDaysInternalSrv(
+        state.lastInseminationDate,
+        item.eventDate
+      ),
+
+    importId:
+      persistencePlan.importId,
+
+    importJobId:
+      persistencePlan.importId,
+
+    workbookFingerprint:
+      persistencePlan.workbookFingerprint,
+
+    importDuplicateKey:
+      derivedKey.duplicateKey,
+
+    importedBy:
+      "herd_import_v2",
+
+    importMode:
+      "operational_history",
+
+    isImportedHistory:
+      true,
+
+    isDerivedImportEvent:
+      true,
+
+    derivedFromEventType:
+      "pregnancy_diagnosis",
+
+    sourceSheet:
+      item.sheetName || "الأحداث",
+
+    sourceRow:
+      Number(item.row || 0) || null,
+
+    createdAt:
+      admin.firestore.FieldValue.serverTimestamp()
+  };
+}
+function herdImportV2ImportedAnimalEventPatchInternalSrv(
+  patch,
+  item,
+  payload,
+  eventId
+) {
+  if (item.eventType === "heat") {
+    Object.assign(patch, {
+      lastHeatDate: item.eventDate,
+      lastHeatTime: item.heatTime,
+      lastHeatEventId: eventId
+    });
+    return;
+  }
+
+  if (item.eventType === "insemination") {
+    patch.lastInseminationEventId = eventId;
+    return;
+  }
+
+  if (item.eventType === "pregnancy_diagnosis") {
+    Object.assign(patch, {
+      lastDiagnosis: "تشخيص حمل",
+      lastDiagnosisDate: item.eventDate,
+      lastPregnancyDiagnosisDate: item.eventDate,
+      lastPregnancyDiagnosisResult: item.pregnancyResult,
+      lastPregnancyDiagnosisEventId: eventId,
+      lastPregnancyDiagnosisCheckType: item.pregnancyCheckType
+    });
+
+    if (item.pregnancyCheckType === "pregnancy_confirmation_120") {
+      Object.assign(patch, {
+        lastPregnancyConfirmation120Date: item.eventDate,
+        lastPregnancyConfirmation120Result:
+          item.pregnancyResult === "عشار" ? "confirmed" : "negative",
+        lastPregnancyConfirmation120EventId: eventId
+      });
+    }
+
+    return;
+  }
+
+  if (item.eventType === "abortion") {
+    Object.assign(patch, {
+      lastAbortionDate: item.eventDate,
+      lastAbortionEventId: eventId,
+      abortionAgeMonths: payload.abortionAgeMonths ?? null,
+      lastPregnancyLossClass:
+        Number(payload.abortionAgeMonths) >= 5 ? "late" : "early"
+    });
+
+    return;
+  }
+
+  if (item.eventType === "health") {
+    Object.assign(patch, {
+      lastDisease: payload.diseaseName,
+      lastDiseaseDate: item.eventDate,
+      lastDiagnosis: payload.diseaseName,
+      lastDiagnosisDate: item.eventDate,
+      healthStatus: payload.diseaseName
+    });
+
+    return;
+  }
+
+  if (item.eventType === "lameness") {
+    Object.assign(patch, {
+      healthStatus: "عرج",
+      lastDisease: "عرج",
+      lastDiseaseDate: item.eventDate,
+      lastDiagnosis: `عرج - ${item.lamenessType}`,
+      lastDiagnosisDate: item.eventDate,
+      lastLamenessDate: item.eventDate,
+      lastLamenessType: item.lamenessType,
+      lastLamenessAffectedLeg: item.affectedLegs?.[0] || ""
+    });
+
+    return;
+  }
+
+  if (item.eventType === "mastitis") {
+    const quarters = [...(item.quarters || [])];
+
+    Object.assign(patch, {
+      healthStatus: "التهاب الضرع",
+      lastDisease: "التهاب الضرع",
+      lastDiseaseDate: item.eventDate,
+      lastDiagnosis: `التهاب الضرع - ${item.mastitisType}`,
+      lastDiagnosisDate: item.eventDate,
+      lastMastitisDate: item.eventDate,
+      lastMastitisType: item.mastitisType,
+      lastMastitisQuarters: quarters,
+      lastMastitisAffectedQuarter: quarters.join("، ")
+    });
+
+    return;
+  }
+
+  if (item.eventType === "hoof_trimming") {
+    patch.lastHoofTrimmingDate = item.eventDate;
+  }
+}
+
+function herdImportV2BuildAtomicWriteSetInternalSrv({
+  uid,
+  baselinePreview,
+  eventsPreflight,
+  sourceProfile,
+  persistencePlan
+}) {
+  const animals = [];
+  const animalMap = new Map();
+
+  for (const base of baselinePreview.animalsInternal || []) {
+    const gate = herdImportV2GateDecisionInternalSrv(base);
+
+    if (!gate.ok) {
+      throw herdImportV2PersistenceErrorInternalSrv(
+        "herd_import_v2_gate_failed_during_write_plan",
+        `تعذّر تجهيز الحيوان رقم ${base.animalNumber || ""} للحفظ.`,
+        400
+      );
+    }
+
+    const key = herdImportV2AnimalPersistenceKeyInternalSrv(uid, base);
+    const canonical = addAnimalBuildSinglePayloadSrv(uid, gate.formData);
+    const ref = db.collection(key.collectionName).doc(key.documentId);
+
+    const entry = {
+      base,
+      gate,
+      ref,
+      animalNumber: key.animalNumber,
+      collectionName: key.collectionName,
+      eventPatch: {},
+
+      payload: {
+        ...canonical.payload,
+        ...herdImportV2OperationalPayloadPatchInternalSrv(
+          base,
+          sourceProfile
+        ),
+
+        importId: persistencePlan.importId,
+        importJobId: persistencePlan.importId,
+        workbookFingerprint: persistencePlan.workbookFingerprint,
+        importState: "operational",
+        source: "server:/api/herd-import-v2/save-operational"
+      }
+    };
+
+    animals.push(entry);
+    animalMap.set(key.animalNumber, entry);
+  }
+
+  const events = [];
+  const stateMap = new Map();
+  const lastHeatOrAIMap = new Map();
+
+  const sorted = [
+    ...(eventsPreflight.normalizedEventsInternal || [])
+  ].sort(
+    (a, b) =>
+      String(a.eventDate || "").localeCompare(
+        String(b.eventDate || "")
+      ) ||
+      Number(a.sourceIndex || 0) -
+        Number(b.sourceIndex || 0)
+  );
+
+  for (const item of sorted) {
+    const animalEntry = animalMap.get(item.animalNumber);
+
+    if (!animalEntry) {
+      throw herdImportV2PersistenceErrorInternalSrv(
+        "herd_import_v2_event_animal_write_target_missing",
+        `تعذّر تجهيز مرجع الحيوان رقم ${item.animalNumber} لحفظ الأحداث.`,
+        400
+      );
+    }
+
+    let state = stateMap.get(item.animalNumber);
+
+    if (!state) {
+    state = herdImportV2CreateTemporalStateInternalSrv(
+  animalEntry.base
+);
+
+      stateMap.set(item.animalNumber, state);
+    }
+
+       const key =
+      herdImportV2EventPersistenceKeyInternalSrv(
+        uid,
+        item
+      );
+
+    const ref = db
+      .collection("events")
+      .doc(key.documentId);
+
+    const needsEmbryonicLoss =
+      item.eventType ===
+        "pregnancy_diagnosis" &&
+      Array.isArray(item.derivedEvents) &&
+      item.derivedEvents.includes(
+        "embryonic_loss"
+      );
+
+    const embryonicLossKey =
+      needsEmbryonicLoss
+        ? herdImportV2DerivedEventPersistenceKeyInternalSrv(
+            uid,
+            item,
+            "embryonic_loss"
+          )
+        : null;
+
+    const embryonicLossRef =
+      embryonicLossKey
+        ? db
+            .collection("events")
+            .doc(
+              embryonicLossKey.documentId
+            )
+        : null;
+
+    const payload =
+      herdImportV2ImportedEventPayloadInternalSrv({
+        uid,
+        item,
+        state,
+        animalEntry,
+        persistencePlan,
+
+        lastHeatOrAIDate:
+          lastHeatOrAIMap.get(
+            item.animalNumber
+          ) || "",
+
+        linkedEmbryonicLossEventId:
+          embryonicLossRef?.id || ""
+      });
+
+    const embryonicLossPayload =
+      embryonicLossRef &&
+      embryonicLossKey
+        ? herdImportV2ImportedEmbryonicLossPayloadInternalSrv({
+            uid,
+            item,
+            state,
+            animalEntry,
+            persistencePlan,
+
+            diagnosisEventId:
+              ref.id,
+
+            derivedKey:
+              embryonicLossKey
+          })
+        : null;
+    const temporalError =
+      herdImportV2ApplyEventTemporalInternalSrv(
+        item,
+        state
+      );
+
+    if (temporalError) {
+      throw herdImportV2PersistenceErrorInternalSrv(
+        temporalError.code ||
+          "herd_import_v2_temporal_replay_failed_during_write",
+
+        temporalError.message ||
+          `تعذّر إعادة تشغيل تسلسل الحيوان رقم ${item.animalNumber} أثناء تجهيز الحفظ.`,
+
+        400
+      );
+    }
+
+    herdImportV2ImportedAnimalEventPatchInternalSrv(
+      animalEntry.eventPatch,
+      item,
+      payload,
+      ref.id
+    );
+
+    if (
+      ["heat", "insemination"].includes(
+        item.eventType
+      )
+    ) {
+      lastHeatOrAIMap.set(
+        item.animalNumber,
+        item.eventDate
+      );
+    }
+
+       events.push({
+      item,
+      ref,
+      payload,
+      derived: false
+    });
+
+    if (
+      embryonicLossRef &&
+      embryonicLossPayload
+    ) {
+      events.push({
+        item,
+
+        ref:
+          embryonicLossRef,
+
+        payload:
+          embryonicLossPayload,
+
+        derived:
+          true,
+
+        derivedEventType:
+          "embryonic_loss"
+      });
+
+      Object.assign(
+        animalEntry.eventPatch,
+        {
+          lastEmbryonicLossDate:
+            item.eventDate,
+
+          lastPregnancyLossType:
+            "embryonic_loss",
+
+          lastPregnancyLossSource:
+            "pregnancy_confirmation_120",
+
+          lastPregnancyLossEventId:
+            embryonicLossRef.id
+        }
+      );
+    }
+  }
+
+  for (const entry of animals) {
+    entry.payload = {
+      ...entry.payload,
+      ...entry.eventPatch,
+
+      updatedAt:
+        admin.firestore.FieldValue.serverTimestamp()
+    };
+  }
+
+  const optionsWrite =
+    persistencePlan.eventOptionsWritesCount
+      ? {
+          ref:
+            db.collection("user_event_options").doc(uid),
+
+          payload: {
+            userId: uid,
+
+            ...(persistencePlan.semenCodes.length
+              ? {
+                  inseminationSemenCodes:
+                    admin.firestore.FieldValue.arrayUnion(
+                      ...persistencePlan.semenCodes
+                    )
+                }
+              : {}),
+
+            ...(persistencePlan.inseminators.length
+              ? {
+                  inseminators:
+                    admin.firestore.FieldValue.arrayUnion(
+                      ...persistencePlan.inseminators
+                    )
+                }
+              : {}),
+
+            updatedAt:
+              admin.firestore.FieldValue.serverTimestamp()
+          }
+        }
+      : null;
+
+  return {
+    animals,
+    events,
+    optionsWrite,
+
+    insertedAnimalsCount:
+      animals.length,
+
+    insertedFollowersCount:
+      animals.filter(
+        x => x.collectionName === "calves"
+      ).length,
+
+    insertedMothersCount:
+      animals.filter(
+        x => x.collectionName === "animals"
+      ).length,
+
+       savedEventsCount:
+      events.length,
+
+    savedSourceEventsCount:
+      events.filter(
+        x => x.derived !== true
+      ).length,
+
+    savedDerivedEventsCount:
+      events.filter(
+        x => x.derived === true
+      ).length
+  };
+}
+
+async function herdImportV2CommitAtomicWriteSetInternalSrv({
+  uid,
+  persistencePlan,
+  writeSet,
+  sourceProfile
+}) {
+  const finalBatchWrites =
+    writeSet.animals.length +
+    writeSet.events.length +
+    (writeSet.optionsWrite ? 1 : 0) +
+    1;
+
+  if (finalBatchWrites > 430) {
+    throw herdImportV2PersistenceErrorInternalSrv(
+      "herd_import_v2_chunked_persistence_not_enabled",
+      "اكتملت المراجعة، لكن هذا الملف يحتاج مسار الحفظ المجزأ قبل تشغيله. لم يتم حفظ أي بيانات.",
+      409
+    );
+  }
+
+  const jobRef =
+    db.collection("herd_import_jobs")
+      .doc(persistencePlan.importId);
+
+  const oldJobSnap =
+    await jobRef.get();
+
+  const oldJob =
+    oldJobSnap.exists
+      ? oldJobSnap.data() || {}
+      : {};
+
+  if (
+    oldJob.status === "completed" &&
+    String(oldJob.workbookFingerprint || "") ===
+      String(persistencePlan.workbookFingerprint || "")
+  ) {
+    return {
+      alreadyCompleted: true,
+
+      insertedAnimalsCount:
+        Number(oldJob.insertedAnimalsCount || 0),
+
+      insertedFollowersCount:
+        Number(oldJob.insertedFollowersCount || 0),
+
+      insertedMothersCount:
+        Number(oldJob.insertedMothersCount || 0),
+
+            savedEventsCount:
+        Number(
+          oldJob.savedEventsCount || 0
+        ),
+
+      savedSourceEventsCount:
+        Number(
+          oldJob.savedSourceEventsCount || 0
+        ),
+
+      savedDerivedEventsCount:
+        Number(
+          oldJob.savedDerivedEventsCount || 0
+        )
+    };
+  }
+
+  await jobRef.set({
+    userId: uid,
+    ownerUid: uid,
+    importId: persistencePlan.importId,
+    workbookFingerprint:
+      persistencePlan.workbookFingerprint,
+
+    sourceProfileKey:
+      sourceProfile.key || "unknown",
+
+    status:
+      "prepared",
+
+    executionMode:
+      "atomic_batch",
+
+    animalWritesCount:
+      writeSet.animals.length,
+
+    eventWritesCount:
+      writeSet.events.length,
+        sourceEventWritesCount:
+      writeSet.savedSourceEventsCount,
+
+    derivedEventWritesCount:
+      writeSet.savedDerivedEventsCount,
+
+    eventOptionsWritesCount:
+      writeSet.optionsWrite ? 1 : 0,
+
+    updatedAt:
+      admin.firestore.FieldValue.serverTimestamp(),
+
+    ...(!oldJobSnap.exists
+      ? {
+          createdAt:
+            admin.firestore.FieldValue.serverTimestamp()
+        }
+      : {})
+  }, {
+    merge: true
+  });
+
+  try {
+    const batch = db.batch();
+
+    for (const row of writeSet.animals) {
+      batch.set(
+        row.ref,
+        row.payload
+      );
+    }
+
+    for (const row of writeSet.events) {
+      batch.set(
+        row.ref,
+        row.payload
+      );
+    }
+
+    if (writeSet.optionsWrite) {
+      batch.set(
+        writeSet.optionsWrite.ref,
+        writeSet.optionsWrite.payload,
+        {
+          merge: true
+        }
+      );
+    }
+
+    batch.set(jobRef, {
+      status:
+        "completed",
+
+      executionMode:
+        "atomic_batch",
+
+      insertedAnimalsCount:
+        writeSet.insertedAnimalsCount,
+
+      insertedFollowersCount:
+        writeSet.insertedFollowersCount,
+
+      insertedMothersCount:
+        writeSet.insertedMothersCount,
+
+      savedEventsCount:
+        writeSet.savedEventsCount,
+            savedSourceEventsCount:
+        writeSet.savedSourceEventsCount,
+
+      savedDerivedEventsCount:
+        writeSet.savedDerivedEventsCount,
+
+      eventOptionsWritesCount:
+        writeSet.optionsWrite ? 1 : 0,
+
+      completedAt:
+        admin.firestore.FieldValue.serverTimestamp(),
+
+      updatedAt:
+        admin.firestore.FieldValue.serverTimestamp(),
+
+      lastErrorCode:
+        admin.firestore.FieldValue.delete(),
+
+      lastErrorMessage:
+        admin.firestore.FieldValue.delete()
+    }, {
+      merge: true
+    });
+
+    await batch.commit();
+
+    return {
+      alreadyCompleted: false,
+
+      insertedAnimalsCount:
+        writeSet.insertedAnimalsCount,
+
+      insertedFollowersCount:
+        writeSet.insertedFollowersCount,
+
+      insertedMothersCount:
+        writeSet.insertedMothersCount,
+
+            savedEventsCount:
+        writeSet.savedEventsCount,
+
+      savedSourceEventsCount:
+        writeSet.savedSourceEventsCount,
+
+      savedDerivedEventsCount:
+        writeSet.savedDerivedEventsCount
+    };
+
+  } catch (e) {
+    try {
+      await jobRef.set({
+        status:
+          "failed_no_data_written",
+
+        lastErrorCode:
+          e?.code ||
+          "herd_import_v2_atomic_batch_failed",
+
+        lastErrorMessage:
+          String(
+            e?.message || e || ""
+          ).slice(0, 1000),
+
+        updatedAt:
+          admin.firestore.FieldValue.serverTimestamp()
+      }, {
+        merge: true
+      });
+
+    } catch (jobError) {
+      console.error(
+        "herd-import-v2 job failure update failed",
+        jobError
+      );
+    }
+
+    throw herdImportV2PersistenceErrorInternalSrv(
+      "herd_import_v2_atomic_batch_failed",
+      "❌ تعذّر إكمال الاستيراد، ولم تُحفظ الحيوانات أو الأحداث. أعد المحاولة بنفس الملف.",
+      503
+    );
+  }
 }
 function addAnimalImportKindSrv(body = {}) {
   const raw = addAnimalStrSrv(
@@ -9452,11 +10579,14 @@ eventImportSummary: {
   rejectedSequencesCount:
     eventsPreflight.rejectedSequencesCount,
 
-  saveEnabled:
-    false,
+ saveEnabled:
+  !requiresDefaultAnimalType &&
+  persistencePlan.saveEnabled === true,
 
-  readyForSavePreview:
-    false,
+readyForSavePreview:
+  !requiresDefaultAnimalType &&
+  persistencePlan.ready === true &&
+  persistencePlan.saveEnabled === true,
 
   reasonCounts:
     eventsPreflight.reasonCounts
@@ -9614,127 +10744,388 @@ if (missingAnimalTypeCount > 0) {
         }
       });
     }
+    const eventsPreflight =
+      herdImportV2BuildEventsPreflightInternalSrv(
+        eventRows,
+        baselinePreview.animalsInternal,
+        baselinePreview.previewAnimals
+      );
+
+    const persistencePlan =
+      herdImportV2BuildPersistencePlanInternalSrv({
+        uid,
+        baselinePreview,
+        eventsPreflight,
+        sourceProfile,
+        importOptions
+      });
+
+    if (
+      eventRows.length > 0 &&
+      !eventsPreflight.validationReady
+    ) {
+      return res.status(400).json({
+        ok: false,
+
+        error:
+          "herd_import_v2_events_validation_failed",
+
+        message:
+          `❌ لم يتم الحفظ. يوجد ${eventsPreflight.rejectedEventsCount} صف أحداث مرفوض.`,
+
+        totalAnimalRows:
+          rows.length,
+
+        totalEventRows:
+          eventRows.length,
+
+        eventImportSummary: {
+          readyEventsCount:
+            eventsPreflight.readyEventsCount,
+
+          rejectedEventsCount:
+            eventsPreflight.rejectedEventsCount,
+
+          reasonCounts:
+            eventsPreflight.reasonCounts
+        },
+
+        persistencePlan
+      });
+    }
+
+    if (eventRows.length > 0) {
+      const completedJobSnap =
+        await db
+          .collection("herd_import_jobs")
+          .doc(persistencePlan.importId)
+          .get();
+
+      const completedJob =
+        completedJobSnap.exists
+          ? completedJobSnap.data() || {}
+          : {};
+
+      if (
+        completedJob.status === "completed" &&
+        String(
+          completedJob.workbookFingerprint || ""
+        ) ===
+          String(
+            persistencePlan.workbookFingerprint || ""
+          )
+      ) {
+        return res.json({
+          ok: true,
+          mode: "herd_import_v2",
+          importMode: "save_operational_import",
+          persistenceStatus: "completed",
+          alreadyImported: true,
+          importId: persistencePlan.importId,
+          workbookFingerprint:
+            persistencePlan.workbookFingerprint,
+
+          redirectUrl:
+            Number(
+              completedJob.insertedFollowersCount || 0
+            ) > 0
+              ? "follower-list.html"
+              : "animal-list.html",
+
+          message:
+            "ℹ️ تم استيراد هذا الملف بالفعل، ولم يكرر مُرَبِّيك الحيوانات أو الأحداث.",
+
+          insertedAnimalsCount:
+            Number(
+              completedJob.insertedAnimalsCount || 0
+            ),
+
+          insertedFollowersCount:
+            Number(
+              completedJob.insertedFollowersCount || 0
+            ),
+
+          insertedMothersCount:
+            Number(
+              completedJob.insertedMothersCount || 0
+            ),
+
+          savedEventsCount:
+            Number(
+              completedJob.savedEventsCount || 0
+            ),
+                    savedSourceEventsCount:
+            Number(
+              completedJob.savedSourceEventsCount || 0
+            ),
+
+          savedDerivedEventsCount:
+            Number(
+              completedJob.savedDerivedEventsCount || 0
+            ),
+          updatedAnimalsCount: 0,
+          savedSeedEventsCount: 0,
+
+          totalAnimalsTouched:
+            Number(
+              completedJob.insertedAnimalsCount || 0
+            ),
+
+          baselineSummary: {
+            totalRows:
+              baselinePreview.totalRows,
+
+            readyAnimalsCount:
+              baselinePreview.readyAnimalsCount,
+
+            needsReviewCount:
+              baselinePreview.needsReviewCount,
+
+            baselineConfidence:
+              baselinePreview.baselineConfidence,
+
+            baselineConfidenceLevel:
+              herdImportV2PublicConfidenceLevelSrv(
+                baselinePreview.baselineConfidence
+              )
+          },
+
+          persistencePlan
+        });
+      }
+    }
+
+    if (
+      eventRows.length > 0 &&
+      !persistencePlan.atomicEligible
+    ) {
+      return res.status(409).json({
+        ok: false,
+
+        error:
+          "herd_import_v2_chunked_persistence_not_enabled",
+
+        message:
+          "اكتملت المراجعة، لكن هذا الملف يحتاج مسار الحفظ المجزأ قبل تشغيله. لم يتم حفظ أي بيانات.",
+
+        totalAnimalRows:
+          rows.length,
+
+        totalEventRows:
+          eventRows.length,
+
+        persistencePlan
+      });
+    }
+
     const gateRejected = [];
 
-for (const base of baselinePreview.animalsInternal || []) {
-  const gate = herdImportV2GateDecisionInternalSrv(base);
-  const numberStr = addAnimalDigitsSrv(gate.formData.animalNumber);
+    for (
+      const base
+      of baselinePreview.animalsInternal || []
+    ) {
+      const gate =
+        herdImportV2GateDecisionInternalSrv(
+          base
+        );
 
-  if (!gate.ok) {
-    gateRejected.push({
-      animalNumber: numberStr,
-      fieldErrors: gate.fieldErrors,
-      message:
-        gate.guardMessage ||
-        "❌ راجع الحقول المطلوبة لهذا الحيوان."
-    });
+      const numberStr =
+        addAnimalDigitsSrv(
+          gate.formData.animalNumber
+        );
 
-    continue;
-  }
+      if (!gate.ok) {
+        gateRejected.push({
+          animalNumber:
+            numberStr,
 
-  const duplicate = await addAnimalDuplicateCheckSrv(uid, numberStr);
+          fieldErrors:
+            gate.fieldErrors,
 
-  if (!duplicate.ok) {
-    gateRejected.push({
-      animalNumber: numberStr,
-      reason: duplicate.duplicate
-        ? "duplicate_animal_number"
-        : "duplicate_check_failed",
-      collection: duplicate.collection || null,
-      message: duplicate.message
-    });
-  }
-}
+          message:
+            gate.guardMessage ||
+            "❌ راجع الحقول المطلوبة لهذا الحيوان."
+        });
 
-if (gateRejected.length) {
-  return res.status(400).json({
-    ok: false,
-    error: "herd_import_v2_gate_failed",
-    message: `❌ لم يتم الاستيراد. يوجد ${gateRejected.length} حيوان لا يطابق شروط إضافة الحيوان.`,
-    rejectedCount: gateRejected.length,
-    rejected: gateRejected
-  });
-}
-    const eventsPreflight =
-  herdImportV2BuildEventsPreflightInternalSrv(
-    eventRows,
-    baselinePreview.animalsInternal,
-    baselinePreview.previewAnimals
-  );
+        continue;
+      }
 
-const persistencePlan =
-  herdImportV2BuildPersistencePlanInternalSrv({
-    uid,
-    baselinePreview,
-    eventsPreflight,
-    sourceProfile,
-    importOptions
-  });
+      const duplicate =
+        await addAnimalDuplicateCheckSrv(
+          uid,
+          numberStr
+        );
 
-if (
-  eventRows.length > 0 &&
-  !eventsPreflight.validationReady
-) {
-  return res.status(400).json({
-    ok: false,
+      if (!duplicate.ok) {
+        gateRejected.push({
+          animalNumber:
+            numberStr,
 
-    error:
-      "herd_import_v2_events_validation_failed",
+          reason:
+            duplicate.duplicate
+              ? "duplicate_animal_number"
+              : "duplicate_check_failed",
 
-    message:
-      `❌ لم يتم الحفظ. يوجد ${eventsPreflight.rejectedEventsCount} صف أحداث مرفوض.`,
+          collection:
+            duplicate.collection || null,
 
-    totalAnimalRows:
-      rows.length,
+          message:
+            duplicate.message
+        });
+      }
+    }
 
-    totalEventRows:
-      eventRows.length,
+    if (gateRejected.length) {
+      return res.status(400).json({
+        ok: false,
 
-    eventImportSummary: {
-      readyEventsCount:
-        eventsPreflight.readyEventsCount,
+        error:
+          "herd_import_v2_gate_failed",
 
-      rejectedEventsCount:
-        eventsPreflight.rejectedEventsCount,
+        message:
+          `❌ لم يتم الاستيراد. يوجد ${gateRejected.length} حيوان لا يطابق شروط إضافة الحيوان.`,
 
-      reasonCounts:
-        eventsPreflight.reasonCounts
-    },
+        rejectedCount:
+          gateRejected.length,
 
-    persistencePlan
-  });
-}
+        rejected:
+          gateRejected
+      });
+    }
 
-if (eventRows.length > 0) {
-  return res.status(409).json({
-    ok: false,
+    if (eventRows.length > 0) {
+      const writeSet =
+        herdImportV2BuildAtomicWriteSetInternalSrv({
+          uid,
+          baselinePreview,
+          eventsPreflight,
+          sourceProfile,
+          persistencePlan
+        });
 
-    error:
-      "herd_import_v2_persistence_plan_ready_not_enabled",
+      const saved =
+        await herdImportV2CommitAtomicWriteSetInternalSrv({
+          uid,
+          persistencePlan,
+          writeSet,
+          sourceProfile
+        });
 
-    message:
-      "✅ اكتمل التحقق الموحد وخطة الكتابة الحتمية، ولم يتم حفظ أي بيانات بعد.",
+      if (
+        typeof scheduleGroupsRebuildSrv ===
+        "function"
+      ) {
+        scheduleGroupsRebuildSrv(
+          uid,
+          "herd_import_v2_unified_save"
+        );
+      }
 
-    totalAnimalRows:
-      rows.length,
+      return res.json({
+        ok: true,
+        mode: "herd_import_v2",
+        importMode: "save_operational_import",
+        persistenceStatus: "completed",
 
-    totalEventRows:
-      eventRows.length,
+        alreadyImported:
+          saved.alreadyCompleted === true,
 
-    eventImportSummary: {
-      readyEventsCount:
-        eventsPreflight.readyEventsCount,
+        importId:
+          persistencePlan.importId,
 
-      rejectedEventsCount:
-        eventsPreflight.rejectedEventsCount,
+        workbookFingerprint:
+          persistencePlan.workbookFingerprint,
 
-      validationReady:
-        eventsPreflight.validationReady
-    },
+        redirectUrl:
+          saved.insertedFollowersCount > 0
+            ? "follower-list.html"
+            : "animal-list.html",
 
-    persistencePlan
-  });
-}
+        message:
+          saved.alreadyCompleted
+            ? "ℹ️ تم استيراد هذا الملف بالفعل، ولم يكرر مُرَبِّيك الحيوانات أو الأحداث."
+            : `✅ تم استيراد ${saved.insertedAnimalsCount} حيوان و${saved.savedEventsCount} حدث بنجاح.`,
+
+        insertedAnimalsCount:
+          saved.insertedAnimalsCount,
+
+        insertedFollowersCount:
+          saved.insertedFollowersCount,
+
+        insertedMothersCount:
+          saved.insertedMothersCount,
+
+        savedEventsCount:
+          saved.savedEventsCount,
+                savedSourceEventsCount:
+          saved.savedSourceEventsCount,
+
+        savedDerivedEventsCount:
+          saved.savedDerivedEventsCount,
+
+        updatedAnimalsCount: 0,
+        savedSeedEventsCount: 0,
+
+        totalAnimalsTouched:
+          saved.insertedAnimalsCount,
+
+        sourceProfile:
+          herdImportV2PublicSourceProfileSrv(
+            sourceProfile
+          ),
+
+        baselineSummary: {
+          totalRows:
+            baselinePreview.totalRows,
+
+          readyAnimalsCount:
+            baselinePreview.readyAnimalsCount,
+
+          needsReviewCount:
+            baselinePreview.needsReviewCount,
+
+          baselineConfidence:
+            baselinePreview.baselineConfidence,
+
+          baselineConfidenceLevel:
+            herdImportV2PublicConfidenceLevelSrv(
+              baselinePreview.baselineConfidence
+            )
+        },
+
+        eventImportSummary: {
+          totalRows:
+            eventsPreflight.totalEventsCount,
+
+          readyEventsCount:
+            eventsPreflight.readyEventsCount,
+
+          rejectedEventsCount:
+            eventsPreflight.rejectedEventsCount,
+
+          validationReady:
+            eventsPreflight.validationReady
+        },
+
+        persistencePlan: {
+          ...persistencePlan,
+          executionStatus: "completed",
+          persistenceEnabled: true,
+          saveEnabled: true
+        },
+
+        seedEventsSummary: {
+          totalSeedEventsCount: 0,
+          animalsWithSeedEventsCount: 0,
+          seedEventsPerAnimal: 0,
+          seedEventsConfidence: 1,
+
+          seedEventsConfidenceLevel:
+            herdImportV2PublicConfidenceLevelSrv(1)
+        }
+      });
+        }
+
     let batch = db.batch();
     let ops = 0;
 
