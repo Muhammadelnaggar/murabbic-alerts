@@ -484,12 +484,18 @@ const mothersCount =
 
 const followersCount =
   Number(j.insertedFollowersCount || 0);
-
 const serverMessage =
   String(
     j.message ||
     "تمت عملية الاستيراد بنجاح."
   );
+const importId =
+  String(j.importId || "").trim();
+
+const importQuery =
+  importId
+    ? `?importId=${encodeURIComponent(importId)}`
+    : "";
 
 if (
   j.ok === true &&
@@ -511,7 +517,7 @@ if (
       <button
         type="button"
         class="ghost"
-        onclick="location.href='animal-list.html'"
+        onclick="location.href='animal-list.html${importQuery}'"
       >
         عرض الأمهات (${mothersCount})
       </button>
@@ -519,7 +525,7 @@ if (
       <button
         type="button"
         class="ghost"
-        onclick="location.href='follower-list.html'"
+        onclick="location.href='follower-list.html${importQuery}'"
       >
         عرض التوابع (${followersCount})
       </button>
