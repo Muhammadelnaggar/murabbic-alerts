@@ -432,10 +432,23 @@ lastFilePayload = {
 renderRows(j.previewAnimals || [], j);
 renderEvents(j.previewEvents || []);
      
+const animalSummary =
+  j.baselineSummary || {};
+
+const totalAnimalRows =
+  Number(animalSummary.totalRows || 0);
+
+const readyAnimalsCount =
+  Number(animalSummary.readyAnimalsCount || 0);
+
 lastPreviewOk = !!(
-  j.ok &&
-  j.baselineSummary &&
-  j.baselineSummary.readyForSavePreview
+  j.ok === true &&
+  j.requiresDefaultAnimalType !== true &&
+  totalAnimalRows > 0 &&
+  readyAnimalsCount === totalAnimalRows &&
+  Number(animalSummary.needsReviewCount || 0) === 0 &&
+  Number(animalSummary.missingNumberCount || 0) === 0 &&
+  Number(animalSummary.duplicateInFileCount || 0) === 0
 );
 
 btnSave.disabled = !lastPreviewOk;
