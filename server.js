@@ -5459,13 +5459,24 @@ function herdImportV2BuildEventsPreflightInternalSrv(
         finalLastInseminationDate:
           "",
 
-        expectedLastInseminationDate:
-          String(
-            animal.lastInseminationDate ||
-            ""
-          ).slice(0, 10)
-      });
+  expectedLastInseminationDate:
+  String(
+    animal.lastInseminationDate ||
+    ""
+  ).slice(0, 10),
 
+finalServicesCount:
+  null,
+
+expectedServicesCount:
+  Math.max(
+    0,
+    Number(
+      animal.servicesCount ||
+      0
+    ) || 0
+  )
+});
       continue;
     }
 
@@ -5517,104 +5528,144 @@ function herdImportV2BuildEventsPreflightInternalSrv(
       }
     }
 
-    const expectedRepro =
-      herdImportV2EventReproStatusInternalSrv(
-        animal.reproductiveStatus
-      );
+ const expectedRepro =
+  herdImportV2EventReproStatusInternalSrv(
+    animal.reproductiveStatus
+  );
 
-    const expectedAI =
-      String(
-        animal.lastInseminationDate ||
-        ""
-      ).slice(0, 10);
+const expectedAI =
+  String(
+    animal.lastInseminationDate ||
+    ""
+  ).slice(0, 10);
 
-    const lastReproRow =
-      state.reproductiveRows[
-        state.reproductiveRows.length -
-        1
-      ];
+const expectedServicesCount =
+  Math.max(
+    0,
+    Number(
+      animal.servicesCount ||
+      0
+    ) || 0
+  );
 
-    if (
-      !failed &&
-      state.hasReproductiveEvent &&
-      expectedRepro &&
-      expectedRepro !==
-        state.reproductiveStatus
-    ) {
-      herdImportV2EventIssueInternalSrv(
-        lastReproRow,
+const lastReproRow =
+  state.reproductiveRows[
+    state.reproductiveRows.length -
+    1
+  ];
 
-        "event_sequence_final_reproductive_status_mismatch",
+if (
+  !failed &&
+  state.hasReproductiveEvent &&
+  expectedRepro &&
+  expectedRepro !==
+    state.reproductiveStatus
+) {
+  herdImportV2EventIssueInternalSrv(
+    lastReproRow,
 
-        `نهاية تسلسل الأحداث تعطي الحالة «${state.reproductiveStatus || "غير محددة"}»، بينما صف الحيوان يحدد حالته الحالية «${expectedRepro}».`,
+    "event_sequence_final_reproductive_status_mismatch",
 
-        "reproductiveStatus",
+    `نهاية تسلسل الأحداث تعطي الحالة «${state.reproductiveStatus || "غير محددة"}»، بينما صف الحيوان يحدد حالته الحالية «${expectedRepro}».`,
 
-        "sequence"
-      );
+    "reproductiveStatus",
 
-      failed =
-        true;
-    }
+    "sequence"
+  );
 
-    if (
-      !failed &&
-      state.inseminationEventsCount >
-        0 &&
-      expectedAI &&
-      expectedAI !==
-        state.lastInseminationDate
-    ) {
-      herdImportV2EventIssueInternalSrv(
-        lastReproRow,
+  failed =
+    true;
+}
 
-        "event_sequence_last_insemination_mismatch",
+if (
+  !failed &&
+  state.inseminationEventsCount >
+    0 &&
+  expectedAI &&
+  expectedAI !==
+    state.lastInseminationDate
+) {
+  herdImportV2EventIssueInternalSrv(
+    lastReproRow,
 
-        `آخر تلقيح في تسلسل الأحداث هو ${state.lastInseminationDate || "غير موجود"}، بينما صف الحيوان يحدد ${expectedAI}.`,
+    "event_sequence_last_insemination_mismatch",
 
-        "lastInseminationDate",
+    `آخر تلقيح في تسلسل الأحداث هو ${state.lastInseminationDate || "غير موجود"}، بينما صف الحيوان يحدد ${expectedAI}.`,
 
-        "sequence"
-      );
+    "lastInseminationDate",
 
-      failed =
-        true;
-    }
+    "sequence"
+  );
 
-    sequenceSummaries.push({
-      animalNumber,
+  failed =
+    true;
+}
 
-      eventsCount:
-        items.length,
+if (
+  !failed &&
+  state.inseminationEventsCount >
+    0 &&
+  expectedServicesCount !==
+    state.servicesCount
+) {
+  herdImportV2EventIssueInternalSrv(
+    lastReproRow,
 
-      reproductiveEventsCount:
-        state.reproductiveRows.length,
+    "event_sequence_services_count_mismatch",
 
-      ok:
-        !failed,
+    `تسلسل الأحداث يحتوي على ${state.servicesCount} تلقيح، بينما صف الحيوان يحدد ${expectedServicesCount}.`,
 
-      status:
-        failed
-          ? "rejected"
-          : "valid",
+    "servicesCount",
 
-      finalReproductiveStatus:
-        state.hasReproductiveEvent
-          ? state.reproductiveStatus
-          : expectedRepro,
+    "sequence"
+  );
 
-      expectedReproductiveStatus:
-        expectedRepro,
+  failed =
+    true;
+}
 
-      finalLastInseminationDate:
-        state.inseminationEventsCount >
-        0
-          ? state.lastInseminationDate
-          : expectedAI,
+sequenceSummaries.push({
+  animalNumber,
 
-      expectedLastInseminationDate:
-        expectedAI
-    });
+  eventsCount:
+    items.length,
+
+  reproductiveEventsCount:
+    state.reproductiveRows.length,
+
+  ok:
+    !failed,
+
+  status:
+    failed
+      ? "rejected"
+      : "valid",
+
+  finalReproductiveStatus:
+    state.hasReproductiveEvent
+      ? state.reproductiveStatus
+      : expectedRepro,
+
+  expectedReproductiveStatus:
+    expectedRepro,
+
+  finalLastInseminationDate:
+    state.inseminationEventsCount >
+    0
+      ? state.lastInseminationDate
+      : expectedAI,
+
+  expectedLastInseminationDate:
+    expectedAI,
+
+  finalServicesCount:
+    state.inseminationEventsCount >
+    0
+      ? state.servicesCount
+      : expectedServicesCount,
+
+  expectedServicesCount
+});
   }
 
   const reasonCounts =
@@ -5857,11 +5908,15 @@ function herdImportV2BuildEventsPreflightInternalSrv(
       x => x.ok
     ).length;
 
-  return {
-    previewEvents,
-    sequenceSummaries,
+ 
+   return {
+  previewEvents,
+  sequenceSummaries,
 
-    totalEventsCount:
+  normalizedEventsInternal:
+    normalized,
+
+  totalEventsCount:
       rows.length,
 
     readyEventsCount,
@@ -5894,7 +5949,270 @@ function herdImportV2BuildEventsPreflightInternalSrv(
       rejectedEventsCount === 0
   };
 }
+// ============================================================
+// HERD IMPORT V2 - DETERMINISTIC PERSISTENCE PLAN
+// تأسيس هوية ثابتة وخطة كتابة قابلة للاستئناف — بدون حفظ
+// ============================================================
 
+function herdImportV2StableValueInternalSrv(v) {
+  if (Array.isArray(v)) {
+    return v.map(
+      herdImportV2StableValueInternalSrv
+    );
+  }
+
+  if (
+    v &&
+    typeof v === "object"
+  ) {
+    const out = {};
+
+    for (
+      const key
+      of Object.keys(v).sort()
+    ) {
+      const value = v[key];
+
+      if (
+        value === undefined ||
+        typeof value === "function"
+      ) {
+        continue;
+      }
+
+      out[key] =
+        herdImportV2StableValueInternalSrv(
+          value
+        );
+    }
+
+    return out;
+  }
+
+  return v === undefined
+    ? null
+    : v;
+}
+
+function herdImportV2HashInternalSrv(v) {
+  return crypto
+    .createHash("sha256")
+    .update(
+      JSON.stringify(
+        herdImportV2StableValueInternalSrv(v)
+      )
+    )
+    .digest("hex");
+}
+
+function herdImportV2AnimalPersistenceKeyInternalSrv(
+  uid,
+  base = {}
+) {
+  const gate =
+    herdImportV2GateDecisionInternalSrv(
+      base
+    );
+
+  const animalNumber =
+    addAnimalDigitsSrv(
+      gate.formData?.animalNumber ||
+      base.animalNumber ||
+      ""
+    );
+
+  const collectionName =
+    gate.formData?.entryType ===
+      "followers"
+      ? "calves"
+      : "animals";
+
+  const documentId =
+    `hi2a_${herdImportV2HashInternalSrv({
+      uid,
+      collectionName,
+      animalNumber
+    }).slice(0, 40)}`;
+
+  return {
+    animalNumber,
+    collectionName,
+    documentId
+  };
+}
+
+function herdImportV2EventPersistenceKeyInternalSrv(
+  uid,
+  item = {}
+) {
+  const duplicateKey =
+    item.duplicateKey ||
+    herdImportV2EventDuplicateKeyInternalSrv(
+      item
+    );
+
+  const documentId =
+    `hi2e_${herdImportV2HashInternalSrv({
+      uid,
+      duplicateKey
+    }).slice(0, 40)}`;
+
+  return {
+    animalNumber:
+      item.animalNumber || "",
+
+    eventType:
+      item.eventType || "",
+
+    eventDate:
+      item.eventDate || "",
+
+    duplicateKey,
+    collectionName:
+      "events",
+
+    documentId
+  };
+}
+
+function herdImportV2BuildPersistencePlanInternalSrv({
+  uid = "",
+  baselinePreview = {},
+  eventsPreflight = {},
+  sourceProfile = {},
+  importOptions = {}
+} = {}) {
+  const animals =
+    Array.isArray(
+      baselinePreview.animalsInternal
+    )
+      ? baselinePreview.animalsInternal
+      : [];
+
+  const events =
+    Array.isArray(
+      eventsPreflight.normalizedEventsInternal
+    )
+      ? eventsPreflight.normalizedEventsInternal
+      : [];
+
+  const ready =
+    Boolean(
+      baselinePreview.readyForSavePreview
+    ) &&
+    Boolean(
+      eventsPreflight.validationReady
+    );
+
+  const animalRefs =
+    animals.map(
+      base =>
+        herdImportV2AnimalPersistenceKeyInternalSrv(
+          uid,
+          base
+        )
+    );
+
+  const eventRefs =
+    events.map(
+      item =>
+        herdImportV2EventPersistenceKeyInternalSrv(
+          uid,
+          item
+        )
+    );
+
+  const workbookFingerprint =
+    herdImportV2HashInternalSrv({
+      sourceProfileKey:
+        sourceProfile.key || "",
+
+      importOptions,
+      animals,
+
+      events:
+        events.map(
+          item => ({
+            animalNumber:
+              item.animalNumber || "",
+
+            eventType:
+              item.eventType || "",
+
+            eventDate:
+              item.eventDate || "",
+
+            duplicateKey:
+              item.duplicateKey ||
+              herdImportV2EventDuplicateKeyInternalSrv(
+                item
+              )
+          })
+        )
+    });
+
+  const importId =
+    `hi2_${herdImportV2HashInternalSrv({
+      uid,
+      workbookFingerprint
+    }).slice(0, 40)}`;
+
+  return {
+    ready,
+
+    executionStatus:
+      ready
+        ? "planned_not_enabled"
+        : "blocked_by_validation",
+
+    importId,
+    workbookFingerprint,
+
+    jobCollection:
+      "herd_import_jobs",
+
+    jobDocumentId:
+      importId,
+
+    animalWritesCount:
+      animalRefs.length,
+
+    eventWritesCount:
+      eventRefs.length,
+
+    importJobWritesCount:
+      2,
+
+    totalPlannedWrites:
+      animalRefs.length +
+      eventRefs.length +
+      2,
+
+    deterministicAnimalRefs:
+      true,
+
+    deterministicEventRefs:
+      true,
+
+    allRefsDeterministic:
+      true,
+
+    resumeFoundationReady:
+      ready,
+
+    persistenceEnabled:
+      false,
+
+    saveEnabled:
+      false,
+
+    animalRefsPreview:
+      animalRefs.slice(0, 5),
+
+    eventRefsPreview:
+      eventRefs.slice(0, 5)
+  };
+}
 function addAnimalImportKindSrv(body = {}) {
   const raw = addAnimalStrSrv(
     body.importKind ||
@@ -8991,6 +9309,15 @@ const eventsPreflight =
     baselinePreview.previewAnimals
   );
 
+const persistencePlan =
+  herdImportV2BuildPersistencePlanInternalSrv({
+    uid: req.userId,
+    baselinePreview,
+    eventsPreflight,
+    sourceProfile,
+    importOptions
+  });
+
 return res.json({
   ok: true,
   mode: "herd_import_v2",
@@ -9134,7 +9461,7 @@ eventImportSummary: {
   reasonCounts:
     eventsPreflight.reasonCounts
 },
- eventSequenceSummary: {
+eventSequenceSummary: {
   animalsCount:
     eventsPreflight.sequenceAnimalsCount,
 
@@ -9147,7 +9474,10 @@ eventImportSummary: {
   animals:
     eventsPreflight.sequenceSummaries
 },
- seedEventsSummary: {
+
+persistencePlan,
+
+seedEventsSummary: {
   calvingEventsCount: 0,
   inseminationEventsCount: 0,
   pregnancyDiagnosisEventsCount: 0,
@@ -9224,16 +9554,6 @@ app.post("/api/herd-import-v2/save-operational", requireUserId, async (req, res)
         ok: false,
         error: "herd_import_v2_rows_required",
         message: "لا توجد صفوف حيوانات صالحة للاستيراد."
-      });
-    }
-
-    if (eventRows.length > 0) {
-      return res.status(409).json({
-        ok: false,
-        error: "herd_import_v2_events_preflight_required",
-        message: "❌ لم يتم الحفظ. تمت قراءة شيت الأحداث، لكن لا يمكن حفظه قبل اكتمال التحقق الموحد من جميع صفوفه.",
-        totalAnimalRows: rows.length,
-        totalEventRows: eventRows.length
       });
     }
 
@@ -9333,6 +9653,86 @@ if (gateRejected.length) {
     message: `❌ لم يتم الاستيراد. يوجد ${gateRejected.length} حيوان لا يطابق شروط إضافة الحيوان.`,
     rejectedCount: gateRejected.length,
     rejected: gateRejected
+  });
+}
+    const eventsPreflight =
+  herdImportV2BuildEventsPreflightInternalSrv(
+    eventRows,
+    baselinePreview.animalsInternal,
+    baselinePreview.previewAnimals
+  );
+
+const persistencePlan =
+  herdImportV2BuildPersistencePlanInternalSrv({
+    uid,
+    baselinePreview,
+    eventsPreflight,
+    sourceProfile,
+    importOptions
+  });
+
+if (
+  eventRows.length > 0 &&
+  !eventsPreflight.validationReady
+) {
+  return res.status(400).json({
+    ok: false,
+
+    error:
+      "herd_import_v2_events_validation_failed",
+
+    message:
+      `❌ لم يتم الحفظ. يوجد ${eventsPreflight.rejectedEventsCount} صف أحداث مرفوض.`,
+
+    totalAnimalRows:
+      rows.length,
+
+    totalEventRows:
+      eventRows.length,
+
+    eventImportSummary: {
+      readyEventsCount:
+        eventsPreflight.readyEventsCount,
+
+      rejectedEventsCount:
+        eventsPreflight.rejectedEventsCount,
+
+      reasonCounts:
+        eventsPreflight.reasonCounts
+    },
+
+    persistencePlan
+  });
+}
+
+if (eventRows.length > 0) {
+  return res.status(409).json({
+    ok: false,
+
+    error:
+      "herd_import_v2_persistence_plan_ready_not_enabled",
+
+    message:
+      "✅ اكتمل التحقق الموحد وخطة الكتابة الحتمية، ولم يتم حفظ أي بيانات بعد.",
+
+    totalAnimalRows:
+      rows.length,
+
+    totalEventRows:
+      eventRows.length,
+
+    eventImportSummary: {
+      readyEventsCount:
+        eventsPreflight.readyEventsCount,
+
+      rejectedEventsCount:
+        eventsPreflight.rejectedEventsCount,
+
+      validationReady:
+        eventsPreflight.validationReady
+    },
+
+    persistencePlan
   });
 }
     let batch = db.batch();
