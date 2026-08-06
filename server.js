@@ -1,6 +1,7 @@
 
 
 
+
 // server.js — stable build, tenant-aware
 // ----------------------------------------------
 const path    = require('path');
@@ -3468,13 +3469,17 @@ function herdImportV2ParseApprovedTemplateSrv(body = {}) {
     }
   );
 
+  const sheetNames = [
+    ...(wb.SheetNames || [])
+  ];
+
   const hasMothersSheet =
-    (wb.SheetNames || []).includes(
+    sheetNames.includes(
       "الأمهات"
     );
 
   const hasFollowersSheet =
-    (wb.SheetNames || []).includes(
+    sheetNames.includes(
       "التوابع"
     );
 
@@ -3489,7 +3494,7 @@ function herdImportV2ParseApprovedTemplateSrv(body = {}) {
 
   const readSheetRows = (
     sheetName,
-    entryType
+    entryType = ""
   ) => {
     const sheet =
       wb.Sheets[sheetName];
@@ -3505,37 +3510,102 @@ function herdImportV2ParseApprovedTemplateSrv(body = {}) {
         }
       );
 
-    const rows =
-      addAnimalImportNormalizeSheetRowsSrv(
-        jsonRows
-      );
+    return jsonRows
+      .map((sourceRow, index) => {
+        const normalizedRows =
+          addAnimalImportNormalizeSheetRowsSrv(
+            [sourceRow]
+          );
 
-    for (const row of rows) {
-      Object.defineProperty(
-        row,
-        "__murabbikEntryType",
-        {
-          value: entryType,
-          enumerable: false,
-          configurable: false
-        }
-      );
-    }
+        const row =
+          normalizedRows[0] || null;
 
-    return rows;
+        if (!row) return null;
+
+        const sourceRowNumber =
+          Number(sourceRow?.__rowNum__);
+
+        const excelRowNumber =
+          Number.isInteger(sourceRowNumber)
+            ? sourceRowNumber + 1
+            : index + 2;
+
+        Object.defineProperties(
+          row,
+          {
+            __murabbikEntryType: {
+              value: entryType,
+              enumerable: false,
+              configurable: false
+            },
+
+            __murabbikSheetName: {
+              value: sheetName,
+              enumerable: false,
+              configurable: false
+            },
+
+            __murabbikRowNumber: {
+              value: excelRowNumber,
+              enumerable: false,
+              configurable: false
+            }
+          }
+        );
+
+        return row;
+      })
+      .filter(Boolean);
   };
 
-  return [
-    ...readSheetRows(
+  const mothersRows =
+    readSheetRows(
       "الأمهات",
       "mothers"
-    ),
+    );
 
-    ...readSheetRows(
+  const followersRows =
+    readSheetRows(
       "التوابع",
       "followers"
-    )
-  ];
+    );
+
+  const eventRows =
+    readSheetRows(
+      "الأحداث"
+    );
+
+  return {
+    animalRows: [
+      ...mothersRows,
+      ...followersRows
+    ],
+
+    eventRows,
+    sheetNames,
+
+    sheets: {
+      mothers: {
+        exists: hasMothersSheet,
+        rowsCount: mothersRows.length
+      },
+
+      followers: {
+        exists: hasFollowersSheet,
+        rowsCount: followersRows.length
+      },
+
+      events: {
+        exists:
+          sheetNames.includes(
+            "الأحداث"
+          ),
+
+        rowsCount:
+          eventRows.length
+      }
+    }
+  };
 }
 
 function addAnimalImportKindSrv(body = {}) {
@@ -6579,17 +6649,24 @@ app.get("/api/herd-import-v2/guide", requireUserId, (req, res) => {
 
 app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
   try {
-    const body = req.body || {};
-       const rows =
+        const body = req.body || {};
+
+    const templateData =
       herdImportV2ParseApprovedTemplateSrv(
         body
       );
+
+    const rows =
+      templateData.animalRows || [];
+
+    const eventRows =
+      templateData.eventRows || [];
 
     if (!rows.length) {
       return res.status(400).json({
         ok: false,
         error: "herd_import_v2_rows_required",
-        message: "لا توجد صفوف صالحة للمعاينة.",
+        message: "لا توجد صفوف حيوانات صالحة للمعاينة.",
         sourceProfile: null,
         headers: []
       });
@@ -6618,10 +6695,6 @@ const baselinePreview = herdImportV2BuildAnimalBaselinePreviewInternalSrv(
   baselinePreview.reasonCounts?.missing_animal_type || 0
 );
 const requiresDefaultAnimalType = missingAnimalTypeCount > 0;
-const seedEventsPreview = herdImportV2BuildSeedEventsPreviewInternalSrv(
-  baselinePreview.animalsInternal
-);
-
 
 return res.json({
   ok: true,
@@ -6629,8 +6702,29 @@ return res.json({
   importMode: "source_profile_preview_only",
  message: requiresDefaultAnimalType
   ? "الملف لا يحتوي على نوع الحيوان. اختر نوع القطيع ثم أعد المعاينة."
-  : "تمت قراءة ملف القطيع وتحليل بنيته بنجاح. لم يتم حفظ أي بيانات.",
-  totalRows: rows.length,
+  : (
+      eventRows.length > 0
+        ? "تمت قراءة بيانات القطيع وشيت الأحداث بنجاح. لم يتم حفظ أي بيانات."
+        : "تمت قراءة ملف القطيع وتحليل بنيته بنجاح. لم يتم حفظ أي بيانات."
+    ),
+
+  totalRows:
+    rows.length + eventRows.length,
+
+  totalAnimalRows:
+    rows.length,
+
+  totalEventRows:
+    eventRows.length,
+
+  workbookSummary: {
+    sheetNames:
+      templateData.sheetNames || [],
+
+    sheets:
+      templateData.sheets || {}
+  },
+
   requiresDefaultAnimalType,
 requiredInput: requiresDefaultAnimalType
   ? {
@@ -6670,12 +6764,30 @@ baselineSummary: {
   archivedRowsCount: baselinePreview.archivedRowsCount,
   baselineConfidence: baselinePreview.baselineConfidence,
   baselineConfidenceLevel: herdImportV2PublicConfidenceLevelSrv(baselinePreview.baselineConfidence),
-  readyForSavePreview: !requiresDefaultAnimalType && baselinePreview.readyForSavePreview,
+  readyForSavePreview:
+    !requiresDefaultAnimalType &&
+    baselinePreview.readyForSavePreview &&
+    eventRows.length === 0,
 
   animalTypeCounts: baselinePreview.animalTypeCounts,
   productionStatusCounts: baselinePreview.productionStatusCounts,
   reproductiveStatusCounts: baselinePreview.reproductiveStatusCounts,
   reasonCounts: baselinePreview.reasonCounts
+},
+  eventImportSummary: {
+  sheetExists:
+    templateData.sheets?.events?.exists === true,
+
+  totalRows:
+    eventRows.length,
+
+  validationStatus:
+    eventRows.length > 0
+      ? "pending_server_validation"
+      : "not_provided",
+
+  readyForSavePreview:
+    eventRows.length === 0
 },
  seedEventsSummary: {
   calvingEventsCount: 0,
@@ -6693,9 +6805,10 @@ baselineSummary: {
   seedEventsConfidenceLevel:
     herdImportV2PublicConfidenceLevelSrv(1),
 
-  readyForSavePreview:
+    readyForSavePreview:
     !requiresDefaultAnimalType &&
-    baselinePreview.readyForSavePreview
+    baselinePreview.readyForSavePreview &&
+    eventRows.length === 0
 }
 });
 
@@ -6735,18 +6848,35 @@ app.post("/api/herd-import-v2/save-operational", requireUserId, async (req, res)
       });
     }
 
-    const uid = req.userId;
+     const uid = req.userId;
     const body = req.body || {};
-        const rows =
+
+    const templateData =
       herdImportV2ParseApprovedTemplateSrv(
         body
       );
+
+    const rows =
+      templateData.animalRows || [];
+
+    const eventRows =
+      templateData.eventRows || [];
 
     if (!rows.length) {
       return res.status(400).json({
         ok: false,
         error: "herd_import_v2_rows_required",
-        message: "لا توجد صفوف صالحة للاستيراد."
+        message: "لا توجد صفوف حيوانات صالحة للاستيراد."
+      });
+    }
+
+    if (eventRows.length > 0) {
+      return res.status(409).json({
+        ok: false,
+        error: "herd_import_v2_events_preflight_required",
+        message: "❌ لم يتم الحفظ. تمت قراءة شيت الأحداث، لكن لا يمكن حفظه قبل اكتمال التحقق الموحد من جميع صفوفه.",
+        totalAnimalRows: rows.length,
+        totalEventRows: eventRows.length
       });
     }
 
@@ -6784,9 +6914,6 @@ if (missingAnimalTypeCount > 0) {
     missingAnimalTypeCount
   });
 }
-    const seedEventsPreview = herdImportV2BuildSeedEventsPreviewInternalSrv(
-      baselinePreview.animalsInternal
-    );
 
     if (
       sourceProfile.key === "unknown" ||
