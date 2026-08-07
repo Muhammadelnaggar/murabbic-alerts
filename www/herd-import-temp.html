@@ -5,20 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
  <title>استيراد القطيع</title>
   <link rel="stylesheet" href="css/forms.css" />
- <style>
-  .herd-import-systems .system-future {
-    opacity: 0.22;
-    filter: grayscale(1);
-    pointer-events: none;
-    user-select: none;
-    box-shadow: none !important;
-  }
 
-  .herd-import-systems .system-active {
-    opacity: 1;
-    font-weight: 700;
-  }
-</style>
 </head>
 
 <body data-page="herd-import">
@@ -102,7 +89,7 @@
 
   <section id="resultsBox" class="card" style="display:none;">
     <h2>تفاصيل المعاينة</h2>
-    <div id="rowsList" class="preview-scroll"></div>
+    <div id="rowsList"></div>
   </section>
 </main>
 
@@ -227,7 +214,48 @@ function importPreviewCell(value, className = ""){
 
   return td;
 }
+function renderServerRejections(j = {}){
+  const rejectedItems =
+    Array.isArray(j?.previewCommand?.rejectedItems)
+      ? j.previewCommand.rejectedItems
+      : [];
 
+  if (!rejectedItems.length) {
+    return;
+  }
+
+  const box =
+    document.createElement("div");
+
+  box.className =
+    "import-preview-rejections";
+
+  const title =
+    document.createElement("div");
+
+  title.className =
+    "import-preview-rejections-title";
+
+  title.textContent =
+    "المطلوب تصحيحه";
+
+  box.appendChild(title);
+
+  rejectedItems.forEach(item => {
+    const message =
+      document.createElement("div");
+
+    message.className =
+      "import-preview-rejection-message";
+
+    message.textContent =
+      item?.message || "";
+
+    box.appendChild(message);
+  });
+
+  rowsList.appendChild(box);
+}
 
 function appendImportPreviewTable(
   title,
@@ -296,21 +324,19 @@ function appendImportPreviewTable(
   const headerRow =
     document.createElement("tr");
 
-  const headers =
-    kind === "event"
-      ? [
-          "رقم الحيوان",
-          "نوع الحدث",
-          "تاريخ الحدث",
-          "النتيجة",
-          "سبب الرفض"
-        ]
-      : [
-          "رقم الحيوان",
-          "نوع الحيوان",
-          "النتيجة",
-          "سبب الرفض"
-        ];
+ const headers =
+  kind === "event"
+    ? [
+        "رقم الحيوان",
+        "نوع الحدث",
+        "تاريخ الحدث",
+        "النتيجة"
+      ]
+    : [
+        "رقم الحيوان",
+        "نوع الحيوان",
+        "النتيجة"
+      ];
 
   headers.forEach(text => {
     const th =
@@ -386,15 +412,6 @@ function appendImportPreviewTable(
     statusCell.appendChild(badge);
     tr.appendChild(statusCell);
 
-    tr.appendChild(
-      importPreviewCell(
-        row?.ok === true
-          ? "—"
-          : row?.message,
-        "import-preview-reason"
-      )
-    );
-
     tbody.appendChild(tr);
   });
 
@@ -435,6 +452,7 @@ function renderRows(rows, j = {}){
   source.appendChild(sourceName);
   source.appendChild(confidence);
   rowsList.appendChild(source);
+  renderServerRejections(j);
 
   const mothers =
     (rows || []).filter(
@@ -597,6 +615,17 @@ async function callHerdImport(path){
     btnGuide.disabled = false;
   }
 });
+  herdFile.addEventListener("change", () => {
+  lastFilePayload = null;
+  lastPreviewOk = false;
+
+  btnSave.disabled = true;
+
+  summaryBox.style.display = "none";
+  resultsBox.style.display = "none";
+
+  rowsList.innerHTML = "";
+});
   btnPreview.addEventListener("click", async () => {
     try {
       btnPreview.disabled = true;
@@ -625,16 +654,23 @@ renderRows(j.previewAnimals || [], j);
 renderEvents(j.previewEvents || []);
      
 lastPreviewOk =
-  j?.eventImportSummary
-    ?.readyForSavePreview === true;
+  j?.previewCommand
+    ?.saveEnabled === true;
 
 btnSave.disabled =
   !lastPreviewOk;
-     showMessage(
+
+const previewStatus =
+  j?.previewCommand?.status ||
+  "rejected";
+
+showMessage(
   j.message || "تمت المعاينة.",
-  lastPreviewOk
+  previewStatus === "ready"
     ? "status-ok"
-    : "status-error"
+    : previewStatus === "needs_input"
+      ? "status-warn"
+      : "status-error"
 );
 
     } catch (e) {
@@ -739,7 +775,7 @@ showMessage(
       console.error(e);
       showMessage(e.message || "فشل الحفظ.", "status-error");
     } finally {
-      btnSave.disabled = false;
+     btnSave.disabled = !lastPreviewOk;
     }
   });
   loadServerSession().catch(err => {
