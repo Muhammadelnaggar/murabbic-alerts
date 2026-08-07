@@ -21,7 +21,7 @@
 </style>
 </head>
 
-<body>
+<body data-page="herd-import">
 <header class="mbk-head">
   <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
 
@@ -86,7 +86,7 @@
     <div class="kpi-grid">
       <div class="kpi-box">
         <div id="totalRows" class="kpi-value">0</div>
-        <div class="kpi-label">إجمالي الصفوف</div>
+        <div class="kpi-label">إجمالي السجلات</div>
       </div>
       <div class="kpi-box">
         <div id="readyRows" class="kpi-value">0</div>
@@ -101,7 +101,7 @@
   </section>
 
   <section id="resultsBox" class="card" style="display:none;">
-    <h2>نتائج الصفوف</h2>
+    <h2>تفاصيل المعاينة</h2>
     <div id="rowsList" class="preview-scroll"></div>
   </section>
 </main>
@@ -188,98 +188,290 @@ async function loadServerSession(){
   }
 
 function setSummary(j){
-  const baseline = j.baselineSummary || {};
+  const baseline =
+    j?.baselineSummary || {};
+
+  const events =
+    j?.eventImportSummary || {};
 
   $("totalRows").textContent =
-    baseline.totalRows ?? j.totalRows ?? 0;
+    Number(baseline.totalRows || 0) +
+    Number(events.totalRows || 0);
 
   $("readyRows").textContent =
-    baseline.readyAnimalsCount ?? 0;
+    Number(baseline.readyAnimalsCount || 0) +
+    Number(events.readyEventsCount || 0);
 
   $("rejectedRows").textContent =
-    baseline.needsReviewCount ?? 0;
+    Number(baseline.needsReviewCount || 0) +
+    Number(events.rejectedEventsCount || 0);
 
   summaryBox.style.display = "block";
 }
 
-function renderRows(rows, j = {}) {
-  rowsList.innerHTML = "";
 
-  const sourceItem = document.createElement("div");
-  sourceItem.className = "preview-row status-ok";
+function importPreviewCell(value, className = ""){
+  const td =
+    document.createElement("td");
 
-  sourceItem.innerHTML = `
-    <div><b>مصدر الملف:</b> ${j.sourceProfile?.name || "غير محدد"}</div>
-    <div><b>مطابقة شكل الملف:</b> ${j.sourceProfile?.confidenceLevel || "-"}</div>
-  `;
+  if (className) {
+    td.className = className;
+  }
 
-  rowsList.appendChild(sourceItem);
+  td.textContent =
+    value === null ||
+    value === undefined ||
+    String(value).trim() === ""
+      ? "—"
+      : String(value);
 
-  (rows || []).forEach(r => {
-    const item = document.createElement("div");
-
-    item.className =
-      "preview-row " +
-      (r.ok ? "status-ok" : "status-error");
-
-    item.innerHTML = `
-      <div><b>السطر:</b> ${r.row || "-"}</div>
-      <div><b>رقم الحيوان:</b> ${r.animalNumber || "غير موجود"}</div>
-      <div><b>التصنيف:</b> ${r.recordKind || "-"}</div>
-      <div><b>نوع الحيوان:</b> ${r.animalType || "-"}</div>
-      <div><b>الحالة:</b> ${r.status || (r.ok ? "جاهز" : "مرفوض")}</div>
-      <div class="hint">${r.message || ""}</div>
-    `;
-
-    rowsList.appendChild(item);
-  });
-
-  resultsBox.style.display = "block";
+  return td;
 }
- function renderEvents(events) {
+
+
+function appendImportPreviewTable(
+  title,
+  rows,
+  kind
+){
   if (
-    !Array.isArray(events) ||
-    !events.length
+    !Array.isArray(rows) ||
+    rows.length === 0
   ) {
     return;
   }
 
-  const sectionTitle =
+  const rejectedCount =
+    rows.filter(
+      row => row?.ok !== true
+    ).length;
+
+  const section =
+    document.createElement("section");
+
+  section.className =
+    "import-preview-section";
+
+  const head =
     document.createElement("div");
 
-  sectionTitle.className =
-    "preview-row";
+  head.className =
+    "import-preview-head";
 
-  sectionTitle.innerHTML = `
-    <div><b>نتائج الأحداث</b></div>
-  `;
+  const h3 =
+    document.createElement("h3");
 
-  rowsList.appendChild(sectionTitle);
+  h3.textContent = title;
 
-  events.forEach(r => {
-    const item =
-      document.createElement("div");
+  const count =
+    document.createElement("span");
 
-    item.className =
-      "preview-row " +
-      (
-        r.ok
-          ? "status-ok"
-          : "status-error"
+  count.className =
+    "import-preview-count";
+
+  count.textContent =
+    rejectedCount > 0
+      ? `${rows.length} سجل — ${rejectedCount} مرفوض`
+      : `${rows.length} سجل`;
+
+  head.appendChild(h3);
+  head.appendChild(count);
+  section.appendChild(head);
+
+  const wrap =
+    document.createElement("div");
+
+  wrap.className =
+    "import-preview-table-wrap";
+
+  const table =
+    document.createElement("table");
+
+  table.className =
+    "import-preview-table";
+
+  const thead =
+    document.createElement("thead");
+
+  const headerRow =
+    document.createElement("tr");
+
+  const headers =
+    kind === "event"
+      ? [
+          "رقم الحيوان",
+          "نوع الحدث",
+          "تاريخ الحدث",
+          "النتيجة",
+          "سبب الرفض"
+        ]
+      : [
+          "رقم الحيوان",
+          "نوع الحيوان",
+          "النتيجة",
+          "سبب الرفض"
+        ];
+
+  headers.forEach(text => {
+    const th =
+      document.createElement("th");
+
+    th.textContent = text;
+    headerRow.appendChild(th);
+  });
+
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody =
+    document.createElement("tbody");
+
+  rows.forEach(row => {
+    const tr =
+      document.createElement("tr");
+
+    tr.className =
+      row?.ok === true
+        ? "is-ready"
+        : "is-rejected";
+
+    tr.appendChild(
+      importPreviewCell(
+        row?.animalNumber ||
+        "غير موجود"
+      )
+    );
+
+    if (kind === "event") {
+      tr.appendChild(
+        importPreviewCell(
+          row?.eventLabel ||
+          row?.eventType ||
+          "—"
+        )
       );
 
-    item.innerHTML = `
-      <div><b>السطر:</b> ${r.row || "-"}</div>
-      <div><b>رقم الحيوان:</b> ${r.animalNumber || "غير موجود"}</div>
-      <div><b>نوع الحدث:</b> ${r.eventLabel || r.eventType || "-"}</div>
-      <div><b>تاريخ الحدث:</b> ${r.eventDate || "-"}</div>
-      <div><b>الحالة:</b> ${r.status || (r.ok ? "جاهز" : "مرفوض")}</div>
-      <div class="hint">${r.message || ""}</div>
-    `;
+      tr.appendChild(
+        importPreviewCell(
+          row?.eventDate ||
+          "—"
+        )
+      );
+    } else {
+      tr.appendChild(
+        importPreviewCell(
+          row?.animalType ||
+          "—"
+        )
+      );
+    }
 
-    rowsList.appendChild(item);
+    const statusCell =
+      document.createElement("td");
+
+    const badge =
+      document.createElement("span");
+
+    badge.className =
+      "import-preview-status " +
+      (
+        row?.ok === true
+          ? "is-ready"
+          : "is-rejected"
+      );
+
+    badge.textContent =
+      row?.status || "—";
+
+    statusCell.appendChild(badge);
+    tr.appendChild(statusCell);
+
+    tr.appendChild(
+      importPreviewCell(
+        row?.ok === true
+          ? "—"
+          : row?.message,
+        "import-preview-reason"
+      )
+    );
+
+    tbody.appendChild(tr);
   });
-} 
+
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  section.appendChild(wrap);
+  rowsList.appendChild(section);
+}
+
+
+function renderRows(rows, j = {}){
+  rowsList.innerHTML = "";
+
+  const source =
+    document.createElement("div");
+
+  source.className =
+    "import-preview-source";
+
+  const sourceName =
+    document.createElement("span");
+
+  sourceName.textContent =
+    `مصدر الملف: ${
+      j?.sourceProfile?.name ||
+      "غير محدد"
+    }`;
+
+  const confidence =
+    document.createElement("span");
+
+  confidence.textContent =
+    `مطابقة شكل الملف: ${
+      j?.sourceProfile?.confidenceLevel ||
+      "—"
+    }`;
+
+  source.appendChild(sourceName);
+  source.appendChild(confidence);
+  rowsList.appendChild(source);
+
+  const mothers =
+    (rows || []).filter(
+      row =>
+        row?.recordKind === "أم"
+    );
+
+  const followers =
+    (rows || []).filter(
+      row =>
+        row?.recordKind === "تابع"
+    );
+
+  appendImportPreviewTable(
+    "الأمهات",
+    mothers,
+    "animal"
+  );
+
+  appendImportPreviewTable(
+    "التوابع",
+    followers,
+    "animal"
+  );
+
+  resultsBox.style.display =
+    "block";
+}
+
+
+function renderEvents(events){
+  appendImportPreviewTable(
+    "الأحداث",
+    events || [],
+    "event"
+  );
+}
 function renderImportGuide(j){
   importGuideTitle.textContent =
     j.title || "كيف أجهّز ملف الاستيراد؟";
@@ -432,28 +624,18 @@ lastFilePayload = {
 renderRows(j.previewAnimals || [], j);
 renderEvents(j.previewEvents || []);
      
-const animalSummary =
-  j.baselineSummary || {};
+lastPreviewOk =
+  j?.eventImportSummary
+    ?.readyForSavePreview === true;
 
-const totalAnimalRows =
-  Number(animalSummary.totalRows || 0);
-
-const readyAnimalsCount =
-  Number(animalSummary.readyAnimalsCount || 0);
-
-lastPreviewOk = !!(
-  j.ok === true &&
-  j.requiresDefaultAnimalType !== true &&
-  totalAnimalRows > 0 &&
-  readyAnimalsCount === totalAnimalRows &&
-  Number(animalSummary.needsReviewCount || 0) === 0 &&
-  Number(animalSummary.missingNumberCount || 0) === 0 &&
-  Number(animalSummary.duplicateInFileCount || 0) === 0
+btnSave.disabled =
+  !lastPreviewOk;
+     showMessage(
+  j.message || "تمت المعاينة.",
+  lastPreviewOk
+    ? "status-ok"
+    : "status-error"
 );
-
-btnSave.disabled = !lastPreviewOk;
-
-      showMessage(j.message || "تمت المعاينة.", j.ok ? "status-ok" : "status-error");
 
     } catch (e) {
       console.error(e);
