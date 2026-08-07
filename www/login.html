@@ -15,176 +15,10 @@
 
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800;900&display=swap" rel="stylesheet">
 
-  <style>
-    :root{
-      --bg:#f7faf7;
-      --bg-top:#eef7f1;
-      --card:#ffffff;
-      --text:#0f172a;
-      --muted:#64748b;
-      --border:#e2e8f0;
-      --brand:#0ea05a;
-      --brand-600:#0b7f47;
-      --danger:#c2410c;
-    }
 
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family:'Cairo',sans-serif;
-      background:linear-gradient(180deg,var(--bg-top) 0%, var(--bg) 60%);
-      min-height:100vh;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      color:var(--text);
-      padding:20px;
-    }
-
-    /* Header */
-    .topbar{
-      position:absolute;
-      top:20px;
-      left:0;
-      right:0;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-    }
-
-    .brand{
-      display:flex;
-      align-items:center;
-      gap:12px;
-    }
-
-    .brand img{
-      width:48px;
-      height:48px;
-      object-fit:contain;
-    }
-
-    .brand-text{
-      display:flex;
-      flex-direction:column;
-      line-height:1.1;
-    }
-
-    .brand-text .main{
-      font-weight:900;
-      font-size:26px;
-    }
-
-    .brand-text .sub{
-      font-size:14px;
-      color:var(--brand-600);
-      font-weight:800;
-      opacity:.8;
-    }
-
-    /* Card */
-    .card{
-      width:100%;
-      max-width:380px;
-      background:var(--card);
-      border:1px solid var(--border);
-      border-radius:18px;
-      box-shadow:0 10px 26px rgba(2,6,23,.08);
-      padding:24px 20px 18px;
-      text-align:center;
-    }
-
-    .card h2{
-      margin:0 0 6px;
-      font-size:22px;
-      font-weight:900;
-      color:var(--brand-600);
-    }
-
-    .desc{
-      font-size:13px;
-      color:var(--muted);
-      margin-bottom:18px;
-    }
-
-    .msg{
-      display:none;
-      margin-bottom:12px;
-      padding:10px 12px;
-      border-radius:12px;
-      font-weight:800;
-      font-size:14px;
-      border:1px solid transparent;
-    }
-    .msg.ok{ display:block;background:#dcfce7;border-color:#86efac;color:#14532d;}
-    .msg.err{ display:block;background:#fee2e2;border-color:#fca5a5;color:#7f1d1d;}
-
-    input{
-      width:100%;
-      padding:13px;
-      border-radius:14px;
-      border:1px solid var(--border);
-      font-size:15px;
-      margin-bottom:12px;
-      outline:none;
-    }
-
-    input:focus{
-      border-color:rgba(14,160,90,.55);
-      box-shadow:0 0 0 4px rgba(14,160,90,.12);
-    }
-
-    button{
-      width:100%;
-      padding:14px;
-      border-radius:14px;
-      border:1px solid var(--brand);
-      background:var(--brand);
-      color:#fff;
-      font-weight:900;
-      font-size:16px;
-      cursor:pointer;
-      transition:.15s ease;
-    }
-
-    button:hover{
-      background:var(--brand-600);
-      border-color:var(--brand-600);
-    }
-
-    button:disabled{
-      opacity:.7;
-      cursor:not-allowed;
-    }
-
-    .hint{
-      margin-top:14px;
-      font-size:14px;
-      color:var(--muted);
-    }
-
-    footer{
-      position:absolute;
-      bottom:16px;
-      font-size:14px;
-      color:var(--muted);
-    }
-.forgot-line{
-  text-align:left;
-  margin:-4px 2px 12px;
-  font-size:13px;
-  font-weight:900;
-}
-
-.forgot-line a{
-  color:#1F5C3A;
-  text-decoration:none;
-}
-  </style>
 </head>
 
-<body>
+<body class="login-page">
 
   <div class="topbar">
     <div class="brand">
@@ -215,12 +49,9 @@
       نظام ذكي لتحليل القطيع وتبسيط القرار للمربي
     </div>
   </div>
-<div style="margin-top:12px; font-size:14px;">
+<div class="signup-line">
   ليس لديك حساب؟
-  <a href="register.html" 
-     style="color:#0ea05a; font-weight:900; text-decoration:none;">
-     أنشئ حساب جديد
-  </a>
+  <a href="register.html">أنشئ حساب جديد</a>
 </div>
 
   <footer>
