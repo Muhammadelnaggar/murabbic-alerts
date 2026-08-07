@@ -328,21 +328,52 @@ async function authSendOtpBridgeSrv(phoneRaw, code) {
   }
 }
 function authRegisterValidateBridgeSrv(body = {}) {
-  const fullName = authRegisterTextBridgeSrv(body.fullName || body.name || body.displayName);
-  const phoneRaw = authRegisterTextBridgeSrv(body.phone || body.phoneNumber);
+  const fullName = authRegisterTextBridgeSrv(
+    body.fullName || body.name || body.displayName
+  );
+
+  const farmName = authRegisterTextBridgeSrv(
+    body.farmName || body.farm || ""
+  );
+
+  const phoneRaw = authRegisterTextBridgeSrv(
+    body.phone || body.phoneNumber
+  );
+
   const phoneKey = authDigitsBridgeSrv(phoneRaw);
   const country = authRegisterTextBridgeSrv(body.country);
-  const region = authRegisterTextBridgeSrv(body.region || body.governorate || body.area);
+  const region = authRegisterTextBridgeSrv(
+    body.region || body.governorate || body.area
+  );
   const role = authRegisterTextBridgeSrv(body.role);
   const password = String(body.password || "");
-  const confirmPassword = String(body.confirmPassword || body.passwordConfirm || "");
+  const confirmPassword = String(
+    body.confirmPassword || body.passwordConfirm || ""
+  );
 
-  if (!fullName || !phoneRaw || !country || !region || !role || !password || !confirmPassword) {
+  if (
+    !fullName ||
+    !phoneRaw ||
+    !country ||
+    !region ||
+    !role ||
+    !password ||
+    !confirmPassword
+  ) {
     return {
       ok: false,
       status: 400,
       error: "register_fields_required",
       message: "❌ أكمل جميع بيانات إنشاء الحساب."
+    };
+  }
+
+  if (farmName.length > 80) {
+    return {
+      ok: false,
+      status: 400,
+      error: "register_farm_name_too_long",
+      message: "❌ اسم المزرعة يجب ألا يزيد عن ٨٠ حرفًا."
     };
   }
 
@@ -373,19 +404,19 @@ function authRegisterValidateBridgeSrv(body = {}) {
     };
   }
 
- const passwordIssue = authRegisterPasswordIssueBridgeSrv(password, {
-  fullName,
-  phoneKey
-});
+  const passwordIssue = authRegisterPasswordIssueBridgeSrv(password, {
+    fullName,
+    phoneKey
+  });
 
-if (passwordIssue) {
-  return {
-    ok: false,
-    status: 400,
-    error: "register_password_weak",
-    message: passwordIssue
-  };
-}
+  if (passwordIssue) {
+    return {
+      ok: false,
+      status: 400,
+      error: "register_password_weak",
+      message: passwordIssue
+    };
+  }
 
   if (password !== confirmPassword) {
     return {
@@ -399,6 +430,7 @@ if (passwordIssue) {
   return {
     ok: true,
     fullName,
+    farmName,
     phoneRaw,
     phoneKey,
     country,
@@ -456,29 +488,50 @@ async function authRegisterStartHandlerBridgeSrv(req, res) {
       });
     }
 
-    await db.collection("auth_register_otps").doc(requestId).set({
-      type: "register",
-      phoneRaw: v.phoneRaw,
-      phoneKey: v.phoneKey,
-      fullName: v.fullName,
-      country: v.country,
-      region: v.region,
-      role: v.role,
+ await db.collection("auth_register_otps").doc(requestId).set({
+  type: "register",
 
-      otpHash: authOtpHashBridgeSrv(code, otpSalt),
-      otpSalt,
+  phoneRaw: v.phoneRaw,
+  phoneKey: v.phoneKey,
 
-      passwordHash: authOtpHashBridgeSrv(v.password, passwordSalt),
-      passwordSalt,
+  fullName: v.fullName,
+  farmName: v.farmName || "",
 
-      attempts: 0,
-      maxAttempts: AUTH_OTP_MAX_ATTEMPTS,
-      usedAt: null,
-      expiresAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + AUTH_OTP_TTL_MS)),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      source: "server:/api/auth/register/start"
-    }, { merge: false });
+  country: v.country,
+  region: v.region,
+  role: v.role,
 
+  otpHash: authOtpHashBridgeSrv(code, otpSalt),
+  otpSalt,
+
+  passwordHash: authOtpHashBridgeSrv(
+    v.password,
+    passwordSalt
+  ),
+  passwordSalt,
+
+  attempts: 0,
+  maxAttempts: AUTH_OTP_MAX_ATTEMPTS,
+
+  resendCount: 0,
+  lastSentAtMs: Date.now(),
+
+  usedAt: null,
+
+  expiresAt:
+    admin.firestore.Timestamp.fromDate(
+      new Date(
+        Date.now() +
+        AUTH_OTP_TTL_MS
+      )
+    ),
+
+  createdAt:
+    admin.firestore.FieldValue.serverTimestamp(),
+
+  source:
+    "server:/api/auth/register/start"
+}, { merge: false });
     const out = {
       ok: true,
       otpRequired: true,
@@ -502,6 +555,246 @@ async function authRegisterStartHandlerBridgeSrv(req, res) {
 }
 
 app.post("/api/auth/register/start", authRegisterStartHandlerBridgeSrv);
+app.post("/api/auth/register/resend", async (req, res) => {
+  try {
+    if (!admin.apps.length || !db) {
+      return res.status(503).json({
+        ok: false,
+        error: "firebase_admin_disabled",
+        message:
+          "❌ خدمة إرسال كود التحقق غير متاحة الآن. حاول مرة أخرى لاحقًا."
+      });
+    }
+
+    const requestId =
+      String(
+        req.body?.requestId || ""
+      ).trim();
+
+    if (!requestId) {
+      return res.status(400).json({
+        ok: false,
+        error: "otp_request_id_required",
+        message:
+          "❌ تعذّر تحديد طلب التحقق. ابدأ التسجيل من جديد."
+      });
+    }
+
+    const ref =
+      db
+        .collection("auth_register_otps")
+        .doc(requestId);
+
+    const snap =
+      await ref.get();
+
+    if (!snap.exists) {
+      return res.status(404).json({
+        ok: false,
+        error: "otp_not_found",
+        message:
+          "❌ طلب التحقق غير موجود. ابدأ التسجيل من جديد."
+      });
+    }
+
+    const p =
+      snap.data() || {};
+
+    if (
+      p.type !== "register" ||
+      p.usedAt
+    ) {
+      return res.status(409).json({
+        ok: false,
+        error: "otp_request_not_active",
+        message:
+          "ℹ️ طلب التحقق لم يعد نشطًا. ابدأ التسجيل من جديد."
+      });
+    }
+
+    const resendCount =
+      Number(
+        p.resendCount || 0
+      );
+
+    if (resendCount >= 5) {
+      return res.status(429).json({
+        ok: false,
+        error: "otp_resend_limit_reached",
+        message:
+          "🚫 وصلت للحد الأقصى لإعادة إرسال الكود. ابدأ التسجيل من جديد."
+      });
+    }
+
+    const lastSentAtMs =
+      Number(
+        p.lastSentAtMs || 0
+      );
+
+    const retryAfterMs =
+      60_000 -
+      (
+        Date.now() -
+        lastSentAtMs
+      );
+
+    if (
+      lastSentAtMs &&
+      retryAfterMs > 0
+    ) {
+      const retryAfterSeconds =
+        Math.max(
+          1,
+          Math.ceil(
+            retryAfterMs / 1000
+          )
+        );
+
+      return res.status(429).json({
+        ok: false,
+        error: "otp_resend_too_soon",
+        retryAfterSeconds,
+        message:
+          `ℹ️ يمكنك إعادة إرسال الكود بعد ${retryAfterSeconds} ثانية.`
+      });
+    }
+
+    const phoneKey =
+      String(
+        p.phoneKey || ""
+      ).trim();
+
+    if (!phoneKey) {
+      return res.status(400).json({
+        ok: false,
+        error: "otp_phone_missing",
+        message:
+          "❌ تعذّر قراءة رقم الهاتف. ابدأ التسجيل من جديد."
+      });
+    }
+
+    const pseudoEmail =
+      `${phoneKey}@murabbik.local`;
+
+    try {
+      await admin.auth()
+        .getUserByEmail(
+          pseudoEmail
+        );
+
+      return res.status(409).json({
+        ok: false,
+        error: "phone_already_registered",
+        message:
+          "ℹ️ رقم الهاتف مسجّل بالفعل. سجّل الدخول أو استعد كلمة المرور."
+      });
+
+    } catch (e) {
+      if (
+        e?.code &&
+        e.code !== "auth/user-not-found"
+      ) {
+        throw e;
+      }
+    }
+
+    const code =
+      authOtpCodeBridgeSrv();
+
+    const otpSalt =
+      crypto
+        .randomBytes(16)
+        .toString("hex");
+
+    const sent =
+      await authSendOtpBridgeSrv(
+        p.phoneRaw || phoneKey,
+        code
+      );
+
+    if (!sent.ok) {
+      return res.status(503).json({
+        ok: false,
+        error:
+          sent.error ||
+          "otp_send_failed",
+        message:
+          sent.message ||
+          "❌ تعذّر إعادة إرسال كود التحقق الآن. حاول مرة أخرى."
+      });
+    }
+
+    await ref.set({
+      otpHash:
+        authOtpHashBridgeSrv(
+          code,
+          otpSalt
+        ),
+
+      otpSalt,
+
+      attempts: 0,
+
+      maxAttempts:
+        AUTH_OTP_MAX_ATTEMPTS,
+
+      resendCount:
+        resendCount + 1,
+
+      lastSentAtMs:
+        Date.now(),
+
+      lastResentAt:
+        admin.firestore.FieldValue
+          .serverTimestamp(),
+
+      expiresAt:
+        admin.firestore.Timestamp
+          .fromDate(
+            new Date(
+              Date.now() +
+              AUTH_OTP_TTL_MS
+            )
+          ),
+
+      source:
+        "server:/api/auth/register/resend"
+
+    }, { merge: true });
+
+    const out = {
+      ok: true,
+      requestId,
+
+      expiresInSeconds:
+        Math.floor(
+          AUTH_OTP_TTL_MS / 1000
+        ),
+
+      message:
+        "✅ تم إرسال كود تحقق جديد إلى رقم الهاتف."
+    };
+
+    if (AUTH_OTP_DEV_RETURN) {
+      out.devOtp = code;
+    }
+
+    return res.json(out);
+
+  } catch (e) {
+    console.warn(
+      "auth register resend failed:",
+      e.message || e
+    );
+
+    return res.status(500).json({
+      ok: false,
+      error: "register_resend_failed",
+      message:
+        "❌ تعذّر إعادة إرسال كود التحقق الآن. حاول مرة أخرى."
+    });
+  }
+});
 
 app.post("/api/auth/register", async (req, res) => {
   return res.status(409).json({
@@ -651,6 +944,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
       fullName: p.fullName,
       name: p.fullName,
       displayName: p.fullName,
+      farmName: p.farmName || "",
       phone: p.phoneRaw,
       phoneKey: p.phoneKey,
       country: p.country,
