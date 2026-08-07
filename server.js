@@ -5691,6 +5691,18 @@ sequenceSummaries.push({
 
         const ok =
           issues.length === 0;
+       const dependencyOnly =
+  !ok &&
+  issues.length > 0 &&
+  issues.every(issue =>
+    [
+      "event_sequence_blocked_by_invalid_row",
+      "event_sequence_blocked_by_previous_event",
+      "event_animal_row_not_ready"
+    ].includes(
+      String(issue?.code || "")
+    )
+  );
 
         if (ok) {
           readyEventsCount++;
@@ -5879,9 +5891,11 @@ sequenceSummaries.push({
           ok,
 
           status:
-            ok
-              ? "جاهز"
-              : "مرفوض",
+  ok
+    ? "جاهز"
+    : dependencyOnly
+      ? "متوقف"
+      : "مرفوض",
 
           error:
             issues[0]?.code ||
@@ -9402,9 +9416,15 @@ if (
   const rawAnimalStatus = herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "animalStatus");
   const animalStatus = herdImportV2NormalizeBaselineAnimalStatusInternalSrv(rawAnimalStatus);
 
-  const base = {
-    rowIndex: rowIndex + 1,
-    animalNumber,
+ const sourceRowNumber =
+  Number(row?.__murabbikRowNumber);
+
+const base = {
+  rowIndex:
+    Number.isInteger(sourceRowNumber) && sourceRowNumber > 0
+      ? sourceRowNumber
+      : rowIndex + 1,
+  animalNumber,
     animalType,
     entryType: explicitEntryType,
     damNumber,
@@ -10523,12 +10543,35 @@ const readyFollowersCount =
       item?.ok === true &&
       item?.recordKind === "تابع"
   ).length;
+const previewDependencyErrorCodes =
+  new Set([
+    "event_sequence_blocked_by_invalid_row",
+    "event_sequence_blocked_by_previous_event",
+    "event_animal_row_not_ready"
+  ]);
+
 const previewRejectedItems = [
   ...(baselinePreview.previewAnimals || [])
     .filter(item => item?.ok !== true),
 
   ...(eventsPreflight.previewEvents || [])
-    .filter(item => item?.ok !== true)
+    .filter(item => {
+      if (item?.ok === true) return false;
+
+      const errors =
+        Array.isArray(item?.errors)
+          ? item.errors
+          : [];
+
+      if (!errors.length) return true;
+
+      return errors.some(
+        error =>
+          !previewDependencyErrorCodes.has(
+            String(error?.code || "")
+          )
+      );
+    })
 ]
   .map(item => ({
     sheetName:
@@ -10582,9 +10625,9 @@ return res.json({
   : (
       previewCommand.status === "rejected"
         ? (
-            previewCommand.rejectedCount > 0
-              ? `يوجد ${previewCommand.rejectedCount} سجل مرفوض. صحّحه، ثم أعد رفع الملف والمعاينة. لم يتم حفظ أي بيانات.`
-              : "الملف غير جاهز للحفظ. راجع نتيجة المعاينة، ثم أعد رفع الملف والمعاينة. لم يتم حفظ أي بيانات."
+           previewCommand.rejectedCount > 0
+  ? `عدد السجلات المطلوب تصحيحها: ${previewCommand.rejectedCount}. صحّحها، ثم أعد رفع الملف والمعاينة.`
+  : "الملف غير جاهز للحفظ. راجع نتيجة المعاينة، ثم أعد رفع الملف والمعاينة. لم يتم حفظ أي بيانات."
           )
         : eventRows.length > 0
           ? `تمت المراجعة الموحدة بنيويًا وزمنيًا بنجاح — الأمهات: ${readyMothersCount}، التوابع: ${readyFollowersCount}، الأحداث: ${eventsPreflight.readyEventsCount}. جميع البيانات جاهزة للحفظ، ولم يتم حفظ أي بيانات بعد.`
