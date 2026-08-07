@@ -5887,15 +5887,32 @@ sequenceSummaries.push({
             issues[0]?.code ||
             null,
 
-          message:
-            ok
-              ? `✅ حدث ${herdImportV2EventLabelInternalSrv(item.eventType)} اجتاز التحقق البنيوي والزمني وجاهز للمرحلة التالية.`
-              : `❌ ${issues
-                  .map(
-                    x =>
-                      x.message
-                  )
-                  .join(" ")}`,
+         message:
+  ok
+    ? `✅ حدث ${herdImportV2EventLabelInternalSrv(item.eventType)} اجتاز التحقق البنيوي والزمني وجاهز للمرحلة التالية.`
+    : herdImportV2PreviewRejectMessageInternalSrv({
+        animalNumber:
+          item.animalNumber || "",
+
+        eventLabel:
+          herdImportV2EventLabelInternalSrv(
+            item.eventType
+          ) ||
+          item.rawEventType ||
+          "حدث",
+
+        sheetName:
+          item.sheetName ||
+          "الأحداث",
+
+        row:
+          item.row || null,
+
+        reason:
+          issues
+            .map(x => x.message)
+            .join(" ")
+      }),
 
           errors:
             issues
@@ -9624,6 +9641,32 @@ function herdImportV2InferFollowerStatusInternalSrv(base = {}) {
 
   return "نامي";
 }
+function herdImportV2PreviewRejectMessageInternalSrv({
+  animalNumber = "",
+  eventLabel = "",
+  sheetName = "",
+  row = null,
+  reason = ""
+} = {}) {
+  const subject =
+    animalNumber
+      ? `الحيوان ${animalNumber}${eventLabel ? ` — ${eventLabel}` : ""} — `
+      : (
+          eventLabel
+            ? `${eventLabel} — `
+            : ""
+        );
+
+  const cleanReason =
+    String(
+      reason ||
+      "راجع بيانات هذا السجل."
+    )
+      .replace(/^❌\s*/u, "")
+      .trim();
+
+  return `❌ ${subject}ورقة «${sheetName || "الملف"}» — صف ${row || "-"}. ${cleanReason} صحّحه، ثم أعد رفع الملف والمعاينة.`;
+}
 function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapInternal = {}, options = {}) {
   const built = [];
   const seenNumbers = new Set();
@@ -9770,27 +9813,49 @@ function herdImportV2BuildAnimalBaselinePreviewInternalSrv(rows = [], columnMapI
       "بيانات الصف تحتاج مراجعة."
     );
 
-  return {
-    row: base.rowIndex || null,
-    animalNumber: base.animalNumber || "",
-    animalType: base.animalType || "",
-    recordKind:
-      base.entryType === "followers"
-        ? "تابع"
-        : "أم",
-    ok: item.ok === true,
-    status:
-      item.ok === true
-        ? "جاهز"
-        : "مرفوض",
-    message:
-      item.ok === true
-        ? "✅ الحيوان جاهز للاستيراد."
-        : (
-            item.gateMessage ||
-            `❌ ${reasons.join(" ")}`
-          )
-  };
+ const sheetName =
+  base.entryType === "followers"
+    ? "التوابع"
+    : "الأمهات";
+
+const rejectionReason =
+  item.gateMessage ||
+  reasons.join(" ") ||
+  "راجع بيانات هذا السجل.";
+
+return {
+  sheetName,
+  row: base.rowIndex || null,
+  animalNumber: base.animalNumber || "",
+  animalType: base.animalType || "",
+  recordKind:
+    base.entryType === "followers"
+      ? "تابع"
+      : "أم",
+
+  ok: item.ok === true,
+
+  status:
+    item.ok === true
+      ? "جاهز"
+      : "مرفوض",
+
+  message:
+    item.ok === true
+      ? "✅ الحيوان جاهز للاستيراد."
+      : herdImportV2PreviewRejectMessageInternalSrv({
+          animalNumber:
+            base.animalNumber || "",
+
+          sheetName,
+
+          row:
+            base.rowIndex || null,
+
+          reason:
+            rejectionReason
+        })
+};
 }),
     readyForSavePreview: rows.length > 0 && readyAnimalsCount > 0 && needsReviewCount === 0
   };
@@ -10458,21 +10523,73 @@ const readyFollowersCount =
       item?.ok === true &&
       item?.recordKind === "تابع"
   ).length;
+const previewRejectedItems = [
+  ...(baselinePreview.previewAnimals || [])
+    .filter(item => item?.ok !== true),
 
+  ...(eventsPreflight.previewEvents || [])
+    .filter(item => item?.ok !== true)
+]
+  .map(item => ({
+    sheetName:
+      item?.sheetName || "",
+
+    row:
+      item?.row || null,
+
+    animalNumber:
+      item?.animalNumber || "",
+
+    recordKind:
+      item?.recordKind || "",
+
+    eventLabel:
+      item?.eventLabel || "",
+
+    message:
+      item?.message || ""
+  }));
+
+const previewCommand = {
+  status:
+    requiresDefaultAnimalType
+      ? "needs_input"
+      : (
+          persistencePlan?.ready === true &&
+          persistencePlan?.saveEnabled === true
+        )
+        ? "ready"
+        : "rejected",
+
+  saveEnabled:
+    !requiresDefaultAnimalType &&
+    persistencePlan?.ready === true &&
+    persistencePlan?.saveEnabled === true,
+
+  rejectedCount:
+    previewRejectedItems.length,
+
+  rejectedItems:
+    previewRejectedItems
+};
 return res.json({
   ok: true,
   mode: "herd_import_v2",
   importMode: "source_profile_preview_only",
-message: requiresDefaultAnimalType
+  previewCommand,
+  message: requiresDefaultAnimalType
   ? "الملف لا يحتوي على نوع الحيوان. اختر نوع القطيع ثم أعد المعاينة."
   : (
-      eventsPreflight.rejectedEventsCount > 0
-        ? `تمت قراءة القطيع، لكن يوجد ${eventsPreflight.rejectedEventsCount} صف أحداث مرفوض. لم يتم حفظ أي بيانات.`
+      previewCommand.status === "rejected"
+        ? (
+            previewCommand.rejectedCount > 0
+              ? `يوجد ${previewCommand.rejectedCount} سجل مرفوض. صحّحه، ثم أعد رفع الملف والمعاينة. لم يتم حفظ أي بيانات.`
+              : "الملف غير جاهز للحفظ. راجع نتيجة المعاينة، ثم أعد رفع الملف والمعاينة. لم يتم حفظ أي بيانات."
+          )
         : eventRows.length > 0
           ? `تمت المراجعة الموحدة بنيويًا وزمنيًا بنجاح — الأمهات: ${readyMothersCount}، التوابع: ${readyFollowersCount}، الأحداث: ${eventsPreflight.readyEventsCount}. جميع البيانات جاهزة للحفظ، ولم يتم حفظ أي بيانات بعد.`
           : `تمت مراجعة القطيع بنجاح — الأمهات: ${readyMothersCount}، التوابع: ${readyFollowersCount}. جميع البيانات جاهزة للحفظ، ولم يتم حفظ أي بيانات بعد.`
     ),
-
   totalRows:
     rows.length + eventRows.length,
 
