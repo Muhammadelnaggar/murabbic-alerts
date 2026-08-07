@@ -478,36 +478,11 @@
 
       showMsg(msg, true);
 
-      const firstSaved =
-        lastSavedRows[0]?.animalNumber ||
-        acceptedRows[0]?.animalNumber ||
-        splitNumbers(inputAnimal.value)[0] ||
-        "";
-
-     if (ration === "نعم") {
-  dialog.classList.remove("hide");
-  return;
-}
-
-      setTimeout(() => {
-        if (j.redirectUrl) {
-          location.href = j.redirectUrl;
-          return;
-        }
-
-        if (
-          lastSavedRows.length === 1 &&
-          firstSaved
-        ) {
-          location.href =
-            `/event-list.html?number=${encodeURIComponent(firstSaved)}`;
-
-          return;
-        }
-
-        location.href = "dashboard.html";
-      }, 900);
-
+setTimeout(() => {
+  if (j.redirectUrl) {
+    location.href = j.redirectUrl;
+  }
+}, 900);
     } catch(err) {
       console.error(
         "close-up save error:",
