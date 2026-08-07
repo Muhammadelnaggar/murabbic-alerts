@@ -1,5 +1,6 @@
 
 
+   
  
 
 // server.js — stable build, tenant-aware
@@ -11156,9 +11157,14 @@ if (missingAnimalTypeCount > 0) {
         error:
           "herd_import_v2_gate_failed",
 
-        message:
-          `❌ لم يتم الاستيراد. يوجد ${gateRejected.length} حيوان لا يطابق شروط إضافة الحيوان.`,
-
+       message:
+  gateRejected.every(
+    item =>
+      item?.reason ===
+      "duplicate_animal_number"
+  )
+    ? "ℹ️ هذه الحيوانات مسجلة بالفعل، ولم يكرر مُرَبِّيك الحفظ."
+    : `❌ لم يتم الاستيراد. يوجد ${gateRejected.length} حيوان يحتاج مراجعة.`,
         rejectedCount:
           gateRejected.length,
 
