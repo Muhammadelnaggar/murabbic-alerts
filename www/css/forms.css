@@ -7521,3 +7521,311 @@ body.register-page{
     grid-template-columns:1fr;
   }
 }
+/* =========================================================
+   Murabbik Login Page
+   صفحة تسجيل الدخول — Scoped
+   ========================================================= */
+
+body.login-page{
+  --login-bg:#f7faf7;
+  --login-bg-top:#eef7f1;
+  --login-card:#ffffff;
+  --login-text:#0f172a;
+  --login-muted:#64748b;
+  --login-border:#e2e8f0;
+  --login-brand:#0ea05a;
+  --login-brand-dark:#0b7f47;
+
+  min-height:100vh;
+  margin:0;
+  padding:20px;
+
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+
+  font-family:'Cairo',sans-serif;
+  color:var(--login-text);
+
+  background:
+    linear-gradient(
+      180deg,
+      var(--login-bg-top) 0%,
+      var(--login-bg) 60%
+    );
+}
+
+
+/* ===== Header ===== */
+
+.login-page .topbar{
+  position:absolute;
+  top:20px;
+  left:0;
+  right:0;
+
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+.login-page .brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.login-page .brand img{
+  width:48px;
+  height:48px;
+  object-fit:contain;
+}
+
+.login-page .brand-text{
+  display:flex;
+  flex-direction:column;
+  line-height:1.1;
+}
+
+.login-page .brand-text .main{
+  font-weight:900;
+  font-size:26px;
+}
+
+.login-page .brand-text .sub{
+  font-size:14px;
+  color:var(--login-brand-dark);
+  font-weight:800;
+  opacity:.8;
+}
+
+
+/* ===== Login Card ===== */
+
+.login-page .card{
+  width:100%;
+  max-width:380px;
+
+  padding:24px 20px 18px;
+
+  background:var(--login-card);
+
+  border:
+    1px solid
+    var(--login-border);
+
+  border-radius:18px;
+
+  box-shadow:
+    0 10px 26px
+    rgba(2,6,23,.08);
+
+  text-align:center;
+}
+
+.login-page .card h2{
+  margin:0 0 6px;
+
+  color:var(--login-brand-dark);
+
+  font-size:22px;
+  font-weight:900;
+}
+
+.login-page .desc{
+  margin-bottom:18px;
+
+  color:var(--login-muted);
+
+  font-size:13px;
+}
+
+
+/* ===== Messages ===== */
+
+.login-page .msg{
+  display:none;
+
+  margin-bottom:12px;
+  padding:10px 12px;
+
+  border:
+    1px solid
+    transparent;
+
+  border-radius:12px;
+
+  font-weight:800;
+  font-size:14px;
+}
+
+.login-page .msg.ok{
+  display:block;
+
+  background:#DCFCE7;
+  border-color:#86EFAC;
+  color:#14532D;
+}
+
+.login-page .msg.err{
+  display:block;
+
+  background:#FEE2E2;
+  border-color:#FCA5A5;
+  color:#7F1D1D;
+}
+
+
+/* ===== Fields ===== */
+
+.login-page input{
+  width:100%;
+
+  margin-bottom:12px;
+  padding:13px;
+
+  border:
+    1px solid
+    var(--login-border);
+
+  border-radius:14px;
+
+  background:#fff;
+
+  color:var(--login-text);
+
+  font-size:15px;
+  font-family:inherit;
+
+  outline:none;
+}
+
+.login-page input:focus{
+  border-color:
+    rgba(14,160,90,.55);
+
+  box-shadow:
+    0 0 0 4px
+    rgba(14,160,90,.12);
+}
+
+
+/* ===== Main Button ===== */
+
+.login-page #submitBtn{
+  width:100%;
+
+  padding:14px;
+
+  border:
+    1px solid
+    var(--login-brand);
+
+  border-radius:14px;
+
+  background:
+    var(--login-brand);
+
+  color:#fff;
+
+  font-family:inherit;
+  font-weight:900;
+  font-size:16px;
+
+  cursor:pointer;
+
+  transition:.15s ease;
+}
+
+.login-page #submitBtn:hover{
+  background:
+    var(--login-brand-dark);
+
+  border-color:
+    var(--login-brand-dark);
+}
+
+.login-page #submitBtn:disabled{
+  opacity:.7;
+  cursor:not-allowed;
+}
+
+
+/* ===== Password / Signup Links ===== */
+
+.login-page .forgot-line{
+  margin:-4px 2px 12px;
+
+  text-align:left;
+
+  font-size:13px;
+  font-weight:900;
+}
+
+.login-page .forgot-line a{
+  color:#1F5C3A;
+  text-decoration:none;
+}
+
+.login-page .hint{
+  margin-top:14px;
+
+  color:var(--login-muted);
+
+  font-size:14px;
+}
+
+.login-page .signup-line{
+  margin-top:12px;
+
+  color:var(--login-text);
+
+  font-size:14px;
+}
+
+.login-page .signup-line a{
+  color:var(--login-brand);
+
+  font-weight:900;
+  text-decoration:none;
+}
+
+
+/* ===== Footer ===== */
+
+.login-page footer{
+  position:absolute;
+  bottom:16px;
+
+  color:var(--login-muted);
+
+  font-size:14px;
+}
+
+
+/* ===== Mobile ===== */
+
+@media(max-width:430px){
+
+  body.login-page{
+    padding:18px 14px;
+  }
+
+  .login-page .topbar{
+    top:16px;
+  }
+
+  .login-page .brand img{
+    width:44px;
+    height:44px;
+  }
+
+  .login-page .brand-text .main{
+    font-size:24px;
+  }
+
+  .login-page .card{
+    padding:22px 17px 17px;
+  }
+}
