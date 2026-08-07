@@ -2428,7 +2428,34 @@ body[data-page="herd-import"] .import-preview-source{
   font-size:13px;
   font-weight:800;
 }
+body[data-page="herd-import"] .import-preview-rejections{
+  margin:0 0 16px;
+  padding:12px;
+  border:1px solid #fecaca;
+  border-radius:14px;
+  background:#fff7f7;
+}
 
+body[data-page="herd-import"] .import-preview-rejections-title{
+  margin-bottom:8px;
+  color:#991b1b;
+  font-size:14px;
+  font-weight:900;
+}
+
+body[data-page="herd-import"] .import-preview-rejection-message{
+  padding:8px 0;
+  color:#991b1b;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.7;
+  border-bottom:1px dashed #fecaca;
+}
+
+body[data-page="herd-import"] .import-preview-rejection-message:last-child{
+  border-bottom:0;
+  padding-bottom:0;
+}
 body[data-page="herd-import"] .import-preview-section{
   margin-top:18px;
 }
@@ -2527,12 +2554,6 @@ body[data-page="herd-import"] .import-preview-status.is-ready{
 body[data-page="herd-import"] .import-preview-status.is-rejected{
   background:#fee2e2;
   color:#b91c1c;
-}
-
-body[data-page="herd-import"] .import-preview-reason{
-  min-width:250px;
-  white-space:normal;
-  line-height:1.65;
 }
 
 @media(max-width:640px){
