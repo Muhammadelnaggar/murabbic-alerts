@@ -76,7 +76,8 @@ console.log("SA client_email:", sa.client_email);
 firestore.settings({ databaseId: "murabbikdata" });
 db = firestore;
 
-  console.log("✅ Firebase Admin ready → murabbikdata");
+ console.log("🔥 Firestore ACTUAL databaseId:", db.databaseId);
+ console.log("✅ Firebase Admin ready");
 
 } catch (e) {
   console.log("⚠️ Firestore disabled:", e.message);
