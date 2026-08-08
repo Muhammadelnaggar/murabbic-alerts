@@ -150,6 +150,34 @@ function authClearSessionCookieBridgeSrv(req, res) {
   });
 }
 
+function authAccountStatusBridgeSrv(profile = {}) {
+  const status = String(profile.accountStatus || "").trim().toLowerCase();
+
+  if (status === "suspended") return "suspended";
+  if (status === "closed") return "closed";
+
+  // Backward compatibility: الحسابات الحالية بلا accountStatus تظل فعّالة.
+  return "active";
+}
+
+function authAccountDeniedBridgeSrv(accountStatus) {
+  if (accountStatus === "suspended") {
+    return {
+      error: "account_suspended",
+      message: "🚫 تم إيقاف هذا الحساب مؤقتًا. تواصل مع إدارة مُرَبِّيك."
+    };
+  }
+
+  if (accountStatus === "closed") {
+    return {
+      error: "account_closed",
+      message: "🚫 تم إغلاق هذا الحساب. تواصل مع إدارة مُرَبِّيك."
+    };
+  }
+
+  return null;
+}
+
 function authPublicUserBridgeSrv(profile = {}, uid = "", userId = "") {
   return {
     uid,
@@ -157,7 +185,8 @@ function authPublicUserBridgeSrv(profile = {}, uid = "", userId = "") {
     name: profile.name || profile.displayName || profile.fullName || "",
     phone: profile.phone || profile.phoneNumber || "",
     role: profile.role || profile.accountRole || "",
-    farmName: profile.farmName || profile.farm || ""
+    farmName: profile.farmName || profile.farm || "",
+    accountStatus: authAccountStatusBridgeSrv(profile)
   };
 }
 
@@ -178,11 +207,12 @@ async function authSessionFromRequestBridgeSrv(req) {
     const sessionCookie = authCookieValueBridgeSrv(req, AUTH_COOKIE_NAME);
     if (!sessionCookie || !admin.apps.length) return null;
 
-    const decoded = await admin.auth().verifySessionCookie(sessionCookie, false);
+    const decoded = await admin.auth().verifySessionCookie(sessionCookie, true);
     const uid = String(decoded.uid || "").trim();
     if (!uid) return null;
 
     const profile = await authReadUserProfileBridgeSrv(uid);
+    const accountStatus = authAccountStatusBridgeSrv(profile);
 
     // نفس userId القديم، حتى لا تنفصل بيانات الحساب
     const userId = tenantKey(profile.userId || profile.tenantId || profile.ownerUid || uid);
@@ -191,13 +221,13 @@ async function authSessionFromRequestBridgeSrv(req) {
       uid,
       userId,
       decoded,
+      accountStatus,
       user: authPublicUserBridgeSrv(profile, uid, userId)
     };
   } catch (_) {
     return null;
   }
 }
-
 async function authPasswordLoginBridgeSrv(email, password) {
   const apiKey =
     process.env.FIREBASE_WEB_API_KEY ||
@@ -950,6 +980,8 @@ app.post("/api/auth/register/verify", async (req, res) => {
       country: p.country,
       region: p.region,
       role: p.role,
+      accountStatus: "active",
+      accountStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
       phoneVerified: true,
       phoneVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1322,7 +1354,19 @@ app.post("/api/auth/login", async (req, res) => {
       });
     }
 
-    const profile = await authReadUserProfileBridgeSrv(uid);
+const profile = await authReadUserProfileBridgeSrv(uid);
+const accountStatus = authAccountStatusBridgeSrv(profile);
+const accountDenied = authAccountDeniedBridgeSrv(accountStatus);
+
+if (accountDenied) {
+  authClearSessionCookieBridgeSrv(req, res);
+
+  return res.status(403).json({
+    ok: false,
+    ...accountDenied
+  });
+}
+     
 
     // مهم جدًا:
     // نرجّع نفس userId القديم، ونحفظ معه جلسة سيرفر.
@@ -1358,10 +1402,24 @@ app.get("/api/auth/me", async (req, res) => {
   const session = await authSessionFromRequestBridgeSrv(req);
 
   if (!session?.userId) {
+    authClearSessionCookieBridgeSrv(req, res);
+
     return res.status(401).json({
       ok: false,
       error: "auth_required",
       message: '❌ يلزم تسجيل الدخول أولًا.'
+    });
+  }
+
+  const accountDenied =
+    authAccountDeniedBridgeSrv(session.accountStatus);
+
+  if (accountDenied) {
+    authClearSessionCookieBridgeSrv(req, res);
+
+    return res.status(403).json({
+      ok: false,
+      ...accountDenied
     });
   }
 
@@ -2267,10 +2325,24 @@ async function requireUserId(req, res, next){
     const session = await authSessionFromRequestBridgeSrv(req);
 
     if (!session?.userId) {
+      authClearSessionCookieBridgeSrv(req, res);
+
       return res.status(401).json({
         ok: false,
         error: 'auth_required',
         message: '❌ يلزم تسجيل الدخول أولًا.'
+      });
+    }
+
+    const accountDenied =
+      authAccountDeniedBridgeSrv(session.accountStatus);
+
+    if (accountDenied) {
+      authClearSessionCookieBridgeSrv(req, res);
+
+      return res.status(403).json({
+        ok: false,
+        ...accountDenied
       });
     }
 
@@ -2280,6 +2352,8 @@ async function requireUserId(req, res, next){
 
   } catch (e) {
     console.error('requireUserId failed:', e.message || e);
+
+    authClearSessionCookieBridgeSrv(req, res);
 
     return res.status(401).json({
       ok: false,
