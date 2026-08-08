@@ -1,342 +1,224 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+  <meta charset="utf-8">
 
-  <title>إدارة الحسابات — مُرَبِّيك</title>
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1,viewport-fit=cover"
+  >
+
+  <meta
+    name="robots"
+    content="noindex,nofollow,noarchive,nosnippet,noimageindex"
+  >
+
+  <title>
+    إدارة الحسابات — مُرَبِّيك
+  </title>
 
   <link
     rel="stylesheet"
-    href="/css/admin-accounts.css?v=20260808a"
+    href="/css/admin-accounts.css?v=20260808b"
   >
 </head>
 
 <body>
 
-  <div class="admin-shell">
+  <header class="admin-header">
 
-    <header class="admin-topbar">
+    <div class="brand-wrap">
 
-      <div class="admin-brand">
-        <img
-          src="/images/logo.png"
-          alt="مُرَبِّيك"
-          class="admin-logo"
-        >
+      <img
+        class="brand-logo"
+        src="/images/logo.png"
+        alt="مُرَبِّيك"
+      >
 
-        <div>
-          <div class="admin-brand-name">
-            مُرَبِّيك
-          </div>
+      <div>
+        <div class="brand-name">
+          مُرَبِّيك
+        </div>
 
-          <div class="admin-brand-sub">
-            بوابة الإدارة الآمنة
-          </div>
+        <div class="brand-sub">
+          لوحة إدارة الحسابات
         </div>
       </div>
 
-      <div class="admin-top-actions">
+    </div>
 
-        <span
-          class="secure-badge"
-          aria-label="جلسة إدارية موثقة"
-        >
-          🔒 جلسة إدارية موثقة
-        </span>
+    <div class="header-actions">
 
-        <a
-          class="btn btn-ghost"
-          href="/dashboard.html"
-        >
-          لوحة مُرَبِّيك
-        </a>
+      <span class="secure-chip">
+        🔐 جلسة إدارية محمية
+      </span>
 
-      </div>
-
-    </header>
-
-    <main class="admin-main">
-
-      <section
-        class="hero-card"
-        aria-labelledby="pageTitle"
+      <a
+        class="back-link"
+        href="/dashboard.html"
       >
+        العودة للوحة التحكم
+      </a>
 
-        <div>
-          <div class="eyebrow">
-            إدارة العملاء
-          </div>
+    </div>
 
-          <h1 id="pageTitle">
-            حسابات مُرَبِّيك
-          </h1>
+  </header>
 
-          <p>
-            بحث ومراجعة حالة الحساب، ثم إيقافه أو إعادة
-            تفعيله أو إغلاقه من مسار إداري موثّق.
-          </p>
+  <main class="page-shell">
+
+    <section class="hero-card">
+
+      <div>
+
+        <div class="eyebrow">
+          إدارة العملاء
         </div>
 
-        <button
-          id="refreshBtn"
-          class="btn btn-secondary"
-          type="button"
-        >
-          تحديث البيانات
-        </button>
-
-      </section>
-
-      <div
-        id="globalMsg"
-        class="global-msg"
-        role="status"
-        aria-live="polite"
-        hidden
-      ></div>
-
-      <section
-        class="filters-card"
-        aria-label="بحث وفلاتر الحسابات"
-      >
-
-        <form
-          id="searchForm"
-          class="search-grid"
-          autocomplete="off"
-          novalidate
-        >
-
-          <label
-            class="field field-search"
-            for="searchInput"
-          >
-
-            <span>
-              البحث
-            </span>
-
-            <input
-              id="searchInput"
-              name="q"
-              type="search"
-              inputmode="search"
-              autocomplete="off"
-              maxlength="80"
-              placeholder="رقم الهاتف كامل أو بداية الاسم"
-            >
-
-          </label>
-
-          <label
-            class="field"
-            for="statusFilter"
-          >
-
-            <span>
-              حالة الحساب
-            </span>
-
-            <select
-              id="statusFilter"
-              name="status"
-            >
-              <option value="all">
-                كل الحالات
-              </option>
-
-              <option value="active">
-                نشط
-              </option>
-
-              <option value="suspended">
-                موقوف مؤقتًا
-              </option>
-
-              <option value="closed">
-                مغلق
-              </option>
-            </select>
-
-          </label>
-
-          <div class="filter-actions">
-
-            <button
-              id="searchBtn"
-              class="btn btn-primary"
-              type="submit"
-            >
-              بحث
-            </button>
-
-            <button
-              id="clearBtn"
-              class="btn btn-ghost"
-              type="button"
-            >
-              مسح
-            </button>
-
-          </div>
-
-        </form>
-
-        <p class="search-hint">
-          للبحث برقم الهاتف أدخل الرقم كاملًا.
-          البحث بالاسم يعمل من بداية الاسم.
-        </p>
-
-      </section>
-
-      <section
-        class="results-toolbar"
-        aria-live="polite"
-      >
-
-        <div
-          id="resultCount"
-          class="result-count"
-        >
-          جارٍ تحميل الحسابات…
-        </div>
-
-        <div
-          id="pageState"
-          class="page-state"
-        ></div>
-
-      </section>
-
-      <section
-        id="accountsList"
-        class="accounts-list"
-        aria-label="قائمة الحسابات"
-      ></section>
-
-      <section
-        id="emptyState"
-        class="empty-state"
-        hidden
-      >
-
-        <div class="empty-icon">
-          ⌕
-        </div>
-
-        <h2>
-          لا توجد نتائج
-        </h2>
+        <h1>
+          الحسابات
+        </h1>
 
         <p>
-          غيّر رقم الهاتف أو الاسم أو فلتر الحالة ثم أعد البحث.
+          ابحث برقم الهاتف الكامل أو ببداية الاسم،
+          وراجع حالة الحساب قبل تنفيذ أي إجراء.
         </p>
 
-      </section>
-
-      <div class="pagination-row">
-
-        <button
-          id="nextBtn"
-          class="btn btn-secondary"
-          type="button"
-          hidden
-        >
-          تحميل المزيد
-        </button>
-
       </div>
-
-    </main>
-
-  </div>
-
-  <div
-    id="actionModal"
-    class="modal-backdrop"
-    hidden
-  >
-
-    <div
-      class="modal-card"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modalTitle"
-      aria-describedby="modalBody"
-    >
-
-      <div class="modal-kicker">
-        تأكيد إجراء إداري
-      </div>
-
-      <h2 id="modalTitle">
-        تأكيد الإجراء
-      </h2>
-
-      <p
-        id="modalBody"
-        class="modal-body"
-      ></p>
-
-      <label
-        class="field"
-        for="actionReason"
-      >
-
-        <span>
-          سبب القرار
-          <small>
-            اختياري — يُحفظ في سجل المراجعة
-          </small>
-        </span>
-
-        <textarea
-          id="actionReason"
-          maxlength="500"
-          rows="3"
-          placeholder="اكتب سببًا مختصرًا إذا لزم"
-        ></textarea>
-
-      </label>
 
       <div
-        id="modalMsg"
-        class="modal-msg"
-        role="status"
-        aria-live="polite"
-        hidden
-      ></div>
+        class="hero-lock"
+        aria-hidden="true"
+      >
+        🔒
+      </div>
 
-      <div class="modal-actions">
+    </section>
 
-        <button
-          id="cancelActionBtn"
-          class="btn btn-ghost"
-          type="button"
-        >
-          إلغاء
-        </button>
+    <section
+      class="toolbar-card"
+      aria-label="البحث والفلترة"
+    >
 
-        <button
-          id="confirmActionBtn"
-          class="btn btn-danger"
-          type="button"
-        >
-          تأكيد
-        </button>
+      <form
+        class="search-grid"
+        method="get"
+        action="/admin/accounts"
+        autocomplete="off"
+      >
+
+        <label class="field field-grow">
+
+          <span>
+            بحث
+          </span>
+
+          <input
+            name="q"
+            type="search"
+            maxlength="80"
+            autocomplete="off"
+            value="{{ADMIN_QUERY}}"
+            placeholder="رقم الهاتف الكامل أو بداية الاسم"
+          >
+
+        </label>
+
+        <label class="field">
+
+          <span>
+            حالة الحساب
+          </span>
+
+          <select name="status">
+
+            <option
+              value="all"
+              {{ADMIN_STATUS_ALL_SELECTED}}
+            >
+              كل الحالات
+            </option>
+
+            <option
+              value="active"
+              {{ADMIN_STATUS_ACTIVE_SELECTED}}
+            >
+              نشط
+            </option>
+
+            <option
+              value="suspended"
+              {{ADMIN_STATUS_SUSPENDED_SELECTED}}
+            >
+              موقوف
+            </option>
+
+            <option
+              value="closed"
+              {{ADMIN_STATUS_CLOSED_SELECTED}}
+            >
+              مغلق
+            </option>
+
+          </select>
+
+        </label>
+
+        <div class="toolbar-actions">
+
+          <button
+            class="btn btn-primary"
+            type="submit"
+          >
+            بحث
+          </button>
+
+          <a
+            class="btn btn-ghost"
+            href="/admin/accounts"
+          >
+            مسح
+          </a>
+
+        </div>
+
+      </form>
+
+    </section>
+
+    {{ADMIN_NOTICE_HTML}}
+
+    <div class="list-head">
+
+      <div>
+
+        <h2>
+          نتائج الحسابات
+        </h2>
+
+        <span class="result-count">
+          {{ADMIN_RESULT_COUNT}}
+        </span>
 
       </div>
 
     </div>
 
-  </div>
+    <section
+      class="account-list"
+      aria-label="قائمة الحسابات"
+    >
+      {{ADMIN_ACCOUNTS_HTML}}
+    </section>
 
-  <script
-    src="/js/admin-accounts.js?v=20260808a"
-    defer
-  ></script>
+    <div class="more-wrap">
+      {{ADMIN_NEXT_HTML}}
+    </div>
+
+  </main>
+
+  <footer class="admin-footer">
+    مُرَبِّيك — أدوات الإدارة المصرّح بها فقط
+  </footer>
 
 </body>
 </html>
