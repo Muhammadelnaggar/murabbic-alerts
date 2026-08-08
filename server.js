@@ -3216,7 +3216,224 @@ app.get(
             '❌ تغيّر البحث أو الفلتر. ابدأ من الصفحة الأولى.'
         });
       }
+           // بحث رقم الهاتف في لوحة الإدارة:
+      // نعتمد على نفس هوية Firebase المستخدمة فعليًا في تسجيل الدخول،
+      // ولا نعتمد على وجود phoneKey داخل وثيقة users.
+      if (search.mode === 'phone') {
+        const pseudoEmail =
+          `${search.value}@murabbik.local`;
 
+        let authUser = null;
+
+        try {
+          authUser =
+            await admin.auth()
+              .getUserByEmail(
+                pseudoEmail
+              );
+
+        } catch (e) {
+          if (
+            e?.code ===
+            'auth/user-not-found'
+          ) {
+            return res.json({
+              ok: true,
+
+              filters: {
+                q: searchText,
+                status:
+                  statusFilter ||
+                  'all'
+              },
+
+              page: {
+                limit,
+                returned: 0,
+                scanned: 0,
+                hasMore: false,
+                nextCursor: null,
+                scanLimited: false
+              },
+
+              accounts: []
+            });
+          }
+
+          throw e;
+        }
+
+        const targetUid =
+          String(
+            authUser?.uid || ''
+          ).trim();
+
+        if (!targetUid) {
+          return res.status(500).json({
+            ok: false,
+            error:
+              'account_phone_lookup_uid_missing',
+            message:
+              '❌ تعذّر تحديد الحساب المرتبط برقم الهاتف.'
+          });
+        }
+
+        const profileSnap =
+          await db
+            .collection('users')
+            .doc(targetUid)
+            .get();
+
+        if (!profileSnap.exists) {
+          return res.status(409).json({
+            ok: false,
+            error:
+              'account_profile_not_found',
+            message:
+              '❌ حساب الدخول موجود، لكن ملف الحساب غير موجود في مُرَبِّيك.'
+          });
+        }
+
+        const profile =
+          profileSnap.data() || {};
+
+        const accountStatus =
+          authAccountStatusBridgeSrv(
+            profile
+          );
+
+        if (
+          statusFilter &&
+          accountStatus !== statusFilter
+        ) {
+          return res.json({
+            ok: true,
+
+            filters: {
+              q: searchText,
+              status:
+                statusFilter
+            },
+
+            page: {
+              limit,
+              returned: 0,
+              scanned: 1,
+              hasMore: false,
+              nextCursor: null,
+              scanLimited: false
+            },
+
+            accounts: []
+          });
+        }
+
+        const expectedDisabled =
+          accountStatus !== 'active';
+
+        const account = {
+          uid:
+            targetUid,
+
+          name:
+            profile.name ||
+            profile.displayName ||
+            profile.fullName ||
+            authUser?.displayName ||
+            '',
+
+          phone:
+            profile.phone ||
+            profile.phoneNumber ||
+            profile.phoneKey ||
+            search.value ||
+            '',
+
+          farmName:
+            profile.farmName ||
+            profile.farm ||
+            '',
+
+          country:
+            profile.country ||
+            '',
+
+          region:
+            profile.region ||
+            profile.governorate ||
+            profile.area ||
+            '',
+
+          role:
+            profile.role ||
+            profile.accountRole ||
+            '',
+
+          accountStatus,
+
+          accountStatusReason:
+            profile.accountStatusReason ||
+            null,
+
+          accountStatusUpdatedAt:
+            adminAccountIsoSrv(
+              profile.accountStatusUpdatedAt
+            ),
+
+          authExists: true,
+
+          authDisabled:
+            authUser.disabled === true,
+
+          statusSyncOk:
+            authUser.disabled ===
+            expectedDisabled,
+
+          isAdmin:
+            authUser
+              ?.customClaims
+              ?.admin === true,
+
+          createdAt:
+            adminAccountIsoSrv(
+              profile.createdAt
+            ) ||
+            adminAccountIsoSrv(
+              authUser
+                ?.metadata
+                ?.creationTime
+            ),
+
+          lastSignInAt:
+            adminAccountIsoSrv(
+              authUser
+                ?.metadata
+                ?.lastSignInTime
+            )
+        };
+
+        return res.json({
+          ok: true,
+
+          filters: {
+            q: searchText,
+            status:
+              statusFilter ||
+              'all'
+          },
+
+          page: {
+            limit,
+            returned: 1,
+            scanned: 1,
+            hasMore: false,
+            nextCursor: null,
+            scanLimited: false
+          },
+
+          accounts: [account]
+        });
+      }
       const usersRef =
         db.collection('users');
 
