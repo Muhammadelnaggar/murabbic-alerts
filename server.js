@@ -2786,7 +2786,177 @@ async function ensureAccountAdminSrv(req, res, next) {
     return res.status(404).send('Not Found');
   }
 }
+// ============================================================
+//          ADMIN BOOTSTRAP — env allowlist -> custom admin claim
+// ============================================================
+async function ensureAccountAdminBootstrapSrv(req, res, next) {
+  try {
+    if (!admin.apps.length) {
+      return res.status(404).send('Not Found');
+    }
 
+    const sessionCookie =
+      authCookieValueBridgeSrv(req, AUTH_COOKIE_NAME);
+
+    if (!sessionCookie) {
+      return res.status(404).send('Not Found');
+    }
+
+    const decoded =
+      await admin.auth().verifySessionCookie(
+        sessionCookie,
+        true
+      );
+
+    const uid =
+      String(decoded?.uid || decoded?.sub || '').trim();
+
+    if (!uid || !ACCOUNT_ADMIN_UIDS.includes(uid)) {
+      return res.status(404).send('Not Found');
+    }
+
+    req.accountAdminAuth = decoded;
+    return next();
+
+  } catch (_) {
+    return res.status(404).send('Not Found');
+  }
+}
+
+async function ensureAccountAdminClaimSrv(req, res, next) {
+  try {
+    if (!admin.apps.length) {
+      return res.status(404).send('Not Found');
+    }
+
+    const sessionCookie =
+      authCookieValueBridgeSrv(req, AUTH_COOKIE_NAME);
+
+    if (!sessionCookie) {
+      return res.status(404).send('Not Found');
+    }
+
+    const decoded =
+      await admin.auth().verifySessionCookie(
+        sessionCookie,
+        true
+      );
+
+    if (decoded?.admin !== true) {
+      return res.status(404).send('Not Found');
+    }
+
+    req.accountAdminAuth = decoded;
+    return next();
+
+  } catch (_) {
+    return res.status(404).send('Not Found');
+  }
+}
+
+app.post(
+  '/api/admin/bootstrap/self-claim',
+  ensureAccountAdminBootstrapSrv,
+  async (req, res) => {
+    try {
+      const actorUid =
+        String(
+          req.accountAdminAuth?.uid ||
+          req.accountAdminAuth?.sub ||
+          ''
+        ).trim();
+
+      if (!actorUid) {
+        return res.status(404).send('Not Found');
+      }
+
+      const userRecord =
+        await admin.auth().getUser(actorUid);
+
+      const existingClaims =
+        userRecord?.customClaims &&
+        typeof userRecord.customClaims === 'object'
+          ? userRecord.customClaims
+          : {};
+
+      await admin.auth().setCustomUserClaims(
+        actorUid,
+        {
+          ...existingClaims,
+          admin: true
+        }
+      );
+
+      // نفرض جلسة جديدة حتى تحمل الـ custom claim الجديدة.
+      await admin.auth().revokeRefreshTokens(actorUid);
+      authClearSessionCookieBridgeSrv(req, res);
+
+      // Audit trail — لا نكسر العملية لو سجل المراجعة نفسه فشل.
+      if (db) {
+        try {
+          await db
+            .collection('admin_security_actions')
+            .add({
+              actorUid,
+              targetUid: actorUid,
+              action: 'bootstrap_admin_claim',
+              adminClaim: true,
+              createdAt:
+                admin.firestore.FieldValue.serverTimestamp(),
+              source:
+                'server:/api/admin/bootstrap/self-claim'
+            });
+        } catch (auditError) {
+          console.warn(
+            'admin bootstrap audit failed:',
+            auditError.message || auditError
+          );
+        }
+      }
+
+      return res.json({
+        ok: true,
+        uid: actorUid,
+        adminClaim: true,
+        reloginRequired: true,
+        message:
+          '✅ تم تثبيت صلاحية الإدارة بأمان. سجّل الدخول من جديد لتفعيلها في الجلسة.'
+      });
+
+    } catch (e) {
+      console.error(
+        'admin bootstrap claim failed:',
+        e.message || e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error: 'admin_bootstrap_claim_failed',
+        message:
+          '❌ تعذّر تثبيت صلاحية الإدارة الآن.'
+      });
+    }
+  }
+);
+
+app.get(
+  '/api/admin/security/me',
+  ensureAccountAdminClaimSrv,
+  async (req, res) => {
+    const uid =
+      String(
+        req.accountAdminAuth?.uid ||
+        req.accountAdminAuth?.sub ||
+        ''
+      ).trim();
+
+    return res.json({
+      ok: true,
+      uid,
+      adminClaim: true
+    });
+  }
+);
 // ============================================================
 //          ADMIN: ACCOUNT CONTROL — SUSPEND / REACTIVATE / CLOSE
 // ============================================================
