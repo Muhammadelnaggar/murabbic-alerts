@@ -67520,10 +67520,10 @@ function adminPortalPageHeadersSrv(req, res, next) {
     ].join('; ')
   );
 
-  res.setHeader(
-    'Referrer-Policy',
-    'no-referrer'
-  );
+ res.setHeader(
+  'Referrer-Policy',
+  'same-origin'
+);
 
   res.setHeader(
     'X-Frame-Options',
