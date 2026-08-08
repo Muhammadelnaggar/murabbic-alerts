@@ -3294,10 +3294,7 @@ function adminAccountIsoSrv(value) {
   }
 }
 
-app.get(
-  '/api/admin/accounts',
-  ensureAccountAdminClaimSrv,
-  async (req, res) => {
+async function adminAccountsDirectoryHandlerSrv(req, res) {
     try {
       if (!db || !admin.apps.length) {
         return res.status(503).json({
@@ -3959,13 +3956,16 @@ app.get(
         message:
           '❌ تعذّر تحميل قائمة الحسابات الآن.'
       });
-    }
+      }
   }
-);
-app.post(
-  '/api/admin/accounts/status',
+
+app.get(
+  '/api/admin/accounts',
   ensureAccountAdminClaimSrv,
-  async (req, res) => {
+  adminAccountsDirectoryHandlerSrv
+);
+
+async function adminAccountStatusHandlerSrv(req, res) {
     try {
       if (!db || !admin.apps.length) {
         return res.status(503).json({
@@ -4197,8 +4197,11 @@ app.post(
               admin.firestore.FieldValue
                 .serverTimestamp(),
 
-            source:
-              'server:/api/admin/accounts/status'
+                        source:
+              String(
+                req.adminAccountActionSource ||
+                'server:/api/admin/accounts/status'
+              )
           });
 
       } catch (auditError) {
@@ -4256,8 +4259,13 @@ app.post(
         message:
           '❌ تعذّر تحديث حالة الحساب الآن.'
       });
-    }
+       }
   }
+
+app.post(
+  '/api/admin/accounts/status',
+  ensureAccountAdminClaimSrv,
+  adminAccountStatusHandlerSrv
 );
 // ============================================================
 //                  API: WEATHER / THI
@@ -67487,7 +67495,7 @@ const affectedNumbers = new Set();
   }
 });
 // ============================================================
-//          ADMIN PORTAL — PRIVATE HTML SHELL
+//          ADMIN PORTAL — PRIVATE SERVER-RENDERED UI
 // ============================================================
 
 function adminPortalPageHeadersSrv(req, res, next) {
@@ -67499,7 +67507,7 @@ function adminPortalPageHeadersSrv(req, res, next) {
       "connect-src 'self'",
       "img-src 'self' data:",
       "style-src 'self'",
-      "script-src 'self'",
+      "script-src 'none'",
       "script-src-attr 'none'",
       "style-src-attr 'none'",
       "font-src 'self'",
@@ -67545,27 +67553,1596 @@ function adminPortalPageHeadersSrv(req, res, next) {
   return next();
 }
 
-app.get(
-  '/admin/accounts',
-  ensureAccountAdminClaimSrv,
-  adminSensitiveHeadersSrv,
-  adminPortalPageHeadersSrv,
-  (req, res) => {
-    return res.sendFile(
+function adminPortalEscapeHtmlSrv(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function adminPortalCsrfTokenSrv(req) {
+  const sessionCookie =
+    authCookieValueBridgeSrv(
+      req,
+      AUTH_COOKIE_NAME
+    );
+
+  if (!sessionCookie) {
+    return '';
+  }
+
+  return crypto
+    .createHmac(
+      'sha256',
+      sessionCookie
+    )
+    .update(
+      'murabbik-admin-portal-csrf-v1'
+    )
+    .digest('base64url');
+}
+
+function adminPortalSafeEqualSrv(a, b) {
+  const left =
+    Buffer.from(
+      String(a || ''),
+      'utf8'
+    );
+
+  const right =
+    Buffer.from(
+      String(b || ''),
+      'utf8'
+    );
+
+  if (
+    !left.length ||
+    left.length !== right.length
+  ) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(
+    left,
+    right
+  );
+}
+
+function adminPortalFormGuardSrv(
+  req,
+  res,
+  next
+) {
+  const fetchSite =
+    String(
+      req.get('sec-fetch-site') || ''
+    )
+      .trim()
+      .toLowerCase();
+
+  if (
+    fetchSite === 'cross-site' ||
+    fetchSite === 'same-site'
+  ) {
+    return res
+      .status(403)
+      .send('Forbidden');
+  }
+
+  const sourceOrigin =
+    adminRequestSourceOriginSrv(req);
+
+  const targetOrigin =
+    adminRequestTargetOriginSrv(req);
+
+  if (
+    !sourceOrigin ||
+    !targetOrigin ||
+    sourceOrigin !== targetOrigin
+  ) {
+    return res
+      .status(403)
+      .send('Forbidden');
+  }
+
+  const supplied =
+    String(
+      req.body?.adminCsrfToken || ''
+    ).trim();
+
+  const expected =
+    adminPortalCsrfTokenSrv(req);
+
+  if (
+    !adminPortalSafeEqualSrv(
+      supplied,
+      expected
+    )
+  ) {
+    return res
+      .status(403)
+      .send('Forbidden');
+  }
+
+  return next();
+}
+
+function adminPortalJsonCollectorSrv() {
+  let statusCode = 200;
+  let body = null;
+
+  const response = {
+    status(code) {
+      statusCode =
+        Number(code) || 200;
+
+      return response;
+    },
+
+    json(payload) {
+      body = payload;
+      return payload;
+    },
+
+    send(payload) {
+      body = payload;
+      return payload;
+    }
+  };
+
+  return {
+    response,
+
+    read() {
+      return {
+        statusCode,
+        body
+      };
+    }
+  };
+}
+
+function adminPortalStatusLabelSrv(status) {
+  if (status === 'active') {
+    return 'نشط';
+  }
+
+  if (status === 'suspended') {
+    return 'موقوف';
+  }
+
+  if (status === 'closed') {
+    return 'مغلق';
+  }
+
+  return 'غير محدد';
+}
+
+function adminPortalStatusClassSrv(status) {
+  if (status === 'active') {
+    return 'status-active';
+  }
+
+  if (status === 'suspended') {
+    return 'status-suspended';
+  }
+
+  if (status === 'closed') {
+    return 'status-closed';
+  }
+
+  return 'status-unknown';
+}
+
+function adminPortalDateSrv(value) {
+  if (!value) {
+    return '—';
+  }
+
+  const d =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      d.getTime()
+    )
+  ) {
+    return '—';
+  }
+
+  try {
+    return new Intl
+      .DateTimeFormat(
+        'ar-EG',
+        {
+          dateStyle:
+            'medium',
+
+          timeStyle:
+            'short',
+
+          timeZone:
+            'Africa/Cairo'
+        }
+      )
+      .format(d);
+
+  } catch (_) {
+    return d.toISOString();
+  }
+}
+
+function adminPortalReturnStateSrv(
+  body = {}
+) {
+  const q =
+    adminAccountsSearchSrv(
+      body.returnQ || ''
+    );
+
+  const rawStatus =
+    String(
+      body.returnStatus || 'all'
+    )
+      .trim()
+      .toLowerCase();
+
+  const status =
+    rawStatus === 'all'
+      ? 'all'
+      : (
+          adminAccountsStatusFilterSrv(
+            rawStatus
+          ) || 'all'
+        );
+
+  return {
+    q,
+    status
+  };
+}
+
+function adminPortalAccountsUrlSrv({
+  q = '',
+  status = 'all',
+  cursor = '',
+  notice = ''
+} = {}) {
+  const params =
+    new URLSearchParams();
+
+  if (q) {
+    params.set(
+      'q',
+      q
+    );
+  }
+
+  if (
+    status &&
+    status !== 'all'
+  ) {
+    params.set(
+      'status',
+      status
+    );
+  }
+
+  if (cursor) {
+    params.set(
+      'cursor',
+      cursor
+    );
+  }
+
+  if (notice) {
+    params.set(
+      'notice',
+      notice
+    );
+  }
+
+  const query =
+    params.toString();
+
+  return query
+    ? `/admin/accounts?${query}`
+    : '/admin/accounts';
+}
+
+function adminPortalNoticeSrv(raw) {
+  const code =
+    String(raw || '')
+      .trim()
+      .toLowerCase();
+
+  if (
+    ![
+      'active',
+      'suspended',
+      'closed'
+    ].includes(code)
+  ) {
+    return null;
+  }
+
+  return {
+    type: 'ok',
+
+    message:
+      adminAccountMessageSrv(
+        code
+      )
+  };
+}
+
+function adminPortalAccountCardSrv(
+  account = {},
+  csrfToken = '',
+  returnState = {}
+) {
+  const esc =
+    adminPortalEscapeHtmlSrv;
+
+  const status =
+    String(
+      account.accountStatus || ''
+    ).trim();
+
+  const uid =
+    esc(
+      account.uid || ''
+    );
+
+  const reason =
+    account.accountStatusReason
+      ? `
+        <div class="reason-line">
+          <strong>آخر سبب مسجل:</strong>
+          ${esc(
+            account.accountStatusReason
+          )}
+        </div>
+      `
+      : '';
+
+  const syncWarning =
+    account.authExists !== true
+      ? `
+        <div class="sync-warning">
+          ⚠️ مستخدم Firebase غير موجود لهذا الحساب.
+          لا يمكن تنفيذ تغيير حالة من البوابة.
+        </div>
+      `
+      : account.statusSyncOk !== true
+        ? `
+          <div class="sync-warning">
+            ⚠️ حالة الحساب لا تتطابق مع حالة Firebase.
+            راجع الحساب قبل تنفيذ أي إجراء.
+          </div>
+        `
+        : '';
+
+  let actionsHtml = '';
+
+  if (
+    account.isAdmin === true
+  ) {
+    actionsHtml = `
+      <div class="protected-admin">
+        🔐 حساب إداري محمي —
+        لا توجد إجراءات عملاء على هذا الحساب.
+      </div>
+    `;
+
+  } else if (
+    account.authExists !== true
+  ) {
+    actionsHtml = `
+      <div class="protected-admin">
+        يلزم إصلاح ربط Firebase
+        قبل تغيير حالة هذا الحساب.
+      </div>
+    `;
+
+  } else {
+    const buttons = [];
+
+    if (status === 'active') {
+      buttons.push(
+        `
+        <button
+          class="btn btn-warn"
+          type="submit"
+          name="status"
+          value="suspended"
+        >
+          إيقاف مؤقت
+        </button>
+        `,
+        `
+        <button
+          class="btn btn-danger"
+          type="submit"
+          name="status"
+          value="closed"
+        >
+          إغلاق الحساب
+        </button>
+        `
+      );
+
+    } else if (
+      status === 'suspended'
+    ) {
+      buttons.push(
+        `
+        <button
+          class="btn btn-primary"
+          type="submit"
+          name="status"
+          value="active"
+        >
+          إعادة تفعيل
+        </button>
+        `,
+        `
+        <button
+          class="btn btn-danger"
+          type="submit"
+          name="status"
+          value="closed"
+        >
+          إغلاق الحساب
+        </button>
+        `
+      );
+
+    } else if (
+      status === 'closed'
+    ) {
+      buttons.push(
+        `
+        <button
+          class="btn btn-primary"
+          type="submit"
+          name="status"
+          value="active"
+        >
+          إعادة تفعيل
+        </button>
+        `
+      );
+    }
+
+    if (buttons.length) {
+      actionsHtml = `
+        <form
+          class="account-actions"
+          method="post"
+          action="/admin/accounts/confirm"
+        >
+          <input
+            type="hidden"
+            name="adminCsrfToken"
+            value="${esc(csrfToken)}"
+          >
+
+          <input
+            type="hidden"
+            name="uid"
+            value="${uid}"
+          >
+
+          <input
+            type="hidden"
+            name="returnQ"
+            value="${esc(
+              returnState.q || ''
+            )}"
+          >
+
+          <input
+            type="hidden"
+            name="returnStatus"
+            value="${esc(
+              returnState.status ||
+              'all'
+            )}"
+          >
+
+          ${buttons.join('')}
+        </form>
+      `;
+    }
+  }
+
+  return `
+    <article class="account-card">
+
+      <div class="account-top">
+
+        <div>
+          <div class="account-name">
+            ${esc(
+              account.name ||
+              'حساب بدون اسم'
+            )}
+          </div>
+
+          <div class="account-phone">
+            ${esc(
+              account.phone ||
+              '—'
+            )}
+          </div>
+        </div>
+
+        <span
+          class="
+            status-badge
+            ${adminPortalStatusClassSrv(
+              status
+            )}
+          "
+        >
+          ${esc(
+            adminPortalStatusLabelSrv(
+              status
+            )
+          )}
+        </span>
+
+      </div>
+
+      <div class="details-grid">
+
+        <div class="detail">
+          <div class="detail-label">
+            المزرعة
+          </div>
+          <div class="detail-value">
+            ${esc(
+              account.farmName ||
+              '—'
+            )}
+          </div>
+        </div>
+
+        <div class="detail">
+          <div class="detail-label">
+            الدولة / المنطقة
+          </div>
+          <div class="detail-value">
+            ${esc(
+              [
+                account.country,
+                account.region
+              ]
+                .filter(Boolean)
+                .join(' — ') ||
+              '—'
+            )}
+          </div>
+        </div>
+
+        <div class="detail">
+          <div class="detail-label">
+            الصفة
+          </div>
+          <div class="detail-value">
+            ${esc(
+              account.role ||
+              '—'
+            )}
+          </div>
+        </div>
+
+        <div class="detail">
+          <div class="detail-label">
+            تاريخ إنشاء الحساب
+          </div>
+          <div class="detail-value">
+            ${esc(
+              adminPortalDateSrv(
+                account.createdAt
+              )
+            )}
+          </div>
+        </div>
+
+        <div class="detail">
+          <div class="detail-label">
+            آخر دخول
+          </div>
+          <div class="detail-value">
+            ${esc(
+              adminPortalDateSrv(
+                account.lastSignInAt
+              )
+            )}
+          </div>
+        </div>
+
+        <div class="detail">
+          <div class="detail-label">
+            آخر تحديث للحالة
+          </div>
+          <div class="detail-value">
+            ${esc(
+              adminPortalDateSrv(
+                account
+                  .accountStatusUpdatedAt
+              )
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      ${syncWarning}
+      ${reason}
+      ${actionsHtml}
+
+    </article>
+  `;
+}
+
+async function adminPortalTemplateSrv() {
+  return await fs.promises
+    .readFile(
       path.join(
         __dirname,
         'admin-private',
         'accounts.html'
       ),
-      {
-        dotfiles: 'deny',
-        acceptRanges: false,
-        cacheControl: false
-      }
+      'utf8'
     );
+}
+
+async function adminPortalRenderAccountsSrv(
+  req,
+  res,
+  options = {}
+) {
+  const directoryReq =
+    Object.create(req);
+
+  directoryReq.query = {
+    ...(req.query || {}),
+    limit: '25'
+  };
+
+  const collector =
+    adminPortalJsonCollectorSrv();
+
+  await adminAccountsDirectoryHandlerSrv(
+    directoryReq,
+    collector.response
+  );
+
+  const result =
+    collector.read();
+
+  const payload =
+    result.body &&
+    typeof result.body === 'object'
+      ? result.body
+      : {};
+
+  const q =
+    adminAccountsSearchSrv(
+      req.query?.q || ''
+    );
+
+  const rawStatus =
+    String(
+      req.query?.status || 'all'
+    )
+      .trim()
+      .toLowerCase();
+
+  const status =
+    rawStatus === 'all'
+      ? 'all'
+      : (
+          adminAccountsStatusFilterSrv(
+            rawStatus
+          ) || 'all'
+        );
+
+  const returnState = {
+    q,
+    status
+  };
+
+  const csrfToken =
+    adminPortalCsrfTokenSrv(req);
+
+  let notice =
+    options.notice ||
+    adminPortalNoticeSrv(
+      req.query?.notice
+    );
+
+  if (
+    result.statusCode < 200 ||
+    result.statusCode >= 300 ||
+    payload.ok !== true
+  ) {
+    notice = {
+      type: 'err',
+
+      message:
+        String(
+          payload.message ||
+          'تعذّر تحميل قائمة الحسابات الآن.'
+        )
+    };
+  }
+
+  const accounts =
+    Array.isArray(
+      payload.accounts
+    )
+      ? payload.accounts
+      : [];
+
+  const cardsHtml =
+    accounts.length
+      ? accounts
+          .map(
+            account =>
+              adminPortalAccountCardSrv(
+                account,
+                csrfToken,
+                returnState
+              )
+          )
+          .join('')
+      : `
+        <div class="empty-state">
+          <div class="empty-icon">
+            ⌕
+          </div>
+
+          <h2>
+            لا توجد نتائج
+          </h2>
+
+          <p>
+            غيّر البحث أو فلتر الحالة
+            ثم أعد المحاولة.
+          </p>
+        </div>
+      `;
+
+  const nextCursor =
+    String(
+      payload.page?.nextCursor || ''
+    ).trim();
+
+  const nextHtml =
+    nextCursor
+      ? `
+        <a
+          class="btn btn-ghost"
+          href="${adminPortalEscapeHtmlSrv(
+            adminPortalAccountsUrlSrv({
+              q,
+              status,
+              cursor:
+                nextCursor
+            })
+          )}"
+        >
+          الصفحة التالية
+        </a>
+      `
+      : '';
+
+  const noticeHtml =
+    notice?.message
+      ? `
+        <div
+          class="
+            notice
+            notice-${
+              notice.type === 'ok'
+                ? 'ok'
+                : notice.type === 'err'
+                  ? 'err'
+                  : 'info'
+            }
+          "
+          role="status"
+        >
+          ${adminPortalEscapeHtmlSrv(
+            notice.message
+          )}
+        </div>
+      `
+      : '';
+
+  let template =
+    await adminPortalTemplateSrv();
+
+  const replacements = {
+    '{{ADMIN_QUERY}}':
+      adminPortalEscapeHtmlSrv(q),
+
+    '{{ADMIN_STATUS_ALL_SELECTED}}':
+      status === 'all'
+        ? 'selected'
+        : '',
+
+    '{{ADMIN_STATUS_ACTIVE_SELECTED}}':
+      status === 'active'
+        ? 'selected'
+        : '',
+
+    '{{ADMIN_STATUS_SUSPENDED_SELECTED}}':
+      status === 'suspended'
+        ? 'selected'
+        : '',
+
+    '{{ADMIN_STATUS_CLOSED_SELECTED}}':
+      status === 'closed'
+        ? 'selected'
+        : '',
+
+    '{{ADMIN_NOTICE_HTML}}':
+      noticeHtml,
+
+    '{{ADMIN_RESULT_COUNT}}':
+      adminPortalEscapeHtmlSrv(
+        accounts.length === 1
+          ? 'حساب واحد'
+          : `${accounts.length} حسابًا`
+      ),
+
+    '{{ADMIN_ACCOUNTS_HTML}}':
+      cardsHtml,
+
+    '{{ADMIN_NEXT_HTML}}':
+      nextHtml
+  };
+
+  template =
+    template.replace(
+      /\{\{ADMIN_[A-Z_]+\}\}/g,
+      token =>
+        Object.prototype
+          .hasOwnProperty
+          .call(
+            replacements,
+            token
+          )
+          ? replacements[token]
+          : ''
+    );
+
+  return res
+    .status(
+      result.statusCode >= 500
+        ? 500
+        : 200
+    )
+    .type('html')
+    .send(template);
+}
+
+function adminPortalConfirmCopySrv(status) {
+  if (
+    status === 'suspended'
+  ) {
+    return {
+      title:
+        'تأكيد إيقاف الحساب مؤقتًا',
+
+      description:
+        'سيتم منع المستخدم من تسجيل الدخول وسحب جلساته الحالية. بيانات المزرعة لن تُحذف.',
+
+      button:
+        'تأكيد الإيقاف',
+
+      buttonClass:
+        'btn-warn',
+
+      phrase:
+        ''
+    };
+  }
+
+  if (
+    status === 'closed'
+  ) {
+    return {
+      title:
+        'تأكيد إغلاق الحساب',
+
+      description:
+        'سيتم منع المستخدم من تسجيل الدخول وسحب جلساته الحالية. بيانات المزرعة ستظل محفوظة ولن يتم حذفها.',
+
+      button:
+        'تأكيد الإغلاق',
+
+      buttonClass:
+        'btn-danger',
+
+      phrase:
+        'إغلاق'
+    };
+  }
+
+  return {
+    title:
+      'تأكيد إعادة تفعيل الحساب',
+
+    description:
+      'سيتم تفعيل الحساب من جديد وسحب الجلسات القديمة، ويلزم المستخدم تسجيل الدخول مرة أخرى.',
+
+    button:
+      'تأكيد إعادة التفعيل',
+
+    buttonClass:
+      'btn-primary',
+
+    phrase:
+      ''
+  };
+}
+
+async function adminPortalLoadTargetSrv(uid) {
+  const targetUid =
+    adminAccountUidSrv(uid);
+
+  if (!targetUid) {
+    return {
+      ok: false,
+      status: 400,
+      message:
+        '❌ تعذّر تحديد الحساب المطلوب.'
+    };
+  }
+
+  try {
+    const [
+      profileSnap,
+      authUser
+    ] =
+      await Promise.all([
+        db
+          .collection('users')
+          .doc(targetUid)
+          .get(),
+
+        admin.auth()
+          .getUser(
+            targetUid
+          )
+      ]);
+
+    if (!profileSnap.exists) {
+      return {
+        ok: false,
+        status: 404,
+        message:
+          '❌ ملف هذا الحساب غير موجود في مُرَبِّيك.'
+      };
+    }
+
+    if (
+      authUser
+        ?.customClaims
+        ?.admin === true
+    ) {
+      return {
+        ok: false,
+        status: 403,
+        message:
+          '🚫 الحسابات الإدارية محمية ولا تُدار من أدوات حسابات العملاء.'
+      };
+    }
+
+    const profile =
+      profileSnap.data() || {};
+
+    return {
+      ok: true,
+
+      uid:
+        targetUid,
+
+      name:
+        profile.name ||
+        profile.displayName ||
+        profile.fullName ||
+        authUser?.displayName ||
+        '',
+
+      phone:
+        profile.phone ||
+        profile.phoneNumber ||
+        profile.phoneKey ||
+        ''
+    };
+
+  } catch (e) {
+    if (
+      e?.code ===
+      'auth/user-not-found'
+    ) {
+      return {
+        ok: false,
+        status: 404,
+        message:
+          '❌ مستخدم Firebase لهذا الحساب غير موجود.'
+      };
+    }
+
+    throw e;
+  }
+}
+
+function adminPortalConfirmationPageSrv({
+  csrfToken = '',
+  target = {},
+  status = '',
+  reason = '',
+  returnState = {},
+  errorMessage = ''
+} = {}) {
+  const esc =
+    adminPortalEscapeHtmlSrv;
+
+  const copy =
+    adminPortalConfirmCopySrv(
+      status
+    );
+
+  const phraseHtml =
+    copy.phrase
+      ? `
+        <label class="field">
+
+          <span>
+            للتأكيد اكتب كلمة:
+            ${esc(copy.phrase)}
+          </span>
+
+          <input
+            name="confirmation"
+            type="text"
+            autocomplete="off"
+            required
+          >
+
+        </label>
+      `
+      : `
+        <label class="decision-check">
+
+          <input
+            name="confirmDecision"
+            type="checkbox"
+            value="yes"
+            required
+          >
+
+          <span>
+            أؤكد أنني راجعت الحساب
+            وأريد تنفيذ هذا الإجراء.
+          </span>
+
+        </label>
+      `;
+
+  const errorHtml =
+    errorMessage
+      ? `
+        <div
+          class="notice notice-err"
+          role="alert"
+        >
+          ${esc(errorMessage)}
+        </div>
+      `
+      : '';
+
+  const cancelUrl =
+    adminPortalAccountsUrlSrv(
+      returnState
+    );
+
+  return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1,viewport-fit=cover"
+  >
+  <meta
+    name="robots"
+    content="noindex,nofollow,noarchive"
+  >
+
+  <title>
+    ${esc(copy.title)} — مُرَبِّيك
+  </title>
+
+  <link
+    rel="stylesheet"
+    href="/css/admin-accounts.css?v=20260808b"
+  >
+</head>
+
+<body>
+
+  <main class="confirm-shell">
+
+    <section class="confirm-card">
+
+      <div class="eyebrow">
+        إجراء إداري محمي
+      </div>
+
+      <h1>
+        ${esc(copy.title)}
+      </h1>
+
+      <div class="confirm-account">
+        ${esc(
+          target.name ||
+          'الحساب'
+        )}
+        —
+        ${esc(
+          target.phone ||
+          '—'
+        )}
+      </div>
+
+      <p>
+        ${esc(copy.description)}
+      </p>
+
+      ${errorHtml}
+
+      <form
+        method="post"
+        action="/admin/accounts/status"
+        class="confirm-form"
+      >
+
+        <input
+          type="hidden"
+          name="adminCsrfToken"
+          value="${esc(csrfToken)}"
+        >
+
+        <input
+          type="hidden"
+          name="uid"
+          value="${esc(
+            target.uid || ''
+          )}"
+        >
+
+        <input
+          type="hidden"
+          name="status"
+          value="${esc(status)}"
+        >
+
+        <input
+          type="hidden"
+          name="returnQ"
+          value="${esc(
+            returnState.q || ''
+          )}"
+        >
+
+        <input
+          type="hidden"
+          name="returnStatus"
+          value="${esc(
+            returnState.status ||
+            'all'
+          )}"
+        >
+
+        <label class="field">
+
+          <span>
+            سبب القرار
+            <small>
+              اختياري — يُحفظ في سجل المراجعة
+            </small>
+          </span>
+
+          <textarea
+            name="reason"
+            maxlength="500"
+            rows="4"
+            placeholder="اكتب سببًا واضحًا إذا لزم"
+          >${esc(reason)}</textarea>
+
+        </label>
+
+        ${phraseHtml}
+
+        <div class="modal-actions">
+
+          <button
+            class="btn ${esc(
+              copy.buttonClass
+            )}"
+            type="submit"
+          >
+            ${esc(copy.button)}
+          </button>
+
+          <a
+            class="btn btn-ghost"
+            href="${esc(cancelUrl)}"
+          >
+            إلغاء والعودة
+          </a>
+
+        </div>
+
+      </form>
+
+    </section>
+
+  </main>
+
+</body>
+</html>`;
+}
+
+app.get(
+  '/admin/accounts',
+
+  ensureAccountAdminClaimSrv,
+  adminSensitiveHeadersSrv,
+  adminPortalPageHeadersSrv,
+
+  async (req, res) => {
+    try {
+      return await adminPortalRenderAccountsSrv(
+        req,
+        res
+      );
+
+    } catch (e) {
+      console.error(
+        'admin portal render failed:',
+        e.message || e
+      );
+
+      return res
+        .status(500)
+        .send(
+          'تعذّر فتح بوابة الإدارة الآن.'
+        );
+    }
   }
 );
-// Static last
+
+app.post(
+  '/admin/accounts/confirm',
+
+  ensureAccountAdminClaimSrv,
+  adminSensitiveHeadersSrv,
+  adminPortalPageHeadersSrv,
+  adminPortalFormGuardSrv,
+
+  async (req, res) => {
+    try {
+      if (
+        !db ||
+        !admin.apps.length
+      ) {
+        return res
+          .status(503)
+          .send(
+            'خدمة إدارة الحسابات غير متاحة الآن.'
+          );
+      }
+
+      const status =
+        adminAccountStatusSrv(
+          req.body?.status
+        );
+
+      if (!status) {
+        return res
+          .status(400)
+          .send(
+            'حالة الحساب المطلوبة غير صحيحة.'
+          );
+      }
+
+      const actorUid =
+        String(
+          req.accountAdminAuth?.uid ||
+          req.accountAdminAuth?.sub ||
+          ''
+        ).trim();
+
+      const targetUid =
+        adminAccountUidSrv(
+          req.body?.uid
+        );
+
+      if (
+        actorUid &&
+        targetUid === actorUid &&
+        status !== 'active'
+      ) {
+        return res
+          .status(400)
+          .send(
+            'لا يمكن للمشرف إيقاف أو إغلاق حسابه الحالي.'
+          );
+      }
+
+      const target =
+        await adminPortalLoadTargetSrv(
+          targetUid
+        );
+
+      if (!target.ok) {
+        return res
+          .status(
+            target.status || 400
+          )
+          .send(
+            adminPortalEscapeHtmlSrv(
+              target.message ||
+              'تعذّر فتح الحساب المطلوب.'
+            )
+          );
+      }
+
+      const returnState =
+        adminPortalReturnStateSrv(
+          req.body || {}
+        );
+
+      return res
+        .status(200)
+        .type('html')
+        .send(
+          adminPortalConfirmationPageSrv({
+            csrfToken:
+              adminPortalCsrfTokenSrv(
+                req
+              ),
+
+            target,
+            status,
+            returnState
+          })
+        );
+
+    } catch (e) {
+      console.error(
+        'admin portal confirmation failed:',
+        e.message || e
+      );
+
+      return res
+        .status(500)
+        .send(
+          'تعذّر فتح شاشة التأكيد الآن.'
+        );
+    }
+  }
+);
+
+app.post(
+  '/admin/accounts/status',
+
+  ensureAccountAdminClaimSrv,
+  adminSensitiveHeadersSrv,
+  adminPortalPageHeadersSrv,
+  adminPortalFormGuardSrv,
+
+  async (req, res) => {
+    try {
+      if (
+        !db ||
+        !admin.apps.length
+      ) {
+        return res
+          .status(503)
+          .send(
+            'خدمة إدارة الحسابات غير متاحة الآن.'
+          );
+      }
+
+      const status =
+        adminAccountStatusSrv(
+          req.body?.status
+        );
+
+      if (!status) {
+        return res
+          .status(400)
+          .send(
+            'حالة الحساب المطلوبة غير صحيحة.'
+          );
+      }
+
+      const returnState =
+        adminPortalReturnStateSrv(
+          req.body || {}
+        );
+
+      const target =
+        await adminPortalLoadTargetSrv(
+          req.body?.uid
+        );
+
+      if (!target.ok) {
+        return res
+          .status(
+            target.status || 400
+          )
+          .send(
+            adminPortalEscapeHtmlSrv(
+              target.message ||
+              'تعذّر تحديد الحساب المطلوب.'
+            )
+          );
+      }
+
+      const reason =
+        String(
+          req.body?.reason || ''
+        )
+          .trim()
+          .slice(0, 500);
+
+      let confirmationError = '';
+
+      if (
+        status === 'closed'
+      ) {
+        if (
+          String(
+            req.body
+              ?.confirmation || ''
+          ).trim() !== 'إغلاق'
+        ) {
+          confirmationError =
+            'اكتب كلمة «إغلاق» كما هي لتأكيد إغلاق الحساب.';
+        }
+
+      } else if (
+        String(
+          req.body
+            ?.confirmDecision || ''
+        ).trim() !== 'yes'
+      ) {
+        confirmationError =
+          'أكد مراجعة القرار قبل التنفيذ.';
+      }
+
+      if (confirmationError) {
+        return res
+          .status(400)
+          .type('html')
+          .send(
+            adminPortalConfirmationPageSrv({
+              csrfToken:
+                adminPortalCsrfTokenSrv(
+                  req
+                ),
+
+              target,
+              status,
+              reason,
+              returnState,
+
+              errorMessage:
+                confirmationError
+            })
+          );
+      }
+
+      const collector =
+        adminPortalJsonCollectorSrv();
+
+      const actionReq =
+        Object.create(req);
+
+      actionReq.body = {
+        uid:
+          target.uid,
+
+        status,
+        reason
+      };
+
+      actionReq.adminAccountActionSource =
+        'server:/admin/accounts/status';
+
+      await adminAccountStatusHandlerSrv(
+        actionReq,
+        collector.response
+      );
+
+      const result =
+        collector.read();
+
+      const payload =
+        result.body &&
+        typeof result.body === 'object'
+          ? result.body
+          : {};
+
+      if (
+        result.statusCode < 200 ||
+        result.statusCode >= 300 ||
+        payload.ok !== true
+      ) {
+        return res
+          .status(
+            result.statusCode || 500
+          )
+          .type('html')
+          .send(
+            adminPortalConfirmationPageSrv({
+              csrfToken:
+                adminPortalCsrfTokenSrv(
+                  req
+                ),
+
+              target,
+              status,
+              reason,
+              returnState,
+
+              errorMessage:
+                String(
+                  payload.message ||
+                  'تعذّر تنفيذ الإجراء الإداري.'
+                )
+            })
+          );
+      }
+
+      return res.redirect(
+        303,
+
+        adminPortalAccountsUrlSrv({
+          ...returnState,
+          notice:
+            status
+        })
+      );
+
+    } catch (e) {
+      console.error(
+        'admin portal status failed:',
+        e.message || e
+      );
+
+      return res
+        .status(500)
+        .send(
+          'تعذّر تنفيذ الإجراء الإداري الآن.'
+        );
+    }
+  }
+);// Static last
 app.use(express.static(path.join(__dirname, 'www')));
 // ✅ DIM job
 startDailyDimJob();
