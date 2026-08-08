@@ -2695,6 +2695,391 @@ async function ensureAdmin(req, res, next) {
   }
 }
 // ============================================================
+//          ACCOUNT ADMIN GATE — session-first, production-safe
+// ============================================================
+const ACCOUNT_ADMIN_UIDS = (process.env.ADMIN_UIDS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+function accountAdminAllowedSrv(decoded = {}) {
+  const uid = String(decoded.uid || decoded.sub || '').trim();
+  const email = String(decoded.email || '').trim().toLowerCase();
+
+  return (
+    decoded.admin === true ||
+    (uid && ACCOUNT_ADMIN_UIDS.includes(uid)) ||
+    (email && ADMIN_EMAILS.includes(email))
+  );
+}
+
+async function ensureAccountAdminSrv(req, res, next) {
+  try {
+    if (!admin.apps.length) {
+      return res.status(404).send('Not Found');
+    }
+
+    let decoded = null;
+
+    const sessionCookie = authCookieValueBridgeSrv(req, AUTH_COOKIE_NAME);
+
+    if (sessionCookie) {
+      decoded = await admin.auth().verifySessionCookie(
+        sessionCookie,
+        true
+      );
+    }
+
+    if (!decoded) {
+      const header =
+        String(req.headers.authorization || '');
+
+      const m =
+        header.match(/^Bearer\s+(.+)$/i);
+
+      const idToken =
+        m ? String(m[1] || '').trim() : '';
+
+      if (idToken) {
+        decoded = await admin.auth().verifyIdToken(
+          idToken,
+          true
+        );
+      }
+    }
+
+    if (!decoded || !accountAdminAllowedSrv(decoded)) {
+      return res.status(404).send('Not Found');
+    }
+
+    req.accountAdminAuth = decoded;
+    return next();
+
+  } catch (_) {
+    return res.status(404).send('Not Found');
+  }
+}
+
+// ============================================================
+//          ADMIN: ACCOUNT CONTROL — SUSPEND / REACTIVATE / CLOSE
+// ============================================================
+function adminAccountUidSrv(raw) {
+  const uid = String(raw || '').trim();
+
+  return /^[A-Za-z0-9_-]{16,128}$/.test(uid)
+    ? uid
+    : '';
+}
+
+function adminAccountStatusSrv(raw) {
+  const status =
+    String(raw || '').trim().toLowerCase();
+
+  return ['active', 'suspended', 'closed'].includes(status)
+    ? status
+    : '';
+}
+
+function adminAccountMessageSrv(status) {
+  if (status === 'suspended') {
+    return '✅ تم إيقاف الحساب وسحب جلساته.';
+  }
+
+  if (status === 'closed') {
+    return '✅ تم إغلاق الحساب وسحب جلساته.';
+  }
+
+  return '✅ تم إعادة تفعيل الحساب. يلزم تسجيل الدخول من جديد.';
+}
+
+app.post(
+  '/api/admin/accounts/status',
+  ensureAccountAdminSrv,
+  async (req, res) => {
+    try {
+      if (!db || !admin.apps.length) {
+        return res.status(503).json({
+          ok: false,
+          error: 'account_control_unavailable',
+          message:
+            '❌ خدمة التحكم في الحسابات غير متاحة الآن.'
+        });
+      }
+
+      const targetUid =
+        adminAccountUidSrv(
+          req.body?.uid ||
+          req.body?.userId
+        );
+
+      const nextStatus =
+        adminAccountStatusSrv(
+          req.body?.status ||
+          req.body?.accountStatus
+        );
+
+      const reason =
+        String(req.body?.reason || '')
+          .trim()
+          .slice(0, 500);
+
+      const actorUid =
+        String(
+          req.accountAdminAuth?.uid ||
+          req.accountAdminAuth?.sub ||
+          ''
+        ).trim();
+
+      if (!targetUid) {
+        return res.status(400).json({
+          ok: false,
+          error: 'account_uid_invalid',
+          message:
+            '❌ تعذّر تحديد الحساب المطلوب.'
+        });
+      }
+
+      if (!nextStatus) {
+        return res.status(400).json({
+          ok: false,
+          error: 'account_status_invalid',
+          message:
+            '❌ حالة الحساب المطلوبة غير صحيحة.'
+        });
+      }
+
+      if (
+        actorUid &&
+        targetUid === actorUid &&
+        nextStatus !== 'active'
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error: 'admin_self_lockout_blocked',
+          message:
+            '🚫 لا يمكن للمشرف إيقاف أو إغلاق حسابه الحالي.'
+        });
+      }
+
+      const userRef =
+        db.collection('users').doc(targetUid);
+
+      const [profileSnap, authUser] =
+        await Promise.all([
+          userRef.get(),
+          admin.auth().getUser(targetUid)
+        ]);
+
+      if (!profileSnap.exists) {
+        return res.status(404).json({
+          ok: false,
+          error: 'account_profile_not_found',
+          message:
+            '❌ ملف هذا الحساب غير موجود في مُرَبِّيك.'
+        });
+      }
+
+      const profile =
+        profileSnap.data() || {};
+
+      const previousStatus =
+        authAccountStatusBridgeSrv(profile);
+
+      const patch = {
+        accountStatus: nextStatus,
+
+        accountStatusUpdatedAt:
+          admin.firestore.FieldValue
+            .serverTimestamp(),
+
+        accountStatusUpdatedBy:
+          actorUid || null,
+
+        accountStatusReason:
+          reason || null
+      };
+
+      // إعادة التفعيل:
+      // نرجع حالة Firestore أولًا،
+      // ثم نفعّل Firebase Auth،
+      // ثم نسحب أي جلسات قديمة لفرض Login جديد.
+      if (nextStatus === 'active') {
+        await userRef.set(
+          patch,
+          { merge: true }
+        );
+
+        try {
+          await admin.auth().updateUser(
+            targetUid,
+            { disabled: false }
+          );
+
+          await admin.auth()
+            .revokeRefreshTokens(targetUid);
+
+        } catch (authError) {
+          // لو Firebase فشل، نرجع Firestore للحالة السابقة
+          // حتى لا يظهر الحساب Active وهو ما زال محظورًا.
+          try {
+            await userRef.set({
+              accountStatus:
+                previousStatus,
+
+              accountStatusUpdatedAt:
+                admin.firestore.FieldValue
+                  .serverTimestamp(),
+
+              accountStatusUpdatedBy:
+                actorUid || null,
+
+              accountStatusReason:
+                'rollback_after_auth_reactivation_failure'
+
+            }, { merge: true });
+
+          } catch (rollbackError) {
+            console.error(
+              'account reactivation rollback failed:',
+              rollbackError.message ||
+              rollbackError
+            );
+          }
+
+          throw authError;
+        }
+
+      } else {
+        // Suspend / Close:
+        // Firebase Auth أولًا حتى يكون Fail-Closed أمنيًا.
+        await admin.auth().updateUser(
+          targetUid,
+          { disabled: true }
+        );
+
+        await admin.auth()
+          .revokeRefreshTokens(targetUid);
+
+        try {
+          await userRef.set(
+            patch,
+            { merge: true }
+          );
+
+        } catch (firestoreError) {
+          console.error(
+            'account status firestore sync failed after auth disable:',
+            {
+              targetUid,
+              nextStatus,
+              error:
+                firestoreError.message ||
+                firestoreError
+            }
+          );
+
+          return res.status(500).json({
+            ok: false,
+            error:
+              'account_status_sync_failed',
+
+            accountBlocked: true,
+
+            message:
+              '🚫 تم منع دخول الحساب أمنيًا، لكن تعذّر تحديث حالته في قاعدة البيانات. أعد المحاولة.'
+          });
+        }
+      }
+
+      // Audit trail — لا نكسر العملية لو سجل المراجعة نفسه فشل.
+      try {
+        await db
+          .collection('admin_account_actions')
+          .add({
+            actorUid:
+              actorUid || null,
+
+            targetUid,
+
+            previousStatus,
+            nextStatus,
+
+            reason:
+              reason || null,
+
+            authDisabledBefore:
+              authUser.disabled === true,
+
+            authDisabledAfter:
+              nextStatus !== 'active',
+
+            createdAt:
+              admin.firestore.FieldValue
+                .serverTimestamp(),
+
+            source:
+              'server:/api/admin/accounts/status'
+          });
+
+      } catch (auditError) {
+        console.warn(
+          'admin account action audit failed:',
+          auditError.message ||
+          auditError
+        );
+      }
+
+      return res.json({
+        ok: true,
+
+        uid:
+          targetUid,
+
+        previousStatus,
+
+        accountStatus:
+          nextStatus,
+
+        authDisabled:
+          nextStatus !== 'active',
+
+        message:
+          adminAccountMessageSrv(
+            nextStatus
+          )
+      });
+
+    } catch (e) {
+      console.error(
+        'admin account status failed:',
+        e.code ||
+        e.message ||
+        e
+      );
+
+      if (
+        e?.code === 'auth/user-not-found'
+      ) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            'auth_user_not_found',
+          message:
+            '❌ مستخدم Firebase لهذا الحساب غير موجود.'
+        });
+      }
+
+      return res.status(500).json({
+        ok: false,
+        error:
+          'account_status_update_failed',
+        message:
+          '❌ تعذّر تحديث حالة الحساب الآن.'
+      });
+    }
+  }
+);
+// ============================================================
 //                  API: WEATHER / THI
 // ============================================================
 app.get('/api/weather/thi', requireUserId, async (req, res) => {
