@@ -258,7 +258,33 @@ async function authPasswordLoginBridgeSrv(email, password) {
   const data = await r.json().catch(() => ({}));
 
   if (!r.ok || !data.idToken) {
-    const err = new Error(data?.error?.message || "login_failed");
+    const firebaseError = String(data?.error?.message || "login_failed").trim();
+    const err = new Error(firebaseError);
+
+    if (firebaseError === "USER_DISABLED") {
+      err.publicStatus = 403;
+      err.publicError = "account_disabled";
+      err.publicMessage = "🚫 تم إيقاف هذا الحساب. تواصل مع إدارة مُرَبِّيك.";
+
+      try {
+        const userRecord = await admin.auth().getUserByEmail(email);
+        const uid = String(userRecord?.uid || "").trim();
+
+        if (uid) {
+          const profile = await authReadUserProfileBridgeSrv(uid);
+          const accountStatus = authAccountStatusBridgeSrv(profile);
+          const accountDenied = authAccountDeniedBridgeSrv(accountStatus);
+
+          if (accountDenied) {
+            err.publicError = accountDenied.error;
+            err.publicMessage = accountDenied.message;
+          }
+        }
+      } catch (_) {}
+
+      throw err;
+    }
+
     err.publicMessage = "❌ رقم الهاتف أو كلمة المرور غير صحيحة.";
     throw err;
   }
@@ -1388,17 +1414,18 @@ if (accountDenied) {
       redirectUrl: "dashboard.html"
     });
 
-  } catch (e) {
+   } catch (e) {
     console.warn("auth bridge login failed:", e.message || e);
 
-    return res.status(401).json({
+    const publicStatus = Number(e?.publicStatus || 401);
+
+    return res.status(publicStatus).json({
       ok: false,
-      error: "login_failed",
-      message: e.publicMessage || "❌ رقم الهاتف أو كلمة المرور غير صحيحة."
+      error: e?.publicError || "login_failed",
+      message: e?.publicMessage || "❌ رقم الهاتف أو كلمة المرور غير صحيحة."
     });
   }
 });
-
 app.get("/api/auth/me", async (req, res) => {
   const session = await authSessionFromRequestBridgeSrv(req);
 
