@@ -2853,7 +2853,182 @@ async function ensureAccountAdminClaimSrv(req, res, next) {
     return res.status(404).send('Not Found');
   }
 }
+// ============================================================
+//       ADMIN API HARDENING — no-store + same-origin writes
+// ============================================================
 
+function adminSensitiveHeadersSrv(req, res, next) {
+  res.setHeader(
+    'Cache-Control',
+    'no-store, max-age=0'
+  );
+
+  res.setHeader(
+    'Pragma',
+    'no-cache'
+  );
+
+  res.setHeader(
+    'Expires',
+    '0'
+  );
+
+  res.setHeader(
+    'X-Content-Type-Options',
+    'nosniff'
+  );
+
+  return next();
+}
+
+function adminRequestSourceOriginSrv(req) {
+  const rawOrigin =
+    String(
+      req.get('origin') || ''
+    ).trim();
+
+  if (
+    rawOrigin &&
+    rawOrigin !== 'null'
+  ) {
+    try {
+      return new URL(
+        rawOrigin
+      ).origin;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  const rawReferer =
+    String(
+      req.get('referer') || ''
+    ).trim();
+
+  if (!rawReferer) {
+    return '';
+  }
+
+  try {
+    return new URL(
+      rawReferer
+    ).origin;
+  } catch (_) {
+    return '';
+  }
+}
+
+function adminRequestTargetOriginSrv(req) {
+  const protocol =
+    String(
+      req.protocol || ''
+    )
+      .trim()
+      .toLowerCase();
+
+  const host =
+    String(
+      req.get('host') || ''
+    ).trim();
+
+  if (!protocol || !host) {
+    return '';
+  }
+
+  try {
+    return new URL(
+      `${protocol}://${host}`
+    ).origin;
+  } catch (_) {
+    return '';
+  }
+}
+
+function adminMutationRequestGuardSrv(req, res, next) {
+  const method =
+    String(
+      req.method || 'GET'
+    )
+      .trim()
+      .toUpperCase();
+
+  if (
+    method === 'GET' ||
+    method === 'HEAD' ||
+    method === 'OPTIONS'
+  ) {
+    return next();
+  }
+
+  const fetchSite =
+    String(
+      req.get('sec-fetch-site') || ''
+    )
+      .trim()
+      .toLowerCase();
+
+  if (
+    fetchSite === 'cross-site' ||
+    fetchSite === 'same-site'
+  ) {
+    return res.status(403).json({
+      ok: false,
+      error:
+        'admin_cross_origin_blocked',
+      message:
+        '🚫 تم رفض طلب إداري من مصدر غير موثوق.'
+    });
+  }
+
+  const sourceOrigin =
+    adminRequestSourceOriginSrv(
+      req
+    );
+
+  const targetOrigin =
+    adminRequestTargetOriginSrv(
+      req
+    );
+
+  if (
+    !sourceOrigin ||
+    !targetOrigin ||
+    sourceOrigin !== targetOrigin
+  ) {
+    return res.status(403).json({
+      ok: false,
+      error:
+        'admin_origin_verification_failed',
+      message:
+        '🚫 تعذّر التحقق من مصدر الطلب الإداري.'
+    });
+  }
+
+  const requestMarker =
+    String(
+      req.get(
+        'x-murabbik-admin-request'
+      ) || ''
+    ).trim();
+
+  if (requestMarker !== '1') {
+    return res.status(403).json({
+      ok: false,
+      error:
+        'admin_request_marker_missing',
+      message:
+        '🚫 الطلب الإداري غير موثّق.'
+    });
+  }
+
+  return next();
+}
+
+app.use(
+  '/api/admin',
+  adminSensitiveHeadersSrv,
+  adminMutationRequestGuardSrv
+);
 app.post(
   '/api/admin/bootstrap/self-claim',
   ensureAccountAdminBootstrapSrv,
@@ -3873,7 +4048,17 @@ app.post(
             '❌ ملف هذا الحساب غير موجود في مُرَبِّيك.'
         });
       }
-
+            if (
+        authUser?.customClaims?.admin === true
+      ) {
+        return res.status(403).json({
+          ok: false,
+          error:
+            'privileged_account_protected',
+          message:
+            '🚫 الحسابات الإدارية محمية ولا تُدار من أدوات حسابات العملاء.'
+        });
+      }
       const profile =
         profileSnap.data() || {};
 
