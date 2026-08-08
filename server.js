@@ -67486,6 +67486,85 @@ const affectedNumbers = new Set();
     });
   }
 });
+// ============================================================
+//          ADMIN PORTAL — PRIVATE HTML SHELL
+// ============================================================
+
+function adminPortalPageHeadersSrv(req, res, next) {
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'none'",
+      "base-uri 'none'",
+      "connect-src 'self'",
+      "img-src 'self' data:",
+      "style-src 'self'",
+      "script-src 'self'",
+      "script-src-attr 'none'",
+      "style-src-attr 'none'",
+      "font-src 'self'",
+      "frame-src 'none'",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "worker-src 'none'",
+      "form-action 'self'",
+      "upgrade-insecure-requests"
+    ].join('; ')
+  );
+
+  res.setHeader(
+    'Referrer-Policy',
+    'no-referrer'
+  );
+
+  res.setHeader(
+    'X-Frame-Options',
+    'DENY'
+  );
+
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
+  );
+
+  res.setHeader(
+    'Cross-Origin-Opener-Policy',
+    'same-origin'
+  );
+
+  res.setHeader(
+    'Cross-Origin-Resource-Policy',
+    'same-origin'
+  );
+
+  res.setHeader(
+    'X-Robots-Tag',
+    'noindex, nofollow, noarchive, nosnippet, noimageindex'
+  );
+
+  return next();
+}
+
+app.get(
+  '/admin/accounts',
+  ensureAccountAdminClaimSrv,
+  adminSensitiveHeadersSrv,
+  adminPortalPageHeadersSrv,
+  (req, res) => {
+    return res.sendFile(
+      path.join(
+        __dirname,
+        'admin-private',
+        'accounts.html'
+      ),
+      {
+        dotfiles: 'deny',
+        acceptRanges: false,
+        cacheControl: false
+      }
+    );
+  }
+);
 // Static last
 app.use(express.static(path.join(__dirname, 'www')));
 // ✅ DIM job
