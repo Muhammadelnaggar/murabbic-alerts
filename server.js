@@ -2988,10 +2988,591 @@ function adminAccountMessageSrv(status) {
 
   return '✅ تم إعادة تفعيل الحساب. يلزم تسجيل الدخول من جديد.';
 }
+// ============================================================
+//          ADMIN: ACCOUNT DIRECTORY — LIST / SEARCH / FILTER
+// ============================================================
+function adminAccountsLimitSrv(raw) {
+  const n = Number.parseInt(String(raw || ''), 10);
 
+  if (!Number.isFinite(n)) return 25;
+
+  return Math.min(100, Math.max(1, n));
+}
+
+function adminAccountsSearchSrv(raw) {
+  return String(raw || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 80);
+}
+
+function adminAccountsSearchModeSrv(searchText) {
+  const raw = String(searchText || '').trim();
+
+  if (!raw) {
+    return {
+      mode: 'all',
+      field: '',
+      value: ''
+    };
+  }
+
+  const digits = authDigitsBridgeSrv(raw);
+
+  const phoneLike =
+    /^[0-9٠-٩۰-۹+()\-\s]+$/.test(raw) &&
+    digits.length > 0;
+
+  if (phoneLike) {
+    return {
+      mode: 'phone',
+      field: 'phoneKey',
+      value: digits
+    };
+  }
+
+  return {
+    mode: 'name',
+    field: 'name',
+    value: raw
+  };
+}
+
+function adminAccountsStatusFilterSrv(raw) {
+  const value =
+    String(raw || '').trim().toLowerCase();
+
+  if (!value || value === 'all') return '';
+
+  return adminAccountStatusSrv(value);
+}
+
+function adminAccountsCursorEncodeSrv(payload = {}) {
+  try {
+    return Buffer
+      .from(JSON.stringify(payload), 'utf8')
+      .toString('base64url');
+  } catch (_) {
+    return '';
+  }
+}
+
+function adminAccountsCursorDecodeSrv(raw) {
+  const token = String(raw || '').trim();
+
+  if (!token) return null;
+
+  try {
+    const parsed = JSON.parse(
+      Buffer
+        .from(token, 'base64url')
+        .toString('utf8')
+    );
+
+    if (!parsed || parsed.v !== 1) {
+      return null;
+    }
+
+    const uid =
+      adminAccountUidSrv(parsed.uid);
+
+    if (!uid) {
+      return null;
+    }
+
+    return {
+      v: 1,
+      mode: String(parsed.mode || ''),
+      search: String(parsed.search || ''),
+      status: String(parsed.status || ''),
+      value: String(parsed.value || ''),
+      uid
+    };
+
+  } catch (_) {
+    return null;
+  }
+}
+
+function adminAccountIsoSrv(value) {
+  if (!value) return null;
+
+  try {
+    if (typeof value.toDate === 'function') {
+      return value.toDate().toISOString();
+    }
+
+    if (Number.isFinite(Number(value?._seconds))) {
+      return new Date(
+        Number(value._seconds) * 1000
+      ).toISOString();
+    }
+
+    const d = new Date(value);
+
+    return Number.isNaN(d.getTime())
+      ? null
+      : d.toISOString();
+
+  } catch (_) {
+    return null;
+  }
+}
+
+app.get(
+  '/api/admin/accounts',
+  ensureAccountAdminClaimSrv,
+  async (req, res) => {
+    try {
+      if (!db || !admin.apps.length) {
+        return res.status(503).json({
+          ok: false,
+          error: 'account_directory_unavailable',
+          message:
+            '❌ خدمة عرض الحسابات غير متاحة الآن.'
+        });
+      }
+
+      const limit =
+        adminAccountsLimitSrv(
+          req.query?.limit
+        );
+
+      const searchText =
+        adminAccountsSearchSrv(
+          req.query?.q
+        );
+
+      const search =
+        adminAccountsSearchModeSrv(
+          searchText
+        );
+
+      const rawStatus =
+        String(
+          req.query?.status || ''
+        )
+          .trim()
+          .toLowerCase();
+
+      const statusFilter =
+        adminAccountsStatusFilterSrv(
+          rawStatus
+        );
+
+      if (
+        rawStatus &&
+        rawStatus !== 'all' &&
+        !statusFilter
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error: 'account_status_filter_invalid',
+          message:
+            '❌ فلتر حالة الحساب غير صحيح.'
+        });
+      }
+
+      const rawCursor =
+        String(
+          req.query?.cursor || ''
+        ).trim();
+
+      const decodedCursor =
+        rawCursor
+          ? adminAccountsCursorDecodeSrv(
+              rawCursor
+            )
+          : null;
+
+      if (
+        rawCursor &&
+        !decodedCursor
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error: 'account_cursor_invalid',
+          message:
+            '❌ مؤشر الصفحة غير صالح. أعد فتح قائمة الحسابات.'
+        });
+      }
+
+      const cursorStatus =
+        statusFilter || 'all';
+
+      if (
+        decodedCursor &&
+        (
+          decodedCursor.mode !== search.mode ||
+          decodedCursor.search !== search.value ||
+          decodedCursor.status !== cursorStatus
+        )
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            'account_cursor_filter_mismatch',
+          message:
+            '❌ تغيّر البحث أو الفلتر. ابدأ من الصفحة الأولى.'
+        });
+      }
+
+      const usersRef =
+        db.collection('users');
+
+      let baseQuery;
+
+      if (search.mode === 'all') {
+        baseQuery =
+          usersRef.orderBy(
+            admin.firestore.FieldPath.documentId(),
+            'asc'
+          );
+
+      } else {
+        baseQuery =
+          usersRef
+            .where(
+              search.field,
+              '>=',
+              search.value
+            )
+            .where(
+              search.field,
+              '<=',
+              `${search.value}\uf8ff`
+            )
+            .orderBy(
+              search.field,
+              'asc'
+            )
+            .orderBy(
+              admin.firestore.FieldPath.documentId(),
+              'asc'
+            );
+      }
+
+      const collected = [];
+
+      const chunkSize =
+        Math.min(
+          100,
+          Math.max(
+            25,
+            limit * 2
+          )
+        );
+
+      const maxScanned = 1000;
+
+      let scanCursor =
+        decodedCursor;
+
+      let lastProcessed =
+        decodedCursor;
+
+      let scanned = 0;
+      let hasMore = false;
+
+      while (
+        collected.length < limit &&
+        scanned < maxScanned
+      ) {
+        let pageQuery =
+          baseQuery;
+
+        if (scanCursor) {
+          if (search.mode === 'all') {
+            pageQuery =
+              pageQuery.startAfter(
+                scanCursor.uid
+              );
+
+          } else {
+            pageQuery =
+              pageQuery.startAfter(
+                scanCursor.value,
+                scanCursor.uid
+              );
+          }
+        }
+
+        const snap =
+          await pageQuery
+            .limit(chunkSize)
+            .get();
+
+        if (snap.empty) {
+          hasMore = false;
+          break;
+        }
+
+        let processedInPage = 0;
+
+        for (
+          const docSnap of snap.docs
+        ) {
+          processedInPage += 1;
+          scanned += 1;
+
+          const profile =
+            docSnap.data() || {};
+
+          const accountStatus =
+            authAccountStatusBridgeSrv(
+              profile
+            );
+
+          const sortValue =
+            search.mode === 'all'
+              ? ''
+              : String(
+                  profile?.[
+                    search.field
+                  ] || ''
+                );
+
+          lastProcessed = {
+            v: 1,
+            mode: search.mode,
+            search: search.value,
+            status: cursorStatus,
+            value: sortValue,
+            uid: docSnap.id
+          };
+
+          scanCursor =
+            lastProcessed;
+
+          if (
+            !statusFilter ||
+            accountStatus === statusFilter
+          ) {
+            collected.push({
+              uid: docSnap.id,
+              profile,
+              accountStatus
+            });
+          }
+
+          if (
+            collected.length >= limit ||
+            scanned >= maxScanned
+          ) {
+            break;
+          }
+        }
+
+        if (
+          processedInPage <
+          snap.docs.length
+        ) {
+          hasMore = true;
+          break;
+        }
+
+        if (
+          snap.size <
+          chunkSize
+        ) {
+          hasMore = false;
+          break;
+        }
+
+        hasMore = true;
+      }
+
+      if (
+        scanned >= maxScanned &&
+        collected.length < limit
+      ) {
+        hasMore = true;
+      }
+
+      const authByUid =
+        new Map();
+
+      if (collected.length) {
+        const authLookup =
+          await admin
+            .auth()
+            .getUsers(
+              collected.map(
+                item => ({
+                  uid: item.uid
+                })
+              )
+            );
+
+        for (
+          const authUser
+          of authLookup.users || []
+        ) {
+          authByUid.set(
+            authUser.uid,
+            authUser
+          );
+        }
+      }
+
+      const accounts =
+        collected.map(item => {
+          const profile =
+            item.profile || {};
+
+          const authUser =
+            authByUid.get(
+              item.uid
+            ) || null;
+
+          const expectedDisabled =
+            item.accountStatus !==
+            'active';
+
+          return {
+            uid:
+              item.uid,
+
+            name:
+              profile.name ||
+              profile.displayName ||
+              profile.fullName ||
+              authUser?.displayName ||
+              '',
+
+            phone:
+              profile.phone ||
+              profile.phoneNumber ||
+              profile.phoneKey ||
+              '',
+
+            farmName:
+              profile.farmName ||
+              profile.farm ||
+              '',
+
+            country:
+              profile.country ||
+              '',
+
+            region:
+              profile.region ||
+              profile.governorate ||
+              profile.area ||
+              '',
+
+            role:
+              profile.role ||
+              profile.accountRole ||
+              '',
+
+            accountStatus:
+              item.accountStatus,
+
+            accountStatusReason:
+              profile.accountStatusReason ||
+              null,
+
+            accountStatusUpdatedAt:
+              adminAccountIsoSrv(
+                profile.accountStatusUpdatedAt
+              ),
+
+            authExists:
+              Boolean(authUser),
+
+            authDisabled:
+              authUser
+                ? authUser.disabled === true
+                : null,
+
+            statusSyncOk:
+              authUser
+                ? (
+                    authUser.disabled ===
+                    expectedDisabled
+                  )
+                : false,
+
+            isAdmin:
+              authUser
+                ?.customClaims
+                ?.admin === true,
+
+            createdAt:
+              adminAccountIsoSrv(
+                profile.createdAt
+              ) ||
+              adminAccountIsoSrv(
+                authUser
+                  ?.metadata
+                  ?.creationTime
+              ),
+
+            lastSignInAt:
+              adminAccountIsoSrv(
+                authUser
+                  ?.metadata
+                  ?.lastSignInTime
+              )
+          };
+        });
+
+      const nextCursor =
+        hasMore &&
+        lastProcessed
+          ? adminAccountsCursorEncodeSrv(
+              lastProcessed
+            )
+          : null;
+
+      return res.json({
+        ok: true,
+
+        filters: {
+          q:
+            searchText,
+
+          status:
+            statusFilter ||
+            'all'
+        },
+
+        page: {
+          limit,
+          returned:
+            accounts.length,
+          scanned,
+          hasMore,
+          nextCursor,
+          scanLimited:
+            scanned >= maxScanned
+        },
+
+        accounts
+      });
+
+    } catch (e) {
+      console.error(
+        'admin account directory failed:',
+        e.code ||
+        e.message ||
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error:
+          'account_directory_failed',
+        message:
+          '❌ تعذّر تحميل قائمة الحسابات الآن.'
+      });
+    }
+  }
+);
 app.post(
   '/api/admin/accounts/status',
-  ensureAccountAdminSrv,
+  ensureAccountAdminClaimSrv,
   async (req, res) => {
     try {
       if (!db || !admin.apps.length) {
