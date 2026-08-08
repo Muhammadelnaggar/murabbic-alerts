@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+
+  <title>إدارة الحسابات — مُرَبِّيك</title>
+
+  <link
+    rel="stylesheet"
+    href="/css/admin-accounts.css?v=20260808a"
+  >
+</head>
+
+<body>
+
+  <div class="admin-shell">
+
+    <header class="admin-topbar">
+
+      <div class="admin-brand">
+        <img
+          src="/images/logo.png"
+          alt="مُرَبِّيك"
+          class="admin-logo"
+        >
+
+        <div>
+          <div class="admin-brand-name">
+            مُرَبِّيك
+          </div>
+
+          <div class="admin-brand-sub">
+            بوابة الإدارة الآمنة
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-top-actions">
+
+        <span
+          class="secure-badge"
+          aria-label="جلسة إدارية موثقة"
+        >
+          🔒 جلسة إدارية موثقة
+        </span>
+
+        <a
+          class="btn btn-ghost"
+          href="/dashboard.html"
+        >
+          لوحة مُرَبِّيك
+        </a>
+
+      </div>
+
+    </header>
+
+    <main class="admin-main">
+
+      <section
+        class="hero-card"
+        aria-labelledby="pageTitle"
+      >
+
+        <div>
+          <div class="eyebrow">
+            إدارة العملاء
+          </div>
+
+          <h1 id="pageTitle">
+            حسابات مُرَبِّيك
+          </h1>
+
+          <p>
+            بحث ومراجعة حالة الحساب، ثم إيقافه أو إعادة
+            تفعيله أو إغلاقه من مسار إداري موثّق.
+          </p>
+        </div>
+
+        <button
+          id="refreshBtn"
+          class="btn btn-secondary"
+          type="button"
+        >
+          تحديث البيانات
+        </button>
+
+      </section>
+
+      <div
+        id="globalMsg"
+        class="global-msg"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></div>
+
+      <section
+        class="filters-card"
+        aria-label="بحث وفلاتر الحسابات"
+      >
+
+        <form
+          id="searchForm"
+          class="search-grid"
+          autocomplete="off"
+          novalidate
+        >
+
+          <label
+            class="field field-search"
+            for="searchInput"
+          >
+
+            <span>
+              البحث
+            </span>
+
+            <input
+              id="searchInput"
+              name="q"
+              type="search"
+              inputmode="search"
+              autocomplete="off"
+              maxlength="80"
+              placeholder="رقم الهاتف كامل أو بداية الاسم"
+            >
+
+          </label>
+
+          <label
+            class="field"
+            for="statusFilter"
+          >
+
+            <span>
+              حالة الحساب
+            </span>
+
+            <select
+              id="statusFilter"
+              name="status"
+            >
+              <option value="all">
+                كل الحالات
+              </option>
+
+              <option value="active">
+                نشط
+              </option>
+
+              <option value="suspended">
+                موقوف مؤقتًا
+              </option>
+
+              <option value="closed">
+                مغلق
+              </option>
+            </select>
+
+          </label>
+
+          <div class="filter-actions">
+
+            <button
+              id="searchBtn"
+              class="btn btn-primary"
+              type="submit"
+            >
+              بحث
+            </button>
+
+            <button
+              id="clearBtn"
+              class="btn btn-ghost"
+              type="button"
+            >
+              مسح
+            </button>
+
+          </div>
+
+        </form>
+
+        <p class="search-hint">
+          للبحث برقم الهاتف أدخل الرقم كاملًا.
+          البحث بالاسم يعمل من بداية الاسم.
+        </p>
+
+      </section>
+
+      <section
+        class="results-toolbar"
+        aria-live="polite"
+      >
+
+        <div
+          id="resultCount"
+          class="result-count"
+        >
+          جارٍ تحميل الحسابات…
+        </div>
+
+        <div
+          id="pageState"
+          class="page-state"
+        ></div>
+
+      </section>
+
+      <section
+        id="accountsList"
+        class="accounts-list"
+        aria-label="قائمة الحسابات"
+      ></section>
+
+      <section
+        id="emptyState"
+        class="empty-state"
+        hidden
+      >
+
+        <div class="empty-icon">
+          ⌕
+        </div>
+
+        <h2>
+          لا توجد نتائج
+        </h2>
+
+        <p>
+          غيّر رقم الهاتف أو الاسم أو فلتر الحالة ثم أعد البحث.
+        </p>
+
+      </section>
+
+      <div class="pagination-row">
+
+        <button
+          id="nextBtn"
+          class="btn btn-secondary"
+          type="button"
+          hidden
+        >
+          تحميل المزيد
+        </button>
+
+      </div>
+
+    </main>
+
+  </div>
+
+  <div
+    id="actionModal"
+    class="modal-backdrop"
+    hidden
+  >
+
+    <div
+      class="modal-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modalTitle"
+      aria-describedby="modalBody"
+    >
+
+      <div class="modal-kicker">
+        تأكيد إجراء إداري
+      </div>
+
+      <h2 id="modalTitle">
+        تأكيد الإجراء
+      </h2>
+
+      <p
+        id="modalBody"
+        class="modal-body"
+      ></p>
+
+      <label
+        class="field"
+        for="actionReason"
+      >
+
+        <span>
+          سبب القرار
+          <small>
+            اختياري — يُحفظ في سجل المراجعة
+          </small>
+        </span>
+
+        <textarea
+          id="actionReason"
+          maxlength="500"
+          rows="3"
+          placeholder="اكتب سببًا مختصرًا إذا لزم"
+        ></textarea>
+
+      </label>
+
+      <div
+        id="modalMsg"
+        class="modal-msg"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></div>
+
+      <div class="modal-actions">
+
+        <button
+          id="cancelActionBtn"
+          class="btn btn-ghost"
+          type="button"
+        >
+          إلغاء
+        </button>
+
+        <button
+          id="confirmActionBtn"
+          class="btn btn-danger"
+          type="button"
+        >
+          تأكيد
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script
+    src="/js/admin-accounts.js?v=20260808a"
+    defer
+  ></script>
+
+</body>
+</html>
