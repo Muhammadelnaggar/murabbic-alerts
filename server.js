@@ -64301,6 +64301,8 @@ async function pricingBillableFemalesForTenantSrv(tenant) {
   let buffaloCount = 0;
 
   const animalNumbers = [];
+const motherAnimalNumbers = [];
+const reproductiveHeiferAnimalNumbers = [];
 
   for (const an of animals) {
     if (isMaleSrv(an)) continue;
@@ -64363,9 +64365,17 @@ async function pricingBillableFemalesForTenantSrv(tenant) {
         ''
       );
 
-    if (number) {
-      animalNumbers.push(number);
-    }
+   if (number) {
+  animalNumbers.push(number);
+
+  if (kind === 'mother') {
+    motherAnimalNumbers.push(number);
+  }
+
+  if (kind === 'reproductive_heifer') {
+    reproductiveHeiferAnimalNumbers.push(number);
+  }
+}
   }
 
   return {
@@ -64376,10 +64386,12 @@ async function pricingBillableFemalesForTenantSrv(tenant) {
     mothersCount,
     reproductiveHeifersCount,
 
-    cowCount,
-    buffaloCount,
+   cowCount,
+buffaloCount,
 
-    animalNumbers
+animalNumbers,
+motherAnimalNumbers,
+reproductiveHeiferAnimalNumbers
   };
 }
 
@@ -64508,7 +64520,13 @@ app.get(
         },
 
         billableAnimalNumbers:
-          billable.animalNumbers
+  billable.animalNumbers,
+
+motherAnimalNumbers:
+  billable.motherAnimalNumbers,
+
+reproductiveHeiferAnimalNumbers:
+  billable.reproductiveHeiferAnimalNumbers
       });
 
     } catch (e) {
