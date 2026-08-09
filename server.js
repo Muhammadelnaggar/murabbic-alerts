@@ -64973,6 +64973,11 @@ async function subscriptionCreateTrialIfMissingSrv({
       .collection('subscriptions')
       .doc(userId);
 
+  const trialStartedMilestoneRef =
+    db
+      .collection('subscription_lifecycle_milestones')
+      .doc(`${userId}__trial_started`);
+
   return db.runTransaction(async tx => {
     const existing =
       await tx.get(subscriptionRef);
@@ -65060,9 +65065,35 @@ async function subscriptionCreateTrialIfMissingSrv({
       source
     };
 
-    tx.set(
+        tx.set(
       subscriptionRef,
       doc,
+      { merge: false }
+    );
+
+    // Lifecycle milestone is written atomically with Trial creation.
+    // Deterministic document id keeps trial_started idempotent.
+    tx.set(
+      trialStartedMilestoneRef,
+      {
+        userId,
+        ownerUid,
+        milestone: 'trial_started',
+        milestoneVersion: 'subscription-lifecycle-v1',
+        subscriptionStatus: 'trial',
+        subscriptionPolicyVersion: 'trial-30d-v1',
+        country,
+        pricingRegion: pricingRegion || null,
+        pricingVersion:
+          String(
+            catalog?.version || ''
+          ).trim() || null,
+        trialDays: SUBSCRIPTION_TRIAL_DAYS_SRV,
+        trialStartedAt: nowTs,
+        trialEndsAt,
+        occurredAt: nowTs,
+        source
+      },
       { merge: false }
     );
 
