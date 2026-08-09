@@ -70394,7 +70394,7 @@ app.post(
   }
 );
 // ============================================================
-//      PAGE ACCESS — LOGIN + SUBSCRIPTION (DASHBOARD TEST)
+//      PAGE ACCESS — CENTRAL HTML GATE
 // ============================================================
 async function requirePageSessionSrv(req, res, next) {
   try {
@@ -70585,18 +70585,45 @@ app.get(
   }
 );
 
-app.get(
-  '/dashboard.html',
-  requirePageSessionSrv,
-  requireSubscriptionPageAccessSrv,
-  (req, res) => {
-    res.set('Cache-Control', 'no-store');
+const PUBLIC_HTML_PAGES_SRV = new Set([
+  '/index.html',
+  '/login.html',
+  '/register.html',
+  '/forgot-password.html'
+]);
 
-    return res.sendFile(
-      path.join(__dirname, 'www', 'dashboard.html')
-    );
+app.use(async (req, res, next) => {
+  const method =
+    String(req.method || '').toUpperCase();
+
+  if (method !== 'GET' && method !== 'HEAD') {
+    return next();
   }
-);
+
+  const pagePath =
+    String(req.path || '')
+      .trim()
+      .toLowerCase();
+
+  if (!pagePath.endsWith('.html')) {
+    return next();
+  }
+
+  if (PUBLIC_HTML_PAGES_SRV.has(pagePath)) {
+    return next();
+  }
+
+  return requirePageSessionSrv(
+    req,
+    res,
+    () =>
+      requireSubscriptionPageAccessSrv(
+        req,
+        res,
+        next
+      )
+  );
+});
 
 // Static last
 app.use(express.static(path.join(__dirname, 'www')));
