@@ -1,6 +1,6 @@
 
    
- 
+   
 
 // server.js — stable build, tenant-aware
 // ----------------------------------------------
@@ -1008,6 +1008,7 @@ app.post("/api/auth/register/verify", async (req, res) => {
       role: p.role,
       accountStatus: "active",
       accountStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      subscriptionManaged: true,
       phoneVerified: true,
       phoneVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1017,7 +1018,8 @@ app.post("/api/auth/register/verify", async (req, res) => {
 
     await db.collection("users").doc(uid).set(profile, { merge: true });
      // يبدأ Trial للحساب الجديد فقط.
-// الفشل هنا لا يكسر إنشاء الحساب؛ لأن Subscription Gate غير مفعّل في هذه المرحلة.
+// إذا تعذّر الإنشاء هنا، الـ Gate يعيد محاولة تهيئة الاشتراك بأمان
+// ولا يسمح للحساب الجديد أن يتحول إلى Legacy غير مُدار.
 try {
   await subscriptionCreateTrialIfMissingSrv({
     tenant: uid,
@@ -1511,6 +1513,51 @@ app.get("/api/auth/me", async (req, res) => {
     userId: session.userId,
     user: session.user
   });
+});
+// ============================================================
+//      API ACCESS — CENTRAL LOGIN + SUBSCRIPTION GATE
+// ============================================================
+const API_SUBSCRIPTION_BYPASS_PREFIXES_SRV = Object.freeze([
+  '/api/auth',
+  '/api/admin',
+  '/api/subscription',
+  '/api/pricing'
+]);
+
+app.use((req, res, next) => {
+  const apiPath =
+    String(req.path || '')
+      .trim()
+      .toLowerCase();
+
+  if (
+    apiPath !== '/api' &&
+    !apiPath.startsWith('/api/')
+  ) {
+    return next();
+  }
+
+  const bypass =
+    API_SUBSCRIPTION_BYPASS_PREFIXES_SRV
+      .some(prefix =>
+        apiPath === prefix ||
+        apiPath.startsWith(`${prefix}/`)
+      );
+
+  if (bypass) {
+    return next();
+  }
+
+  return requireUserId(
+    req,
+    res,
+    () =>
+      requireSubscriptionAccessSrv(
+        req,
+        res,
+        next
+      )
+  );
 });
 app.post("/api/farm-location/save", requireUserId, async (req, res) => {
   try {
@@ -2404,6 +2451,13 @@ function belongs(rec, tenant){
 
 async function requireUserId(req, res, next){
   try {
+    if (
+      req.authSession?.userId &&
+      req.userId
+    ) {
+      return next();
+    }
+
     const session = await authSessionFromRequestBridgeSrv(req);
 
     if (!session?.userId) {
@@ -65052,7 +65106,7 @@ app.get(
   }
 );
 // ============================================================
-//      SUBSCRIPTION ACCESS — PREVIEW ONLY (NO GATE / NO WRITE)
+//      SUBSCRIPTION ACCESS DECISION PREVIEW — READ-ONLY
 // ============================================================
 function subscriptionAccessDecisionPreviewSrv(
   subscription = null,
@@ -65167,7 +65221,102 @@ app.get(
   }
 );
 // ============================================================
-//      SUBSCRIPTION ACCESS GATE — BUILT, NOT APP-WIDE YET
+//      SUBSCRIPTION ACCESS — LEGACY / MANAGED RECONCILIATION
+// ============================================================
+async function subscriptionAccessDocumentSrv(
+  req,
+  source = 'server:subscription-access-reconcile'
+) {
+  const userId =
+    String(req.userId || '').trim();
+
+  if (!userId) {
+    const err = new Error('subscription_user_id_missing');
+    err.code = 'subscription_user_id_missing';
+    throw err;
+  }
+
+  const subscriptionRef =
+    db
+      .collection('subscriptions')
+      .doc(userId);
+
+  let snap =
+    await subscriptionRef.get();
+
+  if (snap.exists) {
+    return {
+      legacyUnmanaged: false,
+      snap
+    };
+  }
+
+  const uid =
+    String(
+      req.authSession?.uid ||
+      userId
+    ).trim();
+
+  let profileSnap =
+    await db
+      .collection('users')
+      .doc(uid)
+      .get();
+
+  if (
+    !profileSnap.exists &&
+    uid !== userId
+  ) {
+    profileSnap =
+      await db
+        .collection('users')
+        .doc(userId)
+        .get();
+  }
+
+  const profile =
+    profileSnap.exists
+      ? (profileSnap.data() || {})
+      : {};
+
+  // الحسابات القديمة فقط تظل Legacy إذا لم تُعلَّم كاشتراك مُدار.
+  if (profile.subscriptionManaged !== true) {
+    return {
+      legacyUnmanaged: true,
+      snap: null
+    };
+  }
+
+  // حساب جديد مُدار فقد مستند الاشتراك:
+  // نعيد محاولة إنشاء الـ Trial بدل تحويله إلى Legacy مجاني.
+  await subscriptionCreateTrialIfMissingSrv({
+    tenant: userId,
+    profile,
+    source
+  });
+
+  snap =
+    await subscriptionRef.get();
+
+  if (!snap.exists) {
+    const err =
+      new Error(
+        'managed_subscription_missing_after_reconcile'
+      );
+
+    err.code =
+      'managed_subscription_missing_after_reconcile';
+
+    throw err;
+  }
+
+  return {
+    legacyUnmanaged: false,
+    snap
+  };
+}
+// ============================================================
+//       SUBSCRIPTION ACCESS GATE — APP-WIDE API CORE
 // ============================================================
 async function requireSubscriptionAccessSrv(req, res, next) {
   try {
@@ -65191,14 +65340,14 @@ async function requireSubscriptionAccessSrv(req, res, next) {
       });
     }
 
-    const snap =
-      await db
-        .collection('subscriptions')
-        .doc(userId)
-        .get();
+       const accessDoc =
+      await subscriptionAccessDocumentSrv(
+        req,
+        'server:api-subscription-gate-reconcile'
+      );
 
     // الحسابات القديمة غير المُدارة بالاشتراك تظل كما هي.
-    if (!snap.exists) {
+    if (accessDoc.legacyUnmanaged) {
       req.subscriptionAccess = {
         initialized: false,
         managed: false,
@@ -65211,8 +65360,7 @@ async function requireSubscriptionAccessSrv(req, res, next) {
     }
 
     const subscription =
-      snap.data() || {};
-
+      accessDoc.snap.data() || {};
     const decision =
       subscriptionAccessDecisionPreviewSrv(
         subscription
@@ -70446,20 +70594,20 @@ async function requireSubscriptionPageAccessSrv(req, res, next) {
     const userId =
       String(req.userId || '').trim();
 
-    const snap =
-      await db
-        .collection('subscriptions')
-        .doc(userId)
-        .get();
+       const accessDoc =
+      await subscriptionAccessDocumentSrv(
+        req,
+        'server:page-subscription-gate-reconcile'
+      );
 
     // الحسابات القديمة غير المُدارة بالاشتراك تظل مسموحة.
-    if (!snap.exists) {
+    if (accessDoc.legacyUnmanaged) {
       return next();
     }
 
     const decision =
       subscriptionAccessDecisionPreviewSrv(
-        snap.data() || {}
+        accessDoc.snap.data() || {}
       );
 
     if (decision.futureGateDecision === 'allow') {
