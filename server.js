@@ -1,5 +1,4 @@
 
-
    
  
 
@@ -1414,20 +1413,60 @@ if (accountDenied) {
     // نرجّع نفس userId القديم، ونحفظ معه جلسة سيرفر.
     const userId = tenantKey(profile.userId || profile.tenantId || profile.ownerUid || uid);
 
-    const sessionCookie = await admin.auth().createSessionCookie(login.idToken, {
-      expiresIn: AUTH_SESSION_EXPIRES_MS
-    });
+   let redirectUrl = "dashboard.html";
 
-    authSetSessionCookieBridgeSrv(req, res, sessionCookie);
+if (!db) {
+  const err = new Error("subscription_unavailable");
+  err.publicStatus = 503;
+  err.publicError = "subscription_unavailable";
+  err.publicMessage =
+    "❌ تعذّر التحقق من الاشتراك الآن. حاول مرة أخرى لاحقًا.";
+  throw err;
+}
 
-    return res.json({
-      ok: true,
-      message: "✅ تم تسجيل الدخول بنجاح.",
-      uid,
-      userId,
-      user: authPublicUserBridgeSrv(profile, uid, userId),
-      redirectUrl: "dashboard.html"
-    });
+const subscriptionSnap =
+  await db
+    .collection("subscriptions")
+    .doc(userId)
+    .get();
+
+if (subscriptionSnap.exists) {
+  const decision =
+    subscriptionAccessDecisionPreviewSrv(
+      subscriptionSnap.data() || {}
+    );
+
+  if (decision.futureGateDecision === "allow") {
+    redirectUrl = "dashboard.html";
+  } else if (
+    decision.effectiveStatus === "expired" ||
+    decision.effectiveStatus === "cancelled"
+  ) {
+    redirectUrl = "/subscription-renewal";
+  } else {
+    const err = new Error("subscription_state_invalid");
+    err.publicStatus = 503;
+    err.publicError = "subscription_state_invalid";
+    err.publicMessage =
+      "❌ تعذّر التحقق من حالة الاشتراك الآن. حاول مرة أخرى لاحقًا.";
+    throw err;
+  }
+}
+
+const sessionCookie = await admin.auth().createSessionCookie(login.idToken, {
+  expiresIn: AUTH_SESSION_EXPIRES_MS
+});
+
+authSetSessionCookieBridgeSrv(req, res, sessionCookie);
+
+return res.json({
+  ok: true,
+  message: "✅ تم تسجيل الدخول بنجاح.",
+  uid,
+  userId,
+  user: authPublicUserBridgeSrv(profile, uid, userId),
+  redirectUrl
+});
 
    } catch (e) {
     console.warn("auth bridge login failed:", e.message || e);
@@ -70354,13 +70393,202 @@ app.post(
       }
   }
 );
-   // ============================================================
-//      PAGE ACCESS — DASHBOARD TEST ONLY
 // ============================================================
+//      PAGE ACCESS — LOGIN + SUBSCRIPTION (DASHBOARD TEST)
+// ============================================================
+async function requirePageSessionSrv(req, res, next) {
+  try {
+    const session =
+      await authSessionFromRequestBridgeSrv(req);
+
+    if (!session?.userId) {
+      authClearSessionCookieBridgeSrv(req, res);
+      return res.redirect(303, '/login.html');
+    }
+
+    const accountDenied =
+      authAccountDeniedBridgeSrv(
+        session.accountStatus
+      );
+
+    if (accountDenied) {
+      authClearSessionCookieBridgeSrv(req, res);
+      return res
+        .status(403)
+        .send(accountDenied.message);
+    }
+
+    req.authSession = session;
+    req.userId = session.userId;
+    return next();
+
+  } catch (e) {
+    console.error(
+      'page session gate failed:',
+      e.message || e
+    );
+
+    authClearSessionCookieBridgeSrv(req, res);
+    return res.redirect(303, '/login.html');
+  }
+}
+
+async function requireSubscriptionPageAccessSrv(req, res, next) {
+  try {
+    if (!db) {
+      return res
+        .status(503)
+        .send(
+          'تعذّر التحقق من الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+        );
+    }
+
+    const userId =
+      String(req.userId || '').trim();
+
+    const snap =
+      await db
+        .collection('subscriptions')
+        .doc(userId)
+        .get();
+
+    // الحسابات القديمة غير المُدارة بالاشتراك تظل مسموحة.
+    if (!snap.exists) {
+      return next();
+    }
+
+    const decision =
+      subscriptionAccessDecisionPreviewSrv(
+        snap.data() || {}
+      );
+
+    if (decision.futureGateDecision === 'allow') {
+      return next();
+    }
+
+    if (
+      decision.effectiveStatus === 'expired' ||
+      decision.effectiveStatus === 'cancelled'
+    ) {
+      return res.redirect(
+        303,
+        '/subscription-renewal'
+      );
+    }
+
+    return res
+      .status(503)
+      .send(
+        'تعذّر التحقق من حالة الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+      );
+
+  } catch (e) {
+    console.error(
+      'subscription page gate failed:',
+      e.message || e
+    );
+
+    return res
+      .status(503)
+      .send(
+        'تعذّر التحقق من الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+      );
+  }
+}
+
+app.get(
+  '/subscription-renewal',
+  requirePageSessionSrv,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res
+          .status(503)
+          .send(
+            'تعذّر قراءة حالة الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+          );
+      }
+
+      const snap =
+        await db
+          .collection('subscriptions')
+          .doc(String(req.userId || '').trim())
+          .get();
+
+      if (!snap.exists) {
+        return res.redirect(303, '/dashboard.html');
+      }
+
+      const decision =
+        subscriptionAccessDecisionPreviewSrv(
+          snap.data() || {}
+        );
+
+      if (decision.futureGateDecision === 'allow') {
+        return res.redirect(303, '/dashboard.html');
+      }
+
+      if (
+        decision.effectiveStatus !== 'expired' &&
+        decision.effectiveStatus !== 'cancelled'
+      ) {
+        return res
+          .status(503)
+          .send(
+            'تعذّر التحقق من حالة الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+          );
+      }
+
+      const title =
+        decision.effectiveStatus === 'expired'
+          ? 'انتهت مدة اشتراك مُرَبِّيك'
+          : 'اشتراك مُرَبِّيك غير نشط';
+
+      res.set('Cache-Control', 'no-store');
+
+      return res.send(`<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>تجديد اشتراك مُرَبِّيك</title>
+  <style>
+    body{margin:0;font-family:Arial,sans-serif;background:#f6faf7;color:#17351f;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}
+    .card{width:min(560px,100%);background:#fff;border:1px solid #dfe9e2;border-radius:22px;padding:32px;box-shadow:0 14px 40px rgba(0,0,0,.08);text-align:center}
+    h1{margin:0 0 16px;font-size:30px;color:#0b7a3b}
+    p{font-size:18px;line-height:1.9;margin:8px 0}
+    .note{margin-top:18px;padding:14px;border-radius:14px;background:#f0f8f2}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>${title}</h1>
+    <p>بيانات مزرعتك محفوظة بالكامل.</p>
+    <p>يلزم تجديد الاشتراك لاستمرار استخدام مُرَبِّيك.</p>
+    <div class="note">لتجديد الاشتراك، تواصل مع إدارة مُرَبِّيك.</div>
+  </main>
+</body>
+</html>`);
+
+    } catch (e) {
+      console.error(
+        'subscription renewal page failed:',
+        e.message || e
+      );
+
+      return res
+        .status(503)
+        .send(
+          'تعذّر فتح صفحة تجديد الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+        );
+    }
+  }
+);
+
 app.get(
   '/dashboard.html',
-  requireUserId,
-  requireSubscriptionAccessSrv,
+  requirePageSessionSrv,
+  requireSubscriptionPageAccessSrv,
   (req, res) => {
     res.set('Cache-Control', 'no-store');
 
