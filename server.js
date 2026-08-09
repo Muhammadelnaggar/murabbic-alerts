@@ -8,7 +8,6 @@ const path    = require('path');
 const fs      = require('fs');
 const crypto  = require('crypto');
 const express = require('express');
-const cors    = require('cors');
 const admin   = require('firebase-admin');
 const { computeTargets, getStandardWeight } = require('./server/nutrition-engine.js');
 const { analyzeRation } = require('./server/ration-engine.js');
@@ -47,7 +46,6 @@ function readJson(p, fallback = []) {
 }
 
 // ===== Middleware =====
-app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
