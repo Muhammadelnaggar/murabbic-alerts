@@ -65056,16 +65056,21 @@ function subscriptionAccessDecisionPreviewSrv(
     };
   }
 
-  // لا نحسم cancelled أو invalid قبل اعتماد سياستهما النهائية.
+ if (effectiveStatus === 'cancelled') {
   return {
     managed: true,
     effectiveStatus,
-    futureGateDecision: null,
-    reason:
-      effectiveStatus === 'cancelled'
-        ? 'subscription_cancelled_policy_pending'
-        : 'subscription_state_invalid'
+    futureGateDecision: 'deny',
+    reason: 'subscription_cancelled'
   };
+}
+
+return {
+  managed: true,
+  effectiveStatus,
+  futureGateDecision: null,
+  reason: 'subscription_state_invalid'
+};
 }
 
 app.get(
@@ -65120,6 +65125,125 @@ app.get(
           '❌ تعذّر قراءة أهلية الاشتراك الآن. حاول مرة أخرى.'
       });
     }
+  }
+);
+// ============================================================
+//      SUBSCRIPTION ACCESS GATE — BUILT, NOT APP-WIDE YET
+// ============================================================
+async function requireSubscriptionAccessSrv(req, res, next) {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: 'subscription_unavailable',
+        message:
+          '❌ تعذّر التحقق من الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+      });
+    }
+
+    const userId =
+      String(req.userId || '').trim();
+
+    if (!userId) {
+      return res.status(401).json({
+        ok: false,
+        error: 'auth_required',
+        message: '❌ يلزم تسجيل الدخول أولًا.'
+      });
+    }
+
+    const snap =
+      await db
+        .collection('subscriptions')
+        .doc(userId)
+        .get();
+
+    // الحسابات القديمة غير المُدارة بالاشتراك تظل كما هي.
+    if (!snap.exists) {
+      req.subscriptionAccess = {
+        initialized: false,
+        managed: false,
+        effectiveStatus: null,
+        gateDecision: 'allow',
+        reason: 'legacy_unmanaged'
+      };
+
+      return next();
+    }
+
+    const subscription =
+      snap.data() || {};
+
+    const decision =
+      subscriptionAccessDecisionPreviewSrv(
+        subscription
+      );
+
+    req.subscriptionAccess = {
+      initialized: true,
+      ...decision,
+      gateDecision:
+        decision.futureGateDecision
+    };
+
+    if (decision.futureGateDecision === 'allow') {
+      return next();
+    }
+
+    if (decision.effectiveStatus === 'expired') {
+      return res.status(402).json({
+        ok: false,
+        error: 'subscription_expired',
+        message:
+          'ℹ️ انتهت مدة اشتراك مُرَبِّيك. جدّد الاشتراك لاستمرار الاستخدام.'
+      });
+    }
+
+    if (decision.effectiveStatus === 'cancelled') {
+      return res.status(402).json({
+        ok: false,
+        error: 'subscription_cancelled',
+        message:
+          'ℹ️ اشتراك مُرَبِّيك غير نشط حاليًا. فعّل الاشتراك لاستمرار الاستخدام.'
+      });
+    }
+
+    // أي حالة تالفة أو غير مفهومة تفشل بأمان.
+    return res.status(503).json({
+      ok: false,
+      error: 'subscription_state_invalid',
+      message:
+        '❌ تعذّر التحقق من حالة الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+    });
+
+  } catch (e) {
+    console.error(
+      'subscription access gate failed:',
+      e.message || e
+    );
+
+    return res.status(503).json({
+      ok: false,
+      error: 'subscription_access_check_failed',
+      message:
+        '❌ تعذّر التحقق من الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+    });
+  }
+}
+
+app.get(
+  '/api/subscription/gate-test',
+  requireUserId,
+  requireSubscriptionAccessSrv,
+  (req, res) => {
+    return res.json({
+      ok: true,
+      readOnly: true,
+      mode: 'subscription_gate_test_only',
+      access: 'allowed',
+      subscriptionAccess:
+        req.subscriptionAccess || null
+    });
   }
 );
 // ============================================================
