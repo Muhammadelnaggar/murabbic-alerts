@@ -64034,7 +64034,498 @@ app.post('/api/groups/rebuild', requireUserId, async (req, res) => {
     return res.status(500).json({ ok:false, error:'groups_rebuild_failed', message:e.message || String(e) });
   }
 });
+// ============================================================
+//      PRICING ENGINE — PREVIEW ONLY (NO BILLING / NO GATE)
+// ============================================================
+const PRICING_CATALOG_DEFAULT_SRV = Object.freeze({
+  version: 'launch-2026-08-09-v1',
+  annualMonthsCharged: 10,
+  regions: Object.freeze({
+    egypt: Object.freeze({
+      currency: 'EGP',
+      baseMonthly: 2000,
+      perBillableFemaleMonthly: 10
+    }),
+    arab: Object.freeze({
+      currency: 'USD',
+      baseMonthly: 69,
+      perBillableFemaleMonthly: 0.30
+    }),
+    gcc: Object.freeze({
+      currency: 'USD',
+      baseMonthly: 79,
+      perBillableFemaleMonthly: 0.40
+    })
+  })
+});
 
+const PRICING_GCC_COUNTRIES_SRV = new Set([
+  'السعودية',
+  'المملكة العربية السعودية',
+  'saudi arabia',
+  'saudi',
+
+  'الإمارات',
+  'الامارات',
+  'الإمارات العربية المتحدة',
+  'الامارات العربية المتحدة',
+  'united arab emirates',
+  'uae',
+
+  'الكويت',
+  'kuwait',
+
+  'قطر',
+  'qatar',
+
+  'البحرين',
+  'bahrain',
+
+  'عمان',
+  'عُمان',
+  'سلطنة عمان',
+  'oman'
+]);
+
+const PRICING_ARAB_COUNTRIES_SRV = new Set([
+  'الأردن', 'الاردن', 'jordan',
+  'العراق', 'iraq',
+  'لبنان', 'lebanon',
+  'فلسطين', 'palestine',
+  'سوريا', 'سورية', 'syria',
+  'اليمن', 'yemen',
+  'ليبيا', 'libya',
+  'تونس', 'tunisia',
+  'الجزائر', 'algeria',
+  'المغرب', 'المملكة المغربية', 'morocco',
+  'موريتانيا', 'mauritania',
+  'السودان', 'sudan',
+  'الصومال', 'somalia',
+  'جيبوتي', 'djibouti',
+  'جزر القمر', 'القمر', 'comoros'
+]);
+
+function pricingNormalizeCountrySrv(v) {
+  return String(v || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function pricingRegionForCountrySrv(countryRaw) {
+  const country = pricingNormalizeCountrySrv(countryRaw);
+
+  if (
+    country === 'مصر' ||
+    country === 'جمهورية مصر العربية' ||
+    country === 'egypt'
+  ) {
+    return 'egypt';
+  }
+
+  if (PRICING_GCC_COUNTRIES_SRV.has(country)) return 'gcc';
+  if (PRICING_ARAB_COUNTRIES_SRV.has(country)) return 'arab';
+
+  return null;
+}
+
+function pricingFinitePositiveSrv(v, fallback) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+async function pricingLoadCatalogSrv() {
+  const fallback = PRICING_CATALOG_DEFAULT_SRV;
+
+  if (!db) {
+    return {
+      catalog: fallback,
+      source: 'server_default'
+    };
+  }
+
+  try {
+    const snap = await db
+      .collection('pricing_catalog')
+      .doc('current')
+      .get();
+
+    if (!snap.exists) {
+      return {
+        catalog: fallback,
+        source: 'server_default'
+      };
+    }
+
+    const raw = snap.data() || {};
+
+    const rawRegions =
+      raw.regions &&
+      typeof raw.regions === 'object'
+        ? raw.regions
+        : raw;
+
+    const regions = {};
+
+    for (const key of ['egypt', 'arab', 'gcc']) {
+      const base = fallback.regions[key];
+
+      const incoming =
+        rawRegions[key] &&
+        typeof rawRegions[key] === 'object'
+          ? rawRegions[key]
+          : {};
+
+      regions[key] = {
+        currency: String(
+          incoming.currency ||
+          base.currency
+        )
+          .trim()
+          .toUpperCase(),
+
+        baseMonthly:
+          pricingFinitePositiveSrv(
+            incoming.baseMonthly,
+            base.baseMonthly
+          ),
+
+        perBillableFemaleMonthly:
+          pricingFinitePositiveSrv(
+            incoming.perBillableFemaleMonthly,
+            base.perBillableFemaleMonthly
+          )
+      };
+    }
+
+    return {
+      catalog: {
+        version:
+          String(
+            raw.version ||
+            fallback.version
+          ).trim() ||
+          fallback.version,
+
+        annualMonthsCharged:
+          pricingFinitePositiveSrv(
+            raw.annualMonthsCharged,
+            fallback.annualMonthsCharged
+          ),
+
+        regions
+      },
+
+      source: 'firestore:pricing_catalog/current'
+    };
+
+  } catch (e) {
+    console.warn(
+      'pricing catalog read failed:',
+      e.message || e
+    );
+
+    return {
+      catalog: fallback,
+      source: 'server_default_after_read_failure'
+    };
+  }
+}
+
+async function pricingReadAccountCountrySrv(req) {
+  if (!db) return '';
+
+  const ids = [
+    req?.authSession?.uid,
+    req?.userId
+  ]
+    .map(v => String(v || '').trim())
+    .filter(Boolean);
+
+  for (const id of [...new Set(ids)]) {
+    try {
+      const snap =
+        await db.collection('users').doc(id).get();
+
+      if (!snap.exists) continue;
+
+      const country =
+        String(
+          snap.data()?.country || ''
+        ).trim();
+
+      if (country) return country;
+
+    } catch (e) {
+      console.warn(
+        'pricing account country read failed:',
+        id,
+        e.message || e
+      );
+    }
+  }
+
+  return '';
+}
+
+async function pricingBillableFemalesForTenantSrv(tenant) {
+  const uid =
+    String(tenant || '').trim();
+
+  if (!uid) {
+    return {
+      count: 0,
+      mothersCount: 0,
+      reproductiveHeifersCount: 0,
+      cowCount: 0,
+      buffaloCount: 0,
+      animalNumbers: []
+    };
+  }
+
+  const thresholds =
+    await loadGroupThresholdsSrv(uid);
+
+  const animals =
+    await loadAnimalsForGroupsSrv(uid);
+
+  await enrichAnimalsForGroupsSrv(
+    uid,
+    animals
+  );
+
+  let mothersCount = 0;
+  let reproductiveHeifersCount = 0;
+
+  let cowCount = 0;
+  let buffaloCount = 0;
+
+  const animalNumbers = [];
+
+  for (const an of animals) {
+    if (isMaleSrv(an)) continue;
+
+    const hasCalved =
+      hasCalvedBeforeGroupSrv(an);
+
+    let billable = false;
+    let kind = '';
+
+    if (hasCalved) {
+      billable = true;
+      kind = 'mother';
+
+    } else {
+      const sp =
+        speciesOfSrv(an);
+
+      const ageMonths =
+        getAgeMonthsSrv(an);
+
+      const cfg =
+        ageCfgGroupSrv(
+          sp,
+          thresholds
+        );
+
+      const reachedReproductiveManagement =
+        hasPassedWeaningStageGroupSrv(an) &&
+        ageMonths > cfg.growingMax;
+
+      if (reachedReproductiveManagement) {
+        billable = true;
+        kind = 'reproductive_heifer';
+      }
+    }
+
+    if (!billable) continue;
+
+    if (kind === 'mother') {
+      mothersCount++;
+    }
+
+    if (kind === 'reproductive_heifer') {
+      reproductiveHeifersCount++;
+    }
+
+    if (speciesOfSrv(an) === 'buffalo') {
+      buffaloCount++;
+    } else {
+      cowCount++;
+    }
+
+    const number =
+      normGroupNumberSrv(
+        an?.animalNumber ??
+        an?.number ??
+        an?.calfNumber ??
+        an?.id ??
+        ''
+      );
+
+    if (number) {
+      animalNumbers.push(number);
+    }
+  }
+
+  return {
+    count:
+      mothersCount +
+      reproductiveHeifersCount,
+
+    mothersCount,
+    reproductiveHeifersCount,
+
+    cowCount,
+    buffaloCount,
+
+    animalNumbers
+  };
+}
+
+function pricingRoundMoneySrv(v) {
+  return (
+    Math.round(
+      (Number(v) + Number.EPSILON) * 100
+    ) / 100
+  );
+}
+
+app.get(
+  '/api/pricing/preview',
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error: 'pricing_unavailable',
+          message:
+            '❌ تعذّر حساب سعر مُرَبِّيك الآن. حاول مرة أخرى لاحقًا.'
+        });
+      }
+
+      const country =
+        await pricingReadAccountCountrySrv(req);
+
+      if (!country) {
+        return res.status(422).json({
+          ok: false,
+          error: 'pricing_country_missing',
+          message:
+            '❌ دولة الحساب غير مسجلة، لذلك تعذّر تحديد سعر مُرَبِّيك.'
+        });
+      }
+
+      const pricingRegion =
+        pricingRegionForCountrySrv(country);
+
+      if (!pricingRegion) {
+        return res.status(422).json({
+          ok: false,
+          error: 'pricing_country_unsupported',
+          message:
+            '❌ التسعير الحالي متاح لمصر والدول العربية فقط.'
+        });
+      }
+
+      const [
+        { catalog, source },
+        billable
+      ] = await Promise.all([
+        pricingLoadCatalogSrv(),
+        pricingBillableFemalesForTenantSrv(
+          req.userId
+        )
+      ]);
+
+      const price =
+        catalog.regions[pricingRegion];
+
+      const monthlySubtotal =
+        pricingRoundMoneySrv(
+          price.baseMonthly +
+          (
+            billable.count *
+            price.perBillableFemaleMonthly
+          )
+        );
+
+      const annualSubtotal =
+        pricingRoundMoneySrv(
+          monthlySubtotal *
+          catalog.annualMonthsCharged
+        );
+
+      return res.json({
+        ok: true,
+
+        mode: 'pricing_preview_only',
+        readOnly: true,
+
+        country,
+        pricingRegion,
+
+        currency:
+          price.currency,
+
+        pricingVersion:
+          catalog.version,
+
+        pricingSource:
+          source,
+
+        billableFemales:
+          billable.count,
+
+        breakdown: {
+          mothers:
+            billable.mothersCount,
+
+          reproductiveHeifers:
+            billable.reproductiveHeifersCount,
+
+          cows:
+            billable.cowCount,
+
+          buffalo:
+            billable.buffaloCount
+        },
+
+        pricing: {
+          baseMonthly:
+            price.baseMonthly,
+
+          perBillableFemaleMonthly:
+            price.perBillableFemaleMonthly,
+
+          monthlySubtotal,
+
+          annualMonthsCharged:
+            catalog.annualMonthsCharged,
+
+          annualSubtotal
+        },
+
+        billableAnimalNumbers:
+          billable.animalNumbers
+      });
+
+    } catch (e) {
+      console.error(
+        'pricing.preview failed:',
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error: 'pricing_preview_failed',
+        message:
+          '❌ تعذّر حساب سعر مُرَبِّيك الآن. حاول مرة أخرى.'
+      });
+    }
+  }
+);
 // ============================================================
 //                 API: GROUPS EVENTS ENRICH
 // ============================================================
