@@ -65013,6 +65013,116 @@ app.get(
   }
 );
 // ============================================================
+//      SUBSCRIPTION ACCESS — PREVIEW ONLY (NO GATE / NO WRITE)
+// ============================================================
+function subscriptionAccessDecisionPreviewSrv(
+  subscription = null,
+  nowMs = Date.now()
+) {
+  if (!subscription || typeof subscription !== 'object') {
+    return {
+      managed: false,
+      effectiveStatus: null,
+      futureGateDecision: null,
+      reason: 'subscription_not_initialized'
+    };
+  }
+
+  const effectiveStatus =
+    subscriptionEffectiveStatusSrv(
+      subscription,
+      nowMs
+    );
+
+  if (
+    effectiveStatus === 'trial' ||
+    effectiveStatus === 'active' ||
+    effectiveStatus === 'grace'
+  ) {
+    return {
+      managed: true,
+      effectiveStatus,
+      futureGateDecision: 'allow',
+      reason: `subscription_${effectiveStatus}`
+    };
+  }
+
+  if (effectiveStatus === 'expired') {
+    return {
+      managed: true,
+      effectiveStatus,
+      futureGateDecision: 'deny',
+      reason: 'subscription_expired'
+    };
+  }
+
+  // لا نحسم cancelled أو invalid قبل اعتماد سياستهما النهائية.
+  return {
+    managed: true,
+    effectiveStatus,
+    futureGateDecision: null,
+    reason:
+      effectiveStatus === 'cancelled'
+        ? 'subscription_cancelled_policy_pending'
+        : 'subscription_state_invalid'
+  };
+}
+
+app.get(
+  '/api/subscription/access-preview',
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error: 'subscription_unavailable',
+          message:
+            '❌ تعذّر قراءة أهلية الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+        });
+      }
+
+      const userId =
+        String(req.userId || '').trim();
+
+      const snap =
+        await db
+          .collection('subscriptions')
+          .doc(userId)
+          .get();
+
+      const subscription =
+        snap.exists
+          ? (snap.data() || {})
+          : null;
+
+      return res.json({
+        ok: true,
+        readOnly: true,
+        mode: 'subscription_access_preview_only',
+        initialized: snap.exists,
+
+        ...subscriptionAccessDecisionPreviewSrv(
+          subscription
+        )
+      });
+
+    } catch (e) {
+      console.error(
+        'subscription.access-preview failed:',
+        e.message || e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error: 'subscription_access_preview_failed',
+        message:
+          '❌ تعذّر قراءة أهلية الاشتراك الآن. حاول مرة أخرى.'
+      });
+    }
+  }
+);
+// ============================================================
 //                 API: GROUPS EVENTS ENRICH
 // ============================================================
 app.post('/api/groups/events-enrich', requireUserId, async (req, res) => {
