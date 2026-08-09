@@ -190,41 +190,151 @@ function authPublicUserBridgeSrv(profile = {}, uid = "", userId = "") {
   };
 }
 
-async function authReadUserProfileBridgeSrv(uid) {
-  if (!db || !uid) return {};
+function authProfileUnavailableErrorBridgeSrv(
+  code = "auth_profile_unavailable"
+) {
+  const err = new Error(code);
+
+  err.code = code;
+  err.publicStatus = 503;
+  err.publicError = code;
+  err.publicMessage =
+    "❌ تعذّر التحقق من حالة الحساب الآن. حاول مرة أخرى لاحقًا.";
+
+  return err;
+}
+
+async function authReadUserProfileBridgeSrv(
+  uid,
+  { required = false } = {}
+) {
+  const userUid =
+    String(uid || "").trim();
+
+  if (!db || !userUid) {
+    if (required) {
+      throw authProfileUnavailableErrorBridgeSrv(
+        !db
+          ? "auth_profile_store_unavailable"
+          : "auth_profile_uid_missing"
+      );
+    }
+
+    return {};
+  }
 
   try {
-    const snap = await db.collection("users").doc(uid).get();
-    return snap.exists ? (snap.data() || {}) : {};
+    const snap =
+      await db
+        .collection("users")
+        .doc(userUid)
+        .get();
+
+    if (!snap.exists) {
+      if (required) {
+        throw authProfileUnavailableErrorBridgeSrv(
+          "auth_profile_missing"
+        );
+      }
+
+      return {};
+    }
+
+    return snap.data() || {};
+
   } catch (e) {
-    console.warn("auth bridge user profile read failed:", e.message || e);
+    if (
+      String(e?.code || "")
+        .startsWith("auth_profile_")
+    ) {
+      throw e;
+    }
+
+    console.warn(
+      "auth bridge user profile read failed:",
+      e.message || e
+    );
+
+    if (required) {
+      throw authProfileUnavailableErrorBridgeSrv(
+        "auth_profile_read_failed"
+      );
+    }
+
     return {};
   }
 }
 
 async function authSessionFromRequestBridgeSrv(req) {
   try {
-    const sessionCookie = authCookieValueBridgeSrv(req, AUTH_COOKIE_NAME);
-    if (!sessionCookie || !admin.apps.length) return null;
+    const sessionCookie =
+      authCookieValueBridgeSrv(
+        req,
+        AUTH_COOKIE_NAME
+      );
 
-    const decoded = await admin.auth().verifySessionCookie(sessionCookie, true);
-    const uid = String(decoded.uid || "").trim();
-    if (!uid) return null;
+    if (
+      !sessionCookie ||
+      !admin.apps.length
+    ) {
+      return null;
+    }
 
-    const profile = await authReadUserProfileBridgeSrv(uid);
-    const accountStatus = authAccountStatusBridgeSrv(profile);
+    const decoded =
+      await admin.auth()
+        .verifySessionCookie(
+          sessionCookie,
+          true
+        );
+
+    const uid =
+      String(
+        decoded.uid || ""
+      ).trim();
+
+    if (!uid) {
+      return null;
+    }
+
+    const profile =
+      await authReadUserProfileBridgeSrv(
+        uid,
+        { required: true }
+      );
+
+    const accountStatus =
+      authAccountStatusBridgeSrv(profile);
 
     // نفس userId القديم، حتى لا تنفصل بيانات الحساب
-    const userId = tenantKey(profile.userId || profile.tenantId || profile.ownerUid || uid);
+    const userId =
+      tenantKey(
+        profile.userId ||
+        profile.tenantId ||
+        profile.ownerUid ||
+        uid
+      );
 
     return {
       uid,
       userId,
       decoded,
       accountStatus,
-      user: authPublicUserBridgeSrv(profile, uid, userId)
+      user:
+        authPublicUserBridgeSrv(
+          profile,
+          uid,
+          userId
+        )
     };
-  } catch (_) {
+
+  } catch (e) {
+    if (
+      String(e?.code || "")
+        .startsWith("auth_profile_")
+    ) {
+      throw e;
+    }
+
     return null;
   }
 }
@@ -1397,8 +1507,14 @@ app.post("/api/auth/login", async (req, res) => {
       });
     }
 
-const profile = await authReadUserProfileBridgeSrv(uid);
-const accountStatus = authAccountStatusBridgeSrv(profile);
+const profile =
+  await authReadUserProfileBridgeSrv(
+    uid,
+    { required: true }
+  );
+
+const accountStatus =
+  authAccountStatusBridgeSrv(profile);
 const accountDenied = authAccountDeniedBridgeSrv(accountStatus);
 
 if (accountDenied) {
@@ -1482,38 +1598,21 @@ return res.json({
     });
   }
 });
-app.get("/api/auth/me", async (req, res) => {
-  const session = await authSessionFromRequestBridgeSrv(req);
+app.get(
+  "/api/auth/me",
+  requireUserId,
+  async (req, res) => {
+    const session =
+      req.authSession;
 
-  if (!session?.userId) {
-    authClearSessionCookieBridgeSrv(req, res);
-
-    return res.status(401).json({
-      ok: false,
-      error: "auth_required",
-      message: '❌ يلزم تسجيل الدخول أولًا.'
+    return res.json({
+      ok: true,
+      uid: session.uid,
+      userId: session.userId,
+      user: session.user
     });
   }
-
-  const accountDenied =
-    authAccountDeniedBridgeSrv(session.accountStatus);
-
-  if (accountDenied) {
-    authClearSessionCookieBridgeSrv(req, res);
-
-    return res.status(403).json({
-      ok: false,
-      ...accountDenied
-    });
-  }
-
-  return res.json({
-    ok: true,
-    uid: session.uid,
-    userId: session.userId,
-    user: session.user
-  });
-});
+);
 // ============================================================
 //      API ACCESS — CENTRAL LOGIN + SUBSCRIPTION GATE
 // ============================================================
@@ -2486,15 +2585,42 @@ async function requireUserId(req, res, next){
     req.userId = session.userId;
     return next();
 
-  } catch (e) {
-    console.error('requireUserId failed:', e.message || e);
+   } catch (e) {
+    console.error(
+      'requireUserId failed:',
+      e.message || e
+    );
 
-    authClearSessionCookieBridgeSrv(req, res);
+    if (
+      Number(
+        e?.publicStatus || 0
+      ) === 503
+    ) {
+      return res
+        .status(503)
+        .json({
+          ok: false,
+
+          error:
+            e?.publicError ||
+            'auth_profile_unavailable',
+
+          message:
+            e?.publicMessage ||
+            '❌ تعذّر التحقق من حالة الحساب الآن. حاول مرة أخرى لاحقًا.'
+        });
+    }
+
+    authClearSessionCookieBridgeSrv(
+      req,
+      res
+    );
 
     return res.status(401).json({
       ok: false,
       error: 'auth_required',
-      message: '❌ يلزم تسجيل الدخول أولًا.'
+      message:
+        '❌ يلزم تسجيل الدخول أولًا.'
     });
   }
 }
@@ -70570,14 +70696,34 @@ async function requirePageSessionSrv(req, res, next) {
     req.userId = session.userId;
     return next();
 
-  } catch (e) {
+   } catch (e) {
     console.error(
       'page session gate failed:',
       e.message || e
     );
 
-    authClearSessionCookieBridgeSrv(req, res);
-    return res.redirect(303, '/login.html');
+    if (
+      Number(
+        e?.publicStatus || 0
+      ) === 503
+    ) {
+      return res
+        .status(503)
+        .send(
+          e?.publicMessage ||
+          'تعذّر التحقق من حالة الحساب الآن. حاول مرة أخرى لاحقًا.'
+        );
+    }
+
+    authClearSessionCookieBridgeSrv(
+      req,
+      res
+    );
+
+    return res.redirect(
+      303,
+      '/login.html'
+    );
   }
 }
 
