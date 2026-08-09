@@ -1017,6 +1017,21 @@ app.post("/api/auth/register/verify", async (req, res) => {
     };
 
     await db.collection("users").doc(uid).set(profile, { merge: true });
+     // يبدأ Trial للحساب الجديد فقط.
+// الفشل هنا لا يكسر إنشاء الحساب؛ لأن Subscription Gate غير مفعّل في هذه المرحلة.
+try {
+  await subscriptionCreateTrialIfMissingSrv({
+    tenant: uid,
+    profile,
+    source: "server:/api/auth/register/verify"
+  });
+} catch (e) {
+  console.warn(
+    "subscription trial init after registration failed:",
+    uid,
+    e.message || e
+  );
+}
 
     await ref.set({
       usedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -64540,6 +64555,459 @@ reproductiveHeiferAnimalNumbers:
         error: 'pricing_preview_failed',
         message:
           '❌ تعذّر حساب سعر مُرَبِّيك الآن. حاول مرة أخرى.'
+      });
+    }
+  }
+);
+// ============================================================
+//      SUBSCRIPTION ENGINE — CORE + 30-DAY TRIAL (NO GATE)
+// ============================================================
+const SUBSCRIPTION_TRIAL_DAYS_SRV = 30;
+const SUBSCRIPTION_DAY_MS_SRV = 24 * 60 * 60 * 1000;
+
+const SUBSCRIPTION_STATUSES_SRV = new Set([
+  'trial',
+  'active',
+  'grace',
+  'expired',
+  'cancelled'
+]);
+
+function subscriptionTimestampMsSrv(v) {
+  if (!v) return null;
+
+  try {
+    if (typeof v.toMillis === 'function') {
+      const ms = Number(v.toMillis());
+      return Number.isFinite(ms) ? ms : null;
+    }
+
+    if (typeof v.toDate === 'function') {
+      const ms = v.toDate().getTime();
+      return Number.isFinite(ms) ? ms : null;
+    }
+
+    if (Number.isFinite(Number(v?._seconds))) {
+      return Number(v._seconds) * 1000;
+    }
+
+    const ms = new Date(v).getTime();
+    return Number.isFinite(ms) ? ms : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function subscriptionIsoSrv(v) {
+  const ms = subscriptionTimestampMsSrv(v);
+  return ms === null ? null : new Date(ms).toISOString();
+}
+
+function subscriptionEffectiveStatusSrv(
+  subscription = {},
+  nowMs = Date.now()
+) {
+  const storedStatus =
+    String(subscription?.status || '')
+      .trim()
+      .toLowerCase();
+
+  if (!SUBSCRIPTION_STATUSES_SRV.has(storedStatus)) {
+    return 'invalid';
+  }
+
+  if (storedStatus === 'cancelled') return 'cancelled';
+  if (storedStatus === 'expired') return 'expired';
+
+  if (storedStatus === 'trial') {
+    const trialEndsAtMs =
+      subscriptionTimestampMsSrv(
+        subscription?.trialEndsAt
+      );
+
+    if (trialEndsAtMs === null) return 'invalid';
+
+    return nowMs <= trialEndsAtMs
+      ? 'trial'
+      : 'expired';
+  }
+
+  if (storedStatus === 'active') {
+    const periodEndMs =
+      subscriptionTimestampMsSrv(
+        subscription?.currentPeriodEnd
+      );
+
+    if (
+      periodEndMs !== null &&
+      nowMs <= periodEndMs
+    ) {
+      return 'active';
+    }
+
+    const graceEndsAtMs =
+      subscriptionTimestampMsSrv(
+        subscription?.graceEndsAt
+      );
+
+    if (
+      graceEndsAtMs !== null &&
+      nowMs <= graceEndsAtMs
+    ) {
+      return 'grace';
+    }
+
+    return periodEndMs === null
+      ? 'invalid'
+      : 'expired';
+  }
+
+  if (storedStatus === 'grace') {
+    const graceEndsAtMs =
+      subscriptionTimestampMsSrv(
+        subscription?.graceEndsAt
+      );
+
+    if (graceEndsAtMs === null) {
+      return 'invalid';
+    }
+
+    return nowMs <= graceEndsAtMs
+      ? 'grace'
+      : 'expired';
+  }
+
+  return 'invalid';
+}
+
+function subscriptionTrialDaysRemainingSrv(
+  subscription = {},
+  nowMs = Date.now()
+) {
+  const effectiveStatus =
+    subscriptionEffectiveStatusSrv(
+      subscription,
+      nowMs
+    );
+
+  if (effectiveStatus !== 'trial') {
+    return 0;
+  }
+
+  const trialEndsAtMs =
+    subscriptionTimestampMsSrv(
+      subscription?.trialEndsAt
+    );
+
+  if (trialEndsAtMs === null) return 0;
+
+  return Math.max(
+    0,
+    Math.ceil(
+      (trialEndsAtMs - nowMs) /
+      SUBSCRIPTION_DAY_MS_SRV
+    )
+  );
+}
+
+async function subscriptionCreateTrialIfMissingSrv({
+  tenant,
+  profile = {},
+  source = 'server:subscription_trial_init'
+} = {}) {
+  if (!db) {
+    throw new Error(
+      'subscription_firestore_unavailable'
+    );
+  }
+
+  const userId =
+    String(tenant || '').trim();
+
+  if (!userId) {
+    throw new Error(
+      'subscription_user_id_required'
+    );
+  }
+
+  const country =
+    String(profile?.country || '').trim();
+
+  const pricingRegion =
+    pricingRegionForCountrySrv(country);
+
+  const { catalog } =
+    await pricingLoadCatalogSrv();
+
+  const nowTs =
+    admin.firestore.Timestamp.now();
+
+  const trialEndsAt =
+    admin.firestore.Timestamp.fromMillis(
+      nowTs.toMillis() +
+      (
+        SUBSCRIPTION_TRIAL_DAYS_SRV *
+        SUBSCRIPTION_DAY_MS_SRV
+      )
+    );
+
+  const subscriptionRef =
+    db
+      .collection('subscriptions')
+      .doc(userId);
+
+  return db.runTransaction(async tx => {
+    const existing =
+      await tx.get(subscriptionRef);
+
+    // لا نعيد بدء Trial ولا نمدده لو الوثيقة موجودة.
+    if (existing.exists) {
+      const data =
+        existing.data() || {};
+
+      return {
+        created: false,
+        userId,
+
+        status:
+          String(data.status || '')
+            .trim()
+            .toLowerCase() ||
+          null,
+
+        effectiveStatus:
+          subscriptionEffectiveStatusSrv(
+            data
+          )
+      };
+    }
+
+    const ownerUid =
+      String(
+        profile?.ownerUid ||
+        profile?.uid ||
+        userId
+      ).trim() || userId;
+
+    const doc = {
+      userId,
+      ownerUid,
+
+      status: 'trial',
+
+      subscriptionPolicyVersion:
+        'trial-30d-v1',
+
+      country,
+
+      pricingRegion:
+        pricingRegion || null,
+
+      pricingVersionAtTrialStart:
+        String(
+          catalog?.version || ''
+        ).trim() || null,
+
+      trialDays:
+        SUBSCRIPTION_TRIAL_DAYS_SRV,
+
+      trialStartedAt:
+        nowTs,
+
+      trialEndsAt,
+
+      billingCycle:
+        null,
+
+      currentPeriodStart:
+        null,
+
+      currentPeriodEnd:
+        null,
+
+      graceEndsAt:
+        null,
+
+      paymentProvider:
+        null,
+
+      lastPaymentId:
+        null,
+
+      createdAt:
+        nowTs,
+
+      updatedAt:
+        nowTs,
+
+      source
+    };
+
+    tx.set(
+      subscriptionRef,
+      doc,
+      { merge: false }
+    );
+
+    return {
+      created: true,
+      userId,
+      status: 'trial',
+      effectiveStatus: 'trial',
+      trialEndsAt
+    };
+  });
+}
+
+function subscriptionPublicStateSrv(
+  subscription = {},
+  nowMs = Date.now()
+) {
+  const storedStatus =
+    String(subscription?.status || '')
+      .trim()
+      .toLowerCase() ||
+    null;
+
+  const effectiveStatus =
+    subscriptionEffectiveStatusSrv(
+      subscription,
+      nowMs
+    );
+
+  return {
+    initialized: true,
+
+    status:
+      storedStatus,
+
+    effectiveStatus,
+
+    country:
+      String(
+        subscription?.country || ''
+      ).trim() ||
+      null,
+
+    pricingRegion:
+      String(
+        subscription?.pricingRegion || ''
+      ).trim() ||
+      null,
+
+    pricingVersionAtTrialStart:
+      String(
+        subscription?.pricingVersionAtTrialStart ||
+        ''
+      ).trim() ||
+      null,
+
+    trialDays:
+      Number(
+        subscription?.trialDays || 0
+      ) || 0,
+
+    trialStartedAt:
+      subscriptionIsoSrv(
+        subscription?.trialStartedAt
+      ),
+
+    trialEndsAt:
+      subscriptionIsoSrv(
+        subscription?.trialEndsAt
+      ),
+
+    trialDaysRemaining:
+      subscriptionTrialDaysRemainingSrv(
+        subscription,
+        nowMs
+      ),
+
+    billingCycle:
+      String(
+        subscription?.billingCycle || ''
+      ).trim() ||
+      null,
+
+    currentPeriodStart:
+      subscriptionIsoSrv(
+        subscription?.currentPeriodStart
+      ),
+
+    currentPeriodEnd:
+      subscriptionIsoSrv(
+        subscription?.currentPeriodEnd
+      ),
+
+    graceEndsAt:
+      subscriptionIsoSrv(
+        subscription?.graceEndsAt
+      )
+  };
+}
+
+app.get(
+  '/api/subscription/me',
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error:
+            'subscription_unavailable',
+
+          message:
+            '❌ تعذّر قراءة حالة اشتراك مُرَبِّيك الآن. حاول مرة أخرى لاحقًا.'
+        });
+      }
+
+      const userId =
+        String(req.userId || '').trim();
+
+      const snap =
+        await db
+          .collection('subscriptions')
+          .doc(userId)
+          .get();
+
+      if (!snap.exists) {
+        return res.json({
+          ok: true,
+          readOnly: true,
+
+          initialized: false,
+
+          status: null,
+          effectiveStatus: null,
+
+          message:
+            'ℹ️ لا يوجد اشتراك مهيأ لهذا الحساب حتى الآن.'
+        });
+      }
+
+      return res.json({
+        ok: true,
+        readOnly: true,
+
+        ...subscriptionPublicStateSrv(
+          snap.data() || {}
+        )
+      });
+
+    } catch (e) {
+      console.error(
+        'subscription.me failed:',
+        e.message || e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error:
+          'subscription_read_failed',
+
+        message:
+          '❌ تعذّر قراءة حالة اشتراك مُرَبِّيك الآن. حاول مرة أخرى.'
       });
     }
   }
