@@ -70351,9 +70351,26 @@ app.post(
         .send(
           'تعذّر تنفيذ الإجراء الإداري الآن.'
         );
-    }
+      }
   }
-);// Static last
+);
+   // ============================================================
+//      PAGE ACCESS — DASHBOARD TEST ONLY
+// ============================================================
+app.get(
+  '/dashboard.html',
+  requireUserId,
+  requireSubscriptionAccessSrv,
+  (req, res) => {
+    res.set('Cache-Control', 'no-store');
+
+    return res.sendFile(
+      path.join(__dirname, 'www', 'dashboard.html')
+    );
+  }
+);
+
+// Static last
 app.use(express.static(path.join(__dirname, 'www')));
 // ✅ DIM job
 startDailyDimJob();
