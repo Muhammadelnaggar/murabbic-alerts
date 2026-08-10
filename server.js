@@ -65467,6 +65467,154 @@ app.get(
   }
 );
 // ============================================================
+//      SUBSCRIPTION LIFECYCLE — FIRST VALUE FROM DASHBOARD
+// ============================================================
+app.post(
+  '/api/subscription/first-value',
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error: 'subscription_unavailable',
+          message:
+            '❌ تعذّر تسجيل مرحلة الاستفادة الأولى الآن. حاول مرة أخرى لاحقًا.'
+        });
+      }
+
+      const userId =
+        String(req.userId || '').trim();
+
+      const displayedActiveCount =
+        Number(req.body?.displayedActiveCount);
+
+      const selectedType =
+        String(req.body?.selectedType || '')
+          .trim()
+          .toLowerCase();
+
+      if (
+        !Number.isFinite(displayedActiveCount) ||
+        displayedActiveCount < 1
+      ) {
+        return res.status(409).json({
+          ok: false,
+          error: 'first_value_not_reached',
+          recorded: false
+        });
+      }
+
+      const lifecycleBase =
+        db.collection('subscription_lifecycle_milestones');
+
+      const trialStartedRef =
+        lifecycleBase.doc(`${userId}__trial_started`);
+
+      const herdSetupStartedRef =
+        lifecycleBase.doc(`${userId}__herd_setup_started`);
+
+      const firstValueRef =
+        lifecycleBase.doc(`${userId}__first_value_reached`);
+
+      const [
+        trialStartedSnap,
+        herdSetupStartedSnap,
+        firstValueSnap
+      ] = await Promise.all([
+        trialStartedRef.get(),
+        herdSetupStartedRef.get(),
+        firstValueRef.get()
+      ]);
+
+      if (firstValueSnap.exists) {
+        return res.json({
+          ok: true,
+          recorded: false,
+          alreadyRecorded: true
+        });
+      }
+
+      if (
+        !trialStartedSnap.exists ||
+        !herdSetupStartedSnap.exists
+      ) {
+        return res.json({
+          ok: true,
+          recorded: false,
+          eligible: false,
+          reason: 'lifecycle_prerequisites_missing'
+        });
+      }
+
+      const activeAnimalSnap =
+        await db
+          .collection('animals')
+          .where('userId', '==', userId)
+          .where('status', '==', 'active')
+          .limit(1)
+          .get();
+
+      if (activeAnimalSnap.empty) {
+        return res.status(409).json({
+          ok: false,
+          error: 'first_value_active_herd_missing',
+          recorded: false
+        });
+      }
+
+      const result =
+        await subscriptionLifecycleMarkOnceSrv({
+          userId,
+          milestone: 'first_value_reached',
+          source:
+            'server:/api/subscription/first-value',
+
+          details: {
+            experience:
+              'dashboard_operational_view',
+
+            displayedActiveCount:
+              Math.trunc(displayedActiveCount),
+
+            selectedType:
+              selectedType || null
+          }
+        });
+
+      if (result?.error) {
+        return res.status(500).json({
+          ok: false,
+          error: 'first_value_write_failed',
+          recorded: false
+        });
+      }
+
+      return res.json({
+        ok: true,
+        recorded: result?.created === true,
+        alreadyRecorded:
+          result?.created !== true &&
+          result?.skipped !== true,
+        eligible:
+          result?.skipped !== true
+      });
+
+    } catch (e) {
+      console.error(
+        'subscription.first-value failed:',
+        e.message || e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error: 'first_value_failed',
+        recorded: false
+      });
+    }
+  }
+);
+// ============================================================
 //      SUBSCRIPTION ACCESS DECISION PREVIEW — READ-ONLY
 // ============================================================
 function subscriptionAccessDecisionPreviewSrv(
