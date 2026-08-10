@@ -64893,7 +64893,8 @@ reproductiveHeiferAnimalNumbers:
 // ============================================================
 const BILLING_ORDER_VERSION_SRV =
   'billing-order-v1';
-
+const BILLING_ORDER_TTL_MS_SRV =
+  72 * 60 * 60 * 1000;
 const BILLING_CYCLES_SRV =
   new Set([
     'monthly',
@@ -65085,7 +65086,7 @@ async function billingStartPaymentProviderSrv({
         orderId,
 
         message:
-          'استخدم رقم طلب التجديد عند إتمام الدفع مع إدارة مُرَبِّيك. لن يتم تفعيل الاشتراك إلا بعد تأكيد الدفع.'
+  'استخدم رقم طلب التجديد عند إتمام الدفع مع إدارة مُرَبِّيك. لن يتم تفعيل الاشتراك إلا بعد تأكيد الدفع. طلب الدفع صالح لمدة 72 ساعة من إنشائه.'
       }
     };
   }
@@ -65346,7 +65347,82 @@ return {
     }
   };
 }
+function billingOrderCurrentIdSrv(
+  subscription = {}
+) {
+  return String(
+    subscription?.pendingBillingOrderId || ''
+  )
+    .trim()
+    .toLowerCase();
+}
 
+function billingOrderExpiresAtMsSrv(
+  order = {}
+) {
+  const explicitMs =
+    subscriptionTimestampMsSrv(
+      order?.expiresAt
+    );
+
+  if (explicitMs !== null) {
+    return explicitMs;
+  }
+
+  const createdAtMs =
+    subscriptionTimestampMsSrv(
+      order?.createdAt
+    );
+
+  if (createdAtMs === null) {
+    return null;
+  }
+
+  return createdAtMs +
+    BILLING_ORDER_TTL_MS_SRV;
+}
+
+function billingOrderEffectiveStatusSrv(
+  orderIdRaw,
+  order = {},
+  subscription = null,
+  nowMs = Date.now()
+) {
+  const storedStatus =
+    String(order?.status || '')
+      .trim()
+      .toLowerCase();
+
+  if (storedStatus !== 'pending_payment') {
+    return storedStatus;
+  }
+
+  const orderId =
+    String(orderIdRaw || '')
+      .trim()
+      .toLowerCase();
+
+  if (
+    !subscription ||
+    typeof subscription !== 'object' ||
+    billingOrderCurrentIdSrv(subscription) !==
+      orderId
+  ) {
+    return 'superseded';
+  }
+
+  const expiresAtMs =
+    billingOrderExpiresAtMsSrv(order);
+
+  if (
+    expiresAtMs === null ||
+    Number(nowMs) > expiresAtMs
+  ) {
+    return 'expired';
+  }
+
+  return 'pending_payment';
+}
 function billingPublicOrderSrv(
   orderId,
   order = {}
@@ -65363,13 +65439,15 @@ function billingPublicOrderSrv(
       ).trim() ||
       null,
 
-    status:
-      String(
-        order?.status || ''
-      )
-        .trim()
-        .toLowerCase() ||
-      null,
+   status:
+  String(
+    order?.effectiveBillingStatus ||
+    order?.status ||
+    ''
+  )
+    .trim()
+    .toLowerCase() ||
+  null,
 
     billingCycle:
       billingNormalizeCycleSrv(
@@ -65469,7 +65547,17 @@ pricingVersion:
       subscriptionIsoSrv(
         order?.createdAt
       ),
+    expiresAt:
+  (() => {
+    const ms =
+      billingOrderExpiresAtMsSrv(
+        order
+      );
 
+    return ms === null
+      ? null
+      : new Date(ms).toISOString();
+  })(),
     paidAt:
       subscriptionIsoSrv(
         order?.paidAt
@@ -65541,51 +65629,77 @@ async function billingCreateCheckoutOrderSrv({
 
   const orderRef =
     db
-      .collection(
-        'billing_orders'
-      )
+      .collection('billing_orders')
       .doc(orderId);
 
   const subscriptionRef =
     db
-      .collection(
-        'subscriptions'
-      )
+      .collection('subscriptions')
       .doc(userId);
 
   const nowTs =
     admin.firestore.Timestamp.now();
 
+  const expiresAt =
+    admin.firestore.Timestamp.fromMillis(
+      nowTs.toMillis() +
+      BILLING_ORDER_TTL_MS_SRV
+    );
+
   return db.runTransaction(
     async tx => {
-      /*
-       * كل القراءات قبل الكتابة.
-       */
       const existingSnap =
-        await tx.get(
-          orderRef
-        );
+        await tx.get(orderRef);
 
       const subscriptionSnap =
         await tx.get(
           subscriptionRef
         );
 
-      /*
-       * نفس Idempotency-Key
-       * = نفس العملية.
-       */
+      if (!subscriptionSnap.exists) {
+        throw billingPublicErrorSrv(
+          409,
+          'billing_subscription_missing',
+          '❌ تعذّر ربط عملية الاشتراك بحسابك. حاول مرة أخرى.'
+        );
+      }
+
+      const subscription =
+        subscriptionSnap.data() || {};
+
+      const previousOrderId =
+        billingOrderCurrentIdSrv(
+          subscription
+        );
+
+      let previousOrderRef = null;
+      let previousOrderSnap = null;
+
+      if (
+        previousOrderId &&
+        previousOrderId !== orderId &&
+        /^ord_[a-f0-9]{40}$/
+          .test(previousOrderId)
+      ) {
+        previousOrderRef =
+          db
+            .collection('billing_orders')
+            .doc(previousOrderId);
+
+        previousOrderSnap =
+          await tx.get(
+            previousOrderRef
+          );
+      }
+
       if (existingSnap.exists) {
         const existing =
-          existingSnap.data() ||
-          {};
+          existingSnap.data() || {};
 
         const sameRequest =
           String(
-            existing?.userId ||
-            ''
-          ).trim() ===
-            userId &&
+            existing?.userId || ''
+          ).trim() === userId &&
 
           String(
             existing
@@ -65603,32 +65717,22 @@ async function billingCreateCheckoutOrderSrv({
         }
 
         return {
-          created:
-            false,
-
-          replayed:
-            true,
-
+          created: false,
+          replayed: true,
           orderId,
 
-          order:
-            existing
+          order: {
+            ...existing,
+
+            effectiveBillingStatus:
+              billingOrderEffectiveStatusSrv(
+                orderId,
+                existing,
+                subscription
+              )
+          }
         };
       }
-
-      if (
-        !subscriptionSnap.exists
-      ) {
-        throw billingPublicErrorSrv(
-          409,
-          'billing_subscription_missing',
-          '❌ تعذّر ربط عملية الاشتراك بحسابك. حاول مرة أخرى.'
-        );
-      }
-
-      const subscription =
-        subscriptionSnap.data() ||
-        {};
 
       const ownerUid =
         String(
@@ -65638,11 +65742,6 @@ async function billingCreateCheckoutOrderSrv({
         ).trim() ||
         userId;
 
-      /*
-       * السعر هنا Snapshot ثابت.
-       * أي تغير لاحق في القطيع لا يغير
-       * قيمة الـ Order المفتوح.
-       */
       const order = {
         orderId,
 
@@ -65658,28 +65757,28 @@ async function billingCreateCheckoutOrderSrv({
         billingCycle:
           quote.billingCycle,
 
-       currency:
-  quote.currency,
+        currency:
+          quote.currency,
 
-amount:
-  quote.amount,
+        amount:
+          quote.amount,
 
-amountMinor:
-  quote.amountMinor,
+        amountMinor:
+          quote.amountMinor,
 
-currencyExponent:
-  quote.currencyExponent,
+        currencyExponent:
+          quote.currencyExponent,
 
-pricingSnapshot: {
-  ...quote.pricingSnapshot,
+        pricingSnapshot: {
+          ...quote.pricingSnapshot,
 
-  capturedAt:
-    nowTs
-},
+          capturedAt:
+            nowTs
+        },
+
         subscriptionStatusAtCheckout:
           String(
-            subscription?.status ||
-            ''
+            subscription?.status || ''
           )
             .trim()
             .toLowerCase() ||
@@ -65702,9 +65801,8 @@ pricingSnapshot: {
         paidAt:
           null,
 
-        /*
-         * لا نخزن Idempotency-Key الخام.
-         */
+        expiresAt,
+
         idempotencyKeyHash:
           billingSha256Srv(
             idemKey
@@ -65721,23 +65819,69 @@ pricingSnapshot: {
         source
       };
 
+      if (
+        previousOrderRef &&
+        previousOrderSnap?.exists
+      ) {
+        const previousOrder =
+          previousOrderSnap.data() || {};
+
+        if (
+          String(
+            previousOrder?.status || ''
+          )
+            .trim()
+            .toLowerCase() ===
+            'pending_payment'
+        ) {
+          tx.set(
+            previousOrderRef,
+            {
+              status:
+                'superseded',
+
+              supersededByOrderId:
+                orderId,
+
+              supersededAt:
+                nowTs,
+
+              updatedAt:
+                nowTs
+            },
+            { merge: true }
+          );
+        }
+      }
+
       tx.set(
         orderRef,
         order,
+        { merge: false }
+      );
+
+      tx.set(
+        subscriptionRef,
         {
-          merge: false
-        }
+          pendingBillingOrderId:
+            orderId,
+
+          pendingBillingOrderExpiresAt:
+            expiresAt,
+
+          pendingBillingOrderUpdatedAt:
+            nowTs,
+
+          updatedAt:
+            nowTs
+        },
+        { merge: true }
       );
 
       return {
-        created:
-          true,
-
-        replayed:
-          false,
-
+        created: true,
+        replayed: false,
         orderId,
-
         order
       };
     }
@@ -65930,15 +66074,36 @@ app.get(
           });
       }
 
-      return res.json({
-        ok: true,
+const subscriptionSnap =
+  await db
+    .collection('subscriptions')
+    .doc(userId)
+    .get();
 
-        order:
-          billingPublicOrderSrv(
-            orderId,
-            order
-          )
-      });
+const subscription =
+  subscriptionSnap.exists
+    ? (subscriptionSnap.data() || {})
+    : null;
+
+const effectiveBillingStatus =
+  billingOrderEffectiveStatusSrv(
+    orderId,
+    order,
+    subscription
+  );
+
+return res.json({
+  ok: true,
+
+  order:
+    billingPublicOrderSrv(
+      orderId,
+      {
+        ...order,
+        effectiveBillingStatus
+      }
+    )
+});
 
     } catch (e) {
       console.error(
@@ -66043,12 +66208,22 @@ app.post(
           )
           .doc(orderId);
 
+      const subscriptionRef =
+        db
+          .collection('subscriptions')
+          .doc(userId);
+
       const selected =
         await db.runTransaction(
           async tx => {
             const snap =
               await tx.get(
                 orderRef
+              );
+
+            const subscriptionSnap =
+              await tx.get(
+                subscriptionRef
               );
 
             if (!snap.exists) {
@@ -66072,6 +66247,43 @@ app.post(
                 404,
                 'billing_order_not_found',
                 '❌ طلب الاشتراك غير موجود.'
+              );
+            }
+
+            if (!subscriptionSnap.exists) {
+              throw billingPublicErrorSrv(
+                409,
+                'billing_subscription_missing',
+                '❌ اشتراك الحساب غير موجود.'
+              );
+            }
+
+            const subscription =
+              subscriptionSnap.data() || {};
+
+            if (
+              billingOrderCurrentIdSrv(
+                subscription
+              ) !== orderId
+            ) {
+              throw billingPublicErrorSrv(
+                409,
+                'billing_order_superseded',
+                'ℹ️ طلب الدفع هذا لم يعد هو الطلب الحالي. أنشئ طلبًا جديدًا.'
+              );
+            }
+
+            if (
+              billingOrderEffectiveStatusSrv(
+                orderId,
+                order,
+                subscription
+              ) === 'expired'
+            ) {
+              throw billingPublicErrorSrv(
+                409,
+                'billing_order_expired',
+                'ℹ️ انتهت صلاحية طلب الدفع. أنشئ طلبًا جديدًا بالسعر الحالي.'
               );
             }
 
@@ -66785,7 +66997,31 @@ if (
           '❌ طلب الاشتراك الحالي غير قابل للدفع.'
         );
       }
+     if (
+  billingOrderCurrentIdSrv(
+    subscription
+  ) !== orderId
+) {
+  throw billingPublicErrorSrv(
+    409,
+    'billing_order_superseded',
+    'ℹ️ طلب الدفع هذا لم يعد هو الطلب الحالي للحساب.'
+  );
+}
 
+if (
+  billingOrderEffectiveStatusSrv(
+    orderId,
+    order,
+    subscription
+  ) === 'expired'
+) {
+  throw billingPublicErrorSrv(
+    409,
+    'billing_order_expired',
+    'ℹ️ انتهت صلاحية طلب الدفع. أنشئ طلبًا جديدًا بالسعر الحالي.'
+  );
+}
       const cycle =
         billingNormalizeCycleSrv(
           order?.billingCycle
@@ -66960,7 +67196,14 @@ if (
 
         lastPaidAt:
           nowTs,
+        pendingBillingOrderId:
+  null,
 
+pendingBillingOrderExpiresAt:
+  null,
+
+pendingBillingOrderUpdatedAt:
+  nowTs,
         updatedAt:
           nowTs,
 
@@ -72214,10 +72457,68 @@ async function adminPortalPendingBillingOrdersSrv() {
     )
   ];
 
-  const profiles =
+  const subscriptions =
     new Map(
       await Promise.all(
         userIds.map(
+          async userId => {
+            const subscriptionSnap =
+              await db
+                .collection('subscriptions')
+                .doc(userId)
+                .get();
+
+            return [
+              userId,
+
+              subscriptionSnap.exists
+                ? (subscriptionSnap.data() || {})
+                : null
+            ];
+          }
+        )
+      )
+    );
+
+  const nowMs = Date.now();
+
+  const currentOrders =
+    orders.filter(order => {
+      const userId =
+        String(
+          order?.userId || ''
+        ).trim();
+
+      const subscription =
+        subscriptions.get(userId);
+
+      return Boolean(
+        subscription &&
+        billingOrderEffectiveStatusSrv(
+          order.orderId,
+          order,
+          subscription,
+          nowMs
+        ) === 'pending_payment'
+      );
+    });
+
+  const currentUserIds = [
+    ...new Set(
+      currentOrders
+        .map(order =>
+          String(
+            order?.userId || ''
+          ).trim()
+        )
+        .filter(Boolean)
+    )
+  ];
+
+  const profiles =
+    new Map(
+      await Promise.all(
+        currentUserIds.map(
           async userId => {
             const profileSnap =
               await db
@@ -72227,6 +72528,7 @@ async function adminPortalPendingBillingOrdersSrv() {
 
             return [
               userId,
+
               profileSnap.exists
                 ? (profileSnap.data() || {})
                 : {}
@@ -72236,7 +72538,7 @@ async function adminPortalPendingBillingOrdersSrv() {
       )
     );
 
-  return orders
+  return currentOrders
     .map(order => {
       const userId =
         String(
@@ -72316,6 +72618,36 @@ async function adminPortalLoadPendingManualOrderSrv(
   const order =
     snap.data() || {};
 
+  const userId =
+    String(
+      order?.userId || ''
+    ).trim();
+
+  if (!userId) {
+    throw billingPublicErrorSrv(
+      409,
+      'billing_order_owner_missing',
+      '❌ طلب الاشتراك غير مرتبط بحساب صالح.'
+    );
+  }
+
+  const subscriptionSnap =
+    await db
+      .collection('subscriptions')
+      .doc(userId)
+      .get();
+
+  if (!subscriptionSnap.exists) {
+    throw billingPublicErrorSrv(
+      409,
+      'billing_subscription_missing',
+      '❌ اشتراك الحساب غير موجود.'
+    );
+  }
+
+  const subscription =
+    subscriptionSnap.data() || {};
+
   const status =
     String(
       order?.status || ''
@@ -72348,10 +72680,37 @@ async function adminPortalLoadPendingManualOrderSrv(
     );
   }
 
+  if (
+    billingOrderCurrentIdSrv(
+      subscription
+    ) !== orderId
+  ) {
+    throw billingPublicErrorSrv(
+      409,
+      'billing_order_superseded',
+      'ℹ️ طلب الدفع هذا لم يعد هو الطلب الحالي للحساب.'
+    );
+  }
+
+  if (
+    billingOrderEffectiveStatusSrv(
+      orderId,
+      order,
+      subscription
+    ) === 'expired'
+  ) {
+    throw billingPublicErrorSrv(
+      409,
+      'billing_order_expired',
+      'ℹ️ انتهت صلاحية طلب الدفع. أنشئ طلبًا جديدًا بالسعر الحالي.'
+    );
+  }
+
   if (provider !== 'manual') {
     throw billingPublicErrorSrv(
       409,
       'billing_payment_provider_mismatch',
+
       provider
         ? '❌ هذا الطلب لا يستخدم الدفع اليدوي.'
         : '❌ لم يبدأ العميل وسيلة الدفع لهذا الطلب بعد.'
@@ -75517,16 +75876,34 @@ app.get(
               })
           }
 
-        ).then(
+               ).then(
           function (data) {
+            var order =
+              data.order || {};
+
             var orderId =
-              data.order &&
-              data.order.orderId;
+              order.orderId;
 
             if (!orderId) {
               throw new Error(
                 'تعذّر قراءة رقم طلب التجديد.'
               );
+            }
+
+            var status =
+              String(
+                order.status || ''
+              ).toLowerCase();
+
+            if (
+              status !== 'pending_payment' &&
+              status !== 'paid'
+            ) {
+              clearAttempt(
+                state.cycle
+              );
+
+              return resolveCheckoutOrder();
             }
 
             attempt.orderId =
@@ -75541,11 +75918,10 @@ app.get(
               orderId;
 
             return {
-              order:
-                data.order,
+              order,
 
               alreadyPaid:
-                false
+                status === 'paid'
             };
           }
         );
