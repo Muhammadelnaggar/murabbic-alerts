@@ -1618,7 +1618,8 @@ const API_SUBSCRIPTION_BYPASS_PREFIXES_SRV = Object.freeze([
   '/api/auth',
   '/api/admin',
   '/api/subscription',
-  '/api/pricing'
+  '/api/pricing',
+  '/api/billing'
 ]);
 
 app.use((req, res, next) => {
@@ -64718,7 +64719,29 @@ function pricingRoundMoneySrv(v) {
     ) / 100
   );
 }
+function pricingComputeTotalsSrv({
+  price = {},
+  billableCount = 0,
+  annualMonthsCharged = 0
+} = {}) {
+  const monthlySubtotal = pricingRoundMoneySrv(
+    Number(price.baseMonthly || 0) +
+    (
+      Number(billableCount || 0) *
+      Number(price.perBillableFemaleMonthly || 0)
+    )
+  );
 
+  const annualSubtotal = pricingRoundMoneySrv(
+    monthlySubtotal *
+    Number(annualMonthsCharged || 0)
+  );
+
+  return {
+    monthlySubtotal,
+    annualSubtotal
+  };
+}
 app.get(
   '/api/pricing/preview',
   requireUserId,
@@ -64770,20 +64793,15 @@ app.get(
       const price =
         catalog.regions[pricingRegion];
 
-      const monthlySubtotal =
-        pricingRoundMoneySrv(
-          price.baseMonthly +
-          (
-            billable.count *
-            price.perBillableFemaleMonthly
-          )
-        );
-
-      const annualSubtotal =
-        pricingRoundMoneySrv(
-          monthlySubtotal *
-          catalog.annualMonthsCharged
-        );
+    const {
+  monthlySubtotal,
+  annualSubtotal
+} = pricingComputeTotalsSrv({
+  price,
+  billableCount: billable.count,
+  annualMonthsCharged:
+    catalog.annualMonthsCharged
+});
 
       return res.json({
         ok: true,
@@ -64857,6 +64875,890 @@ reproductiveHeiferAnimalNumbers:
         message:
           '❌ تعذّر حساب سعر مُرَبِّيك الآن. حاول مرة أخرى.'
       });
+    }
+  }
+);
+// ============================================================
+//      BILLING CORE — PROVIDER-READY CHECKOUT ORDERS
+// ============================================================
+const BILLING_ORDER_VERSION_SRV =
+  'billing-order-v1';
+
+const BILLING_CYCLES_SRV =
+  new Set([
+    'monthly',
+    'annual'
+  ]);
+
+function billingPublicErrorSrv(
+  status,
+  code,
+  message
+) {
+  const err = new Error(code);
+
+  err.publicStatus =
+    Number(status) || 500;
+
+  err.publicError =
+    String(code || 'billing_failed');
+
+  err.publicMessage =
+    String(message || '').trim();
+
+  return err;
+}
+
+function billingNormalizeCycleSrv(v) {
+  const cycle =
+    String(v || '')
+      .trim()
+      .toLowerCase();
+
+  return BILLING_CYCLES_SRV.has(cycle)
+    ? cycle
+    : '';
+}
+
+function billingNormalizeIdempotencyKeySrv(v) {
+  const key =
+    String(v || '').trim();
+
+  if (
+    key.length < 8 ||
+    key.length > 200 ||
+    /[\u0000-\u001f\u007f]/.test(key)
+  ) {
+    return '';
+  }
+
+  return key;
+}
+
+function billingSha256Srv(v) {
+  return crypto
+    .createHash('sha256')
+    .update(
+      String(v || ''),
+      'utf8'
+    )
+    .digest('hex');
+}
+
+function billingOrderIdSrv(
+  userId,
+  idempotencyKey
+) {
+  const digest =
+    billingSha256Srv(
+      `${
+        String(userId || '').trim()
+      }|${idempotencyKey}`
+    );
+
+  return `ord_${digest.slice(0, 40)}`;
+}
+
+function billingBillableHashSrv(numbers) {
+  const normalized = [
+    ...new Set(
+      (
+        Array.isArray(numbers)
+          ? numbers
+          : []
+      )
+        .map(
+          v =>
+            String(v || '').trim()
+        )
+        .filter(Boolean)
+    )
+  ].sort();
+
+  return billingSha256Srv(
+    JSON.stringify(normalized)
+  );
+}
+
+async function billingBuildPricingSnapshotSrv(
+  req,
+  billingCycle
+) {
+  const cycle =
+    billingNormalizeCycleSrv(
+      billingCycle
+    );
+
+  if (!cycle) {
+    throw billingPublicErrorSrv(
+      422,
+      'billing_cycle_invalid',
+      '❌ اختر دورة اشتراك شهرية أو سنوية.'
+    );
+  }
+
+  const country =
+    await pricingReadAccountCountrySrv(
+      req
+    );
+
+  if (!country) {
+    throw billingPublicErrorSrv(
+      422,
+      'pricing_country_missing',
+      '❌ دولة الحساب غير مسجلة، لذلك تعذّر تحديد سعر مُرَبِّيك.'
+    );
+  }
+
+  const pricingRegion =
+    pricingRegionForCountrySrv(
+      country
+    );
+
+  if (!pricingRegion) {
+    throw billingPublicErrorSrv(
+      422,
+      'pricing_country_unsupported',
+      '❌ التسعير الحالي متاح لمصر والدول العربية فقط.'
+    );
+  }
+
+  const [
+    { catalog, source },
+    billable
+  ] = await Promise.all([
+    pricingLoadCatalogSrv(),
+
+    pricingBillableFemalesForTenantSrv(
+      req.userId
+    )
+  ]);
+
+  /*
+   * الـ Preview يستطيع استخدام fallback عند فشل
+   * قراءة كتالوج Firestore.
+   *
+   * الدفع لا يفعل ذلك:
+   * لا ننشئ Order مالي بسعر لم نستطع التحقق منه.
+   */
+  if (
+    source ===
+    'server_default_after_read_failure'
+  ) {
+    throw billingPublicErrorSrv(
+      503,
+      'billing_pricing_unverified',
+      '❌ تعذّر التحقق من سعر الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+    );
+  }
+
+  const price =
+    catalog.regions[
+      pricingRegion
+    ];
+
+  const totals =
+    pricingComputeTotalsSrv({
+      price,
+
+      billableCount:
+        billable.count,
+
+      annualMonthsCharged:
+        catalog.annualMonthsCharged
+    });
+
+  const amount =
+    cycle === 'annual'
+      ? totals.annualSubtotal
+      : totals.monthlySubtotal;
+
+  if (
+    !Number.isFinite(amount) ||
+    amount <= 0
+  ) {
+    throw billingPublicErrorSrv(
+      503,
+      'billing_amount_invalid',
+      '❌ تعذّر تثبيت قيمة الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+    );
+  }
+
+  return {
+    billingCycle:
+      cycle,
+
+    amount,
+
+    currency:
+      String(
+        price.currency || ''
+      )
+        .trim()
+        .toUpperCase(),
+
+    pricingSnapshot: {
+      country,
+
+      pricingRegion,
+
+      pricingVersion:
+        String(
+          catalog.version || ''
+        ).trim() ||
+        null,
+
+      pricingSource:
+        source,
+
+      billableFemales:
+        Number(
+          billable.count || 0
+        ),
+
+      breakdown: {
+        mothers:
+          Number(
+            billable.mothersCount || 0
+          ),
+
+        reproductiveHeifers:
+          Number(
+            billable
+              .reproductiveHeifersCount ||
+            0
+          ),
+
+        cows:
+          Number(
+            billable.cowCount || 0
+          ),
+
+        buffalo:
+          Number(
+            billable.buffaloCount || 0
+          )
+      },
+
+      baseMonthly:
+        Number(
+          price.baseMonthly || 0
+        ),
+
+      perBillableFemaleMonthly:
+        Number(
+          price
+            .perBillableFemaleMonthly ||
+          0
+        ),
+
+      monthlySubtotal:
+        totals.monthlySubtotal,
+
+      annualMonthsCharged:
+        Number(
+          catalog
+            .annualMonthsCharged ||
+          0
+        ),
+
+      annualSubtotal:
+        totals.annualSubtotal,
+
+      billablePopulationHash:
+        billingBillableHashSrv(
+          billable.animalNumbers
+        )
+    }
+  };
+}
+
+function billingPublicOrderSrv(
+  orderId,
+  order = {}
+) {
+  return {
+    orderId:
+      String(
+        orderId || ''
+      ).trim(),
+
+    orderVersion:
+      String(
+        order?.orderVersion || ''
+      ).trim() ||
+      null,
+
+    status:
+      String(
+        order?.status || ''
+      )
+        .trim()
+        .toLowerCase() ||
+      null,
+
+    billingCycle:
+      billingNormalizeCycleSrv(
+        order?.billingCycle
+      ) ||
+      null,
+
+    currency:
+      String(
+        order?.currency || ''
+      )
+        .trim()
+        .toUpperCase() ||
+      null,
+
+    amount:
+      Number.isFinite(
+        Number(order?.amount)
+      )
+        ? Number(order.amount)
+        : null,
+
+    pricingVersion:
+      String(
+        order
+          ?.pricingSnapshot
+          ?.pricingVersion ||
+        ''
+      ).trim() ||
+      null,
+
+    pricingRegion:
+      String(
+        order
+          ?.pricingSnapshot
+          ?.pricingRegion ||
+        ''
+      ).trim() ||
+      null,
+
+    country:
+      String(
+        order
+          ?.pricingSnapshot
+          ?.country ||
+        ''
+      ).trim() ||
+      null,
+
+    billableFemales:
+      Number.isFinite(
+        Number(
+          order
+            ?.pricingSnapshot
+            ?.billableFemales
+        )
+      )
+        ? Number(
+            order
+              .pricingSnapshot
+              .billableFemales
+          )
+        : null,
+
+    paymentProvider:
+      String(
+        order?.paymentProvider || ''
+      ).trim() ||
+      null,
+
+    paymentId:
+      String(
+        order?.paymentId || ''
+      ).trim() ||
+      null,
+
+    createdAt:
+      subscriptionIsoSrv(
+        order?.createdAt
+      ),
+
+    paidAt:
+      subscriptionIsoSrv(
+        order?.paidAt
+      )
+  };
+}
+
+async function billingCreateCheckoutOrderSrv({
+  req,
+  billingCycle,
+  idempotencyKey,
+  source =
+    'server:/api/billing/checkout'
+} = {}) {
+  if (!db) {
+    throw billingPublicErrorSrv(
+      503,
+      'billing_unavailable',
+      '❌ تعذّر بدء عملية الاشتراك الآن. حاول مرة أخرى لاحقًا.'
+    );
+  }
+
+  const userId =
+    String(
+      req?.userId || ''
+    ).trim();
+
+  if (!userId) {
+    throw billingPublicErrorSrv(
+      401,
+      'auth_required',
+      '❌ يلزم تسجيل الدخول أولًا.'
+    );
+  }
+
+  const idemKey =
+    billingNormalizeIdempotencyKeySrv(
+      idempotencyKey
+    );
+
+  if (!idemKey) {
+    throw billingPublicErrorSrv(
+      400,
+      'idempotency_key_required',
+      '❌ تعذّر بدء عملية الاشتراك بأمان. أعد المحاولة.'
+    );
+  }
+
+  const quote =
+    await billingBuildPricingSnapshotSrv(
+      req,
+      billingCycle
+    );
+
+  const orderId =
+    billingOrderIdSrv(
+      userId,
+      idemKey
+    );
+
+  const requestFingerprint =
+    billingSha256Srv(
+      JSON.stringify({
+        userId,
+        billingCycle:
+          quote.billingCycle
+      })
+    );
+
+  const orderRef =
+    db
+      .collection(
+        'billing_orders'
+      )
+      .doc(orderId);
+
+  const subscriptionRef =
+    db
+      .collection(
+        'subscriptions'
+      )
+      .doc(userId);
+
+  const nowTs =
+    admin.firestore.Timestamp.now();
+
+  return db.runTransaction(
+    async tx => {
+      /*
+       * كل القراءات قبل الكتابة.
+       */
+      const existingSnap =
+        await tx.get(
+          orderRef
+        );
+
+      const subscriptionSnap =
+        await tx.get(
+          subscriptionRef
+        );
+
+      /*
+       * نفس Idempotency-Key
+       * = نفس العملية.
+       */
+      if (existingSnap.exists) {
+        const existing =
+          existingSnap.data() ||
+          {};
+
+        const sameRequest =
+          String(
+            existing?.userId ||
+            ''
+          ).trim() ===
+            userId &&
+
+          String(
+            existing
+              ?.requestFingerprint ||
+            ''
+          ).trim() ===
+            requestFingerprint;
+
+        if (!sameRequest) {
+          throw billingPublicErrorSrv(
+            409,
+            'idempotency_conflict',
+            '❌ تعذّر إعادة استخدام طلب الاشتراك السابق. أعد المحاولة من جديد.'
+          );
+        }
+
+        return {
+          created:
+            false,
+
+          replayed:
+            true,
+
+          orderId,
+
+          order:
+            existing
+        };
+      }
+
+      if (
+        !subscriptionSnap.exists
+      ) {
+        throw billingPublicErrorSrv(
+          409,
+          'billing_subscription_missing',
+          '❌ تعذّر ربط عملية الاشتراك بحسابك. حاول مرة أخرى.'
+        );
+      }
+
+      const subscription =
+        subscriptionSnap.data() ||
+        {};
+
+      const ownerUid =
+        String(
+          subscription?.ownerUid ||
+          req?.authSession?.uid ||
+          userId
+        ).trim() ||
+        userId;
+
+      /*
+       * السعر هنا Snapshot ثابت.
+       * أي تغير لاحق في القطيع لا يغير
+       * قيمة الـ Order المفتوح.
+       */
+      const order = {
+        orderId,
+
+        orderVersion:
+          BILLING_ORDER_VERSION_SRV,
+
+        userId,
+        ownerUid,
+
+        status:
+          'pending_payment',
+
+        billingCycle:
+          quote.billingCycle,
+
+        currency:
+          quote.currency,
+
+        amount:
+          quote.amount,
+
+        pricingSnapshot: {
+          ...quote.pricingSnapshot,
+
+          capturedAt:
+            nowTs
+        },
+
+        subscriptionStatusAtCheckout:
+          String(
+            subscription?.status ||
+            ''
+          )
+            .trim()
+            .toLowerCase() ||
+          null,
+
+        effectiveSubscriptionStatusAtCheckout:
+          subscriptionEffectiveStatusSrv(
+            subscription
+          ),
+
+        paymentProvider:
+          null,
+
+        paymentId:
+          null,
+
+        providerReference:
+          null,
+
+        paidAt:
+          null,
+
+        /*
+         * لا نخزن Idempotency-Key الخام.
+         */
+        idempotencyKeyHash:
+          billingSha256Srv(
+            idemKey
+          ),
+
+        requestFingerprint,
+
+        createdAt:
+          nowTs,
+
+        updatedAt:
+          nowTs,
+
+        source
+      };
+
+      tx.set(
+        orderRef,
+        order,
+        {
+          merge: false
+        }
+      );
+
+      return {
+        created:
+          true,
+
+        replayed:
+          false,
+
+        orderId,
+
+        order
+      };
+    }
+  );
+}
+
+app.post(
+  '/api/billing/checkout',
+  requireUserId,
+  async (req, res) => {
+    try {
+      res.set(
+        'Cache-Control',
+        'no-store'
+      );
+
+      const result =
+        await billingCreateCheckoutOrderSrv({
+          req,
+
+          billingCycle:
+            req.body?.billingCycle,
+
+          idempotencyKey:
+            req.get(
+              'Idempotency-Key'
+            ) ||
+            ''
+        });
+
+      return res
+        .status(
+          result.created
+            ? 201
+            : 200
+        )
+        .json({
+          ok: true,
+
+          created:
+            result.created ===
+            true,
+
+          replayed:
+            result.replayed ===
+            true,
+
+          order:
+            billingPublicOrderSrv(
+              result.orderId,
+              result.order
+            )
+        });
+
+    } catch (e) {
+      console.error(
+        'billing.checkout failed:',
+        e.message || e
+      );
+
+      if (
+        Number(
+          e?.publicStatus
+        )
+      ) {
+        return res
+          .status(
+            Number(
+              e.publicStatus
+            )
+          )
+          .json({
+            ok: false,
+
+            error:
+              String(
+                e.publicError ||
+                'billing_checkout_failed'
+              ),
+
+            message:
+              String(
+                e.publicMessage ||
+                '❌ تعذّر بدء عملية الاشتراك الآن. حاول مرة أخرى.'
+              )
+          });
+      }
+
+      return res
+        .status(500)
+        .json({
+          ok: false,
+
+          error:
+            'billing_checkout_failed',
+
+          message:
+            '❌ تعذّر بدء عملية الاشتراك الآن. حاول مرة أخرى.'
+        });
+    }
+  }
+);
+
+app.get(
+  '/api/billing/checkout/:orderId',
+  requireUserId,
+  async (req, res) => {
+    try {
+      res.set(
+        'Cache-Control',
+        'no-store'
+      );
+
+      if (!db) {
+        return res
+          .status(503)
+          .json({
+            ok: false,
+            error:
+              'billing_unavailable'
+          });
+      }
+
+      const userId =
+        String(
+          req.userId || ''
+        ).trim();
+
+      const orderId =
+        String(
+          req.params
+            ?.orderId ||
+          ''
+        )
+          .trim()
+          .toLowerCase();
+
+      if (
+        !/^ord_[a-f0-9]{40}$/
+          .test(orderId)
+      ) {
+        return res
+          .status(404)
+          .json({
+            ok: false,
+            error:
+              'billing_order_not_found'
+          });
+      }
+
+      const snap =
+        await db
+          .collection(
+            'billing_orders'
+          )
+          .doc(orderId)
+          .get();
+
+      if (!snap.exists) {
+        return res
+          .status(404)
+          .json({
+            ok: false,
+            error:
+              'billing_order_not_found'
+          });
+      }
+
+      const order =
+        snap.data() ||
+        {};
+
+      /*
+       * لا نكشف وجود Order
+       * تابع لحساب آخر.
+       */
+      if (
+        String(
+          order?.userId ||
+          ''
+        ).trim() !==
+        userId
+      ) {
+        return res
+          .status(404)
+          .json({
+            ok: false,
+            error:
+              'billing_order_not_found'
+          });
+      }
+
+      return res.json({
+        ok: true,
+
+        order:
+          billingPublicOrderSrv(
+            orderId,
+            order
+          )
+      });
+
+    } catch (e) {
+      console.error(
+        'billing.checkout.read failed:',
+        e.message || e
+      );
+
+      return res
+        .status(500)
+        .json({
+          ok: false,
+
+          error:
+            'billing_order_read_failed',
+
+          message:
+            '❌ تعذّر قراءة عملية الاشتراك الآن. حاول مرة أخرى.'
+        });
     }
   }
 );
