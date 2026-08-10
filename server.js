@@ -73547,7 +73547,10 @@ app.get(
           .get();
 
       if (!snap.exists) {
-        return res.redirect(303, '/dashboard.html');
+        return res.redirect(
+          303,
+          '/dashboard.html'
+        );
       }
 
       const decision =
@@ -73555,13 +73558,21 @@ app.get(
           snap.data() || {}
         );
 
-      if (decision.futureGateDecision === 'allow') {
-        return res.redirect(303, '/dashboard.html');
+      if (
+        decision.futureGateDecision ===
+        'allow'
+      ) {
+        return res.redirect(
+          303,
+          '/dashboard.html'
+        );
       }
 
       if (
-        decision.effectiveStatus !== 'expired' &&
-        decision.effectiveStatus !== 'cancelled'
+        decision.effectiveStatus !==
+          'expired' &&
+        decision.effectiveStatus !==
+          'cancelled'
       ) {
         return res
           .status(503)
@@ -73571,33 +73582,1423 @@ app.get(
       }
 
       const title =
-        decision.effectiveStatus === 'expired'
+        decision.effectiveStatus ===
+        'expired'
           ? 'انتهت مدة اشتراك مُرَبِّيك'
           : 'اشتراك مُرَبِّيك غير نشط';
 
-      res.set('Cache-Control', 'no-store');
+      const renewalNonce =
+        crypto
+          .randomBytes(18)
+          .toString('base64url');
+
+      res.set(
+        'Cache-Control',
+        'no-store'
+      );
+
+      res.set(
+        'Referrer-Policy',
+        'same-origin'
+      );
+
+      res.set(
+        'X-Content-Type-Options',
+        'nosniff'
+      );
+
+      res.set(
+        'Content-Security-Policy',
+        [
+          "default-src 'none'",
+          "base-uri 'none'",
+          "connect-src 'self'",
+          "img-src 'self' data:",
+          "form-action 'self'",
+          "frame-ancestors 'none'",
+          `script-src 'nonce-${renewalNonce}'`,
+          `style-src 'nonce-${renewalNonce}'`
+        ].join('; ')
+      );
 
       return res.send(`<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>تجديد اشتراك مُرَبِّيك</title>
-  <style>
-    body{margin:0;font-family:Arial,sans-serif;background:#f6faf7;color:#17351f;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}
-    .card{width:min(560px,100%);background:#fff;border:1px solid #dfe9e2;border-radius:22px;padding:32px;box-shadow:0 14px 40px rgba(0,0,0,.08);text-align:center}
-    h1{margin:0 0 16px;font-size:30px;color:#0b7a3b}
-    p{font-size:18px;line-height:1.9;margin:8px 0}
-    .note{margin-top:18px;padding:14px;border-radius:14px;background:#f0f8f2}
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  >
+
+  <title>
+    تجديد اشتراك مُرَبِّيك
+  </title>
+
+  <style nonce="${renewalNonce}">
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f6faf7;
+      color: #17351f;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    main {
+      width: min(760px, 100%);
+      margin: 0 auto;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #dfe9e2;
+      border-radius: 22px;
+      padding: 28px;
+      box-shadow:
+        0 14px 40px
+        rgba(0, 0, 0, .08);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 30px;
+      color: #0b7a3b;
+    }
+
+    h2 {
+      font-size: 20px;
+      margin: 24px 0 12px;
+    }
+
+    p {
+      font-size: 17px;
+      line-height: 1.8;
+      margin: 6px 0;
+    }
+
+    .muted {
+      color: #5d7163;
+      font-size: 14px;
+    }
+
+    .status {
+      margin-top: 18px;
+      padding: 14px;
+      border-radius: 14px;
+      background: #f0f8f2;
+      line-height: 1.7;
+    }
+
+    .status.error {
+      background: #fff1f1;
+      color: #8a2020;
+    }
+
+    .status.success {
+      background: #edf9f0;
+      color: #0b6b35;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .plans {
+      display: grid;
+      grid-template-columns:
+        repeat(
+          2,
+          minmax(0, 1fr)
+        );
+      gap: 12px;
+    }
+
+    .plan {
+      appearance: none;
+      width: 100%;
+      border: 2px solid #dfe9e2;
+      background: #fff;
+      border-radius: 18px;
+      padding: 18px;
+      text-align: right;
+      cursor: pointer;
+      color: #17351f;
+    }
+
+    .plan strong {
+      display: block;
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+
+    .plan span {
+      display: block;
+      line-height: 1.7;
+    }
+
+    .plan.selected {
+      border-color: #0b7a3b;
+      background: #f2faf4;
+    }
+
+    .methods {
+      display: grid;
+      gap: 10px;
+    }
+
+    .method {
+      appearance: none;
+      width: 100%;
+      border: 2px solid #dfe9e2;
+      background: #fff;
+      border-radius: 16px;
+      padding: 15px;
+      text-align: right;
+      cursor: pointer;
+      color: #17351f;
+    }
+
+    .method.selected {
+      border-color: #0b7a3b;
+      background: #f2faf4;
+    }
+
+    .primary,
+    .secondary {
+      width: 100%;
+      border: 0;
+      border-radius: 14px;
+      padding: 15px 18px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .primary {
+      background: #0b7a3b;
+      color: #fff;
+      margin-top: 20px;
+    }
+
+    .primary:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .secondary {
+      background: #eef5f0;
+      color: #145c31;
+      margin-top: 10px;
+    }
+
+    .summary {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid #dfe9e2;
+      border-radius: 14px;
+      background: #fbfdfb;
+      line-height: 1.8;
+    }
+
+    @media(max-width: 600px) {
+      body {
+        padding: 14px;
+      }
+
+      .card {
+        padding: 20px;
+      }
+
+      .plans {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 25px;
+      }
+    }
   </style>
 </head>
+
 <body>
-  <main class="card">
-    <h1>${title}</h1>
-    <p>بيانات مزرعتك محفوظة بالكامل.</p>
-    <p>يلزم تجديد الاشتراك لاستمرار استخدام مُرَبِّيك.</p>
-    <div class="note">لتجديد الاشتراك، تواصل مع إدارة مُرَبِّيك.</div>
+  <main>
+    <section class="card">
+
+      <h1>${title}</h1>
+
+      <p>
+        بيانات مزرعتك محفوظة بالكامل.
+      </p>
+
+      <p>
+        اختر دورة الاشتراك ووسيلة الدفع
+        لاستعادة استخدام مُرَبِّيك.
+      </p>
+
+      <div
+        id="loadStatus"
+        class="status"
+      >
+        جارٍ تحميل سعر الاشتراك
+        ووسائل الدفع…
+      </div>
+
+      <div
+        id="renewalContent"
+        class="hidden"
+      >
+
+        <h2>
+          اختر دورة الاشتراك
+        </h2>
+
+        <div class="plans">
+
+          <button
+            id="monthlyPlan"
+            class="plan selected"
+            type="button"
+            data-cycle="monthly"
+          >
+            <strong>
+              شهري
+            </strong>
+
+            <span id="monthlyPrice">
+              —
+            </span>
+          </button>
+
+          <button
+            id="annualPlan"
+            class="plan"
+            type="button"
+            data-cycle="annual"
+          >
+            <strong>
+              سنوي
+            </strong>
+
+            <span id="annualPrice">
+              —
+            </span>
+
+            <span
+              id="annualNote"
+              class="muted"
+            ></span>
+          </button>
+
+        </div>
+
+        <div
+          id="pricingSummary"
+          class="summary"
+        ></div>
+
+        <h2>
+          وسيلة الدفع
+        </h2>
+
+        <div
+          id="methods"
+          class="methods"
+        ></div>
+
+        <button
+          id="continueBtn"
+          class="primary"
+          type="button"
+          disabled
+        >
+          متابعة للدفع
+        </button>
+
+        <div
+          id="actionBox"
+          class="status hidden"
+        ></div>
+
+        <button
+          id="checkBtn"
+          class="secondary hidden"
+          type="button"
+        >
+          التحقق من حالة الدفع
+        </button>
+
+      </div>
+    </section>
   </main>
+
+  <script nonce="${renewalNonce}">
+    (function () {
+      'use strict';
+
+      var state = {
+        cycle: 'monthly',
+        provider: '',
+        pricing: null,
+        methods: [],
+        busy: false,
+        currentOrderId: ''
+      };
+
+      var el = {
+        loadStatus:
+          document.getElementById(
+            'loadStatus'
+          ),
+
+        renewalContent:
+          document.getElementById(
+            'renewalContent'
+          ),
+
+        monthlyPlan:
+          document.getElementById(
+            'monthlyPlan'
+          ),
+
+        annualPlan:
+          document.getElementById(
+            'annualPlan'
+          ),
+
+        monthlyPrice:
+          document.getElementById(
+            'monthlyPrice'
+          ),
+
+        annualPrice:
+          document.getElementById(
+            'annualPrice'
+          ),
+
+        annualNote:
+          document.getElementById(
+            'annualNote'
+          ),
+
+        pricingSummary:
+          document.getElementById(
+            'pricingSummary'
+          ),
+
+        methods:
+          document.getElementById(
+            'methods'
+          ),
+
+        continueBtn:
+          document.getElementById(
+            'continueBtn'
+          ),
+
+        actionBox:
+          document.getElementById(
+            'actionBox'
+          ),
+
+        checkBtn:
+          document.getElementById(
+            'checkBtn'
+          )
+      };
+
+      function apiJson(
+        url,
+        options
+      ) {
+        var opts =
+          options || {};
+
+        opts.credentials =
+          'same-origin';
+
+        return fetch(
+          url,
+          opts
+        ).then(function (r) {
+
+          return r.json()
+            .catch(
+              function () {
+                return {};
+              }
+            )
+            .then(function (data) {
+
+              if (
+                !r.ok ||
+                data.ok === false
+              ) {
+                var err =
+                  new Error(
+                    data.message ||
+                    'تعذّر إتمام الطلب الآن. حاول مرة أخرى.'
+                  );
+
+                err.status =
+                  r.status;
+
+                err.code =
+                  data.error || '';
+
+                throw err;
+              }
+
+              return data;
+            });
+        });
+      }
+
+      function setStatus(
+        message,
+        kind
+      ) {
+        el.loadStatus.textContent =
+          message || '';
+
+        el.loadStatus.className =
+          'status' +
+          (
+            kind
+              ? ' ' + kind
+              : ''
+          );
+      }
+
+      function setAction(
+        message,
+        kind
+      ) {
+        el.actionBox.textContent =
+          message || '';
+
+        el.actionBox.className =
+          'status' +
+          (
+            kind
+              ? ' ' + kind
+              : ''
+          );
+
+        if (!message) {
+          el.actionBox
+            .classList
+            .add('hidden');
+
+        } else {
+          el.actionBox
+            .classList
+            .remove('hidden');
+        }
+      }
+
+      function formatMoney(
+        amount,
+        currency
+      ) {
+        try {
+          return new Intl
+            .NumberFormat(
+              'ar-EG',
+              {
+                style:
+                  'currency',
+
+                currency:
+                  currency
+              }
+            )
+            .format(
+              Number(
+                amount || 0
+              )
+            );
+
+        } catch (_) {
+          return (
+            String(
+              amount || 0
+            ) +
+            ' ' +
+            String(
+              currency || ''
+            )
+          );
+        }
+      }
+
+      function attemptStorageKey(
+        cycle
+      ) {
+        return (
+          'murabbik_renewal_attempt_v1_' +
+          cycle
+        );
+      }
+
+      function randomKey() {
+        if (
+          window.crypto &&
+          typeof
+            window.crypto.randomUUID ===
+            'function'
+        ) {
+          return window
+            .crypto
+            .randomUUID();
+        }
+
+        return (
+          Date.now()
+            .toString(36) +
+          '-' +
+          Math.random()
+            .toString(36)
+            .slice(2) +
+          '-' +
+          Math.random()
+            .toString(36)
+            .slice(2)
+        );
+      }
+
+      function readAttempt(
+        cycle
+      ) {
+        try {
+          var raw =
+            sessionStorage
+              .getItem(
+                attemptStorageKey(
+                  cycle
+                )
+              );
+
+          if (!raw) {
+            return null;
+          }
+
+          var parsed =
+            JSON.parse(raw);
+
+          if (
+            !parsed ||
+            parsed.cycle !== cycle ||
+            !parsed.key
+          ) {
+            return null;
+          }
+
+          return parsed;
+
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function writeAttempt(
+        cycle,
+        attempt
+      ) {
+        try {
+          sessionStorage
+            .setItem(
+              attemptStorageKey(
+                cycle
+              ),
+              JSON.stringify(
+                attempt
+              )
+            );
+
+        } catch (_) {}
+      }
+
+      function clearAttempt(
+        cycle
+      ) {
+        try {
+          sessionStorage
+            .removeItem(
+              attemptStorageKey(
+                cycle
+              )
+            );
+
+        } catch (_) {}
+      }
+
+      function getOrCreateAttempt(
+        cycle
+      ) {
+        var existing =
+          readAttempt(cycle);
+
+        if (existing) {
+          return existing;
+        }
+
+        var created = {
+          cycle:
+            cycle,
+
+          key:
+            randomKey(),
+
+          orderId:
+            ''
+        };
+
+        writeAttempt(
+          cycle,
+          created
+        );
+
+        return created;
+      }
+
+      function setBusy(
+        busy
+      ) {
+        state.busy =
+          busy === true;
+
+        el.continueBtn.disabled =
+          state.busy ||
+          !state.provider;
+
+        el.monthlyPlan.disabled =
+          state.busy;
+
+        el.annualPlan.disabled =
+          state.busy;
+
+        Array.prototype
+          .forEach
+          .call(
+            el.methods
+              .querySelectorAll(
+                '[data-provider]'
+              ),
+
+            function (button) {
+              button.disabled =
+                state.busy;
+            }
+          );
+
+        el.continueBtn.textContent =
+          state.busy
+            ? 'جارٍ تجهيز طلب التجديد…'
+            : 'متابعة للدفع';
+      }
+
+      function selectCycle(
+        cycle
+      ) {
+        state.cycle =
+          cycle;
+
+        el.monthlyPlan
+          .classList
+          .toggle(
+            'selected',
+            cycle ===
+              'monthly'
+          );
+
+        el.annualPlan
+          .classList
+          .toggle(
+            'selected',
+            cycle ===
+              'annual'
+          );
+      }
+
+      function selectProvider(
+        provider
+      ) {
+        state.provider =
+          provider;
+
+        Array.prototype
+          .forEach
+          .call(
+            el.methods
+              .querySelectorAll(
+                '[data-provider]'
+              ),
+
+            function (button) {
+              button.classList
+                .toggle(
+                  'selected',
+
+                  button.getAttribute(
+                    'data-provider'
+                  ) ===
+                    provider
+                );
+            }
+          );
+
+        el.continueBtn.disabled =
+          state.busy ||
+          !state.provider;
+      }
+
+      function renderMethods(
+        methods
+      ) {
+        el.methods.textContent =
+          '';
+
+        methods.forEach(
+          function (
+            method,
+            index
+          ) {
+            var button =
+              document
+                .createElement(
+                  'button'
+                );
+
+            button.type =
+              'button';
+
+            button.className =
+              'method';
+
+            button.setAttribute(
+              'data-provider',
+              method.provider
+            );
+
+            var methodTitle =
+              document
+                .createElement(
+                  'strong'
+                );
+
+            methodTitle.textContent =
+              method.label ||
+              method.provider;
+
+            button.appendChild(
+              methodTitle
+            );
+
+            button.addEventListener(
+              'click',
+              function () {
+                selectProvider(
+                  method.provider
+                );
+              }
+            );
+
+            el.methods.appendChild(
+              button
+            );
+
+            if (
+              index === 0
+            ) {
+              state.provider =
+                method.provider;
+            }
+          }
+        );
+
+        if (
+          state.provider
+        ) {
+          selectProvider(
+            state.provider
+          );
+        }
+      }
+
+      function renderPricing(
+        data
+      ) {
+        state.pricing =
+          data;
+
+        var currency =
+          data.currency || '';
+
+        el.monthlyPrice
+          .textContent =
+          formatMoney(
+            data.pricing
+              .monthlySubtotal,
+
+            currency
+          );
+
+        el.annualPrice
+          .textContent =
+          formatMoney(
+            data.pricing
+              .annualSubtotal,
+
+            currency
+          );
+
+        el.annualNote
+          .textContent =
+          (
+            'القيمة السنوية محسوبة على ' +
+            String(
+              data.pricing
+                .annualMonthsCharged
+            ) +
+            ' أشهر.'
+          );
+
+        el.pricingSummary
+          .textContent =
+          (
+            'التسعير الحالي يشمل ' +
+            String(
+              data.billableFemales
+            ) +
+            ' من الإناث المحتسبة في الاشتراك. ' +
+            'السعر النهائي يثبّته السيرفر عند إنشاء طلب التجديد.'
+          );
+      }
+
+      function loadPage() {
+        return Promise.all([
+          apiJson(
+            '/api/pricing/preview'
+          ),
+
+          apiJson(
+            '/api/billing/payment-methods'
+          )
+
+        ]).then(
+          function (results) {
+            var pricing =
+              results[0];
+
+            var methodsData =
+              results[1];
+
+            if (
+              pricing.pricingSource ===
+              'server_default_after_read_failure'
+            ) {
+              throw new Error(
+                'تعذّر التحقق من سعر الاشتراك المالي الآن. حاول مرة أخرى لاحقًا.'
+              );
+            }
+
+            var methods =
+              Array.isArray(
+                methodsData.methods
+              )
+                ? methodsData.methods
+                : [];
+
+            if (
+              !methods.length
+            ) {
+              throw new Error(
+                'لا توجد وسيلة دفع متاحة لهذا الحساب الآن.'
+              );
+            }
+
+            renderPricing(
+              pricing
+            );
+
+            renderMethods(
+              methods
+            );
+
+            setStatus(
+              'اختر الخطة ثم تابع للدفع.',
+              'success'
+            );
+
+            el.renewalContent
+              .classList
+              .remove(
+                'hidden'
+              );
+          }
+
+        ).catch(
+          function (e) {
+            setStatus(
+              e.message ||
+              'تعذّر تحميل بيانات التجديد الآن.',
+
+              'error'
+            );
+          }
+        );
+      }
+
+      function readOrder(
+        orderId
+      ) {
+        return apiJson(
+          '/api/billing/checkout/' +
+          encodeURIComponent(
+            orderId
+          )
+        );
+      }
+
+      function resolveCheckoutOrder() {
+        var attempt =
+          getOrCreateAttempt(
+            state.cycle
+          );
+
+        if (
+          attempt.orderId
+        ) {
+          return readOrder(
+            attempt.orderId
+          ).then(
+            function (data) {
+              var status =
+                String(
+                  data.order &&
+                  data.order.status ||
+                  ''
+                )
+                  .toLowerCase();
+
+              if (
+                status === 'paid'
+              ) {
+                state.currentOrderId =
+                  attempt.orderId;
+
+                return {
+                  order:
+                    data.order,
+
+                  alreadyPaid:
+                    true
+                };
+              }
+
+              if (
+                status ===
+                'pending_payment'
+              ) {
+                state.currentOrderId =
+                  attempt.orderId;
+
+                return {
+                  order:
+                    data.order,
+
+                  alreadyPaid:
+                    false
+                };
+              }
+
+              clearAttempt(
+                state.cycle
+              );
+
+              return resolveCheckoutOrder();
+            }
+
+          ).catch(
+            function (e) {
+              if (
+                e.status === 404
+              ) {
+                clearAttempt(
+                  state.cycle
+                );
+
+                return resolveCheckoutOrder();
+              }
+
+              throw e;
+            }
+          );
+        }
+
+        return apiJson(
+          '/api/billing/checkout',
+          {
+            method:
+              'POST',
+
+            headers: {
+              'Content-Type':
+                'application/json',
+
+              'Idempotency-Key':
+                attempt.key
+            },
+
+            body:
+              JSON.stringify({
+                billingCycle:
+                  state.cycle
+              })
+          }
+
+        ).then(
+          function (data) {
+            var orderId =
+              data.order &&
+              data.order.orderId;
+
+            if (!orderId) {
+              throw new Error(
+                'تعذّر قراءة رقم طلب التجديد.'
+              );
+            }
+
+            attempt.orderId =
+              orderId;
+
+            writeAttempt(
+              state.cycle,
+              attempt
+            );
+
+            state.currentOrderId =
+              orderId;
+
+            return {
+              order:
+                data.order,
+
+              alreadyPaid:
+                false
+            };
+          }
+        );
+      }
+
+      function checkSubscriptionAndRedirect() {
+        return apiJson(
+          '/api/subscription/me'
+
+        ).then(
+          function (sub) {
+
+            if (
+              sub.effectiveStatus ===
+                'active' ||
+              sub.effectiveStatus ===
+                'trial' ||
+              sub.effectiveStatus ===
+                'grace'
+            ) {
+              window.location
+                .assign(
+                  '/dashboard.html'
+                );
+
+              return true;
+            }
+
+            return false;
+          }
+        );
+      }
+
+      function checkCurrentPayment() {
+        var orderId =
+          state.currentOrderId;
+
+        if (!orderId) {
+          setAction(
+            'لا يوجد طلب دفع جارٍ للتحقق منه.',
+            'error'
+          );
+
+          return;
+        }
+
+        el.checkBtn.disabled =
+          true;
+
+        el.checkBtn.textContent =
+          'جارٍ التحقق…';
+
+        readOrder(
+          orderId
+        ).then(
+          function (data) {
+            var status =
+              String(
+                data.order &&
+                data.order.status ||
+                ''
+              )
+                .toLowerCase();
+
+            if (
+              status !== 'paid'
+            ) {
+              setAction(
+                'لم يصل تأكيد الدفع إلى مُرَبِّيك حتى الآن. يمكنك المحاولة مرة أخرى بعد تأكيد العملية.',
+                ''
+              );
+
+              return false;
+            }
+
+            return checkSubscriptionAndRedirect()
+              .then(
+                function (
+                  redirected
+                ) {
+                  if (
+                    !redirected
+                  ) {
+                    setAction(
+                      'تم تأكيد الدفع، لكن تعذّر التحقق من تفعيل الاشتراك الآن. أعد المحاولة.',
+                      'error'
+                    );
+                  }
+
+                  return redirected;
+                }
+              );
+          }
+
+        ).catch(
+          function (e) {
+            setAction(
+              e.message ||
+              'تعذّر التحقق من حالة الدفع الآن.',
+
+              'error'
+            );
+          }
+
+        ).finally(
+          function () {
+            el.checkBtn.disabled =
+              false;
+
+            el.checkBtn.textContent =
+              'التحقق من حالة الدفع';
+          }
+        );
+      }
+
+      function handleNextAction(
+        nextAction,
+        orderId
+      ) {
+        var action =
+          nextAction || {};
+
+        var type =
+          String(
+            action.type || ''
+          )
+            .toLowerCase();
+
+        if (
+          type ===
+          'manual_confirmation'
+        ) {
+          var message =
+            String(
+              action.message ||
+              'أكمل الدفع ثم تحقق من حالة العملية.'
+            );
+
+          setAction(
+            message +
+            ' رقم الطلب: ' +
+            orderId,
+            ''
+          );
+
+          el.checkBtn
+            .classList
+            .remove(
+              'hidden'
+            );
+
+          return;
+        }
+
+        if (
+          (
+            type === 'redirect' ||
+            type === 'redirect_url' ||
+            type === 'open_url'
+          ) &&
+          action.url
+        ) {
+          window.location
+            .assign(
+              String(
+                action.url
+              )
+            );
+
+          return;
+        }
+
+        setAction(
+          'تم إنشاء طلب التجديد، لكن تعذّر تحديد الخطوة التالية للدفع.',
+          'error'
+        );
+      }
+
+      function startPayment() {
+        if (
+          state.busy ||
+          !state.provider
+        ) {
+          return;
+        }
+
+        setBusy(true);
+
+        setAction(
+          '',
+          ''
+        );
+
+        resolveCheckoutOrder()
+          .then(
+            function (
+              resolved
+            ) {
+              if (
+                resolved
+                  .alreadyPaid
+              ) {
+                return checkSubscriptionAndRedirect()
+                  .then(
+                    function () {
+                      return null;
+                    }
+                  );
+              }
+
+              var orderId =
+                resolved.order
+                  .orderId;
+
+              state.currentOrderId =
+                orderId;
+
+              return apiJson(
+                '/api/billing/checkout/' +
+                encodeURIComponent(
+                  orderId
+                ) +
+                '/start-payment',
+
+                {
+                  method:
+                    'POST',
+
+                  headers: {
+                    'Content-Type':
+                      'application/json'
+                  },
+
+                  body:
+                    JSON.stringify({
+                      provider:
+                        state.provider
+                    })
+                }
+              );
+            }
+          )
+          .then(
+            function (data) {
+              if (!data) {
+                return;
+              }
+
+              handleNextAction(
+                data.nextAction,
+
+                data.order &&
+                data.order.orderId ||
+                state.currentOrderId
+              );
+            }
+          )
+          .catch(
+            function (e) {
+              setAction(
+                e.message ||
+                'تعذّر بدء عملية الدفع الآن.',
+
+                'error'
+              );
+            }
+          )
+          .finally(
+            function () {
+              setBusy(false);
+            }
+          );
+      }
+
+      el.monthlyPlan
+        .addEventListener(
+          'click',
+          function () {
+            selectCycle(
+              'monthly'
+            );
+          }
+        );
+
+      el.annualPlan
+        .addEventListener(
+          'click',
+          function () {
+            selectCycle(
+              'annual'
+            );
+          }
+        );
+
+      el.continueBtn
+        .addEventListener(
+          'click',
+          startPayment
+        );
+
+      el.checkBtn
+        .addEventListener(
+          'click',
+          checkCurrentPayment
+        );
+
+      loadPage();
+    }());
+  </script>
 </body>
 </html>`);
 
@@ -73615,7 +75016,6 @@ app.get(
     }
   }
 );
-
 const PUBLIC_HTML_PAGES_SRV = new Set([
   '/index.html',
   '/login.html',
