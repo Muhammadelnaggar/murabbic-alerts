@@ -72138,7 +72138,666 @@ function adminPortalNoticeSrv(raw) {
       )
   };
 }
+function adminPortalBillingCycleLabelSrv(raw) {
+  const cycle = billingNormalizeCycleSrv(raw);
 
+  if (cycle === 'monthly') return 'شهري';
+  if (cycle === 'annual') return 'سنوي';
+
+  return 'غير محدد';
+}
+
+function adminPortalBillingMoneySrv(
+  amountRaw,
+  currencyRaw
+) {
+  const amount = Number(amountRaw);
+  const currency =
+    String(currencyRaw || '')
+      .trim()
+      .toUpperCase();
+
+  if (
+    !Number.isFinite(amount) ||
+    !/^[A-Z]{3}$/.test(currency)
+  ) {
+    return '—';
+  }
+
+  try {
+    return new Intl.NumberFormat(
+      'ar-EG',
+      {
+        style: 'currency',
+        currency
+      }
+    ).format(amount);
+
+  } catch (_) {
+    return `${amount.toFixed(2)} ${currency}`;
+  }
+}
+
+async function adminPortalPendingBillingOrdersSrv() {
+  if (!db) {
+    throw new Error(
+      'billing_firestore_unavailable'
+    );
+  }
+
+  const snap =
+    await db
+      .collection('billing_orders')
+      .where(
+        'status',
+        '==',
+        'pending_payment'
+      )
+      .limit(100)
+      .get();
+
+  const orders =
+    snap.docs.map(doc => ({
+      orderId: doc.id,
+      ...(doc.data() || {})
+    }));
+
+  const userIds = [
+    ...new Set(
+      orders
+        .map(order =>
+          String(
+            order?.userId || ''
+          ).trim()
+        )
+        .filter(Boolean)
+    )
+  ];
+
+  const profiles =
+    new Map(
+      await Promise.all(
+        userIds.map(
+          async userId => {
+            const profileSnap =
+              await db
+                .collection('users')
+                .doc(userId)
+                .get();
+
+            return [
+              userId,
+              profileSnap.exists
+                ? (profileSnap.data() || {})
+                : {}
+            ];
+          }
+        )
+      )
+    );
+
+  return orders
+    .map(order => {
+      const userId =
+        String(
+          order?.userId || ''
+        ).trim();
+
+      const profile =
+        profiles.get(userId) || {};
+
+      return {
+        ...order,
+        userId,
+
+        customerName:
+          profile.name ||
+          profile.displayName ||
+          profile.fullName ||
+          '',
+
+        customerPhone:
+          profile.phone ||
+          profile.phoneNumber ||
+          profile.phoneKey ||
+          ''
+      };
+    })
+    .sort(
+      (a, b) =>
+        (
+          subscriptionTimestampMsSrv(
+            b?.updatedAt ||
+            b?.createdAt
+          ) || 0
+        ) -
+        (
+          subscriptionTimestampMsSrv(
+            a?.updatedAt ||
+            a?.createdAt
+          ) || 0
+        )
+    );
+}
+
+async function adminPortalLoadPendingManualOrderSrv(
+  orderIdRaw
+) {
+  const orderId =
+    String(orderIdRaw || '')
+      .trim()
+      .toLowerCase();
+
+  if (
+    !/^ord_[a-f0-9]{40}$/
+      .test(orderId)
+  ) {
+    throw billingPublicErrorSrv(
+      404,
+      'billing_order_not_found',
+      '❌ طلب الاشتراك غير موجود.'
+    );
+  }
+
+  const snap =
+    await db
+      .collection('billing_orders')
+      .doc(orderId)
+      .get();
+
+  if (!snap.exists) {
+    throw billingPublicErrorSrv(
+      404,
+      'billing_order_not_found',
+      '❌ طلب الاشتراك غير موجود.'
+    );
+  }
+
+  const order =
+    snap.data() || {};
+
+  const status =
+    String(
+      order?.status || ''
+    )
+      .trim()
+      .toLowerCase();
+
+  const provider =
+    String(
+      order?.paymentProvider || ''
+    )
+      .trim()
+      .toLowerCase();
+
+  if (status === 'paid') {
+    throw billingPublicErrorSrv(
+      409,
+      'billing_order_already_paid',
+      'ℹ️ طلب الاشتراك مدفوع بالفعل.'
+    );
+  }
+
+  if (
+    status !== 'pending_payment'
+  ) {
+    throw billingPublicErrorSrv(
+      409,
+      'billing_order_not_payable',
+      '❌ طلب الاشتراك الحالي غير قابل للدفع.'
+    );
+  }
+
+  if (provider !== 'manual') {
+    throw billingPublicErrorSrv(
+      409,
+      'billing_payment_provider_mismatch',
+      provider
+        ? '❌ هذا الطلب لا يستخدم الدفع اليدوي.'
+        : '❌ لم يبدأ العميل وسيلة الدفع لهذا الطلب بعد.'
+    );
+  }
+
+  const currency =
+    String(
+      order?.currency || ''
+    )
+      .trim()
+      .toUpperCase();
+
+  const amountMinor =
+    Number.isSafeInteger(
+      Number(order?.amountMinor)
+    )
+      ? Number(order.amountMinor)
+      : billingAmountMinorSrv(
+          order?.amount,
+          currency
+        );
+
+  if (
+    !/^[A-Z]{3}$/.test(currency) ||
+    !Number.isSafeInteger(amountMinor) ||
+    amountMinor <= 0
+  ) {
+    throw billingPublicErrorSrv(
+      409,
+      'billing_order_amount_invalid',
+      '❌ قيمة طلب الاشتراك غير صالحة للتأكيد.'
+    );
+  }
+
+  return {
+    orderId,
+    order,
+    currency,
+    amountMinor
+  };
+}
+
+function adminPortalBillingPageSrv({
+  orders = [],
+  csrfToken = '',
+  notice = null
+} = {}) {
+  const esc =
+    adminPortalEscapeHtmlSrv;
+
+  const noticeHtml =
+    notice?.message
+      ? `
+        <div
+          class="
+            notice
+            notice-${
+              notice.type === 'ok'
+                ? 'ok'
+                : 'err'
+            }
+          "
+          role="status"
+        >
+          ${esc(notice.message)}
+        </div>
+      `
+      : '';
+
+  const ordersHtml =
+    orders.length
+      ? orders
+          .map(order => {
+            const provider =
+              String(
+                order?.paymentProvider || ''
+              )
+                .trim()
+                .toLowerCase();
+
+            const billableFemales =
+              Number(
+                order
+                  ?.pricingSnapshot
+                  ?.billableFemales
+              );
+
+            const actionHtml =
+              provider === 'manual'
+                ? `
+                  <form
+                    method="post"
+                    action="/admin/billing/manual/settle"
+                    class="confirm-form"
+                  >
+                    <input
+                      type="hidden"
+                      name="adminCsrfToken"
+                      value="${esc(csrfToken)}"
+                    >
+
+                    <input
+                      type="hidden"
+                      name="orderId"
+                      value="${esc(
+                        order.orderId || ''
+                      )}"
+                    >
+
+                    <label class="field">
+                      <span>
+                        مرجع الدفع
+                        <small>
+                          رقم التحويل أو الإيصال أو المرجع البنكي
+                        </small>
+                      </span>
+
+                      <input
+                        name="providerReference"
+                        type="text"
+                        maxlength="200"
+                        autocomplete="off"
+                        required
+                        placeholder="مثال: BANK-20260810-001"
+                      >
+                    </label>
+
+                    <label class="decision-check">
+                      <input
+                        name="confirmDecision"
+                        type="checkbox"
+                        value="yes"
+                        required
+                      >
+
+                      <span>
+                        أؤكد أنني تحققت فعليًا
+                        من استلام قيمة هذا الطلب.
+                      </span>
+                    </label>
+
+                    <div class="modal-actions">
+                      <button
+                        class="btn btn-primary"
+                        type="submit"
+                      >
+                        تأكيد استلام الدفع وتفعيل الاشتراك
+                      </button>
+                    </div>
+                  </form>
+                `
+                : `
+                  <div class="protected-admin">
+                    ${
+                      provider
+                        ? `هذا الطلب ينتظر تأكيد مزود الدفع: ${esc(provider)}`
+                        : 'الطلب أُنشئ، لكن العميل لم يبدأ وسيلة الدفع بعد.'
+                    }
+                  </div>
+                `;
+
+            return `
+              <article class="account-card">
+
+                <div class="account-top">
+
+                  <div>
+                    <div class="account-name">
+                      ${esc(
+                        order.customerName ||
+                        'حساب بدون اسم'
+                      )}
+                    </div>
+
+                    <div class="account-phone">
+                      ${esc(
+                        order.customerPhone ||
+                        order.userId ||
+                        '—'
+                      )}
+                    </div>
+                  </div>
+
+                  <span
+                    class="
+                      status-badge
+                      status-unknown
+                    "
+                  >
+                    دفع معلّق
+                  </span>
+
+                </div>
+
+                <div class="details-grid">
+
+                  <div class="detail">
+                    <div class="detail-label">
+                      رقم الطلب
+                    </div>
+
+                    <div class="detail-value">
+                      ${esc(
+                        order.orderId ||
+                        '—'
+                      )}
+                    </div>
+                  </div>
+
+                  <div class="detail">
+                    <div class="detail-label">
+                      دورة الاشتراك
+                    </div>
+
+                    <div class="detail-value">
+                      ${esc(
+                        adminPortalBillingCycleLabelSrv(
+                          order.billingCycle
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  <div class="detail">
+                    <div class="detail-label">
+                      القيمة
+                    </div>
+
+                    <div class="detail-value">
+                      ${esc(
+                        adminPortalBillingMoneySrv(
+                          order.amount,
+                          order.currency
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  <div class="detail">
+                    <div class="detail-label">
+                      وسيلة الدفع
+                    </div>
+
+                    <div class="detail-value">
+                      ${esc(
+                        provider === 'manual'
+                          ? 'تحويل / اتفاق مباشر'
+                          : (
+                              provider ||
+                              'لم تبدأ بعد'
+                            )
+                      )}
+                    </div>
+                  </div>
+
+                  <div class="detail">
+                    <div class="detail-label">
+                      الإناث المحتسبة
+                    </div>
+
+                    <div class="detail-value">
+                      ${esc(
+                        Number.isFinite(
+                          billableFemales
+                        )
+                          ? billableFemales
+                          : '—'
+                      )}
+                    </div>
+                  </div>
+
+                  <div class="detail">
+                    <div class="detail-label">
+                      تاريخ إنشاء الطلب
+                    </div>
+
+                    <div class="detail-value">
+                      ${esc(
+                        adminPortalDateSrv(
+                          subscriptionIsoSrv(
+                            order?.createdAt
+                          )
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
+                ${actionHtml}
+
+              </article>
+            `;
+          })
+          .join('')
+      : `
+        <div class="empty-state">
+
+          <div class="empty-icon">
+            ✓
+          </div>
+
+          <h2>
+            لا توجد طلبات دفع معلقة
+          </h2>
+
+          <p>
+            كل طلبات الدفع الحالية تمت تسويتها
+            أو لم تُنشأ بعد.
+          </p>
+
+        </div>
+      `;
+
+  return `<!doctype html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="utf-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1,viewport-fit=cover"
+  >
+
+  <meta
+    name="robots"
+    content="noindex,nofollow,noarchive"
+  >
+
+  <title>
+    إدارة المدفوعات — مُرَبِّيك
+  </title>
+
+  <link
+    rel="stylesheet"
+    href="/css/admin-accounts.css?v=20260808b"
+  >
+</head>
+
+<body>
+
+  <main class="confirm-shell">
+
+    <section class="confirm-card">
+
+      <div class="eyebrow">
+        بوابة إدارة مُرَبِّيك
+      </div>
+
+      <h1>
+        طلبات الدفع المعلقة
+      </h1>
+
+      <p>
+        راجع بيانات الطلب ومرجع التحويل قبل التأكيد.
+        لا يتم تفعيل الاشتراك إلا بعد اعتماد الدفع من هنا.
+      </p>
+
+      ${noticeHtml}
+
+      <div class="modal-actions">
+        <a
+          class="btn btn-ghost"
+          href="/admin/accounts"
+        >
+          العودة إلى إدارة الحسابات
+        </a>
+      </div>
+
+      ${ordersHtml}
+
+    </section>
+
+  </main>
+
+</body>
+</html>`;
+}
+
+async function adminPortalRenderBillingSrv(
+  req,
+  res,
+  options = {}
+) {
+  let orders = [];
+  let notice =
+    options.notice || null;
+
+  let statusCode =
+    Number(
+      options.statusCode || 200
+    );
+
+  try {
+    orders =
+      await adminPortalPendingBillingOrdersSrv();
+
+  } catch (e) {
+    console.error(
+      'admin billing queue load failed:',
+      e.message || e
+    );
+
+    statusCode = 500;
+
+    notice = {
+      type: 'err',
+      message:
+        'تعذّر تحميل طلبات الدفع المعلقة الآن.'
+    };
+  }
+
+  if (
+    !notice &&
+    String(
+      req.query?.notice || ''
+    )
+      .trim()
+      .toLowerCase() ===
+      'confirmed'
+  ) {
+    notice = {
+      type: 'ok',
+      message:
+        '✅ تم تأكيد الدفع وتفعيل الاشتراك بنجاح.'
+    };
+  }
+
+  return res
+    .status(statusCode)
+    .type('html')
+    .send(
+      adminPortalBillingPageSrv({
+        orders,
+
+        csrfToken:
+          adminPortalCsrfTokenSrv(
+            req
+          ),
+
+        notice
+      })
+    );
+}
 function adminPortalAccountCardSrv(
   account = {},
   csrfToken = '',
@@ -72551,7 +73210,37 @@ async function adminPortalRenderAccountsSrv(
       ? payload.accounts
       : [];
 
-  const cardsHtml =
+   const billingEntryHtml = `
+    <article class="account-card">
+
+      <div class="account-top">
+        <div>
+
+          <div class="account-name">
+            إدارة المدفوعات
+          </div>
+
+          <div class="account-phone">
+            مراجعة طلبات التجديد المعلقة
+            واعتماد التحويلات اليدوية.
+          </div>
+
+        </div>
+      </div>
+
+      <div class="account-actions">
+        <a
+          class="btn btn-primary"
+          href="/admin/billing"
+        >
+          فتح طلبات الدفع المعلقة
+        </a>
+      </div>
+
+    </article>
+  `;
+
+  const accountCardsHtml =
     accounts.length
       ? accounts
           .map(
@@ -72565,6 +73254,7 @@ async function adminPortalRenderAccountsSrv(
           .join('')
       : `
         <div class="empty-state">
+
           <div class="empty-icon">
             ⌕
           </div>
@@ -72577,8 +73267,12 @@ async function adminPortalRenderAccountsSrv(
             غيّر البحث أو فلتر الحالة
             ثم أعد المحاولة.
           </p>
+
         </div>
       `;
+
+  const cardsHtml =
+    `${billingEntryHtml}${accountCardsHtml}`;
 
   const nextCursor =
     String(
@@ -73065,7 +73759,169 @@ function adminPortalConfirmationPageSrv({
 </body>
 </html>`;
 }
+app.get(
+  '/admin/billing',
 
+  ensureAccountAdminClaimSrv,
+  adminSensitiveHeadersSrv,
+  adminPortalPageHeadersSrv,
+
+  async (req, res) => {
+    try {
+      return await adminPortalRenderBillingSrv(
+        req,
+        res
+      );
+
+    } catch (e) {
+      console.error(
+        'admin billing render failed:',
+        e.message || e
+      );
+
+      return res
+        .status(500)
+        .send(
+          'تعذّر فتح إدارة المدفوعات الآن.'
+        );
+    }
+  }
+);
+
+app.post(
+  '/admin/billing/manual/settle',
+
+  ensureAccountAdminClaimSrv,
+  adminSensitiveHeadersSrv,
+  adminPortalPageHeadersSrv,
+  adminPortalFormGuardSrv,
+
+  async (req, res) => {
+    try {
+      if (!db) {
+        return await adminPortalRenderBillingSrv(
+          req,
+          res,
+          {
+            statusCode: 503,
+
+            notice: {
+              type: 'err',
+              message:
+                '❌ خدمة الدفع غير متاحة الآن.'
+            }
+          }
+        );
+      }
+
+      const providerReference =
+        billingNormalizeProviderReferenceSrv(
+          req.body?.providerReference
+        );
+
+      if (!providerReference) {
+        return await adminPortalRenderBillingSrv(
+          req,
+          res,
+          {
+            statusCode: 400,
+
+            notice: {
+              type: 'err',
+              message:
+                '❌ أدخل مرجعًا صحيحًا للدفع المؤكد.'
+            }
+          }
+        );
+      }
+
+      if (
+        String(
+          req.body?.confirmDecision || ''
+        ).trim() !== 'yes'
+      ) {
+        return await adminPortalRenderBillingSrv(
+          req,
+          res,
+          {
+            statusCode: 400,
+
+            notice: {
+              type: 'err',
+              message:
+                '❌ أكد أنك تحققت فعليًا من استلام قيمة الطلب.'
+            }
+          }
+        );
+      }
+
+      const selected =
+        await adminPortalLoadPendingManualOrderSrv(
+          req.body?.orderId
+        );
+
+      const actorUid =
+        String(
+          req.accountAdminAuth?.uid ||
+          req.accountAdminAuth?.sub ||
+          ''
+        ).trim();
+
+      await billingApplyVerifiedPaymentSrv({
+        orderId:
+          selected.orderId,
+
+        provider:
+          'manual',
+
+        providerReference,
+
+        verifiedAmountMinor:
+          selected.amountMinor,
+
+        verifiedCurrency:
+          selected.currency,
+
+        verificationSource:
+          'server:/admin/billing/manual/settle',
+
+        actorUid
+      });
+
+      return res.redirect(
+        303,
+        '/admin/billing?notice=confirmed'
+      );
+
+    } catch (e) {
+      console.error(
+        'admin billing manual settle failed:',
+        e.message || e
+      );
+
+      return await adminPortalRenderBillingSrv(
+        req,
+        res,
+        {
+          statusCode:
+            Number(
+              e?.publicStatus || 500
+            ),
+
+          notice: {
+            type: 'err',
+
+            message:
+              String(
+                e?.publicMessage ||
+                '❌ تعذّر تأكيد الدفع الآن.'
+              )
+          }
+        }
+      );
+    }
+  }
+);
 app.get(
   '/admin/accounts',
 
