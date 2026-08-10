@@ -5379,7 +5379,24 @@ app.post("/api/add-animal/save", requireUserId, async (req, res) => {
     source: "server:/api/add-animal/save"
   }
 );
+ await subscriptionLifecycleMarkOnceSrv({
+  userId: uid,
+  milestone: 'herd_setup_started',
+  source: 'server:/api/add-animal/save',
 
+  details: {
+    entryMethod: 'single',
+
+    firstAnimalNumber:
+      numberStr,
+
+    firstAnimalEntryType:
+      payload.entryType || null,
+
+    firstAnimalCollection:
+      collectionName || null
+  }
+});
     if (typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "add_animal_save");
     }
@@ -10393,7 +10410,23 @@ ops++;
     if (ops > 0) {
       await batch.commit();
     }
+    if (saved.length) {
+  await subscriptionLifecycleMarkOnceSrv({
+    userId: uid,
+    milestone: 'herd_setup_started',
+    source: 'server:/api/add-animal/import',
 
+    details: {
+      entryMethod: 'add_animal_import',
+
+      importedAnimalsCount:
+        saved.length,
+
+      firstAnimalNumber:
+        saved[0]?.animalNumber || null
+    }
+  });
+}
     if (saved.length && typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "add_animal_import");
     }
@@ -13364,7 +13397,34 @@ if (missingAnimalTypeCount > 0) {
           writeSet,
           sourceProfile
         });
+      if (
+  saved.alreadyCompleted !== true &&
+  saved.insertedAnimalsCount > 0
+) {
+  await subscriptionLifecycleMarkOnceSrv({
+    userId: uid,
+    milestone: 'herd_setup_started',
 
+    source:
+      'server:/api/herd-import-v2/save-operational',
+
+    details: {
+      entryMethod: 'herd_import_v2',
+
+      importedAnimalsCount:
+        saved.insertedAnimalsCount,
+
+      importedMothersCount:
+        saved.insertedMothersCount,
+
+      importedFollowersCount:
+        saved.insertedFollowersCount,
+
+      importId:
+        persistencePlan.importId || null
+    }
+  });
+}
       if (
         typeof scheduleGroupsRebuildSrv ===
         "function"
@@ -13535,7 +13595,31 @@ if (gate.formData.entryType === "followers") {
       await batch.commit();
     }
 
-   
+   if (insertedAnimalsCount > 0) {
+  await subscriptionLifecycleMarkOnceSrv({
+    userId: uid,
+    milestone: 'herd_setup_started',
+
+    source:
+      'server:/api/herd-import-v2/save-operational',
+
+    details: {
+      entryMethod: 'herd_import_v2',
+
+      importedAnimalsCount:
+        insertedAnimalsCount,
+
+      importedMothersCount:
+        insertedMothersCount,
+
+      importedFollowersCount:
+        insertedFollowersCount,
+
+      importId:
+        persistencePlan.importId || null
+    }
+  });
+}
 
     if ((insertedAnimalsCount || updatedAnimalsCount || savedSeedEventsCount) && typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "herd_import_v2_save_operational");
@@ -65106,7 +65190,129 @@ async function subscriptionCreateTrialIfMissingSrv({
     };
   });
 }
+async function subscriptionLifecycleMarkOnceSrv({
+  userId,
+  milestone,
+  source = 'server:subscription-lifecycle',
+  details = {}
+} = {}) {
+  const uid = String(userId || '').trim();
+  const name = String(milestone || '').trim();
 
+  if (!db || !uid || !name) {
+    return {
+      created: false,
+      skipped: true
+    };
+  }
+
+  const subscriptionRef =
+    db.collection('subscriptions').doc(uid);
+
+  const milestoneRef =
+    db
+      .collection('subscription_lifecycle_milestones')
+      .doc(`${uid}__${name}`);
+
+  const safeDetails =
+    details &&
+    typeof details === 'object' &&
+    !Array.isArray(details)
+      ? details
+      : {};
+
+  try {
+    return await db.runTransaction(async tx => {
+      const subscriptionSnap =
+        await tx.get(subscriptionRef);
+
+      if (!subscriptionSnap.exists) {
+        return {
+          created: false,
+          skipped: true
+        };
+      }
+
+      const milestoneSnap =
+        await tx.get(milestoneRef);
+
+      if (milestoneSnap.exists) {
+        return {
+          created: false,
+          skipped: false
+        };
+      }
+
+      const subscription =
+        subscriptionSnap.data() || {};
+
+      tx.set(
+        milestoneRef,
+        {
+          ...safeDetails,
+
+          userId: uid,
+
+          ownerUid:
+            String(
+              subscription?.ownerUid || uid
+            ).trim() || uid,
+
+          milestone: name,
+
+          milestoneVersion:
+            'subscription-lifecycle-v1',
+
+          subscriptionStatus:
+            String(subscription?.status || '')
+              .trim()
+              .toLowerCase() ||
+            null,
+
+          effectiveSubscriptionStatus:
+            subscriptionEffectiveStatusSrv(
+              subscription
+            ),
+
+          trialStartedAt:
+            subscription?.trialStartedAt || null,
+
+          trialEndsAt:
+            subscription?.trialEndsAt || null,
+
+          occurredAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+
+          source:
+            String(source || '').trim() || null
+        },
+        { merge: false }
+      );
+
+      return {
+        created: true,
+        skipped: false
+      };
+    });
+
+  } catch (e) {
+    console.warn(
+      'subscription lifecycle milestone failed:',
+      uid,
+      name,
+      e.message || e
+    );
+
+    return {
+      created: false,
+      skipped: false,
+      error:
+        String(e?.message || e || '').trim() ||
+        'subscription_lifecycle_write_failed'
+    };
+  }
+}
 function subscriptionPublicStateSrv(
   subscription = {},
   nowMs = Date.now()
