@@ -46,7 +46,17 @@ function readJson(p, fallback = []) {
 }
 
 // ===== Middleware =====
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, _res, buf) => {
+    const p = String(req.originalUrl || req.url || '')
+      .split('?')[0].trim().toLowerCase();
+
+    if (p.startsWith('/api/billing/webhooks/')) {
+      req.billingRawBody = Buffer.from(buf);
+    }
+  }
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 
@@ -64944,7 +64954,91 @@ function billingSha256Srv(v) {
     )
     .digest('hex');
 }
+const BILLING_CURRENCY_EXPONENTS_SRV = Object.freeze({
+  EGP: 2,
+  USD: 2
+});
 
+function billingCurrencyExponentSrv(currencyRaw) {
+  const currency =
+    String(currencyRaw || '')
+      .trim()
+      .toUpperCase();
+
+  const exponent =
+    BILLING_CURRENCY_EXPONENTS_SRV[currency];
+
+  return Number.isInteger(exponent)
+    ? exponent
+    : null;
+}
+
+function billingAmountMinorSrv(amountRaw, currencyRaw) {
+  const amount =
+    Number(amountRaw);
+
+  const exponent =
+    billingCurrencyExponentSrv(
+      currencyRaw
+    );
+
+  if (
+    !Number.isFinite(amount) ||
+    amount <= 0 ||
+    exponent === null
+  ) {
+    return null;
+  }
+
+  const minor =
+    Math.round(
+      (amount + Number.EPSILON) *
+      (10 ** exponent)
+    );
+
+  return Number.isSafeInteger(minor) &&
+    minor > 0
+      ? minor
+      : null;
+}
+
+function billingNormalizeProviderSrv(v) {
+  const provider =
+    String(v || '')
+      .trim()
+      .toLowerCase();
+
+  return /^[a-z0-9][a-z0-9_-]{1,39}$/
+    .test(provider)
+      ? provider
+      : '';
+}
+
+function billingNormalizeProviderReferenceSrv(v) {
+  const ref =
+    String(v || '').trim();
+
+  if (
+    ref.length < 3 ||
+    ref.length > 200 ||
+    /[\u0000-\u001f\u007f]/.test(ref)
+  ) {
+    return '';
+  }
+
+  return ref;
+}
+
+function billingPaymentIdSrv(
+  provider,
+  providerReference
+) {
+  return `pay_${
+    billingSha256Srv(
+      `${provider}|${providerReference}`
+    ).slice(0, 40)
+  }`;
+}
 function billingOrderIdSrv(
   userId,
   idempotencyKey
@@ -65084,20 +65178,43 @@ async function billingBuildPricingSnapshotSrv(
     );
   }
 
-  return {
-    billingCycle:
-      cycle,
+ const currency =
+  String(price.currency || '')
+    .trim()
+    .toUpperCase();
 
+const currencyExponent =
+  billingCurrencyExponentSrv(
+    currency
+  );
+
+const amountMinor =
+  billingAmountMinorSrv(
     amount,
+    currency
+  );
 
-    currency:
-      String(
-        price.currency || ''
-      )
-        .trim()
-        .toUpperCase(),
+if (
+  currencyExponent === null ||
+  amountMinor === null
+) {
+  throw billingPublicErrorSrv(
+    503,
+    'billing_currency_unsupported',
+    '❌ تعذّر تجهيز عملة الاشتراك للدفع الآن. حاول مرة أخرى لاحقًا.'
+  );
+}
 
-    pricingSnapshot: {
+return {
+  billingCycle: cycle,
+
+  amount,
+  amountMinor,
+  currencyExponent,
+
+  currency,
+
+  pricingSnapshot: {
       country,
 
       pricingRegion,
@@ -65211,14 +65328,33 @@ function billingPublicOrderSrv(
         .toUpperCase() ||
       null,
 
-    amount:
-      Number.isFinite(
-        Number(order?.amount)
-      )
-        ? Number(order.amount)
-        : null,
+   amount:
+  Number.isFinite(
+    Number(order?.amount)
+  )
+    ? Number(order.amount)
+    : null,
 
-    pricingVersion:
+amountMinor:
+  Number.isSafeInteger(
+    Number(order?.amountMinor)
+  )
+    ? Number(order.amountMinor)
+    : billingAmountMinorSrv(
+        order?.amount,
+        order?.currency
+      ),
+
+currencyExponent:
+  Number.isInteger(
+    Number(order?.currencyExponent)
+  )
+    ? Number(order.currencyExponent)
+    : billingCurrencyExponentSrv(
+        order?.currency
+      ),
+
+pricingVersion:
       String(
         order
           ?.pricingSnapshot
@@ -65465,19 +65601,24 @@ async function billingCreateCheckoutOrderSrv({
         billingCycle:
           quote.billingCycle,
 
-        currency:
-          quote.currency,
+       currency:
+  quote.currency,
 
-        amount:
-          quote.amount,
+amount:
+  quote.amount,
 
-        pricingSnapshot: {
-          ...quote.pricingSnapshot,
+amountMinor:
+  quote.amountMinor,
 
-          capturedAt:
-            nowTs
-        },
+currencyExponent:
+  quote.currencyExponent,
 
+pricingSnapshot: {
+  ...quote.pricingSnapshot,
+
+  capturedAt:
+    nowTs
+},
         subscriptionStatusAtCheckout:
           String(
             subscription?.status ||
@@ -65758,6 +65899,972 @@ app.get(
 
           message:
             '❌ تعذّر قراءة عملية الاشتراك الآن. حاول مرة أخرى.'
+        });
+    }
+  }
+);
+// ============================================================
+//      BILLING PAYMENTS — VERIFIED SETTLEMENT CORE
+// ============================================================
+function billingAddCalendarMonthsSrv(
+  startMsRaw,
+  monthsRaw
+) {
+  const startMs =
+    Number(startMsRaw);
+
+  const months =
+    Number(monthsRaw);
+
+  if (
+    !Number.isFinite(startMs) ||
+    !Number.isInteger(months) ||
+    months < 1
+  ) {
+    return null;
+  }
+
+  const d =
+    new Date(startMs);
+
+  if (
+    !Number.isFinite(d.getTime())
+  ) {
+    return null;
+  }
+
+  const day =
+    d.getUTCDate();
+
+  const target =
+    new Date(
+      Date.UTC(
+        d.getUTCFullYear(),
+        d.getUTCMonth() + months,
+        1,
+        d.getUTCHours(),
+        d.getUTCMinutes(),
+        d.getUTCSeconds(),
+        d.getUTCMilliseconds()
+      )
+    );
+
+  const lastDay =
+    new Date(
+      Date.UTC(
+        target.getUTCFullYear(),
+        target.getUTCMonth() + 1,
+        0
+      )
+    ).getUTCDate();
+
+  target.setUTCDate(
+    Math.min(
+      day,
+      lastDay
+    )
+  );
+
+  return target.getTime();
+}
+
+function billingPaidPeriodMonthsSrv(cycleRaw) {
+  const cycle =
+    billingNormalizeCycleSrv(
+      cycleRaw
+    );
+
+  if (cycle === 'monthly') return 1;
+  if (cycle === 'annual') return 12;
+
+  return 0;
+}
+
+function billingEntitlementAfterPaymentSrv({
+  subscription = {},
+  billingCycle,
+  paidAtMs = Date.now()
+} = {}) {
+  const nowMs =
+    Number(paidAtMs);
+
+  const months =
+    billingPaidPeriodMonthsSrv(
+      billingCycle
+    );
+
+  if (
+    !Number.isFinite(nowMs) ||
+    !months
+  ) {
+    throw billingPublicErrorSrv(
+      409,
+      'billing_period_invalid',
+      '❌ تعذّر حساب مدة الاشتراك الجديدة.'
+    );
+  }
+
+  const effectiveStatus =
+    subscriptionEffectiveStatusSrv(
+      subscription,
+      nowMs
+    );
+
+  if (effectiveStatus === 'invalid') {
+    throw billingPublicErrorSrv(
+      409,
+      'billing_subscription_state_invalid',
+      '❌ حالة الاشتراك الحالية غير صالحة للتجديد.'
+    );
+  }
+
+  const trialEndMs =
+    subscriptionTimestampMsSrv(
+      subscription?.trialEndsAt
+    );
+
+  const periodEndMs =
+    subscriptionTimestampMsSrv(
+      subscription?.currentPeriodEnd
+    );
+
+  let anchorMs =
+    nowMs;
+
+  // الدفع المبكر لا يهدر الأيام المتبقية.
+  if (
+    effectiveStatus === 'trial' &&
+    Number.isFinite(trialEndMs) &&
+    trialEndMs > nowMs
+  ) {
+    anchorMs =
+      trialEndMs;
+
+  } else if (
+    (
+      effectiveStatus === 'active' ||
+      effectiveStatus === 'cancelled'
+    ) &&
+    Number.isFinite(periodEndMs) &&
+    periodEndMs > nowMs
+  ) {
+    anchorMs =
+      periodEndMs;
+
+  } else if (
+    effectiveStatus === 'grace' &&
+    Number.isFinite(periodEndMs)
+  ) {
+    const candidateEnd =
+      billingAddCalendarMonthsSrv(
+        periodEndMs,
+        months
+      );
+
+    if (
+      Number.isFinite(candidateEnd) &&
+      candidateEnd > nowMs
+    ) {
+      anchorMs =
+        periodEndMs;
+    }
+  }
+
+  let endMs =
+    billingAddCalendarMonthsSrv(
+      anchorMs,
+      months
+    );
+
+  if (
+    !Number.isFinite(endMs) ||
+    endMs <= nowMs
+  ) {
+    anchorMs =
+      nowMs;
+
+    endMs =
+      billingAddCalendarMonthsSrv(
+        anchorMs,
+        months
+      );
+  }
+
+  if (
+    !Number.isFinite(endMs) ||
+    endMs <= nowMs
+  ) {
+    throw billingPublicErrorSrv(
+      503,
+      'billing_period_compute_failed',
+      '❌ تعذّر حساب مدة الاشتراك الجديدة.'
+    );
+  }
+
+  return {
+    previousEffectiveStatus:
+      effectiveStatus,
+
+    periodStartMs:
+      nowMs,
+
+    entitlementAnchorMs:
+      anchorMs,
+
+    periodEndMs:
+      endMs,
+
+    monthsAdded:
+      months
+  };
+}
+
+async function billingApplyVerifiedPaymentSrv({
+  orderId: orderIdRaw,
+  provider: providerRaw,
+  providerReference: providerReferenceRaw,
+  verifiedAmountMinor: verifiedAmountMinorRaw,
+  verifiedCurrency: verifiedCurrencyRaw,
+  verificationSource =
+    'server:billing_verified_payment',
+  actorUid = null
+} = {}) {
+  if (!db) {
+    throw billingPublicErrorSrv(
+      503,
+      'billing_unavailable',
+      '❌ خدمة الدفع غير متاحة الآن.'
+    );
+  }
+
+  const orderId =
+    String(orderIdRaw || '')
+      .trim()
+      .toLowerCase();
+
+  const provider =
+    billingNormalizeProviderSrv(
+      providerRaw
+    );
+
+  const providerReference =
+    billingNormalizeProviderReferenceSrv(
+      providerReferenceRaw
+    );
+
+  const verifiedAmountMinor =
+    Number(
+      verifiedAmountMinorRaw
+    );
+
+  const verifiedCurrency =
+    String(
+      verifiedCurrencyRaw || ''
+    )
+      .trim()
+      .toUpperCase();
+
+  if (
+    !/^ord_[a-f0-9]{40}$/
+      .test(orderId)
+  ) {
+    throw billingPublicErrorSrv(
+      404,
+      'billing_order_not_found',
+      '❌ طلب الاشتراك غير موجود.'
+    );
+  }
+
+  if (
+    !provider ||
+    !providerReference
+  ) {
+    throw billingPublicErrorSrv(
+      400,
+      'billing_provider_invalid',
+      '❌ بيانات مزود الدفع غير صالحة.'
+    );
+  }
+
+  if (
+    !Number.isSafeInteger(
+      verifiedAmountMinor
+    ) ||
+    verifiedAmountMinor <= 0
+  ) {
+    throw billingPublicErrorSrv(
+      400,
+      'billing_verified_amount_invalid',
+      '❌ قيمة الدفع المؤكدة غير صالحة.'
+    );
+  }
+
+  if (
+    !/^[A-Z]{3}$/
+      .test(verifiedCurrency)
+  ) {
+    throw billingPublicErrorSrv(
+      400,
+      'billing_verified_currency_invalid',
+      '❌ عملة الدفع المؤكدة غير صالحة.'
+    );
+  }
+
+  const paymentId =
+    billingPaymentIdSrv(
+      provider,
+      providerReference
+    );
+
+  const orderRef =
+    db
+      .collection('billing_orders')
+      .doc(orderId);
+
+  const paymentRef =
+    db
+      .collection('billing_payments')
+      .doc(paymentId);
+
+  const eventRef =
+    db
+      .collection('billing_payment_events')
+      .doc(`${paymentId}__paid`);
+
+  return db.runTransaction(
+    async tx => {
+      // كل القراءات قبل الكتابة.
+      const orderSnap =
+        await tx.get(orderRef);
+
+      if (!orderSnap.exists) {
+        throw billingPublicErrorSrv(
+          404,
+          'billing_order_not_found',
+          '❌ طلب الاشتراك غير موجود.'
+        );
+      }
+
+      const order =
+        orderSnap.data() || {};
+
+      const userId =
+        String(
+          order?.userId || ''
+        ).trim();
+
+      if (!userId) {
+        throw billingPublicErrorSrv(
+          409,
+          'billing_order_owner_missing',
+          '❌ طلب الاشتراك غير مرتبط بحساب صالح.'
+        );
+      }
+
+      const subscriptionRef =
+        db
+          .collection('subscriptions')
+          .doc(userId);
+
+      const paymentSnap =
+        await tx.get(paymentRef);
+
+      const subscriptionSnap =
+        await tx.get(
+          subscriptionRef
+        );
+
+      if (!subscriptionSnap.exists) {
+        throw billingPublicErrorSrv(
+          409,
+          'billing_subscription_missing',
+          '❌ اشتراك الحساب غير موجود.'
+        );
+      }
+
+      const subscription =
+        subscriptionSnap.data() || {};
+
+      const orderCurrency =
+        String(
+          order?.currency || ''
+        )
+          .trim()
+          .toUpperCase();
+
+      const orderAmountMinor =
+        Number.isSafeInteger(
+          Number(order?.amountMinor)
+        )
+          ? Number(order.amountMinor)
+          : billingAmountMinorSrv(
+              order?.amount,
+              orderCurrency
+            );
+
+      if (
+        !orderCurrency ||
+        !Number.isSafeInteger(
+          orderAmountMinor
+        ) ||
+        orderAmountMinor <= 0
+      ) {
+        throw billingPublicErrorSrv(
+          409,
+          'billing_order_amount_invalid',
+          '❌ قيمة طلب الاشتراك غير صالحة للتسوية.'
+        );
+      }
+
+      if (
+        verifiedCurrency !==
+          orderCurrency ||
+        verifiedAmountMinor !==
+          orderAmountMinor
+      ) {
+        throw billingPublicErrorSrv(
+          409,
+          'billing_payment_amount_mismatch',
+          '🚫 قيمة أو عملة الدفع لا تطابق طلب الاشتراك.'
+        );
+      }
+
+      if (paymentSnap.exists) {
+        const p =
+          paymentSnap.data() || {};
+
+        const samePayment =
+          String(
+            p?.orderId || ''
+          ).trim() === orderId &&
+
+          String(
+            p?.provider || ''
+          )
+            .trim()
+            .toLowerCase() ===
+            provider &&
+
+          String(
+            p?.providerReference || ''
+          ).trim() ===
+            providerReference &&
+
+          Number(
+            p?.amountMinor
+          ) ===
+            orderAmountMinor &&
+
+          String(
+            p?.currency || ''
+          )
+            .trim()
+            .toUpperCase() ===
+            orderCurrency &&
+
+          String(
+            p?.status || ''
+          )
+            .trim()
+            .toLowerCase() ===
+            'paid';
+
+        if (!samePayment) {
+          throw billingPublicErrorSrv(
+            409,
+            'billing_provider_reference_conflict',
+            '🚫 مرجع الدفع مستخدم بالفعل لعملية أخرى.'
+          );
+        }
+
+        if (
+          String(
+            order?.status || ''
+          )
+            .trim()
+            .toLowerCase() ===
+            'paid' &&
+
+          String(
+            order?.paymentId || ''
+          ).trim() ===
+            paymentId
+        ) {
+          return {
+            settled:
+              false,
+
+            replayed:
+              true,
+
+            orderId,
+            paymentId,
+            userId,
+
+            subscription:
+              subscriptionPublicStateSrv(
+                subscription
+              )
+          };
+        }
+
+        throw billingPublicErrorSrv(
+          409,
+          'billing_payment_state_conflict',
+          '🚫 حالة الدفع لا تتطابق مع طلب الاشتراك.'
+        );
+      }
+
+      const orderStatus =
+        String(
+          order?.status || ''
+        )
+          .trim()
+          .toLowerCase();
+
+      if (orderStatus === 'paid') {
+        throw billingPublicErrorSrv(
+          409,
+          'billing_order_already_paid',
+          'ℹ️ طلب الاشتراك مدفوع بالفعل.'
+        );
+      }
+
+      if (
+        orderStatus !==
+        'pending_payment'
+      ) {
+        throw billingPublicErrorSrv(
+          409,
+          'billing_order_not_payable',
+          '❌ طلب الاشتراك الحالي غير قابل للدفع.'
+        );
+      }
+
+      const cycle =
+        billingNormalizeCycleSrv(
+          order?.billingCycle
+        );
+
+      if (!cycle) {
+        throw billingPublicErrorSrv(
+          409,
+          'billing_order_cycle_invalid',
+          '❌ دورة الاشتراك داخل الطلب غير صالحة.'
+        );
+      }
+
+      const nowTs =
+        admin.firestore.Timestamp.now();
+
+      const nowMs =
+        nowTs.toMillis();
+
+      const entitlement =
+        billingEntitlementAfterPaymentSrv({
+          subscription,
+          billingCycle:
+            cycle,
+          paidAtMs:
+            nowMs
+        });
+
+      const periodStart =
+        admin.firestore.Timestamp
+          .fromMillis(
+            entitlement.periodStartMs
+          );
+
+      const periodEnd =
+        admin.firestore.Timestamp
+          .fromMillis(
+            entitlement.periodEndMs
+          );
+
+      const actor =
+        String(actorUid || '')
+          .trim() ||
+        null;
+
+      const source =
+        String(
+          verificationSource || ''
+        ).trim() ||
+        'server:billing_verified_payment';
+
+      tx.set(
+        paymentRef,
+        {
+          paymentId,
+
+          paymentVersion:
+            'billing-payment-v1',
+
+          orderId,
+          userId,
+
+          ownerUid:
+            String(
+              order?.ownerUid ||
+              subscription?.ownerUid ||
+              userId
+            ).trim() ||
+            userId,
+
+          status:
+            'paid',
+
+          provider,
+          providerReference,
+
+          currency:
+            orderCurrency,
+
+          amount:
+            Number(
+              order?.amount
+            ),
+
+          amountMinor:
+            orderAmountMinor,
+
+          currencyExponent:
+            Number.isInteger(
+              Number(
+                order?.currencyExponent
+              )
+            )
+              ? Number(
+                  order.currencyExponent
+                )
+              : billingCurrencyExponentSrv(
+                  orderCurrency
+                ),
+
+          billingCycle:
+            cycle,
+
+          pricingSnapshot:
+            order?.pricingSnapshot ||
+            null,
+
+          verifiedAt:
+            nowTs,
+
+          verificationSource:
+            source,
+
+          verifiedByUid:
+            actor,
+
+          createdAt:
+            nowTs,
+
+          updatedAt:
+            nowTs
+        },
+        { merge: false }
+      );
+
+      tx.set(
+        orderRef,
+        {
+          status:
+            'paid',
+
+          paymentProvider:
+            provider,
+
+          paymentId,
+
+          providerReference,
+
+          paidAt:
+            nowTs,
+
+          updatedAt:
+            nowTs
+        },
+        { merge: true }
+      );
+
+      const subscriptionPatch = {
+        status:
+          'active',
+
+        billingCycle:
+          cycle,
+
+        currentPeriodStart:
+          periodStart,
+
+        currentPeriodEnd:
+          periodEnd,
+
+        graceEndsAt:
+          null,
+
+        paymentProvider:
+          provider,
+
+        lastPaymentId:
+          paymentId,
+
+        lastPaymentOrderId:
+          orderId,
+
+        lastPaidAt:
+          nowTs,
+
+        updatedAt:
+          nowTs,
+
+        source:
+          'server:billing_verified_payment'
+      };
+
+      tx.set(
+        subscriptionRef,
+        subscriptionPatch,
+        { merge: true }
+      );
+
+      tx.set(
+        eventRef,
+        {
+          eventVersion:
+            'billing-payment-event-v1',
+
+          eventType:
+            'payment_settled',
+
+          paymentId,
+          orderId,
+          userId,
+
+          provider,
+          providerReference,
+
+          amountMinor:
+            orderAmountMinor,
+
+          currency:
+            orderCurrency,
+
+          billingCycle:
+            cycle,
+
+          previousEffectiveSubscriptionStatus:
+            entitlement
+              .previousEffectiveStatus,
+
+          currentPeriodStart:
+            periodStart,
+
+          currentPeriodEnd:
+            periodEnd,
+
+          verificationSource:
+            source,
+
+          actorUid:
+            actor,
+
+          occurredAt:
+            nowTs
+        },
+        { merge: false }
+      );
+
+      return {
+        settled:
+          true,
+
+        replayed:
+          false,
+
+        orderId,
+        paymentId,
+        userId,
+
+        subscription:
+          subscriptionPublicStateSrv(
+            {
+              ...subscription,
+              ...subscriptionPatch
+            },
+            nowMs
+          )
+      };
+    }
+  );
+}
+
+// مزود دائم للدفعات التي تعتمدها إدارة مُرَبِّيك.
+// أي Gateway إلكتروني لاحقًا يستدعي نفس Settlement Core
+// بعد التحقق من الـWebhook والمبلغ والعملة.
+app.post(
+  '/api/admin/billing/payments/manual/confirm',
+  ensureAccountAdminClaimSrv,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error:
+            'billing_unavailable',
+          message:
+            '❌ خدمة الدفع غير متاحة الآن.'
+        });
+      }
+
+      const orderId =
+        String(
+          req.body?.orderId || ''
+        )
+          .trim()
+          .toLowerCase();
+
+      const providerReference =
+        billingNormalizeProviderReferenceSrv(
+          req.body?.providerReference
+        );
+
+      if (
+        !/^ord_[a-f0-9]{40}$/
+          .test(orderId)
+      ) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            'billing_order_not_found',
+          message:
+            '❌ طلب الاشتراك غير موجود.'
+        });
+      }
+
+      if (!providerReference) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            'billing_provider_reference_invalid',
+          message:
+            '❌ أدخل مرجعًا صحيحًا للدفع المؤكد.'
+        });
+      }
+
+      const orderSnap =
+        await db
+          .collection('billing_orders')
+          .doc(orderId)
+          .get();
+
+      if (!orderSnap.exists) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            'billing_order_not_found',
+          message:
+            '❌ طلب الاشتراك غير موجود.'
+        });
+      }
+
+      const order =
+        orderSnap.data() || {};
+
+      const currency =
+        String(
+          order?.currency || ''
+        )
+          .trim()
+          .toUpperCase();
+
+      const amountMinor =
+        Number.isSafeInteger(
+          Number(order?.amountMinor)
+        )
+          ? Number(order.amountMinor)
+          : billingAmountMinorSrv(
+              order?.amount,
+              currency
+            );
+
+      if (
+        !currency ||
+        !Number.isSafeInteger(
+          amountMinor
+        ) ||
+        amountMinor <= 0
+      ) {
+        return res.status(409).json({
+          ok: false,
+          error:
+            'billing_order_amount_invalid',
+          message:
+            '❌ قيمة طلب الاشتراك غير صالحة للتأكيد.'
+        });
+      }
+
+      const actorUid =
+        String(
+          req.accountAdminAuth?.uid ||
+          req.accountAdminAuth?.sub ||
+          ''
+        ).trim();
+
+      const result =
+        await billingApplyVerifiedPaymentSrv({
+          orderId,
+
+          provider:
+            'manual',
+
+          providerReference,
+
+          verifiedAmountMinor:
+            amountMinor,
+
+          verifiedCurrency:
+            currency,
+
+          verificationSource:
+            'server:/api/admin/billing/payments/manual/confirm',
+
+          actorUid
+        });
+
+      return res.json({
+        ok: true,
+        ...result
+      });
+
+    } catch (e) {
+      console.error(
+        'billing manual confirm failed:',
+        e.message || e
+      );
+
+      const status =
+        Number(
+          e?.publicStatus || 500
+        );
+
+      return res
+        .status(status)
+        .json({
+          ok: false,
+
+          error:
+            String(
+              e?.publicError ||
+              'billing_manual_confirm_failed'
+            ),
+
+          message:
+            String(
+              e?.publicMessage ||
+              '❌ تعذّر تأكيد الدفع الآن.'
+            )
         });
     }
   }
