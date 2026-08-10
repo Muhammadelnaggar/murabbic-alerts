@@ -65039,6 +65039,63 @@ function billingPaymentIdSrv(
     ).slice(0, 40)
   }`;
 }
+const BILLING_PAYMENT_METHODS_SRV = Object.freeze({
+  manual: Object.freeze({
+    provider: 'manual',
+    label: 'دفع بتحويل أو اتفاق مباشر',
+    mode: 'manual_confirmation'
+  })
+});
+
+function billingPaymentMethodPublicSrv(method = {}) {
+  return {
+    provider:
+      String(method?.provider || '').trim(),
+
+    label:
+      String(method?.label || '').trim(),
+
+    mode:
+      String(method?.mode || '').trim()
+  };
+}
+
+function billingPaymentMethodSrv(providerRaw) {
+  const provider =
+    billingNormalizeProviderSrv(
+      providerRaw
+    );
+
+  return provider
+    ? BILLING_PAYMENT_METHODS_SRV[provider] || null
+    : null;
+}
+
+async function billingStartPaymentProviderSrv({
+  provider,
+  orderId
+} = {}) {
+  if (provider === 'manual') {
+    return {
+      provider: 'manual',
+      started: true,
+
+      nextAction: {
+        type: 'manual_confirmation',
+        orderId,
+
+        message:
+          'استخدم رقم طلب التجديد عند إتمام الدفع مع إدارة مُرَبِّيك. لن يتم تفعيل الاشتراك إلا بعد تأكيد الدفع.'
+      }
+    };
+  }
+
+  throw billingPublicErrorSrv(
+    409,
+    'billing_provider_not_available',
+    '❌ وسيلة الدفع المختارة غير متاحة الآن.'
+  );
+}
 function billingOrderIdSrv(
   userId,
   idempotencyKey
@@ -65904,6 +65961,276 @@ app.get(
   }
 );
 // ============================================================
+//      BILLING PAYMENT METHODS + PROVIDER START ADAPTER
+// ============================================================
+app.get(
+  '/api/billing/payment-methods',
+  requireUserId,
+  async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+
+    return res.json({
+      ok: true,
+
+      methods:
+        Object.values(
+          BILLING_PAYMENT_METHODS_SRV
+        ).map(
+          billingPaymentMethodPublicSrv
+        )
+    });
+  }
+);
+
+app.post(
+  '/api/billing/checkout/:orderId/start-payment',
+  requireUserId,
+  async (req, res) => {
+    try {
+      res.set(
+        'Cache-Control',
+        'no-store'
+      );
+
+      if (!db) {
+        throw billingPublicErrorSrv(
+          503,
+          'billing_unavailable',
+          '❌ خدمة الدفع غير متاحة الآن.'
+        );
+      }
+
+      const userId =
+        String(
+          req.userId || ''
+        ).trim();
+
+      const orderId =
+        String(
+          req.params?.orderId || ''
+        )
+          .trim()
+          .toLowerCase();
+
+      if (
+        !/^ord_[a-f0-9]{40}$/
+          .test(orderId)
+      ) {
+        throw billingPublicErrorSrv(
+          404,
+          'billing_order_not_found',
+          '❌ طلب الاشتراك غير موجود.'
+        );
+      }
+
+      const method =
+        billingPaymentMethodSrv(
+          req.body?.provider
+        );
+
+      if (!method) {
+        throw billingPublicErrorSrv(
+          409,
+          'billing_provider_not_available',
+          '❌ وسيلة الدفع المختارة غير متاحة الآن.'
+        );
+      }
+
+      const orderRef =
+        db
+          .collection(
+            'billing_orders'
+          )
+          .doc(orderId);
+
+      const selected =
+        await db.runTransaction(
+          async tx => {
+            const snap =
+              await tx.get(
+                orderRef
+              );
+
+            if (!snap.exists) {
+              throw billingPublicErrorSrv(
+                404,
+                'billing_order_not_found',
+                '❌ طلب الاشتراك غير موجود.'
+              );
+            }
+
+            const order =
+              snap.data() || {};
+
+            if (
+              String(
+                order?.userId || ''
+              ).trim() !==
+              userId
+            ) {
+              throw billingPublicErrorSrv(
+                404,
+                'billing_order_not_found',
+                '❌ طلب الاشتراك غير موجود.'
+              );
+            }
+
+            const status =
+              String(
+                order?.status || ''
+              )
+                .trim()
+                .toLowerCase();
+
+            if (status === 'paid') {
+              throw billingPublicErrorSrv(
+                409,
+                'billing_order_already_paid',
+                'ℹ️ طلب الاشتراك مدفوع بالفعل.'
+              );
+            }
+
+            if (
+              status !==
+              'pending_payment'
+            ) {
+              throw billingPublicErrorSrv(
+                409,
+                'billing_order_not_payable',
+                '❌ طلب الاشتراك الحالي غير قابل للدفع.'
+              );
+            }
+
+            const existingProvider =
+              String(
+                order?.paymentProvider ||
+                ''
+              )
+                .trim()
+                .toLowerCase();
+
+            if (
+              existingProvider &&
+              existingProvider !==
+                method.provider
+            ) {
+              throw billingPublicErrorSrv(
+                409,
+                'billing_payment_provider_conflict',
+                '❌ تم بدء هذا الطلب بوسيلة دفع أخرى.'
+              );
+            }
+
+            if (
+              existingProvider ===
+              method.provider
+            ) {
+              return {
+                replayed: true,
+                order
+              };
+            }
+
+            const nowTs =
+              admin.firestore
+                .Timestamp.now();
+
+            tx.set(
+              orderRef,
+              {
+                paymentProvider:
+                  method.provider,
+
+                paymentInitiatedAt:
+                  nowTs,
+
+                updatedAt:
+                  nowTs
+              },
+              { merge: true }
+            );
+
+            return {
+              replayed: false,
+
+              order: {
+                ...order,
+
+                paymentProvider:
+                  method.provider,
+
+                paymentInitiatedAt:
+                  nowTs,
+
+                updatedAt:
+                  nowTs
+              }
+            };
+          }
+        );
+
+      const providerResult =
+        await billingStartPaymentProviderSrv({
+          provider:
+            method.provider,
+
+          orderId
+        });
+
+      return res.json({
+        ok: true,
+
+        replayed:
+          selected.replayed ===
+          true,
+
+        method:
+          billingPaymentMethodPublicSrv(
+            method
+          ),
+
+        order:
+          billingPublicOrderSrv(
+            orderId,
+            selected.order
+          ),
+
+        nextAction:
+          providerResult.nextAction
+      });
+
+    } catch (e) {
+      console.error(
+        'billing start payment failed:',
+        e.message || e
+      );
+
+      const status =
+        Number(
+          e?.publicStatus || 500
+        );
+
+      return res
+        .status(status)
+        .json({
+          ok: false,
+
+          error:
+            String(
+              e?.publicError ||
+              'billing_payment_start_failed'
+            ),
+
+          message:
+            String(
+              e?.publicMessage ||
+              '❌ تعذّر بدء وسيلة الدفع الآن.'
+            )
+        });
+    }
+  }
+);
+// ============================================================
 //      BILLING PAYMENTS — VERIFIED SETTLEMENT CORE
 // ============================================================
 function billingAddCalendarMonthsSrv(
@@ -66292,17 +66619,35 @@ async function billingApplyVerifiedPaymentSrv({
           .trim()
           .toUpperCase();
 
-      const orderAmountMinor =
-        Number.isSafeInteger(
-          Number(order?.amountMinor)
-        )
-          ? Number(order.amountMinor)
-          : billingAmountMinorSrv(
-              order?.amount,
-              orderCurrency
-            );
+     const orderAmountMinor =
+  Number.isSafeInteger(
+    Number(order?.amountMinor)
+  )
+    ? Number(order.amountMinor)
+    : billingAmountMinorSrv(
+        order?.amount,
+        orderCurrency
+      );
 
-      if (
+const initiatedProvider =
+  String(
+    order?.paymentProvider || ''
+  )
+    .trim()
+    .toLowerCase();
+
+if (
+  initiatedProvider &&
+  initiatedProvider !== provider
+) {
+  throw billingPublicErrorSrv(
+    409,
+    'billing_payment_provider_mismatch',
+    '🚫 مزود الدفع المؤكد لا يطابق وسيلة الدفع التي بدأ بها الطلب.'
+  );
+}
+
+if (
         !orderCurrency ||
         !Number.isSafeInteger(
           orderAmountMinor
