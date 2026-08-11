@@ -49579,12 +49579,29 @@ async function updateAnimalByCalvingSrv(
     ).trim() ||
     null;
 
+  // مصدر أبو العجلة الوراثي قبل التحويل.
+  const pedigreeFatherSource =
+    String(
+      cur.birthSireSource ||
+      cur.sireSource ||
+      ""
+    ).trim() ||
+    null;
+
   // طلوقة الحمل الذي انتهى بهذه الولادة.
   const lastFertileSireNumber =
     String(
       ev.lastFertileSireNumber ||
       ev.lastFertileSemenCode ||
       cur.inseminationSireNumber ||
+      ""
+    ).trim() ||
+    null;
+
+  // مصدر طلوقة الحمل الحالية.
+  const lastFertileSireSource =
+    String(
+      ev.lastFertileSireSource ||
       ""
     ).trim() ||
     null;
@@ -49662,17 +49679,26 @@ async function updateAnimalByCalvingSrv(
     // ==========================
     // النسب والتلقيح
     // ==========================
-    fatherNumber:
+       fatherNumber:
       pedigreeFatherNumber,
 
     birthSireNumber:
       pedigreeFatherNumber,
 
+    birthSireSource:
+      pedigreeFatherSource,
+
     sireNumber:
       lastFertileSireNumber,
 
+    sireSource:
+      lastFertileSireSource,
+
     lastFertileSireNumber:
       lastFertileSireNumber,
+
+    lastFertileSireSource:
+      lastFertileSireSource,
 
     source:
       "server:/api/calving/save:follower-to-mother"
@@ -50662,10 +50688,16 @@ app.post(
                       ? finalAnimalNumber
                       : "",
 
-                  lastFertileSireNumber:
+                                    lastFertileSireNumber:
                     String(
                       sireLineage.sireNumber ||
                       sireLineage.semenCode ||
+                      ""
+                    ).trim(),
+
+                  lastFertileSireSource:
+                    String(
+                      sireLineage.sireSource ||
                       ""
                     ).trim()
                 },
