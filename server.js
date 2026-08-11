@@ -4817,7 +4817,51 @@ function addAnimalBasicFieldsDecisionSrv(fd = {}, options = {}) {
   }
 
   const birthDate = addAnimalDateOrNullSrv(fd.birthDate);
-  const lastCalvingDate = addAnimalDateOrNullSrv(fd.lastCalvingDate);
+const lastCalvingDate = addAnimalDateOrNullSrv(fd.lastCalvingDate);
+const today = addAnimalTodaySrv();
+
+if (
+  entryType === "mothers" &&
+  birthDate &&
+  !errors.birthDate
+) {
+  const speciesInfo = addAnimalSpeciesFromTypeSrv(
+    fd.animalType || fd.animalTypeAr
+  );
+
+  if (birthDate > today) {
+    errors.birthDate =
+      "❌ تاريخ الميلاد لا يمكن أن يكون في المستقبل.";
+  } else {
+    const [by, bm, bd] = birthDate.split("-").map(Number);
+    const [ty, tm, td] = today.split("-").map(Number);
+
+    let ageTodayMonths =
+      (ty - by) * 12 + (tm - bm);
+
+    if (td < bd) {
+      ageTodayMonths -= 1;
+    }
+
+    const minMotherAgeMonths =
+      speciesInfo.animaltype === "cow"
+        ? 18
+        : speciesInfo.animaltype === "buffalo"
+          ? 24
+          : null;
+
+    if (
+      Number.isFinite(ageTodayMonths) &&
+      Number.isFinite(minMotherAgeMonths) &&
+      ageTodayMonths < minMotherAgeMonths
+    ) {
+      errors.birthDate =
+        speciesInfo.animaltype === "cow"
+          ? "❌ لا يمكن تسجيل هذه البقرة ضمن الأمهات: عمرها أقل من 18 شهرًا."
+          : "❌ لا يمكن تسجيل هذه الجاموسة ضمن الأمهات: عمرها أقل من 24 شهرًا.";
+    }
+  }
+}
 
   if (
     entryType === "mothers" &&
