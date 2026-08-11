@@ -2898,7 +2898,94 @@ if (isDryAnimal) {
 
     if (ops > 0) await batch.commit();
 
-    for (const uid of touchedTenants) {
+// ✅ التوابع التي أجهضت:
+// تظل reproductiveStatus = "إجهاض" لمدة 40 يومًا.
+// بعد اكتمال 40 يومًا تعود «مفتوحة / تحت التلقيح».
+const abortionFollowersSnap =
+  await db
+    .collection("calves")
+    .where(
+      "reproductiveStatus",
+      "==",
+      "إجهاض"
+    )
+    .get();
+
+let followerBatch =
+  db.batch();
+
+let followerOps = 0;
+
+for (const doc of abortionFollowersSnap.docs) {
+  scanned++;
+
+  const a =
+    doc.data() || {};
+
+  const st =
+    String(a.status || "")
+      .trim()
+      .toLowerCase();
+
+  if (
+    st === "inactive" ||
+    st === "archived"
+  ) {
+    continue;
+  }
+
+  const reproPatch =
+    buildReproAutoOpenPatchSrv(
+      a,
+      todayISO
+    );
+
+  // قبل 40 يومًا ترجع null
+  if (!reproPatch) {
+    continue;
+  }
+
+  followerBatch.set(
+    doc.ref,
+    {
+      ...reproPatch,
+
+      followerStatus:
+        "تحت التلقيح",
+
+      status:
+        "تحت التلقيح",
+
+      pregnancyDays:
+        null
+    },
+    { merge: true }
+  );
+
+  if (a.userId) {
+    touchedTenants.add(
+      String(a.userId).trim()
+    );
+  }
+
+  updated++;
+  followerOps++;
+
+  if (followerOps >= 400) {
+    await followerBatch.commit();
+
+    followerBatch =
+      db.batch();
+
+    followerOps = 0;
+  }
+}
+
+if (followerOps > 0) {
+  await followerBatch.commit();
+}
+
+for (const uid of touchedTenants) {
       if (typeof scheduleGroupsRebuildSrv === 'function') {
         scheduleGroupsRebuildSrv(uid, 'daily_dim_update');
       }
@@ -22108,11 +22195,43 @@ function inseminationDecisionSrv(fd) {
   let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
   if (/cow|بقر/i.test(sp)) sp = "أبقار";
   if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
-
   const recommendedPostCalving = { "أبقار": 56, "جاموس": 45 };
-  const hardBlockPostCalving = { "أبقار": 45, "جاموس": 35 };
+const hardBlockPostCalving = { "أبقار": 45, "جاموس": 35 };
 
-  // ⚠️ العشار لا يُرفض مباشرة — يحتاج تأكيد فقد جنيني/فحص
+// ✅ بعد الإجهاض: لا يُسمح بالتلقيح قبل اكتمال 40 يومًا
+const lastAbortionDate = String(
+  fd.lastAbortionDate ||
+  doc.lastAbortionDate ||
+  doc.abortionDate ||
+  (
+    String(fd.lastBoundaryType || "").trim() === "إجهاض"
+      ? fd.lastBoundary
+      : ""
+  ) ||
+  ""
+).trim().slice(0, 10);
+
+if (
+  calvingIsDateSrv(lastAbortionDate) &&
+  calvingIsDateSrv(fd.eventDate)
+) {
+  const daysAfterAbortion =
+    inseminationDaysBetweenSrv(
+      lastAbortionDate,
+      fd.eventDate
+    );
+
+  if (
+    Number.isFinite(daysAfterAbortion) &&
+    daysAfterAbortion >= 0 &&
+    daysAfterAbortion < 40
+  ) {
+    return `❌ مرّ ${daysAfterAbortion} يومًا فقط منذ الإجهاض. يمكن تسجيل التلقيح بعد اكتمال 40 يومًا من تاريخ الإجهاض.`;
+  }
+}
+
+// ⚠️ العشار لا يُرفض مباشرة — يحتاج تأكيد فقد جنيني/فحص
+
   const repro = String(fd.reproStatusFromEvents || fd.reproductiveStatus || doc.reproductiveStatus || "").trim();
 
   if (inseminationIsPregnantStatusSrv(repro)) {
@@ -48989,9 +49108,44 @@ abortionDiagnosticNote: derived.abortionDiagnosticNote || "",
       source: "server-abortion-save"
     };
 
-    const evRef = await db.collection("events").add(payload);
+const eventDocId =
+  eventsPageStableDocIdSrv(
+    uid,
+    "abortion",
+    animalNumber,
+    eventDate
+  );
 
-await updateAnimalByAbortionSrv(payload);
+const evRef =
+  db.collection("events").doc(eventDocId);
+
+const txResult =
+  await db.runTransaction(async (tx) => {
+    const existing = await tx.get(evRef);
+
+    if (existing.exists) {
+      return { created: false };
+    }
+
+    tx.set(evRef, payload);
+
+    await updateAnimalByAbortionSrv(
+      payload,
+      animal,
+      tx
+    );
+
+    return { created: true };
+  });
+
+if (!txResult?.created) {
+  return res.status(409).json({
+    ok: false,
+    allowed: false,
+    message:
+      `ℹ️ الإجهاض مسجل بالفعل للحيوان رقم ${animalNumber} في هذا التاريخ.`
+  });
+}
 
 if (typeof scheduleGroupsRebuildSrv === "function") {
   scheduleGroupsRebuildSrv(uid, "abortion_save");
@@ -49105,53 +49259,164 @@ async function updateAnimalByCalvingSrv(ev) {
 //                 نقل تحديث الحيوان بعد الإجهاض للسيرفر فقط
 // ============================================================
 
-async function updateAnimalByAbortionSrv(ev) {
-  const tenant = String(ev.userId || "").trim();
-  const num = calvingNormDigitsOnlySrv(
-    String(
-      ev.animalNumber ||
-      ev.number ||
-      ev.animalId ||
-      ""
-    ).trim()
-  );
+async function updateAnimalByAbortionSrv(
+  ev,
+  resolvedAnimal = null,
+  writer = null
+) {
+  const tenant =
+    String(ev.userId || "").trim();
+
+  const num =
+    calvingNormDigitsOnlySrv(
+      String(
+        ev.animalNumber ||
+        ev.number ||
+        ev.animalId ||
+        ""
+      ).trim()
+    );
 
   if (!tenant || !num) {
-    console.warn("⛔ updateAnimalByAbortionSrv: missing tenant or number", { tenant, num, ev });
-    return;
+    const err =
+      new Error(
+        "abortion_update_missing_subject"
+      );
+
+    if (writer) {
+      throw err;
+    }
+
+    console.warn(
+      "⛔ updateAnimalByAbortionSrv: missing tenant or number",
+      { tenant, num, ev }
+    );
+
+    return null;
   }
 
-  const date = String(ev.eventDate || "").trim().slice(0, 10);
-  const m = Number(ev.abortionAgeMonths);
+  const date =
+    String(ev.eventDate || "")
+      .trim()
+      .slice(0, 10);
+
+  const m =
+    Number(ev.abortionAgeMonths);
+
+  const animal =
+    resolvedAnimal?.id
+      ? resolvedAnimal
+      : await fetchAnimalByNumberForCalvingGateSrv(
+          tenant,
+          num
+        );
+
+  if (!animal || !animal.id) {
+    const err =
+      new Error(
+        "abortion_update_animal_not_found"
+      );
+
+    if (writer) {
+      throw err;
+    }
+
+    console.warn(
+      "⛔ animal not found for abortion update:",
+      { tenant, num, ev }
+    );
+
+    return null;
+  }
+
+  const collectionName =
+    animal._collection === "calves"
+      ? "calves"
+      : "animals";
+
+  const cur =
+    animal.data ||
+    animal ||
+    {};
 
   const upd = {
     lastAbortionDate: date,
-    abortionAgeMonths: Number.isFinite(m) ? Number(m) : null,
-    reproductiveStatus: "إجهاض",
-    lastPregnancyLossClass: (Number.isFinite(m) && m >= 5) ? "late" : "early",
-    status: "active",
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+
+    abortionAgeMonths:
+      Number.isFinite(m)
+        ? Number(m)
+        : null,
+
+    reproductiveStatus:
+      "إجهاض",
+
+    lastPregnancyLossClass:
+      Number.isFinite(m) && m >= 5
+        ? "late"
+        : "early",
+
+    updatedAt:
+      admin.firestore.FieldValue
+        .serverTimestamp()
   };
 
-  const wantIncLactationFromAbortion = Number.isFinite(m) && m >= 5;
-
-  const animal = await findAnimalDocByNumberSrv(tenant, num);
-
-  if (!animal || !animal.id) {
-    console.warn("⛔ animal not found for abortion update:", { tenant, num, ev });
-    return;
+  // الأم تظل سجلًا نشطًا داخل animals.
+  if (collectionName === "animals") {
+    upd.status = "active";
   }
 
-  const cur = animal || {};
-  const updFinal = { ...upd };
+  // العجلة تظل داخل calves وتظهر حالتها الفعلية «إجهاض».
+  if (collectionName === "calves") {
+    upd.followerStatus = "إجهاض";
+    upd.status = "إجهاض";
+    upd.pregnancyDays = null;
+  }
+
+  // زيادة الموسم بعد الإجهاض المتأخر تخص الأم فقط.
+  const wantIncLactationFromAbortion =
+    collectionName === "animals" &&
+    Number.isFinite(m) &&
+    m >= 5;
 
   if (wantIncLactationFromAbortion) {
-    const curL = Number(cur.lactationNumber || 0);
-    updFinal.lactationNumber = (Number.isFinite(curL) ? curL : 0) + 1;
+    const curL =
+      Number(cur.lactationNumber || 0);
+
+    upd.lactationNumber =
+      (
+        Number.isFinite(curL)
+          ? curL
+          : 0
+      ) + 1;
   }
 
-  await db.collection("animals").doc(animal.id).set(updFinal, { merge: true });
-  console.log("🔥 animal updated by abortion:", animal.id, updFinal);
+  const animalRef =
+    db
+      .collection(collectionName)
+      .doc(animal.id);
+
+  if (
+    writer &&
+    typeof writer.set === "function"
+  ) {
+    writer.set(
+      animalRef,
+      upd,
+      { merge: true }
+    );
+  } else {
+    await animalRef.set(
+      upd,
+      { merge: true }
+    );
+  }
+
+  return {
+    collectionName,
+    animalId: animal.id,
+    animalNumber: num,
+    update: upd
+  };
 }
 // ============================================================
 //                 API: CALVING SAVE — moved from calving.html
@@ -63829,10 +64094,50 @@ function hasPassedWeaningStageGroupSrv(an = {}) {
     "تحت التلقيح",
     "ملقح",
     "ملقحة",
-    "عشار"
+    "عشار",
+    "إجهاض"
   ].includes(stage);
 }
+function isFollowerAbortionRecoveryGroupSrv(an = {}) {
+  const isFollower =
+    String(an?._source || "").trim() === "calves" ||
+    String(an?.entryType || "").trim() === "followers" ||
+    an?.isCalf === true;
 
+  if (!isFollower) return false;
+
+  const reproNorm =
+    reproAutoNormArSrv(
+      an?.reproductiveStatus
+    );
+
+  if (!reproNorm.includes("اجهاض")) {
+    return false;
+  }
+
+  const lastAbortionDate =
+    String(
+      an?.lastAbortionDate ||
+      an?.abortionDate ||
+      ""
+    ).trim().slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(lastAbortionDate)) {
+    return false;
+  }
+
+  const daysAfterAbortion =
+    diffDaysISO(
+      lastAbortionDate,
+      cairoTodayISO()
+    );
+
+  return (
+    Number.isFinite(daysAfterAbortion) &&
+    daysAfterAbortion >= 0 &&
+    daysAfterAbortion < 40
+  );
+}
 function isInfantGroupSrv(an = {}) {
   return (
     !hasCalvedBeforeGroupSrv(an) &&
@@ -64021,6 +64326,11 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
       g[pref + 'fresh'].push(an);
       continue;
     }
+     // العجلة التي أجهضت تظل في فترة الاستشفاء 40 يومًا:
+// تظهر في «كل القطيع» فقط ولا تُصنّف «تحت التلقيح» قبل موعدها.
+if (isFollowerAbortionRecoveryGroupSrv(an)) {
+  continue;
+}
 
     if (!isDryGroupSrv(an) && hasCalvedBeforeGroupSrv(an)) {
       const band = milkBandGroupSrv(an, milk, thresholds);
