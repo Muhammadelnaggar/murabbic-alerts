@@ -4807,6 +4807,61 @@ function addAnimalBasicFieldsDecisionSrv(fd = {}) {
     }
   }
 
+  const birthDate = addAnimalDateOrNullSrv(fd.birthDate);
+  const lastCalvingDate = addAnimalDateOrNullSrv(fd.lastCalvingDate);
+
+  if (
+    entryType === "mothers" &&
+    birthDate &&
+    lastCalvingDate &&
+    !errors.birthDate &&
+    !errors.lastCalvingDate
+  ) {
+    // استحالة زمنية مطلقة:
+    // لا يمكن أن تسبق آخر ولادة تاريخ ميلاد الحيوان.
+    if (lastCalvingDate < birthDate) {
+      errors.lastCalvingDate =
+        "❌ لا يمكن حفظ البيانات: تاريخ آخر ولادة يسبق تاريخ ميلاد الحيوان. راجع التاريخين.";
+    } else if (
+      !errors.lactationNumber &&
+      Number(fd.lactationNumber) === 1
+    ) {
+      const speciesInfo = addAnimalSpeciesFromTypeSrv(
+        fd.animalType || fd.animalTypeAr
+      );
+
+      const [by, bm, bd] = birthDate.split("-").map(Number);
+      const [cy, cm, cd] = lastCalvingDate.split("-").map(Number);
+
+      let ageAtCalvingMonths =
+        (cy - by) * 12 + (cm - bm);
+
+      if (cd < bd) {
+        ageAtCalvingMonths -= 1;
+      }
+
+      // أرضية لمنع البيانات العبثية فقط،
+      // وليست العمر المستهدف لأول ولادة.
+      const absurdFirstCalvingMinMonths =
+        speciesInfo.animaltype === "cow"
+          ? 18
+          : speciesInfo.animaltype === "buffalo"
+            ? 24
+            : null;
+
+      if (
+        Number.isFinite(ageAtCalvingMonths) &&
+        Number.isFinite(absurdFirstCalvingMinMonths) &&
+        ageAtCalvingMonths < absurdFirstCalvingMinMonths
+      ) {
+        errors.lastCalvingDate =
+          speciesInfo.animaltype === "cow"
+            ? "❌ لا يمكن حفظ البيانات: بقرة في الموسم الأول لا يمكن أن يكون عمرها عند آخر ولادة أقل من 18 شهرًا. راجع تاريخ الميلاد وتاريخ آخر ولادة."
+            : "❌ لا يمكن حفظ البيانات: جاموسة في الموسم الأول لا يمكن أن يكون عمرها عند آخر ولادة أقل من 24 شهرًا. راجع تاريخ الميلاد وتاريخ آخر ولادة.";
+      }
+    }
+  }
+
   return errors;
 }
 
