@@ -21872,11 +21872,26 @@ function calvingDecisionSrv(fd) {
     return `❌ لا يوجد لـ${animalText} تاريخ مسجل لآخر تلقيح مُخصِّب، لذلك لا أستطيع حساب عمر الحمل. راجع بيانات التلقيح أولًا.`;
   }
 
-  if (!calvingIsDateSrv(fd.eventDate)) {
-    return "❌ أدخل تاريخ ولادة صحيحًا.";
-  }
+ if (!calvingIsDateSrv(fd.eventDate)) {
+  return "❌ أدخل تاريخ ولادة صحيحًا.";
+}
 
-  const gDays = calvingDaysBetweenSrv(lf, fd.eventDate);
+const eventDate =
+  String(fd.eventDate || "")
+    .trim()
+    .slice(0, 10);
+
+const todayISO =
+  addAnimalTodaySrv();
+
+if (
+  calvingIsDateSrv(todayISO) &&
+  eventDate > todayISO
+) {
+  return "❌ تاريخ الولادة لا يمكن أن يكون في المستقبل.";
+}
+
+const gDays = calvingDaysBetweenSrv(lf, eventDate);
   if (Number.isNaN(gDays)) {
     return "❌ لم أستطع حساب عمر الحمل. راجع تاريخ آخر تلقيح وتاريخ الولادة.";
   }
@@ -49461,32 +49476,38 @@ async function updateAnimalByCalvingSrv(
           ) + 1
         );
 
-  const baseUpdate = {
-    lastCalvingDate:
-      date,
+ const baseUpdate = {
+  lastCalvingDate:
+    date,
 
-    reproductiveStatus:
-      "حديث الولادة",
+  reproductiveStatus:
+    "حديث الولادة",
 
-    productionStatus:
-      "حلاب",
+  productionStatus:
+    "حلاب",
 
-    daysInMilk:
-      0,
+  inMilk:
+    true,
 
-    pregnancyDays:
-      null,
+  daysInMilk:
+    0,
 
-    lactationNumber:
-      nextLactation,
+  pregnancyDays:
+    null,
 
-    status:
-      "active",
+  servicesCount:
+    0,
 
-    updatedAt:
-      admin.firestore.FieldValue
-        .serverTimestamp()
-  };
+  lactationNumber:
+    nextLactation,
+
+  status:
+    "active",
+
+  updatedAt:
+    admin.firestore.FieldValue
+      .serverTimestamp()
+};
 
   // ======================================================
   // الحيوان أم موجودة أصلًا داخل animals
@@ -49868,7 +49889,6 @@ app.post(
 
       const lastInseminationDate =
         String(
-          formData.lastInseminationDate ||
           signals.lastInseminationDateFromEvents ||
           doc?.lastInseminationDate ||
           ""
