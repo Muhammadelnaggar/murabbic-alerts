@@ -4906,22 +4906,26 @@ function addAnimalBasicFieldsDecisionSrv(fd = {}, options = {}) {
   const birthDate = addAnimalDateOrNullSrv(fd.birthDate);
 const lastCalvingDate = addAnimalDateOrNullSrv(fd.lastCalvingDate);
 const today = addAnimalTodaySrv();
-
 if (
   entryType === "mothers" &&
   birthDate &&
   !errors.birthDate
 ) {
-  const speciesInfo = addAnimalSpeciesFromTypeSrv(
-    fd.animalType || fd.animalTypeAr
-  );
+  const speciesInfo =
+    addAnimalSpeciesFromTypeSrv(
+      fd.animalType ||
+      fd.animalTypeAr
+    );
 
   if (birthDate > today) {
     errors.birthDate =
       "❌ تاريخ الميلاد لا يمكن أن يكون في المستقبل.";
   } else {
-    const [by, bm, bd] = birthDate.split("-").map(Number);
-    const [ty, tm, td] = today.split("-").map(Number);
+    const [by, bm, bd] =
+      birthDate.split("-").map(Number);
+
+    const [ty, tm, td] =
+      today.split("-").map(Number);
 
     let ageTodayMonths =
       (ty - by) * 12 + (tm - bm);
@@ -4948,59 +4952,64 @@ if (
           : "❌ لا يمكن تسجيل هذه الجاموسة ضمن الأمهات: عمرها أقل من 24 شهرًا.";
     }
   }
-}
+}   
 
-  if (
-    entryType === "mothers" &&
-    birthDate &&
-    lastCalvingDate &&
-    !errors.birthDate &&
-    !errors.lastCalvingDate
-  ) {
-    // استحالة زمنية مطلقة:
-    // لا يمكن أن تسبق آخر ولادة تاريخ ميلاد الحيوان.
-    if (lastCalvingDate < birthDate) {
-      errors.lastCalvingDate =
-       "❌ تاريخ آخر ولادة لا يمكن أن يسبق تاريخ ميلاد الحيوان. راجع التاريخين."
-    } else if (
-      !errors.lactationNumber &&
-      Number(fd.lactationNumber) === 1
-    ) {
-      const speciesInfo = addAnimalSpeciesFromTypeSrv(
-        fd.animalType || fd.animalTypeAr
+if (
+  entryType === "mothers" &&
+  birthDate &&
+  lastCalvingDate &&
+  !errors.birthDate &&
+  !errors.lastCalvingDate
+) {
+  // استحالة زمنية مطلقة:
+  // لا يمكن أن تسبق آخر ولادة تاريخ ميلاد الحيوان.
+  if (lastCalvingDate < birthDate) {
+    errors.lastCalvingDate =
+      "❌ تاريخ آخر ولادة لا يمكن أن يسبق تاريخ ميلاد الحيوان. راجع التاريخين.";
+  } else {
+    const speciesInfo =
+      addAnimalSpeciesFromTypeSrv(
+        fd.animalType ||
+        fd.animalTypeAr
       );
 
-      const [by, bm, bd] = birthDate.split("-").map(Number);
-      const [cy, cm, cd] = lastCalvingDate.split("-").map(Number);
+    const [by, bm, bd] =
+      birthDate.split("-").map(Number);
 
-      let ageAtCalvingMonths =
-        (cy - by) * 12 + (cm - bm);
+    const [cy, cm, cd] =
+      lastCalvingDate.split("-").map(Number);
 
-      if (cd < bd) {
-        ageAtCalvingMonths -= 1;
-      }
+    let ageAtCalvingMonths =
+      (cy - by) * 12 + (cm - bm);
 
-      // أرضية لمنع البيانات العبثية فقط،
-      // وليست العمر المستهدف لأول ولادة.
-      const absurdFirstCalvingMinMonths =
+    if (cd < bd) {
+      ageAtCalvingMonths -= 1;
+    }
+
+    // أرضية لمنع بيانات ولادة مستحيلة بيولوجيًا.
+    // تطبق على أي موسم، وليست مرتبطة بالموسم الأول.
+    const minimumPossibleCalvingAgeMonths =
+      speciesInfo.animaltype === "cow"
+        ? 18
+        : speciesInfo.animaltype === "buffalo"
+          ? 24
+          : null;
+
+    if (
+      Number.isFinite(ageAtCalvingMonths) &&
+      Number.isFinite(
+        minimumPossibleCalvingAgeMonths
+      ) &&
+      ageAtCalvingMonths <
+        minimumPossibleCalvingAgeMonths
+    ) {
+      errors.lastCalvingDate =
         speciesInfo.animaltype === "cow"
-          ? 18
-          : speciesInfo.animaltype === "buffalo"
-            ? 24
-            : null;
-
-      if (
-        Number.isFinite(ageAtCalvingMonths) &&
-        Number.isFinite(absurdFirstCalvingMinMonths) &&
-        ageAtCalvingMonths < absurdFirstCalvingMinMonths
-      ) {
-        errors.lastCalvingDate =
-          speciesInfo.animaltype === "cow"
-            ? "❌ البيانات غير منطقية: بقرة في الموسم الأول وعمرها عند آخر ولادة أقل من 18 شهرًا. راجع تاريخ الميلاد أو تاريخ آخر ولادة."
-            : "❌ البيانات غير منطقية: جاموسة في الموسم الأول وعمرها عند آخر ولادة أقل من 24 شهرًا. راجع تاريخ الميلاد أو تاريخ آخر ولادة."
-      }
+          ? "❌ البيانات غير منطقية: عمر البقرة عند آخر ولادة أقل من 18 شهرًا. راجع تاريخ الميلاد أو تاريخ آخر ولادة."
+          : "❌ البيانات غير منطقية: عمر الجاموسة عند آخر ولادة أقل من 24 شهرًا. راجع تاريخ الميلاد أو تاريخ آخر ولادة.";
     }
   }
+}
 
   return errors;
 }
