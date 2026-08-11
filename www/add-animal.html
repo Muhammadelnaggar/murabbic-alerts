@@ -653,30 +653,120 @@ function setValue(id, value){
 }
 
 let previewTimer = null;
+let previewRequestSeq = 0;
+let previewGateBlocked = false;
+let saveInFlight = false;
+let lastPreviewGateMessage = "";
+
+function syncPrimaryActionState(){
+  if (primaryActionBtn) {
+    primaryActionBtn.disabled =
+      previewGateBlocked || saveInFlight;
+  }
+}
+
+function clearPreviewGateMessage(){
+  if (
+    infoBar &&
+    lastPreviewGateMessage &&
+    String(infoBar.textContent || "").trim() === lastPreviewGateMessage
+  ) {
+    infoBar.style.display = "none";
+    infoBar.className = "mbk-infobar";
+    infoBar.textContent = "";
+  }
+
+  lastPreviewGateMessage = "";
+}
 
 async function refreshServerPreview(){
   clearTimeout(previewTimer);
+
+  const requestSeq = ++previewRequestSeq;
+
+  // بمجرد تغيير حقل مؤثر نقفل التسجيل حتى يرد Gate من السيرفر.
+  previewGateBlocked = true;
+  syncPrimaryActionState();
 
   previewTimer = setTimeout(async () => {
     try {
       const formData = collectFormData();
 
-      const result = await postToServer("/api/add-animal/preview", { formData });
+      const gateResult = await postToServer(
+        "/api/add-animal/gate",
+        { formData }
+      );
+
+      if (requestSeq !== previewRequestSeq) return;
+
+      const gateData = gateResult.data || {};
+
+      if (!gateData.ok || gateData.allowed === false) {
+        setValue("daysInMilk", null);
+        setValue("pregnancyDays", null);
+        setValue("followerPregnancyDays", null);
+
+        lastPreviewGateMessage =
+          gateData.message ||
+          "❌ راجع بيانات الحيوان قبل المتابعة.";
+
+        showServerMessage(lastPreviewGateMessage, false);
+
+        previewGateBlocked = true;
+        syncPrimaryActionState();
+        return;
+      }
+
+      clearPreviewGateMessage();
+
+      const result = await postToServer(
+        "/api/add-animal/preview",
+        { formData }
+      );
+
+      if (requestSeq !== previewRequestSeq) return;
+
       const data = result.data || {};
 
-      if (!data.ok) return;
+      if (!data.ok) {
+        lastPreviewGateMessage =
+          data.message ||
+          "❌ تعذّر التحقق من بيانات الحيوان الآن.";
+
+        showServerMessage(lastPreviewGateMessage, false);
+
+        previewGateBlocked = true;
+        syncPrimaryActionState();
+        return;
+      }
 
       setValue("daysInMilk", data.daysInMilk);
       setValue("pregnancyDays", data.pregnancyDays);
       setValue("followerPregnancyDays", data.followerPregnancyDays);
 
+      previewGateBlocked = false;
+      syncPrimaryActionState();
+
     } catch (err) {
-      console.warn("add animal preview failed:", err);
+      if (requestSeq !== previewRequestSeq) return;
+
+      console.warn("add animal gate/preview failed:", err);
+
+      lastPreviewGateMessage =
+        "❌ تعذّر التحقق من بيانات الحيوان الآن. حاول مرة أخرى.";
+
+      showServerMessage(lastPreviewGateMessage, false);
+
+      previewGateBlocked = true;
+      syncPrimaryActionState();
     }
   }, 250);
 }
 
 [
+  "animalType",
+  "birthDate",
+  "lactationNumber",
   "productionStatus",
   "reproductiveStatus",
   "lastCalvingDate",
@@ -686,16 +776,33 @@ async function refreshServerPreview(){
 ].forEach((id) => {
   const el = document.getElementById(id);
   if (!el) return;
+
   el.addEventListener("change", refreshServerPreview);
   el.addEventListener("input", refreshServerPreview);
 });
+
+["btnMothers", "btnFollowers"].forEach((id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  el.addEventListener("click", () => {
+    setTimeout(refreshServerPreview, 0);
+  });
+});
   form.addEventListener("submit", async function(e){
     e.preventDefault();
-
+    if (previewGateBlocked) {
+  showServerMessage(
+    lastPreviewGateMessage || "❌ راجع بيانات الحيوان قبل التسجيل.",
+    false
+  );
+  return;
+}
     const formData = collectFormData();
 
     try {
-      if (primaryActionBtn) primaryActionBtn.disabled = true;
+      saveInFlight = true;
+syncPrimaryActionState();
 
       showServerMessage("جارِ إرسال البيانات للسيرفر…", true);
 
@@ -730,7 +837,8 @@ const result = await postToServer("/api/add-animal/save", { formData });
       showServerMessage("تعذّر الاتصال بالسيرفر أثناء تسجيل الحيوان.", false);
 
     } finally {
-      if (primaryActionBtn) primaryActionBtn.disabled = false;
+     saveInFlight = false;
+syncPrimaryActionState();
     }
   });
 })();
