@@ -4748,29 +4748,38 @@ function addAnimalSpeciesFromTypeSrv(animalType) {
   };
 }
 
-function addAnimalBasicFieldsDecisionSrv(fd = {}) {
+function addAnimalBasicFieldsDecisionSrv(fd = {}, options = {}) {
   const errors = {};
+  const partial = options.partial === true;
 
-  if (!addAnimalDigitsSrv(fd.animalNumber || fd.number || fd.calfNumber)) {
+  if (
+    !partial &&
+    !addAnimalDigitsSrv(fd.animalNumber || fd.number || fd.calfNumber)
+  ) {
     errors.animalNumber = "أدخل رقم الحيوان.";
   }
 
-  if (!addAnimalStrSrv(fd.animalType || fd.animalTypeAr)) {
+  if (
+    !partial &&
+    !addAnimalStrSrv(fd.animalType || fd.animalTypeAr)
+  ) {
     errors.animalType = "اختر نوع الحيوان.";
   }
 
-  if (!addAnimalStrSrv(fd.breed)) {
+  if (!partial && !addAnimalStrSrv(fd.breed)) {
     errors.breed = "اختر السلالة.";
   }
 
-  if (!addAnimalStrSrv(fd.birthDate)) {
+  if (!partial && !addAnimalStrSrv(fd.birthDate)) {
     errors.birthDate = "أدخل تاريخ ميلاد الحيوان.";
   }
 
   const entryType = addAnimalStrSrv(fd.entryType);
 
   if (!entryType) {
-    errors.entryType = "اختر نوع الإدخال.";
+    if (!partial) {
+      errors.entryType = "اختر نوع الإدخال.";
+    }
   } else if (!["mothers", "followers"].includes(entryType)) {
     errors.entryType = "نوع الإدخال غير صحيح.";
   }
@@ -4821,7 +4830,7 @@ function addAnimalBasicFieldsDecisionSrv(fd = {}) {
     // لا يمكن أن تسبق آخر ولادة تاريخ ميلاد الحيوان.
     if (lastCalvingDate < birthDate) {
       errors.lastCalvingDate =
-        "❌ لا يمكن حفظ البيانات: تاريخ آخر ولادة يسبق تاريخ ميلاد الحيوان. راجع التاريخين.";
+       "❌ تاريخ آخر ولادة لا يمكن أن يسبق تاريخ ميلاد الحيوان. راجع التاريخين."
     } else if (
       !errors.lactationNumber &&
       Number(fd.lactationNumber) === 1
@@ -4856,8 +4865,8 @@ function addAnimalBasicFieldsDecisionSrv(fd = {}) {
       ) {
         errors.lastCalvingDate =
           speciesInfo.animaltype === "cow"
-            ? "❌ لا يمكن حفظ البيانات: بقرة في الموسم الأول لا يمكن أن يكون عمرها عند آخر ولادة أقل من 18 شهرًا. راجع تاريخ الميلاد وتاريخ آخر ولادة."
-            : "❌ لا يمكن حفظ البيانات: جاموسة في الموسم الأول لا يمكن أن يكون عمرها عند آخر ولادة أقل من 24 شهرًا. راجع تاريخ الميلاد وتاريخ آخر ولادة.";
+            ? "❌ البيانات غير منطقية: بقرة في الموسم الأول وعمرها عند آخر ولادة أقل من 18 شهرًا. راجع تاريخ الميلاد أو تاريخ آخر ولادة."
+            : "❌ البيانات غير منطقية: جاموسة في الموسم الأول وعمرها عند آخر ولادة أقل من 24 شهرًا. راجع تاريخ الميلاد أو تاريخ آخر ولادة."
       }
     }
   }
@@ -5404,14 +5413,19 @@ app.post("/api/add-animal/save", requireUserId, async (req, res) => {
 
     const fieldErrors = addAnimalBasicFieldsDecisionSrv(fd);
 
-    if (Object.keys(fieldErrors).length) {
-      return res.status(400).json({
-        ok: false,
-        error: "add_animal_fields_invalid",
-        message: "❌ راجع الحقول الموضحة وأكمل بيانات الحيوان.",
-        fieldErrors
-      });
-    }
+   if (Object.keys(fieldErrors).length) {
+  const firstFieldError =
+    Object.values(fieldErrors)
+      .find(v => String(v || "").trim()) ||
+    "❌ راجع بيانات الحيوان وأعد المحاولة.";
+
+  return res.status(400).json({
+    ok: false,
+    error: "add_animal_fields_invalid",
+    message: firstFieldError,
+    fieldErrors
+  });
+}
 
     const guardMessage = addAnimalDecisionSrv(fd);
 
@@ -5493,12 +5507,75 @@ app.post("/api/add-animal/save", requireUserId, async (req, res) => {
     });
   }
 });
+app.post("/api/add-animal/gate", requireUserId, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const fd = body.formData && typeof body.formData === "object"
+      ? body.formData
+      : body;
+
+    const fieldErrors =
+      addAnimalBasicFieldsDecisionSrv(
+        fd,
+        { partial: true }
+      );
+
+    if (Object.keys(fieldErrors).length) {
+      const message =
+        Object.values(fieldErrors)
+          .find(v => String(v || "").trim()) ||
+        "❌ راجع بيانات الحيوان قبل المتابعة.";
+
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        error: "add_animal_gate_failed",
+        message,
+        fieldErrors
+      });
+    }
+
+    return res.json({
+      ok: true,
+      allowed: true
+    });
+
+  } catch (e) {
+    console.error("add-animal-gate failed", e);
+
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      error: "add_animal_gate_failed",
+      message: "❌ تعذّر التحقق من بيانات الحيوان الآن. حاول مرة أخرى."
+    });
+  }
+});
 app.post("/api/add-animal/preview", requireUserId, async (req, res) => {
   try {
     const body = req.body || {};
     const fd = body.formData && typeof body.formData === "object"
       ? body.formData
       : body;
+     const previewFieldErrors =
+  addAnimalBasicFieldsDecisionSrv(
+    fd,
+    { partial: true }
+  );
+
+if (Object.keys(previewFieldErrors).length) {
+  const message =
+    Object.values(previewFieldErrors)
+      .find(v => String(v || "").trim()) ||
+    "❌ راجع بيانات الحيوان قبل المتابعة.";
+
+  return res.status(400).json({
+    ok: false,
+    error: "add_animal_preview_gate_failed",
+    message,
+    fieldErrors: previewFieldErrors
+  });
+}
 
     const today = addAnimalTodaySrv();
 
