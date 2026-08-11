@@ -22411,11 +22411,18 @@ if (
   }
 
   // ✅ لازم يكون عشار
-  const rsRaw = String(
-    fd.reproStatusFromEvents ||
-    doc.reproductiveStatus ||
-    ""
-  ).trim();
+const rsRaw = String(
+  fd.reproStatusFromEvents ||
+  fd.reproductiveStatus ||
+  doc.reproductiveStatus ||
+  doc.followerStatus ||
+  (
+    String(doc.entryType || "").trim() === "followers"
+      ? doc.status
+      : ""
+  ) ||
+  ""
+).trim();
 
   const rsNorm = calvingStripArSrv(rsRaw);
 
@@ -48873,7 +48880,16 @@ if (/buffalo|جاموس/i.test(species)) {
 }
 
     const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
-    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+   const reproFromDoc = String(
+  doc.reproductiveStatus ||
+  doc.followerStatus ||
+  (
+    String(doc.entryType || "").trim() === "followers"
+      ? doc.status
+      : ""
+  ) ||
+  ""
+).trim();
    const reproStatus =
   reproFromEvents ||
   reproFromDoc ||
@@ -49039,7 +49055,16 @@ if (/buffalo|جاموس/i.test(species)) {
 }
 
     const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
-    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+   const reproFromDoc = String(
+  doc.reproductiveStatus ||
+  doc.followerStatus ||
+  (
+    String(doc.entryType || "").trim() === "followers"
+      ? doc.status
+      : ""
+  ) ||
+  ""
+).trim();
     const reproStatus = reproFromEvents || reproFromDoc || "";
 
    const lastInseminationDate =
