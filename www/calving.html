@@ -35,7 +35,7 @@
       <input type="hidden" data-field="species" id="species">
       <input type="hidden" data-field="reproStatus" value="عشار">
 
-      <div class="row">
+           <div class="row">
         <div>
           <label>رقم الحيوان</label>
           <input id="animalNumber" data-field="animalNumber" inputmode="numeric"
@@ -44,6 +44,25 @@
         <div>
           <label>تاريخ الولادة</label>
           <input id="eventDate" data-field="eventDate" type="date" required />
+        </div>
+      </div>
+
+      <!-- يظهر فقط عند أول ولادة لعجلة موجودة في التوابع -->
+      <div class="row" id="newMotherNumberRow" style="display:none">
+        <div>
+          <label>رقم الأم الجديد</label>
+          <input
+            id="newMotherNumber"
+            data-field="newMotherNumber"
+            inputmode="numeric"
+            placeholder="حسب سيريال المزرعة"
+          />
+          <small
+            id="newMotherNumberHint"
+            style="display:block;margin-top:6px;font-weight:800;line-height:1.6;color:#556"
+          >
+            سيظل رقم العجلة القديم محفوظًا داخل وثيقة الأم وتاريخها.
+          </small>
         </div>
       </div>
 
@@ -186,8 +205,19 @@
   const lastAiEl = document.getElementById("lastInseminationDate");
   const animalIdEl = document.getElementById("animalId");
   const speciesEl = document.getElementById("species");
+
+  const newMotherNumberRow =
+    document.getElementById("newMotherNumberRow");
+
+  const newMotherNumberEl =
+    document.getElementById("newMotherNumber");
+
+  const newMotherNumberHint =
+    document.getElementById("newMotherNumberHint");
+
   const saveBtn = document.getElementById("saveBtn");
 
+  let requiresNewMotherNumber = false;
 
   function toISO(s) {
     const v = String(s || "").trim();
@@ -329,9 +359,12 @@
       eventDate: String(dateEl?.value || "").trim(),
       date: String(dateEl?.value || "").trim(),
 
-      animalId: String(animalIdEl?.value || "").trim(),
+       animalId: String(animalIdEl?.value || "").trim(),
       species: String(speciesEl?.value || "").trim(),
       reproStatus: "عشار",
+
+      newMotherNumber:
+        normalizeDigits(newMotherNumberEl?.value || ""),
 
       calvingKind: String(kindEl?.value || "").trim(),
       calfCount: readRadio("calfCount"),
@@ -384,6 +417,49 @@
     );
   }
 
+  function syncNewMotherNumberField(
+    required,
+    previousFollowerNumber = ""
+  ) {
+    requiresNewMotherNumber = !!required;
+
+    if (newMotherNumberRow) {
+      newMotherNumberRow.style.display =
+        requiresNewMotherNumber
+          ? ""
+          : "none";
+    }
+
+    if (newMotherNumberEl) {
+      newMotherNumberEl.required =
+        requiresNewMotherNumber;
+
+      newMotherNumberEl.disabled =
+        !requiresNewMotherNumber;
+
+      if (!requiresNewMotherNumber) {
+        newMotherNumberEl.value = "";
+      }
+    }
+
+    if (
+      newMotherNumberHint &&
+      requiresNewMotherNumber
+    ) {
+      const oldNumber =
+        normalizeDigits(
+          previousFollowerNumber ||
+          animalEl?.value ||
+          ""
+        );
+
+      newMotherNumberHint.textContent =
+        oldNumber
+          ? `العجلة رقم ${oldNumber} ستنتقل إلى الأمهات بالرقم الجديد، وسيظل رقمها القديم محفوظًا داخل وثيقة الأم وتاريخها.`
+          : "سيظل رقم العجلة القديم محفوظًا داخل وثيقة الأم وتاريخها.";
+    }
+  }
+
   function applyGateData(data) {
     if (animalIdEl && data?.animalId) {
       animalIdEl.value = String(data.animalId || "");
@@ -396,8 +472,12 @@
     if (lastAiEl && data?.lastInseminationDate) {
       lastAiEl.value = String(data.lastInseminationDate || "").slice(0, 10);
     }
-  }
 
+    syncNewMotherNumberField(
+      data?.requiresNewMotherNumber === true,
+      data?.previousFollowerNumber || ""
+    );
+  }
   function syncCalfGroups() {
     const isDead = (kindEl?.value === "نافقة");
     const count = parseInt(
@@ -500,11 +580,12 @@
 if (authRequired) return;
       renderServerMessage(data, "تعذّر التحقق من أهلية الولادة.", true);
 
-      if (data?.allowed) {
-        applyGateData(data);
+          if (data?.allowed) {
         setDetailsDisabled(false);
+        applyGateData(data);
         syncCalfGroups();
       } else {
+        syncNewMotherNumberField(false);
         setDetailsDisabled(true);
       }
 
@@ -522,7 +603,34 @@ if (authRequired) return;
 
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
+
     const payload = collectPayload();
+
+    if (
+      requiresNewMotherNumber &&
+      !payload.newMotherNumber
+    ) {
+      showSysbar(
+        "❌ أدخل رقم الأم الجديد حسب سيريال المزرعة.",
+        "error"
+      );
+
+      newMotherNumberEl?.focus?.();
+      return;
+    }
+
+    if (
+      requiresNewMotherNumber &&
+      payload.newMotherNumber === payload.animalNumber
+    ) {
+      showSysbar(
+        "❌ رقم الأم الجديد يجب أن يختلف عن رقم العجلة الحالي.",
+        "error"
+      );
+
+      newMotherNumberEl?.focus?.();
+      return;
+    }
 
     try {
       if (saveBtn) saveBtn.disabled = true;
@@ -575,13 +683,31 @@ if (authRequired) return;
     location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
   });
 
-  document.addEventListener("DOMContentLoaded", () => {
-  const n = qp.get("animalNumber") || qp.get("number") || qp.get("animalId") || "";
-  const d = qp.get("eventDate") || qp.get("date") || qp.get("dt") || "";
+   document.addEventListener("DOMContentLoaded", () => {
+    const n =
+      qp.get("animalNumber") ||
+      qp.get("number") ||
+      qp.get("animalId") ||
+      "";
 
-    if (animalEl) animalEl.value = normalizeDigits(n);
-    if (dateEl) dateEl.value = toISO(d) || new Date().toISOString().slice(0, 10);
+    const d =
+      qp.get("eventDate") ||
+      qp.get("date") ||
+      qp.get("dt") ||
+      "";
 
+    if (animalEl) {
+      animalEl.value =
+        normalizeDigits(n);
+    }
+
+    if (dateEl) {
+      dateEl.value =
+        toISO(d) ||
+        new Date().toISOString().slice(0, 10);
+    }
+
+    syncNewMotherNumberField(false);
     setDetailsDisabled(true);
     syncCalfGroups();
     scheduleGate();
