@@ -22245,14 +22245,32 @@ function abortionDecisionSrv(fd) {
   // ✅ خارج القطيع
   const st = String(doc?.status ?? "").trim().toLowerCase();
 
-  if (st === "inactive") {
+  if (st === "inactive" || st === "archived") {
     return "❌ هذا الحيوان خارج القطيع، لذلك لا يمكن تسجيل إجهاض له.";
   }
 
-  // ✅ تاريخ صالح
-  if (!calvingIsDateSrv(fd.eventDate)) {
-    return "❌ أدخل تاريخ إجهاض صحيحًا.";
-  }
+ // ✅ تاريخ صالح
+const eventDate =
+  String(fd.eventDate || "")
+    .trim()
+    .slice(0, 10);
+
+if (!calvingIsDateSrv(eventDate)) {
+  return "❌ أدخل تاريخ إجهاض صحيحًا.";
+}
+
+const todayISO =
+  String(fd.todayISO || "")
+    .trim()
+    .slice(0, 10);
+
+if (
+  todayISO &&
+  calvingIsDateSrv(todayISO) &&
+  eventDate > todayISO
+) {
+  return "❌ تاريخ الإجهاض لا يمكن أن يكون في المستقبل.";
+}
 
   // ✅ تحديد النوع
   let sp = String(
@@ -22314,19 +22332,30 @@ function abortionDecisionSrv(fd) {
     }
   }
 
-  // ✅ عمر الحمل أقل من حد الولادة
-  const gDays = calvingDaysBetweenSrv(lf, fd.eventDate);
+ // ✅ عمر الحمل أقل من حد الولادة
+const gDays =
+  calvingDaysBetweenSrv(
+    lf,
+    eventDate
+  );
 
-  if (Number.isNaN(gDays)) {
-    return "❌ لم أستطع حساب عمر الحمل. راجع تاريخ آخر تلقيح وتاريخ الإجهاض.";
-  }
-
-  if (gDays >= th) {
-    return `❌ عمر الحمل حتى التاريخ المختار ${gDays} يومًا، وهو ضمن نطاق الولادة لأن الحد الأدنى ${th} يومًا. راجع التاريخ أو سجّل ولادة بدلًا من الإجهاض.`;
-  }
-
-  return null;
+if (!Number.isFinite(gDays)) {
+  return "❌ لم أستطع حساب عمر الحمل. راجع تاريخ آخر تلقيح وتاريخ الإجهاض.";
 }
+
+if (gDays < 0) {
+  return "❌ تاريخ الإجهاض لا يمكن أن يسبق تاريخ آخر تلقيح المُخصِّب.";
+}
+
+if (gDays >= th) {
+  return `❌ عمر الحمل حتى التاريخ المختار ${gDays} يومًا، وهو ضمن نطاق الولادة لأن الحد الأدنى ${th} يومًا. راجع التاريخ أو سجّل ولادة بدلًا من الإجهاض.`;
+}
+
+return null;
+}
+
+// ============================================================
+//                 ABORTION DERIVED FIELDS — moved from abortion.html
 
 // ============================================================
 //                 ABORTION DERIVED FIELDS — moved from abortion.html
@@ -48671,7 +48700,7 @@ app.post("/api/abortion/gate", requireUserId, async (req, res) => {
     const doc = animal.data || {};
 
     const st = String(doc.status ?? "").trim().toLowerCase();
-    if (st === "inactive") {
+   if (st === "inactive" || st === "archived") {
       return res.status(400).json({
         ok: false,
         allowed: false,
@@ -48680,12 +48709,47 @@ app.post("/api/abortion/gate", requireUserId, async (req, res) => {
     }
 
     const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+     const alreadyAbortionSameDay =
+  await existsAbortionSameDaySrv(
+    uid,
+    animalNumber,
+    eventDate
+  );
 
-    const docSpecies = String(doc.species || doc.animalTypeAr || "").trim();
+if (alreadyAbortionSameDay) {
+  return res.status(409).json({
+    ok: false,
+    allowed: false,
+    message:
+      `ℹ️ الإجهاض مسجل بالفعل للحيوان رقم ${animalNumber} في هذا التاريخ.`
+  });
+}
 
-    let species = String(body.species || "").trim() || docSpecies;
-    if (/cow|بقر/i.test(species)) species = "أبقار";
-    if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+const todayISO =
+  await farmTodayISOSrv(
+    req.authSession?.uid ||
+    uid
+  );
+
+    const docSpecies =
+  String(
+    doc.species ||
+    doc.animalTypeAr ||
+    doc.animalType ||
+    doc.animaltype ||
+    doc.type ||
+    ""
+  ).trim();
+
+let species = docSpecies;
+
+if (/cow|بقر/i.test(species)) {
+  species = "أبقار";
+}
+
+if (/buffalo|جاموس/i.test(species)) {
+  species = "جاموس";
+}
 
     const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
     const reproFromDoc = String(doc.reproductiveStatus || "").trim();
@@ -48703,6 +48767,7 @@ app.post("/api/abortion/gate", requireUserId, async (req, res) => {
     const gateData = {
       animalNumber,
       eventDate,
+      todayISO,
       animalId: animal.id || "",
       species,
       documentData: doc,
@@ -48802,7 +48867,7 @@ app.post("/api/abortion/save", requireUserId, async (req, res) => {
     const doc = animal.data || {};
 
     const st = String(doc.status ?? "").trim().toLowerCase();
-    if (st === "inactive") {
+   if (st === "inactive" || st === "archived") {
       return res.status(400).json({
         ok: false,
         message: `❌ الحيوان رقم ${animalNumber} خارج القطيع، لذلك لا يمكن تسجيل إجهاض له.`
@@ -48810,27 +48875,66 @@ app.post("/api/abortion/save", requireUserId, async (req, res) => {
     }
 
     const signals = await fetchCalvingSignalsFromEventsSrv(uid, animalNumber);
+     const alreadyAbortionSameDay =
+  await existsAbortionSameDaySrv(
+    uid,
+    animalNumber,
+    eventDate
+  );
 
-    const docSpecies = String(doc.species || doc.animalTypeAr || "").trim();
+if (alreadyAbortionSameDay) {
+  return res.status(409).json({
+    ok: false,
+    allowed: false,
+    message:
+      `ℹ️ الإجهاض مسجل بالفعل للحيوان رقم ${animalNumber} في هذا التاريخ.`
+  });
+}
 
-    let species = String(formData.species || "").trim() || docSpecies;
-    if (/cow|بقر/i.test(species)) species = "أبقار";
-    if (/buffalo|جاموس/i.test(species)) species = "جاموس";
+const todayISO =
+  await farmTodayISOSrv(
+    req.authSession?.uid ||
+    uid
+  );
+
+    const docSpecies =
+  String(
+    doc.species ||
+    doc.animalTypeAr ||
+    doc.animalType ||
+    doc.animaltype ||
+    doc.type ||
+    ""
+  ).trim();
+
+let species = docSpecies;
+
+if (/cow|بقر/i.test(species)) {
+  species = "أبقار";
+}
+
+if (/buffalo|جاموس/i.test(species)) {
+  species = "جاموس";
+}
 
     const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
     const reproFromDoc = String(doc.reproductiveStatus || "").trim();
     const reproStatus = reproFromEvents || reproFromDoc || "";
 
-    const lastInseminationDate = String(
-      formData.lastInseminationDate ||
-      signals.lastInseminationDateFromEvents ||
-      doc.lastInseminationDate ||
-      ""
-    ).trim();
+   const lastInseminationDate =
+  String(
+    signals.lastInseminationDateFromEvents ||
+    doc.lastInseminationDate ||
+    doc.lastAI ||
+    doc.lastInsemination ||
+    doc.lastServiceDate ||
+    ""
+  ).trim();
 
     const gateData = {
       animalNumber,
       eventDate,
+       todayISO,
       animalId: animal.id || "",
       species,
       documentData: doc,
@@ -48862,7 +48966,7 @@ app.post("/api/abortion/save", requireUserId, async (req, res) => {
 
       eventDate,
       animalNumber,
-      animalId: String(formData.animalId || animal.id || "").trim(),
+      animalId: String(animal.id || "").trim(),
 
       species: species || "",
       reproductiveStatusBefore: reproStatus || "",
