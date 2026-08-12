@@ -14960,7 +14960,7 @@ function eventsPageDetailsSrv(ev = {}) {
     add("حالة الحمل عند التجفيف", ["pregnancyStatusAtDryOff", "pregnancyStatus", "pregStatus"]);
     add("سبب التجفيف", ["reason", "dryOffReason"]);
     add("إنتاج اللبن وقت التجفيف", ["milkAtDryOff", "dailyMilk", "milkKg"], " كجم");
-    add("مضاد حيوي", ["usedAntibiotics", "antibioticUsed"]);
+    add("مضاد حيوي", ["usedDryingAntibiotics", "usedAntibiotics", "antibioticUsed"]);
     add("اسم المستحضر", ["antibioticName", "drugName", "productName"]);
     add("تاريخ الولادة المتوقع", ["expectedCalvingDate", "dueDate"]);
     if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
