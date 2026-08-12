@@ -4995,7 +4995,7 @@ if (
           ? 24
           : null;
 
-    if (
+       if (
       Number.isFinite(ageAtCalvingMonths) &&
       Number.isFinite(
         minimumPossibleCalvingAgeMonths
@@ -5009,6 +5009,23 @@ if (
           : "❌ البيانات غير منطقية: عمر الجاموسة عند آخر ولادة أقل من 24 شهرًا. راجع تاريخ الميلاد أو تاريخ آخر ولادة.";
     }
   }
+}
+
+const lastInseminationDate =
+  addAnimalDateOrNullSrv(
+    fd.lastInseminationDate
+  );
+
+if (
+  entryType === "mothers" &&
+  lastCalvingDate &&
+  lastInseminationDate &&
+  !errors.lastCalvingDate &&
+  !errors.lastInseminationDate &&
+  lastInseminationDate <= lastCalvingDate
+) {
+  errors.lastInseminationDate =
+    "❌ تاريخ آخر تلقيح يجب أن يكون بعد تاريخ آخر ولادة. راجع التاريخين.";
 }
 
   return errors;
