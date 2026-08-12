@@ -761,7 +761,9 @@ if (
 }
 
 if (j.ok === true && j.redirectUrl) {
-  location.replace(j.redirectUrl);
+  location.replace(
+    `${j.redirectUrl}${importQuery}`
+  );
   return;
 }
 
