@@ -34,7 +34,13 @@
     <option value="">كل الحالات</option>
   </select>
 
-  <button id="resetFilterBtn" type="button">عرض الكل</button>
+  <button
+  id="showImportedMothersBtn"
+  type="button"
+  style="display:none;"
+>
+  عرض الأمهات المستوردة
+</button>
 </div>
 
 <div class="table-wrapper">
@@ -75,7 +81,24 @@
       location.search
     ).get("importId") || ""
   ).trim();
+if (importId) {
+  const btn =
+    document.getElementById(
+      "showImportedMothersBtn"
+    );
 
+  if (btn) {
+    btn.style.display = "";
+
+    btn.addEventListener(
+      "click",
+      () => {
+        location.href =
+          `animal-list.html?importId=${encodeURIComponent(importId)}`;
+      }
+    );
+  }
+}
 let importHighlightScrolled = false;
 
   const API_BASE = window.API_BASE || "https://murabbic-alerts.onrender.com";
