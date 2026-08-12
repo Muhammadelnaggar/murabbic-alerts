@@ -47889,6 +47889,9 @@ const MURABBIK_CLOSE_UP_POLICY_SRV = Object.freeze({
   })
 });
 
+const MURABBIK_CLOSE_UP_YES_NO_SRV =
+  new Set(["نعم", "لا"]);
+
 function closeupPolicySrv(speciesRaw = "") {
   const species = calvingNormalizeSpeciesSrv(speciesRaw);
   const policy = MURABBIK_CLOSE_UP_POLICY_SRV[species] || null;
@@ -48013,8 +48016,23 @@ if (!rsNorm.includes("عشار")) {
     return "❌ لم أجد تاريخ آخر تلقيح مُخصِّب، لذلك لا أستطيع حساب موعد الولادة. راجع بيانات التلقيح أولًا.";
   }
 
-  if (!calvingIsDateSrv(fd.eventDate)) {
+   if (!calvingIsDateSrv(fd.eventDate)) {
    return "❌ أدخل تاريخ تحضير صحيحًا.";
+  }
+
+  const closeUpDate =
+    String(fd.eventDate || "")
+      .trim()
+      .slice(0, 10);
+
+  const todayISO =
+    addAnimalTodaySrv();
+
+  if (
+    calvingIsDateSrv(todayISO) &&
+    closeUpDate > todayISO
+  ) {
+    return "❌ تاريخ تحضير الولادة لا يمكن أن يكون في المستقبل.";
   }
 
   if (calvingIsDateSrv(lastCloseUp)) {
@@ -48033,30 +48051,98 @@ if (!rsNorm.includes("عشار")) {
 
    return null;
 }
-async function updateAnimalAfterCloseupSaveSrv(ev = {}) {
-  const uid = String(ev.userId || "").trim();
-  const animalNumber = calvingNormDigitsOnlySrv(ev.animalNumber || ev.number || "");
-  let animalId = String(ev.animalId || "").trim();
+async function updateAnimalAfterCloseupSaveSrv(
+  ev = {},
+  tx = null
+) {
+  const uid =
+    String(ev.userId || "").trim();
+
+  const animalNumber =
+    calvingNormDigitsOnlySrv(
+      ev.animalNumber ||
+      ev.number ||
+      ""
+    );
+
+  let animalId =
+    String(ev.animalId || "").trim();
+
+  let animalCollection =
+    String(ev.animalCollection || "").trim() === "calves"
+      ? "calves"
+      : "animals";
 
   if (!animalId) {
-    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
-    animalId = String(animal?.id || "").trim();
+    const animal =
+      await fetchAnimalByNumberForCalvingGateSrv(
+        uid,
+        animalNumber
+      );
+
+    animalId =
+      String(animal?.id || "").trim();
+
+    animalCollection =
+      animal?._collection === "calves"
+        ? "calves"
+        : "animals";
   }
 
   if (!uid || !animalNumber || !animalId) {
-    console.warn("⛔ close-up animal update skipped:", { uid, animalNumber, animalId });
+    console.warn(
+      "⛔ close-up animal update skipped:",
+      {
+        uid,
+        animalNumber,
+        animalId,
+        animalCollection
+      }
+    );
+
     return;
   }
 
-  const eventDate = String(ev.eventDate || "").trim().slice(0, 10);
+  const eventDate =
+    String(ev.eventDate || "")
+      .trim()
+      .slice(0, 10);
 
-  await db.collection("animals").doc(animalId).set({
+  const animalRef =
+    db
+      .collection(animalCollection)
+      .doc(animalId);
+
+  const update = {
     lastCloseUpDate: eventDate,
     productionStatus: "انتظار ولادة",
-    closeUpRation: String(ev.ration || "").trim(),
-    anionicSalts: String(ev.anionicSalts || "").trim(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
+
+    closeUpRation:
+      String(ev.ration || "").trim(),
+
+    anionicSalts:
+      String(ev.anionicSalts || "").trim(),
+
+    updatedAt:
+      admin.firestore
+        .FieldValue
+        .serverTimestamp()
+  };
+
+  if (tx) {
+    tx.set(
+      animalRef,
+      update,
+      { merge: true }
+    );
+
+    return;
+  }
+
+  await animalRef.set(
+    update,
+    { merge: true }
+  );
 }
 function closeupParseNumbersSrv(raw) {
   const values = Array.isArray(raw)
@@ -48136,9 +48222,15 @@ async function closeupEvaluateAnimalSrv({
     ""
   ).trim();
 
-  const row = {
+   const row = {
     animalNumber,
     animalId: animal.id || "",
+
+    animalCollection:
+      animal._collection === "calves"
+        ? "calves"
+        : "animals",
+
     eventDate,
     species,
     lastInseminationDate,
@@ -48374,13 +48466,7 @@ app.post(
       const uid = req.userId;
       const body = req.body || {};
 
-      const numbers = closeupParseNumbersSrv(
-        (
-          Array.isArray(body.accepted) &&
-          body.accepted.length
-            ? body.accepted
-            : null
-        ) ||
+           const numbers = closeupParseNumbersSrv(
         body.animalNumbers ||
         body.numbers ||
         body.bulk ||
@@ -48388,7 +48474,6 @@ app.post(
         body.number ||
         ""
       );
-
       const eventDate = String(
         body.eventDate ||
         body.date ||
@@ -48438,36 +48523,42 @@ app.post(
         });
       }
 
-      if (!ration) {
+          if (
+        !MURABBIK_CLOSE_UP_YES_NO_SRV
+          .has(ration)
+      ) {
         return res.status(400).json({
           ok: false,
 
           message:
-            "❌ أخبرني: هل بدأت تقديم عليقة التحضير؟",
+            "❌ اختر «نعم» أو «لا» لعليقة التحضير.",
 
           savedCount: 0,
           rejectedCount: numbers.length,
           saved: [],
 
           rejected: rejectAll(
-            "❌ يجب تحديد هل تم تقديم عليقة التحضير."
+            "❌ قيمة عليقة التحضير يجب أن تكون «نعم» أو «لا»."
           )
         });
       }
 
-      if (!anionicSalts) {
+      if (
+        !MURABBIK_CLOSE_UP_YES_NO_SRV
+          .has(anionicSalts)
+      ) {
         return res.status(400).json({
           ok: false,
 
           message:
-            "❌ أخبرني: هل استخدمت الأملاح الأنيونية؟",
+            "❌ اختر «نعم» أو «لا» للأملاح الأنيونية.",
 
           savedCount: 0,
           rejectedCount: numbers.length,
           saved: [],
 
           rejected: rejectAll(
-            "❌ يجب تحديد هل تم استخدام الأملاح الأنيونية."
+            "❌ قيمة الأملاح الأنيونية يجب أن تكون «نعم» أو «لا»."
           )
         });
       }
@@ -48493,13 +48584,51 @@ app.post(
           continue;
         }
 
-        const row = result.row;
+               const row = result.row;
+
+        const animalCollection =
+          row.animalCollection === "calves"
+            ? "calves"
+            : "animals";
+
+        const animalId =
+          String(row.animalId || "").trim();
+
+        if (!animalId) {
+          rejected.push({
+            animalNumber,
+            reason:
+              "❌ تعذّر تحديد سجل الحيوان المطلوب تحديثه."
+          });
+
+          continue;
+        }
+
+        const idempotencyKey =
+          `${uid}|close_up|${animalId}|${row.lastInseminationDate}`;
+
+        const eventRef =
+          db
+            .collection("events")
+            .doc(
+              eventsPageStableDocIdSrv(
+                uid,
+                "close_up",
+                animalId,
+                row.lastInseminationDate
+              )
+            );
+
+        const animalRef =
+          db
+            .collection(animalCollection)
+            .doc(animalId);
 
         const payload = {
           userId: uid,
 
-          animalId:
-            row.animalId,
+          animalId,
+          animalCollection,
 
           animalNumber:
             row.animalNumber,
@@ -48523,6 +48652,8 @@ app.post(
           eventTypeNorm:
             "close_up",
 
+          idempotencyKey,
+
           source:
             "server:/api/close-up/save",
 
@@ -48532,20 +48663,80 @@ app.post(
               .serverTimestamp()
         };
 
-        const eventRef =
-          await db
-            .collection("events")
-            .add(payload);
+        const txResult =
+          await db.runTransaction(
+            async tx => {
+              const existingEvent =
+                await tx.get(eventRef);
 
-        await updateAnimalAfterCloseupSaveSrv(
-          payload
-        );
+              if (existingEvent.exists) {
+                return {
+                  created: false,
+                  reason:
+                    "❌ سبق أن سجلت تحضير الولادة لهذا الحمل."
+                };
+              }
+
+              const currentAnimal =
+                await tx.get(animalRef);
+
+              if (!currentAnimal.exists) {
+                return {
+                  created: false,
+                  reason:
+                    "❌ لم أجد سجل الحيوان داخل القطيع."
+                };
+              }
+
+              const decision =
+                closeupDecisionSrv({
+                  ...row,
+                  eventDate,
+                  documentData:
+                    currentAnimal.data() || {}
+                });
+
+              if (decision) {
+                return {
+                  created: false,
+                  reason:
+                    String(decision)
+                };
+              }
+
+              tx.set(
+                eventRef,
+                payload
+              );
+
+              await updateAnimalAfterCloseupSaveSrv(
+                payload,
+                tx
+              );
+
+              return {
+                created: true
+              };
+            }
+          );
+
+        if (!txResult?.created) {
+          rejected.push({
+            animalNumber,
+            reason:
+              txResult?.reason ||
+              "❌ لم يتم حفظ تحضير الولادة لهذا الحيوان."
+          });
+
+          continue;
+        }
 
         saved.push({
-          eventId: eventRef.id,
+          eventId:
+            eventRef.id,
 
-          animalId:
-            row.animalId,
+          animalId,
+          animalCollection,
 
           animalNumber:
             row.animalNumber,
