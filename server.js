@@ -11964,8 +11964,22 @@ heatDatesRaw: String(
 animalStatus
   };
 
-  base.productionStatus = herdImportV2InferProductionStatusInternalSrv(base);
-  base.reproductiveStatus = herdImportV2InferReproductiveStatusInternalSrv({
+  const explicitProductionStatus =
+  addAnimalImportNormalizeProductionSrv(
+    herdImportV2FirstValueByCanonicalInternalSrv(
+      row,
+      columnMapInternal,
+      "productionStatus"
+    ),
+    {}
+  );
+
+base.productionStatus =
+  ["حلاب", "جاف"].includes(explicitProductionStatus)
+    ? explicitProductionStatus
+    : herdImportV2InferProductionStatusInternalSrv(base);
+
+base.reproductiveStatus = herdImportV2InferReproductiveStatusInternalSrv({
     ...base,
     reproductiveStatus,
     pdResult
