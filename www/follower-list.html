@@ -69,7 +69,7 @@
   const $ = id => document.getElementById(id);
   let followersData = [];
   let searchTimer = null;
-  const highlightedImportId =
+  const importId =
   String(
     new URLSearchParams(
       location.search
@@ -134,12 +134,13 @@ let importHighlightScrolled = false;
     const sex = $("sexSelector")?.value || "";
     const status = $("statusSelector")?.value || "";
 
-    if (q) params.set("searchNumber", q);
-    if (type) params.set("type", type);
-    if (sex) params.set("sex", sex);
-    if (status) params.set("status", status);
+   if (q) params.set("searchNumber", q);
+if (type) params.set("type", type);
+if (sex) params.set("sex", sex);
+if (status) params.set("status", status);
+if (importId) params.set("importId", importId);
 
-    const qs = params.toString();
+const qs = params.toString();
     return qs ? `/api/followers?${qs}` : "/api/followers";
   }
 
@@ -250,23 +251,8 @@ let importHighlightScrolled = false;
     noData.style.display = "none";
 
     data.forEach(follower => {
-      const tr = document.createElement("tr");
-      if (follower.rowClass) tr.className = follower.rowClass;
-      const isImportedRow =
-  highlightedImportId &&
-  String(
-    follower.importId || ""
-  ).trim() === highlightedImportId;
-
-if (isImportedRow) {
-  tr.classList.add(
-    "mbk-import-highlight"
-  );
-
-  tr.dataset.importHighlight =
-    "true";
-}
-
+const tr = document.createElement("tr");
+if (follower.rowClass) tr.className = follower.rowClass;
       appendTextCell(tr, follower.animalNumber);
       appendTextCell(tr, follower.animalTypeAr);
       appendTextCell(tr, follower.breed);
@@ -288,13 +274,10 @@ if (isImportedRow) {
 
    updateStickyCols();
 
-if (
-  highlightedImportId &&
-  !importHighlightScrolled
-) {
+if (!importHighlightScrolled) {
   const firstImportedRow =
     tbody.querySelector(
-      'tr[data-import-highlight="true"]'
+      "tr.mbk-import-highlight"
     );
 
   if (firstImportedRow) {
