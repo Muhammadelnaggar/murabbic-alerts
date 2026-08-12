@@ -83,7 +83,7 @@
 if (importId) {
   const btn =
     document.getElementById(
-      "showImportedMothersBtn"
+      "showImportedFollowersBtn"
     );
 
   if (btn) {
@@ -93,7 +93,7 @@ if (importId) {
       "click",
       () => {
         location.href =
-          `animal-list.html?importId=${encodeURIComponent(importId)}`;
+          `follower-list.html?importId=${encodeURIComponent(importId)}`;
       }
     );
   }
