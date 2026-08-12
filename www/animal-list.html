@@ -67,7 +67,7 @@
   const $ = id => document.getElementById(id);
   let animalsData = [];
   let searchTimer = null;
-  const highlightedImportId =
+ const importId =
   String(
     new URLSearchParams(
       location.search
@@ -127,11 +127,12 @@ async function loadServerSession(){
     const type = $('typeSelector')?.value || '';
     const repro = $('filterReproductive')?.value || '';
 
-    if (q) params.set('searchNumber', q);
-    if (type) params.set('type', type);
-    if (repro) params.set('reproductiveStatus', repro);
+   if (q) params.set('searchNumber', q);
+if (type) params.set('type', type);
+if (repro) params.set('reproductiveStatus', repro);
+if (importId) params.set('importId', importId);
 
-    const qs = params.toString();
+const qs = params.toString();
     return qs ? `/api/animals?${qs}` : '/api/animals';
   }
 
@@ -218,22 +219,8 @@ async function apiLoadAnimals() {
     noData.style.display = 'none';
 
     data.forEach(animal => {
-      const tr = document.createElement('tr');
-      if (animal.rowClass) tr.className = animal.rowClass;
-      const isImportedRow =
-  highlightedImportId &&
-  String(
-    animal.importId || ""
-  ).trim() === highlightedImportId;
-
-if (isImportedRow) {
-  tr.classList.add(
-    "mbk-import-highlight"
-  );
-
-  tr.dataset.importHighlight =
-    "true";
-}
+     const tr = document.createElement('tr');
+if (animal.rowClass) tr.className = animal.rowClass;
 
       appendTextCell(tr, animal.animalNumber);
       appendTextCell(tr, animal.animalTypeAr);
@@ -254,13 +241,10 @@ if (isImportedRow) {
 
    updateStickyCols();
 
-if (
-  highlightedImportId &&
-  !importHighlightScrolled
-) {
+if (!importHighlightScrolled) {
   const firstImportedRow =
     tbody.querySelector(
-      'tr[data-import-highlight="true"]'
+      "tr.mbk-import-highlight"
     );
 
   if (firstImportedRow) {
