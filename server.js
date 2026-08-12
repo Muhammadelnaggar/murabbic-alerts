@@ -13448,13 +13448,24 @@ if (missingAnimalTypeCount > 0) {
       );
 
     const persistencePlan =
-      herdImportV2BuildPersistencePlanInternalSrv({
-        uid,
-        baselinePreview,
-        eventsPreflight,
-        sourceProfile,
-        importOptions
-      });
+  herdImportV2BuildPersistencePlanInternalSrv({
+    uid,
+    baselinePreview,
+    eventsPreflight,
+    sourceProfile,
+    importOptions
+  });
+
+const importListQuery =
+  persistencePlan.importId
+    ? `?importId=${encodeURIComponent(persistencePlan.importId)}`
+    : "";
+
+const importMothersListUrl =
+  `animal-list.html${importListQuery}`;
+
+const importFollowersListUrl =
+  `follower-list.html${importListQuery}`;
 
     if (
       eventRows.length > 0 &&
@@ -13521,12 +13532,12 @@ if (missingAnimalTypeCount > 0) {
           workbookFingerprint:
             persistencePlan.workbookFingerprint,
 
-          redirectUrl:
-            Number(
-              completedJob.insertedFollowersCount || 0
-            ) > 0
-              ? "follower-list.html"
-              : "animal-list.html",
+         redirectUrl:
+  Number(
+    completedJob.insertedFollowersCount || 0
+  ) > 0
+    ? importFollowersListUrl
+    : importMothersListUrl,
 
           message:
             "ℹ️ تم استيراد هذا الملف بالفعل، ولم يكرر مُرَبِّيك الحيوانات أو الأحداث.",
@@ -13764,10 +13775,10 @@ if (missingAnimalTypeCount > 0) {
         workbookFingerprint:
           persistencePlan.workbookFingerprint,
 
-        redirectUrl:
-          saved.insertedFollowersCount > 0
-            ? "follower-list.html"
-            : "animal-list.html",
+       redirectUrl:
+  saved.insertedFollowersCount > 0
+    ? importFollowersListUrl
+    : importMothersListUrl,
 
         message:
           saved.alreadyCompleted
@@ -13881,11 +13892,24 @@ await addAnimalWriteSingleSrv(
     source:
       "server:/api/herd-import-v2/save-operational",
 
-    payloadPatch:
-      herdImportV2OperationalPayloadPatchInternalSrv(
-        base,
-        sourceProfile
-      )
+  payloadPatch: {
+  ...herdImportV2OperationalPayloadPatchInternalSrv(
+    base,
+    sourceProfile
+  ),
+
+  importId:
+    persistencePlan.importId,
+
+  importJobId:
+    persistencePlan.importId,
+
+  workbookFingerprint:
+    persistencePlan.workbookFingerprint,
+
+  importState:
+    "operational"
+}
   }
 );
 
@@ -13939,15 +13963,24 @@ if (gate.formData.entryType === "followers") {
       scheduleGroupsRebuildSrv(uid, "herd_import_v2_save_operational");
     }
 
-    return res.json({
-      ok: true,
-      mode: "herd_import_v2",
-      importMode: "save_operational_import",
-           redirectUrl:
-        insertedFollowersCount > 0
-          ? "follower-list.html"
-          : "animal-list.html",
-            message: `✅ تم استيراد ${insertedAnimalsCount} حيوان بنجاح.`,
+   return res.json({
+  ok: true,
+  mode: "herd_import_v2",
+  importMode: "save_operational_import",
+
+  importId:
+    persistencePlan.importId,
+
+  workbookFingerprint:
+    persistencePlan.workbookFingerprint,
+
+  redirectUrl:
+    insertedFollowersCount > 0
+      ? importFollowersListUrl
+      : importMothersListUrl,
+
+  message:
+    `✅ تم استيراد ${insertedAnimalsCount} حيوان بنجاح.`,
       insertedAnimalsCount,
       insertedFollowersCount,
       insertedMothersCount,
@@ -64796,64 +64829,151 @@ function animalListBreedDisplaySrv(v) {
 
   return map[k] || raw;
 }
-function animalListBuildRowSrv(a = {}, todayISO = '') {
+function animalListBuildRowSrv(
+  a = {},
+  todayISO = '',
+  requestedImportId = ''
+) {
   const animalNumber = animalListNumberTextSrv(a);
   const typeEn = animalListTypeEnSrv(a);
   const typeAr = animalListTypeArSrv(a);
   const productionStatusRaw = animalListStrSrv(a.productionStatus);
   const productionStatus = animalListProductionDisplaySrv(productionStatusRaw);
+
+  const importId =
+    animalListStrSrv(
+      a.importId ||
+      a.importJobId
+    );
+
+  const highlightImported =
+    animalListStrSrv(requestedImportId) &&
+    importId ===
+      animalListStrSrv(requestedImportId);
+
   const reproductiveStatus = animalListStrSrv(a.reproductiveStatus);
   const lastCalvingDate = animalListIsoDateSrv(a.lastCalvingDate);
   const lastInseminationDate = animalListIsoDateSrv(a.lastInseminationDate);
 
-  const prodNorm = animalListDisplayKeySrv(productionStatusRaw || productionStatus);
-  const isDry = prodNorm.includes('dry') || productionStatus.includes('جاف');
+  const prodNorm = animalListDisplayKeySrv(
+    productionStatusRaw ||
+    productionStatus
+  );
+
+  const isDry =
+    prodNorm.includes('dry') ||
+    productionStatus.includes('جاف');
 
   const daysInMilk = isDry
     ? '---'
     : lastCalvingDate
-      ? animalListDaysDisplaySrv(lastCalvingDate, todayISO)
-      : animalListNumDisplaySrv(a.daysInMilk);
+      ? animalListDaysDisplaySrv(
+          lastCalvingDate,
+          todayISO
+        )
+      : animalListNumDisplaySrv(
+          a.daysInMilk
+        );
 
   const inseminatedDays = (
-    (reproductiveStatus === 'ملقحة' || reproductiveStatus === 'ملقح') &&
+    (
+      reproductiveStatus === 'ملقحة' ||
+      reproductiveStatus === 'ملقح'
+    ) &&
     lastInseminationDate
-  ) ? animalListDaysDisplaySrv(lastInseminationDate, todayISO) : '---';
+  )
+    ? animalListDaysDisplaySrv(
+        lastInseminationDate,
+        todayISO
+      )
+    : '---';
 
   const pregnancyDays = (
     reproductiveStatus === 'عشار' &&
     lastInseminationDate
-  ) ? animalListDaysDisplaySrv(lastInseminationDate, todayISO)
-    : (reproductiveStatus === 'عشار' ? animalListNumDisplaySrv(a.pregnancyDays) : '---');
+  )
+    ? animalListDaysDisplaySrv(
+        lastInseminationDate,
+        todayISO
+      )
+    : (
+        reproductiveStatus === 'عشار'
+          ? animalListNumDisplaySrv(
+              a.pregnancyDays
+            )
+          : '---'
+      );
 
   const eventUrl = animalNumber
-    ? `add-event.html?animalId=${encodeURIComponent(animalNumber)}&number=${encodeURIComponent(animalNumber)}&animalNumber=${encodeURIComponent(animalNumber)}&eventDate=${encodeURIComponent(todayISO)}&date=${encodeURIComponent(todayISO)}`
+    ? (
+        `add-event.html?animalId=${encodeURIComponent(animalNumber)}` +
+        `&number=${encodeURIComponent(animalNumber)}` +
+        `&animalNumber=${encodeURIComponent(animalNumber)}` +
+        `&eventDate=${encodeURIComponent(todayISO)}` +
+        `&date=${encodeURIComponent(todayISO)}`
+      )
     : '';
 
- return {
-  id: a.id || null,
-  importId: animalListStrSrv(
-    a.importId ||
-    a.importJobId
-  ),
-  animalNumber,
-    animalTypeAr: typeAr,
-    animaltype: typeEn,
-    rowClass: typeEn === 'cow'
-      ? 'mbk-row-cow'
-      : typeEn === 'buffalo'
-        ? 'mbk-row-buffalo'
-        : '',
-    breed: animalListBreedDisplaySrv(a.breed),
+  return {
+    id: a.id || null,
+
+    importId,
+
+    animalNumber,
+
+    animalTypeAr:
+      typeAr,
+
+    animaltype:
+      typeEn,
+
+    rowClass: [
+      typeEn === 'cow'
+        ? 'mbk-row-cow'
+        : typeEn === 'buffalo'
+          ? 'mbk-row-buffalo'
+          : '',
+
+      highlightImported
+        ? 'mbk-import-highlight'
+        : ''
+
+    ].filter(Boolean).join(' '),
+
+    breed:
+      animalListBreedDisplaySrv(
+        a.breed
+      ),
+
     productionStatus,
+
     daysInMilk,
-    reproductiveStatus: reproductiveStatus || '---',
+
+    reproductiveStatus:
+      reproductiveStatus || '---',
+
     inseminatedDays,
-    dailyMilk: animalListNumDisplaySrv(a.dailyMilk),
+
+    dailyMilk:
+      animalListNumDisplaySrv(
+        a.dailyMilk
+      ),
+
     pregnancyDays,
-    birthDate: animalListIsoDateSrv(a.birthDate) || '---',
-    lastCalvingDate: lastCalvingDate || '---',
-    cardUrl: animalNumber ? `cow-card.html?number=${encodeURIComponent(animalNumber)}` : '',
+
+    birthDate:
+      animalListIsoDateSrv(
+        a.birthDate
+      ) || '---',
+
+    lastCalvingDate:
+      lastCalvingDate || '---',
+
+    cardUrl:
+      animalNumber
+        ? `cow-card.html?number=${encodeURIComponent(animalNumber)}`
+        : '',
+
     eventUrl
   };
 }
@@ -64902,6 +65022,10 @@ function animalListSortSrv(a, b) {
 app.get('/api/animals', requireUserId, async (req, res) => {
   const uid = req.userId;
   const todayISO = cairoTodayISO();
+  const requestedImportId =
+  animalListStrSrv(
+    req.query.importId || ''
+  );
 
   try {
     let rawAnimals = [];
@@ -64916,7 +65040,13 @@ app.get('/api/animals', requireUserId, async (req, res) => {
 
     const activeRows = rawAnimals
       .filter(animalListIsActiveSrv)
-      .map(a => animalListBuildRowSrv(a, todayISO))
+     .map(a =>
+  animalListBuildRowSrv(
+    a,
+    todayISO,
+    requestedImportId
+  )
+)
       .filter(a => a.animalNumber);
 
     const typeOptions = [...new Set(activeRows.map(a => a.animalTypeAr).filter(Boolean))]
@@ -64994,7 +65124,8 @@ function followerListStatusDisplaySrv(a = {}) {
 
 function followerListBuildRowSrv(
   a = {},
-  todayISO = ""
+  todayISO = "",
+  requestedImportId = ""
 ) {
   const animalNumber =
     animalListNumberTextSrv(a);
@@ -65003,7 +65134,9 @@ function followerListBuildRowSrv(
     animalListTypeEnSrv(a);
 
   const birthDate =
-    animalListIsoDateSrv(a.birthDate);
+    animalListIsoDateSrv(
+      a.birthDate
+    );
 
   const lastInseminationDate =
     animalListIsoDateSrv(
@@ -65015,8 +65148,21 @@ function followerListBuildRowSrv(
       a.reproductiveStatus
     );
 
+  const importId =
+    animalListStrSrv(
+      a.importId ||
+      a.importJobId
+    );
+
+  const highlightImported =
+    animalListStrSrv(requestedImportId) &&
+    importId ===
+      animalListStrSrv(requestedImportId);
+
   const damNumber =
-    animalListStrSrv(a.damNumber);
+    animalListStrSrv(
+      a.damNumber
+    );
 
   const damReferenceStatus =
     animalListStrSrv(
@@ -65044,28 +65190,32 @@ function followerListBuildRowSrv(
         : "غير معروفة"
     );
 
- return {
-  id: a.id || null,
+  return {
+    id:
+      a.id || null,
 
-  importId:
-    animalListStrSrv(
-      a.importId ||
-      a.importJobId
-    ),
+    importId,
 
-  animalNumber,
+    animalNumber,
 
     animalTypeAr:
       animalListTypeArSrv(a),
 
-    animaltype: typeEn,
+    animaltype:
+      typeEn,
 
-    rowClass:
+    rowClass: [
       typeEn === "cow"
         ? "mbk-row-cow"
         : typeEn === "buffalo"
           ? "mbk-row-buffalo"
           : "",
+
+      highlightImported
+        ? "mbk-import-highlight"
+        : ""
+
+    ].filter(Boolean).join(" "),
 
     breed:
       animalListBreedDisplaySrv(
@@ -65128,7 +65278,6 @@ function followerListBuildRowSrv(
         : ""
   };
 }
-
 async function followerListFetchFirestoreSrv(uid) {
   const byId = new Map();
 
@@ -65256,6 +65405,10 @@ app.get(
   async (req, res) => {
     const uid = req.userId;
     const todayISO = cairoTodayISO();
+     const requestedImportId =
+  animalListStrSrv(
+    req.query.importId || ""
+  );
 
     try {
       if (!db) {
@@ -65277,12 +65430,13 @@ app.get(
           .filter(
             animalListIsActiveSrv
           )
-          .map(a =>
-            followerListBuildRowSrv(
-              a,
-              todayISO
-            )
-          )
+         .map(a =>
+  followerListBuildRowSrv(
+    a,
+    todayISO,
+    requestedImportId
+  )
+)
           .filter(
             a => a.animalNumber
           );
