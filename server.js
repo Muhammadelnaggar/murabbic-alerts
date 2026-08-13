@@ -48120,6 +48120,55 @@ async function dryOffTodaySrv(
     .trim()
     .slice(0, 10);
 }
+// ============================================================
+//                 API: DRY-OFF OPTIONS
+//                 جلب الفنيين/الأطباء المحفوظين للتجفيف
+// ============================================================
+app.get("/api/dry-off/options", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        message: "❌ تعذّر تحميل أسماء الفنيين أو الأطباء المحفوظة الآن. حاول مرة أخرى."
+      });
+    }
+
+    const uid = req.userId;
+
+    const snap =
+      await db
+        .collection("user_event_options")
+        .doc(uid)
+        .get();
+
+    const data =
+      snap.exists
+        ? (snap.data() || {})
+        : {};
+
+    const performers =
+      Array.isArray(data.dryOffPerformers)
+        ? [...new Set(
+            data.dryOffPerformers
+              .map(x => String(x || "").trim())
+              .filter(Boolean)
+          )]
+        : [];
+
+    return res.json({
+      ok: true,
+      performers
+    });
+
+  } catch (e) {
+    console.error("dry-off-options", e);
+
+    return res.status(500).json({
+      ok: false,
+      message: "❌ تعذّر تحميل أسماء الفنيين أو الأطباء المحفوظة الآن. حاول مرة أخرى."
+    });
+  }
+});
 app.post("/api/dry-off/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -49452,13 +49501,17 @@ app.post("/api/dry-off/save", requireUserId, async (req, res) => {
       body.pregnancyStatus || ""
     ).trim();
 
-    const usedDryingAntibiotics = String(
-      body.usedDryingAntibiotics || ""
-    ).trim();
+   const usedDryingAntibiotics = String(
+  body.usedDryingAntibiotics || ""
+).trim();
 
-    const notes = String(
-      body.notes || ""
-    ).trim();
+const performedBy = String(
+  body.performedBy || ""
+).trim();
+
+const notes = String(
+  body.notes || ""
+).trim();
 
     const numbers = dryOffSaveNumbersSrv(body);
 
@@ -49548,8 +49601,27 @@ app.post("/api/dry-off/save", requireUserId, async (req, res) => {
       });
     }
 
-    const saved = [];
-    const rejected = [];
+    if (!performedBy) {
+  return res.status(400).json({
+    ok: false,
+    message:
+      "❌ أدخل اسم الفني أو الطبيب الذي نفّذ التجفيف.",
+    savedCount: 0,
+    rejectedCount: numbers.length,
+    saved: [],
+    rejected: rejectAll(
+      "❌ اسم الفني أو الطبيب مطلوب لتسجيل التجفيف."
+    )
+  });
+}
+
+const saved = [];
+const rejected = [];
+
+const dryOffOptionsRef =
+  db
+    .collection("user_event_options")
+    .doc(uid);
 
     for (const animalNumber of numbers) {
       const result =
@@ -49627,11 +49699,12 @@ app.post("/api/dry-off/save", requireUserId, async (req, res) => {
         dryOffDate: eventDate,
 
         reason: row.reason,
-        pregnancyStatus,
-        usedDryingAntibiotics,
+pregnancyStatus,
+usedDryingAntibiotics,
+performedBy,
 
-        gestationDays:
-          row.gestationDays,
+gestationDays:
+  row.gestationDays,
 
         lastInseminationDate:
           row.lastInseminationDate,
@@ -49663,8 +49736,11 @@ app.post("/api/dry-off/save", requireUserId, async (req, res) => {
             .serverTimestamp()
       };
 
-      const txResult =
-        await db.runTransaction(
+      const shouldSavePerformerOption =
+  saved.length === 0;
+
+const txResult =
+  await db.runTransaction(
           async tx => {
             const existingEvent =
               await tx.get(
@@ -49759,15 +49835,31 @@ app.post("/api/dry-off/save", requireUserId, async (req, res) => {
             );
 
             await updateAnimalAfterDryOffSaveSrv(
-              payload,
-              tx
-            );
+  payload,
+  tx
+);
 
-            return {
-              created: true,
-              reason:
-                currentReason
-            };
+if (shouldSavePerformerOption) {
+  tx.set(
+    dryOffOptionsRef,
+    {
+      userId: uid,
+      dryOffPerformers:
+        admin.firestore.FieldValue
+          .arrayUnion(performedBy),
+      updatedAt:
+        admin.firestore.FieldValue
+          .serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+return {
+  created: true,
+  reason:
+    currentReason
+};
           }
         );
 
