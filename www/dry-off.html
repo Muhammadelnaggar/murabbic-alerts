@@ -65,12 +65,25 @@
     </div>
   
 
-    <div class="field">
+        <div class="field">
       <label>تم استخدام محاقن التجفيف؟</label>
      <div class="radio-group"> 
         <label><input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="نعم" required /> نعم</label>
         <label><input type="radio" data-field="usedDryingAntibiotics" name="usedDryingAntibiotics" value="لا" required /> لا</label>
       </div>
+    </div>
+
+    <div class="field">
+      <label for="performedBy">الفني / الطبيب</label>
+      <input
+        type="text"
+        id="performedBy"
+        data-field="performedBy"
+        list="dryOffPerformersList"
+        autocomplete="off"
+        required
+      />
+      <datalist id="dryOffPerformersList"></datalist>
     </div>
  
 
@@ -87,8 +100,10 @@
 
   const animalEl = document.getElementById("animalNumber");
   const dateEl = document.getElementById("eventDate");
-  const gestEl = document.getElementById("gestationDays");
+   const gestEl = document.getElementById("gestationDays");
   const reasonEl = document.getElementById("reason");
+  const performedByEl = document.getElementById("performedBy");
+  const performersListEl = document.getElementById("dryOffPerformersList");
   const info = document.getElementById("info");
   const openCardBtn = document.getElementById("openCowCard");
 
@@ -155,6 +170,54 @@
   }
 
   return { r, data, authRequired: false };
+}
+   async function loadDryOffOptions() {
+  if (!performersListEl) return;
+
+  try {
+    const r = await fetch("/api/dry-off/options", {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        "Accept": "application/json"
+      }
+    });
+
+    const data = await r.json().catch(() => null);
+
+    if (r.status === 401 || data?.error === "auth_required") {
+      showMsg(data?.message || "❌ سجّل الدخول أولًا.", "error");
+      return;
+    }
+
+    if (!data || data.ok !== true) {
+      console.warn(
+        "dry-off options unavailable:",
+        data?.message || r.status
+      );
+      return;
+    }
+
+    const performers = Array.isArray(data.performers)
+      ? [...new Set(
+          data.performers
+            .map(x => String(x || "").trim())
+            .filter(Boolean)
+        )]
+      : [];
+
+    performersListEl.innerHTML = "";
+
+    for (const name of performers) {
+      const option = document.createElement("option");
+      option.value = name;
+      performersListEl.appendChild(option);
+    }
+
+  } catch (err) {
+    console.warn("dry-off options failed:", err);
+  }
 }
   function normalizeDigits(s) {
     const map = {
@@ -293,6 +356,7 @@ if (authRequired) return false;
     const eventDate = dateEl.value;
     const pregnancyStatus = selectedRadio("pregnancyStatus");
     const usedDryingAntibiotics = selectedRadio("usedDryingAntibiotics");
+    const performedBy = String(performedByEl?.value || "").trim();
 
 
     if (!eventDate) {
@@ -309,7 +373,14 @@ if (authRequired) return false;
       showMsg("❌ حدد هل تم استخدام محاقن التجفيف.", "error");
       return;
     }
-
+       if (!performedBy) {
+      showMsg(
+        "❌ أدخل اسم الفني أو الطبيب الذي نفّذ التجفيف.",
+        "error"
+      );
+      performedByEl?.focus();
+      return;
+    }
     if (!gateOk || !acceptedRows.length) {
       const ok = await runDryOffGate({ silent: false });
       if (!ok) return;
@@ -319,10 +390,11 @@ if (authRequired) return false;
       setButtonLoading(true);
       showMsg("جارِ حفظ التجفيف...", "info");
 
-     const { data, authRequired } = await sessionPostJson("/api/dry-off/save", {
+ const { data, authRequired } = await sessionPostJson("/api/dry-off/save", {
   eventDate,
   pregnancyStatus,
   usedDryingAntibiotics,
+  performedBy,
   accepted: acceptedRows,
   tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
 });
@@ -370,7 +442,9 @@ if (authRequired) return;
     }
   }
 
-  window.addEventListener("load", () => {
+   window.addEventListener("load", () => {
+    loadDryOffOptions();
+
     const qp = new URLSearchParams(location.search);
     const qpNum =
   qp.get("numbers") ||
