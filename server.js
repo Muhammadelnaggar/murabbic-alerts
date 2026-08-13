@@ -39556,6 +39556,26 @@ function dailyMilkIsOutOfHerdSrv(doc = {}) {
   return st === "inactive" || st === "archived";
 }
 
+async function dailyMilkTodaySrv(req, uid) {
+  let todayISO = "";
+
+  try {
+    todayISO =
+      await farmTodayISOSrv(
+        req.authSession?.uid ||
+        uid
+      );
+  } catch (_) {}
+
+  if (!calvingIsDateSrv(todayISO)) {
+    todayISO = addAnimalTodaySrv();
+  }
+
+  return String(todayISO || "")
+    .trim()
+    .slice(0, 10);
+}
+
 function dailyMilkNumStrictSrv(v) {
   if (v === undefined || v === null || String(v).trim() === "") return 0;
 
@@ -39943,6 +39963,41 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
 
     const accepted = [];
     const rejected = [];
+         const todayISO = await dailyMilkTodaySrv(
+      req,
+      uid
+    );
+
+    if (
+      calvingIsDateSrv(todayISO) &&
+      eventDate > todayISO
+    ) {
+      const rejected = numbers.map(n => ({
+        animalNumber: String(n || ""),
+        reason:
+          "تاريخ تسجيل اللبن لا يمكن أن يكون في المستقبل."
+      }));
+
+      const ui = dailyMilkBuildGateUiSrv({
+        rejected,
+        message:
+          "❌ تاريخ تسجيل اللبن لا يمكن أن يكون في المستقبل.",
+        eventDate
+      });
+
+      return res.status(400).json({
+        ok: false,
+        allowed: false,
+        stage: "future_date",
+        message: ui.message,
+        acceptedCount: 0,
+        rejectedCount: rejected.length,
+        accepted: [],
+        valid: [],
+        rejected,
+        ui
+      });
+    }
 
     for (const rawNum of numbers) {
       const animalNumber = calvingNormDigitsOnlySrv(rawNum);
@@ -41522,11 +41577,51 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
       });
     }
 
-    const saved = [];
-    const rejected = [];
+        const todayISO = await dailyMilkTodaySrv(
+      req,
+      uid
+    );
+
+    if (
+      calvingIsDateSrv(todayISO) &&
+      eventDate > todayISO
+    ) {
+      const rejected = rows.map(r => ({
+        animalNumber:
+          calvingNormDigitsOnlySrv(
+            r.animalNumber ||
+            r.number ||
+            ""
+          ),
+
+        reason:
+          "تاريخ تسجيل اللبن لا يمكن أن يكون في المستقبل."
+      }));
+
+      const ui = dailyMilkBuildSaveUiSrv({
+        rejected,
+
+        message:
+          "❌ تاريخ تسجيل اللبن لا يمكن أن يكون في المستقبل.",
+
+        eventDate
+      });
+
+      return res.status(400).json({
+        ok: false,
+        message: ui.message,
+        savedCount: 0,
+        rejectedCount: rejected.length,
+        saved: [],
+        rejected,
+        ui
+      });
+    }
 
     const savedComponentKinds =
     new Set();
+    const saved = [];
+    const rejected = [];
 
     for (const row of rows) {
       const animalNumber = calvingNormDigitsOnlySrv(row.animalNumber || row.number || "");
