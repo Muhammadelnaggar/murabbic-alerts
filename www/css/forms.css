@@ -336,18 +336,16 @@ textarea{
   margin:0;
 }
 
-/* الشريط السفلي للأزرار */
+/* الشريط السفلي الموحد للأزرار — Murabbik Sticky Actions */
 .actions-bar{
-  position:fixed;
+  position:sticky;
   bottom:0;
-  left:0;
-  right:0;
   background:#fff;
   border-top:1px solid var(--border, #e2e8f0);
   box-shadow:0 -2px 6px rgba(0,0,0,.08);
   display:flex;
   gap:10px;
-  padding:12px;
+  padding:12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
   z-index:20;
 }
 
