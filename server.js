@@ -39556,6 +39556,31 @@ function dailyMilkIsOutOfHerdSrv(doc = {}) {
   return st === "inactive" || st === "archived";
 }
 
+function dailyMilkIsMilkingSrv(doc = {}) {
+  if (doc.inMilk === false) return false;
+
+  const production = String(
+    doc.productionStatus ||
+    doc.lactationStatus ||
+    ""
+  ).trim().toLowerCase();
+
+  if (
+    production.includes("جاف") ||
+    production.includes("dry")
+  ) {
+    return false;
+  }
+
+  return (
+    doc.inMilk === true ||
+    production.includes("حلاب") ||
+    production.includes("حلوب") ||
+    production.includes("milking") ||
+    production.includes("lactating")
+  );
+}
+
 async function dailyMilkTodaySrv(req, uid) {
   let todayISO = "";
 
@@ -40010,7 +40035,7 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
         continue;
       }
 
-      const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+           const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
 
       if (!animal) {
         rejected.push({
@@ -40022,6 +40047,14 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
 
       const doc = animal.data || {};
 
+      if (animal._collection !== "animals") {
+        rejected.push({
+          animalNumber,
+          reason: "تسجيل اللبن اليومي متاح للأمهات الحلابة فقط."
+        });
+        continue;
+      }
+
       if (dailyMilkIsOutOfHerdSrv(doc)) {
         rejected.push({
           animalNumber,
@@ -40030,8 +40063,15 @@ app.post("/api/daily-milk/gate", requireUserId, async (req, res) => {
         continue;
       }
 
-      const duplicated = await dailyMilkHasSameDaySrv(uid, animalNumber, eventDate);
+      if (!dailyMilkIsMilkingSrv(doc)) {
+        rejected.push({
+          animalNumber,
+          reason: "الحيوان غير مسجل كحلاب، لذلك لا يمكن تسجيل اللبن اليومي له."
+        });
+        continue;
+      }
 
+      const duplicated = await dailyMilkHasSameDaySrv(uid, animalNumber, eventDate);
       if (duplicated) {
         rejected.push({
           animalNumber,
@@ -41634,7 +41674,7 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
         continue;
       }
 
-      const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+           const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
 
       if (!animal) {
         rejected.push({
@@ -41647,16 +41687,31 @@ app.post("/api/daily-milk/save", requireUserId, async (req, res) => {
       const animalId = String(animal.id || row.animalId || "").trim();
       const animalDoc = animal.data || {};
 
+      if (animal._collection !== "animals") {
+        rejected.push({
+          animalNumber,
+          reason: "تسجيل اللبن اليومي متاح للأمهات الحلابة فقط."
+        });
+        continue;
+      }
+
       if (dailyMilkIsOutOfHerdSrv(animalDoc)) {
         rejected.push({
           animalNumber,
-         reason: "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له."
+          reason: "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له."
+        });
+        continue;
+      }
+
+      if (!dailyMilkIsMilkingSrv(animalDoc)) {
+        rejected.push({
+          animalNumber,
+          reason: "الحيوان غير مسجل كحلاب، لذلك لا يمكن تسجيل اللبن اليومي له."
         });
         continue;
       }
 
       const duplicated = await dailyMilkHasSameDaySrv(uid, animalNumber, eventDate);
-
       if (duplicated) {
         rejected.push({
           animalNumber,
