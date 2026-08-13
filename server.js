@@ -40855,84 +40855,138 @@ async function dailyMilkImportPreviewRowsSrv(uid, eventDate, inputRows = []) {
   const rows = [];
 
   for (const rawRow of inputRows) {
-    const animalNumber = calvingNormDigitsOnlySrv(rawRow.animalNumber || rawRow.number || "");
+    const animalNumber = calvingNormDigitsOnlySrv(
+      rawRow.animalNumber ||
+      rawRow.number ||
+      ""
+    );
 
     if (!animalNumber) {
-      rows.push({ ...rawRow, animalNumber: "", valid: false, reason: "رقم الحيوان غير صحيح.", totalText: "—" });
+      rows.push({
+        ...rawRow,
+        animalNumber: "",
+        valid: false,
+        reason: "رقم الحيوان غير صحيح.",
+        totalText: "—"
+      });
       continue;
     }
 
-    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+    const animal =
+      await fetchAnimalByNumberForCalvingGateSrv(
+        uid,
+        animalNumber
+      );
 
     if (!animal) {
-      rows.push({ ...rawRow, animalNumber, valid: false, reason: "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له.", totalText: "—" });
+      rows.push({
+        ...rawRow,
+        animalNumber,
+        valid: false,
+        reason:
+          "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له.",
+        totalText: "—"
+      });
       continue;
     }
 
     const animalDoc =
-  animal.data || {};
+      animal.data || {};
 
-const animalId =
-  animal.id || "";
+    const animalId =
+      animal.id || "";
 
-const species =
-  dailyMilkSpeciesSrv(
-    animalDoc
-  );
+    const species =
+      dailyMilkSpeciesSrv(
+        animalDoc
+      );
 
-const kind =
-  dailyMilkKindSrv(
-    species
-  );
+    const kind =
+      dailyMilkKindSrv(
+        species
+      );
 
-if (
-  dailyMilkIsOutOfHerdSrv(
-    animalDoc
-  )
-) {
-  rows.push({
-    ...rawRow,
-    animalNumber,
-    animalId,
-    species,
-    kind,
-    valid: false,
-    reason:
-      "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له.",
-    totalText: "—"
-  });
+    if (animal._collection !== "animals") {
+      rows.push({
+        ...rawRow,
+        animalNumber,
+        animalId,
+        species,
+        kind,
+        valid: false,
+        reason:
+          "تسجيل اللبن اليومي متاح للأمهات الحلابة فقط.",
+        totalText: "—"
+      });
+      continue;
+    }
 
-  continue;
-}
+    if (
+      dailyMilkIsOutOfHerdSrv(
+        animalDoc
+      )
+    ) {
+      rows.push({
+        ...rawRow,
+        animalNumber,
+        animalId,
+        species,
+        kind,
+        valid: false,
+        reason:
+          "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له.",
+        totalText: "—"
+      });
+      continue;
+    }
 
-const duplicated =
-  await dailyMilkHasSameDaySrv(
-    uid,
-    animalNumber,
-    eventDate
-  );
+    if (
+      !dailyMilkIsMilkingSrv(
+        animalDoc
+      )
+    ) {
+      rows.push({
+        ...rawRow,
+        animalNumber,
+        animalId,
+        species,
+        kind,
+        valid: false,
+        reason:
+          "الحيوان غير مسجل كحلاب، لذلك لا يمكن تسجيل اللبن اليومي له.",
+        totalText: "—"
+      });
+      continue;
+    }
 
-if (duplicated) {
-  rows.push({
-    ...rawRow,
-    animalNumber,
-    animalId,
-    species,
-    kind,
-    valid: false,
-    reason:
-      "تم تسجيل لبن اليوم لهذا الحيوان بالفعل.",
-    totalText: "—"
-  });
+    const duplicated =
+      await dailyMilkHasSameDaySrv(
+        uid,
+        animalNumber,
+        eventDate
+      );
 
-  continue;
-}
+    if (duplicated) {
+      rows.push({
+        ...rawRow,
+        animalNumber,
+        animalId,
+        species,
+        kind,
+        valid: false,
+        reason:
+          "تم تسجيل لبن اليوم لهذا الحيوان بالفعل.",
+        totalText: "—"
+      });
+      continue;
+    }
 
-const calc =
-  dailyMilkImportCalcSrv(
-    rawRow,
-    kind
-  );
+    const calc =
+      dailyMilkImportCalcSrv(
+        rawRow,
+        kind
+      );
+
     rows.push({
       ...rawRow,
       animalNumber,
@@ -40949,7 +41003,6 @@ const calc =
 
   return rows;
 }
-
 // ============================================================
 //                 API: DAILY MILK IMPORT PREVIEW
 // ============================================================
@@ -40978,13 +41031,44 @@ app.post("/api/daily-milk/import/preview", requireUserId, dailyMilkImportRawPars
       ""
     ).trim().slice(0, 10);
 
-    if (!calvingIsDateSrv(eventDate)) {
+        if (!calvingIsDateSrv(eventDate)) {
       const ui = dailyMilkImportBuildUiSrv({
         rows: [],
         message: "❌ أدخل تاريخ تسجيل لبن صحيحًا."
       });
 
       return res.status(400).json({ ok: false, message: ui.message, ui });
+    }
+
+    const todayISO =
+      await dailyMilkTodaySrv(
+        req,
+        uid
+      );
+
+    if (
+      calvingIsDateSrv(todayISO) &&
+      eventDate > todayISO
+    ) {
+      const ui =
+        dailyMilkImportBuildUiSrv({
+          rows: [],
+          message:
+            "❌ تاريخ تسجيل اللبن لا يمكن أن يكون في المستقبل.",
+          status: "error"
+        });
+
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error:
+            "daily_milk_import_future_date",
+          message:
+            ui.message,
+          rows: [],
+          ui
+        });
     }
 
     const inputRows = dailyMilkImportRowsFromReqSrv(req);
@@ -41128,7 +41212,7 @@ const submittedComponents =
 
     const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
 
-    if (!calvingIsDateSrv(eventDate)) {
+        if (!calvingIsDateSrv(eventDate)) {
       const ui = dailyMilkImportBuildUiSrv({
         rows: [],
        message: "❌ أدخل تاريخ تسجيل لبن صحيحًا."
@@ -41143,6 +41227,62 @@ const submittedComponents =
         rejected: [],
         ui
       });
+    }
+
+    const todayISO =
+      await dailyMilkTodaySrv(
+        req,
+        uid
+      );
+
+    if (
+      calvingIsDateSrv(todayISO) &&
+      eventDate > todayISO
+    ) {
+      const rejected =
+        (
+          Array.isArray(body.rows)
+            ? body.rows
+            : []
+        ).map(row => ({
+          animalNumber:
+            calvingNormDigitsOnlySrv(
+              row?.animalNumber ||
+              row?.number ||
+              ""
+            ),
+          reason:
+            "تاريخ تسجيل اللبن لا يمكن أن يكون في المستقبل."
+        }));
+
+      const ui =
+        dailyMilkImportBuildUiSrv({
+          rows:
+            rejected.map(row => ({
+              ...row,
+              valid: false,
+              totalText: "—"
+            })),
+          message:
+            "❌ تاريخ تسجيل اللبن لا يمكن أن يكون في المستقبل.",
+          status: "error"
+        });
+
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error:
+            "daily_milk_import_future_date",
+          message:
+            ui.message,
+          savedCount: 0,
+          rejectedCount:
+            rejected.length,
+          saved: [],
+          rejected,
+          ui
+        });
     }
 
     const inputRows = Array.isArray(body.rows) ? body.rows : [];
