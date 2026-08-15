@@ -73031,7 +73031,6 @@ function cardEventSeasonsSrv(
   calvingDates = [],
   currentLactationNumber = null
 ) {
-
   const rows =
     (
       Array.isArray(eventRows)
@@ -73057,7 +73056,6 @@ function cardEventSeasonsSrv(
           )
       );
 
-
   const starts =
     [
       ...new Set(
@@ -73066,49 +73064,59 @@ function cardEventSeasonsSrv(
             ? calvingDates
             : []
         )
-          .map(
-            cardISODateSrv
-          )
+          .map(cardISODateSrv)
           .filter(Boolean)
       )
     ].sort();
 
-
   const currentLactation =
-    Number(
-      currentLactationNumber
-    );
-
+    Number(currentLactationNumber);
 
   const hasCurrentLactation =
-    Number.isFinite(
-      currentLactation
-    ) &&
+    Number.isFinite(currentLactation) &&
     currentLactation > 0;
 
+  const seasonLabel = (
+    seasonNumber,
+    fallback
+  ) => {
+    const n =
+      Number(seasonNumber);
+
+    return (
+      Number.isFinite(n) &&
+      n > 0
+    )
+      ? `الموسم ${n}`
+      : fallback;
+  };
 
   if (!starts.length) {
+    const seasonNumber =
+      hasCurrentLactation
+        ? currentLactation
+        : null;
+
     return [
       {
-        key:
-          'current',
+        key: 'current',
 
         label:
-          'الموسم الحالي',
+          seasonLabel(
+            seasonNumber,
+            'الموسم الحالي'
+          ),
 
-        isCurrent:
-          true,
+        isCurrent: true,
 
-        lactationNumber:
-          hasCurrentLactation
-            ? currentLactation
-            : null,
+        seasonNumber,
 
-        startDate:
-          null,
+        // رقم الموسم موجود أصلًا داخل animal.lactationNumber.
+        // نتركه فارغًا هنا حتى لا تكرر الصفحة العنوان.
+        lactationNumber: null,
 
-        nextCalvingDate:
-          null,
+        startDate: null,
+        nextCalvingDate: null,
 
         eventCount:
           rows.length,
@@ -73119,16 +73127,13 @@ function cardEventSeasonsSrv(
     ];
   }
 
-
   const seasons = [];
-
 
   for (
     let i = starts.length - 1;
     i >= 0;
     i--
   ) {
-
     const startDate =
       starts[i];
 
@@ -73139,16 +73144,19 @@ function cardEventSeasonsSrv(
     const distanceFromCurrent =
       (starts.length - 1) - i;
 
+    const seasonNumber =
+      hasCurrentLactation
+        ? currentLactation -
+          distanceFromCurrent
+        : null;
 
     const seasonEvents =
       rows.filter(
         row => {
-
           const d =
             cardISODateSrv(
               row.date
             );
-
 
           if (
             !d ||
@@ -73157,7 +73165,6 @@ function cardEventSeasonsSrv(
             return false;
           }
 
-
           if (
             nextCalvingDate &&
             d >= nextCalvingDate
@@ -73165,18 +73172,9 @@ function cardEventSeasonsSrv(
             return false;
           }
 
-
           return true;
         }
       );
-
-
-    const lactationNumber =
-      distanceFromCurrent === 0 &&
-      hasCurrentLactation
-        ? currentLactation
-        : null;
-
 
     seasons.push({
       key:
@@ -73185,27 +73183,31 @@ function cardEventSeasonsSrv(
           : `previous_${distanceFromCurrent}`,
 
       label:
-        distanceFromCurrent === 0
-          ? 'الموسم الحالي'
-          : (
-              distanceFromCurrent === 1
-                ? 'الموسم السابق'
-                : `الموسم السابق ${distanceFromCurrent}`
-            ),
+        seasonLabel(
+          seasonNumber,
+          distanceFromCurrent === 0
+            ? 'الموسم الحالي'
+            : (
+                distanceFromCurrent === 1
+                  ? 'الموسم السابق'
+                  : `الموسم السابق ${distanceFromCurrent}`
+              )
+        ),
 
       isCurrent:
         distanceFromCurrent === 0,
 
-      lactationNumber:
+      seasonNumber:
         Number.isFinite(
-          lactationNumber
+          seasonNumber
         ) &&
-        lactationNumber > 0
-          ? lactationNumber
+        seasonNumber > 0
+          ? seasonNumber
           : null,
 
-      startDate,
+      lactationNumber: null,
 
+      startDate,
       nextCalvingDate,
 
       eventCount:
@@ -73217,11 +73219,9 @@ function cardEventSeasonsSrv(
     });
   }
 
-
   const beforeFirst =
     rows.filter(
       row => {
-
         const d =
           cardISODateSrv(
             row.date
@@ -73234,26 +73234,44 @@ function cardEventSeasonsSrv(
       }
     );
 
-
   if (beforeFirst.length) {
+    const previousSeasonNumber =
+      hasCurrentLactation
+        ? currentLactation -
+          starts.length
+        : null;
+
+    const validPreviousSeasonNumber =
+      Number.isFinite(
+        previousSeasonNumber
+      ) &&
+      previousSeasonNumber > 0
+        ? previousSeasonNumber
+        : null;
+
     seasons.push({
       key:
         'before_first_recorded_season',
 
       label:
-        'أحداث قبل أول موسم مسجل',
+        validPreviousSeasonNumber
+          ? `الموسم ${validPreviousSeasonNumber}`
+          : (
+              hasCurrentLactation &&
+              currentLactation === starts.length
+                ? 'قبل الموسم 1'
+                : 'أحداث قبل أول موسم مسجل'
+            ),
 
-      isCurrent:
-        false,
+      isCurrent: false,
 
-      lactationNumber:
-        null,
+      seasonNumber:
+        validPreviousSeasonNumber,
 
-      startDate:
-        null,
+      lactationNumber: null,
 
-      nextCalvingDate:
-        starts[0],
+      startDate: null,
+      nextCalvingDate: starts[0],
 
       eventCount:
         beforeFirst.length,
@@ -73263,7 +73281,6 @@ function cardEventSeasonsSrv(
           .reverse()
     });
   }
-
 
   return seasons;
 }
