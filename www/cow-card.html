@@ -1232,7 +1232,9 @@ function renderMilkChart(series = [], herdCurve = []){
     svg.appendChild(tag);
   }
 
-  setTimeout(() => { sc.scrollLeft = svg.scrollWidth; }, 0);
+  setTimeout(() => {
+  sc.scrollLeft = 0;
+}, 0);
 }
   function renderCard(payload){
     const a = payload?.animal || {};
