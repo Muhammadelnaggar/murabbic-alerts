@@ -93,7 +93,7 @@
       <div class="chart-scroll" id="milkScroll">
         <svg id="milkChart" class="prod-chart" viewBox="0 0 100 60" preserveAspectRatio="none" aria-label="مخطط إنتاج اللبن"></svg>
       </div>
-     <div class="hint">الأخضر: الإنتاج الفعلي — الرمادي: المنحنى القياسي — المحور الأفقي DIM كل 7 أيام — المحور الرأسي كجم/يوم</div>
+    <div class="hint">الأخضر: الإنتاج الفعلي — الأزرق الفاتح: المنحنى المرجعي العلمي — المحور الأفقي DIM كل 7 أيام — المحور الرأسي كجم/يوم</div>
     </section>
 
     <section class="card" aria-label="الحالة التناسلية">
@@ -1174,24 +1174,24 @@ function renderMilkChart(series = [], herdCurve = []){
       .join(' ');
   }
 
-   // الرمادي: تظليل نطاق القطيع فقط، بدون خط
-  if (herdRows.length >= 2) {
-    let areaD = makePath(herdRows);
+ // الأزرق الفاتح: تظليل المنحنى المرجعي العلمي، بدون خط
+if (herdRows.length >= 2) {
+  let areaD = makePath(herdRows);
 
-    const first = herdRows[0];
-    const last = herdRows[herdRows.length - 1];
-    const baseY = yAt(0);
+  const first = herdRows[0];
+  const last = herdRows[herdRows.length - 1];
+  const baseY = yAt(0);
 
-    areaD += ` L ${xAt(last.dim).toFixed(1)},${baseY.toFixed(1)}`;
-    areaD += ` L ${xAt(first.dim).toFixed(1)},${baseY.toFixed(1)} Z`;
+  areaD += ` L ${xAt(last.dim).toFixed(1)},${baseY.toFixed(1)}`;
+  areaD += ` L ${xAt(first.dim).toFixed(1)},${baseY.toFixed(1)} Z`;
 
-    const ha = document.createElementNS(NS, 'path');
-    ha.setAttribute('d', areaD);
-    ha.setAttribute('fill', '#9ca3af');
-    ha.setAttribute('fill-opacity', '0.22');
-    ha.setAttribute('stroke', 'none');
-    svg.appendChild(ha);
-  }
+  const ha = document.createElementNS(NS, 'path');
+  ha.setAttribute('d', areaD);
+  ha.setAttribute('fill', '#3b82f6');
+  ha.setAttribute('fill-opacity', '0.18');
+  ha.setAttribute('stroke', 'none');
+  svg.appendChild(ha);
+}
 
   // الأخضر: إنتاج الحيوان
   if (rows.length >= 2) {
