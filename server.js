@@ -65236,6 +65236,8 @@ function animalListBuildRowSrv(
   const reproductiveStatus = animalListStrSrv(a.reproductiveStatus);
   const lastCalvingDate = animalListIsoDateSrv(a.lastCalvingDate);
   const lastInseminationDate = animalListIsoDateSrv(a.lastInseminationDate);
+  const lactationNumber = animalListNumDisplaySrv(a.lactationNumber);
+  const servicesCount = animalListNumDisplaySrv(a.servicesCount);
 
   const prodNorm = animalListDisplayKeySrv(
     productionStatusRaw ||
@@ -65329,12 +65331,19 @@ function animalListBuildRowSrv(
 
     productionStatus,
 
-    daysInMilk,
+lactationNumber,
 
-    reproductiveStatus:
-      reproductiveStatus || '---',
+daysInMilk,
 
-    inseminatedDays,
+reproductiveStatus:
+  reproductiveStatus || '---',
+
+servicesCount,
+
+lastInseminationDate:
+  lastInseminationDate || '---',
+
+inseminatedDays,
 
     dailyMilk:
       animalListNumDisplaySrv(
