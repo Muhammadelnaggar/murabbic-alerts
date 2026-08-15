@@ -73677,7 +73677,7 @@ const events = birthEvent && !baseEvents.some(e => e.id === birthEvent.id)
       '—'
     );
 
-    const damNumber = cardTextSrv(
+       const damNumber = cardTextSrv(
       cardFirstSrv(calf, ['damNumber', 'motherNumber', 'damId', 'motherId'], ''),
       '—'
     );
@@ -73687,7 +73687,70 @@ const events = birthEvent && !baseEvents.some(e => e.id === birthEvent.id)
     if (damNumber && damNumber !== '—') {
       dam = await findCowCardDocSrv(uid, { number: damNumber });
     }
-   const birthSire = await findCalfSireFromBirthEventSrv(uid, birthEvent);
+
+    const birthSire =
+      await findCalfSireFromBirthEventSrv(
+        uid,
+        birthEvent
+      );
+
+    // الأب الحقيقي للتابع:
+    // من بيانات التابع نفسه أولًا،
+    // ثم من حدث الولادة/التلقيح المخصب.
+    // ممنوع استخدام sireNumber الخاص بالأم كبديل.
+    const sireNumber = cardTextSrv(
+      cardFirstSrv(
+        calf,
+        [
+          'fatherNumber',
+          'birthSireNumber',
+          'sireNumber',
+          'sireId'
+        ],
+        birthSire?.sireNumber || ''
+      ),
+      '—'
+    );
+
+    const sireName = cardTextSrv(
+      cardFirstSrv(
+        calf,
+        [
+          'fatherName',
+          'sireName'
+        ],
+        birthSire?.sireName || ''
+      ),
+      '—'
+    );
+
+    // جد الأم = الأب الوراثي للأم فقط.
+    // لا نستخدم sireNumber الخاص بالأم لأنه قد يمثل طلوقة حملها.
+    const maternalGrandsireNumber = cardTextSrv(
+      cardFirstSrv(
+        dam || {},
+        [
+          'fatherNumber',
+          'birthSireNumber'
+        ],
+        ''
+      ),
+      '—'
+    );
+
+    // جد الأب لا يُستنتج من كود الأب.
+    // يظهر فقط إذا كان محفوظًا صراحةً في بيانات النسب.
+    const paternalGrandsireNumber = cardTextSrv(
+      cardFirstSrv(
+        calf,
+        [
+          'paternalGrandsireNumber',
+          'paternalGrandSireNumber'
+        ],
+        ''
+      ),
+      '—'
+    );
    const birthType = cardTextSrv(
   cardFirstSrv(
     calf,
@@ -73758,25 +73821,12 @@ const litterComposition = cardTextSrv(
         ageDays: age.ageDays,
         ageText: age.ageText,
 
-        damNumber,
-        sireNumber: cardTextSrv(
-  cardFirstSrv(
-    calf,
-    ['sireNumber', 'fatherNumber', 'sireId'],
-    birthSire?.sireNumber || dam?.sireNumber || dam?.lastSireNumber || ''
-  ),
-  '—'
-),
-
-sireName: cardTextSrv(
-  cardFirstSrv(
-    calf,
-    ['sireName', 'fatherName'],
-    birthSire?.sireName || dam?.sireName || dam?.lastSireName || ''
-  ),
-  '—'
-),
-
+                damNumber,
+        sireNumber,
+        sireName,
+        paternalGrandsireNumber,
+        maternalGrandsireNumber,
+ 
         birthType,
         litterSize,
         litterOrder,
