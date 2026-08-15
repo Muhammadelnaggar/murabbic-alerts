@@ -4782,7 +4782,22 @@ function addAnimalNumSrv(v, fallback = 0) {
 
 function addAnimalIsDateSrv(v) {
   const s = String(v || "").trim().slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return false;
+  }
+
+  const [year, month, day] =
+    s.split("-").map(Number);
+
+  const d =
+    new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    d.getUTCFullYear() === year &&
+    d.getUTCMonth() === month - 1 &&
+    d.getUTCDate() === day
+  );
 }
 
 function addAnimalDateOrNullSrv(v) {
