@@ -201,7 +201,14 @@ async function apiGetDirect(path){
     if (v === null || v === undefined || v === '') return fallback;
     return String(v);
   }
-
+ function safeHtml(v){
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
   function fmtDate(v){
     if (!v) return '—';
     const s = String(v).slice(0, 10);
@@ -253,7 +260,8 @@ async function apiGetDirect(path){
   function showNotice(text){
     const target = $('timelineBox') || $('evList');
     if (!target) return;
-    target.innerHTML = `<div class="notice">${txt(text)}</div>`;
+    target.innerHTML =
+  `<div class="notice">${safeHtml(txt(text))}</div>`;
   }
 
   function rowList(containerId, rows, emptyText, options = {}){
@@ -270,10 +278,10 @@ async function apiGetDirect(path){
       const item = document.createElement('div');
       item.className = 'ev-item';
       item.innerHTML = `
-        <div class="ev-date">—</div>
-        <div class="ev-type">${emptyText}</div>
-        <div class="ev-note">—</div>
-      `;
+  <div class="ev-date">—</div>
+  <div class="ev-type">${safeHtml(emptyText)}</div>
+  <div class="ev-note">—</div>
+`;
       list.appendChild(item);
       box.appendChild(list);
       return;
@@ -294,10 +302,10 @@ async function apiGetDirect(path){
         : (row.summary || '—');
 
       item.innerHTML = `
-        <div class="ev-date">${fmtDate(date)}</div>
-        <div class="ev-type">${txt(title)}</div>
-        <div class="ev-note">${txt(summary)}</div>
-      `;
+  <div class="ev-date">${safeHtml(fmtDate(date))}</div>
+  <div class="ev-type">${safeHtml(txt(title))}</div>
+  <div class="ev-note">${safeHtml(txt(summary))}</div>
+`;
 
       list.appendChild(item);
     });
@@ -362,9 +370,14 @@ function renderCowCardDairyTraits(dt){
     return;
   }
 
-  const finalScore = Math.max(0, Math.min(100, Math.round(score)));
-  const grade = txt(dt?.grade || cowCardDairyGrade(finalScore));
-  const color = cowCardDairyColor(finalScore);
+  const finalScore =
+  Math.max(0, Math.min(100, Math.round(score)));
+
+const grade =
+  txt(dt?.grade);
+
+const color =
+  cowCardDairyColor(finalScore);
 
   gauge.style.setProperty('--cc-dairy-deg', `${finalScore * 3.6}deg`);
   gauge.style.setProperty('--cc-dairy-color', color);
@@ -373,7 +386,7 @@ function renderCowCardDairyTraits(dt){
   put('ccDairyGrade', grade);
   put('ccDairyFinal', `التقييم النهائي: ${grade}`);
   put('ccDairyDate', fmtDate(dt?.date || dt?.evaluationDate || dt?.createdAt));
-  put('ccDairySummary', txt(dt?.summary || cowCardDairySummary(finalScore), '—'));
+ put('ccDairySummary', txt(dt?.summary, '—'));
 
   bars.innerHTML = '';
 
@@ -1029,9 +1042,23 @@ function renderMilkChart(series = [], herdCurve = []){
     renderHealth(payload?.healthHistory || []);
     rowList('alertsList', payload?.alerts || [], 'لا توجد تنبيهات مختصرة', { alerts: true });
 
-    const events = payload?.recentEvents || payload?.events || [];
-    renderTimeline(events);
-    rowList('evList', events, 'لا توجد أحداث', { prefix: 'evrow' });
+    const timelineEvents =
+  payload?.recentEvents ||
+  payload?.events ||
+  [];
+
+const allEvents =
+  payload?.events ||
+  [];
+
+renderTimeline(timelineEvents);
+
+rowList(
+  'evList',
+  allEvents,
+  'لا توجد أحداث',
+  { prefix: 'evrow' }
+);
   }
 
   async function loadCard({ number, animalId } = {}){
