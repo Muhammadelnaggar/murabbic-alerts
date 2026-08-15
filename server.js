@@ -50899,10 +50899,22 @@ async function updateAnimalByCalvingSrv(
     0,
 
   pregnancyDays:
-    null,
+  null,
 
-  servicesCount:
-    0,
+lastInseminationDate:
+  null,
+
+lastAI:
+  null,
+
+lastInsemination:
+  null,
+
+lastServiceDate:
+  null,
+
+servicesCount:
+  0,
 
   lactationNumber:
     nextLactation,
@@ -65234,10 +65246,44 @@ function animalListBuildRowSrv(
       animalListStrSrv(requestedImportId);
 
   const reproductiveStatus = animalListStrSrv(a.reproductiveStatus);
-  const lastCalvingDate = animalListIsoDateSrv(a.lastCalvingDate);
-  const lastInseminationDate = animalListIsoDateSrv(a.lastInseminationDate);
-  const lactationNumber = animalListNumDisplaySrv(a.lactationNumber);
-  const servicesCount = animalListNumDisplaySrv(a.servicesCount);
+
+const birthDate = animalListIsoDateSrv(
+  a.birthDate ||
+  a.birth_date ||
+  a.dateOfBirth ||
+  a.dob
+);
+
+const lastCalvingDate =
+  animalListIsoDateSrv(a.lastCalvingDate);
+
+const storedLastInseminationDate =
+  animalListIsoDateSrv(
+    a.lastInseminationDate ||
+    a.lastAI ||
+    a.lastInsemination ||
+    a.lastServiceDate
+  );
+
+const lastInseminationDate = (
+  storedLastInseminationDate &&
+  (
+    !lastCalvingDate ||
+    storedLastInseminationDate > lastCalvingDate
+  )
+)
+  ? storedLastInseminationDate
+  : '';
+
+const lactationNumber =
+  animalListNumDisplaySrv(a.lactationNumber);
+
+const servicesCount = (
+  lastCalvingDate &&
+  !lastInseminationDate
+)
+  ? 0
+  : animalListNumDisplaySrv(a.servicesCount);
 
   const prodNorm = animalListDisplayKeySrv(
     productionStatusRaw ||
@@ -65352,10 +65398,8 @@ inseminatedDays,
 
     pregnancyDays,
 
-    birthDate:
-      animalListIsoDateSrv(
-        a.birthDate
-      ) || '---',
+   birthDate:
+  birthDate || '---',
 
     lastCalvingDate:
       lastCalvingDate || '---',
