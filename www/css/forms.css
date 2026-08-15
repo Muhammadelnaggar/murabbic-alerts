@@ -3572,6 +3572,104 @@ html[data-page="cow-card"] .ev-row--focus{
   transition:background .4s ease;
 }
 /* =========================================================
+   Cow Card — Event Seasons
+   مواسم الأحداث داخل بطاقة الحيوان
+   ========================================================= */
+
+html[data-page="cow-card"] .event-season{
+  margin-top:10px;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:14px;
+  background:#fff;
+  overflow:hidden;
+}
+
+html[data-page="cow-card"] .event-season > summary{
+  cursor:pointer;
+  list-style:none;
+  padding:12px 14px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:#f8fbf6;
+  color:#14532d;
+  font-size:14px;
+  font-weight:900;
+  user-select:none;
+}
+
+html[data-page="cow-card"] .event-season > summary::-webkit-details-marker{
+  display:none;
+}
+
+html[data-page="cow-card"] .event-season > summary::after{
+  content:"⌄";
+  flex:0 0 auto;
+  font-size:18px;
+  line-height:1;
+  color:#0f5132;
+  transition:transform .18s ease;
+}
+
+html[data-page="cow-card"] .event-season[open] > summary::after{
+  transform:rotate(180deg);
+}
+
+html[data-page="cow-card"] .event-season-meta{
+  margin-inline-start:auto;
+  color:#617166;
+  font-size:12px;
+  font-weight:700;
+}
+
+html[data-page="cow-card"] .event-season-body{
+  padding:8px;
+  border-top:1px solid #edf2ea;
+}
+
+html[data-page="cow-card"] .ev-details{
+  grid-column:1 / -1;
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 14px;
+  padding-top:7px;
+  border-top:1px dashed #e5eee4;
+  color:#506158;
+  font-size:12px;
+  line-height:1.6;
+}
+
+html[data-page="cow-card"] .ev-detail{
+  white-space:normal;
+}
+
+html[data-page="cow-card"] .ev-detail b{
+  color:#14532d;
+  font-weight:900;
+}
+
+@media (max-width:560px){
+  html[data-page="cow-card"] .event-season > summary{
+    flex-wrap:wrap;
+    padding:11px 12px;
+  }
+
+  html[data-page="cow-card"] .event-season-meta{
+    width:100%;
+    margin-inline-start:0;
+    font-size:11px;
+  }
+
+  html[data-page="cow-card"] .event-season-body{
+    padding:6px;
+  }
+
+  html[data-page="cow-card"] .ev-details{
+    gap:4px 10px;
+    font-size:11px;
+  }
+}
+/* =========================================================
    Calf Card — scoped styles only
    ستايل بطاقة العجل فقط
    ========================================================= */
