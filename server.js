@@ -72637,7 +72637,7 @@ async function fetchCardEventsSrv(uid, subject = {}) {
         const s = await db.collection('events')
           .where('userId', '==', uid)
           .where(field, '==', id)
-          .limit(300)
+         .limit(3000)
           .get();
 
         pushDocs(s.docs);
@@ -72656,7 +72656,7 @@ async function fetchCardEventsSrv(uid, subject = {}) {
           const s = await db.collection('events')
             .where('userId', '==', uid)
             .where(field, '==', v)
-            .limit(300)
+            .limit(3000)
             .get();
 
           pushDocs(s.docs);
@@ -72698,16 +72698,17 @@ function cardEventTitleSrv(e = {}) {
 
   const type = eventTypeForCardSrv(e);
 
-  const map = {
-    milk: 'لبن يومي',
-    calving: 'ولادة',
-    insemination: 'تلقيح',
-    pregnancy: 'تشخيص حمل',
-    heat: 'شياع',
-    dry: 'تجفيف',
-    disease: 'حالة صحية',
-    other: 'حدث'
-  };
+ const map = {
+  milk: 'لبن يومي',
+  calving: 'ولادة',
+  insemination: 'تلقيح',
+  pregnancy: 'تشخيص حمل',
+  heat: 'شياع',
+  dry: 'تجفيف',
+  close_up: 'تحضير للولادة',
+  disease: 'حالة صحية',
+  other: 'حدث'
+};
 
   return map[type] || raw || 'حدث';
 }
@@ -72753,16 +72754,518 @@ function cardEventSummarySrv(e = {}) {
   return note ? cardTextSrv(note, '—') : '—';
 }
 
+function cardEventDetailsSrv(e = {}) {
+  const type =
+    eventTypeForCardSrv(e);
+
+  const details = [];
+
+  const add = (label, value) => {
+    const text =
+      cardTextSrv(value, '');
+
+    if (
+      !text ||
+      text === '—'
+    ) {
+      return;
+    }
+
+    details.push({
+      label,
+      value: text
+    });
+  };
+
+
+  if (type === 'milk') {
+    const kg =
+      milkKgFromEventSrv(e);
+
+    if (kg > 0) {
+      add(
+        'الكمية',
+        `${Math.round(kg * 100) / 100} كجم`
+      );
+    }
+  }
+
+
+  if (type === 'insemination') {
+    add(
+      'الطلوقة',
+      cardFirstSrv(
+        e,
+        [
+          'semenCode',
+          'bull',
+          'sire',
+          'sireNumber',
+          'straw'
+        ],
+        ''
+      )
+    );
+
+    add(
+      'الطريقة',
+      cardFirstSrv(
+        e,
+        [
+          'method',
+          'inseminationMethod'
+        ],
+        ''
+      )
+    );
+
+    add(
+      'الملقّح',
+      cardFirstSrv(
+        e,
+        [
+          'inseminatorName',
+          'inseminator',
+          'technicianName',
+          'technician'
+        ],
+        ''
+      )
+    );
+  }
+
+
+  if (type === 'pregnancy') {
+    add(
+      'النتيجة',
+      cardFirstSrv(
+        e,
+        [
+          'result',
+          'status',
+          'pregnancyResult',
+          'diagnosis'
+        ],
+        ''
+      )
+    );
+
+    add(
+      'طريقة التشخيص',
+      cardFirstSrv(
+        e,
+        [
+          'method',
+          'diagnosisMethod',
+          'pregnancyMethod'
+        ],
+        ''
+      )
+    );
+  }
+
+
+  if (type === 'heat') {
+    add(
+      'وقت الملاحظة',
+      cardFirstSrv(
+        e,
+        [
+          'heatTime',
+          'observationTime',
+          'timeOfObservation',
+          'period'
+        ],
+        ''
+      )
+    );
+  }
+
+
+  if (type === 'calving') {
+    const calfNumbers =
+      [
+        e.calfNumber,
+        e.calf1Number,
+        e.calf2Number,
+        e.calf3Number,
+        e.newCalfNumber
+      ]
+        .map(
+          v =>
+            String(v || '').trim()
+        )
+        .filter(Boolean);
+
+    const calfSexes =
+      [
+        e.calfSex,
+        e.calf1Sex,
+        e.calf2Sex,
+        e.calf3Sex
+      ]
+        .map(
+          v =>
+            String(v || '').trim()
+        )
+        .filter(Boolean);
+
+
+    if (calfNumbers.length) {
+      add(
+        'المواليد',
+        [...new Set(calfNumbers)]
+          .join('، ')
+      );
+    }
+
+
+    if (calfSexes.length) {
+      add(
+        'الجنس',
+        [...new Set(calfSexes)]
+          .join('، ')
+      );
+    }
+
+
+    add(
+      'نوع الولادة',
+      cardFirstSrv(
+        e,
+        [
+          'birthType',
+          'calvingType',
+          'litterType'
+        ],
+        ''
+      )
+    );
+  }
+
+
+  if (type === 'disease') {
+    add(
+      'التشخيص',
+      cardFirstSrv(
+        e,
+        [
+          'diseaseName',
+          'diagnosis',
+          'condition'
+        ],
+        ''
+      )
+    );
+
+    add(
+      'العلاج',
+      cardFirstSrv(
+        e,
+        [
+          'treatment',
+          'treatmentName',
+          'medicine'
+        ],
+        ''
+      )
+    );
+  }
+
+
+  const note =
+    cardFirstSrv(
+      e,
+      [
+        'notes',
+        'note',
+        'comment',
+        'reason',
+        'description'
+      ],
+      ''
+    );
+
+
+  if (note) {
+    add(
+      'ملاحظة',
+      note
+    );
+  }
+
+
+  return details.slice(0, 8);
+}
+
+
 function cardEventRowSrv(e = {}) {
-  const date = computeEventDateFromDoc(e) || cardISODateSrv(e.createdAt) || null;
+  const date =
+    computeEventDateFromDoc(e) ||
+    cardISODateSrv(e.createdAt) ||
+    null;
 
   return {
-    id: e.id || '',
+    id:
+      e.id || '',
+
     date,
-    title: cardEventTitleSrv(e),
-    summary: cardEventSummarySrv(e),
-    type: eventTypeForCardSrv(e)
+
+    title:
+      cardEventTitleSrv(e),
+
+    summary:
+      cardEventSummarySrv(e),
+
+    type:
+      eventTypeForCardSrv(e),
+
+    details:
+      cardEventDetailsSrv(e)
   };
+}
+
+
+function cardEventSeasonsSrv(
+  eventRows = [],
+  calvingDates = [],
+  currentLactationNumber = null
+) {
+
+  const rows =
+    (
+      Array.isArray(eventRows)
+        ? eventRows
+        : []
+    )
+      .filter(
+        row =>
+          row &&
+          (
+            row.date ||
+            row.title
+          )
+      )
+      .sort(
+        (a, b) =>
+          String(
+            a.date || ''
+          ).localeCompare(
+            String(
+              b.date || ''
+            )
+          )
+      );
+
+
+  const starts =
+    [
+      ...new Set(
+        (
+          Array.isArray(calvingDates)
+            ? calvingDates
+            : []
+        )
+          .map(
+            cardISODateSrv
+          )
+          .filter(Boolean)
+      )
+    ].sort();
+
+
+  const currentLactation =
+    Number(
+      currentLactationNumber
+    );
+
+
+  const hasCurrentLactation =
+    Number.isFinite(
+      currentLactation
+    ) &&
+    currentLactation > 0;
+
+
+  if (!starts.length) {
+    return [
+      {
+        key:
+          'current',
+
+        label:
+          'الموسم الحالي',
+
+        isCurrent:
+          true,
+
+        lactationNumber:
+          hasCurrentLactation
+            ? currentLactation
+            : null,
+
+        startDate:
+          null,
+
+        nextCalvingDate:
+          null,
+
+        eventCount:
+          rows.length,
+
+        events:
+          [...rows].reverse()
+      }
+    ];
+  }
+
+
+  const seasons = [];
+
+
+  for (
+    let i = starts.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    const startDate =
+      starts[i];
+
+    const nextCalvingDate =
+      starts[i + 1] ||
+      null;
+
+    const distanceFromCurrent =
+      (starts.length - 1) - i;
+
+
+    const seasonEvents =
+      rows.filter(
+        row => {
+
+          const d =
+            cardISODateSrv(
+              row.date
+            );
+
+
+          if (
+            !d ||
+            d < startDate
+          ) {
+            return false;
+          }
+
+
+          if (
+            nextCalvingDate &&
+            d >= nextCalvingDate
+          ) {
+            return false;
+          }
+
+
+          return true;
+        }
+      );
+
+
+    const lactationNumber =
+      distanceFromCurrent === 0 &&
+      hasCurrentLactation
+        ? currentLactation
+        : null;
+
+
+    seasons.push({
+      key:
+        distanceFromCurrent === 0
+          ? 'current'
+          : `previous_${distanceFromCurrent}`,
+
+      label:
+        distanceFromCurrent === 0
+          ? 'الموسم الحالي'
+          : (
+              distanceFromCurrent === 1
+                ? 'الموسم السابق'
+                : `الموسم السابق ${distanceFromCurrent}`
+            ),
+
+      isCurrent:
+        distanceFromCurrent === 0,
+
+      lactationNumber:
+        Number.isFinite(
+          lactationNumber
+        ) &&
+        lactationNumber > 0
+          ? lactationNumber
+          : null,
+
+      startDate,
+
+      nextCalvingDate,
+
+      eventCount:
+        seasonEvents.length,
+
+      events:
+        [...seasonEvents]
+          .reverse()
+    });
+  }
+
+
+  const beforeFirst =
+    rows.filter(
+      row => {
+
+        const d =
+          cardISODateSrv(
+            row.date
+          );
+
+        return (
+          !d ||
+          d < starts[0]
+        );
+      }
+    );
+
+
+  if (beforeFirst.length) {
+    seasons.push({
+      key:
+        'before_first_recorded_season',
+
+      label:
+        'أحداث قبل أول موسم مسجل',
+
+      isCurrent:
+        false,
+
+      lactationNumber:
+        null,
+
+      startDate:
+        null,
+
+      nextCalvingDate:
+        starts[0],
+
+      eventCount:
+        beforeFirst.length,
+
+      events:
+        [...beforeFirst]
+          .reverse()
+    });
+  }
+
+
+  return seasons;
 }
 
 function cardMatchSubjectSrv(row = {}, subject = {}) {
@@ -73308,21 +73811,25 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
     // وتستخدم الأحداث فقط لاشتقاق النواقص داخل الدورة الحالية.
     // ============================================================
     const calvingDates = [
-      cardISODateSrv(state.lastCalvingDate),
+  ...new Set([
+    cardISODateSrv(
+      state.lastCalvingDate
+    ),
 
-      ...events
-        .filter(
-          e =>
-            eventTypeForCardSrv(e) ===
-            'calving'
-        )
-        .map(
-          e =>
-            computeEventDateFromDoc(e)
-        )
-        .filter(Boolean)
+    ...events
+      .filter(
+        e =>
+          eventTypeForCardSrv(e) ===
+          'calving'
+      )
+      .map(
+        e =>
+          computeEventDateFromDoc(e)
+      )
+      .filter(Boolean)
 
-    ].filter(Boolean).sort();
+  ].filter(Boolean))
+].sort();
 
     if (calvingDates.length) {
       state.lastCalvingDate =
@@ -73577,17 +74084,18 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
       );
 
 
-    state.servicesCount =
-      Number.isFinite(
-        state.servicesCount
-      ) &&
-      state.servicesCount >= 0
-        ? state.servicesCount
-        : (
-            state.inseminations
-              .length ||
-            null
-          );
+ state.servicesCount =
+  state.lastInseminationDate
+    ? (
+        Number.isFinite(
+          state.servicesCount
+        ) &&
+        state.servicesCount >= 0
+          ? state.servicesCount
+          : state.inseminations.length
+      )
+    : 0;
+ 
 
 
     state.serviceIntervalDays =
@@ -73785,12 +74293,28 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
         null;
     }
 
-    const eventRows = events
-      .map(cardEventRowSrv)
-      .filter(e => e.date || e.title)
-      .slice(-80);
+   const eventRows = events
+  .map(cardEventRowSrv)
+  .filter(
+    e =>
+      e.date ||
+      e.title
+  );
 
-   const alerts = await fetchCardAlertsSrv(uid, animal);
+
+const eventSeasons =
+  cardEventSeasonsSrv(
+    eventRows,
+    calvingDates,
+    state.lactationNumber
+  );
+
+
+const alerts =
+  await fetchCardAlertsSrv(
+    uid,
+    animal
+  );
    const dairyTraits = cardDairyTraitsFromAnimalSrv(animal, events);
    const herdMilkCurve = await fetchCardHerdMilkCurveSrv(uid, animal);
 
@@ -73837,8 +74361,16 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
       herdMilkCurve,
       healthHistory: state.healthHistory.slice(-20).reverse(),
       alerts,
-      events: eventRows,
-      recentEvents: [...eventRows].reverse().slice(0, 12)
+
+events:
+  eventRows,
+
+eventSeasons,
+
+recentEvents:
+  [...eventRows]
+    .reverse()
+    .slice(0, 12)
     });
 
   } catch (e) {
