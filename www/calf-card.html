@@ -27,35 +27,125 @@
 </div>
 
 <main id="cardMain" class="card" hidden>
-      <section class="section">
-        <h2 class="section-title">البيانات الأساسية</h2>
-        <div class="hero">
-          <div id="animalNo" class="animal-no">رقم العجل: —</div>
-          <div id="currentStatus" class="status-badge">—</div>
-        </div>
-       <div class="info-grid calf-basic-grid">
-          <div class="info-item"><div class="info-label">النوع</div><div id="sex" class="info-value">—</div></div>
-          <div class="info-item"><div class="info-label">السلالة</div><div id="breed" class="info-value">—</div></div>
-          <div class="info-item"><div class="info-label">تاريخ الميلاد</div><div id="birthDate" class="info-value">—</div></div>
-          <div class="info-item"><div class="info-label">العمر</div><div id="age" class="info-value">—</div></div>
-        </div>
-      </section>
 
-      <section class="section">
-        <h2 class="section-title">التنسيب والولادة</h2>
-        <div class="info-grid">
-          <div class="info-item"><div class="info-label">رقم الأم</div><div id="damNumber" class="info-value">—</div></div>
-          <div class="info-item"><div class="info-label">رقم الأب</div><div id="sireNumber" class="info-value">—</div></div>
-          <div class="info-item"><div class="info-label">اسم الأب</div><div id="sireName" class="info-value">—</div></div>
-          <div class="info-item"><div class="info-label">تاريخ الميلاد</div><div id="birthDate2" class="info-value">—</div></div>
-          <div class="info-item"><div class="info-label">حالة الولادة</div><div id="birthType" class="info-value">—</div></div>
-          <div class="info-item"><div class="info-label">عدد المواليد</div><div id="litterSize" class="info-value">—</div></div>
-          <div class="info-item"><div class="info-label">ترتيب العجل</div><div id="litterOrder" class="info-value">—</div></div>
-          <div class="info-item"><div class="info-label">تركيب الولادة</div><div id="litterComposition" class="info-value">—</div></div>
-        </div>
-        <div id="twinWarning" class="warning-box" hidden></div>
-      </section>
+  <section class="section">
+    <h2 class="section-title">البيانات الأساسية</h2>
 
+    <div class="hero">
+      <div id="animalNo" class="animal-no">رقم العجل: —</div>
+      <div id="currentStatus" class="status-badge">—</div>
+    </div>
+
+    <div class="info-grid calf-basic-grid">
+      <div class="info-item">
+        <div class="info-label">النوع</div>
+        <div id="species" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">الجنس</div>
+        <div id="sex" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">السلالة</div>
+        <div id="breed" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">تاريخ الميلاد</div>
+        <div id="birthDate" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">العمر</div>
+        <div id="age" class="info-value">—</div>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="section">
+    <h2 class="section-title">التنسيب</h2>
+
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">الأب</div>
+        <div id="sireDisplay" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">الأم</div>
+        <div id="damNumber" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">جد الأب</div>
+        <div id="paternalGrandsireNumber" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">جد الأم</div>
+        <div id="maternalGrandsireNumber" class="info-value">—</div>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="section">
+    <h2 class="section-title">بيانات الولادة</h2>
+
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">حالة الولادة</div>
+        <div id="birthType" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">عدد المواليد</div>
+        <div id="litterSize" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">ترتيب العجل</div>
+        <div id="litterOrder" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">تركيب الولادة</div>
+        <div id="litterComposition" class="info-value">—</div>
+      </div>
+    </div>
+
+    <div id="twinWarning" class="warning-box" hidden></div>
+  </section>
+
+
+  <section class="section">
+    <h2 class="section-title">الحالة التناسلية والتشغيلية</h2>
+
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">تاريخ الفطام</div>
+        <div id="weaningDate" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">آخر تلقيح</div>
+        <div id="lastInseminationDate" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">عدد التلقيحات</div>
+        <div id="servicesCount" class="info-value">—</div>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">عمر الحمل</div>
+        <div id="pregnancyDays" class="info-value">—</div>
+      </div>
+    </div>
+  </section>
       <section class="section">
         <h2 class="section-title">الخط الزمني</h2>
         <div id="timelineEmpty" class="empty">لا توجد أحداث مسجلة بعد</div>
@@ -127,20 +217,28 @@ async function loadServerSession(){
 
     animalNo: $('animalNo'),
     currentStatus: $('currentStatus'),
+
+    species: $('species'),
     sex: $('sex'),
     breed: $('breed'),
     birthDate: $('birthDate'),
     age: $('age'),
+
+    sireDisplay: $('sireDisplay'),
     damNumber: $('damNumber'),
-    sireNumber: $('sireNumber'),
-    sireName: $('sireName'),
-    birthDate2: $('birthDate2'),
+    paternalGrandsireNumber: $('paternalGrandsireNumber'),
+    maternalGrandsireNumber: $('maternalGrandsireNumber'),
+
     birthType: $('birthType'),
     litterSize: $('litterSize'),
     litterOrder: $('litterOrder'),
     litterComposition: $('litterComposition'),
     twinWarning: $('twinWarning'),
 
+    weaningDate: $('weaningDate'),
+    lastInseminationDate: $('lastInseminationDate'),
+    servicesCount: $('servicesCount'),
+    pregnancyDays: $('pregnancyDays'),
     timelineEmpty: $('timelineEmpty'),
     timelineWrap: $('timelineWrap'),
     timeline: $('timeline'),
@@ -404,20 +502,98 @@ async function apiGetDirect(path){
     const number = c.calfNumber || c.animalNumber || c.number || '—';
 
     put('animalNo', `رقم العجل: ${txt(number)}`);
-    put('currentStatus', txt(c.status || c.followerStatus || '—'));
-    put('sex', txt(c.sex));
-    put('breed', txt(c.breed || c.species));
-    put('birthDate', fmtDate(c.birthDate));
-    put('birthDate2', fmtDate(c.birthDate));
-    put('age', txt(c.ageText || (c.ageDays != null ? `${c.ageDays} يوم` : '—')));
+    put(
+      'currentStatus',
+      txt(c.status || c.followerStatus || '—')
+    );
 
-    put('damNumber', txt(c.damNumber));
-    put('sireNumber', txt(c.sireNumber));
-    put('sireName', txt(c.sireName));
-    put('birthType', txt(c.birthType));
-    put('litterSize', txt(c.litterSize));
-    put('litterOrder', txt(c.litterOrder));
-    put('litterComposition', txt(c.litterComposition));
+    put('species', txt(c.species));
+    put('sex', txt(c.sex));
+    put('breed', txt(c.breed));
+    put('birthDate', fmtDate(c.birthDate));
+
+    put(
+      'age',
+      txt(
+        c.ageText ||
+        (
+          c.ageDays != null
+            ? `${c.ageDays} يوم`
+            : '—'
+        )
+      )
+    );
+
+    const sireParts = [
+      txt(c.sireNumber, ''),
+      txt(c.sireName, '')
+    ].filter(
+      v => v && v !== '—'
+    );
+
+    put(
+      'sireDisplay',
+      sireParts.join(' — ') || '—'
+    );
+
+    put(
+      'damNumber',
+      txt(c.damNumber)
+    );
+
+    put(
+      'paternalGrandsireNumber',
+      txt(c.paternalGrandsireNumber)
+    );
+
+    put(
+      'maternalGrandsireNumber',
+      txt(c.maternalGrandsireNumber)
+    );
+
+    put(
+      'birthType',
+      txt(c.birthType)
+    );
+
+    put(
+      'litterSize',
+      txt(c.litterSize)
+    );
+
+    put(
+      'litterOrder',
+      txt(c.litterOrder)
+    );
+
+    put(
+      'litterComposition',
+      txt(c.litterComposition)
+    );
+
+    put(
+      'weaningDate',
+      fmtDate(c.weaningDate)
+    );
+
+    put(
+      'lastInseminationDate',
+      fmtDate(c.lastInseminationDate)
+    );
+
+    put(
+      'servicesCount',
+      c.servicesCount != null
+        ? txt(c.servicesCount)
+        : '—'
+    );
+
+    put(
+      'pregnancyDays',
+      c.pregnancyDays != null
+        ? `${txt(c.pregnancyDays)} يوم`
+        : '—'
+    );
 
     if (els.twinWarning) {
       const warning = txt(c.twinWarning, '');
