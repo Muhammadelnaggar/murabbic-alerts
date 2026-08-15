@@ -263,7 +263,49 @@ async function apiGetDirect(path){
     target.innerHTML =
   `<div class="notice">${safeHtml(txt(text))}</div>`;
   }
+  function eventDetailsHtml(row = {}, summaryText = ''){
+  const details =
+    Array.isArray(row?.details)
+      ? row.details
+      : [];
 
+  const summary =
+    String(summaryText || '');
+
+  const visible =
+    details.filter(d => {
+      const label =
+        String(d?.label || '').trim();
+
+      const value =
+        String(d?.value || '').trim();
+
+      if (
+        !label ||
+        !value ||
+        value === '—'
+      ) {
+        return false;
+      }
+
+      return !summary.includes(value);
+    });
+
+  if (!visible.length) {
+    return '';
+  }
+
+  return `
+    <div class="ev-details">
+      ${visible.map(d => `
+        <span class="ev-detail">
+          <b>${safeHtml(d.label)}:</b>
+          ${safeHtml(d.value)}
+        </span>
+      `).join('')}
+    </div>
+  `;
+}
   function rowList(containerId, rows, emptyText, options = {}){
     const box = $(containerId);
     if (!box) return;
@@ -301,10 +343,19 @@ async function apiGetDirect(path){
         ? (row.message || row.summary || '—')
         : (row.summary || '—');
 
-      item.innerHTML = `
+const detailsHtml =
+  options.alerts
+    ? ''
+    : eventDetailsHtml(
+        row,
+        summary
+      );
+
+item.innerHTML = `
   <div class="ev-date">${safeHtml(fmtDate(date))}</div>
   <div class="ev-type">${safeHtml(txt(title))}</div>
   <div class="ev-note">${safeHtml(txt(summary))}</div>
+  ${detailsHtml}
 `;
 
       list.appendChild(item);
@@ -312,7 +363,165 @@ async function apiGetDirect(path){
 
     box.appendChild(list);
   }
+  function seasonRangeText(season = {}){
+  const start =
+    season?.startDate
+      ? fmtDate(season.startDate)
+      : '';
 
+  const next =
+    season?.nextCalvingDate
+      ? fmtDate(season.nextCalvingDate)
+      : '';
+
+  if (
+    season?.key ===
+    'before_first_recorded_season'
+  ) {
+    return next
+      ? `حتى قبل ${next}`
+      : '';
+  }
+
+  if (season?.isCurrent) {
+    return start
+      ? `من ${start} حتى الآن`
+      : 'الموسم الجاري';
+  }
+
+  if (start && next) {
+    return `من ${start} حتى قبل ${next}`;
+  }
+
+  if (start) {
+    return `من ${start}`;
+  }
+
+  return '';
+}
+
+
+function renderEventSeasons(
+  seasons = [],
+  fallbackEvents = []
+){
+  const box = $('evList');
+  if (!box) return;
+
+  const source =
+    Array.isArray(seasons) &&
+    seasons.length
+      ? seasons
+      : [{
+          key: 'current',
+          label: 'الموسم الحالي',
+          isCurrent: true,
+          lactationNumber: null,
+          startDate: null,
+          nextCalvingDate: null,
+          eventCount:
+            Array.isArray(fallbackEvents)
+              ? fallbackEvents.length
+              : 0,
+          events:
+            Array.isArray(fallbackEvents)
+              ? fallbackEvents
+              : []
+        }];
+
+  box.innerHTML = '';
+
+  source.forEach((season, index) => {
+    const panel =
+      document.createElement('details');
+
+    panel.className =
+      'event-season';
+
+    panel.open =
+      season?.isCurrent === true;
+
+    const head =
+      document.createElement('summary');
+
+    const titleParts = [
+      txt(
+        season?.label,
+        'موسم'
+      )
+    ];
+
+    if (
+      season?.lactationNumber != null
+    ) {
+      titleParts.push(
+        `موسم الحليب ${
+          fmtNum(
+            season.lactationNumber
+          )
+        }`
+      );
+    }
+
+    const title =
+      document.createElement('span');
+
+    title.textContent =
+      titleParts.join(' — ');
+
+    const meta =
+      document.createElement('span');
+
+    meta.className =
+      'event-season-meta';
+
+    const rangeText =
+      seasonRangeText(season);
+
+    const eventCount =
+      Number(
+        season?.eventCount ??
+        season?.events?.length ??
+        0
+      );
+
+    const countText =
+      Number.isFinite(eventCount)
+        ? `${NF.format(eventCount)} حدث`
+        : '';
+
+    meta.textContent =
+      [
+        rangeText,
+        countText
+      ]
+        .filter(Boolean)
+        .join(' • ');
+
+    head.appendChild(title);
+    head.appendChild(meta);
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'event-season-body';
+
+    body.id =
+      `eventSeasonBody-${index}`;
+
+    panel.appendChild(head);
+    panel.appendChild(body);
+    box.appendChild(panel);
+
+    rowList(
+      body.id,
+      season?.events || [],
+      'لا توجد أحداث في هذا الموسم',
+      { prefix: 'evrow' }
+    );
+  });
+}
   function renderHealth(rows = []){
     const box = $('healthList');
     if (!box) return;
@@ -692,19 +901,43 @@ tip.style.display = 'block';
     activeMobileKey = '';
   }
 
-  function focusRow(e){
-    if (!e.id) return;
+function focusRow(e){
+  if (!e.id) return;
 
-    const row = document.getElementById(`evrow-${e.id}`);
-    if (!row) return;
+  const row =
+    document.getElementById(
+      `evrow-${e.id}`
+    );
 
-    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    row.classList.add('ev-row--focus');
+  if (!row) return;
 
-    setTimeout(() => {
-      row.classList.remove('ev-row--focus');
-    }, 1600);
+  const seasonPanel =
+    row.closest(
+      'details.event-season'
+    );
+
+  if (
+    seasonPanel &&
+    !seasonPanel.open
+  ) {
+    seasonPanel.open = true;
   }
+
+  row.scrollIntoView({
+    behavior:'smooth',
+    block:'center'
+  });
+
+  row.classList.add(
+    'ev-row--focus'
+  );
+
+  setTimeout(() => {
+    row.classList.remove(
+      'ev-row--focus'
+    );
+  }, 1600);
+}
 
   box.addEventListener('scroll', hideTip, { passive: true });
 
@@ -1051,13 +1284,13 @@ const allEvents =
   payload?.events ||
   [];
 
-renderTimeline(timelineEvents);
+renderTimeline(
+  timelineEvents
+);
 
-rowList(
-  'evList',
-  allEvents,
-  'لا توجد أحداث',
-  { prefix: 'evrow' }
+renderEventSeasons(
+  payload?.eventSeasons || [],
+  allEvents
 );
   }
 
