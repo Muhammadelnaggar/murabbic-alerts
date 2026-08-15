@@ -65042,10 +65042,45 @@ function animalListStrSrv(v) {
 
 function animalListIsoDateSrv(v) {
   const s = String(v || '').trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  if (!s) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    return s.slice(0, 10);
+  }
+
+  // دعم بيانات مُرَبِّيك القديمة المخزنة بصيغة DD/MM/YYYY.
+  const legacyDMY = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+
+  if (legacyDMY) {
+    const day = Number(legacyDMY[1]);
+    const month = Number(legacyDMY[2]);
+    const year = Number(legacyDMY[3]);
+
+    const d = new Date(
+      Date.UTC(year, month - 1, day)
+    );
+
+    if (
+      d.getUTCFullYear() !== year ||
+      d.getUTCMonth() !== month - 1 ||
+      d.getUTCDate() !== day
+    ) {
+      return null;
+    }
+
+    return (
+      `${String(year).padStart(4, '0')}-` +
+      `${String(month).padStart(2, '0')}-` +
+      `${String(day).padStart(2, '0')}`
+    );
+  }
 
   const d = toDate(v);
-  if (!d || Number.isNaN(d.getTime())) return null;
+
+  if (!d || Number.isNaN(d.getTime())) {
+    return null;
+  }
+
   return d.toISOString().slice(0, 10);
 }
 
