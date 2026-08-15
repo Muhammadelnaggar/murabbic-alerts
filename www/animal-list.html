@@ -51,8 +51,11 @@
           <th>النوع</th>
           <th>السلالة</th>
           <th>الحالة الإنتاجية</th>
+          <th>رقم الموسم</th>
           <th>أيام الحليب</th>
           <th>الحالة التناسلية</th>
+          <th>عدد التلقيحات</th>
+          <th>تاريخ آخر تلقيح</th>
           <th>أيام ملقحة</th>
           <th>اللبن اليومي</th>
           <th>عمر الحمل</th>
@@ -250,8 +253,11 @@ if (animal.rowClass) tr.className = animal.rowClass;
       appendTextCell(tr, animal.animalTypeAr);
       appendTextCell(tr, animal.breed);
       appendTextCell(tr, animal.productionStatus);
+      appendTextCell(tr, animal.lactationNumber);
       appendTextCell(tr, animal.daysInMilk);
       appendTextCell(tr, animal.reproductiveStatus);
+      appendTextCell(tr, animal.servicesCount);
+      appendTextCell(tr, animal.lastInseminationDate);
       appendTextCell(tr, animal.inseminatedDays);
       appendTextCell(tr, animal.dailyMilk);
       appendTextCell(tr, animal.pregnancyDays);
