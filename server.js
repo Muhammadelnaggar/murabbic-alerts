@@ -73448,104 +73448,363 @@ function cardMilkDimSrv(e = {}, animal = {}) {
   return Number.isFinite(dim) && dim >= 0 ? dim : null;
 }
 
-async function fetchCardHerdMilkCurveSrv(uid, currentAnimal = {}) {
-  if (!db || !uid) return [];
+function cardStandardMilkBreedSrv(a = {}) {
+  const breed = String(
+    a.breed ||
+    a.breedName ||
+    a.breedAr ||
+    ''
+  ).trim().toLowerCase();
 
-  const targetClass = cardMilkCurveAnimalClassSrv(currentAnimal);
-  const animalsByNumber = new Map();
-
-  try {
-    const animalsSnap = await db.collection('animals')
-      .where('userId', '==', uid)
-      .limit(1500)
-      .get();
-
-    animalsSnap.docs.forEach(d => {
-      const a = {
-        id: d.id,
-        ...(d.data() || {})
-      };
-
-      const st = String(a.status || 'active').trim().toLowerCase();
-      if (st === 'archived' || st === 'inactive') return;
-
-      const cls = cardMilkCurveAnimalClassSrv(a);
-      if (targetClass && cls && cls !== targetClass) return;
-
-      const nums = cardSubjectNumbersSrv(a);
-      for (const n of nums) {
-        animalsByNumber.set(String(n), a);
-      }
-    });
-  } catch (e) {
-    console.warn('card herd milk animals failed:', e.message || e);
-    return [];
+  if (/holstein|هولشتاين|هولستين/.test(breed)) {
+    return 'holstein';
   }
 
-  if (!animalsByNumber.size) return [];
-
-  const buckets = new Map();
-
-  try {
-    const eventsSnap = await db.collection('events')
-      .where('userId', '==', uid)
-      .limit(5000)
-      .get();
-
-    eventsSnap.docs.forEach(d => {
-      const e = {
-        id: d.id,
-        ...(d.data() || {})
-      };
-
-      if (eventTypeForCardSrv(e) !== 'milk') return;
-
-      const kg = milkKgFromEventSrv(e);
-      if (!Number.isFinite(kg) || kg <= 0) return;
-
-      let animal = null;
-      const nums = cardSubjectNumbersSrv(e);
-
-      for (const n of nums) {
-        if (animalsByNumber.has(String(n))) {
-          animal = animalsByNumber.get(String(n));
-          break;
-        }
-      }
-
-      if (!animal) return;
-
-      const dim = cardMilkDimSrv(e, animal);
-      if (!Number.isFinite(dim) || dim < 0 || dim > 305) return;
-
-      const bucketDim = Math.round(dim / 7) * 7;
-
-      if (!buckets.has(bucketDim)) {
-        buckets.set(bucketDim, {
-          dim: bucketDim,
-          sum: 0,
-          count: 0
-        });
-      }
-
-      const b = buckets.get(bucketDim);
-      b.sum += kg;
-      b.count += 1;
-    });
-  } catch (e) {
-    console.warn('card herd milk events failed:', e.message || e);
-    return [];
+  if (/simmental|سيمنتال/.test(breed)) {
+    return 'simmental';
   }
 
-  return [...buckets.values()]
-    .filter(b => b.count > 0)
-    .map(b => ({
-      dim: b.dim,
-      kg: Math.round((b.sum / b.count) * 100) / 100,
-      count: b.count
-    }))
-    .sort((a, b) => a.dim - b.dim)
-    .slice(0, 60);
+  if (/brown\s*swiss|براون\s*سويس|براون سويس/.test(breed)) {
+    return 'brown_swiss';
+  }
+
+  return 'cow';
+}
+
+
+function cardStandardMilkProfileSrv(a = {}) {
+  const cls =
+    cardStandardMilkBreedSrv(a);
+
+  const parityRaw =
+    Number(
+      a.lactationNumber ??
+      a.parity ??
+      a.lactation ??
+      1
+    );
+
+  const parity =
+    Number.isFinite(parityRaw) &&
+    parityRaw > 0
+      ? (
+          parityRaw === 1
+            ? 1
+            : (
+                parityRaw === 2
+                  ? 2
+                  : 3
+              )
+        )
+      : 1;
+
+  /*
+    Scientific reference:
+    Wood lactation curve
+    Jeretina, Babnik & Skorjanc (2013)
+
+    Published mean parameters for:
+    Holstein / Simmental / Brown Swiss
+    parity 1 / 2 / >=3.
+
+    Generic cow is a weighted pooled fallback
+    derived from the same published dataset.
+  */
+  const table = {
+    holstein: {
+      1: {
+        a: 15.7,
+        b: 0.184,
+        c: 0.00290,
+        milk305: 6671
+      },
+
+      2: {
+        a: 19.3,
+        b: 0.193,
+        c: 0.00385,
+        milk305: 7400
+      },
+
+      3: {
+        a: 19.4,
+        b: 0.212,
+        c: 0.00417,
+        milk305: 7617
+      }
+    },
+
+    simmental: {
+      1: {
+        a: 12.9,
+        b: 0.162,
+        c: 0.00308,
+        milk305: 4847
+      },
+
+      2: {
+        a: 15.4,
+        b: 0.166,
+        c: 0.00380,
+        milk305: 5285
+      },
+
+      3: {
+        a: 15.6,
+        b: 0.180,
+        c: 0.00406,
+        milk305: 5426
+      }
+    },
+
+    brown_swiss: {
+      1: {
+        a: 13.7,
+        b: 0.156,
+        c: 0.00298,
+        milk305: 5094
+      },
+
+      2: {
+        a: 16.3,
+        b: 0.166,
+        c: 0.00375,
+        milk305: 5622
+      },
+
+      3: {
+        a: 16.4,
+        b: 0.180,
+        c: 0.00400,
+        milk305: 5797
+      }
+    },
+
+    cow: {
+      1: {
+        a: 14.438,
+        b: 0.17223,
+        c: 0.002974,
+        milk305: 5807
+      },
+
+      2: {
+        a: 17.481,
+        b: 0.17944,
+        c: 0.003817,
+        milk305: 6390
+      },
+
+      3: {
+        a: 17.258,
+        b: 0.19257,
+        c: 0.004091,
+        milk305: 6363
+      }
+    }
+  };
+
+  const row =
+    table[cls]?.[parity] ||
+    table.cow[parity];
+
+  return {
+    ...row,
+    breedClass: cls,
+    parity
+  };
+}
+
+
+function buildCardStandardMilkCurveSrv(
+  currentAnimal = {}
+) {
+  const animalClass =
+    cardMilkCurveAnimalClassSrv(
+      currentAnimal
+    );
+
+  // مرجع الأبقار لا يُستخدم للجاموس.
+  if (animalClass !== 'cow') {
+    return {
+      points: [],
+      reference: null
+    };
+  }
+
+  const profile =
+    cardStandardMilkProfileSrv(
+      currentAnimal
+    );
+
+  /*
+    Wood:
+    Y(t) = a * t^b * exp(-c*t)
+
+    نثبت شكل المنحنى المنشور،
+    ثم نعمل normalization لناتج 305 يوم
+    حتى يطابق متوسط 305 المنشور لنفس
+    السلالة ورقم الموسم.
+  */
+  const rawDaily = [];
+
+  for (
+    let dim = 1;
+    dim <= 305;
+    dim++
+  ) {
+    const kg =
+      profile.a *
+      Math.pow(
+        dim,
+        profile.b
+      ) *
+      Math.exp(
+        -profile.c * dim
+      );
+
+    if (
+      Number.isFinite(kg) &&
+      kg > 0
+    ) {
+      rawDaily.push({
+        dim,
+        kg
+      });
+    }
+  }
+
+  const raw305 =
+    rawDaily.reduce(
+      (sum, row) =>
+        sum + row.kg,
+      0
+    );
+
+  const scale =
+    raw305 > 0 &&
+    Number.isFinite(
+      profile.milk305
+    )
+      ? profile.milk305 /
+        raw305
+      : 1;
+
+  const points = [];
+
+  /*
+    الرسم الحالي يعمل كل 7 DIM.
+    نبدأ بصريًا من DIM 0،
+    لكن قيمة Wood الأولى محسوبة من day 1
+    لأن t يجب أن يكون موجبًا.
+  */
+  for (
+    let dim = 0;
+    dim <= 301;
+    dim += 7
+  ) {
+    const modelDay =
+      Math.max(
+        1,
+        dim
+      );
+
+    const kg =
+      profile.a *
+      Math.pow(
+        modelDay,
+        profile.b
+      ) *
+      Math.exp(
+        -profile.c *
+        modelDay
+      ) *
+      scale;
+
+    points.push({
+      dim,
+
+      kg:
+        Math.round(
+          kg * 100
+        ) / 100
+    });
+  }
+
+  const kg305 =
+    profile.a *
+    Math.pow(
+      305,
+      profile.b
+    ) *
+    Math.exp(
+      -profile.c * 305
+    ) *
+    scale;
+
+  points.push({
+    dim: 305,
+
+    kg:
+      Math.round(
+        kg305 * 100
+      ) / 100
+  });
+
+  const peakDim =
+    Math.max(
+      1,
+      Math.round(
+        profile.b /
+        profile.c
+      )
+    );
+
+  const peakKg =
+    profile.a *
+    Math.pow(
+      peakDim,
+      profile.b
+    ) *
+    Math.exp(
+      -profile.c *
+      peakDim
+    ) *
+    scale;
+
+  return {
+    points,
+
+    reference: {
+      model:
+        'Wood',
+
+      species:
+        'cow',
+
+      breedClass:
+        profile.breedClass,
+
+      parity:
+        profile.parity,
+
+      standardDays:
+        305,
+
+      target305Kg:
+        profile.milk305,
+
+      peakDim,
+
+      peakKg:
+        Math.round(
+          peakKg * 100
+        ) / 100,
+
+      source:
+        'Jeretina_Babnik_Skorjanc_2013'
+    }
+  };
 }
 function cardTwinWarningSrv(calf = {}) {
   const sex = cardNormalizeSexSrv(cardFirstSrv(calf, ['sex', 'gender', 'followerSex'], ''));
@@ -74333,7 +74592,20 @@ const alerts =
     animal
   );
    const dairyTraits = cardDairyTraitsFromAnimalSrv(animal, events);
-   const herdMilkCurve = await fetchCardHerdMilkCurveSrv(uid, animal);
+   const standardMilkCurve =
+  buildCardStandardMilkCurveSrv({
+    kind:
+      state.kind,
+
+    breed:
+      state.breed,
+
+    lactationNumber:
+      state.lactationNumber
+  });
+
+const herdMilkCurve =
+  standardMilkCurve.points;
 
     return res.json({
       ok: true,
@@ -74376,6 +74648,7 @@ const alerts =
       dairyTraits,
       milkSeries: state.milkSeries,
       herdMilkCurve,
+      milkCurveReference: standardMilkCurve.reference,
       healthHistory: state.healthHistory.slice(-20).reverse(),
       alerts,
 
