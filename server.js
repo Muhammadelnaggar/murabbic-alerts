@@ -73616,7 +73616,7 @@ function cardStandardMilkProfileSrv(a = {}) {
 }
 
 
-function buildCardStandardMilkCurveSrv(
+function buildCardCowStandardMilkCurveSrv(
   currentAnimal = {}
 ) {
   const animalClass =
@@ -73805,6 +73805,585 @@ function buildCardStandardMilkCurveSrv(
         'Jeretina_Babnik_Skorjanc_2013'
     }
   };
+}
+// ============================================================
+// Cow Card — Scientific buffalo reference lactation curves
+// ============================================================
+
+function cardStandardBuffaloBreedSrv(a = {}) {
+  const raw = String(
+    a.breed ||
+    a.breedName ||
+    a.breedAr ||
+    ''
+  )
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+
+  if (
+    /nili\s*ravi|نيلي\s*رافي/.test(raw)
+  ) {
+    return 'nili_ravi';
+  }
+
+
+  if (
+    /murrah|مورا/.test(raw)
+  ) {
+    return 'murrah';
+  }
+
+
+  if (
+    /italian\s*buffalo|mediterranean|جاموس\s*ايطالي|جاموس\s*إيطالي|^italian$|^ايطالي$|^إيطالي$/.test(raw)
+  ) {
+    return 'italian_buffalo';
+  }
+
+
+  if (
+    /egyptian\s*buffalo|جاموس\s*مصري|^مصري$|^baladi$|^balady$|^local$|^native$|^بلدي$|جاموس\s*بلدي/.test(raw)
+  ) {
+    return 'egyptian_buffalo';
+  }
+
+
+  if (
+    /italian\s*cross|cross\s*italian|خليط\s*ايطالي|خليط\s*إيطالي/.test(raw)
+  ) {
+    return 'italian_cross';
+  }
+
+
+  if (
+    /indian\s*cross|cross\s*indian|خليط\s*هندي/.test(raw)
+  ) {
+    return 'indian_cross';
+  }
+
+
+  if (
+    /^indian$|^هندي$/.test(raw)
+  ) {
+    return 'indian_buffalo';
+  }
+
+
+  return 'generic_buffalo';
+}
+
+
+function cardStandardBuffaloProfileSrv(a = {}) {
+  const requestedBreedClass =
+    cardStandardBuffaloBreedSrv(a);
+
+
+  const parityRaw =
+    Number(
+      a.lactationNumber ??
+      a.parity ??
+      a.lactation ??
+      1
+    );
+
+
+  const requestedParity =
+    Number.isFinite(parityRaw) &&
+    parityRaw > 0
+      ? Math.max(
+          1,
+          Math.round(parityRaw)
+        )
+      : 1;
+
+
+  // Egyptian buffalo — Wood — weekly milk yield
+  // Aziz et al. 2006 — parity 1..10
+  const egyptian = {
+    1:  { a: 29.92, b: 0.23, c: 0.03 },
+    2:  { a: 41.79, b: 0.12, c: 0.02 },
+    3:  { a: 41.89, b: 0.16, c: 0.02 },
+    4:  { a: 41.50, b: 0.17, c: 0.02 },
+    5:  { a: 43.84, b: 0.18, c: 0.03 },
+    6:  { a: 47.57, b: 0.10, c: 0.02 },
+    7:  { a: 44.13, b: 0.18, c: 0.03 },
+    8:  { a: 46.97, b: 0.15, c: 0.02 },
+    9:  { a: 49.23, b: 0.13, c: 0.02 },
+    10: { a: 50.16, b: 0.06, c: 0.02 }
+  };
+
+
+  // Nili-Ravi — Wood — weekly milk yield
+  // Anwar et al. 2009 — parity 1..8
+  const niliRavi = {
+    1: { a: 30.40, b: 0.311, c: 0.0357 },
+    2: { a: 32.43, b: 0.360, c: 0.0383 },
+    3: { a: 37.27, b: 0.297, c: 0.0356 },
+    4: { a: 36.07, b: 0.339, c: 0.0380 },
+    5: { a: 33.99, b: 0.360, c: 0.0398 },
+    6: { a: 33.97, b: 0.331, c: 0.0387 },
+    7: { a: 31.59, b: 0.343, c: 0.0372 },
+    8: { a: 31.49, b: 0.323, c: 0.0381 }
+  };
+
+
+  // General dairy buffalo reference
+  // Ghavi Hossein-Zadeh 2016
+  // Daily milk yield — first three parities
+  const generic = {
+    1: {
+      a: 5.42,
+      b: 0.0968,
+      c: 0.001520
+    },
+
+    2: {
+      a: 6.36,
+      b: 0.0730,
+      c: 0.00164
+    },
+
+    3: {
+      a: 6.66,
+      b: 0.0764,
+      c: 0.00178
+    }
+  };
+
+
+  if (
+    requestedBreedClass ===
+    'egyptian_buffalo'
+  ) {
+    const referenceParity =
+      Math.min(
+        10,
+        requestedParity
+      );
+
+    return {
+      ...egyptian[
+        referenceParity
+      ],
+
+      requestedBreedClass,
+
+      referenceBreedClass:
+        'egyptian_buffalo',
+
+      requestedParity,
+      referenceParity,
+
+      timeUnit:
+        'week',
+
+      yieldUnit:
+        'kg_per_week',
+
+      referenceScope:
+        requestedParity <= 10
+          ? 'breed_parity_exact'
+          : 'breed_parity10_proxy',
+
+      source:
+        'Aziz_Shalaby_ElShafie_Mahdy_Nishida_2006'
+    };
+  }
+
+
+  if (
+    requestedBreedClass ===
+    'nili_ravi'
+  ) {
+    const referenceParity =
+      Math.min(
+        8,
+        requestedParity
+      );
+
+    return {
+      ...niliRavi[
+        referenceParity
+      ],
+
+      requestedBreedClass,
+
+      referenceBreedClass:
+        'nili_ravi',
+
+      requestedParity,
+      referenceParity,
+
+      timeUnit:
+        'week',
+
+      yieldUnit:
+        'kg_per_week',
+
+      referenceScope:
+        requestedParity <= 8
+          ? 'breed_parity_exact'
+          : 'breed_parity8_proxy',
+
+      source:
+        'Anwar_Cain_Rowlinson_Khan_Abdullah_Babar_2009'
+    };
+  }
+
+
+  // Murrah:
+  // لدينا معادلة Wood مباشرة منشورة للموسم الأول.
+  if (
+    requestedBreedClass ===
+      'murrah' &&
+    requestedParity === 1
+  ) {
+    return {
+      a: 3.98,
+      b: 0.54,
+      c: 0.05,
+
+      requestedBreedClass,
+
+      referenceBreedClass:
+        'murrah',
+
+      requestedParity,
+      referenceParity: 1,
+
+      timeUnit:
+        'week',
+
+      yieldUnit:
+        'kg_per_day',
+
+      referenceScope:
+        'breed_parity_exact',
+
+      source:
+        'Sahoo_Singh_Gupta_Chakravarty_Ambhore_Singh_2016'
+    };
+  }
+
+
+  /*
+    Italian / Indian / crosses / Murrah parity > 1 /
+    unspecified buffalo:
+
+    لا ننسب لها معاملات سلالة غير منشورة.
+    نستخدم مرجع الجاموس العام المنشور،
+    ونوضح ذلك في metadata.
+  */
+  const referenceParity =
+    Math.min(
+      3,
+      requestedParity
+    );
+
+
+  return {
+    ...generic[
+      referenceParity
+    ],
+
+    requestedBreedClass,
+
+    referenceBreedClass:
+      'generic_buffalo',
+
+    requestedParity,
+    referenceParity,
+
+    timeUnit:
+      'day',
+
+    yieldUnit:
+      'kg_per_day',
+
+    referenceScope:
+      requestedParity <= 3
+        ? 'generic_parity_fallback'
+        : 'generic_parity3_proxy',
+
+    source:
+      'Ghavi_HosseinZadeh_2016'
+  };
+}
+
+
+function cardStandardBuffaloMilkAtDimSrv(
+  dim,
+  profile = {}
+) {
+  const d =
+    Math.max(
+      0,
+      Number(dim) || 0
+    );
+
+
+  const t =
+    profile.timeUnit === 'week'
+      ? Math.max(
+          1,
+          d / 7
+        )
+      : Math.max(
+          1,
+          d
+        );
+
+
+  let kg =
+    Number(profile.a) *
+    Math.pow(
+      t,
+      Number(profile.b)
+    ) *
+    Math.exp(
+      -Number(profile.c) * t
+    );
+
+
+  // الدراسات المصرية وNili-Ravi
+  // تسجل Y كإجمالي كجم/أسبوع.
+  if (
+    profile.yieldUnit ===
+    'kg_per_week'
+  ) {
+    kg /= 7;
+  }
+
+
+  return (
+    Number.isFinite(kg) &&
+    kg > 0
+  )
+    ? kg
+    : null;
+}
+
+
+function buildCardBuffaloStandardMilkCurveSrv(
+  currentAnimal = {}
+) {
+  const profile =
+    cardStandardBuffaloProfileSrv(
+      currentAnimal
+    );
+
+
+  if (!profile) {
+    return {
+      points: [],
+      reference: null
+    };
+  }
+
+
+  const points = [];
+
+
+  for (
+    let dim = 0;
+    dim <= 301;
+    dim += 7
+  ) {
+    const kg =
+      cardStandardBuffaloMilkAtDimSrv(
+        dim,
+        profile
+      );
+
+
+    if (kg === null) {
+      continue;
+    }
+
+
+    points.push({
+      dim,
+
+      kg:
+        Math.round(
+          kg * 100
+        ) / 100
+    });
+  }
+
+
+  const kg305 =
+    cardStandardBuffaloMilkAtDimSrv(
+      305,
+      profile
+    );
+
+
+  if (kg305 !== null) {
+    points.push({
+      dim: 305,
+
+      kg:
+        Math.round(
+          kg305 * 100
+        ) / 100
+    });
+  }
+
+
+  const peakTime =
+    Number(profile.c) > 0
+      ? (
+          Number(profile.b) /
+          Number(profile.c)
+        )
+      : null;
+
+
+  const peakDim =
+    Number.isFinite(
+      peakTime
+    ) &&
+    peakTime > 0
+      ? Math.max(
+          1,
+          Math.round(
+            profile.timeUnit ===
+              'week'
+              ? peakTime * 7
+              : peakTime
+          )
+        )
+      : null;
+
+
+  const peakKg =
+    peakDim !== null
+      ? cardStandardBuffaloMilkAtDimSrv(
+          peakDim,
+          profile
+        )
+      : null;
+
+
+  let reference305Kg = 0;
+
+
+  for (
+    let dim = 1;
+    dim <= 305;
+    dim++
+  ) {
+    const kg =
+      cardStandardBuffaloMilkAtDimSrv(
+        dim,
+        profile
+      );
+
+
+    if (
+      Number.isFinite(kg) &&
+      kg > 0
+    ) {
+      reference305Kg += kg;
+    }
+  }
+
+
+  return {
+    points,
+
+    reference: {
+      model:
+        'Wood',
+
+      species:
+        'buffalo',
+
+      breedClass:
+        profile
+          .requestedBreedClass,
+
+      referenceBreedClass:
+        profile
+          .referenceBreedClass,
+
+      parity:
+        profile
+          .requestedParity,
+
+      referenceParity:
+        profile
+          .referenceParity,
+
+      referenceScope:
+        profile
+          .referenceScope,
+
+      timeUnit:
+        profile
+          .timeUnit,
+
+      yieldUnit:
+        profile
+          .yieldUnit,
+
+      standardDays:
+        305,
+
+      reference305Kg:
+        Math.round(
+          reference305Kg *
+          100
+        ) / 100,
+
+      peakDim,
+
+      peakKg:
+        Number.isFinite(
+          peakKg
+        )
+          ? Math.round(
+              peakKg * 100
+            ) / 100
+          : null,
+
+      source:
+        profile.source
+    }
+  };
+}
+
+
+// Dispatcher واحد للأبقار والجاموس.
+function buildCardStandardMilkCurveSrv(
+  currentAnimal = {}
+) {
+  const animalClass =
+    cardMilkCurveAnimalClassSrv(
+      currentAnimal
+    );
+
+
+  if (
+    animalClass ===
+    'buffalo'
+  ) {
+    return buildCardBuffaloStandardMilkCurveSrv(
+      currentAnimal
+    );
+  }
+
+
+  return buildCardCowStandardMilkCurveSrv(
+    currentAnimal
+  );
 }
 function cardTwinWarningSrv(calf = {}) {
   const sex = cardNormalizeSexSrv(cardFirstSrv(calf, ['sex', 'gender', 'followerSex'], ''));
