@@ -73245,11 +73245,41 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
       productionStatus: String(animal.productionStatus || animal.prodStatus || '').trim() || null,
       healthStatus: String(animal.healthStatus || animal.lastDisease || animal.disease || 'سليم').trim(),
 
-      pregnancyDate: animal.pregnancyDate || animal.pregnantFrom || null,
-      lastInseminationDate: animal.lastInseminationDate || null,
-      servicesCount: Number.isFinite(Number(animal.servicesCount)) ? Number(animal.servicesCount) : null,
-      serviceIntervalDays: Number.isFinite(Number(animal.serviceIntervalDays)) ? Number(animal.serviceIntervalDays) : null,
-      heatIntervalDays: Number.isFinite(Number(animal.heatIntervalDays)) ? Number(animal.heatIntervalDays) : null,
+            pregnancyDate:
+        animal.pregnancyDate ||
+        animal.pregnantFrom ||
+        null,
+
+      pregnancyDays:
+        animal.pregnancyDays !== null &&
+        animal.pregnancyDays !== undefined &&
+        animal.pregnancyDays !== '' &&
+        Number.isFinite(Number(animal.pregnancyDays))
+          ? Number(animal.pregnancyDays)
+          : null,
+
+      lastInseminationDate:
+        animal.lastInseminationDate ||
+        null,
+
+      servicesCount:
+        Number.isFinite(Number(animal.servicesCount))
+          ? Number(animal.servicesCount)
+          : null,
+
+      serviceIntervalDays:
+        Number.isFinite(Number(animal.serviceIntervalDays))
+          ? Number(animal.serviceIntervalDays)
+          : null,
+
+      lastHeatDate:
+        animal.lastHeatDate ||
+        null,
+
+      heatIntervalDays:
+        Number.isFinite(Number(animal.heatIntervalDays))
+          ? Number(animal.heatIntervalDays)
+          : null,
 
       milkTraitsScore: Number(animal.milkTraitsScore || animal.milk_score || 0) || 0,
       ovsynch: animal.ovsynch || null,
@@ -73266,137 +73296,487 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
       milkSeries: []
     };
 
+    // ============================================================
+    // Current-cycle source of truth
+    // بطاقة الحيوان تعرض الحالة الحالية من وثيقة الحيوان،
+    // وتستخدم الأحداث فقط لاشتقاق النواقص داخل الدورة الحالية.
+    // ============================================================
+    const calvingDates = [
+      cardISODateSrv(state.lastCalvingDate),
+
+      ...events
+        .filter(
+          e =>
+            eventTypeForCardSrv(e) ===
+            'calving'
+        )
+        .map(
+          e =>
+            computeEventDateFromDoc(e)
+        )
+        .filter(Boolean)
+
+    ].filter(Boolean).sort();
+
+    if (calvingDates.length) {
+      state.lastCalvingDate =
+        calvingDates[
+          calvingDates.length - 1
+        ];
+    }
+
+    const currentCycleStartDate =
+      cardISODateSrv(
+        state.lastCalvingDate
+      );
+
+    const isAfterCurrentCalving =
+      d =>
+        !currentCycleStartDate ||
+        (
+          d &&
+          String(d).slice(0, 10) >
+            currentCycleStartDate
+        );
+
+    const isInCurrentLactation =
+      d =>
+        !currentCycleStartDate ||
+        (
+          d &&
+          String(d).slice(0, 10) >=
+            currentCycleStartDate
+        );
+
     let seasonMilk = 0;
 
+    let derivedReproductiveStatus =
+      null;
+
+    let derivedProductionStatus =
+      null;
+
+
     for (const e of events) {
-      const t = eventTypeForCardSrv(e);
-      const d = computeEventDateFromDoc(e);
 
-      if (t === 'calving' && d) {
-        state.lastCalvingDate = d;
+      const t =
+        eventTypeForCardSrv(e);
+
+      const d =
+        computeEventDateFromDoc(e);
+
+
+      if (
+        t === 'dry' &&
+        d &&
+        isAfterCurrentCalving(d)
+      ) {
+        derivedProductionStatus =
+          'جاف';
       }
 
-      if (t === 'dry') {
-        state.productionStatus = 'جاف';
-      }
 
-      if (t === 'insemination' && d) {
+      if (
+        t === 'insemination' &&
+        d &&
+        isAfterCurrentCalving(d)
+      ) {
         state.inseminations.push(d);
       }
 
-      if (t === 'heat' && d) {
+
+      if (
+        t === 'heat' &&
+        d &&
+        isAfterCurrentCalving(d)
+      ) {
         state.estrusDates.push(d);
       }
 
-      if (t === 'pregnancy') {
-        if (positivePregnancyEventSrv(e)) {
-          if (d) state.pregnancyDate = state.pregnancyDate || d;
-          state.reproductiveStatus = 'عِشار';
-        } else if (negativePregnancyEventSrv(e)) {
-          if (!state.pregnancyDate) state.reproductiveStatus = 'مفتوحة';
+
+      if (
+        t === 'pregnancy' &&
+        d &&
+        isAfterCurrentCalving(d)
+      ) {
+
+        if (
+          positivePregnancyEventSrv(e)
+        ) {
+
+          derivedReproductiveStatus =
+            'عِشار';
+
+        } else if (
+          negativePregnancyEventSrv(e)
+        ) {
+
+          derivedReproductiveStatus =
+            'مفتوحة';
         }
       }
 
+
       if (t === 'disease') {
+
         state.healthHistory.push({
-          date: d || null,
-          name: e.diseaseName || e.eventType || e.type || 'حالة صحية',
-          diagnosis: e.diseaseName || e.eventType || e.type || 'حالة صحية',
-          note: e.notes || e.note || ''
+          date:
+            d || null,
+
+          name:
+            e.diseaseName ||
+            e.eventType ||
+            e.type ||
+            'حالة صحية',
+
+          diagnosis:
+            e.diseaseName ||
+            e.eventType ||
+            e.type ||
+            'حالة صحية',
+
+          note:
+            e.notes ||
+            e.note ||
+            ''
         });
 
-        if (d && !state.lastCheckDate) {
+
+        if (
+          d &&
+          !state.lastCheckDate
+        ) {
           state.lastCheckDate = d;
         }
       }
 
-      if (t === 'milk' && d) {
-        const kg = milkKgFromEventSrv(e);
+
+      if (
+        t === 'milk' &&
+        d &&
+        isInCurrentLactation(d)
+      ) {
+
+        const kg =
+          milkKgFromEventSrv(e);
+
 
         if (kg > 0) {
-          const dim = state.lastCalvingDate
-            ? daysBetweenIsoSrv(String(state.lastCalvingDate).slice(0, 10), d)
-            : null;
+
+          const dim =
+            currentCycleStartDate
+              ? daysBetweenIsoSrv(
+                  currentCycleStartDate,
+                  d
+                )
+              : null;
+
 
           state.milkSeries.push({
             date: d,
             kg,
-            dim: Number.isFinite(dim) && dim >= 0 ? dim : null
+
+            dim:
+              Number.isFinite(dim) &&
+              dim >= 0
+                ? dim
+                : null
           });
+
 
           seasonMilk += kg;
         }
       }
     }
 
-    state.inseminations = [...new Set(state.inseminations.filter(Boolean))].sort();
-    state.estrusDates = [...new Set(state.estrusDates.filter(Boolean))].sort();
 
-    state.milkSeries = state.milkSeries.sort((a, b) =>
-      String(a.date).localeCompare(String(b.date))
-    );
+    state.inseminations =
+      [
+        ...new Set(
+          state.inseminations
+            .filter(Boolean)
+        )
+      ].sort();
 
-    state.lastInseminationDate = state.lastInseminationDate || lastOfSrv(state.inseminations);
+
+    state.estrusDates =
+      [
+        ...new Set(
+          state.estrusDates
+            .filter(Boolean)
+        )
+      ]
+        .filter(
+          d =>
+            isAfterCurrentCalving(d)
+        )
+        .sort();
+
+
+    state.milkSeries =
+      state.milkSeries.sort(
+        (a, b) =>
+          String(a.date)
+            .localeCompare(
+              String(b.date)
+            )
+      );
+
+
+    // الحالة الحالية المحفوظة
+    // هي المصدر الأول.
+    // الأحداث تستخدم فقط عند غيابها.
+    if (
+      !state.reproductiveStatus &&
+      derivedReproductiveStatus
+    ) {
+
+      state.reproductiveStatus =
+        derivedReproductiveStatus;
+    }
+
+
+    if (
+      !state.productionStatus &&
+      derivedProductionStatus
+    ) {
+
+      state.productionStatus =
+        derivedProductionStatus;
+    }
+
+
+    const storedLastInseminationDate =
+      cardISODateSrv(
+        state.lastInseminationDate
+      );
+
+
+    if (
+      storedLastInseminationDate &&
+      currentCycleStartDate &&
+      storedLastInseminationDate <=
+        currentCycleStartDate
+    ) {
+
+      state.lastInseminationDate =
+        null;
+    }
+
+
+    state.lastInseminationDate =
+      state.lastInseminationDate ||
+      lastOfSrv(
+        state.inseminations
+      );
+
 
     state.servicesCount =
-      Number.isFinite(Number(state.servicesCount)) && Number(state.servicesCount) > 0
-        ? Number(state.servicesCount)
-        : (state.inseminations.length || null);
+      Number.isFinite(
+        state.servicesCount
+      ) &&
+      state.servicesCount >= 0
+        ? state.servicesCount
+        : (
+            state.inseminations
+              .length ||
+            null
+          );
+
 
     state.serviceIntervalDays =
-      Number.isFinite(Number(state.serviceIntervalDays)) && Number(state.serviceIntervalDays) > 0
-        ? Number(state.serviceIntervalDays)
-        : avgIntervalDaysSrv(state.inseminations);
+      Number.isFinite(
+        state.serviceIntervalDays
+      ) &&
+      state.serviceIntervalDays > 0
+        ? state.serviceIntervalDays
+        : avgIntervalDaysSrv(
+            state.inseminations
+          );
 
-    const lastHeatDate = lastOfSrv(state.estrusDates);
-    state.lastHeatDate = state.lastHeatDate || lastHeatDate || null;
+
+    const storedLastHeatDate =
+      cardISODateSrv(
+        state.lastHeatDate
+      );
+
+
+    if (
+      storedLastHeatDate &&
+      currentCycleStartDate &&
+      storedLastHeatDate <=
+        currentCycleStartDate
+    ) {
+
+      state.lastHeatDate =
+        null;
+    }
+
+
+    const lastHeatDate =
+      lastOfSrv(
+        state.estrusDates
+      );
+
+
+    state.lastHeatDate =
+      state.lastHeatDate ||
+      lastHeatDate ||
+      null;
+
 
     state.heatIntervalDays =
-      Number.isFinite(Number(state.heatIntervalDays)) && Number(state.heatIntervalDays) > 0
-        ? Number(state.heatIntervalDays)
-        : avgIntervalDaysSrv(state.estrusDates);
+      Number.isFinite(
+        state.heatIntervalDays
+      ) &&
+      state.heatIntervalDays > 0
+        ? state.heatIntervalDays
+        : avgIntervalDaysSrv(
+            state.estrusDates
+          );
+
 
     let gestationDays = null;
 
-    if (state.reproductiveStatus && /عشار|preg/i.test(String(state.reproductiveStatus))) {
-      if (state.pregnancyDate) {
-        gestationDays = daysBetweenIsoSrv(String(state.pregnancyDate).slice(0, 10), cairoTodayISO());
 
-        if (Number.isFinite(gestationDays) && gestationDays < 0) {
-          gestationDays = null;
+    if (
+      state.reproductiveStatus &&
+      /عشار|preg/i.test(
+        String(
+          state.reproductiveStatus
+        )
+      )
+    ) {
+
+      const aiDate =
+        cardISODateSrv(
+          state.lastInseminationDate
+        );
+
+
+      if (aiDate) {
+
+        const calculated =
+          daysBetweenIsoSrv(
+            aiDate,
+            cairoTodayISO()
+          );
+
+
+        if (
+          Number.isFinite(
+            calculated
+          ) &&
+          calculated >= 0
+        ) {
+
+          gestationDays =
+            calculated;
         }
+      }
+
+
+      if (
+        gestationDays === null &&
+        Number.isFinite(
+          state.pregnancyDays
+        ) &&
+        state.pregnancyDays >= 0
+      ) {
+
+        gestationDays =
+          Math.floor(
+            state.pregnancyDays
+          );
       }
     }
 
-    state.gestationDays = gestationDays;
 
-    if (!Number.isFinite(Number(state.daysInMilk)) && state.lastCalvingDate) {
-      const dim = daysBetweenIsoSrv(String(state.lastCalvingDate).slice(0, 10), cairoTodayISO());
-      state.daysInMilk = Number.isFinite(dim) && dim >= 0 ? dim : null;
+    state.gestationDays =
+      gestationDays;
+
+        if (
+      state.lastCalvingDate &&
+      !/جاف|dry/i.test(
+        String(
+          state.productionStatus ||
+          ''
+        )
+      )
+    ) {
+
+      const dim =
+        daysBetweenIsoSrv(
+          String(
+            state.lastCalvingDate
+          ).slice(0, 10),
+
+          cairoTodayISO()
+        );
+
+
+      state.daysInMilk =
+        Number.isFinite(dim) &&
+        dim >= 0
+          ? dim
+          : null;
     }
 
-    if (state.milkSeries.length) {
-      const lastMilk = state.milkSeries[state.milkSeries.length - 1];
+    const todayISO = cairoTodayISO();
 
-      state.milkTodayKg =
-        Number.isFinite(Number(state.milkTodayKg)) && Number(state.milkTodayKg) > 0
-          ? Number(state.milkTodayKg)
-          : Number(lastMilk.kg || 0);
+    const todayMilk =
+      state.milkSeries.find(
+        row =>
+          String(
+            row?.date || ''
+          ).slice(0, 10) ===
+          todayISO
+      );
 
-      state.seasonTotalKg =
-        Number.isFinite(Number(state.seasonTotalKg)) && Number(state.seasonTotalKg) > 0
-          ? Number(state.seasonTotalKg)
-          : Math.round(seasonMilk * 100) / 100;
+    state.milkTodayKg =
+      todayMilk
+        ? Number(
+            todayMilk.kg || 0
+          )
+        : null;
 
-      const proj = projectLactation305AliSchaefferSrv({
-        milkSeries: state.milkSeries,
-        lastCalvingDate: state.lastCalvingDate,
-        species: state.kind,
-        breed: state.breed,
-        parity: state.lactationNumber
-      });
+    state.seasonTotalKg =
+      state.milkSeries.length
+        ? Math.round(
+            seasonMilk * 100
+          ) / 100
+        : null;
 
-      state.m305Kg = proj?.m305Kg ?? null;
+    if (
+      state.milkSeries.length
+    ) {
+
+      const proj =
+        projectLactation305AliSchaefferSrv({
+          milkSeries:
+            state.milkSeries,
+
+          lastCalvingDate:
+            state.lastCalvingDate,
+
+          species:
+            state.kind,
+
+          breed:
+            state.breed,
+
+          parity:
+            state.lactationNumber
+        });
+
+      state.m305Kg =
+        proj?.m305Kg ??
+        null;
+
+    } else {
+
+      state.m305Kg =
+        null;
     }
 
     const eventRows = events
