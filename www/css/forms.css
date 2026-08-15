@@ -3238,6 +3238,7 @@ html[data-page="cow-card"] .kpi .val{
 html[data-page="cow-card"] .chart-scroll{
   overflow-x:auto;
   overflow-y:hidden;
+  direction:ltr;
   border:1px solid #d8e4d2;
   border-radius:18px;
   background:#ffffff;
