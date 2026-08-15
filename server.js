@@ -66170,6 +66170,12 @@ function eventTypeForCardSrv(e = {}) {
   const txt = eventTextSrv(e);
 
   if (/daily[_\s-]?milk|milk\s*daily|milk$|لبن|انتاج/.test(txt)) return 'milk';
+
+  // مهم: تحضير الولادة ليس حدث ولادة.
+  if (/close[_\s-]?up|تحضير\s*(?:لل)?ولادة|تحضير\s*(?:لل)?الولادة/.test(txt)) {
+    return 'close_up';
+  }
+
   if (/calving|birth|ولادة/.test(txt)) return 'calving';
   if (/insemination|تلقيح|خدم|خدمة/.test(txt)) return 'insemination';
   if (/pregnancy|pregnan|تشخيص حمل|سونار|جس/.test(txt)) return 'pregnancy';
