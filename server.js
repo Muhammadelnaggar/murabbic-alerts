@@ -69321,25 +69321,31 @@ async function enrichAnimalsForGroupsSrv(tenant, list = []) {
     const evDateIso = computeEventDateFromDoc(e) || (ms ? new Date(ms).toISOString().slice(0,10) : null);
 
     if (normType === 'calving' && evDateIso) {
-      const curr = an.lastCalvingDate ? new Date(String(an.lastCalvingDate).slice(0,10)).getTime() : null;
-      if (!curr || (ms && ms > curr)) {
-        an.lastCalvingDate = evDateIso;
-        an.productionStatus = 'milking';
-        an.reproductiveStatus = 'fresh';
-        an.inMilk = true;
-      }
-    }
+  const currCalvingDate = groupDateOnlySrv(
+    an?.lastCalvingDate ||
+    an?.calvingDate ||
+    an?.calvedAt ||
+    ""
+  );
 
-    if (normType === 'dry_off' && evDateIso) {
-      const curr = an.lastDryOffDate ? new Date(String(an.lastDryOffDate).slice(0,10)).getTime() : null;
-      if (!curr || (ms && ms > curr)) {
-        an.lastDryOffDate = evDateIso;
-        an.productionStatus = 'dry';
-        an.inMilk = false;
-      }
-    }
+  if (!currCalvingDate || evDateIso > currCalvingDate) {
+    an.lastCalvingDate = evDateIso;
+  }
+}
 
-    if (isCloseUpEventSrv(e) && evDateIso) {
+if (normType === 'dry_off' && evDateIso) {
+  const currDryDate = groupDateOnlySrv(
+    an?.lastDryOffDate ||
+    an?.dryOffDate ||
+    ""
+  );
+
+  if (!currDryDate || evDateIso > currDryDate) {
+    an.lastDryOffDate = evDateIso;
+  }
+}
+
+if (isCloseUpEventSrv(e) && evDateIso) {
   const lastCalvingDate = groupDateOnlySrv(
     an?.lastCalvingDate ||
     an?.calvingDate ||
@@ -69376,9 +69382,9 @@ async function enrichAnimalsForGroupsSrv(tenant, list = []) {
   ) {
     an._hasCloseUpEvent = true;
     an._lastCloseUpDate = evDateIso;
-    an.productionStatus = 'close_up';
   }
 }
+
 
     if (isMilkEventSrv(e)) {
       const milkKg = numSrv(
