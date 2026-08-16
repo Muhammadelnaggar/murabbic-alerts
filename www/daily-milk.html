@@ -99,157 +99,292 @@
   </div>
 
 <script>
-  const $ = (id) => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 
-  const form = $("milkForm");
-  const sysbar = $("sysbar");
-  const msgBox = $("msg");
+const form = $("milkForm");
+const sysbar = $("sysbar");
+const msgBox = $("msg");
 
-  const animalInput = $("animalNumber");
-  const dateInput = $("eventDate");
+const animalInput = $("animalNumber");
+const dateInput = $("eventDate");
 
-  const sessionsBox = $("sessions");
-  const singleTotalBox = $("singleTotalBox");
-  const bulkBox = $("bulkBox");
-  const bulkDateBar = $("bulkDateBar");
-  const bulkInfo = $("bulkInfo");
-   const bulkRows = $("bulkRows");
-  const milkComponentsBox = $("milkComponentsBox");
-  const bulkActions = $("bulkActions");
+const sessionsBox = $("sessions");
+const singleTotalBox = $("singleTotalBox");
+const bulkBox = $("bulkBox");
+const bulkDateBar = $("bulkDateBar");
+const bulkInfo = $("bulkInfo");
+const bulkRows = $("bulkRows");
+const bulkHeadS3 = $("bulkHeadS3");
+const milkComponentsBox = $("milkComponentsBox");
+const bulkActions = $("bulkActions");
 
-  const saveBulkBtn = $("saveBulkBtn");
-  const cancelBulkBtn = $("cancelBulkBtn");
-  const openCowCardBtn = $("openCowCardBtn");
+const saveBulkBtn = $("saveBulkBtn");
+const cancelBulkBtn = $("cancelBulkBtn");
+const openCowCardBtn = $("openCowCardBtn");
+const singleSaveBtn = form?.querySelector('button[type="submit"]');
+const singleActions = $("singleActionsBar");
 
-  const singleSaveBtn = form?.querySelector('button[type="submit"]');
-  const singleActions = $("singleActionsBar");
+const inputSlots = {
+  milkS1: {
+    input: $("s1"),
+    label: $("s1label"),
+    wrap: $("s1")?.closest(".col"),
+    n: 1
+  },
 
-  const inputSlots = {
-    milkS1: { input: $("s1"), label: $("s1label"), wrap: $("s1")?.closest(".col") },
-    milkS2: { input: $("s2"), label: $("s2label"), wrap: $("s2")?.closest(".col") },
-    milkS3: { input: $("s3"), label: $("s3label"), wrap: $("s3")?.closest(".col") }
-  };
+  milkS2: {
+    input: $("s2"),
+    label: $("s2label"),
+    wrap: $("s2")?.closest(".col"),
+    n: 2
+  },
 
-  let currentMode = "single";
-
-  function qs(name) {
-    return new URL(location.href).searchParams.get(name) || "";
+  milkS3: {
+    input: $("s3"),
+    label: $("s3label"),
+    wrap: $("s3")?.closest(".col"),
+    n: 3
   }
+};
 
-async function postServer(path, payload) {
-  const res = await fetch(path, {
-    method: "POST",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json"
-    },
-    body: JSON.stringify(payload || {})
-  });
+let currentMode = "single";
+let currentSingleRow = null;
+let selectedSingleSessionNumber = null;
 
-  const data = await res.json().catch(() => ({
-    ok: false,
-    ui: {
-      status: "error",
-      message: "تعذّر قراءة رد السيرفر."
-    }
-  }));
+if (saveBulkBtn) {
+  saveBulkBtn.textContent = "حفظ الحلبة";
+}
 
-  if (res.status === 401 || data?.error === "auth_required") {
+if (singleSaveBtn) {
+  singleSaveBtn.textContent = "حفظ الحلبة";
+}
+
+if (
+  singleTotalBox?.childNodes?.[0]
+) {
+  singleTotalBox.childNodes[0].textContent =
+    "الإجمالي حتى الآن: ";
+}
+
+function qs(name) {
+  return new URL(location.href)
+    .searchParams
+    .get(name) || "";
+}
+
+function requestedBulkMode() {
+  return (
+    qs("mode") === "bulk" ||
+    !!qs("numbers")
+  );
+}
+
+function formatKg(value) {
+  const n = Number(value);
+
+  return Number.isFinite(n)
+    ? Number(
+        n.toFixed(1)
+      ).toString()
+    : "—";
+}
+
+function escapeHtml(value) {
+  return String(
+    value ?? ""
+  )
+    .replaceAll(
+      "&",
+      "&amp;"
+    )
+    .replaceAll(
+      "<",
+      "&lt;"
+    )
+    .replaceAll(
+      ">",
+      "&gt;"
+    )
+    .replaceAll(
+      '"',
+      "&quot;"
+    )
+    .replaceAll(
+      "'",
+      "&#039;"
+    );
+}
+
+async function postServer(
+  path,
+  payload
+) {
+  const res =
+    await fetch(
+      path,
+      {
+        method:
+          "POST",
+
+        credentials:
+          "same-origin",
+
+        cache:
+          "no-store",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+
+          "Accept":
+            "application/json"
+        },
+
+        body:
+          JSON.stringify(
+            payload || {}
+          )
+      }
+    );
+
+  const data =
+    await res
+      .json()
+      .catch(
+        () => ({
+          ok: false,
+
+          ui: {
+            status:
+              "error",
+
+            message:
+              "تعذّر قراءة رد السيرفر."
+          }
+        })
+      );
+
+  if (
+    res.status === 401 ||
+    data?.error ===
+      "auth_required"
+  ) {
     return {
       ok: false,
+
       ui: {
-        status: "error",
-        message: data?.message || "سجّل الدخول أولًا."
+        status:
+          "error",
+
+        message:
+          data?.message ||
+          "سجّل الدخول أولًا."
       }
     };
   }
 
   return data;
 }
-let previewTimer = null;
 
-async function runPreview() {
-  clearTimeout(previewTimer);
+function showBar(ui) {
+  const status =
+    String(
+      ui?.status ||
+      "info"
+    );
 
-  previewTimer = setTimeout(async () => {
-    const data = await postServer("/api/daily-milk/preview", savePayload());
-    const ui = data.ui || {};
-    const rows = Array.isArray(ui.rows) ? ui.rows : [];
+  const cls =
+    status === "success"
+      ? "success"
+      : status === "error"
+        ? "error"
+        : status === "warning"
+          ? "warning"
+          : "info";
 
-    if (currentMode === "bulk") {
-      rows.forEach(r => {
-        const rowEl = document.querySelector(`[data-mbk-row="daily-milk"][data-number="${r.animalNumber}"]`);
-        const totalEl = rowEl?.querySelector("[data-key='totalText']");
-        if (totalEl) totalEl.textContent = r.totalText || "—";
-      });
-      return;
-    }
+  if (!sysbar) {
+    return;
+  }
 
-    const totalEl = document.querySelector("[data-key='singleTotalText']");
-    if (totalEl) {
-      totalEl.textContent = ui.single?.totalText || rows[0]?.totalText || "—";
-    }
-  }, 250);
+  sysbar.className =
+    `infobar mbk-infobar show ${cls}`;
+
+  sysbar.style.display =
+    "block";
+
+  sysbar.textContent =
+    String(
+      ui?.message ||
+      ""
+    );
 }
-  function showBar(ui) {
-    const status = String(ui?.status || "info");
-    const cls =
-      status === "success" ? "success" :
-      status === "error" ? "error" :
-      status === "warning" ? "warning" :
-      "info";
 
-    if (!sysbar) return;
-    sysbar.className = `infobar mbk-infobar show ${cls}`;
-    sysbar.style.display = "block";
-    sysbar.textContent = String(ui?.message || "");
+function showMsg(text) {
+  if (!msgBox) {
+    return;
   }
 
-  function showMsg(text) {
-    if (!msgBox) return;
-    msgBox.textContent = String(text || "");
-    msgBox.style.display = text ? "block" : "none";
+  msgBox.textContent =
+    String(
+      text || ""
+    );
+
+  msgBox.style.display =
+    text
+      ? "block"
+      : "none";
+}
+
+function renderMilkComponents(
+  componentsUi
+) {
+  if (
+    !milkComponentsBox
+  ) {
+    return;
   }
 
-  function applyInputSlot(slot, item) {
-    if (!slot) return;
-
-    if (slot.label) slot.label.textContent = item?.label || "";
-    if (slot.input) {
-      slot.input.disabled = !!item?.disabled;
-      if (item?.visible === false) slot.input.value = "";
-    }
-    if (slot.wrap) {
-      slot.wrap.classList.toggle("hide", item?.visible === false);
-    }
-  }
-    function renderMilkComponents(componentsUi) {
-    if (!milkComponentsBox) return;
-
-    const sections =
-      Array.isArray(componentsUi?.sections)
-        ? componentsUi.sections.filter(
-            section => section?.visible === true
+  const sections =
+    Array.isArray(
+      componentsUi
+        ?.sections
+    )
+      ? componentsUi
+          .sections
+          .filter(
+            section =>
+              section
+                ?.visible ===
+              true
           )
-        : [];
+      : [];
 
-    milkComponentsBox.innerHTML = "";
+  milkComponentsBox
+    .innerHTML = "";
 
-    if (
-      componentsUi?.enabled !== true ||
-      !sections.length
-    ) {
-      milkComponentsBox.classList.add("hide");
-      return;
-    }
+  if (
+    componentsUi
+      ?.enabled !== true ||
+    !sections.length
+  ) {
+    milkComponentsBox
+      .classList
+      .add("hide");
 
-    sections.forEach(section => {
+    return;
+  }
+
+  sections.forEach(
+    section => {
       const sectionEl =
-        document.createElement("div");
+        document
+          .createElement(
+            "div"
+          );
 
-      sectionEl.dataset.mbkMilkComponentKind =
+      sectionEl
+        .dataset
+        .mbkMilkComponentKind =
         String(
           section?.kind ||
           section?.key ||
@@ -257,421 +392,1413 @@ async function runPreview() {
         );
 
       const titleEl =
-        document.createElement("div");
+        document
+          .createElement(
+            "div"
+          );
 
-      titleEl.style.fontWeight = "900";
-      titleEl.style.marginBottom = "10px";
-      titleEl.textContent =
+      titleEl
+        .style
+        .fontWeight =
+        "900";
+
+      titleEl
+        .style
+        .marginBottom =
+        "10px";
+
+      titleEl
+        .textContent =
         String(
           section?.title ||
           "مكونات اللبن"
         );
 
-      sectionEl.appendChild(titleEl);
+      sectionEl
+        .appendChild(
+          titleEl
+        );
 
       const rowEl =
-        document.createElement("div");
-
-      rowEl.className = "row";
-
-      const inputs =
-        Array.isArray(section?.inputs)
-          ? section.inputs.filter(
-              input => input?.visible !== false
-            )
-          : [];
-
-      inputs.forEach(item => {
-        const colEl =
-          document.createElement("div");
-
-        colEl.className = "col";
-
-        const labelEl =
-          document.createElement("label");
-
-        labelEl.textContent =
-          String(item?.label || "");
-
-        const inputEl =
-          document.createElement("input");
-
-        inputEl.type =
-          String(item?.type || "number");
-
-        inputEl.inputMode = "decimal";
-
-        inputEl.value =
-          item?.value ?? "";
-
-        inputEl.disabled =
-          item?.disabled === true;
-
-        inputEl.dataset.mbkMilkComponentKind =
-          String(
-            section?.kind ||
-            section?.key ||
-            ""
+        document
+          .createElement(
+            "div"
           );
 
-        inputEl.dataset.key =
-          String(item?.key || "");
+      rowEl.className =
+        "row";
 
-        if (item?.step !== undefined) {
-          inputEl.step =
-            String(item.step);
+      const inputs =
+        Array.isArray(
+          section?.inputs
+        )
+          ? section
+              .inputs
+              .filter(
+                input =>
+                  input
+                    ?.visible !==
+                  false
+              )
+          : [];
+
+      inputs.forEach(
+        item => {
+          const colEl =
+            document
+              .createElement(
+                "div"
+              );
+
+          colEl.className =
+            "col";
+
+          const labelEl =
+            document
+              .createElement(
+                "label"
+              );
+
+          labelEl
+            .textContent =
+            String(
+              item?.label ||
+              ""
+            );
+
+          const inputEl =
+            document
+              .createElement(
+                "input"
+              );
+
+          inputEl.type =
+            String(
+              item?.type ||
+              "number"
+            );
+
+          inputEl
+            .inputMode =
+            "decimal";
+
+          inputEl.value =
+            item?.value ??
+            "";
+
+          inputEl.disabled =
+            item?.disabled ===
+            true;
+
+          inputEl
+            .dataset
+            .mbkMilkComponentKind =
+            String(
+              section?.kind ||
+              section?.key ||
+              ""
+            );
+
+          inputEl
+            .dataset
+            .key =
+            String(
+              item?.key ||
+              ""
+            );
+
+          if (
+            item?.step !==
+            undefined
+          ) {
+            inputEl.step =
+              String(
+                item.step
+              );
+          }
+
+          if (
+            item?.min !==
+            undefined
+          ) {
+            inputEl.min =
+              String(
+                item.min
+              );
+          }
+
+          if (
+            item?.max !==
+            undefined
+          ) {
+            inputEl.max =
+              String(
+                item.max
+              );
+          }
+
+          colEl
+            .appendChild(
+              labelEl
+            );
+
+          colEl
+            .appendChild(
+              inputEl
+            );
+
+          rowEl
+            .appendChild(
+              colEl
+            );
         }
+      );
 
-        if (item?.min !== undefined) {
-          inputEl.min =
-            String(item.min);
+      sectionEl
+        .appendChild(
+          rowEl
+        );
+
+      milkComponentsBox
+        .appendChild(
+          sectionEl
+        );
+    }
+  );
+
+  milkComponentsBox
+    .classList
+    .remove("hide");
+}
+
+function readMilkComponents() {
+  const components =
+    {};
+
+  milkComponentsBox
+    ?.querySelectorAll(
+      "input[data-mbk-milk-component-kind][data-key]"
+    )
+    .forEach(
+      input => {
+        if (
+          input.disabled
+        ) {
+          return;
         }
-
-        if (item?.max !== undefined) {
-          inputEl.max =
-            String(item.max);
-        }
-
-        colEl.appendChild(labelEl);
-        colEl.appendChild(inputEl);
-        rowEl.appendChild(colEl);
-      });
-
-      sectionEl.appendChild(rowEl);
-      milkComponentsBox.appendChild(sectionEl);
-    });
-
-    milkComponentsBox.classList.remove("hide");
-  }
-
-  function readMilkComponents() {
-    const components = {};
-
-    milkComponentsBox
-      ?.querySelectorAll(
-        "input[data-mbk-milk-component-kind][data-key]"
-      )
-      .forEach(input => {
-        if (input.disabled) return;
 
         const kind =
           String(
-            input.dataset
+            input
+              .dataset
               .mbkMilkComponentKind ||
             ""
           ).trim();
 
         const key =
           String(
-            input.dataset.key ||
+            input
+              .dataset
+              .key ||
             ""
           ).trim();
 
-        if (!kind || !key) return;
-
-        if (!components[kind]) {
-          components[kind] = {};
+        if (
+          !kind ||
+          !key
+        ) {
+          return;
         }
 
-        components[kind][key] =
-          input.value || "";
-      });
+        if (
+          !components[
+            kind
+          ]
+        ) {
+          components[
+            kind
+          ] = {};
+        }
 
-    return components;
-  }
-  function renderSingle(ui) {
-    currentMode = "single";
+        components[
+          kind
+        ][
+          key
+        ] =
+          input.value ||
+          "";
+      }
+    );
 
-    bulkBox?.classList.add("hide");
-    sessionsBox?.classList.remove("hide");
-    singleTotalBox?.classList.remove("hide");
-    singleActions?.classList.remove("hide");
-    openCowCardBtn?.classList.remove("hide");
+  return components;
+}
 
-    singleTotalBox?.parentNode?.insertBefore(
+function hideAllSingleSlots() {
+  Object
+    .values(
+      inputSlots
+    )
+    .forEach(
+      slot => {
+        slot.wrap
+          ?.classList
+          .add(
+            "hide"
+          );
+
+        if (
+          slot.input
+        ) {
+          slot.input
+            .disabled =
+            true;
+
+          slot.input
+            .value =
+            "";
+        }
+      }
+    );
+}
+
+function renderSingle(ui) {
+  currentMode =
+    "single";
+
+  currentSingleRow =
+    null;
+
+  selectedSingleSessionNumber =
+    null;
+
+  bulkBox
+    ?.classList
+    .add("hide");
+
+  sessionsBox
+    ?.classList
+    .remove("hide");
+
+  singleTotalBox
+    ?.classList
+    .remove("hide");
+
+  singleActions
+    ?.classList
+    .remove("hide");
+
+  openCowCardBtn
+    ?.classList
+    .remove("hide");
+
+  singleTotalBox
+    ?.parentNode
+    ?.insertBefore(
       milkComponentsBox,
       singleTotalBox
     );
 
-    renderMilkComponents(
-      ui?.components
-    );
+  renderMilkComponents(
+    ui?.components
+  );
 
-    Object.values(inputSlots).forEach(slot => {
-      slot.wrap?.classList.add("hide");
-      if (slot.input) {
-        slot.input.disabled = true;
-        slot.input.value = "";
-      }
-    });
+  hideAllSingleSlots();
 
-    const inputs = Array.isArray(ui?.single?.inputs) ? ui.single.inputs : [];
+  const row =
+    ui?.single ||
+    ui?.rows?.[0] ||
+    null;
 
-    inputs.forEach(item => {
-      applyInputSlot(inputSlots[item?.key], item);
-    });
+  const totalEl =
+    document
+      .querySelector(
+        "[data-key='singleTotalText']"
+      );
 
-    if (singleSaveBtn) singleSaveBtn.disabled = ui?.canSave !== true;
+  if (
+    !row ||
+    row?.ok === false ||
+    row?.canSave ===
+      false
+  ) {
+    if (
+      totalEl
+    ) {
+      totalEl
+        .textContent =
+        "—";
+    }
+
+    if (
+      singleSaveBtn
+    ) {
+      singleSaveBtn
+        .disabled =
+        true;
+    }
+
+    return;
   }
 
-  function renderBulk(ui) {
-    currentMode = "bulk";
+  currentSingleRow =
+    row;
 
-    bulkBox?.classList.remove("hide");
-    sessionsBox?.classList.add("hide");
-    singleTotalBox?.classList.add("hide");
-    singleActions?.classList.add("hide");
-        openCowCardBtn?.classList.add("hide");
+  const required =
+    Number(
+      row
+        .requiredSessions ||
+      0
+    );
 
-    bulkActions?.parentNode?.insertBefore(
+  const next =
+    Number(
+      row
+        .nextSessionNumber
+    );
+
+  const sessions =
+    Array.isArray(
+      row
+        .milkSessions
+    )
+      ? row
+          .milkSessions
+      : [];
+
+  const byNumber =
+    new Map(
+      sessions.map(
+        item => [
+          Number(
+            item?.n
+          ),
+
+          Number(
+            item?.kg
+          )
+        ]
+      )
+    );
+
+  for (
+    let n = 1;
+    n <= required;
+    n += 1
+  ) {
+    const slot =
+      inputSlots[
+        `milkS${n}`
+      ];
+
+    if (!slot) {
+      continue;
+    }
+
+    const hasRecorded =
+      byNumber.has(n) &&
+      Number.isFinite(
+        byNumber.get(n)
+      );
+
+    const isCurrent =
+      Number.isInteger(
+        next
+      ) &&
+      n === next;
+
+    if (
+      !hasRecorded &&
+      !isCurrent
+    ) {
+      continue;
+    }
+
+    slot.wrap
+      ?.classList
+      .remove(
+        "hide"
+      );
+
+    if (
+      slot.label
+    ) {
+      slot.label
+        .textContent =
+        hasRecorded
+          ? `حلبة ${n} (كجم) — مسجلة`
+          : `حلبة ${n} (كجم) — الحالية`;
+    }
+
+    if (
+      slot.input
+    ) {
+      slot.input
+        .disabled =
+        false;
+
+      slot.input
+        .value =
+        hasRecorded
+          ? formatKg(
+              byNumber.get(
+                n
+              )
+            )
+          : "";
+
+      slot.input
+        .dataset
+        .sessionNumber =
+        String(n);
+    }
+  }
+
+  if (
+    totalEl
+  ) {
+    totalEl
+      .textContent =
+      formatKg(
+        row
+          .currentTotalKg ||
+        0
+      );
+  }
+
+  selectedSingleSessionNumber =
+    Number.isInteger(
+      next
+    )
+      ? next
+      : null;
+
+  if (
+    singleSaveBtn
+  ) {
+    singleSaveBtn
+      .disabled =
+      ui?.canSave !==
+        true ||
+      !Number.isInteger(
+        next
+      );
+  }
+}
+
+function renderCompletedSingle(
+  savedRow
+) {
+  currentMode =
+    "single";
+
+  currentSingleRow =
+    null;
+
+  selectedSingleSessionNumber =
+    null;
+
+  hideAllSingleSlots();
+
+  const required =
+    Number(
+      savedRow
+        ?.requiredSessions ||
+      0
+    );
+
+  const sessions =
+    Array.isArray(
+      savedRow
+        ?.milkSessions
+    )
+      ? savedRow
+          .milkSessions
+      : [];
+
+  const byNumber =
+    new Map(
+      sessions.map(
+        item => [
+          Number(
+            item?.n
+          ),
+
+          Number(
+            item?.kg
+          )
+        ]
+      )
+    );
+
+  for (
+    let n = 1;
+    n <= required;
+    n += 1
+  ) {
+    const slot =
+      inputSlots[
+        `milkS${n}`
+      ];
+
+    if (
+      !slot ||
+      !byNumber.has(n)
+    ) {
+      continue;
+    }
+
+    slot.wrap
+      ?.classList
+      .remove(
+        "hide"
+      );
+
+    if (
+      slot.label
+    ) {
+      slot.label
+        .textContent =
+        `حلبة ${n} (كجم) — مكتملة`;
+    }
+
+    if (
+      slot.input
+    ) {
+      slot.input
+        .value =
+        formatKg(
+          byNumber.get(
+            n
+          )
+        );
+
+      slot.input
+        .disabled =
+        true;
+    }
+  }
+
+  const totalEl =
+    document
+      .querySelector(
+        "[data-key='singleTotalText']"
+      );
+
+  if (
+    totalEl
+  ) {
+    totalEl
+      .textContent =
+      formatKg(
+        savedRow
+          ?.currentTotalKg
+      );
+  }
+
+  if (
+    singleSaveBtn
+  ) {
+    singleSaveBtn
+      .disabled =
+      true;
+  }
+}
+
+function bulkSessionCell(
+  row,
+  n
+) {
+  const required =
+    Number(
+      row
+        ?.requiredSessions ||
+      0
+    );
+
+  if (
+    !required ||
+    n > required
+  ) {
+    return `
+      <td style="padding:6px 4px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
+        —
+      </td>
+    `;
+  }
+
+  const sessions =
+    Array.isArray(
+      row
+        ?.milkSessions
+    )
+      ? row
+          .milkSessions
+      : [];
+
+  const recorded =
+    sessions.find(
+      item =>
+        Number(
+          item?.n
+        ) === n
+    );
+
+  const next =
+    Number(
+      row
+        ?.nextSessionNumber
+    );
+
+  if (
+    recorded &&
+    Number.isFinite(
+      Number(
+        recorded?.kg
+      )
+    )
+  ) {
+    return `
+      <td style="padding:6px 4px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
+        <input
+          type="number"
+          value="${escapeHtml(formatKg(recorded.kg))}"
+          disabled
+          style="width:100%;min-width:0;padding:10px 6px;text-align:center"
+        />
+      </td>
+    `;
+  }
+
+  if (
+    row?.ok !== false &&
+    Number.isInteger(
+      next
+    ) &&
+    next === n
+  ) {
+    return `
+      <td style="padding:6px 4px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
+        <input
+          data-key="currentSessionKg"
+          data-session-number="${n}"
+          type="number"
+          min="0"
+          step="0.1"
+          inputmode="decimal"
+          placeholder="0.0"
+          style="width:100%;min-width:0;padding:10px 6px;text-align:center"
+        />
+      </td>
+    `;
+  }
+
+  return `
+    <td style="padding:6px 4px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">
+      —
+    </td>
+  `;
+}
+
+function renderBulk(ui) {
+  currentMode =
+    "bulk";
+
+  bulkBox
+    ?.classList
+    .remove("hide");
+
+  sessionsBox
+    ?.classList
+    .add("hide");
+
+  singleTotalBox
+    ?.classList
+    .add("hide");
+
+  singleActions
+    ?.classList
+    .add("hide");
+
+  openCowCardBtn
+    ?.classList
+    .add("hide");
+
+  bulkActions
+    ?.parentNode
+    ?.insertBefore(
       milkComponentsBox,
       bulkActions
     );
 
-    renderMilkComponents(
-      ui?.components
+  renderMilkComponents(
+    ui?.components
+  );
+
+  const animalCol =
+    animalInput
+      ?.closest(
+        ".col"
+      );
+
+  const dateCol =
+    dateInput
+      ?.closest(
+        ".col"
+      );
+
+  const firstRow =
+    animalInput
+      ?.closest(
+        ".row"
+      );
+
+  animalCol
+    ?.classList
+    .add("hide");
+
+  if (
+    bulkDateBar &&
+    dateCol &&
+    !bulkDateBar
+      .contains(
+        dateCol
+      )
+  ) {
+    bulkDateBar
+      .style
+      .display =
+      "block";
+
+    bulkDateBar
+      .innerHTML =
+      "";
+
+    dateCol
+      .style
+      .flex =
+      "1 1 100%";
+
+    dateCol
+      .style
+      .minWidth =
+      "100%";
+
+    bulkDateBar
+      .appendChild(
+        dateCol
+      );
+  }
+
+  if (
+    firstRow
+  ) {
+    const hasVisibleCol =
+      Array
+        .from(
+          firstRow
+            .querySelectorAll(
+              ".col"
+            )
+        )
+        .some(
+          el =>
+            !el
+              .classList
+              .contains(
+                "hide"
+              ) &&
+            !bulkDateBar
+              ?.contains(
+                el
+              )
+        );
+
+    firstRow
+      .classList
+      .toggle(
+        "hide",
+        !hasVisibleCol
+      );
+  }
+
+  const rows =
+    Array.isArray(
+      ui?.rows
+    )
+      ? ui.rows
+      : [];
+
+  const hasThirdSession =
+    rows.some(
+      row =>
+        Number(
+          row
+            ?.requiredSessions ||
+          0
+        ) >= 3
     );
 
-    const animalCol = animalInput?.closest(".col");
-    const dateCol = dateInput?.closest(".col");
-    const firstRow = animalInput?.closest(".row");
-
-    animalCol?.classList.add("hide");
-
-    if (bulkDateBar && dateCol && !bulkDateBar.contains(dateCol)) {
-      bulkDateBar.style.display = "block";
-      bulkDateBar.innerHTML = "";
-      dateCol.style.flex = "1 1 100%";
-      dateCol.style.minWidth = "100%";
-      bulkDateBar.appendChild(dateCol);
-    }
-
-    if (firstRow) {
-      const hasVisibleCol = Array.from(firstRow.querySelectorAll(".col"))
-        .some(el => !el.classList.contains("hide") && !bulkDateBar?.contains(el));
-      firstRow.classList.toggle("hide", !hasVisibleCol);
-    }
-
-    const rows = Array.isArray(ui?.bulk?.rows) ? ui.bulk.rows : [];
-
-    if (bulkInfo) {
-      bulkInfo.textContent = ui?.message || "";
-    }
-
-    if (saveBulkBtn) {
-      saveBulkBtn.disabled = ui?.canSave !== true;
-    }
-
-    if (!bulkRows) return;
-
-    bulkRows.innerHTML = rows.map(row => {
-      const inputs = Array.isArray(row.inputs) ? row.inputs : [];
-      const inputByKey = Object.fromEntries(inputs.map(x => [x.key, x]));
-
-      const inputCell = (key) => {
-        const spec = inputByKey[key] || {};
-        const hidden = spec.visible === false ? "display:none;" : "";
-        const disabled = spec.disabled || row.canEdit === false ? "disabled" : "";
-
-        return `
-          <td style="padding:6px 4px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;${hidden}">
-            <input data-key="${key}" type="number" min="0" step="0.1" inputmode="decimal"
-              placeholder="0.0" ${disabled}
-              style="width:100%;min-width:0;padding:10px 6px;text-align:center" />
-          </td>
-        `;
-      };
-
-      return `
-        <tr data-mbk-row="daily-milk" data-number="${row.animalNumber || ""}" data-can-save="${row.canSave ? "1" : "0"}" style="${row.canSave ? "" : "opacity:.55;filter:grayscale(.15)"}">
-          <td style="padding:8px 6px;background:#fff;border:1px solid #e2e8f0;border-left:none;border-radius:0 12px 12px 0;font-weight:800;white-space:nowrap;font-size:15px">
-            ${row.animalNumber || ""}
-          </td>
-          <td style="padding:8px 6px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:800;color:${row.canSave ? "#0b7f47" : "#b91c1c"};font-size:13px">
-            ${row.canSave ? (row.speciesLabel || "") : (row.reason || "مرفوض")}
-          </td>
-          ${inputCell("milkS1")}
-          ${inputCell("milkS2")}
-          ${inputCell("milkS3")}
-          <td style="padding:8px 6px;background:#fff;border:1px solid #e2e8f0;border-right:none;border-radius:12px 0 0 12px;text-align:center;font-size:14px">
-            <div data-key="totalText" style="font-weight:900;color:#0b7f47;min-width:0;font-size:14px">—</div>
-          </td>
-        </tr>
-      `;
-    }).join("");
+  if (
+    bulkHeadS3
+  ) {
+    bulkHeadS3
+      .style
+      .display =
+      hasThirdSession
+        ? ""
+        : "none";
   }
 
-  function renderServerUi(ui) {
-    showBar(ui || {});
-
-    if (ui?.mode === "bulk") {
-      renderBulk(ui);
-      return;
-    }
-
-    renderSingle(ui || {});
+  if (
+    bulkInfo
+  ) {
+    bulkInfo
+      .textContent =
+      String(
+        ui?.message ||
+        ""
+      );
   }
 
-  function gatePayload() {
+  if (
+    saveBulkBtn
+  ) {
+    saveBulkBtn
+      .disabled =
+      ui?.canSave !==
+      true;
+  }
+
+  if (
+    !bulkRows
+  ) {
+    return;
+  }
+
+  bulkRows.innerHTML =
+    rows
+      .map(
+        row => {
+          const next =
+            Number(
+              row
+                ?.nextSessionNumber
+            );
+
+          const canSave =
+            row?.ok !==
+              false &&
+            row?.canSave !==
+              false &&
+            Number.isInteger(
+              next
+            );
+
+          const kindText =
+            canSave
+              ? (
+                  row
+                    ?.speciesLabel ||
+                  row
+                    ?.species ||
+                  ""
+                )
+              : (
+                  row
+                    ?.reason ||
+                  "مرفوض"
+                );
+
+          return `
+            <tr
+              data-mbk-row="daily-milk-session"
+              data-number="${escapeHtml(row?.animalNumber || "")}"
+              data-can-save="${canSave ? "1" : "0"}"
+              style="${canSave ? "" : "opacity:.55;filter:grayscale(.15)"}"
+            >
+              <td style="padding:8px 6px;background:#fff;border:1px solid #e2e8f0;border-left:none;border-radius:0 12px 12px 0;font-weight:800;white-space:nowrap;font-size:15px">
+                ${escapeHtml(row?.animalNumber || "")}
+              </td>
+
+              <td style="padding:8px 6px;background:#fff;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:800;font-size:13px">
+                ${escapeHtml(kindText)}
+              </td>
+
+              ${bulkSessionCell(
+                row,
+                1
+              )}
+
+              ${bulkSessionCell(
+                row,
+                2
+              )}
+
+              ${
+                hasThirdSession
+                  ? bulkSessionCell(
+                      row,
+                      3
+                    )
+                  : ""
+              }
+
+              <td style="padding:8px 6px;background:#fff;border:1px solid #e2e8f0;border-right:none;border-radius:12px 0 0 12px;text-align:center;font-size:14px">
+                <div style="font-weight:900;color:#0b7f47;min-width:0;font-size:14px">
+                  ${
+                    canSave
+                      ? escapeHtml(
+                          formatKg(
+                            row
+                              ?.currentTotalKg ||
+                            0
+                          )
+                        )
+                      : "—"
+                  }
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+      )
+      .join("");
+}
+
+function renderServerUi(
+  ui,
+  {
+    showStatus = true
+  } = {}
+) {
+  if (
+    showStatus
+  ) {
+    showBar(
+      ui || {}
+    );
+  }
+
+  if (
+    ui?.mode ===
+      "bulk" ||
+    requestedBulkMode()
+  ) {
+    renderBulk(
+      ui || {}
+    );
+
+    return;
+  }
+
+  renderSingle(
+    ui || {}
+  );
+}
+
+function gatePayload() {
+  return {
+    animalNumbers:
+      qs("numbers"),
+
+    animalNumber:
+      animalInput
+        ?.value ||
+      "",
+
+    eventDate:
+      dateInput
+        ?.value ||
+      ""
+  };
+}
+
+function savePayload() {
+  const components =
+    readMilkComponents();
+
+  if (
+    currentMode ===
+    "bulk"
+  ) {
     return {
-      mode: qs("mode"),
-      animalNumbers: qs("numbers"),
-      animalNumber: animalInput?.value || "",
-      eventDate: dateInput?.value || ""
-    };
-  }
-
-  function savePayload() {
-    const components =
-      readMilkComponents();
-
-    if (currentMode === "bulk") {
-      return {
-        eventDate:
-          dateInput?.value || "",
-
-        components,
-
-        rows: Array.from(
-          document.querySelectorAll(
-            "[data-mbk-row='daily-milk']"
-          )
-        )
-          .filter(
-            row =>
-              row.dataset.canSave === "1"
-          )
-          .map(row => ({
-            animalNumber:
-              row.dataset.number || "",
-
-            milkS1:
-              row.querySelector(
-                "[data-key='milkS1']"
-              )?.value || "",
-
-            milkS2:
-              row.querySelector(
-                "[data-key='milkS2']"
-              )?.value || "",
-
-            milkS3:
-              row.querySelector(
-                "[data-key='milkS3']"
-              )?.value || ""
-          }))
-      };
-    }
-
-    return {
-      animalNumber:
-        animalInput?.value || "",
-
       eventDate:
-        dateInput?.value || "",
+        dateInput
+          ?.value ||
+        "",
 
       components,
 
-      milkS1:
-        inputSlots.milkS1.input?.value ||
-        "",
+      rows:
+        Array
+          .from(
+            document
+              .querySelectorAll(
+                "[data-mbk-row='daily-milk-session'][data-can-save='1']"
+              )
+          )
+          .map(
+            row => {
+              const input =
+                row
+                  .querySelector(
+                    "input[data-key='currentSessionKg']"
+                  );
 
-      milkS2:
-        inputSlots.milkS2.input?.value ||
-        "",
+              return {
+                animalNumber:
+                  row
+                    .dataset
+                    .number ||
+                  "",
 
-      milkS3:
-        inputSlots.milkS3.input?.value ||
-        ""
+                sessionNumber:
+                  Number(
+                    input
+                      ?.dataset
+                      .sessionNumber ||
+                    0
+                  ),
+
+                milkKg:
+                  input
+                    ?.value ||
+                  ""
+              };
+            }
+          )
     };
   }
 
-  async function runGate() {
-    const payload = gatePayload();
+  const slot =
+    inputSlots[
+      `milkS${selectedSingleSessionNumber}`
+    ];
 
-    if (!payload.eventDate || (!payload.animalNumber && !payload.animalNumbers)) return;
+  return {
+    animalNumber:
+      animalInput
+        ?.value ||
+      "",
 
-    showMsg("");
-    showBar({ status: "info", message: "جارِ التحقق…" });
+    eventDate:
+      dateInput
+        ?.value ||
+      "",
 
-    const data = await postServer("/api/daily-milk/gate", payload);
-    renderServerUi(data.ui || {
-      status: data.ok ? "success" : "error",
-      message: data.message || "تم استلام رد السيرفر.",
-      canSave: data.allowed === true
+    sessionNumber:
+      selectedSingleSessionNumber,
+
+    milkKg:
+      slot
+        ?.input
+        ?.value ||
+      "",
+
+    components
+  };
+}
+
+async function runGate({
+  silent = false
+} = {}) {
+  const payload =
+    gatePayload();
+
+  if (
+    !payload
+      .eventDate ||
+    (
+      !payload
+        .animalNumber &&
+      !payload
+        .animalNumbers
+    )
+  ) {
+    return;
+  }
+
+  showMsg("");
+
+  if (
+    !silent
+  ) {
+    showBar({
+      status:
+        "info",
+
+      message:
+        "جارِ التحقق…"
     });
   }
 
-  async function runSave() {
-    showMsg("");
-    showBar({ status: "info", message: "جارِ الحفظ…" });
+  const data =
+    await postServer(
+      "/api/daily-milk/session/gate",
+      payload
+    );
 
-    const data = await postServer("/api/daily-milk/save", savePayload());
-    const ui = data.ui || {
-      status: data.ok ? "success" : "error",
-      message: data.message || "تم استلام رد السيرفر.",
-      canRedirect: !!data.redirectUrl,
-      redirectUrl: data.redirectUrl || ""
+  const ui =
+    data.ui || {
+      status:
+        data.ok
+          ? "success"
+          : "error",
+
+      message:
+        data.message ||
+        "تم استلام رد السيرفر.",
+
+      canSave:
+        data.allowed ===
+        true,
+
+      rows: [],
+
+      single:
+        null
     };
 
-    renderServerUi(ui);
-
-    if (ui.canRedirect && ui.redirectUrl) {
-      setTimeout(() => {
-        location.href = ui.redirectUrl;
-      }, 900);
+  renderServerUi(
+    ui,
+    {
+      showStatus:
+        !silent
     }
+  );
+
+  return data;
+}
+
+async function runSave() {
+  showMsg("");
+
+  showBar({
+    status:
+      "info",
+
+    message:
+      "جارِ حفظ الحلبة…"
+  });
+
+  const modeBeforeSave =
+    currentMode;
+
+  const data =
+    await postServer(
+      "/api/daily-milk/session/save",
+      savePayload()
+    );
+
+  const ui =
+    data.ui || {
+      status:
+        data.ok
+          ? "success"
+          : "error",
+
+      message:
+        data.message ||
+        "تم استلام رد السيرفر."
+    };
+
+  showBar(ui);
+
+  if (
+    !data.ok ||
+    !Array.isArray(
+      data.saved
+    ) ||
+    !data
+      .saved
+      .length
+  ) {
+    return;
   }
 
-  form?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    try {
-      await runSave();
-    } catch (_) {
-      showBar({ status: "error", message: "تعذّر الاتصال بالسيرفر أثناء الحفظ." });
+  if (
+    modeBeforeSave ===
+    "single"
+  ) {
+    const savedRow =
+      data.saved[0];
+
+    if (
+      savedRow
+        ?.completed ===
+      true
+    ) {
+      renderCompletedSingle(
+        savedRow
+      );
+
+      return;
     }
+
+    await runGate({
+      silent: true
+    });
+
+    showBar(ui);
+
+    return;
+  }
+
+  await runGate({
+    silent: true
   });
 
-  saveBulkBtn?.addEventListener("click", async () => {
-    try {
-      await runSave();
-    } catch (_) {
-      showBar({ status: "error", message: "تعذّر الاتصال بالسيرفر أثناء الحفظ." });
+  showBar(ui);
+}
+
+form
+  ?.addEventListener(
+    "submit",
+    async e => {
+      e.preventDefault();
+
+      try {
+        await runSave();
+      } catch (_) {
+        showBar({
+          status:
+            "error",
+
+          message:
+            "تعذّر الاتصال بالسيرفر أثناء الحفظ."
+        });
+      }
     }
-  });
+  );
 
-  cancelBulkBtn?.addEventListener("click", () => {
-    location.href = "/dashboard.html";
-  });
+saveBulkBtn
+  ?.addEventListener(
+    "click",
+    async () => {
+      try {
+        await runSave();
+      } catch (_) {
+        showBar({
+          status:
+            "error",
 
-  openCowCardBtn?.addEventListener("click", () => {
-    const n = animalInput?.value || "";
-    if (!n) return;
-    location.href = `/cow-card.html?number=${encodeURIComponent(n)}`;
-  });
+          message:
+            "تعذّر الاتصال بالسيرفر أثناء الحفظ."
+        });
+      }
+    }
+  );
 
-  animalInput?.addEventListener("change", runGate);
-  animalInput?.addEventListener("blur", runGate);
-  dateInput?.addEventListener("change", runGate);
-  ["milkS1", "milkS2", "milkS3"].forEach(key => {
-  inputSlots[key]?.input?.addEventListener("input", runPreview);
-});
+cancelBulkBtn
+  ?.addEventListener(
+    "click",
+    () => {
+      location.href =
+        "/dashboard.html";
+    }
+  );
 
-document.addEventListener("input", (e) => {
-  if (e.target?.matches?.("[data-mbk-row='daily-milk'] input[data-key]")) {
-    runPreview();
-  }
-});
+openCowCardBtn
+  ?.addEventListener(
+    "click",
+    () => {
+      const n =
+        animalInput
+          ?.value ||
+        "";
 
-  const initialDate = qs("date") || qs("eventDate") || "";
-  const initialNumber = qs("animalNumber") || qs("number") || qs("animalId") || "";
+      if (!n) {
+        return;
+      }
 
-  if (initialDate && dateInput) dateInput.value = initialDate;
-  if (initialNumber && animalInput) animalInput.value = initialNumber;
+      location.href =
+        `/cow-card.html?number=${encodeURIComponent(n)}`;
+    }
+  );
 
-  if ((qs("numbers") || initialNumber) && dateInput?.value) {
-    runGate();
-  }
+animalInput
+  ?.addEventListener(
+    "change",
+    runGate
+  );
+
+animalInput
+  ?.addEventListener(
+    "blur",
+    runGate
+  );
+
+dateInput
+  ?.addEventListener(
+    "change",
+    runGate
+  );
+
+Object
+  .values(
+    inputSlots
+  )
+  .forEach(
+    slot => {
+      slot.input
+        ?.addEventListener(
+          "input",
+          () => {
+            if (
+              slot.input
+                .disabled ||
+              slot.wrap
+                ?.classList
+                .contains(
+                  "hide"
+                )
+            ) {
+              return;
+            }
+
+            selectedSingleSessionNumber =
+              slot.n;
+          }
+        );
+    }
+  );
+
+const initialDate =
+  qs("date") ||
+  qs("eventDate") ||
+  "";
+
+const initialNumber =
+  qs("animalNumber") ||
+  qs("number") ||
+  qs("animalId") ||
+  "";
+
+if (
+  initialDate &&
+  dateInput
+) {
+  dateInput.value =
+    initialDate;
+}
+
+if (
+  initialNumber &&
+  animalInput
+) {
+  animalInput.value =
+    initialNumber;
+}
+
+if (
+  (
+    qs("numbers") ||
+    initialNumber
+  ) &&
+  dateInput?.value
+) {
+  runGate();
+}
 </script>
 </body>
 </html>
