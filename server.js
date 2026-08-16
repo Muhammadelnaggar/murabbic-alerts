@@ -42102,6 +42102,1612 @@ source: "server:/api/daily-milk/save"
     });
   }
 });
+// ============================================================
+// DAILY MILK — SESSION-BY-SESSION OPERATIONAL ENTRY
+// نفس وثيقة اليوم تتحدث حلبة بحلبة ثم تتحول إلى daily_milk مكتمل
+// ============================================================
+
+function dailyMilkSessionRowsSrv(body = {}) {
+  if (Array.isArray(body.rows) && body.rows.length) return body.rows;
+  if (Array.isArray(body.items) && body.items.length) return body.items;
+
+  const raw =
+    body.animalNumbers ||
+    body.numbers ||
+    body.selectedNumbers ||
+    body.groupNumbers ||
+    body.animals ||
+    body.animalNumber ||
+    body.number ||
+    "";
+
+  return dailyMilkParseNumbersSrv(raw).map(animalNumber => ({
+    animalNumber,
+
+    sessionNumber:
+      body.sessionNumber ??
+      body.milkingNumber,
+
+    milkKg:
+      body.sessionMilkKg ??
+      body.milkingKg ??
+      body.milkKg ??
+      body.kg
+  }));
+}
+
+function dailyMilkSessionNumberSrv(body = {}, row = {}) {
+  const n = Number(
+    row.sessionNumber ??
+    row.milkingNumber ??
+    body.sessionNumber ??
+    body.milkingNumber
+  );
+
+  return Number.isInteger(n)
+    ? n
+    : null;
+}
+
+function dailyMilkSessionKgSrv(body = {}, row = {}) {
+  return dailyMilkNumStrictSrv(
+    row.sessionMilkKg ??
+    row.milkingKg ??
+    row.milkKg ??
+    row.kg ??
+    row.amount ??
+    body.sessionMilkKg ??
+    body.milkingKg ??
+    body.milkKg ??
+    body.kg
+  );
+}
+
+function dailyMilkSessionNormalizeSrv(
+  raw = [],
+  maxSessions = 3
+) {
+  const map = new Map();
+
+  for (
+    const item of (
+      Array.isArray(raw)
+        ? raw
+        : []
+    )
+  ) {
+    const n = Number(
+      item?.n ??
+      item?.sessionNumber ??
+      item?.number
+    );
+
+    const kg = Number(
+      item?.kg ??
+      item?.milkKg ??
+      item?.value ??
+      item?.amount
+    );
+
+    if (
+      !Number.isInteger(n) ||
+      n < 1 ||
+      n > maxSessions ||
+      !Number.isFinite(kg) ||
+      kg < 0
+    ) {
+      continue;
+    }
+
+    map.set(
+      n,
+      {
+        n,
+        kg: Number(
+          kg.toFixed(1)
+        )
+      }
+    );
+  }
+
+  return [
+    ...map.values()
+  ].sort(
+    (a, b) =>
+      a.n - b.n
+  );
+}
+
+function dailyMilkSessionTotalSrv(
+  sessions = []
+) {
+  return Number(
+    (
+      Array.isArray(sessions)
+        ? sessions
+        : []
+    )
+      .reduce(
+        (sum, x) =>
+          sum +
+          Number(
+            x?.kg || 0
+          ),
+        0
+      )
+      .toFixed(1)
+  );
+}
+
+function dailyMilkSessionNextSrv(
+  sessions = [],
+  required = 3
+) {
+  const present =
+    new Set(
+      (
+        Array.isArray(sessions)
+          ? sessions
+          : []
+      )
+        .map(
+          x =>
+            Number(
+              x?.n
+            )
+        )
+        .filter(
+          Number.isInteger
+        )
+    );
+
+  for (
+    let n = 1;
+    n <= required;
+    n++
+  ) {
+    if (
+      !present.has(n)
+    ) {
+      return n;
+    }
+  }
+
+  return null;
+}
+
+async function dailyMilkSessionAnimalSrv(
+  uid,
+  rawNumber
+) {
+  const animalNumber =
+    calvingNormDigitsOnlySrv(
+      rawNumber
+    );
+
+  if (!animalNumber) {
+    return {
+      ok: false,
+      animalNumber: "",
+      reason:
+        "رقم الحيوان غير صحيح."
+    };
+  }
+
+  const animal =
+    await fetchAnimalByNumberForCalvingGateSrv(
+      uid,
+      animalNumber
+    );
+
+  if (!animal) {
+    return {
+      ok: false,
+      animalNumber,
+      reason:
+        "لم أجد الحيوان في حسابك. راجع الرقم."
+    };
+  }
+
+  const doc =
+    animal.data || {};
+
+  if (
+    animal._collection !==
+    "animals"
+  ) {
+    return {
+      ok: false,
+      animalNumber,
+      reason:
+        "تسجيل اللبن متاح للأمهات الحلابة فقط."
+    };
+  }
+
+  if (
+    dailyMilkIsOutOfHerdSrv(
+      doc
+    )
+  ) {
+    return {
+      ok: false,
+      animalNumber,
+      reason:
+        "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له."
+    };
+  }
+
+  if (
+    !dailyMilkIsMilkingSrv(
+      doc
+    )
+  ) {
+    return {
+      ok: false,
+      animalNumber,
+      reason:
+        "الحيوان غير مسجل كحلاب، لذلك لا يمكن تسجيل اللبن له."
+    };
+  }
+
+  const species =
+    dailyMilkSpeciesSrv(
+      doc
+    );
+
+  const kind =
+    dailyMilkKindSrv(
+      species
+    );
+
+  return {
+    ok: true,
+
+    animal,
+    doc,
+
+    animalNumber,
+
+    animalId:
+      String(
+        animal.id || ""
+      ).trim(),
+
+    species,
+    kind,
+
+    spec:
+      dailyMilkSessionSpecSrv(
+        kind
+      )
+  };
+}
+
+async function dailyMilkSessionDayStateSrv(
+  uid,
+  animalNumber,
+  eventDate,
+  kind
+) {
+  const eventId = [
+    "daily_milk",
+    uid,
+    animalNumber,
+    eventDate
+  ].join("__");
+
+  const eventRef =
+    db
+      .collection("events")
+      .doc(eventId);
+
+  const snap =
+    await eventRef.get();
+
+  if (snap.exists) {
+    const data =
+      snap.data() || {};
+
+    if (
+      String(
+        data.recordState || ""
+      )
+        .trim()
+        .toLowerCase() !==
+      "collecting"
+    ) {
+      return {
+        state:
+          "complete",
+
+        eventId,
+        eventRef,
+        data
+      };
+    }
+
+    const required =
+      dailyMilkSessionSpecSrv(
+        kind
+      ).sessionCount;
+
+    const milkSessions =
+      dailyMilkSessionNormalizeSrv(
+        data.milkSessions,
+        required
+      );
+
+    return {
+      state:
+        "collecting",
+
+      eventId,
+      eventRef,
+      data,
+
+      milkSessions,
+
+      currentTotalKg:
+        dailyMilkSessionTotalSrv(
+          milkSessions
+        ),
+
+      nextSessionNumber:
+        dailyMilkSessionNextSrv(
+          milkSessions,
+          required
+        )
+    };
+  }
+
+  // يحمي من أي daily_milk قديم
+  // محفوظ بمعرف غير ثابت.
+  if (
+    await dailyMilkHasSameDaySrv(
+      uid,
+      animalNumber,
+      eventDate
+    )
+  ) {
+    return {
+      state:
+        "complete",
+
+      eventId,
+      eventRef,
+
+      data: null
+    };
+  }
+
+  return {
+    state:
+      "empty",
+
+    eventId,
+    eventRef,
+
+    data: null,
+
+    milkSessions: [],
+
+    currentTotalKg: 0,
+
+    nextSessionNumber: 1
+  };
+}
+
+function dailyMilkSessionUiSrv({
+  accepted = [],
+  rejected = [],
+  saved = [],
+  eventDate = "",
+  message = "",
+  components = null
+} = {}) {
+  const isSave =
+    saved.length > 0 ||
+    (
+      !accepted.length &&
+      rejected.length > 0 &&
+      components === null
+    );
+
+  const good =
+    isSave
+      ? saved
+      : accepted;
+
+  const rows = [
+    ...good.map(
+      x => ({
+        ...x,
+        ok: true,
+        eligible: true,
+        canSave: true
+      })
+    ),
+
+    ...rejected.map(
+      x => ({
+        ...x,
+        ok: false,
+        eligible: false,
+        canSave: false
+      })
+    )
+  ];
+
+  return {
+    screen:
+      "daily_milk_session",
+
+    mode:
+      rows.length > 1
+        ? "bulk"
+        : "single",
+
+    eventDate,
+
+    status:
+      good.length
+        ? "success"
+        : "error",
+
+    message,
+
+    canSave:
+      !isSave &&
+      accepted.length > 0,
+
+    acceptedCount:
+      accepted.length,
+
+    savedCount:
+      saved.length,
+
+    rejectedCount:
+      rejected.length,
+
+    completedDailyCount:
+      saved.filter(
+        x =>
+          x.completed === true
+      ).length,
+
+    rows,
+
+    single:
+      rows[0] ||
+      null,
+
+    components:
+      components || {
+        enabled: false,
+        sections: []
+      },
+
+    canRedirect: false,
+    redirectUrl: ""
+  };
+}
+
+
+// ============================================================
+// DAILY MILK SESSION GATE
+// ============================================================
+
+app.post(
+  "/api/daily-milk/session/gate",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res
+          .status(503)
+          .json({
+            ok: false,
+
+            allowed: false,
+
+            message:
+              "❌ تعذّر فحص الحلبة الآن. حاول مرة أخرى."
+          });
+      }
+
+      const uid =
+        req.userId;
+
+      const body =
+        req.body || {};
+
+      const eventDate =
+        String(
+          body.eventDate ||
+          body.date ||
+          ""
+        )
+          .trim()
+          .slice(0, 10);
+
+      const raw =
+        body.animalNumbers ||
+        body.numbers ||
+        body.selectedNumbers ||
+        body.groupNumbers ||
+        body.animals ||
+        body.animalNumber ||
+        body.number ||
+        "";
+
+      const numbers =
+        dailyMilkParseNumbersSrv(
+          raw
+        );
+
+      if (
+        !numbers.length ||
+        !calvingIsDateSrv(
+          eventDate
+        )
+      ) {
+        return res
+          .status(400)
+          .json({
+            ok: false,
+
+            allowed: false,
+
+            message:
+              "❌ أدخل رقم الحيوان وتاريخ الحلبة بصورة صحيحة."
+          });
+      }
+
+      const todayISO =
+        await dailyMilkTodaySrv(
+          req,
+          uid
+        );
+
+      if (
+        calvingIsDateSrv(
+          todayISO
+        ) &&
+        eventDate >
+        todayISO
+      ) {
+        return res
+          .status(400)
+          .json({
+            ok: false,
+
+            allowed: false,
+
+            message:
+              "❌ تاريخ الحلبة لا يمكن أن يكون في المستقبل."
+          });
+      }
+
+      const accepted = [];
+      const rejected = [];
+
+      for (
+        const rawNumber
+        of numbers
+      ) {
+        const info =
+          await dailyMilkSessionAnimalSrv(
+            uid,
+            rawNumber
+          );
+
+        if (!info.ok) {
+          rejected.push({
+            animalNumber:
+              info.animalNumber ||
+              String(
+                rawNumber || ""
+              ),
+
+            reason:
+              info.reason
+          });
+
+          continue;
+        }
+
+        const state =
+          await dailyMilkSessionDayStateSrv(
+            uid,
+            info.animalNumber,
+            eventDate,
+            info.kind
+          );
+
+        if (
+          state.state ===
+          "complete"
+        ) {
+          rejected.push({
+            animalNumber:
+              info.animalNumber,
+
+            reason:
+              "سبق اكتمال تسجيل لبن هذا الحيوان في التاريخ نفسه."
+          });
+
+          continue;
+        }
+
+        const milkSessions =
+          state.milkSessions ||
+          [];
+
+        accepted.push({
+          animalNumber:
+            info.animalNumber,
+
+          animalId:
+            info.animalId,
+
+          species:
+            info.species,
+
+          speciesLabel:
+            info.species,
+
+          kind:
+            info.kind,
+
+          recordState:
+            state.state,
+
+          requiredSessions:
+            info.spec
+              .sessionCount,
+
+          milkSessions,
+
+          completedSessionsCount:
+            milkSessions.length,
+
+          currentTotalKg:
+            Number(
+              state.currentTotalKg ||
+              0
+            ),
+
+          nextSessionNumber:
+            state.nextSessionNumber
+        });
+      }
+
+      const message =
+        accepted.length
+          ? (
+              accepted.length === 1
+                ? `✅ الحيوان رقم ${accepted[0].animalNumber} جاهز للحلبة رقم ${accepted[0].nextSessionNumber || "—"}.`
+                : `✅ يمكن تسجيل الحلبة لعدد ${accepted.length} حيوانات.`
+            )
+          : (
+              rejected[0]?.reason ||
+              "❌ لا يوجد حيوان مؤهل لتسجيل الحلبة."
+            );
+
+      const defaults =
+        await dailyMilkLoadComponentsSrv(
+          uid
+        );
+
+      const components =
+        dailyMilkBuildComponentsUiSrv({
+          accepted,
+          defaults
+        });
+
+      const ui =
+        dailyMilkSessionUiSrv({
+          accepted,
+          rejected,
+          eventDate,
+          message,
+          components
+        });
+
+      return res.json({
+        ok: true,
+
+        allowed:
+          accepted.length > 0,
+
+        stage:
+          "daily_milk_session_gate",
+
+        message,
+
+        acceptedCount:
+          accepted.length,
+
+        rejectedCount:
+          rejected.length,
+
+        accepted,
+        rejected,
+
+        ui
+      });
+
+    } catch (e) {
+      console.error(
+        "daily-milk-session-gate",
+        e
+      );
+
+      return res
+        .status(500)
+        .json({
+          ok: false,
+
+          allowed: false,
+
+          message:
+            "❌ تعذّر فحص الحلبة الآن. حاول مرة أخرى."
+        });
+    }
+  }
+);
+
+
+// ============================================================
+// DAILY MILK SESSION SAVE
+// ============================================================
+
+app.post(
+  "/api/daily-milk/session/save",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res
+          .status(503)
+          .json({
+            ok: false,
+
+            message:
+              "❌ تعذّر حفظ الحلبة الآن. حاول مرة أخرى."
+          });
+      }
+
+      const uid =
+        req.userId;
+
+      const body =
+        req.body || {};
+
+      const eventDate =
+        String(
+          body.eventDate ||
+          body.date ||
+          ""
+        )
+          .trim()
+          .slice(0, 10);
+
+      const rows =
+        dailyMilkSessionRowsSrv(
+          body
+        );
+
+      const submittedComponents =
+        dailyMilkComponentsInputFromBodySrv(
+          body
+        );
+
+      if (!rows.length) {
+        return res
+          .status(400)
+          .json({
+            ok: false,
+
+            message:
+              "❌ لا توجد حيوانات للحفظ."
+          });
+      }
+
+      if (
+        !calvingIsDateSrv(
+          eventDate
+        )
+      ) {
+        return res
+          .status(400)
+          .json({
+            ok: false,
+
+            message:
+              "❌ أدخل تاريخ الحلبة بصورة صحيحة."
+          });
+      }
+
+      const todayISO =
+        await dailyMilkTodaySrv(
+          req,
+          uid
+        );
+
+      if (
+        calvingIsDateSrv(
+          todayISO
+        ) &&
+        eventDate >
+        todayISO
+      ) {
+        return res
+          .status(400)
+          .json({
+            ok: false,
+
+            message:
+              "❌ تاريخ الحلبة لا يمكن أن يكون في المستقبل."
+          });
+      }
+
+      const saved = [];
+      const rejected = [];
+
+      const savedComponentKinds =
+        new Set();
+
+      for (
+        const row
+        of rows
+      ) {
+        const info =
+          await dailyMilkSessionAnimalSrv(
+            uid,
+            row.animalNumber ||
+            row.number ||
+            ""
+          );
+
+        if (!info.ok) {
+          rejected.push({
+            animalNumber:
+              info.animalNumber ||
+              "",
+
+            reason:
+              info.reason
+          });
+
+          continue;
+        }
+
+        const sessionNumber =
+          dailyMilkSessionNumberSrv(
+            body,
+            row
+          );
+
+        const sessionKg =
+          dailyMilkSessionKgSrv(
+            body,
+            row
+          );
+
+        if (
+          !Number.isInteger(
+            sessionNumber
+          ) ||
+          sessionNumber < 1 ||
+          sessionNumber >
+          info.spec.sessionCount
+        ) {
+          rejected.push({
+            animalNumber:
+              info.animalNumber,
+
+            reason:
+              info.kind ===
+              "buffalo"
+                ? "رقم الحلبة يجب أن يكون 1 أو 2 للجاموس."
+                : "رقم الحلبة يجب أن يكون من 1 إلى 3 للأبقار."
+          });
+
+          continue;
+        }
+
+        if (
+          !Number.isFinite(
+            sessionKg
+          ) ||
+          sessionKg < 0
+        ) {
+          rejected.push({
+            animalNumber:
+              info.animalNumber,
+
+            reason:
+              "أدخل كمية لبن صحيحة للحلبة؛ لا يمكن أن تكون سالبة."
+          });
+
+          continue;
+        }
+
+        const componentInput =
+          submittedComponents?.[
+            info.kind
+          ] || {
+            provided: false,
+            milkFatPct: null,
+            milkProteinPct: null
+          };
+
+        const componentIssue =
+          dailyMilkComponentIssueSrv(
+            componentInput,
+            info.species
+          );
+
+        if (
+          componentIssue
+        ) {
+          rejected.push({
+            animalNumber:
+              info.animalNumber,
+
+            reason:
+              componentIssue
+          });
+
+          continue;
+        }
+
+        const state =
+          await dailyMilkSessionDayStateSrv(
+            uid,
+            info.animalNumber,
+            eventDate,
+            info.kind
+          );
+
+        if (
+          state.state ===
+          "complete"
+        ) {
+          rejected.push({
+            animalNumber:
+              info.animalNumber,
+
+            reason:
+              "سبق اكتمال تسجيل لبن هذا الحيوان في التاريخ نفسه."
+          });
+
+          continue;
+        }
+
+        const eventId = [
+          "daily_milk",
+          uid,
+          info.animalNumber,
+          eventDate
+        ].join("__");
+
+        const eventRef =
+          db
+            .collection(
+              "events"
+            )
+            .doc(
+              eventId
+            );
+
+        const animalRef =
+          info.animalId
+            ? db
+                .collection(
+                  "animals"
+                )
+                .doc(
+                  info.animalId
+                )
+            : null;
+
+        try {
+          const result =
+            await db.runTransaction(
+              async tx => {
+                const snap =
+                  await tx.get(
+                    eventRef
+                  );
+
+                const existing =
+                  snap.exists
+                    ? (
+                        snap.data() ||
+                        {}
+                      )
+                    : {};
+
+                if (
+                  snap.exists &&
+                  String(
+                    existing
+                      .recordState ||
+                    ""
+                  )
+                    .trim()
+                    .toLowerCase() !==
+                  "collecting"
+                ) {
+                  const err =
+                    new Error(
+                      "daily_milk_day_complete"
+                    );
+
+                  err.publicReason =
+                    "سبق اكتمال تسجيل لبن هذا الحيوان في التاريخ نفسه.";
+
+                  throw err;
+                }
+
+                const sessions =
+                  dailyMilkSessionNormalizeSrv(
+                    existing
+                      .milkSessions,
+                    info.spec
+                      .sessionCount
+                  );
+
+                const existingIndex =
+                  sessions
+                    .findIndex(
+                      x =>
+                        Number(
+                          x?.n
+                        ) ===
+                        sessionNumber
+                    );
+
+                const nextExpected =
+                  dailyMilkSessionNextSrv(
+                    sessions,
+                    info.spec
+                      .sessionCount
+                  );
+
+                if (
+                  existingIndex < 0 &&
+                  nextExpected !==
+                  sessionNumber
+                ) {
+                  const err =
+                    new Error(
+                      "daily_milk_session_out_of_order"
+                    );
+
+                  err.publicReason =
+                    nextExpected
+                      ? `سجّل الحلبة رقم ${nextExpected} أولًا لهذا الحيوان.`
+                      : "اكتمل تسجيل حلبات هذا الحيوان اليوم.";
+
+                  throw err;
+                }
+
+                const nextSessions =
+                  existingIndex >= 0
+                    ? sessions.map(
+                        x =>
+                          Number(
+                            x?.n
+                          ) ===
+                          sessionNumber
+                            ? {
+                                n:
+                                  sessionNumber,
+
+                                kg:
+                                  Number(
+                                    sessionKg
+                                      .toFixed(
+                                        1
+                                      )
+                                  )
+                              }
+                            : x
+                      )
+                    : [
+                        ...sessions,
+
+                        {
+                          n:
+                            sessionNumber,
+
+                          kg:
+                            Number(
+                              sessionKg
+                                .toFixed(
+                                  1
+                                )
+                            )
+                        }
+                      ].sort(
+                        (a, b) =>
+                          a.n -
+                          b.n
+                      );
+
+                const currentTotalKg =
+                  dailyMilkSessionTotalSrv(
+                    nextSessions
+                  );
+
+                const nextSessionNumber =
+                  dailyMilkSessionNextSrv(
+                    nextSessions,
+                    info.spec
+                      .sessionCount
+                  );
+
+                const completed =
+                  nextSessionNumber ===
+                  null;
+
+                if (
+                  completed &&
+                  currentTotalKg <= 0
+                ) {
+                  const err =
+                    new Error(
+                      "daily_milk_total_zero"
+                    );
+
+                  err.publicReason =
+                    "إجمالي اللبن اليومي صفر؛ راجع كميات الحلبات قبل إكمال اليوم.";
+
+                  throw err;
+                }
+
+                const storedFat =
+                  dailyMilkComponentPctOrNullSrv(
+                    existing
+                      .milkFatPct
+                  );
+
+                const storedProtein =
+                  dailyMilkComponentPctOrNullSrv(
+                    existing
+                      .milkProteinPct
+                  );
+
+                const milkFatPct =
+                  componentInput
+                    .provided
+                    ? componentInput
+                        .milkFatPct
+                    : storedFat;
+
+                const milkProteinPct =
+                  componentInput
+                    .provided
+                    ? componentInput
+                        .milkProteinPct
+                    : storedProtein;
+
+                const hasComponents =
+                  Number.isFinite(
+                    Number(
+                      milkFatPct
+                    )
+                  ) &&
+                  Number.isFinite(
+                    Number(
+                      milkProteinPct
+                    )
+                  );
+
+                const fatProteinRatio =
+                  hasComponents
+                    ? dailyMilkFatProteinRatioSrv(
+                        milkFatPct,
+                        milkProteinPct
+                      )
+                    : null;
+
+                const now =
+                  admin
+                    .firestore
+                    .FieldValue
+                    .serverTimestamp();
+
+                if (
+                  !completed
+                ) {
+                  /*
+                   * أثناء التجميع:
+                   * لا userId
+                   * لا eventDate/date
+                   * لا eventType
+                   * لا milkKg/dailyMilk/totalMilk
+                   *
+                   * وبالتالي لا تعتبرها
+                   * المحركات الحالية
+                   * إجمالي لبن يومي.
+                   */
+                  tx.set(
+                    eventRef,
+                    {
+                      recordState:
+                        "collecting",
+
+                      draftDate:
+                        eventDate,
+
+                      animalId:
+                        info.animalId,
+
+                      animalNumber:
+                        info.animalNumber,
+
+                      species:
+                        info.species,
+
+                      kind:
+                        info.kind,
+
+                      requiredSessions:
+                        info.spec
+                          .sessionCount,
+
+                      milkSessions:
+                        nextSessions,
+
+                      currentTotalKg,
+
+                      ...(
+                        hasComponents
+                          ? {
+                              milkFatPct,
+                              milkProteinPct,
+                              fatProteinRatio
+                            }
+                          : {}
+                      ),
+
+                      collectingStartedAt:
+                        existing
+                          .collectingStartedAt ||
+                        now,
+
+                      updatedAt:
+                        now,
+
+                      source:
+                        "server:/api/daily-milk/session/save"
+                    }
+                  );
+
+                } else {
+                  /*
+                   * آخر حلبة:
+                   * نفس الوثيقة تتحول
+                   * إلى daily_milk الرسمي.
+                   */
+                  tx.set(
+                    eventRef,
+                    {
+                      userId:
+                        uid,
+
+                      ownerUid:
+                        uid,
+
+                      animalId:
+                        info.animalId,
+
+                      animalNumber:
+                        info.animalNumber,
+
+                      createdAt:
+                        existing
+                          .collectingStartedAt ||
+                        now,
+
+                      updatedAt:
+                        now,
+
+                      date:
+                        eventDate,
+
+                      eventDate,
+
+                      eventType:
+                        "لبن يومي",
+
+                      eventTypeNorm:
+                        "daily_milk",
+
+                      type:
+                        "daily_milk",
+
+                      recordState:
+                        "complete",
+
+                      species:
+                        info.species,
+
+                      kind:
+                        info.kind,
+
+                      milkSessions:
+                        nextSessions,
+
+                      milkKg:
+                        currentTotalKg,
+
+                      dailyMilk:
+                        currentTotalKg,
+
+                      totalMilk:
+                        currentTotalKg,
+
+                      ...(
+                        hasComponents
+                          ? {
+                              milkFatPct,
+                              milkProteinPct,
+                              fatProteinRatio
+                            }
+                          : {}
+                      ),
+
+                      source:
+                        "server:/api/daily-milk/session/save"
+                    }
+                  );
+
+                  if (
+                    animalRef
+                  ) {
+                    tx.set(
+                      animalRef,
+                      {
+                        dailyMilk:
+                          currentTotalKg,
+
+                        milkTodayKg:
+                          currentTotalKg,
+
+                        lastMilkKg:
+                          currentTotalKg,
+
+                        lastMilkDate:
+                          eventDate,
+
+                        updatedAt:
+                          now
+                      },
+                      {
+                        merge: true
+                      }
+                    );
+                  }
+                }
+
+                return {
+                  corrected:
+                    existingIndex >= 0,
+
+                  completed,
+
+                  milkSessions:
+                    nextSessions,
+
+                  currentTotalKg,
+
+                  nextSessionNumber
+                };
+              }
+            );
+
+          saved.push({
+            animalNumber:
+              info.animalNumber,
+
+            animalId:
+              info.animalId,
+
+            eventId,
+
+            eventDate,
+
+            species:
+              info.species,
+
+            kind:
+              info.kind,
+
+            sessionNumber,
+
+            sessionKg:
+              Number(
+                sessionKg
+                  .toFixed(1)
+              ),
+
+            corrected:
+              result.corrected ===
+              true,
+
+            completed:
+              result.completed ===
+              true,
+
+            recordState:
+              result.completed
+                ? "complete"
+                : "collecting",
+
+            milkSessions:
+              result.milkSessions,
+
+            currentTotalKg:
+              result.currentTotalKg,
+
+            milkKg:
+              result.completed
+                ? result
+                    .currentTotalKg
+                : null,
+
+            requiredSessions:
+              info.spec
+                .sessionCount,
+
+            nextSessionNumber:
+              result
+                .nextSessionNumber
+          });
+
+          if (
+            componentInput
+              .provided
+          ) {
+            savedComponentKinds
+              .add(
+                info.kind
+              );
+          }
+
+        } catch (e) {
+          rejected.push({
+            animalNumber:
+              info.animalNumber,
+
+            reason:
+              e?.publicReason ||
+              "تعذّر حفظ هذه الحلبة. حاول مرة أخرى."
+          });
+        }
+      }
+
+      if (
+        savedComponentKinds
+          .size
+      ) {
+        try {
+          await dailyMilkPersistComponentsSrv({
+            uid,
+
+            submitted:
+              submittedComponents,
+
+            savedKinds:
+              [
+                ...savedComponentKinds
+              ]
+          });
+
+        } catch (e) {
+          console.warn(
+            "daily milk session component defaults save failed:",
+            e.message ||
+            e
+          );
+        }
+      }
+
+      const completedRows =
+        saved.filter(
+          x =>
+            x.completed ===
+            true
+        );
+
+      if (
+        completedRows.length &&
+        typeof
+          scheduleGroupsRebuildSrv ===
+          "function"
+      ) {
+        scheduleGroupsRebuildSrv(
+          uid,
+          "daily_milk_session_complete"
+        );
+      }
+
+      const message =
+        saved.length
+          ? (
+              rejected.length
+                ? `✅ تم حفظ ${saved.length} حلبة، وتعذّر حفظ ${rejected.length}.`
+
+                : saved.length === 1
+                  ? (
+                      saved[0]
+                        .completed
+                        ? `✅ تم حفظ الحلبة رقم ${saved[0].sessionNumber} واكتمل إجمالي اليوم للحيوان رقم ${saved[0].animalNumber}: ${dailyMilkFormatTotalSrv(saved[0].currentTotalKg)} كجم.`
+
+                        : `✅ تم حفظ الحلبة رقم ${saved[0].sessionNumber} للحيوان رقم ${saved[0].animalNumber}. الإجمالي حتى الآن ${dailyMilkFormatTotalSrv(saved[0].currentTotalKg)} كجم.`
+                    )
+
+                  : `✅ تم حفظ ${saved.length} حلبة بنجاح.`
+            )
+
+          : "❌ لم يتم حفظ أي حلبة.";
+
+      const ui =
+        dailyMilkSessionUiSrv({
+          saved,
+          rejected,
+          eventDate,
+          message
+        });
+
+      return res.json({
+        ok:
+          saved.length > 0,
+
+        stage:
+          "daily_milk_session_save",
+
+        message,
+
+        savedCount:
+          saved.length,
+
+        rejectedCount:
+          rejected.length,
+
+        completedDailyCount:
+          completedRows.length,
+
+        saved,
+        rejected,
+
+        eventDate,
+
+        ui
+      });
+
+    } catch (e) {
+      console.error(
+        "daily-milk-session-save",
+        e
+      );
+
+      return res
+        .status(500)
+        .json({
+          ok: false,
+
+          message:
+            "❌ تعذّر حفظ الحلبة الآن. حاول مرة أخرى."
+        });
+    }
+  }
+);
 function milkReportIsDateSrv(v) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(v || "").trim());
 }
