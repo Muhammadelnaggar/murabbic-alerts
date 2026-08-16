@@ -501,10 +501,21 @@ function showBulkMissingMilkConfirmation(
     actions
   );
 
-  reviewBtn.addEventListener(
+ reviewBtn.addEventListener(
     "click",
     () => {
       actions.remove();
+
+      if (sysbar) {
+        sysbar.textContent =
+          "";
+
+        sysbar.className =
+          "infobar";
+
+        sysbar.style.display =
+          "none";
+      }
 
       document
         .querySelector(
@@ -1427,11 +1438,31 @@ function renderBulk(ui) {
   }
 
   const rows =
-    Array.isArray(
-      ui?.rows
+    (
+      Array.isArray(
+        ui?.rows
+      )
+        ? ui.rows
+        : []
     )
-      ? ui.rows
-      : [];
+      .slice()
+      .sort(
+        (a, b) =>
+          String(
+            a?.animalNumber ||
+            ""
+          ).localeCompare(
+            String(
+              b?.animalNumber ||
+              ""
+            ),
+            "ar",
+            {
+              numeric: true,
+              sensitivity: "base"
+            }
+          )
+      );
 
   const hasThirdSession =
     rows.some(
