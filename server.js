@@ -68563,9 +68563,15 @@ function shouldAppearInGroupsSrv(a = {}) {
 
 function speciesOfSrv(an = {}) {
   const txt = [
-    an?.animaltype, an?.animalType, an?.animalTypeAr,
-    an?.kind, an?.type, an?.breed
+    an?.species,
+    an?.animaltype,
+    an?.animalType,
+    an?.animalTypeAr,
+    an?.kind,
+    an?.type,
+    an?.breed
   ].map(v => String(v || '').toLowerCase()).join(' ');
+
   if (txt.includes('buff') || txt.includes('جاموس')) return 'buffalo';
   return 'cow';
 }
