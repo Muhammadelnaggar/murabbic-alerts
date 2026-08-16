@@ -42925,31 +42925,69 @@ app.post(
           .slice(0, 10);
 
       const submittedRows =
-  dailyMilkSessionRowsSrv(
-    body
-  );
+        dailyMilkSessionRowsSrv(
+          body
+        );
 
-const isBulkSubmission =
-  Array.isArray(body.rows) ||
-  Array.isArray(body.items);
+      const isBulkSubmission =
+        Array.isArray(body.rows) ||
+        Array.isArray(body.items);
 
-const rows =
-  isBulkSubmission
-    ? submittedRows.filter(
-        row =>
-          dailyMilkSessionHasKgInputSrv(
-            body,
-            row
-          )
-      )
-    : submittedRows;
+      const missingMilkRows =
+        isBulkSubmission
+          ? submittedRows
+              .filter(
+                row =>
+                  !dailyMilkSessionHasKgInputSrv(
+                    body,
+                    row
+                  )
+              )
+              .map(
+                row => ({
+                  animalNumber:
+                    calvingNormDigitsOnlySrv(
+                      row.animalNumber ||
+                      row.number ||
+                      ""
+                    ),
+
+                  sessionNumber:
+                    dailyMilkSessionNumberSrv(
+                      body,
+                      row
+                    )
+                })
+              )
+              .filter(
+                row =>
+                  Boolean(
+                    row.animalNumber
+                  )
+              )
+          : [];
+
+      const confirmMissingMilk =
+        body.confirmMissingMilk ===
+        true;
+
+      const rows =
+        isBulkSubmission
+          ? submittedRows.filter(
+              row =>
+                dailyMilkSessionHasKgInputSrv(
+                  body,
+                  row
+                )
+            )
+          : submittedRows;
 
       const submittedComponents =
         dailyMilkComponentsInputFromBodySrv(
           body
         );
 
-      if (!rows.length) {
+            if (!submittedRows.length) {
         return res
           .status(400)
           .json({
@@ -42959,7 +42997,6 @@ const rows =
               "❌ لا توجد حيوانات للحفظ."
           });
       }
-
       if (
         !calvingIsDateSrv(
           eventDate
@@ -42997,7 +43034,61 @@ const rows =
               "❌ تاريخ الحلبة لا يمكن أن يكون في المستقبل."
           });
       }
+      if (
+        isBulkSubmission &&
+        missingMilkRows.length &&
+        !confirmMissingMilk
+      ) {
+        const missingNumbers =
+          missingMilkRows
+            .map(
+              row =>
+                row.animalNumber
+            )
+            .join("، ");
 
+        const message =
+          missingMilkRows.length === 1
+            ? `⚠️ لم يتم تسجيل اللبن للحيوان رقم ${missingNumbers} في هذه الحلبة. هل تريد الحفظ على أي حال؟`
+            : `⚠️ لم يتم تسجيل اللبن للحيوانات أرقام ${missingNumbers} في هذه الحلبة. هل تريد الحفظ على أي حال؟`;
+
+        return res.json({
+          ok: true,
+
+          stage:
+            "daily_milk_session_missing_confirmation",
+
+          confirmationRequired:
+            true,
+
+          message,
+
+          missingMilkCount:
+            missingMilkRows.length,
+
+          missingMilkRows,
+
+          eventDate,
+
+          ui: {
+            status:
+              "warning",
+
+            message
+          }
+        });
+      }
+
+      if (!rows.length) {
+        return res
+          .status(400)
+          .json({
+            ok: false,
+
+            message:
+              "❌ لا توجد قيم لبن مسجلة للحفظ."
+          });
+      }
       const saved = [];
       const rejected = [];
 
