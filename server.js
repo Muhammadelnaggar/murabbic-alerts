@@ -42149,8 +42149,8 @@ function dailyMilkSessionNumberSrv(body = {}, row = {}) {
     : null;
 }
 
-function dailyMilkSessionKgSrv(body = {}, row = {}) {
-  return dailyMilkNumStrictSrv(
+function dailyMilkSessionRawKgSrv(body = {}, row = {}) {
+  return (
     row.sessionMilkKg ??
     row.milkingKg ??
     row.milkKg ??
@@ -42163,6 +42163,37 @@ function dailyMilkSessionKgSrv(body = {}, row = {}) {
   );
 }
 
+function dailyMilkSessionHasKgInputSrv(body = {}, row = {}) {
+  const raw =
+    dailyMilkSessionRawKgSrv(
+      body,
+      row
+    );
+
+  return !(
+    raw === undefined ||
+    raw === null ||
+    String(raw).trim() === ""
+  );
+}
+
+function dailyMilkSessionKgSrv(body = {}, row = {}) {
+  if (
+    !dailyMilkSessionHasKgInputSrv(
+      body,
+      row
+    )
+  ) {
+    return NaN;
+  }
+
+  return dailyMilkNumStrictSrv(
+    dailyMilkSessionRawKgSrv(
+      body,
+      row
+    )
+  );
+}
 function dailyMilkSessionNormalizeSrv(
   raw = [],
   maxSessions = 3
@@ -42893,10 +42924,25 @@ app.post(
           .trim()
           .slice(0, 10);
 
-      const rows =
-        dailyMilkSessionRowsSrv(
-          body
-        );
+      const submittedRows =
+  dailyMilkSessionRowsSrv(
+    body
+  );
+
+const isBulkSubmission =
+  Array.isArray(body.rows) ||
+  Array.isArray(body.items);
+
+const rows =
+  isBulkSubmission
+    ? submittedRows.filter(
+        row =>
+          dailyMilkSessionHasKgInputSrv(
+            body,
+            row
+          )
+      )
+    : submittedRows;
 
       const submittedComponents =
         dailyMilkComponentsInputFromBodySrv(
