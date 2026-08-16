@@ -334,7 +334,212 @@ function showMsg(text) {
       ? "block"
       : "none";
 }
+function clearBulkMissingMilkHighlight() {
+  document
+    .querySelectorAll(
+      "input[data-key='currentSessionKg'][data-mbk-missing-milk='1']"
+    )
+    .forEach(
+      input => {
+        input.removeAttribute(
+          "data-mbk-missing-milk"
+        );
 
+        input.removeAttribute(
+          "aria-invalid"
+        );
+
+        input.style.outline =
+          "";
+
+        input.style.outlineOffset =
+          "";
+      }
+    );
+}
+
+function highlightBulkMissingMilkRows(
+  missingRows = []
+) {
+  clearBulkMissingMilkHighlight();
+
+  const targets =
+    new Set(
+      (
+        Array.isArray(
+          missingRows
+        )
+          ? missingRows
+          : []
+      )
+        .map(
+          row => {
+            const animalNumber =
+              String(
+                row?.animalNumber ||
+                ""
+              ).trim();
+
+            const sessionNumber =
+              Number(
+                row?.sessionNumber ||
+                0
+              );
+
+            return (
+              animalNumber &&
+              Number.isInteger(
+                sessionNumber
+              )
+            )
+              ? `${animalNumber}::${sessionNumber}`
+              : "";
+          }
+        )
+        .filter(Boolean)
+    );
+
+  document
+    .querySelectorAll(
+      "[data-mbk-row='daily-milk-session']"
+    )
+    .forEach(
+      row => {
+        const input =
+          row.querySelector(
+            "input[data-key='currentSessionKg']"
+          );
+
+        if (!input) {
+          return;
+        }
+
+        const key =
+          `${String(row.dataset.number || "").trim()}::${Number(input.dataset.sessionNumber || 0)}`;
+
+        if (
+          !targets.has(key)
+        ) {
+          return;
+        }
+
+        input.setAttribute(
+          "data-mbk-missing-milk",
+          "1"
+        );
+
+        input.setAttribute(
+          "aria-invalid",
+          "true"
+        );
+
+        input.style.outline =
+          "2px solid #dc2626";
+
+        input.style.outlineOffset =
+          "1px";
+      }
+    );
+}
+
+function showBulkMissingMilkConfirmation(
+  data
+) {
+  highlightBulkMissingMilkRows(
+    data?.missingMilkRows
+  );
+
+  if (!sysbar) {
+    return;
+  }
+
+  const actions =
+    document.createElement(
+      "div"
+    );
+
+  actions.className =
+    "actions-bar";
+
+  const saveAnywayBtn =
+    document.createElement(
+      "button"
+    );
+
+  saveAnywayBtn.type =
+    "button";
+
+  saveAnywayBtn.className =
+    "save";
+
+  saveAnywayBtn.textContent =
+    "حفظ على أي حال";
+
+  const reviewBtn =
+    document.createElement(
+      "button"
+    );
+
+  reviewBtn.type =
+    "button";
+
+  reviewBtn.className =
+    "ghost";
+
+  reviewBtn.textContent =
+    "مراجعة";
+
+  actions.appendChild(
+    saveAnywayBtn
+  );
+
+  actions.appendChild(
+    reviewBtn
+  );
+
+  sysbar.appendChild(
+    actions
+  );
+
+  reviewBtn.addEventListener(
+    "click",
+    () => {
+      actions.remove();
+
+      document
+        .querySelector(
+          "input[data-key='currentSessionKg'][data-mbk-missing-milk='1']"
+        )
+        ?.focus();
+    }
+  );
+
+  saveAnywayBtn.addEventListener(
+    "click",
+    async () => {
+      saveAnywayBtn.disabled =
+        true;
+
+      reviewBtn.disabled =
+        true;
+
+      try {
+        await runSave({
+          confirmMissingMilk:
+            true
+        });
+      } catch (_) {
+        showBar({
+          status:
+            "error",
+
+          message:
+            "تعذّر الاتصال بالسيرفر أثناء الحفظ."
+        });
+      }
+    }
+  );
+}
 function renderMilkComponents(
   componentsUi
 ) {
@@ -1570,7 +1775,9 @@ async function runGate({
   return data;
 }
 
-async function runSave() {
+async function runSave({
+  confirmMissingMilk = false
+} = {}) {
   showMsg("");
 
   showBar({
@@ -1584,10 +1791,23 @@ async function runSave() {
   const modeBeforeSave =
     currentMode;
 
+  const payload =
+    savePayload();
+
+  if (
+    modeBeforeSave ===
+      "bulk" &&
+    confirmMissingMilk ===
+      true
+  ) {
+    payload.confirmMissingMilk =
+      true;
+  }
+
   const data =
     await postServer(
       "/api/daily-milk/session/save",
-      savePayload()
+      payload
     );
 
   const ui =
@@ -1605,6 +1825,22 @@ async function runSave() {
   showBar(ui);
 
   if (
+    modeBeforeSave ===
+      "bulk" &&
+    data
+      ?.confirmationRequired ===
+      true &&
+    data?.stage ===
+      "daily_milk_session_missing_confirmation"
+  ) {
+    showBulkMissingMilkConfirmation(
+      data
+    );
+
+    return;
+  }
+
+  if (
     !data.ok ||
     !Array.isArray(
       data.saved
@@ -1615,6 +1851,8 @@ async function runSave() {
   ) {
     return;
   }
+
+  clearBulkMissingMilkHighlight();
 
   if (
     modeBeforeSave ===
@@ -1650,7 +1888,6 @@ async function runSave() {
 
   showBar(ui);
 }
-
 form
   ?.addEventListener(
     "submit",
