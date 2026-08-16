@@ -68659,6 +68659,19 @@ function hasCalvedBeforeGroupSrv(an = {}) {
   return Number(an?.lactationNumber || 0) > 0 || !!toDate(an?.lastCalvingDate) || getDimSrv(an) > 0;
 }
 
+function groupDateOnlySrv(v) {
+  const raw = String(v ?? "").trim();
+  const direct = raw.slice(0, 10);
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(direct)) {
+    return direct;
+  }
+
+  const d = toDate(v);
+  if (!d || Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
 function isDryGroupSrv(an = {}) {
   const joined = [
     an?.lactationStatus,
@@ -68667,12 +68680,51 @@ function isDryGroupSrv(an = {}) {
     an?.['الحالةُ_اللبنية'] ?? an?.['الحالة_اللبنية']
   ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
 
-  const milkToday = getMilkKgSrv(an);
-  const latest = an._latestMilkDate ? new Date(an._latestMilkDate) : null;
-  const recentMilk = milkToday > 0 && (!latest || (Date.now() - +latest) < 3 * 86400000);
-  if (recentMilk) return false;
+  const isCloseUpStatus =
+    (joined.includes('انتظار') && joined.includes('ولاد')) ||
+    (joined.includes('تحضير') && joined.includes('ولاد')) ||
+    joined.includes('close_up') ||
+    joined.includes('close up') ||
+    joined.includes('closeup');
 
-  return an?.inMilk === false || an?.dry === true || joined.includes('جاف') || joined.includes('dry');
+  if (isCloseUpStatus) return false;
+
+  if (
+    an?.inMilk === false ||
+    an?.dry === true ||
+    joined.includes('جاف') ||
+    joined.includes('dry')
+  ) {
+    return true;
+  }
+
+  if (
+    an?.inMilk === true ||
+    joined.includes('حلاب') ||
+    joined.includes('حلوب') ||
+    joined.includes('milking') ||
+    joined.includes('lactating')
+  ) {
+    return false;
+  }
+
+  const lastDry = groupDateOnlySrv(
+    an?.lastDryOffDate ||
+    an?.dryOffDate ||
+    ""
+  );
+
+  const lastCalving = groupDateOnlySrv(
+    an?.lastCalvingDate ||
+    an?.calvingDate ||
+    an?.calvedAt ||
+    ""
+  );
+
+  return !!(
+    lastDry &&
+    (!lastCalving || lastDry >= lastCalving)
+  );
 }
 
 function hasWeaningEventGroupSrv(an = {}) {
@@ -68748,12 +68800,79 @@ function isInfantGroupSrv(an = {}) {
 }
 
 function isCloseUpGroupSrv(an = {}) {
-  return an?._hasCloseUpEvent === true;
+  const production = [
+    an?.productionStatus,
+    an?.lactationStatus,
+    an?.['الحالةُ_اللبنية'] ?? an?.['الحالة_اللبنية']
+  ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
+
+  if (
+    (production.includes('انتظار') && production.includes('ولاد')) ||
+    (production.includes('تحضير') && production.includes('ولاد')) ||
+    production.includes('close_up') ||
+    production.includes('close up') ||
+    production.includes('closeup')
+  ) {
+    return true;
+  }
+
+  if (an?._hasCloseUpEvent !== true) {
+    return false;
+  }
+
+  const closeUpDate = groupDateOnlySrv(
+    an?._lastCloseUpDate ||
+    an?.lastCloseUpDate ||
+    an?.closeUpDate ||
+    ""
+  );
+
+  if (!closeUpDate) {
+    return false;
+  }
+
+  const lastCalving = groupDateOnlySrv(
+    an?.lastCalvingDate ||
+    an?.calvingDate ||
+    an?.calvedAt ||
+    ""
+  );
+
+  return !lastCalving || closeUpDate >= lastCalving;
+}
+
+function isMilkingGroupSrv(an = {}) {
+  const production = [
+    an?.productionStatus,
+    an?.lactationStatus,
+    an?.['الحالةُ_اللبنية'] ?? an?.['الحالة_اللبنية']
+  ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
+
+  if (
+    isCloseUpGroupSrv(an) ||
+    isDryGroupSrv(an)
+  ) {
+    return false;
+  }
+
+  return (
+    an?.inMilk === true ||
+    production.includes('حلاب') ||
+    production.includes('حلوب') ||
+    production.includes('milking') ||
+    production.includes('lactating')
+  );
 }
 
 function isFreshGroupSrv(an = {}) {
   const dim = getDimSrv(an);
-  return dim >= 0 && dim <= 21 && !isDryGroupSrv(an) && hasCalvedBeforeGroupSrv(an);
+
+  return (
+    isMilkingGroupSrv(an) &&
+    dim >= 0 &&
+    dim <= 21 &&
+    hasCalvedBeforeGroupSrv(an)
+  );
 }
 
 function ageCfgGroupSrv(sp, thresholds = {}) {
@@ -68895,28 +69014,48 @@ function buildServerGroupMemberDocSrv(tenant, groupId, an = {}) {
 }
 
 function splitGroupsServerSrv(list = [], thresholds = {}) {
-  const g = Object.fromEntries(GROUP_DEFS_SRV.map(def => [def.id, []]));
+  const g = Object.fromEntries(
+    GROUP_DEFS_SRV.map(def => [def.id, []])
+  );
 
   for (const an of list) {
     const sp = speciesOfSrv(an);
-    const pref = sp === 'buffalo' ? 'buffalo_' : 'cow_';
+    const pref =
+      sp === 'buffalo'
+        ? 'buffalo_'
+        : 'cow_';
+
     const m = getAgeMonthsSrv(an);
     const milk = getMilkKgSrv(an);
-    const c = ageCfgGroupSrv(sp, thresholds);
+    const c =
+      ageCfgGroupSrv(
+        sp,
+        thresholds
+      );
 
     g[pref + 'all'].push(an);
 
-        if (isMaleSrv(an)) {
+    if (isMaleSrv(an)) {
       g[pref + 'males'].push(an);
 
       if (isInfantGroupSrv(an)) {
         g[pref + 'suckling'].push(an);
+
       } else if (
-        isWeanedGroupSrv(an, sp, thresholds)
+        isWeanedGroupSrv(
+          an,
+          sp,
+          thresholds
+        )
       ) {
         g[pref + 'weaned'].push(an);
+
       } else if (
-        isGrowingGroupSrv(an, sp, thresholds)
+        isGrowingGroupSrv(
+          an,
+          sp,
+          thresholds
+        )
       ) {
         g[pref + 'growing'].push(an);
       }
@@ -68924,69 +69063,149 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
       continue;
     }
 
+    // ==========================================
+    // أولوية الحالة التشغيلية للأمهات:
+    // انتظار ولادة
+    // ثم حديث الولادة
+    // ثم جاف
+    // ثم حلاب حسب مستوى اللبن
+    // ==========================================
+
+    if (
+      isPregnantGroupSrv(an) &&
+      isCloseUpGroupSrv(an)
+    ) {
+      g[pref + 'closeup'].push(an);
+      continue;
+    }
+
     if (isFreshGroupSrv(an)) {
       g[pref + 'fresh'].push(an);
       continue;
     }
-     // العجلة التي أجهضت تظل في فترة الاستشفاء 40 يومًا:
-// تظهر في «كل القطيع» فقط ولا تُصنّف «تحت التلقيح» قبل موعدها.
-if (isFollowerAbortionRecoveryGroupSrv(an)) {
-  continue;
-}
 
-    if (!isDryGroupSrv(an) && hasCalvedBeforeGroupSrv(an)) {
-      const band = milkBandGroupSrv(an, milk, thresholds);
-      if (band === 'high') { g[pref + 'high'].push(an); continue; }
-      if (band === 'med')  { g[pref + 'med'].push(an);  continue; }
-      if (band === 'low')  { g[pref + 'low'].push(an);  continue; }
+    // العجلة التي أجهضت تظل في فترة
+    // الاستشفاء لمدة 40 يومًا.
+    if (
+      isFollowerAbortionRecoveryGroupSrv(an)
+    ) {
       continue;
     }
 
-    if (isInfantGroupSrv(an)) { g[pref + 'suckling'].push(an); continue; }
-
-   if (isPregnantGroupSrv(an)) {
-  if (isCloseUpGroupSrv(an)) {
-    g[pref + 'closeup'].push(an);
-    continue;
-  }
-
-  if (hasCalvedBeforeGroupSrv(an)) {
-    g[pref + 'dry'].push(an);
-    continue;
-  }
-
-  // العجلات لا تدخل ملقحة/عشار إلا بعد سن التلقيح.
-  // افتراضيًا: نهاية النامي 12 شهر، إذن بداية تحت التلقيح من 13 شهر.
-   if (hasPassedWeaningStageGroupSrv(an) && m > c.growingMax) {
-    g[pref + 'pregHeifers'].push(an);
-    continue;
-  }
-
-  // لو داتا شاذة: عجلة صغيرة مكتوب عليها عشار
-  // لا نصدق الحالة التناسلية قبل سن التلقيح، ونتركها تكمل لمسار العمر الطبيعي.
-}
-
-if (isWeanedGroupSrv(an, sp, thresholds))  { g[pref + 'weaned'].push(an); continue; }
-if (isGrowingGroupSrv(an, sp, thresholds)) { g[pref + 'growing'].push(an); continue; }
-
-if (
-  !hasCalvedBeforeGroupSrv(an) &&
-  hasPassedWeaningStageGroupSrv(an) &&
-  !isPregnantGroupSrv(an) &&
-  isBreedingStatusGroupSrv(an) &&
-  m > c.growingMax
-) {
-  g[pref + 'breeding'].push(an);
-  continue;
-}
-
-if (!hasCalvedBeforeGroupSrv(an) && hasPassedWeaningStageGroupSrv(an) && !isPregnantGroupSrv(an) && m > c.growingMax) {
-  g[pref + 'heiferOpen'].push(an);
-  continue;
-}
-
-    if (isDryGroupSrv(an) && hasCalvedBeforeGroupSrv(an)) {
+    // ==========================================
+    // جاف
+    // ==========================================
+    if (
+      isDryGroupSrv(an) &&
+      hasCalvedBeforeGroupSrv(an)
+    ) {
       g[pref + 'dry'].push(an);
+      continue;
+    }
+
+    // ==========================================
+    // حلاب
+    // الحالة الإنتاجية أولًا،
+    // ثم مستوى اللبن يحدد الجروب.
+    // ==========================================
+    if (
+      isMilkingGroupSrv(an) &&
+      hasCalvedBeforeGroupSrv(an)
+    ) {
+      const band =
+        milkBandGroupSrv(
+          an,
+          milk,
+          thresholds
+        );
+
+      if (band === 'high') {
+        g[pref + 'high'].push(an);
+        continue;
+      }
+
+      if (band === 'med') {
+        g[pref + 'med'].push(an);
+        continue;
+      }
+
+      if (band === 'low') {
+        g[pref + 'low'].push(an);
+        continue;
+      }
+
+      // الحيوان حالته الإنتاجية «حلاب».
+      // إذا كان إنتاجه صفرًا أو لا توجد
+      // قيمة موجبة حاليًا، يظل حلابًا
+      // ويقع في أقل مجموعة إنتاجية.
+      g[pref + 'low'].push(an);
+      continue;
+    }
+
+    // ==========================================
+    // التوابع
+    // ==========================================
+    if (isInfantGroupSrv(an)) {
+      g[pref + 'suckling'].push(an);
+      continue;
+    }
+
+    if (isPregnantGroupSrv(an)) {
+      if (
+        !hasCalvedBeforeGroupSrv(an) &&
+        hasPassedWeaningStageGroupSrv(an) &&
+        m > c.growingMax
+      ) {
+        g[pref + 'pregHeifers'].push(an);
+        continue;
+      }
+
+      // لو داتا شاذة:
+      // عجلة صغيرة مكتوب عليها عشار
+      // تظل في مسار العمر الطبيعي.
+    }
+
+    if (
+      isWeanedGroupSrv(
+        an,
+        sp,
+        thresholds
+      )
+    ) {
+      g[pref + 'weaned'].push(an);
+      continue;
+    }
+
+    if (
+      isGrowingGroupSrv(
+        an,
+        sp,
+        thresholds
+      )
+    ) {
+      g[pref + 'growing'].push(an);
+      continue;
+    }
+
+    if (
+      !hasCalvedBeforeGroupSrv(an) &&
+      hasPassedWeaningStageGroupSrv(an) &&
+      !isPregnantGroupSrv(an) &&
+      isBreedingStatusGroupSrv(an) &&
+      m > c.growingMax
+    ) {
+      g[pref + 'breeding'].push(an);
+      continue;
+    }
+
+    if (
+      !hasCalvedBeforeGroupSrv(an) &&
+      hasPassedWeaningStageGroupSrv(an) &&
+      !isPregnantGroupSrv(an) &&
+      m > c.growingMax
+    ) {
+      g[pref + 'heiferOpen'].push(an);
+      continue;
     }
   }
 
@@ -69120,14 +69339,46 @@ async function enrichAnimalsForGroupsSrv(tenant, list = []) {
       }
     }
 
-    if (isCloseUpEventSrv(e)) {
-      const curr = an._lastCloseUpDate ? new Date(an._lastCloseUpDate).getTime() : null;
-      if (!curr || (ms && ms > curr)) {
-        an._hasCloseUpEvent = true;
-        an._lastCloseUpDate = ms ? new Date(ms).toISOString() : an._lastCloseUpDate;
-        an.productionStatus = 'close_up';
-      }
-    }
+    if (isCloseUpEventSrv(e) && evDateIso) {
+  const lastCalvingDate = groupDateOnlySrv(
+    an?.lastCalvingDate ||
+    an?.calvingDate ||
+    an?.calvedAt ||
+    ""
+  );
+
+  const lastInseminationDate = groupDateOnlySrv(
+    an?.lastInseminationDate ||
+    an?.lastServiceDate ||
+    an?.conceptionDate ||
+    ""
+  );
+
+  const cycleStart =
+    lastInseminationDate ||
+    lastCalvingDate ||
+    "";
+
+  const currCloseUpDate = groupDateOnlySrv(
+    an?._lastCloseUpDate ||
+    an?.lastCloseUpDate ||
+    an?.closeUpDate ||
+    ""
+  );
+
+  const belongsToCurrentCycle =
+    !cycleStart ||
+    evDateIso >= cycleStart;
+
+  if (
+    belongsToCurrentCycle &&
+    (!currCloseUpDate || evDateIso >= currCloseUpDate)
+  ) {
+    an._hasCloseUpEvent = true;
+    an._lastCloseUpDate = evDateIso;
+    an.productionStatus = 'close_up';
+  }
+}
 
     if (isMilkEventSrv(e)) {
       const milkKg = numSrv(
