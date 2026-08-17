@@ -2984,11 +2984,11 @@ body[data-page="animal-list"] .no-data{
   margin-top:30px;
   font-size:18px;
 }
-/* ===== Event List — sticky date/type + horizontal details ===== */
+/* ===== Event List — content-fit sticky columns + season groups ===== */
 
 .event-list-page .table {
   width: 100%;
-  overflow-x: auto;
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -2997,42 +2997,42 @@ body[data-page="animal-list"] .no-data{
   min-width: 760px;
   border-collapse: separate;
   border-spacing: 0;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 .event-list-page #evTable th,
 .event-list-page #evTable td {
   vertical-align: top;
-  white-space: nowrap;
 }
 
 .event-list-page .sticky-col {
   position: sticky;
   background: var(--mbk-card, #fff);
   z-index: 3;
+  white-space: nowrap;
 }
 
 .event-list-page thead .sticky-col {
-  z-index: 6;
+  z-index: 12;
 }
 
 .event-list-page .sticky-date {
   right: 0;
-  width: 112px;
-  min-width: 112px;
-  max-width: 112px;
+  width: 1%;
+  min-width: 0;
+  max-width: none;
 }
 
 .event-list-page .sticky-type {
-  right: var(--w-date, 112px);
-  width: 132px;
-  min-width: 132px;
-  max-width: 132px;
+  right: var(--w-date, 0px);
+  width: 1%;
+  min-width: 0;
+  max-width: none;
 }
 
 .event-list-page .event-details-cell {
+  width: 100%;
   min-width: 460px;
-  max-width: 460px;
   overflow: hidden;
 }
 
@@ -3050,10 +3050,36 @@ body[data-page="animal-list"] .no-data{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  max-width: 112px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: none;
   white-space: nowrap;
+}
+
+.event-list-page .season-row td {
+  position: relative;
+  background: #eef8e9;
+  border-bottom: 1px solid var(--event-list-border);
+  padding: 9px 12px;
+  white-space: normal;
+  z-index: 1;
+}
+
+.event-list-page .season-cell {
+  text-align: right;
+}
+
+.event-list-page .season-title {
+  display: inline-block;
+  color: var(--green-600);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.event-list-page .season-range {
+  display: inline-block;
+  margin-inline-start: 8px;
+  color: #5f6f63;
+  font-size: 12px;
+  font-weight: 600;
 }
 /* =========================================================
    Cow Card — scoped styles only
