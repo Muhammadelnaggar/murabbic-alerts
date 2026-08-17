@@ -68535,14 +68535,13 @@ function isGroupRebuildEventSrv(e = {}) {
 
 function shouldAppearInGroupsSrv(a = {}) {
   const txt = [
-    a?.status,
-    a?.animalStatus,
-    a?.statusAr,
-    a?.saleStatus,
-    a?.lifeStatus,
-    a?.fate,
-    a?.exitReason
-  ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
+  a?.status,
+  a?.animalStatus,
+  a?.statusAr,
+  a?.saleStatus,
+  a?.lifeStatus,
+  a?.exitReason
+].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
 
   if (a?.active === false) return false;
   if (a?.isActive === false) return false;
@@ -69042,32 +69041,24 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
     g[pref + 'all'].push(an);
 
     if (isMaleSrv(an)) {
-      g[pref + 'males'].push(an);
+  if (isInfantGroupSrv(an)) {
+    g[pref + 'suckling'].push(an);
+    continue;
+  }
 
-      if (isInfantGroupSrv(an)) {
-        g[pref + 'suckling'].push(an);
+  if (isWeanedGroupSrv(an, sp, thresholds)) {
+    g[pref + 'weaned'].push(an);
+    continue;
+  }
 
-      } else if (
-        isWeanedGroupSrv(
-          an,
-          sp,
-          thresholds
-        )
-      ) {
-        g[pref + 'weaned'].push(an);
+  if (isGrowingGroupSrv(an, sp, thresholds)) {
+    g[pref + 'growing'].push(an);
+    continue;
+  }
 
-      } else if (
-        isGrowingGroupSrv(
-          an,
-          sp,
-          thresholds
-        )
-      ) {
-        g[pref + 'growing'].push(an);
-      }
-
-      continue;
-    }
+  g[pref + 'males'].push(an);
+  continue;
+}
 
     // ==========================================
     // أولوية الحالة التشغيلية للأمهات:
