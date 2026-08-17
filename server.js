@@ -15858,7 +15858,9 @@ function eventsPageRowSrv(docId, ev = {}) {
     animalNumber,
     typeKey,
     typeLabel: eventsPageTypeLabelSrv(ev),
+    
     details: eventsPageDetailsSrv(ev),
+    edit: eventsPageEditTargetSrv(docId, ev),
     animalCardUrl: animalNumber
       ? `/cow-card.html?number=${encodeURIComponent(animalNumber)}`
       : "",
@@ -16329,7 +16331,102 @@ function eventsPageEditPolicySrv(ev = {}) {
     reason: "تعديل هذا النوع لم يُربط بعد بكاتب تصحيح آمن في مُرَبِّيك."
   };
 }
+function eventsPageEditTargetSrv(docId, ev = {}) {
+  const eventId = String(docId || "").trim();
+  const animalNumber = eventsPageEventAnimalNumberSrv(ev);
+  const typeKey = eventsPageNormalizeTypeKeySrv(ev);
+  const policy = eventsPageEditPolicySrv(ev);
 
+  const pageByType = {
+    uterine_check: "uterine-check.html",
+    supernumerary_teat_removal: "supernumerary-teat-removal.html",
+    dehorning: "dehorning.html",
+    lameness: "lameness.html",
+    mastitis: "mastitis.html",
+    health: "disease.html",
+    weaning: "weaning.html",
+    cull: "cull.html",
+    heat: "heat.html",
+    daily_milk: "daily-milk.html",
+    close_up: "close-up.html",
+    dry_off: "dry-off.html",
+    insemination: "insemination.html",
+    pregnancy_diagnosis: "pregnancy-diagnosis.html",
+    nutrition: "nutrition.html"
+  };
+
+  if (!policy.editable || !eventId) {
+    return {
+      ...policy,
+      formPage: "",
+      editUrl: ""
+    };
+  }
+
+  if (typeKey === "nutrition") {
+    return {
+      ...policy,
+      formPage: "nutrition.html",
+      editUrl: `nutrition.html?eventId=${encodeURIComponent(eventId)}`
+    };
+  }
+
+  if (typeKey === "hoof_trimming") {
+    const qs = new URLSearchParams();
+
+    if (animalNumber) {
+      qs.set("number", animalNumber);
+    }
+
+    qs.set("action", "trimming");
+    qs.set("mode", "edit");
+    qs.set("eventId", eventId);
+
+    return {
+      ...policy,
+      formPage: "add-event.html",
+      editUrl: `add-event.html?${qs.toString()}`
+    };
+  }
+
+  const formPage =
+    pageByType[typeKey] || "";
+
+  if (!formPage) {
+    return {
+      ...policy,
+      formPage: "",
+      editUrl: ""
+    };
+  }
+
+  const qs =
+    new URLSearchParams();
+
+  if (animalNumber) {
+    qs.set(
+      "number",
+      animalNumber
+    );
+  }
+
+  qs.set(
+    "mode",
+    "edit"
+  );
+
+  qs.set(
+    "eventId",
+    eventId
+  );
+
+  return {
+    ...policy,
+    formPage,
+    editUrl:
+      `${formPage}?${qs.toString()}`
+  };
+}
 function eventsPageEditPublicEventSrv(
   docId,
   ev = {}
@@ -16366,6 +16463,7 @@ function eventsPageEditPublicEventSrv(
     typeLabel: eventsPageTypeLabelSrv(ev),
     details: eventsPageDetailsSrv(ev),
     editPolicy: policy,
+    edit: eventsPageEditTargetSrv(docId, ev),
 
     data: {
       eventDate: eventsPageListDateSrv(ev) || "",
@@ -17133,7 +17231,23 @@ app.post(
           eventId
         });
       }
+      const correctionReason =
+  eventsPageCorrectionTextSrv(
+    body.correctionReason ??
+    body.editReason ??
+    "",
+    500
+  );
 
+if (!correctionReason) {
+  return res.status(400).json({
+    ok: false,
+    error:
+      "correction_reason_required",
+    message:
+      "❌ اكتب سبب التعديل حتى يظل سجل التصحيحات واضحًا."
+  });
+}
       const animalNumber = calvingNormDigitsOnlySrv(
         eventsPageEventAnimalNumberSrv(oldEvent)
       );
@@ -17715,6 +17829,68 @@ app.post(
           eventPatch.milkProteinPct = milkProteinPct;
           eventPatch.fatProteinRatio = dailyMilkFatProteinRatioSrv(milkFatPct, milkProteinPct);
         }
+        const oldMilkKg = Number(
+  oldEvent.milkKg ??
+  oldEvent.dailyMilk ??
+  oldEvent.totalMilk
+);
+
+const originalMilkKg =
+  Number.isFinite(
+    Number(
+      oldEvent.originalMilkKg
+    )
+  )
+    ? Number(
+        oldEvent.originalMilkKg
+      )
+    : (
+        Number.isFinite(
+          oldMilkKg
+        )
+          ? oldMilkKg
+          : null
+      );
+
+const originalMilkSessions =
+  Array.isArray(
+    oldEvent.originalMilkSessions
+  )
+    ? oldEvent.originalMilkSessions
+    : (
+        Array.isArray(
+          oldEvent.milkSessions
+        )
+          ? oldEvent.milkSessions
+          : []
+      );
+
+eventPatch.originalMilkKg =
+  originalMilkKg;
+
+eventPatch.originalMilkSessions =
+  originalMilkSessions;
+
+eventPatch.lastMilkCorrectionFromKg =
+  Number.isFinite(oldMilkKg)
+    ? oldMilkKg
+    : null;
+
+eventPatch.lastMilkCorrectionToKg =
+  milkKg;
+
+eventPatch.lastMilkCorrectionDeltaKg =
+  Number.isFinite(oldMilkKg)
+    ? Number(
+        (
+          milkKg -
+          oldMilkKg
+        ).toFixed(1)
+      )
+    : null;
+
+eventPatch.lastMilkCorrectionReason =
+  correctionReason;
       }
 
       else if (typeKey === "dry_off") {
@@ -17877,7 +18053,9 @@ app.post(
         editedAt: now,
         editedAtMs: Date.now(),
         editedBy,
-        editCount: admin.firestore.FieldValue.increment(1)
+        lastCorrectionReason: correctionReason,
+        editCount:
+        admin.firestore.FieldValue.increment(1)
       }, { merge: true });
 
       if (Object.keys(subjectPatch).length) {
@@ -17892,9 +18070,21 @@ app.post(
         eventId,
         animalNumber,
         eventType: typeKey,
-        before: eventsPageEditPublicEventSrv(eventId, oldEvent),
-        after: eventsPageEditPublicEventSrv(eventId, correctedEvent),
-        editedBy,
+        before:
+  eventsPageEditPublicEventSrv(
+    eventId,
+    oldEvent
+  ),
+
+after:
+  eventsPageEditPublicEventSrv(
+    eventId,
+    correctedEvent
+  ),
+
+correctionReason,
+
+editedBy,
         createdAt: now,
         source: "server:/api/events-page/event/correct"
       });
