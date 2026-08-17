@@ -67349,11 +67349,98 @@ function followerListStatusDisplaySrv(a = {}) {
 
   return "---";
 }
+function followerListTypeDisplaySrv(a = {}) {
+  const typeEn = animalListTypeEnSrv(a);
 
+  if (typeEn === "cow") return "أبقار";
+  if (typeEn === "buffalo") return "جاموس";
+
+  return animalListTypeArSrv(a) || "---";
+}
+
+function followerListStatusFromGroupSrv(
+  groupKey = "",
+  groupId = ""
+) {
+  const keys = [groupKey, groupId]
+    .map(v => animalListStrSrv(v).toLowerCase())
+    .filter(Boolean);
+
+  const hasKey = key =>
+    keys.some(v =>
+      v === key ||
+      v.endsWith(`_${key}`)
+    );
+
+  if (hasKey("suckling")) return "رضيع";
+  if (hasKey("weaned")) return "فطام";
+  if (hasKey("growing")) return "نامي";
+  if (hasKey("heiferopen")) return "تحت التلقيح";
+  if (hasKey("breeding")) return "ملقحة";
+  if (hasKey("pregheifers")) return "عشار";
+  if (hasKey("closeup")) return "انتظار ولادة";
+  if (hasKey("males")) return "ذكر";
+
+  return "";
+}
+
+async function followerListLoadGroupStatusMapSrv(uid) {
+  const byNumber = new Map();
+
+  try {
+    const snap = await db
+      .collection("groups_members")
+      .where("userId", "==", uid)
+      .limit(5000)
+      .get();
+
+    snap.docs.forEach(d => {
+      const m = d.data() || {};
+
+      const animalNumber =
+        normalizeDigitsSrv(
+          m.animalNumber ??
+          m.number ??
+          ""
+        ) ||
+        animalListStrSrv(
+          m.animalNumber ??
+          m.number ??
+          ""
+        );
+
+      if (!animalNumber) return;
+
+      const status =
+        followerListStatusFromGroupSrv(
+          m.groupKey,
+          m.groupId
+        );
+
+      if (!status) return;
+
+      byNumber.set(
+        animalNumber,
+        status
+      );
+    });
+
+  } catch (e) {
+    console.warn(
+      "follower-list groups read failed:",
+      e.code ||
+      e.message ||
+      e
+    );
+  }
+
+  return byNumber;
+}
 function followerListBuildRowSrv(
   a = {},
   todayISO = "",
-  requestedImportId = ""
+  requestedImportId = "",
+  operationalStatus = ""
 ) {
   const animalNumber =
     animalListNumberTextSrv(a);
@@ -67427,7 +67514,7 @@ function followerListBuildRowSrv(
     animalNumber,
 
     animalTypeAr:
-      animalListTypeArSrv(a),
+  followerListTypeDisplaySrv(a),
 
     animaltype:
       typeEn,
@@ -67454,7 +67541,8 @@ function followerListBuildRowSrv(
       followerListSexDisplaySrv(a),
 
     followerStatus:
-      followerListStatusDisplaySrv(a),
+  animalListStrSrv(operationalStatus) ||
+  followerListStatusDisplaySrv(a),
 
     reproductiveStatus:
       reproductiveStatus || "---",
@@ -67653,21 +67741,34 @@ app.get(
           uid
         );
 
-      const activeRows =
-        rawFollowers
-          .filter(
-            animalListIsActiveSrv
-          )
-         .map(a =>
-  followerListBuildRowSrv(
-    a,
-    todayISO,
-    requestedImportId
-  )
-)
-          .filter(
-            a => a.animalNumber
-          );
+      const activeFollowers =
+  rawFollowers.filter(
+    animalListIsActiveSrv
+  );
+
+const groupStatusByNumber =
+  await followerListLoadGroupStatusMapSrv(
+    uid
+  );
+
+const activeRows =
+  activeFollowers
+    .map(a => {
+      const animalNumber =
+        animalListNumberTextSrv(a);
+
+      return followerListBuildRowSrv(
+        a,
+        todayISO,
+        requestedImportId,
+        groupStatusByNumber.get(
+          animalNumber
+        ) || ""
+      );
+    })
+    .filter(
+      a => a.animalNumber
+    );
 
       const typeOptions = [
         ...new Set(
