@@ -29,28 +29,10 @@
 
     <div class="controls">
       <input id="f-num" type="text" inputmode="numeric" placeholder="رقم الحيوان (مثال 108)" aria-label="رقم الحيوان">
-      <select id="f-type" aria-label="نوع الحدث">
-        <option value="">كل الأنواع</option>
-        <option>تلقيح</option>
-        <option>لبن يومي</option>
-        <option>ولادة</option>
-        <option>تشخيص حمل</option>
-        <option>تحصين</option>
-        <option>تقليم الحوافر</option>
-        <option>عرج</option>
-        <option>التهاب الضرع</option>
-        <option>شياع</option>
-<option>تزامن</option>
-<option>تجفيف</option>
-<option>إجهاض</option>
-<option>ولادة (عجل)</option>
-<option>نفوق</option>
-<option>استبعاد</option>
-<option>فحص حالة الجسم</option>
-<option>تقييم الروث</option>
-<option>تغذية</option>
-<option>مرض</option>
-      </select>
+      
+       <select id="f-type" aria-label="نوع الحدث">
+  <option value="">كل الأنواع</option>
+</select>
      
      
     </div>
@@ -109,57 +91,246 @@
 
   return { r, j, authRequired: false };
 }
-  function renderRows(rows){
-    if(!evBody) return;
+ function renderTypeOptions(options = [], selectedValue = '') {
+  if (!fType || !Array.isArray(options) || !options.length) return;
 
-    evBody.innerHTML = '';
+  const frag = document.createDocumentFragment();
 
-    if(!rows.length){
-      evBody.innerHTML = '<tr><td colspan="3" class="empty">لا توجد نتائج مطابقة…</td></tr>';
-      return;
-    }
+  for (const item of options) {
+    const opt = document.createElement('option');
 
-    const frag = document.createDocumentFragment();
+    opt.value =
+      String(item?.value ?? '').trim();
 
-    for(const row of rows){
-      const tr = document.createElement('tr');
+    const label =
+      String(
+        item?.label ??
+        item?.value ??
+        ''
+      ).trim() || 'كل الأنواع';
 
-      const cDate = document.createElement('td');
-      cDate.textContent = row.eventDate || '';
-      cDate.className = 'sticky-col sticky-date';
-
-      const cType = document.createElement('td');
-      cType.innerHTML = `<span class="pill">${row.typeLabel || 'حدث'}</span>`;
-      cType.className = 'sticky-col sticky-type';
-
-      const cDet = document.createElement('td');
-      cDet.className = 'event-details-cell';
-
-      const detScroll = document.createElement('div');
-      detScroll.className = 'event-details-scroll';
-      detScroll.textContent = row.details || '—';
-
-      cDet.appendChild(detScroll);
-
-      tr.append(cDate, cType, cDet);
-      frag.appendChild(tr);
-    }
-
-    evBody.appendChild(frag);
-    updateStickyWidths();
+    opt.textContent = label;
+    frag.appendChild(opt);
   }
 
-  function updateStickyWidths(){
-    const thDate = document.querySelector('thead th.sticky-date');
-    const thType = document.querySelector('thead th.sticky-type');
-    if(!thDate || !thType) return;
+  fType.replaceChildren(frag);
 
-    const wDate = Math.ceil(thDate.getBoundingClientRect().width);
-    const wType = Math.ceil(thType.getBoundingClientRect().width);
-
-    document.documentElement.style.setProperty('--w-date', wDate + 'px');
-    document.documentElement.style.setProperty('--w-type', wType + 'px');
+  if (
+    [...fType.options]
+      .some(opt => opt.value === selectedValue)
+  ) {
+    fType.value = selectedValue;
   }
+}
+
+function seasonRangeText(season = {}) {
+  const start =
+    String(season.startDate || '').trim();
+
+  const next =
+    String(season.nextCalvingDate || '').trim();
+
+  if (start && next) {
+    return `من ${start} إلى ما قبل ${next}`;
+  }
+
+  if (start) {
+    return `من ${start} حتى الآن`;
+  }
+
+  if (next) {
+    return `قبل ${next}`;
+  }
+
+  return '';
+}
+
+function appendEventRow(frag, row = {}) {
+  const tr =
+    document.createElement('tr');
+
+  const cDate =
+    document.createElement('td');
+
+  cDate.textContent =
+    row.eventDate || '';
+
+  cDate.className =
+    'sticky-col sticky-date';
+
+  const cType =
+    document.createElement('td');
+
+  cType.className =
+    'sticky-col sticky-type';
+
+  const pill =
+    document.createElement('span');
+
+  pill.className = 'pill';
+
+  pill.textContent =
+    row.typeLabel || 'حدث';
+
+  cType.appendChild(pill);
+
+  const cDet =
+    document.createElement('td');
+
+  cDet.className =
+    'event-details-cell';
+
+  const detScroll =
+    document.createElement('div');
+
+  detScroll.className =
+    'event-details-scroll';
+
+  detScroll.textContent =
+    row.details || '—';
+
+  cDet.appendChild(detScroll);
+
+  tr.append(
+    cDate,
+    cType,
+    cDet
+  );
+
+  frag.appendChild(tr);
+}
+
+function renderSeasons(seasons = []) {
+  if (!evBody) return;
+
+  evBody.innerHTML = '';
+
+  const visibleSeasons =
+    Array.isArray(seasons)
+      ? seasons.filter(
+          season =>
+            Array.isArray(season?.events) &&
+            season.events.length
+        )
+      : [];
+
+  if (!visibleSeasons.length) {
+    evBody.innerHTML =
+      '<tr><td colspan="3" class="empty">لا توجد نتائج مطابقة…</td></tr>';
+
+    return;
+  }
+
+  const frag =
+    document.createDocumentFragment();
+
+  for (const season of visibleSeasons) {
+    const seasonRow =
+      document.createElement('tr');
+
+    seasonRow.className =
+      'season-row';
+
+    const seasonCell =
+      document.createElement('td');
+
+    seasonCell.colSpan = 3;
+    seasonCell.className =
+      'season-cell';
+
+    const seasonTitle =
+      document.createElement('strong');
+
+    seasonTitle.className =
+      'season-title';
+
+    seasonTitle.textContent =
+      season.label || 'الموسم';
+
+    seasonCell.appendChild(
+      seasonTitle
+    );
+
+    const rangeText =
+      seasonRangeText(season);
+
+    if (rangeText) {
+      const seasonRange =
+        document.createElement('span');
+
+      seasonRange.className =
+        'season-range';
+
+      seasonRange.textContent =
+        rangeText;
+
+      seasonCell.appendChild(
+        seasonRange
+      );
+    }
+
+    seasonRow.appendChild(
+      seasonCell
+    );
+
+    frag.appendChild(
+      seasonRow
+    );
+
+    for (const row of season.events) {
+      appendEventRow(
+        frag,
+        row
+      );
+    }
+  }
+
+  evBody.appendChild(frag);
+
+  updateStickyWidths();
+}
+
+function updateStickyWidths(){
+  const thDate =
+    document.querySelector(
+      'thead th.sticky-date'
+    );
+
+  const thType =
+    document.querySelector(
+      'thead th.sticky-type'
+    );
+
+  if(!thDate || !thType) return;
+
+  const wDate =
+    Math.ceil(
+      thDate
+        .getBoundingClientRect()
+        .width
+    );
+
+  const wType =
+    Math.ceil(
+      thType
+        .getBoundingClientRect()
+        .width
+    );
+
+  document.documentElement
+    .style
+    .setProperty(
+      '--w-date',
+      wDate + 'px'
+    );
+
+  document.documentElement
+    .style
+    .setProperty(
+      '--w-type',
+      wType + 'px'
+    );
+}
 
   async function loadAndFilter(){
     
@@ -174,7 +345,7 @@ const fixedNumber =
     const type = (fType.value || '').trim();
 
     if(!fixedNumber){
-      renderRows([]);
+      renderSeasons([]);
       return;
     }
 
@@ -198,7 +369,18 @@ if (authRequired) {
         return;
       }
 
-      renderRows(Array.isArray(j.rows) ? j.rows : []);
+      renderTypeOptions(
+  Array.isArray(j.typeOptions)
+    ? j.typeOptions
+    : [],
+  type
+);
+
+renderSeasons(
+  Array.isArray(j.seasons)
+    ? j.seasons
+    : []
+);
 
     }catch(e){
       console.error('[event-list] server load failed', e);
