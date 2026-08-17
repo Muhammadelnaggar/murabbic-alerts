@@ -67022,8 +67022,13 @@ function animalListBuildRowSrv(
   requestedImportId = ''
 ) {
   const animalNumber = animalListNumberTextSrv(a);
-  const typeEn = animalListTypeEnSrv(a);
-  const typeAr = animalListTypeArSrv(a);
+const typeEn = animalListTypeEnSrv(a);
+const typeAr =
+  typeEn === 'cow'
+    ? 'أبقار'
+    : typeEn === 'buffalo'
+      ? 'جاموس'
+      : animalListTypeArSrv(a);
   const productionStatusRaw = animalListStrSrv(a.productionStatus);
   const productionStatus = animalListProductionDisplaySrv(productionStatusRaw);
 
