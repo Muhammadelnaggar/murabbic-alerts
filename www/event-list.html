@@ -122,13 +122,36 @@
     fType.value = selectedValue;
   }
 }
+function shortEventDate(value = '') {
+  const s = String(value || '').trim();
 
+  const m = s.match(
+    /^(\d{4})-(\d{2})-(\d{2})$/
+  );
+
+  if (!m) return s;
+
+  const year =
+    m[1].slice(-2);
+
+  const month =
+    String(Number(m[2]));
+
+  const day =
+    String(Number(m[3]));
+
+  return `${day}/${month}/${year}`;
+}
 function seasonRangeText(season = {}) {
   const start =
-    String(season.startDate || '').trim();
+    shortEventDate(
+      season.startDate
+    );
 
   const next =
-    String(season.nextCalvingDate || '').trim();
+    shortEventDate(
+      season.nextCalvingDate
+    );
 
   if (start && next) {
     return `من ${start} إلى ما قبل ${next}`;
@@ -145,15 +168,35 @@ function seasonRangeText(season = {}) {
   return '';
 }
 
-function appendEventRow(frag, row = {}) {
+function appendEventRow(
+  frag,
+  row = {},
+  {
+    seasonKey = '',
+    hidden = false
+  } = {}
+) {
   const tr =
     document.createElement('tr');
+
+  tr.className =
+    'season-event-row';
+
+  if (seasonKey) {
+    tr.dataset.seasonKey =
+      seasonKey;
+  }
+
+  tr.hidden =
+    Boolean(hidden);
 
   const cDate =
     document.createElement('td');
 
   cDate.textContent =
-    row.eventDate || '';
+    shortEventDate(
+      row.eventDate
+    );
 
   cDate.className =
     'sticky-col sticky-date';
@@ -167,7 +210,8 @@ function appendEventRow(frag, row = {}) {
   const pill =
     document.createElement('span');
 
-  pill.className = 'pill';
+  pill.className =
+    'pill';
 
   pill.textContent =
     row.typeLabel || 'حدث';
@@ -198,6 +242,8 @@ function appendEventRow(frag, row = {}) {
   );
 
   frag.appendChild(tr);
+
+  return tr;
 }
 
 function renderSeasons(seasons = []) {
@@ -207,11 +253,17 @@ function renderSeasons(seasons = []) {
 
   const visibleSeasons =
     Array.isArray(seasons)
-      ? seasons.filter(
-          season =>
-            Array.isArray(season?.events) &&
-            season.events.length
-        )
+      ? seasons.filter(season => {
+          const events =
+            Array.isArray(season?.events)
+              ? season.events
+              : [];
+
+          return (
+            season?.isCurrent === true ||
+            events.length > 0
+          );
+        })
       : [];
 
   if (!visibleSeasons.length) {
@@ -225,11 +277,27 @@ function renderSeasons(seasons = []) {
     document.createDocumentFragment();
 
   for (const season of visibleSeasons) {
+    const events =
+      Array.isArray(season?.events)
+        ? season.events
+        : [];
+
+    const isCurrent =
+      season?.isCurrent === true;
+
+    const seasonKey =
+      String(
+        season?.key ||
+        ''
+      );
+
     const seasonRow =
       document.createElement('tr');
 
     seasonRow.className =
-      'season-row';
+      isCurrent
+        ? 'season-row current-season'
+        : 'season-row previous-season';
 
     const seasonCell =
       document.createElement('td');
@@ -238,35 +306,107 @@ function renderSeasons(seasons = []) {
     seasonCell.className =
       'season-cell';
 
-    const seasonTitle =
-      document.createElement('strong');
-
-    seasonTitle.className =
-      'season-title';
-
-    seasonTitle.textContent =
-      season.label || 'الموسم';
-
-    seasonCell.appendChild(
-      seasonTitle
-    );
-
     const rangeText =
       seasonRangeText(season);
 
-    if (rangeText) {
-      const seasonRange =
+    if (isCurrent) {
+      const header =
+        document.createElement('div');
+
+      header.className =
+        'season-current-header';
+
+      const title =
+        document.createElement('strong');
+
+      title.className =
+        'season-title';
+
+      title.textContent =
+        season.label ||
+        'الموسم الحالي';
+
+      header.appendChild(title);
+
+      if (rangeText) {
+        const range =
+          document.createElement('span');
+
+        range.className =
+          'season-range';
+
+        range.textContent =
+          rangeText;
+
+        header.appendChild(range);
+      }
+
+      seasonCell.appendChild(header);
+
+    } else {
+      const toggle =
+        document.createElement('button');
+
+      toggle.type = 'button';
+      toggle.className =
+        'season-toggle';
+
+      toggle.setAttribute(
+        'aria-expanded',
+        'false'
+      );
+
+      const main =
         document.createElement('span');
 
-      seasonRange.className =
-        'season-range';
+      main.className =
+        'season-toggle-main';
 
-      seasonRange.textContent =
-        rangeText;
+      const title =
+        document.createElement('strong');
 
-      seasonCell.appendChild(
-        seasonRange
+      title.className =
+        'season-title';
+
+      title.textContent =
+        season.label ||
+        'موسم سابق';
+
+      main.appendChild(title);
+
+      if (rangeText) {
+        const range =
+          document.createElement('span');
+
+        range.className =
+          'season-range';
+
+        range.textContent =
+          rangeText;
+
+        main.appendChild(range);
+      }
+
+      const icon =
+        document.createElement('span');
+
+      icon.className =
+        'season-toggle-icon';
+
+      icon.textContent = '＋';
+
+      toggle.append(
+        main,
+        icon
       );
+
+      seasonCell.appendChild(toggle);
+
+      season._toggleButton =
+        toggle;
+
+      season._toggleIcon =
+        icon;
     }
 
     seasonRow.appendChild(
@@ -277,13 +417,61 @@ function renderSeasons(seasons = []) {
       seasonRow
     );
 
-    for (const row of season.events) {
-      appendEventRow(
-        frag,
-        row
+    const eventRows = [];
+
+    for (const row of events) {
+      eventRows.push(
+        appendEventRow(
+          frag,
+          row,
+          {
+            seasonKey,
+            hidden: !isCurrent
+          }
+        )
+      );
+    }
+
+    if (
+      !isCurrent &&
+      season._toggleButton
+    ) {
+      const toggle =
+        season._toggleButton;
+
+      const icon =
+        season._toggleIcon;
+
+      toggle.addEventListener(
+        'click',
+        () => {
+          const expanded =
+            toggle.getAttribute(
+              'aria-expanded'
+            ) === 'true';
+
+          const open =
+            !expanded;
+
+          toggle.setAttribute(
+            'aria-expanded',
+            String(open)
+          );
+
+          icon.textContent =
+            open ? '−' : '＋';
+
+          for (const row of eventRows) {
+            row.hidden = !open;
+          }
+
+          updateStickyWidths();
+        }
       );
     }
   }
+
+  
 
   evBody.appendChild(frag);
 
