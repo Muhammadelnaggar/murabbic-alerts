@@ -14743,6 +14743,10 @@ function eventsPageNormalizeTypeKeySrv(ev = {}) {
     "تشخيص_حمل": "pregnancy_diagnosis",
     "pregnancy_diagnosis": "pregnancy_diagnosis",
 
+    "فحص_الرحم": "uterine_check",
+    "uterine_check": "uterine_check",
+    "uterinecheck": "uterine_check",
+
     "ولادة": "calving",
     "calving": "calving",
 
@@ -14757,11 +14761,24 @@ function eventsPageNormalizeTypeKeySrv(ev = {}) {
     "اجهاض": "abortion",
     "abortion": "abortion",
 
+    "فقد_جنيني": "embryonic_loss",
+    "فقد_الأجنة": "embryonic_loss",
+    "فقد_الاجنة": "embryonic_loss",
+    "embryonic_loss": "embryonic_loss",
+
     "فطام": "weaning",
     "weaning": "weaning",
 
     "تقليم_الحوافر": "hoof_trimming",
     "hoof_trimming": "hoof_trimming",
+
+    "إزالة_الحلمات_الزائدة": "supernumerary_teat_removal",
+    "ازالة_الحلمات_الزائدة": "supernumerary_teat_removal",
+    "supernumerary_teat_removal": "supernumerary_teat_removal",
+
+    "إزالة_القرون": "dehorning",
+    "ازالة_القرون": "dehorning",
+    "dehorning": "dehorning",
 
     "feces_eval": "feces_eval",
     "تقييم_الروث_بالكاميرا": "feces_eval",
@@ -14788,6 +14805,9 @@ function eventsPageNormalizeTypeKeySrv(ev = {}) {
     "ovsynch": "ovsynch",
     "ovysynch": "ovsynch",
 
+    "خطوة_تزامن": "ovsynch_step",
+    "ovsynch_step": "ovsynch_step",
+
     "تحضير_ولادة": "close_up",
     "تحضير_للولادة": "close_up",
     "closeup": "close_up",
@@ -14806,6 +14826,7 @@ function eventsPageNormalizeTypeKeySrv(ev = {}) {
     "تقييم_صفات_اللبن": "milking_traits_eval",
     "صفات_اللبن": "milking_traits_eval",
     "milking_traits_eval": "milking_traits_eval",
+    "dairy_traits_eval": "milking_traits_eval",
     "dairy_traits": "milking_traits_eval"
   };
 
@@ -14838,7 +14859,12 @@ function eventsPageTypeLabelSrv(ev = {}) {
     lameness: "عرج",
     mastitis: "التهاب الضرع",
     milking_traits_eval: "تقييم صفات اللبن",
-    milking_traits: "تقييم صفات اللبن"
+    milking_traits: "تقييم صفات اللبن",
+    uterine_check: "فحص الرحم",
+    embryonic_loss: "فقد جنيني",
+    supernumerary_teat_removal: "إزالة الحلمات الزائدة",
+    dehorning: "إزالة القرون",
+    ovsynch_step: "خطوة تزامن"
   };
 
   if (labels[key]) return labels[key];
@@ -15060,7 +15086,133 @@ function eventsPageDetailsSrv(ev = {}) {
 
   return eventsPageJoinDetailsSrv(parts, "شياع مسجّل");
 }
+  if (key === "uterine_check") {
+  add("مرحلة الفحص", ["checkStageLabel", "checkStage"]);
+  add("النتيجة", ["resultLabel", "result"]);
+  add("منذ آخر ولادة", ["postpartumDays"], " يوم");
+  add("آخر ولادة", ["lastCalvingDate"]);
+  add("الفاحص", ["vet", "doctor", "examiner"]);
 
+  if (note) {
+    eventsPagePushDetailSrv(parts, "ملاحظة", note);
+  }
+
+  return eventsPageJoinDetailsSrv(
+    parts,
+    "فحص رحم مسجّل"
+  );
+}
+
+if (key === "embryonic_loss") {
+  add(
+    "الحالة قبل الفقد",
+    ["previousReproductiveStatus"]
+  );
+
+  add(
+    "الحالة بعد الفقد",
+    ["reproductiveStatusAfter"]
+  );
+
+  add(
+    "منذ آخر تلقيح",
+    ["daysFromLastInsemination"],
+    " يوم"
+  );
+
+  add(
+    "مصدر التسجيل",
+    ["sourceContext"]
+  );
+
+  if (note) {
+    eventsPagePushDetailSrv(parts, "ملاحظة", note);
+  }
+
+  return eventsPageJoinDetailsSrv(
+    parts,
+    "فقد جنيني مسجّل"
+  );
+}
+
+if (key === "supernumerary_teat_removal") {
+  add(
+    "العمر وقت الإزالة",
+    [
+      "supernumeraryTeatRemovalAgeDays",
+      "superTeatAgeDays",
+      "ageDays"
+    ],
+    " يوم"
+  );
+
+  add("الجنس", ["sex", "gender"]);
+  add("تاريخ الميلاد", ["birthDate"]);
+
+  if (note) {
+    eventsPagePushDetailSrv(parts, "ملاحظة", note);
+  }
+
+  return eventsPageJoinDetailsSrv(
+    parts,
+    "إزالة الحلمات الزائدة"
+  );
+}
+
+if (key === "dehorning") {
+  add(
+    "العمر وقت الإزالة",
+    [
+      "dehorningAgeDays",
+      "ageDays"
+    ],
+    " يوم"
+  );
+
+  add("الجنس", ["sex", "gender"]);
+  add("تاريخ الميلاد", ["birthDate"]);
+
+  if (note) {
+    eventsPagePushDetailSrv(parts, "ملاحظة", note);
+  }
+
+  return eventsPageJoinDetailsSrv(
+    parts,
+    "إزالة القرون"
+  );
+}
+
+if (key === "ovsynch_step") {
+  add(
+    "البرنامج",
+    [
+      "protocolProgram",
+      "program",
+      "protocolName"
+    ]
+  );
+
+  add(
+    "الخطوة",
+    [
+      "stepName",
+      "step"
+    ]
+  );
+
+  add("رقم الخطوة", ["stepIndex"]);
+  add("يوم البروتوكول", ["stepDay"], " يوم");
+  add("تاريخ البداية", ["protocolStartDate"]);
+
+  if (note) {
+    eventsPagePushDetailSrv(parts, "ملاحظة", note);
+  }
+
+  return eventsPageJoinDetailsSrv(
+    parts,
+    "خطوة تزامن"
+  );
+}
   if (key === "ovsynch") {
     add("البروتوكول", ["protocolName", "protocol", "program"]);
     add("الخطوة", ["stepName", "step", "currentStep"]);
@@ -15106,17 +15258,109 @@ function eventsPageDetailsSrv(ev = {}) {
     return eventsPageJoinDetailsSrv(parts, "تقييم الروث");
   }
 
-  if (key === "milking_traits_eval" || key === "milking_traits") {
-    add("الدرجة الكلية", ["kpi.overallScore", "overallScore", "score"]);
-    add("الضرع", ["kpi.udderScore", "udderScore"]);
-    add("الأرجل والأقدام", ["kpi.feetLegsScore", "feetLegsScore"]);
-    add("القوة والطابع الحلاب", ["kpi.dairyStrengthScore", "dairyStrengthScore"]);
-    add("المقدمة والسعة", ["kpi.frameScore", "frameScore"]);
-    add("القرار", ["label", "statusText", "recommendation"]);
-    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+  if (
+  key === "milking_traits_eval" ||
+  key === "milking_traits"
+) {
+  add(
+    "الدرجة الكلية",
+    [
+      "dairyTraitsScore",
+      "analysis.score",
+      "kpi.overallScore",
+      "overallScore",
+      "score",
+      "value"
+    ]
+  );
 
-    return eventsPageJoinDetailsSrv(parts, "تقييم صفات اللبن");
+  add(
+    "التقييم",
+    [
+      "grade",
+      "analysis.grade",
+      "label",
+      "statusText"
+    ]
+  );
+
+  add(
+    "الثقة",
+    [
+      "analysis.confidence",
+      "confidence",
+      "quality.confidence"
+    ]
+  );
+
+  add(
+    "الضرع",
+    [
+      "kpi.udderScore",
+      "udderScore"
+    ]
+  );
+
+  add(
+    "الأرجل والأقدام",
+    [
+      "kpi.feetLegsScore",
+      "feetLegsScore"
+    ]
+  );
+
+  add(
+    "القوة والطابع الحلاب",
+    [
+      "kpi.dairyStrengthScore",
+      "dairyStrengthScore"
+    ]
+  );
+
+  add(
+    "المقدمة والسعة",
+    [
+      "kpi.frameScore",
+      "frameScore"
+    ]
+  );
+
+  add(
+    "نقاط القوة",
+    [
+      "analysis.strengths",
+      "strengths"
+    ]
+  );
+
+  add(
+    "نقاط تحتاج مراجعة",
+    [
+      "analysis.weaknesses",
+      "weaknesses"
+    ]
+  );
+
+  add(
+    "سبب التقييم",
+    [
+      "analysis.reason",
+      "reason",
+      "modelReason"
+    ]
+  );
+
+  add("القرار", ["recommendation"]);
+
+  if (note) {
+    eventsPagePushDetailSrv(parts, "ملاحظة", note);
   }
+
+  return eventsPageJoinDetailsSrv(
+    parts,
+    "تقييم صفات اللبن"
+  );
+}
 
   if (key === "nutrition") {
     add("العليقة", ["rationName", "ration", "dietName"]);
@@ -15144,6 +15388,15 @@ function eventsPageDetailsSrv(ev = {}) {
   if (key === "close_up") {
     add("العليقة", ["ration", "rationName", "dietName"]);
     add("أملاح أنيونية", ["anionicSalts", "anionicSalt", "dcad"]);
+    add(
+  "آخر تلقيح",
+  ["lastInseminationDate"]
+);
+
+add(
+  "النوع",
+  ["species", "animalTypeAr"]
+);
     add("تاريخ الولادة المتوقع", ["expectedCalvingDate", "dueDate"]);
     add("حالة التحضير", ["statusText", "result"]);
     if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
@@ -15178,19 +15431,134 @@ function eventsPageDetailsSrv(ev = {}) {
     return eventsPageJoinDetailsSrv(parts, "استبعاد");
   }
 
-  if (key === "health" || key === "lameness" || key === "mastitis") {
-    add("التشخيص", ["diagnosis", "disease", "diseaseName", "problem"]);
-    add("الشدة", ["severity", "score", "grade"]);
-    add("العلاج", ["treatment", "drugName", "medicine"]);
-    add("الجرعة", ["dose", "doseAmount"]);
-    add("فترة سحب اللبن", ["milkWithdrawalDays", "withdrawalMilkDays"], " يوم");
-    add("فترة سحب اللحم", ["meatWithdrawalDays", "withdrawalMeatDays"], " يوم");
-    add("الطبيب", ["vet", "doctor"]);
-    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
-    if (result) eventsPagePushDetailSrv(parts, "النتيجة", result);
+  if (key === "lameness") {
+  add(
+    "نوع العرج",
+    [
+      "lamenessType",
+      "diagnosis",
+      "details.lamenessType"
+    ]
+  );
 
-    return eventsPageJoinDetailsSrv(parts, key === "mastitis" ? "التهاب الضرع" : key === "lameness" ? "عرج" : "مرض");
+  add(
+    "الطرف/الحافر",
+    [
+      "affectedLeg",
+      "affectedHoof",
+      "details.affectedLeg"
+    ]
+  );
+
+  add(
+    "الأطراف المتأثرة",
+    [
+      "affectedLegs",
+      "affectedHooves",
+      "details.affectedLegs"
+    ]
+  );
+
+  add(
+    "الطبيب",
+    [
+      "vet",
+      "doctor",
+      "details.vet"
+    ]
+  );
+
+  if (note) {
+    eventsPagePushDetailSrv(parts, "ملاحظة", note);
   }
+
+  return eventsPageJoinDetailsSrv(parts, "عرج");
+}
+
+if (key === "mastitis") {
+  add(
+    "نوع الالتهاب",
+    [
+      "mastitisType",
+      "details.mastitisType"
+    ]
+  );
+
+  add(
+    "الأرباع المصابة",
+    [
+      "affectedQuarter",
+      "affectedQuarters",
+      "quarters",
+      "details.affectedQuarter"
+    ]
+  );
+
+  add(
+    "التشخيص",
+    [
+      "diagnosis",
+      "diseaseName",
+      "details.diagnosis"
+    ]
+  );
+
+  if (note) {
+    eventsPagePushDetailSrv(parts, "ملاحظة", note);
+  }
+
+  return eventsPageJoinDetailsSrv(
+    parts,
+    "التهاب الضرع"
+  );
+}
+
+if (key === "health") {
+  add(
+    "التشخيص",
+    [
+      "diagnosis",
+      "disease",
+      "diseaseName",
+      "problem"
+    ]
+  );
+
+  add("المجموعة الصحية", ["diseaseGroup"]);
+  add("الشدة", ["severity", "score", "grade"]);
+  add("العلاج", ["treatment", "drugName", "medicine"]);
+  add("الجرعة", ["dose", "doseAmount"]);
+
+  add(
+    "فترة سحب اللبن",
+    [
+      "milkWithdrawalDays",
+      "withdrawalMilkDays"
+    ],
+    " يوم"
+  );
+
+  add(
+    "فترة سحب اللحم",
+    [
+      "meatWithdrawalDays",
+      "withdrawalMeatDays"
+    ],
+    " يوم"
+  );
+
+  add("الطبيب", ["vet", "doctor"]);
+
+  if (note) {
+    eventsPagePushDetailSrv(parts, "ملاحظة", note);
+  }
+
+  if (result) {
+    eventsPagePushDetailSrv(parts, "النتيجة", result);
+  }
+
+  return eventsPageJoinDetailsSrv(parts, "مرض");
+}
 
   if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
   if (result) eventsPagePushDetailSrv(parts, "النتيجة", result);
@@ -15244,22 +15612,86 @@ function eventsPageListTypeOptionsSrv() {
     { value: "insemination", label: "تلقيح" },
     { value: "daily_milk", label: "لبن يومي" },
     { value: "calving", label: "ولادة" },
-    { value: "pregnancy_diagnosis", label: "تشخيص حمل" },
-    { value: "vaccination", label: "تحصين" },
-    { value: "hoof_trimming", label: "تقليم الحوافر" },
+
+    {
+      value: "pregnancy_diagnosis",
+      label: "تشخيص حمل"
+    },
+
+    {
+      value: "uterine_check",
+      label: "فحص الرحم"
+    },
+
+    {
+      value: "vaccination",
+      label: "تحصين"
+    },
+
+    {
+      value: "hoof_trimming",
+      label: "تقليم الحوافر"
+    },
+
+    {
+      value: "supernumerary_teat_removal",
+      label: "إزالة الحلمات الزائدة"
+    },
+
+    {
+      value: "dehorning",
+      label: "إزالة القرون"
+    },
+
     { value: "lameness", label: "عرج" },
-    { value: "mastitis", label: "التهاب الضرع" },
+
+    {
+      value: "mastitis",
+      label: "التهاب الضرع"
+    },
+
     { value: "heat", label: "شياع" },
     { value: "ovsynch", label: "تزامن" },
+
+    {
+      value: "ovsynch_step",
+      label: "خطوة تزامن"
+    },
+
     { value: "dry_off", label: "تجفيف" },
+
+    {
+      value: "close_up",
+      label: "تحضير ولادة"
+    },
+
     { value: "abortion", label: "إجهاض" },
+
+    {
+      value: "embryonic_loss",
+      label: "فقد جنيني"
+    },
+
     { value: "weaning", label: "فطام" },
     { value: "sale", label: "بيع" },
     { value: "death", label: "نفوق" },
     { value: "cull", label: "استبعاد" },
-    { value: "bcs_eval", label: "فحص حالة الجسم" },
-    { value: "feces_eval", label: "تقييم الروث" },
-    { value: "milking_traits_eval", label: "تقييم صفات اللبن" },
+
+    {
+      value: "bcs_eval",
+      label: "فحص حالة الجسم"
+    },
+
+    {
+      value: "feces_eval",
+      label: "تقييم الروث"
+    },
+
+    {
+      value: "milking_traits_eval",
+      label: "تقييم صفات اللبن"
+    },
+
     { value: "nutrition", label: "تغذية" },
     { value: "health", label: "مرض" }
   ];
@@ -15362,7 +15794,312 @@ function eventsPageRowSrv(docId, ev = {}) {
     _sortMs: eventsPageListSortMsSrv(ev)
   };
 }
+function eventsPageSeasonDateSrv(value) {
+  const s =
+    String(value || "")
+      .trim()
+      .slice(0, 10);
 
+  return /^\d{4}-\d{2}-\d{2}$/.test(s)
+    ? s
+    : "";
+}
+
+function eventsPageSeasonLabelSrv(
+  seasonNumber,
+  fallback
+) {
+  const n = Number(seasonNumber);
+
+  return (
+    Number.isFinite(n) &&
+    n > 0
+  )
+    ? `الموسم ${n}`
+    : fallback;
+}
+
+function eventsPageBuildSeasonGroupsSrv({
+  allRows = [],
+  visibleRows = [],
+  subject = null
+} = {}) {
+
+  const subjectData =
+    subject?.data || {};
+
+  const subjectCollection =
+    String(
+      subject?._collection || ""
+    ).trim();
+
+  // التوابع ليس لها مواسم إنتاج.
+  if (
+    !subject ||
+    subjectCollection === "calves"
+  ) {
+    return {
+      subjectCollection,
+
+      seasonMode:
+        "timeline",
+
+      seasons: [
+        {
+          key: "all",
+
+          label:
+            "كل الأحداث",
+
+          isCurrent:
+            true,
+
+          seasonNumber:
+            null,
+
+          startDate:
+            null,
+
+          nextCalvingDate:
+            null,
+
+          eventCount:
+            visibleRows.length,
+
+          events:
+            visibleRows
+        }
+      ]
+    };
+  }
+
+  const currentLactation =
+    Number(
+      subjectData.lactationNumber
+    );
+
+  const hasCurrentLactation =
+    Number.isFinite(
+      currentLactation
+    ) &&
+    currentLactation > 0;
+
+  // حدود المواسم مصدرها الولادات فقط.
+  const calvingDates = [
+    ...new Set(
+      [
+        eventsPageSeasonDateSrv(
+          subjectData.lastCalvingDate ||
+          subjectData.calvingDate ||
+          subjectData.lastCalving ||
+          ""
+        ),
+
+        ...allRows
+          .filter(
+            row =>
+              row.typeKey ===
+              "calving"
+          )
+          .map(
+            row =>
+              eventsPageSeasonDateSrv(
+                row.eventDate
+              )
+          )
+          .filter(Boolean)
+      ].filter(Boolean)
+    )
+  ].sort();
+
+  if (!calvingDates.length) {
+    return {
+      subjectCollection,
+
+      seasonMode:
+        "timeline",
+
+      seasons: [
+        {
+          key: "all",
+
+          label:
+            "كل الأحداث",
+
+          isCurrent:
+            true,
+
+          seasonNumber:
+            null,
+
+          startDate:
+            null,
+
+          nextCalvingDate:
+            null,
+
+          eventCount:
+            visibleRows.length,
+
+          events:
+            visibleRows
+        }
+      ]
+    };
+  }
+
+  const seasons = [];
+
+  // الأحدث أولًا.
+  for (
+    let i =
+      calvingDates.length - 1;
+
+    i >= 0;
+
+    i--
+  ) {
+    const startDate =
+      calvingDates[i];
+
+    const nextCalvingDate =
+      calvingDates[i + 1] ||
+      null;
+
+    const distanceFromCurrent =
+      (
+        calvingDates.length -
+        1
+      ) - i;
+
+    const seasonNumber =
+      hasCurrentLactation
+        ? currentLactation -
+          distanceFromCurrent
+        : null;
+
+    const validSeasonNumber =
+      Number.isFinite(
+        Number(seasonNumber)
+      ) &&
+      Number(seasonNumber) > 0
+        ? Number(seasonNumber)
+        : null;
+
+    const seasonEvents =
+      visibleRows.filter(
+        row => {
+          const d =
+            eventsPageSeasonDateSrv(
+              row.eventDate
+            );
+
+          if (
+            !d ||
+            d < startDate
+          ) {
+            return false;
+          }
+
+          if (
+            nextCalvingDate &&
+            d >= nextCalvingDate
+          ) {
+            return false;
+          }
+
+          return true;
+        }
+      );
+
+    seasons.push({
+      key:
+        distanceFromCurrent === 0
+          ? "current"
+          : `previous_${distanceFromCurrent}`,
+
+      label:
+        eventsPageSeasonLabelSrv(
+          validSeasonNumber,
+
+          distanceFromCurrent === 0
+            ? "الموسم الحالي"
+            : distanceFromCurrent === 1
+              ? "الموسم السابق"
+              : `الموسم السابق ${distanceFromCurrent}`
+        ),
+
+      isCurrent:
+        distanceFromCurrent === 0,
+
+      seasonNumber:
+        validSeasonNumber,
+
+      startDate,
+
+      nextCalvingDate,
+
+      eventCount:
+        seasonEvents.length,
+
+      events:
+        seasonEvents
+    });
+  }
+
+  // لا نخترع حدود مواسم غير مسجلة.
+  const beforeFirst =
+    visibleRows.filter(
+      row => {
+        const d =
+          eventsPageSeasonDateSrv(
+            row.eventDate
+          );
+
+        return (
+          !d ||
+          d < calvingDates[0]
+        );
+      }
+    );
+
+  if (beforeFirst.length) {
+    seasons.push({
+      key:
+        "before_first_recorded_calving",
+
+      label:
+        "أحداث قبل أول ولادة مسجلة",
+
+      isCurrent:
+        false,
+
+      seasonNumber:
+        null,
+
+      startDate:
+        null,
+
+      nextCalvingDate:
+        calvingDates[0],
+
+      eventCount:
+        beforeFirst.length,
+
+      events:
+        beforeFirst
+    });
+  }
+
+  return {
+    subjectCollection,
+
+    seasonMode:
+      "lactation",
+
+    seasons
+  };
+}
 app.get("/api/events-page/list", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -15398,36 +16135,123 @@ app.get("/api/events-page/list", requireUserId, async (req, res) => {
       });
     }
 
-    const docs = await eventsPageFetchAnimalEventsSrv(uid, number);
+    const docs =
+  await eventsPageFetchAnimalEventsSrv(
+    uid,
+    number
+  );
 
-    const rows = docs
-      .map(item => eventsPageRowSrv(item.id, item.data))
-      .filter(row => {
-        const rowNumber = eventsPageParseNumbersSrv(row.animalNumber)[0] || "";
+const allRowsWithSort =
+  docs
+    .map(
+      item =>
+        eventsPageRowSrv(
+          item.id,
+          item.data
+        )
+    )
+    .filter(
+      row => {
+        const rowNumber =
+          eventsPageParseNumbersSrv(
+            row.animalNumber
+          )[0] || "";
 
-        if (rowNumber !== number) return false;
+        return (
+          rowNumber ===
+          number
+        );
+      }
+    )
+    .sort(
+      (a, b) =>
+        (b._sortMs || 0) -
+        (a._sortMs || 0)
+    );
 
-        if (!typeKey) return true;
+const cleanRow = row => {
+  const {
+    _sortMs,
+    ...clean
+  } = row;
 
-        return row.typeKey === typeKey || row.typeLabel === typeRaw;
-      })
-      .sort((a, b) => (b._sortMs || 0) - (a._sortMs || 0))
-      .map(row => {
-        const { _sortMs, ...clean } = row;
-        return clean;
-      });
+  return clean;
+};
 
-    return res.json({
-      ok: true,
-      number,
-      type: typeRaw,
-      typeKey,
-      count: rows.length,
-      typeOptions: eventsPageListTypeOptionsSrv(),
-      animalCardUrl: `/cow-card.html?number=${encodeURIComponent(number)}`,
-      addEventUrl: `/add-event.html?number=${encodeURIComponent(number)}`,
-      rows
-    });
+const allRows =
+  allRowsWithSort
+    .map(cleanRow);
+
+const rows =
+  allRowsWithSort
+    .filter(
+      row => {
+        if (!typeKey) {
+          return true;
+        }
+
+        return (
+          row.typeKey ===
+            typeKey ||
+          row.typeLabel ===
+            typeRaw
+        );
+      }
+    )
+    .map(cleanRow);
+
+const subject =
+  await fetchAnimalByNumberForCalvingGateSrv(
+    uid,
+    number
+  );
+
+const seasonResult =
+  eventsPageBuildSeasonGroupsSrv({
+    allRows,
+    visibleRows: rows,
+    subject
+  });
+
+return res.json({
+  ok: true,
+
+  number,
+
+  type:
+    typeRaw,
+
+  typeKey,
+
+  count:
+    rows.length,
+
+  totalEvents:
+    allRows.length,
+
+  typeOptions:
+    eventsPageListTypeOptionsSrv(),
+
+  animalCardUrl:
+    `/cow-card.html?number=${encodeURIComponent(number)}`,
+
+  addEventUrl:
+    `/add-event.html?number=${encodeURIComponent(number)}`,
+
+  subjectCollection:
+    seasonResult.subjectCollection,
+
+  seasonMode:
+    seasonResult.seasonMode,
+
+  seasons:
+    seasonResult.seasons,
+
+  // للتوافق مع الصفحة الحالية مؤقتًا.
+  rows
+});
+
+    
 
   } catch (e) {
     console.error("events-page-list failed", e);
