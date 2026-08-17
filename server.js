@@ -14802,10 +14802,12 @@ function eventsPageNormalizeTypeKeySrv(ev = {}) {
     "disease": "health",
 
     "تزامن": "ovsynch",
+    "بروتوكول_تزامن": "ovsynch",
+    "برنامج_تزامن": "ovsynch",
     "ovsynch": "ovsynch",
     "ovysynch": "ovsynch",
 
-    "خطوة_تزامن": "ovsynch_step",
+"خطوة_تزامن": "ovsynch_step",
     "ovsynch_step": "ovsynch_step",
 
     "تحضير_ولادة": "close_up",
@@ -14908,7 +14910,38 @@ function eventsPagePushDetailSrv(parts, label, value, unit = "") {
 
   parts.push(`${label}: ${txt}${unit}`);
 }
+function eventsPageVaccinationDoseLabelSrv(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
 
+  const key = raw.toLowerCase();
+
+  const labels = {
+    prime: "تأسيس لأول مرة (Primary)",
+    primary: "تأسيس لأول مرة (Primary)",
+    booster: "جرعة منشطة (Booster)",
+    periodic: "جرعة دورية (Periodic)",
+    campaign: "حملة تحصين (Campaign)",
+    other: "أخرى (Other)"
+  };
+
+  return labels[key] || raw;
+}
+
+function eventsPageOvsynchProgramLabelSrv(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const key = raw.toLowerCase();
+
+  const labels = {
+    ovsynch: "Ovsynch",
+    cosynch72: "Co-Synch 72",
+    presynch_ovsynch: "Presynch–Ovsynch"
+  };
+
+  return labels[key] || raw;
+}
 function eventsPageFormatMilkSessionsSrv(ev = {}) {
   const sessions = Array.isArray(ev.milkSessions) ? ev.milkSessions : [];
 
@@ -15013,9 +15046,22 @@ function eventsPageDetailsSrv(ev = {}) {
   }
 
   if (key === "vaccination") {
-    add("اللقاح", ["vaccine", "vaccineName", "vaccineKey", "name"]);
-    add("نوع الجرعة", ["doseType", "dose", "doseLabel", "جرعة"]);
-    add("رقم التشغيلة", ["batchNo", "batchNumber", "lot", "lotNo"]);
+  add("اللقاح", ["vaccine", "vaccineName", "vaccineKey", "name"]);
+
+  const doseLabel =
+    eventsPageVaccinationDoseLabelSrv(
+      pick(["doseLabel", "doseType", "dose", "جرعة"], "")
+    );
+
+  if (doseLabel) {
+    eventsPagePushDetailSrv(
+      parts,
+      "نوع الجرعة",
+      doseLabel
+    );
+  }
+
+  add("رقم التشغيلة", ["batchNo", "batchNumber", "lot", "lotNo"]);
     add("طريقة الإعطاء", ["route", "administrationRoute"]);
     add("الجرعة", ["doseAmount", "amount"]);
     add("التحصين التالي", ["nextDueDate", "nextDate", "boosterDate"]);
@@ -15181,19 +15227,29 @@ if (key === "dehorning") {
     "إزالة القرون"
   );
 }
-
 if (key === "ovsynch_step") {
-  add(
-    "البرنامج",
-    [
-      "protocolProgram",
-      "program",
-      "protocolName"
-    ]
+const programLabel =
+  eventsPageOvsynchProgramLabelSrv(
+    pick(
+      [
+        "protocolProgram",
+        "program",
+        "protocolName"
+      ],
+      ""
+    )
   );
 
-  add(
-    "الخطوة",
+if (programLabel) {
+  eventsPagePushDetailSrv(
+    parts,
+    "البرنامج",
+    programLabel
+  );
+}
+
+add(
+  "الخطوة",
     [
       "stepName",
       "step"
@@ -15214,7 +15270,25 @@ if (key === "ovsynch_step") {
   );
 }
   if (key === "ovsynch") {
-    add("البروتوكول", ["protocolName", "protocol", "program"]);
+    const programLabel =
+  eventsPageOvsynchProgramLabelSrv(
+    pick(
+      [
+        "protocolName",
+        "protocol",
+        "program"
+      ],
+      ""
+    )
+  );
+
+if (programLabel) {
+  eventsPagePushDetailSrv(
+    parts,
+    "البروتوكول",
+    programLabel
+  );
+}
     add("الخطوة", ["stepName", "step", "currentStep"]);
     add("تاريخ البداية", ["protocolStartDate", "startDate"]);
     add("الخطوة التالية", ["nextStepName", "nextStep"]);
