@@ -16174,6 +16174,289 @@ function eventsPageBuildSeasonGroupsSrv({
     seasons
   };
 }
+function eventsPageEditSourceSrv(ev = {}) {
+  return String(
+    ev.source ||
+    ev.importedBy ||
+    ""
+  ).trim();
+}
+
+
+function eventsPageEditPolicySrv(ev = {}) {
+  const typeKey =
+    eventsPageNormalizeTypeKeySrv(ev);
+
+  const source =
+    eventsPageEditSourceSrv(ev);
+
+  const sourceLower =
+    source.toLowerCase();
+
+  const systemDerived =
+    typeKey === "ovsynch_step" ||
+    typeKey === "embryonic_loss" ||
+    sourceLower.includes(":auto-") ||
+    sourceLower.includes(":system-") ||
+    sourceLower.includes("smart-alert");
+
+  if (systemDerived) {
+    return {
+      editable: false,
+      mode: "system_derived",
+      reason:
+        "هذا الحدث تم إنشاؤه تلقائيًا بواسطة مُرَبِّيك ولا يُعدّل يدويًا من سجل الأحداث."
+    };
+  }
+
+  if (typeKey === "ovsynch") {
+    return {
+      editable: false,
+      mode: "protocol",
+      reason:
+        "حدث التزامن مرتبط ببروتوكول ومهام تشغيلية، لذلك لا يُعدّل مباشرة من سجل الأحداث."
+    };
+  }
+
+  return {
+    editable: true,
+    mode: "manual_correction",
+    reason: ""
+  };
+}
+
+
+function eventsPageEditPublicEventSrv(
+  docId,
+  ev = {}
+) {
+  const typeKey =
+    eventsPageNormalizeTypeKeySrv(ev);
+
+  const policy =
+    eventsPageEditPolicySrv(ev);
+
+  return {
+    id:
+      String(docId || "").trim(),
+
+    animalNumber:
+      eventsPageEventAnimalNumberSrv(ev),
+
+    eventDate:
+      eventsPageListDateSrv(ev) || "",
+
+    typeKey,
+
+    typeLabel:
+      eventsPageTypeLabelSrv(ev),
+
+    details:
+      eventsPageDetailsSrv(ev),
+
+    editPolicy:
+      policy,
+
+    data: {
+      eventDate:
+        eventsPageListDateSrv(ev) || "",
+
+      notes:
+        ev.notes ??
+        ev.note ??
+        "",
+
+      vet:
+        ev.vet ??
+        ev.examiner ??
+        "",
+
+      inseminator:
+        ev.inseminator ??
+        ev.technician ??
+        "",
+
+      semenCode:
+        ev.semenCode ??
+        ev.sireNumber ??
+        ev.bullNumber ??
+        "",
+
+      inseminationMethod:
+        ev.inseminationMethod ??
+        ev.method ??
+        "",
+
+      inseminationTime:
+        ev.inseminationTime ??
+        ev.time ??
+        "",
+
+      heatTime:
+        ev.heatTime ??
+        ev.observationTime ??
+        "",
+
+      vaccine:
+        ev.vaccine ??
+        ev.vaccineName ??
+        "",
+
+      doseType:
+        ev.doseType ??
+        ev.vaccinationDoseType ??
+        "",
+
+      pregnancyMethod:
+        ev.method ??
+        ev.pregnancyMethod ??
+        "",
+
+      pregnancyResult:
+        ev.result ??
+        ev.pregnancyResult ??
+        "",
+
+      calvingKind:
+        ev.calvingKind ??
+        ev.calvingType ??
+        "",
+
+      calfCount:
+        ev.calfCount ??
+        "",
+
+      milkKg:
+        ev.milkKg ??
+        ev.dailyMilk ??
+        ev.totalMilk ??
+        "",
+
+      dryOffReason:
+        ev.dryOffReason ??
+        ev.reason ??
+        "",
+
+      weaningWeightKg:
+        ev.weaningWeightKg ??
+        ev.weaningWeight ??
+        ev.weight ??
+        "",
+
+      result:
+        ev.result ??
+        "",
+
+      checkStage:
+        ev.checkStage ??
+        "",
+
+      source:
+        eventsPageEditSourceSrv(ev)
+    }
+  };
+}
+
+
+app.get(
+  "/api/events-page/event/:id",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error: "firestore_disabled",
+          message:
+            "تعذّر تحميل الحدث للتعديل — قاعدة البيانات غير متاحة."
+        });
+      }
+
+      const uid =
+        req.userId;
+
+      const eventId =
+        String(
+          req.params.id ||
+          ""
+        ).trim();
+
+      if (!eventId) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "event_id_required",
+          message:
+            "معرّف الحدث مطلوب."
+        });
+      }
+
+      const ref =
+        db
+          .collection("events")
+          .doc(eventId);
+
+      const snap =
+        await ref.get();
+
+      if (!snap.exists) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "event_not_found",
+          message:
+            "الحدث المطلوب غير موجود."
+        });
+      }
+
+      const ev =
+        snap.data() || {};
+
+      const owner =
+        String(
+          ev.userId ||
+          ev.ownerUid ||
+          ""
+        ).trim();
+
+      if (
+        !owner ||
+        owner !== uid
+      ) {
+        return res.status(403).json({
+          ok: false,
+          error:
+            "event_forbidden",
+          message:
+            "لا يمكنك تعديل حدث لا يخص حسابك."
+        });
+      }
+
+      return res.json({
+        ok: true,
+        event:
+          eventsPageEditPublicEventSrv(
+            snap.id,
+            ev
+          )
+      });
+
+    } catch (e) {
+      console.error(
+        "events-page-event-load failed",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error:
+          "events_page_event_load_failed",
+        message:
+          "تعذّر تحميل بيانات الحدث للتعديل الآن."
+      });
+    }
+  }
+);
 app.get("/api/events-page/list", requireUserId, async (req, res) => {
   try {
     if (!db) {
