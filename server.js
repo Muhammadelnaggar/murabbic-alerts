@@ -16184,14 +16184,87 @@ function eventsPageEditSourceSrv(ev = {}) {
   ).trim();
 }
 
+function eventsPageEditOriginSrv(ev = {}) {
+  const details =
+    ev.details &&
+    typeof ev.details === "object"
+      ? ev.details
+      : {};
 
+  const sourceLower =
+    eventsPageEditSourceSrv(ev)
+      .toLowerCase();
+
+  const importedByLower =
+    String(
+      ev.importedBy ||
+      details.importedBy ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const importMode =
+    String(
+      ev.importMode ||
+      details.importMode ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const isDerivedImportEvent =
+    ev.isDerivedImportEvent === true ||
+    details.isDerivedImportEvent === true;
+
+  if (isDerivedImportEvent) {
+    return "system_derived";
+  }
+
+  const isImportedSeed =
+    ev.isImportedSeed === true ||
+    details.isImportedSeed === true ||
+    importMode === "seed_history";
+
+  if (isImportedSeed) {
+    return "import_seed";
+  }
+
+  const isImportedHistory =
+    ev.isImportedHistory === true ||
+    details.isImportedHistory === true ||
+    importMode === "operational_history";
+
+  if (isImportedHistory) {
+    return "import_history";
+  }
+
+  const looksImported =
+    importedByLower === "herd_import_v2" ||
+    sourceLower.includes("herd-import-v2");
+
+  if (looksImported) {
+    return "import_legacy";
+  }
+
+  return "manual";
+}
 
 function eventsPageEditPolicySrv(ev = {}) {
-  const typeKey = eventsPageNormalizeTypeKeySrv(ev);
-  const source = eventsPageEditSourceSrv(ev);
-  const sourceLower = source.toLowerCase();
+  const typeKey =
+    eventsPageNormalizeTypeKeySrv(ev);
+
+  const source =
+    eventsPageEditSourceSrv(ev);
+
+  const sourceLower =
+    source.toLowerCase();
+
+  const origin =
+    eventsPageEditOriginSrv(ev);
 
   const systemDerived =
+    origin === "system_derived" ||
     typeKey === "ovsynch_step" ||
     typeKey === "embryonic_loss" ||
     sourceLower.includes(":auto-") ||
@@ -16203,7 +16276,35 @@ function eventsPageEditPolicySrv(ev = {}) {
       editable: false,
       mode: "system_derived",
       writer: "",
-      reason: "هذا الحدث تم إنشاؤه تلقائيًا بواسطة مُرَبِّيك ولا يُعدّل يدويًا من سجل الأحداث."
+      origin,
+      reason:
+        "هذا الحدث تم إنشاؤه تلقائيًا بواسطة مُرَبِّيك ولا يُعدّل يدويًا من سجل الأحداث."
+    };
+  }
+
+  // seed_history ليس حدثًا تشغيليًا أدخله المستخدم.
+  // هو علامة تاريخية تأسيسية مولّدة من Snapshot الاستيراد.
+  if (origin === "import_seed") {
+    return {
+      editable: false,
+      mode: "import_seed_baseline",
+      writer: "",
+      origin,
+      reason:
+        "هذا سجل تأسيسي مستورد بُني من بيانات الحالة عند بدء مُرَبِّيك، وليس حدثًا تشغيليًا مسجلًا يدويًا؛ لذلك لا يُعدّل من سجل الأحداث."
+    };
+  }
+
+  // استيراد قديم غير معروف هل هو Seed أم History تشغيلي.
+  // الأمان هنا أهم من فتح تعديل غير معلوم الأصل.
+  if (origin === "import_legacy") {
+    return {
+      editable: false,
+      mode: "import_legacy_review",
+      writer: "",
+      origin,
+      reason:
+        "هذا سجل مستورد قديم ولا يحمل تعريفًا كافيًا لمصدره التشغيلي؛ لذلك لا يُفتح للتعديل قبل التحقق من أصله."
     };
   }
 
@@ -16212,7 +16313,9 @@ function eventsPageEditPolicySrv(ev = {}) {
       editable: false,
       mode: "protocol",
       writer: "",
-      reason: "حدث التزامن مرتبط ببروتوكول ومهام تشغيلية، لذلك لا يُعدّل مباشرة من سجل الأحداث."
+      origin,
+      reason:
+        "حدث التزامن مرتبط ببروتوكول ومهام تشغيلية، لذلك لا يُعدّل مباشرة من سجل الأحداث."
     };
   }
 
@@ -16221,51 +16324,76 @@ function eventsPageEditPolicySrv(ev = {}) {
       editable: false,
       mode: "program_linked",
       writer: "",
-      reason: "التحصين مرتبط ببرنامج التحصينات ومهامه، لذلك يُصحح من مسار البرنامج وليس كتعديل حر من سجل الأحداث."
+      origin,
+      reason:
+        "التحصين مرتبط ببرنامج التحصينات ومهامه، لذلك يُصحح من مسار البرنامج وليس كتعديل حر من سجل الأحداث."
     };
   }
 
   if (typeKey === "calving") {
     return {
       editable: false,
-      mode: "structural",
+      mode: "structural_writer_pending",
       writer: "",
-      reason: "الولادة حدث هيكلي يغيّر الأم والموسم وقد ينشئ مواليد، لذلك لا تُعدّل كتعديل مباشر من سجل الأحداث."
+      origin,
+      reason:
+        "الولادة المسجلة يدويًا تحتاج كاتب تصحيح يعيد مصالحة الأم والموسم والمواليد بأمان؛ لذلك لا تُفتح للتعديل قبل ربط هذا الكاتب."
     };
   }
 
   if (typeKey === "abortion") {
     return {
       editable: false,
-      mode: "structural",
+      mode: "structural_writer_pending",
       writer: "",
-      reason: "الإجهاض يغيّر دورة الحيوان وحالته التناسلية، لذلك لا يُعدّل مباشرة من سجل الأحداث."
+      origin,
+      reason:
+        "الإجهاض يحتاج كاتب تصحيح يعيد مصالحة دورة الحيوان وحالته التناسلية بأمان؛ لذلك لا يُفتح للتعديل قبل ربط هذا الكاتب."
     };
   }
 
-  if (["sale", "death"].includes(typeKey)) {
+  if (
+    [
+      "sale",
+      "death"
+    ].includes(typeKey)
+  ) {
     return {
       editable: false,
       mode: "archived_operation",
       writer: "",
-      reason: "البيع والنفوق ينقلان الحيوان وأحداثه إلى الأرشيف، لذلك لا يُعدّلان من سجل الأحداث النشط."
+      origin,
+      reason:
+        "البيع والنفوق ينقلان الحيوان وأحداثه إلى الأرشيف، لذلك لا يُعدّلان من سجل الأحداث النشط."
     };
   }
 
-  if (["bcs_eval", "feces_eval", "milking_traits_eval"].includes(typeKey)) {
+  if (
+    [
+      "bcs_eval",
+      "feces_eval",
+      "milking_traits_eval"
+    ].includes(typeKey)
+  ) {
     return {
       editable: false,
       mode: "evaluation_result",
       writer: "",
-      reason: "نتيجة التقييم تُصحح من مسار التقييم العلمي المخصص، وليس بتعديل سجل النتيجة يدويًا."
+      origin,
+      reason:
+        "نتيجة التقييم تُصحح من مسار التقييم العلمي المخصص، وليس بتعديل سجل النتيجة يدويًا."
     };
   }
 
   if (typeKey === "nutrition") {
     return {
       editable: true,
-      mode: "dedicated_writer",
+      mode:
+        origin === "import_history"
+          ? "historical_correction"
+          : "dedicated_writer",
       writer: "nutrition",
+      origin,
       reason: ""
     };
   }
@@ -16274,52 +16402,72 @@ function eventsPageEditPolicySrv(ev = {}) {
     typeKey === "pregnancy_diagnosis" &&
     (
       pregnancyDiagnosisIsConfirmation120Srv(ev) ||
-      String(ev.linkedEmbryonicLossEventId || "").trim()
+      String(
+        ev.linkedEmbryonicLossEventId ||
+        ""
+      ).trim()
     )
   ) {
     return {
       editable: false,
       mode: "linked_operation",
       writer: "",
-      reason: "تأكيد الحمل المرتبط بفقد جنيني عملية مترابطة، لذلك لا يُعدّل كتسجيل منفرد من سجل الأحداث."
+      origin,
+      reason:
+        "تأكيد الحمل المرتبط بفقد جنيني عملية مترابطة، لذلك لا يُعدّل كتسجيل منفرد من سجل الأحداث."
     };
   }
 
   if (
     typeKey === "insemination" &&
-    String(ev.linkedEmbryonicLossEventId || "").trim()
+    String(
+      ev.linkedEmbryonicLossEventId ||
+      ""
+    ).trim()
   ) {
     return {
       editable: false,
       mode: "linked_operation",
       writer: "",
-      reason: "هذا التلقيح مرتبط بحدث فقد جنيني مولّد آليًا، لذلك لا يُعدّل كتسجيل منفرد من سجل الأحداث."
+      origin,
+      reason:
+        "هذا التلقيح مرتبط بحدث فقد جنيني مولّد آليًا، لذلك لا يُعدّل كتسجيل منفرد من سجل الأحداث."
     };
   }
 
-  const supported = new Set([
-    "uterine_check",
-    "hoof_trimming",
-    "supernumerary_teat_removal",
-    "dehorning",
-    "lameness",
-    "mastitis",
-    "health",
-    "weaning",
-    "cull",
-    "heat",
-    "daily_milk",
-    "close_up",
-    "dry_off",
-    "insemination",
-    "pregnancy_diagnosis"
-  ]);
+  const supported =
+    new Set([
+      "uterine_check",
+      "hoof_trimming",
+      "supernumerary_teat_removal",
+      "dehorning",
+      "lameness",
+      "mastitis",
+      "health",
+      "weaning",
+      "cull",
+      "heat",
+      "daily_milk",
+      "close_up",
+      "dry_off",
+      "insemination",
+      "pregnancy_diagnosis"
+    ]);
 
   if (supported.has(typeKey)) {
     return {
       editable: true,
-      mode: "manual_correction",
-      writer: "events_page_correction",
+
+      mode:
+        origin === "import_history"
+          ? "historical_correction"
+          : "manual_correction",
+
+      writer:
+        "events_page_correction",
+
+      origin,
+
       reason: ""
     };
   }
@@ -16328,9 +16476,12 @@ function eventsPageEditPolicySrv(ev = {}) {
     editable: false,
     mode: "writer_pending",
     writer: "",
-    reason: "تعديل هذا النوع لم يُربط بعد بكاتب تصحيح آمن في مُرَبِّيك."
+    origin,
+    reason:
+      "تعديل هذا النوع لم يُربط بعد بكاتب تصحيح آمن في مُرَبِّيك."
   };
 }
+
 function eventsPageEditTargetSrv(docId, ev = {}) {
   const eventId = String(docId || "").trim();
   const animalNumber = eventsPageEventAnimalNumberSrv(ev);
