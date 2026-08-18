@@ -16614,9 +16614,27 @@ function eventsPageEditPublicEventSrv(
     typeLabel: eventsPageTypeLabelSrv(ev),
     details: eventsPageDetailsSrv(ev),
     editPolicy: policy,
-    edit: eventsPageEditTargetSrv(docId, ev),
+edit: eventsPageEditTargetSrv(docId, ev),
 
-    data: {
+audit: {
+  edited:
+    Number(ev.editCount || 0) > 0 ||
+    Number(ev.editedAtMs || 0) > 0,
+
+  editCount:
+    Number(ev.editCount || 0) || 0,
+
+  editedAtMs:
+    Number(ev.editedAtMs || 0) || null,
+
+  editedByName:
+    String(ev.editedByName || "").trim(),
+
+  correctionReason:
+    String(ev.lastCorrectionReason || "").trim()
+},
+
+data: {
       eventDate: eventsPageListDateSrv(ev) || "",
       notes: String(ev.notes ?? ev.note ?? "").trim(),
       vet: String(ev.vet ?? ev.examiner ?? "").trim(),
@@ -19419,8 +19437,20 @@ eventPatch.lastMilkCorrectionReason =
       }
 
       const now = admin.firestore.FieldValue.serverTimestamp();
-      const editedBy = String(req.authSession?.uid || uid).trim();
-      const subjectCollection = subject._collection === "calves" ? "calves" : "animals";
+const editedAtMs = Date.now();
+
+const editedBy =
+  String(req.authSession?.uid || uid).trim();
+
+const editedByName =
+  String(
+    req.authSession?.user?.name ||
+    req.authSession?.decoded?.name ||
+    ""
+  ).trim();
+
+const subjectCollection =
+  subject._collection === "calves" ? "calves" : "animals";
       const subjectRef = db.collection(subjectCollection).doc(subject.id);
       const auditRef = eventRef.collection("edits").doc();
       const batch = db.batch();
@@ -19428,9 +19458,10 @@ eventPatch.lastMilkCorrectionReason =
       batch.set(eventRef, {
         ...eventPatch,
         editedAt: now,
-        editedAtMs: Date.now(),
-        editedBy,
-        lastCorrectionReason: correctionReason,
+editedAtMs,
+editedBy,
+editedByName,
+lastCorrectionReason: correctionReason,
         editCount:
         admin.firestore.FieldValue.increment(1)
       }, { merge: true });
@@ -19472,7 +19503,8 @@ dependentCorrections:
     : null,
 
 editedBy,
-        createdAt: now,
+editedByName,
+createdAt: now,
         source: "server:/api/events-page/event/correct"
       });
 
