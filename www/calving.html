@@ -239,6 +239,7 @@ const isEditMode =
   const saveBtn = document.getElementById("saveBtn");
 
   let requiresNewMotherNumber = false;
+  let loadedOriginalCalfCount = 0;
 
   function toISO(s) {
     const v = String(s || "").trim();
@@ -309,19 +310,31 @@ function lockEditIdentityFields() {
   form
     .querySelectorAll('input[name="calfCount"]')
     .forEach(r => {
-      r.disabled = true;
+      r.disabled = false;
     });
 
+  if (kindEl) {
+    Array.from(kindEl.options).forEach(opt => {
+      const value = String(opt.value || "").trim();
+      if (!value) return;
+
+      opt.disabled =
+        loadedOriginalCalfCount > 0
+          ? value === "نافقة"
+          : value !== "نافقة";
+    });
+  }
+
   [
-    "calfId",
-    "calf2Id",
-    "calf3Id"
-  ].forEach(id => {
-    const el =
-      document.getElementById(id);
+    ["calfId", 1],
+    ["calf2Id", 2],
+    ["calf3Id", 3]
+  ].forEach(([id, index]) => {
+    const el = document.getElementById(id);
 
     if (el) {
-      el.readOnly = true;
+      el.readOnly =
+        index <= loadedOriginalCalfCount;
     }
   });
 }
@@ -422,6 +435,21 @@ async function loadEditEvent() {
 
     const d =
       ev.data || {};
+      const parsedOriginalCalfCount =
+  Number(d.calfCount || 0);
+
+loadedOriginalCalfCount =
+  [1, 2, 3].includes(parsedOriginalCalfCount)
+    ? parsedOriginalCalfCount
+    : (
+        String(d.calvingKind || "").trim() === "نافقة"
+          ? 0
+          : [
+              d.calfId,
+              d.calf2Id,
+              d.calf3Id
+            ].filter(Boolean).length
+      );
 
     animalEl.value =
       normalizeDigits(
@@ -849,17 +877,17 @@ async function loadEditEvent() {
 
     if (calfId1) {
       calfId1.required = enableLive;
-      if (!enableLive) calfId1.value = "";
+      if (!enableLive && !isEditMode) calfId1.value = "";
     }
 
     calf1SexRadios.forEach((r, i) => {
       r.required = enableLive && i === 0;
-      if (!enableLive) r.checked = false;
+      if (!enableLive && !isEditMode) r.checked = false;
     });
 
     calf1FateRadios.forEach((r, i) => {
       r.required = enableLive && i === 0;
-      if (!enableLive) r.checked = false;
+      if (!enableLive && !isEditMode) r.checked = false;
     });
 
     [["offspring2", 2], ["offspring3", 3]].forEach(([id, idx]) => {
@@ -874,17 +902,17 @@ async function loadEditEvent() {
 
       if (idEl) {
         idEl.required = visible;
-        if (!visible) idEl.value = "";
+        if (!visible && !isEditMode) idEl.value = "";
       }
 
       sexRadios.forEach((r, i) => {
         r.required = visible && i === 0;
-        if (!visible) r.checked = false;
+        if (!visible && !isEditMode) r.checked = false;
       });
 
       fateRadios.forEach((r, i) => {
         r.required = visible && i === 0;
-        if (!visible) r.checked = false;
+        if (!visible && !isEditMode) r.checked = false;
       });
     });
   }
