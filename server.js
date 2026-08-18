@@ -15858,10 +15858,28 @@ function eventsPageRowSrv(docId, ev = {}) {
     animalNumber,
     typeKey,
     typeLabel: eventsPageTypeLabelSrv(ev),
-    
     details: eventsPageDetailsSrv(ev),
-    edit: eventsPageEditTargetSrv(docId, ev),
-    animalCardUrl: animalNumber
+edit: eventsPageEditTargetSrv(docId, ev),
+
+audit: {
+  edited:
+    Number(ev.editCount || 0) > 0 ||
+    Number(ev.editedAtMs || 0) > 0,
+
+  editCount:
+    Number(ev.editCount || 0) || 0,
+
+  editedAtMs:
+    Number(ev.editedAtMs || 0) || null,
+
+  editedByName:
+    String(ev.editedByName || "").trim(),
+
+  correctionReason:
+    String(ev.lastCorrectionReason || "").trim()
+},
+
+animalCardUrl: animalNumber
       ? `/cow-card.html?number=${encodeURIComponent(animalNumber)}`
       : "",
     addEventUrl: animalNumber
@@ -16344,15 +16362,19 @@ function eventsPageEditPolicySrv(ev = {}) {
 }
 
   if (typeKey === "abortion") {
-    return {
-      editable: false,
-      mode: "structural_writer_pending",
-      writer: "",
-      origin,
-      reason:
-        "الإجهاض يحتاج كاتب تصحيح يعيد مصالحة دورة الحيوان وحالته التناسلية بأمان؛ لذلك لا يُفتح للتعديل قبل ربط هذا الكاتب."
-    };
-  }
+  return {
+    editable: true,
+
+    mode:
+      origin === "import_history"
+        ? "historical_correction"
+        : "manual_correction",
+
+    writer: "events_page_correction",
+    origin,
+    reason: ""
+  };
+}
 
   if (
     [
@@ -16439,18 +16461,8 @@ function eventsPageEditPolicySrv(ev = {}) {
 
   const supported =
     new Set([
-      "uterine_check",
-      "hoof_trimming",
-      "supernumerary_teat_removal",
-      "dehorning",
-      "lameness",
-      "mastitis",
-      "health",
-      "weaning",
-      "cull",
       "heat",
       "daily_milk",
-      "close_up",
       "dry_off",
       "insemination",
       "pregnancy_diagnosis"
@@ -16492,6 +16504,7 @@ function eventsPageEditTargetSrv(docId, ev = {}) {
 
   const pageByType = {
     calving: "calving.html",
+    abortion: "abortion.html",
     uterine_check: "uterine-check.html",
     supernumerary_teat_removal: "supernumerary-teat-removal.html",
     dehorning: "dehorning.html",
@@ -16652,7 +16665,26 @@ data: {
       pregnancyMethod: String(ev.method ?? ev.pregnancyMethod ?? "").trim(),
       pregnancyResult: String(ev.result ?? ev.pregnancyResult ?? "").trim(),
       pregnancyCheckType: String(ev.pregnancyCheckType ?? ev.checkType ?? "").trim(),
+gestationDays:
+  Number.isFinite(Number(ev.gestationDays))
+    ? Number(ev.gestationDays)
+    : null,
 
+abortionAgeMonths:
+  Number.isFinite(Number(ev.abortionAgeMonths))
+    ? Number(ev.abortionAgeMonths)
+    : null,
+
+probableCause:
+  String(ev.probableCause ?? "").trim(),
+
+probableCauses:
+  Array.isArray(ev.probableCauses)
+    ? ev.probableCauses
+    : [],
+
+abortionDiagnosticNote:
+  String(ev.abortionDiagnosticNote ?? "").trim(),
 calvingKind: String(ev.calvingKind ?? "").trim(),
 calfCount: String(ev.calfCount ?? "").trim(),
 
@@ -17218,7 +17250,81 @@ function eventsPageCorrectionReproPatchSrv(
 
   return patch;
 }
+function eventsPageCorrectionAbortionSubjectPatchSrv(
+  rows = [],
+  subjectData = {},
+  oldEvent = {}
+) {
+  const abortions =
+    (Array.isArray(rows) ? rows : [])
+      .filter(
+        row =>
+          eventsPageNormalizeTypeKeySrv(
+            row.data || {}
+          ) === "abortion"
+      )
+      .filter(
+        row =>
+          eventsPageListDateSrv(
+            row.data || {}
+          )
+      )
+      .sort(eventsPageCorrectionCompareSrv);
 
+  const latest =
+    abortions.at(-1) || null;
+
+  if (!latest) {
+    return {};
+  }
+
+  const latestDate =
+    eventsPageListDateSrv(
+      latest.data || {}
+    );
+
+  const oldDate =
+    eventsPageListDateSrv(oldEvent);
+
+  const snapshotDate =
+    eventsPageCorrectionDateSrv(
+      subjectData.lastAbortionDate ||
+      subjectData.abortionDate ||
+      ""
+    );
+
+  if (
+    snapshotDate &&
+    snapshotDate !== oldDate &&
+    latestDate < snapshotDate
+  ) {
+    return {};
+  }
+
+  const ageMonths =
+    Number(
+      latest.data?.abortionAgeMonths
+    );
+
+  return {
+    lastAbortionDate: latestDate,
+    lastAbortionEventId: latest.id,
+
+    abortionAgeMonths:
+      Number.isFinite(ageMonths)
+        ? ageMonths
+        : null,
+
+    lastPregnancyLossClass:
+      Number.isFinite(ageMonths)
+        ? (
+            ageMonths >= 5
+              ? "late"
+              : "early"
+          )
+        : null
+  };
+}
 function eventsPageCorrectionUterinePatchSrv(rows = []) {
   const del = eventsPageCorrectionDeleteSrv;
   const uterineRows = (Array.isArray(rows) ? rows : [])
@@ -17442,7 +17548,7 @@ function eventsPageCorrectionConflictSrv(
     return eventsPageNormalizeTypeKeySrv(ev) === typeKey && eventsPageListDateSrv(ev) === date;
   });
 
-  if (["calving", "heat", "daily_milk", "hoof_trimming", "pregnancy_diagnosis"].includes(typeKey) && same.length) {
+ if (["calving", "abortion", "heat", "daily_milk", "hoof_trimming", "pregnancy_diagnosis"].includes(typeKey) && same.length) {
     return "يوجد حدث آخر من النوع نفسه للحيوان في التاريخ المحدد.";
   }
 
@@ -18240,9 +18346,9 @@ if (!correctionReason) {
 
       if (
         [
-          "uterine_check", "heat", "insemination", "pregnancy_diagnosis",
-          "daily_milk", "dry_off", "close_up"
-        ].includes(typeKey) &&
+  "uterine_check", "heat", "insemination", "pregnancy_diagnosis",
+  "abortion", "daily_milk", "dry_off", "close_up"
+].includes(typeKey)
         !eventsPageCorrectionDateInsideBoundsSrv(eventDate, bounds)
       ) {
         return res.status(409).json({
@@ -18940,7 +19046,202 @@ if (newChildren.length > oldChildren.length) {
       `${uid}|calving|${oldEvent.animalId || animalNumber}|${eventDate}`
   };
 }
+else if (typeKey === "abortion") {
+  const species =
+    calvingNormalizeSpeciesSrv(
+      oldEvent.species ||
+      subject.data?.species ||
+      subject.data?.animalTypeAr ||
+      subject.data?.animalType ||
+      subject.data?.animaltype ||
+      ""
+    );
 
+  const lastFertileInseminationDate =
+    eventsPageCorrectionDateSrv(
+      oldEvent.lastFertileInseminationDate ||
+      oldEvent.lastInseminationDate ||
+      ""
+    );
+
+  if (!lastFertileInseminationDate) {
+    return res.status(409).json({
+      ok: false,
+      error: "abortion_linked_insemination_missing",
+      message:
+        "❌ لا يمكن تعديل هذا الإجهاض بأمان لأن تاريخ التلقيح المُخصِّب المرتبط به غير محفوظ."
+    });
+  }
+
+  const gestationDays =
+    calvingDaysBetweenSrv(
+      lastFertileInseminationDate,
+      eventDate
+    );
+
+  const minCalvingDays =
+    Number(
+      CALVING_THRESHOLDS_SRV[species]
+        ?.minGestationDays
+    );
+
+  if (
+    !Number.isFinite(gestationDays) ||
+    gestationDays < 0
+  ) {
+    return res.status(400).json({
+      ok: false,
+      error: "abortion_before_linked_insemination",
+      message:
+        "❌ تاريخ الإجهاض المصحح لا يمكن أن يسبق تاريخ التلقيح المُخصِّب المرتبط به."
+    });
+  }
+
+  if (
+    !Number.isFinite(minCalvingDays) ||
+    minCalvingDays <= 0
+  ) {
+    return res.status(400).json({
+      ok: false,
+      error: "abortion_species_invalid",
+      message:
+        "❌ لم أتعرف على نوع الحيوان، لذلك لا يمكن التحقق من عمر الحمل عند تعديل الإجهاض."
+    });
+  }
+
+  if (gestationDays >= minCalvingDays) {
+    return res.status(409).json({
+      ok: false,
+      error: "abortion_correction_reaches_calving_range",
+      message:
+        `❌ عمر الحمل في التاريخ المصحح ${gestationDays} يومًا، وهو ضمن نطاق الولادة لأن الحد الأدنى ${minCalvingDays} يومًا.`
+    });
+  }
+
+  const blockingRows =
+    docs
+      .filter(
+        item =>
+          String(item.id || "").trim() !==
+          eventId
+      )
+      .map(
+        item => ({
+          id: item.id,
+          data: item.data || {}
+        })
+      )
+      .filter(row => {
+        const d =
+          eventsPageListDateSrv(
+            row.data || {}
+          );
+
+        if (
+          !d ||
+          d <= lastFertileInseminationDate ||
+          d > eventDate
+        ) {
+          return false;
+        }
+
+        const key =
+          eventsPageNormalizeTypeKeySrv(
+            row.data || {}
+          );
+
+        if (
+          [
+            "calving",
+            "abortion",
+            "heat",
+            "embryonic_loss",
+            "insemination"
+          ].includes(key)
+        ) {
+          return true;
+        }
+
+        if (key === "pregnancy_diagnosis") {
+          return (
+            normalizePregnancyResultSrv(
+              row.data?.result ||
+              row.data?.pregnancyResult ||
+              ""
+            ) === "فارغة"
+          );
+        }
+
+        return false;
+      })
+      .sort(eventsPageCorrectionCompareSrv);
+
+  if (blockingRows.length) {
+    const blocker =
+      blockingRows[0];
+
+    const blockerType =
+      eventsPageTypeLabelSrv(
+        blocker.data || {}
+      );
+
+    const blockerDate =
+      eventsPageListDateSrv(
+        blocker.data || {}
+      );
+
+    return res.status(409).json({
+      ok: false,
+      error: "abortion_correction_crosses_pregnancy_dependency",
+      message:
+        `❌ لا يمكن نقل الإجهاض إلى ${eventDate} لأن هناك حدث «${blockerType}» بتاريخ ${blockerDate} يفصل بين التلقيح المُخصِّب وهذا التاريخ.`
+    });
+  }
+
+  const derived =
+    calcAbortionAgeAndCauseSrv(
+      lastFertileInseminationDate,
+      eventDate
+    );
+
+  eventPatch = {
+    ...eventPatch,
+
+    species,
+
+    reproductiveStatusBefore:
+      String(
+        oldEvent.reproductiveStatusBefore ||
+        ""
+      ).trim(),
+
+    lastInseminationDate:
+      lastFertileInseminationDate,
+
+    lastFertileInseminationDate,
+
+    gestationDays:
+      derived.gestationDays,
+
+    abortionAgeMonths:
+      derived.abortionAgeMonths,
+
+    probableCause:
+      derived.probableCause,
+
+    probableCauses:
+      derived.probableCauses || [],
+
+    abortionDiagnosticMatrix:
+      derived.abortionDiagnosticMatrix || [],
+
+    abortionDiagnosticNote:
+      derived.abortionDiagnosticNote || "",
+
+    idempotencyKey:
+      `${uid}|${animalNumber}|abortion|${eventDate}`
+  };
+}
 else if (
   typeKey ===
   "uterine_check"
@@ -19546,19 +19847,35 @@ eventPatch.lastMilkCorrectionReason =
       const rows = eventsPageCorrectionRowsWithEditSrv(docs, eventId, correctedEvent);
       let subjectPatch = {};
 
-      if (
+if (
   [
     "calving",
+    "abortion",
     "heat",
     "insemination",
     "pregnancy_diagnosis"
   ].includes(typeKey)
 ) {
-        subjectPatch = {
-          ...subjectPatch,
-          ...eventsPageCorrectionReproPatchSrv(rows, subject.data || {}, oldEvent)
-        };
-      }
+  subjectPatch = {
+    ...subjectPatch,
+    ...eventsPageCorrectionReproPatchSrv(
+      rows,
+      subject.data || {},
+      oldEvent
+    )
+  };
+}
+
+if (typeKey === "abortion") {
+  subjectPatch = {
+    ...subjectPatch,
+    ...eventsPageCorrectionAbortionSubjectPatchSrv(
+      rows,
+      subject.data || {},
+      oldEvent
+    )
+  };
+}
 
       if (typeKey === "uterine_check") {
         subjectPatch = {
@@ -19588,6 +19905,7 @@ eventPatch.lastMilkCorrectionReason =
         };
       }
       if (typeKey === "calving") {
+
   subjectPatch = {
     ...subjectPatch,
     ...eventsPageCorrectionCalvingSubjectPatchSrv(
@@ -19788,9 +20106,9 @@ createdAt: now,
       if (
         typeof scheduleGroupsRebuildSrv === "function" &&
         [
-          "calving", "heat", "insemination", "pregnancy_diagnosis", "daily_milk",
-          "dry_off", "close_up", "weaning", "cull"
-        ].includes(typeKey)
+  "calving", "abortion", "heat", "insemination", "pregnancy_diagnosis", "daily_milk",
+  "dry_off", "close_up", "weaning", "cull"
+].includes(typeKey)
       ) {
         scheduleGroupsRebuildSrv(uid, `event_correction_${typeKey}`);
       }
@@ -56538,7 +56856,172 @@ return {
       rejected: []
     });
   }
-});
+});// ============================================================
+//                 ABORTION ANIMAL UPDATE — SERVER WRITER
+//                 نفس Transaction الخاصة بحفظ الإجهاض
+// ============================================================
+async function updateAnimalByAbortionSrv(
+  ev = {},
+  resolvedAnimal = null,
+  writer = null
+) {
+  const tenant =
+    String(
+      ev.userId ||
+      ""
+    ).trim();
+
+  const animalNumber =
+    calvingNormDigitsOnlySrv(
+      ev.animalNumber ||
+      ev.number ||
+      ""
+    );
+
+  const eventDate =
+    String(
+      ev.eventDate ||
+      ev.date ||
+      ""
+    )
+      .trim()
+      .slice(0, 10);
+
+  if (
+    !tenant ||
+    !animalNumber ||
+    !calvingIsDateSrv(eventDate)
+  ) {
+    const err =
+      new Error(
+        "abortion_update_missing_subject"
+      );
+
+    err.code =
+      "abortion_update_missing_subject";
+
+    if (writer) {
+      throw err;
+    }
+
+    return null;
+  }
+
+  const animal =
+    resolvedAnimal?.id
+      ? resolvedAnimal
+      : await fetchAnimalByNumberForCalvingGateSrv(
+          tenant,
+          animalNumber
+        );
+
+  if (!animal?.id) {
+    const err =
+      new Error(
+        "abortion_update_animal_not_found"
+      );
+
+    err.code =
+      "abortion_update_animal_not_found";
+
+    if (writer) {
+      throw err;
+    }
+
+    return null;
+  }
+
+  const collectionName =
+    animal._collection === "calves"
+      ? "calves"
+      : "animals";
+
+  const eventId =
+    String(
+      ev.eventId ||
+      ""
+    ).trim();
+
+  const ageMonths =
+    Number(
+      ev.abortionAgeMonths
+    );
+
+  const patch = {
+    reproductiveStatus:
+      "إجهاض",
+
+    lastAbortionDate:
+      eventDate,
+
+    ...(eventId
+      ? {
+          lastAbortionEventId:
+            eventId
+        }
+      : {}),
+
+    abortionAgeMonths:
+      Number.isFinite(ageMonths)
+        ? ageMonths
+        : null,
+
+    lastPregnancyLossClass:
+      Number.isFinite(ageMonths)
+        ? (
+            ageMonths >= 5
+              ? "late"
+              : "early"
+          )
+        : null,
+
+    pregnancyDays:
+      null,
+
+    updatedAt:
+      admin.firestore.FieldValue
+        .serverTimestamp()
+  };
+
+  // التابع الذي أجهض يظل في حالة «إجهاض» أثناء فترة الاستشفاء.
+  // الـ maintenance الحالي يعيده «تحت التلقيح» بعد اكتمال 40 يومًا.
+  if (collectionName === "calves") {
+    patch.followerStatus =
+      "إجهاض";
+
+    patch.status =
+      "إجهاض";
+  }
+
+  const ref =
+    db
+      .collection(collectionName)
+      .doc(animal.id);
+
+  if (
+    writer &&
+    typeof writer.set === "function"
+  ) {
+    writer.set(
+      ref,
+      patch,
+      { merge: true }
+    );
+  } else {
+    await ref.set(
+      patch,
+      { merge: true }
+    );
+  }
+
+  return {
+    ok: true,
+    collection: collectionName,
+    animalId: animal.id,
+    animalNumber,
+    eventDate
+  };
+}
 // ============================================================
 //                 API: ABORTION GATE
 //                 تحقق الإجهاض من السيرفر فقط — بدون حفظ
@@ -56911,10 +57394,13 @@ const txResult =
     tx.set(evRef, payload);
 
     await updateAnimalByAbortionSrv(
-      payload,
-      animal,
-      tx
-    );
+  {
+    ...payload,
+    eventId: evRef.id
+  },
+  animal,
+  tx
+);
 
     return { created: true };
   });
