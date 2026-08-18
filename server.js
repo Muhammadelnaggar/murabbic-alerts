@@ -15873,10 +15873,13 @@ audit: {
     Number(ev.editedAtMs || 0) || null,
 
   editedByName:
-    String(ev.editedByName || "").trim(),
+  String(ev.editedByName || "").trim(),
 
-  correctionReason:
-    String(ev.lastCorrectionReason || "").trim()
+correctionPerformedBy:
+  String(ev.correctionPerformedBy || "").trim(),
+
+correctionReason:
+  String(ev.lastCorrectionReason || "").trim()
 },
 
 animalCardUrl: animalNumber
@@ -16658,10 +16661,13 @@ audit: {
     Number(ev.editedAtMs || 0) || null,
 
   editedByName:
-    String(ev.editedByName || "").trim(),
+  String(ev.editedByName || "").trim(),
 
-  correctionReason:
-    String(ev.lastCorrectionReason || "").trim()
+correctionPerformedBy:
+  String(ev.correctionPerformedBy || "").trim(),
+
+correctionReason:
+  String(ev.lastCorrectionReason || "").trim()
 },
 
 data: {
