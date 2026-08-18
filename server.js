@@ -16632,7 +16632,44 @@ function eventsPageEditPublicEventSrv(
       pregnancyResult: String(ev.result ?? ev.pregnancyResult ?? "").trim(),
       pregnancyCheckType: String(ev.pregnancyCheckType ?? ev.checkType ?? "").trim(),
 
-      checkStage: String(ev.checkStage ?? "").trim(),
+calvingKind: String(ev.calvingKind ?? "").trim(),
+calfCount: String(ev.calfCount ?? "").trim(),
+
+calf1Sex: String(ev.calf1Sex ?? "").trim(),
+calfId: calvingNormDigitsOnlySrv(ev.calfId ?? ""),
+calf1Fate: String(ev.calf1Fate ?? "").trim(),
+
+calf2Sex: String(ev.calf2Sex ?? "").trim(),
+calf2Id: calvingNormDigitsOnlySrv(ev.calf2Id ?? ""),
+calf2Fate: String(ev.calf2Fate ?? "").trim(),
+
+calf3Sex: String(ev.calf3Sex ?? "").trim(),
+calf3Id: calvingNormDigitsOnlySrv(ev.calf3Id ?? ""),
+calf3Fate: String(ev.calf3Fate ?? "").trim(),
+
+lastFertileInseminationDate: String(
+  ev.lastFertileInseminationDate ??
+  ev.lastInseminationDate ??
+  ""
+).trim().slice(0, 10),
+
+convertedFromFollower:
+  ev.convertedFromFollower === true,
+
+sourceAnimalNumber:
+  calvingNormDigitsOnlySrv(
+    ev.sourceAnimalNumber ??
+    ev.previousFollowerNumber ??
+    ""
+  ),
+
+newMotherNumber:
+  calvingNormDigitsOnlySrv(
+    ev.newMotherNumber ??
+    ""
+  ),
+
+checkStage: String(ev.checkStage ?? "").trim(),
       result: String(ev.result ?? "").trim(),
 
       affectedLeg: String(ev.affectedLeg ?? ev.affectedHoof ?? "").trim(),
