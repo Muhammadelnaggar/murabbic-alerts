@@ -167,7 +167,188 @@ function seasonRangeText(season = {}) {
 
   return '';
 }
+function editedAtText(value) {
+  const ms =
+    Number(value);
 
+  if (
+    !Number.isFinite(ms) ||
+    ms <= 0
+  ) {
+    return '';
+  }
+
+  const d =
+    new Date(ms);
+
+  if (
+    Number.isNaN(
+      d.getTime()
+    )
+  ) {
+    return '';
+  }
+
+  return d.toLocaleString(
+    'ar-EG',
+    {
+      dateStyle: 'short',
+      timeStyle: 'short'
+    }
+  );
+}
+
+function appendEventEditAndAudit(
+  cell,
+  row = {}
+) {
+  const edit =
+    row?.edit || {};
+
+  const audit =
+    row?.audit || {};
+
+  if (
+    edit?.editable === true &&
+    String(edit?.editUrl || '').trim()
+  ) {
+    const tools =
+      document.createElement('div');
+
+    tools.className =
+      'event-edit-tools';
+
+    const editLink =
+      document.createElement('a');
+
+    editLink.className =
+      'event-edit-link';
+
+    editLink.href =
+      String(edit.editUrl).trim();
+
+    editLink.textContent =
+      'تعديل';
+
+    tools.appendChild(
+      editLink
+    );
+
+    cell.appendChild(
+      tools
+    );
+  }
+
+  if (audit?.edited !== true) {
+    return;
+  }
+
+  const auditBox =
+    document.createElement('div');
+
+  auditBox.className =
+    'event-audit';
+
+  const title =
+    document.createElement('span');
+
+  title.className =
+    'event-audit-title';
+
+  title.textContent =
+    'تم تعديل هذا الحدث';
+
+  auditBox.appendChild(
+    title
+  );
+
+  const editedByName =
+    String(
+      audit?.editedByName || ''
+    ).trim();
+
+  if (editedByName) {
+    const line =
+      document.createElement('span');
+
+    line.className =
+      'event-audit-line';
+
+    line.textContent =
+      `حُفظ بواسطة: ${editedByName}`;
+
+    auditBox.appendChild(
+      line
+    );
+  }
+
+  const editedAt =
+    editedAtText(
+      audit?.editedAtMs
+    );
+
+  if (editedAt) {
+    const line =
+      document.createElement('span');
+
+    line.className =
+      'event-audit-line';
+
+    line.textContent =
+      `تاريخ التعديل: ${editedAt}`;
+
+    auditBox.appendChild(
+      line
+    );
+  }
+
+  const correctionReason =
+    String(
+      audit?.correctionReason || ''
+    ).trim();
+
+  if (correctionReason) {
+    const line =
+      document.createElement('span');
+
+    line.className =
+      'event-audit-line';
+
+    line.textContent =
+      `سبب التعديل: ${correctionReason}`;
+
+    auditBox.appendChild(
+      line
+    );
+  }
+
+  const editCount =
+    Number(
+      audit?.editCount || 0
+    );
+
+  if (
+    Number.isFinite(editCount) &&
+    editCount > 1
+  ) {
+    const line =
+      document.createElement('span');
+
+    line.className =
+      'event-audit-line';
+
+    line.textContent =
+      `عدد مرات التعديل: ${editCount}`;
+
+    auditBox.appendChild(
+      line
+    );
+  }
+
+  cell.appendChild(
+    auditBox
+  );
+}
 function appendEventRow(
   frag,
   row = {},
@@ -235,7 +416,12 @@ function appendEventRow(
 
   cDet.appendChild(detScroll);
 
-  tr.append(
+appendEventEditAndAudit(
+  cDet,
+  row
+);
+
+tr.append(
     cDate,
     cType,
     cDet
