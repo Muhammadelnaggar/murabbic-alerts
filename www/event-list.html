@@ -262,26 +262,25 @@ function appendEventEditAndAudit(
     title
   );
 
-  const editedByName =
-    String(
-      audit?.editedByName || ''
-    ).trim();
+  const correctionPerformedBy =
+  String(
+    audit?.correctionPerformedBy || ''
+  ).trim();
 
-  if (editedByName) {
-    const line =
-      document.createElement('span');
+if (correctionPerformedBy) {
+  const line =
+    document.createElement('span');
 
-    line.className =
-      'event-audit-line';
+  line.className =
+    'event-audit-line';
 
-    line.textContent =
-      `حُفظ بواسطة: ${editedByName}`;
+  line.textContent =
+    `القائم بالتعديل: ${correctionPerformedBy}`;
 
-    auditBox.appendChild(
-      line
-    );
-  }
-
+  auditBox.appendChild(
+    line
+  );
+}
   const editedAt =
     editedAtText(
       audit?.editedAtMs
