@@ -16921,78 +16921,222 @@ function eventsPageCorrectionSnapshotMaxDateSrv(data = {}, keys = []) {
     .at(-1) || "";
 }
 
-function eventsPageCorrectionReproPatchSrv(rows = [], subjectData = {}, oldEvent = {}) {
-  const del = eventsPageCorrectionDeleteSrv;
+function eventsPageCorrectionReproPatchSrv(
+  rows = [],
+  subjectData = {},
+  oldEvent = {}
+) {
+  const del =
+    eventsPageCorrectionDeleteSrv;
+
   const patch = {};
 
-  const latestRepro = eventsPageCorrectionLatestSrv(
-    rows,
-    ev => [
-      "calving",
-      "abortion",
-      "heat",
-      "insemination",
-      "pregnancy_diagnosis",
-      "embryonic_loss"
-    ].includes(eventsPageNormalizeTypeKeySrv(ev))
-  );
+  const orderedRows =
+    (Array.isArray(rows) ? rows : [])
+      .filter(
+        row =>
+          eventsPageListDateSrv(
+            row.data || {}
+          )
+      )
+      .sort(
+        eventsPageCorrectionCompareSrv
+      );
 
-  const latestHeat = eventsPageCorrectionLatestSrv(
-    rows,
-    ev => eventsPageNormalizeTypeKeySrv(ev) === "heat"
-  );
+  const latestBoundary =
+    eventsPageCorrectionLatestSrv(
+      orderedRows,
+      ev =>
+        [
+          "calving",
+          "abortion"
+        ].includes(
+          eventsPageNormalizeTypeKeySrv(
+            ev
+          )
+        )
+    );
 
-  const latestAI = eventsPageCorrectionLatestSrv(
-    rows,
-    ev => eventsPageNormalizeTypeKeySrv(ev) === "insemination"
-  );
+  const boundaryDate =
+    latestBoundary
+      ? eventsPageListDateSrv(
+          latestBoundary.data || {}
+        )
+      : "";
 
-  const latestPD = eventsPageCorrectionLatestSrv(
-    rows,
-    ev => eventsPageNormalizeTypeKeySrv(ev) === "pregnancy_diagnosis"
-  );
+  const scopedRows =
+    boundaryDate
+      ? orderedRows.filter(row => {
+          const d =
+            eventsPageListDateSrv(
+              row.data || {}
+            );
+
+          if (!d || d < boundaryDate) {
+            return false;
+          }
+
+          if (d > boundaryDate) {
+            return true;
+          }
+
+          return (
+            !latestBoundary ||
+            eventsPageCorrectionCompareSrv(
+              row,
+              latestBoundary
+            ) >= 0
+          );
+        })
+      : orderedRows;
+
+  const latestRepro =
+    eventsPageCorrectionLatestSrv(
+      scopedRows,
+      ev =>
+        [
+          "calving",
+          "abortion",
+          "heat",
+          "insemination",
+          "pregnancy_diagnosis",
+          "embryonic_loss"
+        ].includes(
+          eventsPageNormalizeTypeKeySrv(
+            ev
+          )
+        )
+    );
+
+  const latestHeat =
+    eventsPageCorrectionLatestSrv(
+      scopedRows,
+      ev =>
+        eventsPageNormalizeTypeKeySrv(
+          ev
+        ) === "heat"
+    );
+
+  const latestAI =
+    eventsPageCorrectionLatestSrv(
+      scopedRows,
+      ev =>
+        eventsPageNormalizeTypeKeySrv(
+          ev
+        ) === "insemination"
+    );
+
+  const latestPD =
+    eventsPageCorrectionLatestSrv(
+      scopedRows,
+      ev =>
+        eventsPageNormalizeTypeKeySrv(
+          ev
+        ) ===
+        "pregnancy_diagnosis"
+    );
 
   if (latestHeat) {
-    patch.lastHeatDate = eventsPageListDateSrv(latestHeat.data);
-    patch.lastHeatTime = String(latestHeat.data.heatTime || "").trim() || del();
-    patch.lastHeatEventId = latestHeat.id;
+    patch.lastHeatDate =
+      eventsPageListDateSrv(
+        latestHeat.data
+      );
+
+    patch.lastHeatTime =
+      String(
+        latestHeat.data.heatTime || ""
+      ).trim() ||
+      del();
+
+    patch.lastHeatEventId =
+      latestHeat.id;
   }
 
   if (latestAI) {
-    patch.lastInseminationDate = eventsPageListDateSrv(latestAI.data);
+    patch.lastInseminationDate =
+      eventsPageListDateSrv(
+        latestAI.data
+      );
 
-    if (String(subjectData.entryType || "").trim().toLowerCase() === "followers") {
+    if (
+      String(
+        subjectData.entryType || ""
+      )
+        .trim()
+        .toLowerCase() ===
+      "followers"
+    ) {
       patch.inseminationSireNumber =
-        String(latestAI.data.semenCode || latestAI.data.sireNumber || "").trim() || del();
+        String(
+          latestAI.data.semenCode ||
+          latestAI.data.sireNumber ||
+          ""
+        ).trim() ||
+        del();
     }
   }
 
   if (latestPD) {
-    const pdResult = normalizePregnancyResultSrv(latestPD.data.result || "");
-    patch.lastDiagnosis = "تشخيص حمل";
-    patch.lastDiagnosisDate = eventsPageListDateSrv(latestPD.data);
-    patch.lastPregnancyDiagnosisDate = eventsPageListDateSrv(latestPD.data);
-    patch.lastPregnancyDiagnosisResult = pdResult || del();
-    patch.lastPregnancyDiagnosisEventId = latestPD.id;
+    const pdResult =
+      normalizePregnancyResultSrv(
+        latestPD.data.result || ""
+      );
+
+    patch.lastDiagnosis =
+      "تشخيص حمل";
+
+    patch.lastDiagnosisDate =
+      eventsPageListDateSrv(
+        latestPD.data
+      );
+
+    patch.lastPregnancyDiagnosisDate =
+      eventsPageListDateSrv(
+        latestPD.data
+      );
+
+    patch.lastPregnancyDiagnosisResult =
+      pdResult ||
+      del();
+
+    patch.lastPregnancyDiagnosisEventId =
+      latestPD.id;
+
     patch.lastPregnancyDiagnosisCheckType =
-      pregnancyDiagnosisCheckTypeSrv(latestPD.data);
+      pregnancyDiagnosisCheckTypeSrv(
+        latestPD.data
+      );
   }
 
-  const latestDate = latestRepro
-    ? eventsPageListDateSrv(latestRepro.data)
-    : "";
+  const latestDate =
+    latestRepro
+      ? eventsPageListDateSrv(
+          latestRepro.data
+        )
+      : "";
 
-  const snapshotMax = eventsPageCorrectionSnapshotMaxDateSrv(subjectData, [
-    "lastCalvingDate",
-    "lastAbortionDate",
-    "lastHeatDate",
-    "lastInseminationDate",
-    "lastPregnancyDiagnosisDate",
-    "lastDiagnosisDate"
-  ]);
+  const snapshotMax =
+    eventsPageCorrectionSnapshotMaxDateSrv(
+      subjectData,
+      [
+        "lastCalvingDate",
+        "lastAbortionDate",
+        "lastHeatDate",
+        "lastInseminationDate",
+        "lastPregnancyDiagnosisDate",
+        "lastDiagnosisDate"
+      ]
+    );
 
-  const oldDate = eventsPageListDateSrv(oldEvent);
-  const snapshotOwnedByOld = snapshotMax && oldDate && snapshotMax === oldDate;
+  const oldDate =
+    eventsPageListDateSrv(
+      oldEvent
+    );
+
+  const snapshotOwnedByOld =
+    snapshotMax &&
+    oldDate &&
+    snapshotMax === oldDate;
 
   if (
     latestRepro &&
@@ -17003,8 +17147,15 @@ function eventsPageCorrectionReproPatchSrv(rows = [], subjectData = {}, oldEvent
       snapshotOwnedByOld
     )
   ) {
-    const status = eventsPageCorrectionReproStatusFromEventSrv(latestRepro.data);
-    if (status) patch.reproductiveStatus = status;
+    const status =
+      eventsPageCorrectionReproStatusFromEventSrv(
+        latestRepro.data
+      );
+
+    if (status) {
+      patch.reproductiveStatus =
+        status;
+    }
   }
 
   return patch;
@@ -17233,7 +17384,7 @@ function eventsPageCorrectionConflictSrv(
     return eventsPageNormalizeTypeKeySrv(ev) === typeKey && eventsPageListDateSrv(ev) === date;
   });
 
-  if (["heat", "daily_milk", "hoof_trimming", "pregnancy_diagnosis"].includes(typeKey) && same.length) {
+  if (["calving", "heat", "daily_milk", "hoof_trimming", "pregnancy_diagnosis"].includes(typeKey) && same.length) {
     return "يوجد حدث آخر من النوع نفسه للحيوان في التاريخ المحدد.";
   }
 
@@ -17312,7 +17463,557 @@ function eventsPageCorrectionLatestAIBeforeSrv(rows = [], eventId = "", date = "
 
   return candidates.at(-1) || null;
 }
+function eventsPageCalvingCorrectionChildrenSrv(ev = {}) {
+  if (
+    String(
+      ev.calvingKind || ""
+    ).trim() === "نافقة"
+  ) {
+    return [];
+  }
 
+  const countRaw =
+    Number(
+      ev.calfCount
+    );
+
+  const count =
+    [1, 2, 3].includes(
+      countRaw
+    )
+      ? countRaw
+      : [
+          ev.calfId,
+          ev.calf2Id,
+          ev.calf3Id
+        ].filter(
+          v =>
+            calvingNormDigitsOnlySrv(
+              v
+            )
+        ).length;
+
+  return [
+    {
+      number:
+        calvingNormDigitsOnlySrv(
+          ev.calfId || ""
+        ),
+      sex:
+        String(
+          ev.calf1Sex || ""
+        ).trim(),
+      fate:
+        String(
+          ev.calf1Fate || ""
+        ).trim()
+    },
+    {
+      number:
+        calvingNormDigitsOnlySrv(
+          ev.calf2Id || ""
+        ),
+      sex:
+        String(
+          ev.calf2Sex || ""
+        ).trim(),
+      fate:
+        String(
+          ev.calf2Fate || ""
+        ).trim()
+    },
+    {
+      number:
+        calvingNormDigitsOnlySrv(
+          ev.calf3Id || ""
+        ),
+      sex:
+        String(
+          ev.calf3Sex || ""
+        ).trim(),
+      fate:
+        String(
+          ev.calf3Fate || ""
+        ).trim()
+    }
+  ].slice(
+    0,
+    Math.max(
+      0,
+      Math.min(
+        3,
+        count
+      )
+    )
+  );
+}
+
+async function eventsPageCalvingCorrectionResolveOffspringSrv(
+  uid,
+  number
+) {
+  const num =
+    calvingNormDigitsOnlySrv(
+      number || ""
+    );
+
+  if (!uid || !num) {
+    return null;
+  }
+
+  const direct =
+    await fetchAnimalByNumberForCalvingGateSrv(
+      uid,
+      num
+    );
+
+  if (direct) {
+    return direct;
+  }
+
+  for (
+    const field
+    of [
+      "previousFollowerNumber",
+      "followerNumberBeforeFirstCalving"
+    ]
+  ) {
+    for (
+      const ownerField
+      of [
+        "userId",
+        "ownerUid"
+      ]
+    ) {
+      try {
+        const snap =
+          await db
+            .collection(
+              "animals"
+            )
+            .where(
+              ownerField,
+              "==",
+              uid
+            )
+            .where(
+              field,
+              "==",
+              num
+            )
+            .limit(1)
+            .get();
+
+        if (!snap.empty) {
+          const d =
+            snap.docs[0];
+
+          return {
+            id:
+              d.id,
+            data:
+              d.data() || {},
+            _collection:
+              "animals"
+          };
+        }
+      } catch (_) {}
+    }
+  }
+
+  for (
+    const ownerField
+    of [
+      "userId",
+      "ownerUid"
+    ]
+  ) {
+    try {
+      const snap =
+        await db
+          .collection(
+            "animals"
+          )
+          .where(
+            ownerField,
+            "==",
+            uid
+          )
+          .where(
+            "previousAnimalNumbers",
+            "array-contains",
+            num
+          )
+          .limit(1)
+          .get();
+
+      if (!snap.empty) {
+        const d =
+          snap.docs[0];
+
+        return {
+          id:
+            d.id,
+          data:
+            d.data() || {},
+          _collection:
+            "animals"
+        };
+      }
+    } catch (_) {}
+  }
+
+  return null;
+}
+
+function eventsPageCalvingCorrectionIdentityNumbersSrv(
+  record = null,
+  originalNumber = ""
+) {
+  const data =
+    record?.data ||
+    {};
+
+  const out =
+    new Set();
+
+  const push =
+    value => {
+      const n =
+        calvingNormDigitsOnlySrv(
+          value || ""
+        );
+
+      if (n) {
+        out.add(n);
+      }
+    };
+
+  push(
+    originalNumber
+  );
+
+  push(
+    data.number
+  );
+
+  push(
+    data.animalNumber
+  );
+
+  push(
+    data.calfNumber
+  );
+
+  push(
+    data.previousFollowerNumber
+  );
+
+  push(
+    data.followerNumberBeforeFirstCalving
+  );
+
+  if (
+    Array.isArray(
+      data.previousAnimalNumbers
+    )
+  ) {
+    data.previousAnimalNumbers
+      .forEach(
+        push
+      );
+  }
+
+  return [
+    ...out
+  ];
+}
+
+async function eventsPageCalvingCorrectionEarliestDependentDateSrv(
+  uid,
+  record,
+  originalNumber
+) {
+  const dates =
+    [];
+
+  const numbers =
+    eventsPageCalvingCorrectionIdentityNumbersSrv(
+      record,
+      originalNumber
+    );
+
+  for (
+    const number
+    of numbers
+  ) {
+    const docs =
+      await eventsPageFetchAnimalEventsSrv(
+        uid,
+        number
+      );
+
+    for (
+      const item
+      of docs
+    ) {
+      const d =
+        eventsPageListDateSrv(
+          item?.data || {}
+        );
+
+      if (d) {
+        dates.push(d);
+      }
+    }
+  }
+
+  const data =
+    record?.data ||
+    {};
+
+  [
+    "weaningDate",
+    "firstCalvingDate",
+    "lastCalvingDate",
+    "lastInseminationDate",
+    "lastHeatDate",
+    "lastPregnancyDiagnosisDate",
+    "lastDiagnosisDate",
+    "dryOffDate",
+    "lastDryOffDate"
+  ].forEach(
+    key => {
+      const d =
+        eventsPageCorrectionDateSrv(
+          data[key]
+        );
+
+      if (d) {
+        dates.push(d);
+      }
+    }
+  );
+
+  return [
+    ...new Set(
+      dates
+    )
+  ]
+    .sort()
+    .at(0) ||
+    "";
+}
+
+function eventsPageCalvingCorrectionMoveBoundsSrv(
+  rows = [],
+  eventId = "",
+  oldDate = ""
+) {
+  const date =
+    eventsPageCorrectionDateSrv(
+      oldDate
+    );
+
+  const otherDates =
+    (
+      Array.isArray(rows)
+        ? rows
+        : []
+    )
+      .filter(
+        row =>
+          String(
+            row?.id || ""
+          ) !==
+          String(
+            eventId || ""
+          )
+      )
+      .map(
+        row =>
+          eventsPageListDateSrv(
+            row?.data || {}
+          )
+      )
+      .filter(
+        Boolean
+      )
+      .sort();
+
+  return {
+    sameDay:
+      !!date &&
+      otherDates.includes(
+        date
+      ),
+
+    previousDate:
+      date
+        ? (
+            otherDates
+              .filter(
+                d =>
+                  d < date
+              )
+              .at(-1) ||
+            ""
+          )
+        : "",
+
+    nextDate:
+      date
+        ? (
+            otherDates
+              .find(
+                d =>
+                  d > date
+              ) ||
+            ""
+          )
+        : ""
+  };
+}
+
+function eventsPageCorrectionCalvingSubjectPatchSrv(
+  rows = [],
+  subjectData = {},
+  oldEvent = {},
+  todayISO = ""
+) {
+  const patch =
+    {};
+
+  const calvings =
+    (
+      Array.isArray(rows)
+        ? rows
+        : []
+    )
+      .filter(
+        row =>
+          eventsPageNormalizeTypeKeySrv(
+            row.data || {}
+          ) ===
+          "calving"
+      )
+      .filter(
+        row =>
+          eventsPageListDateSrv(
+            row.data || {}
+          )
+      )
+      .sort(
+        eventsPageCorrectionCompareSrv
+      );
+
+  const latest =
+    calvings.at(-1) ||
+    null;
+
+  if (!latest) {
+    return patch;
+  }
+
+  const latestDate =
+    eventsPageListDateSrv(
+      latest.data || {}
+    );
+
+  const oldDate =
+    eventsPageListDateSrv(
+      oldEvent
+    );
+
+  const snapshotLast =
+    eventsPageCorrectionDateSrv(
+      subjectData.lastCalvingDate
+    );
+
+  if (
+    !snapshotLast ||
+    snapshotLast === oldDate ||
+    latestDate >= snapshotLast
+  ) {
+    patch.lastCalvingDate =
+      latestDate;
+
+    patch.lastCalvingEventId =
+      latest.id;
+  }
+
+  const firstDate =
+    calvings[0]
+      ? eventsPageListDateSrv(
+          calvings[0].data ||
+          {}
+        )
+      : "";
+
+  const snapshotFirst =
+    eventsPageCorrectionDateSrv(
+      subjectData.firstCalvingDate
+    );
+
+  if (
+    firstDate &&
+    (
+      snapshotFirst === oldDate ||
+      (
+        !snapshotFirst &&
+        subjectData.convertedFromFollower ===
+          true
+      )
+    )
+  ) {
+    patch.firstCalvingDate =
+      firstDate;
+  }
+
+  const latestTransition =
+    eventsPageCorrectionLatestSrv(
+      rows,
+      ev =>
+        [
+          "calving",
+          "dry_off",
+          "close_up"
+        ].includes(
+          eventsPageNormalizeTypeKeySrv(
+            ev
+          )
+        )
+    );
+
+  if (
+    latestTransition &&
+    eventsPageNormalizeTypeKeySrv(
+      latestTransition.data ||
+      {}
+    ) ===
+      "calving" &&
+    latestDate &&
+    todayISO
+  ) {
+    const dim =
+      diffDaysISO(
+        latestDate,
+        todayISO
+      );
+
+    if (
+      Number.isFinite(
+        dim
+      ) &&
+      dim >= 0
+    ) {
+      patch.daysInMilk =
+        dim;
+    }
+  }
+
+  return patch;
+}
 app.post(
   "/api/events-page/event/:id/correct",
   requireUserId,
@@ -17499,12 +18200,476 @@ if (!correctionReason) {
       );
 
       let eventPatch = {
-        eventDate,
-        date: eventDate,
-        notes: notes || null
-      };
+  eventDate,
+  date: eventDate,
+  notes: notes || null
+};
 
-      if (typeKey === "uterine_check") {
+let dependentWrites = [];
+let dependentCorrections = [];
+
+if (typeKey === "calving") {
+  const oldEventDate =
+    eventsPageCorrectionDateSrv(
+      eventsPageListDateSrv(
+        oldEvent
+      )
+    );
+
+  const rawRows =
+    docs.map(
+      item => ({
+        id:
+          item.id,
+        data:
+          item.data || {}
+      })
+    );
+
+  const moveBounds =
+    eventsPageCalvingCorrectionMoveBoundsSrv(
+      rawRows,
+      eventId,
+      oldEventDate
+    );
+
+  if (
+    eventDate !==
+    oldEventDate
+  ) {
+    if (
+      moveBounds.sameDay
+    ) {
+      return res.status(409).json({
+        ok: false,
+        error:
+          "calving_same_day_dependencies",
+        message:
+          "❌ توجد أحداث أخرى في يوم الولادة نفسه؛ لا يمكن تغيير تاريخ الولادة قبل مراجعة هذه الأحداث."
+      });
+    }
+
+    if (
+      moveBounds.previousDate &&
+      eventDate <=
+        moveBounds.previousDate
+    ) {
+      return res.status(409).json({
+        ok: false,
+        error:
+          "calving_crosses_previous_event",
+        message:
+          `❌ تاريخ الولادة المصحح يجب أن يكون بعد الحدث السابق المسجل بتاريخ ${moveBounds.previousDate}.`
+      });
+    }
+
+    if (
+      moveBounds.nextDate &&
+      eventDate >=
+        moveBounds.nextDate
+    ) {
+      return res.status(409).json({
+        ok: false,
+        error:
+          "calving_crosses_next_event",
+        message:
+          `❌ تاريخ الولادة المصحح يجب أن يظل قبل الحدث التالي المسجل بتاريخ ${moveBounds.nextDate}.`
+      });
+    }
+  }
+
+  const lastFertileInseminationDate =
+    eventsPageCorrectionDateSrv(
+      oldEvent.lastFertileInseminationDate ||
+      oldEvent.lastInseminationDate ||
+      ""
+    );
+
+  const species =
+    calvingNormalizeSpeciesSrv(
+      oldEvent.species ||
+      subject.data?.species ||
+      subject.data?.animalTypeAr ||
+      subject.data?.animalType ||
+      subject.data?.animaltype ||
+      ""
+    );
+
+  const gateErr =
+    calvingDecisionSrv({
+      animalNumber,
+      eventDate,
+      documentData:
+        subject.data ||
+        {},
+      species,
+      reproductiveStatus:
+        "عشار",
+      reproStatusFromEvents:
+        "عشار",
+      lastInseminationDate:
+        lastFertileInseminationDate
+    });
+
+  if (gateErr) {
+    const raw =
+      String(
+        gateErr ||
+        ""
+      );
+
+    const message =
+      raw
+        .replace(
+          /^OFFER_ABORT\|/,
+          ""
+        )
+        .trim();
+
+    return res.status(400).json({
+      ok: false,
+      error:
+        "calving_correction_gate_failed",
+      message:
+        `❌ ${message.replace(/^❌\s*/, "")}`,
+      guardError:
+        raw
+    });
+  }
+
+  const calvingKind =
+    String(
+      body.calvingKind ??
+      oldEvent.calvingKind ??
+      ""
+    ).trim();
+
+  const proposed = {
+    ...oldEvent,
+    ...body,
+    animalNumber,
+    eventDate,
+    calvingKind,
+    lastInseminationDate:
+      lastFertileInseminationDate
+  };
+
+  const requiredErr =
+    calvingRequiredFieldsSrv(
+      proposed
+    );
+
+  if (requiredErr) {
+    const message =
+      typeof requiredErr ===
+        "string"
+        ? requiredErr
+        : (
+            requiredErr.msg ||
+            "❌ بيانات الولادة غير مكتملة."
+          );
+
+    return res.status(400).json({
+      ok: false,
+      error:
+        "invalid_calving_fields",
+      message,
+
+      fieldErrors:
+        typeof requiredErr ===
+          "object" &&
+        requiredErr.field
+          ? {
+              [requiredErr.field]:
+                message
+            }
+          : {}
+    });
+  }
+
+  const oldDead =
+    String(
+      oldEvent.calvingKind ||
+      ""
+    ).trim() ===
+    "نافقة";
+
+  const newDead =
+    calvingKind ===
+    "نافقة";
+
+  if (
+    oldDead !==
+    newDead
+  ) {
+    return res.status(409).json({
+      ok: false,
+      error:
+        "calving_live_status_structural_change",
+      message:
+        "❌ لا يمكن تحويل ولادة بها مواليد محفوظة إلى «نافقة» أو العكس كتعديل عادي؛ هذا تغيير هيكلي يحتاج مسارًا منفصلًا."
+    });
+  }
+
+  const oldChildren =
+    eventsPageCalvingCorrectionChildrenSrv(
+      oldEvent
+    );
+
+  const newChildren =
+    eventsPageCalvingCorrectionChildrenSrv(
+      proposed
+    );
+
+  if (
+    oldChildren.length !==
+    newChildren.length
+  ) {
+    return res.status(409).json({
+      ok: false,
+      error:
+        "calving_offspring_count_immutable",
+      message:
+        "❌ لا يمكن تغيير عدد المواليد بعد حفظ الولادة من تعديل السجل؛ هوية المواليد المسجلين يجب أن تظل ثابتة."
+    });
+  }
+
+  for (
+    let i = 0;
+    i < oldChildren.length;
+    i++
+  ) {
+    const oldChild =
+      oldChildren[i];
+
+    const newChild =
+      newChildren[i];
+
+    if (
+      !oldChild.number ||
+      !newChild.number ||
+      oldChild.number !==
+        newChild.number
+    ) {
+      return res.status(409).json({
+        ok: false,
+        error:
+          "calving_offspring_identity_immutable",
+        message:
+          `❌ رقم المولود ${i + 1} لا يمكن تغييره من تعديل حدث الولادة؛ هوية المولود ثابتة بعد الحفظ.`
+      });
+    }
+
+    const birthChanged =
+      eventDate !==
+      oldEventDate;
+
+    const sexChanged =
+      newChild.sex !==
+      oldChild.sex;
+
+    const fateChanged =
+      newChild.fate !==
+      oldChild.fate;
+
+    if (
+      !birthChanged &&
+      !sexChanged &&
+      !fateChanged
+    ) {
+      continue;
+    }
+
+    const record =
+      await eventsPageCalvingCorrectionResolveOffspringSrv(
+        uid,
+        oldChild.number
+      );
+
+    if (!record) {
+      return res.status(409).json({
+        ok: false,
+        error:
+          "calving_offspring_record_missing",
+        message:
+          `❌ تعذّر العثور على سجل المولود رقم ${oldChild.number} لمصالحة تعديل الولادة بأمان.`
+      });
+    }
+
+    const earliestDependentDate =
+      await eventsPageCalvingCorrectionEarliestDependentDateSrv(
+        uid,
+        record,
+        oldChild.number
+      );
+
+    if (
+      birthChanged &&
+      earliestDependentDate &&
+      eventDate >
+        earliestDependentDate
+    ) {
+      return res.status(409).json({
+        ok: false,
+        error:
+          "calving_date_after_offspring_dependency",
+        message:
+          `❌ لا يمكن نقل تاريخ الولادة إلى ${eventDate} لأن للمولود رقم ${oldChild.number} بيانات لاحقة تبدأ بتاريخ ${earliestDependentDate}.`
+      });
+    }
+
+    if (
+      sexChanged &&
+      (
+        record._collection !==
+          "calves" ||
+        earliestDependentDate
+      )
+    ) {
+      return res.status(409).json({
+        ok: false,
+        error:
+          "calving_offspring_sex_has_dependencies",
+        message:
+          `❌ لا يمكن تغيير جنس المولود رقم ${oldChild.number} بعد وجود بيانات تشغيلية لاحقة له.`
+      });
+    }
+
+    const collectionName =
+      record._collection ===
+        "animals"
+        ? "animals"
+        : "calves";
+
+    dependentWrites.push({
+      ref:
+        db
+          .collection(
+            collectionName
+          )
+          .doc(
+            record.id
+          ),
+
+      patch: {
+        birthDate:
+          eventDate,
+        sex:
+          newChild.sex,
+        fate:
+          newChild.fate,
+        updatedAt:
+          admin.firestore.FieldValue
+            .serverTimestamp()
+      }
+    });
+
+    dependentCorrections.push({
+      animalNumber:
+        oldChild.number,
+
+      collection:
+        collectionName,
+
+      before: {
+        birthDate:
+          String(
+            record.data?.birthDate ||
+            oldEventDate ||
+            ""
+          ).slice(
+            0,
+            10
+          ),
+
+        sex:
+          String(
+            record.data?.sex ||
+            oldChild.sex ||
+            ""
+          ).trim(),
+
+        fate:
+          String(
+            record.data?.fate ||
+            oldChild.fate ||
+            ""
+          ).trim()
+      },
+
+      after: {
+        birthDate:
+          eventDate,
+        sex:
+          newChild.sex,
+        fate:
+          newChild.fate
+      }
+    });
+  }
+
+  eventPatch = {
+    ...eventPatch,
+
+    calvingKind,
+
+    calfCount:
+      newDead
+        ? ""
+        : String(
+            newChildren.length
+          ),
+
+    calf1Sex:
+      newChildren[0]?.sex ||
+      "",
+
+    calfId:
+      newChildren[0]?.number ||
+      "",
+
+    calf1Fate:
+      newChildren[0]?.fate ||
+      "",
+
+    calf2Sex:
+      newChildren[1]?.sex ||
+      "",
+
+    calf2Id:
+      newChildren[1]?.number ||
+      "",
+
+    calf2Fate:
+      newChildren[1]?.fate ||
+      "",
+
+    calf3Sex:
+      newChildren[2]?.sex ||
+      "",
+
+    calf3Id:
+      newChildren[2]?.number ||
+      "",
+
+    calf3Fate:
+      newChildren[2]?.fate ||
+      "",
+
+    lastInseminationDate:
+      lastFertileInseminationDate,
+
+    lastFertileInseminationDate,
+
+    idempotencyKey:
+      `${uid}|calving|${oldEvent.animalId || animalNumber}|${eventDate}`
+  };
+}
+
+else if (
+  typeKey ===
+  "uterine_check"
+) {
         const checkStage = String(body.checkStage ?? body.stage ?? oldEvent.checkStage ?? "").trim();
         const resultValue = String(body.result ?? body.uterineResult ?? oldEvent.result ?? "").trim();
         const stage = uterineCheckStageSrv(checkStage);
@@ -18106,7 +19271,14 @@ eventPatch.lastMilkCorrectionReason =
       const rows = eventsPageCorrectionRowsWithEditSrv(docs, eventId, correctedEvent);
       let subjectPatch = {};
 
-      if (["heat", "insemination", "pregnancy_diagnosis"].includes(typeKey)) {
+      if (
+  [
+    "calving",
+    "heat",
+    "insemination",
+    "pregnancy_diagnosis"
+  ].includes(typeKey)
+) {
         subjectPatch = {
           ...subjectPatch,
           ...eventsPageCorrectionReproPatchSrv(rows, subject.data || {}, oldEvent)
@@ -18127,13 +19299,30 @@ eventPatch.lastMilkCorrectionReason =
         };
       }
 
-      if (["daily_milk", "dry_off", "close_up"].includes(typeKey)) {
+      if (
+  [
+    "calving",
+    "daily_milk",
+    "dry_off",
+    "close_up"
+  ].includes(typeKey)
+) {
         subjectPatch = {
           ...subjectPatch,
           ...eventsPageCorrectionProductionPatchSrv(rows, subject.data || {}, oldEvent, todayISO)
         };
       }
-
+      if (typeKey === "calving") {
+  subjectPatch = {
+    ...subjectPatch,
+    ...eventsPageCorrectionCalvingSubjectPatchSrv(
+      rows,
+      subject.data || {},
+      oldEvent,
+      todayISO
+    )
+  };
+}
       if (typeKey === "hoof_trimming") {
         const latest = eventsPageCorrectionLatestSrv(rows, ev => eventsPageNormalizeTypeKeySrv(ev) === "hoof_trimming");
         if (latest) subjectPatch.lastHoofTrimmingDate = eventsPageListDateSrv(latest.data);
@@ -18215,7 +19404,13 @@ eventPatch.lastMilkCorrectionReason =
           updatedAt: now
         }, { merge: true });
       }
-
+      for (const item of dependentWrites) {
+  batch.set(
+    item.ref,
+    item.patch,
+    { merge: true }
+  );
+}
       batch.set(auditRef, {
         userId: uid,
         eventId,
@@ -18234,6 +19429,10 @@ after:
   ),
 
 correctionReason,
+dependentCorrections:
+  dependentCorrections.length
+    ? dependentCorrections
+    : null,
 
 editedBy,
         createdAt: now,
@@ -18245,7 +19444,7 @@ editedBy,
       if (
         typeof scheduleGroupsRebuildSrv === "function" &&
         [
-          "heat", "insemination", "pregnancy_diagnosis", "daily_milk",
+          "calving", "heat", "insemination", "pregnancy_diagnosis", "daily_milk",
           "dry_off", "close_up", "weaning", "cull"
         ].includes(typeKey)
       ) {
