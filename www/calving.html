@@ -184,7 +184,20 @@
           <input id="notes" data-field="notes" placeholder="اختياري" />
         </div>
       </div>
-
+      <div class="row" id="editToolsRow" style="display:none">
+  <div style="grid-column:1/-1">
+    <label>سبب التعديل</label>
+    <input
+      id="correctionReason"
+      type="text"
+      maxlength="500"
+      placeholder="اكتب سبب تصحيح بيانات الولادة"
+    />
+    <small style="display:block;margin-top:6px;font-weight:800;color:#556">
+      يُحفظ سبب التعديل داخل سجل التصحيحات.
+    </small>
+  </div>
+</div>
     </form>
   </main>
 
@@ -195,6 +208,14 @@
 
 <script>
   const qp = new URLSearchParams(location.search);
+  const requestedEditMode =
+  String(qp.get("mode") || "").trim().toLowerCase() === "edit";
+
+const editEventId =
+  String(qp.get("eventId") || "").trim();
+
+const isEditMode =
+  requestedEditMode && !!editEventId;
 
   const form = document.getElementById("calving-form");
   const sysbar = document.getElementById("sysbar");
@@ -268,7 +289,328 @@
   function readRadio(name) {
     return String(form.querySelector(`input[name="${name}"]:checked`)?.value || "").trim();
   }
+  function setRadioValue(name, value) {
+  const wanted =
+    String(value || "").trim();
 
+  form
+    .querySelectorAll(`input[name="${name}"]`)
+    .forEach(r => {
+      r.checked =
+        String(r.value || "").trim() === wanted;
+    });
+}
+
+function lockEditIdentityFields() {
+  if (animalEl) {
+    animalEl.readOnly = true;
+  }
+
+  form
+    .querySelectorAll('input[name="calfCount"]')
+    .forEach(r => {
+      r.disabled = true;
+    });
+
+  [
+    "calfId",
+    "calf2Id",
+    "calf3Id"
+  ].forEach(id => {
+    const el =
+      document.getElementById(id);
+
+    if (el) {
+      el.readOnly = true;
+    }
+  });
+}
+
+async function loadEditEvent() {
+  if (!editEventId) {
+    showSysbar(
+      "❌ تعذّر تحديد حدث الولادة المطلوب تعديله.",
+      "error"
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    return;
+  }
+
+  try {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    if (animalEl) {
+      animalEl.readOnly = true;
+    }
+
+    if (dateEl) {
+      dateEl.disabled = true;
+    }
+
+    showSysbar(
+      "جارِ تحميل بيانات الولادة للتعديل…",
+      "info"
+    );
+
+    const r =
+      await fetch(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}`,
+        {
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: {
+            "Accept": "application/json"
+          }
+        }
+      );
+
+    const data =
+      await r.json().catch(() => ({
+        ok: false,
+        message:
+          "تعذّر قراءة بيانات الولادة."
+      }));
+
+    if (
+      r.status === 401 ||
+      data?.error === "auth_required"
+    ) {
+      showSysbar(
+        data?.message ||
+          "سجّل الدخول أولًا.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      !r.ok ||
+      !data?.ok ||
+      !data?.event
+    ) {
+      showSysbar(
+        data?.message ||
+          "❌ تعذّر تحميل بيانات الولادة للتعديل.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      String(
+        data.event.typeKey || ""
+      ).trim() !== "calving"
+    ) {
+      showSysbar(
+        "❌ الحدث المحدد ليس حدث ولادة.",
+        "error"
+      );
+
+      return;
+    }
+
+    const ev =
+      data.event;
+
+    const d =
+      ev.data || {};
+
+    animalEl.value =
+      normalizeDigits(
+        ev.animalNumber || ""
+      );
+
+    dateEl.value =
+      toISO(
+        d.eventDate ||
+        ev.eventDate ||
+        ""
+      );
+
+    kindEl.value =
+      String(
+        d.calvingKind || ""
+      ).trim();
+
+    lastAiEl.value =
+      toISO(
+        d.lastFertileInseminationDate ||
+        ""
+      );
+
+    document.getElementById("notes").value =
+      String(
+        d.notes || ""
+      );
+
+    setRadioValue(
+      "calfCount",
+      d.calfCount
+    );
+
+    setRadioValue(
+      "calf1Sex",
+      d.calf1Sex
+    );
+
+    setRadioValue(
+      "calf1Fate",
+      d.calf1Fate
+    );
+
+    setRadioValue(
+      "calf2Sex",
+      d.calf2Sex
+    );
+
+    setRadioValue(
+      "calf2Fate",
+      d.calf2Fate
+    );
+
+    setRadioValue(
+      "calf3Sex",
+      d.calf3Sex
+    );
+
+    setRadioValue(
+      "calf3Fate",
+      d.calf3Fate
+    );
+
+    document.getElementById("calfId").value =
+      normalizeDigits(
+        d.calfId || ""
+      );
+
+    document.getElementById("calf2Id").value =
+      normalizeDigits(
+        d.calf2Id || ""
+      );
+
+    document.getElementById("calf3Id").value =
+      normalizeDigits(
+        d.calf3Id || ""
+      );
+
+    setDetailsDisabled(false);
+
+    if (dateEl) {
+      dateEl.disabled = false;
+    }
+
+    syncCalfGroups();
+
+    requiresNewMotherNumber = false;
+
+    if (
+      d.convertedFromFollower === true
+    ) {
+      if (newMotherNumberRow) {
+        newMotherNumberRow.style.display = "";
+      }
+
+      if (newMotherNumberEl) {
+        newMotherNumberEl.disabled = false;
+        newMotherNumberEl.required = false;
+        newMotherNumberEl.readOnly = true;
+
+        newMotherNumberEl.value =
+          normalizeDigits(
+            d.newMotherNumber ||
+            ev.animalNumber ||
+            ""
+          );
+      }
+
+      if (newMotherNumberHint) {
+        newMotherNumberHint.textContent =
+          "رقم الأم ثابت أثناء تصحيح حدث الولادة.";
+      }
+    } else {
+      syncNewMotherNumberField(false);
+    }
+
+    lockEditIdentityFields();
+
+    const editToolsRow =
+      document.getElementById(
+        "editToolsRow"
+      );
+
+    const correctionReasonEl =
+      document.getElementById(
+        "correctionReason"
+      );
+
+    if (editToolsRow) {
+      editToolsRow.style.display = "";
+    }
+
+    if (correctionReasonEl) {
+      correctionReasonEl.required = true;
+    }
+
+    const title =
+      document.querySelector(
+        ".mbk-page-title"
+      );
+
+    if (title) {
+      title.textContent =
+        "تعديل ولادة";
+    }
+
+    document.title =
+      "تعديل ولادة — مُرَبِّيك";
+
+    if (saveBtn) {
+      saveBtn.textContent =
+        "حفظ التعديل ✅";
+
+      saveBtn.disabled = false;
+    }
+
+    const back =
+      document.querySelector(
+        ".mbk-back"
+      );
+
+    if (back) {
+      back.href =
+        `event-list.html?number=${encodeURIComponent(
+          ev.animalNumber || ""
+        )}`;
+    }
+
+    if (sysbar) {
+      sysbar.style.display = "none";
+    }
+
+  } catch (err) {
+    console.error(
+      "calving edit load failed",
+      err
+    );
+
+    showSysbar(
+      "❌ تعذّر تحميل بيانات الولادة للتعديل.",
+      "error"
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+  }
+}
   function escapeHtml(s) {
     return String(s || "")
       .replace(/&/g, "&amp;")
@@ -597,14 +939,109 @@ if (authRequired) return;
   }
 
   function scheduleGate() {
-    clearTimeout(gateTimer);
-    gateTimer = setTimeout(runGateNow, 350);
-  }
+  if (requestedEditMode) return;
+
+  clearTimeout(gateTimer);
+  gateTimer = setTimeout(runGateNow, 350);
+}
 
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const payload = collectPayload();
+    if (requestedEditMode) {
+  if (!isEditMode) {
+    showSysbar(
+      "❌ تعذّر تحديد حدث الولادة المطلوب تعديله.",
+      "error"
+    );
+
+    return;
+  }
+
+  const correctionReason =
+    String(
+      document.getElementById(
+        "correctionReason"
+      )?.value || ""
+    ).trim();
+
+  if (!correctionReason) {
+    showSysbar(
+      "❌ اكتب سبب التعديل.",
+      "error"
+    );
+
+    document
+      .getElementById(
+        "correctionReason"
+      )
+      ?.focus?.();
+
+    return;
+  }
+
+  payload.correctionReason =
+    correctionReason;
+
+  try {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    showSysbar(
+      "جارِ حفظ تعديل الولادة…",
+      "info"
+    );
+
+    const {
+      data,
+      authRequired
+    } =
+      await sessionPostJson(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
+        payload,
+        "تعذّر قراءة رد السيرفر."
+      );
+
+    if (authRequired) {
+      return;
+    }
+
+    renderServerMessage(
+      data,
+      "تعذّر حفظ تعديل الولادة.",
+      false
+    );
+
+    if (data?.ok) {
+      setTimeout(() => {
+        location.href =
+          `event-list.html?number=${encodeURIComponent(
+            payload.animalNumber
+          )}`;
+      }, 1000);
+    }
+
+  } catch (err) {
+    console.error(
+      "calving correction failed",
+      err
+    );
+
+    showSysbar(
+      "❌ تعذّر حفظ تعديل الولادة الآن.",
+      "error"
+    );
+
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+    }
+  }
+
+  return;
+}
 
     if (
       requiresNewMotherNumber &&
@@ -684,6 +1121,27 @@ if (authRequired) return;
   });
 
    document.addEventListener("DOMContentLoaded", () => {
+    if (requestedEditMode) {
+  syncNewMotherNumberField(false);
+  setDetailsDisabled(true);
+  syncCalfGroups();
+
+  if (!editEventId) {
+    showSysbar(
+      "❌ رابط تعديل الولادة غير مكتمل.",
+      "error"
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    return;
+  }
+
+  loadEditEvent();
+  return;
+}
     const n =
       qp.get("animalNumber") ||
       qp.get("number") ||
