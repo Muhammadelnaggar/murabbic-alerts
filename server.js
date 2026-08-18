@@ -16280,6 +16280,20 @@ function eventsPageEditPolicySrv(ev = {}) {
 
   const origin =
     eventsPageEditOriginSrv(ev);
+    const alreadyEdited =
+  Number(ev.editCount || 0) > 0 ||
+  Number(ev.editedAtMs || 0) > 0;
+
+if (alreadyEdited) {
+  return {
+    editable: false,
+    mode: "correction_locked",
+    writer: "",
+    origin,
+    reason:
+      "هذا الحدث تم تعديله مرة واحدة بالفعل، ولا يسمح مُرَبِّيك بتعديل نفس الحدث مرة أخرى."
+  };
+}
 
   const systemDerived =
     origin === "system_derived" ||
