@@ -184,8 +184,25 @@
           <input id="notes" data-field="notes" placeholder="اختياري" />
         </div>
       </div>
-      <div class="row" id="editToolsRow" style="display:none">
-  <div style="grid-column:1/-1">
+     <div class="row" id="editToolsRow" style="display:none">
+  <div>
+    <label>القائم بالتعديل</label>
+    <input
+      id="correctionPerformedBy"
+      type="text"
+      maxlength="160"
+      list="correctionPerformersList"
+      placeholder="اسم الفني أو الطبيب"
+      autocomplete="off"
+    />
+    <datalist id="correctionPerformersList"></datalist>
+
+    <small style="display:block;margin-top:6px;font-weight:800;color:#556">
+      يُحفظ الاسم ضمن قائمة القائمين بالتعديل لاستخدامه لاحقًا.
+    </small>
+  </div>
+
+  <div>
     <label>سبب التعديل</label>
     <input
       id="correctionReason"
@@ -193,6 +210,7 @@
       maxlength="500"
       placeholder="اكتب سبب تصحيح بيانات الولادة"
     />
+
     <small style="display:block;margin-top:6px;font-weight:800;color:#556">
       يُحفظ سبب التعديل داخل سجل التصحيحات.
     </small>
@@ -238,7 +256,13 @@ const isEditMode =
 
   const saveBtn = document.getElementById("saveBtn");
 
-  let requiresNewMotherNumber = false;
+const correctionPerformedByEl =
+  document.getElementById("correctionPerformedBy");
+
+const correctionPerformersListEl =
+  document.getElementById("correctionPerformersList");
+
+let requiresNewMotherNumber = false;
   let loadedOriginalCalfCount = 0;
 
   function toISO(s) {
@@ -257,12 +281,36 @@ const isEditMode =
       "۰": "0","۱": "1","۲": "2","۳": "3","۴": "4","۵": "5","۶": "6","۷": "7","۸": "8","۹": "9"
     };
 
-    return String(raw || "")
-      .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
-      .replace(/[^\d]/g, "")
-      .trim();
-  }
-  async function sessionPostJson(path, payload, fallbackMessage) {
+    
+      return String(raw || "")
+  .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
+  .replace(/[^\d]/g, "")
+  .trim();
+}
+
+function renderCorrectionPerformers(items = []) {
+  if (!correctionPerformersListEl) return;
+
+  const values =
+    [...new Set(
+      (Array.isArray(items) ? items : [])
+        .map(x => String(x || "").trim())
+        .filter(Boolean)
+    )];
+
+  correctionPerformersListEl.replaceChildren(
+    ...values.map(value => {
+      const option =
+        document.createElement("option");
+
+      option.value = value;
+
+      return option;
+    })
+  );
+}
+
+async function sessionPostJson(path, payload, fallbackMessage) {
   const r = await fetch(path, {
     method: "POST",
     credentials: "same-origin",
@@ -418,20 +466,36 @@ async function loadEditEvent() {
     }
 
     if (
-      String(
-        data.event.typeKey || ""
-      ).trim() !== "calving"
-    ) {
-      showSysbar(
-        "❌ الحدث المحدد ليس حدث ولادة.",
-        "error"
-      );
+  String(
+    data.event.typeKey || ""
+  ).trim() !== "calving"
+) {
+  showSysbar(
+    "❌ الحدث المحدد ليس حدث ولادة.",
+    "error"
+  );
 
-      return;
-    }
+  return;
+}
 
-    const ev =
-      data.event;
+if (
+  data.event?.editPolicy?.editable !== true
+) {
+  showSysbar(
+    data.event?.editPolicy?.reason ||
+      "❌ هذا الحدث غير متاح للتعديل.",
+    "error"
+  );
+
+  return;
+}
+
+renderCorrectionPerformers(
+  data.correctionPerformers
+);
+
+const ev =
+  data.event;
 
     const d =
       ev.data || {};
@@ -580,12 +644,16 @@ loadedOriginalCalfCount =
       );
 
     if (editToolsRow) {
-      editToolsRow.style.display = "";
-    }
+  editToolsRow.style.display = "";
+}
 
-    if (correctionReasonEl) {
-      correctionReasonEl.required = true;
-    }
+if (correctionPerformedByEl) {
+  correctionPerformedByEl.required = true;
+}
+
+if (correctionReasonEl) {
+  correctionReasonEl.required = true;
+}
 
     const title =
       document.querySelector(
@@ -986,6 +1054,21 @@ if (authRequired) return;
 
     return;
   }
+  const correctionPerformedBy =
+  String(
+    correctionPerformedByEl?.value || ""
+  ).trim();
+
+if (!correctionPerformedBy) {
+  showSysbar(
+    "❌ أدخل اسم القائم بالتعديل.",
+    "error"
+  );
+
+  correctionPerformedByEl?.focus?.();
+
+  return;
+}
 
   const correctionReason =
     String(
@@ -1009,8 +1092,11 @@ if (authRequired) return;
     return;
   }
 
-  payload.correctionReason =
-    correctionReason;
+  payload.correctionPerformedBy =
+  correctionPerformedBy;
+
+payload.correctionReason =
+  correctionReason;
 
   try {
     if (saveBtn) {
