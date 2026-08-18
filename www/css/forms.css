@@ -3081,6 +3081,57 @@ body[data-page="animal-list"] .no-data{
   font-size: 12px;
   font-weight: 600;
 }
+.event-list-page .event-edit-tools{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:8px;
+}
+
+.event-list-page .event-edit-link{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:32px;
+  padding:5px 12px;
+  border:1px solid var(--green);
+  border-radius:10px;
+  background:#fff;
+  color:var(--green-600);
+  text-decoration:none;
+  font-size:12px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.event-list-page .event-edit-link:hover{
+  background:#eef8e9;
+}
+
+.event-list-page .event-audit{
+  margin-top:8px;
+  padding:8px 10px;
+  border:1px solid #d7e8d8;
+  border-radius:10px;
+  background:#f8fbf8;
+  color:#425348;
+  font-size:12px;
+  line-height:1.6;
+  white-space:normal;
+}
+
+.event-list-page .event-audit-title{
+  display:block;
+  margin-bottom:2px;
+  color:var(--green-600);
+  font-weight:900;
+}
+
+.event-list-page .event-audit-line{
+  display:block;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
 /* =========================================================
    Cow Card — scoped styles only
    ستايل بطاقة الحيوان فقط — لا يؤثر على أي صفحة أخرى
