@@ -16850,14 +16850,45 @@ app.get(
         });
       }
 
-      return res.json({
-        ok: true,
-        event:
-          eventsPageEditPublicEventSrv(
-            snap.id,
-            ev
-          )
-      });
+      let correctionPerformers = [];
+
+try {
+  const optionsSnap =
+    await db
+      .collection("user_event_options")
+      .doc(uid)
+      .get();
+
+  const optionsData =
+    optionsSnap.exists
+      ? (optionsSnap.data() || {})
+      : {};
+
+  correctionPerformers =
+    Array.isArray(optionsData.correctionPerformers)
+      ? [...new Set(
+          optionsData.correctionPerformers
+            .map(x => String(x || "").trim())
+            .filter(Boolean)
+        )]
+      : [];
+
+} catch (e) {
+  console.warn(
+    "events-page-correction-options-load failed",
+    e.message || e
+  );
+}
+
+return res.json({
+  ok: true,
+  event:
+    eventsPageEditPublicEventSrv(
+      snap.id,
+      ev
+    ),
+  correctionPerformers
+});
 
     } catch (e) {
       console.error(
@@ -18278,6 +18309,27 @@ if (!correctionReason) {
       "❌ اكتب سبب التعديل حتى يظل سجل التصحيحات واضحًا."
   });
 }
+const correctionPerformedBy =
+  eventsPageCorrectionTextSrv(
+    body.correctionPerformedBy ??
+    body.correctionTechnician ??
+    "",
+    160
+  );
+
+if (
+  typeKey === "calving" &&
+  !correctionPerformedBy
+) {
+  return res.status(400).json({
+    ok: false,
+    error:
+      "correction_performed_by_required",
+    message:
+      "❌ أدخل اسم القائم بالتعديل."
+  });
+}
+
       const animalNumber = calvingNormDigitsOnlySrv(
         eventsPageEventAnimalNumberSrv(oldEvent)
       );
@@ -20064,6 +20116,11 @@ editedAtMs,
 editedBy,
 editedByName,
 lastCorrectionReason: correctionReason,
+...(correctionPerformedBy
+  ? {
+      correctionPerformedBy
+    }
+  : {}),
         editCount:
         admin.firestore.FieldValue.increment(1)
       }, { merge: true });
@@ -20111,10 +20168,33 @@ dependentCorrections:
 
 editedBy,
 editedByName,
+correctionPerformedBy:
+  correctionPerformedBy || null,
 createdAt: now,
         source: "server:/api/events-page/event/correct"
       });
+if (correctionPerformedBy) {
+  const correctionOptionsRef =
+    db
+      .collection("user_event_options")
+      .doc(uid);
 
+  batch.set(
+    correctionOptionsRef,
+    {
+      userId: uid,
+
+      correctionPerformers:
+        admin.firestore.FieldValue
+          .arrayUnion(
+            correctionPerformedBy
+          ),
+
+      updatedAt: now
+    },
+    { merge: true }
+  );
+}
       await batch.commit();
 
       if (
