@@ -18348,7 +18348,7 @@ if (!correctionReason) {
         [
   "uterine_check", "heat", "insemination", "pregnancy_diagnosis",
   "abortion", "daily_milk", "dry_off", "close_up"
-].includes(typeKey)
+].includes(typeKey) &&
         !eventsPageCorrectionDateInsideBoundsSrv(eventDate, bounds)
       ) {
         return res.status(409).json({
