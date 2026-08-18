@@ -16331,15 +16331,17 @@ function eventsPageEditPolicySrv(ev = {}) {
   }
 
   if (typeKey === "calving") {
-    return {
-      editable: false,
-      mode: "structural_writer_pending",
-      writer: "",
-      origin,
-      reason:
-        "الولادة المسجلة يدويًا تحتاج كاتب تصحيح يعيد مصالحة الأم والموسم والمواليد بأمان؛ لذلك لا تُفتح للتعديل قبل ربط هذا الكاتب."
-    };
-  }
+  return {
+    editable: true,
+    mode:
+      origin === "import_history"
+        ? "historical_correction"
+        : "manual_correction",
+    writer: "events_page_correction",
+    origin,
+    reason: ""
+  };
+}
 
   if (typeKey === "abortion") {
     return {
@@ -16489,6 +16491,7 @@ function eventsPageEditTargetSrv(docId, ev = {}) {
   const policy = eventsPageEditPolicySrv(ev);
 
   const pageByType = {
+    calving: "calving.html",
     uterine_check: "uterine-check.html",
     supernumerary_teat_removal: "supernumerary-teat-removal.html",
     dehorning: "dehorning.html",
@@ -18466,74 +18469,198 @@ if (typeKey === "calving") {
     });
   }
 
-  const oldChildren =
-    eventsPageCalvingCorrectionChildrenSrv(
-      oldEvent
-    );
+const oldChildren =
+  eventsPageCalvingCorrectionChildrenSrv(oldEvent);
 
-  const newChildren =
-    eventsPageCalvingCorrectionChildrenSrv(
-      proposed
-    );
+const newChildren =
+  eventsPageCalvingCorrectionChildrenSrv(proposed);
+
+const commonCount =
+  Math.min(oldChildren.length, newChildren.length);
+
+const newNumbers =
+  newChildren
+    .map(child => child.number)
+    .filter(Boolean);
+
+if (new Set(newNumbers).size !== newNumbers.length) {
+  return res.status(400).json({
+    ok: false,
+    error: "duplicate_calf_number_in_request",
+    message: "❌ لا يمكن استخدام نفس الرقم لأكثر من مولود."
+  });
+}
+
+// المواليد الموجودون أصلًا:
+// الهوية ثابتة، لكن الجنس/المصير/تاريخ الميلاد يمكن تصحيحهم بأمان.
+for (let i = 0; i < commonCount; i++) {
+  const oldChild = oldChildren[i];
+  const newChild = newChildren[i];
 
   if (
-    oldChildren.length !==
-    newChildren.length
+    !oldChild.number ||
+    !newChild.number ||
+    oldChild.number !== newChild.number
   ) {
     return res.status(409).json({
       ok: false,
-      error:
-        "calving_offspring_count_immutable",
+      error: "calving_offspring_identity_immutable",
       message:
-        "❌ لا يمكن تغيير عدد المواليد بعد حفظ الولادة من تعديل السجل؛ هوية المواليد المسجلين يجب أن تظل ثابتة."
+        `❌ رقم المولود ${i + 1} ثابت بعد تسجيله؛ عدّل عدد المواليد بدل تغيير هوية مولود موجود.`
     });
   }
 
+  const birthChanged =
+    eventDate !== oldEventDate;
+
+  const sexChanged =
+    newChild.sex !== oldChild.sex;
+
+  const fateChanged =
+    newChild.fate !== oldChild.fate;
+
+  if (
+    !birthChanged &&
+    !sexChanged &&
+    !fateChanged
+  ) {
+    continue;
+  }
+
+  const record =
+    await eventsPageCalvingCorrectionResolveOffspringSrv(
+      uid,
+      oldChild.number
+    );
+
+  if (!record) {
+    return res.status(409).json({
+      ok: false,
+      error: "calving_offspring_record_missing",
+      message:
+        `❌ تعذّر العثور على سجل المولود رقم ${oldChild.number} لمصالحة التعديل بأمان.`
+    });
+  }
+
+  const earliestDependentDate =
+    await eventsPageCalvingCorrectionEarliestDependentDateSrv(
+      uid,
+      record,
+      oldChild.number
+    );
+
+  if (
+    birthChanged &&
+    earliestDependentDate &&
+    eventDate > earliestDependentDate
+  ) {
+    return res.status(409).json({
+      ok: false,
+      error: "calving_date_after_offspring_dependency",
+      message:
+        `❌ لا يمكن نقل تاريخ الولادة إلى ${eventDate} لأن للمولود رقم ${oldChild.number} بيانات لاحقة تبدأ بتاريخ ${earliestDependentDate}.`
+    });
+  }
+
+  if (
+    sexChanged &&
+    (
+      record._collection !== "calves" ||
+      earliestDependentDate
+    )
+  ) {
+    return res.status(409).json({
+      ok: false,
+      error: "calving_offspring_sex_has_dependencies",
+      message:
+        `❌ لا يمكن تغيير جنس المولود رقم ${oldChild.number} بعد وجود بيانات تشغيلية لاحقة له.`
+    });
+  }
+
+  const collectionName =
+    record._collection === "animals"
+      ? "animals"
+      : "calves";
+
+  dependentWrites.push({
+    ref:
+      db.collection(collectionName).doc(record.id),
+
+    patch: {
+      birthDate: eventDate,
+      sex: newChild.sex,
+      fate: newChild.fate,
+      updatedAt:
+        admin.firestore.FieldValue.serverTimestamp()
+    }
+  });
+
+  dependentCorrections.push({
+    action: "updated",
+    animalNumber: oldChild.number,
+    collection: collectionName,
+
+    before: {
+      birthDate:
+        String(
+          record.data?.birthDate ||
+          oldEventDate ||
+          ""
+        ).slice(0, 10),
+
+      sex:
+        String(
+          record.data?.sex ||
+          oldChild.sex ||
+          ""
+        ).trim(),
+
+      fate:
+        String(
+          record.data?.fate ||
+          oldChild.fate ||
+          ""
+        ).trim()
+    },
+
+    after: {
+      birthDate: eventDate,
+      sex: newChild.sex,
+      fate: newChild.fate
+    }
+  });
+}
+
+// تقليل عدد المواليد:
+// يُسمح فقط إذا كان المولود ما زال تابعًا
+// ولم تُسجل له أي بيانات تشغيلية لاحقة.
+if (newChildren.length < oldChildren.length) {
+  const validDamNumbers =
+    new Set(
+      [
+        animalNumber,
+        oldEvent.animalNumber,
+        oldEvent.sourceAnimalNumber,
+        oldEvent.previousFollowerNumber,
+        oldEvent.newMotherNumber
+      ]
+        .map(calvingNormDigitsOnlySrv)
+        .filter(Boolean)
+    );
+
+  const expectedDamId =
+    String(
+      oldEvent.animalId ||
+      subject.id ||
+      ""
+    ).trim();
+
   for (
-    let i = 0;
+    let i = newChildren.length;
     i < oldChildren.length;
     i++
   ) {
-    const oldChild =
-      oldChildren[i];
-
-    const newChild =
-      newChildren[i];
-
-    if (
-      !oldChild.number ||
-      !newChild.number ||
-      oldChild.number !==
-        newChild.number
-    ) {
-      return res.status(409).json({
-        ok: false,
-        error:
-          "calving_offspring_identity_immutable",
-        message:
-          `❌ رقم المولود ${i + 1} لا يمكن تغييره من تعديل حدث الولادة؛ هوية المولود ثابتة بعد الحفظ.`
-      });
-    }
-
-    const birthChanged =
-      eventDate !==
-      oldEventDate;
-
-    const sexChanged =
-      newChild.sex !==
-      oldChild.sex;
-
-    const fateChanged =
-      newChild.fate !==
-      oldChild.fate;
-
-    if (
-      !birthChanged &&
-      !sexChanged &&
-      !fateChanged
-    ) {
-      continue;
-    }
+    const oldChild = oldChildren[i];
 
     const record =
       await eventsPageCalvingCorrectionResolveOffspringSrv(
@@ -18544,10 +18671,9 @@ if (typeKey === "calving") {
     if (!record) {
       return res.status(409).json({
         ok: false,
-        error:
-          "calving_offspring_record_missing",
+        error: "calving_removed_offspring_missing",
         message:
-          `❌ تعذّر العثور على سجل المولود رقم ${oldChild.number} لمصالحة تعديل الولادة بأمان.`
+          `❌ تعذّر العثور على سجل المولود رقم ${oldChild.number}.`
       });
     }
 
@@ -18558,73 +18684,58 @@ if (typeKey === "calving") {
         oldChild.number
       );
 
-    if (
-      birthChanged &&
-      earliestDependentDate &&
-      eventDate >
-        earliestDependentDate
-    ) {
-      return res.status(409).json({
-        ok: false,
-        error:
-          "calving_date_after_offspring_dependency",
-        message:
-          `❌ لا يمكن نقل تاريخ الولادة إلى ${eventDate} لأن للمولود رقم ${oldChild.number} بيانات لاحقة تبدأ بتاريخ ${earliestDependentDate}.`
-      });
-    }
+    const recordBirthDate =
+      eventsPageCorrectionDateSrv(
+        record.data?.birthDate
+      );
 
-    if (
-      sexChanged &&
+    const recordDamId =
+      String(
+        record.data?.damId ||
+        ""
+      ).trim();
+
+    const recordDamNumber =
+      calvingNormDigitsOnlySrv(
+        record.data?.damNumber ||
+        ""
+      );
+
+    const linkedToThisCalving =
       (
-        record._collection !==
-          "calves" ||
-        earliestDependentDate
-      )
+        expectedDamId &&
+        recordDamId &&
+        recordDamId === expectedDamId
+      ) ||
+      (
+        recordDamNumber &&
+        validDamNumbers.has(recordDamNumber)
+      );
+
+    if (
+      record._collection !== "calves" ||
+      earliestDependentDate ||
+      recordBirthDate !== oldEventDate ||
+      !linkedToThisCalving
     ) {
       return res.status(409).json({
         ok: false,
-        error:
-          "calving_offspring_sex_has_dependencies",
+        error: "calving_removed_offspring_has_dependencies",
         message:
-          `❌ لا يمكن تغيير جنس المولود رقم ${oldChild.number} بعد وجود بيانات تشغيلية لاحقة له.`
+          `❌ لا يمكن حذف المولود رقم ${oldChild.number} من الولادة لأن له بيانات تشغيلية لاحقة أو لم يعد تابعًا رضيعًا مرتبطًا بهذه الولادة.`
       });
     }
-
-    const collectionName =
-      record._collection ===
-        "animals"
-        ? "animals"
-        : "calves";
 
     dependentWrites.push({
       ref:
-        db
-          .collection(
-            collectionName
-          )
-          .doc(
-            record.id
-          ),
-
-      patch: {
-        birthDate:
-          eventDate,
-        sex:
-          newChild.sex,
-        fate:
-          newChild.fate,
-        updatedAt:
-          admin.firestore.FieldValue
-            .serverTimestamp()
-      }
+        db.collection("calves").doc(record.id),
+      delete: true
     });
 
     dependentCorrections.push({
-      animalNumber:
-        oldChild.number,
-
-      collection:
-        collectionName,
+      action: "removed",
+      animalNumber: oldChild.number,
+      collection: "calves",
 
       before: {
         birthDate:
@@ -18632,10 +18743,7 @@ if (typeKey === "calving") {
             record.data?.birthDate ||
             oldEventDate ||
             ""
-          ).slice(
-            0,
-            10
-          ),
+          ).slice(0, 10),
 
         sex:
           String(
@@ -18652,17 +18760,129 @@ if (typeKey === "calving") {
           ).trim()
       },
 
-      after: {
-        birthDate:
-          eventDate,
-        sex:
-          newChild.sex,
-        fate:
-          newChild.fate
-      }
+      after: null
+    });
+  }
+}
+
+// زيادة عدد المواليد:
+// الأرقام الجديدة تُفحص ضد animals + calves
+// ثم تُنشأ بنفس بنية مولود الولادة الأصلية.
+if (newChildren.length > oldChildren.length) {
+  const addedChildren =
+    newChildren.slice(oldChildren.length);
+
+  const availability =
+    await calvingNumbersAvailableSrv(
+      uid,
+      addedChildren.map(child => child.number)
+    );
+
+  if (!availability.ok) {
+    return res.status(
+      availability.duplicate ? 409 : 503
+    ).json({
+      ok: false,
+      error:
+        availability.duplicate
+          ? "duplicate_animal_number"
+          : "animal_number_check_failed",
+      message: availability.message
     });
   }
 
+  const sireLineage =
+    await calvingResolvedSireLineageSrv({
+      userId: uid,
+      animal: subject,
+      animalNumber,
+      lastInseminationDate:
+        lastFertileInseminationDate
+    });
+
+  const damNumber =
+    calvingNormDigitsOnlySrv(
+      oldEvent.animalNumber ||
+      animalNumber
+    );
+
+  const damId =
+    String(
+      oldEvent.animalId ||
+      subject.id ||
+      ""
+    ).trim();
+
+  for (const child of addedChildren) {
+    const calfRef =
+      db.collection("calves").doc();
+
+    const calfData = {
+      userId: uid,
+      ownerUid: uid,
+      userId_number:
+        `${uid}#${child.number}`,
+
+      entryType: "followers",
+
+      calfNumber: child.number,
+      number: child.number,
+      animalNumber: Number(child.number),
+
+      damId,
+      damNumber,
+
+      damPreviousFollowerNumber:
+        oldEvent.convertedFromFollower === true
+          ? calvingNormDigitsOnlySrv(
+              oldEvent.sourceAnimalNumber ||
+              oldEvent.previousFollowerNumber ||
+              ""
+            )
+          : null,
+
+      damReferenceStatus: "known",
+
+      birthDate: eventDate,
+      species,
+      sex: child.sex,
+      fate: child.fate,
+
+      status: "رضيع",
+      followerStatus: "رضيع",
+      reproductiveStatus: null,
+
+      ...sireLineage,
+
+      createdAt:
+        admin.firestore.FieldValue.serverTimestamp(),
+
+      updatedAt:
+        admin.firestore.FieldValue.serverTimestamp(),
+
+      source:
+        "server:/api/events-page/event/correct:calving-add-offspring"
+    };
+
+    dependentWrites.push({
+      ref: calfRef,
+      patch: calfData
+    });
+
+    dependentCorrections.push({
+      action: "created",
+      animalNumber: child.number,
+      collection: "calves",
+      before: null,
+
+      after: {
+        birthDate: eventDate,
+        sex: child.sex,
+        fate: child.fate
+      }
+    });
+  }
+}
   eventPatch = {
     ...eventPatch,
 
@@ -19473,6 +19693,11 @@ lastCorrectionReason: correctionReason,
         }, { merge: true });
       }
       for (const item of dependentWrites) {
+  if (item.delete === true) {
+    batch.delete(item.ref);
+    continue;
+  }
+
   batch.set(
     item.ref,
     item.patch,
