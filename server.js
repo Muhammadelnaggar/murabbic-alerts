@@ -19660,14 +19660,64 @@ eventPatch.lastMilkCorrectionReason =
 const editedAtMs = Date.now();
 
 const editedBy =
-  String(req.authSession?.uid || uid).trim();
+  String(
+    req.authSession?.uid ||
+    uid
+  ).trim();
 
-const editedByName =
+let editedByName =
   String(
     req.authSession?.user?.name ||
     req.authSession?.decoded?.name ||
     ""
   ).trim();
+
+// fallback آمن للحسابات القديمة:
+// نحاول قراءة الاسم من ملف المستخدم ثم Firebase Auth.
+if (!editedByName && editedBy) {
+  try {
+    const editorProfile =
+      await authReadUserProfileBridgeSrv(
+        editedBy
+      );
+
+    editedByName =
+      String(
+        editorProfile?.name ||
+        editorProfile?.displayName ||
+        editorProfile?.fullName ||
+        ""
+      ).trim();
+  } catch (_) {}
+}
+
+if (
+  !editedByName &&
+  editedBy &&
+  admin.apps.length
+) {
+  try {
+    const editorAuthUser =
+      await admin.auth().getUser(
+        editedBy
+      );
+
+    editedByName =
+      String(
+        editorAuthUser?.displayName ||
+        ""
+      ).trim();
+  } catch (_) {}
+}
+
+// آخر fallback: يظل المُعدِّل معروفًا بدل خانة فارغة.
+if (!editedByName) {
+  editedByName =
+    String(
+      req.authSession?.user?.phone ||
+      ""
+    ).trim();
+}
 
 const subjectCollection =
   subject._collection === "calves" ? "calves" : "animals";
