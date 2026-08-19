@@ -16485,6 +16485,7 @@ if (alreadyEdited) {
       "daily_milk",
       "dry_off",
       "insemination",
+      "uterine_check",
       "pregnancy_diagnosis"
     ]);
 
@@ -18403,6 +18404,7 @@ if (
     "daily_milk",
     "dry_off",
     "insemination",
+    "uterine_check",
     "pregnancy_diagnosis"
   ].includes(typeKey) &&
   !correctionPerformedBy
