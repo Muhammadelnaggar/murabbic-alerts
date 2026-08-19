@@ -61,9 +61,45 @@
       <label>عدد الأيام منذ آخر شياع / تلقيح</label>
 <input id="daysSinceLastHeatOrAI" readonly />
       <label>ملاحظات</label>
-      <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
+<textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
 
-      <!-- زر داخلي مخفي فقط للتوافق لو احتجناه -->
+<div class="row" id="editToolsRow" style="display:none">
+  <div>
+    <label>القائم بالتعديل</label>
+
+    <input
+      id="correctionPerformedBy"
+      type="text"
+      maxlength="160"
+      list="correctionPerformersList"
+      placeholder="اسم الفني أو الطبيب"
+      autocomplete="off"
+    />
+
+    <datalist id="correctionPerformersList"></datalist>
+
+    <small class="form-hint">
+      يُستخدم نفس دليل الفنيين والأطباء في مُرَبِّيك.
+    </small>
+  </div>
+
+  <div>
+    <label>سبب التعديل</label>
+
+    <input
+      id="correctionReason"
+      type="text"
+      maxlength="500"
+      placeholder="اكتب سبب تصحيح بيانات الشياع"
+    />
+
+    <small class="form-hint">
+      يُحفظ سبب التعديل داخل سجل التصحيحات.
+    </small>
+  </div>
+</div>
+
+<!-- زر داخلي مخفي فقط للتوافق لو احتجناه -->
       <button type="submit" id="saveBtn" style="display:none"></button>
     </form>
   </div>
@@ -85,9 +121,28 @@
   const animalEl = $("animalNumber");
   const dateEl = $("eventDate");
   const saveBtn = $("saveBtnUI");
-  const openCowCardBtn = $("openCowCard");
+const openCowCardBtn = $("openCowCard");
 
-  let gateTimer = null;
+const p = new URLSearchParams(location.search);
+
+const requestedEditMode =
+  String(p.get("mode") || "")
+    .trim()
+    .toLowerCase() === "edit";
+
+const editEventId =
+  String(p.get("eventId") || "").trim();
+
+const isEditMode =
+  requestedEditMode && !!editEventId;
+
+const correctionPerformedByEl =
+  $("correctionPerformedBy");
+
+const correctionPerformersListEl =
+  $("correctionPerformersList");
+
+let gateTimer = null;
   let gateState = {
     allowed: false,
     animalNumbers: [],
@@ -180,8 +235,265 @@ function msg(text, ok=false, actionUrl="", actionLabel="الذهاب لتأكي�
   }
 
   function getHeatTime(){
-    return form.querySelector('input[name="heatTime"]:checked')?.value || "";
+  return form.querySelector('input[name="heatTime"]:checked')?.value || "";
+}
+
+function setHeatTime(value){
+  const raw =
+    String(value || "")
+      .trim()
+      .replace(/[ًٌٍَُِّْ]/g, "")
+      .replace(/\s+/g, "");
+
+  const wanted =
+    raw === "ص" || raw.includes("صباح")
+      ? "صباحا"
+      : (
+          raw === "م" || raw.includes("مساء")
+            ? "مساءا"
+            : ""
+        );
+
+  if (!wanted) return;
+
+  const target =
+    form.querySelector(
+      `input[name="heatTime"][value="${wanted}"]`
+    );
+
+  if (target) {
+    target.checked = true;
   }
+}
+
+function renderCorrectionPerformers(items = []){
+  if (!correctionPerformersListEl) return;
+
+  const values =
+    [...new Set(
+      (Array.isArray(items) ? items : [])
+        .map(x => String(x || "").trim())
+        .filter(Boolean)
+    )];
+
+  correctionPerformersListEl.replaceChildren(
+    ...values.map(value => {
+      const option =
+        document.createElement("option");
+
+      option.value = value;
+
+      return option;
+    })
+  );
+}
+
+async function loadEditEvent(){
+  if (!editEventId) {
+    msg(
+      "❌ تعذّر تحديد حدث الشياع المطلوب تعديله.",
+      false
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    return;
+  }
+
+  try {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    if (animalEl) {
+      animalEl.readOnly = true;
+    }
+
+    const r =
+      await fetch(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}`,
+        {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: {
+            "Accept": "application/json"
+          }
+        }
+      );
+
+    const data =
+      await r.json().catch(() => ({
+        ok: false,
+        message:
+          "تعذّر قراءة بيانات الشياع."
+      }));
+
+    if (
+      r.status === 401 ||
+      data?.error === "auth_required"
+    ) {
+      msg(
+        data?.message ||
+          "سجّل الدخول أولًا.",
+        false
+      );
+
+      return;
+    }
+
+    if (
+      !r.ok ||
+      !data?.ok ||
+      !data?.event
+    ) {
+      msg(
+        data?.message ||
+          "❌ تعذّر تحميل بيانات الشياع للتعديل.",
+        false
+      );
+
+      return;
+    }
+
+    if (
+      String(
+        data.event.typeKey || ""
+      ).trim() !== "heat"
+    ) {
+      msg(
+        "❌ الحدث المحدد ليس حدث شياع.",
+        false
+      );
+
+      return;
+    }
+
+    if (
+      data.event?.editPolicy?.editable !== true
+    ) {
+      msg(
+        data.event?.editPolicy?.reason ||
+          "❌ هذا الحدث غير متاح للتعديل.",
+        false
+      );
+
+      return;
+    }
+
+    renderCorrectionPerformers(
+      data.correctionPerformers
+    );
+
+    const ev =
+      data.event;
+
+    const d =
+      ev.data || {};
+
+    if (animalEl) {
+      animalEl.value =
+        String(
+          ev.animalNumber || ""
+        ).trim();
+
+      animalEl.readOnly = true;
+    }
+
+    if (dateEl) {
+      dateEl.value =
+        String(
+          d.eventDate ||
+          ev.eventDate ||
+          ""
+        )
+          .trim()
+          .slice(0, 10);
+    }
+
+    setHeatTime(
+      d.heatTime || ""
+    );
+
+    if ($("notes")) {
+      $("notes").value =
+        String(
+          d.notes || ""
+        );
+    }
+
+    clearContextFields();
+
+    const editToolsRow =
+      $("editToolsRow");
+
+    const correctionReasonEl =
+      $("correctionReason");
+
+    if (editToolsRow) {
+      editToolsRow.style.display = "";
+    }
+
+    if (correctionPerformedByEl) {
+      correctionPerformedByEl.required = true;
+    }
+
+    if (correctionReasonEl) {
+      correctionReasonEl.required = true;
+    }
+
+    const title =
+      document.querySelector(
+        ".mbk-page-title"
+      );
+
+    if (title) {
+      title.textContent =
+        "تعديل شياع";
+    }
+
+    document.title =
+      "تعديل شياع — مُرَبِّيك";
+
+    if (saveBtn) {
+      saveBtn.textContent =
+        "حفظ التعديل ✅";
+
+      saveBtn.disabled = false;
+    }
+
+    const back =
+      document.querySelector(
+        ".mbk-back"
+      );
+
+    if (back) {
+      back.href =
+        `event-list.html?number=${encodeURIComponent(
+          ev.animalNumber || ""
+        )}`;
+    }
+
+    clearMsg();
+
+  } catch(err) {
+    console.error(
+      "heat edit load failed:",
+      err
+    );
+
+    msg(
+      "❌ تعذّر تحميل بيانات الشياع للتعديل.",
+      false
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+  }
+}
 
 async function postJson(url, body){
   const r = await fetch(url, {
@@ -267,7 +579,9 @@ async function getContextSingle(number, eventDate){
   }
 
   async function runGate(){
-    const raw = String(animalEl.value || "").trim();
+  if (requestedEditMode) return;
+
+  const raw = String(animalEl.value || "").trim();
     const eventDate = String(dateEl.value || "").slice(0,10);
 
     gateState = { allowed:false, animalNumbers:[], results:[] };
@@ -332,9 +646,11 @@ return;
 }
 }
   function scheduleGate(){
-    clearTimeout(gateTimer);
-    gateTimer = setTimeout(runGate, 350);
-  }
+  if (requestedEditMode) return;
+
+  clearTimeout(gateTimer);
+  gateTimer = setTimeout(runGate, 350);
+}
 
 async function saveHeat(e){
   e.preventDefault();
@@ -345,10 +661,108 @@ async function saveHeat(e){
   const notes = String($("notes")?.value || "").trim();
 
   if (!raw) return msg("❌ رقم الحيوان مطلوب.", false);
-  if (!eventDate) return msg("❌ تاريخ الشياع مطلوب.", false);
-  if (!heatTime) return msg("❌ وقت ملاحظة الشياع مطلوب.", false);
+if (!eventDate) return msg("❌ تاريخ الشياع مطلوب.", false);
+if (!heatTime) return msg("❌ وقت ملاحظة الشياع مطلوب.", false);
+
+if (requestedEditMode) {
+  if (!isEditMode) {
+    return msg(
+      "❌ تعذّر تحديد حدث الشياع المطلوب تعديله.",
+      false
+    );
+  }
+
+  const correctionPerformedBy =
+    String(
+      correctionPerformedByEl?.value || ""
+    ).trim();
+
+  if (!correctionPerformedBy) {
+    msg(
+      "❌ أدخل اسم القائم بالتعديل.",
+      false
+    );
+
+    correctionPerformedByEl?.focus?.();
+
+    return;
+  }
+
+  const correctionReason =
+    String(
+      $("correctionReason")?.value || ""
+    ).trim();
+
+  if (!correctionReason) {
+    msg(
+      "❌ اكتب سبب التعديل.",
+      false
+    );
+
+    $("correctionReason")?.focus?.();
+
+    return;
+  }
 
   try {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent =
+        "جارٍ حفظ التعديل…";
+    }
+
+    const res =
+      await postJson(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
+        {
+          animalNumber: raw,
+          eventDate,
+          heatTime,
+          notes: notes || null,
+          correctionPerformedBy,
+          correctionReason
+        }
+      );
+
+    msg(
+      res.message ||
+        "✅ تم تعديل الشياع بنجاح.",
+      true
+    );
+
+    setTimeout(() => {
+      location.href =
+        `event-list.html?number=${encodeURIComponent(raw)}`;
+    }, 1000);
+
+  } catch(err) {
+    console.error(
+      "heat correction failed:",
+      err
+    );
+
+    const payload =
+      err?.payload || {};
+
+    msg(
+      payload.message ||
+        err.message ||
+        "❌ تعذّر حفظ تعديل الشياع الآن.",
+      false
+    );
+
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent =
+        "حفظ التعديل ✅";
+    }
+  }
+
+  return;
+}
+
+try {
     if (saveBtn) {
       saveBtn.disabled = true;
       saveBtn.textContent = "جارٍ الحفظ…";
@@ -392,7 +806,7 @@ async function saveHeat(e){
     }
   }
 }
-const p = new URLSearchParams(location.search);
+
 
 const bulk =
   String(
@@ -430,7 +844,24 @@ const dt =
     location.href = `cow-card.html?number=${encodeURIComponent(nums[0])}`;
   });
 
+ if (requestedEditMode) {
+  if (!editEventId) {
+    msg(
+      "❌ رابط تعديل الشياع غير مكتمل.",
+      false
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+  } else {
+    loadEditEvent();
+  }
+
+} else {
   scheduleGate();
+}
 
 })();
 </script>
