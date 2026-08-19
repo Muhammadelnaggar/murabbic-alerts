@@ -18324,7 +18324,7 @@ const correctionPerformedBy =
   );
 
 if (
-  typeKey === "calving" &&
+  ["calving", "abortion"].includes(typeKey) &&
   !correctionPerformedBy
 ) {
   return res.status(400).json({
