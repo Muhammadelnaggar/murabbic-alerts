@@ -9594,13 +9594,18 @@ function herdImportV2BuildAtomicWriteSetInternalSrv({
               : {}),
 
             ...(persistencePlan.inseminators.length
-              ? {
-                  inseminators:
-                    admin.firestore.FieldValue.arrayUnion(
-                      ...persistencePlan.inseminators
-                    )
-                }
-              : {}),
+  ? {
+      inseminators:
+        admin.firestore.FieldValue.arrayUnion(
+          ...persistencePlan.inseminators
+        ),
+
+      operationalPerformers:
+        admin.firestore.FieldValue.arrayUnion(
+          ...persistencePlan.inseminators
+        )
+    }
+  : {}),
 
             updatedAt:
               admin.firestore.FieldValue.serverTimestamp()
@@ -16781,7 +16786,80 @@ checkStage: String(ev.checkStage ?? "").trim(),
     }
   };
 }
+function eventOptionsOperationalPerformersSrv(data = {}) {
+  const lists = [
+    data.operationalPerformers,
+    data.inseminators,
+    data.dryOffPerformers,
+    data.correctionPerformers
+  ];
 
+  return [
+    ...new Set(
+      lists
+        .flatMap(list =>
+          Array.isArray(list)
+            ? list
+            : []
+        )
+        .map(x =>
+          String(x || "").trim()
+        )
+        .filter(Boolean)
+    )
+  ];
+}
+
+app.get(
+  "/api/event-options/operational-performers",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          operationalPerformers: [],
+          message:
+            "❌ تعذّر تحميل قائمة الفنيين والأطباء الآن. حاول مرة أخرى."
+        });
+      }
+
+      const uid = req.userId;
+
+      const snap =
+        await db
+          .collection("user_event_options")
+          .doc(uid)
+          .get();
+
+      const data =
+        snap.exists
+          ? (snap.data() || {})
+          : {};
+
+      return res.json({
+        ok: true,
+        operationalPerformers:
+          eventOptionsOperationalPerformersSrv(
+            data
+          )
+      });
+
+    } catch (e) {
+      console.error(
+        "operational-performers-options",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        operationalPerformers: [],
+        message:
+          "❌ تعذّر تحميل قائمة الفنيين والأطباء الآن. حاول مرة أخرى."
+      });
+    }
+  }
+);
 app.get(
   "/api/events-page/event/:id",
   requireUserId,
@@ -16871,13 +16949,9 @@ try {
       : {};
 
   correctionPerformers =
-    Array.isArray(optionsData.correctionPerformers)
-      ? [...new Set(
-          optionsData.correctionPerformers
-            .map(x => String(x || "").trim())
-            .filter(Boolean)
-        )]
-      : [];
+  eventOptionsOperationalPerformersSrv(
+    optionsData
+  );
 
 } catch (e) {
   console.warn(
@@ -18324,7 +18398,15 @@ const correctionPerformedBy =
   );
 
 if (
-  ["calving", "abortion"].includes(typeKey) &&
+  [
+    "calving",
+    "abortion",
+    "heat",
+    "daily_milk",
+    "dry_off",
+    "insemination",
+    "pregnancy_diagnosis"
+  ].includes(typeKey) &&
   !correctionPerformedBy
 ) {
   return res.status(400).json({
@@ -20195,6 +20277,11 @@ if (correctionPerformedBy) {
           .arrayUnion(
             correctionPerformedBy
           ),
+          operationalPerformers:
+  admin.firestore.FieldValue
+    .arrayUnion(
+      correctionPerformedBy
+    ),
 
       updatedAt: now
     },
@@ -28182,11 +28269,10 @@ app.get("/api/insemination/options", requireUserId, async (req, res) => {
           .filter(Boolean)
       : [];
 
-    const inseminators = Array.isArray(data.inseminators)
-      ? data.inseminators
-          .map(x => String(x || "").trim())
-          .filter(Boolean)
-      : [];
+    const inseminators =
+  eventOptionsOperationalPerformersSrv(
+    data
+  );
 
     return res.json({
       ok: true,
@@ -28928,9 +29014,12 @@ if (semenOption || inseminatorOption) {
   }
 
   if (inseminatorOption) {
-    optionsPatch.inseminators =
-      admin.firestore.FieldValue.arrayUnion(inseminatorOption);
-  }
+  optionsPatch.inseminators =
+    admin.firestore.FieldValue.arrayUnion(inseminatorOption);
+
+  optionsPatch.operationalPerformers =
+    admin.firestore.FieldValue.arrayUnion(inseminatorOption);
+}
 
   batch.set(optionsRef, optionsPatch, { merge: true });
 }
@@ -29321,9 +29410,12 @@ rejected.push({
       }
 
       if (inseminatorOption) {
-        optionsPatch.inseminators =
-          admin.firestore.FieldValue.arrayUnion(inseminatorOption);
-      }
+  optionsPatch.inseminators =
+    admin.firestore.FieldValue.arrayUnion(inseminatorOption);
+
+  optionsPatch.operationalPerformers =
+    admin.firestore.FieldValue.arrayUnion(inseminatorOption);
+}
 
       batch.set(optionsRef, optionsPatch, { merge: true });
       ops++;
@@ -30198,7 +30290,32 @@ const embryonicLossRef = needsEmbryonicLoss
   { merge: true }
 );
 
-    await batch.commit();
+const pregnancyVetOption =
+  String(payload.vet || "").trim();
+
+if (pregnancyVetOption) {
+  batch.set(
+    db
+      .collection("user_event_options")
+      .doc(uid),
+    {
+      userId: uid,
+
+      operationalPerformers:
+        admin.firestore.FieldValue
+          .arrayUnion(
+            pregnancyVetOption
+          ),
+
+      updatedAt:
+        admin.firestore.FieldValue
+          .serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+await batch.commit();
 
     if (typeof scheduleGroupsRebuildSrv === "function") {
       scheduleGroupsRebuildSrv(uid, "pregnancy_diagnosis_save");
@@ -30899,14 +31016,32 @@ app.post(
       });
 
       batch.set(
-        animalRef,
-        animalPatch,
-        {
-          merge: true
-        }
-      );
+  animalRef,
+  animalPatch,
+  {
+    merge: true
+  }
+);
 
-      await batch.commit();
+if (fd.vet) {
+  batch.set(
+    db
+      .collection("user_event_options")
+      .doc(uid),
+    {
+      userId: uid,
+
+      operationalPerformers:
+        admin.firestore.FieldValue
+          .arrayUnion(fd.vet),
+
+      updatedAt: now
+    },
+    { merge: true }
+  );
+}
+
+await batch.commit();
 
       return res.json({
         ok: true,
@@ -33051,13 +33186,34 @@ details: {
     };
 
     const batch = db.batch();
-    batch.set(eventRef, eventPayload);
-    batch.set(db.collection(targetCollection).doc(animal.id), animalPatch, { merge: true });
-    await batch.commit();
+batch.set(eventRef, eventPayload);
+batch.set(db.collection(targetCollection).doc(animal.id), animalPatch, { merge: true });
 
-    return res.json({
-      ok: true,
-      message: `✅ سجلت حالة العرج للحيوان رقم ${fd.animalNumber} بنجاح.`,
+if (fd.vet) {
+  batch.set(
+    db
+      .collection("user_event_options")
+      .doc(uid),
+    {
+      userId: uid,
+
+      operationalPerformers:
+        admin.firestore.FieldValue
+          .arrayUnion(fd.vet),
+
+      updatedAt:
+        admin.firestore.FieldValue
+          .serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+await batch.commit();
+
+return res.json({
+  ok: true,
+  message: `✅ سجلت حالة العرج للحيوان رقم ${fd.animalNumber} بنجاح.`,
       eventId: eventRef.id,
       animalNumber: fd.animalNumber,
       eventDate: fd.eventDate,
@@ -33950,10 +34106,32 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
       await commitIfNeeded(false);
     }
 
-    await commitIfNeeded(true);
+    if (vet && saved.length) {
+  batch.set(
+    db
+      .collection("user_event_options")
+      .doc(uid),
+    {
+      userId: uid,
 
-    if (saved.length && typeof scheduleGroupsRebuildSrv === "function") {
-      scheduleGroupsRebuildSrv(uid, "pregnancy_diagnosis_bulk_save");
+      operationalPerformers:
+        admin.firestore.FieldValue
+          .arrayUnion(vet),
+
+      updatedAt:
+        admin.firestore.FieldValue
+          .serverTimestamp()
+    },
+    { merge: true }
+  );
+
+  ops++;
+}
+
+await commitIfNeeded(true);
+
+if (saved.length && typeof scheduleGroupsRebuildSrv === "function") {
+  scheduleGroupsRebuildSrv(uid, "pregnancy_diagnosis_bulk_save");
     }
 const initialNegativeItems =
   saved.filter(item =>
@@ -55152,13 +55330,9 @@ app.get("/api/dry-off/options", requireUserId, async (req, res) => {
         : {};
 
     const performers =
-      Array.isArray(data.dryOffPerformers)
-        ? [...new Set(
-            data.dryOffPerformers
-              .map(x => String(x || "").trim())
-              .filter(Boolean)
-          )]
-        : [];
+  eventOptionsOperationalPerformersSrv(
+    data
+  );
 
     return res.json({
       ok: true,
@@ -56849,9 +57023,15 @@ if (shouldSavePerformerOption) {
     dryOffOptionsRef,
     {
       userId: uid,
+
       dryOffPerformers:
         admin.firestore.FieldValue
           .arrayUnion(performedBy),
+
+      operationalPerformers:
+        admin.firestore.FieldValue
+          .arrayUnion(performedBy),
+
       updatedAt:
         admin.firestore.FieldValue
           .serverTimestamp()
