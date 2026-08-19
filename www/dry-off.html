@@ -83,7 +83,37 @@
         autocomplete="off"
         required
       />
-      <datalist id="dryOffPerformersList"></datalist>
+           <datalist id="dryOffPerformersList"></datalist>
+    </div>
+
+    <div class="row" id="editToolsRow" style="display:none">
+      <div>
+        <label for="correctionPerformedBy">القائم بالتعديل</label>
+        <input
+          type="text"
+          id="correctionPerformedBy"
+          maxlength="160"
+          list="dryOffPerformersList"
+          placeholder="اسم الفني أو الطبيب"
+          autocomplete="off"
+        >
+        <small class="form-hint">
+          يُستخدم نفس دليل الفنيين والأطباء في مُرَبِّيك.
+        </small>
+      </div>
+
+      <div>
+        <label for="correctionReason">سبب التعديل</label>
+        <input
+          type="text"
+          id="correctionReason"
+          maxlength="500"
+          placeholder="اكتب سبب تصحيح التجفيف"
+        >
+        <small class="form-hint">
+          يُحفظ سبب التعديل داخل سجل التصحيحات.
+        </small>
+      </div>
     </div>
  
 
@@ -98,14 +128,33 @@
  <script>
   const form = document.getElementById("dryOffForm");
 
+  const qp = new URLSearchParams(location.search);
+
+  const requestedEditMode =
+    String(qp.get("mode") || "")
+      .trim()
+      .toLowerCase() === "edit";
+
+  const editEventId =
+    String(qp.get("eventId") || "").trim();
+
+  const isEditMode =
+    requestedEditMode && !!editEventId;
+
   const animalEl = document.getElementById("animalNumber");
   const dateEl = document.getElementById("eventDate");
    const gestEl = document.getElementById("gestationDays");
   const reasonEl = document.getElementById("reason");
   const performedByEl = document.getElementById("performedBy");
   const performersListEl = document.getElementById("dryOffPerformersList");
-  const info = document.getElementById("info");
+   const info = document.getElementById("info");
   const openCardBtn = document.getElementById("openCowCard");
+  const saveBtn = form.querySelector('button[type="submit"]');
+  const editToolsRow = document.getElementById("editToolsRow");
+  const correctionPerformedByEl =
+    document.getElementById("correctionPerformedBy");
+  const correctionReasonEl =
+    document.getElementById("correctionReason");
 
   let acceptedRows = [];
   let rejectedRows = [];
@@ -207,18 +256,236 @@
         )]
       : [];
 
-    performersListEl.innerHTML = "";
-
-    for (const name of performers) {
-      const option = document.createElement("option");
-      option.value = name;
-      performersListEl.appendChild(option);
-    }
+       renderDryOffPerformers(performers);
 
   } catch (err) {
     console.warn("dry-off options failed:", err);
   }
 }
+  function renderDryOffPerformers(items = []) {
+    if (!performersListEl) return;
+
+    const current = Array.from(
+      performersListEl.querySelectorAll("option")
+    )
+      .map(option => String(option.value || "").trim())
+      .filter(Boolean);
+
+    const names = [
+      ...new Set(
+        [
+          ...current,
+          ...(Array.isArray(items) ? items : [])
+        ]
+          .map(x => String(x || "").trim())
+          .filter(Boolean)
+      )
+    ];
+
+    performersListEl.innerHTML = "";
+
+    for (const name of names) {
+      const option = document.createElement("option");
+      option.value = name;
+      performersListEl.appendChild(option);
+    }
+  }
+
+  function setRadioValue(name, value) {
+    const wanted = String(value || "").trim();
+
+    form
+      .querySelectorAll(`input[name="${name}"]`)
+      .forEach(input => {
+        input.checked =
+          String(input.value || "").trim() === wanted;
+      });
+  }
+
+  async function loadEditEvent() {
+    if (!isEditMode) return;
+
+    try {
+      showMsg(
+        "جارِ تحميل بيانات التجفيف للتعديل...",
+        "info"
+      );
+
+      const r = await fetch(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}`,
+        {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: {
+            "Accept": "application/json"
+          }
+        }
+      );
+
+      const data =
+        await r.json().catch(() => null);
+
+      if (
+        r.status === 401 ||
+        data?.error === "auth_required"
+      ) {
+        showMsg(
+          data?.message || "❌ سجّل الدخول أولًا.",
+          "error"
+        );
+        return;
+      }
+
+      if (
+        !r.ok ||
+        !data ||
+        data.ok !== true ||
+        !data.event
+      ) {
+        showMsg(
+          data?.message ||
+            "❌ تعذّر تحميل حدث التجفيف للتعديل.",
+          "error"
+        );
+        return;
+      }
+
+      const ev = data.event;
+      const evData = ev.data || {};
+
+      if (
+        String(ev.typeKey || "").trim() !==
+        "dry_off"
+      ) {
+        showMsg(
+          "❌ رابط التعديل لا يخص حدث تجفيف.",
+          "error"
+        );
+        return;
+      }
+
+      if (ev.editPolicy?.editable !== true) {
+        showMsg(
+          ev.editPolicy?.reason ||
+            "❌ هذا الحدث غير متاح للتعديل.",
+          "error"
+        );
+        return;
+      }
+
+      renderDryOffPerformers(
+        data.correctionPerformers
+      );
+
+      animalEl.value =
+        String(ev.animalNumber || "").trim();
+
+      animalEl.readOnly = true;
+
+      dateEl.value =
+        String(
+          evData.eventDate ||
+          ev.eventDate ||
+          ""
+        )
+          .trim()
+          .slice(0, 10);
+
+      gestEl.value =
+        Number.isFinite(
+          Number(evData.gestationDays)
+        )
+          ? Number(evData.gestationDays)
+          : "";
+
+      reasonEl.value =
+        String(
+          evData.dryOffReason || ""
+        ).trim();
+
+      setRadioValue(
+        "pregnancyStatus",
+        evData.pregnancyStatus
+      );
+
+      setRadioValue(
+        "usedDryingAntibiotics",
+        evData.usedDryingAntibiotics
+      );
+
+      performedByEl.value =
+        String(
+          evData.performedBy || ""
+        ).trim();
+
+      gestEl.required = false;
+      reasonEl.required = false;
+
+      if (editToolsRow) {
+        editToolsRow.style.display = "";
+      }
+
+      if (correctionPerformedByEl) {
+        correctionPerformedByEl.required = true;
+      }
+
+      if (correctionReasonEl) {
+        correctionReasonEl.required = true;
+      }
+
+      const titleEl =
+        document.querySelector(
+          ".mbk-page-title"
+        );
+
+      if (titleEl) {
+        titleEl.textContent =
+          "تعديل التجفيف";
+      }
+
+      if (saveBtn) {
+        saveBtn.textContent =
+          "حفظ التعديل ✅";
+      }
+
+      const backEl =
+        document.querySelector(
+          ".mbk-back"
+        );
+
+      if (backEl) {
+        backEl.href =
+          `event-list.html?number=${encodeURIComponent(animalEl.value)}`;
+      }
+
+      if (info) {
+        info.style.display = "none";
+      }
+
+    } catch (err) {
+      console.error(
+        "dry-off edit load failed:",
+        err
+      );
+
+      showMsg(
+        "❌ تعذّر تحميل حدث التجفيف للتعديل.",
+        "error"
+      );
+    }
+  }
+
+  function markEditDerivedFieldsForRecalculation() {
+    if (!isEditMode) return;
+
+    gestEl.value = "";
+    gestEl.placeholder =
+      "يُعاد حسابها عند الحفظ";
+
+    reasonEl.value =
+      "يُعاد تحديده تلقائيًا عند الحفظ";
+  }
   function normalizeDigits(s) {
     const map = {
       "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
@@ -242,12 +509,24 @@
     return form.querySelector(`input[name="${name}"]:checked`)?.value || "";
   }
 
-  function setButtonLoading(isLoading) {
-    const btn = form.querySelector('button[type="submit"]');
+    function setButtonLoading(isLoading) {
+    const btn =
+      form.querySelector(
+        'button[type="submit"]'
+      );
+
     if (!btn) return;
 
     btn.disabled = !!isLoading;
-    btn.textContent = isLoading ? "جارِ الحفظ..." : "حفظ التجفيف";
+
+    btn.textContent =
+      isLoading
+        ? "جارِ الحفظ..."
+        : (
+            isEditMode
+              ? "حفظ التعديل ✅"
+              : "حفظ التجفيف"
+          );
   }
 
   function resetGateResult() {
@@ -305,8 +584,11 @@ function renderGateResult(data) {
 
   showMsg(msg, gateOk ? "success" : "error");
 }
-  async function runDryOffGate({ silent = false } = {}) {
-    const animalNumbers = animalEl.value.trim();
+    async function runDryOffGate({ silent = false } = {}) {
+    if (requestedEditMode) return false;
+
+    const animalNumbers =
+      animalEl.value.trim();
     const eventDate = dateEl.value;
 
     resetGateResult();
@@ -345,7 +627,9 @@ if (authRequired) return false;
     }
   }
 
-  function scheduleGate() {
+   function scheduleGate() {
+    if (requestedEditMode) return;
+
     clearTimeout(gateTimer);
     gateTimer = setTimeout(() => {
       runDryOffGate({ silent: true });
@@ -381,15 +665,129 @@ if (authRequired) return false;
       performedByEl?.focus();
       return;
     }
+       if (isEditMode) {
+      const correctionPerformedBy =
+        String(
+          correctionPerformedByEl?.value ||
+          ""
+        ).trim();
+
+      const correctionReason =
+        String(
+          correctionReasonEl?.value ||
+          ""
+        ).trim();
+
+      if (!correctionPerformedBy) {
+        showMsg(
+          "❌ أدخل اسم القائم بالتعديل.",
+          "error"
+        );
+        correctionPerformedByEl?.focus();
+        return;
+      }
+
+      if (!correctionReason) {
+        showMsg(
+          "❌ اكتب سبب التعديل.",
+          "error"
+        );
+        correctionReasonEl?.focus();
+        return;
+      }
+
+      try {
+        setButtonLoading(true);
+
+        showMsg(
+          "جارِ حفظ تعديل التجفيف...",
+          "info"
+        );
+
+        const {
+          r,
+          data,
+          authRequired
+        } =
+          await sessionPostJson(
+            `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
+            {
+              animalNumber:
+                animalEl.value.trim(),
+
+              eventDate,
+              pregnancyStatus,
+              usedDryingAntibiotics,
+              performedBy,
+
+              correctionPerformedBy,
+              correctionReason
+            }
+          );
+
+        if (authRequired) {
+          setButtonLoading(false);
+          return;
+        }
+
+        if (
+          !r.ok ||
+          !data ||
+          data.ok !== true
+        ) {
+          showMsg(
+            data?.message ||
+              "❌ لم يتم حفظ تعديل التجفيف.",
+            "error"
+          );
+
+          setButtonLoading(false);
+          return;
+        }
+
+        showMsg(
+          data.message ||
+            "✅ تم تعديل التجفيف بنجاح.",
+          "success"
+        );
+
+        setTimeout(() => {
+          location.href =
+            `event-list.html?number=${encodeURIComponent(animalEl.value.trim())}`;
+        }, 700);
+
+      } catch (err) {
+        console.error(
+          "dry-off correction save failed:",
+          err
+        );
+
+        showMsg(
+          "❌ فشل الاتصال بالسيرفر أثناء حفظ تعديل التجفيف.",
+          "error"
+        );
+
+        setButtonLoading(false);
+      }
+
+      return;
+    }
+
     if (!gateOk || !acceptedRows.length) {
-      const ok = await runDryOffGate({ silent: false });
+      const ok =
+        await runDryOffGate({
+          silent: false
+        });
+
       if (!ok) return;
     }
 
     try {
       setButtonLoading(true);
-      showMsg("جارِ حفظ التجفيف...", "info");
-
+      showMsg(
+        "جارِ حفظ التجفيف...",
+        "info"
+      );
  const { data, authRequired } = await sessionPostJson("/api/dry-off/save", {
   eventDate,
   pregnancyStatus,
@@ -442,35 +840,68 @@ if (authRequired) return;
     }
   }
 
-   window.addEventListener("load", () => {
+     window.addEventListener("load", () => {
+    if (requestedEditMode) {
+      if (!editEventId) {
+        showMsg(
+          "❌ رابط تعديل التجفيف غير مكتمل.",
+          "error"
+        );
+        return;
+      }
+
+      loadEditEvent();
+      return;
+    }
+
     loadDryOffOptions();
 
-    const qp = new URLSearchParams(location.search);
     const qpNum =
-  qp.get("numbers") ||
-  qp.get("animalNumbers") ||
-  qp.get("bulk") ||
-  qp.get("number") ||
-  qp.get("animalNumber") ||
-  qp.get("animalId") ||
-  "";
+      qp.get("numbers") ||
+      qp.get("animalNumbers") ||
+      qp.get("bulk") ||
+      qp.get("number") ||
+      qp.get("animalNumber") ||
+      qp.get("animalId") ||
+      "";
+
     const startNumber = qpNum || "";
+
     if (startNumber) {
       animalEl.value = startNumber;
     }
 
     if (!dateEl.value) {
-      dateEl.value = todayYYYYMMDD();
+      dateEl.value =
+        todayYYYYMMDD();
     }
 
-    if (animalEl.value && dateEl.value) {
-      runDryOffGate({ silent: true });
+    if (
+      animalEl.value &&
+      dateEl.value
+    ) {
+      runDryOffGate({
+        silent: true
+      });
     }
   });
 
-  animalEl.addEventListener("input", scheduleGate);
-  dateEl.addEventListener("change", scheduleGate);
+  animalEl.addEventListener(
+    "input",
+    scheduleGate
+  );
 
+  dateEl.addEventListener(
+    "change",
+    () => {
+      if (isEditMode) {
+        markEditDerivedFieldsForRecalculation();
+        return;
+      }
+
+      scheduleGate();
+    }
+  );
   openCardBtn?.addEventListener("click", () => {
     const first = splitNumbers(animalEl.value)[0] || "";
     if (!first) return;
