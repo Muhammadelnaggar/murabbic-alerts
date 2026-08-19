@@ -20261,30 +20261,61 @@ correctionPerformedBy:
 createdAt: now,
         source: "server:/api/events-page/event/correct"
       });
-if (correctionPerformedBy) {
+const correctedOperationalPerformers =
+  [
+    correctionPerformedBy,
+    eventPatch.inseminator,
+    eventPatch.vet,
+    eventPatch.performedBy
+  ]
+    .map(x => String(x || "").trim())
+    .filter(Boolean);
+
+if (correctedOperationalPerformers.length) {
   const correctionOptionsRef =
     db
       .collection("user_event_options")
       .doc(uid);
 
+  const correctionOptionsPatch = {
+    userId: uid,
+
+    operationalPerformers:
+      admin.firestore.FieldValue
+        .arrayUnion(
+          ...correctedOperationalPerformers
+        ),
+
+    updatedAt: now
+  };
+
+  if (correctionPerformedBy) {
+    correctionOptionsPatch.correctionPerformers =
+      admin.firestore.FieldValue
+        .arrayUnion(
+          correctionPerformedBy
+        );
+  }
+
+  if (eventPatch.inseminator) {
+    correctionOptionsPatch.inseminators =
+      admin.firestore.FieldValue
+        .arrayUnion(
+          eventPatch.inseminator
+        );
+  }
+
+  if (eventPatch.performedBy) {
+    correctionOptionsPatch.dryOffPerformers =
+      admin.firestore.FieldValue
+        .arrayUnion(
+          eventPatch.performedBy
+        );
+  }
+
   batch.set(
     correctionOptionsRef,
-    {
-      userId: uid,
-
-      correctionPerformers:
-        admin.firestore.FieldValue
-          .arrayUnion(
-            correctionPerformedBy
-          ),
-          operationalPerformers:
-  admin.firestore.FieldValue
-    .arrayUnion(
-      correctionPerformedBy
-    ),
-
-      updatedAt: now
-    },
+    correctionOptionsPatch,
     { merge: true }
   );
 }
