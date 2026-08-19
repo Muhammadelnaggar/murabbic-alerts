@@ -88,6 +88,32 @@
   الإجمالي: <span data-key="singleTotalText">—</span> كجم
 </div>
 
+<div class="row hide" id="editToolsRow">
+  <div class="col">
+    <label for="correctionPerformedBy">القائم بالتعديل</label>
+    <input
+      id="correctionPerformedBy"
+      type="text"
+      maxlength="160"
+      list="correctionPerformersList"
+      autocomplete="off"
+      placeholder="اسم القائم بالتعديل"
+    />
+    <datalist id="correctionPerformersList"></datalist>
+  </div>
+
+  <div class="col">
+    <label for="correctionReason">سبب التعديل</label>
+    <input
+      id="correctionReason"
+      type="text"
+      maxlength="500"
+      autocomplete="off"
+      placeholder="اكتب سبب تصحيح كميات اللبن"
+    />
+  </div>
+</div>
+
 <div class="actions-bar" id="singleActionsBar">
   <button type="submit" class="save">حفظ اللبن اليومي</button>
 
@@ -123,6 +149,10 @@ const cancelBulkBtn = $("cancelBulkBtn");
 const openCowCardBtn = $("openCowCardBtn");
 const singleSaveBtn = form?.querySelector('button[type="submit"]');
 const singleActions = $("singleActionsBar");
+const editToolsRow = $("editToolsRow");
+const correctionPerformedByInput = $("correctionPerformedBy");
+const correctionReasonInput = $("correctionReason");
+const correctionPerformersList = $("correctionPerformersList");
 
 const inputSlots = {
   milkS1: {
@@ -171,7 +201,18 @@ function qs(name) {
     .searchParams
     .get(name) || "";
 }
+const requestedEditMode =
+  String(qs("mode") || "")
+    .trim()
+    .toLowerCase() === "edit";
 
+const editEventId =
+  String(qs("eventId") || "")
+    .trim();
+
+const isEditMode =
+  requestedEditMode &&
+  !!editEventId;
 function requestedBulkMode() {
   return (
     qs("mode") === "bulk" ||
@@ -285,7 +326,438 @@ async function postServer(
 
   return data;
 }
+async function getServer(path) {
+  const res =
+    await fetch(
+      path,
+      {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: {
+          "Accept": "application/json"
+        }
+      }
+    );
 
+  return await res
+    .json()
+    .catch(
+      () => ({
+        ok: false,
+        message:
+          "تعذّر قراءة رد السيرفر."
+      })
+    );
+}
+
+function renderCorrectionPerformers(items = []) {
+  if (!correctionPerformersList) {
+    return;
+  }
+
+  const names =
+    [
+      ...new Set(
+        (
+          Array.isArray(items)
+            ? items
+            : []
+        )
+          .map(
+            value =>
+              String(value || "").trim()
+          )
+          .filter(Boolean)
+      )
+    ];
+
+  correctionPerformersList.innerHTML = "";
+
+  names.forEach(
+    name => {
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value = name;
+
+      correctionPerformersList
+        .appendChild(option);
+    }
+  );
+}
+
+function editMilkValuesPayload() {
+  return {
+    animalNumber:
+      animalInput?.value || "",
+
+    milkS1:
+      inputSlots.milkS1.input?.value || "",
+
+    milkS2:
+      inputSlots.milkS2.input?.value || "",
+
+    milkS3:
+      inputSlots.milkS3.input?.disabled
+        ? ""
+        : (
+            inputSlots.milkS3.input?.value || ""
+          )
+  };
+}
+
+let editPreviewTimer = null;
+
+function runEditPreview() {
+  if (!isEditMode) {
+    return;
+  }
+
+  clearTimeout(editPreviewTimer);
+
+  editPreviewTimer =
+    setTimeout(
+      async () => {
+        try {
+          const data =
+            await postServer(
+              "/api/daily-milk/preview",
+              editMilkValuesPayload()
+            );
+
+          const row =
+            data?.ui?.single ||
+            data?.rows?.[0] ||
+            null;
+
+          const totalEl =
+            document.querySelector(
+              "[data-key='singleTotalText']"
+            );
+
+          if (!totalEl) {
+            return;
+          }
+
+          if (
+            !data?.ok ||
+            !row ||
+            row?.ok === false ||
+            !Number.isFinite(
+              Number(row?.milkKg)
+            )
+          ) {
+            totalEl.textContent = "—";
+            return;
+          }
+
+          totalEl.textContent =
+            formatKg(row.milkKg);
+
+        } catch (_) {
+          const totalEl =
+            document.querySelector(
+              "[data-key='singleTotalText']"
+            );
+
+          if (totalEl) {
+            totalEl.textContent = "—";
+          }
+        }
+      },
+      250
+    );
+}
+
+function renderEditMilkSessions(milkSessions = []) {
+  hideAllSingleSlots();
+
+  const sessions =
+    Array.isArray(milkSessions)
+      ? milkSessions
+      : [];
+
+  const byNumber =
+    new Map(
+      sessions.map(
+        item => [
+          Number(item?.n || 0),
+          Number(item?.kg)
+        ]
+      )
+    );
+
+  const required =
+    byNumber.has(3)
+      ? 3
+      : 2;
+
+  for (
+    let n = 1;
+    n <= required;
+    n += 1
+  ) {
+    const slot =
+      inputSlots[`milkS${n}`];
+
+    if (!slot) {
+      continue;
+    }
+
+    slot.wrap
+      ?.classList
+      .remove("hide");
+
+    if (slot.label) {
+      if (required === 2) {
+        slot.label.textContent =
+          n === 1
+            ? "حلبة صباح (كجم)"
+            : "حلبة مساء (كجم)";
+      } else {
+        slot.label.textContent =
+          `حلبة ${n} (كجم)`;
+      }
+    }
+
+    if (slot.input) {
+      slot.input.disabled = false;
+
+      slot.input.value =
+        Number.isFinite(
+          byNumber.get(n)
+        )
+          ? formatKg(
+              byNumber.get(n)
+            )
+          : "";
+    }
+  }
+}
+
+async function loadEditEvent() {
+  showMsg("");
+
+  if (singleSaveBtn) {
+    singleSaveBtn.disabled = true;
+    singleSaveBtn.textContent =
+      "جارِ التحميل…";
+  }
+
+  showBar({
+    status: "info",
+    message:
+      "جارِ تحميل سجل اللبن للتعديل…"
+  });
+
+  try {
+    const data =
+      await getServer(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}`
+      );
+
+    if (
+      !data ||
+      data.ok !== true ||
+      !data.event
+    ) {
+      showBar({
+        status: "error",
+        message:
+          data?.message ||
+          "تعذّر تحميل سجل اللبن للتعديل."
+      });
+
+      return;
+    }
+
+    const ev = data.event;
+    const evData = ev.data || {};
+
+    if (
+      String(ev.typeKey || "").trim() !==
+      "daily_milk"
+    ) {
+      showBar({
+        status: "error",
+        message:
+          "رابط التعديل لا يخص سجل لبن يومي."
+      });
+
+      return;
+    }
+
+    if (
+      ev.editPolicy?.editable !== true
+    ) {
+      showBar({
+        status: "error",
+        message:
+          ev.editPolicy?.reason ||
+          "هذا السجل غير متاح للتعديل."
+      });
+
+      return;
+    }
+
+    const milkSessions =
+      Array.isArray(evData.milkSessions)
+        ? evData.milkSessions
+        : [];
+
+    if (
+      ![2, 3].includes(
+        milkSessions.length
+      )
+    ) {
+      showBar({
+        status: "error",
+        message:
+          "هذا السجل لا يحتوي كميات الحلبات اللازمة للتعديل."
+      });
+
+      return;
+    }
+
+    currentMode = "single";
+    currentSingleRow = null;
+    selectedSingleSessionNumber = null;
+
+    bulkBox
+      ?.classList
+      .add("hide");
+
+    sessionsBox
+      ?.classList
+      .remove("hide");
+
+    singleTotalBox
+      ?.classList
+      .remove("hide");
+
+    singleActions
+      ?.classList
+      .remove("hide");
+
+    editToolsRow
+      ?.classList
+      .remove("hide");
+
+    milkComponentsBox
+      ?.classList
+      .add("hide");
+
+    animalInput.value =
+      String(ev.animalNumber || "").trim();
+
+    animalInput.readOnly = true;
+
+    dateInput.value =
+      String(
+        ev.eventDate ||
+        evData.eventDate ||
+        ""
+      )
+        .trim()
+        .slice(0, 10);
+
+    dateInput.readOnly = true;
+
+    const dateLabel =
+      document.querySelector(
+        'label[for="eventDate"]'
+      );
+
+    if (dateLabel) {
+      dateLabel.textContent =
+        "تاريخ التسجيل (ثابت)";
+    }
+
+    renderEditMilkSessions(
+      milkSessions
+    );
+
+    renderCorrectionPerformers(
+      data.correctionPerformers
+    );
+
+    if (correctionPerformedByInput) {
+      correctionPerformedByInput.required = true;
+    }
+
+    if (correctionReasonInput) {
+      correctionReasonInput.required = true;
+    }
+
+    const titleEl =
+      document.querySelector(
+        ".mbk-page-title"
+      );
+
+    if (titleEl) {
+      titleEl.textContent =
+        "تعديل كميات اللبن اليومي";
+    }
+
+    const backEl =
+      document.querySelector(
+        ".mbk-back"
+      );
+
+    if (backEl) {
+      backEl.href =
+        `event-list.html?number=${encodeURIComponent(animalInput.value)}`;
+    }
+
+    if (
+      singleTotalBox?.childNodes?.[0]
+    ) {
+      singleTotalBox.childNodes[0].textContent =
+        "الإجمالي بعد التعديل: ";
+    }
+
+    const totalEl =
+      document.querySelector(
+        "[data-key='singleTotalText']"
+      );
+
+    if (totalEl) {
+      totalEl.textContent =
+        Number.isFinite(
+          Number(evData.milkKg)
+        )
+          ? formatKg(evData.milkKg)
+          : "—";
+    }
+
+    if (singleSaveBtn) {
+      singleSaveBtn.disabled = false;
+      singleSaveBtn.textContent =
+        "حفظ التعديل ✅";
+    }
+
+    showBar({
+      status: "info",
+      message:
+        "عدّل كميات الحلبات فقط؛ الإجمالي يحسبه السيرفر تلقائيًا."
+    });
+
+  } catch (e) {
+    console.error(
+      "daily milk edit load failed",
+      e
+    );
+
+    showBar({
+      status: "error",
+      message:
+        "تعذّر تحميل سجل اللبن للتعديل."
+    });
+  }
+}
 function showBar(ui) {
   const status =
     String(
@@ -1738,6 +2210,10 @@ function savePayload() {
 async function runGate({
   silent = false
 } = {}) {
+  if (requestedEditMode) {
+    return;
+  }
+
   const payload =
     gatePayload();
 
@@ -1810,6 +2286,122 @@ async function runSave({
   confirmMissingMilk = false
 } = {}) {
   showMsg("");
+
+  if (isEditMode) {
+    const correctionPerformedBy =
+      String(
+        correctionPerformedByInput?.value ||
+        ""
+      ).trim();
+
+    const correctionReason =
+      String(
+        correctionReasonInput?.value ||
+        ""
+      ).trim();
+
+    if (!correctionPerformedBy) {
+      showBar({
+        status: "error",
+        message:
+          "أدخل اسم القائم بالتعديل."
+      });
+
+      correctionPerformedByInput
+        ?.focus();
+
+      return;
+    }
+
+    if (!correctionReason) {
+      showBar({
+        status: "error",
+        message:
+          "اكتب سبب التعديل."
+      });
+
+      correctionReasonInput
+        ?.focus();
+
+      return;
+    }
+
+    if (singleSaveBtn) {
+      singleSaveBtn.disabled = true;
+      singleSaveBtn.textContent =
+        "جارِ الحفظ…";
+    }
+
+    showBar({
+      status: "info",
+      message:
+        "جارِ حفظ تعديل كميات اللبن…"
+    });
+
+    const values =
+      editMilkValuesPayload();
+
+    const data =
+      await postServer(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
+        {
+          animalNumber:
+            animalInput?.value || "",
+
+          eventDate:
+            dateInput?.value || "",
+
+          milkS1:
+            values.milkS1,
+
+          milkS2:
+            values.milkS2,
+
+          milkS3:
+            values.milkS3,
+
+          correctionPerformedBy,
+          correctionReason
+        }
+      );
+
+    if (
+      !data ||
+      data.ok !== true
+    ) {
+      showBar({
+        status: "error",
+        message:
+          data?.message ||
+          "لم يتم حفظ تعديل اللبن اليومي."
+      });
+
+      if (singleSaveBtn) {
+        singleSaveBtn.disabled = false;
+        singleSaveBtn.textContent =
+          "حفظ التعديل ✅";
+      }
+
+      return;
+    }
+
+    showBar({
+      status: "success",
+      message:
+        data.message ||
+        "تم تعديل كميات اللبن اليومي بنجاح."
+    });
+
+    setTimeout(
+      () => {
+        location.href =
+          `event-list.html?number=${encodeURIComponent(animalInput?.value || "")}`;
+      },
+      700
+    );
+
+    return;
+  }
 
   showBar({
     status:
@@ -2024,6 +2616,11 @@ Object
               return;
             }
 
+                       if (isEditMode) {
+              runEditPreview();
+              return;
+            }
+
             selectedSingleSessionNumber =
               slot.n;
           }
@@ -2031,41 +2628,59 @@ Object
     }
   );
 
-const initialDate =
-  qs("date") ||
-  qs("eventDate") ||
-  "";
+if (requestedEditMode) {
+  if (!editEventId) {
+    showBar({
+      status: "error",
+      message:
+        "رابط تعديل اللبن اليومي غير مكتمل."
+    });
 
-const initialNumber =
-  qs("animalNumber") ||
-  qs("number") ||
-  qs("animalId") ||
-  "";
+    if (singleSaveBtn) {
+      singleSaveBtn.disabled = true;
+    }
 
-if (
-  initialDate &&
-  dateInput
-) {
-  dateInput.value =
-    initialDate;
-}
+  } else {
+    loadEditEvent();
+  }
 
-if (
-  initialNumber &&
-  animalInput
-) {
-  animalInput.value =
-    initialNumber;
-}
+} else {
+  const initialDate =
+    qs("date") ||
+    qs("eventDate") ||
+    "";
 
-if (
-  (
-    qs("numbers") ||
-    initialNumber
-  ) &&
-  dateInput?.value
-) {
-  runGate();
+  const initialNumber =
+    qs("animalNumber") ||
+    qs("number") ||
+    qs("animalId") ||
+    "";
+
+  if (
+    initialDate &&
+    dateInput
+  ) {
+    dateInput.value =
+      initialDate;
+  }
+
+  if (
+    initialNumber &&
+    animalInput
+  ) {
+    animalInput.value =
+      initialNumber;
+  }
+
+  if (
+    (
+      qs("numbers") ||
+      initialNumber
+    ) &&
+    dateInput?.value
+  ) {
+    runGate();
+  }
 }
 </script>
 </body>
