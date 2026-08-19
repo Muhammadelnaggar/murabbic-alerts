@@ -19765,17 +19765,50 @@ else if (
           });
         }
 
-        const ai = eventsPageCorrectionLatestAIBeforeSrv(
+               const ai = eventsPageCorrectionLatestAIBeforeSrv(
           docs.map(item => ({ id: item.id, data: item.data || {} })),
           eventId,
           eventDate
         );
 
-        const lastInseminationDate = ai ? eventsPageListDateSrv(ai.data) : "";
+        const documentLastInseminationDate =
+          eventsPageCorrectionDateSrv(
+            subject.data?.lastInseminationDate ||
+            subject.data?.lastAI ||
+            subject.data?.lastInsemination ||
+            ""
+          );
+
+        const storedDiagnosisLastInseminationDate =
+          eventsPageCorrectionDateSrv(
+            oldEvent.lastInseminationDate ||
+            ""
+          );
+
+        const fallbackLastInseminationDate =
+          documentLastInseminationDate &&
+          documentLastInseminationDate <= eventDate
+            ? documentLastInseminationDate
+            : (
+                storedDiagnosisLastInseminationDate &&
+                storedDiagnosisLastInseminationDate <= eventDate
+                  ? storedDiagnosisLastInseminationDate
+                  : ""
+              );
+
+        const lastInseminationDate =
+          ai
+            ? eventsPageListDateSrv(ai.data)
+            : fallbackLastInseminationDate;
+
         const daysFromLastInsemination = lastInseminationDate
           ? calvingDaysBetweenSrv(lastInseminationDate, eventDate)
           : NaN;
-        const minDays = method === "سونار" ? 26 : 40;
+
+        const minDays =
+          method === "سونار"
+            ? 26
+            : 40;
 
         if (!lastInseminationDate || !Number.isFinite(daysFromLastInsemination) || daysFromLastInsemination < minDays) {
           return res.status(409).json({
