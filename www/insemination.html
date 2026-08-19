@@ -69,7 +69,38 @@
       </div>
 
       <label>ملاحظات</label>
-      <textarea data-field="notes"></textarea>
+<textarea data-field="notes"></textarea>
+
+<div class="row" id="editToolsRow" style="display:none">
+  <div>
+    <label>القائم بالتعديل</label>
+    <input
+      id="correctionPerformedBy"
+      type="text"
+      maxlength="160"
+      list="correctionPerformersList"
+      placeholder="اسم الفني أو الطبيب"
+      autocomplete="off"
+    />
+    <datalist id="correctionPerformersList"></datalist>
+    <small class="form-hint">
+      يُستخدم نفس دليل الفنيين والأطباء في مُرَبِّيك.
+    </small>
+  </div>
+
+  <div>
+    <label>سبب التعديل</label>
+    <input
+      id="correctionReason"
+      type="text"
+      maxlength="500"
+      placeholder="اكتب سبب تصحيح بيانات التلقيح"
+    />
+    <small class="form-hint">
+      يُحفظ سبب التعديل داخل سجل التصحيحات.
+    </small>
+  </div>
+</div>
 
 <div class="actions-bar">
   <button type="submit" class="save">حفظ التلقيح ✅</button>
@@ -84,10 +115,32 @@
 <script>
   const qp = new URLSearchParams(location.search);
 
+  const requestedEditMode =
+    String(qp.get("mode") || "")
+      .trim()
+      .toLowerCase() === "edit";
+
+  const editEventId =
+    String(qp.get("eventId") || "").trim();
+
+  const isEditMode =
+    requestedEditMode && !!editEventId;
+
   const form = document.getElementById("eventForm");
   const animalEl = document.querySelector('[data-field="animalNumber"]');
-  const dateEl = document.querySelector('[data-field="eventDate"]');
-  const gateBox = document.getElementById("gateBox");
+const dateEl = document.querySelector('[data-field="eventDate"]');
+const gateBox = document.getElementById("gateBox");
+const saveBtn = form?.querySelector('button[type="submit"]');
+
+const correctionPerformedByEl =
+  document.getElementById(
+    "correctionPerformedBy"
+  );
+
+const correctionPerformersListEl =
+  document.getElementById(
+    "correctionPerformersList"
+  );
 
  if (animalEl) {
   animalEl.value =
@@ -209,9 +262,287 @@ setRadioValue("heatStatus", heatTimeFromQuery);
     return { r, data, authRequired: true };
   }
 
-  return { r, data, authRequired: false };
+ return { r, data, authRequired: false };
 }
-  function collectPayload() {
+
+function renderCorrectionPerformers(items = []) {
+  if (!correctionPerformersListEl) return;
+
+  const values =
+    [...new Set(
+      (Array.isArray(items) ? items : [])
+        .map(x =>
+          String(x || "").trim()
+        )
+        .filter(Boolean)
+    )];
+
+  correctionPerformersListEl.replaceChildren(
+    ...values.map(value => {
+      const option =
+        document.createElement("option");
+
+      option.value = value;
+
+      return option;
+    })
+  );
+}
+
+async function loadEditEvent() {
+  if (!editEventId) {
+    showGate(
+      "❌ تعذّر تحديد حدث التلقيح المطلوب تعديله.",
+      "error"
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    return;
+  }
+
+  try {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    if (animalEl) {
+      animalEl.readOnly = true;
+    }
+
+    if (dateEl) {
+      dateEl.disabled = true;
+    }
+
+    showGate(
+      "جارِ تحميل بيانات التلقيح للتعديل…",
+      "info"
+    );
+
+    const {
+      r,
+      data,
+      authRequired
+    } =
+      await sessionFetchJson(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}`
+      );
+
+    if (authRequired) return;
+
+    if (
+      !r.ok ||
+      !data?.ok ||
+      !data?.event
+    ) {
+      showGate(
+        data?.message ||
+          "❌ تعذّر تحميل بيانات التلقيح للتعديل.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      String(
+        data.event.typeKey || ""
+      ).trim() !== "insemination"
+    ) {
+      showGate(
+        "❌ الحدث المحدد ليس حدث تلقيح.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      data.event?.editPolicy?.editable !== true
+    ) {
+      showGate(
+        data.event?.editPolicy?.reason ||
+          "❌ هذا الحدث غير متاح للتعديل.",
+        "error"
+      );
+
+      return;
+    }
+
+    renderCorrectionPerformers(
+      data.correctionPerformers
+    );
+
+    const ev =
+      data.event;
+
+    const d =
+      ev.data || {};
+
+    if (animalEl) {
+      animalEl.value =
+        String(
+          ev.animalNumber || ""
+        ).trim();
+    }
+
+    if (dateEl) {
+      dateEl.value =
+        String(
+          d.eventDate ||
+          ev.eventDate ||
+          ""
+        )
+          .trim()
+          .slice(0, 10);
+    }
+
+    const methodEl =
+      form.querySelector(
+        '[data-field="inseminationMethod"]'
+      );
+
+    const semenEl =
+      form.querySelector(
+        '[data-field="semenCode"]'
+      );
+
+    const inseminatorEl =
+      form.querySelector(
+        '[data-field="inseminator"]'
+      );
+
+    const notesEl =
+      form.querySelector(
+        '[data-field="notes"]'
+      );
+
+    if (methodEl) {
+      methodEl.value =
+        String(
+          d.inseminationMethod || ""
+        ).trim();
+    }
+
+    if (semenEl) {
+      semenEl.value =
+        String(
+          d.semenCode || ""
+        ).trim();
+    }
+
+    if (inseminatorEl) {
+      inseminatorEl.value =
+        String(
+          d.inseminator || ""
+        ).trim();
+    }
+
+    setRadioValue(
+      "inseminationTime",
+      d.inseminationTime || ""
+    );
+
+    setRadioValue(
+      "heatStatus",
+      d.heatStatus || ""
+    );
+
+    if (notesEl) {
+      notesEl.value =
+        String(
+          d.notes || ""
+        );
+    }
+
+    setDetailsDisabled(false);
+
+    if (animalEl) {
+      animalEl.readOnly = true;
+    }
+
+    if (dateEl) {
+      dateEl.disabled = false;
+    }
+
+    const editToolsRow =
+      document.getElementById(
+        "editToolsRow"
+      );
+
+    const correctionReasonEl =
+      document.getElementById(
+        "correctionReason"
+      );
+
+    if (editToolsRow) {
+      editToolsRow.style.display = "";
+    }
+
+    if (correctionPerformedByEl) {
+      correctionPerformedByEl.required = true;
+    }
+
+    if (correctionReasonEl) {
+      correctionReasonEl.required = true;
+    }
+
+    const title =
+      document.querySelector(
+        ".mbk-page-title"
+      );
+
+    if (title) {
+      title.textContent =
+        "تعديل تلقيح";
+    }
+
+    document.title =
+      "تعديل تلقيح — مُرَبِّيك";
+
+    if (saveBtn) {
+      saveBtn.textContent =
+        "حفظ التعديل ✅";
+
+      saveBtn.disabled = false;
+    }
+
+    const back =
+      document.querySelector(
+        ".mbk-back"
+      );
+
+    if (back) {
+      back.href =
+        `event-list.html?number=${encodeURIComponent(
+          ev.animalNumber || ""
+        )}`;
+    }
+
+    if (gateBox) {
+      gateBox.style.display = "none";
+    }
+
+  } catch (err) {
+    console.error(
+      "insemination edit load failed",
+      err
+    );
+
+    showGate(
+      "❌ تعذّر تحميل بيانات التلقيح للتعديل.",
+      "error"
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+  }
+}
+
+function collectPayload() {
     const animalNumber = String(animalEl?.value || "").trim();
     const eventDate = String(dateEl?.value || "").trim();
 
@@ -337,9 +668,15 @@ async function runGateNow() {
 }
 
   function scheduleGate() {
-    clearTimeout(gateTimer);
-    gateTimer = setTimeout(runGateNow, 350);
-  }
+  if (requestedEditMode) return;
+
+  clearTimeout(gateTimer);
+  gateTimer =
+    setTimeout(
+      runGateNow,
+      350
+    );
+}
 
   animalEl?.addEventListener("input", scheduleGate);
   animalEl?.addEventListener("change", scheduleGate);
@@ -349,8 +686,146 @@ async function runGateNow() {
   e.preventDefault();
 
   const payload = collectPayload();
-  const nums = parseNumbers(payload.animalNumber);
-  const isBulk =
+
+if (requestedEditMode) {
+  if (!isEditMode) {
+    showGate(
+      "❌ تعذّر تحديد حدث التلقيح المطلوب تعديله.",
+      "error"
+    );
+
+    return;
+  }
+
+  const correctionPerformedBy =
+    String(
+      correctionPerformedByEl?.value || ""
+    ).trim();
+
+  if (!correctionPerformedBy) {
+    showGate(
+      "❌ أدخل اسم القائم بالتعديل.",
+      "error"
+    );
+
+    correctionPerformedByEl?.focus?.();
+
+    return;
+  }
+
+  const correctionReason =
+    String(
+      document.getElementById(
+        "correctionReason"
+      )?.value || ""
+    ).trim();
+
+  if (!correctionReason) {
+    showGate(
+      "❌ اكتب سبب التعديل.",
+      "error"
+    );
+
+    document
+      .getElementById(
+        "correctionReason"
+      )
+      ?.focus?.();
+
+    return;
+  }
+
+  payload.correctionPerformedBy =
+    correctionPerformedBy;
+
+  payload.correctionReason =
+    correctionReason;
+
+  try {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    showGate(
+      "جارِ حفظ تعديل التلقيح…",
+      "info"
+    );
+
+    const {
+      r,
+      data,
+      authRequired
+    } =
+      await sessionFetchJson(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
+        {
+          method: "POST",
+          body: payload
+        }
+      );
+
+    if (authRequired) return;
+
+    if (
+      !r.ok &&
+      !data?.message &&
+      !data?.error
+    ) {
+      data.message =
+        "تعذّر حفظ تعديل التلقيح.";
+    }
+
+    const serverMessage =
+      String(
+        data?.message ||
+        data?.error ||
+        ""
+      ).trim();
+
+    if (serverMessage) {
+      showGate(
+        serverMessage,
+        data?.ok
+          ? "success"
+          : "error"
+      );
+    }
+
+    if (data?.ok) {
+      setTimeout(() => {
+        location.href =
+          `event-list.html?number=${encodeURIComponent(
+            payload.animalNumber
+          )}`;
+      }, 1000);
+    }
+
+  } catch (err) {
+    console.error(
+      "insemination correction failed",
+      err
+    );
+
+    showGate(
+      "❌ تعذّر حفظ تعديل التلقيح الآن.",
+      "error"
+    );
+
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+    }
+  }
+
+  return;
+}
+
+const nums =
+  parseNumbers(
+    payload.animalNumber
+  );
+
+const isBulk =
     new URLSearchParams(location.search).get("mode") === "bulk" ||
     nums.length > 1;
 
@@ -450,8 +925,26 @@ async function loadInseminationSavedOptions() {
   } catch (_) {}
 }
   setDetailsDisabled(true);
-  loadInseminationSavedOptions();
+loadInseminationSavedOptions();
+
+if (requestedEditMode) {
+  if (!editEventId) {
+    showGate(
+      "❌ رابط تعديل التلقيح غير مكتمل.",
+      "error"
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+  } else {
+    loadEditEvent();
+  }
+
+} else {
   scheduleGate();
+}
 </script>
 </body>
 </html>
