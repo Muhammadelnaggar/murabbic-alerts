@@ -77,9 +77,51 @@
 </div>
 
       <label for="vet">اسم الطبيب البيطري (اختياري)</label>
-      <input type="text" id="vet" name="vet" data-field="vet">
+<input
+  type="text"
+  id="vet"
+  name="vet"
+  data-field="vet"
+  list="operationalPerformersList"
+  autocomplete="off"
+>
+<datalist id="operationalPerformersList"></datalist>
 
-    <div class="actions-bar">
+<div class="row" id="editToolsRow" style="display:none">
+  <div>
+    <label for="correctionPerformedBy">القائم بالتعديل</label>
+
+    <input
+      type="text"
+      id="correctionPerformedBy"
+      maxlength="160"
+      list="operationalPerformersList"
+      placeholder="اسم الفني أو الطبيب"
+      autocomplete="off"
+    >
+
+    <small class="form-hint">
+      يُستخدم نفس دليل الفنيين والأطباء في مُرَبِّيك.
+    </small>
+  </div>
+
+  <div>
+    <label for="correctionReason">سبب التعديل</label>
+
+    <input
+      type="text"
+      id="correctionReason"
+      maxlength="500"
+      placeholder="اكتب سبب تصحيح تشخيص الحمل"
+    >
+
+    <small class="form-hint">
+      يُحفظ سبب التعديل داخل سجل التصحيحات.
+    </small>
+  </div>
+</div>
+
+<div class="actions-bar">
   <button type="submit" id="saveBtn" class="save">تسجيل التشخيص</button>
 </div>
     </form>
@@ -90,6 +132,17 @@
   // MURABBIK_STATUS: UI_ONLY | pregnancy-diagnosis.html | server-side gate/save pending via forms-init
 
   const qp = new URLSearchParams(location.search);
+
+const requestedEditMode =
+  String(qp.get("mode") || "")
+    .trim()
+    .toLowerCase() === "edit";
+
+const editEventId =
+  String(qp.get("eventId") || "").trim();
+
+const isEditMode =
+  requestedEditMode && !!editEventId;
 
  const animalFromURL =
   qp.get("numbers") ||
@@ -103,9 +156,26 @@
     qp.get("eventDate") ||
     "";
   const animalEl = document.getElementById("animalNumber");
-  const dateEl = document.getElementById("eventDate");
+const dateEl = document.getElementById("eventDate");
+const saveBtn = document.getElementById("saveBtn");
+const vetEl = document.getElementById("vet");
 
-  if (animalEl) {
+const operationalPerformersListEl =
+  document.getElementById(
+    "operationalPerformersList"
+  );
+
+const correctionPerformedByEl =
+  document.getElementById(
+    "correctionPerformedBy"
+  );
+
+const correctionReasonEl =
+  document.getElementById(
+    "correctionReason"
+  );
+
+if (animalEl) {
     animalEl.value = String(animalFromURL || "").trim();
   }
 
@@ -462,9 +532,390 @@ function applyCheckTypeUI() {
   }
 
   if (saveBtn) {
-    saveBtn.textContent = isConfirmation120 ? "تسجيل تأكيد الحمل" : "تسجيل التشخيص";
-  }
+  saveBtn.textContent =
+    requestedEditMode
+      ? "حفظ التعديل ✅"
+      : (
+          isConfirmation120
+            ? "تسجيل تأكيد الحمل"
+            : "تسجيل التشخيص"
+        );
+}
  renderBulkResultTable();
+}
+function renderOperationalPerformers(items = []) {
+  if (!operationalPerformersListEl) return;
+
+  const values =
+    [...new Set(
+      (Array.isArray(items) ? items : [])
+        .map(x => String(x || "").trim())
+        .filter(Boolean)
+    )];
+
+  operationalPerformersListEl.replaceChildren(
+    ...values.map(value => {
+      const option =
+        document.createElement("option");
+
+      option.value = value;
+
+      return option;
+    })
+  );
+}
+
+async function loadOperationalPerformers() {
+  try {
+    const r =
+      await fetch(
+        "/api/event-options/operational-performers",
+        {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: {
+            "Accept": "application/json"
+          }
+        }
+      );
+
+    const data =
+      await r.json().catch(() => ({
+        ok: false,
+        operationalPerformers: []
+      }));
+
+    if (
+      r.status === 401 ||
+      data?.error === "auth_required"
+    ) {
+      return;
+    }
+
+    if (
+      r.ok &&
+      data?.ok === true
+    ) {
+      renderOperationalPerformers(
+        data.operationalPerformers
+      );
+    }
+
+  } catch (_) {}
+}
+
+function setPregnancyMethodValue(value) {
+  const raw =
+    String(value || "").trim();
+
+  const low =
+    raw.toLowerCase();
+
+  const wanted =
+    raw === "سونار" ||
+    low === "ultrasound"
+      ? "ultrasound"
+      : (
+          raw === "جس يدوي" ||
+          raw === "يدوي" ||
+          low === "manual"
+            ? "manual"
+            : ""
+        );
+
+  if (!wanted) return;
+
+  const target =
+    document.querySelector(
+      `input[name="method"][value="${wanted}"]`
+    );
+
+  if (target) {
+    target.checked = true;
+  }
+}
+
+function setPregnancyResultValue(value) {
+  const wanted =
+    String(value || "").trim();
+
+  if (!wanted) return;
+
+  const target =
+    document.querySelector(
+      `input[name="result"][value="${wanted}"]`
+    );
+
+  if (target) {
+    target.checked = true;
+  }
+}
+
+async function loadEditEvent() {
+  if (!editEventId) {
+    showMsg(
+      "❌ تعذّر تحديد حدث تشخيص الحمل المطلوب تعديله.",
+      "error"
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    return;
+  }
+
+  try {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    if (animalEl) {
+      animalEl.readOnly = true;
+    }
+
+    showMsg(
+      "جارِ تحميل بيانات تشخيص الحمل للتعديل…",
+      "info"
+    );
+
+    const r =
+      await fetch(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}`,
+        {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: {
+            "Accept": "application/json"
+          }
+        }
+      );
+
+    const data =
+      await r.json().catch(() => ({
+        ok: false,
+        message:
+          "تعذّر قراءة بيانات تشخيص الحمل."
+      }));
+
+    if (
+      r.status === 401 ||
+      data?.error === "auth_required"
+    ) {
+      showMsg(
+        data?.message ||
+          "❌ سجّل الدخول أولًا.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      !r.ok ||
+      !data?.ok ||
+      !data?.event
+    ) {
+      showMsg(
+        data?.message ||
+          "❌ تعذّر تحميل بيانات تشخيص الحمل للتعديل.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      String(
+        data.event.typeKey || ""
+      ).trim() !== "pregnancy_diagnosis"
+    ) {
+      showMsg(
+        "❌ الحدث المحدد ليس تشخيص حمل.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      data.event?.editPolicy?.editable !== true
+    ) {
+      showMsg(
+        data.event?.editPolicy?.reason ||
+          "❌ هذا الحدث غير متاح للتعديل.",
+        "error"
+      );
+
+      return;
+    }
+
+    const ev =
+      data.event;
+
+    const d =
+      ev.data || {};
+
+    const pregnancyCheckType =
+      String(
+        d.pregnancyCheckType || ""
+      ).trim();
+
+    if (
+      pregnancyCheckType ===
+      "pregnancy_confirmation_120"
+    ) {
+      showMsg(
+        "❌ تأكيد الحمل 120 يوم لا يُعدّل كتسجيل منفرد من سجل الأحداث.",
+        "error"
+      );
+
+      return;
+    }
+
+    renderOperationalPerformers(
+      data.correctionPerformers
+    );
+
+    if (animalEl) {
+      animalEl.value =
+        String(
+          ev.animalNumber || ""
+        ).trim();
+
+      animalEl.readOnly = true;
+    }
+
+    if (dateEl) {
+      dateEl.value =
+        String(
+          d.eventDate ||
+          ev.eventDate ||
+          ""
+        )
+          .trim()
+          .slice(0, 10);
+    }
+
+    const initialCheck =
+      document.querySelector(
+        'input[name="checkType"][value="initial_pregnancy_diagnosis"]'
+      );
+
+    if (initialCheck) {
+      initialCheck.checked = true;
+    }
+
+    document
+      .querySelectorAll(
+        'input[name="checkType"]'
+      )
+      .forEach(el => {
+        el.disabled = true;
+      });
+
+    setPregnancyMethodValue(
+      d.pregnancyMethod || ""
+    );
+
+    setPregnancyResultValue(
+      d.pregnancyResult || ""
+    );
+
+    if (vetEl) {
+      vetEl.value =
+        String(
+          d.vet || ""
+        ).trim();
+    }
+
+    const editToolsRow =
+      document.getElementById(
+        "editToolsRow"
+      );
+
+    if (editToolsRow) {
+      editToolsRow.style.display = "";
+    }
+
+    if (correctionPerformedByEl) {
+      correctionPerformedByEl.required = true;
+    }
+
+    if (correctionReasonEl) {
+      correctionReasonEl.required = true;
+    }
+
+    applyCheckTypeUI();
+    renderBulkResultTable();
+
+    const title =
+      document.querySelector(
+        ".mbk-page-title"
+      );
+
+    if (title) {
+      title.textContent =
+        "تعديل تشخيص الحمل";
+    }
+
+    document.title =
+      "تعديل تشخيص الحمل — مُرَبِّيك";
+
+    if (saveBtn) {
+      saveBtn.textContent =
+        "حفظ التعديل ✅";
+
+      saveBtn.disabled = false;
+    }
+
+    const back =
+      document.querySelector(
+        ".mbk-back"
+      );
+
+    if (back) {
+      back.href =
+        `event-list.html?number=${encodeURIComponent(
+          ev.animalNumber || ""
+        )}`;
+    }
+
+    const gateBox =
+      document.getElementById(
+        "gateBox"
+      );
+
+    if (gateBox) {
+      gateBox.style.display = "none";
+    }
+
+    const infoBar =
+      document.getElementById(
+        "mbk-infobar"
+      );
+
+    if (infoBar) {
+      infoBar.style.display = "none";
+    }
+
+  } catch (err) {
+    console.error(
+      "pregnancy diagnosis edit load failed",
+      err
+    );
+
+    showMsg(
+      "❌ تعذّر تحميل بيانات تشخيص الحمل للتعديل.",
+      "error"
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+  }
 }
 function collectPayload(form) {
   const animalNumber = String(document.getElementById("animalNumber")?.value || "").trim();
@@ -625,7 +1076,12 @@ function renderGateResult(data, nums) {
   }
 }
 async function runGateNow() {
-  const form = document.getElementById("diagnosisForm");
+  if (requestedEditMode) return;
+
+  const form =
+    document.getElementById(
+      "diagnosisForm"
+    );
   if (!form) return;
   const payload = collectPayload(form);
   const nums = parseNumbers(payload.animalNumber);
@@ -666,8 +1122,14 @@ const gateKey = JSON.stringify({
 }
 
 function scheduleGate() {
+  if (requestedEditMode) return;
+
   clearTimeout(gateTimer);
-  gateTimer = setTimeout(runGateNow, 350);
+  gateTimer =
+    setTimeout(
+      runGateNow,
+      350
+    );
 }
   document.getElementById("animalNumber")?.addEventListener("input", () => {
   resetServerAcceptedNumbers();
@@ -695,15 +1157,198 @@ document.querySelectorAll('input[name="result"]').forEach(el => {
   });
 });
 applyCheckTypeUI();
-// أول رسالة تحقق عند فتح الصفحة
-scheduleGate();
-document.getElementById("diagnosisForm")?.addEventListener("submit", async (e) => {
+loadOperationalPerformers();
+
+if (requestedEditMode) {
+  if (!editEventId) {
+    showMsg(
+      "❌ رابط تعديل تشخيص الحمل غير مكتمل.",
+      "error"
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+  } else {
+    loadEditEvent();
+  }
+
+} else {
+  // أول رسالة تحقق عند فتح الصفحة
+  scheduleGate();
+}
+
+document
+  .getElementById("diagnosisForm")
+  ?.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const form = e.currentTarget;
-  const payload = collectPayload(form);
-  const nums = parseNumbers(payload.animalNumber);
- if (!payload.checkType) {
+  const payload =
+  collectPayload(form);
+
+const nums =
+  parseNumbers(
+    payload.animalNumber
+  );
+
+if (requestedEditMode) {
+  if (!isEditMode) {
+    showMsg(
+      "❌ تعذّر تحديد حدث تشخيص الحمل المطلوب تعديله.",
+      "error"
+    );
+
+    return;
+  }
+
+  const correctionPerformedBy =
+    String(
+      correctionPerformedByEl?.value || ""
+    ).trim();
+
+  if (!correctionPerformedBy) {
+    showMsg(
+      "❌ أدخل اسم القائم بالتعديل.",
+      "error"
+    );
+
+    correctionPerformedByEl?.focus?.();
+
+    return;
+  }
+
+  const correctionReason =
+    String(
+      correctionReasonEl?.value || ""
+    ).trim();
+
+  if (!correctionReason) {
+    showMsg(
+      "❌ اكتب سبب التعديل.",
+      "error"
+    );
+
+    correctionReasonEl?.focus?.();
+
+    return;
+  }
+
+  if (!payload.method) {
+    showMsg(
+      "❌ اختر طريقة التشخيص.",
+      "error"
+    );
+
+    return;
+  }
+
+  if (!payload.result) {
+    showMsg(
+      "❌ اختر نتيجة التشخيص.",
+      "error"
+    );
+
+    return;
+  }
+
+  payload.checkType =
+    "initial_pregnancy_diagnosis";
+
+  payload.pregnancyCheckType =
+    "initial_pregnancy_diagnosis";
+
+  payload.correctionPerformedBy =
+    correctionPerformedBy;
+
+  payload.correctionReason =
+    correctionReason;
+
+  const btn =
+    document.getElementById(
+      "saveBtn"
+    );
+
+  try {
+    if (btn) {
+      btn.disabled = true;
+    }
+
+    showMsg(
+      "جارِ حفظ تعديل تشخيص الحمل…",
+      "info"
+    );
+
+    const {
+      r,
+      data,
+      authRequired
+    } =
+      await sessionPostJson(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
+        payload
+      );
+
+    if (authRequired) {
+      showMsg(
+        data.message ||
+          "❌ سجّل الدخول أولًا.",
+        "error"
+      );
+
+      return;
+    }
+
+    const serverMessage =
+      String(
+        data?.message ||
+        data?.error ||
+        ""
+      ).trim();
+
+    if (serverMessage) {
+      showMsg(
+        serverMessage,
+        data?.ok
+          ? "success"
+          : "error"
+      );
+    }
+
+    if (
+      r.ok &&
+      data?.ok
+    ) {
+      setTimeout(() => {
+        location.href =
+          `event-list.html?number=${encodeURIComponent(
+            payload.animalNumber
+          )}`;
+      }, 1000);
+    }
+
+  } catch (err) {
+    console.error(
+      "pregnancy diagnosis correction failed",
+      err
+    );
+
+    showMsg(
+      "❌ تعذّر حفظ تعديل تشخيص الحمل الآن.",
+      "error"
+    );
+
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+    }
+  }
+
+  return;
+}
+
+if (!payload.checkType) {
   showMsg("❌ اختر نوع الفحص أولًا.", "error");
   return;
 }
