@@ -16433,14 +16433,12 @@ if (alreadyEdited) {
 
   if (typeKey === "nutrition") {
     return {
-      editable: true,
-      mode:
-        origin === "import_history"
-          ? "historical_correction"
-          : "dedicated_writer",
-      writer: "nutrition",
+      editable: false,
+      mode: "nutrition_record",
+      writer: "",
       origin,
-      reason: ""
+      reason:
+        "سجل التغذية لا يُعدّل من قائمة أحداث الحيوان."
     };
   }
 
