@@ -18464,12 +18464,31 @@ if (
         body.eventDate ?? body.date ?? eventsPageListDateSrv(oldEvent)
       );
 
-      if (!eventDate || !calvingIsDateSrv(eventDate)) {
+           if (!eventDate || !calvingIsDateSrv(eventDate)) {
         return res.status(400).json({
           ok: false,
           error: "invalid_date",
           message: "❌ أدخل تاريخ حدث صحيحًا."
         });
+      }
+
+      if (typeKey === "daily_milk") {
+        const originalEventDate =
+          eventsPageCorrectionDateSrv(
+            eventsPageListDateSrv(oldEvent)
+          );
+
+        if (
+          !originalEventDate ||
+          eventDate !== originalEventDate
+        ) {
+          return res.status(409).json({
+            ok: false,
+            error: "daily_milk_date_immutable",
+            message:
+              "❌ لا يمكن تغيير تاريخ سجل اللبن اليومي أثناء التصحيح."
+          });
+        }
       }
 
       const todayISO = await farmTodayISOSrv(req.authSession?.uid || uid);
@@ -19837,42 +19856,110 @@ else if (
         const species = String(oldEvent.species || subject.data?.species || "").trim();
         const kind = String(oldEvent.kind || dailyMilkKindSrv(dailyMilkSpeciesSrv(subject.data || {}))).trim() || "cow";
 
-        const hasSessionInput = [
-          body.milkS1, body.s1, body.session1,
-          body.milkS2, body.s2, body.session2,
-          body.milkS3, body.s3, body.session3
-        ].some(v => v !== undefined && v !== null && String(v).trim() !== "");
+          const forbiddenDirectFields =
+          [
+            "milkKg",
+            "dailyMilk",
+            "totalMilk",
+            "milkFatPct",
+            "milkProteinPct",
+            "fatProteinRatio"
+          ].some(key =>
+            Object.prototype.hasOwnProperty.call(
+              body,
+              key
+            )
+          ) ||
+          (
+            body.components &&
+            typeof body.components === "object" &&
+            Object.keys(body.components).length > 0
+          );
 
-        let milkSessions = oldSessions;
-        let milkKg = Number(oldEvent.milkKg ?? oldEvent.dailyMilk ?? oldEvent.totalMilk);
-
-        if (hasSessionInput || oldSessions.length) {
-          const s1 = dailyMilkNumStrictSrv(body.milkS1 ?? body.s1 ?? body.session1 ?? oldMap.get(1));
-          const s2 = dailyMilkNumStrictSrv(body.milkS2 ?? body.s2 ?? body.session2 ?? oldMap.get(2));
-          const s3 = dailyMilkNumStrictSrv(body.milkS3 ?? body.s3 ?? body.session3 ?? oldMap.get(3) ?? 0);
-
-          const required = kind === "buffalo" ? [s1, s2] : [s1, s2, s3];
-          if (!required.every(Number.isFinite) || required.some(v => v < 0)) {
-            return res.status(400).json({
-              ok: false,
-              error: "invalid_milk_sessions",
-              message: "❌ أدخل كميات الحلبات بأرقام صحيحة غير سالبة."
-            });
-          }
-
-          milkSessions = kind === "buffalo"
-            ? [{ n: 1, kg: s1 }, { n: 2, kg: s2 }]
-            : [{ n: 1, kg: s1 }, { n: 2, kg: s2 }, { n: 3, kg: s3 }];
-          milkKg = Number(required.reduce((sum, v) => sum + v, 0).toFixed(1));
-        } else {
-          milkKg = Number(body.milkKg ?? body.dailyMilk ?? body.totalMilk ?? milkKg);
+        if (forbiddenDirectFields) {
+          return res.status(400).json({
+            ok: false,
+            error:
+              "daily_milk_correction_fields_not_allowed",
+            message:
+              "❌ تصحيح اللبن اليومي يسمح بتعديل كميات الحلبات فقط؛ الإجمالي يحسبه السيرفر تلقائيًا."
+          });
         }
 
-        if (!Number.isFinite(milkKg) || milkKg <= 0) {
+        const s1 =
+          dailyMilkNumStrictSrv(
+            body.milkS1 ??
+            body.s1 ??
+            body.session1 ??
+            oldMap.get(1)
+          );
+
+        const s2 =
+          dailyMilkNumStrictSrv(
+            body.milkS2 ??
+            body.s2 ??
+            body.session2 ??
+            oldMap.get(2)
+          );
+
+        const s3 =
+          dailyMilkNumStrictSrv(
+            body.milkS3 ??
+            body.s3 ??
+            body.session3 ??
+            oldMap.get(3) ??
+            0
+          );
+
+        const required =
+          kind === "buffalo"
+            ? [s1, s2]
+            : [s1, s2, s3];
+
+        if (
+          !required.every(Number.isFinite) ||
+          required.some(v => v < 0)
+        ) {
+          return res.status(400).json({
+            ok: false,
+            error: "invalid_milk_sessions",
+            message:
+              "❌ أدخل كميات الحلبات بأرقام صحيحة غير سالبة."
+          });
+        }
+
+        const milkSessions =
+          kind === "buffalo"
+            ? [
+                { n: 1, kg: s1 },
+                { n: 2, kg: s2 }
+              ]
+            : [
+                { n: 1, kg: s1 },
+                { n: 2, kg: s2 },
+                { n: 3, kg: s3 }
+              ];
+
+        const milkKg =
+          Number(
+            required
+              .reduce(
+                (sum, value) =>
+                  sum + value,
+                0
+              )
+              .toFixed(1)
+          );
+
+        if (
+          !Number.isFinite(milkKg) ||
+          milkKg <= 0
+        ) {
           return res.status(400).json({
             ok: false,
             error: "invalid_milk_total",
-            message: "❌ إجمالي اللبن يجب أن يكون رقمًا أكبر من صفر."
+            message:
+              "❌ إجمالي اللبن المحسوب يجب أن يكون أكبر من صفر."
           });
         }
 
@@ -19880,32 +19967,11 @@ else if (
           ...eventPatch,
           species,
           kind,
+          milkSessions,
           milkKg,
           dailyMilk: milkKg,
-          totalMilk: milkKg,
-          ...(milkSessions.length ? { milkSessions } : {})
+          totalMilk: milkKg
         };
-
-        const fatRaw = body.milkFatPct;
-        const proteinRaw = body.milkProteinPct;
-        const componentsTouched = fatRaw !== undefined || proteinRaw !== undefined;
-
-        if (componentsTouched) {
-          const milkFatPct = Number(fatRaw);
-          const milkProteinPct = Number(proteinRaw);
-          const componentInput = {
-            provided: true,
-            milkFatPct,
-            milkProteinPct
-          };
-          const issue = dailyMilkComponentIssueSrv(componentInput, species);
-          if (issue) {
-            return res.status(400).json({ ok: false, error: "invalid_milk_components", message: `❌ ${issue}` });
-          }
-          eventPatch.milkFatPct = milkFatPct;
-          eventPatch.milkProteinPct = milkProteinPct;
-          eventPatch.fatProteinRatio = dailyMilkFatProteinRatioSrv(milkFatPct, milkProteinPct);
-        }
         const oldMilkKg = Number(
   oldEvent.milkKg ??
   oldEvent.dailyMilk ??
