@@ -19972,19 +19972,195 @@ eventPatch.lastMilkCorrectionReason =
   correctionReason;
       }
 
-      else if (typeKey === "dry_off") {
-        const pregnancyStatus = String(body.pregnancyStatus ?? oldEvent.pregnancyStatus ?? "").trim();
-        const usedDryingAntibiotics = String(body.usedDryingAntibiotics ?? oldEvent.usedDryingAntibiotics ?? "").trim();
-        const performedBy = eventsPageCorrectionTextSrv(body.performedBy ?? oldEvent.performedBy ?? "", 160);
+         else if (typeKey === "dry_off") {
+        const pregnancyStatus = String(
+          body.pregnancyStatus ??
+          oldEvent.pregnancyStatus ??
+          ""
+        ).trim();
 
-        if (!MURABBIK_DRY_OFF_PREGNANCY_STATUS_SRV.has(pregnancyStatus)) {
-          return res.status(400).json({ ok: false, error: "invalid_pregnancy_status", message: "❌ اختر حالة الحمل: «عشار» أو «فارغة»." });
+        const usedDryingAntibiotics = String(
+          body.usedDryingAntibiotics ??
+          oldEvent.usedDryingAntibiotics ??
+          ""
+        ).trim();
+
+        const performedBy =
+          eventsPageCorrectionTextSrv(
+            body.performedBy ??
+            oldEvent.performedBy ??
+            "",
+            160
+          );
+
+        if (
+          !MURABBIK_DRY_OFF_PREGNANCY_STATUS_SRV
+            .has(pregnancyStatus)
+        ) {
+          return res.status(400).json({
+            ok: false,
+            error: "invalid_pregnancy_status",
+            message:
+              "❌ اختر حالة الحمل: «عشار» أو «فارغة»."
+          });
         }
-        if (!MURABBIK_DRY_OFF_YES_NO_SRV.has(usedDryingAntibiotics)) {
-          return res.status(400).json({ ok: false, error: "invalid_dry_treatment", message: "❌ حدد استخدام محاقن التجفيف: «نعم» أو «لا»." });
+
+        if (
+          !MURABBIK_DRY_OFF_YES_NO_SRV
+            .has(usedDryingAntibiotics)
+        ) {
+          return res.status(400).json({
+            ok: false,
+            error: "invalid_dry_treatment",
+            message:
+              "❌ حدد استخدام محاقن التجفيف: «نعم» أو «لا»."
+          });
         }
+
         if (!performedBy) {
-          return res.status(400).json({ ok: false, error: "performed_by_required", message: "❌ أدخل اسم الفني أو الطبيب الذي نفّذ التجفيف." });
+          return res.status(400).json({
+            ok: false,
+            error: "performed_by_required",
+            message:
+              "❌ أدخل اسم الفني أو الطبيب الذي نفّذ التجفيف."
+          });
+        }
+
+        const oldDryOffReason =
+          String(
+            oldEvent.reason ??
+            oldEvent.dryOffReason ??
+            ""
+          ).trim();
+
+        const isSaleDryOff =
+          oldDryOffReason ===
+          "تجفيف للبيع";
+
+        const storedLastInseminationDate =
+          eventsPageCorrectionDateSrv(
+            oldEvent.lastInseminationDate ||
+            ""
+          );
+
+        if (
+          !isSaleDryOff &&
+          storedLastInseminationDate &&
+          storedLastInseminationDate > eventDate
+        ) {
+          return res.status(409).json({
+            ok: false,
+            error:
+              "dry_off_before_linked_insemination",
+            message:
+              `❌ تاريخ التجفيف المصحح لا يمكن أن يسبق آخر تلقيح المرتبط بهذا التجفيف بتاريخ ${storedLastInseminationDate}.`
+          });
+        }
+
+        const ai =
+          storedLastInseminationDate
+            ? null
+            : eventsPageCorrectionLatestAIBeforeSrv(
+                docs.map(item => ({
+                  id: item.id,
+                  data: item.data || {}
+                })),
+                eventId,
+                eventDate
+              );
+
+        const eventLastInseminationDate =
+          ai
+            ? eventsPageCorrectionDateSrv(
+                eventsPageListDateSrv(
+                  ai.data || {}
+                )
+              )
+            : "";
+
+        const documentLastInseminationDate =
+          eventsPageCorrectionDateSrv(
+            subject.data?.lastInseminationDate ||
+            subject.data?.lastAI ||
+            subject.data?.lastInsemination ||
+            subject.data?.lastServiceDate ||
+            ""
+          );
+
+        const fallbackDocumentLastInseminationDate =
+          documentLastInseminationDate &&
+          documentLastInseminationDate <= eventDate
+            ? documentLastInseminationDate
+            : "";
+
+        const lastInseminationDate =
+          storedLastInseminationDate ||
+          eventLastInseminationDate ||
+          fallbackDocumentLastInseminationDate ||
+          "";
+
+        let gestationDays = 0;
+
+        if (!isSaleDryOff) {
+          if (!lastInseminationDate) {
+            return res.status(409).json({
+              ok: false,
+              error:
+                "dry_off_insemination_missing",
+              message:
+                "❌ لا يوجد تاريخ تلقيح صالح يسبق تاريخ التجفيف المصحح."
+            });
+          }
+
+          gestationDays =
+            calvingDaysBetweenSrv(
+              lastInseminationDate,
+              eventDate
+            );
+
+          if (
+            !Number.isFinite(
+              gestationDays
+            ) ||
+            gestationDays < 0
+          ) {
+            return res.status(409).json({
+              ok: false,
+              error:
+                "dry_off_gestation_invalid",
+              message:
+                "❌ تعذّر حساب أيام الحمل من تاريخ التجفيف المصحح وآخر تلقيح."
+            });
+          }
+        }
+
+        const reasonDoc = {
+          species:
+            oldEvent.species ||
+            subject.data?.species ||
+            subject.data?.animalTypeAr ||
+            subject.data?.animalType ||
+            subject.data?.animaltype ||
+            "",
+
+          breedingBlocked:
+            isSaleDryOff
+        };
+
+        const reason =
+          dryOffReasonFromDaysSrv({
+            doc: reasonDoc,
+            gestationDays
+          });
+
+        if (!reason) {
+          return res.status(409).json({
+            ok: false,
+            error:
+              "dry_off_reason_unresolved",
+            message:
+              "❌ تعذّر تحديد سبب التجفيف من التاريخ المصحح."
+          });
         }
 
         eventPatch = {
@@ -19993,7 +20169,10 @@ eventPatch.lastMilkCorrectionReason =
           pregnancyStatus,
           usedDryingAntibiotics,
           performedBy,
-          reason: String(body.reason ?? body.dryOffReason ?? oldEvent.reason ?? "").trim()
+          gestationDays,
+          lastInseminationDate:
+            lastInseminationDate || null,
+          reason
         };
       }
 
