@@ -70,7 +70,41 @@
           <textarea id="notes" data-field="notes" placeholder="اختياري"></textarea>
         </div>
       </div>
+<div class="row" id="editToolsRow" style="display:none">
+  <div>
+    <label>القائم بالتعديل</label>
 
+    <input
+      id="correctionPerformedBy"
+      type="text"
+      maxlength="160"
+      list="correctionPerformersList"
+      placeholder="اسم الفني أو الطبيب"
+      autocomplete="off"
+    />
+
+    <datalist id="correctionPerformersList"></datalist>
+
+    <small class="form-hint">
+      يُحفظ الاسم ضمن قائمة القائمين بالتعديل لاستخدامه لاحقًا.
+    </small>
+  </div>
+
+  <div>
+    <label>سبب التعديل</label>
+
+    <input
+      id="correctionReason"
+      type="text"
+      maxlength="500"
+      placeholder="اكتب سبب تصحيح بيانات الإجهاض"
+    />
+
+    <small class="form-hint">
+      يُحفظ سبب التعديل داخل سجل التصحيحات.
+    </small>
+  </div>
+</div>
     </form>
   </main>
 
@@ -80,6 +114,16 @@
   </div>
 <script>
   const qp = new URLSearchParams(location.search);
+  const requestedEditMode =
+  String(qp.get("mode") || "")
+    .trim()
+    .toLowerCase() === "edit";
+
+const editEventId =
+  String(qp.get("eventId") || "").trim();
+
+const isEditMode =
+  requestedEditMode && !!editEventId;
 
   const form = document.getElementById("abortion-form");
   const sysbar = document.getElementById("sysbar");
@@ -93,6 +137,15 @@
   const causeEl = document.getElementById("probableCause");
   const notesEl = document.getElementById("notes");
   const saveBtn = document.getElementById("saveBtn");
+  const correctionPerformedByEl =
+  document.getElementById(
+    "correctionPerformedBy"
+  );
+
+const correctionPerformersListEl =
+  document.getElementById(
+    "correctionPerformersList"
+  );
 
   function normalizeDigits(raw) {
     const map = {
@@ -139,7 +192,252 @@
       .toISOString()
       .slice(0, 10);
   }
+function renderCorrectionPerformers(items = []) {
+  if (!correctionPerformersListEl) return;
 
+  const values =
+    [...new Set(
+      (Array.isArray(items) ? items : [])
+        .map(x => String(x || "").trim())
+        .filter(Boolean)
+    )];
+
+  correctionPerformersListEl.replaceChildren(
+    ...values.map(value => {
+      const option =
+        document.createElement("option");
+
+      option.value = value;
+
+      return option;
+    })
+  );
+}
+
+async function loadEditEvent() {
+  if (!editEventId) {
+    showSysbar(
+      "❌ تعذّر تحديد حدث الإجهاض المطلوب تعديله.",
+      "error"
+    );
+
+    if (saveBtn) saveBtn.disabled = true;
+
+    return;
+  }
+
+  try {
+    if (saveBtn) saveBtn.disabled = true;
+
+    if (animalEl) {
+      animalEl.readOnly = true;
+    }
+
+    if (dateEl) {
+      dateEl.disabled = true;
+    }
+
+    showSysbar(
+      "جارِ تحميل بيانات الإجهاض للتعديل…",
+      "info"
+    );
+
+    const r =
+      await fetch(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}`,
+        {
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: {
+            "Accept": "application/json"
+          }
+        }
+      );
+
+    const data =
+      await r.json().catch(() => ({
+        ok: false,
+        message:
+          "تعذّر قراءة بيانات الإجهاض."
+      }));
+
+    if (
+      r.status === 401 ||
+      data?.error === "auth_required"
+    ) {
+      showSysbar(
+        data?.message ||
+          "سجّل الدخول أولًا.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      !r.ok ||
+      !data?.ok ||
+      !data?.event
+    ) {
+      showSysbar(
+        data?.message ||
+          "❌ تعذّر تحميل بيانات الإجهاض للتعديل.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      String(
+        data.event.typeKey || ""
+      ).trim() !== "abortion"
+    ) {
+      showSysbar(
+        "❌ الحدث المحدد ليس حدث إجهاض.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      data.event?.editPolicy?.editable !== true
+    ) {
+      showSysbar(
+        data.event?.editPolicy?.reason ||
+          "❌ هذا الحدث غير متاح للتعديل.",
+        "error"
+      );
+
+      return;
+    }
+
+    renderCorrectionPerformers(
+      data.correctionPerformers
+    );
+
+    const ev =
+      data.event;
+
+    const d =
+      ev.data || {};
+
+    animalEl.value =
+      normalizeDigits(
+        ev.animalNumber || ""
+      );
+
+    dateEl.value =
+      toISO(
+        d.eventDate ||
+        ev.eventDate ||
+        ""
+      );
+
+    lastAiEl.value =
+      toISO(
+        d.lastFertileInseminationDate ||
+        ""
+      );
+
+    ageEl.value =
+      d.abortionAgeMonths ?? "";
+
+    causeEl.value =
+      String(
+        d.probableCause || ""
+      );
+
+    notesEl.value =
+      String(
+        d.notes || ""
+      );
+
+    setDetailsDisabled(false);
+
+    if (animalEl) {
+      animalEl.readOnly = true;
+    }
+
+    if (dateEl) {
+      dateEl.disabled = false;
+    }
+
+    const editToolsRow =
+      document.getElementById(
+        "editToolsRow"
+      );
+
+    const correctionReasonEl =
+      document.getElementById(
+        "correctionReason"
+      );
+
+    if (editToolsRow) {
+      editToolsRow.style.display = "";
+    }
+
+    if (correctionPerformedByEl) {
+      correctionPerformedByEl.required = true;
+    }
+
+    if (correctionReasonEl) {
+      correctionReasonEl.required = true;
+    }
+
+    const title =
+      document.querySelector(
+        ".mbk-page-title"
+      );
+
+    if (title) {
+      title.textContent =
+        "تعديل إجهاض";
+    }
+
+    document.title =
+      "تعديل إجهاض — مُرَبِّيك";
+
+    if (saveBtn) {
+      saveBtn.textContent =
+        "حفظ التعديل ✅";
+
+      saveBtn.disabled = false;
+    }
+
+    const back =
+      document.querySelector(
+        ".mbk-back"
+      );
+
+    if (back) {
+      back.href =
+        `event-list.html?number=${encodeURIComponent(
+          ev.animalNumber || ""
+        )}`;
+    }
+
+    if (sysbar) {
+      sysbar.style.display = "none";
+    }
+
+  } catch (err) {
+    console.error(
+      "abortion edit load failed",
+      err
+    );
+
+    showSysbar(
+      "❌ تعذّر تحميل بيانات الإجهاض للتعديل.",
+      "error"
+    );
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+  }
+}
   function escapeHtml(s) {
     return String(s || "")
       .replace(/&/g, "&amp;")
@@ -341,16 +639,128 @@ if (authRequired) return;
   }
 
   function scheduleGate() {
-    clearTimeout(gateTimer);
-    gateTimer = setTimeout(runGateNow, 350);
-  }
+  if (requestedEditMode) return;
+
+  clearTimeout(gateTimer);
+  gateTimer = setTimeout(runGateNow, 350);
+}
 
  form?.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const payload = collectPayload();
 
+if (requestedEditMode) {
+  if (!isEditMode) {
+    showSysbar(
+      "❌ تعذّر تحديد حدث الإجهاض المطلوب تعديله.",
+      "error"
+    );
+
+    return;
+  }
+
+  const correctionPerformedBy =
+    String(
+      correctionPerformedByEl?.value || ""
+    ).trim();
+
+  if (!correctionPerformedBy) {
+    showSysbar(
+      "❌ أدخل اسم القائم بالتعديل.",
+      "error"
+    );
+
+    correctionPerformedByEl?.focus?.();
+
+    return;
+  }
+
+  const correctionReason =
+    String(
+      document.getElementById(
+        "correctionReason"
+      )?.value || ""
+    ).trim();
+
+  if (!correctionReason) {
+    showSysbar(
+      "❌ اكتب سبب التعديل.",
+      "error"
+    );
+
+    document
+      .getElementById(
+        "correctionReason"
+      )
+      ?.focus?.();
+
+    return;
+  }
+
+  payload.correctionPerformedBy =
+    correctionPerformedBy;
+
+  payload.correctionReason =
+    correctionReason;
+
   try {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    showSysbar(
+      "جارِ حفظ تعديل الإجهاض…",
+      "info"
+    );
+
+    const {
+      data,
+      authRequired
+    } =
+      await sessionPostJson(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
+        payload
+      );
+
+    if (authRequired) return;
+
+    renderServerMessage(
+      data,
+      "تعذّر حفظ تعديل الإجهاض.",
+      false
+    );
+
+    if (data?.ok) {
+      setTimeout(() => {
+        location.href =
+          `event-list.html?number=${encodeURIComponent(
+            payload.animalNumber
+          )}`;
+      }, 1000);
+    }
+
+  } catch (err) {
+    console.error(
+      "abortion correction failed",
+      err
+    );
+
+    showSysbar(
+      "❌ تعذّر حفظ تعديل الإجهاض الآن.",
+      "error"
+    );
+
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+    }
+  }
+
+  return;
+}
+
+try {
     if (saveBtn) saveBtn.disabled = true;
 
     showSysbar("جارِ حفظ الإجهاض…", "info");
@@ -392,7 +802,28 @@ if (authRequired) return;
   });
 
   document.addEventListener("DOMContentLoaded", () => {
-    const n =
+  if (requestedEditMode) {
+    setDetailsDisabled(true);
+
+    if (!editEventId) {
+      showSysbar(
+        "❌ رابط تعديل الإجهاض غير مكتمل.",
+        "error"
+      );
+
+      if (saveBtn) {
+        saveBtn.disabled = true;
+      }
+
+      return;
+    }
+
+    loadEditEvent();
+
+    return;
+  }
+
+  const n =
   qp.get("animalNumber") ||
   qp.get("number") ||
   qp.get("animalId") ||
