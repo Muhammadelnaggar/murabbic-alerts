@@ -14,11 +14,11 @@
     <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
 
     <div class="mbk-title">
-      <div class="mbk-page">التشخيص الصحي</div>
+      <div class="mbk-page" id="pageTitle">التشخيص الصحي</div>
       <div class="mbk-app">مُرَبِّيك</div>
     </div>
 
-    <a class="mbk-back" href="add-event.html" aria-label="رجوع">رجوع</a>
+    <a class="mbk-back" id="backLink" href="add-event.html" aria-label="رجوع">رجوع</a>
   </div>
 </header>
 
@@ -44,10 +44,43 @@
       </div>
     </div>
 
-   <div class="card grid">
+   <div
+  class="card grid"
+  id="editToolsCard"
+  hidden
+  style="display:none"
+>
+  <div class="row">
+    <div>
+      <label for="correctionPerformedBy">القائم بالتعديل</label>
+      <input
+        id="correctionPerformedBy"
+        type="text"
+        list="operationalPerformersList"
+        maxlength="160"
+        autocomplete="off"
+        placeholder="اسم القائم بالتعديل"
+      />
+    </div>
+
+    <div>
+      <label for="correctionReason">سبب التعديل</label>
+      <input
+        id="correctionReason"
+        type="text"
+        maxlength="500"
+        autocomplete="off"
+        placeholder="اكتب سبب تصحيح التشخيص الصحي"
+      />
+    </div>
+  </div>
+
+  <datalist id="operationalPerformersList"></datalist>
+</div>
+
+<div class="card grid">
   <div id="animalSummary" class="form-hint"></div>
   <div id="dz" class="mbk-action-hub"></div>
- 
 </div>
   </main>
 
@@ -55,23 +88,67 @@
 (function(){
   const API_BASE = location.origin;
   const $ = (id) => document.getElementById(id);
+
   const animalNumberEl = $("animalNumber");
   const eventDateEl = $("eventDate");
   const gateBox = $("gateBox");
   const dz = $("dz");
   const animalSummary = $("animalSummary");
   const notesEl = $("notes");
-    const DISEASE_OPTIONS = [
+
+  const editToolsCard =
+    $("editToolsCard");
+
+  const correctionPerformedByEl =
+    $("correctionPerformedBy");
+
+  const correctionReasonEl =
+    $("correctionReason");
+
+  const operationalPerformersList =
+    $("operationalPerformersList");
+
+  const pageTitle =
+    $("pageTitle");
+
+  const backLink =
+    $("backLink");
+
+  const params =
+    new URLSearchParams(
+      location.search
+    );
+
+  const requestedEditMode =
+    String(
+      params.get("mode") || ""
+    )
+      .trim()
+      .toLowerCase() === "edit";
+
+  const editEventId =
+    String(
+      params.get("eventId") || ""
+    ).trim();
+
+  const isEditMode =
+    requestedEditMode &&
+    !!editEventId;
+
+
+  const DISEASE_OPTIONS = [
     { code: "milk_fever", name: "حمى اللبن", group: "تمثيل وإنتاج" },
     { code: "ketosis", name: "كيتوزس", group: "تمثيل وإنتاج" },
     { code: "displaced_abomasum", name: "انقلاب المنفحة", group: "تمثيل وإنتاج" },
     { code: "rumen_acidosis", name: "حموضة الكرش", group: "تمثيل وإنتاج" },
     { code: "phosphorus_def", name: "نقص فوسفور", group: "تمثيل وإنتاج" },
     { code: "magnesium_def", name: "نقص ماغنيسيوم", group: "تمثيل وإنتاج" },
+
     { code: "retained_placenta", name: "احتباس مشيمة", group: "تناسل" },
     { code: "metritis_endometritis", name: "التهاب رحم / التهاب بطانة الرحم", group: "تناسل" },
     { code: "ovarian_cysts", name: "تكيسات مبيضية", group: "تناسل" },
     { code: "brucellosis", name: "بروسيلا", group: "تناسل" },
+
     { code: "bovine_respiratory_disease", name: "مرض تنفسي بقري", group: "معدية / جهازية" },
     { code: "johnes_disease", name: "جونز", group: "معدية / جهازية" },
     { code: "bovine_viral_diarrhea", name: "BVD / الإسهال الفيروسي البقري", group: "معدية / جهازية" },
@@ -89,276 +166,1130 @@
     { code: "calf_coccidiosis", name: "كوكسيديا عجول", group: "أمراض العجول" }
   ];
 
+
   let gateTimer = null;
   let gateAllowed = false;
   let gateKey = "";
-  let gateMessage = "لم يتم التحقق من الحيوان بعد.";
- 
+  let gateMessage =
+    "لم يتم التحقق من الحيوان بعد.";
+
+  let currentDiseaseCode = "";
+
 
   function todayLocal(){
     const d = new Date();
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().slice(0,10);
+
+    d.setMinutes(
+      d.getMinutes() -
+      d.getTimezoneOffset()
+    );
+
+    return d
+      .toISOString()
+      .slice(0,10);
   }
+
 
   function digitsOnly(v){
     const map = {
-      "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
-      "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+      "٠":"0","١":"1","٢":"2","٣":"3","٤":"4",
+      "٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+      "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4",
+      "۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
     };
 
     return String(v || "")
-      .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
+      .replace(
+        /[٠-٩۰-۹]/g,
+        d => map[d] || d
+      )
       .replace(/[^\d]/g, "")
       .trim();
   }
 
 
-  function setBar(el, text, type){
+  function setBar(
+    el,
+    text,
+    type
+  ){
     if (!el) return;
-    el.textContent = text || "";
-    el.className = "infobar show " + (type || "info");
+
+    el.textContent =
+      text || "";
+
+    el.className =
+      "infobar show " +
+      (type || "info");
   }
-  function handleAuthRequired(j){
-    if (j && (j.error === "auth_required" || j.message === "سجّل الدخول أولًا.")) {
-      location.replace("login.html");
+
+
+  function handleAuthRequired(
+    j,
+    status
+  ){
+    if (
+      status === 401 ||
+      (
+        j &&
+        (
+          j.error ===
+            "auth_required" ||
+          j.message ===
+            "سجّل الدخول أولًا."
+        )
+      )
+    ) {
+      location.href =
+        "login.html?next=" +
+        encodeURIComponent(
+          location.pathname +
+          location.search
+        );
+
       return true;
     }
+
     return false;
   }
-  function renderSummary(animal){
+
+
+  async function apiRequest(
+    url,
+    {
+      method = "GET",
+      body
+    } = {}
+  ){
+    const options = {
+      method,
+      credentials:
+        "same-origin",
+      cache:
+        "no-store",
+      headers: {
+        "Accept":
+          "application/json"
+      }
+    };
+
+    if (body !== undefined) {
+      options.headers[
+        "Content-Type"
+      ] =
+        "application/json";
+
+      options.body =
+        JSON.stringify(
+          body || {}
+        );
+    }
+
+    const r =
+      await fetch(
+        API_BASE + url,
+        options
+      );
+
+    const j =
+      await r
+        .json()
+        .catch(() => ({}));
+
+    if (
+      handleAuthRequired(
+        j,
+        r.status
+      )
+    ) {
+      throw new Error(
+        j.message ||
+        "❌ سجّل الدخول أولًا."
+      );
+    }
+
+    if (
+      !r.ok ||
+      j.ok === false
+    ) {
+      const err =
+        new Error(
+          j.message ||
+          "تعذّر تنفيذ الطلب."
+        );
+
+      err.status =
+        r.status;
+
+      err.response =
+        j;
+
+      throw err;
+    }
+
+    return j;
+  }
+
+
+  function renderSummary(
+    animal
+  ){
     if (!animalSummary) return;
 
     if (!animal) {
-      animalSummary.textContent = "";
+      animalSummary.textContent =
+        "";
+
       return;
     }
 
     const parts = [];
 
-    if (animal.productionStatus) parts.push("إنتاجيًا: " + animal.productionStatus);
-    if (animal.reproductiveStatus) parts.push("تناسليًا: " + animal.reproductiveStatus);
-    if (animal.followerStatus) parts.push("حالة التابع: " + animal.followerStatus);
+    if (
+      animal.productionStatus
+    ) {
+      parts.push(
+        "إنتاجيًا: " +
+        animal.productionStatus
+      );
+    }
 
-    animalSummary.textContent = parts.join(" — ");
+    if (
+      animal.reproductiveStatus
+    ) {
+      parts.push(
+        "تناسليًا: " +
+        animal.reproductiveStatus
+      );
+    }
+
+    if (
+      animal.followerStatus
+    ) {
+      parts.push(
+        "حالة التابع: " +
+        animal.followerStatus
+      );
+    }
+
+    animalSummary.textContent =
+      parts.join(" — ");
   }
-async function saveDiseaseItem(item, btn){
-  const animalNumber = digitsOnly(animalNumberEl.value);
-  const eventDate = eventDateEl.value || todayLocal();
-  const notes = notesEl ? notesEl.value : "";
 
-  if (!animalNumber || !eventDate) {
-    setBar(gateBox, "أدخل رقم الحيوان وتاريخ التشخيص أولًا.", "error");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    return;
+
+  function renderPerformers(
+    items = []
+  ){
+    operationalPerformersList
+      .replaceChildren();
+
+    [
+      ...new Set(
+        (
+          Array.isArray(items)
+            ? items
+            : []
+        )
+          .map(x =>
+            String(x || "")
+              .trim()
+          )
+          .filter(Boolean)
+      )
+    ].forEach(name => {
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value =
+        name;
+
+      operationalPerformersList
+        .appendChild(option);
+    });
   }
 
-  // الأمراض التي لها صفحة خاصة تمرر الرقم والتاريخ مثل صفحات الأحداث
-  if (item.specialPage) {
-    const qs = new URLSearchParams({
-      number: animalNumber,
-      animalNumber: animalNumber,
-      date: eventDate,
-      eventDate: eventDate
+
+  function renderDiseases(
+    list,
+    selectedCode = ""
+  ){
+    dz.innerHTML = "";
+
+    const source =
+      Array.isArray(list) &&
+      list.length
+        ? list
+        : DISEASE_OPTIONS;
+
+    const groups =
+      new Map();
+
+    source.forEach(item => {
+      const g =
+        item.group ||
+        "عام";
+
+      if (!groups.has(g)) {
+        groups.set(g, []);
+      }
+
+      groups
+        .get(g)
+        .push(item);
     });
 
-    if (notes) qs.set("notes", notes);
+    groups.forEach(
+      (
+        items,
+        groupName
+      ) => {
+        const sec =
+          document.createElement(
+            "section"
+          );
 
-    location.href = `${item.specialPage}?${qs.toString()}`;
-    return;
-  }
+        sec.className =
+          "mbk-action-section";
 
-  // الأمراض التي تُحفظ من نفس الصفحة لا تُحفظ إلا بعد Gate ناجح
-  const currentGateKey = animalNumber + "|" + eventDate;
+        const title =
+          document.createElement(
+            "div"
+          );
 
-  if (!gateAllowed || gateKey !== currentGateKey) {
-    setBar(
-      gateBox,
-      gateMessage || "يلزم نجاح التحقق من الحيوان قبل تسجيل التشخيص.",
-      "error"
+        title.className =
+          "mbk-action-section-title";
+
+        title.textContent =
+          groupName;
+
+        const wrap =
+          document.createElement(
+            "div"
+          );
+
+        wrap.className =
+          "mbk-action-list";
+
+        items.forEach(item => {
+          const btn =
+            document.createElement(
+              "button"
+            );
+
+          btn.type =
+            "button";
+
+          btn.className =
+            "mbk-action-tile";
+
+          btn.dataset.code =
+            item.code || "";
+
+          btn.textContent =
+            selectedCode &&
+            item.code ===
+              selectedCode
+              ? `✓ ${item.name || ""}`
+              : (
+                  item.name ||
+                  ""
+                );
+
+          btn.addEventListener(
+            "click",
+            () =>
+              saveDiseaseItem(
+                item,
+                btn
+              )
+          );
+
+          wrap.appendChild(
+            btn
+          );
+        });
+
+        sec.appendChild(
+          title
+        );
+
+        sec.appendChild(
+          wrap
+        );
+
+        dz.appendChild(sec);
+      }
     );
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    runGate();
-    return;
   }
 
-  btn.disabled = true;
-  setBar(gateBox, "جاري حفظ التشخيص...", "info");
 
-  try {
-    const r = await fetch(API_BASE + "/api/disease/save", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      credentials: "same-origin",
-      body: JSON.stringify({
-        animalNumber,
-        eventDate,
-        diseaseCode: item.code,
-        notes
-      })
-    });
+  async function saveDiseaseItem(
+    item,
+    btn
+  ){
+    if (isEditMode) {
+      await saveCorrection(
+        item,
+        btn
+      );
 
-    const j = await r.json().catch(() => ({}));
-    if (r.status === 401 || handleAuthRequired(j)) return;
-
-    if (!r.ok || !j.ok) {
-      setBar(gateBox, j.message || "❌ تعذّر حفظ التشخيص الصحي.", "error");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      btn.disabled = false;
       return;
     }
 
-    setBar(gateBox, j.message || "✅ تم حفظ التشخيص الصحي بنجاح.", "success");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const animalNumber =
+      digitsOnly(
+        animalNumberEl.value
+      );
 
-    setTimeout(() => {
-      location.href = j.redirectUrl || `event-list.html?number=${encodeURIComponent(animalNumber)}`;
-    }, 2500);
+    const eventDate =
+      eventDateEl.value ||
+      todayLocal();
 
-  } catch (e) {
-    console.error("disease save failed", e);
-    setBar(gateBox, "❌ تعذّر الاتصال بالسيرفر.", "error");
-    btn.disabled = false;
-  }
-}
-  function renderDiseases(list){
-    dz.innerHTML = "";
+    const notes =
+      notesEl
+        ? notesEl.value
+        : "";
 
-    const source = Array.isArray(list) && list.length ? list : DISEASE_OPTIONS;
+    if (
+      !animalNumber ||
+      !eventDate
+    ) {
+      setBar(
+        gateBox,
+        "أدخل رقم الحيوان وتاريخ التشخيص أولًا.",
+        "error"
+      );
 
-    const groups = new Map();
-
-    source.forEach(item => {
-      const g = item.group || "عام";
-      if (!groups.has(g)) groups.set(g, []);
-      groups.get(g).push(item);
-    });
-
-    groups.forEach((items, groupName) => {
-      const sec = document.createElement("section");
-      sec.className = "mbk-action-section";
-
-      const title = document.createElement("div");
-      title.className = "mbk-action-section-title";
-      title.textContent = groupName;
-
-      const wrap = document.createElement("div");
-      wrap.className = "mbk-action-list";
-
-      items.forEach(item => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "mbk-action-tile";
-        btn.dataset.code = item.code || "";
-        btn.textContent = item.name || "";
-
-        btn.addEventListener("click", () => saveDiseaseItem(item, btn));
-
-        wrap.appendChild(btn);
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
       });
 
-      sec.appendChild(title);
-      sec.appendChild(wrap);
-      dz.appendChild(sec);
-    });
+      return;
+    }
+
+
+    if (item.specialPage) {
+      const qs =
+        new URLSearchParams({
+          number:
+            animalNumber,
+
+          animalNumber:
+            animalNumber,
+
+          date:
+            eventDate,
+
+          eventDate:
+            eventDate
+        });
+
+      if (notes) {
+        qs.set(
+          "notes",
+          notes
+        );
+      }
+
+      location.href =
+        `${item.specialPage}?${qs.toString()}`;
+
+      return;
+    }
+
+
+    const currentGateKey =
+      animalNumber +
+      "|" +
+      eventDate;
+
+    if (
+      !gateAllowed ||
+      gateKey !==
+        currentGateKey
+    ) {
+      setBar(
+        gateBox,
+        gateMessage ||
+        "يلزم نجاح التحقق من الحيوان قبل تسجيل التشخيص.",
+        "error"
+      );
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+
+      runGate();
+
+      return;
+    }
+
+
+    btn.disabled = true;
+
+    setBar(
+      gateBox,
+      "جاري حفظ التشخيص...",
+      "info"
+    );
+
+
+    try {
+      const j =
+        await apiRequest(
+          "/api/disease/save",
+          {
+            method:
+              "POST",
+
+            body: {
+              animalNumber,
+              eventDate,
+
+              diseaseCode:
+                item.code,
+
+              notes
+            }
+          }
+        );
+
+      setBar(
+        gateBox,
+        j.message ||
+        "✅ تم حفظ التشخيص الصحي بنجاح.",
+        "success"
+      );
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+
+      setTimeout(() => {
+        location.href =
+          j.redirectUrl ||
+          `event-list.html?number=${encodeURIComponent(animalNumber)}`;
+      }, 2500);
+
+    } catch (e) {
+      console.error(
+        "disease save failed",
+        e
+      );
+
+      setBar(
+        gateBox,
+        e.message ||
+        "❌ تعذّر حفظ التشخيص الصحي.",
+        "error"
+      );
+
+      btn.disabled =
+        false;
+    }
   }
 
+
+  async function saveCorrection(
+    item,
+    btn
+  ){
+    const animalNumber =
+      digitsOnly(
+        animalNumberEl.value
+      );
+
+    const eventDate =
+      eventDateEl.value;
+
+    const notes =
+      notesEl
+        ? String(
+            notesEl.value || ""
+          ).trim()
+        : "";
+
+    const correctionPerformedBy =
+      String(
+        correctionPerformedByEl
+          ?.value ||
+        ""
+      ).trim();
+
+    const correctionReason =
+      String(
+        correctionReasonEl
+          ?.value ||
+        ""
+      ).trim();
+
+
+    if (
+      !correctionPerformedBy
+    ) {
+      setBar(
+        gateBox,
+        "❌ أدخل اسم القائم بالتعديل.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    if (
+      !correctionReason
+    ) {
+      setBar(
+        gateBox,
+        "❌ اكتب سبب التعديل.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    if (
+      !item?.code ||
+      item.specialPage
+    ) {
+      setBar(
+        gateBox,
+        "❌ اختر تشخيصًا صحيًا عامًا صالحًا للتعديل.",
+        "error"
+      );
+
+      return;
+    }
+
+
+    btn.disabled = true;
+
+    setBar(
+      gateBox,
+      "جاري حفظ تعديل التشخيص الصحي...",
+      "info"
+    );
+
+
+    try {
+      const j =
+        await apiRequest(
+          `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
+          {
+            method:
+              "POST",
+
+            body: {
+              animalNumber,
+              eventDate,
+
+              diseaseCode:
+                item.code,
+
+              notes,
+
+              correctionPerformedBy,
+              correctionReason
+            }
+          }
+        );
+
+      setBar(
+        gateBox,
+        j.message ||
+        "✅ تم تعديل التشخيص الصحي بنجاح.",
+        "success"
+      );
+
+      setTimeout(() => {
+        location.href =
+          `event-list.html?number=${encodeURIComponent(animalNumber)}`;
+      }, 900);
+
+    } catch (e) {
+      console.error(
+        "disease correction failed",
+        e
+      );
+
+      setBar(
+        gateBox,
+        e.message ||
+        "❌ تعذّر تعديل التشخيص الصحي.",
+        "error"
+      );
+
+      btn.disabled =
+        false;
+    }
+  }
+
+
   async function runGate(){
-    const animalNumber = digitsOnly(animalNumberEl.value);
-    const eventDate = eventDateEl.value;
+    if (requestedEditMode) {
+      return;
+    }
+
+    const animalNumber =
+      digitsOnly(
+        animalNumberEl.value
+      );
+
+    const eventDate =
+      eventDateEl.value;
 
     gateAllowed = false;
     gateKey = "";
-    gateMessage = "لم يتم التحقق من الحيوان بعد.";
+
+    gateMessage =
+      "لم يتم التحقق من الحيوان بعد.";
 
     renderSummary(null);
-    renderDiseases(DISEASE_OPTIONS);
+
+    renderDiseases(
+      DISEASE_OPTIONS
+    );
 
 
-    if (!animalNumber || !eventDate) {
-      setBar(gateBox, "أدخل رقم الحيوان وتاريخ التشخيص لعرض التشخيصات المناسبة.", "info");
+    if (
+      !animalNumber ||
+      !eventDate
+    ) {
+      setBar(
+        gateBox,
+        "أدخل رقم الحيوان وتاريخ التشخيص لعرض التشخيصات المناسبة.",
+        "info"
+      );
+
       return;
     }
 
-    setBar(gateBox, "جاري التحقق من السيرفر...", "info");
+
+    setBar(
+      gateBox,
+      "جاري التحقق من السيرفر...",
+      "info"
+    );
+
 
     try {
-           const r = await fetch(API_BASE + "/api/disease/gate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "same-origin",
-        body: JSON.stringify({ animalNumber, eventDate })
-      });
+      const j =
+        await apiRequest(
+          "/api/disease/gate",
+          {
+            method:
+              "POST",
 
-      const j = await r.json().catch(() => ({}));
-      if (r.status === 401 || handleAuthRequired(j)) return;
+            body: {
+              animalNumber,
+              eventDate
+            }
+          }
+        );
 
-           if (!r.ok || !j.allowed) {
-        gateAllowed = false;
+
+      if (!j.allowed) {
+        gateAllowed =
+          false;
+
         gateKey = "";
-        gateMessage = j.message || "لم يمر الحيوان من التحقق.";
 
-        setBar(gateBox, gateMessage, "error");
+        gateMessage =
+          j.message ||
+          "لم يمر الحيوان من التحقق.";
+
+        setBar(
+          gateBox,
+          gateMessage,
+          "error"
+        );
+
         renderSummary(null);
-        renderDiseases(DISEASE_OPTIONS);
+
+        renderDiseases(
+          DISEASE_OPTIONS
+        );
+
         return;
       }
 
-      gateAllowed = true;
-      gateKey = animalNumber + "|" + eventDate;
-      gateMessage = j.message || "✅ الحيوان صالح لتسجيل التشخيص.";
 
-      setBar(gateBox, gateMessage, "success");
-      renderSummary(j.animal || null);
-      renderDiseases(DISEASE_OPTIONS);
+      gateAllowed =
+        true;
 
-       } catch (e) {
-      console.error("disease gate failed", e);
+      gateKey =
+        animalNumber +
+        "|" +
+        eventDate;
 
-      gateAllowed = false;
+      gateMessage =
+        j.message ||
+        "✅ الحيوان صالح لتسجيل التشخيص.";
+
+      setBar(
+        gateBox,
+        gateMessage,
+        "success"
+      );
+
+      renderSummary(
+        j.animal ||
+        null
+      );
+
+      /*
+        نحافظ على واجهة التسجيل
+        الحالية كما هي.
+        السيرفر يعيد التحقق
+        من diseaseCode عند الحفظ.
+      */
+      renderDiseases(
+        DISEASE_OPTIONS
+      );
+
+    } catch (e) {
+      console.error(
+        "disease gate failed",
+        e
+      );
+
+      gateAllowed =
+        false;
+
       gateKey = "";
-      gateMessage = "❌ تعذّر التحقق من السيرفر. لا يمكن حفظ التشخيص المباشر قبل نجاح التحقق.";
 
-      setBar(gateBox, gateMessage, "error");
-      renderDiseases(DISEASE_OPTIONS);
+      gateMessage =
+        e.message ||
+        "❌ تعذّر التحقق من السيرفر. لا يمكن حفظ التشخيص المباشر قبل نجاح التحقق.";
+
+      setBar(
+        gateBox,
+        gateMessage,
+        "error"
+      );
+
+      renderDiseases(
+        DISEASE_OPTIONS
+      );
+
       renderSummary(null);
     }
   }
 
+
   function scheduleGate(){
-    clearTimeout(gateTimer);
-    gateTimer = setTimeout(runGate, 350);
-  }
+    if (requestedEditMode) {
+      return;
+    }
 
-  function hydrate(){
-    const p = new URLSearchParams(location.search);
-
-    animalNumberEl.value = digitsOnly(
-      p.get("number") ||
-      p.get("animalNumber") ||
-      p.get("animalId") ||
-      ""
+    clearTimeout(
+      gateTimer
     );
 
-    const d = String(
-      p.get("date") ||
-      p.get("eventDate") ||
-      ""
-    ).slice(0,10);
-
-    eventDateEl.value = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayLocal();
+    gateTimer =
+      setTimeout(
+        runGate,
+        350
+      );
   }
 
-  animalNumberEl.addEventListener("input", scheduleGate);
-  eventDateEl.addEventListener("change", scheduleGate);
 
-   hydrate();
-  renderDiseases(DISEASE_OPTIONS);
-  runGate();
+  function hydrateNormal(){
+    animalNumberEl.value =
+      digitsOnly(
+        params.get("number") ||
+        params.get("animalNumber") ||
+        params.get("animalId") ||
+        ""
+      );
+
+    const d =
+      String(
+        params.get("date") ||
+        params.get("eventDate") ||
+        ""
+      ).slice(0,10);
+
+    eventDateEl.value =
+      /^\d{4}-\d{2}-\d{2}$/
+        .test(d)
+        ? d
+        : todayLocal();
+  }
+
+
+  async function loadEditEvent(){
+    setBar(
+      gateBox,
+      "جاري تحميل التشخيص الصحي للتعديل...",
+      "info"
+    );
+
+    const data =
+      await apiRequest(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}`
+      );
+
+
+    if (
+      data.ok !== true ||
+      !data.event
+    ) {
+      throw new Error(
+        data.message ||
+        "تعذّر تحميل التشخيص الصحي للتعديل."
+      );
+    }
+
+
+    const ev =
+      data.event;
+
+
+    if (
+      ev.typeKey !== "health"
+    ) {
+      throw new Error(
+        "الحدث المطلوب ليس تشخيصًا صحيًا عامًا."
+      );
+    }
+
+
+    if (
+      ev.editPolicy
+        ?.editable !== true
+    ) {
+      throw new Error(
+        ev.editPolicy
+          ?.reason ||
+        "هذا الحدث غير متاح للتعديل."
+      );
+    }
+
+
+    animalNumberEl.value =
+      ev.animalNumber ||
+      "";
+
+    animalNumberEl.readOnly =
+      true;
+
+
+    eventDateEl.value =
+      ev.data?.eventDate ||
+      ev.eventDate ||
+      "";
+
+    /*
+      التاريخ ثابت ولا يعدّل.
+      السيرفر لديه الحارس النهائي.
+    */
+    eventDateEl.disabled =
+      true;
+
+
+    notesEl.value =
+      ev.data?.notes ||
+      "";
+
+
+    currentDiseaseCode =
+      String(
+        ev.data
+          ?.diseaseCode ||
+        ""
+      ).trim();
+
+
+    const gate =
+      await apiRequest(
+        "/api/disease/gate",
+        {
+          method:
+            "POST",
+
+          body: {
+            animalNumber:
+              animalNumberEl.value,
+
+            eventDate:
+              eventDateEl.value
+          }
+        }
+      );
+
+
+    if (
+      gate.allowed === false
+    ) {
+      throw new Error(
+        gate.message ||
+        "تعذّر تجهيز التشخيص الصحي للتعديل."
+      );
+    }
+
+
+    const editableDiseases =
+      (
+        Array.isArray(
+          gate.diseases
+        )
+          ? gate.diseases
+          : []
+      )
+        .filter(item =>
+          item &&
+          item.code &&
+          !item.specialPage
+        );
+
+
+    if (
+      !editableDiseases.length
+    ) {
+      throw new Error(
+        "لا توجد تشخيصات صحية عامة متاحة للتعديل لهذا الحيوان."
+      );
+    }
+
+
+    renderSummary(
+      gate.animal ||
+      null
+    );
+
+
+    renderDiseases(
+      editableDiseases,
+      currentDiseaseCode
+    );
+
+
+    renderPerformers(
+      data.correctionPerformers ||
+      []
+    );
+
+
+    editToolsCard.hidden =
+      false;
+
+    editToolsCard.style.display =
+      "";
+
+
+    correctionPerformedByEl.required =
+      true;
+
+    correctionReasonEl.required =
+      true;
+
+
+    if (pageTitle) {
+      pageTitle.textContent =
+        "تعديل التشخيص الصحي";
+    }
+
+
+    document.title =
+      "تعديل التشخيص الصحي — مُرَبِّيك";
+
+
+    if (backLink) {
+      backLink.href =
+        `event-list.html?number=${encodeURIComponent(ev.animalNumber || "")}`;
+    }
+
+
+    const currentName =
+      ev.data?.diseaseName ||
+      editableDiseases
+        .find(
+          item =>
+            item.code ===
+            currentDiseaseCode
+        )
+        ?.name ||
+      "";
+
+
+    setBar(
+      gateBox,
+
+      currentName
+        ? `التشخيص الحالي: ${currentName}. عدّل الملاحظات إن لزم، ثم اختر التشخيص المصحح بعد إدخال القائم بالتعديل وسبب التعديل.`
+        : "عدّل الملاحظات إن لزم، ثم اختر التشخيص المصحح بعد إدخال القائم بالتعديل وسبب التعديل.",
+
+      "success"
+    );
+  }
+
+
+  async function init(){
+    try {
+      if (
+        requestedEditMode
+      ) {
+        if (!editEventId) {
+          throw new Error(
+            "رابط تعديل التشخيص الصحي غير مكتمل."
+          );
+        }
+
+        await loadEditEvent();
+
+      } else {
+        hydrateNormal();
+
+        renderDiseases(
+          DISEASE_OPTIONS
+        );
+
+        await runGate();
+      }
+
+    } catch (e) {
+      console.error(
+        "disease page init failed",
+        e
+      );
+
+      setBar(
+        gateBox,
+        e.message ||
+        "❌ تعذّر تجهيز صفحة التشخيص الصحي.",
+        "error"
+      );
+
+      dz.innerHTML =
+        "";
+    }
+  }
+
+
+  animalNumberEl
+    .addEventListener(
+      "input",
+      scheduleGate
+    );
+
+
+  eventDateEl
+    .addEventListener(
+      "change",
+      scheduleGate
+    );
+
+
+  init();
+
 })();
 </script>
 </body>
