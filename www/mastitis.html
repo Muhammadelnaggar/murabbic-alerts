@@ -10,10 +10,10 @@
 <body>
 <header>
   <div class="mbk-head">
-    <a class="mbk-back" href="add-event.html">رجوع</a>
+    <a class="mbk-back" id="backLink" href="add-event.html">رجوع</a>
 
     <div class="mbk-center">
-      <div class="mbk-page-title">تسجيل التهاب الضرع</div>
+      <div class="mbk-page-title" id="pageTitle">تسجيل التهاب الضرع</div>
       <div class="mbk-app-name">مُرَبِّك</div>
     </div>
 
@@ -43,23 +43,64 @@
         <div id="quartersBox" class="radio-group"></div>
       </fieldset>
 
-      <div class="row">
-       <div>
-  <label>وصف التهاب الضرع</label>
+           <div class="row">
+        <div>
+          <label>وصف التهاب الضرع</label>
 
-  <input id="mastitisType" type="hidden" />
+          <input id="mastitisType" type="hidden" />
 
-  <details id="mastitisTypeDrop">
-    <summary id="mastitisTypeSummary">اختر وصف التهاب الضرع...</summary>
-    <div id="mastitisTypeList" class="radio-group"></div>
-  </details>
-</div>
+          <details id="mastitisTypeDrop">
+            <summary id="mastitisTypeSummary">
+              اختر وصف التهاب الضرع...
+            </summary>
+
+            <div
+              id="mastitisTypeList"
+              class="radio-group"
+            ></div>
+          </details>
+        </div>
 
         <div>
-          <label for="notes">ملاحظات اختيارية</label>
-          <textarea id="notes" rows="3" placeholder="أي ملاحظة علاجية أو تشخيصية مختصرة"></textarea>
+          <label for="notes">
+            ملاحظات اختيارية
+          </label>
+
+          <textarea
+            id="notes"
+            rows="3"
+            placeholder="أي ملاحظة علاجية أو تشخيصية مختصرة"
+          ></textarea>
         </div>
       </div>
+
+      <div class="row" id="editToolsRow" hidden>
+  <div>
+    <label for="correctionPerformedBy">القائم بالتعديل</label>
+    <input
+      id="correctionPerformedBy"
+      type="text"
+      list="operationalPerformersList"
+      maxlength="160"
+      autocomplete="off"
+      placeholder="اسم القائم بالتعديل"
+    />
+  </div>
+
+  <div>
+    <label for="correctionReason">سبب التعديل</label>
+    <input
+      id="correctionReason"
+      type="text"
+      maxlength="500"
+      autocomplete="off"
+      placeholder="اكتب سبب تصحيح التهاب الضرع"
+    />
+  </div>
+</div>
+
+<datalist id="operationalPerformersList"></datalist>
+
  
     </form>
   </section>
@@ -73,22 +114,94 @@
 (function(){
 
   const els = {
-    sysbar: document.getElementById("sysbar"),
-    animalNumber: document.getElementById("animalNumber"),
-    eventDate: document.getElementById("eventDate"),
-    quartersBox: document.getElementById("quartersBox"),
-    mastitisType: document.getElementById("mastitisType"),
-    mastitisTypeDrop: document.getElementById("mastitisTypeDrop"),
-    mastitisTypeSummary: document.getElementById("mastitisTypeSummary"),
-    mastitisTypeList: document.getElementById("mastitisTypeList"),
-    notes: document.getElementById("notes"),
-    saveBtn: document.getElementById("saveBtn")
+    sysbar:
+      document.getElementById("sysbar"),
+
+    animalNumber:
+      document.getElementById("animalNumber"),
+
+    eventDate:
+      document.getElementById("eventDate"),
+
+    quartersBox:
+      document.getElementById("quartersBox"),
+
+    mastitisType:
+      document.getElementById("mastitisType"),
+
+    mastitisTypeDrop:
+      document.getElementById("mastitisTypeDrop"),
+
+    mastitisTypeSummary:
+      document.getElementById("mastitisTypeSummary"),
+
+    mastitisTypeList:
+      document.getElementById("mastitisTypeList"),
+
+    notes:
+      document.getElementById("notes"),
+
+    saveBtn:
+      document.getElementById("saveBtn"),
+
+    editToolsRow:
+      document.getElementById("editToolsRow"),
+
+    correctionPerformedBy:
+      document.getElementById(
+        "correctionPerformedBy"
+      ),
+
+    correctionReason:
+      document.getElementById(
+        "correctionReason"
+      ),
+
+    operationalPerformersList:
+      document.getElementById(
+        "operationalPerformersList"
+      ),
+
+    pageTitle:
+      document.getElementById("pageTitle"),
+
+    backLink:
+      document.getElementById("backLink")
   };
+
+  const params =
+    new URLSearchParams(
+      location.search
+    );
+
+  const requestedEditMode =
+    String(
+      params.get("mode") || ""
+    )
+      .trim()
+      .toLowerCase() === "edit";
+
+  const editEventId =
+    String(
+      params.get("eventId") || ""
+    ).trim();
+
+  const isEditMode =
+    requestedEditMode &&
+    !!editEventId;
+
 
   function todayLocal(){
     const d = new Date();
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().slice(0, 10);
+
+    d.setMinutes(
+      d.getMinutes() -
+      d.getTimezoneOffset()
+    );
+
+    return d
+      .toISOString()
+      .slice(0, 10);
   }
 
 
@@ -101,177 +214,667 @@
       .replace(/'/g, "&#039;");
   }
 
+
   function showMsg(text, type){
-    const msg = String(text || "").trim();
+    const msg =
+      String(text || "").trim();
+
     if (!msg) {
-      els.sysbar.className = "infobar";
-      els.sysbar.textContent = "";
+      els.sysbar.className =
+        "infobar";
+
+      els.sysbar.textContent =
+        "";
+
       return;
     }
 
-    els.sysbar.textContent = msg;
-    els.sysbar.className = "infobar show " + (type || "info");
+    els.sysbar.textContent =
+      msg;
+
+    els.sysbar.className =
+      "infobar show " +
+      (type || "info");
 
     try {
-      els.sysbar.scrollIntoView({ behavior:"smooth", block:"center" });
+      els.sysbar.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
     } catch {}
   }
 
-  async function apiPost(path, body){
-    const r = await fetch(path, {
-      method: "POST",
+
+  async function apiRequest(
+    path,
+    {
+      method = "GET",
+      body
+    } = {}
+  ) {
+    const options = {
+      method,
       credentials: "same-origin",
       cache: "no-store",
       headers: {
-        "Content-Type": "application/json",
         "Accept": "application/json"
-      },
-      body: JSON.stringify(body || {})
-    });
+      }
+    };
 
-    const j = await r.json().catch(() => ({
-      ok: false,
-      message: "❌ رد السيرفر غير صالح."
-    }));
+    if (body !== undefined) {
+      options.headers[
+        "Content-Type"
+      ] = "application/json";
 
-    if (r.status === 401 || j?.error === "auth_required") {
-      location.href = "login.html?next=mastitis.html";
-      throw new Error(j?.message || "سجّل الدخول أولًا.");
+      options.body =
+        JSON.stringify(body || {});
+    }
+
+    const r =
+      await fetch(
+        path,
+        options
+      );
+
+    const j =
+      await r
+        .json()
+        .catch(() => ({
+          ok: false,
+          message:
+            "❌ رد السيرفر غير صالح."
+        }));
+
+    if (
+      r.status === 401 ||
+      j?.error === "auth_required"
+    ) {
+      location.href =
+        "login.html?next=" +
+        encodeURIComponent(
+          location.pathname +
+          location.search
+        );
+
+      throw new Error(
+        j?.message ||
+        "سجّل الدخول أولًا."
+      );
     }
 
     if (!r.ok) {
-      const err = new Error(j?.message || "تعذّر تنفيذ الطلب من السيرفر.");
+      const err =
+        new Error(
+          j?.message ||
+          "تعذّر تنفيذ الطلب من السيرفر."
+        );
+
       err.response = j;
       err.status = r.status;
+
       throw err;
     }
 
     return j || {};
   }
 
-  function hydrateFromQuery(){
-    const qs = new URLSearchParams(location.search);
 
+  function hydrateFromQuery(){
     els.animalNumber.value =
-      qs.get("number") ||
-      qs.get("animalNumber") ||
-      qs.get("animalId") ||
+      params.get("number") ||
+      params.get("animalNumber") ||
+      params.get("animalId") ||
       "";
 
     els.eventDate.value =
-      qs.get("date") ||
-      qs.get("eventDate") ||
+      params.get("date") ||
+      params.get("eventDate") ||
       todayLocal();
   }
 
+
   function collectPayload(){
     return {
-      animalNumber: els.animalNumber.value.trim(),
-      eventDate: els.eventDate.value,
-      mastitisType: els.mastitisType.value,
-      quarters: Array.from(
-        document.querySelectorAll('input[name="quarters"]:checked')
-      ).map(x => x.value),
-      notes: els.notes.value.trim()
+      animalNumber:
+        els.animalNumber
+          .value
+          .trim(),
+
+      eventDate:
+        els.eventDate.value,
+
+      mastitisType:
+        els.mastitisType.value,
+
+      quarters:
+        Array.from(
+          document.querySelectorAll(
+            'input[name="quarters"]:checked'
+          )
+        ).map(x => x.value),
+
+      notes:
+        els.notes.value.trim()
     };
   }
 
-  function renderOptions(options){
-    const quarters = Array.isArray(options?.quarters) ? options.quarters : [];
-    const mastitisTypes = Array.isArray(options?.mastitisTypes) ? options.mastitisTypes : [];
 
-    els.quartersBox.innerHTML = quarters.map(q => {
-      const safe = escapeHtml(q);
-      return `<label><input type="checkbox" name="quarters" value="${safe}"> ${safe}</label>`;
-    }).join("");
+  function renderOptions(
+    options,
+    selectedQuarters = [],
+    selectedType = ""
+  ){
+    const quarters =
+      Array.isArray(
+        options?.quarters
+      )
+        ? options.quarters
+        : [];
 
-const oldType = els.mastitisType.value;
+    const mastitisTypes =
+      Array.isArray(
+        options?.mastitisTypes
+      )
+        ? options.mastitisTypes
+        : [];
 
-els.mastitisTypeList.innerHTML = mastitisTypes.map(t => {
-  const safe = escapeHtml(t);
-  const checked = oldType === t ? " checked" : "";
-  return `
-    <label>
-      <input type="radio" name="mastitisTypeChoice" value="${safe}"${checked}>
-      ${safe}
-    </label>
-  `;
-}).join("");
+    const selectedQuarterSet =
+      new Set(
+        (
+          Array.isArray(selectedQuarters)
+            ? selectedQuarters
+            : []
+        )
+          .map(x =>
+            String(x || "").trim()
+          )
+          .filter(Boolean)
+      );
 
-if (oldType && mastitisTypes.includes(oldType)) {
-  els.mastitisType.value = oldType;
-  els.mastitisTypeSummary.textContent = oldType;
-} else {
-  els.mastitisType.value = "";
-  els.mastitisTypeSummary.textContent = "اختر وصف التهاب الضرع...";
-}
+    els.quartersBox.innerHTML =
+      quarters
+        .map(q => {
+          const safe =
+            escapeHtml(q);
 
-els.mastitisTypeList
-  .querySelectorAll('input[name="mastitisTypeChoice"]')
-  .forEach(input => {
-    input.addEventListener("change", () => {
-      els.mastitisType.value = input.value;
-      els.mastitisTypeSummary.textContent = input.value;
-      els.mastitisTypeDrop.open = false;
-    });
-  });
+          const checked =
+            selectedQuarterSet.has(q)
+              ? " checked"
+              : "";
+
+          return `
+            <label>
+              <input
+                type="checkbox"
+                name="quarters"
+                value="${safe}"${checked}
+              >
+              ${safe}
+            </label>
+          `;
+        })
+        .join("");
+
+    const currentType =
+      String(
+        selectedType ||
+        els.mastitisType.value ||
+        ""
+      ).trim();
+
+    els.mastitisTypeList.innerHTML =
+      mastitisTypes
+        .map(t => {
+          const safe =
+            escapeHtml(t);
+
+          const checked =
+            currentType === t
+              ? " checked"
+              : "";
+
+          return `
+            <label>
+              <input
+                type="radio"
+                name="mastitisTypeChoice"
+                value="${safe}"${checked}
+              >
+              ${safe}
+            </label>
+          `;
+        })
+        .join("");
+
+    if (
+      currentType &&
+      mastitisTypes.includes(
+        currentType
+      )
+    ) {
+      els.mastitisType.value =
+        currentType;
+
+      els.mastitisTypeSummary
+        .textContent =
+          currentType;
+
+    } else {
+      els.mastitisType.value = "";
+
+      els.mastitisTypeSummary
+        .textContent =
+          "اختر وصف التهاب الضرع...";
+    }
+
+    els.mastitisTypeList
+      .querySelectorAll(
+        'input[name="mastitisTypeChoice"]'
+      )
+      .forEach(input => {
+        input.addEventListener(
+          "change",
+          () => {
+            els.mastitisType.value =
+              input.value;
+
+            els.mastitisTypeSummary
+              .textContent =
+                input.value;
+
+            els.mastitisTypeDrop.open =
+              false;
+          }
+        );
+      });
   }
+
+
+  function renderOperationalPerformers(
+    items = []
+  ){
+    els.operationalPerformersList
+      .replaceChildren();
+
+    [
+      ...new Set(
+        (
+          Array.isArray(items)
+            ? items
+            : []
+        )
+          .map(item =>
+            String(item || "").trim()
+          )
+          .filter(Boolean)
+      )
+    ].forEach(name => {
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value = name;
+
+      els.operationalPerformersList
+        .appendChild(option);
+    });
+  }
+
 
   async function runGate(){
+    if (requestedEditMode) {
+      return;
+    }
+
     try {
-      const payload = collectPayload();
+      const payload =
+        collectPayload();
 
-      const j = await apiPost("/api/mastitis/gate", {
-        animalNumber: payload.animalNumber,
-        eventDate: payload.eventDate
-      });
+      const j =
+        await apiRequest(
+          "/api/mastitis/gate",
+          {
+            method: "POST",
+            body: {
+              animalNumber:
+                payload.animalNumber,
 
-      renderOptions(j.options || {});
+              eventDate:
+                payload.eventDate
+            }
+          }
+        );
 
-      if (j.message && !j.silent) {
-        showMsg(j.message, j.allowed ? "success" : "warning");
-      } else if (!payload.animalNumber) {
-        showMsg("أدخل رقم الحيوان وتاريخ التشخيص.", "info");
+      renderOptions(
+        j.options || {},
+        payload.quarters,
+        payload.mastitisType
+      );
+
+      if (
+        j.message &&
+        !j.silent
+      ) {
+        showMsg(
+          j.message,
+          j.allowed
+            ? "success"
+            : "warning"
+        );
+
+      } else if (
+        !payload.animalNumber
+      ) {
+        showMsg(
+          "أدخل رقم الحيوان وتاريخ التشخيص.",
+          "info"
+        );
       }
 
     } catch (e) {
-      showMsg(e.message || "تعذّر التحقق من السيرفر.", "error");
+      showMsg(
+        e.message ||
+        "تعذّر التحقق من السيرفر.",
+        "error"
+      );
     }
   }
+
+
+  async function loadEditEvent(){
+    els.saveBtn.disabled = true;
+
+    els.saveBtn.textContent =
+      "جارٍ تحميل الحدث...";
+
+    const data =
+      await apiRequest(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}`
+      );
+
+    if (
+      data.ok !== true ||
+      !data.event
+    ) {
+      throw new Error(
+        data.message ||
+        "تعذّر تحميل التهاب الضرع للتعديل."
+      );
+    }
+
+    const ev =
+      data.event;
+
+    if (
+      ev.typeKey !== "mastitis"
+    ) {
+      throw new Error(
+        "الحدث المطلوب ليس تسجيل التهاب ضرع."
+      );
+    }
+
+    if (
+      ev.editPolicy?.editable !== true
+    ) {
+      throw new Error(
+        ev.editPolicy?.reason ||
+        "هذا الحدث غير متاح للتعديل."
+      );
+    }
+
+    els.animalNumber.value =
+      ev.animalNumber || "";
+
+    els.animalNumber.readOnly =
+      true;
+
+    els.eventDate.value =
+      ev.data?.eventDate ||
+      ev.eventDate ||
+      "";
+
+    /*
+      تاريخ الحدث لا يُعدّل إطلاقًا.
+      السيرفر لديه الحارس النهائي أيضًا.
+    */
+    els.eventDate.disabled =
+      true;
+
+    const gate =
+      await apiRequest(
+        "/api/mastitis/gate",
+        {
+          method: "POST",
+          body: {
+            animalNumber:
+              els.animalNumber.value,
+
+            eventDate:
+              els.eventDate.value
+          }
+        }
+      );
+
+    if (
+      gate.allowed === false
+    ) {
+      throw new Error(
+        gate.message ||
+        "تعذّر تجهيز بيانات التهاب الضرع للتعديل."
+      );
+    }
+
+    renderOptions(
+      gate.options || {},
+      ev.data?.quarters || [],
+      ev.data?.mastitisType || ""
+    );
+
+    els.notes.value =
+      ev.data?.notes || "";
+
+    renderOperationalPerformers(
+      data.correctionPerformers || []
+    );
+
+    els.editToolsRow.hidden =
+      false;
+
+    els.correctionPerformedBy
+      .required = true;
+
+    els.correctionReason
+      .required = true;
+
+    if (els.pageTitle) {
+      els.pageTitle.textContent =
+        "تعديل التهاب الضرع";
+    }
+
+    document.title =
+      "تعديل التهاب الضرع — مُرَبِّك";
+
+    if (els.backLink) {
+      els.backLink.href =
+        `event-list.html?number=${encodeURIComponent(ev.animalNumber || "")}`;
+    }
+
+    els.saveBtn.textContent =
+      "حفظ التعديل ✅";
+
+    els.saveBtn.disabled =
+      false;
+
+    showMsg(
+      "عدّل وصف التهاب الضرع أو الأرباع المصابة أو الملاحظات، ثم اكتب القائم بالتعديل وسبب التعديل.",
+      "success"
+    );
+  }
+
 
   async function save(){
-    const prev = els.saveBtn.textContent;
+    const idleText =
+      isEditMode
+        ? "حفظ التعديل ✅"
+        : "حفظ التهاب الضرع";
 
     try {
-      els.saveBtn.disabled = true;
-      els.saveBtn.textContent = "جارٍ الحفظ...";
-      showMsg("جارٍ إرسال البيانات للسيرفر...", "info");
+      els.saveBtn.disabled =
+        true;
 
-      const j = await apiPost("/api/mastitis/save", collectPayload());
+      els.saveBtn.textContent =
+        "جارٍ الحفظ...";
 
-      showMsg(j.message || "✅ تم حفظ التهاب الضرع بنجاح", "success");
+      showMsg(
+        "جارٍ إرسال البيانات للسيرفر...",
+        "info"
+      );
 
-      if (j.redirectUrl) {
-        setTimeout(() => {
-          location.href = j.redirectUrl;
-        }, 900);
+      const payload =
+        collectPayload();
+
+      let j;
+
+      if (isEditMode) {
+        const correctionPerformedBy =
+          els.correctionPerformedBy
+            .value
+            .trim();
+
+        const correctionReason =
+          els.correctionReason
+            .value
+            .trim();
+
+        if (!correctionPerformedBy) {
+          throw new Error(
+            "أدخل اسم القائم بالتعديل."
+          );
+        }
+
+        if (!correctionReason) {
+          throw new Error(
+            "اكتب سبب التعديل."
+          );
+        }
+
+        j =
+          await apiRequest(
+            `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
+            {
+              method: "POST",
+              body: {
+                ...payload,
+                correctionPerformedBy,
+                correctionReason
+              }
+            }
+          );
+
+      } else {
+        j =
+          await apiRequest(
+            "/api/mastitis/save",
+            {
+              method: "POST",
+              body: payload
+            }
+          );
       }
 
+      showMsg(
+        j.message ||
+        (
+          isEditMode
+            ? "✅ تم تعديل التهاب الضرع بنجاح."
+            : "✅ تم حفظ التهاب الضرع بنجاح."
+        ),
+        "success"
+      );
+
+      setTimeout(() => {
+        if (isEditMode) {
+          location.href =
+            `event-list.html?number=${encodeURIComponent(els.animalNumber.value.trim())}`;
+
+          return;
+        }
+
+        if (j.redirectUrl) {
+          location.href =
+            j.redirectUrl;
+        }
+      }, 900);
+
     } catch (e) {
-      showMsg(e.message || "تعذّر حفظ التهاب الضرع.", "error");
+      showMsg(
+        e.message ||
+        (
+          isEditMode
+            ? "تعذّر تعديل التهاب الضرع."
+            : "تعذّر حفظ التهاب الضرع."
+        ),
+        "error"
+      );
+
     } finally {
-      els.saveBtn.disabled = false;
-      els.saveBtn.textContent = prev;
+      els.saveBtn.disabled =
+        false;
+
+      els.saveBtn.textContent =
+        idleText;
     }
   }
 
-  hydrateFromQuery();
 
-  els.animalNumber.addEventListener("blur", runGate);
-  els.eventDate.addEventListener("change", runGate);
-  els.saveBtn.addEventListener("click", save);
+  async function init(){
+    try {
+      hydrateFromQuery();
 
-  runGate();
+      if (requestedEditMode) {
+        if (!editEventId) {
+          throw new Error(
+            "رابط تعديل التهاب الضرع غير مكتمل."
+          );
+        }
+
+        await loadEditEvent();
+
+      } else {
+        await runGate();
+      }
+
+    } catch (e) {
+      showMsg(
+        e.message ||
+        "تعذّر تجهيز صفحة التهاب الضرع.",
+        "error"
+      );
+
+      els.saveBtn.disabled =
+        true;
+    }
+  }
+
+
+  els.animalNumber.addEventListener(
+    "blur",
+    runGate
+  );
+
+  els.eventDate.addEventListener(
+    "change",
+    runGate
+  );
+
+  els.saveBtn.addEventListener(
+    "click",
+    save
+  );
+
+  init();
+
 })();
 </script>
 </body>
