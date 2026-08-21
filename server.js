@@ -16564,14 +16564,15 @@ if (alreadyEdited) {
   }
 
   const supported =
-    new Set([
-      "heat",
-      "daily_milk",
-      "dry_off",
-      "insemination",
-      "uterine_check",
-      "pregnancy_diagnosis"
-    ]);
+  new Set([
+    "heat",
+    "daily_milk",
+    "dry_off",
+    "insemination",
+    "uterine_check",
+    "mastitis",
+    "pregnancy_diagnosis"
+  ]);
 
   if (supported.has(typeKey)) {
     return {
@@ -18529,6 +18530,7 @@ if (
     "dry_off",
     "insemination",
     "uterine_check",
+    "mastitis",
     "pregnancy_diagnosis"
   ].includes(typeKey) &&
   !correctionPerformedBy
