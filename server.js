@@ -16202,6 +16202,90 @@ function eventsPageBuildSeasonGroupsSrv({
     seasons
   };
 }
+function eventsPageCurrentMotherSeasonStartSrv(
+  subject = null,
+  rows = []
+) {
+  if (!subject) return "";
+
+  const subjectCollection =
+    String(
+      subject?._collection || ""
+    ).trim();
+
+  // التوابع ليس لها مواسم إنتاج.
+  if (subjectCollection === "calves") {
+    return null;
+  }
+
+  const subjectData =
+    subject?.data || {};
+
+  const calvingDates = [
+    eventsPageSeasonDateSrv(
+      subjectData.lastCalvingDate ||
+      subjectData.calvingDate ||
+      subjectData.lastCalving ||
+      ""
+    ),
+
+    ...(Array.isArray(rows) ? rows : [])
+      .map(row => {
+        const data =
+          row?.data || row || {};
+
+        const typeKey =
+          String(
+            row?.typeKey ||
+            eventsPageNormalizeTypeKeySrv(data) ||
+            ""
+          ).trim();
+
+        if (typeKey !== "calving") {
+          return "";
+        }
+
+        return eventsPageSeasonDateSrv(
+          row?.eventDate ||
+          eventsPageListDateSrv(data) ||
+          ""
+        );
+      })
+      .filter(Boolean)
+  ].filter(Boolean);
+
+  return [
+    ...new Set(calvingDates)
+  ].sort().at(-1) || "";
+}
+
+function eventsPageIsCurrentMotherSeasonEventSrv(
+  subject = null,
+  rows = [],
+  eventDate = ""
+) {
+  const currentSeasonStart =
+    eventsPageCurrentMotherSeasonStartSrv(
+      subject,
+      rows
+    );
+
+  // null = تابع؛ لا تنطبق عليه قاعدة مواسم الأمهات.
+  if (currentSeasonStart === null) {
+    return true;
+  }
+
+  const date =
+    eventsPageSeasonDateSrv(
+      eventDate
+    );
+
+  return (
+    !!currentSeasonStart &&
+    !!date &&
+    date >= currentSeasonStart
+  );
+}
 function eventsPageEditSourceSrv(ev = {}) {
   return String(
     ev.source ||
@@ -16932,7 +17016,47 @@ app.get(
             "لا يمكنك تعديل حدث لا يخص حسابك."
         });
       }
+      const eventAnimalNumber =
+        eventsPageEventAnimalNumberSrv(ev);
 
+      const eventSubject =
+        eventAnimalNumber
+          ? await fetchAnimalByNumberForCalvingGateSrv(
+              uid,
+              eventAnimalNumber
+            )
+          : null;
+
+      if (!eventSubject) {
+        return res.status(409).json({
+          ok: false,
+          error: "event_subject_missing",
+          message:
+            "❌ لا يمكن فتح تعديل هذا الحدث لأن الحيوان المرتبط به غير موجود في القطيع النشط."
+        });
+      }
+
+      const eventDocs =
+        await eventsPageFetchAnimalEventsSrv(
+          uid,
+          eventAnimalNumber
+        );
+
+      if (
+        !eventsPageIsCurrentMotherSeasonEventSrv(
+          eventSubject,
+          eventDocs,
+          eventsPageListDateSrv(ev)
+        )
+      ) {
+        return res.status(409).json({
+          ok: false,
+          error:
+            "mother_previous_season_edit_locked",
+          message:
+            "❌ يُسمح بتعديل أحداث الأم في الموسم الجاري فقط؛ أحداث المواسم السابقة تبقى محفوظة للرجوع إليها دون تعديل."
+        });
+      }
       let correctionPerformers = [];
 
 try {
@@ -18511,7 +18635,24 @@ if (
         });
       }
 
-      const docs = await eventsPageFetchAnimalEventsSrv(uid, animalNumber);
+          const docs = await eventsPageFetchAnimalEventsSrv(uid, animalNumber);
+
+      if (
+        !eventsPageIsCurrentMotherSeasonEventSrv(
+          subject,
+          docs,
+          eventsPageListDateSrv(oldEvent)
+        )
+      ) {
+        return res.status(409).json({
+          ok: false,
+          error:
+            "mother_previous_season_edit_locked",
+          message:
+            "❌ يُسمح بتعديل أحداث الأم في الموسم الجاري فقط؛ أحداث المواسم السابقة تبقى محفوظة للرجوع إليها دون تعديل."
+        });
+      }
+
       const bounds = eventsPageCorrectionSeasonBoundsSrv(
         docs.map(item => ({ id: item.id, data: item.data || {} })),
         eventsPageListDateSrv(oldEvent)
@@ -20735,10 +20876,66 @@ const subject =
     number
   );
 
+const currentMotherSeasonStart =
+  eventsPageCurrentMotherSeasonStartSrv(
+    subject,
+    allRows
+  );
+
+const lockPreviousMotherSeasonEdits =
+  inputRows =>
+    (Array.isArray(inputRows) ? inputRows : [])
+      .map(row => {
+        // null = تابع؛ لا تنطبق عليه قاعدة مواسم الأمهات.
+        if (currentMotherSeasonStart === null) {
+          return row;
+        }
+
+        const rowDate =
+          eventsPageSeasonDateSrv(
+            row?.eventDate || ""
+          );
+
+        if (
+          currentMotherSeasonStart &&
+          rowDate &&
+          rowDate >= currentMotherSeasonStart
+        ) {
+          return row;
+        }
+
+        return {
+          ...row,
+          edit: {
+            ...(row?.edit || {}),
+            editable: false,
+            mode:
+              "previous_season_locked",
+            writer: "",
+            reason:
+              currentMotherSeasonStart
+                ? "يُسمح بتعديل أحداث الأم في الموسم الجاري فقط؛ أحداث المواسم السابقة تبقى محفوظة للرجوع إليها دون تعديل."
+                : "لا يمكن فتح تعديل أحداث الأم لأن آخر ولادة التي تحدد الموسم الجاري غير مسجلة.",
+            formPage: "",
+            editUrl: ""
+          }
+        };
+      });
+
+const guardedAllRows =
+  lockPreviousMotherSeasonEdits(
+    allRows
+  );
+
+const guardedRows =
+  lockPreviousMotherSeasonEdits(
+    rows
+  );
+
 const seasonResult =
   eventsPageBuildSeasonGroupsSrv({
-    allRows,
-    visibleRows: rows,
+    allRows: guardedAllRows,
+    visibleRows: guardedRows,
     subject
   });
 
@@ -20753,10 +20950,10 @@ return res.json({
   typeKey,
 
   count:
-    rows.length,
+  guardedRows.length,
 
-  totalEvents:
-    allRows.length,
+totalEvents:
+  guardedAllRows.length,
 
   typeOptions:
     eventsPageListTypeOptionsSrv(),
@@ -20777,7 +20974,7 @@ return res.json({
     seasonResult.seasons,
 
   // للتوافق مع الصفحة الحالية مؤقتًا.
-  rows
+rows: guardedRows
 });
 
     
