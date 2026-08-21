@@ -14,10 +14,10 @@
   <div class="mbk-head">
     <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
     <div class="mbk-center">
-      <div class="mbk-page-title">التحضير للولادة</div>
+      <div class="mbk-page-title" id="pageTitle">التحضير للولادة</div>
       <div class="mbk-app-name">مُرَبِّيك</div>
     </div>
-    <a class="mbk-back" href="add-event.html">رجوع</a>
+    <a class="mbk-back" id="backLink" href="add-event.html">رجوع</a>
   </div>
 </header>
 
@@ -38,13 +38,36 @@
       </div>
     </fieldset>
 
-    <fieldset>
+        <fieldset>
       <legend>الأملاح الأنيونية</legend>
       <div class="radio-group">
         <label><input type="radio" name="anionicSalts" value="نعم" required> نعم</label>
         <label><input type="radio" name="anionicSalts" value="لا" required> لا</label>
       </div>
     </fieldset>
+
+    <div id="editToolsRow" hidden style="display:none">
+      <label for="correctionPerformedBy">القائم بالتعديل</label>
+      <input
+        id="correctionPerformedBy"
+        type="text"
+        list="operationalPerformersList"
+        maxlength="160"
+        autocomplete="off"
+        placeholder="اسم القائم بالتعديل"
+      />
+
+      <label for="correctionReason">سبب التعديل</label>
+      <input
+        id="correctionReason"
+        type="text"
+        maxlength="500"
+        autocomplete="off"
+        placeholder="اكتب سبب تصحيح تحضير الولادة"
+      />
+
+      <datalist id="operationalPerformersList"></datalist>
+    </div>
 
     <div class="actions-bar inline">
       <button class="save" id="saveBtn" type="submit">حفظ التحضير</button>
@@ -78,6 +101,12 @@
   const ndYes = $("nd_yes");
   const ndNo = $("nd_no");
   const sysbar = $("sysbar");
+  const pageTitle = $("pageTitle");
+  const backLink = $("backLink");
+  const editToolsRow = $("editToolsRow");
+  const correctionPerformedBy = $("correctionPerformedBy");
+  const correctionReason = $("correctionReason");
+  const operationalPerformersList = $("operationalPerformersList");
 
   let acceptedRows = [];
   let rejectedRows = [];
@@ -135,6 +164,22 @@
 
     return u.toString();
   }
+
+  const requestedMode =
+    String(
+      getQS("mode") ||
+      getQS("mbkMode") ||
+      ""
+    ).trim().toLowerCase();
+
+  const requestedEditMode =
+    requestedMode === "edit";
+
+  const editEventId =
+    String(getQS("eventId") || "").trim();
+
+  const isEditMode =
+    requestedEditMode && !!editEventId;
 
   function showMsg(text, ok){
     if (!sysbar) return;
@@ -206,6 +251,75 @@
     };
   }
 
+  async function sessionGetJson(path){
+    const r = await fetch(path, {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        "Accept": "application/json"
+      }
+    });
+
+    const j = await r.json().catch(() => ({
+      ok: false,
+      message: "تعذّر قراءة رد السيرفر."
+    }));
+
+    if (
+      r.status === 401 ||
+      j?.error === "auth_required"
+    ) {
+      showMsg(
+        j?.message || "سجّل الدخول أولًا.",
+        false
+      );
+
+      return {
+        r,
+        j,
+        authRequired: true
+      };
+    }
+
+    return {
+      r,
+      j,
+      authRequired: false
+    };
+  }
+
+  function setRadioValue(name, value){
+    const wanted = String(value || "").trim();
+
+    form
+      .querySelectorAll(`input[name="${name}"]`)
+      .forEach(el => {
+        el.checked =
+          String(el.value || "").trim() === wanted;
+      });
+  }
+
+  function renderPerformers(items = []){
+    if (!operationalPerformersList) return;
+
+    operationalPerformersList.replaceChildren();
+
+    [...new Set(
+      (Array.isArray(items) ? items : [])
+        .map(x => String(x || "").trim())
+        .filter(Boolean)
+    )].forEach(name => {
+      const option =
+        document.createElement("option");
+
+      option.value = name;
+
+      operationalPerformersList
+        .appendChild(option);
+    });
+  }
+
   function setSaveEnabled(v){
     if (saveBtn) {
       saveBtn.disabled = !v;
@@ -216,10 +330,15 @@
     if (!saveBtn) return;
 
     saveBtn.disabled = !!v;
+
     saveBtn.textContent =
       v
         ? "جارٍ الحفظ…"
-        : "حفظ التحضير";
+        : (
+            isEditMode
+              ? "حفظ التعديل"
+              : "حفظ التحضير"
+          );
   }
 
   function resetGate(){
@@ -241,7 +360,8 @@
         ? j.rejected
         : [];
 
-    gateOk = acceptedRows.length > 0;
+    gateOk =
+      acceptedRows.length > 0;
 
     setSaveEnabled(gateOk);
 
@@ -280,25 +400,31 @@
     if (acceptedRows.length) {
       msg += "\n\n✅ المؤهل:";
 
-      msg += "\n" + acceptedRows
-        .map(row => row.animalNumber)
-        .join("، ");
+      msg += "\n" +
+        acceptedRows
+          .map(row => row.animalNumber)
+          .join("، ");
     }
 
     if (rejectedRows.length) {
       msg += "\n\n❌ غير المؤهل:";
 
-      msg += "\n" + rejectedRows
-        .map(row =>
-          `${row.animalNumber || "-"} — ${row.reason || "غير مؤهل"}`
-        )
-        .join("\n");
+      msg += "\n" +
+        rejectedRows
+          .map(row =>
+            `${row.animalNumber || "-"} — ${row.reason || "غير مؤهل"}`
+          )
+          .join("\n");
     }
 
     showMsg(msg, gateOk);
   }
 
   async function runGate(){
+    if (requestedEditMode) {
+      return false;
+    }
+
     const animalNumbers =
       numbersText(inputAnimal.value);
 
@@ -307,7 +433,10 @@
 
     resetGate();
 
-    if (!animalNumbers || !eventDate) {
+    if (
+      !animalNumbers ||
+      !eventDate
+    ) {
       hideMsg();
       return false;
     }
@@ -317,15 +446,18 @@
         r,
         j,
         authRequired
-      } = await sessionPostJson(
-        "/api/close-up/gate",
-        {
-          animalNumbers,
-          eventDate
-        }
-      );
+      } =
+        await sessionPostJson(
+          "/api/close-up/gate",
+          {
+            animalNumbers,
+            eventDate
+          }
+        );
 
-      if (authRequired) return false;
+      if (authRequired) {
+        return false;
+      }
 
       renderGateResult(j || {});
 
@@ -354,10 +486,17 @@
   }
 
   function scheduleGate(){
+    if (requestedEditMode) {
+      return;
+    }
+
     clearTimeout(gateTimer);
 
     gateTimer =
-      setTimeout(runGate, 350);
+      setTimeout(
+        runGate,
+        350
+      );
   }
 
   async function saveCloseup(e){
@@ -413,27 +552,35 @@
         const allowed =
           await runGate();
 
-        if (!allowed) return;
+        if (!allowed) {
+          return;
+        }
       }
 
       const {
         r,
         j,
         authRequired
-      } = await sessionPostJson(
-        "/api/close-up/save",
-        {
-          animalNumbers,
-          accepted: acceptedRows,
-          eventDate,
-          ration,
-          anionicSalts
-        }
-      );
+      } =
+        await sessionPostJson(
+          "/api/close-up/save",
+          {
+            animalNumbers,
+            accepted: acceptedRows,
+            eventDate,
+            ration,
+            anionicSalts
+          }
+        );
 
-      if (authRequired) return;
+      if (authRequired) {
+        return;
+      }
 
-      if (!r.ok || !j.ok) {
+      if (
+        !r.ok ||
+        !j.ok
+      ) {
         let msg =
           j.message ||
           "تعذّر حفظ تحضير الولادة.";
@@ -444,11 +591,12 @@
         ) {
           msg += "\n\nلم تُحفظ:";
 
-          msg += "\n" + j.rejected
-            .map(row =>
-              `${row.animalNumber || "-"} — ${row.reason || ""}`
-            )
-            .join("\n");
+          msg += "\n" +
+            j.rejected
+              .map(row =>
+                `${row.animalNumber || "-"} — ${row.reason || ""}`
+              )
+              .join("\n");
         }
 
         throw new Error(msg);
@@ -469,20 +617,26 @@
       ) {
         msg += "\n\nلم تُحفظ:";
 
-        msg += "\n" + j.rejected
-          .map(row =>
-            `${row.animalNumber || "-"} — ${row.reason || ""}`
-          )
-          .join("\n");
+        msg += "\n" +
+          j.rejected
+            .map(row =>
+              `${row.animalNumber || "-"} — ${row.reason || ""}`
+            )
+            .join("\n");
       }
 
-      showMsg(msg, true);
+      showMsg(
+        msg,
+        true
+      );
 
-setTimeout(() => {
-  if (j.redirectUrl) {
-    location.href = j.redirectUrl;
-  }
-}, 900);
+      setTimeout(() => {
+        if (j.redirectUrl) {
+          location.href =
+            j.redirectUrl;
+        }
+      }, 900);
+
     } catch(err) {
       console.error(
         "close-up save error:",
@@ -500,105 +654,450 @@ setTimeout(() => {
     }
   }
 
-  const qsAnimal = firstNonEmpty(
-    getQS("numbers"),
-    getQS("animalNumbers"),
-    getQS("bulk"),
-    getQS("animalId"),
-    getQS("number"),
-    getQS("animalNumber")
-  );
+  async function loadEditEvent(){
+    showMsg(
+      "جاري تحميل حدث تحضير الولادة للتعديل...",
+      true
+    );
 
-  const qsDate = firstNonEmpty(
-    getQS("date"),
-    getQS("eventDate"),
-    todayISO()
-  );
+    setSaveEnabled(false);
 
-  if (inputAnimal && qsAnimal) {
-    inputAnimal.value =
-      numbersText(qsAnimal);
-  }
+    const {
+      r,
+      j,
+      authRequired
+    } =
+      await sessionGetJson(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}`
+      );
 
-  if (inputDate && qsDate) {
-    inputDate.value = qsDate;
-  }
-
-  setSaveEnabled(false);
-  scheduleGate();
-
-  inputAnimal?.addEventListener(
-    "input",
-    scheduleGate
-  );
-
-  inputDate?.addEventListener(
-    "change",
-    scheduleGate
-  );
-
-  form?.addEventListener(
-    "submit",
-    saveCloseup
-  );
-
-  openCowCardBtn?.addEventListener(
-    "click",
-    () => {
-      const n =
-        splitNumbers(inputAnimal.value)[0] ||
-        "";
-
-      if (!n) return;
-
-      location.href =
-        `/cow-card.html?number=${encodeURIComponent(n)}`;
+    if (authRequired) {
+      return false;
     }
-  );
 
-  ndYes?.addEventListener(
-    "click",
-    () => {
-      const n =
-        lastSavedRows[0]?.animalNumber ||
-        splitNumbers(inputAnimal.value)[0] ||
+    if (
+      !r.ok ||
+      !j?.ok ||
+      !j?.event
+    ) {
+      throw new Error(
+        j?.message ||
+        "تعذّر تحميل حدث تحضير الولادة للتعديل."
+      );
+    }
+
+    const ev = j.event;
+
+    if (
+      ev.typeKey !==
+      "close_up"
+    ) {
+      throw new Error(
+        "الحدث المطلوب ليس حدث تحضير ولادة."
+      );
+    }
+
+    if (
+      ev.editPolicy
+        ?.editable !== true
+    ) {
+      throw new Error(
+        ev.editPolicy
+          ?.reason ||
+        "هذا الحدث غير متاح للتعديل."
+      );
+    }
+
+    inputAnimal.value =
+      ev.animalNumber ||
+      "";
+
+    inputAnimal.readOnly =
+      true;
+
+    inputDate.value =
+      ev.data?.eventDate ||
+      ev.eventDate ||
+      "";
+
+    inputDate.disabled =
+      true;
+
+    setRadioValue(
+      "ration",
+      ev.data?.ration ||
+      ""
+    );
+
+    setRadioValue(
+      "anionicSalts",
+      ev.data?.anionicSalts ||
+      ""
+    );
+
+    renderPerformers(
+      j.correctionPerformers ||
+      []
+    );
+
+    if (editToolsRow) {
+      editToolsRow.hidden =
+        false;
+
+      editToolsRow.style.display =
         "";
+    }
 
-      const d =
-        String(inputDate.value || "").trim();
+    correctionPerformedBy.required =
+      true;
 
-      location.href =
-        buildUrl(
-          "/nutrition.html",
+    correctionReason.required =
+      true;
+
+    if (pageTitle) {
+      pageTitle.textContent =
+        "تعديل التحضير للولادة";
+    }
+
+    document.title =
+      "تعديل التحضير للولادة — مُرَبِّيك";
+
+    if (backLink) {
+      backLink.href =
+        `event-list.html?number=${encodeURIComponent(ev.animalNumber || "")}`;
+    }
+
+    saveBtn.textContent =
+      "حفظ التعديل";
+
+    setSaveEnabled(true);
+
+    showMsg(
+      "يمكن تعديل عليقة التحضير والأملاح الأنيونية فقط. رقم الحيوان وتاريخ التحضير ثابتان.",
+      true
+    );
+
+    return true;
+  }
+
+  async function saveCorrection(e){
+    e.preventDefault();
+
+    const numbers =
+      splitNumbers(
+        inputAnimal.value
+      );
+
+    const animalNumber =
+      numbers[0] ||
+      "";
+
+    const eventDate =
+      String(
+        inputDate.value ||
+        ""
+      ).trim();
+
+    const ration =
+      getRadio("ration");
+
+    const anionicSalts =
+      getRadio("anionicSalts");
+
+    const performedBy =
+      String(
+        correctionPerformedBy.value ||
+        ""
+      ).trim();
+
+    const reason =
+      String(
+        correctionReason.value ||
+        ""
+      ).trim();
+
+    if (
+      numbers.length !== 1 ||
+      !animalNumber ||
+      !eventDate
+    ) {
+      return showMsg(
+        "❌ تعذّر تحديد حدث تحضير الولادة المطلوب تعديله.",
+        false
+      );
+    }
+
+    if (!ration) {
+      return showMsg(
+        "❌ يجب تحديد هل تم تقديم عليقة التحضير.",
+        false
+      );
+    }
+
+    if (!anionicSalts) {
+      return showMsg(
+        "❌ يجب تحديد هل تم استخدام الأملاح الأنيونية.",
+        false
+      );
+    }
+
+    if (!performedBy) {
+      return showMsg(
+        "❌ أدخل اسم القائم بالتعديل.",
+        false
+      );
+    }
+
+    if (!reason) {
+      return showMsg(
+        "❌ اكتب سبب التعديل.",
+        false
+      );
+    }
+
+    try {
+      setSaveLoading(true);
+
+      const {
+        r,
+        j,
+        authRequired
+      } =
+        await sessionPostJson(
+          `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
           {
-            animalId: n,
-            number: n,
-            date: d
+            animalNumber,
+            eventDate,
+            ration,
+            anionicSalts,
+            correctionPerformedBy:
+              performedBy,
+            correctionReason:
+              reason
           }
         );
-    }
-  );
 
-  ndNo?.addEventListener(
-    "click",
-    () => {
-      const n =
-        lastSavedRows[0]?.animalNumber ||
-        splitNumbers(inputAnimal.value)[0] ||
-        "";
-
-      dialog.classList.add("hide");
-
-      if (n) {
-        location.href =
-          `/event-list.html?number=${encodeURIComponent(n)}`;
-
+      if (authRequired) {
         return;
       }
 
-      location.href = "dashboard.html";
+      if (
+        !r.ok ||
+        !j?.ok
+      ) {
+        throw new Error(
+          j?.message ||
+          "تعذّر تعديل حدث تحضير الولادة."
+        );
+      }
+
+      showMsg(
+        j?.message ||
+        "✅ تم تعديل حدث تحضير الولادة بنجاح.",
+        true
+      );
+
+      setTimeout(() => {
+        location.href =
+          `/event-list.html?number=${encodeURIComponent(animalNumber)}`;
+      }, 900);
+
+    } catch(err) {
+      console.error(
+        "close-up correction error:",
+        err
+      );
+
+      showMsg(
+        err.message ||
+        "تعذّر تعديل حدث تحضير الولادة.",
+        false
+      );
+
+    } finally {
+      setSaveLoading(false);
     }
-  );
+  }
+
+  const qsAnimal =
+    firstNonEmpty(
+      getQS("numbers"),
+      getQS("animalNumbers"),
+      getQS("bulk"),
+      getQS("animalId"),
+      getQS("number"),
+      getQS("animalNumber")
+    );
+
+  const qsDate =
+    firstNonEmpty(
+      getQS("date"),
+      getQS("eventDate"),
+      todayISO()
+    );
+
+  async function initPage(){
+    try {
+      if (requestedEditMode) {
+        if (!editEventId) {
+          throw new Error(
+            "رابط تعديل تحضير الولادة غير مكتمل."
+          );
+        }
+
+        await loadEditEvent();
+        return;
+      }
+
+      if (
+        inputAnimal &&
+        qsAnimal
+      ) {
+        inputAnimal.value =
+          numbersText(qsAnimal);
+      }
+
+      if (
+        inputDate &&
+        qsDate
+      ) {
+        inputDate.value =
+          qsDate;
+      }
+
+      setSaveEnabled(false);
+      scheduleGate();
+
+    } catch(err) {
+      console.error(
+        "close-up init error:",
+        err
+      );
+
+      setSaveEnabled(false);
+
+      showMsg(
+        err.message ||
+        "تعذّر تجهيز صفحة تحضير الولادة.",
+        false
+      );
+    }
+  }
+
+  inputAnimal
+    ?.addEventListener(
+      "input",
+      scheduleGate
+    );
+
+  inputDate
+    ?.addEventListener(
+      "change",
+      scheduleGate
+    );
+
+  form
+    ?.addEventListener(
+      "submit",
+      e => {
+        if (isEditMode) {
+          saveCorrection(e);
+          return;
+        }
+
+        if (requestedEditMode) {
+          e.preventDefault();
+
+          showMsg(
+            "❌ رابط تعديل تحضير الولادة غير مكتمل.",
+            false
+          );
+
+          return;
+        }
+
+        saveCloseup(e);
+      }
+    );
+
+  openCowCardBtn
+    ?.addEventListener(
+      "click",
+      () => {
+        const n =
+          splitNumbers(
+            inputAnimal.value
+          )[0] ||
+          "";
+
+        if (!n) {
+          return;
+        }
+
+        location.href =
+          `/cow-card.html?number=${encodeURIComponent(n)}`;
+      }
+    );
+
+  ndYes
+    ?.addEventListener(
+      "click",
+      () => {
+        const n =
+          lastSavedRows[0]
+            ?.animalNumber ||
+          splitNumbers(
+            inputAnimal.value
+          )[0] ||
+          "";
+
+        const d =
+          String(
+            inputDate.value ||
+            ""
+          ).trim();
+
+        location.href =
+          buildUrl(
+            "/nutrition.html",
+            {
+              animalId: n,
+              number: n,
+              date: d
+            }
+          );
+      }
+    );
+
+  ndNo
+    ?.addEventListener(
+      "click",
+      () => {
+        const n =
+          lastSavedRows[0]
+            ?.animalNumber ||
+          splitNumbers(
+            inputAnimal.value
+          )[0] ||
+          "";
+
+        dialog.classList.add(
+          "hide"
+        );
+
+        if (n) {
+          location.href =
+            `/event-list.html?number=${encodeURIComponent(n)}`;
+
+          return;
+        }
+
+        location.href =
+          "dashboard.html";
+      }
+    );
+
+  initPage();
 })();
 </script>
 </body>
