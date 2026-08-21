@@ -16574,6 +16574,7 @@ const supported =
     "lameness",
     "health",
     "weaning",
+    "close_up",
     "pregnancy_diagnosis"
   ]);
 
@@ -18537,6 +18538,7 @@ if (
     "lameness",
     "health",
     "weaning",
+    "close_up",
     "pregnancy_diagnosis"
   ].includes(typeKey) &&
   !correctionPerformedBy
