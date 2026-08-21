@@ -12,10 +12,10 @@
   <div class="mbk-head">
     <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
     <div class="mbk-center">
-      <div class="mbk-page-title">تسجيل الفطام</div>
+      <div class="mbk-page-title" id="pageTitle">تسجيل الفطام</div>
       <div class="mbk-app-name">مُرَبِّيك</div>
     </div>
-    <a class="mbk-back" href="add-event.html">رجوع</a>
+    <a class="mbk-back" id="backLink" href="add-event.html">رجوع</a>
   </div>
 </header>
 
@@ -50,6 +50,33 @@
         <label for="notes">ملاحظات</label>
         <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
       </div>
+      </section>
+
+    <section class="mbk-card" id="editToolsCard" hidden style="display:none">
+      <div class="field">
+        <label for="correctionPerformedBy">القائم بالتعديل</label>
+        <input
+          id="correctionPerformedBy"
+          type="text"
+          list="operationalPerformersList"
+          maxlength="160"
+          autocomplete="off"
+          placeholder="اسم القائم بالتعديل"
+        />
+      </div>
+
+      <div class="field">
+        <label for="correctionReason">سبب التعديل</label>
+        <input
+          id="correctionReason"
+          type="text"
+          maxlength="500"
+          autocomplete="off"
+          placeholder="اكتب سبب تصحيح حدث الفطام"
+        />
+      </div>
+
+      <datalist id="operationalPerformersList"></datalist>
     </section>
 
     <div class="actions-bar">
@@ -60,284 +87,1060 @@
 </main>
 
 <script>
+(() => {
   const $ = (id) => document.getElementById(id);
 
   const form = $("weaningForm");
   const info = $("info");
   const saveBtn = $("saveBtn");
   const cardBtn = $("cardBtn");
+  const animalNumberEl = $("animalNumber");
+  const eventDateEl = $("eventDate");
+  const ageWrap = $("singleAgeWrap");
+  const ageEl = $("weaningAgeDays");
+  const bulkAgeHint = $("bulkAgeHint");
+  const weightEl = $("weaningWeightKg");
+  const notesEl = $("notes");
+
+  const editToolsCard = $("editToolsCard");
+  const correctionPerformedByEl = $("correctionPerformedBy");
+  const correctionReasonEl = $("correctionReason");
+  const operationalPerformersList = $("operationalPerformersList");
+  const pageTitle = $("pageTitle");
+  const backLink = $("backLink");
 
   const qs = new URLSearchParams(location.search);
+  const requestedMode = String(
+    qs.get("mode") ||
+    qs.get("mbkMode") ||
+    ""
+  ).trim().toLowerCase();
+
+  const requestedEditMode =
+    requestedMode === "edit";
+
+  const editEventId =
+    String(
+      qs.get("eventId") || ""
+    ).trim();
+
+  const isEditMode =
+    requestedEditMode &&
+    !!editEventId;
 
   const DIGITS = {
-    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
-    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
+    "٠":"0","١":"1","٢":"2","٣":"3","٤":"4",
+    "٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+    "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4",
+    "۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"
   };
 
   function toLatin(v){
-    return String(v || "").replace(/[٠-٩۰-۹]/g, d => DIGITS[d] || d);
+    return String(v || "")
+      .replace(
+        /[٠-٩۰-۹]/g,
+        d => DIGITS[d] || d
+      );
   }
 
   function parseNumbers(raw){
-    return [...new Set(
-      (toLatin(raw).match(/\d+/g) || [])
-        .map(x => x.replace(/\D/g, ""))
-        .filter(Boolean)
-    )];
+    return [
+      ...new Set(
+        (
+          toLatin(raw)
+            .match(/\d+/g) ||
+          []
+        )
+          .map(x =>
+            x.replace(/\D/g, "")
+          )
+          .filter(Boolean)
+      )
+    ];
   }
 
   function todayISO(){
-    return new Date().toISOString().slice(0, 10);
+    return new Date()
+      .toISOString()
+      .slice(0, 10);
   }
 
+  const initialRaw =
+    String(
+      qs.get("numbers") ||
+      qs.get("bulk") ||
+      qs.get("animalNumbers") ||
+      qs.get("selectedNumbers") ||
+      qs.get("number") ||
+      qs.get("animalNumber") ||
+      ""
+    ).trim();
 
+  const initialNumbers =
+    parseNumbers(initialRaw);
 
-  const initialRaw = String(
-    qs.get("numbers") ||
-    qs.get("bulk") ||
-    qs.get("animalNumbers") ||
-    qs.get("selectedNumbers") ||
-    qs.get("number") ||
-    qs.get("animalNumber") ||
-    ""
-  ).trim();
+  const startsBulk =
+    !requestedEditMode &&
+    (
+      requestedMode === "bulk" ||
+      requestedMode === "group" ||
+      initialNumbers.length > 1
+    );
 
-  const initialNumbers = parseNumbers(initialRaw);
-  const initialMode = String(qs.get("mode") || qs.get("mbkMode") || "").trim().toLowerCase();
-  const startsBulk = initialMode === "bulk" || initialMode === "group" || initialNumbers.length > 1;
-  const initialDate = String(qs.get("date") || qs.get("eventDate") || todayISO()).slice(0, 10);
+  const initialDate =
+    String(
+      qs.get("date") ||
+      qs.get("eventDate") ||
+      todayISO()
+    ).slice(0, 10);
 
   let lastGate = null;
   let gateTimer = null;
 
   function getCurrentNumbers(){
-    return parseNumbers($("animalNumber").value || "");
+    return parseNumbers(
+      animalNumberEl.value || ""
+    );
   }
 
   function isBulkNow(){
-    return startsBulk || getCurrentNumbers().length > 1;
+    return (
+      !requestedEditMode &&
+      (
+        startsBulk ||
+        getCurrentNumbers().length > 1
+      )
+    );
   }
 
-function setMessage(text, type = "info"){
-  info.className = `infobar show ${type}`;
-  info.textContent = String(text || "");
-  info.style.whiteSpace = "pre-line";
-}
+  function setMessage(
+    text,
+    type = "info"
+  ){
+    info.className =
+      `infobar show ${type}`;
 
-function clearMessage(){
-  info.className = "infobar";
-  info.textContent = "";
-  info.innerHTML = "";
-}
+    info.textContent =
+      String(text || "");
 
-function setMessageWithOk(text, type = "success", okLabel = "حسنًا", onOk = null){
-  info.className = `infobar show ${type}`;
-  info.innerHTML = "";
-  info.style.whiteSpace = "normal";
+    info.style.whiteSpace =
+      "pre-line";
+  }
 
-  const msg = document.createElement("div");
-  msg.textContent = String(text || "");
-  msg.style.whiteSpace = "pre-line";
+  function clearMessage(){
+    info.className =
+      "infobar";
 
-  const actions = document.createElement("div");
-  actions.className = "mbk-weaning-ok-actions";
+    info.textContent =
+      "";
 
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "mbk-weaning-ok-btn";
-  btn.textContent = okLabel;
+    info.innerHTML =
+      "";
+  }
 
-  btn.addEventListener("click", () => {
-    if (typeof onOk === "function") {
-      onOk();
-    } else {
-      clearMessage();
-    }
-  }, { once:true });
+  function setMessageWithOk(
+    text,
+    type = "success",
+    okLabel = "حسنًا",
+    onOk = null
+  ){
+    info.className =
+      `infobar show ${type}`;
 
-  actions.appendChild(btn);
-  info.appendChild(msg);
-  info.appendChild(actions);
-}
-function setBusy(busy){
-  if (saveBtn) saveBtn.disabled = !!busy || !lastGate?.canSave;
-  if (cardBtn) cardBtn.disabled = !!busy || getCurrentNumbers().length !== 1;
-}
+    info.innerHTML =
+      "";
 
-function responseText(j = {}){
-  return String(j?.message || j?.ui?.message || "").trim();
-}
-  async function apiPost(path, payload){
-    const r = await fetch(path, {
-      method: "POST",
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
+    info.style.whiteSpace =
+      "normal";
+
+    const msg =
+      document.createElement(
+        "div"
+      );
+
+    msg.textContent =
+      String(text || "");
+
+    msg.style.whiteSpace =
+      "pre-line";
+
+    const actions =
+      document.createElement(
+        "div"
+      );
+
+    actions.className =
+      "mbk-weaning-ok-actions";
+
+    const btn =
+      document.createElement(
+        "button"
+      );
+
+    btn.type =
+      "button";
+
+    btn.className =
+      "mbk-weaning-ok-btn";
+
+    btn.textContent =
+      okLabel;
+
+    btn.addEventListener(
+      "click",
+      () => {
+        if (
+          typeof onOk ===
+          "function"
+        ) {
+          onOk();
+        } else {
+          clearMessage();
+        }
       },
-      body: JSON.stringify(payload || {})
-    });
+      { once:true }
+    );
 
-    const j = await r.json().catch(() => ({
-      ok: false,
-      canSave: false,
-      message: "❌ رد السيرفر غير صالح."
-    }));
+    actions.appendChild(btn);
+    info.appendChild(msg);
+    info.appendChild(actions);
+  }
 
-    if (r.status === 401 || j?.error === "auth_required") {
-      return {
-        httpStatus: r.status,
-        ok: false,
-        canSave: false,
-        error: "auth_required",
-        message: j?.message || "❌ سجّل الدخول أولًا.",
-        accepted: [],
-        rejected: []
-      };
+  function setBusy(busy){
+    if (saveBtn) {
+      saveBtn.disabled =
+        !!busy ||
+        (
+          !isEditMode &&
+          !lastGate?.canSave
+        );
     }
 
-    return { httpStatus: r.status, ...j };
+    if (cardBtn) {
+      cardBtn.disabled =
+        !!busy ||
+        getCurrentNumbers()
+          .length !== 1;
+    }
+  }
+
+  function responseText(j = {}){
+    return String(
+      j?.message ||
+      j?.ui?.message ||
+      ""
+    ).trim();
+  }
+
+  async function request(
+    path,
+    {
+      method = "GET",
+      body
+    } = {}
+  ){
+    const options = {
+      method,
+      credentials:
+        "same-origin",
+      cache:
+        "no-store",
+      headers: {
+        "Accept":
+          "application/json"
+      }
+    };
+
+    if (body !== undefined) {
+      options.headers[
+        "Content-Type"
+      ] =
+        "application/json";
+
+      options.body =
+        JSON.stringify(
+          body || {}
+        );
+    }
+
+    const r =
+      await fetch(
+        path,
+        options
+      );
+
+    const j =
+      await r
+        .json()
+        .catch(() => ({
+          ok: false,
+          canSave: false,
+          message:
+            "❌ رد السيرفر غير صالح."
+        }));
+
+    if (
+      r.status === 401 ||
+      j?.error ===
+        "auth_required"
+    ) {
+      location.href =
+        "login.html?next=" +
+        encodeURIComponent(
+          location.pathname +
+          location.search
+        );
+
+      throw new Error(
+        j?.message ||
+        "❌ سجّل الدخول أولًا."
+      );
+    }
+
+    return {
+      httpStatus:
+        r.status,
+      ...j
+    };
+  }
+
+  function renderPerformers(
+    items = []
+  ){
+    operationalPerformersList
+      .replaceChildren();
+
+    [
+      ...new Set(
+        (
+          Array.isArray(items)
+            ? items
+            : []
+        )
+          .map(x =>
+            String(x || "")
+              .trim()
+          )
+          .filter(Boolean)
+      )
+    ].forEach(name => {
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value =
+        name;
+
+      operationalPerformersList
+        .appendChild(option);
+    });
   }
 
   function renderGate(j = {}){
     lastGate = j;
 
-    const accepted = Array.isArray(j.accepted) ? j.accepted : [];
-    const first = accepted[0] || null;
-    const bulk = isBulkNow();
+    const accepted =
+      Array.isArray(j.accepted)
+        ? j.accepted
+        : [];
 
-    $("singleAgeWrap").style.display = bulk ? "none" : "";
-    $("bulkAgeHint").style.display = bulk ? "" : "none";
+    const first =
+      accepted[0] ||
+      null;
 
-    $("weaningAgeDays").value =
-      !bulk && first && Number.isFinite(Number(first.weaningAgeDays))
-        ? String(first.weaningAgeDays)
+    const bulk =
+      isBulkNow();
+
+    ageWrap.style.display =
+      bulk
+        ? "none"
         : "";
 
-    if (saveBtn) saveBtn.disabled = !j.canSave;
+    bulkAgeHint.style.display =
+      bulk
+        ? ""
+        : "none";
 
-    const nums = getCurrentNumbers();
-    if (cardBtn) {
-      cardBtn.disabled = nums.length !== 1;
-      cardBtn.style.opacity = nums.length === 1 ? "1" : ".6";
-      cardBtn.style.pointerEvents = nums.length === 1 ? "auto" : "none";
+    ageEl.value =
+      !bulk &&
+      first &&
+      Number.isFinite(
+        Number(
+          first.weaningAgeDays
+        )
+      )
+        ? String(
+            first.weaningAgeDays
+          )
+        : "";
+
+    if (saveBtn) {
+      saveBtn.disabled =
+        !j.canSave;
     }
 
-    const text = responseText(j);
-    if (text) setMessage(text, j.canSave ? "success" : "error");
-    else clearMessage();
+    const nums =
+      getCurrentNumbers();
+
+    if (cardBtn) {
+      cardBtn.disabled =
+        nums.length !== 1;
+
+      cardBtn.style.opacity =
+        nums.length === 1
+          ? "1"
+          : ".6";
+
+      cardBtn.style.pointerEvents =
+        nums.length === 1
+          ? "auto"
+          : "none";
+    }
+
+    const text =
+      responseText(j);
+
+    if (text) {
+      setMessage(
+        text,
+        j.canSave
+          ? "success"
+          : "error"
+      );
+    } else {
+      clearMessage();
+    }
   }
 
-  async function runGate({ silent = false } = {}){
-    const numbers = getCurrentNumbers();
-    const eventDate = String($("eventDate").value || "").slice(0, 10);
-
-    if (!numbers.length || !eventDate) {
-      lastGate = { canSave:false };
-      if (saveBtn) saveBtn.disabled = true;
-      if (!silent) setMessage("اكتب رقم الحيوان وتاريخ الفطام.", "info");
+  async function runGate(
+    { silent = false } = {}
+  ){
+    if (requestedEditMode) {
       return;
     }
 
-    if (!silent) setMessage("جاري التحقق من السيرفر…", "info");
+    const numbers =
+      getCurrentNumbers();
+
+    const eventDate =
+      String(
+        eventDateEl.value ||
+        ""
+      ).slice(0, 10);
+
+    if (
+      !numbers.length ||
+      !eventDate
+    ) {
+      lastGate = {
+        canSave:false
+      };
+
+      saveBtn.disabled =
+        true;
+
+      if (!silent) {
+        setMessage(
+          "اكتب رقم الحيوان وتاريخ الفطام.",
+          "info"
+        );
+      }
+
+      return;
+    }
+
+    if (!silent) {
+      setMessage(
+        "جاري التحقق من السيرفر…",
+        "info"
+      );
+    }
+
     setBusy(true);
 
     try {
-      const j = await apiPost("/api/weaning/gate", {
-        numbers,
-        animalNumbers: numbers,
-        eventDate
-      });
+      const j =
+        await request(
+          "/api/weaning/gate",
+          {
+            method:
+              "POST",
+
+            body: {
+              numbers,
+              animalNumbers:
+                numbers,
+              eventDate
+            }
+          }
+        );
 
       renderGate(j);
+
     } catch (e) {
       console.error(e);
-      lastGate = { canSave:false };
-      if (saveBtn) saveBtn.disabled = true;
-      setMessage("❌ تعذّر التحقق من السيرفر الآن.", "error");
+
+      lastGate = {
+        canSave:false
+      };
+
+      saveBtn.disabled =
+        true;
+
+      setMessage(
+        e.message ||
+        "❌ تعذّر التحقق من السيرفر الآن.",
+        "error"
+      );
+
     } finally {
       setBusy(false);
     }
   }
 
   function scheduleGate(){
-    clearTimeout(gateTimer);
-    gateTimer = setTimeout(() => runGate({ silent:true }), 350);
+    if (requestedEditMode) {
+      return;
+    }
+
+    clearTimeout(
+      gateTimer
+    );
+
+    gateTimer =
+      setTimeout(
+        () =>
+          runGate({
+            silent:true
+          }),
+        350
+      );
   }
 
-  function hydrateUI(){
-    $("eventDate").value = initialDate;
-    $("animalNumber").value = initialNumbers.join(startsBulk ? "\n" : "");
-    $("animalNumber").rows = startsBulk ? Math.max(3, initialNumbers.length) : 1;
+  function hydrateNormal(){
+    eventDateEl.value =
+      initialDate;
 
-    $("singleAgeWrap").style.display = startsBulk ? "none" : "";
-    $("bulkAgeHint").style.display = startsBulk ? "" : "none";
+    animalNumberEl.value =
+      initialNumbers.join(
+        startsBulk
+          ? "\n"
+          : ""
+      );
 
-    if (saveBtn) saveBtn.disabled = true;
-    if (cardBtn) cardBtn.disabled = initialNumbers.length !== 1;
+    animalNumberEl.rows =
+      startsBulk
+        ? Math.max(
+            3,
+            initialNumbers.length
+          )
+        : 1;
+
+    ageWrap.style.display =
+      startsBulk
+        ? "none"
+        : "";
+
+    bulkAgeHint.style.display =
+      startsBulk
+        ? ""
+        : "none";
+
+    saveBtn.disabled =
+      true;
+
+    cardBtn.disabled =
+      initialNumbers.length !== 1;
   }
 
-  cardBtn.addEventListener("click", () => {
-    const nums = getCurrentNumbers();
-    if (nums.length !== 1) return;
-   location.href = `calf-card.html?number=${encodeURIComponent(nums[0])}`;
-  });
+  async function loadEditEvent(){
+    setMessage(
+      "جاري تحميل حدث الفطام للتعديل...",
+      "info"
+    );
 
-  $("animalNumber").addEventListener("input", scheduleGate);
-  $("eventDate").addEventListener("input", scheduleGate);
-  $("eventDate").addEventListener("change", () => runGate({ silent:false }));
+    const data =
+      await request(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}`
+      );
 
-form.addEventListener("submit", async (ev) => {
-  ev.preventDefault();
+    if (
+      !data.ok ||
+      !data.event
+    ) {
+      throw new Error(
+        responseText(data) ||
+        "تعذّر تحميل حدث الفطام للتعديل."
+      );
+    }
 
-  const numbers = getCurrentNumbers();
-  const eventDate = String($("eventDate").value || "").slice(0, 10);
-  const notes = String($("notes").value || "").trim();
-  const weaningWeightKg = String($("weaningWeightKg")?.value || "").trim();
+    const ev =
+      data.event;
 
-  setMessage("جاري الحفظ من السيرفر…", "info");
-  setBusy(true);
+    if (
+      ev.typeKey !==
+      "weaning"
+    ) {
+      throw new Error(
+        "الحدث المطلوب ليس حدث فطام."
+      );
+    }
 
-  try {
-    const j = await apiPost("/api/weaning/save", {
-      numbers,
-      animalNumbers: numbers,
-      eventDate,
-      notes,
-      weaningWeightKg
-    });
+    if (
+      ev.editPolicy
+        ?.editable !== true
+    ) {
+      throw new Error(
+        ev.editPolicy
+          ?.reason ||
+        "هذا الحدث غير متاح للتعديل."
+      );
+    }
 
-const text = responseText(j) || "تمت المعالجة.";
+    animalNumberEl.value =
+      ev.animalNumber ||
+      "";
 
-if (j.ok) {
-  setMessageWithOk(
-    text || "✅ تم حفظ الفطام بنجاح.",
-    "success",
-    "حسنًا",
+    animalNumberEl.readOnly =
+      true;
+
+    animalNumberEl.rows =
+      1;
+
+    eventDateEl.value =
+      ev.data?.eventDate ||
+      ev.eventDate ||
+      "";
+
+    eventDateEl.disabled =
+      true;
+
+    notesEl.value =
+      ev.data?.notes ||
+      "";
+
+    const currentWeight =
+      ev.data
+        ?.weaningWeightKg;
+
+    weightEl.value =
+      currentWeight !== null &&
+      currentWeight !== undefined &&
+      Number.isFinite(
+        Number(
+          currentWeight
+        )
+      )
+        ? String(
+            currentWeight
+          )
+        : "";
+
+    ageWrap.style.display =
+      "none";
+
+    bulkAgeHint.style.display =
+      "none";
+
+    renderPerformers(
+      data.correctionPerformers ||
+      []
+    );
+
+    editToolsCard.hidden =
+      false;
+
+    editToolsCard.style.display =
+      "";
+
+    correctionPerformedByEl.required =
+      true;
+
+    correctionReasonEl.required =
+      true;
+
+    pageTitle.textContent =
+      "تعديل الفطام";
+
+    document.title =
+      "تعديل الفطام — مُرَبِّيك";
+
+    backLink.href =
+      `event-list.html?number=${encodeURIComponent(ev.animalNumber || "")}`;
+
+    saveBtn.textContent =
+      "حفظ التعديل";
+
+    lastGate = {
+      canSave:true
+    };
+
+    saveBtn.disabled =
+      false;
+
+    setMessage(
+      "يمكن تعديل وزن الفطام والملاحظات فقط. رقم الحيوان وتاريخ الفطام ثابتان. ترك خانة الوزن فارغة يعني عدم تغيير الوزن المسجل.",
+      "success"
+    );
+  }
+
+  async function saveCorrection(){
+    const numbers =
+      getCurrentNumbers();
+
+    const animalNumber =
+      numbers[0] ||
+      "";
+
+    const eventDate =
+      String(
+        eventDateEl.value ||
+        ""
+      ).slice(0, 10);
+
+    const notes =
+      String(
+        notesEl.value ||
+        ""
+      ).trim();
+
+    const weaningWeightKg =
+      String(
+        weightEl.value ||
+        ""
+      ).trim();
+
+    const correctionPerformedBy =
+      String(
+        correctionPerformedByEl
+          .value ||
+        ""
+      ).trim();
+
+    const correctionReason =
+      String(
+        correctionReasonEl
+          .value ||
+        ""
+      ).trim();
+
+    if (
+      numbers.length !== 1 ||
+      !animalNumber ||
+      !eventDate
+    ) {
+      setMessage(
+        "❌ تعذّر تحديد حدث الفطام المطلوب تعديله.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      weaningWeightKg &&
+      (
+        !Number.isFinite(
+          Number(
+            weaningWeightKg
+          )
+        ) ||
+        Number(
+          weaningWeightKg
+        ) < 0
+      )
+    ) {
+      setMessage(
+        "❌ أدخل وزن فطام رقميًا صحيحًا أو اترك الحقل فارغًا.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      !correctionPerformedBy
+    ) {
+      setMessage(
+        "❌ أدخل اسم القائم بالتعديل.",
+        "error"
+      );
+
+      return;
+    }
+
+    if (
+      !correctionReason
+    ) {
+      setMessage(
+        "❌ اكتب سبب التعديل.",
+        "error"
+      );
+
+      return;
+    }
+
+    setMessage(
+      "جاري حفظ تعديل الفطام...",
+      "info"
+    );
+
+    setBusy(true);
+
+    try {
+      const j =
+        await request(
+          `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
+          {
+            method:
+              "POST",
+
+            body: {
+              animalNumber,
+              eventDate,
+              weaningWeightKg,
+              notes,
+              correctionPerformedBy,
+              correctionReason
+            }
+          }
+        );
+
+      if (!j.ok) {
+        setMessage(
+          responseText(j) ||
+          "❌ تعذّر تعديل حدث الفطام.",
+          "error"
+        );
+
+        return;
+      }
+
+      setMessageWithOk(
+        responseText(j) ||
+        "✅ تم تعديل حدث الفطام بنجاح.",
+        "success",
+        "حسنًا",
+        () => {
+          location.href =
+            `event-list.html?number=${encodeURIComponent(animalNumber)}`;
+        }
+      );
+
+    } catch (e) {
+      console.error(
+        "weaning correction failed",
+        e
+      );
+
+      setMessage(
+        e.message ||
+        "❌ تعذّر تعديل حدث الفطام.",
+        "error"
+      );
+
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  cardBtn.addEventListener(
+    "click",
     () => {
-      if (j.redirectUrl) {
-        location.href = j.redirectUrl;
-      } else {
-        clearMessage();
+      const nums =
+        getCurrentNumbers();
+
+      if (
+        nums.length !== 1
+      ) {
+        return;
+      }
+
+      location.href =
+        `calf-card.html?number=${encodeURIComponent(nums[0])}`;
+    }
+  );
+
+  animalNumberEl
+    .addEventListener(
+      "input",
+      scheduleGate
+    );
+
+  eventDateEl
+    .addEventListener(
+      "input",
+      scheduleGate
+    );
+
+  eventDateEl
+    .addEventListener(
+      "change",
+      () => {
+        if (
+          !requestedEditMode
+        ) {
+          runGate({
+            silent:false
+          });
+        }
+      }
+    );
+
+  form.addEventListener(
+    "submit",
+    async (ev) => {
+      ev.preventDefault();
+
+      if (isEditMode) {
+        await saveCorrection();
+        return;
+      }
+
+      if (requestedEditMode) {
+        setMessage(
+          "❌ رابط تعديل الفطام غير مكتمل.",
+          "error"
+        );
+
+        return;
+      }
+
+      const numbers =
+        getCurrentNumbers();
+
+      const eventDate =
+        String(
+          eventDateEl.value ||
+          ""
+        ).slice(0, 10);
+
+      const notes =
+        String(
+          notesEl.value ||
+          ""
+        ).trim();
+
+      const weaningWeightKg =
+        String(
+          weightEl.value ||
+          ""
+        ).trim();
+
+      setMessage(
+        "جاري الحفظ من السيرفر…",
+        "info"
+      );
+
+      setBusy(true);
+
+      try {
+        const j =
+          await request(
+            "/api/weaning/save",
+            {
+              method:
+                "POST",
+
+              body: {
+                numbers,
+                animalNumbers:
+                  numbers,
+                eventDate,
+                notes,
+                weaningWeightKg
+              }
+            }
+          );
+
+        const text =
+          responseText(j) ||
+          "تمت المعالجة.";
+
+        if (j.ok) {
+          setMessageWithOk(
+            text ||
+            "✅ تم حفظ الفطام بنجاح.",
+            "success",
+            "حسنًا",
+            () => {
+              if (
+                j.redirectUrl
+              ) {
+                location.href =
+                  j.redirectUrl;
+              } else {
+                clearMessage();
+              }
+            }
+          );
+
+          return;
+        }
+
+        setMessage(
+          text,
+          "error"
+        );
+
+        await runGate({
+          silent:true
+        });
+
+      } catch (e) {
+        console.error(e);
+
+        setMessage(
+          e.message ||
+          "❌ فشل حفظ الفطام من السيرفر.",
+          "error"
+        );
+
+      } finally {
+        setBusy(false);
       }
     }
   );
-  return;
-}
 
-setMessage(text, "error");
-await runGate({ silent:true });
-  } catch (e) {
-    console.error(e);
-    setMessage("❌ فشل حفظ الفطام من السيرفر.", "error");
-  } finally {
-    setBusy(false);
+  async function init(){
+    try {
+      if (requestedEditMode) {
+        if (!editEventId) {
+          throw new Error(
+            "رابط تعديل الفطام غير مكتمل."
+          );
+        }
+
+        await loadEditEvent();
+
+      } else {
+        hydrateNormal();
+
+        await runGate({
+          silent:true
+        });
+      }
+
+    } catch (e) {
+      console.error(
+        "weaning page init failed",
+        e
+      );
+
+      saveBtn.disabled =
+        true;
+
+      setMessage(
+        e.message ||
+        "❌ تعذّر تجهيز صفحة الفطام.",
+        "error"
+      );
+    }
   }
-});
 
-  hydrateUI();
-  runGate({ silent:true });
+  init();
+})();
 </script>
 </body>
 </html>
