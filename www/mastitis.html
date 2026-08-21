@@ -74,7 +74,7 @@
         </div>
       </div>
 
-      <div class="row" id="editToolsRow" hidden>
+      <div class="row" id="editToolsRow" hidden style="display:none">
   <div>
     <label for="correctionPerformedBy">القائم بالتعديل</label>
     <input
@@ -678,8 +678,8 @@
       data.correctionPerformers || []
     );
 
-    els.editToolsRow.hidden =
-      false;
+    els.editToolsRow.hidden = false;
+    els.editToolsRow.style.display = "";
 
     els.correctionPerformedBy
       .required = true;
