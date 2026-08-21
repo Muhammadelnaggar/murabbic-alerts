@@ -25,9 +25,9 @@
       >
 
       <div class="mbk-center">
-        <div class="mbk-page-title">
-          تسجيل فحص الرحم
-        </div>
+        <div class="mbk-page-title" id="pageTitle">
+  تسجيل فحص الرحم
+</div>
 
         <div class="mbk-app-name">
           مُرَبِّيك
@@ -35,9 +35,10 @@
       </div>
 
       <a
-        class="mbk-back"
-        href="add-event.html"
-      >
+  class="mbk-back"
+  id="backLink"
+  href="add-event.html"
+>
         رجوع
       </a>
     </div>
@@ -122,12 +123,13 @@
           </label>
 
           <input
-            type="text"
-            id="vet"
-            name="vet"
-            placeholder="اختياري"
-            autocomplete="off"
-          >
+  type="text"
+  id="vet"
+  name="vet"
+  list="operationalPerformersList"
+  placeholder="اختياري"
+  autocomplete="off"
+>
         </div>
 
         <div>
@@ -142,6 +144,38 @@
             placeholder="اختياري"
           ></textarea>
         </div>
+        <div class="row" id="editToolsRow" hidden>
+  <div>
+    <label for="correctionPerformedBy">
+      القائم بالتعديل
+    </label>
+
+    <input
+      type="text"
+      id="correctionPerformedBy"
+      list="operationalPerformersList"
+      maxlength="160"
+      autocomplete="off"
+      placeholder="اسم القائم بالتعديل"
+    >
+  </div>
+
+  <div>
+    <label for="correctionReason">
+      سبب التعديل
+    </label>
+
+    <input
+      type="text"
+      id="correctionReason"
+      maxlength="500"
+      autocomplete="off"
+      placeholder="اكتب سبب تصحيح فحص الرحم"
+    >
+  </div>
+</div>
+
+<datalist id="operationalPerformersList"></datalist>
       </form>
     </section>
   </main>
@@ -188,7 +222,62 @@
       document.getElementById(
         "result"
       );
+    const vetInput =
+  document.getElementById("vet");
 
+const notesInput =
+  document.getElementById("notes");
+
+const editToolsRow =
+  document.getElementById(
+    "editToolsRow"
+  );
+
+const correctionPerformedByInput =
+  document.getElementById(
+    "correctionPerformedBy"
+  );
+
+const correctionReasonInput =
+  document.getElementById(
+    "correctionReason"
+  );
+
+const operationalPerformersList =
+  document.getElementById(
+    "operationalPerformersList"
+  );
+
+const pageTitle =
+  document.getElementById(
+    "pageTitle"
+  );
+
+const backLink =
+  document.getElementById(
+    "backLink"
+  );
+
+const params =
+  new URLSearchParams(
+    location.search
+  );
+
+const requestedEditMode =
+  String(
+    params.get("mode") || ""
+  )
+    .trim()
+    .toLowerCase() === "edit";
+
+const editEventId =
+  String(
+    params.get("eventId") || ""
+  ).trim();
+
+const isEditMode =
+  requestedEditMode &&
+  !!editEventId;
     function todayLocal() {
       const date = new Date();
 
@@ -340,16 +429,10 @@
           resultSelect.value,
 
         vet:
-          document
-            .getElementById("vet")
-            .value
-            .trim(),
+  vetInput.value.trim(),
 
-        notes:
-          document
-            .getElementById("notes")
-            .value
-            .trim()
+notes:
+  notesInput.value.trim()
       };
     }
 
@@ -424,12 +507,167 @@
         "اختر نتيجة الفحص"
       );
     }
+    function renderOperationalPerformers(
+  items = []
+) {
+  if (!operationalPerformersList) {
+    return;
+  }
 
+  operationalPerformersList
+    .replaceChildren();
+
+  [
+    ...new Set(
+      (Array.isArray(items)
+        ? items
+        : []
+      )
+        .map(item =>
+          String(item || "").trim()
+        )
+        .filter(Boolean)
+    )
+  ].forEach(name => {
+    const option =
+      document.createElement(
+        "option"
+      );
+
+    option.value = name;
+
+    operationalPerformersList
+      .appendChild(option);
+  });
+}
+
+async function loadOperationalPerformers() {
+  const {
+    response,
+    data
+  } = await requestJSON(
+    "/api/event-options/operational-performers",
+    {
+      method: "GET"
+    }
+  );
+
+  if (
+    response.ok &&
+    data.ok === true
+  ) {
+    renderOperationalPerformers(
+      data.operationalPerformers
+    );
+  }
+}
+
+async function loadEditEvent() {
+  if (!isEditMode) {
+    return;
+  }
+
+  saveBtn.disabled = true;
+  saveBtn.textContent =
+    "جارِ تحميل الحدث…";
+
+  const {
+    response,
+    data
+  } = await requestJSON(
+    `/api/events-page/event/${encodeURIComponent(editEventId)}`,
+    {
+      method: "GET"
+    }
+  );
+
+  if (
+    !response.ok ||
+    data.ok !== true ||
+    !data.event
+  ) {
+    throw new Error(
+      data.message ||
+      "تعذّر تحميل فحص الرحم للتعديل."
+    );
+  }
+
+  const ev = data.event;
+
+  if (ev.typeKey !== "uterine_check") {
+    throw new Error(
+      "الحدث المطلوب ليس فحص رحم."
+    );
+  }
+
+  if (
+    ev.editPolicy?.editable !== true
+  ) {
+    throw new Error(
+      ev.editPolicy?.reason ||
+      "هذا الحدث غير متاح للتعديل."
+    );
+  }
+
+  renderOperationalPerformers(
+    data.correctionPerformers
+  );
+
+  animalNumberInput.value =
+    ev.animalNumber || "";
+
+  animalNumberInput.readOnly = true;
+
+  eventDateInput.value =
+    ev.data?.eventDate ||
+    ev.eventDate ||
+    "";
+
+  checkStageSelect.value =
+    ev.data?.checkStage || "";
+
+  resultSelect.value =
+    ev.data?.result || "";
+
+  vetInput.value =
+    ev.data?.vet || "";
+
+  notesInput.value =
+    ev.data?.notes || "";
+
+  editToolsRow.hidden = false;
+
+  correctionPerformedByInput
+    .required = true;
+
+  correctionReasonInput
+    .required = true;
+
+  if (pageTitle) {
+    pageTitle.textContent =
+      "تعديل فحص الرحم";
+  }
+
+  document.title =
+    "تعديل فحص الرحم";
+
+  if (backLink) {
+    backLink.href =
+      `event-list.html?number=${encodeURIComponent(ev.animalNumber || "")}`;
+  }
+
+  saveBtn.textContent =
+    "حفظ التعديل ✅";
+
+  saveBtn.disabled = false;
+
+  showMessage(
+    "عدّل بيانات فحص الرحم ثم اكتب القائم بالتعديل وسبب التعديل.",
+    true
+  );
+}
     function hydrate() {
-      const params =
-        new URLSearchParams(
-          location.search
-        );
+      
 
       animalNumberInput.value =
         params.get("number") ||
@@ -445,9 +683,12 @@
     }
 
     async function runGate() {
-      const payload =
-        collectPayload();
+  if (requestedEditMode) {
+    return;
+  }
 
+  const payload =
+    collectPayload();
       if (
         !payload.animalNumber ||
         !payload.eventDate
@@ -545,19 +786,70 @@
         runGate
       );
 
-    form.addEventListener(
-      "submit",
-      async event => {
-        event.preventDefault();
+   form.addEventListener(
+  "submit",
+  async event => {
+    event.preventDefault();
 
-        showMessage("");
-        saveBtn.disabled = true;
+    showMessage("");
+    saveBtn.disabled = true;
 
-        try {
-          const {
-            response,
-            data
-          } = await requestJSON(
+    try {
+      const payload =
+        collectPayload();
+
+      let response;
+      let data;
+
+      if (isEditMode) {
+        const correctionPerformedBy =
+          correctionPerformedByInput
+            .value
+            .trim();
+
+        const correctionReason =
+          correctionReasonInput
+            .value
+            .trim();
+
+        if (!correctionPerformedBy) {
+          throw new Error(
+            "أدخل اسم القائم بالتعديل."
+          );
+        }
+
+        if (!correctionReason) {
+          throw new Error(
+            "اكتب سبب التعديل."
+          );
+        }
+
+        const result =
+          await requestJSON(
+            `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body:
+                JSON.stringify({
+                  ...payload,
+                  correctionPerformedBy,
+                  correctionReason
+                })
+            }
+          );
+
+        response = result.response;
+        data = result.data;
+
+      } else {
+        const result =
+          await requestJSON(
             "/api/uterine-check/save",
             {
               method: "POST",
@@ -569,64 +861,100 @@
 
               body:
                 JSON.stringify(
-                  collectPayload()
+                  payload
                 )
             }
           );
 
-          if (
-            !response.ok ||
-            data.ok !== true
-          ) {
-            throw new Error(
-              data.message ||
-              "تعذّر حفظ فحص الرحم."
-            );
-          }
-
-          showMessage(
-            data.message ||
-            "تم حفظ فحص الرحم بنجاح.",
-            true,
-            {
-              label: "حسنًا",
-
-              onClick: () => {
-                location.href =
-                  data.redirectUrl ||
-                  "add-event.html";
-              }
-            }
-          );
-
-        } catch (error) {
-          showMessage(
-            error.message ||
-            "تعذّر حفظ فحص الرحم الآن.",
-            false
-          );
-
-          saveBtn.disabled = false;
-        }
+        response = result.response;
+        data = result.data;
       }
+
+      if (
+        !response.ok ||
+        data.ok !== true
+      ) {
+        throw new Error(
+          data.message ||
+          (
+            isEditMode
+              ? "تعذّر تعديل فحص الرحم."
+              : "تعذّر حفظ فحص الرحم."
+          )
+        );
+      }
+
+      showMessage(
+        data.message ||
+        (
+          isEditMode
+            ? "تم تعديل فحص الرحم بنجاح."
+            : "تم حفظ فحص الرحم بنجاح."
+        ),
+        true,
+        {
+          label: "حسنًا",
+
+          onClick: () => {
+            location.href =
+              isEditMode
+                ? `event-list.html?number=${encodeURIComponent(animalNumberInput.value.trim())}`
+                : data.redirectUrl ||
+                  "add-event.html";
+          }
+        }
+      );
+
+    } catch (error) {
+      showMessage(
+        error.message ||
+        (
+          isEditMode
+            ? "تعذّر تعديل فحص الرحم الآن."
+            : "تعذّر حفظ فحص الرحم الآن."
+        ),
+        false
+      );
+
+      saveBtn.disabled = false;
+
+      saveBtn.textContent =
+        isEditMode
+          ? "حفظ التعديل ✅"
+          : "تسجيل فحص الرحم";
+    }
+  }
+);
+async function init() {
+  try {
+    hydrate();
+
+    await loadOptions();
+    await loadOperationalPerformers();
+
+    if (requestedEditMode) {
+      if (!editEventId) {
+        throw new Error(
+          "رابط تعديل فحص الرحم غير مكتمل."
+        );
+      }
+
+      await loadEditEvent();
+
+    } else {
+      await runGate();
+    }
+
+  } catch (error) {
+    showMessage(
+      error.message ||
+      "تعذّر تجهيز صفحة فحص الرحم.",
+      false
     );
 
-    async function init() {
-      try {
-        hydrate();
-        await loadOptions();
-        await runGate();
-
-      } catch (error) {
-        showMessage(
-          error.message ||
-          "تعذّر تجهيز صفحة فحص الرحم.",
-          false
-        );
-
-        saveBtn.disabled = true;
-      }
-    }
+    saveBtn.disabled = true;
+  }
+}
 
     init();
   </script>
