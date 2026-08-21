@@ -18586,36 +18586,44 @@ if (
         }
       }
 
-      const eventDate = eventsPageCorrectionDateSrv(
-        body.eventDate ?? body.date ?? eventsPageListDateSrv(oldEvent)
-      );
+const originalEventDate =
+  eventsPageCorrectionDateSrv(
+    eventsPageListDateSrv(oldEvent)
+  );
 
-           if (!eventDate || !calvingIsDateSrv(eventDate)) {
-        return res.status(400).json({
-          ok: false,
-          error: "invalid_date",
-          message: "❌ أدخل تاريخ حدث صحيحًا."
-        });
-      }
+if (
+  !originalEventDate ||
+  !calvingIsDateSrv(originalEventDate)
+) {
+  return res.status(409).json({
+    ok: false,
+    error: "event_original_date_invalid",
+    message:
+      "❌ لا يمكن تعديل هذا الحدث لأن تاريخه الأصلي غير صالح."
+  });
+}
 
-      if (typeKey === "daily_milk") {
-        const originalEventDate =
-          eventsPageCorrectionDateSrv(
-            eventsPageListDateSrv(oldEvent)
-          );
+const requestedEventDate =
+  eventsPageCorrectionDateSrv(
+    body.eventDate ??
+    body.date ??
+    originalEventDate
+  );
 
-        if (
-          !originalEventDate ||
-          eventDate !== originalEventDate
-        ) {
-          return res.status(409).json({
-            ok: false,
-            error: "daily_milk_date_immutable",
-            message:
-              "❌ لا يمكن تغيير تاريخ سجل اللبن اليومي أثناء التصحيح."
-          });
-        }
-      }
+if (
+  !requestedEventDate ||
+  requestedEventDate !== originalEventDate
+) {
+  return res.status(409).json({
+    ok: false,
+    error: "event_date_immutable",
+    message:
+      "❌ لا يمكن تغيير تاريخ الحدث أثناء التصحيح."
+  });
+}
+
+const eventDate =
+  originalEventDate;
 
       const todayISO = await farmTodayISOSrv(req.authSession?.uid || uid);
       if (eventDate > todayISO) {
