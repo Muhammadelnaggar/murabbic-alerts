@@ -622,7 +622,7 @@ async function loadEditEvent() {
     ev.data?.eventDate ||
     ev.eventDate ||
     "";
-
+  eventDateInput.readOnly = true;
   checkStageSelect.value =
     ev.data?.checkStage || "";
 
