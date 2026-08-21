@@ -16575,6 +16575,7 @@ const supported =
     "health",
     "weaning",
     "close_up",
+    "cull",
     "pregnancy_diagnosis"
   ]);
 
@@ -18539,6 +18540,7 @@ if (
     "health",
     "weaning",
     "close_up",
+    "cull",
     "pregnancy_diagnosis"
   ].includes(typeKey) &&
   !correctionPerformedBy
