@@ -16563,7 +16563,7 @@ if (alreadyEdited) {
     };
   }
 
-  const supported =
+const supported =
   new Set([
     "heat",
     "daily_milk",
@@ -16571,6 +16571,7 @@ if (alreadyEdited) {
     "insemination",
     "uterine_check",
     "mastitis",
+    "lameness",
     "pregnancy_diagnosis"
   ]);
 
@@ -18531,6 +18532,7 @@ if (
     "insemination",
     "uterine_check",
     "mastitis",
+    "lameness",
     "pregnancy_diagnosis"
   ].includes(typeKey) &&
   !correctionPerformedBy
