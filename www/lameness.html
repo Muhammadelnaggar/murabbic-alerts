@@ -13,10 +13,10 @@
   <div class="mbk-head">
     <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
     <div class="mbk-center">
-      <div class="mbk-page-title">تسجيل حالة العرج</div>
+      <div class="mbk-page-title" id="pageTitle">تسجيل حالة العرج</div>
       <div class="mbk-app-name">مُرَبِّيك</div>
     </div>
-    <a class="mbk-back" href="add-event.html">رجوع</a>
+    <a class="mbk-back" id="backLink" href="add-event.html">رجوع</a>
   </div>
 </header>
 
@@ -69,10 +69,52 @@
 
           <div>
             <label for="vet">اسم الطبيب البيطري المعالج</label>
-            <input type="text" id="vet" name="vet" placeholder="اختياري">
+            <input
+  type="text"
+  id="vet"
+  name="vet"
+  list="operationalPerformersList"
+  placeholder="اختياري"
+>
           </div>
         </div>
+<div
+  class="row"
+  id="editToolsRow"
+  hidden
+  style="display:none"
+>
+  <div>
+    <label for="correctionPerformedBy">
+      القائم بالتعديل
+    </label>
 
+    <input
+      type="text"
+      id="correctionPerformedBy"
+      list="operationalPerformersList"
+      maxlength="160"
+      autocomplete="off"
+      placeholder="اسم القائم بالتعديل"
+    >
+  </div>
+
+  <div>
+    <label for="correctionReason">
+      سبب التعديل
+    </label>
+
+    <input
+      type="text"
+      id="correctionReason"
+      maxlength="500"
+      autocomplete="off"
+      placeholder="اكتب سبب تصحيح حدث العرج"
+    >
+  </div>
+</div>
+
+<datalist id="operationalPerformersList"></datalist>
       </form>
     </section>
   </main>
@@ -83,125 +125,629 @@
 
 
 <script>
-  const form = document.getElementById('lamenessForm');
-  const msg  = document.getElementById('msg');
-  const btn  = document.getElementById('saveBtn');
+(function(){
 
+  const form =
+    document.getElementById("lamenessForm");
+
+  const msg =
+    document.getElementById("msg");
+
+  const btn =
+    document.getElementById("saveBtn");
+
+  const animalId =
+    document.getElementById("animalId");
+
+  const lamenessDate =
+    document.getElementById("lamenessDate");
+
+  const lamenessType =
+    document.getElementById("lamenessType");
+
+  const vet =
+    document.getElementById("vet");
+
+  const editToolsRow =
+    document.getElementById("editToolsRow");
+
+  const correctionPerformedBy =
+    document.getElementById(
+      "correctionPerformedBy"
+    );
+
+  const correctionReason =
+    document.getElementById(
+      "correctionReason"
+    );
+
+  const operationalPerformersList =
+    document.getElementById(
+      "operationalPerformersList"
+    );
+
+  const pageTitle =
+    document.getElementById("pageTitle");
+
+  const backLink =
+    document.getElementById("backLink");
+
+
+  const qs =
+    new URLSearchParams(location.search);
+
+  const requestedEditMode =
+    String(qs.get("mode") || "")
+      .trim()
+      .toLowerCase() === "edit";
+
+  const editEventId =
+    String(qs.get("eventId") || "")
+      .trim();
+
+  const isEditMode =
+    requestedEditMode &&
+    !!editEventId;
 
 
   function todayLocal(){
     const d = new Date();
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().slice(0,10);
+
+    d.setMinutes(
+      d.getMinutes() -
+      d.getTimezoneOffset()
+    );
+
+    return d
+      .toISOString()
+      .slice(0, 10);
   }
 
-   function showMsg(text, ok){
+
+  function showMsg(text, ok){
     if (!msg) return;
 
-    msg.textContent = text || "";
-    msg.className = text
-      ? `infobar mbk-infobar show ${ok ? "success" : "error"}`
-      : "infobar";
+    msg.textContent =
+      text || "";
 
-    msg.style.display = text ? "block" : "none";
+    msg.className =
+      text
+        ? `infobar mbk-infobar show ${
+            ok ? "success" : "error"
+          }`
+        : "infobar";
 
-    try { msg.scrollIntoView({ behavior:"smooth", block:"center" }); } catch {}
+    msg.style.display =
+      text ? "block" : "none";
+
+    try {
+      msg.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    } catch {}
   }
 
-  function collectPayload(){
-   const affectedLegs = Array.from(
-  document.querySelectorAll('input[name="affectedLegs"]:checked')
-).map(el => el.value);
 
-return {
-  animalNumber: document.getElementById("animalId").value.trim(),
-  eventDate: document.getElementById("lamenessDate").value,
-  affectedLegs,
-  affectedLeg: affectedLegs.join("، "),
-  lamenessType: document.getElementById("lamenessType").value,
-  vet: (document.getElementById("vet").value || "").trim()
-};
-  }
-
-  async function apiPost(url, payload){
-    const r = await fetch(url, {
-      method: "POST",
+  async function apiRequest(
+    url,
+    {
+      method = "GET",
+      body
+    } = {}
+  ){
+    const options = {
+      method,
       credentials: "same-origin",
       cache: "no-store",
       headers: {
-        "Content-Type": "application/json",
         "Accept": "application/json"
-      },
-      body: JSON.stringify(payload || {})
-    });
+      }
+    };
 
-    let data = {};
-    try { data = await r.json(); } catch {}
+    if (body !== undefined) {
+      options.headers[
+        "Content-Type"
+      ] = "application/json";
 
-    if (r.status === 401 || data?.error === "auth_required") {
-      throw new Error(data.message || "❌ سجّل الدخول أولًا.");
+      options.body =
+        JSON.stringify(body || {});
     }
 
-    if (!r.ok || data.ok === false) {
-      throw new Error(data.message || "تعذّر تنفيذ الطلب.");
+    const r =
+      await fetch(url, options);
+
+    let data = {};
+
+    try {
+      data = await r.json();
+    } catch {}
+
+    if (
+      r.status === 401 ||
+      data?.error === "auth_required"
+    ) {
+      location.href =
+        "login.html?next=" +
+        encodeURIComponent(
+          location.pathname +
+          location.search
+        );
+
+      throw new Error(
+        data.message ||
+        "❌ سجّل الدخول أولًا."
+      );
+    }
+
+    if (
+      !r.ok ||
+      data.ok === false
+    ) {
+      const err =
+        new Error(
+          data.message ||
+          "تعذّر تنفيذ الطلب."
+        );
+
+      err.status = r.status;
+      err.response = data;
+
+      throw err;
     }
 
     return data;
   }
 
-  function hydrate(){
-    const qs = new URLSearchParams(location.search);
-    const id = qs.get("animalId") || qs.get("number") || qs.get("animalNumber") || "";
-    const dt = qs.get("date") || qs.get("eventDate") || todayLocal();
 
-    document.getElementById("animalId").value = id;
-    document.getElementById("lamenessDate").value = dt;
+  function collectPayload(){
+    const affectedLegs =
+      Array.from(
+        document.querySelectorAll(
+          'input[name="affectedLegs"]:checked'
+        )
+      ).map(el => el.value);
 
-    try { history.replaceState(null, "", location.pathname); } catch {}
+    return {
+      animalNumber:
+        animalId.value.trim(),
+
+      eventDate:
+        lamenessDate.value,
+
+      affectedLegs,
+
+      affectedLeg:
+        affectedLegs.join("، "),
+
+      lamenessType:
+        lamenessType.value,
+
+      vet:
+        (vet.value || "").trim()
+    };
   }
+
+
+  function renderPerformers(items = []){
+    operationalPerformersList
+      .replaceChildren();
+
+    [
+      ...new Set(
+        (
+          Array.isArray(items)
+            ? items
+            : []
+        )
+          .map(x =>
+            String(x || "").trim()
+          )
+          .filter(Boolean)
+      )
+    ].forEach(name => {
+      const option =
+        document.createElement("option");
+
+      option.value = name;
+
+      operationalPerformersList
+        .appendChild(option);
+    });
+  }
+
+
+  async function loadOperationalPerformers(){
+    try {
+      const data =
+        await apiRequest(
+          "/api/event-options/operational-performers"
+        );
+
+      renderPerformers(
+        data.operationalPerformers || []
+      );
+
+    } catch (_) {
+      /*
+        القائمة مساعدة فقط.
+        فشل تحميلها لا يمنع التسجيل.
+      */
+    }
+  }
+
+
+  function hydrateNormal(){
+    const id =
+      qs.get("animalId") ||
+      qs.get("number") ||
+      qs.get("animalNumber") ||
+      "";
+
+    const dt =
+      qs.get("date") ||
+      qs.get("eventDate") ||
+      todayLocal();
+
+    animalId.value = id;
+    lamenessDate.value = dt;
+  }
+
 
   async function runGate(){
-    const payload = collectPayload();
+    if (requestedEditMode) {
+      return;
+    }
 
-    if (!payload.animalNumber || !payload.eventDate) return;
+    const payload =
+      collectPayload();
+
+    if (
+      !payload.animalNumber ||
+      !payload.eventDate
+    ) {
+      return;
+    }
 
     try {
-      const data = await apiPost("/api/lameness/gate", payload);
-      if (data && data.message && !data.silent) {
-        showMsg(data.message, !!data.allowed);
+      const data =
+        await apiRequest(
+          "/api/lameness/gate",
+          {
+            method: "POST",
+            body: payload
+          }
+        );
+
+      if (
+        data.message &&
+        !data.silent
+      ) {
+        showMsg(
+          data.message,
+          !!data.allowed
+        );
       }
+
     } catch (err) {
-      showMsg(err.message || "تعذّر التحقق من الحيوان.", false);
+      showMsg(
+        err.message ||
+        "تعذّر التحقق من الحيوان.",
+        false
+      );
     }
   }
 
-  hydrate();
 
-  document.getElementById("animalId").addEventListener("change", runGate);
-  document.getElementById("lamenessDate").addEventListener("change", runGate);
-
-  form.addEventListener("submit", async (e)=>{
-    e.preventDefault();
-
-    showMsg("", false);
+  async function loadEditEvent(){
     btn.disabled = true;
+    btn.textContent =
+      "جارٍ تحميل الحدث...";
 
+    const data =
+      await apiRequest(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}`
+      );
+
+    if (
+      data.ok !== true ||
+      !data.event
+    ) {
+      throw new Error(
+        data.message ||
+        "تعذّر تحميل حدث العرج للتعديل."
+      );
+    }
+
+    const ev = data.event;
+
+    if (
+      ev.typeKey !== "lameness"
+    ) {
+      throw new Error(
+        "الحدث المطلوب ليس حدث عرج."
+      );
+    }
+
+    if (
+      ev.editPolicy?.editable !== true
+    ) {
+      throw new Error(
+        ev.editPolicy?.reason ||
+        "هذا الحدث غير متاح للتعديل."
+      );
+    }
+
+    animalId.value =
+      ev.animalNumber || "";
+
+    animalId.readOnly = true;
+
+    lamenessDate.value =
+      ev.data?.eventDate ||
+      ev.eventDate ||
+      "";
+
+    /*
+      التاريخ جزء ثابت من هوية الحدث.
+    */
+    lamenessDate.disabled = true;
+
+    const gate =
+      await apiRequest(
+        "/api/lameness/gate",
+        {
+          method: "POST",
+          body: {
+            animalNumber:
+              animalId.value,
+
+            eventDate:
+              lamenessDate.value
+          }
+        }
+      );
+
+    if (
+      gate.allowed === false
+    ) {
+      throw new Error(
+        gate.message ||
+        "تعذّر تجهيز حدث العرج للتعديل."
+      );
+    }
+
+    const selectedLegs =
+      Array.isArray(
+        ev.data?.affectedLegs
+      )
+        ? ev.data.affectedLegs
+        : [];
+
+    const selectedSet =
+      new Set(
+        selectedLegs.map(x =>
+          String(x || "").trim()
+        )
+      );
+
+    document
+      .querySelectorAll(
+        'input[name="affectedLegs"]'
+      )
+      .forEach(input => {
+        input.checked =
+          selectedSet.has(
+            input.value
+          );
+      });
+
+    lamenessType.value =
+      ev.data?.lamenessType || "";
+
+    vet.value =
+      ev.data?.vet || "";
+
+    renderPerformers(
+      data.correctionPerformers || []
+    );
+
+    editToolsRow.hidden = false;
+    editToolsRow.style.display = "";
+
+    correctionPerformedBy.required =
+      true;
+
+    correctionReason.required =
+      true;
+
+    if (pageTitle) {
+      pageTitle.textContent =
+        "تعديل حالة العرج";
+    }
+
+    document.title =
+      "تعديل حالة العرج";
+
+    if (backLink) {
+      backLink.href =
+        `event-list.html?number=${encodeURIComponent(ev.animalNumber || "")}`;
+    }
+
+    btn.textContent =
+      "حفظ التعديل ✅";
+
+    btn.disabled = false;
+
+    showMsg(
+      "عدّل الحافر المصاب أو نوع العرج أو اسم الطبيب، ثم اكتب القائم بالتعديل وسبب التعديل.",
+      true
+    );
+  }
+
+
+  async function saveNormal(){
+    const data =
+      await apiRequest(
+        "/api/lameness/save",
+        {
+          method: "POST",
+          body: collectPayload()
+        }
+      );
+
+    showMsg(
+      data.message ||
+      "✅ تم حفظ العرج بنجاح",
+      true
+    );
+
+    setTimeout(() => {
+      location.href =
+        data.redirectUrl ||
+        "event-list.html";
+    }, 1200);
+  }
+
+
+  async function saveCorrection(){
+    const performer =
+      correctionPerformedBy
+        .value
+        .trim();
+
+    const reason =
+      correctionReason
+        .value
+        .trim();
+
+    if (!performer) {
+      throw new Error(
+        "أدخل اسم القائم بالتعديل."
+      );
+    }
+
+    if (!reason) {
+      throw new Error(
+        "اكتب سبب التعديل."
+      );
+    }
+
+    const data =
+      await apiRequest(
+        `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
+        {
+          method: "POST",
+          body: {
+            ...collectPayload(),
+
+            correctionPerformedBy:
+              performer,
+
+            correctionReason:
+              reason
+          }
+        }
+      );
+
+    showMsg(
+      data.message ||
+      "✅ تم تعديل حدث العرج بنجاح.",
+      true
+    );
+
+    setTimeout(() => {
+      location.href =
+        `event-list.html?number=${encodeURIComponent(animalId.value.trim())}`;
+    }, 900);
+  }
+
+
+  form.addEventListener(
+    "submit",
+    async e => {
+      e.preventDefault();
+
+      showMsg("", false);
+      btn.disabled = true;
+
+      const idleText =
+        isEditMode
+          ? "حفظ التعديل ✅"
+          : "تسجيل الحالة";
+
+      try {
+        if (isEditMode) {
+          await saveCorrection();
+        } else {
+          await saveNormal();
+        }
+
+      } catch (err) {
+        showMsg(
+          err.message ||
+          (
+            isEditMode
+              ? "❌ تعذّر تعديل العرج الآن."
+              : "❌ تعذّر حفظ العرج الآن."
+          ),
+          false
+        );
+
+        btn.disabled = false;
+        btn.textContent =
+          idleText;
+      }
+    }
+  );
+
+
+  animalId.addEventListener(
+    "change",
+    runGate
+  );
+
+  lamenessDate.addEventListener(
+    "change",
+    runGate
+  );
+
+
+  async function init(){
     try {
-      const data = await apiPost("/api/lameness/save", collectPayload());
+      if (requestedEditMode) {
+        if (!editEventId) {
+          throw new Error(
+            "رابط تعديل العرج غير مكتمل."
+          );
+        }
 
-      showMsg(data.message || "✅ تم حفظ العرج بنجاح", true);
+        await loadEditEvent();
 
-      setTimeout(()=>{
-        location.href = data.redirectUrl || "event-list.html";
-      }, 1200);
+      } else {
+        hydrateNormal();
+
+        await Promise.all([
+          loadOperationalPerformers(),
+          runGate()
+        ]);
+      }
 
     } catch (err) {
-      showMsg(err.message || "❌ تعذّر حفظ العرج الآن.", false);
-      btn.disabled = false;
-    }
-  });
+      showMsg(
+        err.message ||
+        "تعذّر تجهيز صفحة العرج.",
+        false
+      );
 
-  runGate();
+      btn.disabled = true;
+    }
+  }
+
+
+  init();
+
+})();
 </script>
 </body>
 </html>
