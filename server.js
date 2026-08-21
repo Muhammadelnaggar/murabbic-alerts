@@ -16572,6 +16572,7 @@ const supported =
     "uterine_check",
     "mastitis",
     "lameness",
+    "health",
     "pregnancy_diagnosis"
   ]);
 
@@ -18533,6 +18534,7 @@ if (
     "uterine_check",
     "mastitis",
     "lameness",
+    "health",
     "pregnancy_diagnosis"
   ].includes(typeKey) &&
   !correctionPerformedBy
