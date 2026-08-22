@@ -22,8 +22,48 @@
 
 <main>
   <div id="statusBox" class="infobar info show">
-    جاري تحميل أرشيف التنبيهات...
+  جاري تحميل أرشيف التنبيهات...
+</div>
+  <div class="card grid">
+  <div>
+    <label for="animalSearch">رقم الحيوان</label>
+    <input
+      id="animalSearch"
+      type="text"
+      inputmode="numeric"
+      placeholder="مثال: 117"
+      autocomplete="off"
+    >
   </div>
+
+  <div>
+    <label for="dateSearch">التاريخ</label>
+    <input
+      id="dateSearch"
+      type="date"
+    >
+  </div>
+
+  <div>
+    <label for="alertSearch">البحث في التنبيه</label>
+    <input
+      id="alertSearch"
+      type="search"
+      placeholder="مثال: تلقيح أو تشخيص حمل"
+      autocomplete="off"
+    >
+  </div>
+
+  <div class="row">
+    <button id="searchBtn" type="button">
+      🔍 بحث
+    </button>
+
+    <button id="clearSearchBtn" type="button" class="secondary">
+      مسح البحث
+    </button>
+  </div>
+</div>
 
   <div class="card grid">
     <div class="row">
@@ -56,9 +96,13 @@
   const API_BASE = location.origin;
   const statusBox = document.getElementById("statusBox");
   const alertsContainer = document.getElementById("alertsContainer");
-  const daysFilter = document.getElementById("daysFilter");
-  const limitFilter = document.getElementById("limitFilter");
-
+const daysFilter = document.getElementById("daysFilter");
+const limitFilter = document.getElementById("limitFilter");
+const animalSearch = document.getElementById("animalSearch");
+const dateSearch = document.getElementById("dateSearch");
+const alertSearch = document.getElementById("alertSearch");
+const searchBtn = document.getElementById("searchBtn");
+const clearSearchBtn = document.getElementById("clearSearchBtn");
   function setBar(text, type){
     statusBox.textContent = text || "";
     statusBox.className = "infobar show " + (type || "info");
@@ -162,6 +206,14 @@ card.appendChild(msg);
   async function loadAlerts(){
     const days = Number(daysFilter.value || 30);
     const limit = Number(limitFilter.value || 100);
+    const animalNumber =
+  String(animalSearch.value || "").trim();
+
+const searchDate =
+  String(dateSearch.value || "").trim();
+
+const searchText =
+  String(alertSearch.value || "").trim();
 
     setBar("جاري تحميل أرشيف التنبيهات...", "info");
     alertsContainer.innerHTML = "";
@@ -169,7 +221,22 @@ card.appendChild(msg);
     try {
       const qs = new URLSearchParams();
       qs.set("limit", String(limit));
-      if (days > 0) qs.set("days", String(days));
+
+if (days > 0) {
+  qs.set("days", String(days));
+}
+
+if (animalNumber) {
+  qs.set("animalNumber", animalNumber);
+}
+
+if (searchDate) {
+  qs.set("date", searchDate);
+}
+
+if (searchText) {
+  qs.set("q", searchText);
+}
 
       const r = await fetch(API_BASE + "/api/alerts?" + qs.toString(), {
         method: "GET",
@@ -201,10 +268,31 @@ card.appendChild(msg);
     }
   }
 
-  daysFilter.addEventListener("change", loadAlerts);
-  limitFilter.addEventListener("change", loadAlerts);
+  searchBtn.addEventListener("click", loadAlerts);
 
+clearSearchBtn.addEventListener("click", () => {
+  animalSearch.value = "";
+  dateSearch.value = "";
+  alertSearch.value = "";
   loadAlerts();
+});
+
+alertSearch.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    loadAlerts();
+  }
+});
+
+animalSearch.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    loadAlerts();
+  }
+});
+
+daysFilter.addEventListener("change", loadAlerts);
+limitFilter.addEventListener("change", loadAlerts);
+
+loadAlerts();
 })();
 </script>
 </body>
