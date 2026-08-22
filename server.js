@@ -65984,36 +65984,135 @@ app.get('/api/alerts', requireUserId, async (req, res) => {
     }
 
     const tenant = req.userId;
-    const animalId = String(req.query.animalId || '').trim();
-    const sinceMs = Number(req.query.since || 0);
-    const days = Number(req.query.days || 0);
-    const limit = Math.min(Number(req.query.limit || 100), 2000);
+const animalId = String(req.query.animalId || '').trim();
+const sinceMs = Number(req.query.since || 0);
+const days = Number(req.query.days || 0);
 
-    let q = db.collection('alerts').where('userId', '==', tenant);
+const requestedLimit =
+  Number(req.query.limit || 100);
 
-    if (animalId) {
-      q = q.where('subject.animalId', '==', animalId);
-    }
+const limit =
+  Math.max(
+    1,
+    Math.min(
+      Number.isFinite(requestedLimit)
+        ? requestedLimit
+        : 100,
+      2000
+    )
+  );
 
-    let since = sinceMs;
-    if (!since && days > 0) since = Date.now() - days * dayMs;
-    if (since) q = q.where('ts', '>=', since);
+let since = sinceMs;
 
-    q = q.orderBy('ts', 'desc').limit(limit);
+if (!since && days > 0) {
+  since =
+    Date.now() -
+    days * dayMs;
+}
 
-    const snap = await q.get();
+const snap =
+  await db
+    .collection('alerts')
+    .where('userId', '==', tenant)
+    .get();
 
-    const alerts = snap.docs.map(d => {
-      const a = d.data() || {};
+const alertTsMs = value => {
+  if (!value) return 0;
+
+  if (
+    typeof value.toMillis === 'function'
+  ) {
+    return value.toMillis();
+  }
+
+  if (
+    Number.isFinite(
+      Number(value?._seconds)
+    )
+  ) {
+    return (
+      Number(value._seconds) *
+      1000
+    );
+  }
+
+  const numeric =
+    Number(value);
+
+  if (Number.isFinite(numeric)) {
+    return numeric;
+  }
+
+  const parsed =
+    new Date(value).getTime();
+
+  return Number.isFinite(parsed)
+    ? parsed
+    : 0;
+};
+
+const alerts =
+  snap.docs
+    .map(d => {
+      const a =
+        d.data() || {};
+
       return {
         id: d.id,
         ...a,
-        title: a.title || a.name || a.code || 'تنبيه',
-        message: a.message || a.summary || a.description || '',
-        date: a.date || a.dueDate || a.eventDate || null,
-        ts: a.ts || 0
+
+        title:
+          a.title ||
+          a.name ||
+          a.code ||
+          'تنبيه',
+
+        message:
+          a.message ||
+          a.summary ||
+          a.description ||
+          '',
+
+        date:
+          a.date ||
+          a.dueDate ||
+          a.eventDate ||
+          null,
+
+        ts:
+          a.ts || 0,
+
+        __tsMs:
+          alertTsMs(a.ts)
       };
-    });
+    })
+    .filter(a => {
+      if (
+        animalId &&
+        String(
+          a?.subject?.animalId || ''
+        ).trim() !== animalId
+      ) {
+        return false;
+      }
+
+      if (
+        since &&
+        a.__tsMs < since
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort(
+      (a, b) =>
+        b.__tsMs - a.__tsMs
+    )
+    .slice(0, limit)
+    .map(
+      ({ __tsMs, ...a }) => a
+    );
 
     return res.json({
       ok: true,
