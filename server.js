@@ -82592,14 +82592,51 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
           ? Number(animal.heatIntervalDays)
           : null,
 
-      milkTraitsScore: Number(animal.milkTraitsScore || animal.milk_score || 0) || 0,
-      ovsynch: animal.ovsynch || null,
+      milkTraitsScore:
+  Number(
+    animal.milkTraitsScore ||
+    animal.milk_score ||
+    0
+  ) || 0,
 
-      milkTodayKg: Number.isFinite(Number(animal.milkTodayKg)) ? Number(animal.milkTodayKg) : null,
-      seasonTotalKg: Number.isFinite(Number(animal.seasonTotalKg)) ? Number(animal.seasonTotalKg) : null,
-      m305Kg: Number.isFinite(Number(animal.m305Kg)) ? Number(animal.m305Kg) : null,
+ovsynch:
+  String(
+    animal.currentProtocol || ""
+  ).trim().toLowerCase() === "ovsynch" &&
+  String(
+    animal.protocolStatus || ""
+  ).trim().toLowerCase() === "active"
+    ? eventsPageOvsynchProgramLabelSrv(
+        animal.currentProtocolProgram ||
+        animal.protocolProgram ||
+        animal.program ||
+        "ovsynch"
+      )
+    : null,
 
-      lastCheckDate: animal.lastCheckDate || animal.healthCheckDate || null,
+milkTodayKg:
+  Number.isFinite(Number(animal.milkTodayKg))
+    ? Number(animal.milkTodayKg)
+    : null,
+
+seasonTotalKg:
+  Number.isFinite(Number(animal.seasonTotalKg))
+    ? Number(animal.seasonTotalKg)
+    : null,
+
+m305Kg:
+  Number.isFinite(Number(animal.m305Kg))
+    ? Number(animal.m305Kg)
+    : null,
+
+lastCheckDate:
+  animal.lastCheckDate ||
+  animal.healthCheckDate ||
+  animal.lastDiseaseDate ||
+  animal.lastDiagnosisDate ||
+  animal.lastLamenessDate ||
+  animal.lastMastitisDate ||
+  null,
 
       inseminations: [],
       estrusDates: Array.isArray(animal.estrusDates) ? [...animal.estrusDates] : [],
@@ -82757,13 +82794,16 @@ app.get('/api/animal-card', requireUserId, async (req, res) => {
         });
 
 
-        if (
-          d &&
-          !state.lastCheckDate
-        ) {
-          state.lastCheckDate = d;
-        }
-      }
+      if (
+  d &&
+  (
+    !cardISODateSrv(state.lastCheckDate) ||
+    d > cardISODateSrv(state.lastCheckDate)
+  )
+) {
+  state.lastCheckDate = d;
+}
+}
 
 
       if (
@@ -83138,6 +83178,10 @@ const herdMilkCurve =
       cardType: 'cow',
       page: 'cow-card',
       title: 'بطاقة الحيوان',
+      eventListUrl:
+      state.number
+    ? `/event-list.html?number=${encodeURIComponent(state.number)}`
+    : '',
 
       animal: {
         id: animal.id,
