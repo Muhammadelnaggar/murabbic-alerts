@@ -908,42 +908,14 @@ tip.style.display = 'block';
     activeMobileKey = '';
   }
 
-function focusRow(e){
-  if (!e.id) return;
+function focusRow(){
+  const href =
+    $('openEventsBtn')
+      ?.getAttribute('href') || '';
 
-  const row =
-    document.getElementById(
-      `evrow-${e.id}`
-    );
+  if (!href || href === '#') return;
 
-  if (!row) return;
-
-  const seasonPanel =
-    row.closest(
-      'details.event-season'
-    );
-
-  if (
-    seasonPanel &&
-    !seasonPanel.open
-  ) {
-    seasonPanel.open = true;
-  }
-
-  row.scrollIntoView({
-    behavior:'smooth',
-    block:'center'
-  });
-
-  row.classList.add(
-    'ev-row--focus'
-  );
-
-  setTimeout(() => {
-    row.classList.remove(
-      'ev-row--focus'
-    );
-  }, 1600);
+  location.href = href;
 }
 
   box.addEventListener('scroll', hideTip, { passive: true });
@@ -1243,12 +1215,15 @@ if (herdRows.length >= 2) {
   sc.scrollLeft = 0;
 }, 0);
 }
-  function renderCard(payload){
+ function renderCard(payload){
     const a = payload?.animal || {};
     const number = txt(a.animalNumber ?? a.number);
     const eventsBtn = $('openEventsBtn');
+
 const eventListUrl =
-  String(payload?.eventListUrl || '').trim();
+  String(
+    payload?.eventListUrl || ''
+  ).trim();
 
 if (eventsBtn) {
   if (eventListUrl) {
@@ -1259,7 +1234,6 @@ if (eventsBtn) {
     eventsBtn.hidden = true;
   }
 }
-
     const title = $('cardTitle');
     if (title) title.textContent = `${kindTitle(a)} رقم ${number}`;
 
@@ -1277,12 +1251,17 @@ if (eventsBtn) {
     put('fiGestAge', a.gestationDays != null ? fmtNum(a.gestationDays) : '—');
     put('fiBreed', txt(a.breed));
     put('fiGroup', txt(a.group));
+
     renderCowCardDairyTraits(payload?.dairyTraits || null);
 
     put('kpiMilkToday', a.milkTodayKg != null ? fmtNum(a.milkTodayKg, ' كجم') : '—');
     put('kpiSeason', a.seasonTotalKg != null ? fmtNum(a.seasonTotalKg, ' كجم') : '—');
     put('kpi305', a.m305Kg != null ? fmtNum(a.m305Kg, ' كجم') : '—');
-   renderMilkChart(payload?.milkSeries || [], payload?.herdMilkCurve || []);
+
+    renderMilkChart(
+      payload?.milkSeries || [],
+      payload?.herdMilkCurve || []
+    );
 
     put('fiLastIns', fmtDate(a.lastInseminationDate));
     put('fiServiceInterval', a.serviceIntervalDays != null ? fmtNum(a.serviceIntervalDays, ' يوم') : '—');
@@ -1295,15 +1274,22 @@ if (eventsBtn) {
     put('fiLastCheck', fmtDate(a.lastCheckDate));
 
     renderHealth(payload?.healthHistory || []);
-    rowList('alertsList', payload?.alerts || [], 'لا توجد تنبيهات مختصرة', { alerts: true });
 
-const timelineEvents =
+    rowList(
+      'alertsList',
+      payload?.alerts || [],
+      'لا توجد تنبيهات مختصرة',
+      { alerts: true }
+    );
+
+    const timelineEvents =
   payload?.recentEvents ||
   payload?.events ||
   [];
 
 renderTimeline(timelineEvents);
-  }
+}
+
 
   async function loadCard({ number, animalId } = {}){
     try{
