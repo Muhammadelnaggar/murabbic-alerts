@@ -13,10 +13,10 @@
 
     <div class="mbk-center">
       <div class="mbk-page-title">أرشيف التنبيهات</div>
-      <div class="mbk-app-name">مُرَبِّك — التنبيهات السابقة</div>
+     <div class="mbk-app-name">مُرَبِّيك — التنبيهات السابقة</div>
     </div>
 
-    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّك" />
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك" />
   </div>
 </header>
 
@@ -70,25 +70,26 @@
   }
 
   function formatDate(alert){
-    const raw =
-      alert.date ||
-      alert.dueDate ||
-      alert.eventDate ||
-      alert.createdAt ||
-      alert.ts ||
-      "";
+  const raw =
+    alert.ts ||
+    alert.firstSeenAtMs ||
+    alert.createdAt ||
+    alert.date ||
+    alert.dueDate ||
+    alert.eventDate ||
+    "";
 
-    if (typeof raw === "number" && raw > 0) {
-      return new Date(raw).toLocaleDateString("ar-EG");
-    }
-
-    if (raw && raw._seconds) {
-      return new Date(raw._seconds * 1000).toLocaleDateString("ar-EG");
-    }
-
-    const s = String(raw || "").slice(0, 10);
-    return s || "—";
+  if (typeof raw === "number" && raw > 0) {
+    return new Date(raw).toLocaleDateString("ar-EG");
   }
+
+  if (raw && raw._seconds) {
+    return new Date(raw._seconds * 1000).toLocaleDateString("ar-EG");
+  }
+
+  const s = String(raw || "").slice(0, 10);
+  return s || "—";
+}
 
   function handleAuthRequired(j, status){
     if (status === 401 || j?.error === "auth_required") {
@@ -110,20 +111,50 @@
       const card = document.createElement("div");
       card.className = "card grid";
 
-      const title = document.createElement("h3");
-      title.textContent = "🔔 " + safeText(alert.title || alert.name || alert.code, "تنبيه");
+     const title = document.createElement("h3");
+title.textContent =
+  "🔔 " +
+  safeText(
+    alert.title ||
+    alert.name ||
+    alert.code,
+    "تنبيه"
+  );
 
-      const date = document.createElement("div");
-      date.className = "form-hint";
-      date.textContent = "التاريخ: " + formatDate(alert);
+const date = document.createElement("div");
+date.className = "form-hint";
+date.textContent =
+  "التاريخ: " + formatDate(alert);
 
-      const msg = document.createElement("div");
-      msg.textContent = safeText(alert.message || alert.summary || alert.description, "لا يوجد وصف.");
+const animalNumbers =
+  Array.isArray(alert.animalNumbers)
+    ? alert.animalNumbers
+        .map(v => String(v || "").trim())
+        .filter(Boolean)
+    : [];
 
-      card.appendChild(title);
-      card.appendChild(date);
-      card.appendChild(msg);
+const animal = document.createElement("div");
+animal.className = "form-hint";
 
+animal.textContent =
+  animalNumbers.length > 1
+    ? "أرقام الحيوانات: " + animalNumbers.join("، ")
+    : "رقم الحيوان: " + (animalNumbers[0] || "—");
+
+const msg = document.createElement("div");
+msg.textContent =
+  "التنبيه: " +
+  safeText(
+    alert.message ||
+    alert.summary ||
+    alert.description,
+    "لا يوجد وصف."
+  );
+
+card.appendChild(title);
+card.appendChild(date);
+card.appendChild(animal);
+card.appendChild(msg);
       alertsContainer.appendChild(card);
     });
   }
