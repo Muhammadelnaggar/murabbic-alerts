@@ -65983,10 +65983,32 @@ app.get('/api/alerts', requireUserId, async (req, res) => {
       });
     }
 
-    const tenant = req.userId;
-const animalId = String(req.query.animalId || '').trim();
-const sinceMs = Number(req.query.since || 0);
-const days = Number(req.query.days || 0);
+const tenant = req.userId;
+
+const animalNumber =
+  String(
+    req.query.animalNumber ||
+    req.query.animalId ||
+    ''
+  ).trim();
+
+const searchDate =
+  String(
+    req.query.date || ''
+  ).trim();
+
+const searchText =
+  String(
+    req.query.q || ''
+  )
+    .trim()
+    .toLowerCase();
+
+const sinceMs =
+  Number(req.query.since || 0);
+
+const days =
+  Number(req.query.days || 0);
 
 const requestedLimit =
   Number(req.query.limit || 100);
@@ -66009,7 +66031,35 @@ if (!since && days > 0) {
     Date.now() -
     days * dayMs;
 }
+let archiveTimeZone = "UTC";
 
+if (searchDate) {
+  const profileUid =
+    req.authSession?.uid ||
+    req.userId;
+
+  const profile =
+    await authReadUserProfileBridgeSrv(
+      profileUid
+    );
+
+  const savedZone =
+    String(
+      profile.farmTimeZone ||
+      profile.farmLocation?.timeZone ||
+      ""
+    ).trim();
+
+  if (
+    savedZone &&
+    farmDateISOInTimeZoneSrv(
+      savedZone
+    )
+  ) {
+    archiveTimeZone =
+      savedZone;
+  }
+}
 const snap =
   await db
     .collection('alerts')
@@ -66087,24 +66137,91 @@ const alerts =
       };
     })
     .filter(a => {
-      if (
-        animalId &&
-        String(
-          a?.subject?.animalId || ''
-        ).trim() !== animalId
-      ) {
-        return false;
-      }
+  if (animalNumber) {
+    const numbers =
+      new Set(
+        [
+          ...(
+            Array.isArray(
+              a.animalNumbers
+            )
+              ? a.animalNumbers
+              : []
+          ),
 
-      if (
-        since &&
-        a.__tsMs < since
-      ) {
-        return false;
-      }
+          a?.subject?.animalId,
+          a?.subject?.animalNumber,
+          a?.animalNumber
+        ]
+          .map(v =>
+            String(v || "").trim()
+          )
+          .filter(Boolean)
+      );
 
-      return true;
-    })
+    if (
+      !numbers.has(
+        animalNumber
+      )
+    ) {
+      return false;
+    }
+  }
+
+  if (
+    since &&
+    a.__tsMs < since
+  ) {
+    return false;
+  }
+
+  if (searchDate) {
+    const archiveDate =
+      a.__tsMs > 0
+        ? farmDateISOInTimeZoneSrv(
+            archiveTimeZone,
+            new Date(a.__tsMs)
+          )
+        : "";
+
+    if (
+      archiveDate !== searchDate
+    ) {
+      return false;
+    }
+  }
+
+  if (searchText) {
+    const searchableText =
+      [
+        a.title,
+        a.name,
+        a.code,
+        a.message,
+        a.summary,
+        a.description,
+        a.kind,
+        a.domain
+      ]
+        .map(v =>
+          String(v || "")
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean)
+        .join(" ");
+
+    if (
+      !searchableText.includes(
+        searchText
+      )
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+})
     .sort(
       (a, b) =>
         b.__tsMs - a.__tsMs
