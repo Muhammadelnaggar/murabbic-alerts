@@ -124,10 +124,17 @@
   <h3>تنبيهات مختصرة</h3>
   <div id="alertsList"></div>
 </section> 
-    <!-- جديد: جميع الأحداث المسجّلة -->
- <section class="card" aria-label="الأحداث المسجّلة">
-  <h3>الأحداث المسجّلة</h3>
-  <div id="evList"></div>
+ <section class="card cc-events-card" aria-label="سجل أحداث الحيوان">
+  <a id="openEventsBtn" class="cc-events-launch" href="#" hidden>
+    <span class="cc-events-icon" aria-hidden="true">☷</span>
+
+    <span class="cc-events-copy">
+      <strong>سجل أحداث الحيوان</strong>
+      <small>كل الأحداث والتفاصيل في مكان واحد</small>
+    </span>
+
+    <span class="cc-events-arrow" aria-hidden="true">←</span>
+  </a>
 </section>
 </div> 
 
@@ -1239,6 +1246,19 @@ if (herdRows.length >= 2) {
   function renderCard(payload){
     const a = payload?.animal || {};
     const number = txt(a.animalNumber ?? a.number);
+    const eventsBtn = $('openEventsBtn');
+const eventListUrl =
+  String(payload?.eventListUrl || '').trim();
+
+if (eventsBtn) {
+  if (eventListUrl) {
+    eventsBtn.href = eventListUrl;
+    eventsBtn.hidden = false;
+  } else {
+    eventsBtn.removeAttribute('href');
+    eventsBtn.hidden = true;
+  }
+}
 
     const title = $('cardTitle');
     if (title) title.textContent = `${kindTitle(a)} رقم ${number}`;
@@ -1277,23 +1297,12 @@ if (herdRows.length >= 2) {
     renderHealth(payload?.healthHistory || []);
     rowList('alertsList', payload?.alerts || [], 'لا توجد تنبيهات مختصرة', { alerts: true });
 
-    const timelineEvents =
+const timelineEvents =
   payload?.recentEvents ||
   payload?.events ||
   [];
 
-const allEvents =
-  payload?.events ||
-  [];
-
-renderTimeline(
-  timelineEvents
-);
-
-renderEventSeasons(
-  payload?.eventSeasons || [],
-  allEvents
-);
+renderTimeline(timelineEvents);
   }
 
   async function loadCard({ number, animalId } = {}){
