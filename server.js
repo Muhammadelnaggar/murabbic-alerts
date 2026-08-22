@@ -60199,7 +60199,21 @@ function murabbikSmartAlertNormalizeSrv(sourceName, raw = {}) {
 }
 
 function murabbikSmartAlertCompareSrv(a, b) {
+  const aUrgentNow =
+    a.priority === "urgent" &&
+    a.urgency === "now"
+      ? 0
+      : 1;
+
+  const bUrgentNow =
+    b.priority === "urgent" &&
+    b.urgency === "now"
+      ? 0
+      : 1;
+
   return (
+    aUrgentNow - bUrgentNow ||
+
     (MURABBIK_SMART_ALERT_KIND_RANK[a.kind] ?? 99) -
       (MURABBIK_SMART_ALERT_KIND_RANK[b.kind] ?? 99) ||
 
@@ -60216,7 +60230,6 @@ function murabbikSmartAlertCompareSrv(a, b) {
     String(a.id).localeCompare(String(b.id))
   );
 }
-
 function murabbikSmartAlertPublicSrv(alert) {
   if (!alert) return null;
 
