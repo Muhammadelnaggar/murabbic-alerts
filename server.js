@@ -60267,6 +60267,180 @@ function murabbikSmartAlertStateRefSrv(req, alertId) {
     );
 }
 
+const MURABBIK_SMART_ALERT_ARCHIVE_COLLECTION = "alerts";
+const murabbikSmartAlertArchivedDocsSrv = new Set();
+
+function murabbikSmartAlertArchiveDocIdSrv(req, alert = {}) {
+  const userId =
+    murabbikSmartAlertTextSrv(
+      req?.userId
+    );
+
+  const alertId =
+    murabbikSmartAlertTextSrv(
+      alert.id
+    );
+
+  const revision =
+    murabbikSmartAlertTextSrv(
+      alert.revision
+    );
+
+  if (!userId || !alertId || !revision) {
+    return "";
+  }
+
+  return `msa_archive_${murabbikSmartAlertHashSrv({
+    userId,
+    alertId,
+    revision
+  })}`;
+}
+
+async function murabbikSmartAlertArchiveSyncSrv(
+  req,
+  alerts = [],
+  nowMs = Date.now()
+) {
+  if (!db || !req?.userId || !alerts.length) {
+    return;
+  }
+
+  for (const alert of alerts) {
+    const docId =
+      murabbikSmartAlertArchiveDocIdSrv(
+        req,
+        alert
+      );
+
+    if (!docId) continue;
+
+    if (
+      murabbikSmartAlertArchivedDocsSrv
+        .has(docId)
+    ) {
+      continue;
+    }
+
+    try {
+      const ref =
+        db
+          .collection(
+            MURABBIK_SMART_ALERT_ARCHIVE_COLLECTION
+          )
+          .doc(docId);
+
+      const snap =
+        await ref.get();
+
+      if (!snap.exists) {
+        const publicAlert =
+          murabbikSmartAlertPublicSrv(
+            alert
+          ) || {};
+
+        await ref.set({
+          userId: req.userId,
+
+          archiveType: "smart_alert",
+          smartAlert: true,
+
+          smartAlertId:
+            alert.id,
+
+          revision:
+            alert.revision,
+
+          sourceName:
+            alert.source,
+
+          kind:
+            alert.kind,
+
+          domain:
+            alert.domain,
+
+          code:
+            alert.code,
+
+          priority:
+            alert.priority,
+
+          urgency:
+            alert.urgency,
+
+          certainty:
+            alert.certainty,
+
+          status:
+            alert.status,
+
+          title:
+            alert.title,
+
+          message:
+            alert.message,
+
+          details:
+            publicAlert.details || {},
+
+          dueDate:
+            alert.dueDate || "",
+
+          date:
+            alert.dueDate || "",
+
+          animalNumbers:
+            Array.isArray(
+              alert.animalNumbers
+            )
+              ? alert.animalNumbers
+              : [],
+
+          affectedCount:
+            Number(
+              alert.affectedCount || 0
+            ),
+
+          action:
+            publicAlert.action || {
+              type: "none",
+              label: "",
+              url: ""
+            },
+
+          ts:
+            nowMs,
+
+          firstSeenAtMs:
+            nowMs,
+
+          createdAt:
+            admin.firestore
+              .FieldValue
+              .serverTimestamp(),
+
+          source:
+            "server:/api/smart-alerts:archive"
+
+        }, {
+          merge: false
+        });
+      }
+
+      murabbikSmartAlertArchivedDocsSrv
+        .add(docId);
+
+    } catch (e) {
+      console.warn(
+        "smart-alert archive row failed:",
+        docId,
+        e.message || e
+      );
+    }
+  }
+}
+
 function murabbikSmartAlertDateMsSrv(value) {
   if (!value) return 0;
 
@@ -65500,10 +65674,23 @@ app.get("/api/smart-alerts", requireUserId, async (req, res) => {
       });
     }
 
-    const result =
+  const result =
   await murabbikSmartAlertCollectSrv(
     req
   );
+
+try {
+  await murabbikSmartAlertArchiveSyncSrv(
+    req,
+    result.alerts,
+    result.context.nowMs
+  );
+} catch (e) {
+  console.warn(
+    "smart-alert archive sync failed:",
+    e.message || e
+  );
+}
 
 const stateResult =
   await murabbikSmartAlertApplyUserStateSrv(
