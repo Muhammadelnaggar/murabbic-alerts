@@ -81281,76 +81281,60 @@ function cardAlertRowSrv(row = {}, fallbackTitle = 'تنبيه') {
   };
 }
 
-async function fetchCardAlertsSrv(uid, subject = {}) {
-  if (!db || !uid || !subject) return [];
+async function fetchCardAlertsSrv(req, subject = {}) {
+  if (!db || !req?.userId || !subject) return [];
 
-  const out = [];
-  const seen = new Set();
+  const subjectNumbers =
+    cardSubjectNumbersSrv(subject);
 
-  const add = row => {
-    const key = String(row.id || row.taskId || `${row.title || ''}_${row.message || ''}_${row.dueDate || ''}`);
-    if (seen.has(key)) return;
-
-    seen.add(key);
-    out.push(row);
-  };
+  if (!subjectNumbers.size) return [];
 
   try {
-    const snap = await db.collection('alerts')
-      .where('userId', '==', uid)
-      .limit(400)
-      .get();
+    const result =
+      await murabbikSmartAlertCollectSrv(req);
 
-    snap.docs.forEach(d => {
-      const row = {
-        id: d.id,
-        ...(d.data() || {})
-      };
+    const relevantAlerts =
+      result.alerts.filter(alert => {
+        const alertNumbers =
+          cardNumberSetSrv(
+            alert.animalNumbers || []
+          );
 
-      if (cardMatchSubjectSrv(row, subject)) {
-        add(cardAlertRowSrv(row, 'تنبيه'));
-      }
-    });
-  } catch (_) {}
+        for (const number of alertNumbers) {
+          if (subjectNumbers.has(number)) {
+            return true;
+          }
+        }
 
-  try {
-    const snap = await db.collection('tasks')
-      .where('userId', '==', uid)
-      .where('status', '==', 'pending')
-      .limit(500)
-      .get();
+        return false;
+      });
 
-    snap.docs.forEach(d => {
-      const t = {
-        id: d.id,
-        ...(d.data() || {})
-      };
-
-      if (t.done === true) return;
-      if (!cardMatchSubjectSrv(t, subject)) return;
-
-      const title = cardTextSrv(
-        t.title || t.taskTitle || t.stepName || t.taskType || 'مهمة مستحقة',
-        'مهمة مستحقة'
+    const stateResult =
+      await murabbikSmartAlertApplyUserStateSrv(
+        req,
+        relevantAlerts,
+        result.context.nowMs
       );
 
-      const msg = cardTextSrv(
-        t.message || t.note || t.description || t.vaccineKey || t.protocol || title,
-        title
-      );
+    return stateResult.visibleAlerts
+      .map(murabbikSmartAlertPublicSrv)
+      .filter(Boolean)
+      .map(alert =>
+        cardAlertRowSrv(
+          alert,
+          'تنبيه ذكي'
+        )
+      )
+      .slice(0, 8);
 
-      add(cardAlertRowSrv({
-        ...t,
-        title,
-        message: msg,
-        level: t.level || 'warn'
-      }, 'مهمة مستحقة'));
-    });
-  } catch (_) {}
+  } catch (e) {
+    console.error(
+      'card smart alerts failed:',
+      e.message || e
+    );
 
-  out.sort((a, b) => String(a.dueDate || '').localeCompare(String(b.dueDate || '')));
-
-  return out.slice(0, 8);
+    return [];
+  }
 }
 function cardMilkCurveAnimalClassSrv(a = {}) {
   const s = String(
@@ -83154,7 +83138,7 @@ const eventSeasons =
 
 const alerts =
   await fetchCardAlertsSrv(
-    uid,
+    req,
     animal
   );
    const dairyTraits = cardDairyTraitsFromAnimalSrv(animal, events);
@@ -83440,7 +83424,7 @@ const events = birthEvent && !baseEvents.some(e => e.id === birthEvent.id)
       .filter(e => e.date || e.title)
       .slice(-80);
 
-    const alerts = await fetchCardAlertsSrv(uid, calf);
+   const alerts = await fetchCardAlertsSrv(req, calf);
 
     const calfNumber = cardSubjectNumberSrv(calf) || number;
 
