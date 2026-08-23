@@ -557,6 +557,7 @@ function collectPayload() {
       inseminator: String(form.querySelector('[data-field="inseminator"]')?.value || "").trim(),
       inseminationTime: readRadio(form, "inseminationTime"),
       heatStatus: readRadio(form, "heatStatus"),
+      inseminationSource: String(qp.get("source") || "").trim(),
       notes: String(form.querySelector('[data-field="notes"]')?.value || "").trim()
     };
   }
