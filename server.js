@@ -27866,10 +27866,36 @@ function inseminationDecisionSrv(fd) {
   const warnings = [];
 
   // ❌ خارج القطيع
-  const st = String(doc.status ?? "").trim().toLowerCase();
-  if (st === "inactive" || st === "archived") {
-   return "❌ هذا الحيوان خارج القطيع، لذلك لا يمكن تسجيل التلقيح له.";
-  }
+const st =
+  String(
+    doc.status ?? ""
+  )
+    .trim()
+    .toLowerCase();
+
+if (
+  st === "inactive" ||
+  st === "archived"
+) {
+  return "❌ هذا الحيوان خارج القطيع، لذلك لا يمكن تسجيل التلقيح له.";
+}
+
+// ❌ مستبعد من التناسل
+const cullStatus =
+  String(
+    doc.cullStatus || ""
+  )
+    .trim()
+    .toLowerCase();
+
+if (
+  doc.breedingBlocked === true ||
+  cullStatus === "excluded"
+) {
+  return "❌ هذا الحيوان مستبعد من التناسل، لذلك لا يمكن تسجيل التلقيح له.";
+}
+
+// ✅ تحديد النوع
 
   // ✅ تحديد النوع
   let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
@@ -84569,7 +84595,24 @@ app.post("/api/cull/gate", requireUserId, async (req, res) => {
         message: "❌ الحيوان غير موجود في القطيع."
       });
     }
+    const cullStatus =
+  String(
+    doc.cullStatus || ""
+  )
+    .trim()
+    .toLowerCase();
 
+if (
+  doc.breedingBlocked === true ||
+  cullStatus === "excluded"
+) {
+  return res.status(409).json({
+    ok: false,
+    allowed: false,
+    message:
+      `ℹ️ سبق تسجيل استبعاد الحيوان رقم ${animalNumber}.`
+  });
+}
     return res.json({
         ok: true,
         allowed: true,
@@ -84619,13 +84662,19 @@ app.post("/api/cull/save", requireUserId, async (req, res) => {
       });
     }
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
-      return res.status(400).json({
-        ok: false,
-        message: "❌ أدخل تاريخ استبعاد صحيحًا."
-      });
-    }
+   const todayISO =
+  await farmTodayISOSrv(
+    req.authSession?.uid ||
+    req.userId
+  );
 
+if (eventDate > todayISO) {
+  return res.status(400).json({
+    ok: false,
+    message:
+      "❌ تاريخ الاستبعاد لا يمكن أن يكون في المستقبل."
+  });
+}
     if (!cullMain || !CULL_OPTIONS_SRV[cullMain]) {
       return res.status(400).json({
         ok: false,
@@ -84658,7 +84707,23 @@ app.post("/api/cull/save", requireUserId, async (req, res) => {
         message: "❌ الحيوان غير موجود في القطيع."
       });
     }
+    const cullStatus =
+  String(
+    doc.cullStatus || ""
+  )
+    .trim()
+    .toLowerCase();
 
+if (
+  doc.breedingBlocked === true ||
+  cullStatus === "excluded"
+) {
+  return res.status(409).json({
+    ok: false,
+    message:
+      `ℹ️ سبق تسجيل استبعاد الحيوان رقم ${animalNumber}.`
+  });
+}
     const reason = `${cullMain} — ${cullDetail}`;
     const now = admin.firestore.FieldValue.serverTimestamp();
 
