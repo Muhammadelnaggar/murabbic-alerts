@@ -41,8 +41,22 @@
   <label>عمر العجول</label>
   <div class="form-hint">سيتم حساب العمر تلقائيًا من السيرفر لكل عجل حسب تاريخ الميلاد المسجل.</div>
 </div>
-      <div class="field">
-        <label for="notes">ملاحظات</label>
+
+<div class="field">
+  <label for="performedBy">منفذ الإجراء</label>
+  <input
+    id="performedBy"
+    data-field="performedBy"
+    type="text"
+    list="operationalPerformersList"
+    autocomplete="off"
+    placeholder="اختر أو اكتب اسم الفني أو الطبيب"
+  />
+  <datalist id="operationalPerformersList"></datalist>
+</div>
+
+<div class="field">
+  <label for="notes">ملاحظات</label>
         <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
       </div>
     </section>
@@ -169,7 +183,55 @@
       };
     }
 
-    return { httpStatus: r.status, ...j };
+  return { httpStatus: r.status, ...j };
+  }
+
+  async function loadOperationalPerformers(){
+    const list = $("operationalPerformersList");
+    if (!list) return;
+
+    try {
+      const r = await fetch(
+        "/api/event-options/operational-performers",
+        {
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: {
+            "Accept": "application/json"
+          }
+        }
+      );
+
+      const j = await r.json().catch(() => ({}));
+
+      if (!r.ok || !j?.ok) return;
+
+      const names = [
+        ...new Set(
+          (
+            Array.isArray(j.operationalPerformers)
+              ? j.operationalPerformers
+              : []
+          )
+            .map(x => String(x || "").trim())
+            .filter(Boolean)
+        )
+      ];
+
+      list.replaceChildren(
+        ...names.map(name => {
+          const option = document.createElement("option");
+          option.value = name;
+          return option;
+        })
+      );
+
+    } catch (e) {
+      console.error(
+        "load operational performers failed",
+        e
+      );
+    }
   }
 
 function renderGate(j = {}){
@@ -269,6 +331,8 @@ function renderGate(j = {}){
     const numbers = getCurrentNumbers();
     const eventDate = String($("eventDate").value || "").slice(0, 10);
     const notes = String($("notes").value || "").trim();
+    const performedBy =
+      String($("performedBy").value || "").trim();
 
     if (!numbers.length) {
       setMessage("❌ رقم العجل مطلوب.", "error");
@@ -280,6 +344,11 @@ function renderGate(j = {}){
       return;
     }
 
+    if (!performedBy) {
+      setMessage("❌ أدخل اسم منفذ إزالة القرون.", "error");
+      return;
+    }
+
     setMessage("جاري الحفظ من السيرفر…", "info");
     setBusy(true);
 
@@ -288,6 +357,7 @@ function renderGate(j = {}){
         numbers,
         animalNumbers: numbers,
         eventDate,
+        performedBy,
         notes
       });
 
@@ -307,6 +377,7 @@ function renderGate(j = {}){
   });
 
   hydrateUI();
+  loadOperationalPerformers();
   runGate({ silent:true });
 </script>
 </body>
