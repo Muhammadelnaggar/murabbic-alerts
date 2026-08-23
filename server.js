@@ -19686,14 +19686,21 @@ else if (
           eventDate
         });
 
-        const badLegs = (fd.affectedLegs || []).filter(x => !LAMENESS_AFFECTED_LEGS_SRV.includes(x));
-        if (!fd.affectedLegs?.length || badLegs.length || !LAMENESS_TYPES_SRV.includes(fd.lamenessType)) {
-          return res.status(400).json({
-            ok: false,
-            error: "invalid_lameness_fields",
-            message: "❌ اختر الحافر المصاب ونوع العرج من القوائم."
-          });
-        }
+      const badLegs = (fd.affectedLegs || [])
+  .filter(x => !LAMENESS_AFFECTED_LEGS_SRV.includes(x));
+
+if (
+  !fd.affectedLegs?.length ||
+  badLegs.length ||
+  !LAMENESS_TYPES_SRV.includes(fd.lamenessType) ||
+  !fd.vet
+) {
+  return res.status(400).json({
+    ok: false,
+    error: "invalid_lameness_fields",
+    message: "❌ اختر الحافر المصاب ونوع العرج من القوائم، وأدخل اسم الطبيب أو الفني المعالج."
+  });
+}
 
         eventPatch = {
           ...eventPatch,
@@ -33962,13 +33969,19 @@ app.post("/api/lameness/save", requireUserId, async (req, res) => {
     const body = req.body || {};
     const fd = lamenessNormalizeBodySrv(body);
 
-    if (!fd.animalNumber || !fd.eventDate || !fd.affectedLeg || !fd.lamenessType) {
-      return res.status(400).json({
-        ok: false,
-        error: "missing_required_fields",
-        message: "❌ أكمل رقم الحيوان وتاريخ العرج، واختر الحافر المصاب ونوع العرج.",
-      });
-    }
+   if (
+  !fd.animalNumber ||
+  !fd.eventDate ||
+  !fd.affectedLeg ||
+  !fd.lamenessType ||
+  !fd.vet
+) {
+  return res.status(400).json({
+    ok: false,
+    error: "missing_required_fields",
+    message: "❌ أكمل رقم الحيوان وتاريخ العرج، واختر الحافر المصاب ونوع العرج، وأدخل اسم الطبيب أو الفني المعالج.",
+  });
+}
 
     if (!calvingIsDateSrv(fd.eventDate)) {
       return res.status(400).json({
