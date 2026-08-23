@@ -23954,15 +23954,20 @@ async function syncAnimalGroupFieldsSrv(tenant, groups = []) {
     const groupName = String(g?.groupName || g?.name || groupId || '').trim();
     const species = String(g?.species || '').trim() || null;
     const feedingEligible = !!g?.feedingEligible;
-    const avgMilkKg = Number.isFinite(Number(g?.avgMilkKg)) ? Number(g.avgMilkKg) : null;
-    const avgDim = Number.isFinite(Number(g?.avgDim)) ? Number(g.avgDim) : null;
+    const avgMilkKg = Number.isFinite(Number(g?.avgMilkKg))
+      ? Number(g.avgMilkKg)
+      : null;
+    const avgDim = Number.isFinite(Number(g?.avgDim))
+      ? Number(g.avgDim)
+      : null;
 
     const nums = Array.isArray(g?.animalNumbers)
-      ? g.animalNumbers.map(x => String(x).trim()).filter(Boolean)
+      ? g.animalNumbers.map(x => normGroupNumberSrv(x)).filter(Boolean)
       : [];
 
     for (const n of nums) {
-      const animalNumberKey = String(n);
+      const animalNumberKey = normGroupNumberSrv(n);
+      if (!animalNumberKey) continue;
 
       const incomingPatch = {
         group: groupName || null,
@@ -23989,8 +23994,7 @@ async function syncAnimalGroupFieldsSrv(tenant, groups = []) {
         currentPatch.groupId !== "cow_all" &&
         currentPatch.groupId !== "buffalo_all";
 
-      // لا تجعل جروب "كل الأبقار/كل الجاموس" يغطي الجروب التشغيلي
-      // مثل حديث الولادة / عالي / متوسط / منخفض / جاف / انتظار ولادة
+      // لا تجعل جروب "كل الأبقار/كل الجاموس" يغطي الجروب التشغيلي.
       if (incomingIsAll && currentIsOperational) {
         continue;
       }
@@ -23999,19 +24003,38 @@ async function syncAnimalGroupFieldsSrv(tenant, groups = []) {
     }
   }
 
-  const animalsSnap = await db.collection('animals')
-    .where('userId', '==', tenant)
-    .limit(5000)
-    .get();
+  const [animalsSnap, calvesSnap] = await Promise.all([
+    db.collection('animals')
+      .where('userId', '==', tenant)
+      .limit(5000)
+      .get(),
 
-  if (animalsSnap.empty) return;
+    db.collection('calves')
+      .where('userId', '==', tenant)
+      .limit(5000)
+      .get()
+  ]);
 
   let batch = db.batch();
   let ops = 0;
 
-  for (const d of animalsSnap.docs) {
+  const commitIfNeeded = async () => {
+    if (ops < 400) return;
+
+    await batch.commit();
+    batch = db.batch();
+    ops = 0;
+  };
+
+  const syncDoc = async (d, collectionName) => {
     const a = d.data() || {};
-    const animalNum = String(a.animalNumber ?? a.number ?? '').trim();
+
+    const animalNum = normGroupNumberSrv(
+      collectionName === 'calves'
+        ? (a.calfNumber ?? a.animalNumber ?? a.number ?? d.id)
+        : (a.animalNumber ?? a.number ?? d.id)
+    );
+
     const patch = desired.get(animalNum);
 
     if (patch) {
@@ -24030,11 +24053,15 @@ async function syncAnimalGroupFieldsSrv(tenant, groups = []) {
     }
 
     ops++;
-    if (ops >= 400) {
-      await batch.commit();
-      batch = db.batch();
-      ops = 0;
-    }
+    await commitIfNeeded();
+  };
+
+  for (const d of animalsSnap.docs) {
+    await syncDoc(d, 'animals');
+  }
+
+  for (const d of calvesSnap.docs) {
+    await syncDoc(d, 'calves');
   }
 
   if (ops > 0) {
@@ -28007,21 +28034,42 @@ if (isFollowerRecord) {
     return "❌ لم أتعرف على جنس التابع. يجب أن يكون التابع أنثى لتسجيل التلقيح.";
   }
 
-  const followerStage = String(
-    doc.followerStatus ||
-    doc.status ||
-    ""
-  ).trim();
+  const groupKey = String(doc.groupKey || "").trim();
+
+  const followerStageByGroupKey = {
+    suckling: "رضيع",
+    weaned: "فطام",
+    growing: "نامي",
+    heiferOpen: "تحت التلقيح",
+    breeding: "ملقح",
+    pregHeifers: "عشار"
+  };
+
+  const followerStage =
+    followerStageByGroupKey[groupKey] ||
+    String(
+      doc.followerStatus ||
+      doc.status ||
+      ""
+    ).trim();
 
   const followerStageAllowed =
-    followerStage === "تحت التلقيح" ||
-    followerStage === "ملقح" ||
-    followerStage === "ملقحة" ||
-    followerStage === "عشار" ||
-    inseminationIsPregnantStatusSrv(repro);
+    groupKey === "heiferOpen" ||
+    groupKey === "breeding" ||
+    groupKey === "pregHeifers" ||
+    (
+      !groupKey &&
+      (
+        followerStage === "تحت التلقيح" ||
+        followerStage === "ملقح" ||
+        followerStage === "ملقحة" ||
+        followerStage === "عشار" ||
+        inseminationIsPregnantStatusSrv(repro)
+      )
+    );
 
   if (!followerStageAllowed) {
-    return `❌ حالة التابع الحالية «${followerStage || "غير محددة"}» لا تسمح بتسجيل التلقيح.`;
+    return `❌ مرحلة التابع الحالية «${followerStage || "غير محددة"}» لا تسمح بتسجيل التلقيح.`;
   }
 }
 
@@ -69152,21 +69200,7 @@ async function heatBuildInseminationCandidatesSrv(uid, saved = [], eventDate = "
 
       if (/cow|بقر/i.test(species)) species = "أبقار";
       if (/buffalo|جاموس/i.test(species)) species = "جاموس";
-    const dimAtHeat = Number(item?.dimAtEvent);
-const recommendedPostCalving = species === "جاموس" ? 45 : 56;
-const hardBlockPostCalving = species === "جاموس" ? 35 : 45;
-
-if (
-  Number.isFinite(dimAtHeat) &&
-  dimAtHeat >= 0 &&
-  dimAtHeat < hardBlockPostCalving
-) {
-  rejected.push({
-    animalNumber,
-   reason: `مرّ ${Math.round(dimAtHeat)} يومًا فقط منذ الولادة. لا يمكن التلقيح قبل ${hardBlockPostCalving} يومًا، والأفضل الانتظار حتى ${recommendedPostCalving} يومًا.`
-  });
-  continue;
-}
+      const dimAtHeat = Number(item?.dimAtEvent);
       const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
       const reproFromDoc = String(doc.reproductiveStatus || "").trim();
       const reproStatus =
@@ -75584,13 +75618,14 @@ function isFreshGroupSrv(an = {}) {
 function ageCfgGroupSrv(sp, thresholds = {}) {
   if (sp === 'buffalo') {
     return {
-      weanedMax:  Number(thresholds.bufWeanedMax || 5),
-      growingMax: Number(thresholds.bufGrowingMax || 12)
+      weanedMax: Number(thresholds.bufWeanedMax || 5),
+      breedingMin: Number(thresholds.bufBreedingMin || 11)
     };
   }
+
   return {
-    weanedMax:  Number(thresholds.cowWeanedMax || 5),
-    growingMax: Number(thresholds.cowGrowingMax || 12)
+    weanedMax: Number(thresholds.cowWeanedMax || 5),
+    breedingMin: Number(thresholds.cowBreedingMin || 11)
   };
 }
 
@@ -75639,8 +75674,8 @@ function isGrowingGroupSrv(an = {}, sp = 'cow', thresholds = {}) {
   return (
     !hasCalvedBeforeGroupSrv(an) &&
     hasPassedWeaningStageGroupSrv(an) &&
-    m > c.weanedMax &&
-    m <= c.growingMax
+        m > c.weanedMax &&
+        m < c.breedingMin
   );
 }
 function groupMilkMetricAllowedSrv(groupId, def = {}) {
@@ -75852,7 +75887,7 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
       if (
         !hasCalvedBeforeGroupSrv(an) &&
         hasPassedWeaningStageGroupSrv(an) &&
-        m > c.growingMax
+        m >= c.breedingMin
       ) {
         g[pref + 'pregHeifers'].push(an);
         continue;
@@ -75890,7 +75925,7 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
       hasPassedWeaningStageGroupSrv(an) &&
       !isPregnantGroupSrv(an) &&
       isBreedingStatusGroupSrv(an) &&
-      m > c.growingMax
+      m >= c.breedingMin
     ) {
       g[pref + 'breeding'].push(an);
       continue;
@@ -75900,7 +75935,7 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
       !hasCalvedBeforeGroupSrv(an) &&
       hasPassedWeaningStageGroupSrv(an) &&
       !isPregnantGroupSrv(an) &&
-      m > c.growingMax
+      m >= c.breedingMin
     ) {
       g[pref + 'heiferOpen'].push(an);
       continue;
@@ -75920,8 +75955,10 @@ async function loadGroupThresholdsSrv(tenant) {
     bufHighMin:12,
     cowWeanedMax:5,
     cowGrowingMax:12,
+    cowBreedingMin:11,
     bufWeanedMax:5,
     bufGrowingMax:12,
+    bufBreedingMin:11,
     species:'cow'
   };
 
