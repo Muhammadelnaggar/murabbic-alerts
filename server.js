@@ -15222,6 +15222,7 @@ if (key === "dehorning") {
 
   add("الجنس", ["sex", "gender"]);
   add("تاريخ الميلاد", ["birthDate"]);
+  add("منفذ الإجراء", ["performedBy"]);
 
   if (note) {
     eventsPagePushDetailSrv(parts, "ملاحظة", note);
@@ -33265,22 +33266,37 @@ app.post("/api/dehorning/save", requireUserId, async (req, res) => {
     }
 
     const uid = req.userId;
-    const body = req.body || {};
-    const numbers = dehorningNumbersFromBodySrv(body);
-    const eventDate = dehorningEventDateSrv(body);
-    const notes = dehorningNotesSrv(body);
+const body = req.body || {};
+const numbers = dehorningNumbersFromBodySrv(body);
+const eventDate = dehorningEventDateSrv(body);
+const notes = dehorningNotesSrv(body);
 
-    if (!numbers.length || !eventDate) {
-      return res.status(400).json({
-        ok: false,
-        error: "missing_required_fields",
-        message: "❌ أدخل رقم العجل وتاريخ إزالة القرون.",
-        saved: [],
-        rejected: []
-      });
-    }
+const performedBy =
+  dehorningStrSrv(
+    body.performedBy || ""
+  );
 
-    if (!calvingIsDateSrv(eventDate)) {
+  if (!numbers.length || !eventDate) {
+  return res.status(400).json({
+    ok: false,
+    error: "missing_required_fields",
+    message: "❌ أدخل رقم العجل وتاريخ إزالة القرون.",
+    saved: [],
+    rejected: []
+  });
+}
+
+if (!performedBy) {
+  return res.status(400).json({
+    ok: false,
+    error: "performed_by_required",
+    message: "❌ أدخل اسم منفذ إزالة القرون.",
+    saved: [],
+    rejected: []
+  });
+}
+
+if (!calvingIsDateSrv(eventDate)) {
       return res.status(400).json({
         ok: false,
         error: "invalid_date",
@@ -33306,11 +33322,22 @@ app.post("/api/dehorning/save", requireUserId, async (req, res) => {
       });
     }
 
-    const checked = await dehorningEvaluateManySrv(uid, numbers, eventDate);
-    const saved = [];
-    const saveErrors = [];
+    const checked =
+  await dehorningEvaluateManySrv(
+    uid,
+    numbers,
+    eventDate
+  );
 
-    for (const row of checked.accepted) {
+const saved = [];
+const saveErrors = [];
+
+const dehorningOptionsRef =
+  db
+    .collection("user_event_options")
+    .doc(uid);
+
+for (const row of checked.accepted) {
       const animalNumber = row.animalNumber;
       const ageDays = Number.isFinite(Number(row.ageDays))
        ? Number(row.ageDays)
@@ -33346,30 +33373,51 @@ app.post("/api/dehorning/save", requireUserId, async (req, res) => {
         type: "dehorning",
 
         sex: row.sex || "",
-        birthDate: row.birthDate || "",
-        notes,
-        ageDays,
-        dehorningAgeDays: ageDays,
+birthDate: row.birthDate || "",
 
-        animalCollection: "calves",
+performedBy,
+notes,
+
+ageDays,
+dehorningAgeDays: ageDays,
+
+animalCollection: "calves",
         source: "server:/api/dehorning/save",
 
         createdAt: now,
         updatedAt: now
       });
 
-      if (row.ref) {
-       batch.set(row.ref, {
-  dehorned: true,
-  dehorningDate: eventDate,
-  lastDehorningDate: eventDate,
-  lastDehorningAgeDays: ageDays,
-  lastEventDate: eventDate,
-  updatedAt: now
-}, { merge: true });
-      }
+if (row.ref) {
+  batch.set(row.ref, {
+    dehorned: true,
+    dehorningDate: eventDate,
+    lastDehorningDate: eventDate,
+    lastDehorningAgeDays: ageDays,
+    lastEventDate: eventDate,
+    updatedAt: now
+  }, { merge: true });
+}
 
-      await batch.commit();
+if (saved.length === 0) {
+  batch.set(
+    dehorningOptionsRef,
+    {
+      userId: uid,
+
+      operationalPerformers:
+        admin.firestore.FieldValue
+          .arrayUnion(performedBy),
+
+      updatedAt:
+        admin.firestore.FieldValue
+          .serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+await batch.commit();
 
       saved.push({
   animalNumber,
