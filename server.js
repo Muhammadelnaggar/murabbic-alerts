@@ -27719,6 +27719,32 @@ function inseminationDayPartSrv(v) {
 
   return "";
 }
+function inseminationMethodNormSrv(v) {
+  const s = String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/\s+/g, "");
+
+  if (s === "طبيعي" || s === "natural") return "طبيعي";
+  if (s === "اصطناعي" || s === "artificial" || s === "ai") return "اصطناعي";
+
+  return "";
+}
+
+function inseminationSexNormSrv(v) {
+  const s = String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/\s+/g, "");
+
+  if (s === "انثى" || s === "female" || s === "f") return "female";
+  if (s === "ذكر" || s === "male" || s === "m") return "male";
+
+  return "";
+}
+
 function inseminationDaysBetweenSrv(a, b) {
   const d1 = a instanceof Date ? a : (a ? new Date(a) : null);
   const d2 = b instanceof Date ? b : (b ? new Date(b) : null);
@@ -27747,13 +27773,22 @@ function validateInseminationFieldsSrv(fd = {}) {
     fieldErrors.species = "لم أتعرف على نوع الحيوان. راجع بياناته.";
   }
 
-  if (!inseminationReqSrv(fd.inseminationMethod)) {
-    fieldErrors.inseminationMethod = "اختر طريقة التلقيح.";
-  }
+  const inseminationMethod =
+  inseminationMethodNormSrv(fd.inseminationMethod);
 
-  if (!inseminationReqSrv(fd.semenCode)) {
-    fieldErrors.semenCode = "أدخل كود السائل المنوي.";
-  }
+if (!inseminationReqSrv(fd.inseminationMethod)) {
+  fieldErrors.inseminationMethod = "اختر طريقة التلقيح.";
+} else if (!inseminationMethod) {
+  fieldErrors.inseminationMethod =
+    "طريقة التلقيح يجب أن تكون طبيعي أو اصطناعي.";
+}
+
+if (!inseminationReqSrv(fd.semenCode)) {
+  fieldErrors.semenCode =
+    inseminationMethod === "طبيعي"
+      ? "أدخل رقم الطلوقة."
+      : "أدخل كود السائل المنوي.";
+}
 
   if (!inseminationReqSrv(fd.inseminator)) {
     fieldErrors.inseminator = "أدخل اسم الملقّح.";
@@ -27903,7 +27938,7 @@ if (
   let sp = String(fd.species || doc.species || doc.animalTypeAr || "").trim();
   if (/cow|بقر/i.test(sp)) sp = "أبقار";
   if (/buffalo|جاموس/i.test(sp)) sp = "جاموس";
-  const recommendedPostCalving = { "أبقار": 56, "جاموس": 45 };
+  const recommendedPostCalving = { "أبقار": 60, "جاموس": 45 };
 const hardBlockPostCalving = { "أبقار": 45, "جاموس": 35 };
 
 // ✅ بعد الإجهاض: لا يُسمح بالتلقيح قبل اكتمال 40 يومًا
@@ -27953,10 +27988,44 @@ if (
   }
 
   const isFollowerRecord =
-    String(fd.animalCollection || "").trim() === "calves" ||
-    String(doc.entryType || "").trim() === "followers";
+  String(fd.animalCollection || "").trim() === "calves" ||
+  String(doc.entryType || "").trim() === "followers";
 
-  // قواعد ما بعد الولادة تخص الأمهات فقط.
+const sexNorm = inseminationSexNormSrv(
+  doc.sex ||
+  doc.followerSex ||
+  doc.gender ||
+  ""
+);
+
+if (sexNorm === "male") {
+  return "❌ لا يمكن تسجيل التلقيح لذكر.";
+}
+
+if (isFollowerRecord) {
+  if (sexNorm !== "female") {
+    return "❌ لم أتعرف على جنس التابع. يجب أن يكون التابع أنثى لتسجيل التلقيح.";
+  }
+
+  const followerStage = String(
+    doc.followerStatus ||
+    doc.status ||
+    ""
+  ).trim();
+
+  const followerStageAllowed =
+    followerStage === "تحت التلقيح" ||
+    followerStage === "ملقح" ||
+    followerStage === "ملقحة" ||
+    followerStage === "عشار" ||
+    inseminationIsPregnantStatusSrv(repro);
+
+  if (!followerStageAllowed) {
+    return `❌ حالة التابع الحالية «${followerStage || "غير محددة"}» لا تسمح بتسجيل التلقيح.`;
+  }
+}
+
+// قواعد ما بعد الولادة تخص الأمهات فقط.
   // العجلة البكر داخل calves لا تحتاج تاريخ ولادة سابق.
   if (!isFollowerRecord) {
     const lastCalving =
@@ -29029,6 +29098,37 @@ if (!calvingIsDateSrv(eventDate)) {
     rejected: invalidDateRejected
   });
 }
+
+const todayISO =
+  await farmTodayISOSrv(
+    req.authSession?.uid || uid
+  );
+
+if (eventDate > todayISO) {
+  const futureDateRejected = numbers.map(n => ({
+    animalNumber: String(n || ""),
+    reason: "تاريخ التلقيح لا يمكن أن يكون في المستقبل."
+  }));
+
+  return res.status(400).json({
+    ok: false,
+    allowed: false,
+    stage: "future_date",
+    message: inseminationJoinMessageSrv(
+      "❌ تاريخ التلقيح لا يمكن أن يكون في المستقبل.",
+      inseminationRejectedReasonsTextSrv(
+        futureDateRejected,
+        "الأرقام التي لا يمكن تسجيل التلقيح لها"
+      )
+    ),
+    acceptedCount: 0,
+    rejectedCount: futureDateRejected.length,
+    accepted: [],
+    rejected: futureDateRejected
+  });
+}
+
+
     const accepted = [];
     const rejected = [];
 
@@ -29277,17 +29377,42 @@ app.post("/api/insemination/save", requireUserId, async (req, res) => {
     ).trim().slice(0, 10);
 
     if (!animalNumber || !eventDate) {
-      return res.status(400).json({
-          ok: false,
-          message: "❌ أدخل رقم الحيوان وتاريخ التلقيح.",
-          fieldErrors: {
-          animalNumber: !animalNumber ? "أدخل رقم الحيوان." : undefined,
-          eventDate: !eventDate ? "أدخل تاريخ تلقيح صحيحًا." : undefined
-        }
-      });
+  return res.status(400).json({
+      ok: false,
+      message: "❌ أدخل رقم الحيوان وتاريخ التلقيح.",
+      fieldErrors: {
+      animalNumber: !animalNumber ? "أدخل رقم الحيوان." : undefined,
+      eventDate: !eventDate ? "أدخل تاريخ تلقيح صحيحًا." : undefined
     }
+  });
+}
 
-    const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+if (!calvingIsDateSrv(eventDate)) {
+  return res.status(400).json({
+    ok: false,
+    message: "❌ أدخل تاريخ تلقيح صحيحًا.",
+    fieldErrors: {
+      eventDate: "أدخل تاريخ تلقيح صحيحًا."
+    }
+  });
+}
+
+const todayISO =
+  await farmTodayISOSrv(
+    req.authSession?.uid || uid
+  );
+
+if (eventDate > todayISO) {
+  return res.status(400).json({
+    ok: false,
+    message: "❌ تاريخ التلقيح لا يمكن أن يكون في المستقبل.",
+    fieldErrors: {
+      eventDate: "تاريخ التلقيح لا يمكن أن يكون في المستقبل."
+    }
+  });
+}
+
+const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
 
     if (!animal) {
       return res.status(404).json({
@@ -29434,14 +29559,22 @@ if (!isWarn) {
         const needsEmbryonicLoss =
       inseminationIsPregnantStatusSrv(reproStatus) &&
       inseminationConfirmEmbryonicLossSrv(formData);
-        let thiAtInsemination = null;
+     let thiAtInsemination = null;
 
-    try {
-      thiAtInsemination = await weatherBuildFarmThiSrv(req.authSession?.uid || uid);
-    } catch (e) {
-      console.warn("insemination thi snapshot failed:", e.message || e);
-      thiAtInsemination = null;
-    }
+if (eventDate === todayISO) {
+  try {
+    thiAtInsemination =
+      await weatherBuildFarmThiSrv(
+        req.authSession?.uid || uid
+      );
+  } catch (e) {
+    console.warn(
+      "insemination thi snapshot failed:",
+      e.message || e
+    );
+    thiAtInsemination = null;
+  }
+}
     const payload = {
       userId: uid,
       animalId: animal.id || "",
@@ -29452,7 +29585,8 @@ if (!isWarn) {
       type: "insemination",
       eventTypeNorm: "insemination",
 
-      inseminationMethod: String(formData.inseminationMethod || "").trim(),
+      inseminationMethod:
+      inseminationMethodNormSrv(formData.inseminationMethod),
       semenCode: String(formData.semenCode || "").trim(),
       inseminator: String(formData.inseminator || "").trim(),
       inseminationTime:
@@ -29495,6 +29629,9 @@ const animalRef = db.collection(animalCol).doc(animal.id);
 
 const batch = db.batch();
 
+payload.serviceNumber = nextServices;
+payload.servicesCount = nextServices;
+
 if (needsEmbryonicLoss && embryonicLossRef) {
   batch.set(embryonicLossRef, {
     userId: uid,
@@ -29516,9 +29653,7 @@ if (needsEmbryonicLoss && embryonicLossRef) {
     source: "server:/api/insemination/save:auto-embryonic-loss",
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
-}
 
-if (needsEmbryonicLoss && embryonicLossRef) {
   payload.linkedEmbryonicLossEventId = embryonicLossRef.id;
   payload.sequenceInOperation = 2;
   payload.smartWarning = warningMessage || null;
@@ -29601,7 +29736,9 @@ await batch.commit();
       reproductiveStatus: "ملقحة",
       lastInseminationDate: eventDate,
       servicesCount: nextServices,
-      actions: [
+redirectUrl:
+  `/event-list.html?number=${encodeURIComponent(animalNumber)}`,
+actions: [
         {
           key: "event_list",
           label: "فتح قائمة الأحداث",
@@ -29676,21 +29813,57 @@ app.post("/api/insemination/bulk-save", requireUserId, async (req, res) => {
     }
 
     if (!calvingIsDateSrv(eventDate)) {
-      return res.status(400).json({
-        ok: false,
-        message: "❌ أدخل تاريخ تلقيح صحيحًا.",
-        savedCount: 0,
-        rejectedCount: animalNumbers.length,
-        saved: [],
-        rejected: animalNumbers.map(n => ({
-          animalNumber: String(n || ""),
-          reason: "أدخل تاريخ تلقيح صحيحًا."
-        }))
-      });
-    }
+  return res.status(400).json({
+    ok: false,
+    message: "❌ أدخل تاريخ تلقيح صحيحًا.",
+    savedCount: 0,
+    rejectedCount: animalNumbers.length,
+    saved: [],
+    rejected: animalNumbers.map(n => ({
+      animalNumber: String(n || ""),
+      reason: "أدخل تاريخ تلقيح صحيحًا."
+    }))
+  });
+}
 
-    const saved = [];
-    const rejected = [];
+const todayISO =
+  await farmTodayISOSrv(
+    req.authSession?.uid || uid
+  );
+
+if (eventDate > todayISO) {
+  return res.status(400).json({
+    ok: false,
+    message: "❌ تاريخ التلقيح لا يمكن أن يكون في المستقبل.",
+    savedCount: 0,
+    rejectedCount: animalNumbers.length,
+    saved: [],
+    rejected: animalNumbers.map(n => ({
+      animalNumber: String(n || ""),
+      reason: "تاريخ التلقيح لا يمكن أن يكون في المستقبل."
+    }))
+  });
+}
+
+let thiAtInsemination = null;
+
+if (eventDate === todayISO) {
+  try {
+    thiAtInsemination =
+      await weatherBuildFarmThiSrv(
+        req.authSession?.uid || uid
+      );
+  } catch (e) {
+    console.warn(
+      "insemination bulk thi snapshot failed:",
+      e.message || e
+    );
+    thiAtInsemination = null;
+  }
+}
+
+const saved = [];
+const rejected = [];
 
     let batch = db.batch();
     let ops = 0;
@@ -29848,7 +30021,8 @@ rejected.push({
           type: "insemination",
           eventTypeNorm: "insemination",
 
-          inseminationMethod: String(formData.inseminationMethod || "").trim(),
+          inseminationMethod:
+          inseminationMethodNormSrv(formData.inseminationMethod),
           semenCode: String(formData.semenCode || "").trim(),
           inseminator: String(formData.inseminator || "").trim(),
           inseminationTime:
@@ -29856,8 +30030,24 @@ rejected.push({
 
           heatStatus:
            inseminationDayPartSrv(formData.heatStatus),
-          inseminationSource:
+                    inseminationSource:
            inseminationSourceNormSrv(formData) || null,
+          thiAtInsemination: thiAtInsemination ? {
+            thi: thiAtInsemination.thi ?? null,
+            tempC: thiAtInsemination.tempC ?? null,
+            humidity: thiAtInsemination.humidity ?? null,
+            status: thiAtInsemination.status || null,
+            level: thiAtInsemination.status?.level || "",
+            label: thiAtInsemination.status?.label || "",
+            severity: thiAtInsemination.status?.severity ?? null,
+            source: thiAtInsemination.source || "",
+            locationSource: thiAtInsemination.locationSource || "",
+            locationLabel: thiAtInsemination.locationLabel || "",
+            capturedAt: new Date().toISOString()
+          } : null,
+          thiValue: thiAtInsemination?.thi ?? null,
+          thiLevel: thiAtInsemination?.status?.level || "",
+          thiLabel: thiAtInsemination?.status?.label || "",
           notes: String(formData.notes || "").trim() || null,
 
           species,
@@ -29868,12 +30058,13 @@ rejected.push({
         const prevServices = Number(doc.servicesCount || 0);
         const nextServices = Number.isFinite(prevServices) ? prevServices + 1 : 1;
 
-        const animalCol = animal._collection || "animals";
-        const animalRef = db.collection(animalCol).doc(animal.id);
+       const animalCol = animal._collection || "animals";
+const animalRef = db.collection(animalCol).doc(animal.id);
 
-        batch.set(eventRef, payload);
-        ops++;
-                if (needsEmbryonicLoss && embryonicLossRef) {
+payload.serviceNumber = nextServices;
+payload.servicesCount = nextServices;
+
+if (needsEmbryonicLoss && embryonicLossRef) {
           batch.set(embryonicLossRef, {
             userId: uid,
             animalId: animal.id || "",
@@ -29900,6 +30091,10 @@ rejected.push({
           payload.sequenceInOperation = 2;
           payload.smartWarning = warningMessage || null;
         }
+
+        batch.set(eventRef, payload);
+        ops++;
+
         const animalUpdate = {
           reproductiveStatus: "ملقحة",
           lastInseminationDate: eventDate,
