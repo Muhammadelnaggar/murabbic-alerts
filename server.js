@@ -15199,6 +15199,7 @@ if (key === "supernumerary_teat_removal") {
 
   add("الجنس", ["sex", "gender"]);
   add("تاريخ الميلاد", ["birthDate"]);
+  add("الفني أو الطبيب", ["performedBy"]);
 
   if (note) {
     eventsPagePushDetailSrv(parts, "ملاحظة", note);
@@ -15222,7 +15223,7 @@ if (key === "dehorning") {
 
   add("الجنس", ["sex", "gender"]);
   add("تاريخ الميلاد", ["birthDate"]);
-  add("منفذ الإجراء", ["performedBy"]);
+  add("الفني أو الطبيب", ["performedBy"]);
 
   if (note) {
     eventsPagePushDetailSrv(parts, "ملاحظة", note);
@@ -32189,10 +32190,8 @@ function superTeatStrSrv(v) {
   return String(v ?? "").trim();
 }
 
-function superTeatTodaySrv() {
-  return typeof cairoTodayISO === "function"
-    ? cairoTodayISO()
-    : new Date().toISOString().slice(0, 10);
+async function superTeatTodaySrv(uid) {
+  return await farmTodayISOSrv(uid);
 }
 
 function superTeatParseNumbersSrv(raw) {
@@ -32489,8 +32488,30 @@ async function superTeatEvaluateOneSrv(uid, rawNumber, eventDate) {
     };
   }
 
-  const birthDate = String(doc.birthDate || "").trim().slice(0, 10);
-const ageDays = superTeatAgeDaysSrv(birthDate, eventDate);
+const birthDate =
+  String(doc.birthDate || "")
+    .trim()
+    .slice(0, 10);
+
+const ageDays =
+  superTeatAgeDaysSrv(
+    birthDate,
+    eventDate
+  );
+
+if (
+  birthDate &&
+  calvingIsDateSrv(birthDate) &&
+  eventDate < birthDate
+) {
+  return {
+    ok: false,
+    animalNumber: num,
+    animalId: calf.id,
+    reason:
+      "تاريخ إزالة الحلمات الزائدة لا يمكن أن يسبق تاريخ الميلاد."
+  };
+}
 
 return {
   ok: true,
@@ -32593,22 +32614,22 @@ app.post("/api/supernumerary-teat-removal/gate", requireUserId, async (req, res)
     }
 
     const uid = req.userId;
-    const body = req.body || {};
-    const numbers = superTeatNumbersFromBodySrv(body);
-    const eventDate = superTeatEventDateSrv(body);
+const body = req.body || {};
+const numbers = superTeatNumbersFromBodySrv(body);
+const eventDate = superTeatEventDateSrv(body);
+const notes = superTeatNotesSrv(body);
 
-    if (!numbers.length || !eventDate) {
-      return res.json({
-        ok: true,
-        canSave: false,
-        silent: true,
-        message: "❌ أدخل رقم العجل وتاريخ إزالة الحلمات الزائدة.",
-        accepted: [],
-        rejected: []
-      });
-    }
+if (!numbers.length || !eventDate) {
+  return res.status(400).json({
+    ok: false,
+    error: "missing_required_fields",
+    message: "❌ أدخل رقم العجل وتاريخ إزالة الحلمات الزائدة.",
+    saved: [],
+    rejected: []
+  });
+}
 
-    if (!calvingIsDateSrv(eventDate)) {
+if (!calvingIsDateSrv(eventDate)) {
       return res.status(400).json({
         ok: false,
         canSave: false,
@@ -32619,7 +32640,13 @@ app.post("/api/supernumerary-teat-removal/gate", requireUserId, async (req, res)
       });
     }
 
-    if (eventDate > superTeatTodaySrv()) {
+    if (
+  eventDate >
+  await superTeatTodaySrv(
+    req.authSession?.uid ||
+    req.userId
+  )
+) {
       return res.status(400).json({
         ok: false,
         canSave: false,
@@ -32681,23 +32708,38 @@ app.post("/api/supernumerary-teat-removal/save", requireUserId, async (req, res)
       });
     }
 
-    const uid = req.userId;
-    const body = req.body || {};
-    const numbers = superTeatNumbersFromBodySrv(body);
-    const eventDate = superTeatEventDateSrv(body);
-    const notes = superTeatNotesSrv(body);
+  const uid = req.userId;
+const body = req.body || {};
+const numbers = superTeatNumbersFromBodySrv(body);
+const eventDate = superTeatEventDateSrv(body);
+const notes = superTeatNotesSrv(body);
 
-    if (!numbers.length || !eventDate) {
-      return res.status(400).json({
-        ok: false,
-        error: "missing_required_fields",
-        message: "❌ أدخل رقم العجل وتاريخ إزالة الحلمات الزائدة.",
-        saved: [],
-        rejected: []
-      });
-    }
+const performedBy =
+  superTeatStrSrv(
+    body.performedBy || ""
+  );
 
-    if (!calvingIsDateSrv(eventDate)) {
+if (!numbers.length || !eventDate) {
+  return res.status(400).json({
+    ok: false,
+    error: "missing_required_fields",
+    message: "❌ أدخل رقم العجل وتاريخ إزالة الحلمات الزائدة.",
+    saved: [],
+    rejected: []
+  });
+}
+
+if (!performedBy) {
+  return res.status(400).json({
+    ok: false,
+    error: "performed_by_required",
+    message: "❌ أدخل اسم الفني أو الطبيب الذي نفّذ إزالة الحلمات الزائدة.",
+    saved: [],
+    rejected: []
+  });
+}
+
+if (!calvingIsDateSrv(eventDate)) {
       return res.status(400).json({
         ok: false,
         error: "invalid_date",
@@ -32707,7 +32749,13 @@ app.post("/api/supernumerary-teat-removal/save", requireUserId, async (req, res)
       });
     }
 
-    if (eventDate > superTeatTodaySrv()) {
+    if (
+  eventDate >
+  await superTeatTodaySrv(
+    req.authSession?.uid ||
+    req.userId
+  )
+) {
       return res.status(400).json({
         ok: false,
         error: "future_date",
@@ -32718,10 +32766,15 @@ app.post("/api/supernumerary-teat-removal/save", requireUserId, async (req, res)
     }
 
     const checked = await superTeatEvaluateManySrv(uid, numbers, eventDate);
-    const saved = [];
-    const saveErrors = [];
+const saved = [];
+const saveErrors = [];
 
-    for (const row of checked.accepted) {
+const superTeatOptionsRef =
+  db
+    .collection("user_event_options")
+    .doc(uid);
+
+for (const row of checked.accepted) {
       const animalNumber = row.animalNumber;
       const ageDays = Number.isFinite(Number(row.ageDays))
        ? Number(row.ageDays)
@@ -32751,37 +32804,57 @@ app.post("/api/supernumerary-teat-removal/save", requireUserId, async (req, res)
         calfNumber: row.calfNumber || animalNumber,
 
         eventDate,
-        date: eventDate,
-        eventType: "إزالة الحلمات الزائدة",
-        eventTypeNorm: "supernumerary_teat_removal",
-        type: "supernumerary_teat_removal",
+date: eventDate,
+eventType: "إزالة الحلمات الزائدة",
+eventTypeNorm: "supernumerary_teat_removal",
+type: "supernumerary_teat_removal",
 
-        sex: row.sex || "",
-        birthDate: row.birthDate || "",
-        notes,
-        ageDays,
-        superTeatAgeDays: ageDays,
-        supernumeraryTeatRemovalAgeDays: ageDays,
+sex: row.sex || "",
+birthDate: row.birthDate || "",
 
-        animalCollection: "calves",
-        source: "server:/api/supernumerary-teat-removal/save",
+performedBy,
+notes,
 
+ageDays,
+superTeatAgeDays: ageDays,
+supernumeraryTeatRemovalAgeDays: ageDays,
+
+animalCollection: "calves",
+source: "server:/api/supernumerary-teat-removal/save",
         createdAt: now,
         updatedAt: now
       });
 
       if (row.ref) {
-       batch.set(row.ref, {
-       supernumeraryTeatRemoved: true,
-       supernumeraryTeatRemovalDate: eventDate,
-       lastSupernumeraryTeatRemovalDate: eventDate,
-       lastSupernumeraryTeatRemovalAgeDays: ageDays,
-       lastEventDate: eventDate,
-       updatedAt: now
+  batch.set(row.ref, {
+    supernumeraryTeatRemoved: true,
+    supernumeraryTeatRemovalDate: eventDate,
+    lastSupernumeraryTeatRemovalDate: eventDate,
+    lastSupernumeraryTeatRemovalAgeDays: ageDays,
+    lastEventDate: eventDate,
+    updatedAt: now
   }, { merge: true });
-      }
+}
 
-      await batch.commit();
+if (saved.length === 0) {
+  batch.set(
+    superTeatOptionsRef,
+    {
+      userId: uid,
+
+      operationalPerformers:
+        admin.firestore.FieldValue
+          .arrayUnion(performedBy),
+
+      updatedAt:
+        admin.firestore.FieldValue
+          .serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+await batch.commit();
 
 saved.push({
   animalNumber,
@@ -33290,7 +33363,7 @@ if (!performedBy) {
   return res.status(400).json({
     ok: false,
     error: "performed_by_required",
-    message: "❌ أدخل اسم منفذ إزالة القرون.",
+    message: "❌ أدخل اسم الفني أو الطبيب الذي نفّذ إزالة القرون.",
     saved: [],
     rejected: []
   });
