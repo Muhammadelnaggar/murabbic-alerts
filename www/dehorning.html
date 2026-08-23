@@ -363,11 +363,18 @@ function renderGate(j = {}){
 
       setMessage(responseText(j) || j.message || "تمت المعالجة.", j.ok ? "success" : "error");
 
-      if (j.ok && j.redirectUrl) {
-        setTimeout(() => {
-          location.href = j.redirectUrl;
-        }, 900);
-      }
+      if (j.ok) {
+  const redirectUrl =
+    isBulkNow()
+      ? "add-event.html"
+      : j.redirectUrl;
+
+  if (redirectUrl) {
+    setTimeout(() => {
+      location.href = redirectUrl;
+    }, 900);
+  }
+}
     } catch (e) {
       console.error(e);
       setMessage("❌ فشل حفظ إزالة القرون من السيرفر.", "error");
