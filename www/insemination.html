@@ -597,8 +597,8 @@ function collectPayload() {
       .map(x => {
         const n = String(x.animalNumber || "").trim();
         const reason = compactReason(x.reason || "");
-        if (!reason) return "";
-        if (reason === msgClean) return "";
+               if (!reason) return "";
+        if (msgClean.includes(reason)) return "";
         return `${n}: ${reason}`;
       })
       .filter(Boolean);
@@ -856,8 +856,8 @@ const isBulk =
       ? data.rejected.slice(0, 8).map(x => {
           const n = String(x.animalNumber || "").trim();
           const reason = compactReason(x.reason || "");
-          if (!reason) return "";
-          if (reason === mainClean) return "";
+                   if (!reason) return "";
+          if (mainClean.includes(reason)) return "";
           return `${n}: ${reason}`;
         }).filter(Boolean).join("\n")
       : "";
