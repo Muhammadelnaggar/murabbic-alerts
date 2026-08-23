@@ -32828,10 +32828,8 @@ function dehorningStrSrv(v) {
   return String(v ?? "").trim();
 }
 
-function dehorningTodaySrv() {
-  return typeof cairoTodayISO === "function"
-    ? cairoTodayISO()
-    : new Date().toISOString().slice(0, 10);
+async function dehorningTodaySrv(uid) {
+  return await farmTodayISOSrv(uid);
 }
 
 function dehorningParseNumbersSrv(raw) {
@@ -33199,7 +33197,13 @@ app.post("/api/dehorning/gate", requireUserId, async (req, res) => {
       });
     }
 
-    if (eventDate > dehorningTodaySrv()) {
+    if (
+  eventDate >
+  await dehorningTodaySrv(
+    req.authSession?.uid ||
+    req.userId
+  )
+) {
       return res.status(400).json({
         ok: false,
         canSave: false,
@@ -33286,7 +33290,13 @@ app.post("/api/dehorning/save", requireUserId, async (req, res) => {
       });
     }
 
-    if (eventDate > dehorningTodaySrv()) {
+    if (
+  eventDate >
+  await dehorningTodaySrv(
+    req.authSession?.uid ||
+    req.userId
+  )
+) {
       return res.status(400).json({
         ok: false,
         error: "future_date",
