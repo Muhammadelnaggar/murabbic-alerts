@@ -28057,15 +28057,11 @@ if (isFollowerRecord) {
         return "";
       }
 
-      if (d < hardBlockDaysAfterCalving) {
-        return `❌ مرّ ${d} يومًا فقط منذ الولادة. يمكن تسجيل التلقيح بعد ${hardBlockDaysAfterCalving} يومًا على الأقل.`;
-      }
-
       if (d < recommendedDaysAfterCalving) {
-        warnings.push(
-          `⚠️ مرّ ${d} يومًا منذ الولادة. يمكن حفظ التلقيح، لكن التوقيت المفضل بعد ${recommendedDaysAfterCalving} يومًا من الولادة.`
-        );
-      }
+  warnings.push(
+    `⚠️ مرّ ${d} يومًا منذ الولادة. يمكن حفظ التلقيح، لكن التوقيت المفضل بعد ${recommendedDaysAfterCalving} يومًا من الولادة.`
+  );
+}
 
       return "";
     }
