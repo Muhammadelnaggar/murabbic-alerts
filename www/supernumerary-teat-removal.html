@@ -43,9 +43,22 @@
   <div class="form-hint">سيتم حساب العمر تلقائيًا من السيرفر لكل عجل حسب تاريخ الميلاد المسجل.</div>
 </div>
       <div class="field">
-        <label for="notes">ملاحظات</label>
-        <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
-      </div>
+  <label for="performedBy">الفني أو الطبيب</label>
+  <input
+    id="performedBy"
+    data-field="performedBy"
+    type="text"
+    list="operationalPerformersList"
+    autocomplete="off"
+    placeholder="اختر أو اكتب الاسم"
+  />
+  <datalist id="operationalPerformersList"></datalist>
+</div>
+
+<div class="field">
+  <label for="notes">ملاحظات</label>
+  <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
+</div>
     </section>
 
     <div class="actions-bar">
@@ -59,9 +72,11 @@
   const $ = (id) => document.getElementById(id);
 
   const form = $("extraTeatForm");
-  const info = $("info");
-  const saveBtn = $("saveBtn");
-  const cardBtn = $("cardBtn");
+const info = $("info");
+const saveBtn = $("saveBtn");
+const cardBtn = $("cardBtn");
+const performedByEl = $("performedBy");
+const operationalPerformersList = $("operationalPerformersList");
 
   const qs = new URLSearchParams(location.search);
 
@@ -198,8 +213,56 @@ function responseText(j = {}){
       };
     }
 
-    return { httpStatus: r.status, ...j };
+return { httpStatus: r.status, ...j };
+}
+
+async function loadOperationalPerformers(){
+  if (!operationalPerformersList) return;
+
+  operationalPerformersList.innerHTML = "";
+
+  try {
+    const r = await fetch(
+      "/api/event-options/operational-performers",
+      {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: {
+          "Accept": "application/json"
+        }
+      }
+    );
+
+    const j = await r.json().catch(() => ({}));
+
+    if (!r.ok || j?.ok !== true) return;
+
+    const names = [
+      ...new Set(
+        (
+          Array.isArray(j.operationalPerformers)
+            ? j.operationalPerformers
+            : []
+        )
+          .map(x => String(x || "").trim())
+          .filter(Boolean)
+      )
+    ];
+
+    for (const name of names) {
+      const option = document.createElement("option");
+      option.value = name;
+      operationalPerformersList.appendChild(option);
+    }
+
+  } catch (e) {
+    console.warn(
+      "operational performers load failed",
+      e
+    );
   }
+}
 
 function renderGate(j = {}){
   lastGate = j;
@@ -295,49 +358,90 @@ form.addEventListener("submit", async (ev) => {
   ev.preventDefault();
 
   const numbers = getCurrentNumbers();
-  const eventDate = String($("eventDate").value || "").slice(0, 10);
-  const notes = String($("notes").value || "").trim();
+  const eventDate =
+    String($("eventDate").value || "")
+      .slice(0, 10);
 
-  setMessage("جاري الحفظ من السيرفر…", "info");
+  const performedBy =
+    String(
+      performedByEl?.value || ""
+    ).trim();
+
+  const notes =
+    String(
+      $("notes").value || ""
+    ).trim();
+
+  setMessage(
+    "جاري الحفظ من السيرفر…",
+    "info"
+  );
+
   setBusy(true);
 
   try {
-    const j = await apiPost("/api/supernumerary-teat-removal/save", {
-      numbers,
-      animalNumbers: numbers,
-      eventDate,
-      notes
-    });
+    const j =
+      await apiPost(
+        "/api/supernumerary-teat-removal/save",
+        {
+          numbers,
+          animalNumbers: numbers,
+          eventDate,
+          performedBy,
+          notes
+        }
+      );
 
-    const text = responseText(j) || "تمت المعالجة.";
+    const text =
+      responseText(j) ||
+      "تمت المعالجة.";
 
     if (j.ok) {
+      const bulk = isBulkNow();
+
       setMessageWithOk(
         text,
         "success",
         "حسنًا",
         () => {
+          if (bulk) {
+            location.href =
+              "add-event.html";
+            return;
+          }
+
           if (j.redirectUrl) {
-            location.href = j.redirectUrl;
+            location.href =
+              j.redirectUrl;
           } else {
             clearMessage();
           }
         }
       );
+
       return;
     }
 
-    setMessage(text, "error");
+    setMessage(
+      text,
+      "error"
+    );
 
   } catch (e) {
     console.error(e);
-    setMessage("❌ فشل حفظ إزالة الحلمات الزائدة من السيرفر.", "error");
+
+    setMessage(
+      "❌ فشل حفظ إزالة الحلمات الزائدة من السيرفر.",
+      "error"
+    );
+
   } finally {
     setBusy(false);
   }
 });
-  hydrateUI();
-  runGate({ silent:true });
+ hydrateUI();
+loadOperationalPerformers();
+runGate({ silent:true });
 </script>
 </body>
 </html>
