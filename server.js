@@ -84092,40 +84092,68 @@ function archiveNormNumberSrv(v) {
     .replace(/[^\d]/g, "");
 }
 
-async function archiveFindAnimalSrv(uid, animalNumber) {
+async function archiveFindAnimalSrv(
+  uid,
+  animalNumber,
+  { includeCalves = false } = {}
+) {
   const n = archiveNormNumberSrv(animalNumber);
   if (!db || !uid || !n) return null;
 
   const vals = [n];
   const nNum = Number(n);
-  if (Number.isFinite(nNum)) vals.push(nNum);
+
+  if (Number.isFinite(nNum)) {
+    vals.push(nNum);
+  }
+
+  const collections =
+    includeCalves
+      ? ["animals", "calves"]
+      : ["animals"];
 
   const found = new Map();
 
-  for (const val of vals) {
-    for (const ownerField of ["userId", "ownerUid"]) {
-      for (const numField of ["number", "animalNumber"]) {
-        try {
-          const snap = await db.collection("animals")
-            .where(ownerField, "==", uid)
-            .where(numField, "==", val)
-            .limit(3)
-            .get();
+  for (const collectionName of collections) {
+    for (const val of vals) {
+      for (const ownerField of ["userId", "ownerUid"]) {
+        for (const numField of ["number", "animalNumber"]) {
+          try {
+            const snap =
+              await db
+                .collection(collectionName)
+                .where(ownerField, "==", uid)
+                .where(numField, "==", val)
+                .limit(3)
+                .get();
 
-          snap.forEach(d => found.set(d.id, d));
-        } catch (_) {}
+            snap.forEach(d => {
+              found.set(
+                `${collectionName}:${d.id}`,
+                {
+                  doc: d,
+                  collectionName
+                }
+              );
+            });
+          } catch (_) {}
+        }
       }
     }
   }
 
   if (!found.size) return null;
 
-  const d = [...found.values()][0];
+  const first =
+    [...found.values()][0];
+
+  const d = first.doc;
 
   return {
     id: d.id,
     ref: d.ref,
-    data: d.data() || {}
+    data: d.data() || {},
+    _collection: first.collectionName
   };
 }
 
@@ -84302,7 +84330,15 @@ app.post("/api/animals/archive/gate", requireUserId, async (req, res) => {
       });
     }
 
-    const animal = await archiveFindAnimalSrv(uid, animalNumber);
+   const animal =
+  await archiveFindAnimalSrv(
+    uid,
+    animalNumber,
+    {
+      includeCalves:
+        archiveReason === "death"
+    }
+  );
 
     if (!animal) {
       return res.status(404).json({
@@ -84383,8 +84419,27 @@ const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
 if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
   return res.status(400).json({
     ok: false,
-    message: archiveReason === "sale" ? "أدخل تاريخ بيع صحيحًا." : "أدخل تاريخ نفوق صحيحًا.",
+    message:
+      archiveReason === "sale"
+        ? "أدخل تاريخ بيع صحيحًا."
+        : "أدخل تاريخ نفوق صحيحًا.",
   });
+}
+
+if (archiveReason === "death") {
+  const todayISO =
+    await farmTodayISOSrv(
+      req.authSession?.uid ||
+      req.userId
+    );
+
+  if (eventDate > todayISO) {
+    return res.status(400).json({
+      ok: false,
+      message:
+        "❌ تاريخ النفوق لا يمكن أن يكون في المستقبل."
+    });
+  }
 }
 
 if (archiveReason === "sale") {
@@ -84407,17 +84462,43 @@ if (archiveReason === "sale") {
     });
   }
 }
-    const animal = await archiveFindAnimalSrv(uid, animalNumber);
-
-    if (!animal) {
-      return res.status(404).json({
-        ok: false,
-        message: "❌ لم أجد الحيوان في القطيع المسجل بحسابك.",
-      });
+    const animal =
+  await archiveFindAnimalSrv(
+    uid,
+    animalNumber,
+    {
+      includeCalves:
+        archiveReason === "death"
     }
+  );
 
-   
-    const archiveId = `${uid}__${animalNumber}__${archiveReason}__${Date.now()}`;
+   if (!animal) {
+  return res.status(404).json({
+    ok: false,
+    message: "❌ لم أجد الحيوان في القطيع المسجل بحسابك.",
+  });
+}
+
+const doc =
+  animal.data || {};
+
+const st =
+  String(
+    doc.status || "active"
+  )
+    .trim()
+    .toLowerCase();
+
+if (st !== "active") {
+  return res.status(400).json({
+    ok: false,
+    message:
+      "❌ الحيوان خارج القطيع أو سبق تسجيل خروجه."
+  });
+}
+
+const archiveId =
+  `${uid}__${animalNumber}__${archiveReason}__${Date.now()}`;
     const archivedAt = admin.firestore.FieldValue.serverTimestamp();
 
     const events = await archiveFetchEventsSrv(uid, animalNumber, animal.id);
