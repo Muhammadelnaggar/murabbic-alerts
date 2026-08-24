@@ -37,10 +37,37 @@
           <label>تاريخ التشخيص</label>
           <input id="eventDate" type="date" required />
         </div>
-        <div>
+               <div>
           <label>ملاحظات</label>
           <input id="notes" placeholder="اختياري" />
         </div>
+      </div>
+    </div>
+
+    <div
+      class="card grid"
+      id="diseaseConfirmCard"
+      hidden
+      style="display:none"
+    >
+      <div id="diseaseConfirmText" class="form-hint"></div>
+
+      <div class="mbk-action-list mbk-event-grid">
+        <button
+          type="button"
+          class="mbk-action-tile"
+          id="confirmDiseaseBtn"
+        >
+          تأكيد التسجيل
+        </button>
+
+        <button
+          type="button"
+          class="mbk-action-tile"
+          id="cancelDiseaseBtn"
+        >
+          إلغاء
+        </button>
       </div>
     </div>
 
@@ -113,6 +140,20 @@
 
   const backLink =
     $("backLink");
+    const diseaseConfirmCard =
+  $("diseaseConfirmCard");
+
+const diseaseConfirmText =
+  $("diseaseConfirmText");
+
+const confirmDiseaseBtn =
+  $("confirmDiseaseBtn");
+
+const cancelDiseaseBtn =
+  $("cancelDiseaseBtn");
+
+let pendingDiseaseItem = null;
+let pendingDiseaseButton = null;
 
   const params =
     new URLSearchParams(
@@ -134,37 +175,6 @@
   const isEditMode =
     requestedEditMode &&
     !!editEventId;
-
-
-  const DISEASE_OPTIONS = [
-    { code: "milk_fever", name: "حمى اللبن", group: "تمثيل وإنتاج" },
-    { code: "ketosis", name: "كيتوزس", group: "تمثيل وإنتاج" },
-    { code: "displaced_abomasum", name: "انقلاب المنفحة", group: "تمثيل وإنتاج" },
-    { code: "rumen_acidosis", name: "حموضة الكرش", group: "تمثيل وإنتاج" },
-    { code: "phosphorus_def", name: "نقص فوسفور", group: "تمثيل وإنتاج" },
-    { code: "magnesium_def", name: "نقص ماغنيسيوم", group: "تمثيل وإنتاج" },
-
-    { code: "retained_placenta", name: "احتباس مشيمة", group: "تناسل" },
-    { code: "metritis_endometritis", name: "التهاب رحم / التهاب بطانة الرحم", group: "تناسل" },
-    { code: "ovarian_cysts", name: "تكيسات مبيضية", group: "تناسل" },
-    { code: "brucellosis", name: "بروسيلا", group: "تناسل" },
-
-    { code: "bovine_respiratory_disease", name: "مرض تنفسي بقري", group: "معدية / جهازية" },
-    { code: "johnes_disease", name: "جونز", group: "معدية / جهازية" },
-    { code: "bovine_viral_diarrhea", name: "BVD / الإسهال الفيروسي البقري", group: "معدية / جهازية" },
-    { code: "fmd", name: "حمى قلاعية", group: "معدية / جهازية" },
-    { code: "three_day_sickness", name: "حمى الثلاث أيام", group: "معدية / جهازية" },
-    { code: "lumpy_skin", name: "جلد عقدي", group: "معدية / جهازية" },
-    { code: "septicemia", name: "تسمم دموي", group: "معدية / جهازية" },
-    { code: "blood_parasites", name: "طفيليات دم", group: "معدية / جهازية" },
-    { code: "pinkeye", name: "التهاب العين", group: "معدية / جهازية" },
-
-    { code: "calf_scours", name: "سكاور / إسهال عجول", group: "أمراض العجول" },
-    { code: "calf_pneumonia", name: "نيمونيا عجول", group: "أمراض العجول" },
-    { code: "navel_infection", name: "التهاب سرة", group: "أمراض العجول" },
-    { code: "joint_ill", name: "التهاب مفاصل عجول", group: "أمراض العجول" },
-    { code: "calf_coccidiosis", name: "كوكسيديا عجول", group: "أمراض العجول" }
-  ];
 
 
   let gateTimer = null;
@@ -411,120 +421,302 @@
   }
 
 
-  function renderDiseases(
-    list,
-    selectedCode = ""
-  ){
-    dz.innerHTML = "";
+function renderDiseases(
+  list,
+  selectedCode = ""
+){
+  dz.innerHTML = "";
 
-    const source =
-      Array.isArray(list) &&
-      list.length
-        ? list
-        : DISEASE_OPTIONS;
+  const source =
+    Array.isArray(list)
+      ? list.filter(
+          item =>
+            item &&
+            item.code &&
+            !item.specialPage
+        )
+      : [];
 
-    const groups =
-      new Map();
-
-    source.forEach(item => {
-      const g =
-        item.group ||
-        "عام";
-
-      if (!groups.has(g)) {
-        groups.set(g, []);
-      }
-
-      groups
-        .get(g)
-        .push(item);
-    });
-
-    groups.forEach(
-      (
-        items,
-        groupName
-      ) => {
-        const sec =
-          document.createElement(
-            "section"
-          );
-
-        sec.className =
-          "mbk-action-section";
-
-        const title =
-          document.createElement(
-            "div"
-          );
-
-        title.className =
-          "mbk-action-section-title";
-
-        title.textContent =
-          groupName;
-
-        const wrap =
-          document.createElement(
-            "div"
-          );
-
-        wrap.className =
-          "mbk-action-list";
-
-        items.forEach(item => {
-          const btn =
-            document.createElement(
-              "button"
-            );
-
-          btn.type =
-            "button";
-
-          btn.className =
-            "mbk-action-tile";
-
-          btn.dataset.code =
-            item.code || "";
-
-          btn.textContent =
-            selectedCode &&
-            item.code ===
-              selectedCode
-              ? `✓ ${item.name || ""}`
-              : (
-                  item.name ||
-                  ""
-                );
-
-          btn.addEventListener(
-            "click",
-            () =>
-              saveDiseaseItem(
-                item,
-                btn
-              )
-          );
-
-          wrap.appendChild(
-            btn
-          );
-        });
-
-        sec.appendChild(
-          title
-        );
-
-        sec.appendChild(
-          wrap
-        );
-
-        dz.appendChild(sec);
-      }
-    );
+  if (!source.length) {
+    return;
   }
 
+  const groups =
+    new Map();
 
+  source.forEach(item => {
+    const groupName =
+      String(
+        item.group || "عام"
+      ).trim();
+
+    if (!groups.has(groupName)) {
+      groups.set(
+        groupName,
+        []
+      );
+    }
+
+    groups
+      .get(groupName)
+      .push(item);
+  });
+
+  groups.forEach(
+    (
+      items,
+      groupName
+    ) => {
+      const sec =
+        document.createElement(
+          "section"
+        );
+
+      sec.className =
+        "mbk-action-section";
+
+      const title =
+        document.createElement(
+          "h3"
+        );
+
+      title.className =
+        "mbk-action-section-title";
+
+      title.textContent =
+        groupName;
+
+      const wrap =
+        document.createElement(
+          "div"
+        );
+
+      wrap.className =
+        "mbk-action-list mbk-event-grid";
+
+      items.forEach(item => {
+        const btn =
+          document.createElement(
+            "button"
+          );
+
+        btn.type =
+          "button";
+
+        btn.className =
+          "mbk-action-tile mbk-event-card";
+
+        btn.dataset.code =
+          item.code || "";
+
+        const label =
+          document.createElement(
+            "span"
+          );
+
+        label.className =
+          "mbk-event-label";
+
+        label.textContent =
+          selectedCode &&
+          item.code === selectedCode
+            ? `✓ ${item.name || ""}`
+            : (
+                item.name ||
+                ""
+              );
+
+        btn.appendChild(
+          label
+        );
+
+        btn.addEventListener(
+          "click",
+          () =>
+            prepareDiseaseConfirmation(
+              item,
+              btn
+            )
+        );
+
+        wrap.appendChild(
+          btn
+        );
+      });
+
+      sec.appendChild(
+        title
+      );
+
+      sec.appendChild(
+        wrap
+      );
+
+      dz.appendChild(
+        sec
+      );
+    }
+  );
+}
+function clearDiseaseConfirmation(){
+  pendingDiseaseItem = null;
+  pendingDiseaseButton = null;
+
+  if (diseaseConfirmText) {
+    diseaseConfirmText.textContent =
+      "";
+  }
+
+  if (diseaseConfirmCard) {
+    diseaseConfirmCard.hidden =
+      true;
+
+    diseaseConfirmCard.style.display =
+      "none";
+  }
+
+  if (confirmDiseaseBtn) {
+    confirmDiseaseBtn.disabled =
+      false;
+
+    confirmDiseaseBtn.textContent =
+      isEditMode
+        ? "تأكيد التعديل"
+        : "تأكيد التسجيل";
+  }
+}
+
+
+function prepareDiseaseConfirmation(
+  item,
+  btn
+){
+  const animalNumber =
+    digitsOnly(
+      animalNumberEl.value
+    );
+
+  const eventDate =
+    eventDateEl.value ||
+    todayLocal();
+
+  if (
+    !animalNumber ||
+    !eventDate
+  ) {
+    setBar(
+      gateBox,
+      "أدخل رقم الحيوان وتاريخ التشخيص أولًا.",
+      "error"
+    );
+
+    return;
+  }
+
+  if (!isEditMode) {
+    const currentGateKey =
+      animalNumber +
+      "|" +
+      eventDate;
+
+    if (
+      !gateAllowed ||
+      gateKey !== currentGateKey
+    ) {
+      setBar(
+        gateBox,
+        gateMessage ||
+        "يلزم نجاح التحقق من الحيوان قبل تسجيل التشخيص.",
+        "error"
+      );
+
+      runGate();
+
+      return;
+    }
+  }
+
+  pendingDiseaseItem =
+    item;
+
+  pendingDiseaseButton =
+    btn;
+
+  if (diseaseConfirmText) {
+    diseaseConfirmText.textContent =
+      isEditMode
+        ? `هل تؤكد تعديل التشخيص للحيوان رقم ${animalNumber} إلى «${item.name || ""}»؟`
+        : `هل تؤكد تسجيل «${item.name || ""}» للحيوان رقم ${animalNumber} بتاريخ ${eventDate}؟`;
+  }
+
+  if (confirmDiseaseBtn) {
+    confirmDiseaseBtn.textContent =
+      isEditMode
+        ? "تأكيد التعديل"
+        : "تأكيد التسجيل";
+  }
+
+  if (diseaseConfirmCard) {
+    diseaseConfirmCard.hidden =
+      false;
+
+    diseaseConfirmCard.style.display =
+      "";
+  }
+
+  diseaseConfirmCard
+    ?.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+}
+
+
+async function confirmPendingDisease(){
+  if (
+    !pendingDiseaseItem ||
+    !pendingDiseaseButton
+  ) {
+    clearDiseaseConfirmation();
+    return;
+  }
+
+  if (confirmDiseaseBtn) {
+    confirmDiseaseBtn.disabled =
+      true;
+
+    confirmDiseaseBtn.textContent =
+      isEditMode
+        ? "جاري التعديل..."
+        : "جاري التسجيل...";
+  }
+
+  try {
+    if (isEditMode) {
+      await saveCorrection(
+        pendingDiseaseItem,
+        pendingDiseaseButton
+      );
+
+    } else {
+      await saveDiseaseItem(
+        pendingDiseaseItem,
+        pendingDiseaseButton
+      );
+    }
+
+  } finally {
+    if (confirmDiseaseBtn) {
+      confirmDiseaseBtn.disabled =
+        false;
+
+      confirmDiseaseBtn.textContent =
+        isEditMode
+          ? "تأكيد التعديل"
+          : "تأكيد التسجيل";
+    }
+  }
+}
   async function saveDiseaseItem(
     item,
     btn
@@ -853,9 +1045,8 @@
 
     renderSummary(null);
 
-    renderDiseases(
-      DISEASE_OPTIONS
-    );
+clearDiseaseConfirmation();
+renderDiseases([]);
 
 
     if (
@@ -911,11 +1102,10 @@
           "error"
         );
 
-        renderSummary(null);
+       renderSummary(null);
 
-        renderDiseases(
-          DISEASE_OPTIONS
-        );
+clearDiseaseConfirmation();
+renderDiseases([]);
 
         return;
       }
@@ -939,19 +1129,17 @@
         "success"
       );
 
-      renderSummary(
+         renderSummary(
         j.animal ||
         null
       );
 
-      /*
-        نحافظ على واجهة التسجيل
-        الحالية كما هي.
-        السيرفر يعيد التحقق
-        من diseaseCode عند الحفظ.
-      */
+      clearDiseaseConfirmation();
+
       renderDiseases(
-        DISEASE_OPTIONS
+        Array.isArray(j.diseases)
+          ? j.diseases
+          : []
       );
 
     } catch (e) {
@@ -975,30 +1163,31 @@
         "error"
       );
 
-      renderDiseases(
-        DISEASE_OPTIONS
-      );
+     clearDiseaseConfirmation();
+renderDiseases([]);
 
-      renderSummary(null);
+renderSummary(null);
     }
   }
 
 
   function scheduleGate(){
-    if (requestedEditMode) {
-      return;
-    }
-
-    clearTimeout(
-      gateTimer
-    );
-
-    gateTimer =
-      setTimeout(
-        runGate,
-        350
-      );
+  if (requestedEditMode) {
+    return;
   }
+
+  clearDiseaseConfirmation();
+
+  clearTimeout(
+    gateTimer
+  );
+
+  gateTimer =
+    setTimeout(
+      runGate,
+      350
+    );
+}
 
 
   function hydrateNormal(){
@@ -1245,15 +1434,13 @@
 
         await loadEditEvent();
 
-      } else {
-        hydrateNormal();
+     } else {
+  hydrateNormal();
 
-        renderDiseases(
-          DISEASE_OPTIONS
-        );
+  renderDiseases([]);
 
-        await runGate();
-      }
+  await runGate();
+}
 
     } catch (e) {
       console.error(
@@ -1287,7 +1474,17 @@
       scheduleGate
     );
 
+confirmDiseaseBtn
+  ?.addEventListener(
+    "click",
+    confirmPendingDisease
+  );
 
+cancelDiseaseBtn
+  ?.addEventListener(
+    "click",
+    clearDiseaseConfirmation
+  );
   init();
 
 })();
