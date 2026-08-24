@@ -3132,6 +3132,26 @@ body[data-page="animal-list"] .no-data{
   white-space:normal;
   overflow-wrap:anywhere;
 }
+
+/* Event List — keep long event names from covering details on mobile */
+@media (max-width:520px){
+
+  .event-list-page .sticky-type{
+    width:118px;
+    min-width:118px;
+    max-width:118px;
+    white-space:normal;
+  }
+
+  .event-list-page .sticky-type .pill{
+    max-width:108px;
+    white-space:normal;
+    overflow-wrap:anywhere;
+    line-height:1.35;
+    text-align:center;
+  }
+
+}
 /* =========================================================
    Cow Card — scoped styles only
    ستايل بطاقة الحيوان فقط — لا يؤثر على أي صفحة أخرى
