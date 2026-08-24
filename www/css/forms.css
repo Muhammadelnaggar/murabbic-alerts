@@ -3152,6 +3152,13 @@ body[data-page="animal-list"] .no-data{
   }
 
 }
+/* Event List — keep Details header fixed while details content scrolls */
+.event-list-page thead th:last-child{
+  position:sticky;
+  left:0;
+  z-index:11;
+  background:#f6fff2;
+}
 /* =========================================================
    Cow Card — scoped styles only
    ستايل بطاقة الحيوان فقط — لا يؤثر على أي صفحة أخرى
