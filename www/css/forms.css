@@ -5908,6 +5908,45 @@ body[data-page="add-event"] .mbk-event-label{
   font-weight:900;
   line-height:1.35;
 }
+
+/* Disease page — same visual grid as Add Event */
+body[data-page="disease"] .mbk-event-hub{
+  max-width:920px;
+  margin:12px auto 84px;
+  padding:0 12px;
+  gap:14px;
+}
+
+body[data-page="disease"] .mbk-event-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:10px;
+}
+
+body[data-page="disease"] .mbk-event-card{
+  min-height:112px;
+  padding:12px 8px;
+  border-radius:18px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  text-align:center;
+}
+
+body[data-page="disease"] .mbk-event-card::after{
+  content:none !important;
+}
+
+body[data-page="disease"] .mbk-event-label{
+  display:block;
+  color:var(--ink, #0f172a);
+  font-size:14px;
+  font-weight:900;
+  line-height:1.35;
+}
+
 body[data-page="add-event"] .mbk-page-warn {
   display: none;
 }
