@@ -34496,7 +34496,62 @@ app.post(
               audOptionsSrv()
           });
       }
+const duplicate =
+  await healthDuplicateSameDayDetailsSrv(
+    req.userId,
+    {
+      animalNumber:
+        fd.animalNumber,
 
+      eventDate:
+        fd.eventDate,
+
+      diseaseCode:
+        "acute_undifferentiated_diarrhea",
+
+      diseaseName:
+        "الإسهال الحاد غير المتمايز"
+    }
+  );
+
+if (duplicate?.error) {
+  return res.status(503).json({
+    ok: false,
+    allowed: false,
+    error: duplicate.error,
+    message:
+      "⚠️ تعذّر التحقق من وجود تسجيل مماثل الآن. حاول مرة أخرى.",
+    options:
+      audOptionsSrv()
+  });
+}
+
+const editEventId =
+  String(
+    req.body?.editEventId ||
+    req.body?.eventId ||
+    ""
+  ).trim();
+
+if (
+  duplicate?.found &&
+  String(duplicate.eventId || "") !== editEventId
+) {
+  return res.status(409).json({
+    ok: false,
+    allowed: false,
+    duplicate: true,
+    error:
+      "duplicate_aud_same_day",
+    eventId:
+      duplicate.eventId ||
+      null,
+    message:
+      `❌ سبق تسجيل الإسهال الحاد غير المتمايز للعجل رقم ${fd.animalNumber} في هذا اليوم.`,
+    options:
+      audOptionsSrv()
+  });
+}
       const d =
         context.animal.data ||
         {};
