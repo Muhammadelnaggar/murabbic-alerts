@@ -31879,42 +31879,42 @@ await batch.commit();
 
 const DISEASE_CATALOG_SRV = {
   // الأمراض الأيضية والهضمية
-  milk_fever: { name:"حمى اللبن", group:"الأمراض الأيضية والهضمية" },
-  ketosis: { name:"كيتوزس", group:"الأمراض الأيضية والهضمية" },
-  displaced_abomasum: { name:"انقلاب المنفحة", group:"الأمراض الأيضية والهضمية" },
-  rumen_acidosis: { name:"حموضة الكرش", group:"الأمراض الأيضية والهضمية" },
-  phosphorus_def: { name:"نقص فوسفور", group:"الأمراض الأيضية والهضمية" },
-  magnesium_def: { name:"نقص ماغنيسيوم", group:"الأمراض الأيضية والهضمية" },
+  milk_fever: { name:"حمى اللبن", nameEn:"Milk Fever", group:"الأمراض الأيضية والهضمية" },
+  ketosis: { name:"الكيتوزيس", nameEn:"Ketosis", group:"الأمراض الأيضية والهضمية" },
+  displaced_abomasum: { name:"انزياح المنفحة", nameEn:"Displaced Abomasum", group:"الأمراض الأيضية والهضمية" },
+  rumen_acidosis: { name:"حموضة الكرش", nameEn:"Rumen Acidosis", group:"الأمراض الأيضية والهضمية" },
+  phosphorus_def: { name:"نقص الفوسفور", nameEn:"Phosphorus Deficiency", group:"الأمراض الأيضية والهضمية" },
+  magnesium_def: { name:"نقص الماغنيسيوم", nameEn:"Magnesium Deficiency", group:"الأمراض الأيضية والهضمية" },
 
-  // صفحة مستقلة — لا تظهر داخل «أمراض أخرى»
-  mastitis: { name:"التهاب ضرع", group:"صحة الضرع", specialPage:"mastitis.html" },
+  // صفحة مستقلة
+  mastitis: { name:"التهاب الضرع", nameEn:"Mastitis", group:"صحة الضرع", specialPage:"mastitis.html" },
 
   // أمراض التناسل وما بعد الولادة
-  retained_placenta: { name:"احتباس مشيمة", group:"أمراض التناسل وما بعد الولادة" },
-  metritis_endometritis: { name:"التهاب رحم / التهاب بطانة الرحم", group:"أمراض التناسل وما بعد الولادة" },
-  ovarian_cysts: { name:"تكيسات مبيضية", group:"أمراض التناسل وما بعد الولادة" },
+  retained_placenta: { name:"احتباس المشيمة", nameEn:"Retained Placenta", group:"أمراض التناسل وما بعد الولادة" },
+  metritis_endometritis: { name:"التهاب الرحم / التهاب بطانة الرحم", nameEn:"Metritis / Endometritis", group:"أمراض التناسل وما بعد الولادة" },
+  ovarian_cysts: { name:"تكيسات المبايض", nameEn:"Ovarian Cysts", group:"أمراض التناسل وما بعد الولادة" },
 
-  // صفحة مستقلة — لا تظهر داخل «أمراض أخرى»
-  lameness: { name:"عرج / مشاكل حافر", group:"حركة وعرج", specialPage:"lameness.html" },
+  // صفحة مستقلة
+  lameness: { name:"العرج / مشاكل الحافر", nameEn:"Lameness / Hoof Problems", group:"حركة وعرج", specialPage:"lameness.html" },
 
   // الأمراض المعدية والجهازية
-  brucellosis: { name:"بروسيلا", group:"الأمراض المعدية والجهازية" },
-  bovine_respiratory_disease: { name:"مرض تنفسي بقري", group:"الأمراض المعدية والجهازية" },
-  johnes_disease: { name:"جونز", group:"الأمراض المعدية والجهازية" },
-  bovine_viral_diarrhea: { name:"BVD / الإسهال الفيروسي البقري", group:"الأمراض المعدية والجهازية" },
-  fmd: { name:"حمى قلاعية", group:"الأمراض المعدية والجهازية" },
-  three_day_sickness: { name:"حمى الثلاث أيام", group:"الأمراض المعدية والجهازية" },
-  lumpy_skin: { name:"جلد عقدي", group:"الأمراض المعدية والجهازية" },
-  septicemia: { name:"تسمم دموي", group:"الأمراض المعدية والجهازية" },
-  blood_parasites: { name:"طفيليات دم", group:"الأمراض المعدية والجهازية" },
-  pinkeye: { name:"التهاب العين", group:"الأمراض المعدية والجهازية" },
+  brucellosis: { name:"البروسيلا", nameEn:"Brucellosis", group:"الأمراض المعدية والجهازية" },
+  bovine_respiratory_disease: { name:"المركب التنفسي البقري", nameEn:"Bovine Respiratory Disease", group:"الأمراض المعدية والجهازية" },
+  johnes_disease: { name:"داء جون (نظير السل)", nameEn:"Johne’s Disease", group:"الأمراض المعدية والجهازية" },
+  bovine_viral_diarrhea: { name:"الإسهال الفيروسي البقري", nameEn:"Bovine Viral Diarrhea (BVD)", group:"الأمراض المعدية والجهازية" },
+  fmd: { name:"الحمى القلاعية", nameEn:"Foot-and-Mouth Disease (FMD)", group:"الأمراض المعدية والجهازية" },
+  three_day_sickness: { name:"حمى الثلاثة أيام", nameEn:"Bovine Ephemeral Fever", group:"الأمراض المعدية والجهازية" },
+  lumpy_skin: { name:"مرض الجلد العقدي", nameEn:"Lumpy Skin Disease", group:"الأمراض المعدية والجهازية" },
+  septicemia: { name:"تسمم الدم", nameEn:"Septicemia", group:"الأمراض المعدية والجهازية" },
+  blood_parasites: { name:"طفيليات الدم", nameEn:"Blood Parasites", group:"الأمراض المعدية والجهازية" },
+  pinkeye: { name:"التهاب العين المعدي", nameEn:"Infectious Bovine Keratoconjunctivitis (IBK)", group:"الأمراض المعدية والجهازية" },
 
   // أمراض العجول
-  calf_scours: { name:"سكاور / إسهال عجول", group:"أمراض العجول" },
-  calf_pneumonia: { name:"نيمونيا عجول", group:"أمراض العجول" },
-  navel_infection: { name:"التهاب سرة", group:"أمراض العجول" },
-  joint_ill: { name:"التهاب مفاصل عجول", group:"أمراض العجول" },
-  calf_coccidiosis: { name:"كوكسيديا عجول", group:"أمراض العجول" }
+  calf_scours: { name:"إسهال العجول", nameEn:"Calf Scours", group:"أمراض العجول" },
+  calf_pneumonia: { name:"الالتهاب الرئوي في العجول", nameEn:"Calf Pneumonia", group:"أمراض العجول" },
+  navel_infection: { name:"التهاب السرة", nameEn:"Navel Infection", group:"أمراض العجول" },
+  joint_ill: { name:"التهاب مفاصل العجول", nameEn:"Joint Ill", group:"أمراض العجول" },
+  calf_coccidiosis: { name:"كوكسيديا العجول", nameEn:"Calf Coccidiosis", group:"أمراض العجول" }
 };
 function diseaseDateOnlySrv(v){
   const s = String(v || "").trim().slice(0,10);
@@ -31955,9 +31955,10 @@ function diseaseAnimalClassSrv(animal = {}){
 function diseaseListForAnimalSrv(animal = {}){
   return Object.entries(DISEASE_CATALOG_SRV)
     .filter(([, x]) => !x?.specialPage)
-    .map(([code, x]) => ({
+        .map(([code, x]) => ({
       code,
       name: x.name,
+      nameEn: x.nameEn || "",
       group: x.group || "عام"
     }));
 }
