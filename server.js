@@ -34531,7 +34531,7 @@ const editEventId =
     req.body?.editEventId ||
     req.body?.eventId ||
     ""
-  ).trim();
+  ).trim(); 
 
 if (
   duplicate?.found &&
