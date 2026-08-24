@@ -14097,6 +14097,7 @@ const EVENTS_PAGE_KNOWN_PAGES = new Set([
   "nutrition.html",
   "pregnancy-diagnosis.html",
   "disease.html",
+  "acute-undifferentiated-diarrhea.html",
   "abortion.html",
   "early-fetal-death.html",
   "weaning.html",
