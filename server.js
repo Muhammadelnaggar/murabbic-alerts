@@ -31878,36 +31878,36 @@ await batch.commit();
 // ============================================================
 
 const DISEASE_CATALOG_SRV = {
-  // تمثيل وإنتاج
-  milk_fever: { name:"حمى اللبن", group:"تمثيل وإنتاج" },
-  ketosis: { name:"كيتوزس", group:"تمثيل وإنتاج" },
-  displaced_abomasum: { name:"انقلاب المنفحة", group:"تمثيل وإنتاج" },
-  rumen_acidosis: { name:"حموضة الكرش", group:"تمثيل وإنتاج" },
-  phosphorus_def: { name:"نقص فوسفور", group:"تمثيل وإنتاج" },
-  magnesium_def: { name:"نقص ماغنيسيوم", group:"تمثيل وإنتاج" },
+  // الأمراض الأيضية والهضمية
+  milk_fever: { name:"حمى اللبن", group:"الأمراض الأيضية والهضمية" },
+  ketosis: { name:"كيتوزس", group:"الأمراض الأيضية والهضمية" },
+  displaced_abomasum: { name:"انقلاب المنفحة", group:"الأمراض الأيضية والهضمية" },
+  rumen_acidosis: { name:"حموضة الكرش", group:"الأمراض الأيضية والهضمية" },
+  phosphorus_def: { name:"نقص فوسفور", group:"الأمراض الأيضية والهضمية" },
+  magnesium_def: { name:"نقص ماغنيسيوم", group:"الأمراض الأيضية والهضمية" },
 
-  // صحة الضرع
+  // صفحة مستقلة — لا تظهر داخل «أمراض أخرى»
   mastitis: { name:"التهاب ضرع", group:"صحة الضرع", specialPage:"mastitis.html" },
 
-  // تناسل
-  retained_placenta: { name:"احتباس مشيمة", group:"تناسل" },
-  metritis_endometritis: { name:"التهاب رحم / التهاب بطانة الرحم", group:"تناسل" },
-  ovarian_cysts: { name:"تكيسات مبيضية", group:"تناسل" },
-  brucellosis: { name:"بروسيلا", group:"تناسل" },
+  // أمراض التناسل وما بعد الولادة
+  retained_placenta: { name:"احتباس مشيمة", group:"أمراض التناسل وما بعد الولادة" },
+  metritis_endometritis: { name:"التهاب رحم / التهاب بطانة الرحم", group:"أمراض التناسل وما بعد الولادة" },
+  ovarian_cysts: { name:"تكيسات مبيضية", group:"أمراض التناسل وما بعد الولادة" },
 
-  // حركة وعرج
+  // صفحة مستقلة — لا تظهر داخل «أمراض أخرى»
   lameness: { name:"عرج / مشاكل حافر", group:"حركة وعرج", specialPage:"lameness.html" },
 
-  // معدية / جهازية
-  bovine_respiratory_disease: { name:"مرض تنفسي بقري", group:"معدية / جهازية" },
-  johnes_disease: { name:"جونز", group:"معدية / جهازية" },
-  bovine_viral_diarrhea: { name:"BVD / الإسهال الفيروسي البقري", group:"معدية / جهازية" },
-  fmd: { name:"حمى قلاعية", group:"معدية / جهازية" },
-  three_day_sickness: { name:"حمى الثلاث أيام", group:"معدية / جهازية" },
-  lumpy_skin: { name:"جلد عقدي", group:"معدية / جهازية" },
-  septicemia: { name:"تسمم دموي", group:"معدية / جهازية" },
-  blood_parasites: { name:"طفيليات دم", group:"معدية / جهازية" },
-  pinkeye: { name:"التهاب العين", group:"معدية / جهازية" },
+  // الأمراض المعدية والجهازية
+  brucellosis: { name:"بروسيلا", group:"الأمراض المعدية والجهازية" },
+  bovine_respiratory_disease: { name:"مرض تنفسي بقري", group:"الأمراض المعدية والجهازية" },
+  johnes_disease: { name:"جونز", group:"الأمراض المعدية والجهازية" },
+  bovine_viral_diarrhea: { name:"BVD / الإسهال الفيروسي البقري", group:"الأمراض المعدية والجهازية" },
+  fmd: { name:"حمى قلاعية", group:"الأمراض المعدية والجهازية" },
+  three_day_sickness: { name:"حمى الثلاث أيام", group:"الأمراض المعدية والجهازية" },
+  lumpy_skin: { name:"جلد عقدي", group:"الأمراض المعدية والجهازية" },
+  septicemia: { name:"تسمم دموي", group:"الأمراض المعدية والجهازية" },
+  blood_parasites: { name:"طفيليات دم", group:"الأمراض المعدية والجهازية" },
+  pinkeye: { name:"التهاب العين", group:"الأمراض المعدية والجهازية" },
 
   // أمراض العجول
   calf_scours: { name:"سكاور / إسهال عجول", group:"أمراض العجول" },
@@ -31954,11 +31954,11 @@ function diseaseAnimalClassSrv(animal = {}){
 
 function diseaseListForAnimalSrv(animal = {}){
   return Object.entries(DISEASE_CATALOG_SRV)
+    .filter(([, x]) => !x?.specialPage)
     .map(([code, x]) => ({
       code,
       name: x.name,
-      group: x.group || "عام",
-      specialPage: x.specialPage || ""
+      group: x.group || "عام"
     }));
 }
 async function diseaseFindSubjectByNumberSrv(uid, number) {
