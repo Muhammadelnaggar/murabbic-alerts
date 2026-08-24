@@ -511,7 +511,7 @@ function renderDiseases(
         btn.dataset.code =
           item.code || "";
 
-        const label =
+               const label =
           document.createElement(
             "span"
           );
@@ -528,8 +528,38 @@ function renderDiseases(
                 ""
               );
 
+        const labelEn =
+          document.createElement(
+            "small"
+          );
+
+        labelEn.className =
+          "mbk-disease-en";
+
+        labelEn.dir =
+          "ltr";
+
+        labelEn.textContent =
+          item.nameEn || "";
+
         btn.appendChild(
           label
+        );
+
+        if (labelEn.textContent) {
+          btn.appendChild(
+            labelEn
+          );
+        }
+
+        btn.setAttribute(
+          "aria-label",
+          [
+            item.name || "",
+            item.nameEn || ""
+          ]
+            .filter(Boolean)
+            .join(" — ")
         );
 
         btn.addEventListener(
