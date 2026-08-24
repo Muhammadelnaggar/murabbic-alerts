@@ -3152,20 +3152,19 @@ body[data-page="animal-list"] .no-data{
   }
 
 }
-/* Event List — keep Details header fixed while details content scrolls */
-.event-list-page thead th:last-child{
-  position:sticky;
-  left:0;
-  z-index:11;
+/* Event List — keep Details title fixed while only details content scrolls */
+.event-list-page .event-details-head{
+  text-align:right;
+  white-space:nowrap;
   background:#f6fff2;
 }
-/* Event List — keep Details header visible on horizontal scroll */
-.event-list-page thead th:last-child{
+
+.event-list-page .event-details-head-label{
   position:sticky;
   right:calc(var(--w-date, 0px) + var(--w-type, 0px));
+  display:inline-block;
   z-index:11;
   background:#f6fff2;
-  text-align:right;
   white-space:nowrap;
 }
 /* =========================================================
