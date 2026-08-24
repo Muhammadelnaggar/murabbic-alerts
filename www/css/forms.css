@@ -3159,6 +3159,15 @@ body[data-page="animal-list"] .no-data{
   z-index:11;
   background:#f6fff2;
 }
+/* Event List — keep Details header visible on horizontal scroll */
+.event-list-page thead th:last-child{
+  position:sticky;
+  right:calc(var(--w-date, 0px) + var(--w-type, 0px));
+  z-index:11;
+  background:#f6fff2;
+  text-align:right;
+  white-space:nowrap;
+}
 /* =========================================================
    Cow Card — scoped styles only
    ستايل بطاقة الحيوان فقط — لا يؤثر على أي صفحة أخرى
