@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-page="acute-undifferentiated-diarrhea">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="css/forms.css">
+ 
+  <title>تسجيل الإسهال الحاد غير المتمايز — مُرَبِّيك</title>
+ 
+</head>
+<body>
+  <header>
+  <div class="mbk-head">
+    <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
+    <div class="mbk-center">
+      <div class="mbk-page-title" id="pageTitle">تسجيل الإسهال الحاد غير المتمايز</div>
+      <div class="mbk-app-name">مُرَبِّيك</div>
+    </div>
+    <a class="mbk-back" id="backLink" href="add-event.html">رجوع</a>
+  </div>
+</header>
+
+  <div id="msg" class="infobar" role="status" aria-live="polite"></div>
+
+  <main>
+  <section class="card">
+    <form id="audForm" class="grid">
+
+      <div class="row">
+        <div>
+          <label for="animalId">رقم العجل</label>
+          <input type="text" id="animalId" name="animalId" inputmode="numeric" autocomplete="off">
+        </div>
+
+        <div>
+          <label for="eventDate">تاريخ الحالة</label>
+          <input type="date" id="eventDate" name="eventDate">
+        </div>
+      </div>
+
+      <div id="calfSummary" class="infobar" role="status" aria-live="polite" hidden></div>
+
+      <button type="button" id="fallbackBtn" class="save" hidden>
+        تسجيل إسهال العجول من التشخيص الصحي
+      </button>
+
+      <fieldset>
+        <legend>وصف الإسهال</legend>
+
+        <div class="row">
+          <div>
+            <label for="stoolConsistency">قوام الإسهال *</label>
+            <select id="stoolConsistency" name="stoolConsistency" required>
+              <option value="">اختر</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="stoolColor">لون البراز *</label>
+            <input
+              type="text"
+              id="stoolColor"
+              name="stoolColor"
+              maxlength="80"
+              autocomplete="off"
+              placeholder="اكتب لون البراز كما تراه"
+              required
+            >
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <fieldset>
+              <legend>مخاط *</legend>
+              <div class="radio-group">
+                <label><input type="radio" name="mucusPresent" value="true" required> نعم</label>
+                <label><input type="radio" name="mucusPresent" value="false" required> لا</label>
+              </div>
+            </fieldset>
+          </div>
+
+          <div>
+            <fieldset>
+              <legend>دم *</legend>
+              <div class="radio-group">
+                <label><input type="radio" name="bloodPresent" value="true" required> نعم</label>
+                <label><input type="radio" name="bloodPresent" value="false" required> لا</label>
+              </div>
+            </fieldset>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>حالة العجل</legend>
+
+        <div class="row">
+          <div>
+            <label for="generalCondition">الحالة العامة *</label>
+            <select id="generalCondition" name="generalCondition" required>
+              <option value="">اختر</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="sucklingStatus">الرضاعة *</label>
+            <select id="sucklingStatus" name="sucklingStatus" required>
+              <option value="">اختر</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="row">
+        <div>
+          <label for="vet">اسم الطبيب أو الفني المعالج *</label>
+          <input
+            type="text"
+            id="vet"
+            name="vet"
+            list="operationalPerformersList"
+            maxlength="160"
+            autocomplete="off"
+            placeholder="اكتب اسم الطبيب أو الفني المعالج"
+            required
+          >
+        </div>
+
+        <div>
+          <label for="notes">ملاحظات</label>
+          <textarea
+            id="notes"
+            name="notes"
+            rows="3"
+            maxlength="500"
+            placeholder="ملاحظات اختيارية"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="row" id="editToolsRow" hidden style="display:none">
+        <div>
+          <label for="correctionPerformedBy">القائم بالتعديل</label>
+          <input type="text" id="correctionPerformedBy" list="operationalPerformersList" maxlength="160" autocomplete="off" placeholder="اسم القائم بالتعديل">
+        </div>
+
+        <div>
+          <label for="correctionReason">سبب التعديل</label>
+          <input type="text" id="correctionReason" maxlength="500" autocomplete="off" placeholder="اكتب سبب تصحيح الحدث">
+        </div>
+      </div>
+
+      <datalist id="operationalPerformersList"></datalist>
+    </form>
+  </section>
+</main>
+
+<div class="actions-bar">
+  <button type="submit" form="audForm" id="saveBtn" class="save" disabled>تسجيل الحالة</button>
+</div>
+
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const form = $("audForm"), msg = $("msg"), btn = $("saveBtn");
+  const animalId = $("animalId"), eventDate = $("eventDate");
+  const calfSummary = $("calfSummary"), fallbackBtn = $("fallbackBtn");
+  const stoolConsistency = $("stoolConsistency"), stoolColor = $("stoolColor");
+  const generalCondition = $("generalCondition"), sucklingStatus = $("sucklingStatus");
+  const vet = $("vet"), notes = $("notes");
+  const editToolsRow = $("editToolsRow");
+  const correctionPerformedBy = $("correctionPerformedBy");
+  const correctionReason = $("correctionReason");
+  const operationalPerformersList = $("operationalPerformersList");
+  const pageTitle = $("pageTitle"), backLink = $("backLink");
+
+  const qs = new URLSearchParams(location.search);
+  const requestedEditMode = String(qs.get("mode") || "").trim().toLowerCase() === "edit";
+  const editEventId = String(qs.get("eventId") || "").trim();
+  const isEditMode = requestedEditMode && !!editEventId;
+  let gateAllowed = false;
+  let fallbackUrl = "";
+
+  function todayLocal(){
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
+  }
+
+  function showMsg(text, ok){
+    msg.textContent = text || "";
+    msg.className = text ? `infobar mbk-infobar show ${ok ? "success" : "error"}` : "infobar";
+    msg.style.display = text ? "block" : "none";
+    if (text) try { msg.scrollIntoView({behavior:"smooth", block:"center"}); } catch {}
+  }
+
+  async function apiRequest(url, {method="GET", body} = {}){
+    const options = {
+      method,
+      credentials:"same-origin",
+      cache:"no-store",
+      headers:{Accept:"application/json"}
+    };
+    if (body !== undefined) {
+      options.headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(body || {});
+    }
+    const r = await fetch(url, options);
+    let data = {};
+    try { data = await r.json(); } catch {}
+    if (r.status === 401 || data?.error === "auth_required") {
+      location.href = "login.html?next=" + encodeURIComponent(location.pathname + location.search);
+      throw new Error(data.message || "❌ سجّل الدخول أولًا.");
+    }
+    if (!r.ok || data.ok === false) {
+      const err = new Error(data.message || "تعذّر تنفيذ الطلب.");
+      err.status = r.status;
+      err.response = data;
+      throw err;
+    }
+    return data;
+  }
+
+  function selectedBool(name){
+    const el = document.querySelector(`input[name="${name}"]:checked`);
+    return el ? el.value === "true" : null;
+  }
+
+  function setBool(name, value){
+    document.querySelectorAll(`input[name="${name}"]`).forEach(el => {
+      el.checked = String(value) === el.value;
+    });
+  }
+
+  function collectPayload(){
+    return {
+      animalNumber: animalId.value.trim(),
+      eventDate: eventDate.value,
+      stoolConsistency: stoolConsistency.value,
+      stoolColor: stoolColor.value.trim(),
+      mucusPresent: selectedBool("mucusPresent"),
+      bloodPresent: selectedBool("bloodPresent"),
+      generalCondition: generalCondition.value,
+      sucklingStatus: sucklingStatus.value,
+      vet: vet.value.trim(),
+      notes: notes.value.trim()
+    };
+  }
+
+  function renderSelect(el, items, selected=""){
+    const vals = (Array.isArray(items) ? items : []).map(v => String(v || "").trim()).filter(Boolean);
+    el.replaceChildren();
+    const first = document.createElement("option");
+    first.value = "";
+    first.textContent = "اختر";
+    el.appendChild(first);
+    vals.forEach(v => {
+      const op = document.createElement("option");
+      op.value = v;
+      op.textContent = v;
+      el.appendChild(op);
+    });
+    if (selected && vals.includes(selected)) el.value = selected;
+  }
+
+  function renderOptions(options={}, selected={}){
+    renderSelect(stoolConsistency, options.stoolConsistency, selected.stoolConsistency || "");
+    renderSelect(generalCondition, options.generalCondition, selected.generalCondition || "");
+    renderSelect(sucklingStatus, options.sucklingStatus, selected.sucklingStatus || "");
+  }
+
+  function renderCalf(animal={}){
+    const parts = [];
+    if (Number.isFinite(Number(animal.ageDays))) parts.push(`العمر: ${Number(animal.ageDays)} يوم`);
+    if (animal.species) parts.push(`النوع: ${animal.species}`);
+    if (animal.sex) parts.push(`الجنس: ${animal.sex}`);
+    if (animal.damNumber) parts.push(`رقم الأم: ${animal.damNumber}`);
+    calfSummary.textContent = parts.join(" — ");
+    calfSummary.hidden = !parts.length;
+    calfSummary.style.display = parts.length ? "block" : "none";
+  }
+
+  function clearCalf(){
+    calfSummary.textContent = "";
+    calfSummary.hidden = true;
+    calfSummary.style.display = "none";
+  }
+
+  function setFallback(url=""){
+    fallbackUrl = String(url || "").trim();
+    fallbackBtn.hidden = !fallbackUrl;
+    fallbackBtn.style.display = fallbackUrl ? "" : "none";
+  }
+
+  function renderPerformers(items=[]){
+    operationalPerformersList.replaceChildren();
+    [...new Set((Array.isArray(items) ? items : []).map(x => String(x || "").trim()).filter(Boolean))]
+      .forEach(name => {
+        const op = document.createElement("option");
+        op.value = name;
+        operationalPerformersList.appendChild(op);
+      });
+  }
+
+  async function loadPerformers(){
+    try {
+      const data = await apiRequest("/api/event-options/operational-performers");
+      renderPerformers(data.operationalPerformers || []);
+    } catch (_) {}
+  }
+
+  function hydrateNormal(){
+    animalId.value = qs.get("animalId") || qs.get("number") || qs.get("animalNumber") || "";
+    eventDate.value = qs.get("date") || qs.get("eventDate") || todayLocal();
+  }
+
+  async function runGate(){
+    if (requestedEditMode) return;
+    gateAllowed = false;
+    btn.disabled = true;
+    clearCalf();
+    setFallback("");
+
+    const payload = collectPayload();
+    if (!payload.animalNumber || !payload.eventDate) return;
+
+    try {
+      const data = await apiRequest("/api/acute-undifferentiated-diarrhea/gate", {
+        method:"POST",
+        body: payload
+      });
+      renderOptions(data.options || {});
+      renderCalf(data.animal || {});
+      gateAllowed = data.allowed === true;
+      btn.disabled = !gateAllowed;
+      if (data.message && !data.silent) showMsg(data.message, gateAllowed);
+    } catch (err) {
+      const out = err.response || {};
+      renderOptions(out.options || {});
+      setFallback(out.redirectUrl || "");
+      showMsg(err.message || "تعذّر التحقق من العجل.", false);
+      btn.disabled = true;
+    }
+  }
+
+  async function loadEditEvent(){
+    btn.disabled = true;
+    btn.textContent = "جارٍ تحميل الحدث...";
+
+    const data = await apiRequest(`/api/events-page/event/${encodeURIComponent(editEventId)}`);
+    const ev = data.event;
+    if (!ev) throw new Error(data.message || "تعذّر تحميل الحدث للتعديل.");
+    if (ev.typeKey !== "acute_undifferentiated_diarrhea") throw new Error("الحدث المطلوب ليس حدث إسهال حاد غير متمايز.");
+    if (ev.editPolicy?.editable !== true) throw new Error(ev.editPolicy?.reason || "هذا الحدث غير متاح للتعديل.");
+
+    animalId.value = ev.animalNumber || "";
+    animalId.readOnly = true;
+    eventDate.value = ev.data?.eventDate || ev.eventDate || "";
+    eventDate.disabled = true;
+
+    const gate = await apiRequest("/api/acute-undifferentiated-diarrhea/gate", {
+      method:"POST",
+      body:{animalNumber:animalId.value, eventDate:eventDate.value}
+    });
+
+    renderOptions(gate.options || {}, ev.data || {});
+    renderCalf(gate.animal || {});
+    stoolColor.value = ev.data?.stoolColor || "";
+    setBool("mucusPresent", ev.data?.mucusPresent);
+    setBool("bloodPresent", ev.data?.bloodPresent);
+    vet.value = ev.data?.vet || "";
+    notes.value = ev.data?.notes || "";
+    renderPerformers(data.correctionPerformers || []);
+
+    editToolsRow.hidden = false;
+    editToolsRow.style.display = "";
+    correctionPerformedBy.required = true;
+    correctionReason.required = true;
+    pageTitle.textContent = "تعديل الإسهال الحاد غير المتمايز";
+    document.title = "تعديل الإسهال الحاد غير المتمايز — مُرَبِّيك";
+    backLink.href = `event-list.html?number=${encodeURIComponent(ev.animalNumber || "")}`;
+    gateAllowed = true;
+    btn.textContent = "حفظ التعديل ✅";
+    btn.disabled = false;
+    showMsg("عدّل وصف الحالة أو حالة العجل أو اسم الطبيب، ثم اكتب القائم بالتعديل وسبب التعديل.", true);
+  }
+
+  async function saveNormal(){
+    if (!gateAllowed) throw new Error("راجع رقم العجل وتاريخ الحالة أولًا.");
+    const data = await apiRequest("/api/acute-undifferentiated-diarrhea/save", {
+      method:"POST",
+      body:collectPayload()
+    });
+    showMsg(data.message || "✅ تم حفظ الحالة بنجاح.", true);
+    setTimeout(() => location.href = data.redirectUrl || "event-list.html", 1200);
+  }
+
+  async function saveCorrection(){
+    const performer = correctionPerformedBy.value.trim();
+    const reason = correctionReason.value.trim();
+    if (!performer) throw new Error("أدخل اسم القائم بالتعديل.");
+    if (!reason) throw new Error("اكتب سبب التعديل.");
+
+    const data = await apiRequest(`/api/events-page/event/${encodeURIComponent(editEventId)}/correct`, {
+      method:"POST",
+      body:{
+        ...collectPayload(),
+        correctionPerformedBy:performer,
+        correctionReason:reason
+      }
+    });
+    showMsg(data.message || "✅ تم تعديل الحدث بنجاح.", true);
+    setTimeout(() => {
+      location.href = `event-list.html?number=${encodeURIComponent(animalId.value.trim())}`;
+    }, 900);
+  }
+
+  fallbackBtn.addEventListener("click", () => {
+    if (fallbackUrl) location.href = fallbackUrl;
+  });
+
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    showMsg("", false);
+    btn.disabled = true;
+    const idle = isEditMode ? "حفظ التعديل ✅" : "تسجيل الحالة";
+    try {
+      if (isEditMode) await saveCorrection();
+      else await saveNormal();
+    } catch (err) {
+      setFallback(err.response?.redirectUrl || "");
+      showMsg(err.message || (isEditMode ? "❌ تعذّر تعديل الحدث الآن." : "❌ تعذّر حفظ الحالة الآن."), false);
+      btn.disabled = false;
+      btn.textContent = idle;
+    }
+  });
+
+  animalId.addEventListener("change", runGate);
+  eventDate.addEventListener("change", runGate);
+
+  async function init(){
+    try {
+      if (requestedEditMode) {
+        if (!editEventId) throw new Error("رابط تعديل الحدث غير مكتمل.");
+        await loadEditEvent();
+      } else {
+        hydrateNormal();
+        await Promise.all([loadPerformers(), runGate()]);
+      }
+    } catch (err) {
+      setFallback(err.response?.redirectUrl || "");
+      showMsg(err.message || "تعذّر تجهيز صفحة الحالة.", false);
+      btn.disabled = true;
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
