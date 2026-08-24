@@ -20,12 +20,18 @@ const EVENT_SYNONYMS = {
   close_up: ['close-up', 'close_up', 'تحضير ولادة', 'تحضير'],
   daily_milk: ['daily milk', 'daily_milk', 'لبن يومي', 'اللبن اليومي', 'لبن'],
   nutrition: ['nutrition', 'تغذية', 'عليقة'],
-  weaning: ['weaning', 'فطام'],
+    weaning: ['weaning', 'فطام'],
   lameness: ['lameness', 'عرج'], 
   hoof_trimming: ['hoof trimming', 'تقليم حوافر', 'حافر'], 
   vaccination: ['vaccination', 'تحصين', 'تطعيم'],
   milking_status: ['milking', 'milking status', 'حلاب'],
   fresh: ['fresh', 'حديث الولادة', 'فريش'],
+  acute_undifferentiated_diarrhea: [
+    'acute undifferentiated diarrhea',
+    'acute_undifferentiated_diarrhea',
+    'الإسهال الحاد غير المتمايز',
+    'الاسهال الحاد غير المتمايز'
+  ],
   diagnosis: ['diagnosis', 'التشخيص', 'فحص', 'كشف']
 };
 
@@ -14827,8 +14833,13 @@ function eventsPageNormalizeTypeKeySrv(ev = {}) {
     "عرج": "lameness",
     "lameness": "lameness",
 
-    "التهاب_الضرع": "mastitis",
+        "التهاب_الضرع": "mastitis",
     "mastitis": "mastitis",
+
+    "الإسهال_الحاد_غير_المتمايز": "acute_undifferentiated_diarrhea",
+    "الاسهال_الحاد_غير_المتمايز": "acute_undifferentiated_diarrhea",
+    "acute_undifferentiated_diarrhea": "acute_undifferentiated_diarrhea",
+    "aud": "acute_undifferentiated_diarrhea",
 
     "تقييم_صفات_اللبن": "milking_traits_eval",
     "صفات_اللبن": "milking_traits_eval",
@@ -14865,6 +14876,7 @@ function eventsPageTypeLabelSrv(ev = {}) {
     nutrition: "تغذية",
     lameness: "عرج",
     mastitis: "التهاب الضرع",
+    acute_undifferentiated_diarrhea: "الإسهال الحاد غير المتمايز",
     milking_traits_eval: "تقييم صفات اللبن",
     milking_traits: "تقييم صفات اللبن",
     uterine_check: "فحص الرحم",
@@ -15588,9 +15600,52 @@ if (key === "mastitis") {
     eventsPagePushDetailSrv(parts, "ملاحظة", note);
   }
 
-  return eventsPageJoinDetailsSrv(
+    return eventsPageJoinDetailsSrv(
     parts,
     "التهاب الضرع"
+  );
+}
+
+if (key === "acute_undifferentiated_diarrhea") {
+  add("العمر وقت الحالة", ["ageDays", "calfAgeDays"], " يوم");
+  add("قوام الإسهال", ["stoolConsistency"]);
+  add("لون البراز", ["stoolColor"]);
+
+  const mucusPresent = audBoolSrv(
+    pick(["mucusPresent"], null)
+  );
+
+  const bloodPresent = audBoolSrv(
+    pick(["bloodPresent"], null)
+  );
+
+  if (mucusPresent !== null) {
+    eventsPagePushDetailSrv(
+      parts,
+      "مخاط",
+      mucusPresent ? "نعم" : "لا"
+    );
+  }
+
+  if (bloodPresent !== null) {
+    eventsPagePushDetailSrv(
+      parts,
+      "دم",
+      bloodPresent ? "نعم" : "لا"
+    );
+  }
+
+  add("الحالة العامة", ["generalCondition"]);
+  add("الرضاعة", ["sucklingStatus"]);
+  add("الطبيب أو الفني", ["vet", "doctor"]);
+
+  if (note) {
+    eventsPagePushDetailSrv(parts, "ملاحظة", note);
+  }
+
+  return eventsPageJoinDetailsSrv(
+    parts,
+    "الإسهال الحاد غير المتمايز"
   );
 }
 
@@ -15726,9 +15781,14 @@ function eventsPageListTypeOptionsSrv() {
 
     { value: "lameness", label: "عرج" },
 
-    {
+        {
       value: "mastitis",
       label: "التهاب الضرع"
+    },
+
+    {
+      value: "acute_undifferentiated_diarrhea",
+      label: "الإسهال الحاد غير المتمايز"
     },
 
     { value: "heat", label: "شياع" },
@@ -16571,9 +16631,10 @@ const supported =
     "daily_milk",
     "dry_off",
     "insemination",
-    "uterine_check",
+       "uterine_check",
     "mastitis",
     "lameness",
+    "acute_undifferentiated_diarrhea",
     "health",
     "weaning",
     "close_up",
@@ -16623,6 +16684,7 @@ function eventsPageEditTargetSrv(docId, ev = {}) {
     dehorning: "dehorning.html",
     lameness: "lameness.html",
     mastitis: "mastitis.html",
+    acute_undifferentiated_diarrhea: "acute-undifferentiated-diarrhea.html",
     health: "disease.html",
     weaning: "weaning.html",
     cull: "cull.html",
@@ -16845,8 +16907,26 @@ checkStage: String(ev.checkStage ?? "").trim(),
       affectedLegs,
       lamenessType: String(ev.lamenessType ?? ev.diagnosis ?? "").trim(),
 
-      mastitisType: String(ev.mastitisType ?? "").trim(),
+            mastitisType: String(ev.mastitisType ?? "").trim(),
       quarters,
+
+      stoolConsistency: String(ev.stoolConsistency ?? "").trim(),
+      stoolColor: String(ev.stoolColor ?? "").trim(),
+      mucusPresent:
+        typeof ev.mucusPresent === "boolean"
+          ? ev.mucusPresent
+          : audBoolSrv(ev.mucusPresent),
+      bloodPresent:
+        typeof ev.bloodPresent === "boolean"
+          ? ev.bloodPresent
+          : audBoolSrv(ev.bloodPresent),
+      generalCondition: String(ev.generalCondition ?? "").trim(),
+      sucklingStatus: String(ev.sucklingStatus ?? "").trim(),
+      birthDate: String(ev.birthDate ?? "").trim().slice(0, 10),
+      ageDays:
+        Number.isFinite(Number(ev.ageDays ?? ev.calfAgeDays))
+          ? Number(ev.ageDays ?? ev.calfAgeDays)
+          : null,
 
       diseaseCode: String(ev.diseaseCode ?? "").trim(),
       diseaseName: String(ev.diseaseName ?? "").trim(),
@@ -17624,7 +17704,12 @@ function eventsPageCorrectionHealthPatchSrv(rows = [], subjectData = {}, oldEven
   const patch = {};
   const del = eventsPageCorrectionDeleteSrv;
 
-  const healthTypes = new Set(["health", "lameness", "mastitis"]);
+  const healthTypes = new Set([
+    "health",
+    "lameness",
+    "mastitis",
+    "acute_undifferentiated_diarrhea"
+  ]);
   const latestHealth = eventsPageCorrectionLatestSrv(
     rows,
     ev => healthTypes.has(eventsPageNormalizeTypeKeySrv(ev))
@@ -17804,7 +17889,15 @@ function eventsPageCorrectionConflictSrv(
     return eventsPageNormalizeTypeKeySrv(ev) === typeKey && eventsPageListDateSrv(ev) === date;
   });
 
- if (["calving", "abortion", "heat", "daily_milk", "hoof_trimming", "pregnancy_diagnosis"].includes(typeKey) && same.length) {
+  if ([
+    "calving",
+    "abortion",
+    "heat",
+    "daily_milk",
+    "hoof_trimming",
+    "pregnancy_diagnosis",
+    "acute_undifferentiated_diarrhea"
+  ].includes(typeKey) && same.length) {
     return "يوجد حدث آخر من النوع نفسه للحيوان في التاريخ المحدد.";
   }
 
@@ -18536,9 +18629,10 @@ if (
     "daily_milk",
     "dry_off",
     "insemination",
-    "uterine_check",
+       "uterine_check",
     "mastitis",
     "lameness",
+    "acute_undifferentiated_diarrhea",
     "health",
     "weaning",
     "close_up",
@@ -19678,6 +19772,174 @@ else if (
         };
       }
 
+            else if (typeKey === "acute_undifferentiated_diarrhea") {
+        const fd = audNormalizeBodySrv({
+          ...oldEvent,
+          ...body,
+          animalNumber,
+          eventDate
+        });
+
+        if (
+          !fd.stoolConsistency ||
+          !fd.stoolColor ||
+          fd.mucusPresent === null ||
+          fd.bloodPresent === null ||
+          !fd.generalCondition ||
+          !fd.sucklingStatus ||
+          !fd.vet ||
+          !AUD_STOOL_CONSISTENCY_SRV.includes(fd.stoolConsistency) ||
+          !AUD_GENERAL_CONDITION_SRV.includes(fd.generalCondition) ||
+          !AUD_SUCKLING_STATUS_SRV.includes(fd.sucklingStatus)
+        ) {
+          return res.status(400).json({
+            ok: false,
+            error: "invalid_aud_fields",
+            message:
+              "❌ أكمل وصف الإسهال وحالة العجل، وأدخل اسم الطبيب أو الفني المعالج من القيم المعتمدة."
+          });
+        }
+
+        const audSubject =
+          audSubjectCheckSrv(
+            subject,
+            eventDate
+          );
+
+        if (!audSubject.ok) {
+          return res.status(400).json({
+            ok: false,
+            error:
+              audSubject.error,
+            message:
+              audSubject.message
+          });
+        }
+
+        const subjectData =
+          subject.data || {};
+
+        const species =
+          String(
+            subjectData.species ||
+            subjectData.animalTypeAr ||
+            subjectData.animalType ||
+            oldEvent.species ||
+            ""
+          ).trim();
+
+        const sex =
+          String(
+            subjectData.followerSex ||
+            subjectData.sex ||
+            subjectData.gender ||
+            oldEvent.sex ||
+            ""
+          ).trim();
+
+        const damNumber =
+          String(
+            subjectData.damNumber ||
+            subjectData.motherNumber ||
+            subjectData.damId ||
+            oldEvent.damNumber ||
+            ""
+          ).trim();
+
+        eventPatch = {
+          ...eventPatch,
+
+          diagnosis:
+            "الإسهال الحاد غير المتمايز",
+
+          diseaseCode:
+            "acute_undifferentiated_diarrhea",
+
+          diseaseName:
+            "الإسهال الحاد غير المتمايز",
+
+          diseaseNameEn:
+            "Acute Undifferentiated Diarrhea",
+
+          diseaseGroup:
+            "أمراض العجول",
+
+          birthDate:
+            audSubject.birthDate,
+
+          ageDays:
+            audSubject.ageDays,
+
+          calfAgeDays:
+            audSubject.ageDays,
+
+          species:
+            species || null,
+
+          sex:
+            sex || null,
+
+          damNumber:
+            damNumber || null,
+
+          stoolConsistency:
+            fd.stoolConsistency,
+
+          stoolColor:
+            fd.stoolColor,
+
+          mucusPresent:
+            fd.mucusPresent,
+
+          bloodPresent:
+            fd.bloodPresent,
+
+          generalCondition:
+            fd.generalCondition,
+
+          sucklingStatus:
+            fd.sucklingStatus,
+
+          vet:
+            fd.vet,
+
+          details: {
+            birthDate:
+              audSubject.birthDate,
+
+            ageDays:
+              audSubject.ageDays,
+
+            stoolConsistency:
+              fd.stoolConsistency,
+
+            stoolColor:
+              fd.stoolColor,
+
+            mucusPresent:
+              fd.mucusPresent,
+
+            bloodPresent:
+              fd.bloodPresent,
+
+            generalCondition:
+              fd.generalCondition,
+
+            sucklingStatus:
+              fd.sucklingStatus,
+
+            vet:
+              fd.vet,
+
+            notes:
+              notes || null,
+
+            diseaseName:
+              "الإسهال الحاد غير المتمايز"
+          }
+        };
+      }
+
       else if (typeKey === "lameness") {
         const fd = lamenessNormalizeBodySrv({
           ...oldEvent,
@@ -20486,7 +20748,12 @@ if (typeKey === "abortion") {
         };
       }
 
-      if (["health", "lameness", "mastitis"].includes(typeKey)) {
+      if ([
+        "health",
+        "lameness",
+        "mastitis",
+        "acute_undifferentiated_diarrhea"
+      ].includes(typeKey)) {
         subjectPatch = {
           ...subjectPatch,
           ...eventsPageCorrectionHealthPatchSrv(rows, subject.data || {}, oldEvent)
@@ -33775,6 +34042,935 @@ await batch.commit();
     });
   }
 });
+// ============================================================
+//          API: ACUTE UNDIFFERENTIATED DIARRHEA GATE / SAVE
+//          الإسهال الحاد غير المتمايز — عجول 0–21 يومًا
+// ============================================================
+
+function audStrSrv(v) {
+  return String(v ?? "").trim();
+}
+
+function audDateOnlySrv(v) {
+  const s = String(v || "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+}
+
+function audTodaySrv() {
+  return typeof cairoTodayISO === "function"
+    ? cairoTodayISO()
+    : new Date().toISOString().slice(0, 10);
+}
+
+function audBoolSrv(v) {
+  if (v === true || v === false) return v;
+
+  const s =
+    String(v ?? "")
+      .trim()
+      .toLowerCase();
+
+  if (
+    ["true", "1", "yes", "نعم", "موجود"]
+      .includes(s)
+  ) {
+    return true;
+  }
+
+  if (
+    ["false", "0", "no", "لا", "غير موجود"]
+      .includes(s)
+  ) {
+    return false;
+  }
+
+  return null;
+}
+
+const AUD_MAX_AGE_DAYS_SRV = 21;
+
+const AUD_STOOL_CONSISTENCY_SRV = [
+  "رخو",
+  "مائي"
+];
+
+const AUD_GENERAL_CONDITION_SRV = [
+  "طبيعي",
+  "خامل",
+  "شديد الخمول"
+];
+
+const AUD_SUCKLING_STATUS_SRV = [
+  "طبيعية",
+  "ضعيفة",
+  "متوقفة"
+];
+
+const AUD_YES_NO_OPTIONS_SRV = [
+  { value: true, label: "نعم" },
+  { value: false, label: "لا" }
+];
+
+function audOptionsSrv() {
+  return {
+    stoolConsistency:
+      AUD_STOOL_CONSISTENCY_SRV,
+
+    generalCondition:
+      AUD_GENERAL_CONDITION_SRV,
+
+    sucklingStatus:
+      AUD_SUCKLING_STATUS_SRV,
+
+    yesNo:
+      AUD_YES_NO_OPTIONS_SRV
+  };
+}
+
+function audNormalizeBodySrv(body = {}) {
+  return {
+    animalNumber:
+      calvingNormDigitsOnlySrv(
+        body.animalNumber ||
+        body.number ||
+        body.animalId ||
+        body.calfNumber ||
+        ""
+      ),
+
+    eventDate:
+      audDateOnlySrv(
+        body.eventDate ||
+        body.date ||
+        body.diagnosisDate ||
+        ""
+      ),
+
+    stoolConsistency:
+      audStrSrv(
+        body.stoolConsistency ||
+        body.consistency ||
+        ""
+      ),
+
+    stoolColor:
+      audStrSrv(
+        body.stoolColor ||
+        body.color ||
+        ""
+      ),
+
+    mucusPresent:
+      audBoolSrv(
+        body.mucusPresent ??
+        body.mucus ??
+        body.hasMucus
+      ),
+
+    bloodPresent:
+      audBoolSrv(
+        body.bloodPresent ??
+        body.blood ??
+        body.hasBlood
+      ),
+
+    generalCondition:
+      audStrSrv(
+        body.generalCondition ||
+        body.condition ||
+        ""
+      ),
+
+    sucklingStatus:
+      audStrSrv(
+        body.sucklingStatus ||
+        body.suckleStatus ||
+        body.suckling ||
+        ""
+      ),
+
+    vet:
+      audStrSrv(
+        body.vet ||
+        body.doctor ||
+        body.technician ||
+        ""
+      ),
+
+    notes:
+      audStrSrv(
+        body.notes ||
+        body.note ||
+        ""
+      )
+  };
+}
+
+function audBirthDateSrv(animal = {}) {
+  const d =
+    animal.data || {};
+
+  return audDateOnlySrv(
+    d.birthDate ||
+    d.dateOfBirth ||
+    d.dob ||
+    d.calfBirthDate ||
+    ""
+  );
+}
+
+function audDiseaseRedirectSrv(
+  animalNumber,
+  eventDate
+) {
+  return `/disease.html?number=${encodeURIComponent(animalNumber)}&date=${encodeURIComponent(eventDate)}`;
+}
+
+function audSubjectCheckSrv(
+  animal,
+  eventDate,
+  animalNumber = ""
+) {
+  if (
+    !animal ||
+    diseaseAnimalClassSrv(animal) !== "calf"
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "aud_calf_only",
+      message:
+        "❌ الإسهال الحاد غير المتمايز يُسجّل للعجول فقط."
+    };
+  }
+
+  const birthDate =
+    audBirthDateSrv(animal);
+
+  if (
+    !birthDate ||
+    !calvingIsDateSrv(birthDate)
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "aud_birth_date_missing",
+      message:
+        "❌ لا يمكن تحديد عمر العجل لأن تاريخ الميلاد غير مسجل بصورة صحيحة."
+    };
+  }
+
+  const ageDays =
+    diffDaysISO(
+      birthDate,
+      eventDate
+    );
+
+  if (
+    !Number.isFinite(ageDays) ||
+    ageDays < 0
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "aud_event_before_birth",
+      message:
+        "❌ تاريخ الحالة لا يمكن أن يسبق تاريخ ميلاد العجل."
+    };
+  }
+
+  if (
+    ageDays >
+    AUD_MAX_AGE_DAYS_SRV
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "aud_age_out_of_range",
+
+      message:
+        "❌ هذه الحالة خارج نطاق الإسهال الحاد غير المتمايز (0–21 يومًا). يمكنك تسجيل «إسهال العجول» من التشخيص الصحي.",
+
+      birthDate,
+      ageDays,
+
+      redirectUrl:
+        audDiseaseRedirectSrv(
+          animalNumber,
+          eventDate
+        )
+    };
+  }
+
+  return {
+    ok: true,
+    birthDate,
+    ageDays
+  };
+}
+
+async function audContextSrv(
+  uid,
+  fd
+) {
+  if (
+    !calvingIsDateSrv(
+      fd.eventDate
+    )
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "invalid_date",
+      message:
+        "❌ أدخل تاريخ حالة صحيحًا."
+    };
+  }
+
+  if (
+    fd.eventDate >
+    audTodaySrv()
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "future_date",
+      message:
+        "❌ تاريخ الحالة لا يمكن أن يكون في المستقبل."
+    };
+  }
+
+  const animal =
+    await fetchAnimalByNumberForCalvingGateSrv(
+      uid,
+      fd.animalNumber
+    );
+
+  if (!animal) {
+    return {
+      ok: false,
+      status: 404,
+      error: "animal_not_found",
+      message:
+        "❌ لم أجد العجل في القطيع المسجل بحسابك."
+    };
+  }
+
+  if (
+    diseaseIsArchivedSrv(
+      animal.data || {}
+    )
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "animal_archived",
+      message:
+        "❌ لا يمكن تسجيل الحالة؛ العجل خارج القطيع."
+    };
+  }
+
+  const subject =
+    audSubjectCheckSrv(
+      animal,
+      fd.eventDate,
+      fd.animalNumber
+    );
+
+  if (!subject.ok) {
+    return subject;
+  }
+
+  return {
+    ok: true,
+    animal,
+    birthDate:
+      subject.birthDate,
+    ageDays:
+      subject.ageDays
+  };
+}
+
+function audFieldsErrorSrv(fd) {
+  if (
+    !fd.animalNumber ||
+    !fd.eventDate ||
+    !fd.stoolConsistency ||
+    !fd.stoolColor ||
+    fd.mucusPresent === null ||
+    fd.bloodPresent === null ||
+    !fd.generalCondition ||
+    !fd.sucklingStatus ||
+    !fd.vet
+  ) {
+    return "❌ أكمل رقم العجل وتاريخ الحالة ووصف الإسهال وحالة العجل، وأدخل اسم الطبيب أو الفني المعالج.";
+  }
+
+  if (
+    !AUD_STOOL_CONSISTENCY_SRV
+      .includes(
+        fd.stoolConsistency
+      )
+  ) {
+    return "❌ اختر قوام الإسهال من القائمة.";
+  }
+
+  if (
+    !AUD_GENERAL_CONDITION_SRV
+      .includes(
+        fd.generalCondition
+      )
+  ) {
+    return "❌ اختر الحالة العامة للعجل من القائمة.";
+  }
+
+  if (
+    !AUD_SUCKLING_STATUS_SRV
+      .includes(
+        fd.sucklingStatus
+      )
+  ) {
+    return "❌ اختر حالة الرضاعة من القائمة.";
+  }
+
+  return "";
+}
+
+app.post(
+  "/api/acute-undifferentiated-diarrhea/gate",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          allowed: false,
+          error:
+            "firestore_disabled",
+
+          message:
+            "❌ تعذّر تحميل بيانات تسجيل الإسهال الحاد غير المتمايز الآن. حاول مرة أخرى.",
+
+          options:
+            audOptionsSrv()
+        });
+      }
+
+      const fd =
+        audNormalizeBodySrv(
+          req.body || {}
+        );
+
+      if (
+        !fd.animalNumber ||
+        !fd.eventDate
+      ) {
+        return res.json({
+          ok: true,
+          allowed: false,
+          silent: true,
+          message:
+            "أدخل رقم العجل وتاريخ الحالة.",
+          options:
+            audOptionsSrv()
+        });
+      }
+
+      const context =
+        await audContextSrv(
+          req.userId,
+          fd
+        );
+
+      if (!context.ok) {
+        return res
+          .status(
+            context.status ||
+            400
+          )
+          .json({
+            ...context,
+            allowed: false,
+            options:
+              audOptionsSrv()
+          });
+      }
+
+      const d =
+        context.animal.data ||
+        {};
+
+      return res.json({
+        ok: true,
+        allowed: true,
+
+        message:
+          `✅ راجعت بيانات العجل رقم ${fd.animalNumber}، ويمكنك تسجيل الحالة الآن.`,
+
+        animalNumber:
+          fd.animalNumber,
+
+        eventDate:
+          fd.eventDate,
+
+        animal: {
+          id:
+            context.animal.id,
+
+          collection:
+            context.animal
+              ._collection ||
+            "calves",
+
+          birthDate:
+            context.birthDate,
+
+          ageDays:
+            context.ageDays,
+
+          species:
+            String(
+              d.species ||
+              d.animalTypeAr ||
+              d.animalType ||
+              ""
+            ).trim(),
+
+          sex:
+            String(
+              d.followerSex ||
+              d.sex ||
+              d.gender ||
+              ""
+            ).trim(),
+
+          damNumber:
+            String(
+              d.damNumber ||
+              d.motherNumber ||
+              d.damId ||
+              ""
+            ).trim(),
+
+          followerStatus:
+            String(
+              d.followerStatus ||
+              d.status ||
+              ""
+            ).trim()
+        },
+
+        options:
+          audOptionsSrv()
+      });
+
+    } catch (e) {
+      console.error(
+        "acute undifferentiated diarrhea gate failed",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        allowed: false,
+        error:
+          "aud_gate_failed",
+
+        message:
+          "❌ تعذّر فحص بيانات الإسهال الحاد غير المتمايز الآن. حاول مرة أخرى.",
+
+        options:
+          audOptionsSrv()
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/acute-undifferentiated-diarrhea/save",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error:
+            "firestore_disabled",
+
+          message:
+            "❌ تعذّر تسجيل الإسهال الحاد غير المتمايز الآن. حاول مرة أخرى."
+        });
+      }
+
+      const uid =
+        req.userId;
+
+      const fd =
+        audNormalizeBodySrv(
+          req.body || {}
+        );
+
+      const fieldsError =
+        audFieldsErrorSrv(fd);
+
+      if (fieldsError) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "invalid_aud_fields",
+          message:
+            fieldsError
+        });
+      }
+
+      const context =
+        await audContextSrv(
+          uid,
+          fd
+        );
+
+      if (!context.ok) {
+        return res
+          .status(
+            context.status ||
+            400
+          )
+          .json(context);
+      }
+
+      const duplicate =
+        await healthDuplicateSameDayDetailsSrv(
+          uid,
+          {
+            animalNumber:
+              fd.animalNumber,
+
+            eventDate:
+              fd.eventDate,
+
+            diseaseCode:
+              "acute_undifferentiated_diarrhea",
+
+            diseaseName:
+              "الإسهال الحاد غير المتمايز"
+          }
+        );
+
+      if (
+        duplicate?.error
+      ) {
+        return res.status(503).json({
+          ok: false,
+          error:
+            duplicate.error,
+
+          message:
+            "⚠️ تعذّر التحقق من وجود تسجيل مماثل الآن. حاول مرة أخرى."
+        });
+      }
+
+      if (
+        duplicate?.found
+      ) {
+        return res.status(409).json({
+          ok: false,
+          duplicate: true,
+
+          error:
+            "duplicate_aud_same_day",
+
+          eventId:
+            duplicate.eventId ||
+            null,
+
+          message:
+            `❌ سبق تسجيل الإسهال الحاد غير المتمايز للعجل رقم ${fd.animalNumber} في هذا اليوم.`
+        });
+      }
+
+      const animal =
+        context.animal;
+
+      const d =
+        animal.data || {};
+
+      const diseaseName =
+        "الإسهال الحاد غير المتمايز";
+
+      const targetCollection =
+        animal._collection ||
+        "calves";
+
+      const eventRef =
+        db
+          .collection("events")
+          .doc();
+
+      const now =
+        admin.firestore
+          .FieldValue
+          .serverTimestamp();
+
+      const species =
+        String(
+          d.species ||
+          d.animalTypeAr ||
+          d.animalType ||
+          ""
+        ).trim();
+
+      const sex =
+        String(
+          d.followerSex ||
+          d.sex ||
+          d.gender ||
+          ""
+        ).trim();
+
+      const damNumber =
+        String(
+          d.damNumber ||
+          d.motherNumber ||
+          d.damId ||
+          ""
+        ).trim();
+
+      const eventPayload = {
+        userId:
+          uid,
+
+        ownerUid:
+          uid,
+
+        animalId:
+          animal.id || "",
+
+        animalNumber:
+          fd.animalNumber,
+
+        eventDate:
+          fd.eventDate,
+
+        date:
+          fd.eventDate,
+
+        type:
+          diseaseName,
+
+        eventType:
+          "acute_undifferentiated_diarrhea",
+
+        eventTypeNorm:
+          "acute_undifferentiated_diarrhea",
+
+        eventName:
+          diseaseName,
+
+        diagnosis:
+          diseaseName,
+
+        diseaseCode:
+          "acute_undifferentiated_diarrhea",
+
+        diseaseName,
+
+        diseaseNameEn:
+          "Acute Undifferentiated Diarrhea",
+
+        diseaseGroup:
+          "أمراض العجول",
+
+        birthDate:
+          context.birthDate,
+
+        ageDays:
+          context.ageDays,
+
+        calfAgeDays:
+          context.ageDays,
+
+        species:
+          species || null,
+
+        sex:
+          sex || null,
+
+        damNumber:
+          damNumber || null,
+
+        stoolConsistency:
+          fd.stoolConsistency,
+
+        stoolColor:
+          fd.stoolColor,
+
+        mucusPresent:
+          fd.mucusPresent,
+
+        bloodPresent:
+          fd.bloodPresent,
+
+        generalCondition:
+          fd.generalCondition,
+
+        sucklingStatus:
+          fd.sucklingStatus,
+
+        vet:
+          fd.vet,
+
+        notes:
+          fd.notes || null,
+
+        details: {
+          birthDate:
+            context.birthDate,
+
+          ageDays:
+            context.ageDays,
+
+          stoolConsistency:
+            fd.stoolConsistency,
+
+          stoolColor:
+            fd.stoolColor,
+
+          mucusPresent:
+            fd.mucusPresent,
+
+          bloodPresent:
+            fd.bloodPresent,
+
+          generalCondition:
+            fd.generalCondition,
+
+          sucklingStatus:
+            fd.sucklingStatus,
+
+          vet:
+            fd.vet,
+
+          notes:
+            fd.notes || null,
+
+          diseaseName
+        },
+
+        animalCollection:
+          targetCollection,
+
+        source:
+          "server:/api/acute-undifferentiated-diarrhea/save",
+
+        createdAt:
+          now
+      };
+
+      const batch =
+        db.batch();
+
+      batch.set(
+        eventRef,
+        eventPayload
+      );
+
+      batch.set(
+        db
+          .collection(
+            targetCollection
+          )
+          .doc(
+            animal.id
+          ),
+        {
+          healthStatus:
+            diseaseName,
+
+          lastDisease:
+            diseaseName,
+
+          lastDiseaseDate:
+            fd.eventDate,
+
+          lastDiagnosis:
+            diseaseName,
+
+          lastDiagnosisDate:
+            fd.eventDate,
+
+          updatedAt:
+            now
+        },
+        {
+          merge: true
+        }
+      );
+
+      batch.set(
+        db
+          .collection(
+            "user_event_options"
+          )
+          .doc(uid),
+        {
+          userId:
+            uid,
+
+          operationalPerformers:
+            admin.firestore
+              .FieldValue
+              .arrayUnion(
+                fd.vet
+              ),
+
+          updatedAt:
+            now
+        },
+        {
+          merge: true
+        }
+      );
+
+      await batch.commit();
+
+      return res.json({
+        ok: true,
+
+        message:
+          `✅ تم تسجيل الإسهال الحاد غير المتمايز للعجل رقم ${fd.animalNumber} بنجاح.`,
+
+        eventId:
+          eventRef.id,
+
+        animalNumber:
+          fd.animalNumber,
+
+        eventDate:
+          fd.eventDate,
+
+        redirectUrl:
+          `/event-list.html?number=${encodeURIComponent(fd.animalNumber)}`
+      });
+
+    } catch (e) {
+      console.error(
+        "acute undifferentiated diarrhea save failed",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+
+        error:
+          "aud_save_failed",
+
+        message:
+          "❌ تعذّر تسجيل الإسهال الحاد غير المتمايز الآن. حاول مرة أخرى."
+      });
+    }
+  }
+);
+
 // ============================================================
 //                 API: LAMENESS GATE / SAVE
 //                 تسجيل العرج من السيرفر فقط
@@ -74673,7 +75869,7 @@ function eventTypeForCardSrv(e = {}) {
   if (/pregnancy|pregnan|تشخيص حمل|سونار|جس/.test(txt)) return 'pregnancy';
   if (/heat|estrus|شياع|شبق/.test(txt)) return 'heat';
   if (/dry\s*-?\s*off|^dry$|جاف|تجفيف/.test(txt)) return 'dry';
-  if (/mastitis|lameness|disease|ill|مرض|التهاب|عرج/.test(txt)) return 'disease';
+   if (/mastitis|lameness|acute[_\s-]?undifferentiated[_\s-]?diarrhea|disease|ill|مرض|التهاب|عرج|الإسهال الحاد غير المتمايز|الاسهال الحاد غير المتمايز/.test(txt)) return 'disease';
 
   return 'other';
 }
@@ -85585,13 +86781,16 @@ if (isPregnancyDiagnosisEvent) return;
         return;
       }
 
-      if (
+            if (
         normType === 'diagnosis' ||
+        normType === 'acute_undifferentiated_diarrhea' ||
         text.includes('disease') ||
         text.includes('health') ||
         text.includes('diagnosis') ||
         text.includes('مرض') ||
-        text.includes('تشخيص')
+        text.includes('تشخيص') ||
+        text.includes('الإسهال الحاد غير المتمايز') ||
+        text.includes('الاسهال الحاد غير المتمايز')
       ) {
         diseaseEvents.push(row);
       }
