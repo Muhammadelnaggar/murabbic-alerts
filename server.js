@@ -32211,11 +32211,11 @@ const DISEASE_CATALOG_SRV = {
   },
 
   metritis_endometritis: {
-    name:"التهاب الرحم / التهاب بطانة الرحم",
-    nameEn:"Metritis / Endometritis",
-    group:"أمراض التناسل وما بعد الولادة",
-    eligibility:"mother_or_breeding_heifer"
-  },
+  name:"التهاب الرحم / التهاب بطانة الرحم",
+  nameEn:"Metritis / Endometritis",
+  group:"أمراض التناسل وما بعد الولادة",
+  eligibility:"mother_history"
+},
 
   ovarian_cysts: {
     name:"تكيسات المبايض",
