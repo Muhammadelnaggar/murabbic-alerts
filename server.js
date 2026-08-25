@@ -32182,6 +32182,34 @@ const DISEASE_CATALOG_SRV = {
     group:"الأمراض الأيضية والهضمية"
   },
 
+  bloat_tympany: {
+    name:"النفاخ / انتفاخ الكرش",
+    nameEn:"Bloat / Tympany",
+    group:"الأمراض الأيضية والهضمية",
+    eligibility:"post_weaning_plus"
+  },
+
+  traumatic_reticuloperitonitis: {
+    name:"التهاب الشبكية والبريتون الرضحي",
+    nameEn:"Traumatic Reticuloperitonitis (Hardware Disease)",
+    group:"الأمراض الأيضية والهضمية",
+    eligibility:"post_weaning_plus"
+  },
+
+  simple_indigestion_rumen_atony: {
+    name:"عسر الهضم / خمول الكرش",
+    nameEn:"Simple Indigestion / Rumen Atony",
+    group:"الأمراض الأيضية والهضمية",
+    eligibility:"post_weaning_plus"
+  },
+
+  fatty_liver: {
+    name:"الكبد الدهني",
+    nameEn:"Fatty Liver Syndrome",
+    group:"الأمراض الأيضية والهضمية",
+    eligibility:"calved_mother_only"
+  },
+
   phosphorus_def: {
     name:"نقص الفوسفور",
     nameEn:"Phosphorus Deficiency",
@@ -32211,17 +32239,24 @@ const DISEASE_CATALOG_SRV = {
   },
 
   metritis_endometritis: {
-  name:"التهاب الرحم / التهاب بطانة الرحم",
-  nameEn:"Metritis / Endometritis",
-  group:"أمراض التناسل وما بعد الولادة",
-  eligibility:"mother_history"
-},
+    name:"التهاب الرحم / التهاب بطانة الرحم",
+    nameEn:"Metritis / Endometritis",
+    group:"أمراض التناسل وما بعد الولادة",
+    eligibility:"mother_history"
+  },
 
   ovarian_cysts: {
     name:"تكيسات المبايض",
     nameEn:"Ovarian Cysts",
     group:"أمراض التناسل وما بعد الولادة",
     eligibility:"mother_or_breeding_heifer"
+  },
+
+  pyometra: {
+    name:"تقيح الرحم",
+    nameEn:"Pyometra",
+    group:"أمراض التناسل وما بعد الولادة",
+    eligibility:"mother_history"
   },
 
   // صفحة مستقلة
@@ -32283,6 +32318,36 @@ const DISEASE_CATALOG_SRV = {
     group:"الأمراض المعدية والجهازية"
   },
 
+  salmonellosis: {
+    name:"السالمونيلا",
+    nameEn:"Salmonellosis",
+    group:"الأمراض المعدية والجهازية"
+  },
+
+  leptospirosis: {
+    name:"الليبتوسبيروزيس",
+    nameEn:"Leptospirosis",
+    group:"الأمراض المعدية والجهازية"
+  },
+
+  ibr: {
+    name:"التهاب الأنف والقصبة الهوائية المعدي",
+    nameEn:"Infectious Bovine Rhinotracheitis (IBR)",
+    group:"الأمراض المعدية والجهازية"
+  },
+
+  blackleg: {
+    name:"الجمرة العرضية",
+    nameEn:"Blackleg",
+    group:"الأمراض المعدية والجهازية"
+  },
+
+  clostridial_enterotoxemia: {
+    name:"التسمم المعوي الكلوستريدي",
+    nameEn:"Clostridial Enterotoxemia",
+    group:"الأمراض المعدية والجهازية"
+  },
+
   blood_parasites: {
     name:"طفيليات الدم",
     nameEn:"Blood Parasites",
@@ -32293,6 +32358,19 @@ const DISEASE_CATALOG_SRV = {
     name:"التهاب العين المعدي",
     nameEn:"Infectious Bovine Keratoconjunctivitis (IBK)",
     group:"الأمراض المعدية والجهازية"
+  },
+
+  // الأمراض الطفيلية والجلدية
+  gastrointestinal_parasites: {
+    name:"الطفيليات الداخلية / الديدان المعوية",
+    nameEn:"Gastrointestinal Parasitism",
+    group:"الأمراض الطفيلية والجلدية"
+  },
+
+  mange_ectoparasites: {
+    name:"الجرب / الطفيليات الخارجية",
+    nameEn:"Mange / Ectoparasites",
+    group:"الأمراض الطفيلية والجلدية"
   },
 
   // أمراض العجول
@@ -32469,7 +32547,41 @@ function diseaseIsBreedingHeiferSrv(animal = {}){
 
   return stage === "تحت التلقيح";
 }
+function diseaseIsPostWeaningPlusSrv(animal = {}){
+  if (diseaseAnimalClassSrv(animal) !== "calf") {
+    return true;
+  }
 
+  const d =
+    diseaseAnimalDataSrv(animal);
+
+  if (
+    diseaseDateOnlySrv(
+      d?.weaningDate ||
+      d?.lastWeaningDate ||
+      ""
+    )
+  ) {
+    return true;
+  }
+
+  const stage =
+    diseaseNormArSrv(
+      d?.followerStatus ||
+      d?.status ||
+      ""
+    );
+
+  return [
+    "فطام",
+    "نامي",
+    "تحت التلقيح",
+    "ملقح",
+    "ملقحه",
+    "عشار",
+    "اجهاض"
+  ].includes(stage);
+}
 function diseaseAgeAtLeast365Srv(animal = {}){
   const d =
     diseaseAnimalDataSrv(animal);
@@ -32569,6 +32681,17 @@ function diseaseEligibilityAllowedSrv(
       animal
     );
   }
+  if (rule === "calved_mother_only") {
+  return diseaseHasCalvingHistorySrv(
+    animal
+  );
+}
+
+if (rule === "post_weaning_plus") {
+  return diseaseIsPostWeaningPlusSrv(
+    animal
+  );
+}
 
   if (rule === "mother_history") {
     return diseaseHasMotherHistorySrv(
