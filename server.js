@@ -16869,7 +16869,7 @@ correctionReason:
 },
 
 data: {
-      data: {
+  
   eventDate: eventsPageListDateSrv(ev) || "",
   notes: String(ev.notes ?? ev.note ?? "").trim(),
 
