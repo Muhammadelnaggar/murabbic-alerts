@@ -32752,19 +32752,143 @@ const DISEASE_DETAIL_FORMS_SRV = Object.freeze({
     ]
   })
 });
+const DISEASE_DETAIL_REQUIRED_FIELDS_SRV = Object.freeze({
+  blood_parasites: Object.freeze([
+    "parasiteType",
+    "diagnosisMethod",
+    "severity"
+  ]),
+
+  internal_parasites: Object.freeze([
+    "parasiteType",
+    "diagnosisMethod",
+    "severity"
+  ]),
+
+  external_parasites: Object.freeze([
+    "parasiteType",
+    "diagnosisMethod",
+    "severity",
+    "bodySites"
+  ])
+});
 
 function diseaseDetailFormSchemaSrv(formKey = ""){
-  const key = String(formKey || "").trim();
-  const schema = DISEASE_DETAIL_FORMS_SRV[key];
+  const key =
+    String(formKey || "").trim();
+
+  const schema =
+    DISEASE_DETAIL_FORMS_SRV[key];
 
   if (!schema) return null;
 
+  const requiredFields =
+    new Set(
+      DISEASE_DETAIL_REQUIRED_FIELDS_SRV[key] ||
+      []
+    );
+
+  const parasiteTypes =
+    [...(schema.parasiteTypes || [])];
+
+  const diagnosisMethods =
+    [...(schema.diagnosisMethods || [])];
+
+  const severities =
+    [...(schema.severities || [])];
+
+  const signs =
+    [...(schema.signs || [])];
+
+  const bodySites =
+    [...(schema.bodySites || [])];
+
+  const fields = [
+    {
+      key: "parasiteType",
+      label: "نوع الطفيل",
+      control: "select",
+      placeholder: "اختر نوع الطفيل",
+      required:
+        requiredFields.has(
+          "parasiteType"
+        ),
+      options:
+        parasiteTypes
+    },
+
+    {
+      key: "diagnosisMethod",
+      label: "طريقة التشخيص",
+      control: "select",
+      placeholder:
+        "اختر طريقة التشخيص",
+      required:
+        requiredFields.has(
+          "diagnosisMethod"
+        ),
+      options:
+        diagnosisMethods
+    },
+
+    {
+      key: "severity",
+      label: "شدة الإصابة",
+      control: "select",
+      placeholder:
+        "اختر شدة الإصابة",
+      required:
+        requiredFields.has(
+          "severity"
+        ),
+      options:
+        severities
+    },
+
+    {
+      key: "signs",
+      label: "العلامات الموجودة",
+      control: "multi_select",
+      required:
+        requiredFields.has(
+          "signs"
+        ),
+      options:
+        signs
+    }
+  ];
+
+  if (bodySites.length) {
+    fields.push({
+      key: "bodySites",
+      label: "مواضع الإصابة",
+      control: "multi_select",
+      required:
+        requiredFields.has(
+          "bodySites"
+        ),
+      options:
+        bodySites
+    });
+  }
+
   return {
-    parasiteTypes: [...(schema.parasiteTypes || [])],
-    diagnosisMethods: [...(schema.diagnosisMethods || [])],
-    severities: [...(schema.severities || [])],
-    signs: [...(schema.signs || [])],
-    bodySites: [...(schema.bodySites || [])]
+    formKey: key,
+
+    requiredFields:
+      [...requiredFields],
+
+    fields,
+
+    /*
+      Backward compatibility
+      + server validation source.
+    */
+    parasiteTypes,
+    diagnosisMethods,
+    severities,
+    signs,
+    bodySites
   };
 }
 
@@ -32890,9 +33014,14 @@ function diseaseValidateDetailsSrv(diseaseCode = "", body = {}){
   }
 
   if (
-    formKey === "external_parasites" &&
-    !bodySites.length
-  ) {
+  Array.isArray(
+    schema.requiredFields
+  ) &&
+  schema.requiredFields.includes(
+    "bodySites"
+  ) &&
+  !bodySites.length
+) {
     return {
       ok:false,
       error:"parasite_body_site_required",
