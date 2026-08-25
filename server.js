@@ -16869,9 +16869,18 @@ correctionReason:
 },
 
 data: {
-      eventDate: eventsPageListDateSrv(ev) || "",
-      notes: String(ev.notes ?? ev.note ?? "").trim(),
-      vet: String(ev.vet ?? ev.examiner ?? "").trim(),
+      data: {
+  eventDate: eventsPageListDateSrv(ev) || "",
+  notes: String(ev.notes ?? ev.note ?? "").trim(),
+
+  details:
+    ev.details &&
+    typeof ev.details === "object" &&
+    !Array.isArray(ev.details)
+      ? { ...ev.details }
+      : {},
+
+  vet: String(ev.vet ?? ev.examiner ?? "").trim(),
 
       inseminator: String(ev.inseminator ?? ev.technician ?? "").trim(),
       semenCode: String(ev.semenCode ?? ev.sireNumber ?? ev.bullNumber ?? "").trim(),
