@@ -7061,37 +7061,47 @@ function herdImportV2ValidateEventStructuralInternalSrv(
   }
 
   if (
-    item.eventType === "health"
+  item.eventType === "health"
+) {
+  if (!item.rawDisease) {
+    add(
+      "disease_required",
+      "اختر التشخيص الصحي.",
+      "diseaseCode"
+    );
+
+  } else if (
+    !item.diseaseCode
   ) {
-    if (!item.rawDisease) {
-      add(
-        "disease_required",
-        "اختر التشخيص الصحي.",
-        "diseaseCode"
-      );
+    add(
+      "disease_not_in_catalog",
+      `التشخيص الصحي «${item.rawDisease}» غير موجود في قائمة مُرَبِّيك.`,
+      "diseaseCode"
+    );
 
-    } else if (
-      !item.diseaseCode
-    ) {
-      add(
-        "disease_not_in_catalog",
-        `التشخيص الصحي «${item.rawDisease}» غير موجود في قائمة مُرَبِّيك.`,
-        "diseaseCode"
-      );
+  } else if (
+    DISEASE_CATALOG_SRV[
+      item.diseaseCode
+    ]?.specialPage
+  ) {
+    add(
+      "specialized_health_event_type_required",
+      `تشخيص «${DISEASE_CATALOG_SRV[item.diseaseCode].name}» له نوع حدث مستقل في شيت الأحداث.`,
+      "eventType"
+    );
 
-    } else if (
-      DISEASE_CATALOG_SRV[
-        item.diseaseCode
-      ]?.specialPage
-    ) {
-      add(
-        "specialized_health_event_type_required",
-        `تشخيص «${DISEASE_CATALOG_SRV[item.diseaseCode].name}» له نوع حدث مستقل في شيت الأحداث.`,
-        "eventType"
-      );
-    }
+  } else if (
+    DISEASE_CATALOG_SRV[
+      item.diseaseCode
+    ]?.detailForm
+  ) {
+    add(
+      "detailed_health_event_required",
+      `تشخيص «${DISEASE_CATALOG_SRV[item.diseaseCode].name}» يحتاج تفاصيل من فورم التشخيص الصحي، ولا يُستورد كسطر صحي مختصر.`,
+      "diseaseCode"
+    );
   }
-
+}
   if (
     item.eventType === "lameness"
   ) {
@@ -15662,7 +15672,36 @@ if (key === "health") {
   );
 
   add("المجموعة الصحية", ["diseaseGroup"]);
-  add("الشدة", ["severity", "score", "grade"]);
+  add("نوع الطفيل", [
+  "parasiteType",
+  "details.parasiteType"
+]);
+
+add("طريقة التشخيص", [
+  "diagnosisMethod",
+  "details.diagnosisMethod"
+]);
+
+add("الشدة", [
+  "severity",
+  "details.severity",
+  "score",
+  "grade"
+]);
+
+add("العلامات", [
+  "signs",
+  "clinicalSigns",
+  "details.signs",
+  "details.clinicalSigns"
+]);
+
+add("مواضع الإصابة", [
+  "bodySites",
+  "affectedSites",
+  "details.bodySites",
+  "details.affectedSites"
+]);
   add("العلاج", ["treatment", "drugName", "medicine"]);
   add("الجرعة", ["dose", "doseAmount"]);
 
@@ -17733,11 +17772,24 @@ function eventsPageCorrectionHealthPatchSrv(rows = [], subjectData = {}, oldEven
         ? "التهاب الضرع"
         : String(ev.diseaseName || ev.diagnosis || "").trim();
 
-    const diagnosis = key === "lameness"
-      ? `عرج - ${String(ev.lamenessType || ev.diagnosis || "").trim()}`
-      : key === "mastitis"
-        ? `التهاب الضرع - ${String(ev.mastitisType || "").trim()}`
-        : diseaseName;
+    const diagnosis =
+  key === "lameness"
+    ? `عرج - ${String(
+        ev.lamenessType ||
+        ev.diagnosis ||
+        ""
+      ).trim()}`
+
+    : key === "mastitis"
+      ? `التهاب الضرع - ${String(
+          ev.mastitisType ||
+          ""
+        ).trim()}`
+
+      : String(
+          ev.diagnosis ||
+          diseaseName
+        ).trim();
 
     const latestDate = eventsPageListDateSrv(ev);
     const snapshotDate = eventsPageCorrectionDateSrv(subjectData.lastDiseaseDate || subjectData.lastDiagnosisDate);
@@ -17910,11 +17962,63 @@ function eventsPageCorrectionConflictSrv(
   }
 
   if (typeKey === "health") {
-    const code = String(correctedEvent.diseaseCode || "").trim();
-    if (same.some(row => String(row.data?.diseaseCode || "").trim() === code)) {
-      return "يوجد التشخيص الصحي نفسه للحيوان في التاريخ المحدد.";
+  const code =
+    String(
+      correctedEvent.diseaseCode ||
+      ""
+    ).trim();
+
+  const hasDetailForm =
+    !!DISEASE_CATALOG_SRV[
+      code
+    ]?.detailForm;
+
+  if (hasDetailForm) {
+    const parasiteType =
+      String(
+        correctedEvent.parasiteType ||
+        correctedEvent
+          .details
+          ?.parasiteType ||
+        ""
+      ).trim();
+
+    if (
+      same.some(row => {
+        const ev =
+          row.data || {};
+
+        return (
+          String(
+            ev.diseaseCode || ""
+          ).trim() === code &&
+
+          String(
+            ev.parasiteType ||
+            ev.details
+              ?.parasiteType ||
+            ""
+          ).trim() ===
+            parasiteType
+        );
+      })
+    ) {
+      return "يوجد التشخيص الطفيلي نفسه للحيوان في التاريخ المحدد بنفس نوع الطفيل.";
     }
+
+  } else if (
+    same.some(
+      row =>
+        String(
+          row.data
+            ?.diseaseCode ||
+          ""
+        ).trim() === code
+    )
+  ) {
+    return "يوجد التشخيص الصحي نفسه للحيوان في التاريخ المحدد.";
   }
+}
 
   if (typeKey === "lameness") {
     const leg = String(correctedEvent.affectedLeg || "").trim();
@@ -20024,43 +20128,167 @@ if (
         };
       }
 
-      else if (typeKey === "health") {
-        const diseaseCode = String(body.diseaseCode ?? body.code ?? oldEvent.diseaseCode ?? "").trim().toLowerCase();
-        const disease = DISEASE_CATALOG_SRV[diseaseCode];
+else if (typeKey === "health") {
+  const diseaseCode = String(
+    body.diseaseCode ??
+    body.code ??
+    oldEvent.diseaseCode ??
+    ""
+  ).trim().toLowerCase();
 
-        if (!disease || disease.specialPage) {
-          return res.status(400).json({
-            ok: false,
-            error: "invalid_health_diagnosis",
-            message: "❌ اختر تشخيصًا صحيًا عامًا صالحًا للتعديل من سجل الأحداث."
-          });
-        }
+  const disease =
+    DISEASE_CATALOG_SRV[diseaseCode];
 
-        const diseaseThresholds =
-  await loadGroupThresholdsSrv(uid);
+  if (!disease || disease.specialPage) {
+    return res.status(400).json({
+      ok: false,
+      error: "invalid_health_diagnosis",
+      message:
+        "❌ اختر تشخيصًا صحيًا عامًا صالحًا للتعديل من سجل الأحداث."
+    });
+  }
 
-const allowedCodes = new Set(
-  diseaseListForAnimalSrv(
-    subject,
-    diseaseThresholds
-  ).map(x => x.code)
-);
-        if (!allowedCodes.has(diseaseCode)) {
-          return res.status(400).json({
-            ok: false,
-            error: "health_diagnosis_not_allowed",
-            message: "❌ هذا التشخيص غير مناسب لهذا الحيوان حسب بياناته الحالية."
-          });
-        }
+  const diseaseThresholds =
+    await loadGroupThresholdsSrv(uid);
 
-        eventPatch = {
-          ...eventPatch,
-          diseaseCode,
-          diseaseName: disease.name,
-          diseaseGroup: disease.group || "general"
-        };
-      }
+  const allowedCodes =
+    new Set(
+      diseaseListForAnimalSrv(
+        subject,
+        diseaseThresholds
+      ).map(x => x.code)
+    );
 
+  if (!allowedCodes.has(diseaseCode)) {
+    return res.status(400).json({
+      ok: false,
+      error:
+        "health_diagnosis_not_allowed",
+      message:
+        "❌ هذا التشخيص غير مناسب لهذا الحيوان حسب بياناته الحالية."
+    });
+  }
+
+  const detailInput = {
+    ...oldEvent,
+    ...body,
+
+    details:
+      body.details &&
+      typeof body.details === "object" &&
+      !Array.isArray(body.details)
+        ? body.details
+        : oldEvent.details
+  };
+
+  const detailCheck =
+    diseaseValidateDetailsSrv(
+      diseaseCode,
+      detailInput
+    );
+
+  if (!detailCheck.ok) {
+    return res.status(400).json({
+      ok: false,
+
+      error:
+        detailCheck.error ||
+        "invalid_disease_details",
+
+      message:
+        detailCheck.message ||
+        "❌ راجع تفاصيل التشخيص الصحي."
+    });
+  }
+
+  const diseaseDetails =
+    detailCheck.details;
+
+  const diagnosisText =
+    diseaseDetails?.parasiteType
+      ? `${disease.name} - ${diseaseDetails.parasiteType}`
+      : disease.name;
+
+  eventPatch = {
+    ...eventPatch,
+
+    diseaseCode,
+    diseaseName:
+      disease.name,
+
+    diseaseGroup:
+      disease.group || "general",
+
+    diagnosis:
+      diagnosisText,
+
+    diagnosisMode:
+      "health_diagnosis",
+
+    detailForm:
+      disease.detailForm || null,
+
+    parasiteType:
+      diseaseDetails?.parasiteType ||
+      null,
+
+    diagnosisMethod:
+      diseaseDetails
+        ?.diagnosisMethod ||
+      null,
+
+    severity:
+      diseaseDetails?.severity ||
+      null,
+
+    signs:
+      diseaseDetails?.signs ||
+      null,
+
+    bodySites:
+      diseaseDetails?.bodySites ||
+      null,
+
+    details: {
+      diseaseCode,
+
+      diseaseName:
+        disease.name,
+
+      diagnosis:
+        diagnosisText,
+
+      formType:
+        diseaseDetails?.formType ||
+        null,
+
+      parasiteType:
+        diseaseDetails
+          ?.parasiteType ||
+        null,
+
+      diagnosisMethod:
+        diseaseDetails
+          ?.diagnosisMethod ||
+        null,
+
+      severity:
+        diseaseDetails?.severity ||
+        null,
+
+      signs:
+        diseaseDetails?.signs ||
+        null,
+
+      bodySites:
+        diseaseDetails?.bodySites ||
+        null,
+
+      notes:
+        notes || null
+    }
+  };
+}
       else if (typeKey === "weaning") {
         const weight = weaningWeightFromBodySrv({
           ...oldEvent,
@@ -32349,10 +32577,11 @@ const DISEASE_CATALOG_SRV = {
   },
 
   blood_parasites: {
-    name:"طفيليات الدم",
-    nameEn:"Blood Parasites",
-    group:"الأمراض المعدية والجهازية"
-  },
+  name:"طفيليات الدم",
+  nameEn:"Blood Parasites",
+  group:"الأمراض المعدية والجهازية",
+  detailForm:"blood_parasites"
+},
 
   pinkeye: {
     name:"التهاب العين المعدي",
@@ -32362,16 +32591,18 @@ const DISEASE_CATALOG_SRV = {
 
   // الأمراض الطفيلية والجلدية
   gastrointestinal_parasites: {
-    name:"الطفيليات الداخلية / الديدان المعوية",
-    nameEn:"Gastrointestinal Parasitism",
-    group:"الأمراض الطفيلية والجلدية"
-  },
+  name:"الطفيليات الداخلية / الديدان المعوية",
+  nameEn:"Gastrointestinal Parasitism",
+  group:"الأمراض الطفيلية والجلدية",
+  detailForm:"internal_parasites"
+},
 
-  mange_ectoparasites: {
-    name:"الجرب / الطفيليات الخارجية",
-    nameEn:"Mange / Ectoparasites",
-    group:"الأمراض الطفيلية والجلدية"
-  },
+mange_ectoparasites: {
+  name:"الجرب / الطفيليات الخارجية",
+  nameEn:"Mange / Ectoparasites",
+  group:"الأمراض الطفيلية والجلدية",
+  detailForm:"external_parasites"
+},
 
   // أمراض العجول
   calf_scours: {
@@ -32409,6 +32640,278 @@ const DISEASE_CATALOG_SRV = {
     eligibility:"calf_only"
   }
 };
+const DISEASE_DETAIL_FORMS_SRV = Object.freeze({
+  blood_parasites: Object.freeze({
+    parasiteTypes: [
+      "بابيزيا",
+      "ثيليريا",
+      "أنابلازما",
+      "تريبانوسوما",
+      "طفيليات دم مختلطة",
+      "طفيليات دم غير محددة"
+    ],
+    diagnosisMethods: [
+      "اشتباه إكلينيكي",
+      "فحص لطاخة دم",
+      "فحص معملي / PCR",
+      "فحص إكلينيكي + لطاخة دم",
+      "تشخيص معملي آخر"
+    ],
+    severities: [
+      "خفيفة",
+      "متوسطة",
+      "شديدة"
+    ],
+    signs: [
+      "ارتفاع الحرارة",
+      "شحوب الأغشية المخاطية / أنيميا",
+      "يرقان",
+      "بول أحمر / هيموجلوبينوريا",
+      "تضخم العقد الليمفاوية",
+      "ضعف / فقد شهية",
+      "هبوط إنتاج اللبن",
+      "علامات عصبية",
+      "وجود قراد"
+    ],
+    bodySites: []
+  }),
+
+  internal_parasites: Object.freeze({
+    parasiteTypes: [
+      "ديدان معدية معوية",
+      "فاشيولا / ديدان كبدية",
+      "بارامفستومم / ديدان الكرش",
+      "ديدان رئوية",
+      "طفيليات داخلية مختلطة",
+      "طفيليات داخلية غير محددة"
+    ],
+    diagnosisMethods: [
+      "اشتباه إكلينيكي",
+      "فحص براز نوعي",
+      "عد بيض البراز",
+      "فحص معملي آخر",
+      "تشريح / فحص بعد النفوق"
+    ],
+    severities: [
+      "خفيفة",
+      "متوسطة",
+      "شديدة"
+    ],
+    signs: [
+      "إسهال",
+      "نقص وزن / تأخر نمو",
+      "خشونة الشعر",
+      "شحوب / أنيميا",
+      "وذمة تحت الفك",
+      "كحة / صعوبة تنفس",
+      "انخفاض الشهية",
+      "هبوط إنتاج اللبن"
+    ],
+    bodySites: []
+  }),
+
+  external_parasites: Object.freeze({
+    parasiteTypes: [
+      "قراد",
+      "قمل",
+      "جرب / حلم",
+      "ذباب / حشرات خارجية",
+      "طفيليات خارجية مختلطة",
+      "طفيليات خارجية غير محددة"
+    ],
+    diagnosisMethods: [
+      "فحص ظاهري",
+      "كشط جلدي",
+      "فحص مجهري / معملي",
+      "فحص ظاهري + كشط جلدي",
+      "تشخيص معملي آخر"
+    ],
+    severities: [
+      "خفيفة",
+      "متوسطة",
+      "شديدة"
+    ],
+    signs: [
+      "حكة",
+      "تساقط شعر",
+      "قشور / سماكة جلد",
+      "جروح / نزف",
+      "التهاب جلد",
+      "هزال / ضعف",
+      "شحوب / أنيميا"
+    ],
+    bodySites: [
+      "الرأس / الأذنان",
+      "الرقبة",
+      "الظهر / الجانبان",
+      "البطن",
+      "الضرع / العجان",
+      "الأطراف",
+      "الذيل / قاعدة الذيل",
+      "منتشر على الجسم"
+    ]
+  })
+});
+
+function diseaseDetailFormSchemaSrv(formKey = ""){
+  const key = String(formKey || "").trim();
+  const schema = DISEASE_DETAIL_FORMS_SRV[key];
+
+  if (!schema) return null;
+
+  return {
+    parasiteTypes: [...(schema.parasiteTypes || [])],
+    diagnosisMethods: [...(schema.diagnosisMethods || [])],
+    severities: [...(schema.severities || [])],
+    signs: [...(schema.signs || [])],
+    bodySites: [...(schema.bodySites || [])]
+  };
+}
+
+function diseaseDetailListSrv(raw){
+  const source = Array.isArray(raw)
+    ? raw
+    : String(raw || "").split(/[،,|]/);
+
+  return [...new Set(
+    source
+      .map(v => String(v || "").trim())
+      .filter(Boolean)
+  )];
+}
+
+function diseaseValidateDetailsSrv(diseaseCode = "", body = {}){
+  const code = String(diseaseCode || "").trim().toLowerCase();
+  const disease = DISEASE_CATALOG_SRV[code] || {};
+  const formKey = String(disease.detailForm || "").trim();
+
+  if (!formKey) {
+    return { ok:true, details:null };
+  }
+
+  const schema =
+    diseaseDetailFormSchemaSrv(formKey);
+
+  if (!schema) {
+    return {
+      ok:false,
+      error:"disease_detail_schema_missing",
+      message:"❌ تعذّر تحميل تفاصيل هذا التشخيص الصحي."
+    };
+  }
+
+  const src =
+    body?.details &&
+    typeof body.details === "object" &&
+    !Array.isArray(body.details)
+      ? body.details
+      : body;
+
+  const parasiteType =
+    String(src.parasiteType || "").trim();
+
+  const diagnosisMethod =
+    String(src.diagnosisMethod || "").trim();
+
+  const severity =
+    String(src.severity || "").trim();
+
+  const signs =
+    diseaseDetailListSrv(
+      src.signs ||
+      src.clinicalSigns ||
+      []
+    );
+
+  const bodySites =
+    diseaseDetailListSrv(
+      src.bodySites ||
+      src.affectedSites ||
+      []
+    );
+
+  if (
+    !parasiteType ||
+    !schema.parasiteTypes.includes(parasiteType)
+  ) {
+    return {
+      ok:false,
+      error:"parasite_type_required",
+      message:"❌ اختر نوع الطفيل من القائمة."
+    };
+  }
+
+  if (
+    !diagnosisMethod ||
+    !schema.diagnosisMethods.includes(diagnosisMethod)
+  ) {
+    return {
+      ok:false,
+      error:"parasite_diagnosis_method_required",
+      message:"❌ اختر طريقة تشخيص الإصابة الطفيلية."
+    };
+  }
+
+  if (
+    !severity ||
+    !schema.severities.includes(severity)
+  ) {
+    return {
+      ok:false,
+      error:"parasite_severity_required",
+      message:"❌ اختر شدة الإصابة."
+    };
+  }
+
+  const invalidSigns =
+    signs.filter(
+      x => !schema.signs.includes(x)
+    );
+
+  if (invalidSigns.length) {
+    return {
+      ok:false,
+      error:"parasite_sign_invalid",
+      message:`❌ توجد علامة سريرية غير معتمدة: ${invalidSigns.join("، ")}.`
+    };
+  }
+
+  const invalidSites =
+    bodySites.filter(
+      x => !schema.bodySites.includes(x)
+    );
+
+  if (invalidSites.length) {
+    return {
+      ok:false,
+      error:"parasite_body_site_invalid",
+      message:`❌ يوجد موضع إصابة غير معتمد: ${invalidSites.join("، ")}.`
+    };
+  }
+
+  if (
+    formKey === "external_parasites" &&
+    !bodySites.length
+  ) {
+    return {
+      ok:false,
+      error:"parasite_body_site_required",
+      message:"❌ اختر موضع إصابة واحدًا على الأقل للطفيليات الخارجية."
+    };
+  }
+
+  return {
+    ok:true,
+    details: {
+      formType: formKey,
+      parasiteType,
+      diagnosisMethod,
+      severity,
+      signs,
+      bodySites
+    }
+  };
+}
 function diseaseDateOnlySrv(v){
   const s = String(v || "").trim().slice(0,10);
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
@@ -32765,7 +33268,17 @@ function diseaseListForAnimalSrv(
       code,
       name: x.name,
       nameEn: x.nameEn || "",
-      group: x.group || "عام"
+      group: x.group || "عام",
+      detailForm:
+        String(
+          x.detailForm || ""
+        ).trim(),
+      detailOptions:
+        x.detailForm
+          ? diseaseDetailFormSchemaSrv(
+              x.detailForm
+            )
+          : null
     }));
 }
 async function diseaseFindSubjectByNumberSrv(uid, number) {
@@ -32992,7 +33505,22 @@ const affectedLeg = (
 
     return `lameness|${affectedLeg}|${lamenessType}`;
   }
+if (
+  [
+    "blood_parasites",
+    "gastrointestinal_parasites",
+    "mange_ectoparasites"
+  ].includes(diseaseCode)
+) {
+  const parasiteType =
+    healthDupStrSrv(
+      e.parasiteType ||
+      e.details?.parasiteType ||
+      ""
+    );
 
+  return `disease|${diseaseCode}|${parasiteType}`;
+}
   if (diseaseCode) {
     return `disease|${diseaseCode}`;
   }
@@ -33160,13 +33688,35 @@ const allowedCodes = new Set(
     redirectUrl
   });
 }
+const detailCheck =
+  diseaseValidateDetailsSrv(
+    diseaseCode,
+    body
+  );
 
-    const duplicateHealth = await healthDuplicateSameDayDetailsSrv(uid, {
-      animalNumber,
-      eventDate,
-      diseaseCode,
-      diseaseName: disease.name
-    });
+if (!detailCheck.ok) {
+  return res.status(400).json({
+    ok:false,
+    error:
+      detailCheck.error ||
+      "invalid_disease_details",
+    message:
+      detailCheck.message ||
+      "❌ راجع تفاصيل التشخيص الصحي."
+  });
+}
+
+const diseaseDetails =
+  detailCheck.details;
+
+    const duplicateHealth =
+  await healthDuplicateSameDayDetailsSrv(uid, {
+    animalNumber,
+    eventDate,
+    diseaseCode,
+    diseaseName: disease.name,
+    ...(diseaseDetails || {})
+  });
 
     if (duplicateHealth?.error) {
       return res.status(503).json({
@@ -33188,35 +33738,73 @@ const allowedCodes = new Set(
 
     const eventRef = db.collection("events").doc();
     const targetCollection = animal._collection || "animals";
+    const diagnosisText =
+    diseaseDetails?.parasiteType
+    ? `${disease.name} - ${diseaseDetails.parasiteType}`
+    : disease.name;
 
-    const payload = {
-      userId: uid,
-      ownerUid: uid,
-      animalId: animal.id || "",
-      animalNumber,
-      eventDate,
+const payload = {
+  userId: uid,
+  ownerUid: uid,
+  animalId: animal.id || "",
+  animalNumber,
+  eventDate,
 
-      type: "تشخيص صحي",
-      eventType: "health",
-      eventTypeNorm: "health",
+  type: "تشخيص صحي",
+  eventType: "health",
+  eventTypeNorm: "health",
 
-      diseaseCode,
-      diseaseName: disease.name,
-      diseaseGroup: disease.group || "general",
-      diagnosisMode: "health_diagnosis",
-      notes: notes || null,
+  diseaseCode,
+  diseaseName: disease.name,
+  diseaseGroup: disease.group || "general",
+  diagnosis: diagnosisText,
+  diagnosisMode: "health_diagnosis",
+  detailForm: disease.detailForm || null,
 
-      animalCollection: targetCollection,
-      animalClass: diseaseAnimalClassSrv(animal),
+  ...(diseaseDetails
+    ? {
+        parasiteType:
+          diseaseDetails.parasiteType,
 
-      source: "server:/api/disease/save",
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    };
+        diagnosisMethod:
+          diseaseDetails.diagnosisMethod,
 
+        severity:
+          diseaseDetails.severity,
+
+        signs:
+          diseaseDetails.signs,
+
+        bodySites:
+          diseaseDetails.bodySites
+      }
+    : {}),
+
+  notes: notes || null,
+
+  details: {
+    diseaseCode,
+    diseaseName: disease.name,
+    diagnosis: diagnosisText,
+    ...(diseaseDetails || {}),
+    notes: notes || null
+  },
+
+  animalCollection: targetCollection,
+  animalClass:
+    diseaseAnimalClassSrv(animal),
+
+  source:
+    "server:/api/disease/save",
+
+  createdAt:
+    admin.firestore.FieldValue
+      .serverTimestamp()
+};
     const animalPatch = {
       lastDisease: disease.name,
       lastDiseaseDate: eventDate,
-      lastDiagnosis: disease.name,
+      lastDiagnosis: diagnosisText,
       lastDiagnosisDate: eventDate,
       healthStatus: disease.name,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -36426,7 +37014,7 @@ app.post("/api/mastitis/save", requireUserId, async (req, res) => {
       healthStatus: "التهاب الضرع",
       lastDisease: "التهاب الضرع",
       lastDiseaseDate: fd.eventDate,
-      lastDiagnosis: diagnosisText,
+      lastDiagnosis: disease.name,
       lastDiagnosisDate: fd.eventDate,
 
       lastMastitisDate: fd.eventDate,
