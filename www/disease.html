@@ -43,6 +43,18 @@
         </div>
       </div>
     </div>
+  <div
+  class="card grid"
+  id="editDiseaseCard"
+  hidden
+  style="display:none"
+>
+  <div>
+    <label for="editDiseaseSelect">التشخيص</label>
+    <select id="editDiseaseSelect"></select>
+  </div>
+</div>
+
 <div
   class="card grid"
   id="diseaseDetailCard"
@@ -54,92 +66,13 @@
     class="form-hint"
   ></div>
 
-  <div class="row">
-    <div>
-      <label for="parasiteType">
-        نوع الطفيل
-      </label>
-
-      <select
-        id="parasiteType"
-      ></select>
-    </div>
-
-    <div>
-      <label for="parasiteDiagnosisMethod">
-        طريقة التشخيص
-      </label>
-
-      <select
-        id="parasiteDiagnosisMethod"
-      ></select>
-    </div>
-
-    <div>
-      <label for="parasiteSeverity">
-        شدة الإصابة
-      </label>
-
-      <select
-        id="parasiteSeverity"
-      ></select>
-    </div>
-  </div>
-
-  <div>
-    <label>
-      العلامات الموجودة
-    </label>
-
-    <div
-      id="parasiteSignsList"
-      class="mbk-action-list mbk-event-grid"
-    ></div>
-  </div>
-
   <div
-    id="parasiteBodySitesWrap"
-    hidden
-    style="display:none"
-  >
-    <label>
-      مواضع الإصابة
-    </label>
-
-    <div
-      id="parasiteBodySitesList"
-      class="mbk-action-list mbk-event-grid"
-    ></div>
-  </div>
+    id="diseaseDetailFields"
+    class="grid"
+  ></div>
 </div>
-    <div
-      class="card grid"
-      id="diseaseConfirmCard"
-      hidden
-      style="display:none"
-    >
-      <div id="diseaseConfirmText" class="form-hint"></div>
 
-      <div class="mbk-action-list mbk-event-grid">
-        <button
-          type="button"
-          class="mbk-action-tile"
-          id="confirmDiseaseBtn"
-        >
-          تأكيد التسجيل
-        </button>
-
-        <button
-          type="button"
-          class="mbk-action-tile"
-          id="cancelDiseaseBtn"
-        >
-          إلغاء
-        </button>
-      </div>
-    </div>
-
-   <div
+<div
   class="card grid"
   id="editToolsCard"
   hidden
@@ -147,7 +80,10 @@
 >
   <div class="row">
     <div>
-      <label for="correctionPerformedBy">القائم بالتعديل</label>
+      <label for="correctionPerformedBy">
+        القائم بالتعديل
+      </label>
+
       <input
         id="correctionPerformedBy"
         type="text"
@@ -159,7 +95,10 @@
     </div>
 
     <div>
-      <label for="correctionReason">سبب التعديل</label>
+      <label for="correctionReason">
+        سبب التعديل
+      </label>
+
       <input
         id="correctionReason"
         type="text"
@@ -170,7 +109,39 @@
     </div>
   </div>
 
-  <datalist id="operationalPerformersList"></datalist>
+  <datalist
+    id="operationalPerformersList"
+  ></datalist>
+</div>
+
+<div
+  class="card grid"
+  id="diseaseConfirmCard"
+  hidden
+  style="display:none"
+>
+  <div
+    id="diseaseConfirmText"
+    class="form-hint"
+  ></div>
+
+  <div class="mbk-action-list mbk-event-grid">
+    <button
+      type="button"
+      class="mbk-action-tile"
+      id="confirmDiseaseBtn"
+    >
+      تأكيد التسجيل
+    </button>
+
+    <button
+      type="button"
+      class="mbk-action-tile"
+      id="cancelDiseaseBtn"
+    >
+      إلغاء
+    </button>
+  </div>
 </div>
 
 <div id="animalSummary" class="form-hint"></div>
@@ -221,33 +192,28 @@ const confirmDiseaseBtn =
 
 const cancelDiseaseBtn =
   $("cancelDiseaseBtn");
-  const diseaseDetailCard =
+
+const editDiseaseCard =
+  $("editDiseaseCard");
+
+const editDiseaseSelect =
+  $("editDiseaseSelect");
+
+const diseaseDetailCard =
   $("diseaseDetailCard");
 
 const diseaseDetailTitle =
   $("diseaseDetailTitle");
 
-const parasiteTypeEl =
-  $("parasiteType");
-
-const parasiteDiagnosisMethodEl =
-  $("parasiteDiagnosisMethod");
-
-const parasiteSeverityEl =
-  $("parasiteSeverity");
-
-const parasiteSignsList =
-  $("parasiteSignsList");
-
-const parasiteBodySitesWrap =
-  $("parasiteBodySitesWrap");
-
-const parasiteBodySitesList =
-  $("parasiteBodySitesList");
+const diseaseDetailFields =
+  $("diseaseDetailFields");
 
 let pendingDiseaseItem = null;
 let pendingDiseaseButton = null;
+
 let currentEditDiseaseData = null;
+let editableDiseaseItems = [];
+
 
   const params =
     new URLSearchParams(
@@ -513,6 +479,7 @@ let currentEditDiseaseData = null;
         .appendChild(option);
     });
   }
+
 function diseaseDetailSavedValue(
   saved,
   key,
@@ -525,15 +492,12 @@ function diseaseDetailSavedValue(
     return fallback;
   }
 
-  const direct =
-    saved[key];
-
   if (
-    direct !== undefined &&
-    direct !== null &&
-    direct !== ""
+    saved[key] !== undefined &&
+    saved[key] !== null &&
+    saved[key] !== ""
   ) {
-    return direct;
+    return saved[key];
   }
 
   const nested =
@@ -552,195 +516,20 @@ function diseaseDetailSavedValue(
 }
 
 
-function fillDiseaseDetailSelect(
-  selectEl,
-  items,
-  selectedValue,
-  placeholder
-){
-  if (!selectEl) return;
-
-  selectEl.innerHTML = "";
-
-  const empty =
-    document.createElement(
-      "option"
-    );
-
-  empty.value = "";
-  empty.textContent =
-    placeholder;
-
-  selectEl.appendChild(
-    empty
-  );
-
-  (
-    Array.isArray(items)
-      ? items
-      : []
-  ).forEach(value => {
-    const option =
-      document.createElement(
-        "option"
-      );
-
-    option.value =
-      value;
-
-    option.textContent =
-      value;
-
-    if (
-      String(value) ===
-      String(
-        selectedValue ||
-        ""
-      )
-    ) {
-      option.selected =
-        true;
-    }
-
-    selectEl.appendChild(
-      option
-    );
-  });
-}
-
-
-function renderDiseaseDetailChecks(
-  container,
-  name,
-  items,
-  selectedValues
-){
-  if (!container) return;
-
-  container.innerHTML = "";
-
-  const selected =
-    new Set(
-      Array.isArray(
-        selectedValues
-      )
-        ? selectedValues
-            .map(x =>
-              String(
-                x || ""
-              ).trim()
-            )
-        : []
-    );
-
-  (
-    Array.isArray(items)
-      ? items
-      : []
-  ).forEach(value => {
-    const label =
-      document.createElement(
-        "label"
-      );
-
-    label.className =
-      "mbk-action-tile";
-
-    const input =
-      document.createElement(
-        "input"
-      );
-
-    input.type =
-      "checkbox";
-
-    input.name =
-      name;
-
-    input.value =
-      value;
-
-    input.checked =
-      selected.has(value);
-
-    const text =
-      document.createElement(
-        "span"
-      );
-
-    text.textContent =
-      value;
-
-    label.appendChild(
-      input
-    );
-
-    label.appendChild(
-      text
-    );
-
-    container.appendChild(
-      label
-    );
-  });
-}
-
-
 function clearDiseaseDetailForm(){
+  diseaseDetailFields
+    ?.replaceChildren();
+
+  if (diseaseDetailTitle) {
+    diseaseDetailTitle.textContent =
+      "";
+  }
+
   if (diseaseDetailCard) {
     diseaseDetailCard.hidden =
       true;
 
-    diseaseDetailCard
-      .style.display =
-      "none";
-  }
-
-  if (diseaseDetailTitle) {
-    diseaseDetailTitle
-      .textContent =
-      "";
-  }
-
-  if (parasiteTypeEl) {
-    parasiteTypeEl
-      .innerHTML =
-      "";
-  }
-
-  if (
-    parasiteDiagnosisMethodEl
-  ) {
-    parasiteDiagnosisMethodEl
-      .innerHTML =
-      "";
-  }
-
-  if (parasiteSeverityEl) {
-    parasiteSeverityEl
-      .innerHTML =
-      "";
-  }
-
-  if (parasiteSignsList) {
-    parasiteSignsList
-      .innerHTML =
-      "";
-  }
-
-  if (parasiteBodySitesList) {
-    parasiteBodySitesList
-      .innerHTML =
-      "";
-  }
-
-  if (parasiteBodySitesWrap) {
-    parasiteBodySitesWrap
-      .hidden =
-      true;
-
-    parasiteBodySitesWrap
-      .style.display =
+    diseaseDetailCard.style.display =
       "none";
   }
 }
@@ -752,125 +541,221 @@ function renderDiseaseDetailForm(
 ){
   clearDiseaseDetailForm();
 
-  if (
-    !item?.detailForm ||
-    !item?.detailOptions
-  ) {
+  const fields =
+    Array.isArray(
+      item?.detailOptions?.fields
+    )
+      ? item.detailOptions.fields
+      : [];
+
+  if (!fields.length) {
     return;
   }
 
-  const options =
-    item.detailOptions ||
-    {};
-
-  const savedParasiteType =
-    diseaseDetailSavedValue(
-      saved,
-      "parasiteType",
-      ""
-    );
-
-  const savedDiagnosisMethod =
-    diseaseDetailSavedValue(
-      saved,
-      "diagnosisMethod",
-      ""
-    );
-
-  const savedSeverity =
-    diseaseDetailSavedValue(
-      saved,
-      "severity",
-      ""
-    );
-
-  const savedSigns =
-    diseaseDetailSavedValue(
-      saved,
-      "signs",
-      []
-    );
-
-  const savedBodySites =
-    diseaseDetailSavedValue(
-      saved,
-      "bodySites",
-      []
-    );
-
-  diseaseDetailTitle
-    .textContent =
+  diseaseDetailTitle.textContent =
     `تفاصيل «${item.name || "التشخيص"}»`;
 
-  fillDiseaseDetailSelect(
-    parasiteTypeEl,
-    options.parasiteTypes,
-    savedParasiteType,
-    "اختر نوع الطفيل"
-  );
+  fields.forEach(field => {
+    const key =
+      String(
+        field?.key || ""
+      ).trim();
 
-  fillDiseaseDetailSelect(
-    parasiteDiagnosisMethodEl,
-    options.diagnosisMethods,
-    savedDiagnosisMethod,
-    "اختر طريقة التشخيص"
-  );
+    if (!key) return;
 
-  fillDiseaseDetailSelect(
-    parasiteSeverityEl,
-    options.severities,
-    savedSeverity,
-    "اختر شدة الإصابة"
-  );
+    const control =
+      String(
+        field?.control || "text"
+      ).trim();
 
-  renderDiseaseDetailChecks(
-    parasiteSignsList,
-    "parasiteSigns",
-    options.signs,
+    const options =
+      Array.isArray(field?.options)
+        ? field.options
+        : [];
 
-    Array.isArray(
-      savedSigns
-    )
-      ? savedSigns
-      : []
-  );
+    const wrap =
+      document.createElement("div");
 
-  const bodySites =
-    Array.isArray(
-      options.bodySites
-    )
-      ? options.bodySites
-      : [];
+    const label =
+      document.createElement("label");
 
-  renderDiseaseDetailChecks(
-    parasiteBodySitesList,
-    "parasiteBodySites",
-    bodySites,
+    label.textContent =
+      String(
+        field?.label || key
+      ) +
+      (
+        field?.required
+          ? " *"
+          : ""
+      );
 
-    Array.isArray(
-      savedBodySites
-    )
-      ? savedBodySites
-      : []
-  );
+    wrap.appendChild(label);
 
-  const showBodySites =
-    bodySites.length > 0;
+    const savedValue =
+      diseaseDetailSavedValue(
+        saved,
+        key,
+        control === "multi_select"
+          ? []
+          : ""
+      );
 
-  parasiteBodySitesWrap.hidden =
-    !showBodySites;
+    if (
+      control === "multi_select"
+    ) {
+      const list =
+        document.createElement("div");
 
-  parasiteBodySitesWrap
-    .style.display =
-    showBodySites
-      ? ""
-      : "none";
+      list.className =
+        "mbk-action-list mbk-event-grid";
+
+      const selected =
+        new Set(
+          Array.isArray(savedValue)
+            ? savedValue.map(
+                v =>
+                  String(v || "")
+              )
+            : []
+        );
+
+      options.forEach(value => {
+        const optionLabel =
+          document.createElement(
+            "label"
+          );
+
+        optionLabel.className =
+          "mbk-action-tile";
+
+        const input =
+          document.createElement(
+            "input"
+          );
+
+        input.type =
+          "checkbox";
+
+        input.value =
+          value;
+
+        input.dataset.detailKey =
+          key;
+
+        input.checked =
+          selected.has(
+            String(value)
+          );
+
+        const text =
+          document.createElement(
+            "span"
+          );
+
+        text.textContent =
+          value;
+
+        optionLabel.appendChild(
+          input
+        );
+
+        optionLabel.appendChild(
+          text
+        );
+
+        list.appendChild(
+          optionLabel
+        );
+      });
+
+      wrap.appendChild(list);
+
+    } else if (
+      control === "select"
+    ) {
+      const select =
+        document.createElement(
+          "select"
+        );
+
+      select.dataset.detailKey =
+        key;
+
+      const empty =
+        document.createElement(
+          "option"
+        );
+
+      empty.value = "";
+
+      empty.textContent =
+        String(
+          field?.placeholder ||
+          "اختر"
+        );
+
+      select.appendChild(empty);
+
+      options.forEach(value => {
+        const option =
+          document.createElement(
+            "option"
+          );
+
+        option.value =
+          value;
+
+        option.textContent =
+          value;
+
+        option.selected =
+          String(value) ===
+          String(
+            savedValue || ""
+          );
+
+        select.appendChild(option);
+      });
+
+      wrap.appendChild(select);
+
+    } else {
+      const input =
+        document.createElement(
+          "input"
+        );
+
+      input.type =
+        control === "number"
+          ? "number"
+          : "text";
+
+      input.dataset.detailKey =
+        key;
+
+      input.value =
+        String(
+          savedValue ?? ""
+        );
+
+      if (field?.placeholder) {
+        input.placeholder =
+          String(
+            field.placeholder
+          );
+      }
+
+      wrap.appendChild(input);
+    }
+
+    diseaseDetailFields
+      ?.appendChild(wrap);
+  });
 
   diseaseDetailCard.hidden =
     false;
 
-  diseaseDetailCard
-    .style.display =
+  diseaseDetailCard.style.display =
     "";
 }
 
@@ -878,114 +763,227 @@ function renderDiseaseDetailForm(
 function collectDiseaseDetails(
   item
 ){
-  if (!item?.detailForm) {
-    return {
-      ok: true,
-      details: null
-    };
-  }
-
-  const parasiteType =
-    String(
-      parasiteTypeEl
-        ?.value ||
-      ""
-    ).trim();
-
-  const diagnosisMethod =
-    String(
-      parasiteDiagnosisMethodEl
-        ?.value ||
-      ""
-    ).trim();
-
-  const severity =
-    String(
-      parasiteSeverityEl
-        ?.value ||
-      ""
-    ).trim();
-
-  const signs =
-    Array.from(
-      document
-        .querySelectorAll(
-          'input[name="parasiteSigns"]:checked'
-        )
+  const fields =
+    Array.isArray(
+      item?.detailOptions?.fields
     )
-      .map(x =>
-        String(
-          x.value || ""
-        ).trim()
-      )
-      .filter(Boolean);
+      ? item.detailOptions.fields
+      : [];
 
-  const bodySites =
+  if (!fields.length) {
+    return null;
+  }
+
+  const details = {};
+
+  const controls =
     Array.from(
-      document
-        .querySelectorAll(
-          'input[name="parasiteBodySites"]:checked'
-        )
-    )
-      .map(x =>
-        String(
-          x.value || ""
-        ).trim()
-      )
-      .filter(Boolean);
+      diseaseDetailFields
+        ?.querySelectorAll(
+          "[data-detail-key]"
+        ) || []
+    );
 
-  if (!parasiteType) {
-    return {
-      ok: false,
-      message:
-        "❌ اختر نوع الطفيل."
-    };
-  }
+  fields.forEach(field => {
+    const key =
+      String(
+        field?.key || ""
+      ).trim();
 
-  if (!diagnosisMethod) {
-    return {
-      ok: false,
-      message:
-        "❌ اختر طريقة تشخيص الإصابة الطفيلية."
-    };
-  }
+    if (!key) return;
 
-  if (!severity) {
-    return {
-      ok: false,
-      message:
-        "❌ اختر شدة الإصابة."
-    };
-  }
+    const matches =
+      controls.filter(
+        el =>
+          el.dataset.detailKey ===
+          key
+      );
 
-  if (
-    item.detailForm ===
-      "external_parasites" &&
-    !bodySites.length
-  ) {
-    return {
-      ok: false,
-      message:
-        "❌ اختر موضع إصابة واحدًا على الأقل للطفيليات الخارجية."
-    };
-  }
+    if (
+      String(
+        field?.control || ""
+      ) === "multi_select"
+    ) {
+      details[key] =
+        matches
+          .filter(
+            el => el.checked
+          )
+          .map(
+            el =>
+              String(
+                el.value || ""
+              ).trim()
+          )
+          .filter(Boolean);
 
-  return {
-    ok: true,
-
-    details: {
-      formType:
-        item.detailForm,
-
-      parasiteType,
-      diagnosisMethod,
-      severity,
-      signs,
-      bodySites
+      return;
     }
-  };
+
+    details[key] =
+      String(
+        matches[0]?.value || ""
+      ).trim();
+  });
+
+  return details;
 }
 
+
+function setDiseaseCatalogVisible(
+  show
+){
+  if (!dz) return;
+
+  dz.hidden =
+    !show;
+
+  dz.style.display =
+    show
+      ? ""
+      : "none";
+}
+
+
+function renderEditDiseaseSelect(
+  list,
+  selectedCode = ""
+){
+  editDiseaseSelect
+    .replaceChildren();
+
+  const groups =
+    new Map();
+
+  (
+    Array.isArray(list)
+      ? list
+      : []
+  )
+    .filter(
+      item =>
+        item &&
+        item.code
+    )
+    .forEach(item => {
+      const groupName =
+        String(
+          item.group || "عام"
+        ).trim();
+
+      if (
+        !groups.has(
+          groupName
+        )
+      ) {
+        groups.set(
+          groupName,
+          []
+        );
+      }
+
+      groups
+        .get(groupName)
+        .push(item);
+    });
+
+  groups.forEach(
+    (
+      items,
+      groupName
+    ) => {
+      const optgroup =
+        document.createElement(
+          "optgroup"
+        );
+
+      optgroup.label =
+        groupName;
+
+      items.forEach(item => {
+        const option =
+          document.createElement(
+            "option"
+          );
+
+        option.value =
+          item.code;
+
+        option.textContent =
+          item.name ||
+          item.code;
+
+        optgroup.appendChild(
+          option
+        );
+      });
+
+      editDiseaseSelect
+        .appendChild(
+          optgroup
+        );
+    }
+  );
+
+  editDiseaseSelect.value =
+    String(
+      selectedCode || ""
+    ).trim();
+}
+
+
+function selectDiseaseForEdit(
+  diseaseCode
+){
+  const code =
+    String(
+      diseaseCode || ""
+    ).trim();
+
+  const item =
+    editableDiseaseItems.find(
+      x =>
+        String(
+          x?.code || ""
+        ).trim() ===
+        code
+    );
+
+  if (!item) {
+    return false;
+  }
+
+  const saved =
+    item.code ===
+      currentDiseaseCode
+      ? currentEditDiseaseData
+      : null;
+
+  renderDiseaseDetailForm(
+    item,
+    saved
+  );
+
+  pendingDiseaseItem =
+    item;
+
+  pendingDiseaseButton =
+    confirmDiseaseBtn;
+
+  diseaseConfirmText.textContent =
+    "راجع البيانات ثم اضغط حفظ التعديل.";
+
+  confirmDiseaseBtn.textContent =
+    "حفظ التعديل";
+
+  diseaseConfirmCard.hidden =
+    false;
+
+  diseaseConfirmCard.style.display =
+    "";
+
+  return true;
+}
 function renderDiseases(
   list,
   selectedCode = ""
@@ -997,8 +995,8 @@ function renderDiseases(
       ? list.filter(
           item =>
             item &&
-            item.code &&
-            !item.specialPage
+            item.code 
+           
         )
       : [];
 
@@ -1177,7 +1175,7 @@ function clearDiseaseConfirmation(){
 
     confirmDiseaseBtn.textContent =
       isEditMode
-        ? "تأكيد التعديل"
+        ? "حفظ التعديل"
         : "تأكيد التسجيل";
   }
 }
@@ -1242,11 +1240,12 @@ renderDiseaseDetailForm(
   item,
   savedDetails
 );
-  pendingDiseaseItem =
-    item;
 
-  pendingDiseaseButton =
-    btn;
+pendingDiseaseItem =
+  item;
+
+pendingDiseaseButton =
+  btn;
 
   if (diseaseConfirmText) {
     diseaseConfirmText.textContent =
@@ -1271,10 +1270,10 @@ renderDiseaseDetailForm(
   }
 
   const focusCard =
-  item?.detailForm
+  diseaseDetailCard &&
+  diseaseDetailCard.hidden === false
     ? diseaseDetailCard
     : diseaseConfirmCard;
-
 focusCard
   ?.scrollIntoView({
     behavior: "smooth",
@@ -1323,380 +1322,257 @@ async function confirmPendingDisease(){
 
       confirmDiseaseBtn.textContent =
         isEditMode
-          ? "تأكيد التعديل"
+          ? "حفظ التعديل"
           : "تأكيد التسجيل";
     }
   }
 }
-  async function saveDiseaseItem(
-    item,
-    btn
-  ){
-    if (isEditMode) {
-      await saveCorrection(
-        item,
-        btn
-      );
+async function saveDiseaseItem(
+  item,
+  btn
+){
+  if (isEditMode) {
+    await saveCorrection(
+      item,
+      btn
+    );
 
-      return;
-    }
+    return;
+  }
 
-    const animalNumber =
-      digitsOnly(
-        animalNumberEl.value
-      );
+  const animalNumber =
+    digitsOnly(
+      animalNumberEl.value
+    );
 
-    const eventDate =
-      eventDateEl.value ||
-      todayLocal();
+  const eventDate =
+    eventDateEl.value ||
+    todayLocal();
 
-    const notes =
-      notesEl
-        ? notesEl.value
-        : "";
+  const notes =
+    notesEl
+      ? notesEl.value
+      : "";
 
-    if (
-      !animalNumber ||
-      !eventDate
-    ) {
-      setBar(
-        gateBox,
-        "أدخل رقم الحيوان وتاريخ التشخيص أولًا.",
-        "error"
-      );
+  if (
+    !animalNumber ||
+    !eventDate
+  ) {
+    setBar(
+      gateBox,
+      "أدخل رقم الحيوان وتاريخ التشخيص أولًا.",
+      "error"
+    );
 
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-      });
+    return;
+  }
 
-      return;
-    }
+  const currentGateKey =
+    animalNumber +
+    "|" +
+    eventDate;
 
+  if (
+    !gateAllowed ||
+    gateKey !==
+      currentGateKey
+  ) {
+    setBar(
+      gateBox,
+      gateMessage ||
+      "يلزم نجاح التحقق من الحيوان قبل تسجيل التشخيص.",
+      "error"
+    );
 
-    if (item.specialPage) {
-      const qs =
-        new URLSearchParams({
-          number:
+    runGate();
+    return;
+  }
+
+  const diseaseDetails =
+    collectDiseaseDetails(
+      item
+    );
+
+  btn.disabled =
+    true;
+
+  setBar(
+    gateBox,
+    "جاري حفظ التشخيص...",
+    "info"
+  );
+
+  try {
+    const j =
+      await apiRequest(
+        "/api/disease/save",
+        {
+          method:
+            "POST",
+
+          body: {
             animalNumber,
-
-          animalNumber:
-            animalNumber,
-
-          date:
             eventDate,
 
-          eventDate:
-            eventDate
-        });
+            diseaseCode:
+              item.code,
 
-      if (notes) {
-        qs.set(
-          "notes",
-          notes
-        );
-      }
+            notes,
 
+            ...(diseaseDetails
+              ? {
+                  details:
+                    diseaseDetails
+                }
+              : {})
+          }
+        }
+      );
+
+    setBar(
+      gateBox,
+      j.message ||
+      "✅ تم حفظ التشخيص الصحي بنجاح.",
+      "success"
+    );
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+
+    setTimeout(() => {
       location.href =
-        `${item.specialPage}?${qs.toString()}`;
+        j.redirectUrl ||
+        `event-list.html?number=${encodeURIComponent(
+          animalNumber
+        )}`;
+    }, 2500);
 
-      return;
-    }
-
-
-    const currentGateKey =
-      animalNumber +
-      "|" +
-      eventDate;
-
-    if (
-      !gateAllowed ||
-      gateKey !==
-        currentGateKey
-    ) {
-      setBar(
-        gateBox,
-        gateMessage ||
-        "يلزم نجاح التحقق من الحيوان قبل تسجيل التشخيص.",
-        "error"
-      );
-
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-      });
-
-      runGate();
-
-      return;
-    }
-
-const detailResult =
-  collectDiseaseDetails(
-    item
-  );
-
-if (!detailResult.ok) {
-  setBar(
-    gateBox,
-
-    detailResult.message ||
-    "❌ راجع تفاصيل التشخيص الصحي.",
-
-    "error"
-  );
-
-  diseaseDetailCard
-    ?.scrollIntoView({
-      behavior: "smooth",
-      block: "center"
-    });
-
-  return;
-}
-
-const diseaseDetails =
-  detailResult.details;
-    btn.disabled = true;
+  } catch (e) {
+    console.error(
+      "disease save failed",
+      e
+    );
 
     setBar(
       gateBox,
-      "جاري حفظ التشخيص...",
-      "info"
+      e.message ||
+      "❌ تعذّر حفظ التشخيص الصحي.",
+      "error"
     );
 
-
-    try {
-      const j =
-        await apiRequest(
-          "/api/disease/save",
-          {
-            method:
-              "POST",
-
-            body: {
-              animalNumber,
-              eventDate,
-
-              diseaseCode:
-                item.code,
-
-              notes,
-
-...(diseaseDetails
-  ? {
-      details:
-        diseaseDetails
-    }
-  : {})
-            }
-          }
-        );
-
-      setBar(
-        gateBox,
-        j.message ||
-        "✅ تم حفظ التشخيص الصحي بنجاح.",
-        "success"
-      );
-
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-      });
-
-      setTimeout(() => {
-        location.href =
-          j.redirectUrl ||
-          `event-list.html?number=${encodeURIComponent(animalNumber)}`;
-      }, 2500);
-
-    } catch (e) {
-      console.error(
-        "disease save failed",
-        e
-      );
-
-      setBar(
-        gateBox,
-        e.message ||
-        "❌ تعذّر حفظ التشخيص الصحي.",
-        "error"
-      );
-
-      btn.disabled =
-        false;
-    }
+    btn.disabled =
+      false;
   }
-
-
-  async function saveCorrection(
-    item,
-    btn
-  ){
-    const animalNumber =
-      digitsOnly(
-        animalNumberEl.value
-      );
-
-    const eventDate =
-      eventDateEl.value;
-
-    const notes =
-      notesEl
-        ? String(
-            notesEl.value || ""
-          ).trim()
-        : "";
-
-    const correctionPerformedBy =
-      String(
-        correctionPerformedByEl
-          ?.value ||
-        ""
-      ).trim();
-
-    const correctionReason =
-      String(
-        correctionReasonEl
-          ?.value ||
-        ""
-      ).trim();
-
-
-    if (
-      !correctionPerformedBy
-    ) {
-      setBar(
-        gateBox,
-        "❌ أدخل اسم القائم بالتعديل.",
-        "error"
-      );
-
-      return;
-    }
-
-
-    if (
-      !correctionReason
-    ) {
-      setBar(
-        gateBox,
-        "❌ اكتب سبب التعديل.",
-        "error"
-      );
-
-      return;
-    }
-
-
-    if (
-      !item?.code ||
-      item.specialPage
-    ) {
-      setBar(
-        gateBox,
-        "❌ اختر تشخيصًا صحيًا عامًا صالحًا للتعديل.",
-        "error"
-      );
-
-      return;
-    }
-const detailResult =
-  collectDiseaseDetails(
-    item
-  );
-
-if (!detailResult.ok) {
-  setBar(
-    gateBox,
-
-    detailResult.message ||
-    "❌ راجع تفاصيل التشخيص الصحي.",
-
-    "error"
-  );
-
-  diseaseDetailCard
-    ?.scrollIntoView({
-      behavior: "smooth",
-      block: "center"
-    });
-
-  return;
 }
 
-const diseaseDetails =
-  detailResult.details;
+async function saveCorrection(
+  item,
+  btn
+){
+  const animalNumber =
+    digitsOnly(
+      animalNumberEl.value
+    );
 
-    btn.disabled = true;
+  const eventDate =
+    eventDateEl.value;
+
+  const notes =
+    String(
+      notesEl?.value || ""
+    ).trim();
+
+  const correctionPerformedBy =
+    String(
+      correctionPerformedByEl
+        ?.value || ""
+    ).trim();
+
+  const correctionReason =
+    String(
+      correctionReasonEl
+        ?.value || ""
+    ).trim();
+
+  const diseaseDetails =
+    collectDiseaseDetails(
+      item
+    );
+
+  btn.disabled =
+    true;
+
+  setBar(
+    gateBox,
+    "جاري حفظ تعديل التشخيص الصحي...",
+    "info"
+  );
+
+  try {
+    const j =
+      await apiRequest(
+        `/api/events-page/event/${encodeURIComponent(
+          editEventId
+        )}/correct`,
+        {
+          method:
+            "POST",
+
+          body: {
+            animalNumber,
+            eventDate,
+
+            diseaseCode:
+              item.code,
+
+            notes,
+
+            ...(diseaseDetails
+              ? {
+                  details:
+                    diseaseDetails
+                }
+              : {}),
+
+            correctionPerformedBy,
+            correctionReason
+          }
+        }
+      );
 
     setBar(
       gateBox,
-      "جاري حفظ تعديل التشخيص الصحي...",
-      "info"
+      j.message ||
+      "✅ تم تعديل التشخيص الصحي بنجاح.",
+      "success"
     );
 
+    setTimeout(() => {
+      location.href =
+        `event-list.html?number=${encodeURIComponent(
+          animalNumber
+        )}`;
+    }, 900);
 
-    try {
-      const j =
-        await apiRequest(
-          `/api/events-page/event/${encodeURIComponent(editEventId)}/correct`,
-          {
-            method:
-              "POST",
+  } catch (e) {
+    console.error(
+      "disease correction failed",
+      e
+    );
 
-            body: {
-              animalNumber,
-              eventDate,
+    setBar(
+      gateBox,
+      e.message ||
+      "❌ تعذّر تعديل التشخيص الصحي.",
+      "error"
+    );
 
-              diseaseCode:
-                item.code,
-
-              notes,
-              ...(diseaseDetails
-  ? {
-      details:
-        diseaseDetails
-    }
-  : {}),
-
-              correctionPerformedBy,
-              correctionReason
-            }
-          }
-        );
-
-      setBar(
-        gateBox,
-        j.message ||
-        "✅ تم تعديل التشخيص الصحي بنجاح.",
-        "success"
-      );
-
-      setTimeout(() => {
-        location.href =
-          `event-list.html?number=${encodeURIComponent(animalNumber)}`;
-      }, 900);
-
-    } catch (e) {
-      console.error(
-        "disease correction failed",
-        e
-      );
-
-      setBar(
-        gateBox,
-        e.message ||
-        "❌ تعذّر تعديل التشخيص الصحي.",
-        "error"
-      );
-
-      btn.disabled =
-        false;
-    }
+    btn.disabled =
+      false;
   }
-
+}
 
   async function runGate(){
     if (requestedEditMode) {
@@ -1888,214 +1764,193 @@ renderSummary(null);
   }
 
 
-  async function loadEditEvent(){
-    setBar(
-      gateBox,
-      "جاري تحميل التشخيص الصحي للتعديل...",
-      "info"
+async function loadEditEvent(){
+  setBar(
+    gateBox,
+    "جاري تحميل التشخيص الصحي للتعديل...",
+    "info"
+  );
+
+  const data =
+    await apiRequest(
+      `/api/events-page/event/${encodeURIComponent(
+        editEventId
+      )}`
     );
 
-    const data =
-      await apiRequest(
-        `/api/events-page/event/${encodeURIComponent(editEventId)}`
-      );
-
-
-    if (
-      data.ok !== true ||
-      !data.event
-    ) {
-      throw new Error(
-        data.message ||
-        "تعذّر تحميل التشخيص الصحي للتعديل."
-      );
-    }
-
-
-    const ev =
-      data.event;
-      currentEditDiseaseData =
-  ev.data || {};
-
-
-    if (
-      ev.typeKey !== "health"
-    ) {
-      throw new Error(
-        "الحدث المطلوب ليس تشخيصًا صحيًا عامًا."
-      );
-    }
-
-
-    if (
-      ev.editPolicy
-        ?.editable !== true
-    ) {
-      throw new Error(
-        ev.editPolicy
-          ?.reason ||
-        "هذا الحدث غير متاح للتعديل."
-      );
-    }
-
-
-    animalNumberEl.value =
-      ev.animalNumber ||
-      "";
-
-    animalNumberEl.readOnly =
-      true;
-
-
-    eventDateEl.value =
-      ev.data?.eventDate ||
-      ev.eventDate ||
-      "";
-
-    /*
-      التاريخ ثابت ولا يعدّل.
-      السيرفر لديه الحارس النهائي.
-    */
-    eventDateEl.disabled =
-      true;
-
-
-    notesEl.value =
-      ev.data?.notes ||
-      "";
-
-
-    currentDiseaseCode =
-      String(
-        ev.data
-          ?.diseaseCode ||
-        ""
-      ).trim();
-
-
-    const gate =
-      await apiRequest(
-        "/api/disease/gate",
-        {
-          method:
-            "POST",
-
-          body: {
-            animalNumber:
-              animalNumberEl.value,
-
-            eventDate:
-              eventDateEl.value
-          }
-        }
-      );
-
-
-    if (
-      gate.allowed === false
-    ) {
-      throw new Error(
-        gate.message ||
-        "تعذّر تجهيز التشخيص الصحي للتعديل."
-      );
-    }
-
-
-    const editableDiseases =
-      (
-        Array.isArray(
-          gate.diseases
-        )
-          ? gate.diseases
-          : []
-      )
-        .filter(item =>
-          item &&
-          item.code &&
-          !item.specialPage
-        );
-
-
-    if (
-      !editableDiseases.length
-    ) {
-      throw new Error(
-        "لا توجد تشخيصات صحية عامة متاحة للتعديل لهذا الحيوان."
-      );
-    }
-
-
-    renderSummary(
-      gate.animal ||
-      null
-    );
-
-
-    renderDiseases(
-      editableDiseases,
-      currentDiseaseCode
-    );
-
-
-    renderPerformers(
-      data.correctionPerformers ||
-      []
-    );
-
-
-    editToolsCard.hidden =
-      false;
-
-    editToolsCard.style.display =
-      "";
-
-
-    correctionPerformedByEl.required =
-      true;
-
-    correctionReasonEl.required =
-      true;
-
-
-    if (pageTitle) {
-      pageTitle.textContent =
-        "تعديل التشخيص الصحي";
-    }
-
-
-    document.title =
-      "تعديل التشخيص الصحي — مُرَبِّيك";
-
-
-    if (backLink) {
-      backLink.href =
-        `event-list.html?number=${encodeURIComponent(ev.animalNumber || "")}`;
-    }
-
-
-    const currentName =
-      ev.data?.diseaseName ||
-      editableDiseases
-        .find(
-          item =>
-            item.code ===
-            currentDiseaseCode
-        )
-        ?.name ||
-      "";
-
-
-    setBar(
-      gateBox,
-
-      currentName
-        ? `التشخيص الحالي: ${currentName}. عدّل الملاحظات إن لزم، ثم اختر التشخيص المصحح بعد إدخال القائم بالتعديل وسبب التعديل.`
-        : "عدّل الملاحظات إن لزم، ثم اختر التشخيص المصحح بعد إدخال القائم بالتعديل وسبب التعديل.",
-
-      "success"
+  if (
+    data.ok !== true ||
+    !data.event
+  ) {
+    throw new Error(
+      data.message ||
+      "تعذّر تحميل التشخيص الصحي للتعديل."
     );
   }
 
+  const ev =
+    data.event;
+
+  currentEditDiseaseData =
+    ev.data || {};
+
+  if (
+    ev.typeKey !== "health"
+  ) {
+    throw new Error(
+      "الحدث المطلوب ليس تشخيصًا صحيًا عامًا."
+    );
+  }
+
+  if (
+    ev.editPolicy?.editable !==
+    true
+  ) {
+    throw new Error(
+      ev.editPolicy?.reason ||
+      "هذا الحدث غير متاح للتعديل."
+    );
+  }
+
+  animalNumberEl.value =
+    ev.animalNumber || "";
+
+  animalNumberEl.readOnly =
+    true;
+
+  eventDateEl.value =
+    ev.data?.eventDate ||
+    ev.eventDate ||
+    "";
+
+  eventDateEl.disabled =
+    true;
+
+  notesEl.value =
+    ev.data?.notes || "";
+
+  currentDiseaseCode =
+    String(
+      ev.data?.diseaseCode ||
+      ""
+    ).trim();
+
+  const gate =
+    await apiRequest(
+      "/api/disease/gate",
+      {
+        method:
+          "POST",
+
+        body: {
+          animalNumber:
+            animalNumberEl.value,
+
+          eventDate:
+            eventDateEl.value
+        }
+      }
+    );
+
+  if (
+    gate.allowed === false
+  ) {
+    throw new Error(
+      gate.message ||
+      "تعذّر تجهيز التشخيص الصحي للتعديل."
+    );
+  }
+
+  editableDiseaseItems =
+    (
+      Array.isArray(
+        gate.diseases
+      )
+        ? gate.diseases
+        : []
+    )
+      .filter(
+        item =>
+          item &&
+          item.code
+      );
+
+  if (
+    !editableDiseaseItems.length
+  ) {
+    throw new Error(
+      "لا توجد تشخيصات صحية متاحة للتعديل لهذا الحيوان."
+    );
+  }
+
+  renderSummary(
+    gate.animal || null
+  );
+
+  /*
+    Edit Mode:
+    لا نعرض كتالوج البطاقات.
+  */
+  setDiseaseCatalogVisible(
+    false
+  );
+
+  renderEditDiseaseSelect(
+    editableDiseaseItems,
+    currentDiseaseCode
+  );
+
+  editDiseaseCard.hidden =
+    false;
+
+  editDiseaseCard.style.display =
+    "";
+
+  renderPerformers(
+    data.correctionPerformers ||
+    []
+  );
+
+  editToolsCard.hidden =
+    false;
+
+  editToolsCard.style.display =
+    "";
+
+  if (pageTitle) {
+    pageTitle.textContent =
+      "تعديل التشخيص الصحي";
+  }
+
+  document.title =
+    "تعديل التشخيص الصحي — مُرَبِّيك";
+
+  if (backLink) {
+    backLink.href =
+      `event-list.html?number=${encodeURIComponent(
+        ev.animalNumber || ""
+      )}`;
+  }
+
+  cancelDiseaseBtn.textContent =
+    "رجوع بدون حفظ";
+
+  if (
+    !selectDiseaseForEdit(
+      currentDiseaseCode
+    )
+  ) {
+    throw new Error(
+      "تعذّر تحميل التشخيص الحالي للتعديل."
+    );
+  }
+
+  setBar(
+    gateBox,
+    "عدّل البيانات المطلوبة ثم اضغط حفظ التعديل.",
+    "success"
+  );
+}
 
   async function init(){
     try {
@@ -2155,11 +2010,31 @@ confirmDiseaseBtn
     "click",
     confirmPendingDisease
   );
-
+editDiseaseSelect
+  ?.addEventListener(
+    "change",
+    () => {
+      selectDiseaseForEdit(
+        editDiseaseSelect.value
+      );
+    }
+  );
 cancelDiseaseBtn
   ?.addEventListener(
     "click",
-    clearDiseaseConfirmation
+    () => {
+      if (isEditMode) {
+        location.href =
+          `event-list.html?number=${encodeURIComponent(
+            animalNumberEl.value ||
+            ""
+          )}`;
+
+        return;
+      }
+
+      clearDiseaseConfirmation();
+    }
   );
   init();
 
