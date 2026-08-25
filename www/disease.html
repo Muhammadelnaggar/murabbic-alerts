@@ -43,7 +43,75 @@
         </div>
       </div>
     </div>
+<div
+  class="card grid"
+  id="diseaseDetailCard"
+  hidden
+  style="display:none"
+>
+  <div
+    id="diseaseDetailTitle"
+    class="form-hint"
+  ></div>
 
+  <div class="row">
+    <div>
+      <label for="parasiteType">
+        نوع الطفيل
+      </label>
+
+      <select
+        id="parasiteType"
+      ></select>
+    </div>
+
+    <div>
+      <label for="parasiteDiagnosisMethod">
+        طريقة التشخيص
+      </label>
+
+      <select
+        id="parasiteDiagnosisMethod"
+      ></select>
+    </div>
+
+    <div>
+      <label for="parasiteSeverity">
+        شدة الإصابة
+      </label>
+
+      <select
+        id="parasiteSeverity"
+      ></select>
+    </div>
+  </div>
+
+  <div>
+    <label>
+      العلامات الموجودة
+    </label>
+
+    <div
+      id="parasiteSignsList"
+      class="mbk-action-list mbk-event-grid"
+    ></div>
+  </div>
+
+  <div
+    id="parasiteBodySitesWrap"
+    hidden
+    style="display:none"
+  >
+    <label>
+      مواضع الإصابة
+    </label>
+
+    <div
+      id="parasiteBodySitesList"
+      class="mbk-action-list mbk-event-grid"
+    ></div>
+  </div>
+</div>
     <div
       class="card grid"
       id="diseaseConfirmCard"
@@ -153,9 +221,33 @@ const confirmDiseaseBtn =
 
 const cancelDiseaseBtn =
   $("cancelDiseaseBtn");
+  const diseaseDetailCard =
+  $("diseaseDetailCard");
+
+const diseaseDetailTitle =
+  $("diseaseDetailTitle");
+
+const parasiteTypeEl =
+  $("parasiteType");
+
+const parasiteDiagnosisMethodEl =
+  $("parasiteDiagnosisMethod");
+
+const parasiteSeverityEl =
+  $("parasiteSeverity");
+
+const parasiteSignsList =
+  $("parasiteSignsList");
+
+const parasiteBodySitesWrap =
+  $("parasiteBodySitesWrap");
+
+const parasiteBodySitesList =
+  $("parasiteBodySitesList");
 
 let pendingDiseaseItem = null;
 let pendingDiseaseButton = null;
+let currentEditDiseaseData = null;
 
   const params =
     new URLSearchParams(
@@ -421,7 +513,478 @@ let pendingDiseaseButton = null;
         .appendChild(option);
     });
   }
+function diseaseDetailSavedValue(
+  saved,
+  key,
+  fallback = ""
+){
+  if (
+    !saved ||
+    typeof saved !== "object"
+  ) {
+    return fallback;
+  }
 
+  const direct =
+    saved[key];
+
+  if (
+    direct !== undefined &&
+    direct !== null &&
+    direct !== ""
+  ) {
+    return direct;
+  }
+
+  const nested =
+    saved.details &&
+    typeof saved.details === "object"
+      ? saved.details[key]
+      : undefined;
+
+  return (
+    nested !== undefined &&
+    nested !== null &&
+    nested !== ""
+  )
+    ? nested
+    : fallback;
+}
+
+
+function fillDiseaseDetailSelect(
+  selectEl,
+  items,
+  selectedValue,
+  placeholder
+){
+  if (!selectEl) return;
+
+  selectEl.innerHTML = "";
+
+  const empty =
+    document.createElement(
+      "option"
+    );
+
+  empty.value = "";
+  empty.textContent =
+    placeholder;
+
+  selectEl.appendChild(
+    empty
+  );
+
+  (
+    Array.isArray(items)
+      ? items
+      : []
+  ).forEach(value => {
+    const option =
+      document.createElement(
+        "option"
+      );
+
+    option.value =
+      value;
+
+    option.textContent =
+      value;
+
+    if (
+      String(value) ===
+      String(
+        selectedValue ||
+        ""
+      )
+    ) {
+      option.selected =
+        true;
+    }
+
+    selectEl.appendChild(
+      option
+    );
+  });
+}
+
+
+function renderDiseaseDetailChecks(
+  container,
+  name,
+  items,
+  selectedValues
+){
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  const selected =
+    new Set(
+      Array.isArray(
+        selectedValues
+      )
+        ? selectedValues
+            .map(x =>
+              String(
+                x || ""
+              ).trim()
+            )
+        : []
+    );
+
+  (
+    Array.isArray(items)
+      ? items
+      : []
+  ).forEach(value => {
+    const label =
+      document.createElement(
+        "label"
+      );
+
+    label.className =
+      "mbk-action-tile";
+
+    const input =
+      document.createElement(
+        "input"
+      );
+
+    input.type =
+      "checkbox";
+
+    input.name =
+      name;
+
+    input.value =
+      value;
+
+    input.checked =
+      selected.has(value);
+
+    const text =
+      document.createElement(
+        "span"
+      );
+
+    text.textContent =
+      value;
+
+    label.appendChild(
+      input
+    );
+
+    label.appendChild(
+      text
+    );
+
+    container.appendChild(
+      label
+    );
+  });
+}
+
+
+function clearDiseaseDetailForm(){
+  if (diseaseDetailCard) {
+    diseaseDetailCard.hidden =
+      true;
+
+    diseaseDetailCard
+      .style.display =
+      "none";
+  }
+
+  if (diseaseDetailTitle) {
+    diseaseDetailTitle
+      .textContent =
+      "";
+  }
+
+  if (parasiteTypeEl) {
+    parasiteTypeEl
+      .innerHTML =
+      "";
+  }
+
+  if (
+    parasiteDiagnosisMethodEl
+  ) {
+    parasiteDiagnosisMethodEl
+      .innerHTML =
+      "";
+  }
+
+  if (parasiteSeverityEl) {
+    parasiteSeverityEl
+      .innerHTML =
+      "";
+  }
+
+  if (parasiteSignsList) {
+    parasiteSignsList
+      .innerHTML =
+      "";
+  }
+
+  if (parasiteBodySitesList) {
+    parasiteBodySitesList
+      .innerHTML =
+      "";
+  }
+
+  if (parasiteBodySitesWrap) {
+    parasiteBodySitesWrap
+      .hidden =
+      true;
+
+    parasiteBodySitesWrap
+      .style.display =
+      "none";
+  }
+}
+
+
+function renderDiseaseDetailForm(
+  item,
+  saved = null
+){
+  clearDiseaseDetailForm();
+
+  if (
+    !item?.detailForm ||
+    !item?.detailOptions
+  ) {
+    return;
+  }
+
+  const options =
+    item.detailOptions ||
+    {};
+
+  const savedParasiteType =
+    diseaseDetailSavedValue(
+      saved,
+      "parasiteType",
+      ""
+    );
+
+  const savedDiagnosisMethod =
+    diseaseDetailSavedValue(
+      saved,
+      "diagnosisMethod",
+      ""
+    );
+
+  const savedSeverity =
+    diseaseDetailSavedValue(
+      saved,
+      "severity",
+      ""
+    );
+
+  const savedSigns =
+    diseaseDetailSavedValue(
+      saved,
+      "signs",
+      []
+    );
+
+  const savedBodySites =
+    diseaseDetailSavedValue(
+      saved,
+      "bodySites",
+      []
+    );
+
+  diseaseDetailTitle
+    .textContent =
+    `تفاصيل «${item.name || "التشخيص"}»`;
+
+  fillDiseaseDetailSelect(
+    parasiteTypeEl,
+    options.parasiteTypes,
+    savedParasiteType,
+    "اختر نوع الطفيل"
+  );
+
+  fillDiseaseDetailSelect(
+    parasiteDiagnosisMethodEl,
+    options.diagnosisMethods,
+    savedDiagnosisMethod,
+    "اختر طريقة التشخيص"
+  );
+
+  fillDiseaseDetailSelect(
+    parasiteSeverityEl,
+    options.severities,
+    savedSeverity,
+    "اختر شدة الإصابة"
+  );
+
+  renderDiseaseDetailChecks(
+    parasiteSignsList,
+    "parasiteSigns",
+    options.signs,
+
+    Array.isArray(
+      savedSigns
+    )
+      ? savedSigns
+      : []
+  );
+
+  const bodySites =
+    Array.isArray(
+      options.bodySites
+    )
+      ? options.bodySites
+      : [];
+
+  renderDiseaseDetailChecks(
+    parasiteBodySitesList,
+    "parasiteBodySites",
+    bodySites,
+
+    Array.isArray(
+      savedBodySites
+    )
+      ? savedBodySites
+      : []
+  );
+
+  const showBodySites =
+    bodySites.length > 0;
+
+  parasiteBodySitesWrap.hidden =
+    !showBodySites;
+
+  parasiteBodySitesWrap
+    .style.display =
+    showBodySites
+      ? ""
+      : "none";
+
+  diseaseDetailCard.hidden =
+    false;
+
+  diseaseDetailCard
+    .style.display =
+    "";
+}
+
+
+function collectDiseaseDetails(
+  item
+){
+  if (!item?.detailForm) {
+    return {
+      ok: true,
+      details: null
+    };
+  }
+
+  const parasiteType =
+    String(
+      parasiteTypeEl
+        ?.value ||
+      ""
+    ).trim();
+
+  const diagnosisMethod =
+    String(
+      parasiteDiagnosisMethodEl
+        ?.value ||
+      ""
+    ).trim();
+
+  const severity =
+    String(
+      parasiteSeverityEl
+        ?.value ||
+      ""
+    ).trim();
+
+  const signs =
+    Array.from(
+      document
+        .querySelectorAll(
+          'input[name="parasiteSigns"]:checked'
+        )
+    )
+      .map(x =>
+        String(
+          x.value || ""
+        ).trim()
+      )
+      .filter(Boolean);
+
+  const bodySites =
+    Array.from(
+      document
+        .querySelectorAll(
+          'input[name="parasiteBodySites"]:checked'
+        )
+    )
+      .map(x =>
+        String(
+          x.value || ""
+        ).trim()
+      )
+      .filter(Boolean);
+
+  if (!parasiteType) {
+    return {
+      ok: false,
+      message:
+        "❌ اختر نوع الطفيل."
+    };
+  }
+
+  if (!diagnosisMethod) {
+    return {
+      ok: false,
+      message:
+        "❌ اختر طريقة تشخيص الإصابة الطفيلية."
+    };
+  }
+
+  if (!severity) {
+    return {
+      ok: false,
+      message:
+        "❌ اختر شدة الإصابة."
+    };
+  }
+
+  if (
+    item.detailForm ===
+      "external_parasites" &&
+    !bodySites.length
+  ) {
+    return {
+      ok: false,
+      message:
+        "❌ اختر موضع إصابة واحدًا على الأقل للطفيليات الخارجية."
+    };
+  }
+
+  return {
+    ok: true,
+
+    details: {
+      formType:
+        item.detailForm,
+
+      parasiteType,
+      diagnosisMethod,
+      severity,
+      signs,
+      bodySites
+    }
+  };
+}
 
 function renderDiseases(
   list,
@@ -593,6 +1156,7 @@ function renderDiseases(
 function clearDiseaseConfirmation(){
   pendingDiseaseItem = null;
   pendingDiseaseButton = null;
+  clearDiseaseDetailForm();
 
   if (diseaseConfirmText) {
     diseaseConfirmText.textContent =
@@ -667,7 +1231,17 @@ function prepareDiseaseConfirmation(
       return;
     }
   }
+const savedDetails =
+  isEditMode &&
+  item?.code ===
+    currentDiseaseCode
+    ? currentEditDiseaseData
+    : null;
 
+renderDiseaseDetailForm(
+  item,
+  savedDetails
+);
   pendingDiseaseItem =
     item;
 
@@ -696,11 +1270,16 @@ function prepareDiseaseConfirmation(
       "";
   }
 
-  diseaseConfirmCard
-    ?.scrollIntoView({
-      behavior: "smooth",
-      block: "center"
-    });
+  const focusCard =
+  item?.detailForm
+    ? diseaseDetailCard
+    : diseaseConfirmCard;
+
+focusCard
+  ?.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
 }
 
 
@@ -852,7 +1431,32 @@ async function confirmPendingDisease(){
       return;
     }
 
+const detailResult =
+  collectDiseaseDetails(
+    item
+  );
 
+if (!detailResult.ok) {
+  setBar(
+    gateBox,
+
+    detailResult.message ||
+    "❌ راجع تفاصيل التشخيص الصحي.",
+
+    "error"
+  );
+
+  diseaseDetailCard
+    ?.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+
+  return;
+}
+
+const diseaseDetails =
+  detailResult.details;
     btn.disabled = true;
 
     setBar(
@@ -877,7 +1481,14 @@ async function confirmPendingDisease(){
               diseaseCode:
                 item.code,
 
-              notes
+              notes,
+
+...(diseaseDetails
+  ? {
+      details:
+        diseaseDetails
+    }
+  : {})
             }
           }
         );
@@ -991,7 +1602,32 @@ async function confirmPendingDisease(){
 
       return;
     }
+const detailResult =
+  collectDiseaseDetails(
+    item
+  );
 
+if (!detailResult.ok) {
+  setBar(
+    gateBox,
+
+    detailResult.message ||
+    "❌ راجع تفاصيل التشخيص الصحي.",
+
+    "error"
+  );
+
+  diseaseDetailCard
+    ?.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+
+  return;
+}
+
+const diseaseDetails =
+  detailResult.details;
 
     btn.disabled = true;
 
@@ -1018,6 +1654,12 @@ async function confirmPendingDisease(){
                 item.code,
 
               notes,
+              ...(diseaseDetails
+  ? {
+      details:
+        diseaseDetails
+    }
+  : {}),
 
               correctionPerformedBy,
               correctionReason
@@ -1272,6 +1914,8 @@ renderSummary(null);
 
     const ev =
       data.event;
+      currentEditDiseaseData =
+  ev.data || {};
 
 
     if (
