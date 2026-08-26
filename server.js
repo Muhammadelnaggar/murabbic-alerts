@@ -75292,37 +75292,50 @@ eventDate,
       completedAt: admin.firestore.FieldValue.serverTimestamp()
     }), { merge: true });
 
-    result = {
-      ok: true,
-      mode: "group",
-      completed: true,
-      groupComplete: true,
-      sessionId: sessionRef.id,
-      id: eventRef.id,
-      eventId: eventRef.id,
-      eventDate,
+result = {
+  ok: true,
+  mode: "group",
+  completed: true,
+  groupComplete: true,
+  sessionId: sessionRef.id,
+  id: eventRef.id,
+  eventId: eventRef.id,
+  eventDate,
 
-      groupId: groupId || null,
-      groupName: groupName || null,
+  groupId: groupId || null,
+  groupName: groupName || null,
 
-      sampleNo,
-      sampleCount: stats.sampleCount,
-      samplesRequired: FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV,
-      samples: nextSamples,
+  sampleNo,
+  sampleCount: stats.sampleCount,
+  samplesRequired: FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV,
+  samples: nextSamples,
 
-      score: stats.finalScore,
-      label: stats.label,
-      avgScore: stats.avgScore,
-      minScore: stats.minScore,
-      maxScore: stats.maxScore,
-      variation: stats.variation,
+  score: stats.finalScore,
+  label: stats.label,
+  avgScore: stats.avgScore,
+  minScore: stats.minScore,
+  maxScore: stats.maxScore,
+  variation: stats.variation,
 
-      dailySequence,
-      dailyLimit: FECES_DAILY_LIMIT_SRV,
+  dailySequence,
+  dailyLimit: FECES_DAILY_LIMIT_SRV,
 
-     message: `✅ اكتمل تقييم روث المجموعة بعد ${stats.sampleCount} عينات — المتوسط ${stats.finalScore}/5.`,
-      saved: payload
-    };
+  display: {
+    title: `اكتمل تقييم المجموعة — ${stats.finalScore}/5 — ${stats.label}`,
+    summary: [
+      `✅ اكتمل تقييم روث المجموعة بعد ${stats.sampleCount} عينات.`,
+      `المتوسط: ${stats.avgScore}/5`,
+      `أقل درجة: ${stats.minScore}/5`,
+      `أعلى درجة: ${stats.maxScore}/5`,
+      `التباين: ${payload.variationLabel}`
+    ].join("\n"),
+    saveButtonText: "اكتمل التقييم",
+    backButtonText: "العودة لصفحة الأحداث"
+  },
+
+  message: `✅ اكتمل تقييم روث المجموعة بعد ${stats.sampleCount} عينات.`,
+  saved: payload
+};
   });
 
   return result || {
