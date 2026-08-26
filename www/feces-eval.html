@@ -416,23 +416,8 @@ async function renderCompletedGroupFromServer(j) {
   }
 
   if (saveBtn) {
-    saveBtn.disabled = true;
-
-    if (j.display?.saveButtonText) {
-      saveBtn.textContent = j.display.saveButtonText;
-    }
-  }
-
-  if (backBtn && j.display?.backButtonText) {
-    backBtn.textContent = j.display.backButtonText;
-  }
-
-  try {
-    scoreWidget?.scrollIntoView({
-      behavior: "smooth",
-      block: "center"
-    });
-  } catch (_) {}
+  saveBtn.disabled = true;
+}
 }
   function setWaiting() {
     state.analysis = null;

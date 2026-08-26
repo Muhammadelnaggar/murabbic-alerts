@@ -75320,22 +75320,18 @@ result = {
   dailySequence,
   dailyLimit: FECES_DAILY_LIMIT_SRV,
 
-  display: {
-    title: `اكتمل تقييم المجموعة — ${stats.finalScore}/5 — ${stats.label}`,
-    summary: [
-      `✅ اكتمل تقييم روث المجموعة بعد ${stats.sampleCount} عينات.`,
-      `المتوسط: ${stats.avgScore}/5`,
-      `أقل درجة: ${stats.minScore}/5`,
-      `أعلى درجة: ${stats.maxScore}/5`,
-      `التباين: ${payload.variationLabel}`
-    ].join("\n"),
-    saveButtonText: "اكتمل التقييم",
-    backButtonText: "العودة لصفحة الأحداث"
-  },
+display: {
+  title: `اكتمل تقييم المجموعة — ${stats.finalScore}/5 — ${stats.label}`,
+  summary: [
+    `المتوسط: ${stats.avgScore}/5`,
+    `أقل درجة: ${stats.minScore}/5`,
+    `أعلى درجة: ${stats.maxScore}/5`,
+    `التباين: ${payload.variationLabel}`
+  ].join("\n")
+},
 
-  message: `✅ اكتمل تقييم روث المجموعة بعد ${stats.sampleCount} عينات.`,
-  saved: payload
-};
+message: `✅ تم حفظ تقييم روث المجموعة بنجاح بعد ${stats.sampleCount} عينات.`,
+saved: payload
   });
 
   return result || {
