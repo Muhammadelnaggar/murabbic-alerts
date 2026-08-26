@@ -494,12 +494,21 @@ async function analyzeOnServer(image) {
   const ctx = contextFromUrl();
 
   const { r, data, authRequired } = await sessionFetchJson("/api/feces/vision-analyze", {
-    method: "POST",
-    body: {
-      image,
-      eventDate: eventDateInput?.value || ctx.eventDate || todayCairo()
-    }
-  });
+  method: "POST",
+  body: {
+    mode: ctx.mode,
+
+    animalId: ctx.mode === "individual" ? ctx.animalId : "",
+    animalNumber: ctx.mode === "individual" ? ctx.animalNumber : "",
+
+    groupName: ctx.mode === "group" ? ctx.groupName : "",
+    groupId: ctx.mode === "group" ? ctx.groupId : "",
+    groupKey: ctx.mode === "group" ? ctx.groupKey : "",
+
+    image,
+    eventDate: eventDateInput?.value || ctx.eventDate || todayCairo()
+  }
+});
 
   if (authRequired) {
     throw new Error(data?.message || "سجّل الدخول أولًا.");
