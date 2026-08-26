@@ -75332,6 +75332,7 @@ display: {
 
 message: `✅ تم حفظ تقييم روث المجموعة بنجاح بعد ${stats.sampleCount} عينات.`,
 saved: payload
+};
   });
 
   return result || {
