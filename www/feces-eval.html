@@ -356,7 +356,7 @@ refreshTrainingButton();
 
   if (scoreBadge) {
     const next = j.nextSampleNo || "";
-    const total = j.samplesRequired || 4;
+    const total = j.samplesRequired || "";
 
     scoreBadge.textContent = next
       ? `بانتظار العينة ${next} من ${total}`
@@ -373,9 +373,9 @@ refreshTrainingButton();
   }
 
   if (saveBtn) {
-    saveBtn.disabled = false;
-    saveBtn.textContent = "حفظ العينة";
-  }
+  saveBtn.disabled = true;
+  saveBtn.textContent = "حفظ العينة";
+}
 }
   function setWaiting() {
     state.analysis = null;
@@ -724,10 +724,23 @@ if (authRequired) return;
       return;
     }
 
-    setTimeout(() => {
+  setTimeout(() => {
+  const dt =
+    j.eventDate ||
+    eventDateInput?.value ||
+    ctx.eventDate ||
+    todayCairo();
+
+  if (ctx.mode === "group") {
+    const u = new URL("add-event.html", location.href);
+    carryContextToUrl(u, ctx, dt);
+    location.href = u.toString();
+    return;
+  }
+
   const u = new URL("event-list.html", location.href);
 
-  if (ctx.mode === "individual" && ctx.animalNumber) {
+  if (ctx.animalNumber) {
     u.searchParams.set("number", ctx.animalNumber);
   }
 
@@ -737,11 +750,17 @@ if (authRequired) return;
     console.error("feces save error:", e);
     showMsg(e.message || "تعذّر حفظ تقييم الروث.", false);
   } finally {
-    if (saveBtn) {
-      saveBtn.disabled = false;
-      saveBtn.textContent = ctx.mode === "group" ? "حفظ العينة" : "حفظ التقييم";
-    }
+  if (saveBtn) {
+    saveBtn.disabled = !(
+      state.operationalAllowed &&
+      state.analysis?.ok &&
+      Number.isFinite(Number(state.analysis.score))
+    );
+
+    saveBtn.textContent =
+      ctx.mode === "group" ? "حفظ العينة" : "حفظ التقييم";
   }
+}
 }
  async function saveTrainingCorrection() {
   if (!state.canTrain) return;
