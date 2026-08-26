@@ -1449,22 +1449,27 @@ async function saveDiseaseItem(
         )}`;
     }, 2500);
 
-  } catch (e) {
-    console.error(
-      "disease save failed",
-      e
-    );
+ } catch (e) {
+  console.error(
+    "disease save failed",
+    e
+  );
 
-    setBar(
-      gateBox,
-      e.message ||
-      "❌ تعذّر حفظ التشخيص الصحي.",
-      "error"
-    );
+  setBar(
+    gateBox,
+    e.message ||
+    "❌ تعذّر حفظ التشخيص الصحي.",
+    "error"
+  );
 
-    btn.disabled =
-      false;
-  }
+  gateBox?.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+
+  btn.disabled =
+    false;
+}
 }
 
 async function saveCorrection(

@@ -32407,11 +32407,18 @@ const DISEASE_CATALOG_SRV = {
   },
 
   displaced_abomasum: {
-    name:"انزياح المنفحة",
-    nameEn:"Displaced Abomasum",
-    group:"الأمراض الأيضية والهضمية",
-    eligibility:"high_yield_mother"
-  },
+  name:"انزياح المنفحة",
+  nameEn:"Displaced Abomasum",
+  group:"الأمراض الأيضية والهضمية",
+ eligibility:"high_yield_mother"
+},
+
+cecal_dilatation: {
+  name:"تمدد الأعور",
+  nameEn:"Cecal Dilatation",
+  group:"الأمراض الأيضية والهضمية",
+  eligibility:"calved_mother_only"
+},
 
   rumen_acidosis: {
     name:"حموضة الكرش",
