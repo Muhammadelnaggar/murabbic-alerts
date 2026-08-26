@@ -32607,8 +32607,8 @@ const DISEASE_CATALOG_SRV = {
 },
 
 mange_ectoparasites: {
-  name:"الجرب / الطفيليات الخارجية",
-  nameEn:"Mange / Ectoparasites",
+  name:"الطفيليات الخارجية",
+  nameEn:"Ectoparasites",
   group:"الأمراض الطفيلية والجلدية",
   detailForm:"external_parasites"
 },
@@ -32655,67 +32655,53 @@ const DISEASE_DETAIL_FORMS_SRV = Object.freeze({
       "بابيزيا",
       "ثيليريا",
       "أنابلازما",
-      "تريبانوسوما",
-      "طفيليات دم مختلطة",
-      "طفيليات دم غير محددة"
+      "تريبانوسوما"
     ],
+
     diagnosisMethods: [
       "اشتباه إكلينيكي",
-      "فحص لطاخة دم",
-      "فحص معملي / PCR",
-      "فحص إكلينيكي + لطاخة دم",
-      "تشخيص معملي آخر"
+      "فحص إكلينيكي + لطاخة دم"
     ],
-    severities: [
-      "خفيفة",
-      "متوسطة",
-      "شديدة"
-    ],
+
+    severities: [],
+
     signs: [
       "ارتفاع الحرارة",
       "شحوب الأغشية المخاطية / أنيميا",
       "يرقان",
-      "بول أحمر / هيموجلوبينوريا",
+      "بول أحمر",
       "تضخم العقد الليمفاوية",
-      "ضعف / فقد شهية",
-      "هبوط إنتاج اللبن",
-      "علامات عصبية",
+      "وجود قمل",
       "وجود قراد"
     ],
+
     bodySites: []
   }),
 
   internal_parasites: Object.freeze({
     parasiteTypes: [
       "ديدان معدية معوية",
-      "فاشيولا / ديدان كبدية",
+      "ديدان كبدية",
       "بارامفستومم / ديدان الكرش",
-      "ديدان رئوية",
-      "طفيليات داخلية مختلطة",
-      "طفيليات داخلية غير محددة"
+      "ديدان رئوية"
     ],
+
     diagnosisMethods: [
       "اشتباه إكلينيكي",
-      "فحص براز نوعي",
-      "عد بيض البراز",
-      "فحص معملي آخر",
-      "تشريح / فحص بعد النفوق"
+      "فحص معملي"
     ],
-    severities: [
-      "خفيفة",
-      "متوسطة",
-      "شديدة"
-    ],
+
+    severities: [],
+
     signs: [
       "إسهال",
-      "نقص وزن / تأخر نمو",
+      "نقص وزن",
       "خشونة الشعر",
       "شحوب / أنيميا",
       "وذمة تحت الفك",
-      "كحة / صعوبة تنفس",
-      "انخفاض الشهية",
-      "هبوط إنتاج اللبن"
+      "كحة / صعوبة تنفس"
     ],
+
     bodySites: []
   }),
 
@@ -32723,61 +32709,38 @@ const DISEASE_DETAIL_FORMS_SRV = Object.freeze({
     parasiteTypes: [
       "قراد",
       "قمل",
-      "جرب / حلم",
-      "ذباب / حشرات خارجية",
-      "طفيليات خارجية مختلطة",
-      "طفيليات خارجية غير محددة"
+      "ذباب ثاقب ماص"
     ],
+
     diagnosisMethods: [
-      "فحص ظاهري",
-      "كشط جلدي",
-      "فحص مجهري / معملي",
-      "فحص ظاهري + كشط جلدي",
-      "تشخيص معملي آخر"
+      "فحص ظاهري"
     ],
-    severities: [
-      "خفيفة",
-      "متوسطة",
-      "شديدة"
-    ],
-    signs: [
-      "حكة",
-      "تساقط شعر",
-      "قشور / سماكة جلد",
-      "جروح / نزف",
-      "التهاب جلد",
-      "هزال / ضعف",
-      "شحوب / أنيميا"
-    ],
+
+    severities: [],
+
+    signs: [],
+
     bodySites: [
-      "الرأس / الأذنان",
-      "الرقبة",
-      "الظهر / الجانبان",
-      "البطن",
-      "الضرع / العجان",
-      "الأطراف",
-      "الذيل / قاعدة الذيل",
+      "في مناطق معينة من الجسم",
       "منتشر على الجسم"
     ]
   })
 });
+
 const DISEASE_DETAIL_REQUIRED_FIELDS_SRV = Object.freeze({
   blood_parasites: Object.freeze([
     "parasiteType",
-    "diagnosisMethod",
-    "severity"
+    "diagnosisMethod"
   ]),
 
   internal_parasites: Object.freeze([
     "parasiteType",
-    "diagnosisMethod",
-    "severity"
+    "diagnosisMethod"
   ]),
 
   external_parasites: Object.freeze([
     "parasiteType",
     "diagnosisMethod",
-    "severity",
     "bodySites"
   ])
 });
@@ -32812,75 +32775,65 @@ function diseaseDetailFormSchemaSrv(formKey = ""){
   const bodySites =
     [...(schema.bodySites || [])];
 
-  const fields = [
-    {
-      key: "parasiteType",
-      label: "نوع الطفيل",
-      control: "select",
-      placeholder: "اختر نوع الطفيل",
-      required:
-        requiredFields.has(
-          "parasiteType"
-        ),
-      options:
-        parasiteTypes
-    },
+ const fields = [];
 
-    {
-      key: "diagnosisMethod",
-      label: "طريقة التشخيص",
-      control: "select",
-      placeholder:
-        "اختر طريقة التشخيص",
-      required:
-        requiredFields.has(
-          "diagnosisMethod"
-        ),
-      options:
-        diagnosisMethods
-    },
+if (parasiteTypes.length) {
+  fields.push({
+    key: "parasiteType",
+    label: "نوع الطفيل",
+    control: "select",
+    placeholder: "اختر نوع الطفيل",
+    required:
+      requiredFields.has("parasiteType"),
+    options: parasiteTypes
+  });
+}
 
-    {
-      key: "severity",
-      label: "شدة الإصابة",
-      control: "select",
-      placeholder:
-        "اختر شدة الإصابة",
-      required:
-        requiredFields.has(
-          "severity"
-        ),
-      options:
-        severities
-    },
+if (diagnosisMethods.length) {
+  fields.push({
+    key: "diagnosisMethod",
+    label: "طريقة التشخيص",
+    control: "select",
+    placeholder: "اختر طريقة التشخيص",
+    required:
+      requiredFields.has("diagnosisMethod"),
+    options: diagnosisMethods
+  });
+}
 
-    {
-      key: "signs",
-      label: "العلامات الموجودة",
-      control: "multi_select",
-      required:
-        requiredFields.has(
-          "signs"
-        ),
-      options:
-        signs
-    }
-  ];
+if (severities.length) {
+  fields.push({
+    key: "severity",
+    label: "شدة الإصابة",
+    control: "select",
+    placeholder: "اختر شدة الإصابة",
+    required:
+      requiredFields.has("severity"),
+    options: severities
+  });
+}
 
-  if (bodySites.length) {
-    fields.push({
-      key: "bodySites",
-      label: "مواضع الإصابة",
-      control: "multi_select",
-      required:
-        requiredFields.has(
-          "bodySites"
-        ),
-      options:
-        bodySites
-    });
-  }
+if (signs.length) {
+  fields.push({
+    key: "signs",
+    label: "العلامات الموجودة",
+    control: "multi_select",
+    required:
+      requiredFields.has("signs"),
+    options: signs
+  });
+}
 
+if (bodySites.length) {
+  fields.push({
+    key: "bodySites",
+    label: "مواضع الإصابة",
+    control: "multi_select",
+    required:
+      requiredFields.has("bodySites"),
+    options: bodySites
+  });
+}
   return {
     formKey: key,
 
@@ -32986,16 +32939,18 @@ function diseaseValidateDetailsSrv(diseaseCode = "", body = {}){
   }
 
   if (
+  schema.severities.length &&
+  (
     !severity ||
     !schema.severities.includes(severity)
-  ) {
-    return {
-      ok:false,
-      error:"parasite_severity_required",
-      message:"❌ اختر شدة الإصابة."
-    };
-  }
-
+  )
+) {
+  return {
+    ok:false,
+    error:"parasite_severity_required",
+    message:"❌ اختر شدة الإصابة."
+  };
+}
   const invalidSigns =
     signs.filter(
       x => !schema.signs.includes(x)
