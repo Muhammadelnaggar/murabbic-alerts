@@ -134,6 +134,7 @@
   const eventDateInput = $("#eventDate");
   const numberSpan = $(".animal-number");
   const contextLabel = $("#contextLabel");
+  const scoreWidget = $("#scoreWidget");
   const scoreBadge = $("#scoreBadge");
   const scoreFill = $("#scoreFill");
   const scoreNote = $("#scoreNote");
@@ -147,12 +148,13 @@
   const trainingSaveBtn = $("#trainingSaveBtn");
   const trainingStatus = $("#trainingStatus");
 
-  const state = {
+const state = {
   stream: null,
   image: null,
   analysis: null,
   canTrain: false,
-  operationalAllowed: false
+  operationalAllowed: false,
+  groupCompleted: false
 };
 
   function todayCairo() {
@@ -376,6 +378,61 @@ refreshTrainingButton();
   saveBtn.disabled = true;
   saveBtn.textContent = "حفظ العينة";
 }
+}
+async function renderCompletedGroupFromServer(j) {
+  state.groupCompleted = true;
+  state.image = null;
+  state.analysis = null;
+
+  setOperationalUiAllowed(false);
+  await stopCamera();
+
+  if (preview) preview.srcObject = null;
+  if (uploadPreviewBox) uploadPreviewBox.style.display = "none";
+  if (uploadPreviewImg) uploadPreviewImg.removeAttribute("src");
+  if (retakeBtn) retakeBtn.disabled = true;
+
+  if (correctedScoreInput) correctedScoreInput.value = "";
+  if (trainingNoteInput) trainingNoteInput.value = "";
+  showTrainingStatus("", true);
+  refreshTrainingButton();
+
+  if (scoreFill) {
+    scoreFill.style.width = "0%";
+  }
+
+  if (scoreBadge) {
+    scoreBadge.textContent =
+      j.display?.title ||
+      j.message ||
+      "";
+  }
+
+  if (scoreNote) {
+    scoreNote.textContent =
+      j.display?.summary ||
+      j.message ||
+      "";
+  }
+
+  if (saveBtn) {
+    saveBtn.disabled = true;
+
+    if (j.display?.saveButtonText) {
+      saveBtn.textContent = j.display.saveButtonText;
+    }
+  }
+
+  if (backBtn && j.display?.backButtonText) {
+    backBtn.textContent = j.display.backButtonText;
+  }
+
+  try {
+    scoreWidget?.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+  } catch (_) {}
 }
   function setWaiting() {
     state.analysis = null;
@@ -719,25 +776,19 @@ if (authRequired) return;
 
     showMsg(j.message || "✅ تم حفظ تقييم الروث بنجاح", true);
 
-    if (ctx.mode === "group" && j.completed === false) {
-      resetForNextGroupSample(j);
-      return;
-    }
-
-  setTimeout(() => {
-  const dt =
-    j.eventDate ||
-    eventDateInput?.value ||
-    ctx.eventDate ||
-    todayCairo();
-
-  if (ctx.mode === "group") {
-    const u = new URL("add-event.html", location.href);
-    carryContextToUrl(u, ctx, dt);
-    location.href = u.toString();
+if (ctx.mode === "group") {
+  if (j.completed === false) {
+    resetForNextGroupSample(j);
     return;
   }
 
+  if (j.completed === true) {
+    await renderCompletedGroupFromServer(j);
+    return;
+  }
+}
+
+setTimeout(() => {
   const u = new URL("event-list.html", location.href);
 
   if (ctx.animalNumber) {
@@ -750,16 +801,16 @@ if (authRequired) return;
     console.error("feces save error:", e);
     showMsg(e.message || "تعذّر حفظ تقييم الروث.", false);
   } finally {
-  if (saveBtn) {
-    saveBtn.disabled = !(
-      state.operationalAllowed &&
-      state.analysis?.ok &&
-      Number.isFinite(Number(state.analysis.score))
-    );
+if (saveBtn && !state.groupCompleted) {
+  saveBtn.disabled = !(
+    state.operationalAllowed &&
+    state.analysis?.ok &&
+    Number.isFinite(Number(state.analysis.score))
+  );
 
-    saveBtn.textContent =
-      ctx.mode === "group" ? "حفظ العينة" : "حفظ التقييم";
-  }
+  saveBtn.textContent =
+    ctx.mode === "group" ? "حفظ العينة" : "حفظ التقييم";
+}
 }
 }
  async function saveTrainingCorrection() {
