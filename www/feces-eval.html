@@ -404,20 +404,19 @@ async function renderCompletedGroupFromServer(j) {
   if (scoreBadge) {
     scoreBadge.textContent =
       j.display?.title ||
-      j.message ||
       "";
   }
 
   if (scoreNote) {
     scoreNote.textContent =
       j.display?.summary ||
-      j.message ||
       "";
   }
 
   if (saveBtn) {
-  saveBtn.disabled = true;
-}
+    saveBtn.disabled = true;
+    saveBtn.textContent = "حفظ العينة";
+  }
 }
   function setWaiting() {
     state.analysis = null;
@@ -769,6 +768,11 @@ if (ctx.mode === "group") {
 
   if (j.completed === true) {
     await renderCompletedGroupFromServer(j);
+
+    setTimeout(() => {
+      location.href = "add-event.html";
+    }, 3000);
+
     return;
   }
 }
