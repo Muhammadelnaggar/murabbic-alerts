@@ -74381,6 +74381,47 @@ async function fecesConsumeDailySlotSrv({
     dailyLimit: limit
   };
 }
+app.post("/api/feces/gate", requireUserId, async (req, res) => {
+  try {
+    const scopeGate =
+      await fecesCowOnlyScopeGateSrv(
+        req.userId,
+        req.body || {}
+      );
+
+    if (!scopeGate.ok) {
+      return res
+        .status(scopeGate.statusCode || 400)
+        .json({
+          ...scopeGate,
+          allowed: false
+        });
+    }
+
+    return res.json({
+      ok: true,
+      allowed: true,
+      mode: scopeGate.mode,
+      modelSpecies: scopeGate.modelSpecies,
+      modelScope: scopeGate.modelScope,
+      animalId: scopeGate.animalId || "",
+      animalNumber: scopeGate.animalNumber || "",
+      groupId: scopeGate.groupId || "",
+      groupKey: scopeGate.groupKey || "",
+      groupName: scopeGate.groupName || ""
+    });
+
+  } catch (e) {
+    console.warn("feces operational gate failed:", e.message || e);
+
+    return res.status(500).json({
+      ok: false,
+      allowed: false,
+      error: "feces_gate_failed",
+      message: "❌ تعذّر التحقق من صلاحية تقييم الروث الآن. حاول مرة أخرى."
+    });
+  }
+});
 app.post("/api/feces/vision-analyze", requireUserId, async (req, res) => {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
