@@ -74015,6 +74015,249 @@ function fecesGroupValueSrv(...vals) {
   }
   return "";
 }
+const FECES_ALLOWED_ADULT_COW_GROUP_IDS_SRV = new Set([
+  "cow_fresh",
+  "cow_high",
+  "cow_med",
+  "cow_low",
+  "cow_dry",
+  "cow_closeup"
+]);
+
+async function fecesCowOnlyScopeGateSrv(uid, body = {}) {
+  if (!db) {
+    return {
+      ok: false,
+      statusCode: 503,
+      error: "firestore_disabled",
+      message: "❌ تعذّر التحقق من صلاحية تقييم الروث الآن. حاول مرة أخرى."
+    };
+  }
+
+  const group = body.group && typeof body.group === "object"
+    ? body.group
+    : {};
+
+  const rawGroupId = fecesGroupValueSrv(
+    body.groupId,
+    body.feedingGroupId,
+    group.groupId,
+    group.id
+  );
+
+  const rawGroupKey = fecesGroupValueSrv(
+    body.groupKey,
+    group.groupKey
+  );
+
+  const rawGroupName = fecesGroupValueSrv(
+    body.groupName,
+    body.feedingGroupName,
+    group.groupName,
+    group.name
+  );
+
+  const rawAnimalId = String(
+    body.animalId ||
+    body.id ||
+    body.sampleAnimalId ||
+    ""
+  ).trim();
+
+  const rawAnimalNumber = fecesDigitsOnlySrv(
+    body.animalNumber ||
+    body.number ||
+    body.sampleAnimalNumber ||
+    ""
+  );
+
+  const hasGroupScope = Boolean(
+    rawGroupId ||
+    rawGroupName ||
+    rawGroupKey
+  );
+
+  const hasIndividualScope = Boolean(
+    rawAnimalId ||
+    rawAnimalNumber
+  );
+
+  if (hasGroupScope && hasIndividualScope) {
+    return {
+      ok: false,
+      statusCode: 400,
+      error: "feces_scope_conflict",
+      message: "❌ اختر حيوانًا فرديًا أو مجموعة تغذية فقط، وليس كليهما."
+    };
+  }
+
+  if (!hasGroupScope && !hasIndividualScope) {
+    return {
+      ok: false,
+      statusCode: 400,
+      error: "feces_scope_required",
+      message: "❌ اختر بقرة أو مجموعة أبقار قبل تقييم الروث."
+    };
+  }
+
+  if (hasGroupScope) {
+    let def = null;
+
+    if (
+      rawGroupId &&
+      typeof GROUP_DEF_BY_ID_SRV === "object"
+    ) {
+      def = GROUP_DEF_BY_ID_SRV[rawGroupId] || null;
+    }
+
+    if (
+      !def &&
+      rawGroupName &&
+      Array.isArray(GROUP_DEFS_SRV)
+    ) {
+      def = GROUP_DEFS_SRV.find(x =>
+        String(x?.label || "").trim() === rawGroupName
+      ) || null;
+    }
+
+    if (!def) {
+      return {
+        ok: false,
+        statusCode: 400,
+        error: "feces_group_unresolved",
+        message: "❌ تعذّر التحقق من مجموعة التغذية من بيانات السيرفر."
+      };
+    }
+
+    if (String(def.species || "").trim() !== "cow") {
+      return {
+        ok: false,
+        statusCode: 400,
+        error: "feces_buffalo_not_supported",
+        message: "ℹ️ نموذج تقييم الروث الحالي مخصص للأبقار فقط، ولا يقيّم الجاموس."
+      };
+    }
+
+    if (!FECES_ALLOWED_ADULT_COW_GROUP_IDS_SRV.has(def.id)) {
+      return {
+        ok: false,
+        statusCode: 400,
+        error: "feces_adult_cows_only",
+        message: "ℹ️ نموذج تقييم الروث الحالي مخصص لمجموعات الأبقار البالغة فقط."
+      };
+    }
+
+    return {
+      ok: true,
+      statusCode: 200,
+      mode: "group",
+      modelSpecies: "cow",
+      modelScope: "adult_dairy_cow",
+
+      groupId: def.id,
+      groupKey: def.baseKey || rawGroupKey || def.id,
+      groupName: def.label || rawGroupName || def.id,
+
+      animalId: "",
+      animalNumber: ""
+    };
+  }
+
+  let animal = null;
+
+  if (rawAnimalId) {
+    const snap =
+      await db
+        .collection("animals")
+        .doc(rawAnimalId)
+        .get();
+
+    if (snap.exists) {
+      const data = snap.data() || {};
+      const owner =
+        String(
+          data.userId ||
+          data.ownerUid ||
+          ""
+        ).trim();
+
+      if (owner === String(uid || "").trim()) {
+        animal = {
+          id: snap.id,
+          ...data
+        };
+      }
+    }
+  }
+
+  if (!animal && rawAnimalNumber) {
+    animal =
+      await findAnimalDocByNumberSrv(
+        uid,
+        rawAnimalNumber
+      );
+  }
+
+  if (!animal) {
+    return {
+      ok: false,
+      statusCode: 404,
+      error: "feces_animal_not_found",
+      message: "❌ الحيوان غير موجود ضمن أبقار هذه المزرعة."
+    };
+  }
+
+  if (speciesOfSrv(animal) !== "cow") {
+    return {
+      ok: false,
+      statusCode: 400,
+      error: "feces_buffalo_not_supported",
+      message: "ℹ️ نموذج تقييم الروث الحالي مخصص للأبقار فقط، ولا يقيّم الجاموس."
+    };
+  }
+
+  const followerText = [
+    animal.entryType,
+    animal.source,
+    animal._source,
+    animal.followerStatus,
+    animal.statusAr
+  ]
+    .map(v => String(v || "").trim().toLowerCase())
+    .join(" ");
+
+  if (
+    animal.isCalf === true ||
+    /follower|followers|calf|عجل|عجلة|رضيع|فطام|نامي/.test(followerText)
+  ) {
+    return {
+      ok: false,
+      statusCode: 400,
+      error: "feces_adult_cows_only",
+      message: "ℹ️ نموذج تقييم الروث الحالي مخصص للأبقار البالغة فقط، ولا يقيّم العجول أو التوابع."
+    };
+  }
+
+  return {
+    ok: true,
+    statusCode: 200,
+    mode: "individual",
+    modelSpecies: "cow",
+    modelScope: "adult_dairy_cow",
+
+    animalId: animal.id,
+
+    animalNumber: fecesDigitsOnlySrv(
+      animal.animalNumber ||
+      animal.number ||
+      rawAnimalNumber
+    ),
+
+    groupId: "",
+    groupKey: "",
+    groupName: ""
+  };
+}
 function fecesDigitsOnlySrv(v) {
   const map = {
     "٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
@@ -74165,6 +74408,17 @@ app.post("/api/feces/vision-analyze", requireUserId, async (req, res) => {
       });
     }
 const uid = req.userId;
+const scopeGate =
+  await fecesCowOnlyScopeGateSrv(
+    uid,
+    body
+  );
+
+if (!scopeGate.ok) {
+  return res
+    .status(scopeGate.statusCode || 400)
+    .json(scopeGate);
+}
 
 const analysisDateRaw = String(
   body.eventDate ||
@@ -74205,10 +74459,10 @@ Task:
 Evaluate only the manure/feces visible in the TARGET image.
 Return one integer feces score from 1 to 5.
 
-This scoring is for adult dairy cows and buffalo only.
+This scoring is for adult dairy cows only.
+Do NOT evaluate buffalo.
 Do NOT evaluate calves.
 Do NOT diagnose disease.
-Do NOT score from color alone.
 
 Quality gate:
 - Reject if manure is not clearly visible.
@@ -74427,6 +74681,9 @@ For rejected images:
     visual: String(parsed.visualFindings || "").trim()
   },
   note: fecesBuildNoteSrv(score),
+  modelSpecies: "cow",
+modelScope: "adult_dairy_cow",
+scope: scopeGate.mode,
 
   dailySequence: dailyUsage.dailySequence,
   dailyLimit: FECES_DAILY_LIMIT_SRV,
@@ -74773,11 +75030,14 @@ async function fecesSaveGroupSampleSessionSrv({
       ownerUid: uid,
 
       type: "تقييم الروث",
-      eventType: "تقييم الروث",
-      eventTypeNorm: "feces_eval",
+eventType: "تقييم الروث",
+eventTypeNorm: "feces_eval",
 
-      scope: "feeding_group",
-      sessionType: "group_session_pending",
+species: "cow",
+modelSpecies: "cow",
+modelScope: "adult_dairy_cow",
+
+scope: "feeding_group",
 
       eventDate,
       date: eventDate,
@@ -74891,11 +75151,15 @@ async function fecesSaveGroupSampleSessionSrv({
       ownerUid: uid,
 
       type: "تقييم الروث",
-      eventType: "تقييم الروث",
-      eventTypeNorm: "feces_eval",
+eventType: "تقييم الروث",
+eventTypeNorm: "feces_eval",
 
-      date: eventDate,
-      eventDate,
+species: "cow",
+modelSpecies: "cow",
+modelScope: "adult_dairy_cow",
+
+date: eventDate,
+eventDate,
 
       scope: "feeding_group",
       sessionType: "group_session",
@@ -75022,6 +75286,17 @@ app.post("/api/feces/save", requireUserId, async (req, res) => {
 
     const uid = req.userId;
     const body = req.body || {};
+    const scopeGate =
+  await fecesCowOnlyScopeGateSrv(
+    uid,
+    body
+  );
+
+if (!scopeGate.ok) {
+  return res
+    .status(scopeGate.statusCode || 400)
+    .json(scopeGate);
+}
 
     const eventDate = String(
       body.eventDate ||
@@ -75029,43 +75304,31 @@ app.post("/api/feces/save", requireUserId, async (req, res) => {
       ""
     ).trim().slice(0, 10);
 
-    const group = body.group && typeof body.group === "object"
-      ? body.group
-      : {};
+const groupId =
+  scopeGate.mode === "group"
+    ? String(scopeGate.groupId || "").trim()
+    : "";
 
-    const groupId = fecesGroupValueSrv(
-      body.groupId,
-      body.feedingGroupId,
-      body.groupKey,
-      group.groupId,
-      group.id,
-      group.groupKey
-    );
+const groupName =
+  scopeGate.mode === "group"
+    ? String(scopeGate.groupName || "").trim()
+    : "";
 
-    const groupName = fecesGroupValueSrv(
-      body.groupName,
-      body.feedingGroupName,
-      group.groupName,
-      group.name
-    );
+const animalIdFromPage =
+  scopeGate.mode === "individual"
+    ? String(scopeGate.animalId || "").trim()
+    : "";
 
-    const animalIdFromPage = String(
-      body.animalId ||
-      body.id ||
-      body.sampleAnimalId ||
-      ""
-    ).trim();
+const animalNumber =
+  scopeGate.mode === "individual"
+    ? fecesDigitsOnlySrv(scopeGate.animalNumber || "")
+    : "";
 
-    const animalNumber = fecesDigitsOnlySrv(
-      body.animalNumber ||
-      body.number ||
-      body.sampleAnimalNumber ||
-      ""
-    );
+const hasGroupScope =
+  scopeGate.mode === "group";
 
-    const hasGroupScope = Boolean(groupId || groupName);
-    const hasIndividualScope = Boolean(animalIdFromPage || animalNumber);
-
+const hasIndividualScope =
+  scopeGate.mode === "individual";
     const analysis = body.analysis || body.result || {};
     const fallbackScore = fecesClampScoreSrv(
       body.score ??
@@ -75128,7 +75391,7 @@ if (hasGroupScope) {
     eventDate,
     groupId,
     groupName,
-    animalType: String(body.animalType || body.species || "").trim(),
+    animalType: "cow",
     sample: samples[0],
     userComment
   });
@@ -75187,11 +75450,15 @@ if (hasGroupScope) {
       ownerUid: uid,
 
       type: "تقييم الروث",
-      eventType: "تقييم الروث",
-      eventTypeNorm: "feces_eval",
+eventType: "تقييم الروث",
+eventTypeNorm: "feces_eval",
 
-      date: eventDate,
-      eventDate,
+species: "cow",
+modelSpecies: "cow",
+modelScope: "adult_dairy_cow",
+
+date: eventDate,
+eventDate,
 
       scope,
       sessionType: hasGroupScope ? "group_session" : "individual_sample",
