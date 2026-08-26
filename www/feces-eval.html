@@ -39,9 +39,9 @@
   <div class="left"></div>
 
   <div class="right" style="grid-template-columns:repeat(2,minmax(0,1fr));">
-    <button id="captureBtn" class="mbk-btn mbk-btn-primary">التقاط</button>
+    <button id="captureBtn" class="mbk-btn mbk-btn-primary" disabled>التقاط</button>
     <button id="retakeBtn" class="mbk-btn mbk-btn-danger" disabled>إعادة الالتقاط</button>
-    <button id="uploadBtn" class="mbk-btn mbk-btn-light" style="grid-column:1 / -1;">رفع صورة بديلة</button>
+    <button id="uploadBtn" class="mbk-btn mbk-btn-light" style="grid-column:1 / -1;" disabled>رفع صورة بديلة</button>
   </div>
 
   <input id="uploadInput" type="file" accept="image/*" style="display:none" />
@@ -107,7 +107,7 @@
   </label>
 
   <div class="actions-bar inline">
-  <button id="saveBtn" class="save" type="button">حفظ التقييم</button>
+  <button id="saveBtn" class="save" type="button" disabled>حفظ التقييم</button>
   <button id="backBtn" class="ghost" type="button">لوحة التحكم</button>
 </div>
 </div>
@@ -151,7 +151,8 @@
   stream: null,
   image: null,
   analysis: null,
-  canTrain: false
+  canTrain: false,
+  operationalAllowed: false
 };
 
   function todayCairo() {
@@ -251,7 +252,70 @@ function refreshTrainingButton() {
   if (!trainingSaveBtn) return;
   trainingSaveBtn.disabled = !(state.canTrain && state.analysis && Number.isFinite(Number(state.analysis.score)));
 }
+function setOperationalUiAllowed(allowed) {
+  state.operationalAllowed = Boolean(allowed);
 
+  if (captureBtn) captureBtn.disabled = !state.operationalAllowed;
+  if (uploadBtn) uploadBtn.disabled = !state.operationalAllowed;
+
+  if (!state.operationalAllowed) {
+    if (retakeBtn) retakeBtn.disabled = true;
+    if (saveBtn) saveBtn.disabled = true;
+    return;
+  }
+
+  if (saveBtn) {
+    saveBtn.disabled = !(
+      state.analysis?.ok &&
+      Number.isFinite(Number(state.analysis.score))
+    );
+  }
+}
+
+async function initOperationalGate() {
+  const ctx = contextFromUrl();
+
+  setOperationalUiAllowed(false);
+
+  try {
+    const { r, data, authRequired } =
+      await sessionFetchJson("/api/feces/gate", {
+        method: "POST",
+        body: {
+          mode: ctx.mode,
+
+          animalId: ctx.mode === "individual" ? ctx.animalId : "",
+          animalNumber: ctx.mode === "individual" ? ctx.animalNumber : "",
+
+          groupName: ctx.mode === "group" ? ctx.groupName : "",
+          groupId: ctx.mode === "group" ? ctx.groupId : "",
+          groupKey: ctx.mode === "group" ? ctx.groupKey : ""
+        }
+      });
+
+    if (authRequired) return false;
+
+    if (!r.ok || !data?.ok || data?.allowed !== true) {
+      showMsg(
+        data?.message || "تعذّر التحقق من صلاحية تقييم الروث.",
+        false
+      );
+      return false;
+    }
+
+    hideMsg();
+    setOperationalUiAllowed(true);
+    return true;
+
+  } catch (e) {
+    console.warn("feces operational gate error:", e);
+    showMsg(
+      "تعذّر الاتصال بالسيرفر للتحقق من تقييم الروث.",
+      false
+    );
+    return false;
+  }
+}
 async function initTrainingGate() {
   try {
     const { r, data, authRequired } = await sessionFetchJson("/api/feces/training/gate");
@@ -330,6 +394,7 @@ refreshTrainingButton();
     if (scoreNote) {
       scoreNote.textContent = "وجّه الروث داخل الإطار ثم التقط صورة واضحة للتقييم.";
     }
+    if (saveBtn) saveBtn.disabled = true;
   }
 
   function renderAnalysis(result) {
@@ -361,6 +426,7 @@ refreshTrainingButton();
 
     showTrainingStatus("", true);
     refreshTrainingButton();
+    setOperationalUiAllowed(true);
   }
 
   function showPreview(dataUrl) {
@@ -822,21 +888,30 @@ if (headBackBtn) {
 }
 
 setWaiting();
+bindEvents();
+
+const operationalAllowed = await initOperationalGate();
+if (!operationalAllowed) return;
+
 initTrainingGate();
 
 if (ctx.mode === "group") {
   if (scoreBadge) scoreBadge.textContent = "بانتظار عينة المجموعة";
-  if (scoreNote) scoreNote.textContent = "حلّل عينة روث واحدة، ثم اضغط حفظ العينة. السيرفر سيحدد العينة التالية أو اكتمال تقييم المجموعة.";
+  if (scoreNote) {
+    scoreNote.textContent =
+      "حلّل عينة روث واحدة، ثم اضغط حفظ العينة. السيرفر سيحدد العينة التالية أو اكتمال تقييم المجموعة.";
+  }
 }
 
-bindEvents();
-
-    try {
-      await startCamera();
-    } catch (e) {
-      console.warn("camera error:", e);
-      showMsg(e.message || "تعذّر تشغيل الكاميرا. يمكنك استخدام رفع صورة بديلة.", false);
-    }
+try {
+  await startCamera();
+} catch (e) {
+  console.warn("camera error:", e);
+  showMsg(
+    e.message || "تعذّر تشغيل الكاميرا. يمكنك استخدام رفع صورة بديلة.",
+    false
+  );
+}
   }
 
   init();
