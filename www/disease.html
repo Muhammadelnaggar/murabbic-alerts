@@ -1542,36 +1542,46 @@ async function saveCorrection(
         }
       );
 
-    setBar(
-      gateBox,
-      j.message ||
-      "✅ تم تعديل التشخيص الصحي بنجاح.",
-      "success"
-    );
+   setBar(
+  gateBox,
+  j.message ||
+  "✅ تم تعديل التشخيص الصحي بنجاح.",
+  "success"
+);
 
-    setTimeout(() => {
-      location.href =
-        `event-list.html?number=${encodeURIComponent(
-          animalNumber
-        )}`;
-    }, 900);
+gateBox?.scrollIntoView({
+  behavior: "smooth",
+  block: "center"
+});
 
-  } catch (e) {
-    console.error(
-      "disease correction failed",
-      e
-    );
+setTimeout(() => {
+  location.href =
+    `event-list.html?number=${encodeURIComponent(
+      animalNumber
+    )}`;
+}, 2500);
 
-    setBar(
-      gateBox,
-      e.message ||
-      "❌ تعذّر تعديل التشخيص الصحي.",
-      "error"
-    );
+} catch (e) {
+  console.error(
+    "disease correction failed",
+    e
+  );
 
-    btn.disabled =
-      false;
-  }
+  setBar(
+    gateBox,
+    e.message ||
+    "❌ تعذّر تعديل التشخيص الصحي.",
+    "error"
+  );
+
+  gateBox?.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+
+  btn.disabled =
+    false;
+}
 }
 
   async function runGate(){
