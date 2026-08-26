@@ -25782,16 +25782,30 @@ function fecesScoreBandNutritionSrv(score) {
     };
   }
 
-  if (s > 3.5) {
+  if (s > 4.5) {
     return {
       key: "dry",
-      label: "روث متماسك/جاف",
+      label: "روث جاف جدًا/صلب",
       reasons: [
         "نقص استهلاك الماء",
-        "ارتفاع المادة الجافة",
+        "ارتفاع المادة الجافة للعليقة",
         "زيادة الألياف الخشنة أو بطء الهضم",
         "انخفاض الاستهلاك",
         "بطء مرور العليقة"
+      ]
+    };
+  }
+
+  if (s > 3.5) {
+    return {
+      key: "thick",
+      label: "روث سميك ومتراكم",
+      reasons: [
+        "ارتفاع المادة الجافة للعليقة",
+        "زيادة الألياف الخشنة أو انخفاض قابلية الهضم",
+        "انخفاض الاستهلاك أو بطء مرور العليقة",
+        "تغيّر تركيب العليقة أو حدوث فرز",
+        "يُراجع مع استهلاك الماء واللبن وباقي مؤشرات المجموعة"
       ]
     };
   }
@@ -73876,7 +73890,7 @@ function fecesLabelSrv(score) {
   if (s === 1) return "إسهال شديد";
   if (s === 2) return "لين زيادة";
   if (s === 3) return "نموذجي";
-  if (s === 4) return "جاف زيادة";
+  if (s === 4) return "سميك ومتراكم";
   if (s === 5) return "جاف جدًا";
 
   return "غير محدد";
@@ -73894,11 +73908,11 @@ function fecesBuildNoteSrv(score) {
   }
 
   if (s === 3) {
-    return "قوام نموذجي؛ الروث متماسك بدرجة مناسبة ويكوّن كومة واضحة بدون جفاف أو سيولة زائدة.";
+    return "قوام نموذجي؛ روث عصيدي لين يتخذ شكلًا منخفضًا وعريضًا نسبيًا دون سيولة أو تكتل مرتفع.";
   }
 
   if (s === 4) {
-    return "روث متماسك أو جاف زيادة؛ قد يرتبط بزيادة الألياف أو قلة الماء أو بطء المرور.";
+    return "روث سميك ومتراكم؛ يحتفظ بشكله في كومة مرتفعة أو عجينية وقد يكون رطبًا. هذه الدرجة لا تعني الجفاف وحده.";
   }
 
   if (s === 5) {
@@ -74598,6 +74612,8 @@ Output rules:
 - For score 3, describe the shape in Arabic as "قرص عصيدي لين" or "بقعة/قرص متماسك لين"; do not describe score 3 as "كومة".
 For score 3, do not say "قرص" unless the shape is visibly low, broad, flat, and not raised.
 If the visible shape has a raised center or mound-like body, do not describe it as "قرص"; classify it as score 4.
+For score 4, describe the visible consistency in Arabic as "سميك ومتراكم" or as a thick/pasty raised mound.
+Do NOT describe score 4 as "جاف زيادة" unless visible dryness is specifically present, and never infer dehydration from score 4 alone.
 Return exactly one JSON object with these keys:
 ok
 score
