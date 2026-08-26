@@ -725,12 +725,14 @@ if (authRequired) return;
     }
 
     setTimeout(() => {
-      const dt = j.eventDate || eventDateInput?.value || ctx.eventDate || todayCairo();
-      const u = new URL("add-event.html", location.href);
-      carryContextToUrl(u, ctx, dt);
-      location.href = u.toString();
-    }, 900);
+  const u = new URL("event-list.html", location.href);
 
+  if (ctx.mode === "individual" && ctx.animalNumber) {
+    u.searchParams.set("number", ctx.animalNumber);
+  }
+
+  location.href = u.toString();
+}, 900);
   } catch (e) {
     console.error("feces save error:", e);
     showMsg(e.message || "تعذّر حفظ تقييم الروث.", false);
