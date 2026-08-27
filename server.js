@@ -73921,7 +73921,22 @@ function fecesBuildNoteSrv(score) {
 
   return "";
 }
-const FECES_DAILY_LIMIT_SRV = 10;
+const FECES_AI_DAILY_LIMIT_SRV = Math.max(
+  1,
+  Number.parseInt(
+    process.env.FECES_AI_DAILY_LIMIT || "30",
+    10
+  ) || 30
+);
+
+const FECES_AI_MONTHLY_LIMIT_SRV = Math.max(
+  FECES_AI_DAILY_LIMIT_SRV,
+  Number.parseInt(
+    process.env.FECES_AI_MONTHLY_LIMIT || "300",
+    10
+  ) || 300
+);
+
 const FECES_GROUP_SESSION_SAMPLE_LIMIT_SRV = 4;
 const FECES_TRAINING_ADMIN_UID_SRV =
   process.env.FECES_TRAINING_ADMIN_UID || "DEQ98faBPYSFikEMtaPTTynJ6iI2";
@@ -74012,7 +74027,18 @@ function fecesDailyCounterIdSrv(uid, eventDate, counterType = "save") {
     eventDate
   );
 }
-
+function fecesMonthlyCounterIdSrv(
+  uid,
+  usageMonth,
+  counterType = "analysis"
+) {
+  return eventsPageStableDocIdSrv(
+    uid,
+    "feces_eval_monthly",
+    counterType,
+    usageMonth
+  );
+}
 function fecesDailyEventDocIdSrv(uid, eventDate, sequence) {
   return eventsPageStableDocIdSrv(
     uid,
@@ -74339,60 +74365,241 @@ function fecesNormalizeSamplesSrv(body = {}, fallbackAnalysis = {}, fallbackScor
     })
     .filter(Boolean);
 }
-async function fecesConsumeDailySlotSrv({
+async function fecesConsumeAiFairUseSrv({
   uid,
-  eventDate,
-  counterType = "save",
-  limit = FECES_DAILY_LIMIT_SRV
+  profileUid = ""
 } = {}) {
-  const counterRef = db.collection("event_counters").doc(
-    fecesDailyCounterIdSrv(uid, eventDate, counterType)
+  const usageDay = await farmTodayISOSrv(
+    profileUid || uid
   );
 
-  let allowed = false;
-  let dailySequence = 0;
-  let currentDailyCount = 0;
+  const usageMonth =
+    String(usageDay || "").slice(0, 7);
+
+  // حساب التدريب منفصل عن حدود العملاء
+  if (
+    fecesIsTrainingAdminSrv(uid) ||
+    fecesIsTrainingAdminSrv(profileUid)
+  ) {
+    return {
+      allowed: true,
+      bypassed: true,
+      usageDay,
+      usageMonth,
+      dailyCount: 0,
+      monthlyCount: 0
+    };
+  }
+
+  const dailyRef =
+    db.collection("event_counters").doc(
+      fecesDailyCounterIdSrv(
+        uid,
+        usageDay,
+        "analysis"
+      )
+    );
+
+  const monthlyRef =
+    db.collection("event_counters").doc(
+      fecesMonthlyCounterIdSrv(
+        uid,
+        usageMonth,
+        "analysis"
+      )
+    );
+
+  let result = null;
 
   await db.runTransaction(async (tx) => {
-    const snap = await tx.get(counterRef);
-    const current = Number(snap.exists ? (snap.data()?.count || 0) : 0);
+    const dailySnap = await tx.get(dailyRef);
+    const monthlySnap = await tx.get(monthlyRef);
 
-    currentDailyCount = Number.isFinite(current) && current > 0 ? current : 0;
+    const dailyCount = Math.max(
+      0,
+      Number(
+        dailySnap.exists
+          ? (dailySnap.data()?.count || 0)
+          : 0
+      ) || 0
+    );
 
-    if (currentDailyCount >= limit) {
-      allowed = false;
+    const monthlyCount = Math.max(
+      0,
+      Number(
+        monthlySnap.exists
+          ? (monthlySnap.data()?.count || 0)
+          : 0
+      ) || 0
+    );
+
+    if (
+      dailyCount >=
+      FECES_AI_DAILY_LIMIT_SRV
+    ) {
+      result = {
+        allowed: false,
+        reason: "daily",
+        usageDay,
+        usageMonth,
+        dailyCount,
+        monthlyCount
+      };
       return;
     }
 
-    dailySequence = currentDailyCount + 1;
-    allowed = true;
-
-    const payload = {
-      userId: uid,
-      ownerUid: uid,
-      counterType,
-      eventType: "تقييم الروث",
-      eventTypeNorm: "feces_eval",
-      eventDate,
-      date: eventDate,
-      scope: "feeding_group_daily",
-      dailyLimit: limit,
-      count: dailySequence,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    };
-
-    if (!snap.exists) {
-      payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    if (
+      monthlyCount >=
+      FECES_AI_MONTHLY_LIMIT_SRV
+    ) {
+      result = {
+        allowed: false,
+        reason: "monthly",
+        usageDay,
+        usageMonth,
+        dailyCount,
+        monthlyCount
+      };
+      return;
     }
 
-    tx.set(counterRef, payload, { merge: true });
+    const now =
+      admin.firestore.FieldValue.serverTimestamp();
+
+    tx.set(
+      dailyRef,
+      {
+        userId: uid,
+        ownerUid: uid,
+        counterType: "analysis",
+
+        eventType: "تقييم الروث",
+        eventTypeNorm: "feces_eval",
+
+        usageDay,
+        date: usageDay,
+
+        scope: "ai_fair_use_daily",
+        count: dailyCount + 1,
+
+        updatedAt: now,
+
+        ...(
+          !dailySnap.exists
+            ? { createdAt: now }
+            : {}
+        )
+      },
+      { merge: true }
+    );
+
+    tx.set(
+      monthlyRef,
+      {
+        userId: uid,
+        ownerUid: uid,
+        counterType: "analysis",
+
+        eventType: "تقييم الروث",
+        eventTypeNorm: "feces_eval",
+
+        usageMonth,
+
+        scope: "ai_fair_use_monthly",
+        count: monthlyCount + 1,
+
+        updatedAt: now,
+
+        ...(
+          !monthlySnap.exists
+            ? { createdAt: now }
+            : {}
+        )
+      },
+      { merge: true }
+    );
+
+    result = {
+      allowed: true,
+      usageDay,
+      usageMonth,
+      dailyCount: dailyCount + 1,
+      monthlyCount: monthlyCount + 1
+    };
+  });
+
+  return result || {
+    allowed: false,
+    reason: "unknown",
+    usageDay,
+    usageMonth
+  };
+}
+
+async function fecesNextDailySaveSequenceSrv({
+  uid,
+  eventDate
+} = {}) {
+  const counterRef =
+    db.collection("event_counters").doc(
+      fecesDailyCounterIdSrv(
+        uid,
+        eventDate,
+        "save"
+      )
+    );
+
+  let dailySequence = 0;
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(counterRef);
+
+    const current = Math.max(
+      0,
+      Number(
+        snap.exists
+          ? (snap.data()?.count || 0)
+          : 0
+      ) || 0
+    );
+
+    dailySequence = current + 1;
+
+    const now =
+      admin.firestore.FieldValue.serverTimestamp();
+
+    tx.set(
+      counterRef,
+      {
+        userId: uid,
+        ownerUid: uid,
+
+        counterType: "save",
+
+        eventType: "تقييم الروث",
+        eventTypeNorm: "feces_eval",
+
+        eventDate,
+        date: eventDate,
+
+        scope: "feces_save_sequence",
+
+        count: dailySequence,
+
+        updatedAt: now,
+
+        ...(
+          !snap.exists
+            ? { createdAt: now }
+            : {}
+        )
+      },
+      { merge: true }
+    );
   });
 
   return {
-    allowed,
-    dailySequence,
-    currentDailyCount,
-    dailyLimit: limit
+    dailySequence
   };
 }
 app.post("/api/feces/gate", requireUserId, async (req, res) => {
@@ -74475,35 +74682,32 @@ if (!scopeGate.ok) {
     .json(scopeGate);
 }
 
-const analysisDateRaw = String(
-  body.eventDate ||
-  body.date ||
-  (typeof cairoTodayISO === "function"
-    ? cairoTodayISO()
-    : new Date().toISOString().slice(0, 10))
-).trim().slice(0, 10);
+const profileUid =
+  req.authSession?.uid ||
+  uid;
 
-const analysisDate = /^\d{4}-\d{2}-\d{2}$/.test(analysisDateRaw)
-  ? analysisDateRaw
-  : (typeof cairoTodayISO === "function"
-    ? cairoTodayISO()
-    : new Date().toISOString().slice(0, 10));
+const aiUsage =
+  await fecesConsumeAiFairUseSrv({
+    uid,
+    profileUid
+  });
 
-const dailyUsage = await fecesConsumeDailySlotSrv({
-  uid,
-  eventDate: analysisDate,
-  counterType: "analysis",
-  limit: FECES_DAILY_LIMIT_SRV
-});
+if (!aiUsage.allowed) {
+  const monthly =
+    aiUsage.reason === "monthly";
 
-if (!dailyUsage.allowed) {
   return res.status(429).json({
     ok: false,
-    error: "feces_daily_analysis_limit_reached",
-   message: `🚫 وصلت إلى الحد اليومي لتحليل صور الروث: ${FECES_DAILY_LIMIT_SRV} صورة. يمكنك المحاولة غدًا.`,
-   eventDate: analysisDate,
-   dailyLimit: FECES_DAILY_LIMIT_SRV,
-   currentDailyCount: dailyUsage.currentDailyCount || FECES_DAILY_LIMIT_SRV
+
+    error: monthly
+      ? "feces_ai_monthly_fair_use_limit_reached"
+      : "feces_ai_daily_fair_use_limit_reached",
+
+    usagePolicy: "fair_use",
+
+    message: monthly
+      ? "ℹ️ وصل استخدام تحليل الروث الذكي هذا الشهر إلى الحد المخصص للاستخدام العادل. يتاح التحليل مرة أخرى مع بداية شهر المزرعة التالي."
+      : "ℹ️ وصل استخدام تحليل الروث الذكي اليوم إلى الحد المخصص للاستخدام العادل. يتاح التحليل مرة أخرى مع بداية يوم المزرعة التالي."
   });
 }
   const expertCalibrationPrompt = await fecesBuildExpertCalibrationPromptSrv();
@@ -74742,13 +74946,7 @@ For rejected images:
 modelScope: "adult_dairy_cow",
 scope: scopeGate.mode,
 
-  dailySequence: dailyUsage.dailySequence,
-  dailyLimit: FECES_DAILY_LIMIT_SRV,
-  remainingToday: Math.max(
-  0,
-  FECES_DAILY_LIMIT_SRV - (dailyUsage.dailySequence || 0)
-),
-
+usagePolicy: "fair_use",
   message: `✅ اكتمل تحليل الروث — الدرجة ${score}/5 (${label}).`
 });
 
@@ -75164,19 +75362,6 @@ scope: "feeding_group",
     const current = Number(counterSnap.exists ? (counterSnap.data()?.count || 0) : 0);
     const currentDailyCount = Number.isFinite(current) && current > 0 ? current : 0;
 
-    if (currentDailyCount >= FECES_DAILY_LIMIT_SRV) {
-      result = {
-        statusCode: 429,
-        ok: false,
-        error: "feces_daily_save_limit_reached",
-        message: `🚫 وصلت إلى الحد اليومي لحفظ تقييمات الروث: ${FECES_DAILY_LIMIT_SRV} تقييمات. يمكنك المحاولة غدًا.`,
-        eventDate,
-        dailyLimit: FECES_DAILY_LIMIT_SRV,
-        currentDailyCount
-      };
-      return;
-    }
-
     const dailySequence = currentDailyCount + 1;
 
     const counterPayload = {
@@ -75187,8 +75372,7 @@ scope: "feeding_group",
       eventTypeNorm: "feces_eval",
       eventDate,
       date: eventDate,
-      scope: "feeding_group_daily",
-      dailyLimit: FECES_DAILY_LIMIT_SRV,
+      scope: "feces_save_sequence",
       count: dailySequence,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
@@ -75234,7 +75418,6 @@ eventDate,
       animalType: animalType || null,
 
       dailySequence,
-      dailyLimit: FECES_DAILY_LIMIT_SRV,
 
       score: stats.finalScore,
       value: stats.finalScore,
@@ -75318,7 +75501,7 @@ result = {
   variation: stats.variation,
 
   dailySequence,
-  dailyLimit: FECES_DAILY_LIMIT_SRV,
+  
 
 display: {
   title: `اكتمل تقييم المجموعة — ${stats.finalScore}/5 — ${stats.label}`,
@@ -75488,26 +75671,14 @@ if (hasGroupScope) {
     const label = fecesSessionLabelSrv(finalScore);
     const scope = hasGroupScope ? "feeding_group" : "individual";
 
-    const saveUsage = await fecesConsumeDailySlotSrv({
-      uid,
-      eventDate,
-      counterType: "save",
-      limit: FECES_DAILY_LIMIT_SRV
-    });
+    const saveSequence =
+  await fecesNextDailySaveSequenceSrv({
+    uid,
+    eventDate
+  });
 
-    if (!saveUsage.allowed) {
-      return res.status(429).json({
-        ok: false,
-        error: "feces_daily_save_limit_reached",
-        message: `🚫 وصلت إلى الحد اليومي لحفظ تقييمات الروث: ${FECES_DAILY_LIMIT_SRV} تقييمات. يمكنك المحاولة غدًا.`,
-        eventDate,
-        dailyLimit: FECES_DAILY_LIMIT_SRV,
-        currentDailyCount: saveUsage.currentDailyCount || FECES_DAILY_LIMIT_SRV
-      });
-    }
-
-    const dailySequence = saveUsage.dailySequence;
-
+const dailySequence =
+  saveSequence.dailySequence;
     const eventRef = db.collection("events").doc(
       fecesDailyEventDocIdSrv(uid, eventDate, dailySequence)
     );
@@ -75542,7 +75713,7 @@ eventDate,
       feedingGroupName: hasGroupScope ? (groupName || null) : null,
 
       dailySequence,
-      dailyLimit: FECES_DAILY_LIMIT_SRV,
+      
 
       score: finalScore,
       value: finalScore,
@@ -75606,9 +75777,7 @@ eventDate,
       minScore,
       maxScore,
       variation,
-
       dailySequence,
-      dailyLimit: FECES_DAILY_LIMIT_SRV,
       linkedToAnimal: hasIndividualScope,
       saved: payload
     });
@@ -75651,7 +75820,315 @@ function dairyTraitsGradeSrv(score) {
 
   return "ضعيف جدًا";
 }
+const DAIRY_TRAITS_AI_DAILY_ATTEMPT_LIMIT_SRV =
+  Math.max(
+    1,
+    Number.parseInt(
+      process.env
+        .DAIRY_TRAITS_AI_DAILY_ATTEMPT_LIMIT ||
+        "3",
+      10
+    ) || 3
+  );
 
+const DAIRY_TRAITS_REEVALUATION_DAYS_SRV =
+  Math.max(
+    1,
+    Number.parseInt(
+      process.env
+        .DAIRY_TRAITS_REEVALUATION_DAYS ||
+        "30",
+      10
+    ) || 30
+  );
+
+function dairyTraitsAiCounterIdSrv(
+  uid,
+  animalId,
+  usageDay
+) {
+  return eventsPageStableDocIdSrv(
+    uid,
+    "dairy_traits_ai_daily",
+    animalId,
+    usageDay
+  );
+}
+
+function dairyTraitsTimestampMsSrv(value) {
+  if (!value) return 0;
+
+  if (typeof value.toMillis === "function") {
+    const ms = Number(value.toMillis());
+    return Number.isFinite(ms) ? ms : 0;
+  }
+
+  if (typeof value.toDate === "function") {
+    const d = value.toDate();
+    const ms =
+      d instanceof Date
+        ? d.getTime()
+        : NaN;
+
+    return Number.isFinite(ms)
+      ? ms
+      : 0;
+  }
+
+  if (value instanceof Date) {
+    const ms = value.getTime();
+
+    return Number.isFinite(ms)
+      ? ms
+      : 0;
+  }
+
+  const ms =
+    new Date(value).getTime();
+
+  return Number.isFinite(ms)
+    ? ms
+    : 0;
+}
+
+function dairyTraitsCooldownStateSrv(
+  animalDoc = {}
+) {
+  const lastSavedMs =
+    dairyTraitsTimestampMsSrv(
+      animalDoc.lastDairyTraitsAiSavedAt ||
+      animalDoc.lastDairyTraitsSavedAt ||
+      null
+    );
+
+  if (!lastSavedMs) {
+    return {
+      blocked: false,
+      remainingDays: 0
+    };
+  }
+
+  const cooldownMs =
+    DAIRY_TRAITS_REEVALUATION_DAYS_SRV *
+    24 * 60 * 60 * 1000;
+
+  const remainingMs =
+    (lastSavedMs + cooldownMs) -
+    Date.now();
+
+  if (remainingMs <= 0) {
+    return {
+      blocked: false,
+      remainingDays: 0
+    };
+  }
+
+  return {
+    blocked: true,
+
+    remainingDays:
+      Math.max(
+        1,
+        Math.ceil(
+          remainingMs / 86400000
+        )
+      )
+  };
+}
+
+async function dairyTraitsResolveAiAnimalSrv(
+  uid,
+  body = {}
+) {
+  const animalId =
+    String(
+      body.animalId ||
+      body.id ||
+      ""
+    ).trim();
+
+  const animalNumber =
+    calvingNormDigitsOnlySrv(
+      body.animalNumber ||
+      body.number ||
+      ""
+    );
+
+  if (animalId) {
+    const snap =
+      await db
+        .collection("animals")
+        .doc(animalId)
+        .get();
+
+    if (snap.exists) {
+      const data = snap.data() || {};
+
+      const owner =
+        String(
+          data.userId ||
+          data.ownerUid ||
+          ""
+        ).trim();
+
+      if (
+        owner ===
+        String(uid || "").trim()
+      ) {
+        return {
+          id: snap.id,
+          collection: "animals",
+          data,
+
+          animalNumber:
+            calvingNormDigitsOnlySrv(
+              data.animalNumber ||
+              data.number ||
+              animalNumber
+            )
+        };
+      }
+    }
+  }
+
+  if (animalNumber) {
+    const found =
+      await fetchAnimalByNumberForCalvingGateSrv(
+        uid,
+        animalNumber
+      );
+
+    if (found?.id) {
+      const collection =
+        found._collection ||
+        "animals";
+
+      const snap =
+        await db
+          .collection(collection)
+          .doc(found.id)
+          .get();
+
+      if (snap.exists) {
+        const data =
+          snap.data() ||
+          found.data ||
+          {};
+
+        return {
+          id: snap.id,
+          collection,
+          data,
+
+          animalNumber:
+            calvingNormDigitsOnlySrv(
+              data.animalNumber ||
+              data.number ||
+              animalNumber
+            )
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+async function dairyTraitsConsumeAiAttemptSrv({
+  uid,
+  animalId,
+  profileUid = ""
+} = {}) {
+  const usageDay =
+    await farmTodayISOSrv(
+      profileUid || uid
+    );
+
+  const ref =
+    db.collection("event_counters").doc(
+      dairyTraitsAiCounterIdSrv(
+        uid,
+        animalId,
+        usageDay
+      )
+    );
+
+  let result = null;
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+
+    const current = Math.max(
+      0,
+      Number(
+        snap.exists
+          ? (snap.data()?.count || 0)
+          : 0
+      ) || 0
+    );
+
+    if (
+      current >=
+      DAIRY_TRAITS_AI_DAILY_ATTEMPT_LIMIT_SRV
+    ) {
+      result = {
+        allowed: false,
+        usageDay,
+        current
+      };
+      return;
+    }
+
+    const next = current + 1;
+
+    const now =
+      admin.firestore.FieldValue
+        .serverTimestamp();
+
+    tx.set(
+      ref,
+      {
+        userId: uid,
+        ownerUid: uid,
+        animalId,
+
+        counterType: "analysis",
+
+        eventType:
+          "تقييم سمات إنتاج اللبن",
+
+        eventTypeNorm:
+          "dairy_traits_eval",
+
+        usageDay,
+        date: usageDay,
+
+        scope: "ai_attempt_guard",
+        count: next,
+
+        updatedAt: now,
+
+        ...(
+          !snap.exists
+            ? { createdAt: now }
+            : {}
+        )
+      },
+      { merge: true }
+    );
+
+    result = {
+      allowed: true,
+      usageDay,
+      current: next
+    };
+  });
+
+  return result || {
+    allowed: false,
+    usageDay
+  };
+}
 app.post("/api/dairy-traits/vision-analyze", requireUserId, async (req, res) => {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -75685,6 +76162,70 @@ app.post("/api/dairy-traits/vision-analyze", requireUserId, async (req, res) => 
   return res.status(400).json({
     ok: false,
     message: "❌ التقط صورتين كاملتين للحيوان: صورة جانبية وصورة خلفية يظهر فيها الضرع بوضوح."
+  });
+}
+if (!db) {
+  return res.status(503).json({
+    ok: false,
+    error: "firestore_disabled",
+    message:
+      "❌ تعذّر التحقق من صلاحية تحليل سمات إنتاج اللبن الآن. حاول مرة أخرى."
+  });
+}
+
+const uid = req.userId;
+
+const aiAnimal =
+  await dairyTraitsResolveAiAnimalSrv(
+    uid,
+    body
+  );
+
+if (!aiAnimal) {
+  return res.status(404).json({
+    ok: false,
+    error: "dairy_traits_animal_not_found",
+    message:
+      "❌ لم أجد الحيوان في القطيع المسجل بحسابك."
+  });
+}
+
+const cooldown =
+  dairyTraitsCooldownStateSrv(
+    aiAnimal.data
+  );
+
+if (cooldown.blocked) {
+  return res.status(409).json({
+    ok: false,
+    error:
+      "dairy_traits_reevaluation_cooldown",
+
+    message:
+      `ℹ️ تم حفظ تقييم سمات إنتاج اللبن لهذا الحيوان مؤخرًا. يمكن إعادة التقييم بعد ${cooldown.remainingDays} يوم.`
+  });
+}
+
+const attempt =
+  await dairyTraitsConsumeAiAttemptSrv({
+    uid,
+    animalId: aiAnimal.id,
+    profileUid:
+      req.authSession?.uid ||
+      uid
+  });
+
+if (!attempt.allowed) {
+  return res.status(429).json({
+    ok: false,
+
+    error:
+      "dairy_traits_ai_attempt_guard_reached",
+
+    usagePolicy: "fair_use",
+
+    message:
+      "ℹ️ استُخدمت محاولات تحليل سمات إنتاج اللبن المتاحة لهذا الحيوان اليوم. يتاح التحليل مرة أخرى مع بداية يوم المزرعة التالي."
   });
 }
 const prompt = `
@@ -76165,7 +76706,22 @@ app.post("/api/dairy-traits/save", requireUserId, async (req, res) => {
         message: "❌ لا يمكن تسجيل تقييم سمات إنتاج اللبن؛ الحيوان خارج القطيع."
       });
     }
+const saveCooldown =
+  dairyTraitsCooldownStateSrv(
+    animalDoc
+  );
 
+if (saveCooldown.blocked) {
+  return res.status(409).json({
+    ok: false,
+
+    error:
+      "dairy_traits_reevaluation_cooldown",
+
+    message:
+      `ℹ️ تم حفظ تقييم سمات إنتاج اللبن لهذا الحيوان مؤخرًا. يمكن إعادة التقييم بعد ${saveCooldown.remainingDays} يوم.`
+  });
+}
     const finalAnimalId = animal.id || animalDocSnap.id;
     const finalAnimalNumber = calvingNormDigitsOnlySrv(
       animalNumber ||
@@ -76224,10 +76780,15 @@ app.post("/api/dairy-traits/save", requireUserId, async (req, res) => {
 
     batch.set(db.collection(animalCollection).doc(finalAnimalId), {
       lastDairyTraitsScore: score,
-      lastDairyTraitsDate: eventDate,
-      lastDairyTraitsGrade: grade,
-      lastDairyTraitsBreakdown: cleanObj(breakdown),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+lastDairyTraitsDate: eventDate,
+lastDairyTraitsGrade: grade,
+lastDairyTraitsBreakdown: cleanObj(breakdown),
+
+lastDairyTraitsAiSavedAt:
+  admin.firestore.FieldValue.serverTimestamp(),
+
+updatedAt:
+  admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
 
     await batch.commit();
