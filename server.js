@@ -73965,7 +73965,100 @@ function fecesImageHashSrv(image = "") {
     return "";
   }
 }
+const FECES_TRAINING_STORAGE_BUCKET_SRV =
+  process.env.FECES_TRAINING_STORAGE_BUCKET ||
+  "murabbik-470511.firebasestorage.app";
 
+function fecesTrainingImageDataSrv(image = "") {
+  const raw = String(image || "").trim();
+  if (!raw) return null;
+
+  const m = raw.match(
+    /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=\r\n]+)$/i
+  );
+
+  if (!m) return null;
+
+  const contentType =
+    String(m[1] || "").toLowerCase() === "image/jpg"
+      ? "image/jpeg"
+      : String(m[1] || "").toLowerCase();
+
+  const ext =
+    contentType === "image/png"
+      ? "png"
+      : contentType === "image/webp"
+        ? "webp"
+        : "jpg";
+
+  const buffer = Buffer.from(
+    String(m[2] || "").replace(/\s+/g, ""),
+    "base64"
+  );
+
+  if (!buffer.length) return null;
+
+  return {
+    buffer,
+    contentType,
+    ext,
+    sha256: crypto
+      .createHash("sha256")
+      .update(buffer)
+      .digest("hex")
+  };
+}
+
+async function fecesStoreTrainingImageSrv({
+  uid,
+  eventDate,
+  correctionId,
+  image
+} = {}) {
+  const parsed = fecesTrainingImageDataSrv(image);
+
+  if (!parsed) {
+    return {
+      ok: false,
+      statusCode: 400,
+      error: "feces_training_image_invalid",
+      message: "❌ صورة الروث غير صالحة للحفظ ضمن بيانات التدريب."
+    };
+  }
+
+  const bucketName =
+    String(FECES_TRAINING_STORAGE_BUCKET_SRV || "").trim();
+
+  const objectPath = [
+    "training",
+    "feces",
+    String(uid || "").trim(),
+    String(eventDate || "").trim(),
+    `${String(correctionId || "").trim()}.${parsed.ext}`
+  ].join("/");
+
+  const file = admin
+    .storage()
+    .bucket(bucketName)
+    .file(objectPath);
+
+  await file.save(parsed.buffer, {
+    resumable: false,
+    metadata: {
+      contentType: parsed.contentType,
+      cacheControl: "private, max-age=0, no-store"
+    }
+  });
+
+  return {
+    ok: true,
+    bucket: bucketName,
+    path: objectPath,
+    contentType: parsed.contentType,
+    bytes: parsed.buffer.length,
+    sha256: parsed.sha256
+  };
+}
 async function fecesBuildExpertCalibrationPromptSrv() {
   if (!db) return "";
 
@@ -75092,9 +75185,34 @@ app.post("/api/feces/training/save", requireUserId, async (req, res) => {
     );
 
     const image = String(body.image || body.imageData || body.photo || "");
-    const imageHash = fecesImageHashSrv(image);
+const imageHash = fecesImageHashSrv(image);
 
-    const payload = cleanObj({
+if (!image) {
+  return res.status(400).json({
+    ok: false,
+    error: "feces_training_image_required",
+    message: "❌ صورة الروث مطلوبة لحفظ بيانات التدريب."
+  });
+}
+
+const ref = db
+  .collection(FECES_TRAINING_CORRECTIONS_COLLECTION_SRV)
+  .doc();
+
+const storedImage = await fecesStoreTrainingImageSrv({
+  uid,
+  eventDate,
+  correctionId: ref.id,
+  image
+});
+
+if (!storedImage.ok) {
+  return res
+    .status(storedImage.statusCode || 500)
+    .json(storedImage);
+}
+
+const payload = cleanObj({
       userId: uid,
       ownerUid: uid,
       adminUid: uid,
@@ -75132,8 +75250,13 @@ app.post("/api/feces/training/save", requireUserId, async (req, res) => {
       }),
 
       imageHash: imageHash || null,
-      imageReceived: Boolean(image),
-      imageStored: false,
+imageReceived: true,
+imageStored: true,
+imageStorageBucket: storedImage.bucket,
+imageStoragePath: storedImage.path,
+imageContentType: storedImage.contentType,
+imageBytes: storedImage.bytes,
+imageSha256: storedImage.sha256,
 
       status: "accepted",
       source: "server:/api/feces/training/save",
@@ -75141,9 +75264,19 @@ app.post("/api/feces/training/save", requireUserId, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    const ref = await db
-      .collection(FECES_TRAINING_CORRECTIONS_COLLECTION_SRV)
-      .add(payload);
+    try {
+  await ref.set(payload);
+} catch (writeError) {
+  try {
+    await admin
+      .storage()
+      .bucket(storedImage.bucket)
+      .file(storedImage.path)
+      .delete();
+  } catch {}
+
+  throw writeError;
+}
 
     await db
       .collection(FECES_TRAINING_SUMMARY_COLLECTION_SRV)
