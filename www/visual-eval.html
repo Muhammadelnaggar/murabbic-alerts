@@ -412,12 +412,14 @@
   }
 
   async function analyzeOnServer() {
-    if (!hasAllCaptures()) {
-      setWaiting();
-      return;
-    }
+  if (!hasAllCaptures()) {
+    setWaiting();
+    return;
+  }
 
-       const r = await fetch("/api/dairy-traits/vision-analyze", {
+  const ctx = contextFromUrl();
+
+  const r = await fetch("/api/dairy-traits/vision-analyze", {
       method: "POST",
       credentials: "same-origin",
       cache: "no-store",
@@ -425,12 +427,15 @@
         "Content-Type": "application/json",
         "Accept": "application/json"
       },
-      body: JSON.stringify({
- captures: {
-  side: state.captures.side,
-  rear: state.captures.rear
-}
-      })
+ body: JSON.stringify({
+  animalId: ctx.animalId,
+  animalNumber: ctx.animalNumber,
+
+  captures: {
+    side: state.captures.side,
+    rear: state.captures.rear
+  }
+})
     });
 
     const j = await r.json().catch(() => ({}));
