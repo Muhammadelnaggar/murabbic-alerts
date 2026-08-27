@@ -73883,7 +73883,11 @@ function fecesClampScoreSrv(v) {
   if (!Number.isFinite(n)) return null;
   return Math.max(1, Math.min(5, Math.round(n)));
 }
-
+function fecesExpertScoreSrv(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 1 || n > 5) return null;
+  return Math.round(n * 10) / 10;
+}
 function fecesLabelSrv(score) {
   const s = Number(score);
 
@@ -74066,21 +74070,53 @@ async function fecesBuildExpertCalibrationPromptSrv() {
     const snap = await db
       .collection(FECES_TRAINING_CORRECTIONS_COLLECTION_SRV)
       .orderBy("createdAt", "desc")
-      .limit(12)
+      .limit(30)
       .get();
 
-    const rows = snap.docs
-      .map(doc => doc.data() || {})
-      .filter(r => {
+    // الأحدث لنفس الصورة هو المعتمد فقط.
+    // مهم: إزالة التكرار تتم قبل فلترة التصحيحات،
+    // حتى لا يعود تصحيح أقدم لنفس الصورة للتأثير على المعايرة.
+    const latestRows = [];
+    const seenImageHashes = new Set();
+
+    for (const doc of snap.docs) {
+      const r = doc.data() || {};
+      const imageHash = String(r.imageHash || "").trim();
+
+      if (imageHash) {
+        if (seenImageHashes.has(imageHash)) continue;
+        seenImageHashes.add(imageHash);
+      }
+
+      latestRows.push(r);
+    }
+
+    const rows = latestRows
+      .map(r => {
         const predicted = Number(r.predictedScore);
-        const corrected = Number(r.correctedScore);
+
+        // التصحيحات الجديدة تستخدم calibrationScore.
+        // التصحيحات القديمة تظل متوافقة عبر correctedScore.
+        const calibrationScore = fecesClampScoreSrv(
+          r.calibrationScore ?? r.correctedScore
+        );
+
+        return {
+          ...r,
+          __predictedScore: predicted,
+          __calibrationScore: calibrationScore
+        };
+      })
+      .filter(r => {
+        const predicted = Number(r.__predictedScore);
+        const calibration = Number(r.__calibrationScore);
 
         return (
           Number.isFinite(predicted) &&
-          Number.isFinite(corrected) &&
+          Number.isFinite(calibration) &&
           predicted >= 1 && predicted <= 5 &&
-          corrected >= 1 && corrected <= 5 &&
-          predicted !== corrected
+          calibration >= 1 && calibration <= 5 &&
+          predicted !== calibration
         );
       })
       .slice(0, 6);
@@ -74088,11 +74124,18 @@ async function fecesBuildExpertCalibrationPromptSrv() {
     if (!rows.length) return "";
 
     const lines = rows.map((r, idx) => {
-      const note = fecesShortTextSrv(r.expertNote || r.note || r.reason || "", 160);
-      const visual = fecesShortTextSrv(r.visualFindings || r.findings?.visual || "", 160);
+      const note = fecesShortTextSrv(
+        r.expertNote || r.note || r.reason || "",
+        160
+      );
+
+      const visual = fecesShortTextSrv(
+        r.visualFindings || r.findings?.visual || "",
+        160
+      );
 
       return [
-        `${idx + 1}) توقع النموذج سابقًا درجة ${r.predictedScore} وصحح الخبير الدرجة إلى ${r.correctedScore}.`,
+        `${idx + 1}) توقع النموذج سابقًا درجة ${r.__predictedScore} واعتمد الخبير الدرجة التشغيلية ${r.__calibrationScore}.`,
         visual ? `العلامات البصرية المصححة: ${visual}.` : "",
         note ? `ملاحظة الخبير: ${note}.` : ""
       ].filter(Boolean).join(" ");
@@ -75103,11 +75146,16 @@ app.post("/api/feces/training/save", requireUserId, async (req, res) => {
       analysis.score
     );
 
-    const correctedScore = fecesClampScoreSrv(
-      body.correctedScore ??
-      body.expertScore ??
-      body.correctScore
-    );
+    const correctedScore = fecesExpertScoreSrv(
+  body.correctedScore ??
+  body.expertScore ??
+  body.correctScore
+);
+
+const calibrationScore =
+  Number.isFinite(Number(correctedScore))
+    ? fecesClampScoreSrv(correctedScore)
+    : null;
 
     if (!Number.isFinite(Number(predictedScore))) {
       return res.status(400).json({
@@ -75231,8 +75279,14 @@ const payload = cleanObj({
       predictedScore,
       predictedLabel: fecesLabelSrv(predictedScore),
       correctedScore,
-      correctedLabel: fecesLabelSrv(correctedScore),
-      delta: correctedScore - predictedScore,
+expertScore: correctedScore,
+
+calibrationScore,
+correctedLabel: fecesLabelSrv(calibrationScore),
+calibrationLabel: fecesLabelSrv(calibrationScore),
+
+delta: Number((correctedScore - predictedScore).toFixed(1)),
+calibrationDelta: calibrationScore - predictedScore,
 
       modelReason: fecesShortTextSrv(analysis.reason || body.modelReason || "", 700),
       visualFindings,
