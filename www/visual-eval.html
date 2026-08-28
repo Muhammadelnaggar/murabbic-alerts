@@ -848,36 +848,130 @@ async function saveExpertGroundTruth() {
       "حفظ Ground Truth";
   }
 }
-  function renderAnalysis(result) {
-    state.analysis = result;
+function renderAnalysis(result) {
+  state.analysis = result;
 
-    const score = Number(result.score);
-    const pct = Math.max(0, Math.min(100, score));
+  const score = Number(result.score);
+  const pct = Math.max(0, Math.min(100, score));
 
-    scoreBadge.textContent = `درجة ${score} من 100 — ${result.grade || ""}`;
-    scoreFill.style.width = pct + "%";
-    scoreFill.style.background = score >= 80 ? "#22c55e" : "#f59e0b";
+  const isBuffalo =
+    String(result.evaluationFramework || "").trim() === "buffalo_anasb" ||
+    String(result.speciesKey || "").trim() === "buffalo";
 
-    scoreNote.textContent = [
-      result.reason || "",
-      result.recommendation ? `التوصية: ${result.recommendation}` : ""
-    ].filter(Boolean).join("\n");
+  scoreBadge.textContent =
+    `درجة ${score} من 100 — ${result.grade || ""}`;
 
-    if (breakdownBox) {
-      const b = result.breakdown || {};
+  scoreFill.style.width = pct + "%";
+  scoreFill.style.background =
+    score >= 80 ? "#22c55e" : "#f59e0b";
 
-      breakdownBox.classList.remove("hide");
-      breakdownBox.innerHTML = `
-        <div class="mbk-score-badge">التوزيع العلمي</div>
-        <div>الضرع: ${Number(b.udder || 0)} / 40</div>
-        <div>الأرجل والأقدام: ${Number(b.feetAndLegs || 0)} / 20</div>
-        <div>القوة والطابع الحلاب: ${Number(b.dairyStrength || 0)} / 20</div>
-        <div>المقدمة والسعة الجسمية: ${Number(b.frontEndAndCapacity || 0)} / 15</div>
-        <div>الرامب/الحوض: ${Number(b.rump || 0)} / 5</div>
-      `;
-    }
-    fillExpertGroundTruthFromModel(result);
+  scoreNote.textContent = [
+    result.reason || "",
+    result.recommendation
+      ? `التوصية: ${result.recommendation}`
+      : ""
+  ].filter(Boolean).join("\n");
+
+  if (!breakdownBox) {
+    return;
   }
+
+  breakdownBox.classList.remove("hide");
+
+  if (isBuffalo) {
+    const c = result.compositeScores || {};
+    const l = result.linearTraits || {};
+
+    const n100 = v =>
+      Number.isFinite(Number(v))
+        ? `${Number(v)} / 100`
+        : "غير متاح";
+
+    const n50 = v =>
+      Number.isFinite(Number(v))
+        ? `${Number(v)} / 50`
+        : "غير مقيم";
+
+    const weighted =
+      Number.isFinite(
+        Number(result.officialWeightedScoreRounded)
+      )
+        ? `${Number(result.officialWeightedScoreRounded)} / 100`
+        : "غير متاح";
+
+    breakdownBox.innerHTML = `
+      <div class="mbk-score-badge">التقييم العلمي للجاموس الحلاب</div>
+
+      <div>الجهاز الضرعي والحلمات — وزن 40%: ${n100(c.udderTeat)}</div>
+      <div>الأرجل والأقدام — وزن 25%: ${n100(c.feetAndLegs)}</div>
+      <div>القدرة الإنتاجية — وزن 20%: ${n100(c.yieldPotential)}</div>
+      <div>التركيب — وزن 15%: ${n100(c.structure)}</div>
+
+      <div class="form-hint">
+        الدرجة المركبة حسب الأوزان الرسمية: ${weighted}.
+        هذه قيمة تشخيص اتساق فقط ولا تستبدل درجة النموذج المعروضة أعلى الصفحة.
+      </div>
+
+      <div class="form-hint">
+        القيم الخطية 1–50 وصفية لدرجة ظهور الصفة؛
+        الرقم الأعلى لا يعني الأفضل تلقائيًا.
+      </div>
+
+      <div class="mbk-score-badge">التركيب — الصفات الخطية</div>
+      <div>الارتفاع عند الكتف: ${n50(l.stature)}</div>
+      <div>خط الظهر: ${n50(l.topline)}</div>
+      <div>طول الحوض: ${n50(l.rumpLength)}</div>
+      <div>ميل الحوض: ${n50(l.rumpAngle)}</div>
+      <div>عرض الحوض عند الحرقفتين: ${n50(l.iliaWidth)}</div>
+      <div>عرض الحوض عند عظمتي الجلوس: ${n50(l.ischiaWidth)}</div>
+      <div>العضلات: ${n50(l.musculature)}</div>
+
+      <div class="mbk-score-badge">القدرة الإنتاجية — الصفات الخطية</div>
+      <div>القوة والحيوية: ${n50(l.strengthVigor)}</div>
+      <div>الزاوية والطابع الإنتاجي: ${n50(l.angularity)}</div>
+      <div>عمق الصدر: ${n50(l.chestDepth)}</div>
+      <div>طول الجذع: ${n50(l.trunkLength)}</div>
+
+      <div class="mbk-score-badge">الجهاز الضرعي والحلمات — الصفات الخطية</div>
+      <div>طول ارتباط الضرع الأمامي: ${n50(l.foreUdderAttachmentLength)}</div>
+      <div>قوة ارتباط الضرع الأمامي: ${n50(l.foreUdderAttachmentStrength)}</div>
+      <div>عرض ارتباط الضرع الخلفي: ${n50(l.rearUdderAttachmentWidth)}</div>
+      <div>ارتفاع ارتباط الضرع الخلفي: ${n50(l.rearUdderAttachmentHeight)}</div>
+      <div>قوة الرباط المعلّق: ${n50(l.suspensoryLigamentStrength)}</div>
+      <div>عمق الضرع: ${n50(l.udderDepth)}</div>
+      <div>اتجاه الحلمات: ${n50(l.teatDirection)}</div>
+      <div>طول الحلمات: ${n50(l.teatLength)}</div>
+      <div>موضع الحلمات: ${n50(l.teatPlacement)}</div>
+
+      <div class="mbk-score-badge">الأرجل والأقدام — الصفات الخطية</div>
+      <div>زاوية العرقوب: ${n50(l.hockAngle)}</div>
+      <div>قوة السلاميات: ${n50(l.pasternStrength)}</div>
+      <div>ارتفاع الكعب: ${n50(l.heelHeight)}</div>
+
+      <div class="mbk-score-badge">الحركة</div>
+      <div>غير مقيمة من الصور الثابتة.</div>
+    `;
+
+    if (expertTrainingBox) {
+      expertTrainingBox.classList.add("hide");
+    }
+
+    return;
+  }
+
+  const b = result.breakdown || {};
+
+  breakdownBox.innerHTML = `
+    <div class="mbk-score-badge">التوزيع العلمي</div>
+    <div>الضرع: ${Number(b.udder || 0)} / 40</div>
+    <div>الأرجل والأقدام: ${Number(b.feetAndLegs || 0)} / 20</div>
+    <div>القوة والطابع الحلاب: ${Number(b.dairyStrength || 0)} / 20</div>
+    <div>المقدمة والسعة الجسمية: ${Number(b.frontEndAndCapacity || 0)} / 15</div>
+    <div>الرامب/الحوض: ${Number(b.rump || 0)} / 5</div>
+  `;
+
+  fillExpertGroundTruthFromModel(result);
+}
 
   async function analyzeOnServer() {
   if (!hasAllCaptures()) {
