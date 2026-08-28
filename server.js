@@ -76007,6 +76007,362 @@ function dairyTraitsGradeSrv(score) {
 
   return "ضعيف جدًا";
 }
+// ============================================================
+//      DAIRY TRAITS EXPERT GROUND TRUTH — DATASET ONLY
+//      لا Override ولا Calibration داخل الاستدلال في هذه المرحلة
+// ============================================================
+
+const DAIRY_TRAITS_TRAINING_ADMIN_UID_SRV =
+  process.env.DAIRY_TRAITS_TRAINING_ADMIN_UID ||
+  "DEQ98faBPYSFikEMtaPTTynJ6iI2";
+
+const DAIRY_TRAITS_TRAINING_COLLECTION_SRV =
+  "dairy_traits_training_corrections";
+
+const DAIRY_TRAITS_TRAINING_SUMMARY_COLLECTION_SRV =
+  "dairy_traits_training_summary";
+
+const DAIRY_TRAITS_TRAINING_STORAGE_BUCKET_SRV =
+  process.env.DAIRY_TRAITS_TRAINING_STORAGE_BUCKET ||
+  "murabbik-470511.firebasestorage.app";
+
+const DAIRY_TRAITS_PROMPT_VERSION_SRV =
+  "dairy_traits_v1_2026-08-28";
+
+function dairyTraitsIsTrainingAdminSrv(uid) {
+  return (
+    String(uid || "").trim() ===
+    String(DAIRY_TRAITS_TRAINING_ADMIN_UID_SRV || "").trim()
+  );
+}
+
+function dairyTraitsShortTextSrv(v, max = 700) {
+  const s = String(v || "").trim().replace(/\s+/g, " ");
+
+  if (!s) return "";
+
+  return s.length > max
+    ? s.slice(0, max).trim()
+    : s;
+}
+
+function dairyTraitsExpertPartSrv(v, max) {
+  const n = Number(v);
+  const m = Number(max);
+
+  if (
+    !Number.isFinite(n) ||
+    !Number.isFinite(m) ||
+    n < 0 ||
+    n > m ||
+    !Number.isInteger(n)
+  ) {
+    return null;
+  }
+
+  return n;
+}
+
+function dairyTraitsExpertScoreSrv(v) {
+  return dairyTraitsExpertPartSrv(v, 100);
+}
+
+function dairyTraitsExpertBreakdownSrv(raw = {}) {
+  if (!raw || typeof raw !== "object") return null;
+
+  const out = {
+    udder:
+      dairyTraitsExpertPartSrv(
+        raw.udder,
+        40
+      ),
+
+    feetAndLegs:
+      dairyTraitsExpertPartSrv(
+        raw.feetAndLegs,
+        20
+      ),
+
+    dairyStrength:
+      dairyTraitsExpertPartSrv(
+        raw.dairyStrength,
+        20
+      ),
+
+    frontEndAndCapacity:
+      dairyTraitsExpertPartSrv(
+        raw.frontEndAndCapacity,
+        15
+      ),
+
+    rump:
+      dairyTraitsExpertPartSrv(
+        raw.rump,
+        5
+      )
+  };
+
+  if (
+    Object.values(out)
+      .some(v => v === null)
+  ) {
+    return null;
+  }
+
+  return out;
+}
+
+function dairyTraitsExpertUdderSubscoresSrv(raw = {}) {
+  if (!raw || typeof raw !== "object") return null;
+
+  const out = {
+    udderDepth:
+      dairyTraitsExpertPartSrv(
+        raw.udderDepth,
+        10
+      ),
+
+    rearUdder:
+      dairyTraitsExpertPartSrv(
+        raw.rearUdder,
+        9
+      ),
+
+    teatPlacement:
+      dairyTraitsExpertPartSrv(
+        raw.teatPlacement,
+        5
+      ),
+
+    udderCleft:
+      dairyTraitsExpertPartSrv(
+        raw.udderCleft,
+        5
+      ),
+
+    foreUdder:
+      dairyTraitsExpertPartSrv(
+        raw.foreUdder,
+        5
+      ),
+
+    teats:
+      dairyTraitsExpertPartSrv(
+        raw.teats,
+        3
+      ),
+
+    udderBalanceTexture:
+      dairyTraitsExpertPartSrv(
+        raw.udderBalanceTexture,
+        3
+      )
+  };
+
+  if (
+    Object.values(out)
+      .some(v => v === null)
+  ) {
+    return null;
+  }
+
+  return out;
+}
+
+function dairyTraitsBreakdownSumSrv(b = {}) {
+  return [
+    b.udder,
+    b.feetAndLegs,
+    b.dairyStrength,
+    b.frontEndAndCapacity,
+    b.rump
+  ].reduce(
+    (sum, v) =>
+      sum + (Number(v) || 0),
+    0
+  );
+}
+
+function dairyTraitsUdderSubscoresSumSrv(u = {}) {
+  return [
+    u.udderDepth,
+    u.rearUdder,
+    u.teatPlacement,
+    u.udderCleft,
+    u.foreUdder,
+    u.teats,
+    u.udderBalanceTexture
+  ].reduce(
+    (sum, v) =>
+      sum + (Number(v) || 0),
+    0
+  );
+}
+
+function dairyTraitsPartDeltaSrv(
+  expert = {},
+  model = {}
+) {
+  const out = {};
+
+  for (
+    const key of Object.keys(expert || {})
+  ) {
+    const e = Number(expert[key]);
+    const m = Number(model?.[key]);
+
+    out[key] =
+      Number.isFinite(e) &&
+      Number.isFinite(m)
+        ? e - m
+        : null;
+  }
+
+  return out;
+}
+
+function dairyTraitsTrainingImageDataSrv(
+  image = ""
+) {
+  const raw =
+    String(image || "").trim();
+
+  if (!raw) return null;
+
+  const m = raw.match(
+    /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=\r\n]+)$/i
+  );
+
+  if (!m) return null;
+
+  const contentType =
+    String(m[1] || "")
+      .toLowerCase() === "image/jpg"
+      ? "image/jpeg"
+      : String(m[1] || "")
+          .toLowerCase();
+
+  const ext =
+    contentType === "image/png"
+      ? "png"
+      : contentType === "image/webp"
+        ? "webp"
+        : "jpg";
+
+  const buffer =
+    Buffer.from(
+      String(m[2] || "")
+        .replace(/\s+/g, ""),
+      "base64"
+    );
+
+  if (!buffer.length) {
+    return null;
+  }
+
+  return {
+    buffer,
+    contentType,
+    ext,
+
+    sha256:
+      crypto
+        .createHash("sha256")
+        .update(buffer)
+        .digest("hex")
+  };
+}
+
+async function dairyTraitsStoreTrainingImageSrv({
+  uid,
+  eventDate,
+  correctionId,
+  view,
+  image
+} = {}) {
+  const parsed =
+    dairyTraitsTrainingImageDataSrv(
+      image
+    );
+
+  if (!parsed) {
+    return {
+      ok: false,
+      statusCode: 400,
+
+      error:
+        "dairy_traits_training_image_invalid",
+
+      message:
+        "❌ إحدى صور سمات إنتاج اللبن غير صالحة للحفظ ضمن بيانات التدريب."
+    };
+  }
+
+  const safeView =
+    String(view || "").trim() === "rear"
+      ? "rear"
+      : "side";
+
+  const bucketName =
+    String(
+      DAIRY_TRAITS_TRAINING_STORAGE_BUCKET_SRV ||
+      ""
+    ).trim();
+
+  const objectPath = [
+    "training",
+    "dairy_traits",
+    String(uid || "").trim(),
+    String(eventDate || "").trim(),
+
+    `${
+      String(correctionId || "").trim()
+    }-${safeView}.${parsed.ext}`
+  ].join("/");
+
+  const file =
+    admin
+      .storage()
+      .bucket(bucketName)
+      .file(objectPath);
+
+  await file.save(
+    parsed.buffer,
+    {
+      resumable: false,
+
+      metadata: {
+        contentType:
+          parsed.contentType,
+
+        cacheControl:
+          "private, max-age=0, no-store"
+      }
+    }
+  );
+
+  return {
+    ok: true,
+
+    view:
+      safeView,
+
+    bucket:
+      bucketName,
+
+    path:
+      objectPath,
+
+    contentType:
+      parsed.contentType,
+
+    bytes:
+      parsed.buffer.length,
+
+    sha256:
+      parsed.sha256
+  };
+}
 const DAIRY_TRAITS_AI_DAILY_ATTEMPT_LIMIT_SRV =
   Math.max(
     1,
@@ -76756,19 +77112,67 @@ const breakdown = {
     const grade = parsed.grade || dairyTraitsGradeSrv(score);
     const confidence = String(parsed.confidence || "medium").trim();
 
-    return res.json({
-      ok: true,
-      score,
-      grade,
-      rangeText: "0–100",
-      confidence,
-      breakdown,
-      udderSubscores,
-      strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 4) : [],
-      weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses.slice(0, 4) : [],
-      reason: String(parsed.reason || "").trim(),
-      message: `✅ اكتمل تحليل سمات إنتاج اللبن — الدرجة ${score}/100 (${grade}).`
-    });
+    const rawModelScore =
+  Number.isFinite(Number(parsed.score))
+    ? Number(parsed.score)
+    : null;
+
+return res.json({
+  ok: true,
+
+  score,
+  grade,
+
+  rangeText:
+    "0–100",
+
+  confidence,
+
+  breakdown,
+  udderSubscores,
+
+  strengths:
+    Array.isArray(parsed.strengths)
+      ? parsed.strengths.slice(0, 4)
+      : [],
+
+  weaknesses:
+    Array.isArray(parsed.weaknesses)
+      ? parsed.weaknesses.slice(0, 4)
+      : [],
+
+  reason:
+    String(
+      parsed.reason || ""
+    ).trim(),
+
+  // Dataset diagnostics فقط.
+  // لا تغيّر حكم النموذج المعروض.
+  modelRawScore:
+    rawModelScore,
+
+  modelBreakdownSum:
+    summedScore,
+
+  modelScoreVsBreakdownDelta:
+    Number(
+      (
+        score -
+        summedScore
+      ).toFixed(2)
+    ),
+
+  modelPromptVersion:
+    DAIRY_TRAITS_PROMPT_VERSION_SRV,
+
+  modelName:
+    process.env.OPENAI_DAIRY_TRAITS_MODEL ||
+    process.env.OPENAI_BCS_MODEL ||
+    "gpt-4.1",
+
+  message:
+    `✅ اكتمل تحليل سمات إنتاج اللبن — الدرجة ${score}/100 (${grade}).`
+});
 
   } catch (e) {
     console.error("dairy traits vision analyze error:", e);
@@ -76778,6 +77182,931 @@ const breakdown = {
     });
   }
 });
+// ============================================================
+//       API: DAIRY TRAITS EXPERT GROUND TRUTH (admin only)
+//       Dataset مستقل — لا يغيّر Prediction ولا Prompt التشغيل
+// ============================================================
+
+app.get(
+  "/api/dairy-traits/training/gate",
+  requireUserId,
+  async (req, res) => {
+    try {
+      const canTrain =
+        dairyTraitsIsTrainingAdminSrv(
+          req.userId
+        );
+
+      return res.json({
+        ok: true,
+
+        canTrain,
+
+        trainingEnabled:
+          canTrain,
+
+        mode:
+          canTrain
+            ? "expert_ground_truth"
+            : "hidden",
+
+        datasetOnly:
+          true,
+
+        runtimeOverride:
+          false,
+
+        calibrationApplied:
+          false,
+
+        fineTuningApplied:
+          false,
+
+        message:
+          canTrain
+            ? "✅ مراجعة Ground Truth لسمات إنتاج اللبن متاحة لهذا الحساب."
+            : "أدوات مراجعة Ground Truth غير متاحة لهذا الحساب."
+      });
+
+    } catch (e) {
+      console.error(
+        "dairy traits training gate failed:",
+        e.message || e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        canTrain: false,
+
+        message:
+          "❌ تعذّر فتح مراجعة Ground Truth لسمات إنتاج اللبن الآن. حاول مرة أخرى."
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/dairy-traits/training/save",
+  requireUserId,
+  async (req, res) => {
+    let storedSide = null;
+    let storedRear = null;
+
+    try {
+      if (
+        !dairyTraitsIsTrainingAdminSrv(
+          req.userId
+        )
+      ) {
+        return res.status(403).json({
+          ok: false,
+          canTrain: false,
+
+          error:
+            "dairy_traits_training_forbidden",
+
+          message:
+            "أدوات مراجعة Ground Truth لسمات إنتاج اللبن متاحة لحساب دكتور محمد فقط."
+        });
+      }
+
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+
+          error:
+            "firestore_disabled",
+
+          message:
+            "❌ تعذّر حفظ Ground Truth لسمات إنتاج اللبن الآن. حاول مرة أخرى."
+        });
+      }
+
+      const uid =
+        req.userId;
+
+      const body =
+        req.body || {};
+
+      const analysis =
+        body.analysis &&
+        typeof body.analysis === "object"
+          ? body.analysis
+          : {};
+
+      const captures =
+        body.captures &&
+        typeof body.captures === "object"
+          ? body.captures
+          : {};
+
+      const sideImage =
+        captures.side ||
+        body.sideImage ||
+        body.side ||
+        "";
+
+      const rearImage =
+        captures.rear ||
+        captures.udderRear ||
+        body.rearImage ||
+        body.udderRearImage ||
+        body.rear ||
+        body.udderRear ||
+        "";
+
+      if (
+        !sideImage ||
+        !rearImage
+      ) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_training_images_required",
+
+          message:
+            "❌ الصورتان الأصليتان، الجانبية والخلفية، مطلوبتان لحفظ Ground Truth."
+        });
+      }
+
+      const modelScore =
+        dairyTraitsClampScoreSrv(
+          body.predictedScore ??
+          body.modelScore ??
+          analysis.score
+        );
+
+      if (
+        !Number.isFinite(
+          Number(modelScore)
+        )
+      ) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_training_model_score_invalid",
+
+          message:
+            "❌ درجة النموذج الأصلية غير صالحة. أعد تحليل الصور أولًا."
+        });
+      }
+
+      const modelBreakdownRaw =
+        body.modelBreakdown ||
+        analysis.breakdown ||
+        {};
+
+      const modelUdderRaw =
+        body.modelUdderSubscores ||
+        analysis.udderSubscores ||
+        {};
+
+      const modelBreakdown = {
+        udder:
+          dairyTraitsClampPartSrv(
+            modelBreakdownRaw.udder,
+            40
+          ),
+
+        feetAndLegs:
+          dairyTraitsClampPartSrv(
+            modelBreakdownRaw.feetAndLegs,
+            20
+          ),
+
+        dairyStrength:
+          dairyTraitsClampPartSrv(
+            modelBreakdownRaw.dairyStrength,
+            20
+          ),
+
+        frontEndAndCapacity:
+          dairyTraitsClampPartSrv(
+            modelBreakdownRaw.frontEndAndCapacity,
+            15
+          ),
+
+        rump:
+          dairyTraitsClampPartSrv(
+            modelBreakdownRaw.rump,
+            5
+          )
+      };
+
+      const modelUdderSubscores = {
+        udderDepth:
+          dairyTraitsClampPartSrv(
+            modelUdderRaw.udderDepth,
+            10
+          ),
+
+        rearUdder:
+          dairyTraitsClampPartSrv(
+            modelUdderRaw.rearUdder,
+            9
+          ),
+
+        teatPlacement:
+          dairyTraitsClampPartSrv(
+            modelUdderRaw.teatPlacement,
+            5
+          ),
+
+        udderCleft:
+          dairyTraitsClampPartSrv(
+            modelUdderRaw.udderCleft,
+            5
+          ),
+
+        foreUdder:
+          dairyTraitsClampPartSrv(
+            modelUdderRaw.foreUdder,
+            5
+          ),
+
+        teats:
+          dairyTraitsClampPartSrv(
+            modelUdderRaw.teats,
+            3
+          ),
+
+        udderBalanceTexture:
+          dairyTraitsClampPartSrv(
+            modelUdderRaw.udderBalanceTexture,
+            3
+          )
+      };
+
+      const expertScore =
+        dairyTraitsExpertScoreSrv(
+          body.expertScore ??
+          body.correctedScore ??
+          body.groundTruthScore
+        );
+
+      const expertBreakdown =
+        dairyTraitsExpertBreakdownSrv(
+          body.expertBreakdown ||
+          body.groundTruthBreakdown ||
+          {}
+        );
+
+      const expertUdderSubscores =
+        dairyTraitsExpertUdderSubscoresSrv(
+          body.expertUdderSubscores ||
+          body.groundTruthUdderSubscores ||
+          {}
+        );
+
+      if (expertScore === null) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_training_expert_score_invalid",
+
+          message:
+            "❌ أدخل Ground Truth النهائي كدرجة صحيحة من 0 إلى 100."
+        });
+      }
+
+      if (!expertBreakdown) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_training_expert_breakdown_invalid",
+
+          message:
+            "❌ أكمل Ground Truth للمكونات الخمسة ضمن حدودها المعتمدة."
+        });
+      }
+
+      if (!expertUdderSubscores) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_training_expert_udder_invalid",
+
+          message:
+            "❌ أكمل Ground Truth للسمات السبع الفرعية للضرع ضمن حدودها المعتمدة."
+        });
+      }
+
+      const expertBreakdownSum =
+        dairyTraitsBreakdownSumSrv(
+          expertBreakdown
+        );
+
+      if (
+        expertBreakdownSum !==
+        expertScore
+      ) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_training_expert_total_mismatch",
+
+          message:
+            `❌ مجموع المكونات الخمسة = ${expertBreakdownSum}/100، بينما Ground Truth النهائي = ${expertScore}/100. يجب أن يتطابقا.`
+        });
+      }
+
+      const expertUdderSum =
+        dairyTraitsUdderSubscoresSumSrv(
+          expertUdderSubscores
+        );
+
+      if (
+        expertUdderSum !==
+        expertBreakdown.udder
+      ) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_training_expert_udder_mismatch",
+
+          message:
+            `❌ مجموع سمات الضرع الفرعية = ${expertUdderSum}/40، بينما درجة الضرع = ${expertBreakdown.udder}/40. يجب أن يتطابقا.`
+        });
+      }
+
+      const aiAnimal =
+        await dairyTraitsResolveAiAnimalSrv(
+          uid,
+          body
+        );
+
+      if (!aiAnimal) {
+        return res.status(404).json({
+          ok: false,
+
+          error:
+            "dairy_traits_training_animal_not_found",
+
+          message:
+            "❌ لم أجد الحيوان في القطيع المسجل بحسابك."
+        });
+      }
+
+      const eventDateRaw =
+        String(
+          body.eventDate ||
+          body.date ||
+          await farmTodayISOSrv(
+            req.authSession?.uid ||
+            uid
+          )
+        )
+          .trim()
+          .slice(0, 10);
+
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/
+          .test(eventDateRaw)
+      ) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_training_date_invalid",
+
+          message:
+            "❌ تاريخ مراجعة Ground Truth غير صالح."
+        });
+      }
+
+      const eventDate =
+        eventDateRaw;
+
+      const ref =
+        db
+          .collection(
+            DAIRY_TRAITS_TRAINING_COLLECTION_SRV
+          )
+          .doc();
+
+      storedSide =
+        await dairyTraitsStoreTrainingImageSrv({
+          uid,
+          eventDate,
+
+          correctionId:
+            ref.id,
+
+          view:
+            "side",
+
+          image:
+            sideImage
+        });
+
+      if (!storedSide.ok) {
+        return res
+          .status(
+            storedSide.statusCode ||
+            500
+          )
+          .json(storedSide);
+      }
+
+      storedRear =
+        await dairyTraitsStoreTrainingImageSrv({
+          uid,
+          eventDate,
+
+          correctionId:
+            ref.id,
+
+          view:
+            "rear",
+
+          image:
+            rearImage
+        });
+
+      if (!storedRear.ok) {
+        try {
+          await admin
+            .storage()
+            .bucket(
+              storedSide.bucket
+            )
+            .file(
+              storedSide.path
+            )
+            .delete();
+
+        } catch {}
+
+        return res
+          .status(
+            storedRear.statusCode ||
+            500
+          )
+          .json(storedRear);
+      }
+
+      const modelBreakdownSum =
+        dairyTraitsBreakdownSumSrv(
+          modelBreakdown
+        );
+
+      const modelUdderSum =
+        dairyTraitsUdderSubscoresSumSrv(
+          modelUdderSubscores
+        );
+
+      const modelRawScore =
+        Number.isFinite(
+          Number(
+            body.modelRawScore ??
+            analysis.modelRawScore
+          )
+        )
+          ? Number(
+              body.modelRawScore ??
+              analysis.modelRawScore
+            )
+          : modelScore;
+
+      const expertNote =
+        dairyTraitsShortTextSrv(
+          body.expertNote ||
+          body.note ||
+          body.trainingNote ||
+          "",
+          1200
+        );
+
+      const payload =
+        cleanObj({
+          userId:
+            uid,
+
+          ownerUid:
+            uid,
+
+          adminUid:
+            uid,
+
+          eventType:
+            "Ground Truth سمات إنتاج اللبن",
+
+          eventTypeNorm:
+            "dairy_traits_ground_truth",
+
+          date:
+            eventDate,
+
+          eventDate,
+
+          animalId:
+            aiAnimal.id,
+
+          animalNumber:
+            aiAnimal.animalNumber ||
+            null,
+
+          animalCollection:
+            aiAnimal.collection ||
+            "animals",
+
+          animalType:
+            String(
+              aiAnimal.data?.species ||
+              aiAnimal.data?.animalType ||
+              body.animalType ||
+              ""
+            ).trim() ||
+            null,
+
+          prediction:
+            cleanObj({
+              score:
+                modelScore,
+
+              rawScore:
+                modelRawScore,
+
+              grade:
+                analysis.grade ||
+                dairyTraitsGradeSrv(
+                  modelScore
+                ),
+
+              confidence:
+                analysis.confidence ||
+                null,
+
+              breakdown:
+                modelBreakdown,
+
+              breakdownSum:
+                modelBreakdownSum,
+
+              scoreVsBreakdownDelta:
+                Number(
+                  (
+                    modelScore -
+                    modelBreakdownSum
+                  ).toFixed(2)
+                ),
+
+              udderSubscores:
+                modelUdderSubscores,
+
+              udderSubscoresSum:
+                modelUdderSum,
+
+              udderVsSubscoresDelta:
+                Number(
+                  (
+                    modelBreakdown.udder -
+                    modelUdderSum
+                  ).toFixed(2)
+                ),
+
+              strengths:
+                Array.isArray(
+                  analysis.strengths
+                )
+                  ? analysis.strengths.slice(
+                      0,
+                      4
+                    )
+                  : [],
+
+              weaknesses:
+                Array.isArray(
+                  analysis.weaknesses
+                )
+                  ? analysis.weaknesses.slice(
+                      0,
+                      4
+                    )
+                  : [],
+
+              reason:
+                dairyTraitsShortTextSrv(
+                  analysis.reason ||
+                  body.modelReason ||
+                  "",
+                  1200
+                ),
+
+              modelName:
+                analysis.modelName ||
+                body.modelName ||
+                process.env
+                  .OPENAI_DAIRY_TRAITS_MODEL ||
+                process.env
+                  .OPENAI_BCS_MODEL ||
+                "gpt-4.1",
+
+              promptVersion:
+                analysis.modelPromptVersion ||
+                body.modelPromptVersion ||
+                DAIRY_TRAITS_PROMPT_VERSION_SRV
+            }),
+
+          groundTruth:
+            cleanObj({
+              score:
+                expertScore,
+
+              grade:
+                dairyTraitsGradeSrv(
+                  expertScore
+                ),
+
+              breakdown:
+                expertBreakdown,
+
+              breakdownSum:
+                expertBreakdownSum,
+
+              udderSubscores:
+                expertUdderSubscores,
+
+              udderSubscoresSum:
+                expertUdderSum,
+
+              expertNote:
+                expertNote ||
+                null
+            }),
+
+          delta:
+            cleanObj({
+              score:
+                expertScore -
+                modelScore,
+
+              breakdown:
+                dairyTraitsPartDeltaSrv(
+                  expertBreakdown,
+                  modelBreakdown
+                ),
+
+              udderSubscores:
+                dairyTraitsPartDeltaSrv(
+                  expertUdderSubscores,
+                  modelUdderSubscores
+                )
+            }),
+
+          images: {
+            side: {
+              stored: true,
+
+              bucket:
+                storedSide.bucket,
+
+              path:
+                storedSide.path,
+
+              contentType:
+                storedSide.contentType,
+
+              bytes:
+                storedSide.bytes,
+
+              sha256:
+                storedSide.sha256
+            },
+
+            rear: {
+              stored: true,
+
+              bucket:
+                storedRear.bucket,
+
+              path:
+                storedRear.path,
+
+              contentType:
+                storedRear.contentType,
+
+              bytes:
+                storedRear.bytes,
+
+              sha256:
+                storedRear.sha256
+            }
+          },
+
+          datasetVersion:
+            1,
+
+          datasetPurpose:
+            "expert_ground_truth_for_future_calibration",
+
+          calibrationEligible:
+            true,
+
+          runtimeOverrideApplied:
+            false,
+
+          calibrationAppliedToRuntime:
+            false,
+
+          fineTuningApplied:
+            false,
+
+          status:
+            "accepted",
+
+          source:
+            "server:/api/dairy-traits/training/save",
+
+          createdAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+
+          updatedAt:
+            admin.firestore.FieldValue
+              .serverTimestamp()
+        });
+
+      try {
+        await ref.set(
+          payload,
+          { merge: false }
+        );
+
+      } catch (writeError) {
+        try {
+          await Promise.all([
+            admin
+              .storage()
+              .bucket(
+                storedSide.bucket
+              )
+              .file(
+                storedSide.path
+              )
+              .delete(),
+
+            admin
+              .storage()
+              .bucket(
+                storedRear.bucket
+              )
+              .file(
+                storedRear.path
+              )
+              .delete()
+          ]);
+
+        } catch {}
+
+        throw writeError;
+      }
+
+      await db
+        .collection(
+          DAIRY_TRAITS_TRAINING_SUMMARY_COLLECTION_SRV
+        )
+        .doc("global")
+        .set(
+          {
+            lastGroundTruthAt:
+              admin.firestore.FieldValue
+                .serverTimestamp(),
+
+            lastGroundTruthId:
+              ref.id,
+
+            lastAnimalId:
+              aiAnimal.id,
+
+            lastAnimalNumber:
+              aiAnimal.animalNumber ||
+              null,
+
+            lastModelScore:
+              modelScore,
+
+            lastExpertScore:
+              expertScore,
+
+            lastDelta:
+              expertScore -
+              modelScore,
+
+            totalGroundTruthSamples:
+              admin.firestore.FieldValue
+                .increment(1),
+
+            updatedAt:
+              admin.firestore.FieldValue
+                .serverTimestamp()
+          },
+          { merge: true }
+        );
+
+      return res.json({
+        ok: true,
+        canTrain: true,
+
+        id:
+          ref.id,
+
+        groundTruthId:
+          ref.id,
+
+        animalId:
+          aiAnimal.id,
+
+        animalNumber:
+          aiAnimal.animalNumber ||
+          null,
+
+        modelScore,
+        expertScore,
+
+        delta:
+          expertScore -
+          modelScore,
+
+        runtimeOverrideApplied:
+          false,
+
+        calibrationApplied:
+          false,
+
+        fineTuningApplied:
+          false,
+
+        message:
+          `✅ تم حفظ Ground Truth لسمات إنتاج اللبن: النموذج ${modelScore}/100، والخبرة ${expertScore}/100.`
+      });
+
+    } catch (e) {
+      console.error(
+        "dairy traits training save failed:",
+        e.message || e
+      );
+
+      if (
+        storedSide?.ok ||
+        storedRear?.ok
+      ) {
+        try {
+          const deletions = [];
+
+          if (storedSide?.ok) {
+            deletions.push(
+              admin
+                .storage()
+                .bucket(
+                  storedSide.bucket
+                )
+                .file(
+                  storedSide.path
+                )
+                .delete()
+            );
+          }
+
+          if (storedRear?.ok) {
+            deletions.push(
+              admin
+                .storage()
+                .bucket(
+                  storedRear.bucket
+                )
+                .file(
+                  storedRear.path
+                )
+                .delete()
+            );
+          }
+
+          if (deletions.length) {
+            await Promise.allSettled(
+              deletions
+            );
+          }
+
+        } catch {}
+      }
+
+      return res.status(500).json({
+        ok: false,
+
+        message:
+          "❌ تعذّر حفظ Ground Truth لسمات إنتاج اللبن الآن. حاول مرة أخرى."
+      });
+    }
+  }
+);
 // ============================================================
 //              API: DAIRY TRAITS SAVE (server-only)
 //              حفظ تقييم سمات إنتاج اللبن من السيرفر فقط
