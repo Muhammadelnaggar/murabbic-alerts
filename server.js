@@ -77567,15 +77567,108 @@ Return JSON only:
       });
     }
 
-    const outText = bcsOpenAIOutputTextSrv(j);
-    const parsed = bcsExtractJsonTextSrv(outText);
+  const outText = bcsOpenAIOutputTextSrv(j);
+let parsed = bcsExtractJsonTextSrv(outText);
 
-    if (!parsed || parsed.ok === false) {
-      return res.status(400).json({
-        ok: false,
-        message: parsed?.message || "❌ الصور غير كافية لتقييم سمات إنتاج اللبن بدقة. أعد التصوير من الجانب والخلف بوضوح."
-      });
+// جاموس فقط:
+// لا تغيير للـPrompt أو الدرجة أو الأوزان.
+// إذا ظهر رفض واحد لصلاحية الصور، يُعاد نفس الحكم
+// على نفس الصور مرتين. لا يُتجاوز الرفض الأول
+// إلا إذا اتفقت المحاولتان التاليتان على القبول.
+if (
+  speciesKey === "buffalo" &&
+  parsed?.ok === false
+) {
+  const runBuffaloConfirmation = async () => {
+    const rr = await fetch(
+      "https://api.openai.com/v1/responses",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model:
+            process.env.OPENAI_DAIRY_TRAITS_MODEL ||
+            process.env.OPENAI_BCS_MODEL ||
+            "gpt-4.1",
+
+          input: [
+            {
+              role: "user",
+              content
+            }
+          ],
+
+          temperature: 0,
+          max_output_tokens: 1400
+        })
+      }
+    );
+
+    if (!rr.ok) {
+      return null;
     }
+
+    const jj =
+      await rr.json().catch(() => ({}));
+
+    const tt =
+      bcsOpenAIOutputTextSrv(jj);
+
+    return {
+      responseId:
+        jj?.id || null,
+
+      parsed:
+        bcsExtractJsonTextSrv(tt)
+    };
+  };
+
+  const confirm1 =
+    await runBuffaloConfirmation();
+
+  if (confirm1?.parsed?.ok === true) {
+    const confirm2 =
+      await runBuffaloConfirmation();
+
+    if (confirm2?.parsed?.ok === true) {
+      console.warn(
+        "Dairy Traits buffalo image gate recovered by 2-of-3 consensus",
+        {
+          animalId:
+            aiAnimal.id,
+
+          animalNumber:
+            aiAnimal.animalNumber || null,
+
+          firstResponseId:
+            j?.id || null,
+
+          confirmResponseId1:
+            confirm1.responseId,
+
+          confirmResponseId2:
+            confirm2.responseId
+        }
+      );
+
+      parsed =
+        confirm2.parsed;
+    }
+  }
+}
+
+if (!parsed || parsed.ok === false) {
+  return res.status(400).json({
+    ok: false,
+
+    message:
+      parsed?.message ||
+      "❌ الصور غير كافية لتقييم سمات إنتاج اللبن بدقة. أعد التصوير من الجانب والخلف بوضوح."
+  });
+}
 if (speciesKey === "buffalo") {
   const modelScore =
     dairyTraitsStrictIntRangeSrv(
