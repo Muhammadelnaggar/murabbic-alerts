@@ -185,6 +185,61 @@
     </button>
   </div>
 </section>
+
+<section class="mbk-score-card hide" id="buffaloTrainingBox">
+  <div class="mbk-page-title">مراجعة الخبير للجاموس — Ground Truth</div>
+
+  <div class="form-hint">
+    تُحفظ مراجعتك كتدريب مستقل للجاموس ولا تغيّر نتيجة النموذج الحالية.
+  </div>
+
+  <label>الجهاز الضرعي والحلمات / 100
+    <input class="input buffalo-expert-score-input"
+           id="buffaloExpertUdderTeat"
+           type="number" min="65" max="100" step="1">
+  </label>
+
+  <label>الأرجل والأقدام / 100
+    <input class="input buffalo-expert-score-input"
+           id="buffaloExpertFeetAndLegs"
+           type="number" min="65" max="100" step="1">
+  </label>
+
+  <label>القدرة الإنتاجية / 100
+    <input class="input buffalo-expert-score-input"
+           id="buffaloExpertYieldPotential"
+           type="number" min="65" max="100" step="1">
+  </label>
+
+  <label>التركيب / 100
+    <input class="input buffalo-expert-score-input"
+           id="buffaloExpertStructure"
+           type="number" min="65" max="100" step="1">
+  </label>
+
+  <label>Ground Truth النهائي / 100
+    <input class="input"
+           id="buffaloExpertScore"
+           type="number"
+           readonly>
+  </label>
+
+  <label>ملاحظة الخبير
+    <textarea class="input"
+              id="buffaloExpertNote"
+              rows="3"
+              maxlength="1200"></textarea>
+  </label>
+
+  <div class="actions-bar inline">
+    <button id="saveBuffaloGroundTruthBtn"
+            class="save"
+            type="button">
+      حفظ Ground Truth للجاموس
+    </button>
+  </div>
+</section>
+
     <div class="mbk-save-panel">
       <input type="hidden" id="animalId" />
 
@@ -241,6 +296,8 @@
   const breakdownBox = $("#breakdownBox");
   const expertTrainingBox = $("#expertTrainingBox");
   const saveGroundTruthBtn = $("#saveGroundTruthBtn");
+  const buffaloTrainingBox = $("#buffaloTrainingBox");
+  const saveBuffaloGroundTruthBtn = $("#saveBuffaloGroundTruthBtn");
 
   const state = {
     stream: null,
@@ -493,6 +550,10 @@
 if (expertTrainingBox) {
   expertTrainingBox.classList.add("hide");
 }
+
+if (buffaloTrainingBox) {
+  buffaloTrainingBox.classList.add("hide");
+}
   }
 async function loadTrainingGate() {
   try {
@@ -727,7 +788,275 @@ function readExpertGroundTruth() {
       ).trim()
   };
 }
+function buffaloExpertInt(id) {
+  const el = $("#" + id);
+  const raw = String(el?.value ?? "").trim();
 
+  if (!raw) return null;
+
+  const n = Number(raw);
+
+  if (
+    !Number.isInteger(n) ||
+    n < 65 ||
+    n > 100
+  ) {
+    return null;
+  }
+
+  return n;
+}
+
+function recalcBuffaloExpertTotal() {
+  const udderTeat =
+    buffaloExpertInt("buffaloExpertUdderTeat");
+
+  const feetAndLegs =
+    buffaloExpertInt("buffaloExpertFeetAndLegs");
+
+  const yieldPotential =
+    buffaloExpertInt("buffaloExpertYieldPotential");
+
+  const structure =
+    buffaloExpertInt("buffaloExpertStructure");
+
+  const ready =
+    [
+      udderTeat,
+      feetAndLegs,
+      yieldPotential,
+      structure
+    ].every(v => v !== null);
+
+  const total =
+    ready
+      ? Math.round(
+          (udderTeat * 0.40) +
+          (feetAndLegs * 0.25) +
+          (yieldPotential * 0.20) +
+          (structure * 0.15)
+        )
+      : null;
+
+  const scoreInput =
+    $("#buffaloExpertScore");
+
+  if (scoreInput) {
+    scoreInput.value =
+      total === null
+        ? ""
+        : String(total);
+  }
+}
+
+function fillBuffaloGroundTruthFromModel(result) {
+  if (
+    !state.training.canTrain ||
+    !buffaloTrainingBox
+  ) {
+    return;
+  }
+
+  const c =
+    result?.compositeScores || {};
+
+  const values = {
+    buffaloExpertUdderTeat:
+      c.udderTeat,
+
+    buffaloExpertFeetAndLegs:
+      c.feetAndLegs,
+
+    buffaloExpertYieldPotential:
+      c.yieldPotential,
+
+    buffaloExpertStructure:
+      c.structure
+  };
+
+  for (
+    const [id, value]
+    of Object.entries(values)
+  ) {
+    const el = $("#" + id);
+
+    if (
+      el &&
+      Number.isInteger(Number(value)) &&
+      Number(value) >= 65 &&
+      Number(value) <= 100
+    ) {
+      el.value =
+        String(Number(value));
+    }
+  }
+
+  const note =
+    $("#buffaloExpertNote");
+
+  if (note) {
+    note.value = "";
+  }
+
+  recalcBuffaloExpertTotal();
+
+  buffaloTrainingBox
+    .classList.remove("hide");
+}
+
+function readBuffaloGroundTruth() {
+  const expertCompositeScores = {
+    udderTeat:
+      buffaloExpertInt(
+        "buffaloExpertUdderTeat"
+      ),
+
+    feetAndLegs:
+      buffaloExpertInt(
+        "buffaloExpertFeetAndLegs"
+      ),
+
+    yieldPotential:
+      buffaloExpertInt(
+        "buffaloExpertYieldPotential"
+      ),
+
+    structure:
+      buffaloExpertInt(
+        "buffaloExpertStructure"
+      )
+  };
+
+  if (
+    Object.values(expertCompositeScores)
+      .some(v => v === null)
+  ) {
+    throw new Error(
+      "أكمل Ground Truth للأقسام الأربعة بدرجات من 65 إلى 100."
+    );
+  }
+
+  return {
+    expertCompositeScores,
+
+    expertNote:
+      String(
+        $("#buffaloExpertNote")
+          ?.value || ""
+      ).trim()
+  };
+}
+
+async function saveBuffaloExpertGroundTruth() {
+  if (!state.training.canTrain) return;
+
+  if (
+    !state.analysis ||
+    !state.analysis.ok ||
+    !hasAllCaptures()
+  ) {
+    showMsg(
+      "حلّل الصورتين أولًا قبل حفظ Ground Truth للجاموس.",
+      false
+    );
+    return;
+  }
+
+  try {
+    hideMsg();
+
+    const ctx = contextFromUrl();
+    const expert =
+      readBuffaloGroundTruth();
+
+    saveBuffaloGroundTruthBtn.disabled = true;
+    saveBuffaloGroundTruthBtn.textContent =
+      "جارٍ حفظ Ground Truth…";
+
+    const r = await fetch(
+      "/api/dairy-traits/buffalo-training/save",
+      {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+
+        body: JSON.stringify({
+          animalId:
+            ctx.animalId,
+
+          animalNumber:
+            ctx.animalNumber,
+
+          eventDate:
+            eventDateInput.value ||
+            ctx.eventDate ||
+            todayCairo(),
+
+          captures: {
+            side:
+              state.captures.side,
+
+            rear:
+              state.captures.rear
+          },
+
+          analysis:
+            state.analysis,
+
+          modelScore:
+            state.analysis.score,
+
+          modelCompositeScores:
+            state.analysis.compositeScores,
+
+          expertCompositeScores:
+            expert.expertCompositeScores,
+
+          expertNote:
+            expert.expertNote
+        })
+      }
+    );
+
+    const j =
+      await r.json().catch(() => ({}));
+
+    if (!r.ok || !j.ok) {
+      throw new Error(
+        j.message ||
+        "تعذّر حفظ Ground Truth للجاموس."
+      );
+    }
+
+    showMsg(
+      j.message ||
+      "✅ تم حفظ Ground Truth للجاموس بنجاح.",
+      true
+    );
+
+  } catch (e) {
+    console.error(
+      "buffalo dairy traits ground truth save error:",
+      e
+    );
+
+    showMsg(
+      e.message ||
+      "تعذّر حفظ Ground Truth للجاموس.",
+      false
+    );
+
+  } finally {
+    saveBuffaloGroundTruthBtn.disabled = false;
+    saveBuffaloGroundTruthBtn.textContent =
+      "حفظ Ground Truth للجاموس";
+  }
+}
 async function saveExpertGroundTruth() {
   if (!state.training.canTrain) return;
 
@@ -882,21 +1211,28 @@ function renderAnalysis(result) {
     const c = result.compositeScores || {};
     const l = result.linearTraits || {};
 
+      const hasNumericValue = v =>
+      v !== null &&
+      v !== undefined &&
+      String(v).trim() !== "" &&
+      Number.isFinite(Number(v));
+
     const n100 = v =>
-      Number.isFinite(Number(v))
+      hasNumericValue(v)
         ? `${Number(v)} / 100`
         : "غير متاح";
 
     const n50 = v =>
-      Number.isFinite(Number(v))
+      hasNumericValue(v)
         ? `${Number(v)} / 50`
         : "غير مقيم";
 
+    const weightedValue =
+      result.officialWeightedScoreRounded;
+
     const weighted =
-      Number.isFinite(
-        Number(result.officialWeightedScoreRounded)
-      )
-        ? `${Number(result.officialWeightedScoreRounded)} / 100`
+      hasNumericValue(weightedValue)
+        ? `${Number(weightedValue)} / 100`
         : "غير متاح";
 
     breakdownBox.innerHTML = `
@@ -956,7 +1292,13 @@ function renderAnalysis(result) {
       expertTrainingBox.classList.add("hide");
     }
 
+    fillBuffaloGroundTruthFromModel(result);
+
     return;
+  }
+
+  if (buffaloTrainingBox) {
+    buffaloTrainingBox.classList.add("hide");
   }
 
   const b = result.breakdown || {};
@@ -1185,6 +1527,22 @@ if (saveGroundTruthBtn) {
     saveExpertGroundTruth();
   });
 }
+
+$$(".buffalo-expert-score-input")
+  .forEach(input => {
+    input.addEventListener(
+      "input",
+      recalcBuffaloExpertTotal
+    );
+  });
+
+if (saveBuffaloGroundTruthBtn) {
+  saveBuffaloGroundTruthBtn.addEventListener("click", e => {
+    e.preventDefault();
+    saveBuffaloExpertGroundTruth();
+  });
+}
+
     backBtn.addEventListener("click", e => {
       e.preventDefault();
 
