@@ -76010,7 +76010,7 @@ function dairyTraitsGradeSrv(score) {
 const DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV = "buffalo_anasb";
 
 const DAIRY_TRAITS_BUFFALO_PROMPT_VERSION_SRV =
-  "dairy_traits_buffalo_anasb_v2_2026-08-28";
+  "dairy_traits_buffalo_anasb_v3_2026-08-28";
   const DAIRY_TRAITS_BUFFALO_TRAINING_COLLECTION_SRV =
   "dairy_traits_buffalo_training_corrections";
 
@@ -76564,73 +76564,51 @@ OUTPUT
 
 All user-visible text must be Arabic only.
 
-Return JSON only:
+Return exactly one JSON object with these keys:
 
-{
-  "ok": true,
+ok
+evaluationFramework
+score
+grade
+confidence
+compositeScores
+linearTraits
+visibleDefects
+strengths
+weaknesses
+reason
 
-  "evaluationFramework":
-    "buffalo_anasb",
+Output rules:
+- ok must be true for an accepted evaluation.
+- evaluationFramework must be "buffalo_anasb".
+- score must be one integer from 65 to 100.
+- grade must match the official classification band of score.
+- confidence must be "high", "medium", or "low".
+- compositeScores must contain exactly these four keys:
+  structure
+  yieldPotential
+  udderTeat
+  feetAndLegs
+- Judge each composite independently from the CURRENT TARGET.
+- Each composite must be an integer from 65 to 100.
+- Calculate the final score only after judging the four composites.
+- The final score must equal the rounded official weighted result:
+  udderTeat × 0.40
+  feetAndLegs × 0.25
+  yieldPotential × 0.20
+  structure × 0.15
+- linearTraits must contain all required linear-trait keys defined above.
+- Each reliably visible linear trait must be an integer from 1 to 50.
+- If a linear trait cannot be judged reliably, return null.
+- locomotion must always be null.
+- visibleDefects, strengths, weaknesses, and reason must describe only the CURRENT TARGET.
 
-  "score": 84,
-
-  "grade":
-    "جيد+",
-
-  "confidence":
-    "high|medium|low",
-
-  "compositeScores": {
-    "structure": 82,
-    "yieldPotential": 85,
-    "udderTeat": 86,
-    "feetAndLegs": 81
-  },
-
-  "linearTraits": {
-    "stature": 30,
-    "topline": 28,
-    "rumpLength": 31,
-    "rumpAngle": 26,
-    "iliaWidth": 32,
-    "ischiaWidth": 30,
-    "musculature": 24,
-
-    "strengthVigor": 31,
-    "angularity": 29,
-    "chestDepth": 32,
-    "trunkLength": 33,
-
-    "foreUdderAttachmentLength": 30,
-    "foreUdderAttachmentStrength": 32,
-    "rearUdderAttachmentWidth": 31,
-    "rearUdderAttachmentHeight": 33,
-    "suspensoryLigamentStrength": 30,
-    "udderDepth": 29,
-    "teatDirection": 27,
-    "teatLength": 25,
-    "teatPlacement": 28,
-
-    "hockAngle": 27,
-    "pasternStrength": 30,
-    "heelHeight": 28,
-
-    "locomotion": null
-  },
-
-  "visibleDefects": [],
-
-  "strengths": [
-    "نقطة قوة واضحة"
-  ],
-
-  "weaknesses": [
-    "أبرز قيد شكلي مؤثر إن وجد"
-  ],
-
-  "reason":
-    "الحكم مبني على الجهاز الضرعي والحلمات والأرجل والقدرة الإنتاجية والتركيب وفق إطار تقييم الجاموس الحلاب."
-}
+Anti-anchoring rules:
+- Do not gravitate toward any typical, central, average, safe, or familiar score.
+- Do not reuse a score pattern from previous evaluations.
+- Do not make different buffaloes converge to the same score unless their visible morphology genuinely supports the same result.
+- Use the full official 65–100 scale when justified.
+- The CURRENT TARGET images are the primary evidence.
   `.trim();
 }
 // ============================================================
