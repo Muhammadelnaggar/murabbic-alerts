@@ -76007,6 +76007,482 @@ function dairyTraitsGradeSrv(score) {
 
   return "ضعيف جدًا";
 }
+const DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV = "buffalo_anasb";
+
+const DAIRY_TRAITS_BUFFALO_PROMPT_VERSION_SRV =
+  "dairy_traits_buffalo_anasb_v1_2026-08-28";
+
+function dairyTraitsSpeciesKeySrv(animalDoc = {}) {
+  const raw = [
+    animalDoc.animaltype,
+    animalDoc.animalType,
+    animalDoc.animalTypeAr,
+    animalDoc.species
+  ]
+    .map(v => String(v || "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (/buffalo|جاموس/i.test(raw)) return "buffalo";
+  if (/cow|cattle|بقر|ابقار|أبقار/i.test(raw)) return "cow";
+
+  return "";
+}
+
+function dairyTraitsAnimalTypeArSrv(speciesKey) {
+  return speciesKey === "buffalo"
+    ? "جاموس"
+    : speciesKey === "cow"
+      ? "أبقار"
+      : "";
+}
+
+function dairyTraitsIsLactatingSrv(animalDoc = {}) {
+  if (animalDoc.inMilk === true) return true;
+
+  const raw = String(
+    animalDoc.productionStatus ||
+    animalDoc.milkingStatus ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (/حلاب|lactat|milking|in[\s_-]*milk/i.test(raw)) {
+    return true;
+  }
+
+  if (/جاف|dry|dried/i.test(raw)) {
+    return false;
+  }
+
+  return false;
+}
+
+function dairyTraitsStrictIntRangeSrv(v, min, max) {
+  const n = Number(v);
+
+  if (
+    !Number.isFinite(n) ||
+    !Number.isInteger(n) ||
+    n < min ||
+    n > max
+  ) {
+    return null;
+  }
+
+  return n;
+}
+
+function dairyTraitsBuffaloGradeSrv(score) {
+  const s = Number(score);
+
+  if (s >= 90) return "ممتاز";
+  if (s >= 85) return "جيد جدًا";
+  if (s >= 80) return "جيد+";
+  if (s >= 75) return "جيد";
+  if (s >= 70) return "كافٍ";
+
+  return "غير كافٍ";
+}
+
+function dairyTraitsBuffaloCompositeScoresSrv(raw = {}) {
+  const out = {
+    structure:
+      dairyTraitsStrictIntRangeSrv(
+        raw.structure,
+        65,
+        100
+      ),
+
+    yieldPotential:
+      dairyTraitsStrictIntRangeSrv(
+        raw.yieldPotential,
+        65,
+        100
+      ),
+
+    udderTeat:
+      dairyTraitsStrictIntRangeSrv(
+        raw.udderTeat,
+        65,
+        100
+      ),
+
+    feetAndLegs:
+      dairyTraitsStrictIntRangeSrv(
+        raw.feetAndLegs,
+        65,
+        100
+      )
+  };
+
+  return Object.values(out)
+    .some(v => v === null)
+      ? null
+      : out;
+}
+
+const DAIRY_TRAITS_BUFFALO_LINEAR_KEYS_SRV =
+  Object.freeze([
+    "stature",
+    "topline",
+    "rumpLength",
+    "rumpAngle",
+    "iliaWidth",
+    "ischiaWidth",
+    "musculature",
+
+    "strengthVigor",
+    "angularity",
+    "chestDepth",
+    "trunkLength",
+
+    "foreUdderAttachmentLength",
+    "foreUdderAttachmentStrength",
+    "rearUdderAttachmentWidth",
+    "rearUdderAttachmentHeight",
+    "suspensoryLigamentStrength",
+    "udderDepth",
+    "teatDirection",
+    "teatLength",
+    "teatPlacement",
+
+    "hockAngle",
+    "pasternStrength",
+    "heelHeight"
+  ]);
+
+function dairyTraitsBuffaloLinearTraitsSrv(raw = {}) {
+  const out = {};
+
+  for (
+    const key of
+      DAIRY_TRAITS_BUFFALO_LINEAR_KEYS_SRV
+  ) {
+    const v = raw?.[key];
+
+    out[key] =
+      v === null ||
+      v === undefined ||
+      v === ""
+        ? null
+        : dairyTraitsStrictIntRangeSrv(
+            v,
+            1,
+            50
+          );
+  }
+
+  // لا ندّعي تقييم الحركة من صورتين ثابتتين.
+  out.locomotion = null;
+
+  return out;
+}
+
+function dairyTraitsBuffaloWeightedScoreSrv(
+  composite = {}
+) {
+  const values = [
+    Number(composite.structure),
+    Number(composite.yieldPotential),
+    Number(composite.udderTeat),
+    Number(composite.feetAndLegs)
+  ];
+
+  if (!values.every(Number.isFinite)) {
+    return null;
+  }
+
+  const exact =
+    (values[0] * 0.15) +
+    (values[1] * 0.20) +
+    (values[2] * 0.40) +
+    (values[3] * 0.25);
+
+  return {
+    exact:
+      Number(
+        exact.toFixed(2)
+      ),
+
+    rounded:
+      Math.round(exact)
+  };
+}
+
+function dairyTraitsBuffaloPromptSrv() {
+  return `
+You are Murabbik's specialist vision judge for LACTATING DAIRY BUFFALO (Bubalus bubalis).
+
+Never use dairy-cow or Holstein scoring rules.
+
+Use the ANASB/BIG Italian Mediterranean Buffalo morphological framework.
+
+Official composite scores are 65–100 and final weighting is:
+- Udder and Teat Apparatus 40%
+- Feet and Legs 25%
+- Yield Potential 20%
+- Structure 15%
+
+Final score must equal the rounded weighted result:
+(udderTeat×0.40)+(feetAndLegs×0.25)+(yieldPotential×0.20)+(structure×0.15).
+
+Use ONLY two TARGET images:
+1) complete side view
+2) complete rear view
+
+Do not estimate milk yield.
+Do not diagnose disease.
+Do not give feeding, management, ration, treatment, or photography advice.
+
+Do not reward:
+- body size alone
+- fatness
+- general beauty
+- resemblance to dairy cattle
+
+Judge the animal specifically as a dairy buffalo.
+
+If the buffalo, udder, teats, feet, or rear structure are not sufficiently visible for a professional judgment, return:
+{
+  "ok": false,
+  "message": "الصورتان غير كافيتين لتقييم سمات الجاموس الحلاب؛ يجب ظهور الجسم والضرع والحلمات والأرجل بوضوح من الجانب والخلف."
+}
+
+==================================================
+UDDER AND TEAT APPARATUS — 65–100 — WEIGHT 40%
+==================================================
+
+Evaluate:
+
+1) Fore Udder Attachment Length
+2) Fore Udder Attachment Strength
+3) Rear Udder Attachment Width
+4) Rear Udder Attachment Height
+5) Suspensory Ligament Strength
+6) Udder Depth / distance between udder floor and hock plane
+7) Teat Direction
+8) Teat Length
+9) Teat Placement
+
+Judge:
+- attachment
+- support
+- udder elevation
+- balance
+- functional capacity
+- visible teat configuration
+
+A weak, loose or pendulous udder,
+weak attachment,
+very low udder floor,
+marked asymmetry,
+or clearly unfavorable teat configuration
+must reduce the mammary composite.
+
+Judge teat placement, direction and length
+as BUFFALO traits.
+
+Do not import cow teat ideals.
+
+Do not invent hidden quarters,
+milk flow,
+blind teats,
+or functional defects that cannot be seen.
+
+==================================================
+FEET AND LEGS — 65–100 — WEIGHT 25%
+==================================================
+
+Evaluate visible static traits:
+
+- Hock Angle
+- Pastern Strength
+- Heel Height
+- Rear-leg alignment
+- Visible hoof form
+- Standing support
+- Structural stability
+
+Locomotion is an official trait,
+but it CANNOT be judged from two still images.
+
+Always return:
+"locomotion": null
+
+Do not infer:
+- gait
+- stride
+- tracking
+- walking ability
+
+from still photographs.
+
+==================================================
+YIELD POTENTIAL — 65–100 — WEIGHT 20%
+==================================================
+
+Evaluate buffalo-specific:
+
+- Strength and Vigor
+- Angularity
+- Chest Depth
+- Trunk Length
+- Proportional productive capacity
+
+Do NOT import Holstein Dairy Strength as-is.
+
+A dairy buffalo should combine:
+- functional strength
+- body capacity
+- productive morphology
+- appropriate dairy expression
+
+Do not reward excessive flesh merely because
+the buffalo appears large or powerful.
+
+==================================================
+STRUCTURE — 65–100 — WEIGHT 15%
+==================================================
+
+Evaluate:
+
+- Stature
+- Topline
+- Rump Length
+- Rump Angle
+- Width at Ilia
+- Width at Ischia
+- Musculature
+- Overall structural balance
+
+Judge proportions from the images.
+
+Do not invent absolute metric measurements
+when no scale reference exists.
+
+==================================================
+LINEAR TRAITS — SCALE 1–50
+==================================================
+
+Record the visible BIOLOGICAL EXPRESSION
+of each linear trait on a 1–50 scale.
+
+IMPORTANT:
+
+These are DESCRIPTIVE LINEAR SCORES.
+
+They are NOT quality points.
+
+50 is NOT automatically better than 25 or 30.
+
+Do not invent weights for the linear traits.
+
+The four composite scores are separate
+professional judgments.
+
+If a linear trait cannot be judged reliably
+from these two images, return null.
+
+Always return locomotion as null.
+
+==================================================
+FINAL CLASSIFICATION
+==================================================
+
+Use these official classification bands:
+
+below 70 = غير كافٍ
+70–74 = كافٍ
+75–79 = جيد
+80–84 = جيد+
+85–89 = جيد جدًا
+90–100 = ممتاز
+
+Use the full scale when justified.
+
+Do not under-score a strong buffalo from caution.
+
+Do not over-score an animal because it is large
+or visually impressive.
+
+==================================================
+OUTPUT
+==================================================
+
+All user-visible text must be Arabic only.
+
+Return JSON only:
+
+{
+  "ok": true,
+
+  "evaluationFramework":
+    "buffalo_anasb",
+
+  "score": 84,
+
+  "grade":
+    "جيد+",
+
+  "confidence":
+    "high|medium|low",
+
+  "compositeScores": {
+    "structure": 82,
+    "yieldPotential": 85,
+    "udderTeat": 86,
+    "feetAndLegs": 81
+  },
+
+  "linearTraits": {
+    "stature": 30,
+    "topline": 28,
+    "rumpLength": 31,
+    "rumpAngle": 26,
+    "iliaWidth": 32,
+    "ischiaWidth": 30,
+    "musculature": 24,
+
+    "strengthVigor": 31,
+    "angularity": 29,
+    "chestDepth": 32,
+    "trunkLength": 33,
+
+    "foreUdderAttachmentLength": 30,
+    "foreUdderAttachmentStrength": 32,
+    "rearUdderAttachmentWidth": 31,
+    "rearUdderAttachmentHeight": 33,
+    "suspensoryLigamentStrength": 30,
+    "udderDepth": 29,
+    "teatDirection": 27,
+    "teatLength": 25,
+    "teatPlacement": 28,
+
+    "hockAngle": 27,
+    "pasternStrength": 30,
+    "heelHeight": 28,
+
+    "locomotion": null
+  },
+
+  "visibleDefects": [],
+
+  "strengths": [
+    "نقطة قوة واضحة"
+  ],
+
+  "weaknesses": [
+    "أبرز قيد شكلي مؤثر إن وجد"
+  ],
+
+  "reason":
+    "الحكم مبني على الجهاز الضرعي والحلمات والأرجل والقدرة الإنتاجية والتركيب وفق إطار تقييم الجاموس الحلاب."
+}
+  `.trim();
+}
 // ============================================================
 //      DAIRY TRAITS EXPERT GROUND TRUTH — DATASET ONLY
 //      لا Override ولا Calibration داخل الاستدلال في هذه المرحلة
@@ -76732,7 +77208,43 @@ if (!aiAnimal) {
       "❌ لم أجد الحيوان في القطيع المسجل بحسابك."
   });
 }
+const speciesKey =
+  dairyTraitsSpeciesKeySrv(
+    aiAnimal.data || {}
+  );
 
+if (!speciesKey) {
+  return res.status(400).json({
+    ok: false,
+
+    error:
+      "dairy_traits_species_unknown",
+
+    message:
+      "❌ تعذّر تحديد نوع الحيوان من بيانات القطيع. راجع بيانات النوع أولًا."
+  });
+}
+
+if (
+  !dairyTraitsIsLactatingSrv(
+    aiAnimal.data || {}
+  )
+) {
+  return res.status(409).json({
+    ok: false,
+
+    error:
+      "dairy_traits_lactating_only",
+
+    animalType:
+      dairyTraitsAnimalTypeArSrv(
+        speciesKey
+      ),
+
+    message:
+      "ℹ️ تقييم سمات إنتاج اللبن الحالي مخصص للأبقار والجاموس الحلاب. تقييم العجلات مؤجل للتطوير."
+  });
+}
 const cooldown =
   dairyTraitsCooldownStateSrv(
     aiAnimal.data
@@ -76771,7 +77283,10 @@ if (!attempt.allowed) {
       "ℹ️ استُخدمت محاولات تحليل سمات إنتاج اللبن المتاحة لهذا الحيوان اليوم. يتاح التحليل مرة أخرى مع بداية يوم المزرعة التالي."
   });
 }
-const prompt = `
+const prompt =
+  speciesKey === "buffalo"
+    ? dairyTraitsBuffaloPromptSrv()
+    : `
 You are Murabbik's dairy-production traits vision judge.
 You evaluate the TARGET animal from images with confidence, technical discipline, and clear judgment.
 
@@ -77018,7 +77533,10 @@ Return JSON only:
           }
         ],
         temperature: 0,
-        max_output_tokens: 900
+        max_output_tokens:
+  speciesKey === "buffalo"
+    ? 1400
+    : 900
       })
     });
 
@@ -77058,7 +77576,148 @@ Return JSON only:
         message: parsed?.message || "❌ الصور غير كافية لتقييم سمات إنتاج اللبن بدقة. أعد التصوير من الجانب والخلف بوضوح."
       });
     }
+if (speciesKey === "buffalo") {
+  const modelScore =
+    dairyTraitsStrictIntRangeSrv(
+      parsed.score,
+      65,
+      100
+    );
 
+  const compositeScores =
+    dairyTraitsBuffaloCompositeScoresSrv(
+      parsed.compositeScores ||
+      parsed.breakdown ||
+      {}
+    );
+
+  if (
+    modelScore === null ||
+    !compositeScores
+  ) {
+    return res.status(400).json({
+      ok: false,
+
+      error:
+        "dairy_traits_buffalo_score_invalid",
+
+      message:
+        "❌ لم أتمكن من استخراج تقييم جاموس صحيح ومتسق. أعد التحليل بصورتين واضحتين."
+    });
+  }
+
+  const officialWeighted =
+    dairyTraitsBuffaloWeightedScoreSrv(
+      compositeScores
+    );
+
+  const linearTraits =
+    dairyTraitsBuffaloLinearTraitsSrv(
+      parsed.linearTraits || {}
+    );
+
+  const grade =
+    dairyTraitsBuffaloGradeSrv(
+      modelScore
+    );
+
+  const confidence =
+    String(
+      parsed.confidence ||
+      "medium"
+    ).trim();
+
+  return res.json({
+    ok: true,
+
+    animalType:
+      "جاموس",
+
+    speciesKey:
+      "buffalo",
+
+    evaluationFramework:
+      DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV,
+
+    score:
+      modelScore,
+
+    grade,
+
+    rangeText:
+      "65–100",
+
+    confidence,
+
+    compositeScores,
+    linearTraits,
+
+    visibleDefects:
+      Array.isArray(
+        parsed.visibleDefects
+      )
+        ? parsed.visibleDefects.slice(
+            0,
+            6
+          )
+        : [],
+
+    strengths:
+      Array.isArray(parsed.strengths)
+        ? parsed.strengths.slice(0, 4)
+        : [],
+
+    weaknesses:
+      Array.isArray(parsed.weaknesses)
+        ? parsed.weaknesses.slice(0, 4)
+        : [],
+
+    reason:
+      String(
+        parsed.reason || ""
+      ).trim(),
+
+    // تشخيص اتساق فقط.
+    // لا Override لحكم النموذج الخام.
+    modelRawScore:
+      modelScore,
+
+    officialWeightedScoreExact:
+      officialWeighted?.exact ??
+      null,
+
+    officialWeightedScoreRounded:
+      officialWeighted?.rounded ??
+      null,
+
+    modelScoreVsOfficialWeightedDelta:
+      officialWeighted
+        ? Number(
+            (
+              modelScore -
+              officialWeighted.rounded
+            ).toFixed(2)
+          )
+        : null,
+
+    modelPromptVersion:
+      DAIRY_TRAITS_BUFFALO_PROMPT_VERSION_SRV,
+
+    modelName:
+      process.env
+        .OPENAI_DAIRY_TRAITS_MODEL ||
+      process.env
+        .OPENAI_BCS_MODEL ||
+      "gpt-4.1",
+
+    limitations: [
+      "الحركة غير مقيمة من الصور الثابتة."
+    ],
+
+    message:
+      `✅ اكتمل تقييم سمات الجاموس الحلاب — الدرجة ${modelScore}/100 (${grade}).`
+  });
+}
     const rawBreakdown = parsed.breakdown || {};
 const rawUdderSub = parsed.udderSubscores || {};
 
@@ -77119,6 +77778,9 @@ const breakdown = {
 
 return res.json({
   ok: true,
+  animalType: "أبقار",
+speciesKey: "cow",
+evaluationFramework: "cow_murabbik",
 
   score,
   grade,
@@ -77293,6 +77955,24 @@ app.post(
         typeof body.analysis === "object"
           ? body.analysis
           : {};
+          if (
+  String(
+    analysis.evaluationFramework ||
+    body.evaluationFramework ||
+    ""
+  ).trim() ===
+  DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV
+) {
+  return res.status(409).json({
+    ok: false,
+
+    error:
+      "dairy_traits_buffalo_training_not_ready",
+
+    message:
+      "ℹ️ Ground Truth للجاموس سيُفتح بعد اعتماد أول نتيجة من نموذج الجاموس المستقل."
+  });
+}
 
       const captures =
         body.captures &&
@@ -77553,7 +78233,22 @@ app.post(
             "❌ لم أجد الحيوان في القطيع المسجل بحسابك."
         });
       }
+      const trainingSpeciesKey =
+  dairyTraitsSpeciesKeySrv(
+    aiAnimal.data || {}
+  );
 
+if (trainingSpeciesKey !== "cow") {
+  return res.status(409).json({
+    ok: false,
+
+    error:
+      "dairy_traits_training_cow_only",
+
+    message:
+      "ℹ️ Ground Truth الحالي مخصص للأبقار فقط. سيتم حفظ الجاموس في مساره المستقل."
+  });
+}
       const eventDateRaw =
         String(
           body.eventDate ||
@@ -78246,8 +78941,38 @@ if (saveCooldown.blocked) {
       ""
     );
 
-    const grade = analysis.grade || dairyTraitsGradeSrv(score);
-    const breakdown = analysis.breakdown || {};
+    const framework =
+  String(
+    analysis.evaluationFramework ||
+    "cow_murabbik"
+  ).trim();
+
+const isBuffaloFramework =
+  framework ===
+  DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV;
+
+const grade =
+  analysis.grade ||
+  (
+    isBuffaloFramework
+      ? dairyTraitsBuffaloGradeSrv(
+          score
+        )
+      : dairyTraitsGradeSrv(
+          score
+        )
+  );
+
+const breakdown =
+  analysis.breakdown || {};
+
+const compositeScores =
+  analysis.compositeScores ||
+  null;
+
+const linearTraits =
+  analysis.linearTraits ||
+  null;
 
     const payload = {
       userId: uid,
@@ -78266,21 +78991,94 @@ if (saveCooldown.blocked) {
       score,
       value: score,
       dairyTraitsScore: score,
-      grade,
+grade,
 
-      analysis: cleanObj({
-        score: analysis.score ?? score,
-        grade,
-        rangeText: analysis.rangeText || "0–100",
-        confidence: analysis.confidence || null,
-        breakdown,
-        udderSubscores: analysis.udderSubscores || null,
-        strengths: analysis.strengths || [],
-        weaknesses: analysis.weaknesses || [],
-        reason: analysis.reason || null,
-        source: "server:/api/dairy-traits/vision-analyze"
-      }),
+evaluationFramework:
+  framework,
 
+speciesKey:
+  isBuffaloFramework
+    ? "buffalo"
+    : "cow",
+
+analysis: cleanObj({
+  score:
+    analysis.score ??
+    score,
+
+  grade,
+
+  rangeText:
+    analysis.rangeText ||
+    (
+      isBuffaloFramework
+        ? "65–100"
+        : "0–100"
+    ),
+
+  confidence:
+    analysis.confidence ||
+    null,
+
+  evaluationFramework:
+    framework,
+
+  speciesKey:
+    isBuffaloFramework
+      ? "buffalo"
+      : "cow",
+
+  breakdown,
+
+  udderSubscores:
+    analysis.udderSubscores ||
+    null,
+
+  compositeScores,
+  linearTraits,
+
+  visibleDefects:
+    analysis.visibleDefects ||
+    [],
+
+  officialWeightedScoreExact:
+    analysis
+      .officialWeightedScoreExact ??
+    null,
+
+  officialWeightedScoreRounded:
+    analysis
+      .officialWeightedScoreRounded ??
+    null,
+
+  modelScoreVsOfficialWeightedDelta:
+    analysis
+      .modelScoreVsOfficialWeightedDelta ??
+    null,
+
+  strengths:
+    analysis.strengths ||
+    [],
+
+  weaknesses:
+    analysis.weaknesses ||
+    [],
+
+  reason:
+    analysis.reason ||
+    null,
+
+  modelPromptVersion:
+    analysis.modelPromptVersion ||
+    null,
+
+  modelName:
+    analysis.modelName ||
+    null,
+
+  source:
+    "server:/api/dairy-traits/vision-analyze"
+}),
       notes: userComment || null,
       comment: userComment || null,
 
@@ -78296,11 +79094,31 @@ if (saveCooldown.blocked) {
 
     batch.set(db.collection(animalCollection).doc(finalAnimalId), {
       lastDairyTraitsScore: score,
-lastDairyTraitsDate: eventDate,
-lastDairyTraitsGrade: grade,
-lastDairyTraitsBreakdown: cleanObj(breakdown),
+      lastDairyTraitsDate: eventDate,
+      lastDairyTraitsGrade:
+  grade,
 
-lastDairyTraitsAiSavedAt:
+lastDairyTraitsFramework:
+  framework,
+
+lastDairyTraitsBreakdown:
+  cleanObj(breakdown),
+
+lastDairyTraitsCompositeScores:
+  compositeScores
+    ? cleanObj(
+        compositeScores
+      )
+    : null,
+
+lastDairyTraitsLinearTraits:
+  linearTraits
+    ? cleanObj(
+        linearTraits
+      )
+    : null,
+
+      lastDairyTraitsAiSavedAt:
   admin.firestore.FieldValue.serverTimestamp(),
 
 updatedAt:
