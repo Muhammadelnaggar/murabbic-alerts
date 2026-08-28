@@ -76010,7 +76010,148 @@ function dairyTraitsGradeSrv(score) {
 const DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV = "buffalo_anasb";
 
 const DAIRY_TRAITS_BUFFALO_PROMPT_VERSION_SRV =
-  "dairy_traits_buffalo_anasb_v1_2026-08-28";
+  "dairy_traits_buffalo_anasb_v2_2026-08-28";
+  const DAIRY_TRAITS_BUFFALO_TRAINING_COLLECTION_SRV =
+  "dairy_traits_buffalo_training_corrections";
+
+const DAIRY_TRAITS_BUFFALO_TRAINING_SUMMARY_COLLECTION_SRV =
+  "dairy_traits_buffalo_training_summary";
+
+function dairyTraitsBuffaloExpertCompositeScoresSrv(raw = {}) {
+  return dairyTraitsBuffaloCompositeScoresSrv(raw);
+}
+
+function dairyTraitsBuffaloCompositeDeltaSrv(expert = {}, model = {}) {
+  const out = {};
+
+  for (const key of [
+    "udderTeat",
+    "feetAndLegs",
+    "yieldPotential",
+    "structure"
+  ]) {
+    const e = Number(expert?.[key]);
+    const m = Number(model?.[key]);
+
+    out[key] =
+      Number.isFinite(e) &&
+      Number.isFinite(m)
+        ? e - m
+        : null;
+  }
+
+  return out;
+}
+
+async function dairyTraitsBuffaloBuildExpertCalibrationPromptSrv(uid) {
+  if (!db) return "";
+
+  try {
+    const snap =
+      await db
+        .collection(
+          DAIRY_TRAITS_BUFFALO_TRAINING_COLLECTION_SRV
+        )
+        .orderBy("createdAt", "desc")
+        .limit(20)
+        .get();
+
+    const rows =
+      snap.docs
+        .map(doc => doc.data() || {})
+        .filter(r => {
+          if (
+            String(r.userId || "").trim() !==
+            String(uid || "").trim()
+          ) {
+            return false;
+          }
+
+          const predicted =
+            Number(r.prediction?.score);
+
+          const corrected =
+            Number(r.groundTruth?.score);
+
+          const modelComposite =
+            r.prediction?.compositeScores || {};
+
+          const expertComposite =
+            r.groundTruth?.compositeScores || {};
+
+          const compositeChanged =
+            [
+              "udderTeat",
+              "feetAndLegs",
+              "yieldPotential",
+              "structure"
+            ].some(key =>
+              Number.isFinite(
+                Number(modelComposite?.[key])
+              ) &&
+              Number.isFinite(
+                Number(expertComposite?.[key])
+              ) &&
+              Number(modelComposite[key]) !==
+                Number(expertComposite[key])
+            );
+
+          return (
+            Number.isFinite(predicted) &&
+            Number.isFinite(corrected) &&
+            (
+              predicted !== corrected ||
+              compositeChanged
+            )
+          );
+        })
+        .slice(0, 6);
+
+    if (!rows.length) return "";
+
+    const lines =
+      rows.map((r, idx) => {
+        const m =
+          r.prediction?.compositeScores || {};
+
+        const e =
+          r.groundTruth?.compositeScores || {};
+
+        const note =
+          dairyTraitsShortTextSrv(
+            r.groundTruth?.expertNote || "",
+            220
+          );
+
+        return [
+          `${idx + 1}) Previous reviewed buffalo: model final ${r.prediction?.score}/100; expert final ${r.groundTruth?.score}/100.`,
+          `Udder/teat ${m.udderTeat}→${e.udderTeat}; feet/legs ${m.feetAndLegs}→${e.feetAndLegs}; yield potential ${m.yieldPotential}→${e.yieldPotential}; structure ${m.structure}→${e.structure}.`,
+          note
+            ? `Expert note: ${note}`
+            : ""
+        ]
+          .filter(Boolean)
+          .join(" ");
+      });
+
+    return `
+Expert dairy-buffalo calibration memory from Dr. Mohamed:
+Use these reviewed corrections only as calibration guidance when the CURRENT TARGET shows similar visible morphology.
+Do not copy a previous total or composite score blindly.
+Judge the current buffalo independently from its two images, then use the expert corrections only to improve calibration of comparable visible traits.
+${lines.join("\n")}
+`.trim();
+
+  } catch (e) {
+    console.warn(
+      "Dairy Traits buffalo training calibration skipped:",
+      e.message || e
+    );
+
+    return "";
+  }
+}
+
 
 function dairyTraitsSpeciesKeySrv(animalDoc = {}) {
   const raw = [
@@ -76212,7 +76353,9 @@ function dairyTraitsBuffaloWeightedScoreSrv(
   };
 }
 
-function dairyTraitsBuffaloPromptSrv() {
+function dairyTraitsBuffaloPromptSrv(
+  expertCalibrationPrompt = ""
+) {
   return `
 You are Murabbik's specialist vision judge for LACTATING DAIRY BUFFALO (Bubalus bubalis).
 
@@ -76244,6 +76387,13 @@ Do not reward:
 - resemblance to dairy cattle
 
 Judge the animal specifically as a dairy buffalo.
+
+${expertCalibrationPrompt ? `
+==================================================
+EXPERT CALIBRATION MEMORY
+==================================================
+${expertCalibrationPrompt}
+` : ""}
 
 If the buffalo, udder, teats, feet, or rear structure are not sufficiently visible for a professional judgment, return:
 {
@@ -76754,7 +76904,8 @@ async function dairyTraitsStoreTrainingImageSrv({
   eventDate,
   correctionId,
   view,
-  image
+  image,
+  trainingBranch = ""
 } = {}) {
   const parsed =
     dairyTraitsTrainingImageDataSrv(
@@ -76785,16 +76936,32 @@ async function dairyTraitsStoreTrainingImageSrv({
       ""
     ).trim();
 
-  const objectPath = [
-    "training",
-    "dairy_traits",
-    String(uid || "").trim(),
-    String(eventDate || "").trim(),
+  const objectPathParts = [
+  "training",
+  "dairy_traits"
+];
 
-    `${
-      String(correctionId || "").trim()
-    }-${safeView}.${parsed.ext}`
-  ].join("/");
+const safeTrainingBranch =
+  String(trainingBranch || "")
+    .trim()
+    .replace(/[^a-z0-9_-]+/gi, "_");
+
+if (safeTrainingBranch) {
+  objectPathParts.push(
+    safeTrainingBranch
+  );
+}
+
+objectPathParts.push(
+  String(uid || "").trim(),
+  String(eventDate || "").trim(),
+  `${
+    String(correctionId || "").trim()
+  }-${safeView}.${parsed.ext}`
+);
+
+const objectPath =
+  objectPathParts.join("/");
 
   const file =
     admin
@@ -77242,7 +77409,7 @@ if (
       ),
 
     message:
-      "ℹ️ تقييم سمات إنتاج اللبن الحالي مخصص للأبقار والجاموس الحلاب. تقييم العجلات مؤجل للتطوير."
+  "ℹ️ تقييم سمات إنتاج اللبن متاح حاليًا للأبقار والجاموس الحلاب."
   });
 }
 const cooldown =
@@ -77283,9 +77450,18 @@ if (!attempt.allowed) {
       "ℹ️ استُخدمت محاولات تحليل سمات إنتاج اللبن المتاحة لهذا الحيوان اليوم. يتاح التحليل مرة أخرى مع بداية يوم المزرعة التالي."
   });
 }
+const buffaloExpertCalibrationPrompt =
+  speciesKey === "buffalo"
+    ? await dairyTraitsBuffaloBuildExpertCalibrationPromptSrv(
+        uid
+      )
+    : "";
+
 const prompt =
   speciesKey === "buffalo"
-    ? dairyTraitsBuffaloPromptSrv()
+    ? dairyTraitsBuffaloPromptSrv(
+        buffaloExpertCalibrationPrompt
+      )
     : `
 You are Murabbik's dairy-production traits vision judge.
 You evaluate the TARGET animal from images with confidence, technical discipline, and clear judgment.
@@ -77796,12 +77972,17 @@ if (speciesKey === "buffalo") {
     modelPromptVersion:
       DAIRY_TRAITS_BUFFALO_PROMPT_VERSION_SRV,
 
-    modelName:
+       modelName:
       process.env
         .OPENAI_DAIRY_TRAITS_MODEL ||
       process.env
         .OPENAI_BCS_MODEL ||
       "gpt-4.1",
+
+    expertCalibrationApplied:
+      Boolean(
+        buffaloExpertCalibrationPrompt
+      ),
 
     limitations: [
       "الحركة غير مقيمة من الصور الثابتة."
@@ -77937,6 +78118,517 @@ evaluationFramework: "cow_murabbik",
     });
   }
 });
+app.post(
+  "/api/dairy-traits/buffalo-training/save",
+  requireUserId,
+  async (req, res) => {
+    let storedSide = null;
+    let storedRear = null;
+
+    try {
+      if (
+        !dairyTraitsIsTrainingAdminSrv(
+          req.userId
+        )
+      ) {
+        return res.status(403).json({
+          ok: false,
+          canTrain: false,
+          error:
+            "dairy_traits_buffalo_training_forbidden",
+          message:
+            "أدوات تدريب سمات الجاموس متاحة لحساب دكتور محمد فقط."
+        });
+      }
+
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error: "firestore_disabled",
+          message:
+            "❌ تعذّر حفظ Ground Truth للجاموس الآن. حاول مرة أخرى."
+        });
+      }
+
+      const uid = req.userId;
+      const body = req.body || {};
+
+      const analysis =
+        body.analysis &&
+        typeof body.analysis === "object"
+          ? body.analysis
+          : {};
+
+      const captures =
+        body.captures &&
+        typeof body.captures === "object"
+          ? body.captures
+          : {};
+
+      const sideImage =
+        captures.side ||
+        body.sideImage ||
+        body.side ||
+        "";
+
+      const rearImage =
+        captures.rear ||
+        body.rearImage ||
+        body.rear ||
+        "";
+
+      if (!sideImage || !rearImage) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "dairy_traits_buffalo_training_images_required",
+          message:
+            "❌ الصورتان الجانبية والخلفية مطلوبتان لحفظ Ground Truth للجاموس."
+        });
+      }
+
+      const aiAnimal =
+        await dairyTraitsResolveAiAnimalSrv(
+          uid,
+          body
+        );
+
+      if (!aiAnimal) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "dairy_traits_buffalo_training_animal_not_found",
+          message:
+            "❌ لم أجد الحيوان في القطيع المسجل بحسابك."
+        });
+      }
+
+      if (
+        dairyTraitsSpeciesKeySrv(
+          aiAnimal.data || {}
+        ) !== "buffalo"
+      ) {
+        return res.status(409).json({
+          ok: false,
+          error:
+            "dairy_traits_buffalo_training_species_mismatch",
+          message:
+            "ℹ️ مسار التدريب هذا مخصص لسمات الجاموس الحلاب."
+        });
+      }
+
+      const framework =
+        String(
+          analysis.evaluationFramework ||
+          body.evaluationFramework ||
+          ""
+        ).trim();
+
+      if (
+        framework !==
+        DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "dairy_traits_buffalo_training_framework_invalid",
+          message:
+            "❌ أعد تحليل الجاموس أولًا بإطار التقييم المعتمد ثم احفظ Ground Truth."
+        });
+      }
+
+      const modelScore =
+        dairyTraitsStrictIntRangeSrv(
+          body.modelScore ??
+          body.predictedScore ??
+          analysis.score,
+          65,
+          100
+        );
+
+      const modelCompositeScores =
+        dairyTraitsBuffaloCompositeScoresSrv(
+          body.modelCompositeScores ||
+          analysis.compositeScores ||
+          {}
+        );
+
+      if (
+        modelScore === null ||
+        !modelCompositeScores
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "dairy_traits_buffalo_training_prediction_invalid",
+          message:
+            "❌ نتيجة نموذج الجاموس الأصلية غير مكتملة. أعد التحليل أولًا."
+        });
+      }
+
+      const expertCompositeScores =
+        dairyTraitsBuffaloExpertCompositeScoresSrv(
+          body.expertCompositeScores ||
+          body.groundTruthCompositeScores ||
+          {}
+        );
+
+      if (!expertCompositeScores) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "dairy_traits_buffalo_training_expert_composites_invalid",
+          message:
+            "❌ أكمل Ground Truth للأقسام الأربعة بدرجات صحيحة من 65 إلى 100."
+        });
+      }
+
+      const expertWeighted =
+        dairyTraitsBuffaloWeightedScoreSrv(
+          expertCompositeScores
+        );
+
+      const expertScore =
+        expertWeighted.rounded;
+
+      const eventDate =
+        String(
+          body.eventDate ||
+          body.date ||
+          await farmTodayISOSrv(
+            req.authSession?.uid || uid
+          )
+        )
+          .trim()
+          .slice(0, 10);
+
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/
+          .test(eventDate)
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "dairy_traits_buffalo_training_date_invalid",
+          message:
+            "❌ تاريخ مراجعة Ground Truth للجاموس غير صالح."
+        });
+      }
+
+      const ref =
+        db
+          .collection(
+            DAIRY_TRAITS_BUFFALO_TRAINING_COLLECTION_SRV
+          )
+          .doc();
+
+      storedSide =
+        await dairyTraitsStoreTrainingImageSrv({
+          uid,
+          eventDate,
+          correctionId: ref.id,
+          view: "side",
+          image: sideImage,
+          trainingBranch: "buffalo"
+        });
+
+      if (!storedSide.ok) {
+        return res
+          .status(
+            storedSide.statusCode || 500
+          )
+          .json(storedSide);
+      }
+
+      storedRear =
+        await dairyTraitsStoreTrainingImageSrv({
+          uid,
+          eventDate,
+          correctionId: ref.id,
+          view: "rear",
+          image: rearImage,
+          trainingBranch: "buffalo"
+        });
+
+      if (!storedRear.ok) {
+        try {
+          await admin.storage()
+            .bucket(storedSide.bucket)
+            .file(storedSide.path)
+            .delete();
+        } catch {}
+
+        return res
+          .status(
+            storedRear.statusCode || 500
+          )
+          .json(storedRear);
+      }
+
+      const expertNote =
+        dairyTraitsShortTextSrv(
+          body.expertNote || "",
+          1200
+        );
+
+      const payload =
+        cleanObj({
+          userId: uid,
+          ownerUid: uid,
+          adminUid: uid,
+
+          eventType:
+            "Ground Truth سمات الجاموس",
+
+          eventTypeNorm:
+            "dairy_traits_buffalo_ground_truth",
+
+          date: eventDate,
+          eventDate,
+
+          animalId: aiAnimal.id,
+
+          animalNumber:
+            aiAnimal.animalNumber || null,
+
+          speciesKey: "buffalo",
+
+          evaluationFramework:
+            DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV,
+
+          prediction: cleanObj({
+            score: modelScore,
+
+            grade:
+              analysis.grade ||
+              dairyTraitsBuffaloGradeSrv(
+                modelScore
+              ),
+
+            confidence:
+              analysis.confidence || null,
+
+            compositeScores:
+              modelCompositeScores,
+
+            linearTraits:
+              dairyTraitsBuffaloLinearTraitsSrv(
+                analysis.linearTraits || {}
+              ),
+
+            reason:
+              dairyTraitsShortTextSrv(
+                analysis.reason || "",
+                1200
+              ),
+
+            modelName:
+              analysis.modelName ||
+              process.env
+                .OPENAI_DAIRY_TRAITS_MODEL ||
+              process.env
+                .OPENAI_BCS_MODEL ||
+              "gpt-4.1",
+
+            promptVersion:
+              analysis.modelPromptVersion ||
+              DAIRY_TRAITS_BUFFALO_PROMPT_VERSION_SRV
+          }),
+
+          groundTruth: cleanObj({
+            score:
+              expertScore,
+
+            grade:
+              dairyTraitsBuffaloGradeSrv(
+                expertScore
+              ),
+
+            compositeScores:
+              expertCompositeScores,
+
+            officialWeightedScoreExact:
+              expertWeighted.exact,
+
+            officialWeightedScoreRounded:
+              expertWeighted.rounded,
+
+            expertNote:
+              expertNote || null
+          }),
+
+          delta: cleanObj({
+            score:
+              expertScore - modelScore,
+
+            compositeScores:
+              dairyTraitsBuffaloCompositeDeltaSrv(
+                expertCompositeScores,
+                modelCompositeScores
+              )
+          }),
+
+          images: {
+            side: {
+              stored: true,
+              bucket: storedSide.bucket,
+              path: storedSide.path,
+              contentType:
+                storedSide.contentType,
+              bytes: storedSide.bytes,
+              sha256: storedSide.sha256
+            },
+
+            rear: {
+              stored: true,
+              bucket: storedRear.bucket,
+              path: storedRear.path,
+              contentType:
+                storedRear.contentType,
+              bytes: storedRear.bytes,
+              sha256: storedRear.sha256
+            }
+          },
+
+          datasetVersion: 1,
+
+          datasetPurpose:
+            "expert_ground_truth_and_runtime_calibration",
+
+          calibrationEligible: true,
+
+          runtimeOverrideApplied: false,
+
+          fineTuningApplied: false,
+
+          status: "accepted",
+
+          source:
+            "server:/api/dairy-traits/buffalo-training/save",
+
+          createdAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+
+          updatedAt:
+            admin.firestore.FieldValue
+              .serverTimestamp()
+        });
+
+      await ref.set(
+        payload,
+        { merge: false }
+      );
+
+      await db
+        .collection(
+          DAIRY_TRAITS_BUFFALO_TRAINING_SUMMARY_COLLECTION_SRV
+        )
+        .doc("global")
+        .set(
+          {
+            lastGroundTruthAt:
+              admin.firestore.FieldValue
+                .serverTimestamp(),
+
+            lastGroundTruthId:
+              ref.id,
+
+            lastAnimalId:
+              aiAnimal.id,
+
+            lastAnimalNumber:
+              aiAnimal.animalNumber || null,
+
+            lastModelScore:
+              modelScore,
+
+            lastExpertScore:
+              expertScore,
+
+            lastDelta:
+              expertScore - modelScore,
+
+            totalGroundTruthSamples:
+              admin.firestore.FieldValue
+                .increment(1),
+
+            updatedAt:
+              admin.firestore.FieldValue
+                .serverTimestamp()
+          },
+          { merge: true }
+        );
+
+      return res.json({
+        ok: true,
+        canTrain: true,
+
+        groundTruthId:
+          ref.id,
+
+        modelScore,
+        expertScore,
+
+        delta:
+          expertScore - modelScore,
+
+        expertCompositeScores,
+
+        calibrationEligible: true,
+
+        runtimeOverrideApplied: false,
+
+        fineTuningApplied: false,
+
+        message:
+          `✅ تم حفظ تدريب الجاموس: النموذج ${modelScore}/100، وGround Truth ${expertScore}/100. سيُستخدم التصحيح كمعايرة في التقييمات التالية.`
+      });
+
+    } catch (e) {
+      console.error(
+        "dairy traits buffalo training save failed:",
+        e.message || e
+      );
+
+      if (storedSide?.ok || storedRear?.ok) {
+        try {
+          const deletions = [];
+
+          if (storedSide?.ok) {
+            deletions.push(
+              admin.storage()
+                .bucket(storedSide.bucket)
+                .file(storedSide.path)
+                .delete()
+            );
+          }
+
+          if (storedRear?.ok) {
+            deletions.push(
+              admin.storage()
+                .bucket(storedRear.bucket)
+                .file(storedRear.path)
+                .delete()
+            );
+          }
+
+          await Promise.all(deletions);
+        } catch {}
+      }
+
+      return res.status(500).json({
+        ok: false,
+
+        error:
+          "dairy_traits_buffalo_training_save_failed",
+
+        message:
+          "❌ تعذّر حفظ تدريب الجاموس الآن. حاول مرة أخرى."
+      });
+    }
+  }
+);
 // ============================================================
 //       API: DAIRY TRAITS EXPERT GROUND TRUTH (admin only)
 //       Dataset مستقل — لا يغيّر Prediction ولا Prompt التشغيل
