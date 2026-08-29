@@ -78163,7 +78163,7 @@ if (speciesKey === "buffalo") {
           .slice(0, 22)
       : [];
 
-  return res.json({
+    return res.json({
     ok: true,
 
     animalType:
@@ -78184,6 +78184,57 @@ if (speciesKey === "buffalo") {
       "0–100",
 
     confidence,
+
+    presentation: {
+      scoreText:
+        `درجة مُرَبِّيك ${modelScore}/100 — ${grade}`,
+
+      scoreWidth:
+        `${modelScore}%`,
+
+      scoreColor:
+        modelScore >= 80
+          ? "#22c55e"
+          : "#f59e0b",
+
+      note:
+        String(
+          parsed.reason || ""
+        ).trim(),
+
+      breakdownTitle:
+        "التقسيم العام",
+
+      breakdownRows: [
+        {
+          label:
+            "الجهاز الضرعي والحلمات",
+          value:
+            `${compositeScores.udderTeat} / 40`
+        },
+        {
+          label:
+            "الأرجل والأقدام",
+          value:
+            `${compositeScores.feetAndLegs} / 25`
+        },
+        {
+          label:
+            "السعة والطابع الحلاب",
+          value:
+            `${compositeScores.yieldPotential} / 20`
+        },
+        {
+          label:
+            "الحوض والتركيب",
+          value:
+            `${compositeScores.structure} / 15`
+        }
+      ],
+
+      trainingPanel:
+        "none"
+    },
 
     compositeScores,
     subscores,
@@ -78344,6 +78395,63 @@ evaluationFramework: "cow_murabbik",
     "0–100",
 
   confidence,
+
+  presentation: {
+    scoreText:
+      `درجة مُرَبِّيك ${score}/100 — ${grade}`,
+
+    scoreWidth:
+      `${score}%`,
+
+    scoreColor:
+      score >= 80
+        ? "#22c55e"
+        : "#f59e0b",
+
+    note:
+      String(
+        parsed.reason || ""
+      ).trim(),
+
+    breakdownTitle:
+      "التقسيم العام",
+
+    breakdownRows: [
+      {
+        label:
+          "الضرع",
+        value:
+          `${breakdown.udder} / 40`
+      },
+      {
+        label:
+          "الأرجل والأقدام",
+        value:
+          `${breakdown.feetAndLegs} / 20`
+      },
+      {
+        label:
+          "القوة والطابع الحلاب",
+        value:
+          `${breakdown.dairyStrength} / 20`
+      },
+      {
+        label:
+          "المقدمة والسعة الجسمية",
+        value:
+          `${breakdown.frontEndAndCapacity} / 15`
+      },
+      {
+        label:
+          "الحوض",
+        value:
+          `${breakdown.rump} / 5`
+      }
+    ],
+
+    trainingPanel:
+      "cow"
+  },
 
   breakdown,
   udderSubscores,
