@@ -76010,7 +76010,7 @@ function dairyTraitsGradeSrv(score) {
 const DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV = "buffalo_murabbik";
 
 const DAIRY_TRAITS_BUFFALO_PROMPT_VERSION_SRV =
-  "dairy_traits_buffalo_murabbik_v2_2026-08-29";
+  "dairy_traits_buffalo_murabbik_v3_2026-08-29";
   const DAIRY_TRAITS_BUFFALO_TRAINING_COLLECTION_SRV =
   "dairy_traits_buffalo_training_corrections";
 
@@ -76556,52 +76556,19 @@ Different buffaloes should receive similar scores only when their visible morpho
 A. MAMMARY SYSTEM — SUPPORTING COMPOSITE /40
 ==================================================
 
-MAMMARY MERIT CALIBRATION:
+Evaluate the mammary system as the strongest component of the dairy-buffalo judgment.
 
-These are FUNCTIONAL MERIT subscores.
-They are NOT linear-expression scores, NOT percentages, and NOT a rule that "average-looking" must equal the numerical midpoint.
+Judge each mammary subtrait directly from the visible morphology.
 
-Interpret the scale as follows when the trait is reliably visible:
+For every subtrait:
+- give high points when the visible trait is close to its stated functional optimum
+- lose points according to the severity of the visible functional limitation
+- do not penalize an animal merely because a trait is not extreme
+- do not reward udder size, fullness, or visual impressiveness by themselves
+- do not duplicate the same visible weakness across several subscores unless it is independently evident in each trait
 
-For a /7 trait:
-- 7 = near functional optimum
-- 6 = clearly good functional merit
-- 5 = acceptable functional merit with only a mild limitation
-- 3–4 = clear visible weakness
-- 0–2 = marked or severe visible defect
-
-For a /5 trait:
-- 5 = near functional optimum
-- 4 = clearly good functional merit
-- 3 = acceptable only when a real mild/moderate limitation is visible
-- 2 = clear visible weakness
-- 0–1 = marked or severe visible defect
-
-For a /4 trait:
-- 4 = near functional optimum
-- 3 = clearly good functional merit
-- 2 = clear moderate visible weakness
-- 0–1 = marked or severe visible defect
-
-For a /3 trait:
-- 3 = near functional optimum
-- 2 = functional with a real mild limitation
-- 1 = clear visible weakness
-- 0 = severe visible defect
-
-Do NOT default a trait to the numerical midpoint merely because it is described as moderate, ordinary, non-extreme, or not exceptional.
-
-A trait that is visibly functional and has no meaningful defect should score in the GOOD functional band, even if it is not extreme or show-ring ideal.
-
-Do not score a mammary subtrait below half of its available points unless a clear visible functional weakness supports that deduction.
-
-Do not penalize the absence of extremity.
-"Not very high", "not very wide", or "not exceptionally strong" is not itself a defect.
-
-Avoid duplicate punishment:
-one visible weakness may influence more than one anatomical trait only when that weakness is independently visible in each trait.
-Do not copy the same observation across several subscores merely to create a larger penalty.
-
+Use the full available points when the visible trait genuinely warrants them.
+Do not under-score a clearly strong functional mammary trait out of caution.
 1) udderDepth — /7
 Judge udder-floor position and functional depth relative to the hock and the buffalo's own anatomy.
 Preferred:
@@ -76839,29 +76806,36 @@ Do not reward excessive upward arching.
 FINAL JUDGMENT
 ==================================================
 
-After evaluating all reliably visible traits:
+After evaluating the visible buffalo-specific traits:
 
-1. Give supporting composite judgments:
+Give supporting composite judgments:
 - udderTeat from 0 to 40
 - feetAndLegs from 0 to 25
 - yieldPotential from 0 to 20
-  This backend key represents Dairy Capacity & Character.
 - structure from 0 to 15
-  This backend key represents Rump & Structure.
 
-2. Then give YOUR FINAL Murabbik dairy-buffalo score from 0 to 100.
+Then give YOUR FINAL Murabbik dairy-buffalo score from 0 to 100.
 
-The final score is your own professional visual judgment of the animal's complete visible functional dairy conformation.
+The final score is the model's professional visual judgment according to the buffalo-specific rubric above.
 
-The final score must NOT be mechanically substituted by the arithmetic sum of the composites or subscores.
+The composites and subscores must support the final judgment, but they do not mechanically replace it.
 
-Subscores and composites are structured evidence supporting your judgment.
-Keep them reasonably coherent with the final judgment, but they do not override your final professional score.
+Use the full scoring range when justified:
 
-Do not anchor to any historical score distribution.
-Do not assume ordinary buffaloes belong inside a narrow score band.
-Do not reuse a previous scoring pattern.
-The CURRENT TARGET images are the primary evidence.
+- 90–100: exceptional visible dairy-buffalo functional conformation, especially the mammary system, with no major visible functional weakness
+- 80–89: strong dairy-buffalo conformation with only minor limitations
+- 70–79: good functional dairy-buffalo traits with noticeable limitations
+- 60–69: average/moderate functional dairy-buffalo traits
+- 50–59: weak-to-moderate traits with important visible limitations
+- below 50: weak dairy-buffalo conformation or serious visible functional weaknesses
+
+Do not be timid.
+Do not under-score an excellent buffalo out of caution.
+Do not over-score a visually impressive but functionally weak buffalo.
+Give a clear judgment.
+
+Do not force the final score to equal the arithmetic sum of the composites.
+The CURRENT TARGET images are the evidence.
 
 ==================================================
 OUTPUT RULES
@@ -78248,8 +78222,8 @@ if (speciesKey === "buffalo") {
     confidence,
 
     presentation: {
-      scoreText:
-        `درجة مُرَبِّيك ${modelScore}/100 — ${grade}`,
+  scoreText:
+    `درجة مُرَبِّيك ${modelScore}/100`,
 
       scoreWidth:
         `${modelScore}%`,
