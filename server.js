@@ -78142,7 +78142,7 @@ if (speciesKey === "buffalo") {
     modelRawScore:
       modelScore,
 
-    modelCompositeSum:
+    modelCompositeSum: 
       compositeSum,
 
     modelScoreVsCompositeDelta:
