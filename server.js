@@ -76007,10 +76007,10 @@ function dairyTraitsGradeSrv(score) {
 
   return "ضعيف جدًا";
 }
-const DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV = "buffalo_anasb";
+const DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV = "buffalo_murabbik";
 
 const DAIRY_TRAITS_BUFFALO_PROMPT_VERSION_SRV =
-  "dairy_traits_buffalo_anasb_v3_2026-08-28";
+  "dairy_traits_buffalo_murabbik_v1_2026-08-29";
   const DAIRY_TRAITS_BUFFALO_TRAINING_COLLECTION_SRV =
   "dairy_traits_buffalo_training_corrections";
 
@@ -76217,15 +76217,7 @@ function dairyTraitsStrictIntRangeSrv(v, min, max) {
 }
 
 function dairyTraitsBuffaloGradeSrv(score) {
-  const s = Number(score);
-
-  if (s >= 90) return "ممتاز";
-  if (s >= 85) return "جيد جدًا";
-  if (s >= 80) return "جيد+";
-  if (s >= 75) return "جيد";
-  if (s >= 70) return "كافٍ";
-
-  return "غير كافٍ";
+  return dairyTraitsGradeSrv(score);
 }
 
 function dairyTraitsBuffaloCompositeScoresSrv(raw = {}) {
@@ -76353,262 +76345,540 @@ function dairyTraitsBuffaloWeightedScoreSrv(
   };
 }
 
+const DAIRY_TRAITS_BUFFALO_MURABBIK_SUBSCORE_LIMITS_SRV =
+  Object.freeze({
+    udderDepth: 7,
+    foreUdderAttachment: 5,
+    rearUdderHeight: 5,
+    rearUdderWidth: 5,
+    centralSupport: 4,
+    teatPlacement: 5,
+    teatDirection: 3,
+    teatLength: 3,
+    udderBalance: 3,
+
+    hockAngle: 7,
+    rearLegsRearView: 6,
+    heelHeight: 5,
+    pasternStrength: 5,
+    footAngle: 2,
+
+    bodyDepth: 8,
+    bodyLength: 6,
+    ribStructureAngularity: 4,
+    strengthVigor: 2,
+
+    rumpLength: 5,
+    rumpWidth: 5,
+    rumpAngle: 2,
+    toplineBackLoin: 3
+  });
+
+function dairyTraitsBuffaloMurabbikCompositeScoresSrv(raw = {}) {
+  const out = {
+    udderTeat:
+      dairyTraitsStrictIntRangeSrv(
+        raw.udderTeat,
+        0,
+        40
+      ),
+
+    feetAndLegs:
+      dairyTraitsStrictIntRangeSrv(
+        raw.feetAndLegs,
+        0,
+        25
+      ),
+
+    yieldPotential:
+      dairyTraitsStrictIntRangeSrv(
+        raw.yieldPotential,
+        0,
+        20
+      ),
+
+    structure:
+      dairyTraitsStrictIntRangeSrv(
+        raw.structure,
+        0,
+        15
+      )
+  };
+
+  return Object.values(out)
+    .some(v => v === null)
+      ? null
+      : out;
+}
+
+function dairyTraitsBuffaloMurabbikSubscoresSrv(raw = {}) {
+  const out = {};
+
+  for (
+    const [key, max]
+    of Object.entries(
+      DAIRY_TRAITS_BUFFALO_MURABBIK_SUBSCORE_LIMITS_SRV
+    )
+  ) {
+    const v = raw?.[key];
+
+    if (
+      v === null ||
+      v === undefined ||
+      v === ""
+    ) {
+      out[key] = null;
+      continue;
+    }
+
+    const parsed =
+      dairyTraitsStrictIntRangeSrv(
+        v,
+        0,
+        max
+      );
+
+    if (parsed === null) {
+      return null;
+    }
+
+    out[key] = parsed;
+  }
+
+  return out;
+}
+
+function dairyTraitsBuffaloMurabbikCompositeSumSrv(
+  composite = {}
+) {
+  const values = [
+    composite.udderTeat,
+    composite.feetAndLegs,
+    composite.yieldPotential,
+    composite.structure
+  ];
+
+  if (
+    values.some(v =>
+      !Number.isFinite(Number(v))
+    )
+  ) {
+    return null;
+  }
+
+  return values.reduce(
+    (sum, v) =>
+      sum + Number(v),
+    0
+  );
+}
+
 function dairyTraitsBuffaloPromptSrv(
-  expertCalibrationPrompt = ""
+  _expertCalibrationPrompt = ""
 ) {
   return `
 You are Murabbik's specialist vision judge for LACTATING DAIRY BUFFALO (Bubalus bubalis).
 
-Never use dairy-cow or Holstein scoring rules.
+Your task is to evaluate the visible functional dairy conformation of the CURRENT TARGET from:
+1) one complete side image
+2) one complete rear image
 
-Use the ANASB/BIG Italian Mediterranean Buffalo morphological framework.
+Use Murabbik's scientific dairy-buffalo rubric below.
 
-Official composite scores are 65–100 and final weighting is:
-- Udder and Teat Apparatus 40%
-- Feet and Legs 25%
-- Yield Potential 20%
-- Structure 15%
+IMPORTANT:
+You are the judge.
+The rubric structures and informs your judgment.
+Do not let a formula, a familiar score, a previous animal, or a historical classification range replace your own visual judgment.
 
-Final score must equal the rounded weighted result:
-(udderTeat×0.40)+(feetAndLegs×0.25)+(yieldPotential×0.20)+(structure×0.15).
+Evaluate this buffalo independently from every other buffalo.
 
-Use ONLY two TARGET images:
-1) complete side view
-2) complete rear view
+==================================================
+GENERAL SCIENTIFIC RULES
+==================================================
 
-Do not estimate milk yield.
-Do not diagnose disease.
-Do not give feeding, management, ration, treatment, or photography advice.
+Judge only morphology that is actually visible.
+
+Do not infer:
+- milk yield in kg
+- milk flow
+- somatic cell count
+- mastitis
+- internal udder or teat anatomy
+- fertility
+- locomotion or gait from still images
+- measurements in centimeters
+- hidden hoof or limb disease
+- body condition score
 
 Do not reward:
-- body size alone
+- body size by itself
+- stature by itself
 - fatness
-- general beauty
+- abdominal fill
+- pregnancy enlargement
+- beefiness
+- muscularity
+- generic beauty
+- vague femininity
 - resemblance to dairy cattle
 
-Judge the animal specifically as a dairy buffalo.
+Dairy capacity is not the same as body size.
+Angularity is not the same as thinness.
+Strength is not the same as beefiness.
+A large udder is not automatically a good udder.
 
-${expertCalibrationPrompt ? `
-==================================================
-EXPERT CALIBRATION MEMORY
-==================================================
-${expertCalibrationPrompt}
-` : ""}
+Some traits have an intermediate functional optimum.
+Do not assume that more, higher, wider, shorter, or longer is always better.
 
-If the buffalo, udder, teats, feet, or rear structure are not sufficiently visible for a professional judgment, return:
+Judge each trait independently.
+A strong udder must not improve the leg judgment.
+Poor legs must not reduce the anatomical judgment of rump length.
+Do not let one impressive feature dominate unrelated traits.
+
+If a subtrait cannot be judged reliably from the available views:
+- do not invent it
+- do not automatically assign a middle score
+- return null for that subtrait
+- include its key in notReliablyVisible
+- reflect the limitation in confidence and reason
+
+If the animal, mammary system, rear structure, or feet and legs are too poorly visible for a professional overall judgment, return exactly:
 {
   "ok": false,
   "message": "الصورتان غير كافيتين لتقييم سمات الجاموس الحلاب؛ يجب ظهور الجسم والضرع والحلمات والأرجل بوضوح من الجانب والخلف."
 }
 
+Use the full 0–100 final scoring space when morphology warrants it.
+Do not gravitate toward central, safe, typical, familiar, or repeated scores.
+Different buffaloes should receive similar scores only when their visible morphology genuinely supports similar judgments.
+
 ==================================================
-UDDER AND TEAT APPARATUS — 65–100 — WEIGHT 40%
+A. MAMMARY SYSTEM — SUPPORTING COMPOSITE /40
 ==================================================
 
-Evaluate:
+1) udderDepth — /7
+Judge udder-floor position and functional depth relative to the hock and the buffalo's own anatomy.
+Preferred:
+- functionally supported depth
+- safe udder-floor position relative to the hock
+- neither markedly pendulous nor excessively shallow
+Penalize according to severity:
+- marked descent toward or below the hock
+- pendulous appearance
+- obvious loss of functional support
+- biologically excessive shallowness
+Do not use "higher is always better."
 
-1) Fore Udder Attachment Length
-2) Fore Udder Attachment Strength
-3) Rear Udder Attachment Width
-4) Rear Udder Attachment Height
-5) Suspensory Ligament Strength
-6) Udder Depth / distance between udder floor and hock plane
-7) Teat Direction
-8) Teat Length
-9) Teat Placement
+2) foreUdderAttachment — /5
+Judge visible fore-udder attachment to the abdominal wall.
+Preferred:
+- strong
+- smooth
+- well integrated
+- functionally extended
+Penalize:
+- loose attachment
+- abrupt separation
+- short or weak visible attachment
+- obvious lack of support
 
+3) rearUdderHeight — /5
+Judge visible height of rear udder attachment relative to pelvic anatomy.
+Preferred:
+- functionally high
+- clearly extended rear attachment
+Penalize distinctly low attachment.
+Do not reward anatomical extremity merely because it is higher.
+
+4) rearUdderWidth — /5
+Judge width and functional capacity of the rear udder attachment.
+Preferred:
+- good functional width
+- strong attachment
+- balanced with the animal
+Do not confuse milk fullness or udder bulk with true attachment width.
+Do not assume maximum width is automatically optimal.
+
+5) centralSupport — /4
+Judge visible median/suspensory support and rear cleft when reliably visible.
+Preferred:
+- clear functional central support
+- adequate division and support
+Penalize:
+- obvious weakening
+- visible loss of structural support
+- marked associated pendulousness
+Return null if it cannot be judged reliably.
+
+6) teatPlacement — /5
+Judge front and rear teat placement as a functional distribution beneath the quarters.
+Preferred:
+- balanced placement
+- practical functional distribution
+- neither excessively close nor excessively wide
+Both severe convergence and severe divergence are undesirable.
+
+7) teatDirection — /3
+Judge visible teat orientation.
+Preferred:
+- approximately vertical functional orientation
+Penalize marked inward, outward, forward, or backward deviation according to severity.
+
+8) teatLength — /3
+Judge RELATIVE visible teat length.
+Preferred:
+- moderate functional length
+Penalize both excessively short and excessively long teats.
+Never estimate centimeters.
+
+9) udderBalance — /3
+Judge overall visible balance and symmetry of the udder and quarters.
+Preferred:
+- balanced
+- proportionate
+- reasonably symmetrical
+Penalize clear asymmetry or imbalance.
+Do not heavily double-penalize the same defect already represented by a specific attachment or support trait.
+
+==================================================
+B. FEET AND LEGS — SUPPORTING COMPOSITE /25
+==================================================
+
+1) hockAngle — /7
+Use the side view.
+Judge rear-leg set at the hock.
+Preferred:
+- functional intermediate angulation
+- balanced support
+Penalize:
+- markedly straight/post-legged conformation
+- markedly sickle/over-curved conformation
+Neither biological extreme is automatically desirable.
+
+2) rearLegsRearView — /6
+Use the rear view.
 Judge:
-- attachment
-- support
-- udder elevation
-- balance
-- functional capacity
-- visible teat configuration
+- rear-limb alignment
+- hock direction
+- foot direction
+- symmetry of the weight-bearing structure
+Preferred:
+- functionally straight and balanced alignment
+Penalize visible:
+- hocked-in deviation
+- substantial outward/inward directional deviation
+- marked structural asymmetry
 
-A weak, loose or pendulous udder,
-weak attachment,
-very low udder floor,
-marked asymmetry,
-or clearly unfavorable teat configuration
-must reduce the mammary composite.
+3) heelHeight — /5
+Judge relative heel height and structural support when the hoof is clearly visible.
+Preferred:
+- functional, adequately supported heel
+Penalize:
+- markedly low or collapsed heel
+- clearly poor functional heel structure
+Return null if bedding, mud, cropping, or image angle prevents reliable assessment.
 
-Judge teat placement, direction and length
-as BUFFALO traits.
+4) pasternStrength — /5
+Judge visible pastern/fetlock support.
+Preferred:
+- strong functional support
+- no obvious excessive collapse
+Penalize marked weakness or dropping.
+Do not infer pathology from posture alone.
 
-Do not import cow teat ideals.
+5) footAngle — /2
+Judge foot angle only when clearly visible.
+Preferred:
+- functional hoof angle appropriate to sound weight bearing
+Do not over-weight this trait.
+Return null when it cannot be judged reliably.
 
-Do not invent hidden quarters,
-milk flow,
-blind teats,
-or functional defects that cannot be seen.
-
-==================================================
-FEET AND LEGS — 65–100 — WEIGHT 25%
-==================================================
-
-Evaluate visible static traits:
-
-- Hock Angle
-- Pastern Strength
-- Heel Height
-- Rear-leg alignment
-- Visible hoof form
-- Standing support
-- Structural stability
-
-Locomotion is an official trait,
-but it CANNOT be judged from two still images.
-
-Always return:
-"locomotion": null
-
-Do not infer:
-- gait
-- stride
-- tracking
-- walking ability
-
-from still photographs.
+LOCOMOTION:
+Do not score locomotion.
+Still photographs cannot demonstrate gait or stride.
+Visible hoof deformities may be reported under visibleDefects when genuinely visible, but do not diagnose disease.
 
 ==================================================
-YIELD POTENTIAL — 65–100 — WEIGHT 20%
+C. DAIRY CAPACITY & CHARACTER — SUPPORTING COMPOSITE /20
 ==================================================
 
-Evaluate buffalo-specific:
+1) bodyDepth — /8
+Use the side view.
+Judge functional body/barrel depth, especially around the last-rib region, RELATIVE to the buffalo's frame.
+Preferred:
+- good functional depth and capacity
+- balanced dairy body capacity
+Do not mistake rumen fill, abdominal distension, pregnancy, or fatness for true structural body depth.
 
-- Strength and Vigor
-- Angularity
-- Chest Depth
-- Trunk Length
-- Proportional productive capacity
+2) bodyLength — /6
+Judge relative trunk/body length from the side.
+Preferred:
+- functionally long, balanced trunk
+- good capacity relative to the animal's own frame
+Do not reward overall size or stature by itself.
 
-Do NOT import Holstein Dairy Strength as-is.
+3) ribStructureAngularity — /4
+Judge visible dairy-type rib/body structure.
+Consider:
+- rib angle
+- rib spring
+- overall angular dairy structure where truly visible
+Do not score vague femininity.
+Do not equate angularity with thinness, poor body condition, or weakness.
+Do not create a separate rib-openness score.
 
-A dairy buffalo should combine:
-- functional strength
-- body capacity
-- productive morphology
-- appropriate dairy expression
-
-Do not reward excessive flesh merely because
-the buffalo appears large or powerful.
-
-==================================================
-STRUCTURE — 65–100 — WEIGHT 15%
-==================================================
-
-Evaluate:
-
-- Stature
-- Topline
-- Rump Length
-- Rump Angle
-- Width at Ilia
-- Width at Ischia
-- Musculature
-- Overall structural balance
-
-Judge proportions from the images.
-
-Do not invent absolute metric measurements
-when no scale reference exists.
+4) strengthVigor — /2
+Judge whether visible skeletal structure shows sufficient functional strength to support a dairy animal.
+Preferred:
+- adequate structural strength
+- balanced vigor
+Do not reward beefiness, excessive muscularity, coarse build, broad chest alone, or body size alone.
 
 ==================================================
-LINEAR TRAITS — SCALE 1–50
+D. RUMP & STRUCTURE — SUPPORTING COMPOSITE /15
 ==================================================
 
-Record the visible BIOLOGICAL EXPRESSION
-of each linear trait on a 1–50 scale.
+1) rumpLength — /5
+Use primarily the side view.
+Judge RELATIVE functional rump/pelvic length.
+Preferred:
+- good functional length
+- proportional to the animal
+Do not estimate centimeters.
 
-IMPORTANT:
+2) rumpWidth — /5
+Use primarily the rear view.
+Judge functional pelvic/rump width relative to the buffalo's own frame.
+Preferred:
+- adequately wide
+- balanced
+- non-constricted pelvic structure
+Do not assume maximum width is automatically best.
 
-These are DESCRIPTIVE LINEAR SCORES.
+3) rumpAngle — /2
+Use the side view.
+Judge direction/slope from hooks toward pins.
+This is primarily a structural trait.
+Penalize clear biological extremes or obviously poor structural balance.
+Do not use rump angle as a major milk-production proxy.
 
-They are NOT quality points.
-
-50 is NOT automatically better than 25 or 30.
-
-Do not invent weights for the linear traits.
-
-The four composite scores are separate
-professional judgments.
-
-If a linear trait cannot be judged reliably
-from these two images, return null.
-
-Always return locomotion as null.
-
-==================================================
-FINAL CLASSIFICATION
-==================================================
-
-Use these official classification bands:
-
-below 70 = غير كافٍ
-70–74 = كافٍ
-75–79 = جيد
-80–84 = جيد+
-85–89 = جيد جدًا
-90–100 = ممتاز
-
-Use the full scale when justified.
-
-Do not under-score a strong buffalo from caution.
-
-Do not over-score an animal because it is large
-or visually impressive.
+4) toplineBackLoin — /3
+Judge the visible topline through back and loin.
+Preferred:
+- functionally strong
+- naturally straight and supported back/loin
+Penalize:
+- obvious sway or weakness
+- clear loin weakness
+- major structural deviation
+Do not reward excessive upward arching.
 
 ==================================================
-OUTPUT
+FINAL JUDGMENT
+==================================================
+
+After evaluating all reliably visible traits:
+
+1. Give supporting composite judgments:
+- udderTeat from 0 to 40
+- feetAndLegs from 0 to 25
+- yieldPotential from 0 to 20
+  This backend key represents Dairy Capacity & Character.
+- structure from 0 to 15
+  This backend key represents Rump & Structure.
+
+2. Then give YOUR FINAL Murabbik dairy-buffalo score from 0 to 100.
+
+The final score is your own professional visual judgment of the animal's complete visible functional dairy conformation.
+
+The final score must NOT be mechanically substituted by the arithmetic sum of the composites or subscores.
+
+Subscores and composites are structured evidence supporting your judgment.
+Keep them reasonably coherent with the final judgment, but they do not override your final professional score.
+
+Do not anchor to any historical score distribution.
+Do not assume ordinary buffaloes belong inside a narrow score band.
+Do not reuse a previous scoring pattern.
+The CURRENT TARGET images are the primary evidence.
+
+==================================================
+OUTPUT RULES
 ==================================================
 
 All user-visible text must be Arabic only.
+Return exactly one JSON object.
 
-Return exactly one JSON object with these keys:
-
+Required top-level keys:
 ok
 evaluationFramework
 score
 grade
 confidence
 compositeScores
-linearTraits
+subscores
+notReliablyVisible
 visibleDefects
 strengths
 weaknesses
 reason
 
-Output rules:
-- ok must be true for an accepted evaluation.
-- evaluationFramework must be "buffalo_anasb".
-- score must be one integer from 65 to 100.
-- grade must match the official classification band of score.
+For an accepted evaluation:
+- ok must be true.
+- evaluationFramework must be "buffalo_murabbik".
+- score must be one integer from 0 to 100 and must be YOUR final judgment.
+- grade must be a short Arabic qualitative judgment.
 - confidence must be "high", "medium", or "low".
-- compositeScores must contain exactly these four keys:
-  structure
-  yieldPotential
-  udderTeat
-  feetAndLegs
-- Judge each composite independently from the CURRENT TARGET.
-- Each composite must be an integer from 65 to 100.
-- Calculate the final score only after judging the four composites.
-- The final score must equal the rounded official weighted result:
-  udderTeat × 0.40
-  feetAndLegs × 0.25
-  yieldPotential × 0.20
-  structure × 0.15
-- linearTraits must contain all required linear-trait keys defined above.
-- Each reliably visible linear trait must be an integer from 1 to 50.
-- If a linear trait cannot be judged reliably, return null.
-- locomotion must always be null.
-- visibleDefects, strengths, weaknesses, and reason must describe only the CURRENT TARGET.
 
-Anti-anchoring rules:
-- Do not gravitate toward any typical, central, average, safe, or familiar score.
+compositeScores must contain exactly:
+- udderTeat: integer 0–40
+- feetAndLegs: integer 0–25
+- yieldPotential: integer 0–20
+- structure: integer 0–15
+
+Do not force score to equal the sum of compositeScores.
+
+subscores must contain all of these keys:
+udderDepth
+foreUdderAttachment
+rearUdderHeight
+rearUdderWidth
+centralSupport
+teatPlacement
+teatDirection
+teatLength
+udderBalance
+hockAngle
+rearLegsRearView
+heelHeight
+pasternStrength
+footAngle
+bodyDepth
+bodyLength
+ribStructureAngularity
+strengthVigor
+rumpLength
+rumpWidth
+rumpAngle
+toplineBackLoin
+
+For each subscore:
+- return an integer within its stated range when reliably visible
+- return null when not reliably visible
+- never invent a middle score because of uncertainty
+
+notReliablyVisible must list only subtrait keys that could not be judged reliably.
+
+visibleDefects must contain only defects genuinely visible in the CURRENT TARGET.
+
+strengths and weaknesses must contain concise Arabic observations about the CURRENT TARGET only.
+
+reason must be a concise Arabic explanation of the final judgment based on the most influential visible morphology.
+
+Anti-anchoring:
+- Do not gravitate toward a typical, central, average, safe, or familiar final score.
 - Do not reuse a score pattern from previous evaluations.
-- Do not make different buffaloes converge to the same score unless their visible morphology genuinely supports the same result.
-- Use the full official 65–100 scale when justified.
-- The CURRENT TARGET images are the primary evidence.
+- Do not make different buffaloes converge to the same score unless their visible morphology genuinely supports it.
+- Use the full 0–100 final scoring space when justified.
   `.trim();
 }
 // ============================================================
@@ -77428,12 +77698,7 @@ if (!attempt.allowed) {
       "ℹ️ استُخدمت محاولات تحليل سمات إنتاج اللبن المتاحة لهذا الحيوان اليوم. يتاح التحليل مرة أخرى مع بداية يوم المزرعة التالي."
   });
 }
-const buffaloExpertCalibrationPrompt =
-  speciesKey === "buffalo"
-    ? await dairyTraitsBuffaloBuildExpertCalibrationPromptSrv(
-        uid
-      )
-    : "";
+const buffaloExpertCalibrationPrompt = "";
 
 const prompt =
   speciesKey === "buffalo"
@@ -77827,20 +78092,26 @@ if (speciesKey === "buffalo") {
   const modelScore =
     dairyTraitsStrictIntRangeSrv(
       parsed.score,
-      65,
+      0,
       100
     );
 
   const compositeScores =
-    dairyTraitsBuffaloCompositeScoresSrv(
+    dairyTraitsBuffaloMurabbikCompositeScoresSrv(
       parsed.compositeScores ||
       parsed.breakdown ||
       {}
     );
 
+  const subscores =
+    dairyTraitsBuffaloMurabbikSubscoresSrv(
+      parsed.subscores || {}
+    );
+
   if (
     modelScore === null ||
-    !compositeScores
+    !compositeScores ||
+    !subscores
   ) {
     return res.status(400).json({
       ok: false,
@@ -77853,26 +78124,44 @@ if (speciesKey === "buffalo") {
     });
   }
 
-  const officialWeighted =
-    dairyTraitsBuffaloWeightedScoreSrv(
+  const compositeSum =
+    dairyTraitsBuffaloMurabbikCompositeSumSrv(
       compositeScores
     );
 
-  const linearTraits =
-    dairyTraitsBuffaloLinearTraitsSrv(
-      parsed.linearTraits || {}
-    );
-
   const grade =
-    dairyTraitsBuffaloGradeSrv(
-      modelScore
-    );
+    String(
+      parsed.grade ||
+      dairyTraitsBuffaloGradeSrv(
+        modelScore
+      )
+    ).trim();
 
-  const confidence =
+  const confidenceRaw =
     String(
       parsed.confidence ||
       "medium"
-    ).trim();
+    )
+      .trim()
+      .toLowerCase();
+
+  const confidence =
+    ["high", "medium", "low"]
+      .includes(confidenceRaw)
+        ? confidenceRaw
+        : "medium";
+
+  const notReliablyVisible =
+    Array.isArray(
+      parsed.notReliablyVisible
+    )
+      ? parsed.notReliablyVisible
+          .map(v =>
+            String(v || "").trim()
+          )
+          .filter(Boolean)
+          .slice(0, 22)
+      : [];
 
   return res.json({
     ok: true,
@@ -77892,12 +78181,20 @@ if (speciesKey === "buffalo") {
     grade,
 
     rangeText:
-      "65–100",
+      "0–100",
 
     confidence,
 
     compositeScores,
-    linearTraits,
+    subscores,
+
+    // Legacy field kept empty deliberately.
+    // The Murabbik buffalo rubric now uses scored subtraits,
+    // not ANASB 1–50 linear-trait output.
+    linearTraits:
+      null,
+
+    notReliablyVisible,
 
     visibleDefects:
       Array.isArray(
@@ -77905,18 +78202,18 @@ if (speciesKey === "buffalo") {
       )
         ? parsed.visibleDefects.slice(
             0,
-            6
+            8
           )
         : [],
 
     strengths:
       Array.isArray(parsed.strengths)
-        ? parsed.strengths.slice(0, 4)
+        ? parsed.strengths.slice(0, 5)
         : [],
 
     weaknesses:
       Array.isArray(parsed.weaknesses)
-        ? parsed.weaknesses.slice(0, 4)
+        ? parsed.weaknesses.slice(0, 5)
         : [],
 
     reason:
@@ -77925,32 +78222,36 @@ if (speciesKey === "buffalo") {
       ).trim(),
 
     // تشخيص اتساق فقط.
-    // لا Override لحكم النموذج الخام.
+    // لا Override ولا إعادة حساب لحكم النموذج الخام.
     modelRawScore:
       modelScore,
 
+    modelCompositeSum:
+      compositeSum,
+
+    modelScoreVsCompositeDelta:
+      compositeSum === null
+        ? null
+        : Number(
+            (
+              modelScore -
+              compositeSum
+            ).toFixed(2)
+          ),
+
     officialWeightedScoreExact:
-      officialWeighted?.exact ??
       null,
 
     officialWeightedScoreRounded:
-      officialWeighted?.rounded ??
       null,
 
     modelScoreVsOfficialWeightedDelta:
-      officialWeighted
-        ? Number(
-            (
-              modelScore -
-              officialWeighted.rounded
-            ).toFixed(2)
-          )
-        : null,
+      null,
 
     modelPromptVersion:
       DAIRY_TRAITS_BUFFALO_PROMPT_VERSION_SRV,
 
-       modelName:
+    modelName:
       process.env
         .OPENAI_DAIRY_TRAITS_MODEL ||
       process.env
@@ -77958,13 +78259,15 @@ if (speciesKey === "buffalo") {
       "gpt-4.1",
 
     expertCalibrationApplied:
-      Boolean(
-        buffaloExpertCalibrationPrompt
-      ),
+      false,
 
     limitations: [
-      "الحركة غير مقيمة من الصور الثابتة."
-    ],
+      "الحركة غير مقيمة من الصور الثابتة.",
+      ...notReliablyVisible.map(
+        key =>
+          `الصفة ${key} غير مقيمة لعدم كفاية الرؤية.`
+      )
+    ].slice(0, 10),
 
     message:
       `✅ اكتمل تقييم سمات الجاموس الحلاب — الدرجة ${modelScore}/100 (${grade}).`
@@ -78097,6 +78400,7 @@ evaluationFramework: "cow_murabbik",
   }
 });
 app.post(
+
   "/api/dairy-traits/buffalo-training/save",
   requireUserId,
   async (req, res) => {
@@ -78104,6 +78408,14 @@ app.post(
     let storedRear = null;
 
     try {
+      return res.status(409).json({
+        ok: false,
+        canTrain: false,
+        error:
+          "dairy_traits_buffalo_training_paused",
+        message:
+          "ℹ️ حفظ Ground Truth للجاموس متوقف مؤقتًا أثناء اعتماد مقياس مُرَبِّيك الجديد."
+      });
       if (
         !dairyTraitsIsTrainingAdminSrv(
           req.userId
@@ -79773,11 +80085,7 @@ analysis: cleanObj({
 
   rangeText:
     analysis.rangeText ||
-    (
-      isBuffaloFramework
-        ? "65–100"
-        : "0–100"
-    ),
+    "0–100",
 
   confidence:
     analysis.confidence ||
@@ -79797,12 +80105,31 @@ analysis: cleanObj({
     analysis.udderSubscores ||
     null,
 
-  compositeScores,
+    compositeScores,
+
+  subscores:
+    analysis.subscores ||
+    null,
+
   linearTraits,
 
-  visibleDefects:
+  notReliablyVisible:
+    analysis.notReliablyVisible ||
+    [],
+
+   visibleDefects:
     analysis.visibleDefects ||
     [],
+
+    modelCompositeSum:
+    analysis
+      .modelCompositeSum ??
+    null,
+
+  modelScoreVsCompositeDelta:
+    analysis
+      .modelScoreVsCompositeDelta ??
+    null,
 
   officialWeightedScoreExact:
     analysis
@@ -79871,6 +80198,13 @@ lastDairyTraitsCompositeScores:
   compositeScores
     ? cleanObj(
         compositeScores
+      )
+    : null,
+
+lastDairyTraitsSubscores:
+  analysis.subscores
+    ? cleanObj(
+        analysis.subscores
       )
     : null,
 
