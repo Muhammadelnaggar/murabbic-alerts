@@ -76010,7 +76010,7 @@ function dairyTraitsGradeSrv(score) {
 const DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV = "buffalo_murabbik";
 
 const DAIRY_TRAITS_BUFFALO_PROMPT_VERSION_SRV =
-  "dairy_traits_buffalo_murabbik_v3_2026-08-29";
+  "dairy_traits_buffalo_murabbik_v4_2026-08-29";
   const DAIRY_TRAITS_BUFFALO_TRAINING_COLLECTION_SRV =
   "dairy_traits_buffalo_training_corrections";
 
@@ -76637,28 +76637,49 @@ Do not assign a low score merely because the cleft is not deep or dramatic.
 Return null if it cannot be judged reliably.
 
 6) teatPlacement — /5
-Judge front and rear teat placement as a functional distribution beneath the quarters.
-Preferred:
-- balanced placement
-- practical functional distribution
-- neither excessively close nor excessively wide
-If placement is visibly functional with no meaningful deviation, score it in the good functional band.
-Do not default to 3/5 merely because placement is not visually perfect.
-Penalize true functional convergence, divergence, or clear imbalance according to severity.
+Judge teat placement independently from udder depth, udder attachment, and teat direction.
+
+Best:
+- teats functionally positioned beneath their quarters
+- balanced and reasonably symmetrical distribution
+- neither clearly too close nor clearly too wide
+
+Lose points only for clearly visible functional displacement:
+- distinctly too close
+- distinctly too wide
+- clear uneven placement
+- obvious displacement away from a functional position beneath the quarter
+
+Do not deduct points merely because the teats are not perfectly centered or visually ideal.
+If placement is clearly functional and no meaningful placement defect is visible, give a high score.
 
 7) teatDirection — /3
-Judge visible teat orientation.
-Preferred:
-- approximately vertical functional orientation
-Near-vertical functional direction with no meaningful deviation deserves a high score.
-Penalize marked inward, outward, forward, or backward deviation according to severity.
+Judge direction independently from teat placement and udder depth.
+
+Best:
+- vertical or near-vertical functional orientation
+
+Lose points only for clearly visible directional deviation:
+- marked inward direction
+- marked outward direction
+- marked forward or backward direction
+
+Minor natural variation is not a functional defect.
+If the teats are essentially vertical and no meaningful directional deviation is visible, give full or near-full points.
 
 8) teatLength — /3
-Judge RELATIVE visible teat length.
-Preferred:
+Judge RELATIVE visible teat length independently from placement and direction.
+
+Best:
 - moderate functional length
-Moderate functional length is the optimum, not a midpoint condition.
-Penalize both excessively short and excessively long teats.
+
+Lose points for clearly visible functional extremes:
+- distinctly too short
+- distinctly too long
+
+Do not deduct merely because length is not visually ideal.
+If the visible length is moderate and functional, give full or near-full points.
+Return null if relative teat length cannot be judged reliably from the available views.
 Never estimate centimeters.
 
 9) udderBalance — /3
