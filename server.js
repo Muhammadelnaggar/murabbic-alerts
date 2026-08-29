@@ -78097,8 +78097,8 @@ if (speciesKey === "buffalo") {
         }
       ],
 
-      trainingPanel:
-        "none"
+         trainingPanel:
+        "buffalo"
     },
 
     compositeScores,

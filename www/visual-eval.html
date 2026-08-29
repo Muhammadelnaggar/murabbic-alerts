@@ -187,42 +187,153 @@
 </section>
 
 <section class="mbk-score-card hide" id="buffaloTrainingBox">
-  <div class="mbk-page-title">مراجعة الخبير للجاموس — Ground Truth</div>
+  <div class="mbk-page-title">Ground Truth — الجاموس</div>
 
   <div class="form-hint">
-    تُحفظ مراجعتك كتدريب مستقل للجاموس ولا تغيّر نتيجة النموذج الحالية.
+    مراجعة خبير مستقلة لا تغيّر نتيجة النموذج المعروضة.
   </div>
 
-  <label>الجهاز الضرعي والحلمات / 100
-    <input class="input buffalo-expert-score-input"
-           id="buffaloExpertUdderTeat"
-           type="number" min="65" max="100" step="1">
+  <label>
+    <input id="buffaloImageQualityAccepted" type="checkbox">
+    الصور صالحة للتقييم الخبروي
   </label>
 
-  <label>الأرجل والأقدام / 100
-    <input class="input buffalo-expert-score-input"
-           id="buffaloExpertFeetAndLegs"
-           type="number" min="65" max="100" step="1">
-  </label>
+  <div class="mbk-score-card">
+    <div class="mbk-score-badge">التقسيم العام</div>
 
-  <label>القدرة الإنتاجية / 100
-    <input class="input buffalo-expert-score-input"
-           id="buffaloExpertYieldPotential"
-           type="number" min="65" max="100" step="1">
-  </label>
+    <label>الجهاز الضرعي والحلمات / 40
+      <input class="input" id="buffaloExpertUdderTeat"
+             type="number" min="0" max="40" step="1">
+    </label>
 
-  <label>التركيب / 100
-    <input class="input buffalo-expert-score-input"
-           id="buffaloExpertStructure"
-           type="number" min="65" max="100" step="1">
-  </label>
+    <label>الأرجل والأقدام / 25
+      <input class="input" id="buffaloExpertFeetAndLegs"
+             type="number" min="0" max="25" step="1">
+    </label>
 
-  <label>Ground Truth النهائي / 100
-    <input class="input"
-           id="buffaloExpertScore"
-           type="number"
-           readonly>
-  </label>
+    <label>السعة والطابع الحلاب / 20
+      <input class="input" id="buffaloExpertYieldPotential"
+             type="number" min="0" max="20" step="1">
+    </label>
+
+    <label>الحوض والتركيب / 15
+      <input class="input" id="buffaloExpertStructure"
+             type="number" min="0" max="15" step="1">
+    </label>
+
+    <label>Ground Truth النهائي / 100
+      <input class="input" id="buffaloExpertScore"
+             type="number" min="0" max="100" step="1">
+    </label>
+  </div>
+
+  <details>
+    <summary>الصفات التفصيلية</summary>
+
+    <div class="mbk-score-card">
+      <div class="mbk-score-badge">الجهاز الضرعي والحلمات</div>
+
+      <label>عمق الضرع / 7
+        <input class="input" id="buffaloGTUdderDepth" type="number" min="0" max="7" step="1">
+      </label>
+
+      <label>ارتباط الضرع الأمامي / 5
+        <input class="input" id="buffaloGTForeUdderAttachment" type="number" min="0" max="5" step="1">
+      </label>
+
+      <label>ارتفاع الضرع الخلفي / 5
+        <input class="input" id="buffaloGTRearUdderHeight" type="number" min="0" max="5" step="1">
+      </label>
+
+      <label>عرض الضرع الخلفي / 5
+        <input class="input" id="buffaloGTRearUdderWidth" type="number" min="0" max="5" step="1">
+      </label>
+
+      <label>الدعم المركزي / 4
+        <input class="input" id="buffaloGTCentralSupport" type="number" min="0" max="4" step="1">
+      </label>
+
+      <label>موضع الحلمات / 5
+        <input class="input" id="buffaloGTTeatPlacement" type="number" min="0" max="5" step="1">
+      </label>
+
+      <label>اتجاه الحلمات / 3
+        <input class="input" id="buffaloGTTeatDirection" type="number" min="0" max="3" step="1">
+      </label>
+
+      <label>طول الحلمات / 3
+        <input class="input" id="buffaloGTTeatLength" type="number" min="0" max="3" step="1">
+      </label>
+
+      <label>اتزان الضرع / 3
+        <input class="input" id="buffaloGTUdderBalance" type="number" min="0" max="3" step="1">
+      </label>
+    </div>
+
+    <div class="mbk-score-card">
+      <div class="mbk-score-badge">الأرجل والأقدام</div>
+
+      <label>زاوية العرقوب / 7
+        <input class="input" id="buffaloGTHockAngle" type="number" min="0" max="7" step="1">
+      </label>
+
+      <label>استقامة الأرجل الخلفية من الخلف / 6
+        <input class="input" id="buffaloGTRearLegsRearView" type="number" min="0" max="6" step="1">
+      </label>
+
+      <label>ارتفاع الكعب / 5
+        <input class="input" id="buffaloGTHeelHeight" type="number" min="0" max="5" step="1">
+      </label>
+
+      <label>قوة السلاميات / 5
+        <input class="input" id="buffaloGTPasternStrength" type="number" min="0" max="5" step="1">
+      </label>
+
+      <label>زاوية الحافر / 2
+        <input class="input" id="buffaloGTFootAngle" type="number" min="0" max="2" step="1">
+      </label>
+    </div>
+
+    <div class="mbk-score-card">
+      <div class="mbk-score-badge">السعة والطابع الحلاب</div>
+
+      <label>عمق الجسم / 8
+        <input class="input" id="buffaloGTBodyDepth" type="number" min="0" max="8" step="1">
+      </label>
+
+      <label>طول الجسم / 6
+        <input class="input" id="buffaloGTBodyLength" type="number" min="0" max="6" step="1">
+      </label>
+
+      <label>تركيب الضلوع والطابع الحلاب / 4
+        <input class="input" id="buffaloGTRibStructureAngularity" type="number" min="0" max="4" step="1">
+      </label>
+
+      <label>القوة والحيوية / 2
+        <input class="input" id="buffaloGTStrengthVigor" type="number" min="0" max="2" step="1">
+      </label>
+    </div>
+
+    <div class="mbk-score-card">
+      <div class="mbk-score-badge">الحوض والتركيب</div>
+
+      <label>طول الحوض / 5
+        <input class="input" id="buffaloGTRumpLength" type="number" min="0" max="5" step="1">
+      </label>
+
+      <label>عرض الحوض / 5
+        <input class="input" id="buffaloGTRumpWidth" type="number" min="0" max="5" step="1">
+      </label>
+
+      <label>ميل الحوض / 2
+        <input class="input" id="buffaloGTRumpAngle" type="number" min="0" max="2" step="1">
+      </label>
+
+      <label>قوة خط الظهر والقطنية / 3
+        <input class="input" id="buffaloGTToplineBackLoin" type="number" min="0" max="3" step="1">
+      </label>
+    </div>
+  </details>
 
   <label>ملاحظة الخبير
     <textarea class="input"
@@ -310,7 +421,8 @@
     analysis: null,
 
      training: {
-  canTrain: false
+  canTrain: false,
+  buffaloCanTrain: false
 }
   };
 
@@ -556,6 +668,9 @@ if (buffaloTrainingBox) {
 }
   }
 async function loadTrainingGate() {
+  state.training.canTrain = false;
+  state.training.buffaloCanTrain = false;
+
   try {
     const r = await fetch("/api/dairy-traits/training/gate", {
       method: "GET",
@@ -573,22 +688,45 @@ async function loadTrainingGate() {
       j.ok &&
       j.canTrain
     );
-
-    if (!state.training.canTrain && expertTrainingBox) {
-      expertTrainingBox.classList.add("hide");
-    }
-
   } catch (e) {
-    state.training.canTrain = false;
+    console.warn("dairy traits cow training gate error:", e);
+  }
 
-    if (expertTrainingBox) {
-      expertTrainingBox.classList.add("hide");
-    }
+  try {
+    const r = await fetch("/api/dairy-traits/buffalo-training/gate", {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        "Accept": "application/json"
+      }
+    });
 
-    console.warn("dairy traits training gate error:", e);
+    const j = await r.json().catch(() => ({}));
+
+    state.training.buffaloCanTrain = !!(
+      r.ok &&
+      j.ok &&
+      j.canTrain
+    );
+  } catch (e) {
+    console.warn("dairy traits buffalo training gate error:", e);
+  }
+
+  if (
+    !state.training.canTrain &&
+    expertTrainingBox
+  ) {
+    expertTrainingBox.classList.add("hide");
+  }
+
+  if (
+    !state.training.buffaloCanTrain &&
+    buffaloTrainingBox
+  ) {
+    buffaloTrainingBox.classList.add("hide");
   }
 }
-
 function expertInt(id, max) {
   const el = $("#" + id);
   const raw = String(el?.value ?? "").trim();
@@ -788,70 +926,22 @@ function readExpertGroundTruth() {
       ).trim()
   };
 }
-function buffaloExpertInt(id) {
+function buffaloGroundTruthValue(id) {
   const el = $("#" + id);
   const raw = String(el?.value ?? "").trim();
 
-  if (!raw) return null;
+  if (raw === "") return null;
 
   const n = Number(raw);
 
-  if (
-    !Number.isInteger(n) ||
-    n < 65 ||
-    n > 100
-  ) {
-    return null;
-  }
-
-  return n;
-}
-
-function recalcBuffaloExpertTotal() {
-  const udderTeat =
-    buffaloExpertInt("buffaloExpertUdderTeat");
-
-  const feetAndLegs =
-    buffaloExpertInt("buffaloExpertFeetAndLegs");
-
-  const yieldPotential =
-    buffaloExpertInt("buffaloExpertYieldPotential");
-
-  const structure =
-    buffaloExpertInt("buffaloExpertStructure");
-
-  const ready =
-    [
-      udderTeat,
-      feetAndLegs,
-      yieldPotential,
-      structure
-    ].every(v => v !== null);
-
-  const total =
-    ready
-      ? Math.round(
-          (udderTeat * 0.40) +
-          (feetAndLegs * 0.25) +
-          (yieldPotential * 0.20) +
-          (structure * 0.15)
-        )
-      : null;
-
-  const scoreInput =
-    $("#buffaloExpertScore");
-
-  if (scoreInput) {
-    scoreInput.value =
-      total === null
-        ? ""
-        : String(total);
-  }
+  return Number.isFinite(n)
+    ? n
+    : null;
 }
 
 function fillBuffaloGroundTruthFromModel(result) {
   if (
-    !state.training.canTrain ||
+    !state.training.buffaloCanTrain ||
     !buffaloTrainingBox
   ) {
     return;
@@ -860,18 +950,41 @@ function fillBuffaloGroundTruthFromModel(result) {
   const c =
     result?.compositeScores || {};
 
+  const s =
+    result?.subscores || {};
+
   const values = {
-    buffaloExpertUdderTeat:
-      c.udderTeat,
+    buffaloExpertUdderTeat: c.udderTeat,
+    buffaloExpertFeetAndLegs: c.feetAndLegs,
+    buffaloExpertYieldPotential: c.yieldPotential,
+    buffaloExpertStructure: c.structure,
+    buffaloExpertScore: result?.score,
 
-    buffaloExpertFeetAndLegs:
-      c.feetAndLegs,
+    buffaloGTUdderDepth: s.udderDepth,
+    buffaloGTForeUdderAttachment: s.foreUdderAttachment,
+    buffaloGTRearUdderHeight: s.rearUdderHeight,
+    buffaloGTRearUdderWidth: s.rearUdderWidth,
+    buffaloGTCentralSupport: s.centralSupport,
+    buffaloGTTeatPlacement: s.teatPlacement,
+    buffaloGTTeatDirection: s.teatDirection,
+    buffaloGTTeatLength: s.teatLength,
+    buffaloGTUdderBalance: s.udderBalance,
 
-    buffaloExpertYieldPotential:
-      c.yieldPotential,
+    buffaloGTHockAngle: s.hockAngle,
+    buffaloGTRearLegsRearView: s.rearLegsRearView,
+    buffaloGTHeelHeight: s.heelHeight,
+    buffaloGTPasternStrength: s.pasternStrength,
+    buffaloGTFootAngle: s.footAngle,
 
-    buffaloExpertStructure:
-      c.structure
+    buffaloGTBodyDepth: s.bodyDepth,
+    buffaloGTBodyLength: s.bodyLength,
+    buffaloGTRibStructureAngularity: s.ribStructureAngularity,
+    buffaloGTStrengthVigor: s.strengthVigor,
+
+    buffaloGTRumpLength: s.rumpLength,
+    buffaloGTRumpWidth: s.rumpWidth,
+    buffaloGTRumpAngle: s.rumpAngle,
+    buffaloGTToplineBackLoin: s.toplineBackLoin
   };
 
   for (
@@ -880,15 +993,21 @@ function fillBuffaloGroundTruthFromModel(result) {
   ) {
     const el = $("#" + id);
 
-    if (
-      el &&
-      Number.isInteger(Number(value)) &&
-      Number(value) >= 65 &&
-      Number(value) <= 100
-    ) {
-      el.value =
-        String(Number(value));
-    }
+    if (!el) continue;
+
+    el.value =
+      value === null ||
+      value === undefined ||
+      value === ""
+        ? ""
+        : String(value);
+  }
+
+  const quality =
+    $("#buffaloImageQualityAccepted");
+
+  if (quality) {
+    quality.checked = false;
   }
 
   const note =
@@ -898,57 +1017,119 @@ function fillBuffaloGroundTruthFromModel(result) {
     note.value = "";
   }
 
-  recalcBuffaloExpertTotal();
-
   buffaloTrainingBox
     .classList.remove("hide");
 }
 
 function readBuffaloGroundTruth() {
-  const expertCompositeScores = {
-    udderTeat:
-      buffaloExpertInt(
-        "buffaloExpertUdderTeat"
-      ),
-
-    feetAndLegs:
-      buffaloExpertInt(
-        "buffaloExpertFeetAndLegs"
-      ),
-
-    yieldPotential:
-      buffaloExpertInt(
-        "buffaloExpertYieldPotential"
-      ),
-
-    structure:
-      buffaloExpertInt(
-        "buffaloExpertStructure"
-      )
-  };
-
-  if (
-    Object.values(expertCompositeScores)
-      .some(v => v === null)
-  ) {
-    throw new Error(
-      "أكمل Ground Truth للأقسام الأربعة بدرجات من 65 إلى 100."
-    );
-  }
-
   return {
-    expertCompositeScores,
+    score:
+      buffaloGroundTruthValue(
+        "buffaloExpertScore"
+      ),
+
+    compositeScores: {
+      udderTeat:
+        buffaloGroundTruthValue(
+          "buffaloExpertUdderTeat"
+        ),
+
+      feetAndLegs:
+        buffaloGroundTruthValue(
+          "buffaloExpertFeetAndLegs"
+        ),
+
+      yieldPotential:
+        buffaloGroundTruthValue(
+          "buffaloExpertYieldPotential"
+        ),
+
+      structure:
+        buffaloGroundTruthValue(
+          "buffaloExpertStructure"
+        )
+    },
+
+    subscores: {
+      udderDepth:
+        buffaloGroundTruthValue("buffaloGTUdderDepth"),
+
+      foreUdderAttachment:
+        buffaloGroundTruthValue("buffaloGTForeUdderAttachment"),
+
+      rearUdderHeight:
+        buffaloGroundTruthValue("buffaloGTRearUdderHeight"),
+
+      rearUdderWidth:
+        buffaloGroundTruthValue("buffaloGTRearUdderWidth"),
+
+      centralSupport:
+        buffaloGroundTruthValue("buffaloGTCentralSupport"),
+
+      teatPlacement:
+        buffaloGroundTruthValue("buffaloGTTeatPlacement"),
+
+      teatDirection:
+        buffaloGroundTruthValue("buffaloGTTeatDirection"),
+
+      teatLength:
+        buffaloGroundTruthValue("buffaloGTTeatLength"),
+
+      udderBalance:
+        buffaloGroundTruthValue("buffaloGTUdderBalance"),
+
+      hockAngle:
+        buffaloGroundTruthValue("buffaloGTHockAngle"),
+
+      rearLegsRearView:
+        buffaloGroundTruthValue("buffaloGTRearLegsRearView"),
+
+      heelHeight:
+        buffaloGroundTruthValue("buffaloGTHeelHeight"),
+
+      pasternStrength:
+        buffaloGroundTruthValue("buffaloGTPasternStrength"),
+
+      footAngle:
+        buffaloGroundTruthValue("buffaloGTFootAngle"),
+
+      bodyDepth:
+        buffaloGroundTruthValue("buffaloGTBodyDepth"),
+
+      bodyLength:
+        buffaloGroundTruthValue("buffaloGTBodyLength"),
+
+      ribStructureAngularity:
+        buffaloGroundTruthValue("buffaloGTRibStructureAngularity"),
+
+      strengthVigor:
+        buffaloGroundTruthValue("buffaloGTStrengthVigor"),
+
+      rumpLength:
+        buffaloGroundTruthValue("buffaloGTRumpLength"),
+
+      rumpWidth:
+        buffaloGroundTruthValue("buffaloGTRumpWidth"),
+
+      rumpAngle:
+        buffaloGroundTruthValue("buffaloGTRumpAngle"),
+
+      toplineBackLoin:
+        buffaloGroundTruthValue("buffaloGTToplineBackLoin")
+    },
+
+    imageQualityAccepted:
+      !!$("#buffaloImageQualityAccepted")?.checked,
 
     expertNote:
       String(
-        $("#buffaloExpertNote")
-          ?.value || ""
+        $("#buffaloExpertNote")?.value || ""
       ).trim()
   };
 }
 
 async function saveBuffaloExpertGroundTruth() {
-  if (!state.training.canTrain) return;
+  if (!state.training.buffaloCanTrain) return;
 
   if (
     !state.analysis ||
@@ -966,7 +1147,7 @@ async function saveBuffaloExpertGroundTruth() {
     hideMsg();
 
     const ctx = contextFromUrl();
-    const expert =
+    const groundTruth =
       readBuffaloGroundTruth();
 
     saveBuffaloGroundTruthBtn.disabled = true;
@@ -1008,17 +1189,7 @@ async function saveBuffaloExpertGroundTruth() {
           analysis:
             state.analysis,
 
-          modelScore:
-            state.analysis.score,
-
-          modelCompositeScores:
-            state.analysis.compositeScores,
-
-          expertCompositeScores:
-            expert.expertCompositeScores,
-
-          expertNote:
-            expert.expertNote
+          groundTruth
         })
       }
     );
@@ -1277,12 +1448,19 @@ function renderAnalysis(result) {
       .add("hide");
   }
 
-  if (
+  const trainingPanel =
     String(
       view.trainingPanel || "none"
-    ) === "cow"
-  ) {
+    );
+
+  if (trainingPanel === "cow") {
     fillExpertGroundTruthFromModel(
+      result
+    );
+  }
+
+  if (trainingPanel === "buffalo") {
+    fillBuffaloGroundTruthFromModel(
       result
     );
   }
@@ -1499,14 +1677,6 @@ if (saveGroundTruthBtn) {
     saveExpertGroundTruth();
   });
 }
-
-$$(".buffalo-expert-score-input")
-  .forEach(input => {
-    input.addEventListener(
-      "input",
-      recalcBuffaloExpertTotal
-    );
-  });
 
 if (saveBuffaloGroundTruthBtn) {
   saveBuffaloGroundTruthBtn.addEventListener("click", e => {
