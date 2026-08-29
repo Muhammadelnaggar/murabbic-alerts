@@ -76010,7 +76010,7 @@ function dairyTraitsGradeSrv(score) {
 const DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV = "buffalo_murabbik";
 
 const DAIRY_TRAITS_BUFFALO_PROMPT_VERSION_SRV =
-  "dairy_traits_buffalo_murabbik_v1_2026-08-29";
+  "dairy_traits_buffalo_murabbik_v2_2026-08-29";
   const DAIRY_TRAITS_BUFFALO_TRAINING_COLLECTION_SRV =
   "dairy_traits_buffalo_training_corrections";
 
@@ -76556,12 +76556,60 @@ Different buffaloes should receive similar scores only when their visible morpho
 A. MAMMARY SYSTEM — SUPPORTING COMPOSITE /40
 ==================================================
 
+MAMMARY MERIT CALIBRATION:
+
+These are FUNCTIONAL MERIT subscores.
+They are NOT linear-expression scores, NOT percentages, and NOT a rule that "average-looking" must equal the numerical midpoint.
+
+Interpret the scale as follows when the trait is reliably visible:
+
+For a /7 trait:
+- 7 = near functional optimum
+- 6 = clearly good functional merit
+- 5 = acceptable functional merit with only a mild limitation
+- 3–4 = clear visible weakness
+- 0–2 = marked or severe visible defect
+
+For a /5 trait:
+- 5 = near functional optimum
+- 4 = clearly good functional merit
+- 3 = acceptable only when a real mild/moderate limitation is visible
+- 2 = clear visible weakness
+- 0–1 = marked or severe visible defect
+
+For a /4 trait:
+- 4 = near functional optimum
+- 3 = clearly good functional merit
+- 2 = clear moderate visible weakness
+- 0–1 = marked or severe visible defect
+
+For a /3 trait:
+- 3 = near functional optimum
+- 2 = functional with a real mild limitation
+- 1 = clear visible weakness
+- 0 = severe visible defect
+
+Do NOT default a trait to the numerical midpoint merely because it is described as moderate, ordinary, non-extreme, or not exceptional.
+
+A trait that is visibly functional and has no meaningful defect should score in the GOOD functional band, even if it is not extreme or show-ring ideal.
+
+Do not score a mammary subtrait below half of its available points unless a clear visible functional weakness supports that deduction.
+
+Do not penalize the absence of extremity.
+"Not very high", "not very wide", or "not exceptionally strong" is not itself a defect.
+
+Avoid duplicate punishment:
+one visible weakness may influence more than one anatomical trait only when that weakness is independently visible in each trait.
+Do not copy the same observation across several subscores merely to create a larger penalty.
+
 1) udderDepth — /7
 Judge udder-floor position and functional depth relative to the hock and the buffalo's own anatomy.
 Preferred:
 - functionally supported depth
 - safe udder-floor position relative to the hock
 - neither markedly pendulous nor excessively shallow
+A safely supported udder floor above the hock is already functionally favorable.
+Do not withhold a good score merely because the udder is not exceptionally shallow.
 Penalize according to severity:
 - marked descent toward or below the hock
 - pendulous appearance
@@ -76572,42 +76620,53 @@ Do not use "higher is always better."
 2) foreUdderAttachment — /5
 Judge visible fore-udder attachment to the abdominal wall.
 Preferred:
-- strong
-- smooth
-- well integrated
-- functionally extended
+- secure attachment
+- smooth blending
+- good functional integration
+- adequate visible extension
+A smooth, secure attachment of moderate extension can score well.
+Do not penalize merely because the attachment is not exceptionally long.
 Penalize:
-- loose attachment
+- visible looseness
 - abrupt separation
-- short or weak visible attachment
-- obvious lack of support
+- clearly weak or poorly supported attachment
+- distinctly inadequate functional extension
 
 3) rearUdderHeight — /5
 Judge visible height of rear udder attachment relative to pelvic anatomy.
 Preferred:
-- functionally high
-- clearly extended rear attachment
-Penalize distinctly low attachment.
+- functionally adequate to high attachment
+- secure visible rear support
+Moderate-to-high functional height can score well.
+"Not extremely high" is not a weakness.
+Penalize only when the rear attachment is distinctly low or visibly weak.
 Do not reward anatomical extremity merely because it is higher.
 
 4) rearUdderWidth — /5
 Judge width and functional capacity of the rear udder attachment.
 Preferred:
-- good functional width
+- adequate to good functional width
 - strong attachment
 - balanced with the animal
+Adequate width relative to the buffalo's own anatomy can score well.
+"Not very wide" is not by itself a weakness.
+Penalize clear functional narrowness or weak attachment.
 Do not confuse milk fullness or udder bulk with true attachment width.
 Do not assume maximum width is automatically optimal.
 
 5) centralSupport — /4
 Judge visible median/suspensory support and rear cleft when reliably visible.
+Judge FUNCTIONAL SUPPORT, not how dramatic the cleft looks.
 Preferred:
 - clear functional central support
-- adequate division and support
+- quarters visibly held and supported
+- adequate division when visible
+A modest cleft can still represent good functional support when the udder floor and quarters are visibly supported.
 Penalize:
 - obvious weakening
 - visible loss of structural support
 - marked associated pendulousness
+Do not assign a low score merely because the cleft is not deep or dramatic.
 Return null if it cannot be judged reliably.
 
 6) teatPlacement — /5
@@ -76616,18 +76675,22 @@ Preferred:
 - balanced placement
 - practical functional distribution
 - neither excessively close nor excessively wide
-Both severe convergence and severe divergence are undesirable.
+If placement is visibly functional with no meaningful deviation, score it in the good functional band.
+Do not default to 3/5 merely because placement is not visually perfect.
+Penalize true functional convergence, divergence, or clear imbalance according to severity.
 
 7) teatDirection — /3
 Judge visible teat orientation.
 Preferred:
 - approximately vertical functional orientation
+Near-vertical functional direction with no meaningful deviation deserves a high score.
 Penalize marked inward, outward, forward, or backward deviation according to severity.
 
 8) teatLength — /3
 Judge RELATIVE visible teat length.
 Preferred:
 - moderate functional length
+Moderate functional length is the optimum, not a midpoint condition.
 Penalize both excessively short and excessively long teats.
 Never estimate centimeters.
 
@@ -76639,7 +76702,6 @@ Preferred:
 - reasonably symmetrical
 Penalize clear asymmetry or imbalance.
 Do not heavily double-penalize the same defect already represented by a specific attachment or support trait.
-
 ==================================================
 B. FEET AND LEGS — SUPPORTING COMPOSITE /25
 ==================================================
