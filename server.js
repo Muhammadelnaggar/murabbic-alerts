@@ -76298,7 +76298,211 @@ function dairyTraitsAnimalTypeArSrv(speciesKey) {
       ? "أبقار"
       : "";
 }
+async function dairyTraitsVerifyImageSpeciesSrv({
+  apiKey,
+  sideImage,
+  rearImage
+} = {}) {
+  const speciesPrompt = `
+You are Murabbik's strict cattle-species verification gate.
+Your ONLY task is to classify the animal species visible in each TARGET image before any dairy-traits evaluation starts.
 
+Allowed labels only:
+- cow = cattle (Bos taurus / Bos indicus / dairy cattle)
+- buffalo = domestic water buffalo (Bubalus bubalis)
+- uncertain = species cannot be determined reliably from that image
+
+Rules:
+- Classify the SIDE image and the REAR image independently.
+- Do not score dairy traits.
+- Do not assess conformation, udder quality, feet, body condition, production, breed quality, or health.
+- Do not infer the expected species from context; use the images only.
+- If an image is too unclear to distinguish cow from buffalo reliably, return uncertain for that image.
+- Never force a cow/buffalo label when uncertain.
+
+Return JSON only:
+{
+  "sideSpecies": "cow|buffalo|uncertain",
+  "rearSpecies": "cow|buffalo|uncertain"
+}
+`.trim();
+
+  try {
+    const r = await fetch(
+      "https://api.openai.com/v1/responses",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model:
+            process.env.OPENAI_DAIRY_TRAITS_MODEL ||
+            process.env.OPENAI_BCS_MODEL ||
+            "gpt-4.1",
+
+          input: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "input_text",
+                  text: speciesPrompt
+                },
+                {
+                  type: "input_text",
+                  text: "TARGET side image."
+                },
+                {
+                  type: "input_image",
+                  image_url: sideImage,
+                  detail: "high"
+                },
+                {
+                  type: "input_text",
+                  text: "TARGET rear image."
+                },
+                {
+                  type: "input_image",
+                  image_url: rearImage,
+                  detail: "high"
+                }
+              ]
+            }
+          ],
+
+          temperature: 0,
+          max_output_tokens: 120
+        })
+      }
+    );
+
+    const j =
+      await r.json().catch(() => ({}));
+
+    if (!r.ok) {
+      console.error(
+        "Dairy Traits species verification OpenAI error:",
+        {
+          status: r.status,
+          message:
+            j?.error?.message ||
+            j?.message ||
+            `openai_http_${r.status}`,
+          type: j?.error?.type || null,
+          code: j?.error?.code || null
+        }
+      );
+
+      return {
+        ok: false,
+        statusCode: 503,
+        error:
+          "dairy_traits_species_verification_unavailable",
+        message:
+          "❌ تعذّر التحقق من نوع الحيوان في الصور الآن. حاول مرة أخرى."
+      };
+    }
+
+    const parsed =
+      bcsExtractJsonTextSrv(
+        bcsOpenAIOutputTextSrv(j)
+      );
+
+    const allowed =
+      new Set([
+        "cow",
+        "buffalo",
+        "uncertain"
+      ]);
+
+    const sideSpecies =
+      String(
+        parsed?.sideSpecies || ""
+      )
+        .trim()
+        .toLowerCase();
+
+    const rearSpecies =
+      String(
+        parsed?.rearSpecies || ""
+      )
+        .trim()
+        .toLowerCase();
+
+    if (
+      !allowed.has(sideSpecies) ||
+      !allowed.has(rearSpecies)
+    ) {
+      return {
+        ok: false,
+        statusCode: 400,
+        error:
+          "dairy_traits_species_verification_invalid",
+        message:
+          "❌ لم أتمكن من التحقق من نوع الحيوان في الصورتين. أعد التصوير بوضوح من الجانب والخلف."
+      };
+    }
+
+    if (
+      sideSpecies === "uncertain" ||
+      rearSpecies === "uncertain"
+    ) {
+      return {
+        ok: false,
+        statusCode: 400,
+        error:
+          "dairy_traits_species_verification_uncertain",
+        sideSpecies,
+        rearSpecies,
+        message:
+          "❌ نوع الحيوان غير واضح بما يكفي في الصورتين. أعد التصوير بحيث يظهر الحيوان كاملًا بوضوح."
+      };
+    }
+
+    if (sideSpecies !== rearSpecies) {
+      return {
+        ok: false,
+        statusCode: 409,
+        error:
+          "dairy_traits_image_pair_species_mismatch",
+        sideSpecies,
+        rearSpecies,
+        message:
+          "❌ الصورتان لا تظهران نفس نوع الحيوان. التقط الصورتين لنفس الحيوان قبل التحليل."
+      };
+    }
+
+    return {
+      ok: true,
+
+      speciesKey:
+        sideSpecies,
+
+      sideSpecies,
+      rearSpecies,
+
+      responseId:
+        j?.id || null
+    };
+
+  } catch (e) {
+    console.error(
+      "Dairy Traits species verification failed:",
+      e.message || e
+    );
+
+    return {
+      ok: false,
+      statusCode: 503,
+      error:
+        "dairy_traits_species_verification_failed",
+      message:
+        "❌ تعذّر التحقق من نوع الحيوان في الصور الآن. حاول مرة أخرى."
+    };
+  }
+}
 function dairyTraitsIsLactatingSrv(animalDoc = {}) {
   if (animalDoc.inMilk === true) return true;
 
@@ -77909,6 +78113,43 @@ if (cooldown.blocked) {
   });
 }
 
+const imageSpeciesGate =
+  await dairyTraitsVerifyImageSpeciesSrv({
+    apiKey,
+    sideImage,
+    rearImage
+  });
+
+if (!imageSpeciesGate.ok) {
+  return res
+    .status(
+      imageSpeciesGate.statusCode ||
+      400
+    )
+    .json(imageSpeciesGate);
+}
+
+if (
+  imageSpeciesGate.speciesKey !==
+  speciesKey
+) {
+  return res.status(409).json({
+    ok: false,
+
+    error:
+      "dairy_traits_image_species_mismatch",
+
+    expectedSpeciesKey:
+      speciesKey,
+
+    detectedSpeciesKey:
+      imageSpeciesGate.speciesKey,
+
+    message:
+      "❌ الصور المرفوعة لا تطابق نوع الحيوان المسجل. تأكد من تصوير الحيوان الصحيح قبل التحليل."
+  });
+}
+
 const attempt =
   await dairyTraitsConsumeAiAttemptSrv({
     uid,
@@ -78419,6 +78660,11 @@ if (speciesKey === "buffalo") {
 
     speciesKey:
       "buffalo",
+      imageSpeciesVerified:
+  true,
+
+imageSpeciesKey:
+  imageSpeciesGate.speciesKey,
 
     evaluationFramework:
       DAIRY_TRAITS_BUFFALO_FRAMEWORK_SRV,
@@ -78636,6 +78882,11 @@ return res.json({
   ok: true,
   animalType: "أبقار",
 speciesKey: "cow",
+imageSpeciesVerified:
+  true,
+
+imageSpeciesKey:
+  imageSpeciesGate.speciesKey,
 evaluationFramework: "cow_murabbik",
 
   score,
