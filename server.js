@@ -79316,6 +79316,8 @@ const confidence =
 
 const rawModelScore =
   score;
+
+const cowTrainingAdmin =
   dairyTraitsIsTrainingAdminSrv(
     req.userId
   );
