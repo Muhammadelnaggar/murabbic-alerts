@@ -170,12 +170,14 @@
            readonly>
   </label>
 
-  <label>ملاحظة الخبير
-    <textarea class="input"
-              id="expertNote"
-              rows="3"
-              maxlength="1200"></textarea>
-  </label>
+  <label>ملاحظة الخبير *
+  <textarea class="input"
+            id="expertNote"
+            rows="3"
+            maxlength="1200"
+            required
+            aria-required="true"></textarea>
+</label>
 
   <div class="actions-bar inline">
     <button id="saveGroundTruthBtn"
@@ -335,12 +337,14 @@
     </div>
   </details>
 
-  <label>ملاحظة الخبير
-    <textarea class="input"
-              id="buffaloExpertNote"
-              rows="3"
-              maxlength="1200"></textarea>
-  </label>
+  <label>ملاحظة الخبير *
+  <textarea class="input"
+            id="buffaloExpertNote"
+            rows="3"
+            maxlength="1200"
+            required
+            aria-required="true"></textarea>
+</label>
 
   <div class="actions-bar inline">
     <button id="saveBuffaloGroundTruthBtn"
@@ -911,19 +915,26 @@ function readExpertGroundTruth() {
     );
   }
 
-  const expertScore =
+    const expertScore =
     Object.values(expertBreakdown)
       .reduce((a, b) => a + b, 0);
+
+  const expertNote =
+    String(
+      $("#expertNote")?.value || ""
+    ).trim();
+
+  if (!expertNote) {
+    throw new Error(
+      "اكتب ملاحظة الخبير قبل حفظ Ground Truth."
+    );
+  }
 
   return {
     expertScore,
     expertBreakdown,
     expertUdderSubscores,
-
-    expertNote:
-      String(
-        $("#expertNote")?.value || ""
-      ).trim()
+    expertNote
   };
 }
 function buffaloGroundTruthValue(id) {
@@ -1042,7 +1053,18 @@ function fillBuffaloGroundTruthFromModel(result) {
 }
 
 function readBuffaloGroundTruth() {
-   return {
+  const expertNote =
+    String(
+      $("#buffaloExpertNote")?.value || ""
+    ).trim();
+
+  if (!expertNote) {
+    throw new Error(
+      "اكتب ملاحظة الخبير قبل حفظ Ground Truth للجاموس."
+    );
+  }
+
+  return {
     compositeScores: {
       udderTeat:
         buffaloGroundTruthValue(
@@ -1136,10 +1158,7 @@ function readBuffaloGroundTruth() {
     imageQualityAccepted:
       !!$("#buffaloImageQualityAccepted")?.checked,
 
-    expertNote:
-      String(
-        $("#buffaloExpertNote")?.value || ""
-      ).trim()
+        expertNote
   };
 }
 

@@ -76046,6 +76046,66 @@ function dairyTraitsBuffaloCompositeDeltaSrv(expert = {}, model = {}) {
 async function dairyTraitsBuffaloBuildExpertCalibrationPromptSrv() {
   if (!db) return "";
 
+  const subscoreLabels = {
+    udderDepth: "udder depth",
+    foreUdderAttachment: "fore udder attachment",
+    rearUdderHeight: "rear udder height",
+    rearUdderWidth: "rear udder width",
+    centralSupport: "central support",
+    teatPlacement: "teat placement",
+    teatDirection: "teat direction",
+    teatLength: "teat length",
+    udderBalance: "udder balance",
+
+    hockAngle: "hock angle",
+    rearLegsRearView: "rear legs rear view",
+    heelHeight: "heel height",
+    pasternStrength: "pastern strength",
+    footAngle: "foot angle",
+
+    bodyDepth: "body depth",
+    bodyLength: "body length",
+    ribStructureAngularity: "rib structure/angularity",
+    strengthVigor: "strength/vigor",
+
+    rumpLength: "rump length",
+    rumpWidth: "rump width",
+    rumpAngle: "rump angle",
+    toplineBackLoin: "topline/back/loin"
+  };
+
+  const valueChanged = (a, b) => {
+    const aMissing =
+      a === null ||
+      a === undefined ||
+      a === "";
+
+    const bMissing =
+      b === null ||
+      b === undefined ||
+      b === "";
+
+    if (aMissing || bMissing) {
+      return aMissing !== bMissing;
+    }
+
+    const an = Number(a);
+    const bn = Number(b);
+
+    return (
+      Number.isFinite(an) &&
+      Number.isFinite(bn) &&
+      an !== bn
+    );
+  };
+
+  const displayValue = v =>
+    v === null ||
+    v === undefined ||
+    v === ""
+      ? "not reliably visible"
+      : String(v);
+
   try {
     const snap =
       await db
@@ -76061,16 +76121,30 @@ async function dairyTraitsBuffaloBuildExpertCalibrationPromptSrv() {
         .map(doc => doc.data() || {})
         .filter(r => {
           const predicted =
-            Number(r.prediction?.score);
+            Number(
+              r.prediction?.score
+            );
 
           const corrected =
-            Number(r.groundTruth?.score);
+            Number(
+              r.groundTruth?.score
+            );
 
           const modelComposite =
-            r.prediction?.compositeScores || {};
+            r.prediction?.compositeScores ||
+            {};
 
           const expertComposite =
-            r.groundTruth?.compositeScores || {};
+            r.groundTruth?.compositeScores ||
+            {};
+
+          const modelSubscores =
+            r.prediction?.subscores ||
+            {};
+
+          const expertSubscores =
+            r.groundTruth?.subscores ||
+            {};
 
           const compositeChanged =
             [
@@ -76078,15 +76152,23 @@ async function dairyTraitsBuffaloBuildExpertCalibrationPromptSrv() {
               "feetAndLegs",
               "yieldPotential",
               "structure"
-            ].some(key =>
-              Number.isFinite(
-                Number(modelComposite?.[key])
-              ) &&
-              Number.isFinite(
-                Number(expertComposite?.[key])
-              ) &&
-              Number(modelComposite[key]) !==
-                Number(expertComposite[key])
+            ].some(
+              key =>
+                valueChanged(
+                  modelComposite?.[key],
+                  expertComposite?.[key]
+                )
+            );
+
+          const subscoreChanged =
+            Object.keys(
+              subscoreLabels
+            ).some(
+              key =>
+                valueChanged(
+                  modelSubscores?.[key],
+                  expertSubscores?.[key]
+                )
             );
 
           return (
@@ -76094,43 +76176,89 @@ async function dairyTraitsBuffaloBuildExpertCalibrationPromptSrv() {
             Number.isFinite(corrected) &&
             (
               predicted !== corrected ||
-              compositeChanged
+              compositeChanged ||
+              subscoreChanged
             )
           );
         })
         .slice(0, 6);
 
-    if (!rows.length) return "";
+    if (!rows.length) {
+      return "";
+    }
 
     const lines =
-      rows.map((r, idx) => {
-        const m =
-          r.prediction?.compositeScores || {};
+      rows.map(
+        (r, idx) => {
+          const m =
+            r.prediction
+              ?.compositeScores ||
+            {};
 
-        const e =
-          r.groundTruth?.compositeScores || {};
+          const e =
+            r.groundTruth
+              ?.compositeScores ||
+            {};
 
-        const note =
-          dairyTraitsShortTextSrv(
-            r.groundTruth?.expertNote || "",
-            220
-          );
+          const modelSubscores =
+            r.prediction?.subscores ||
+            {};
 
-        return [
-          `${idx + 1}) Previous reviewed buffalo: model final ${r.prediction?.score}/100; expert final ${r.groundTruth?.score}/100.`,
-          `Udder/teat ${m.udderTeat}→${e.udderTeat}; feet/legs ${m.feetAndLegs}→${e.feetAndLegs}; yield potential ${m.yieldPotential}→${e.yieldPotential}; structure ${m.structure}→${e.structure}.`,
-          note
-            ? `Expert note: ${note}`
-            : ""
-        ]
-          .filter(Boolean)
-          .join(" ");
-      });
+          const expertSubscores =
+            r.groundTruth?.subscores ||
+            {};
+
+          const changedSubscores =
+            Object.entries(
+              subscoreLabels
+            )
+              .filter(
+                ([key]) =>
+                  valueChanged(
+                    modelSubscores?.[key],
+                    expertSubscores?.[key]
+                  )
+              )
+              .map(
+                ([key, label]) =>
+                  `${label} ${displayValue(
+                    modelSubscores?.[key]
+                  )}→${displayValue(
+                    expertSubscores?.[key]
+                  )}`
+              )
+              .join("; ");
+
+          const note =
+            dairyTraitsShortTextSrv(
+              r.groundTruth
+                ?.expertNote ||
+                "",
+              220
+            );
+
+          return [
+            `${idx + 1}) Previous reviewed buffalo: model final ${r.prediction?.score}/100; expert final ${r.groundTruth?.score}/100.`,
+
+            `Udder/teat ${m.udderTeat}→${e.udderTeat}; feet/legs ${m.feetAndLegs}→${e.feetAndLegs}; yield potential ${m.yieldPotential}→${e.yieldPotential}; structure ${m.structure}→${e.structure}.`,
+
+            changedSubscores
+              ? `Changed detailed traits: ${changedSubscores}.`
+              : "",
+
+            note
+              ? `Expert note: ${note}`
+              : ""
+          ]
+            .filter(Boolean)
+            .join(" ");
+        }
+      );
 
     return `
 Expert dairy-buffalo calibration memory from Dr. Mohamed:
 Use these reviewed corrections only as calibration guidance when the CURRENT TARGET shows similar visible morphology.
-Do not copy a previous total or composite score blindly.
+Do not copy a previous total, composite score, or detailed-trait score blindly.
 Judge the current buffalo independently from its two images, then use the expert corrections only to improve calibration of comparable visible traits.
 ${lines.join("\n")}
 `.trim();
@@ -76144,7 +76272,6 @@ ${lines.join("\n")}
     return "";
   }
 }
-
 
 function dairyTraitsSpeciesKeySrv(animalDoc = {}) {
   const raw = [
@@ -76787,6 +76914,29 @@ function dairyTraitsShortTextSrv(v, max = 700) {
 async function dairyTraitsCowBuildExpertCalibrationPromptSrv() {
   if (!db) return "";
 
+  const udderSubscoreLabels = {
+    udderDepth:
+      "udder depth",
+
+    rearUdder:
+      "rear udder",
+
+    teatPlacement:
+      "teat placement",
+
+    udderCleft:
+      "udder cleft",
+
+    foreUdder:
+      "fore udder",
+
+    teats:
+      "teats",
+
+    udderBalanceTexture:
+      "udder balance/texture"
+  };
+
   try {
     const snap =
       await db
@@ -76799,19 +76949,38 @@ async function dairyTraitsCowBuildExpertCalibrationPromptSrv() {
 
     const rows =
       snap.docs
-        .map(doc => doc.data() || {})
+        .map(
+          doc =>
+            doc.data() || {}
+        )
         .filter(r => {
           const predicted =
-            Number(r.prediction?.score);
+            Number(
+              r.prediction?.score
+            );
 
           const corrected =
-            Number(r.groundTruth?.score);
+            Number(
+              r.groundTruth?.score
+            );
 
           const modelBreakdown =
-            r.prediction?.breakdown || {};
+            r.prediction?.breakdown ||
+            {};
 
           const expertBreakdown =
-            r.groundTruth?.breakdown || {};
+            r.groundTruth?.breakdown ||
+            {};
+
+          const modelUdderSubscores =
+            r.prediction
+              ?.udderSubscores ||
+            {};
+
+          const expertUdderSubscores =
+            r.groundTruth
+              ?.udderSubscores ||
+            {};
 
           const breakdownChanged =
             [
@@ -76820,59 +76989,157 @@ async function dairyTraitsCowBuildExpertCalibrationPromptSrv() {
               "dairyStrength",
               "frontEndAndCapacity",
               "rump"
-            ].some(key =>
-              Number.isFinite(
-                Number(modelBreakdown?.[key])
-              ) &&
-              Number.isFinite(
-                Number(expertBreakdown?.[key])
-              ) &&
-              Number(modelBreakdown[key]) !==
-                Number(expertBreakdown[key])
+            ].some(
+              key =>
+                Number.isFinite(
+                  Number(
+                    modelBreakdown
+                      ?.[key]
+                  )
+                ) &&
+                Number.isFinite(
+                  Number(
+                    expertBreakdown
+                      ?.[key]
+                  )
+                ) &&
+                Number(
+                  modelBreakdown[key]
+                ) !==
+                  Number(
+                    expertBreakdown[key]
+                  )
+            );
+
+          const udderSubscoresChanged =
+            Object.keys(
+              udderSubscoreLabels
+            ).some(
+              key =>
+                Number.isFinite(
+                  Number(
+                    modelUdderSubscores
+                      ?.[key]
+                  )
+                ) &&
+                Number.isFinite(
+                  Number(
+                    expertUdderSubscores
+                      ?.[key]
+                  )
+                ) &&
+                Number(
+                  modelUdderSubscores[key]
+                ) !==
+                  Number(
+                    expertUdderSubscores[key]
+                  )
             );
 
           return (
-            Number.isFinite(predicted) &&
-            Number.isFinite(corrected) &&
+            Number.isFinite(
+              predicted
+            ) &&
+            Number.isFinite(
+              corrected
+            ) &&
             (
               predicted !== corrected ||
-              breakdownChanged
+              breakdownChanged ||
+              udderSubscoresChanged
             )
           );
         })
         .slice(0, 6);
 
-    if (!rows.length) return "";
+    if (!rows.length) {
+      return "";
+    }
 
     const lines =
-      rows.map((r, idx) => {
-        const m =
-          r.prediction?.breakdown || {};
+      rows.map(
+        (r, idx) => {
+          const m =
+            r.prediction
+              ?.breakdown ||
+            {};
 
-        const e =
-          r.groundTruth?.breakdown || {};
+          const e =
+            r.groundTruth
+              ?.breakdown ||
+            {};
 
-        const note =
-          dairyTraitsShortTextSrv(
-            r.groundTruth?.expertNote || "",
-            220
-          );
+          const modelUdderSubscores =
+            r.prediction
+              ?.udderSubscores ||
+            {};
 
-        return [
-          `${idx + 1}) Previous reviewed cow: model final ${r.prediction?.score}/100; expert final ${r.groundTruth?.score}/100.`,
-          `Udder ${m.udder}→${e.udder}; feet/legs ${m.feetAndLegs}→${e.feetAndLegs}; dairy strength ${m.dairyStrength}→${e.dairyStrength}; front/capacity ${m.frontEndAndCapacity}→${e.frontEndAndCapacity}; rump ${m.rump}→${e.rump}.`,
-          note
-            ? `Expert note: ${note}`
-            : ""
-        ]
-          .filter(Boolean)
-          .join(" ");
-      });
+          const expertUdderSubscores =
+            r.groundTruth
+              ?.udderSubscores ||
+            {};
+
+          const changedUdderSubscores =
+            Object.entries(
+              udderSubscoreLabels
+            )
+              .filter(
+                ([key]) =>
+                  Number.isFinite(
+                    Number(
+                      modelUdderSubscores
+                        ?.[key]
+                    )
+                  ) &&
+                  Number.isFinite(
+                    Number(
+                      expertUdderSubscores
+                        ?.[key]
+                    )
+                  ) &&
+                  Number(
+                    modelUdderSubscores[key]
+                  ) !==
+                    Number(
+                      expertUdderSubscores[key]
+                    )
+              )
+              .map(
+                ([key, label]) =>
+                  `${label} ${modelUdderSubscores[key]}→${expertUdderSubscores[key]}`
+              )
+              .join("; ");
+
+          const note =
+            dairyTraitsShortTextSrv(
+              r.groundTruth
+                ?.expertNote ||
+                "",
+              220
+            );
+
+          return [
+            `${idx + 1}) Previous reviewed cow: model final ${r.prediction?.score}/100; expert final ${r.groundTruth?.score}/100.`,
+
+            `Udder ${m.udder}→${e.udder}; feet/legs ${m.feetAndLegs}→${e.feetAndLegs}; dairy strength ${m.dairyStrength}→${e.dairyStrength}; front/capacity ${m.frontEndAndCapacity}→${e.frontEndAndCapacity}; rump ${m.rump}→${e.rump}.`,
+
+            changedUdderSubscores
+              ? `Changed detailed udder traits: ${changedUdderSubscores}.`
+              : "",
+
+            note
+              ? `Expert note: ${note}`
+              : ""
+          ]
+            .filter(Boolean)
+            .join(" ");
+        }
+      );
 
     return `
 Expert dairy-cow calibration memory from Dr. Mohamed:
 Use these reviewed cow corrections only as calibration guidance when the CURRENT TARGET shows comparable visible morphology.
-Do not copy a previous total or component score blindly.
+Do not copy a previous total, component score, or detailed-trait score blindly.
 Judge the current cow independently from its two images, then use the cow expert reviews to improve calibration of comparable visible traits.
 ${lines.join("\n")}
 `.trim();
@@ -78628,18 +78895,6 @@ app.post(
           1200
         );
 
-      if (!expertNote) {
-        return res.status(400).json({
-          ok: false,
-
-          error:
-            "dairy_traits_buffalo_training_expert_note_required",
-
-          message:
-            "❌ اكتب ملاحظة الخبير قبل حفظ Ground Truth للجاموس."
-        });
-      }
-
       const captures =
         body.captures &&
         typeof body.captures === "object"
@@ -78852,7 +79107,7 @@ app.post(
             )
           : null;
 
-            if (
+                 if (
         !expertCompositeScores ||
         !expertSubscores
       ) {
@@ -78864,6 +79119,53 @@ app.post(
 
           message:
             "❌ أكمل Ground Truth للأقسام الأربعة والصفات التفصيلية وفق مقياس الجاموس الحالي."
+        });
+      }
+
+      const buffaloCorrectionApplied =
+        [
+          "udderTeat",
+          "feetAndLegs",
+          "yieldPotential",
+          "structure"
+        ].some(
+          key =>
+            expertCompositeScores[key] !==
+            modelCompositeScores[key]
+        ) ||
+        subscoreKeys.some(
+          key =>
+            expertSubscores[key] !==
+            modelSubscores[key]
+        );
+
+      if (
+        buffaloCorrectionApplied &&
+        !expertNote
+      ) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_buffalo_training_expert_note_required",
+
+          message:
+            "❌ اكتب ملاحظة الخبير لتوضيح سبب التصحيح قبل حفظ Ground Truth."
+        });
+      }
+
+      if (
+        !buffaloCorrectionApplied &&
+        expertNote
+      ) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_buffalo_training_expert_note_not_allowed",
+
+          message:
+            "ℹ️ لا تُكتب ملاحظة خبير عند تطابق Ground Truth مع تقييم النموذج؛ الملاحظة مخصصة فقط عند إجراء تصحيح."
         });
       }
 
@@ -79466,7 +79768,7 @@ app.post(
           ? body.analysis
           : {};
 
-      const expertNote =
+              const expertNote =
         dairyTraitsShortTextSrv(
           body.expertNote ||
           body.note ||
@@ -79474,18 +79776,6 @@ app.post(
           "",
           1200
         );
-
-      if (!expertNote) {
-        return res.status(400).json({
-          ok: false,
-
-          error:
-            "dairy_traits_training_expert_note_required",
-
-          message:
-            "❌ اكتب ملاحظة الخبير قبل حفظ Ground Truth لسمات إنتاج اللبن."
-        });
-      }
 
           if (
   String(
@@ -79733,7 +80023,7 @@ app.post(
           expertUdderSubscores
         );
 
-      if (
+           if (
         expertUdderSum !==
         expertBreakdown.udder
       ) {
@@ -79745,6 +80035,50 @@ app.post(
 
           message:
             `❌ مجموع سمات الضرع الفرعية = ${expertUdderSum}/40، بينما درجة الضرع = ${expertBreakdown.udder}/40. يجب أن يتطابقا.`
+        });
+      }
+
+      const cowCorrectionApplied =
+        Object.keys(expertBreakdown)
+          .some(
+            key =>
+              expertBreakdown[key] !==
+              modelBreakdown[key]
+          ) ||
+        Object.keys(expertUdderSubscores)
+          .some(
+            key =>
+              expertUdderSubscores[key] !==
+              modelUdderSubscores[key]
+          );
+
+      if (
+        cowCorrectionApplied &&
+        !expertNote
+      ) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_training_expert_note_required",
+
+          message:
+            "❌ اكتب ملاحظة الخبير لتوضيح سبب التصحيح قبل حفظ Ground Truth."
+        });
+      }
+
+      if (
+        !cowCorrectionApplied &&
+        expertNote
+      ) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_training_expert_note_not_allowed",
+
+          message:
+            "ℹ️ لا تُكتب ملاحظة خبير عند تطابق Ground Truth مع تقييم النموذج؛ الملاحظة مخصصة فقط عند إجراء تصحيح."
         });
       }
 
