@@ -78678,16 +78678,7 @@ app.post(
         });
       }
 
-      const expertScore =
-        dairyTraitsStrictIntRangeSrv(
-          groundTruth.score ??
-          body.expertScore ??
-          body.groundTruthScore,
-          0,
-          100
-        );
-
-      const expertCompositeScores =
+          const expertCompositeScores =
         dairyTraitsBuffaloMurabbikCompositeScoresSrv(
           groundTruth.compositeScores ||
           body.expertCompositeScores ||
@@ -78717,8 +78708,7 @@ app.post(
             )
           : null;
 
-      if (
-        expertScore === null ||
+            if (
         !expertCompositeScores ||
         !expertSubscores
       ) {
@@ -78729,7 +78719,7 @@ app.post(
             "dairy_traits_buffalo_training_ground_truth_invalid",
 
           message:
-            "❌ أكمل Ground Truth بدرجة نهائية والأقسام الأربعة والصفات التفصيلية وفق مقياس الجاموس الحالي."
+            "❌ أكمل Ground Truth للأقسام الأربعة والصفات التفصيلية وفق مقياس الجاموس الحالي."
         });
       }
 
@@ -78784,10 +78774,13 @@ app.post(
             : expertValue - modelValue;
       }
 
-      const expertCompositeSum =
+            const expertCompositeSum =
         dairyTraitsBuffaloMurabbikCompositeSumSrv(
           expertCompositeScores
         );
+
+      const expertScore =
+        expertCompositeSum;
 
       const modelCompositeSum =
         dairyTraitsBuffaloMurabbikCompositeSumSrv(
