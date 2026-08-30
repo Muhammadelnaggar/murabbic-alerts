@@ -76043,7 +76043,7 @@ function dairyTraitsBuffaloCompositeDeltaSrv(expert = {}, model = {}) {
   return out;
 }
 
-async function dairyTraitsBuffaloBuildExpertCalibrationPromptSrv(uid) {
+async function dairyTraitsBuffaloBuildExpertCalibrationPromptSrv() {
   if (!db) return "";
 
   try {
@@ -76060,13 +76060,6 @@ async function dairyTraitsBuffaloBuildExpertCalibrationPromptSrv(uid) {
       snap.docs
         .map(doc => doc.data() || {})
         .filter(r => {
-          if (
-            String(r.userId || "").trim() !==
-            String(uid || "").trim()
-          ) {
-            return false;
-          }
-
           const predicted =
             Number(r.prediction?.score);
 
@@ -76474,7 +76467,7 @@ function dairyTraitsBuffaloMurabbikCompositeSumSrv(
 }
 
 function dairyTraitsBuffaloPromptSrv(
-  _expertCalibrationPrompt = ""
+  expertCalibrationPrompt = ""
 ) {
   return `
 You are Murabbik's dairy-production traits vision judge for LACTATING DAIRY BUFFALO (Bubalus bubalis).
@@ -76680,6 +76673,13 @@ Do not under-score an excellent buffalo out of caution.
 Do not over-score a visually impressive but functionally weak buffalo.
 Give a clear judgment.
 
+${expertCalibrationPrompt ? `
+==================================================
+EXPERT REVIEW MEMORY — BUFFALO ONLY
+==================================================
+${expertCalibrationPrompt}
+` : ""}
+
 ==================================================
 OUTPUT RULES
 ==================================================
@@ -76784,7 +76784,108 @@ function dairyTraitsShortTextSrv(v, max = 700) {
     ? s.slice(0, max).trim()
     : s;
 }
+async function dairyTraitsCowBuildExpertCalibrationPromptSrv() {
+  if (!db) return "";
 
+  try {
+    const snap =
+      await db
+        .collection(
+          DAIRY_TRAITS_TRAINING_COLLECTION_SRV
+        )
+        .orderBy("createdAt", "desc")
+        .limit(20)
+        .get();
+
+    const rows =
+      snap.docs
+        .map(doc => doc.data() || {})
+        .filter(r => {
+          const predicted =
+            Number(r.prediction?.score);
+
+          const corrected =
+            Number(r.groundTruth?.score);
+
+          const modelBreakdown =
+            r.prediction?.breakdown || {};
+
+          const expertBreakdown =
+            r.groundTruth?.breakdown || {};
+
+          const breakdownChanged =
+            [
+              "udder",
+              "feetAndLegs",
+              "dairyStrength",
+              "frontEndAndCapacity",
+              "rump"
+            ].some(key =>
+              Number.isFinite(
+                Number(modelBreakdown?.[key])
+              ) &&
+              Number.isFinite(
+                Number(expertBreakdown?.[key])
+              ) &&
+              Number(modelBreakdown[key]) !==
+                Number(expertBreakdown[key])
+            );
+
+          return (
+            Number.isFinite(predicted) &&
+            Number.isFinite(corrected) &&
+            (
+              predicted !== corrected ||
+              breakdownChanged
+            )
+          );
+        })
+        .slice(0, 6);
+
+    if (!rows.length) return "";
+
+    const lines =
+      rows.map((r, idx) => {
+        const m =
+          r.prediction?.breakdown || {};
+
+        const e =
+          r.groundTruth?.breakdown || {};
+
+        const note =
+          dairyTraitsShortTextSrv(
+            r.groundTruth?.expertNote || "",
+            220
+          );
+
+        return [
+          `${idx + 1}) Previous reviewed cow: model final ${r.prediction?.score}/100; expert final ${r.groundTruth?.score}/100.`,
+          `Udder ${m.udder}→${e.udder}; feet/legs ${m.feetAndLegs}→${e.feetAndLegs}; dairy strength ${m.dairyStrength}→${e.dairyStrength}; front/capacity ${m.frontEndAndCapacity}→${e.frontEndAndCapacity}; rump ${m.rump}→${e.rump}.`,
+          note
+            ? `Expert note: ${note}`
+            : ""
+        ]
+          .filter(Boolean)
+          .join(" ");
+      });
+
+    return `
+Expert dairy-cow calibration memory from Dr. Mohamed:
+Use these reviewed cow corrections only as calibration guidance when the CURRENT TARGET shows comparable visible morphology.
+Do not copy a previous total or component score blindly.
+Judge the current cow independently from its two images, then use the cow expert reviews to improve calibration of comparable visible traits.
+${lines.join("\n")}
+`.trim();
+
+  } catch (e) {
+    console.warn(
+      "Dairy Traits cow training calibration skipped:",
+      e.message || e
+    );
+
+    return "";
+  }
+}
 function dairyTraitsExpertPartSrv(v, max) {
   const n = Number(v);
   const m = Number(max);
@@ -77563,7 +77664,15 @@ if (!attempt.allowed) {
       "ℹ️ استُخدمت محاولات تحليل سمات إنتاج اللبن المتاحة لهذا الحيوان اليوم. يتاح التحليل مرة أخرى مع بداية يوم المزرعة التالي."
   });
 }
-const buffaloExpertCalibrationPrompt = "";
+const buffaloExpertCalibrationPrompt =
+  speciesKey === "buffalo"
+    ? await dairyTraitsBuffaloBuildExpertCalibrationPromptSrv()
+    : "";
+
+const cowExpertCalibrationPrompt =
+  speciesKey === "cow"
+    ? await dairyTraitsCowBuildExpertCalibrationPromptSrv()
+    : "";
 
 const prompt =
   speciesKey === "buffalo"
@@ -77743,6 +77852,13 @@ Do not be timid.
 Do not under-score an excellent animal out of caution.
 Do not over-score a visually impressive but functionally weak animal.
 Give a clear judgment.
+
+${cowExpertCalibrationPrompt ? `
+==================================================
+EXPERT REVIEW MEMORY — COW ONLY
+==================================================
+${cowExpertCalibrationPrompt}
+` : ""}
 
 ==================================================
 OUTPUT RULES
@@ -78174,8 +78290,10 @@ if (speciesKey === "buffalo") {
         .OPENAI_BCS_MODEL ||
       "gpt-4.1",
 
-    expertCalibrationApplied:
-      false,
+       expertCalibrationApplied:
+      Boolean(
+        buffaloExpertCalibrationPrompt
+      ),
 
     limitations: [
       "الحركة غير مقيمة من الصور الثابتة.",
@@ -78355,10 +78473,15 @@ evaluationFramework: "cow_murabbik",
   modelPromptVersion:
     DAIRY_TRAITS_PROMPT_VERSION_SRV,
 
-  modelName:
+   modelName:
     process.env.OPENAI_DAIRY_TRAITS_MODEL ||
     process.env.OPENAI_BCS_MODEL ||
     "gpt-4.1",
+
+  expertCalibrationApplied:
+    Boolean(
+      cowExpertCalibrationPrompt
+    ),
 
   message:
     `✅ اكتمل تحليل سمات إنتاج اللبن — الدرجة ${score}/100 (${grade}).`
@@ -78401,9 +78524,10 @@ app.get(
         promptVersion:
           DAIRY_TRAITS_BUFFALO_PROMPT_VERSION_SRV,
 
-        datasetOnly: true,
+        datasetOnly: false,
+        runtimeCalibrationEnabled: true,
+        calibrationScope: "global_model",
         runtimeOverride: false,
-        calibrationApplied: false,
         fineTuningApplied: false,
 
         imageQualityConfirmationRequired: true,
@@ -78490,11 +78614,31 @@ app.post(
           ? body.analysis
           : {};
 
-      const groundTruth =
+            const groundTruth =
         body.groundTruth &&
         typeof body.groundTruth === "object"
           ? body.groundTruth
           : {};
+
+      const expertNote =
+        dairyTraitsShortTextSrv(
+          groundTruth.expertNote ||
+          body.expertNote ||
+          "",
+          1200
+        );
+
+      if (!expertNote) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_buffalo_training_expert_note_required",
+
+          message:
+            "❌ اكتب ملاحظة الخبير قبل حفظ Ground Truth للجاموس."
+        });
+      }
 
       const captures =
         body.captures &&
@@ -78863,14 +79007,6 @@ app.post(
           .json(storedRear);
       }
 
-      const expertNote =
-        dairyTraitsShortTextSrv(
-          groundTruth.expertNote ||
-          body.expertNote ||
-          "",
-          1200
-        );
-
       const payload =
         cleanObj({
           userId: uid,
@@ -79034,14 +79170,20 @@ app.post(
           datasetVersion:
             2,
 
-          datasetPurpose:
-            "expert_ground_truth_dataset",
+                   datasetPurpose:
+            "expert_ground_truth_and_runtime_calibration",
 
           datasetOnly:
-            true,
+            false,
 
           calibrationEligible:
-            false,
+            true,
+
+          runtimeCalibrationEnabled:
+            true,
+
+          calibrationScope:
+            "global_model",
 
           runtimeOverrideApplied:
             false,
@@ -79237,13 +79379,16 @@ app.get(
             ? "expert_ground_truth"
             : "hidden",
 
-        datasetOnly:
-          true,
-
-        runtimeOverride:
+               datasetOnly:
           false,
 
-        calibrationApplied:
+        runtimeCalibrationEnabled:
+          true,
+
+        calibrationScope:
+          "global_model",
+
+        runtimeOverride:
           false,
 
         fineTuningApplied:
@@ -79315,11 +79460,33 @@ app.post(
       const body =
         req.body || {};
 
-      const analysis =
+                  const analysis =
         body.analysis &&
         typeof body.analysis === "object"
           ? body.analysis
           : {};
+
+      const expertNote =
+        dairyTraitsShortTextSrv(
+          body.expertNote ||
+          body.note ||
+          body.trainingNote ||
+          "",
+          1200
+        );
+
+      if (!expertNote) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_training_expert_note_required",
+
+          message:
+            "❌ اكتب ملاحظة الخبير قبل حفظ Ground Truth لسمات إنتاج اللبن."
+        });
+      }
+
           if (
   String(
     analysis.evaluationFramework ||
@@ -79735,15 +79902,6 @@ if (trainingSpeciesKey !== "cow") {
             )
           : modelScore;
 
-      const expertNote =
-        dairyTraitsShortTextSrv(
-          body.expertNote ||
-          body.note ||
-          body.trainingNote ||
-          "",
-          1200
-        );
-
       const payload =
         cleanObj({
           userId:
@@ -79964,16 +80122,22 @@ if (trainingSpeciesKey !== "cow") {
           datasetVersion:
             1,
 
-          datasetPurpose:
-            "expert_ground_truth_for_future_calibration",
+                  datasetPurpose:
+            "expert_ground_truth_and_runtime_calibration",
+
+          datasetOnly:
+            false,
 
           calibrationEligible:
             true,
 
-          runtimeOverrideApplied:
-            false,
+          runtimeCalibrationEnabled:
+            true,
 
-          calibrationAppliedToRuntime:
+          calibrationScope:
+            "global_model",
+
+          runtimeOverrideApplied:
             false,
 
           fineTuningApplied:

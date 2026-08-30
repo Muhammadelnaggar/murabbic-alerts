@@ -202,28 +202,28 @@
     <div class="mbk-score-badge">التقسيم العام</div>
 
     <label>الجهاز الضرعي والحلمات / 40
-      <input class="input" id="buffaloExpertUdderTeat"
+      <input class="input buffalo-expert-composite-input" id="buffaloExpertUdderTeat"
              type="number" min="0" max="40" step="1">
     </label>
 
     <label>الأرجل والأقدام / 25
-      <input class="input" id="buffaloExpertFeetAndLegs"
+      <input class="input buffalo-expert-composite-input" id="buffaloExpertFeetAndLegs"
              type="number" min="0" max="25" step="1">
     </label>
 
     <label>السعة والطابع الحلاب / 20
-      <input class="input" id="buffaloExpertYieldPotential"
+      <input class="input buffalo-expert-composite-input" id="buffaloExpertYieldPotential"
              type="number" min="0" max="20" step="1">
     </label>
 
     <label>الحوض والتركيب / 15
-      <input class="input" id="buffaloExpertStructure"
+      <input class="input buffalo-expert-composite-input" id="buffaloExpertStructure"
              type="number" min="0" max="15" step="1">
     </label>
 
     <label>Ground Truth النهائي / 100
       <input class="input" id="buffaloExpertScore"
-             type="number" min="0" max="100" step="1">
+             type="number" readonly>
     </label>
   </div>
 
@@ -938,7 +938,28 @@ function buffaloGroundTruthValue(id) {
     ? n
     : null;
 }
+function recalcBuffaloExpertTotal() {
+  const values = [
+    buffaloGroundTruthValue("buffaloExpertUdderTeat"),
+    buffaloGroundTruthValue("buffaloExpertFeetAndLegs"),
+    buffaloGroundTruthValue("buffaloExpertYieldPotential"),
+    buffaloGroundTruthValue("buffaloExpertStructure")
+  ];
 
+  const scoreInput =
+    $("#buffaloExpertScore");
+
+  if (!scoreInput) return;
+
+  if (values.some(v => v === null)) {
+    scoreInput.value = "";
+    return;
+  }
+
+  scoreInput.value = String(
+    values.reduce((sum, v) => sum + v, 0)
+  );
+}
 function fillBuffaloGroundTruthFromModel(result) {
   if (
     !state.training.buffaloCanTrain ||
@@ -956,9 +977,8 @@ function fillBuffaloGroundTruthFromModel(result) {
   const values = {
     buffaloExpertUdderTeat: c.udderTeat,
     buffaloExpertFeetAndLegs: c.feetAndLegs,
-    buffaloExpertYieldPotential: c.yieldPotential,
+        buffaloExpertYieldPotential: c.yieldPotential,
     buffaloExpertStructure: c.structure,
-    buffaloExpertScore: result?.score,
 
     buffaloGTUdderDepth: s.udderDepth,
     buffaloGTForeUdderAttachment: s.foreUdderAttachment,
@@ -1002,7 +1022,7 @@ function fillBuffaloGroundTruthFromModel(result) {
         ? ""
         : String(value);
   }
-
+  recalcBuffaloExpertTotal();
   const quality =
     $("#buffaloImageQualityAccepted");
 
@@ -1022,12 +1042,7 @@ function fillBuffaloGroundTruthFromModel(result) {
 }
 
 function readBuffaloGroundTruth() {
-  return {
-    score:
-      buffaloGroundTruthValue(
-        "buffaloExpertScore"
-      ),
-
+   return {
     compositeScores: {
       udderTeat:
         buffaloGroundTruthValue(
@@ -1677,7 +1692,13 @@ if (saveGroundTruthBtn) {
     saveExpertGroundTruth();
   });
 }
-
+$$(".buffalo-expert-composite-input")
+  .forEach(input => {
+    input.addEventListener(
+      "input",
+      recalcBuffaloExpertTotal
+    );
+  });
 if (saveBuffaloGroundTruthBtn) {
   saveBuffaloGroundTruthBtn.addEventListener("click", e => {
     e.preventDefault();
