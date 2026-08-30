@@ -79002,262 +79002,199 @@ imageSpeciesKey:
       `✅ اكتمل تقييم سمات الجاموس الحلاب — الدرجة ${modelScore}/100 (${grade}).`
   });
 }
+const cowModelNumberSrv = v => {
+  const n = Number(v);
+
+  return Number.isFinite(n)
+    ? n
+    : null;
+};
+
 const rawBreakdown =
   parsed.breakdown || {};
 
 const rawUdderSub =
   parsed.udderSubscores || {};
 
+// حكم النموذج كما عاد — بلا Clamp أو Round أو إعادة حساب.
 const score =
-  dairyTraitsStrictIntRangeSrv(
-    parsed.score,
-    0,
-    100
+  cowModelNumberSrv(
+    parsed.score
   );
+
+// ده Parsing تقني فقط:
+// لو مفيش درجة رقمية أصلًا مفيش نتيجة قابلة للعرض.
+if (score === null) {
+  return res.status(400).json({
+    ok: false,
+
+    error:
+      "dairy_traits_cow_model_score_unreadable",
+
+    message:
+      "❌ تعذّر قراءة الدرجة النهائية من استجابة نموذج الأبقار. أعد التحليل."
+  });
+}
 
 const breakdown = {
   udder:
-    dairyTraitsStrictIntRangeSrv(
-      rawBreakdown.udder,
-      0,
-      40
+    cowModelNumberSrv(
+      rawBreakdown.udder
     ),
 
   feetAndLegs:
-    dairyTraitsStrictIntRangeSrv(
-      rawBreakdown.feetAndLegs,
-      0,
-      20
+    cowModelNumberSrv(
+      rawBreakdown.feetAndLegs
     ),
 
   dairyStrength:
-    dairyTraitsStrictIntRangeSrv(
-      rawBreakdown.dairyStrength,
-      0,
-      20
+    cowModelNumberSrv(
+      rawBreakdown.dairyStrength
     ),
 
   frontEndAndCapacity:
-    dairyTraitsStrictIntRangeSrv(
-      rawBreakdown.frontEndAndCapacity,
-      0,
-      15
+    cowModelNumberSrv(
+      rawBreakdown.frontEndAndCapacity
     ),
 
   rump:
-    dairyTraitsStrictIntRangeSrv(
-      rawBreakdown.rump,
-      0,
-      5
+    cowModelNumberSrv(
+      rawBreakdown.rump
     )
 };
 
 const udderSubscores = {
   udderDepth:
-    dairyTraitsStrictIntRangeSrv(
-      rawUdderSub.udderDepth,
-      0,
-      10
+    cowModelNumberSrv(
+      rawUdderSub.udderDepth
     ),
 
   rearUdder:
-    dairyTraitsStrictIntRangeSrv(
-      rawUdderSub.rearUdder,
-      0,
-      9
+    cowModelNumberSrv(
+      rawUdderSub.rearUdder
     ),
 
   teatPlacement:
-    dairyTraitsStrictIntRangeSrv(
-      rawUdderSub.teatPlacement,
-      0,
-      5
+    cowModelNumberSrv(
+      rawUdderSub.teatPlacement
     ),
 
   udderCleft:
-    dairyTraitsStrictIntRangeSrv(
-      rawUdderSub.udderCleft,
-      0,
-      5
+    cowModelNumberSrv(
+      rawUdderSub.udderCleft
     ),
 
   foreUdder:
-    dairyTraitsStrictIntRangeSrv(
-      rawUdderSub.foreUdder,
-      0,
-      5
+    cowModelNumberSrv(
+      rawUdderSub.foreUdder
     ),
 
   teats:
-    dairyTraitsStrictIntRangeSrv(
-      rawUdderSub.teats,
-      0,
-      3
+    cowModelNumberSrv(
+      rawUdderSub.teats
     ),
 
   udderBalanceTexture:
-    dairyTraitsStrictIntRangeSrv(
-      rawUdderSub.udderBalanceTexture,
-      0,
-      3
+    cowModelNumberSrv(
+      rawUdderSub.udderBalanceTexture
     )
 };
 
-if (
-  score === null ||
-  Object.values(breakdown)
-    .some(v => v === null) ||
-  Object.values(udderSubscores)
-    .some(v => v === null)
-) {
-  return res.status(400).json({
-    ok: false,
-
-    error:
-      "dairy_traits_cow_model_output_invalid",
-
-    message:
-      "❌ لم أتمكن من استخراج تقييم أبقار صحيح من استجابة النموذج. أعد التحليل بصورتين واضحتين."
-  });
-}
+// Audit فقط — لا Gate ولا Override.
+const udderSubscoreValues =
+  Object.values(
+    udderSubscores
+  );
 
 const udderFromSubscores =
-  udderSubscores.udderDepth +
-  udderSubscores.rearUdder +
-  udderSubscores.teatPlacement +
-  udderSubscores.udderCleft +
-  udderSubscores.foreUdder +
-  udderSubscores.teats +
-  udderSubscores.udderBalanceTexture;
-
-if (
-  breakdown.udder !==
-  udderFromSubscores
-) {
-  return res.status(400).json({
-    ok: false,
-
-    error:
-      "dairy_traits_cow_udder_inconsistent",
-
-    modelUdder:
-      breakdown.udder,
-
-    modelUdderSubscoreSum:
-      udderFromSubscores,
-
-    message:
-      "❌ استجابة نموذج الأبقار غير متسقة بين درجة الضرع وسماته الفرعية. أعد التحليل."
-  });
-}
+  udderSubscoreValues.every(
+    Number.isFinite
+  )
+    ? udderSubscoreValues.reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      )
+    : null;
 
 const componentDeductionsRaw =
   parsed.componentDeductions &&
   typeof parsed.componentDeductions === "object"
     ? parsed.componentDeductions
-    : null;
+    : {};
 
 const udderSubscoreDeductionsRaw =
   parsed.udderSubscoreDeductions &&
   typeof parsed.udderSubscoreDeductions === "object"
     ? parsed.udderSubscoreDeductions
-    : null;
+    : {};
 
-if (
-  !componentDeductionsRaw ||
-  !udderSubscoreDeductionsRaw
-) {
-  return res.status(400).json({
-    ok: false,
-
-    error:
-      "dairy_traits_cow_deductions_missing",
-
-    message:
-      "❌ النموذج لم يُرجع تفاصيل الخصومات المطلوبة لتفسير تقييم الأبقار. أعد التحليل."
-  });
-}
-
+// تجهيز للعرض فقط.
+// نقص أو اختلاف الخصومات لا يوقف حكم النموذج.
 const componentDeductions = {
   udder:
     dairyTraitsCowDeductionArraySrv(
       componentDeductionsRaw.udder
-    ),
+    ) || [],
 
   feetAndLegs:
     dairyTraitsCowDeductionArraySrv(
       componentDeductionsRaw.feetAndLegs
-    ),
+    ) || [],
 
   dairyStrength:
     dairyTraitsCowDeductionArraySrv(
       componentDeductionsRaw.dairyStrength
-    ),
+    ) || [],
 
   frontEndAndCapacity:
     dairyTraitsCowDeductionArraySrv(
       componentDeductionsRaw.frontEndAndCapacity
-    ),
+    ) || [],
 
   rump:
     dairyTraitsCowDeductionArraySrv(
       componentDeductionsRaw.rump
-    )
+    ) || []
 };
 
 const udderSubscoreDeductions = {
   udderDepth:
     dairyTraitsCowDeductionArraySrv(
       udderSubscoreDeductionsRaw.udderDepth
-    ),
+    ) || [],
 
   rearUdder:
     dairyTraitsCowDeductionArraySrv(
       udderSubscoreDeductionsRaw.rearUdder
-    ),
+    ) || [],
 
   teatPlacement:
     dairyTraitsCowDeductionArraySrv(
       udderSubscoreDeductionsRaw.teatPlacement
-    ),
+    ) || [],
 
   udderCleft:
     dairyTraitsCowDeductionArraySrv(
       udderSubscoreDeductionsRaw.udderCleft
-    ),
+    ) || [],
 
   foreUdder:
     dairyTraitsCowDeductionArraySrv(
       udderSubscoreDeductionsRaw.foreUdder
-    ),
+    ) || [],
 
   teats:
     dairyTraitsCowDeductionArraySrv(
       udderSubscoreDeductionsRaw.teats
-    ),
+    ) || [],
 
   udderBalanceTexture:
     dairyTraitsCowDeductionArraySrv(
-      udderSubscoreDeductionsRaw.udderBalanceTexture
-    )
+      udderSubscoreDeductionsRaw
+        .udderBalanceTexture
+    ) || []
 };
-
-if (
-  Object.values(componentDeductions)
-    .some(v => v === null) ||
-  Object.values(udderSubscoreDeductions)
-    .some(v => v === null)
-) {
-  return res.status(400).json({
-    ok: false,
-
-    error:
-      "dairy_traits_cow_deductions_invalid",
-
-    message:
-      "❌ تفاصيل خصومات نموذج الأبقار غير صالحة أو غير مكتملة. أعد التحليل."
-  });
-}
 
 const componentDeductionAudit = {
   udder:
@@ -79349,36 +79286,27 @@ const udderSubscoreDeductionAudit = {
     )
 };
 
-if (
-  Object.values(componentDeductionAudit)
-    .some(v => v !== true) ||
-  Object.values(udderSubscoreDeductionAudit)
-    .some(v => v !== true)
-) {
-  return res.status(400).json({
-    ok: false,
-
-    error:
-      "dairy_traits_cow_deduction_mismatch",
-
-    componentDeductionAudit,
-    udderSubscoreDeductionAudit,
-
-    message:
-      "❌ استجابة نموذج الأبقار غير متسقة بين الدرجات والخصومات التي ذكرها. أعد التحليل."
-  });
-}
+const breakdownValues =
+  Object.values(
+    breakdown
+  );
 
 const summedScore =
-  breakdown.udder +
-  breakdown.feetAndLegs +
-  breakdown.dairyStrength +
-  breakdown.frontEndAndCapacity +
-  breakdown.rump;
+  breakdownValues.every(
+    Number.isFinite
+  )
+    ? breakdownValues.reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      )
+    : null;
 
 const grade =
-  parsed.grade ||
-  dairyTraitsGradeSrv(score);
+  String(
+    parsed.grade ||
+    dairyTraitsGradeSrv(score)
+  ).trim();
 
 const confidence =
   String(
@@ -79388,8 +79316,6 @@ const confidence =
 
 const rawModelScore =
   score;
-
-const cowTrainingAdmin =
   dairyTraitsIsTrainingAdminSrv(
     req.userId
   );
@@ -79507,6 +79433,7 @@ evaluationFramework: "cow_murabbik",
   ...(cowTrainingAdmin
     ? {
         componentDeductions,
+
         udderSubscoreDeductions,
 
         deductionAudit: {
@@ -79532,8 +79459,8 @@ evaluationFramework: "cow_murabbik",
       ? parsed.weaknesses.slice(0, 4)
       : [],
 
-  reason:
-    String(
+
+      String(
       parsed.reason || ""
     ).trim(),
 
@@ -79545,13 +79472,15 @@ evaluationFramework: "cow_murabbik",
   modelBreakdownSum:
     summedScore,
 
-  modelScoreVsBreakdownDelta:
-    Number(
-      (
-        score -
-        summedScore
-      ).toFixed(2)
-    ),
+    modelScoreVsBreakdownDelta:
+    summedScore === null
+      ? null
+      : Number(
+          (
+            score -
+            summedScore
+          ).toFixed(2)
+        ),
 
   modelPromptVersion:
     DAIRY_TRAITS_PROMPT_VERSION_SRV,
@@ -80648,26 +80577,39 @@ app.post(
         });
       }
 
+      const cowTrainingModelNumber = v => {
+        if (
+          v === null ||
+          v === undefined ||
+          v === ""
+        ) {
+          return null;
+        }
+
+        const n = Number(v);
+
+        return Number.isFinite(n)
+          ? n
+          : null;
+      };
+
+      // Prediction محفوظ كما قاله النموذج — بلا Clamp أو Round.
       const modelScore =
-        dairyTraitsClampScoreSrv(
+        cowTrainingModelNumber(
           body.predictedScore ??
           body.modelScore ??
           analysis.score
         );
 
-      if (
-        !Number.isFinite(
-          Number(modelScore)
-        )
-      ) {
+      if (modelScore === null) {
         return res.status(400).json({
           ok: false,
 
           error:
-            "dairy_traits_training_model_score_invalid",
+            "dairy_traits_training_model_score_unreadable",
 
           message:
-            "❌ درجة النموذج الأصلية غير صالحة. أعد تحليل الصور أولًا."
+            "❌ تعذّر قراءة درجة النموذج الأصلية. أعد التحليل أولًا."
         });
       }
 
@@ -80683,80 +80625,67 @@ app.post(
 
       const modelBreakdown = {
         udder:
-          dairyTraitsClampPartSrv(
-            modelBreakdownRaw.udder,
-            40
+          cowTrainingModelNumber(
+            modelBreakdownRaw.udder
           ),
 
         feetAndLegs:
-          dairyTraitsClampPartSrv(
-            modelBreakdownRaw.feetAndLegs,
-            20
+          cowTrainingModelNumber(
+            modelBreakdownRaw.feetAndLegs
           ),
 
         dairyStrength:
-          dairyTraitsClampPartSrv(
-            modelBreakdownRaw.dairyStrength,
-            20
+          cowTrainingModelNumber(
+            modelBreakdownRaw.dairyStrength
           ),
 
         frontEndAndCapacity:
-          dairyTraitsClampPartSrv(
-            modelBreakdownRaw.frontEndAndCapacity,
-            15
+          cowTrainingModelNumber(
+            modelBreakdownRaw.frontEndAndCapacity
           ),
 
         rump:
-          dairyTraitsClampPartSrv(
-            modelBreakdownRaw.rump,
-            5
+          cowTrainingModelNumber(
+            modelBreakdownRaw.rump
           )
       };
 
       const modelUdderSubscores = {
         udderDepth:
-          dairyTraitsClampPartSrv(
-            modelUdderRaw.udderDepth,
-            10
+          cowTrainingModelNumber(
+            modelUdderRaw.udderDepth
           ),
 
         rearUdder:
-          dairyTraitsClampPartSrv(
-            modelUdderRaw.rearUdder,
-            9
+          cowTrainingModelNumber(
+            modelUdderRaw.rearUdder
           ),
 
         teatPlacement:
-          dairyTraitsClampPartSrv(
-            modelUdderRaw.teatPlacement,
-            5
+          cowTrainingModelNumber(
+            modelUdderRaw.teatPlacement
           ),
 
         udderCleft:
-          dairyTraitsClampPartSrv(
-            modelUdderRaw.udderCleft,
-            5
+          cowTrainingModelNumber(
+            modelUdderRaw.udderCleft
           ),
 
         foreUdder:
-          dairyTraitsClampPartSrv(
-            modelUdderRaw.foreUdder,
-            5
+          cowTrainingModelNumber(
+            modelUdderRaw.foreUdder
           ),
 
         teats:
-          dairyTraitsClampPartSrv(
-            modelUdderRaw.teats,
-            3
+          cowTrainingModelNumber(
+            modelUdderRaw.teats
           ),
 
         udderBalanceTexture:
-          dairyTraitsClampPartSrv(
-            modelUdderRaw.udderBalanceTexture,
-            3
+          cowTrainingModelNumber(
+            modelUdderRaw.udderBalanceTexture
           )
       };
-
       const expertScore =
         dairyTraitsExpertScoreSrv(
           body.expertScore ??
