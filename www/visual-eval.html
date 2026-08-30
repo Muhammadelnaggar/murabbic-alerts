@@ -89,79 +89,79 @@
   <div class="mbk-score-card">
     <div class="mbk-score-badge">الضرع — 40 درجة</div>
 
-    <label>عمق الضرع / 10
-      <input class="input expert-score-input"
-             id="expertUdderDepth"
-             type="number" min="0" max="10" step="1">
-    </label>
+<label>عمق الضرع / 10
+  <input class="input expert-score-input"
+         id="expertUdderDepth"
+         type="number" min="0" max="10" step="0.1">
+</label>
 
-    <label>الضرع الخلفي / 9
-      <input class="input expert-score-input"
-             id="expertRearUdder"
-             type="number" min="0" max="9" step="1">
-    </label>
+<label>الضرع الخلفي / 9
+  <input class="input expert-score-input"
+         id="expertRearUdder"
+         type="number" min="0" max="9" step="0.1">
+</label>
 
-    <label>موضع الحلمات / 5
-      <input class="input expert-score-input"
-             id="expertTeatPlacement"
-             type="number" min="0" max="5" step="1">
-    </label>
+<label>موضع الحلمات / 5
+  <input class="input expert-score-input"
+         id="expertTeatPlacement"
+         type="number" min="0" max="5" step="0.1">
+</label>
 
-    <label>الأخدود الضرعي / 5
-      <input class="input expert-score-input"
-             id="expertUdderCleft"
-             type="number" min="0" max="5" step="1">
-    </label>
+<label>الأخدود الضرعي / 5
+  <input class="input expert-score-input"
+         id="expertUdderCleft"
+         type="number" min="0" max="5" step="0.1">
+</label>
 
-    <label>ارتباط الضرع الأمامي / 5
-      <input class="input expert-score-input"
-             id="expertForeUdder"
-             type="number" min="0" max="5" step="1">
-    </label>
+<label>ارتباط الضرع الأمامي / 5
+  <input class="input expert-score-input"
+         id="expertForeUdder"
+         type="number" min="0" max="5" step="0.1">
+</label>
 
-    <label>الحلمات / 3
-      <input class="input expert-score-input"
-             id="expertTeats"
-             type="number" min="0" max="3" step="1">
-    </label>
+<label>الحلمات / 3
+  <input class="input expert-score-input"
+         id="expertTeats"
+         type="number" min="0" max="3" step="0.1">
+</label>
 
-    <label>اتزان وملمس الضرع / 3
-      <input class="input expert-score-input"
-             id="expertUdderBalanceTexture"
-             type="number" min="0" max="3" step="1">
-    </label>
+<label>اتزان وملمس الضرع / 3
+  <input class="input expert-score-input"
+         id="expertUdderBalanceTexture"
+         type="number" min="0" max="3" step="0.1">
+</label>
 
-    <label>إجمالي الضرع / 40
-      <input class="input"
-             id="expertUdder"
-             type="number"
-             readonly>
-    </label>
-  </div>
+<label>إجمالي الضرع / 40
+  <input class="input"
+         id="expertUdder"
+         type="number"
+         readonly>
+</label>
+</div>
 
-  <label>الأرجل والأقدام / 20
-    <input class="input expert-score-input"
-           id="expertFeetAndLegs"
-           type="number" min="0" max="20" step="1">
-  </label>
+<label>الأرجل والأقدام / 20
+  <input class="input expert-score-input"
+         id="expertFeetAndLegs"
+         type="number" min="0" max="20" step="0.1">
+</label>
 
-  <label>القوة والطابع الحلاب / 20
-    <input class="input expert-score-input"
-           id="expertDairyStrength"
-           type="number" min="0" max="20" step="1">
-  </label>
+<label>القوة والطابع الحلاب / 20
+  <input class="input expert-score-input"
+         id="expertDairyStrength"
+         type="number" min="0" max="20" step="0.1">
+</label>
 
-  <label>المقدمة والسعة الجسمية / 15
-    <input class="input expert-score-input"
-           id="expertFrontEndAndCapacity"
-           type="number" min="0" max="15" step="1">
-  </label>
+<label>المقدمة والسعة الجسمية / 15
+  <input class="input expert-score-input"
+         id="expertFrontEndAndCapacity"
+         type="number" min="0" max="15" step="0.1">
+</label>
 
-  <label>الرامب/الحوض / 5
-    <input class="input expert-score-input"
-           id="expertRump"
-           type="number" min="0" max="5" step="1">
-  </label>
+<label>الرامب/الحوض / 5
+  <input class="input expert-score-input"
+         id="expertRump"
+         type="number" min="0" max="5" step="0.1">
+</label>
 
   <label>Ground Truth النهائي / 100
     <input class="input"
@@ -727,77 +727,165 @@ async function loadTrainingGate() {
     buffaloTrainingBox.classList.add("hide");
   }
 }
-function expertInt(id, max) {
-  const el = $("#" + id);
-  const raw = String(el?.value ?? "").trim();
+let expertTotalsTimer = null;
+let expertTotalsRequestSeq = 0;
 
-  if (!raw) return null;
+function clearExpertServerTotals() {
+  const expertUdderInput =
+    $("#expertUdder");
 
-  const n = Number(raw);
-
-  if (
-    !Number.isInteger(n) ||
-    n < 0 ||
-    n > max
-  ) {
-    return null;
-  }
-
-  return n;
-}
-
-function recalcExpertTotals() {
-  const udderParts = [
-    expertInt("expertUdderDepth", 10),
-    expertInt("expertRearUdder", 9),
-    expertInt("expertTeatPlacement", 5),
-    expertInt("expertUdderCleft", 5),
-    expertInt("expertForeUdder", 5),
-    expertInt("expertTeats", 3),
-    expertInt("expertUdderBalanceTexture", 3)
-  ];
-
-  const udderReady =
-    udderParts.every(v => v !== null);
-
-  const udder =
-    udderReady
-      ? udderParts.reduce((a, b) => a + b, 0)
-      : null;
-
-  const expertUdderInput = $("#expertUdder");
+  const expertScoreInput =
+    $("#expertScore");
 
   if (expertUdderInput) {
-    expertUdderInput.value =
-      udder === null
-        ? ""
-        : String(udder);
+    expertUdderInput.value = "";
   }
-
-  const otherParts = [
-    expertInt("expertFeetAndLegs", 20),
-    expertInt("expertDairyStrength", 20),
-    expertInt("expertFrontEndAndCapacity", 15),
-    expertInt("expertRump", 5)
-  ];
-
-  const totalReady =
-    udder !== null &&
-    otherParts.every(v => v !== null);
-
-  const total =
-    totalReady
-      ? udder + otherParts.reduce((a, b) => a + b, 0)
-      : null;
-
-  const expertScoreInput = $("#expertScore");
 
   if (expertScoreInput) {
-    expertScoreInput.value =
-      total === null
-        ? ""
-        : String(total);
+    expertScoreInput.value = "";
   }
+}
+
+function readExpertGroundTruthDraft() {
+  return {
+    expertUdderSubscores: {
+      udderDepth:
+        expertGroundTruthValue("expertUdderDepth"),
+
+      rearUdder:
+        expertGroundTruthValue("expertRearUdder"),
+
+      teatPlacement:
+        expertGroundTruthValue("expertTeatPlacement"),
+
+      udderCleft:
+        expertGroundTruthValue("expertUdderCleft"),
+
+      foreUdder:
+        expertGroundTruthValue("expertForeUdder"),
+
+      teats:
+        expertGroundTruthValue("expertTeats"),
+
+      udderBalanceTexture:
+        expertGroundTruthValue(
+          "expertUdderBalanceTexture"
+        )
+    },
+
+    expertBreakdown: {
+      feetAndLegs:
+        expertGroundTruthValue(
+          "expertFeetAndLegs"
+        ),
+
+      dairyStrength:
+        expertGroundTruthValue(
+          "expertDairyStrength"
+        ),
+
+      frontEndAndCapacity:
+        expertGroundTruthValue(
+          "expertFrontEndAndCapacity"
+        ),
+
+      rump:
+        expertGroundTruthValue(
+          "expertRump"
+        )
+    }
+  };
+}
+
+async function recalcExpertTotals() {
+  if (!state.training.canTrain) {
+    clearExpertServerTotals();
+    return;
+  }
+
+  const requestSeq =
+    ++expertTotalsRequestSeq;
+
+  try {
+    const r = await fetch(
+      "/api/dairy-traits/training/calculate",
+      {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+
+          "Accept":
+            "application/json"
+        },
+
+        body: JSON.stringify(
+          readExpertGroundTruthDraft()
+        )
+      }
+    );
+
+    const j =
+      await r.json().catch(() => ({}));
+
+    if (
+      requestSeq !==
+      expertTotalsRequestSeq
+    ) {
+      return;
+    }
+
+    if (!r.ok || !j.ok) {
+      clearExpertServerTotals();
+      return;
+    }
+
+    const expertUdderInput =
+      $("#expertUdder");
+
+    const expertScoreInput =
+      $("#expertScore");
+
+    if (expertUdderInput) {
+      expertUdderInput.value =
+        String(j.expertUdder);
+    }
+
+    if (expertScoreInput) {
+      expertScoreInput.value =
+        String(j.expertScore);
+    }
+
+  } catch (e) {
+    if (
+      requestSeq ===
+      expertTotalsRequestSeq
+    ) {
+      clearExpertServerTotals();
+    }
+
+    console.warn(
+      "dairy traits expert totals calculate error:",
+      e
+    );
+  }
+}
+
+function scheduleExpertTotalsCalculation() {
+  if (expertTotalsTimer) {
+    clearTimeout(
+      expertTotalsTimer
+    );
+  }
+
+  expertTotalsTimer =
+    setTimeout(
+      recalcExpertTotals,
+      180
+    );
 }
 
 function fillExpertGroundTruthFromModel(result) {
@@ -833,10 +921,10 @@ function fillExpertGroundTruthFromModel(result) {
       el &&
       Number.isFinite(Number(value))
     ) {
-      el.value =
-        String(
-          Math.round(Number(value))
-        );
+     el.value =
+  String(
+    Number(value)
+  );
     }
   }
 
@@ -846,7 +934,7 @@ function fillExpertGroundTruthFromModel(result) {
     note.value = "";
   }
 
-  recalcExpertTotals();
+  scheduleExpertTotalsCalculation();
 
   expertTrainingBox.classList.remove("hide");
 }
@@ -865,60 +953,8 @@ function expertGroundTruthValue(id) {
 }
 
 function readExpertGroundTruth() {
-  const expertUdderSubscores = {
-    udderDepth:
-      expertGroundTruthValue("expertUdderDepth"),
-
-    rearUdder:
-      expertGroundTruthValue("expertRearUdder"),
-
-    teatPlacement:
-      expertGroundTruthValue("expertTeatPlacement"),
-
-    udderCleft:
-      expertGroundTruthValue("expertUdderCleft"),
-
-    foreUdder:
-      expertGroundTruthValue("expertForeUdder"),
-
-    teats:
-      expertGroundTruthValue("expertTeats"),
-
-    udderBalanceTexture:
-      expertGroundTruthValue("expertUdderBalanceTexture")
-  };
-
-  const udderValues =
-    Object.values(expertUdderSubscores);
-
-  const expertUdder =
-    udderValues.every(v => v !== null)
-      ? udderValues.reduce((a, b) => a + b, 0)
-      : null;
-
-  const expertBreakdown = {
-    udder: expertUdder,
-
-    feetAndLegs:
-      expertGroundTruthValue("expertFeetAndLegs"),
-
-    dairyStrength:
-      expertGroundTruthValue("expertDairyStrength"),
-
-    frontEndAndCapacity:
-      expertGroundTruthValue("expertFrontEndAndCapacity"),
-
-    rump:
-      expertGroundTruthValue("expertRump")
-  };
-
-  const breakdownValues =
-    Object.values(expertBreakdown);
-
-  const expertScore =
-    breakdownValues.every(v => v !== null)
-      ? breakdownValues.reduce((a, b) => a + b, 0)
-      : null;
+  const draft =
+    readExpertGroundTruthDraft();
 
   const expertNote =
     String(
@@ -926,9 +962,7 @@ function readExpertGroundTruth() {
     ).trim();
 
   return {
-    expertScore,
-    expertBreakdown,
-    expertUdderSubscores,
+    ...draft,
     expertNote
   };
 }
@@ -1291,9 +1325,6 @@ async function saveExpertGroundTruth() {
 
           modelName:
             state.analysis?.modelName ?? "",
-
-          expertScore:
-            expert.expertScore,
 
           expertBreakdown:
             expert.expertBreakdown,
@@ -1661,7 +1692,7 @@ function renderAnalysis(result) {
     $$(".expert-score-input").forEach(input => {
   input.addEventListener(
     "input",
-    recalcExpertTotals
+    scheduleExpertTotalsCalculation
   );
 });
 
