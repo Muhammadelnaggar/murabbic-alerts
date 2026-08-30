@@ -79389,6 +79389,11 @@ const confidence =
 const rawModelScore =
   score;
 
+const cowTrainingAdmin =
+  dairyTraitsIsTrainingAdminSrv(
+    req.userId
+  );
+
 return res.json({
   ok: true,
   animalType: "أبقار",
@@ -79428,70 +79433,95 @@ evaluationFramework: "cow_murabbik",
     breakdownTitle:
       "التقسيم العام",
 
-    breakdownRows: [
-  {
-    label:
-      "الضرع",
-    value:
-      componentDeductions.udder.length
-        ? `${breakdown.udder} / 40 — ${dairyTraitsCowDeductionSummarySrv(componentDeductions.udder)}`
-        : `${breakdown.udder} / 40 — بدون خصم`
-  },
-  {
-    label:
-      "الأرجل والأقدام",
-    value:
-      componentDeductions.feetAndLegs.length
-        ? `${breakdown.feetAndLegs} / 20 — ${dairyTraitsCowDeductionSummarySrv(componentDeductions.feetAndLegs)}`
-        : `${breakdown.feetAndLegs} / 20 — بدون خصم`
-  },
-  {
-    label:
-      "القوة والطابع الحلاب",
-    value:
-      componentDeductions.dairyStrength.length
-        ? `${breakdown.dairyStrength} / 20 — ${dairyTraitsCowDeductionSummarySrv(componentDeductions.dairyStrength)}`
-        : `${breakdown.dairyStrength} / 20 — بدون خصم`
-  },
-  {
-    label:
-      "المقدمة والسعة الجسمية",
-    value:
-      componentDeductions.frontEndAndCapacity.length
-        ? `${breakdown.frontEndAndCapacity} / 15 — ${dairyTraitsCowDeductionSummarySrv(componentDeductions.frontEndAndCapacity)}`
-        : `${breakdown.frontEndAndCapacity} / 15 — بدون خصم`
-  },
-  {
-    label:
-      "الحوض",
-    value:
-      componentDeductions.rump.length
-        ? `${breakdown.rump} / 5 — ${dairyTraitsCowDeductionSummarySrv(componentDeductions.rump)}`
-        : `${breakdown.rump} / 5 — بدون خصم`
-  }
-],
+    breakdownRows:
+      cowTrainingAdmin
+        ? [
+            {
+              label: "الضرع",
+              value:
+                componentDeductions.udder.length
+                  ? `${breakdown.udder} / 40 — ${dairyTraitsCowDeductionSummarySrv(componentDeductions.udder)}`
+                  : `${breakdown.udder} / 40 — بدون خصم`
+            },
+            {
+              label: "الأرجل والأقدام",
+              value:
+                componentDeductions.feetAndLegs.length
+                  ? `${breakdown.feetAndLegs} / 20 — ${dairyTraitsCowDeductionSummarySrv(componentDeductions.feetAndLegs)}`
+                  : `${breakdown.feetAndLegs} / 20 — بدون خصم`
+            },
+            {
+              label: "القوة والطابع الحلاب",
+              value:
+                componentDeductions.dairyStrength.length
+                  ? `${breakdown.dairyStrength} / 20 — ${dairyTraitsCowDeductionSummarySrv(componentDeductions.dairyStrength)}`
+                  : `${breakdown.dairyStrength} / 20 — بدون خصم`
+            },
+            {
+              label: "المقدمة والسعة الجسمية",
+              value:
+                componentDeductions.frontEndAndCapacity.length
+                  ? `${breakdown.frontEndAndCapacity} / 15 — ${dairyTraitsCowDeductionSummarySrv(componentDeductions.frontEndAndCapacity)}`
+                  : `${breakdown.frontEndAndCapacity} / 15 — بدون خصم`
+            },
+            {
+              label: "الحوض",
+              value:
+                componentDeductions.rump.length
+                  ? `${breakdown.rump} / 5 — ${dairyTraitsCowDeductionSummarySrv(componentDeductions.rump)}`
+                  : `${breakdown.rump} / 5 — بدون خصم`
+            }
+          ]
+        : [
+            {
+              label: "الضرع",
+              value: `${breakdown.udder} / 40`
+            },
+            {
+              label: "الأرجل والأقدام",
+              value: `${breakdown.feetAndLegs} / 20`
+            },
+            {
+              label: "القوة والطابع الحلاب",
+              value: `${breakdown.dairyStrength} / 20`
+            },
+            {
+              label: "المقدمة والسعة الجسمية",
+              value: `${breakdown.frontEndAndCapacity} / 15`
+            },
+            {
+              label: "الحوض",
+              value: `${breakdown.rump} / 5`
+            }
+          ],
 
     trainingPanel:
-      "cow"
+      cowTrainingAdmin
+        ? "cow"
+        : "none"
   },
 
   breakdown,
   udderSubscores,
-  componentDeductions,
-udderSubscoreDeductions,
 
-deductionAudit: {
-  components:
-    componentDeductionAudit,
+  ...(cowTrainingAdmin
+    ? {
+        componentDeductions,
+        udderSubscoreDeductions,
 
-  udderSubscores:
-    udderSubscoreDeductionAudit,
+        deductionAudit: {
+          components:
+            componentDeductionAudit,
 
-  udderMatchesSubscores:
-    breakdown.udder ===
-    udderFromSubscores
-},
+          udderSubscores:
+            udderSubscoreDeductionAudit,
 
+          udderMatchesSubscores:
+            breakdown.udder ===
+            udderFromSubscores
+        }
+      }
+    : {}),
   strengths:
     Array.isArray(parsed.strengths)
       ? parsed.strengths.slice(0, 4)
