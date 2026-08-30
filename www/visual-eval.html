@@ -170,13 +170,11 @@
            readonly>
   </label>
 
-  <label>ملاحظة الخبير *
+  <label>ملاحظة الخبير (مطلوبة فقط عند إجراء تصحيح)
   <textarea class="input"
             id="expertNote"
             rows="3"
-            maxlength="1200"
-            required
-            aria-required="true"></textarea>
+            maxlength="1200"></textarea>
 </label>
 
   <div class="actions-bar inline">
@@ -337,13 +335,11 @@
     </div>
   </details>
 
-  <label>ملاحظة الخبير *
+ <label>ملاحظة الخبير (مطلوبة فقط عند إجراء تصحيح)
   <textarea class="input"
             id="buffaloExpertNote"
             rows="3"
-            maxlength="1200"
-            required
-            aria-required="true"></textarea>
+            maxlength="1200"></textarea>
 </label>
 
   <div class="actions-bar inline">
@@ -855,80 +851,79 @@ function fillExpertGroundTruthFromModel(result) {
   expertTrainingBox.classList.remove("hide");
 }
 
+function expertGroundTruthValue(id) {
+  const el = $("#" + id);
+  const raw = String(el?.value ?? "").trim();
+
+  if (raw === "") return null;
+
+  const n = Number(raw);
+
+  return Number.isFinite(n)
+    ? n
+    : null;
+}
+
 function readExpertGroundTruth() {
   const expertUdderSubscores = {
     udderDepth:
-      expertInt("expertUdderDepth", 10),
+      expertGroundTruthValue("expertUdderDepth"),
 
     rearUdder:
-      expertInt("expertRearUdder", 9),
+      expertGroundTruthValue("expertRearUdder"),
 
     teatPlacement:
-      expertInt("expertTeatPlacement", 5),
+      expertGroundTruthValue("expertTeatPlacement"),
 
     udderCleft:
-      expertInt("expertUdderCleft", 5),
+      expertGroundTruthValue("expertUdderCleft"),
 
     foreUdder:
-      expertInt("expertForeUdder", 5),
+      expertGroundTruthValue("expertForeUdder"),
 
     teats:
-      expertInt("expertTeats", 3),
+      expertGroundTruthValue("expertTeats"),
 
     udderBalanceTexture:
-      expertInt("expertUdderBalanceTexture", 3)
+      expertGroundTruthValue("expertUdderBalanceTexture")
   };
 
-  if (
-    Object.values(expertUdderSubscores)
-      .some(v => v === null)
-  ) {
-    throw new Error(
-      "أكمل تقييم سمات الضرع السبع ضمن الحدود المحددة."
-    );
-  }
+  const udderValues =
+    Object.values(expertUdderSubscores);
+
+  const expertUdder =
+    udderValues.every(v => v !== null)
+      ? udderValues.reduce((a, b) => a + b, 0)
+      : null;
 
   const expertBreakdown = {
-    udder:
-      Object.values(expertUdderSubscores)
-        .reduce((a, b) => a + b, 0),
+    udder: expertUdder,
 
     feetAndLegs:
-      expertInt("expertFeetAndLegs", 20),
+      expertGroundTruthValue("expertFeetAndLegs"),
 
     dairyStrength:
-      expertInt("expertDairyStrength", 20),
+      expertGroundTruthValue("expertDairyStrength"),
 
     frontEndAndCapacity:
-      expertInt("expertFrontEndAndCapacity", 15),
+      expertGroundTruthValue("expertFrontEndAndCapacity"),
 
     rump:
-      expertInt("expertRump", 5)
+      expertGroundTruthValue("expertRump")
   };
 
-  if (
-    Object.values(expertBreakdown)
-      .some(v => v === null)
-  ) {
-    throw new Error(
-      "أكمل Ground Truth للمكونات الخمسة ضمن الحدود المحددة."
-    );
-  }
+  const breakdownValues =
+    Object.values(expertBreakdown);
 
-    const expertScore =
-    Object.values(expertBreakdown)
-      .reduce((a, b) => a + b, 0);
+  const expertScore =
+    breakdownValues.every(v => v !== null)
+      ? breakdownValues.reduce((a, b) => a + b, 0)
+      : null;
 
   const expertNote =
     String(
       $("#expertNote")?.value || ""
     ).trim();
-
-  if (!expertNote) {
-    throw new Error(
-      "اكتب ملاحظة الخبير قبل حفظ Ground Truth."
-    );
-  }
 
   return {
     expertScore,
@@ -1058,12 +1053,6 @@ function readBuffaloGroundTruth() {
       $("#buffaloExpertNote")?.value || ""
     ).trim();
 
-  if (!expertNote) {
-    throw new Error(
-      "اكتب ملاحظة الخبير قبل حفظ Ground Truth للجاموس."
-    );
-  }
-
   return {
     compositeScores: {
       udderTeat:
@@ -1163,20 +1152,6 @@ function readBuffaloGroundTruth() {
 }
 
 async function saveBuffaloExpertGroundTruth() {
-  if (!state.training.buffaloCanTrain) return;
-
-  if (
-    !state.analysis ||
-    !state.analysis.ok ||
-    !hasAllCaptures()
-  ) {
-    showMsg(
-      "حلّل الصورتين أولًا قبل حفظ Ground Truth للجاموس.",
-      false
-    );
-    return;
-  }
-
   try {
     hideMsg();
 
@@ -1263,21 +1238,6 @@ async function saveBuffaloExpertGroundTruth() {
   }
 }
 async function saveExpertGroundTruth() {
-  if (!state.training.canTrain) return;
-
-  if (
-    !state.analysis ||
-    !state.analysis.ok ||
-    !hasAllCaptures()
-  ) {
-    showMsg(
-      "حلّل الصورتين أولًا قبل حفظ Ground Truth.",
-      false
-    );
-
-    return;
-  }
-
   try {
     hideMsg();
 
@@ -1323,14 +1283,14 @@ async function saveExpertGroundTruth() {
           analysis:
             state.analysis,
 
-          modelRawScore:
-            state.analysis.modelRawScore,
+           modelRawScore:
+            state.analysis?.modelRawScore ?? null,
 
           modelPromptVersion:
-            state.analysis.modelPromptVersion,
+            state.analysis?.modelPromptVersion ?? "",
 
           modelName:
-            state.analysis.modelName,
+            state.analysis?.modelName ?? "",
 
           expertScore:
             expert.expertScore,
