@@ -77468,20 +77468,35 @@ ${lines.join("\n")}
   }
 }
 function dairyTraitsExpertPartSrv(v, max) {
-  const n = Number(v);
+  const raw =
+    String(v ?? "").trim();
+
+  if (!raw) return null;
+
+  const n = Number(raw);
   const m = Number(max);
 
   if (
     !Number.isFinite(n) ||
     !Number.isFinite(m) ||
     n < 0 ||
-    n > m ||
-    !Number.isInteger(n)
+    n > m
   ) {
     return null;
   }
 
-  return n;
+  // Ground Truth للأبقار يسمح بعُشر نقطة.
+  const normalized =
+    Number(n.toFixed(1));
+
+  if (
+    Math.abs(n - normalized) >
+    0.0000001
+  ) {
+    return null;
+  }
+
+  return normalized;
 }
 
 function dairyTraitsExpertScoreSrv(v) {
@@ -77591,7 +77606,7 @@ function dairyTraitsExpertUdderSubscoresSrv(raw = {}) {
 }
 
 function dairyTraitsBreakdownSumSrv(b = {}) {
-  return [
+  const total = [
     b.udder,
     b.feetAndLegs,
     b.dairyStrength,
@@ -77602,10 +77617,12 @@ function dairyTraitsBreakdownSumSrv(b = {}) {
       sum + (Number(v) || 0),
     0
   );
+
+  return Number(total.toFixed(1));
 }
 
 function dairyTraitsUdderSubscoresSumSrv(u = {}) {
-  return [
+  const total = [
     u.udderDepth,
     u.rearUdder,
     u.teatPlacement,
@@ -77618,6 +77635,77 @@ function dairyTraitsUdderSubscoresSumSrv(u = {}) {
       sum + (Number(v) || 0),
     0
   );
+
+  return Number(total.toFixed(1));
+}
+
+function dairyTraitsCowExpertTotalsSrv(
+  body = {}
+) {
+  const expertUdderSubscores =
+    dairyTraitsExpertUdderSubscoresSrv(
+      body.expertUdderSubscores ||
+      body.groundTruthUdderSubscores ||
+      {}
+    );
+
+  if (!expertUdderSubscores) {
+    return {
+      ok: false,
+      error:
+        "dairy_traits_training_expert_udder_invalid",
+      message:
+        "❌ أكمل درجات السمات السبع للضرع داخل حدودها؛ يسمح بعُشر نقطة."
+    };
+  }
+
+  const expertUdderSum =
+    dairyTraitsUdderSubscoresSumSrv(
+      expertUdderSubscores
+    );
+
+  const expertBreakdownRaw =
+    body.expertBreakdown ||
+    body.groundTruthBreakdown ||
+    {};
+
+  const expertBreakdown =
+    dairyTraitsExpertBreakdownSrv({
+      ...expertBreakdownRaw,
+
+      // السيرفر وحده يحسب درجة الضرع.
+      udder: expertUdderSum
+    });
+
+  if (!expertBreakdown) {
+    return {
+      ok: false,
+      error:
+        "dairy_traits_training_expert_breakdown_invalid",
+      message:
+        "❌ أكمل درجات المكونات داخل حدودها؛ يسمح بعُشر نقطة، والسيرفر يحسب الضرع والدرجة النهائية."
+    };
+  }
+
+  const expertScore =
+    dairyTraitsBreakdownSumSrv(
+      expertBreakdown
+    );
+
+  return {
+    ok: true,
+
+    expertScore,
+
+    expertBreakdown,
+
+    expertUdderSubscores,
+
+    expertUdderSum,
+
+    expertBreakdownSum:
+      expertScore
+  };
 }
 
 function dairyTraitsPartDeltaSrv(
@@ -79461,8 +79549,8 @@ evaluationFramework: "cow_murabbik",
       ? parsed.weaknesses.slice(0, 4)
       : [],
 
-
-      String(
+  reason:
+    String(
       parsed.reason || ""
     ).trim(),
 
@@ -80465,7 +80553,77 @@ app.get(
     }
   }
 );
+app.post(
+  "/api/dairy-traits/training/calculate",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (
+        !dairyTraitsIsTrainingAdminSrv(
+          req.userId
+        )
+      ) {
+        return res.status(403).json({
+          ok: false,
+          canTrain: false,
 
+          error:
+            "dairy_traits_training_forbidden",
+
+          message:
+            "أدوات مراجعة Ground Truth لسمات إنتاج اللبن متاحة لحساب دكتور محمد فقط."
+        });
+      }
+
+      const totals =
+        dairyTraitsCowExpertTotalsSrv(
+          req.body || {}
+        );
+
+      if (!totals.ok) {
+        return res.status(400).json({
+          ok: false,
+          canTrain: true,
+          error:
+            totals.error,
+          message:
+            totals.message
+        });
+      }
+
+      return res.json({
+        ok: true,
+        canTrain: true,
+
+        expertUdder:
+          totals.expertUdderSum,
+
+        expertScore:
+          totals.expertScore,
+
+        expertBreakdown:
+          totals.expertBreakdown
+      });
+
+    } catch (e) {
+      console.error(
+        "dairy traits training calculate failed:",
+        e.message || e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        canTrain: true,
+
+        error:
+          "dairy_traits_training_calculate_failed",
+
+        message:
+          "❌ تعذّر حساب Ground Truth الآن. حاول مرة أخرى."
+      });
+    }
+  }
+);
 app.post(
   "/api/dairy-traits/training/save",
   requireUserId,
@@ -80688,102 +80846,37 @@ app.post(
             modelUdderRaw.udderBalanceTexture
           )
       };
-      const expertScore =
-        dairyTraitsExpertScoreSrv(
-          body.expertScore ??
-          body.correctedScore ??
-          body.groundTruthScore
+      const expertTotals =
+        dairyTraitsCowExpertTotalsSrv(
+          body
         );
+
+      if (!expertTotals.ok) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            expertTotals.error,
+
+          message:
+            expertTotals.message
+        });
+      }
+
+      const expertScore =
+        expertTotals.expertScore;
 
       const expertBreakdown =
-        dairyTraitsExpertBreakdownSrv(
-          body.expertBreakdown ||
-          body.groundTruthBreakdown ||
-          {}
-        );
+        expertTotals.expertBreakdown;
 
       const expertUdderSubscores =
-        dairyTraitsExpertUdderSubscoresSrv(
-          body.expertUdderSubscores ||
-          body.groundTruthUdderSubscores ||
-          {}
-        );
-
-      if (expertScore === null) {
-        return res.status(400).json({
-          ok: false,
-
-          error:
-            "dairy_traits_training_expert_score_invalid",
-
-          message:
-            "❌ أدخل Ground Truth النهائي كدرجة صحيحة من 0 إلى 100."
-        });
-      }
-
-      if (!expertBreakdown) {
-        return res.status(400).json({
-          ok: false,
-
-          error:
-            "dairy_traits_training_expert_breakdown_invalid",
-
-          message:
-            "❌ أكمل Ground Truth للمكونات الخمسة ضمن حدودها المعتمدة."
-        });
-      }
-
-      if (!expertUdderSubscores) {
-        return res.status(400).json({
-          ok: false,
-
-          error:
-            "dairy_traits_training_expert_udder_invalid",
-
-          message:
-            "❌ أكمل Ground Truth للسمات السبع الفرعية للضرع ضمن حدودها المعتمدة."
-        });
-      }
+        expertTotals.expertUdderSubscores;
 
       const expertBreakdownSum =
-        dairyTraitsBreakdownSumSrv(
-          expertBreakdown
-        );
-
-      if (
-        expertBreakdownSum !==
-        expertScore
-      ) {
-        return res.status(400).json({
-          ok: false,
-
-          error:
-            "dairy_traits_training_expert_total_mismatch",
-
-          message:
-            `❌ مجموع المكونات الخمسة = ${expertBreakdownSum}/100، بينما Ground Truth النهائي = ${expertScore}/100. يجب أن يتطابقا.`
-        });
-      }
+        expertTotals.expertBreakdownSum;
 
       const expertUdderSum =
-        dairyTraitsUdderSubscoresSumSrv(
-          expertUdderSubscores
-        );
-
-           if (
-        expertUdderSum !==
-        expertBreakdown.udder
-      ) {
-        return res.status(400).json({
-          ok: false,
-
-          error:
-            "dairy_traits_training_expert_udder_mismatch",
-
-          message:
-            `❌ مجموع سمات الضرع الفرعية = ${expertUdderSum}/40، بينما درجة الضرع = ${expertBreakdown.udder}/40. يجب أن يتطابقا.`
-        });
-      }
+        expertTotals.expertUdderSum;
 
       const cowCorrectionApplied =
         Object.keys(expertBreakdown)
