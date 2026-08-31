@@ -563,14 +563,9 @@
             : "warning"
         );
 
-      } else if (
-        !payload.animalNumber
-      ) {
-        showMsg(
-          "أدخل رقم الحيوان وتاريخ التشخيص.",
-          "info"
-        );
-      }
+      } else {
+  showMsg("", "info");
+}
 
     } catch (e) {
       showMsg(
@@ -746,18 +741,6 @@
           els.correctionReason
             .value
             .trim();
-
-        if (!correctionPerformedBy) {
-          throw new Error(
-            "أدخل اسم القائم بالتعديل."
-          );
-        }
-
-        if (!correctionReason) {
-          throw new Error(
-            "اكتب سبب التعديل."
-          );
-        }
 
         j =
           await apiRequest(
