@@ -39164,18 +39164,33 @@ const last =
   await getLastOvsynchEventForSave(
     animalNumber
   );
-        const g14 = calvingDaysBetweenSrv(last.eventDate, eventDate);
 
-        if (Number.isFinite(g14) && g14 >= 0 && g14 < 14) {
-          rejected.push({
-            animalNumber,
-            reason: `❌ سبق تسجيل برنامج تزامن بدأ بتاريخ ${last.eventDate}.`
-          });
-          continue;
-        }
-      }
+if (
+  last?.eventDate &&
+  String(last.program || "").trim() === "ovsynch"
+) {
+  const g14 =
+    calvingDaysBetweenSrv(
+      last.eventDate,
+      eventDate
+    );
 
-      valid.push({
+  if (
+    Number.isFinite(g14) &&
+    g14 >= 0 &&
+    g14 < 14
+  ) {
+    rejected.push({
+      animalNumber,
+      reason:
+        `❌ سبق تسجيل برنامج تزامن بدأ بتاريخ ${last.eventDate}.`
+    });
+
+    continue;
+  }
+}
+
+valid.push({
         animalNumber,
         animal
       });
@@ -72287,7 +72302,8 @@ async function heatDuplicateCheckSrv(uid, animalNumber, eventDate, windowDays = 
     const d = computeEventDateFromDoc(ev);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d || ""))) continue;
 
-    const last = new Date(d + "T00:00:00");
+    
+     new Date(d + "T00:00:00");
     if (Number.isNaN(last.getTime())) continue;
 
     const diff = Math.floor((cur - last) / 86400000);
