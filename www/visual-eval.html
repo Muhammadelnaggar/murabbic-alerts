@@ -978,27 +978,127 @@ function buffaloGroundTruthValue(id) {
     ? n
     : null;
 }
-function recalcBuffaloExpertTotal() {
-  const values = [
-    buffaloGroundTruthValue("buffaloExpertUdderTeat"),
-    buffaloGroundTruthValue("buffaloExpertFeetAndLegs"),
-    buffaloGroundTruthValue("buffaloExpertYieldPotential"),
-    buffaloGroundTruthValue("buffaloExpertStructure")
-  ];
+let buffaloExpertTotalsTimer = null;
+let buffaloExpertTotalsRequestSeq = 0;
 
+function clearBuffaloExpertServerTotal() {
   const scoreInput =
     $("#buffaloExpertScore");
 
-  if (!scoreInput) return;
-
-  if (values.some(v => v === null)) {
+  if (scoreInput) {
     scoreInput.value = "";
-    return;
+  }
+}
+
+function readBuffaloExpertCompositeDraft() {
+  return {
+    compositeScores: {
+      udderTeat:
+        buffaloGroundTruthValue(
+          "buffaloExpertUdderTeat"
+        ),
+
+      feetAndLegs:
+        buffaloGroundTruthValue(
+          "buffaloExpertFeetAndLegs"
+        ),
+
+      yieldPotential:
+        buffaloGroundTruthValue(
+          "buffaloExpertYieldPotential"
+        ),
+
+      structure:
+        buffaloGroundTruthValue(
+          "buffaloExpertStructure"
+        )
+    }
+  };
+}
+
+function recalcBuffaloExpertTotal() {
+  if (buffaloExpertTotalsTimer) {
+    clearTimeout(
+      buffaloExpertTotalsTimer
+    );
   }
 
-  scoreInput.value = String(
-    values.reduce((sum, v) => sum + v, 0)
-  );
+  buffaloExpertTotalsTimer =
+    setTimeout(
+      async () => {
+        if (
+          !state.training.buffaloCanTrain
+        ) {
+          clearBuffaloExpertServerTotal();
+          return;
+        }
+
+        const requestSeq =
+          ++buffaloExpertTotalsRequestSeq;
+
+        try {
+          const r = await fetch(
+            "/api/dairy-traits/buffalo-training/calculate",
+            {
+              method: "POST",
+              credentials: "same-origin",
+              cache: "no-store",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+
+                "Accept":
+                  "application/json"
+              },
+
+              body: JSON.stringify(
+                readBuffaloExpertCompositeDraft()
+              )
+            }
+          );
+
+          const j =
+            await r.json().catch(
+              () => ({})
+            );
+
+          if (
+            requestSeq !==
+            buffaloExpertTotalsRequestSeq
+          ) {
+            return;
+          }
+
+          if (!r.ok || !j.ok) {
+            clearBuffaloExpertServerTotal();
+            return;
+          }
+
+          const scoreInput =
+            $("#buffaloExpertScore");
+
+          if (scoreInput) {
+            scoreInput.value =
+              String(j.expertScore);
+          }
+
+        } catch (e) {
+          if (
+            requestSeq ===
+            buffaloExpertTotalsRequestSeq
+          ) {
+            clearBuffaloExpertServerTotal();
+          }
+
+          console.warn(
+            "buffalo dairy traits expert total calculate error:",
+            e
+          );
+        }
+      },
+      180
+    );
 }
 function fillBuffaloGroundTruthFromModel(result) {
   if (
