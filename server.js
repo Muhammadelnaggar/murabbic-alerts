@@ -80863,6 +80863,7 @@ app.post(
         });
       }
 
+
       const expertScore =
         expertTotals.expertScore;
 
@@ -81109,10 +81110,15 @@ if (trainingSpeciesKey !== "cow") {
             aiAnimal.collection ||
             "animals",
 
-          animalType:
+                    animalType:
             String(
               aiAnimal.data?.species ||
+              aiAnimal.data?.animaltype ||
               aiAnimal.data?.animalType ||
+              aiAnimal.data?.animalTypeAr ||
+              dairyTraitsAnimalTypeArSrv(
+                trainingSpeciesKey
+              ) ||
               body.animalType ||
               ""
             ).trim() ||
@@ -81332,17 +81338,17 @@ if (trainingSpeciesKey !== "cow") {
           status:
             "accepted",
 
-          source:
-            "server:/api/dairy-traits/training/save",
-
-          createdAt:
-            admin.firestore.FieldValue
-              .serverTimestamp(),
-
-          updatedAt:
-            admin.firestore.FieldValue
-              .serverTimestamp()
+                   source:
+            "server:/api/dairy-traits/training/save"
         });
+
+      payload.createdAt =
+        admin.firestore.FieldValue
+          .serverTimestamp();
+
+      payload.updatedAt =
+        admin.firestore.FieldValue
+          .serverTimestamp();
 
       try {
         await ref.set(
