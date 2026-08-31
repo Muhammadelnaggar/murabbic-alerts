@@ -76365,11 +76365,13 @@ async function dairyTraitsBuffaloBuildExpertCalibrationPromptSrv() {
         }
       );
 
+   
     return `
-Expert dairy-buffalo calibration memory from Dr. Mohamed:
-Use these reviewed corrections only as calibration guidance when the CURRENT TARGET shows similar visible morphology.
-Do not copy a previous total, composite score, or detailed-trait score blindly.
-Judge the current buffalo independently from its two images, then use the expert corrections only to improve calibration of comparable visible traits.
+Previous expert-reviewed dairy-buffalo corrections and notes from Dr. Mohamed:
+The expert-reviewed records are provided below as prior expert context.
+Judge the CURRENT buffalo independently from its two TARGET images.
+Determine for yourself what, if anything, from the previous expert feedback is relevant to the current judgment.
+Do not mechanically copy any previous total, composite score, detailed-trait score, or correction.
 ${lines.join("\n")}
 `.trim();
 
@@ -76809,40 +76811,44 @@ const DAIRY_TRAITS_BUFFALO_MURABBIK_SUBSCORE_LIMITS_SRV =
   });
 
 function dairyTraitsBuffaloMurabbikCompositeScoresSrv(raw = {}) {
-  const out = {
-    udderTeat:
-      dairyTraitsStrictIntRangeSrv(
-        raw.udderTeat,
-        0,
-        40
-      ),
-
-    feetAndLegs:
-      dairyTraitsStrictIntRangeSrv(
-        raw.feetAndLegs,
-        0,
-        25
-      ),
-
-    yieldPotential:
-      dairyTraitsStrictIntRangeSrv(
-        raw.yieldPotential,
-        0,
-        20
-      ),
-
-    structure:
-      dairyTraitsStrictIntRangeSrv(
-        raw.structure,
-        0,
-        15
-      )
+  const limits = {
+    udderTeat: 40,
+    feetAndLegs: 25,
+    yieldPotential: 20,
+    structure: 15
   };
 
-  return Object.values(out)
-    .some(v => v === null)
-      ? null
-      : out;
+  const out = {};
+
+  for (
+    const [key, max]
+    of Object.entries(limits)
+  ) {
+    const v = raw?.[key];
+
+    if (
+      v === null ||
+      v === undefined ||
+      String(v).trim() === ""
+    ) {
+      return null;
+    }
+
+    const parsed =
+      dairyTraitsStrictIntRangeSrv(
+        v,
+        0,
+        max
+      );
+
+    if (parsed === null) {
+      return null;
+    }
+
+    out[key] = parsed;
+  }
+
+  return out;
 }
 
 function dairyTraitsBuffaloMurabbikSubscoresSrv(raw = {}) {
@@ -76859,7 +76865,7 @@ function dairyTraitsBuffaloMurabbikSubscoresSrv(raw = {}) {
     if (
       v === null ||
       v === undefined ||
-      v === ""
+      String(v).trim() === ""
     ) {
       out[key] = null;
       continue;
@@ -76882,6 +76888,69 @@ function dairyTraitsBuffaloMurabbikSubscoresSrv(raw = {}) {
   return out;
 }
 
+// قراءة حكم نموذج الجاموس كما عاد.
+// لا Clamp ولا Round ولا فرض حدود تقييمية.
+function dairyTraitsBuffaloModelNumberSrv(v) {
+  if (
+    v === null ||
+    v === undefined ||
+    String(v).trim() === ""
+  ) {
+    return null;
+  }
+
+  const n = Number(v);
+
+  return Number.isFinite(n)
+    ? n
+    : null;
+}
+
+function dairyTraitsBuffaloModelCompositeScoresSrv(
+  raw = {}
+) {
+  return {
+    udderTeat:
+      dairyTraitsBuffaloModelNumberSrv(
+        raw.udderTeat
+      ),
+
+    feetAndLegs:
+      dairyTraitsBuffaloModelNumberSrv(
+        raw.feetAndLegs
+      ),
+
+    yieldPotential:
+      dairyTraitsBuffaloModelNumberSrv(
+        raw.yieldPotential
+      ),
+
+    structure:
+      dairyTraitsBuffaloModelNumberSrv(
+        raw.structure
+      )
+  };
+}
+
+function dairyTraitsBuffaloModelSubscoresSrv(
+  raw = {}
+) {
+  const out = {};
+
+  for (
+    const key of Object.keys(
+      DAIRY_TRAITS_BUFFALO_MURABBIK_SUBSCORE_LIMITS_SRV
+    )
+  ) {
+    out[key] =
+      dairyTraitsBuffaloModelNumberSrv(
+        raw?.[key]
+      );
+  }
+
+  return out;
+}
+
 function dairyTraitsBuffaloMurabbikCompositeSumSrv(
   composite = {}
 ) {
@@ -76893,8 +76962,12 @@ function dairyTraitsBuffaloMurabbikCompositeSumSrv(
   ];
 
   if (
-    values.some(v =>
-      !Number.isFinite(Number(v))
+    values.some(
+      v =>
+        v === null ||
+        v === undefined ||
+        v === "" ||
+        !Number.isFinite(Number(v))
     )
   ) {
     return null;
@@ -77450,11 +77523,12 @@ async function dairyTraitsCowBuildExpertCalibrationPromptSrv() {
         }
       );
 
-    return `
-Expert dairy-cow calibration memory from Dr. Mohamed:
-Use these reviewed cow corrections only as calibration guidance when the CURRENT TARGET shows comparable visible morphology.
-Do not copy a previous total, component score, or detailed-trait score blindly.
-Judge the current cow independently from its two images, then use the cow expert reviews to improve calibration of comparable visible traits.
+       return `
+Previous expert-reviewed dairy-cow corrections and notes from Dr. Mohamed:
+The expert-reviewed records are provided below as prior expert context.
+Judge the CURRENT cow independently from its two TARGET images.
+Determine for yourself what, if anything, from the previous expert feedback is relevant to the current judgment.
+Do not mechanically copy any previous total, component score, detailed-trait score, or correction.
 ${lines.join("\n")}
 `.trim();
 
@@ -78848,46 +78922,43 @@ if (!parsed || parsed.ok === false) {
   });
 }
 if (speciesKey === "buffalo") {
+  // حكم نموذج الجاموس كما عاد.
+  // السيرفر يقرأه ولا يعيد حسابه أو يفرض عليه Consistency.
   const modelScore =
-    dairyTraitsStrictIntRangeSrv(
-      parsed.score,
-      0,
-      100
+    dairyTraitsBuffaloModelNumberSrv(
+      parsed.score
     );
 
+  if (modelScore === null) {
+    return res.status(400).json({
+      ok: false,
+
+      error:
+        "dairy_traits_buffalo_model_score_unreadable",
+
+      message:
+        "❌ تعذّر قراءة الدرجة النهائية من استجابة نموذج الجاموس. أعد التحليل."
+    });
+  }
+
   const compositeScores =
-    dairyTraitsBuffaloMurabbikCompositeScoresSrv(
+    dairyTraitsBuffaloModelCompositeScoresSrv(
       parsed.compositeScores ||
       parsed.breakdown ||
       {}
     );
 
   const subscores =
-    dairyTraitsBuffaloMurabbikSubscoresSrv(
+    dairyTraitsBuffaloModelSubscoresSrv(
       parsed.subscores || {}
     );
 
-  if (
-    modelScore === null ||
-    !compositeScores ||
-    !subscores
-  ) {
-    return res.status(400).json({
-      ok: false,
-
-      error:
-        "dairy_traits_buffalo_score_invalid",
-
-      message:
-        "❌ لم أتمكن من استخراج تقييم جاموس صحيح ومتسق. أعد التحليل بصورتين واضحتين."
-    });
-  }
-
+  // Audit فقط.
+  // لا Gate ولا Override لحكم النموذج.
   const compositeSum =
     dairyTraitsBuffaloMurabbikCompositeSumSrv(
       compositeScores
     );
-
   const grade =
     String(
       parsed.grade ||
@@ -78969,30 +79040,38 @@ imageSpeciesKey:
       breakdownTitle:
         "التقسيم العام",
 
-      breakdownRows: [
+            breakdownRows: [
         {
           label:
             "الجهاز الضرعي والحلمات",
           value:
-            `${compositeScores.udderTeat} / 40`
+            compositeScores.udderTeat === null
+              ? "غير متاح"
+              : `${compositeScores.udderTeat} / 40`
         },
         {
           label:
             "الأرجل والأقدام",
           value:
-            `${compositeScores.feetAndLegs} / 25`
+            compositeScores.feetAndLegs === null
+              ? "غير متاح"
+              : `${compositeScores.feetAndLegs} / 25`
         },
         {
           label:
             "السعة والطابع الحلاب",
           value:
-            `${compositeScores.yieldPotential} / 20`
+            compositeScores.yieldPotential === null
+              ? "غير متاح"
+              : `${compositeScores.yieldPotential} / 20`
         },
         {
           label:
             "الحوض والتركيب",
           value:
-            `${compositeScores.structure} / 15`
+            compositeScores.structure === null
+              ? "غير متاح"
+              : `${compositeScores.structure} / 15`
         }
       ],
 
@@ -79671,7 +79750,84 @@ app.get(
     }
   }
 );
+app.post(
+  "/api/dairy-traits/buffalo-training/calculate",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (
+        !dairyTraitsIsTrainingAdminSrv(
+          req.userId
+        )
+      ) {
+        return res.status(403).json({
+          ok: false,
+          canTrain: false,
 
+          error:
+            "dairy_traits_buffalo_training_forbidden",
+
+          message:
+            "أدوات مراجعة Ground Truth لسمات الجاموس متاحة للحساب الإداري المعتمد فقط."
+        });
+      }
+
+      const body =
+        req.body || {};
+
+      const expertCompositeScores =
+        dairyTraitsBuffaloMurabbikCompositeScoresSrv(
+          body.compositeScores ||
+          body.expertCompositeScores ||
+          body.groundTruthCompositeScores ||
+          {}
+        );
+
+      if (!expertCompositeScores) {
+        return res.status(400).json({
+          ok: false,
+          canTrain: true,
+
+          error:
+            "dairy_traits_buffalo_training_composite_invalid",
+
+          message:
+            "❌ أكمل الأقسام الأربعة لـ Ground Truth للجاموس داخل حدودها."
+        });
+      }
+
+      const expertScore =
+        dairyTraitsBuffaloMurabbikCompositeSumSrv(
+          expertCompositeScores
+        );
+
+      return res.json({
+        ok: true,
+        canTrain: true,
+
+        expertScore,
+        expertCompositeScores
+      });
+
+    } catch (e) {
+      console.error(
+        "dairy traits buffalo training calculate failed:",
+        e.message || e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        canTrain: true,
+
+        error:
+          "dairy_traits_buffalo_training_calculate_failed",
+
+        message:
+          "❌ تعذّر حساب Ground Truth للجاموس الآن. حاول مرة أخرى."
+      });
+    }
+  }
+);
 app.post(
   "/api/dairy-traits/buffalo-training/save",
   requireUserId,
@@ -79855,16 +80011,26 @@ app.post(
       }
 
       const modelScore =
-        dairyTraitsStrictIntRangeSrv(
+        dairyTraitsBuffaloModelNumberSrv(
           body.modelScore ??
           body.predictedScore ??
-          analysis.score,
-          0,
-          100
+          analysis.score
         );
 
+      if (modelScore === null) {
+        return res.status(400).json({
+          ok: false,
+
+          error:
+            "dairy_traits_buffalo_training_model_score_unreadable",
+
+          message:
+            "❌ تعذّر قراءة الدرجة الأصلية لنموذج الجاموس. أعد التحليل أولًا."
+        });
+      }
+
       const modelCompositeScores =
-        dairyTraitsBuffaloMurabbikCompositeScoresSrv(
+        dairyTraitsBuffaloModelCompositeScoresSrv(
           body.modelCompositeScores ||
           analysis.compositeScores ||
           {}
@@ -79880,38 +80046,10 @@ app.post(
         analysis.subscores ||
         {};
 
-      const modelSubscoresComplete =
-        subscoreKeys.every(
-          key =>
-            Object.prototype.hasOwnProperty.call(
-              modelSubscoresRaw,
-              key
-            )
-        );
-
       const modelSubscores =
-        modelSubscoresComplete
-          ? dairyTraitsBuffaloMurabbikSubscoresSrv(
-              modelSubscoresRaw
-            )
-          : null;
-
-      if (
-        modelScore === null ||
-        !modelCompositeScores ||
-        !modelSubscores
-      ) {
-        return res.status(400).json({
-          ok: false,
-
-          error:
-            "dairy_traits_buffalo_training_prediction_invalid",
-
-          message:
-            "❌ نتيجة نموذج الجاموس الأصلية غير مكتملة. أعد التحليل أولًا."
-        });
-      }
-
+        dairyTraitsBuffaloModelSubscoresSrv(
+          modelSubscoresRaw
+        );
           const expertCompositeScores =
         dairyTraitsBuffaloMurabbikCompositeScoresSrv(
           groundTruth.compositeScores ||
@@ -80026,7 +80164,7 @@ app.post(
                 modelSubscores[key] === null
             );
 
-      const compositeDelta = {};
+            const compositeDelta = {};
 
       for (const key of [
         "udderTeat",
@@ -80034,9 +80172,18 @@ app.post(
         "yieldPotential",
         "structure"
       ]) {
-        compositeDelta[key] =
-          expertCompositeScores[key] -
+        const expertValue =
+          expertCompositeScores[key];
+
+        const modelValue =
           modelCompositeScores[key];
+
+        compositeDelta[key] =
+          expertValue === null ||
+          modelValue === null
+            ? null
+            : expertValue -
+              modelValue;
       }
 
       const subscoreDelta = {};
@@ -80331,17 +80478,17 @@ app.post(
           status:
             "accepted",
 
-          source:
-            "server:/api/dairy-traits/buffalo-training/save",
-
-          createdAt:
-            admin.firestore.FieldValue
-              .serverTimestamp(),
-
-          updatedAt:
-            admin.firestore.FieldValue
-              .serverTimestamp()
+                   source:
+            "server:/api/dairy-traits/buffalo-training/save"
         });
+
+      payload.createdAt =
+        admin.firestore.FieldValue
+          .serverTimestamp();
+
+      payload.updatedAt =
+        admin.firestore.FieldValue
+          .serverTimestamp();
 
       await ref.set(
         payload,
@@ -80391,9 +80538,18 @@ app.post(
                 .increment(1),
 
             datasetOnly:
+              false,
+
+            runtimeCalibrationEnabled:
               true,
 
+            calibrationScope:
+              "global_model",
+
             calibrationApplied:
+              false,
+
+            runtimeOverrideApplied:
               false,
 
             fineTuningApplied:
@@ -80423,8 +80579,14 @@ app.post(
         expertCompositeScores,
         expertSubscores,
 
-        datasetOnly:
+                datasetOnly:
+          false,
+
+        runtimeCalibrationEnabled:
           true,
+
+        calibrationScope:
+          "global_model",
 
         calibrationApplied:
           false,
