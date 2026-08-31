@@ -73,11 +73,8 @@
           <div class="field">
             <label for="program">نوع البرنامج</label>
             <select id="program" data-field="program">
-              <option value="" selected disabled>اختر البرنامج</option>
-              <option value="ovsynch">Ovsynch</option>
-              <option value="cosynch72">Cosynch-72</option>
-              <option value="presynch_ovsynch">Presynch + Ovsynch</option>
-            </select>
+  <option value="" selected disabled>اختر البرنامج</option>
+</select>
            <div class="form-hint">ضع علامة ✓ عند تنفيذ كل خطوة.</div>
           </div>
         </div>
@@ -273,27 +270,56 @@ const STEP_PROTOCOL_START_DATE =
     ""
   ).trim().slice(0, 10);
 
-  const PROGRAMS = {
-    ovsynch: [
-      { day: 0,  name: "GnRH (اليوم 0)" },
-      { day: 7,  name: "PGF2α (اليوم 7)" },
-      { day: 9,  name: "GnRH (اليوم 9)" },
-      { day: 10, name: "تلقيح مُوقّت TAI (اليوم 10)" }
-    ],
-    cosynch72: [
-      { day: 0,  name: "GnRH (اليوم 0)" },
-      { day: 7,  name: "PGF2α (اليوم 7)" },
-      { day: 10, name: "GnRH + تلقيح مُوقّت TAI (Cosynch-72) (اليوم 10)" }
-    ],
-    presynch_ovsynch: [
-      { day: 0,  name: "PGF2α (Presynch 1) (اليوم 0)" },
-      { day: 14, name: "PGF2α (Presynch 2) (اليوم 14)" },
-      { day: 28, name: "GnRH (Ovsynch) (اليوم 28)" },
-      { day: 35, name: "PGF2α (Ovsynch) (اليوم 35)" },
-      { day: 37, name: "GnRH (Ovsynch) (اليوم 37)" },
-      { day: 38, name: "تلقيح مُوقّت TAI (Ovsynch) (اليوم 38)" }
-    ]
-  };
+async function loadProgramConfig(){
+  const data =
+    await mbkApi(
+      "/api/ovsynch/config",
+      {
+        method: "GET"
+      }
+    );
+
+  const programs =
+    Array.isArray(
+      data.programs
+    )
+      ? data.programs
+      : [];
+
+  programEl.innerHTML =
+    '<option value="" selected disabled>اختر البرنامج</option>';
+
+  for (
+    const item of programs
+  ) {
+    const key =
+      String(
+        item?.key || ""
+      ).trim();
+
+    const label =
+      String(
+        item?.label || key
+      ).trim();
+
+    if (!key) continue;
+
+    const opt =
+      document.createElement(
+        "option"
+      );
+
+    opt.value =
+      key;
+
+    opt.textContent =
+      label;
+
+    programEl.appendChild(
+      opt
+    );
+  }
+}
 
   function syncCentral(){
     const list = getCurrentNumbers();
@@ -307,51 +333,118 @@ const STEP_PROTOCOL_START_DATE =
     stepsHidden.value = JSON.stringify(stepsState || []);
   }
 
-  function updateSteps(){
-    stepsBox.innerHTML = "";
+async function updateSteps(){
+  stepsBox.innerHTML = "";
 
-    const start = startDateEl.value;
-    const program = programEl.value;
+  const start =
+    String(
+      startDateEl.value || ""
+    ).trim();
 
-    if (!start || !program) {
-      stepsState = [];
-      syncCentral();
-      return;
+  const program =
+    String(
+      programEl.value || ""
+    ).trim();
+
+  const startTime =
+    String(
+      startTimeEl.value ||
+      "08:00"
+    ).trim();
+
+  if (
+    !start ||
+    !program
+  ) {
+    stepsState = [];
+    syncCentral();
+    return;
+  }
+
+  try {
+    const data =
+      await mbkApi(
+        "/api/ovsynch/preview",
+        {
+          method: "POST",
+
+          body:
+            JSON.stringify({
+              program,
+              startDate:
+                start,
+
+              eventDate:
+                start,
+
+              startTime
+            })
+        }
+      );
+
+    stepsState =
+      Array.isArray(
+        data.steps
+      )
+        ? data.steps.map(
+            st => ({
+              ...st,
+              done: false
+            })
+          )
+        : [];
+
+    if (data.startTime) {
+      startTimeEl.value =
+        String(
+          data.startTime
+        ).slice(0, 5);
     }
 
-    stepsState = (PROGRAMS[program] || []).map(s => {
-      const d = new Date(start + "T" + (startTimeEl.value || "08:00"));
-      d.setDate(d.getDate() + s.day);
+    for (
+      let i = 0;
+      i < stepsState.length;
+      i++
+    ) {
+      const st =
+        stepsState[i];
 
-      return {
-        day: s.day,
-        name: s.name,
-        date: d.toISOString().slice(0,16),
-        done: false
-      };
-    });
+      const row =
+        document.createElement(
+          "div"
+        );
 
-    for (let i = 0; i < stepsState.length; i++) {
-      const st = stepsState[i];
-      const row = document.createElement("div");
-      row.className = "step-item";
+      row.className =
+        "step-item";
 
       row.innerHTML = `
         <div>
-          <div class="name">${st.name}</div>
+          <div class="name">${String(st.name || "")}</div>
           <div class="date">📅 ${new Date(st.date).toLocaleString('ar-EG')}</div>
         </div>
+
         <label class="chk">
           <input type="checkbox" data-i="${i}">
           تم
         </label>`;
 
-      stepsBox.appendChild(row);
+      stepsBox.appendChild(
+        row
+      );
     }
 
     syncCentral();
-  }
 
+  } catch (err) {
+    stepsState = [];
+    syncCentral();
+
+    showWarn(
+      err?.message ||
+      "❌ تعذّر تحميل خطوات برنامج التزامن من السيرفر."
+    );
+  }
+}
   async function runGatePreview(){
     if (STEP_MODE) return;
 
@@ -481,12 +574,17 @@ const data = await mbkApi(
       if (meta.protocolStartDate) {
         startDateEl.value = String(meta.protocolStartDate).slice(0,10);
       }
-
+if (meta.plannedTime) {
+  startTimeEl.value =
+    String(
+      meta.plannedTime
+    ).slice(0, 5);
+}
       programEl.disabled = true;
       startDateEl.disabled = true;
       startTimeEl.disabled = true;
 
-      updateSteps();
+      await updateSteps();
 
       bulkEl.value = nums.join("\n");
 
@@ -527,7 +625,7 @@ const data = await mbkApi(
       return;
     }
 
-    const st = stepsState[STEP_INDEX] || {};
+    
     const program =
   String(
     programEl.value ||
@@ -552,8 +650,7 @@ const startISO =
           protocolProgram: program,
           protocolStartDate: startISO,
           stepIndex: STEP_INDEX,
-          stepDay: Number(st.day ?? 0),
-          stepName: String(st.name || "")
+          
         })
       });
 
@@ -596,9 +693,27 @@ const startISO =
           animalNumbers: list,
           animalNumber: list[0] || "",
           eventDate: start,
-          startDate: start,
-          program,
-          steps: stepsState
+startDate: start,
+
+startTime:
+  String(
+    startTimeEl.value ||
+    "08:00"
+  ).trim(),
+
+program,
+
+doneStepIndexes:
+  stepsState
+    .map(
+      (st, i) =>
+        st?.done
+          ? i
+          : -1
+    )
+    .filter(
+      i => i >= 0
+    )
         })
       });
 
@@ -784,14 +899,34 @@ requestAnimationFrame(() => {
     saveProtocol();
   });
 
+  async function boot(){
   if (!startDateEl.value) {
-    startDateEl.value = todayISO();
+    startDateEl.value =
+      todayISO();
   }
 
-  hydrateFromURL();
-  updateSteps();
-  loadStepTargets();
-  syncCentral();
+  try {
+    await loadProgramConfig();
+
+    hydrateFromURL();
+
+    if (STEP_MODE) {
+      await loadStepTargets();
+    } else {
+      await updateSteps();
+    }
+
+    syncCentral();
+
+  } catch (err) {
+    showWarn(
+      err?.message ||
+      "❌ تعذّر تحميل بيانات برنامج التزامن من السيرفر."
+    );
+  }
+}
+
+boot();
 })();
 </script>
 </body>
