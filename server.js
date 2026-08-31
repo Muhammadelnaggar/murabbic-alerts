@@ -37128,7 +37128,7 @@ app.post("/api/mastitis/save", requireUserId, async (req, res) => {
       healthStatus: "التهاب الضرع",
       lastDisease: "التهاب الضرع",
       lastDiseaseDate: fd.eventDate,
-      lastDiagnosis: disease.name,
+      lastDiagnosis: diagnosisText,
       lastDiagnosisDate: fd.eventDate,
 
       lastMastitisDate: fd.eventDate,
