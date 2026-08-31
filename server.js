@@ -38016,14 +38016,135 @@ app.post(
 //                 إنهاء/تجاهل البروتوكول النشط حسب مدة البرنامج
 // ============================================================
 
+const OVSYNCH_PROGRAMS_SRV = Object.freeze({
+  ovsynch: Object.freeze({
+    label: "Ovsynch",
+    steps: Object.freeze([
+      Object.freeze({ day: 0,  name: "GnRH (اليوم 0)" }),
+      Object.freeze({ day: 7,  name: "PGF2α (اليوم 7)" }),
+      Object.freeze({ day: 9,  name: "GnRH (اليوم 9)" }),
+      Object.freeze({ day: 10, name: "تلقيح مُوقّت TAI (اليوم 10)" })
+    ])
+  }),
+
+  cosynch72: Object.freeze({
+    label: "Cosynch-72",
+    steps: Object.freeze([
+      Object.freeze({ day: 0,  name: "GnRH (اليوم 0)" }),
+      Object.freeze({ day: 7,  name: "PGF2α (اليوم 7)" }),
+      Object.freeze({ day: 10, name: "GnRH + تلقيح مُوقّت TAI (Cosynch-72) (اليوم 10)" })
+    ])
+  }),
+
+  presynch_ovsynch: Object.freeze({
+    label: "Presynch + Ovsynch",
+    steps: Object.freeze([
+      Object.freeze({ day: 0,  name: "PGF2α (Presynch 1) (اليوم 0)" }),
+      Object.freeze({ day: 14, name: "PGF2α (Presynch 2) (اليوم 14)" }),
+      Object.freeze({ day: 28, name: "GnRH (Ovsynch) (اليوم 28)" }),
+      Object.freeze({ day: 35, name: "PGF2α (Ovsynch) (اليوم 35)" }),
+      Object.freeze({ day: 37, name: "GnRH (Ovsynch) (اليوم 37)" }),
+      Object.freeze({ day: 38, name: "تلقيح مُوقّت TAI (Ovsynch) (اليوم 38)" })
+    ])
+  })
+});
+
+function ovsynchProgramDefinitionSrv(program) {
+  const key = String(program || "").trim().toLowerCase();
+  return OVSYNCH_PROGRAMS_SRV[key] || null;
+}
+
+function ovsynchNormalizeStartTimeSrv(raw) {
+  const value = String(raw || "").trim();
+
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
+    ? value
+    : "08:00";
+}
+
+function ovsynchBuildStepsSrv(
+  program,
+  startDate,
+  startTime,
+  doneIndexes = []
+) {
+  const def =
+    ovsynchProgramDefinitionSrv(program);
+
+  const start =
+    String(startDate || "")
+      .trim()
+      .slice(0, 10);
+
+  if (
+    !def ||
+    !calvingIsDateSrv(start)
+  ) {
+    return [];
+  }
+
+  const plannedTime =
+    ovsynchNormalizeStartTimeSrv(
+      startTime
+    );
+
+  const doneSet =
+    new Set(
+      (Array.isArray(doneIndexes)
+        ? doneIndexes
+        : []
+      )
+        .map(x => Number(x))
+        .filter(
+          x =>
+            Number.isInteger(x) &&
+            x >= 0 &&
+            x < def.steps.length
+        )
+    );
+
+  return def.steps.map(
+    (step, index) => {
+      const dueDate =
+        addDaysToIsoDateSrv(
+          start,
+          step.day
+        );
+
+      return {
+        day:
+          step.day,
+
+        name:
+          step.name,
+
+        date:
+          `${dueDate}T${plannedTime}`,
+
+        done:
+          doneSet.has(index)
+      };
+    }
+  );
+}
+
 function ovsynchProgramDurationDaysSrv(program) {
-  const p = String(program || "").trim().toLowerCase();
+  const def =
+    ovsynchProgramDefinitionSrv(
+      program
+    );
 
-  if (p === "ovsynch") return 10;
-  if (p === "cosynch72") return 10;
-  if (p === "presynch_ovsynch") return 38;
+  if (
+    def?.steps?.length
+  ) {
+    return Math.max(
+      ...def.steps.map(
+        step =>
+          Number(step.day) || 0
+      )
+    );
+  }
 
-  // لو البرنامج القديم غير محفوظ في وثيقة الحيوان، نستخدم أطول مدة آمنة.
   return 38;
 }
 
@@ -38073,6 +38194,109 @@ function ovsynchActiveProtocolBlockMessageSrv(doc = {}, eventDate = "") {
   // لو تعدى مدة البرنامج، لا يمنع؛ يعتبر منتهيًا منطقيًا.
   return null;
 }
+// ============================================================
+//                 API: OVSYNCH CONFIG / PREVIEW
+//                 السيرفر هو مصدر تعريف البرامج والخطوات والمواعيد
+// ============================================================
+
+app.get(
+  "/api/ovsynch/config",
+  requireUserId,
+  async (_req, res) => {
+
+    return res.json({
+      ok: true,
+
+      programs:
+        Object.entries(
+          OVSYNCH_PROGRAMS_SRV
+        ).map(
+          ([key, def]) => ({
+            key,
+            label: def.label
+          })
+        )
+    });
+  }
+);
+
+app.post(
+  "/api/ovsynch/preview",
+  requireUserId,
+  async (req, res) => {
+
+    const body =
+      req.body || {};
+
+    const program =
+      String(
+        body.program || ""
+      )
+        .trim()
+        .toLowerCase();
+
+    const startDate =
+      String(
+        body.startDate ||
+        body.eventDate ||
+        body.date ||
+        ""
+      )
+        .trim()
+        .slice(0, 10);
+
+    const startTime =
+      ovsynchNormalizeStartTimeSrv(
+        body.startTime
+      );
+
+    if (
+      !ovsynchProgramDefinitionSrv(
+        program
+      )
+    ) {
+      return res.status(400).json({
+        ok: false,
+
+        error:
+          "ovsynch_program_invalid",
+
+        message:
+          "❌ اختر برنامج تزامن صحيحًا."
+      });
+    }
+
+    if (
+      !calvingIsDateSrv(
+        startDate
+      )
+    ) {
+      return res.status(400).json({
+        ok: false,
+
+        error:
+          "ovsynch_start_date_invalid",
+
+        message:
+          "❌ أدخل تاريخ بدء صحيحًا لبرنامج التزامن."
+      });
+    }
+
+    return res.json({
+      ok: true,
+      program,
+      startDate,
+      startTime,
+
+      steps:
+        ovsynchBuildStepsSrv(
+          program,
+          startDate,
+          startTime
+        )
+    });
+  }
+);
 // ============================================================
 //                 API: OVSYNCH GATE
 //                 أهلية أرقام التزامن فقط — بدون حفظ وبدون Tasks
@@ -38528,19 +38752,44 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
       )];
     }
 
-    function parseOvsynchStepsForSave(raw) {
-      if (Array.isArray(raw)) return raw;
+    function parseOvsynchDoneIndexesForSave(raw) {
+  const arr =
+    Array.isArray(raw)
+      ? raw
+      : (() => {
+          const txt =
+            String(raw || "")
+              .trim();
 
-      const txt = String(raw || "").trim();
-      if (!txt) return [];
+          if (!txt) {
+            return [];
+          }
 
-      try {
-        const parsed = JSON.parse(txt);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch (_) {
-        return [];
-      }
-    }
+          try {
+            const parsed =
+              JSON.parse(txt);
+
+            return Array.isArray(parsed)
+              ? parsed
+              : [];
+
+          } catch (_) {
+            return [];
+          }
+        })();
+
+  return [
+    ...new Set(
+      arr
+        .map(x => Number(x))
+        .filter(
+          x =>
+            Number.isInteger(x) &&
+            x >= 0
+        )
+    )
+  ];
+}
 
     const numbers = parseOvsynchNumbersForSave(rawNumbers);
 
@@ -38551,8 +38800,30 @@ app.post("/api/ovsynch/save", requireUserId, async (req, res) => {
       ""
     ).trim().slice(0, 10);
 
-    const program = String(body.program || "").trim();
-    const steps = parseOvsynchStepsForSave(body.steps);
+    const program =
+  String(
+    body.program || ""
+  )
+    .trim()
+    .toLowerCase();
+
+const startTime =
+  ovsynchNormalizeStartTimeSrv(
+    body.startTime
+  );
+
+const doneStepIndexes =
+  parseOvsynchDoneIndexesForSave(
+    body.doneStepIndexes
+  );
+
+const steps =
+  ovsynchBuildStepsSrv(
+    program,
+    eventDate,
+    startTime,
+    doneStepIndexes
+  );
 
     // حماية طلب الحفظ فقط — لا كتابة قبل اكتمال هذه البيانات
     const missing = {};
@@ -38564,12 +38835,18 @@ if (!eventDate || !calvingIsDateSrv(eventDate)) {
   missing.eventDate = "أدخل تاريخ بدء صحيحًا لبرنامج التزامن.";
 }
 
-if (!program) {
-  missing.program = "اختر برنامج التزامن.";
+if (
+  !ovsynchProgramDefinitionSrv(
+    program
+  )
+) {
+  missing.program =
+    "اختر برنامج تزامن صحيحًا.";
 }
 
 if (!steps.length) {
-  missing.steps = "اختر البرنامج أولًا حتى تظهر خطواته.";
+  missing.steps =
+    "تعذّر بناء خطوات برنامج التزامن من السيرفر.";
 }
 
     if (Object.keys(missing).length) {
@@ -38680,11 +38957,10 @@ function ovsynchEligibilityDecisionForSave(fd = {}) {
   const w = ovsynchAnimalWordForSave(sp);
 
   const rsRaw = String(
-    fd.reproStatusFromEvents ||
-    doc.reproductiveStatus ||
-    ""
-  ).trim();
-
+  doc.reproductiveStatus ||
+  fd.reproStatusFromEvents ||
+  ""
+).trim();
   const cat = ovsynchReproCategoryForSave(rsRaw);
   const shownStatus = rsRaw ? `«${rsRaw}»` : "غير معروفة";
 
@@ -38826,11 +39102,68 @@ function ovsynchEligibilityDecisionForSave(fd = {}) {
         continue;
       }
 
-      // تم فحص الأهلية مسبقًا في /api/ovsynch/gate.
-// الحفظ لا يعيد قرار الأهلية؛ يراجع فقط وجود الحيوان والتكرار القريب قبل الكتابة.
-      const last = await getLastOvsynchEventForSave(animalNumber);
+     const doc =
+  animal.data || {};
 
-      if (last?.eventDate && String(last.program || "").trim() === "ovsynch") {
+const signals =
+  await fetchCalvingSignalsFromEventsSrv(
+    uid,
+    animalNumber
+  );
+
+const species =
+  normalizeOvsynchSpeciesForSave(
+    doc,
+    body.species
+  );
+
+const reproFromEvents =
+  String(
+    signals.reproStatusFromEvents ||
+    ""
+  ).trim();
+
+const decision =
+  ovsynchEligibilityDecisionForSave({
+    animalNumber,
+    eventDate,
+
+    animalId:
+      animal.id || "",
+
+    species,
+
+    documentData:
+      doc,
+
+    reproStatusFromEvents:
+      reproFromEvents,
+
+    lastBoundary:
+      String(
+        signals.lastBoundary || ""
+      ).trim(),
+
+    lastBoundaryType:
+      String(
+        signals.lastBoundaryType || ""
+      ).trim()
+  });
+
+if (decision) {
+  rejected.push({
+    animalNumber,
+    reason:
+      String(decision)
+  });
+
+  continue;
+}
+
+const last =
+  await getLastOvsynchEventForSave(
+    animalNumber
+  );
         const g14 = calvingDaysBetweenSrv(last.eventDate, eventDate);
 
         if (Number.isFinite(g14) && g14 >= 0 && g14 < 14) {
@@ -38909,6 +39242,7 @@ function ovsynchEligibilityDecisionForSave(fd = {}) {
         eventTypeNorm: "ovsynch",
         eventDate,
         program,
+        startTime,
         steps,
         userId: uid,
         ownerUid: uid,
@@ -39408,345 +39742,673 @@ const n =
 //                 تأكيد تنفيذ خطوة التزامن + تحديث Task + Event
 // ============================================================
 
-app.post("/api/ovsynch/confirm-step", requireUserId, async (req, res) => {
-  try {
-    if (!db) {
-      return res.status(503).json({
-        ok: false,
-        message: "❌ تعذّر تأكيد تنفيذ خطوة التزامن الآن. حاول مرة أخرى.",
-        doneCount: 0,
-        rejectedCount: 0,
-        saved: [],
-        rejected: []
-      });
-    }
+app.post(
+  "/api/ovsynch/confirm-step",
+  requireUserId,
+  async (req, res) => {
 
-    const uid = req.userId;
-    const body = req.body || {};
-
-    const rawNumbers =
-      body.animalNumbers ||
-      body.numbers ||
-      body.animalNumber ||
-      body.number ||
-      "";
-
-    function parseOvsynchNumbersForConfirm(raw) {
-      let arr = [];
-
-      if (Array.isArray(raw)) {
-        arr = raw;
-      } else {
-        const txt = String(raw || "").trim();
-        if (!txt) return [];
-
-        try {
-          const parsed = JSON.parse(txt);
-          arr = Array.isArray(parsed) ? parsed : txt.split(/\n|,|;|،|\s+/g);
-        } catch (_) {
-          arr = txt.split(/\n|,|;|،|\s+/g);
-        }
-      }
-
-      return [...new Set(
-        arr
-          .map(x => calvingNormDigitsOnlySrv(x))
-          .filter(Boolean)
-      )];
-    }
-
-    const numbers = parseOvsynchNumbersForConfirm(rawNumbers);
-
-    const program = String(
-      body.program ||
-      body.protocolProgram ||
-      "ovsynch"
-    ).trim();
-
-    const protocolStartDate = String(
-      body.protocolStartDate ||
-      body.startDate ||
-      body.eventDate ||
-      ""
-    ).trim().slice(0, 10);
-
-    const farmToday =
-  await farmTodayISOSrv(
-    req.authSession?.uid ||
-    req.userId
-  );
-
-const eventDate = String(
-  body.confirmedOn ||
-  body.doneDate ||
-  body.date ||
-  farmToday
-).trim().slice(0, 10);
-
-    const stepIndex = Math.max(
-      0,
-      parseInt(body.stepIndex ?? body.step ?? "0", 10) || 0
-    );
-
-    const stepDay = Number(body.stepDay ?? 0);
-    const stepName = String(body.stepName || "").trim();
-
-    const missing = {};
-    if (!numbers.length) {
-  missing.animalNumbers = "اختر الحيوان أو الحيوانات التي نُفذت لها الخطوة.";
-}
-
-if (!program) {
-  missing.program = "برنامج التزامن غير محدد.";
-}
-    if (!protocolStartDate || !calvingIsDateSrv(protocolStartDate)) {
-      missing.protocolStartDate = "تاريخ بداية برنامج التزامن غير صحيح.";
-    }
-    if (!eventDate || !calvingIsDateSrv(eventDate)) {
-      missing.eventDate = "أدخل تاريخ تنفيذ صحيحًا للخطوة.";
-    }
-    if (!stepName) {
-  missing.stepName = "خطوة التزامن غير محددة.";
-}
-
-    if (Object.keys(missing).length) {
-      return res.status(400).json({
-        ok: false,
-        message: "❌ أكمل بيانات خطوة التزامن قبل التأكيد.",
-        fieldErrors: missing,
-        doneCount: 0,
-        rejectedCount: 0,
-        saved: [],
-        rejected: []
-      });
-    }
-
-    const batch = db.batch();
-    let ops = 0;
-    let doneCount = 0;
-    const saved = [];
-    const rejected = [];
-    const isTaiStep =
-          stepName.includes("تلقيح") ||
-          stepName.toLowerCase().includes("tai");
-
-    const taiEligibleNumbers = [];
-    const taiExcluded = [];
-
-    for (const animalNumber of numbers) {
-      const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
-
-      if (!animal) {
-        rejected.push({
-          animalNumber,
-          reason: "❌ لم أجد الحيوان في القطيع المسجل بحسابك."
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          message:
+            "❌ تعذّر تأكيد تنفيذ خطوة التزامن الآن. حاول مرة أخرى.",
+          doneCount: 0,
+          rejectedCount: 0,
+          saved: [],
+          rejected: []
         });
-        continue;
       }
-      const animalDoc = animal.data || {};
 
-if (isTaiStep) {
-  const animalStatus =
-    String(animalDoc.status || "active")
-      .trim()
-      .toLowerCase();
+      const uid =
+        req.userId;
 
-  const currentProtocol =
-    String(animalDoc.currentProtocol || "")
-      .trim()
-      .toLowerCase();
+      const body =
+        req.body || {};
 
-  const protocolStatus =
-    String(animalDoc.protocolStatus || "")
-      .trim()
-      .toLowerCase();
+      const rawNumbers =
+        body.animalNumbers ||
+        body.numbers ||
+        body.animalNumber ||
+        body.number ||
+        "";
 
-  const lastInseminationDate =
-    String(animalDoc.lastInseminationDate || "")
-      .trim()
-      .slice(0, 10);
+      const numbers =
+        [
+          ...new Set(
+            (
+              Array.isArray(rawNumbers)
+                ? rawNumbers
+                : String(rawNumbers || "")
+                    .split(/\n|,|;|،|\s+/g)
+            )
+              .map(
+                x =>
+                  calvingNormDigitsOnlySrv(
+                    x
+                  )
+              )
+              .filter(Boolean)
+          )
+        ];
 
-  const lastHeatDate =
-    String(
-      animalDoc.lastHeatDate ||
-      animalDoc.heatDate ||
-      animalDoc.lastEstrusDate ||
-      ""
-    )
-      .trim()
-      .slice(0, 10);
+      const program =
+        String(
+          body.program ||
+          body.protocolProgram ||
+          ""
+        )
+          .trim()
+          .toLowerCase();
 
-  let exclusionReason = "";
+      const protocolStartDate =
+        String(
+          body.protocolStartDate ||
+          body.startDate ||
+          ""
+        )
+          .trim()
+          .slice(0, 10);
 
-  if (
-    animalStatus === "inactive" ||
-    animalStatus === "sold" ||
-    animalStatus === "dead" ||
-    animalStatus === "archived"
-  ) {
-    exclusionReason =
-      "الحيوان خرج من القطيع النشط.";
-  } else if (
-    currentProtocol !== "ovsynch" ||
-    protocolStatus !== "active"
-  ) {
-    exclusionReason =
-      "الحيوان خرج من برنامج التزامن.";
-  } else if (
-    lastInseminationDate &&
-    lastInseminationDate >= protocolStartDate
-  ) {
-    exclusionReason =
-      "تم تلقيح الحيوان أثناء البرنامج.";
-  } else if (
-    lastHeatDate &&
-    lastHeatDate >= protocolStartDate
-  ) {
-    exclusionReason =
-      "سُجّل للحيوان شياع أثناء البرنامج وأصبح غير مناسب للتلقيح الموقّت.";
-  } else if (
-    animalDoc.breedingBlocked === true
-  ) {
-    exclusionReason =
-      "الحيوان غير صالح للتلقيح حاليًا.";
-  }
+      const stepIndex =
+        Math.max(
+          0,
+          parseInt(
+            body.stepIndex ??
+            body.step ??
+            "0",
+            10
+          ) || 0
+        );
 
-  if (exclusionReason) {
-    taiExcluded.push({
-      animalNumber: String(animalNumber),
-      reason: exclusionReason
-    });
-  } else {
-    taiEligibleNumbers.push(
-      String(animalNumber)
-    );
-  }
-}
-      const baseId = ["ovsynch", animalNumber, program, protocolStartDate].join("__");
-      const stepEventId = `${baseId}__step_event_${stepIndex}`;
+      const programDef =
+        ovsynchProgramDefinitionSrv(
+          program
+        );
 
-      const eventRef = db.collection("events").doc(stepEventId);
+      const canonicalStep =
+        programDef?.steps?.[
+          stepIndex
+        ] || null;
 
-      batch.set(eventRef, {
-        type: "ovsynch_step",
-        eventType: "خطوة تزامن",
-        eventTypeNorm: "ovsynch_step",
-        eventDate,
-        userId: uid,
-        ownerUid: uid,
-        animalId: animal.id || "",
-        animalNumber: String(animalNumber),
-        protocolType: "ovsynch",
-        protocolProgram: program,
-        protocolStartDate,
-        stepIndex,
-        stepDay: Number.isFinite(stepDay) ? stepDay : 0,
-        stepName,
-        source: "server:/api/ovsynch/confirm-step",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-      ops++;
+      const farmToday =
+        await farmTodayISOSrv(
+          req.authSession?.uid ||
+          req.userId
+        );
 
-      const primaryTaskId =
-        `task__${animalNumber}__ovsynch__${protocolStartDate}__d${Number.isFinite(stepDay) ? stepDay : 0}`;
+      if (
+        !numbers.length ||
+        !programDef ||
+        !canonicalStep ||
+        !calvingIsDateSrv(
+          protocolStartDate
+        )
+      ) {
+        return res.status(400).json({
+          ok: false,
 
-      const legacyTaskId =
-        `${baseId}__step_${stepIndex}`;
+          message:
+            "❌ تعذّر تحديد خطوة التزامن من بيانات السيرفر.",
 
-      for (const taskId of [...new Set([primaryTaskId, legacyTaskId])]) {
-        batch.set(db.collection("tasks").doc(taskId), {
-          userId: uid,
-          animalNumber: String(animalNumber),
-          type: "protocol_step",
-          protocol: "ovsynch",
-          program,
-          protocolStartDate,
-          stepIndex,
-          stepDay: Number.isFinite(stepDay) ? stepDay : 0,
-          stepName,
-          status: "done",
-          done: true,
-          doneAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+          doneCount: 0,
+          rejectedCount: 0,
+          saved: [],
+          rejected: []
+        });
+      }
+
+      const stepDay =
+        Number(
+          canonicalStep.day
+        );
+
+      const stepName =
+        String(
+          canonicalStep.name || ""
+        ).trim();
+
+      const isTaiStep =
+        stepName.includes("تلقيح") ||
+        stepName
+          .toLowerCase()
+          .includes("tai");
+
+      const batch =
+        db.batch();
+
+      let ops = 0;
+      let doneCount = 0;
+
+      const saved = [];
+      const rejected = [];
+      const taiEligibleNumbers = [];
+      const taiExcluded = [];
+
+      for (
+        const animalNumber
+        of numbers
+      ) {
+        const animal =
+          await fetchAnimalByNumberForCalvingGateSrv(
+            uid,
+            animalNumber
+          );
+
+        if (!animal) {
+          rejected.push({
+            animalNumber,
+            reason:
+              "❌ لم أجد الحيوان في القطيع المسجل بحسابك."
+          });
+
+          continue;
+        }
+
+        const baseId =
+          [
+            "ovsynch",
+            animalNumber,
+            program,
+            protocolStartDate
+          ].join("__");
+
+        const primaryTaskId =
+          `task__${animalNumber}__ovsynch__${protocolStartDate}__d${stepDay}`;
+
+        const legacyTaskId =
+          `${baseId}__step_${stepIndex}`;
+
+        const taskRefsToComplete =
+          [];
+
+        for (
+          const taskId of
+          [
+            ...new Set([
+              primaryTaskId,
+              legacyTaskId
+            ])
+          ]
+        ) {
+          const taskRef =
+            db
+              .collection("tasks")
+              .doc(taskId);
+
+          const taskSnap =
+            await taskRef.get();
+
+          if (!taskSnap.exists) {
+            continue;
+          }
+
+          const task =
+            taskSnap.data() || {};
+
+          const taskStatus =
+            String(
+              task.status || ""
+            )
+              .trim()
+              .toLowerCase();
+
+          const taskNumber =
+            calvingNormDigitsOnlySrv(
+              task.animalNumber || ""
+            );
+
+          const taskProgram =
+            String(
+              task.program ||
+              task.protocolProgram ||
+              ""
+            )
+              .trim()
+              .toLowerCase();
+
+          const taskStart =
+            String(
+              task.protocolStartDate ||
+              ""
+            )
+              .trim()
+              .slice(0, 10);
+
+          const taskIndex =
+            Number(
+              task.stepIndex ?? -1
+            );
+
+          const taskDay =
+            Number(
+              task.stepDay ?? -1
+            );
+
+          const taskName =
+            String(
+              task.stepName || ""
+            ).trim();
+
+          const isOvsynchTask =
+            String(
+              task.taskType || ""
+            ).trim() ===
+              "ovsynch_step" ||
+
+            String(
+              task.type || ""
+            ).trim() ===
+              "ovsynch_step" ||
+
+            (
+              String(
+                task.type || ""
+              ).trim() ===
+                "protocol_step" &&
+
+              String(
+                task.protocol || ""
+              ).trim() ===
+                "ovsynch"
+            );
+
+          if (
+            String(
+              task.userId || ""
+            ).trim() !== uid ||
+
+            taskNumber !==
+              animalNumber ||
+
+            !isOvsynchTask ||
+
+            taskProgram !==
+              program ||
+
+            taskStart !==
+              protocolStartDate ||
+
+            taskIndex !==
+              stepIndex ||
+
+            taskDay !==
+              stepDay ||
+
+            taskName !==
+              stepName ||
+
+            taskStatus !==
+              "pending"
+          ) {
+            continue;
+          }
+
+          taskRefsToComplete.push(
+            taskRef
+          );
+        }
+
+        if (
+          !taskRefsToComplete.length
+        ) {
+          rejected.push({
+            animalNumber,
+
+            reason:
+              "❌ لا توجد خطوة تزامن معلّقة مطابقة لهذا الحيوان."
+          });
+
+          continue;
+        }
+
+        const animalDoc =
+          animal.data || {};
+
+        if (isTaiStep) {
+          const animalStatus =
+            String(
+              animalDoc.status ||
+              "active"
+            )
+              .trim()
+              .toLowerCase();
+
+          const currentProtocol =
+            String(
+              animalDoc.currentProtocol ||
+              ""
+            )
+              .trim()
+              .toLowerCase();
+
+          const protocolStatus =
+            String(
+              animalDoc.protocolStatus ||
+              ""
+            )
+              .trim()
+              .toLowerCase();
+
+          const lastInseminationDate =
+            String(
+              animalDoc.lastInseminationDate ||
+              ""
+            )
+              .trim()
+              .slice(0, 10);
+
+          const lastHeatDate =
+            String(
+              animalDoc.lastHeatDate ||
+              animalDoc.heatDate ||
+              animalDoc.lastEstrusDate ||
+              ""
+            )
+              .trim()
+              .slice(0, 10);
+
+          let exclusionReason =
+            "";
+
+          if (
+            [
+              "inactive",
+              "sold",
+              "dead",
+              "archived"
+            ].includes(
+              animalStatus
+            )
+          ) {
+            exclusionReason =
+              "الحيوان خرج من القطيع النشط.";
+
+          } else if (
+            currentProtocol !==
+              "ovsynch" ||
+
+            protocolStatus !==
+              "active"
+          ) {
+            exclusionReason =
+              "الحيوان خرج من برنامج التزامن.";
+
+          } else if (
+            lastInseminationDate &&
+            lastInseminationDate >=
+              protocolStartDate
+          ) {
+            exclusionReason =
+              "تم تلقيح الحيوان أثناء البرنامج.";
+
+          } else if (
+            lastHeatDate &&
+            lastHeatDate >=
+              protocolStartDate
+          ) {
+            exclusionReason =
+              "سُجّل للحيوان شياع أثناء البرنامج وأصبح غير مناسب للتلقيح الموقّت.";
+
+          } else if (
+            animalDoc.breedingBlocked ===
+              true
+          ) {
+            exclusionReason =
+              "الحيوان غير صالح للتلقيح حاليًا.";
+          }
+
+          if (exclusionReason) {
+            taiExcluded.push({
+              animalNumber:
+                String(
+                  animalNumber
+                ),
+
+              reason:
+                exclusionReason
+            });
+
+            rejected.push({
+              animalNumber:
+                String(
+                  animalNumber
+                ),
+
+              reason:
+                `❌ ${exclusionReason}`
+            });
+
+            continue;
+          }
+
+          taiEligibleNumbers.push(
+            String(animalNumber)
+          );
+        }
+
+        const stepEventId =
+          `${baseId}__step_event_${stepIndex}`;
+
+        const eventRef =
+          db
+            .collection("events")
+            .doc(stepEventId);
+
+        batch.set(
+          eventRef,
+          {
+            type:
+              "ovsynch_step",
+
+            eventType:
+              "خطوة تزامن",
+
+            eventTypeNorm:
+              "ovsynch_step",
+
+            eventDate:
+              farmToday,
+
+            userId:
+              uid,
+
+            ownerUid:
+              uid,
+
+            animalId:
+              animal.id || "",
+
+            animalNumber:
+              String(
+                animalNumber
+              ),
+
+            protocolType:
+              "ovsynch",
+
+            protocolProgram:
+              program,
+
+            protocolStartDate,
+
+            stepIndex,
+            stepDay,
+            stepName,
+
+            source:
+              "server:/api/ovsynch/confirm-step",
+
+            createdAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp(),
+
+            updatedAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp()
+          },
+
+          { merge: true }
+        );
+
         ops++;
+
+        for (
+          const taskRef of
+          taskRefsToComplete
+        ) {
+          batch.set(
+            taskRef,
+            {
+              status:
+                "done",
+
+              done:
+                true,
+
+              doneAt:
+                admin.firestore
+                  .FieldValue
+                  .serverTimestamp(),
+
+              updatedAt:
+                admin.firestore
+                  .FieldValue
+                  .serverTimestamp()
+            },
+
+            { merge: true }
+          );
+
+          ops++;
+        }
+
+        if (isTaiStep) {
+          batch.set(
+            db
+              .collection(
+                animal._collection ||
+                "animals"
+              )
+              .doc(animal.id),
+
+            {
+              currentProtocol:
+                null,
+
+              protocolStatus:
+                "completed",
+
+              protocolExitDate:
+                farmToday,
+
+              updatedAt:
+                admin.firestore
+                  .FieldValue
+                  .serverTimestamp()
+            },
+
+            { merge: true }
+          );
+
+          ops++;
+        }
+
+        doneCount++;
+
+        saved.push({
+          animalNumber,
+          eventId:
+            stepEventId
+        });
       }
 
-      if (stepName.includes("تلقيح") || stepName.includes("TAI")) {
-        batch.set(db.collection(animal._collection || "animals").doc(animal.id), {
-          currentProtocol: null,
-          protocolStatus: "completed",
-          protocolExitDate: eventDate,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-        ops++;
+      if (ops > 0) {
+        await batch.commit();
       }
 
-      doneCount++;
-      saved.push({
-        animalNumber,
-        eventId: stepEventId
+      if (
+        doneCount &&
+        typeof scheduleGroupsRebuildSrv ===
+          "function"
+      ) {
+        scheduleGroupsRebuildSrv(
+          uid,
+          "ovsynch_confirm_step"
+        );
+      }
+
+      const taiNumbersText =
+        taiEligibleNumbers.join(",");
+
+      const redirectUrl =
+        isTaiStep &&
+        taiEligibleNumbers.length
+          ? (
+              `/insemination.html?mbkMode=group` +
+              `&mode=bulk` +
+              `&bulk=1` +
+              `&numbers=${encodeURIComponent(taiNumbersText)}` +
+              `&animalNumbers=${encodeURIComponent(taiNumbersText)}` +
+              `&date=${encodeURIComponent(farmToday)}` +
+              `&eventDate=${encodeURIComponent(farmToday)}` +
+              `&source=ovsynch_tai`
+            )
+          : "";
+
+      return res.json({
+        ok:
+          doneCount > 0,
+
+        message:
+          doneCount === 1
+            ? `✅ تم تأكيد تنفيذ خطوة «${stepName}» للحيوان رقم ${saved[0].animalNumber}.`
+            : doneCount > 1
+              ? `✅ تم تأكيد تنفيذ خطوة «${stepName}» لعدد ${doneCount} من الحيوانات.`
+              : "❌ لم يتم تأكيد تنفيذ الخطوة لأي حيوان.",
+
+        doneCount,
+
+        rejectedCount:
+          rejected.length,
+
+        saved,
+        rejected,
+
+        redirectUrl,
+
+        requiresInsemination:
+          isTaiStep &&
+          taiEligibleNumbers.length > 0,
+
+        animalNumbers:
+          taiEligibleNumbers,
+
+        taiExcluded
+      });
+
+    } catch (e) {
+      console.error(
+        "ovsynch-confirm-step",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+
+        message:
+          "❌ تعذّر تأكيد تنفيذ خطوة التزامن الآن. حاول مرة أخرى.",
+
+        doneCount: 0,
+        rejectedCount: 0,
+        saved: [],
+        rejected: []
       });
     }
-
-    if (ops > 0) {
-      await batch.commit();
-    }
-
-    if (doneCount && typeof scheduleGroupsRebuildSrv === "function") {
-      scheduleGroupsRebuildSrv(uid, "ovsynch_confirm_step");
-    }
-    const taiNumbersText =
-  taiEligibleNumbers.join(",");
-
-const redirectUrl =
-  isTaiStep && taiEligibleNumbers.length
-    ? (
-        `/insemination.html?mbkMode=group` +
-        `&mode=bulk` +
-        `&bulk=1` +
-        `&numbers=${encodeURIComponent(taiNumbersText)}` +
-        `&animalNumbers=${encodeURIComponent(taiNumbersText)}` +
-        `&date=${encodeURIComponent(eventDate)}` +
-        `&eventDate=${encodeURIComponent(eventDate)}` +
-        `&source=ovsynch_tai`
-      )
-    : "";
-
-    return res.json({
-      ok: true,
-message: doneCount === 1
-  ? `✅ تم تأكيد تنفيذ خطوة «${stepName}» للحيوان رقم ${saved[0].animalNumber}.`
-  : doneCount > 1
-    ? `✅ تم تأكيد تنفيذ خطوة «${stepName}» لعدد ${doneCount} من الحيوانات.`
-    : "❌ لم أتمكن من تأكيد تنفيذ الخطوة لأي حيوان.",
-      doneCount,
-      rejectedCount: rejected.length,
-      saved,
-      rejected,
-     redirectUrl,
-     requiresInsemination:
-     isTaiStep &&
-     taiEligibleNumbers.length > 0,
-     animalNumbers:
-     taiEligibleNumbers,
-     taiExcluded
-});
-
-  } catch (e) {
-    console.error("ovsynch-confirm-step", e);
-
-    return res.status(500).json({
-      ok: false,
-      message: "❌ تعذّر تأكيد تنفيذ خطوة التزامن الآن. حاول مرة أخرى.",
-      doneCount: 0,
-      rejectedCount: 0,
-      saved: [],
-      rejected: []
-    });
   }
-});
+);
 // ============================================================
 //                 API: VACCINATION GATE ONLY
 //                 تحقق التحصين من السيرفر فقط — فردي/جماعي — بدون حفظ
