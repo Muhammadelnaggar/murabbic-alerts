@@ -64294,6 +64294,300 @@ const settled = await Promise.allSettled([
     }
   );
 }
+function murabbikSmartAlertLatestIsoDateSrv(...values) {
+  return values
+    .flat()
+    .map(v => murabbikSmartAlertTextSrv(v).slice(0, 10))
+    .filter(calvingIsDateSrv)
+    .sort()
+    .at(-1) || "";
+}
+
+async function murabbikSmartAlertReproTruthSrv(
+  context,
+  animalNumber,
+  doc = {}
+) {
+  const number = calvingNormDigitsOnlySrv(animalNumber || "");
+
+  if (!number) {
+    return {
+      lastInseminationDate: "",
+      lastCalvingDate: "",
+      lastAbortionDate: "",
+      lastEmbryonicLossDate: "",
+      lastHeatDate: "",
+      lastDryOffDate: "",
+      lastCloseUpDate: "",
+      lastDiagnosisDate: "",
+      lastDiagnosisResult: "",
+      pregnancyEndedAfterService: false,
+      isPregnant: false
+    };
+  }
+
+  const rows = await context.load(
+    `smart-alerts:repro-truth:${number}`,
+    async () => {
+      const variants = [String(number)];
+      const numericNumber = Number(number);
+
+      if (
+        Number.isFinite(numericNumber) &&
+        String(numericNumber) === String(number)
+      ) {
+        variants.push(numericNumber);
+      }
+
+      const settled = await Promise.allSettled(
+        [...new Set(variants)].map(value =>
+          db.collection("events")
+            .where("userId", "==", context.userId)
+            .where("animalNumber", "==", value)
+            .get()
+        )
+      );
+
+      const byId = new Map();
+      let successfulQueries = 0;
+
+      for (const result of settled) {
+        if (result.status !== "fulfilled") continue;
+
+        successfulQueries++;
+
+        for (const eventDoc of result.value.docs) {
+          if (!byId.has(eventDoc.id)) {
+            byId.set(
+              eventDoc.id,
+              eventDoc.data() || {}
+            );
+          }
+        }
+      }
+
+      if (!successfulQueries) {
+        throw new Error(
+          "smart_alert_repro_truth_load_failed"
+        );
+      }
+
+      return [...byId.values()];
+    }
+  );
+
+  const eventDates = {
+    insemination: "",
+    calving: "",
+    abortion: "",
+    embryonic_loss: "",
+    heat: "",
+    dry_off: "",
+    close_up: ""
+  };
+
+  let eventLastDiagnosisDate = "";
+  let eventLastDiagnosisResult = "";
+
+  for (const event of rows) {
+    const eventDate = murabbikSmartAlertTextSrv(
+      event.eventDate ||
+      event.date ||
+      ""
+    ).slice(0, 10);
+
+    if (!calvingIsDateSrv(eventDate)) continue;
+
+    const typeKey =
+      eventsPageNormalizeTypeKeySrv(event);
+
+    if (
+      Object.prototype.hasOwnProperty.call(
+        eventDates,
+        typeKey
+      )
+    ) {
+      eventDates[typeKey] =
+        murabbikSmartAlertLatestIsoDateSrv(
+          eventDates[typeKey],
+          eventDate
+        );
+
+      continue;
+    }
+
+    if (
+      typeKey === "pregnancy_diagnosis" &&
+      (
+        !eventLastDiagnosisDate ||
+        eventDate >= eventLastDiagnosisDate
+      )
+    ) {
+      eventLastDiagnosisDate = eventDate;
+
+      eventLastDiagnosisResult =
+        normalizePregnancyResultSrv(
+          event.result ||
+          event.pregnancyResult ||
+          event.status ||
+          ""
+        );
+    }
+  }
+
+  const docLastInseminationDate =
+    murabbikSmartAlertLatestIsoDateSrv(
+      doc.lastInseminationDate,
+      doc.lastAI,
+      doc.lastInsemination,
+      doc.lastServiceDate
+    );
+
+  const lastInseminationDate =
+    murabbikSmartAlertLatestIsoDateSrv(
+      docLastInseminationDate,
+      eventDates.insemination
+    );
+
+  const lastCalvingDate =
+    murabbikSmartAlertLatestIsoDateSrv(
+      doc.lastCalvingDate,
+      doc.calvingDate,
+      doc.lastCalving,
+      eventDates.calving
+    );
+
+  const lastAbortionDate =
+    murabbikSmartAlertLatestIsoDateSrv(
+      doc.lastAbortionDate,
+      doc.abortionDate,
+      eventDates.abortion
+    );
+
+  const lastEmbryonicLossDate =
+    murabbikSmartAlertLatestIsoDateSrv(
+      doc.lastEmbryonicLossDate,
+      eventDates.embryonic_loss
+    );
+
+  const lastHeatDate =
+    murabbikSmartAlertLatestIsoDateSrv(
+      doc.lastHeatDate,
+      doc.heatDate,
+      doc.lastEstrusDate,
+      eventDates.heat
+    );
+
+  const lastDryOffDate =
+    murabbikSmartAlertLatestIsoDateSrv(
+      doc.lastDryOffDate,
+      eventDates.dry_off
+    );
+
+  const lastCloseUpDate =
+    murabbikSmartAlertLatestIsoDateSrv(
+      doc.lastCloseUpDate,
+      doc.closeUpDate,
+      eventDates.close_up
+    );
+
+  const docDiagnosisDate =
+    murabbikSmartAlertLatestIsoDateSrv(
+      doc.lastPregnancyDiagnosisDate,
+      doc.lastDiagnosisDate
+    );
+
+  const lastDiagnosisDate =
+    murabbikSmartAlertLatestIsoDateSrv(
+      docDiagnosisDate,
+      eventLastDiagnosisDate
+    );
+
+  const lastDiagnosisResult =
+    eventLastDiagnosisDate &&
+    eventLastDiagnosisDate >= docDiagnosisDate
+      ? eventLastDiagnosisResult
+      : normalizePregnancyResultSrv(
+          doc.lastPregnancyDiagnosisResult ||
+          ""
+        );
+
+  const lastBoundaryDate =
+    murabbikSmartAlertLatestIsoDateSrv(
+      lastCalvingDate,
+      lastAbortionDate,
+      lastEmbryonicLossDate
+    );
+
+  const pregnancyEndedAfterService =
+    Boolean(
+      lastInseminationDate &&
+      lastBoundaryDate &&
+      lastBoundaryDate >=
+        lastInseminationDate
+    );
+
+  const heatAfterService =
+    Boolean(
+      lastInseminationDate &&
+      lastHeatDate &&
+      lastHeatDate >
+        lastInseminationDate
+    );
+
+  const diagnosisAfterService =
+    Boolean(
+      lastInseminationDate &&
+      lastDiagnosisDate &&
+      lastDiagnosisDate >=
+        lastInseminationDate
+    );
+
+  const docPregnant =
+    pregnancyDiagnosisIsPregnantStatusSrv(
+      doc.reproductiveStatus ||
+      doc.reproStatus ||
+      doc.pregStatus ||
+      ""
+    );
+
+  const isPregnant =
+    Boolean(
+      lastInseminationDate &&
+      !pregnancyEndedAfterService &&
+      !heatAfterService &&
+      (
+        (
+          diagnosisAfterService &&
+          lastDiagnosisResult ===
+            "عشار"
+        ) ||
+        (
+          !diagnosisAfterService &&
+          docPregnant &&
+          docLastInseminationDate ===
+            lastInseminationDate
+        )
+      )
+    );
+
+  return {
+    lastInseminationDate,
+    lastCalvingDate,
+    lastAbortionDate,
+    lastEmbryonicLossDate,
+    lastHeatDate,
+    lastDryOffDate,
+    lastCloseUpDate,
+    lastDiagnosisDate,
+    lastDiagnosisResult,
+    lastBoundaryDate,
+    pregnancyEndedAfterService,
+    heatAfterService,
+    diagnosisAfterService,
+    isPregnant
+  };
+}
 // ============================================================
 //       SMART ALERT SOURCE: MILK MIRROR — HEALTH / HERD
 //       مرآة اللبن: فردي + جماعي + تغذية + طقس
@@ -65850,34 +66144,31 @@ async function murabbikDryOffDueAlertSourceSrv(context) {
 
     if (dryOffIsBlockedSrv(doc)) continue;
     if (!murabbikDryOffAlertIsMilkingSrv(doc)) continue;
-    if (murabbikDryOffAlertAlreadyDoneSrv(doc)) continue;
 
-    const reproStatus = calvingStripArSrv(
-      doc.reproductiveStatus || ""
-    );
-
-    if (!reproStatus.includes("عشار")) continue;
+    const reproTruth =
+      await murabbikSmartAlertReproTruthSrv(
+        context,
+        animalNumber,
+        doc
+      );
 
     const lastInseminationDate =
-      murabbikSmartAlertTextSrv(
-        doc.lastInseminationDate ||
-        doc.lastAI ||
-        doc.lastInsemination ||
-        doc.lastServiceDate ||
-        ""
-      ).slice(0, 10);
-
-    if (!calvingIsDateSrv(lastInseminationDate)) continue;
+      reproTruth.lastInseminationDate;
 
     if (
-      murabbikDryOffAlertPregnancyEndedSrv(
-        doc,
-        lastInseminationDate
-      )
+      !calvingIsDateSrv(lastInseminationDate) ||
+      reproTruth.isPregnant !== true
     ) {
       continue;
     }
 
+    if (
+      reproTruth.lastDryOffDate &&
+      reproTruth.lastDryOffDate >=
+        lastInseminationDate
+    ) {
+      continue;
+    }
     const speciesKey = dryOffSpeciesKeySrv(doc);
 
     const dueGestationDay =
@@ -66178,36 +66469,29 @@ async function murabbikCloseUpDueAlertSourceSrv(
       continue;
     }
 
-    const reproStatus =
-      calvingStripArSrv(
-        doc.reproductiveStatus ||
-        doc.reproStatus ||
-        ""
+    const reproTruth =
+      await murabbikSmartAlertReproTruthSrv(
+        context,
+        animalNumber,
+        doc
       );
 
-    if (!reproStatus.includes("عشار")) continue;
-
     const lastInseminationDate =
-      murabbikSmartAlertTextSrv(
-        doc.lastInseminationDate ||
-        doc.lastAI ||
-        doc.lastInsemination ||
-        doc.lastServiceDate ||
-        ""
-      ).slice(0, 10);
-
-    if (!calvingIsDateSrv(lastInseminationDate)) continue;
+      reproTruth.lastInseminationDate;
 
     if (
-      murabbikCloseUpAlertPregnancyEndedSrv(
-        doc,
-        lastInseminationDate
-      )
+      !calvingIsDateSrv(lastInseminationDate) ||
+      reproTruth.isPregnant !== true
     ) {
       continue;
     }
 
     if (
+      (
+        reproTruth.lastCloseUpDate &&
+        reproTruth.lastCloseUpDate >=
+          lastInseminationDate
+      ) ||
       murabbikCloseUpAlertAlreadyDoneSrv(
         doc,
         lastInseminationDate
@@ -66215,7 +66499,6 @@ async function murabbikCloseUpDueAlertSourceSrv(
     ) {
       continue;
     }
-
     const policy = closeupPolicySrv(
       doc.species ||
       doc.animalTypeAr ||
@@ -66525,7 +66808,7 @@ async function murabbikCalvingOverdueAlertSourceSrv(
       context
     );
 
-  const alerts = [];
+   const alerts = [];
 
   for (const doc of animals) {
     const animalNumber =
@@ -66547,51 +66830,24 @@ async function murabbikCalvingOverdueAlertSourceSrv(
       continue;
     }
 
-    const reproductiveStatus =
-      calvingStripArSrv(
-        doc.reproductiveStatus || ""
-      ).toLowerCase();
-
-    const isPregnant =
-      reproductiveStatus.includes("عشار") ||
-      reproductiveStatus.includes("حامل") ||
-      reproductiveStatus.includes("pregnant");
-
-    if (!isPregnant) continue;
-
     const species =
       murabbikCalvingOverdueSpeciesSrv(doc);
 
     if (!species) continue;
 
+    const reproTruth =
+      await murabbikSmartAlertReproTruthSrv(
+        context,
+        animalNumber,
+        doc
+      );
+
     const lastInseminationDate =
-      murabbikCalvingOverdueDateSrv(
-        doc.lastInseminationDate
-      );
-
-    if (!lastInseminationDate) continue;
-
-    const lastCalvingDate =
-      murabbikCalvingOverdueDateSrv(
-        doc.lastCalvingDate
-      );
+      reproTruth.lastInseminationDate;
 
     if (
-      lastCalvingDate &&
-      lastCalvingDate >= lastInseminationDate
-    ) {
-      continue;
-    }
-
-    const lastAbortionDate =
-      murabbikCalvingOverdueDateSrv(
-        doc.lastAbortionDate ||
-        doc.abortionDate
-      );
-
-    if (
-      lastAbortionDate &&
-      lastAbortionDate >= lastInseminationDate
+      !calvingIsDateSrv(lastInseminationDate) ||
+      reproTruth.isPregnant !== true
     ) {
       continue;
     }
@@ -66602,12 +66858,13 @@ async function murabbikCalvingOverdueAlertSourceSrv(
         context.today
       );
 
-if (
-  !Number.isFinite(gestationDays) ||
-  gestationDays < species.overdueAfterDays
-) {
-  continue;
-}
+    if (
+      !Number.isFinite(gestationDays) ||
+      gestationDays <
+        species.overdueAfterDays
+    ) {
+      continue;
+    }
 
     const stage =
   gestationDays >= species.overdueAfterDays
