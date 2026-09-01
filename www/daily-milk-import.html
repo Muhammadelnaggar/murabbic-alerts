@@ -76,6 +76,9 @@
           <div class="kpi-label">إجمالي اللبن</div>
         </div>
       </div>
+      <div class="actions-bar milk-import-save-bar">
+  <button type="button" id="saveBtn" class="save">حفظ بيانات المحلب</button>
+</div>
 
     <div class="preview-scroll hide" id="previewWrap">
   <table class="compact-table">
@@ -97,9 +100,7 @@
 
 <div id="milkComponentsBox" class="hide compact-section"></div>
 
-<div class="actions-bar milk-import-save-bar">
-  <button type="button" id="saveBtn" class="save">حفظ بيانات المحلب</button>
-</div>
+
     </div>
   </div>
 
@@ -518,8 +519,9 @@ const data =
   }
 
   loadFileBtn.addEventListener("click", () => {
-    fileInput.click();
-  });
+  fileInput.value = "";
+  fileInput.click();
+});
 
   fileInput.addEventListener("change", async () => {
   const f = fileInput.files?.[0];
