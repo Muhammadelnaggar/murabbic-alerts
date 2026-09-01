@@ -1224,6 +1224,14 @@ const dashboardAlertSnoozedUntil = new Map();
 let dashboardAlertActiveKey = '';
 
 function dashboardAlertKey(alert = {}){
+  if (
+    alert.dashboardSource === 'murabbik_smart' &&
+    alert.id &&
+    alert.revision
+  ) {
+    return `${alert.id}__${alert.revision}`;
+  }
+
   return String(
     alert.id ||
     `${alert.type || 'alert'}__${alert.actionUrl || ''}__${alert.message || ''}`
@@ -1426,31 +1434,17 @@ if (alert.actionText) {
   primaryButton.title = 'لا توجد عليقة محفوظة لهذه المجموعة.';
 }
   if (!actionDisabled) {
-    primaryButton.addEventListener(
-      'click',
-      async () => {
-        primaryButton.disabled = true;
+  primaryButton.addEventListener(
+    'click',
+    () => {
+      primaryButton.disabled = true;
 
-        if (isMurabbikSmart) {
-          try {
-            await respondMurabbikSmartAlert(
-              alert,
-              'acknowledged'
-            );
-          } catch (e) {
-            console.warn(
-              'murabbik smart alert action response failed',
-              e
-            );
-          }
-        }
-
-        location.href = String(
-          alert.actionUrl
-        );
-      }
-    );
-  }
+      location.href = String(
+        alert.actionUrl
+      );
+    }
+  );
+}
 
   actions.appendChild(primaryButton);
 }
@@ -1631,7 +1625,7 @@ async function loadMurabbikSmartAlerts() {
     dashboardAlertSources.murabbik = [];
   }
 
-  dashboardAlertActiveKey = '';
+ 
   refreshDashboardSmartAlert();
 }
 async function loadOvsynchDashboardAlerts(){
