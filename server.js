@@ -31742,8 +31742,13 @@ return res.json({
     reproStatus ||
     "",
 
-  followupDecisionRequired:
+    followupDecisionRequired:
     isInitialNegative,
+
+  redirectUrl:
+    isInitialNegative
+      ? ""
+      : `/event-list.html?number=${encodeURIComponent(animalNumber)}`,
 
   actions:
     responseActions
@@ -37718,11 +37723,20 @@ return res.json({
   rejectedCount:
     rejected.length,
 
-  followupDecisionRequired:
+    followupDecisionRequired:
     initialNegativeItems.length > 0,
 
   followupAnimalNumbers:
     initialNegativeNumbers,
+
+  redirectUrl:
+    initialNegativeItems.length > 0
+      ? ""
+      : saved.length === 1
+        ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
+        : saved.length > 1
+          ? "/add-event.html"
+          : "",
 
   actions:
     responseActions,
@@ -37987,8 +38001,15 @@ app.post(
           acceptedCount:
             accepted.length,
 
-          rejectedCount:
+                    rejectedCount:
             rejected.length,
+
+          redirectUrl:
+            accepted.length === 1
+              ? `/event-list.html?number=${encodeURIComponent(accepted[0].animalNumber)}`
+              : accepted.length > 1
+                ? "/add-event.html"
+                : "",
 
           accepted,
           rejected
