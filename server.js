@@ -49692,6 +49692,14 @@ function dailyMilkImportLooksLikeHeaderSrv(line) {
     "cow id",
     "tag",
     "ear tag",
+    "تاريخ اللبن",
+    "تاريخ الحليب",
+    "تاريخ الحلب",
+    "milk date",
+    "milking date",
+    "recording date",
+    "production date",
+    "date",
     "اجمالي",
     "اجمالي اللبن",
     "total",
@@ -49716,11 +49724,31 @@ function dailyMilkImportLooksLikeHeaderSrv(line) {
   ].some(x => s.includes(x));
 }
 
+function dailyMilkImportDateSrv(v) {
+  const normalized =
+    addAnimalImportNormalizeDateSrv(
+      dailyMilkImportLatinDigitsSrv(v)
+    );
+
+  const iso =
+    String(normalized || "")
+      .trim()
+      .slice(0, 10);
+
+  return (
+    /^\d{4}-\d{2}-\d{2}$/.test(iso) &&
+    calvingIsDateSrv(iso)
+  )
+    ? iso
+    : "";
+}
+
 function dailyMilkImportDetectColumnsSrv(parts = []) {
   const cols = parts.map(dailyMilkImportNormalizeHeaderSrv);
 
   const out = {
     animalIdx: -1,
+    dateIdx: -1,
     totalIdx: -1,
     s1Idx: -1,
     s2Idx: -1,
@@ -49732,34 +49760,105 @@ function dailyMilkImportDetectColumnsSrv(parts = []) {
   }
 
   cols.forEach((c, i) => {
-    if (out.animalIdx < 0 && has(c, ["رقم الحيوان", "الحيوان", "animal number", "animal no", "animal id", "cow id", "tag", "ear tag", "animal"])) {
+    if (
+      out.animalIdx < 0 &&
+      has(c, [
+        "رقم الحيوان",
+        "الحيوان",
+        "animal number",
+        "animal no",
+        "animal id",
+        "cow id",
+        "tag",
+        "ear tag",
+        "animal"
+      ])
+    ) {
       out.animalIdx = i;
       return;
     }
 
-    if (out.s1Idx < 0 && has(c, ["حلبه 1", "حلبة 1", "session 1", "milking 1", "morning", "milk 1"])) {
+    if (
+      out.dateIdx < 0 &&
+      has(c, [
+        "تاريخ اللبن",
+        "تاريخ الحليب",
+        "تاريخ الحلب",
+        "milk date",
+        "milking date",
+        "recording date",
+        "production date",
+        "date"
+      ])
+    ) {
+      out.dateIdx = i;
+      return;
+    }
+
+    if (
+      out.s1Idx < 0 &&
+      has(c, [
+        "حلبه 1",
+        "حلبة 1",
+        "session 1",
+        "milking 1",
+        "morning",
+        "milk 1"
+      ])
+    ) {
       out.s1Idx = i;
       return;
     }
 
-    if (out.s2Idx < 0 && has(c, ["حلبه 2", "حلبة 2", "session 2", "milking 2", "evening", "milk 2"])) {
+    if (
+      out.s2Idx < 0 &&
+      has(c, [
+        "حلبه 2",
+        "حلبة 2",
+        "session 2",
+        "milking 2",
+        "evening",
+        "milk 2"
+      ])
+    ) {
       out.s2Idx = i;
       return;
     }
 
-    if (out.s3Idx < 0 && has(c, ["حلبه 3", "حلبة 3", "session 3", "milking 3", "night", "milk 3"])) {
+    if (
+      out.s3Idx < 0 &&
+      has(c, [
+        "حلبه 3",
+        "حلبة 3",
+        "session 3",
+        "milking 3",
+        "night",
+        "milk 3"
+      ])
+    ) {
       out.s3Idx = i;
       return;
     }
 
-    if (out.totalIdx < 0 && has(c, ["اجمالي", "اجمالي اللبن", "total", "total milk", "milk total", "yield", "daily milk", "production"])) {
+    if (
+      out.totalIdx < 0 &&
+      has(c, [
+        "اجمالي",
+        "اجمالي اللبن",
+        "total",
+        "total milk",
+        "milk total",
+        "yield",
+        "daily milk",
+        "production"
+      ])
+    ) {
       out.totalIdx = i;
     }
   });
 
   return out;
 }
-
 function dailyMilkImportReadExcelSrv(file) {
   let XLSX_NODE = null;
 
@@ -49866,11 +49965,20 @@ function dailyMilkImportParseTextSrv(text) {
   let colMap = null;
 
   for (const line of lines) {
-    const parts = dailyMilkImportSplitLineSrv(line);
+    const parts =
+      dailyMilkImportSplitLineSrv(line);
+
     if (!parts.length) continue;
 
-    if (!colMap && dailyMilkImportLooksLikeHeaderSrv(line)) {
-      colMap = dailyMilkImportDetectColumnsSrv(parts);
+    if (
+      !colMap &&
+      dailyMilkImportLooksLikeHeaderSrv(line)
+    ) {
+      colMap =
+        dailyMilkImportDetectColumnsSrv(
+          parts
+        );
+
       continue;
     }
 
@@ -49880,46 +49988,108 @@ function dailyMilkImportParseTextSrv(text) {
     let milkS3 = 0;
     let importMode = "sessions";
 
-    if (colMap && colMap.animalIdx >= 0) {
-      animalNumber = dailyMilkImportNormAnimalSrv(parts[colMap.animalIdx]);
+    let eventDate = "";
+    let eventDateRaw = "";
+    let eventDateFromFile = false;
+
+    if (
+      colMap &&
+      colMap.animalIdx >= 0
+    ) {
+      animalNumber =
+        dailyMilkImportNormAnimalSrv(
+          parts[colMap.animalIdx]
+        );
+
+      eventDateFromFile =
+        Number.isInteger(
+          colMap.dateIdx
+        ) &&
+        colMap.dateIdx >= 0;
+
+      if (eventDateFromFile) {
+        eventDateRaw =
+          String(
+            parts[colMap.dateIdx] || ""
+          ).trim();
+
+        eventDate =
+          dailyMilkImportDateSrv(
+            eventDateRaw
+          );
+      }
 
       const total =
         colMap.totalIdx >= 0
-          ? dailyMilkImportNumSrv(parts[colMap.totalIdx])
+          ? dailyMilkImportNumSrv(
+              parts[colMap.totalIdx]
+            )
           : null;
 
       const s1 =
         colMap.s1Idx >= 0
-          ? dailyMilkImportNumSrv(parts[colMap.s1Idx])
+          ? dailyMilkImportNumSrv(
+              parts[colMap.s1Idx]
+            )
           : null;
 
       const s2 =
         colMap.s2Idx >= 0
-          ? dailyMilkImportNumSrv(parts[colMap.s2Idx])
+          ? dailyMilkImportNumSrv(
+              parts[colMap.s2Idx]
+            )
           : null;
 
       const s3 =
         colMap.s3Idx >= 0
-          ? dailyMilkImportNumSrv(parts[colMap.s3Idx])
+          ? dailyMilkImportNumSrv(
+              parts[colMap.s3Idx]
+            )
           : null;
 
-      if (Number.isFinite(total) && !Number.isFinite(s1) && !Number.isFinite(s2) && !Number.isFinite(s3)) {
+      if (
+        Number.isFinite(total) &&
+        !Number.isFinite(s1) &&
+        !Number.isFinite(s2) &&
+        !Number.isFinite(s3)
+      ) {
         milkS1 = total;
         milkS2 = 0;
         milkS3 = 0;
         importMode = "total_only";
       } else {
-        milkS1 = Number.isFinite(s1) ? s1 : 0;
-        milkS2 = Number.isFinite(s2) ? s2 : 0;
-        milkS3 = Number.isFinite(s3) ? s3 : 0;
-      }
-    } else {
-      animalNumber = dailyMilkImportNormAnimalSrv(parts[0]);
+        milkS1 =
+          Number.isFinite(s1)
+            ? s1
+            : 0;
 
-      const nums = parts
-        .slice(1)
-        .map(dailyMilkImportNumSrv)
-        .filter(x => Number.isFinite(x));
+        milkS2 =
+          Number.isFinite(s2)
+            ? s2
+            : 0;
+
+        milkS3 =
+          Number.isFinite(s3)
+            ? s3
+            : 0;
+      }
+
+    } else {
+      animalNumber =
+        dailyMilkImportNormAnimalSrv(
+          parts[0]
+        );
+
+      const nums =
+        parts
+          .slice(1)
+          .map(
+            dailyMilkImportNumSrv
+          )
+          .filter(
+            x =>
+              Number.isFinite(x)
+          );
 
       if (nums.length === 1) {
         milkS1 = nums[0];
@@ -49930,7 +50100,11 @@ function dailyMilkImportParseTextSrv(text) {
         milkS1 = nums[0] ?? 0;
         milkS2 = nums[1] ?? 0;
         milkS3 = nums[2] ?? 0;
-        importMode = nums.length >= 3 ? "sessions_3" : "sessions_2";
+
+        importMode =
+          nums.length >= 3
+            ? "sessions_3"
+            : "sessions_2";
       }
     }
 
@@ -49941,7 +50115,11 @@ function dailyMilkImportParseTextSrv(text) {
       milkS1,
       milkS2,
       milkS3,
-      importMode
+      importMode,
+
+      eventDate,
+      eventDateRaw,
+      eventDateFromFile
     });
   }
 
@@ -50139,42 +50317,160 @@ function dailyMilkImportBuildUiSrv({
   };
 }
 
-async function dailyMilkImportPreviewRowsSrv(uid, eventDate, inputRows = []) {
+async function dailyMilkImportPreviewRowsSrv(
+  uid,
+  fallbackEventDate,
+  inputRows = [],
+  todayISO = ""
+) {
   const rows = [];
 
-  for (const rawRow of inputRows) {
-    const animalNumber = calvingNormDigitsOnlySrv(
-      rawRow.animalNumber ||
-      rawRow.number ||
-      ""
+  const fallbackDate =
+    dailyMilkImportDateSrv(
+      fallbackEventDate
     );
+
+  const seenImportKeys =
+    new Set();
+
+  const animalCache =
+    new Map();
+
+  for (const rawRow of inputRows) {
+    const animalNumber =
+      calvingNormDigitsOnlySrv(
+        rawRow.animalNumber ||
+        rawRow.number ||
+        ""
+      );
+
+    const explicitDateRaw =
+      String(
+        rawRow?.eventDateRaw ||
+        rawRow?.eventDate ||
+        rawRow?.date ||
+        ""
+      ).trim();
+
+    const hasDateSourceFlag =
+      typeof rawRow?.eventDateFromFile ===
+      "boolean";
+
+    const hasOwnDate =
+      rawRow?.eventDateFromFile === true ||
+      (
+        !hasDateSourceFlag &&
+        !!explicitDateRaw
+      );
+
+    const eventDate =
+      hasOwnDate
+        ? dailyMilkImportDateSrv(
+            explicitDateRaw
+          )
+        : fallbackDate;
 
     if (!animalNumber) {
       rows.push({
         ...rawRow,
         animalNumber: "",
+        eventDate,
         valid: false,
-        reason: "رقم الحيوان غير صحيح.",
+        reason:
+          "رقم الحيوان غير صحيح.",
         totalText: "—"
       });
+
       continue;
     }
 
-    const animal =
-      await fetchAnimalByNumberForCalvingGateSrv(
-        uid,
+    if (!eventDate) {
+      rows.push({
+        ...rawRow,
+        animalNumber,
+        eventDate: "",
+        valid: false,
+        reason:
+          hasOwnDate
+            ? "تاريخ اللبن في هذا الصف غير صحيح."
+            : "أدخل تاريخ تسجيل اللبن أو أضف عمود تاريخ داخل الملف.",
+        totalText: "—"
+      });
+
+      continue;
+    }
+
+    if (
+      calvingIsDateSrv(todayISO) &&
+      eventDate > todayISO
+    ) {
+      rows.push({
+        ...rawRow,
+        animalNumber,
+        eventDate,
+        valid: false,
+        reason:
+          "تاريخ تسجيل اللبن لا يمكن أن يكون في المستقبل.",
+        totalText: "—"
+      });
+
+      continue;
+    }
+
+    const importKey =
+      `${animalNumber}__${eventDate}`;
+
+    if (
+      seenImportKeys.has(
+        importKey
+      )
+    ) {
+      rows.push({
+        ...rawRow,
+        animalNumber,
+        eventDate,
+        valid: false,
+        reason:
+          "يوجد سجل مكرر لنفس الحيوان في نفس التاريخ داخل الملف.",
+        totalText: "—"
+      });
+
+      continue;
+    }
+
+    seenImportKeys.add(
+      importKey
+    );
+
+    let animal =
+      animalCache.get(
         animalNumber
       );
+
+    if (animal === undefined) {
+      animal =
+        await fetchAnimalByNumberForCalvingGateSrv(
+          uid,
+          animalNumber
+        );
+
+      animalCache.set(
+        animalNumber,
+        animal || null
+      );
+    }
 
     if (!animal) {
       rows.push({
         ...rawRow,
         animalNumber,
+        eventDate,
         valid: false,
         reason:
           "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له.",
         totalText: "—"
       });
+
       continue;
     }
 
@@ -50194,18 +50490,30 @@ async function dailyMilkImportPreviewRowsSrv(uid, eventDate, inputRows = []) {
         species
       );
 
-    if (animal._collection !== "animals") {
+    const currentLastMilkDate =
+      dailyMilkImportDateSrv(
+        animalDoc.lastMilkDate ||
+        ""
+      );
+
+    if (
+      animal._collection !==
+      "animals"
+    ) {
       rows.push({
         ...rawRow,
         animalNumber,
         animalId,
         species,
         kind,
+        eventDate,
+        currentLastMilkDate,
         valid: false,
         reason:
           "تسجيل اللبن اليومي متاح للأمهات الحلابة فقط.",
         totalText: "—"
       });
+
       continue;
     }
 
@@ -50220,11 +50528,14 @@ async function dailyMilkImportPreviewRowsSrv(uid, eventDate, inputRows = []) {
         animalId,
         species,
         kind,
+        eventDate,
+        currentLastMilkDate,
         valid: false,
         reason:
           "الحيوان خارج القطيع، لذلك لا يمكن تسجيل اللبن له.",
         totalText: "—"
       });
+
       continue;
     }
 
@@ -50239,11 +50550,14 @@ async function dailyMilkImportPreviewRowsSrv(uid, eventDate, inputRows = []) {
         animalId,
         species,
         kind,
+        eventDate,
+        currentLastMilkDate,
         valid: false,
         reason:
           "الحيوان غير مسجل كحلاب، لذلك لا يمكن تسجيل اللبن اليومي له.",
         totalText: "—"
       });
+
       continue;
     }
 
@@ -50261,11 +50575,14 @@ async function dailyMilkImportPreviewRowsSrv(uid, eventDate, inputRows = []) {
         animalId,
         species,
         kind,
+        eventDate,
+        currentLastMilkDate,
         valid: false,
         reason:
-          "تم تسجيل لبن اليوم لهذا الحيوان بالفعل.",
+          "تم تسجيل لبن هذا الحيوان في التاريخ نفسه بالفعل.",
         totalText: "—"
       });
+
       continue;
     }
 
@@ -50281,11 +50598,21 @@ async function dailyMilkImportPreviewRowsSrv(uid, eventDate, inputRows = []) {
       animalId,
       species,
       kind,
-      milkKg: calc.milkKg,
-      totalText: calc.totalText,
-      valid: calc.ok,
-      reason: calc.reason || "",
-      eventDate
+
+      milkKg:
+        calc.milkKg,
+
+      totalText:
+        calc.totalText,
+
+      valid:
+        calc.ok,
+
+      reason:
+        calc.reason || "",
+
+      eventDate,
+      currentLastMilkDate
     });
   }
 
@@ -50295,177 +50622,193 @@ async function dailyMilkImportPreviewRowsSrv(uid, eventDate, inputRows = []) {
 //                 API: DAILY MILK IMPORT PREVIEW
 // ============================================================
 
-app.post("/api/daily-milk/import/preview", requireUserId, dailyMilkImportRawParserSrv, async (req, res) => {
-  try {
-    if (!db) {
-      const ui = dailyMilkImportBuildUiSrv({
-        rows: [],
-       message: "❌ تعذّرت معاينة بيانات المحلب الآن. حاول مرة أخرى."
+app.post(
+  "/api/daily-milk/import/preview",
+  requireUserId,
+  dailyMilkImportRawParserSrv,
+  async (req, res) => {
+    try {
+      if (!db) {
+        const ui =
+          dailyMilkImportBuildUiSrv({
+            rows: [],
+            message:
+              "❌ تعذّرت معاينة بيانات المحلب الآن. حاول مرة أخرى."
+          });
+
+        return res
+          .status(503)
+          .json({
+            ok: false,
+            message: ui.message,
+            ui
+          });
+      }
+
+      const uid =
+        req.userId;
+
+      const bodyObj =
+        Buffer.isBuffer(req.body)
+          ? {}
+          : (
+              req.body ||
+              {}
+            );
+
+      const mp =
+        Buffer.isBuffer(req.body)
+          ? dailyMilkImportParseMultipartSrv(
+              req
+            )
+          : {
+              fields: {}
+            };
+
+      const fallbackEventDate =
+        dailyMilkImportDateSrv(
+          bodyObj.eventDate ||
+          bodyObj.date ||
+          mp.fields.eventDate ||
+          mp.fields.date ||
+          ""
+        );
+
+      const inputRows =
+        dailyMilkImportRowsFromReqSrv(
+          req
+        );
+
+      if (!inputRows.length) {
+        const ui =
+          dailyMilkImportBuildUiSrv({
+            rows: [],
+            message:
+              "أَلصق بيانات المحلب أو ارفع ملفًا للمعاينة."
+          });
+
+        return res.json({
+          ok: true,
+          message: ui.message,
+          ui
+        });
+      }
+
+      const todayISO =
+        await dailyMilkTodaySrv(
+          req,
+          uid
+        );
+
+      const rows =
+        await dailyMilkImportPreviewRowsSrv(
+          uid,
+          fallbackEventDate,
+          inputRows,
+          todayISO
+        );
+
+      const importState =
+        dailyMilkImportKindStateSrv(
+          rows
+        );
+
+      if (importState.mixed) {
+        const blockedRows =
+          dailyMilkImportBlockMixedRowsSrv(
+            rows
+          );
+
+        const ui =
+          dailyMilkImportBuildUiSrv({
+            rows:
+              blockedRows,
+
+            message:
+              "❌ لا يسمح باستيراد الأبقار والجاموس في عملية واحدة. استورد كل نوع في عملية مستقلة.",
+
+            status:
+              "error"
+          });
+
+        return res
+          .status(400)
+          .json({
+            ok: false,
+
+            error:
+              "daily_milk_import_mixed_species",
+
+            message:
+              ui.message,
+
+            rows:
+              blockedRows,
+
+            ui
+          });
+      }
+
+      const componentDefaults =
+        await dailyMilkLoadComponentsSrv(
+          uid
+        );
+
+      const acceptedRows =
+        rows.filter(
+          row =>
+            row.valid === true
+        );
+
+            const ui =
+        dailyMilkImportBuildUiSrv({
+          rows,
+
+          importKind:
+            importState.kind,
+
+          components:
+            dailyMilkBuildComponentsUiSrv({
+              accepted:
+                acceptedRows,
+
+              defaults:
+                componentDefaults
+            })
+        });
+
+      return res.json({
+        ok: true,
+        message:
+          ui.message,
+        rows,
+        ui
       });
 
-      return res.status(503).json({ ok: false, message: ui.message, ui });
-    }
-
-    const uid = req.userId;
-
-    const bodyObj = Buffer.isBuffer(req.body) ? {} : (req.body || {});
-    const mp = Buffer.isBuffer(req.body) ? dailyMilkImportParseMultipartSrv(req) : { fields: {} };
-
-    const eventDate = String(
-      bodyObj.eventDate ||
-      bodyObj.date ||
-      mp.fields.eventDate ||
-      mp.fields.date ||
-      ""
-    ).trim().slice(0, 10);
-
-        if (!calvingIsDateSrv(eventDate)) {
-      const ui = dailyMilkImportBuildUiSrv({
-        rows: [],
-        message: "❌ أدخل تاريخ تسجيل لبن صحيحًا."
-      });
-
-      return res.status(400).json({ ok: false, message: ui.message, ui });
-    }
-
-    const todayISO =
-      await dailyMilkTodaySrv(
-        req,
-        uid
+    } catch (e) {
+      console.error(
+        "daily-milk-import-preview",
+        e
       );
 
-    if (
-      calvingIsDateSrv(todayISO) &&
-      eventDate > todayISO
-    ) {
       const ui =
         dailyMilkImportBuildUiSrv({
           rows: [],
           message:
-            "❌ تاريخ تسجيل اللبن لا يمكن أن يكون في المستقبل.",
-          status: "error"
+            "❌ تعذّرت معاينة بيانات المحلب الآن. حاول مرة أخرى."
         });
 
       return res
-        .status(400)
+        .status(500)
         .json({
           ok: false,
-          error:
-            "daily_milk_import_future_date",
           message:
             ui.message,
-          rows: [],
           ui
         });
     }
-
-    const inputRows = dailyMilkImportRowsFromReqSrv(req);
-
-    if (!inputRows.length) {
-      const ui = dailyMilkImportBuildUiSrv({
-        rows: [],
-        message: "أَلصق بيانات المحلب أو ارفع ملفًا للمعاينة."
-      });
-
-      return res.json({ ok: true, message: ui.message, ui });
-    }
-
- const rows =
-  await dailyMilkImportPreviewRowsSrv(
-    uid,
-    eventDate,
-    inputRows
-  );
-
-const importState =
-  dailyMilkImportKindStateSrv(
-    rows
-  );
-
-if (importState.mixed) {
-  const blockedRows =
-    dailyMilkImportBlockMixedRowsSrv(
-      rows
-    );
-
-  const ui =
-    dailyMilkImportBuildUiSrv({
-      rows: blockedRows,
-
-      message:
-        "❌ لا يسمح باستيراد الأبقار والجاموس في عملية واحدة. استورد كل نوع في عملية مستقلة.",
-
-      status: "error"
-    });
-
-  return res
-    .status(400)
-    .json({
-      ok: false,
-
-      error:
-        "daily_milk_import_mixed_species",
-
-      message:
-        ui.message,
-
-      rows:
-        blockedRows,
-
-      ui
-    });
-}
-
-const componentDefaults =
-  await dailyMilkLoadComponentsSrv(
-    uid
-  );
-
-const acceptedRows =
-  rows.filter(
-    row =>
-      row.valid === true
-  );
-
-const ui =
-  dailyMilkImportBuildUiSrv({
-    rows,
-
-    importKind:
-      importState.kind,
-
-    components:
-      dailyMilkBuildComponentsUiSrv({
-        accepted:
-          acceptedRows,
-
-        defaults:
-          componentDefaults
-      })
-  });
-
-return res.json({
-  ok: true,
-  message: ui.message,
-  rows,
-  ui
-});
-
-  } catch (e) {
-    console.error("daily-milk-import-preview", e);
-
-    const ui = dailyMilkImportBuildUiSrv({
-      rows: [],
-      message: "❌ تعذّرت معاينة بيانات المحلب الآن. حاول مرة أخرى."
-    });
-
-    return res.status(500).json({
-      ok: false,
-      message: ui.message,
-      ui
-    });
   }
-});
+);
 
 // ============================================================
 //                 API: DAILY MILK IMPORT SAVE
@@ -50498,23 +50841,38 @@ const submittedComponents =
     body
   );
 
-    const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
+       const fallbackEventDate =
+      dailyMilkImportDateSrv(
+        body.eventDate ||
+        body.date ||
+        ""
+      );
 
-        if (!calvingIsDateSrv(eventDate)) {
-      const ui = dailyMilkImportBuildUiSrv({
-        rows: [],
-       message: "❌ أدخل تاريخ تسجيل لبن صحيحًا."
-      });
+    const inputRows =
+      Array.isArray(body.rows)
+        ? body.rows
+        : [];
 
-      return res.status(400).json({
-        ok: false,
-        message: ui.message,
-        savedCount: 0,
-        rejectedCount: 0,
-        saved: [],
-        rejected: [],
-        ui
-      });
+    if (!inputRows.length) {
+      const ui =
+        dailyMilkImportBuildUiSrv({
+          rows: [],
+          message:
+            "❌ لا توجد سجلات جاهزة للحفظ. راجع بيانات المعاينة."
+        });
+
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          message:
+            ui.message,
+          savedCount: 0,
+          rejectedCount: 0,
+          saved: [],
+          rejected: [],
+          ui
+        });
     }
 
     const todayISO =
@@ -50523,81 +50881,13 @@ const submittedComponents =
         uid
       );
 
-    if (
-      calvingIsDateSrv(todayISO) &&
-      eventDate > todayISO
-    ) {
-      const rejected =
-        (
-          Array.isArray(body.rows)
-            ? body.rows
-            : []
-        ).map(row => ({
-          animalNumber:
-            calvingNormDigitsOnlySrv(
-              row?.animalNumber ||
-              row?.number ||
-              ""
-            ),
-          reason:
-            "تاريخ تسجيل اللبن لا يمكن أن يكون في المستقبل."
-        }));
-
-      const ui =
-        dailyMilkImportBuildUiSrv({
-          rows:
-            rejected.map(row => ({
-              ...row,
-              valid: false,
-              totalText: "—"
-            })),
-          message:
-            "❌ تاريخ تسجيل اللبن لا يمكن أن يكون في المستقبل.",
-          status: "error"
-        });
-
-      return res
-        .status(400)
-        .json({
-          ok: false,
-          error:
-            "daily_milk_import_future_date",
-          message:
-            ui.message,
-          savedCount: 0,
-          rejectedCount:
-            rejected.length,
-          saved: [],
-          rejected,
-          ui
-        });
-    }
-
-    const inputRows = Array.isArray(body.rows) ? body.rows : [];
-
-    if (!inputRows.length) {
-      const ui = dailyMilkImportBuildUiSrv({
-        rows: [],
-        message: "❌ لا توجد سجلات جاهزة للحفظ. راجع بيانات المعاينة."
-      });
-
-      return res.status(400).json({
-        ok: false,
-        message: ui.message,
-        savedCount: 0,
-        rejectedCount: 0,
-        saved: [],
-        rejected: [],
-        ui
-      });
-    }
-
- const checkedRows =
-  await dailyMilkImportPreviewRowsSrv(
-    uid,
-    eventDate,
-    inputRows
-  );
+    const checkedRows =
+      await dailyMilkImportPreviewRowsSrv(
+        uid,
+        fallbackEventDate,
+        inputRows,
+        todayISO
+      );
 
 const importState =
   dailyMilkImportKindStateSrv(
@@ -50760,120 +51050,327 @@ const fatProteinRatio =
 const saved = [];
 const rejected = [];
 
-    for (const row of checkedRows) {
-      if (row.valid !== true) {
-        rejected.push({
-          animalNumber: row.animalNumber || "",
-          reason: row.reason || "راجع بيانات هذا الحيوان قبل الحفظ."
-        });
-        continue;
-      }
+const latestSnapshotDateByAnimal =
+  new Map();
 
-      const animalNumber = calvingNormDigitsOnlySrv(row.animalNumber);
-      const animalId = String(row.animalId || "").trim();
-      const kind = String(row.kind || "").trim();
-      const species = String(row.species || "").trim();
+for (const row of checkedRows) {
+  if (row.valid !== true) {
+    rejected.push({
+      animalNumber:
+        row.animalNumber || "",
 
-      const s1 = dailyMilkNumStrictSrv(row.milkS1);
-      const s2 = dailyMilkNumStrictSrv(row.milkS2);
-      const s3 = dailyMilkNumStrictSrv(row.milkS3);
-      const calc = dailyMilkImportCalcSrv(row, kind);
+      eventDate:
+        row.eventDate || "",
 
-      if (!calc.ok) {
-        rejected.push({
+      reason:
+        row.reason ||
+        "راجع بيانات هذا الحيوان قبل الحفظ."
+    });
+
+    continue;
+  }
+
+  const animalNumber =
+    calvingNormDigitsOnlySrv(
+      row.animalNumber
+    );
+
+  const animalId =
+    String(
+      row.animalId || ""
+    ).trim();
+
+  const kind =
+    String(
+      row.kind || ""
+    ).trim();
+
+  const species =
+    String(
+      row.species || ""
+    ).trim();
+
+  const rowEventDate =
+    dailyMilkImportDateSrv(
+      row.eventDate ||
+      fallbackEventDate
+    );
+
+  if (!rowEventDate) {
+    rejected.push({
+      animalNumber,
+      eventDate: "",
+      reason:
+        "تاريخ تسجيل اللبن غير صحيح."
+    });
+
+    continue;
+  }
+
+  const s1 =
+    dailyMilkNumStrictSrv(
+      row.milkS1
+    );
+
+  const s2 =
+    dailyMilkNumStrictSrv(
+      row.milkS2
+    );
+
+  const s3 =
+    dailyMilkNumStrictSrv(
+      row.milkS3
+    );
+
+  const calc =
+    dailyMilkImportCalcSrv(
+      row,
+      kind
+    );
+
+  if (!calc.ok) {
+    rejected.push({
+      animalNumber,
+
+      eventDate:
+        rowEventDate,
+
+      reason:
+        calc.reason ||
+        "أدخل كمية لبن رقمية صحيحة."
+    });
+
+    continue;
+  }
+
+  const milkSessions =
+    String(
+      row.importMode || ""
+    ) === "total_only"
+      ? [
+          {
+            n: 1,
+            kg: calc.milkKg
+          }
+        ]
+      : (
+          kind === "buffalo"
+            ? [
+                {
+                  n: 1,
+                  kg: s1
+                },
+                {
+                  n: 2,
+                  kg: s2
+                }
+              ]
+            : [
+                {
+                  n: 1,
+                  kg: s1
+                },
+                {
+                  n: 2,
+                  kg: s2
+                },
+                {
+                  n: 3,
+                  kg: s3
+                }
+              ]
+        );
+
+  const eventId =
+    [
+      "daily_milk",
+      uid,
+      animalNumber,
+      rowEventDate
+    ].join("__");
+
+  const eventRef =
+    db
+      .collection("events")
+      .doc(eventId);
+
+  const existing =
+    await eventRef.get();
+
+  if (existing.exists) {
+    rejected.push({
+      animalNumber,
+
+      eventDate:
+        rowEventDate,
+
+      reason:
+        "سبق تسجيل اللبن لهذا الحيوان في التاريخ نفسه."
+    });
+
+    continue;
+  }
+
+  const payload = {
+    userId: uid,
+    ownerUid: uid,
+
+    animalId,
+    animalNumber,
+
+    createdAt:
+      admin.firestore
+        .FieldValue
+        .serverTimestamp(),
+
+    updatedAt:
+      admin.firestore
+        .FieldValue
+        .serverTimestamp(),
+
+    date:
+      rowEventDate,
+
+    eventDate:
+      rowEventDate,
+
+    eventType:
+      "لبن يومي",
+
+    eventTypeNorm:
+      "daily_milk",
+
+    type:
+      "daily_milk",
+
+    species,
+    kind,
+
+    importMode:
+      String(
+        row.importMode || ""
+      ).trim() || "sessions",
+
+    milkSessions,
+
+    milkKg:
+      calc.milkKg,
+
+    dailyMilk:
+      calc.milkKg,
+
+    totalMilk:
+      calc.milkKg,
+
+    ...(
+      componentInput.provided
+        ? {
+            milkFatPct,
+            milkProteinPct,
+            fatProteinRatio
+          }
+        : {}
+    ),
+
+    source:
+      "server:/api/daily-milk/import/save"
+  };
+
+  const batch =
+    db.batch();
+
+  batch.set(
+    eventRef,
+    payload
+  );
+
+  if (animalId) {
+    if (
+      !latestSnapshotDateByAnimal
+        .has(animalNumber)
+    ) {
+      latestSnapshotDateByAnimal
+        .set(
           animalNumber,
-          reason: calc.reason || "أدخل كمية لبن رقمية صحيحة."
-        });
-        continue;
-      }
+          dailyMilkImportDateSrv(
+            row.currentLastMilkDate ||
+            ""
+          )
+        );
+    }
 
-      const milkSessions =
-        String(row.importMode || "") === "total_only"
-          ? [{ n: 1, kg: calc.milkKg }]
-          : (
-              kind === "buffalo"
-                ? [{ n: 1, kg: s1 }, { n: 2, kg: s2 }]
-                : [{ n: 1, kg: s1 }, { n: 2, kg: s2 }, { n: 3, kg: s3 }]
-            );
+    const latestSnapshotDate =
+      String(
+        latestSnapshotDateByAnimal
+          .get(animalNumber) ||
+        ""
+      );
 
-      const eventId = ["daily_milk", uid, animalNumber, eventDate].join("__");
-      const eventRef = db.collection("events").doc(eventId);
+    if (
+      !latestSnapshotDate ||
+      rowEventDate >
+        latestSnapshotDate
+    ) {
+      batch.set(
+        db
+          .collection("animals")
+          .doc(animalId),
+        {
+          dailyMilk:
+            calc.milkKg,
 
-      const existing = await eventRef.get();
-      if (existing.exists) {
-        rejected.push({
+          milkTodayKg:
+            calc.milkKg,
+
+          lastMilkKg:
+            calc.milkKg,
+
+          lastMilkDate:
+            rowEventDate,
+
+          updatedAt:
+            admin.firestore
+              .FieldValue
+              .serverTimestamp()
+        },
+        {
+          merge: true
+        }
+      );
+
+      latestSnapshotDateByAnimal
+        .set(
           animalNumber,
-         reason: "سبق تسجيل اللبن لهذا الحيوان في التاريخ نفسه."
-        });
-        continue;
-      }
-
-      const payload = {
-        userId: uid,
-        ownerUid: uid,
-
-        animalId,
-        animalNumber,
-
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-
-        date: eventDate,
-        eventDate,
-
-        eventType: "لبن يومي",
-        eventTypeNorm: "daily_milk",
-        type: "daily_milk",
-
-        species,
-        kind,
-        importMode: String(row.importMode || "").trim() || "sessions",
-
-        milkSessions,
-  milkKg: calc.milkKg,
-dailyMilk: calc.milkKg,
-totalMilk: calc.milkKg,
-
-...(componentInput.provided
-  ? {
-      milkFatPct,
-      milkProteinPct,
-      fatProteinRatio
+          rowEventDate
+        );
     }
-  : {}),
+  }
 
-source: "server:/api/daily-milk/import/save"
-      };
+  await batch.commit();
 
-      const batch = db.batch();
+  saved.push({
+    animalNumber,
+    animalId,
+    eventId,
 
-      batch.set(eventRef, payload);
+    eventDate:
+      rowEventDate,
 
-      if (animalId) {
-        batch.set(db.collection("animals").doc(animalId), {
-          dailyMilk: calc.milkKg,
-          milkTodayKg: calc.milkKg,
-          lastMilkKg: calc.milkKg,
-          lastMilkDate: eventDate,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-      }
+    milkKg:
+      calc.milkKg,
 
-      await batch.commit();
+    species,
+    kind,
 
-      saved.push({
-        animalNumber,
-        animalId,
-        eventId,
-        eventDate,
-        milkKg: calc.milkKg,
-        species,
-        kind,
-        totalText: dailyMilkFormatTotalSrv(calc.milkKg),
-        valid: true,
-        reason: ""
-      });
-    }
+    totalText:
+      dailyMilkFormatTotalSrv(
+        calc.milkKg
+      ),
+
+    valid: true,
+    reason: ""
+  });
+}
     if (
   saved.length &&
   componentInput.provided &&
