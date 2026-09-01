@@ -56,6 +56,7 @@
   <button type="button" id="previewBtn" class="save">معاينة</button>
   <button type="button" id="clearBtn" class="ghost">مسح</button>
 </div>
+<div id="fileStatus" class="form-hint hide"></div>
     
       <div class="kpi-grid" id="kpiBar">
        <div class="kpi-box">
@@ -120,6 +121,7 @@
   const kpiValid = $("kpiValid");
   const kpiInvalid = $("kpiInvalid");
   const kpiMilk = $("kpiMilk");
+  const fileStatus = $("fileStatus");
 
   let lastPreviewRows = [];
 
@@ -500,6 +502,8 @@ const data =
     hideBar();
     batchInput.value = "";
     fileInput.value = "";
+    fileStatus.textContent = "";
+    fileStatus.classList.add("hide");
     lastPreviewRows = [];
     renderUi({
       rows: [],
@@ -519,7 +523,15 @@ const data =
 
   fileInput.addEventListener("change", async () => {
   const f = fileInput.files?.[0];
-  if (!f) return;
+
+  if (!f) {
+    fileStatus.textContent = "";
+    fileStatus.classList.add("hide");
+    return;
+  }
+
+  fileStatus.textContent = `✅ تم تحميل الملف: ${f.name}`;
+  fileStatus.classList.remove("hide");
 
   await makePreview();
 });
