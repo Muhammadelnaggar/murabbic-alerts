@@ -475,6 +475,20 @@ function renderPregnancyFollowupActions(data = {}) {
               : "error"
           );
 
+                   if (
+            actionData?.ok &&
+            actionData?.redirectUrl
+          ) {
+            setTimeout(() => {
+              location.href =
+                String(
+                  actionData.redirectUrl
+                );
+            }, 900);
+
+            return;
+          }
+
           if (!actionData?.ok) {
             renderPregnancyFollowupActions(
               data
