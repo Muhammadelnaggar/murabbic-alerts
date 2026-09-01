@@ -10,6 +10,7 @@
  
 </head>
 <body>
+
   <header>
     <div class="mbk-head">
       <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
@@ -30,8 +31,12 @@
 
        <div class="row">
   <div>
-          <label for="eventDate">تاريخ اليوم</label>
-          <input id="eventDate" type="date" />
+          <label for="eventDate">التاريخ الافتراضي للملفات بلا تاريخ</label>
+<input id="eventDate" type="date" />
+
+<div class="form-hint">
+  إذا كان الملف يحتوي على تاريخ لكل صف، سيستخدم مُرَبِّيك تاريخ الصف تلقائيًا.
+</div>
         </div>
       </div>
 
@@ -76,6 +81,7 @@
           <thead>
             <tr>
               <th>رقم الحيوان</th>
+              <th>التاريخ</th>
               <th>النوع</th>
               <th>حلبة 1</th>
               <th>حلبة 2</th>
@@ -381,6 +387,7 @@ const kpi = ui?.kpi || {};
       return `
         <tr>
           <td class="num">${row.animalNumber || "—"}</td>
+          <td class="num">${row.eventDate || "—"}</td>
           <td>${row.species || "—"}</td>
           <td>${Number(row.milkS1 || 0) ? Number(row.milkS1 || 0).toFixed(1) : "—"}</td>
           <td>${Number(row.milkS2 || 0) ? Number(row.milkS2 || 0).toFixed(1) : "—"}</td>
@@ -403,12 +410,8 @@ const kpi = ui?.kpi || {};
     hideBar();
 
     const date = String(eventDate.value || "").trim();
-    if (!date) {
-      showBar("warning", "اختر تاريخ اليوم أولًا.");
-      return;
-    }
 
-    const file = fileInput.files?.[0] || null;
+const file = fileInput.files?.[0] || null;
     const rawText = String(batchInput.value || "").trim();
 
     if (!file && !rawText) {
@@ -453,12 +456,8 @@ const kpi = ui?.kpi || {};
     hideBar();
 
     const date = String(eventDate.value || "").trim();
-    if (!date) {
-      showBar("warning", "اختر تاريخ اليوم أولًا.");
-      return;
-    }
 
-    const rows = lastPreviewRows.filter(r => r.valid === true);
+const rows = lastPreviewRows.filter(r => r.valid === true);
     if (!rows.length) {
       showBar("warning", "لا توجد صفوف صحيحة جاهزة للحفظ.");
       return;
@@ -519,17 +518,11 @@ const data =
   });
 
   fileInput.addEventListener("change", async () => {
-    const f = fileInput.files?.[0];
-    if (!f) return;
+  const f = fileInput.files?.[0];
+  if (!f) return;
 
-    const date = String(eventDate.value || "").trim();
-    if (!date) {
-      showBar("warning", "تم اختيار الملف. اختر تاريخ اليوم ثم اضغط معاينة.");
-      return;
-    }
-
-    await makePreview();
-  });
+  await makePreview();
+});
 
   previewBtn.addEventListener("click", makePreview);
   saveBtn.addEventListener("click", saveAll);
