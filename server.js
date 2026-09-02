@@ -51291,8 +51291,10 @@ const fatProteinRatio =
 const saved = [];
 const rejected = [];
 
-const latestSnapshotDateByAnimal =
-  new Map();
+const bulkWriter =
+  db.bulkWriter();
+
+const pendingEventWrites = [];
 
 for (const row of checkedRows) {
   if (row.valid !== true) {
@@ -51435,23 +51437,6 @@ for (const row of checkedRows) {
       .collection("events")
       .doc(eventId);
 
-  const existing =
-    await eventRef.get();
-
-  if (existing.exists) {
-    rejected.push({
-      animalNumber,
-
-      eventDate:
-        rowEventDate,
-
-      reason:
-        "سبق تسجيل اللبن لهذا الحيوان في التاريخ نفسه."
-    });
-
-    continue;
-  }
-
   const payload = {
     userId: uid,
     ownerUid: uid,
@@ -51517,79 +51502,23 @@ for (const row of checkedRows) {
       "server:/api/daily-milk/import/save"
   };
 
-  const batch =
-    db.batch();
+  const writePromise =
+    bulkWriter
+      .create(
+        eventRef,
+        payload
+      )
+      .then(() => ({
+        ok: true
+      }))
+      .catch(error => ({
+        ok: false,
+        error
+      }));
 
-  batch.set(
-    eventRef,
-    payload
-  );
+  pendingEventWrites.push({
+    writePromise,
 
-  if (animalId) {
-    if (
-      !latestSnapshotDateByAnimal
-        .has(animalNumber)
-    ) {
-      latestSnapshotDateByAnimal
-        .set(
-          animalNumber,
-          dailyMilkImportDateSrv(
-            row.currentLastMilkDate ||
-            ""
-          )
-        );
-    }
-
-    const latestSnapshotDate =
-      String(
-        latestSnapshotDateByAnimal
-          .get(animalNumber) ||
-        ""
-      );
-
-    if (
-      !latestSnapshotDate ||
-      rowEventDate >
-        latestSnapshotDate
-    ) {
-      batch.set(
-        db
-          .collection("animals")
-          .doc(animalId),
-        {
-          dailyMilk:
-            calc.milkKg,
-
-          milkTodayKg:
-            calc.milkKg,
-
-          lastMilkKg:
-            calc.milkKg,
-
-          lastMilkDate:
-            rowEventDate,
-
-          updatedAt:
-            admin.firestore
-              .FieldValue
-              .serverTimestamp()
-        },
-        {
-          merge: true
-        }
-      );
-
-      latestSnapshotDateByAnimal
-        .set(
-          animalNumber,
-          rowEventDate
-        );
-    }
-  }
-
-  await batch.commit();
-
-  saved.push({
     animalNumber,
     animalId,
     eventId,
@@ -51603,15 +51532,190 @@ for (const row of checkedRows) {
     species,
     kind,
 
+    currentLastMilkDate:
+      dailyMilkImportDateSrv(
+        row.currentLastMilkDate ||
+        ""
+      )
+  });
+}
+
+await bulkWriter.close();
+
+const writeOutcomes =
+  await Promise.all(
+    pendingEventWrites.map(
+      item =>
+        item.writePromise
+    )
+  );
+
+const snapshotByAnimal =
+  new Map();
+
+for (
+  let i = 0;
+  i < pendingEventWrites.length;
+  i += 1
+) {
+  const item =
+    pendingEventWrites[i];
+
+  const outcome =
+    writeOutcomes[i];
+
+  if (!outcome?.ok) {
+    const code =
+      String(
+        outcome?.error?.code ??
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+    const alreadyExists =
+      code === "6" ||
+      code === "already-exists" ||
+      code === "already_exists";
+
+    if (alreadyExists) {
+      rejected.push({
+        animalNumber:
+          item.animalNumber,
+
+        eventDate:
+          item.eventDate,
+
+        reason:
+          "سبق تسجيل اللبن لهذا الحيوان في التاريخ نفسه."
+      });
+
+      continue;
+    }
+
+    throw outcome?.error ||
+      new Error(
+        "daily_milk_import_event_write_failed"
+      );
+  }
+
+  saved.push({
+    animalNumber:
+      item.animalNumber,
+
+    animalId:
+      item.animalId,
+
+    eventId:
+      item.eventId,
+
+    eventDate:
+      item.eventDate,
+
+    milkKg:
+      item.milkKg,
+
+    species:
+      item.species,
+
+    kind:
+      item.kind,
+
     totalText:
       dailyMilkFormatTotalSrv(
-        calc.milkKg
+        item.milkKg
       ),
 
     valid: true,
     reason: ""
   });
+
+  if (!item.animalId) {
+    continue;
+  }
+
+  const currentLastMilkDate =
+    String(
+      item.currentLastMilkDate ||
+      ""
+    );
+
+  if (
+    currentLastMilkDate &&
+    item.eventDate <=
+      currentLastMilkDate
+  ) {
+    continue;
+  }
+
+  const previous =
+    snapshotByAnimal.get(
+      item.animalNumber
+    );
+
+  if (
+    !previous ||
+    item.eventDate >
+      previous.eventDate
+  ) {
+    snapshotByAnimal.set(
+      item.animalNumber,
+      item
+    );
+  }
 }
+
+const snapshotRows =
+  [...snapshotByAnimal.values()];
+
+const snapshotChunkSize = 400;
+
+for (
+  let i = 0;
+  i < snapshotRows.length;
+  i += snapshotChunkSize
+) {
+  const chunk =
+    snapshotRows.slice(
+      i,
+      i + snapshotChunkSize
+    );
+
+  const batch =
+    db.batch();
+
+  for (const item of chunk) {
+    batch.set(
+      db
+        .collection("animals")
+        .doc(item.animalId),
+      {
+        dailyMilk:
+          item.milkKg,
+
+        milkTodayKg:
+          item.milkKg,
+
+        lastMilkKg:
+          item.milkKg,
+
+        lastMilkDate:
+          item.eventDate,
+
+        updatedAt:
+          admin.firestore
+            .FieldValue
+            .serverTimestamp()
+      },
+      {
+        merge: true
+      }
+    );
+  }
+
+  await batch.commit();
+}
+
     if (
   saved.length &&
   componentInput.provided &&
