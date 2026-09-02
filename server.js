@@ -54031,7 +54031,15 @@ function milkReportKindSrv(v) {
   return /buffalo|جاموس/i.test(s) ? "buffalo" : "cow";
 }
 function milkReportRequestedKindSrv(query = {}) {
-  const raw = String(query.species || query.type || "").trim().toLowerCase();
+ const raw =
+  String(
+    query.kind ||
+    query.species ||
+    query.type ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
 
   if (raw === "buffalo" || raw === "جاموس") return "buffalo";
 
@@ -55948,11 +55956,32 @@ if (!Number.isInteger(milkPriceUsed) || milkPriceUsed <= 0) {
       ? String(req.query.date).slice(0, 10)
       : defaultReportDate;
 
-    const selectedKind = milkReportRequestedKindSrv(req.query);
-    const selectedTypeLabel =
-      selectedKind === "buffalo" ? "جاموس" :
-      selectedKind === "cow" ? "أبقار" :
-      "الكل";
+    const selectedKind =
+  milkReportRequestedKindSrv(
+    req.query
+  );
+
+if (!selectedKind) {
+  return res
+    .status(400)
+    .json({
+      ok: false,
+      error:
+        "milk_report_kind_required",
+      message:
+        "اختر نوع تقرير اللبن: أبقار أو جاموس."
+    });
+}
+
+const selectedTypeLabel =
+  selectedKind === "buffalo"
+    ? "جاموس"
+    : "أبقار";
+
+const reportTitle =
+  selectedKind === "buffalo"
+    ? "تقرير إنتاج الجاموس"
+    : "تقرير إنتاج الأبقار";
 
     const eventDate = ev => String(ev.eventDate || ev.date || "").slice(0, 10);
     const isDate = v => milkReportIsDateSrv(String(v || "").slice(0, 10));
@@ -56041,7 +56070,9 @@ if (!Number.isInteger(milkPriceUsed) || milkPriceUsed <= 0) {
       .filter(milkReportIsMilkEventSrv)
       .filter(ev => isDate(eventDate(ev)))
       .map(ev => milkReportDecorateMilkEventKindSrv(ev, animalsByNumber))
-      .filter(ev => !selectedKind || ev.kind === selectedKind)
+      .filter(
+  ev => ev.kind === selectedKind
+)
       .sort((a, b) => eventDate(a).localeCompare(eventDate(b)));
 
     const nutritionEvents = allEvents
@@ -56213,7 +56244,9 @@ if (!Number.isInteger(milkPriceUsed) || milkPriceUsed <= 0) {
       const groupKind =
         def.species || (groupId.startsWith("buffalo_") ? "buffalo" : "cow");
 
-      if (selectedKind && groupKind !== selectedKind) continue;
+      if (groupKind !== selectedKind) {
+  continue;
+}
 
       const members = Array.isArray(groupsMap[groupId]) ? groupsMap[groupId] : [];
       if (!members.length) continue;
@@ -56466,7 +56499,7 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
           kg,
           groupId: "ungrouped",
           groupName: "غير مصنف إنتاجيًا",
-          species: selectedKind || "mixed"
+          species: selectedKind
         });
 
         if (point) herdScatterPoints.push(point);
@@ -56475,7 +56508,7 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
       groupSummaries.push({
         groupId: "ungrouped",
         groupName: "غير مصنف إنتاجيًا",
-        species: selectedKind || "mixed",
+        species: selectedKind,
 
         milkersCount: count,
         recordedCount: count,
@@ -56817,7 +56850,7 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
       },
 
       headline: {
-        title: "تقرير إنتاج اللبن",
+        title: reportTitle,
         text: headline,
         tone: economicTotals.hasData && economicTotals.netOperatingResult < 0 ? "danger" : "ok"
       },
