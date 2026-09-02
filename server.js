@@ -50316,7 +50316,243 @@ function dailyMilkImportBuildUiSrv({
     }
   };
 }
+async function dailyMilkImportExistingKeysSrv(
+  uid,
+  fallbackEventDate,
+  inputRows = []
+) {
+  const existingKeys = new Set();
 
+  if (
+    !db ||
+    !uid ||
+    !Array.isArray(inputRows) ||
+    !inputRows.length
+  ) {
+    return existingKeys;
+  }
+
+  const fallbackDate =
+    dailyMilkImportDateSrv(
+      fallbackEventDate
+    );
+
+  const targets = new Map();
+  const datesByAnimal = new Map();
+
+  for (const rawRow of inputRows) {
+    const animalNumber =
+      calvingNormDigitsOnlySrv(
+        rawRow?.animalNumber ||
+        rawRow?.number ||
+        ""
+      );
+
+    const explicitDateRaw =
+      String(
+        rawRow?.eventDateRaw ||
+        rawRow?.eventDate ||
+        rawRow?.date ||
+        ""
+      ).trim();
+
+    const hasDateSourceFlag =
+      typeof rawRow?.eventDateFromFile ===
+      "boolean";
+
+    const hasOwnDate =
+      rawRow?.eventDateFromFile === true ||
+      (
+        !hasDateSourceFlag &&
+        !!explicitDateRaw
+      );
+
+    const eventDate =
+      hasOwnDate
+        ? dailyMilkImportDateSrv(
+            explicitDateRaw
+          )
+        : fallbackDate;
+
+    if (!animalNumber || !eventDate) {
+      continue;
+    }
+
+    const importKey =
+      `${animalNumber}__${eventDate}`;
+
+    if (!targets.has(importKey)) {
+      targets.set(importKey, {
+        animalNumber,
+        eventDate,
+        eventId:
+          [
+            "daily_milk",
+            uid,
+            animalNumber,
+            eventDate
+          ].join("__")
+      });
+    }
+
+    if (!datesByAnimal.has(animalNumber)) {
+      datesByAnimal.set(
+        animalNumber,
+        new Set()
+      );
+    }
+
+    datesByAnimal
+      .get(animalNumber)
+      .add(eventDate);
+  }
+
+  const targetEntries =
+    [...targets.entries()];
+
+  const chunkSize = 250;
+
+  for (
+    let i = 0;
+    i < targetEntries.length;
+    i += chunkSize
+  ) {
+    const chunk =
+      targetEntries.slice(
+        i,
+        i + chunkSize
+      );
+
+    const refs =
+      chunk.map(
+        ([, target]) =>
+          db
+            .collection("events")
+            .doc(target.eventId)
+      );
+
+    let snaps = [];
+
+    try {
+      snaps =
+        await db.getAll(
+          ...refs
+        );
+    } catch (_) {
+      snaps =
+        await Promise.all(
+          refs.map(
+            ref => ref.get()
+          )
+        );
+    }
+
+    snaps.forEach(
+      (snap, index) => {
+        if (snap && snap.exists) {
+          existingKeys.add(
+            chunk[index][0]
+          );
+        }
+      }
+    );
+  }
+
+  const legacyJobs = [];
+
+  for (
+    const [
+      animalNumber,
+      dates
+    ] of datesByAnimal.entries()
+  ) {
+    const missingDates =
+      [...dates].filter(
+        eventDate =>
+          !existingKeys.has(
+            `${animalNumber}__${eventDate}`
+          )
+      );
+
+    if (!missingDates.length) {
+      continue;
+    }
+
+    legacyJobs.push(
+      (async () => {
+        const wantedDates =
+          new Set(missingDates);
+
+        const snap =
+          await db
+            .collection("events")
+            .where(
+              "userId",
+              "==",
+              uid
+            )
+            .where(
+              "animalNumber",
+              "==",
+              animalNumber
+            )
+            .limit(120)
+            .get();
+
+        snap.forEach(
+          docSnap => {
+            const ev =
+              docSnap.data() || {};
+
+            const eventDate =
+              String(
+                ev.eventDate ||
+                ev.date ||
+                ""
+              )
+                .trim()
+                .slice(0, 10);
+
+            if (
+              !wantedDates.has(
+                eventDate
+              )
+            ) {
+              return;
+            }
+
+            const t =
+              String(
+                ev.eventTypeNorm ||
+                ev.type ||
+                ev.eventType ||
+                ""
+              )
+                .trim()
+                .toLowerCase();
+
+            const isDailyMilk =
+              t === "daily_milk" ||
+              t === "لبن يومي" ||
+              t.includes("daily_milk");
+
+            if (isDailyMilk) {
+              existingKeys.add(
+                `${animalNumber}__${eventDate}`
+              );
+            }
+          }
+        );
+      })()
+    );
+  }
+
+  await Promise.all(
+    legacyJobs
+  );
+
+  return existingKeys;
+}
 async function dailyMilkImportPreviewRowsSrv(
   uid,
   fallbackEventDate,
@@ -50334,9 +50570,16 @@ async function dailyMilkImportPreviewRowsSrv(
     new Set();
 
   const animalCache =
-    new Map();
+  new Map();
 
-  for (const rawRow of inputRows) {
+const existingMilkKeys =
+  await dailyMilkImportExistingKeysSrv(
+    uid,
+    fallbackEventDate,
+    inputRows
+  );
+
+for (const rawRow of inputRows) {
     const animalNumber =
       calvingNormDigitsOnlySrv(
         rawRow.animalNumber ||
@@ -50562,11 +50805,9 @@ async function dailyMilkImportPreviewRowsSrv(
     }
 
     const duplicated =
-      await dailyMilkHasSameDaySrv(
-        uid,
-        animalNumber,
-        eventDate
-      );
+  existingMilkKeys.has(
+    importKey
+  );
 
     if (duplicated) {
       rows.push({
