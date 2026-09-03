@@ -478,8 +478,24 @@ function currentScreenOrientation() {
     : "portrait";
 }
 
-function syncCaptureOrientation() {
+function requiredOrientationForCurrentAngle() {
+  return state.currentAngle === "side"
+    ? "landscape"
+    : "portrait";
+}
+
+function isCaptureOrientationReady() {
+  if (!isMobileCaptureDevice()) return true;
+
+  return (
+    currentScreenOrientation() ===
+    requiredOrientationForCurrentAngle()
+  );
+}
+
+function updateOrientationUI() {
   const mobile = isMobileCaptureDevice();
+  const ready = isCaptureOrientationReady();
 
   if (!mobile) {
     if (orientationHint) {
@@ -490,20 +506,9 @@ function syncCaptureOrientation() {
       );
     }
 
-    captureBtn.disabled = false;
+    captureBtn.disabled = !state.stream;
     return true;
   }
-
-  const required =
-    state.currentAngle === "side"
-      ? "landscape"
-      : "portrait";
-
-  const current =
-    currentScreenOrientation();
-
-  const ready =
-    current === required;
 
   if (orientationHint) {
     orientationHint.classList.toggle(
@@ -519,45 +524,130 @@ function syncCaptureOrientation() {
     if (ready) {
       orientationHint.textContent =
         state.currentAngle === "side"
-          ? "✓ جاهز للتصوير الجانبي — الهاتف بالعرض"
-          : "✓ جاهز للتصوير الخلفي — الهاتف بالطول";
+          ? "✓ جاهز للتصوير الجانبي — 16:9 بالعرض"
+          : "✓ جاهز للتصوير الخلفي — 9:16 بالطول";
     } else {
       orientationHint.textContent =
         state.currentAngle === "side"
-          ? "↻ لف الهاتف بالعرض لالتقاط الصورة الجانبية كاملة"
-          : "↻ أعد الهاتف للوضع الرأسي لالتقاط الصورة الخلفية كاملة";
+          ? "↻ لف الهاتف بالعرض لالتقاط الصورة الجانبية 16:9"
+          : "↻ أعد الهاتف للوضع الرأسي لالتقاط الصورة الخلفية 9:16";
     }
   }
 
-  captureBtn.disabled = !ready;
-
-  requestAnimationFrame(() => {
-    fitOverlay();
-    drawGuide();
-  });
+  captureBtn.disabled =
+    !ready || !state.stream;
 
   return ready;
 }
-  function setAngle(angle) {
-    if (!angles.includes(angle)) return;
 
-    state.currentAngle = angle;
+let activeCameraProfileKey = "";
+let cameraPrepareSeq = 0;
 
-    $$(".mbk-vision-tab").forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.angle === angle);
-    });
+async function prepareCameraForCurrentAngle({
+  forceRestart = false
+} = {}) {
+  const seq = ++cameraPrepareSeq;
+  const ready = updateOrientationUI();
 
-    if (previewWrap) {
-      previewWrap.classList.remove("side-view", "rear-view");
-      previewWrap.classList.add(angle === "side" ? "side-view" : "rear-view");
+  if (!ready) {
+    activeCameraProfileKey = "";
+
+    await stopCamera();
+
+    updateOrientationUI();
+    fitOverlay();
+    drawGuide();
+
+    return false;
+  }
+
+  const profileKey =
+    isMobileCaptureDevice()
+      ? `${state.currentAngle}:${currentScreenOrientation()}`
+      : `desktop:${state.currentAngle}`;
+
+  if (
+    !forceRestart &&
+    state.stream &&
+    activeCameraProfileKey === profileKey
+  ) {
+    updateOrientationUI();
+    fitOverlay();
+    drawGuide();
+    return true;
+  }
+
+  try {
+    activeCameraProfileKey = "";
+
+    const started = await startCamera(
+      state.currentAngle,
+      seq
+    );
+
+    if (!started) {
+      return false;
     }
 
-  retakeBtn.disabled = !state.captures[angle];
+    activeCameraProfileKey = profileKey;
 
-  syncCaptureOrientation();
-  fitOverlay();
-  drawGuide(); 
+    updateOrientationUI();
+    fitOverlay();
+    drawGuide();
+
+    return true;
+
+  } catch (e) {
+    if (seq === cameraPrepareSeq) {
+      console.warn(
+        "dairy traits camera prepare error:",
+        e
+      );
+
+      showMsg(
+        e.message ||
+        "تعذّر تشغيل الكاميرا. يمكنك استخدام رفع صور بديلة.",
+        false
+      );
+    }
+
+    updateOrientationUI();
+    return false;
   }
+}
+
+async function setAngle(angle) {
+  if (!angles.includes(angle)) return;
+
+  state.currentAngle = angle;
+
+  $$(".mbk-vision-tab").forEach(btn => {
+    btn.classList.toggle(
+      "active",
+      btn.dataset.angle === angle
+    );
+  });
+
+  if (previewWrap) {
+    previewWrap.classList.remove(
+      "side-view",
+      "rear-view"
+    );
+
+    previewWrap.classList.add(
+      angle === "side"
+        ? "side-view"
+        : "rear-view"
+    );
+  }
+
+  retakeBtn.disabled =
+    !state.captures[angle];
+
+  await prepareCameraForCurrentAngle({
+    forceRestart: true
+  });
+}
 
   function fitOverlay() {
     if (!preview || !overlay) return;
@@ -644,36 +734,97 @@ function syncCaptureOrientation() {
   }
 
   async function stopCamera() {
-    if (state.stream) {
-      state.stream.getTracks().forEach(t => t.stop());
-    }
-    state.stream = null;
+  if (state.stream) {
+    state.stream
+      .getTracks()
+      .forEach(t => t.stop());
   }
 
-  async function startCamera() {
-    await stopCamera();
+  state.stream = null;
 
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error("متصفحك لا يدعم تشغيل الكاميرا. استخدم رفع صورة بديلة.");
-    }
+  if (preview) {
+    preview.srcObject = null;
+  }
+}
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: "environment" },
-        width: { ideal: 1600 },
-        height: { ideal: 1200 }
-      },
+function cameraConstraintsForAngle(angle) {
+  if (!isMobileCaptureDevice()) {
+    return {
+      facingMode: { ideal: "environment" },
+      width: { ideal: 1600 },
+      height: { ideal: 1200 }
+    };
+  }
+
+  if (angle === "rear") {
+    return {
+      facingMode: { ideal: "environment" },
+      width: { ideal: 1080 },
+      height: { ideal: 1920 },
+      aspectRatio: { ideal: 9 / 16 }
+    };
+  }
+
+  return {
+    facingMode: { ideal: "environment" },
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    aspectRatio: { ideal: 16 / 9 }
+  };
+}
+
+async function startCamera(
+  angle = state.currentAngle,
+  expectedSeq = cameraPrepareSeq
+) {
+  await stopCamera();
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error(
+      "متصفحك لا يدعم تشغيل الكاميرا. استخدم رفع صورة بديلة."
+    );
+  }
+
+  const stream =
+    await navigator.mediaDevices.getUserMedia({
+      video: cameraConstraintsForAngle(angle),
       audio: false
     });
 
-    state.stream = stream;
-    preview.srcObject = stream;
+  if (
+    expectedSeq !== cameraPrepareSeq ||
+    angle !== state.currentAngle
+  ) {
+    stream
+      .getTracks()
+      .forEach(t => t.stop());
 
-    await preview.play();
-
-    fitOverlay();
-    drawGuide();
+    return false;
   }
+
+  state.stream = stream;
+  preview.srcObject = stream;
+
+  await preview.play();
+
+  if (expectedSeq !== cameraPrepareSeq) {
+    stream
+      .getTracks()
+      .forEach(t => t.stop());
+
+    if (state.stream === stream) {
+      state.stream = null;
+      preview.srcObject = null;
+    }
+
+    return false;
+  }
+
+  fitOverlay();
+  drawGuide();
+
+  return true;
+}
 
   function captureFrame() {
     const w = preview.videoWidth || preview.clientWidth;
@@ -1710,9 +1861,17 @@ function renderAnalysis(result) {
   try {
     hideMsg();
 
-    if (!syncCaptureOrientation()) {
-      return;
-    }
+   if (
+  !isCaptureOrientationReady() ||
+  !state.stream
+) {
+  const ready =
+    await prepareCameraForCurrentAngle();
+
+  if (!ready || !state.stream) {
+    return;
+  }
+}
 
     captureBtn.disabled = true;
       captureBtn.textContent = "جاري الالتقاط...";
@@ -1741,7 +1900,7 @@ function renderAnalysis(result) {
       showMsg(e.message || "تعذّر تحليل سمات إنتاج اللبن.", false);
     } finally {
   captureBtn.textContent = "التقاط";
-  syncCaptureOrientation();
+updateOrientationUI();
 }
   }
 
@@ -1910,10 +2069,17 @@ if (saveBuffaloGroundTruthBtn) {
       location.href = `dashboard.html?number=${encodeURIComponent(number)}&date=${encodeURIComponent(dt)}`;
     });
 
-  const handleViewportChange = () => {
-  syncCaptureOrientation();
-  fitOverlay();
-  drawGuide();
+let viewportChangeTimer = null;
+
+const handleViewportChange = () => {
+  if (viewportChangeTimer) {
+    clearTimeout(viewportChangeTimer);
+  }
+
+  viewportChangeTimer =
+    setTimeout(() => {
+      prepareCameraForCurrentAngle();
+    }, 180);
 };
 
 window.addEventListener(
@@ -1939,16 +2105,9 @@ if (screen.orientation?.addEventListener) {
     renderThumbs();
     setWaiting();
     bindEvents();
-    setAngle("side");
-    loadTrainingGate();
-
-    try {
-      await startCamera();
-    } catch (e) {
-      console.warn("camera error:", e);
-      showMsg(e.message || "تعذّر تشغيل الكاميرا. يمكنك استخدام رفع صور بديلة.", false);
-    }
-  }
+loadTrainingGate();
+await setAngle("side");
+}
 
   init();
 })();
