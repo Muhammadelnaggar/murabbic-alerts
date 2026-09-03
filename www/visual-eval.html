@@ -473,7 +473,7 @@ function isMobileCaptureDevice() {
 }
 
 function currentScreenOrientation() {
-  return window.matchMedia("(orientation: landscape)").matches
+  return window.innerWidth >= window.innerHeight
     ? "landscape"
     : "portrait";
 }
@@ -2087,12 +2087,7 @@ window.addEventListener(
   handleViewportChange
 );
 
-if (screen.orientation?.addEventListener) {
-  screen.orientation.addEventListener(
-    "change",
-    handleViewportChange
-  );
-}
+
   }
 
   async function init() {
