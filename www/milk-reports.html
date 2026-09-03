@@ -761,7 +761,10 @@ function renderAnimalPointReport(pt, shouldScroll=false){
     }
 
 function renderGroups(j){
-  const groups = Array.isArray(j.groups) ? j.groups : [];
+  const groups =
+    Array.isArray(j.groups)
+      ? j.groups
+      : [];
 
   if (!groups.length) {
     $("groupsList").innerHTML =
@@ -769,224 +772,216 @@ function renderGroups(j){
     return;
   }
 
-  const regMainRows = groups.map(g => `
-    <tr>
-      <td><b>${esc(g.groupName || "—")}</b></td>
-      <td class="num">${int(g.milkersCount)}</td>
-      <td class="num">${int(g.recordedCount)}</td>
-      <td class="num">${int(g.missingCount)}</td>
-    </tr>
-  `).join("");
-
-  const regQualityRows = groups.map(g => `
-    <tr>
-      <td><b>${esc(g.groupName || "—")}</b></td>
-      <td>${status(
-        g.statusText || "مستقرة",
-        g.status === "loss"
-          ? "danger"
-          : g.status === "watch"
-            ? "warn"
-            : g.status === "good"
-              ? "good"
-              : ""
-      )}</td>
-      <td class="num">${num(g.recordingRate,1)}%</td>
-    </tr>
-  `).join("");
-
-  const productionRows = groups.map(g => `
-    <tr>
-      <td><b>${esc(g.groupName || "—")}</b></td>
-      <td class="num">${num(g.totalMilkKg,1)} كجم</td>
-      <td class="num">${num(g.avgMilkKgMilker,1)} كجم</td>
-      <td class="num">${arrow(g.deltaPct)} ${pct(g.deltaPct)}</td>
-    </tr>
-  `).join("");
-
-  const stageRows = groups.map(g => `
-    <tr>
-      <td><b>${esc(g.groupName || "—")}</b></td>
-      <td class="num">${num(g.avgDim,0)} يوم</td>
-      <td class="num">${num(g.avgDcc,0)} يوم</td>
-    </tr>
-  `).join("");
-
-  const econMainRows = groups.map(g => {
-    const e = g.economics || {};
-    const has = econHasData(e);
-    const econ = value => has ? money(value) : "غير مكتمل";
-
-    return `
+  const productionRows =
+    groups.map(g => `
       <tr>
         <td><b>${esc(g.groupName || "—")}</b></td>
-        <td class="num">${econ(e.milkIncome)}</td>
-        <td class="num">${econ(e.feedCost)}</td>
-        <td class="num">${econ(e.otherOperatingCost)}</td>
+
+        <td>
+          ${status(
+            g.statusText || "مستقرة",
+            g.status === "loss"
+              ? "danger"
+              : g.status === "watch"
+                ? "warn"
+                : g.status === "good"
+                  ? "good"
+                  : ""
+          )}
+        </td>
+
+        <td class="num">${int(g.milkersCount)}</td>
+
+        <td class="num">${int(g.recordedCount)}</td>
+
+        <td class="num">${int(g.missingCount)}</td>
+
+        <td class="num">${num(g.recordingRate,1)}%</td>
+
+        <td class="num">${num(g.totalMilkKg,1)} كجم</td>
+
+        <td class="num">${num(g.avgMilkKgMilker,1)} كجم</td>
+
+        <td class="num">${num(g.avgDim,0)} يوم</td>
+
+        <td class="num">${num(g.avgDcc,0)} يوم</td>
+
+        <td class="num">
+          ${arrow(g.deltaPct)}
+          ${pct(g.deltaPct)}
+        </td>
       </tr>
-    `;
-  }).join("");
+    `).join("");
 
-  const econResultRows = groups.map(g => {
-    const e = g.economics || {};
-    const has = econHasData(e);
-    const econ = value => has ? money(value) : "غير مكتمل";
+  const economicRows =
+    groups.map(g => {
+      const e = g.economics || {};
+      const has = econHasData(e);
 
-    return `
-      <tr>
-        <td><b>${esc(g.groupName || "—")}</b></td>
-        <td class="num">${econ(e.totalProductionCost)}</td>
-        <td class="num">${econ(e.netOperatingResult)}</td>
-      </tr>
-    `;
-  }).join("");
+      const econ =
+        value =>
+          has
+            ? money(value)
+            : "غير مكتمل";
 
-  const econKgRows = groups.map(g => {
-    const e = g.economics || {};
-    const has = econHasData(e);
-    const econ = value => has ? money(value) : "غير مكتمل";
+      return `
+        <tr>
+          <td><b>${esc(g.groupName || "—")}</b></td>
 
-    return `
-      <tr>
-        <td><b>${esc(g.groupName || "—")}</b></td>
-        <td class="num">${econ(e.feedCostPerKgMilk)}</td>
-        <td class="num">${econ(e.productionCostPerKgMilk)}</td>
-        <td class="num">${econ(e.marginPerKgMilk)}</td>
-      </tr>
-    `;
-  }).join("");
+          <td class="num">${econ(e.milkIncome)}</td>
 
-  const followRows = groups.map(g => {
-    const top = (g.topAnimals || [])
-      .slice(0,3)
-      .map(x => `#${esc(x.number)} ${num(x.kg ?? x.milkKg,1)} كجم`)
-      .join("، ");
+          <td class="num">${econ(e.feedCost)}</td>
 
-    const watch = (g.watchAnimals || [])
-      .slice(0,3)
-      .map(x => `#${esc(x.number)} ${pct(x.deltaPct)}`)
-      .join("، ");
+          <td class="num">${econ(e.otherOperatingCost)}</td>
 
-    return `
-      <tr>
-        <td><b>${esc(g.groupName || "—")}</b></td>
-        <td>${top || "—"}</td>
-        <td>${watch || "—"}</td>
-      </tr>
-    `;
-  }).join("");
+          <td class="num">${econ(e.totalProductionCost)}</td>
 
-  const evidenceRows = groups.map(g => {
-    const evidence = (g.murabbik?.evidence || [])
-      .map(arClean)
-      .join(" · ");
+          <td class="num">${econ(e.netOperatingResult)}</td>
 
-    return `
-      <tr>
-        <td><b>${esc(g.groupName || "—")}</b></td>
-        <td>${esc(evidence || "—")}</td>
-      </tr>
-    `;
-  }).join("");
+          <td class="num">${econ(e.feedCostPerKgMilk)}</td>
 
-  const interpretationRows = groups.map(g => {
-    const meaning = groupMeaning(g);
+          <td class="num">${econ(e.productionCostPerKgMilk)}</td>
 
-    return `
-      <tr>
-        <td><b>${esc(g.groupName || "—")}</b></td>
-        <td>${esc(meaning?.text || "—")}</td>
-        <td>${esc(
-          g.murabbik?.action ||
-          "متابعة روتينية بدون إجراء عاجل."
-        )}</td>
-      </tr>
-    `;
-  }).join("");
+          <td class="num">${econ(e.marginPerKgMilk)}</td>
+        </tr>
+      `;
+    }).join("");
 
-  const tableBlock = (title, headers, rows, cls="") => `
-    <div class="milk-group-table-block ${cls}">
-      <div class="milk-group-table-title">${title}</div>
+  const readingRows =
+    groups.map(g => {
+      const meaning =
+        groupMeaning(g);
 
-      <div class="milk-group-wrap">
-        <table class="milk-group-table">
+      const top =
+        (g.topAnimals || [])
+          .slice(0,3)
+          .map(
+            x =>
+              `#${esc(x.number)} ${num(x.kg ?? x.milkKg,1)} كجم`
+          )
+          .join("، ");
+
+      const watch =
+        (g.watchAnimals || [])
+          .slice(0,3)
+          .map(
+            x =>
+              `#${esc(x.number)} ${pct(x.deltaPct)}`
+          )
+          .join("، ");
+
+      const evidence =
+        (g.murabbik?.evidence || [])
+          .map(arClean)
+          .join(" · ");
+
+      return `
+        <tr>
+          <td><b>${esc(g.groupName || "—")}</b></td>
+
+          <td>${top || "—"}</td>
+
+          <td>${watch || "—"}</td>
+
+          <td>${esc(evidence || "—")}</td>
+
+          <td>${esc(meaning?.text || "—")}</td>
+
+          <td>
+            ${esc(
+              g.murabbik?.action ||
+              "متابعة روتينية بدون إجراء عاجل."
+            )}
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+  $("groupsList").innerHTML = `
+
+    <div class="milk-groups-section">
+      <div class="milk-groups-title">
+        الإنتاج والتسجيل
+      </div>
+
+      <div class="table-wrap milk-groups-scroll">
+        <table class="milk-groups-table milk-groups-production">
           <thead>
             <tr>
-              ${headers.map(h => `<th>${h}</th>`).join("")}
+              <th>المجموعة</th>
+              <th>الحالة</th>
+              <th>الحلاب</th>
+              <th>المسجل</th>
+              <th>غير المسجل</th>
+              <th>نسبة التسجيل</th>
+              <th>إجمالي اللبن</th>
+              <th>متوسط الحلاب</th>
+              <th>أيام الحليب</th>
+              <th>أيام الحمل</th>
+              <th>التغير</th>
             </tr>
           </thead>
-          <tbody>${rows}</tbody>
+
+          <tbody>
+            ${productionRows}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="milk-groups-section">
+      <div class="milk-groups-title">
+        اقتصاد المجموعات
+      </div>
+
+      <div class="table-wrap milk-groups-scroll">
+        <table class="milk-groups-table milk-groups-economy">
+          <thead>
+            <tr>
+              <th>المجموعة</th>
+              <th>دخل اللبن</th>
+              <th>التغذية</th>
+              <th>التشغيل</th>
+              <th>إجمالي التكلفة</th>
+              <th>الصافي</th>
+              <th>تغذية / كجم</th>
+              <th>تكلفة / كجم</th>
+              <th>هامش / كجم</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${economicRows}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="milk-groups-section">
+      <div class="milk-groups-title">
+        قراءة مُرَبِّيك للمجموعات
+      </div>
+
+      <div class="table-wrap milk-groups-scroll">
+        <table class="milk-groups-table milk-groups-reading">
+          <thead>
+            <tr>
+              <th>المجموعة</th>
+              <th>أفضل الحيوانات</th>
+              <th>تحتاج متابعة</th>
+              <th>الدليل</th>
+              <th>معنى الرقم</th>
+              <th>توصية مُرَبِّيك</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${readingRows}
+          </tbody>
         </table>
       </div>
     </div>
   `;
-
-  $("groupsList").innerHTML = [
-    tableBlock(
-      "أعداد وتسجيل المجموعات",
-      ["المجموعة","الحلاب","المسجل","غير المسجل"],
-      regMainRows
-    ),
-
-    tableBlock(
-      "جودة التسجيل",
-      ["المجموعة","الحالة","نسبة التسجيل"],
-      regQualityRows,
-      "milk-group-small"
-    ),
-
-    tableBlock(
-      "الأداء الإنتاجي",
-      ["المجموعة","إجمالي اللبن","متوسط الحلاب","التغير"],
-      productionRows
-    ),
-
-    tableBlock(
-      "مرحلة الإنتاج",
-      ["المجموعة","أيام الحليب","أيام الحمل"],
-      stageRows,
-      "milk-group-small"
-    ),
-
-    tableBlock(
-      "اقتصاد المجموعات — التشغيل",
-      ["المجموعة","دخل اللبن","التغذية","التشغيل"],
-      econMainRows
-    ),
-
-    tableBlock(
-      "اقتصاد المجموعات — النتيجة",
-      ["المجموعة","إجمالي التكلفة","الصافي"],
-      econResultRows,
-      "milk-group-small"
-    ),
-
-    tableBlock(
-      "اقتصاد كجم اللبن",
-      ["المجموعة","تغذية / كجم","تكلفة / كجم","هامش / كجم"],
-      econKgRows
-    ),
-
-    tableBlock(
-      "متابعة الحيوانات",
-      ["المجموعة","أفضل الحيوانات","تحتاج متابعة"],
-      followRows
-    ),
-
-    tableBlock(
-      "دليل مُرَبِّيك",
-      ["المجموعة","الدليل"],
-      evidenceRows,
-      "milk-group-evidence"
-    ),
-
-    tableBlock(
-      "تفسير وتوصية مُرَبِّيك",
-      ["المجموعة","معنى الرقم","توصية مُرَبِّيك"],
-      interpretationRows,
-      "milk-group-reading"
-    )
-  ].join("");
 }
     function renderThi(j){
   const t = j.thi || {};

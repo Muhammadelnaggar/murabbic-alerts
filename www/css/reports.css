@@ -913,20 +913,15 @@ body[data-page="milk-report"] .milk-comparison-table td.num{
   }
 }
 /* =========================================================
-   Milk Report — Final group tables
+   Milk Report — Group tables with mobile horizontal scroll
    ========================================================= */
 
-body[data-page="milk-report"] .milk-group-table-block{
-  width:min(900px, calc(100% - 24px));
-  margin:22px auto 0;
+body[data-page="milk-report"] .milk-groups-section{
+  margin:22px 0 0;
 }
 
-body[data-page="milk-report"] .milk-group-small{
-  width:min(760px, calc(100% - 24px));
-}
-
-body[data-page="milk-report"] .milk-group-table-title{
-  margin:0 0 9px;
+body[data-page="milk-report"] .milk-groups-title{
+  margin:0 0 10px;
   padding:0 2px 9px;
   border-bottom:1px solid #e6efe8;
   color:#315f49;
@@ -935,40 +930,52 @@ body[data-page="milk-report"] .milk-group-table-title{
   line-height:1.45;
 }
 
-body[data-page="milk-report"] .milk-group-wrap{
+body[data-page="milk-report"] .milk-groups-scroll{
   width:100%;
-  overflow:visible;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
   border:1px solid var(--line);
   border-radius:16px;
   background:#fff;
 }
 
-body[data-page="milk-report"] .milk-group-table{
+body[data-page="milk-report"] .milk-groups-table{
   width:100%;
-  min-width:0;
-  table-layout:fixed;
   border-collapse:collapse;
   border-spacing:0;
+  table-layout:auto;
 }
 
-body[data-page="milk-report"] .milk-group-table th{
+body[data-page="milk-report"] .milk-groups-production{
+  min-width:1040px;
+}
+
+body[data-page="milk-report"] .milk-groups-economy{
+  min-width:980px;
+}
+
+body[data-page="milk-report"] .milk-groups-reading{
+  min-width:1080px;
+}
+
+body[data-page="milk-report"] .milk-groups-table th{
   padding:12px 10px;
   background:#eef7f0;
   color:#315f49;
   font-size:14px;
   font-weight:950;
   line-height:1.4;
-  white-space:normal;
+  white-space:nowrap;
   text-align:center;
   border-bottom:1px solid #dfe9e2;
 }
 
-body[data-page="milk-report"] .milk-group-table th:first-child{
-  width:28%;
+body[data-page="milk-report"] .milk-groups-table th:first-child{
   text-align:right;
 }
 
-body[data-page="milk-report"] .milk-group-table td{
+body[data-page="milk-report"] .milk-groups-table td{
   padding:13px 10px;
   background:#fff;
   color:#17231d;
@@ -979,131 +986,147 @@ body[data-page="milk-report"] .milk-group-table td{
   border:0;
   border-bottom:1px solid #edf3ee;
   border-radius:0;
-  overflow-wrap:break-word;
-  word-break:normal;
 }
 
-body[data-page="milk-report"] .milk-group-table td:first-child{
-  color:#173126;
+body[data-page="milk-report"] .milk-groups-table td:first-child{
   font-weight:950;
+  color:#173126;
+  white-space:normal;
 }
 
-body[data-page="milk-report"] .milk-group-table td.num{
+body[data-page="milk-report"] .milk-groups-table td.num{
   direction:rtl;
   text-align:center;
-  white-space:normal;
-  font-size:15px;
+  white-space:nowrap;
+  font-size:14px;
   font-weight:950;
 }
 
-body[data-page="milk-report"] .milk-group-table tr:last-child td{
+body[data-page="milk-report"] .milk-groups-reading td{
+  white-space:normal;
+  min-width:170px;
+}
+
+body[data-page="milk-report"] .milk-groups-table tr:last-child td{
   border-bottom:0;
 }
 
-body[data-page="milk-report"] .milk-group-table tbody tr:nth-child(even) td{
+body[data-page="milk-report"] .milk-groups-table tbody tr:nth-child(even) td{
   background:#fbfdfb;
 }
 
-body[data-page="milk-report"] .milk-group-evidence{
-  width:min(820px, calc(100% - 24px));
-}
 
-body[data-page="milk-report"] .milk-group-evidence th:first-child{
-  width:28%;
-}
-
-body[data-page="milk-report"] .milk-group-reading{
-  width:min(900px, calc(100% - 24px));
-}
-
-body[data-page="milk-report"] .milk-group-reading th:first-child{
-  width:24%;
-}
-
-body[data-page="milk-report"] .milk-group-reading th:nth-child(2),
-body[data-page="milk-report"] .milk-group-reading th:nth-child(3){
-  width:38%;
-}
-
-body[data-page="milk-report"] .milk-group-reading td{
-  line-height:1.75;
-}
+/* ===== الموبايل ===== */
 
 @media(max-width:760px){
 
-  body[data-page="milk-report"] .milk-group-table-block,
-  body[data-page="milk-report"] .milk-group-small,
-  body[data-page="milk-report"] .milk-group-evidence,
-  body[data-page="milk-report"] .milk-group-reading{
-    width:100%;
-    margin:18px auto 0;
+  body[data-page="milk-report"] .milk-groups-section{
+    margin-top:18px;
   }
 
-  body[data-page="milk-report"] .milk-group-table-title{
+  body[data-page="milk-report"] .milk-groups-title{
     font-size:15px;
   }
 
-  body[data-page="milk-report"] .milk-group-table th{
-    padding:10px 5px;
+  body[data-page="milk-report"] .milk-groups-table th{
+    padding:10px 9px;
     font-size:12px;
-    line-height:1.35;
   }
 
-  body[data-page="milk-report"] .milk-group-table td{
-    padding:11px 5px;
+  body[data-page="milk-report"] .milk-groups-table td{
+    padding:11px 9px;
     font-size:12px;
-    line-height:1.5;
   }
 
-  body[data-page="milk-report"] .milk-group-table td.num{
-    font-size:12.5px;
-    white-space:normal;
+  body[data-page="milk-report"] .milk-groups-table td.num{
+    font-size:12px;
   }
 
-  body[data-page="milk-report"] .milk-group-table th:first-child{
-    width:32%;
+  /*
+   * تثبيت اسم المجموعة أثناء التحريك الأفقي
+   * للحفاظ على سياق الصف.
+   */
+  body[data-page="milk-report"] .milk-groups-table th:first-child{
+    position:sticky;
+    right:0;
+    z-index:4;
+    min-width:150px;
+    background:#eef7f0;
   }
 
-  body[data-page="milk-report"] .milk-group-reading th:first-child{
-    width:28%;
+  body[data-page="milk-report"] .milk-groups-table td:first-child{
+    position:sticky;
+    right:0;
+    z-index:3;
+    min-width:150px;
+    background:#fff;
+    box-shadow:-1px 0 0 #e6efe8;
   }
 
-  body[data-page="milk-report"] .milk-group-reading th:nth-child(2),
-  body[data-page="milk-report"] .milk-group-reading th:nth-child(3){
-    width:36%;
+  body[data-page="milk-report"]
+  .milk-groups-table
+  tbody tr:nth-child(even) td:first-child{
+    background:#fbfdfb;
   }
 }
 
+
+/* ===== الطباعة / PDF ===== */
+
 @media print{
 
-  body[data-page="milk-report"] .milk-group-table-block,
-  body[data-page="milk-report"] .milk-group-small,
-  body[data-page="milk-report"] .milk-group-evidence,
-  body[data-page="milk-report"] .milk-group-reading{
-    width:100%;
-    max-width:none;
-    margin:0 0 6mm;
+  body[data-page="milk-report"] #groupsBlock{
+    break-inside:auto;
+    page-break-inside:auto;
   }
 
-  body[data-page="milk-report"] .milk-group-wrap{
+  body[data-page="milk-report"] .milk-groups-section{
+    margin:0 0 6mm;
+    break-inside:auto;
+    page-break-inside:auto;
+  }
+
+  body[data-page="milk-report"] .milk-groups-scroll{
     overflow:visible !important;
     border-radius:0;
   }
 
-  body[data-page="milk-report"] .milk-group-table{
+  body[data-page="milk-report"] .milk-groups-table,
+  body[data-page="milk-report"] .milk-groups-production,
+  body[data-page="milk-report"] .milk-groups-economy,
+  body[data-page="milk-report"] .milk-groups-reading{
     width:100%;
-    min-width:0;
+    min-width:0 !important;
     table-layout:fixed;
   }
 
-  body[data-page="milk-report"] .milk-group-table th,
-  body[data-page="milk-report"] .milk-group-table td{
-    font-size:9pt;
-    padding:2.6mm 2mm;
+  body[data-page="milk-report"] .milk-groups-table th{
+    padding:1.8mm 1mm;
+    font-size:7.8pt;
+    white-space:normal;
   }
 
-  body[data-page="milk-report"] .milk-group-table-title{
-    font-size:11pt;
-    margin-bottom:2mm;
+  body[data-page="milk-report"] .milk-groups-table td{
+    padding:1.8mm 1mm;
+    font-size:7.8pt;
+    line-height:1.35;
+    white-space:normal;
+    overflow-wrap:anywhere;
   }
-} 
+
+  body[data-page="milk-report"] .milk-groups-table td.num{
+    font-size:7.8pt;
+    white-space:normal;
+  }
+
+  body[data-page="milk-report"] .milk-groups-table th:first-child,
+  body[data-page="milk-report"] .milk-groups-table td:first-child{
+    position:static;
+    min-width:0;
+    box-shadow:none;
+  }
+
+  body[data-page="milk-report"] .milk-groups-reading td{
+    min-width:0;
+  }
+}
