@@ -912,3 +912,194 @@ body[data-page="milk-report"] .milk-comparison-table td.num{
     min-width:0;
   }
 }
+/* =========================================================
+   Milk Report — Clear printable group tables
+   ========================================================= */
+
+body[data-page="milk-report"] .milk-group-table-block{
+  width:min(940px, calc(100% - 24px));
+  margin:20px auto 0;
+}
+
+body[data-page="milk-report"] .milk-group-narrow{
+  width:min(760px, calc(100% - 24px));
+}
+
+body[data-page="milk-report"] .milk-group-table-title{
+  margin:0 0 9px;
+  padding:0 2px 8px;
+  border-bottom:1px solid #e6efe8;
+  color:#315f49;
+  font-size:16px;
+  font-weight:950;
+  line-height:1.45;
+}
+
+body[data-page="milk-report"] .milk-group-wrap{
+  width:100%;
+  overflow:visible;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:#fff;
+}
+
+body[data-page="milk-report"] .milk-group-table{
+  width:100%;
+  min-width:0;
+  table-layout:fixed;
+  border-collapse:collapse;
+  border-spacing:0;
+}
+
+body[data-page="milk-report"] .milk-group-table th{
+  padding:11px 9px;
+  background:#eef7f0;
+  color:#315f49;
+  font-size:14px;
+  font-weight:950;
+  line-height:1.4;
+  white-space:normal;
+  text-align:center;
+  border-bottom:1px solid #dfe9e2;
+}
+
+body[data-page="milk-report"] .milk-group-table th:first-child{
+  text-align:right;
+}
+
+body[data-page="milk-report"] .milk-group-table td{
+  padding:12px 9px;
+  background:#fff;
+  color:#17231d;
+  font-size:14px;
+  font-weight:850;
+  line-height:1.55;
+  vertical-align:middle;
+  border:0;
+  border-bottom:1px solid #edf3ee;
+  border-radius:0;
+  overflow-wrap:anywhere;
+}
+
+body[data-page="milk-report"] .milk-group-table td:first-child{
+  font-weight:950;
+  color:#173126;
+}
+
+body[data-page="milk-report"] .milk-group-table td.num{
+  direction:rtl;
+  text-align:center;
+  white-space:nowrap;
+  font-size:15px;
+  font-weight:950;
+}
+
+body[data-page="milk-report"] .milk-group-table tr:last-child td{
+  border-bottom:0;
+}
+
+body[data-page="milk-report"] .milk-group-table tbody tr:nth-child(even) td{
+  background:#fbfdfb;
+}
+
+/* 6 أعمدة */
+body[data-page="milk-report"] .milk-group-table-6 th:first-child{
+  width:23%;
+}
+
+/* 4 أعمدة */
+body[data-page="milk-report"] .milk-group-table-4 th:first-child{
+  width:34%;
+}
+
+/* متابعة الحيوانات */
+body[data-page="milk-report"] .milk-group-table-follow th:nth-child(1){
+  width:22%;
+}
+
+body[data-page="milk-report"] .milk-group-table-follow th:nth-child(2){
+  width:27%;
+}
+
+body[data-page="milk-report"] .milk-group-table-follow th:nth-child(3){
+  width:22%;
+}
+
+body[data-page="milk-report"] .milk-group-table-follow th:nth-child(4){
+  width:29%;
+}
+
+/* تفسير وتوصية */
+body[data-page="milk-report"] .milk-group-table-reading th:nth-child(1){
+  width:22%;
+}
+
+body[data-page="milk-report"] .milk-group-table-reading th:nth-child(2){
+  width:39%;
+}
+
+body[data-page="milk-report"] .milk-group-table-reading th:nth-child(3){
+  width:39%;
+}
+
+body[data-page="milk-report"] .milk-group-table-reading td{
+  line-height:1.7;
+}
+
+@media(max-width:760px){
+
+  body[data-page="milk-report"] .milk-group-table-block,
+  body[data-page="milk-report"] .milk-group-narrow{
+    width:100%;
+  }
+
+  body[data-page="milk-report"] .milk-group-table th{
+    padding:9px 5px;
+    font-size:12px;
+  }
+
+  body[data-page="milk-report"] .milk-group-table td{
+    padding:10px 5px;
+    font-size:12px;
+  }
+
+  body[data-page="milk-report"] .milk-group-table td.num{
+    font-size:13px;
+  }
+}
+
+@media print{
+
+  body[data-page="milk-report"] .milk-group-table-block,
+  body[data-page="milk-report"] .milk-group-narrow{
+    width:100%;
+    max-width:none;
+    margin:0 0 6mm;
+  }
+
+  body[data-page="milk-report"] .milk-group-wrap{
+    overflow:visible !important;
+    border-radius:0;
+  }
+
+  body[data-page="milk-report"] .milk-group-table{
+    width:100%;
+    min-width:0;
+    table-layout:fixed;
+  }
+
+  body[data-page="milk-report"] .milk-group-table th{
+    font-size:8.5pt;
+    padding:2.4mm 1.8mm;
+  }
+
+  body[data-page="milk-report"] .milk-group-table td{
+    font-size:8.5pt;
+    padding:2.5mm 1.8mm;
+  }
+
+  body[data-page="milk-report"] .milk-group-table-title{
+    font-size:11pt;
+    margin-bottom:2mm;
+  }
+}
