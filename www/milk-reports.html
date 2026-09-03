@@ -65,29 +65,53 @@
 <div class="report-meta" id="printMeta"></div>
 </section>
 
-<section class="card" id="summaryBlock" data-print-block>
-  <div class="section-title">الملخص الإجمالي لإنتاج القطيع</div>
+<!-- عناصر توافق داخلية مع الكود الحالي -->
+<div id="heroTitle" hidden>تقرير إنتاج اللبن</div>
+<div id="heroLine" hidden>—</div>
+<div id="heroSummary" hidden></div>
+<span id="heroNet" hidden>—</span>
 
-  <div class="sub">
-    أهم مؤشرات الإنتاج والتسجيل والاقتصاد في قراءة واحدة.
+<section
+  class="card milk-compact-section"
+  id="productionBlock"
+  data-print-block
+>
+  <div class="section-title">
+    1. الإنتاج والتسجيل
   </div>
 
-  <div id="heroTitle" hidden>تقرير إنتاج اللبن</div>
-  <div id="heroLine" hidden>—</div>
-  <div id="heroSummary" hidden></div>
-  <span id="heroNet" hidden>—</span>
-
-  <div class="table-wrap report-extra">
-    <table id="overallMilkTable">
+  <div class="table-wrap milk-table-wrap">
+    <table class="milk-compact-table">
       <thead>
         <tr>
           <th>المؤشر</th>
           <th>القيمة</th>
-          <th>القراءة</th>
         </tr>
       </thead>
 
       <tbody id="productionCards"></tbody>
+    </table>
+  </div>
+</section>
+
+<section
+  class="card milk-compact-section"
+  id="economyBlock"
+  data-print-block
+>
+  <div class="section-title">
+    2. اقتصاد إنتاج اللبن
+  </div>
+
+  <div class="table-wrap milk-table-wrap">
+    <table class="milk-compact-table">
+      <thead>
+        <tr>
+          <th>المؤشر</th>
+          <th>القيمة</th>
+        </tr>
+      </thead>
+
       <tbody id="economyCards"></tbody>
     </table>
   </div>
@@ -95,11 +119,18 @@
 
 <div class="card empty" id="serverMessage" hidden></div>
 
-      <section class="card" id="comparisonBlock" data-print-block>
+     <section
+  class="card milk-comparison-section"
+  id="comparisonBlock"
+  data-print-block
+>
   <div class="section-title">المقارنات</div>
   <div class="sub">يومي، أسبوعي، شهري، و305 يوم في جدول واحد.</div>
   <div class="table-wrap report-extra">
-    <table id="comparisonTable"></table>
+    <table
+  id="comparisonTable"
+  class="milk-comparison-table"
+></table>
   </div>
 </section>
 
@@ -270,20 +301,11 @@ function toneByValue(v, goodPositive=true){
 function row(a,b,c,d){
   return `<tr><td>${a}</td><td class="num">${b}</td><td>${c || ""}</td><td>${d || ""}</td></tr>`;
 }
-function metricRow(label, value, note = ""){
+function metricRow(label, value){
   return `
     <tr>
-      <td><b>${esc(label)}</b></td>
+      <td>${esc(label)}</td>
       <td class="num">${value ?? "—"}</td>
-      <td>${esc(note || "")}</td>
-    </tr>
-  `;
-}
-
-function metricSection(title){
-  return `
-    <tr>
-      <th colspan="3">${esc(title)}</th>
     </tr>
   `;
 }
@@ -345,58 +367,47 @@ function kpiCard(label, value, sub, tone=""){
 function renderProduction(j){
   const p = j.production || {};
 
-  $("productionCards").innerHTML =
-    metricSection("الإنتاج والتسجيل") +
+  $("productionCards").innerHTML = [
+    metricRow(
+      "إجمالي إنتاج اللبن",
+      `${num(p.totalMilkKg,1)} كجم`
+    ),
 
-    [
-      metricRow(
-        "إجمالي إنتاج اللبن",
-        `${num(p.totalMilkKg,1)} كجم`,
-        "إجمالي اللبن المسجل في تاريخ التقرير"
-      ),
+    metricRow(
+      "عدد الحلاب الفعلي",
+      int(p.milkersCount)
+    ),
 
-      metricRow(
-        "عدد الحلاب الفعلي",
-        int(p.milkersCount),
-        "الحيوانات الموجودة فعليًا في دورة الحليب"
-      ),
+    metricRow(
+      "الحلاب المسجل له لبن",
+      int(p.recordedCount)
+    ),
 
-      metricRow(
-        "الحلاب المسجل له لبن",
-        int(p.recordedCount),
-        "له تسجيل لبن في يوم التقرير"
-      ),
+    metricRow(
+      "الحلاب بدون تسجيل",
+      int(p.missingCount)
+    ),
 
-      metricRow(
-        "الحلاب بدون تسجيل",
-        int(p.missingCount),
-        "حلاب فعلي لم يسجل له لبن"
-      ),
+    metricRow(
+      "نسبة تسجيل اللبن",
+      `${num(p.recordingRate,1)}%`
+    ),
 
-      metricRow(
-        "نسبة تسجيل اللبن",
-        `${num(p.recordingRate,1)}%`,
-        `${int(p.recordedCount)} مسجل من ${int(p.milkersCount)} حلاب فعلي`
-      ),
+    metricRow(
+      "متوسط إنتاج الحلاب",
+      `${num(p.avgMilkKgMilker,1)} كجم`
+    ),
 
-      metricRow(
-        "متوسط إنتاج الحلاب",
-        `${num(p.avgMilkKgMilker,1)} كجم`,
-        "متوسط الإنتاج على الحلاب الفعلي"
-      ),
+    metricRow(
+      "متوسط أيام الحليب",
+      `${num(p.avgDim,0)} يوم`
+    ),
 
-      metricRow(
-        "متوسط أيام الحليب",
-        `${num(p.avgDim,0)} يوم`,
-        "متوسط DIM للقطيع"
-      ),
-
-      metricRow(
-        "متوسط أيام الحمل",
-        `${num(p.avgDcc,0)} يوم`,
-        "للحيوانات المتاح لها بيانات حمل"
-      )
-    ].join("");
+    metricRow(
+      "متوسط أيام الحمل",
+      `${num(p.avgDcc,0)} يوم`
+    )
+  ].join("");
 }
 
    function econCard(label, value, sub, tone=""){
@@ -412,64 +423,52 @@ function renderEconomy(j){
       getMilkPriceRequired()
     );
 
-  $("economyCards").innerHTML =
-    metricSection("اقتصاد إنتاج اللبن") +
+  $("economyCards").innerHTML = [
+    metricRow(
+      "سعر كجم اللبن",
+      money0(milkPricePerKg)
+    ),
 
-    [
-      metricRow(
-        "سعر كجم اللبن",
-        money0(milkPricePerKg),
-        "السعر المدخل في التقرير"
-      ),
+    metricRow(
+      "إجمالي دخل اللبن",
+      money(e.milkIncome)
+    ),
 
-      metricRow(
-        "إجمالي دخل اللبن",
-        money(e.milkIncome),
-        "إجمالي اللبن × سعر الكجم"
-      ),
+    metricRow(
+      "إجمالي تكاليف التغذية",
+      money(e.feedCost)
+    ),
 
-      metricRow(
-        "إجمالي تكاليف التغذية",
-        money(e.feedCost),
-        `مرتبطة بـ ${int(e.groupsCount)} مجموعة`
-      ),
+    metricRow(
+      "تكلفة التغذية / كجم لبن",
+      money(e.feedCostPerKgMilk)
+    ),
 
-      metricRow(
-        "تكلفة التغذية / كجم لبن",
-        money(e.feedCostPerKgMilk),
-        "تكلفة التغذية ÷ إنتاج اللبن"
-      ),
+    metricRow(
+      "تكاليف التشغيل",
+      money(e.otherOperatingCost)
+    ),
 
-      metricRow(
-        "تكاليف التشغيل",
-        money(e.otherOperatingCost),
-        "وفق قاعدة التشغيل الحالية بالسيرفر"
-      ),
+    metricRow(
+      "إجمالي تكاليف الإنتاج",
+      money(e.totalProductionCost)
+    ),
 
-      metricRow(
-        "إجمالي تكاليف الإنتاج",
-        money(e.totalProductionCost),
-        "تغذية + تشغيل"
-      ),
+    metricRow(
+      "صافي نتيجة إنتاج اللبن",
+      money(e.netOperatingResult)
+    ),
 
-      metricRow(
-        "صافي نتيجة إنتاج اللبن",
-        money(e.netOperatingResult),
-        "دخل اللبن − إجمالي التكلفة"
-      ),
+    metricRow(
+      "إجمالي تكلفة إنتاج كجم اللبن",
+      money(e.productionCostPerKgMilk)
+    ),
 
-      metricRow(
-        "إجمالي تكلفة إنتاج كجم اللبن",
-        money(e.productionCostPerKgMilk),
-        "إجمالي التكلفة ÷ كجم اللبن"
-      ),
-
-      metricRow(
-        "هامش كجم اللبن",
-        money(e.marginPerKgMilk),
-        "الصافي لكل كجم"
-      )
-    ].join("");
+    metricRow(
+      "هامش كجم اللبن",
+      money(e.marginPerKgMilk)
+    )
+  ].join("");
 }
 
     function renderComparisons(j){
@@ -1209,7 +1208,7 @@ $("heroLine").textContent = "";
 
 $("productionCards").innerHTML = `
   <tr>
-    <td colspan="3">
+    <td colspan="2">
       سعر كجم اللبن مطلوب قبل تحميل التقرير.
     </td>
   </tr>
