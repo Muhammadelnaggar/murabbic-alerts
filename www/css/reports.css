@@ -913,24 +913,24 @@ body[data-page="milk-report"] .milk-comparison-table td.num{
   }
 }
 /* =========================================================
-   Milk Report — Clear printable group tables
+   Milk Report — Final group tables
    ========================================================= */
 
 body[data-page="milk-report"] .milk-group-table-block{
-  width:min(940px, calc(100% - 24px));
-  margin:20px auto 0;
+  width:min(900px, calc(100% - 24px));
+  margin:22px auto 0;
 }
 
-body[data-page="milk-report"] .milk-group-narrow{
+body[data-page="milk-report"] .milk-group-small{
   width:min(760px, calc(100% - 24px));
 }
 
 body[data-page="milk-report"] .milk-group-table-title{
   margin:0 0 9px;
-  padding:0 2px 8px;
+  padding:0 2px 9px;
   border-bottom:1px solid #e6efe8;
   color:#315f49;
-  font-size:16px;
+  font-size:17px;
   font-weight:950;
   line-height:1.45;
 }
@@ -952,7 +952,7 @@ body[data-page="milk-report"] .milk-group-table{
 }
 
 body[data-page="milk-report"] .milk-group-table th{
-  padding:11px 9px;
+  padding:12px 10px;
   background:#eef7f0;
   color:#315f49;
   font-size:14px;
@@ -964,32 +964,34 @@ body[data-page="milk-report"] .milk-group-table th{
 }
 
 body[data-page="milk-report"] .milk-group-table th:first-child{
+  width:28%;
   text-align:right;
 }
 
 body[data-page="milk-report"] .milk-group-table td{
-  padding:12px 9px;
+  padding:13px 10px;
   background:#fff;
   color:#17231d;
   font-size:14px;
   font-weight:850;
-  line-height:1.55;
+  line-height:1.6;
   vertical-align:middle;
   border:0;
   border-bottom:1px solid #edf3ee;
   border-radius:0;
-  overflow-wrap:anywhere;
+  overflow-wrap:break-word;
+  word-break:normal;
 }
 
 body[data-page="milk-report"] .milk-group-table td:first-child{
-  font-weight:950;
   color:#173126;
+  font-weight:950;
 }
 
 body[data-page="milk-report"] .milk-group-table td.num{
   direction:rtl;
   text-align:center;
-  white-space:nowrap;
+  white-space:normal;
   font-size:15px;
   font-weight:950;
 }
@@ -1002,76 +1004,82 @@ body[data-page="milk-report"] .milk-group-table tbody tr:nth-child(even) td{
   background:#fbfdfb;
 }
 
-/* 6 أعمدة */
-body[data-page="milk-report"] .milk-group-table-6 th:first-child{
-  width:23%;
+body[data-page="milk-report"] .milk-group-evidence{
+  width:min(820px, calc(100% - 24px));
 }
 
-/* 4 أعمدة */
-body[data-page="milk-report"] .milk-group-table-4 th:first-child{
-  width:34%;
+body[data-page="milk-report"] .milk-group-evidence th:first-child{
+  width:28%;
 }
 
-/* متابعة الحيوانات */
-body[data-page="milk-report"] .milk-group-table-follow th:nth-child(1){
-  width:22%;
+body[data-page="milk-report"] .milk-group-reading{
+  width:min(900px, calc(100% - 24px));
 }
 
-body[data-page="milk-report"] .milk-group-table-follow th:nth-child(2){
-  width:27%;
+body[data-page="milk-report"] .milk-group-reading th:first-child{
+  width:24%;
 }
 
-body[data-page="milk-report"] .milk-group-table-follow th:nth-child(3){
-  width:22%;
+body[data-page="milk-report"] .milk-group-reading th:nth-child(2),
+body[data-page="milk-report"] .milk-group-reading th:nth-child(3){
+  width:38%;
 }
 
-body[data-page="milk-report"] .milk-group-table-follow th:nth-child(4){
-  width:29%;
-}
-
-/* تفسير وتوصية */
-body[data-page="milk-report"] .milk-group-table-reading th:nth-child(1){
-  width:22%;
-}
-
-body[data-page="milk-report"] .milk-group-table-reading th:nth-child(2){
-  width:39%;
-}
-
-body[data-page="milk-report"] .milk-group-table-reading th:nth-child(3){
-  width:39%;
-}
-
-body[data-page="milk-report"] .milk-group-table-reading td{
-  line-height:1.7;
+body[data-page="milk-report"] .milk-group-reading td{
+  line-height:1.75;
 }
 
 @media(max-width:760px){
 
   body[data-page="milk-report"] .milk-group-table-block,
-  body[data-page="milk-report"] .milk-group-narrow{
+  body[data-page="milk-report"] .milk-group-small,
+  body[data-page="milk-report"] .milk-group-evidence,
+  body[data-page="milk-report"] .milk-group-reading{
     width:100%;
+    margin:18px auto 0;
+  }
+
+  body[data-page="milk-report"] .milk-group-table-title{
+    font-size:15px;
   }
 
   body[data-page="milk-report"] .milk-group-table th{
-    padding:9px 5px;
+    padding:10px 5px;
     font-size:12px;
+    line-height:1.35;
   }
 
   body[data-page="milk-report"] .milk-group-table td{
-    padding:10px 5px;
+    padding:11px 5px;
     font-size:12px;
+    line-height:1.5;
   }
 
   body[data-page="milk-report"] .milk-group-table td.num{
-    font-size:13px;
+    font-size:12.5px;
+    white-space:normal;
+  }
+
+  body[data-page="milk-report"] .milk-group-table th:first-child{
+    width:32%;
+  }
+
+  body[data-page="milk-report"] .milk-group-reading th:first-child{
+    width:28%;
+  }
+
+  body[data-page="milk-report"] .milk-group-reading th:nth-child(2),
+  body[data-page="milk-report"] .milk-group-reading th:nth-child(3){
+    width:36%;
   }
 }
 
 @media print{
 
   body[data-page="milk-report"] .milk-group-table-block,
-  body[data-page="milk-report"] .milk-group-narrow{
+  body[data-page="milk-report"] .milk-group-small,
+  body[data-page="milk-report"] .milk-group-evidence,
+  body[data-page="milk-report"] .milk-group-reading{
     width:100%;
     max-width:none;
     margin:0 0 6mm;
@@ -1088,14 +1096,10 @@ body[data-page="milk-report"] .milk-group-table-reading td{
     table-layout:fixed;
   }
 
-  body[data-page="milk-report"] .milk-group-table th{
-    font-size:8.5pt;
-    padding:2.4mm 1.8mm;
-  }
-
+  body[data-page="milk-report"] .milk-group-table th,
   body[data-page="milk-report"] .milk-group-table td{
-    font-size:8.5pt;
-    padding:2.5mm 1.8mm;
+    font-size:9pt;
+    padding:2.6mm 2mm;
   }
 
   body[data-page="milk-report"] .milk-group-table-title{
