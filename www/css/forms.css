@@ -1432,142 +1432,30 @@ body[data-page="dairy-traits"]
 }
 
 body[data-page="dairy-traits"]
+#cameraCard #previewWrap{
+  margin-inline:auto;
+  max-height:none;
+  left:auto;
+  transform:none;
+}
+
+body[data-page="dairy-traits"]
+#cameraCard #previewWrap.side-view{
+  width:100%;
+  max-width:100%;
+  aspect-ratio:16 / 9;
+}
+
+body[data-page="dairy-traits"]
+#cameraCard #previewWrap.rear-view{
+  width:min(100%, 440px);
+  max-width:440px;
+  aspect-ratio:9 / 16;
+}
+
+body[data-page="dairy-traits"]
 #cameraCard #previewWrap .mbk-camera-preview{
   object-fit:contain;
-}
-
-
-/* Side — 16:9 Landscape */
-
-@media (pointer:coarse)
-       and (max-width:1100px)
-       and (orientation:landscape){
-
-  body[data-page="dairy-traits"]
-  #cameraCard #previewWrap.side-view{
-    width:min(100vw, 177.78svh);
-    height:auto;
-
-    max-width:none;
-    max-height:none;
-
-    aspect-ratio:16 / 9;
-
-    position:relative;
-    left:50%;
-    transform:translateX(-50%);
-
-    margin:0;
-    border-radius:0;
-  }
-}
-
-
-/* Rear — 9:16 Portrait */
-
-@media (pointer:coarse)
-       and (max-width:1100px)
-       and (orientation:portrait){
-
-  body[data-page="dairy-traits"]
-  #cameraCard #previewWrap.rear-view{
-    width:min(100vw, 56.25svh);
-    height:auto;
-
-    max-width:none;
-    max-height:none;
-
-    aspect-ratio:9 / 16;
-
-    position:relative;
-    left:50%;
-    transform:translateX(-50%);
-
-    margin:0;
-    border-radius:0;
-  }
-}
-/* Dairy traits camera — mobile capture orientation */
-
-#cameraCard #previewWrap .mbk-camera-preview{
-  object-fit:contain;
-}
-
-#cameraCard .mbk-vision-controls .left{
-  min-height:22px;
-  font-size:13px;
-  font-weight:900;
-  line-height:1.4;
-}
-
-#cameraCard .mbk-vision-controls .left.is-ready{
-  color:var(--brand-600, #0b7f47);
-}
-
-#cameraCard .mbk-vision-controls .left.is-warn{
-  color:#b45309;
-}
-
-/* الجانبية — الهاتف بالعرض */
-@media (pointer:coarse)
-       and (max-width:1100px)
-       and (orientation:landscape){
-
-  #cameraCard #previewWrap.side-view{
-    width:100vw;
-    height:calc(100svh - 118px);
-    min-height:280px;
-    max-height:none;
-
-    margin-inline:calc(50% - 50vw);
-
-    border-radius:0;
-    aspect-ratio:auto;
-  }
-
-  /* الخلفية لم تُهيأ بعد:
-     تظل صغيرة لحين قلب الهاتف Portrait */
-  #cameraCard #previewWrap.rear-view{
-    width:min(54vw, 440px);
-    height:auto;
-    max-height:56vh;
-
-    margin-inline:auto;
-
-    border-radius:16px;
-    aspect-ratio:3/4;
-  }
-}
-
-/* الخلفية — الهاتف بالطول */
-@media (pointer:coarse)
-       and (max-width:1100px)
-       and (orientation:portrait){
-
-  #cameraCard #previewWrap.rear-view{
-    width:100vw;
-    height:calc(100svh - 150px);
-    min-height:420px;
-    max-height:none;
-
-    margin-inline:calc(50% - 50vw);
-
-    border-radius:0;
-    aspect-ratio:auto;
-  }
-
-  /* الجانبية لم تُهيأ:
-     تنتظر قلب الهاتف Landscape */
-  #cameraCard #previewWrap.side-view{
-    width:100vw;
-    height:auto;
-    max-height:56vh;
-
-    margin-inline:calc(50% - 50vw);
-
-    border-radius:0;
-    aspect-ratio:4/3;
-  }
 }
 .mbk-thumbs{
   display:flex;
