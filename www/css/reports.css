@@ -728,3 +728,187 @@ body[data-report-page] .svg-value{font:950 16px Arial,Tahoma,sans-serif;fill:#0f
     min-height:250px;
   }
 }
+/* =========================================================
+   Milk Report — Independent readable tables
+   ========================================================= */
+
+body[data-page="milk-report"] .milk-compact-section{
+  width:min(720px, calc(100% - 24px));
+  margin:18px auto;
+  padding:18px 20px 20px;
+}
+
+body[data-page="milk-report"] .milk-comparison-section{
+  width:min(900px, calc(100% - 24px));
+  margin:18px auto;
+  padding:18px 20px 20px;
+}
+
+body[data-page="milk-report"] .milk-compact-section .section-title,
+body[data-page="milk-report"] .milk-comparison-section .section-title{
+  margin:0 0 14px;
+  padding-bottom:10px;
+  font-size:19px;
+  font-weight:950;
+  line-height:1.45;
+  color:#134e2f;
+}
+
+body[data-page="milk-report"] .milk-table-wrap{
+  width:100%;
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:#fff;
+}
+
+body[data-page="milk-report"] .milk-compact-table{
+  width:100%;
+  min-width:0;
+  table-layout:fixed;
+  border-collapse:collapse;
+  border-spacing:0;
+}
+
+body[data-page="milk-report"] .milk-compact-table th{
+  background:#eef7f0;
+  color:#315f49;
+  padding:12px 16px;
+  font-size:15px;
+  font-weight:950;
+  line-height:1.45;
+  border-bottom:1px solid #dfe9e2;
+}
+
+body[data-page="milk-report"] .milk-compact-table th:first-child{
+  width:68%;
+}
+
+body[data-page="milk-report"] .milk-compact-table th:last-child{
+  width:32%;
+  text-align:center;
+}
+
+body[data-page="milk-report"] .milk-compact-table td{
+  padding:13px 16px;
+  min-height:48px;
+  background:#fff;
+  color:#17231d;
+  font-size:15px;
+  font-weight:850;
+  line-height:1.55;
+  vertical-align:middle;
+  border:0;
+  border-bottom:1px solid #edf3ee;
+  border-radius:0;
+}
+
+body[data-page="milk-report"] .milk-compact-table tr:last-child td{
+  border-bottom:0;
+}
+
+body[data-page="milk-report"] .milk-compact-table tbody tr:nth-child(even) td{
+  background:#fbfdfb;
+}
+
+body[data-page="milk-report"] .milk-compact-table td.num{
+  direction:rtl;
+  text-align:center;
+  white-space:nowrap;
+  color:var(--green);
+  font-size:17px;
+  font-weight:950;
+}
+
+body[data-page="milk-report"] .milk-comparison-section .table-wrap{
+  border:1px solid var(--line);
+  border-radius:16px;
+  overflow:auto;
+  background:#fff;
+}
+
+body[data-page="milk-report"] .milk-comparison-table{
+  width:100%;
+  min-width:680px;
+  border-collapse:collapse;
+  border-spacing:0;
+}
+
+body[data-page="milk-report"] .milk-comparison-table th{
+  background:#eef7f0;
+  color:#315f49;
+  padding:12px 14px;
+  font-size:15px;
+  font-weight:950;
+  border-bottom:1px solid #dfe9e2;
+}
+
+body[data-page="milk-report"] .milk-comparison-table td{
+  padding:13px 14px;
+  background:#fff;
+  color:#17231d;
+  font-size:15px;
+  font-weight:850;
+  line-height:1.5;
+  vertical-align:middle;
+  border:0;
+  border-bottom:1px solid #edf3ee;
+  border-radius:0;
+}
+
+body[data-page="milk-report"] .milk-comparison-table tr:last-child td{
+  border-bottom:0;
+}
+
+body[data-page="milk-report"] .milk-comparison-table tbody tr:nth-child(even) td{
+  background:#fbfdfb;
+}
+
+body[data-page="milk-report"] .milk-comparison-table td.num{
+  font-size:16px;
+  font-weight:950;
+}
+
+@media(max-width:760px){
+
+  body[data-page="milk-report"] .milk-compact-section,
+  body[data-page="milk-report"] .milk-comparison-section{
+    width:100%;
+    margin:14px auto;
+    padding:14px;
+  }
+
+  body[data-page="milk-report"] .milk-compact-table th,
+  body[data-page="milk-report"] .milk-compact-table td{
+    padding:11px 10px;
+    font-size:14px;
+  }
+
+  body[data-page="milk-report"] .milk-compact-table td.num{
+    font-size:15px;
+  }
+
+  body[data-page="milk-report"] .milk-compact-table th:first-child{
+    width:64%;
+  }
+
+  body[data-page="milk-report"] .milk-compact-table th:last-child{
+    width:36%;
+  }
+}
+
+@media print{
+
+  body[data-page="milk-report"] .milk-compact-section,
+  body[data-page="milk-report"] .milk-comparison-section{
+    width:100%;
+    max-width:none;
+    margin:0 0 6mm;
+    box-shadow:none;
+  }
+
+  body[data-page="milk-report"] .milk-compact-table,
+  body[data-page="milk-report"] .milk-comparison-table{
+    min-width:0;
+  }
+}
