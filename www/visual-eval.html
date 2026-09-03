@@ -399,6 +399,7 @@
   const eventDateInput = $("#eventDate");
   const numberSpan = $(".animal-number");
   const msgBox = $("#sysbar");
+  const orientationHint = $(".mbk-vision-controls .left");
 
   const thumbs = $("#thumbs");
   const scoreBadge = $("#scoreBadge");
@@ -458,7 +459,85 @@
     msgBox.className = "infobar";
     msgBox.textContent = "";
   }
+function isMobileCaptureDevice() {
+  const ua = navigator.userAgent || "";
 
+  const iPadLike =
+    /Macintosh/i.test(ua) &&
+    navigator.maxTouchPoints > 1;
+
+  return (
+    /Android|iPhone|iPod|Mobile/i.test(ua) ||
+    iPadLike
+  );
+}
+
+function currentScreenOrientation() {
+  return window.matchMedia("(orientation: landscape)").matches
+    ? "landscape"
+    : "portrait";
+}
+
+function syncCaptureOrientation() {
+  const mobile = isMobileCaptureDevice();
+
+  if (!mobile) {
+    if (orientationHint) {
+      orientationHint.textContent = "";
+      orientationHint.classList.remove(
+        "is-ready",
+        "is-warn"
+      );
+    }
+
+    captureBtn.disabled = false;
+    return true;
+  }
+
+  const required =
+    state.currentAngle === "side"
+      ? "landscape"
+      : "portrait";
+
+  const current =
+    currentScreenOrientation();
+
+  const ready =
+    current === required;
+
+  if (orientationHint) {
+    orientationHint.classList.toggle(
+      "is-ready",
+      ready
+    );
+
+    orientationHint.classList.toggle(
+      "is-warn",
+      !ready
+    );
+
+    if (ready) {
+      orientationHint.textContent =
+        state.currentAngle === "side"
+          ? "✓ جاهز للتصوير الجانبي — الهاتف بالعرض"
+          : "✓ جاهز للتصوير الخلفي — الهاتف بالطول";
+    } else {
+      orientationHint.textContent =
+        state.currentAngle === "side"
+          ? "↻ لف الهاتف بالعرض لالتقاط الصورة الجانبية كاملة"
+          : "↻ أعد الهاتف للوضع الرأسي لالتقاط الصورة الخلفية كاملة";
+    }
+  }
+
+  captureBtn.disabled = !ready;
+
+  requestAnimationFrame(() => {
+    fitOverlay();
+    drawGuide();
+  });
+
+  return ready;
+}
   function setAngle(angle) {
     if (!angles.includes(angle)) return;
 
@@ -473,10 +552,11 @@
       previewWrap.classList.add(angle === "side" ? "side-view" : "rear-view");
     }
 
-    retakeBtn.disabled = !state.captures[angle];
+  retakeBtn.disabled = !state.captures[angle];
 
-    fitOverlay();
-    drawGuide();
+  syncCaptureOrientation();
+  fitOverlay();
+  drawGuide(); 
   }
 
   function fitOverlay() {
@@ -1627,10 +1707,14 @@ function renderAnalysis(result) {
   }
 
   async function captureCurrentAngle() {
-    try {
-      hideMsg();
+  try {
+    hideMsg();
 
-      captureBtn.disabled = true;
+    if (!syncCaptureOrientation()) {
+      return;
+    }
+
+    captureBtn.disabled = true;
       captureBtn.textContent = "جاري الالتقاط...";
 
       const image = captureFrame();
@@ -1656,9 +1740,9 @@ function renderAnalysis(result) {
       console.warn("dairy traits capture error:", e);
       showMsg(e.message || "تعذّر تحليل سمات إنتاج اللبن.", false);
     } finally {
-      captureBtn.disabled = false;
-      captureBtn.textContent = "التقاط";
-    }
+  captureBtn.textContent = "التقاط";
+  syncCaptureOrientation();
+}
   }
 
   function readFileAsDataUrl(file) {
@@ -1826,10 +1910,23 @@ if (saveBuffaloGroundTruthBtn) {
       location.href = `dashboard.html?number=${encodeURIComponent(number)}&date=${encodeURIComponent(dt)}`;
     });
 
-    window.addEventListener("resize", () => {
-      fitOverlay();
-      drawGuide();
-    });
+  const handleViewportChange = () => {
+  syncCaptureOrientation();
+  fitOverlay();
+  drawGuide();
+};
+
+window.addEventListener(
+  "resize",
+  handleViewportChange
+);
+
+if (screen.orientation?.addEventListener) {
+  screen.orientation.addEventListener(
+    "change",
+    handleViewportChange
+  );
+}
   }
 
   async function init() {
