@@ -62,38 +62,38 @@
       </div>
     </div>
 
-    <div class="report-meta" id="printMeta"></div>
-  </section>
-      <section class="card" id="summaryBlock" data-print-block>
-  <div class="section-title">🌿 ملخص تقرير اللبن</div>
+<div class="report-meta" id="printMeta"></div>
+</section>
+
+<section class="card" id="summaryBlock" data-print-block>
+  <div class="section-title">الملخص الإجمالي لإنتاج القطيع</div>
+
+  <div class="sub">
+    أهم مؤشرات الإنتاج والتسجيل والاقتصاد في قراءة واحدة.
+  </div>
 
   <div id="heroTitle" hidden>تقرير إنتاج اللبن</div>
   <div id="heroLine" hidden>—</div>
+  <div id="heroSummary" hidden></div>
+  <span id="heroNet" hidden>—</span>
 
-  <div class="grid report-stack-mobile" id="heroSummary"></div>
+  <div class="table-wrap report-extra">
+    <table id="overallMilkTable">
+      <thead>
+        <tr>
+          <th>المؤشر</th>
+          <th>القيمة</th>
+          <th>القراءة</th>
+        </tr>
+      </thead>
 
-  <div class="cards report-extra">
-    <div class="mini">
-      <div class="name">صافي ربح اللبن</div>
-      <div class="value" id="heroNet">—</div>
-      <div class="note">بعد التغذية + 20% من تكلفة التغذية كمصاريف تشغيل</div>
-    </div>
+      <tbody id="productionCards"></tbody>
+      <tbody id="economyCards"></tbody>
+    </table>
   </div>
 </section>
 
-     <div class="card empty" id="serverMessage" hidden></div>
-
-      <section class="card" id="productionBlock" data-print-block>
-  <div class="section-title" id="productionSectionTitle">إنتاج أمس</div>
-  <div class="sub">قراءة سريعة واضحة لصاحب المزرعة.</div>
-  <div class="grid report-extra" id="productionCards"></div>
-</section>
-
-     <section class="card" id="economyBlock" data-print-block>
-  <div class="section-title">اقتصاد إنتاج اللبن</div>
-  <div class="sub">الأرقام الاقتصادية الأساسية للقطيع.</div>
-  <div class="grid report-extra" id="economyCards"></div>
-</section>
+<div class="card empty" id="serverMessage" hidden></div>
 
       <section class="card" id="comparisonBlock" data-print-block>
   <div class="section-title">المقارنات</div>
@@ -103,37 +103,73 @@
   </div>
 </section>
 
- <section class="card" id="chartsBlock" data-print-block>
-  <div class="section-title">الرسوم البيانية</div>
-  <div class="sub">منحنى الإنتاج ورسوم المجموعات ومراحل أيام الحليب.</div>
-  <div class="grid grid-2">
-<div class="card chart-card">
-            <div class="chart-title"><strong>منحنى آخر 30 يوم</strong><span>كجم لبن / يوم</span></div>
-            <div class="chart" id="dailyTrendChart"></div>
-            <div class="chart-note" id="dailyTrendNote"></div>
-          </div>
-          <div class="card chart-card">
-            <div class="chart-title"><strong>إنتاج المجموعات</strong><span>إجمالي كجم لكل مجموعة</span></div>
-            <div class="chart" id="groupProductionChart"></div>
-            <div class="chart-note" id="groupProductionNote"></div>
-          </div>
-          <div class="card chart-card">
-            <div class="chart-title"><strong>اقتصاد المجموعات</strong><span>صافي ربح/خسارة</span></div>
-            <div class="legend"><span><i></i>ربح</span><span class="red"><i></i>خسارة</span></div>
-            <div class="chart" id="groupEconomyChart"></div>
-            <div class="chart-note" id="groupEconomyNote"></div>
-          </div>
-          <div class="card chart-card">
-            <div class="chart-title"><strong>مراحل أيام الحليب</strong><span>متوسط كجم/رأس</span></div>
-            <div class="chart" id="dimStageChart"></div>
-            <div class="chart-note" id="dimStageNote"></div>
-          </div>
-        </div>
-      </section>
+<section class="card" id="chartsBlock" data-print-block>
+  <div class="section-title">التحليل البياني للإنتاج</div>
 
-     <section class="card" id="groupsBlock" data-print-block>
-  <div class="section-title">المجموعات الإنتاجية</div>
-  <div class="cards" id="groupsList"></div>
+  <div class="sub">
+    اتجاه إنتاج القطيع وتحليل المجموعات ومراحل أيام الحليب.
+  </div>
+
+  <!-- الرسم الرئيسي -->
+  <div class="card chart-card report-extra">
+    <div class="chart-title">
+      <strong>منحنى إنتاج اللبن للقطيع</strong>
+      <span>إجمالي كجم اللبن / يوم</span>
+    </div>
+
+    <div class="chart" id="dailyTrendChart"></div>
+    <div class="chart-note" id="dailyTrendNote"></div>
+  </div>
+
+  <!-- الرسوم التحليلية -->
+  <div class="grid grid-2 report-extra">
+
+    <div class="card chart-card">
+      <div class="chart-title">
+        <strong>إنتاج المجموعات</strong>
+        <span>إجمالي كجم لكل مجموعة</span>
+      </div>
+
+      <div class="chart" id="groupProductionChart"></div>
+      <div class="chart-note" id="groupProductionNote"></div>
+    </div>
+
+    <div class="card chart-card">
+      <div class="chart-title">
+        <strong>اقتصاد المجموعات</strong>
+        <span>صافي ربح / خسارة</span>
+      </div>
+
+      <div class="legend">
+        <span><i></i>ربح</span>
+        <span class="red"><i></i>خسارة</span>
+      </div>
+
+      <div class="chart" id="groupEconomyChart"></div>
+      <div class="chart-note" id="groupEconomyNote"></div>
+    </div>
+
+    <div class="card chart-card">
+      <div class="chart-title">
+        <strong>مراحل أيام الحليب</strong>
+        <span>متوسط كجم / رأس</span>
+      </div>
+
+      <div class="chart" id="dimStageChart"></div>
+      <div class="chart-note" id="dimStageNote"></div>
+    </div>
+
+  </div>
+</section>
+
+<section class="card" id="groupsBlock" data-print-block>
+  <div class="section-title">تفصيل المجموعات الإنتاجية</div>
+
+  <div class="sub">
+    مقارنة الإنتاج والتسجيل والاقتصاد وقراءة مُرَبِّيك بين المجموعات.
+  </div>
+
+  <div id="groupsList"></div>
 </section>
 
       <section class="card" id="thiBlock" data-print-block>
@@ -154,16 +190,28 @@
   <div class="cards" id="scientificNotes"></div>
 </section>
 
-     <section class="card no-print" id="herdScatterBlock">
-  <div class="section-title">سكاتر القطيع</div>
-  <div class="sub">كل نقطة = حيوان. اضغط أو المس النقطة لفتح بطاقة مختصرة أسفل الرسم.</div>
-  <div class="card chart-card">
-          <div class="chart-title"><strong>سكاتر القطيع</strong><span>كل نقطة = حيوان</span></div>
-          <div class="legend"><span><i></i>اللبن حسب أيام الحليب</span></div>
-          <div class="chart" id="herdScatterChart"></div>
-          <div class="chart-note" id="herdScatterNote"></div>
-        </div>
-      </section>
+<section class="card no-print" id="herdScatterBlock">
+  <div class="section-title">الخريطة الإنتاجية للقطيع</div>
+
+  <div class="sub">
+    كل نقطة تمثل حيوانًا؛ موقعها يربط إنتاج اللبن بمرحلة أيام الحليب.
+    المس النقطة لعرض بيانات الحيوان.
+  </div>
+
+  <div class="card chart-card report-extra">
+    <div class="chart-title">
+      <strong>إنتاج اللبن مقابل أيام الحليب</strong>
+      <span>كل نقطة = حيوان</span>
+    </div>
+
+    <div class="legend">
+      <span><i></i>إنتاج الحيوان حسب أيام الحليب</span>
+    </div>
+
+    <div class="chart" id="herdScatterChart"></div>
+    <div class="chart-note" id="herdScatterNote"></div>
+  </div>
+</section>
 
      <section class="card no-print" id="animalPointBlock">
   <div class="section-title">بطاقة الحيوان من السكاتر</div>
@@ -222,7 +270,23 @@ function toneByValue(v, goodPositive=true){
 function row(a,b,c,d){
   return `<tr><td>${a}</td><td class="num">${b}</td><td>${c || ""}</td><td>${d || ""}</td></tr>`;
 }
+function metricRow(label, value, note = ""){
+  return `
+    <tr>
+      <td><b>${esc(label)}</b></td>
+      <td class="num">${value ?? "—"}</td>
+      <td>${esc(note || "")}</td>
+    </tr>
+  `;
+}
 
+function metricSection(title){
+  return `
+    <tr>
+      <th colspan="3">${esc(title)}</th>
+    </tr>
+  `;
+}
 function arClean(v){
   return String(v || "")
     .replace(/DIM/g,"أيام الحليب")
@@ -278,38 +342,135 @@ function kpiCard(label, value, sub, tone=""){
   return reportKpi(label, value, sub, tone);
 }
 
-    function renderProduction(j){
-      const p=j.production||{};
-      const recTone = Number(p.recordingRate)>=90 ? "good" : Number(p.recordingRate)>=75 ? "warn" : "warn";
+function renderProduction(j){
+  const p = j.production || {};
 
-      $("productionCards").innerHTML = [
-        kpiCard("إجمالي إنتاج اللبن للقطيع", `${num(p.totalMilkKg,1)} كجم`, "إجمالي اللبن المسجل في تاريخ التقرير", "blue"),
-        kpiCard("متوسط الرأس/يوم للقطيع", `${num(p.avgMilkKgMilker,1)} كجم`, `على ${int(p.milkersCount)} حلاب`, "good"),
-        kpiCard("نسبة تسجيل اللبن للقطيع", `${num(p.recordingRate,1)}%`, `${int(p.recordedCount)} مسجل · ${int(p.missingCount)} غير مسجل`, recTone),
-        kpiCard("متوسط أيام الحليب للقطيع", `${num(p.avgDim,0)} يوم`, "متوسط أيام الحليب للقطيع", "blue"),
-        kpiCard("متوسط أيام الحمل للقطيع", `${num(p.avgDcc,0)} يوم`, "متوسط أيام الحمل للحيوانات المتاح لها بيانات", "blue")
-      ].join("");
-    }
+  $("productionCards").innerHTML =
+    metricSection("الإنتاج والتسجيل") +
+
+    [
+      metricRow(
+        "إجمالي إنتاج اللبن",
+        `${num(p.totalMilkKg,1)} كجم`,
+        "إجمالي اللبن المسجل في تاريخ التقرير"
+      ),
+
+      metricRow(
+        "عدد الحلاب الفعلي",
+        int(p.milkersCount),
+        "الحيوانات الموجودة فعليًا في دورة الحليب"
+      ),
+
+      metricRow(
+        "الحلاب المسجل له لبن",
+        int(p.recordedCount),
+        "له تسجيل لبن في يوم التقرير"
+      ),
+
+      metricRow(
+        "الحلاب بدون تسجيل",
+        int(p.missingCount),
+        "حلاب فعلي لم يسجل له لبن"
+      ),
+
+      metricRow(
+        "نسبة تسجيل اللبن",
+        `${num(p.recordingRate,1)}%`,
+        `${int(p.recordedCount)} مسجل من ${int(p.milkersCount)} حلاب فعلي`
+      ),
+
+      metricRow(
+        "متوسط إنتاج الحلاب",
+        `${num(p.avgMilkKgMilker,1)} كجم`,
+        "متوسط الإنتاج على الحلاب الفعلي"
+      ),
+
+      metricRow(
+        "متوسط أيام الحليب",
+        `${num(p.avgDim,0)} يوم`,
+        "متوسط DIM للقطيع"
+      ),
+
+      metricRow(
+        "متوسط أيام الحمل",
+        `${num(p.avgDcc,0)} يوم`,
+        "للحيوانات المتاح لها بيانات حمل"
+      )
+    ].join("");
+}
 
    function econCard(label, value, sub, tone=""){
   return reportKpi(label, value, sub, tone);
 }
 
-    function renderEconomy(j){
-      const e=j.economics||{};
-      const milkPricePerKg = Number(e.milkPriceUsed || getMilkPriceRequired());
-      const netTone = Number(e.netOperatingResult) >= 0 ? "good" : "danger";
+function renderEconomy(j){
+  const e = j.economics || {};
 
-      $("economyCards").innerHTML = [
-        econCard("سعر كجم اللبن", money0(milkPricePerKg), "مدخل في تقرير اللبن", "blue"),
-        econCard("إجمالي تكاليف التغذية للقطيع", money(e.feedCost), `محسوبة على ${int(e.groupsCount)} مجموعة`, "warn"),
-        econCard("تكاليف التشغيل", money(e.otherOperatingCost), "20% من تكلفة التغذية", "warn"),
-        econCard("إجمالي تكاليف الإنتاج", money(e.totalProductionCost), "تغذية + تشغيل", "warn"),
-        econCard("صافي ربح إنتاج اللبن", money(e.netOperatingResult), "بعد التغذية والتشغيل", netTone),
-        econCard("متوسط إجمالي تكلفة إنتاج كجم لبن", money(e.productionCostPerKgMilk), "التغذية + التشغيل ÷ كجم اللبن", "blue"),
-        econCard("صافي هامش ربح كجم اللبن", money(e.marginPerKgMilk), "الصافي ÷ كجم اللبن", Number(e.marginPerKgMilk) >= 0 ? "good" : "danger")
-      ].join("");
-    }
+  const milkPricePerKg =
+    Number(
+      e.milkPriceUsed ||
+      getMilkPriceRequired()
+    );
+
+  $("economyCards").innerHTML =
+    metricSection("اقتصاد إنتاج اللبن") +
+
+    [
+      metricRow(
+        "سعر كجم اللبن",
+        money0(milkPricePerKg),
+        "السعر المدخل في التقرير"
+      ),
+
+      metricRow(
+        "إجمالي دخل اللبن",
+        money(e.milkIncome),
+        "إجمالي اللبن × سعر الكجم"
+      ),
+
+      metricRow(
+        "إجمالي تكاليف التغذية",
+        money(e.feedCost),
+        `مرتبطة بـ ${int(e.groupsCount)} مجموعة`
+      ),
+
+      metricRow(
+        "تكلفة التغذية / كجم لبن",
+        money(e.feedCostPerKgMilk),
+        "تكلفة التغذية ÷ إنتاج اللبن"
+      ),
+
+      metricRow(
+        "تكاليف التشغيل",
+        money(e.otherOperatingCost),
+        "وفق قاعدة التشغيل الحالية بالسيرفر"
+      ),
+
+      metricRow(
+        "إجمالي تكاليف الإنتاج",
+        money(e.totalProductionCost),
+        "تغذية + تشغيل"
+      ),
+
+      metricRow(
+        "صافي نتيجة إنتاج اللبن",
+        money(e.netOperatingResult),
+        "دخل اللبن − إجمالي التكلفة"
+      ),
+
+      metricRow(
+        "إجمالي تكلفة إنتاج كجم اللبن",
+        money(e.productionCostPerKgMilk),
+        "إجمالي التكلفة ÷ كجم اللبن"
+      ),
+
+      metricRow(
+        "هامش كجم اللبن",
+        money(e.marginPerKgMilk),
+        "الصافي لكل كجم"
+      )
+    ].join("");
+}
 
     function renderComparisons(j){
       const c=j.comparisons||{};
@@ -601,55 +762,221 @@ function renderAnimalPointReport(pt, shouldScroll=false){
     }
 
 function renderGroups(j){
-  const groups = Array.isArray(j.groups) ? j.groups : [];
-  if(!groups.length){
-    $("groupsList").innerHTML = `<div class="empty">لا توجد مجموعات إنتاجية.</div>`;
+  const groups =
+    Array.isArray(j.groups)
+      ? j.groups
+      : [];
+
+  if (!groups.length) {
+    $("groupsList").innerHTML =
+      `<div class="empty">لا توجد مجموعات إنتاجية.</div>`;
     return;
   }
 
-  $("groupsList").innerHTML = groups.map(g => {
-    const e = g.economics || {};
-    const tone = g.status === "loss" ? "danger" : g.status === "watch" ? "warn" : g.status === "good" ? "blue" : "ok";
-    const top = (g.topAnimals || []).slice(0,3);
-    const watch = (g.watchAnimals || []).slice(0,3);
-    const meaning = groupMeaning(g);
-    const hasEcon = econHasData(e);
-    const evidence = (g.murabbik?.evidence || []).map(x => status(x, "info")).join(" ");
-    const topText = top.length ? `أفضل 3: ${top.map(x => "#" + esc(x.number) + " " + num(x.kg ?? x.milkKg ?? x.dailyMilk ?? x.totalMilk,1) + " كجم").join("، ")}` : "";
-    const watchText = watch.length ? `متابعة: ${watch.map(x => "#" + esc(x.number) + " " + pct(x.deltaPct)).join("، ")}` : "";
+  const productionRows =
+    groups.map(g => `
+      <tr>
+        <td><b>${esc(g.groupName || "—")}</b></td>
 
-    return `<article class="mini">
-      <div class="name">${esc(g.groupName || "مجموعة إنتاجية")}</div>
-      <div class="note">
-        ${g.species === "buffalo" ? "جاموس" : "أبقار"} ·
-        التسجيل ${num(g.recordingRate,1)}% ·
-        ${int(g.recordedCount)} مسجل من ${int(g.milkersCount)} حلاب ·
-        ${status(g.statusText || "مستقرة", tone)}
-      </div>
+        <td>
+          ${status(
+            g.statusText || "مستقرة",
+            g.status === "loss"
+              ? "danger"
+              : g.status === "watch"
+                ? "warn"
+                : g.status === "good"
+                  ? "good"
+                  : ""
+          )}
+        </td>
 
-      <div class="grid report-stack-mobile">
-        ${reportKpi("إنتاج المجموعة", `${num(g.totalMilkKg,1)} كجم`, `متوسط ${num(g.avgMilkKgMilker,1)} كجم/حلاب`)}
-        ${reportKpi("مرحلة المجموعة", `${num(g.avgDim,0)} يوم حليب`, `${num(g.avgDcc,0)} يوم حمل · التغير ${arrow(g.deltaPct)} ${pct(g.deltaPct)}`)}
-        ${reportKpi("دخل اللبن", hasEcon ? money(e.milkIncome) : "غير مكتمل", "حسب سعر اللبن المدخل")}
-        ${reportKpi("صافي ربح/خسارة", hasEcon ? money(e.netOperatingResult) : "غير مكتمل", "بعد التغذية والتشغيل")}
-        ${reportKpi("تكلفة كجم اللبن", hasEcon ? money(e.productionCostPerKgMilk) : "غير مكتمل", "تكلفة إنتاج كجم اللبن")}
-        ${reportKpi("هامش كجم اللبن", hasEcon ? money(e.marginPerKgMilk) : "غير مكتمل", "الهامش الصافي لكل كجم")}
-      </div>
+        <td class="num">${int(g.milkersCount)}</td>
 
-      <div class="cards">
-        ${reportNote("معنى الرقم", esc(meaning.text))}
-        ${reportNote("توصية مُرَبِّيك", esc(g.murabbik?.action || "متابعة روتينية بدون إجراء عاجل."))}
-      </div>
+        <td class="num">${int(g.recordedCount)}</td>
 
-      ${(evidence || topText || watchText) ? `<div class="cards">
-        ${evidence ? reportNote("الدليل", evidence) : ""}
-        ${topText ? reportNote("أفضل الحيوانات", esc(topText)) : ""}
-        ${watchText ? reportNote("حيوانات للمتابعة", esc(watchText)) : ""}
-      </div>` : ""}
-    </article>`;
-  }).join("");
+        <td class="num">${int(g.missingCount)}</td>
+
+        <td class="num">${num(g.recordingRate,1)}%</td>
+
+        <td class="num">${num(g.totalMilkKg,1)} كجم</td>
+
+        <td class="num">${num(g.avgMilkKgMilker,1)} كجم</td>
+
+        <td class="num">${num(g.avgDim,0)} يوم</td>
+
+        <td class="num">${num(g.avgDcc,0)} يوم</td>
+
+        <td class="num">
+          ${arrow(g.deltaPct)}
+          ${pct(g.deltaPct)}
+        </td>
+      </tr>
+    `).join("");
+
+  const economicRows =
+    groups.map(g => {
+      const e = g.economics || {};
+      const has = econHasData(e);
+
+      const econ =
+        value =>
+          has
+            ? money(value)
+            : "غير مكتمل";
+
+      return `
+        <tr>
+          <td><b>${esc(g.groupName || "—")}</b></td>
+
+          <td class="num">${econ(e.milkIncome)}</td>
+
+          <td class="num">${econ(e.feedCost)}</td>
+
+          <td class="num">${econ(e.otherOperatingCost)}</td>
+
+          <td class="num">${econ(e.totalProductionCost)}</td>
+
+          <td class="num">${econ(e.netOperatingResult)}</td>
+
+          <td class="num">${econ(e.feedCostPerKgMilk)}</td>
+
+          <td class="num">${econ(e.productionCostPerKgMilk)}</td>
+
+          <td class="num">${econ(e.marginPerKgMilk)}</td>
+        </tr>
+      `;
+    }).join("");
+
+  const readingRows =
+    groups.map(g => {
+      const meaning =
+        groupMeaning(g);
+
+      const top =
+        (g.topAnimals || [])
+          .slice(0,3)
+          .map(
+            x =>
+              `#${esc(x.number)} ${num(x.kg ?? x.milkKg,1)} كجم`
+          )
+          .join("، ");
+
+      const watch =
+        (g.watchAnimals || [])
+          .slice(0,3)
+          .map(
+            x =>
+              `#${esc(x.number)} ${pct(x.deltaPct)}`
+          )
+          .join("، ");
+
+      const evidence =
+        (g.murabbik?.evidence || [])
+          .map(arClean)
+          .join(" · ");
+
+      return `
+        <tr>
+          <td><b>${esc(g.groupName || "—")}</b></td>
+
+          <td>${top || "—"}</td>
+
+          <td>${watch || "—"}</td>
+
+          <td>${esc(evidence || "—")}</td>
+
+          <td>${esc(meaning?.text || "—")}</td>
+
+          <td>
+            ${esc(
+              g.murabbik?.action ||
+              "متابعة روتينية بدون إجراء عاجل."
+            )}
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+  $("groupsList").innerHTML = `
+    <div class="sub report-extra">
+      <b>الإنتاج والتسجيل</b>
+    </div>
+
+    <div class="table-wrap report-extra">
+      <table>
+        <thead>
+          <tr>
+            <th>المجموعة</th>
+            <th>الحالة</th>
+            <th>الحلاب</th>
+            <th>المسجل</th>
+            <th>غير المسجل</th>
+            <th>نسبة التسجيل</th>
+            <th>إجمالي اللبن</th>
+            <th>متوسط الحلاب</th>
+            <th>DIM</th>
+            <th>DCC</th>
+            <th>التغير</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${productionRows}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sub report-extra">
+      <b>اقتصاد المجموعات</b>
+    </div>
+
+    <div class="table-wrap report-extra">
+      <table>
+        <thead>
+          <tr>
+            <th>المجموعة</th>
+            <th>دخل اللبن</th>
+            <th>التغذية</th>
+            <th>التشغيل</th>
+            <th>إجمالي التكلفة</th>
+            <th>الصافي</th>
+            <th>تغذية / كجم</th>
+            <th>تكلفة / كجم</th>
+            <th>هامش / كجم</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${economicRows}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sub report-extra">
+      <b>قراءة مُرَبِّيك للمجموعات</b>
+    </div>
+
+    <div class="table-wrap report-extra">
+      <table>
+        <thead>
+          <tr>
+            <th>المجموعة</th>
+            <th>أفضل الحيوانات</th>
+            <th>تحتاج متابعة</th>
+            <th>الدليل</th>
+            <th>معنى الرقم</th>
+            <th>توصية مُرَبِّيك</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${readingRows}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
-
     function renderThi(j){
   const t = j.thi || {};
   const val = Number.isFinite(Number(t.value)) ? Number(t.value) : null;
@@ -790,12 +1117,17 @@ function renderAll(j){
   $("report").style.display = "";
   $("report").hidden = false;
 
-  const selectedReportDate = $("reportDate").value || yesterdayISO();
-  const dayLabel = reportDayLabel(selectedReportDate);
+const selectedReportDate =
+  $("reportDate").value ||
+  yesterdayISO();
 
-  $("heroTitle").textContent = arClean(j.headline?.title || "تقرير إنتاج اللبن");
-  $("heroLine").textContent = "";
-  $("productionSectionTitle").textContent = `إنتاج ${dayLabel}`;
+$("heroTitle").textContent =
+  arClean(
+    j.headline?.title ||
+    "تقرير إنتاج اللبن"
+  );
+
+$("heroLine").textContent = "";
 
   renderHeroSummary(j);
 
@@ -875,8 +1207,15 @@ function renderAll(j){
 ].join("");
       $("heroNet").textContent="—";
 
-      $("productionCards").innerHTML=`<div class="empty">سعر كجم اللبن مطلوب قبل تحميل التقرير.</div>`;
-      $("economyCards").innerHTML="";
+$("productionCards").innerHTML = `
+  <tr>
+    <td colspan="3">
+      سعر كجم اللبن مطلوب قبل تحميل التقرير.
+    </td>
+  </tr>
+`;
+
+$("economyCards").innerHTML = "";
       $("comparisonTable").innerHTML="";
 
       if ($("herdScatterChart")) $("herdScatterChart").innerHTML="";
