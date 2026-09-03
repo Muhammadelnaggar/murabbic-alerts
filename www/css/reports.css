@@ -1109,7 +1109,7 @@ body[data-page="milk-report"] .milk-groups-table tbody tr:nth-child(even) td{
   body[data-page="milk-report"] .milk-groups-table td{
     padding:1.8mm 1mm;
     font-size:7.8pt;
-    line-height:1.35;
+    line-height:1.35; 
     white-space:normal;
     overflow-wrap:anywhere;
   }
