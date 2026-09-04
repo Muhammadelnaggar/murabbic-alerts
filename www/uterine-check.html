@@ -91,9 +91,10 @@
               مرحلة الفحص
             </label>
 
-            <select
+                        <select
               id="checkStage"
               name="checkStage"
+              disabled
             >
               <option value="">
                 جاري تحميل المراحل...
@@ -148,7 +149,7 @@
   class="row"
   id="editToolsRow"
   hidden
-  style="display:none"
+  
 >
   <div>
     <label for="correctionPerformedBy">
@@ -283,23 +284,13 @@ const editEventId =
 const isEditMode =
   requestedEditMode &&
   !!editEventId;
-    function todayLocal() {
-      const date = new Date();
 
-      date.setMinutes(
-        date.getMinutes() -
-        date.getTimezoneOffset()
-      );
 
-      return date
-        .toISOString()
-        .slice(0, 10);
-    }
-
-    function showMessage(
+       function showMessage(
       text = "",
       ok = false,
-      action = null
+      action = null,
+      tone = ""
     ) {
       if (!msg) return;
 
@@ -307,7 +298,7 @@ const isEditMode =
 
       if (!text) {
         msg.className = "infobar";
-        msg.style.display = "none";
+       
         return;
       }
 
@@ -352,12 +343,24 @@ const isEditMode =
         msg.appendChild(actions);
       }
 
-      msg.className =
-        `infobar mbk-infobar show ${
-          ok ? "success" : "error"
-        }`;
+            const toneClass =
+        [
+          "success",
+          "error",
+          "warning",
+          "info"
+        ].includes(tone)
+          ? tone
+          : (
+              ok
+                ? "success"
+                : "error"
+            );
 
-      msg.style.display = "block";
+      msg.className =
+        `infobar mbk-infobar show ${toneClass}`;
+
+     
 
       try {
         msg.scrollIntoView({
@@ -426,9 +429,6 @@ const isEditMode =
 
         eventDate:
           eventDateInput.value,
-
-        checkStage:
-          checkStageSelect.value,
 
         result:
           resultSelect.value,
@@ -506,11 +506,20 @@ notes:
         "اختر مرحلة الفحص"
       );
 
-      fillSelect(
+          fillSelect(
         resultSelect,
         data?.options?.results,
         "اختر نتيجة الفحص"
       );
+
+      if (
+        !eventDateInput.value &&
+        data.today
+      ) {
+        eventDateInput.value =
+          String(data.today)
+            .slice(0, 10);
+      }
     }
     function renderOperationalPerformers(
   items = []
@@ -641,7 +650,7 @@ async function loadEditEvent() {
     ev.data?.notes || "";
 
   editToolsRow.hidden = false;
-editToolsRow.style.display = "";
+
 
   correctionPerformedByInput
     .required = true;
@@ -682,10 +691,10 @@ editToolsRow.style.display = "";
         ) ||
         "";
 
-      eventDateInput.value =
+            eventDateInput.value =
         params.get("eventDate") ||
         params.get("date") ||
-        todayLocal();
+        "";
     }
 
     async function runGate() {
@@ -751,10 +760,7 @@ editToolsRow.style.display = "";
           return;
         }
 
-        if (
-          data.suggestedStage &&
-          !checkStageSelect.value
-        ) {
+               if (data.suggestedStage) {
           checkStageSelect.value =
             data.suggestedStage;
         }
@@ -766,9 +772,11 @@ editToolsRow.style.display = "";
           .filter(Boolean)
           .join(" ");
 
-        showMessage(
+                showMessage(
           text,
-          true
+          true,
+          null,
+          data.advisoryTone || ""
         );
 
       } catch (error) {
