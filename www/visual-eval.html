@@ -575,15 +575,6 @@ function stopCamera() {
 
 async function enterCaptureDisplayMode(angle) {
   try {
-    if (
-      !document.fullscreenElement &&
-      captureStage?.requestFullscreen
-    ) {
-      await captureStage.requestFullscreen();
-    }
-  } catch (_) {}
-
-  try {
     if (screen.orientation?.lock) {
       await screen.orientation.lock(
         angle === "side"
@@ -594,17 +585,9 @@ async function enterCaptureDisplayMode(angle) {
   } catch (_) {}
 }
 
-
 function leaveCaptureDisplayMode() {
   try {
     screen.orientation?.unlock?.();
-  } catch (_) {}
-
-  try {
-    if (document.fullscreenElement) {
-      document.exitFullscreen()
-        .catch(() => {});
-    }
   } catch (_) {}
 }
 function cameraConstraintsForAngle(angle) {
