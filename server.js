@@ -59376,21 +59376,158 @@ function weaningWeightFromBodySrv(body = {}) {
     ""
   ).trim().replace(",", ".");
 
-  if (!raw) return { ok: true, value: null };
+  if (!raw) {
+    return {
+      ok: true,
+      value: null
+    };
+  }
 
   const n = Number(raw);
 
-  if (!Number.isFinite(n) || n < 0) {
+  if (
+    !Number.isFinite(n) ||
+    n < 0
+  ) {
     return {
       ok: false,
       value: null,
-      message: "أدخل وزن فطام رقميًا صحيحًا أو اترك الحقل فارغًا."
+      message:
+        "أدخل وزن فطام رقميًا صحيحًا أو اترك الحقل فارغًا."
     };
   }
 
   return {
     ok: true,
-    value: Number(n.toFixed(1))
+    value:
+      Number(n.toFixed(1))
+  };
+}
+
+
+function weaningWeightsByAnimalFromBodySrv(
+  body = {}
+) {
+  const out = new Map();
+
+  const raw =
+    body.weaningWeights ??
+    body.weaningWeightsByAnimal ??
+    body.weightsByAnimal ??
+    null;
+
+  function add(
+    rawNumber,
+    rawWeight
+  ) {
+    const animalNumber =
+      calvingNormDigitsOnlySrv(
+        rawNumber
+      );
+
+    if (!animalNumber) return;
+
+    let value = rawWeight;
+
+    if (
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    ) {
+      value =
+        value.weaningWeightKg ??
+        value.weaningWeight ??
+        value.weight ??
+        "";
+    }
+
+    out.set(
+      animalNumber,
+      value ?? ""
+    );
+  }
+
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (
+        !item ||
+        typeof item !== "object"
+      ) {
+        continue;
+      }
+
+      add(
+        item.animalNumber ??
+        item.calfNumber ??
+        item.number ??
+        "",
+
+        item.weaningWeightKg ??
+        item.weaningWeight ??
+        item.weight ??
+        ""
+      );
+    }
+
+  } else if (
+    raw &&
+    typeof raw === "object"
+  ) {
+    for (
+      const [key, value]
+      of Object.entries(raw)
+    ) {
+      add(key, value);
+    }
+  }
+
+  return out;
+}
+
+
+function weaningWeightForAnimalSrv({
+  body = {},
+  animalNumber = "",
+  totalNumbers = 0,
+  weightsByAnimal = null
+} = {}) {
+
+  const num =
+    calvingNormDigitsOnlySrv(
+      animalNumber
+    );
+
+  const map =
+    weightsByAnimal instanceof Map
+      ? weightsByAnimal
+      : weaningWeightsByAnimalFromBodySrv(
+          body
+        );
+
+  if (
+    num &&
+    map.has(num)
+  ) {
+    return weaningWeightFromBodySrv({
+      weaningWeightKg:
+        map.get(num)
+    });
+  }
+
+  // توافق مع الإدخال الفردي القديم فقط.
+  // في الجماعي لا نطبّق وزنًا عامًا
+  // واحدًا على جميع العجول.
+  if (
+    Number(totalNumbers) === 1
+  ) {
+    return weaningWeightFromBodySrv(
+      body
+    );
+  }
+
+  return {
+    ok: true,
+    value: null
   };
 }
 
@@ -59541,23 +59678,32 @@ app.post("/api/weaning/save", requireUserId, async (req, res) => {
 
     const uid = req.userId;
     const body = req.body || {};
-    const eventDate = String(body.eventDate || body.date || "").trim().slice(0, 10);
-    const notes = String(body.notes || body.note || "").trim();
-    const numbers = weaningNumbersFromBodySrv(body);
-    const weightResult = weaningWeightFromBodySrv(body);
 
-if (!weightResult.ok) {
-  return res.status(400).json(weaningBuildSaveResponseSrv({
-    saved: [],
-    rejected: numbers.map(n => ({
-      animalNumber: n,
-     reason: weightResult.message || "أدخل وزن فطام رقميًا صحيحًا أو اترك الحقل فارغًا."
-    })),
-    eventDate
-  }));
-}
+    const eventDate =
+      String(
+        body.eventDate ||
+        body.date ||
+        ""
+      )
+        .trim()
+        .slice(0, 10);
 
-const weaningWeightKg = weightResult.value;
+    const notes =
+      String(
+        body.notes ||
+        body.note ||
+        ""
+      ).trim();
+
+    const numbers =
+      weaningNumbersFromBodySrv(
+        body
+      );
+
+    const weightsByAnimal =
+      weaningWeightsByAnimalFromBodySrv(
+        body
+      );
     if (!numbers.length) {
       return res.status(400).json(weaningBuildSaveResponseSrv({
         saved:[],
@@ -59588,9 +59734,42 @@ eventDate
     const rejected = [];
     const warnings = [];
 
-    for (const row of checked.accepted) {
-      const animalNumber = row.animalNumber;
-      const eventId = ["weaning", uid, animalNumber].join("__");
+       for (
+      const row
+      of checked.accepted
+    ) {
+      const animalNumber =
+        row.animalNumber;
+
+      const weightResult =
+        weaningWeightForAnimalSrv({
+          body,
+          animalNumber,
+          totalNumbers:
+            numbers.length,
+          weightsByAnimal
+        });
+
+      if (!weightResult.ok) {
+        rejected.push({
+          animalNumber,
+          reason:
+            weightResult.message ||
+            "أدخل وزن فطام رقميًا صحيحًا أو اترك الحقل فارغًا."
+        });
+
+        continue;
+      }
+
+      const weaningWeightKg =
+        weightResult.value;
+
+      const eventId =
+        [
+          "weaning",
+          uid,
+          animalNumber
+        ].join("__");
       const eventRef = db.collection("events").doc(eventId);
 
       const exists = await eventRef.get();
