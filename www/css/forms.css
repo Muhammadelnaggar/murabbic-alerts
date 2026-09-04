@@ -1409,7 +1409,158 @@ textarea{
   inset:0;
   pointer-events:none;
 }
+/* Feces Evaluation only */
 
+body[data-page="feces"].mbk-capture-open{
+  overflow:hidden;
+}
+
+body[data-page="feces"]
+.feces-capture-stage{
+  position:fixed;
+  inset:0;
+  z-index:1000;
+  width:100vw;
+  height:100dvh;
+  overflow:hidden;
+  background:#000;
+}
+
+body[data-page="feces"]
+.feces-capture-stage[hidden]{
+  display:none !important;
+}
+
+body[data-page="feces"]
+.feces-capture-shell{
+  position:absolute;
+  inset:0;
+  overflow:hidden;
+  background:#000;
+}
+
+body[data-page="feces"]
+.feces-capture-stage-body{
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  background:#000;
+}
+
+body[data-page="feces"]
+.feces-capture-frame{
+  width:min(100vw, 100dvh);
+  height:min(100vw, 100dvh);
+  max-width:none;
+  max-height:none;
+  margin:0;
+  aspect-ratio:1 / 1;
+  border-radius:0;
+  background:#000;
+}
+
+body[data-page="feces"]
+.feces-capture-frame
+.mbk-camera-preview{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center center;
+}
+
+body[data-page="feces"]
+.feces-capture-stage-head{
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  z-index:3;
+
+  min-height:52px;
+  padding:8px 12px;
+
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:10px;
+
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(0,0,0,.86),
+      rgba(0,0,0,.25)
+    );
+
+  color:#fff;
+}
+
+body[data-page="feces"]
+.feces-capture-stage-close{
+  min-width:72px;
+  min-height:40px;
+  padding:8px 12px;
+
+  border:
+    1px solid
+    rgba(255,255,255,.40);
+
+  border-radius:12px;
+
+  background:
+    rgba(0,0,0,.35);
+
+  color:#fff;
+  font:inherit;
+  font-weight:900;
+  cursor:pointer;
+}
+
+body[data-page="feces"]
+.feces-capture-stage-title{
+  grid-column:2;
+  text-align:center;
+  font-size:14px;
+  font-weight:900;
+}
+
+body[data-page="feces"]
+.feces-capture-stage-actions{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:3;
+
+  padding:
+    10px 12px
+    calc(
+      10px +
+      env(
+        safe-area-inset-bottom,
+        0px
+      )
+    );
+
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+
+  background:
+    linear-gradient(
+      to top,
+      rgba(0,0,0,.88),
+      rgba(0,0,0,.20)
+    );
+}
+
+body[data-page="feces"]
+.feces-capture-stage-actions
+.mbk-btn{
+  width:100%;
+  min-height:48px;
+}
 
 /* Dairy Traits only */
 
