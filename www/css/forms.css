@@ -8627,3 +8627,6 @@ html[data-page="cow-card"] .cc-events-launch[hidden]{
     font-size: 15px;
   }
 }
+html[data-page="uterine-check"] #editToolsRow[hidden]{
+  display:none !important;
+}
