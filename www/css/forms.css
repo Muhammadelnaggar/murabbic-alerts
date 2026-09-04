@@ -1519,7 +1519,8 @@ body[data-page="dairy-traits"]
 body[data-page="dairy-traits"]
 .mbk-capture-stage
 #previewWrap .mbk-camera-preview{
-  object-fit:contain;
+  object-fit:cover;
+  object-position:center center;
 }
 
 
