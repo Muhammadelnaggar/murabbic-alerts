@@ -59341,7 +59341,7 @@ function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [],
   savedCount === 1
     ? `event-list.html?number=${encodeURIComponent(first.animalNumber)}&date=${encodeURIComponent(eventDate)}`
     : savedCount > 1
-      ? "/event-list.html"
+      ? "/add-event.html"
       : "";
 
   return {
