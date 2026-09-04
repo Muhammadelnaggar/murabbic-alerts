@@ -742,16 +742,64 @@ captureStage.hidden = true;
   captureBtn.textContent = "التقاط";
 }
 
-  function fitOverlay() {
-    if (!preview || !overlay) return;
+function fitOverlay() {
+  if (!preview || !overlay) return;
 
-    const r = preview.getBoundingClientRect();
-    overlay.width = Math.max(1, Math.floor(r.width * devicePixelRatio));
-    overlay.height = Math.max(1, Math.floor(r.height * devicePixelRatio));
-    overlay.style.width = r.width + "px";
-    overlay.style.height = r.height + "px";
+  const sideCssRotated =
+    state.currentAngle === "side" &&
+    window.matchMedia(
+      "(orientation: portrait)"
+    ).matches;
+
+  if (sideCssRotated) {
+    const w = previewWrap.clientWidth;
+    const h = previewWrap.clientHeight;
+    const dpr =
+      window.devicePixelRatio || 1;
+
+    overlay.width =
+      Math.max(
+        1,
+        Math.floor(w * dpr)
+      );
+
+    overlay.height =
+      Math.max(
+        1,
+        Math.floor(h * dpr)
+      );
+
+    overlay.style.width = "100%";
+    overlay.style.height = "100%";
+
+    return;
   }
 
+  const r =
+    preview.getBoundingClientRect();
+
+  overlay.width =
+    Math.max(
+      1,
+      Math.floor(
+        r.width * devicePixelRatio
+      )
+    );
+
+  overlay.height =
+    Math.max(
+      1,
+      Math.floor(
+        r.height * devicePixelRatio
+      )
+    );
+
+  overlay.style.width =
+    r.width + "px";
+
+  overlay.style.height =
+    r.height + "px";
+}
   function drawGuide() {
     if (!overlay) return;
 
