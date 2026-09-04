@@ -26,14 +26,14 @@
     <section class="mbk-card">
      <div class="field">
   <label for="animalNumber">رقم الحيوان</label>
-  <textarea id="animalNumber" data-field="animalNumber" style="min-height:80px; resize:vertical;"></textarea>
+  <textarea id="animalNumber" data-field="animalNumber"></textarea>
 </div>
       <div class="field">
         <label for="eventDate">تاريخ الفطام</label>
         <input id="eventDate" data-field="eventDate" type="date" />
       </div>
 
-      <div class="field" id="singleAgeWrap" style="display:none;">
+      <div class="field" id="singleAgeWrap" hidden>
         <label for="weaningAgeDays">عمر الفطام (يوم)</label>
         <input id="weaningAgeDays" data-field="weaningAgeDays" type="number" readonly />
       </div>
@@ -50,7 +50,7 @@
     الوزن اختياري لكل عجل، ويُحفظ لكل عجل بشكل مستقل.
   </div>
 </div>
-      <div class="field" id="bulkAgeHint" style="display:none;">
+      <div class="field" id="bulkAgeHint" hidden>
         <label>عمر الفطام</label>
        <div class="form-hint">سيتم حساب عمر الفطام تلقائيًا من السيرفر لكل حيوان حسب تاريخ الميلاد المسجل.</div>
       </div>
@@ -61,7 +61,7 @@
       </div>
       </section>
 
-    <section class="mbk-card" id="editToolsCard" hidden style="display:none">
+    <section class="mbk-card" id="editToolsCard" hidden>
       <div class="field">
         <label for="correctionPerformedBy">القائم بالتعديل</label>
         <input
@@ -673,15 +673,9 @@ function currentBulkWeightsPayload(){
       isBulkNow();
       renderBulkWeights(accepted);
 
-    ageWrap.style.display =
-      bulk
-        ? "none"
-        : "";
+    ageWrap.hidden = bulk;
 
-    bulkAgeHint.style.display =
-      bulk
-        ? ""
-        : "none";
+bulkAgeHint.hidden = !bulk;
 
     ageEl.value =
       !bulk &&
@@ -858,15 +852,9 @@ function currentBulkWeightsPayload(){
           )
         : 1;
 
-    ageWrap.style.display =
-      startsBulk
-        ? "none"
-        : "";
+    ageWrap.hidden = startsBulk;
 
-    bulkAgeHint.style.display =
-      startsBulk
-        ? ""
-        : "none";
+bulkAgeHint.hidden = !startsBulk;
 
     saveBtn.disabled =
       true;
@@ -958,22 +946,16 @@ function currentBulkWeightsPayload(){
           )
         : "";
 
-    ageWrap.style.display =
-      "none";
+    ageWrap.hidden = true;
 
-    bulkAgeHint.style.display =
-      "none";
-
+bulkAgeHint.hidden = true;
     renderPerformers(
       data.correctionPerformers ||
       []
     );
 
     editToolsCard.hidden =
-      false;
-
-    editToolsCard.style.display =
-      "";
+  false;
 
     correctionPerformedByEl.required =
       true;
