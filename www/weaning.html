@@ -41,6 +41,15 @@
   <label for="weaningWeightKg">وزن الفطام (كجم)</label>
   <input id="weaningWeightKg" data-field="weaningWeightKg" type="number" min="0" step="0.1" placeholder="اختياري" />
 </div>
+<div class="field" id="bulkWeightsWrap" hidden>
+  <label>أوزان الفطام للعجول المقبولة</label>
+
+  <div id="bulkWeightsList"></div>
+
+  <div class="form-hint">
+    الوزن اختياري لكل عجل، ويُحفظ لكل عجل بشكل مستقل.
+  </div>
+</div>
       <div class="field" id="bulkAgeHint" style="display:none;">
         <label>عمر الفطام</label>
        <div class="form-hint">سيتم حساب عمر الفطام تلقائيًا من السيرفر لكل حيوان حسب تاريخ الميلاد المسجل.</div>
@@ -99,8 +108,21 @@
   const ageWrap = $("singleAgeWrap");
   const ageEl = $("weaningAgeDays");
   const bulkAgeHint = $("bulkAgeHint");
-  const weightEl = $("weaningWeightKg");
-  const notesEl = $("notes");
+
+const weightWrap =
+  $("weaningWeightWrap");
+
+const weightEl =
+  $("weaningWeightKg");
+
+const bulkWeightsWrap =
+  $("bulkWeightsWrap");
+
+const bulkWeightsList =
+  $("bulkWeightsList");
+
+const notesEl =
+  $("notes");
 
   const editToolsCard = $("editToolsCard");
   const correctionPerformedByEl = $("correctionPerformedBy");
@@ -160,10 +182,32 @@
   }
 
   function todayISO(){
-    return new Date()
-      .toISOString()
-      .slice(0, 10);
-  }
+  const now =
+    new Date(
+      new Date().toLocaleString(
+        "en-US",
+        {
+          timeZone:
+            "Africa/Cairo"
+        }
+      )
+    );
+
+  const y =
+    now.getFullYear();
+
+  const m =
+    String(
+      now.getMonth() + 1
+    ).padStart(2, "0");
+
+  const d =
+    String(
+      now.getDate()
+    ).padStart(2, "0");
+
+  return `${y}-${m}-${d}`;
+}
 
   const initialRaw =
     String(
@@ -196,6 +240,8 @@
 
   let lastGate = null;
   let gateTimer = null;
+  const bulkWeightsByNumber =
+  new Map();
 
   function getCurrentNumbers(){
     return parseNumbers(
@@ -212,6 +258,180 @@
       )
     );
   }
+  function collectBulkWeightsFromUi(){
+  if (!bulkWeightsList) return;
+
+  bulkWeightsList
+    .querySelectorAll(
+      "[data-weaning-weight-number]"
+    )
+    .forEach(input => {
+      const number =
+        String(
+          input.dataset
+            .weaningWeightNumber ||
+          ""
+        ).trim();
+
+      if (!number) return;
+
+      bulkWeightsByNumber.set(
+        number,
+        String(
+          input.value || ""
+        ).trim()
+      );
+    });
+}
+
+
+function renderBulkWeights(
+  accepted = []
+){
+  collectBulkWeightsFromUi();
+
+  const bulk =
+    isBulkNow();
+
+  if (weightWrap) {
+    weightWrap.hidden = bulk;
+  }
+
+  if (
+    !bulkWeightsWrap ||
+    !bulkWeightsList
+  ) {
+    return;
+  }
+
+  bulkWeightsList
+    .replaceChildren();
+
+  if (!bulk) {
+    bulkWeightsWrap.hidden = true;
+    return;
+  }
+
+  const rows =
+    Array.isArray(accepted)
+      ? accepted
+      : [];
+
+  bulkWeightsWrap.hidden =
+    rows.length === 0;
+
+  rows.forEach(row => {
+    const animalNumber =
+      String(
+        row.animalNumber ||
+        row.calfNumber ||
+        row.number ||
+        ""
+      ).trim();
+
+    if (!animalNumber) return;
+
+    const ageDays =
+      Number(
+        row.weaningAgeDays
+      );
+
+    const field =
+      document.createElement(
+        "div"
+      );
+
+    field.className = "field";
+
+    const label =
+      document.createElement(
+        "label"
+      );
+
+    label.textContent =
+      Number.isFinite(ageDays)
+        ? `العجل ${animalNumber} — العمر ${ageDays} يوم`
+        : `العجل ${animalNumber}`;
+
+    const input =
+      document.createElement(
+        "input"
+      );
+
+    input.type = "number";
+    input.min = "0";
+    input.step = "0.1";
+    input.inputMode = "decimal";
+
+    input.placeholder =
+      "وزن الفطام (كجم) — اختياري";
+
+    input.dataset
+      .weaningWeightNumber =
+        animalNumber;
+
+    input.value =
+      bulkWeightsByNumber.get(
+        animalNumber
+      ) || "";
+
+    input.addEventListener(
+      "input",
+      () => {
+        bulkWeightsByNumber.set(
+          animalNumber,
+          String(
+            input.value || ""
+          ).trim()
+        );
+      }
+    );
+
+    field.appendChild(label);
+    field.appendChild(input);
+
+    bulkWeightsList.appendChild(
+      field
+    );
+  });
+}
+
+
+function currentBulkWeightsPayload(){
+  collectBulkWeightsFromUi();
+
+  const accepted =
+    Array.isArray(
+      lastGate?.accepted
+    )
+      ? lastGate.accepted
+      : [];
+
+  return accepted
+    .map(row => {
+      const animalNumber =
+        String(
+          row.animalNumber ||
+          row.calfNumber ||
+          row.number ||
+          ""
+        ).trim();
+
+      if (!animalNumber) {
+        return null;
+      }
+
+      return {
+        animalNumber,
+
+        weaningWeightKg:
+          bulkWeightsByNumber.get(
+            animalNumber
+          ) || ""
+      };
+    })
+    .filter(Boolean);
+}
 
   function setMessage(
     text,
@@ -451,6 +671,7 @@
 
     const bulk =
       isBulkNow();
+      renderBulkWeights(accepted);
 
     ageWrap.style.display =
       bulk
@@ -1022,11 +1243,21 @@
           ""
         ).trim();
 
-      const weaningWeightKg =
-        String(
-          weightEl.value ||
-          ""
-        ).trim();
+      const bulk =
+  isBulkNow();
+
+const weaningWeights =
+  bulk
+    ? currentBulkWeightsPayload()
+    : [];
+
+const weaningWeightKg =
+  bulk
+    ? ""
+    : String(
+        weightEl.value ||
+        ""
+      ).trim();
 
       setMessage(
         "جاري الحفظ من السيرفر…",
@@ -1044,13 +1275,16 @@
                 "POST",
 
               body: {
-                numbers,
-                animalNumbers:
-                  numbers,
-                eventDate,
-                notes,
-                weaningWeightKg
-              }
+  numbers,
+  animalNumbers:
+    numbers,
+  eventDate,
+  notes,
+
+  ...(bulk
+    ? { weaningWeights }
+    : { weaningWeightKg })
+}
             }
           );
 
