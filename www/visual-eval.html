@@ -573,7 +573,40 @@ function stopCamera() {
   stopStream(stream);
 }
 
+async function enterCaptureDisplayMode(angle) {
+  try {
+    if (
+      !document.fullscreenElement &&
+      captureStage?.requestFullscreen
+    ) {
+      await captureStage.requestFullscreen();
+    }
+  } catch (_) {}
 
+  try {
+    if (screen.orientation?.lock) {
+      await screen.orientation.lock(
+        angle === "side"
+          ? "landscape"
+          : "portrait"
+      );
+    }
+  } catch (_) {}
+}
+
+
+function leaveCaptureDisplayMode() {
+  try {
+    screen.orientation?.unlock?.();
+  } catch (_) {}
+
+  try {
+    if (document.fullscreenElement) {
+      document.exitFullscreen()
+        .catch(() => {});
+    }
+  } catch (_) {}
+}
 function cameraConstraintsForAngle(angle) {
   if (angle === "rear") {
     return {
@@ -675,12 +708,14 @@ async function openCaptureStage(angle) {
   );
 
   document.body.classList.add(
-    "mbk-capture-open"
-  );
+  "mbk-capture-open"
+);
 
-  captureBtn.disabled = true;
+captureBtn.disabled = true;
 
-  try {
+await enterCaptureDisplayMode(angle);
+
+try {
     const started =
       await startCamera(angle);
 
@@ -706,9 +741,10 @@ async function openCaptureStage(angle) {
 function closeCaptureStage() {
   cameraRequestSeq += 1;
 
-  stopCamera();
+ stopCamera();
+leaveCaptureDisplayMode();
 
-  captureStage.hidden = true;
+captureStage.hidden = true;
 
   captureStage.setAttribute(
     "aria-hidden",
@@ -809,23 +845,71 @@ function closeCaptureStage() {
 
 
 
-  function captureFrame() {
-    const w = preview.videoWidth || preview.clientWidth;
-    const h = preview.videoHeight || preview.clientHeight;
+ function captureFrame() {
+  const sourceW = preview.videoWidth;
+  const sourceH = preview.videoHeight;
 
-    if (!w || !h) return null;
+  if (!sourceW || !sourceH) return null;
 
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
+  const side =
+    state.currentAngle === "side";
 
-    const g = canvas.getContext("2d");
-    if (!g) return null;
+  const targetW =
+    side ? 1920 : 1080;
 
-    g.drawImage(preview, 0, 0, w, h);
+  const targetH =
+    side ? 1080 : 1920;
 
-    return canvas.toDataURL("image/jpeg", 0.92);
+  const targetRatio =
+    targetW / targetH;
+
+  const sourceRatio =
+    sourceW / sourceH;
+
+  let sx = 0;
+  let sy = 0;
+  let sw = sourceW;
+  let sh = sourceH;
+
+  if (sourceRatio > targetRatio) {
+    sw = sourceH * targetRatio;
+    sx = (sourceW - sw) / 2;
+
+  } else if (
+    sourceRatio < targetRatio
+  ) {
+    sh = sourceW / targetRatio;
+    sy = (sourceH - sh) / 2;
   }
+
+  const canvas =
+    document.createElement("canvas");
+
+  canvas.width = targetW;
+  canvas.height = targetH;
+
+  const g =
+    canvas.getContext("2d");
+
+  if (!g) return null;
+
+  g.drawImage(
+    preview,
+    sx,
+    sy,
+    sw,
+    sh,
+    0,
+    0,
+    targetW,
+    targetH
+  );
+
+  return canvas.toDataURL(
+    "image/jpeg",
+    0.92
+  );
+}
 
   function renderThumbs() {
     if (!thumbs) return;
