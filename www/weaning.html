@@ -522,8 +522,15 @@ function currentBulkWeightsPayload(){
     );
 
     actions.appendChild(btn);
-    info.appendChild(msg);
-    info.appendChild(actions);
+info.appendChild(msg);
+info.appendChild(actions);
+
+requestAnimationFrame(() => {
+  info.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+});
   }
 
   function setBusy(busy){

@@ -59337,9 +59337,12 @@ function weaningBuildSaveResponseSrv({ saved = [], rejected = [], warnings = [],
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  const redirectUrl = savedCount === 1
+  const redirectUrl =
+  savedCount === 1
     ? `event-list.html?number=${encodeURIComponent(first.animalNumber)}&date=${encodeURIComponent(eventDate)}`
-    : "";
+    : savedCount > 1
+      ? "/event-list.html"
+      : "";
 
   return {
     ok: savedCount > 0,
