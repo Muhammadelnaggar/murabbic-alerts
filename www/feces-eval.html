@@ -9,7 +9,7 @@
   <title>تقييم الروث بالكاميرا — مُرَبِّك</title>
 
 </head>
-<body>
+<body data-page="feces">
 <header>
   <div class="mbk-head">
     <a class="mbk-back" href="add-event.html" id="headBackBtn">رجوع</a>
@@ -35,21 +35,39 @@
   </div>
 
   <section class="card vision-card" id="cameraCard">
- <div class="mbk-vision-controls">
-  <div class="left"></div>
-
-  <div class="right" style="grid-template-columns:repeat(2,minmax(0,1fr));">
-    <button id="captureBtn" class="mbk-btn mbk-btn-primary" disabled>التقاط</button>
-    <button id="retakeBtn" class="mbk-btn mbk-btn-danger" disabled>إعادة الالتقاط</button>
-    <button id="uploadBtn" class="mbk-btn mbk-btn-light" style="grid-column:1 / -1;" disabled>رفع صورة بديلة</button>
+<div class="mbk-vision-controls">
+  <div class="left">
+    صوّر عينة الروث من شاشة التصوير.
   </div>
 
-  <input id="uploadInput" type="file" accept="image/*" style="display:none" />
-</div>
+  <div class="right" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+    <button id="captureBtn"
+            class="mbk-btn mbk-btn-primary"
+            type="button"
+            disabled>
+      فتح الكاميرا
+    </button>
 
-<div class="mbk-camera-frame">
-  <video id="preview" class="mbk-camera-preview" playsinline autoplay muted></video>
-  <canvas id="overlay" class="mbk-camera-overlay"></canvas>
+    <button id="retakeBtn"
+            class="mbk-btn mbk-btn-danger"
+            type="button"
+            disabled>
+      إعادة الالتقاط
+    </button>
+
+    <button id="uploadBtn"
+            class="mbk-btn mbk-btn-light"
+            style="grid-column:1 / -1;"
+            type="button"
+            disabled>
+      رفع صورة بديلة
+    </button>
+  </div>
+
+  <input id="uploadInput"
+         type="file"
+         accept="image/*"
+         style="display:none" />
 </div>
 
      <div class="mbk-results" id="resultsBox">
@@ -115,7 +133,65 @@
 </div>
   </section>
 </main>
+<section id="fecesCaptureStage"
+         class="feces-capture-stage"
+         hidden
+         aria-hidden="true">
 
+  <div class="feces-capture-shell">
+
+    <div class="feces-capture-stage-body">
+
+      <div id="previewWrap"
+           class="mbk-camera-frame feces-capture-frame">
+
+        <video id="preview"
+               class="mbk-camera-preview"
+               playsinline
+               autoplay
+               muted></video>
+
+        <canvas id="overlay"
+                class="mbk-camera-overlay"></canvas>
+
+      </div>
+
+    </div>
+
+    <div class="feces-capture-stage-head">
+
+      <button id="captureCloseBtn"
+              class="feces-capture-stage-close"
+              type="button">
+        رجوع
+      </button>
+
+      <div class="feces-capture-stage-title">
+        تصوير عينة الروث
+      </div>
+
+    </div>
+
+    <div class="feces-capture-stage-actions">
+
+      <button id="stageCaptureBtn"
+              class="mbk-btn mbk-btn-primary"
+              type="button"
+              disabled>
+        التقاط
+      </button>
+
+      <button id="stageUploadBtn"
+              class="mbk-btn mbk-btn-light"
+              type="button">
+        رفع صورة بديلة
+      </button>
+
+    </div>
+
+  </div>
+
+</section>
 <script>
 (function () {
   "use strict";
@@ -123,12 +199,38 @@
   const qs = new URLSearchParams(location.search);
   const $ = (s, p = document) => p.querySelector(s);
 
-  const preview = $("#preview");
-  const overlay = $("#overlay");
-  const captureBtn = $("#captureBtn");
-  const retakeBtn = $("#retakeBtn");
-  const uploadBtn = $("#uploadBtn");
-  const uploadInput = $("#uploadInput");
+ const captureStage =
+  $("#fecesCaptureStage");
+
+const previewWrap =
+  $("#previewWrap");
+
+const preview =
+  $("#preview");
+
+const overlay =
+  $("#overlay");
+
+const captureBtn =
+  $("#captureBtn");
+
+const stageCaptureBtn =
+  $("#stageCaptureBtn");
+
+const captureCloseBtn =
+  $("#captureCloseBtn");
+
+const stageUploadBtn =
+  $("#stageUploadBtn");
+
+const retakeBtn =
+  $("#retakeBtn");
+
+const uploadBtn =
+  $("#uploadBtn");
+
+const uploadInput =
+  $("#uploadInput");
   const saveBtn = $("#saveBtn");
   const backBtn = $("#backBtn");
   const headBackBtn = $("#headBackBtn");
@@ -158,7 +260,7 @@ const state = {
   operationalAllowed: false,
   groupCompleted: false
 };
-
+let cameraRequestSeq = 0;
   function todayCairo() {
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
     const y = now.getFullYear();
@@ -480,124 +582,323 @@ refreshTrainingButton();
   }
 
   function fitOverlay() {
-    if (!preview || !overlay) return;
+  if (!previewWrap || !overlay) return;
 
-    const r = preview.getBoundingClientRect();
+  const w = previewWrap.clientWidth;
+  const h = previewWrap.clientHeight;
+  const dpr =
+    window.devicePixelRatio || 1;
 
-    overlay.width = Math.max(1, Math.floor(r.width * devicePixelRatio));
-    overlay.height = Math.max(1, Math.floor(r.height * devicePixelRatio));
-    overlay.style.width = r.width + "px";
-    overlay.style.height = r.height + "px";
+  if (!w || !h) return;
+
+  overlay.width =
+    Math.max(
+      1,
+      Math.floor(w * dpr)
+    );
+
+  overlay.height =
+    Math.max(
+      1,
+      Math.floor(h * dpr)
+    );
+
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+}
+
+
+function drawGuide() {
+  if (!overlay) return;
+
+  const g =
+    overlay.getContext("2d");
+
+  if (!g) return;
+
+  const w = overlay.width;
+  const h = overlay.height;
+
+  const dpr =
+    window.devicePixelRatio || 1;
+
+  const line = 4 * dpr;
+
+  g.clearRect(
+    0,
+    0,
+    w,
+    h
+  );
+
+  g.strokeStyle =
+    "rgba(14,160,90,.98)";
+
+  g.lineWidth = line;
+
+  g.strokeRect(
+    line / 2,
+    line / 2,
+    Math.max(1, w - line),
+    Math.max(1, h - line)
+  );
+
+  g.fillStyle =
+    "rgba(14,160,90,.98)";
+
+  g.font =
+    `${15 * dpr}px Cairo, system-ui, sans-serif`;
+
+  g.textAlign = "center";
+  g.textBaseline = "top";
+
+  g.fillText(
+    "ضع الروث داخل الكادر بالكامل",
+    w / 2,
+    14 * dpr
+  );
+}
+
+
+function stopStream(stream) {
+  if (!stream) return;
+
+  stream
+    .getTracks()
+    .forEach(
+      track => track.stop()
+    );
+}
+
+
+function stopCamera() {
+  const stream = state.stream;
+
+  state.stream = null;
+
+  if (preview) {
+    preview.srcObject = null;
   }
 
-  function drawGuide() {
-    if (!overlay) return;
+  stopStream(stream);
+}
 
-    const g = overlay.getContext("2d");
-    if (!g) return;
 
-    const w = overlay.width;
-    const h = overlay.height;
+async function startCamera() {
+  const requestSeq =
+    ++cameraRequestSeq;
 
-    g.clearRect(0, 0, w, h);
+  stopCamera();
 
-    const box = {
-      x: Math.round(w * 0.16),
-      y: Math.round(h * 0.18),
-      w: Math.round(w * 0.68),
-      h: Math.round(h * 0.64)
-    };
-
-    g.fillStyle = "rgba(0,0,0,.25)";
-    g.fillRect(0, 0, w, h);
-
-    g.save();
-    g.globalCompositeOperation = "destination-out";
-    g.beginPath();
-
-    if (g.roundRect) {
-      g.roundRect(box.x, box.y, box.w, box.h, 18 * devicePixelRatio);
-    } else {
-      g.rect(box.x, box.y, box.w, box.h);
-    }
-
-    g.fill();
-    g.restore();
-
-    g.strokeStyle = "rgba(14,160,90,.95)";
-    g.lineWidth = 4 * devicePixelRatio;
-    g.beginPath();
-
-    if (g.roundRect) {
-      g.roundRect(box.x, box.y, box.w, box.h, 18 * devicePixelRatio);
-    } else {
-      g.rect(box.x, box.y, box.w, box.h);
-    }
-
-    g.stroke();
-
-    g.fillStyle = "rgba(14,160,90,.95)";
-    g.font = `${15 * devicePixelRatio}px Cairo, system-ui, sans-serif`;
-    g.textAlign = "center";
-    g.fillText(
-      "ضع الروث داخل الإطار بالكامل",
-      w / 2,
-      Math.max(24 * devicePixelRatio, box.y - 10 * devicePixelRatio)
+  if (
+    !navigator.mediaDevices
+      ?.getUserMedia
+  ) {
+    throw new Error(
+      "متصفحك لا يدعم تشغيل الكاميرا. استخدم رفع صورة بديلة."
     );
   }
 
-  async function stopCamera() {
-    if (state.stream) {
-      state.stream.getTracks().forEach(t => t.stop());
-    }
+  const stream =
+    await navigator.mediaDevices
+      .getUserMedia({
+        video: {
+          facingMode: {
+            ideal: "environment"
+          },
 
-    state.stream = null;
+          width: {
+            ideal: 1600
+          },
+
+          height: {
+            ideal: 1600
+          },
+
+          aspectRatio: {
+            ideal: 1
+          }
+        },
+
+        audio: false
+      });
+
+  if (
+    requestSeq !== cameraRequestSeq ||
+    !captureStage ||
+    captureStage.hidden
+  ) {
+    stopStream(stream);
+    return false;
   }
 
-  async function startCamera() {
-    await stopCamera();
+  state.stream = stream;
+  preview.srcObject = stream;
 
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error("متصفحك لا يدعم تشغيل الكاميرا. استخدم رفع صورة بديلة.");
+  await preview.play();
+
+  if (
+    requestSeq !== cameraRequestSeq ||
+    state.stream !== stream ||
+    captureStage.hidden
+  ) {
+    if (state.stream === stream) {
+      state.stream = null;
+      preview.srcObject = null;
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: "environment" },
-        width: { ideal: 1600 },
-        height: { ideal: 1200 }
-      },
-      audio: false
-    });
+    stopStream(stream);
+    return false;
+  }
 
-    state.stream = stream;
-    preview.srcObject = stream;
+  fitOverlay();
+  drawGuide();
 
-    await preview.play();
+  return true;
+}
+
+
+async function openCaptureStage() {
+  if (
+    !state.operationalAllowed ||
+    !captureStage
+  ) {
+    return;
+  }
+
+  hideMsg();
+
+  captureStage.hidden = false;
+
+  captureStage.setAttribute(
+    "aria-hidden",
+    "false"
+  );
+
+  document.body.classList.add(
+    "mbk-capture-open"
+  );
+
+  if (stageCaptureBtn) {
+    stageCaptureBtn.disabled = true;
+    stageCaptureBtn.textContent =
+      "التقاط";
+  }
+
+  try {
+    const started =
+      await startCamera();
+
+    if (!started) return;
+
+    if (stageCaptureBtn) {
+      stageCaptureBtn.disabled =
+        false;
+    }
 
     fitOverlay();
     drawGuide();
+
+  } catch (e) {
+    if (
+      !captureStage ||
+      captureStage.hidden
+    ) {
+      return;
+    }
+
+    closeCaptureStage();
+
+    showMsg(
+      e.message ||
+      "تعذّر تشغيل الكاميرا. يمكنك استخدام رفع صورة بديلة.",
+      false
+    );
+  }
+}
+
+
+function closeCaptureStage() {
+  cameraRequestSeq += 1;
+
+  stopCamera();
+
+  if (captureStage) {
+    captureStage.hidden = true;
+
+    captureStage.setAttribute(
+      "aria-hidden",
+      "true"
+    );
   }
 
-  function captureFrame() {
-    if (!preview) return null;
+  document.body.classList.remove(
+    "mbk-capture-open"
+  );
 
-    const w = preview.videoWidth || preview.clientWidth;
-    const h = preview.videoHeight || preview.clientHeight;
-
-    if (!w || !h) return null;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-
-    const g = canvas.getContext("2d");
-    if (!g) return null;
-
-    g.drawImage(preview, 0, 0, w, h);
-
-    return canvas.toDataURL("image/jpeg", 0.92);
+  if (stageCaptureBtn) {
+    stageCaptureBtn.disabled = true;
+    stageCaptureBtn.textContent =
+      "التقاط";
   }
+}
+
+function captureFrame() {
+  const sourceW =
+    preview.videoWidth;
+
+  const sourceH =
+    preview.videoHeight;
+
+  if (
+    !sourceW ||
+    !sourceH
+  ) {
+    return null;
+  }
+
+  const sourceSize =
+    Math.min(
+      sourceW,
+      sourceH
+    );
+
+  const sx =
+    (sourceW - sourceSize) / 2;
+
+  const sy =
+    (sourceH - sourceSize) / 2;
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+  canvas.width = 1600;
+  canvas.height = 1600;
+
+  const g =
+    canvas.getContext("2d");
+
+  if (!g) return null;
+
+  g.drawImage(
+    preview,
+    sx,
+    sy,
+    sourceSize,
+    sourceSize,
+    0,
+    0,
+    1600,
+    1600
+  );
+
+  return canvas.toDataURL(
+    "image/jpeg",
+    0.92
+  );
+}
 
 async function analyzeOnServer(image) {
   const ctx = contextFromUrl();
@@ -630,41 +931,62 @@ async function analyzeOnServer(image) {
   renderAnalysis(data);
 }
 
-  async function captureAndAnalyze() {
-    try {
-      hideMsg();
-      setWaiting();
+async function captureAndAnalyze() {
+  try {
+    hideMsg();
+    setWaiting();
 
-      if (captureBtn) {
-        captureBtn.disabled = true;
-        captureBtn.textContent = "جاري الالتقاط...";
-      }
+    if (!state.stream) return;
 
-      const image = captureFrame();
+    stageCaptureBtn.disabled = true;
 
-      if (!image) {
-        throw new Error("تعذّر التقاط الصورة.");
-      }
+    stageCaptureBtn.textContent =
+      "جاري الالتقاط...";
 
-      state.image = image;
-      showPreview(image);
+    const image =
+      captureFrame();
 
-      if (captureBtn) captureBtn.textContent = "جاري التحليل...";
-
-      await analyzeOnServer(image);
-
-      if (retakeBtn) retakeBtn.disabled = false;
-
-    } catch (e) {
-      console.warn("feces analyze error:", e);
-      showMsg(e.message || "تعذّر تحليل الروث.", false);
-    } finally {
-      if (captureBtn) {
-        captureBtn.disabled = false;
-        captureBtn.textContent = "التقاط";
-      }
+    if (!image) {
+      throw new Error(
+        "تعذّر التقاط الصورة."
+      );
     }
+
+    state.image = image;
+
+    showPreview(image);
+
+    closeCaptureStage();
+
+    if (scoreBadge) {
+      scoreBadge.textContent =
+        "جاري التحليل...";
+    }
+
+    if (scoreNote) {
+      scoreNote.textContent =
+        "يتم الآن تحليل صورة الروث.";
+    }
+
+    await analyzeOnServer(image);
+
+    retakeBtn.disabled = false;
+
+  } catch (e) {
+    console.warn(
+      "feces analyze error:",
+      e
+    );
+
+    closeCaptureStage();
+
+    showMsg(
+      e.message ||
+      "تعذّر تحليل الروث.",
+      false
+    );
   }
+}
 
   function readFileAsDataUrl(file) {
     return new Promise((resolve, reject) => {
@@ -691,6 +1013,12 @@ async function analyzeOnServer(image) {
 
       state.image = image;
       showPreview(image);
+      if (
+  captureStage &&
+  !captureStage.hidden
+) {
+  closeCaptureStage();
+}
 
       await analyzeOnServer(image);
 
@@ -883,48 +1211,126 @@ if (authRequired) return;
   }
 
 function bindEvents() {
-  captureBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
-    captureAndAnalyze();
-  });
 
-  retakeBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
-    resetCapture();
-  });
+  captureBtn?.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+      openCaptureStage();
+    }
+  );
 
-  uploadBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
-    uploadInput?.click();
-  });
+  stageCaptureBtn?.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+      captureAndAnalyze();
+    }
+  );
 
-  uploadInput?.addEventListener("change", (e) => {
-    uploadAndAnalyze(e.target.files?.[0]);
-  });
+  captureCloseBtn?.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+      closeCaptureStage();
+    }
+  );
 
-  saveBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
-    saveFeces();
-  });
-    trainingSaveBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
-    saveTrainingCorrection();
-  });
-  backBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
+  stageUploadBtn?.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+      uploadInput?.click();
+    }
+  );
 
-    const ctx = contextFromUrl();
-    const dt = eventDateInput?.value || ctx.eventDate || todayCairo();
+  retakeBtn?.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
 
-    const u = new URL("add-event.html", location.href);
-    carryContextToUrl(u, ctx, dt);
-    location.href = u.toString();
-  });
+      resetCapture();
+      openCaptureStage();
+    }
+  );
 
-  window.addEventListener("resize", () => {
-    fitOverlay();
-    drawGuide();
-  });
+  uploadBtn?.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+      uploadInput?.click();
+    }
+  );
+
+  uploadInput?.addEventListener(
+    "change",
+    (e) => {
+      uploadAndAnalyze(
+        e.target.files?.[0]
+      );
+    }
+  );
+
+  saveBtn?.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+      saveFeces();
+    }
+  );
+
+  trainingSaveBtn
+    ?.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+        saveTrainingCorrection();
+      }
+    );
+
+  backBtn?.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+
+      const ctx =
+        contextFromUrl();
+
+      const dt =
+        eventDateInput?.value ||
+        ctx.eventDate ||
+        todayCairo();
+
+      const u =
+        new URL(
+          "add-event.html",
+          location.href
+        );
+
+      carryContextToUrl(
+        u,
+        ctx,
+        dt
+      );
+
+      location.href =
+        u.toString();
+    }
+  );
+
+  window.addEventListener(
+    "resize",
+    () => {
+      if (
+        captureStage &&
+        !captureStage.hidden &&
+        state.stream
+      ) {
+        fitOverlay();
+        drawGuide();
+      }
+    }
+  );
 }
 
   async function init() {
@@ -966,15 +1372,6 @@ if (ctx.mode === "group") {
   }
 }
 
-try {
-  await startCamera();
-} catch (e) {
-  console.warn("camera error:", e);
-  showMsg(
-    e.message || "تعذّر تشغيل الكاميرا. يمكنك استخدام رفع صورة بديلة.",
-    false
-  );
-}
   }
 
   init();
