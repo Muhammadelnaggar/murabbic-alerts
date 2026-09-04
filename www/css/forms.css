@@ -6454,6 +6454,16 @@ html[data-page="weaning"] .infobar .mbk-weaning-ok-btn {
   line-height: 1.4;
   cursor: pointer;
 }
+html[data-page="weaning"] #animalNumber{
+  min-height:80px;
+  resize:vertical;
+}
+
+html[data-page="weaning"] #singleAgeWrap[hidden],
+html[data-page="weaning"] #bulkAgeHint[hidden],
+html[data-page="weaning"] #editToolsCard[hidden]{
+  display:none !important;
+}
 html[data-page="supernumerary-teat-removal"] .mbk-super-teat-ok-actions{
   margin-top: 10px;
   display: flex;
