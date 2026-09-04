@@ -19790,16 +19790,24 @@ else if (
   typeKey ===
   "uterine_check"
 ) {
-        const checkStage = String(body.checkStage ?? body.stage ?? oldEvent.checkStage ?? "").trim();
-        const resultValue = String(body.result ?? body.uterineResult ?? oldEvent.result ?? "").trim();
-        const stage = uterineCheckStageSrv(checkStage);
-        const result = uterineCheckResultSrv(resultValue);
+                const resultValue = String(
+          body.result ??
+          body.uterineResult ??
+          oldEvent.result ??
+          ""
+        ).trim();
 
-        if (!stage || !result) {
+        const result =
+          uterineCheckResultSrv(
+            resultValue
+          );
+
+        if (!result) {
           return res.status(400).json({
             ok: false,
             error: "invalid_option",
-            message: "❌ اختر مرحلة فحص الرحم والنتيجة من القوائم."
+            message:
+              "❌ اختر نتيجة فحص الرحم من القائمة."
           });
         }
 
@@ -19821,13 +19829,20 @@ else if (
           ? diffDaysISO(lastCalvingDate, eventDate)
           : NaN;
 
-        if (!lastCalvingDate || !Number.isFinite(postpartumDays) || postpartumDays < 0) {
+                if (!lastCalvingDate || !Number.isFinite(postpartumDays) || postpartumDays < 0) {
           return res.status(400).json({
             ok: false,
             error: "last_calving_date_missing",
             message: "❌ لا توجد ولادة مسجلة تسبق تاريخ فحص الرحم."
           });
         }
+
+        const stage =
+          uterineCheckStageSrv(
+            postpartumDays < 30
+              ? "day_14_initial"
+              : "day_30_followup"
+          );
 
         eventPatch = {
           ...eventPatch,
@@ -31984,11 +31999,35 @@ async function uterineCheckContextSrv(req, fd) {
 app.get(
   "/api/uterine-check/options",
   requireUserId,
-  (req, res) => {
-    return res.json({
-      ok: true,
-      options: uterineCheckOptionsSrv()
-    });
+  async (req, res) => {
+    try {
+      const today =
+        await farmTodayISOSrv(
+          req.authSession?.uid ||
+          req.userId
+        );
+
+      return res.json({
+        ok: true,
+        today,
+        options:
+          uterineCheckOptionsSrv()
+      });
+
+    } catch (e) {
+      console.error(
+        "uterine check options failed",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error:
+          "uterine_check_options_failed",
+        message:
+          "❌ تعذّر تحميل قوائم فحص الرحم الآن."
+      });
+    }
   }
 );
 
@@ -32026,20 +32065,6 @@ app.post(
         });
       }
 
-      if (
-        fd.checkStage &&
-        !uterineCheckStageSrv(fd.checkStage)
-      ) {
-        return res.status(400).json({
-          ok: false,
-          allowed: false,
-          error: "invalid_check_stage",
-          message:
-            "❌ اختر مرحلة فحص الرحم من القائمة.",
-          options: uterineCheckOptionsSrv()
-        });
-      }
-
       const context =
         await uterineCheckContextSrv(
           req,
@@ -32065,11 +32090,11 @@ app.post(
           : "day_30_followup";
 
       const advisory =
-        context.postpartumDays < 14
-          ? "الفحص قبل موعد المتابعة الروتيني عند 14 يومًا، ويمكن تسجيله إذا تم بالفعل لحاجة سريرية."
-          : context.postpartumDays < 30
-            ? "هذا التوقيت يقع ضمن متابعة الفحص الأولي بعد الولادة."
-            : "هذا التوقيت مناسب لفحص المتابعة بعد 30 يومًا من الولادة.";
+  context.postpartumDays < 14
+    ? "⚠️ فحص الرحم قبل 14 يومًا قد يكون مضللًا في تقييم ارتداد الرحم. يمكن التسجيل مع إعادة التقييم لاحقًا."
+    : context.postpartumDays < 30
+      ? "هذا التوقيت يقع ضمن متابعة الفحص الأولي بعد الولادة."
+      : "هذا التوقيت مناسب لفحص المتابعة بعد 30 يومًا من الولادة.";
 
       return res.json({
         ok: true,
@@ -32078,7 +32103,11 @@ app.post(
         message:
           `✅ الحيوان رقم ${fd.animalNumber} عمره بعد الولادة ${context.postpartumDays} يومًا، ويمكن تسجيل فحص الرحم الآن.`,
 
-        advisory,
+               advisory,
+        advisoryTone:
+          context.postpartumDays < 14
+            ? "warning"
+            : "success",
         animalNumber: fd.animalNumber,
         eventDate: fd.eventDate,
 
@@ -32133,11 +32162,6 @@ app.post(
         req.body || {}
       );
 
-      const stage =
-        uterineCheckStageSrv(
-          fd.checkStage
-        );
-
       const result =
         uterineCheckResultSrv(
           fd.result
@@ -32146,7 +32170,6 @@ app.post(
       if (
         !fd.animalNumber ||
         !fd.eventDate ||
-        !fd.checkStage ||
         !fd.result
       ) {
         return res.status(400).json({
@@ -32154,16 +32177,16 @@ app.post(
           error:
             "missing_required_fields",
           message:
-            "❌ أكمل رقم الحيوان وتاريخ الفحص، واختر مرحلة الفحص والنتيجة."
+            "❌ أكمل رقم الحيوان وتاريخ الفحص، واختر نتيجة الفحص."
         });
       }
 
-      if (!stage || !result) {
+      if (!result) {
         return res.status(400).json({
           ok: false,
           error: "invalid_option",
           message:
-            "❌ اختر مرحلة فحص الرحم والنتيجة من القوائم."
+            "❌ اختر نتيجة فحص الرحم من القائمة."
         });
       }
 
@@ -32183,6 +32206,12 @@ app.post(
           });
       }
 
+      const stage =
+        uterineCheckStageSrv(
+          context.postpartumDays < 30
+            ? "day_14_initial"
+            : "day_30_followup"
+        );
       const duplicate =
         await healthDuplicateSameDayDetailsSrv(
           uid,
@@ -32200,7 +32229,7 @@ app.post(
               "uterine_check",
 
             checkStage:
-              fd.checkStage
+              stage.value
           }
         );
 
