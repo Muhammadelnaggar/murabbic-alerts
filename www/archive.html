@@ -130,60 +130,66 @@
        ========================= -->
 
   <section
-    id="detailView"
+  id="detailView"
+  hidden
+>
+
+  <h2 id="animalHeading">
+    بيانات الحيوان المؤرشف
+  </h2>
+
+  <div class="table-wrapper archive-detail-table-wrap">
+    <table id="archiveAnimalTable">
+      <thead>
+        <tr>
+          <th>البيان</th>
+          <th>القيمة</th>
+        </tr>
+      </thead>
+
+      <tbody id="animalFactsBody"></tbody>
+    </table>
+  </div>
+
+
+  <h2 id="eventsHeading">
+    الأحداث المؤرشفة
+  </h2>
+
+  <div class="table-wrapper archive-events-table-wrap">
+    <table id="archiveEventsTable">
+      <thead>
+        <tr>
+          <th>التاريخ</th>
+          <th>الحدث</th>
+          <th>التفاصيل</th>
+        </tr>
+      </thead>
+
+      <tbody id="eventsList"></tbody>
+    </table>
+  </div>
+
+  <div
+    id="noEvents"
+    class="no-data"
     hidden
   >
-
-    <section class="mbk-card">
-
-      <h2 id="animalHeading">
-        بيانات الحيوان المؤرشف
-      </h2>
+    لا توجد أحداث مؤرشفة لهذا الحيوان.
+  </div>
 
 
-      <div class="table-wrapper">
+  <div class="actions-bar">
+    <button
+      class="ghost"
+      id="backToArchive"
+      type="button"
+    >
+      العودة إلى الأرشيف
+    </button>
+  </div>
 
-        <table>
-          <tbody id="animalFactsBody"></tbody>
-        </table>
-
-      </div>
-
-    </section>
-
-
-    <section class="mbk-card">
-
-      <h2 id="eventsHeading">
-        الأحداث المؤرشفة
-      </h2>
-
-      <div id="eventsList"></div>
-
-      <div
-        id="noEvents"
-        class="no-data"
-        hidden
-      >
-        لا توجد أحداث مؤرشفة لهذا الحيوان.
-      </div>
-
-    </section>
-
-
-    <div class="actions-bar">
-
-      <button
-        class="ghost"
-        id="backToArchive"
-        type="button"
-      >
-        العودة إلى الأرشيف
-      </button>
-
-    </div>
-
-  </section>
+</section>
 
 </main>
 
@@ -782,142 +788,90 @@ function renderEvents(
   events = []
 ) {
 
-  const list =
+  const tbody =
     $("eventsList");
-
 
   const noEvents =
     $("noEvents");
 
-
   if (
-    !list ||
+    !tbody ||
     !noEvents
   ) {
     return;
   }
 
-
-  list.replaceChildren();
-
+  tbody.replaceChildren();
 
   const safeEvents =
     Array.isArray(events)
       ? events
       : [];
 
-
   noEvents.hidden =
     safeEvents.length > 0;
-
 
   for (
     const event of safeEvents
   ) {
 
-    const card =
-      document.createElement(
-        "section"
-      );
+    const tr =
+      document.createElement("tr");
 
 
-    card.className =
-      "mbk-card";
-
-
-    const title =
-      document.createElement(
-        "h3"
-      );
-
-
-    const eventTitle =
-      String(
-        event?.title ||
-        "حدث"
-      ).trim();
-
-
-    const eventDate =
-      String(
-        event?.date ||
-        ""
-      ).trim();
-
-
-    title.textContent =
-      eventDate
-        ? `${eventTitle} — ${eventDate}`
-        : eventTitle;
-
-
-    card.appendChild(
-      title
+    textCell(
+      tr,
+      event?.date
     );
 
 
-    const wrapper =
-      document.createElement(
-        "div"
-      );
-
-
-    wrapper.className =
-      "table-wrapper";
-
-
-    const table =
-      document.createElement(
-        "table"
-      );
-
-
-    const tbody =
-      document.createElement(
-        "tbody"
-      );
+    textCell(
+      tr,
+      event?.title
+    );
 
 
     const facts =
-      Array.isArray(
-        event?.facts
-      )
+      Array.isArray(event?.facts)
         ? event.facts
         : [];
 
+    const details =
+      facts
+        .map(fact => {
 
-    for (
-      const fact of facts
-    ) {
+          const label =
+            String(
+              fact?.label || ""
+            ).trim();
 
-      appendFactRow(
-        tbody,
-        fact
-      );
-    }
+          const value =
+            String(
+              fact?.value || ""
+            ).trim();
+
+          if (
+            !label ||
+            !value
+          ) {
+            return "";
+          }
+
+          return `${label}: ${value}`;
+        })
+        .filter(Boolean)
+        .join(" • ");
 
 
-    table.appendChild(
-      tbody
+    textCell(
+      tr,
+      details || "—"
     );
 
 
-    wrapper.appendChild(
-      table
-    );
-
-
-    card.appendChild(
-      wrapper
-    );
-
-
-    list.appendChild(
-      card
-    );
+    tbody.appendChild(tr);
   }
 }
-
 
 
 async function loadArchiveDetails(
