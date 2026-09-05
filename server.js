@@ -95387,7 +95387,7 @@ async function archiveFindAnimalSrv(
   for (const collectionName of collections) {
     for (const val of vals) {
       for (const ownerField of ["userId", "ownerUid"]) {
-        for (const numField of ["number", "animalNumber"]) {
+        for (const numField of ["number", "animalNumber", "calfNumber"]) {
           try {
             const snap =
               await db
