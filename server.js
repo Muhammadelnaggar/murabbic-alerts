@@ -32594,7 +32594,7 @@ await batch.commit();
           eventRef.id,
 
         redirectUrl:
-          "add-event.html"
+  `event-list.html?number=${encodeURIComponent(fd.animalNumber)}`
       });
 
     } catch (e) {
