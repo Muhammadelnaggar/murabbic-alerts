@@ -32,33 +32,34 @@
 
     <label>تاريخ البيع</label>
     <input id="eventDate" data-field="eventDate" type="date" required />
-   <label>الموسم</label>
-<input id="season" data-field="season" type="number" inputmode="numeric" placeholder="مثال: 3" />
-<div class="form-hint">يتم تحميل رقم الموسم تلقائيًا من بيانات الحيوان.</div>
+   <label>سعر البيع (اختياري)</label>
+<input
+  id="price"
+  data-field="price"
+  type="number"
+  inputmode="decimal"
+  min="0"
+  step="any"
+  placeholder="مثال: 85000"
+/>
 
-    <label>سعر البيع (اختياري)</label>
-    <input id="price" data-field="price" type="number" inputmode="decimal" placeholder="مثال: 85000" />
-
-    <label>سبب البيع</label>
-    <!-- ✅ قائمة منسدلة -->
-    <select id="saleReasonPreset" aria-label="سبب البيع">
-      <option value="ذبح اضطراري">ذبح اضطراري</option>
-      <option value="استبعاد">استبعاد</option>
-      <option value="حادثة">حادثة</option>
-      <option value="أخرى">أخرى</option>
-    </select>
-   <input id="saleReason" data-field="saleReason" placeholder="سيتم ملؤه تلقائيًا حسب اختيارك" readonly style="display:none" />
-    <input id="saleReasonCustom" placeholder="اكتب سبب البيع" style="display:none" />
-
-    <div id="cullHint" class="field-hint" style="display:none;"></div>
-
+<label for="saleReason">سبب البيع</label>
+<input
+  id="saleReason"
+  data-field="saleReason"
+  list="saleReasonOptions"
+  autocomplete="off"
+  placeholder="اكتب سبب البيع"
+  required
+/>
+<datalist id="saleReasonOptions"></datalist>
     <label>ملاحظات</label>
     <textarea id="notes" data-field="notes" rows="3" placeholder="اختياري"></textarea>
 </section>
     <!-- ✅ زر يطلب التحقق المركزي فقط -->
 <div class="actions-bar">
-  <button class="save" id="saveBtn" type="submit">تسجيل الحدث</button>
-  <button class="ghost" id="cardBtn" type="button">بطاقة الحيوان</button>
+  <button class="save" id="saveBtn" type="submit" disabled>تسجيل الحدث</button>
+<button class="ghost" id="cardBtn" type="button" disabled>بطاقة الحيوان</button>
 </div>
       </form>
   </main>
@@ -72,7 +73,7 @@
 
   $("animalNumber").value = String(num || "");
   $("eventDate").value = dt;
-  let saleGateAllowed = false;
+  let saleCardUrl = "";
 async function sessionPostJson(path, payload) {
   const r = await fetch(path, {
     method: "POST",
@@ -94,11 +95,53 @@ async function sessionPostJson(path, payload) {
 
   return { r, data, authRequired: false };
 }
+async function loadSaleReasonOptions() {
+  try {
+    const r = await fetch("/api/sale-reasons/options", {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        "Accept": "application/json"
+      }
+    });
+
+    const data = await r.json().catch(() => null);
+
+    if (r.status === 401 || data?.error === "auth_required") {
+      msg(data?.message || "❌ سجّل الدخول أولًا.");
+      return;
+    }
+
+    if (!r.ok || data?.ok !== true) {
+      return;
+    }
+
+    const list = $("saleReasonOptions");
+    if (!list) return;
+
+    list.replaceChildren();
+
+    for (const reason of Array.isArray(data.reasons) ? data.reasons : []) {
+      const value = String(reason || "").trim();
+      if (!value) continue;
+
+      const option = document.createElement("option");
+      option.value = value;
+      list.appendChild(option);
+    }
+
+  } catch (err) {
+    console.error("sale reasons options", err);
+  }
+}
 async function runSaleGate() {
-  const animalNumber = String($("animalNumber")?.value || "").trim();
+  const animalNumber =
+    String($("animalNumber")?.value || "").trim();
 
   $("saveBtn").disabled = true;
-  saleGateAllowed = false;
+  $("cardBtn").disabled = true;
+  saleCardUrl = "";
 
   if (!animalNumber) {
     msg("❌ رقم الحيوان مطلوب.");
@@ -108,40 +151,72 @@ async function runSaleGate() {
   try {
     msg("جارِ التحقق من الحيوان...");
 
-    const { r, data, authRequired } = await sessionPostJson("/api/animals/archive/gate", {
-      animalNumber,
-      archiveReason: "sale"
-    });
+    const {
+      r,
+      data,
+      authRequired
+    } = await sessionPostJson(
+      "/api/animals/archive/gate",
+      {
+        animalNumber,
+        archiveReason: "sale"
+      }
+    );
 
-    if (authRequired) return false;
-
-    if (!r.ok || data?.allowed !== true) {
-      saleGateAllowed = false;
-      $("saveBtn").disabled = true;
-      msg(data?.message || "❌ لا يمكن تسجيل بيع لهذا الحيوان.");
+    if (authRequired) {
       return false;
     }
 
-    saleGateAllowed = true;
-    $("saveBtn").disabled = false;
+    if (
+      !r.ok ||
+      data?.ok === false ||
+      data?.allowed !== true
+    ) {
+      $("saveBtn").disabled = true;
+      $("cardBtn").disabled = true;
+      saleCardUrl = "";
 
-    if ($("season") && data?.animal?.lactationNumber) {
-      $("season").value = String(data.animal.lactationNumber);
+      msg(
+        data?.message ||
+        "❌ لا يمكن تسجيل بيع لهذا الحيوان."
+      );
+
+      return false;
     }
 
-    msg(data.message || "✅ الحيوان مؤهل لتسجيل البيع.", true);
+    saleCardUrl =
+      String(
+        data?.animal?.cardUrl || ""
+      ).trim();
+
+    $("saveBtn").disabled = false;
+    $("cardBtn").disabled = !saleCardUrl;
+
+    msg(
+      data?.message ||
+      "✅ الحيوان مؤهل لتسجيل البيع.",
+      true
+    );
+
     return true;
 
   } catch (err) {
     console.error(err);
-    saleGateAllowed = false;
+
     $("saveBtn").disabled = true;
-    msg("❌ فشل الاتصال بالسيرفر أثناء التحقق من الحيوان.");
+    $("cardBtn").disabled = true;
+    saleCardUrl = "";
+
+    msg(
+      "❌ فشل الاتصال بالسيرفر أثناء التحقق من الحيوان."
+    );
+
     return false;
   }
 }
 
 runSaleGate();
+loadSaleReasonOptions();
  
 
   function msg(t, ok = false) {
@@ -155,67 +230,54 @@ runSaleGate();
     try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
   }
 
-  function currentSaleReason() {
-    const preset = String($("saleReasonPreset")?.value || "").trim();
-    const custom = String($("saleReasonCustom")?.value || "").trim();
 
-    if (preset === "أخرى") return custom;
-    return preset;
-  }
-
-  function applySaleReasonUI() {
-    const preset = String($("saleReasonPreset")?.value || "").trim();
-    const custom = $("saleReasonCustom");
-
-    if (!custom) return;
-
-    if (preset === "أخرى") {
-      custom.style.display = "";
-      custom.focus();
-    } else {
-      custom.style.display = "none";
-      custom.value = "";
-    }
-  }
-
-  $("saleReasonPreset")?.addEventListener("change", applySaleReasonUI);
-  applySaleReasonUI();
 
   $("cardBtn")?.addEventListener("click", () => {
-    const n = String($("animalNumber")?.value || "").trim();
-    if (n) location.href = `cow-card.html?number=${encodeURIComponent(n)}`;
-  });
+  if (saleCardUrl) {
+    location.href = saleCardUrl;
+  }
+});
 
  $("saleForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    if (!saleGateAllowed) {
-      msg("❌ لا يمكن الحفظ قبل نجاح التحقق من الحيوان.");
-      return;
-    }
-
+    
     const payload = {
-      animalNumber: String($("animalNumber")?.value || "").trim(),
-      eventDate: String($("eventDate")?.value || "").trim(),
-      archiveReason: "sale",
-      price: Number($("price")?.value || 0) || null,
-      saleReason: currentSaleReason(),
-      season: Number($("season")?.value || 0) || null,
-      notes: String($("notes")?.value || "").trim()
-    };
+  animalNumber:
+    String($("animalNumber")?.value || "").trim(),
+
+  eventDate:
+    String($("eventDate")?.value || "").trim(),
+
+  archiveReason: "sale",
+
+  price:
+    String($("price")?.value || "").trim(),
+
+  saleReason:
+    String($("saleReason")?.value || "").trim(),
+
+  notes:
+    String($("notes")?.value || "").trim()
+};
 
     try {
      
-
+      $("saveBtn").disabled = true;
       msg("جارِ أرشفة الحيوان بعد البيع...");
 
          const { r, data, authRequired } = await sessionPostJson("/api/animals/archive", payload);
 
       if (authRequired) return;
-      if (!r.ok || data?.ok !== true) {
-        msg(data?.message || "❌ فشل أرشفة الحيوان بعد البيع.");
-        return;
-      }
+     if (!r.ok || data?.ok !== true) {
+  msg(
+    data?.message ||
+    "❌ فشل أرشفة الحيوان بعد البيع."
+  );
+
+  await runSaleGate();
+  return;
+}
 
       msg(data.message || "✅ تم أرشفة الحيوان وأحداثه بعد البيع.", true);
 
@@ -226,6 +288,7 @@ runSaleGate();
     } catch (err) {
       console.error(err);
       msg("❌ فشل الاتصال بالسيرفر أثناء أرشفة البيع.");
+await runSaleGate();
     }
   });
 </script>
