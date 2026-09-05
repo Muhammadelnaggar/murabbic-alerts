@@ -95988,7 +95988,14 @@ if (typeof scheduleGroupsRebuildSrv === "function") {
       animalNumber,
       archivedAnimalId: archiveId,
       archivedEventsCount: events.length,
-      message: archiveReason === "sale" ? `✅ سجلت بيع الحيوان رقم ${animalNumber} بنجاح، ونقلت بياناته وأحداثه إلى الأرشيف.` : `✅ سجلت نفوق الحيوان رقم ${animalNumber} بنجاح، ونقلت بياناته وأحداثه إلى الأرشيف.`,
+
+redirectUrl:
+  `archive.html?id=${encodeURIComponent(archiveId)}`,
+
+message:
+  archiveReason === "sale"
+    ? `✅ سجلت بيع الحيوان رقم ${animalNumber} بنجاح، ونقلت بياناته وأحداثه إلى الأرشيف.`
+    : `✅ سجلت نفوق الحيوان رقم ${animalNumber} بنجاح، ونقلت بياناته وأحداثه إلى الأرشيف.`,
     });
 
   } catch (e) {
@@ -95999,6 +96006,834 @@ if (typeof scheduleGroupsRebuildSrv === "function") {
     });
   }
 });
+// ============================================================
+//                 API: ARCHIVE VIEW — SERVER SIDE
+//                 قائمة الأرشيف + تفاصيل الحيوان وأحداثه
+// ============================================================
+
+function archiveViewStrSrv(v) {
+  return String(v ?? "").trim();
+}
+
+function archiveViewDateSrv(v) {
+  const s = archiveViewStrSrv(v);
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    return s.slice(0, 10);
+  }
+
+  if (v && typeof v.toDate === "function") {
+    const d = v.toDate();
+
+    return Number.isNaN(d.getTime())
+      ? ""
+      : d.toISOString().slice(0, 10);
+  }
+
+  if (v && typeof v._seconds === "number") {
+    const d =
+      new Date(
+        v._seconds * 1000
+      );
+
+    return Number.isNaN(d.getTime())
+      ? ""
+      : d.toISOString().slice(0, 10);
+  }
+
+  return "";
+}
+
+function archiveViewSortMsSrv(
+  dateValue,
+  timestampValue
+) {
+  const date =
+    archiveViewDateSrv(
+      dateValue
+    );
+
+  if (date) {
+    return (
+      Date.parse(
+        `${date}T00:00:00Z`
+      ) || 0
+    );
+  }
+
+  if (
+    timestampValue &&
+    typeof timestampValue.toMillis === "function"
+  ) {
+    return (
+      Number(
+        timestampValue.toMillis()
+      ) || 0
+    );
+  }
+
+  if (
+    timestampValue &&
+    typeof timestampValue._seconds === "number"
+  ) {
+    return (
+      Number(
+        timestampValue._seconds
+      ) * 1000
+    );
+  }
+
+  return 0;
+}
+
+function archiveViewSubjectSrv(doc = {}) {
+  return archiveViewStrSrv(
+    doc.originalAnimalPath
+  )
+    .toLowerCase()
+    .startsWith("calves/")
+      ? "تابع"
+      : "أم";
+}
+
+function archiveViewSpeciesSrv(doc = {}) {
+  const raw = [
+    doc.species,
+    doc.animalType,
+    doc.animaltype,
+    doc.animalTypeAr
+  ]
+    .map(archiveViewStrSrv)
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    raw.includes("buffalo") ||
+    raw.includes("جاموس")
+  ) {
+    return "جاموس";
+  }
+
+  if (
+    raw.includes("cow") ||
+    raw.includes("cattle") ||
+    raw.includes("بقر") ||
+    raw.includes("أبقار") ||
+    raw.includes("ابقار")
+  ) {
+    return "أبقار";
+  }
+
+  return (
+    archiveViewStrSrv(
+      doc.animalTypeAr ||
+      doc.species ||
+      doc.animalType ||
+      doc.animaltype
+    ) ||
+    "غير محدد"
+  );
+}
+
+function archiveViewExitSrv(doc = {}) {
+  const reason =
+    archiveViewStrSrv(
+      doc.archiveReason
+    ).toLowerCase();
+
+  if (reason === "sale") {
+    return "بيع";
+  }
+
+  if (reason === "death") {
+    return "نفوق";
+  }
+
+  return (
+    archiveViewStrSrv(
+      doc.archiveReasonLabel
+    ) ||
+    "خروج"
+  );
+}
+
+function archiveViewReasonSrv(doc = {}) {
+  const reason =
+    archiveViewStrSrv(
+      doc.archiveReason
+    ).toLowerCase();
+
+  if (reason === "sale") {
+    return archiveViewStrSrv(
+      doc.saleReason
+    );
+  }
+
+  if (reason === "death") {
+    return archiveViewStrSrv(
+      doc.deathReason
+    );
+  }
+
+  return "";
+}
+
+function archiveViewPriceSrv(doc = {}) {
+  if (
+    doc.salePrice === null ||
+    doc.salePrice === undefined ||
+    doc.salePrice === ""
+  ) {
+    return null;
+  }
+
+  const n =
+    Number(
+      doc.salePrice
+    );
+
+  return (
+    Number.isFinite(n) &&
+    n > 0
+  )
+    ? n
+    : null;
+}
+
+function archiveViewAddFactSrv(
+  list,
+  label,
+  value
+) {
+  const text =
+    archiveViewStrSrv(
+      value
+    );
+
+  if (!text) {
+    return;
+  }
+
+  list.push({
+    label,
+    value: text
+  });
+}
+
+function archiveViewAnimalFactsSrv(doc = {}) {
+  const facts = [];
+  const price =
+    archiveViewPriceSrv(doc);
+
+  archiveViewAddFactSrv(
+    facts,
+    "الفئة",
+    archiveViewSubjectSrv(doc)
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "النوع",
+    archiveViewSpeciesSrv(doc)
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "السلالة",
+    doc.breed
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "الجنس",
+    doc.sex
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "تاريخ الميلاد",
+    archiveViewDateSrv(
+      doc.birthDate
+    )
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "الحالة الإنتاجية",
+    doc.productionStatus
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "الحالة التناسلية",
+    doc.reproductiveStatus
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "حالة التابع",
+    doc.followerStatus
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "رقم الأم",
+    doc.damNumber
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "الموسم",
+    doc.season ||
+    doc.lactationNumber
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "آخر ولادة",
+    archiveViewDateSrv(
+      doc.lastCalvingDate
+    )
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "آخر تلقيح",
+    archiveViewDateSrv(
+      doc.lastInseminationDate
+    )
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "نوع الخروج",
+    archiveViewExitSrv(doc)
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    "تاريخ الخروج",
+    archiveViewDateSrv(
+      doc.archiveDate
+    )
+  );
+
+  archiveViewAddFactSrv(
+    facts,
+    archiveViewStrSrv(
+      doc.archiveReason
+    ).toLowerCase() === "death"
+      ? "سبب النفوق"
+      : "سبب البيع",
+    archiveViewReasonSrv(doc)
+  );
+
+  if (price !== null) {
+    archiveViewAddFactSrv(
+      facts,
+      "سعر البيع",
+      `${price.toLocaleString("ar-EG")} جنيه`
+    );
+  }
+
+  archiveViewAddFactSrv(
+    facts,
+    "ملاحظات",
+    doc.notes
+  );
+
+  return facts;
+}
+
+function archiveViewEventFactsSrv(ev = {}) {
+  const facts = [];
+
+  for (const [label, value] of [
+    ["النتيجة", ev.result],
+    ["التشخيص", ev.diagnosis],
+    ["الطريقة", ev.method],
+    ["السبب", ev.reason],
+    ["وقت الشياع", ev.heatTime],
+    ["كود السائل المنوي", ev.semenCode],
+    [
+      "الطلوقة",
+      ev.inseminationSireNumber ||
+      ev.sireNumber
+    ],
+    ["الوزن", ev.weight],
+    [
+      "إجمالي اللبن",
+      ev.totalMilk ||
+      ev.dailyMilk ||
+      ev.milkKg
+    ],
+    ["ملاحظات", ev.notes]
+  ]) {
+    archiveViewAddFactSrv(
+      facts,
+      label,
+      value
+    );
+  }
+
+  return facts;
+}
+
+app.get(
+  "/api/archive",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          rows: [],
+          message:
+            "❌ تعذّر تحميل الأرشيف الآن. حاول مرة أخرى لاحقًا."
+        });
+      }
+
+      const uid =
+        req.userId;
+
+      const requestedFilter =
+        archiveViewStrSrv(
+          req.query.type
+        ).toLowerCase();
+
+      const activeFilter =
+        ["sale", "death"].includes(
+          requestedFilter
+        )
+          ? requestedFilter
+          : "all";
+
+      const searchNumber =
+        archiveNormNumberSrv(
+          req.query.q || ""
+        );
+
+      const snap =
+        await db
+          .collection(
+            "archived_animals"
+          )
+          .where(
+            "userId",
+            "==",
+            uid
+          )
+          .limit(3000)
+          .get();
+
+      const allRows =
+        snap.docs
+          .map(d => {
+            const doc =
+              d.data() || {};
+
+            const animalNumber =
+              archiveNormNumberSrv(
+                doc.animalNumber ||
+                doc.number ||
+                doc.calfNumber ||
+                ""
+              );
+
+            const archiveReason =
+              archiveViewStrSrv(
+                doc.archiveReason
+              ).toLowerCase();
+
+            const salePrice =
+              archiveViewPriceSrv(
+                doc
+              );
+
+            return {
+              archiveId:
+                d.id,
+
+              animalNumber,
+
+              subjectLabel:
+                archiveViewSubjectSrv(
+                  doc
+                ),
+
+              speciesLabel:
+                archiveViewSpeciesSrv(
+                  doc
+                ),
+
+              exitLabel:
+                archiveViewExitSrv(
+                  doc
+                ),
+
+              archiveReason,
+
+              archiveDate:
+                archiveViewDateSrv(
+                  doc.archiveDate
+                ),
+
+              reasonText:
+                archiveViewReasonSrv(
+                  doc
+                ),
+
+              salePrice,
+
+              salePriceText:
+                salePrice === null
+                  ? ""
+                  : `${salePrice.toLocaleString("ar-EG")} جنيه`,
+
+              detailsUrl:
+                `archive.html?id=${encodeURIComponent(d.id)}`,
+
+              _sortMs:
+                archiveViewSortMsSrv(
+                  doc.archiveDate,
+                  doc.archivedAt
+                )
+            };
+          })
+
+          .filter(
+            row =>
+              Boolean(
+                row.animalNumber
+              )
+          )
+
+          .sort(
+            (a, b) =>
+              Number(
+                b._sortMs || 0
+              ) -
+              Number(
+                a._sortMs || 0
+              )
+          );
+
+      const totalSale =
+        allRows.filter(
+          r =>
+            r.archiveReason ===
+            "sale"
+        ).length;
+
+      const totalDeath =
+        allRows.filter(
+          r =>
+            r.archiveReason ===
+            "death"
+        ).length;
+
+      let rows =
+        allRows;
+
+      if (
+        activeFilter !==
+        "all"
+      ) {
+        rows =
+          rows.filter(
+            r =>
+              r.archiveReason ===
+              activeFilter
+          );
+      }
+
+      if (searchNumber) {
+        rows =
+          rows.filter(
+            r =>
+              archiveNormNumberSrv(
+                r.animalNumber
+              ).includes(
+                searchNumber
+              )
+          );
+      }
+
+      rows =
+        rows.map(
+          ({
+            _sortMs,
+            ...row
+          }) => row
+        );
+
+      return res.json({
+        ok: true,
+
+        pageTitle:
+          "أرشيف القطيع",
+
+        activeFilter,
+
+        searchNumber,
+
+        totalCount:
+          allRows.length,
+
+        count:
+          rows.length,
+
+        filters: [
+          {
+            value: "all",
+            label: "الكل",
+            count: allRows.length
+          },
+          {
+            value: "sale",
+            label: "بيع",
+            count: totalSale
+          },
+          {
+            value: "death",
+            label: "نفوق",
+            count: totalDeath
+          }
+        ],
+
+        rows
+      });
+
+    } catch (e) {
+      console.error(
+        "archive.list",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        rows: [],
+        message:
+          "❌ تعذّر تحميل الأرشيف الآن. حاول مرة أخرى."
+      });
+    }
+  }
+);
+
+app.get(
+  "/api/archive/:archiveId",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          message:
+            "❌ تعذّر تحميل بيانات الحيوان المؤرشف الآن."
+        });
+      }
+
+      const uid =
+        req.userId;
+
+      const archiveId =
+        archiveViewStrSrv(
+          req.params.archiveId
+        );
+
+      if (!archiveId) {
+        return res.status(400).json({
+          ok: false,
+          message:
+            "❌ تعذّر تحديد الحيوان المؤرشف."
+        });
+      }
+
+      const animalSnap =
+        await db
+          .collection(
+            "archived_animals"
+          )
+          .doc(
+            archiveId
+          )
+          .get();
+
+      if (!animalSnap.exists) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "❌ الحيوان المؤرشف غير موجود."
+        });
+      }
+
+      const doc =
+        animalSnap.data() || {};
+
+      if (
+        archiveViewStrSrv(
+          doc.userId
+        ) !== uid
+      ) {
+        return res.status(404).json({
+          ok: false,
+          message:
+            "❌ الحيوان المؤرشف غير موجود."
+        });
+      }
+
+      const animalNumber =
+        archiveNormNumberSrv(
+          doc.animalNumber ||
+          doc.number ||
+          doc.calfNumber ||
+          ""
+        );
+
+      const eventSnap =
+        await db
+          .collection(
+            "archived_events"
+          )
+          .where(
+            "archivedAnimalId",
+            "==",
+            archiveId
+          )
+          .limit(2000)
+          .get();
+
+      const events =
+        eventSnap.docs
+          .map(d => ({
+            eventId:
+              d.id,
+
+            ...(d.data() || {})
+          }))
+
+          .filter(
+            ev =>
+              archiveViewStrSrv(
+                ev.userId
+              ) === uid
+          )
+
+          .map(ev => ({
+            eventId:
+              ev.eventId,
+
+            title:
+              archiveViewStrSrv(
+                ev.eventTypeAr ||
+                ev.eventType ||
+                ev.type ||
+                ev.name
+              ) ||
+              "حدث",
+
+            date:
+              archiveViewDateSrv(
+                ev.eventDate ||
+                ev.date
+              ),
+
+            facts:
+              archiveViewEventFactsSrv(
+                ev
+              ),
+
+            _sortMs:
+              archiveViewSortMsSrv(
+                ev.eventDate ||
+                ev.date,
+                ev.createdAt
+              )
+          }))
+
+          .sort(
+            (a, b) =>
+              Number(
+                b._sortMs || 0
+              ) -
+              Number(
+                a._sortMs || 0
+              )
+          )
+
+          .map(
+            ({
+              _sortMs,
+              ...ev
+            }) => ev
+          );
+
+      return res.json({
+        ok: true,
+
+        pageTitle:
+          `أرشيف الحيوان ${animalNumber}`,
+
+        backUrl:
+          "archive.html",
+
+        animal: {
+          archiveId,
+
+          animalNumber,
+
+          subjectLabel:
+            archiveViewSubjectSrv(
+              doc
+            ),
+
+          speciesLabel:
+            archiveViewSpeciesSrv(
+              doc
+            ),
+
+          exitLabel:
+            archiveViewExitSrv(
+              doc
+            ),
+
+          archiveDate:
+            archiveViewDateSrv(
+              doc.archiveDate
+            ),
+
+          reasonText:
+            archiveViewReasonSrv(
+              doc
+            ),
+
+          facts:
+            archiveViewAnimalFactsSrv(
+              doc
+            )
+        },
+
+        eventsCount:
+          events.length,
+
+        events
+      });
+
+    } catch (e) {
+      console.error(
+        "archive.details",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        message:
+          "❌ تعذّر تحميل تفاصيل الحيوان المؤرشف الآن."
+      });
+    }
+  }
+);
 // ============================================================
 //                 API: CULL — SERVER SIDE
 //                 الاستبعاد لا يؤرشف الحيوان
