@@ -35,13 +35,19 @@
       <fieldset>
 <legend>تشخيص الحمل</legend>
 
-<label for="checkTypeDisplay">نوع الفحص</label>
-<input
-  type="text"
-  id="checkTypeDisplay"
-  value="يحدده مُرَبِّيك بعد التحقق"
-  readonly
->
+<div style="margin-bottom:12px">
+  <div class="sub-title">نوع الفحص</div>
+  <div class="radio-group" id="checkTypeGroup">
+    <label>
+     <input type="radio" name="checkType" data-field="checkType" value="initial_pregnancy_diagnosis">
+      تشخيص حمل أولي
+    </label>
+    <label>
+      <input type="radio" name="checkType" data-field="checkType" value="pregnancy_confirmation_120">
+      تأكيد حمل 120 يوم
+    </label>
+  </div>
+</div>
 
 <div class="row">
           <div>
@@ -123,7 +129,7 @@
 </main>
 
 <script type="module">
- // MURABBIK_STATUS: SERVER_DRIVEN | pregnancy-diagnosis.html | gate/save live
+  // MURABBIK_STATUS: UI_ONLY | pregnancy-diagnosis.html | server-side gate/save pending via forms-init
 
   const qp = new URLSearchParams(location.search);
 
@@ -176,7 +182,18 @@ if (animalEl) {
   if (dateEl) {
     dateEl.value = dateFromURL || new Date().toISOString().slice(0, 10);
   }
-  
+  const checkTypeFromURL =
+  qp.get("checkType") ||
+  qp.get("pregnancyCheckType") ||
+  "";
+
+if (checkTypeFromURL) {
+  document.querySelectorAll('input[name="checkType"]').forEach(el => {
+    if (el.value === checkTypeFromURL) {
+      el.checked = true;
+    }
+  });
+}
 function parseNumbers(raw) {
   const map = {
     "٠": "0","١": "1","٢": "2","٣": "3","٤": "4","٥": "5","٦": "6","٧": "7","٨": "8","٩": "9",
@@ -187,32 +204,10 @@ function parseNumbers(raw) {
   return [...new Set((s.match(/\d+/g) || []).map(x => x.trim()).filter(Boolean))];
 }
 const bulkResultState = new Map();
-
-let serverAcceptedNumbers = null;
-let serverAcceptedItems = [];
-let serverCheckType = "";
+  let serverAcceptedNumbers = null;
 
 function resetServerAcceptedNumbers() {
   serverAcceptedNumbers = null;
-  serverAcceptedItems = [];
-
-  if (!requestedEditMode) {
-    serverCheckType = "";
-    applyServerCheckTypeUI();
-  }
-}
-
-function serverAcceptedItemForNumber(number) {
-  const n =
-    String(number || "").trim();
-
-  return (
-    serverAcceptedItems.find(item =>
-      String(
-        item?.animalNumber || ""
-      ).trim() === n
-    ) || null
-  );
 }
 
 function escHtml(v) {
@@ -220,6 +215,18 @@ function escHtml(v) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+function bulkPositiveLabel() {
+  return currentCheckType() === "pregnancy_confirmation_120"
+    ? "مؤكد عشار"
+    : "عشار";
+}
+
+function bulkNegativeLabel() {
+  return currentCheckType() === "pregnancy_confirmation_120"
+    ? "غير عشار / فقد أجنة"
+    : "فارغة";
 }
 
 function syncBulkResultStateFromDom() {
@@ -288,72 +295,32 @@ const resultBlock = resultGroup?.closest("div");
   return;
 }
 
-rows.innerHTML = `
-  <div style="display:grid; gap:8px;">
-    ${nums.map(n => {
-      const current =
-        String(
-          bulkResultState.get(n) || ""
-        ).trim();
+  const posLabel = bulkPositiveLabel();
+  const negLabel = bulkNegativeLabel();
 
-      const meta =
-        serverAcceptedItemForNumber(n);
+  rows.innerHTML = `
+    <div style="display:grid; gap:8px;">
+      ${nums.map(n => {
+        const current = String(bulkResultState.get(n) || "").trim();
 
-      const checkTypeLabel =
-        String(
-          meta?.checkTypeLabel || ""
-        ).trim();
-
-      const posLabel =
-        String(
-          meta?.positiveResultLabel ||
-          "عشار"
-        ).trim();
-
-      const negLabel =
-        String(
-          meta?.negativeResultLabel ||
-          "فارغة"
-        ).trim();
-
-      return `
-        <div style="display:grid; grid-template-columns:80px 1fr; gap:8px; align-items:center; padding:10px; border:1px solid #ddd; border-radius:14px; background:#fff;">
-          <div style="font-weight:900; text-align:center;">${escHtml(n)}</div>
-
-          <div>
-            ${
-              checkTypeLabel
-                ? `<div class="form-hint">${escHtml(checkTypeLabel)}</div>`
-                : ""
-            }
-
+        return `
+          <div style="display:grid; grid-template-columns:80px 1fr; gap:8px; align-items:center; padding:10px; border:1px solid #ddd; border-radius:14px; background:#fff;">
+            <div style="font-weight:900; text-align:center;">${escHtml(n)}</div>
             <div class="radio-group" style="margin:0;">
               <label>
-                <input type="radio"
-                  data-bulk-result="1"
-                  data-number="${escHtml(n)}"
-                  name="bulkResult_${escHtml(n)}"
-                  value="عشار"
-                  ${current === "عشار" ? "checked" : ""}>
+                <input type="radio" data-bulk-result="1" data-number="${escHtml(n)}" name="bulkResult_${escHtml(n)}" value="عشار" ${current === "عشار" ? "checked" : ""}>
                 ${escHtml(posLabel)}
               </label>
-
               <label>
-                <input type="radio"
-                  data-bulk-result="1"
-                  data-number="${escHtml(n)}"
-                  name="bulkResult_${escHtml(n)}"
-                  value="فارغة"
-                  ${current === "فارغة" ? "checked" : ""}>
+                <input type="radio" data-bulk-result="1" data-number="${escHtml(n)}" name="bulkResult_${escHtml(n)}" value="فارغة" ${current === "فارغة" ? "checked" : ""}>
                 ${escHtml(negLabel)}
               </label>
             </div>
           </div>
-        </div>
-      `;
-    }).join("")}
-  </div>
-`;
+        `;
+      }).join("")}
+    </div>
+  `;
 
   rows.querySelectorAll('input[data-bulk-result="1"]').forEach(el => {
     el.addEventListener("change", () => {
@@ -556,94 +523,39 @@ function renderPregnancyFollowupActions(data = {}) {
 function readRadio(form, name) {
   return String(form.querySelector(`input[name="${name}"]:checked`)?.value || "").trim();
 }
-function currentCheckType() {
-  return String(
-    serverCheckType || ""
-  ).trim();
+function currentCheckType(form = document.getElementById("diagnosisForm")) {
+  return readRadio(form, "checkType");
 }
 
-function applyServerCheckTypeUI(
-  data = {}
-) {
-  const checkTypeDisplay =
-    document.getElementById(
-      "checkTypeDisplay"
-    );
+function applyCheckTypeUI() {
+  const form = document.getElementById("diagnosisForm");
+  if (!form) return;
 
-  const positiveLabel =
-    document.getElementById(
-      "positiveResultLabel"
-    );
+  const isConfirmation120 = currentCheckType(form) === "pregnancy_confirmation_120";
 
-  const negativeLabel =
-    document.getElementById(
-      "negativeResultLabel"
-    );
-
-  const saveBtn =
-    document.getElementById(
-      "saveBtn"
-    );
-
-  const incomingCheckType =
-    String(
-      data?.checkType || ""
-    ).trim();
-
-  if (incomingCheckType) {
-    serverCheckType =
-      incomingCheckType;
-  }
-
-  const checkTypeLabel =
-    String(
-      data?.checkTypeLabel || ""
-    ).trim();
-
-  const positiveResultLabel =
-    String(
-      data?.positiveResultLabel || ""
-    ).trim();
-
-  const negativeResultLabel =
-    String(
-      data?.negativeResultLabel || ""
-    ).trim();
-
-  const saveLabel =
-    String(
-      data?.saveLabel || ""
-    ).trim();
-
-  if (checkTypeDisplay) {
-    checkTypeDisplay.value =
-      checkTypeLabel ||
-      "يحدده مُرَبِّيك بعد التحقق";
-  }
+  const positiveLabel = document.getElementById("positiveResultLabel");
+  const negativeLabel = document.getElementById("negativeResultLabel");
+  const saveBtn = document.getElementById("saveBtn");
 
   if (positiveLabel) {
-    positiveLabel.textContent =
-      positiveResultLabel ||
-      "عشار";
+    positiveLabel.textContent = isConfirmation120 ? "مؤكد عشار" : "عشار";
   }
 
   if (negativeLabel) {
-    negativeLabel.textContent =
-      negativeResultLabel ||
-      "فارغة";
+    negativeLabel.textContent = isConfirmation120 ? "غير عشار / فقد أجنة" : "فارغة";
   }
 
   if (saveBtn) {
-    saveBtn.textContent =
-      requestedEditMode
-        ? "حفظ التعديل ✅"
-        : (
-            saveLabel ||
-            "تسجيل التشخيص"
-          );
-  }
-
-  renderBulkResultTable();
+  saveBtn.textContent =
+    requestedEditMode
+      ? "حفظ التعديل ✅"
+      : (
+          isConfirmation120
+            ? "تسجيل تأكيد الحمل"
+            : "تسجيل التشخيص"
+        );
+}
+ renderBulkResultTable();
 }
 function renderOperationalPerformers(items = []) {
   if (!operationalPerformersListEl) return;
@@ -901,26 +813,22 @@ async function loadEditEvent() {
           .slice(0, 10);
     }
 
-serverCheckType =
-  pregnancyCheckType ||
-  "initial_pregnancy_diagnosis";
+    const initialCheck =
+      document.querySelector(
+        'input[name="checkType"][value="initial_pregnancy_diagnosis"]'
+      );
 
-applyServerCheckTypeUI({
-  checkType:
-    serverCheckType,
+    if (initialCheck) {
+      initialCheck.checked = true;
+    }
 
-  checkTypeLabel:
-    "تشخيص حمل أولي",
-
-  positiveResultLabel:
-    "عشار",
-
-  negativeResultLabel:
-    "فارغة",
-
-  saveLabel:
-    "حفظ التعديل ✅"
-});
+    document
+      .querySelectorAll(
+        'input[name="checkType"]'
+      )
+      .forEach(el => {
+        el.disabled = true;
+      });
 
     setPregnancyMethodValue(
       d.pregnancyMethod || ""
@@ -954,22 +862,8 @@ applyServerCheckTypeUI({
       correctionReasonEl.required = true;
     }
 
-    applyServerCheckTypeUI({
-  checkType:
-    serverCheckType,
-
-  checkTypeLabel:
-    "تشخيص حمل أولي",
-
-  positiveResultLabel:
-    "عشار",
-
-  negativeResultLabel:
-    "فارغة",
-
-  saveLabel:
-    "حفظ التعديل ✅"
-});
+    applyCheckTypeUI();
+    renderBulkResultTable();
 
     const title =
       document.querySelector(
@@ -1038,40 +932,13 @@ applyServerCheckTypeUI({
   }
 }
 function collectPayload(form) {
-  const animalNumber =
-    String(
-      document.getElementById(
-        "animalNumber"
-      )?.value || ""
-    ).trim();
+  const animalNumber = String(document.getElementById("animalNumber")?.value || "").trim();
+  const eventDate = String(document.getElementById("eventDate")?.value || "").trim();
+  const vet = String(document.getElementById("vet")?.value || "").trim();
+  const checkType = currentCheckType(form);
 
-  const eventDate =
-    String(
-      document.getElementById(
-        "eventDate"
-      )?.value || ""
-    ).trim();
-
-  const vet =
-    String(
-      document.getElementById(
-        "vet"
-      )?.value || ""
-    ).trim();
-
-  const nums =
-    parseNumbers(
-      animalNumber
-    );
-
-  const isBulk =
-    nums.length > 1 ||
-    qp.get("mode") === "bulk";
-
-  const checkType =
-    isBulk
-      ? ""
-      : currentCheckType();
+  const nums = parseNumbers(animalNumber);
+  const isBulk = nums.length > 1 || qp.get("mode") === "bulk";
   const bulkResults = isBulk ? bulkResultsForNumbers(nums) : [];
   const singleResult = readRadio(form, "result");
   const firstBulkResult = bulkResults[0]?.result || "";
@@ -1161,76 +1028,17 @@ function compactReason(reason) {
     .replace(/\s+/g, " ")
     .trim();
 }
-function applyAcceptedNumbers(
-  data,
-  originalNums
-) {
-  serverAcceptedItems =
-    Array.isArray(data.accepted)
-      ? data.accepted
-      : [];
+function applyAcceptedNumbers(data, originalNums) {
+  const acceptedNums = Array.isArray(data.accepted)
+    ? data.accepted.map(x => String(x.animalNumber || "").trim()).filter(Boolean)
+    : [];
 
-  const acceptedNums =
-    serverAcceptedItems
-      .map(x =>
-        String(
-          x?.animalNumber || ""
-        ).trim()
-      )
-      .filter(Boolean);
-
-  const isBulk =
-    Array.isArray(originalNums) &&
-    originalNums.length > 1;
-
+  const isBulk = Array.isArray(originalNums) && originalNums.length > 1;
   if (!isBulk) return;
 
-  serverAcceptedNumbers =
-    acceptedNums;
+  serverAcceptedNumbers = acceptedNums;
 
-  const checkTypeLabels =
-    [...new Set(
-      serverAcceptedItems
-        .map(x =>
-          String(
-            x?.checkTypeLabel || ""
-          ).trim()
-        )
-        .filter(Boolean)
-    )];
-
-  const checkTypeDisplay =
-    document.getElementById(
-      "checkTypeDisplay"
-    );
-
-  if (checkTypeDisplay) {
-    checkTypeDisplay.value =
-      checkTypeLabels.length
-        ? checkTypeLabels.join(" / ")
-        : "يحدده مُرَبِّيك لكل حيوان";
-  }
-
-  const saveLabels =
-    [...new Set(
-      serverAcceptedItems
-        .map(x =>
-          String(
-            x?.saveLabel || ""
-          ).trim()
-        )
-        .filter(Boolean)
-    )];
-
-  if (saveBtn) {
-    saveBtn.textContent =
-      saveLabels.length === 1
-        ? saveLabels[0]
-        : "تسجيل التشخيص";
-  }
-
-  const allowed =
-    new Set(acceptedNums);
+  const allowed = new Set(acceptedNums);
 
   for (const key of [...bulkResultState.keys()]) {
     if (!allowed.has(key)) {
@@ -1277,31 +1085,10 @@ function renderGateResult(data, nums) {
     );
   }
 
-if (
-  nums.length > 1 &&
-  Array.isArray(data?.accepted)
-) {
-  applyAcceptedNumbers(
-    data,
-    nums
-  );
-
-  return;
-}
-
-if (nums.length === 1) {
-  if (data?.allowed) {
-    applyServerCheckTypeUI(
-      data
-    );
-  } else {
-    serverCheckType = "";
-
-    applyServerCheckTypeUI();
+  if (nums.length > 1 && Array.isArray(data?.accepted)) {
+    applyAcceptedNumbers(data, nums);
   }
 }
-}
-
 async function runGateNow() {
   if (requestedEditMode) return;
 
@@ -1310,22 +1097,20 @@ async function runGateNow() {
       "diagnosisForm"
     );
   if (!form) return;
-  const payload =
-  collectPayload(form);
+  const payload = collectPayload(form);
+  const nums = parseNumbers(payload.animalNumber);
+  renderBulkResultTable();
+  if (!payload.checkType) {
+  showGate("اختر نوع الفحص أولًا، ثم يبدأ التحقق.", "info");
+  return;
+}
 
-const nums =
-  parseNumbers(
-    payload.animalNumber
-  );
-
-renderBulkResultTable();
-
-const gateKey =
-  JSON.stringify({
-    n: nums.join(","),
-    d: payload.eventDate,
-    m: payload.method || ""
-  });
+const gateKey = JSON.stringify({
+  n: nums.join(","),
+  d: payload.eventDate,
+  m: payload.method || "",
+  c: payload.checkType || ""
+});
 
   if (gateKey === lastGateKey) return;
   lastGateKey = gateKey;
@@ -1372,21 +1157,20 @@ document.getElementById("eventDate")?.addEventListener("change", () => {
   scheduleGate();
 });
 
-document
-  .querySelectorAll(
-    'input[name="method"]'
-  )
-  .forEach(el => {
-    el.addEventListener(
-      "change",
-      () => {
-        resetServerAcceptedNumbers();
-        scheduleGate();
-      }
-    );
+document.querySelectorAll('input[name="method"], input[name="checkType"]').forEach(el => {
+  el.addEventListener("change", () => {
+    resetServerAcceptedNumbers();
+    applyCheckTypeUI();
+    scheduleGate();
   });
+});
 
-applyServerCheckTypeUI();
+document.querySelectorAll('input[name="result"]').forEach(el => {
+  el.addEventListener("change", () => {
+    applyCheckTypeUI();
+  });
+});
+applyCheckTypeUI();
 loadOperationalPerformers();
 
 if (requestedEditMode) {
@@ -1578,23 +1362,13 @@ if (requestedEditMode) {
   return;
 }
 
-const isBulk =
-  new URLSearchParams(
-    location.search
-  ).get("mode") === "bulk" ||
-  nums.length > 1;
-
-if (
-  !isBulk &&
-  !currentCheckType()
-) {
-  showMsg(
-    "❌ انتظر نتيجة التحقق من السيرفر أولًا.",
-    "error"
-  );
-
+if (!payload.checkType) {
+  showMsg("❌ اختر نوع الفحص أولًا.", "error");
   return;
 }
+  const isBulk =
+    new URLSearchParams(location.search).get("mode") === "bulk" ||
+    nums.length > 1;
   const saveNums = isBulk
   ? (Array.isArray(serverAcceptedNumbers) ? serverAcceptedNumbers : [])
   : nums;
