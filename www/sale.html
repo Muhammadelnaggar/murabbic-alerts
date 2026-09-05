@@ -25,7 +25,7 @@
 
   <main class="mbk-form">
    <form id="saleForm" data-event="بيع" novalidate>
-    <div id="sysbar" class="infobar mbk-infobar"></div>
+    <div id="sysbar" class="infobar mbk-infobar" hidden></div>
     <section class="mbk-card">
     <label>رقم الحيوان</label>
     <input id="animalNumber" data-field="animalNumber" readonly />
@@ -224,7 +224,7 @@ loadSaleReasonOptions();
     if (!bar) return;
 
     bar.className = "infobar mbk-infobar show " + (ok ? "success" : "error");
-    bar.style.display = "block";
+    bar.hidden = false;
     bar.textContent = t;
 
     try { bar.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
@@ -281,9 +281,17 @@ loadSaleReasonOptions();
 
       msg(data.message || "✅ تم أرشفة الحيوان وأحداثه بعد البيع.", true);
 
-      setTimeout(() => {
-        location.href = "add-event.html";
-      }, 900);
+      const redirectUrl =
+  String(
+    data?.redirectUrl || ""
+  ).trim();
+
+if (redirectUrl) {
+  setTimeout(() => {
+    location.href =
+      redirectUrl;
+  }, 900);
+}
 
     } catch (err) {
       console.error(err);
