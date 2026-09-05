@@ -95337,7 +95337,6 @@ function archiveAnimalIsActiveSrv(doc = {}) {
     doc.animalStatus,
     doc.statusAr,
     doc.saleStatus,
-    doc.fate,
     doc.exitReason,
     doc.inactiveReason,
     doc.archiveReason
