@@ -191,8 +191,9 @@
       type="submit"
       form="uterineCheckForm"
       id="saveBtn"
-      class="save"
-    >
+class="save"
+disabled
+>
       تسجيل فحص الرحم
     </button>
   </div>
@@ -696,97 +697,95 @@ async function loadEditEvent() {
         params.get("date") ||
         "";
     }
-
-    async function runGate() {
+async function runGate() {
   if (requestedEditMode) {
     return;
   }
 
+  saveBtn.disabled = true;
+  checkStageSelect.value = "";
+
   const payload =
     collectPayload();
-      if (
-        !payload.animalNumber ||
-        !payload.eventDate
-      ) {
-        showMessage("");
-        return;
+
+  if (
+    !payload.animalNumber ||
+    !payload.eventDate
+  ) {
+    showMessage("");
+    return;
+  }
+
+  try {
+    const {
+      response,
+      data
+    } = await requestJSON(
+      "/api/uterine-check/gate",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+
+        body:
+          JSON.stringify(
+            payload
+          )
       }
+    );
 
-      try {
-        const {
-          response,
-          data
-        } = await requestJSON(
-          "/api/uterine-check/gate",
-          {
-            method: "POST",
+    if (
+      !response.ok ||
+      data.ok === false ||
+      data.allowed === false
+    ) {
+      saveBtn.disabled = true;
+      checkStageSelect.value = "";
 
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
-
-            body:
-              JSON.stringify(
-                payload
-              )
-          }
-        );
-
-        if (
-          !response.ok ||
-          data.ok === false
-        ) {
-          showMessage(
-            data.message ||
-            "تعذّر التحقق من الحيوان.",
-            false
-          );
-
-          return;
-        }
-
-        if (
-          data.allowed === false
-        ) {
-          if (!data.silent) {
-            showMessage(
-              data.message ||
-              "لا يمكن تسجيل الفحص.",
-              false
-            );
-          }
-
-          return;
-        }
-
-               if (data.suggestedStage) {
-          checkStageSelect.value =
-            data.suggestedStage;
-        }
-
-        const text = [
-          data.message,
-          data.advisory
-        ]
-          .filter(Boolean)
-          .join(" ");
-
-                showMessage(
-          text,
-          true,
-          null,
-          data.advisoryTone || ""
-        );
-
-      } catch (error) {
+      if (!data.silent) {
         showMessage(
-          error.message ||
+          data.message ||
           "تعذّر التحقق من الحيوان.",
           false
         );
       }
+
+      return;
     }
+
+    checkStageSelect.value =
+      data.suggestedStage || "";
+
+    saveBtn.disabled = false;
+
+    const text = [
+      data.message,
+      data.advisory
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    showMessage(
+      text,
+      true,
+      null,
+      data.advisoryTone || ""
+    );
+
+  } catch (error) {
+    saveBtn.disabled = true;
+    checkStageSelect.value = "";
+
+    showMessage(
+      error.message ||
+      "تعذّر التحقق من الحيوان.",
+      false
+    );
+  }
+}
 
     animalNumberInput
       .addEventListener(
