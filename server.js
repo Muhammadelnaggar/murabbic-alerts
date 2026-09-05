@@ -95321,7 +95321,47 @@ function archiveNormNumberSrv(v) {
     .replace(/[٠-٩۰-۹]/g, d => map[d] || d)
     .replace(/[^\d]/g, "");
 }
+function archiveAnimalIsActiveSrv(doc = {}) {
+  if (
+    doc.active === false ||
+    doc.isActive === false ||
+    doc.inactive === true ||
+    doc.archived === true
+  ) {
+    return false;
+  }
 
+  const statusText = [
+    doc.status,
+    doc.lifeStatus,
+    doc.animalStatus,
+    doc.statusAr,
+    doc.saleStatus,
+    doc.fate,
+    doc.exitReason,
+    doc.inactiveReason,
+    doc.archiveReason
+  ]
+    .map(v => String(v || "").trim().toLowerCase())
+    .filter(Boolean)
+    .join(" ");
+
+  return ![
+    "inactive",
+    "archived",
+    "dead",
+    "death",
+    "sold",
+    "sale",
+    "نافق",
+    "نفوق",
+    "مباع",
+    "بيع",
+    "مؤرشف",
+    "غير نشط",
+    "خارج القطيع"
+  ].some(token => statusText.includes(token));
+}
 async function archiveFindAnimalSrv(
   uid,
   animalNumber,
@@ -95433,6 +95473,99 @@ async function archiveCommitOpsSrv(ops = []) {
 
   if (n > 0) await batch.commit();
 }
+// ============================================================
+//                 API: SALE REASONS OPTIONS
+//                 تحميل/حفظ أسباب البيع من السيرفر فقط
+// ============================================================
+
+function archiveSaleReasonKeySrv(uid, label) {
+  const clean = String(label || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[\/\\#?\[\]]/g, "_")
+    .slice(0, 100);
+
+  return `${uid}__${clean}`;
+}
+
+async function archiveSaveSaleReasonOptionSrv(uid, label) {
+  try {
+    const clean = String(label || "").trim();
+    if (!db || !uid || !clean) return false;
+
+    const key = archiveSaleReasonKeySrv(uid, clean);
+
+    await db.collection("sale_reasons").doc(key).set({
+      userId: uid,
+      label: clean,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    return true;
+
+  } catch (e) {
+    console.error("sale-reason option save failed", e);
+    return false;
+  }
+}
+
+app.get("/api/sale-reasons/options", requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        reasons: [],
+        message: "قاعدة البيانات غير متاحة الآن."
+      });
+    }
+
+    const uid = req.userId;
+
+    const snap = await db.collection("sale_reasons")
+      .where("userId", "==", uid)
+      .limit(200)
+      .get();
+
+    const defaultReasons = [
+      "ذبح اضطراري",
+      "استبعاد",
+      "حادثة"
+    ];
+
+    const reasons = [...defaultReasons];
+
+    snap.forEach(d => {
+      const x = d.data() || {};
+      const label = String(x.label || "").trim();
+
+      if (
+        label &&
+        !reasons.includes(label)
+      ) {
+        reasons.push(label);
+      }
+    });
+
+    reasons.sort(
+      (a, b) => a.localeCompare(b, "ar")
+    );
+
+    return res.json({
+      ok: true,
+      reasons
+    });
+
+  } catch (e) {
+    console.error("sale-reasons options", e);
+
+    return res.status(500).json({
+      ok: false,
+      reasons: [],
+      message: "تعذّر تحميل أسباب البيع الآن."
+    });
+  }
+});
 // ============================================================
 //                 API: DEATH REASONS OPTIONS
 //                 تحميل/حفظ أسباب النفوق من السيرفر فقط
@@ -95565,8 +95698,7 @@ app.post("/api/animals/archive/gate", requireUserId, async (req, res) => {
     uid,
     animalNumber,
     {
-      includeCalves:
-        archiveReason === "death"
+      includeCalves: true
     }
   );
 
@@ -95579,15 +95711,14 @@ app.post("/api/animals/archive/gate", requireUserId, async (req, res) => {
     }
 
     const doc = animal.data || {};
-    const st = String(doc.status || "active").trim().toLowerCase();
 
-    if (st !== "active") {
-      return res.status(400).json({
-        ok: false,
-        allowed: false,
-       message: "❌ الحيوان خارج القطيع أو سبق تسجيل خروجه.",
-      });
-    }
+if (!archiveAnimalIsActiveSrv(doc)) {
+  return res.status(400).json({
+    ok: false,
+    allowed: false,
+    message: "❌ الحيوان خارج القطيع أو سبق تسجيل خروجه.",
+  });
+}
 
     return res.json({
         ok: true,
@@ -95596,6 +95727,15 @@ app.post("/api/animals/archive/gate", requireUserId, async (req, res) => {
         animal: {
         id: animal.id,
         animalNumber,
+
+        sourceCollection:
+          animal._collection || "animals",
+
+        cardUrl:
+          animal._collection === "calves"
+            ? `calf-card.html?number=${encodeURIComponent(animalNumber)}`
+            : `cow-card.html?number=${encodeURIComponent(animalNumber)}`,
+
         number: String(doc.number || animalNumber),
         lactationNumber: Number(doc.lactationNumber || 0) || null,
         animalType: doc.animalType || doc.animaltype || null,
@@ -95656,30 +95796,60 @@ if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
   });
 }
 
-if (archiveReason === "death") {
-  const todayISO =
-    await farmTodayISOSrv(
-      req.authSession?.uid ||
-      req.userId
-    );
+const todayISO =
+  await farmTodayISOSrv(
+    req.authSession?.uid ||
+    req.userId
+  );
 
-  if (eventDate > todayISO) {
-    return res.status(400).json({
-      ok: false,
-      message:
-        "❌ تاريخ النفوق لا يمكن أن يكون في المستقبل."
-    });
-  }
+if (eventDate > todayISO) {
+  return res.status(400).json({
+    ok: false,
+
+    message:
+      archiveReason === "sale"
+        ? "❌ تاريخ البيع لا يمكن أن يكون في المستقبل."
+        : "❌ تاريخ النفوق لا يمكن أن يكون في المستقبل."
+  });
 }
 
+let normalizedSalePrice = null;
+
 if (archiveReason === "sale") {
-  const saleReason = String(body.saleReason || "").trim();
+  const saleReason =
+    String(
+      body.saleReason || ""
+    ).trim();
 
   if (!saleReason) {
     return res.status(400).json({
       ok: false,
-      message: "أدخل سبب البيع.",
+      message: "أدخل سبب البيع."
     });
+  }
+
+  const rawPrice =
+    String(
+      body.price ?? ""
+    ).trim();
+
+  if (rawPrice) {
+    const parsedPrice =
+      Number(rawPrice);
+
+    if (
+      !Number.isFinite(parsedPrice) ||
+      parsedPrice <= 0
+    ) {
+      return res.status(400).json({
+        ok: false,
+        message:
+          "أدخل سعر بيع صحيحًا أكبر من صفر أو اتركه فارغًا."
+      });
+    }
+
+    normalizedSalePrice =
+      parsedPrice;
   }
 }
     if (archiveReason === "death") {
@@ -95697,8 +95867,7 @@ if (archiveReason === "sale") {
     uid,
     animalNumber,
     {
-      includeCalves:
-        archiveReason === "death"
+      includeCalves: true
     }
   );
 
@@ -95712,14 +95881,7 @@ if (archiveReason === "sale") {
 const doc =
   animal.data || {};
 
-const st =
-  String(
-    doc.status || "active"
-  )
-    .trim()
-    .toLowerCase();
-
-if (st !== "active") {
+if (!archiveAnimalIsActiveSrv(doc)) {
   return res.status(400).json({
     ok: false,
     message:
@@ -95754,14 +95916,20 @@ const archiveId =
         originalAnimalDocId: animal.id,
         originalAnimalPath: animal.ref.path,
 
-        salePrice: archiveReason === "sale" ? (Number(body.price) || null) : null,
+        salePrice:
+  archiveReason === "sale"
+    ? normalizedSalePrice
+    : null,
         saleReason: archiveReason === "sale" ? String(body.saleReason || "").trim() : null,
 
         deathReason: archiveReason === "death"
   ? String(body.reason || body.deathReason || "").trim()
   : null,
 
-        season: Number(body.season) || null,
+        season:
+  archiveReason === "sale"
+    ? (Number(doc.lactationNumber) || null)
+    : (Number(body.season) || null),
         notes: String(body.notes || "").trim() || null
       },
       options: { merge: true }
@@ -95799,7 +95967,12 @@ const archiveId =
     ops.push({ type: "delete", ref: animal.ref });
 
 await archiveCommitOpsSrv(ops);
-
+if (archiveReason === "sale") {
+  await archiveSaveSaleReasonOptionSrv(
+    uid,
+    String(body.saleReason || "").trim()
+  );
+}
 if (archiveReason === "death") {
   await archiveSaveDeathReasonOptionSrv(
     uid,
@@ -95896,16 +96069,17 @@ app.post("/api/cull/gate", requireUserId, async (req, res) => {
       });
     }
 
-    const doc = animal.data || {};
-    const st = String(doc.status || "active").trim().toLowerCase();
+   
+const doc = animal.data || {};
+const st = String(doc.status || "active").trim().toLowerCase();
 
-    if (st !== "active") {
-      return res.status(400).json({
-        ok: false,
-        allowed: false,
-        message: "❌ الحيوان غير موجود في القطيع."
-      });
-    }
+if (st !== "active") {
+  return res.status(400).json({
+    ok: false,
+    allowed: false,
+    message: "❌ الحيوان غير موجود في القطيع."
+  });
+}
     const cullStatus =
   String(
     doc.cullStatus || ""
@@ -96009,15 +96183,15 @@ if (eventDate > todayISO) {
       });
     }
 
-    const doc = animal.data || {};
-    const st = String(doc.status || "active").trim().toLowerCase();
+const doc = animal.data || {};
+const st = String(doc.status || "active").trim().toLowerCase();
 
-    if (st !== "active") {
-      return res.status(400).json({
-        ok: false,
-        message: "❌ الحيوان غير موجود في القطيع."
-      });
-    }
+if (st !== "active") {
+  return res.status(400).json({
+    ok: false,
+    message: "❌ الحيوان غير موجود في القطيع."
+  });
+}
     const cullStatus =
   String(
     doc.cullStatus || ""
