@@ -19837,11 +19837,17 @@ else if (
           });
         }
 
+               const firstReproductiveEvent =
+          uterineCheckFirstReproductiveEventAfterCalvingSrv(
+            docs,
+            lastCalvingDate,
+            eventDate
+          );
+
         const stage =
-          uterineCheckStageSrv(
-            postpartumDays < 30
-              ? "day_14_initial"
-              : "day_30_followup"
+          uterineCheckStageDecisionSrv(
+            postpartumDays,
+            firstReproductiveEvent
           );
 
         eventPatch = {
@@ -31792,6 +31798,11 @@ const UTERINE_CHECK_STAGES_SRV = Object.freeze([
     value: "day_30_followup",
     label: "فحص المتابعة — 30 يومًا بعد الولادة",
     dueDay: 30
+  },
+  {
+    value: "clinical_check",
+    label: "فحص سريري للرحم",
+    dueDay: null
   }
 ]);
 
@@ -31879,7 +31890,108 @@ function uterineCheckResultSrv(value) {
     item => item.value === value
   ) || null;
 }
+const UTERINE_CHECK_STAGE_END_EVENT_TYPES_SRV = new Set([
+  "heat",
+  "insemination",
+  "pregnancy_diagnosis",
+  "abortion",
+  "embryonic_loss",
+  "ovsynch"
+]);
 
+function uterineCheckFirstReproductiveEventAfterCalvingSrv(
+  rows = [],
+  lastCalvingDate = "",
+  eventDate = ""
+) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter(row => {
+      const data = row?.data || {};
+      const d =
+        eventsPageListDateSrv(data);
+
+      const typeKey =
+        eventsPageNormalizeTypeKeySrv(data);
+
+      return (
+        d &&
+        d > lastCalvingDate &&
+        d <= eventDate &&
+        UTERINE_CHECK_STAGE_END_EVENT_TYPES_SRV
+          .has(typeKey)
+      );
+    })
+    .sort(
+      eventsPageCorrectionCompareSrv
+    )[0] || null;
+}
+
+function uterineCheckReproductiveStatusAtDateSrv(
+  rows = [],
+  animalData = {},
+  lastCalvingDate = "",
+  eventDate = ""
+) {
+  const statusRows =
+    (Array.isArray(rows) ? rows : [])
+      .filter(row => {
+        const data =
+          row?.data || {};
+
+        const d =
+          eventsPageListDateSrv(data);
+
+        return (
+          d &&
+          d >= lastCalvingDate &&
+          d <= eventDate &&
+          !!eventsPageCorrectionReproStatusFromEventSrv(
+            data
+          )
+        );
+      })
+      .sort(
+        eventsPageCorrectionCompareSrv
+      );
+
+  const latest =
+    statusRows.at(-1) || null;
+
+  if (latest) {
+    return String(
+      eventsPageCorrectionReproStatusFromEventSrv(
+        latest.data || {}
+      ) || ""
+    ).trim();
+  }
+
+  return String(
+    animalData.reproductiveStatus ||
+    animalData.reproStatus ||
+    ""
+  ).trim();
+}
+
+function uterineCheckStageDecisionSrv(
+  postpartumDays,
+  firstReproductiveEvent = null
+) {
+  if (postpartumDays < 30) {
+    return uterineCheckStageSrv(
+      "day_14_initial"
+    );
+  }
+
+  if (firstReproductiveEvent) {
+    return uterineCheckStageSrv(
+      "clinical_check"
+    );
+  }
+
+  return uterineCheckStageSrv(
+    "day_30_followup"
+  );
+}
 function uterineCheckIsFollowerSrv(animal = {}) {
   const entryType = String(
     animal.entryType || ""
@@ -31987,12 +32099,61 @@ async function uterineCheckContextSrv(req, fd) {
     };
   }
 
+    const eventRows =
+    await eventsPageFetchAnimalEventsSrv(
+      uid,
+      fd.animalNumber
+    );
+
+  const reproductiveStatus =
+    uterineCheckReproductiveStatusAtDateSrv(
+      eventRows,
+      animalData,
+      lastCalvingDate,
+      fd.eventDate
+    );
+
+  if (
+    pregnancyDiagnosisIsInseminatedStatusSrv(
+      reproductiveStatus
+    ) ||
+    pregnancyDiagnosisIsPregnantStatusSrv(
+      reproductiveStatus
+    )
+  ) {
+    return {
+      ok: false,
+      status: 409,
+      error:
+        "uterine_check_reproductive_status_blocked",
+
+      message:
+        `❌ لا يمكن تسجيل فحص الرحم للحيوان رقم ${fd.animalNumber} لأن حالته التناسلية الحالية «${reproductiveStatus}».`
+    };
+  }
+
+  const firstReproductiveEvent =
+    uterineCheckFirstReproductiveEventAfterCalvingSrv(
+      eventRows,
+      lastCalvingDate,
+      fd.eventDate
+    );
+
+  const stage =
+    uterineCheckStageDecisionSrv(
+      postpartumDays,
+      firstReproductiveEvent
+    );
+
   return {
     ok: true,
     animal,
     animalData,
     lastCalvingDate,
-    postpartumDays
+    postpartumDays,
+    reproductiveStatus,
+    firstReproductiveEvent,
+    stage
   };
 }
 
@@ -32085,16 +32246,25 @@ app.post(
       }
 
       const suggestedStage =
-        context.postpartumDays < 30
-          ? "day_14_initial"
-          : "day_30_followup";
+        context.stage.value;
+
+      const firstReproductiveEventDate =
+        context.firstReproductiveEvent
+          ? eventsPageListDateSrv(
+              context.firstReproductiveEvent.data || {}
+            )
+          : "";
 
       const advisory =
-  context.postpartumDays < 14
-    ? "⚠️ فحص الرحم قبل 14 يومًا قد يكون مضللًا في تقييم ارتداد الرحم. يمكن التسجيل مع إعادة التقييم لاحقًا."
-    : context.postpartumDays < 30
-      ? "هذا التوقيت يقع ضمن متابعة الفحص الأولي بعد الولادة."
-      : "هذا التوقيت مناسب لفحص المتابعة بعد 30 يومًا من الولادة.";
+        context.postpartumDays < 14
+          ? "⚠️ فحص الرحم قبل 14 يومًا قد يكون مضللًا في تقييم ارتداد الرحم. يمكن التسجيل مع إعادة التقييم لاحقًا."
+          : suggestedStage ===
+              "day_14_initial"
+            ? "هذا التوقيت يقع ضمن مرحلة الفحص الأولي بعد الولادة."
+            : suggestedStage ===
+                "day_30_followup"
+              ? "هذا التوقيت يقع ضمن مرحلة فحص المتابعة بعد 30 يومًا من الولادة."
+              : `انتهت مرحلة فحص المتابعة بعد 30 يومًا بوجود حدث تناسلي بتاريخ ${firstReproductiveEventDate}؛ يُسجّل هذا الفحص كفحص سريري للرحم.`;
 
       return res.json({
         ok: true,
@@ -32103,13 +32273,21 @@ app.post(
         message:
           `✅ الحيوان رقم ${fd.animalNumber} عمره بعد الولادة ${context.postpartumDays} يومًا، ويمكن تسجيل فحص الرحم الآن.`,
 
-               advisory,
+        advisory,
+
         advisoryTone:
           context.postpartumDays < 14
             ? "warning"
-            : "success",
-        animalNumber: fd.animalNumber,
-        eventDate: fd.eventDate,
+            : suggestedStage ===
+                "clinical_check"
+              ? "info"
+              : "success",
+
+        animalNumber:
+          fd.animalNumber,
+
+        eventDate:
+          fd.eventDate,
 
         lastCalvingDate:
           context.lastCalvingDate,
@@ -32118,6 +32296,7 @@ app.post(
           context.postpartumDays,
 
         suggestedStage,
+
         options:
           uterineCheckOptionsSrv()
       });
@@ -32206,12 +32385,8 @@ app.post(
           });
       }
 
-      const stage =
-        uterineCheckStageSrv(
-          context.postpartumDays < 30
-            ? "day_14_initial"
-            : "day_30_followup"
-        );
+         const stage =
+        context.stage;
       const duplicate =
         await healthDuplicateSameDayDetailsSrv(
           uid,
@@ -32297,7 +32472,11 @@ app.post(
         animalPatch
           .lastUterineCheck14EventId =
             eventRef.id;
-      } else {
+
+      } else if (
+        stage.value ===
+        "day_30_followup"
+      ) {
         animalPatch
           .lastUterineCheck30Date =
             fd.eventDate;
@@ -32310,6 +32489,7 @@ app.post(
           .lastUterineCheck30EventId =
             eventRef.id;
       }
+
 
       const batch = db.batch();
 
