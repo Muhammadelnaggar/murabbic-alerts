@@ -30941,63 +30941,6 @@ function pregnancyDiagnosisIsInseminatedStatusSrv(v) {
 
   return n.includes("ملقح");
 }
-
-function pregnancyDiagnosisResolveCheckTypeSrv(
-  reproductiveStatus = ""
-) {
-  if (
-    pregnancyDiagnosisIsPregnantStatusSrv(
-      reproductiveStatus
-    )
-  ) {
-    return "pregnancy_confirmation_120";
-  }
-
-  if (
-    pregnancyDiagnosisIsInseminatedStatusSrv(
-      reproductiveStatus
-    )
-  ) {
-    return "initial_pregnancy_diagnosis";
-  }
-
-  return "";
-}
-
-function pregnancyDiagnosisCheckTypeUiSrv(
-  checkType = ""
-) {
-  const type =
-    String(checkType || "").trim();
-
-  const isConfirmation120 =
-    type ===
-    "pregnancy_confirmation_120";
-
-  return {
-    checkType: type,
-
-    checkTypeLabel:
-      isConfirmation120
-        ? "تأكيد حمل 120 يوم"
-        : "تشخيص حمل أولي",
-
-    positiveResultLabel:
-      isConfirmation120
-        ? "مؤكد عشار"
-        : "عشار",
-
-    negativeResultLabel:
-      isConfirmation120
-        ? "غير عشار / فقد أجنة"
-        : "فارغة",
-
-    saveLabel:
-      isConfirmation120
-        ? "تسجيل تأكيد الحمل"
-        : "تسجيل التشخيص"
-  };
-}
 function pregnancyDiagnosisDecisionSrv(fd) {
   const doc = fd.documentData;
  if (!doc) return "❌ تعذّر قراءة بيانات الحيوان الآن.";
@@ -31008,9 +30951,9 @@ function pregnancyDiagnosisDecisionSrv(fd) {
   }
 
   const rsRaw = String(
-  fd.reproStatusFromEvents ||
-  fd.reproductiveStatus ||
   doc.reproductiveStatus ||
+  fd.reproductiveStatus ||
+  fd.reproStatusFromEvents ||
   ""
 ).trim();
 
@@ -31269,52 +31212,33 @@ app.post("/api/pregnancy-diagnosis/gate", requireUserId, async (req, res) => {
         continue;
       }
 
-const reproFromEvents =
-  String(
-    signals.reproStatusFromEvents || ""
-  ).trim();
+      const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+      const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+      const reproStatus = reproFromDoc || reproFromEvents || "";
+      const reproNorm = calvingStripArSrv(reproStatus);
+      const isConfirmation120 = pregnancyDiagnosisIsConfirmation120Srv(body);
 
-const reproFromDoc =
-  String(
-    doc.reproductiveStatus || ""
-  ).trim();
-
-const reproStatus =
-  reproFromEvents ||
-  reproFromDoc ||
-  "";
-
-const resolvedCheckType =
-  pregnancyDiagnosisResolveCheckTypeSrv(
-    reproStatus
-  );
-
-if (!resolvedCheckType) {
-  const shown =
-    reproStatus
-      ? `«${reproStatus}»`
-      : "غير معروفة";
-
-  rejected.push({
-    animalNumber,
-    animalId: animal.id || "",
-
-    reason:
-      `❌ لا يمكن تسجيل تشخيص حمل لـ${animalLabel} ` +
-      `لأن حالتها التناسلية الحالية ${shown}.`
-  });
-
-  continue;
+      if (isConfirmation120) {
+      if (!pregnancyDiagnosisIsPregnantStatusSrv(reproStatus)) {
+      const shown = reproStatus ? `«${reproStatus}»` : "غير معروفة";
+      rejected.push({
+      animalNumber,
+      animalId: animal.id || "",
+     reason: `❌ لا يمكن تأكيد الحمل بعد 120 يومًا لأن ${animalLabel} ليست مسجلة عِشار. الحالة الحالية: ${shown}.`
+    });
+    continue;
+  }
+} else {
+  if (!pregnancyDiagnosisIsInseminatedStatusSrv(reproStatus)) {
+    const shown = reproStatus ? `«${reproStatus}»` : "غير معروفة";
+    rejected.push({
+      animalNumber,
+      animalId: animal.id || "",
+     reason: `❌ لا يمكن تشخيص الحمل لأن ${animalLabel} ليست مسجلة ملقحة. الحالة الحالية: ${shown}.`
+    });
+    continue;
+  }
 }
-
-const checkTypeUi =
-  pregnancyDiagnosisCheckTypeUiSrv(
-    resolvedCheckType
-  );
-
-const isConfirmation120 =
-  resolvedCheckType ===
-  "pregnancy_confirmation_120";
 
       const lastInseminationDate = String(
         signals.lastInseminationDateFromEvents ||
@@ -31384,43 +31308,15 @@ if (diff < minDays) {
       }
 
       accepted.push({
-  animalNumber,
-  animalId: animal.id || "",
-  species,
-
-  reproductiveStatus:
-    reproStatus || "",
-
-  lastInseminationDate,
-
-  daysSinceInsemination:
-    diff,
-
-  method:
-    hasMethod
-      ? method
-      : "",
-
-  checkType:
-    resolvedCheckType,
-
-  checkTypeLabel:
-    checkTypeUi.checkTypeLabel,
-
-  positiveResultLabel:
-    checkTypeUi.positiveResultLabel,
-
-  negativeResultLabel:
-    checkTypeUi.negativeResultLabel,
-
-  saveLabel:
-    checkTypeUi.saveLabel,
-
-  stage:
-    hasMethod
-      ? "method_gate"
-      : "pre_gate"
-});
+        animalNumber,
+        animalId: animal.id || "",
+        species,
+        reproductiveStatus: reproStatus || "",
+        lastInseminationDate,
+        daysSinceInsemination: diff,
+        method: hasMethod ? method : "",
+        stage: hasMethod ? "method_gate" : "pre_gate"
+      });
     }
 
     const acceptedCount = accepted.length;
@@ -31459,23 +31355,7 @@ if (diff < minDays) {
         lastInseminationDate: a0.lastInseminationDate || "",
         daysSinceInsemination: a0.daysSinceInsemination,
         method: a0.method || "",
-
-checkType:
-  a0.checkType || "",
-
-checkTypeLabel:
-  a0.checkTypeLabel || "",
-
-positiveResultLabel:
-  a0.positiveResultLabel || "",
-
-negativeResultLabel:
-  a0.negativeResultLabel || "",
-
-saveLabel:
-  a0.saveLabel || "",
-
-acceptedCount,
+        acceptedCount,
         rejectedCount,
         accepted,
         rejected
@@ -31582,27 +31462,11 @@ fieldErrors: {
     if (/cow|بقر/i.test(species)) species = "أبقار";
     if (/buffalo|جاموس/i.test(species)) species = "جاموس";
 
-    const reproFromEvents =
-  String(
-    signals.reproStatusFromEvents || ""
-  ).trim();
+    const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+    const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+    const reproStatus = reproFromDoc || reproFromEvents || "";
 
-const reproFromDoc =
-  String(
-    doc.reproductiveStatus || ""
-  ).trim();
-
-const reproStatus =
-  reproFromEvents ||
-  reproFromDoc ||
-  "";
-
-const resolvedCheckType =
-  pregnancyDiagnosisResolveCheckTypeSrv(
-    reproStatus
-  );
-
-const lastInseminationDate = String(
+    const lastInseminationDate = String(
       signals.lastInseminationDateFromEvents ||
       doc.lastInseminationDate ||
       ""
@@ -31619,18 +31483,8 @@ const lastInseminationDate = String(
       reproStatusFromEvents: reproFromEvents,
       lastInseminationDate,
       method,
-result,
-
-checkType:
-  resolvedCheckType,
-
-pregnancyCheckType:
-  resolvedCheckType,
-
-lastBoundary:
-  String(
-    signals.lastBoundary || ""
-  ).trim(),
+      result,
+      lastBoundary: String(signals.lastBoundary || "").trim(),
       lastBoundaryType: String(signals.lastBoundaryType || "").trim()
     };
 
@@ -37718,31 +37572,14 @@ app.post("/api/pregnancy-diagnosis/bulk-save", requireUserId, async (req, res) =
       if (/cow|بقر/i.test(species)) species = "أبقار";
       if (/buffalo|جاموس/i.test(species)) species = "جاموس";
 
-      const reproFromEvents =
-  String(
-    signals.reproStatusFromEvents || ""
-  ).trim();
-
-const reproFromDoc =
-  String(
-    doc.reproductiveStatus || ""
-  ).trim();
-
-const reproStatus =
-  reproFromEvents ||
-  reproFromDoc ||
-  "";
-
-const resolvedCheckType =
-  pregnancyDiagnosisResolveCheckTypeSrv(
-    reproStatus
-  );
-
-const lastInseminationDate = String(
-  signals.lastInseminationDateFromEvents ||
-  doc.lastInseminationDate ||
-  ""
-).trim();
+      const reproFromEvents = String(signals.reproStatusFromEvents || "").trim();
+      const reproFromDoc = String(doc.reproductiveStatus || "").trim();
+     const reproStatus = reproFromDoc || reproFromEvents || "";
+      const lastInseminationDate = String(
+        signals.lastInseminationDateFromEvents ||
+        doc.lastInseminationDate ||
+        ""
+      ).trim();
 
       const gateData = {
         animalNumber,
@@ -37755,11 +37592,11 @@ const lastInseminationDate = String(
         lastInseminationDate,
         method,
         result,
-        checkType:
-  resolvedCheckType,
-
-pregnancyCheckType:
-  resolvedCheckType,
+        checkType: pregnancyDiagnosisCheckTypeSrv(body),
+        diagnosisType: body.diagnosisType,
+        examType: body.examType,
+        pregnancyCheckType: body.pregnancyCheckType,
+        confirmationType: body.confirmationType,
         lastBoundary: String(signals.lastBoundary || "").trim(),
         lastBoundaryType: String(signals.lastBoundaryType || "").trim()
       };
