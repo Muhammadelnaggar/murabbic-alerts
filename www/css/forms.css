@@ -8786,3 +8786,142 @@ html[data-page="archive"] #countBar{
     font-size:13px;
   }
 }
+/* =========================================================
+   Murabbik Herd Archive — Detail Tables
+   ========================================================= */
+
+html[data-page="archive"] #detailView{
+  width:100%;
+  min-width:0;
+}
+
+html[data-page="archive"] #detailView > h2{
+  margin:16px 0 10px;
+  color:#0f172a;
+  font-size:19px;
+  font-weight:900;
+}
+
+html[data-page="archive"] .archive-detail-table-wrap,
+html[data-page="archive"] .archive-events-table-wrap{
+  width:100%;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  direction:rtl;
+  background:#fff;
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:12px;
+}
+
+
+/* بيانات الحيوان */
+
+html[data-page="archive"] #archiveAnimalTable{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+}
+
+html[data-page="archive"] #archiveAnimalTable th,
+html[data-page="archive"] #archiveAnimalTable td{
+  padding:10px 12px;
+  border-bottom:1px solid #e5ece7;
+  border-left:1px solid #edf2ee;
+  text-align:center;
+  font-size:14px;
+}
+
+html[data-page="archive"] #archiveAnimalTable th{
+  background:#eaf6ee;
+  color:#0b7f47;
+  font-weight:900;
+}
+
+html[data-page="archive"] #archiveAnimalTable td:first-child{
+  font-weight:800;
+}
+
+html[data-page="archive"] #archiveAnimalTable td:last-child{
+  font-weight:900;
+}
+
+
+/* الأحداث */
+
+html[data-page="archive"] #archiveEventsTable{
+  width:100%;
+  min-width:760px;
+  border-collapse:separate;
+  border-spacing:0;
+  table-layout:fixed;
+  direction:rtl;
+}
+
+html[data-page="archive"] #archiveEventsTable th,
+html[data-page="archive"] #archiveEventsTable td{
+  padding:10px 8px;
+  border-bottom:1px solid #e5ece7;
+  border-left:1px solid #edf2ee;
+  background:#fff;
+  text-align:center;
+  vertical-align:middle;
+  white-space:nowrap;
+  font-size:14px;
+}
+
+html[data-page="archive"] #archiveEventsTable th{
+  background:#eaf6ee;
+  color:#0b7f47;
+  font-weight:900;
+}
+
+
+/* Sticky 1 — التاريخ */
+
+html[data-page="archive"] #archiveEventsTable th:nth-child(1),
+html[data-page="archive"] #archiveEventsTable td:nth-child(1){
+  position:sticky;
+  right:0;
+  width:112px;
+  min-width:112px;
+  max-width:112px;
+  z-index:6;
+}
+
+
+/* Sticky 2 — الحدث */
+
+html[data-page="archive"] #archiveEventsTable th:nth-child(2),
+html[data-page="archive"] #archiveEventsTable td:nth-child(2){
+  position:sticky;
+  right:112px;
+  width:132px;
+  min-width:132px;
+  max-width:132px;
+  z-index:6;
+  font-weight:900;
+  box-shadow:-4px 0 7px rgba(15,23,42,.06);
+}
+
+html[data-page="archive"] #archiveEventsTable thead th:nth-child(1),
+html[data-page="archive"] #archiveEventsTable thead th:nth-child(2){
+  z-index:9;
+  background:#dff1e5;
+}
+
+html[data-page="archive"] #archiveEventsTable tbody td:nth-child(1),
+html[data-page="archive"] #archiveEventsTable tbody td:nth-child(2){
+  background:#fff;
+}
+
+
+/* تفاصيل الحدث */
+
+html[data-page="archive"] #archiveEventsTable th:nth-child(3),
+html[data-page="archive"] #archiveEventsTable td:nth-child(3){
+  width:500px;
+  min-width:500px;
+  text-align:right;
+  white-space:normal;
+  line-height:1.6;
+}
