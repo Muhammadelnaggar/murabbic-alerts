@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-page="archive">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+  <title>أرشيف القطيع — مُرَبِّيك</title>
+
+  <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
+  <meta name="theme-color" content="#2e7d32" />
+  <link rel="stylesheet" href="css/forms.css" />
+</head>
+
+<body>
+
+<header>
+  <div class="mbk-head">
+
+    <img
+      class="mbk-logo"
+      src="/images/logo.png"
+      alt="مُرَبِّيك"
+    >
+
+    <div class="mbk-center">
+      <div
+        class="mbk-page-title"
+        id="pageTitle"
+      >
+        أرشيف القطيع
+      </div>
+
+      <div class="mbk-app-name">
+        مُرَبِّيك
+      </div>
+    </div>
+
+    <a
+      class="mbk-back"
+      id="headerBack"
+      href="dashboard.html"
+    >
+      رجوع
+    </a>
+
+  </div>
+</header>
+
+
+<main class="mbk-form">
+
+  <div
+    id="sysbar"
+    class="infobar mbk-infobar"
+    hidden
+  ></div>
+
+
+  <!-- =========================
+       قائمة الأرشيف
+       ========================= -->
+
+  <section id="listView">
+
+    <section class="mbk-card">
+
+      <label for="searchNumber">
+        بحث برقم الحيوان
+      </label>
+
+      <input
+        id="searchNumber"
+        type="text"
+        inputmode="numeric"
+        autocomplete="off"
+        placeholder="اكتب رقم الحيوان"
+      />
+
+      <div
+        class="actions-bar"
+        id="filterBar"
+      ></div>
+
+    </section>
+
+
+    <div
+      id="countBar"
+      class="form-hint"
+    ></div>
+
+
+    <div class="table-wrapper">
+
+      <table id="archiveTable">
+
+        <thead>
+          <tr>
+            <th>رقم الحيوان</th>
+            <th>الفئة</th>
+            <th>النوع</th>
+            <th>الخروج</th>
+            <th>تاريخ الخروج</th>
+            <th>السبب</th>
+            <th>سعر البيع</th>
+            <th>التفاصيل</th>
+          </tr>
+        </thead>
+
+        <tbody id="archiveBody"></tbody>
+
+      </table>
+
+    </div>
+
+
+    <div
+      id="emptyState"
+      class="no-data"
+      hidden
+    >
+      لا توجد سجلات مؤرشفة.
+    </div>
+
+  </section>
+
+
+  <!-- =========================
+       تفاصيل الحيوان
+       ========================= -->
+
+  <section
+    id="detailView"
+    hidden
+  >
+
+    <section class="mbk-card">
+
+      <h2 id="animalHeading">
+        بيانات الحيوان المؤرشف
+      </h2>
+
+
+      <div class="table-wrapper">
+
+        <table>
+          <tbody id="animalFactsBody"></tbody>
+        </table>
+
+      </div>
+
+    </section>
+
+
+    <section class="mbk-card">
+
+      <h2 id="eventsHeading">
+        الأحداث المؤرشفة
+      </h2>
+
+      <div id="eventsList"></div>
+
+      <div
+        id="noEvents"
+        class="no-data"
+        hidden
+      >
+        لا توجد أحداث مؤرشفة لهذا الحيوان.
+      </div>
+
+    </section>
+
+
+    <div class="actions-bar">
+
+      <button
+        class="ghost"
+        id="backToArchive"
+        type="button"
+      >
+        العودة إلى الأرشيف
+      </button>
+
+    </div>
+
+  </section>
+
+</main>
+
+
+<script>
+
+const $ =
+  id =>
+    document.getElementById(id);
+
+
+const params =
+  new URLSearchParams(
+    location.search
+  );
+
+
+const archiveId =
+  String(
+    params.get("id") || ""
+  ).trim();
+
+
+let searchTimer = null;
+let currentFilter = "";
+
+
+
+function showMessage(
+  text,
+  ok = false
+) {
+
+  const bar =
+    $("sysbar");
+
+  if (!bar) return;
+
+  bar.hidden = false;
+
+  bar.className =
+    "infobar mbk-infobar show " +
+    (
+      ok
+        ? "success"
+        : "error"
+    );
+
+  bar.textContent =
+    String(text || "");
+}
+
+
+
+function clearMessage() {
+
+  const bar =
+    $("sysbar");
+
+  if (!bar) return;
+
+  bar.hidden = true;
+  bar.textContent = "";
+}
+
+
+
+async function getJson(url) {
+
+  const r =
+    await fetch(
+      url,
+      {
+        method: "GET",
+
+        credentials:
+          "same-origin",
+
+        cache:
+          "no-store",
+
+        headers: {
+          "Accept":
+            "application/json"
+        }
+      }
+    );
+
+
+  const data =
+    await r
+      .json()
+      .catch(
+        () => null
+      );
+
+
+  if (
+    r.status === 401 ||
+    data?.error ===
+      "auth_required"
+  ) {
+
+    showMessage(
+      data?.message ||
+      "❌ سجّل الدخول أولًا."
+    );
+
+    return null;
+  }
+
+
+  if (
+    !r.ok ||
+    data?.ok !== true
+  ) {
+
+    showMessage(
+      data?.message ||
+      "❌ تعذّر تحميل الأرشيف."
+    );
+
+    return null;
+  }
+
+
+  return data;
+}
+
+
+
+function displayValue(value) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "—";
+  }
+
+  return String(value);
+}
+
+
+
+function textCell(
+  tr,
+  value
+) {
+
+  const td =
+    document.createElement(
+      "td"
+    );
+
+  td.textContent =
+    displayValue(value);
+
+  tr.appendChild(td);
+
+  return td;
+}
+
+
+
+function linkButtonCell(
+  tr,
+  label,
+  url
+) {
+
+  const td =
+    document.createElement(
+      "td"
+    );
+
+
+  const button =
+    document.createElement(
+      "button"
+    );
+
+
+  const target =
+    String(
+      url || ""
+    ).trim();
+
+
+  button.type =
+    "button";
+
+  button.className =
+    "ghost";
+
+  button.textContent =
+    label;
+
+  button.disabled =
+    !target;
+
+
+  button.addEventListener(
+    "click",
+    () => {
+
+      if (target) {
+        location.href =
+          target;
+      }
+
+    }
+  );
+
+
+  td.appendChild(
+    button
+  );
+
+  tr.appendChild(
+    td
+  );
+}
+
+
+
+function renderFilters(
+  filters = [],
+  activeFilter = "all"
+) {
+
+  const bar =
+    $("filterBar");
+
+  if (!bar) return;
+
+
+  bar.replaceChildren();
+
+
+  const rows =
+    Array.isArray(filters)
+      ? filters
+      : [];
+
+
+  for (
+    const item of rows
+  ) {
+
+    const button =
+      document.createElement(
+        "button"
+      );
+
+
+    const value =
+      String(
+        item?.value || ""
+      ).trim();
+
+
+    const label =
+      String(
+        item?.label || ""
+      ).trim();
+
+
+    const count =
+      Number(
+        item?.count || 0
+      );
+
+
+    button.type =
+      "button";
+
+    button.className =
+      "ghost";
+
+    button.textContent =
+      `${label} (${count})`;
+
+
+    button.disabled =
+      value ===
+      activeFilter;
+
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        currentFilter =
+          value;
+
+        loadArchiveList();
+      }
+    );
+
+
+    bar.appendChild(
+      button
+    );
+  }
+}
+
+
+
+function renderArchiveRows(
+  rows = []
+) {
+
+  const tbody =
+    $("archiveBody");
+
+  const empty =
+    $("emptyState");
+
+
+  if (
+    !tbody ||
+    !empty
+  ) {
+    return;
+  }
+
+
+  tbody.replaceChildren();
+
+
+  const safeRows =
+    Array.isArray(rows)
+      ? rows
+      : [];
+
+
+  empty.hidden =
+    safeRows.length > 0;
+
+
+  for (
+    const row of safeRows
+  ) {
+
+    const tr =
+      document.createElement(
+        "tr"
+      );
+
+
+    textCell(
+      tr,
+      row.animalNumber
+    );
+
+
+    textCell(
+      tr,
+      row.subjectLabel
+    );
+
+
+    textCell(
+      tr,
+      row.speciesLabel
+    );
+
+
+    textCell(
+      tr,
+      row.exitLabel
+    );
+
+
+    textCell(
+      tr,
+      row.archiveDate
+    );
+
+
+    textCell(
+      tr,
+      row.reasonText
+    );
+
+
+    textCell(
+      tr,
+      row.salePriceText
+    );
+
+
+    linkButtonCell(
+      tr,
+      "فتح",
+      row.detailsUrl
+    );
+
+
+    tbody.appendChild(
+      tr
+    );
+  }
+}
+
+
+
+async function loadArchiveList() {
+
+  clearMessage();
+
+
+  const q =
+    String(
+      $("searchNumber")?.value ||
+      ""
+    ).trim();
+
+
+  const query =
+    new URLSearchParams();
+
+
+  if (currentFilter) {
+
+    query.set(
+      "type",
+      currentFilter
+    );
+  }
+
+
+  if (q) {
+
+    query.set(
+      "q",
+      q
+    );
+  }
+
+
+  const suffix =
+    query.toString()
+      ? `?${query.toString()}`
+      : "";
+
+
+  const data =
+    await getJson(
+      `/api/archive${suffix}`
+    );
+
+
+  if (!data) return;
+
+
+  currentFilter =
+    String(
+      data.activeFilter ||
+      "all"
+    ).trim();
+
+
+  $("pageTitle").textContent =
+    String(
+      data.pageTitle ||
+      "أرشيف القطيع"
+    );
+
+
+  $("countBar").textContent =
+    `المعروض: ${
+      Number(
+        data.count || 0
+      )
+    } من ${
+      Number(
+        data.totalCount || 0
+      )
+    }`;
+
+
+  renderFilters(
+    data.filters,
+    currentFilter
+  );
+
+
+  renderArchiveRows(
+    data.rows
+  );
+}
+
+
+
+function appendFactRow(
+  tbody,
+  fact
+) {
+
+  const label =
+    String(
+      fact?.label || ""
+    ).trim();
+
+
+  const value =
+    String(
+      fact?.value || ""
+    ).trim();
+
+
+  if (
+    !label ||
+    !value
+  ) {
+    return;
+  }
+
+
+  const tr =
+    document.createElement(
+      "tr"
+    );
+
+
+  textCell(
+    tr,
+    label
+  );
+
+
+  textCell(
+    tr,
+    value
+  );
+
+
+  tbody.appendChild(
+    tr
+  );
+}
+
+
+
+function renderAnimalFacts(
+  animal = {}
+) {
+
+  const tbody =
+    $("animalFactsBody");
+
+
+  if (!tbody) return;
+
+
+  tbody.replaceChildren();
+
+
+  appendFactRow(
+    tbody,
+    {
+      label:
+        "رقم الحيوان",
+
+      value:
+        animal.animalNumber
+    }
+  );
+
+
+  const facts =
+    Array.isArray(
+      animal.facts
+    )
+      ? animal.facts
+      : [];
+
+
+  for (
+    const fact of facts
+  ) {
+
+    appendFactRow(
+      tbody,
+      fact
+    );
+  }
+}
+
+
+
+function renderEvents(
+  events = []
+) {
+
+  const list =
+    $("eventsList");
+
+
+  const noEvents =
+    $("noEvents");
+
+
+  if (
+    !list ||
+    !noEvents
+  ) {
+    return;
+  }
+
+
+  list.replaceChildren();
+
+
+  const safeEvents =
+    Array.isArray(events)
+      ? events
+      : [];
+
+
+  noEvents.hidden =
+    safeEvents.length > 0;
+
+
+  for (
+    const event of safeEvents
+  ) {
+
+    const card =
+      document.createElement(
+        "section"
+      );
+
+
+    card.className =
+      "mbk-card";
+
+
+    const title =
+      document.createElement(
+        "h3"
+      );
+
+
+    const eventTitle =
+      String(
+        event?.title ||
+        "حدث"
+      ).trim();
+
+
+    const eventDate =
+      String(
+        event?.date ||
+        ""
+      ).trim();
+
+
+    title.textContent =
+      eventDate
+        ? `${eventTitle} — ${eventDate}`
+        : eventTitle;
+
+
+    card.appendChild(
+      title
+    );
+
+
+    const wrapper =
+      document.createElement(
+        "div"
+      );
+
+
+    wrapper.className =
+      "table-wrapper";
+
+
+    const table =
+      document.createElement(
+        "table"
+      );
+
+
+    const tbody =
+      document.createElement(
+        "tbody"
+      );
+
+
+    const facts =
+      Array.isArray(
+        event?.facts
+      )
+        ? event.facts
+        : [];
+
+
+    for (
+      const fact of facts
+    ) {
+
+      appendFactRow(
+        tbody,
+        fact
+      );
+    }
+
+
+    table.appendChild(
+      tbody
+    );
+
+
+    wrapper.appendChild(
+      table
+    );
+
+
+    card.appendChild(
+      wrapper
+    );
+
+
+    list.appendChild(
+      card
+    );
+  }
+}
+
+
+
+async function loadArchiveDetails(
+  id
+) {
+
+  clearMessage();
+
+
+  $("listView").hidden =
+    true;
+
+
+  $("detailView").hidden =
+    false;
+
+
+  const data =
+    await getJson(
+      `/api/archive/${
+        encodeURIComponent(id)
+      }`
+    );
+
+
+  if (!data) return;
+
+
+  $("pageTitle").textContent =
+    String(
+      data.pageTitle ||
+      "تفاصيل الأرشيف"
+    );
+
+
+  const backUrl =
+    String(
+      data.backUrl ||
+      "archive.html"
+    ).trim();
+
+
+  $("headerBack").href =
+    backUrl;
+
+
+  const animal =
+    data.animal || {};
+
+
+  $("animalHeading").textContent =
+    `الحيوان ${
+      String(
+        animal.animalNumber ||
+        ""
+      )
+    }`;
+
+
+  $("eventsHeading").textContent =
+    `الأحداث المؤرشفة (${
+      Number(
+        data.eventsCount || 0
+      )
+    })`;
+
+
+  renderAnimalFacts(
+    animal
+  );
+
+
+  renderEvents(
+    data.events
+  );
+
+
+  $("backToArchive")
+    ?.addEventListener(
+      "click",
+      () => {
+
+        location.href =
+          backUrl;
+
+      },
+      {
+        once: true
+      }
+    );
+}
+
+
+
+$("searchNumber")
+  ?.addEventListener(
+    "input",
+    () => {
+
+      clearTimeout(
+        searchTimer
+      );
+
+
+      searchTimer =
+        setTimeout(
+          loadArchiveList,
+          250
+        );
+    }
+  );
+
+
+
+document.addEventListener(
+  "DOMContentLoaded",
+  async () => {
+
+    if (archiveId) {
+
+      await loadArchiveDetails(
+        archiveId
+      );
+
+      return;
+    }
+
+
+    await loadArchiveList();
+  }
+);
+
+</script>
+
+</body>
+</html>
