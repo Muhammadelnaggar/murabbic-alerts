@@ -41334,10 +41334,20 @@ if (linkedProgramRowId) {
   });
 
   if (!nearest) {
-  const isMaternalProgram =
+    const isMaternalProgram =
     linkedProgramSection
       .trim()
-      .toLowerCase() === "mothers";
+      .toLowerCase() === "mothers" &&
+    Array.isArray(
+      programLink.doseSchedule
+    ) &&
+    programLink.doseSchedule.some(
+      step =>
+        String(
+          step?.timingBasis || ""
+        ).trim() ===
+          "before_expected_calving"
+    );
 
   // تحصينات الأمومة:
   // لا يوجد اختيار جرعة من المستخدم.
@@ -41523,7 +41533,17 @@ if (linkedProgramRowId) {
     if (
     linkedProgramSection
       .trim()
-      .toLowerCase() === "mothers"
+      .toLowerCase() === "mothers" &&
+    Array.isArray(
+      programLink.doseSchedule
+    ) &&
+    programLink.doseSchedule.some(
+      step =>
+        String(
+          step?.timingBasis || ""
+        ).trim() ===
+          "before_expected_calving"
+    )
   ) {
     const selectedMaternalStep =
       Array.isArray(
@@ -44426,22 +44446,18 @@ function vaccinationMurabbikDefaultProgramSrv() {
       programSection: "mothers",
       vaccineForm:
         "bacterin_toxoid",
-      targetGroup: "mothers",
-      repeatEvery: 6,
-      repeatUnit: "month",
+      targetGroup:
+        "pregnant_mothers",
       doseSchedule: [
-        dose("prime", "any_time"),
         dose(
-          "booster",
-          "after_previous_dose",
-          21,
-          "day"
-        ),
-        dose(
-          "periodic",
-          "repeat",
-          6,
-          "month"
+          "prime",
+          "before_expected_calving",
+          30,
+          "day",
+          {
+            cycle:
+              "each_pregnancy"
+          }
         )
       ]
     }),
@@ -44748,10 +44764,10 @@ function vaccinationMurabbikDefaultProgramSrv() {
   return {
     exists: true,
 
-    programMode:
+       programMode:
       "murabbik_default",
 
-    version: 1,
+    version: 2,
 
     programName:
       "برنامج مُرَبِّيك ",
@@ -44760,7 +44776,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
       "برنامج مُرَبِّيك ",
 
     source:
-      "server:vaccination-murabbik-default-v1",
+      "server:vaccination-murabbik-default-v2",
 
       defaultAlternatives: {
       respiratory_program:
@@ -45170,8 +45186,18 @@ async function vaccinationResolveProgramRowSrv({
       .trim()
       .toLowerCase();
 
-  const isMaternalProgram =
-    programSection === "mothers";
+    const isMaternalProgram =
+    programSection === "mothers" &&
+    Array.isArray(
+      row.doseSchedule
+    ) &&
+    row.doseSchedule.some(
+      step =>
+        String(
+          step?.timingBasis || ""
+        ).trim() ===
+          "before_expected_calving"
+    );
 
   // الأمومة: الجرعة من البرنامج والحمل فقط.
   // باقي البرامج: اختيار المستخدم صالح فقط كبداية لأول تسجيل.

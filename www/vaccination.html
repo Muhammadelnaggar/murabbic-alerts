@@ -1018,6 +1018,35 @@ function syncExecutionProgramSelection() {
   const programRow =
     getSelectedExecutionProgramRow();
 
+  const doseLabel =
+    document.querySelector(
+      'label[for="doseType"]'
+    );
+
+  const isMaternalProgram =
+    String(
+      programRow?.programSection || ""
+    )
+      .trim()
+      .toLowerCase() === "mothers";
+
+  if (isMaternalProgram) {
+    if (doseLabel) {
+      doseLabel.textContent =
+        "الجرعة المستحقة";
+    }
+
+    fillServerSelect(
+      doseTypeEl,
+      [],
+      "يحددها مُرَبِّيك حسب الحمل والبرنامج",
+      ""
+    );
+
+    doseTypeEl.disabled = true;
+    return;
+  }
+
   const doseOptions =
     Array.isArray(
       programRow?.allowedDoseOptions
@@ -1042,12 +1071,17 @@ function syncExecutionProgramSelection() {
           )
       : [];
 
+  if (doseLabel) {
+    doseLabel.textContent =
+      "نوع الجرعة الأولى";
+  }
+
   fillServerSelect(
     doseTypeEl,
     doseOptions,
 
     programRow
-      ? "اختر الجرعة التي نُفذت فعليًا"
+      ? "اختر أول جرعة مسجلة فقط"
       : "اختر التحصين أولًا",
 
     getDoseType()
@@ -1056,6 +1090,141 @@ function syncExecutionProgramSelection() {
   doseTypeEl.disabled =
     !programRow ||
     doseOptions.length === 0;
+}
+
+function syncDoseControlFromGate(result = {}) {
+  if (!doseTypeEl) return;
+
+  const programRow =
+    getSelectedExecutionProgramRow();
+
+  if (!programRow) {
+    syncExecutionProgramSelection();
+    return;
+  }
+
+  const isMaternalProgram =
+    String(
+      programRow.programSection || ""
+    )
+      .trim()
+      .toLowerCase() === "mothers";
+
+  if (isMaternalProgram) {
+    syncExecutionProgramSelection();
+    return;
+  }
+
+  const doseLabel =
+    document.querySelector(
+      'label[for="doseType"]'
+    );
+
+  const accepted =
+    Array.isArray(result.accepted)
+      ? result.accepted
+      : [];
+
+  const rejected =
+    Array.isArray(result.rejected)
+      ? result.rejected
+      : [];
+
+  const needsInitialDose =
+    rejected.some(item =>
+      item?.initialDoseRequired === true ||
+      String(item?.code || "").trim() ===
+        "vaccination_initial_dose_required"
+    );
+
+  if (needsInitialDose) {
+    syncExecutionProgramSelection();
+
+    if (doseLabel) {
+      doseLabel.textContent =
+        accepted.length
+          ? "نوع الجرعة الأولى للحيوانات غير المبدوءة"
+          : "نوع الجرعة الأولى";
+    }
+
+    return;
+  }
+
+  const serverManagedRows =
+    accepted.filter(item => {
+      const source =
+        String(
+          item?.doseSource || ""
+        ).trim();
+
+      return (
+        source === "program_task" ||
+        source === "program_decision" ||
+        source === "maternal_program" ||
+        source === "pregnancy_program"
+      );
+    });
+
+  if (
+    accepted.length &&
+    serverManagedRows.length ===
+      accepted.length
+  ) {
+    const doseTypes = [
+      ...new Set(
+        accepted
+          .map(item =>
+            String(
+              item?.doseType || ""
+            ).trim()
+          )
+          .filter(Boolean)
+      )
+    ];
+
+    if (doseLabel) {
+      doseLabel.textContent =
+        "الجرعة التي حددها مُرَبِّيك";
+    }
+
+    if (doseTypes.length === 1) {
+      const doseType = doseTypes[0];
+
+      const doseTypeLabel =
+        String(
+          accepted.find(item =>
+            String(
+              item?.doseType || ""
+            ).trim() === doseType
+          )?.doseTypeLabel ||
+          doseType
+        ).trim();
+
+      fillServerSelect(
+        doseTypeEl,
+        [
+          {
+            value: doseType,
+            label: doseTypeLabel
+          }
+        ],
+        "يحددها مُرَبِّيك من البرنامج",
+        doseType
+      );
+    } else {
+      fillServerSelect(
+        doseTypeEl,
+        [],
+        "مُرَبِّيك يحدد جرعة كل حيوان من برنامجه",
+        ""
+      );
+    }
+
+    doseTypeEl.disabled = true;
+    return;
+  }
+
+  syncExecutionProgramSelection();
 }
 function renderEventProgramOptions() {
   const currentVaccine =
@@ -2640,11 +2809,12 @@ function renderServerResult(result = {}) {
 
     try {
       saveBtn.disabled = true;
-      msg("جارِ التحقق من التحصين…", "info");
+           msg("جارِ التحقق من التحصين…", "info");
 
       const gate = await postJson("/api/vaccination/gate", payload);
 
       renderProgramContext(gate);
+      syncDoseControlFromGate(gate);
 
 if (!gate.ok || !gate.allowed) {
   lastGateAllowed = false;
@@ -2744,11 +2914,12 @@ async function runServerGate(reason = "page_load") {
   try {
     if (saveBtn) saveBtn.disabled = true;
 
-    msg("جارِ التحقق من بيانات التحصين…", "info");
+        msg("جارِ التحقق من بيانات التحصين…", "info");
 
     const gate = await postJson("/api/vaccination/gate", payload);
 
     renderProgramContext(gate);
+    syncDoseControlFromGate(gate);
 
 if (!gate.ok || !gate.allowed) {
   lastGateAllowed = false;
@@ -2903,6 +3074,7 @@ if (
 
  animalNumberEl?.addEventListener("input", () => {
   updateContext();
+  syncExecutionProgramSelection();
   runServerGate("animal_change");
 });
 
