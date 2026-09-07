@@ -41333,55 +41333,177 @@ if (linkedProgramRowId) {
     }
   });
 
- if (!nearest) {
-  const initialAgeAdvice =
-    vaccinationAgeTimingAdviceSrv({
-      animalDoc,
-      programLink,
-      eventDate: dt
-    });
+  if (!nearest) {
+  const isMaternalProgram =
+    linkedProgramSection
+      .trim()
+      .toLowerCase() === "mothers";
 
-  const initialMaternalAdvice =
-    vaccinationMaternalTimingAdviceSrv({
-      animalDoc,
-      programLink,
-      eventDate: dt
-    });
+  // تحصينات الأمومة:
+  // لا يوجد اختيار جرعة من المستخدم.
+  // البرنامج + الحمل هما اللذان يحددان الجرعة.
+  if (isMaternalProgram) {
+    const doseSchedule =
+      Array.isArray(
+        programLink.doseSchedule
+      )
+        ? programLink.doseSchedule
+        : [];
 
-  if (!latestPreviousDate) {
-    return (
-      initialAgeAdvice ||
-      initialMaternalAdvice ||
-      null
-    );
+    const maternalCycleStartDate =
+      vaccinationMaternalCycleStartDateSrv(
+        animalDoc
+      );
+
+    const hasEventInCurrentPregnancy =
+      Boolean(
+        latestPreviousDate &&
+        /^\d{4}-\d{2}-\d{2}$/.test(
+          maternalCycleStartDate
+        ) &&
+        latestPreviousDate >=
+          maternalCycleStartDate
+      );
+
+    if (!hasEventInCurrentPregnancy) {
+      const firstMaternalStep =
+        doseSchedule.find(step =>
+          String(
+            step?.timingBasis || ""
+          ).trim() ===
+            "before_expected_calving"
+        ) || null;
+
+      const maternalDoseType =
+        String(
+          firstMaternalStep?.doseType || ""
+        ).trim();
+
+      if (!maternalDoseType) {
+        return {
+          allowed: false,
+          level: "block",
+
+          code:
+            "vaccination_maternal_program_step_missing",
+
+          message:
+            "تعذّر تحديد جرعة تحصين الأمومة من البرنامج المعتمد."
+        };
+      }
+
+      const maternalAdvice =
+        vaccinationMaternalTimingAdviceSrv({
+          animalDoc,
+
+          programLink: {
+            ...programLink,
+            doseType:
+              maternalDoseType
+          },
+
+          eventDate: dt
+        });
+
+      return maternalAdvice
+        ? {
+            ...maternalAdvice,
+
+            taskDoseType:
+              maternalDoseType,
+
+            doseSource:
+              "maternal_program"
+          }
+        : {
+            allowed: false,
+            level: "block",
+
+            code:
+              "vaccination_maternal_timing_unresolved",
+
+            message:
+              "تعذّر تحديد موعد جرعة الأمومة من بيانات الحمل والبرنامج المعتمد."
+          };
+    }
+
+    return {
+      allowed: false,
+      level: "block",
+
+      code:
+        "vaccination_next_task_not_available",
+
+      previousEventDate:
+        latestPreviousDate,
+
+      message:
+        "لا توجد جرعة أمومة مفتوحة حاليًا حسب برنامج التحصين ومرحلة الحمل."
+    };
   }
 
-  const eachPregnancy =
-    Array.isArray(
-      programLink.doseSchedule
-    ) &&
-    programLink.doseSchedule.some(
-      step =>
-        String(
-          step?.cycle || ""
-        ).trim() ===
-        "each_pregnancy"
-    );
+    // تحصينات القطيع والعجول:
+  // المستخدم يختار الجرعة فقط عند أول تسجيل.
+  if (!latestPreviousDate) {
+    const firstDoseType =
+      String(
+        programLink.requestedDoseType || ""
+      ).trim();
 
-  const maternalCycleStartDate =
-    vaccinationMaternalCycleStartDateSrv(
-      animalDoc
-    );
+    if (!firstDoseType) {
+      return {
+        allowed: false,
+        level: "block",
 
-  if (
-    eachPregnancy &&
-    /^\d{4}-\d{2}-\d{2}$/.test(
-      maternalCycleStartDate
-    ) &&
-    maternalCycleStartDate >
-      latestPreviousDate
-  ) {
-    return initialMaternalAdvice || null;
+        code:
+          "vaccination_initial_dose_required",
+
+        initialDoseRequired: true,
+
+        message:
+          "اختر أول جرعة مسجلة لهذا التحصين: تأسيسية أو منشطة أو دورية."
+      };
+    }
+
+    const initialAgeAdvice =
+      vaccinationAgeTimingAdviceSrv({
+        animalDoc,
+
+        programLink: {
+          ...programLink,
+          doseType:
+            firstDoseType
+        },
+
+        eventDate: dt
+      });
+
+    return initialAgeAdvice
+      ? {
+          ...initialAgeAdvice,
+
+          taskDoseType:
+            firstDoseType,
+
+          doseSource:
+            "initial_selection"
+        }
+      : {
+          allowed: true,
+          level: "info",
+
+          code:
+            "vaccination_initial_dose_ready",
+
+          taskDoseType:
+            firstDoseType,
+
+          doseSource:
+            "initial_selection",
+
+          message:
+            "سيتم اعتماد الجرعة المختارة كنقطة بداية، وبعدها يتولى مُرَبِّيك الجرعات التالية تلقائيًا."
+        };
   }
 
   return {
@@ -41395,7 +41517,7 @@ if (linkedProgramRowId) {
       latestPreviousDate,
 
     message:
-      "تم تسجيل هذا التحصين للحيوان من قبل، ولا توجد جرعة تالية مفتوحة له الآن. سيُنبهك مُرَبِّيك عند دخول الجرعة التالية في موعدها."
+      "تم تسجيل هذا التحصين من قبل، ولا توجد جرعة تالية مفتوحة له الآن."
   };
 }
     if (
@@ -41413,8 +41535,8 @@ if (linkedProgramRowId) {
                 step?.doseType || ""
               ).trim() ===
                 String(
-                  programLink.doseType ||
                   nearest.taskDoseType ||
+                  programLink.doseType ||
                   ""
                 ).trim()
           ) || null
@@ -41467,10 +41589,18 @@ if (linkedProgramRowId) {
       };
     }
 
-    const fixedMaternalAdvice =
+        const fixedMaternalAdvice =
       vaccinationMaternalTimingAdviceSrv({
         animalDoc,
-        programLink,
+
+        programLink: {
+          ...programLink,
+          doseType:
+            nearest.taskDoseType ||
+            programLink.doseType ||
+            ""
+        },
+
         eventDate: dt
       });
 
@@ -45026,12 +45156,29 @@ async function vaccinationResolveProgramRowSrv({
 
   const row = matches[0];
 
-  const requestedDoseType =
+    const clientDoseType =
     String(
       body.doseType ||
       body.vaccineDoseType ||
       ""
     ).trim();
+
+  const programSection =
+    String(
+      row.programSection || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const isMaternalProgram =
+    programSection === "mothers";
+
+  // الأمومة: الجرعة من البرنامج والحمل فقط.
+  // باقي البرامج: اختيار المستخدم صالح فقط كبداية لأول تسجيل.
+  const requestedDoseType =
+    isMaternalProgram
+      ? ""
+      : clientDoseType;
 
   const fixedDoseType =
     String(
@@ -45049,28 +45196,23 @@ async function vaccinationResolveProgramRowSrv({
           .filter(Boolean)
       : [];
 
-  const doseTypeOption =
-    vaccinationFarmProgramOptionsSrv()
-      .doseTypes
-      .find(item =>
-        String(item?.value || "").trim() ===
-        requestedDoseType
-      ) ||
-    null;
+  const requestedDoseOption =
+    requestedDoseType
+      ? (
+          vaccinationFarmProgramOptionsSrv()
+            .doseTypes
+            .find(item =>
+              String(item?.value || "").trim() ===
+              requestedDoseType
+            ) ||
+          null
+        )
+      : null;
 
-  if (!requestedDoseType) {
-    return {
-      ok: false,
-      linked: false,
-      error:
-        "vaccination_program_dose_required",
-
-      message:
-        "❌ اختر نوع الجرعة المطلوب تسجيلها."
-    };
-  }
-
-  if (!doseTypeOption) {
+  if (
+    requestedDoseType &&
+    !requestedDoseOption
+  ) {
     return {
       ok: false,
       linked: false,
@@ -45083,6 +45225,7 @@ async function vaccinationResolveProgramRowSrv({
   }
 
   if (
+    requestedDoseType &&
     fixedDoseType &&
     requestedDoseType !== fixedDoseType
   ) {
@@ -45097,7 +45240,8 @@ async function vaccinationResolveProgramRowSrv({
     };
   }
 
-   if (
+  if (
+    requestedDoseType &&
     allowedDoseTypes.length &&
     !allowedDoseTypes.includes(
       requestedDoseType
@@ -45114,10 +45258,17 @@ async function vaccinationResolveProgramRowSrv({
     };
   }
 
-   const resolvedDoseType =
-    requestedDoseType;
+  const resolvedDoseType =
+    isMaternalProgram
+      ? fixedDoseType
+      : (
+          requestedDoseType ||
+          fixedDoseType ||
+          ""
+        );
 
   const selectedDoseStep =
+    resolvedDoseType &&
     Array.isArray(row.doseSchedule)
       ? row.doseSchedule.find(step =>
           String(
@@ -45130,7 +45281,8 @@ async function vaccinationResolveProgramRowSrv({
   const doseTypeLabel =
     String(
       selectedDoseStep?.doseTypeLabel ||
-      doseTypeOption.label ||
+      requestedDoseOption?.label ||
+      row.doseTypeLabel ||
       ""
     ).trim();
   return {
@@ -45138,8 +45290,12 @@ async function vaccinationResolveProgramRowSrv({
     linked: true,
     programMode,
 
-    ...row,
-         programDoseType:
+        ...row,
+
+    requestedDoseType,
+    isMaternalProgram,
+
+    programDoseType:
       fixedDoseType,
 
     programDoseTypeLabel:
@@ -46032,35 +46188,46 @@ const dueWarning =
 if (dueWarning?.allowed === false) {
   rejected.push({
     animalNumber,
-    reason: dueWarning.message
+    reason: dueWarning.message,
+    code: dueWarning.code || "",
+    initialDoseRequired:
+      dueWarning.initialDoseRequired === true
   });
   continue;
 }
-const openTaskDoseType =
+
+const effectiveDoseType =
   String(
-    dueWarning?.taskDoseType || ""
-  )
-    .trim()
-    .toLowerCase();
+    dueWarning?.taskDoseType ||
+    programLink.requestedDoseType ||
+    doseType ||
+    ""
+  ).trim();
 
-const selectedDoseType =
-  String(doseType || "")
-    .trim()
-    .toLowerCase();
-
-if (
-  openTaskDoseType &&
-  openTaskDoseType !== selectedDoseType
-) {
+if (!effectiveDoseType) {
   rejected.push({
     animalNumber,
-
+    code:
+      "vaccination_dose_unresolved",
     reason:
-      "الجرعة المختارة لا تطابق الجرعة المفتوحة حاليًا في برنامج التحصينات. اختر الجرعة المطلوبة للمهمة الحالية."
+      "تعذّر تحديد الجرعة المطلوب تسجيلها من البرنامج الحالي."
   });
-
   continue;
 }
+
+const effectiveDoseStep =
+  Array.isArray(
+    programLink.doseSchedule
+  )
+    ? programLink.doseSchedule.find(
+        step =>
+          String(
+            step?.doseType || ""
+          ).trim() ===
+            effectiveDoseType
+      ) || null
+    : null;
+
 accepted.push({
 
   animalNumber,
@@ -46087,6 +46254,25 @@ murabbikProgramVersion:
   Number(
     programLink.murabbikProgramVersion || 0
   ),
+
+  doseType:
+    effectiveDoseType,
+
+  doseTypeLabel:
+    String(
+      effectiveDoseStep?.doseTypeLabel ||
+      effectiveDoseType
+    ).trim(),
+
+  doseSource:
+    String(
+      dueWarning?.doseSource || ""
+    ).trim() ||
+    (
+      dueWarning?.taskId
+        ? "program_task"
+        : "program_decision"
+    ),
 
   warnings: dueWarning ? [dueWarning] : [],
   warning: dueWarning?.message || "",
@@ -48283,19 +48469,7 @@ const programRowId = String(
       });
     }
 
-    if (!vaccinationRequiredSrv(doseType)) {
-      return res.status(400).json({
-        ok: false,
-        message: "❌ اختر نوع الجرعة.",
-        savedCount: 0,
-        rejectedCount: rows.length,
-        saved: [],
-        rejected: rows.map(r => ({
-        animalNumber: calvingNormDigitsOnlySrv(r.animalNumber || ""),
-        reason: "اختر نوع الجرعة."
-        }))
-      });
-    }
+    
 
     const saved = [];
     const rejected = [];
@@ -48394,34 +48568,22 @@ if (dueWarning?.allowed === false) {
   continue;
 }
 
-const openTaskDoseType =
+const effectiveDoseType =
   String(
-    dueWarning?.taskDoseType || ""
-  )
-    .trim()
-    .toLowerCase();
+    dueWarning?.taskDoseType ||
+    programLink.requestedDoseType ||
+    doseType ||
+    ""
+  ).trim();
 
-const selectedDoseType =
-  String(doseType || "")
-    .trim()
-    .toLowerCase();
-
-if (
-  openTaskDoseType &&
-  openTaskDoseType !== selectedDoseType
-) {
+if (!effectiveDoseType) {
   rejected.push({
     animalNumber,
-
     reason:
-      "الجرعة المختارة لا تطابق الجرعة المفتوحة حاليًا في برنامج التحصينات. اختر الجرعة المطلوبة للمهمة الحالية."
+      "تعذّر تحديد الجرعة المطلوب تسجيلها من البرنامج الحالي."
   });
-
   continue;
 }
-
-const effectiveDoseType =
-  String(doseType || "").trim();
 
 const payload = {
   userId: uid,
