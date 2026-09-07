@@ -70648,11 +70648,8 @@ async function murabbikVaccinationProgramAlertSourceSrv(
       message:
         cleanText(alert.message),
 
-            details: {
-              observation:
-          isInitialAge || isInitialMaternal
-            ? ""
-            : cleanText(alert.message),
+        details: {
+  observation: "",
 
               meaning:
           isInitialAge
