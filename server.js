@@ -42513,6 +42513,63 @@ function vaccinationExecutionDoseLabelSrv({
     step?.doseTypeLabel || type
   ).trim();
 }
+function vaccinationExecutionDoseLabelSrv({
+  programLink = {},
+  doseType = ""
+} = {}) {
+  const type =
+    String(doseType || "").trim();
+
+  if (!type) return "";
+
+  const doseSchedule =
+    Array.isArray(programLink.doseSchedule)
+      ? programLink.doseSchedule
+      : [];
+
+  const step =
+    doseSchedule.find(
+      item =>
+        String(
+          item?.doseType || ""
+        ).trim() === type
+    ) || null;
+
+  const isPregnancyLinkedMaternal =
+    programLink.isMaternalProgram === true ||
+    (
+      String(
+        programLink.programSection || ""
+      )
+        .trim()
+        .toLowerCase() === "mothers" &&
+      doseSchedule.some(
+        item =>
+          String(
+            item?.timingBasis || ""
+          ).trim() ===
+            "before_expected_calving"
+      )
+    );
+
+  if (isPregnancyLinkedMaternal) {
+    return vaccinationProgramDoseLabelSrv({
+      doseType: type,
+      timingBasis:
+        "before_expected_calving",
+      scheduleLength:
+        doseSchedule.length,
+      fallbackLabel:
+        String(
+          step?.doseTypeLabel || type
+        ).trim()
+    });
+  }
+
+  return String(
+    step?.doseTypeLabel || type
+  ).trim();
+}
 function vaccinationFarmProgramExpandSimpleRowSrv(raw = {}) {
   if (
     !raw ||
@@ -45485,6 +45542,257 @@ async function vaccinationResolveProgramRowSrv({
         : 0
   };
 }
+async function vaccinationProgramTargetEligibilitySrv({
+  uid,
+  animalNumber,
+  animal,
+  programLink = {}
+} = {}) {
+  const doc =
+    animal?.data &&
+    typeof animal.data === "object"
+      ? animal.data
+      : {};
+
+  const collection =
+    String(
+      animal?._collection || ""
+    ).trim();
+
+  const isFollower =
+    collection === "calves";
+
+  const programSection =
+    String(
+      programLink.programSection || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const pregnancyLinked =
+    Array.isArray(
+      programLink.doseSchedule
+    ) &&
+    programLink.doseSchedule.some(
+      step =>
+        String(
+          step?.timingBasis || ""
+        ).trim() ===
+          "before_expected_calving"
+    );
+
+  let targetGroup =
+    String(
+      programLink.targetGroup || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  // Backward compatibility لأي برنامج مزرعة محفوظ قبل targetGroup.
+  // العمر لا يدخل هنا: يظل Warning فقط في محرك التوقيت.
+  if (!targetGroup) {
+    targetGroup =
+      programSection === "herd"
+        ? "herd_all"
+        : programSection === "calves"
+          ? "calves"
+          : programSection === "mothers"
+            ? (
+                pregnancyLinked
+                  ? "pregnant_mothers"
+                  : "mothers"
+              )
+            : "";
+  }
+
+  const allow = extra => ({
+    allowed: true,
+    targetGroup,
+    ...(extra || {})
+  });
+
+  const deny = (
+    code,
+    message,
+    extra = {}
+  ) => ({
+    allowed: false,
+    targetGroup,
+    code,
+    message,
+    ...extra
+  });
+
+  // ======================================================
+  // كل القطيع
+  // ======================================================
+  if (targetGroup === "herd_all") {
+    return allow();
+  }
+
+  // ======================================================
+  // العجول / التوابع
+  // العمر ليس Eligibility هنا.
+  // ======================================================
+  if (targetGroup === "calves") {
+    return isFollower
+      ? allow()
+      : deny(
+          "vaccination_target_calves_only",
+          `❌ التحصين المختار مخصص للعجول/التوابع، والحيوان رقم ${animalNumber} مسجل ضمن الأمهات.`
+        );
+  }
+
+  // ======================================================
+  // العجلات الإناث
+  // مثال: Brucella S19
+  // العمر يظل Warning في محرك التوقيت.
+  // ======================================================
+  if (targetGroup === "heifers") {
+    if (!isFollower) {
+      return deny(
+        "vaccination_target_heifers_only",
+        `❌ التحصين المختار مخصص للعجلات الإناث فقط، والحيوان رقم ${animalNumber} مسجل ضمن الأمهات.`
+      );
+    }
+
+    const sex =
+      inseminationSexNormSrv(
+        doc.followerSex ||
+        doc.sex ||
+        doc.gender ||
+        ""
+      );
+
+    if (sex !== "female") {
+      return deny(
+        "vaccination_target_heifers_only",
+        `❌ التحصين المختار مخصص للعجلات الإناث فقط، والحيوان رقم ${animalNumber} ليس تابعًا أنثى.`
+      );
+    }
+
+    return allow();
+  }
+
+  // ======================================================
+  // الأمهات
+  // مثال: Lysigin
+  // لا يشترط الحمل.
+  // ======================================================
+  if (targetGroup === "mothers") {
+    return !isFollower
+      ? allow()
+      : deny(
+          "vaccination_target_mothers_only",
+          `❌ التحصين المختار مخصص للأمهات، والحيوان رقم ${animalNumber} مسجل ضمن التوابع.`
+        );
+  }
+
+  // ======================================================
+  // الأمهات العشار فقط
+  // تحصينات الأمومة المرتبطة بالحمل.
+  // ======================================================
+  if (targetGroup === "pregnant_mothers") {
+    if (isFollower) {
+      return deny(
+        "vaccination_target_pregnant_mothers_only",
+        `❌ التحصين المختار مخصص للأمهات العِشار، والحيوان رقم ${animalNumber} مسجل ضمن التوابع.`
+      );
+    }
+
+    const signals =
+      uid && animalNumber
+        ? await fetchCalvingSignalsFromEventsSrv(
+            uid,
+            animalNumber
+          )
+        : {};
+
+    const reproFromEvents =
+      String(
+        signals?.reproStatusFromEvents ||
+        ""
+      ).trim();
+
+    const reproFromDoc =
+      String(
+        doc.reproductiveStatus ||
+        doc.pregStatus ||
+        ""
+      ).trim();
+
+    const lastBoundary =
+      String(
+        signals?.lastBoundary ||
+        ""
+      )
+        .trim()
+        .slice(0, 10);
+
+    const lastInseminationDate =
+      String(
+        signals?.lastInseminationDateFromEvents ||
+        doc.lastInseminationDate ||
+        doc.lastAI ||
+        doc.lastInsemination ||
+        doc.lastServiceDate ||
+        ""
+      )
+        .trim()
+        .slice(0, 10);
+
+    // ولادة/إجهاض بعد آخر تلقيح = الحمل انتهى فعليًا،
+    // حتى لو كانت وثيقة الحيوان قديمة.
+    const pregnancyEndedByBoundary =
+      calvingIsDateSrv(lastBoundary) &&
+      (
+        !calvingIsDateSrv(
+          lastInseminationDate
+        ) ||
+        lastBoundary >=
+          lastInseminationDate
+      );
+
+    const isPregnant =
+      !pregnancyEndedByBoundary &&
+      (
+        inseminationIsPregnantStatusSrv(
+          reproFromEvents
+        ) ||
+        inseminationIsPregnantStatusSrv(
+          reproFromDoc
+        ) ||
+        doc.pregnant === true
+      );
+
+    if (!isPregnant) {
+      return deny(
+        "vaccination_target_pregnant_mothers_only",
+        `❌ التحصين المختار مخصص للأمهات العِشار، والحيوان رقم ${animalNumber} ليس مسجلًا كأم عِشار حاليًا.`,
+        {
+          reproductiveStatus:
+            reproFromEvents ||
+            reproFromDoc ||
+            ""
+        }
+      );
+    }
+
+    return allow({
+      reproductiveStatus:
+        reproFromEvents ||
+        reproFromDoc ||
+        "عشار"
+    });
+  }
+
+  // Fail closed:
+  // أي targetGroup غير معروف لا يتحول ضمنيًا إلى herd_all.
+  return deny(
+    "vaccination_target_group_invalid",
+    "❌ فئة الاستهداف في سطر برنامج التحصين غير معروفة. راجع البرنامج المعتمد ثم حاول مرة أخرى."
+  );
+}
 app.get(
   "/api/vaccination/options",
   requireUserId,
@@ -46305,13 +46613,34 @@ const doseType = String(
         continue;
       }
 
-      const doc = animal.data || {};
+            const doc = animal.data || {};
       const status = String(doc.status || "active").trim().toLowerCase();
 
       if (status === "inactive" || status === "archived") {
         rejected.push({
           animalNumber,
           reason: "الحيوان خارج القطيع، لذلك لا يمكن تسجيل تحصين له."
+        });
+        continue;
+      }
+
+      const targetEligibility =
+        await vaccinationProgramTargetEligibilitySrv({
+          uid,
+          animalNumber,
+          animal,
+          programLink
+        });
+
+      if (targetEligibility.allowed === false) {
+        rejected.push({
+          animalNumber,
+          code:
+            targetEligibility.code ||
+            "vaccination_target_not_eligible",
+          reason:
+            targetEligibility.message ||
+            "الحيوان غير مؤهل لهذا التحصين وفق البرنامج الحالي."
         });
         continue;
       }
@@ -48660,7 +48989,7 @@ const programRowId = String(
       const animalId =
         String(animal.id || "").trim();
 
-      const animalDoc =
+            const animalDoc =
         animal.data || {};
 
       const animalCollection =
@@ -48688,6 +49017,27 @@ const programRowId = String(
         rejected.push({
           animalNumber,
           reason: "الحيوان خارج القطيع، لذلك لا يمكن تسجيل تحصين له."
+        });
+        continue;
+      }
+
+      const targetEligibility =
+        await vaccinationProgramTargetEligibilitySrv({
+          uid,
+          animalNumber,
+          animal,
+          programLink
+        });
+
+      if (targetEligibility.allowed === false) {
+        rejected.push({
+          animalNumber,
+          code:
+            targetEligibility.code ||
+            "vaccination_target_not_eligible",
+          reason:
+            targetEligibility.message ||
+            "الحيوان غير مؤهل لهذا التحصين وفق البرنامج الحالي."
         });
         continue;
       }
