@@ -1028,7 +1028,17 @@ function syncExecutionProgramSelection() {
       programRow?.programSection || ""
     )
       .trim()
-      .toLowerCase() === "mothers";
+      .toLowerCase() === "mothers" &&
+    Array.isArray(
+      programRow?.doseSchedule
+    ) &&
+    programRow.doseSchedule.some(
+      step =>
+        String(
+          step?.timingBasis || ""
+        ).trim() ===
+          "before_expected_calving"
+    );
 
   if (isMaternalProgram) {
     if (doseLabel) {
@@ -1103,12 +1113,22 @@ function syncDoseControlFromGate(result = {}) {
     return;
   }
 
-  const isMaternalProgram =
+    const isMaternalProgram =
     String(
       programRow.programSection || ""
     )
       .trim()
-      .toLowerCase() === "mothers";
+      .toLowerCase() === "mothers" &&
+    Array.isArray(
+      programRow.doseSchedule
+    ) &&
+    programRow.doseSchedule.some(
+      step =>
+        String(
+          step?.timingBasis || ""
+        ).trim() ===
+          "before_expected_calving"
+    );
 
   if (isMaternalProgram) {
     syncExecutionProgramSelection();
