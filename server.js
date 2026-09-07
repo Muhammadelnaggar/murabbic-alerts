@@ -48996,7 +48996,9 @@ saved.push({
       rejected,
       redirectUrl: saved.length === 1
         ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
-        : ""
+        : saved.length > 1
+          ? "/add-event.html"
+          : ""
     });
 
   } catch (e) {
