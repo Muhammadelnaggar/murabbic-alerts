@@ -58344,13 +58344,17 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
       ) {
         continue;
       }
-      const alertStatus =
+            const alertStatus =
         today > dueDate
           ? "overdue"
           : today === dueDate
             ? "due"
-            : "upcoming";
-
+            : vaccinationYmdAddDaysSrv(
+                today,
+                1
+              ) === dueDate
+              ? "day_before"
+              : "upcoming";
        const key = [
         "vaccination_initial_maternal",
         alertStatus,
@@ -58490,6 +58494,7 @@ const tomorrow =
         summary: {
           overdue: 0,
           due: 0,
+          dayBefore: 0,
           upcoming: 0,
           needsData: 0
         },
@@ -58681,15 +58686,15 @@ const timingPolicy =
       ) {
         continue;
 
-      } else if (
-        today > dueDate
-      ) {
-        alertStatus = "overdue";
-
-      } else if (
+           } else if (
         today === dueDate
       ) {
         alertStatus = "due";
+
+      } else if (
+        tomorrow === dueDate
+      ) {
+        alertStatus = "day_before";
 
       } else if (
         /^\d{4}-\d{2}-\d{2}$/.test(
@@ -58906,6 +58911,7 @@ const timingPolicy =
    const summary = {
       overdue: 0,
       due: 0,
+      dayBefore: 0,
       upcoming: 0,
       initialAgeReady: 0,
       needsData: 0
@@ -58990,6 +58996,21 @@ const timingPolicy =
           actionText =
             "تسجيل جرعة ما قبل الولادة";
 
+                } else if (
+          g.alertStatus === "day_before"
+        ) {
+          title =
+            "جرعة ما قبل الولادة غدًا";
+
+          message =
+            (nums.length === 1
+              ? `غدًا موعد جرعة «${g.vaccine}» قبل الولادة لأم واحدة.\n`
+              : `غدًا موعد جرعة «${g.vaccine}» قبل الولادة لـ${nums.length} أمهات.\n`) +
+            `الحيوانات: ${nums.join("، ")}`;
+
+          actionText =
+            "مراجعة جرعة ما قبل الولادة";
+
         } else {
           title =
             "تحصين أمومة قادم";
@@ -59053,11 +59074,37 @@ const timingPolicy =
 
         actionText =
           "تسجيل التحصين";
+                } else if (
+        g.alertStatus === "day_before"
+      ) {
+        const isBooster =
+          String(g.doseType || "")
+            .trim() === "booster";
+
+        title = isBooster
+          ? "جرعة منشطة غدًا"
+          : "تحصين مستحق غدًا";
+
+        message = isBooster
+          ? (
+              `غدًا موعد الجرعة المنشطة «${g.vaccine}».\n` +
+              `الحيوانات: ${nums.join("، ")}`
+            )
+          : (
+              `غدًا موعد جرعة «${g.vaccine}».\n` +
+              `الحيوانات: ${nums.join("، ")}`
+            );
+
+        actionText = isBooster
+          ? "مراجعة موعد الجرعة"
+          : "فتح صفحة التحصين";
 
       } else if (
         g.alertStatus ===
           "upcoming"
       ) {
+
+ 
         const daysUntil =
           Math.max(
             1,
@@ -59106,6 +59153,7 @@ actionText = isBooster
     if (
    (
     g.alertStatus === "upcoming" ||
+    g.alertStatus === "day_before" ||
     g.alertStatus === "due" ||
     g.alertStatus ===
       "overdue" ||
@@ -59155,14 +59203,17 @@ actionText = isBooster
           "_"
         );
 
-      const summaryKey =
+            const summaryKey =
         g.alertStatus ===
           "needs_data"
           ? "needsData"
           : g.alertStatus ===
               "initial_age_ready"
             ? "initialAgeReady"
-            : g.alertStatus;
+            : g.alertStatus ===
+                "day_before"
+              ? "dayBefore"
+              : g.alertStatus;
 
       summary[summaryKey] +=
         nums.length;
@@ -59255,12 +59306,13 @@ actionText = isBooster
       });
     }
 
-   const statusRank = {
+     const statusRank = {
       overdue: 0,
       needs_data: 1,
       due: 2,
-      initial_age_ready: 3,
-      upcoming: 4
+      day_before: 3,
+      initial_age_ready: 4,
+      upcoming: 5
     };
 
     alerts.sort((a, b) => {
@@ -70451,6 +70503,12 @@ const MURABBIK_VACCINATION_SMART_ALERT_STATUS = {
     certainty: "confirmed",
     snoozeMinutes: 12 * 60
   },
+    day_before: {
+    priority: "normal",
+    urgency: "soon",
+    certainty: "confirmed",
+    snoozeMinutes: 12 * 60
+  },
 
   upcoming: {
     priority: "low",
@@ -70610,6 +70668,8 @@ async function murabbikVaccinationProgramAlertSourceSrv(
             ? "سجّل الجرعة التأسيسية عند تنفيذها فعليًا، وبعد الحفظ سيحسب مُرَبِّيك الجرعة التالية من البرنامج."
             : isInitialMaternal
               ? "سجّل جرعة ما قبل الولادة عند تنفيذها فعليًا؛ وبعد الحفظ يُغلق التنبيه وتُحسب أي جرعة تالية يحددها البرنامج."
+                            : status === "day_before"
+                ? "موعد الجرعة غدًا؛ استعد للتنفيذ وسجّلها عند إعطائها فعليًا."
               : status === "upcoming"
                 ? "راجع البرنامج واستعد للتنفيذ في موعده، ولا تسجّل الجرعة قبل إعطائها فعليًا."
                 : status === "needs_data"
