@@ -15074,12 +15074,67 @@ function eventsPageDetailsSrv(ev = {}) {
   }
 
   if (key === "vaccination") {
-  add("اللقاح", ["vaccine", "vaccineName", "vaccineKey", "name"]);
+  add(
+    "اللقاح",
+    ["vaccine", "vaccineName", "vaccineKey", "name"]
+  );
 
-  const doseLabel =
-    eventsPageVaccinationDoseLabelSrv(
-      pick(["doseLabel", "doseType", "dose", "جرعة"], "")
+  const savedDoseTypeLabel =
+    eventsPageDetailTextSrv(
+      pick(
+        ["doseTypeLabel", "doseLabel"],
+        ""
+      )
     );
+
+  const vaccinationWarnings =
+    Array.isArray(ev.warnings)
+      ? ev.warnings
+      : [];
+
+  const isPregnancyLinkedMaternalDose =
+    String(
+      ev.timingBasis || ""
+    ).trim() ===
+      "before_expected_calving" ||
+    vaccinationWarnings.some(
+      warning =>
+        String(
+          warning?.timingBasis || ""
+        ).trim() ===
+          "before_expected_calving"
+    );
+
+  const rawDoseType =
+    pick(
+      ["doseType", "dose", "جرعة"],
+      ""
+    );
+
+  let doseLabel =
+    savedDoseTypeLabel;
+
+  if (
+    !doseLabel &&
+    isPregnancyLinkedMaternalDose
+  ) {
+    const doseKey =
+      String(rawDoseType || "")
+        .trim()
+        .toLowerCase();
+
+    doseLabel =
+      doseKey === "booster"
+        ? "الجرعة المنشطة قبل الولادة"
+        : "جرعة قبل الولادة";
+  }
+
+  if (!doseLabel) {
+    doseLabel =
+      eventsPageVaccinationDoseLabelSrv(
+        rawDoseType
+      );
+  }
 
   if (doseLabel) {
     eventsPagePushDetailSrv(
@@ -15089,14 +15144,33 @@ function eventsPageDetailsSrv(ev = {}) {
     );
   }
 
-  add("رقم التشغيلة", ["batchNo", "batchNumber", "lot", "lotNo"]);
-    add("طريقة الإعطاء", ["route", "administrationRoute"]);
-    add("الجرعة", ["doseAmount", "amount"]);
-    add("التحصين التالي", ["nextDueDate", "nextDate", "boosterDate"]);
-    if (note) eventsPagePushDetailSrv(parts, "ملاحظة", note);
+  add(
+    "رقم التشغيلة",
+    ["batchNo", "batchNumber", "lot", "lotNo"]
+  );
+  add(
+    "طريقة الإعطاء",
+    ["route", "administrationRoute"]
+  );
+  add(
+    "الجرعة",
+    ["doseAmount", "amount"]
+  );
+  add(
+    "التحصين التالي",
+    ["nextDueDate", "nextDate", "boosterDate"]
+  );
 
-    return eventsPageJoinDetailsSrv(parts);
+  if (note) {
+    eventsPagePushDetailSrv(
+      parts,
+      "ملاحظة",
+      note
+    );
   }
+
+  return eventsPageJoinDetailsSrv(parts);
+}
 
   if (key === "pregnancy_diagnosis") {
     add("طريقة الفحص", ["method", "diagnosisMethod", "طريقة"]);
@@ -42382,6 +42456,63 @@ function vaccinationProgramDoseLabelSrv({
     fallbackLabel || ""
   ).trim();
 }
+function vaccinationExecutionDoseLabelSrv({
+  programLink = {},
+  doseType = ""
+} = {}) {
+  const type =
+    String(doseType || "").trim();
+
+  if (!type) return "";
+
+  const doseSchedule =
+    Array.isArray(programLink.doseSchedule)
+      ? programLink.doseSchedule
+      : [];
+
+  const step =
+    doseSchedule.find(
+      item =>
+        String(
+          item?.doseType || ""
+        ).trim() === type
+    ) || null;
+
+  const isPregnancyLinkedMaternal =
+    programLink.isMaternalProgram === true ||
+    (
+      String(
+        programLink.programSection || ""
+      )
+        .trim()
+        .toLowerCase() === "mothers" &&
+      doseSchedule.some(
+        item =>
+          String(
+            item?.timingBasis || ""
+          ).trim() ===
+            "before_expected_calving"
+      )
+    );
+
+  if (isPregnancyLinkedMaternal) {
+    return vaccinationProgramDoseLabelSrv({
+      doseType: type,
+      timingBasis:
+        "before_expected_calving",
+      scheduleLength:
+        doseSchedule.length,
+      fallbackLabel:
+        String(
+          step?.doseTypeLabel || type
+        ).trim()
+    });
+  }
+
+  return String(
+    step?.doseTypeLabel || type
+  ).trim();
+}
 function vaccinationFarmProgramExpandSimpleRowSrv(raw = {}) {
   if (
     !raw ||
@@ -46285,10 +46416,11 @@ murabbikProgramVersion:
     effectiveDoseType,
 
   doseTypeLabel:
-    String(
-      effectiveDoseStep?.doseTypeLabel ||
-      effectiveDoseType
-    ).trim(),
+    vaccinationExecutionDoseLabelSrv({
+      programLink,
+      doseType:
+        effectiveDoseType
+    }),
 
   doseSource:
     String(
@@ -48611,6 +48743,33 @@ if (!effectiveDoseType) {
   continue;
 }
 
+const effectiveDoseTypeLabel =
+  vaccinationExecutionDoseLabelSrv({
+    programLink,
+    doseType:
+      effectiveDoseType
+  });
+
+const isPregnancyLinkedMaternalDose =
+  programLink.isMaternalProgram === true ||
+  (
+    String(
+      programLink.programSection || ""
+    )
+      .trim()
+      .toLowerCase() === "mothers" &&
+    Array.isArray(
+      programLink.doseSchedule
+    ) &&
+    programLink.doseSchedule.some(
+      step =>
+        String(
+          step?.timingBasis || ""
+        ).trim() ===
+          "before_expected_calving"
+    )
+  );
+
 const payload = {
   userId: uid,
 
@@ -48618,10 +48777,24 @@ const payload = {
   animalCollection,
   animalNumber,
 
-  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  createdAt:
+    admin.firestore.FieldValue.serverTimestamp(),
 
-    date: eventDate,
-  doseType: effectiveDoseType,
+  date: eventDate,
+
+  // كود داخلي للمحرك
+  doseType:
+    effectiveDoseType,
+
+  // الوصف الصحيح للمستخدم
+  doseTypeLabel:
+    effectiveDoseTypeLabel,
+
+  timingBasis:
+    isPregnancyLinkedMaternalDose
+      ? "before_expected_calving"
+      : "",
+
   eventDate,
 
   vaccinationProgramMode:
