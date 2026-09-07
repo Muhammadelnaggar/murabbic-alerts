@@ -65599,6 +65599,8 @@ async function murabbikSmartAlertArchiveSyncSrv(
     return;
   }
 
+  const pending = [];
+
   for (const alert of alerts) {
     const docId =
       murabbikSmartAlertArchiveDocIdSrv(
@@ -65615,64 +65617,78 @@ async function murabbikSmartAlertArchiveSyncSrv(
       continue;
     }
 
-    try {
-      const ref =
+    pending.push({
+      docId,
+      alert,
+      ref:
         db
           .collection(
             MURABBIK_SMART_ALERT_ARCHIVE_COLLECTION
           )
-          .doc(docId);
+          .doc(docId)
+    });
+  }
 
-      const snap =
-        await ref.get();
+  if (!pending.length) return;
 
-      if (!snap.exists) {
-        const publicAlert =
-          murabbikSmartAlertPublicSrv(
-            alert
-          ) || {};
+  const snapshots = [];
 
-        await ref.set({
+  for (let i = 0; i < pending.length; i += 100) {
+    snapshots.push(
+      ...await db.getAll(
+        ...pending
+          .slice(i, i + 100)
+          .map(row => row.ref)
+      )
+    );
+  }
+
+  const writes = [];
+
+  for (let i = 0; i < pending.length; i++) {
+    const row = pending[i];
+    const alert = row.alert;
+    const snap = snapshots[i];
+
+    const snoozeMinutesRaw =
+      Number(alert._snoozeMinutes);
+
+    const snoozeMinutes =
+      Number.isFinite(snoozeMinutesRaw) &&
+      snoozeMinutesRaw > 0
+        ? snoozeMinutesRaw
+        : 0;
+
+    if (!snap?.exists) {
+      const publicAlert =
+        murabbikSmartAlertPublicSrv(
+          alert
+        ) || {};
+
+      writes.push({
+        ref: row.ref,
+        merge: false,
+        data: {
           userId: req.userId,
 
           archiveType: "smart_alert",
           smartAlert: true,
 
-          smartAlertId:
-            alert.id,
+          smartAlertId: alert.id,
+          revision: alert.revision,
+          sourceName: alert.source,
 
-          revision:
-            alert.revision,
+          kind: alert.kind,
+          domain: alert.domain,
+          code: alert.code,
 
-          sourceName:
-            alert.source,
+          priority: alert.priority,
+          urgency: alert.urgency,
+          certainty: alert.certainty,
+          status: alert.status,
 
-          kind:
-            alert.kind,
-
-          domain:
-            alert.domain,
-
-          code:
-            alert.code,
-
-          priority:
-            alert.priority,
-
-          urgency:
-            alert.urgency,
-
-          certainty:
-            alert.certainty,
-
-          status:
-            alert.status,
-
-          title:
-            alert.title,
-
-          message:
-            alert.message,
+          title: alert.title,
+          message: alert.message,
 
           details:
             publicAlert.details || {},
@@ -65702,11 +65718,10 @@ async function murabbikSmartAlertArchiveSyncSrv(
               url: ""
             },
 
-          ts:
-            nowMs,
+          snoozeMinutes,
 
-          firstSeenAtMs:
-            nowMs,
+          ts: nowMs,
+          firstSeenAtMs: nowMs,
 
           createdAt:
             admin.firestore
@@ -65715,22 +65730,50 @@ async function murabbikSmartAlertArchiveSyncSrv(
 
           source:
             "server:/api/smart-alerts:archive"
+        }
+      });
 
-        }, {
-          merge: false
-        });
-      }
+      continue;
+    }
 
-      murabbikSmartAlertArchivedDocsSrv
-        .add(docId);
+    const oldSnooze =
+      Number(
+        snap.data()?.snoozeMinutes
+      );
 
-    } catch (e) {
-      console.warn(
-        "smart-alert archive row failed:",
-        docId,
-        e.message || e
+    if (
+      snoozeMinutes > 0 &&
+      oldSnooze !== snoozeMinutes
+    ) {
+      writes.push({
+        ref: row.ref,
+        merge: true,
+        data: {
+          snoozeMinutes
+        }
+      });
+    }
+  }
+
+  for (let i = 0; i < writes.length; i += 400) {
+    const batch = db.batch();
+
+    for (const write of writes.slice(i, i + 400)) {
+      batch.set(
+        write.ref,
+        write.data,
+        {
+          merge: write.merge
+        }
       );
     }
+
+    await batch.commit();
+  }
+
+  for (const row of pending) {
+    murabbikSmartAlertArchivedDocsSrv
+      .add(row.docId);
   }
 }
 
@@ -66289,6 +66332,59 @@ async function murabbikSmartAlertReproTruthSrv(
     diagnosisAfterService,
     isPregnant
   };
+}
+async function murabbikSmartAlertWarmReproTruthSrv(
+  context,
+  animals = []
+) {
+  return await context.load(
+    "smart-alerts:repro-truth:warm-active-mothers",
+    async () => {
+      const candidates = [];
+
+      for (const doc of animals) {
+        const animalNumber =
+          murabbikDryOffAlertNumberSrv(doc);
+
+        const status =
+          murabbikSmartAlertTextSrv(
+            doc.status || "active"
+          ).toLowerCase();
+
+        if (!animalNumber) continue;
+        if (["inactive", "archived"].includes(status)) continue;
+
+        if (
+          murabbikSmartAlertTextSrv(
+            doc.entryType
+          ).toLowerCase() === "followers"
+        ) {
+          continue;
+        }
+
+        candidates.push({
+          animalNumber,
+          doc
+        });
+      }
+
+      for (let i = 0; i < candidates.length; i += 20) {
+        await Promise.all(
+          candidates
+            .slice(i, i + 20)
+            .map(row =>
+              murabbikSmartAlertReproTruthSrv(
+                context,
+                row.animalNumber,
+                row.doc
+              )
+            )
+        );
+      }
+
+      return true;
+    }
+  );
 }
 // ============================================================
 //       SMART ALERT SOURCE: MILK MIRROR — HEALTH / HERD
@@ -67821,6 +67917,10 @@ async function murabbikDryOffDueAlertSourceSrv(context) {
   const animals = await murabbikSmartAlertAnimalsSrv(
     context
   );
+  await murabbikSmartAlertWarmReproTruthSrv(
+  context,
+  animals
+);
 
   const due = [];
 
@@ -68147,7 +68247,10 @@ async function murabbikCloseUpDueAlertSourceSrv(
     await murabbikSmartAlertAnimalsSrv(
       context
     );
-
+await murabbikSmartAlertWarmReproTruthSrv(
+  context,
+  animals
+);
   const due = [];
 
   for (const doc of animals) {
@@ -68508,7 +68611,10 @@ async function murabbikCalvingOverdueAlertSourceSrv(
     await murabbikSmartAlertAnimalsSrv(
       context
     );
-
+await murabbikSmartAlertWarmReproTruthSrv(
+  context,
+  animals
+);
    const alerts = [];
 
   for (const doc of animals) {
@@ -71313,6 +71419,81 @@ degraded:
     });
   }
 });
+async function murabbikSmartAlertArchivedForResponseSrv(
+  req,
+  alertId,
+  revision
+) {
+  const docId =
+    murabbikSmartAlertArchiveDocIdSrv(
+      req,
+      {
+        id: alertId,
+        revision
+      }
+    );
+
+  if (!docId) return null;
+
+  const snap =
+    await db
+      .collection(
+        MURABBIK_SMART_ALERT_ARCHIVE_COLLECTION
+      )
+      .doc(docId)
+      .get();
+
+  if (!snap.exists) return null;
+
+  const data = snap.data() || {};
+
+  if (
+    data.archiveType !== "smart_alert" ||
+    data.smartAlert !== true ||
+    murabbikSmartAlertTextSrv(data.userId) !==
+      murabbikSmartAlertTextSrv(req.userId) ||
+    murabbikSmartAlertTextSrv(data.smartAlertId) !==
+      alertId ||
+    murabbikSmartAlertTextSrv(data.revision) !==
+      revision
+  ) {
+    return null;
+  }
+
+  const snoozeMinutesRaw =
+    Number(data.snoozeMinutes);
+
+  return {
+    id: alertId,
+    revision,
+
+    source:
+      murabbikSmartAlertTextSrv(
+        data.sourceName
+      ),
+
+    kind:
+      murabbikSmartAlertTextSrv(
+        data.kind
+      ),
+
+    domain:
+      murabbikSmartAlertTextSrv(
+        data.domain
+      ),
+
+    code:
+      murabbikSmartAlertTextSrv(
+        data.code
+      ),
+
+    _snoozeMinutes:
+      Number.isFinite(snoozeMinutesRaw) &&
+      snoozeMinutesRaw > 0
+        ? snoozeMinutesRaw
+        : 0
+  };
+}
 app.post(
   "/api/smart-alerts/respond",
   requireUserId,
@@ -71363,17 +71544,32 @@ app.post(
           });
       }
 
-      const result =
-        await murabbikSmartAlertCollectSrv(
-          req
-        );
+  let alert =
+  await murabbikSmartAlertArchivedForResponseSrv(
+    req,
+    alertId,
+    revision
+  );
 
-      const alert =
-        result.alerts.find(
-          item =>
-            item.id === alertId &&
-            item.revision === revision
-        );
+if (
+  !alert ||
+  (
+    decision === "snoozed" &&
+    !(Number(alert._snoozeMinutes) > 0)
+  )
+) {
+  const result =
+    await murabbikSmartAlertCollectSrv(
+      req
+    );
+
+  alert =
+    result.alerts.find(
+      item =>
+        item.id === alertId &&
+        item.revision === revision
+    ) || null;
+}
 
       if (!alert) {
         return res
@@ -71869,6 +72065,25 @@ const herdType =
       .get();
 
 const rawAnimalsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+let herdStatsEventsPromise = null;
+
+const loadHerdStatsEventsSrv = () => {
+  if (!herdStatsEventsPromise) {
+    herdStatsEventsPromise = db
+      .collection("events")
+      .where("userId", "==", uid)
+      .limit(5000)
+      .get()
+      .then(eventSnap =>
+        eventSnap.docs.map(d => ({
+          id: d.id,
+          ...(d.data() || {})
+        }))
+      );
+  }
+
+  return herdStatsEventsPromise;
+};
 
 const normalizeAnimalNumberForStats = (v) => String(v ?? '')
   .replace(/[٠-٩]/g, d => ({'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'}[d] || d))
@@ -72015,11 +72230,19 @@ try {
     return Number.isFinite(n) ? n : null;
   };
 
-  const allOfficial = await getOfficialGroupCount('all');
-  const freshOfficial = await getOfficialGroupCount('fresh');
-  const highOfficial = await getOfficialGroupCount('high');
-  const medOfficial = await getOfficialGroupCount('med');
-  const lowOfficial = await getOfficialGroupCount('low');
+  const [
+  allOfficial,
+  freshOfficial,
+  highOfficial,
+  medOfficial,
+  lowOfficial
+] = await Promise.all([
+  getOfficialGroupCount('all'),
+  getOfficialGroupCount('fresh'),
+  getOfficialGroupCount('high'),
+  getOfficialGroupCount('med'),
+  getOfficialGroupCount('low')
+]);
 
   if (Number.isFinite(Number(allOfficial))) {
     total = Number(allOfficial);
@@ -72137,12 +72360,9 @@ for (const a of active) {
 let byAnimal = new Map();
 
 try {
-  const evSnapBreed = await db.collection("events")
-    .where("userId", "==", uid)
-    .limit(5000)
-    .get();
-
-  const evBreed = evSnapBreed.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+  const evBreed = (
+  await loadHerdStatsEventsSrv()
+).map(e => ({ ...e }));
 
 const inseminationEvents = evBreed
   .map(e => {
@@ -72219,12 +72439,9 @@ const avgBreedIntervalDays =
 let cullProd = 0, cullRepro = 0, cullHealth = 0;
 
 try {
-  const evSnap = await db.collection("events")
-    .where("userId", "==", uid)
-    .limit(5000)
-    .get();
-
-const ev = evSnap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+ const ev = (
+  await loadHerdStatsEventsSrv()
+).map(e => ({ ...e }));
 
   const cullEvents = ev.filter(e => {
     const txt = String(e.eventType || e.type || e.eventTypeNorm || "").toLowerCase();
@@ -72299,12 +72516,9 @@ let avgHeadDeltaPct = 0;
 
     
 try {
-  const evSnapMilk = await db.collection("events")
-    .where("userId", "==", uid)
-    .limit(5000)
-    .get();
-
-  const evMilkAll = evSnapMilk.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+  const evMilkAll = (
+  await loadHerdStatsEventsSrv()
+).map(e => ({ ...e }));
 
   const animalNosSet = new Set(
     animalsByType.map(a => String(a.animalNumber || a.number || a.id || '').trim())
@@ -72437,12 +72651,9 @@ console.log("MILK avgHeadDeltaPct =", avgHeadDeltaPct);
     let extraFertility = { scPlus:0, hdr21:0, cr21:0, pr21:0, firstServicePct:0 };
 
     try {
-      const evSnap = await db.collection("events")
-        .where("userId", "==", uid)
-        .limit(5000)
-        .get();
-
-     const ev = evSnap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+      const ev = (
+  await loadHerdStatsEventsSrv()
+).map(e => ({ ...e }));
 
       const heats = ev.filter(e => e.eventTypeNorm === "heat" && e.eventDate);
       const ins   = ev.filter(e => e.eventTypeNorm === "insemination" && e.eventDate);
@@ -72544,12 +72755,9 @@ let feedBands = {
 };
 
     try {
-      const evSnapNut = await db.collection("events")
-        .where("userId", "==", uid)
-        .limit(5000)
-        .get();
-
-      const evNutAll = evSnapNut.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+      const evNutAll = (
+  await loadHerdStatsEventsSrv()
+).map(e => ({ ...e }));
 const isLactatingNutritionEventForDashboard = (e = {}) => {
   const ctx = e?.nutrition?.context || {};
   const groupText = String(
