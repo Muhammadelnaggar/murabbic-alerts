@@ -24385,11 +24385,34 @@ const economicsCards = isDryEconomics
         milkMarginHint
       )
     ];
- const reportStage =
-  context?.stage ||
-  context?.nutritionStage ||
-  context?.productionStage ||
-  '';
+ const reportStageText = [
+  context?.stage,
+  context?.nutritionStage,
+  context?.productionStage,
+  context?.productionStatus,
+  context?.groupType,
+  context?.groupName,
+  context?.group,
+  context?.groupLabel
+].filter(Boolean).join(' ').toLowerCase();
+
+const reportStage =
+  context?.closeUp === true ||
+  /انتظار|تحضير|close[_ -]?up|closeup/.test(reportStageText)
+    ? 'close_up'
+    : (
+        context?.earlyDry === true ||
+        /جاف|dry|far[_ -]?dry/.test(reportStageText)
+          ? 'far_dry'
+          : (
+              String(
+                context?.stage ||
+                context?.nutritionStage ||
+                context?.productionStage ||
+                ''
+              ).trim().toLowerCase()
+            )
+      );
 
 const advancedCards = [
   nutritionAdvancedDisplayCardSrv({
@@ -26711,7 +26734,22 @@ function nutritionAdvancedDisplayCardSrv(o = {}) {
       : '';
 
    const gaugeScale = nutritionGaugeScaleSrv(actual, reference, mode);
-  const balanceCommentObj = nutritionBalanceCommentSrv(key, mode, status, diff);
+  const isDryStage =
+    o.stage === 'close_up' ||
+    o.stage === 'far_dry';
+
+  const balanceCommentObj =
+    isDryStage && guidance && guidance !== '—'
+      ? {
+          text: guidance,
+          sourceLabel: 'مُرَبِّيك'
+        }
+      : nutritionBalanceCommentSrv(
+          key,
+          mode,
+          status,
+          diff
+        );
 
   const referenceType =
     mode === 'min'
