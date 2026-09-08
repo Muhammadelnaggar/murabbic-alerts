@@ -71481,7 +71481,165 @@ degraded:
     });
   }
 });
+async function murabbikSmartAlertLiveResponseAlertSrv(
+  req,
+  alertId,
+  revision
+) {
+  let sourceName = "";
 
+  try {
+    const archiveDocId =
+      murabbikSmartAlertArchiveDocIdSrv(
+        req,
+        {
+          id: alertId,
+          revision
+        }
+      );
+
+    if (archiveDocId) {
+      const archiveSnap =
+        await db
+          .collection(
+            MURABBIK_SMART_ALERT_ARCHIVE_COLLECTION
+          )
+          .doc(archiveDocId)
+          .get();
+
+      if (archiveSnap.exists) {
+        const archive =
+          archiveSnap.data() || {};
+
+        const archiveMatches =
+          archive.archiveType === "smart_alert" &&
+          archive.smartAlert === true &&
+          murabbikSmartAlertTextSrv(
+            archive.userId
+          ) === murabbikSmartAlertTextSrv(
+            req.userId
+          ) &&
+          murabbikSmartAlertTextSrv(
+            archive.smartAlertId
+          ) === alertId &&
+          murabbikSmartAlertTextSrv(
+            archive.revision
+          ) === revision;
+
+        if (archiveMatches) {
+          sourceName =
+            murabbikSmartAlertTextSrv(
+              archive.sourceName
+            );
+        }
+      }
+    }
+  } catch (e) {
+    console.warn(
+      "smart-alert response source lookup failed:",
+      e.message || e
+    );
+  }
+
+  if (sourceName) {
+    const builder =
+      murabbikSmartAlertSourcesSrv.get(
+        sourceName
+      );
+
+    if (typeof builder === "function") {
+      const context = {
+        req,
+        userId: req.userId,
+
+        profileUid:
+          req.authSession?.uid ||
+          req.userId,
+
+        today:
+          await farmTodayISOSrv(
+            req.authSession?.uid ||
+            req.userId
+          ),
+
+        nowMs: Date.now(),
+        memo: new Map()
+      };
+
+      context.load = async (key, loader) => {
+        const memoKey =
+          murabbikSmartAlertTextSrv(key);
+
+        if (!context.memo.has(memoKey)) {
+          context.memo.set(
+            memoKey,
+            Promise.resolve().then(loader)
+          );
+        }
+
+        return await context.memo.get(
+          memoKey
+        );
+      };
+
+      try {
+        const rows =
+          await builder(context);
+
+        for (
+          const raw of
+          Array.isArray(rows) ? rows : []
+        ) {
+          try {
+            const alert =
+              murabbikSmartAlertNormalizeSrv(
+                sourceName,
+                raw
+              );
+
+            if (
+              alert.id === alertId &&
+              alert.revision === revision
+            ) {
+              return alert;
+            }
+
+          } catch (e) {
+            console.error(
+              `murabbik-smart-alert-normalize:${sourceName}`,
+              e
+            );
+          }
+        }
+
+        // أُعيد بناء المصدر حيًا،
+        // والتنبيه لم يعد موجودًا.
+        return null;
+
+      } catch (e) {
+        console.warn(
+          `smart-alert response source rebuild failed:${sourceName}`,
+          e.message || e
+        );
+      }
+    }
+  }
+
+  // حماية للحسابات القديمة أو فشل قراءة الأرشيف:
+  // نستخدم المسار الكامل الحالي.
+  const result =
+    await murabbikSmartAlertCollectSrv(
+      req
+    );
+
+  return (
+    result.alerts.find(
+      item =>
+        item.id === alertId &&
+        item.revision === revision
+    ) || null
+  );
+}
 app.post(
   "/api/smart-alerts/respond",
   requireUserId,
@@ -71532,17 +71690,12 @@ app.post(
           });
       }
 
-const result =
-  await murabbikSmartAlertCollectSrv(
-    req
-  );
-
 const alert =
-  result.alerts.find(
-    item =>
-      item.id === alertId &&
-      item.revision === revision
-  ) || null;
+  await murabbikSmartAlertLiveResponseAlertSrv(
+    req,
+    alertId,
+    revision
+  );
 
       if (!alert) {
         return res
