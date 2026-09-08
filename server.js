@@ -24098,7 +24098,6 @@ ndfHint =
       status: nutrition.rumenStatus || null,
       model: rumenModel || null
     },
-        ...(dcadCard ? [dcadCard] : []),
     {
       key: 'priority',
       title: 'أولوية التعديل',
@@ -24415,6 +24414,8 @@ const reportStage =
       );
 
 const advancedCards = [
+  ...(dcadCard ? [dcadCard] : []),
+
   nutritionAdvancedDisplayCardSrv({
     key: 'dmi',
     title: 'المادة الجافة المأكولة',
