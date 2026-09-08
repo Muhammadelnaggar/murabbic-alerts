@@ -24965,20 +24965,70 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
       const species = speciesOf(a);
       const lastCalvingDate = dateOnly(a.lastCalvingDate || a.calvingDate || '');
       const lastInseminationDate = dateOnly(a.lastInseminationDate || '');
-      const productionStatus = String(a.productionStatus || '').trim();
-      const reproductiveStatus = String(a.reproductiveStatus || '').trim();
+           const productionStatus =
+        String(a.productionStatus || '').trim();
 
-      const pregnancyDays = reproductiveStatus === 'عشار'
-        ? (toNum(a.pregnancyDays) ?? daysFrom(lastInseminationDate))
-        : (toNum(a.pregnancyDays) || 0);
+      const reproductiveStatus =
+        String(a.reproductiveStatus || '').trim();
 
-      const daysToCalving = pregnancyDays > 0
-        ? Math.max(0, (species === 'جاموس' ? 315 : 280) - pregnancyDays)
-        : null;
+      const stageText =
+        [
+          productionStatus,
+          a.groupId,
+          a.groupKey,
+          a.group,
+          a.groupName,
+          a.groupLabel
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
 
-      const daysInMilk = productionStatus === 'جاف'
-        ? null
-        : (toNum(a.daysInMilk) ?? daysFrom(lastCalvingDate));
+      const isCloseUp =
+        (
+          stageText.includes('انتظار') &&
+          stageText.includes('ولاد')
+        ) ||
+        (
+          stageText.includes('تحضير') &&
+          stageText.includes('ولاد')
+        ) ||
+        /close[_ ]?up/.test(stageText);
+
+      const isEarlyDry =
+        !isCloseUp &&
+        (
+          stageText.includes('جاف') ||
+          stageText.includes('dry')
+        );
+
+      const isNonLactating =
+        isCloseUp || isEarlyDry;
+
+      const pregnancyDays =
+        reproductiveStatus === 'عشار'
+          ? (
+              toNum(a.pregnancyDays) ??
+              daysFrom(lastInseminationDate)
+            )
+          : (toNum(a.pregnancyDays) || 0);
+
+      const daysToCalving =
+        pregnancyDays > 0
+          ? Math.max(
+              0,
+              (species === 'جاموس' ? 315 : 280) -
+                pregnancyDays
+            )
+          : null;
+
+      const daysInMilk =
+        isNonLactating
+          ? null
+          : (
+              toNum(a.daysInMilk) ??
+              daysFrom(lastCalvingDate)
+            );
 
            return {
         animalId: docSnap.id,
@@ -24992,20 +25042,45 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
 
         species,
         breed: a.breed || null,
-        productionStatus: productionStatus || null,
+               productionStatus: productionStatus || null,
         pregnancyStatus: reproductiveStatus || null,
         reproductiveStatus: reproductiveStatus || null,
+
+        earlyDry: isEarlyDry,
+        closeUp: isCloseUp,
+
         daysInMilk,
-        avgMilkKg: toNum(a.dailyMilk ?? a.milkTodayKg ?? a.avgMilkKg),
+
+        avgMilkKg:
+          isNonLactating
+            ? null
+            : toNum(
+                a.dailyMilk ??
+                a.milkTodayKg ??
+                a.avgMilkKg
+              ),
+
         pregnancyDays,
         daysToCalving,
         bodyWeightKg: toNum(a.bodyWeightKg ?? a.bodyWeight ?? a.weightKg),
         bcs: toNum(a.bcs ?? a.bodyConditionScore),
         parity: toNum(a.parity ?? a.lactationNumber),
         lactationNumber: toNum(a.lactationNumber ?? a.parity),
-        milkFatPct: toNum(a.milkFatPct),
-        milkProteinPct: toNum(a.milkProteinPct),
-        milkPrice: toNum(a.milkPrice)
+
+        milkFatPct:
+          isNonLactating
+            ? null
+            : toNum(a.milkFatPct),
+
+        milkProteinPct:
+          isNonLactating
+            ? null
+            : toNum(a.milkProteinPct),
+
+        milkPrice:
+          isNonLactating
+            ? null
+            : toNum(a.milkPrice)
       };
     };
 
@@ -25099,6 +25174,47 @@ const dominantText = (field) => {
     const groupId = String(req.query.groupId || '').trim() || commonText('groupId');
     const groupKey = String(req.query.groupKey || '').trim() || commonText('groupKey');
 
+    const groupStageText =
+      [
+        groupId,
+        groupKey,
+        groupName
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+    const normalizedGroupId =
+      String(groupId || '').toLowerCase();
+
+    const normalizedGroupKey =
+      String(groupKey || '').toLowerCase();
+
+    const isCloseUpGroup =
+      normalizedGroupKey === 'closeup' ||
+      /(^|_)closeup($|_)/.test(normalizedGroupId) ||
+      /close[_ ]?up/.test(groupStageText) ||
+      (
+        groupStageText.includes('انتظار') &&
+        groupStageText.includes('ولاد')
+      ) ||
+      (
+        groupStageText.includes('تحضير') &&
+        groupStageText.includes('ولاد')
+      );
+
+    const isEarlyDryGroup =
+      !isCloseUpGroup &&
+      (
+        normalizedGroupKey === 'dry' ||
+        /(^|_)dry($|_)/.test(normalizedGroupId) ||
+        groupStageText.includes('جاف') ||
+        groupStageText.includes('dry')
+      );
+
+    const isNonLactatingGroup =
+      isCloseUpGroup || isEarlyDryGroup;
+
     const breed = dominantText('breed');
 
     const groupParityValues = items
@@ -25125,20 +25241,53 @@ const dominantText = (field) => {
         groupKey,
         species,
         breed,
-        parity: parityFactor,
+                parity: parityFactor,
         parityFactor,
         lactationNumber: parityFactor,
-        daysInMilk: avg('daysInMilk'),
-        avgMilkKg: avg('avgMilkKg'),
+
+        productionStatus:
+          isCloseUpGroup
+            ? 'انتظار ولادة'
+            : (
+                isEarlyDryGroup
+                  ? 'جاف'
+                  : commonText('productionStatus')
+              ),
+
+        earlyDry: isEarlyDryGroup,
+        closeUp: isCloseUpGroup,
+
+        daysInMilk:
+          isNonLactatingGroup
+            ? null
+            : avg('daysInMilk'),
+
+        avgMilkKg:
+          isNonLactatingGroup
+            ? null
+            : avg('avgMilkKg'),
+
         pregnancyDays: avg('pregnancyDays'),
         daysToCalving: avg('daysToCalving'),
         bodyWeightKg: avgPositive('bodyWeightKg'),
         groupBodyWeightKg: avgPositive('bodyWeightKg'),
         bcs: avgPositive('bcs'),
         groupBcs: avgPositive('bcs'),
-        milkFatPct: avgPositive('milkFatPct'),
-        milkProteinPct: avgPositive('milkProteinPct'),
-        milkPrice: avgPositive('milkPrice')
+
+        milkFatPct:
+          isNonLactatingGroup
+            ? null
+            : avgPositive('milkFatPct'),
+
+        milkProteinPct:
+          isNonLactatingGroup
+            ? null
+            : avgPositive('milkProteinPct'),
+
+        milkPrice:
+          isNonLactatingGroup
+            ? null
+            : avgPositive('milkPrice')
       }
     });
   } catch (e) {
@@ -61549,6 +61698,28 @@ if (!rsNorm.includes("عشار")) {
       .trim()
       .slice(0, 10);
 
+  const lastDryOffEventDate =
+    String(
+      fd.lastDryOffEventDate || ""
+    ).trim().slice(0, 10);
+
+  if (
+    !calvingIsDateSrv(lastDryOffEventDate) ||
+    lastDryOffEventDate <= lf ||
+    lastDryOffEventDate > closeUpDate
+  ) {
+    return "❌ لا يمكن تسجيل انتظار الولادة قبل وجود حدث تجفيف فعلي للحمل الحالي. سجّل التجفيف أولًا.";
+  }
+
+  const isCurrentlyDry =
+    doc.inMilk === false ||
+    psNorm.includes("جاف") ||
+    psNorm.includes("dry");
+
+  if (!isCurrentlyDry) {
+    return "❌ يوجد حدث تجفيف للحمل الحالي، لكن الحالة الإنتاجية الحالية ليست «جاف». راجع بيانات الحيوان قبل تحضير الولادة.";
+  }
+
   const todayISO =
     addAnimalTodaySrv();
 
@@ -61640,6 +61811,10 @@ async function updateAnimalAfterCloseupSaveSrv(
   const update = {
     lastCloseUpDate: eventDate,
     productionStatus: "انتظار ولادة",
+    inMilk: false,
+    dailyMilk: null,
+    milkTodayKg: null,
+    daysInMilk: null,
 
     closeUpRation:
       String(ev.ration || "").trim(),
@@ -61689,6 +61864,105 @@ function closeupParseNumbersSrv(raw) {
       })
       .filter(Boolean)
   )];
+}
+
+async function closeupLastDryOffEventDateSrv(
+  uid,
+  animalNumber,
+  onOrBeforeDate = ""
+) {
+  const number =
+    calvingNormDigitsOnlySrv(
+      animalNumber || ""
+    );
+
+  if (!uid || !number) {
+    return "";
+  }
+
+  const variants = [String(number)];
+  const numericNumber = Number(number);
+
+  if (
+    Number.isFinite(numericNumber) &&
+    String(numericNumber) === String(number)
+  ) {
+    variants.push(numericNumber);
+  }
+
+  const settled =
+    await Promise.allSettled(
+      [...new Set(variants)].map(value =>
+        db.collection("events")
+          .where("userId", "==", uid)
+          .where("animalNumber", "==", value)
+          .get()
+      )
+    );
+
+  const byId = new Map();
+  let successfulQueries = 0;
+
+  for (const result of settled) {
+    if (result.status !== "fulfilled") {
+      continue;
+    }
+
+    successfulQueries++;
+
+    for (const eventDoc of result.value.docs) {
+      if (!byId.has(eventDoc.id)) {
+        byId.set(
+          eventDoc.id,
+          eventDoc.data() || {}
+        );
+      }
+    }
+  }
+
+  if (!successfulQueries) {
+    throw new Error(
+      "close_up_dry_off_events_load_failed"
+    );
+  }
+
+  const maxDate =
+    calvingIsDateSrv(onOrBeforeDate)
+      ? String(onOrBeforeDate).slice(0, 10)
+      : "";
+
+  let latest = "";
+
+  for (const event of byId.values()) {
+    if (
+      eventsPageNormalizeTypeKeySrv(event) !==
+      "dry_off"
+    ) {
+      continue;
+    }
+
+    const date =
+      String(
+        event.eventDate ||
+        event.dryOffDate ||
+        event.date ||
+        ""
+      ).trim().slice(0, 10);
+
+    if (!calvingIsDateSrv(date)) {
+      continue;
+    }
+
+    if (maxDate && date > maxDate) {
+      continue;
+    }
+
+    if (!latest || date > latest) {
+      latest = date;
+    }
+  }
+
+  return latest;
 }
 
 async function closeupEvaluateAnimalSrv({
@@ -61746,6 +62020,13 @@ async function closeupEvaluateAnimalSrv({
     ""
   ).trim();
 
+  const lastDryOffEventDate =
+    await closeupLastDryOffEventDateSrv(
+      uid,
+      animalNumber,
+      eventDate
+    );
+
    const row = {
     animalNumber,
     animalId: animal.id || "",
@@ -61758,6 +62039,7 @@ async function closeupEvaluateAnimalSrv({
     eventDate,
     species,
     lastInseminationDate,
+    lastDryOffEventDate,
 
     reproductiveStatus:
       reproFromDoc ||
@@ -66109,6 +66391,7 @@ async function murabbikSmartAlertReproTruthSrv(
       lastEmbryonicLossDate: "",
       lastHeatDate: "",
       lastDryOffDate: "",
+      lastDryOffEventDate: "",
       lastCloseUpDate: "",
       lastDiagnosisDate: "",
       lastDiagnosisResult: "",
@@ -66383,6 +66666,7 @@ const rows = await context.load(
     lastEmbryonicLossDate,
     lastHeatDate,
     lastDryOffDate,
+    lastDryOffEventDate: eventDates.dry_off,
     lastCloseUpDate,
     lastDiagnosisDate,
     lastDiagnosisResult,
@@ -68302,6 +68586,28 @@ function murabbikCloseUpAlertPregnancyEndedSrv(
   });
 }
 
+function murabbikCloseUpAlertIsDrySrv(
+  doc = {}
+) {
+  if (doc.inMilk === false) {
+    return true;
+  }
+
+  const production =
+    murabbikSmartAlertTextSrv([
+      doc.productionStatus,
+      doc.lactationStatus,
+      doc.group,
+      doc.groupId
+    ].filter(Boolean).join(" "))
+      .toLowerCase();
+
+  return (
+    production.includes("جاف") ||
+    production.includes("dry")
+  );
+}
+
 async function murabbikCloseUpDueAlertSourceSrv(
   context
 ) {
@@ -68348,6 +68654,17 @@ await murabbikSmartAlertWarmReproTruthSrv(
     if (
       !calvingIsDateSrv(lastInseminationDate) ||
       reproTruth.isPregnant !== true
+    ) {
+      continue;
+    }
+
+    const lastDryOffEventDate =
+      reproTruth.lastDryOffEventDate;
+
+    if (
+      !calvingIsDateSrv(lastDryOffEventDate) ||
+      lastDryOffEventDate <= lastInseminationDate ||
+      !murabbikCloseUpAlertIsDrySrv(doc)
     ) {
       continue;
     }
