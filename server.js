@@ -66047,7 +66047,53 @@ function murabbikSmartAlertLatestIsoDateSrv(...values) {
     .sort()
     .at(-1) || "";
 }
+const MURABBIK_SMART_ALERT_EVENTS_LIMIT = 8000;
 
+async function murabbikSmartAlertEventsIndexSrv(context) {
+  return await context.load(
+    "smart-alerts:events-index",
+    async () => {
+      const snap =
+        await db
+          .collection("events")
+          .where("userId", "==", context.userId)
+          .limit(MURABBIK_SMART_ALERT_EVENTS_LIMIT)
+          .get();
+
+      const rows =
+        snap.docs.map(doc => ({
+          id: doc.id,
+          ...(doc.data() || {})
+        }));
+
+      const byAnimal = new Map();
+
+      for (const event of rows) {
+        const animalNumber =
+          calvingNormDigitsOnlySrv(
+            event.animalNumber || ""
+          );
+
+        if (!animalNumber) continue;
+
+        if (!byAnimal.has(animalNumber)) {
+          byAnimal.set(animalNumber, []);
+        }
+
+        byAnimal.get(animalNumber).push(event);
+      }
+
+      return {
+        rows,
+        byAnimal,
+
+        complete:
+          rows.length <
+          MURABBIK_SMART_ALERT_EVENTS_LIMIT
+      };
+    }
+  );
+}
 async function murabbikSmartAlertReproTruthSrv(
   context,
   animalNumber,
@@ -66071,55 +66117,69 @@ async function murabbikSmartAlertReproTruthSrv(
     };
   }
 
-  const rows = await context.load(
-    `smart-alerts:repro-truth:${number}`,
-    async () => {
-      const variants = [String(number)];
-      const numericNumber = Number(number);
-
-      if (
-        Number.isFinite(numericNumber) &&
-        String(numericNumber) === String(number)
-      ) {
-        variants.push(numericNumber);
-      }
-
-      const settled = await Promise.allSettled(
-        [...new Set(variants)].map(value =>
-          db.collection("events")
-            .where("userId", "==", context.userId)
-            .where("animalNumber", "==", value)
-            .get()
-        )
+const rows = await context.load(
+  `smart-alerts:repro-truth:${number}`,
+  async () => {
+    const sharedEvents =
+      await murabbikSmartAlertEventsIndexSrv(
+        context
       );
 
-      const byId = new Map();
-      let successfulQueries = 0;
+    if (sharedEvents.complete) {
+      return (
+        sharedEvents.byAnimal.get(number) ||
+        []
+      );
+    }
 
-      for (const result of settled) {
-        if (result.status !== "fulfilled") continue;
+    // إذا وصلت القراءة المشتركة للحد الأقصى،
+    // نحافظ على Ground Truth بالاستعلام الفردي الأصلي.
+    const variants = [String(number)];
+    const numericNumber = Number(number);
 
-        successfulQueries++;
+    if (
+      Number.isFinite(numericNumber) &&
+      String(numericNumber) === String(number)
+    ) {
+      variants.push(numericNumber);
+    }
 
-        for (const eventDoc of result.value.docs) {
-          if (!byId.has(eventDoc.id)) {
-            byId.set(
-              eventDoc.id,
-              eventDoc.data() || {}
-            );
-          }
+    const settled = await Promise.allSettled(
+      [...new Set(variants)].map(value =>
+        db.collection("events")
+          .where("userId", "==", context.userId)
+          .where("animalNumber", "==", value)
+          .get()
+      )
+    );
+
+    const byId = new Map();
+    let successfulQueries = 0;
+
+    for (const result of settled) {
+      if (result.status !== "fulfilled") continue;
+
+      successfulQueries++;
+
+      for (const eventDoc of result.value.docs) {
+        if (!byId.has(eventDoc.id)) {
+          byId.set(
+            eventDoc.id,
+            eventDoc.data() || {}
+          );
         }
       }
-
-      if (!successfulQueries) {
-        throw new Error(
-          "smart_alert_repro_truth_load_failed"
-        );
-      }
-
-      return [...byId.values()];
     }
-  );
+
+    if (!successfulQueries) {
+      throw new Error(
+        "smart_alert_repro_truth_load_failed"
+      );
+    }
+
+    return [...byId.values()];
+  }
+);
 
   const eventDates = {
     insemination: "",
@@ -66340,6 +66400,14 @@ async function murabbikSmartAlertWarmReproTruthSrv(
   return await context.load(
     "smart-alerts:repro-truth:warm-active-mothers",
     async () => {
+      const sharedEvents =
+  await murabbikSmartAlertEventsIndexSrv(
+    context
+  );
+
+if (sharedEvents.complete) {
+  return true;
+}
       const candidates = [];
 
       for (const doc of animals) {
@@ -67229,18 +67297,12 @@ function murabbikMilkMirrorGroupRationEventIdSrv(
   ).trim();
 }
 async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
-  const [animals, allEvents] = await Promise.all([
-    murabbikSmartAlertAnimalsSrv(context),
+ const [animals, sharedEvents] = await Promise.all([
+  murabbikSmartAlertAnimalsSrv(context),
+  murabbikSmartAlertEventsIndexSrv(context)
+]);
 
-    context.load(
-      "smart-alerts:milk-mirror-events",
-      async () =>
-        await milkReportFetchUserEventsSrv(
-          context.userId,
-          8000
-        )
-    )
-  ]);
+const allEvents = sharedEvents.rows;
     const officialGroupsResult =
     await context.load(
       "smart-alerts:milk-mirror-official-groups",
@@ -71419,81 +71481,7 @@ degraded:
     });
   }
 });
-async function murabbikSmartAlertArchivedForResponseSrv(
-  req,
-  alertId,
-  revision
-) {
-  const docId =
-    murabbikSmartAlertArchiveDocIdSrv(
-      req,
-      {
-        id: alertId,
-        revision
-      }
-    );
 
-  if (!docId) return null;
-
-  const snap =
-    await db
-      .collection(
-        MURABBIK_SMART_ALERT_ARCHIVE_COLLECTION
-      )
-      .doc(docId)
-      .get();
-
-  if (!snap.exists) return null;
-
-  const data = snap.data() || {};
-
-  if (
-    data.archiveType !== "smart_alert" ||
-    data.smartAlert !== true ||
-    murabbikSmartAlertTextSrv(data.userId) !==
-      murabbikSmartAlertTextSrv(req.userId) ||
-    murabbikSmartAlertTextSrv(data.smartAlertId) !==
-      alertId ||
-    murabbikSmartAlertTextSrv(data.revision) !==
-      revision
-  ) {
-    return null;
-  }
-
-  const snoozeMinutesRaw =
-    Number(data.snoozeMinutes);
-
-  return {
-    id: alertId,
-    revision,
-
-    source:
-      murabbikSmartAlertTextSrv(
-        data.sourceName
-      ),
-
-    kind:
-      murabbikSmartAlertTextSrv(
-        data.kind
-      ),
-
-    domain:
-      murabbikSmartAlertTextSrv(
-        data.domain
-      ),
-
-    code:
-      murabbikSmartAlertTextSrv(
-        data.code
-      ),
-
-    _snoozeMinutes:
-      Number.isFinite(snoozeMinutesRaw) &&
-      snoozeMinutesRaw > 0
-        ? snoozeMinutesRaw
-        : 0
-  };
-}
 app.post(
   "/api/smart-alerts/respond",
   requireUserId,
@@ -71544,32 +71532,17 @@ app.post(
           });
       }
 
-  let alert =
-  await murabbikSmartAlertArchivedForResponseSrv(
-    req,
-    alertId,
-    revision
+const result =
+  await murabbikSmartAlertCollectSrv(
+    req
   );
 
-if (
-  !alert ||
-  (
-    decision === "snoozed" &&
-    !(Number(alert._snoozeMinutes) > 0)
-  )
-) {
-  const result =
-    await murabbikSmartAlertCollectSrv(
-      req
-    );
-
-  alert =
-    result.alerts.find(
-      item =>
-        item.id === alertId &&
-        item.revision === revision
-    ) || null;
-}
+const alert =
+  result.alerts.find(
+    item =>
+      item.id === alertId &&
+      item.revision === revision
+  ) || null;
 
       if (!alert) {
         return res
