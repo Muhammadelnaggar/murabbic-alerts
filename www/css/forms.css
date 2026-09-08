@@ -368,6 +368,19 @@ textarea{
   background:#eef2f7;
   color:#0f172a;
 }
+@media (max-width: 520px){
+
+  #nutritionBottomActions{
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  #nutritionBottomActions button{
+    width:100%;
+    flex:0 0 auto;
+  }
+
+}
 
 /* Header موحد */
 .mbk-head{
