@@ -24308,10 +24308,8 @@ const mixPriceAsFedVal =
     ? Number(totals.mixPriceAsFed)
     : null;
 
-if (isDryEconomics) {
-  return {
-    analysisCards,
-    economicsCards: [
+const economicsCards = isDryEconomics
+  ? [
       econCard(
         'feedCostPerHeadDay',
         'تكلفة التغذية / رأس / يوم',
@@ -24338,55 +24336,55 @@ if (isDryEconomics) {
         mixPriceAsFedVal != null ? 'good' : 'warn',
         'مؤشر تكلفة الخلطة كما تُقدَّم في المعلف.'
       )
-    ],
-    advancedCards: []
-  };
-}
-  const economicsCards = [
-    econCard(
-      'feedCostPctOfMilkIncome',
-      'تكلفة العلف من دخل اللبن',
-      feedCostPctOfMilkIncome != null ? `${num(feedCostPctOfMilkIncome, 1)}%` : '—',
-      feedCostPctOfMilkIncome,
-      feedCostBand.status,
-      feedCostHint
-    ),
-    econCard(
-      'iofcPctOfMilkIncome',
-      'هامش اللبن بعد العلف',
-      iofcPctOfMilkIncome != null ? `${num(iofcPctOfMilkIncome, 1)}%` : '—',
-      iofcPctOfMilkIncome,
-      iofcBand.status,
-      milkAfterFeedHint
-    ),
-    econCard(
-      'feedEfficiencyECM',
-      'لبن مصحح لكل 1 كجم مادة جافة',
-      correctedMilkEfficiency != null ? `${num(correctedMilkEfficiency, 2)} كجم لبن مصحح` : '—',
-      correctedMilkEfficiency,
-      correctedMilkStatus,
-      correctedMilkEfficiency != null
-        ? `مقابل كل 1 كجم مادة جافة من العليقة تنتج الحيوانات ${num(correctedMilkEfficiency, 2)} كجم لبن مصحح.`
-        : 'يحتاج بيانات اللبن والمادة الجافة.'
-    ),
-    econCard(
-      'costPerKgMilk',
-      'تكلفة كجم اللبن',
-      costPerKgMilkVal != null ? `${num(costPerKgMilkVal, 2)} ج/كجم` : '—',
-      costPerKgMilkVal,
-      feedCostBand.status === 'danger' ? 'danger' : feedCostBand.status === 'warn' ? 'warn' : 'good',
-      costPerKgMilkHint
-    ),
-    econCard(
-      'milkMargin',
-      'هامش لبن-علف',
-      milkMarginVal != null ? `${num(milkMarginVal, 2)} ج` : '—',
-      milkMarginVal,
-      economicDecision?.status || iofcBand.status,
-      milkMarginHint
-    )
-  ];
-
+    ]
+  : [
+      econCard(
+        'feedCostPctOfMilkIncome',
+        'تكلفة العلف من دخل اللبن',
+        feedCostPctOfMilkIncome != null ? `${num(feedCostPctOfMilkIncome, 1)}%` : '—',
+        feedCostPctOfMilkIncome,
+        feedCostBand.status,
+        feedCostHint
+      ),
+      econCard(
+        'iofcPctOfMilkIncome',
+        'هامش اللبن بعد العلف',
+        iofcPctOfMilkIncome != null ? `${num(iofcPctOfMilkIncome, 1)}%` : '—',
+        iofcPctOfMilkIncome,
+        iofcBand.status,
+        milkAfterFeedHint
+      ),
+      econCard(
+        'feedEfficiencyECM',
+        'لبن مصحح لكل 1 كجم مادة جافة',
+        correctedMilkEfficiency != null ? `${num(correctedMilkEfficiency, 2)} كجم لبن مصحح` : '—',
+        correctedMilkEfficiency,
+        correctedMilkStatus,
+        correctedMilkEfficiency != null
+          ? `مقابل كل 1 كجم مادة جافة من العليقة تنتج الحيوانات ${num(correctedMilkEfficiency, 2)} كجم لبن مصحح.`
+          : 'يحتاج بيانات اللبن والمادة الجافة.'
+      ),
+      econCard(
+        'costPerKgMilk',
+        'تكلفة كجم اللبن',
+        costPerKgMilkVal != null ? `${num(costPerKgMilkVal, 2)} ج/كجم` : '—',
+        costPerKgMilkVal,
+        feedCostBand.status === 'danger'
+          ? 'danger'
+          : feedCostBand.status === 'warn'
+            ? 'warn'
+            : 'good',
+        costPerKgMilkHint
+      ),
+      econCard(
+        'milkMargin',
+        'هامش لبن-علف',
+        milkMarginVal != null ? `${num(milkMarginVal, 2)} ج` : '—',
+        milkMarginVal,
+        economicDecision?.status || iofcBand.status,
+        milkMarginHint
+      )
+    ];
  const reportStage =
   context?.stage ||
   context?.nutritionStage ||
