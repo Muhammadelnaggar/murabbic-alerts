@@ -25222,8 +25222,36 @@ const dominantText = (field) => {
       .filter(n => Number.isFinite(n) && n > 0);
 
     const parityFactor = groupParityValues.length
-      ? Math.round((groupParityValues.filter(n => n >= 2).length / groupParityValues.length) * 1000) / 1000
+      ? Math.round(
+          (
+            groupParityValues.filter(n => n >= 2).length /
+            groupParityValues.length
+          ) * 1000
+        ) / 1000
       : null;
+
+    const groupLactationNumber = groupParityValues.length
+      ? Math.round(
+          groupParityValues.reduce((sum, n) => sum + n, 0) /
+          groupParityValues.length
+        )
+      : null;
+
+    const groupPregnancyDaysAvg =
+      avg('pregnancyDays');
+
+    const groupDaysToCalvingAvg =
+      avg('daysToCalving');
+
+    const groupPregnancyDays =
+      Number.isFinite(groupPregnancyDaysAvg)
+        ? Math.round(groupPregnancyDaysAvg)
+        : null;
+
+    const groupDaysToCalving =
+      Number.isFinite(groupDaysToCalvingAvg)
+        ? Math.round(groupDaysToCalvingAvg)
+        : null;
 
     return res.json({
       ok: true,
@@ -25241,9 +25269,9 @@ const dominantText = (field) => {
         groupKey,
         species,
         breed,
-                parity: parityFactor,
+        parity: groupLactationNumber,
         parityFactor,
-        lactationNumber: parityFactor,
+        lactationNumber: groupLactationNumber,
 
         productionStatus:
           isCloseUpGroup
@@ -25267,8 +25295,8 @@ const dominantText = (field) => {
             ? null
             : avg('avgMilkKg'),
 
-        pregnancyDays: avg('pregnancyDays'),
-        daysToCalving: avg('daysToCalving'),
+        pregnancyDays: groupPregnancyDays,
+        daysToCalving: groupDaysToCalving,
         bodyWeightKg: avgPositive('bodyWeightKg'),
         groupBodyWeightKg: avgPositive('bodyWeightKg'),
         bcs: avgPositive('bcs'),
