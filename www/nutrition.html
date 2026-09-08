@@ -414,17 +414,22 @@
     </div>
 
 
-   <form id="nutritionForm" data-event="تغذية" data-redirect="/dashboard.html" style="width:100%">
- <input type="hidden" id="animalNumber" data-field="animalNumber">
-<input type="hidden" id="eventDate" data-field="eventDate">
-<input type="hidden" id="animalId" data-field="animalId">
-<input type="hidden" id="ctxParity">
-<input type="hidden" id="ctxDietNDFPct">
+<form id="nutritionForm" data-event="تغذية" data-redirect="/dashboard.html">
+  <input type="hidden" id="animalNumber" data-field="animalNumber">
+  <input type="hidden" id="eventDate" data-field="eventDate">
+  <input type="hidden" id="animalId" data-field="animalId">
+  <input type="hidden" id="ctxParity">
+  <input type="hidden" id="ctxDietNDFPct">
 
- <div id="nutritionBottomActions" class="actions-bar" style="left:50%;right:auto;transform:translateX(-50%);width:min(94vw,520px);z-index:999">
-   <button id="saveEditedRation" class="ghost" type="button" disabled style="position:static;transform:none;width:auto;min-height:52px;box-shadow:none;flex:1">💾 حفظ التعديل</button>
-   <button id="saveEvent" class="save" type="submit" style="position:static;left:auto;bottom:auto;transform:none;width:auto;min-height:52px;box-shadow:none;flex:1">🧾 تسجيل كحدث تغذية جديد</button>
- </div>
+  <div id="nutritionBottomActions" class="actions-bar">
+    <button id="saveEditedRation" class="ghost" type="button" disabled>
+      💾 حفظ التعديل
+    </button>
+
+    <button id="saveEvent" class="save" type="submit">
+      🧾 تسجيل كحدث تغذية جديد
+    </button>
+  </div>
 </form>
   </div>
 </div>
@@ -1783,8 +1788,18 @@ function thiRecommendationsHtml() {
     const thiCard = thiAdvancedCardHtml(analysis);
     const adviceCards = thiRecommendationsHtml();
 
-    if (thiCard) out.push(thiCard);
+ if (thiCard) out.push(thiCard);
     if (adviceCards) out.push(adviceCards);
+
+    const dcadServerCard = a("dcad");
+    if (dcadServerCard) {
+      out.push(
+        cardHtml(
+          dcadServerCard,
+          { wide: true }
+        )
+      );
+    }
 
     const totDMCard = a("totDM") || makeCard(totals.dmKg ?? totals.totalDMKg, "كجم", 2);
     const dmiTargetCard = a("dmiTarget") || makeCard(targets.dmiTarget, "كجم", 2);
