@@ -17294,13 +17294,24 @@ try {
   );
 }
 
+const editUiPolicy =
+  eventsPageNormalizeTypeKeySrv(ev) ===
+  "insemination"
+    ? inseminationFieldPolicySrv(ev)
+    : null;
+
 return res.json({
   ok: true,
+
   event:
     eventsPageEditPublicEventSrv(
       snap.id,
       ev
     ),
+
+  uiPolicy:
+    editUiPolicy,
+
   correctionPerformers
 });
 
@@ -20495,16 +20506,57 @@ else if (typeKey === "health") {
         ).trim();
 
         const fd = {
-          animalNumber,
-          eventDate,
-          documentData: subject.data || {},
-          species,
-          inseminationMethod: String(body.inseminationMethod ?? oldEvent.inseminationMethod ?? "").trim(),
-          semenCode: String(body.semenCode ?? oldEvent.semenCode ?? oldEvent.sireNumber ?? "").trim(),
-          inseminator: String(body.inseminator ?? oldEvent.inseminator ?? "").trim(),
-          inseminationTime: heatNormalizeDayPartForInseminationSrv(body.inseminationTime ?? oldEvent.inseminationTime ?? ""),
-          heatStatus: heatNormalizeDayPartForInseminationSrv(body.heatStatus ?? oldEvent.heatStatus ?? "")
-        };
+  animalNumber,
+  eventDate,
+  documentData:
+    subject.data || {},
+  species,
+
+  inseminationMethod:
+    String(
+      body.inseminationMethod ??
+      oldEvent.inseminationMethod ??
+      ""
+    ).trim(),
+
+  semenCode:
+    String(
+      body.semenCode ??
+      oldEvent.semenCode ??
+      oldEvent.sireNumber ??
+      ""
+    ).trim(),
+
+  inseminator:
+    String(
+      body.inseminator ??
+      oldEvent.inseminator ??
+      ""
+    ).trim(),
+
+  inseminationTime:
+    heatNormalizeDayPartForInseminationSrv(
+      body.inseminationTime ??
+      oldEvent.inseminationTime ??
+      ""
+    ),
+
+  heatStatus:
+    heatNormalizeDayPartForInseminationSrv(
+      body.heatStatus ??
+      oldEvent.heatStatus ??
+      ""
+    ),
+
+  inseminationSource:
+  String(
+    oldEvent.inseminationSource ||
+    ""
+  ).trim()
+};
+
+const fieldPolicy =
+  inseminationFieldPolicySrv(fd);
 
         const fieldErrors = validateInseminationFieldsSrv(fd);
         const firstError = Object.values(fieldErrors || {}).find(Boolean);
@@ -20532,13 +20584,32 @@ else if (typeKey === "health") {
         }
 
         eventPatch = {
-          ...eventPatch,
-          inseminationMethod: fd.inseminationMethod,
-          semenCode: fd.semenCode,
-          inseminator: fd.inseminator,
-          inseminationTime: inseminationDayPartSrv(fd.inseminationTime),
-          heatStatus: inseminationDayPartSrv(fd.heatStatus)
-        };
+  ...eventPatch,
+
+  inseminationMethod:
+    fd.inseminationMethod,
+
+  semenCode:
+    fd.semenCode,
+
+  inseminator:
+    fd.inseminator,
+
+  inseminationTime:
+    inseminationDayPartSrv(
+      fd.inseminationTime
+    ),
+
+  heatStatus:
+    fieldPolicy.requiresHeatStatus
+      ? inseminationDayPartSrv(
+          fd.heatStatus
+        )
+      : null,
+
+  inseminationSource:
+    fieldPolicy.source || null
+};
       }
 
       else if (typeKey === "pregnancy_diagnosis") {
@@ -29035,9 +29106,433 @@ function inseminationDaysBetweenSrv(a, b) {
   d2.setHours(0, 0, 0, 0);
   return Math.round((d2 - d1) / 86400000);
 }
+function inseminationTaiStepNameSrv(v = "") {
+  const s = String(v || "").trim();
 
+  return (
+    s.includes("تلقيح") ||
+    s.toLowerCase().includes("tai")
+  );
+}
+
+async function inseminationResolveTaiContextSrv(
+  uid,
+  animalNumber,
+  eventDate,
+  doc = {}
+) {
+  const number =
+    calvingNormDigitsOnlySrv(
+      animalNumber || ""
+    );
+
+  const date =
+    String(eventDate || "")
+      .trim()
+      .slice(0, 10);
+
+  const none = {
+    isTai: false,
+    source: "",
+    state: "",
+    program: "",
+    protocolStartDate: "",
+    stepIndex: null,
+    stepDay: null,
+    stepName: "",
+    taskRefs: [],
+    stepEventId: ""
+  };
+
+  if (
+    !db ||
+    !uid ||
+    !number ||
+    !calvingIsDateSrv(date)
+  ) {
+    return none;
+  }
+
+  const program =
+    String(
+      resolveOvsynchProgramFromAnimalSrv(doc) ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const protocolStartDate =
+    String(doc.protocolStartDate || "")
+      .trim()
+      .slice(0, 10);
+
+  const programDef =
+    ovsynchProgramDefinitionSrv(program);
+
+  const stepIndex =
+    Array.isArray(programDef?.steps)
+      ? programDef.steps.findIndex(
+          step =>
+            inseminationTaiStepNameSrv(
+              step?.name
+            )
+        )
+      : -1;
+
+  const canonicalStep =
+    stepIndex >= 0
+      ? programDef.steps[stepIndex]
+      : null;
+
+  if (
+    !canonicalStep ||
+    !calvingIsDateSrv(protocolStartDate)
+  ) {
+    return none;
+  }
+
+  const stepDay =
+    Number(canonicalStep.day);
+
+  const stepName =
+    String(
+      canonicalStep.name || ""
+    ).trim();
+
+  const dueDate =
+    addDaysToIsoDateSrv(
+      protocolStartDate,
+      stepDay
+    );
+
+  if (dueDate !== date) {
+    return none;
+  }
+
+  const currentProtocol =
+    String(doc.currentProtocol || "")
+      .trim()
+      .toLowerCase();
+
+  const protocolStatus =
+    String(doc.protocolStatus || "")
+      .trim()
+      .toLowerCase();
+
+  const protocolExitDate =
+    String(doc.protocolExitDate || "")
+      .trim()
+      .slice(0, 10);
+
+  const baseId =
+    [
+      "ovsynch",
+      number,
+      program,
+      protocolStartDate
+    ].join("__");
+
+  const stepEventId =
+    `${baseId}__step_event_${stepIndex}`;
+
+  if (
+    protocolStatus === "completed" &&
+    protocolExitDate === date
+  ) {
+    return {
+      isTai: true,
+      source: "ovsynch_tai",
+      state: "confirmed_step",
+      program,
+      protocolStartDate,
+      stepIndex,
+      stepDay,
+      stepName,
+      taskRefs: [],
+      stepEventId
+    };
+  }
+
+  if (
+    currentProtocol !== "ovsynch" ||
+    protocolStatus !== "active"
+  ) {
+    return none;
+  }
+
+  const animalStatus =
+    String(doc.status || "active")
+      .trim()
+      .toLowerCase();
+
+  if (
+    [
+      "inactive",
+      "sold",
+      "dead",
+      "archived"
+    ].includes(animalStatus)
+  ) {
+    return none;
+  }
+
+  const lastInseminationDate =
+    String(doc.lastInseminationDate || "")
+      .trim()
+      .slice(0, 10);
+
+  if (
+    lastInseminationDate &&
+    lastInseminationDate >=
+      protocolStartDate
+  ) {
+    return none;
+  }
+
+  const lastHeatDate =
+    String(
+      doc.lastHeatDate ||
+      doc.heatDate ||
+      doc.lastEstrusDate ||
+      ""
+    )
+      .trim()
+      .slice(0, 10);
+
+  if (
+    lastHeatDate &&
+    lastHeatDate >=
+      protocolStartDate
+  ) {
+    return none;
+  }
+
+  if (doc.breedingBlocked === true) {
+    return none;
+  }
+
+  const snap =
+    await db
+      .collection("tasks")
+      .where("userId", "==", uid)
+      .where("dueDate", "==", date)
+      .where("status", "==", "pending")
+      .limit(500)
+      .get();
+
+  const taskRefs = [];
+
+  snap.forEach(docSnap => {
+    const task =
+      docSnap.data() || {};
+
+    const taskNumber =
+      calvingNormDigitsOnlySrv(
+        task.animalNumber || ""
+      );
+
+    const taskProgram =
+      String(
+        task.program ||
+        task.protocolProgram ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+    const taskStart =
+      String(
+        task.protocolStartDate ||
+        ""
+      )
+        .trim()
+        .slice(0, 10);
+
+    const taskIndex =
+      Number(
+        task.stepIndex ?? -1
+      );
+
+    const taskDay =
+      Number(
+        task.stepDay ?? -1
+      );
+
+    const taskName =
+      String(
+        task.stepName || ""
+      ).trim();
+
+    const isOvsynchTask =
+      String(
+        task.taskType || ""
+      ).trim() === "ovsynch_step" ||
+
+      String(
+        task.type || ""
+      ).trim() === "ovsynch_step" ||
+
+      (
+        String(
+          task.type || ""
+        ).trim() === "protocol_step" &&
+
+        String(
+          task.protocol || ""
+        ).trim() === "ovsynch"
+      );
+
+    if (
+      taskNumber === number &&
+      isOvsynchTask &&
+      taskProgram === program &&
+      taskStart === protocolStartDate &&
+      taskIndex === stepIndex &&
+      taskDay === stepDay &&
+      taskName === stepName
+    ) {
+      taskRefs.push(
+        docSnap.ref
+      );
+    }
+  });
+
+  if (!taskRefs.length) {
+    return none;
+  }
+
+  return {
+    isTai: true,
+    source: "ovsynch_tai",
+    state: "pending_step",
+    program,
+    protocolStartDate,
+    stepIndex,
+    stepDay,
+    stepName,
+    taskRefs,
+    stepEventId
+  };
+}
+
+function inseminationQueueTaiCompletionSrv(
+  batch,
+  taiContext = {},
+  {
+    uid = "",
+    animalId = "",
+    animalNumber = "",
+    eventDate = "",
+    inseminationEventId = "",
+    source =
+      "server:/api/insemination/save:auto-confirm-tai"
+  } = {}
+) {
+  if (
+    !batch ||
+    taiContext.isTai !== true ||
+    taiContext.state !== "pending_step" ||
+    !taiContext.stepEventId
+  ) {
+    return {
+      ops: 0,
+      stepEventId: ""
+    };
+  }
+
+  let ops = 0;
+
+  batch.set(
+    db
+      .collection("events")
+      .doc(taiContext.stepEventId),
+    {
+      type: "ovsynch_step",
+      eventType: "خطوة تزامن",
+      eventTypeNorm: "ovsynch_step",
+      eventDate,
+      userId: uid,
+      ownerUid: uid,
+      animalId: animalId || "",
+      animalNumber:
+        String(animalNumber || ""),
+      protocolType: "ovsynch",
+      protocolProgram:
+        taiContext.program || "",
+      protocolStartDate:
+        taiContext.protocolStartDate || "",
+      stepIndex:
+        taiContext.stepIndex,
+      stepDay:
+        taiContext.stepDay,
+      stepName:
+        taiContext.stepName || "",
+      linkedInseminationEventId:
+        inseminationEventId || null,
+      source,
+      createdAt:
+        admin.firestore.FieldValue
+          .serverTimestamp(),
+      updatedAt:
+        admin.firestore.FieldValue
+          .serverTimestamp()
+    },
+    { merge: true }
+  );
+
+  ops++;
+
+  for (
+    const taskRef of
+    Array.isArray(taiContext.taskRefs)
+      ? taiContext.taskRefs
+      : []
+  ) {
+    batch.set(
+      taskRef,
+      {
+        status: "done",
+        done: true,
+        doneAt:
+          admin.firestore.FieldValue
+            .serverTimestamp(),
+        updatedAt:
+          admin.firestore.FieldValue
+            .serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    ops++;
+  }
+
+  return {
+    ops,
+    stepEventId:
+      taiContext.stepEventId
+  };
+}
+function inseminationFieldPolicySrv(fd = {}) {
+  const source =
+    inseminationSourceNormSrv(fd);
+
+  const isOvsynchTai =
+    source === "ovsynch_tai";
+
+  return {
+    source,
+    isOvsynchTai,
+    requiresHeatStatus:
+      !isOvsynchTai,
+    showHeatStatus:
+      !isOvsynchTai
+  };
+}
 function validateInseminationFieldsSrv(fd = {}) {
   const fieldErrors = {};
+
+  const fieldPolicy =
+    inseminationFieldPolicySrv(fd);
 
   if (!inseminationReqSrv(fd.animalNumber)) {
    fieldErrors.animalNumber = "أدخل رقم الحيوان.";
@@ -29083,12 +29578,19 @@ if (!inseminationReqSrv(fd.semenCode)) {
       "وقت التلقيح يجب أن يكون صباحا أو مساءا.";
   }
 
+ if (fieldPolicy.requiresHeatStatus) {
   if (!inseminationReqSrv(fd.heatStatus)) {
-    fieldErrors.heatStatus = "اختر وقت الشياع.";
-  } else if (!inseminationDayPartSrv(fd.heatStatus)) {
+    fieldErrors.heatStatus =
+      "اختر وقت الشياع.";
+  } else if (
+    !inseminationDayPartSrv(
+      fd.heatStatus
+    )
+  ) {
     fieldErrors.heatStatus =
       "وقت الشياع يجب أن يكون صباحا أو مساءا.";
   }
+}
 
   return fieldErrors;
 }
@@ -30343,6 +30845,9 @@ app.post("/api/insemination/gate", requireUserId, async (req, res) => {
     const uid = req.userId;
     const body = req.body || {};
 
+    let uiPolicy =
+      inseminationFieldPolicySrv({});
+
     const rawNumbers =
       body.animalNumbers ||
       body.numbers ||
@@ -30479,13 +30984,22 @@ if (eventDate > todayISO) {
           ""
         ).trim();
 
-        const sameDayInseminationCount = await countInseminationsSameDaySrv(
-          uid,
-          animalNumber,
-          eventDate
-        );
+        const sameDayInseminationCount =
+  await countInseminationsSameDaySrv(
+    uid,
+    animalNumber,
+    eventDate
+  );
 
-        const gateData = {
+const taiContext =
+  await inseminationResolveTaiContextSrv(
+    uid,
+    animalNumber,
+    eventDate,
+    doc
+  );
+
+const gateData = {
           animalNumber,
           eventDate,
           animalId: animal.id || "",
@@ -30501,9 +31015,17 @@ if (eventDate > todayISO) {
           embryonicLossConfirmed: body.embryonicLossConfirmed,
           confirmPregnancyLoss: body.confirmPregnancyLoss,
           pregnancyLossConfirmed: body.pregnancyLossConfirmed,
-          lastBoundary: String(signals.lastBoundary || "").trim(),
-          lastBoundaryType: String(signals.lastBoundaryType || "").trim()
-        };
+          lastBoundary:
+  String(signals.lastBoundary || "").trim(),
+
+lastBoundaryType:
+  String(signals.lastBoundaryType || "").trim(),
+
+inseminationSource:
+  taiContext.isTai
+    ? "ovsynch_tai"
+    : ""
+};
 
         const errMsg = inseminationDecisionSrv(gateData);
 
@@ -30533,9 +31055,17 @@ if (eventDate > todayISO) {
             reproductiveStatus: reproStatus,
             warning: true,
             message,
-            requiresEmbryonicLossConfirmation: needsEmbryonicConfirm,
-            sameDayInseminationCount,
-            stage: "pre_gate"
+            requiresEmbryonicLossConfirmation:
+  needsEmbryonicConfirm,
+
+sameDayInseminationCount,
+
+inseminationSource:
+  taiContext.isTai
+    ? "ovsynch_tai"
+    : "",
+
+stage: "pre_gate"
           });
           continue;
         }
@@ -30543,9 +31073,17 @@ if (eventDate > todayISO) {
           animalNumber,
           animalId: animal.id || "",
           species,
-          reproductiveStatus: reproStatus,
-          lastInseminationDate,
-          stage: "pre_gate"
+          reproductiveStatus:
+  reproStatus,
+
+lastInseminationDate,
+
+inseminationSource:
+  taiContext.isTai
+    ? "ovsynch_tai"
+    : "",
+
+stage: "pre_gate"
         });
 
       } catch (oneErr) {
@@ -30558,10 +31096,33 @@ if (eventDate > todayISO) {
       }
     }
 
-const acceptedCount = accepted.length;
-const rejectedCount = rejected.length;
-const isBulk = numbers.length > 1;
+const acceptedCount =
+  accepted.length;
 
+const rejectedCount =
+  rejected.length;
+
+const isBulk =
+  numbers.length > 1;
+
+const allAcceptedTai =
+  acceptedCount > 0 &&
+  accepted.every(
+    x =>
+      String(
+        x.inseminationSource ||
+        ""
+      ).trim() ===
+        "ovsynch_tai"
+  );
+
+uiPolicy =
+  inseminationFieldPolicySrv({
+    inseminationSource:
+      allAcceptedTai
+        ? "ovsynch_tai"
+        : ""
+  });
 if (!isBulk) {
   if (!acceptedCount) {
     const r0 = rejected[0] || {};
@@ -30601,8 +31162,12 @@ if (!isBulk) {
     animalNumber: a0.animalNumber || "",
     species: a0.species || "",
     reproductiveStatus: a0.reproductiveStatus || "",
-    lastInseminationDate: a0.lastInseminationDate || "",
-    acceptedCount,
+    lastInseminationDate:
+  a0.lastInseminationDate || "",
+
+uiPolicy,
+
+acceptedCount,
     rejectedCount,
     accepted,
     rejected
@@ -30629,8 +31194,11 @@ return res.json({
     ),
     inseminationAcceptedWarningsTextSrv(accepted)
   ),
-  acceptedCount,
-  rejectedCount,
+
+uiPolicy,
+
+acceptedCount,
+rejectedCount,
   accepted,
   rejected
 });
@@ -30750,13 +31318,22 @@ const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
       ""
     ).trim();
 
-    const sameDayInseminationCount = await countInseminationsSameDaySrv(
-      uid,
-      animalNumber,
-      eventDate
-    );
+const sameDayInseminationCount =
+  await countInseminationsSameDaySrv(
+    uid,
+    animalNumber,
+    eventDate
+  );
 
-    const gateData = {
+const taiContext =
+  await inseminationResolveTaiContextSrv(
+    uid,
+    animalNumber,
+    eventDate,
+    doc
+  );
+
+const gateData = {
       ...formData,
       animalNumber,
       eventDate,
@@ -30773,11 +31350,23 @@ const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
       embryonicLossConfirmed: formData.embryonicLossConfirmed,
       confirmPregnancyLoss: formData.confirmPregnancyLoss,
       pregnancyLossConfirmed: formData.pregnancyLossConfirmed,
-      lastBoundary: String(signals.lastBoundary || "").trim(),
-      lastBoundaryType: String(signals.lastBoundaryType || "").trim()
-    };
+      lastBoundary:
+  String(signals.lastBoundary || "").trim(),
 
-    const fieldErrors = validateInseminationFieldsSrv(gateData);
+lastBoundaryType:
+  String(signals.lastBoundaryType || "").trim(),
+
+inseminationSource:
+  taiContext.isTai
+    ? "ovsynch_tai"
+    : ""
+};
+
+const fieldPolicy =
+  inseminationFieldPolicySrv(gateData);
+
+const fieldErrors =
+  validateInseminationFieldsSrv(gateData);
 
     const cleanFieldErrors = {};
     for (const [k, v] of Object.entries(fieldErrors || {})) {
@@ -30892,9 +31481,14 @@ if (eventDate === todayISO) {
         inseminationDayPartSrv(formData.inseminationTime),
 
       heatStatus:
-        inseminationDayPartSrv(formData.heatStatus),
-      inseminationSource:
-       inseminationSourceNormSrv(formData) || null,
+  fieldPolicy.requiresHeatStatus
+    ? inseminationDayPartSrv(
+        formData.heatStatus
+      )
+    : null,
+
+inseminationSource:
+  fieldPolicy.source || null,
             thiAtInsemination: thiAtInsemination ? {
         thi: thiAtInsemination.thi ?? null,
         tempC: thiAtInsemination.tempC ?? null,
@@ -30928,8 +31522,26 @@ const animalRef = db.collection(animalCol).doc(animal.id);
 
 const batch = db.batch();
 
-payload.serviceNumber = nextServices;
-payload.servicesCount = nextServices;
+const taiCompletion =
+  inseminationQueueTaiCompletionSrv(
+    batch,
+    taiContext,
+    {
+      uid,
+      animalId:
+        animal.id || "",
+      animalNumber,
+      eventDate,
+      inseminationEventId:
+        eventRef.id
+    }
+  );
+
+payload.serviceNumber =
+  nextServices;
+
+payload.servicesCount =
+  nextServices;
 
 if (needsEmbryonicLoss && embryonicLossRef) {
   batch.set(embryonicLossRef, {
@@ -30964,8 +31576,25 @@ const animalUpdate = {
   reproductiveStatus: "ملقحة",
   lastInseminationDate: eventDate,
   servicesCount: nextServices,
-  updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  updatedAt:
+    admin.firestore.FieldValue
+      .serverTimestamp()
 };
+
+if (
+  taiContext.isTai === true &&
+  taiContext.state ===
+    "pending_step"
+) {
+  animalUpdate.currentProtocol =
+    null;
+
+  animalUpdate.protocolStatus =
+    "completed";
+
+  animalUpdate.protocolExitDate =
+    eventDate;
+}
 
 if (animalCol === "calves") {
   animalUpdate.followerStatus = "ملقح";
@@ -31223,13 +31852,22 @@ const rejected = [];
           ""
         ).trim();
 
-        const sameDayInseminationCount = await countInseminationsSameDaySrv(
-          uid,
-          animalNumber,
-          eventDate
-        );
+const sameDayInseminationCount =
+  await countInseminationsSameDaySrv(
+    uid,
+    animalNumber,
+    eventDate
+  );
 
-        const gateData = {
+const taiContext =
+  await inseminationResolveTaiContextSrv(
+    uid,
+    animalNumber,
+    eventDate,
+    doc
+  );
+
+const gateData = {
           ...formData,
           animalNumber,
           eventDate,
@@ -31246,11 +31884,23 @@ const rejected = [];
           embryonicLossConfirmed: formData.embryonicLossConfirmed,
           confirmPregnancyLoss: formData.confirmPregnancyLoss,
           pregnancyLossConfirmed: formData.pregnancyLossConfirmed,
-          lastBoundary: String(signals.lastBoundary || "").trim(),
-          lastBoundaryType: String(signals.lastBoundaryType || "").trim()
-        };
+          lastBoundary:
+  String(signals.lastBoundary || "").trim(),
 
-        const fieldErrors = validateInseminationFieldsSrv(gateData);
+lastBoundaryType:
+  String(signals.lastBoundaryType || "").trim(),
+
+inseminationSource:
+  taiContext.isTai
+    ? "ovsynch_tai"
+    : ""
+};
+
+const fieldPolicy =
+  inseminationFieldPolicySrv(gateData);
+
+const fieldErrors =
+  validateInseminationFieldsSrv(gateData);
 
         const cleanFieldErrors = {};
         for (const [k, v] of Object.entries(fieldErrors || {})) {
@@ -31328,9 +31978,14 @@ rejected.push({
            inseminationDayPartSrv(formData.inseminationTime),
 
           heatStatus:
-           inseminationDayPartSrv(formData.heatStatus),
-                    inseminationSource:
-           inseminationSourceNormSrv(formData) || null,
+  fieldPolicy.requiresHeatStatus
+    ? inseminationDayPartSrv(
+        formData.heatStatus
+      )
+    : null,
+
+inseminationSource:
+  fieldPolicy.source || null,
           thiAtInsemination: thiAtInsemination ? {
             thi: thiAtInsemination.thi ?? null,
             tempC: thiAtInsemination.tempC ?? null,
@@ -31360,10 +32015,35 @@ rejected.push({
        const animalCol = animal._collection || "animals";
 const animalRef = db.collection(animalCol).doc(animal.id);
 
-payload.serviceNumber = nextServices;
-payload.servicesCount = nextServices;
+payload.serviceNumber =
+  nextServices;
 
-if (needsEmbryonicLoss && embryonicLossRef) {
+payload.servicesCount =
+  nextServices;
+
+const taiCompletion =
+  inseminationQueueTaiCompletionSrv(
+    batch,
+    taiContext,
+    {
+      uid,
+      animalId:
+        animal.id || "",
+      animalNumber,
+      eventDate,
+      inseminationEventId:
+        eventRef.id,
+      source:
+        "server:/api/insemination/bulk-save:auto-confirm-tai"
+    }
+  );
+
+ops += taiCompletion.ops;
+
+if (
+  needsEmbryonicLoss &&
+  embryonicLossRef
+) {
           batch.set(embryonicLossRef, {
             userId: uid,
             animalId: animal.id || "",
@@ -31394,14 +32074,31 @@ if (needsEmbryonicLoss && embryonicLossRef) {
         batch.set(eventRef, payload);
         ops++;
 
-        const animalUpdate = {
-          reproductiveStatus: "ملقحة",
-          lastInseminationDate: eventDate,
-          servicesCount: nextServices,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        };
+      const animalUpdate = {
+  reproductiveStatus: "ملقحة",
+  lastInseminationDate: eventDate,
+  servicesCount: nextServices,
+  updatedAt:
+    admin.firestore.FieldValue
+      .serverTimestamp()
+};
 
-        if (animalCol === "calves") {
+if (
+  taiContext.isTai === true &&
+  taiContext.state ===
+    "pending_step"
+) {
+  animalUpdate.currentProtocol =
+    null;
+
+  animalUpdate.protocolStatus =
+    "completed";
+
+  animalUpdate.protocolExitDate =
+    eventDate;
+}
+
+if (animalCol === "calves") {
           animalUpdate.followerStatus = "ملقح";
           animalUpdate.status = "ملقح";
           animalUpdate.inseminationSireNumber =
