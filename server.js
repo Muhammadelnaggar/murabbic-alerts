@@ -42511,318 +42511,6 @@ function vaccinationAgeTimingAdviceSrv({
       `من ${windowStart} إلى ${windowEnd}.`
   };
 }
-function vaccinationTargetSexSrv(
-  animalDoc = {},
-  animalCollection = ""
-) {
-  const raw = [
-    animalDoc.sex,
-    animalDoc.gender,
-    animalDoc.animalSex,
-    animalDoc.sexAr,
-    animalDoc.genderAr
-  ]
-    .map(value =>
-      String(value ?? "")
-        .trim()
-        .toLowerCase()
-    )
-    .filter(Boolean);
-
-  const joined = raw.join(" ");
-
-  if (
-    raw.includes("m") ||
-    joined.includes("male") ||
-    joined.includes("bull") ||
-    joined.includes("ذكر")
-  ) {
-    return "male";
-  }
-
-  if (
-    raw.includes("f") ||
-    joined.includes("female") ||
-    joined.includes("heifer") ||
-    joined.includes("انث") ||
-    joined.includes("أنث") ||
-    joined.includes("نتاي")
-  ) {
-    return "female";
-  }
-
-  // animals في مُرَبِّيك هو مسار الأمهات بعد أول ولادة.
-  if (
-    String(animalCollection || "")
-      .trim()
-      .toLowerCase() === "animals"
-  ) {
-    return "female";
-  }
-
-  return "unknown";
-}
-
-async function vaccinationTargetEligibilitySrv({
-  uid = "",
-  animalNumber = "",
-  animal = null,
-  programLink = {},
-  eventDate = ""
-} = {}) {
-  if (programLink?.linked !== true) {
-    return null;
-  }
-
-  const doc =
-    animal?.data &&
-    typeof animal.data === "object"
-      ? animal.data
-      : {};
-
-  const animalCollection =
-    String(
-      animal?._collection || ""
-    )
-      .trim()
-      .toLowerCase();
-
-  const vaccineCode =
-    String(
-      programLink.vaccineCode || ""
-    )
-      .trim()
-      .toLowerCase();
-
-  // Lysigin:
-  // إناث من عمر 6 أشهر فأكثر،
-  // بلا اشتراط أمومة أو حالة تناسلية.
-  const targetGroup =
-    vaccineCode === "lysigin"
-      ? "females_6m_plus"
-      : String(
-          programLink.targetGroup || ""
-        )
-          .trim()
-          .toLowerCase();
-
-  if (
-    !targetGroup ||
-    targetGroup === "herd_all"
-  ) {
-    return null;
-  }
-
-  if (targetGroup === "calves") {
-    if (animalCollection !== "calves") {
-      return {
-        allowed: false,
-        code:
-          "vaccination_target_group_calves_only",
-        message:
-          "هذا التحصين مخصص للتوابع، والحيوان المختار ليس ضمن التوابع."
-      };
-    }
-
-    return null;
-  }
-
-  if (targetGroup === "mothers") {
-    if (animalCollection !== "animals") {
-      return {
-        allowed: false,
-        code:
-          "vaccination_target_group_mothers_only",
-        message:
-          "هذا التحصين مخصص للأمهات، والحيوان المختار ليس أمًا."
-      };
-    }
-
-    return null;
-  }
-
-  if (targetGroup === "heifers") {
-    const sex =
-      vaccinationTargetSexSrv(
-        doc,
-        animalCollection
-      );
-
-    if (
-      animalCollection !== "calves" ||
-      sex !== "female"
-    ) {
-      return {
-        allowed: false,
-        code:
-          "vaccination_target_group_heifers_only",
-        message:
-          "هذا التحصين مخصص للعجلات الإناث فقط."
-      };
-    }
-
-    return null;
-  }
-
-  if (
-    targetGroup ===
-      "pregnant_mothers"
-  ) {
-    if (animalCollection !== "animals") {
-      return {
-        allowed: false,
-        code:
-          "vaccination_target_group_pregnant_mothers_only",
-        message:
-          "هذا التحصين مخصص للأمهات العشار فقط."
-      };
-    }
-
-    let reproFromEvents = "";
-
-    try {
-      const signals =
-        await fetchCalvingSignalsFromEventsSrv(
-          uid,
-          animalNumber
-        );
-
-      reproFromEvents =
-        String(
-          signals?.reproStatusFromEvents ||
-          ""
-        ).trim();
-
-    } catch (_) {}
-
-    const reproRaw =
-      reproFromEvents ||
-      String(
-        doc.reproductiveStatus ||
-        doc.pregStatus ||
-        ""
-      ).trim();
-
-    const reproNorm =
-      calvingStripArSrv(
-        reproRaw
-      ).toLowerCase();
-
-    const isPregnant =
-      reproFromEvents
-        ? (
-            reproNorm.includes("عشار") ||
-            reproNorm.includes("حامل") ||
-            reproNorm.includes("pregnant")
-          )
-        : (
-            doc.pregnant === true ||
-            reproNorm.includes("عشار") ||
-            reproNorm.includes("حامل") ||
-            reproNorm.includes("pregnant")
-          );
-
-    if (!isPregnant) {
-      return {
-        allowed: false,
-        code:
-          "vaccination_target_group_pregnant_mothers_only",
-        message:
-          "هذا التحصين مخصص للأمهات العشار فقط، والحيوان المختار غير عشار حاليًا."
-      };
-    }
-
-    return null;
-  }
-
-  if (
-    targetGroup ===
-      "females_6m_plus"
-  ) {
-    const sex =
-      vaccinationTargetSexSrv(
-        doc,
-        animalCollection
-      );
-
-    if (sex !== "female") {
-      return {
-        allowed: false,
-        code:
-          "vaccination_target_group_females_only",
-        message:
-          "ليسيجين مخصص للإناث فقط."
-      };
-    }
-
-    // الأم المسجلة في animals تجاوزت 6 أشهر حتمًا.
-    if (animalCollection === "animals") {
-      return null;
-    }
-
-    const birthDate =
-      vaccinationAnimalBirthDateSrv(
-        doc
-      );
-
-    if (!birthDate) {
-      return {
-        allowed: false,
-        code:
-          "vaccination_lysigin_birth_date_required",
-        message:
-          "لا يمكن التحقق من أهلية ليسيجين بدون تاريخ ميلاد مسجل؛ يبدأ من عمر 6 أشهر."
-      };
-    }
-
-    const eligibleFrom =
-      vaccinationYmdAddUnitSrv(
-        birthDate,
-        6,
-        "month"
-      );
-
-    if (
-      !/^\d{4}-\d{2}-\d{2}$/.test(
-        eligibleFrom
-      )
-    ) {
-      return {
-        allowed: false,
-        code:
-          "vaccination_lysigin_age_unresolved",
-        message:
-          "تعذّر حساب عمر الحيوان للتحقق من أهلية ليسيجين."
-      };
-    }
-
-    const dt =
-      String(eventDate || "")
-        .trim()
-        .slice(0, 10);
-
-    if (dt < eligibleFrom) {
-      return {
-        allowed: false,
-        code:
-          "vaccination_lysigin_min_age",
-        eligibleFrom,
-        message:
-          `لا يمكن تسجيل ليسيجين قبل عمر 6 أشهر. يبدأ السماح لهذا الحيوان من ${eligibleFrom}.`
-      };
-    }
-
-    return null;
-  }
-
-  return {
-    allowed: false,
-    code:
-      "vaccination_target_group_unknown",
-    message:
-      "تعذّر التحقق من أهلية الحيوان لسطر برنامج التحصين المختار."
-  };
-}
 async function vaccinationDueWarningSrv({
   uid,
   animalNumber,
@@ -46270,15 +45958,12 @@ function vaccinationMurabbikDefaultProgramSrv() {
     }),
 
     row({
-      // نحافظ على الـRow ID القديم حتى لا نكسر Tasks محفوظة سابقًا.
       programRowId:
         "murabbik_lysigin_mothers",
       vaccineCode: "lysigin",
-      programSection: "herd",
+      programSection: "mothers",
       vaccineForm: "bacterin",
-      targetGroup: "females_6m_plus",
-      ageMinValue: 6,
-      ageMinUnit: "month",
+      targetGroup: "mothers",
       repeatEvery: 6,
       repeatUnit: "month",
       doseSchedule: [
@@ -46297,6 +45982,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
         )
       ]
     }),
+
     row({
       programRowId:
         "murabbik_brucella_s19_heifers",
@@ -47960,35 +47646,13 @@ const doseType = String(
         vaccine
       );
 
-            if (duplicated) {
+      if (duplicated) {
         rejected.push({
           animalNumber,
           reason: "سبق تسجيل التحصين نفسه لهذا الحيوان في التاريخ نفسه."
         });
         continue;
       }
-
-const targetEligibility =
-  await vaccinationTargetEligibilitySrv({
-    uid,
-    animalNumber,
-    animal,
-    programLink,
-    eventDate
-  });
-
-if (targetEligibility?.allowed === false) {
-  rejected.push({
-    animalNumber,
-    reason:
-      targetEligibility.message,
-    code:
-      targetEligibility.code || "",
-    eligibleFrom:
-      targetEligibility.eligibleFrom || ""
-  });
-  continue;
-}
 
 const dueWarning =
   await vaccinationDueWarningSrv({
@@ -50358,36 +50022,13 @@ const programRowId = String(
         vaccine
       );
 
-            if (duplicated) {
+      if (duplicated) {
         rejected.push({
           animalNumber,
           reason: "سبق تسجيل التحصين نفسه لهذا الحيوان في التاريخ نفسه."
         });
         continue;
       }
-
-const targetEligibility =
-  await vaccinationTargetEligibilitySrv({
-    uid,
-    animalNumber,
-    animal,
-    programLink,
-    eventDate
-  });
-
-if (targetEligibility?.allowed === false) {
-  rejected.push({
-    animalNumber,
-    reason:
-      targetEligibility.message,
-    code:
-      targetEligibility.code || "",
-    eligibleFrom:
-      targetEligibility.eligibleFrom || ""
-  });
-  continue;
-}
-
 const dueWarning =
   await vaccinationDueWarningSrv({
     uid,
