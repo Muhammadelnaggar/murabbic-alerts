@@ -21766,7 +21766,98 @@ milkMax: toNumOrNull(ctx.milkMax),
     formulationTarget: ctx.formulationTarget || null
   });
 }
+function nutritionFeedEfficiencyReadingSrv(value, species = '', surface = 'panel') {
+  const fe = Number(value);
+  const isBuffalo = isBuffaloSpecies(species);
 
+  if (!Number.isFinite(fe) || fe <= 0) {
+    return {
+      status: 'warn',
+      label: 'غير مكتمل',
+      hint: 'يحتاج بيانات اللبن المصحح والمادة الجافة.'
+    };
+  }
+
+  // Murabbik operational reading for buffalo — not a nutrient requirement.
+  if (isBuffalo) {
+    if (fe < 0.80) {
+      return {
+        status: 'warn',
+        label: 'تحتاج متابعة',
+        hint: 'كفاءة اللبن المصحح أقل من المجال التشغيلي المعتاد للجاموس؛ راجع DMI والإنتاج وحالة الجسم قبل تعديل العليقة.'
+      };
+    }
+
+    return {
+      status: 'good',
+      label: 'كفاءة مناسبة',
+      hint: 'كفاءة اللبن المصحح مناسبة للجاموس؛ اقرأها مع IOFC وحالة الجسم وثبات المأكول.'
+    };
+  }
+
+  // الأبقار — نحافظ على الحكم الحالي كما هو.
+  if (surface === 'dashboard') {
+    if (fe > 1.8) {
+      return {
+        status: 'watch',
+        label: 'مرتفع جدًا',
+        hint: 'الكفاءة مرتفعة جدًا؛ اقرأها مع IOFC وحالة الجسم لاحتمال السحب من الجسم.'
+      };
+    }
+
+    if (fe >= 1.45) {
+      return {
+        status: 'good',
+        label: 'كفاءة مناسبة',
+        hint: 'كفاءة التحويل داخل النطاق العملي؛ حافظ على الاتزان واقرأها مع IOFC.'
+      };
+    }
+
+    if (fe >= 1.30) {
+      return {
+        status: 'warn',
+        label: 'تحتاج متابعة',
+        hint: 'الكفاءة أقل من النطاق العملي؛ راجع المادة الجافة والإنتاج قبل تعديل الخلطة.'
+      };
+    }
+
+    return {
+      status: 'danger',
+      label: 'كفاءة منخفضة',
+      hint: 'التحويل ضعيف؛ افتح تقرير التغذية وراجع DMI والإنتاج والتكلفة.'
+    };
+  }
+
+  if (fe >= 1.6) {
+    return {
+      status: 'good',
+      label: 'ممتازة',
+      hint: 'كفاءة ممتازة؛ لا تطارد رفعها قبل ضبط الكرش والبروتين.'
+    };
+  }
+
+  if (fe >= 1.4) {
+    return {
+      status: 'good',
+      label: 'جيدة',
+      hint: 'كفاءة جيدة؛ حسّنها من الطاقة والكرش لا من تقليل المأكول.'
+    };
+  }
+
+  if (fe >= 1.3) {
+    return {
+      status: 'warn',
+      label: 'متوسطة',
+      hint: 'كفاءة متوسطة؛ راجع جودة الخشن والطاقة والمأكول.'
+    };
+  }
+
+  return {
+    status: 'danger',
+    label: 'ضعيفة',
+    hint: 'كفاءة ضعيفة؛ راجع المأكول والطاقة وجودة العليقة.'
+  };
+}
 function normalizeNutritionAnalysis(a = {}) {
   return cleanObj({
    totals: {
@@ -22005,7 +22096,7 @@ const iofcPctOfMilkIncome =
     eventDate: null
   };
 }
-function buildDashboardFeedAdviceSrv(overall = {}) {
+function buildDashboardFeedAdviceSrv(overall = {}, species = '') {
   if (overall.coverageComplete === false) {
     const covered = Number(overall.coverageHeadCount || 0);
     const required = Number(overall.coverageRequiredHeadCount || 0);
@@ -22022,6 +22113,28 @@ function buildDashboardFeedAdviceSrv(overall = {}) {
   if (!Number.isFinite(fe) || !Number.isFinite(iofcPct) || iofcPct <= 0) {
     return 'بيانات التغذية غير مكتملة؛ احفظ علائق الحلاب بسعر اللبن لتظهر قراءة مُرَبِّيك.';
   }
+  if (isBuffaloSpecies(species)) {
+  const feReading =
+    nutritionFeedEfficiencyReadingSrv(fe, species, 'dashboard');
+
+  if (feReading.status === 'warn' && iofcPct < 40) {
+    return 'كفاءة اللبن المصحح وIOFC يحتاجان مراجعة في الجاموس؛ راجع DMI والإنتاج والتكلفة قبل تغيير الخلطة.';
+  }
+
+  if (iofcPct >= 60 && feReading.status === 'good') {
+    return 'اقتصاد تغذية الجاموس قوي؛ كفاءة اللبن المصحح مناسبة وIOFC قوي. حافظ على الاتزان واقرأ المؤشرات بمقاييس الجاموس.';
+  }
+
+  if (iofcPct >= 50 && feReading.status === 'good') {
+    return 'اقتصاد تغذية الجاموس مقبول؛ اقرأ الكفاءة مع حالة الجسم والمأكول قبل أي تعديل في الخلطة.';
+  }
+
+  if (costPct > 60 || iofcPct < 40) {
+    return 'تكلفة التغذية تضغط هامش لبن الجاموس. راجع أعلى مجموعة تكلفة قبل تغيير الخلطة.';
+  }
+
+  return `مؤشرات تغذية الجاموس تحتاج متابعة؛ ${feReading.hint}`;
+}
 
   if (fe > 1.8) {
     return 'كفاءة تحويل المادة الجافة مرتفعة جدًا؛ راجع حالة الجسم واحتمال الاعتماد على مخزون الجسم، واقرأها مع IOFC قبل أي قرار.';
@@ -22045,7 +22158,7 @@ function buildDashboardFeedAdviceSrv(overall = {}) {
 
   return 'تحتاج مؤشرات التغذية إلى متابعة؛ راجع كفاءة تحويل المادة الجافة و IOFC في تقرير التغذية.';
 }
-function buildDashboardFeedGaugeCardsSrv(overall = {}) {
+function buildDashboardFeedGaugeCardsSrv(overall = {}, species = '') {
   const fe = Number(overall.feedEfficiency || 0);
   const iofcPct = Number(overall.iofcPctOfMilkIncome || 0);
   const marginDay = Number(overall.totalMilkFeedMarginPerDay ?? overall.totalMargin ?? 0);
@@ -22123,27 +22236,24 @@ function buildDashboardFeedGaugeCardsSrv(overall = {}) {
       feedEfficiency: feCard
     };
   }
-  if (Number.isFinite(fe) && fe > 0) {
-    if (fe > 1.8) {
-      feCard.state = 'watch';
-      feCard.stateLabel = 'مرتفع جدًا';
-      feCard.message = 'الكفاءة مرتفعة جدًا؛ اقرأها مع IOFC وحالة الجسم لاحتمال السحب من الجسم.';
-    } else if (fe >= 1.45) {
-      feCard.state = 'good';
-      feCard.stateLabel = 'كفاءة مناسبة';
-      feCard.message = 'كفاءة التحويل داخل النطاق العملي؛ حافظ على الاتزان واقرأها مع IOFC.';
-    } else if (fe >= 1.30) {
-      feCard.state = 'warn';
-      feCard.stateLabel = 'تحتاج متابعة';
-      feCard.message = 'الكفاءة أقل من النطاق العملي؛ راجع المادة الجافة والإنتاج قبل تعديل الخلطة.';
-    } else {
-      feCard.state = 'danger';
-      feCard.stateLabel = 'كفاءة منخفضة';
-      feCard.message = 'التحويل ضعيف؛ افتح تقرير التغذية وراجع DMI والإنتاج والتكلفة.';
-    }
+ if (Number.isFinite(fe) && fe > 0) {
+  const feReading =
+    nutritionFeedEfficiencyReadingSrv(fe, species, 'dashboard');
 
-    feCard.pointerPct = Math.max(0, Math.min(100, ((fe - 1.0) / (2.0 - 1.0)) * 100));
-  }
+  feCard.state = feReading.status;
+  feCard.stateLabel = feReading.label;
+  feCard.message = feReading.hint;
+
+  feCard.pointerPct = isBuffaloSpecies(species)
+    ? Math.max(0, Math.min(100, (fe / 1.5) * 100))
+    : Math.max(
+        0,
+        Math.min(
+          100,
+          ((fe - 1.0) / (2.0 - 1.0)) * 100
+        )
+      );
+}
 
   return {
     iofc: iofcCard,
@@ -23045,15 +23155,22 @@ const isDryOrCloseUpForRumen =
   !!contextForTargets?.closeUp ||
   /جاف|dry|انتظار|تحضير|close/i.test(String(contextForTargets?.pregnancyStatus || ''));
 
+const isBuffaloNutritionContext =
+  isBuffaloSpecies(contextForTargets?.species);
+
 const forageNDFMinForRumen =
   Number.isFinite(Number(targetsCore?.forageNDFMin))
     ? Number(targetsCore.forageNDFMin)
-    : (isDryOrCloseUpForRumen ? 21 : 19);
+    : (
+        isBuffaloNutritionContext
+          ? null
+          : (isDryOrCloseUpForRumen ? 21 : 19)
+      );
 
 const peNDFMinForRumen =
   Number.isFinite(Number(targetsCore?.peNDFMin))
     ? Number(targetsCore.peNDFMin)
-    : 18;
+    : (isBuffaloNutritionContext ? null : 18);
 
 const starchActual = Number(rationCore?.nutrition?.starchPct || 0);
 const ndfActual = Number(rationCore?.nutrition?.ndfPctActual || 0);
@@ -23063,17 +23180,30 @@ const carbNdfMinForDisplay = Number(carbSafetyModelForDisplay?.minTotalNDFPctDM)
 const ndfTargetRawForDisplay = Number(targetsCore?.ndfTarget);
 const roughageMinRawForDisplay = Number(targetsCore?.roughageMin);
 
-const ndfTargetForDisplay =
-  Number.isFinite(carbNdfMinForDisplay) && carbNdfMinForDisplay > 0
-    ? round2(carbNdfMinForDisplay)
-    : (
-        Number.isFinite(ndfTargetRawForDisplay) &&
-        ndfTargetRawForDisplay > 0 &&
-        !(Number.isFinite(roughageMinRawForDisplay) && ndfTargetRawForDisplay === roughageMinRawForDisplay && ndfTargetRawForDisplay >= 40)
-          ? round2(ndfTargetRawForDisplay)
-          : null
-      );
 
+const ndfTargetForDisplay = isBuffaloNutritionContext
+  ? (
+      Number.isFinite(ndfTargetRawForDisplay) &&
+      ndfTargetRawForDisplay > 0
+        ? round2(ndfTargetRawForDisplay)
+        : null
+    )
+  : (
+      Number.isFinite(carbNdfMinForDisplay) &&
+      carbNdfMinForDisplay > 0
+        ? round2(carbNdfMinForDisplay)
+        : (
+            Number.isFinite(ndfTargetRawForDisplay) &&
+            ndfTargetRawForDisplay > 0 &&
+            !(
+              Number.isFinite(roughageMinRawForDisplay) &&
+              ndfTargetRawForDisplay === roughageMinRawForDisplay &&
+              ndfTargetRawForDisplay >= 40
+            )
+              ? round2(ndfTargetRawForDisplay)
+              : null
+          )
+    );
 const hasScientificPeNDFActual =
   Number.isFinite(Number(rationCore?.nutrition?.peNDFPctActual)) &&
   Number(rationCore.nutrition.peNDFPctActual) > 0;
@@ -23083,10 +23213,12 @@ const rumenHealthModel = buildRumenHealthModel({
   concPctDM,
   forageNDFPctDM,
   forageNDFShareOfTotalNDF,
+  forageNDFMin: forageNDFMinForRumen,
+
   starchActual,
   starchMax: targetsCore?.starchMax,
   ndfActual,
-  isBuffaloRumen: /جاموس|buffalo/i.test(String(contextForTargets?.species || '')),
+  isBuffaloRumen: isBuffaloNutritionContext,
   carbohydrateSafetyModel: rationCore?.nutrition?.carbohydrateSafetyModel || null,
   dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null,
   animalDmiExpected: targetsCore?.dmi ?? null
@@ -23139,6 +23271,14 @@ const iofcPctOfMilkIncome =
 const mpSupplyForSafety = Number(rationCore?.nutrition?.mpSupplyG);
 const mpTargetForSafety = Number(targetsCore?.mpTargetG);
 const fatActualForSafety = Number(rationCore?.nutrition?.fatPctActual);
+const fatLimitForSafety =
+  Number(targetsCore?.fatLimit ?? targetsCore?.fatMax ?? 7);
+
+const buffaloStarchUnsafe =
+  isBuffaloNutritionContext &&
+  Number.isFinite(Number(starchActual)) &&
+  Number.isFinite(Number(targetsCore?.starchMax)) &&
+  Number(starchActual) > Number(targetsCore.starchMax);
 const carbSafetyStatus = String(rationCore?.nutrition?.carbohydrateSafetyModel?.status || '').toLowerCase();
 
 const economicDecision = buildEconomicDecision({
@@ -23164,11 +23304,20 @@ const economicDecision = buildEconomicDecision({
       mpTargetForSafety > 0 &&
   (((mpSupplyForSafety - mpTargetForSafety) / mpTargetForSafety) * 100) < -5
 ),
-    ndfUnsafe: carbSafetyStatus === 'danger',
-    starchUnsafe: carbSafetyStatus === 'danger',
-    fatUnsafe:
-      Number.isFinite(fatActualForSafety) &&
-      fatActualForSafety > 7
+    ndfUnsafe:
+  isBuffaloNutritionContext
+    ? false
+    : carbSafetyStatus === 'danger',
+
+starchUnsafe:
+  isBuffaloNutritionContext
+    ? buffaloStarchUnsafe
+    : carbSafetyStatus === 'danger',
+
+fatUnsafe:
+  Number.isFinite(fatActualForSafety) &&
+  Number.isFinite(fatLimitForSafety) &&
+  fatActualForSafety > fatLimitForSafety
   }
 });
 
@@ -23222,7 +23371,11 @@ dmiRationEffect: rationCore?.nutrition?.dmiRationEffect || null
   cpReferencePct: targetsCore?.cpReferencePct ?? targetsCore?.cpTarget ?? null,
   mpTargetG: targetsCore?.mpTargetG ?? null,
   ndfTarget: ndfTargetForDisplay,
-  fatTarget: null,
+  fatTarget:
+  targetsCore?.fatLimit ??
+  targetsCore?.fatMax ??
+  targetsCore?.fatTarget ??
+  null,
   starchMax: targetsCore?.starchMax ?? null,
   roughageMin: targetsCore?.roughageMin ?? null,
   peNDFMin: peNDFMinForRumen,
@@ -23298,6 +23451,7 @@ function buildRumenHealthModel({
   concPctDM,
   forageNDFPctDM,
   forageNDFShareOfTotalNDF,
+  forageNDFMin = null,
   starchActual,
   starchMax,
   ndfActual,
@@ -23317,13 +23471,26 @@ function buildRumenHealthModel({
   const conc = safePct(concPctDM);
   const forageNDF = safePct(forageNDFPctDM);
   const forageNDFShare = safePct(forageNDFShareOfTotalNDF);
+  const forageNDFMinRef =
+  safePct(forageNDFMin);
   const starch = safePct(starchActual);
   const starchLimit = safePct(starchMax);
   const ndf = safePct(ndfActual);
 
-  const minTotalNDF = safePct(carb?.minTotalNDFPctDM);
-  const maxStarch = safePct(carb?.maxStarchPctDM);
-  const carbStatus = String(carb?.status || '').toLowerCase();
+  const minTotalNDF =
+  isBuffaloRumen
+    ? null
+    : safePct(carb?.minTotalNDFPctDM);
+
+const maxStarch =
+  isBuffaloRumen
+    ? starchLimit
+    : safePct(carb?.maxStarchPctDM);
+
+const carbStatus =
+  isBuffaloRumen
+    ? ''
+    : String(carb?.status || '').toLowerCase();
 
   const rationDmi = Number(
     dmiRationEffect?.dmi ??
@@ -23337,25 +23504,88 @@ function buildRumenHealthModel({
   const hasRationDmi = Number.isFinite(rationDmi) && rationDmi > 0;
   const hasAnimalDmi = Number.isFinite(animalDmi) && animalDmi > 0;
 
-  let status = 'good';
-  let score = 90;
-  let title = 'صحة الكرش آمنة';
-  let reason = 'توازن الألياف والنشا مناسب حسب بيانات العليقة الحالية.';
-  let instruction = 'حافظ على جودة الخشن وثبات الخلط، وراقب الروث والاجترار ودهن اللبن.';
+let status = 'good';
+let score = 90;
 
-  if (carbStatus === 'danger') {
+let title =
+  isBuffaloRumen
+    ? 'صحة كرش الجاموس آمنة'
+    : 'صحة الكرش آمنة';
+
+let reason =
+  isBuffaloRumen
+    ? 'ألياف الخشن والنشا داخل المراجع التشغيلية لطبقة الجاموس حسب بيانات العليقة الحالية.'
+    : 'توازن الألياف والنشا مناسب حسب بيانات العليقة الحالية.';
+
+let instruction =
+  isBuffaloRumen
+    ? 'حافظ على جودة الخشن وثبات الخلط، وراقب الروث والاجترار ودهن اللبن في الجاموس.'
+    : 'حافظ على جودة الخشن وثبات الخلط، وراقب الروث والاجترار ودهن اللبن.';
+
+let buffaloCarbStatus = null;
+
+if (isBuffaloRumen) {
+  const lowForageNDF =
+    Number.isFinite(Number(forageNDF)) &&
+    Number.isFinite(Number(forageNDFMinRef)) &&
+    Number(forageNDFMinRef) > 0 &&
+    Number(forageNDF) < Number(forageNDFMinRef);
+
+  const highStarch =
+    Number.isFinite(Number(starch)) &&
+    Number.isFinite(Number(starchLimit)) &&
+    Number(starchLimit) > 0 &&
+    Number(starch) > Number(starchLimit);
+
+  if (lowForageNDF && highStarch) {
     status = 'danger';
     score = 45;
-    title = 'خطر اضطراب كرش';
-    reason = 'توازن الخشن والنشا غير آمن: NDF أقل من حد الأمان أو النشا أعلى من الحد.';
-    instruction = 'اضبط الخشن والنشا قبل رفع الطاقة أو الحبوب.';
-  } else if (carbStatus === 'warn' || carbStatus === 'watch') {
+    title = 'خطر اضطراب كرش الجاموس';
+    reason =
+      'ألياف الخشن أقل من المرجع التشغيلي للجاموس مع تجاوز حد النشا.';
+    instruction =
+      'اضبط الخشن والنشا معًا قبل رفع الطاقة أو الحبوب.';
+    buffaloCarbStatus = 'danger';
+
+  } else if (lowForageNDF || highStarch) {
     status = 'watch';
     score = 72;
-    title = 'صحة الكرش تحتاج متابعة';
-    reason = 'توازن الخشن والنشا قريب من حدود الأمان.';
-    instruction = 'راجع الخشن والنشا، ولا ترفع الحبوب قبل التأكد من ثبات الروث والاجترار.';
+    title = 'صحة كرش الجاموس تحتاج متابعة';
+
+    reason = lowForageNDF
+      ? 'ألياف الخشن أقل من المرجع التشغيلي لطبقة الجاموس.'
+      : 'النشا أعلى من الحد التشغيلي لطبقة الجاموس.';
+
+    instruction =
+      'راجع الخشن والنشا وفق طبقة الجاموس، بدون تطبيق حد NDF الأبقار.';
+
+    buffaloCarbStatus = 'watch';
+
+  } else {
+    buffaloCarbStatus = 'good';
   }
+
+} else if (carbStatus === 'danger') {
+  status = 'danger';
+  score = 45;
+  title = 'خطر اضطراب كرش';
+  reason =
+    'توازن الخشن والنشا غير آمن: NDF أقل من حد الأمان أو النشا أعلى من الحد.';
+  instruction =
+    'اضبط الخشن والنشا قبل رفع الطاقة أو الحبوب.';
+
+} else if (
+  carbStatus === 'warn' ||
+  carbStatus === 'watch'
+) {
+  status = 'watch';
+  score = 72;
+  title = 'صحة الكرش تحتاج متابعة';
+  reason =
+    'توازن الخشن والنشا قريب من حدود الأمان.';
+  instruction =
+    'راجع الخشن والنشا، ولا ترفع الحبوب قبل التأكد من ثبات الروث والاجترار.';
+}
 
   const dmiLine =
     hasRationDmi && hasAnimalDmi
@@ -23389,14 +23619,34 @@ function buildRumenHealthModel({
     adviceText,
     indicators: {
       carbohydrateSafety: {
-        status: carbStatus || null,
-        fNDFPctDM: safePct(carb?.fNDFPctDM),
-        totalNDFPctDM: safePct(carb?.totalNDFPctDM ?? ndf),
-        starchPctDM: safePct(carb?.starchPctDM ?? starch),
-        minTotalNDFPctDM: minTotalNDF,
-        maxStarchPctDM: maxStarch,
-        note: carb?.note || null
-      },
+  status:
+    isBuffaloRumen
+      ? buffaloCarbStatus
+      : (carbStatus || null),
+
+  fNDFPctDM:
+    isBuffaloRumen
+      ? forageNDF
+      : safePct(carb?.fNDFPctDM),
+
+  totalNDFPctDM:
+    isBuffaloRumen
+      ? ndf
+      : safePct(carb?.totalNDFPctDM ?? ndf),
+
+  starchPctDM:
+    isBuffaloRumen
+      ? starch
+      : safePct(carb?.starchPctDM ?? starch),
+
+  minTotalNDFPctDM: minTotalNDF,
+  maxStarchPctDM: maxStarch,
+
+  note:
+    isBuffaloRumen
+      ? 'Buffalo judgement uses buffalo-layer forage NDF and starch references.'
+      : (carb?.note || null)
+},
       ndf: {
         label: 'NDF الكلي',
         actual: ndf,
@@ -23409,12 +23659,22 @@ function buildRumenHealthModel({
         target: maxStarch ?? starchLimit,
         rule: 'maximum_safety'
       },
-      forageNDF: {
-        label: 'Forage NDF',
-        actual: forageNDF,
-        shareOfTotalNDF: forageNDFShare,
-        rule: 'carbohydrate_safety_input'
-      },
+     forageNDF: {
+  label: 'Forage NDF',
+  actual: forageNDF,
+
+  target:
+    isBuffaloRumen
+      ? forageNDFMinRef
+      : null,
+
+  shareOfTotalNDF: forageNDFShare,
+
+  rule:
+    isBuffaloRumen
+      ? 'buffalo_layer_operational_reference'
+      : 'carbohydrate_safety_input'
+},
       roughage: {
         label: 'الخشن',
         actual: rough
@@ -23432,7 +23692,15 @@ function buildRumenHealthModel({
           }
         : null
     },
-    sourceBasis: [
+    sourceBasis: isBuffaloRumen
+  ? [
+      'MURABBIK_SERVER_SIDE_ONLY',
+      'BUFFALO_REQUIREMENT_LAYER_FORAGE_NDF_REFERENCE',
+      'BUFFALO_REQUIREMENT_LAYER_STARCH_MAX',
+      'BUFFALO_TOTAL_NDF_REFERENCE_NOT_CATTLE_MINIMUM',
+      'DMI_RATION_EFFECT_DISPLAY_ONLY_WHEN_AVAILABLE'
+    ]
+  : [
       'MURABBIK_SERVER_SIDE_ONLY',
       'CARBOHYDRATE_SAFETY_FOR_RUMEN_HEALTH',
       'TOTAL_NDF_MINIMUM_NOT_NDF_REQUIREMENT',
@@ -23734,11 +24002,11 @@ const buffaloCpState =
     : null;
 
 const starchActual = num(nutrition.starchPctActual, 1);
-  const starchMax = num(targets.starchMax, 1);
+const starchMax = num(targets.starchMax, 1);
 
-  const fatActual = num(nutrition.fatPctActual, 1);
-  const fatMax = 7;
-  const hasScientificPeNDFActual =
+const fatActual = num(nutrition.fatPctActual, 1);
+const fatMax = num(targets.fatTarget, 1) ?? 7;
+const hasScientificPeNDFActual =
   Number.isFinite(Number(nutrition.peNDFPctActual)) &&
   Number(nutrition.peNDFPctActual) > 0;
   
@@ -23787,24 +24055,36 @@ const starchActual = num(nutrition.starchPctActual, 1);
   nutrition?.rumenHealthModel?.indicators?.carbohydrateSafety ||
   {};
 
-const ndfSafetyMin = num(
-  Number.isFinite(Number(carbohydrateSafety?.minTotalNDFPctDM)) && Number(carbohydrateSafety.minTotalNDFPctDM) > 0
-    ? carbohydrateSafety.minTotalNDFPctDM
-    : targets.ndfTarget,
+const ndfReference = num(
+  isBuffalo
+    ? targets.ndfTarget
+    : (
+        Number.isFinite(
+          Number(carbohydrateSafety?.minTotalNDFPctDM)
+        ) &&
+        Number(carbohydrateSafety.minTotalNDFPctDM) > 0
+          ? carbohydrateSafety.minTotalNDFPctDM
+          : targets.ndfTarget
+      ),
   1
 );
-const ndfActualForCard = num(nutrition.ndfPctActual, 1);
 
-const ndfState =
-  Number.isFinite(Number(ndfActualForCard)) &&
-  Number.isFinite(Number(ndfSafetyMin)) &&
-  Number(ndfSafetyMin) > 0
-    ? (
-        Number(ndfActualForCard) < Number(ndfSafetyMin)
-          ? 'danger'
-          : 'good'
-      )
-    : 'info';
+const ndfActualForCard =
+  num(nutrition.ndfPctActual, 1);
+
+const ndfState = isBuffalo
+  ? 'info'
+  : (
+      Number.isFinite(Number(ndfActualForCard)) &&
+      Number.isFinite(Number(ndfReference)) &&
+      Number(ndfReference) > 0
+        ? (
+            Number(ndfActualForCard) < Number(ndfReference)
+              ? 'danger'
+              : 'good'
+          )
+        : 'info'
+    );
 
   let dmHint =
     Number.isFinite(Number(dmRatioPct))
@@ -23831,7 +24111,7 @@ let mpHint =
       ? `مربيك: البروتين الممثل أقل من المطلوب. فرق الاتزان ${mpDiffText}. لا تزود البروتين الخام عشوائيًا؛ الأفضل تحسين مصدر البروتين المفيد للحيوان.`
       : `مربيك: البروتين الممثل أعلى من المطلوب. فرق الاتزان ${mpDiffText}. راجع كمية أو نوع مصدر البروتين لتقليل التكلفة والهدر.`;
  
- ndfHint =
+ let ndfHint =
   ndfState === 'danger'
     ? 'مربيك: NDF أقل من حد أمان الكرش. راجع الخشن قبل زيادة المركزات.'
     : ndfState === 'good'
@@ -23921,11 +24201,7 @@ mpHint =
 
 
 ndfHint =
-  ndfState === 'danger'
-    ? 'مربيك: NDF أقل من حد أمان الكرش. راجع الخشن قبل زيادة المركزات.'
-    : ndfState === 'good'
-      ? 'مربيك: NDF يغطي حد أمان الكرش الأدنى. لا نحكم بزيادة NDF كاحتياج مستقل.'
-      : 'مربيك: NDF قراءة ألياف للعليقة، وليس احتياجًا مستقلًا.';
+  'مربيك: NDF الكلي في الجاموس مرجع تشغيلي من طبقة الجاموس، وليس حدًا أدنى بقريًا. اقرأه مع ألياف الخشن والنشا وصحة الكرش.';
   }
 
    let priorityText = (() => {
@@ -24014,8 +24290,8 @@ ndfHint =
           : (
               nelState !== 'good' ||
               mpState !== 'good' ||
-              starchHigh ||
-              fatHigh
+              starchWarnForUi ||
+              fatWarnForUi
             )
               ? 'warn'
               : 'good'
@@ -24056,9 +24332,16 @@ ndfHint =
   title: 'الألياف NDF',
   value: pctTxt(nutrition.ndfPctActual, 1),
   actual: num(nutrition.ndfPctActual, 1),
-  target: ndfSafetyMin,
-  targetText: `${pctTxt(nutrition.ndfPctActual, 1)} / حد أمان ${pctTxt(ndfSafetyMin, 1)} — ${ndfHint}`,
-  status: uiStatus(ndfState)
+  target: ndfReference,
+
+targetText: isBuffalo
+  ? `${pctTxt(nutrition.ndfPctActual, 1)} / مرجع تشغيلي ${pctTxt(ndfReference, 1)} — ${ndfHint}`
+  : `${pctTxt(nutrition.ndfPctActual, 1)} / حد أمان ${pctTxt(ndfReference, 1)} — ${ndfHint}`,
+
+status:
+  isBuffalo
+    ? 'info'
+    : uiStatus(ndfState)
 },
     {
   key: 'starch',
@@ -24230,27 +24513,18 @@ ndfHint =
       ? feedEfficiencyECM
       : feedEfficiencyFPCM;
 
-  const correctedMilkStatus =
-    correctedMilkEfficiency == null
-      ? 'warn'
-      : correctedMilkEfficiency >= 1.6
-        ? 'good'
-        : correctedMilkEfficiency >= 1.4
-          ? 'good'
-          : correctedMilkEfficiency >= 1.3
-            ? 'warn'
-            : 'danger';
+  const correctedMilkReading =
+  nutritionFeedEfficiencyReadingSrv(
+    correctedMilkEfficiency,
+    isBuffalo ? 'buffalo' : 'cow',
+    'panel'
+  );
 
-  const correctedMilkHint =
-    correctedMilkEfficiency == null
-      ? 'يحتاج بيانات اللبن والمادة الجافة.'
-      : correctedMilkEfficiency >= 1.6
-        ? `كفاءة ممتازة؛ لا تطارد رفعها قبل ضبط الكرش والبروتين.${nutritionGateText}`
-        : correctedMilkEfficiency >= 1.4
-          ? `كفاءة جيدة؛ حسّنها من الطاقة والكرش لا من تقليل المأكول.${nutritionGateText}`
-          : correctedMilkEfficiency >= 1.3
-            ? 'كفاءة متوسطة؛ راجع جودة الخشن والطاقة والمأكول.'
-            : 'كفاءة ضعيفة؛ راجع المأكول والطاقة وجودة العليقة.';
+const correctedMilkStatus =
+  correctedMilkReading.status;
+
+const correctedMilkHint =
+  `${correctedMilkReading.hint}${nutritionGateText}`;
 
   const costPerKgMilkVal =
     Number.isFinite(Number(economics.costPerKgMilk))
@@ -24354,15 +24628,21 @@ const economicsCards = isDryEconomics
         milkAfterFeedHint
       ),
       econCard(
-        'feedEfficiencyECM',
-        'لبن مصحح لكل 1 كجم مادة جافة',
-        correctedMilkEfficiency != null ? `${num(correctedMilkEfficiency, 2)} كجم لبن مصحح` : '—',
-        correctedMilkEfficiency,
-        correctedMilkStatus,
-        correctedMilkEfficiency != null
-          ? `مقابل كل 1 كجم مادة جافة من العليقة تنتج الحيوانات ${num(correctedMilkEfficiency, 2)} كجم لبن مصحح.`
-          : 'يحتاج بيانات اللبن والمادة الجافة.'
-      ),
+  'feedEfficiencyECM',
+  'لبن مصحح لكل 1 كجم مادة جافة',
+
+  correctedMilkEfficiency != null
+    ? `${num(correctedMilkEfficiency, 2)} كجم لبن مصحح`
+    : '—',
+
+  correctedMilkEfficiency,
+
+  correctedMilkStatus,
+
+  correctedMilkEfficiency != null
+    ? `مقابل كل 1 كجم مادة جافة من العليقة تنتج الحيوانات ${num(correctedMilkEfficiency, 2)} كجم لبن مصحح. ${correctedMilkHint}`
+    : correctedMilkHint
+),
       econCard(
         'costPerKgMilk',
         'تكلفة كجم اللبن',
@@ -24469,8 +24749,15 @@ const advancedCards = [
     actualText: txt(nutrition.ndfPctActual, '% من المادة الجافة', 1),
     referenceText: txt(targets.ndfTarget, '% من المادة الجافة', 1),
     actualLabel: 'الإمداد الفعلي',
-    referenceLabel: 'الحد الأدنى للألياف المتعادلة NDF',
-    mode: 'min',
+    referenceLabel:
+  isBuffalo
+    ? 'مرجع NDF التشغيلي للجاموس'
+    : 'الحد الأدنى للألياف المتعادلة NDF',
+
+mode:
+  isBuffalo
+    ? 'reference'
+    : 'min',
     unit: '%',
     decimals: 1,
     guidanceKey: 'ndf',
@@ -24503,9 +24790,15 @@ const advancedCards = [
     key: 'fat',
     title: 'الدهون',
     actual: nutrition.fatPctActual,
-    reference: 7,
-    actualText: txt(nutrition.fatPctActual, '% من المادة الجافة', 1),
-    referenceText: '6–7 % من المادة الجافة',
+    reference: fatMax,
+
+actualText:
+  txt(nutrition.fatPctActual, '% من المادة الجافة', 1),
+
+referenceText:
+  isBuffalo
+    ? txt(fatMax, '% من المادة الجافة', 1)
+    : '6–7 % من المادة الجافة',
     referenceLabel: 'الحد الأقصى للدهون',
     mode: 'max',
     unit: '%',
@@ -24517,7 +24810,10 @@ const advancedCards = [
   advancedCards.push(
   {
     key: 'ndfTarget',
-    title: 'الحد الأدنى للألياف المتعادلة NDF',
+    title:
+  isBuffalo
+    ? 'مرجع NDF التشغيلي للجاموس'
+    : 'الحد الأدنى للألياف المتعادلة NDF',
     value: txt(targets.ndfTarget, '% من المادة الجافة', 1),
     actual: targets.ndfTarget,
     target: targets.ndfTarget
@@ -26577,6 +26873,13 @@ function nutritionBalanceCommentSrv(key, mode, status, diff) {
   const d = Number(diff);
 
   if (k === 'ndf') {
+    if (m === 'reference') {
+  return {
+    text:
+      'NDF الكلي معروض كمرجع تشغيلي للجاموس وليس كحد أدنى ثابت؛ اقرأه مع ألياف الخشن والنشا وصحة الكرش.',
+    sourceLabel: 'مُرَبِّيك'
+  };
+}
     if (s.includes('warn')) {
       return {
         text: 'الألياف أقل من الحد الأدنى؛ قد يقل المضغ وتنظيم حموضة الكرش.',
@@ -26699,6 +27002,8 @@ function nutritionAdvancedDisplayCardSrv(o = {}) {
     reference > 0;
 
   const status = !hasNumbers
+  ? 'muted'
+  : mode === 'reference'
     ? 'muted'
     : mode === 'min'
       ? reportMinStatusSrv(actual, reference)
@@ -26711,23 +27016,35 @@ function nutritionAdvancedDisplayCardSrv(o = {}) {
 
   let balanceText = 'الاتزان: غير مكتمل';
 
-  if (hasNumbers) {
-    if (mode === 'min') {
-      balanceText = diff < 0
+if (hasNumbers) {
+  if (mode === 'reference') {
+    balanceText =
+      Math.abs(diff) < 0.0001
+        ? 'مطابق للمرجع التشغيلي'
+        : `الفرق عن المرجع التشغيلي: ${diff > 0 ? '+' : ''}${fmtSrv(
+            diff,
+            o.decimals ?? 1,
+            o.unit || ''
+          )}`;
+
+  } else if (mode === 'min') {
+    balanceText = diff < 0
+      ? `الاتزان: ناقص ${fmtSrv(Math.abs(diff), o.decimals ?? 1, o.unit || '')}`
+      : `الاتزان: زائد/آمن ${sign}${fmtSrv(diff, o.decimals ?? 1, o.unit || '')}`;
+
+  } else if (mode === 'max') {
+    balanceText = diff > 0
+      ? `الاتزان: زائد عن الحد ${sign}${fmtSrv(diff, o.decimals ?? 1, o.unit || '')}`
+      : `الاتزان: داخل الحد ${fmtSrv(Math.abs(diff), o.decimals ?? 1, o.unit || '')}`;
+
+  } else {
+    balanceText = Math.abs(diff) < 0.0001
+      ? 'الاتزان: متزن'
+      : diff < 0
         ? `الاتزان: ناقص ${fmtSrv(Math.abs(diff), o.decimals ?? 1, o.unit || '')}`
-        : `الاتزان: زائد/آمن ${sign}${fmtSrv(diff, o.decimals ?? 1, o.unit || '')}`;
-    } else if (mode === 'max') {
-      balanceText = diff > 0
-        ? `الاتزان: زائد عن الحد ${sign}${fmtSrv(diff, o.decimals ?? 1, o.unit || '')}`
-        : `الاتزان: داخل الحد ${fmtSrv(Math.abs(diff), o.decimals ?? 1, o.unit || '')}`;
-    } else {
-      balanceText = Math.abs(diff) < 0.0001
-        ? 'الاتزان: متزن'
-        : diff < 0
-          ? `الاتزان: ناقص ${fmtSrv(Math.abs(diff), o.decimals ?? 1, o.unit || '')}`
-          : `الاتزان: زائد ${sign}${fmtSrv(diff, o.decimals ?? 1, o.unit || '')}`;
-    }
+        : `الاتزان: زائد ${sign}${fmtSrv(diff, o.decimals ?? 1, o.unit || '')}`;
   }
+}
 
   const guidance =
     typeof reportMurabbikGuidanceSrv === 'function'
@@ -26740,7 +27057,14 @@ function nutritionAdvancedDisplayCardSrv(o = {}) {
     o.stage === 'far_dry';
 
   const balanceCommentObj =
-    isDryStage && guidance && guidance !== '—'
+  mode === 'reference'
+    ? nutritionBalanceCommentSrv(
+        key,
+        mode,
+        status,
+        diff
+      )
+    : isDryStage && guidance && guidance !== '—'
       ? {
           text: guidance,
           sourceLabel: 'مُرَبِّيك'
@@ -26752,15 +27076,19 @@ function nutritionAdvancedDisplayCardSrv(o = {}) {
           diff
         );
 
-  const referenceType =
-    mode === 'min'
+ const referenceType =
+  mode === 'reference'
+    ? 'reference'
+    : mode === 'min'
       ? 'minimum'
       : mode === 'max'
         ? 'maximum'
         : 'requirement';
 
-  const referenceTypeLabel =
-    mode === 'min'
+const referenceTypeLabel =
+  mode === 'reference'
+    ? 'المرجع التشغيلي'
+    : mode === 'min'
       ? 'الحد الأدنى'
       : mode === 'max'
         ? 'الحد الأقصى'
@@ -27387,6 +27715,11 @@ const totals = a.totals || {};
 const ec = a.economics || {};
 const rows = [];
 const reportStage = nutritionStageFromEvent(e);
+const reportSpecies =
+  e?.nutrition?.context?.species || '';
+
+const isBuffaloReport =
+  isBuffaloSpecies(reportSpecies);
 const isDryReport =
   reportStage === 'far_dry' ||
   reportStage === 'close_up';
@@ -27469,28 +27802,86 @@ const nelReportLabel = isDryReport ? 'الطاقة الصافية' : 'الطاق
 ));
 
   const carb = n.carbohydrateSafetyModel || a.carbohydrateSafetyModel || {};
-  const ndfMin = carb.minTotalNDFPctDM ?? t.ndfSafetyMin ?? t.ndfMin ?? t.ndfTarget;
-  const starchMax = carb.starchMaxPctDM ?? t.starchMax;
+  const ndfMin =
+  isBuffaloReport
+    ? t.ndfTarget
+    : (
+        carb.minTotalNDFPctDM ??
+        t.ndfSafetyMin ??
+        t.ndfMin ??
+        t.ndfTarget
+      );
+  const starchMax =
+  isBuffaloReport
+    ? t.starchMax
+    : (carb.starchMaxPctDM ?? t.starchMax);
   const fatMaxRaw = t.fatSafeMax ?? t.fatMax ?? t.fatTarget;
   const fatMax = finiteSrv(fatMaxRaw) && Number(fatMaxRaw) > 0 ? Number(fatMaxRaw) : 7;
   
 
  {
-  const status = reportMinStatusSrv(n.ndfPctActual, ndfMin);
-  const bal = finiteSrv(n.ndfPctActual) && finiteSrv(ndfMin)
-    ? Number(n.ndfPctActual) - Number(ndfMin)
-    : null;
+  const status =
+    isBuffaloReport
+      ? 'muted'
+      : reportMinStatusSrv(
+          n.ndfPctActual,
+          ndfMin
+        );
+
+  const bal =
+    finiteSrv(n.ndfPctActual) &&
+    finiteSrv(ndfMin)
+      ? Number(n.ndfPctActual) - Number(ndfMin)
+      : null;
 
   rows.push(reportRowSrv(
     'الألياف والكربوهيدرات والدهون',
     'ndf',
     'الألياف المتعادلة',
-    finiteSrv(ndfMin) ? `حد أدنى ${fmtSrv(ndfMin, 1, '% من المادة الجافة')}` : 'حد أدنى',
-    fmtSrv(n.ndfPctActual, 1, '% من المادة الجافة'),
-    finiteSrv(bal) ? fmtSrv(bal, 1, '%') : '—',
+
+    isBuffaloReport
+      ? (
+          finiteSrv(ndfMin)
+            ? `مرجع تشغيلي ${fmtSrv(
+                ndfMin,
+                1,
+                '% من المادة الجافة'
+              )}`
+            : 'مرجع تشغيلي'
+        )
+      : (
+          finiteSrv(ndfMin)
+            ? `حد أدنى ${fmtSrv(
+                ndfMin,
+                1,
+                '% من المادة الجافة'
+              )}`
+            : 'حد أدنى'
+        ),
+
+    fmtSrv(
+      n.ndfPctActual,
+      1,
+      '% من المادة الجافة'
+    ),
+
+    finiteSrv(bal)
+      ? fmtSrv(bal, 1, '%')
+      : '—',
+
     status,
-    guidanceSrv('ndf', status, bal),
-    status === 'good' ? 'كافية' : 'منخفضة'
+
+    isBuffaloReport
+      ? 'NDF الكلي للجاموس مرجع تشغيلي من طبقة الجاموس، وليس حدًا أدنى بقريًا؛ اقرأه مع ألياف الخشن والنشا وصحة الكرش.'
+      : guidanceSrv('ndf', status, bal),
+
+    isBuffaloReport
+      ? 'مرجع تشغيلي'
+      : (
+          status === 'good'
+            ? 'كافية'
+            : 'منخفضة'
+        )
   ));
 }
 
@@ -27561,12 +27952,33 @@ const nelReportLabel = isDryReport ? 'الطاقة الصافية' : 'الطاق
     'الألياف والكربوهيدرات والدهون',
     'forage_ndf',
     'ألياف الخشن المتعادلة',
-    finiteSrv(t.forageNDFMin) ? `حد أدنى ${fmtSrv(t.forageNDFMin, 1, '% من المادة الجافة')}` : 'حد أدنى',
-    fmtSrv(n.forageNDFPctDM, 1, '% من المادة الجافة'),
-    finiteSrv(bal) ? fmtSrv(bal, 1, '%') : '—',
-    status,
-    guidanceSrv('forage_ndf', status, bal),
-    status === 'good' ? 'كافٍ' : 'منخفض'
+    finiteSrv(t.forageNDFMin)
+  ? `${isBuffaloReport ? 'مرجع تشغيلي' : 'حد أدنى'} ${fmtSrv(
+      t.forageNDFMin,
+      1,
+      '% من المادة الجافة'
+    )}`
+  : (isBuffaloReport ? 'مرجع تشغيلي' : 'حد أدنى'),
+
+fmtSrv(n.forageNDFPctDM, 1, '% من المادة الجافة'),
+
+finiteSrv(bal)
+  ? fmtSrv(bal, 1, '%')
+  : '—',
+
+status,
+
+isBuffaloReport
+  ? (
+      status === 'good'
+        ? 'ألياف الخشن عند أو فوق المرجع التشغيلي لطبقة الجاموس؛ تابع جودة الخشن والاجترار والروث.'
+        : 'ألياف الخشن أقل من المرجع التشغيلي لطبقة الجاموس؛ راجع جودة وكمية الخشن مع النشا وصحة الكرش.'
+    )
+  : guidanceSrv('forage_ndf', status, bal),
+
+isBuffaloReport
+  ? (status === 'good' ? 'ضمن المرجع' : 'أقل من المرجع')
+  : (status === 'good' ? 'كافٍ' : 'منخفض')
   ));
 }
 
@@ -73474,8 +73886,17 @@ totalMilkFeedMarginPerDay: feedBands.overall.totalMilkFeedMarginPerDay ?? feedBa
 totalIofcPerDay: feedBands.overall.totalIofc ?? feedBands.overall.totalMargin ?? 0,
 iofcPctOfMilkIncome: feedBands.overall.iofcPctOfMilkIncome ?? 0,
 feedCostPctOfMilkIncome: feedBands.overall.feedCostPctOfMilkIncome ?? 0,
-feedAdvice: buildDashboardFeedAdviceSrv(feedBands.overall),
-feedGaugeCards: buildDashboardFeedGaugeCardsSrv(feedBands.overall),
+feedAdvice:
+  buildDashboardFeedAdviceSrv(
+    feedBands.overall,
+    selectedDashboardSpecies
+  ),
+
+feedGaugeCards:
+  buildDashboardFeedGaugeCardsSrv(
+    feedBands.overall,
+    selectedDashboardSpecies
+  ),
 
 feedBands,
 
