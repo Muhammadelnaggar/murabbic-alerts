@@ -62,8 +62,8 @@
         <label><input type="radio" name="inseminationTime" value="مساءا" data-field="inseminationTime"> مساءا</label>
       </div>
 
-      <label>حالة الشياع *</label>
-      <div class="radio-group">
+      <label id="heatStatusLabel">حالة الشياع *</label>
+        <div id="heatStatusGroup" class="radio-group">
         <label><input type="radio" name="heatStatus" value="صباحا" data-field="heatStatus"> صباحا</label>
         <label><input type="radio" name="heatStatus" value="مساءا" data-field="heatStatus"> مساءا</label>
       </div>
@@ -131,6 +131,12 @@
 const dateEl = document.querySelector('[data-field="eventDate"]');
 const gateBox = document.getElementById("gateBox");
 const saveBtn = form?.querySelector('button[type="submit"]');
+
+const heatStatusLabelEl =
+  document.getElementById("heatStatusLabel");
+
+const heatStatusGroupEl =
+  document.getElementById("heatStatusGroup");
 
 const correctionPerformedByEl =
   document.getElementById(
@@ -201,6 +207,35 @@ setRadioValue("heatStatus", heatTimeFromQuery);
 
     if (target) target.checked = true;
   }
+  function applyInseminationUiPolicy(policy = {}) {
+  const showHeatStatus =
+    policy?.showHeatStatus !== false;
+
+  const requiresHeatStatus =
+    policy?.requiresHeatStatus !== false;
+
+  if (heatStatusLabelEl) {
+    heatStatusLabelEl.hidden =
+      !showHeatStatus;
+  }
+
+  if (heatStatusGroupEl) {
+    heatStatusGroupEl.hidden =
+      !showHeatStatus;
+  }
+
+  const radios =
+    [...form.querySelectorAll(
+      'input[name="heatStatus"]'
+    )];
+
+  if (!requiresHeatStatus) {
+    radios.forEach(r => {
+      r.checked = false;
+      r.disabled = true;
+    });
+  }
+}
   function compactReason(reason) {
     return String(reason || "")
       .replace(/^❌\s*/, "")
@@ -459,7 +494,11 @@ async function loadEditEvent() {
 
     setDetailsDisabled(false);
 
-    if (animalEl) {
+applyInseminationUiPolicy(
+  data?.uiPolicy || {}
+);
+
+if (animalEl) {
       animalEl.readOnly = true;
     }
 
@@ -613,12 +652,16 @@ function collectPayload() {
       showGate(fullMsg, data?.allowed ? "success" : "error");
     }
 
-    if (data?.allowed) {
-      applyAcceptedNumbers(data);
-      setDetailsDisabled(false);
-    } else {
-      setDetailsDisabled(true);
-    }
+   if (data?.allowed) {
+  applyAcceptedNumbers(data);
+  setDetailsDisabled(false);
+} else {
+  setDetailsDisabled(true);
+}
+
+applyInseminationUiPolicy(
+  data?.uiPolicy || {}
+);
   }
 
   let gateTimer = null;
