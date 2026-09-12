@@ -42511,6 +42511,98 @@ function vaccinationAgeTimingAdviceSrv({
       `من ${windowStart} إلى ${windowEnd}.`
   };
 }
+function vaccinationScopedEligibilitySrv({
+  vaccineCode = "",
+  animalDoc = {},
+  animalCollection = ""
+} = {}) {
+  const code =
+    String(vaccineCode || "")
+      .trim()
+      .toLowerCase();
+
+  if (
+    code !== "lysigin" &&
+    code !== "brucella_rb51" &&
+    code !== "brucella_s19"
+  ) {
+    return null;
+  }
+
+  const collection =
+    String(animalCollection || "")
+      .trim()
+      .toLowerCase();
+
+  const sex =
+    getSexTextSrv(animalDoc);
+
+  const isFemale =
+    sex === "أنثى" ||
+    (
+      code === "lysigin" &&
+      collection === "animals"
+    );
+
+  if (!isFemale) {
+    return {
+      allowed: false,
+      code:
+        code === "lysigin"
+          ? "vaccination_lysigin_females_only"
+          : "vaccination_brucella_heifers_only",
+      message:
+        code === "lysigin"
+          ? "ليسيجين مخصص للإناث فقط."
+          : "تحصين البروسيلا المختار مخصص للعجلات الإناث فقط."
+    };
+  }
+
+  if (code === "lysigin") {
+    return null;
+  }
+
+  if (collection !== "calves") {
+    return {
+      allowed: false,
+      code:
+        "vaccination_brucella_heifers_only",
+      message:
+        "تحصين البروسيلا المختار مخصص للعجلات الإناث فقط."
+    };
+  }
+
+  const reproText = [
+    animalDoc.reproductiveStatus,
+    animalDoc.pregStatus,
+    animalDoc.reproductionStatus
+  ]
+    .map(value =>
+      String(value || "")
+        .trim()
+        .toLowerCase()
+    )
+    .filter(Boolean)
+    .join(" ");
+
+  const isPregnant =
+    animalDoc.pregnant === true ||
+    reproText.includes("عشار") ||
+    reproText.includes("حامل") ||
+    reproText.includes("pregnant");
+
+  if (isPregnant) {
+    return {
+      allowed: false,
+      code:
+        "vaccination_brucella_nonpregnant_heifers_only",
+      message:
+        "تحصين البروسيلا المختار مخصص للعجلات الإناث غير العشار."
+    };
+  }
+
+  return null;
+}
 async function vaccinationDueWarningSrv({
   uid,
   animalNumber,
@@ -43167,13 +43259,108 @@ function vaccinationProgramModeNormSrv(raw) {
 
   return "";
 }
+const VACCINATION_MURABBIK_ALTERNATIVE_OPTIONS_SRV = Object.freeze({
+  respiratory_program: Object.freeze([
+    "combined",
+    "separate"
+  ]),
+  maternal_calf_scour_program: Object.freeze([
+    "rotavac_corona",
+    "scourguard"
+  ]),
+  brucella_program: Object.freeze([
+    "rb51",
+    "s19"
+  ])
+});
 
+function vaccinationMurabbikAlternativesNormSrv(raw = {}) {
+  const source =
+    raw &&
+    typeof raw === "object" &&
+    !Array.isArray(raw)
+      ? raw
+      : {};
+
+  const out = {};
+
+  for (const [group, allowed] of Object.entries(
+    VACCINATION_MURABBIK_ALTERNATIVE_OPTIONS_SRV
+  )) {
+    const value =
+      String(source[group] || "")
+        .trim()
+        .toLowerCase();
+
+    if (allowed.includes(value)) {
+      out[group] = value;
+    }
+  }
+
+  return out;
+}
+
+function vaccinationMurabbikAlternativesCompleteSrv(raw = {}) {
+  const selected =
+    vaccinationMurabbikAlternativesNormSrv(raw);
+
+  return Object.keys(
+    VACCINATION_MURABBIK_ALTERNATIVE_OPTIONS_SRV
+  ).every(group => Boolean(selected[group]));
+}
+
+function vaccinationMurabbikAlternativesValidateSrv(raw) {
+  if (
+    raw === undefined ||
+    raw === null
+  ) {
+    return null;
+  }
+
+  if (
+    typeof raw !== "object" ||
+    Array.isArray(raw)
+  ) {
+    return {
+      ok: false,
+      message:
+        "❌ اختيارات بدائل برنامج مُرَبِّيك غير صالحة."
+    };
+  }
+
+  for (const [group, allowed] of Object.entries(
+    VACCINATION_MURABBIK_ALTERNATIVE_OPTIONS_SRV
+  )) {
+    if (!(group in raw)) continue;
+
+    const value =
+      String(raw[group] || "")
+        .trim()
+        .toLowerCase();
+
+    if (value && !allowed.includes(value)) {
+      return {
+        ok: false,
+        message:
+          "❌ اختر أحد البدائل المعتمدة داخل برنامج مُرَبِّيك."
+      };
+    }
+  }
+
+  return { ok: true };
+}
 function vaccinationProgramContextSrv(
   mode,
-  saved = false
+  saved = false,
+  murabbikAlternatives = {}
 ) {
   const programMode =
     vaccinationProgramModeNormSrv(mode);
+
+  const selectedAlternatives =
+    vaccinationMurabbikAlternativesNormSrv(
+      murabbikAlternatives
+    );
 
   return {
     programMode,
@@ -43186,6 +43373,16 @@ function vaccinationProgramContextSrv(
           : "",
 
     message: "",
+
+    murabbikAlternatives:
+      selectedAlternatives,
+
+    murabbikAlternativesComplete:
+      programMode === "murabbik_default"
+        ? vaccinationMurabbikAlternativesCompleteSrv(
+            selectedAlternatives
+          )
+        : true,
 
     saved:
       Boolean(
@@ -43205,7 +43402,8 @@ async function vaccinationReadProgramContextSrv(
   if (!db || !uid) {
     return vaccinationProgramContextSrv(
       requested,
-      false
+      false,
+      {}
     );
   }
 
@@ -43232,13 +43430,15 @@ async function vaccinationReadProgramContextSrv(
     Boolean(
       storedMode &&
       storedMode === activeMode
-    )
+    ),
+    stored.murabbikAlternatives || {}
   );
 }
 
 async function vaccinationSaveProgramContextSrv(
   uid,
-  rawMode
+  rawMode,
+  rawAlternatives
 ) {
   const programMode =
     vaccinationProgramModeNormSrv(rawMode);
@@ -43248,7 +43448,24 @@ async function vaccinationSaveProgramContextSrv(
       new Error("vaccination_program_required");
 
     err.publicMessage =
-  "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك.";
+      "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك.";
+
+    throw err;
+  }
+
+  const alternativesValidation =
+    vaccinationMurabbikAlternativesValidateSrv(
+      rawAlternatives
+    );
+
+  if (alternativesValidation?.ok === false) {
+    const err =
+      new Error(
+        "vaccination_murabbik_alternatives_invalid"
+      );
+
+    err.publicMessage =
+      alternativesValidation.message;
 
     throw err;
   }
@@ -43268,15 +43485,44 @@ async function vaccinationSaveProgramContextSrv(
       old.programMode
     );
 
+  const previousAlternatives =
+    vaccinationMurabbikAlternativesNormSrv(
+      old.murabbikAlternatives || {}
+    );
+
+  const hasAlternativesPayload =
+    rawAlternatives &&
+    typeof rawAlternatives === "object" &&
+    !Array.isArray(rawAlternatives);
+
+  const nextAlternatives =
+    hasAlternativesPayload
+      ? vaccinationMurabbikAlternativesNormSrv({
+          ...previousAlternatives,
+          ...rawAlternatives
+        })
+      : previousAlternatives;
+
+  const modeChanged =
+    previousMode !== programMode;
+
+  const alternativesChanged =
+    JSON.stringify(previousAlternatives) !==
+    JSON.stringify(nextAlternatives);
+
   await ref.set({
     userId: uid,
 
     programMode,
 
-   programLabel:
-  programMode === "farm"
-    ? "برنامج تحصينات المزرعة"
-    : "برنامج تحصينات مُرَبِّيك",
+    murabbikAlternatives:
+      nextAlternatives,
+
+    programLabel:
+      programMode === "farm"
+        ? "برنامج تحصينات المزرعة"
+        : "برنامج تحصينات مُرَبِّيك",
+
     previousMode,
 
     source:
@@ -43293,20 +43539,24 @@ async function vaccinationSaveProgramContextSrv(
         })
   }, { merge: true });
 
-const programContext =
-  vaccinationProgramContextSrv(
-    programMode,
-    true
-  );
+  const programContext =
+    vaccinationProgramContextSrv(
+      programMode,
+      true,
+      nextAlternatives
+    );
 
-return {
-  ...programContext,
+  return {
+    ...programContext,
 
-  previousMode,
+    previousMode,
+    modeChanged,
+    alternativesChanged,
 
-  changed:
-    previousMode !== programMode
-};
+    changed:
+      modeChanged ||
+      alternativesChanged
+  };
 }
 app.post(
   "/api/vaccination/program-mode",
@@ -43314,10 +43564,13 @@ app.post(
   async (req, res) => {
     try {
       const programContext =
-        await vaccinationSaveProgramContextSrv(
-          req.userId,
-          req.body?.programMode
-        );
+       await vaccinationSaveProgramContextSrv(
+  req.userId,
+  req.body?.programMode,
+  req.body?.murabbikAlternatives ??
+    req.body?.alternativeSelections ??
+    req.body?.alternatives
+);
 
       let taskReconciliation =
         vaccinationTaskReconciliationResultSrv(
@@ -43332,7 +43585,9 @@ app.post(
               uid: req.userId,
 
               reason:
-                "vaccination_program_mode_changed"
+  programContext.modeChanged === true
+    ? "vaccination_program_mode_changed"
+    : "vaccination_murabbik_alternatives_changed"
             });
 
         } catch (reconcileError) {
@@ -45957,17 +46212,27 @@ function vaccinationMurabbikDefaultProgramSrv() {
       ]
     }),
 
-    row({
+        row({
+      // نحافظ على الـRow ID القديم حتى لا تنفصل السجلات والمهام السابقة.
       programRowId:
         "murabbik_lysigin_mothers",
       vaccineCode: "lysigin",
-      programSection: "mothers",
+      programSection: "herd",
       vaccineForm: "bacterin",
-      targetGroup: "mothers",
+      targetGroup: "females",
+      ageMinValue: 6,
+      ageMinUnit: "month",
       repeatEvery: 6,
       repeatUnit: "month",
+      notes:
+        "للإناث من عمر 6 أشهر: تأسيسية، ثم منشطة بعد 30 يومًا، ثم دورية كل 6 أشهر.",
       doseSchedule: [
-        dose("prime", "any_time"),
+        dose(
+          "prime",
+          "calf_age",
+          6,
+          "month"
+        ),
         dose(
           "booster",
           "after_previous_dose",
@@ -45985,6 +46250,42 @@ function vaccinationMurabbikDefaultProgramSrv() {
 
     row({
       programRowId:
+        "murabbik_brucella_rb51_heifers",
+      vaccineCode:
+        "brucella_rb51",
+      programSection: "calves",
+      vaccineForm:
+        "live_attenuated_bacterial",
+      targetGroup: "heifers",
+      ageMinValue: 4,
+      ageMinUnit: "month",
+      ageMaxValue: 12,
+      ageMaxUnit: "month",
+      alternativeGroup:
+        "brucella_program",
+      alternativePath: "rb51",
+      notes:
+        "جرعة واحدة للعجلات الإناث غير العشار من عمر 4 إلى 12 شهرًا.",
+      doseSchedule: [
+        dose(
+          "prime",
+          "calf_age_window",
+          0,
+          "",
+          {
+            ageMinValue: 4,
+            ageMinUnit: "month",
+            ageMaxValue: 12,
+            ageMaxUnit: "month",
+            cycle:
+              "once_lifetime"
+          }
+        )
+      ]
+    }),
+
+    row({
+      programRowId:
         "murabbik_brucella_s19_heifers",
       vaccineCode:
         "brucella_s19",
@@ -45996,8 +46297,11 @@ function vaccinationMurabbikDefaultProgramSrv() {
       ageMinUnit: "month",
       ageMaxValue: 6,
       ageMaxUnit: "month",
+      alternativeGroup:
+        "brucella_program",
+      alternativePath: "s19",
       notes:
-        "جرعة واحدة للعجلات من عمر 3 إلى 6 أشهر.",
+        "جرعة واحدة للعجلات الإناث غير العشار من عمر 3 إلى 6 أشهر.",
       doseSchedule: [
         dose(
           "prime",
@@ -46221,7 +46525,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
        programMode:
       "murabbik_default",
 
-    version: 2,
+    version: 3,
 
     programName:
       "برنامج مُرَبِّيك ",
@@ -46230,14 +46534,10 @@ function vaccinationMurabbikDefaultProgramSrv() {
       "برنامج مُرَبِّيك ",
 
     source:
-      "server:vaccination-murabbik-default-v2",
+       "server:vaccination-murabbik-default-v3",
 
-      defaultAlternatives: {
-      respiratory_program:
-        "combined",
-      maternal_calf_scour_program:
-        "rotavac_corona"
-    },
+    // لا توجد بدائل افتراضية: المربي هو صاحب الاختيار.
+    defaultAlternatives: {},
 
     alternativeGroups: [
       {
@@ -46247,8 +46547,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
         label:
           "برنامج التحصينات التنفسية",
 
-        defaultPath:
-          "combined",
+        defaultPath: "",
 
         paths: [
           {
@@ -46262,8 +46561,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
               "اللقاحات التنفسية المنفصلة"
           }
         ]
-      }
-            ,
+      },
       {
         value:
           "maternal_calf_scour_program",
@@ -46271,8 +46569,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
         label:
           "برنامج تحصين الأمهات ضد إسهالات العجول",
 
-        defaultPath:
-          "rotavac_corona",
+        defaultPath: "",
 
         paths: [
           {
@@ -46286,6 +46583,28 @@ function vaccinationMurabbikDefaultProgramSrv() {
               "scourguard",
             label:
               "سكاور جارد للأمهات"
+          }
+        ]
+      },
+      {
+        value:
+          "brucella_program",
+
+        label:
+          "برنامج تحصين البروسيلا",
+
+        defaultPath: "",
+
+        paths: [
+          {
+            value: "rb51",
+            label:
+              "البروسيلا عترة RB51"
+          },
+          {
+            value: "s19",
+            label:
+              "البروسيلا عترة S19"
           }
         ]
       }
@@ -46317,8 +46636,16 @@ async function vaccinationReadExecutionProgramSrv(
     const program =
       vaccinationMurabbikDefaultProgramSrv();
 
-    const selectedAlternatives =
-      program.defaultAlternatives || {};
+    const programContext =
+  await vaccinationReadProgramContextSrv(
+    uid,
+    programMode
+  );
+
+const selectedAlternatives =
+  vaccinationMurabbikAlternativesNormSrv(
+    programContext.murabbikAlternatives || {}
+  );
 
     const rows =
       vaccinationProgramExecutionRowsSrv(
@@ -47638,7 +47965,24 @@ const doseType = String(
         });
         continue;
       }
+      const scopedEligibility =
+  vaccinationScopedEligibilitySrv({
+    vaccineCode,
+    animalDoc: doc,
+    animalCollection:
+      animal._collection === "calves"
+        ? "calves"
+        : "animals"
+  });
 
+if (scopedEligibility?.allowed === false) {
+  rejected.push({
+    animalNumber,
+    reason: scopedEligibility.message,
+    code: scopedEligibility.code || ""
+  });
+  continue;
+}
       const duplicated = await vaccinationHasSameDaySrv(
         uid,
         animalNumber,
@@ -50014,7 +50358,20 @@ const programRowId = String(
         });
         continue;
       }
+      const scopedEligibility =
+  vaccinationScopedEligibilitySrv({
+    vaccineCode,
+    animalDoc,
+    animalCollection
+  });
 
+if (scopedEligibility?.allowed === false) {
+  rejected.push({
+    animalNumber,
+    reason: scopedEligibility.message
+  });
+  continue;
+}
       const duplicated = await vaccinationHasSameDaySrv(
         uid,
         animalNumber,
@@ -59141,7 +59498,17 @@ async function vaccinationInitialAgeAlertGroupsSrv({
       ) {
         continue;
       }
+      const scopedEligibility =
+  vaccinationScopedEligibilitySrv({
+    vaccineCode:
+      row.vaccineCode || "",
+    animalDoc: calf,
+    animalCollection: "calves"
+  });
 
+if (scopedEligibility?.allowed === false) {
+  continue;
+}
       const advice =
         vaccinationAgeTimingAdviceSrv({
           animalDoc: calf,
