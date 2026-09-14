@@ -93182,9 +93182,9 @@ app.post(
   }
 );
 // ============================================================
-//      SUBSCRIPTION ENGINE — CORE + 30-DAY TRIAL (NO GATE)
+//      SUBSCRIPTION ENGINE — CORE + 21-DAY TRIAL (NO GATE)
 // ============================================================
-const SUBSCRIPTION_TRIAL_DAYS_SRV = 30;
+const SUBSCRIPTION_TRIAL_DAYS_SRV = 21;
 const SUBSCRIPTION_DAY_MS_SRV = 24 * 60 * 60 * 1000;
 
 const SUBSCRIPTION_STATUSES_SRV = new Set([
@@ -93423,7 +93423,7 @@ async function subscriptionCreateTrialIfMissingSrv({
       status: 'trial',
 
       subscriptionPolicyVersion:
-        'trial-30d-v1',
+        'trial-21d-v1',
 
       country,
 
@@ -93486,7 +93486,7 @@ async function subscriptionCreateTrialIfMissingSrv({
         milestone: 'trial_started',
         milestoneVersion: 'subscription-lifecycle-v1',
         subscriptionStatus: 'trial',
-        subscriptionPolicyVersion: 'trial-30d-v1',
+        subscriptionPolicyVersion: 'trial-21d-v1',
         country,
         pricingRegion: pricingRegion || null,
         pricingVersion:
