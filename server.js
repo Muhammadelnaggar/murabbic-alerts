@@ -88490,8 +88490,57 @@ app.get('/timeline.html', ensureAdmin, (_req, res) => {
 });
 
 app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'www', 'index.html'));
-});// ============================================================
+  res.set('Cache-Control', 'no-store');
+
+  return res.type('html').send(`<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>مُرَبِّيك — قريبًا</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #f3fbff;
+      overflow: hidden;
+    }
+
+    picture, img {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    img {
+      object-fit: cover;
+      object-position: center;
+    }
+  </style>
+</head>
+
+<body>
+  <picture>
+    <source
+      media="(orientation: portrait)"
+      srcset="/images/murabbik-coming-soon-mobile.png"
+    >
+
+    <img
+      src="/images/murabbik-coming-soon-desktop.png"
+      alt="مُرَبِّيك — قريبًا الإطلاق الرسمي"
+    >
+  </picture>
+</body>
+</html>`);
+});
+
+app.get('/trial', (_req, res) => {
+  return res.sendFile(path.join(__dirname, 'www', 'index.html'));
+});
+// ============================================================
 //  DEBUG: Dump animals with explicit error logging
 // ============================================================
 app.get('/api/debug/animals/all', async (req, res) => {
