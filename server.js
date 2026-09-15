@@ -42770,6 +42770,84 @@ async function vaccinationResolveMurabbikDamAgeProgramLinkSrv({
       damStatus.lastVaccinationDate || ""
   };
 }
+function vaccinationAnimalLabelSrv(
+  animalDoc = {},
+  animalCollection = ""
+) {
+  const collection =
+    String(animalCollection || "")
+      .trim()
+      .toLowerCase();
+
+  const entryType =
+    String(animalDoc.entryType || "")
+      .trim()
+      .toLowerCase();
+
+  const isCalfRecord =
+    collection === "calves" ||
+    entryType === "followers" ||
+    animalDoc.isCalf === true;
+
+  if (isCalfRecord) {
+    const sex =
+      getSexTextSrv(animalDoc);
+
+    if (sex === "أنثى") {
+      return "العجلة";
+    }
+
+    if (sex === "ذكر") {
+      return "العجل";
+    }
+
+    return "العجل أو العجلة";
+  }
+
+  const species =
+    calvingNormalizeSpeciesSrv(
+      animalDoc.species ||
+      animalDoc.animalTypeAr ||
+      animalDoc.animalType ||
+      animalDoc.animaltype ||
+      animalDoc.type ||
+      ""
+    );
+
+  if (species === "جاموس") {
+    return "الجاموسة";
+  }
+
+  if (species === "أبقار") {
+    return "البقرة";
+  }
+
+  return "الرأس";
+}
+
+function vaccinationMotherLabelSrv(
+  animalDoc = {}
+) {
+  const species =
+    calvingNormalizeSpeciesSrv(
+      animalDoc.species ||
+      animalDoc.animalTypeAr ||
+      animalDoc.animalType ||
+      animalDoc.animaltype ||
+      animalDoc.type ||
+      ""
+    );
+
+  if (species === "جاموس") {
+    return "الجاموسة";
+  }
+
+  if (species === "أبقار") {
+    return "البقرة";
+  }
+
+  return "الأم";
+}
 function vaccinationAgeTimingAdviceSrv({
   animalDoc = {},
   programLink = {},
@@ -42802,6 +42880,16 @@ function vaccinationAgeTimingAdviceSrv({
     ""
   ).trim();
 
+  const animalLabel =
+    vaccinationAnimalLabelSrv(
+      animalDoc,
+      String(
+        programLink.programSection || ""
+      ).trim().toLowerCase() === "calves"
+        ? "calves"
+        : ""
+    );
+
   if (!birthDate) {
     return {
       allowed: true,
@@ -42813,7 +42901,7 @@ function vaccinationAgeTimingAdviceSrv({
       taskDoseType,
 
       message:
-        "لا يوجد تاريخ ميلاد مسجل لهذا الحيوان، لذلك لم يتمكن مُرَبِّيك من مقارنة الجرعة بالعمر المحدد في البرنامج. يمكنك المتابعة إذا كان هذا قرار المزرعة."
+        `⚠️ تاريخ ميلاد ${animalLabel} غير مسجل، لذلك لا يستطيع مُرَبِّيك تقييم توقيت الجرعة حسب العمر. يمكنك المتابعة بالتسجيل.`
     };
   }
 
@@ -42936,76 +43024,90 @@ function vaccinationAgeTimingAdviceSrv({
   };
 
   if (dt < windowStart) {
-  const daysUntilWindow =
-    diffDaysISO(
-      dt,
-      windowStart
-    );
+    const daysUntilWindow =
+      diffDaysISO(
+        dt,
+        windowStart
+      );
 
-  const vaccineCode =
-    String(
-      programLink.vaccineCode || ""
-    )
-      .trim()
-      .toLowerCase();
+    const vaccineForm =
+      String(
+        programLink.vaccineForm || ""
+      )
+        .trim()
+        .toLowerCase();
 
-  const vaccineForm =
-    String(
-      programLink.vaccineForm || ""
-    )
-      .trim()
-      .toLowerCase();
+    const isInactivatedVaccine =
+      [
+        "killed_virus",
+        "modified_live_and_killed_virus",
+        "bacterin",
+        "bacterin_toxoid",
+        "killed_virus_bacterin_toxoid"
+      ].includes(vaccineForm);
 
-  const isKilledIbrBvd =
-    vaccineForm === "killed_virus" &&
-    (
-      vaccineCode === "ibr" ||
-      vaccineCode === "bvd" ||
-      vaccineCode ===
-        "ibr_bvd_pi3_brsv"
-    );
+    if (isInactivatedVaccine) {
+      return {
+        ...common,
 
-  const isKilledHs =
-    vaccineCode === "pasteurella_hs" &&
-    vaccineForm === "bacterin_toxoid";
+        level: "warn",
+        severity: "high",
 
-  if (isKilledIbrBvd || isKilledHs) {
+        code:
+          "vaccination_inactivated_age_window_early",
+
+        daysUntilWindow,
+        vaccineForm,
+
+        message:
+          `⚠️ هذا التحصين ميت/غير نشط، وإعطاؤه لـ${animalLabel} قبل العمر الموصى به قد يعطي استجابة مناعية ضعيفة أو غير موثوقة. ` +
+          `الموعد الموصى به: عمر ${ageText}، وتبدأ النافذة في ${windowStart} — متبقي ${daysUntilWindow} يومًا.`
+      };
+    }
+
+    const isLiveVaccine =
+      [
+        "live_attenuated_virus",
+        "modified_live_virus",
+        "live_attenuated_bacterial",
+        "avirulent_live_culture"
+      ].includes(vaccineForm);
+
+    if (isLiveVaccine) {
+      return {
+        ...common,
+
+        level: "warn",
+
+        code:
+          "vaccination_age_window_early",
+
+        daysUntilWindow,
+        vaccineForm,
+
+        message:
+          `⚠️ الجرعة قبل العمر الموصى به لـ${animalLabel}. التبكير في هذا النوع من التحصين لا يُعد ضارًا. ` +
+          `الموعد الموصى به: عمر ${ageText}، وتبدأ النافذة في ${windowStart} — متبقي ${daysUntilWindow} يومًا. يمكنك المتابعة بالتسجيل.`
+      };
+    }
+
     return {
       ...common,
 
       level: "warn",
-      severity: "high",
 
       code:
-        "vaccination_inactivated_age_window_early",
+        "vaccination_age_window_early",
 
       daysUntilWindow,
-      vaccineForm,
 
       message:
-        `⚠️ تحذير مناعي مهم: هذا التحصين من النوع الميت/غير الحي، وإعطاء الجرعة قبل العمر الموصى به قد يؤدي إلى تعادل أو حجب المستضد بواسطة الأجسام المضادة الموجودة، فتكون الاستجابة المناعية الجديدة ضعيفة أو غير موثوقة. ` +
-        `الموعد الموصى به عند عمر ${ageText}، وتبدأ نافذته في ${windowStart}. ما زال عليها ${daysUntilWindow} يومًا. ` +
-        "لا تُعامل الجرعة المبكرة كبديل موثوق عن الجرعة في موعدها، ولا يُنصح بالتبكير إلا بقرار بيطري واضح."
+        `⚠️ الجرعة قبل العمر الموصى به لـ${animalLabel}. الموعد الموصى به: عمر ${ageText}، ` +
+        `وتبدأ النافذة في ${windowStart} — متبقي ${daysUntilWindow} يومًا. يمكنك المتابعة بالتسجيل.`
     };
   }
 
-  return {
-    ...common,
-
-    level: "warn",
-
-    code:
-      "vaccination_age_window_early",
-
-    daysUntilWindow,
-
-    message:
-      `الموعد المفضل لهذه الجرعة عند عمر ${ageText}، وتبدأ نافذتها الموصى بها في ${windowStart}. ` +
-      `ما زال عليها ${daysUntilWindow} يومًا، ويمكنك المتابعة إذا كان هذا قرار المزرعة.`
-  };
-}
-
-if (dt > windowEnd) {
+  if (dt > windowEnd) {
     const daysLate =
       diffDaysISO(
         windowEnd,
@@ -43023,8 +43125,8 @@ if (dt > windowEnd) {
       daysLate,
 
       message:
-        `تجاوز الحيوان النافذة الموصى بها لهذه الجرعة عند عمر ${ageText} منذ ${daysLate} يومًا. ` +
-        "يمكنك تسجيل التنفيذ الآن، وسيحسب مُرَبِّيك الجرعة التالية من تاريخ التنفيذ الفعلي."
+        `⚠️ تجاوز موعد جرعة ${animalLabel} النافذة الموصى بها عند عمر ${ageText} بـ${daysLate} يومًا. ` +
+        "يمكنك تسجيلها الآن، وسيُحسب الموعد التالي من تاريخ التنفيذ."
     };
   }
 
@@ -43037,7 +43139,7 @@ if (dt > windowEnd) {
       "vaccination_age_window_due",
 
     message:
-      `الحيوان داخل النافذة الموصى بها لهذه الجرعة عند عمر ${ageText} ` +
+      `✅ ${animalLabel} داخل النافذة الموصى بها لهذه الجرعة عند عمر ${ageText}: ` +
       `من ${windowStart} إلى ${windowEnd}.`
   };
 }
@@ -43515,6 +43617,17 @@ if (
         .damNumber || ""
     ).trim();
 
+  const animalLabel =
+    vaccinationAnimalLabelSrv(
+      animalDoc,
+      "calves"
+    );
+
+  const motherLabel =
+    vaccinationMotherLabelSrv(
+      animalDoc
+    );
+
   return {
     allowed: false,
     level: "block",
@@ -43539,8 +43652,8 @@ if (
 
     message:
       damNumber
-        ? `لا توجد لدى مُرَبِّيك بيانات سابقة كافية عن تحصين الأم رقم ${damNumber} لهذا المرض. حدّد هل الأم محصنة أم غير محصنة حتى يحدد مُرَبِّيك العمر الصحيح للتابع.`
-        : "لا توجد لدى مُرَبِّيك بيانات سابقة كافية عن حالة تحصين أم هذا التابع. حدّد هل الأم محصنة أم غير محصنة حتى يحدد مُرَبِّيك العمر الصحيح."
+        ? `لا توجد بيانات سابقة كافية عن تحصين ${motherLabel} رقم ${damNumber} ضد هذا المرض. حدّد هل ${motherLabel} محصنة أم غير محصنة لتحديد العمر المناسب لتحصين ${animalLabel}.`
+        : `لا توجد بيانات سابقة كافية عن تحصين ${motherLabel} ضد هذا المرض. حدّد هل ${motherLabel} محصنة أم غير محصنة لتحديد العمر المناسب لتحصين ${animalLabel}.`
   };
 }
 
@@ -43668,7 +43781,7 @@ const initialAgeAdvice =
           nearest.taskDoseType,
 
         message:
-          `انتهت نافذة جرعة ما قبل الولادة. كان آخر يوم مسموح للتنفيذ هو ${maternalWindow.latestAllowedDate}، أي قبل الولادة المتوقعة بـ${maternalWindow.latestDaysBeforeCalving} يومًا.`
+          `انتهت نافذة جرعة ما قبل الولادة؛ آخر موعد للتنفيذ كان ${maternalWindow.latestAllowedDate}، أي قبل الولادة المتوقعة بـ${maternalWindow.latestDaysBeforeCalving} يومًا.`
       };
     }
 
@@ -43738,8 +43851,8 @@ const earliestAllowedDate =
 
      message:
   timingPolicy.executionWindowDays === 0
-    ? `موعد الجرعة المنشطة هو ${nearest.dueDate}، ولا يُسمح بتسجيلها قبل موعدها.`
-    : `موعد هذه الجرعة هو ${nearest.dueDate}، ويبدأ السماح بتسجيلها من ${earliestAllowedDate}. إذا أردت تقديمها أكثر، عدّل موعدها أولًا داخل برنامج التحصينات المعتمد.`
+    ? `موعد الجرعة المنشطة ${nearest.dueDate}، ولا يمكن تسجيلها قبل الموعد.`
+    : `موعد الجرعة ${nearest.dueDate}، ويبدأ التسجيل من ${earliestAllowedDate}. للتقديم قبل ذلك، عدّل موعدها في برنامج التحصينات.`
     };
   }
 
@@ -43770,7 +43883,7 @@ const earliestAllowedDate =
         nearest.taskDoseType,
 
       message:
-        `هذه الجرعة داخل نافذة التنفيذ، وموعدها في البرنامج بعد ${daysEarly} يومًا. عند تسجيلها الآن سيُحسب موعد الجرعة التالية من تاريخ التنفيذ الفعلي.`
+        `الجرعة داخل نافذة التنفيذ وموعدها بعد ${daysEarly} يومًا. إذا سُجلت الآن، سيُحسب الموعد التالي من تاريخ التنفيذ.`
     };
   }
 
@@ -43801,7 +43914,7 @@ const earliestAllowedDate =
         nearest.taskDoseType,
 
       message:
-        `تأخر هذا التحصين ${daysLate} يومًا عن موعد البرنامج. يمكنك تسجيل التنفيذ الآن، وسيحسب مُرَبِّيك الموعد التالي من تاريخ التنفيذ الفعلي.`
+        `⚠️ التحصين متأخر ${daysLate} يومًا عن موعد البرنامج. يمكنك تسجيله الآن، وسيُحسب الموعد التالي من تاريخ التنفيذ.`
     };
   }
 
@@ -46567,7 +46680,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
   repeatEvery: 1,
   repeatUnit: "year",
   notes:
-    "للتوابع: من عمر شهر إذا كانت الأم غير محصنة، ومن عمر 4 شهور إذا كانت الأم محصنة.",
+    "للعجول والعجلات: من عمر شهر إذا كانت الأم غير محصنة، ومن عمر 4 شهور إذا كانت الأم محصنة.",
   doseSchedule: [
     dose(
       "prime",
@@ -46704,7 +46817,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
   repeatEvery: 6,
   repeatUnit: "month",
   notes:
-    "للتوابع: من عمر شهر إذا كانت الأم غير محصنة، ومن عمر 4 شهور إذا كانت الأم محصنة.",
+    "للعجول والعجلات: من عمر شهر إذا كانت الأم غير محصنة، ومن عمر 4 شهور إذا كانت الأم محصنة.",
   doseSchedule: [
     dose(
       "prime",
@@ -48405,7 +48518,7 @@ const doseType = String(
         stage: "missing_basic",
 
         message: programContext.programMode
-          ? "أدخل رقم الحيوان وتاريخ التحصين ونوع التحصين."
+          ? "أدخل الرقم وتاريخ التحصين ونوع التحصين."
           : "اختر برنامج المزرعة أو برنامج مُرَبِّيك، ثم أكمل بيانات التحصين.",
 
         programContext,
@@ -48499,7 +48612,7 @@ const doseType = String(
       if (!animalNumber) {
         rejected.push({
           animalNumber: String(rawNum || ""),
-          reason: "رقم الحيوان غير صحيح."
+          reason: "الرقم غير صحيح."
         });
         continue;
       }
@@ -48509,21 +48622,28 @@ const doseType = String(
       if (!animal) {
         rejected.push({
           animalNumber,
-          reason: "لم أجد الحيوان في حسابك. راجع الرقم."
+          reason: "لم أجد هذا الرقم في حسابك. راجع الرقم."
         });
         continue;
       }
 
       const doc = animal.data || {};
-      const status = String(doc.status || "active").trim().toLowerCase();
+const status = String(doc.status || "active").trim().toLowerCase();
 
-      if (status === "inactive" || status === "archived") {
-        rejected.push({
-          animalNumber,
-          reason: "الحيوان خارج القطيع، لذلك لا يمكن تسجيل تحصين له."
-        });
-        continue;
-      }
+const animalLabel =
+  vaccinationAnimalLabelSrv(
+    doc,
+    animal._collection || ""
+  );
+
+if (status === "inactive" || status === "archived") {
+  rejected.push({
+    animalNumber,
+    reason:
+      `${animalLabel} خارج القطيع، لذلك لا يمكن تسجيل التحصين.`
+  });
+  continue;
+}
       const scopedEligibility =
   vaccinationScopedEligibilitySrv({
     vaccineCode,
@@ -48550,12 +48670,13 @@ if (scopedEligibility?.allowed === false) {
       );
 
       if (duplicated) {
-        rejected.push({
-          animalNumber,
-          reason: "سبق تسجيل التحصين نفسه لهذا الحيوان في التاريخ نفسه."
-        });
-        continue;
-      }
+  rejected.push({
+    animalNumber,
+    reason:
+      `سبق تسجيل التحصين نفسه على ${animalLabel} في التاريخ نفسه.`
+  });
+  continue;
+}
 
 const dueWarning =
   await vaccinationDueWarningSrv({
@@ -48635,8 +48756,9 @@ const effectiveDoseStep =
 accepted.push({
 
   animalNumber,
-  animalId: animal.id || "",
-  species: doc.species || doc.animalTypeAr || doc.animalType || "",
+animalId: animal.id || "",
+animalLabel,
+species: doc.species || doc.animalTypeAr || doc.animalType || "",
   status,
   vaccineCode,
   programRowId,
@@ -48701,10 +48823,10 @@ const warningMessages = [
 
 const gateSummary =
   rejected.length
-    ? `راجعت ${numbers.length} حيوانًا: يمكن تسجيل التحصين لـ${accepted.length}، ولا يمكن تسجيله لـ${rejected.length}.`
+    ? `راجعت ${numbers.length} رقمًا: يمكن تسجيل التحصين لـ${accepted.length}، ولا يمكن تسجيله لـ${rejected.length}.`
     : accepted.length === 1
-      ? `✅ راجعت بيانات الحيوان رقم ${accepted[0].animalNumber}، ويمكنك تسجيل التحصين الآن.`
-      : `✅ راجعت البيانات، ويمكن تسجيل التحصين لعدد ${accepted.length} حيوانات.`;
+      ? `✅ راجعت بيانات ${accepted[0].animalLabel || "الرأس"} رقم ${accepted[0].animalNumber}، ويمكنك تسجيل التحصين الآن.`
+      : `✅ راجعت البيانات، ويمكن تسجيل التحصين لعدد ${accepted.length} من الأرقام المدخلة.`;
 
 return res.json({
   ok: true,
@@ -48794,7 +48916,7 @@ app.post(
           error:
             "vaccination_dam_baseline_invalid",
           message:
-            "❌ حدّد التابع والتحصين، ثم اختر هل الأم محصنة أم غير محصنة."
+            "❌ حدّد رقم العجل أو العجلة والتحصين، ثم اختر هل الأم محصنة أم غير محصنة."
         });
       }
 
@@ -48825,26 +48947,37 @@ app.post(
           error:
             "vaccination_dam_baseline_animal_not_found",
           message:
-            "❌ لم أجد التابع في حسابك. راجع الرقم."
+            "❌ لم أجد هذا الرقم ضمن العجول أو العجلات في حسابك. راجع الرقم."
         });
       }
 
       if (
-        animal._collection !== "calves"
-      ) {
-        return res.status(400).json({
-          ok: false,
-          error:
-            "vaccination_dam_baseline_requires_calf",
-          message:
-            "❌ حالة تحصين الأم تُستخدم مع التوابع فقط."
-        });
-      }
+  animal._collection !== "calves"
+) {
+  return res.status(400).json({
+    ok: false,
+    error:
+      "vaccination_dam_baseline_requires_calf",
+    message:
+      "❌ حالة تحصين الأم تُستخدم مع العجول والعجلات فقط."
+  });
+}
 
       const animalDoc =
-        animal.data || {};
+  animal.data || {};
 
-      const identity =
+const animalLabel =
+  vaccinationAnimalLabelSrv(
+    animalDoc,
+    "calves"
+  );
+
+const motherLabel =
+  vaccinationMotherLabelSrv(
+    animalDoc
+  );
+
+const identity =
         vaccinationDamBaselineIdentitySrv({
           uid,
           animalDoc,
@@ -48852,14 +48985,14 @@ app.post(
         });
 
       if (!identity) {
-        return res.status(400).json({
-          ok: false,
-          error:
-            "vaccination_dam_baseline_identity_missing",
-          message:
-            "❌ تعذّر ربط حالة تحصين الأم بهذا التابع."
-        });
-      }
+  return res.status(400).json({
+    ok: false,
+    error:
+      "vaccination_dam_baseline_identity_missing",
+    message:
+      `❌ تعذّر ربط حالة تحصين الأم بـ${animalLabel}.`
+  });
+}
 
       await db
         .collection(
@@ -48918,10 +49051,10 @@ app.post(
         damVaccinationStatus:
           status,
 
-        message:
-          status === "vaccinated"
-            ? "✅ تم اعتماد أن الأم محصنة لهذا التحصين."
-            : "✅ تم اعتماد أن الأم غير محصنة لهذا التحصين."
+     message:
+  status === "vaccinated"
+    ? `✅ تم اعتماد أن ${motherLabel} محصنة ضد هذا التحصين.`
+    : `✅ تم اعتماد أن ${motherLabel} غير محصنة ضد هذا التحصين.`
       });
 
     } catch (e) {
@@ -49338,6 +49471,10 @@ function vaccinationMaternalTimingAdviceSrv({
       step.doseType ||
       ""
     ).trim();
+    const motherLabel =
+  vaccinationMotherLabelSrv(
+    animalDoc
+  );
 
    const maternalWindow =
     vaccinationMaternalLatestWindowSrv({
@@ -49360,7 +49497,7 @@ function vaccinationMaternalTimingAdviceSrv({
       taskDoseType,
 
       message:
-        "لا يوجد تاريخ تلقيح أخير أو موعد ولادة متوقع صالح لهذه الأم، لذلك لم يتمكن مُرَبِّيك من حساب موعد جرعة ما قبل الولادة. يمكنك المتابعة إذا كان هذا قرار المزرعة."
+`⚠️ لا يوجد لدى ${motherLabel} تاريخ تلقيح أخير أو موعد ولادة متوقع صالح، لذلك لا يمكن حساب موعد جرعة ما قبل الولادة. يمكنك المتابعة بالتسجيل.`
     };
   }
 
@@ -49441,7 +49578,7 @@ function vaccinationMaternalTimingAdviceSrv({
         ),
 
       message:
-        `انتهت نافذة جرعة ما قبل الولادة. كان آخر يوم مسموح للتنفيذ هو ${latestAllowedDate}، أي قبل الولادة المتوقعة بـ${latestDaysBeforeCalving} يومًا.`
+        `انتهت نافذة جرعة ما قبل الولادة لـ${motherLabel}؛ آخر موعد للتنفيذ كان ${latestAllowedDate}، أي قبل الولادة المتوقعة بـ${latestDaysBeforeCalving} يومًا.`
     };
   }
   if (dt < earliestAllowedDate) {
@@ -49463,8 +49600,8 @@ function vaccinationMaternalTimingAdviceSrv({
 
       message:
         timingPolicy.executionWindowDays === 0
-          ? `موعد جرعة ما قبل الولادة هو ${dueDate}، ولا يُسمح بتسجيلها قبل موعدها.`
-          : `موعد جرعة ما قبل الولادة هو ${dueDate}، ويبدأ السماح بتسجيلها من ${earliestAllowedDate}.`
+          ? `موعد جرعة ما قبل الولادة لـ${motherLabel} هو ${dueDate}، ولا يمكن تسجيلها قبل الموعد.`
+          : `موعد جرعة ما قبل الولادة لـ${motherLabel} هو ${dueDate}، ويبدأ التسجيل من ${earliestAllowedDate}.`
     };
   }
 
@@ -49483,7 +49620,7 @@ function vaccinationMaternalTimingAdviceSrv({
       daysEarly,
 
       message:
-        `جرعة ما قبل الولادة داخل نافذة التنفيذ، وموعدها في البرنامج بعد ${daysEarly} يومًا.`
+       `جرعة ما قبل الولادة لـ${motherLabel} داخل نافذة التنفيذ، وموعدها بعد ${daysEarly} يومًا.`
     };
   }
 
@@ -49501,7 +49638,7 @@ function vaccinationMaternalTimingAdviceSrv({
       daysLate,
 
       message:
-        `تأخرت جرعة ما قبل الولادة ${daysLate} يومًا عن موعد البرنامج، وما زالت داخل النافذة المسموحة حتى ${windowEnd}.`
+        `⚠️ جرعة ما قبل الولادة لـ${motherLabel} متأخرة ${daysLate} يومًا عن موعد البرنامج، وما زال التسجيل متاحًا حتى ${windowEnd}.`
     };
   }
 
@@ -49513,7 +49650,7 @@ function vaccinationMaternalTimingAdviceSrv({
       "vaccination_due_ok",
 
     message:
-      "توقيت جرعة ما قبل الولادة مطابق لموعد البرنامج."
+      `✅ توقيت جرعة ما قبل الولادة لـ${motherLabel} مطابق لموعد البرنامج.`
   };
 }
 
@@ -51095,7 +51232,7 @@ const programRowId = String(
       if (!animal) {
         rejected.push({
           animalNumber,
-          reason: "لم أجد الحيوان في حسابك. راجع الرقم."
+          reason: "لم أجد هذا الرقم في حسابك. راجع الرقم."
         });
         continue;
       }
