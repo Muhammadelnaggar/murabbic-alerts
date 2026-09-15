@@ -42286,7 +42286,490 @@ function vaccinationDoseTimingPolicySrv(
         : VACCINATION_EXECUTION_WINDOW_DAYS_SRV
   };
 }
+function vaccinationMurabbikDamAgePolicySrv(
+  vaccineCode = ""
+) {
+  const code =
+    String(vaccineCode || "")
+      .trim()
+      .toLowerCase();
 
+  if (
+    code !== "lsd" &&
+    code !== "pasteurella_hs"
+  ) {
+    return null;
+  }
+
+  return {
+    vaccineCode: code,
+    unvaccinatedDamAgeValue: 1,
+    vaccinatedDamAgeValue: 4,
+    ageUnit: "month"
+  };
+}
+function vaccinationDamStatusNormSrv(raw = "") {
+  const s =
+    String(raw || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[أإآ]/g, "ا")
+      .replace(/ة/g, "ه")
+      .replace(/ى/g, "ي")
+      .replace(/\s+/g, "_");
+
+  if (
+    s === "vaccinated" ||
+    s === "محصنه" ||
+    s === "محصن"
+  ) {
+    return "vaccinated";
+  }
+
+  if (
+    s === "unvaccinated" ||
+    s === "غير_محصنه" ||
+    s === "غير_محصن"
+  ) {
+    return "unvaccinated";
+  }
+
+  return "unknown";
+}
+
+function vaccinationDamBaselineIdentitySrv({
+  uid,
+  animalDoc = {},
+  vaccineCode = ""
+} = {}) {
+  const tenant =
+    String(uid || "").trim();
+
+  const damNumber =
+    calvingNormDigitsOnlySrv(
+      animalDoc.damNumber ||
+      animalDoc.motherNumber ||
+      animalDoc.damId ||
+      ""
+    );
+
+  const calfNumber =
+    calvingNormDigitsOnlySrv(
+      animalDoc.calfNumber ||
+      animalDoc.animalNumber ||
+      animalDoc.number ||
+      ""
+    );
+
+  const vaccineKey =
+    vaccinationTextKeySrv(
+      vaccineCode || ""
+    );
+
+  const scopeType =
+    damNumber
+      ? "dam"
+      : "calf";
+
+  const scopeNumber =
+    damNumber ||
+    calfNumber;
+
+  if (
+    !tenant ||
+    !scopeNumber ||
+    !vaccineKey
+  ) {
+    return null;
+  }
+
+  const rawKey =
+    [
+      tenant,
+      scopeType,
+      scopeNumber,
+      vaccineKey
+    ].join("|");
+
+  const docId =
+    crypto
+      .createHash("sha256")
+      .update(rawKey)
+      .digest("hex");
+
+  return {
+    docId,
+    damNumber,
+    calfNumber,
+    vaccineKey,
+    scopeType,
+    scopeNumber
+  };
+}
+
+async function vaccinationReadDamBaselineSrv({
+  uid,
+  animalDoc = {},
+  vaccineCode = ""
+} = {}) {
+  if (!db) {
+    return {
+      status: "unknown"
+    };
+  }
+
+  const identity =
+    vaccinationDamBaselineIdentitySrv({
+      uid,
+      animalDoc,
+      vaccineCode
+    });
+
+  if (!identity) {
+    return {
+      status: "unknown"
+    };
+  }
+
+  const snap =
+    await db
+      .collection(
+        "vaccination_dam_baselines"
+      )
+      .doc(identity.docId)
+      .get();
+
+  if (!snap.exists) {
+    return {
+      ...identity,
+      status: "unknown"
+    };
+  }
+
+  const data =
+    snap.data() || {};
+
+  return {
+    ...identity,
+
+    status:
+      vaccinationDamStatusNormSrv(
+        data.status || ""
+      ),
+
+    source:
+      String(
+        data.source || ""
+      ).trim()
+  };
+}
+async function vaccinationDamVaccinationStatusSrv({
+  uid,
+  animalDoc = {},
+  vaccineCode = "",
+  vaccine = ""
+} = {}) {
+  const damNumber =
+    calvingNormDigitsOnlySrv(
+      animalDoc.damNumber ||
+      animalDoc.motherNumber ||
+      animalDoc.damId ||
+      ""
+    );
+
+  const wantedCode =
+    vaccinationTextKeySrv(
+      vaccineCode || ""
+    );
+
+  const wantedName =
+    String(vaccine || "").trim();
+
+  let vaccinated = false;
+  let lastVaccinationDate = "";
+
+  if (
+    db &&
+    uid &&
+    damNumber &&
+    (wantedCode || wantedName)
+  ) {
+    const snap =
+      await db
+        .collection("events")
+        .where("userId", "==", uid)
+        .where(
+          "animalNumber",
+          "==",
+          damNumber
+        )
+        .limit(300)
+        .get();
+
+    snap.forEach(ds => {
+      const ev = ds.data() || {};
+
+      const eventType = String(
+        ev.eventType ||
+        ev.type ||
+        ev.eventTypeNorm ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+      const isVaccination =
+        eventType === "تحصين" ||
+        eventType === "vaccination" ||
+        eventType.includes("تحصين") ||
+        eventType.includes(
+          "vaccination"
+        );
+
+      if (!isVaccination) return;
+
+      const eventCode =
+        vaccinationTextKeySrv(
+          ev.vaccineCode || ""
+        );
+
+      const eventName =
+        String(
+          ev.vaccine ||
+          ev.vaccineName ||
+          ""
+        ).trim();
+
+      const sameVaccine =
+        Boolean(
+          wantedCode &&
+          eventCode &&
+          wantedCode === eventCode
+        ) ||
+        Boolean(
+          wantedName &&
+          eventName &&
+          vaccinationSameVaccineKeySrv(
+            eventName,
+            wantedName
+          )
+        );
+
+      if (!sameVaccine) return;
+
+      vaccinated = true;
+
+      const eventDate = String(
+        ev.eventDate ||
+        ev.date ||
+        ""
+      )
+        .trim()
+        .slice(0, 10);
+
+      if (
+        /^\d{4}-\d{2}-\d{2}$/.test(
+          eventDate
+        ) &&
+        (
+          !lastVaccinationDate ||
+          eventDate >
+            lastVaccinationDate
+        )
+      ) {
+        lastVaccinationDate =
+          eventDate;
+      }
+    });
+  }
+
+  if (vaccinated) {
+    return {
+      damNumber,
+      status: "vaccinated",
+      vaccinated: true,
+      source: "events",
+      lastVaccinationDate
+    };
+  }
+
+  const baseline =
+    await vaccinationReadDamBaselineSrv({
+      uid,
+      animalDoc,
+      vaccineCode
+    });
+
+  if (
+    baseline.status === "vaccinated" ||
+    baseline.status === "unvaccinated"
+  ) {
+    return {
+      damNumber:
+        damNumber ||
+        baseline.damNumber ||
+        "",
+
+      status:
+        baseline.status,
+
+      vaccinated:
+        baseline.status ===
+        "vaccinated",
+
+      source:
+        baseline.source ||
+        "baseline",
+
+      lastVaccinationDate: ""
+    };
+  }
+
+  return {
+    damNumber,
+    status: "unknown",
+    vaccinated: null,
+    source: "",
+    lastVaccinationDate: ""
+  };
+}
+async function vaccinationResolveMurabbikDamAgeProgramLinkSrv({
+  uid,
+  animalDoc = {},
+  programLink = {}
+} = {}) {
+  const programMode =
+    vaccinationProgramModeNormSrv(
+      programLink.programMode || ""
+    );
+
+  const programSection =
+    String(
+      programLink.programSection || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const policy =
+    vaccinationMurabbikDamAgePolicySrv(
+      programLink.vaccineCode || ""
+    );
+
+  if (
+    programMode !== "murabbik_default" ||
+    programSection !== "calves" ||
+    !policy
+  ) {
+    return programLink;
+  }
+
+  const damStatus =
+    await vaccinationDamVaccinationStatusSrv({
+      uid,
+      animalDoc,
+      vaccineCode:
+        programLink.vaccineCode || "",
+      vaccine:
+        programLink.vaccine || ""
+    });
+
+  const damVaccinationStatus =
+    String(
+      damStatus.status ||
+      (
+        damStatus.vaccinated === true
+          ? "vaccinated"
+          : "unknown"
+      )
+    )
+      .trim()
+      .toLowerCase();
+
+  if (
+    damVaccinationStatus !== "vaccinated" &&
+    damVaccinationStatus !== "unvaccinated"
+  ) {
+    return {
+      ...programLink,
+
+      damVaccinationPolicy: true,
+      damVaccinationStatus: "unknown",
+
+      damNumber:
+        damStatus.damNumber || "",
+
+      damVaccinated: null,
+
+      damLastVaccinationDate:
+        damStatus.lastVaccinationDate || ""
+    };
+  }
+
+  const targetAgeValue =
+    damVaccinationStatus === "vaccinated"
+      ? policy.vaccinatedDamAgeValue
+      : policy.unvaccinatedDamAgeValue;
+
+  const targetAgeUnit =
+    policy.ageUnit || "month";
+
+  const doseSchedule =
+    (
+      Array.isArray(
+        programLink.doseSchedule
+      )
+        ? programLink.doseSchedule
+        : []
+    ).map(step => {
+      const doseType =
+        String(
+          step?.doseType || ""
+        ).trim();
+
+      const timingBasis =
+        String(
+          step?.timingBasis || ""
+        ).trim();
+
+      if (
+        doseType !== "prime" ||
+        timingBasis !== "calf_age"
+      ) {
+        return step;
+      }
+
+      return {
+        ...step,
+        timingValue:
+          targetAgeValue,
+        timingUnit:
+          targetAgeUnit
+      };
+    });
+
+  return {
+    ...programLink,
+
+    ageMinValue:
+      targetAgeValue,
+    ageMinUnit:
+      targetAgeUnit,
+
+    doseSchedule,
+
+    damVaccinationPolicy: true,
+    damVaccinationStatus,
+
+    damNumber:
+      damStatus.damNumber || "",
+
+    damVaccinated:
+      damVaccinationStatus === "vaccinated",
+
+    damLastVaccinationDate:
+      damStatus.lastVaccinationDate || ""
+  };
+}
 function vaccinationAgeTimingAdviceSrv({
   animalDoc = {},
   programLink = {},
@@ -42964,19 +43447,63 @@ if (linkedProgramRowId) {
       };
     }
 
-    const initialAgeAdvice =
-      vaccinationAgeTimingAdviceSrv({
-        animalDoc,
+const resolvedInitialProgramLink =
+  await vaccinationResolveMurabbikDamAgeProgramLinkSrv({
+    uid,
+    animalDoc,
 
-        programLink: {
-          ...programLink,
-          doseType:
-            firstDoseType
-        },
+    programLink: {
+      ...programLink,
+      doseType:
+        firstDoseType
+    }
+  });
+if (
+  resolvedInitialProgramLink
+    .damVaccinationStatus === "unknown"
+) {
+  const damNumber =
+    String(
+      resolvedInitialProgramLink
+        .damNumber || ""
+    ).trim();
 
-        eventDate: dt
-      });
+  return {
+    allowed: false,
+    level: "block",
 
+    code:
+      "vaccination_dam_status_required",
+
+    damVaccinationStatusRequired: true,
+
+    requiredField:
+      "damVaccinationStatus",
+
+    damNumber,
+
+    damVaccinationStatusOptions: [
+      "vaccinated",
+      "unvaccinated"
+    ],
+
+    taskDoseType:
+      firstDoseType,
+
+    message:
+      damNumber
+        ? `لا توجد لدى مُرَبِّيك بيانات سابقة كافية عن تحصين الأم رقم ${damNumber} لهذا المرض. حدّد هل الأم محصنة أم غير محصنة حتى يحدد مُرَبِّيك العمر الصحيح للتابع.`
+        : "لا توجد لدى مُرَبِّيك بيانات سابقة كافية عن حالة تحصين أم هذا التابع. حدّد هل الأم محصنة أم غير محصنة حتى يحدد مُرَبِّيك العمر الصحيح."
+  };
+}
+
+const initialAgeAdvice =
+  vaccinationAgeTimingAdviceSrv({
+    animalDoc,
+    programLink:
+      resolvedInitialProgramLink,
+    eventDate: dt
+  });
     return initialAgeAdvice
       ? {
           ...initialAgeAdvice,
@@ -45981,33 +46508,37 @@ function vaccinationMurabbikDefaultProgramSrv() {
     }),
 
     row({
-      programRowId:
-        "murabbik_lsd_calves",
-      vaccineCode: "lsd",
-      programSection: "calves",
-      vaccineForm:
-        "live_attenuated_virus",
-      targetGroup: "calves",
-      ageMinValue: 12,
-      ageMinUnit: "month",
-      repeatEvery: 1,
-      repeatUnit: "year",
-      doseSchedule: [
-        dose(
-          "prime",
-          "calf_age",
-          12,
-          "month"
-        ),
-        dose(
-          "periodic",
-          "repeat",
-          1,
-          "year"
-        )
-      ]
-    }),
-
+  programRowId:
+    "murabbik_lsd_calves",
+  vaccineCode: "lsd",
+  programSection: "calves",
+  vaccineForm:
+    "live_attenuated_virus",
+  targetGroup: "calves",
+  ageMinValue: 1,
+  ageMinUnit: "month",
+  repeatEvery: 1,
+  repeatUnit: "year",
+  notes:
+    "للتوابع: من عمر شهر إذا كانت الأم غير محصنة، ومن عمر 4 شهور إذا كانت الأم محصنة.",
+  doseSchedule: [
+    dose(
+      "prime",
+      "calf_age",
+      1,
+      "month"
+    ),
+    dose(
+      "periodic",
+      "repeat",
+      1,
+      "year",
+      {
+        joinHerdSchedule: true
+      }
+    )
+  ]
+}),
       row({
       programRowId:
         "murabbik_rotavac_corona_mothers",
@@ -46086,67 +46617,71 @@ function vaccinationMurabbikDefaultProgramSrv() {
     }),
 
     row({
-      programRowId:
-        "murabbik_pasteurella_herd",
-      vaccineCode:
-        "pasteurella_hs",
-      programSection: "herd",
-      vaccineForm:
-        "bacterin_toxoid",
-      targetGroup: "herd_all",
-      repeatEvery: 1,
-      repeatUnit: "year",
-      doseSchedule: [
-        dose("prime", "any_time"),
-        dose(
-          "booster",
-          "after_previous_dose",
-          1,
-          "month"
-        ),
-        dose(
-          "periodic",
-          "repeat",
-          1,
-          "year"
-        )
-      ]
-    }),
-
-    row({
-      programRowId:
-        "murabbik_pasteurella_calves",
-      vaccineCode:
-        "pasteurella_hs",
-      programSection: "calves",
-      vaccineForm:
-        "bacterin_toxoid",
-      targetGroup: "calves",
-      ageMinValue: 12,
-      ageMinUnit: "month",
-      repeatEvery: 1,
-      repeatUnit: "year",
-      doseSchedule: [
-        dose(
-          "prime",
-          "calf_age",
-          12,
-          "month"
-        ),
-        dose(
-          "booster",
-          "after_previous_dose",
-          1,
-          "month"
-        ),
-        dose(
-          "periodic",
-          "repeat",
-          1,
-          "year"
-        )
-      ]
-    }),
+  programRowId:
+    "murabbik_pasteurella_herd",
+  vaccineCode:
+    "pasteurella_hs",
+  programSection: "herd",
+  vaccineForm:
+    "bacterin_toxoid",
+  targetGroup: "herd_all",
+  repeatEvery: 6,
+  repeatUnit: "month",
+  doseSchedule: [
+    dose("prime", "any_time"),
+    dose(
+      "booster",
+      "after_previous_dose",
+      1,
+      "month"
+    ),
+    dose(
+      "periodic",
+      "repeat",
+      6,
+      "month"
+    )
+  ]
+}),
+   row({
+  programRowId:
+    "murabbik_pasteurella_calves",
+  vaccineCode:
+    "pasteurella_hs",
+  programSection: "calves",
+  vaccineForm:
+    "bacterin_toxoid",
+  targetGroup: "calves",
+  ageMinValue: 1,
+  ageMinUnit: "month",
+  repeatEvery: 6,
+  repeatUnit: "month",
+  notes:
+    "للتوابع: من عمر شهر إذا كانت الأم غير محصنة، ومن عمر 4 شهور إذا كانت الأم محصنة.",
+  doseSchedule: [
+    dose(
+      "prime",
+      "calf_age",
+      1,
+      "month"
+    ),
+    dose(
+      "booster",
+      "after_previous_dose",
+      1,
+      "month"
+    ),
+    dose(
+      "periodic",
+      "repeat",
+      6,
+      "month",
+      {
+        joinHerdSchedule: true
+      }
+    )
+  ]
+}),
 
     row({
       programRowId:
@@ -48014,9 +48549,30 @@ if (dueWarning?.allowed === false) {
     animalNumber,
     reason: dueWarning.message,
     code: dueWarning.code || "",
+
     initialDoseRequired:
-      dueWarning.initialDoseRequired === true
+      dueWarning.initialDoseRequired === true,
+
+    damVaccinationStatusRequired:
+      dueWarning
+        .damVaccinationStatusRequired === true,
+
+    requiredField:
+      dueWarning.requiredField || "",
+
+    damNumber:
+      dueWarning.damNumber || "",
+
+    damVaccinationStatusOptions:
+      Array.isArray(
+        dueWarning
+          .damVaccinationStatusOptions
+      )
+        ? dueWarning
+            .damVaccinationStatusOptions
+        : []
   });
+
   continue;
 }
 
@@ -48164,6 +48720,202 @@ return res.json({
     });
   }
 });
+app.post(
+  "/api/vaccination/dam-baseline/save",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error:
+            "firestore_disabled",
+          message:
+            "❌ تعذّر حفظ حالة تحصين الأم الآن. حاول مرة أخرى."
+        });
+      }
+
+      const uid =
+        req.userId;
+
+      const body =
+        req.body || {};
+
+      const animalNumber =
+        calvingNormDigitsOnlySrv(
+          body.animalNumber ||
+          body.number ||
+          ""
+        );
+
+      const vaccineCode =
+        String(
+          body.vaccineCode || ""
+        ).trim();
+
+      const status =
+        vaccinationDamStatusNormSrv(
+          body.damVaccinationStatus ||
+          body.status ||
+          ""
+        );
+
+      if (
+        !animalNumber ||
+        !vaccineCode ||
+        status === "unknown"
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "vaccination_dam_baseline_invalid",
+          message:
+            "❌ حدّد التابع والتحصين، ثم اختر هل الأم محصنة أم غير محصنة."
+        });
+      }
+
+      const policy =
+        vaccinationMurabbikDamAgePolicySrv(
+          vaccineCode
+        );
+
+      if (!policy) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "vaccination_dam_baseline_not_applicable",
+          message:
+            "❌ حالة تحصين الأم غير مطلوبة لهذا التحصين."
+        });
+      }
+
+      const animal =
+        await fetchAnimalByNumberForCalvingGateSrv(
+          uid,
+          animalNumber
+        );
+
+      if (!animal) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "vaccination_dam_baseline_animal_not_found",
+          message:
+            "❌ لم أجد التابع في حسابك. راجع الرقم."
+        });
+      }
+
+      if (
+        animal._collection !== "calves"
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "vaccination_dam_baseline_requires_calf",
+          message:
+            "❌ حالة تحصين الأم تُستخدم مع التوابع فقط."
+        });
+      }
+
+      const animalDoc =
+        animal.data || {};
+
+      const identity =
+        vaccinationDamBaselineIdentitySrv({
+          uid,
+          animalDoc,
+          vaccineCode
+        });
+
+      if (!identity) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "vaccination_dam_baseline_identity_missing",
+          message:
+            "❌ تعذّر ربط حالة تحصين الأم بهذا التابع."
+        });
+      }
+
+      await db
+        .collection(
+          "vaccination_dam_baselines"
+        )
+        .doc(identity.docId)
+        .set(
+          {
+            userId: uid,
+
+            damNumber:
+              identity.damNumber || "",
+
+            calfNumber:
+              animalNumber,
+
+            vaccineCode,
+
+            vaccineKey:
+              identity.vaccineKey,
+
+            scopeType:
+              identity.scopeType,
+
+            scopeNumber:
+              identity.scopeNumber,
+
+            status,
+
+            source:
+              "user_confirmation",
+
+            confirmedAt:
+              admin.firestore.FieldValue
+                .serverTimestamp(),
+
+            updatedAt:
+              admin.firestore.FieldValue
+                .serverTimestamp()
+          },
+          {
+            merge: true
+          }
+        );
+
+      return res.json({
+        ok: true,
+
+        animalNumber,
+
+        damNumber:
+          identity.damNumber || "",
+
+        vaccineCode,
+
+        damVaccinationStatus:
+          status,
+
+        message:
+          status === "vaccinated"
+            ? "✅ تم اعتماد أن الأم محصنة لهذا التحصين."
+            : "✅ تم اعتماد أن الأم غير محصنة لهذا التحصين."
+      });
+
+    } catch (e) {
+      console.error(
+        "vaccination-dam-baseline-save",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error:
+          "vaccination_dam_baseline_save_failed",
+        message:
+          "❌ تعذّر حفظ حالة تحصين الأم الآن. حاول مرة أخرى."
+      });
+    }
+  }
+);
 // ============================================================
 //          VACCINATION SMART TASKS — PROGRAM DRIVEN
 //          المهمة الحالية لكل حيوان/سطر برنامج
