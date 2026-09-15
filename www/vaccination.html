@@ -178,28 +178,63 @@
           </div>
         </div>
 
-               <div class="row row-2">
-          <div>
-            <label for="vaccine">نوع التحصين</label>
+<div class="row row-2">
+  <div>
+    <label for="vaccine">نوع التحصين</label>
 
-            <select id="vaccine" data-field="vaccine">
-              <option value="">
-                جارِ تحميل قائمة التحصينات…
-              </option>
-            </select>
-          </div>
+    <select id="vaccine" data-field="vaccine">
+      <option value="">
+        جارِ تحميل قائمة التحصينات…
+      </option>
+    </select>
+  </div>
 
-          <div>
-            <label for="doseType">نوع الجرعة</label>
+  <div>
+    <label for="doseType">نوع الجرعة</label>
 
-            <select id="doseType" data-field="doseType">
-              <option value="">
-                جارِ تحميل أنواع الجرعات…
-              </option>
-            </select>
-          </div>
-        </div>
-        </form>
+    <select id="doseType" data-field="doseType">
+      <option value="">
+        جارِ تحميل أنواع الجرعات…
+      </option>
+    </select>
+  </div>
+</div>
+
+<section
+  id="damVaccinationStatusSection"
+  class="hidden-block"
+>
+  <div class="form-hint">
+    <strong id="damVaccinationStatusTitle">
+      هل الأم محصنة ضد هذا المرض؟
+    </strong>
+
+    <div
+      id="damVaccinationStatusMessage"
+      aria-live="polite"
+    ></div>
+  </div>
+
+  <div class="row row-2">
+    <button
+      id="damVaccinatedBtn"
+      class="save"
+      type="button"
+    >
+      الأم محصنة
+    </button>
+
+    <button
+      id="damUnvaccinatedBtn"
+      class="ghost"
+      type="button"
+    >
+      الأم غير محصنة
+    </button>
+  </div>
+</section>
+
+</form>
     </div>
 
     <section
@@ -329,7 +364,33 @@
   const eventDateEl = document.getElementById("eventDate");
   const vaccineEl  = document.getElementById("vaccine");
   const doseTypeEl = document.getElementById("doseType");
-  const saveBtn    = document.getElementById("saveBtn");
+  const saveBtn =
+  document.getElementById("saveBtn");
+
+const damVaccinationStatusSection =
+  document.getElementById(
+    "damVaccinationStatusSection"
+  );
+
+const damVaccinationStatusTitle =
+  document.getElementById(
+    "damVaccinationStatusTitle"
+  );
+
+const damVaccinationStatusMessage =
+  document.getElementById(
+    "damVaccinationStatusMessage"
+  );
+
+const damVaccinatedBtn =
+  document.getElementById(
+    "damVaccinatedBtn"
+  );
+
+const damUnvaccinatedBtn =
+  document.getElementById(
+    "damUnvaccinatedBtn"
+  );
 
 let farmProgramOptions = {
   programTypes: [],
@@ -440,11 +501,14 @@ cancelFarmProgramManageBtn?.addEventListener(
   const bulkBox       = document.getElementById("bulkBox");
   const bulkList      = document.getElementById("bulkList");
   const bulkSelected = new Set();
-  let pageMode = "single";
-  let lastGateAllowed = false;
-  let farmProgramDraftRows = [];
-  let programSwitchOpen = false;
-  let currentProgramContext = null;
+let pageMode = "single";
+let lastGateAllowed = false;
+let farmProgramDraftRows = [];
+let programSwitchOpen = false;
+let currentProgramContext = null;
+
+let pendingDamBaselineRequest = null;
+let damBaselineBusy = false;
 
   function msg(text, type = "warning") {
     let bar =
@@ -859,6 +923,200 @@ async function postJson(path, body) {
   }
 
   return data;
+}
+function damBaselineRequestFromGate(
+  result = {}
+) {
+  const rejected =
+    Array.isArray(result.rejected)
+      ? result.rejected
+      : [];
+
+  return (
+    rejected.find(item =>
+      item?.damVaccinationStatusRequired === true ||
+      String(item?.code || "").trim() ===
+        "vaccination_dam_status_required"
+    ) ||
+    null
+  );
+}
+
+function hideDamVaccinationStatusQuestion() {
+  pendingDamBaselineRequest = null;
+
+  damVaccinationStatusSection
+    ?.classList.add("hidden-block");
+
+  if (damVaccinationStatusMessage) {
+    damVaccinationStatusMessage.textContent = "";
+  }
+}
+
+function showDamVaccinationStatusQuestion(
+  result = {},
+  resumeMode = "gate"
+) {
+  const request =
+    damBaselineRequestFromGate(result);
+
+  if (!request) {
+    hideDamVaccinationStatusQuestion();
+    return false;
+  }
+
+  const payload = collectPayload();
+
+  const animalNumber =
+    String(
+      request.animalNumber || ""
+    ).trim();
+
+  const damNumber =
+    String(
+      request.damNumber || ""
+    ).trim();
+
+  const vaccineCode =
+    String(
+      payload.vaccineCode || ""
+    ).trim();
+
+  if (
+    !animalNumber ||
+    !vaccineCode
+  ) {
+    return false;
+  }
+
+  pendingDamBaselineRequest = {
+    animalNumber,
+    damNumber,
+    vaccineCode,
+
+    resumeMode:
+      resumeMode === "submit"
+        ? "submit"
+        : "gate"
+  };
+
+  if (damVaccinationStatusTitle) {
+    damVaccinationStatusTitle.textContent =
+      damNumber
+        ? `هل الأم رقم ${damNumber} محصنة ضد هذا المرض؟`
+        : `هل أم التابع رقم ${animalNumber} محصنة ضد هذا المرض؟`;
+  }
+
+  if (damVaccinationStatusMessage) {
+    damVaccinationStatusMessage.textContent =
+      String(
+        request.reason ||
+        result.message ||
+        "حدّد حالة تحصين الأم."
+      ).trim();
+  }
+
+  damVaccinationStatusSection
+    ?.classList.remove("hidden-block");
+
+  lastGateAllowed = false;
+
+  if (saveBtn) {
+    saveBtn.disabled = true;
+  }
+
+  return true;
+}
+
+async function saveDamVaccinationBaseline(
+  damVaccinationStatus
+) {
+  if (
+    damBaselineBusy ||
+    !pendingDamBaselineRequest
+  ) {
+    return;
+  }
+
+  const request = {
+    ...pendingDamBaselineRequest
+  };
+
+  damBaselineBusy = true;
+
+  if (damVaccinatedBtn) {
+    damVaccinatedBtn.disabled = true;
+  }
+
+  if (damUnvaccinatedBtn) {
+    damUnvaccinatedBtn.disabled = true;
+  }
+
+  try {
+    msg(
+      "جارِ حفظ حالة تحصين الأم…",
+      "info"
+    );
+
+    const result =
+      await postJson(
+        "/api/vaccination/dam-baseline/save",
+        {
+          animalNumber:
+            request.animalNumber,
+
+          vaccineCode:
+            request.vaccineCode,
+
+          damVaccinationStatus
+        }
+      );
+
+    if (!result.ok) {
+      msg(
+        result.message ||
+        "تعذّر حفظ حالة تحصين الأم.",
+        "error"
+      );
+
+      return;
+    }
+
+    hideDamVaccinationStatusQuestion();
+
+    if (
+      request.resumeMode === "submit"
+    ) {
+      await submitVaccination();
+      return;
+    }
+
+    await runServerGate(
+      "dam_baseline_saved"
+    );
+
+  } catch (err) {
+    console.error(
+      "vaccination dam baseline save failed:",
+      err
+    );
+
+    msg(
+      "تعذّر الاتصال بالسيرفر أثناء حفظ حالة تحصين الأم.",
+      "error"
+    );
+
+  } finally {
+    damBaselineBusy = false;
+
+    if (damVaccinatedBtn) {
+      damVaccinatedBtn.disabled = false;
+    }
+
+    if (damUnvaccinatedBtn) {
+      damUnvaccinatedBtn.disabled = false;
+    }
+  }
 }
 async function getJson(path) {
   const r = await fetch(path, {
@@ -2821,7 +3079,7 @@ function renderServerResult(result = {}) {
   showWarn(lines.join("\n\n"));
 }
   async function submitVaccination(ev) {
-    ev.preventDefault();
+  ev?.preventDefault?.();
     clearWarn();
 
     const payload = collectPayload();
@@ -2835,6 +3093,14 @@ function renderServerResult(result = {}) {
 
       renderProgramContext(gate);
       syncDoseControlFromGate(gate);
+      if (
+  showDamVaccinationStatusQuestion(
+    gate,
+    "submit"
+  )
+) {
+  return;
+}
 
 if (!gate.ok || !gate.allowed) {
   lastGateAllowed = false;
@@ -2940,6 +3206,14 @@ async function runServerGate(reason = "page_load") {
 
     renderProgramContext(gate);
     syncDoseControlFromGate(gate);
+   if (
+  showDamVaccinationStatusQuestion(
+    gate,
+    "gate"
+  )
+) {
+  return;
+}
 
 if (!gate.ok || !gate.allowed) {
   lastGateAllowed = false;
@@ -3091,6 +3365,23 @@ if (
   });
 
   form?.addEventListener("submit", submitVaccination);
+  damVaccinatedBtn?.addEventListener(
+  "click",
+  () => {
+    saveDamVaccinationBaseline(
+      "vaccinated"
+    );
+  }
+);
+
+damUnvaccinatedBtn?.addEventListener(
+  "click",
+  () => {
+    saveDamVaccinationBaseline(
+      "unvaccinated"
+    );
+  }
+);
 
  animalNumberEl?.addEventListener("input", () => {
   updateContext();
