@@ -43005,7 +43005,7 @@ function vaccinationAgeTimingAdviceSrv({
   };
 }
 
-  if (dt > windowEnd) {
+if (dt > windowEnd) {
     const daysLate =
       diffDaysISO(
         windowEnd,
@@ -47232,30 +47232,7 @@ const selectedAlternatives =
     const rows =
       vaccinationProgramExecutionRowsSrv(
         program.rows
-      ).filter(row => {
-        const alternativeGroup =
-          String(
-            row.alternativeGroup || ""
-          ).trim();
-
-        if (!alternativeGroup) {
-          return true;
-        }
-
-        const selectedPath =
-          String(
-            selectedAlternatives[
-              alternativeGroup
-            ] || ""
-          ).trim();
-
-        return Boolean(
-          selectedPath &&
-          String(
-            row.alternativePath || ""
-          ).trim() === selectedPath
-        );
-      });
+      );
 
     return {
       ...program,
