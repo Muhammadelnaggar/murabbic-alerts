@@ -42936,27 +42936,74 @@ function vaccinationAgeTimingAdviceSrv({
   };
 
   if (dt < windowStart) {
-    const daysUntilWindow =
-      diffDaysISO(
-        dt,
-        windowStart
-      );
+  const daysUntilWindow =
+    diffDaysISO(
+      dt,
+      windowStart
+    );
 
+  const vaccineCode =
+    String(
+      programLink.vaccineCode || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const vaccineForm =
+    String(
+      programLink.vaccineForm || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const isKilledIbrBvd =
+    vaccineForm === "killed_virus" &&
+    (
+      vaccineCode === "ibr" ||
+      vaccineCode === "bvd" ||
+      vaccineCode ===
+        "ibr_bvd_pi3_brsv"
+    );
+
+  const isKilledHs =
+    vaccineCode === "pasteurella_hs" &&
+    vaccineForm === "bacterin_toxoid";
+
+  if (isKilledIbrBvd || isKilledHs) {
     return {
       ...common,
 
       level: "warn",
+      severity: "high",
 
       code:
-        "vaccination_age_window_early",
+        "vaccination_inactivated_age_window_early",
 
       daysUntilWindow,
+      vaccineForm,
 
       message:
-        `الموعد المفضل لهذه الجرعة عند عمر ${ageText}، وتبدأ نافذتها الموصى بها في ${windowStart}. ` +
-        `ما زال عليها ${daysUntilWindow} يومًا، ويمكنك المتابعة إذا كان هذا قرار المزرعة.`
+        `⚠️ تحذير مناعي مهم: هذا التحصين من النوع الميت/غير الحي، وإعطاء الجرعة قبل العمر الموصى به قد يؤدي إلى تعادل أو حجب المستضد بواسطة الأجسام المضادة الموجودة، فتكون الاستجابة المناعية الجديدة ضعيفة أو غير موثوقة. ` +
+        `الموعد الموصى به عند عمر ${ageText}، وتبدأ نافذته في ${windowStart}. ما زال عليها ${daysUntilWindow} يومًا. ` +
+        "لا تُعامل الجرعة المبكرة كبديل موثوق عن الجرعة في موعدها، ولا يُنصح بالتبكير إلا بقرار بيطري واضح."
     };
   }
+
+  return {
+    ...common,
+
+    level: "warn",
+
+    code:
+      "vaccination_age_window_early",
+
+    daysUntilWindow,
+
+    message:
+      `الموعد المفضل لهذه الجرعة عند عمر ${ageText}، وتبدأ نافذتها الموصى بها في ${windowStart}. ` +
+      `ما زال عليها ${daysUntilWindow} يومًا، ويمكنك المتابعة إذا كان هذا قرار المزرعة.`
+  };
+}
 
   if (dt > windowEnd) {
     const daysLate =
