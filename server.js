@@ -43143,6 +43143,136 @@ function vaccinationAgeTimingAdviceSrv({
       `من ${windowStart} إلى ${windowEnd}.`
   };
 }
+function vaccinationProgramRowTargetDecisionSrv({
+  row = {},
+  animalDoc = {},
+  animalCollection = ""
+} = {}) {
+  const collection =
+    String(animalCollection || "")
+      .trim()
+      .toLowerCase();
+
+  const entryType =
+    String(animalDoc.entryType || "")
+      .trim()
+      .toLowerCase();
+
+  const section =
+    String(row.programSection || "")
+      .trim()
+      .toLowerCase();
+
+  const targetGroup =
+    String(row.targetGroup || "")
+      .trim()
+      .toLowerCase() ||
+    (
+      section === "calves"
+        ? "calves"
+        : section === "mothers"
+          ? "mothers"
+          : section === "herd"
+            ? "herd_all"
+            : ""
+    );
+
+  const isFollower =
+    collection === "calves" ||
+    entryType === "followers" ||
+    animalDoc.isCalf === true;
+
+  const isMother =
+    collection === "animals" &&
+    entryType !== "followers" &&
+    animalDoc.isCalf !== true;
+
+  const sex =
+    getSexTextSrv(animalDoc);
+
+  const isFemale =
+    sex === "أنثى" ||
+    isMother;
+
+  const reproText = [
+    animalDoc.reproductiveStatus,
+    animalDoc.pregStatus,
+    animalDoc.reproductionStatus,
+    animalDoc.statusRepro,
+    animalDoc.lastDiagnosis
+  ]
+    .map(value =>
+      String(value || "")
+        .trim()
+        .toLowerCase()
+    )
+    .join(" ");
+
+  const isPregnant =
+    animalDoc.pregnant === true ||
+    reproText.includes("عشار") ||
+    reproText.includes("حامل") ||
+    reproText.includes("preg");
+
+  const allow = rank => ({
+    allowed: true,
+    rank
+  });
+
+  const deny = message => ({
+    allowed: false,
+    rank: -1,
+    message
+  });
+
+  if (targetGroup === "pregnant_mothers") {
+    return isMother && isPregnant
+      ? allow(90)
+      : deny(
+          "هذا التحصين مخصص للأمهات العشار فقط."
+        );
+  }
+
+  if (targetGroup === "heifers") {
+    return isFollower && isFemale
+      ? allow(80)
+      : deny(
+          "هذا التحصين مخصص للعجلات الإناث فقط."
+        );
+  }
+
+  if (targetGroup === "calves") {
+    return isFollower
+      ? allow(70)
+      : deny(
+          "هذا التحصين مخصص للعجول والعجلات فقط."
+        );
+  }
+
+  if (targetGroup === "mothers") {
+    return isMother
+      ? allow(70)
+      : deny(
+          "هذا التحصين مخصص للأمهات فقط."
+        );
+  }
+
+  if (targetGroup === "females") {
+    return isFemale
+      ? allow(60)
+      : deny(
+          "هذا التحصين مخصص للإناث فقط."
+        );
+  }
+
+  if (targetGroup === "herd_all") {
+    return allow(10);
+  }
+
+  return deny(
+    "تعذّر تحديد الفئة المستهدفة لهذا التحصين من البرنامج الحالي."
+  );
+}
 function vaccinationScopedEligibilitySrv({
   vaccineCode = "",
   animalDoc = {},
@@ -47602,7 +47732,10 @@ function vaccinationProgramDisplaySrv({
 async function vaccinationResolveProgramRowSrv({
   uid,
   programContext = {},
-  body = {}
+  body = {},
+  executionProgram = null,
+  animalDoc = null,
+  animalCollection = ""
 } = {}) {
   const programMode =
     vaccinationProgramModeNormSrv(
@@ -47632,10 +47765,13 @@ async function vaccinationResolveProgramRowSrv({
   }
 
   const program =
-    await vaccinationReadExecutionProgramSrv(
-      uid,
-      programMode
-    );
+  executionProgram &&
+  typeof executionProgram === "object"
+    ? executionProgram
+    : await vaccinationReadExecutionProgramSrv(
+        uid,
+        programMode
+      );
 
   const programLabel =
     programMode === "farm"
@@ -47683,21 +47819,85 @@ async function vaccinationResolveProgramRowSrv({
     };
   }
 
-  if (matches.length > 1) {
+  if (
+  animalDoc &&
+  typeof animalDoc === "object"
+) {
+  const rankedMatches =
+    matches
+      .map(row => ({
+        row,
+
+        target:
+          vaccinationProgramRowTargetDecisionSrv({
+            row,
+            animalDoc,
+            animalCollection
+          })
+      }))
+      .filter(item =>
+        item.target.allowed === true
+      );
+
+  if (!rankedMatches.length) {
+    const reason =
+      matches
+        .map(row =>
+          vaccinationProgramRowTargetDecisionSrv({
+            row,
+            animalDoc,
+            animalCollection
+          })
+        )
+        .find(item =>
+          item.allowed === false
+        )?.message ||
+      "هذا التحصين غير مخصص لهذه الفئة من الحيوانات.";
+
     return {
       ok: false,
       linked: false,
+
       error:
-        "vaccination_program_row_ambiguous",
+        "vaccination_program_target_not_applicable",
 
       message:
-        `❌ اختر سطر التحصين المحدد من ${programLabel}.`
+        `❌ ${reason}`
     };
   }
 
-  
+  const bestRank =
+    Math.max(
+      ...rankedMatches.map(item =>
+        Number(item.target.rank || 0)
+      )
+    );
 
-  const row = matches[0];
+  matches =
+    rankedMatches
+      .filter(item =>
+        Number(item.target.rank || 0) ===
+          bestRank
+      )
+      .map(item =>
+        item.row
+      );
+}
+
+if (matches.length > 1) {
+  return {
+    ok: false,
+    linked: false,
+
+    error:
+      "vaccination_program_row_ambiguous",
+
+    message:
+      `❌ يوجد أكثر من مسار صالح لهذا التحصين داخل ${programLabel}. راجع إعداد البرنامج.`
+  };
+}
+
+const row = matches[0];
 
 const clientVaccineForm =
   String(
@@ -48639,25 +48839,58 @@ if (
   });
 }
 
-const programLink =
-  await vaccinationResolveProgramRowSrv({
-    uid,
-    programContext,
-    body
-  });
+const rawNumbers =
+  body.animalNumbers ||
+  body.numbers ||
+  body.selectedNumbers ||
+  body.groupNumbers ||
+  body.animals ||
+  body.animalNumber ||
+  body.number ||
+  "";
 
-if (!programLink.ok) {
-  return res.status(409).json({
-    ok: false,
+const eventDate = String(
+  body.eventDate ||
+  body.date ||
+  ""
+).trim().slice(0, 10);
+
+const numbers =
+  vaccinationParseNumbersSrv(
+    rawNumbers
+  );
+
+const requestedProgramRowId =
+  String(
+    body.programRowId ||
+    body.vaccinationProgramRowId ||
+    ""
+  ).trim();
+
+const requestedVaccineCode =
+  String(
+    body.vaccineCode ||
+    body.vaccinationVaccineCode ||
+    ""
+  ).trim();
+
+if (
+  !numbers.length ||
+  !eventDate ||
+  (
+    !requestedVaccineCode &&
+    !requestedProgramRowId
+  )
+) {
+  return res.json({
+    ok: true,
     allowed: false,
+    silent: true,
+    stage: "missing_basic",
 
-    stage:
-      programLink.error ||
-      "vaccination_program_link_failed",
-
-    message:
-      programLink.message ||
-      "❌ تعذّر ربط التحصين بالبرنامج المختار.",
+    message: programContext.programMode
+      ? "أدخل الرقم وتاريخ التحصين ونوع التحصين."
+      : "اختر برنامج المزرعة أو برنامج مُرَبِّيك، ثم أكمل بيانات التحصين.",
 
     programContext,
 
@@ -48667,106 +48900,101 @@ if (!programLink.ok) {
     rejected: []
   });
 }
-    const rawNumbers =
-      body.animalNumbers ||
-      body.numbers ||
-      body.selectedNumbers ||
-      body.groupNumbers ||
-      body.animals ||
-      body.animalNumber ||
-      body.number ||
-      "";
- 
-    const eventDate = String(
-      body.eventDate ||
-      body.date ||
-      ""
-    ).trim().slice(0, 10);
 
-const vaccine = String(
-  programLink.linked
-    ? programLink.vaccine
-    : (
-        body.vaccine ||
-        body.vaccineName ||
-        ""
-      )
-).trim();
+if (!programContext.programMode) {
+  return res.status(400).json({
+    ok: false,
+    allowed: false,
 
-const vaccineCode = String(
-  programLink.vaccineCode ||
-  body.vaccineCode ||
-  ""
-).trim();
+    stage:
+      "vaccination_program_required",
 
-const programRowId = String(
-  programLink.programRowId ||
-  body.programRowId ||
-  ""
-).trim();
+    message:
+      "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك.",
 
-const doseType = String(
-  programLink.linked
-    ? programLink.doseType
-    : (body.doseType || "")
-).trim();
-    const numbers = vaccinationParseNumbersSrv(rawNumbers);
+    programContext,
 
-        if (!numbers.length || !eventDate || !vaccine) {
-      return res.json({
-        ok: true,
-        allowed: false,
-        silent: true,
-        stage: "missing_basic",
+    acceptedCount: 0,
+    rejectedCount: 0,
+    accepted: [],
+    rejected: []
+  });
+}
 
-        message: programContext.programMode
-          ? "أدخل الرقم وتاريخ التحصين ونوع التحصين."
-          : "اختر برنامج المزرعة أو برنامج مُرَبِّيك، ثم أكمل بيانات التحصين.",
+const executionProgram =
+  await vaccinationReadExecutionProgramSrv(
+    uid,
+    programContext.programMode
+  );
 
-        programContext,
-
-        acceptedCount: 0,
-        rejectedCount: 0,
-        accepted: [],
-        rejected: []
-      });
+const selectedProgramRows =
+  (
+    Array.isArray(
+      executionProgram.rows
+    )
+      ? executionProgram.rows
+      : []
+  ).filter(row => {
+    if (requestedVaccineCode) {
+      return (
+        String(
+          row?.vaccineCode || ""
+        ).trim() ===
+          requestedVaccineCode
+      );
     }
 
-    if (!programContext.programMode) {
-      return res.status(400).json({
-        ok: false,
-        allowed: false,
-        stage: "vaccination_program_required",
+    return (
+      String(
+        row?.programRowId || ""
+      ).trim() ===
+        requestedProgramRowId
+    );
+  });
 
-        message:
-         "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك.",
+if (!selectedProgramRows.length) {
+  return res.status(409).json({
+    ok: false,
+    allowed: false,
 
-        programContext,
+    stage:
+      "vaccination_program_vaccine_not_found",
 
-        acceptedCount: 0,
-        rejectedCount: 0,
-        accepted: [],
-        rejected: []
-      });
-    }
-        if (programLink.linked !== true) {
-      return res.status(409).json({
-        ok: false,
-        allowed: false,
-        stage:
-          "vaccination_program_row_required",
+    message:
+      "❌ التحصين المختار غير موجود داخل البرنامج الحالي.",
 
-        message:
-          "❌ اختر التحصين من البرنامج المعتمد.",
+    programContext,
 
-        programContext,
+    acceptedCount: 0,
+    rejectedCount: 0,
+    accepted: [],
+    rejected: []
+  });
+}
 
-        acceptedCount: 0,
-        rejectedCount: 0,
-        accepted: [],
-        rejected: []
-      });
-    }
+const vaccineCode =
+  String(
+    requestedVaccineCode ||
+    selectedProgramRows[0]
+      ?.vaccineCode ||
+    ""
+  ).trim();
+
+const vaccine =
+  String(
+    selectedProgramRows[0]
+      ?.vaccine ||
+    selectedProgramRows[0]
+      ?.vaccineName ||
+    vaccineCode
+  ).trim();
+
+const requestedDoseType =
+  String(
+    body.doseType ||
+    body.vaccineDoseType ||
+    ""
+  ).trim();
     if (!calvingIsDateSrv(eventDate)) {
       return res.status(400).json({
         ok: false,
@@ -48846,37 +49074,109 @@ if (status === "inactive" || status === "archived") {
   });
   continue;
 }
-      const scopedEligibility =
-  vaccinationScopedEligibilitySrv({
-    vaccineCode,
-    animalDoc: doc,
-    animalCollection:
-      animal._collection === "calves"
-        ? "calves"
-        : "animals"
+const animalCollection =
+  animal._collection === "calves"
+    ? "calves"
+    : "animals";
+
+const programLink =
+  await vaccinationResolveProgramRowSrv({
+    uid,
+    programContext,
+
+    body: {
+      ...body,
+
+      programRowId:
+        requestedVaccineCode
+          ? ""
+          : requestedProgramRowId,
+
+      vaccinationProgramRowId:
+        "",
+
+      vaccineCode
+    },
+
+    executionProgram,
+animalDoc: doc,
+animalCollection
   });
 
-if (scopedEligibility?.allowed === false) {
+if (
+  programLink.ok !== true ||
+  programLink.linked !== true
+) {
   rejected.push({
     animalNumber,
-    reason: scopedEligibility.message,
-    code: scopedEligibility.code || ""
+
+    reason:
+      programLink.message ||
+      "هذا التحصين غير مخصص لهذا الحيوان.",
+
+    code:
+      programLink.error || ""
   });
+
   continue;
 }
-      const duplicated = await vaccinationHasSameDaySrv(
-        uid,
-        animalNumber,
-        eventDate,
-        vaccine
-      );
 
-      if (duplicated) {
+
+const resolvedVaccine =
+  String(
+    programLink.vaccine ||
+    vaccine
+  ).trim();
+
+const resolvedVaccineCode =
+  String(
+    programLink.vaccineCode ||
+    vaccineCode
+  ).trim();
+
+const resolvedProgramRowId =
+  String(
+    programLink.programRowId || ""
+  ).trim();
+
+const scopedEligibility =
+  vaccinationScopedEligibilitySrv({
+    vaccineCode:
+      resolvedVaccineCode,
+
+    animalDoc: doc,
+    animalCollection
+  });
+
+if (
+  scopedEligibility?.allowed === false
+) {
+  rejected.push({
+    animalNumber,
+    reason:
+      scopedEligibility.message,
+    code:
+      scopedEligibility.code || ""
+  });
+
+  continue;
+}
+
+const duplicated =
+  await vaccinationHasSameDaySrv(
+    uid,
+    animalNumber,
+    eventDate,
+    resolvedVaccine
+  );
+
+if (duplicated) {
   rejected.push({
     animalNumber,
     reason:
       `سبق تسجيل التحصين نفسه على ${animalLabel} في التاريخ نفسه.`
   });
+
   continue;
 }
 
@@ -48885,8 +49185,13 @@ const dueWarning =
     uid,
     animalNumber,
     eventDate,
-    vaccine,
-    vaccineCode,
+
+    vaccine:
+      resolvedVaccine,
+
+    vaccineCode:
+      resolvedVaccineCode,
+
     animalDoc: doc,
     programLink
   });
@@ -48894,8 +49199,11 @@ const dueWarning =
 if (dueWarning?.allowed === false) {
   rejected.push({
     animalNumber,
-    reason: dueWarning.message,
-    code: dueWarning.code || "",
+    reason:
+      dueWarning.message,
+
+    code:
+      dueWarning.code || "",
 
     initialDoseRequired:
       dueWarning.initialDoseRequired === true,
@@ -48927,61 +49235,69 @@ const effectiveDoseType =
   String(
     dueWarning?.taskDoseType ||
     programLink.requestedDoseType ||
-    doseType ||
+    requestedDoseType ||
     ""
   ).trim();
 
 if (!effectiveDoseType) {
   rejected.push({
     animalNumber,
+
     code:
       "vaccination_dose_unresolved",
+
     reason:
       "تعذّر تحديد الجرعة المطلوب تسجيلها من البرنامج الحالي."
   });
+
   continue;
 }
 
-const effectiveDoseStep =
-  Array.isArray(
-    programLink.doseSchedule
-  )
-    ? programLink.doseSchedule.find(
-        step =>
-          String(
-            step?.doseType || ""
-          ).trim() ===
-            effectiveDoseType
-      ) || null
-    : null;
-
 accepted.push({
-
   animalNumber,
-animalId: animal.id || "",
-animalLabel,
-species: doc.species || doc.animalTypeAr || doc.animalType || "",
+
+  animalId:
+    animal.id || "",
+
+  animalLabel,
+
+  species:
+    doc.species ||
+    doc.animalTypeAr ||
+    doc.animalType ||
+    "",
+
   status,
-  vaccineCode,
-  programRowId,
+
+  vaccine:
+    resolvedVaccine,
+
+  vaccineCode:
+    resolvedVaccineCode,
+
+  programRowId:
+    resolvedProgramRowId,
 
   programSection:
-  programLink.programSection || "",
+    programLink.programSection || "",
 
-vaccinationProgramVersion:
-  Number(
-    programLink.vaccinationProgramVersion || 0
-  ),
+  vaccinationProgramVersion:
+    Number(
+      programLink.vaccinationProgramVersion ||
+      0
+    ),
 
-farmProgramVersion:
-  Number(
-    programLink.farmProgramVersion || 0
-  ),
+  farmProgramVersion:
+    Number(
+      programLink.farmProgramVersion ||
+      0
+    ),
 
-murabbikProgramVersion:
-  Number(
-    programLink.murabbikProgramVersion || 0
-  ),
+  murabbikProgramVersion:
+    Number(
+      programLink.murabbikProgramVersion ||
+      0
+    ),
 
   doseType:
     effectiveDoseType,
@@ -49003,9 +49319,16 @@ murabbikProgramVersion:
         : "program_decision"
     ),
 
-  warnings: dueWarning ? [dueWarning] : [],
-  warning: dueWarning?.message || "",
-  dueDate: dueWarning?.dueDate || ""
+  warnings:
+    dueWarning
+      ? [dueWarning]
+      : [],
+
+  warning:
+    dueWarning?.message || "",
+
+  dueDate:
+    dueWarning?.dueDate || ""
 });
 }
 const firstReason =
@@ -51281,20 +51604,63 @@ if (
     rejected: []
   });
 }
-    const programLink =
-  await vaccinationResolveProgramRowSrv({
+const eventDate = String(
+  body.eventDate ||
+  body.date ||
+  ""
+).trim().slice(0, 10);
+
+const requestedProgramRowId =
+  String(
+    body.programRowId ||
+    body.vaccinationProgramRowId ||
+    ""
+  ).trim();
+
+const requestedVaccineCode =
+  String(
+    body.vaccineCode ||
+    body.vaccinationVaccineCode ||
+    ""
+  ).trim();
+
+const executionProgram =
+  await vaccinationReadExecutionProgramSrv(
     uid,
-    programContext,
-    body
+    programContext.programMode
+  );
+
+const selectedProgramRows =
+  (
+    Array.isArray(
+      executionProgram.rows
+    )
+      ? executionProgram.rows
+      : []
+  ).filter(row => {
+    if (requestedVaccineCode) {
+      return (
+        String(
+          row?.vaccineCode || ""
+        ).trim() ===
+          requestedVaccineCode
+      );
+    }
+
+    return (
+      String(
+        row?.programRowId || ""
+      ).trim() ===
+        requestedProgramRowId
+    );
   });
 
-if (!programLink.ok) {
+if (!selectedProgramRows.length) {
   return res.status(409).json({
     ok: false,
 
     message:
-      programLink.message ||
-     "❌ تعذّر ربط التحصين بالبرنامج المختار.",
+      "❌ التحصين المختار غير موجود داخل البرنامج الحالي.",
 
     programContext,
 
@@ -51304,54 +51670,30 @@ if (!programLink.ok) {
     rejected: []
   });
 }
-   if (programLink.linked !== true) {
-  return res.status(409).json({
-    ok: false,
 
-    message:
-      "❌ اختر التحصين من البرنامج المعتمد.",
+const vaccineCode =
+  String(
+    requestedVaccineCode ||
+    selectedProgramRows[0]
+      ?.vaccineCode ||
+    ""
+  ).trim();
 
-    programContext,
+const vaccine =
+  String(
+    selectedProgramRows[0]
+      ?.vaccine ||
+    selectedProgramRows[0]
+      ?.vaccineName ||
+    vaccineCode
+  ).trim();
 
-    savedCount: 0,
-    rejectedCount: 0,
-    saved: [],
-    rejected: []
-  });
-} 
-    const eventDate = String(
-      body.eventDate ||
-      body.date ||
-      ""
-    ).trim().slice(0, 10);
-
-  const vaccine = String(
-  programLink.linked
-    ? programLink.vaccine
-    : (
-        body.vaccine ||
-        body.vaccineName ||
-        ""
-      )
-).trim();
-
-const vaccineCode = String(
-  programLink.vaccineCode ||
-  body.vaccineCode ||
-  ""
-).trim();
-
-const programRowId = String(
-  programLink.programRowId ||
-  body.programRowId ||
-  ""
-).trim();
-
-    const doseType = String(
-  programLink.linked
-    ? programLink.doseType
-    : (body.doseType || "")
-).trim();
+const requestedDoseType =
+  String(
+    body.doseType ||
+    body.vaccineDoseType ||
+    ""
+  ).trim();
     const notes = String(body.notes || "").trim();
     const campaignId = String(body.campaignId || "").trim();
 
@@ -51421,362 +51763,575 @@ const programRowId = String(
     const saved = [];
     const rejected = [];
 
-    for (const row of rows) {
-      const animalNumber = calvingNormDigitsOnlySrv(row.animalNumber || row.number || "");
+for (const row of rows) {
+  const animalNumber =
+    calvingNormDigitsOnlySrv(
+      row.animalNumber ||
+      row.number ||
+      ""
+    );
 
-      if (!animalNumber) {
-        rejected.push({
-          animalNumber: "",
-          reason: "رقم الحيوان غير صحيح."
-        });
-        continue;
-      }
+  if (!animalNumber) {
+    rejected.push({
+      animalNumber: "",
+      reason: "رقم الحيوان غير صحيح."
+    });
+    continue;
+  }
 
-           const animal =
-        await fetchAnimalByNumberForCalvingGateSrv(
-          uid,
-          animalNumber
-        );
+  const animal =
+    await fetchAnimalByNumberForCalvingGateSrv(
+      uid,
+      animalNumber
+    );
 
-      if (!animal) {
-        rejected.push({
-          animalNumber,
-          reason: "لم أجد هذا الرقم في حسابك. راجع الرقم."
-        });
-        continue;
-      }
+  if (!animal) {
+    rejected.push({
+      animalNumber,
+      reason:
+        "لم أجد هذا الرقم في حسابك. راجع الرقم."
+    });
+    continue;
+  }
 
-      const animalId =
-        String(animal.id || "").trim();
-
-      const animalDoc =
-        animal.data || {};
-
-      const animalCollection =
-        animal._collection === "calves"
-          ? "calves"
-          : "animals";
-
-      const suppliedAnimalId =
-        String(row.animalId || "").trim();
-
-      if (
-        suppliedAnimalId &&
-        suppliedAnimalId !== animalId
-      ) {
-        rejected.push({
-          animalNumber,
-          reason: "بيانات الحيوان المرسلة لا تطابق رقم الحيوان داخل حسابك."
-        });
-        continue;
-      }
-
-      const status = String(animalDoc.status || "active").trim().toLowerCase();
-
-      if (status === "inactive" || status === "archived") {
-        rejected.push({
-          animalNumber,
-          reason: "الحيوان خارج القطيع، لذلك لا يمكن تسجيل تحصين له."
-        });
-        continue;
-      }
-      const scopedEligibility =
-  vaccinationScopedEligibilitySrv({
-    vaccineCode,
-    animalDoc,
-    animalCollection
-  });
-
-if (scopedEligibility?.allowed === false) {
-  rejected.push({
-    animalNumber,
-    reason: scopedEligibility.message
-  });
-  continue;
-}
-      const duplicated = await vaccinationHasSameDaySrv(
-        uid,
-        animalNumber,
-        eventDate,
-        vaccine
-      );
-
-      if (duplicated) {
-        rejected.push({
-          animalNumber,
-          reason: "سبق تسجيل التحصين نفسه لهذا الحيوان في التاريخ نفسه."
-        });
-        continue;
-      }
-const dueWarning =
-  await vaccinationDueWarningSrv({
-    uid,
-    animalNumber,
-    eventDate,
-    vaccine,
-    vaccineCode,
-    animalDoc,
-    programLink
-  });
-
-if (dueWarning?.allowed === false) {
-  rejected.push({
-    animalNumber,
-    reason: dueWarning.message
-  });
-
-  continue;
-}
-
-const effectiveDoseType =
-  String(
-    dueWarning?.taskDoseType ||
-    programLink.requestedDoseType ||
-    doseType ||
-    ""
-  ).trim();
-
-if (!effectiveDoseType) {
-  rejected.push({
-    animalNumber,
-    reason:
-      "تعذّر تحديد الجرعة المطلوب تسجيلها من البرنامج الحالي."
-  });
-  continue;
-}
-
-const effectiveDoseTypeLabel =
-  vaccinationExecutionDoseLabelSrv({
-    programLink,
-    doseType:
-      effectiveDoseType
-  });
-
-const isPregnancyLinkedMaternalDose =
-  programLink.isMaternalProgram === true ||
-  (
+  const animalId =
     String(
-      programLink.programSection || ""
+      animal.id || ""
+    ).trim();
+
+  const animalDoc =
+    animal.data || {};
+
+  const animalCollection =
+    animal._collection === "calves"
+      ? "calves"
+      : "animals";
+
+  const suppliedAnimalId =
+    String(
+      row.animalId || ""
+    ).trim();
+
+  if (
+    suppliedAnimalId &&
+    suppliedAnimalId !== animalId
+  ) {
+    rejected.push({
+      animalNumber,
+      reason:
+        "بيانات الحيوان المرسلة لا تطابق رقم الحيوان داخل حسابك."
+    });
+    continue;
+  }
+
+  const status =
+    String(
+      animalDoc.status || "active"
     )
       .trim()
-      .toLowerCase() === "mothers" &&
-    Array.isArray(
-      programLink.doseSchedule
-    ) &&
-    programLink.doseSchedule.some(
-      step =>
-        String(
-          step?.timingBasis || ""
-        ).trim() ===
-          "before_expected_calving"
-    )
-  );
-
-const payload = {
-  userId: uid,
-
-  animalId,
-  animalCollection,
-  animalNumber,
-
-  createdAt:
-    admin.firestore.FieldValue.serverTimestamp(),
-
-  date: eventDate,
-
-  // كود داخلي للمحرك
-  doseType:
-    effectiveDoseType,
-
-  // الوصف الصحيح للمستخدم
-  doseTypeLabel:
-    effectiveDoseTypeLabel,
-
-  timingBasis:
-    isPregnancyLinkedMaternalDose
-      ? "before_expected_calving"
-      : "",
-
-  eventDate,
-
-  vaccinationProgramMode:
-    programContext.programMode,
-
-  vaccinationProgramLabel:
-    programContext.programLabel,
-
-  eventType: "تحصين",
-  source: "server:/api/vaccination/save",
-  type: "vaccination",
-  vaccine
-};
-if (programLink.linked) {
-  payload.programRowId = programRowId;
-  payload.vaccineCode = vaccineCode;
-  payload.programSection =
-    programLink.programSection || "";
-  payload.programSectionLabel =
-    programLink.programSectionLabel || "";
-  payload.vaccineForm =
-    programLink.vaccineForm || "";
-  payload.vaccineFormLabel =
-    programLink.vaccineFormLabel || "";
-   payload.vaccinationProgramVersion = Number(
-    programLink.vaccinationProgramVersion || 0
-  );
+      .toLowerCase();
 
   if (
-    programLink.programMode === "farm"
+    status === "inactive" ||
+    status === "archived"
   ) {
-    payload.farmProgramVersion = Number(
-      programLink.farmProgramVersion || 0
-    );
+    rejected.push({
+      animalNumber,
+      reason:
+        "الحيوان خارج القطيع، لذلك لا يمكن تسجيل تحصين له."
+    });
+    continue;
   }
+
+  // =====================================================
+  // السيرفر يختار سطر البرنامج الصحيح لهذا الحيوان
+  // حسب vaccineCode + targetGroup
+  // =====================================================
+  const programLink =
+    await vaccinationResolveProgramRowSrv({
+      uid,
+      programContext,
+
+      body: {
+        ...body,
+
+        programRowId:
+          requestedVaccineCode
+            ? ""
+            : requestedProgramRowId,
+
+        vaccinationProgramRowId: "",
+
+        vaccineCode
+      },
+
+      executionProgram,
+      animalDoc,
+      animalCollection
+    });
 
   if (
-    programLink.programMode ===
-      "murabbik_default"
+    programLink.ok !== true ||
+    programLink.linked !== true
   ) {
-    payload.murabbikProgramVersion = Number(
-      programLink.murabbikProgramVersion || 0
-    );
+    rejected.push({
+      animalNumber,
+
+      reason:
+        programLink.message ||
+        "هذا التحصين غير مخصص لهذا الحيوان.",
+
+      code:
+        programLink.error || ""
+    });
+
+    continue;
   }
-}
-if (notes) {
-  payload.notes = notes;
-}
 
-if (campaignId) {
-  payload.campaignId = campaignId;
-}
-if (dueWarning) {
-  payload.warnings = [dueWarning];
-  payload.warning = dueWarning.message || "";
-  payload.warningFlags = [dueWarning.code || "vaccination_due_timing"];
-}
-const vaccineKeyForDoc = String(vaccine || "")
-  .trim()
-  .replace(/[^\p{L}\p{N}]+/gu, "_")
-  .replace(/^_+|_+$/g, "");
+  const resolvedVaccine =
+    String(
+      programLink.vaccine ||
+      vaccine
+    ).trim();
 
-const vaccinationEventId = [
-  "vaccination",
-  uid,
-  animalNumber,
-  eventDate,
-  vaccineKeyForDoc || "vaccine"
-].join("__");
+  const resolvedVaccineCode =
+    String(
+      programLink.vaccineCode ||
+      vaccineCode
+    ).trim();
 
-const eventRef = db.collection("events").doc(vaccinationEventId);
+  const resolvedProgramRowId =
+    String(
+      programLink.programRowId ||
+      ""
+    ).trim();
 
-const existingEventSnap = await eventRef.get();
+  // =====================================================
+  // القيود الخاصة المستقلة
+  // Lysigin / Brucella وغيرها الموجودة في الـHelper
+  // =====================================================
+  const scopedEligibility =
+    vaccinationScopedEligibilitySrv({
+      vaccineCode:
+        resolvedVaccineCode,
 
-if (existingEventSnap.exists) {
-  rejected.push({
-    animalNumber,
-    reason: "سبق تسجيل التحصين نفسه لهذا الحيوان في التاريخ نفسه."
-  });
-  continue;
-}
+      animalDoc,
+      animalCollection
+    });
 
-const taskWrite =
-  vaccinationBuildProgramTaskWriteSrv({
-    uid,
+  if (
+    scopedEligibility?.allowed === false
+  ) {
+    rejected.push({
+      animalNumber,
 
-    animalNumber,
+      reason:
+        scopedEligibility.message,
+
+      code:
+        scopedEligibility.code || ""
+    });
+
+    continue;
+  }
+
+  // =====================================================
+  // منع تكرار نفس التحصين في نفس اليوم
+  // =====================================================
+  const duplicated =
+    await vaccinationHasSameDaySrv(
+      uid,
+      animalNumber,
+      eventDate,
+      resolvedVaccine
+    );
+
+  if (duplicated) {
+    rejected.push({
+      animalNumber,
+      reason:
+        "سبق تسجيل التحصين نفسه لهذا الحيوان في التاريخ نفسه."
+    });
+    continue;
+  }
+
+  // =====================================================
+  // التوقيت والجرعة من السطر الذي اختاره السيرفر
+  // =====================================================
+  const dueWarning =
+    await vaccinationDueWarningSrv({
+      uid,
+      animalNumber,
+      eventDate,
+
+      vaccine:
+        resolvedVaccine,
+
+      vaccineCode:
+        resolvedVaccineCode,
+
+      animalDoc,
+      programLink
+    });
+
+  if (
+    dueWarning?.allowed === false
+  ) {
+    rejected.push({
+      animalNumber,
+      reason:
+        dueWarning.message,
+
+      code:
+        dueWarning.code || ""
+    });
+
+    continue;
+  }
+
+  const effectiveDoseType =
+    String(
+      dueWarning?.taskDoseType ||
+      programLink.requestedDoseType ||
+      requestedDoseType ||
+      ""
+    ).trim();
+
+  if (!effectiveDoseType) {
+    rejected.push({
+      animalNumber,
+
+      reason:
+        "تعذّر تحديد الجرعة المطلوب تسجيلها من البرنامج الحالي."
+    });
+
+    continue;
+  }
+
+  const effectiveDoseTypeLabel =
+    vaccinationExecutionDoseLabelSrv({
+      programLink,
+
+      doseType:
+        effectiveDoseType
+    });
+
+  const isPregnancyLinkedMaternalDose =
+    programLink.isMaternalProgram === true ||
+    (
+      String(
+        programLink.programSection || ""
+      )
+        .trim()
+        .toLowerCase() === "mothers" &&
+
+      Array.isArray(
+        programLink.doseSchedule
+      ) &&
+
+      programLink.doseSchedule.some(
+        step =>
+          String(
+            step?.timingBasis || ""
+          ).trim() ===
+            "before_expected_calving"
+      )
+    );
+
+  // =====================================================
+  // Event payload
+  // =====================================================
+  const payload = {
+    userId: uid,
+
     animalId,
-    animalDoc,
+    animalCollection,
+    animalNumber,
+
+    createdAt:
+      admin.firestore.FieldValue
+        .serverTimestamp(),
+
+    date: eventDate,
+
+    doseType:
+      effectiveDoseType,
+
+    doseTypeLabel:
+      effectiveDoseTypeLabel,
+
+    timingBasis:
+      isPregnancyLinkedMaternalDose
+        ? "before_expected_calving"
+        : "",
 
     eventDate,
+
+    vaccinationProgramMode:
+      programContext.programMode,
+
+    vaccinationProgramLabel:
+      programContext.programLabel,
+
+    eventType: "تحصين",
+
+    source:
+      "server:/api/vaccination/save",
+
+    type: "vaccination",
+
+    vaccine:
+      resolvedVaccine
+  };
+
+  if (programLink.linked) {
+    payload.programRowId =
+      resolvedProgramRowId;
+
+    payload.vaccineCode =
+      resolvedVaccineCode;
+
+    payload.programSection =
+      programLink.programSection || "";
+
+    payload.programSectionLabel =
+      programLink.programSectionLabel || "";
+
+    payload.vaccineForm =
+      programLink.vaccineForm || "";
+
+    payload.vaccineFormLabel =
+      programLink.vaccineFormLabel || "";
+
+    payload.vaccinationProgramVersion =
+      Number(
+        programLink
+          .vaccinationProgramVersion ||
+        0
+      );
+
+    if (
+      programLink.programMode === "farm"
+    ) {
+      payload.farmProgramVersion =
+        Number(
+          programLink
+            .farmProgramVersion ||
+          0
+        );
+    }
+
+    if (
+      programLink.programMode ===
+      "murabbik_default"
+    ) {
+      payload.murabbikProgramVersion =
+        Number(
+          programLink
+            .murabbikProgramVersion ||
+          0
+        );
+    }
+  }
+
+  if (notes) {
+    payload.notes =
+      notes;
+  }
+
+  if (campaignId) {
+    payload.campaignId =
+      campaignId;
+  }
+
+  if (dueWarning) {
+    payload.warnings =
+      [dueWarning];
+
+    payload.warning =
+      dueWarning.message || "";
+
+    payload.warningFlags = [
+      dueWarning.code ||
+      "vaccination_due_timing"
+    ];
+  }
+
+  // =====================================================
+  // Event identity من اسم التحصين الحقيقي الذي حدده السيرفر
+  // =====================================================
+  const vaccineKeyForDoc =
+    String(
+      resolvedVaccine || ""
+    )
+      .trim()
+      .replace(
+        /[^\p{L}\p{N}]+/gu,
+        "_"
+      )
+      .replace(
+        /^_+|_+$/g,
+        ""
+      );
+
+  const vaccinationEventId = [
+    "vaccination",
+    uid,
+    animalNumber,
+    eventDate,
+    vaccineKeyForDoc || "vaccine"
+  ].join("__");
+
+  const eventRef =
+    db
+      .collection("events")
+      .doc(vaccinationEventId);
+
+  const existingEventSnap =
+    await eventRef.get();
+
+  if (existingEventSnap.exists) {
+    rejected.push({
+      animalNumber,
+
+      reason:
+        "سبق تسجيل التحصين نفسه لهذا الحيوان في التاريخ نفسه."
+    });
+
+    continue;
+  }
+
+  // =====================================================
+  // بناء الـTask من نفس السطر الذي اختاره السيرفر
+  // =====================================================
+  const taskWrite =
+    vaccinationBuildProgramTaskWriteSrv({
+      uid,
+
+      animalNumber,
+      animalId,
+      animalDoc,
+
+      eventDate,
+
+      eventId:
+        eventRef.id,
+
+      campaignId,
+
+      programContext,
+      programLink,
+
+      doseType:
+        effectiveDoseType
+    });
+
+  const writeBatch =
+    db.batch();
+
+  writeBatch.set(
+    eventRef,
+    payload
+  );
+
+  if (animalId) {
+    writeBatch.set(
+      db
+        .collection(
+          animalCollection
+        )
+        .doc(animalId),
+
+      {
+        lastVaccinationDate:
+          eventDate,
+
+        lastVaccine:
+          resolvedVaccine,
+
+        lastVaccinationDoseType:
+          effectiveDoseType,
+
+        ...(programLink.linked
+          ? {
+              lastVaccineCode:
+                resolvedVaccineCode,
+
+              lastVaccinationProgramRowId:
+                resolvedProgramRowId
+            }
+          : {}),
+
+        updatedAt:
+          admin.firestore.FieldValue
+            .serverTimestamp()
+      },
+
+      {
+        merge: true
+      }
+    );
+  }
+
+  if (taskWrite) {
+    writeBatch.set(
+      taskWrite.taskRef,
+      taskWrite.payload,
+
+      {
+        merge: true
+      }
+    );
+  }
+
+  await writeBatch.commit();
+
+  const tasks =
+    taskWrite?.publicTask
+      ? [taskWrite.publicTask]
+      : [];
+
+  saved.push({
+    animalNumber,
+    animalId,
+
     eventId:
       eventRef.id,
 
-    campaignId,
+    eventDate,
 
-    programContext,
-    programLink,
-    doseType: effectiveDoseType
+    vaccine:
+      resolvedVaccine,
+
+    vaccineCode:
+      resolvedVaccineCode,
+
+    programRowId:
+      resolvedProgramRowId,
+
+    doseType:
+      effectiveDoseType,
+
+    vaccinationProgramMode:
+      programContext.programMode,
+
+    vaccinationProgramLabel:
+      programContext.programLabel,
+
+    warning:
+      dueWarning?.message || "",
+
+    warnings:
+      dueWarning
+        ? [dueWarning]
+        : [],
+
+    tasksCount:
+      tasks.length,
+
+    tasks
   });
-
-const writeBatch =
-  db.batch();
-
-writeBatch.set(
-  eventRef,
-  payload
-);
-
-if (animalId) {
-  writeBatch.set(
-    db.collection(animalCollection).doc(
-      animalId
-    ),
-    {
-      lastVaccinationDate:
-        eventDate,
-
-      lastVaccine:
-        vaccine,
-
-     lastVaccinationDoseType:
-  effectiveDoseType,
-
-      ...(programLink.linked
-        ? {
-            lastVaccineCode:
-              vaccineCode,
-
-            lastVaccinationProgramRowId:
-              programRowId
-          }
-        : {}),
-
-      updatedAt:
-        admin.firestore.FieldValue
-          .serverTimestamp()
-    },
-    {
-      merge: true
-    }
-  );
 }
-
-if (taskWrite) {
-  writeBatch.set(
-    taskWrite.taskRef,
-    taskWrite.payload,
-    {
-      merge: true
-    }
-  );
-}
-
-await writeBatch.commit();
-
-const tasks =
-  taskWrite?.publicTask
-    ? [taskWrite.publicTask]
-    : [];
-saved.push({
-  animalNumber,
-  animalId,
-  eventId: eventRef.id,
-  eventDate,
-   vaccine,
-  doseType: effectiveDoseType,
-
-  vaccinationProgramMode:
-    programContext.programMode,
-
-  vaccinationProgramLabel:
-    programContext.programLabel,
-
-  warning: dueWarning?.message || "",
-  warnings: dueWarning ? [dueWarning] : [],
-  tasksCount: tasks.length,
-  tasks
-});
-    }
 
     return res.json({
       ok: saved.length > 0,
