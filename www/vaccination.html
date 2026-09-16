@@ -1261,39 +1261,184 @@ function findFarmVaccineOption(
   );
 }
 
-function getSelectedExecutionProgramRow() {
-  const programRowId =
-    String(vaccineEl?.value || "").trim();
+function getSelectedExecutionVaccineCode() {
+  return String(
+    vaccineEl?.value || ""
+  ).trim();
+}
 
-  return (
-    executionProgramRows.find(row =>
-      String(row?.programRowId || "").trim() ===
-      programRowId
-    ) || null
+function getSelectedExecutionProgramRows() {
+  const vaccineCode =
+    getSelectedExecutionVaccineCode();
+
+  if (!vaccineCode) return [];
+
+  return executionProgramRows.filter(row =>
+    String(
+      row?.vaccineCode || ""
+    ).trim() === vaccineCode
   );
 }
 
-function executionProgramRowLabel(row = {}) {
-  const vaccineArabic =
-    String(
-      row.vaccine ||
-      row.vaccineCode ||
-      ""
-    )
-      .split("(")[0]
-      .trim();
+function mergeExecutionProgramOptions(
+  rows = [],
+  listKey = "",
+  fixedValueKey = "",
+  fixedLabelKey = ""
+) {
+  const map = new Map();
 
-  const section =
-    String(row.programSectionLabel || "")
-      .replace(/^تحصينات\s+/, "")
-      .trim();
+  for (const row of rows) {
+    const items =
+      Array.isArray(row?.[listKey])
+        ? row[listKey]
+        : [];
 
-  return [
-    vaccineArabic,
-    section
-  ]
-    .filter(Boolean)
-    .join(" — ");
+    for (const item of items) {
+      const value =
+        String(
+          item?.value || ""
+        ).trim();
+
+      const label =
+        String(
+          item?.label ||
+          item?.value ||
+          ""
+        ).trim();
+
+      if (
+        value &&
+        label &&
+        !map.has(value)
+      ) {
+        map.set(value, {
+          value,
+          label
+        });
+      }
+    }
+
+    const fixedValue =
+      String(
+        row?.[fixedValueKey] || ""
+      ).trim();
+
+    const fixedLabel =
+      String(
+        row?.[fixedLabelKey] ||
+        fixedValue ||
+        ""
+      ).trim();
+
+    if (
+      fixedValue &&
+      fixedLabel &&
+      !map.has(fixedValue)
+    ) {
+      map.set(fixedValue, {
+        value: fixedValue,
+        label: fixedLabel
+      });
+    }
+  }
+
+  return [...map.values()];
+}
+
+function getSelectedExecutionProgramRow() {
+  const rows =
+    getSelectedExecutionProgramRows();
+
+  if (!rows.length) return null;
+
+  const first = rows[0];
+
+  const formOptions =
+    mergeExecutionProgramOptions(
+      rows,
+      "allowedVaccineFormOptions",
+      "vaccineForm",
+      "vaccineFormLabel"
+    );
+
+  const doseOptions =
+    mergeExecutionProgramOptions(
+      rows,
+      "allowedDoseOptions",
+      "doseType",
+      "doseTypeLabel"
+    );
+
+  return {
+    ...first,
+
+    programRowId: "",
+
+    vaccineCode:
+      getSelectedExecutionVaccineCode(),
+
+    programSection: "",
+    programSectionLabel: "",
+    doseSchedule: [],
+
+    vaccineForm:
+      formOptions.length === 1
+        ? formOptions[0].value
+        : "",
+
+    vaccineFormLabel:
+      formOptions.length === 1
+        ? formOptions[0].label
+        : "",
+
+    allowedVaccineFormOptions:
+      formOptions,
+
+    allowedDoseOptions:
+      doseOptions
+  };
+}
+
+function executionProgramVaccineLabel(row = {}) {
+  return String(
+    row.vaccine ||
+    row.vaccineCode ||
+    ""
+  )
+    .split("(")[0]
+    .trim();
+}
+
+function executionProgramVaccineOptions() {
+  const seen = new Set();
+  const options = [];
+
+  for (const row of executionProgramRows) {
+    const vaccineCode =
+      String(
+        row?.vaccineCode || ""
+      ).trim();
+
+    if (
+      !vaccineCode ||
+      seen.has(vaccineCode)
+    ) {
+      continue;
+    }
+
+    seen.add(vaccineCode);
+
+    options.push({
+      value: vaccineCode,
+
+      label:
+        executionProgramVaccineLabel(row) ||
+        vaccineCode
+    });
+  }
+
+  return options;
 }
 
 function syncExecutionProgramSelection({
@@ -1593,61 +1738,60 @@ function renderEventProgramOptions() {
         ? "برنامج المزرعة"
         : "تحصينات مُرَبِّيك";
 
+    const vaccineOptions =
+      executionProgramVaccineOptions();
+
     fillServerSelect(
       vaccineEl,
-      executionProgramRows.map(row => ({
-        value:
-          String(
-            row?.programRowId || ""
-          ).trim(),
+      vaccineOptions,
 
-        label:
-          executionProgramRowLabel(row)
-      })),
-      executionProgramRows.length
+      vaccineOptions.length
         ? `اختر التحصين من ${programLabel}`
         : `لا توجد تحصينات فعالة في ${programLabel}`,
+
       currentVaccine
     );
 
     if (vaccineEl) {
       vaccineEl.disabled =
-        executionProgramRows.length === 0;
+        vaccineOptions.length === 0;
     }
 
     syncExecutionProgramSelection();
     return;
   }
 
- fillServerSelect(
-  vaccineFormEl,
-  [],
-  "اختر التحصين أولًا",
-  ""
-);
-
-if (vaccineFormBox) {
-  vaccineFormBox.classList.add(
-    "hidden-block"
+  fillServerSelect(
+    vaccineFormEl,
+    [],
+    "اختر التحصين أولًا",
+    ""
   );
-}
 
-if (vaccineFormEl) {
-  vaccineFormEl.disabled = true;
-}
+  if (vaccineFormBox) {
+    vaccineFormBox.classList.add(
+      "hidden-block"
+    );
+  }
 
-if (vaccineEl) {
-  vaccineEl.disabled = false;
-}
+  if (vaccineFormEl) {
+    vaccineFormEl.disabled = true;
+  }
 
-fillServerSelect(
-  vaccineEl,
+  if (vaccineEl) {
+    vaccineEl.disabled = false;
+  }
+
+  fillServerSelect(
+    vaccineEl,
+
     farmProgramOptions.vaccines.map(
       item => ({
         value: item.label,
         label: item.label
       })
     ),
+
     "اختر نوع التحصين",
     currentVaccine
   );
@@ -3082,10 +3226,13 @@ async function saveFarmProgram() {
   }
 }
 function collectPayload() {
-  const numbers = getSelectedNumbers();
+  const numbers =
+    getSelectedNumbers();
 
   const eventDate =
-    String(eventDateEl?.value || "")
+    String(
+      eventDateEl?.value || ""
+    )
       .trim()
       .slice(0, 10);
 
@@ -3102,6 +3249,11 @@ function collectPayload() {
       ? getSelectedExecutionProgramRow()
       : null;
 
+  const vaccineCode =
+    isExecutionProgram
+      ? getSelectedExecutionVaccineCode()
+      : "";
+
   const vaccine =
     isExecutionProgram
       ? String(
@@ -3111,29 +3263,29 @@ function collectPayload() {
           vaccineEl?.value || ""
         ).trim();
 
-   const doseType = getDoseType();
+  const doseType =
+    getDoseType();
 
   return {
     animalNumbers: numbers,
-    animalNumber: numbers.join(","),
+
+    animalNumber:
+      numbers.join(","),
+
     eventDate,
     date: eventDate,
+
     vaccine,
     doseType,
     programMode,
 
-    programRowId:
-      String(
-        programRow?.programRowId || ""
-      ).trim(),
+    // السيرفر يحدد السطر الصحيح لكل حيوان.
+    programRowId: "",
 
-  vaccineCode:
-  String(
-    programRow?.vaccineCode || ""
-  ).trim(),
+    vaccineCode,
 
-vaccineForm:
-  getVaccineForm()
+    vaccineForm:
+      getVaccineForm()
   };
 }
 function renderServerResult(result = {}) {
@@ -3403,9 +3555,11 @@ const numberFromUrl =
   numbersFromUrl
     ? ""
     : rawNumberParam;
-  const vaccine =
+const vaccine =
   String(
-    qp.get("vaccine") || ""
+    qp.get("vaccineCode") ||
+    qp.get("vaccine") ||
+    ""
   ).trim();
 
 const vaccineForm =
@@ -3420,20 +3574,69 @@ const doseType =
     qp.get("doseType") || ""
   ).toLowerCase();
 
-   pageMode = (entryMode === "bulk" || numbersFromUrl) ? "bulk" : "single";
+pageMode =
+  (
+    entryMode === "bulk" ||
+    numbersFromUrl
+  )
+    ? "bulk"
+    : "single";
 
-        if (eventDateEl) eventDateEl.value = dt;
+if (eventDateEl) {
+  eventDateEl.value = dt;
+}
 
-    await loadVaccinationOptions();
-    await loadFarmProgram();
+await loadVaccinationOptions();
+await loadFarmProgram();
 
-   if (vaccineEl && vaccine) {
-  const found = [...vaccineEl.options].some(
-    option => option.value === vaccine
-  );
+if (vaccineEl && vaccine) {
+  let selectedVaccine =
+    vaccine;
+
+  let found =
+    [...vaccineEl.options].some(
+      option =>
+        option.value ===
+        selectedVaccine
+    );
+
+  // توافق مع روابط التنبيهات القديمة
+  // التي كانت ترسل programRowId.
+  if (
+    !found &&
+    usesExecutionProgramMode(
+      getProgramMode()
+    )
+  ) {
+    const legacyRow =
+      executionProgramRows.find(row =>
+        String(
+          row?.programRowId || ""
+        ).trim() === vaccine
+      );
+
+    const legacyVaccineCode =
+      String(
+        legacyRow?.vaccineCode || ""
+      ).trim();
+
+    if (legacyVaccineCode) {
+      selectedVaccine =
+        legacyVaccineCode;
+
+      found =
+        [...vaccineEl.options].some(
+          option =>
+            option.value ===
+            selectedVaccine
+        );
+    }
+  }
 
   if (found) {
-    vaccineEl.value = vaccine;
+    vaccineEl.value =
+      selectedVaccine;
+
     syncExecutionProgramSelection();
   }
 }
