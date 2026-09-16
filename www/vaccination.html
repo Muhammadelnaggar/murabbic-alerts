@@ -180,17 +180,31 @@
 
 <div class="row row-2">
   <div>
-    <label for="vaccine">نوع التحصين</label>
+  <label for="vaccine">نوع التحصين</label>
 
-    <select id="vaccine" data-field="vaccine">
-      <option value="">
-        جارِ تحميل قائمة التحصينات…
-      </option>
-    </select>
-  </div>
+  <select id="vaccine" data-field="vaccine">
+    <option value="">
+      جارِ تحميل قائمة التحصينات…
+    </option>
+  </select>
+</div>
 
-  <div>
-    <label for="doseType">نوع الجرعة</label>
+<div id="vaccineFormBox" class="hidden-block">
+  <label for="vaccineForm">نوع اللقاح</label>
+
+  <select
+    id="vaccineForm"
+    data-field="vaccineForm"
+    disabled
+  >
+    <option value="">
+      اختر التحصين أولًا
+    </option>
+  </select>
+</div>
+
+<div>
+  <label for="doseType">نوع الجرعة</label>
 
     <select id="doseType" data-field="doseType">
       <option value="">
@@ -363,7 +377,15 @@
   const animalNumberEl = document.getElementById("animalNumber");
   const eventDateEl = document.getElementById("eventDate");
   const vaccineEl  = document.getElementById("vaccine");
-  const doseTypeEl = document.getElementById("doseType");
+
+const vaccineFormEl =
+  document.getElementById("vaccineForm");
+
+const vaccineFormBox =
+  document.getElementById("vaccineFormBox");
+
+const doseTypeEl =
+  document.getElementById("doseType");
   const saveBtn =
   document.getElementById("saveBtn");
 
@@ -594,7 +616,11 @@ function clearWarn() {
       arr.map(x => String(x || "").replace(/\D/g, "")).filter(Boolean)
     )];
   }
-
+function getVaccineForm() {
+  return String(
+    vaccineFormEl?.value || ""
+  ).trim();
+}
   function getDoseType() {
     return String(
       doseTypeEl?.value || ""
@@ -1270,50 +1296,98 @@ function executionProgramRowLabel(row = {}) {
     .join(" — ");
 }
 
-function syncExecutionProgramSelection() {
-  if (!doseTypeEl) return;
+function syncExecutionProgramSelection({
+  resetVaccineForm = false
+} = {}) {
+  if (!doseTypeEl || !vaccineFormEl) return;
 
   const programRow =
     getSelectedExecutionProgramRow();
 
-  const doseLabel =
-    document.querySelector(
-      'label[for="doseType"]'
-    );
-
-  const isMaternalProgram =
-    String(
-      programRow?.programSection || ""
-    )
-      .trim()
-      .toLowerCase() === "mothers" &&
+  const serverFormOptions =
     Array.isArray(
-      programRow?.doseSchedule
-    ) &&
-    programRow.doseSchedule.some(
-      step =>
-        String(
-          step?.timingBasis || ""
-        ).trim() ===
-          "before_expected_calving"
-    );
+      programRow?.allowedVaccineFormOptions
+    )
+      ? programRow.allowedVaccineFormOptions
+          .map(item => ({
+            value:
+              String(
+                item?.value || ""
+              ).trim(),
 
-  if (isMaternalProgram) {
-    if (doseLabel) {
-      doseLabel.textContent =
-        "الجرعة المستحقة";
-    }
+            label:
+              String(
+                item?.label ||
+                item?.value ||
+                ""
+              ).trim()
+          }))
+          .filter(item =>
+            item.value &&
+            item.label
+          )
+      : [];
 
-    fillServerSelect(
-      doseTypeEl,
-      [],
-      "يحددها مُرَبِّيك حسب الحمل والبرنامج",
-      ""
-    );
+  const fixedVaccineForm =
+    String(
+      programRow?.vaccineForm || ""
+    ).trim();
 
-    doseTypeEl.disabled = true;
-    return;
+  const vaccineFormOptions =
+    serverFormOptions.length
+      ? serverFormOptions
+      : (
+          fixedVaccineForm
+            ? [
+                {
+                  value:
+                    fixedVaccineForm,
+
+                  label:
+                    String(
+                      programRow?.vaccineFormLabel ||
+                      fixedVaccineForm
+                    ).trim()
+                }
+              ]
+            : []
+        );
+
+  const selectedVaccineForm =
+    resetVaccineForm
+      ? ""
+      : getVaccineForm();
+
+  fillServerSelect(
+    vaccineFormEl,
+    vaccineFormOptions,
+
+    programRow
+      ? "اختر نوع اللقاح"
+      : "اختر التحصين أولًا",
+
+    selectedVaccineForm
+  );
+
+  if (
+    vaccineFormOptions.length === 1
+  ) {
+    vaccineFormEl.value =
+      vaccineFormOptions[0].value;
   }
+
+  const needsVaccineFormChoice =
+    vaccineFormOptions.length > 1;
+
+  if (vaccineFormBox) {
+    vaccineFormBox.classList.toggle(
+      "hidden-block",
+      !needsVaccineFormChoice
+    );
+  }
+
+  vaccineFormEl.disabled =
+    !needsVaccineFormChoice;
 
   const doseOptions =
     Array.isArray(
@@ -1339,17 +1413,12 @@ function syncExecutionProgramSelection() {
           )
       : [];
 
-  if (doseLabel) {
-    doseLabel.textContent =
-      "نوع الجرعة الأولى";
-  }
-
   fillServerSelect(
     doseTypeEl,
     doseOptions,
 
     programRow
-      ? "اختر أول جرعة مسجلة فقط"
+      ? "اختر الجرعة التي نُفذت فعليًا"
       : "اختر التحصين أولًا",
 
     getDoseType()
@@ -1550,12 +1619,29 @@ function renderEventProgramOptions() {
     return;
   }
 
-  if (vaccineEl) {
-    vaccineEl.disabled = false;
-  }
+ fillServerSelect(
+  vaccineFormEl,
+  [],
+  "اختر التحصين أولًا",
+  ""
+);
 
-  fillServerSelect(
-    vaccineEl,
+if (vaccineFormBox) {
+  vaccineFormBox.classList.add(
+    "hidden-block"
+  );
+}
+
+if (vaccineFormEl) {
+  vaccineFormEl.disabled = true;
+}
+
+if (vaccineEl) {
+  vaccineEl.disabled = false;
+}
+
+fillServerSelect(
+  vaccineEl,
     farmProgramOptions.vaccines.map(
       item => ({
         value: item.label,
@@ -3041,10 +3127,13 @@ function collectPayload() {
         programRow?.programRowId || ""
       ).trim(),
 
-    vaccineCode:
-      String(
-        programRow?.vaccineCode || ""
-      ).trim()
+  vaccineCode:
+  String(
+    programRow?.vaccineCode || ""
+  ).trim(),
+
+vaccineForm:
+  getVaccineForm()
   };
 }
 function renderServerResult(result = {}) {
@@ -3314,8 +3403,22 @@ const numberFromUrl =
   numbersFromUrl
     ? ""
     : rawNumberParam;
-    const vaccine = String(qp.get("vaccine") || "").trim();
-    const doseType = String(qp.get("doseType") || "").toLowerCase();
+  const vaccine =
+  String(
+    qp.get("vaccine") || ""
+  ).trim();
+
+const vaccineForm =
+  String(
+    qp.get("vaccineForm") || ""
+  )
+    .trim()
+    .toLowerCase();
+
+const doseType =
+  String(
+    qp.get("doseType") || ""
+  ).toLowerCase();
 
    pageMode = (entryMode === "bulk" || numbersFromUrl) ? "bulk" : "single";
 
@@ -3333,6 +3436,16 @@ const numberFromUrl =
     vaccineEl.value = vaccine;
     syncExecutionProgramSelection();
   }
+}
+if (
+  vaccineFormEl &&
+  vaccineForm &&
+  [...vaccineFormEl.options].some(
+    option =>
+      option.value === vaccineForm
+  )
+) {
+  vaccineFormEl.value = vaccineForm;
 }
 
 if (
@@ -3394,9 +3507,22 @@ damUnvaccinatedBtn?.addEventListener(
   runServerGate("date_change");
 });
 vaccineEl?.addEventListener("change", () => {
-  syncExecutionProgramSelection();
-  runServerGate("vaccine_change");
+  syncExecutionProgramSelection({
+    resetVaccineForm: true
+  });
+
+  if (
+    vaccineFormEl?.disabled ||
+    getVaccineForm()
+  ) {
+    runServerGate("vaccine_change");
+  }
 });
+
+vaccineFormEl?.addEventListener("change", () => {
+  runServerGate("vaccine_form_change");
+});
+
 doseTypeEl?.addEventListener("change", () => {
   runServerGate("dose_type_change");
 });
