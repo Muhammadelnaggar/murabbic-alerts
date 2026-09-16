@@ -14344,55 +14344,113 @@ app.get("/api/events-page/context", requireUserId, async (req, res) => {
 
 app.get("/api/events-page/groups", requireUserId, async (req, res) => {
   try {
-    if (!db) {
+    const result =
+      await buildGroupsPageForTenantSrv(
+        req.userId
+      );
+
+    if (!result?.ok) {
       return res.status(503).json({
         ok: false,
-        error: "firestore_disabled",
-        message: "❌ تعذّر تحميل مجموعات القطيع الآن. حاول مرة أخرى لاحقًا.",
+
+        error:
+          result?.error ||
+          "events_page_groups_failed",
+
+        message:
+          result?.message ||
+          "❌ تعذّر تحميل مجموعات القطيع الآن. حاول مرة أخرى.",
+
         groups: []
       });
     }
 
-    const snap = await db.collection("groups")
-      .where("userId", "==", req.userId)
-      .limit(100)
-      .get();
+    const groups =
+      (
+        Array.isArray(result.groups)
+          ? result.groups
+          : []
+      ).map(group => ({
+        id:
+          String(
+            group?.id ||
+            group?.groupId ||
+            ""
+          ).trim(),
 
-    const groups = [];
+        name:
+          String(
+            group?.groupName ||
+            group?.label ||
+            group?.id ||
+            ""
+          ).trim(),
 
-    snap.forEach(doc => {
-      const d = doc.data() || {};
+        members:
+          (
+            Array.isArray(
+              group?.animalNumbers
+            )
+              ? group.animalNumbers
+              : []
+          )
+            .map(value =>
+              String(value || "").trim()
+            )
+            .filter(Boolean),
 
-      const members = Array.isArray(d.animalNumbers)
-        ? d.animalNumbers
-        : Array.isArray(d.members)
-          ? d.members
-          : [];
+        animalType:
+          String(
+            group?.species || ""
+          ).trim(),
 
-      groups.push({
-        id: doc.id,
-        name: String(d.groupName || d.name || doc.id),
-        members: members.map(x => String(x || "").trim()).filter(Boolean),
-        animalType: String(d.animalType || d.species || ""),
-        animalsCount: Number(d.animalsCount || members.length || 0),
-        groupId: String(d.groupId || doc.id || ""),
-        groupKey: String(d.groupKey || ""),
-        feedingEligible: d.feedingEligible === true
-      });
-    });
+        animalsCount:
+          Number(
+            group?.animalsCount || 0
+          ),
+
+        groupId:
+          String(
+            group?.groupId ||
+            group?.id ||
+            ""
+          ).trim(),
+
+        groupKey:
+          String(
+            group?.groupKey ||
+            group?.baseKey ||
+            ""
+          ).trim(),
+
+        feedingEligible:
+          group?.feedingEligible === true
+      }));
 
     return res.json({
       ok: true,
+
+      source:
+        "server_groups_page",
+
       groups
     });
 
   } catch (e) {
-    console.error("events-page-groups failed", e);
+    console.error(
+      "events-page-groups failed",
+      e
+    );
 
     return res.status(500).json({
       ok: false,
-      error: "events_page_groups_failed",
-      message: "❌ تعذّر تحميل مجموعات القطيع الآن. حاول مرة أخرى.",
+
+      error:
+        "events_page_groups_failed",
+
+      message:
+        "❌ تعذّر تحميل مجموعات القطيع الآن. حاول مرة أخرى.",
+
       groups: []
     });
   }
