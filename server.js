@@ -46321,11 +46321,12 @@ function vaccinationMurabbikDefaultProgramSrv() {
   });
 
   const row = ({
-    programRowId,
-    vaccineCode,
-    programSection,
-    vaccineForm,
-    targetGroup,
+  programRowId,
+  vaccineCode,
+  programSection,
+  vaccineForm = "",
+  vaccineForms = [],
+  targetGroup,
     doseSchedule,
     repeatEvery = 0,
     repeatUnit = "",
@@ -46346,11 +46347,71 @@ function vaccinationMurabbikDefaultProgramSrv() {
         programSection
       );
 
-    const form =
-      vaccine?.formOptions?.find(
-        item =>
-          item.value === vaccineForm
-      );
+   const requestedVaccineForms =
+  Array.isArray(vaccineForms) &&
+  vaccineForms.length
+    ? vaccineForms
+    : [vaccineForm];
+
+const allowedVaccineFormOptions =
+  [
+    ...new Set(
+      requestedVaccineForms
+        .map(value =>
+          String(value || "").trim()
+        )
+        .filter(Boolean)
+    )
+  ]
+    .map(value => {
+      const option =
+        vaccine?.formOptions?.find(
+          item =>
+            String(item?.value || "").trim() ===
+            value
+        );
+
+      return option
+        ? {
+            value:
+              String(option.value || "").trim(),
+
+            label:
+              String(
+                option.label ||
+                option.value ||
+                ""
+              ).trim()
+          }
+        : null;
+    })
+    .filter(Boolean);
+
+const allowedVaccineForms =
+  allowedVaccineFormOptions.map(
+    item => item.value
+  );
+
+const fixedVaccineForm =
+  allowedVaccineForms.length === 1
+    ? allowedVaccineForms[0]
+    : "";
+
+const fixedVaccineFormLabel =
+  fixedVaccineForm
+    ? String(
+        allowedVaccineFormOptions[0]
+          ?.label || ""
+      ).trim()
+    : "";
+
+const vaccineFormDisplayLabel =
+  allowedVaccineFormOptions
+    .map(item =>
+      String(item?.label || "").trim()
+    )
+    .filter(Boolean)
+    .join(" / ");
 
     const enrichedDoseSchedule =
       doseSchedule.map(step => ({
@@ -46416,10 +46477,15 @@ function vaccinationMurabbikDefaultProgramSrv() {
       programSectionLabel:
         section?.label || "",
 
-      vaccineForm,
+      vaccineForm:
+  fixedVaccineForm,
 
-      vaccineFormLabel:
-        form?.label || "",
+vaccineFormLabel:
+  fixedVaccineFormLabel ||
+  vaccineFormDisplayLabel,
+
+allowedVaccineForms,
+allowedVaccineFormOptions,
 
       doseType:
         fixedDoseType,
@@ -46600,51 +46666,57 @@ function vaccinationMurabbikDefaultProgramSrv() {
     }),
 
     row({
-      programRowId:
-        "murabbik_bef_herd",
-      vaccineCode: "bef",
-      programSection: "herd",
-      vaccineForm: "killed_virus",
-      targetGroup: "herd_all",
-      repeatEvery: 1,
-      repeatUnit: "year",
-      doseSchedule: [
-        dose("prime", "any_time"),
-        dose(
-          "periodic",
-          "repeat",
-          1,
-          "year"
-        )
-      ]
-    }),
+  programRowId:
+    "murabbik_bef_herd",
+  vaccineCode: "bef",
+  programSection: "herd",
+  vaccineForms: [
+    "live_attenuated_virus",
+    "killed_virus"
+  ],
+  targetGroup: "herd_all",
+  repeatEvery: 1,
+  repeatUnit: "year",
+  doseSchedule: [
+    dose("prime", "any_time"),
+    dose(
+      "periodic",
+      "repeat",
+      1,
+      "year"
+    )
+  ]
+}),
 
-    row({
-      programRowId:
-        "murabbik_bef_calves",
-      vaccineCode: "bef",
-      programSection: "calves",
-      vaccineForm: "killed_virus",
-      targetGroup: "calves",
-      ageMinValue: 12,
-      ageMinUnit: "month",
-      repeatEvery: 1,
-      repeatUnit: "year",
-      doseSchedule: [
-        dose(
-          "prime",
-          "calf_age",
-          12,
-          "month"
-        ),
-        dose(
-          "periodic",
-          "repeat",
-          1,
-          "year"
-        )
-      ]
-    }),
+row({
+  programRowId:
+    "murabbik_bef_calves",
+  vaccineCode: "bef",
+  programSection: "calves",
+  vaccineForms: [
+    "live_attenuated_virus",
+    "killed_virus"
+  ],
+  targetGroup: "calves",
+  ageMinValue: 12,
+  ageMinUnit: "month",
+  repeatEvery: 1,
+  repeatUnit: "year",
+  doseSchedule: [
+    dose(
+      "prime",
+      "calf_age",
+      12,
+      "month"
+    ),
+    dose(
+      "periodic",
+      "repeat",
+      1,
+      "year"
+    )
+  ]
+}),
 
     row({
       programRowId:
@@ -47220,7 +47292,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
        programMode:
       "murabbik_default",
 
-    version: 3,
+    version: 4,
 
     programName:
       "برنامج مُرَبِّيك ",
@@ -47229,7 +47301,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
       "برنامج مُرَبِّيك ",
 
     source:
-       "server:vaccination-murabbik-default-v3",
+       "server:vaccination-murabbik-default-v4",
 
     // لا توجد بدائل افتراضية: المربي هو صاحب الاختيار.
     defaultAlternatives: {},
@@ -47623,14 +47695,133 @@ async function vaccinationResolveProgramRowSrv({
     };
   }
 
+  
+
   const row = matches[0];
 
-    const clientDoseType =
-    String(
-      body.doseType ||
-      body.vaccineDoseType ||
-      ""
-    ).trim();
+const clientVaccineForm =
+  String(
+    body.vaccineForm ||
+    body.vaccineType ||
+    ""
+  ).trim();
+
+const rowAllowedVaccineFormOptions =
+  Array.isArray(
+    row.allowedVaccineFormOptions
+  )
+    ? row.allowedVaccineFormOptions
+        .map(item => ({
+          value:
+            String(
+              item?.value || ""
+            ).trim(),
+
+          label:
+            String(
+              item?.label ||
+              item?.value ||
+              ""
+            ).trim()
+        }))
+        .filter(item =>
+          item.value && item.label
+        )
+    : [];
+
+const fixedVaccineForm =
+  String(
+    row.vaccineForm || ""
+  ).trim();
+
+const effectiveVaccineFormOptions =
+  rowAllowedVaccineFormOptions.length
+    ? rowAllowedVaccineFormOptions
+    : (
+        fixedVaccineForm
+          ? [
+              {
+                value:
+                  fixedVaccineForm,
+
+                label:
+                  String(
+                    row.vaccineFormLabel ||
+                    fixedVaccineForm
+                  ).trim()
+              }
+            ]
+          : []
+      );
+
+const allowedVaccineForms =
+  effectiveVaccineFormOptions.map(
+    item => item.value
+  );
+
+if (
+  clientVaccineForm &&
+  allowedVaccineForms.length &&
+  !allowedVaccineForms.includes(
+    clientVaccineForm
+  )
+) {
+  return {
+    ok: false,
+    linked: false,
+    error:
+      "vaccination_program_form_not_allowed",
+
+    message:
+      `❌ نوع اللقاح المختار غير موجود لهذا التحصين داخل ${programLabel}.`
+  };
+}
+
+if (
+  !clientVaccineForm &&
+  allowedVaccineForms.length > 1
+) {
+  return {
+    ok: false,
+    linked: false,
+    error:
+      "vaccination_program_form_required",
+
+    message:
+      "❌ اختر نوع اللقاح: حي مُضعّف أو ميت/غير نشط."
+  };
+}
+
+const resolvedVaccineForm =
+  clientVaccineForm ||
+  fixedVaccineForm ||
+  (
+    allowedVaccineForms.length === 1
+      ? allowedVaccineForms[0]
+      : ""
+  );
+
+const resolvedVaccineFormOption =
+  effectiveVaccineFormOptions.find(
+    item =>
+      item.value ===
+      resolvedVaccineForm
+  ) || null;
+
+const resolvedVaccineFormLabel =
+  String(
+    resolvedVaccineFormOption?.label ||
+    row.vaccineFormLabel ||
+    resolvedVaccineForm ||
+    ""
+  ).trim();
+
+const clientDoseType =
+  String(
+    body.doseType ||
+    body.vaccineDoseType ||
+    ""
+  ).trim();
 
   const programSection =
     String(
@@ -47769,10 +47960,21 @@ async function vaccinationResolveProgramRowSrv({
     linked: true,
     programMode,
 
-        ...row,
+    ...row,
 
-    requestedDoseType,
-    isMaternalProgram,
+vaccineForm:
+  resolvedVaccineForm,
+
+vaccineFormLabel:
+  resolvedVaccineFormLabel,
+
+allowedVaccineForms,
+
+allowedVaccineFormOptions:
+  effectiveVaccineFormOptions,
+
+requestedDoseType,
+isMaternalProgram,
 
     programDoseType:
       fixedDoseType,
@@ -50802,17 +51004,24 @@ async function vaccinationReconcileProgramTasksSrv({
         uid: userId,
         programContext,
 
-        body: {
-          programRowId,
+      body: {
+  programRowId,
 
-          vaccineCode:
-            String(
-              currentRow.vaccineCode || ""
-            ).trim(),
+  vaccineCode:
+    String(
+      currentRow.vaccineCode || ""
+    ).trim(),
 
-          doseType:
-            sourceDoseType
-        }
+  vaccineForm:
+    String(
+      sourceEvent.vaccineForm ||
+      currentRow.vaccineForm ||
+      ""
+    ).trim(),
+
+  doseType:
+    sourceDoseType
+}
       });
 
     if (
