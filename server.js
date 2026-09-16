@@ -60989,6 +60989,28 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
   }
 });
 const VACCINATION_INITIAL_AGE_RANGE_DAYS = 15;
+const VACCINATION_ALERT_REPORT_DAYS = 7;
+
+function vaccinationAlertReportEndDateSrv(reportDate = "") {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) return "";
+
+  return vaccinationYmdAddDaysSrv(
+    reportDate,
+    VACCINATION_ALERT_REPORT_DAYS - 1
+  );
+}
+
+function vaccinationAlertIsWeeklyIndividualDoseSrv(doseType = "") {
+  const dose = String(doseType || "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    dose === "prime" ||
+    dose === "primary" ||
+    dose === "booster"
+  );
+}
 async function vaccinationInitialAgeAlertGroupsSrv({
   uid = "",
   programMode = "",
@@ -61009,6 +61031,8 @@ async function vaccinationInitialAgeAlertGroupsSrv({
       uid,
       programMode
     );
+    const reportEndDate =
+  vaccinationAlertReportEndDateSrv(today);
 
   const ageRows =
     (
@@ -61287,17 +61311,17 @@ if (scopedEligibility?.allowed === false) {
             ).trim();
 
       if (
-        !/^\d{4}-\d{2}-\d{2}$/.test(
-          ageRangeStart
-        ) ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(
-          ageRangeEnd
-        ) ||
-        today < ageRangeStart ||
-        today > ageRangeEnd
-      ) {
-        continue;
-      }
+  !/^\d{4}-\d{2}-\d{2}$/.test(
+    ageRangeStart
+  ) ||
+  !/^\d{4}-\d{2}-\d{2}$/.test(
+    ageRangeEnd
+  ) ||
+  today > ageRangeEnd ||
+  String(advice.dueDate || "").slice(0, 10) > reportEndDate
+) {
+  continue;
+}
 
       const alertStatus =
         "initial_age_ready";
@@ -61452,6 +61476,9 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
   ) {
     return [];
   }
+
+  const reportEndDate =
+    vaccinationAlertReportEndDateSrv(today);
 
   const program =
     await vaccinationReadExecutionProgramSrv(
@@ -61752,34 +61779,25 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
         .trim()
         .slice(0, 10);
 
-      if (
-        !/^\d{4}-\d{2}-\d{2}$/.test(
-          dueDate
-        ) ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(
-          alertFromDate
-        ) ||
-        today < alertFromDate ||
-        (
-          /^\d{4}-\d{2}-\d{2}$/.test(
-            windowEnd
-          ) &&
-          today > windowEnd
-        )
-      ) {
-        continue;
-      }
-            const alertStatus =
-        today > dueDate
-          ? "overdue"
-          : today === dueDate
-            ? "due"
-            : vaccinationYmdAddDaysSrv(
-                today,
-                1
-              ) === dueDate
-              ? "day_before"
-              : "upcoming";
+if (
+  !/^\d{4}-\d{2}-\d{2}$/.test(
+    dueDate
+  ) ||
+  (
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      windowEnd
+    ) &&
+    today > windowEnd
+  ) ||
+  dueDate > reportEndDate
+) {
+  continue;
+}
+
+const alertStatus =
+  today > dueDate
+    ? "overdue"
+    : "upcoming";
        const key = [
         "vaccination_initial_maternal",
         alertStatus,
@@ -61895,7 +61913,10 @@ const tomorrow =
     1
   );
 
-    const programContext =
+const reportEndDate =
+  vaccinationAlertReportEndDateSrv(today);
+
+const programContext =
       await vaccinationReadProgramContextSrv(uid);
 
     const activeProgramMode =
@@ -62043,6 +62064,13 @@ const tomorrow =
        const taskDoseType =
   String(t.doseType || "")
     .trim();
+    if (
+  !vaccinationAlertIsWeeklyIndividualDoseSrv(
+    taskDoseType
+  )
+) {
+  continue;
+}
 
 const timingPolicy =
   vaccinationDoseTimingPolicySrv(
@@ -62088,50 +62116,42 @@ const timingPolicy =
           .trim()
           .toLowerCase();
 
-      let alertStatus = "";
+let alertStatus = "";
 
-      if (
-        taskStatus === "needs_data"
-      ) {
-        alertStatus = "needs_data";
+if (
+  taskStatus === "needs_data"
+) {
+  alertStatus = "needs_data";
 
-      } else if (
-        !/^\d{4}-\d{2}-\d{2}$/.test(
-          dueDate
-        )
-      ) {
-        continue;
+} else if (
+  !/^\d{4}-\d{2}-\d{2}$/.test(
+    dueDate
+  )
+) {
+  continue;
 
-      } else if (
-        taskProgramSection === "mothers" &&
-        /^\d{4}-\d{2}-\d{2}$/.test(
-          windowEnd
-        ) &&
-        today > windowEnd
-      ) {
-        continue;
+} else if (
+  taskProgramSection === "mothers" &&
+  /^\d{4}-\d{2}-\d{2}$/.test(
+    windowEnd
+  ) &&
+  today > windowEnd
+) {
+  continue;
 
-           } else if (
-        today === dueDate
-      ) {
-        alertStatus = "due";
+} else if (
+  dueDate < today
+) {
+  alertStatus = "overdue";
 
-      } else if (
-        tomorrow === dueDate
-      ) {
-        alertStatus = "day_before";
+} else if (
+  dueDate <= reportEndDate
+) {
+  alertStatus = "upcoming";
 
-      } else if (
-        /^\d{4}-\d{2}-\d{2}$/.test(
-          alertFromDate
-        ) &&
-        today >= alertFromDate
-      ) {
-        alertStatus = "upcoming";
-
-      } else {
-        continue;
-      }
+} else {
+  continue;
+}
       const animalNumber =
         calvingNormDigitsOnlySrv(
           t.animalNumber || ""
@@ -62181,15 +62201,14 @@ const timingPolicy =
           t.attentionCode || ""
         ).trim();
 
-      const key = [
-        alertStatus,
-        programMode,
-        programRowId,
-        vaccineCode,
-        doseType,
-        dueDate,
-        attentionCode
-      ].join("__");
+const key = [
+  alertStatus,
+  programMode,
+  programRowId,
+  vaccineCode,
+  doseType,
+  attentionCode
+].join("__");
 
       if (!groups.has(key)) {
         groups.set(key, {
@@ -62371,226 +62390,123 @@ const timingPolicy =
           g.alertKind || ""
         ).trim() ===
           "vaccination_initial_maternal";
-           if (
-        g.alertStatus ===
-          "initial_age_ready"
-      ) {
-        level = "info";
+if (
+  g.alertStatus ===
+    "initial_age_ready"
+) {
+  level = "info";
 
-        title =
-          "الجرعة التأسيسية جاهزة";
+  title =
+    "الجرعة التأسيسية خلال 7 أيام";
 
-                message =
-          `${nums.length === 1 ? "أصبح الحيوان في العمر المناسب" : "توجد حيوانات في العمر المناسب"} لبدء الجرعة التأسيسية لتحصين ${g.vaccine}.\n` +
-          `الحيوانات: ${nums.join("، ")}`;
+  message =
+    `لديك ${nums.length} ${nums.length === 1 ? "حيوان" : "حيوانات"} ضمن استحقاقات الجرعة التأسيسية لتحصين ${g.vaccine} من ${today} إلى ${reportEndDate}.\n` +
+    `الحيوانات: ${nums.join("، ")}`;
 
-        actionText =
-          "تسجيل الجرعة التأسيسية";
-            } else if (isInitialMaternal) {
-        if (
-          g.alertStatus === "overdue"
-        ) {
-          level = "warn";
+  actionText =
+    "فتح صفحة التحصين";
 
-          title =
-            "جرعة ما قبل الولادة متأخرة";
+} else if (isInitialMaternal) {
 
-          message =
-            (nums.length === 1
-              ? `توجد أم لم تُنفذ لها جرعة «${g.vaccine}» في الموعد المحدد قبل الولادة.\n`
-              : `توجد ${nums.length} أمهات لم تُنفذ لهن جرعة «${g.vaccine}» في الموعد المحدد قبل الولادة.\n`) +
-            `الحيوانات: ${nums.join("، ")}`;
+  if (
+    g.alertStatus === "overdue"
+  ) {
+    level = "warn";
 
-          actionText =
-            "تسجيل الجرعة الآن";
+    title =
+      "جرعة ما قبل الولادة متأخرة";
 
-        } else if (
-          g.alertStatus === "due"
-        ) {
-          level = "warn";
+    message =
+      `لديك ${nums.length} ${nums.length === 1 ? "أم" : "أمهات"} لم تُنفذ لهن جرعة «${g.vaccine}» في موعدها قبل الولادة.\n` +
+      `الحيوانات: ${nums.join("، ")}`;
 
-          title =
-            "جرعة ما قبل الولادة مستحقة اليوم";
+    actionText =
+      "تسجيل الجرعة الآن";
 
-          message =
-            (nums.length === 1
-              ? `توجد أم مستحقة لها اليوم جرعة «${g.vaccine}» قبل الولادة.\n`
-              : `توجد ${nums.length} أمهات مستحقة لهن اليوم جرعة «${g.vaccine}» قبل الولادة.\n`) +
-            `الحيوانات: ${nums.join("، ")}`;
+  } else {
+    level = "info";
 
-          actionText =
-            "تسجيل جرعة ما قبل الولادة";
+    title =
+      "تحصين أمومة خلال 7 أيام";
 
-                } else if (
-          g.alertStatus === "day_before"
-        ) {
-          title =
-            "جرعة ما قبل الولادة غدًا";
+    message =
+      `لديك ${nums.length} ${nums.length === 1 ? "أم" : "أمهات"} ضمن استحقاقات جرعة «${g.vaccine}» قبل الولادة من ${today} إلى ${reportEndDate}.\n` +
+      `الحيوانات: ${nums.join("، ")}`;
 
-          message =
-            (nums.length === 1
-              ? `غدًا موعد جرعة «${g.vaccine}» قبل الولادة لأم واحدة.\n`
-              : `غدًا موعد جرعة «${g.vaccine}» قبل الولادة لـ${nums.length} أمهات.\n`) +
-            `الحيوانات: ${nums.join("، ")}`;
+    actionText =
+      "فتح صفحة التحصين";
+  }
 
-          actionText =
-            "مراجعة جرعة ما قبل الولادة";
+} else if (
+  g.alertStatus === "overdue"
+) {
+  level = "warn";
 
-        } else {
-          title =
-            "تحصين أمومة قادم";
+  title =
+    "تحصين متأخر";
 
-          message =
-            (nums.length === 1
-              ? `دخلت أم واحدة فترة الاستعداد لتنفيذ جرعة «${g.vaccine}» قبل الولادة حسب البرنامج.\n`
-              : `دخلت ${nums.length} أمهات فترة الاستعداد لتنفيذ جرعة «${g.vaccine}» قبل الولادة حسب البرنامج.\n`) +
-            `الحيوانات: ${nums.join("، ")}`;
+  message =
+    `لديك ${nums.length} ${nums.length === 1 ? "حيوان" : "حيوانات"} لم تُنفذ لها جرعة «${g.vaccine}» في موعدها.\n` +
+    `الحيوانات: ${nums.join("، ")}`;
 
-          actionText =
-            "تسجيل جرعة ما قبل الولادة";
-        }
-      } else if (
-        g.alertStatus === "overdue"
-      ) {
-        const lateDays =
-          Math.max(
-            1,
-            diffDaysISO(
-              g.windowEnd ||
-              g.dueDate,
-              today
-            )
-          );
+  actionText =
+    "تسجيل التحصين الآن";
 
-        level = "warn";
-        title =
-          "تحصين متأخر";
+} else if (
+  g.alertStatus === "upcoming"
+) {
+  const isBooster =
+    String(g.doseType || "")
+      .trim()
+      .toLowerCase() === "booster";
 
-        message =
-          `تأخر تنفيذ جرعة «${g.vaccine}» عن موعد البرنامج بـ${lateDays} يومًا.\n` +
-          `الحيوانات: ${nums.join("، ")}`;
+  level = "info";
 
-        actionText =
-          "تسجيل التحصين الآن";
+  title = isBooster
+    ? "جرعات منشطة خلال 7 أيام"
+    : "تحصينات مستحقة خلال 7 أيام";
 
-      } else if (
-        g.alertStatus === "due"
-      ) {
-        const isToday =
-          g.dueDate === today;
+  message =
+    `لديك ${nums.length} ${nums.length === 1 ? "حيوان" : "حيوانات"} ضمن ${isBooster ? "الجرعة المنشطة" : "الجرعة"} «${g.vaccine}» من ${today} إلى ${reportEndDate}.\n` +
+    `الحيوانات: ${nums.join("، ")}`;
 
-        level = "warn";
+  actionText =
+    "فتح صفحة التحصين";
 
-        title = isToday
-          ? "تحصين مستحق اليوم"
-          : "تحصين داخل نافذة التنفيذ";
+} else {
+  level = "warn";
 
-        message = isToday
-          ? (
-              `⏰ مستحق اليوم: ${g.vaccine}\n` +
-              `الحيوانات: ${nums.join("، ")}`
-            )
-          : (
-              `⏰ داخل نافذة التنفيذ: ${g.vaccine}\n` +
-              `الموعد الأصلي: ${g.dueDate}\n` +
-              `آخر يوم في النافذة: ${g.windowEnd}\n` +
-              `الحيوانات: ${nums.join("، ")}`
-            );
+  title =
+    "بيانات مطلوبة لحساب التحصين";
 
-        actionText =
-          "تسجيل التحصين";
-                } else if (
-        g.alertStatus === "day_before"
-      ) {
-        const isBooster =
-          String(g.doseType || "")
-            .trim() === "booster";
+  message =
+    `⚠️ لا يمكن حساب الموعد التالي لـ ${g.vaccine}.\n` +
+    `${g.attentionMessage || "راجع بيانات البرنامج والحيوان."}\n` +
+    `الحيوانات: ${nums.join("، ")}`;
 
-        title = isBooster
-          ? "جرعة منشطة غدًا"
-          : "تحصين مستحق غدًا";
+  actionText =
+    "مراجعة بيانات التحصين";
+}
 
-        message = isBooster
-          ? (
-              `غدًا موعد الجرعة المنشطة «${g.vaccine}».\n` +
-              `الحيوانات: ${nums.join("، ")}`
-            )
-          : (
-              `غدًا موعد جرعة «${g.vaccine}».\n` +
-              `الحيوانات: ${nums.join("، ")}`
-            );
-
-        actionText = isBooster
-          ? "مراجعة موعد الجرعة"
-          : "فتح صفحة التحصين";
-
-      } else if (
-        g.alertStatus ===
-          "upcoming"
-      ) {
-
- 
-        const daysUntil =
-          Math.max(
-            1,
-            diffDaysISO(
-              today,
-              g.dueDate
-            )
-          );
-
-        title =
-          "موعد تحصين قادم";
-
-       const isBooster =
-  String(g.doseType || "")
-    .trim() === "booster";
-
-message = isBooster
-  ? (
-      `موعد الجرعة المنشطة «${g.vaccine}» بعد ${daysUntil} أيام، وتُنفذ في موعدها المحدد.\n` +
-      `الحيوانات: ${nums.join("، ")}`
-    )
-  : (
-      `موعد جرعة «${g.vaccine}» بعد ${daysUntil} أيام، ويمكن تنفيذها الآن داخل نافذة التسجيل.\n` +
-      `الحيوانات: ${nums.join("، ")}`
-    );
-
-actionText = isBooster
-  ? "مراجعة موعد الجرعة"
-  : "تسجيل التحصين";
-
-      } else {
-        level = "warn";
-
-        title =
-          "بيانات مطلوبة لحساب التحصين";
-
-        message =
-          `⚠️ لا يمكن حساب الموعد التالي لـ ${g.vaccine}.\n` +
-          `${g.attentionMessage || "راجع بيانات البرنامج والحيوان."}\n` +
-          `الحيوانات: ${nums.join("، ")}`;
-
-        actionText =
-          "مراجعة بيانات التحصين";
-      }
-
-    if (
-   (
+  if (
+  (
     g.alertStatus === "upcoming" ||
-    g.alertStatus === "day_before" ||
-    g.alertStatus === "due" ||
-    g.alertStatus ===
-      "overdue" ||
-    g.alertStatus ===
-      "initial_age_ready"
+    g.alertStatus === "initial_age_ready"
   ) &&
+  g.programRowId
+) {
+  actionUrl =
+    `vaccination.html?vaccine=${encodeURIComponent(g.programRowId)}` +
+    `&doseType=${encodeURIComponent(g.doseType || "")}`;
+
+} else if (
+  g.alertStatus === "overdue" &&
   g.programRowId
 ) {
   const executionQuery =
     `&date=${encodeURIComponent(today)}` +
     `&vaccine=${encodeURIComponent(g.programRowId)}` +
-    `&doseType=${encodeURIComponent(g.doseType)}`;
+    `&doseType=${encodeURIComponent(g.doseType || "")}`;
 
   if (nums.length === 1) {
     actionUrl =
