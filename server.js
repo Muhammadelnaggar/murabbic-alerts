@@ -90978,6 +90978,7 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
 
   for (const an of list) {
     const sp = speciesOfSrv(an);
+
     const pref =
       sp === 'buffalo'
         ? 'buffalo_'
@@ -90985,54 +90986,141 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
 
     const m = getAgeMonthsSrv(an);
     const milk = getMilkKgSrv(an);
+
     const c =
       ageCfgGroupSrv(
         sp,
         thresholds
       );
 
+    const source =
+      String(an?._source || "")
+        .trim()
+        .toLowerCase();
+
+    const entryType =
+      String(an?.entryType || "")
+        .trim()
+        .toLowerCase();
+
+    // مصدر السجل هو صاحب القرار:
+    // animals = حيوان رئيسي / أم
+    // calves  = تابع
+    const isFollowerRecord =
+      source === "calves"
+        ? true
+        : source === "animals"
+          ? false
+          : (
+              entryType === "followers" ||
+              an?.isCalf === true
+            );
+
     g[pref + 'all'].push(an);
 
+    // ==========================================
+    // الذكور
+    // ==========================================
     if (isMaleSrv(an)) {
-  if (isInfantGroupSrv(an)) {
-    g[pref + 'suckling'].push(an);
-    continue;
-  }
+      if (isFollowerRecord) {
+        if (isInfantGroupSrv(an)) {
+          g[pref + 'suckling'].push(an);
+          continue;
+        }
 
-  if (isWeanedGroupSrv(an, sp, thresholds)) {
-    g[pref + 'weaned'].push(an);
-    continue;
-  }
+        if (
+          isWeanedGroupSrv(
+            an,
+            sp,
+            thresholds
+          )
+        ) {
+          g[pref + 'weaned'].push(an);
+          continue;
+        }
 
-  if (isGrowingGroupSrv(an, sp, thresholds)) {
-    g[pref + 'growing'].push(an);
-    continue;
-  }
+        if (
+          isGrowingGroupSrv(
+            an,
+            sp,
+            thresholds
+          )
+        ) {
+          g[pref + 'growing'].push(an);
+          continue;
+        }
+      }
 
-  g[pref + 'males'].push(an);
-  continue;
-}
-
-    // ==========================================
-    // أولوية الحالة التشغيلية للأمهات:
-    // انتظار ولادة
-    // ثم حديث الولادة
-    // ثم جاف
-    // ثم حلاب حسب مستوى اللبن
-    // ==========================================
-
-    if (
-      isPregnantGroupSrv(an) &&
-      isCloseUpGroupSrv(an)
-    ) {
-      g[pref + 'closeup'].push(an);
+      g[pref + 'males'].push(an);
       continue;
     }
 
-    if (isFreshGroupSrv(an)) {
-      g[pref + 'fresh'].push(an);
+    // ==========================================
+    // الحيوانات الرئيسية / الأمهات فقط
+    // ==========================================
+    if (!isFollowerRecord) {
+      if (
+        isPregnantGroupSrv(an) &&
+        isCloseUpGroupSrv(an)
+      ) {
+        g[pref + 'closeup'].push(an);
+        continue;
+      }
+
+      if (isFreshGroupSrv(an)) {
+        g[pref + 'fresh'].push(an);
+        continue;
+      }
+
+      if (
+        isDryGroupSrv(an) &&
+        hasCalvedBeforeGroupSrv(an)
+      ) {
+        g[pref + 'dry'].push(an);
+        continue;
+      }
+
+      if (
+        isMilkingGroupSrv(an) &&
+        hasCalvedBeforeGroupSrv(an)
+      ) {
+        const band =
+          milkBandGroupSrv(
+            an,
+            milk,
+            thresholds
+          );
+
+        if (band === 'high') {
+          g[pref + 'high'].push(an);
+          continue;
+        }
+
+        if (band === 'med') {
+          g[pref + 'med'].push(an);
+          continue;
+        }
+
+        if (band === 'low') {
+          g[pref + 'low'].push(an);
+          continue;
+        }
+
+        // الحيوان مسجل حلابًا لكن لا توجد
+        // قيمة لبن موجبة حالية.
+        g[pref + 'low'].push(an);
+        continue;
+      }
+
+      // مهم:
+      // سجل animals لا يدخل أبدًا
+      // مجموعات التوابع.
       continue;
     }
+
+    // ==========================================
+    // التوابع فقط
+    // ==========================================
 
     // العجلة التي أجهضت تظل في فترة
     // الاستشفاء لمدة 40 يومًا.
@@ -91042,59 +91130,6 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
       continue;
     }
 
-    // ==========================================
-    // جاف
-    // ==========================================
-    if (
-      isDryGroupSrv(an) &&
-      hasCalvedBeforeGroupSrv(an)
-    ) {
-      g[pref + 'dry'].push(an);
-      continue;
-    }
-
-    // ==========================================
-    // حلاب
-    // الحالة الإنتاجية أولًا،
-    // ثم مستوى اللبن يحدد الجروب.
-    // ==========================================
-    if (
-      isMilkingGroupSrv(an) &&
-      hasCalvedBeforeGroupSrv(an)
-    ) {
-      const band =
-        milkBandGroupSrv(
-          an,
-          milk,
-          thresholds
-        );
-
-      if (band === 'high') {
-        g[pref + 'high'].push(an);
-        continue;
-      }
-
-      if (band === 'med') {
-        g[pref + 'med'].push(an);
-        continue;
-      }
-
-      if (band === 'low') {
-        g[pref + 'low'].push(an);
-        continue;
-      }
-
-      // الحيوان حالته الإنتاجية «حلاب».
-      // إذا كان إنتاجه صفرًا أو لا توجد
-      // قيمة موجبة حاليًا، يظل حلابًا
-      // ويقع في أقل مجموعة إنتاجية.
-      g[pref + 'low'].push(an);
-      continue;
-    }
-
-    // ==========================================
-    // التوابع
-    // ==========================================
     if (isInfantGroupSrv(an)) {
       g[pref + 'suckling'].push(an);
       continue;
@@ -91109,10 +91144,6 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
         g[pref + 'pregHeifers'].push(an);
         continue;
       }
-
-      // لو داتا شاذة:
-      // عجلة صغيرة مكتوب عليها عشار
-      // تظل في مسار العمر الطبيعي.
     }
 
     if (
@@ -91161,7 +91192,6 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
 
   return g;
 }
-
 async function loadGroupThresholdsSrv(tenant) {
   const d = {
     cowLowMin:0.1,  cowLowMax:19.9,
