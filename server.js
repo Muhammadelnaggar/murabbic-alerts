@@ -62867,7 +62867,7 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
     };
   }
 
-  const missing =
+    const missing =
     members
       .map(
         item =>
@@ -62878,20 +62878,56 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
           !covered.has(n)
       );
 
-  // ليس تحصين قطيع كاملًا:
-  // لا يبدأ دورة حملة.
-  if (missing.length) {
+  // أي رقم يظهر في تجميع القطيع لكنه لا يستطيع المرور
+  // من نفس مصدر الحقيقة الذي تعتمد عليه Gate
+  // لا يجوز أن يمنع اكتمال حملة القطيع.
+  //
+  // نتوقف من أول حيوان حقيقي ناقص، لذلك لا نحوّل
+  // هذا الفحص إلى Scan ثقيل عند الحملات الجزئية.
+  for (
+    const animalNumber of
+    missing
+  ) {
+    const registered =
+      await fetchAnimalByNumberForCalvingGateSrv(
+        tenant,
+        animalNumber
+      );
+
+    if (registered) {
+      return {
+        ok: true,
+        updated: false,
+        complete: false,
+
+        targetCount:
+          members.length,
+
+        coveredCount:
+          members.length -
+          missing.length
+      };
+    }
+  }
+
+  // بعد استبعاد أي أرقام غير قابلة للحل رسميًا،
+  // أعضاء أول حملة هم الحيوانات التي لها تنفيذ دوري
+  // فعلي محفوظ في Events في تاريخ الحملة.
+  const campaignMembers =
+    members.filter(
+      item =>
+        covered.has(
+          item.animalNumber
+        )
+    );
+
+  if (!campaignMembers.length) {
     return {
       ok: true,
       updated: false,
       complete: false,
-
-      targetCount:
-        members.length,
-
-      coveredCount:
-        members.length -
-        missing.length
+      targetCount: 0,
+      coveredCount: 0
     };
   }
 
@@ -62907,7 +62943,7 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
 
   for (
     const member of
-    members
+    campaignMembers
   ) {
     const programRowId =
       String(
@@ -63023,11 +63059,216 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
     complete: true,
 
     targetCount:
-      members.length,
+      campaignMembers.length,
 
     coveredCount:
-      members.length
+      campaignMembers.length
   };
+}
+
+async function vaccinationCampaignReconcileScheduleFromEventsSrv({
+  uid = "",
+  programContext = {},
+  executionProgram = {},
+  vaccineCode = ""
+} = {}) {
+  const tenant =
+    tenantKey(uid);
+
+  const mode =
+    vaccinationProgramModeNormSrv(
+      programContext.programMode
+    );
+
+  const code =
+    String(
+      vaccineCode || ""
+    ).trim();
+
+  if (
+    !db ||
+    !tenant ||
+    !mode ||
+    !code
+  ) {
+    return null;
+  }
+
+  let snap;
+
+  try {
+    snap =
+      await db
+        .collection("events")
+        .where(
+          "userId",
+          "==",
+          tenant
+        )
+        .where(
+          "vaccineCode",
+          "==",
+          code
+        )
+        .get();
+
+  } catch (_) {
+    try {
+      snap =
+        await db
+          .collection("events")
+          .where(
+            "userId",
+            "==",
+            tenant
+          )
+          .get();
+
+    } catch (e) {
+      console.error(
+        "vaccination-campaign-reconcile-events-read",
+        e
+      );
+
+      return null;
+    }
+  }
+
+  const byDate =
+    new Map();
+
+  for (const ds of snap.docs) {
+    const event =
+      ds.data() || {};
+
+    const eventType =
+      String(
+        event.type ||
+        event.eventType ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+    const eventMode =
+      vaccinationProgramModeNormSrv(
+        event.vaccinationProgramMode ||
+        event.programMode ||
+        ""
+      );
+
+    const eventDoseType =
+      String(
+        event.doseType ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+    const eventCode =
+      vaccinationTextKeySrv(
+        event.vaccineCode ||
+        ""
+      );
+
+    const eventDate =
+      String(
+        event.eventDate ||
+        event.date ||
+        ""
+      )
+        .trim()
+        .slice(0, 10);
+
+    if (
+      !(
+        eventType ===
+          "vaccination" ||
+        eventType ===
+          "تحصين"
+      ) ||
+      eventMode !== mode ||
+      eventDoseType !==
+        "periodic" ||
+      eventCode !==
+        vaccinationTextKeySrv(
+          code
+        ) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        eventDate
+      )
+    ) {
+      continue;
+    }
+
+    const animalNumber =
+      calvingNormDigitsOnlySrv(
+        event.animalNumber ||
+        ""
+      );
+
+    if (!animalNumber) {
+      continue;
+    }
+
+    if (!byDate.has(eventDate)) {
+      byDate.set(
+        eventDate,
+        []
+      );
+    }
+
+    byDate
+      .get(eventDate)
+      .push({
+        animalNumber,
+        doseType:
+          "periodic"
+      });
+  }
+
+  const dates =
+    [...byDate.keys()]
+      .sort()
+      .reverse();
+
+  for (const eventDate of dates) {
+    const result =
+      await vaccinationCampaignMaybeSeedFromActualSaveSrv({
+        uid:
+          tenant,
+
+        programContext,
+        executionProgram,
+
+        vaccineCode:
+          code,
+
+        eventDate,
+
+        saved:
+          byDate.get(eventDate) ||
+          [],
+
+        rejected: []
+      });
+
+    if (
+      result?.complete === true &&
+      /^\d{4}-\d{2}-\d{2}$/.test(
+        String(
+          result?.dueDate ||
+          ""
+        )
+          .trim()
+          .slice(0, 10)
+      )
+    ) {
+      return result;
+    }
+  }
+
+  return null;
 }
 
 async function vaccinationCampaignAdvanceIfCompleteSrv({
@@ -63454,7 +63695,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
       herdRow
     ] of herdRows
   ) {
-    const schedule =
+    let schedule =
       await vaccinationCampaignReadScheduleSrv({
         uid:
           tenant,
@@ -63463,10 +63704,30 @@ async function vaccinationCampaignDashboardAlertsSrv({
         vaccineCode
       });
 
-    // مهم:
-    // لا تبدأ حملة القطيع من Task فردية.
-    // لا توجد حملة دورية أصلًا
-    // قبل وجود تحصين قطيع فعلي سابق.
+    // Recovery فقط عند غياب Schedule:
+    // لو يوجد تنفيذ دوري فعلي كامل محفوظ في Events
+    // نعيد بناء مرجع دورة الحملة منه مرة واحدة.
+    // لا ننشئ حملة من Task فردية.
+    if (!schedule) {
+      await vaccinationCampaignReconcileScheduleFromEventsSrv({
+        uid:
+          tenant,
+
+        programContext,
+        executionProgram,
+        vaccineCode
+      });
+
+      schedule =
+        await vaccinationCampaignReadScheduleSrv({
+          uid:
+            tenant,
+
+          programMode,
+          vaccineCode
+        });
+    }
+
     if (!schedule) {
       continue;
     }
