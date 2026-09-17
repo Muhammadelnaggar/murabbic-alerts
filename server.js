@@ -63094,10 +63094,77 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
     return null;
   }
 
-  let snap;
+  const rows =
+    Array.isArray(
+      executionProgram.rows
+    )
+      ? executionProgram.rows
+      : [];
 
+  const relatedRows =
+    rows.filter(
+      row =>
+        row &&
+        row.active !== false &&
+        vaccinationTextKeySrv(
+          row.vaccineCode || ""
+        ) ===
+          vaccinationTextKeySrv(code)
+    );
+
+  const herdRow =
+    relatedRows.find(
+      row =>
+        String(
+          row.programSection || ""
+        )
+          .trim()
+          .toLowerCase() === "herd"
+    ) ||
+    relatedRows[0] ||
+    null;
+
+  if (!herdRow) {
+    return null;
+  }
+
+  const vaccineName =
+    String(
+      herdRow.vaccine ||
+      herdRow.vaccineName ||
+      code
+    ).trim();
+
+  const relatedProgramRowIds =
+    new Set(
+      relatedRows
+        .map(row =>
+          String(
+            row.programRowId || ""
+          ).trim()
+        )
+        .filter(Boolean)
+    );
+
+  const docsById =
+    new Map();
+
+  const collect = snap => {
+    if (!snap) return;
+
+    snap.docs.forEach(ds => {
+      docsById.set(
+        ds.id,
+        ds
+      );
+    });
+  };
+
+  // بعض الأحداث قد تحمل vaccineCode،
+  // وبعضها يعتمد على اسم التحصين.
+  // نجمع الاثنين ولا نفترض صيغة واحدة.
   try {
-    snap =
+    const snapByCode =
       await db
         .collection("events")
         .where(
@@ -63112,9 +63179,35 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
         )
         .get();
 
-  } catch (_) {
+    collect(snapByCode);
+  } catch (_) {}
+
+  if (vaccineName) {
     try {
-      snap =
+      const snapByName =
+        await db
+          .collection("events")
+          .where(
+            "userId",
+            "==",
+            tenant
+          )
+          .where(
+            "vaccine",
+            "==",
+            vaccineName
+          )
+          .get();
+
+      collect(snapByName);
+    } catch (_) {}
+  }
+
+  // fallback نادر فقط لو لم نجد شيئًا
+  // بالمفاتيح المباشرة.
+  if (!docsById.size) {
+    try {
+      const snap =
         await db
           .collection("events")
           .where(
@@ -63123,6 +63216,8 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
             tenant
           )
           .get();
+
+      collect(snap);
 
     } catch (e) {
       console.error(
@@ -63137,7 +63232,13 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
   const byDate =
     new Map();
 
-  for (const ds of snap.docs) {
+  const codeKey =
+    vaccinationTextKeySrv(code);
+
+  for (
+    const ds of
+    docsById.values()
+  ) {
     const event =
       ds.data() || {};
 
@@ -63165,10 +63266,43 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
         .trim()
         .toLowerCase();
 
-    const eventCode =
+    const eventCodeKey =
       vaccinationTextKeySrv(
         event.vaccineCode ||
         ""
+      );
+
+    const eventVaccine =
+      String(
+        event.vaccine ||
+        event.vaccineName ||
+        ""
+      ).trim();
+
+    const eventProgramRowId =
+      String(
+        event.programRowId ||
+        ""
+      ).trim();
+
+    const sameVaccine =
+      (
+        eventCodeKey &&
+        eventCodeKey === codeKey
+      ) ||
+      (
+        vaccineName &&
+        eventVaccine &&
+        vaccinationSameVaccineKeySrv(
+          eventVaccine,
+          vaccineName
+        )
+      ) ||
+      (
+        eventProgramRowId &&
+        relatedProgramRowIds.has(
+          eventProgramRowId
+        )
       );
 
     const eventDate =
@@ -63190,10 +63324,7 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
       eventMode !== mode ||
       eventDoseType !==
         "periodic" ||
-      eventCode !==
-        vaccinationTextKeySrv(
-          code
-        ) ||
+      !sameVaccine ||
       !/^\d{4}-\d{2}-\d{2}$/.test(
         eventDate
       )
