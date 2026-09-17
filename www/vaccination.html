@@ -522,16 +522,20 @@ cancelFarmProgramManageBtn?.addEventListener(
 );
   const bulkBox       = document.getElementById("bulkBox");
   const bulkList      = document.getElementById("bulkList");
-  const bulkSelected = new Set();
+const bulkSelected = new Set();
+
 let pageMode = "single";
 let lastGateAllowed = false;
 let farmProgramDraftRows = [];
 let programSwitchOpen = false;
 let currentProgramContext = null;
 
+let currentCampaignId = "";
+let currentCampaignVaccineCode = "";
+let currentCampaignProgramMode = "";
+
 let pendingDamBaselineRequest = null;
 let damBaselineBusy = false;
-
   function msg(text, type = "warning") {
     let bar =
       document.getElementById("mbk-infobar") ||
@@ -3266,6 +3270,17 @@ function collectPayload() {
   const doseType =
     getDoseType();
 
+  const campaignId =
+    currentCampaignId &&
+    vaccineCode &&
+    vaccineCode ===
+      currentCampaignVaccineCode &&
+    programMode ===
+      currentCampaignProgramMode &&
+    doseType === "periodic"
+      ? currentCampaignId
+      : "";
+
   return {
     animalNumbers: numbers,
 
@@ -3278,6 +3293,8 @@ function collectPayload() {
     vaccine,
     doseType,
     programMode,
+
+    campaignId,
 
     // السيرفر يحدد السطر الصحيح لكل حيوان.
     programRowId: "",
@@ -3528,153 +3545,326 @@ function renderBulkList() {
       ? list.join("، ")
       : "لا توجد أرقام محددة.";
 }
-   async function hydrate() {
-    const qp = new URLSearchParams(location.search);
+async function hydrate() {
+  const qp =
+    new URLSearchParams(location.search);
 
-const rawNumberParam =
-  qp.get("number") ||
-  qp.get("animalNumber") ||
-  qp.get("animalId") ||
-  "";
+  const rawNumberParam =
+    qp.get("number") ||
+    qp.get("animalNumber") ||
+    qp.get("animalId") ||
+    "";
 
-const dt = qp.get("date") || qp.get("eventDate") || todayLocal();
+  const dt =
+    qp.get("date") ||
+    qp.get("eventDate") ||
+    todayLocal();
 
-const entryMode = String(
-  qp.get("entryMode") ||
-  qp.get("mode") ||
-  ""
-).toLowerCase();
+  const entryMode =
+    String(
+      qp.get("entryMode") ||
+      qp.get("mode") ||
+      ""
+    ).toLowerCase();
 
-const numbersFromUrl =
-  qp.get("numbers") ||
-  qp.get("animalNumbers") ||
-  (entryMode === "bulk" ? rawNumberParam : "") ||
-  "";
+  const requestedCampaignId =
+    String(
+      qp.get("campaignId") || ""
+    ).trim();
 
-const numberFromUrl =
-  numbersFromUrl
-    ? ""
-    : rawNumberParam;
-const vaccine =
-  String(
-    qp.get("vaccineCode") ||
-    qp.get("vaccine") ||
-    ""
-  ).trim();
+  const numbersFromUrl =
+    qp.get("numbers") ||
+    qp.get("animalNumbers") ||
+    (
+      entryMode === "bulk"
+        ? rawNumberParam
+        : ""
+    ) ||
+    "";
 
-const vaccineForm =
-  String(
-    qp.get("vaccineForm") || ""
-  )
-    .trim()
-    .toLowerCase();
-
-const doseType =
-  String(
-    qp.get("doseType") || ""
-  ).toLowerCase();
-
-pageMode =
-  (
-    entryMode === "bulk" ||
+  const numberFromUrl =
     numbersFromUrl
-  )
-    ? "bulk"
-    : "single";
+      ? ""
+      : rawNumberParam;
 
-if (eventDateEl) {
-  eventDateEl.value = dt;
-}
+  const vaccine =
+    String(
+      qp.get("vaccineCode") ||
+      qp.get("vaccine") ||
+      ""
+    ).trim();
 
-await loadVaccinationOptions();
-await loadFarmProgram();
-
-if (vaccineEl && vaccine) {
-  let selectedVaccine =
-    vaccine;
-
-  let found =
-    [...vaccineEl.options].some(
-      option =>
-        option.value ===
-        selectedVaccine
-    );
-
-  // توافق مع روابط التنبيهات القديمة
-  // التي كانت ترسل programRowId.
-  if (
-    !found &&
-    usesExecutionProgramMode(
-      getProgramMode()
+  const vaccineForm =
+    String(
+      qp.get("vaccineForm") || ""
     )
-  ) {
-    const legacyRow =
-      executionProgramRows.find(row =>
-        String(
-          row?.programRowId || ""
-        ).trim() === vaccine
+      .trim()
+      .toLowerCase();
+
+  const doseType =
+    String(
+      qp.get("doseType") || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  pageMode =
+    (
+      entryMode === "bulk" ||
+      numbersFromUrl ||
+      requestedCampaignId
+    )
+      ? "bulk"
+      : "single";
+
+  if (eventDateEl) {
+    eventDateEl.value = dt;
+  }
+
+  await loadVaccinationOptions();
+  await loadFarmProgram();
+
+  let campaignData = null;
+
+  if (requestedCampaignId) {
+    if (!vaccine) {
+      currentCampaignId = "";
+      currentCampaignVaccineCode = "";
+      currentCampaignProgramMode = "";
+
+      msg(
+        "❌ تعذّر تحديد تحصين الحملة الحالية.",
+        "error"
       );
 
-    const legacyVaccineCode =
+      if (saveBtn) {
+        saveBtn.disabled = true;
+      }
+
+      applyModeUI();
+      updateContext();
+      renderProgramChoice();
+      return;
+    }
+
+    campaignData =
+      await getJson(
+        "/api/vaccination/campaign/open" +
+        `?campaignId=${encodeURIComponent(
+          requestedCampaignId
+        )}` +
+        `&vaccineCode=${encodeURIComponent(
+          vaccine
+        )}`
+      );
+
+    if (!campaignData?.ok) {
+      currentCampaignId = "";
+      currentCampaignVaccineCode = "";
+      currentCampaignProgramMode = "";
+
+      bulkSelected.clear();
+
+      msg(
+        campaignData?.message ||
+          "❌ تعذّر تحميل حملة التحصين الحالية.",
+        campaignData?.error ===
+          "vaccination_campaign_completed"
+          ? "info"
+          : "error"
+      );
+
+      if (saveBtn) {
+        saveBtn.disabled = true;
+      }
+
+      applyModeUI();
+      updateContext();
+      renderProgramChoice();
+      return;
+    }
+
+    currentCampaignId =
       String(
-        legacyRow?.vaccineCode || ""
+        campaignData.campaignId || ""
       ).trim();
 
-    if (legacyVaccineCode) {
-      selectedVaccine =
-        legacyVaccineCode;
+    currentCampaignVaccineCode =
+      String(
+        campaignData.vaccineCode ||
+        vaccine ||
+        ""
+      ).trim();
 
-      found =
-        [...vaccineEl.options].some(
-          option =>
-            option.value ===
-            selectedVaccine
-        );
-    }
-  }
+    currentCampaignProgramMode =
+      String(
+        getProgramMode() || ""
+      ).trim();
 
-  if (found) {
-    vaccineEl.value =
-      selectedVaccine;
+    bulkSelected.clear();
 
-    syncExecutionProgramSelection();
-  }
-}
-if (
-  vaccineFormEl &&
-  vaccineForm &&
-  [...vaccineFormEl.options].some(
-    option =>
-      option.value === vaccineForm
-  )
-) {
-  vaccineFormEl.value = vaccineForm;
-}
+    for (
+      const n of
+      Array.isArray(campaignData.animalNumbers)
+        ? campaignData.animalNumbers
+        : []
+    ) {
+      const number =
+        parseNumbers(n)[0] || "";
 
-if (
-  doseTypeEl &&
-  [...doseTypeEl.options].some(
-    option => option.value === doseType
-  )
-) {
-  doseTypeEl.value = doseType;
-}
-    if (numbersFromUrl) {
-      for (const n of parseNumbers(numbersFromUrl)) {
-        bulkSelected.add(n);
+      if (number) {
+        bulkSelected.add(number);
       }
     }
 
-    if (animalNumberEl && !numbersFromUrl) {
-      animalNumberEl.value = parseNumbers(numberFromUrl)[0] || "";
+    if (!bulkSelected.size) {
+      currentCampaignId = "";
+      currentCampaignVaccineCode = "";
+      currentCampaignProgramMode = "";
+
+      msg(
+        "✅ تم تنفيذ هذه الحملة بالكامل.",
+        "info"
+      );
+
+      if (saveBtn) {
+        saveBtn.disabled = true;
+      }
+
+      applyModeUI();
+      updateContext();
+      renderProgramChoice();
+      return;
     }
 
-   applyModeUI();
-   updateContext();
-   renderProgramChoice();
-      runServerGate("page_load");
-
+  } else {
+    currentCampaignId = "";
+    currentCampaignVaccineCode = "";
+    currentCampaignProgramMode = "";
   }
+
+  const effectiveVaccine =
+    String(
+      campaignData?.vaccineCode ||
+      vaccine ||
+      ""
+    ).trim();
+
+  if (
+    vaccineEl &&
+    effectiveVaccine
+  ) {
+    let selectedVaccine =
+      effectiveVaccine;
+
+    let found =
+      [...vaccineEl.options].some(
+        option =>
+          option.value === selectedVaccine
+      );
+
+    // توافق مع روابط التنبيهات القديمة
+    // التي كانت ترسل programRowId.
+    if (
+      !found &&
+      usesExecutionProgramMode(
+        getProgramMode()
+      )
+    ) {
+      const legacyRow =
+        executionProgramRows.find(
+          row =>
+            String(
+              row?.programRowId || ""
+            ).trim() ===
+              effectiveVaccine
+        );
+
+      const legacyVaccineCode =
+        String(
+          legacyRow?.vaccineCode || ""
+        ).trim();
+
+      if (legacyVaccineCode) {
+        selectedVaccine =
+          legacyVaccineCode;
+
+        found =
+          [...vaccineEl.options].some(
+            option =>
+              option.value ===
+                selectedVaccine
+          );
+      }
+    }
+
+    if (found) {
+      vaccineEl.value =
+        selectedVaccine;
+
+      syncExecutionProgramSelection();
+    }
+  }
+
+  if (
+    vaccineFormEl &&
+    vaccineForm &&
+    [...vaccineFormEl.options].some(
+      option =>
+        option.value === vaccineForm
+    )
+  ) {
+    vaccineFormEl.value =
+      vaccineForm;
+  }
+
+  const effectiveDoseType =
+    String(
+      campaignData?.doseType ||
+      doseType ||
+      ""
+    ).trim();
+
+  if (
+    doseTypeEl &&
+    [...doseTypeEl.options].some(
+      option =>
+        option.value ===
+          effectiveDoseType
+    )
+  ) {
+    doseTypeEl.value =
+      effectiveDoseType;
+  }
+
+  if (
+    !requestedCampaignId &&
+    numbersFromUrl
+  ) {
+    for (
+      const n of
+      parseNumbers(numbersFromUrl)
+    ) {
+      bulkSelected.add(n);
+    }
+  }
+
+  if (
+    animalNumberEl &&
+    !requestedCampaignId &&
+    !numbersFromUrl
+  ) {
+    animalNumberEl.value =
+      parseNumbers(numberFromUrl)[0] ||
+      "";
+  }
+
+  applyModeUI();
+  updateContext();
+  renderProgramChoice();
+
+  runServerGate("page_load");
+}
 
   dashBtn?.addEventListener("click", () => {
     location.href = "dashboard.html";
