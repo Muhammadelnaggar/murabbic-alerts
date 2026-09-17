@@ -93316,27 +93316,35 @@ function isGroupRebuildEventSrv(e = {}) {
 
 function shouldAppearInGroupsSrv(a = {}) {
   const txt = [
-  a?.status,
-  a?.animalStatus,
-  a?.statusAr,
-  a?.saleStatus,
-  a?.lifeStatus,
-  a?.exitReason
-].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
+    a?.status,
+    a?.animalStatus,
+    a?.statusAr,
+    a?.saleStatus,
+    a?.lifeStatus,
+    a?.exitReason
+  ]
+    .map(v =>
+      String(v ?? "")
+        .trim()
+        .toLowerCase()
+    )
+    .join(" ");
 
   if (a?.active === false) return false;
   if (a?.isActive === false) return false;
   if (a?.inactive === true) return false;
+  if (a?.archived === true) return false;
 
-  if (txt.includes('inactive')) return false;
-  if (txt.includes('dead')) return false;
-  if (txt.includes('sold')) return false;
-  if (txt.includes('نافق')) return false;
-  if (txt.includes('نفوق')) return false;
-  if (txt.includes('مباع')) return false;
-  if (txt.includes('بيع')) return false;
-  if (txt.includes('غير نشط')) return false;
-  if (txt.includes('خارج القطيع')) return false;
+  if (txt.includes("inactive")) return false;
+  if (txt.includes("archived")) return false;
+  if (txt.includes("dead")) return false;
+  if (txt.includes("sold")) return false;
+  if (txt.includes("نافق")) return false;
+  if (txt.includes("نفوق")) return false;
+  if (txt.includes("مباع")) return false;
+  if (txt.includes("بيع")) return false;
+  if (txt.includes("غير نشط")) return false;
+  if (txt.includes("خارج القطيع")) return false;
 
   return true;
 }
@@ -94057,22 +94065,42 @@ async function loadAnimalsForGroupsSrv(tenant) {
   }
 
   try {
-    const snap = await db.collection('calves').where('userId', '==', tenant).limit(5000).get();
-    snap.forEach(d => rows.push({
-      id:d.id,
-      _source:'calves',
-      _sourceRank:2,
+  const snap =
+    await db
+      .collection("calves")
+      .where("userId", "==", tenant)
+      .limit(5000)
+      .get();
+
+  snap.forEach(d =>
+    rows.push({
+      id: d.id,
+      _source: "calves",
+      _sourceRank: 2,
       ...(d.data() || {}),
-      animalNumber: d.data()?.calfNumber || d.data()?.animalNumber || d.id,
+
+      animalNumber:
+        d.data()?.calfNumber ||
+        d.data()?.animalNumber ||
+        d.data()?.number ||
+        "",
+
       isCalf: true
-    }));
-  } catch (_) {}
+    })
+  );
+} catch (_) {}
 
    const clean = rows.filter(shouldAppearInGroupsSrv);
   const byNumber = new Map();
 
   for (const r of clean) {
-    const n = normGroupNumberSrv(r?.animalNumber ?? r?.number ?? r?.calfNumber ?? r?.id ?? '');
+    const n =
+  normGroupNumberSrv(
+    r?.animalNumber ||
+    r?.number ||
+    r?.calfNumber ||
+    ""
+  );
     if (!n) continue;
 
     const row = { ...r, animalNumber: n, number: n };
