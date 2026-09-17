@@ -50713,6 +50713,8 @@ function vaccinationBuildProgramTaskWriteSrv({
     campaignId:
       String(campaignId || "").trim(),
 
+    campaignDueDate: "",
+
     sourceEventId:
       String(eventId || "").trim(),
 
@@ -61880,6 +61882,911 @@ const alertStatus =
   ];
 }
 // ============================================================
+//              VACCINATION HERD CAMPAIGNS — SERVER FIRST
+// ============================================================
+function vaccinationCampaignIdSrv({
+  uid = "",
+  programMode = "",
+  vaccineCode = "",
+  dueDate = ""
+} = {}) {
+  const raw = [
+    String(uid || "").trim(),
+    vaccinationProgramModeNormSrv(programMode),
+    vaccinationTextKeySrv(vaccineCode),
+    String(dueDate || "").trim().slice(0, 10)
+  ].join("|");
+
+  const hash = crypto
+    .createHash("sha256")
+    .update(raw)
+    .digest("hex")
+    .slice(0, 32);
+
+  return `vax_campaign__${hash}`;
+}
+
+function vaccinationCampaignPeriodicStepSrv(row = {}) {
+  const steps = Array.isArray(row?.doseSchedule)
+    ? row.doseSchedule
+    : [];
+
+  return steps.find(step =>
+    String(step?.doseType || "").trim() === "periodic" &&
+    String(step?.timingBasis || "").trim() === "repeat" &&
+    Number(step?.timingValue || 0) > 0 &&
+    String(step?.timingUnit || "").trim()
+  ) || null;
+}
+
+function vaccinationCampaignTaskMatchesSrv({
+  task = {},
+  programMode = "",
+  vaccineCode = ""
+} = {}) {
+  return Boolean(
+    String(task.taskType || "").trim() === "vaccination" &&
+    String(task.engine || "").trim() ===
+      "vaccination_program_v1" &&
+    vaccinationTaskPendingSrv(task) &&
+    vaccinationProgramModeNormSrv(task.programMode) ===
+      vaccinationProgramModeNormSrv(programMode) &&
+    String(task.doseType || "").trim() === "periodic" &&
+    vaccinationTextKeySrv(
+      task.vaccineCode ||
+      task.vaccineKey ||
+      ""
+    ) ===
+      vaccinationTextKeySrv(vaccineCode)
+  );
+}
+
+function vaccinationCampaignTaskWindowStartSrv({
+  task = {},
+  timingPolicy = {}
+} = {}) {
+  const stored =
+    String(task.windowStart || "")
+      .trim()
+      .slice(0, 10);
+
+  if (
+    /^\d{4}-\d{2}-\d{2}$/.test(stored)
+  ) {
+    return stored;
+  }
+
+  const dueDate =
+    String(task.dueDate || "")
+      .trim()
+      .slice(0, 10);
+
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      dueDate
+    )
+  ) {
+    return "";
+  }
+
+  return vaccinationYmdAddDaysSrv(
+    dueDate,
+    -Number(
+      timingPolicy.executionWindowDays ||
+      0
+    )
+  );
+}
+
+async function vaccinationCampaignDashboardAlertsSrv({
+  uid = "",
+  programContext = {},
+  executionProgram = {},
+  taskDocs = [],
+  today = "",
+  isAnimalActive = null
+} = {}) {
+  const tenant =
+    tenantKey(uid);
+
+  const programMode =
+    vaccinationProgramModeNormSrv(
+      programContext.programMode
+    );
+
+  if (
+    !db ||
+    !tenant ||
+    !programMode ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      today
+    )
+  ) {
+    return [];
+  }
+
+  const timingPolicy =
+    vaccinationDoseTimingPolicySrv(
+      "periodic"
+    );
+
+  const periodicByVaccine =
+    new Map();
+
+  for (
+    const ds of
+    Array.isArray(taskDocs)
+      ? taskDocs
+      : []
+  ) {
+    const task =
+      ds?.data
+        ? (ds.data() || {})
+        : (ds || {});
+
+    const vaccineCode =
+      String(
+        task.vaccineCode ||
+        task.vaccineKey ||
+        ""
+      ).trim();
+
+    if (
+      !vaccineCode ||
+      !vaccinationCampaignTaskMatchesSrv({
+        task,
+        programMode,
+        vaccineCode
+      })
+    ) {
+      continue;
+    }
+
+    const animalNumber =
+      calvingNormDigitsOnlySrv(
+        task.animalNumber || ""
+      );
+
+    const dueDate =
+      String(task.dueDate || "")
+        .trim()
+        .slice(0, 10);
+
+    if (
+      !animalNumber ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        dueDate
+      )
+    ) {
+      continue;
+    }
+
+    if (
+      typeof isAnimalActive ===
+        "function" &&
+      !(
+        await isAnimalActive(
+          animalNumber
+        )
+      )
+    ) {
+      continue;
+    }
+
+    if (
+      !periodicByVaccine.has(
+        vaccineCode
+      )
+    ) {
+      periodicByVaccine.set(
+        vaccineCode,
+        []
+      );
+    }
+
+    periodicByVaccine
+      .get(vaccineCode)
+      .push({
+        ref:
+          ds.ref,
+
+        taskId:
+          ds.id || "",
+
+        animalNumber,
+
+        dueDate,
+
+        windowStart:
+          vaccinationCampaignTaskWindowStartSrv({
+            task,
+            timingPolicy
+          }),
+
+        campaignId:
+          String(
+            task.campaignId || ""
+          ).trim(),
+
+        campaignDueDate:
+          String(
+            task.campaignDueDate || ""
+          )
+            .trim()
+            .slice(0, 10),
+
+        programSection:
+          String(
+            task.programSection || ""
+          )
+            .trim()
+            .toLowerCase(),
+
+        vaccine:
+          String(
+            task.vaccine ||
+            vaccineCode
+          ).trim()
+      });
+  }
+
+  const herdRows =
+    new Map();
+
+  for (
+    const row of
+    Array.isArray(
+      executionProgram.rows
+    )
+      ? executionProgram.rows
+      : []
+  ) {
+    if (
+      !row ||
+      row.active === false
+    ) {
+      continue;
+    }
+
+    const vaccineCode =
+      String(
+        row.vaccineCode || ""
+      ).trim();
+
+    const programSection =
+      String(
+        row.programSection || ""
+      )
+        .trim()
+        .toLowerCase();
+
+    const periodicStep =
+      vaccinationCampaignPeriodicStepSrv(
+        row
+      );
+
+    if (
+      programSection !== "herd" ||
+      !vaccineCode ||
+      !periodicStep
+    ) {
+      continue;
+    }
+
+    if (
+      !herdRows.has(vaccineCode)
+    ) {
+      herdRows.set(
+        vaccineCode,
+        row
+      );
+    }
+  }
+
+  const alerts = [];
+
+  for (
+    const [
+      vaccineCode,
+      herdRow
+    ] of herdRows
+  ) {
+    const tasks =
+      periodicByVaccine.get(
+        vaccineCode
+      ) || [];
+
+    if (!tasks.length) {
+      continue;
+    }
+
+    let campaignDueDate = "";
+    let campaignId = "";
+
+    const openCampaignDates = [
+      ...new Set(
+        tasks
+          .filter(item =>
+            /^\d{4}-\d{2}-\d{2}$/.test(
+              item.campaignDueDate
+            ) &&
+            item.campaignId ===
+              vaccinationCampaignIdSrv({
+                uid: tenant,
+                programMode,
+                vaccineCode,
+
+                dueDate:
+                  item.campaignDueDate
+              })
+          )
+          .map(item =>
+            item.campaignDueDate
+          )
+      )
+    ].sort();
+
+    if (
+      openCampaignDates.length
+    ) {
+      campaignDueDate =
+        openCampaignDates[0];
+
+      campaignId =
+        vaccinationCampaignIdSrv({
+          uid: tenant,
+          programMode,
+          vaccineCode,
+
+          dueDate:
+            campaignDueDate
+        });
+
+    } else {
+      const herdDueDates =
+        tasks
+          .filter(item =>
+            item.programSection ===
+              "herd"
+          )
+          .map(item =>
+            item.dueDate
+          )
+          .filter(date =>
+            /^\d{4}-\d{2}-\d{2}$/.test(
+              date
+            )
+          )
+          .sort();
+
+      const allDueDates =
+        tasks
+          .map(item =>
+            item.dueDate
+          )
+          .filter(date =>
+            /^\d{4}-\d{2}-\d{2}$/.test(
+              date
+            )
+          )
+          .sort();
+
+      campaignDueDate =
+        herdDueDates[0] ||
+        allDueDates[0] ||
+        "";
+
+      if (!campaignDueDate) {
+        continue;
+      }
+
+      const alertFromDate =
+        vaccinationYmdAddDaysSrv(
+          campaignDueDate,
+          -timingPolicy.alertLeadDays
+        );
+
+      if (
+        today < alertFromDate
+      ) {
+        continue;
+      }
+
+      campaignId =
+        vaccinationCampaignIdSrv({
+          uid: tenant,
+          programMode,
+          vaccineCode,
+
+          dueDate:
+            campaignDueDate
+        });
+    }
+
+    const alertFromDate =
+      vaccinationYmdAddDaysSrv(
+        campaignDueDate,
+        -timingPolicy.alertLeadDays
+      );
+
+    if (
+      today < alertFromDate
+    ) {
+      continue;
+    }
+
+    const eligibilityReferenceDate =
+      today > campaignDueDate
+        ? today
+        : campaignDueDate;
+
+    const remaining = [];
+    const writes = [];
+
+    for (const item of tasks) {
+      const isCurrentMember =
+        item.campaignId ===
+          campaignId &&
+        item.campaignDueDate ===
+          campaignDueDate;
+
+      // الحيوان الذي نُفذت له
+      // الحملة الحالية لا يدخلها مرة ثانية.
+      //
+      // الـTask التالي يحتفظ بـcampaignId
+      // لكن campaignDueDate تكون فارغة.
+      const completedCurrentCampaign =
+        item.campaignId ===
+          campaignId &&
+        !item.campaignDueDate;
+
+      if (
+        completedCurrentCampaign
+      ) {
+        continue;
+      }
+
+      // الحملة لا تغيّر موعد الحيوان.
+      // ندخله فقط عندما تكون نافذة
+      // تنفيذه الأصلية قد بدأت.
+      const eligibleForCampaign =
+        /^\d{4}-\d{2}-\d{2}$/.test(
+          item.windowStart
+        ) &&
+        eligibilityReferenceDate >=
+          item.windowStart;
+
+      if (
+        !isCurrentMember &&
+        !eligibleForCampaign
+      ) {
+        continue;
+      }
+
+      remaining.push(item);
+
+      if (!isCurrentMember) {
+        writes.push({
+          ref:
+            item.ref,
+
+          payload: {
+            campaignId,
+
+            campaignDueDate,
+
+            campaignJoinedAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp(),
+
+            updatedAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp()
+          }
+        });
+      }
+    }
+
+    if (!remaining.length) {
+      continue;
+    }
+
+    let batch =
+      db.batch();
+
+    let operations = 0;
+
+    for (
+      const write of writes
+    ) {
+      batch.set(
+        write.ref,
+        write.payload,
+        {
+          merge: true
+        }
+      );
+
+      operations += 1;
+
+      if (
+        operations >= 400
+      ) {
+        await batch.commit();
+
+        batch =
+          db.batch();
+
+        operations = 0;
+      }
+    }
+
+    if (
+      operations > 0
+    ) {
+      await batch.commit();
+    }
+
+    const nums = [
+      ...new Set(
+        remaining.map(
+          item =>
+            item.animalNumber
+        )
+      )
+    ].sort(
+      (a, b) =>
+        Number(a) -
+        Number(b)
+    );
+
+    const vaccine =
+      String(
+        herdRow.vaccine ||
+        herdRow.vaccineName ||
+        remaining[0]?.vaccine ||
+        vaccineCode
+      ).trim();
+
+    const overdue =
+      today >
+        campaignDueDate;
+
+    alerts.push({
+      id:
+        campaignId,
+
+      source:
+        "server:/api/vaccination/dashboard-alerts",
+
+      type:
+        "vaccination",
+
+      level:
+        overdue
+          ? "warn"
+          : "info",
+
+      status:
+        overdue
+          ? "overdue"
+          : "upcoming",
+
+      alertKind:
+        "vaccination_herd_campaign",
+
+      title:
+        "حملة تحصين القطيع",
+
+      message:
+        overdue
+          ? (
+              `لديك حملة «${vaccine}» للقطيع متأخرة عن موعدها ${campaignDueDate}.\n` +
+              `المتبقي للتنفيذ: ${nums.length} حيوان.`
+            )
+          : (
+              `لديك حملة «${vaccine}» للقطيع وموعدها ${campaignDueDate}.\n` +
+              `الحيوانات المستهدفة المتبقية: ${nums.length}.`
+            ),
+
+      actionText:
+        "تنفيذ حملة التحصين",
+
+      actionUrl:
+        `vaccination.html?entryMode=bulk` +
+        `&date=${encodeURIComponent(today)}` +
+        `&campaignId=${encodeURIComponent(campaignId)}` +
+        `&vaccineCode=${encodeURIComponent(vaccineCode)}` +
+        `&doseType=periodic`,
+
+      dueDate:
+        campaignDueDate,
+
+      alertFromDate,
+
+      windowEnd: "",
+
+      expectedCalvingDate: "",
+
+      programMode,
+
+      programLabel:
+        String(
+          programContext
+            .programLabel ||
+          (
+            programMode === "farm"
+              ? "برنامج المزرعة"
+              : "برنامج مُرَبِّيك"
+          )
+        ).trim(),
+
+      programRowId: "",
+
+      vaccineCode,
+
+      vaccine,
+
+      vaccineKey:
+        vaccineCode ||
+        vaccine,
+
+      doseType:
+        "periodic",
+
+      doseTypeLabel:
+        "جرعة دورية",
+
+      attentionCode: "",
+
+      attentionMessage: "",
+
+      requiredField: "",
+
+      campaignId,
+
+      campaignDueDate,
+
+      animalNumbers:
+        nums,
+
+      taskIds:
+        remaining
+          .map(item =>
+            item.taskId
+          )
+          .filter(Boolean),
+
+      count:
+        nums.length
+    });
+  }
+
+  return alerts;
+}
+
+app.get(
+  "/api/vaccination/campaign/open",
+  requireUserId,
+  async (req, res) => {
+    try {
+      const uid =
+        req.userId;
+
+      const campaignId =
+        String(
+          req.query?.campaignId ||
+          ""
+        ).trim();
+
+      const vaccineCode =
+        String(
+          req.query?.vaccineCode ||
+          ""
+        ).trim();
+
+      const programContext =
+        await vaccinationReadProgramContextSrv(
+          uid
+        );
+
+      const programMode =
+        vaccinationProgramModeNormSrv(
+          programContext.programMode
+        );
+
+      if (
+        !campaignId ||
+        !vaccineCode ||
+        !programMode
+      ) {
+        return res
+          .status(400)
+          .json({
+            ok: false,
+
+            error:
+              "vaccination_campaign_invalid",
+
+            message:
+              "❌ تعذّر تحديد حملة التحصين الحالية."
+          });
+      }
+
+      const snap =
+        await db
+          .collection("tasks")
+          .where(
+            "userId",
+            "==",
+            uid
+          )
+          .where(
+            "status",
+            "==",
+            "pending"
+          )
+          .limit(500)
+          .get();
+
+      const matching =
+        snap.docs
+          .map(ds =>
+            ds.data() || {}
+          )
+          .filter(task => {
+            if (
+              !vaccinationCampaignTaskMatchesSrv({
+                task,
+                programMode,
+                vaccineCode
+              }) ||
+
+              String(
+                task.campaignId ||
+                ""
+              ).trim() !==
+                campaignId
+            ) {
+              return false;
+            }
+
+            const campaignDueDate =
+              String(
+                task.campaignDueDate ||
+                ""
+              )
+                .trim()
+                .slice(0, 10);
+
+            return (
+              /^\d{4}-\d{2}-\d{2}$/.test(
+                campaignDueDate
+              ) &&
+
+              vaccinationCampaignIdSrv({
+                uid,
+                programMode,
+                vaccineCode,
+
+                dueDate:
+                  campaignDueDate
+              }) ===
+                campaignId
+            );
+          });
+
+      if (
+        !matching.length
+      ) {
+        return res
+          .status(409)
+          .json({
+            ok: false,
+
+            error:
+              "vaccination_campaign_completed",
+
+            message:
+              "✅ تم تنفيذ هذه الحملة أو لم تعد مفتوحة."
+          });
+      }
+
+      const campaignDueDate =
+        String(
+          matching[0]
+            .campaignDueDate ||
+          ""
+        )
+          .trim()
+          .slice(0, 10);
+
+      const animalNumbers = [
+        ...new Set(
+          matching
+            .filter(task =>
+              String(
+                task.campaignDueDate ||
+                ""
+              )
+                .trim()
+                .slice(0, 10) ===
+                  campaignDueDate
+            )
+            .map(task =>
+              calvingNormDigitsOnlySrv(
+                task.animalNumber ||
+                ""
+              )
+            )
+            .filter(Boolean)
+        )
+      ].sort(
+        (a, b) =>
+          Number(a) -
+          Number(b)
+      );
+
+      if (
+        !animalNumbers.length
+      ) {
+        return res
+          .status(409)
+          .json({
+            ok: false,
+
+            error:
+              "vaccination_campaign_completed",
+
+            message:
+              "✅ تم تنفيذ هذه الحملة بالكامل."
+          });
+      }
+
+      return res.json({
+        ok: true,
+
+        campaignId,
+
+        vaccineCode,
+
+        doseType:
+          "periodic",
+
+        dueDate:
+          campaignDueDate,
+
+        campaignDueDate,
+
+        animalNumbers,
+
+        count:
+          animalNumbers.length
+      });
+
+    } catch (e) {
+      console.error(
+        "vaccination-campaign-open",
+        e
+      );
+
+      return res
+        .status(500)
+        .json({
+          ok: false,
+
+          error:
+            "vaccination_campaign_read_failed",
+
+          message:
+            "❌ تعذّر تحميل حملة التحصين الآن. حاول مرة أخرى."
+        });
+    }
+  }
+);
+// ============================================================
 //                 API: VACCINATION DASHBOARD ALERTS ONLY
 //                 تنبيهات التحصين من السيرفر فقط — للداشبورد
 // ============================================================
@@ -61942,13 +62849,20 @@ const programContext =
           due: 0,
           dayBefore: 0,
           upcoming: 0,
-          needsData: 0
+          needsData: 0,
+          campaigns: 0
         },
 
         message:
           "اختر برنامج المزرعة أو برنامج مُرَبِّيك لتفعيل تنبيهات التحصين."
       };
     }
+
+        const executionProgram =
+      await vaccinationReadExecutionProgramSrv(
+        uid,
+        activeProgramMode
+      );
 
     const [
       pendingSnap,
@@ -62016,8 +62930,20 @@ const programContext =
           active
         );
 
-        return active;
+            return active;
       };
+
+    const herdCampaignAlerts =
+      await vaccinationCampaignDashboardAlertsSrv({
+        uid,
+        programContext,
+        executionProgram,
+        taskDocs:
+          pendingSnap.docs,
+        today,
+        isAnimalActive:
+          vaccinationAlertAnimalIsActive
+      });
 
     for (
       const ds of [
@@ -62352,13 +63278,15 @@ const key = [
     }
     const alerts = [];
 
-   const summary = {
+     const summary = {
       overdue: 0,
       due: 0,
       dayBefore: 0,
       upcoming: 0,
       initialAgeReady: 0,
-      needsData: 0
+      needsData: 0,
+      campaigns:
+        herdCampaignAlerts.length
     };
 
     for (
@@ -62645,7 +63573,11 @@ if (
         count:
           nums.length
       });
-    }
+       }
+
+    alerts.push(
+      ...herdCampaignAlerts
+    );
 
      const statusRank = {
       overdue: 0,
