@@ -62697,74 +62697,105 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
     };
   }
 
-  const periodicSavedNumbers =
-    [
-      ...new Set(
-        (
-          Array.isArray(saved)
-            ? saved
-            : []
-        )
-          .filter(item =>
-            String(
-              item?.doseType || ""
-            )
-              .trim()
-              .toLowerCase() ===
-                "periodic"
-          )
-          .map(item =>
-            calvingNormDigitsOnlySrv(
-              item?.animalNumber ||
-              ""
-            )
-          )
-          .filter(Boolean)
-      )
-    ];
-
-  if (!periodicSavedNumbers.length) {
-    return {
-      ok: true,
-      updated: false,
-      complete: false,
-      targetCount: 0
-    };
-  }
-
-  const members =
-    await vaccinationCampaignEligibleMembersSrv({
-      uid:
-        tenant,
-
-      programContext,
-      executionProgram,
-
-      vaccineCode:
-        code,
-
-      campaignDate:
-        dt,
-
-      // هؤلاء تم تنفيذ الجرعة الدورية لهم الآن
-      // كجزء من الحملة الحالية نفسها.
-      includeReadyNumbers:
-        periodicSavedNumbers
-    });
-
-  if (!members.length) {
-    return {
-      ok: true,
-      updated: false,
-      complete: false,
-      targetCount: 0
-    };
-  }
-
     const covered =
     new Set(
-      periodicSavedNumbers
+      (
+        Array.isArray(saved)
+          ? saved
+          : []
+      )
+        .filter(item =>
+          String(
+            item?.doseType || ""
+          )
+            .trim()
+            .toLowerCase() ===
+              "periodic"
+        )
+        .map(item =>
+          calvingNormDigitsOnlySrv(
+            item?.animalNumber ||
+            ""
+          )
+        )
+        .filter(Boolean)
     );
+
+  // أول حملة قد تُحفَظ على أكثر من طلب
+  // مثل الأمهات ثم التوابع.
+  // مصدر الحقيقة هو التنفيذ الفعلي المحفوظ
+  // لنفس اللقاح ونفس التاريخ.
+  const sameDayEventsSnap =
+    await db
+      .collection("events")
+      .where(
+        "userId",
+        "==",
+        tenant
+      )
+      .where(
+        "eventDate",
+        "==",
+        dt
+      )
+      .get();
+
+  for (
+    const ds of
+    sameDayEventsSnap.docs
+  ) {
+    const event =
+      ds.data() || {};
+
+    const eventType =
+      String(
+        event.type ||
+        event.eventType ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+    const eventProgramMode =
+      vaccinationProgramModeNormSrv(
+        event.vaccinationProgramMode ||
+        event.programMode ||
+        ""
+      );
+
+    const eventDoseType =
+      String(
+        event.doseType || ""
+      )
+        .trim()
+        .toLowerCase();
+
+    if (
+      !(
+        eventType === "vaccination" ||
+        eventType === "تحصين"
+      ) ||
+      eventProgramMode !== mode ||
+      vaccinationTextKeySrv(
+        event.vaccineCode || ""
+      ) !==
+        vaccinationTextKeySrv(code) ||
+      eventDoseType !== "periodic"
+    ) {
+      continue;
+    }
+
+    const animalNumber =
+      calvingNormDigitsOnlySrv(
+        event.animalNumber || ""
+      );
+
+    if (animalNumber) {
+      covered.add(
+        animalNumber
+      );
+    }
+  }
 
   for (
     const item of
@@ -62795,6 +62826,45 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
         covered.add(n);
       }
     }
+  }
+
+  if (!covered.size) {
+    return {
+      ok: true,
+      updated: false,
+      complete: false,
+      targetCount: 0
+    };
+  }
+
+  const members =
+    await vaccinationCampaignEligibleMembersSrv({
+      uid:
+        tenant,
+
+      programContext,
+      executionProgram,
+
+      vaccineCode:
+        code,
+
+      campaignDate:
+        dt,
+
+      // كل من تم تحصينه فعليًا في يوم الحملة
+      // يدخل الحساب حتى لو تم الحفظ
+      // على أكثر من Request.
+      includeReadyNumbers:
+        [...covered]
+    });
+
+  if (!members.length) {
+    return {
+      ok: true,
+      updated: false,
+      complete: false,
+      targetCount: 0
+    };
   }
 
   const missing =
