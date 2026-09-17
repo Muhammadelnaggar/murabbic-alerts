@@ -62325,7 +62325,8 @@ async function vaccinationCampaignEligibleMembersSrv({
   programContext = {},
   executionProgram = {},
   vaccineCode = "",
-  campaignDate = ""
+  campaignDate = "",
+  includeReadyNumbers = []
 } = {}) {
   const tenant =
     tenantKey(uid);
@@ -62346,6 +62347,19 @@ async function vaccinationCampaignEligibleMembersSrv({
     )
       .trim()
       .slice(0, 10);
+
+  const includeReadySet =
+    new Set(
+      (
+        Array.isArray(includeReadyNumbers)
+          ? includeReadyNumbers
+          : []
+      )
+        .map(value =>
+          calvingNormDigitsOnlySrv(value)
+        )
+        .filter(Boolean)
+    );
 
   if (
     !db ||
@@ -62588,7 +62602,10 @@ async function vaccinationCampaignEligibleMembersSrv({
       /^\d{4}-\d{2}-\d{2}$/.test(
         readyAfter
       ) &&
-      dt <= readyAfter
+      dt <= readyAfter &&
+      !includeReadySet.has(
+        animalNumber
+      )
     ) {
       continue;
     }
@@ -62680,6 +62697,41 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
     };
   }
 
+  const periodicSavedNumbers =
+    [
+      ...new Set(
+        (
+          Array.isArray(saved)
+            ? saved
+            : []
+        )
+          .filter(item =>
+            String(
+              item?.doseType || ""
+            )
+              .trim()
+              .toLowerCase() ===
+                "periodic"
+          )
+          .map(item =>
+            calvingNormDigitsOnlySrv(
+              item?.animalNumber ||
+              ""
+            )
+          )
+          .filter(Boolean)
+      )
+    ];
+
+  if (!periodicSavedNumbers.length) {
+    return {
+      ok: true,
+      updated: false,
+      complete: false,
+      targetCount: 0
+    };
+  }
+
   const members =
     await vaccinationCampaignEligibleMembersSrv({
       uid:
@@ -62692,7 +62744,12 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
         code,
 
       campaignDate:
-        dt
+        dt,
+
+      // هؤلاء تم تنفيذ الجرعة الدورية لهم الآن
+      // كجزء من الحملة الحالية نفسها.
+      includeReadyNumbers:
+        periodicSavedNumbers
     });
 
   if (!members.length) {
@@ -62704,20 +62761,9 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
     };
   }
 
-  const covered =
+    const covered =
     new Set(
-      (
-        Array.isArray(saved)
-          ? saved
-          : []
-      )
-        .map(item =>
-          calvingNormDigitsOnlySrv(
-            item?.animalNumber ||
-            ""
-          )
-        )
-        .filter(Boolean)
+      periodicSavedNumbers
     );
 
   for (
