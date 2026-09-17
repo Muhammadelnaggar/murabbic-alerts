@@ -94058,71 +94058,121 @@ async function loadAnimalsForGroupsSrv(tenant) {
   const rows = [];
 
   try {
-    const snap = await db.collection('animals').where('userId', '==', tenant).limit(5000).get();
-    snap.forEach(d => rows.push({ id:d.id, _source:'animals', _sourceRank:1, ...(d.data() || {}) }));
+    const snap = await db
+      .collection("animals")
+      .where("userId", "==", tenant)
+      .limit(5000)
+      .get();
+
+    snap.forEach(d =>
+      rows.push({
+        id: d.id,
+        _source: "animals",
+        _sourceRank: 1,
+        ...(d.data() || {})
+      })
+    );
   } catch (e) {
-    console.error('groups.auto animals load failed:', e.message || e);
+    console.error(
+      "groups.auto animals load failed:",
+      e.message || e
+    );
   }
 
   try {
-  const snap =
-    await db
+    const snap = await db
       .collection("calves")
       .where("userId", "==", tenant)
       .limit(5000)
       .get();
 
-  snap.forEach(d =>
-    rows.push({
-      id: d.id,
-      _source: "calves",
-      _sourceRank: 2,
-      ...(d.data() || {}),
+    snap.forEach(d =>
+      rows.push({
+        id: d.id,
+        _source: "calves",
+        _sourceRank: 2,
+        ...(d.data() || {}),
 
-      animalNumber:
-        d.data()?.calfNumber ||
-        d.data()?.animalNumber ||
-        d.data()?.number ||
-        "",
+        animalNumber:
+          d.data()?.calfNumber ||
+          d.data()?.animalNumber ||
+          d.data()?.number ||
+          "",
 
-      isCalf: true
-    })
-  );
-} catch (_) {}
+        isCalf: true
+      })
+    );
+  } catch (_) {}
 
-   const clean = rows.filter(shouldAppearInGroupsSrv);
+  // نحسم السجل الرسمي أولًا قبل فلترة النشاط.
+  // لو نفس الرقم موجود في animals و calves،
+  // تكون أولوية animals مثل الـGate الرسمي.
   const byNumber = new Map();
 
-  for (const r of clean) {
+  for (const r of rows) {
     const n =
-  normGroupNumberSrv(
-    r?.animalNumber ||
-    r?.number ||
-    r?.calfNumber ||
-    ""
-  );
+      normGroupNumberSrv(
+        r?.animalNumber ||
+        r?.number ||
+        r?.calfNumber ||
+        ""
+      );
+
     if (!n) continue;
 
-    const row = { ...r, animalNumber: n, number: n };
-    const old = byNumber.get(n);
+    const row = {
+      ...r,
+      animalNumber: n,
+      number: n
+    };
+
+    const old =
+      byNumber.get(n);
 
     if (!old) {
       byNumber.set(n, row);
       continue;
     }
 
-    // نفس فكرة الصفحة: عند تكرار الرقم بين animals و calves
-    // نحافظ على بيانات الطرفين، مع تفضيل سجل animals عند وجوده.
-    if (old._source === 'calves' && row._source === 'animals') {
-      byNumber.set(n, { ...old, ...row, animalNumber: n, number: n });
-    } else if (old._source === 'animals' && row._source === 'calves') {
-      byNumber.set(n, { ...row, ...old, animalNumber: n, number: n });
-    } else {
-      byNumber.set(n, { ...old, ...row, animalNumber: n, number: n });
+    if (
+      old._source === "calves" &&
+      row._source === "animals"
+    ) {
+      byNumber.set(n, {
+        ...old,
+        ...row,
+        animalNumber: n,
+        number: n
+      });
+
+      continue;
     }
+
+    if (
+      old._source === "animals" &&
+      row._source === "calves"
+    ) {
+      byNumber.set(n, {
+        ...row,
+        ...old,
+        animalNumber: n,
+        number: n
+      });
+
+      continue;
+    }
+
+    byNumber.set(n, {
+      ...old,
+      ...row,
+      animalNumber: n,
+      number: n
+    });
   }
 
-  return [...byNumber.values()];
+  return [...byNumber.values()].filter(
+    shouldAppearInGroupsSrv
+  );
 }
 
 async function enrichAnimalsForGroupsSrv(tenant, list = []) {
