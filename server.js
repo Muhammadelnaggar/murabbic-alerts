@@ -95453,6 +95453,30 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
 
   return g;
 }
+async function loadGroupThresholdsSrv(tenant) {
+  const d = {
+    cowLowMin:0.1,  cowLowMax:19.9,
+    cowMedMin:20,   cowMedMax:24.9,
+    cowHighMin:25,
+    bufLowMin:0.1,  bufLowMax:7.9,
+    bufMedMin:8,    bufMedMax:11.9,
+    bufHighMin:12,
+    cowWeanedMax:5,
+    cowGrowingMax:12,
+    cowBreedingMin:11,
+    bufWeanedMax:5,
+    bufGrowingMax:12,
+    bufBreedingMin:11,
+    species:'cow'
+  };
+
+  try {
+    const ds = await db.collection('users').doc(tenant).collection('settings').doc('groups').get();
+    if (ds.exists) return { ...d, ...(ds.data()?.thresholds || {}) };
+  } catch (_) {}
+
+  return d;
+}
 async function loadAnimalsForGroupsSrv(tenant) {
   const rows = [];
 
