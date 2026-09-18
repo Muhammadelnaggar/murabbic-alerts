@@ -3337,107 +3337,91 @@ function renderServerResult(result = {}) {
   showWarn(lines.join("\n\n"));
 }
   async function submitVaccination(ev) {
-  ev?.preventDefault?.();
+    ev?.preventDefault?.();
     clearWarn();
 
     const payload = collectPayload();
-   
+
+    // الـGate تم بالفعل عند فتح الصفحة وعند كل تغيير في البيانات.
+    // Save يعيد التحقق Server-first قبل أي كتابة،
+    // لذلك لا نكرر Gate كاملًا هنا.
+    if (!lastGateAllowed) {
+      msg(
+        "انتظر اكتمال التحقق من بيانات التحصين قبل الحفظ.",
+        "info"
+      );
+      return;
+    }
 
     try {
       saveBtn.disabled = true;
-           msg("جارِ التحقق من التحصين…", "info");
 
-      const gate = await postJson("/api/vaccination/gate", payload);
+      msg(
+        "جارِ حفظ التحصين…",
+        "info"
+      );
 
-      renderProgramContext(gate);
-      syncDoseControlFromGate(gate);
-      if (
-  showDamVaccinationStatusQuestion(
-    gate,
-    "submit"
-  )
-) {
-  return;
-}
-
-if (!gate.ok || !gate.allowed) {
-  lastGateAllowed = false;
-
-  if (gate.silent === true) {
-    const bar =
-      document.getElementById("mbk-infobar") ||
-      document.getElementById("sysbar") ||
-      document.getElementById("infobar") ||
-      document.querySelector(".infobar");
-
-    if (bar) {
-      bar.className = "infobar mbk-infobar";
-      bar.style.display = "none";
-      bar.textContent = "";
-    }
-
-    renderServerResult(gate);
-
-    if (saveBtn) saveBtn.disabled = true;
-    return;
-  }
-
-msg(gate.message || "تعذّر عرض رد السيرفر.", "error");
-
-if (saveBtn) saveBtn.disabled = true;
-return;
-   }
-      const acceptedNumbers = Array.isArray(gate.accepted)
-        ? gate.accepted.map(x => String(x.animalNumber || "").trim()).filter(Boolean)
-        : [];
-      renderServerResult(gate);
-      if (!acceptedNumbers.length) {
-        msg("❌ لا يوجد أي رقم صالح لتسجيل التحصين.", "error");
-        return;
-      }
-
-      const savePayload = {
-        ...payload,
-        animalNumbers: acceptedNumbers,
-        accepted: gate.accepted || []
-      };
-
-      msg("جارِ حفظ التحصين…", "info");
-
-      const saved = await postJson("/api/vaccination/save", savePayload);
+      const saved =
+        await postJson(
+          "/api/vaccination/save",
+          payload
+        );
 
       renderProgramContext(saved);
 
-if (!saved.ok) {
-  msg(saved.message || "تعذّر حفظ التحصين.", "error");
-  renderServerResult(saved);
-  return;
-}
+      if (!saved.ok) {
+        msg(
+          saved.message ||
+            "تعذّر حفظ التحصين.",
+          "error"
+        );
+
+        renderServerResult(saved);
+        return;
+      }
 
       const successMsg =
-  saved.message ||
-  `✅ تم حفظ التحصين بنجاح لعدد ${saved.savedCount || acceptedNumbers.length}.`;
+        saved.message ||
+        `✅ تم حفظ التحصين بنجاح لعدد ${
+          saved.savedCount ||
+          payload.animalNumbers.length
+        }.`;
 
-msg(successMsg, "success");
-renderServerResult(saved);
-     const redirectUrl =
-  String(
-    saved.redirectUrl || ""
-  ).trim();
+      msg(
+        successMsg,
+        "success"
+      );
 
-if (redirectUrl) {
-  location.href = redirectUrl;
-  return;
-}
+      renderServerResult(saved);
+
+      const redirectUrl =
+        String(
+          saved.redirectUrl || ""
+        ).trim();
+
+      if (redirectUrl) {
+        location.href =
+          redirectUrl;
+
+        return;
+      }
 
     } catch (err) {
-      console.error("vaccination server-only save failed:", err);
-      msg("تعذّر الاتصال بالسيرفر أثناء حفظ التحصين.", "error");
-} finally {
-  if (lastGateAllowed) {
-    saveBtn.disabled = false;
-  }
-}
+      console.error(
+        "vaccination server-only save failed:",
+        err
+      );
+
+      msg(
+        "تعذّر الاتصال بالسيرفر أثناء حفظ التحصين.",
+        "error"
+      );
+
+    } finally {
+      if (lastGateAllowed) {
+        saveBtn.disabled = false;
+      }
+    }
   }
 async function runServerGate(reason = "page_load") {
   clearWarn();
