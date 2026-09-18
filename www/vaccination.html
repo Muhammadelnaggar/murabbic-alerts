@@ -1155,19 +1155,7 @@ async function prepareManualCampaignIfNeeded() {
         serverVaccineForm;
     }
 
-    fillServerSelect(
-      doseTypeEl,
-      [
-        {
-          value: "periodic",
-          label: "جرعة دورية"
-        }
-      ],
-      "يحددها مُرَبِّيك من الحملة",
-      "periodic"
-    );
-
-    doseTypeEl.disabled = true;
+   syncExecutionProgramSelection();
 
     applyModeUI();
     updateContext();
