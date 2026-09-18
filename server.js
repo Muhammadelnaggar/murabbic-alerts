@@ -50832,6 +50832,7 @@ function vaccinationBuildProgramTaskWriteSrv({
   eventId,
   campaignId = "",
   programContext = {},
+  executionProgram = {},
   programLink = {},
   doseType
 } = {}) {
@@ -51276,7 +51277,43 @@ function vaccinationBuildProgramTaskWriteSrv({
       ""
     ).trim();
 
+  const currentVaccineCode =
+    String(
+      programLink.vaccineCode || ""
+    ).trim();
+
+  const hasHerdCampaign =
+    currentVaccineCode &&
+    (
+      Array.isArray(executionProgram.rows)
+        ? executionProgram.rows
+        : []
+    ).some(row =>
+      row &&
+      row.active !== false &&
+      String(
+        row.programSection || ""
+      )
+        .trim()
+        .toLowerCase() === "herd" &&
+      vaccinationTextKeySrv(
+        row.vaccineCode || ""
+      ) ===
+        vaccinationTextKeySrv(
+          currentVaccineCode
+        ) &&
+      Boolean(
+        vaccinationCampaignPeriodicStepSrv(
+          row,
+          String(
+            programLink.vaccineForm || ""
+          ).trim()
+        )
+      )
+    );
+
   const waitForHerdCampaign =
+    hasHerdCampaign &&
     String(
       nextTask?.doseType ||
       ""
@@ -51287,6 +51324,29 @@ function vaccinationBuildProgramTaskWriteSrv({
         String(campaignId || "").trim()
       )
     );
+
+  const herdCampaignReadyDate =
+    waitForHerdCampaign
+      ? (
+          vaccinationCampaignJoinReadyDateSrv({
+            executionDate: eventDate,
+            dueDate:
+              String(
+                nextTask?.dueDate || ""
+              ).trim(),
+            programRow: programLink,
+            vaccineForm:
+              String(
+                programLink.vaccineForm || ""
+              ).trim()
+          }) ||
+          String(
+            nextTask?.dueDate || ""
+          )
+            .trim()
+            .slice(0, 10)
+        )
+      : "";
 
   const payload = {
     ...common,
@@ -51303,9 +51363,7 @@ function vaccinationBuildProgramTaskWriteSrv({
           doseType: "periodic",
 
           herdReadyAfterDate:
-            String(eventDate || "")
-              .trim()
-              .slice(0, 10),
+            herdCampaignReadyDate,
 
           joinHerdSchedule: true
         }
@@ -51782,6 +51840,7 @@ async function vaccinationReconcileProgramTasksSrv({
           ).trim(),
 
         programContext,
+        executionProgram,
         programLink,
         doseType: sourceDoseType
       });
@@ -52600,7 +52659,8 @@ doseTypeLabel:
 
       campaignId,
 
-      programContext,
+            programContext,
+      executionProgram,
       programLink,
 
       doseType:
@@ -62345,6 +62405,176 @@ function vaccinationCampaignPeriodicStepSrv(
     ).trim()
   ) || null;
 }
+function vaccinationCampaignJoinReadyDateSrv({
+  executionDate = "",
+  dueDate = "",
+  programRow = {},
+  vaccineForm = ""
+} = {}) {
+  const start =
+    String(executionDate || "")
+      .trim()
+      .slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) {
+    return "";
+  }
+
+  const periodicStep =
+    vaccinationCampaignPeriodicStepSrv(
+      programRow,
+      vaccineForm
+    );
+
+  const timingValue =
+    Number(
+      periodicStep?.timingValue || 0
+    );
+
+  const timingUnit =
+    String(
+      periodicStep?.timingUnit || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  if (
+    Number.isInteger(timingValue) &&
+    timingValue > 0 &&
+    (
+      timingUnit === "day" ||
+      timingUnit === "week"
+    )
+  ) {
+    const intervalDays =
+      timingUnit === "week"
+        ? timingValue * 7
+        : timingValue;
+
+    return vaccinationYmdAddDaysSrv(
+      start,
+      Math.ceil(
+        (intervalDays * 2) / 3
+      )
+    );
+  }
+
+  if (
+    Number.isInteger(timingValue) &&
+    timingValue > 0 &&
+    (
+      timingUnit === "month" ||
+      timingUnit === "year"
+    )
+  ) {
+    const intervalMonths =
+      timingUnit === "year"
+        ? timingValue * 12
+        : timingValue;
+
+    const scaledMonths =
+      (intervalMonths * 2) / 3;
+
+    const wholeMonths =
+      Math.floor(scaledMonths);
+
+    const fraction =
+      scaledMonths - wholeMonths;
+
+    const baseDate =
+      vaccinationYmdAddUnitSrv(
+        start,
+        wholeMonths,
+        "month"
+      );
+
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        baseDate
+      )
+    ) {
+      return "";
+    }
+
+    if (fraction <= 0) {
+      return baseDate;
+    }
+
+    const nextMonthDate =
+      vaccinationYmdAddUnitSrv(
+        start,
+        wholeMonths + 1,
+        "month"
+      );
+
+    const baseMs =
+      Date.parse(
+        `${baseDate}T00:00:00Z`
+      );
+
+    const nextMs =
+      Date.parse(
+        `${nextMonthDate}T00:00:00Z`
+      );
+
+    if (
+      !Number.isFinite(baseMs) ||
+      !Number.isFinite(nextMs) ||
+      nextMs <= baseMs
+    ) {
+      return baseDate;
+    }
+
+    const monthSpanDays =
+      Math.round(
+        (nextMs - baseMs) /
+        (24 * 60 * 60 * 1000)
+      );
+
+    return vaccinationYmdAddDaysSrv(
+      baseDate,
+      Math.ceil(
+        monthSpanDays * fraction
+      )
+    );
+  }
+
+  const due =
+    String(dueDate || "")
+      .trim()
+      .slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) {
+    return "";
+  }
+
+  const startMs =
+    Date.parse(`${start}T00:00:00Z`);
+
+  const dueMs =
+    Date.parse(`${due}T00:00:00Z`);
+
+  if (
+    !Number.isFinite(startMs) ||
+    !Number.isFinite(dueMs) ||
+    dueMs <= startMs
+  ) {
+    return "";
+  }
+
+  const intervalDays =
+    Math.round(
+      (dueMs - startMs) /
+      (24 * 60 * 60 * 1000)
+    );
+
+  return vaccinationYmdAddDaysSrv(
+    start,
+    Math.ceil(
+      (intervalDays * 2) / 3
+    )
+  );
+}
 
 function vaccinationCampaignTaskMatchesSrv({
   task = {},
@@ -62825,6 +63055,7 @@ async function vaccinationCampaignEligibleMembersSrv({
           "programRowId",
           "doseType",
           "herdReadyAfterDate",
+          "basedOnEventDate",
           "status",
           "done",
           "completedAt"
@@ -62851,6 +63082,7 @@ async function vaccinationCampaignEligibleMembersSrv({
           "programRowId",
           "doseType",
           "herdReadyAfterDate",
+          "basedOnEventDate",
           "status",
           "done",
           "completedAt"
@@ -63046,29 +63278,53 @@ async function vaccinationCampaignEligibleMembersSrv({
             return null;
           }
 
-          const readyAfter =
-            String(
-              currentTask
-                ?.herdReadyAfterDate ||
-              ""
-            )
-              .trim()
-              .slice(0, 10);
+        const storedReadyAfter =
+  String(
+    currentTask
+      ?.herdReadyAfterDate ||
+    ""
+  )
+    .trim()
+    .slice(0, 10);
 
-          if (
-            /^\d{4}-\d{2}-\d{2}$/.test(
-              dt
-            ) &&
-            /^\d{4}-\d{2}-\d{2}$/.test(
-              readyAfter
-            ) &&
-            dt <= readyAfter &&
-            !includeReadySet.has(
-              animalNumber
-            )
-          ) {
-            return null;
-          }
+const derivedReadyAfter =
+  currentTask
+    ? vaccinationCampaignJoinReadyDateSrv({
+        executionDate:
+          String(
+            currentTask
+              .basedOnEventDate ||
+            ""
+          )
+            .trim()
+            .slice(0, 10),
+
+        programRow:
+          programLink,
+
+        vaccineForm:
+          form
+      })
+    : "";
+
+const readyAfter =
+  derivedReadyAfter ||
+  storedReadyAfter;
+
+if (
+  /^\d{4}-\d{2}-\d{2}$/.test(
+    dt
+  ) &&
+  /^\d{4}-\d{2}-\d{2}$/.test(
+    readyAfter
+  ) &&
+  dt < readyAfter &&
+  !includeReadySet.has(
+    animalNumber
+  )
+) {
+  return null;
+}
 
           return {
             animalNumber,
@@ -63559,7 +63815,13 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
           ).trim(),
 
         herdReadyAfterDate:
-          dt,
+          vaccinationCampaignJoinReadyDateSrv({
+            executionDate: dt,
+            programRow:
+              member?.programLink || {},
+            vaccineForm:
+              campaignForm
+          }) || dt,
 
         joinHerdSchedule:
           true,
@@ -64783,7 +65045,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
         continue;
       }
 
-      const herdReadyAfterDate =
+        const storedHerdReadyAfterDate =
         String(
           currentTask
             ?.herdReadyAfterDate ||
@@ -64792,14 +65054,41 @@ async function vaccinationCampaignDashboardAlertsSrv({
           .trim()
           .slice(0, 10);
 
-      // لو الحيوان أنهى تأسيسه أو Booster
-      // في نفس يوم الحملة، لا يدخل هذه الحملة.
-      // يدخل أول حملة لاحقة فقط.
+      const derivedHerdReadyAfterDate =
+        currentTask
+          ? vaccinationCampaignJoinReadyDateSrv({
+              executionDate:
+                String(
+                  currentTask
+                    .basedOnEventDate ||
+                  ""
+                )
+                  .trim()
+                  .slice(0, 10),
+
+              programRow:
+                programLink,
+
+              vaccineForm:
+                String(
+                  programLink.vaccineForm ||
+                  ""
+                ).trim()
+            })
+          : "";
+
+      const herdReadyAfterDate =
+        derivedHerdReadyAfterDate ||
+        storedHerdReadyAfterDate;
+
+      // بعد التأسيس/Booster لا يدخل الحملة
+      // إلا إذا كان موعدها عند أو بعد ثلثي
+      // الـ interval الدوري المحدد في البرنامج.
       if (
         /^\d{4}-\d{2}-\d{2}$/.test(
           herdReadyAfterDate
         ) &&
-        campaignDueDate <=
+        campaignDueDate <
           herdReadyAfterDate
       ) {
         continue;
@@ -65706,7 +65995,61 @@ app.post(
             "❌ لا توجد جرعة دورية صالحة لهذا التحصين في البرنامج الحالي."
         });
       }
+            const existingSchedule =
+        await vaccinationCampaignReadScheduleSrv({
+          uid,
+          programMode,
+          vaccineCode
+        });
 
+      if (existingSchedule) {
+        const existingCampaignId =
+          vaccinationCampaignIdSrv({
+            uid,
+            programMode,
+            vaccineCode,
+            dueDate:
+              existingSchedule.dueDate
+          });
+
+        return res.status(409).json({
+          ok: false,
+          existingCampaign: true,
+          error:
+            "vaccination_campaign_already_scheduled",
+
+          campaignId:
+            existingCampaignId,
+
+          campaignDueDate:
+            existingSchedule.dueDate,
+
+          dueDate:
+            existingSchedule.dueDate,
+
+          lastExecutionDate:
+            existingSchedule.lastExecutionDate,
+
+          vaccineCode,
+
+          vaccineForm:
+            existingSchedule.vaccineForm ||
+            campaignForm,
+
+          vaccineFormLabel:
+            existingSchedule
+              .vaccineFormLabel ||
+            String(
+              effectiveHerdRow
+                .vaccineFormLabel ||
+              campaignForm ||
+              ""
+            ).trim(),
+
+          message:
+            `لديك حملة قائمة بالفعل لهذا التحصين في مُرَبِّيك، وموعدها القادم ${existingSchedule.dueDate}.`
+        });
+      }
       const members =
         await vaccinationCampaignEligibleMembersSrv({
           uid,
