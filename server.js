@@ -62762,6 +62762,39 @@ async function vaccinationCampaignEligibleMembersSrv({
     return [];
   }
 
+  const campaignRows =
+    (
+      Array.isArray(
+        executionProgram.rows
+      )
+        ? executionProgram.rows
+        : []
+    ).filter(row =>
+      String(
+        row?.vaccineCode || ""
+      ).trim() === code
+    );
+
+  if (!campaignRows.length) {
+    return [];
+  }
+
+  const campaignExecutionProgram = {
+    ...executionProgram,
+    rows: campaignRows
+  };
+
+  const campaignRowIds =
+    new Set(
+      campaignRows
+        .map(row =>
+          String(
+            row?.programRowId || ""
+          ).trim()
+        )
+        .filter(Boolean)
+    );
+
   const [
     herd,
     pendingSnap,
@@ -62784,6 +62817,18 @@ async function vaccinationCampaignEligibleMembersSrv({
           "==",
           "pending"
         )
+        .select(
+          "taskType",
+          "engine",
+          "programMode",
+          "animalNumber",
+          "programRowId",
+          "doseType",
+          "herdReadyAfterDate",
+          "status",
+          "done",
+          "completedAt"
+        )
         .get(),
 
       db
@@ -62797,6 +62842,18 @@ async function vaccinationCampaignEligibleMembersSrv({
           "status",
           "==",
           "needs_data"
+        )
+        .select(
+          "taskType",
+          "engine",
+          "programMode",
+          "animalNumber",
+          "programRowId",
+          "doseType",
+          "herdReadyAfterDate",
+          "status",
+          "done",
+          "completedAt"
         )
         .get()
     ]);
@@ -62847,167 +62904,188 @@ async function vaccinationCampaignEligibleMembersSrv({
       ).trim();
 
     if (
-      n &&
-      rowId
+      !n ||
+      !rowId ||
+      !campaignRowIds.has(rowId)
     ) {
-      openTaskIndex.set(
-        `${n}|${rowId}`,
-        task
-      );
+      continue;
     }
+
+    openTaskIndex.set(
+      `${n}|${rowId}`,
+      task
+    );
   }
 
   const members = [];
+  const eligibilityConcurrency = 32;
 
   for (
-    const animalDoc of
-    herd
+    let start = 0;
+    start < herd.length;
+    start += eligibilityConcurrency
   ) {
-    const animalNumber =
-      calvingNormDigitsOnlySrv(
-        animalDoc.animalNumber ||
-        animalDoc.number ||
-        ""
+    const chunk =
+      herd.slice(
+        start,
+        start + eligibilityConcurrency
       );
 
-    if (!animalNumber) {
-      continue;
-    }
+    const chunkMembers =
+      await Promise.all(
+        chunk.map(async animalDoc => {
+          const animalNumber =
+            calvingNormDigitsOnlySrv(
+              animalDoc.animalNumber ||
+              animalDoc.number ||
+              ""
+            );
 
-    const animalCollection =
-      String(
-        animalDoc._source || ""
-      ).trim() === "calves"
-        ? "calves"
-        : "animals";
+          if (!animalNumber) {
+            return null;
+          }
 
-    const programLink =
-      await vaccinationResolveProgramRowSrv({
-        uid: tenant,
+          const animalCollection =
+            String(
+              animalDoc._source || ""
+            ).trim() === "calves"
+              ? "calves"
+              : "animals";
 
-        programContext,
+          const programLink =
+            await vaccinationResolveProgramRowSrv({
+              uid: tenant,
 
-        body: {
-          programRowId: "",
-          vaccineCode: code,
-          vaccineForm: form,
-          doseType: "periodic"
-        },
+              programContext,
 
-        executionProgram,
-        animalDoc,
-        animalCollection
-      });
+              body: {
+                programRowId: "",
+                vaccineCode: code,
+                vaccineForm: form,
+                doseType: "periodic"
+              },
 
-    if (
-      programLink?.ok !== true ||
-      programLink?.linked !== true ||
-      !vaccinationCampaignPeriodicStepSrv(
-        programLink
-      )
+              executionProgram:
+                campaignExecutionProgram,
+
+              animalDoc,
+              animalCollection
+            });
+
+          if (
+            programLink?.ok !== true ||
+            programLink?.linked !== true ||
+            !vaccinationCampaignPeriodicStepSrv(
+              programLink
+            )
+          ) {
+            return null;
+          }
+
+          const scoped =
+            vaccinationScopedEligibilitySrv({
+              vaccineCode:
+                programLink.vaccineCode ||
+                code,
+
+              animalDoc,
+              animalCollection
+            });
+
+          if (
+            scoped?.allowed === false
+          ) {
+            return null;
+          }
+
+          const rowId =
+            String(
+              programLink.programRowId ||
+              ""
+            ).trim();
+
+          const currentTask =
+            rowId
+              ? (
+                  openTaskIndex.get(
+                    `${animalNumber}|${rowId}`
+                  ) ||
+                  null
+                )
+              : null;
+
+          const currentDoseType =
+            String(
+              currentTask?.doseType ||
+              ""
+            )
+              .trim()
+              .toLowerCase();
+
+          if (
+            currentDoseType &&
+            currentDoseType !==
+              "periodic"
+          ) {
+            return null;
+          }
+
+          const section =
+            String(
+              programLink.programSection ||
+              ""
+            )
+              .trim()
+              .toLowerCase();
+
+          if (
+            section === "calves" &&
+            currentDoseType !==
+              "periodic"
+          ) {
+            return null;
+          }
+
+          const readyAfter =
+            String(
+              currentTask
+                ?.herdReadyAfterDate ||
+              ""
+            )
+              .trim()
+              .slice(0, 10);
+
+          if (
+            /^\d{4}-\d{2}-\d{2}$/.test(
+              dt
+            ) &&
+            /^\d{4}-\d{2}-\d{2}$/.test(
+              readyAfter
+            ) &&
+            dt <= readyAfter &&
+            !includeReadySet.has(
+              animalNumber
+            )
+          ) {
+            return null;
+          }
+
+          return {
+            animalNumber,
+            programLink,
+            currentTask
+          };
+        })
+      );
+
+    for (
+      const member of
+      chunkMembers
     ) {
-      continue;
+      if (member) {
+        members.push(member);
+      }
     }
-
-    const scoped =
-      vaccinationScopedEligibilitySrv({
-        vaccineCode:
-          programLink.vaccineCode ||
-          code,
-
-        animalDoc,
-        animalCollection
-      });
-
-    if (
-      scoped?.allowed === false
-    ) {
-      continue;
-    }
-
-    const rowId =
-      String(
-        programLink.programRowId ||
-        ""
-      ).trim();
-
-    const currentTask =
-      rowId
-        ? (
-            openTaskIndex.get(
-              `${animalNumber}|${rowId}`
-            ) ||
-            null
-          )
-        : null;
-
-    const currentDoseType =
-      String(
-        currentTask?.doseType ||
-        ""
-      )
-        .trim()
-        .toLowerCase();
-
-    // لا يدخل حملة القطيع
-    // وهو ما زال في تأسيس أو Booster.
-    if (
-      currentDoseType &&
-      currentDoseType !==
-        "periodic"
-    ) {
-      continue;
-    }
-
-    const section =
-      String(
-        programLink.programSection ||
-        ""
-      )
-        .trim()
-        .toLowerCase();
-
-    // التابع لا يلتحق بالحملة
-    // إلا بعد إنهاء مساره الفردي.
-    if (
-      section === "calves" &&
-      currentDoseType !==
-        "periodic"
-    ) {
-      continue;
-    }
-
-    const readyAfter =
-      String(
-        currentTask
-          ?.herdReadyAfterDate ||
-        ""
-      )
-        .trim()
-        .slice(0, 10);
-
-    // من أنهى التأسيس/Booster اليوم
-    // لا يدخل حملة اليوم نفسها.
-    if (
-      /^\d{4}-\d{2}-\d{2}$/.test(
-        dt
-      ) &&
-      /^\d{4}-\d{2}-\d{2}$/.test(
-        readyAfter
-      ) &&
-      dt <= readyAfter &&
-      !includeReadySet.has(
-        animalNumber
-      )
-    ) {
-      continue;
-    }
-
-    members.push({
-      animalNumber,
-      programLink,
-      currentTask
-    });
   }
 
   return members;
@@ -65422,6 +65500,300 @@ app.get(
           message:
             "❌ تعذّر تحميل حملة التحصين الآن. حاول مرة أخرى."
         });
+    }
+  }
+);
+app.post(
+  "/api/vaccination/campaign/prepare",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error: "firestore_disabled",
+          message:
+            "❌ تعذّر تجهيز حملة التحصين الآن. حاول مرة أخرى."
+        });
+      }
+
+      const uid = req.userId;
+      const body = req.body || {};
+
+      const eventDate =
+        String(
+          body.eventDate ||
+          body.date ||
+          ""
+        )
+          .trim()
+          .slice(0, 10);
+
+      const vaccineCode =
+        String(
+          body.vaccineCode ||
+          body.vaccinationVaccineCode ||
+          ""
+        ).trim();
+
+      const vaccineForm =
+        String(
+          body.vaccineForm ||
+          ""
+        ).trim();
+
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          eventDate
+        )
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "vaccination_campaign_date_required",
+          message:
+            "❌ اختر تاريخ تنفيذ حملة التحصين."
+        });
+      }
+
+      if (!vaccineCode) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "vaccination_campaign_vaccine_required",
+          message:
+            "❌ اختر التحصين الذي تريد تنفيذه للقطيع."
+        });
+      }
+
+      const programContext =
+        await vaccinationReadProgramContextSrv(
+          uid
+        );
+
+      const programMode =
+        vaccinationProgramModeNormSrv(
+          programContext.programMode
+        );
+
+      if (
+        programContext.saved !== true ||
+        !programMode
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "vaccination_program_required",
+          message:
+            "❌ اختر برنامج المزرعة أو برنامج مُرَبِّيك أولًا.",
+          programContext
+        });
+      }
+
+      const requestedProgramMode =
+        vaccinationProgramModeNormSrv(
+          body.programMode
+        );
+
+      if (
+        requestedProgramMode &&
+        requestedProgramMode !== programMode
+      ) {
+        return res.status(409).json({
+          ok: false,
+          error:
+            "vaccination_program_changed",
+          message:
+            "تم تغيير برنامج التحصينات المعتمد منذ فتح الصفحة. حدّث الصفحة ثم أعد المحاولة.",
+          programContext
+        });
+      }
+
+      const executionProgram =
+        await vaccinationReadExecutionProgramSrv(
+          uid,
+          programMode
+        );
+
+      const rows =
+        Array.isArray(
+          executionProgram.rows
+        )
+          ? executionProgram.rows
+          : [];
+
+      const herdRow =
+        rows.find(row =>
+          row &&
+          row.active !== false &&
+          String(
+            row.programSection || ""
+          )
+            .trim()
+            .toLowerCase() ===
+              "herd" &&
+
+          vaccinationTextKeySrv(
+            row.vaccineCode || ""
+          ) ===
+            vaccinationTextKeySrv(
+              vaccineCode
+            ) &&
+
+          vaccinationCampaignPeriodicStepSrv(
+            row
+          )
+        ) ||
+        null;
+
+      if (!herdRow) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "vaccination_campaign_not_herd_periodic",
+          message:
+            "❌ هذا التحصين ليس تحصين قطيع دوريًا في البرنامج الحالي."
+        });
+      }
+
+      const allowedForms =
+        Array.isArray(
+          herdRow.allowedVaccineForms
+        )
+          ? herdRow.allowedVaccineForms
+              .map(value =>
+                String(value || "").trim()
+              )
+              .filter(Boolean)
+          : [];
+
+      const campaignForm =
+        vaccinationProgramVaccineFormSrv(
+          herdRow,
+          vaccineForm
+        );
+
+      if (
+        allowedForms.length > 1 &&
+        !campaignForm
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "vaccination_campaign_vaccine_form_required",
+          message:
+            "❌ اختر نوع اللقاح أولًا قبل تجهيز الحملة."
+        });
+      }
+
+      const effectiveHerdRow =
+        vaccinationProgramRowForVaccineFormSrv(
+          herdRow,
+          campaignForm
+        );
+
+      if (
+        !vaccinationCampaignPeriodicStepSrv(
+          effectiveHerdRow,
+          campaignForm
+        )
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "vaccination_campaign_periodic_step_missing",
+          message:
+            "❌ لا توجد جرعة دورية صالحة لهذا التحصين في البرنامج الحالي."
+        });
+      }
+
+      const members =
+        await vaccinationCampaignEligibleMembersSrv({
+          uid,
+          programContext,
+          executionProgram,
+
+          vaccineCode,
+
+          vaccineForm:
+            campaignForm,
+
+          campaignDate:
+            eventDate
+        });
+
+      const animalNumbers = [
+        ...new Set(
+          members
+            .map(item =>
+              calvingNormDigitsOnlySrv(
+                item?.animalNumber || ""
+              )
+            )
+            .filter(Boolean)
+        )
+      ].sort(
+        (a, b) =>
+          Number(a) - Number(b)
+      );
+
+      return res.json({
+        ok: true,
+        manualCampaign: true,
+
+        programContext,
+        programMode,
+
+        vaccineCode,
+
+        vaccine:
+          String(
+            effectiveHerdRow.vaccine ||
+            effectiveHerdRow.vaccineName ||
+            vaccineCode
+          ).trim(),
+
+        vaccineForm:
+          campaignForm,
+
+        vaccineFormLabel:
+          String(
+            effectiveHerdRow.vaccineFormLabel ||
+            campaignForm ||
+            ""
+          ).trim(),
+
+        doseType:
+          "periodic",
+
+        eventDate,
+        date:
+          eventDate,
+
+        animalNumbers,
+
+        count:
+          animalNumbers.length,
+
+        message:
+          animalNumbers.length
+            ? `لديك ${animalNumbers.length} حيوانًا مؤهلًا لحملة التحصين.`
+            : "لا توجد حيوانات مؤهلة لهذه الحملة في التاريخ المحدد."
+      });
+
+    } catch (e) {
+      console.error(
+        "vaccination-campaign-prepare",
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error:
+          "vaccination_campaign_prepare_failed",
+        message:
+          "❌ تعذّر تجهيز حملة التحصين الآن. حاول مرة أخرى."
+      });
     }
   }
 );
@@ -94738,80 +95110,62 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
 
   return g;
 }
-async function loadGroupThresholdsSrv(tenant) {
-  const d = {
-    cowLowMin:0.1,  cowLowMax:19.9,
-    cowMedMin:20,   cowMedMax:24.9,
-    cowHighMin:25,
-    bufLowMin:0.1,  bufLowMax:7.9,
-    bufMedMin:8,    bufMedMax:11.9,
-    bufHighMin:12,
-    cowWeanedMax:5,
-    cowGrowingMax:12,
-    cowBreedingMin:11,
-    bufWeanedMax:5,
-    bufGrowingMax:12,
-    bufBreedingMin:11,
-    species:'cow'
-  };
-
-  try {
-    const ds = await db.collection('users').doc(tenant).collection('settings').doc('groups').get();
-    if (ds.exists) return { ...d, ...(ds.data()?.thresholds || {}) };
-  } catch (_) {}
-
-  return d;
-}
-
 async function loadAnimalsForGroupsSrv(tenant) {
   const rows = [];
 
-  try {
-    const snap = await db
+  const [
+    animalsSnap,
+    calvesSnap
+  ] = await Promise.all([
+    db
       .collection("animals")
       .where("userId", "==", tenant)
       .limit(5000)
-      .get();
+      .get()
+      .catch(e => {
+        console.error(
+          "groups.auto animals load failed:",
+          e.message || e
+        );
+        return null;
+      }),
 
-    snap.forEach(d =>
-      rows.push({
-        id: d.id,
-        _source: "animals",
-        _sourceRank: 1,
-        ...(d.data() || {})
-      })
-    );
-  } catch (e) {
-    console.error(
-      "groups.auto animals load failed:",
-      e.message || e
-    );
-  }
-
-  try {
-    const snap = await db
+    db
       .collection("calves")
       .where("userId", "==", tenant)
       .limit(5000)
-      .get();
+      .get()
+      .catch(() => null)
+  ]);
 
-    snap.forEach(d =>
-      rows.push({
-        id: d.id,
-        _source: "calves",
-        _sourceRank: 2,
-        ...(d.data() || {}),
+  animalsSnap?.forEach(d =>
+    rows.push({
+      id: d.id,
+      _source: "animals",
+      _sourceRank: 1,
+      ...(d.data() || {})
+    })
+  );
 
-        animalNumber:
-          d.data()?.calfNumber ||
-          d.data()?.animalNumber ||
-          d.data()?.number ||
-          "",
+  calvesSnap?.forEach(d => {
+    const data =
+      d.data() || {};
 
-        isCalf: true
-      })
-    );
-  } catch (_) {}
+    rows.push({
+      id: d.id,
+      _source: "calves",
+      _sourceRank: 2,
+      ...data,
+
+      animalNumber:
+        data.calfNumber ||
+        data.animalNumber ||
+        data.number ||
+        "",
+
+      isCalf: true
+    });
+  });
 
   // نحسم السجل الرسمي أولًا قبل فلترة النشاط.
   // لو نفس الرقم موجود في animals و calves،
