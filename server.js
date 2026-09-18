@@ -66031,19 +66031,12 @@ if (
     "مراجعة بيانات التحصين";
 }
 
-  if (
+if (
   (
     g.alertStatus === "upcoming" ||
-    g.alertStatus === "initial_age_ready"
+    g.alertStatus === "initial_age_ready" ||
+    g.alertStatus === "overdue"
   ) &&
-  g.programRowId
-) {
-  actionUrl =
-    `vaccination.html?vaccine=${encodeURIComponent(g.programRowId)}` +
-    `&doseType=${encodeURIComponent(g.doseType || "")}`;
-
-} else if (
-  g.alertStatus === "overdue" &&
   g.programRowId
 ) {
   const executionQuery =
