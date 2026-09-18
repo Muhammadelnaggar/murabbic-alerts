@@ -62943,7 +62943,8 @@ async function vaccinationCampaignEligibleMembersSrv({
   vaccineCode = "",
   vaccineForm = "",
   campaignDate = "",
-  includeReadyNumbers = []
+  includeReadyNumbers = [],
+  periodicOnly = true
 } = {}) {
   const tenant =
     tenantKey(uid);
@@ -63194,7 +63195,10 @@ async function vaccinationCampaignEligibleMembersSrv({
                 programRowId: "",
                 vaccineCode: code,
                 vaccineForm: form,
-                doseType: "periodic"
+                doseType:
+                periodicOnly
+              ? "periodic"
+              : ""
               },
 
               executionProgram:
@@ -63204,16 +63208,18 @@ async function vaccinationCampaignEligibleMembersSrv({
               animalCollection
             });
 
-          if (
-            programLink?.ok !== true ||
-            programLink?.linked !== true ||
-            !vaccinationCampaignPeriodicStepSrv(
-              programLink
-            )
-          ) {
-            return null;
-          }
-
+ if (
+  programLink?.ok !== true ||
+  programLink?.linked !== true ||
+  (
+    periodicOnly &&
+    !vaccinationCampaignPeriodicStepSrv(
+      programLink
+    )
+  )
+) {
+  return null;
+}
           const scoped =
             vaccinationScopedEligibilitySrv({
               vaccineCode:
@@ -63255,12 +63261,13 @@ async function vaccinationCampaignEligibleMembersSrv({
               .toLowerCase();
 
           if (
-            currentDoseType &&
-            currentDoseType !==
-              "periodic"
-          ) {
-            return null;
-          }
+  periodicOnly &&
+  currentDoseType &&
+  currentDoseType !==
+    "periodic"
+) {
+  return null;
+}
 
           const section =
             String(
@@ -63271,12 +63278,13 @@ async function vaccinationCampaignEligibleMembersSrv({
               .toLowerCase();
 
           if (
-            section === "calves" &&
-            currentDoseType !==
-              "periodic"
-          ) {
-            return null;
-          }
+  periodicOnly &&
+  section === "calves" &&
+  currentDoseType !==
+    "periodic"
+) {
+  return null;
+}
 
         const storedReadyAfter =
   String(
@@ -63312,6 +63320,7 @@ const readyAfter =
   storedReadyAfter;
 
 if (
+  currentDoseType === "periodic" &&
   /^\d{4}-\d{2}-\d{2}$/.test(
     dt
   ) &&
@@ -65911,39 +65920,35 @@ app.post(
           ? executionProgram.rows
           : [];
 
-      const herdRow =
-        rows.find(row =>
-          row &&
-          row.active !== false &&
-          String(
-            row.programSection || ""
-          )
-            .trim()
-            .toLowerCase() ===
-              "herd" &&
+     const herdRow =
+  rows.find(row =>
+    row &&
+    row.active !== false &&
+    String(
+      row.programSection || ""
+    )
+      .trim()
+      .toLowerCase() ===
+        "herd" &&
 
-          vaccinationTextKeySrv(
-            row.vaccineCode || ""
-          ) ===
-            vaccinationTextKeySrv(
-              vaccineCode
-            ) &&
+    vaccinationTextKeySrv(
+      row.vaccineCode || ""
+    ) ===
+      vaccinationTextKeySrv(
+        vaccineCode
+      )
+  ) ||
+  null;
 
-          vaccinationCampaignPeriodicStepSrv(
-            row
-          )
-        ) ||
-        null;
-
-      if (!herdRow) {
-        return res.status(400).json({
-          ok: false,
-          error:
-            "vaccination_campaign_not_herd_periodic",
-          message:
-            "❌ هذا التحصين ليس تحصين قطيع دوريًا في البرنامج الحالي."
-        });
-      }
+if (!herdRow) {
+  return res.status(400).json({
+    ok: false,
+    error:
+      "vaccination_campaign_not_herd",
+    message:
+      "❌ هذا التحصين ليس تحصين قطيع في البرنامج الحالي."
+  });
+}
 
       const allowedForms =
         Array.isArray(
@@ -65981,20 +65986,7 @@ app.post(
           campaignForm
         );
 
-      if (
-        !vaccinationCampaignPeriodicStepSrv(
-          effectiveHerdRow,
-          campaignForm
-        )
-      ) {
-        return res.status(400).json({
-          ok: false,
-          error:
-            "vaccination_campaign_periodic_step_missing",
-          message:
-            "❌ لا توجد جرعة دورية صالحة لهذا التحصين في البرنامج الحالي."
-        });
-      }
+      
             const existingSchedule =
         await vaccinationCampaignReadScheduleSrv({
           uid,
@@ -66059,10 +66051,13 @@ app.post(
           vaccineCode,
 
           vaccineForm:
-            campaignForm,
+          campaignForm,
 
           campaignDate:
-            eventDate
+          eventDate,
+
+          periodicOnly:
+          false
         });
 
       const animalNumbers = [
@@ -66107,7 +66102,7 @@ app.post(
           ).trim(),
 
         doseType:
-          "periodic",
+         "",
 
         eventDate,
         date:
