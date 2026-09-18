@@ -46514,19 +46514,20 @@ function vaccinationMurabbikDefaultProgramSrv() {
   programSection,
   vaccineForm = "",
   vaccineForms = [],
+  vaccineFormPeriodic = {},
   targetGroup,
-    doseSchedule,
-    repeatEvery = 0,
-    repeatUnit = "",
-    ageMinValue = 0,
-    ageMinUnit = "",
-    ageMaxValue = 0,
-    ageMaxUnit = "",
-    alternativeGroup = "",
-    alternativePath = "",
-    advanceNoticeDays = 14,
-    notes = ""
-  }) => {
+  doseSchedule,
+  repeatEvery = 0,
+  repeatUnit = "",
+  ageMinValue = 0,
+  ageMinUnit = "",
+  ageMaxValue = 0,
+  ageMaxUnit = "",
+  alternativeGroup = "",
+  alternativePath = "",
+  advanceNoticeDays = 14,
+  notes = ""
+}) => {
     const vaccine =
       vaccineByCode.get(vaccineCode);
 
@@ -46600,6 +46601,42 @@ const vaccineFormDisplayLabel =
     )
     .filter(Boolean)
     .join(" / ");
+
+const normalizedVaccineFormPeriodic = {};
+
+for (
+  const [formKeyRaw, ruleRaw] of
+  Object.entries(
+    vaccineFormPeriodic &&
+    typeof vaccineFormPeriodic === "object" &&
+    !Array.isArray(vaccineFormPeriodic)
+      ? vaccineFormPeriodic
+      : {}
+  )
+) {
+  const formKey =
+    String(formKeyRaw || "").trim();
+
+  const repeatEveryByForm =
+    Number(ruleRaw?.repeatEvery || 0);
+
+  const repeatUnitByForm =
+    String(ruleRaw?.repeatUnit || "").trim();
+
+  if (
+    !formKey ||
+    !allowedVaccineForms.includes(formKey) ||
+    !(repeatEveryByForm > 0) ||
+    !repeatUnitByForm
+  ) {
+    continue;
+  }
+
+  normalizedVaccineFormPeriodic[formKey] = {
+    repeatEvery: repeatEveryByForm,
+    repeatUnit: repeatUnitByForm
+  };
+}
 
     const enrichedDoseSchedule =
       doseSchedule.map(step => ({
@@ -46675,7 +46712,10 @@ vaccineFormLabel:
 allowedVaccineForms,
 allowedVaccineFormOptions,
 
-      doseType:
+vaccineFormPeriodic:
+  normalizedVaccineFormPeriodic,
+
+doseType:
         fixedDoseType,
 
       doseTypeLabel:
@@ -46853,20 +46893,46 @@ allowedVaccineFormOptions,
       ]
     }),
 
-    row({
+row({
   programRowId:
     "murabbik_bef_herd",
-  vaccineCode: "bef",
-  programSection: "herd",
+
+  vaccineCode:
+    "bef",
+
+  programSection:
+    "herd",
+
   vaccineForms: [
     "live_attenuated_virus",
     "killed_virus"
   ],
-  targetGroup: "herd_all",
+
+  vaccineFormPeriodic: {
+    live_attenuated_virus: {
+      repeatEvery: 1,
+      repeatUnit: "year"
+    },
+
+    killed_virus: {
+      repeatEvery: 6,
+      repeatUnit: "month"
+    }
+  },
+
+  targetGroup:
+    "herd_all",
+
+  // fallback فقط قبل اختيار شكل اللقاح.
   repeatEvery: 1,
   repeatUnit: "year",
+
   doseSchedule: [
-    dose("prime", "any_time"),
+    dose(
+      "prime",
+      "any_time"
+    ),
+
     dose(
       "periodic",
       "repeat",
@@ -46879,17 +46945,40 @@ allowedVaccineFormOptions,
 row({
   programRowId:
     "murabbik_bef_calves",
-  vaccineCode: "bef",
-  programSection: "calves",
+
+  vaccineCode:
+    "bef",
+
+  programSection:
+    "calves",
+
   vaccineForms: [
     "live_attenuated_virus",
     "killed_virus"
   ],
-  targetGroup: "calves",
+
+  vaccineFormPeriodic: {
+    live_attenuated_virus: {
+      repeatEvery: 1,
+      repeatUnit: "year"
+    },
+
+    killed_virus: {
+      repeatEvery: 6,
+      repeatUnit: "month"
+    }
+  },
+
+  targetGroup:
+    "calves",
+
   ageMinValue: 12,
   ageMinUnit: "month",
+
+  // fallback فقط قبل اختيار شكل اللقاح.
   repeatEvery: 1,
   repeatUnit: "year",
+
   doseSchedule: [
     dose(
       "prime",
@@ -46897,6 +46986,7 @@ row({
       12,
       "month"
     ),
+
     dose(
       "periodic",
       "repeat",
@@ -47787,6 +47877,172 @@ function vaccinationProgramDisplaySrv({
       displayRows
   };
 }
+function vaccinationProgramVaccineFormSrv(
+  row = {},
+  rawForm = ""
+) {
+  const requested =
+    String(rawForm || "").trim();
+
+  const allowed =
+    Array.isArray(row?.allowedVaccineForms)
+      ? row.allowedVaccineForms
+          .map(value =>
+            String(value || "").trim()
+          )
+          .filter(Boolean)
+      : [];
+
+  const fixed =
+    String(
+      row?.vaccineForm || ""
+    ).trim();
+
+  if (requested) {
+    if (
+      !allowed.length ||
+      allowed.includes(requested)
+    ) {
+      return requested;
+    }
+
+    return "";
+  }
+
+  if (fixed) {
+    return fixed;
+  }
+
+  if (allowed.length === 1) {
+    return allowed[0];
+  }
+
+  return "";
+}
+
+function vaccinationProgramFormPeriodicRuleSrv(
+  row = {},
+  rawForm = ""
+) {
+  const form =
+    vaccinationProgramVaccineFormSrv(
+      row,
+      rawForm
+    );
+
+  if (!form) {
+    return null;
+  }
+
+  const rules =
+    row?.vaccineFormPeriodic &&
+    typeof row.vaccineFormPeriodic === "object" &&
+    !Array.isArray(row.vaccineFormPeriodic)
+      ? row.vaccineFormPeriodic
+      : {};
+
+  const rule =
+    rules[form] &&
+    typeof rules[form] === "object"
+      ? rules[form]
+      : null;
+
+  if (!rule) {
+    return null;
+  }
+
+  const repeatEvery =
+    Number(
+      rule.repeatEvery || 0
+    );
+
+  const repeatUnit =
+    String(
+      rule.repeatUnit || ""
+    ).trim();
+
+  if (
+    !(repeatEvery > 0) ||
+    !repeatUnit
+  ) {
+    return null;
+  }
+
+  return {
+    repeatEvery,
+    repeatUnit
+  };
+}
+
+function vaccinationProgramRowForVaccineFormSrv(
+  row = {},
+  rawForm = ""
+) {
+  const form =
+    vaccinationProgramVaccineFormSrv(
+      row,
+      rawForm
+    );
+
+  const rule =
+    vaccinationProgramFormPeriodicRuleSrv(
+      row,
+      form
+    );
+
+  const doseSchedule =
+    (
+      Array.isArray(row?.doseSchedule)
+        ? row.doseSchedule
+        : []
+    ).map(step => {
+      if (
+        rule &&
+        String(
+          step?.doseType || ""
+        ).trim() === "periodic" &&
+        String(
+          step?.timingBasis || ""
+        ).trim() === "repeat"
+      ) {
+        return {
+          ...step,
+
+          timingValue:
+            rule.repeatEvery,
+
+          timingUnit:
+            rule.repeatUnit
+        };
+      }
+
+      return {
+        ...step
+      };
+    });
+
+  return {
+    ...row,
+
+    ...(form
+      ? {
+          vaccineForm: form
+        }
+      : {}),
+
+    ...(rule
+      ? {
+          repeatEvery:
+            rule.repeatEvery,
+
+          repeatUnit:
+            rule.repeatUnit
+        }
+      : {}),
+
+    doseSchedule
+  };
+}
 async function vaccinationResolveProgramRowSrv({
   uid,
   programContext = {},
@@ -48058,6 +48314,18 @@ const resolvedVaccineForm =
       ? allowedVaccineForms[0]
       : ""
   );
+  const effectiveRow =
+  vaccinationProgramRowForVaccineFormSrv(
+    row,
+    resolvedVaccineForm
+  );
+
+const effectiveDoseSchedule =
+  Array.isArray(
+    effectiveRow.doseSchedule
+  )
+    ? effectiveRow.doseSchedule
+    : [];
 
 const resolvedVaccineFormOption =
   effectiveVaccineFormOptions.find(
@@ -48089,17 +48357,14 @@ const clientDoseType =
       .toLowerCase();
 
     const isMaternalProgram =
-    programSection === "mothers" &&
-    Array.isArray(
-      row.doseSchedule
-    ) &&
-    row.doseSchedule.some(
-      step =>
-        String(
-          step?.timingBasis || ""
-        ).trim() ===
-          "before_expected_calving"
-    );
+  programSection === "mothers" &&
+  effectiveDoseSchedule.some(
+    step =>
+      String(
+        step?.timingBasis || ""
+      ).trim() ===
+        "before_expected_calving"
+  );
 
   // الأمومة: الجرعة من البرنامج والحمل فقط.
   // باقي البرامج: اختيار المستخدم صالح فقط كبداية لأول تسجيل.
@@ -48196,15 +48461,14 @@ const clientDoseType =
         );
 
   const selectedDoseStep =
-    resolvedDoseType &&
-    Array.isArray(row.doseSchedule)
-      ? row.doseSchedule.find(step =>
-          String(
-            step?.doseType || ""
-          ).trim() ===
-            resolvedDoseType
-        )
-      : null;
+  resolvedDoseType
+    ? effectiveDoseSchedule.find(step =>
+        String(
+          step?.doseType || ""
+        ).trim() ===
+          resolvedDoseType
+      )
+    : null;
 
   const doseTypeLabel =
     String(
@@ -48218,7 +48482,7 @@ const clientDoseType =
     linked: true,
     programMode,
 
-    ...row,
+    ...effectiveRow,
 
 vaccineForm:
   resolvedVaccineForm,
@@ -52151,11 +52415,11 @@ for (const row of rows) {
 
     date: eventDate,
 
-    doseType:
-      effectiveDoseType,
+doseType:
+  effectiveDoseType,
 
-    doseTypeLabel:
-      effectiveDoseTypeLabel,
+doseTypeLabel:
+  effectiveDoseTypeLabel,
 
     timingBasis:
       isPregnancyLinkedMaternalDose
@@ -52403,14 +52667,24 @@ for (const row of rows) {
     vaccineCode:
       resolvedVaccineCode,
 
-    programRowId:
-      resolvedProgramRowId,
+ programRowId:
+  resolvedProgramRowId,
 
-    doseType:
-      effectiveDoseType,
+doseType:
+  effectiveDoseType,
 
-    vaccinationProgramMode:
-      programContext.programMode,
+vaccineForm:
+  String(
+    programLink.vaccineForm || ""
+  ).trim(),
+
+vaccineFormLabel:
+  String(
+    programLink.vaccineFormLabel || ""
+  ).trim(),
+
+vaccinationProgramMode:
+  programContext.programMode,
 
     vaccinationProgramLabel:
       programContext.programLabel,
@@ -52459,7 +52733,11 @@ for (const row of rows) {
               executionProgram,
 
               fallbackEventDate:
-                eventDate
+                eventDate,
+              fallbackVaccineForm:
+  String(
+    saved[0]?.vaccineForm || ""
+  ).trim()  
             });
 
           } else {
@@ -52475,6 +52753,10 @@ for (const row of rows) {
 
               vaccineCode:
                 campaignVaccineCode,
+                vaccineForm:
+  String(
+    saved[0]?.vaccineForm || ""
+  ).trim(),
 
               eventDate,
 
@@ -62004,16 +62286,39 @@ function vaccinationCampaignIdSrv({
   return `vax_campaign__${hash}`;
 }
 
-function vaccinationCampaignPeriodicStepSrv(row = {}) {
-  const steps = Array.isArray(row?.doseSchedule)
-    ? row.doseSchedule
-    : [];
+function vaccinationCampaignPeriodicStepSrv(
+  row = {},
+  vaccineForm = ""
+) {
+  const effectiveRow =
+    vaccinationProgramRowForVaccineFormSrv(
+      row,
+      vaccineForm
+    );
+
+  const steps =
+    Array.isArray(
+      effectiveRow?.doseSchedule
+    )
+      ? effectiveRow.doseSchedule
+      : [];
 
   return steps.find(step =>
-    String(step?.doseType || "").trim() === "periodic" &&
-    String(step?.timingBasis || "").trim() === "repeat" &&
-    Number(step?.timingValue || 0) > 0 &&
-    String(step?.timingUnit || "").trim()
+    String(
+      step?.doseType || ""
+    ).trim() === "periodic" &&
+
+    String(
+      step?.timingBasis || ""
+    ).trim() === "repeat" &&
+
+    Number(
+      step?.timingValue || 0
+    ) > 0 &&
+
+    String(
+      step?.timingUnit || ""
+    ).trim()
   ) || null;
 }
 
@@ -62149,7 +62454,17 @@ async function vaccinationCampaignReadScheduleSrv({
     ref,
     task,
     lastExecutionDate,
-    dueDate
+    dueDate,
+
+    vaccineForm:
+      String(
+        task.vaccineForm || ""
+      ).trim(),
+
+    vaccineFormLabel:
+      String(
+        task.vaccineFormLabel || ""
+      ).trim()
   };
 }
 
@@ -62157,6 +62472,7 @@ async function vaccinationCampaignWriteScheduleSrv({
   uid = "",
   programMode = "",
   vaccineCode = "",
+  vaccineForm = "",
   vaccine = "",
   herdRow = {},
   executionDate = "",
@@ -62182,9 +62498,33 @@ async function vaccinationCampaignWriteScheduleSrv({
       .trim()
       .slice(0, 10);
 
+  const form =
+    vaccinationProgramVaccineFormSrv(
+      herdRow,
+      vaccineForm
+    );
+
+  const allowedForms =
+    Array.isArray(
+      herdRow?.allowedVaccineForms
+    )
+      ? herdRow.allowedVaccineForms
+          .map(value =>
+            String(value || "").trim()
+          )
+          .filter(Boolean)
+      : [];
+
+  const effectiveHerdRow =
+    vaccinationProgramRowForVaccineFormSrv(
+      herdRow,
+      form
+    );
+
   const periodicStep =
     vaccinationCampaignPeriodicStepSrv(
-      herdRow
+      effectiveHerdRow,
+      form
     );
 
   if (
@@ -62193,6 +62533,10 @@ async function vaccinationCampaignWriteScheduleSrv({
     !mode ||
     !code ||
     !/^\d{4}-\d{2}-\d{2}$/.test(dt) ||
+    (
+      allowedForms.length > 1 &&
+      !form
+    ) ||
     !periodicStep
   ) {
     return {
@@ -62258,7 +62602,7 @@ async function vaccinationCampaignWriteScheduleSrv({
 
       programRowId:
         String(
-          herdRow.programRowId || ""
+          effectiveHerdRow.programRowId || ""
         ).trim(),
 
       vaccineCode:
@@ -62267,9 +62611,26 @@ async function vaccinationCampaignWriteScheduleSrv({
       vaccine:
         String(
           vaccine ||
-          herdRow.vaccine ||
-          herdRow.vaccineName ||
+          effectiveHerdRow.vaccine ||
+          effectiveHerdRow.vaccineName ||
           code
+        ).trim(),
+
+      vaccineForm:
+        form,
+
+      vaccineFormLabel:
+        String(
+          effectiveHerdRow
+            .allowedVaccineFormOptions
+            ?.find(item =>
+              String(
+                item?.value || ""
+              ).trim() === form
+            )?.label ||
+          effectiveHerdRow.vaccineFormLabel ||
+          form ||
+          ""
         ).trim(),
 
       lastExecutionDate:
@@ -62316,7 +62677,8 @@ async function vaccinationCampaignWriteScheduleSrv({
     ok: true,
     updated: true,
     lastExecutionDate: dt,
-    dueDate
+    dueDate,
+    vaccineForm: form
   };
 }
 
@@ -62325,6 +62687,7 @@ async function vaccinationCampaignEligibleMembersSrv({
   programContext = {},
   executionProgram = {},
   vaccineCode = "",
+  vaccineForm = "",
   campaignDate = "",
   includeReadyNumbers = []
 } = {}) {
@@ -62339,6 +62702,11 @@ async function vaccinationCampaignEligibleMembersSrv({
   const code =
     String(
       vaccineCode || ""
+    ).trim();
+
+  const form =
+    String(
+      vaccineForm || ""
     ).trim();
 
   const dt =
@@ -62498,6 +62866,7 @@ async function vaccinationCampaignEligibleMembersSrv({
         body: {
           programRowId: "",
           vaccineCode: code,
+          vaccineForm: form,
           doseType: "periodic"
         },
 
@@ -62625,6 +62994,7 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
   programContext = {},
   executionProgram = {},
   vaccineCode = "",
+  vaccineForm = "",
   eventDate = "",
   saved = [],
   rejected = []
@@ -62641,6 +63011,33 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
     String(
       vaccineCode || ""
     ).trim();
+
+  let requestedForm =
+    String(
+      vaccineForm || ""
+    ).trim();
+
+  if (!requestedForm) {
+    requestedForm =
+      String(
+        (
+          Array.isArray(saved)
+            ? saved
+            : []
+        ).find(item =>
+          String(
+            item?.doseType || ""
+          )
+            .trim()
+            .toLowerCase() ===
+              "periodic" &&
+          String(
+            item?.vaccineForm || ""
+          ).trim()
+        )?.vaccineForm ||
+        ""
+      ).trim();
+  }
 
   const dt =
     String(
@@ -62681,11 +63078,42 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
     ) ||
     null;
 
+  const allowedForms =
+    Array.isArray(
+      herdRow?.allowedVaccineForms
+    )
+      ? herdRow.allowedVaccineForms
+          .map(value =>
+            String(value || "").trim()
+          )
+          .filter(Boolean)
+      : [];
+
+  const campaignForm =
+    vaccinationProgramVaccineFormSrv(
+      herdRow || {},
+      requestedForm
+    );
+
+  const effectiveHerdRow =
+    vaccinationProgramRowForVaccineFormSrv(
+      herdRow || {},
+      campaignForm
+    );
+
   if (
     !db ||
     !tenant ||
     !mode ||
     !herdRow ||
+    (
+      allowedForms.length > 1 &&
+      !campaignForm
+    ) ||
+    !vaccinationCampaignPeriodicStepSrv(
+      effectiveHerdRow,
+      campaignForm
+    ) ||
     !/^\d{4}-\d{2}-\d{2}$/.test(
       dt
     )
@@ -62697,21 +63125,36 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
     };
   }
 
-    const covered =
+  const covered =
     new Set(
       (
         Array.isArray(saved)
           ? saved
           : []
       )
-        .filter(item =>
-          String(
-            item?.doseType || ""
-          )
-            .trim()
-            .toLowerCase() ===
-              "periodic"
-        )
+        .filter(item => {
+          const doseType =
+            String(
+              item?.doseType || ""
+            )
+              .trim()
+              .toLowerCase();
+
+          if (doseType !== "periodic") {
+            return false;
+          }
+
+          const itemForm =
+            vaccinationProgramVaccineFormSrv(
+              herdRow,
+              item?.vaccineForm || ""
+            );
+
+          return (
+            !campaignForm ||
+            itemForm === campaignForm
+          );
+        })
         .map(item =>
           calvingNormDigitsOnlySrv(
             item?.animalNumber ||
@@ -62724,7 +63167,7 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
   // أول حملة قد تُحفَظ على أكثر من طلب
   // مثل الأمهات ثم التوابع.
   // مصدر الحقيقة هو التنفيذ الفعلي المحفوظ
-  // لنفس اللقاح ونفس التاريخ.
+  // لنفس اللقاح ونفس التاريخ ونفس شكل اللقاح.
   const sameDayEventsSnap =
     await db
       .collection("events")
@@ -62770,6 +63213,12 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
         .trim()
         .toLowerCase();
 
+    const eventForm =
+      vaccinationProgramVaccineFormSrv(
+        herdRow,
+        event.vaccineForm || ""
+      );
+
     if (
       !(
         eventType === "vaccination" ||
@@ -62780,7 +63229,11 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
         event.vaccineCode || ""
       ) !==
         vaccinationTextKeySrv(code) ||
-      eventDoseType !== "periodic"
+      eventDoseType !== "periodic" ||
+      (
+        campaignForm &&
+        eventForm !== campaignForm
+      )
     ) {
       continue;
     }
@@ -62797,33 +63250,37 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
     }
   }
 
-  for (
-    const item of
-    Array.isArray(rejected)
-      ? rejected
-      : []
-  ) {
-    const reason =
-      String(
-        item?.reason || ""
-      ).trim();
-
-    if (
-      reason.includes(
-        "سبق تسجيل التحصين نفسه"
-      ) &&
-      reason.includes(
-        "التاريخ نفسه"
-      )
+  // التكرار المرفوض لا نحتاجه في اللقاحات متعددة الأشكال؛
+  // الـEvents نفسها هي مصدر شكل اللقاح الحقيقي.
+  if (allowedForms.length <= 1) {
+    for (
+      const item of
+      Array.isArray(rejected)
+        ? rejected
+        : []
     ) {
-      const n =
-        calvingNormDigitsOnlySrv(
-          item?.animalNumber ||
-          ""
-        );
+      const reason =
+        String(
+          item?.reason || ""
+        ).trim();
 
-      if (n) {
-        covered.add(n);
+      if (
+        reason.includes(
+          "سبق تسجيل التحصين نفسه"
+        ) &&
+        reason.includes(
+          "التاريخ نفسه"
+        )
+      ) {
+        const n =
+          calvingNormDigitsOnlySrv(
+            item?.animalNumber ||
+            ""
+          );
+
+        if (n) {
+          covered.add(n);
+        }
       }
     }
   }
@@ -62848,6 +63305,9 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
       vaccineCode:
         code,
 
+      vaccineForm:
+        campaignForm,
+
       campaignDate:
         dt,
 
@@ -62867,7 +63327,7 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
     };
   }
 
-    const missing =
+  const missing =
     members
       .map(
         item =>
@@ -62985,6 +63445,17 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
         doseType:
           "periodic",
 
+        vaccineForm:
+          campaignForm,
+
+        vaccineFormLabel:
+          String(
+            member
+              ?.programLink
+              ?.vaccineFormLabel ||
+            ""
+          ).trim(),
+
         herdReadyAfterDate:
           dt,
 
@@ -63040,11 +63511,15 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
         code,
 
       vaccine:
-        herdRow.vaccine ||
-        herdRow.vaccineName ||
+        effectiveHerdRow.vaccine ||
+        effectiveHerdRow.vaccineName ||
         code,
 
-      herdRow,
+      vaccineForm:
+        campaignForm,
+
+      herdRow:
+        effectiveHerdRow,
 
       executionDate:
         dt,
@@ -63056,7 +63531,8 @@ async function vaccinationCampaignMaybeSeedFromActualSaveSrv({
   return {
     ...schedule,
 
-    complete: true,
+    complete:
+      schedule?.updated === true,
 
     targetCount:
       campaignMembers.length,
@@ -63127,6 +63603,17 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
   if (!herdRow) {
     return null;
   }
+
+  const herdAllowedForms =
+    Array.isArray(
+      herdRow.allowedVaccineForms
+    )
+      ? herdRow.allowedVaccineForms
+          .map(value =>
+            String(value || "").trim()
+          )
+          .filter(Boolean)
+      : [];
 
   const vaccineName =
     String(
@@ -63229,7 +63716,7 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
     }
   }
 
-  const byDate =
+  const byCycle =
     new Map();
 
   const codeKey =
@@ -63265,6 +63752,12 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
       )
         .trim()
         .toLowerCase();
+
+    const eventForm =
+      vaccinationProgramVaccineFormSrv(
+        herdRow,
+        event.vaccineForm || ""
+      );
 
     const eventCodeKey =
       vaccinationTextKeySrv(
@@ -63325,6 +63818,10 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
       eventDoseType !==
         "periodic" ||
       !sameVaccine ||
+      (
+        herdAllowedForms.length > 1 &&
+        !eventForm
+      ) ||
       !/^\d{4}-\d{2}-\d{2}$/.test(
         eventDate
       )
@@ -63342,28 +63839,51 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
       continue;
     }
 
-    if (!byDate.has(eventDate)) {
-      byDate.set(
-        eventDate,
-        []
+    const cycleKey =
+      `${eventDate}|${eventForm || ""}`;
+
+    if (!byCycle.has(cycleKey)) {
+      byCycle.set(
+        cycleKey,
+        {
+          eventDate,
+          vaccineForm:
+            eventForm,
+          saved: []
+        }
       );
     }
 
-    byDate
-      .get(eventDate)
+    byCycle
+      .get(cycleKey)
+      .saved
       .push({
         animalNumber,
         doseType:
-          "periodic"
+          "periodic",
+        vaccineForm:
+          eventForm
       });
   }
 
-  const dates =
-    [...byDate.keys()]
-      .sort()
-      .reverse();
+  const cycles =
+    [...byCycle.values()]
+      .sort((a, b) =>
+        String(
+          b.eventDate || ""
+        ).localeCompare(
+          String(
+            a.eventDate || ""
+          )
+        )
+      );
 
-  for (const eventDate of dates) {
+  for (const cycle of cycles) {
+    const eventDate =
+      String(
+        cycle.eventDate || ""
+      ).trim();
+
     const result =
       await vaccinationCampaignMaybeSeedFromActualSaveSrv({
         uid:
@@ -63375,11 +63895,15 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
         vaccineCode:
           code,
 
+        vaccineForm:
+          String(
+            cycle.vaccineForm || ""
+          ).trim(),
+
         eventDate,
 
         saved:
-          byDate.get(eventDate) ||
-          [],
+          cycle.saved || [],
 
         rejected: []
       });
@@ -63408,7 +63932,8 @@ async function vaccinationCampaignAdvanceIfCompleteSrv({
   vaccineCode = "",
   campaignId = "",
   executionProgram = {},
-  fallbackEventDate = ""
+  fallbackEventDate = "",
+  fallbackVaccineForm = ""
 } = {}) {
   const tenant =
     tenantKey(uid);
@@ -63636,6 +64161,51 @@ async function vaccinationCampaignAdvanceIfCompleteSrv({
     };
   }
 
+  const campaignForm =
+    vaccinationProgramVaccineFormSrv(
+      herdRow,
+      String(
+        fallbackVaccineForm ||
+        matching
+          .map(task =>
+            String(
+              task.vaccineForm || ""
+            ).trim()
+          )
+          .find(Boolean) ||
+        ""
+      ).trim()
+    );
+
+  const allowedForms =
+    Array.isArray(
+      herdRow?.allowedVaccineForms
+    )
+      ? herdRow.allowedVaccineForms
+          .map(value =>
+            String(value || "").trim()
+          )
+          .filter(Boolean)
+      : [];
+
+  if (
+    allowedForms.length > 1 &&
+    !campaignForm
+  ) {
+    return {
+      ok: true,
+      updated: false,
+      complete: false,
+      remainingCount: 0
+    };
+  }
+
+  const effectiveHerdRow =
+    vaccinationProgramRowForVaccineFormSrv(
+      herdRow,
+      campaignForm
+    );
+
   const result =
     await vaccinationCampaignWriteScheduleSrv({
       uid:
@@ -63648,11 +64218,15 @@ async function vaccinationCampaignAdvanceIfCompleteSrv({
         code,
 
       vaccine:
-        herdRow.vaccine ||
-        herdRow.vaccineName ||
+        effectiveHerdRow.vaccine ||
+        effectiveHerdRow.vaccineName ||
         code,
 
-      herdRow,
+      vaccineForm:
+        campaignForm,
+
+      herdRow:
+        effectiveHerdRow,
 
       executionDate,
 
@@ -63717,7 +64291,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
     ...needsDataSnap.docs
   ];
 
-    const openTaskIndex = new Map();
+  const openTaskIndex = new Map();
 
   for (const ds of taskDocs) {
     const task = ds.data() || {};
@@ -63761,7 +64335,6 @@ async function vaccinationCampaignDashboardAlertsSrv({
       );
     }
   }
-
 
   const herdRows = new Map();
 
@@ -63812,7 +64385,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
     }
   }
 
-   const alerts = [];
+  const alerts = [];
 
   // القطيع الفعلي النشط هو مصدر أعضاء الحملة.
   const herdCache =
@@ -63863,6 +64436,62 @@ async function vaccinationCampaignDashboardAlertsSrv({
       continue;
     }
 
+    const herdAllowedForms =
+      Array.isArray(
+        herdRow?.allowedVaccineForms
+      )
+        ? herdRow.allowedVaccineForms
+            .map(value =>
+              String(value || "").trim()
+            )
+            .filter(Boolean)
+        : [];
+
+    let campaignVaccineForm =
+      vaccinationProgramVaccineFormSrv(
+        herdRow,
+        schedule.vaccineForm ||
+        schedule.task?.vaccineForm ||
+        ""
+      );
+
+    // Schedule قديم قبل حفظ شكل اللقاح:
+    // نعيد بناءه من التنفيذ الفعلي المحفوظ في Events.
+    if (
+      herdAllowedForms.length > 1 &&
+      !campaignVaccineForm
+    ) {
+      await vaccinationCampaignReconcileScheduleFromEventsSrv({
+        uid:
+          tenant,
+
+        programContext,
+        executionProgram,
+        vaccineCode
+      });
+
+      schedule =
+        await vaccinationCampaignReadScheduleSrv({
+          uid:
+            tenant,
+
+          programMode,
+          vaccineCode
+        });
+
+      campaignVaccineForm =
+        vaccinationProgramVaccineFormSrv(
+          herdRow,
+          schedule?.vaccineForm ||
+          schedule?.task?.vaccineForm ||
+          ""
+        );
+
+      if (!campaignVaccineForm) {
+        continue;
+      }
+    }
+
     const campaignDueDate =
       String(
         schedule.dueDate ||
@@ -63891,7 +64520,6 @@ async function vaccinationCampaignDashboardAlertsSrv({
           campaignDueDate
       });
 
-
     const alertFromDate =
       vaccinationYmdAddDaysSrv(
         campaignDueDate,
@@ -63905,7 +64533,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
       continue;
     }
 
-      // هنا مصدر العضوية هو القطيع الفعلي كله.
+    // هنا مصدر العضوية هو القطيع الفعلي كله.
     const members = [];
     const writes = [];
 
@@ -63939,6 +64567,8 @@ async function vaccinationCampaignDashboardAlertsSrv({
           body: {
             programRowId: "",
             vaccineCode,
+            vaccineForm:
+              campaignVaccineForm,
             doseType:
               "periodic"
           },
@@ -64041,7 +64671,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
           .trim()
           .toLowerCase();
 
-           // التابع لا يدخل حملة القطيع
+      // التابع لا يدخل حملة القطيع
       // إلا بعد وصوله إلى periodic.
       if (
         section === "calves" &&
@@ -64266,7 +64896,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
       });
     }
 
-        if (!members.length) {
+    if (!members.length) {
       try {
         await vaccinationCampaignAdvanceIfCompleteSrv({
           uid:
@@ -64275,7 +64905,9 @@ async function vaccinationCampaignDashboardAlertsSrv({
           programMode,
           vaccineCode,
           campaignId,
-          executionProgram
+          executionProgram,
+          fallbackVaccineForm:
+            campaignVaccineForm
         });
 
       } catch (e) {
@@ -64405,6 +65037,13 @@ async function vaccinationCampaignDashboardAlertsSrv({
         `&date=${encodeURIComponent(today)}` +
         `&campaignId=${encodeURIComponent(campaignId)}` +
         `&vaccineCode=${encodeURIComponent(vaccineCode)}` +
+        (
+          campaignVaccineForm
+            ? `&vaccineForm=${encodeURIComponent(
+                campaignVaccineForm
+              )}`
+            : ""
+        ) +
         `&doseType=periodic`,
 
       dueDate:
@@ -64432,6 +65071,19 @@ async function vaccinationCampaignDashboardAlertsSrv({
 
       vaccineCode,
       vaccine,
+
+      vaccineForm:
+        campaignVaccineForm,
+
+      vaccineFormLabel:
+        String(
+          schedule.vaccineFormLabel ||
+          schedule.task?.vaccineFormLabel ||
+          members[0]
+            ?.programLink
+            ?.vaccineFormLabel ||
+          ""
+        ).trim(),
 
       vaccineKey:
         vaccineCode ||
@@ -64510,7 +65162,8 @@ app.get(
               "❌ تعذّر تحديد حملة التحصين الحالية."
           });
       }
-            // نعيد فقط أعضاء الحملة الموجودين فعليًا
+
+      // نعيد فقط أعضاء الحملة الموجودين فعليًا
       // داخل القطيع النشط وقت فتح الحملة.
       const activeHerd =
         await loadAnimalsForGroupsSrv(
@@ -64548,7 +65201,7 @@ app.get(
           .map(ds =>
             ds.data() || {}
           )
-                  .filter(task => {
+          .filter(task => {
             const animalNumber =
               calvingNormDigitsOnlySrv(
                 task.animalNumber || ""
@@ -64669,11 +65322,50 @@ app.get(
           });
       }
 
+      const schedule =
+        await vaccinationCampaignReadScheduleSrv({
+          uid,
+          programMode,
+          vaccineCode
+        });
+
+      const campaignVaccineForm =
+        String(
+          matching
+            .map(task =>
+              String(
+                task.vaccineForm || ""
+              ).trim()
+            )
+            .find(Boolean) ||
+          schedule?.vaccineForm ||
+          ""
+        ).trim();
+
+      const campaignVaccineFormLabel =
+        String(
+          matching
+            .map(task =>
+              String(
+                task.vaccineFormLabel || ""
+              ).trim()
+            )
+            .find(Boolean) ||
+          schedule?.vaccineFormLabel ||
+          ""
+        ).trim();
+
       return res.json({
         ok: true,
 
         campaignId,
         vaccineCode,
+
+        vaccineForm:
+          campaignVaccineForm,
+
+        vaccineFormLabel:
+          campaignVaccineFormLabel,
 
         doseType:
           "periodic",
