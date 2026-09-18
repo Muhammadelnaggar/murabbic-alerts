@@ -52120,11 +52120,27 @@ const requestedDoseType =
     }
 
     
-
     const saved = [];
     const rejected = [];
 
-for (const row of rows) {
+    // الحفظ الجماعي:
+    // نفس تحقق السيرفر ونفس Save الرسمي لكل حيوان،
+    // لكن بعدد محدود بالتوازي بدل الانتظار حيوانًا بعد حيوان.
+    const vaccinationSaveConcurrency = 8;
+
+    for (
+      let offset = 0;
+      offset < rows.length;
+      offset += vaccinationSaveConcurrency
+    ) {
+      const chunk = rows.slice(
+        offset,
+        offset + vaccinationSaveConcurrency
+      );
+
+      await Promise.all(
+        chunk.map(async rawRow => {
+          for (const row of [rawRow]) {
   const animalNumber =
     calvingNormDigitsOnlySrv(
       row.animalNumber ||
@@ -52299,13 +52315,32 @@ for (const row of rows) {
   // =====================================================
   // منع تكرار نفس التحصين في نفس اليوم
   // =====================================================
-  const duplicated =
-    await vaccinationHasSameDaySrv(
-      uid,
-      animalNumber,
-      eventDate,
-      resolvedVaccine
-    );
+    // منع التكرار + فحص التوقيت/الجرعة مستقلان،
+  // لذلك ننفذهما بالتوازي بدل انتظار أحدهما قبل الآخر.
+  const [duplicated, dueWarning] =
+    await Promise.all([
+      vaccinationHasSameDaySrv(
+        uid,
+        animalNumber,
+        eventDate,
+        resolvedVaccine
+      ),
+
+      vaccinationDueWarningSrv({
+        uid,
+        animalNumber,
+        eventDate,
+
+        vaccine:
+          resolvedVaccine,
+
+        vaccineCode:
+          resolvedVaccineCode,
+
+        animalDoc,
+        programLink
+      })
+    ]);
 
   if (duplicated) {
     rejected.push({
@@ -52313,42 +52348,27 @@ for (const row of rows) {
       reason:
         "سبق تسجيل التحصين نفسه لهذا الحيوان في التاريخ نفسه."
     });
+
     continue;
   }
+if (
+  dueWarning?.allowed === false
+) {
+  rejected.push({
+    animalNumber,
 
+    reason:
+      dueWarning.message,
+
+    code:
+      dueWarning.code || ""
+  });
+
+  continue;
+}
   // =====================================================
   // التوقيت والجرعة من السطر الذي اختاره السيرفر
   // =====================================================
-  const dueWarning =
-    await vaccinationDueWarningSrv({
-      uid,
-      animalNumber,
-      eventDate,
-
-      vaccine:
-        resolvedVaccine,
-
-      vaccineCode:
-        resolvedVaccineCode,
-
-      animalDoc,
-      programLink
-    });
-
-  if (
-    dueWarning?.allowed === false
-  ) {
-    rejected.push({
-      animalNumber,
-      reason:
-        dueWarning.message,
-
-      code:
-        dueWarning.code || ""
-    });
-
-    continue;
-  }
 
   const effectiveDoseType =
     String(
@@ -52667,24 +52687,24 @@ doseTypeLabel:
     vaccineCode:
       resolvedVaccineCode,
 
- programRowId:
-  resolvedProgramRowId,
+    programRowId:
+      resolvedProgramRowId,
 
-doseType:
-  effectiveDoseType,
+    doseType:
+      effectiveDoseType,
 
-vaccineForm:
-  String(
-    programLink.vaccineForm || ""
-  ).trim(),
+    vaccineForm:
+      String(
+        programLink.vaccineForm || ""
+      ).trim(),
 
-vaccineFormLabel:
-  String(
-    programLink.vaccineFormLabel || ""
-  ).trim(),
+    vaccineFormLabel:
+      String(
+        programLink.vaccineFormLabel || ""
+      ).trim(),
 
-vaccinationProgramMode:
-  programContext.programMode,
+    vaccinationProgramMode:
+      programContext.programMode,
 
     vaccinationProgramLabel:
       programContext.programLabel,
@@ -52702,7 +52722,11 @@ vaccinationProgramMode:
 
     tasks
   });
-}
+          }
+        })
+      );
+    }
+
     try {
       if (saved.length) {
         const campaignVaccineCode =
