@@ -46,7 +46,39 @@
     </div>
 
     <div class="card">
-      <form id="vaccinationForm" data-event="تحصين" novalidate>
+
+  <section
+    id="campaignIntentSection"
+    class="hidden-block"
+    aria-live="polite"
+  >
+    <div class="form-hint">
+      <strong>هل هذا تحصين حملة؟</strong>
+      <div>
+        إذا كانت حملة، سيحدد مُرَبِّيك الفئة والحيوانات المؤهلة تلقائيًا من برنامج التحصين المعتمد.
+      </div>
+    </div>
+
+    <div class="row row-2">
+      <button
+        id="campaignIntentYesBtn"
+        class="save"
+        type="button"
+      >
+        نعم، حملة
+      </button>
+
+      <button
+        id="campaignIntentNoBtn"
+        class="ghost"
+        type="button"
+      >
+        لا، تحصين جماعي
+      </button>
+    </div>
+  </section>
+
+  <form id="vaccinationForm" data-event="تحصين" novalidate>
 
         <section
           id="programChoiceSection"
@@ -386,8 +418,24 @@ const vaccineFormBox =
 
 const doseTypeEl =
   document.getElementById("doseType");
-  const saveBtn =
+
+const saveBtn =
   document.getElementById("saveBtn");
+
+const campaignIntentSection =
+  document.getElementById(
+    "campaignIntentSection"
+  );
+
+const campaignIntentYesBtn =
+  document.getElementById(
+    "campaignIntentYesBtn"
+  );
+
+const campaignIntentNoBtn =
+  document.getElementById(
+    "campaignIntentNoBtn"
+  );
 
 const damVaccinationStatusSection =
   document.getElementById(
@@ -533,6 +581,10 @@ let currentProgramContext = null;
 let currentCampaignId = "";
 let currentCampaignVaccineCode = "";
 let currentCampaignProgramMode = "";
+
+let manualCampaignIntent = "";
+let manualCampaignPreparedKey = "";
+let manualCampaignBusy = false;
 
 let pendingDamBaselineRequest = null;
 let damBaselineBusy = false;
@@ -896,6 +948,287 @@ await runServerGate("program_saved");
     radios.forEach(input => {
       input.disabled = false;
     });
+  }
+}
+function showCampaignIntentQuestion() {
+  manualCampaignPreparedKey = "";
+  lastGateAllowed = false;
+
+  campaignIntentSection
+    ?.classList.remove("hidden-block");
+
+  form?.classList.add("hidden-block");
+
+  if (saveBtn) {
+    saveBtn.disabled = true;
+  }
+}
+
+function hideCampaignIntentQuestion() {
+  campaignIntentSection
+    ?.classList.add("hidden-block");
+
+  form?.classList.remove("hidden-block");
+}
+
+function resetManualCampaignPreparation() {
+  manualCampaignPreparedKey = "";
+
+  if (manualCampaignIntent === "campaign") {
+    lastGateAllowed = false;
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+  }
+}
+
+function manualCampaignKey() {
+  return [
+    String(
+      eventDateEl?.value || ""
+    ).trim().slice(0, 10),
+
+    String(
+      getProgramMode() || ""
+    ).trim(),
+
+    String(
+      getSelectedExecutionVaccineCode() || ""
+    ).trim(),
+
+    String(
+      getVaccineForm() || ""
+    ).trim()
+  ].join("|");
+}
+
+async function prepareManualCampaignIfNeeded() {
+  if (manualCampaignIntent !== "campaign") {
+    return {
+      ready: true
+    };
+  }
+
+  const eventDate =
+    String(
+      eventDateEl?.value || ""
+    )
+      .trim()
+      .slice(0, 10);
+
+  const programMode =
+    String(
+      getProgramMode() || ""
+    ).trim();
+
+  const vaccineCode =
+    String(
+      getSelectedExecutionVaccineCode() || ""
+    ).trim();
+
+  const programRow =
+    getSelectedExecutionProgramRow();
+
+  const vaccineForm =
+    String(
+      getVaccineForm() || ""
+    ).trim();
+
+  const formOptions =
+    Array.isArray(
+      programRow?.allowedVaccineFormOptions
+    )
+      ? programRow.allowedVaccineFormOptions
+      : [];
+
+  if (
+    !eventDate ||
+    !programMode ||
+    !vaccineCode ||
+    (
+      formOptions.length > 1 &&
+      !vaccineForm
+    )
+  ) {
+    lastGateAllowed = false;
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    return {
+      ready: false,
+      waiting: true
+    };
+  }
+
+  const preparationKey =
+    manualCampaignKey();
+
+  if (
+    preparationKey &&
+    manualCampaignPreparedKey ===
+      preparationKey &&
+    bulkSelected.size
+  ) {
+    return {
+      ready: true
+    };
+  }
+
+  if (manualCampaignBusy) {
+    return {
+      ready: false,
+      waiting: true
+    };
+  }
+
+  manualCampaignBusy = true;
+
+  try {
+    const result =
+      await postJson(
+        "/api/vaccination/campaign/prepare",
+        {
+          eventDate,
+          date: eventDate,
+          programMode,
+          vaccineCode,
+          vaccineForm
+        }
+      );
+
+    if (!result.ok) {
+      manualCampaignPreparedKey = "";
+      lastGateAllowed = false;
+
+      if (saveBtn) {
+        saveBtn.disabled = true;
+      }
+
+      msg(
+        result.message ||
+          "تعذّر تجهيز حملة التحصين.",
+        result.existingCampaign === true
+          ? "info"
+          : "error"
+      );
+
+      return {
+        ready: false,
+        blocked: true
+      };
+    }
+
+    bulkSelected.clear();
+
+    for (
+      const rawNumber of
+      Array.isArray(result.animalNumbers)
+        ? result.animalNumbers
+        : []
+    ) {
+      const number =
+        parseNumbers(rawNumber)[0] || "";
+
+      if (number) {
+        bulkSelected.add(number);
+      }
+    }
+
+    const serverVaccineForm =
+      String(
+        result.vaccineForm || ""
+      ).trim();
+
+    if (
+      serverVaccineForm &&
+      vaccineFormEl &&
+      [...vaccineFormEl.options].some(
+        option =>
+          option.value ===
+            serverVaccineForm
+      )
+    ) {
+      vaccineFormEl.value =
+        serverVaccineForm;
+    }
+
+    fillServerSelect(
+      doseTypeEl,
+      [
+        {
+          value: "periodic",
+          label: "جرعة دورية"
+        }
+      ],
+      "يحددها مُرَبِّيك من الحملة",
+      "periodic"
+    );
+
+    doseTypeEl.disabled = true;
+
+    applyModeUI();
+    updateContext();
+
+    manualCampaignPreparedKey =
+      manualCampaignKey();
+
+    if (!bulkSelected.size) {
+      lastGateAllowed = false;
+
+      if (saveBtn) {
+        saveBtn.disabled = true;
+      }
+
+      msg(
+        result.message ||
+          "لا توجد حيوانات مؤهلة لهذه الحملة في التاريخ المحدد.",
+        "info"
+      );
+
+      return {
+        ready: false,
+        blocked: true
+      };
+    }
+
+    msg(
+      result.message ||
+        `لديك ${bulkSelected.size} حيوانًا مؤهلًا لحملة التحصين.`,
+      "info"
+    );
+
+    return {
+      ready: true
+    };
+
+  } catch (err) {
+    console.error(
+      "manual vaccination campaign prepare failed:",
+      err
+    );
+
+    manualCampaignPreparedKey = "";
+    lastGateAllowed = false;
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+
+    msg(
+      "تعذّر تجهيز حملة التحصين الآن.",
+      "error"
+    );
+
+    return {
+      ready: false,
+      blocked: true
+    };
+
+  } finally {
+    manualCampaignBusy = false;
   }
 }
   function updateContext() {
@@ -3426,6 +3759,13 @@ function renderServerResult(result = {}) {
 async function runServerGate(reason = "page_load") {
   clearWarn();
 
+  const campaignPreparation =
+    await prepareManualCampaignIfNeeded();
+
+  if (campaignPreparation.ready !== true) {
+    return;
+  }
+
   const payload = collectPayload();
 
   // الصفحة لا تقرر. فقط لا ترسل Gate ناقص بلا رقم أو تاريخ.
@@ -3601,12 +3941,44 @@ async function hydrate() {
       ? "bulk"
       : "single";
 
-  if (eventDateEl) {
-    eventDateEl.value = dt;
+if (eventDateEl) {
+  eventDateEl.value = dt;
+}
+
+const manualBulkFromEvents =
+  pageMode === "bulk" &&
+  String(
+    qp.get("mbkMode") || ""
+  )
+    .trim()
+    .toLowerCase() === "group" &&
+  !requestedCampaignId;
+
+if (
+  manualBulkFromEvents &&
+  !manualCampaignIntent
+) {
+  bulkSelected.clear();
+
+  for (
+    const n of
+    parseNumbers(numbersFromUrl)
+  ) {
+    bulkSelected.add(n);
   }
 
-  await loadVaccinationOptions();
-  await loadFarmProgram();
+  applyModeUI();
+  updateContext();
+
+  showCampaignIntentQuestion();
+
+  return;
+}
+
+hideCampaignIntentQuestion();
+
+await loadVaccinationOptions();
+await loadFarmProgram();
 
   let campaignData = null;
 
@@ -3849,7 +4221,29 @@ async function hydrate() {
 
   runServerGate("page_load");
 }
+campaignIntentYesBtn?.addEventListener(
+  "click",
+  async () => {
+    manualCampaignIntent = "campaign";
 
+    resetManualCampaignPreparation();
+    hideCampaignIntentQuestion();
+
+    await hydrate();
+  }
+);
+
+campaignIntentNoBtn?.addEventListener(
+  "click",
+  async () => {
+    manualCampaignIntent = "bulk";
+
+    resetManualCampaignPreparation();
+    hideCampaignIntentQuestion();
+
+    await hydrate();
+  }
+);
   dashBtn?.addEventListener("click", () => {
     location.href = "dashboard.html";
   });
@@ -3880,10 +4274,13 @@ damUnvaccinatedBtn?.addEventListener(
 });
 
  eventDateEl?.addEventListener("input", () => {
+  resetManualCampaignPreparation();
   updateContext();
   runServerGate("date_change");
 });
 vaccineEl?.addEventListener("change", () => {
+  resetManualCampaignPreparation();
+
   syncExecutionProgramSelection({
     resetVaccineForm: true
   });
@@ -3897,6 +4294,7 @@ vaccineEl?.addEventListener("change", () => {
 });
 
 vaccineFormEl?.addEventListener("change", () => {
+  resetManualCampaignPreparation();
   runServerGate("vaccine_form_change");
 });
 
@@ -3906,10 +4304,11 @@ doseTypeEl?.addEventListener("change", () => {
 document
   .querySelectorAll('input[name="programMode"]')
   .forEach(input => {
-    input.addEventListener("change", async () => {
-      renderProgramChoice();
-      await saveProgramMode();
-    });
+input.addEventListener("change", async () => {
+  resetManualCampaignPreparation();
+  renderProgramChoice();
+  await saveProgramMode();
+});
   });
 addFarmProgramRowBtn?.addEventListener(
   "click",
