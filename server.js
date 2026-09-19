@@ -100490,8 +100490,7 @@ function subscriptionPublicUiSrv(
       daysRemaining <= 7 &&
       !SUBSCRIPTION_BILLING_READY_SRV
         ? `متبقي من الفترة التجريبية لمُرَبِّيك: ${daysRemaining} يوم. سيتم إتاحة الاشتراك قريبًا، وسيستمر استخدامك لمُرَبِّيك دون انقطاع.`
-        : `أنت في الفترة التجريبية لمُرَبِّيك — متبقي لديك ${daysRemaining} يوم.`;
-
+        : `متبقي لديك ${daysRemaining} يومًا للتجربة للاستفادة من كامل إمكانيات مُرَبِّيك.`;
     return {
       visible: true,
       state: 'trial',
