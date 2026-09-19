@@ -8938,3 +8938,167 @@ html[data-page="archive"] #archiveEventsTable td:nth-child(3){
   white-space:normal;
   line-height:1.6;
 }
+/* =========================================================
+   Murabbik Subscription Banner — Dashboard
+   ========================================================= */
+
+body[data-page="dashboard"] .mbk-subscription-banner{
+  width:min(1180px, calc(100% - 24px));
+  margin:12px auto 0;
+  padding:13px 16px;
+
+  display:flex;
+  align-items:center;
+  gap:13px;
+
+  position:relative;
+  overflow:hidden;
+
+  border:1px solid rgba(14,160,90,.22);
+  border-radius:18px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #eefaf3 0%,
+      #ffffff 58%,
+      #f3fbf6 100%
+    );
+
+  box-shadow:
+    0 8px 24px rgba(11,127,71,.08);
+
+  color:#173126;
+}
+
+body[data-page="dashboard"]
+.mbk-subscription-banner[hidden]{
+  display:none !important;
+}
+
+body[data-page="dashboard"]
+.mbk-subscription-banner::before{
+  content:"";
+  position:absolute;
+  inset-inline-start:0;
+  top:0;
+  bottom:0;
+  width:5px;
+  background:#0ea05a;
+}
+
+body[data-page="dashboard"]
+.mbk-subscription-icon{
+  width:42px;
+  height:42px;
+  flex:0 0 42px;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  border-radius:50%;
+
+  background:#ffffff;
+  border:1px solid rgba(14,160,90,.18);
+
+  box-shadow:
+    0 4px 14px rgba(11,127,71,.10);
+
+  font-size:20px;
+}
+
+body[data-page="dashboard"]
+.mbk-subscription-copy{
+  min-width:0;
+  flex:1;
+}
+
+body[data-page="dashboard"]
+.mbk-subscription-label{
+  margin-bottom:2px;
+
+  color:#0b7f47;
+
+  font-size:12px;
+  font-weight:900;
+
+  letter-spacing:.1px;
+}
+
+body[data-page="dashboard"]
+.mbk-subscription-message{
+  color:#173126;
+
+  font-size:15px;
+  font-weight:800;
+  line-height:1.6;
+}
+
+/* Grace قبل جاهزية الدفع */
+body[data-page="dashboard"]
+.mbk-subscription-banner[data-state="grace"]{
+  border-color:rgba(14,160,90,.26);
+  background:
+    linear-gradient(
+      135deg,
+      #edf9f2 0%,
+      #ffffff 65%,
+      #f4fbf7 100%
+    );
+}
+
+/* آخر مهلة بعد إتاحة الاشتراك */
+body[data-page="dashboard"]
+.mbk-subscription-banner[data-state="grace_final"]{
+  border-color:rgba(217,139,6,.30);
+
+  background:
+    linear-gradient(
+      135deg,
+      #fff8e8 0%,
+      #ffffff 62%,
+      #fffaf0 100%
+    );
+}
+
+body[data-page="dashboard"]
+.mbk-subscription-banner[data-state="grace_final"]::before{
+  background:#d98b06;
+}
+
+body[data-page="dashboard"]
+.mbk-subscription-banner[data-state="grace_final"]
+.mbk-subscription-label{
+  color:#9a6200;
+}
+
+@media (max-width:600px){
+  body[data-page="dashboard"]
+  .mbk-subscription-banner{
+    width:calc(100% - 20px);
+    margin-top:10px;
+    padding:11px 13px;
+    gap:10px;
+    border-radius:16px;
+  }
+
+  body[data-page="dashboard"]
+  .mbk-subscription-icon{
+    width:36px;
+    height:36px;
+    flex-basis:36px;
+    font-size:18px;
+  }
+
+  body[data-page="dashboard"]
+  .mbk-subscription-message{
+    font-size:14px;
+    line-height:1.55;
+  }
+
+  body[data-page="dashboard"]
+  .mbk-subscription-label{
+    font-size:11px;
+  }
+}
