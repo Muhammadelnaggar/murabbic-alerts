@@ -20,7 +20,28 @@
     <img class="mbk-logo" src="/images/logo.png" alt="مُرَبِّيك">
   </div>
 </header>
+<section
+  id="subscriptionBanner"
+  class="mbk-subscription-banner"
+  aria-live="polite"
+  hidden
+>
+  <div
+    class="mbk-subscription-icon"
+    aria-hidden="true"
+  >✨</div>
 
+  <div class="mbk-subscription-copy">
+    <div class="mbk-subscription-label">
+      حالة اشتراك مُرَبِّيك
+    </div>
+
+    <div
+      id="subscriptionBannerMessage"
+      class="mbk-subscription-message"
+    ></div>
+  </div>
+</section>
 <div class="page">
   <div id="serverAlertsBar" aria-live="polite">
     <div id="smartAlertHost"></div>
@@ -168,7 +189,64 @@ async function loadServerSession(){
 
   return data;
 }
+async function loadSubscriptionUi(){
+  const banner =
+    document.getElementById('subscriptionBanner');
 
+  const message =
+    document.getElementById(
+      'subscriptionBannerMessage'
+    );
+
+  if (!banner || !message) return;
+
+  banner.hidden = true;
+  banner.dataset.state = '';
+  message.textContent = '';
+
+  try {
+    const res = await fetch(
+      API_BASE + '/api/subscription/me',
+      {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-store'
+        },
+        credentials: 'same-origin',
+        cache: 'no-store'
+      }
+    );
+
+    const data =
+      await res.json().catch(() => ({}));
+
+    const ui = data?.ui || {};
+
+    if (
+      !res.ok ||
+      data?.ok !== true ||
+      ui?.visible !== true ||
+      !ui?.message
+    ) {
+      return;
+    }
+
+    banner.dataset.state =
+      String(ui.state || '');
+
+    message.textContent =
+      String(ui.message || '');
+
+    banner.hidden = false;
+
+  } catch (e) {
+    console.warn(
+      'subscription ui load failed',
+      e
+    );
+  }
+}
 async function fetchJSON(path){
   const res = await fetch(API_BASE + path, {
     method: 'GET',
@@ -1709,8 +1787,9 @@ async function loadVaccinationDashboardAlerts(){
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     await loadServerSession();
+await loadSubscriptionUi();
 
-    loadWeatherTHI();
+loadWeatherTHI();
     loadHerdKPIs();
     loadMurabbikSmartAlerts();
     loadVaccinationDashboardAlerts();
