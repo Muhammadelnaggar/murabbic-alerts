@@ -100486,16 +100486,32 @@ function subscriptionPublicUiSrv(
         nowMs
       );
 
-    const message =
-      daysRemaining <= 7 &&
-      !SUBSCRIPTION_BILLING_READY_SRV
-        ? `متبقي من الفترة التجريبية لمُرَبِّيك: ${daysRemaining} يوم. سيتم إتاحة الاشتراك قريبًا، وسيستمر استخدامك لمُرَبِّيك دون انقطاع.`
-        : `متبقي لديك ${daysRemaining} يومًا للتجربة للاستفادة من كامل إمكانيات مُرَبِّيك.`;
-    return {
-      visible: true,
-      state: 'trial',
-      message
-    };
+    const isBillingPending =
+  daysRemaining <= 7 &&
+  !SUBSCRIPTION_BILLING_READY_SRV;
+
+const prefix =
+  'لديك';
+
+const emphasis =
+  `${daysRemaining} يومًا`;
+
+const suffix =
+  isBillingPending
+    ? 'للتجربة. سيتم إتاحة الاشتراك قريبًا، وسيستمر استخدامك لمُرَبِّيك دون انقطاع.'
+    : 'للتجربة والاستفادة من كامل إمكانيات مُرَبِّيك.';
+
+return {
+  visible: true,
+  state: 'trial',
+
+  message:
+    `${prefix} ${emphasis} ${suffix}`,
+
+  prefix,
+  emphasis,
+  suffix
+};
   }
 
   if (effectiveStatus === 'grace') {
