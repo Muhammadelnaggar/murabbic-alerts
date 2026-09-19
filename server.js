@@ -104,6 +104,10 @@ db = firestore;
 const AUTH_COOKIE_NAME = process.env.MURABBIK_AUTH_COOKIE || "mbk_session";
 const AUTH_SESSION_DAYS = Number(process.env.MURABBIK_SESSION_DAYS || 7);
 const AUTH_SESSION_EXPIRES_MS = Math.max(1, AUTH_SESSION_DAYS) * 24 * 60 * 60 * 1000;
+const AUTH_ONBOARDING_COOKIE_NAME_SRV = "mbk_onboarding";
+const AUTH_ONBOARDING_TRIAL_VALUE_SRV = "trial";
+const AUTH_ONBOARDING_COOKIE_MAX_AGE_MS_SRV =
+  24 * 60 * 60 * 1000;
 
 function authDigitsBridgeSrv(raw) {
   const map = {
@@ -162,6 +166,31 @@ function authClearSessionCookieBridgeSrv(req, res) {
     sameSite: "lax",
     path: "/"
   });
+}
+function authSetTrialOnboardingCookieSrv(req, res) {
+  res.cookie(
+    AUTH_ONBOARDING_COOKIE_NAME_SRV,
+    AUTH_ONBOARDING_TRIAL_VALUE_SRV,
+    {
+      httpOnly: true,
+      secure: authIsHttpsReqBridgeSrv(req),
+      sameSite: "lax",
+      path: "/",
+      maxAge: AUTH_ONBOARDING_COOKIE_MAX_AGE_MS_SRV
+    }
+  );
+}
+
+function authClearOnboardingCookieSrv(req, res) {
+  res.clearCookie(
+    AUTH_ONBOARDING_COOKIE_NAME_SRV,
+    {
+      httpOnly: true,
+      secure: authIsHttpsReqBridgeSrv(req),
+      sameSite: "lax",
+      path: "/"
+    }
+  );
 }
 
 function authAccountStatusBridgeSrv(profile = {}) {
@@ -1168,7 +1197,16 @@ try {
       expiresIn: AUTH_SESSION_EXPIRES_MS
     });
 
-    authSetSessionCookieBridgeSrv(req, res, sessionCookie);
+    authSetSessionCookieBridgeSrv(
+  req,
+  res,
+  sessionCookie
+);
+
+authClearOnboardingCookieSrv(
+  req,
+  res
+);
 
     return res.json({
       ok: true,
@@ -1589,7 +1627,16 @@ const sessionCookie = await admin.auth().createSessionCookie(login.idToken, {
   expiresIn: AUTH_SESSION_EXPIRES_MS
 });
 
-authSetSessionCookieBridgeSrv(req, res, sessionCookie);
+authSetSessionCookieBridgeSrv(
+  req,
+  res,
+  sessionCookie
+);
+
+authClearOnboardingCookieSrv(
+  req,
+  res
+);
 
 return res.json({
   ok: true,
@@ -1625,6 +1672,64 @@ app.get(
       userId: session.userId,
       user: session.user
     });
+  }
+);
+app.get(
+  "/api/auth/onboarding/next",
+  async (req, res) => {
+    try {
+      const session =
+        await authSessionFromRequestBridgeSrv(req);
+
+      if (session?.userId) {
+        authClearOnboardingCookieSrv(req, res);
+
+        return res.json({
+          ok: true,
+          action: "redirect",
+          redirectUrl: "/dashboard.html",
+          reason: "authenticated"
+        });
+      }
+
+      const entry =
+        authCookieValueBridgeSrv(
+          req,
+          AUTH_ONBOARDING_COOKIE_NAME_SRV
+        );
+
+      if (
+        entry ===
+        AUTH_ONBOARDING_TRIAL_VALUE_SRV
+      ) {
+        return res.json({
+          ok: true,
+          action: "redirect",
+          redirectUrl: "/register.html",
+          reason: "trial_onboarding"
+        });
+      }
+
+      return res.json({
+        ok: true,
+        action: "redirect",
+        redirectUrl: "/login.html",
+        reason: "standard_entry"
+      });
+
+    } catch (e) {
+      console.warn(
+        "auth onboarding next failed:",
+        e.message || e
+      );
+
+      return res.status(503).json({
+        ok: false,
+        error: "onboarding_next_unavailable",
+        message:
+          "❌ تعذّر تحديد الخطوة التالية الآن. حاول مرة أخرى."
+      });
+    }
   }
 );
 // ============================================================
@@ -94795,8 +94900,24 @@ app.get('/', (_req, res) => {
 </html>`);
 });
 
-app.get('/trial', (_req, res) => {
-  return res.sendFile(path.join(__dirname, 'www', 'index.html'));
+app.get('/trial', (req, res) => {
+  authSetTrialOnboardingCookieSrv(
+    req,
+    res
+  );
+
+  res.set(
+    'Cache-Control',
+    'no-store'
+  );
+
+  return res.sendFile(
+    path.join(
+      __dirname,
+      'www',
+      'index.html'
+    )
+  );
 });
 // ============================================================
 //  DEBUG: Dump animals with explicit error logging
