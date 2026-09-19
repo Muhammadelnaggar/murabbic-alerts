@@ -1593,7 +1593,10 @@ if (!db) {
     "❌ تعذّر التحقق من الاشتراك الآن. حاول مرة أخرى لاحقًا.";
   throw err;
 }
-
+await subscriptionReconcilePrebillingGraceSrv({
+  userId,
+  source: "server:auth-login"
+});
 const subscriptionSnap =
   await db
     .collection("subscriptions")
@@ -99680,6 +99683,28 @@ app.post(
 const SUBSCRIPTION_TRIAL_DAYS_SRV = 21;
 const SUBSCRIPTION_DAY_MS_SRV = 24 * 60 * 60 * 1000;
 
+const SUBSCRIPTION_PREBILLING_GRACE_DAYS_SRV = 7;
+
+const SUBSCRIPTION_PREBILLING_GRACE_MS_SRV =
+  SUBSCRIPTION_PREBILLING_GRACE_DAYS_SRV *
+  SUBSCRIPTION_DAY_MS_SRV;
+
+const SUBSCRIPTION_PREBILLING_GRACE_REASON_SRV =
+  'billing_not_ready';
+
+const SUBSCRIPTION_PREBILLING_GRACE_POLICY_SRV =
+  'prebilling-7d-auto-v1';
+
+// افتراضيًا الاشتراكات غير متاحة حتى نفعّلها نحن صراحة من Render.
+const SUBSCRIPTION_BILLING_READY_SRV =
+  ['1', 'true', 'yes', 'on'].includes(
+    String(
+      process.env.MURABBIK_BILLING_READY || ''
+    )
+      .trim()
+      .toLowerCase()
+  );
+
 const SUBSCRIPTION_STATUSES_SRV = new Set([
   'trial',
   'active',
@@ -99820,6 +99845,35 @@ function subscriptionTrialDaysRemainingSrv(
     0,
     Math.ceil(
       (trialEndsAtMs - nowMs) /
+      SUBSCRIPTION_DAY_MS_SRV
+    )
+  );
+}
+function subscriptionGraceDaysRemainingSrv(
+  subscription = {},
+  nowMs = Date.now()
+) {
+  const effectiveStatus =
+    subscriptionEffectiveStatusSrv(
+      subscription,
+      nowMs
+    );
+
+  if (effectiveStatus !== 'grace') {
+    return 0;
+  }
+
+  const graceEndsAtMs =
+    subscriptionTimestampMsSrv(
+      subscription?.graceEndsAt
+    );
+
+  if (graceEndsAtMs === null) return 0;
+
+  return Math.max(
+    0,
+    Math.ceil(
+      (graceEndsAtMs - nowMs) /
       SUBSCRIPTION_DAY_MS_SRV
     )
   );
@@ -100127,6 +100181,294 @@ async function subscriptionLifecycleMarkOnceSrv({
     };
   }
 }
+async function subscriptionReconcilePrebillingGraceSrv({
+  userId,
+  source = 'server:prebilling-grace-reconcile'
+} = {}) {
+  if (!db) {
+    throw new Error(
+      'subscription_firestore_unavailable'
+    );
+  }
+
+  const uid =
+    String(userId || '').trim();
+
+  if (!uid) {
+    throw new Error(
+      'subscription_user_id_required'
+    );
+  }
+
+  const subscriptionRef =
+    db.collection('subscriptions').doc(uid);
+
+  const nowMs = Date.now();
+
+  const nowTs =
+    admin.firestore.Timestamp.fromMillis(nowMs);
+
+  let graceStartedNow = false;
+  let graceFinalWindowStartedNow = false;
+
+  await db.runTransaction(async tx => {
+    const snap =
+      await tx.get(subscriptionRef);
+
+    if (!snap.exists) return;
+
+    const subscription =
+      snap.data() || {};
+
+    const storedStatus =
+      String(subscription?.status || '')
+        .trim()
+        .toLowerCase();
+
+    const graceReason =
+      String(subscription?.graceReason || '')
+        .trim()
+        .toLowerCase();
+
+    // عند جاهزية الاشتراك:
+    // أي عميل داخل Grace يأخذ آخر 7 أيام مرة واحدة فقط.
+    if (SUBSCRIPTION_BILLING_READY_SRV) {
+      if (
+        storedStatus === 'grace' &&
+        graceReason ===
+          SUBSCRIPTION_PREBILLING_GRACE_REASON_SRV &&
+        !subscription?.graceFinalizedAt
+      ) {
+        tx.set(
+          subscriptionRef,
+          {
+            graceEndsAt:
+              admin.firestore.Timestamp.fromMillis(
+                nowMs +
+                SUBSCRIPTION_PREBILLING_GRACE_MS_SRV
+              ),
+
+            graceFinalizedAt:
+              nowTs,
+
+            updatedAt:
+              nowTs,
+
+            graceSource:
+              String(source || '').trim() ||
+              null
+          },
+          { merge: true }
+        );
+
+        graceFinalWindowStartedNow = true;
+      }
+
+      return;
+    }
+
+    // انتهت الـ Trial والدفع ما زال غير جاهز:
+    // نبدأ Grace من لحظة انتهاء الـ Trial نفسها.
+    if (storedStatus === 'trial') {
+      const trialEndsAtMs =
+        subscriptionTimestampMsSrv(
+          subscription?.trialEndsAt
+        );
+
+      if (
+        trialEndsAtMs === null ||
+        nowMs <= trialEndsAtMs
+      ) {
+        return;
+      }
+
+      const elapsedAfterTrialMs =
+        Math.max(
+          1,
+          nowMs - trialEndsAtMs
+        );
+
+      const graceWindows =
+        Math.max(
+          1,
+          Math.ceil(
+            elapsedAfterTrialMs /
+            SUBSCRIPTION_PREBILLING_GRACE_MS_SRV
+          )
+        );
+
+      const graceEndsAtMs =
+        trialEndsAtMs +
+        (
+          graceWindows *
+          SUBSCRIPTION_PREBILLING_GRACE_MS_SRV
+        );
+
+      tx.set(
+        subscriptionRef,
+        {
+          status:
+            'grace',
+
+          graceReason:
+            SUBSCRIPTION_PREBILLING_GRACE_REASON_SRV,
+
+          gracePolicyVersion:
+            SUBSCRIPTION_PREBILLING_GRACE_POLICY_SRV,
+
+          graceStartedAt:
+            admin.firestore.Timestamp.fromMillis(
+              trialEndsAtMs
+            ),
+
+          graceFinalizedAt:
+            null,
+
+          graceEndsAt:
+            admin.firestore.Timestamp.fromMillis(
+              graceEndsAtMs
+            ),
+
+          graceLastExtendedAt:
+            nowTs,
+
+          updatedAt:
+            nowTs,
+
+          graceSource:
+            String(source || '').trim() ||
+            null
+        },
+        { merge: true }
+      );
+
+      graceStartedNow = true;
+
+      return;
+    }
+
+    if (storedStatus !== 'grace') {
+      return;
+    }
+
+    // لا نمدد أي Grace أخرى،
+    // ولا نمدد الـGrace النهائية بعد إتاحة الاشتراك.
+    if (
+      graceReason !==
+        SUBSCRIPTION_PREBILLING_GRACE_REASON_SRV ||
+      subscription?.graceFinalizedAt
+    ) {
+      return;
+    }
+
+    const graceEndsAtMs =
+      subscriptionTimestampMsSrv(
+        subscription?.graceEndsAt
+      );
+
+    // ما زالت نافذة الـ7 أيام الحالية سارية.
+    if (
+      graceEndsAtMs !== null &&
+      nowMs <= graceEndsAtMs
+    ) {
+      return;
+    }
+
+    const baseEndMs =
+      graceEndsAtMs !== null
+        ? graceEndsAtMs
+        : nowMs;
+
+    // لو العميل عاد بعد أكثر من أسبوع،
+    // نصل لنهاية أقرب نافذة 7 أيام مستقبلية
+    // بدون خلق Trials جديدة.
+    const windowsToAdd =
+      graceEndsAtMs === null
+        ? 1
+        : Math.max(
+            1,
+            Math.floor(
+              (nowMs - graceEndsAtMs) /
+              SUBSCRIPTION_PREBILLING_GRACE_MS_SRV
+            ) + 1
+          );
+
+    const nextGraceEndsAtMs =
+      baseEndMs +
+      (
+        windowsToAdd *
+        SUBSCRIPTION_PREBILLING_GRACE_MS_SRV
+      );
+
+    tx.set(
+      subscriptionRef,
+      {
+        status:
+          'grace',
+
+        graceReason:
+          SUBSCRIPTION_PREBILLING_GRACE_REASON_SRV,
+
+        gracePolicyVersion:
+          SUBSCRIPTION_PREBILLING_GRACE_POLICY_SRV,
+
+        graceEndsAt:
+          admin.firestore.Timestamp.fromMillis(
+            nextGraceEndsAtMs
+          ),
+
+        graceLastExtendedAt:
+          nowTs,
+
+        updatedAt:
+          nowTs,
+
+        graceSource:
+          String(source || '').trim() ||
+          null
+      },
+      { merge: true }
+    );
+  });
+
+  if (graceStartedNow) {
+    await subscriptionLifecycleMarkOnceSrv({
+      userId: uid,
+      milestone: 'grace_started',
+      source,
+      details: {
+        graceReason:
+          SUBSCRIPTION_PREBILLING_GRACE_REASON_SRV,
+
+        gracePolicyVersion:
+          SUBSCRIPTION_PREBILLING_GRACE_POLICY_SRV
+      }
+    });
+  }
+
+  if (graceFinalWindowStartedNow) {
+    await subscriptionLifecycleMarkOnceSrv({
+      userId: uid,
+      milestone:
+        'grace_final_window_started',
+
+      source,
+
+      details: {
+        graceReason:
+          SUBSCRIPTION_PREBILLING_GRACE_REASON_SRV,
+
+        gracePolicyVersion:
+          SUBSCRIPTION_PREBILLING_GRACE_POLICY_SRV,
+
+        finalWindowDays:
+          SUBSCRIPTION_PREBILLING_GRACE_DAYS_SRV
+      }
+    });
+  }
+
+  return subscriptionRef.get();
+}
 function subscriptionPublicStateSrv(
   subscription = {},
   nowMs = Date.now()
@@ -100207,10 +100549,38 @@ function subscriptionPublicStateSrv(
         subscription?.currentPeriodEnd
       ),
 
-    graceEndsAt:
-      subscriptionIsoSrv(
-        subscription?.graceEndsAt
-      )
+   graceStartedAt:
+  subscriptionIsoSrv(
+    subscription?.graceStartedAt
+  ),
+
+graceFinalizedAt:
+  subscriptionIsoSrv(
+    subscription?.graceFinalizedAt
+  ),
+
+graceEndsAt:
+  subscriptionIsoSrv(
+    subscription?.graceEndsAt
+  ),
+
+graceDaysRemaining:
+  subscriptionGraceDaysRemainingSrv(
+    subscription,
+    nowMs
+  ),
+
+graceReason:
+  String(
+    subscription?.graceReason || ''
+  ).trim() ||
+  null,
+
+gracePolicyVersion:
+  String(
+    subscription?.gracePolicyVersion || ''
+  ).trim() ||
+  null
   };
 }
 
@@ -100232,6 +100602,10 @@ app.get(
 
       const userId =
         String(req.userId || '').trim();
+        await subscriptionReconcilePrebillingGraceSrv({
+  userId,
+  source: 'server:subscription-me'
+});
 
       const snap =
         await db
@@ -100568,11 +100942,17 @@ async function subscriptionAccessDocumentSrv(
     await subscriptionRef.get();
 
   if (snap.exists) {
-    return {
-      legacyUnmanaged: false,
-      snap
-    };
-  }
+  snap =
+    await subscriptionReconcilePrebillingGraceSrv({
+      userId,
+      source
+    });
+
+  return {
+    legacyUnmanaged: false,
+    snap
+  };
+}
 
   const uid =
     String(
@@ -107671,6 +108051,7 @@ async function adminPortalPendingBillingOrdersSrv() {
           async userId => {
             const subscriptionSnap =
               await db
+
                 .collection('subscriptions')
                 .doc(userId)
                 .get();
@@ -109962,11 +110343,19 @@ app.get(
           );
       }
 
-      const snap =
-        await db
-          .collection('subscriptions')
-          .doc(String(req.userId || '').trim())
-          .get();
+    const userId =
+  String(req.userId || '').trim();
+
+await subscriptionReconcilePrebillingGraceSrv({
+  userId,
+  source: 'server:subscription-renewal-page'
+});
+
+const snap =
+  await db
+    .collection('subscriptions')
+    .doc(userId)
+    .get();
 
       if (!snap.exists) {
         return res.redirect(
