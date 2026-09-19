@@ -100469,6 +100469,76 @@ async function subscriptionReconcilePrebillingGraceSrv({
 
   return subscriptionRef.get();
 }
+function subscriptionPublicUiSrv(
+  subscription = {},
+  nowMs = Date.now()
+) {
+  const effectiveStatus =
+    subscriptionEffectiveStatusSrv(
+      subscription,
+      nowMs
+    );
+
+  if (effectiveStatus === 'trial') {
+    const daysRemaining =
+      subscriptionTrialDaysRemainingSrv(
+        subscription,
+        nowMs
+      );
+
+    const message =
+      daysRemaining <= 7 &&
+      !SUBSCRIPTION_BILLING_READY_SRV
+        ? `متبقي من الفترة التجريبية لمُرَبِّيك: ${daysRemaining} يوم. سيتم إتاحة الاشتراك قريبًا، وسيستمر استخدامك لمُرَبِّيك دون انقطاع.`
+        : `أنت في الفترة التجريبية لمُرَبِّيك — متبقي لديك ${daysRemaining} يوم.`;
+
+    return {
+      visible: true,
+      state: 'trial',
+      message
+    };
+  }
+
+  if (effectiveStatus === 'grace') {
+    const daysRemaining =
+      subscriptionGraceDaysRemainingSrv(
+        subscription,
+        nowMs
+      );
+
+    const graceReason =
+      String(
+        subscription?.graceReason || ''
+      ).trim();
+
+    if (
+      graceReason ===
+        SUBSCRIPTION_PREBILLING_GRACE_REASON_SRV
+    ) {
+      if (subscription?.graceFinalizedAt) {
+        return {
+          visible: true,
+          state: 'grace_final',
+          message:
+            `تم إتاحة الاشتراك في مُرَبِّيك — متبقي لديك ${daysRemaining} يوم لاستكمال الاشتراك.`
+        };
+      }
+
+      return {
+        visible: true,
+        state: 'grace',
+        message:
+          'تم تمديد استخدام مُرَبِّيك مؤقتًا لحين إتاحة الاشتراك.'
+      };
+    }
+  }
+
+  return {
+    visible: false,
+    state: effectiveStatus || null,
+    message: ''
+  };
+}
 function subscriptionPublicStateSrv(
   subscription = {},
   nowMs = Date.now()
@@ -100628,14 +100698,22 @@ app.get(
         });
       }
 
-      return res.json({
-        ok: true,
-        readOnly: true,
+     const subscription =
+  snap.data() || {};
 
-        ...subscriptionPublicStateSrv(
-          snap.data() || {}
-        )
-      });
+return res.json({
+  ok: true,
+  readOnly: true,
+
+  ...subscriptionPublicStateSrv(
+    subscription
+  ),
+
+  ui:
+    subscriptionPublicUiSrv(
+      subscription
+    )
+});
 
     } catch (e) {
       console.error(
