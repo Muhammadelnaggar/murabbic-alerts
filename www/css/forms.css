@@ -8944,29 +8944,24 @@ html[data-page="archive"] #archiveEventsTable td:nth-child(3){
 
 body[data-page="dashboard"] .mbk-subscription-banner{
   width:min(1180px, calc(100% - 24px));
-  margin:12px auto 0;
-  padding:13px 16px;
+  min-height:50px;
+  margin:10px auto 0;
+  padding:7px 12px;
 
   display:flex;
   align-items:center;
-  gap:13px;
+  gap:10px;
 
   position:relative;
   overflow:hidden;
 
-  border:1px solid rgba(14,160,90,.22);
-  border-radius:18px;
+  border:1px solid rgba(14,160,90,.18);
+  border-radius:14px;
 
-  background:
-    linear-gradient(
-      135deg,
-      #eefaf3 0%,
-      #ffffff 58%,
-      #f3fbf6 100%
-    );
+  background:#f7fcf9;
 
   box-shadow:
-    0 8px 24px rgba(11,127,71,.08);
+    0 3px 10px rgba(11,127,71,.05);
 
   color:#173126;
 }
@@ -8983,15 +8978,15 @@ body[data-page="dashboard"]
   inset-inline-start:0;
   top:0;
   bottom:0;
-  width:5px;
+  width:3px;
   background:#0ea05a;
 }
 
 body[data-page="dashboard"]
 .mbk-subscription-icon{
-  width:42px;
-  height:42px;
-  flex:0 0 42px;
+  width:32px;
+  height:32px;
+  flex:0 0 32px;
 
   display:flex;
   align-items:center;
@@ -8999,13 +8994,10 @@ body[data-page="dashboard"]
 
   border-radius:50%;
 
-  background:#ffffff;
-  border:1px solid rgba(14,160,90,.18);
+  background:#fff;
+  border:1px solid rgba(14,160,90,.14);
 
-  box-shadow:
-    0 4px 14px rgba(11,127,71,.10);
-
-  font-size:20px;
+  font-size:16px;
 }
 
 body[data-page="dashboard"]
@@ -9015,51 +9007,38 @@ body[data-page="dashboard"]
 }
 
 body[data-page="dashboard"]
-.mbk-subscription-label{
-  margin-bottom:2px;
-
-  color:#0b7f47;
-
-  font-size:12px;
-  font-weight:900;
-
-  letter-spacing:.1px;
-}
-
-body[data-page="dashboard"]
 .mbk-subscription-message{
   color:#173126;
-
-  font-size:15px;
-  font-weight:800;
-  line-height:1.6;
+  font-size:14px;
+  font-weight:700;
+  line-height:1.45;
 }
 
-/* Grace قبل جاهزية الدفع */
 body[data-page="dashboard"]
-.mbk-subscription-banner[data-state="grace"]{
-  border-color:rgba(14,160,90,.26);
-  background:
-    linear-gradient(
-      135deg,
-      #edf9f2 0%,
-      #ffffff 65%,
-      #f4fbf7 100%
-    );
+.mbk-subscription-emphasis{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  margin:0 4px;
+  padding:3px 9px;
+
+  border-radius:999px;
+
+  background:#0ea05a;
+  color:#fff;
+
+  font-size:14px;
+  font-weight:900;
+  line-height:1.25;
+
+  box-shadow:none;
 }
 
-/* آخر مهلة بعد إتاحة الاشتراك */
 body[data-page="dashboard"]
 .mbk-subscription-banner[data-state="grace_final"]{
-  border-color:rgba(217,139,6,.30);
-
-  background:
-    linear-gradient(
-      135deg,
-      #fff8e8 0%,
-      #ffffff 62%,
-      #fffaf0 100%
-    );
+  border-color:rgba(217,139,6,.22);
+  background:#fffaf2;
 }
 
 body[data-page="dashboard"]
@@ -9067,59 +9046,35 @@ body[data-page="dashboard"]
   background:#d98b06;
 }
 
-body[data-page="dashboard"]
-.mbk-subscription-banner[data-state="grace_final"]
-.mbk-subscription-label{
-  color:#9a6200;
-}
-
 @media (max-width:600px){
   body[data-page="dashboard"]
   .mbk-subscription-banner{
     width:calc(100% - 20px);
-    margin-top:10px;
-    padding:11px 13px;
-    gap:10px;
-    border-radius:16px;
+    min-height:48px;
+    margin-top:8px;
+    padding:7px 10px;
+    gap:8px;
+    border-radius:13px;
   }
 
   body[data-page="dashboard"]
   .mbk-subscription-icon{
-    width:36px;
-    height:36px;
-    flex-basis:36px;
-    font-size:18px;
+    width:30px;
+    height:30px;
+    flex-basis:30px;
+    font-size:15px;
   }
 
   body[data-page="dashboard"]
   .mbk-subscription-message{
-    font-size:14px;
-    line-height:1.55;
+    font-size:13px;
+    line-height:1.4;
   }
 
   body[data-page="dashboard"]
-  .mbk-subscription-label{
-    font-size:11px;
+  .mbk-subscription-emphasis{
+    padding:3px 8px;
+    margin:0 3px;
+    font-size:13px;
   }
-}
-body[data-page="dashboard"]
-.mbk-subscription-emphasis{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-
-  margin:0 5px;
-  padding:5px 12px;
-
-  border-radius:999px;
-
-  background:#0ea05a;
-  color:#fff;
-
-  font-size:18px;
-  font-weight:900;
-  line-height:1.2;
-
-  box-shadow:
-    0 4px 12px rgba(14,160,90,.22);
 }
