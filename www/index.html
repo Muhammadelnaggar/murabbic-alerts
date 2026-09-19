@@ -27,120 +27,169 @@
     <button id="installBtn" class="install-btn" type="button">تثبيت مُرَبِّيك</button>
     <div class="install-note">اضغط مرة واحدة لتثبيت التطبيق على جهازك</div>
   </div>
- <script>
+<script>
   let deferredInstallPrompt = null;
   let installPromptSeen = false;
   let installDone = false;
+  let nextActionBusy = false;
 
   const installBox = document.getElementById('installBox');
   const installBtn = document.getElementById('installBtn');
-  const installNote = installBox ? installBox.querySelector('.install-note') : null;
-   function mbkInstallDeviceText(state = 'ready'){
-  const ua = String(navigator.userAgent || '').toLowerCase();
-  const platform = String(navigator.platform || '').toLowerCase();
-  const touch = Number(navigator.maxTouchPoints || 0);
+  const installNote = installBox
+    ? installBox.querySelector('.install-note')
+    : null;
 
-  const isIpad =
-    ua.includes('ipad') ||
-    (platform.includes('mac') && touch > 1);
+  function mbkInstallDeviceText(state = 'ready') {
+    const ua = String(navigator.userAgent || '').toLowerCase();
+    const platform = String(navigator.platform || '').toLowerCase();
+    const touch = Number(navigator.maxTouchPoints || 0);
 
-  const isMobile =
-    /iphone|ipod|android.*mobile|windows phone/.test(ua);
+    const isIpad =
+      ua.includes('ipad') ||
+      (platform.includes('mac') && touch > 1);
 
-  const isTablet =
-    isIpad ||
-    ua.includes('tablet') ||
-    (ua.includes('android') && !ua.includes('mobile'));
+    const isMobile =
+      /iphone|ipod|android.*mobile|windows phone/.test(ua);
 
-  const deviceText = isMobile
-    ? 'موبايلك'
-    : isTablet
-      ? 'التابلت'
-      : 'الكمبيوتر';
+    const isTablet =
+      isIpad ||
+      ua.includes('tablet') ||
+      (ua.includes('android') && !ua.includes('mobile'));
 
-  const openText = isMobile || isTablet
-    ? 'الشاشة الرئيسية'
-    : 'سطح المكتب أو قائمة Start';
+    const deviceText = isMobile
+      ? 'موبايلك'
+      : isTablet
+        ? 'التابلت'
+        : 'الكمبيوتر';
 
-  if (state === 'installed') {
+    const openText = isMobile || isTablet
+      ? 'الشاشة الرئيسية'
+      : 'سطح المكتب أو قائمة Start';
+
+    if (state === 'installed') {
+      return {
+        button: 'تم تثبيت مُرَبِّيك بنجاح',
+        note: `افتح مُرَبِّيك من الأيقونة الجديدة على ${openText}.`
+      };
+    }
+
     return {
-      button: 'تم تثبيت مُرَبِّيك بنجاح',
-      note: `افتح مُرَبِّيك الآن من الأيقونة الجديدة على ${openText}.`
+      button: `تثبيت مُرَبِّيك على ${deviceText}`,
+      note: `اضغط مرة واحدة لتثبيت التطبيق على ${deviceText}.`
     };
   }
 
-  return {
-    button: `تثبيت مُرَبِّيك على ${deviceText}`,
-    note: `اضغط مرة واحدة لتثبيت التطبيق على ${deviceText}.`
-  };
-}
+  function applyInstallDeviceText(state = 'ready') {
+    const t = mbkInstallDeviceText(state);
 
-function applyInstallDeviceText(state = 'ready'){
-  const t = mbkInstallDeviceText(state);
+    if (installBtn) {
+      installBtn.textContent = t.button;
+    }
 
-  if (installBtn) {
-    installBtn.textContent = t.button;
+    if (installNote) {
+      installNote.textContent = t.note;
+    }
   }
 
-  if (installNote) {
-    installNote.textContent = t.note;
-  }
-}
-
-  function isStandaloneApp(){
-    return window.matchMedia('(display-mode: standalone)').matches ||
-           window.navigator.standalone === true;
+  function isStandaloneApp() {
+    return (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true
+    );
   }
 
-  function goLogin(delay){
-    setTimeout(() => {
-      window.location.replace("login.html");
-    }, delay);
+  async function executeServerNext(delay = 0) {
+    if (nextActionBusy) return;
+
+    nextActionBusy = true;
+
+    if (delay > 0) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    try {
+      const response = await fetch('/api/auth/onboarding/next', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store'
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (
+        !response.ok ||
+        data?.ok !== true ||
+        !data?.redirectUrl
+      ) {
+        throw new Error('onboarding_next_failed');
+      }
+
+      window.location.replace(data.redirectUrl);
+
+    } catch (_) {
+      nextActionBusy = false;
+
+      if (installBox) {
+        installBox.hidden = false;
+      }
+
+      if (installNote) {
+        installNote.textContent =
+          'تعذّر فتح مُرَبِّيك الآن. حاول مرة أخرى بعد لحظات.';
+      }
+    }
   }
 
-function showInstalledMessage(){
-  installDone = true;
+  function showInstalledMessage() {
+    installDone = true;
 
-  if (installBox) {
-    installBox.hidden = false;
+    if (installBox) {
+      installBox.hidden = false;
+    }
+
+    const t = mbkInstallDeviceText('installed');
+
+    if (installBtn) {
+      installBtn.disabled = true;
+      installBtn.textContent = t.button;
+      installBtn.style.opacity = '0.9';
+      installBtn.style.cursor = 'default';
+    }
+
+    if (installNote) {
+      installNote.textContent = t.note;
+    }
   }
-
-  const t = mbkInstallDeviceText('installed');
-
-  if (installBtn) {
-    installBtn.disabled = true;
-    installBtn.textContent = t.button;
-    installBtn.style.opacity = '0.9';
-    installBtn.style.cursor = 'default';
-  }
-
-  if (installNote) {
-    installNote.textContent = t.note;
-  }
-}
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
+      navigator.serviceWorker
+        .register('/sw.js', { scope: '/' })
+        .catch(function () {});
     });
   }
 
   window.addEventListener('beforeinstallprompt', function (event) {
     event.preventDefault();
+
     deferredInstallPrompt = event;
     installPromptSeen = true;
 
     applyInstallDeviceText('ready');
 
-if (installBox) {
-  installBox.hidden = false;
-}
+    if (installBox) {
+      installBox.hidden = false;
+    }
   });
 
   if (installBtn) {
     installBtn.addEventListener('click', async function () {
       if (!deferredInstallPrompt) {
-        goLogin(300);
+        if (installNote) {
+          installNote.textContent =
+            'استخدم خيار «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية» من قائمة المتصفح.';
+        }
+
         return;
       }
 
@@ -149,19 +198,38 @@ if (installBox) {
 
       try {
         promptEvent.prompt();
+
         const choice = await promptEvent.userChoice;
 
-        if (choice && choice.outcome === 'accepted') {
-          showInstalledMessage();
+        if (
+          choice &&
+          choice.outcome === 'accepted'
+        ) {
+          if (installBtn) {
+            installBtn.disabled = true;
+            installBtn.textContent =
+              'جارٍ تثبيت مُرَبِّيك...';
+          }
+
+          if (installNote) {
+            installNote.textContent =
+              'انتظر حتى يكتمل التثبيت، ثم افتح مُرَبِّيك من الأيقونة الجديدة.';
+          }
+
           return;
         }
       } catch (_) {}
 
       if (!installDone) {
-        if (installBox) {
-          installBox.hidden = true;
+        if (installBtn) {
+          installBtn.disabled = false;
         }
-        goLogin(700);
+
+        applyInstallDeviceText('ready');
+
+        if (installBox) {
+          installBox.hidden = false;
+        }
       }
     });
   }
@@ -170,15 +238,25 @@ if (installBox) {
     showInstalledMessage();
   });
 
- if (isStandaloneApp()) {
-  goLogin(6000);
-} else {
-  setTimeout(function () {
-    if (!installPromptSeen && !installDone) {
-      window.location.replace("login.html");
-    }
-  }, 6000);
-}
+  if (isStandaloneApp()) {
+    executeServerNext(300);
+
+  } else {
+    setTimeout(function () {
+      if (
+        !installPromptSeen &&
+        !installDone &&
+        installBox
+      ) {
+        installBox.hidden = false;
+
+        if (installNote) {
+          installNote.textContent =
+            'إذا لم يظهر طلب التثبيت تلقائيًا، اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية» من قائمة المتصفح.';
+        }
+      }
+    }, 4000);
+  }
 </script>
 </body>
 </html>
