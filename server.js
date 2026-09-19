@@ -42132,27 +42132,56 @@ function vaccinationParseNumbersSrv(raw) {
   )];
 }
 
-async function vaccinationHasSameDaySrv(uid, animalNumber, eventDate, vaccine) {
+async function vaccinationHasSameDaySrv(
+  uid,
+  animalNumber,
+  eventDate,
+  vaccine,
+  prefetchedEventDocs = null
+) {
   const num = calvingNormDigitsOnlySrv(animalNumber);
   const dt = String(eventDate || "").trim().slice(0, 10);
   const vx = String(vaccine || "").trim();
 
   if (!db || !uid || !num || !dt || !vx) return false;
 
-  const snap = await db.collection("events")
-    .where("userId", "==", uid)
-    .where("animalNumber", "==", num)
-    .limit(80)
-    .get();
+  let eventDocs = null;
+
+  if (Array.isArray(prefetchedEventDocs)) {
+    eventDocs = prefetchedEventDocs.slice(0, 80);
+  } else {
+    const snap = await db.collection("events")
+      .where("userId", "==", uid)
+      .where("animalNumber", "==", num)
+      .limit(80)
+      .get();
+
+    eventDocs = snap.docs;
+  }
 
   let found = false;
 
-  snap.forEach(ds => {
+  eventDocs.forEach(ds => {
     const ev = ds.data() || {};
 
-    const t = String(ev.eventType || ev.type || ev.eventTypeNorm || "").trim();
-    const ed = String(ev.eventDate || ev.date || "").trim().slice(0, 10);
-    const v = String(ev.vaccine || ev.vaccineName || "").trim();
+    const t = String(
+      ev.eventType ||
+      ev.type ||
+      ev.eventTypeNorm ||
+      ""
+    ).trim();
+
+    const ed = String(
+      ev.eventDate ||
+      ev.date ||
+      ""
+    ).trim().slice(0, 10);
+
+    const v = String(
+      ev.vaccine ||
+      ev.vaccineName ||
+      ""
+    ).trim();
 
     const isVaccination =
       t === "تحصين" ||
@@ -42160,7 +42189,11 @@ async function vaccinationHasSameDaySrv(uid, animalNumber, eventDate, vaccine) {
       t.includes("تحصين") ||
       t.includes("vaccination");
 
-    if (isVaccination && ed === dt && v === vx) {
+    if (
+      isVaccination &&
+      ed === dt &&
+      v === vx
+    ) {
       found = true;
     }
   });
@@ -43430,7 +43463,9 @@ async function vaccinationDueWarningSrv({
   vaccine,
   vaccineCode = "",
   animalDoc = {},
-  programLink = {}
+  programLink = {},
+  prefetchedTaskDocs = null,
+  prefetchedEventDocs = null
 } = {}) {
   const num = calvingNormDigitsOnlySrv(animalNumber);
   const dt = String(eventDate || "").trim().slice(0, 10);
@@ -43458,23 +43493,36 @@ const linkedProgramSection = String(
     );
   };
 
-  const [taskSnap, eventSnap] = await Promise.all([
-    db.collection("tasks")
-      .where("userId", "==", uid)
-      .where("animalNumber", "==", num)
-      .limit(120)
-      .get(),
+let taskDocs = null;
+let eventDocs = null;
 
-    db.collection("events")
-      .where("userId", "==", uid)
-      .where("animalNumber", "==", num)
-      .limit(120)
-      .get()
-  ]);
+if (Array.isArray(prefetchedTaskDocs)) {
+  taskDocs = prefetchedTaskDocs.slice(0, 120);
+} else {
+  const taskSnap = await db.collection("tasks")
+    .where("userId", "==", uid)
+    .where("animalNumber", "==", num)
+    .limit(120)
+    .get();
 
-  let nearest = null;
+  taskDocs = taskSnap.docs;
+}
 
-  taskSnap.forEach(ds => {
+if (Array.isArray(prefetchedEventDocs)) {
+  eventDocs = prefetchedEventDocs.slice(0, 120);
+} else {
+  const eventSnap = await db.collection("events")
+    .where("userId", "==", uid)
+    .where("animalNumber", "==", num)
+    .limit(120)
+    .get();
+
+  eventDocs = eventSnap.docs;
+}
+
+let nearest = null;
+
+taskDocs.forEach(ds => {
     const t = ds.data() || {};
 
     const taskType = String(
@@ -43552,7 +43600,7 @@ const linkedProgramSection = String(
 
   let latestPreviousDate = "";
 
-  eventSnap.forEach(ds => {
+  eventDocs.forEach(ds => {
     const ev = ds.data() || {};
 
     const eventType = String(
@@ -49107,7 +49155,236 @@ try {
     }
   }
 );
+async function vaccinationGateBulkStateSrv({
+  uid = "",
+  numbers = [],
+  vaccineCode = "",
+  vaccine = ""
+} = {}) {
+  const tenant =
+    tenantKey(uid);
 
+  const wantedNumbers =
+    [
+      ...new Set(
+        (
+          Array.isArray(numbers)
+            ? numbers
+            : []
+        )
+          .map(value =>
+            calvingNormDigitsOnlySrv(value)
+          )
+          .filter(Boolean)
+      )
+    ];
+
+  if (
+    !db ||
+    !tenant ||
+    !wantedNumbers.length
+  ) {
+    return null;
+  }
+
+  try {
+    const herdPromise =
+      loadAnimalsForGroupsSrv(
+        tenant
+      );
+
+    const taskDocs = [];
+    const eventDocs = [];
+
+    const firestoreInChunkSize = 30;
+
+    for (
+      let start = 0;
+      start < wantedNumbers.length;
+      start += firestoreInChunkSize
+    ) {
+      const chunk =
+        wantedNumbers.slice(
+          start,
+          start + firestoreInChunkSize
+        );
+
+      const [
+        taskSnap,
+        eventSnap
+      ] = await Promise.all([
+        db.collection("tasks")
+          .where(
+            "userId",
+            "==",
+            tenant
+          )
+          .where(
+            "animalNumber",
+            "in",
+            chunk
+          )
+          .get(),
+
+        db.collection("events")
+          .where(
+            "userId",
+            "==",
+            tenant
+          )
+          .where(
+            "animalNumber",
+            "in",
+            chunk
+          )
+          .get()
+      ]);
+
+      taskDocs.push(
+        ...taskSnap.docs
+      );
+
+      eventDocs.push(
+        ...eventSnap.docs
+      );
+    }
+
+    const herd =
+      await herdPromise;
+
+    const wantedSet =
+      new Set(wantedNumbers);
+
+    const animalByNumber =
+      new Map();
+
+    for (
+      const row of
+      Array.isArray(herd)
+        ? herd
+        : []
+    ) {
+      const animalNumber =
+        calvingNormDigitsOnlySrv(
+          row?.animalNumber ||
+          row?.number ||
+          row?.calfNumber ||
+          ""
+        );
+
+      if (
+        !animalNumber ||
+        !wantedSet.has(
+          animalNumber
+        )
+      ) {
+        continue;
+      }
+
+      animalByNumber.set(
+        animalNumber,
+        {
+          id:
+            String(
+              row?.id || ""
+            ).trim(),
+
+          data:
+            row || {},
+
+          _collection:
+            String(
+              row?._source || ""
+            ).trim() === "calves"
+              ? "calves"
+              : "animals"
+        }
+      );
+    }
+
+    const taskDocsByNumber =
+      new Map();
+
+    for (const ds of taskDocs) {
+      const task =
+        ds.data() || {};
+
+      const animalNumber =
+        calvingNormDigitsOnlySrv(
+          task.animalNumber || ""
+        );
+
+      if (
+        !animalNumber ||
+        !wantedSet.has(
+          animalNumber
+        )
+      ) {
+        continue;
+      }
+
+      const list =
+        taskDocsByNumber.get(
+          animalNumber
+        ) || [];
+
+      list.push(ds);
+
+      taskDocsByNumber.set(
+        animalNumber,
+        list
+      );
+    }
+
+    const eventDocsByNumber =
+      new Map();
+
+    for (const ds of eventDocs) {
+      const ev =
+        ds.data() || {};
+
+      const animalNumber =
+        calvingNormDigitsOnlySrv(
+          ev.animalNumber || ""
+        );
+
+      if (
+        !animalNumber ||
+        !wantedSet.has(
+          animalNumber
+        )
+      ) {
+        continue;
+      }
+
+      const list =
+        eventDocsByNumber.get(
+          animalNumber
+        ) || [];
+
+      list.push(ds);
+
+      eventDocsByNumber.set(
+        animalNumber,
+        list
+      );
+    }
+
+    return {
+      animalByNumber,
+      taskDocsByNumber,
+      eventDocsByNumber
+    };
+
+  } catch (e) {
+    console.warn(
+      "vaccination bulk gate prefetch skipped:",
+      e.message || e
+    );
+
+    return null;
+  }
+}
 app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -49355,11 +49632,23 @@ const requestedDoseType =
       });
     }
 
-    const accepted = [];
+const bulkGateState =
+  numbers.length > 1
+    ? await vaccinationGateBulkStateSrv({
+        uid,
+        numbers,
+        vaccineCode,
+        vaccine
+      })
+    : null;
+
+const accepted = [];
 const rejected = [];
 
-// التحقق الجماعي: نفس الـ Gate لكل حيوان، لكن بعدد محدود بالتوازي.
-const vaccinationGateConcurrency = 8;
+// إذا نجح الـPrefetch نتحقق على دفعات أكبر؛
+// وإذا تعذر نرجع تلقائيًا للمسار القديم الآمن.
+const vaccinationGateConcurrency =
+  bulkGateState ? 32 : 8;
 
 for (
   let offset = 0;
@@ -49384,7 +49673,14 @@ for (
         continue;
       }
 
-      const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
+      const animal =
+  bulkGateState?.animalByNumber?.get(
+    animalNumber
+  ) ||
+  await fetchAnimalByNumberForCalvingGateSrv(
+    uid,
+    animalNumber
+  );
 
       if (!animal) {
         rejected.push({
@@ -49498,13 +49794,21 @@ if (
 
   continue;
 }
-
+const prefetchedEventDocs =
+  bulkGateState
+    ? (
+        bulkGateState.eventDocsByNumber.get(
+          animalNumber
+        ) || []
+      )
+    : null;
 const duplicated =
   await vaccinationHasSameDaySrv(
     uid,
     animalNumber,
     eventDate,
-    resolvedVaccine
+    resolvedVaccine,
+    prefetchedEventDocs
   );
 
 if (duplicated) {
@@ -49530,7 +49834,17 @@ const dueWarning =
       resolvedVaccineCode,
 
     animalDoc: doc,
-    programLink
+    programLink,
+    prefetchedTaskDocs:
+  bulkGateState
+    ? (
+        bulkGateState.taskDocsByNumber.get(
+          animalNumber
+        ) || []
+      )
+    : null,
+
+prefetchedEventDocs
   });
 
 if (dueWarning?.allowed === false) {
