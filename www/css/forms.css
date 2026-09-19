@@ -9102,3 +9102,24 @@ body[data-page="dashboard"]
     font-size:11px;
   }
 }
+body[data-page="dashboard"]
+.mbk-subscription-emphasis{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  margin:0 5px;
+  padding:5px 12px;
+
+  border-radius:999px;
+
+  background:#0ea05a;
+  color:#fff;
+
+  font-size:18px;
+  font-weight:900;
+  line-height:1.2;
+
+  box-shadow:
+    0 4px 12px rgba(14,160,90,.22);
+}
