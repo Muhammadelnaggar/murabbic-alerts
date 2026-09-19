@@ -189,7 +189,9 @@ async function loadServerSession(){
 }
 async function loadSubscriptionUi(){
   const banner =
-    document.getElementById('subscriptionBanner');
+    document.getElementById(
+      'subscriptionBanner'
+    );
 
   const message =
     document.getElementById(
@@ -200,7 +202,7 @@ async function loadSubscriptionUi(){
 
   banner.hidden = true;
   banner.dataset.state = '';
-  message.textContent = '';
+  message.replaceChildren();
 
   try {
     const res = await fetch(
@@ -219,7 +221,8 @@ async function loadSubscriptionUi(){
     const data =
       await res.json().catch(() => ({}));
 
-    const ui = data?.ui || {};
+    const ui =
+      data?.ui || {};
 
     if (
       !res.ok ||
@@ -233,8 +236,53 @@ async function loadSubscriptionUi(){
     banner.dataset.state =
       String(ui.state || '');
 
-    message.textContent =
-      String(ui.message || '');
+    const prefix =
+      String(ui.prefix || '').trim();
+
+    const emphasis =
+      String(ui.emphasis || '').trim();
+
+    const suffix =
+      String(ui.suffix || '').trim();
+
+    if (
+      prefix &&
+      emphasis &&
+      suffix
+    ) {
+      const prefixEl =
+        document.createElement('span');
+
+      prefixEl.textContent =
+        prefix;
+
+      const emphasisEl =
+        document.createElement('span');
+
+      emphasisEl.className =
+        'mbk-subscription-emphasis';
+
+      emphasisEl.textContent =
+        emphasis;
+
+      const suffixEl =
+        document.createElement('span');
+
+      suffixEl.textContent =
+        suffix;
+
+      message.append(
+        prefixEl,
+        document.createTextNode(' '),
+        emphasisEl,
+        document.createTextNode(' '),
+        suffixEl
+      );
+
+    } else {
+      message.textContent =
+        String(ui.message || '');
+    }
 
     banner.hidden = false;
 
