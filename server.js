@@ -49356,9 +49356,24 @@ const requestedDoseType =
     }
 
     const accepted = [];
-    const rejected = [];
+const rejected = [];
 
-    for (const rawNum of numbers) {
+// التحقق الجماعي: نفس الـ Gate لكل حيوان، لكن بعدد محدود بالتوازي.
+const vaccinationGateConcurrency = 8;
+
+for (
+  let offset = 0;
+  offset < numbers.length;
+  offset += vaccinationGateConcurrency
+) {
+  const chunk = numbers.slice(
+    offset,
+    offset + vaccinationGateConcurrency
+  );
+
+  await Promise.all(
+    chunk.map(async rawNumber => {
+      for (const rawNum of [rawNumber]) {
       const animalNumber = calvingNormDigitsOnlySrv(rawNum);
 
       if (!animalNumber) {
@@ -49652,7 +49667,11 @@ accepted.push({
   dueDate:
     dueWarning?.dueDate || ""
 });
-}
+          }
+        })
+      );
+    }
+
 const firstReason =
   rejected[0]?.reason || "";
 
