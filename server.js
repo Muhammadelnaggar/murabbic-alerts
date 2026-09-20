@@ -49798,14 +49798,25 @@ for (
         continue;
       }
 
-      const animal =
+const prefetchedAnimal =
   bulkGateState?.animalByNumber?.get(
     animalNumber
   ) ||
-  await fetchAnimalByNumberForCalvingGateSrv(
-    uid,
-    animalNumber
-  );
+  null;
+
+const animal =
+  isCampaignExecution
+    ? await fetchAnimalByNumberForCalvingGateSrv(
+        uid,
+        animalNumber
+      )
+    : (
+        prefetchedAnimal ||
+        await fetchAnimalByNumberForCalvingGateSrv(
+          uid,
+          animalNumber
+        )
+      );
 
       if (!animal) {
         rejected.push({
