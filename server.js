@@ -50142,8 +50142,28 @@ const campaignAcceptedNumbers =
     )
     .filter(Boolean);
 
+const campaignInitialDoseRows =
+  isCampaignExecution
+    ? rejected.filter(item =>
+        item?.initialDoseRequired === true ||
+        String(item?.code || "").trim() ===
+          "vaccination_initial_dose_required"
+      )
+    : [];
+
+const campaignActualRejectedRows =
+  isCampaignExecution
+    ? rejected.filter(item =>
+        !(
+          item?.initialDoseRequired === true ||
+          String(item?.code || "").trim() ===
+            "vaccination_initial_dose_required"
+        )
+      )
+    : rejected;
+
 const campaignRejectedLines =
-  rejected
+  campaignActualRejectedRows
     .map(item => {
       const animalNumber =
         String(
@@ -50168,6 +50188,10 @@ const campaignGateMessage =
           ? `✅ الأرقام المقبولة (${campaignAcceptedNumbers.length}): ${campaignAcceptedNumbers.join("، ")}`
           : "",
 
+        campaignInitialDoseRows.length
+          ? `اختر أول جرعة مسجلة لهذا التحصين للحيوانات التي لم يبدأ لها التحصين (${campaignInitialDoseRows.length}): تأسيسية أو منشطة أو دورية.`
+          : "",
+
         campaignRejectedLines.length
           ? `❌ الأرقام المرفوضة (${campaignRejectedLines.length}):\n${campaignRejectedLines.join("\n")}`
           : ""
@@ -50175,7 +50199,6 @@ const campaignGateMessage =
         .filter(Boolean)
         .join("\n\n")
     : "";
-
 return res.json({
   ok: true,
   allowed: accepted.length > 0,
