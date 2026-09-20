@@ -111976,9 +111976,123 @@ app.use(async (req, res, next) => {
       )
   );
 });
+// ============================================================
+//  CUSTOM DOMAIN STATIC ORIGIN BRIDGE
+//  يحافظ على Render كما هو، ويجعل صفحات murabbik.com
+//  تستخدم نفس الـ origin الحالي بدل عنوان Render الثابت.
+// ============================================================
+const CUSTOM_DOMAIN_HOSTS_SRV = new Set([
+  'murabbik.com',
+  'www.murabbik.com'
+]);
 
+const LEGACY_RENDER_ORIGIN_SRV =
+  'https://murabbic-alerts.onrender.com';
+
+app.use(async (req, res, next) => {
+  try {
+    const method =
+      String(req.method || '').toUpperCase();
+
+    if (method !== 'GET' && method !== 'HEAD') {
+      return next();
+    }
+
+    const hostname =
+      String(req.hostname || '')
+        .trim()
+        .toLowerCase();
+
+    // Render والحسابات الحالية عليه لا تتغير إطلاقًا.
+    if (!CUSTOM_DOMAIN_HOSTS_SRV.has(hostname)) {
+      return next();
+    }
+
+    const requestPath =
+      String(req.path || '');
+
+    const ext =
+      path.extname(requestPath)
+        .toLowerCase();
+
+    if (ext !== '.html' && ext !== '.js') {
+      return next();
+    }
+
+    const staticRoot =
+      path.resolve(__dirname, 'www');
+
+    const relativePath =
+      requestPath.replace(/^\/+/, '');
+
+    const filePath =
+      path.resolve(staticRoot, relativePath);
+
+    const relativeCheck =
+      path.relative(staticRoot, filePath);
+
+    if (
+      !relativeCheck ||
+      relativeCheck.startsWith('..') ||
+      path.isAbsolute(relativeCheck)
+    ) {
+      return next();
+    }
+
+    let source;
+
+    try {
+      source =
+        await fs.promises.readFile(
+          filePath,
+          'utf8'
+        );
+    } catch (e) {
+      if (
+        e?.code === 'ENOENT' ||
+        e?.code === 'EISDIR'
+      ) {
+        return next();
+      }
+
+      throw e;
+    }
+
+    if (!source.includes(LEGACY_RENDER_ORIGIN_SRV)) {
+      return next();
+    }
+
+    const output =
+      source
+        .split(LEGACY_RENDER_ORIGIN_SRV)
+        .join('');
+
+    res.set('Cache-Control', 'no-store');
+
+    if (ext === '.html') {
+      res.type('html');
+    } else {
+      res.type('application/javascript');
+    }
+
+    if (method === 'HEAD') {
+      return res.status(200).end();
+    }
+
+    return res.status(200).send(output);
+
+  } catch (e) {
+    console.error(
+      'custom domain static origin bridge failed:',
+      e.message || e
+    );
+
+    return next();
+  }
+});
 // Static last
 app.use(express.static(path.join(__dirname, 'www')));
+
 // ✅ DIM job
 startDailyDimJob();
 // (اختياري ومفيد) تشغيل مرة واحدة فورًا بعد كل Deploy:
