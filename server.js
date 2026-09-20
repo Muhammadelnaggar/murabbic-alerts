@@ -49678,7 +49678,24 @@ if (!selectedProgramRows.length) {
     rejected: []
   });
 }
+const executionContext =
+  String(
+    body.executionContext || ""
+  )
+    .trim()
+    .toLowerCase();
 
+const isCampaignExecution =
+  executionContext === "campaign" &&
+  selectedProgramRows.some(row =>
+    row &&
+    row.active !== false &&
+    String(
+      row.programSection || ""
+    )
+      .trim()
+      .toLowerCase() === "herd"
+  );
 const vaccineCode =
   String(
     requestedVaccineCode ||
@@ -50116,21 +50133,75 @@ const gateSummary =
       ? `✅ راجعت بيانات ${accepted[0].animalLabel || "الرأس"} رقم ${accepted[0].animalNumber}، ويمكنك تسجيل التحصين الآن.`
       : `✅ راجعت البيانات، ويمكن تسجيل التحصين لعدد ${accepted.length} من الأرقام المدخلة.`;
 
+const campaignAcceptedNumbers =
+  accepted
+    .map(item =>
+      String(
+        item?.animalNumber || ""
+      ).trim()
+    )
+    .filter(Boolean);
+
+const campaignRejectedLines =
+  rejected
+    .map(item => {
+      const animalNumber =
+        String(
+          item?.animalNumber || ""
+        ).trim();
+
+      const reason =
+        String(
+          item?.reason || "مرفوض"
+        ).trim();
+
+      return animalNumber
+        ? `${animalNumber} — ${reason}`
+        : reason;
+    })
+    .filter(Boolean);
+
+const campaignGateMessage =
+  isCampaignExecution
+    ? [
+        campaignAcceptedNumbers.length
+          ? `✅ الأرقام المقبولة (${campaignAcceptedNumbers.length}): ${campaignAcceptedNumbers.join("، ")}`
+          : "",
+
+        campaignRejectedLines.length
+          ? `❌ الأرقام المرفوضة (${campaignRejectedLines.length}):\n${campaignRejectedLines.join("\n")}`
+          : ""
+      ]
+        .filter(Boolean)
+        .join("\n\n")
+    : "";
+
 return res.json({
   ok: true,
   allowed: accepted.length > 0,
   stage: "vaccination_gate",
 
   message:
-    accepted.length
-      ? [
-          ...warningMessages,
-          gateSummary
-        ].join("\n")
+    isCampaignExecution
+      ? (
+          campaignGateMessage ||
+          "❌ لا توجد أرقام مقبولة في حملة التحصين الحالية."
+        )
       : (
-          firstReason ||
-          "❌ لا يمكن تسجيل التحصين لأي من الأرقام المدخلة."
+          accepted.length
+            ? [
+                ...warningMessages,
+                gateSummary
+              ].join("\n")
+            : (
+                firstReason ||
+                "❌ لا يمكن تسجيل التحصين لأي من الأرقام المدخلة."
+              )
         ),
+
+  campaignDisplay:
+    isCampaignExecution,
+
   programContext,
 
   acceptedCount: accepted.length,
@@ -52531,7 +52602,24 @@ if (!selectedProgramRows.length) {
     rejected: []
   });
 }
+const executionContext =
+  String(
+    body.executionContext || ""
+  )
+    .trim()
+    .toLowerCase();
 
+const isCampaignExecution =
+  executionContext === "campaign" &&
+  selectedProgramRows.some(row =>
+    row &&
+    row.active !== false &&
+    String(
+      row.programSection || ""
+    )
+      .trim()
+      .toLowerCase() === "herd"
+  );
 const vaccineCode =
   String(
     requestedVaccineCode ||
@@ -53298,30 +53386,86 @@ doseTypeLabel:
         campaignError
       );
     }
-    return res.json({
-      ok: saved.length > 0,
- message: saved.length
-  ? (
-      rejected.length
-        ? `✅ سجلت التحصين لعدد ${saved.length} حيوانات، ولم أتمكن من تسجيله لعدد ${rejected.length}.`
-        : saved.length === 1
-          ? `✅ سجلت التحصين للحيوان رقم ${saved[0].animalNumber} بنجاح.`
-          : `✅ سجلت التحصين لعدد ${saved.length} حيوانات بنجاح.`
-    )
-  : "❌ لم أتمكن من تسجيل التحصين لأي حيوان.",
-           programContext,
+const campaignRejectedLines =
+  rejected
+    .map(item => {
+      const animalNumber =
+        String(
+          item?.animalNumber || ""
+        ).trim();
 
-      savedCount: saved.length,
-      rejectedCount: rejected.length,
+      const reason =
+        String(
+          item?.reason || "مرفوض"
+        ).trim();
 
-      saved,
-      rejected,
-      redirectUrl: saved.length === 1
-        ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
-        : saved.length > 1
-          ? "/add-event.html"
-          : ""
-    });
+      return animalNumber
+        ? `${animalNumber} — ${reason}`
+        : reason;
+    })
+    .filter(Boolean);
+
+const campaignSaveMessage =
+  isCampaignExecution
+    ? (
+        saved.length
+          ? (
+              campaignRejectedLines.length
+                ? `✅ تم تحصين القطيع المستهدف ما عدا الأرقام المرفوضة التالية:\n${campaignRejectedLines.join("\n")}`
+                : "✅ تم تحصين القطيع المستهدف بنجاح."
+            )
+          : [
+              "❌ لم يتم تحصين أي حيوان من القطيع المستهدف.",
+
+              campaignRejectedLines.length
+                ? `❌ الأرقام المرفوضة:\n${campaignRejectedLines.join("\n")}`
+                : ""
+            ]
+              .filter(Boolean)
+              .join("\n\n")
+      )
+    : "";
+
+return res.json({
+  ok: saved.length > 0,
+
+  message:
+    isCampaignExecution
+      ? campaignSaveMessage
+      : (
+          saved.length
+            ? (
+                rejected.length
+                  ? `✅ سجلت التحصين لعدد ${saved.length} حيوانات، ولم أتمكن من تسجيله لعدد ${rejected.length}.`
+                  : saved.length === 1
+                    ? `✅ سجلت التحصين للحيوان رقم ${saved[0].animalNumber} بنجاح.`
+                    : `✅ سجلت التحصين لعدد ${saved.length} حيوانات بنجاح.`
+              )
+            : "❌ لم أتمكن من تسجيل التحصين لأي حيوان."
+        ),
+
+  campaignDisplay:
+    isCampaignExecution,
+
+  programContext,
+
+  savedCount: saved.length,
+  rejectedCount: rejected.length,
+
+  saved,
+  rejected,
+
+  redirectUrl:
+    isCampaignExecution
+      ? ""
+      : (
+          saved.length === 1
+            ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
+            : saved.length > 1
+              ? "/add-event.html"
+              : ""
+        )
+});
 
   } catch (e) {
     console.error("vaccination-save", e);
@@ -66198,6 +66342,8 @@ app.get(
 
       return res.json({
         ok: true,
+        executionContext:
+       "campaign",
 
         campaignId,
         vaccineCode,
@@ -66519,6 +66665,8 @@ if (!herdRow) {
       return res.json({
         ok: true,
         manualCampaign: true,
+        executionContext:
+       "campaign",
 
         programContext,
         programMode,
