@@ -95,7 +95,7 @@
 <script>
 const $ = (s, p = document) => p.querySelector(s);
 const $$ = (s, p = document) => [...p.querySelectorAll(s)];
-const API_BASE = window.API_BASE || "https://murabbic-alerts.onrender.com";
+const API_BASE = window.API_BASE || "";
 
 async function loadServerSession(){
   const res = await fetch(API_BASE + "/api/auth/me", {
