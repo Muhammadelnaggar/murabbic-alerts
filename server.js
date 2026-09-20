@@ -50192,23 +50192,45 @@ const campaignRejectedLines =
     })
     .filter(Boolean);
 
-const campaignGateMessage =
+const campaignGateMessages =
   isCampaignExecution
     ? [
         campaignAcceptedNumbers.length
-          ? `✅ الأرقام المقبولة (${campaignAcceptedNumbers.length}): ${campaignAcceptedNumbers.join("، ")}`
-          : "",
+          ? {
+              type: "success",
+              text:
+                `✅ الأرقام المقبولة (${campaignAcceptedNumbers.length}): ${campaignAcceptedNumbers.join("، ")}`
+            }
+          : null,
 
         campaignInitialDoseRows.length
-          ? `اختر أول جرعة مسجلة لهذا التحصين للحيوانات التي لم يبدأ لها التحصين (${campaignInitialDoseRows.length}): تأسيسية أو منشطة أو دورية.`
-          : "",
+          ? {
+              type: "info",
+              text:
+                `اختر أول جرعة مسجلة لهذا التحصين للحيوانات التي لم يبدأ لها التحصين (${campaignInitialDoseRows.length}): تأسيسية أو منشطة أو دورية.`
+            }
+          : null,
 
         campaignRejectedLines.length
-          ? `❌ الأرقام المرفوضة (${campaignRejectedLines.length}):\n${campaignRejectedLines.join("\n")}`
-          : ""
+          ? {
+              type: "error",
+              text:
+                `❌ الأرقام المرفوضة (${campaignRejectedLines.length}):\n${campaignRejectedLines.join("\n")}`
+            }
+          : null
       ]
         .filter(Boolean)
-        .join("\n\n")
+    : [];
+
+const campaignGateMessage =
+  isCampaignExecution
+    ? (
+        campaignGateMessages.length
+          ? campaignGateMessages
+              .map(item => item.text)
+              .join("\n\n")
+          : "❌ لا توجد أرقام مقبولة في حملة التحصين الحالية."
+      )
     : "";
 return res.json({
   ok: true,
@@ -50234,9 +50256,14 @@ return res.json({
         ),
 
   campaignDisplay:
-    isCampaignExecution,
+  isCampaignExecution,
 
-  programContext,
+campaignMessages:
+  isCampaignExecution
+    ? campaignGateMessages
+    : [],
+
+programContext,
 
   acceptedCount: accepted.length,
   rejectedCount: rejected.length,
@@ -53439,25 +53466,39 @@ const campaignRejectedLines =
     })
     .filter(Boolean);
 
+const campaignSaveMessages =
+  isCampaignExecution
+    ? [
+        saved.length
+          ? {
+              type: "success",
+              text:
+                campaignRejectedLines.length
+                  ? "✅ تم تحصين القطيع المستهدف ما عدا الأرقام المرفوضة."
+                  : "✅ تم تحصين القطيع المستهدف بنجاح."
+            }
+          : {
+              type: "error",
+              text:
+                "❌ لم يتم تحصين أي حيوان من القطيع المستهدف."
+            },
+
+        campaignRejectedLines.length
+          ? {
+              type: "error",
+              text:
+                `❌ الأرقام المرفوضة (${campaignRejectedLines.length}):\n${campaignRejectedLines.join("\n")}`
+            }
+          : null
+      ]
+        .filter(Boolean)
+    : [];
+
 const campaignSaveMessage =
   isCampaignExecution
-    ? (
-        saved.length
-          ? (
-              campaignRejectedLines.length
-                ? `✅ تم تحصين القطيع المستهدف ما عدا الأرقام المرفوضة التالية:\n${campaignRejectedLines.join("\n")}`
-                : "✅ تم تحصين القطيع المستهدف بنجاح."
-            )
-          : [
-              "❌ لم يتم تحصين أي حيوان من القطيع المستهدف.",
-
-              campaignRejectedLines.length
-                ? `❌ الأرقام المرفوضة:\n${campaignRejectedLines.join("\n")}`
-                : ""
-            ]
-              .filter(Boolean)
-              .join("\n\n")
-      )
+    ? campaignSaveMessages
+        .map(item => item.text)
+        .join("\n\n")
     : "";
 
 return res.json({
@@ -53479,9 +53520,14 @@ return res.json({
         ),
 
   campaignDisplay:
-    isCampaignExecution,
+  isCampaignExecution,
 
-  programContext,
+campaignMessages:
+  isCampaignExecution
+    ? campaignSaveMessages
+    : [],
+
+programContext,
 
   savedCount: saved.length,
   rejectedCount: rejected.length,
