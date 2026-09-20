@@ -49493,6 +49493,146 @@ async function vaccinationGateBulkStateSrv({
     return null;
   }
 }
+function vaccinationCampaignUiContextSrv({
+  executionContext = "",
+  selectedProgramRows = [],
+  vaccineCode = ""
+} = {}) {
+  const requestedContext =
+    String(executionContext || "")
+      .trim()
+      .toLowerCase();
+
+  if (requestedContext !== "campaign") {
+    return false;
+  }
+
+  const code =
+    vaccinationTextKeySrv(
+      vaccineCode || ""
+    );
+
+  return (
+    Array.isArray(selectedProgramRows) &&
+    selectedProgramRows.some(row =>
+      row &&
+      row.active !== false &&
+      String(
+        row.programSection || ""
+      )
+        .trim()
+        .toLowerCase() === "herd" &&
+      (
+        !code ||
+        vaccinationTextKeySrv(
+          row.vaccineCode || ""
+        ) === code
+      )
+    )
+  );
+}
+
+function vaccinationCampaignUiSrv({
+  phase = "gate",
+  accepted = [],
+  saved = [],
+  rejected = []
+} = {}) {
+  const successRows =
+    phase === "save"
+      ? (
+          Array.isArray(saved)
+            ? saved
+            : []
+        )
+      : (
+          Array.isArray(accepted)
+            ? accepted
+            : []
+        );
+
+  const rejectedRows =
+    Array.isArray(rejected)
+      ? rejected
+      : [];
+
+  const successCount =
+    successRows.length;
+
+  const rejectedCount =
+    rejectedRows.length;
+
+  const rejectedLines =
+    rejectedRows
+      .map(item => {
+        const animalNumber =
+          String(
+            item?.animalNumber || ""
+          ).trim();
+
+        const reason =
+          String(
+            item?.reason ||
+            "مرفوض"
+          ).trim();
+
+        return animalNumber
+          ? `${animalNumber} — ${reason}`
+          : reason;
+      })
+      .filter(Boolean);
+
+  let summary = "";
+
+  if (phase === "save") {
+    summary = successCount
+      ? (
+          rejectedCount
+            ? `✅ تم تسجيل التحصين في الحملة لعدد ${successCount}، ولم يتم التسجيل لعدد ${rejectedCount}.`
+            : `✅ تم تسجيل التحصين في الحملة لعدد ${successCount} حيوانًا.`
+        )
+      : "❌ لم يتم تسجيل التحصين لأي حيوان في الحملة.";
+
+  } else {
+    summary = successCount
+      ? (
+          rejectedCount
+            ? `تم التحقق من الحملة: يمكن تسجيل التحصين لعدد ${successCount}، ومرفوض ${rejectedCount}.`
+            : `✅ تم التحقق من الحملة: يمكن تسجيل التحصين لعدد ${successCount}، ولا توجد أرقام مرفوضة.`
+        )
+      : "❌ لم يتم قبول أي حيوان في الحملة.";
+  }
+
+  const message = [
+    summary,
+
+    rejectedLines.length
+      ? `❌ المرفوض (${rejectedCount}):\n${rejectedLines.join("\n")}`
+      : ""
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  return {
+    screen: "vaccination",
+    context: "campaign",
+
+    status:
+      successCount > 0
+        ? "success"
+        : "error",
+
+    message,
+
+    showAcceptedList: false,
+    showRejectedList: true,
+
+    acceptedCount:
+      successCount,
+
+    rejectedCount
+  };
+}
 app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -49510,6 +49650,13 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
 
   const uid = req.userId;
 const body = req.body || {};
+
+const executionContext =
+  String(
+    body.executionContext || ""
+  )
+    .trim()
+    .toLowerCase();
 
 const requestedProgramMode =
   vaccinationProgramModeNormSrv(
@@ -49695,6 +49842,13 @@ const vaccine =
       ?.vaccineName ||
     vaccineCode
   ).trim();
+
+const campaignUiContext =
+  vaccinationCampaignUiContextSrv({
+    executionContext,
+    selectedProgramRows,
+    vaccineCode
+  });
 
 const requestedDoseType =
   String(
@@ -50134,10 +50288,21 @@ return res.json({
   programContext,
 
   acceptedCount: accepted.length,
-  rejectedCount: rejected.length,
+rejectedCount: rejected.length,
 
-  accepted,
-  rejected
+accepted,
+rejected,
+
+...(campaignUiContext
+  ? {
+      ui:
+        vaccinationCampaignUiSrv({
+          phase: "gate",
+          accepted,
+          rejected
+        })
+    }
+  : {})
 });
   } catch (e) {
     console.error("vaccination-gate", e);
@@ -52416,6 +52581,12 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
 
         const uid = req.userId;
     const body = req.body || {};
+    const executionContext =
+  String(
+    body.executionContext || ""
+  )
+    .trim()
+    .toLowerCase();
 
   const requestedProgramMode =
   vaccinationProgramModeNormSrv(
@@ -52548,6 +52719,13 @@ const vaccine =
       ?.vaccineName ||
     vaccineCode
   ).trim();
+
+const campaignUiContext =
+  vaccinationCampaignUiContextSrv({
+    executionContext,
+    selectedProgramRows,
+    vaccineCode
+  });
 
 const requestedDoseType =
   String(
@@ -53314,9 +53492,21 @@ doseTypeLabel:
       savedCount: saved.length,
       rejectedCount: rejected.length,
 
-      saved,
-      rejected,
-      redirectUrl: saved.length === 1
+     saved,
+rejected,
+
+...(campaignUiContext
+  ? {
+      ui:
+        vaccinationCampaignUiSrv({
+          phase: "save",
+          saved,
+          rejected
+        })
+    }
+  : {}),
+
+redirectUrl: saved.length === 1
         ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
         : saved.length > 1
           ? "/add-event.html"
@@ -66197,9 +66387,12 @@ app.get(
         ).trim();
 
       return res.json({
-        ok: true,
+  ok: true,
 
-        campaignId,
+  executionContext:
+    "campaign",
+
+  campaignId,
         vaccineCode,
 
         vaccineForm:
@@ -66517,10 +66710,13 @@ if (!herdRow) {
       );
 
       return res.json({
-        ok: true,
-        manualCampaign: true,
+  ok: true,
+  manualCampaign: true,
 
-        programContext,
+  executionContext:
+    "campaign",
+
+  programContext,
         programMode,
 
         vaccineCode,
