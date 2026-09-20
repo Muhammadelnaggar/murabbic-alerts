@@ -581,7 +581,6 @@ let currentProgramContext = null;
 let currentCampaignId = "";
 let currentCampaignVaccineCode = "";
 let currentCampaignProgramMode = "";
-let currentVaccinationExecutionContext = "";
 
 let manualCampaignIntent = "";
 let manualCampaignPreparedKey = "";
@@ -1121,12 +1120,7 @@ async function prepareManualCampaignIfNeeded() {
         blocked: true
       };
     }
-    currentVaccinationExecutionContext =
-  String(
-    result.executionContext || ""
-  )
-    .trim()
-    .toLowerCase();
+
     bulkSelected.clear();
 
     for (
@@ -3618,13 +3612,10 @@ function collectPayload() {
     date: eventDate,
 
     vaccine,
-doseType,
-programMode,
+    doseType,
+    programMode,
 
-executionContext:
-  currentVaccinationExecutionContext,
-
-campaignId,
+    campaignId,
 
     // السيرفر يحدد السطر الصحيح لكل حيوان.
     programRowId: "",
@@ -3636,29 +3627,6 @@ campaignId,
   };
 }
 function renderServerResult(result = {}) {
-  const serverUi =
-  result?.ui &&
-  typeof result.ui === "object"
-    ? result.ui
-    : null;
-
-const serverUiMessage =
-  String(
-    serverUi?.message || ""
-  ).trim();
-
-if (serverUiMessage) {
-  msg(
-    serverUiMessage,
-    String(
-      serverUi?.status || "info"
-    )
-      .trim()
-      .toLowerCase()
-  );
-
-  return;
-}
   const accepted = Array.isArray(result.accepted)
     ? result.accepted
     : (Array.isArray(result.saved) ? result.saved : []);
@@ -3839,12 +3807,7 @@ if (!gate.ok || !gate.allowed) {
     return;
   }
 
-  msg(
-  gate?.ui?.message ||
-    gate.message ||
-    "تعذّر عرض رد السيرفر.",
-  gate?.ui?.status || "error"
-);
+  msg(gate.message || "تعذّر عرض رد السيرفر.", "error");
   if (saveBtn) saveBtn.disabled = true;
   return;
 }
@@ -3895,7 +3858,6 @@ function renderBulkList() {
       : "لا توجد أرقام محددة.";
 }
 async function hydrate() {
-  currentVaccinationExecutionContext = "";
   const qp =
     new URLSearchParams(location.search);
 
@@ -4041,7 +4003,6 @@ await loadFarmProgram();
       );
 
     if (!campaignData?.ok) {
-      
       currentCampaignId = "";
       currentCampaignVaccineCode = "";
       currentCampaignProgramMode = "";
@@ -4066,12 +4027,7 @@ await loadFarmProgram();
       renderProgramChoice();
       return;
     }
-    currentVaccinationExecutionContext =
-  String(
-    campaignData.executionContext || ""
-  )
-    .trim()
-    .toLowerCase();
+
     currentCampaignId =
       String(
         campaignData.campaignId || ""
@@ -4461,7 +4417,6 @@ backBtn?.addEventListener("click", () => {
 </script>
 </body>
 </html>
-
 
 
 
