@@ -49493,146 +49493,6 @@ async function vaccinationGateBulkStateSrv({
     return null;
   }
 }
-function vaccinationCampaignUiContextSrv({
-  executionContext = "",
-  selectedProgramRows = [],
-  vaccineCode = ""
-} = {}) {
-  const requestedContext =
-    String(executionContext || "")
-      .trim()
-      .toLowerCase();
-
-  if (requestedContext !== "campaign") {
-    return false;
-  }
-
-  const code =
-    vaccinationTextKeySrv(
-      vaccineCode || ""
-    );
-
-  return (
-    Array.isArray(selectedProgramRows) &&
-    selectedProgramRows.some(row =>
-      row &&
-      row.active !== false &&
-      String(
-        row.programSection || ""
-      )
-        .trim()
-        .toLowerCase() === "herd" &&
-      (
-        !code ||
-        vaccinationTextKeySrv(
-          row.vaccineCode || ""
-        ) === code
-      )
-    )
-  );
-}
-
-function vaccinationCampaignUiSrv({
-  phase = "gate",
-  accepted = [],
-  saved = [],
-  rejected = []
-} = {}) {
-  const successRows =
-    phase === "save"
-      ? (
-          Array.isArray(saved)
-            ? saved
-            : []
-        )
-      : (
-          Array.isArray(accepted)
-            ? accepted
-            : []
-        );
-
-  const rejectedRows =
-    Array.isArray(rejected)
-      ? rejected
-      : [];
-
-  const successCount =
-    successRows.length;
-
-  const rejectedCount =
-    rejectedRows.length;
-
-  const rejectedLines =
-    rejectedRows
-      .map(item => {
-        const animalNumber =
-          String(
-            item?.animalNumber || ""
-          ).trim();
-
-        const reason =
-          String(
-            item?.reason ||
-            "مرفوض"
-          ).trim();
-
-        return animalNumber
-          ? `${animalNumber} — ${reason}`
-          : reason;
-      })
-      .filter(Boolean);
-
-  let summary = "";
-
-  if (phase === "save") {
-    summary = successCount
-      ? (
-          rejectedCount
-            ? `✅ تم تسجيل التحصين في الحملة لعدد ${successCount}، ولم يتم التسجيل لعدد ${rejectedCount}.`
-            : `✅ تم تسجيل التحصين في الحملة لعدد ${successCount} حيوانًا.`
-        )
-      : "❌ لم يتم تسجيل التحصين لأي حيوان في الحملة.";
-
-  } else {
-    summary = successCount
-      ? (
-          rejectedCount
-            ? `تم التحقق من الحملة: يمكن تسجيل التحصين لعدد ${successCount}، ومرفوض ${rejectedCount}.`
-            : `✅ تم التحقق من الحملة: يمكن تسجيل التحصين لعدد ${successCount}، ولا توجد أرقام مرفوضة.`
-        )
-      : "❌ لم يتم قبول أي حيوان في الحملة.";
-  }
-
-  const message = [
-    summary,
-
-    rejectedLines.length
-      ? `❌ المرفوض (${rejectedCount}):\n${rejectedLines.join("\n")}`
-      : ""
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
-  return {
-    screen: "vaccination",
-    context: "campaign",
-
-    status:
-      successCount > 0
-        ? "success"
-        : "error",
-
-    message,
-
-    showAcceptedList: false,
-    showRejectedList: true,
-
-    acceptedCount:
-      successCount,
-
-    rejectedCount
-  };
-}
 app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -49650,13 +49510,6 @@ app.post("/api/vaccination/gate", requireUserId, async (req, res) => {
 
   const uid = req.userId;
 const body = req.body || {};
-
-const executionContext =
-  String(
-    body.executionContext || ""
-  )
-    .trim()
-    .toLowerCase();
 
 const requestedProgramMode =
   vaccinationProgramModeNormSrv(
@@ -49842,13 +49695,6 @@ const vaccine =
       ?.vaccineName ||
     vaccineCode
   ).trim();
-
-const campaignUiContext =
-  vaccinationCampaignUiContextSrv({
-    executionContext,
-    selectedProgramRows,
-    vaccineCode
-  });
 
 const requestedDoseType =
   String(
@@ -50288,21 +50134,10 @@ return res.json({
   programContext,
 
   acceptedCount: accepted.length,
-rejectedCount: rejected.length,
+  rejectedCount: rejected.length,
 
-accepted,
-rejected,
-
-...(campaignUiContext
-  ? {
-      ui:
-        vaccinationCampaignUiSrv({
-          phase: "gate",
-          accepted,
-          rejected
-        })
-    }
-  : {})
+  accepted,
+  rejected
 });
   } catch (e) {
     console.error("vaccination-gate", e);
@@ -52581,12 +52416,6 @@ app.post("/api/vaccination/save", requireUserId, async (req, res) => {
 
         const uid = req.userId;
     const body = req.body || {};
-    const executionContext =
-  String(
-    body.executionContext || ""
-  )
-    .trim()
-    .toLowerCase();
 
   const requestedProgramMode =
   vaccinationProgramModeNormSrv(
@@ -52719,13 +52548,6 @@ const vaccine =
       ?.vaccineName ||
     vaccineCode
   ).trim();
-
-const campaignUiContext =
-  vaccinationCampaignUiContextSrv({
-    executionContext,
-    selectedProgramRows,
-    vaccineCode
-  });
 
 const requestedDoseType =
   String(
@@ -53492,21 +53314,9 @@ doseTypeLabel:
       savedCount: saved.length,
       rejectedCount: rejected.length,
 
-     saved,
-rejected,
-
-...(campaignUiContext
-  ? {
-      ui:
-        vaccinationCampaignUiSrv({
-          phase: "save",
-          saved,
-          rejected
-        })
-    }
-  : {}),
-
-redirectUrl: saved.length === 1
+      saved,
+      rejected,
+      redirectUrl: saved.length === 1
         ? `/event-list.html?number=${encodeURIComponent(saved[0].animalNumber)}`
         : saved.length > 1
           ? "/add-event.html"
@@ -66387,12 +66197,9 @@ app.get(
         ).trim();
 
       return res.json({
-  ok: true,
+        ok: true,
 
-  executionContext:
-    "campaign",
-
-  campaignId,
+        campaignId,
         vaccineCode,
 
         vaccineForm:
@@ -66710,13 +66517,10 @@ if (!herdRow) {
       );
 
       return res.json({
-  ok: true,
-  manualCampaign: true,
+        ok: true,
+        manualCampaign: true,
 
-  executionContext:
-    "campaign",
-
-  programContext,
+        programContext,
         programMode,
 
         vaccineCode,
@@ -112172,123 +111976,9 @@ app.use(async (req, res, next) => {
       )
   );
 });
-// ============================================================
-//  CUSTOM DOMAIN STATIC ORIGIN BRIDGE
-//  يحافظ على Render كما هو، ويجعل صفحات murabbik.com
-//  تستخدم نفس الـ origin الحالي بدل عنوان Render الثابت.
-// ============================================================
-const CUSTOM_DOMAIN_HOSTS_SRV = new Set([
-  'murabbik.com',
-  'www.murabbik.com'
-]);
 
-const LEGACY_RENDER_ORIGIN_SRV =
-  'https://murabbic-alerts.onrender.com';
-
-app.use(async (req, res, next) => {
-  try {
-    const method =
-      String(req.method || '').toUpperCase();
-
-    if (method !== 'GET' && method !== 'HEAD') {
-      return next();
-    }
-
-    const hostname =
-      String(req.hostname || '')
-        .trim()
-        .toLowerCase();
-
-    // Render والحسابات الحالية عليه لا تتغير إطلاقًا.
-    if (!CUSTOM_DOMAIN_HOSTS_SRV.has(hostname)) {
-      return next();
-    }
-
-    const requestPath =
-      String(req.path || '');
-
-    const ext =
-      path.extname(requestPath)
-        .toLowerCase();
-
-    if (ext !== '.html' && ext !== '.js') {
-      return next();
-    }
-
-    const staticRoot =
-      path.resolve(__dirname, 'www');
-
-    const relativePath =
-      requestPath.replace(/^\/+/, '');
-
-    const filePath =
-      path.resolve(staticRoot, relativePath);
-
-    const relativeCheck =
-      path.relative(staticRoot, filePath);
-
-    if (
-      !relativeCheck ||
-      relativeCheck.startsWith('..') ||
-      path.isAbsolute(relativeCheck)
-    ) {
-      return next();
-    }
-
-    let source;
-
-    try {
-      source =
-        await fs.promises.readFile(
-          filePath,
-          'utf8'
-        );
-    } catch (e) {
-      if (
-        e?.code === 'ENOENT' ||
-        e?.code === 'EISDIR'
-      ) {
-        return next();
-      }
-
-      throw e;
-    }
-
-    if (!source.includes(LEGACY_RENDER_ORIGIN_SRV)) {
-      return next();
-    }
-
-    const output =
-      source
-        .split(LEGACY_RENDER_ORIGIN_SRV)
-        .join('');
-
-    res.set('Cache-Control', 'no-store');
-
-    if (ext === '.html') {
-      res.type('html');
-    } else {
-      res.type('application/javascript');
-    }
-
-    if (method === 'HEAD') {
-      return res.status(200).end();
-    }
-
-    return res.status(200).send(output);
-
-  } catch (e) {
-    console.error(
-      'custom domain static origin bridge failed:',
-      e.message || e
-    );
-
-    return next();
-  }
-});
 // Static last
 app.use(express.static(path.join(__dirname, 'www')));
-
 // ✅ DIM job
 startDailyDimJob();
 // (اختياري ومفيد) تشغيل مرة واحدة فورًا بعد كل Deploy:
