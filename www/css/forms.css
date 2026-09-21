@@ -9821,3 +9821,59 @@ button:last-child{
     line-height:1.55;
   }
 }
+/* =========================================================
+   Farm Program — Sticky Edit / Delete Column
+   ========================================================= */
+
+#farmProgramSection
+.mbk-vax-farm-editable-table
+th:nth-child(6),
+#farmProgramSection
+.mbk-vax-farm-editable-table
+td:nth-child(6){
+  position:sticky;
+  left:0;
+}
+
+#farmProgramSection
+.mbk-vax-farm-editable-table
+thead th:nth-child(6){
+  z-index:4;
+
+  background:#edf8f1;
+
+  box-shadow:
+    3px 0 8px rgba(15,23,42,.08);
+}
+
+#farmProgramSection
+.mbk-vax-farm-editable-table
+tbody td:nth-child(6){
+  z-index:3;
+
+  background:#fff;
+
+  box-shadow:
+    3px 0 8px rgba(15,23,42,.08);
+}
+
+#farmProgramSection
+.mbk-vax-farm-editable-table
+tbody tr:nth-child(even)
+td:nth-child(6){
+  background:#fbfdfb;
+}
+
+#farmProgramSection
+.mbk-vax-farm-editable-table
+tbody tr:hover
+td:nth-child(6){
+  background:#f5fbf7;
+}
+
+#farmProgramSection
+.mbk-vax-farm-editable-table
+tbody tr.is-inactive
+td:nth-child(6){
+  background:#f8fafc;
+}
