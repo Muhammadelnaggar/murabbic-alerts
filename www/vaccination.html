@@ -2445,78 +2445,91 @@ function renderFarmProgramRows() {
     return;
   }
 
-  const cleanLabel = value =>
-    String(value || "")
-      .split("(")[0]
-      .trim();
-
   const stepText = step => {
-    if (!step) return "—";
+    if (!step) return "";
 
-    const timingLabel =
-      cleanLabel(step.timingBasisLabel);
+    const parts = [];
 
-    const timingUnit =
-      cleanLabel(
-        step.timingUnitLabel ||
-        step.timingUnit
-      );
+    const timingBasisLabel =
+      String(
+        step?.timingBasisLabel || ""
+      ).trim();
+
+    if (timingBasisLabel) {
+      parts.push(timingBasisLabel);
+    }
 
     const ageMinValue =
-      Number(step.ageMinValue || 0);
+      Number(step?.ageMinValue || 0);
 
     const ageMaxValue =
-      Number(step.ageMaxValue || 0);
-
-    const ageMinUnit =
-      cleanLabel(
-        step.ageMinUnitLabel ||
-        step.ageMinUnit
-      );
-
-    const ageMaxUnit =
-      cleanLabel(
-        step.ageMaxUnitLabel ||
-        step.ageMaxUnit
-      );
+      Number(step?.ageMaxValue || 0);
 
     if (
       ageMinValue > 0 &&
       ageMaxValue > 0
     ) {
-      return [
-        timingLabel,
-        `من ${ageMinValue} ${ageMinUnit} إلى ${ageMaxValue} ${ageMaxUnit}`
-      ]
-        .filter(Boolean)
-        .join(" — ");
+      parts.push(
+        `من ${ageMinValue} ${String(
+          step?.ageMinUnitLabel || ""
+        ).trim()} إلى ${ageMaxValue} ${String(
+          step?.ageMaxUnitLabel || ""
+        ).trim()}`
+      );
+
+    } else if (
+      Number(step?.timingValue || 0) > 0
+    ) {
+      parts.push(
+        `${Number(step.timingValue)} ${String(
+          step?.timingUnitLabel || ""
+        ).trim()}`
+      );
     }
 
-    const timingValue =
-      Number(step.timingValue || 0);
+    const cycleLabel =
+      String(
+        step?.cycleLabel || ""
+      ).trim();
 
-    if (timingValue > 0) {
-      return [
-        timingLabel,
-        `${timingValue} ${timingUnit}`.trim()
-      ]
-        .filter(Boolean)
-        .join(" — ");
+    if (cycleLabel) {
+      parts.push(cycleLabel);
     }
 
-    return timingLabel || "—";
+    return parts.join(" — ");
   };
+
+  const scheduleCellText = (
+    row,
+    predicate
+  ) => {
+    const schedule =
+      Array.isArray(row?.doseSchedule)
+        ? row.doseSchedule
+        : [];
+
+    const values =
+      schedule
+        .filter(predicate)
+        .map(stepText)
+        .filter(Boolean);
+
+    return values.length
+      ? values.join(" • ")
+      : "—";
+  };
+
+  const wrapper =
+    document.createElement("div");
+
+  wrapper.className =
+    "mbk-vax-farm-table-wrap";
 
   const table =
     document.createElement("table");
 
   table.className =
-    "mbk-vax-program-table mbk-vax-farm-table";
-
-  table.setAttribute(
-    "aria-label",
-    "جدول برنامج تحصينات المزرعة"
-  );
+    "mbk-vax-farm-table";
 
   const thead =
     document.createElement("thead");
@@ -2548,65 +2561,14 @@ function renderFarmProgramRows() {
 
   farmProgramDraftRows.forEach(
     (row, index) => {
-      const schedule =
-        Array.isArray(row.doseSchedule)
-          ? row.doseSchedule
-          : [];
-
-      const prime =
-        schedule.find(step =>
-          String(
-            step?.doseType || ""
-          ).trim() === "prime"
-        ) ||
-        schedule[0] ||
-        null;
-
-      const booster =
-        schedule.find(step =>
-          String(
-            step?.doseType || ""
-          ).trim() === "booster"
-        ) || null;
-
-      const periodic =
-        schedule.find(step =>
-          String(
-            step?.doseType || ""
-          ).trim() === "periodic"
-        ) || null;
-
-      const cycleLabels =
-        [
-          ...new Set(
-            schedule
-              .map(step =>
-                cleanLabel(
-                  step?.cycleLabel
-                )
-              )
-              .filter(Boolean)
-          )
-        ];
-
-      const repeatText =
-        periodic
-          ? stepText(periodic)
-          : (
-              cycleLabels.length
-                ? cycleLabels.join(" • ")
-                : (
-                    row.onceLifetime === true
-                      ? "مرة واحدة في العمر"
-                      : "—"
-                  )
-            );
-
       const tr =
         document.createElement("tr");
 
-      /* التحصين */
-      const vaccineCell =
+      if (row.active === false) {
+        tr.classList.add("is-inactive");
+      }
+
+      const vaccineTd =
         document.createElement("td");
 
       const vaccineName =
@@ -2616,124 +2578,107 @@ function renderFarmProgramRows() {
         "mbk-vax-farm-vaccine-name";
 
       vaccineName.textContent =
-        cleanLabel(
+        String(
           row.vaccineName ||
           row.vaccine ||
           row.vaccineCode ||
           "تحصين"
-        );
+        ).trim();
 
-      vaccineCell.appendChild(
+      vaccineTd.appendChild(
         vaccineName
       );
 
-      const meta =
-        document.createElement("div");
+      const sectionLabel =
+        String(
+          row.programSectionLabel || ""
+        ).trim();
 
-      meta.className =
-        "mbk-vax-farm-meta";
-
-      if (
-        cleanLabel(
-          row.programSectionLabel
-        )
-      ) {
+      if (sectionLabel) {
         const section =
           document.createElement("span");
 
         section.className =
-          "mbk-vax-farm-badge";
+          "mbk-vax-farm-section";
 
         section.textContent =
-          cleanLabel(
-            row.programSectionLabel
-          );
+          sectionLabel;
 
-        meta.appendChild(section);
+        vaccineTd.appendChild(section);
       }
 
       const status =
         document.createElement("span");
 
       status.className =
-        "mbk-vax-farm-badge mbk-vax-farm-status";
+        "mbk-vax-farm-status";
 
       if (row.active === false) {
         status.classList.add(
           "is-inactive"
         );
-
-        status.textContent =
-          "متوقف";
+        status.textContent = "متوقف";
       } else {
-        status.textContent =
-          "نشط";
+        status.textContent = "نشط";
       }
 
-      meta.appendChild(status);
+      vaccineTd.appendChild(status);
 
-      vaccineCell.appendChild(meta);
-
-      if (
-        String(row.notes || "").trim()
-      ) {
-        const notes =
-          document.createElement("div");
-
-        notes.className =
-          "mbk-vax-farm-notes";
-
-        notes.textContent =
-          String(row.notes).trim();
-
-        vaccineCell.appendChild(notes);
-      }
-
-      tr.appendChild(vaccineCell);
-
-      /* طبيعة اللقاح */
-      const formCell =
+      const formTd =
         document.createElement("td");
 
-      formCell.textContent =
-        cleanLabel(
-          row.vaccineFormLabel
-        ) || "—";
+      formTd.textContent =
+        String(
+          row.vaccineFormLabel || "—"
+        ).trim() || "—";
 
-      tr.appendChild(formCell);
-
-      /* البداية */
-      const startCell =
+      const startTd =
         document.createElement("td");
 
-      startCell.textContent =
-        stepText(prime);
+      startTd.textContent =
+        scheduleCellText(
+          row,
+          step => {
+            const type =
+              String(
+                step?.doseType || ""
+              ).trim();
 
-      tr.appendChild(startCell);
+            return (
+              type !== "booster" &&
+              type !== "periodic"
+            );
+          }
+        );
 
-      /* المنشطة */
-      const boosterCell =
+      const boosterTd =
         document.createElement("td");
 
-      boosterCell.textContent =
-        stepText(booster);
+      boosterTd.textContent =
+        scheduleCellText(
+          row,
+          step =>
+            String(
+              step?.doseType || ""
+            ).trim() === "booster"
+        );
 
-      tr.appendChild(boosterCell);
-
-      /* التكرار */
-      const repeatCell =
+      const periodicTd =
         document.createElement("td");
 
-      repeatCell.textContent =
-        repeatText;
+      periodicTd.textContent =
+        scheduleCellText(
+          row,
+          step =>
+            String(
+              step?.doseType || ""
+            ).trim() === "periodic"
+        );
 
-      tr.appendChild(repeatCell);
-
-      /* الإدارة */
-      const actionsCell =
+      const actionsTd =
         document.createElement("td");
 
-      actionsCell.className =
+      actionsTd.className =
         "mbk-vax-farm-actions";
 
       const editButton =
@@ -2741,7 +2686,7 @@ function renderFarmProgramRows() {
 
       editButton.type = "button";
       editButton.className =
-        "ghost mbk-vax-program-row-btn";
+        "ghost mbk-vax-farm-edit";
 
       editButton.dataset.action =
         "edit-farm-program-row";
@@ -2756,40 +2701,11 @@ function renderFarmProgramRows() {
         document.createElement("button");
 
       removeButton.type = "button";
-
       removeButton.className =
-        "ghost mbk-vax-program-row-btn is-delete";
+        "ghost mbk-vax-farm-delete";
 
       removeButton.dataset.action =
-        "remove-farm-program-row";
-
-      removeButton.dataset.rowIndex =
-        String(index);
-
-      removeButton.textContent =
-        "حذف";
-
-      actionsCell.appendChild(
-        editButton
-      );
-
-      actionsCell.appendChild(
-        removeButton
-      );
-
-      tr.appendChild(actionsCell);
-
-      tbody.appendChild(tr);
-    }
-  );
-
-  table.appendChild(thead);
-  table.appendChild(tbody);
-
-  farmProgramRows.appendChild(
-    table
-  );
-}
+       
 function readFarmProgramEditorRow() {
   const rowElement =
     farmProgramEditor?.querySelector(
