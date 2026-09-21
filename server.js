@@ -48299,56 +48299,12 @@ function vaccinationProgramDisplaySrv({
     ].join(" • ");
   };
 
-  const activeAlternatives =
-    executionProgram?.activeAlternatives &&
-    typeof executionProgram.activeAlternatives === "object" &&
-    !Array.isArray(
-      executionProgram.activeAlternatives
-    )
-      ? executionProgram.activeAlternatives
-      : (
-          programContext?.murabbikAlternatives &&
-          typeof programContext.murabbikAlternatives === "object" &&
-          !Array.isArray(
-            programContext.murabbikAlternatives
-          )
-            ? programContext.murabbikAlternatives
-            : {}
-        );
-
-  const sourceRows =
-    (
-      Array.isArray(
-        executionProgram.rows
-      )
-        ? executionProgram.rows
-        : []
-    ).filter(row => {
-      const group =
-        String(
-          row?.alternativeGroup || ""
-        ).trim();
-
-      if (!group) {
-        return true;
-      }
-
-      const selectedPath =
-        String(
-          activeAlternatives[group] || ""
-        ).trim();
-
-      const rowPath =
-        String(
-          row?.alternativePath || ""
-        ).trim();
-
-      return Boolean(
-        selectedPath &&
-        rowPath &&
-        selectedPath === rowPath
-      );
-    });
+const sourceRows =
+  Array.isArray(
+    executionProgram.rows
+  )
+    ? executionProgram.rows
+    : [];
 
   const groups = new Map();
 
