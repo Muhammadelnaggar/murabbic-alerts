@@ -44669,34 +44669,33 @@ app.post(
 // ============================================================
 function vaccinationFarmProgramOptionsSrv() {
   const formLabels = {
-    live_attenuated_virus:
-      "حي مُضعّف (Live Attenuated Virus)",
+  live_attenuated_virus:
+    "فيروس مضعف",
 
-    modified_live_virus:
-      "حي مُعدّل (Modified Live Virus)",
+  modified_live_virus:
+    "فيروس مضعف",
 
-    killed_virus:
-      "ميت/غير نشط (Killed / Inactivated Virus)",
+  killed_virus:
+    "فيروس غير نشط",
 
-    modified_live_and_killed_virus:
-      "مركب حي مُعدّل وميت (Modified Live & Killed Virus)",
+  modified_live_and_killed_virus:
+    "فيروس مضعف + فيروس غير نشط",
 
-    live_attenuated_bacterial:
-      "بكتيري حي مُضعّف (Live Attenuated Bacterial Vaccine)",
+  live_attenuated_bacterial:
+    "بكتيريا حية مضعفة",
 
-    avirulent_live_culture:
-      "مزرعة حية غير ممرضة (Avirulent Live Culture)",
+  avirulent_live_culture:
+    "مزرعة بكتيرية حية غير ممرضة",
 
-    bacterin:
-      "بكتيرين (Bacterin)",
+  bacterin:
+    "باكترين",
 
-    bacterin_toxoid:
-      "بكتيرين/توكسويد (Bacterin-Toxoid)",
+  bacterin_toxoid:
+    "باكترين + توكسويد",
 
-    killed_virus_bacterin_toxoid:
-      "فيروسات ميتة + بكتيرين/توكسويد (Killed Virus + Bacterin-Toxoid)"
-  };
-
+  killed_virus_bacterin_toxoid:
+    "فيروس غير نشط + باكترين + توكسويد"
+};
   const forms = (...values) =>
     values.map((value) => ({
       value,
@@ -44704,7 +44703,7 @@ function vaccinationFarmProgramOptionsSrv() {
     }));
 
       return {
-    catalogVersion: "vaccination-catalog-2026-07-20-01",
+    catalogVersion: "vaccination-catalog-2026-09-21-01",
 
     programTypes: [
       { value: "herd", label: "القطيع" },
@@ -46671,6 +46670,7 @@ function vaccinationMurabbikDefaultProgramSrv() {
   vaccineForm = "",
   vaccineForms = [],
   vaccineFormPeriodic = {},
+  vaccineFormDoseSchedules = {},
   targetGroup,
   doseSchedule,
   repeatEvery = 0,
@@ -46794,27 +46794,75 @@ for (
   };
 }
 
-    const enrichedDoseSchedule =
-      doseSchedule.map(step => ({
-        ...step,
+const enrichDoseSchedule = rawSchedule => {
+  const schedule =
+    Array.isArray(rawSchedule)
+      ? rawSchedule
+      : [];
 
-        doseTypeLabel:
-          vaccinationProgramDoseLabelSrv({
-            doseType:
-              step.doseType,
+  return schedule.map(step => ({
+    ...step,
 
-            timingBasis:
-              step.timingBasis,
+    doseTypeLabel:
+      vaccinationProgramDoseLabelSrv({
+        doseType:
+          step.doseType,
 
-            scheduleLength:
-              doseSchedule.length,
+        timingBasis:
+          step.timingBasis,
 
-            fallbackLabel:
-              doseByCode.get(
-                step.doseType
-              )?.label || ""
-          })
-      }));
+        scheduleLength:
+          schedule.length,
+
+        fallbackLabel:
+          doseByCode.get(
+            step.doseType
+          )?.label || ""
+      })
+  }));
+};
+
+const normalizedVaccineFormDoseSchedules = {};
+
+for (
+  const [formKeyRaw, scheduleRaw] of
+  Object.entries(
+    vaccineFormDoseSchedules &&
+    typeof vaccineFormDoseSchedules === "object" &&
+    !Array.isArray(vaccineFormDoseSchedules)
+      ? vaccineFormDoseSchedules
+      : {}
+  )
+) {
+  const formKey =
+    String(
+      formKeyRaw || ""
+    ).trim();
+
+  const schedule =
+    enrichDoseSchedule(
+      scheduleRaw
+    );
+
+  if (
+    !formKey ||
+    !allowedVaccineForms.includes(
+      formKey
+    ) ||
+    !schedule.length
+  ) {
+    continue;
+  }
+
+  normalizedVaccineFormDoseSchedules[
+    formKey
+  ] = schedule;
+}
+
+const enrichedDoseSchedule =
+  enrichDoseSchedule(
+    doseSchedule
+  );
 
     const allowedDoseTypes =
       [
@@ -46870,6 +46918,9 @@ allowedVaccineFormOptions,
 
 vaccineFormPeriodic:
   normalizedVaccineFormPeriodic,
+
+  vaccineFormDoseSchedules:
+  normalizedVaccineFormDoseSchedules,
 
 doseType:
         fixedDoseType,
@@ -47076,10 +47127,33 @@ row({
     }
   },
 
+  vaccineFormDoseSchedules: {
+    killed_virus: [
+      dose(
+        "prime",
+        "any_time"
+      ),
+
+      dose(
+        "booster",
+        "after_previous_dose",
+        1,
+        "month"
+      ),
+
+      dose(
+        "periodic",
+        "repeat",
+        6,
+        "month"
+      )
+    ]
+  },
+
   targetGroup:
     "herd_all",
 
-  // fallback فقط قبل اختيار شكل اللقاح.
+  // المسار الأساسي = فيروس مضعف
   repeatEvery: 1,
   repeatUnit: "year",
 
@@ -47125,13 +47199,41 @@ row({
     }
   },
 
+  vaccineFormDoseSchedules: {
+    killed_virus: [
+      dose(
+        "prime",
+        "calf_age",
+        12,
+        "month"
+      ),
+
+      dose(
+        "booster",
+        "after_previous_dose",
+        1,
+        "month"
+      ),
+
+      dose(
+        "periodic",
+        "repeat",
+        6,
+        "month",
+        {
+          joinHerdSchedule: true
+        }
+      )
+    ]
+  },
+
   targetGroup:
     "calves",
 
   ageMinValue: 12,
   ageMinUnit: "month",
 
-  // fallback فقط قبل اختيار شكل اللقاح.
+  // المسار الأساسي = فيروس مضعف
   repeatEvery: 1,
   repeatUnit: "year",
 
@@ -47147,11 +47249,13 @@ row({
       "periodic",
       "repeat",
       1,
-      "year"
+      "year",
+      {
+        joinHerdSchedule: true
+      }
     )
   ]
 }),
-
     row({
       programRowId:
         "murabbik_lsd_herd",
@@ -47888,131 +47992,576 @@ function vaccinationProgramDisplaySrv({
       title: "",
       summary: "",
       openLabel: "",
+      columns: [],
       rows: []
     };
   }
 
-  const rows =
-    Array.isArray(executionProgram.rows)
-      ? executionProgram.rows
-      : [];
+  const unitText = (valueRaw, unitRaw) => {
+    const value = Number(valueRaw || 0);
+    const unit = String(unitRaw || "").trim();
 
-  const displayRows =
-    rows.map(row => {
-      const scheduleLines =
-        (
-          Array.isArray(row.doseSchedule)
-            ? row.doseSchedule
-            : []
+    if (!(value > 0) || !unit) return "";
+
+    if (unit === "day") {
+      if (value === 1) return "يوم";
+      if (value === 2) return "يومين";
+      if (value >= 3 && value <= 10) return `${value} أيام`;
+      return `${value} يومًا`;
+    }
+
+    if (unit === "week") {
+      if (value === 1) return "أسبوع";
+      if (value === 2) return "أسبوعين";
+      if (value >= 3 && value <= 10) return `${value} أسابيع`;
+      return `${value} أسبوعًا`;
+    }
+
+    if (unit === "month") {
+      if (value === 1) return "شهر";
+      if (value === 2) return "شهرين";
+      if (value >= 3 && value <= 10) return `${value} أشهر`;
+      return `${value} شهرًا`;
+    }
+
+    if (unit === "year") {
+      if (value === 1) return "سنة";
+      if (value === 2) return "سنتين";
+      if (value >= 3 && value <= 10) return `${value} سنوات`;
+      return `${value} سنة`;
+    }
+
+    return `${value} ${unit}`;
+  };
+
+  const cleanVaccineName = raw =>
+    String(raw || "")
+      .split("(")[0]
+      .trim() || "تحصين";
+
+  const scopeLabel = row => {
+    const targetGroup =
+      String(row?.targetGroup || "").trim();
+
+    if (targetGroup === "females") return "الإناث";
+    if (targetGroup === "heifers") return "العجلات";
+
+    if (
+      targetGroup === "pregnant_mothers" ||
+      targetGroup === "mothers"
+    ) {
+      return "الأمهات";
+    }
+
+    const section =
+      String(row?.programSection || "").trim();
+
+    if (section === "calves") return "العجول";
+    if (section === "mothers") return "الأمهات";
+
+    return "القطيع";
+  };
+
+  const startValue = row => {
+    const notes = String(row?.notes || "").trim();
+
+    // في الحالات التي يختلف فيها عمر البداية
+    // حسب تحصين الأم، نعرض النص الصريح من البرنامج.
+    if (notes.includes("إذا كانت الأم")) {
+      const colonIndex = notes.indexOf(":");
+
+      return (
+        colonIndex >= 0
+          ? notes.slice(colonIndex + 1)
+          : notes
+      )
+        .trim()
+        .replace(/[.。]+$/u, "");
+    }
+
+    const schedule =
+      Array.isArray(row?.doseSchedule)
+        ? row.doseSchedule
+        : [];
+
+    const firstStep =
+      schedule.find(step =>
+        String(step?.doseType || "").trim() === "prime"
+      ) ||
+      schedule[0] ||
+      null;
+
+    if (!firstStep) return "—";
+
+    const basis =
+      String(firstStep.timingBasis || "").trim();
+
+    if (basis === "any_time") {
+      return "عند بدء البرنامج";
+    }
+
+    if (basis === "calf_age") {
+      const age = unitText(
+        firstStep.timingValue,
+        firstStep.timingUnit
+      );
+
+      return age
+        ? `من عمر ${age}`
+        : "—";
+    }
+
+    if (basis === "calf_age_window") {
+      const minText = unitText(
+        firstStep.ageMinValue ||
+        row?.ageMinValue,
+
+        firstStep.ageMinUnit ||
+        row?.ageMinUnit
+      );
+
+      const maxText = unitText(
+        firstStep.ageMaxValue ||
+        row?.ageMaxValue,
+
+        firstStep.ageMaxUnit ||
+        row?.ageMaxUnit
+      );
+
+      return minText && maxText
+        ? `من عمر ${minText} إلى ${maxText}`
+        : "—";
+    }
+
+    if (
+      basis ===
+      "before_expected_calving"
+    ) {
+      const before = unitText(
+        firstStep.timingValue,
+        firstStep.timingUnit
+      );
+
+      return before
+        ? `قبل موعد الولادة المتوقع بـ ${before}`
+        : "قبل موعد الولادة المتوقع";
+    }
+
+    return "—";
+  };
+
+  const boosterValue = row => {
+    const schedule =
+      Array.isArray(row?.doseSchedule)
+        ? row.doseSchedule
+        : [];
+
+    const booster =
+      schedule.find(step =>
+        String(step?.doseType || "").trim() === "booster"
+      ) || null;
+
+    if (!booster) {
+      return "لا توجد";
+    }
+
+    const basis =
+      String(booster.timingBasis || "").trim();
+
+    const duration = unitText(
+      booster.timingValue,
+      booster.timingUnit
+    );
+
+    if (
+      basis ===
+      "after_previous_dose"
+    ) {
+      return duration
+        ? `بعد ${duration}`
+        : "بعد الجرعة السابقة";
+    }
+
+    if (
+      basis ===
+      "before_expected_calving"
+    ) {
+      return duration
+        ? `قبل موعد الولادة المتوقع بـ ${duration}`
+        : "قبل موعد الولادة المتوقع";
+    }
+
+    return duration || "حسب البرنامج";
+  };
+
+  const repeatValue = row => {
+    const schedule =
+      Array.isArray(row?.doseSchedule)
+        ? row.doseSchedule
+        : [];
+
+    const repeatStep =
+      schedule.find(step =>
+        String(step?.doseType || "").trim() === "periodic" ||
+        String(step?.timingBasis || "").trim() === "repeat"
+      ) || null;
+
+    if (repeatStep) {
+      const every = unitText(
+        repeatStep.timingValue,
+        repeatStep.timingUnit
+      );
+
+      const stopAtAge = unitText(
+        repeatStep.stopAtAgeValue,
+        repeatStep.stopAtAgeUnit
+      );
+
+      if (every && stopAtAge) {
+        return `كل ${every} حتى عمر ${stopAtAge}`;
+      }
+
+      if (every) {
+        return `كل ${every}`;
+      }
+    }
+
+    if (
+      schedule.some(step =>
+        String(step?.cycle || "").trim() ===
+          "once_lifetime"
+      ) ||
+      row?.onceLifetime === true ||
+      row?.oneTime === true
+    ) {
+      return "مرة واحدة في العمر";
+    }
+
+    if (
+      schedule.some(step =>
+        String(step?.cycle || "").trim() ===
+          "each_pregnancy"
+      )
+    ) {
+      return "مع كل حمل";
+    }
+
+    return "لا يتكرر";
+  };
+
+  const mergeScoped = (
+    items = [],
+    { alwaysShowScope = false } = {}
+  ) => {
+    const normalized =
+      items
+        .map(item => ({
+          scope:
+            String(
+              item?.scope || ""
+            ).trim(),
+
+          value:
+            String(
+              item?.value || ""
+            ).trim()
+        }))
+        .filter(item =>
+          item.scope &&
+          item.value
+        );
+
+    if (!normalized.length) {
+      return "—";
+    }
+
+    const uniqueValues = [
+      ...new Set(
+        normalized.map(item =>
+          item.value
         )
-          .map(step => {
-            const parts = [
-              step?.doseTypeLabel,
-              step?.timingBasisLabel
-            ]
-              .map(value =>
-                String(value || "").trim()
-              )
-              .filter(Boolean);
+      )
+    ];
 
-            const ageMinValue =
-              Number(
-                step?.ageMinValue || 0
-              );
+    if (
+      !alwaysShowScope &&
+      uniqueValues.length === 1
+    ) {
+      return uniqueValues[0];
+    }
 
-            const ageMaxValue =
-              Number(
-                step?.ageMaxValue || 0
-              );
+    return [
+      ...new Set(
+        normalized.map(item =>
+          `${item.scope}: ${item.value}`
+        )
+      )
+    ].join(" • ");
+  };
 
-            if (
-              ageMinValue > 0 &&
-              ageMaxValue > 0
-            ) {
-              parts.push(
-                `من ${ageMinValue} ${String(
-                  step?.ageMinUnitLabel || ""
-                ).trim()} إلى ${ageMaxValue} ${String(
-                  step?.ageMaxUnitLabel || ""
-                ).trim()}`
-              );
+  const activeAlternatives =
+    executionProgram?.activeAlternatives &&
+    typeof executionProgram.activeAlternatives === "object" &&
+    !Array.isArray(
+      executionProgram.activeAlternatives
+    )
+      ? executionProgram.activeAlternatives
+      : (
+          programContext?.murabbikAlternatives &&
+          typeof programContext.murabbikAlternatives === "object" &&
+          !Array.isArray(
+            programContext.murabbikAlternatives
+          )
+            ? programContext.murabbikAlternatives
+            : {}
+        );
 
-            } else if (
-              Number(
-                step?.timingValue || 0
-              ) > 0
-            ) {
-              parts.push(
-                `${Number(
-                  step.timingValue
-                )} ${String(
-                  step?.timingUnitLabel || ""
-                ).trim()}`
-              );
-            }
-
-            if (step?.cycleLabel) {
-              parts.push(
-                String(
-                  step.cycleLabel
-                ).trim()
-              );
-            }
-
-            return parts
-              .filter(Boolean)
-              .join(" — ");
-          })
-          .filter(Boolean);
-
-      const notes =
+  const sourceRows =
+    (
+      Array.isArray(
+        executionProgram.rows
+      )
+        ? executionProgram.rows
+        : []
+    ).filter(row => {
+      const group =
         String(
-          row.notes || ""
+          row?.alternativeGroup || ""
         ).trim();
 
-      return {
-        rowId:
-          String(
-            row.programRowId ||
-            row.rowId ||
-            ""
-          ).trim(),
+      if (!group) {
+        return true;
+      }
 
-        title:
-          String(
-            row.vaccine ||
-            row.vaccineName ||
-            row.vaccineCode ||
-            "تحصين"
-          ).trim(),
+      const selectedPath =
+        String(
+          activeAlternatives[group] || ""
+        ).trim();
 
-        statusText:
-          row.active === false
-            ? "متوقف"
-            : "نشط",
+      const rowPath =
+        String(
+          row?.alternativePath || ""
+        ).trim();
 
-        statusTone:
-          row.active === false
-            ? "inactive"
-            : "active",
-
-        tags: [
-          row.programSectionLabel,
-          row.vaccineFormLabel
-        ]
-          .map(value =>
-            String(value || "").trim()
-          )
-          .filter(Boolean),
-
-        scheduleLines,
-
-        notesText:
-          notes
-            ? `ملاحظات: ${notes}`
-            : ""
-      };
+      return Boolean(
+        selectedPath &&
+        rowPath &&
+        selectedPath === rowPath
+      );
     });
+
+  const groups = new Map();
+
+  for (const row of sourceRows) {
+    const formOptions =
+      Array.isArray(
+        row?.allowedVaccineFormOptions
+      ) &&
+      row.allowedVaccineFormOptions.length
+        ? row.allowedVaccineFormOptions
+        : (
+            String(
+              row?.vaccineForm || ""
+            ).trim()
+              ? [
+                  {
+                    value:
+                      String(
+                        row.vaccineForm
+                      ).trim(),
+
+                    label:
+                      String(
+                        row.vaccineFormLabel ||
+                        row.vaccineForm
+                      ).trim()
+                  }
+                ]
+              : []
+          );
+
+    const variants =
+      formOptions.length
+        ? formOptions
+        : [
+            {
+              value: "",
+              label: ""
+            }
+          ];
+
+    for (const formOption of variants) {
+      const formValue =
+        String(
+          formOption?.value || ""
+        ).trim();
+
+      const effectiveRow =
+        vaccinationProgramRowForVaccineFormSrv(
+          row,
+          formValue
+        );
+
+      const vaccineCode =
+        String(
+          effectiveRow.vaccineCode ||
+          row.vaccineCode ||
+          ""
+        ).trim();
+
+      const formLabel =
+        String(
+          formOption?.label ||
+          effectiveRow.vaccineFormLabel ||
+          row.vaccineFormLabel ||
+          ""
+        ).trim();
+
+      const key = [
+        vaccineCode,
+        formValue,
+        String(
+          row.alternativeGroup || ""
+        ).trim(),
+        String(
+          row.alternativePath || ""
+        ).trim()
+      ].join("::");
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          rowId:
+            String(
+              row.programRowId ||
+              row.rowId ||
+              vaccineCode ||
+              "vaccination"
+            ).trim(),
+
+          vaccine:
+            cleanVaccineName(
+              effectiveRow.vaccine ||
+              row.vaccine ||
+              vaccineCode
+            ),
+
+          vaccineForm:
+            formLabel,
+
+          items: []
+        });
+      }
+
+      groups
+        .get(key)
+        .items
+        .push({
+          row:
+            effectiveRow,
+
+          scope:
+            scopeLabel(
+              effectiveRow
+            )
+        });
+    }
+  }
+
+  const displayRows =
+    Array.from(
+      groups.values()
+    )
+      .map(group => {
+        const start =
+          mergeScoped(
+            group.items.map(item => ({
+              scope:
+                item.scope,
+
+              value:
+                startValue(
+                  item.row
+                )
+            })),
+            {
+              alwaysShowScope: true
+            }
+          );
+
+        const booster =
+          mergeScoped(
+            group.items.map(item => ({
+              scope:
+                item.scope,
+
+              value:
+                boosterValue(
+                  item.row
+                )
+            }))
+          );
+
+        const repeat =
+          mergeScoped(
+            group.items.map(item => ({
+              scope:
+                item.scope,
+
+              value:
+                repeatValue(
+                  item.row
+                )
+            }))
+          );
+
+        const title = [
+          group.vaccine,
+          group.vaccineForm
+        ]
+          .filter(Boolean)
+          .join(" — ");
+
+        return {
+          rowId:
+            group.rowId,
+
+          vaccine:
+            group.vaccine,
+
+          vaccineForm:
+            group.vaccineForm,
+
+          start,
+          booster,
+          repeat,
+
+          // توافق مؤقت مع عارض الصفحة الحالي
+          // إلى أن تتحول الصفحة إلى جدول HTML.
+          title,
+
+          statusText:
+            "نشط",
+
+          statusTone:
+            "active",
+
+          tags:
+            group.vaccineForm
+              ? [
+                  group.vaccineForm
+                ]
+              : [],
+
+          scheduleLines: [
+            `بداية التحصين: ${start}`,
+            `الجرعة المنشطة: ${booster}`,
+            `التكرار: ${repeat}`
+          ],
+
+          notesText:
+            ""
+        };
+      });
 
   return {
     visible: true,
@@ -48028,6 +48577,29 @@ function vaccinationProgramDisplaySrv({
       `الإصدار ${Number(
         executionProgram.version || 0
       )} — عدد التحصينات: ${displayRows.length}.`,
+
+    columns: [
+      {
+        key: "vaccine",
+        label: "التحصين"
+      },
+      {
+        key: "vaccineForm",
+        label: "طبيعة اللقاح"
+      },
+      {
+        key: "start",
+        label: "بداية التحصين"
+      },
+      {
+        key: "booster",
+        label: "الجرعة المنشطة"
+      },
+      {
+        key: "repeat",
+        label: "التكرار"
+      }
+    ],
 
     rows:
       displayRows
@@ -48146,12 +48718,36 @@ function vaccinationProgramRowForVaccineFormSrv(
       form
     );
 
+  const formSchedules =
+    row?.vaccineFormDoseSchedules &&
+    typeof row.vaccineFormDoseSchedules === "object" &&
+    !Array.isArray(
+      row.vaccineFormDoseSchedules
+    )
+      ? row.vaccineFormDoseSchedules
+      : {};
+
+  const formSpecificSchedule =
+    form &&
+    Array.isArray(
+      formSchedules[form]
+    )
+      ? formSchedules[form]
+      : [];
+
+  const sourceSchedule =
+    formSpecificSchedule.length
+      ? formSpecificSchedule
+      : (
+          Array.isArray(
+            row?.doseSchedule
+          )
+            ? row.doseSchedule
+            : []
+        );
+
   const doseSchedule =
-    (
-      Array.isArray(row?.doseSchedule)
-        ? row.doseSchedule
-        : []
-    ).map(step => {
+    sourceSchedule.map(step => {
       if (
         rule &&
         String(
@@ -48177,12 +48773,82 @@ function vaccinationProgramRowForVaccineFormSrv(
       };
     });
 
+  const allowedDoseTypes =
+    [
+      ...new Set(
+        doseSchedule
+          .map(step =>
+            String(
+              step?.doseType || ""
+            ).trim()
+          )
+          .filter(Boolean)
+      )
+    ];
+
+  const fixedDoseType =
+    allowedDoseTypes.length === 1
+      ? allowedDoseTypes[0]
+      : "";
+
+  const fixedDoseStep =
+    fixedDoseType
+      ? (
+          doseSchedule.find(step =>
+            String(
+              step?.doseType || ""
+            ).trim() === fixedDoseType
+          ) || null
+        )
+      : null;
+
+  const allowedDoseOptions =
+    allowedDoseTypes.map(value => {
+      const step =
+        doseSchedule.find(item =>
+          String(
+            item?.doseType || ""
+          ).trim() === value
+        ) || null;
+
+      return {
+        value,
+
+        label:
+          String(
+            step?.doseTypeLabel ||
+            value
+          ).trim()
+      };
+    });
+
+  const formOption =
+    (
+      Array.isArray(
+        row?.allowedVaccineFormOptions
+      )
+        ? row.allowedVaccineFormOptions
+        : []
+    ).find(item =>
+      String(
+        item?.value || ""
+      ).trim() === form
+    ) || null;
+
   return {
     ...row,
 
     ...(form
       ? {
-          vaccineForm: form
+          vaccineForm:
+            form,
+
+          vaccineFormLabel:
+            String(
+              formOption?.label ||
+              row.vaccineFormLabel ||
+              form
+            ).trim()
         }
       : {}),
 
@@ -48196,7 +48862,20 @@ function vaccinationProgramRowForVaccineFormSrv(
         }
       : {}),
 
-    doseSchedule
+    doseSchedule,
+
+    allowedDoseTypes,
+    allowedDoseOptions,
+
+    doseType:
+      fixedDoseType,
+
+    doseTypeLabel:
+      String(
+        fixedDoseStep
+          ?.doseTypeLabel ||
+        ""
+      ).trim()
   };
 }
 async function vaccinationResolveProgramRowSrv({
@@ -48458,7 +49137,7 @@ if (
       "vaccination_program_form_required",
 
     message:
-      "❌ اختر نوع اللقاح: حي مُضعّف أو ميت/غير نشط."
+  "❌ اختر نوع اللقاح: فيروس مضعف أو فيروس غير نشط."
   };
 }
 
@@ -48530,21 +49209,20 @@ const clientDoseType =
       : clientDoseType;
 
   const fixedDoseType =
-    String(
-      row.doseType || ""
-    ).trim();
+  String(
+    effectiveRow.doseType || ""
+  ).trim();
 
-  const allowedDoseTypes =
-    Array.isArray(
-      row.allowedDoseTypes
-    )
-      ? row.allowedDoseTypes
-          .map(value =>
-            String(value || "").trim()
-          )
-          .filter(Boolean)
-      : [];
-
+const allowedDoseTypes =
+  Array.isArray(
+    effectiveRow.allowedDoseTypes
+  )
+    ? effectiveRow.allowedDoseTypes
+        .map(value =>
+          String(value || "").trim()
+        )
+        .filter(Boolean)
+    : [];
   const requestedDoseOption =
     requestedDoseType
       ? (
