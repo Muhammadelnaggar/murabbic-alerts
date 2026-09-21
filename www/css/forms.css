@@ -9502,3 +9502,322 @@ tbody td:nth-child(2){
     line-height:1.55;
   }
 }
+/* =========================================================
+   Farm Program — same table UI as Murabbik program
+   ========================================================= */
+
+#farmProgramSection #farmProgramRows{
+  display:block;
+  width:100%;
+  max-width:100%;
+  margin:10px 0;
+
+  overflow:visible;
+
+  border:0;
+  border-radius:0;
+
+  background:transparent;
+}
+
+#farmProgramSection
+.mbk-vax-program-table-wrap{
+  display:block;
+
+  width:100%;
+  max-width:100%;
+
+  overflow-x:auto;
+  overflow-y:hidden;
+
+  -webkit-overflow-scrolling:touch;
+
+  direction:rtl;
+
+  background:#fff;
+
+  border:1px solid #dce8df;
+  border-radius:14px;
+
+  scrollbar-width:thin;
+}
+
+#farmProgramSection
+.mbk-vax-program-table{
+  width:100%;
+  min-width:900px;
+
+  border-collapse:separate;
+  border-spacing:0;
+
+  table-layout:fixed;
+
+  direction:rtl;
+
+  background:#fff;
+  color:#172033;
+
+  font-family:inherit;
+}
+
+
+/* ===== Column widths ===== */
+
+#farmProgramSection
+.mbk-vax-farm-editable-table
+th:nth-child(1),
+#farmProgramSection
+.mbk-vax-farm-editable-table
+td:nth-child(1){
+  width:22%;
+}
+
+#farmProgramSection
+.mbk-vax-farm-editable-table
+th:nth-child(2),
+#farmProgramSection
+.mbk-vax-farm-editable-table
+td:nth-child(2){
+  width:14%;
+}
+
+#farmProgramSection
+.mbk-vax-farm-editable-table
+th:nth-child(3),
+#farmProgramSection
+.mbk-vax-farm-editable-table
+td:nth-child(3){
+  width:18%;
+}
+
+#farmProgramSection
+.mbk-vax-farm-editable-table
+th:nth-child(4),
+#farmProgramSection
+.mbk-vax-farm-editable-table
+td:nth-child(4){
+  width:18%;
+}
+
+#farmProgramSection
+.mbk-vax-farm-editable-table
+th:nth-child(5),
+#farmProgramSection
+.mbk-vax-farm-editable-table
+td:nth-child(5){
+  width:16%;
+}
+
+#farmProgramSection
+.mbk-vax-farm-editable-table
+th:nth-child(6),
+#farmProgramSection
+.mbk-vax-farm-editable-table
+td:nth-child(6){
+  width:12%;
+}
+
+
+/* ===== Header ===== */
+
+#farmProgramSection
+.mbk-vax-program-table
+thead th{
+  padding:12px 11px;
+
+  text-align:right;
+  vertical-align:middle;
+
+  background:#edf8f1;
+  color:#14532d;
+
+  border-bottom:2px solid #b9dbc4;
+  border-left:1px solid #d9e8dd;
+
+  font-size:13px;
+  font-weight:900;
+  line-height:1.4;
+
+  white-space:normal;
+}
+
+#farmProgramSection
+.mbk-vax-program-table
+thead th:last-child{
+  border-left:0;
+}
+
+
+/* ===== Body ===== */
+
+#farmProgramSection
+.mbk-vax-program-table
+tbody td{
+  padding:12px 11px;
+
+  text-align:right;
+  vertical-align:top;
+
+  border-bottom:1px solid #e7eee9;
+  border-left:1px solid #eef3ef;
+
+  background:#fff;
+
+  font-size:13px;
+  font-weight:700;
+  line-height:1.65;
+
+  white-space:normal;
+
+  overflow-wrap:normal;
+  word-break:normal;
+}
+
+#farmProgramSection
+.mbk-vax-program-table
+tbody td:last-child{
+  border-left:0;
+}
+
+#farmProgramSection
+.mbk-vax-program-table
+tbody tr:nth-child(even) td{
+  background:#fbfdfb;
+}
+
+#farmProgramSection
+.mbk-vax-program-table
+tbody tr:last-child td{
+  border-bottom:0;
+}
+
+#farmProgramSection
+.mbk-vax-program-table
+tbody tr:hover td{
+  background:#f5fbf7;
+}
+
+
+/* ===== Vaccine ===== */
+
+#farmProgramSection
+.mbk-vax-farm-vaccine-name{
+  display:block;
+
+  color:#0b6b42;
+
+  font-weight:900;
+  line-height:1.55;
+}
+
+#farmProgramSection
+.mbk-vax-farm-section,
+#farmProgramSection
+.mbk-vax-farm-status{
+  display:inline-flex;
+
+  margin-top:6px;
+  margin-left:5px;
+
+  padding:3px 7px;
+
+  border:1px solid #dce8df;
+  border-radius:999px;
+
+  background:#f7fbf8;
+  color:#365443;
+
+  font-size:10px;
+  font-weight:850;
+  line-height:1.2;
+}
+
+#farmProgramSection
+.mbk-vax-farm-status{
+  border-color:#bbf7d0;
+  background:#ecfdf5;
+  color:#047857;
+}
+
+#farmProgramSection
+.mbk-vax-farm-status.is-inactive{
+  border-color:#e2e8f0;
+  background:#f1f5f9;
+  color:#64748b;
+}
+
+
+/* ===== Edit / Delete ===== */
+
+#farmProgramSection
+.mbk-vax-farm-actions{
+  text-align:center;
+  white-space:nowrap;
+}
+
+#farmProgramSection
+.mbk-vax-farm-edit,
+#farmProgramSection
+.mbk-vax-farm-delete{
+  display:block;
+
+  width:100%;
+  min-height:34px;
+
+  margin:0 0 6px;
+  padding:6px 8px;
+
+  border-radius:9px;
+
+  font-family:inherit;
+  font-size:11px;
+  font-weight:900;
+
+  white-space:nowrap;
+}
+
+#farmProgramSection
+.mbk-vax-farm-actions
+button:last-child{
+  margin-bottom:0;
+}
+
+#farmProgramSection
+.mbk-vax-farm-edit{
+  border:1px solid #b7d9c2;
+  background:#fff;
+  color:var(--brand-600, #0b7f47);
+}
+
+#farmProgramSection
+.mbk-vax-farm-delete{
+  border:1px solid #fecaca;
+  background:#fffafa;
+  color:#b91c1c;
+}
+
+
+/* ===== Mobile ===== */
+
+@media(max-width:639px){
+
+  #farmProgramSection
+  .mbk-vax-program-table{
+    min-width:900px;
+  }
+
+  #farmProgramSection
+  .mbk-vax-program-table
+  thead th{
+    padding:10px 9px;
+    font-size:12px;
+  }
+
+  #farmProgramSection
+  .mbk-vax-program-table
+  tbody td{
+    padding:10px 9px;
+    font-size:12px;
+    line-height:1.55;
+  }
+}
