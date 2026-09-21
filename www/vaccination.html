@@ -383,10 +383,10 @@
     </summary>
 
     <div
-      id="programDisplayRows"
-      class="steps-list"
-      aria-live="polite"
-    ></div>
+  id="programDisplayRows"
+  class="mbk-vax-program-table-wrap"
+  aria-live="polite"
+></div>
   </details>
 </section>
   </main>
@@ -3053,7 +3053,7 @@ function openFarmProgramEditor(row = {}) {
     });
   } catch (_) {}
 }
-   function renderProgramDisplay(result = {}) {
+  function renderProgramDisplay(result = {}) {
   const display =
     result?.programDisplay &&
     typeof result.programDisplay === "object"
@@ -3096,166 +3096,118 @@ function openFarmProgramEditor(row = {}) {
 
   if (programDisplayTitle) {
     programDisplayTitle.textContent =
-      String(display.title || "").trim();
+      String(
+        display.title || ""
+      ).trim();
   }
 
   if (programDisplaySummary) {
     programDisplaySummary.textContent =
-      String(display.summary || "").trim();
+      String(
+        display.summary || ""
+      ).trim();
   }
 
   if (programDisplayOpenLabel) {
     programDisplayOpenLabel.textContent =
-      String(display.openLabel || "").trim();
+      String(
+        display.openLabel || ""
+      ).trim();
   }
 
-  if (!programDisplayRows) return;
+  if (!programDisplayRows) {
+    return;
+  }
 
   programDisplayRows.innerHTML = "";
 
-  for (
-    const row of Array.isArray(display.rows)
+  const columns =
+    Array.isArray(display.columns)
+      ? display.columns
+          .map(column => ({
+            key:
+              String(
+                column?.key || ""
+              ).trim(),
+
+            label:
+              String(
+                column?.label || ""
+              ).trim()
+          }))
+          .filter(column =>
+            column.key &&
+            column.label
+          )
+      : [];
+
+  const rows =
+    Array.isArray(display.rows)
       ? display.rows
-      : []
+      : [];
+
+  if (
+    !columns.length ||
+    !rows.length
   ) {
-    const item =
-      document.createElement("div");
-
-    item.className =
-      "step-item mbk-vax-program-row";
-
-    const content =
-      document.createElement("div");
-
-    content.className =
-      "mbk-vax-program-row-content";
-
-    const head =
-      document.createElement("div");
-
-    head.className =
-      "mbk-vax-program-row-head";
-
-    const title =
-      document.createElement("strong");
-
-    title.className =
-      "mbk-vax-program-row-title";
-
-    title.textContent =
-      String(row?.title || "").trim();
-
-    const status =
-      document.createElement("span");
-
-    status.className =
-      "mbk-vax-program-row-status";
-
-    const statusTone =
-      String(
-        row?.statusTone || ""
-      ).trim();
-
-    if (statusTone) {
-      status.classList.add(
-        `is-${statusTone}`
-      );
-    }
-
-    status.textContent =
-      String(
-        row?.statusText || ""
-      ).trim();
-
-    head.appendChild(title);
-
-    if (status.textContent) {
-      head.appendChild(status);
-    }
-
-    content.appendChild(head);
-
-    const meta =
-      document.createElement("div");
-
-    meta.className =
-      "mbk-vax-program-row-meta";
-
-    for (
-      const tag of Array.isArray(row?.tags)
-        ? row.tags
-        : []
-    ) {
-      const value =
-        String(tag || "").trim();
-
-      if (!value) continue;
-
-      const element =
-        document.createElement("span");
-
-      element.className =
-        "mbk-vax-program-row-tag";
-
-      element.textContent = value;
-      meta.appendChild(element);
-    }
-
-    if (meta.childElementCount) {
-      content.appendChild(meta);
-    }
-
-    const schedule =
-      document.createElement("div");
-
-    schedule.className =
-      "mbk-vax-program-row-schedule";
-
-    for (
-      const line of Array.isArray(
-        row?.scheduleLines
-      )
-        ? row.scheduleLines
-        : []
-    ) {
-      const value =
-        String(line || "").trim();
-
-      if (!value) continue;
-
-      const element =
-        document.createElement("span");
-
-      element.className =
-        "mbk-vax-program-row-dose";
-
-      element.textContent = value;
-      schedule.appendChild(element);
-    }
-
-    if (schedule.childElementCount) {
-      content.appendChild(schedule);
-    }
-
-    const notesText =
-      String(
-        row?.notesText || ""
-      ).trim();
-
-    if (notesText) {
-      const notes =
-        document.createElement("div");
-
-      notes.className =
-        "mbk-vax-program-row-notes";
-
-      notes.textContent = notesText;
-      content.appendChild(notes);
-    }
-
-    item.appendChild(content);
-    programDisplayRows.appendChild(item);
+    return;
   }
+
+  const table =
+    document.createElement("table");
+
+  table.className =
+    "mbk-vax-program-table";
+
+  const thead =
+    document.createElement("thead");
+
+  const headRow =
+    document.createElement("tr");
+
+  for (const column of columns) {
+    const th =
+      document.createElement("th");
+
+    th.scope = "col";
+    th.textContent =
+      column.label;
+
+    headRow.appendChild(th);
+  }
+
+  thead.appendChild(headRow);
+
+  const tbody =
+    document.createElement("tbody");
+
+  for (const row of rows) {
+    const tr =
+      document.createElement("tr");
+
+    for (const column of columns) {
+      const td =
+        document.createElement("td");
+
+      const value =
+        String(
+          row?.[column.key] ?? ""
+        ).trim();
+
+      td.textContent = value;
+
+      tr.appendChild(td);
+    }
+
+    tbody.appendChild(tr);
+  }
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+
+  programDisplayRows.appendChild(
+    table
+  );
 }
 function renderFarmProgramResponse(result = {}) {
   renderProgramContext(result);
