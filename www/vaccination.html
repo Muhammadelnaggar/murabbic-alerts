@@ -2704,8 +2704,36 @@ function renderFarmProgramRows() {
       removeButton.className =
         "ghost mbk-vax-farm-delete";
 
-      removeButton.dataset.action =
-       
+    removeButton.dataset.action =
+  "remove-farm-program-row";
+
+removeButton.dataset.rowIndex =
+  String(index);
+
+removeButton.textContent =
+  "حذف";
+
+actionsTd.appendChild(editButton);
+actionsTd.appendChild(removeButton);
+
+tr.appendChild(vaccineTd);
+tr.appendChild(formTd);
+tr.appendChild(startTd);
+tr.appendChild(boosterTd);
+tr.appendChild(periodicTd);
+tr.appendChild(actionsTd);
+
+tbody.appendChild(tr);
+    }
+  );
+
+table.appendChild(thead);
+table.appendChild(tbody);
+
+wrapper.appendChild(table);
+farmProgramRows.appendChild(wrapper);
+}
+
 function readFarmProgramEditorRow() {
   const rowElement =
     farmProgramEditor?.querySelector(
