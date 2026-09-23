@@ -22784,10 +22784,93 @@ const BREED_NUTRITION_DEFAULTS = {
 
 function pickFirstFinite(...vals) {
   for (const v of vals) {
+    if (v === null || v === undefined || String(v).trim() === '') continue;
     const n = Number(v);
     if (Number.isFinite(n)) return n;
   }
   return null;
+}
+
+function nutritionPositiveInputSrv(v) {
+  if (v === null || v === undefined || String(v).trim() === '') return false;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0;
+}
+
+function nutritionMilkPercentInputSrv(v) {
+  return nutritionPositiveInputSrv(v) && Number(v) < 100;
+}
+
+function pickFirstPositiveSrv(...vals) {
+  for (const v of vals) {
+    if (nutritionPositiveInputSrv(v)) return Number(v);
+  }
+  return null;
+}
+
+function validateNutritionRequiredInputsSrv(context = {}) {
+  const bodyWeight = pickFirstPositiveSrv(
+    context.bodyWeightKg,
+    context.bodyWeight,
+    context.cameraWeightKg,
+    context.groupBodyWeightKg
+  );
+
+  if (bodyWeight === null) {
+    return {
+      ok: false,
+      error: 'nutrition_body_weight_required',
+      message: '❌ أدخل وزن الجسم أو الوزن الممثل للفئة التغذوية قبل حساب العليقة.'
+    };
+  }
+
+  const stage = [
+    context.groupType,
+    context.groupName,
+    context.group,
+    context.groupLabel,
+    context.productionStatus,
+    context.pregnancyStatus
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  const isDry =
+    context.earlyDry === true ||
+    context.closeUp === true ||
+    /جاف|dry|close[_ -]?up|انتظار.*ولاد|تحضير.*ولاد/.test(stage);
+
+  const isLactating = !isDry && (
+    nutritionPositiveInputSrv(context.avgMilkKg) ||
+    nutritionPositiveInputSrv(context.actualMilkKg) ||
+    nutritionPositiveInputSrv(context.daysInMilk) ||
+    (
+      context.useTargetMilkForRation === true &&
+      nutritionPositiveInputSrv(context.targetMilkKg)
+    ) ||
+    /حلاب|فريش|حديث الولاد|lactat|milking|fresh/.test(stage)
+  );
+
+  if (!isLactating) return { ok: true };
+
+  const missingFields = [];
+
+  if (!nutritionMilkPercentInputSrv(context.milkFatPct)) {
+    missingFields.push('milkFatPct');
+  }
+
+  if (!nutritionMilkPercentInputSrv(context.milkProteinPct)) {
+    missingFields.push('milkProteinPct');
+  }
+
+  if (missingFields.length) {
+    return {
+      ok: false,
+      error: 'nutrition_milk_composition_required',
+      message: '❌ أدخل نسبة دهن اللبن ونسبة بروتين اللبن للحلاب بقيم صحيحة قبل حساب العليقة.',
+      missingFields
+    };
+  }
+
+  return { ok: true };
 }
 
 function normalizeBreedKey(species, breed = '') {
@@ -22867,40 +22950,33 @@ function deriveNutritionRuntimeContext(context = {}) {
     Number(context.headCount || 0) > 1 ||
     String(context.groupContextSource || '').trim() !== '';
 
-  const standardBodyWeightKg = getStandardWeight(context.species, context.breed);
-
   const hasUserBodyWeight =
-    Number.isFinite(Number(context.bodyWeightKg)) ||
-    Number.isFinite(Number(context.bodyWeight));
+    nutritionPositiveInputSrv(context.bodyWeightKg) ||
+    nutritionPositiveInputSrv(context.bodyWeight);
 
   const hasGroupBodyWeight =
-    Number.isFinite(Number(context.groupBodyWeightKg));
+    nutritionPositiveInputSrv(context.groupBodyWeightKg);
 
-  const bodyWeightKgUsed = pickFirstFinite(
+  const bodyWeightKgUsed = pickFirstPositiveSrv(
     context.bodyWeightKg,
     context.bodyWeight,
     context.cameraWeightKg,
-    context.groupBodyWeightKg,
-    standardBodyWeightKg,
-    breedDefaults.bodyWeightKg
+    context.groupBodyWeightKg
   );
 
   const bodyWeightSource =
     hasUserBodyWeight ? 'user_body_weight' :
-    Number.isFinite(Number(context.cameraWeightKg)) ? 'camera_weight' :
+    nutritionPositiveInputSrv(context.cameraWeightKg) ? 'camera_weight' :
     hasGroupBodyWeight ? 'group_representative_body_weight_input' :
-    Number.isFinite(Number(standardBodyWeightKg)) ? 'standard_weight_fallback' :
-    'breed_default_fallback';
+    'not_available';
 
-  const milkFatPctUsed = pickFirstFinite(
-    context.milkFatPct,
-    breedDefaults.milkFatPct
-  );
+  const milkFatPctUsed = nutritionMilkPercentInputSrv(context.milkFatPct)
+    ? Number(context.milkFatPct)
+    : null;
 
-  const milkProteinPctUsed = pickFirstFinite(
-    context.milkProteinPct,
-    breedDefaults.milkProteinPct
-  );
+  const milkProteinPctUsed = nutritionMilkPercentInputSrv(context.milkProteinPct)
+    ? Number(context.milkProteinPct)
+    : null;
 
   const lactationNumberUsed = pickFirstFinite(
     context.lactationNumber,
@@ -22912,8 +22988,8 @@ function deriveNutritionRuntimeContext(context = {}) {
   );
 
   const hasBcsInput =
-    Number.isFinite(Number(context.bcs)) ||
-    Number.isFinite(Number(context.groupBcs));
+    nutritionPositiveInputSrv(context.bcs) ||
+    nutritionPositiveInputSrv(context.groupBcs);
 
   const bcsUsed = pickFirstFinite(
     context.bcs,
@@ -22922,14 +22998,14 @@ function deriveNutritionRuntimeContext(context = {}) {
   );
 
   const bcsSource =
-    Number.isFinite(Number(context.bcs)) ? 'user_bcs' :
-    Number.isFinite(Number(context.groupBcs)) ? 'group_representative_bcs_input' :
+    nutritionPositiveInputSrv(context.bcs) ? 'user_bcs' :
+    nutritionPositiveInputSrv(context.groupBcs) ? 'group_representative_bcs_input' :
     isGroupContext ? 'standard_bcs_fallback' :
     'not_available';
 
   const representativeWarning =
-    isGroupContext && (!hasUserBodyWeight && !hasGroupBodyWeight || !hasBcsInput)
-      ? 'تم استخدام وزن/BCS قياسي للمجموعة. إدخال وزن وBCS ممثلين يعطي تحليلًا أدق.'
+    isGroupContext && !hasBcsInput
+      ? 'تم استخدام BCS قياسي للمجموعة. إدخال BCS ممثل يعطي تحليلًا أدق.'
       : null;
 
   return {
@@ -25244,7 +25320,13 @@ async function syncAnimalGroupFieldsSrv(tenant, groups = []) {
 app.post('/api/nutrition/targets', requireUserId, async (req, res) => {
   try {
     const body = req.body || {};
-    const ctx = normalizeNutritionContext(body.context || {});
+const ctx = normalizeNutritionContext(body.context || {});
+
+const required = validateNutritionRequiredInputsSrv(ctx);
+
+if (!required.ok) {
+  return res.status(400).json(required);
+}
 
 const built = buildNutritionCentralTargets(ctx);
 const publicTargets = { ...built.targetsCore };
@@ -25393,6 +25475,13 @@ if (!milkScenario.ok) {
 }
 
 const context = milkScenario.context;
+
+const required = validateNutritionRequiredInputsSrv(context);
+
+if (!required.ok) {
+  return res.status(400).json(required);
+}
+
 const mode = body.mode || 'tmr_asfed';
 const concKg = toNumOrNull(body.concKg);
 const milkPrice = toNumOrNull(body.milkPrice);
@@ -25500,10 +25589,7 @@ app.get('/api/nutrition/context', requireUserId, async (req, res) => {
       });
     }
 
-    const toNum = (v) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : null;
-    };
+    const toNum = (v) => toNumOrNull(v);
 
     const speciesOf = (a = {}) => {
       const s = String(a.species || a.animalTypeAr || a.animaltype || a.animalType || '').trim();
@@ -26215,6 +26301,12 @@ if (!milkScenario.ok) {
 }
 
 const analysisContext = milkScenario.context;
+
+const required = validateNutritionRequiredInputsSrv(analysisContext);
+
+if (!required.ok) {
+  return res.status(400).json(required);
+}
 
 const centralAnalysis = buildNutritionCentralAnalysis({
   rows,
