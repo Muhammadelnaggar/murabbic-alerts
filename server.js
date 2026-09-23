@@ -50496,6 +50496,10 @@ const animal =
      
 const doc = animal.data || {};
 
+const status = String(doc.status || "active")
+  .trim()
+  .toLowerCase();
+
 const animalLabel =
   vaccinationAnimalLabelSrv(
     doc,
