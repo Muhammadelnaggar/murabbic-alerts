@@ -42245,68 +42245,63 @@ async function vaccinationHasSameDaySrv(
   animalNumber,
   eventDate,
   vaccine,
-  prefetchedEventDocs = null
+  prefetchedEventDocs = null,
+  vaccineCode = ""
 ) {
   const num = calvingNormDigitsOnlySrv(animalNumber);
   const dt = String(eventDate || "").trim().slice(0, 10);
   const vx = String(vaccine || "").trim();
+  const code = vaccinationTextKeySrv(vaccineCode);
 
-  if (!db || !uid || !num || !dt || !vx) return false;
-
-  let eventDocs = null;
-
-  if (Array.isArray(prefetchedEventDocs)) {
-    eventDocs = prefetchedEventDocs.slice(0, 80);
-  } else {
-    const snap = await db.collection("events")
-      .where("userId", "==", uid)
-      .where("animalNumber", "==", num)
-      .limit(80)
-      .get();
-
-    eventDocs = snap.docs;
+  if (!db || !uid || !num || !dt || (!vx && !code)) {
+    return false;
   }
 
-  let found = false;
+  const eventDocs = Array.isArray(prefetchedEventDocs)
+    ? prefetchedEventDocs
+    : (
+        await db.collection("events")
+          .where("userId", "==", uid)
+          .where("animalNumber", "==", num)
+          .get()
+      ).docs;
 
-  eventDocs.forEach(ds => {
+  return eventDocs.some(ds => {
     const ev = ds.data() || {};
 
-    const t = String(
+    const type = String(
       ev.eventType ||
       ev.type ||
       ev.eventTypeNorm ||
       ""
     ).trim();
 
-    const ed = String(
+    const date = String(
       ev.eventDate ||
       ev.date ||
       ""
     ).trim().slice(0, 10);
 
-    const v = String(
+    const name = String(
       ev.vaccine ||
       ev.vaccineName ||
       ""
     ).trim();
 
+    const storedCode =
+      vaccinationTextKeySrv(ev.vaccineCode);
+
     const isVaccination =
-      t === "تحصين" ||
-      t === "vaccination" ||
-      t.includes("تحصين") ||
-      t.includes("vaccination");
+      type === "تحصين" ||
+      type === "vaccination" ||
+      type.includes("تحصين") ||
+      type.includes("vaccination");
 
-    if (
-      isVaccination &&
-      ed === dt &&
-      v === vx
-    ) {
-      found = true;
-    }
+    return isVaccination && date === dt && (
+      (code && storedCode && code === storedCode) ||
+      (vx && name === vx)
+    );
   });
-
-  return found;
 }
 function vaccinationDoseNormSrv(v) {
   const s = String(v || "").trim().toLowerCase();
@@ -49493,6 +49488,7 @@ app.get(
           .doc(uid)
           .get()
       ]);
+  
 
       return res.json({
         ok: true,
@@ -49832,15 +49828,15 @@ app.post(
           }
         );
 
-      const savedSnap =
-        await currentRef.get();
-      let taskReconciliation;
+const savedSnap =
+  await currentRef.get();
+
+let taskReconciliation;
 
 try {
   taskReconciliation =
     await vaccinationReconcileProgramTasksSrv({
       uid,
-
       reason:
         "vaccination_farm_program_updated"
     });
@@ -49857,7 +49853,43 @@ try {
       false
     );
 }
-      return res.json({
+
+// تحديث مواعيد الحملات بعد حفظ برنامج المزرعة
+let campaignScheduleReconciliation = {
+  ok: true,
+  checkedCount: 0,
+  updatedCount: 0,
+  activeCampaignsSkipped: 0
+};
+
+try {
+  const currentExecutionProgram =
+    await vaccinationReadExecutionProgramSrv(
+      uid,
+      "farm"
+    );
+
+  campaignScheduleReconciliation =
+    await vaccinationCampaignRefreshFarmSchedulesSrv({
+      uid,
+      executionProgram: currentExecutionProgram
+    });
+
+} catch (scheduleError) {
+  console.error(
+    "vaccination-farm-campaign-schedule-reconciliation",
+    scheduleError
+  );
+
+  campaignScheduleReconciliation = {
+    ok: false,
+    error:
+      "vaccination_campaign_schedule_refresh_failed"
+  };
+}
+
+return res.json({
+      
         ok: true,
 
                 message:
@@ -49867,8 +49899,9 @@ try {
 
         programContext,
 
-        savedMeta,
+                savedMeta,
         taskReconciliation,
+        campaignScheduleReconciliation,
 
         program:
           vaccinationFarmProgramResponseSrv(
@@ -50460,8 +50493,8 @@ const animal =
         continue;
       }
 
-      const doc = animal.data || {};
-const status = String(doc.status || "active").trim().toLowerCase();
+     
+const doc = animal.data || {};
 
 const animalLabel =
   vaccinationAnimalLabelSrv(
@@ -50469,7 +50502,7 @@ const animalLabel =
     animal._collection || ""
   );
 
-if (status === "inactive" || status === "archived") {
+if (!shouldAppearInGroupsSrv(doc)) {
   rejected.push({
     animalNumber,
     reason:
@@ -50578,7 +50611,8 @@ const duplicated =
     animalNumber,
     eventDate,
     resolvedVaccine,
-    prefetchedEventDocs
+    prefetchedEventDocs,
+    resolvedVaccineCode
   );
 
 if (duplicated) {
@@ -52723,20 +52757,18 @@ async function vaccinationReconcileProgramTasksSrv({
         ])
     );
 
-  const [
+    const [
     pendingSnap,
     needsDataSnap
   ] = await Promise.all([
     db.collection("tasks")
       .where("userId", "==", userId)
       .where("status", "==", "pending")
-      .limit(500)
       .get(),
 
     db.collection("tasks")
       .where("userId", "==", userId)
       .where("status", "==", "needs_data")
-      .limit(500)
       .get()
   ]);
 
@@ -53003,17 +53035,9 @@ async function vaccinationReconcileProgramTasksSrv({
     const animalDoc =
       animal?.data || {};
 
-    const animalStatus =
-      String(
-        animalDoc.status || "active"
-      )
-        .trim()
-        .toLowerCase();
-
-    if (
+        if (
       !animal ||
-      animalStatus === "inactive" ||
-      animalStatus === "archived"
+      !shouldAppearInGroupsSrv(animalDoc)
     ) {
       closeTask(
         ds,
@@ -53484,17 +53508,7 @@ const requestedDoseType =
     continue;
   }
 
-  const status =
-    String(
-      animalDoc.status || "active"
-    )
-      .trim()
-      .toLowerCase();
-
-  if (
-    status === "inactive" ||
-    status === "archived"
-  ) {
+    if (!shouldAppearInGroupsSrv(animalDoc)) {
     rejected.push({
       animalNumber,
       reason:
@@ -53602,11 +53616,13 @@ const requestedDoseType =
   // لذلك ننفذهما بالتوازي بدل انتظار أحدهما قبل الآخر.
   const [duplicated, dueWarning] =
     await Promise.all([
-      vaccinationHasSameDaySrv(
+            vaccinationHasSameDaySrv(
         uid,
         animalNumber,
         eventDate,
-        resolvedVaccine
+        resolvedVaccine,
+        null,
+        resolvedVaccineCode
       ),
 
       vaccinationDueWarningSrv({
@@ -53894,7 +53910,7 @@ doseTypeLabel:
   const writeBatch =
     db.batch();
 
-  writeBatch.set(
+  writeBatch.create(
     eventRef,
     payload
   );
@@ -53949,7 +53965,25 @@ doseTypeLabel:
     );
   }
 
-  await writeBatch.commit();
+    try {
+    await writeBatch.commit();
+  } catch (e) {
+    const alreadyExists =
+      Number(e?.code) === 6 ||
+      String(e?.code || "").toLowerCase() === "already-exists" ||
+      /ALREADY_EXISTS/i.test(String(e?.message || ""));
+
+    if (alreadyExists) {
+      rejected.push({
+        animalNumber,
+        reason:
+          "سبق تسجيل التحصين نفسه لهذا الحيوان في التاريخ نفسه."
+      });
+      continue;
+    }
+
+    throw e;
+  }
 
   const tasks =
     taskWrite?.publicTask
@@ -64234,7 +64268,146 @@ async function vaccinationCampaignWriteScheduleSrv({
     vaccineForm: form
   };
 }
+async function vaccinationCampaignRefreshFarmSchedulesSrv({
+  uid = "",
+  executionProgram = {}
+} = {}) {
+  const tenant = tenantKey(uid);
 
+  const rows = Array.isArray(executionProgram.rows)
+    ? executionProgram.rows
+    : [];
+
+  const seenCodes = new Set();
+
+  const result = {
+    ok: true,
+    checkedCount: 0,
+    updatedCount: 0,
+    activeCampaignsSkipped: 0
+  };
+
+  for (const row of rows) {
+    const code =
+      String(row?.vaccineCode || "").trim();
+
+    if (
+      !row ||
+      row.active === false ||
+      String(row.programSection || "")
+        .trim().toLowerCase() !== "herd" ||
+      !code ||
+      seenCodes.has(code) ||
+      !vaccinationCampaignPeriodicStepSrv(row)
+    ) {
+      continue;
+    }
+
+    seenCodes.add(code);
+
+    const schedule =
+      await vaccinationCampaignReadScheduleSrv({
+        uid: tenant,
+        programMode: "farm",
+        vaccineCode: code
+      });
+
+    if (
+      !schedule ||
+      String(schedule.task.status || "").trim() !== "pending" ||
+      schedule.task.done === true
+    ) {
+      continue;
+    }
+
+    result.checkedCount += 1;
+
+    const form =
+      schedule.vaccineForm || "";
+
+    const step =
+      vaccinationCampaignPeriodicStepSrv(
+        row,
+        form
+      );
+
+    if (!step) continue;
+
+    const nextDueDate =
+      vaccinationYmdAddUnitSrv(
+        schedule.lastExecutionDate,
+        Number(step.timingValue || 0),
+        String(step.timingUnit || "").trim()
+      );
+
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(nextDueDate) ||
+      nextDueDate === schedule.dueDate
+    ) {
+      continue;
+    }
+
+    const oldCampaignId =
+      vaccinationCampaignIdSrv({
+        uid: tenant,
+        programMode: "farm",
+        vaccineCode: code,
+        dueDate: schedule.dueDate
+      });
+
+    const oldCampaignSnap =
+      await db.collection("tasks")
+        .where("campaignId", "==", oldCampaignId)
+        .get();
+
+    const ongoingCampaign =
+      oldCampaignSnap.docs.some(ds => {
+        const task = ds.data() || {};
+
+        return (
+          tenantKey(task.userId) === tenant &&
+          vaccinationCampaignTaskMatchesSrv({
+            task,
+            programMode: "farm",
+            vaccineCode: code
+          }) &&
+          String(task.campaignDueDate || "")
+            .trim().slice(0, 10) === schedule.dueDate
+        );
+      });
+
+    if (ongoingCampaign) {
+      result.activeCampaignsSkipped += 1;
+      continue;
+    }
+
+    const write =
+      await vaccinationCampaignWriteScheduleSrv({
+        uid: tenant,
+        programMode: "farm",
+        vaccineCode: code,
+        vaccineForm: form,
+        vaccine:
+          row.vaccine ||
+          row.vaccineName ||
+          code,
+        herdRow: row,
+        executionDate: schedule.lastExecutionDate,
+        source:
+          "server:vaccination-farm-program-updated"
+      });
+
+    if (write?.updated !== true) {
+      throw new Error(
+        "vaccination_campaign_schedule_refresh_failed"
+      );
+    }
+
+    result.updatedCount += 1;
+  }
+
+  return result;
+}
 async function vaccinationCampaignEligibleMembersSrv({
   uid = "",
   programContext = {},
@@ -65943,20 +66116,20 @@ async function vaccinationCampaignDashboardAlertsSrv({
 
   // الحملة لا تعتمد على أول 500 Task في الداشبورد.
   // نقرأ كل مهام التحصين المفتوحة لهذا الحساب فقط.
-  const [
-    pendingSnap,
-    needsDataSnap
-  ] = await Promise.all([
-    db.collection("tasks")
-      .where("userId", "==", tenant)
-      .where("status", "==", "pending")
-      .get(),
+     const [
+      pendingSnap,
+      needsDataSnap
+    ] = await Promise.all([
+      db.collection("tasks")
+        .where("userId", "==", uid)
+        .where("status", "==", "pending")
+        .get(),
 
-    db.collection("tasks")
-      .where("userId", "==", tenant)
-      .where("status", "==", "needs_data")
-      .get()
-  ]);
+      db.collection("tasks")
+        .where("userId", "==", uid)
+        .where("status", "==", "needs_data")
+        .get()
+    ]);
 
   const taskDocs = [
     ...pendingSnap.docs,
@@ -67517,21 +67690,19 @@ const programContext =
       );
 
     const [
-      pendingSnap,
-      needsDataSnap
-    ] = await Promise.all([
-      db.collection("tasks")
-        .where("userId", "==", uid)
-        .where("status", "==", "pending")
-        .limit(500)
-        .get(),
+  pendingSnap,
+  needsDataSnap
+] = await Promise.all([
+  db.collection("tasks")
+    .where("userId", "==", uid)
+    .where("status", "==", "pending")
+    .get(),
 
-      db.collection("tasks")
-        .where("userId", "==", uid)
-        .where("status", "==", "needs_data")
-        .limit(500)
-        .get()
-    ]);
+  db.collection("tasks")
+    .where("userId", "==", uid)
+    .where("status", "==", "needs_data")
+    .get()
+]);
 
       const groups = new Map();
 
@@ -67564,25 +67735,18 @@ const programContext =
             key
           );
 
-        const status =
-          String(
-            animal?.data?.status ||
-            "active"
-          )
-            .trim()
-            .toLowerCase();
-
         const active =
-          Boolean(animal) &&
-          status !== "inactive" &&
-          status !== "archived";
+  Boolean(animal) &&
+  shouldAppearInGroupsSrv(
+    animal.data || {}
+  );
 
-        activeAnimalCache.set(
-          key,
-          active
-        );
+  activeAnimalCache.set(
+    key,
+    active
+  );
 
-            return active;
+  return active;
       };
 
     const herdCampaignAlerts =
