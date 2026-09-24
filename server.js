@@ -26582,7 +26582,9 @@ function filterNutritionReportEvents(events, { type, stage, groupName } = {}) {
   const wantedGroup = normReportText(groupName || '');
 
   return (events || [])
-    .filter(isNutritionSavedEvent)
+    .filter(e =>
+     String(e.type || e.eventTypeNorm || '').trim().toLowerCase() === 'nutrition_group'
+   )
     .filter(e => e?.nutrition?.analysis && e?.nutrition?.context)
     .filter(e => !wantedSpecies || nutritionSpeciesKeyFromEvent(e) === wantedSpecies)
     .filter(e => !wantedStage || nutritionStageFromEvent(e) === wantedStage)
