@@ -1130,3 +1130,171 @@ body[data-page="milk-report"] .milk-groups-table tbody tr:nth-child(even) td{
     min-width:0;
   }
 }
+/* ===== Fertility report: reproductive inventory only ===== */
+
+body[data-page="fertility-report"] #herdGrid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+  align-items:start;
+}
+
+body[data-page="fertility-report"] .fert-inventory-panel{
+  min-width:0;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:18px;
+  overflow:hidden;
+  break-inside:avoid;
+  page-break-inside:avoid;
+}
+
+body[data-page="fertility-report"] .fert-inventory-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:15px 16px;
+  background:var(--brand-soft);
+  border-bottom:1px solid var(--border);
+}
+
+body[data-page="fertility-report"] .fert-inventory-head h3{
+  margin:0;
+  font-size:17px;
+  font-weight:950;
+  color:#134e2f;
+}
+
+body[data-page="fertility-report"] .fert-inventory-total{
+  display:flex;
+  align-items:baseline;
+  gap:6px;
+  white-space:nowrap;
+  color:var(--green);
+}
+
+body[data-page="fertility-report"] .fert-inventory-total b{
+  font-size:27px;
+  line-height:1;
+  font-weight:950;
+}
+
+body[data-page="fertility-report"] .fert-inventory-total span{
+  font-size:12px;
+  font-weight:850;
+}
+
+body[data-page="fertility-report"] .fert-inventory-table{
+  width:100%;
+  min-width:0;
+  border-collapse:collapse;
+  border-spacing:0;
+  table-layout:fixed;
+}
+
+body[data-page="fertility-report"] .fert-inventory-table th,
+body[data-page="fertility-report"] .fert-inventory-table td{
+  border:0;
+  border-bottom:1px solid var(--line);
+  border-radius:0;
+  padding:12px 14px;
+  line-height:1.35;
+  background:#fff;
+}
+
+body[data-page="fertility-report"] .fert-inventory-table th{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:850;
+}
+
+body[data-page="fertility-report"] .fert-inventory-table th:first-child{
+  width:48%;
+}
+
+body[data-page="fertility-report"] .fert-inventory-table th:nth-child(2),
+body[data-page="fertility-report"] .fert-inventory-table th:nth-child(3){
+  text-align:center;
+}
+
+body[data-page="fertility-report"] .fert-inventory-table td{
+  color:var(--ink);
+  font-size:14px;
+  font-weight:850;
+  vertical-align:middle;
+}
+
+body[data-page="fertility-report"] .fert-inventory-table td.fert-num,
+body[data-page="fertility-report"] .fert-inventory-table td.fert-pct{
+  text-align:center;
+  color:var(--green);
+  font-size:17px;
+  font-weight:950;
+  white-space:nowrap;
+}
+
+body[data-page="fertility-report"] .fert-inventory-table tbody tr:last-child td{
+  border-bottom:0;
+}
+
+body[data-page="fertility-report"] .fert-inventory-table tbody tr:nth-child(even) td{
+  background:#fbfdfb;
+}
+
+@media(max-width:760px){
+
+  body[data-page="fertility-report"] #herdGrid{
+    grid-template-columns:1fr;
+  }
+
+  body[data-page="fertility-report"] .fert-inventory-head{
+    padding:12px 14px;
+  }
+
+  body[data-page="fertility-report"] .fert-inventory-table th,
+  body[data-page="fertility-report"] .fert-inventory-table td{
+    padding:10px 12px;
+  }
+}
+
+@media print{
+
+  body[data-page="fertility-report"] #herdGrid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:3mm;
+  }
+
+  body[data-page="fertility-report"] .fert-inventory-panel{
+    border-radius:0;
+    box-shadow:none;
+  }
+
+  body[data-page="fertility-report"] .fert-inventory-head{
+    padding:3mm;
+  }
+
+  body[data-page="fertility-report"] .fert-inventory-head h3{
+    font-size:11pt;
+  }
+
+  body[data-page="fertility-report"] .fert-inventory-total b{
+    font-size:18pt;
+  }
+
+  body[data-page="fertility-report"] .fert-inventory-total span{
+    font-size:8pt;
+  }
+
+  body[data-page="fertility-report"] .fert-inventory-table th,
+  body[data-page="fertility-report"] .fert-inventory-table td{
+    padding:2.5mm 2mm;
+    font-size:9pt;
+    overflow-wrap:anywhere;
+  }
+
+  body[data-page="fertility-report"] .fert-inventory-table td.fert-num,
+  body[data-page="fertility-report"] .fert-inventory-table td.fert-pct{
+    font-size:10pt;
+  }
+}
