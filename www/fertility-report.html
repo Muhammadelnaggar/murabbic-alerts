@@ -229,30 +229,80 @@ function renderSummary(j){
 }
 
 function renderHerd(j){
-  const hc = j.herdComposition || j.herdReproductiveComposition || {};
-  const cards = Array.isArray(hc.cards) ? hc.cards : [];
+  const hc =
+    j.herdComposition ||
+    j.herdReproductiveComposition ||
+    {};
 
-  if (!cards.length) {
-    el("herdGrid").innerHTML = emptyMsg("لا توجد قراءة بنية قطيع جاهزة من السيرفر.");
+  const cows = hc.cows;
+  const heifers = hc.heifers;
+
+  if (
+    !Array.isArray(cows?.cards) ||
+    !Array.isArray(heifers?.cards)
+  ) {
+    el("herdGrid").innerHTML =
+      emptyMsg("بيانات الجرد التناسلي غير متاحة حاليًا.");
     return;
   }
 
-  el("herdGrid").innerHTML = `
-    ${noteMini(
-      hc.title || "بنية القطيع التناسلية الحالية",
-      "قراءة القطيع",
-      esc(hc.read || "يعرض هذا القسم توزيع الحالة التناسلية الحالية للقطيع.")
-    )}
+  function inventoryPanel(title, total, cards) {
+    return `
+      <section class="fert-inventory-panel">
 
-    ${cards.map(c => noteMini(
-      c.label,
-      `${fmtNum(c.count)} رأس`,
-      `
-        <b>النسبة:</b> ${esc(c.pctText || "--")}<br>
-        ${esc(c.read || "")}
-      `
-    )).join("")}
-  `;
+        <div class="fert-inventory-head">
+          <h3>${esc(title)}</h3>
+
+          <div class="fert-inventory-total">
+            <b>${esc(fmtNum(total))}</b>
+            <span>رأسًا</span>
+          </div>
+        </div>
+
+        <table class="fert-inventory-table">
+          <thead>
+            <tr>
+              <th>الحالة</th>
+              <th>العدد</th>
+              <th>النسبة</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${cards.map(c => `
+              <tr>
+                <td>${esc(c.label)}</td>
+
+                <td class="fert-num">
+                  ${esc(fmtNum(c.count))}
+                </td>
+
+                <td class="fert-pct">
+                  ${esc(c.pctText || "--")}
+                </td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+
+      </section>
+    `;
+  }
+
+  const mothersLabel =
+    reportType === "buffalo"
+      ? "إجمالي الجاموس"
+      : "إجمالي الأبقار";
+
+  const heifersLabel =
+    reportType === "buffalo"
+      ? "إجمالي عجلات الجاموس"
+      : "إجمالي العجلات";
+
+  el("herdGrid").innerHTML = [
+    inventoryPanel(mothersLabel, cows.total, cows.cards),
+    inventoryPanel(heifersLabel, heifers.total, heifers.cards)
+  ].join("");
 }
 
 function renderConception(j){
