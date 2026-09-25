@@ -83681,40 +83681,80 @@ const repeatBreederAnalysis = fertilityReportRepeatBreederAnalysisSrv(
       .sort((a, b) => Number(b.daysInMilk || 0) - Number(a.daysInMilk || 0))
       .slice(0, 50);
 
-     const pregnantCount = activeAnimals.filter(a =>
-      fertilityReportReproKindSrv(a.reproductiveStatus || "") === "pregnant"
-    ).length;
-
-    const openCount = activeAnimals.filter(a =>
-      fertilityReportReproKindSrv(a.reproductiveStatus || "") === "open"
-    ).length;
-
-    const inseminatedCount = activeAnimals.filter(a =>
-      fertilityReportReproKindSrv(a.reproductiveStatus || "") === "inseminated"
-    ).length;
-
-    const freshCount = activeAnimals.filter(a =>
-      fertilityReportReproKindSrv(a.reproductiveStatus || "") === "fresh"
-    ).length;
-
-    // جرد العجلات من التصنيف الرسمي للمجموعات.
+    // جرد الخصوبة من المجموعات الرسمية للقطيع.
     const groupPage = await buildGroupsPageForTenantSrv(uid);
 
     if (!groupPage?.ok || !Array.isArray(groupPage.groups)) {
       return res.status(503).json({
         ok: false,
-        error: "fertility_heifer_inventory_unavailable",
-        message: "تعذّر تحميل جرد العجلات حاليًا. حاول مرة أخرى."
+        error: "fertility_inventory_unavailable",
+        message: "تعذّر تحميل جرد القطيع حاليًا. حاول مرة أخرى."
       });
     }
 
     const groupSpecies =
       selectedType === "buffalo" ? "buffalo" : "cow";
 
+    // مجموعات الأمهات فقط، بصرف النظر عن حالتها الإنتاجية.
+    const motherGroupKeys = new Set([
+      "fresh",
+      "high",
+      "med",
+      "low",
+      "dry",
+      "closeup"
+    ]);
+
+    const motherNumbers = new Set(
+      groupPage.groups
+        .filter(g =>
+          g.species === groupSpecies &&
+          motherGroupKeys.has(g.baseKey)
+        )
+        .flatMap(g =>
+          Array.isArray(g.animalNumbers)
+            ? g.animalNumbers
+            : []
+        )
+        .map(fertilityReportDigitsSrv)
+        .filter(Boolean)
+    );
+
+    // نستخدم المجموعة الرسمية لتحديد الأمهات،
+    // ثم نقرأ حالتهن التناسلية من بيانات التقرير الحالية.
+    const mothers = activeAnimals.filter(a =>
+      motherNumbers.has(a._number)
+    );
+
+    const pregnantCount = mothers.filter(a =>
+      fertilityReportReproKindSrv(
+        a.reproductiveStatus || ""
+      ) === "pregnant"
+    ).length;
+
+    const openCount = mothers.filter(a =>
+      fertilityReportReproKindSrv(
+        a.reproductiveStatus || ""
+      ) === "open"
+    ).length;
+
+    const inseminatedCount = mothers.filter(a =>
+      fertilityReportReproKindSrv(
+        a.reproductiveStatus || ""
+      ) === "inseminated"
+    ).length;
+
+    const freshCount = mothers.filter(a =>
+      fertilityReportReproKindSrv(
+        a.reproductiveStatus || ""
+      ) === "fresh"
+    ).length;
+
+    // العجلات: نفس المجموعات الرسمية التي نجحت لايف.
     function heiferCount(baseKey, minAgeMonths = 0) {
       return groupPage.groups
         .filter(g =>
-          (!selectedType || g.species === groupSpecies) &&
+          g.species === groupSpecies &&
           g.baseKey === baseKey
         )
         .reduce((sum, g) => {
@@ -83728,14 +83768,17 @@ const repeatBreederAnalysis = fertilityReportRepeatBreederAnalysisSrv(
         }, 0);
     }
 
-    const heiferPregnantCount = heiferCount("pregHeifers");
+    const heiferPregnantCount =
+      heiferCount("pregHeifers");
 
-    const heiferInseminatedCount = heiferCount("breeding");
+    const heiferInseminatedCount =
+      heiferCount("breeding");
 
-    const heiferOpenCount = heiferCount("heiferOpen", 12);
+    const heiferOpenCount =
+      heiferCount("heiferOpen", 12);
 
     const herdComposition = fertilityReportHerdCompositionSrv({
-      totalActive: activeAnimals.length,
+      totalActive: mothers.length,
       pregnantCount,
       openCount,
       inseminatedCount,
