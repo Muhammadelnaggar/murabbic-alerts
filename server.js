@@ -82531,68 +82531,50 @@ function fertilityReportHerdCompositionSrv({
   openCount = 0,
   inseminatedCount = 0,
   freshCount = 0,
-  dryCount = 0
+  heiferPregnantCount = 0,
+  heiferInseminatedCount = 0,
+  heiferOpenCount = 0
 } = {}) {
-  const total = Number(totalActive || 0);
+  const cowsTotal = Number(totalActive || 0);
 
-  function pctText(pct) {
-    return pct === null ? "--" : `${pct}%`;
-  }
+  const heifersTotal =
+    Number(heiferPregnantCount || 0) +
+    Number(heiferInseminatedCount || 0) +
+    Number(heiferOpenCount || 0);
 
-  function card(key, label, count, read) {
-    const pct = fertilityReportPctSrv(count, total);
+  function item(key, label, count, denominator) {
+    const pct = fertilityReportPctSrv(count, denominator);
 
     return {
       key,
       label,
       count: Number(count || 0),
       pct,
-      pctText: pctText(pct),
-      read
+      pctText: pct === null ? "--" : `${pct}%`
     };
   }
 
-  const cards = [
-    card(
-      "pregnant",
-      "عشار",
-      pregnantCount,
-      "رصيد الحمل الحالي في القطيع. هذه قراءة وصفية لبنية القطيع، ولا تُستخدم وحدها للحكم على كفاءة الخصوبة إلا مع معدل الحمل 21 يوم، ومعدل رصد الشياع، والأيام المفتوحة."
-    ),
-
-    card(
-      "open",
-      "مفتوحة",
-      openCount,
-      "حجم الحيوانات غير الحامل حاليًا. أهميته الفنية تظهر عند ربطه بمتوسط الأيام المفتوحة، وكفاءة إدخال الحيوانات للتلقيح، ونتائج تشخيص الحمل."
-    ),
-
-    card(
-      "inseminated",
-      "ملقحة",
-      inseminatedCount,
-      "حيوانات بين التلقيح والحكم على الحمل. تُقرأ كخط انتظار تناسلي، وليس كنجاح أو فشل، حتى تظهر نتيجة التشخيص أو رجوع الشياع."
-    ),
-
-    card(
-      "fresh",
-      "حديثة الولادة",
-      freshCount,
-      "مرحلة ما بعد الولادة. لا تُدان تناسليًا قبل تجاوز فترة الانتظار الطوعي وفحص جاهزية الرحم والحالة العامة."
-    ),
-
-    card(
-      "dry",
-      "جافة",
-      dryCount,
-      "مرحلة مرتبطة بدورة الحمل والولادة القادمة. تُقرأ مع العشار والتحضير للولادة، وليست مؤشر فشل خصوبة منفرد."
-    )
-  ];
-
   return {
-    title: "بنية القطيع التناسلية الحالية",
-    read: "هذا القسم يصف توزيع الحالات التناسلية داخل القطيع الآن. الحكم الفني الحقيقي يأتي من مؤشرات الخصوبة: الحمل 21 يوم، رصد الشياع، الإخصاب، الأيام المفتوحة، فقد الحمل، والتلقيح المتكرر.",
-    cards
+    title: "الحالة التناسلية للقطيع",
+
+    cows: {
+      total: cowsTotal,
+      cards: [
+        item("pregnant", "عشار", pregnantCount, cowsTotal),
+        item("inseminated", "ملقحة", inseminatedCount, cowsTotal),
+        item("open", "مفتوحة", openCount, cowsTotal),
+        item("fresh", "حديثة الولادة", freshCount, cowsTotal)
+      ]
+    },
+
+    heifers: {
+      total: heifersTotal,
+      cards: [
+        item("pregnant", "عشار", heiferPregnantCount, heifersTotal),
+        item("inseminated", "ملقحة", heiferInseminatedCount, heifersTotal),
+        item("open", "تحت التلقيح", heiferOpenCount, heifersTotal)
+      ]
+    }
   };
 }
 function fertilityReportEventTypeSrv(e = {}) {
@@ -83699,19 +83681,69 @@ const repeatBreederAnalysis = fertilityReportRepeatBreederAnalysisSrv(
       .sort((a, b) => Number(b.daysInMilk || 0) - Number(a.daysInMilk || 0))
       .slice(0, 50);
 
-    const pregnantCount = activeAnimals.filter(a => fertilityReportReproKindSrv(a.reproductiveStatus || "") === "pregnant").length;
-    const openCount = activeAnimals.filter(a => fertilityReportReproKindSrv(a.reproductiveStatus || "") === "open").length;
-    const inseminatedCount = activeAnimals.filter(a => fertilityReportReproKindSrv(a.reproductiveStatus || "") === "inseminated").length;
-    const freshCount = activeAnimals.filter(a => fertilityReportReproKindSrv(a.reproductiveStatus || "") === "fresh").length;
-    const dryCount = activeAnimals.filter(a => /جاف|dry/i.test(String(a.productionStatus || ""))).length;
+     const pregnantCount = activeAnimals.filter(a =>
+      fertilityReportReproKindSrv(a.reproductiveStatus || "") === "pregnant"
+    ).length;
+
+    const openCount = activeAnimals.filter(a =>
+      fertilityReportReproKindSrv(a.reproductiveStatus || "") === "open"
+    ).length;
+
+    const inseminatedCount = activeAnimals.filter(a =>
+      fertilityReportReproKindSrv(a.reproductiveStatus || "") === "inseminated"
+    ).length;
+
+    const freshCount = activeAnimals.filter(a =>
+      fertilityReportReproKindSrv(a.reproductiveStatus || "") === "fresh"
+    ).length;
+
+    // جرد العجلات من التصنيف الرسمي للمجموعات.
+    const groupPage = await buildGroupsPageForTenantSrv(uid);
+
+    if (!groupPage?.ok || !Array.isArray(groupPage.groups)) {
+      return res.status(503).json({
+        ok: false,
+        error: "fertility_heifer_inventory_unavailable",
+        message: "تعذّر تحميل جرد العجلات حاليًا. حاول مرة أخرى."
+      });
+    }
+
+    const groupSpecies =
+      selectedType === "buffalo" ? "buffalo" : "cow";
+
+    function heiferCount(baseKey, minAgeMonths = 0) {
+      return groupPage.groups
+        .filter(g =>
+          (!selectedType || g.species === groupSpecies) &&
+          g.baseKey === baseKey
+        )
+        .reduce((sum, g) => {
+          const members = Array.isArray(g.animals)
+            ? g.animals
+            : [];
+
+          return sum + members.filter(a =>
+            Number(a.ageMonths) >= minAgeMonths
+          ).length;
+        }, 0);
+    }
+
+    const heiferPregnantCount = heiferCount("pregHeifers");
+
+    const heiferInseminatedCount = heiferCount("breeding");
+
+    const heiferOpenCount = heiferCount("heiferOpen", 12);
+
     const herdComposition = fertilityReportHerdCompositionSrv({
-    totalActive: activeAnimals.length,
-    pregnantCount,
-    openCount,
-    inseminatedCount,
-    freshCount,
-    dryCount
-  });
+      totalActive: activeAnimals.length,
+      pregnantCount,
+      openCount,
+      inseminatedCount,
+      freshCount,
+      heiferPregnantCount,
+      heiferInseminatedCount,
+      heiferOpenCount
+    });
     let fertilityCurrentThiRaw = null;
 
 try {
@@ -83786,8 +83818,7 @@ herdSummary: {
   pregnantCount,
   openCount,
   inseminatedCount,
-  freshCount,
-  dryCount
+  freshCount
 },
 
 herdComposition,
