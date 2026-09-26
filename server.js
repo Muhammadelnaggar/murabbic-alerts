@@ -82825,12 +82825,41 @@ function fertilityReportInseminationSourceSrv(ai = {}) {
 }
 function fertilityReportThiInfoSrv(e = {}) {
   const src = e.thiAtInsemination || {};
-  const value = Number(e.thiValue ?? src.thi);
-  const level = String(e.thiLevel || src.level || src.status?.level || "unknown").trim() || "unknown";
-  const label = String(e.thiLabel || src.label || src.status?.label || "").trim();
+
+  const readThi = v => {
+    if (
+      v === null ||
+      v === undefined ||
+      String(v).trim() === ""
+    ) return null;
+
+    const n = Number(v);
+
+    return Number.isFinite(n) && n > 0
+      ? Math.round(n)
+      : null;
+  };
+
+  const value =
+    readThi(e.thiValue) ??
+    readThi(src.thi);
+
+  const level = String(
+    e.thiLevel ||
+    src.level ||
+    src.status?.level ||
+    "unknown"
+  ).trim() || "unknown";
+
+  const label = String(
+    e.thiLabel ||
+    src.label ||
+    src.status?.label ||
+    ""
+  ).trim();
 
   return {
-    value: Number.isFinite(value) ? Math.round(value) : null,
+    value,
     level,
     label: label || (
       level === "comfort" ? "راحة" :
@@ -84911,10 +84940,16 @@ const outcomeForAi = (ai) => {
       if (row.outcome.success) g.pregnancies++;
       if (row.timing.code && row.timing.code !== "ideal" && row.timing.code !== "unknown") g.timingProblems++;
 
-      if (Number.isFinite(Number(row.thi.value))) {
+        if (Number.isFinite(row.thi.value)) {
         g.thiKnown++;
-        g.thiSum += Number(row.thi.value);
-        if (row.thi.level === "moderate" || row.thi.level === "high") g.highThiCount++;
+        g.thiSum += row.thi.value;
+
+        if (
+          row.thi.level === "moderate" ||
+          row.thi.level === "high"
+        ) {
+          g.highThiCount++;
+        }
       }
     }
 
