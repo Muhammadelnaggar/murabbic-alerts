@@ -350,20 +350,44 @@ function renderConception(j){
       );
 
   if (!indicators.length) {
-    el("conceptionGrid").innerHTML = emptyMsg("لا توجد مؤشرات تناسلية كافية حاليًا.");
+    el("conceptionGrid").innerHTML =
+      emptyMsg("لا توجد مؤشرات تناسلية كافية حاليًا.");
     return;
   }
 
-  el("conceptionGrid").innerHTML = indicators.map(x => noteMini(
-    x.title || x.key || "--",
-    x.valueText || "--",
-    `
-      ${x.benchmarkText ? `<b>المعيار:</b> ${esc(x.benchmarkText)}<br>` : ""}
-      ${badge(x.rating || "غير مكتمل", x.status)}<br>
-      ${esc(x.read || "")}
-      ${x.advice ? `<br><b>التوجيه:</b> ${esc(x.advice)}` : ""}
-    `
-  )).join("");
+  el("conceptionGrid").innerHTML = `
+    <div class="cards">
+      ${indicators.map(x => `
+        <div class="mini">
+          <div class="name">${esc(x.title || x.key || "--")}</div>
+
+          <div class="note">
+            <div>
+              <b>القراءة:</b> ${esc(x.valueText || "--")}
+              &nbsp;|&nbsp;
+              <b>المستهدف:</b> ${esc(x.benchmarkText || "--")}
+            </div>
+
+            <div style="margin-top:6px;">
+              ${badge(x.rating || "غير مكتمل", x.status)}
+            </div>
+
+            ${
+              x.read
+                ? `<div style="margin-top:8px;"><b>الشرح:</b> ${esc(x.read)}</div>`
+                : ""
+            }
+
+            ${
+              x.advice
+                ? `<div style="margin-top:8px;"><b>التوجيه:</b> ${esc(x.advice)}</div>`
+                : ""
+            }
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 function renderInseminators(j){
