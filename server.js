@@ -83903,16 +83903,10 @@ const reportDisplay = {
       valueText: herdComposition.cows.totalText
     },
     {
-      key: "repeatBreeder",
-      label: "Repeat Breeder",
-      valueText: `${fertilityReportDisplayNumberSrv(repeatBreederAnalysis.count)} — ${
-        repeatBreederAnalysis.ratePct === null
-          ? "--"
-          : `${fertilityReportDisplayNumberSrv(
-              repeatBreederAnalysis.ratePct
-            )}%`
-      }`
-    }
+  key: "eligibleHeifers",
+  label: "إجمالي العجلات المؤهلة للتناسل",
+  valueText: herdComposition.heifers.totalText
+}
   ],
 
   print: {
