@@ -94,6 +94,9 @@
 <div class="print-footer"></div>
 
 <div class="actions report-actions">
+  <label for="periodSelect">فترة التحليل</label>
+  <select id="periodSelect" aria-label="فترة التحليل" disabled></select>
+
   <a class="ghost" href="dashboard.html">لوحة التحكم</a>
   <button type="button" class="primary" onclick="window.print()">طباعة / PDF</button>
 </div>
@@ -186,24 +189,66 @@ function table(headers, rows){
   `;
 }
 
-async function fetchReport(){
-  const res = await fetch(`${API_BASE}/api/fertility-report?type=${encodeURIComponent(reportType)}`, {
-    method: "GET",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: {
-      "Accept": "application/json",
-      "Cache-Control": "no-store"
+async function fetchReport(periodCode = ""){
+  const params = new URLSearchParams({ type: reportType });
+
+  if (periodCode) {
+    params.set("period", periodCode);
+  }
+
+  const res = await fetch(
+    `${API_BASE}/api/fertility-report?${params.toString()}`,
+    {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        "Accept": "application/json",
+        "Cache-Control": "no-store"
+      }
     }
-  });
+  );
 
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok || data.ok !== true) {
-    throw new Error(data.message || data.error || "تعذّر تحميل تقرير الخصوبة.");
+    throw new Error(
+      data.message || data.error || "تعذّر تحميل تقرير الخصوبة."
+    );
   }
 
   return data;
+}
+
+function renderPeriodSelector(j){
+  const select = el("periodSelect");
+  const options = j.periodOptions;
+  const selectedCode = String(j.selectedPeriod?.code || "");
+
+  if (
+    !Array.isArray(options) ||
+    !options.length ||
+    !selectedCode
+  ) {
+    throw new Error("بيانات فترات التحليل غير متاحة من السيرفر.");
+  }
+
+  select.replaceChildren(
+    ...options.map(p =>
+      new Option(
+        String(p.label || ""),
+        String(p.code || "")
+      )
+    )
+  );
+
+  select.value = selectedCode;
+
+  if (select.value !== selectedCode) {
+    throw new Error(
+      "الفترة المعتمدة غير موجودة ضمن اختيارات السيرفر."
+    );
+  }
 }
 
 function noteMini(title, value, note = ""){
@@ -529,10 +574,20 @@ function renderPrintMeta(j){
   if (period) period.textContent = p.periodText;
   if (date) date.textContent = p.dateText;
 }
-async function main(){
+let acceptedPeriodCode = "";
+
+async function main(periodCode = ""){
+  const select = el("periodSelect");
+
+  select.disabled = true;
+
+  el("statusBar").style.display = "";
+  el("statusBar").textContent = "جارٍ تحميل تقرير الخصوبة...";
 
   try {
-    const j = await fetchReport();
+    const j = await fetchReport(periodCode);
+
+    renderPeriodSelector(j);
     renderPrintMeta(j);
     renderSummary(j);
     renderHerd(j);
@@ -542,14 +597,27 @@ async function main(){
     renderRepeatBreeders(j);
     renderAdvisory(j);
 
-      el("statusBar").style.display = "none";
+    acceptedPeriodCode = j.selectedPeriod.code;
+
+    el("statusBar").style.display = "none";
 
   } catch (e) {
     console.error(e);
+
+    select.value = acceptedPeriodCode;
+
     el("statusBar").style.display = "";
-    el("statusBar").textContent = e.message || "تعذّر تحميل تقرير الخصوبة.";
+    el("statusBar").textContent =
+      e.message || "تعذّر تحميل تقرير الخصوبة.";
+
+  } finally {
+    select.disabled = !acceptedPeriodCode;
   }
 }
+
+el("periodSelect").addEventListener("change", () => {
+  main(el("periodSelect").value);
+});
 
 main();
 </script>
