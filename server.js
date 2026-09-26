@@ -82846,8 +82846,9 @@ function fertilityReportThiInfoSrv(e = {}) {
 function fertilityReportPregnancy21Srv({
   todayISO,
   animals = [],
-  events = [],
-  thresholds = {}
+    events = [],
+  thresholds = {},
+  audit = false
 } = {}) {
   const DAY = 86400000;
 
@@ -83247,6 +83248,7 @@ function fertilityReportPregnancy21Srv({
     let judgedServices = 0;
     let successfulServices = 0;
     let pending = 0;
+    const eligibilityRows = [];
 
     for (const animal of cohort) {
       if (
@@ -83359,6 +83361,44 @@ function fertilityReportPregnancy21Srv({
           )
         ) continue;
 
+        if (audit) {
+          eligibilityRows.push({
+            animalNumber: animal.number,
+            source: animal.raw._prCollection,
+            category: animal.mother ? "mother" : "heifer",
+            registrationDate: iso(animal.startMs),
+            firstEligibleDate: iso(day),
+
+            birthDate: Number.isFinite(animal.birthMs)
+              ? iso(animal.birthMs) : null,
+
+            minimumBreedingAgeMonths: animal.mother
+              ? null : minAgeMonths,
+
+            lastCalvingDate: Number.isFinite(lastCalving)
+              ? iso(lastCalving) : null,
+
+            daysAfterCalving: Number.isFinite(lastCalving)
+              ? Math.round((day - lastCalving) / DAY) : null,
+
+            lastLossDate: Number.isFinite(lastLoss)
+              ? iso(lastLoss) : null,
+
+            archiveDate: Number.isFinite(animal.exitMs)
+              ? iso(animal.exitMs) : null,
+
+            servicesInWindow: animal.services
+              .filter(s =>
+                s._prMs >= start &&
+                s._prMs <= end
+              )
+              .map(s => ({
+                date: s._prDate,
+                result: s._prResult
+              }))
+          });
+        }
+
         eligible = true;
         break;
       }
@@ -83459,6 +83499,7 @@ successfulServices += inWindow.filter(s =>
 
       pendingResults: 0,
       shiftedDays: attempts - 1,
+      ...(audit ? { eligibilityRows } : {}),
 
       message:
         `معدل الحمل لأحدث نافذة مكتملة من ${
@@ -84677,7 +84718,8 @@ const pr21Info = fertilityReportPregnancy21Srv({
   todayISO,
   animals: prAnimals,
   events: prEvents,
-  thresholds: await loadGroupThresholdsSrv(uid)
+  thresholds: await loadGroupThresholdsSrv(uid),
+  audit: req.query.prAudit === "1"
 });
 
 const pregnancyRate21Report = pr21Info.valuePct;
