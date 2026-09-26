@@ -217,25 +217,22 @@ function noteMini(title, value, note = ""){
 }
 
 function renderSummary(j){
-  const h = j.herdSummary || {};
-  const rb = j.repeatBreederAnalysis || j.repeatBreeders || {};
+  const cards = j.display?.summaryCards;
 
-  el("summaryGrid").innerHTML = [
-    box("نوع القطيع", reportTypeLabel),
-    box("فترة التحليل", `${fmtNum(j.periodDays || 180)} يوم`),
-    box("إجمالي نشط", fmtNum(h.totalActive)),
-    box("Repeat Breeder", `${fmtNum(rb.count || 0)} — ${fmtPct(rb.ratePct)}`)
-  ].join("");
+  if (!Array.isArray(cards)) {
+    el("summaryGrid").innerHTML =
+      emptyMsg("بيانات ملخص التقرير غير متاحة حاليًا.");
+    return;
+  }
+
+  el("summaryGrid").innerHTML =
+    cards.map(c => box(c.label, c.valueText)).join("");
 }
 
 function renderHerd(j){
-  const hc =
-    j.herdComposition ||
-    j.herdReproductiveComposition ||
-    {};
-
-  const cows = hc.cows;
-  const heifers = hc.heifers;
+  const hc = j.herdComposition;
+  const cows = hc?.cows;
+  const heifers = hc?.heifers;
 
   if (
     !Array.isArray(cows?.cards) ||
@@ -246,15 +243,15 @@ function renderHerd(j){
     return;
   }
 
-  function inventoryPanel(title, total, cards) {
+  function inventoryPanel(group) {
     return `
       <section class="fert-inventory-panel">
 
         <div class="fert-inventory-head">
-          <h3>${esc(title)}</h3>
+          <h3>${esc(group.label)}</h3>
 
           <div class="fert-inventory-total">
-            <b>${esc(fmtNum(total))}</b>
+            <b>${esc(group.totalText)}</b>
             <span>رأسًا</span>
           </div>
         </div>
@@ -269,16 +266,16 @@ function renderHerd(j){
           </thead>
 
           <tbody>
-            ${cards.map(c => `
+            ${group.cards.map(c => `
               <tr>
                 <td>${esc(c.label)}</td>
 
                 <td class="fert-num">
-                  ${esc(fmtNum(c.count))}
+                  ${esc(c.countText)}
                 </td>
 
                 <td class="fert-pct">
-                  ${esc(c.pctText || "--")}
+                  ${esc(c.pctText)}
                 </td>
               </tr>
             `).join("")}
@@ -289,19 +286,9 @@ function renderHerd(j){
     `;
   }
 
-  const mothersLabel =
-    reportType === "buffalo"
-      ? "إجمالي الجاموس"
-      : "إجمالي الأبقار";
-
-  const heifersLabel =
-    reportType === "buffalo"
-      ? "إجمالي عجلات الجاموس"
-      : "إجمالي العجلات";
-
   el("herdGrid").innerHTML = [
-    inventoryPanel(mothersLabel, cows.total, cows.cards),
-    inventoryPanel(heifersLabel, heifers.total, heifers.cards)
+    inventoryPanel(cows),
+    inventoryPanel(heifers)
   ].join("");
 }
 
@@ -523,36 +510,26 @@ function renderAdvisory(j){
     </div>
   `;
 }
- function renderPrintMeta(j){
-  const today = new Date().toLocaleDateString("ar-EG", {
-    year: "numeric",
-    month: "long",
-    day: "numeric"
-  });
+function renderPrintMeta(j){
+  const p = j.display?.print;
 
+  if (!p) {
+    throw new Error("بيانات عرض التقرير غير متاحة من السيرفر.");
+  }
+
+  const pageTitle = el("pageTitle");
   const title = el("printTitle");
   const type = el("printType");
   const period = el("printPeriod");
   const date = el("printDate");
 
-  if (title) {
-    title.textContent = `تقرير الخصوبة — ${reportTypeLabel}`;
-  }
-
- if (type) {
-  type.textContent = reportTypeLabel;
-}
-
-if (period) {
-  period.textContent = `${fmtNum(j.periodDays || 180)} يوم`;
-}
-
-if (date) {
-  date.textContent = today;
-}
+  if (pageTitle) pageTitle.textContent = p.title;
+  if (title) title.textContent = p.title;
+  if (type) type.textContent = p.typeText;
+  if (period) period.textContent = p.periodText;
+  if (date) date.textContent = p.dateText;
 }
 async function main(){
-  el("pageTitle").textContent = `تقرير الخصوبة — ${reportTypeLabel}`;
 
   try {
     const j = await fetchReport();
