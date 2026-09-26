@@ -51,7 +51,13 @@
       <div class="meta-pill"><span>تاريخ الطباعة</span><b id="printDate">--</b></div>
       <div class="meta-pill"><span>إعداد</span><b>مُرَبِّيك</b></div>
     </div>
-  </section>
+    </section>
+
+  <div class="card" id="periodControls">
+    <label for="periodSelect">فترة التحليل</label>
+    <select id="periodSelect" aria-label="فترة التحليل" disabled></select>
+  </div>
+
   <div id="statusBar" class="card">جارٍ تحميل تقرير الخصوبة...</div>
 
   <div class="card">
@@ -94,9 +100,6 @@
 <div class="print-footer"></div>
 
 <div class="actions report-actions">
-  <label for="periodSelect">فترة التحليل</label>
-  <select id="periodSelect" aria-label="فترة التحليل" disabled></select>
-
   <a class="ghost" href="dashboard.html">لوحة التحكم</a>
   <button type="button" class="primary" onclick="window.print()">طباعة / PDF</button>
 </div>
@@ -618,7 +621,13 @@ async function main(periodCode = ""){
 el("periodSelect").addEventListener("change", () => {
   main(el("periodSelect").value);
 });
+window.addEventListener("beforeprint", () => {
+  el("periodControls").hidden = true;
+});
 
+window.addEventListener("afterprint", () => {
+  el("periodControls").hidden = false;
+});
 main();
 </script>
 
