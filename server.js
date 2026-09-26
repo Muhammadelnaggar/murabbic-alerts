@@ -82525,8 +82525,36 @@ function fertilityReportPctSrv(num, den) {
   if (!Number.isFinite(n) || !Number.isFinite(d) || d <= 0) return null;
   return Math.round((n * 1000) / d) / 10;
 }
+function fertilityReportDisplayNumberSrv(v) {
+  if (v === null || v === undefined || v === "") return "--";
+
+  const n = Number(v);
+
+  return Number.isFinite(n)
+    ? n.toLocaleString("en-US", { maximumFractionDigits: 1 })
+    : "--";
+}
+
+function fertilityReportDisplayDateSrv(iso) {
+  const s = String(iso || "").trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "--";
+
+  const date = new Date(`${s}T12:00:00Z`);
+
+  if (!Number.isFinite(date.getTime())) return "--";
+
+  return date.toLocaleDateString("ar-EG-u-nu-latn", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC"
+  });
+}
+
 function fertilityReportHerdCompositionSrv({
-  totalActive = 0,
+  species = "cow",
+  mothersTotal = 0,
   pregnantCount = 0,
   openCount = 0,
   inseminatedCount = 0,
@@ -82535,7 +82563,7 @@ function fertilityReportHerdCompositionSrv({
   heiferInseminatedCount = 0,
   heiferOpenCount = 0
 } = {}) {
-  const cowsTotal = Number(totalActive || 0);
+  const cowsTotal = Number(mothersTotal || 0);
 
   const heifersTotal =
     Number(heiferPregnantCount || 0) +
@@ -82549,8 +82577,11 @@ function fertilityReportHerdCompositionSrv({
       key,
       label,
       count: Number(count || 0),
+      countText: fertilityReportDisplayNumberSrv(count),
       pct,
-      pctText: pct === null ? "--" : `${pct}%`
+      pctText: pct === null
+        ? "--"
+        : `${fertilityReportDisplayNumberSrv(pct)}%`
     };
   }
 
@@ -82558,7 +82589,13 @@ function fertilityReportHerdCompositionSrv({
     title: "الحالة التناسلية للقطيع",
 
     cows: {
+      label: species === "buffalo"
+        ? "إجمالي أمهات الجاموس"
+        : "إجمالي أمهات الأبقار",
+
       total: cowsTotal,
+      totalText: fertilityReportDisplayNumberSrv(cowsTotal),
+
       cards: [
         item("pregnant", "عشار", pregnantCount, cowsTotal),
         item("inseminated", "ملقحة", inseminatedCount, cowsTotal),
@@ -82568,7 +82605,13 @@ function fertilityReportHerdCompositionSrv({
     },
 
     heifers: {
+      label: species === "buffalo"
+        ? "إجمالي عجلات الجاموس"
+        : "إجمالي العجلات",
+
       total: heifersTotal,
+      totalText: fertilityReportDisplayNumberSrv(heifersTotal),
+
       cards: [
         item("pregnant", "عشار", heiferPregnantCount, heifersTotal),
         item("inseminated", "ملقحة", heiferInseminatedCount, heifersTotal),
@@ -83778,7 +83821,8 @@ const repeatBreederAnalysis = fertilityReportRepeatBreederAnalysisSrv(
       heiferCount("heiferOpen", 12);
 
     const herdComposition = fertilityReportHerdCompositionSrv({
-      totalActive: mothers.length,
+      species: groupSpecies,
+      mothersTotal: mothers.length,
       pregnantCount,
       openCount,
       inseminatedCount,
@@ -83835,6 +83879,50 @@ const expertReport = fertilityReportBuildExpertReportSrv({
 
 const headline = expertReport.headline;
 
+const reportSpeciesText =
+  groupSpecies === "buffalo" ? "الجاموس" : "الأبقار";
+
+const reportPeriodText =
+  `${fertilityReportDisplayNumberSrv(periodDays)} يوم`;
+
+const reportDisplay = {
+  summaryCards: [
+    {
+      key: "species",
+      label: "نوع القطيع",
+      valueText: reportSpeciesText
+    },
+    {
+      key: "period",
+      label: "فترة التحليل",
+      valueText: reportPeriodText
+    },
+    {
+      key: "mothers",
+      label: "إجمالي الأمهات",
+      valueText: herdComposition.cows.totalText
+    },
+    {
+      key: "repeatBreeder",
+      label: "Repeat Breeder",
+      valueText: `${fertilityReportDisplayNumberSrv(repeatBreederAnalysis.count)} — ${
+        repeatBreederAnalysis.ratePct === null
+          ? "--"
+          : `${fertilityReportDisplayNumberSrv(
+              repeatBreederAnalysis.ratePct
+            )}%`
+      }`
+    }
+  ],
+
+  print: {
+    title: `تقرير الخصوبة — ${reportSpeciesText}`,
+    typeText: reportSpeciesText,
+    periodText: reportPeriodText,
+    dateText: fertilityReportDisplayDateSrv(todayISO)
+  }
+};
+
     return res.json({
       ok: true,
       reportName: "fertility_report",
@@ -83843,6 +83931,7 @@ const headline = expertReport.headline;
       today: todayISO,
       periodDays,
       selectedType: selectedType || "all",
+      display: reportDisplay,
 
       benchmarks: {
         firstServiceConceptionRatePct: 40,
@@ -83857,7 +83946,10 @@ const headline = expertReport.headline;
       },
 
 herdSummary: {
-  totalActive: activeAnimals.length,
+  // توافق مؤقت مع الصفحة الحالية؛ كلا الحقلين من نفس جرد الأمهات.
+  totalActive: mothers.length,
+  mothersTotal: mothers.length,
+  mothersTotalText: herdComposition.cows.totalText,
   pregnantCount,
   openCount,
   inseminatedCount,
