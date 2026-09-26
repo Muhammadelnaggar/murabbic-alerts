@@ -355,41 +355,59 @@ function renderConception(j){
     return;
   }
 
-  el("conceptionGrid").innerHTML = `
-    <div class="cards">
-      ${indicators.map(x => `
-        <div class="mini">
-          <div class="name">${esc(x.title || x.key || "--")}</div>
+  el("conceptionGrid").innerHTML = indicators.map(x => {
+    // إزالة تكرار كلمة "المستهدف" من العرض فقط.
+    // القيمة والاتجاه يظلان كما أرسلهما السيرفر.
+    const targetText = String(x.benchmarkText || "")
+      .replace(/^\s*المستهدف\s*/u, "")
+      .trim() || "غير محدد";
 
-          <div class="note">
-            <div>
-              <b>القراءة:</b> ${esc(x.valueText || "--")}
-              &nbsp;|&nbsp;
-              <b>المستهدف:</b> ${esc(x.benchmarkText || "--")}
-            </div>
+    return `
+      <article class="fert-indicator-card">
 
-            <div style="margin-top:6px;">
+        <div class="fert-indicator-title">
+          ${esc(x.title || x.key || "--")}
+        </div>
+
+        <div class="fert-indicator-metrics">
+
+          <div class="fert-indicator-metric">
+            <span class="fert-metric-label">القراءة</span>
+            <strong class="fert-metric-value">
+              ${esc(x.valueText ?? "--")}
+            </strong>
+          </div>
+
+          <div class="fert-indicator-metric">
+            <span class="fert-metric-label">المستهدف</span>
+            <strong class="fert-metric-value">
+              ${esc(targetText)}
+            </strong>
+          </div>
+
+          <div class="fert-indicator-metric">
+            <span class="fert-metric-label">التقييم</span>
+            <div class="fert-metric-rating">
               ${badge(x.rating || "غير مكتمل", x.status)}
             </div>
-
-            ${
-              x.read
-                ? `<div style="margin-top:8px;"><b>الشرح:</b> ${esc(x.read)}</div>`
-                : ""
-            }
-
-            ${
-              x.advice
-                ? `<div style="margin-top:8px;"><b>التوجيه:</b> ${esc(x.advice)}</div>`
-                : ""
-            }
           </div>
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
 
+        </div>
+
+        <div class="fert-indicator-details">
+          ${x.read
+            ? `<p><strong>الشرح:</strong> ${esc(x.read)}</p>`
+            : ""}
+
+          ${x.advice
+            ? `<p><strong>التوجيه:</strong> ${esc(x.advice)}</p>`
+            : ""}
+        </div>
+
+      </article>
+    `;
+  }).join("");
+}
 function renderInseminators(j){
   const rows = Array.isArray(j.inseminators) ? j.inseminators : [];
 
