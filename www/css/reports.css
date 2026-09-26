@@ -1297,4 +1297,26 @@ body[data-page="fertility-report"] .fert-inventory-table tbody tr:nth-child(even
   body[data-page="fertility-report"] .fert-inventory-table td.fert-pct{
     font-size:10pt;
   }
+ 
+
+/* Fertility report — print layout only */
+
+body[data-page="fertility-report"] #summaryGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
 }
+
+body[data-page="fertility-report"] #conceptionGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+body[data-page="fertility-report"] .card {
+  break-inside: auto !important;
+  page-break-inside: auto !important;
+}
+
+body[data-page="fertility-report"] .section-title {
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+} 
