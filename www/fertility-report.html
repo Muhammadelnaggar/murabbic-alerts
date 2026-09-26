@@ -97,6 +97,12 @@
 
 </main>
 
+<section
+  id="fertilityPrintReport"
+  class="fert-print-report"
+  aria-label="تقرير الخصوبة للطباعة"
+></section>
+
 <div class="print-footer"></div>
 
 <div class="actions report-actions">
@@ -600,6 +606,328 @@ function renderAdvisory(j){
     </div>
   `;
 }
+function renderFertilityPrint(j){
+  const p = j.display?.print;
+  if (!p) throw new Error("بيانات الطباعة غير متاحة من السيرفر.");
+
+  const safe = v => esc(v == null || v === "" ? "—" : v);
+  const sections = [];
+
+  const summary = Array.isArray(j.display?.summaryCards)
+    ? j.display.summaryCards : [];
+
+  const hc = j.herdComposition || {};
+
+  const indicators = Array.isArray(j.fertilityIndicators)
+    ? j.fertilityIndicators
+    : (Array.isArray(j.expertReport?.indicators)
+        ? j.expertReport.indicators : []);
+
+  const inseminators = Array.isArray(j.inseminators)
+    ? j.inseminators : [];
+
+  const thi = j.fertilityThiAdvice ||
+              j.breedingThiAdvice ||
+              j.thiBreedingAdvice || {};
+
+  const current = thi.current || {};
+  const rb = j.repeatBreederAnalysis || j.repeatBreeders || {};
+  const rbRows = Array.isArray(rb.rows) ? rb.rows : [];
+
+  const expert = j.expertReport || {};
+  const bottleneck =
+    expert.mainBottleneck || j.bottleneckAnalysis?.main || {};
+
+  const recs = Array.isArray(j.farmRecommendations)
+    ? j.farmRecommendations
+    : (Array.isArray(j.advisory?.notes) ? j.advisory.notes : []);
+
+  if (summary.length) sections.push(`
+    <section class="fert-print-section">
+      <h2>ملخص تقرير الخصوبة</h2>
+      <table class="fert-print-table">
+        <thead>
+          <tr><th>البيان</th><th>القيمة</th></tr>
+        </thead>
+        <tbody>
+          ${summary.map(c => `
+            <tr>
+              <td>${safe(c.label)}</td>
+              <td>${safe(c.valueText)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </section>
+  `);
+
+  const herdGroups = [hc.cows, hc.heifers]
+    .filter(g => g && Array.isArray(g.cards));
+
+  if (herdGroups.length) sections.push(`
+    <section class="fert-print-section">
+      <h2>الحالة التناسلية للقطيع</h2>
+
+      ${herdGroups.map(g => `
+        <h3>${safe(g.label)} — الإجمالي: ${safe(g.totalText)} رأسًا</h3>
+
+        <table class="fert-print-table">
+          <thead>
+            <tr>
+              <th>الحالة</th>
+              <th>العدد</th>
+              <th>النسبة</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${g.cards.map(c => `
+              <tr>
+                <td>${safe(c.label)}</td>
+                <td>${safe(c.countText)}</td>
+                <td>${safe(c.pctText)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `).join("")}
+    </section>
+  `);
+
+  if (indicators.length) sections.push(`
+    <section class="fert-print-section">
+      <h2>المؤشرات التناسلية الفنية</h2>
+
+      <table class="fert-print-table fert-print-indicators">
+        <thead>
+          <tr>
+            <th>المؤشر</th>
+            <th>القراءة</th>
+            <th>المستهدف</th>
+            <th>التقييم</th>
+          </tr>
+        </thead>
+
+        ${indicators.map(x => {
+          const target = String(x.benchmarkText || "")
+            .replace(/^\s*المستهدف\s*/u, "")
+            .trim() || "غير محدد";
+
+          return `
+            <tbody class="fert-print-indicator-group">
+              <tr>
+                <td>${safe(x.title || x.key)}</td>
+                <td>${safe(x.valueText)}</td>
+                <td>${safe(target)}</td>
+                <td>${safe(x.rating || "غير مكتمل")}</td>
+              </tr>
+
+              ${(x.read || x.advice) ? `
+                <tr>
+                  <td colspan="4" class="fert-print-explanation">
+                    ${x.read ? `
+                      <p><b>الشرح:</b> ${safe(x.read)}</p>
+                    ` : ""}
+
+                    ${x.advice ? `
+                      <p><b>التوجيه:</b> ${safe(x.advice)}</p>
+                    ` : ""}
+                  </td>
+                </tr>
+              ` : ""}
+            </tbody>
+          `;
+        }).join("")}
+      </table>
+    </section>
+  `);
+
+  sections.push(`
+    <section class="fert-print-section">
+      <h2>كفاءة الملقحين</h2>
+
+      ${inseminators.length ? `
+        <table class="fert-print-table fert-print-inseminators">
+          <thead>
+            <tr>
+              <th>الملقّح</th>
+              <th>تلقيحات الفترة</th>
+              <th>محكوم عليها</th>
+              <th>حمل مثبت</th>
+              <th>CR</th>
+              <th>متوسط THI</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${inseminators.map(r => `
+              <tr>
+                <td>${safe(r.inseminator || "غير محدد")}</td>
+                <td>${safe(r.totalAiInPeriod)}</td>
+                <td>${safe(r.totalJudged)}</td>
+                <td>${safe(r.pregnancies)}</td>
+                <td>${r.conceptionRatePct == null
+                  ? "—"
+                  : safe(fmtPct(r.conceptionRatePct))}</td>
+                <td>${safe(r.avgThi)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      ` : `
+        <p class="fert-print-copy">لا توجد بيانات كافية حاليًا.</p>
+      `}
+    </section>
+  `);
+
+  sections.push(`
+    <section class="fert-print-section">
+      <h2>THI الحالي ونصيحة توقيت التلقيح</h2>
+
+      <table class="fert-print-table">
+        <thead>
+          <tr>
+            <th>THI الحالي</th>
+            <th>الحالة</th>
+            <th>الحرارة</th>
+            <th>الرطوبة</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${safe(current.thiText)}</td>
+            <td>${safe(current.levelLabel || "غير متاح")}</td>
+            <td>${current.tempC == null
+              ? "—" : safe(`${fmtNum(current.tempC)}°`)}</td>
+            <td>${current.humidity == null
+              ? "—" : safe(`${fmtNum(current.humidity)}%`)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="fert-print-copy">
+        <b>القراءة:</b>
+        ${safe(thi.summary || "لا توجد قراءة THI حالية كافية.")}
+      </p>
+
+      ${thi.timingAdvice ? `
+        <p class="fert-print-copy">
+          <b>توقيت التلقيح:</b> ${safe(thi.timingAdvice)}
+        </p>
+      ` : ""}
+
+      ${Array.isArray(thi.actions) && thi.actions.length ? `
+        <h3>إجراءات مقترحة</h3>
+        <ul class="fert-print-list">
+          ${thi.actions.map(a => `<li>${safe(a)}</li>`).join("")}
+        </ul>
+      ` : ""}
+    </section>
+  `);
+
+  sections.push(`
+    <section class="fert-print-section">
+      <h2>التلقيح المتكرر (Repeat Breeder)</h2>
+
+      ${rbRows.length ? `
+        <table class="fert-print-table fert-print-repeat">
+          <thead>
+            <tr>
+              <th>رقم الحيوان</th>
+              <th>عدد التلقيحات</th>
+              <th>الفترة بين التلقيحات</th>
+              <th>الملقّح</th>
+              <th>السائل المنوي</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rbRows.map(r => `
+              <tr>
+                <td>${safe(r.animalNumber)}</td>
+                <td>${safe(r.servicesCount)}</td>
+                <td>${safe(
+                  (Array.isArray(r.cycleIntervalsDays)
+                    ? r.cycleIntervalsDays : [])
+                    .map(d => `${d} يوم`).join("، ")
+                )}</td>
+                <td>${safe(
+                  (Array.isArray(r.inseminators)
+                    ? r.inseminators : []).join("، ")
+                )}</td>
+                <td>${safe(
+                  (Array.isArray(r.semenCodes)
+                    ? r.semenCodes : []).join("، ")
+                )}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      ` : `
+        <p class="fert-print-copy">
+          لا توجد حيوانات مطابقة لشروط Repeat Breeder حاليًا.
+        </p>
+      `}
+
+      <p class="fert-print-copy">
+        <b>توصية مُرَبِّيك:</b>
+        ${safe(rb.recommendation || "راجع إدارة التلقيح والظروف المصاحبة.")}
+      </p>
+    </section>
+  `);
+
+  sections.push(`
+    <section class="fert-print-section">
+      <h2>قراءة مُرَبِّيك والتوصيات</h2>
+
+      <p class="fert-print-copy">
+        <b>${safe(
+          expert.headline ||
+          j.advisory?.headline ||
+          "قراءة مُرَبِّيك"
+        )}</b>
+      </p>
+
+      <h3>${safe(bottleneck.title || "القراءة الفنية")}</h3>
+
+      <p class="fert-print-copy">
+        ${safe(bottleneck.read || "لا توجد قراءة فنية مكتملة حاليًا.")}
+      </p>
+
+      ${recs.length ? `
+        <h3>توصيات المتابعة</h3>
+        <ol class="fert-print-list">
+          ${recs.map(r => `<li>${safe(r)}</li>`).join("")}
+        </ol>
+      ` : ""}
+    </section>
+  `);
+
+  el("fertilityPrintReport").innerHTML = `
+    <header class="fert-print-header">
+      <img src="/images/logo.png" alt="مُرَبِّيك">
+
+      <div>
+        <div class="fert-print-brand">
+          مُرَبِّيك لإدارة مزارع الألبان
+        </div>
+
+        <h1>${safe(p.title)}</h1>
+
+        <p>
+          نوع القطيع: ${safe(p.typeText)}
+          &nbsp; | &nbsp;
+          فترة التحليل: ${safe(p.periodText)}
+          &nbsp; | &nbsp;
+          تاريخ التقرير: ${safe(p.dateText)}
+        </p>
+      </div>
+    </header>
+
+    ${sections.join("")}
+
+    <footer class="fert-print-end">
+      مُرَبِّيك — تقرير خصوبة مبني على البيانات المسجلة داخل المنصة
+    </footer>
+  `;
+}
 function renderPrintMeta(j){
   const p = j.display?.print;
 
@@ -641,6 +969,7 @@ async function main(periodCode = ""){
     renderThi(j);
     renderRepeatBreeders(j);
     renderAdvisory(j);
+    renderFertilityPrint(j);
 
     acceptedPeriodCode = j.selectedPeriod.code;
 
