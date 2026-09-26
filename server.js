@@ -82692,19 +82692,27 @@ function fertilityReportReproKindSrv(v) {
 function fertilityReportPregResultSrv(v) {
   const s = String(v || "").trim().toLowerCase();
 
-  if (s.includes("عشار") || s.includes("حامل") || s.includes("positive") || s.includes("pregnant")) {
-    return "positive";
-  }
-
   if (
     s.includes("فارغة") ||
     s.includes("فارغ") ||
     s.includes("غير حامل") ||
+    s.includes("غير عشار") ||
     s.includes("negative") ||
+    s.includes("not pregnant") ||
+    s.includes("not_pregnant") ||
     s.includes("open") ||
     s.includes("empty")
   ) {
     return "negative";
+  }
+
+  if (
+    s.includes("عشار") ||
+    s.includes("حامل") ||
+    s.includes("positive") ||
+    s.includes("pregnant")
+  ) {
+    return "positive";
   }
 
   return "unknown";
@@ -82833,10 +82841,664 @@ function fertilityReportThiInfoSrv(e = {}) {
     )
   };
 }
+// أحدث نافذة متحركة 21 يومًا نضجت نتائجها.
+// البحث يتحرك يومًا واحدًا في كل محاولة.
+function fertilityReportPregnancy21Srv({
+  todayISO,
+  animals = [],
+  events = [],
+  thresholds = {}
+} = {}) {
+  const DAY = 86400000;
 
+  // يشمل المزارع التي تعتمد الجس اليدوي دون سونار.
+  const maturityDays = 40;
+
+  const todayMs = fertilityReportMsSrv(todayISO);
+  const endLimit = todayMs - maturityDays * DAY;
+
+  const asMs = v => {
+    if (v && typeof v.toDate === "function") {
+      return v.toDate().getTime();
+    }
+
+    if (v && typeof v.seconds === "number") {
+      return v.seconds * 1000;
+    }
+
+    if (v && typeof v._seconds === "number") {
+      return v._seconds * 1000;
+    }
+
+    if (v instanceof Date) return v.getTime();
+    if (typeof v === "number") return v;
+
+    return fertilityReportMsSrv(v);
+  };
+
+  const iso = ms =>
+    new Date(ms).toISOString().slice(0, 10);
+
+  const eventKind = e => {
+    const t = String(
+      e.eventTypeNorm ||
+      e.eventType ||
+      e.type ||
+      ""
+    ).toLowerCase();
+
+    if (
+      t.includes("pregnancy_diagnosis") ||
+      t.includes("تشخيص حمل")
+    ) return "dx";
+
+    if (
+      t.includes("insemination") ||
+      t.includes("تلقيح")
+    ) return "ai";
+
+    if (
+      t.includes("calving") ||
+      t.includes("ولادة")
+    ) return "calving";
+
+    if (
+      t.includes("abortion") ||
+      t.includes("إجهاض") ||
+      t.includes("اجهاض") ||
+      t.includes("embryonic_loss") ||
+      t.includes("فقد أجنة") ||
+      t.includes("فقد جنيني")
+    ) return "loss";
+
+    if (
+      t === "heat" ||
+      t.includes("شياع")
+    ) return "heat";
+
+    return "";
+  };
+
+  const byNumber = new Map();
+
+  let ambiguousNumbers = false;
+  let missingRegistration = false;
+
+  for (const raw of animals) {
+    const number =
+      fertilityReportAnimalNumberSrv(raw);
+
+    if (
+      !number ||
+      raw.breedingBlocked === true
+    ) continue;
+
+    const isArchived =
+      raw._prCollection === "archived";
+
+    if (
+      !isArchived &&
+      (
+        raw.isActive === false ||
+        !fertilityReportIsActiveAnimalSrv(raw)
+      )
+    ) continue;
+
+    const sex = getSexTextSrv(raw);
+
+    if (sex === "ذكر") continue;
+
+    if (
+      isArchived &&
+      !fertilityReportDateSrv(raw.archiveDate)
+    ) continue;
+
+    const species =
+      fertilityReportAnimalSpeciesSrv(raw);
+
+    if (!species) continue;
+
+    const registeredMs = asMs(raw.createdAt);
+
+    if (!Number.isFinite(registeredMs)) {
+      missingRegistration = true;
+      continue;
+    }
+
+    const startMs =
+      Math.floor(registeredMs / DAY) * DAY;
+
+    const mother =
+      raw._prCollection === "animals" ||
+      (
+        isArchived &&
+        !String(
+          raw.originalAnimalPath || ""
+        ).includes("calves/")
+      );
+
+    const exitMs = isArchived
+      ? fertilityReportMsSrv(raw.archiveDate)
+      : Infinity;
+
+    const birthMs =
+      fertilityReportMsSrv(raw.birthDate);
+
+    const lastCalvingMs =
+      fertilityReportMsSrv(
+        raw.lastCalvingDate ||
+        raw.calvingDate
+      );
+
+    const baselinePregnant =
+      fertilityReportReproKindSrv(
+        raw.reproductiveStatus ||
+        raw.followerStatus
+      ) === "pregnant";
+
+    if (byNumber.has(number)) {
+      ambiguousNumbers = true;
+    }
+
+    byNumber.set(number, {
+      raw,
+      number,
+      species,
+      mother,
+      birthMs,
+      lastCalvingMs,
+      startMs,
+      exitMs,
+      baselinePregnant,
+      events: [],
+      services: [],
+      pregnancies: []
+    });
+  }
+
+  const cohort = [...byNumber.values()];
+
+  if (
+    !Number.isFinite(endLimit) ||
+    !cohort.length ||
+    ambiguousNumbers ||
+    missingRegistration
+  ) {
+    return {
+      status: "insufficient_data",
+      valuePct: null,
+
+      message: ambiguousNumbers
+        ? "توجد أرقام حيوانات مكررة تاريخيًا؛ تعذّر نسب نتائج الحمل بأمان."
+        : missingRegistration
+          ? "ينقص تاريخ تسجيل بعض الحيوانات؛ لا يمكن توثيق فرص الحمل التاريخية."
+          : "البيانات غير كافية لحساب معدل الحمل خلال 21 يومًا."
+    };
+  }
+
+  // ربط الأحداث بحيواناتها.
+  for (const raw of events) {
+    const number =
+      fertilityReportAnimalNumberSrv(raw);
+
+    const animal = byNumber.get(number);
+
+    if (!animal) continue;
+
+    const date =
+      computeEventDateFromDoc(raw);
+
+    const ms =
+      fertilityReportMsSrv(date);
+
+    if (
+      !Number.isFinite(ms) ||
+      ms > todayMs
+    ) continue;
+
+    const kind = eventKind(raw);
+
+    if (!kind) continue;
+
+    animal.events.push({
+      ...raw,
+      _prMs: ms,
+      _prDate: date,
+      _prKind: kind
+    });
+  }
+
+  // بناء نتائج التلقيحات وإثبات فترات الحمل.
+  for (const animal of cohort) {
+    animal.events.sort(
+      (a, b) => a._prMs - b._prMs
+    );
+
+    // تلقيحات اليوم الواحد = فرصة خدمة واحدة.
+    const services = new Map();
+
+    for (const event of animal.events) {
+      if (event._prKind === "ai") {
+        services.set(
+          event._prDate,
+          event
+        );
+      }
+    }
+
+    animal.services =
+      [...services.values()].sort(
+        (a, b) => a._prMs - b._prMs
+      );
+
+    for (
+      let i = 0;
+      i < animal.services.length;
+      i++
+    ) {
+      const service = animal.services[i];
+      const next = animal.services[i + 1];
+
+      const boundary = animal.events.find(e =>
+        (
+          e._prKind === "calving" ||
+          e._prKind === "loss"
+        ) &&
+        e._prMs > service._prMs &&
+        (
+          !next ||
+          e._prMs < next._prMs
+        )
+      );
+
+      const stop = Math.min(
+        next?._prMs ?? Infinity,
+        boundary?._prMs ?? Infinity
+      );
+
+      const diagnoses = animal.events.filter(e => {
+        if (
+          e._prKind !== "dx" ||
+          e._prMs < service._prMs ||
+          e._prMs > service._prMs + 120 * DAY ||
+          e._prMs >= stop
+        ) return false;
+
+        const linkedDate =
+          fertilityReportDateSrv(
+            e.lastInseminationDate ||
+            e.inseminationDate
+          );
+
+        return (
+          !linkedDate ||
+          linkedDate === service._prDate
+        );
+      });
+
+      const knownResults = diagnoses
+        .map(e =>
+          fertilityReportPregResultSrv(
+            e.result
+          )
+        )
+        .filter(x => x !== "unknown");
+
+      const firstResult =
+        knownResults[0] || "unknown";
+
+      // موجب أولي ثم سلبي عند تأكيد 120:
+      // الحمل حدث بالفعل ثم فُقد؛ لا نلغيه من PR.
+      const conflictingDx =
+        firstResult === "negative" &&
+        knownResults.includes("positive");
+
+      const returnedHeat =
+        animal.events.find(e =>
+          e._prKind === "heat" &&
+          e._prMs > service._prMs &&
+          e._prMs < stop &&
+          e._prMs - service._prMs >= 16 * DAY &&
+          e._prMs - service._prMs <= 35 * DAY
+        );
+
+      const result =
+        conflictingDx
+          ? "pending"
+          : firstResult === "positive"
+            ? "positive"
+            : firstResult === "negative"
+              ? "negative"
+              : boundary?._prKind === "calving"
+                ? "positive"
+                : next || returnedHeat
+                  ? "negative"
+                  : "pending";
+
+      service._prResult = result;
+
+      if (result === "positive") {
+        animal.pregnancies.push({
+          start: service._prMs,
+          end: Infinity
+        });
+      }
+    }
+
+    // الحالة الحالية تساعد في استبعاد الحمل،
+    // لكنها لا تختلق حملًا جديدًا في البسط.
+    const baselineAi =
+      fertilityReportMsSrv(
+        animal.raw.lastInseminationDate
+      );
+
+    if (
+      animal.baselinePregnant &&
+      Number.isFinite(baselineAi)
+    ) {
+      animal.pregnancies.push({
+        start: baselineAi,
+        end: Infinity
+      });
+    }
+
+    for (const pregnancy of animal.pregnancies) {
+      const boundary = animal.events.find(e =>
+        (
+          e._prKind === "calving" ||
+          e._prKind === "loss"
+        ) &&
+        e._prMs > pregnancy.start
+      );
+
+      const nextService =
+        animal.services.find(e =>
+          e._prMs > pregnancy.start
+        );
+
+      pregnancy.end = Math.min(
+        boundary?._prMs ?? Infinity,
+        nextService?._prMs ?? Infinity
+      );
+    }
+  }
+
+  // البحث محدود ببداية وجود القطيع المسجل،
+  // وليس بفترة التقرير الاختيارية.
+  const firstRegistered = Math.min(
+    ...cohort.map(a => a.startMs)
+  );
+
+  let attempts = 0;
+  let latestPending = 0;
+
+  for (
+    let end = endLimit;
+    end - 20 * DAY >= firstRegistered;
+    end -= DAY
+  ) {
+    attempts++;
+
+    const start = end - 20 * DAY;
+
+    let opportunities = 0;
+    let pregnancies = 0;
+    let judged = 0;
+    let judgedServices = 0;
+    let successfulServices = 0;
+    let pending = 0;
+
+    for (const animal of cohort) {
+      if (
+        animal.startMs > end ||
+        animal.exitMs < start
+      ) continue;
+
+      const speciesMinDays =
+        animal.species === "buffalo"
+          ? 45
+          : 60;
+
+      const heiferMinMonths = Number(
+        animal.species === "buffalo"
+          ? thresholds.bufBreedingMin
+          : thresholds.cowBreedingMin
+      );
+
+      const minAgeMonths =
+        Number.isFinite(heiferMinMonths) &&
+        heiferMinMonths > 0
+          ? heiferMinMonths
+          : 11;
+
+      const ageStart =
+        Number.isFinite(animal.birthMs)
+          ? Date.UTC(
+              new Date(animal.birthMs)
+                .getUTCFullYear(),
+
+              new Date(animal.birthMs)
+                .getUTCMonth() + minAgeMonths,
+
+              new Date(animal.birthMs)
+                .getUTCDate()
+            )
+          : null;
+
+      const calvings = animal.events
+        .filter(e =>
+          e._prKind === "calving" &&
+          e._prMs <= end
+        )
+        .map(e => e._prMs);
+
+      if (
+        Number.isFinite(animal.lastCalvingMs) &&
+        animal.lastCalvingMs <= end
+      ) {
+        calvings.push(
+          animal.lastCalvingMs
+        );
+      }
+
+      const losses = animal.events
+        .filter(e =>
+          e._prKind === "loss" &&
+          e._prMs <= end
+        )
+        .map(e => e._prMs);
+
+      let eligible = false;
+
+      for (
+        let day = Math.max(
+          start,
+          animal.startMs
+        );
+
+        day <= Math.min(
+          end,
+          animal.exitMs
+        );
+
+        day += DAY
+      ) {
+        const lastCalving = Math.max(
+          -Infinity,
+          ...calvings.filter(x => x <= day)
+        );
+
+        const lastLoss = Math.max(
+          -Infinity,
+          ...losses.filter(x => x <= day)
+        );
+
+        const pastVwp = animal.mother
+          ? (
+              Number.isFinite(lastCalving) &&
+              day - lastCalving >=
+                speciesMinDays * DAY
+            )
+          : (
+              Number.isFinite(ageStart) &&
+              day >= ageStart
+            );
+
+        if (
+          !pastVwp ||
+          (
+            Number.isFinite(lastLoss) &&
+            day - lastLoss < 40 * DAY
+          )
+        ) continue;
+
+        if (
+          animal.pregnancies.some(p =>
+            p.start < day &&
+            day < p.end
+          )
+        ) continue;
+
+        eligible = true;
+        break;
+      }
+
+      if (!eligible) continue;
+
+      // فرصة واحدة للحيوان المؤهل داخل النافذة.
+      opportunities++;
+
+      const inWindow =
+        animal.services.filter(s =>
+          s._prMs >= start &&
+          s._prMs <= end
+        );
+      judgedServices += inWindow.filter(s =>
+  s._prResult !== "pending"
+).length;
+
+successfulServices += inWindow.filter(s =>
+  s._prResult === "positive"
+).length;
+      const unresolvedPrior =
+        animal.services.some(s =>
+          s._prMs < start &&
+          s._prResult === "pending" &&
+          !animal.services.some(next =>
+            next._prMs > s._prMs &&
+            next._prMs <= start
+          )
+        );
+
+      if (
+        unresolvedPrior ||
+        inWindow.some(s =>
+          s._prResult === "pending"
+        )
+      ) {
+        pending++;
+      }
+
+      if (
+        inWindow.some(s =>
+          s._prResult !== "pending"
+        )
+      ) {
+        judged++;
+      }
+
+      if (
+        inWindow.some(s =>
+          s._prResult === "positive"
+        )
+      ) {
+        pregnancies++;
+      }
+    }
+
+    if (attempts === 1) {
+      latestPending = pending;
+    }
+
+    // لا نعتمد نافذة ناقصة.
+    // ولا نصنع صفرًا قديمًا بعد الرجوع بسبب نتائج معلقة.
+    if (
+      !opportunities ||
+      pending ||
+      (
+        attempts > 1 &&
+        !judged
+      )
+    ) {
+      continue;
+    }
+
+    return {
+      status: "complete",
+
+      valuePct:
+        fertilityReportPctSrv(
+          pregnancies,
+          opportunities
+        ),
+
+      conceptionRatePct:
+  fertilityReportPctSrv(
+    successfulServices,
+    judgedServices
+  ),
+
+      startDate: iso(start),
+      endDate: iso(end),
+
+      maturityDays,
+
+      opportunities,
+      pregnancies,
+      judgedAnimals: judged,
+
+      pendingResults: 0,
+      shiftedDays: attempts - 1,
+
+      message:
+        `معدل الحمل لأحدث نافذة مكتملة من ${
+          fertilityReportDisplayDateSrv(iso(start))
+        } إلى ${
+          fertilityReportDisplayDateSrv(iso(end))
+        }.`
+    };
+  }
+
+  return {
+    status: "insufficient_data",
+    valuePct: null,
+
+    startDate: null,
+    endDate: null,
+
+    maturityDays,
+
+    pendingResults: latestPending,
+    shiftedDays: Math.max(0, attempts - 1),
+
+    message:
+      "لا توجد نافذة 21 يومًا مكتملة وقابلة للتوثيق من سجلات القطيع الحالية."
+  };
+}
 function fertilityReportKpiStatusSrv(value, benchmark, direction = "higher") {
-  const v = Number(value);
-  const b = Number(benchmark);
+ const v =
+  value === null ||
+  value === undefined ||
+  value === ""
+    ? NaN
+    : Number(value);
+
+const b =
+  benchmark === null ||
+  benchmark === undefined ||
+  benchmark === ""
+    ? NaN
+    : Number(benchmark);
 
   if (!Number.isFinite(v) || !Number.isFinite(b)) {
     return {
@@ -82901,8 +83563,19 @@ function fertilityReportExpertIndicatorSrv({
   dangerText = "",
   advice = ""
 } = {}) {
-  const n = Number(value);
-  const b = Number(benchmark);
+ const n =
+  value === null ||
+  value === undefined ||
+  value === ""
+    ? NaN
+    : Number(value);
+
+const b =
+  benchmark === null ||
+  benchmark === undefined ||
+  benchmark === ""
+    ? NaN
+    : Number(benchmark);
   const base = fertilityReportKpiStatusSrv(value, benchmark, direction);
 
   let read = "البيانات غير كافية لإصدار قراءة فنية على هذا المؤشر.";
@@ -82970,6 +83643,7 @@ function fertilityReportBuildExpertReportSrv({
   overallCr = null,
   firstServiceCr = null,
   pregnancyRate21d = null,
+  pregnancyRate21Info = null,
   heatDetectionRatePct = null,
   servicesPerConception = null,
   openDaysAvg = null,
@@ -83106,15 +83780,59 @@ function fertilityReportBuildExpertReportSrv({
       advice: "راجع التحصينات والأمراض التناسلية والتغذية والحرارة وتوقيت تشخيص الحمل."
     })
   ];
+const prIndicator = indicators.find(
+  x => x.key === "pregnancy_rate_21d"
+);
 
+if (prIndicator) {
+  if (pregnancyRate21Info?.status === "complete") {
+    prIndicator.read =
+      pregnancyRate21Info.judgedAnimals === 0
+        ? `${pregnancyRate21Info.message} لم تُسجّل تلقيحات في النافذة، ولا يصح تقييم الإخصاب منها.`
+        : `${prIndicator.read} ${pregnancyRate21Info.message}`;
+  } else {
+    prIndicator.read =
+      pregnancyRate21Info?.message ||
+      prIndicator.read;
+
+    prIndicator.advice =
+      "استكمل نتائج التشخيص والتسجيل؛ لا يصدر تقييم لمعدل الحمل قبل اكتمال نافذته.";
+  }
+}
   const bottlenecks = [];
-  const pr = Number(pregnancyRate21d);
-  const hdr = Number(heatDetectionRatePct);
-  const cr = Number(overallCr);
-  const first = Number(firstServiceCr);
+ const pr =
+  pregnancyRate21d == null
+    ? NaN
+    : Number(pregnancyRate21d);
+
+const prWindowCr =
+  pregnancyRate21Info?.status === "complete" &&
+  pregnancyRate21Info.conceptionRatePct != null
+    ? Number(pregnancyRate21Info.conceptionRatePct)
+    : NaN;
+
+const hdr =
+  heatDetectionRatePct == null
+    ? NaN
+    : Number(heatDetectionRatePct);
+
+const cr =
+  overallCr == null
+    ? NaN
+    : Number(overallCr);
+
+const first =
+  firstServiceCr == null
+    ? NaN
+    : Number(firstServiceCr);
   const spc = Number(servicesPerConception);
 
-  if (Number.isFinite(pr) && Number.isFinite(cr) && pr < 20 && cr >= 35) {
+  if (
+  Number.isFinite(pr) &&
+  Number.isFinite(prWindowCr) &&
+  pr < 20 &&
+  prWindowCr >= 35
+) {
     bottlenecks.push({
       key: "heat_detection_bottleneck",
       title: "الخلل المرجح: كشف الشياع وإدخال الحيوانات للتلقيح",
@@ -83164,18 +83882,29 @@ read: "المؤشرات لا تُظهر سببًا واحدًا مسيطرًا �
   const goodCount = indicators.filter(x => x.status === "good").length;
   const dangerCount = indicators.filter(x => x.status === "danger").length;
 
-  let overallStatus = "warn";
-  let overallRating = "متوسط يحتاج متابعة فنية";
+ let overallStatus = "warn";
+let overallRating = "متوسط يحتاج متابعة فنية";
 
-  if (dangerCount >= 2) {
-    overallStatus = "danger";
-    overallRating = "ضعيف ويحتاج مراجعة فنية";
-  } else if (goodCount >= 4 && dangerCount === 0) {
-    overallStatus = "good";
-    overallRating = "جيد فنيًا";
-  }
+if (pregnancyRate21Info?.status !== "complete") {
+  overallStatus = "muted";
+  overallRating =
+    "قراءة غير مكتملة — معدل الحمل 21 يوم غير متاح";
+
+} else if (dangerCount >= 2) {
+  overallStatus = "danger";
+  overallRating = "ضعيف ويحتاج مراجعة فنية";
+
+} else if (goodCount >= 4 && dangerCount === 0) {
+  overallStatus = "good";
+  overallRating = "جيد فنيًا";
+}
 
   const recommendations = [];
+  if (pregnancyRate21Info?.status !== "complete") {
+  recommendations.push(
+    "استكمل تسجيل نتائج الحمل قبل إصدار تقييم شامل للخصوبة."
+  );
+}
 
   if (mainBottleneck.key === "heat_detection_bottleneck") {
     recommendations.push("الأولوية الفنية: تحسين كشف الشياع وانتظام التسجيل قبل تغيير السائل أو الحكم على الملقحين.");
@@ -83243,6 +83972,38 @@ app.get("/api/fertility-report", requireUserId, async (req, res) => {
       id: d.id,
       ...(d.data() || {})
     }));
+    // بيانات PR مستقلة عن جرد الأمهات الحالي.
+const prCalvesSnap = await db
+  .collection("calves")
+  .where("userId", "==", uid)
+  .get();
+
+const prArchivedSnap = await db
+  .collection("archived_animals")
+  .where("userId", "==", uid)
+  .get();
+
+const prAnimals = [
+  ...animalsRaw.map(a => ({
+    ...a,
+    _prCollection: "animals"
+  })),
+
+  ...prCalvesSnap.docs.map(d => ({
+    id: d.id,
+    ...(d.data() || {}),
+    _prCollection: "calves"
+  })),
+
+  ...prArchivedSnap.docs.map(d => ({
+    id: d.id,
+    ...(d.data() || {}),
+    _prCollection: "archived"
+  }))
+].filter(a =>
+  !selectedType ||
+  fertilityReportAnimalSpeciesSrv(a) === selectedType
+);
 
     const animalsByNumber = new Map();
 
@@ -83266,9 +84027,20 @@ app.get("/api/fertility-report", requireUserId, async (req, res) => {
     const activeAnimals = [...animalsByNumber.values()];
 
     const eventSnap = await db.collection("events")
-      .where("userId", "==", uid)
-      .limit(8000)
-      .get();
+  .where("userId", "==", uid)
+  .get();
+  const prArchivedEventsSnap = await db
+  .collection("archived_events")
+  .where("userId", "==", uid)
+  .get();
+
+const prEvents = [
+  ...eventSnap.docs,
+  ...prArchivedEventsSnap.docs
+].map(d => ({
+  id: d.id,
+  ...(d.data() || {})
+}));
 
     const allEvents = eventSnap.docs.map(d => {
       const raw = d.data() || {};
@@ -83330,80 +84102,131 @@ app.get("/api/fertility-report", requireUserId, async (req, res) => {
     const dxByAnimal = groupByAnimal(diagnoses);
     const heatByAnimal = groupByAnimal(heats);
 
-    const outcomeForAi = (ai) => {
-      const number = ai._number;
-      const aiMs = ai._ms;
-      const maxMs = aiMs + (120 * 86400000);
+const outcomeForAi = (ai) => {
+  const number = ai._number;
+  const aiMs = ai._ms;
+  const maxMs = aiMs + (120 * 86400000);
 
-      const dxArr = (dxByAnimal.get(number) || [])
-        .filter(x => x._ms >= aiMs && x._ms <= maxMs)
-        .sort((a, b) => a._ms - b._ms);
+  const nextAi = (aiByAnimal.get(number) || [])
+    .find(x =>
+      x.id !== ai.id &&
+      x._ms > aiMs &&
+      x._ms <= maxMs
+    );
 
-      const positiveDx = dxArr.find(x => fertilityReportPregResultSrv(x.result) === "positive");
-      if (positiveDx) {
-        return {
-          outcome: "pregnant",
-          judged: true,
-          success: true,
-          by: "pregnancy_diagnosis",
-          diagnosisDate: positiveDx._date,
-          daysToDiagnosis: fertilityReportDaysBetweenSrv(ai._date, positiveDx._date)
-        };
-      }
+  // لا ننسب تشخيص التلقيح اللاحق للتلقيح السابق.
+  const dxArr = (dxByAnimal.get(number) || [])
+    .filter(x => {
+      const linked =
+        fertilityReportDateSrv(
+          x.lastInseminationDate ||
+          x.inseminationDate
+        );
 
-      const negativeDx = dxArr.find(x => fertilityReportPregResultSrv(x.result) === "negative");
-      if (negativeDx) {
-        return {
-          outcome: "open",
-          judged: true,
-          success: false,
-          by: "pregnancy_diagnosis",
-          diagnosisDate: negativeDx._date,
-          daysToDiagnosis: fertilityReportDaysBetweenSrv(ai._date, negativeDx._date)
-        };
-      }
+      return (
+        x._ms >= aiMs &&
+        x._ms <= maxMs &&
+        (!nextAi || x._ms < nextAi._ms) &&
+        (!linked || linked === ai._date)
+      );
+    })
+    .sort((a, b) => a._ms - b._ms);
 
-      const nextHeat = (heatByAnimal.get(number) || [])
-        .find(x => {
-          const d = fertilityReportDaysBetweenSrv(ai._date, x._date);
-          return d !== null && d >= 16 && d <= 35;
-        });
+  const firstDx = dxArr.find(x =>
+    fertilityReportPregResultSrv(x.result) !== "unknown"
+  );
 
-      if (nextHeat) {
-        return {
-          outcome: "returned_heat",
-          judged: true,
-          success: false,
-          by: "heat_return",
-          heatDate: nextHeat._date,
-          daysToHeat: fertilityReportDaysBetweenSrv(ai._date, nextHeat._date)
-        };
-      }
+  if (firstDx) {
+    const result =
+      fertilityReportPregResultSrv(firstDx.result);
 
-      const nextAi = (aiByAnimal.get(number) || [])
-        .find(x => x.id !== ai.id && x._ms > aiMs && x._ms <= maxMs);
+    return {
+      outcome:
+        result === "positive" ? "pregnant" : "open",
 
-      if (nextAi) {
-        return {
-          outcome: "re_inseminated",
-          judged: true,
-          success: false,
-          by: "next_insemination",
-          nextInseminationDate: nextAi._date,
-          daysToNextInsemination: fertilityReportDaysBetweenSrv(ai._date, nextAi._date)
-        };
-      }
+      judged: true,
+      success: result === "positive",
 
-      const daysSinceAi = Math.floor((todayMs - aiMs) / 86400000);
+      by: "pregnancy_diagnosis",
 
-      return {
-        outcome: daysSinceAi >= 35 ? "due_diagnosis" : "waiting",
-        judged: false,
-        success: false,
-        by: "",
-        daysSinceAi
-      };
+      diagnosisDate: firstDx._date,
+
+      daysToDiagnosis:
+        fertilityReportDaysBetweenSrv(
+          ai._date,
+          firstDx._date
+        )
     };
+  }
+
+  const nextHeat = (heatByAnimal.get(number) || [])
+    .find(x => {
+      const days =
+        fertilityReportDaysBetweenSrv(
+          ai._date,
+          x._date
+        );
+
+      return (
+        days !== null &&
+        days >= 16 &&
+        days <= 35 &&
+        (!nextAi || x._ms < nextAi._ms)
+      );
+    });
+
+  if (nextHeat) {
+    return {
+      outcome: "returned_heat",
+      judged: true,
+      success: false,
+
+      by: "heat_return",
+
+      heatDate: nextHeat._date,
+
+      daysToHeat:
+        fertilityReportDaysBetweenSrv(
+          ai._date,
+          nextHeat._date
+        )
+    };
+  }
+
+  if (nextAi) {
+    return {
+      outcome: "re_inseminated",
+      judged: true,
+      success: false,
+
+      by: "next_insemination",
+
+      nextInseminationDate: nextAi._date,
+
+      daysToNextInsemination:
+        fertilityReportDaysBetweenSrv(
+          ai._date,
+          nextAi._date
+        )
+    };
+  }
+
+  const daysSinceAi = Math.floor(
+    (todayMs - aiMs) / 86400000
+  );
+
+  return {
+    outcome:
+      daysSinceAi >= 35
+        ? "due_diagnosis"
+        : "waiting",
+
+    judged: false,
+    success: false,
+    by: "",
+    daysSinceAi
+  };
+};
 
     const lastHeatBeforeAi = (ai) => {
       const arr = heatByAnimal.get(ai._number) || [];
@@ -83850,7 +84673,14 @@ const heatsInPeriod = heats.filter(h => h._ms >= periodStartMs && h._ms <= today
 const lossesInPeriod = losses.filter(x => x._ms >= periodStartMs && x._ms <= todayMs);
 
 const heatDetectionRateReport = fertilityReportPctSrv(heatsInPeriod.length, cycleOpportunities);
-const pregnancyRate21Report = fertilityReportPctSrv(successfulAi.length, cycleOpportunities);
+const pr21Info = fertilityReportPregnancy21Srv({
+  todayISO,
+  animals: prAnimals,
+  events: prEvents,
+  thresholds: await loadGroupThresholdsSrv(uid)
+});
+
+const pregnancyRate21Report = pr21Info.valuePct;
 
 const servicesPerConceptionReport = successfulAi.length
   ? fertilityReportRound1Srv(judgedAi.length / successfulAi.length)
@@ -83869,6 +84699,7 @@ const expertReport = fertilityReportBuildExpertReportSrv({
   overallCr,
   firstServiceCr,
   pregnancyRate21d: pregnancyRate21Report,
+  pregnancyRate21Info: pr21Info,
   heatDetectionRatePct: heatDetectionRateReport,
   servicesPerConception: servicesPerConceptionReport,
   openDaysAvg: openDaysAvgReport,
@@ -83972,8 +84803,8 @@ herdReproductiveComposition: herdComposition,
           read: overallStatus.label
         }
       },
-
-     expertReport,
+pregnancyRate21d: pr21Info,
+expertReport,
 fertilityIndicators: expertReport.indicators,
 bottleneckAnalysis: {
   main: expertReport.mainBottleneck,
