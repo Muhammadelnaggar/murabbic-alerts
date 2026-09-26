@@ -84161,6 +84161,7 @@ function fertilityReportBuildExpertReportSrv({
   daysOpenInfo = null,
   abortionLossRatePct = null,
   pregnancyLossInfo = null,
+  repeatBreederAnalysis = null,
   thiGroups = []
 } = {}) {
   const indicators = [
