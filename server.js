@@ -83460,15 +83460,12 @@ successfulServices += inWindow.filter(s =>
       latestPending = pending;
     }
 
-    // لا نعتمد نافذة ناقصة.
-    // ولا نصنع صفرًا قديمًا بعد الرجوع بسبب نتائج معلقة.
+       // لا نعتمد نافذة بلا فرص، أو بها نتائج معلقة، أو دون أي تلقيح محسوم.
+    // نرجع يومًا بيوم حتى نجد نافذة مكتملة قابلة للتقييم.
     if (
       !opportunities ||
       pending ||
-      (
-        attempts > 1 &&
-        !judged
-      )
+      !judged
     ) {
       continue;
     }
