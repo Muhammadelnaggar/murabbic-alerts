@@ -96287,7 +96287,7 @@ const typeAr =
       ? 'جاموس'
       : animalListTypeArSrv(a);
   const productionStatusRaw = animalListStrSrv(a.productionStatus);
-  const productionStatus = animalListProductionDisplaySrv(productionStatusRaw);
+  let productionStatus = animalListProductionDisplaySrv(productionStatusRaw);
 
   const importId =
     animalListStrSrv(
@@ -96359,7 +96359,23 @@ const servicesCount = (
       : animalListNumDisplaySrv(
           a.daysInMilk
         );
+    if (
+    productionStatus === 'حديث الولادة' &&
+    Number.isFinite(daysInMilk)
+  ) {
+    const productionView = {
+      ...a,
+      lastCalvingDate,
+      daysInMilk
+    };
 
+    if (
+      isMilkingGroupSrv(productionView, true) &&
+      !isFreshGroupSrv(productionView)
+    ) {
+      productionStatus = 'حلاب';
+    }
+  }
   const inseminatedDays = (
     (
       reproductiveStatus === 'ملقحة' ||
@@ -107129,6 +107145,25 @@ lastCheckDate:
         dim >= 0
           ? dim
           : null;
+    }
+
+    if (
+      animalListProductionDisplaySrv(state.productionStatus) === 'حديث الولادة' &&
+      Number.isFinite(state.daysInMilk)
+    ) {
+      const productionView = {
+        ...animal,
+        productionStatus: state.productionStatus,
+        lastCalvingDate: state.lastCalvingDate,
+        daysInMilk: state.daysInMilk
+      };
+
+      if (
+        isMilkingGroupSrv(productionView, true) &&
+        !isFreshGroupSrv(productionView)
+      ) {
+        state.productionStatus = 'حلاب';
+      }
     }
 
     const todayISO = cairoTodayISO();
