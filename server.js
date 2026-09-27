@@ -83263,7 +83263,8 @@ function fertilityReportPregnancy21Srv({
       };
     }
 
-    let eligibleAnimalDays = 0;
+      let eligibleAnimalDays = 0;
+    let excludedTaiOpportunities = 0;
     const observed = new Set();
 
     for (const animal of cohort) {
@@ -83354,6 +83355,41 @@ function fertilityReportPregnancy21Srv({
         eligibleDates.add(iso(day));
       }
 
+      // التلقيح الموقّت الفعلي فقط هو الذي يُستبعد.
+      // بدء البرنامج أو موعده المخطط لا يسببان استبعادًا.
+      const naturalHeatDates = new Set(
+        animal.events
+          .filter(event =>
+            event._prKind === "heat" ||
+            (
+              event._prKind === "ai" &&
+              !fertilityReportInseminationSourceSrv(event).isForced &&
+              /صباح|مساء|morning|evening|^am$|^pm$/i.test(
+                String(event.heatStatus || "")
+              )
+            )
+          )
+          .map(event => event._prDate)
+      );
+
+      const actualTaiDates = new Set(
+        animal.events
+          .filter(event =>
+            event._prKind === "ai" &&
+            fertilityReportInseminationSourceSrv(event).isForced
+          )
+          .map(event => event._prDate)
+      );
+
+      for (const taiDate of actualTaiDates) {
+        if (
+          eligibleDates.has(taiDate) &&
+          !naturalHeatDates.has(taiDate)
+        ) {
+          excludedTaiOpportunities++;
+        }
+      }
+
       for (const heat of animal.events) {
         const recordedHeat =
           heat._prKind === "heat" ||
@@ -83379,8 +83415,11 @@ function fertilityReportPregnancy21Srv({
       }
     }
 
-    const expectedCycles =
+    const expectedCyclesBeforeTai =
       eligibleAnimalDays / 21;
+
+    const expectedCycles =
+      expectedCyclesBeforeTai - excludedTaiOpportunities;
 
     const rawPct = fertilityReportPctSrv(
       observed.size,
@@ -83392,24 +83431,30 @@ function fertilityReportPregnancy21Srv({
 
     return {
       status:
-        eligibleAnimalDays === 0 || invalid
+        expectedCycles <= 0 || invalid
           ? "insufficient_data"
           : "complete",
 
       valuePct:
-        eligibleAnimalDays === 0 || invalid
+        expectedCycles <= 0 || invalid
           ? null
           : rawPct,
 
       observedHeats: observed.size,
       eligibleAnimalDays,
+      excludedTaiOpportunities,
+
+      expectedCyclesBeforeTai:
+        fertilityReportRound1Srv(expectedCyclesBeforeTai),
 
       expectedCycles:
         fertilityReportRound1Srv(expectedCycles),
 
       reason: invalid
-        ? "عدد الشياعات يتجاوز الدورات المتوقعة؛ راجع صحة التسجيل."
-        : ""
+        ? "عدد الشياعات يتجاوز فرص الرصد الطبيعية المتوقعة؛ راجع صحة التسجيل."
+        : expectedCycles <= 0
+          ? "لا توجد فرص رصد طبيعية كافية بعد استبعاد التلقيحات الموقّتة المنفذة فعليًا."
+          : ""
     };
   })();
   // البحث محدود ببداية وجود القطيع المسجل،
@@ -84326,7 +84371,7 @@ fertilityReportExpertIndicatorSrv({
 if (heatIndicator) {
   heatIndicator.read =
     heatDetectionInfo?.status === "complete"
-      ? `رُصد ${heatDetectionInfo.observedHeats} شياع مسجل خلال ${heatDetectionInfo.eligibleAnimalDays} يوم أهلية (${heatDetectionInfo.expectedCycles} دورة متوقعة). هذا تقدير للرصد من السجلات، وليس إثباتًا لكل الشياعات الفعلية.`
+      ? `رُصد ${heatDetectionInfo.observedHeats} شياع مسجل خلال ${heatDetectionInfo.eligibleAnimalDays} يوم أهلية؛ بعد استبعاد ${heatDetectionInfo.excludedTaiOpportunities} فرصة تلقيح موقّت منفذة فعليًا، تبقّى ${heatDetectionInfo.expectedCycles} دورة طبيعية متوقعة. الشياع الطبيعي المسجل أثناء التزامن يُحتسب. هذا تقدير من السجلات، وليس إثباتًا لكل الشياعات الفعلية.`
       : heatDetectionInfo?.reason ||
         "لا تكفي البيانات التاريخية لتقدير رصد الشياع المسجل.";
 
