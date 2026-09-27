@@ -402,12 +402,12 @@ function renderConception(j){
 
         <div class="fert-indicator-details">
           ${x.read
-            ? `<p><strong>الشرح:</strong> ${esc(x.read)}</p>`
-            : ""}
+  ? `<p>${esc(x.read)}</p>`
+  : ""}
 
-          ${x.advice
-            ? `<p><strong>التوجيه:</strong> ${esc(x.advice)}</p>`
-            : ""}
+${x.advice
+  ? `<p><strong>قراءة مُرَبِّيك:</strong> ${esc(x.advice)}</p>`
+  : ""}
         </div>
 
       </article>
@@ -724,13 +724,13 @@ function renderFertilityPrint(j){
               ${(x.read || x.advice) ? `
                 <tr>
                   <td colspan="4" class="fert-print-explanation">
-                    ${x.read ? `
-                      <p><b>الشرح:</b> ${safe(x.read)}</p>
-                    ` : ""}
+                   ${x.read ? `
+  <p>${safe(x.read)}</p>
+` : ""}
 
-                    ${x.advice ? `
-                      <p><b>التوجيه:</b> ${safe(x.advice)}</p>
-                    ` : ""}
+${x.advice ? `
+  <p><b>قراءة مُرَبِّيك:</b> ${safe(x.advice)}</p>
+` : ""}
                   </td>
                 </tr>
               ` : ""}
