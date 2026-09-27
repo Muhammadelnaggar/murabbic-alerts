@@ -54749,7 +54749,8 @@ function dailyMilkIsMilkingSrv(doc = {}) {
     production.includes("حلاب") ||
     production.includes("حلوب") ||
     production.includes("milking") ||
-    production.includes("lactating")
+    production.includes("lactating") ||
+    production.includes("fresh")
   );
 }
 
@@ -98281,7 +98282,7 @@ function isCloseUpGroupSrv(an = {}) {
   return !lastCalving || closeUpDate >= lastCalving;
 }
 
-function isMilkingGroupSrv(an = {}) {
+function isMilkingGroupSrv(an = {}, allowFresh = false) {
   const production = [
     an?.productionStatus,
     an?.lactationStatus,
@@ -98300,7 +98301,11 @@ function isMilkingGroupSrv(an = {}) {
     production.includes('حلاب') ||
     production.includes('حلوب') ||
     production.includes('milking') ||
-    production.includes('lactating')
+    production.includes('lactating') ||
+    (
+      allowFresh &&
+      production.includes('fresh')
+    )
   );
 }
 
@@ -98308,7 +98313,7 @@ function isFreshGroupSrv(an = {}) {
   const dim = getDimSrv(an);
 
   return (
-    isMilkingGroupSrv(an) &&
+   isMilkingGroupSrv(an, true) &&
     dim >= 0 &&
     dim <= 21 &&
     hasCalvedBeforeGroupSrv(an)
@@ -98563,10 +98568,10 @@ function splitGroupsServerSrv(list = [], thresholds = {}) {
         continue;
       }
 
-      if (
-        isMilkingGroupSrv(an) &&
-        hasCalvedBeforeGroupSrv(an)
-      ) {
+     if (
+  isMilkingGroupSrv(an, true) &&
+  hasCalvedBeforeGroupSrv(an)
+) {
         const band =
           milkBandGroupSrv(
             an,
