@@ -83831,45 +83831,42 @@ function fertilityReportExpertIndicatorSrv({
   unit = "%",
   benchmark = null,
   direction = "higher",
+  meaning = "",
   goodText = "",
   warnText = "",
   dangerText = "",
-  advice = ""
+  mutedText = ""
 } = {}) {
- const n =
-  value === null ||
-  value === undefined ||
-  value === ""
-    ? NaN
-    : Number(value);
+  const n = value === null || value === undefined || value === ""
+    ? NaN : Number(value);
 
-const b =
-  benchmark === null ||
-  benchmark === undefined ||
-  benchmark === ""
-    ? NaN
-    : Number(benchmark);
+  const b = benchmark === null || benchmark === undefined || benchmark === ""
+    ? NaN : Number(benchmark);
+
   const base = fertilityReportKpiStatusSrv(value, benchmark, direction);
 
-  let read = "البيانات غير كافية لإصدار قراءة فنية على هذا المؤشر.";
-
-  if (base.status === "good") read = goodText || "المؤشر داخل النطاق المقبول فنيًا.";
-  if (base.status === "warn") read = warnText || "المؤشر قريب من الحد الفني ويحتاج متابعة مع باقي المؤشرات.";
-  if (base.status === "danger") read = dangerText || "المؤشر خارج النطاق المطلوب ويحتاج تفسير سبب الخلل.";
+  const readings = {
+    good: goodText || "المؤشر ضمن المستوى المستهدف. حافظ على انتظام المتابعة.",
+    warn: warnText || "المؤشر يحتاج متابعة لتحسين الأداء.",
+    danger: dangerText || "المؤشر يحتاج تدخلًا لتحسين الأداء.",
+    muted: mutedText || "استكمل البيانات اللازمة لتقييم المؤشر."
+  };
 
   return {
     key,
     title,
     value: Number.isFinite(n) ? fertilityReportRound1Srv(n) : null,
-    valueText: Number.isFinite(n) ? `${fertilityReportRound1Srv(n)}${unit ? " " + unit : ""}` : "غير مكتمل",
+    valueText: Number.isFinite(n)
+      ? `${fertilityReportRound1Srv(n)}${unit ? " " + unit : ""}`
+      : "غير مكتمل",
     benchmark: Number.isFinite(b) ? b : null,
     benchmarkText: Number.isFinite(b)
       ? `${direction === "lower" ? "المستهدف ≤" : "المستهدف ≥"} ${b}${unit ? " " + unit : ""}`
       : "",
     status: base.status,
     rating: base.label,
-    read,
-    advice
+    read: meaning,
+    advice: readings[base.status]
   };
 }
 
@@ -83893,10 +83890,14 @@ function fertilityReportRepeatBreederAnalysisSrv(repeatBreeders = [], eligibleCo
     severityLabel = "حالات متعددة";
   }
 
-  const herdRead =
+    const herdRead =
     count === 0
       ? "لا توجد حيوانات مطابقة لشروط Repeat Breeder حسب البيانات الحالية."
-      : `لديك ${count} حيوانات مطابقة لشروط Repeat Breeder.`;
+      : count === 1
+        ? "لديك حيوان واحد مطابق لشروط Repeat Breeder."
+        : count === 2
+          ? "لديك حيوانان مطابقان لشروط Repeat Breeder."
+          : `لديك ${count} حيوانات مطابقة لشروط Repeat Breeder.`;
 
   const recommendation =
     "راجع توقيت التلقيح، وانتظام دورات الشياع، وطريقة حفظ وتداول السائل المنوي. نفّذ التلقيح في الأوقات الأبرد، واهتم بتبريد الحيوانات عند وجود إجهاد حراري.";
@@ -84238,196 +84239,133 @@ function fertilityReportBuildExpertReportSrv({
   repeatBreederAnalysis = null,
   thiGroups = []
 } = {}) {
-  const indicators = [
+    const indicators = [
     fertilityReportExpertIndicatorSrv({
       key: "pregnancy_rate_21d",
       title: "معدل الحمل 21 يوم",
       value: pregnancyRate21d,
       benchmark: 20,
-      goodText: "معدل الحمل 21 يوم مقبول؛ برنامج الخصوبة يحقق حملًا بمعدل عملي.",
-      warnText: "معدل الحمل 21 يوم متوسط؛ اقرأه مع كشف الشياع والإخصاب لتحديد موضع الخلل.",
-      dangerText: "معدل الحمل 21 يوم منخفض؛ غالبًا توجد مشكلة في كشف الشياع أو الإخصاب أو كليهما.",
-      advice: "هذا هو مؤشر إدارة الخصوبة الأشمل على مستوى القطيع."
+      meaning: "أهم مقياس شامل للخصوبة في القطيع، ويعكس سرعة حدوث الحمل بعد الولادة.",
+      goodText: "معدل الحمل جيد. حافظ على انتظام رصد الشياع ومتابعة الحيوانات المؤهلة.",
+      warnText: "معدل الحمل يحتاج تحسينًا. تابع دخول الحيوانات المؤهلة للتلقيح وانتظام تشخيص الحمل.",
+      dangerText: pregnancyRate21Info?.status === "complete" &&
+        Number(pregnancyRate21Info?.conceptionRatePct) >= 35
+          ? "معدل الحمل منخفض رغم نجاح التلقيحات المقيمة. حسّن رصد الشياع وتابع الحيوانات المؤهلة التي تأخر تلقيحها."
+          : "معدل الحمل منخفض. راجع رصد الشياع ونتائج التلقيح، وتابع الحيوانات المؤهلة.",
+      mutedText: "نتائج الحمل غير مكتملة. استكمل التسجيل وتشخيص الحمل قبل تقييم المؤشر."
     }),
+
     fertilityReportExpertIndicatorSrv({
       key: "heat_detection_rate",
       title: "معدل رصد الشياع المسجل",
       value: heatDetectionRatePct,
       benchmark: 50,
-      goodText: "رصد الشياع المسجل مقبول؛ القطيع يدخل برنامج التلقيح بمعدل مناسب.",
-      warnText: "رصد الشياع متوسط؛ قد توجد شياعات مفقودة أو تسجيل غير منتظم.",
-      dangerText: "رصد الشياع منخفض؛ نقطة الضعف المرجحة هي اكتشاف الشياع وإدخال الحيوانات للتلقيح.",
-      advice: "راجع نظام الملاحظة ودقة التسجيل قبل اتهام الإخصاب وحده."
+      meaning: "يقيس كفاءة اكتشاف الشياع وإدخال الحيوانات للتلقيح في الوقت المناسب.",
+      goodText: "معدل رصد الشياع جيد في القطيع. حافظ على انتظام الملاحظة اليومية.",
+      warnText: "معدل رصد الشياع يحتاج تحسينًا. نظّم الملاحظة صباحًا ومساءً.",
+      dangerText: "معدل رصد الشياع منخفض في القطيع. كثّف الملاحظة صباحًا ومساءً، وتابع الحيوانات المتأخرة في إظهار الشياع.",
+      mutedText: "لا تتوافر بيانات كافية لتقييم رصد الشياع. استكمل التسجيل."
     }),
+
     fertilityReportExpertIndicatorSrv({
       key: "first_service_conception",
       title: "نسبة الحمل من أول تلقيحة",
       value: firstServiceCr,
       benchmark: 40,
-      goodText: "أداء أول تلقيحة مقبول؛ جاهزية الحيوانات بعد الولادة غالبًا مناسبة.",
-      warnText: "أداء أول تلقيحة قريب من الحد الأدنى؛ يحتاج قراءة مع VWP والرحم وBCS.",
-      dangerText: "أداء أول تلقيحة منخفض؛ يرجّح مشكلة جاهزية أول خدمة بعد الولادة أو توقيتها.",
-      advice: "راجع فترة الانتظار الطوعي وفحص الرحم والحالة الجسمية وTHI."
+      meaning: "تعكس جاهزية الحيوانات للتلقيح ونجاح أول فرصة لتحقيق الحمل.",
+      goodText: "نتائج أول تلقيحة جيدة. حافظ على تقييم جاهزية الحيوانات قبل التلقيح.",
+      warnText: "نتائج أول تلقيحة تحتاج متابعة. راجع جاهزية الحيوانات وتوقيت أول تلقيحة.",
+      dangerText: "نسبة الحمل من أول تلقيحة منخفضة. راجع فحص الرحم والحالة الجسمية وتوقيت التلقيح.",
+      mutedText: "نتائج أول تلقيحة غير مكتملة. استكمل تشخيص الحمل."
     }),
+
     fertilityReportExpertIndicatorSrv({
       key: "overall_conception",
       title: "معدل الإخصاب العام",
       value: overallCr,
       benchmark: 35,
-      goodText: "معدل الإخصاب العام مقبول فنيًا على مستوى القطيع.",
-      warnText: "معدل الإخصاب قريب من الحد الأدنى؛ يحتاج قراءة مع التوقيت والملقحين وTHI.",
-      dangerText: "معدل الإخصاب منخفض؛ راجع توقيت التلقيح وجودة السائل والملقحين وTHI والحالة الرحمية.",
-      advice: "لا يُحكم على الملقح منفردًا قبل فصل أثر THI وعدد الحالات."
+      meaning: "يقيس نجاح التلقيحات في تحقيق الحمل، بغض النظر عن ترتيب التلقيحة.",
+      goodText: "الإخصاب جيد. حافظ على جودة إجراءات التلقيح، وتابع فرص تلقيح الحيوانات المؤهلة.",
+      warnText: "الإخصاب يحتاج متابعة. راجع توقيت التلقيح ونتائجه حسب الظروف والملقحين.",
+      dangerText: "الإخصاب منخفض. راجع التوقيت وجودة السائل والحالة التناسلية والإجهاد الحراري.",
+      mutedText: "نتائج التلقيحات غير مكتملة. استكمل تشخيص الحمل."
     }),
- fertilityReportExpertIndicatorSrv({
-  key: "services_per_conception",
-  title: "عدد الخدمات للحمل",
-  value: servicesPerConception,
-  unit: "",
-  benchmark: 2,
-  direction: "lower",
-  goodText: "عدد الخدمات للحمل ضمن النطاق المقبول.",
-  warnText: "عدد الخدمات للحمل أعلى من المستوى المستهدف.",
-  dangerText: "عدد الخدمات للحمل مرتفع ويحتاج مراجعة إدارة التلقيح.",
-  advice: "راجع هذا المؤشر مع نتائج الحمل العامة."
-}),
+
+    fertilityReportExpertIndicatorSrv({
+      key: "services_per_conception",
+      title: "عدد الخدمات للحمل",
+      value: servicesPerConception,
+      unit: "",
+      benchmark: 2,
+      direction: "lower",
+      meaning: "يوضح متوسط عدد التلقيحات اللازمة لتحقيق حمل واحد.",
+      goodText: "عدد الخدمات للحمل ضمن المستهدف. تابع الحالات التي يتكرر تلقيحها.",
+      warnText: "عدد الخدمات للحمل أعلى من المستهدف. راجع الحالات التي تأخر حملها.",
+      dangerText: "عدد الخدمات للحمل مرتفع. راجع توقيت التلقيح والحالات متكررة التلقيح.",
+      mutedText: "البيانات غير كافية لتقييم عدد الخدمات للحمل. استكمل نتائج الحمل."
+    }),
+
     fertilityReportExpertIndicatorSrv({
       key: "days_open",
-     title: "متوسط الأيام المفتوحة حتى الحمل",
+      title: "متوسط الأيام المفتوحة حتى الحمل",
       value: openDaysAvg,
       unit: "يوم",
       benchmark: 115,
       direction: "lower",
-      goodText: "الأيام المفتوحة ضمن نطاق مقبول؛ التأخير الاقتصادي التناسلي غير ظاهر بقوة.",
-      warnText: "الأيام المفتوحة تحتاج متابعة؛ قد يبدأ أثر اقتصادي من تأخر الحمل.",
-      dangerText: "الأيام المفتوحة مرتفعة؛ يوجد تأخير تناسلي مؤثر على دورة الإنتاج والربحية.",
-      advice: "اقرأها مع سرعة العودة للتلقيح وكفاءة كشف الشياع."
+      meaning: "المدة من الولادة إلى التلقيح الذي نتج عنه الحمل، وتعكس سرعة عودة الأمهات للحمل.",
+      goodText: "الأيام المفتوحة ضمن المستهدف. حافظ على انتظام التلقيح ومتابعة الحمل.",
+      warnText: "الأيام المفتوحة تحتاج متابعة. راجع الأمهات المتأخرة في الحمل.",
+      dangerText: "الأيام المفتوحة مرتفعة. راجع تأخر أول تلقيحة وتكرار التلقيح لدى الأمهات.",
+      mutedText: "لا توجد حالات مكتملة كافية لحساب الأيام المفتوحة حاليًا."
     }),
- {
-  key: "repeat_breeder_pressure",
 
-  title:
-    "حالات Repeat Breeder",
-
-  value:
-    Number(
-      repeatBreederAnalysis?.count || 0
-    ),
-
-  valueText:
-    `${Number(
-      repeatBreederAnalysis?.count || 0
-    )} حالة`,
-
-  benchmark:
-    null,
-
-  benchmarkText:
-    "",
-
-  status:
-    Number(
-      repeatBreederAnalysis?.count || 0
-    ) > 0
-      ? "warn"
-      : "good",
-
-  rating:
-    Number(
-      repeatBreederAnalysis?.count || 0
-    ) === 0
-      ? "لا توجد حالات"
-      : Number(
-          repeatBreederAnalysis?.count || 0
-        ) === 1
+    {
+      key: "repeat_breeder_pressure",
+      title: "حالات Repeat Breeder",
+      value: Number(repeatBreederAnalysis?.count || 0),
+      valueText: `${Number(repeatBreederAnalysis?.count || 0)} حالة`,
+      benchmark: null,
+      benchmarkText: "",
+      status: Number(repeatBreederAnalysis?.count || 0) > 0
+        ? "warn" : "good",
+      rating: Number(repeatBreederAnalysis?.count || 0) === 0
+        ? "لا توجد حالات"
+        : Number(repeatBreederAnalysis?.count || 0) === 1
           ? "حالة فردية تحتاج متابعة"
           : "حالات تحتاج متابعة",
+      read: "يرصد الحيوانات التي تكرر تلقيحها دون ثبوت حمل، لتحديد الحالات التي تحتاج متابعة فردية.",
+      advice: Number(repeatBreederAnalysis?.count || 0) === 0
+        ? "لا توجد حالات تكرار تلقيح حاليًا. استمر في متابعة نتائج الحمل."
+        : Number(repeatBreederAnalysis?.count || 0) === 1
+          ? "لديك حيوان واحد يحتاج متابعة. راجع سجل الشياع والتلقيح والحالة التناسلية."
+          : Number(repeatBreederAnalysis?.count || 0) === 2
+            ? "لديك حيوانان يحتاجان متابعة. راجع سجلي الشياع والتلقيح والحالة التناسلية."
+            : `لديك ${Number(repeatBreederAnalysis.count)} حيوانات تحتاج متابعة. راجع سجلات الشياع والتلقيح والحالة التناسلية.`
+    },
 
-  read:
-    repeatBreederAnalysis?.herdRead ||
-    "لا توجد قراءة Repeat Breeder مكتملة حاليًا.",
-
-   advice:
-    Number(
-      repeatBreederAnalysis?.count || 0
-    ) > 0
-      ? repeatBreederAnalysis?.recommendation ||
-        "راجع إدارة التلقيح والظروف المصاحبة."
-      : "استمر في متابعة عدد الخدمات ونتائج تشخيص الحمل."
-},
-fertilityReportExpertIndicatorSrv({
-  key: "pregnancy_loss",
-  title: "فقد الحمل حتى تأكيد 120 يوم",
-  value: abortionLossRatePct,
-  benchmark: null,
-  advice:
-    "مؤشر وصفي للحالات ذات التشخيص الموجب والمتابعة الموثقة؛ لا يقارن بمستهدف عام دون تحديد مرحلة الحمل."
-})
+    {
+      key: "pregnancy_loss",
+      title: "فقد الحمل حتى تأكيد 120 يوم",
+      value: abortionLossRatePct == null
+        ? null
+        : fertilityReportRound1Srv(abortionLossRatePct),
+      valueText: abortionLossRatePct == null
+        ? "غير مكتمل"
+        : `${fertilityReportRound1Srv(abortionLossRatePct)} %`,
+      benchmark: null,
+      benchmarkText: "",
+      status: "muted",
+      rating: pregnancyLossInfo?.followed
+        ? "قراءة وصفية"
+        : "غير مكتمل",
+      read: "يقيس فقد الحمل بين الحالات المشخّصة التي اكتملت متابعتها حتى تأكيد 120 يومًا.",
+      advice: !pregnancyLossInfo?.followed
+        ? "متابعة الأحمال غير مكتملة. استكمل تأكيد الحمل في مواعيده."
+        : pregnancyLossInfo.lost === 0
+          ? "لم يُسجّل فقد حمل بين الحالات مكتملة المتابعة. استمر في تأكيد الأحمال."
+          : `سُجّل فقد حمل في ${pregnancyLossInfo.lost} من ${pregnancyLossInfo.followed} حالات مكتملة المتابعة. راجع حالات الفقد واستكمل تأكيد الأحمال المنتظرة.`
+    }
   ];
-  const heatIndicator = indicators.find(
-  x => x.key === "heat_detection_rate"
-);
-
-if (heatIndicator) {
-  heatIndicator.read =
-    heatDetectionInfo?.status === "complete"
-      ? `رُصد ${heatDetectionInfo.observedHeats} شياع مسجل خلال ${heatDetectionInfo.eligibleAnimalDays} يوم أهلية؛ بعد استبعاد ${heatDetectionInfo.excludedTaiOpportunities} فرصة تلقيح موقّت منفذة فعليًا، تبقّى ${heatDetectionInfo.expectedCycles} دورة طبيعية متوقعة. الشياع الطبيعي المسجل أثناء التزامن يُحتسب. هذا تقدير من السجلات، وليس إثباتًا لكل الشياعات الفعلية.`
-      : heatDetectionInfo?.reason ||
-        "لا تكفي البيانات التاريخية لتقدير رصد الشياع المسجل.";
-
-  heatIndicator.advice =
-    "اقرأ هذا المؤشر منفصلًا عن التلقيح الموقّت الذي لا يعتمد على رصد الشياع.";
-}
-
-const daysIndicator = indicators.find(
-  x => x.key === "days_open"
-);
-
-if (daysIndicator) {
-  daysIndicator.read = daysOpenInfo?.count
-    ? `متوسط المدة من آخر ولادة إلى تلقيح ثبت نجاحه لـ${daysOpenInfo.count} أم عشار خلال فترة التقرير.`
-    : "لا توجد حالات حمل موثقة ومستوفية لتاريخ الولادة والتلقيح داخل الفترة المختارة.";
-}
-
-const lossIndicator = indicators.find(
-  x => x.key === "pregnancy_loss"
-);
-
-if (lossIndicator) {
-  lossIndicator.status = "muted";
-
-  lossIndicator.rating =
-    pregnancyLossInfo?.followed
-      ? "قراءة وصفية"
-      : "غير مكتمل";
-
-  lossIndicator.read =
-    pregnancyLossInfo?.followed
-      ? `فُقد ${pregnancyLossInfo.lost} من ${pregnancyLossInfo.followed} أحمال ذات متابعة موثقة حتى تأكيد 120 يومًا؛ ${pregnancyLossInfo.pendingFollowup} أحمال لم تكتمل متابعتها واستُبعدت من المقام.`
-      : "لا توجد أحمال بتشخيص أولي موجب ونتيجة متابعة موثقة؛ لا يصح احتساب الصفر.";
-
-  lossIndicator.benchmark = null;
-  lossIndicator.benchmarkText = "";
-}
-const prIndicator = indicators.find(
-  x => x.key === "pregnancy_rate_21d"
-);
-
-if (prIndicator) {
-  if (pregnancyRate21Info?.status === "complete") {
-    prIndicator.read =
-      pregnancyRate21Info.judgedAnimals === 0
-        ? `${pregnancyRate21Info.message} لم تُسجّل تلقيحات في النافذة، ولا يصح تقييم الإخصاب منها.`
-        : `${prIndicator.read} ${pregnancyRate21Info.message}`;
-  } else {
-    prIndicator.read =
-      pregnancyRate21Info?.message ||
-      prIndicator.read;
-
-    prIndicator.advice =
-      "استكمل نتائج التشخيص والتسجيل؛ لا يصدر تقييم لمعدل الحمل قبل اكتمال نافذته.";
-  }
-}
   const bottlenecks = [];
  const pr =
   pregnancyRate21d == null
