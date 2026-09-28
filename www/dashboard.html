@@ -1338,69 +1338,68 @@ function renderMiniGauge(id, percent){
   el.textContent = gaugeDisplayValue(id, n);
 }
 const dashboardAlertSources = {
-  murabbik: [],
-  ovsynch: [],
-  vaccination: []
+  murabbik: []
 };
 
-const dashboardAlertDismissed = new Set();
-const dashboardAlertSnoozedUntil = new Map();
 let dashboardAlertActiveKey = '';
 
-function dashboardAlertKey(alert = {}){
-  if (
-    alert.dashboardSource === 'murabbik_smart' &&
-    alert.id &&
-    alert.revision
-  ) {
-    return `${alert.id}__${alert.revision}`;
-  }
+function dashboardAlertKey(alert = {}) {
+  const id =
+    String(
+      alert.id || ''
+    ).trim();
 
-  return String(
-    alert.id ||
-    `${alert.type || 'alert'}__${alert.actionUrl || ''}__${alert.message || ''}`
+  const revision =
+    String(
+      alert.revision || ''
+    ).trim();
+
+  return (
+    [id, revision]
+      .filter(Boolean)
+      .join('__') ||
+    'murabbik-smart-alert'
   );
 }
 
-function dashboardAlertPriority(alert = {}){
-  const level = String(alert.level || 'info').toLowerCase();
+function dashboardGreetingPeriod(
+  alert = {}
+) {
+  if (
+    String(
+      alert.code || ''
+    ) !==
+    'daily_farm_greeting'
+  ) {
+    return '';
+  }
 
-  if (level === 'danger' || level === 'error') return 0;
-  if (level === 'warn' || level === 'warning') return 1;
-  return 2;
+  const period =
+    String(
+      alert.status || ''
+    ).toLowerCase();
+
+  return (
+    period === 'morning' ||
+    period === 'evening'
+  )
+    ? period
+    : '';
 }
 
-function refreshDashboardSmartAlert(){
-  const host = document.getElementById('smartAlertHost');
-  if (!host) return;
-
-  const now = Date.now();
-
- const alerts = [
-  ...dashboardAlertSources.murabbik,
-  ...dashboardAlertSources.ovsynch,
-  ...dashboardAlertSources.vaccination
-]
-   
-    .filter(alert => alert?.message)
-    .filter(alert => {
-      const key = dashboardAlertKey(alert);
-      const snoozedUntil = Number(
-        dashboardAlertSnoozedUntil.get(key) || 0
-      );
-
-      return (
-        !dashboardAlertDismissed.has(key) &&
-        snoozedUntil <= now
-      );
-    })
-    .sort(
-      (a, b) =>
-        dashboardAlertPriority(a) -
-        dashboardAlertPriority(b)
+function refreshDashboardSmartAlert() {
+  const host =
+    document.getElementById(
+      'smartAlertHost'
     );
 
-  const alert = alerts[0] || null;
+  if (!host) return;
+
+  // السيرفر وحده يحدد currentAlert وترتيبه.
+  const alert =
+    dashboardAlertSources
+      .murabbik[0] ||
+    null;
 
   if (!alert) {
     dashboardAlertActiveKey = '';
@@ -1408,9 +1407,10 @@ function refreshDashboardSmartAlert(){
     return;
   }
 
-  const key = dashboardAlertKey(alert);
-  const isMurabbikSmart =
-  alert.dashboardSource === 'murabbik_smart';
+  const key =
+    dashboardAlertKey(
+      alert
+    );
 
   if (
     dashboardAlertActiveKey === key &&
@@ -1419,227 +1419,375 @@ function refreshDashboardSmartAlert(){
     return;
   }
 
-  dashboardAlertActiveKey = key;
+  dashboardAlertActiveKey =
+    key;
+
   host.replaceChildren();
 
-  const level = String(
-    alert.level || 'info'
-  ).toLowerCase();
+  const level =
+    String(
+      alert.level ||
+      'info'
+    ).toLowerCase();
 
-  const modal = document.createElement('section');
-  modal.className = 'mbk-smart-alert';
-  modal.dataset.alertId = key;
-  modal.dataset.alertLevel = level;
-  modal.setAttribute('role', 'alertdialog');
+  const isDailyGreeting =
+    String(
+      alert.code || ''
+    ) ===
+    'daily_farm_greeting';
 
-  const titleId = `smartAlertTitle_${Math.abs(
-    Array.from(key).reduce(
-      (acc, ch) =>
-        ((acc * 31) + ch.charCodeAt(0)) | 0,
-      0
-    )
-  )}`;
+  const greetingPeriod =
+    dashboardGreetingPeriod(
+      alert
+    );
 
-  const messageId = `${titleId}_message`;
+  const modal =
+    document.createElement(
+      'section'
+    );
 
-  modal.setAttribute('aria-labelledby', titleId);
-  modal.setAttribute('aria-describedby', messageId);
+  modal.className =
+    'mbk-smart-alert';
 
-  const head = document.createElement('div');
-  head.className = 'mbk-smart-alert-head';
+  modal.dataset.alertId =
+    key;
 
-  const icon = document.createElement('div');
-  icon.className = 'mbk-smart-alert-icon';
-  icon.setAttribute('aria-hidden', 'true');
+  modal.dataset.alertLevel =
+    level;
+
+  modal.dataset.alertCode =
+    String(
+      alert.code || ''
+    );
+
+  if (greetingPeriod) {
+    modal.dataset.greetingPeriod =
+      greetingPeriod;
+  }
+
+  modal.setAttribute(
+    'role',
+    'alertdialog'
+  );
+
+  const titleId =
+    `smartAlertTitle_${Math.abs(
+      Array.from(key).reduce(
+        (acc, ch) =>
+          (
+            (acc * 31) +
+            ch.charCodeAt(0)
+          ) | 0,
+        0
+      )
+    )}`;
+
+  const messageId =
+    `${titleId}_message`;
+
+  modal.setAttribute(
+    'aria-labelledby',
+    titleId
+  );
+
+  modal.setAttribute(
+    'aria-describedby',
+    messageId
+  );
+
+  const head =
+    document.createElement(
+      'div'
+    );
+
+  head.className =
+    'mbk-smart-alert-head';
+
+  const icon =
+    document.createElement(
+      'div'
+    );
+
+  icon.className =
+    'mbk-smart-alert-icon';
+
+  icon.setAttribute(
+    'aria-hidden',
+    'true'
+  );
 
   icon.textContent =
-    level === 'danger' ||
-    level === 'error' ||
-    level === 'warn' ||
-    level === 'warning'
-      ? '⚠️'
-      : '🔔';
+    isDailyGreeting
+      ? (
+          greetingPeriod ===
+          'evening'
+            ? '🌙'
+            : '🌤️'
+        )
+      : (
+          level === 'danger' ||
+          level === 'error' ||
+          level === 'warn' ||
+          level === 'warning'
+            ? '⚠️'
+            : '🔔'
+        );
 
-  const copy = document.createElement('div');
-  copy.className = 'mbk-smart-alert-copy';
+  const copy =
+    document.createElement(
+      'div'
+    );
 
-  const title = document.createElement('h2');
-  title.id = titleId;
-  title.className = 'mbk-smart-alert-title';
-  title.textContent = String(
-    alert.title || 'تنبيه'
+  copy.className =
+    'mbk-smart-alert-copy';
+
+  const title =
+    document.createElement(
+      'h2'
+    );
+
+  title.id =
+    titleId;
+
+  title.className =
+    'mbk-smart-alert-title';
+
+  title.textContent =
+    String(
+      alert.title ||
+      'تنبيه'
+    );
+
+  const message =
+    document.createElement(
+      'div'
+    );
+
+  message.id =
+    messageId;
+
+  message.className =
+    'mbk-smart-alert-message';
+
+  message.textContent =
+    String(
+      alert.message || ''
+    );
+
+  const observation =
+    document.createElement(
+      'div'
+    );
+
+  observation.className =
+    'mbk-smart-alert-message';
+
+  observation.textContent =
+    String(
+      alert?.details
+        ?.observation ||
+      ''
+    );
+
+  copy.append(
+    title,
+    message
   );
 
-  const message = document.createElement('div');
-  message.id = messageId;
-  message.className = 'mbk-smart-alert-message';
-  message.textContent = String(
-    alert.message || ''
-  );
-  const observation = document.createElement('div');
-  observation.className = 'mbk-smart-alert-message';
-  observation.textContent = String(
-  alert?.details?.observation || ''
-);
-  copy.append(title, message);
-
-if (observation.textContent) {
-  copy.appendChild(observation);
-}
-
-  const closeButton = document.createElement('button');
-  closeButton.type = 'button';
-  closeButton.className = 'mbk-smart-alert-close';
-  closeButton.setAttribute(
-    'aria-label',
-    'إغلاق التنبيه'
-  );
-  closeButton.textContent = '×';
-
- closeButton.addEventListener('click', async () => {
-  closeButton.disabled = true;
-
-  if (isMurabbikSmart) {
-    try {
-      await respondMurabbikSmartAlert(
-        alert,
-        'acknowledged'
-      );
-    } catch (e) {
-      closeButton.disabled = false;
-
-      console.warn(
-        'murabbik smart alert acknowledge failed',
-        e
-      );
-    }
-
-    return;
+  if (
+    observation.textContent
+  ) {
+    copy.appendChild(
+      observation
+    );
   }
 
-  dashboardAlertDismissed.add(key);
-  dashboardAlertActiveKey = '';
-  refreshDashboardSmartAlert();
-});
-
-head.append(icon, copy);
-
-if (!isMurabbikSmart) {
-  head.appendChild(closeButton);
-}
-
-  modal.appendChild(head);
-
-  const actions = document.createElement('div');
-  actions.className = 'mbk-smart-alert-actions';
-
-if (alert.actionText) {
-  const primaryButton =
-    document.createElement('button');
-
-  primaryButton.type = 'button';
-  primaryButton.className =
-    'mbk-smart-alert-primary';
-
-  primaryButton.textContent = String(
-    alert.actionText
+  head.append(
+    icon,
+    copy
   );
 
-  const actionDisabled =
-    alert.actionDisabled === true;
-
-  primaryButton.disabled =
-    actionDisabled;
-  if (actionDisabled) {
-  primaryButton.style.opacity = '0.45';
-  primaryButton.style.cursor = 'not-allowed';
-  primaryButton.style.boxShadow = 'none';
-  primaryButton.setAttribute('aria-disabled', 'true');
-  primaryButton.title = 'لا توجد عليقة محفوظة لهذه المجموعة.';
-}
-  if (!actionDisabled) {
-  primaryButton.addEventListener(
-    'click',
-    () => {
-      primaryButton.disabled = true;
-
-      location.href = String(
-        alert.actionUrl
-      );
-    }
+  modal.appendChild(
+    head
   );
-}
 
-  actions.appendChild(primaryButton);
-}
+  const actions =
+    document.createElement(
+      'div'
+    );
 
-  const laterButton =
-    document.createElement('button');
+  actions.className =
+    'mbk-smart-alert-actions';
 
-  laterButton.type = 'button';
-  laterButton.className =
-    'mbk-smart-alert-later';
-
-laterButton.textContent =
-  isMurabbikSmart
-    ? 'ذكّرني لاحقًا'
-    : 'لاحقًا';
-
-laterButton.addEventListener('click', async () => {
-  laterButton.disabled = true;
-
-  if (isMurabbikSmart) {
-    try {
-      await respondMurabbikSmartAlert(
-        alert,
-        'snoozed'
+  if (alert.actionText) {
+    const primaryButton =
+      document.createElement(
+        'button'
       );
-    } catch (e) {
-      laterButton.disabled = false;
 
-      console.warn(
-        'murabbik smart alert snooze failed',
-        e
+    primaryButton.type =
+      'button';
+
+    primaryButton.className =
+      'mbk-smart-alert-primary';
+
+    primaryButton.textContent =
+      String(
+        alert.actionText
       );
+
+    const actionDisabled =
+      alert.actionDisabled ===
+      true;
+
+    primaryButton.disabled =
+      actionDisabled;
+
+    if (actionDisabled) {
+      primaryButton.setAttribute(
+        'aria-disabled',
+        'true'
+      );
+
+    } else {
+      primaryButton
+        .addEventListener(
+          'click',
+          async () => {
+            primaryButton.disabled =
+              true;
+
+            try {
+              await respondMurabbikSmartAlert(
+                alert,
+                'acknowledged'
+              );
+            } catch (e) {
+              console.warn(
+                'murabbik smart alert action response failed',
+                e
+              );
+            }
+
+            location.href =
+              String(
+                alert.actionUrl
+              );
+          }
+        );
     }
 
-    return;
+    actions.appendChild(
+      primaryButton
+    );
   }
 
-  const snoozeMs = 30 * 60 * 1000;
+  // تحية المستخدم = حسنًا فقط.
+  if (!isDailyGreeting) {
+    const laterButton =
+      document.createElement(
+        'button'
+      );
 
-  dashboardAlertSnoozedUntil.set(
-    key,
-    Date.now() + snoozeMs
-  );
+    laterButton.type =
+      'button';
 
-  dashboardAlertActiveKey = '';
-  refreshDashboardSmartAlert();
+    laterButton.className =
+      'mbk-smart-alert-later';
 
-  window.setTimeout(() => {
-    refreshDashboardSmartAlert();
-  }, snoozeMs + 250);
-});
+    laterButton.textContent =
+      'ذكّرني لاحقًا';
 
-actions.appendChild(laterButton);
+    laterButton
+      .addEventListener(
+        'click',
+        async () => {
+          laterButton.disabled =
+            true;
 
-if (isMurabbikSmart) {
-  closeButton.className =
+          try {
+            await respondMurabbikSmartAlert(
+              alert,
+              'snoozed'
+            );
+
+          } catch (e) {
+            laterButton.disabled =
+              false;
+
+            console.warn(
+              'murabbik smart alert snooze failed',
+              e
+            );
+          }
+        }
+      );
+
+    actions.appendChild(
+      laterButton
+    );
+  }
+
+  const okButton =
+    document.createElement(
+      'button'
+    );
+
+  okButton.type =
+    'button';
+
+  okButton.className =
     'mbk-smart-alert-later mbk-smart-alert-ok';
 
-  closeButton.removeAttribute('aria-label');
-  closeButton.textContent = 'حسنًا';
+  okButton.textContent =
+    'حسنًا';
 
-  actions.appendChild(closeButton);
+  okButton
+    .addEventListener(
+      'click',
+      async () => {
+        okButton.disabled =
+          true;
+
+        try {
+          await respondMurabbikSmartAlert(
+            alert,
+            'acknowledged'
+          );
+
+        } catch (e) {
+          okButton.disabled =
+            false;
+
+          console.warn(
+            'murabbik smart alert acknowledge failed',
+            e
+          );
+        }
+      }
+    );
+
+  actions.appendChild(
+    okButton
+  );
+
+  modal.appendChild(
+    actions
+  );
+
+  host.appendChild(
+    modal
+  );
 }
 
-modal.appendChild(actions);
-host.appendChild(modal);
-}
-function dashboardMurabbikUiAlert(alert = {}) {
-  const priority = String(
-    alert.priority || 'normal'
-  ).toLowerCase();
+function dashboardMurabbikUiAlert(
+  alert = {}
+) {
+  const priority =
+    String(
+      alert.priority ||
+      'normal'
+    ).toLowerCase();
 
   return {
     ...alert,
@@ -1654,14 +1802,17 @@ function dashboardMurabbikUiAlert(alert = {}) {
           ? 'warn'
           : 'info',
 
-   actionText:
-  alert?.action?.label || '',
+    actionText:
+      alert?.action?.label ||
+      '',
 
-actionUrl:
-  alert?.action?.url || '',
+    actionUrl:
+      alert?.action?.url ||
+      '',
 
-actionDisabled:
-  alert?.action?.type !== 'navigate'
+    actionDisabled:
+      alert?.action?.type !==
+      'navigate'
   };
 }
 
@@ -1752,108 +1903,32 @@ async function loadMurabbikSmartAlerts() {
  
   refreshDashboardSmartAlert();
 }
-async function loadOvsynchDashboardAlerts(){
-  try {
-    if (!currentUserId) return;
 
-    const r = await fetch(
-      API_BASE +
-        '/api/ovsynch/dashboard-alerts',
-      {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-store'
-        },
-        credentials: 'same-origin',
-        cache: 'no-store'
-      }
-    );
+// ============ تشغيل ============
+document.addEventListener(
+  'DOMContentLoaded',
+  async () => {
+    try {
+      await loadServerSession();
 
-    const data = await r
-      .json()
-      .catch(() => null);
+      await loadMurabbikSmartAlerts();
 
-    dashboardAlertSources.ovsynch =
-      Array.isArray(data?.alerts)
-        ? data.alerts
-        : [];
+      loadWeatherTHI();
+      loadHerdKPIs();
 
-  } catch (e) {
-    console.warn(
-      'ovsynch dashboard alerts failed',
-      e
-    );
+      setInterval(
+        loadMurabbikSmartAlerts,
+        60 * 1000
+      );
 
-    dashboardAlertSources.ovsynch = [];
+    } catch (e) {
+      console.warn(
+        'dashboard auth failed',
+        e
+      );
+    }
   }
-
-  refreshDashboardSmartAlert();
-}
-
-async function loadVaccinationDashboardAlerts(){
-  try {
-    if (!currentUserId) return;
-
-    const r = await fetch(
-      API_BASE +
-        '/api/vaccination/dashboard-alerts',
-      {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-store'
-        },
-        credentials: 'same-origin',
-        cache: 'no-store'
-      }
-    );
-
-    const data = await r
-      .json()
-      .catch(() => null);
-
-    dashboardAlertSources.vaccination =
-      Array.isArray(data?.alerts)
-        ? data.alerts
-        : [];
-
-  } catch (e) {
-    console.warn(
-      'vaccination dashboard alerts failed',
-      e
-    );
-
-    dashboardAlertSources.vaccination = [];
-  }
-
-  refreshDashboardSmartAlert();
-}
-  // ============ تشغيل ============
-document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    await loadServerSession();
-await loadSubscriptionUi();
-
-loadWeatherTHI();
-    loadHerdKPIs();
-    loadMurabbikSmartAlerts();
-    loadVaccinationDashboardAlerts();
-
-    setInterval(
-      loadMurabbikSmartAlerts,
-      60 * 1000
-    );
-
-    setInterval(
-      loadVaccinationDashboardAlerts,
-      10 * 60 * 1000
-    );
-
-  } catch (e) {
-    console.warn('dashboard auth failed', e);
-  }
-});
+);
 </script>
 
 
