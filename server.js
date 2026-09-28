@@ -84225,6 +84225,671 @@ function fertilityReportTrackedLossSrv({
     rows
   };
 }
+function fertilityReportBuffaloSeasonContextSrv({
+  species = "",
+  aiRows = []
+} = {}) {
+  const isBuffalo =
+    String(species || "")
+      .trim()
+      .toLowerCase() === "buffalo";
+
+  if (!isBuffalo) {
+    return {
+      applicable: false,
+      species: "cow"
+    };
+  }
+
+  const rows =
+    Array.isArray(aiRows)
+      ? aiRows
+      : [];
+
+  const monthOf = row => {
+    const month =
+      Number(
+        String(
+          row?.eventDate || ""
+        ).slice(5, 7)
+      );
+
+    return (
+      Number.isInteger(month) &&
+      month >= 1 &&
+      month <= 12
+    )
+      ? month
+      : null;
+  };
+
+  const summarize = list => {
+    const judged =
+      list.filter(
+        row =>
+          row?.outcome?.judged === true
+      );
+
+    const pregnancies =
+      judged.filter(
+        row =>
+          row?.outcome?.success === true
+      ).length;
+
+    return {
+      totalAi: list.length,
+      judged: judged.length,
+      pregnancies,
+
+      conceptionRatePct:
+        fertilityReportPctSrv(
+          pregnancies,
+          judged.length
+        )
+    };
+  };
+
+  // سياق مصري للجاموس:
+  // مايو–أكتوبر فترة حارة وأقل ملاءمة تناسليًا نسبيًا.
+  // نوفمبر–أبريل فترة أبرد وأكثر ملاءمة نسبيًا.
+  const hotRows =
+    rows.filter(row => {
+      const month = monthOf(row);
+
+      return (
+        month !== null &&
+        month >= 5 &&
+        month <= 10
+      );
+    });
+
+  const coolerRows =
+    rows.filter(row => {
+      const month = monthOf(row);
+
+      return (
+        month !== null &&
+        (
+          month >= 11 ||
+          month <= 4
+        )
+      );
+    });
+
+    const judgedWithThi =
+    rows.filter(row => {
+      const rawThi =
+        row?.thi?.value;
+
+      return (
+        row?.outcome?.judged === true &&
+        rawThi !== null &&
+        rawThi !== undefined &&
+        String(rawThi).trim() !== "" &&
+        Number.isFinite(Number(rawThi))
+      );
+    });
+  // مرجع تناسلي للجاموس فقط.
+  // لا يغيّر تصنيف THI العام في مُرَبِّيك.
+  const thiStressRows =
+    judgedWithThi.filter(
+      row =>
+        Number(
+          row?.thi?.value
+        ) >= 75
+    );
+
+  const thiBelowStressRows =
+    judgedWithThi.filter(
+      row =>
+        Number(
+          row?.thi?.value
+        ) < 75
+    );
+
+  const hotSeason =
+    summarize(hotRows);
+
+  const coolerSeason =
+    summarize(coolerRows);
+
+  const thiStress =
+    summarize(thiStressRows);
+
+  const thiBelowStress =
+    summarize(
+      thiBelowStressRows
+    );
+
+  const hotAiSharePct =
+    rows.length
+      ? fertilityReportPctSrv(
+          hotRows.length,
+          rows.length
+        )
+      : null;
+
+  let seasonRead =
+    "لا توجد تلقيحات كافية داخل الفترة لإصدار قراءة موسمية للجاموس.";
+
+  if (
+    hotSeason.judged > 0 &&
+    coolerSeason.judged > 0 &&
+    hotSeason.conceptionRatePct !== null &&
+    coolerSeason.conceptionRatePct !== null
+  ) {
+    seasonRead =
+      hotSeason.conceptionRatePct <
+      coolerSeason.conceptionRatePct
+        ? `في بيانات التقرير، الإخصاب المقيم في مايو–أكتوبر ${hotSeason.conceptionRatePct}% مقابل ${coolerSeason.conceptionRatePct}% في نوفمبر–أبريل؛ هذا اتجاه وصفي يتفق مع موسمية الجاموس ولا يثبت السبب منفردًا.`
+        : "في البيانات الحالية لا يظهر انخفاض موسمي واضح في الإخصاب خلال مايو–أكتوبر مقارنة بنوفمبر–أبريل؛ لا يُنسب أي ضعف للموسم دون دليل إضافي.";
+
+  } else if (hotSeason.totalAi > 0) {
+
+    seasonRead =
+      `يوجد ${hotSeason.totalAi} تلقيحًا في مايو–أكتوبر داخل نافذة التقرير${hotAiSharePct !== null ? ` (${hotAiSharePct}% من التلقيحات)` : ""}؛ يجب تفسير مؤشرات الجاموس مع هذا السياق الموسمي وعدم مساواتها تلقائيًا بقراءة الأبقار.`;
+
+  } else if (coolerSeason.totalAi > 0) {
+
+    seasonRead =
+      "التلقيحات المسجلة في نافذة التقرير تقع أساسًا في نوفمبر–أبريل، وهي الفترة الأبرد والأكثر ملاءمة نسبيًا لتناسل الجاموس في الظروف المصرية.";
+  }
+
+  let heatStressRead =
+    "لا توجد قراءات THI كافية عند التلقيح لربط الخصوبة بالإجهاد الحراري تاريخيًا.";
+
+  if (
+    thiStress.judged > 0 &&
+    thiBelowStress.judged > 0 &&
+    thiStress.conceptionRatePct !== null &&
+    thiBelowStress.conceptionRatePct !== null
+  ) {
+    heatStressRead =
+      thiStress.conceptionRatePct <
+      thiBelowStress.conceptionRatePct
+        ? `الإخصاب المقيم عند THI ≥ 75 بلغ ${thiStress.conceptionRatePct}% مقابل ${thiBelowStress.conceptionRatePct}% عند THI أقل من 75؛ يوجد اتجاه وصفي يدعم اعتبار الإجهاد الحراري عاملًا ضاغطًا في هذه البيانات.`
+        : "لا يظهر في البيانات الحالية انخفاض في الإخصاب عند THI ≥ 75 مقارنة بالقراءات الأقل؛ لا يُحمَّل الإجهاد الحراري مسؤولية ضعف الخصوبة دون دليل آخر.";
+
+  } else if (thiStress.judged > 0) {
+
+    heatStressRead =
+      `يوجد ${thiStress.judged} حالة تلقيح مقيمة عند THI ≥ 75؛ تُقرأ كتعرض لضغط حراري تناسلي محتمل، لكن لا توجد مجموعة مقارنة كافية داخل الفترة.`;
+
+  } else if (judgedWithThi.length > 0) {
+
+    heatStressRead =
+      "الحالات المقيمة التي تحمل قراءة THI في هذه الفترة لم تصل إلى 75؛ لا توجد إشارة تاريخية من THI وحده إلى ضغط حراري تناسلي واضح.";
+  }
+
+  return {
+    applicable: true,
+    species: "buffalo",
+
+    reproductiveThiThreshold: 75,
+
+    seasonModel: {
+      hotMonths: "مايو–أكتوبر",
+      coolerMonths: "نوفمبر–أبريل"
+    },
+
+    hotSeason,
+    coolerSeason,
+    hotAiSharePct,
+
+    thiAtInsemination: {
+      knownJudged:
+        judgedWithThi.length,
+
+      stress:
+        thiStress,
+
+      belowStress:
+        thiBelowStress
+    },
+
+    seasonRead,
+    heatStressRead,
+
+    summary:
+      `${seasonRead} ${heatStressRead}`
+  };
+}
+
+
+function fertilityReportApplyBuffaloContextSrv(
+  baseReport = {},
+  context = {}
+) {
+  if (!context?.applicable) {
+    return baseReport;
+  }
+
+  const indicators =
+    (
+      Array.isArray(
+        baseReport.indicators
+      )
+        ? baseReport.indicators
+        : []
+    ).map(item => {
+
+      const row =
+        { ...item };
+
+      if (
+        row.key ===
+          "pregnancy_rate_21d" &&
+        (
+          row.status === "warn" ||
+          row.status === "danger"
+        )
+      ) {
+        row.advice =
+          "في الجاموس لا تُقرأ قيمة معدل الحمل 21 يوم بمعزل عن الموسم وTHI؛ راجع السياق الموسمي والحراري قبل الحكم على كشف الشياع أو كفاءة التلقيح.";
+      }
+
+      if (
+        row.key ===
+          "heat_detection_rate" &&
+        (
+          row.status === "warn" ||
+          row.status === "danger"
+        )
+      ) {
+        row.advice =
+          "معدل رصد الشياع منخفض/يحتاج متابعة في الجاموس؛ ضعف إظهار الشياع قد يزداد في الفترة الحارة، لذلك قارن الموسم وTHI أولًا ثم قيّم انتظام الملاحظة والتسجيل.";
+      }
+
+      if (
+        row.key ===
+          "first_service_conception" &&
+        (
+          row.status === "warn" ||
+          row.status === "danger"
+        )
+      ) {
+        row.advice =
+          "في الجاموس راجع موسم التلقيح وTHI مع جاهزية الحيوان وفحص الرحم والحالة الجسمية قبل تفسير انخفاض نجاح أول تلقيحة.";
+      }
+
+      if (
+        row.key ===
+          "overall_conception" &&
+        (
+          row.status === "warn" ||
+          row.status === "danger"
+        )
+      ) {
+        row.advice =
+          "الإخصاب منخفض/يحتاج متابعة في الجاموس؛ افصل نتائج مايو–أكتوبر عن نوفمبر–أبريل، وافصل التلقيحات عند THI ≥ 75 عن القراءات الأقل، ثم راجع التوقيت والسائل والملقحين.";
+      }
+
+      if (
+        row.key ===
+          "days_open" &&
+        (
+          row.status === "warn" ||
+          row.status === "danger"
+        )
+      ) {
+        row.advice =
+          "الأيام المفتوحة مرتفعة/تحتاج متابعة في الجاموس؛ راجع مقدار التأخر الذي وقع خلال الفترة الحارة أو تحت THI مرتفع قبل نسب المشكلة لعامل إداري واحد.";
+      }
+
+      return row;
+    });
+
+
+  const bottlenecks =
+    (
+      Array.isArray(
+        baseReport.bottlenecks
+      )
+        ? baseReport.bottlenecks
+        : []
+    ).map(item => {
+
+      const row =
+        { ...item };
+
+      if (
+        row.key ===
+        "heat_detection_bottleneck"
+      ) {
+        row.read =
+          `الإخصاب مقبول لكن معدل الحمل 21 يوم منخفض. في الجاموس لا يُفسَّر ذلك كضعف رصد فقط؛ ${context.summary}`;
+      }
+
+      if (
+        row.key ===
+        "conception_bottleneck"
+      ) {
+        row.read =
+          `رصد الشياع ليس نقطة الضعف الأكبر، لكن الإخصاب منخفض في الجاموس. ${context.summary}`;
+      }
+
+      if (
+        row.key ===
+        "first_service_bottleneck"
+      ) {
+        row.read =
+          `انخفاض نجاح أول تلقيحة في الجاموس يحتاج قراءة الجاهزية مع الموسم وTHI، وليس توقيت التلقيح وحده. ${context.summary}`;
+      }
+
+      return row;
+    })
+    .filter(
+      row =>
+        row.key !==
+        "heat_stress_pressure"
+    );
+
+  const stressJudged =
+    Number(
+      context
+        ?.thiAtInsemination
+        ?.stress
+        ?.judged || 0
+    );
+
+  const stressCr =
+    context
+      ?.thiAtInsemination
+      ?.stress
+      ?.conceptionRatePct;
+
+
+  const hasBuffaloHeatPressure =
+    stressJudged > 0 &&
+    stressCr !== null &&
+    Number.isFinite(
+      Number(stressCr)
+    ) &&
+    Number(stressCr) < 35;
+
+
+  if (
+    hasBuffaloHeatPressure &&
+    !bottlenecks.some(
+      row =>
+        row.key ===
+        "heat_stress_pressure"
+    )
+  ) {
+    bottlenecks.push({
+      key:
+        "heat_stress_pressure",
+
+      title:
+        "عامل ضاغط محتمل: الإجهاد الحراري في الجاموس",
+
+      read:
+        `يوجد انخفاض مسجل في الإخصاب عند THI ≥ 75 داخل بيانات الجاموس. ${context.heatStressRead}`,
+
+      weight: 70
+    });
+  }
+
+
+  bottlenecks.sort(
+    (a, b) =>
+      Number(b.weight || 0) -
+      Number(a.weight || 0)
+  );
+
+
+  const mainBottleneck =
+    bottlenecks[0] ||
+    baseReport.mainBottleneck;
+
+
+  const recommendations =
+    [
+      `سياق الجاموس: ${context.summary}`,
+
+      ...(
+        Array.isArray(
+          baseReport.recommendations
+        )
+          ? baseReport.recommendations.filter(
+              text =>
+                !String(
+                  text || ""
+                ).startsWith(
+                  "الأولوية الفنية:"
+                )
+            )
+          : []
+      )
+    ];
+
+
+  if (
+    mainBottleneck?.key ===
+    "heat_detection_bottleneck"
+  ) {
+
+    recommendations.push(
+      "الأولوية الفنية: فرّق بين ضعف رصد الشياع الحقيقي وبين ضعف إظهار الشياع الموسمي في الجاموس؛ قارن النتائج حسب الموسم وTHI قبل تغيير السائل أو الحكم على الملقحين."
+    );
+
+  } else if (
+    mainBottleneck?.key ===
+    "conception_bottleneck"
+  ) {
+
+    recommendations.push(
+      "الأولوية الفنية: افصل نتائج الجاموس في مايو–أكتوبر عن نوفمبر–أبريل، وافصل THI ≥ 75 عن القراءات الأقل، ثم راجع توقيت التلقيح والسائل والملقحين."
+    );
+
+  } else if (
+    mainBottleneck?.key ===
+    "first_service_bottleneck"
+  ) {
+
+    recommendations.push(
+      "الأولوية الفنية: راجع جاهزية أول تلقيحة في الجاموس مع الموسم وTHI وفحص الرحم والحالة الجسمية."
+    );
+
+  } else if (
+    mainBottleneck?.key ===
+    "heat_stress_pressure"
+  ) {
+
+    recommendations.push(
+      "الأولوية الفنية: افصل نتائج التلقيحات عند THI ≥ 75 عن القراءات الأقل مع مراعاة الموسم قبل تقييم الملقحين أو السائل."
+    );
+  }
+
+
+  return {
+    ...baseReport,
+
+    headline:
+      `تقييم مُرَبِّيك لحالة خصوبة الجاموس: ${baseReport.overallRating || "قراءة تحتاج متابعة"}.`,
+
+    speciesContext:
+      context,
+
+    mainBottleneck,
+    indicators,
+    bottlenecks,
+    recommendations
+  };
+}
+
+
+function fertilityReportBuffaloCurrentThiAdviceSrv(
+  weather = null,
+  todayISO = ""
+) {
+  const thi =
+    Number(
+      weather?.thi
+    );
+
+  const tempC =
+    Number(
+      weather?.tempC
+    );
+
+  const humidity =
+    Number(
+      weather?.humidity
+    );
+
+  const status =
+    weather?.status ||
+    classifyTHI(thi);
+
+  const month =
+    Number(
+      String(todayISO || "")
+        .slice(5, 7)
+    );
+
+  const hotSeason =
+    Number.isInteger(month) &&
+    month >= 5 &&
+    month <= 10;
+
+
+  const current = {
+    available:
+      Number.isFinite(thi),
+
+    thi:
+      Number.isFinite(thi)
+        ? Math.round(thi)
+        : null,
+
+    thiText:
+      Number.isFinite(thi)
+        ? String(
+            Math.round(thi)
+          )
+        : "--",
+
+    tempC:
+      Number.isFinite(tempC)
+        ? Math.round(tempC)
+        : null,
+
+    humidity:
+      Number.isFinite(humidity)
+        ? Math.round(humidity)
+        : null,
+
+    level:
+      String(
+        status?.level ||
+        "unknown"
+      ),
+
+    levelLabel:
+      status?.label ||
+      "غير متاح",
+
+    locationLabel:
+      weather?.locationLabel ||
+      "",
+
+    updatedAt:
+      weather?.updatedAt ||
+      "",
+
+    reproductiveHeatThreshold:
+      75,
+
+    reproductiveHeatPressure:
+      Number.isFinite(thi)
+        ? thi >= 75
+        : null,
+
+    buffaloSeason:
+      hotSeason
+        ? "hot"
+        : "cooler"
+  };
+
+
+  if (!Number.isFinite(thi)) {
+    return {
+      available: false,
+
+      title:
+        "THI الحالي ونصيحة توقيت التلقيح — جاموس",
+
+      summary:
+        "لا توجد قراءة THI حالية كافية. يظل السياق الموسمي للجاموس قائمًا، لكن لا يصدر مُرَبِّيك حكمًا حراريًا لحظيًا دون قراءة فعلية.",
+
+      current,
+
+      timingAdvice:
+        "اعتمد على توقيت الشياع المؤكد، واستكمل قراءة THI قبل ربط القرار بالإجهاد الحراري.",
+
+      actions: [
+        "تأكد من حفظ موقع المزرعة.",
+        "استمر في تسجيل توقيت الشياع والتلقيح.",
+        "لا تنسب انخفاض الخصوبة للحرارة دون قراءة THI فعلية."
+      ]
+    };
+  }
+
+
+  const seasonText =
+    hotSeason
+      ? "والتاريخ يقع ضمن مايو–أكتوبر، وهي الفترة الحارة والأقل ملاءمة تناسليًا نسبيًا للجاموس في الظروف المصرية."
+      : "والتاريخ يقع ضمن نوفمبر–أبريل، وهي الفترة الأبرد والأكثر ملاءمة تناسليًا نسبيًا للجاموس في الظروف المصرية.";
+
+
+  if (thi < 75) {
+    return {
+      available: true,
+
+      title:
+        "THI الحالي ونصيحة توقيت التلقيح — جاموس",
+
+      summary:
+        `THI الحالي ${Math.round(thi)} وهو أقل من مرجع الضغط الحراري التناسلي للجاموس (75). ${seasonText}`,
+
+      current,
+
+      timingAdvice:
+        "نفّذ التلقيح حسب توقيت الشياع المعتاد، مع عدم تفويت نافذة الشياع المؤكدة.",
+
+      actions: [
+        "استمر في تسجيل THI وقت التلقيح للمقارنة التاريخية.",
+        "اقرأ خصوبة الجاموس مع الموسم حتى لو كانت قراءة THI اللحظية مقبولة.",
+        "استمر في الظل والمياه والتهوية كإدارة أساسية."
+      ]
+    };
+  }
+
+
+  return {
+    available: true,
+
+    title:
+      "THI الحالي ونصيحة توقيت التلقيح — جاموس",
+
+    summary:
+      `THI الحالي ${Math.round(thi)} ووصل إلى أو تجاوز 75؛ يوجد ضغط حراري تناسلي محتمل على الجاموس. ${seasonText}`,
+
+    current,
+
+    timingAdvice:
+      "لا تُضيّع تلقيحة الشياع المؤكد، لكن نفّذها في أبرد نافذة ممكنة مع تقليل الانتظار والحركة وتوفير التبريد.",
+
+    actions: [
+      "فضّل الصباح المبكر أو المساء بما لا يضيّع توقيت الشياع.",
+      "برّد الحيوان ومنطقة الانتظار قبل التلقيح وبعده عند توفر الإمكانات.",
+      "قلّل المشي والزحام والوقوف الطويل.",
+      "افصل نتائج التلقيحات عند THI ≥ 75 عن القراءات الأقل قبل الحكم على الملقح أو السائل.",
+      "اقرأ النتيجة مع موسمية الجاموس، وليس THI وحده."
+    ]
+  };
+}
 function fertilityReportBuildExpertReportSrv({
   overallCr = null,
   firstServiceCr = null,
@@ -85283,7 +85948,15 @@ try {
   console.warn("fertility current THI failed:", e.message || e);
 }
 
-const fertilityThiAdvice = fertilityReportCurrentThiAdviceSrv(fertilityCurrentThiRaw);
+const fertilityThiAdvice =
+  groupSpecies === "buffalo"
+    ? fertilityReportBuffaloCurrentThiAdviceSrv(
+        fertilityCurrentThiRaw,
+        todayISO
+      )
+    : fertilityReportCurrentThiAdviceSrv(
+        fertilityCurrentThiRaw
+      );
    const overallStatus = fertilityReportKpiStatusSrv(overallCr, 35, "higher");
 const firstStatus = fertilityReportKpiStatusSrv(firstServiceCr, 40, "higher");
 
@@ -85338,21 +86011,55 @@ const pregnancyLossInfo =
 const abortionLossRateReport =
   pregnancyLossInfo.valuePct;
 
-const expertReport = fertilityReportBuildExpertReportSrv({
-  overallCr,
-  firstServiceCr,
-  pregnancyRate21d: pregnancyRate21Report,
-  pregnancyRate21Info: pr21Info,
-  heatDetectionRatePct: heatDetectionRateReport,
-  heatDetectionInfo,
-  servicesPerConception: servicesPerConceptionReport,
-  openDaysAvg: openDaysAvgReport,
-  daysOpenInfo,
-  abortionLossRatePct: abortionLossRateReport,
-  pregnancyLossInfo,
-  repeatBreederAnalysis,
-  thiGroups
-});
+const buffaloSeasonContext =
+  fertilityReportBuffaloSeasonContextSrv({
+    species: groupSpecies,
+    aiRows
+  });
+
+
+const baseExpertReport =
+  fertilityReportBuildExpertReportSrv({
+    overallCr,
+    firstServiceCr,
+
+    pregnancyRate21d:
+      pregnancyRate21Report,
+
+    pregnancyRate21Info:
+      pr21Info,
+
+    heatDetectionRatePct:
+      heatDetectionRateReport,
+
+    heatDetectionInfo,
+
+    servicesPerConception:
+      servicesPerConceptionReport,
+
+    openDaysAvg:
+      openDaysAvgReport,
+
+    daysOpenInfo,
+
+    abortionLossRatePct:
+      abortionLossRateReport,
+
+    pregnancyLossInfo,
+
+    repeatBreederAnalysis,
+
+    thiGroups
+  });
+
+
+const expertReport =
+  groupSpecies === "buffalo"
+    ? fertilityReportApplyBuffaloContextSrv(
+        baseExpertReport,
+        buffaloSeasonContext
+      )
+    : baseExpertReport;
 
 const headline = expertReport.headline;
 
