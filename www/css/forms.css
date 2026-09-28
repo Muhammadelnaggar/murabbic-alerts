@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2:wght@700&display=swap');
 /* ========= Murabbik Form Styles ========= */
 
 :root{
@@ -6099,6 +6100,48 @@ body[data-page="dashboard"] .mbk-smart-alert-later:focus-visible{
 @media(prefers-reduced-motion:reduce){
   body[data-page="dashboard"] .mbk-smart-alert{
     animation:none;
+  }
+}
+/* Daily greeting — Baloo / morning gold / evening blue */
+body[data-page="dashboard"]
+.mbk-smart-alert[data-alert-code="daily_farm_greeting"]
+.mbk-smart-alert-title{
+  font-family:"Baloo Bhaijaan 2","Cairo",system-ui,sans-serif;
+  font-size:24px;
+  font-weight:700;
+  line-height:1.25;
+}
+
+body[data-page="dashboard"]
+.mbk-smart-alert[data-alert-code="daily_farm_greeting"][data-greeting-period="morning"]
+.mbk-smart-alert-title{
+  color:#b7791f;
+}
+
+body[data-page="dashboard"]
+.mbk-smart-alert[data-alert-code="daily_farm_greeting"][data-greeting-period="evening"]
+.mbk-smart-alert-title{
+  color:#2563eb;
+}
+
+body[data-page="dashboard"]
+.mbk-smart-alert[data-alert-code="daily_farm_greeting"]
+.mbk-smart-alert-actions{
+  grid-template-columns:1fr;
+}
+
+body[data-page="dashboard"]
+.mbk-smart-alert[data-alert-code="daily_farm_greeting"]
+.mbk-smart-alert-ok{
+  max-width:280px;
+  justify-self:center;
+}
+
+@media(max-width:480px){
+  body[data-page="dashboard"]
+  .mbk-smart-alert[data-alert-code="daily_farm_greeting"]
+  .mbk-smart-alert-title{
+    font-size:21px;
   }
 }
 body[data-page="dashboard"] .logout-floating{
