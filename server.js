@@ -80856,9 +80856,6 @@ murabbikSmartAlertRegisterSourceSrv(
 const MURABBIK_DAILY_GREETING_SOURCE_NAME =
   "daily_farm_greeting";
 
-const MURABBIK_DAILY_GREETING_SNOOZE_MINUTES =
-  60;
-
 async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
   context
 ) {
@@ -80919,11 +80916,6 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
       ? "صباح الخير"
       : "مساء الخير";
 
-  const icon =
-    period === "morning"
-      ? "🌤️"
-      : "🌙";
-
   const cheerfulLine =
     weatherGreetingCheerfulLineSrv(
       today,
@@ -80940,34 +80932,34 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
     );
 
   const thiRaw =
-    weather?.thi;
+  weather?.thi;
 
-  const tempRaw =
-    weather?.tempC;
+const tempRaw =
+  weather?.tempC;
 
-  const humidityRaw =
-    weather?.humidity;
+const humidityRaw =
+  weather?.humidity;
 
-  const thi =
-    thiRaw === null ||
-    thiRaw === undefined ||
-    thiRaw === ""
-      ? NaN
-      : Number(thiRaw);
+const thi =
+  thiRaw === null ||
+  thiRaw === undefined ||
+  thiRaw === ""
+    ? NaN
+    : Number(thiRaw);
 
-  const tempC =
-    tempRaw === null ||
-    tempRaw === undefined ||
-    tempRaw === ""
-      ? NaN
-      : Number(tempRaw);
+const tempC =
+  tempRaw === null ||
+  tempRaw === undefined ||
+  tempRaw === ""
+    ? NaN
+    : Number(tempRaw);
 
-  const humidity =
-    humidityRaw === null ||
-    humidityRaw === undefined ||
-    humidityRaw === ""
-      ? NaN
-      : Number(humidityRaw);
+const humidity =
+  humidityRaw === null ||
+  humidityRaw === undefined ||
+  humidityRaw === ""
+    ? NaN
+    : Number(humidityRaw);
 
   const hasThi =
     Number.isFinite(thi);
@@ -80984,6 +80976,11 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
           severity: 0
         };
 
+  const level =
+    murabbikSmartAlertTextSrv(
+      status?.level
+    ).toLowerCase();
+
   const instructions =
     weather?.instructions ||
     buildThiInstructionsSrv(
@@ -80991,39 +80988,53 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
       status
     );
 
-  const weatherLine =
-    hasThi
-      ? [
-          `THI ${Math.round(thi)}`,
-          `(${status?.label || "غير متاح"})`,
+  const climateLine =
+  !hasThi
+    ? "خلّينا نبدأ اليوم بهدوء، وهنحدّث قراءة THI أول ما تتوفر."
+    : level === "comfort"
+      ? "الجو النهارده مريح للقطيع، حافظ على الروتين الجيد للمياه والتهوية."
+      : level === "mild"
+        ? "الجو النهارده فيه إجهاد حراري بسيط، وشوية عناية بالمياه والتهوية تساعد القطيع يفضل مرتاح."
+        : level === "moderate"
+          ? "الجو النهارده فيه إجهاد حراري متوسط، والقطيع محتاج عناية إضافية."
+          : "الجو النهارده فيه إجهاد حراري عالي، والقطيع محتاج عناية إضافية.";
 
-          Number.isFinite(tempC)
-            ? `الحرارة ${Math.round(tempC)}°م`
-            : "",
+const weatherLine =
+  hasThi
+    ? [
+        `THI اليوم: ${Math.round(thi)}`,
+        status?.label || "غير متاح",
 
-          Number.isFinite(humidity)
-            ? `الرطوبة ${Math.round(humidity)}%`
-            : ""
-        ]
-          .filter(Boolean)
-          .join(" — ")
-      : "قراءة THI غير متاحة حاليًا.";
+        Number.isFinite(tempC)
+          ? `الحرارة: ${Math.round(tempC)}°م`
+          : "",
 
-  const adviceSummary =
-    murabbikSmartAlertTextSrv(
-      instructions?.summary
-    );
+        Number.isFinite(humidity)
+          ? `الرطوبة: ${Math.round(humidity)}%`
+          : ""
+      ]
+        .filter(Boolean)
+        .join(" — ")
+    : "";
 
   const adviceActions =
-    Array.isArray(
-      instructions?.actions
+    (
+      Array.isArray(
+        instructions?.actions
+      )
+        ? instructions.actions
+        : []
     )
-      ? instructions.actions
-          .map(
-            murabbikSmartAlertTextSrv
-          )
-          .filter(Boolean)
-      : [];
+      .map(
+        murabbikSmartAlertTextSrv
+      )
+      .filter(Boolean)
+      .slice(0, 3);
+
+  const adviceText =
+    adviceActions.length
+      ? `نصيحة مُرَبِّيك لليوم:\n• ${adviceActions.join("\n• ")}`
+      : "";
 
   return [{
     identityKey:
@@ -81053,37 +81064,43 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
         : "data_gap",
 
     status:
-      "daily",
+      period,
 
     title:
-      `${greeting} ${icon} — ${farmName}`,
+      `${greeting} — ${farmName}`,
 
     message:
-      `${cheerfulLine} ${weatherLine}`,
-
+  [
+    cheerfulLine,
+    climateLine,
+    weatherLine
+  ]
+    .filter(Boolean)
+    .join("\n"),
     details: {
       observation:
-        adviceSummary,
+        adviceText,
 
       meaning:
         "",
 
       recommendation:
-        adviceActions.join(" "),
+        "",
 
       evidence:
         hasThi
           ? [
-              `THI=${Math.round(thi)}`,
+    `THI=${Math.round(thi)}`,
+    `status=${status?.label || ""}`,
 
-              Number.isFinite(tempC)
-                ? `temperatureC=${Math.round(tempC)}`
-                : "",
+    Number.isFinite(tempC)
+      ? `temperatureC=${Math.round(tempC)}`
+      : "",
 
-              Number.isFinite(humidity)
-                ? `humidity=${Math.round(humidity)}`
-                : ""
-            ].filter(Boolean)
+    Number.isFinite(humidity)
+      ? `humidity=${Math.round(humidity)}`
+      : ""
+  ].filter(Boolean)
           : []
     },
 
@@ -81105,8 +81122,10 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
         ""
     },
 
+    // مطلوب داخليًا من عقد Smart Alerts فقط.
+    // تحية المستخدم لا تعرض "ذكّرني لاحقًا".
     snoozeMinutes:
-      MURABBIK_DAILY_GREETING_SNOOZE_MINUTES
+      60
   }];
 }
 
