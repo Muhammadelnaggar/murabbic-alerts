@@ -4794,263 +4794,17 @@ function weatherGreetingCheerfulLineSrv(
   ];
 }
 
-function weatherGreetingFocusSrv(
-  thi,
-  status = {}
-) {
-  const n = Number(thi);
 
-  const level =
-    String(
-      status?.level || ""
-    ).trim();
-
-  if (!Number.isFinite(n)) {
-    return [];
-  }
-
-  if (
-    n < 68 ||
-    level === "comfort"
-  ) {
-    return [
-      "المياه",
-      "المأكول",
-      "الاجترار",
-      "اللبن"
-    ];
-  }
-
-  return [
-    "المادة الجافة",
-    "المياه",
-    "اللبن ومكوناته",
-    "الكرش",
-    "الخصوبة",
-    "التنفس والراحة"
-  ];
-}
-
-function weatherDailyGreetingCardSrv({
-  farmName = "",
-  timeZone = "UTC",
-  today = "",
-  weather = null,
-  needsFarmLocation = false,
-  message = ""
-} = {}) {
-  const hour =
-    weatherHourInTimeZoneSrv(
-      timeZone,
-      new Date()
-    );
-
-  const period =
-    Number.isInteger(hour) &&
-    hour >= 5 &&
-    hour < 12
-      ? "morning"
-      : "evening";
-
-  const greeting =
-    period === "evening"
-      ? "مساء الخير"
-      : "صباح الخير";
-
-  const icon =
-    period === "evening"
-      ? "🌙"
-      : "🌤️";
-
-  const farmLabel =
-    String(
-      farmName || "مزرعتك"
-    ).trim() || "مزرعتك";
-
-  const thiRaw = weather?.thi;
-  const tempCRaw = weather?.tempC;
-  const humidityRaw = weather?.humidity;
-
-  const thi =
-    thiRaw === null ||
-    thiRaw === undefined ||
-    thiRaw === ""
-      ? NaN
-      : Number(thiRaw);
-
-  const tempC =
-    tempCRaw === null ||
-    tempCRaw === undefined ||
-    tempCRaw === ""
-      ? NaN
-      : Number(tempCRaw);
-
-  const humidity =
-    humidityRaw === null ||
-    humidityRaw === undefined ||
-    humidityRaw === ""
-      ? NaN
-      : Number(humidityRaw);
-
-  const status =
-    weather?.status || {};
-
-  const instructions =
-    weather?.instructions ||
-    weather?.thiInstructions ||
-    null;
-
-  const actions =
-    Array.isArray(
-      instructions?.actions
-    )
-      ? instructions.actions
-          .map(v =>
-            String(v || "").trim()
-          )
-          .filter(Boolean)
-      : [];
-
-  const severity =
-    Number(status?.severity);
-
-  return {
-    version:
-      "murabbik_daily_greeting_v1",
-
-    greeting,
-    icon,
-
-    farmName:
-      farmLabel,
-
-    cheerfulLine:
-      weatherGreetingCheerfulLineSrv(
-        today,
-        period
-      ),
-
-    period,
-    today,
-    timeZone,
-
-    available:
-      Number.isFinite(thi),
-
-    thi:
-      Number.isFinite(thi)
-        ? Math.round(thi)
-        : null,
-
-    tempC:
-      Number.isFinite(tempC)
-        ? Math.round(tempC)
-        : null,
-
-    humidity:
-      Number.isFinite(humidity)
-        ? Math.round(humidity)
-        : null,
-
-    statusLabel:
-      String(
-        status?.label ||
-        message ||
-        "غير متاح"
-      ).trim(),
-
-    severity:
-      Number.isFinite(severity)
-        ? severity
-        : 0,
-
-    adviceTitle:
-      "نصيحة مُرَبِّيك لليوم",
-
-    adviceText:
-      needsFarmLocation
-        ? "حدّد موقع المزرعة مرة واحدة ليبدأ مُرَبِّيك قراءة THI وربط الطقس بتأثيره على القطيع."
-        : String(
-            instructions?.summary ||
-            message ||
-            "لا توجد توصية مناخية متاحة الآن."
-          ).trim(),
-
-    focus:
-      needsFarmLocation
-        ? []
-        : weatherGreetingFocusSrv(
-            thi,
-            status
-          ),
-
-    actions:
-      needsFarmLocation
-        ? []
-        : actions,
-
-    expandDetails:
-      Number.isFinite(severity) &&
-      severity >= 2,
-
-    needsFarmLocation:
-      needsFarmLocation === true
-  };
-}
+// ============================================================
+//                  API: WEATHER / THI
+// ============================================================
 // ============================================================
 //                  API: WEATHER / THI
 // ============================================================
 app.get('/api/weather/thi', requireUserId, async (req, res) => {
   try {
-    const profileUid =
-      req.authSession?.uid ||
-      req.userId ||
-      "";
-
-    const farmClock =
-      await farmTimeContextSrv(
-        profileUid
-      );
-
-    const farmTimeZone =
-      String(
-        farmClock?.timeZone ||
-        "UTC"
-      ).trim() || "UTC";
-
-    const today =
-      farmDateISOInTimeZoneSrv(
-        farmTimeZone
-      ) ||
-      new Date()
-        .toISOString()
-        .slice(0, 10);
-
-    const farmName =
-      String(
-        req.authSession?.user?.farmName ||
-        req.authSession?.user?.farm ||
-        "مزرعتك"
-      ).trim() ||
-      "مزرعتك";
-
-    const greetingCard = (
-      weather,
-      extra = {}
-    ) =>
-      weatherDailyGreetingCardSrv({
-        farmName,
-        timeZone:
-          farmTimeZone,
-        today,
-        weather,
-        ...extra
-      });
-
-    const resolvedLocation =
-      await weatherResolveFarmLocationSrv(
-        profileUid
-      );
+    const profileUid = req.authSession?.uid || req.userId || "";
+    const resolvedLocation = await weatherResolveFarmLocationSrv(profileUid);
 
     if (
       !resolvedLocation ||
@@ -5085,15 +4839,6 @@ app.get('/api/weather/thi', requireUserId, async (req, res) => {
 
         source:
           "farm-location-required",
-
-        greetingCard:
-          greetingCard(
-            null,
-            {
-              needsFarmLocation: true,
-              message
-            }
-          ),
 
         ui:
           weatherThiUiSrv({
@@ -5159,15 +4904,6 @@ app.get('/api/weather/thi', requireUserId, async (req, res) => {
         source:
           "weather-upstream-unavailable",
 
-        greetingCard:
-          greetingCard({
-            tempC: null,
-            humidity: null,
-            thi: null,
-            status,
-            instructions
-          }),
-
         locationSource:
           resolvedLocation.source ||
           "farm_location",
@@ -5212,9 +4948,6 @@ app.get('/api/weather/thi', requireUserId, async (req, res) => {
       message,
 
       ...data,
-
-      greetingCard:
-        greetingCard(data),
 
       ui:
         weatherThiUiSrv({
@@ -5289,31 +5022,6 @@ app.get('/api/weather/thi', requireUserId, async (req, res) => {
 
       lat: null,
       lon: null,
-
-      greetingCard:
-        weatherDailyGreetingCardSrv({
-          farmName:
-            req.authSession?.user?.farmName ||
-            "مزرعتك",
-
-          timeZone:
-            "UTC",
-
-          today:
-            new Date()
-              .toISOString()
-              .slice(0, 10),
-
-          weather: {
-            tempC: null,
-            humidity: null,
-            thi: null,
-            status,
-            instructions
-          },
-
-          message
-        }),
 
       ui:
         weatherThiUiSrv({
@@ -75155,7 +74863,11 @@ app.post('/api/events', requireUserId, async (req, res) => {
 //          عقد نواة تنبيهات مُرَبِّيك الذكية
 // ============================================================
 
-const MURABBIK_SMART_ALERT_KIND_RANK = { operational: 0, technical: 1 };
+const MURABBIK_SMART_ALERT_KIND_RANK = {
+  operational: 0,
+  technical: 1,
+  informational: 2
+};
 const MURABBIK_SMART_ALERT_PRIORITY_RANK = { urgent: 0, high: 1, normal: 2, low: 3 };
 const MURABBIK_SMART_ALERT_URGENCY_RANK = { now: 0, today: 1, soon: 2, review: 3 };
 const MURABBIK_SMART_ALERT_CERTAINTY = new Set([
@@ -75285,6 +74997,16 @@ function murabbikSmartAlertNormalizeSrv(sourceName, raw = {}) {
 }
 
 function murabbikSmartAlertCompareSrv(a, b) {
+  const aDailyGreeting =
+    a.code === "daily_farm_greeting"
+      ? 0
+      : 1;
+
+  const bDailyGreeting =
+    b.code === "daily_farm_greeting"
+      ? 0
+      : 1;
+
   const aUrgentNow =
     a.priority === "urgent" &&
     a.urgency === "now"
@@ -75298,6 +75020,8 @@ function murabbikSmartAlertCompareSrv(a, b) {
       : 1;
 
   return (
+    aDailyGreeting - bDailyGreeting ||
+
     aUrgentNow - bUrgentNow ||
 
     (MURABBIK_SMART_ALERT_KIND_RANK[a.kind] ?? 99) -
@@ -81123,6 +80847,272 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
 murabbikSmartAlertRegisterSourceSrv(
   "ovsynch_protocol_steps",
   murabbikOvsynchStepSmartAlertSourceSrv
+);
+// ============================================================
+//      SMART ALERT SOURCE: DAILY FARM GREETING + THI
+//      أول تنبيه ذكي عند فتح مُرَبِّيك كل يوم
+// ============================================================
+
+const MURABBIK_DAILY_GREETING_SOURCE_NAME =
+  "daily_farm_greeting";
+
+const MURABBIK_DAILY_GREETING_SNOOZE_MINUTES =
+  60;
+
+async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
+  context
+) {
+  const profileUid =
+    murabbikSmartAlertTextSrv(
+      context?.profileUid
+    );
+
+  const today =
+    murabbikSmartAlertTextSrv(
+      context?.today
+    ).slice(0, 10);
+
+  if (
+    !profileUid ||
+    !calvingIsDateSrv(today)
+  ) {
+    return [];
+  }
+
+  const farmName =
+    murabbikSmartAlertTextSrv(
+      context?.req?.authSession?.user?.farmName ||
+      context?.req?.authSession?.user?.farm ||
+      "مزرعتك"
+    ) || "مزرعتك";
+
+  const farmClock =
+    await context.load(
+      "daily-greeting:farm-clock",
+      async () =>
+        await farmTimeContextSrv(
+          profileUid
+        )
+    );
+
+  const timeZone =
+    murabbikSmartAlertTextSrv(
+      farmClock?.timeZone ||
+      "UTC"
+    ) || "UTC";
+
+  const hour =
+    weatherHourInTimeZoneSrv(
+      timeZone,
+      new Date(context.nowMs)
+    );
+
+  const period =
+    Number.isInteger(hour) &&
+    hour >= 5 &&
+    hour < 12
+      ? "morning"
+      : "evening";
+
+  const greeting =
+    period === "morning"
+      ? "صباح الخير"
+      : "مساء الخير";
+
+  const icon =
+    period === "morning"
+      ? "🌤️"
+      : "🌙";
+
+  const cheerfulLine =
+    weatherGreetingCheerfulLineSrv(
+      today,
+      period
+    );
+
+  const weather =
+    await context.load(
+      "daily-greeting:weather-thi",
+      async () =>
+        await weatherBuildFarmThiSrv(
+          profileUid
+        )
+    );
+
+  const thiRaw =
+    weather?.thi;
+
+  const tempRaw =
+    weather?.tempC;
+
+  const humidityRaw =
+    weather?.humidity;
+
+  const thi =
+    thiRaw === null ||
+    thiRaw === undefined ||
+    thiRaw === ""
+      ? NaN
+      : Number(thiRaw);
+
+  const tempC =
+    tempRaw === null ||
+    tempRaw === undefined ||
+    tempRaw === ""
+      ? NaN
+      : Number(tempRaw);
+
+  const humidity =
+    humidityRaw === null ||
+    humidityRaw === undefined ||
+    humidityRaw === ""
+      ? NaN
+      : Number(humidityRaw);
+
+  const hasThi =
+    Number.isFinite(thi);
+
+  const status =
+    hasThi
+      ? (
+          weather?.status ||
+          classifyTHI(thi)
+        )
+      : {
+          level: "unknown",
+          label: "غير متاح",
+          severity: 0
+        };
+
+  const instructions =
+    weather?.instructions ||
+    buildThiInstructionsSrv(
+      hasThi ? thi : null,
+      status
+    );
+
+  const weatherLine =
+    hasThi
+      ? [
+          `THI ${Math.round(thi)}`,
+          `(${status?.label || "غير متاح"})`,
+
+          Number.isFinite(tempC)
+            ? `الحرارة ${Math.round(tempC)}°م`
+            : "",
+
+          Number.isFinite(humidity)
+            ? `الرطوبة ${Math.round(humidity)}%`
+            : ""
+        ]
+          .filter(Boolean)
+          .join(" — ")
+      : "قراءة THI غير متاحة حاليًا.";
+
+  const adviceSummary =
+    murabbikSmartAlertTextSrv(
+      instructions?.summary
+    );
+
+  const adviceActions =
+    Array.isArray(
+      instructions?.actions
+    )
+      ? instructions.actions
+          .map(
+            murabbikSmartAlertTextSrv
+          )
+          .filter(Boolean)
+      : [];
+
+  return [{
+    identityKey:
+      "daily-farm-greeting",
+
+    revisionKey:
+      today,
+
+    kind:
+      "informational",
+
+    domain:
+      "climate",
+
+    code:
+      "daily_farm_greeting",
+
+    priority:
+      "low",
+
+    urgency:
+      "today",
+
+    certainty:
+      hasThi
+        ? "confirmed"
+        : "data_gap",
+
+    status:
+      "daily",
+
+    title:
+      `${greeting} ${icon} — ${farmName}`,
+
+    message:
+      `${cheerfulLine} ${weatherLine}`,
+
+    details: {
+      observation:
+        adviceSummary,
+
+      meaning:
+        "",
+
+      recommendation:
+        adviceActions.join(" "),
+
+      evidence:
+        hasThi
+          ? [
+              `THI=${Math.round(thi)}`,
+
+              Number.isFinite(tempC)
+                ? `temperatureC=${Math.round(tempC)}`
+                : "",
+
+              Number.isFinite(humidity)
+                ? `humidity=${Math.round(humidity)}`
+                : ""
+            ].filter(Boolean)
+          : []
+    },
+
+    dueDate:
+      today,
+
+    affectedCount:
+      0,
+
+    animalNumbers:
+      [],
+
+    action: {
+      type:
+        "none",
+      label:
+        "",
+      url:
+        ""
+    },
+
+    snoozeMinutes:
+      MURABBIK_DAILY_GREETING_SNOOZE_MINUTES
+  }];
+}
+
+murabbikSmartAlertRegisterSourceSrv(
+  MURABBIK_DAILY_GREETING_SOURCE_NAME,
+  murabbikDailyFarmGreetingSmartAlertSourceSrv
 );
 async function murabbikSmartAlertCollectSrv(req) {
   const context = {
