@@ -2041,10 +2041,12 @@ function buildThiInstructionsSrv(thi, status = {}) {
   if (!Number.isFinite(n)) {
     return {
       title: 'تعليمات مُرَبِّيك للـ THI',
-      summary: 'قراءة الحرارة والرطوبة غير مكتملة؛ لا يتم إصدار توصية تشغيلية دقيقة من THI وحده الآن.',
+      summary:
+        'قراءة الحرارة والرطوبة غير مكتملة؛ لا يصدر مُرَبِّيك توصية مناخية دقيقة بدون قراءة THI صحيحة.',
       actions: [
-        'اعتمد على العلامات الحيوانية: اللهاث، تجمع الحيوانات، انخفاض المأكول، زيادة الوقوف، وانخفاض اللبن.',
-        'راجع التهوية والمياه خصوصًا وقت الظهيرة وساعات الانتظار قبل الحلب.'
+        'راقب العلامات الحيوانية مباشرة: اللهاث، تجمع الحيوانات، زيادة الوقوف، انخفاض المأكول أو الاجترار، وتراجع اللبن.',
+        'راجع المياه والتهوية والتظليل خصوصًا وقت الظهيرة وساعات الانتظار قبل الحلب.',
+        'تابع المأكول واللبن والاجترار ووضوح الشياع والخصوبة حتى تتوفر قراءة THI محدثة.'
       ],
       sourceLabel
     };
@@ -2053,11 +2055,12 @@ function buildThiInstructionsSrv(thi, status = {}) {
   if (n < 68 || level === 'comfort') {
     return {
       title: 'تعليمات مُرَبِّيك للـ THI',
-      summary: 'THI في نطاق مريح؛ لا توجد دلالة إجهاد حراري مؤثر حاليًا.',
+      summary:
+        'THI في نطاق مريح؛ لا توجد دلالة إجهاد حراري مؤثر حاليًا.',
       actions: [
-        'استمر على التهوية الطبيعية وتوفير مياه نظيفة كافية.',
-        'لا تعدّل العليقة بسبب THI وحده.',
-        'استمر في متابعة المأكول وبقايا العليقة كروتين يومي.'
+        'استمر على المياه النظيفة والتهوية المعتادة ومتابعة المأكول وبقايا العليقة.',
+        'تابع الاجترار واللبن ومكوناته وراحة الحيوانات كروتين يومي.',
+        'لا تغيّر العليقة أو برنامج التلقيح بسبب THI وحده ما دام القطيع في نطاق الراحة.'
       ],
       sourceLabel
     };
@@ -2066,12 +2069,14 @@ function buildThiInstructionsSrv(thi, status = {}) {
   if (n < 72 || level === 'mild') {
     return {
       title: 'تعليمات مُرَبِّيك للـ THI',
-      summary: 'بداية إجهاد حراري؛ الأبقار عالية الإنتاج قد تتأثر مبكرًا.',
+      summary:
+        'بداية إجهاد حراري؛ قد يبدأ تأثيره على الشهية والمادة الجافة والمياه واللبن ومكوناته والاجترار وصحة الكرش ووضوح الشياع والخصوبة والتنفس والراحة.',
       actions: [
-        'زِد مراقبة المأكول وبقايا العليقة خلال ساعات الحر.',
+        'زِد مراقبة المأكول وبقايا العليقة والاجترار خلال ساعات الحر.',
         'تأكد من توافر مياه باردة ونظيفة وسهلة الوصول.',
-        'شغّل مراوح التهوية في مناطق التغذية والانتظار إن وجدت.',
-        'ادفع العلف مرات أكثر للحفاظ على الإقبال وعدم سخونة العليقة.'
+        'شغّل مراوح التهوية في مناطق التغذية والانتظار والرقاد إن وجدت.',
+        'قدّم وادفع العلف بصورة أكبر في الأوقات الأبرد للحفاظ على الإقبال وتقليل سخونة العليقة.',
+        'راقب اللبن ومكوناته ووضوح الشياع والتلقيحات، مع أولوية للحلابات عالية الإنتاج والحديثة الولادة والعشار وقرب الولادة.'
       ],
       sourceLabel
     };
@@ -2080,13 +2085,15 @@ function buildThiInstructionsSrv(thi, status = {}) {
   if (n < 78 || level === 'moderate') {
     return {
       title: 'تعليمات مُرَبِّيك للـ THI',
-      summary: 'إجهاد حراري متوسط؛ متوقع انخفاض المأكول واللبن وزيادة ضغط الكرش.',
+      summary:
+        'إجهاد حراري متوسط؛ متوقع ضغط واضح على المادة الجافة والمياه واللبن ومكوناته والاجترار وصحة الكرش والخصوبة ووضوح الشياع والتنفس والراحة.',
       actions: [
         'فعّل التهوية القوية فوق المعالف ومناطق الانتظار والرقاد.',
         'استخدم الرش أو التبليل المتقطع مع تهوية جيدة لتبخير الماء من جسم الحيوان.',
-        'قدّم العليقة في الأوقات الأبرد وادفع العلف أكثر من مرة.',
-        'راجع المادة الجافة المأكولة وصحة الكرش قبل رفع المركزات.',
-        'راقب NDF والنشا والدهون حتى لا يتحول تعويض نقص المأكول إلى حماض.'
+        'قدّم العليقة في الأوقات الأبرد وادفع العلف أكثر من مرة خلال اليوم.',
+        'راجع المادة الجافة المأكولة وNDF والنشا والدهون وصحة الكرش قبل التفكير في رفع المركزات.',
+        'راقب اللبن ومكوناته والاجترار واللهاث والتنفس والوقوف والراحة ووضوح الشياع ونتائج التلقيح.',
+        'أعطِ أولوية للحلابات عالية الإنتاج والحديثة الولادة والعشار والحيوانات القريبة من الولادة.'
       ],
       sourceLabel
     };
@@ -2094,14 +2101,17 @@ function buildThiInstructionsSrv(thi, status = {}) {
 
   return {
     title: 'تعليمات مُرَبِّيك للـ THI',
-    summary: 'إجهاد حراري عالٍ؛ خطر واضح على المأكول والإنتاج وصحة الحيوان ويحتاج تدخل تبريد فوري.',
+    summary:
+      'إجهاد حراري عالٍ؛ خطر واضح على الشهية والمادة الجافة والمياه واللبن ومكوناته والاجترار وصحة الكرش والخصوبة ووضوح الشياع والتنفس والراحة ويحتاج تدخل تبريد فوري.',
     actions: [
-      'فعّل المراوح والرش/التبليل المتقطع في المعالف والانتظار فورًا.',
-      'قلّل حركة الحيوانات والعمل المجهد إلى أبرد وقت في اليوم.',
-      'راجع عدد نقاط الشرب وسرعة ملئها ونظافتها.',
-      'ادفع العليقة أكثر من مرة وركّز التقديم في الأوقات الأبرد.',
-      'لا ترفع الحبوب لتعويض نقص المأكول بدون مراجعة النشا وNDF وصحة الكرش.',
-      'تابع الحيوانات عالية الإنتاج والحديثة الولادة أولًا لأنها الأكثر حساسية للإجهاد.'
+      'فعّل المراوح والرش أو التبليل المتقطع في المعالف والانتظار والرقاد فورًا.',
+      'قلّل حركة الحيوانات والعمل المجهد إلى أبرد وقت في اليوم قدر الإمكان.',
+      'راجع عدد نقاط الشرب وسرعة امتلائها ونظافتها وسهولة وصول الحيوانات إليها.',
+      'قدّم وادفع العليقة أكثر في الأوقات الأبرد وراقب سخونة العليقة وبقاياها.',
+      'لا ترفع الحبوب لتعويض نقص المأكول بدون مراجعة النشا وNDF والدهون وصحة الكرش والاجترار.',
+      'راقب اللبن ومكوناته واللهاث والتنفس والوقوف والرقاد واعتبر أي هبوط مفاجئ إشارة تستحق المراجعة.',
+      'راقب وضوح الشياع ونتائج التلقيح والخصوبة، ونفّذ الإجراءات التناسلية المستحقة في الأوقات الأبرد قدر الإمكان دون تأخيرها.',
+      'ابدأ بالحلابات عالية الإنتاج والحديثة الولادة والعشار والحيوانات القريبة من الولادة لأنها الأكثر حساسية.'
     ],
     sourceLabel
   };
@@ -4711,16 +4721,346 @@ app.post(
   ensureAccountAdminClaimSrv,
   adminAccountStatusHandlerSrv
 );
+function weatherHourInTimeZoneSrv(
+  timeZone = "",
+  date = new Date()
+) {
+  const zone = String(timeZone || "").trim();
+
+  if (!zone) return null;
+
+  try {
+    const parts =
+      new Intl.DateTimeFormat(
+        "en-GB",
+        {
+          timeZone: zone,
+          hour: "2-digit",
+          hourCycle: "h23"
+        }
+      ).formatToParts(date);
+
+    const hour =
+      Number(
+        parts.find(
+          part => part.type === "hour"
+        )?.value
+      );
+
+    return Number.isInteger(hour)
+      ? hour
+      : null;
+
+  } catch (_) {
+    return null;
+  }
+}
+
+function weatherGreetingCheerfulLineSrv(
+  today = "",
+  period = "morning"
+) {
+  const morningLines = [
+    "يوم جديد ومُرَبِّيك صاحي معاك من أوله 💚",
+    "صباح النشاط… مُرَبِّيك متابع يوم المزرعة معاك 🌿",
+    "خلّينا نبدأ اليوم وإحنا مطمّنين على القطيع 🌤️",
+    "مُرَبِّيك سبقك يطمن على جو المزرعة والقطيع 💚"
+  ];
+
+  const eveningLines = [
+    "مُرَبِّيك لسه صاحي معاك وبيطمن على القطيع 🌙",
+    "مساء هادي… ومُرَبِّيك متابع يوم المزرعة لآخره 💚",
+    "قبل ما اليوم يخلص، خلّينا نطمن على ظروف القطيع 🌿",
+    "مُرَبِّيك معاك لآخر اليوم… نطمن على الجو والقطيع 🌙"
+  ];
+
+  const lines =
+    period === "evening"
+      ? eveningLines
+      : morningLines;
+
+  const seed =
+    String(today || "")
+      .replace(/\D/g, "")
+      .split("")
+      .reduce(
+        (sum, digit) =>
+          sum + Number(digit || 0),
+        0
+      );
+
+  return lines[
+    seed % lines.length
+  ];
+}
+
+function weatherGreetingFocusSrv(
+  thi,
+  status = {}
+) {
+  const n = Number(thi);
+
+  const level =
+    String(
+      status?.level || ""
+    ).trim();
+
+  if (!Number.isFinite(n)) {
+    return [];
+  }
+
+  if (
+    n < 68 ||
+    level === "comfort"
+  ) {
+    return [
+      "المياه",
+      "المأكول",
+      "الاجترار",
+      "اللبن"
+    ];
+  }
+
+  return [
+    "المادة الجافة",
+    "المياه",
+    "اللبن ومكوناته",
+    "الكرش",
+    "الخصوبة",
+    "التنفس والراحة"
+  ];
+}
+
+function weatherDailyGreetingCardSrv({
+  farmName = "",
+  timeZone = "UTC",
+  today = "",
+  weather = null,
+  needsFarmLocation = false,
+  message = ""
+} = {}) {
+  const hour =
+    weatherHourInTimeZoneSrv(
+      timeZone,
+      new Date()
+    );
+
+  const period =
+    Number.isInteger(hour) &&
+    hour >= 5 &&
+    hour < 12
+      ? "morning"
+      : "evening";
+
+  const greeting =
+    period === "evening"
+      ? "مساء الخير"
+      : "صباح الخير";
+
+  const icon =
+    period === "evening"
+      ? "🌙"
+      : "🌤️";
+
+  const farmLabel =
+    String(
+      farmName || "مزرعتك"
+    ).trim() || "مزرعتك";
+
+  const thiRaw = weather?.thi;
+  const tempCRaw = weather?.tempC;
+  const humidityRaw = weather?.humidity;
+
+  const thi =
+    thiRaw === null ||
+    thiRaw === undefined ||
+    thiRaw === ""
+      ? NaN
+      : Number(thiRaw);
+
+  const tempC =
+    tempCRaw === null ||
+    tempCRaw === undefined ||
+    tempCRaw === ""
+      ? NaN
+      : Number(tempCRaw);
+
+  const humidity =
+    humidityRaw === null ||
+    humidityRaw === undefined ||
+    humidityRaw === ""
+      ? NaN
+      : Number(humidityRaw);
+
+  const status =
+    weather?.status || {};
+
+  const instructions =
+    weather?.instructions ||
+    weather?.thiInstructions ||
+    null;
+
+  const actions =
+    Array.isArray(
+      instructions?.actions
+    )
+      ? instructions.actions
+          .map(v =>
+            String(v || "").trim()
+          )
+          .filter(Boolean)
+      : [];
+
+  const severity =
+    Number(status?.severity);
+
+  return {
+    version:
+      "murabbik_daily_greeting_v1",
+
+    greeting,
+    icon,
+
+    farmName:
+      farmLabel,
+
+    cheerfulLine:
+      weatherGreetingCheerfulLineSrv(
+        today,
+        period
+      ),
+
+    period,
+    today,
+    timeZone,
+
+    available:
+      Number.isFinite(thi),
+
+    thi:
+      Number.isFinite(thi)
+        ? Math.round(thi)
+        : null,
+
+    tempC:
+      Number.isFinite(tempC)
+        ? Math.round(tempC)
+        : null,
+
+    humidity:
+      Number.isFinite(humidity)
+        ? Math.round(humidity)
+        : null,
+
+    statusLabel:
+      String(
+        status?.label ||
+        message ||
+        "غير متاح"
+      ).trim(),
+
+    severity:
+      Number.isFinite(severity)
+        ? severity
+        : 0,
+
+    adviceTitle:
+      "نصيحة مُرَبِّيك لليوم",
+
+    adviceText:
+      needsFarmLocation
+        ? "حدّد موقع المزرعة مرة واحدة ليبدأ مُرَبِّيك قراءة THI وربط الطقس بتأثيره على القطيع."
+        : String(
+            instructions?.summary ||
+            message ||
+            "لا توجد توصية مناخية متاحة الآن."
+          ).trim(),
+
+    focus:
+      needsFarmLocation
+        ? []
+        : weatherGreetingFocusSrv(
+            thi,
+            status
+          ),
+
+    actions:
+      needsFarmLocation
+        ? []
+        : actions,
+
+    expandDetails:
+      Number.isFinite(severity) &&
+      severity >= 2,
+
+    needsFarmLocation:
+      needsFarmLocation === true
+  };
+}
 // ============================================================
 //                  API: WEATHER / THI
 // ============================================================
 app.get('/api/weather/thi', requireUserId, async (req, res) => {
   try {
-    const profileUid = req.authSession?.uid || req.userId || "";
-    const resolvedLocation = await weatherResolveFarmLocationSrv(profileUid);
+    const profileUid =
+      req.authSession?.uid ||
+      req.userId ||
+      "";
 
-    if (!resolvedLocation || !weatherValidCoordSrv(resolvedLocation.lat, resolvedLocation.lon)) {
-     const message = "📍 حدّد موقع المزرعة لتفعيل قراءة THI والتنبيهات المناخية.";
+    const farmClock =
+      await farmTimeContextSrv(
+        profileUid
+      );
+
+    const farmTimeZone =
+      String(
+        farmClock?.timeZone ||
+        "UTC"
+      ).trim() || "UTC";
+
+    const today =
+      farmDateISOInTimeZoneSrv(
+        farmTimeZone
+      ) ||
+      new Date()
+        .toISOString()
+        .slice(0, 10);
+
+    const farmName =
+      String(
+        req.authSession?.user?.farmName ||
+        req.authSession?.user?.farm ||
+        "مزرعتك"
+      ).trim() ||
+      "مزرعتك";
+
+    const greetingCard = (
+      weather,
+      extra = {}
+    ) =>
+      weatherDailyGreetingCardSrv({
+        farmName,
+        timeZone:
+          farmTimeZone,
+        today,
+        weather,
+        ...extra
+      });
+
+    const resolvedLocation =
+      await weatherResolveFarmLocationSrv(
+        profileUid
+      );
+
+    if (
+      !resolvedLocation ||
+      !weatherValidCoordSrv(
+        resolvedLocation.lat,
+        resolvedLocation.lon
+      )
+    ) {
+      const message =
+        "📍 حدّد موقع المزرعة لتفعيل قراءة THI والتنبيهات المناخية.";
 
       return res.json({
         ok: true,
@@ -4730,26 +5070,46 @@ app.get('/api/weather/thi', requireUserId, async (req, res) => {
         tempC: null,
         humidity: null,
         thi: null,
+
         status: {
           level: "unknown",
           label: "غير متاح",
           severity: 0
         },
+
         instructions: null,
         thiInstructions: null,
         thiRecommendations: null,
         recommendations: [],
         advice: "",
-        source: "farm-location-required",
-        ui: weatherThiUiSrv({
-          needsFarmLocation: true,
-          message
-        }),
-        updatedAt: new Date().toISOString()
+
+        source:
+          "farm-location-required",
+
+        greetingCard:
+          greetingCard(
+            null,
+            {
+              needsFarmLocation: true,
+              message
+            }
+          ),
+
+        ui:
+          weatherThiUiSrv({
+            needsFarmLocation: true,
+            message
+          }),
+
+        updatedAt:
+          new Date().toISOString()
       });
     }
 
-    const data = await weatherFetchThiForCoordsSrv(resolvedLocation);
+    const data =
+      await weatherFetchThiForCoordsSrv(
+        resolvedLocation
+      );
 
     if (!data) {
       const status = {
@@ -4758,59 +5118,127 @@ app.get('/api/weather/thi', requireUserId, async (req, res) => {
         severity: 0
       };
 
-      const instructions = buildThiInstructionsSrv(null, status);
-      const message = "⚠️ تعذّر تحديث قراءة THI الآن. حاول مرة أخرى لاحقًا.";
+      const instructions =
+        buildThiInstructionsSrv(
+          null,
+          status
+        );
+
+      const message =
+        "⚠️ تعذّر تحديث قراءة THI الآن. حاول مرة أخرى لاحقًا.";
 
       return res.json({
         ok: true,
         cached: false,
-        warning: "weather_upstream_unavailable",
+
+        warning:
+          "weather_upstream_unavailable",
+
         needsFarmLocation: false,
         message,
+
         tempC: null,
         humidity: null,
         thi: null,
+
         status,
         instructions,
-        thiInstructions: instructions,
-        thiRecommendations: instructions,
-        recommendations: instructions.actions,
-        advice: instructions.summary,
-        source: "weather-upstream-unavailable",
-        locationSource: resolvedLocation.source || "farm_location",
-        locationLabel: resolvedLocation.label || "موقع المزرعة",
-        lat: resolvedLocation.lat,
-        lon: resolvedLocation.lon,
-        ui: weatherThiUiSrv({
-          tempC: null,
-          humidity: null,
-          thi: null,
-          status,
-          message
-        }),
-        updatedAt: new Date().toISOString()
+
+        thiInstructions:
+          instructions,
+
+        thiRecommendations:
+          instructions,
+
+        recommendations:
+          instructions.actions,
+
+        advice:
+          instructions.summary,
+
+        source:
+          "weather-upstream-unavailable",
+
+        greetingCard:
+          greetingCard({
+            tempC: null,
+            humidity: null,
+            thi: null,
+            status,
+            instructions
+          }),
+
+        locationSource:
+          resolvedLocation.source ||
+          "farm_location",
+
+        locationLabel:
+          resolvedLocation.label ||
+          "موقع المزرعة",
+
+        lat:
+          resolvedLocation.lat,
+
+        lon:
+          resolvedLocation.lon,
+
+        ui:
+          weatherThiUiSrv({
+            tempC: null,
+            humidity: null,
+            thi: null,
+            status,
+            message
+          }),
+
+        updatedAt:
+          new Date().toISOString()
       });
     }
 
-    const message = String(data?.status?.label || "غير متاح");
+    const message =
+      String(
+        data?.status?.label ||
+        "غير متاح"
+      );
 
     return res.json({
       ok: true,
-      cached: Boolean(data.cached),
+
+      cached:
+        Boolean(data.cached),
+
       needsFarmLocation: false,
       message,
+
       ...data,
-      ui: weatherThiUiSrv({
-        tempC: data.tempC,
-        humidity: data.humidity,
-        thi: data.thi,
-        status: data.status,
-        message
-      })
+
+      greetingCard:
+        greetingCard(data),
+
+      ui:
+        weatherThiUiSrv({
+          tempC:
+            data.tempC,
+
+          humidity:
+            data.humidity,
+
+          thi:
+            data.thi,
+
+          status:
+            data.status,
+
+          message
+        })
     });
 
   } catch (e) {
-    console.error("weather.thi fatal error:", e.message || e);
+    console.error(
+      "weather.thi fatal error:",
+      e.message || e
+    );
 
     const status = {
       level: "unknown",
@@ -4818,35 +5246,86 @@ app.get('/api/weather/thi', requireUserId, async (req, res) => {
       severity: 0
     };
 
-    const instructions = buildThiInstructionsSrv(null, status);
-    const message = "⚠️ تعذّر تحديث قراءة THI الآن. حاول مرة أخرى.";
+    const instructions =
+      buildThiInstructionsSrv(
+        null,
+        status
+      );
+
+    const message =
+      "⚠️ تعذّر تحديث قراءة THI الآن. حاول مرة أخرى.";
 
     return res.json({
       ok: true,
       cached: false,
-      warning: "weather_route_failed",
+
+      warning:
+        "weather_route_failed",
+
       needsFarmLocation: false,
       message,
+
       tempC: null,
       humidity: null,
       thi: null,
+
       status,
       instructions,
-      thiInstructions: instructions,
-      thiRecommendations: instructions,
-      recommendations: instructions.actions,
-      advice: instructions.summary,
-      source: "weather-route-failed",
+
+      thiInstructions:
+        instructions,
+
+      thiRecommendations:
+        instructions,
+
+      recommendations:
+        instructions.actions,
+
+      advice:
+        instructions.summary,
+
+      source:
+        "weather-route-failed",
+
       lat: null,
       lon: null,
-      ui: weatherThiUiSrv({
-        tempC: null,
-        humidity: null,
-        thi: null,
-        status,
-        message
-      }),
-      updatedAt: new Date().toISOString()
+
+      greetingCard:
+        weatherDailyGreetingCardSrv({
+          farmName:
+            req.authSession?.user?.farmName ||
+            "مزرعتك",
+
+          timeZone:
+            "UTC",
+
+          today:
+            new Date()
+              .toISOString()
+              .slice(0, 10),
+
+          weather: {
+            tempC: null,
+            humidity: null,
+            thi: null,
+            status,
+            instructions
+          },
+
+          message
+        }),
+
+      ui:
+        weatherThiUiSrv({
+          tempC: null,
+          humidity: null,
+          thi: null,
+          status,
+          message
+        }),
+
+      updatedAt:
+        new Date().toISOString()
     });
   }
 });
