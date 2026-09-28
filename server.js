@@ -82019,35 +82019,85 @@ const herdType =
       ? 'cows'
       : '';
 
-    // --------------------------------------
-    // 🔥 1) جلب الحيوانات
-    // --------------------------------------
-    const snap = await db
-      .collection("animals")
-      .where("userId", "==", uid)
-      .get();
+// --------------------------------------
+// 🔥 1) جلب الحيوانات + كل الأحداث بلا سقف صامت
+// --------------------------------------
+const animalsSnapPromise = db
+  .collection("animals")
+  .where("userId", "==", uid)
+  .get();
 
-const rawAnimalsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-let herdStatsEventsPromise = null;
+const herdStatsEventsLoadPromise = (async () => {
+  try {
+    const rows = [];
+    const pageSize = 500;
+    let cursor = null;
 
-const loadHerdStatsEventsSrv = () => {
-  if (!herdStatsEventsPromise) {
-    herdStatsEventsPromise = db
-      .collection("events")
-      .where("userId", "==", uid)
-      .limit(5000)
-      .get()
-      .then(eventSnap =>
-        eventSnap.docs.map(d => ({
+    while (true) {
+      let q = db
+        .collection("events")
+        .where("userId", "==", uid)
+        .orderBy(
+          admin.firestore.FieldPath.documentId()
+        )
+        .limit(pageSize);
+
+      if (cursor) {
+        q = q.startAfter(cursor);
+      }
+
+      const eventSnap = await q.get();
+
+      for (const d of eventSnap.docs) {
+        rows.push({
           id: d.id,
           ...(d.data() || {})
-        }))
-      );
+        });
+      }
+
+      if (eventSnap.size < pageSize) {
+        break;
+      }
+
+      cursor =
+        eventSnap.docs[
+          eventSnap.docs.length - 1
+        ];
+    }
+
+    return {
+      ok: true,
+      rows
+    };
+
+  } catch (error) {
+    return {
+      ok: false,
+      error
+    };
   }
+})();
 
-  return herdStatsEventsPromise;
-};
+const snap =
+  await animalsSnapPromise;
 
+const rawAnimalsAll =
+  snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
+
+const loadHerdStatsEventsSrv =
+  async () => {
+    const result =
+      await herdStatsEventsLoadPromise;
+
+    if (!result.ok) {
+      throw result.error;
+    }
+
+    return result.rows;
+  };
 const normalizeAnimalNumberForStats = (v) => String(v ?? '')
   .replace(/[٠-٩]/g, d => ({'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'}[d] || d))
   .replace(/[۰-۹]/g, d => ({'۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'}[d] || d))
@@ -82165,7 +82215,16 @@ const animalsByType = animalsAll.filter(a => {
   }
   return true;
 });
-
+const animalNosSet = new Set(
+  animalsByType.map(a =>
+    String(
+      a.animalNumber ||
+      a.number ||
+      a.id ||
+      ''
+    ).trim()
+  )
+);
 const active = animalsByType.filter(a => {
   const st = String(a.status || a.lifeStatus || "").toLowerCase();
   return !["dead","died","sold","archived","inactive","nafaq","نافق"].includes(st);
@@ -82323,9 +82382,8 @@ for (const a of active) {
 let byAnimal = new Map();
 
 try {
-  const evBreed = (
-  await loadHerdStatsEventsSrv()
-).map(e => ({ ...e }));
+const evBreed =
+  await loadHerdStatsEventsSrv();
 
 const inseminationEvents = evBreed
   .map(e => {
@@ -82402,9 +82460,8 @@ const avgBreedIntervalDays =
 let cullProd = 0, cullRepro = 0, cullHealth = 0;
 
 try {
- const ev = (
-  await loadHerdStatsEventsSrv()
-).map(e => ({ ...e }));
+const ev =
+  await loadHerdStatsEventsSrv();
 
   const cullEvents = ev.filter(e => {
     const txt = String(e.eventType || e.type || e.eventTypeNorm || "").toLowerCase();
@@ -82414,11 +82471,9 @@ try {
  for (const e of cullEvents) {
   const evAnimalNo = String(e.animalNumber || e.animalId || '').trim();
 
- const matchedAnimal = animalsByType.find(a =>
-    String(a.animalNumber || a.number || a.id || '').trim() === evAnimalNo
-  );
-
-  if (!matchedAnimal) continue;
+ if (!animalNosSet.has(evAnimalNo)) {
+  continue;
+}
 
   const main = String(e.cullMain || e.reason || "").toLowerCase();
 
@@ -82479,13 +82534,8 @@ let avgHeadDeltaPct = 0;
 
     
 try {
-  const evMilkAll = (
-  await loadHerdStatsEventsSrv()
-).map(e => ({ ...e }));
-
-  const animalNosSet = new Set(
-    animalsByType.map(a => String(a.animalNumber || a.number || a.id || '').trim())
-  );
+const evMilkAll =
+  await loadHerdStatsEventsSrv();
 
   const milkEvents = evMilkAll.filter(e => {
     const txt = String(e.eventTypeNorm || e.eventType || e.type || "").toLowerCase().trim();
@@ -82572,16 +82622,12 @@ avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
 monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
 
 const sortedKeys = [...dayMap.keys()].sort();
-console.log("MILK sortedKeys =", sortedKeys);
-console.log("MILK latestKey =", sortedKeys[sortedKeys.length - 1] || null);
-console.log("MILK prevKey =", sortedKeys[sortedKeys.length - 2] || null);
 const latestKey = sortedKeys.length ? sortedKeys[sortedKeys.length - 1] : null;
 const prevKey   = sortedKeys.length > 1 ? sortedKeys[sortedKeys.length - 2] : null;
 
 const latestRec = latestKey ? dayMap.get(latestKey) : null;
 const prevRec   = prevKey ? dayMap.get(prevKey) : null;
-console.log("MILK latestRec =", latestRec);
-console.log("MILK prevRec =", prevRec);
+
 avgHeadToday = (latestRec && latestRec.heads.size)
   ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
   : 0;
@@ -82598,12 +82644,7 @@ dailyMilkDeltaPct = prevDailyMilkTotal > 0
 avgHeadDeltaPct = prevAvgHeadToday > 0
   ? +(((avgHeadToday - prevAvgHeadToday) / prevAvgHeadToday) * 100).toFixed(1)
   : 0;
-  console.log("MILK dailyMilkTotal =", dailyMilkTotal);
-console.log("MILK prevDailyMilkTotal =", prevDailyMilkTotal);
-console.log("MILK avgHeadToday =", avgHeadToday);
-console.log("MILK prevAvgHeadToday =", prevAvgHeadToday);
-console.log("MILK dailyMilkDeltaPct =", dailyMilkDeltaPct);
-console.log("MILK avgHeadDeltaPct =", avgHeadDeltaPct);
+
 }
 } catch (e) {
   console.error("milk stats error:", e.message || e);
@@ -82614,21 +82655,53 @@ console.log("MILK avgHeadDeltaPct =", avgHeadDeltaPct);
     let extraFertility = { scPlus:0, hdr21:0, cr21:0, pr21:0, firstServicePct:0 };
 
     try {
-      const ev = (
-  await loadHerdStatsEventsSrv()
-).map(e => ({ ...e }));
+const ev =
+  await loadHerdStatsEventsSrv();
 
-      const heats = ev.filter(e => e.eventTypeNorm === "heat" && e.eventDate);
-      const ins   = ev.filter(e => e.eventTypeNorm === "insemination" && e.eventDate);
-      const pregP = ev.filter(e =>
-        e.eventTypeNorm === "pregnancy_diagnosis" &&
-        (String(e.result).includes("عشار") || String(e.result).includes("positive"))
-      );
+const heats = [];
+const ins = [];
+const pregP = [];
 
-      heats.forEach(e => e.ms = new Date(e.eventDate).getTime());
-      ins.forEach(e => e.ms = new Date(e.eventDate).getTime());
-      pregP.forEach(e => e.ms = new Date(e.eventDate).getTime());
-      const pregByAnimal = new Map();
+for (const e of ev) {
+  if (
+    e.eventTypeNorm === "heat" &&
+    e.eventDate
+  ) {
+    heats.push({
+      ...e,
+      ms: new Date(e.eventDate).getTime()
+    });
+
+    continue;
+  }
+
+  if (
+    e.eventTypeNorm === "insemination" &&
+    e.eventDate
+  ) {
+    ins.push({
+      ...e,
+      ms: new Date(e.eventDate).getTime()
+    });
+
+    continue;
+  }
+
+  if (
+    e.eventTypeNorm === "pregnancy_diagnosis" &&
+    (
+      String(e.result).includes("عشار") ||
+      String(e.result).includes("positive")
+    )
+  ) {
+    pregP.push({
+      ...e,
+      ms: new Date(e.eventDate).getTime()
+    });
+  }
+}
+
+const pregByAnimal = new Map();
 
 for (const e of pregP) {
   const animalKey = String(
@@ -82638,29 +82711,92 @@ for (const e of pregP) {
     ""
   ).trim();
 
-  if (!animalKey || !Number.isFinite(e.ms)) continue;
+  if (
+    !animalKey ||
+    !Number.isFinite(e.ms)
+  ) {
+    continue;
+  }
 
-  if (!pregByAnimal.has(animalKey)) pregByAnimal.set(animalKey, []);
-  pregByAnimal.get(animalKey).push(e.ms);
+  if (!pregByAnimal.has(animalKey)) {
+    pregByAnimal.set(
+      animalKey,
+      []
+    );
+  }
+
+  pregByAnimal
+    .get(animalKey)
+    .push(e.ms);
 }
 
 for (const arr of pregByAnimal.values()) {
   arr.sort((a, b) => a - b);
 }
-      // --- S/C+ ---
-      let sc_total=0, sc_conc=0;
-      for (const p of pregP) {
-        const linked = ins.filter(i =>
-          i.animalId === p.animalId &&
-          i.ms <= p.ms &&
-          (p.ms - i.ms) <= 90*86400000
+
+// --- S/C+ ---
+const insByAnimalId = new Map();
+
+for (const i of ins) {
+  const animalId = i.animalId;
+
+  // يحافظ على سلوك المقارنة === القديم
+  if (
+    typeof animalId === "number" &&
+    Number.isNaN(animalId)
+  ) {
+    continue;
+  }
+
+  if (!insByAnimalId.has(animalId)) {
+    insByAnimalId.set(
+      animalId,
+      []
+    );
+  }
+
+  insByAnimalId
+    .get(animalId)
+    .push(i);
+}
+
+let sc_total = 0;
+let sc_conc = 0;
+
+for (const p of pregP) {
+  const animalId = p.animalId;
+
+  const candidates =
+    typeof animalId === "number" &&
+    Number.isNaN(animalId)
+      ? []
+      : (
+          insByAnimalId.get(animalId) ||
+          []
         );
-        if (linked.length) {
-          sc_conc++;
-          sc_total += linked.length;
-        }
-      }
-      const scPlus = sc_conc ? +(sc_total / sc_conc).toFixed(2) : 0;
+
+  let linkedCount = 0;
+
+  for (const i of candidates) {
+    if (
+      i.ms <= p.ms &&
+      (p.ms - i.ms) <=
+        90 * 86400000
+    ) {
+      linkedCount++;
+    }
+  }
+
+  if (linkedCount) {
+    sc_conc++;
+    sc_total += linkedCount;
+  }
+}
+
+const scPlus =
+  sc_conc
+    ? +(sc_total / sc_conc).toFixed(2)
+    : 0;
 
       // --- 21d window ---
       const now = Date.now();
@@ -82718,9 +82854,8 @@ let feedBands = {
 };
 
     try {
-      const evNutAll = (
-  await loadHerdStatsEventsSrv()
-).map(e => ({ ...e }));
+const evNutAll =
+  await loadHerdStatsEventsSrv();
 const isLactatingNutritionEventForDashboard = (e = {}) => {
   const ctx = e?.nutrition?.context || {};
   const groupText = String(
