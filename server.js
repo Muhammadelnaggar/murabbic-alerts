@@ -83549,6 +83549,27 @@ function fertilityReportPregResultSrv(v) {
 
   return "unknown";
 }
+
+function fertilityCurrentPregnantSrv(a = {}) {
+  const reproKind =
+    fertilityReportReproKindSrv(
+      a.reproductiveStatus ||
+      a.reproStatus ||
+      ""
+    );
+
+  if (reproKind === "pregnant") return true;
+  if (reproKind !== "unknown") return false;
+
+  return (
+    fertilityReportPregResultSrv(
+      a.lastPregnancyDiagnosisResult ||
+      a.lastDiagnosisResult ||
+      ""
+    ) === "positive"
+  );
+}
+
 function fertilityReportOutcomeForAiSrv({
   ai,
   aiByAnimal,
