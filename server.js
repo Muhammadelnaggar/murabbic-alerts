@@ -82994,30 +82994,20 @@ conceptionScope:
     pregnantCount:
       currentPregnantCount,
 
-    pregnantPct:
-      fertilityHerdTotal
-        ? Math.round(
-            (
-              currentPregnantCount *
-              100
-            ) /
-            fertilityHerdTotal
-          )
-        : 0,
+        pregnantPct:
+      fertilityPctSrv(
+        currentPregnantCount,
+        fertilityHerdTotal
+      ) ?? 0,
 
     openOver120Count:
       openOver120Rows.length,
 
     openOver120Pct:
-      fertilityHerdTotal
-        ? Math.round(
-            (
-              openOver120Rows.length *
-              100
-            ) /
-            fertilityHerdTotal
-          )
-        : 0,
+      fertilityPctSrv(
+        openOver120Rows.length,
+        fertilityHerdTotal
+      ) ?? 0,
 
     openOver120Message:
       "⚠️ كل يوم بعد 120 يوم من الولادة بدون ثبوت حمل يزيد التكلفة الاقتصادية على المزرعة.",
@@ -83351,7 +83341,7 @@ function fertilityReportDaysBetweenSrv(a, b) {
   return Math.round((bms - ams) / 86400000);
 }
 
-function fertilityReportPctSrv(num, den) {
+function fertilityPctSrv(num, den) {
   const n = Number(num);
   const d = Number(den);
   if (!Number.isFinite(n) || !Number.isFinite(d) || d <= 0) return null;
@@ -83403,7 +83393,7 @@ function fertilityReportHerdCompositionSrv({
     Number(heiferOpenCount || 0);
 
   function item(key, label, count, denominator) {
-    const pct = fertilityReportPctSrv(count, denominator);
+    const pct = fertilityPctSrv(count, denominator);
 
     return {
       key,
@@ -84055,7 +84045,7 @@ function fertilityDashboardCurrentMetricsSrv({
     successfulConceptions,
 
     conceptionRatePct:
-      fertilityReportPctSrv(
+      fertilityPctSrv(
         successfulConceptions,
         judgedStraws
       ),
@@ -84785,7 +84775,7 @@ function fertilityReportPregnancy21Srv({
     const expectedCycles =
       expectedCyclesBeforeTai - excludedTaiOpportunities;
 
-    const rawPct = fertilityReportPctSrv(
+    const rawPct = fertilityPctSrv(
       observed.size,
       expectedCycles
     );
@@ -85071,13 +85061,13 @@ successfulServices += inWindow.filter(s =>
       status: "complete",
 
       valuePct:
-        fertilityReportPctSrv(
+        fertilityPctSrv(
           pregnancies,
           opportunities
         ),
 
       conceptionRatePct:
-  fertilityReportPctSrv(
+  fertilityPctSrv(
     successfulServices,
     judgedServices
   ),
@@ -85184,7 +85174,7 @@ function fertilityReportTopValueSrv(values = []) {
   return {
     value,
     count,
-    pct: fertilityReportPctSrv(count, arr.length)
+    pct: fertilityPctSrv(count, arr.length)
   };
 }
 
@@ -85241,7 +85231,7 @@ function fertilityReportRepeatBreederAnalysisSrv(repeatBreeders = [], eligibleCo
 
   const count = rows.length;
   const den = Number(eligibleCount || 0);
-  const ratePct = fertilityReportPctSrv(count, den);
+  const ratePct = fertilityPctSrv(count, den);
 
   let severity = "good";
   let severityLabel = "لا توجد حالات";
@@ -85576,7 +85566,7 @@ function fertilityReportTrackedLossSrv({
       : "insufficient_data",
 
     valuePct:
-      fertilityReportPctSrv(
+      fertilityPctSrv(
         lost,
         rows.length
       ),
@@ -85645,7 +85635,7 @@ function fertilityReportBuffaloSeasonContextSrv({
       pregnancies,
 
       conceptionRatePct:
-        fertilityReportPctSrv(
+        fertilityPctSrv(
           pregnancies,
           judged.length
         )
@@ -85726,7 +85716,7 @@ function fertilityReportBuffaloSeasonContextSrv({
 
   const hotAiSharePct =
     rows.length
-      ? fertilityReportPctSrv(
+      ? fertilityPctSrv(
           hotRows.length,
           rows.length
         )
@@ -86809,8 +86799,8 @@ const outcomeForAi = (ai) =>
     const firstServiceRows = aiRows.filter(x => x.isFirstService && x.outcome.judged);
     const firstServiceSuccess = firstServiceRows.filter(x => x.outcome.success);
 
-    const overallCr = fertilityReportPctSrv(successfulAi.length, judgedAi.length);
-    const firstServiceCr = fertilityReportPctSrv(firstServiceSuccess.length, firstServiceRows.length);
+    const overallCr = fertilityPctSrv(successfulAi.length, judgedAi.length);
+    const firstServiceCr = fertilityPctSrv(firstServiceSuccess.length, firstServiceRows.length);
 
     const inseminatorMap = new Map();
 
@@ -86867,9 +86857,9 @@ const outcomeForAi = (ai) =>
 
     const inseminators = [...inseminatorMap.values()]
       .map(g => {
-        const cr = fertilityReportPctSrv(g.pregnancies, g.totalJudged);
+        const cr = fertilityPctSrv(g.pregnancies, g.totalJudged);
         const avgThi = g.thiKnown ? Math.round(g.thiSum / g.thiKnown) : null;
-        const highThiPct = fertilityReportPctSrv(g.highThiCount, g.thiKnown);
+        const highThiPct = fertilityPctSrv(g.highThiCount, g.thiKnown);
 
         let evaluation = "غير مكتمل";
         let status = "muted";
@@ -86921,7 +86911,7 @@ const outcomeForAi = (ai) =>
 
     const thiGroups = [...thiGroupsMap.values()].map(g => ({
       ...g,
-      conceptionRatePct: fertilityReportPctSrv(g.pregnancies, g.judged)
+      conceptionRatePct: fertilityPctSrv(g.pregnancies, g.judged)
     }));
 
 const repeatBreeders = [];
