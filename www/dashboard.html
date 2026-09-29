@@ -595,6 +595,17 @@ function fertilityBenchmarkBox({
 
   const benchmarkLabel =
     String(benchmark?.label || '').trim();
+    const benchmarkLabelHtml =
+  benchmarkLabel.replace(
+    /((?:>=|<=|>|<|≥|≤)\s*[\d.]+\s*%?)/,
+    part =>
+      `<bdi dir="ltr">${
+        part
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+      }</bdi>`
+  );
 
   const hasBenchmark =
     currentPos !== null &&
@@ -607,9 +618,9 @@ function fertilityBenchmarkBox({
     : '--';
 
   const subText =
-    [sub, benchmarkLabel]
-      .filter(Boolean)
-      .join(' · ');
+  [sub, benchmarkLabelHtml]
+    .filter(Boolean)
+    .join(' · ');
 
   const go =
     href
