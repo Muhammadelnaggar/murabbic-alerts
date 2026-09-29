@@ -87079,74 +87079,67 @@ const repeatBreederAnalysis = fertilityReportRepeatBreederAnalysisSrv(
       .sort((a, b) => Number(b.daysInMilk || 0) - Number(a.daysInMilk || 0))
       .slice(0, 50);
 
-    // جرد الخصوبة من المجموعات الرسمية للقطيع.
-    const groupPage = await buildGroupsPageForTenantSrv(uid);
+        // الجرد التناسلي الحالي للأمهات مستقل عن مجموعات الإنتاج.
+    // activeAnimals هي نفس بيانات الحيوانات الحالية النشطة
+    // من مجموعة animals بعد حسم النوع والنشاط.
+    const mothers =
+      activeAnimals;
 
-    if (!groupPage?.ok || !Array.isArray(groupPage.groups)) {
-      return res.status(503).json({
-        ok: false,
-        error: "fertility_inventory_unavailable",
-        message: "تعذّر تحميل جرد القطيع حاليًا. حاول مرة أخرى."
-      });
-    }
+    const pregnantCount =
+      mothers.filter(
+        fertilityCurrentPregnantSrv
+      ).length;
+
+    const openCount =
+      mothers.filter(a =>
+        fertilityReportReproKindSrv(
+          a.reproductiveStatus ||
+          a.reproStatus ||
+          ""
+        ) === "open"
+      ).length;
+
+    const inseminatedCount =
+      mothers.filter(a =>
+        fertilityReportReproKindSrv(
+          a.reproductiveStatus ||
+          a.reproStatus ||
+          ""
+        ) === "inseminated"
+      ).length;
+
+    const freshCount =
+      mothers.filter(a =>
+        fertilityReportReproKindSrv(
+          a.reproductiveStatus ||
+          a.reproStatus ||
+          ""
+        ) === "fresh"
+      ).length;
 
     const groupSpecies =
-      selectedType === "buffalo" ? "buffalo" : "cow";
+      selectedType === "buffalo"
+        ? "buffalo"
+        : "cow";
 
-    // مجموعات الأمهات فقط، بصرف النظر عن حالتها الإنتاجية.
-    const motherGroupKeys = new Set([
-      "fresh",
-      "high",
-      "med",
-      "low",
-      "dry",
-      "closeup"
-    ]);
+    // العجلات فقط تظل مؤقتًا على تصنيفها التناسلي الحالي.
+    const groupPage =
+      await buildGroupsPageForTenantSrv(
+        uid
+      );
 
-    const motherNumbers = new Set(
-      groupPage.groups
-        .filter(g =>
-          g.species === groupSpecies &&
-          motherGroupKeys.has(g.baseKey)
-        )
-        .flatMap(g =>
-          Array.isArray(g.animalNumbers)
-            ? g.animalNumbers
-            : []
-        )
-        .map(fertilityReportDigitsSrv)
-        .filter(Boolean)
-    );
-
-    // نستخدم المجموعة الرسمية لتحديد الأمهات،
-    // ثم نقرأ حالتهن التناسلية من بيانات التقرير الحالية.
-    const mothers = activeAnimals.filter(a =>
-      motherNumbers.has(a._number)
-    );
-
-    const pregnantCount = mothers.filter(a =>
-      fertilityReportReproKindSrv(
-        a.reproductiveStatus || ""
-      ) === "pregnant"
-    ).length;
-
-    const openCount = mothers.filter(a =>
-      fertilityReportReproKindSrv(
-        a.reproductiveStatus || ""
-      ) === "open"
-    ).length;
-
-    const inseminatedCount = mothers.filter(a =>
-      fertilityReportReproKindSrv(
-        a.reproductiveStatus || ""
-      ) === "inseminated"
-    ).length;
-
-    const freshCount = mothers.filter(a =>
-      fertilityReportReproKindSrv(
-        a.reproductiveStatus || ""
-      ) === "fresh"
-    ).length;
+    if (
+      !groupPage?.ok ||
+      !Array.isArray(groupPage.groups)
+    ) {
+      return res.status(503).json({
+        ok: false,
+        error:
+          "fertility_inventory_unavailable",
+        message:
+          "تعذّر تحميل جرد القطيع حاليًا. حاول مرة أخرى."
+      });
+    }
 
     // العجلات: نفس المجموعات الرسمية التي نجحت لايف.
     function heiferCount(baseKey, minAgeMonths = 0) {
