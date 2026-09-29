@@ -82707,6 +82707,309 @@ extraFertility = { scPlus, hdr21, cr21, pr21, firstServicePct };
       console.error("FERTILITY EVENT ERROR", e);
     }
     // --------------------------------------
+// 5.1) خصوبة الداشبورد — الموقف الحالي
+// --------------------------------------
+let dashboardFertility = {
+  pregnancyRate21d: null,
+  pregnancyRate21Status: "insufficient_data",
+  pregnancyRate21StartDate: null,
+  pregnancyRate21EndDate: null,
+  conceptionRatePct: null,
+  strawsPerConception: null,
+  judgedStraws: 0,
+  successfulConceptions: 0,
+  pregnantCount: 0,
+  pregnantPct: 0,
+  openOver120Count: 0,
+  openOver120Pct: 0,
+  openOver120Message:
+    "⚠️ كل يوم بعد 120 يوم من الولادة بدون ثبوت حمل يزيد التكلفة الاقتصادية على المزرعة.",
+  reproductiveCullingCount: cullRepro,
+  reproductiveCullingPct: cullReproPct
+};
+
+try {
+  const dashboardTodayISO = cairoTodayISO();
+  const dashboardTodayMs =
+    fertilityReportMsSrv(dashboardTodayISO) || Date.now();
+
+  const [
+    dashboardEventsSnap,
+    dashboardCalvesSnap,
+    dashboardArchivedAnimalsSnap,
+    dashboardArchivedEventsSnap,
+    dashboardThresholds
+  ] = await Promise.all([
+    db.collection("events")
+      .where("userId", "==", uid)
+      .get(),
+
+    db.collection("calves")
+      .where("userId", "==", uid)
+      .get(),
+
+    db.collection("archived_animals")
+      .where("userId", "==", uid)
+      .get(),
+
+    db.collection("archived_events")
+      .where("userId", "==", uid)
+      .get(),
+
+    loadGroupThresholdsSrv(uid)
+  ]);
+
+  const dashboardCurrentEvents =
+    dashboardEventsSnap.docs.map(d => ({
+      id: d.id,
+      ...(d.data() || {})
+    }));
+
+  const dashboardPrAnimals = [
+    ...rawAnimalsAll.map(a => ({
+      ...a,
+      _prCollection: "animals"
+    })),
+
+    ...dashboardCalvesSnap.docs.map(d => ({
+      id: d.id,
+      ...(d.data() || {}),
+      _prCollection: "calves"
+    })),
+
+    ...dashboardArchivedAnimalsSnap.docs.map(d => ({
+      id: d.id,
+      ...(d.data() || {}),
+      _prCollection: "archived"
+    }))
+  ].filter(a =>
+    fertilityReportAnimalSpeciesSrv(a) ===
+    selectedDashboardType
+  );
+
+  const dashboardPrEvents = [
+    ...dashboardCurrentEvents,
+    ...dashboardArchivedEventsSnap.docs.map(d => ({
+      id: d.id,
+      ...(d.data() || {})
+    }))
+  ];
+
+  const dashboardPr21 =
+    fertilityReportPregnancy21Srv({
+      todayISO: dashboardTodayISO,
+      animals: dashboardPrAnimals,
+      events: dashboardPrEvents,
+      thresholds: dashboardThresholds,
+      audit: true
+    });
+
+  const fertilityHerdTotal = active.length;
+
+  const isCurrentlyPregnant = (a = {}) => {
+    const reproKind =
+      fertilityReportReproKindSrv(
+        a.reproductiveStatus ||
+        a.reproStatus ||
+        ""
+      );
+
+    if (reproKind === "pregnant") return true;
+    if (reproKind !== "unknown") return false;
+
+    return (
+      fertilityReportPregResultSrv(
+        a.lastPregnancyDiagnosisResult ||
+        a.lastDiagnosisResult ||
+        ""
+      ) === "positive"
+    );
+  };
+
+  const currentPregnantCount =
+    active.filter(isCurrentlyPregnant).length;
+
+  const openOver120Rows =
+    active.filter(a => {
+      if (isCurrentlyPregnant(a)) return false;
+
+      const calvingDate =
+        fertilityReportDateSrv(
+          a.lastCalvingDate ||
+          a.calvingDate ||
+          ""
+        );
+
+      const calvingMs =
+        fertilityReportMsSrv(calvingDate);
+
+      if (!Number.isFinite(calvingMs)) {
+        return false;
+      }
+
+      const daysAfterCalving =
+        Math.floor(
+          (dashboardTodayMs - calvingMs) /
+          86400000
+        );
+
+      return daysAfterCalving >= 120;
+    });
+
+  const prComplete =
+    dashboardPr21?.status === "complete";
+
+  const judgedServiceKeys = new Set();
+  const successfulServiceKeys = new Set();
+
+  if (prComplete) {
+    for (
+      const row of
+      Array.isArray(dashboardPr21.eligibilityRows)
+        ? dashboardPr21.eligibilityRows
+        : []
+    ) {
+      const animalNumber =
+        String(row?.animalNumber || "").trim();
+
+      for (
+        const service of
+        Array.isArray(row?.servicesInWindow)
+          ? row.servicesInWindow
+          : []
+      ) {
+        if (
+          !animalNumber ||
+          !service?.date ||
+          service?.result === "pending"
+        ) {
+          continue;
+        }
+
+        const serviceKey =
+          `${animalNumber}:${service.date}`;
+
+        judgedServiceKeys.add(
+          serviceKey
+        );
+
+        if (
+          service?.result === "positive"
+        ) {
+          successfulServiceKeys.add(
+            serviceKey
+          );
+        }
+      }
+    }
+  }
+
+  const judgedStraws =
+    prComplete
+      ? dashboardPrEvents.filter(e => {
+          if (
+            fertilityReportEventTypeSrv(e) !==
+            "insemination"
+          ) {
+            return false;
+          }
+
+          const animalNumber =
+            fertilityReportAnimalNumberSrv(e);
+
+          const eventDate =
+            computeEventDateFromDoc(e);
+
+          return judgedServiceKeys.has(
+            `${animalNumber}:${eventDate}`
+          );
+        }).length
+      : 0;
+
+  const successfulConceptions =
+    prComplete
+      ? successfulServiceKeys.size
+      : 0;
+
+  dashboardFertility = {
+    pregnancyRate21d:
+      prComplete
+        ? dashboardPr21.valuePct
+        : null,
+
+    pregnancyRate21Status:
+      String(
+        dashboardPr21?.status ||
+        "insufficient_data"
+      ),
+
+    pregnancyRate21StartDate:
+      dashboardPr21?.startDate || null,
+
+    pregnancyRate21EndDate:
+      dashboardPr21?.endDate || null,
+
+    conceptionRatePct:
+      prComplete
+        ? dashboardPr21.conceptionRatePct
+        : null,
+
+    strawsPerConception:
+      successfulConceptions > 0
+        ? fertilityReportRound1Srv(
+            judgedStraws /
+            successfulConceptions
+          )
+        : null,
+
+    judgedStraws,
+    successfulConceptions,
+
+    pregnantCount:
+      currentPregnantCount,
+
+    pregnantPct:
+      fertilityHerdTotal
+        ? Math.round(
+            (
+              currentPregnantCount *
+              100
+            ) /
+            fertilityHerdTotal
+          )
+        : 0,
+
+    openOver120Count:
+      openOver120Rows.length,
+
+    openOver120Pct:
+      fertilityHerdTotal
+        ? Math.round(
+            (
+              openOver120Rows.length *
+              100
+            ) /
+            fertilityHerdTotal
+          )
+        : 0,
+
+    openOver120Message:
+      "⚠️ كل يوم بعد 120 يوم من الولادة بدون ثبوت حمل يزيد التكلفة الاقتصادية على المزرعة.",
+
+    reproductiveCullingCount:
+  cullRepro,
+
+reproductiveCullingPct:
+  cullReproPct
+  };
+
+} catch (e) {
+  console.error(
+    "DASHBOARD FERTILITY ERROR",
+    e.message || e
+  );
+}
+    // --------------------------------------
 // 🔥 5.5) التغذية — غرفة التحكم تعرض مزرعة الحلاب فقط
     // --------------------------------------
 let feedBands = {
@@ -82876,7 +83179,10 @@ fertility: {
   hdr21: extraFertility.hdr21,
   cr21: extraFertility.cr21,
   pr21: extraFertility.pr21,
-  firstServicePct: extraFertility.firstServicePct
+  firstServicePct: extraFertility.firstServicePct,
+
+  // مصدر مؤشرات الخصوبة في الداشبورد.
+  dashboard: dashboardFertility
 },
 // ===== الحقول التي ينتظرها الداشبورد مباشرة =====
 servicesPerConception,
@@ -82901,7 +83207,7 @@ heatDetectionRatePct: extraFertility.hdr21,
 pregRate21d: extraFertility.pr21,
 firstServiceConceptionPct: extraFertility.firstServicePct,
 
-  cullTotal: cullProd + cullRepro + cullHealth,
+  cullTotal,
   cullTotalPct: total ? Math.round(((cullProd + cullRepro + cullHealth) * 100) / total) : 0,
 
   cullProdCount: cullProd,
