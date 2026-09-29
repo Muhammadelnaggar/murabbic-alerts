@@ -549,18 +549,21 @@ function healthReportHref(){
   const type = currentType === 'buffalo' ? 'buffalo' : 'cows';
   return `health-report.html?type=${encodeURIComponent(type)}&days=90`;
 }
-function pr21Box(value){
-  const v = Number(value);
+function pr21Box(value, href=''){
+  const v = value == null ? NaN : Number(value);
+
   return scaleMetricBox(
     'معدل الحمل 21 يوم',
     Number.isFinite(v) ? `${Math.round(v)}%` : '--',
     metricScalePositionDirect(v, 15, 30),
-    'repro'
+    'repro',
+    href
   );
 }
 
 function conceptionBox(value, href=''){
-  const v = Number(value);
+  const v = value == null ? NaN : Number(value);
+
   return scaleMetricBox(
     'معدل الإخصاب العام',
     Number.isFinite(v) ? `${Math.round(v)}%` : '--',
@@ -580,13 +583,15 @@ function hdrBox(value){
   );
 }
 
-function spcBox(value){
-  const v = Number(value);
+function spcBox(value, href=''){
+  const v = value == null ? NaN : Number(value);
+
   return scaleMetricBox(
-    'عدد الخدمات للحمل',
+    'Straws / Conception',
     Number.isFinite(v) ? v.toFixed(2) : '--',
     metricScalePositionInverse(v, 1.4, 4.0),
-    'repro'
+    'repro',
+    href
   );
 }
 
@@ -973,22 +978,64 @@ const dailyMilkDeltaPct = Number(stats.dailyMilkDeltaPct ?? 0);
     const dryCount = Math.max(0, totalActive - inMilk);
     const dryPct = totalActive ? Math.round((dryCount * 100) / totalActive) : 0;
 
-const pregCount = Number(t?.pregnant?.count ?? 0);
 const avgDIM = Number(stats.avgDIM ?? 0);
 
-const servicesPerConception =
-  stats.servicesPerConception != null
-    ? Number(stats.servicesPerConception)
-    : Number(fert.servicesPerConception ?? 0);
+const dashboardFert =
+  fert.dashboard || {};
 
-const conceptionRatePct =
-  stats.conceptionRatePct != null
-    ? Number(stats.conceptionRatePct)
-    : Number(fert.conceptionRatePct ?? 0);
-const firstServiceConceptionPct =
-  stats.firstServiceConceptionPct != null
-    ? Number(stats.firstServiceConceptionPct)
-    : Number(fert.firstServicePct ?? 0);
+const dashboardPregnancyRate21d =
+  dashboardFert.pregnancyRate21d != null
+    ? Number(dashboardFert.pregnancyRate21d)
+    : null;
+
+const dashboardConceptionRatePct =
+  dashboardFert.conceptionRatePct != null
+    ? Number(dashboardFert.conceptionRatePct)
+    : null;
+
+const dashboardStrawsPerConception =
+  dashboardFert.strawsPerConception != null
+    ? Number(dashboardFert.strawsPerConception)
+    : null;
+
+const dashboardPregnantCount =
+  dashboardFert.pregnantCount != null
+    ? Number(dashboardFert.pregnantCount)
+    : null;
+
+const dashboardPregnantPct =
+  dashboardFert.pregnantPct != null
+    ? Number(dashboardFert.pregnantPct)
+    : null;
+
+const dashboardOpenOver120Count =
+  dashboardFert.openOver120Count != null
+    ? Number(dashboardFert.openOver120Count)
+    : null;
+
+const dashboardOpenOver120Pct =
+  dashboardFert.openOver120Pct != null
+    ? Number(dashboardFert.openOver120Pct)
+    : null;
+
+const dashboardOpenOver120Message =
+  String(
+    dashboardFert.openOver120Message || ''
+  ).trim();
+
+const dashboardReproductiveCullingCount =
+  dashboardFert.reproductiveCullingCount != null
+    ? Number(
+        dashboardFert.reproductiveCullingCount
+      )
+    : null;
+
+const dashboardReproductiveCullingPct =
+  dashboardFert.reproductiveCullingPct != null
+    ? Number(
+        dashboardFert.reproductiveCullingPct
+      )
+    : null;
 
     herdGrid.innerHTML =
       box(`عدد ${typeLabel} في القطيع`, totalActive, '', 'g_active', 'herd') +
@@ -1051,35 +1098,110 @@ prodCauseWrap.innerHTML = showCausesCard
     </div>
   `
   : '';
+
 const fertilityReportHref =
-  `fertility-report.html?type=${encodeURIComponent(currentType || requestedType)}`;
+  `fertility-report.html?type=${encodeURIComponent(
+    currentType || requestedType
+  )}`;
+
+const openOver120Label =
+  currentType === 'buffalo'
+    ? 'نسبة الجاموس المفتوح فوق 120 يوم في القطيع'
+    : 'نسبة الأبقار المفتوحة فوق 120 يوم في القطيع';
+
+const openOver120Sub = [
+  Number.isFinite(dashboardOpenOver120Count)
+    ? `العدد ${Math.round(
+        dashboardOpenOver120Count
+      )}`
+    : '',
+
+  dashboardOpenOver120Message
+
+].filter(Boolean).join('<br>');
 
 reproGrid.innerHTML =
+
+  pr21Box(
+    dashboardPregnancyRate21d,
+    fertilityReportHref
+  ) +
+
+  conceptionBox(
+    dashboardConceptionRatePct,
+    fertilityReportHref
+  ) +
+
+  spcBox(
+    dashboardStrawsPerConception,
+    fertilityReportHref
+  ) +
+
   box(
-    `عدد ${typeLabel} العشار في القطيع`,
-    pregCount,
-    `نسبتهم من القطيع ${pregPct}%`,
-    'g_preg',
+    'نسبة العشار في القطيع',
+
+    Number.isFinite(dashboardPregnantPct)
+      ? `${Math.round(
+          dashboardPregnantPct
+        )}%`
+      : '--',
+
+    Number.isFinite(dashboardPregnantCount)
+      ? `العدد ${Math.round(
+          dashboardPregnantCount
+        )}`
+      : '',
+
+    null,
     'repro',
     fertilityReportHref
   ) +
+
   box(
-    `عدد ${typeLabel} الملقحة في القطيع`,
-    bredCount,
-    `نسبتهم من القطيع ${bredPct}%`,
-    'g_bred',
+    openOver120Label,
+
+    Number.isFinite(dashboardOpenOver120Pct)
+      ? `${Math.round(
+          dashboardOpenOver120Pct
+        )}%`
+      : '--',
+
+    openOver120Sub,
+
+    null,
     'repro',
     fertilityReportHref
   ) +
-  firstServiceBox(firstServiceConceptionPct, fertilityReportHref) +
-  conceptionBox(conceptionRatePct, fertilityReportHref) +
-  fertilityReportOpenBox(typeLabel, fertilityReportHref);
+
+  box(
+    'الاستبعاد التناسلي',
+
+    Number.isFinite(
+      dashboardReproductiveCullingCount
+    )
+      ? Math.round(
+          dashboardReproductiveCullingCount
+        )
+      : '--',
+
+    Number.isFinite(
+      dashboardReproductiveCullingPct
+    )
+      ? `نسبته من القطيع ${Math.round(
+          dashboardReproductiveCullingPct
+        )}%`
+      : '',
+
+    null,
+    'repro',
+    fertilityReportHref
+  );
     
 cullGrid.innerHTML =
-      cullTotalBox(cullTotalCount, cullTotalPct) +
-      box('عدد الاستبعاد الإنتاجي', stats.cullProdCount ?? 0, `نسبته من الاستبعاد ${cullProdPct}%`, 'g_cullProd', 'cull') +
-      box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من الاستبعاد ${cullReproPct}%`, 'g_cullRepro', 'cull') +
-      box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من الاستبعاد ${cullHealthPct}%`, 'g_cullHealth', 'cull');
+  cullTotalBox(cullTotalCount, cullTotalPct) +
+  box('عدد الاستبعاد الإنتاجي', stats.cullProdCount ?? 0, `نسبته من القطيع ${cullProdPct}%`, 'g_cullProd', 'cull') +
+  box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من القطيع ${cullReproPct}%`, 'g_cullRepro', 'cull') +
+  box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من القطيع ${cullHealthPct}%`, 'g_cullHealth', 'cull');
 feedGrid.innerHTML =
   feedSmartGaugeCard(
     feedGaugeCards.iofc,
@@ -1917,6 +2039,7 @@ document.addEventListener(
       loadHerdKPIs();
 
       setInterval(
+
         loadMurabbikSmartAlerts,
         60 * 1000
       );
