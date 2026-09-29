@@ -602,13 +602,9 @@ function fertilityBenchmarkBox({
     benchmarkLabel;
 
   const displayValue =
-    Number.isFinite(v)
-      ? `${
-          decimals > 0
-            ? v.toFixed(decimals)
-            : Math.round(v)
-        }${suffix}`
-      : '--';
+  Number.isFinite(v)
+    ? `${v}${suffix}`
+    : '--';
 
   const subText =
     [sub, benchmarkLabel]
