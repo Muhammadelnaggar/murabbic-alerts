@@ -5493,63 +5493,137 @@ async function addAnimalDuplicateCheckSrv(uid, numberStr) {
   if (!db || !uid || !numberStr) {
     return {
       ok: false,
-     message: "❌ تعذّر فحص رقم الحيوان الآن. حاول مرة أخرى."
+      message:
+        "❌ تعذّر فحص رقم الحيوان الآن. حاول مرة أخرى."
     };
   }
 
-  const key = `${uid}#${numberStr}`;
-  const nNum = Number(numberStr);
-  const collectionsToCheck = ["animals", "calves"];
+  const key =
+    `${uid}#${numberStr}`;
+
+  const nNum =
+    Number(numberStr);
+
+  const collectionsToCheck = [
+    "animals",
+    "calves"
+  ];
 
   for (const colName of collectionsToCheck) {
-    const q1 = await db.collection(colName)
-      .where("userId_number", "==", key)
-      .limit(1)
-      .get();
+
+    // الصيغة الموحدة الحالية
+    const q1 =
+      await db
+        .collection(colName)
+        .where(
+          "userId_number",
+          "==",
+          key
+        )
+        .limit(1)
+        .get();
 
     if (!q1.empty) {
       return {
         ok: false,
         duplicate: true,
         collection: colName,
-        message: `❌ الرقم ${numberStr} مسجل بالفعل لحيوان في حسابك.`
+        message:
+          `❌ الرقم ${numberStr} مسجل بالفعل لحيوان في حسابك.`
       };
     }
 
-    const q2 = await db.collection(colName)
-      .where("userId", "==", uid)
-      .where("number", "==", numberStr)
-      .limit(1)
-      .get();
+    // الصيغة النصية الحالية / القديمة
+    const q2 =
+      await db
+        .collection(colName)
+        .where(
+          "userId",
+          "==",
+          uid
+        )
+        .where(
+          "number",
+          "==",
+          numberStr
+        )
+        .limit(1)
+        .get();
 
     if (!q2.empty) {
       return {
         ok: false,
         duplicate: true,
         collection: colName,
-        message: `❌ الرقم ${numberStr} مسجل بالفعل لحيوان في حسابك.`
+        message:
+          `❌ الرقم ${numberStr} مسجل بالفعل لحيوان في حسابك.`
       };
     }
 
+    // الصيغة الرقمية
     if (Number.isFinite(nNum)) {
-      const q3 = await db.collection(colName)
-        .where("userId", "==", uid)
-        .where("animalNumber", "==", nNum)
-        .limit(1)
-        .get();
+      const q3 =
+        await db
+          .collection(colName)
+          .where(
+            "userId",
+            "==",
+            uid
+          )
+          .where(
+            "animalNumber",
+            "==",
+            nNum
+          )
+          .limit(1)
+          .get();
 
       if (!q3.empty) {
         return {
           ok: false,
           duplicate: true,
           collection: colName,
-          message: `❌ الرقم ${numberStr} مسجل بالفعل لحيوان في حسابك.`
+          message:
+            `❌ الرقم ${numberStr} مسجل بالفعل لحيوان في حسابك.`
+        };
+      }
+    }
+
+    // توافق مع سجلات التوابع القديمة:
+    // بعضها كان يحمل calfNumber فقط
+    // بدون number / animalNumber / userId_number.
+    if (colName === "calves") {
+      const q4 =
+        await db
+          .collection("calves")
+          .where(
+            "userId",
+            "==",
+            uid
+          )
+          .where(
+            "calfNumber",
+            "==",
+            numberStr
+          )
+          .limit(1)
+          .get();
+
+      if (!q4.empty) {
+        return {
+          ok: false,
+          duplicate: true,
+          collection: "calves",
+          message:
+            `❌ الرقم ${numberStr} مسجل بالفعل لحيوان في حسابك.`
         };
       }
     }
   }
 
-  return { ok: true };
+  return {
+    ok: true
+  };
 }
 app.get("/api/add-animal/check-number", requireUserId, async (req, res) => {
   try {
