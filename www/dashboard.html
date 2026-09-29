@@ -545,36 +545,138 @@ function scaleMetricBox(label, displayValue, positionPct, cls='repro', href=''){
     </div>
   `;
 }
+
+function fertilityBenchmarkPosition(value, benchmark = {}){
+  const v = Number(value);
+  const min = Number(benchmark?.scaleMin);
+  const max = Number(benchmark?.scaleMax);
+
+  if (
+    !Number.isFinite(v) ||
+    !Number.isFinite(min) ||
+    !Number.isFinite(max) ||
+    max <= min
+  ) {
+    return null;
+  }
+
+  return clamp(
+    ((v - min) / (max - min)) * 100,
+    0,
+    100
+  );
+}
+
+function fertilityBenchmarkBox({
+  label,
+  value,
+  benchmark = {},
+  sub = '',
+  href = '',
+  decimals = 0,
+  suffix = '%'
+} = {}){
+  const v =
+    value == null
+      ? NaN
+      : Number(value);
+
+  const currentPos =
+    fertilityBenchmarkPosition(
+      v,
+      benchmark
+    );
+
+  const targetPos =
+    fertilityBenchmarkPosition(
+      benchmark?.target,
+      benchmark
+    );
+
+  const benchmarkLabel =
+    String(benchmark?.label || '').trim();
+
+  const hasBenchmark =
+    currentPos !== null &&
+    targetPos !== null &&
+    benchmarkLabel;
+
+  const displayValue =
+    Number.isFinite(v)
+      ? `${
+          decimals > 0
+            ? v.toFixed(decimals)
+            : Math.round(v)
+        }${suffix}`
+      : '--';
+
+  const subText =
+    [sub, benchmarkLabel]
+      .filter(Boolean)
+      .join(' · ');
+
+  const go =
+    href
+      ? `onclick="location.href='${href}'"`
+      : '';
+
+  return `
+    <div class="kpi repro" ${go}>
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value">${displayValue}</div>
+
+      ${hasBenchmark ? `
+        <div class="metric-scale">
+          <div class="metric-scale-track">
+
+            <div
+              class="metric-scale-dot"
+              style="left:${currentPos}%"
+              title="القيمة الحالية"
+            ></div>
+
+            <div
+              style="position:absolute;left:${targetPos}%;top:0;bottom:0;width:2px;background:var(--brand);transform:translateX(-50%);"
+              title="${benchmarkLabel}"
+            ></div>
+
+          </div>
+        </div>
+      ` : ''}
+
+      ${subText
+        ? `<div class="kpi-sub">${subText}</div>`
+        : ''}
+    </div>
+  `;
+}
+
 function healthReportHref(){
   const type = currentType === 'buffalo' ? 'buffalo' : 'cows';
   return `health-report.html?type=${encodeURIComponent(type)}&days=90`;
 }
-function pr21Box(value, href=''){
-  const v = value == null ? NaN : Number(value);
-
-  return scaleMetricBox(
-    'معدل الحمل 21 يوم',
-    Number.isFinite(v) ? `${Math.round(v)}%` : '--',
-    metricScalePositionDirect(v, 15, 30),
-    'repro',
+function pr21Box(value, benchmark = {}, href=''){
+  return fertilityBenchmarkBox({
+    label: 'معدل الحمل 21 يوم',
+    value,
+    benchmark,
     href
-  );
+  });
 }
 
-function conceptionBox(value, href=''){
-  const v = value == null ? NaN : Number(value);
-
-  return scaleMetricBox(
-    'معدل الإخصاب العام',
-    Number.isFinite(v) ? `${Math.round(v)}%` : '--',
-    metricScalePositionDirect(v, 35, 60),
-    'repro',
-    href
-  );
+function conceptionBox(value, benchmark = {}, href=''){
+  return fertilityBenchmarkBox({
+    label: 'معدل الإخصاب',
+    value,
+    benchmark,
+    href,
+    decimals: 1
+  });
 }
 
 function hdrBox(value){
   const v = Number(value);
+
   return scaleMetricBox(
     'معدل رصد الشياع',
     Number.isFinite(v) ? `${Math.round(v)}%` : '--',
@@ -583,16 +685,15 @@ function hdrBox(value){
   );
 }
 
-function spcBox(value, href=''){
-  const v = value == null ? NaN : Number(value);
-
-  return scaleMetricBox(
-    'Straws / Conception',
-    Number.isFinite(v) ? v.toFixed(2) : '--',
-    metricScalePositionInverse(v, 1.4, 4.0),
-    'repro',
-    href
-  );
+function spcBox(value, benchmark = {}, href=''){
+  return fertilityBenchmarkBox({
+    label: 'Straws / Conception',
+    value,
+    benchmark,
+    href,
+    decimals: 1,
+    suffix: ''
+  });
 }
 
 function openDaysBox(value){
@@ -983,6 +1084,12 @@ const avgDIM = Number(stats.avgDIM ?? 0);
 const dashboardFert =
   fert.dashboard || {};
 
+const dashboardFertilityBenchmarks =
+  dashboardFert.benchmarks &&
+  typeof dashboardFert.benchmarks === 'object'
+    ? dashboardFert.benchmarks
+    : {};
+
 const dashboardPregnancyRate21d =
   dashboardFert.pregnancyRate21d != null
     ? Number(dashboardFert.pregnancyRate21d)
@@ -1109,93 +1216,66 @@ const openOver120Label =
     ? 'نسبة الجاموس المفتوح فوق 120 يوم في القطيع'
     : 'نسبة الأبقار المفتوحة فوق 120 يوم في القطيع';
 
-const openOver120Sub = [
-  Number.isFinite(dashboardOpenOver120Count)
-    ? `العدد ${Math.round(
-        dashboardOpenOver120Count
-      )}`
-    : '',
-
-  dashboardOpenOver120Message
-
-].filter(Boolean).join('<br>');
-
 reproGrid.innerHTML =
 
   pr21Box(
     dashboardPregnancyRate21d,
+    dashboardFertilityBenchmarks.pregnancyRate21d,
     fertilityReportHref
   ) +
 
   conceptionBox(
     dashboardConceptionRatePct,
+    dashboardFertilityBenchmarks.conceptionRatePct,
     fertilityReportHref
   ) +
 
   spcBox(
     dashboardStrawsPerConception,
+    dashboardFertilityBenchmarks.strawsPerConception,
     fertilityReportHref
   ) +
 
-  box(
-    'نسبة العشار في القطيع',
+  fertilityBenchmarkBox({
+    label: 'نسبة العشار في القطيع',
+    value: dashboardPregnantPct,
+    benchmark:
+      dashboardFertilityBenchmarks.pregnantPct,
+    sub:
+      Number.isFinite(dashboardPregnantCount)
+        ? `العدد ${Math.round(dashboardPregnantCount)}`
+        : '',
+    href: fertilityReportHref
+  }) +
 
-    Number.isFinite(dashboardPregnantPct)
-      ? `${Math.round(
-          dashboardPregnantPct
-        )}%`
-      : '--',
+  fertilityBenchmarkBox({
+    label: openOver120Label,
+    value: dashboardOpenOver120Pct,
+    benchmark:
+      dashboardFertilityBenchmarks.openOver120Pct,
+    sub:
+      Number.isFinite(dashboardOpenOver120Count)
+        ? `العدد ${Math.round(dashboardOpenOver120Count)}`
+        : '',
+    href: fertilityReportHref
+  }) +
 
-    Number.isFinite(dashboardPregnantCount)
-      ? `العدد ${Math.round(
-          dashboardPregnantCount
-        )}`
-      : '',
+  fertilityBenchmarkBox({
+    label: 'الاستبعاد التناسلي',
+    value: dashboardReproductiveCullingPct,
+    benchmark:
+      dashboardFertilityBenchmarks.reproductiveCullingPct,
+    sub:
+      Number.isFinite(
+        dashboardReproductiveCullingCount
+      )
+        ? `العدد ${Math.round(
+            dashboardReproductiveCullingCount
+          )}`
+        : '',
+    href: fertilityReportHref
+  });
 
-    null,
-    'repro',
-    fertilityReportHref
-  ) +
-
-  box(
-    openOver120Label,
-
-    Number.isFinite(dashboardOpenOver120Pct)
-      ? `${Math.round(
-          dashboardOpenOver120Pct
-        )}%`
-      : '--',
-
-    openOver120Sub,
-
-    null,
-    'repro',
-    fertilityReportHref
-  ) +
-
-  box(
-    'الاستبعاد التناسلي',
-
-    Number.isFinite(
-      dashboardReproductiveCullingCount
-    )
-      ? Math.round(
-          dashboardReproductiveCullingCount
-        )
-      : '--',
-
-    Number.isFinite(
-      dashboardReproductiveCullingPct
-    )
-      ? `نسبته من القطيع ${Math.round(
-          dashboardReproductiveCullingPct
-        )}%`
-      : '',
-
-    null,
-    'repro',
-    fertilityReportHref
-  );
     
 cullGrid.innerHTML =
   cullTotalBox(cullTotalCount, cullTotalPct) +
