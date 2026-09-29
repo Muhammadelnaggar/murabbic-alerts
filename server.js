@@ -83207,8 +83207,13 @@ heatDetectionRatePct: extraFertility.hdr21,
 pregRate21d: extraFertility.pr21,
 firstServiceConceptionPct: extraFertility.firstServicePct,
 
-  cullTotal,
-  cullTotalPct: total ? Math.round(((cullProd + cullRepro + cullHealth) * 100) / total) : 0,
+  cullTotal: cullProd + cullRepro + cullHealth,
+cullTotalPct: total
+  ? Math.round(
+      ((cullProd + cullRepro + cullHealth) * 100) /
+      total
+    )
+  : 0,
 
   cullProdCount: cullProd,
   cullReproCount: cullRepro,
