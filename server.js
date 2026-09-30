@@ -30163,43 +30163,170 @@ function inseminationEventTypeIsAISrv(ev = {}) {
   );
 }
 
-async function countInseminationsSameDaySrv(uid, animalNumber, eventDate) {
-  const num = calvingNormDigitsOnlySrv(animalNumber || "");
-  const dt = String(eventDate || "").trim().slice(0, 10);
+async function inseminationSameDayInfoSrv(
+  uid,
+  animalNumber,
+  eventDate
+) {
+  const num =
+    calvingNormDigitsOnlySrv(
+      animalNumber || ""
+    );
 
-  if (!db || !uid || !num || !calvingIsDateSrv(dt)) return 0;
+  const dt =
+    String(eventDate || "")
+      .trim()
+      .slice(0, 10);
 
-  const vals = typeof findAnimalNumberMatches === "function"
-    ? findAnimalNumberMatches(num)
-    : [num, Number(num)].filter(v => v !== "" && v !== null && v !== undefined);
+  if (
+    !db ||
+    !uid ||
+    !num ||
+    !calvingIsDateSrv(dt)
+  ) {
+    return {
+      count: 0,
+      periods: []
+    };
+  }
 
-  const seen = new Set();
+  const vals =
+    typeof findAnimalNumberMatches === "function"
+      ? findAnimalNumberMatches(num)
+      : [
+          num,
+          Number(num)
+        ].filter(
+          v =>
+            v !== "" &&
+            v !== null &&
+            v !== undefined
+        );
 
-  for (const field of ["animalNumber", "number"]) {
-    for (const v of vals) {
-      try {
-        const snap = await db.collection("events")
-          .where("userId", "==", uid)
-          .where(field, "==", v)
-          .limit(120)
-          .get();
+  const found = new Map();
 
-        snap.docs.forEach(d => {
-          const ev = d.data() || {};
-          const evDate = String(ev.eventDate || ev.date || "").trim().slice(0, 10);
+  for (const numberField of [
+    "animalNumber",
+    "number"
+  ]) {
+    for (const dateField of [
+      "eventDate",
+      "date"
+    ]) {
+      for (const v of vals) {
+        try {
+          const snap =
+            await db
+              .collection("events")
+              .where(
+                "userId",
+                "==",
+                uid
+              )
+              .where(
+                numberField,
+                "==",
+                v
+              )
+              .where(
+                dateField,
+                "==",
+                dt
+              )
+              .get();
 
-          if (evDate === dt && inseminationEventTypeIsAISrv(ev)) {
-            seen.add(d.id);
-          }
-        });
+          snap.docs.forEach(d => {
+            const ev =
+              d.data() || {};
 
-      } catch (e) {
-        console.warn("countInseminationsSameDaySrv failed:", e.message || e);
+            if (
+              inseminationEventTypeIsAISrv(
+                ev
+              )
+            ) {
+              found.set(
+                d.id,
+                inseminationDayPartSrv(
+                  ev.inseminationTime ||
+                  ev.timeOfDay ||
+                  ev.time ||
+                  ""
+                )
+              );
+            }
+          });
+
+        } catch (e) {
+          console.warn(
+            "inseminationSameDayInfoSrv failed:",
+            e.message || e
+          );
+        }
       }
     }
   }
 
-  return seen.size;
+  return {
+    count: found.size,
+
+    periods: [
+      ...new Set(
+        [...found.values()]
+          .filter(Boolean)
+      )
+    ]
+  };
+}
+function inseminationEventIdSrv(
+  uid,
+  animalNumber,
+  eventDate,
+  inseminationTime
+) {
+  const num =
+    calvingNormDigitsOnlySrv(
+      animalNumber || ""
+    );
+
+  const dt =
+    String(eventDate || "")
+      .trim()
+      .slice(0, 10);
+
+  const period =
+    inseminationDayPartSrv(
+      inseminationTime || ""
+    );
+
+  const raw =
+    [
+      String(uid || "").trim(),
+      num,
+      dt,
+      period
+    ].join("|");
+
+  return (
+    "insemination__" +
+    crypto
+      .createHash("sha256")
+      .update(raw)
+      .digest("hex")
+  );
+}
+async function countInseminationsSameDaySrv(
+  uid,
+  animalNumber,
+  eventDate
+) {
+  const info =
+    await inseminationSameDayInfoSrv(
+      uid,
+      animalNumber,
+      eventDate
+    );
+
+  return info.count;
 }
 function inseminationDecisionSrv(fd) {
   const doc = fd.documentData;
@@ -30426,16 +30553,52 @@ if (isFollowerRecord) {
       }
     }
   }
-  // ✅ تلقيح نفس اليوم: مرة إعادة واحدة فقط
-  const sameDayCount = Number(fd.sameDayInseminationCount || 0);
+ // ✅ تلقيح نفس اليوم:
+// يسمح بفترتين مختلفتين فقط: صباحًا + مساءً.
+// يمنع تكرار نفس الفترة.
+const sameDayCount =
+  Number(
+    fd.sameDayInseminationCount || 0
+  );
 
-  if (sameDayCount >= 2) {
-    return "❌ سبق تسجيل تلقيحين لهذا الحيوان في اليوم نفسه، لذلك لا يمكن تسجيل تلقيح ثالث.";
-  }
+const requestedPeriod =
+  inseminationDayPartSrv(
+    fd.inseminationTime || ""
+  );
 
-  if (sameDayCount === 1) {
-   warnings.push("⚠️ سبق تسجيل تلقيح لهذا الحيوان اليوم. يُسمح بإعادة واحدة فقط؛ تأكد أن هذا التسجيل مقصود.");
-  }
+const existingPeriods =
+  Array.isArray(
+    fd.sameDayInseminationPeriods
+  )
+    ? fd.sameDayInseminationPeriods
+        .map(
+          inseminationDayPartSrv
+        )
+        .filter(Boolean)
+    : [];
+
+if (
+  requestedPeriod &&
+  existingPeriods.includes(
+    requestedPeriod
+  )
+) {
+  return (
+    `❌ سبق تسجيل تلقيح لهذا الحيوان ` +
+    `${requestedPeriod} في اليوم نفسه. ` +
+    `لا يمكن تكرار التلقيح في نفس الفترة.`
+  );
+}
+
+if (sameDayCount >= 2) {
+  return "❌ سبق تسجيل تلقيحين لهذا الحيوان في اليوم نفسه، لذلك لا يمكن تسجيل تلقيح ثالث.";
+}
+
+if (sameDayCount === 1) {
+  warnings.push(
+    "⚠️ سبق تسجيل تلقيح لهذا الحيوان اليوم. يُسمح بإعادة واحدة فقط في الفترة الأخرى."
+  );
+}
 
   // ✅ آخر تلقيح: من الأحداث أولًا ثم الوثيقة
   const lastAI = String(fd.lastInseminationDate || doc.lastInseminationDate || "").trim();
@@ -31505,12 +31668,16 @@ if (eventDate > todayISO) {
           ""
         ).trim();
 
-        const sameDayInseminationCount =
-  await countInseminationsSameDaySrv(
+  const sameDayInseminationInfo =
+  await inseminationSameDayInfoSrv(
     uid,
     animalNumber,
     eventDate
   );
+
+const sameDayInseminationCount =
+  sameDayInseminationInfo.count;
+    
 
 const taiContext =
   await inseminationResolveTaiContextSrv(
@@ -31532,6 +31699,11 @@ const gateData = {
           reproStatusFromEvents: reproFromEvents,
           lastInseminationDate,
           sameDayInseminationCount,
+          sameDayInseminationPeriods:
+          sameDayInseminationInfo.periods,
+
+          inseminationTime:
+          body.inseminationTime,
           confirmEmbryonicLoss: body.confirmEmbryonicLoss,
           embryonicLossConfirmed: body.embryonicLossConfirmed,
           confirmPregnancyLoss: body.confirmPregnancyLoss,
@@ -31839,12 +32011,15 @@ const animal = await fetchAnimalByNumberForCalvingGateSrv(uid, animalNumber);
       ""
     ).trim();
 
-const sameDayInseminationCount =
-  await countInseminationsSameDaySrv(
+const sameDayInseminationInfo =
+  await inseminationSameDayInfoSrv(
     uid,
     animalNumber,
     eventDate
   );
+
+const sameDayInseminationCount =
+  sameDayInseminationInfo.count;
 
 const taiContext =
   await inseminationResolveTaiContextSrv(
@@ -31867,6 +32042,8 @@ const gateData = {
       reproStatusFromEvents: reproFromEvents,
       lastInseminationDate,
       sameDayInseminationCount,
+      sameDayInseminationPeriods:
+      sameDayInseminationInfo.periods,
       confirmEmbryonicLoss: formData.confirmEmbryonicLoss,
       embryonicLossConfirmed: formData.embryonicLossConfirmed,
       confirmPregnancyLoss: formData.confirmPregnancyLoss,
@@ -32037,7 +32214,17 @@ const prevServices = Number(doc.servicesCount || 0);
 const nextServices = Number.isFinite(prevServices) ? prevServices + 1 : 1;
 
 const animalCol = animal._collection || "animals";
-const eventRef = db.collection("events").doc();
+const eventRef =
+  db
+    .collection("events")
+    .doc(
+      inseminationEventIdSrv(
+        uid,
+        animalNumber,
+        eventDate,
+        formData.inseminationTime
+      )
+    );
 const embryonicLossRef = needsEmbryonicLoss ? db.collection("events").doc() : null;
 const animalRef = db.collection(animalCol).doc(animal.id);
 
@@ -32091,7 +32278,7 @@ if (needsEmbryonicLoss && embryonicLossRef) {
   payload.smartWarning = warningMessage || null;
 }
 
-batch.set(eventRef, payload);
+batch.create(eventRef, payload);
 
 const animalUpdate = {
   reproductiveStatus: "ملقحة",
@@ -32373,12 +32560,15 @@ const rejected = [];
           ""
         ).trim();
 
-const sameDayInseminationCount =
-  await countInseminationsSameDaySrv(
+const sameDayInseminationInfo =
+  await inseminationSameDayInfoSrv(
     uid,
     animalNumber,
     eventDate
   );
+
+const sameDayInseminationCount =
+  sameDayInseminationInfo.count;
 
 const taiContext =
   await inseminationResolveTaiContextSrv(
@@ -32401,6 +32591,8 @@ const gateData = {
           reproStatusFromEvents: reproFromEvents,
           lastInseminationDate,
           sameDayInseminationCount,
+          sameDayInseminationPeriods:
+          sameDayInseminationInfo.periods,
           confirmEmbryonicLoss: formData.confirmEmbryonicLoss,
           embryonicLossConfirmed: formData.embryonicLossConfirmed,
           confirmPregnancyLoss: formData.confirmPregnancyLoss,
@@ -32472,7 +32664,17 @@ rejected.push({
           warningMessage = message;
         }
 
-        const eventRef = db.collection("events").doc();
+        const eventRef =
+  db
+    .collection("events")
+    .doc(
+      inseminationEventIdSrv(
+        uid,
+        animalNumber,
+        eventDate,
+        formData.inseminationTime
+      )
+    );
                 const needsEmbryonicLoss =
           inseminationIsPregnantStatusSrv(reproStatus) &&
           inseminationConfirmEmbryonicLossSrv(formData);
@@ -32592,7 +32794,7 @@ if (
           payload.smartWarning = warningMessage || null;
         }
 
-        batch.set(eventRef, payload);
+        batch.create(eventRef, payload);
         ops++;
 
       const animalUpdate = {
