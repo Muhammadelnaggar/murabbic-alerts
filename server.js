@@ -22594,6 +22594,336 @@ const iofcPctOfMilkIncome =
     eventDate: null
   };
 }
+function dashboardNutritionScalePctSrv(
+  value,
+  low,
+  high,
+  inverse = false
+) {
+  const v = Number(value);
+  const a = Number(low);
+  const b = Number(high);
+
+  if (
+    !Number.isFinite(v) ||
+    !Number.isFinite(a) ||
+    !Number.isFinite(b) ||
+    a === b
+  ) {
+    return null;
+  }
+
+  const raw =
+    inverse
+      ? ((b - v) / (b - a)) * 100
+      : ((v - a) / (b - a)) * 100;
+
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      Number(raw.toFixed(1))
+    )
+  );
+}
+
+function buildDashboardFeedMetricStandardsSrv(
+  overall = {},
+  species = ""
+) {
+  const headCount =
+    Number(overall.headCount || 0);
+
+  const totalMilkKg =
+    Number(overall.totalMilkKg || 0);
+
+  const totalMilkRevenue =
+    Number(overall.totalMilkRevenue || 0);
+
+  const iofcPct =
+    Number(overall.iofcPctOfMilkIncome);
+
+  const feedCostPct =
+    Number(overall.feedCostPctOfMilkIncome);
+
+  const iofcPerHead =
+    Number(overall.iofc);
+
+  const feedCostPerKgMilk =
+    Number(overall.feedCostPerLiter);
+
+  const totalFeedCostPerDay =
+    Number(
+      overall.totalFeedCostPerDay ??
+      overall.totalFeedCost
+    );
+
+  const feedEfficiency =
+    Number(overall.feedEfficiency);
+
+  const available =
+    overall.coverageComplete !== false &&
+    headCount > 0 &&
+    totalMilkKg > 0 &&
+    totalMilkRevenue > 0;
+
+  if (!available) {
+    return {
+      available: false,
+      currentDate:
+        overall.currentDate || null,
+      metrics: []
+    };
+  }
+
+  const milkIncomePerHead =
+    totalMilkRevenue /
+    headCount;
+
+  const milkPricePerKg =
+    totalMilkRevenue /
+    totalMilkKg;
+
+  /*
+   * Penn State IOFC benchmark:
+   *
+   * High IOFC:
+   * feed cost <= 40% milk income
+   *
+   * Low IOFC:
+   * feed cost >= 60% milk income
+   */
+  const iofcLow =
+    milkIncomePerHead * 0.40;
+
+  const iofcHigh =
+    milkIncomePerHead * 0.60;
+
+  const feedCostPerKgStrong =
+    milkPricePerKg * 0.40;
+
+  const feedCostPerKgWeak =
+    milkPricePerKg * 0.60;
+
+  const totalFeedCostStrong =
+    totalMilkRevenue * 0.40;
+
+  const totalFeedCostWeak =
+    totalMilkRevenue * 0.60;
+
+  const buffalo =
+    isBuffaloSpecies(species);
+
+  /*
+   * الأبقار:
+   * Penn State ECM / DMI
+   * ideal = 1.45–1.70
+   *
+   * الجاموس:
+   * مرجع تشغيلي مستقل
+   * للّبن المصحح / DMI.
+   */
+  const feScaleMin =
+    buffalo ? 0.50 : 1.00;
+
+  const feScaleMax =
+    buffalo ? 1.20 : 2.00;
+
+  const feTargetMin =
+    buffalo ? 0.80 : 1.45;
+
+  const feTargetMax =
+    buffalo ? 1.10 : 1.70;
+
+  const feTargetStartPct =
+    dashboardNutritionScalePctSrv(
+      feTargetMin,
+      feScaleMin,
+      feScaleMax
+    );
+
+  const feTargetEndPct =
+    dashboardNutritionScalePctSrv(
+      feTargetMax,
+      feScaleMin,
+      feScaleMax
+    );
+
+  return {
+    available: true,
+
+    currentDate:
+      overall.currentDate || null,
+
+    source:
+      "current_server_recalculation",
+
+    metrics: [
+      {
+        key:
+          "iofcPct",
+
+        label:
+          "IOFC من دخل اللبن",
+
+        value:
+          Number(iofcPct.toFixed(1)),
+
+        valueText:
+          `${iofcPct.toFixed(1)}%`,
+
+        positionPct:
+          dashboardNutritionScalePctSrv(
+            iofcPct,
+            40,
+            60
+          ),
+
+        standardText:
+          "القياسي: 40% منخفض — 60% فأعلى قوي"
+      },
+
+      {
+        key:
+          "iofcPerHead",
+
+        label:
+          "IOFC / رأس / يوم",
+
+        value:
+          Number(iofcPerHead.toFixed(2)),
+
+        valueText:
+          `${iofcPerHead.toFixed(2)} جنيه`,
+
+        positionPct:
+          dashboardNutritionScalePctSrv(
+            iofcPerHead,
+            iofcLow,
+            iofcHigh
+          ),
+
+        standardText:
+          `القياسي الحالي: ${iofcLow.toFixed(2)} – ${iofcHigh.toFixed(2)} جنيه/رأس/يوم`
+      },
+
+      {
+        key:
+          "feedCostPct",
+
+        label:
+          "تكلفة العلف من دخل اللبن",
+
+        value:
+          Number(feedCostPct.toFixed(1)),
+
+        valueText:
+          `${feedCostPct.toFixed(1)}%`,
+
+        positionPct:
+          dashboardNutritionScalePctSrv(
+            feedCostPct,
+            40,
+            60,
+            true
+          ),
+
+        standardText:
+          "القياسي: 40% أو أقل قوي — 60% فأعلى مرتفع"
+      },
+
+      {
+        key:
+          "feedCostPerKgMilk",
+
+        label:
+          "تكلفة العلف / كجم لبن",
+
+        value:
+          Number(
+            feedCostPerKgMilk.toFixed(2)
+          ),
+
+        valueText:
+          `${feedCostPerKgMilk.toFixed(2)} جنيه`,
+
+        positionPct:
+          dashboardNutritionScalePctSrv(
+            feedCostPerKgMilk,
+            feedCostPerKgStrong,
+            feedCostPerKgWeak,
+            true
+          ),
+
+        standardText:
+          `القياسي الحالي: ${feedCostPerKgStrong.toFixed(2)} – ${feedCostPerKgWeak.toFixed(2)} جنيه/كجم حسب سعر اللبن`
+      },
+
+      {
+        key:
+          "feedEfficiency",
+
+        label:
+          buffalo
+            ? "كفاءة اللبن المصحح / المادة الجافة"
+            : "كفاءة تحويل ECM / المادة الجافة",
+
+        value:
+          Number(
+            feedEfficiency.toFixed(2)
+          ),
+
+        valueText:
+          feedEfficiency.toFixed(2),
+
+        positionPct:
+          dashboardNutritionScalePctSrv(
+            feedEfficiency,
+            feScaleMin,
+            feScaleMax
+          ),
+
+        targetStartPct:
+          feTargetStartPct,
+
+        targetEndPct:
+          feTargetEndPct,
+
+        standardText:
+          buffalo
+            ? "المرجع التشغيلي للجاموس: 0.80–1.10"
+            : "القياسي للأبقار: 1.45–1.70 ECM/DMI"
+      },
+
+      {
+        key:
+          "totalFeedCostPerDay",
+
+        label:
+          "إجمالي تكلفة التغذية / يوم",
+
+        value:
+          Number(
+            totalFeedCostPerDay.toFixed(2)
+          ),
+
+        valueText:
+          `${totalFeedCostPerDay.toFixed(2)} جنيه`,
+
+        positionPct:
+          dashboardNutritionScalePctSrv(
+            totalFeedCostPerDay,
+            totalFeedCostStrong,
+            totalFeedCostWeak,
+            true
+          ),
+
+        standardText:
+          `القياسي الحالي حسب دخل اللبن: ${totalFeedCostStrong.toFixed(2)} – ${totalFeedCostWeak.toFixed(2)} جنيه/يوم`
+      }
+    ]
+  };
+}
 function buildDashboardFeedAdviceSrv(overall = {}, species = '') {
   if (overall.coverageComplete === false) {
     const covered = Number(overall.coverageHeadCount || 0);
@@ -76633,7 +76963,8 @@ function murabbikNutritionRecalculateGroupSrv({
   weather = null,
   officialGroupsMap = {},
   historyByAnimal = new Map(),
-  animalsByNumber = new Map()
+  animalsByNumber = new Map(),
+  requireMilkDrop = true
 } = {}) {
   try {
 
@@ -76654,14 +76985,17 @@ function murabbikNutritionRecalculateGroupSrv({
 
 
     if (
-      !rows.length ||
-      !group.groupKey ||
-      !milkReportIsDateSrv(
-        currentDate
-      )
-    ) {
-      return null;
-    }
+  (
+    requireMilkDrop &&
+    !rows.length
+  ) ||
+  !group.groupKey ||
+  !milkReportIsDateSrv(
+    currentDate
+  )
+) {
+  return null;
+}
 
 
     const officialMembers =
@@ -76797,14 +77131,16 @@ function murabbikNutritionRecalculateGroupSrv({
      * 95%.
      */
     const minimumCurrentRecords =
-      Math.max(
-        MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS,
+  Math.max(
+    requireMilkDrop
+      ? MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS
+      : 1,
 
-        Math.round(
-          currentGroupNumbers.length *
-          0.95
-        )
-      );
+    Math.round(
+      currentGroupNumbers.length *
+      0.95
+    )
+  );
 
 
     if (
@@ -77022,18 +77358,26 @@ function murabbikNutritionRecalculateGroupSrv({
      * لا ينتج عنه
      * تنبيه تغذية.
      */
-    if (
-      milkChangePct >
-      -5
-    ) {
-      return null;
-    }
+   if (
+  requireMilkDrop &&
+  milkChangePct > -5
+) {
+  return null;
+}
 
 
-    const currentThi =
-      Number(
-        weather?.thi
-      );
+    const currentThiRaw =
+  weather?.thi;
+
+const currentThi =
+  currentThiRaw !== null &&
+  currentThiRaw !== undefined &&
+  String(currentThiRaw).trim() !== "" &&
+  Number.isFinite(
+    Number(currentThiRaw)
+  )
+    ? Number(currentThiRaw)
+    : null;
 
 
     const savedThiRaw =
@@ -77150,12 +77494,15 @@ function murabbikNutritionRecalculateGroupSrv({
          * العليقة أن يدخل
          * القراءة الحالية.
          */
-        thi:
-          Number.isFinite(
-            Number(thiValue)
-          )
-            ? Number(thiValue)
-            : null
+      thi:
+  thiValue !== null &&
+  thiValue !== undefined &&
+  String(thiValue).trim() !== "" &&
+  Number.isFinite(
+    Number(thiValue)
+  )
+    ? Number(thiValue)
+    : null
       });
 
 
@@ -77426,6 +77773,27 @@ currentFeedCostPct:
       .feedCostPctOfMilkIncome
   ),
 
+currentFeedCostPerHeadPerDay:
+  round2(
+    currentAnalysis
+      ?.totals
+      ?.totCost
+  ),
+
+currentMilkRevenuePerHead:
+  round2(
+    nowEco
+      .milkRevenue
+  ),
+
+currentMilkPrice:
+  round2(
+    currentAnalysis
+      ?.inputs
+      ?.milkPriceUsed ??
+    milkPrice
+  ),
+
 currentRecordedCount:
         currentGroupRows.length,
 
@@ -77669,8 +78037,7 @@ const allEvents = sharedEvents.rows;
   }
 
  if (
-  !analyses.length &&
-  !rumenAcidosisPatterns.length
+  !analyses.length
 ) {
   return [];
 }
@@ -84402,148 +84769,525 @@ let feedBands = {
   fresh: emptyFeedBand()
 };
 
-    try {
-      const evNutAll = (
-  await loadHerdStatsEventsSrv()
-).map(e => ({ ...e }));
-const isLactatingNutritionEventForDashboard = (e = {}) => {
-  const ctx = e?.nutrition?.context || {};
-  const groupText = String(
-    ctx.groupType ||
-    ctx.groupName ||
-    ctx.group ||
-    ctx.groupLabel ||
-    e.groupType ||
-    e.groupName ||
-    e.group ||
-    ''
-  ).toLowerCase();
-
-  const isDryOrClose =
-    ctx.earlyDry === true ||
-    ctx.closeUp === true ||
-    /جاف|dry|انتظار|تحضير|close/i.test(groupText) ||
-    /جاف|dry|انتظار|تحضير|close/i.test(String(ctx.pregnancyStatus || ''));
-
-  if (isDryOrClose) return false;
-
-  const milkKg = Number(
-    ctx.avgMilkKg ??
-    ctx.observedAvgMilkKg ??
-    e?.nutrition?.analysis?.economics?.milkRevenue ??
-    0
-  );
-
-  const looksLactating =
-    /حلاب|عالي|متوسط|منخفض|milk|lact/i.test(groupText) ||
-    milkKg > 0;
-
-  return looksLactating;
+let feedDashboardMetrics = {
+  available: false,
+  currentDate: null,
+  metrics: []
 };
-const nutritionEvents = evNutAll
-  .map(e => {
-    const txt = String(e.eventTypeNorm || e.eventType || e.type || '').toLowerCase().trim();
-    const ms = getEventMsSrv(e);
 
-    const ctxSpecies = String(
-      e?.nutrition?.context?.species ||
-      e?.species ||
-      e?.animalTypeAr ||
-      e?.animaltype ||
-      ''
-    ).trim().toLowerCase();
+try {
+  const evNutAll =
+    (
+      await loadHerdStatsEventsSrv()
+    ).map(
+      e => ({
+        ...e
+      })
+    );
 
- const matchesType =
-  selectedDashboardType === 'cows'
-    ? (ctxSpecies.includes('بقر') || ctxSpecies.includes('cow'))
-    : selectedDashboardType === 'buffalo'
-      ? (ctxSpecies.includes('جاموس') || ctxSpecies.includes('buffalo'))
-      : true;
+  const currentDate =
+    cairoTodayISO();
 
-    return { ...e, _txt: txt, _ms: ms, _matchesType: matchesType };
-  })
-.filter(e =>
-  (
-    e._txt === 'nutrition' ||
-    e._txt === 'nutrition_group' ||
-    e._txt.includes('nutrition') ||
-    e._txt.includes('تغذية')
-  ) &&
-  e?.nutrition?.analysis &&
-  e._matchesType &&
-  isLactatingNutritionEventForDashboard(e)
-);
-      const latestByBand = new Map();
-      const lactatingBandKeys = ['fresh', 'high', 'medium', 'low'];
+  const officialGroupsResult =
+    await milkReportLoadOfficialGroupsMapFromFirestoreSrv(
+      uid,
+      animalsAll,
+      true
+    );
 
-      for (const e of nutritionEvents) {
-        const rawGroup =
-          e?.nutrition?.context?.group ||
-          e?.nutrition?.context?.groupKey ||
-          e?.nutrition?.context?.groupName ||
-          e?.group ||
-          e?.groupName ||
-          '';
+  const officialGroupsMap =
+    officialGroupsResult
+      ?.groupsMap ||
+    milkReportEmptyOfficialGroupsMapSrv();
 
-        const band = feedBandKey(rawGroup);
+  const animalsByNumber =
+    new Map();
 
-        // غرفة التحكم لا تعرض عليقة عامة ولا حدث تغذية بلا مجموعة إنتاجية واضحة
-        if (!lactatingBandKeys.includes(band)) continue;
+  for (
+    const doc
+    of animalsAll
+  ) {
+    const number =
+      murabbikDryOffAlertNumberSrv(
+        doc
+      );
 
-        const prev = latestByBand.get(band);
-        if (!prev || Number(e._ms || 0) > Number(prev._ms || 0)) {
-          latestByBand.set(band, e);
-        }
-      }
+    if (!number) continue;
 
-      for (const key of lactatingBandKeys) {
-        if (latestByBand.has(key)) {
-          feedBands[key] = buildFeedBandFromEvent(
-            latestByBand.get(key),
-            officialFeedBandCounts?.[key]
-          );
-        }
-      }
+    animalsByNumber.set(
+      number,
+      doc
+    );
+  }
 
-      const lactatingCards = lactatingBandKeys
-        .map(key => feedBands[key])
-        .filter(x => x && Number(x.headCount || 0) > 0);
+  /*
+   * اللبن الحالي فقط.
+   *
+   * الداشبورد لا يعرض
+   * اقتصاد Snapshot قديم.
+   */
+  const historyByAnimal =
+    new Map();
 
-      const coveredHeads = lactatingCards
-        .reduce((sum, x) => sum + Number(x.headCount || 0), 0);
-
-      const farmLactatingHeadCount = Number(inMilkCount || 0);
-      const minRequiredHeads = farmLactatingHeadCount > 0
-        ? Math.max(1, Math.round(farmLactatingHeadCount * 0.95))
-        : 0;
-
-      const bandCoverageCoversFarm =
-        lactatingCards.length > 0 &&
-        (!minRequiredHeads || coveredHeads >= minRequiredHeads);
-
-      if (bandCoverageCoversFarm) {
-        feedBands.overall = {
-          ...weightedFeedBands(lactatingCards),
-          scope: 'lactating_farm',
-          coverageComplete: true,
-          coverageHeadCount: coveredHeads,
-          coverageRequiredHeadCount: farmLactatingHeadCount,
-          source: 'weighted_lactating_feed_bands'
-        };
-          } else {
-        feedBands.overall = {
-          ...emptyFeedBand(),
-          headCount: farmLactatingHeadCount || coveredHeads || 0,
-          scope: 'lactating_farm',
-          coverageComplete: false,
-          coverageHeadCount: coveredHeads,
-          coverageRequiredHeadCount: farmLactatingHeadCount,
-          source: 'incomplete_lactating_feed_coverage'
-        };
-      }
-    } catch (e) {
-      console.error("FEED BANDS ERROR:", e.message || e);
+  for (
+    const event
+    of evNutAll
+  ) {
+    if (
+      !milkReportIsMilkEventSrv(
+        event
+      )
+    ) {
+      continue;
     }
+
+    const animalNumber =
+      calvingNormDigitsOnlySrv(
+        event.animalNumber ||
+        event.number ||
+        ""
+      );
+
+    const eventDate =
+      murabbikMilkMirrorDateSrv(
+        event
+      );
+
+    const milkKg =
+      milkReportKgSrv(
+        event
+      );
+
+    if (
+      !animalNumber ||
+      eventDate !== currentDate ||
+      !Number.isFinite(
+        Number(milkKg)
+      ) ||
+      Number(milkKg) <= 0
+    ) {
+      continue;
+    }
+
+    if (
+      !historyByAnimal.has(
+        animalNumber
+      )
+    ) {
+      historyByAnimal.set(
+        animalNumber,
+        new Map()
+      );
+    }
+
+    const byDate =
+      historyByAnimal.get(
+        animalNumber
+      );
+
+    if (
+      !byDate.has(
+        eventDate
+      )
+    ) {
+      byDate.set(
+        eventDate,
+        {
+          animalNumber,
+          eventDate,
+          milkKg:
+            Number(milkKg)
+        }
+      );
+    }
+  }
+
+  const nutritionEvents =
+    evNutAll.filter(
+      event =>
+        isNutritionSavedEvent(
+          event
+        )
+    );
+
+  let currentWeather =
+    null;
+
+  try {
+    currentWeather =
+      await weatherBuildFarmThiSrv(
+        req.authSession?.uid ||
+        uid
+      );
+  } catch (e) {
+    console.warn(
+      "dashboard nutrition THI failed:",
+      e.message ||
+      e
+    );
+
+    currentWeather =
+      null;
+  }
+
+  const groupPrefix =
+    selectedDashboardType ===
+    "buffalo"
+      ? "buffalo_"
+      : "cow_";
+
+  const lactatingBands = [
+    {
+      key: "fresh",
+      groupId:
+        `${groupPrefix}fresh`
+    },
+    {
+      key: "high",
+      groupId:
+        `${groupPrefix}high`
+    },
+    {
+      key: "medium",
+      groupId:
+        `${groupPrefix}med`
+    },
+    {
+      key: "low",
+      groupId:
+        `${groupPrefix}low`
+    }
+  ];
+
+  const hasNumber =
+    value =>
+      value !== null &&
+      value !== undefined &&
+      String(value).trim() !== "" &&
+      Number.isFinite(
+        Number(value)
+      );
+
+  for (
+    const band
+    of lactatingBands
+  ) {
+    const groupId =
+      band.groupId;
+
+    const def =
+      GROUP_DEF_BY_ID_SRV[
+        groupId
+      ] ||
+      {};
+
+    const members =
+      Array.isArray(
+        officialGroupsMap[
+          groupId
+        ]
+      )
+        ? officialGroupsMap[
+            groupId
+          ]
+        : [];
+
+    if (
+      !members.length
+    ) {
+      continue;
+    }
+
+    const perf =
+      murabbikNutritionRecalculateGroupSrv({
+        groupData: {
+          rows: [],
+
+          currentDate,
+
+          group: {
+            groupId,
+
+            groupKey:
+              groupId,
+
+            groupName:
+              def.label ||
+              groupId,
+
+            speciesKey:
+              def.species ===
+              "buffalo"
+                ? "buffalo"
+                : "cow"
+          }
+        },
+
+        nutritionEvents,
+
+        weather:
+          currentWeather,
+
+        officialGroupsMap,
+
+        historyByAnimal,
+
+        animalsByNumber,
+
+        requireMilkDrop:
+          false
+      });
+
+    if (!perf) {
+      continue;
+    }
+
+    if (
+      !hasNumber(
+        perf.currentFeedCostPerHeadPerDay
+      ) ||
+      !hasNumber(
+        perf.currentMilkRevenuePerHead
+      ) ||
+      !hasNumber(
+        perf.currentIofc
+      ) ||
+      !hasNumber(
+        perf.currentIofcPct
+      ) ||
+      !hasNumber(
+        perf.currentFeedCostPct
+      ) ||
+      !hasNumber(
+        perf.currentFeedCostPerKgMilk
+      ) ||
+      !hasNumber(
+        perf.currentFeedEfficiency
+      )
+    ) {
+      continue;
+    }
+
+    const headCount =
+      Number(
+        perf.currentGroupSize
+      );
+
+    const avgMilkKg =
+      Number(
+        perf.currentMilkKg
+      );
+
+    const feedCostPerHead =
+      Number(
+        perf.currentFeedCostPerHeadPerDay
+      );
+
+    const milkRevenuePerHead =
+      Number(
+        perf.currentMilkRevenuePerHead
+      );
+
+    const marginPerHead =
+      Number(
+        perf.currentIofc
+      );
+
+    feedBands[
+      band.key
+    ] = {
+      headCount,
+
+      avgMilkKg,
+
+      totalMilkKg:
+        Number(
+          (
+            avgMilkKg *
+            headCount
+          ).toFixed(2)
+        ),
+
+      feedCostPerLiter:
+        Number(
+          perf.currentFeedCostPerKgMilk
+        ),
+
+      feedEfficiency:
+        Number(
+          perf.currentFeedEfficiency
+        ),
+
+      feedCostPerHeadPerDay:
+        feedCostPerHead,
+
+      totalFeedCost:
+        Number(
+          (
+            feedCostPerHead *
+            headCount
+          ).toFixed(2)
+        ),
+
+      totalMilkRevenue:
+        Number(
+          (
+            milkRevenuePerHead *
+            headCount
+          ).toFixed(2)
+        ),
+
+      iofc:
+        marginPerHead,
+
+      totalMargin:
+        Number(
+          (
+            marginPerHead *
+            headCount
+          ).toFixed(2)
+        ),
+
+      feedCostPctOfMilkIncome:
+        Number(
+          perf.currentFeedCostPct
+        ),
+
+      iofcPctOfMilkIncome:
+        Number(
+          perf.currentIofcPct
+        ),
+
+      eventDate:
+        perf.eventDate ||
+        null,
+
+      currentDate,
+
+      source:
+        "current_server_recalculation"
+    };
+  }
+
+  const lactatingCards =
+    lactatingBands
+      .map(
+        band =>
+          feedBands[
+            band.key
+          ]
+      )
+      .filter(
+        card =>
+          card &&
+          Number(
+            card.headCount ||
+            0
+          ) > 0
+      );
+
+  const coveredHeads =
+    lactatingCards.reduce(
+      (sum, card) =>
+        sum +
+        Number(
+          card.headCount ||
+          0
+        ),
+      0
+    );
+
+  const farmLactatingHeadCount =
+    Number(
+      inMilkCount ||
+      0
+    );
+
+  const minRequiredHeads =
+    farmLactatingHeadCount > 0
+      ? Math.max(
+          1,
+          Math.round(
+            farmLactatingHeadCount *
+            0.95
+          )
+        )
+      : 0;
+
+  const coverageComplete =
+    lactatingCards.length > 0 &&
+    (
+      !minRequiredHeads ||
+      coveredHeads >=
+      minRequiredHeads
+    );
+
+  if (
+    coverageComplete
+  ) {
+    feedBands.overall = {
+      ...weightedFeedBands(
+        lactatingCards
+      ),
+
+      scope:
+        "lactating_farm",
+
+      coverageComplete:
+        true,
+
+      coverageHeadCount:
+        coveredHeads,
+
+      coverageRequiredHeadCount:
+        farmLactatingHeadCount,
+
+      currentDate,
+
+      source:
+        "current_server_recalculation"
+    };
+  } else {
+    feedBands.overall = {
+      ...emptyFeedBand(),
+
+      headCount:
+        farmLactatingHeadCount ||
+        coveredHeads ||
+        0,
+
+      scope:
+        "lactating_farm",
+
+      coverageComplete:
+        false,
+
+      coverageHeadCount:
+        coveredHeads,
+
+      coverageRequiredHeadCount:
+        farmLactatingHeadCount,
+
+      currentDate,
+
+      source:
+        "incomplete_current_feed_coverage"
+    };
+  }
+
+  feedDashboardMetrics =
+    buildDashboardFeedMetricStandardsSrv(
+      feedBands.overall,
+      selectedDashboardSpecies
+    );
+
+} catch (e) {
+  console.error(
+    "FEED BANDS CURRENT RECALC ERROR:",
+    e.message ||
+    e
+  );
+}
     // --------------------------------------
     // 🔥 6) RETURN — النتيجة النهائية للداشبورد
 return res.json({
@@ -84633,6 +85377,8 @@ feedGaugeCards:
     feedBands.overall,
     selectedDashboardSpecies
   ),
+
+feedDashboardMetrics,
 
 feedBands,
 
