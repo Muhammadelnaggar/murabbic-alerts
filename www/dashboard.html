@@ -741,138 +741,100 @@ function cullTotalBox(count, pct){
     'cull'
   );
 }
-function iofcBox(totalValue, pctValue){
-  const pct = Number(pctValue);
-  const total = Number(totalValue);
+function feedDashboardMetricBox(metric = {}, fallback = {}){
+  const label =
+    String(
+      metric?.label ||
+      fallback.label ||
+      'مؤشر التغذية'
+    ).trim();
+
+  const valueText =
+    String(
+      metric?.valueText ||
+      ''
+    ).trim() || '—';
+
+  const rawPosition =
+    metric?.positionPct;
+
+  const hasPosition =
+    rawPosition !== null &&
+    rawPosition !== undefined &&
+    Number.isFinite(
+      Number(rawPosition)
+    );
+
+  const positionPct =
+    hasPosition
+      ? clamp(
+          Number(rawPosition),
+          0,
+          100
+        )
+      : null;
+
+  const standardText =
+    String(
+      metric?.standardText ||
+      fallback.unavailableText ||
+      ''
+    ).trim();
+
+  const href =
+    String(
+      fallback.href ||
+      ''
+    ).trim();
+
+  const go =
+    href
+      ? `onclick="location.href='${href}'"`
+      : '';
 
   return `
-    <div class="kpi feed">
-      <div class="kpi-label">IOFC — هامش اللبن بعد العلف</div>
-      <div class="kpi-value">${Number.isFinite(pct) ? `${pct.toFixed(1)}%` : '--'}</div>
-
-<div class="metric-scale">
-  <div class="metric-scale-track">
-    <div class="metric-scale-segs">
-      <div class="metric-scale-seg danger"></div>
-      <div class="metric-scale-seg warn"></div>
-      <div class="metric-scale-seg ok"></div>
-      <div class="metric-scale-seg elite"></div>
-    </div>
-    <div class="metric-scale-dot" style="left:${metricScalePositionDirect(pct, 40, 70)}%"></div>
-  </div>
-  <div class="metric-scale-labels">
-    <span>&lt;40%</span>
-    <span>40–49%</span>
-    <span>50–59%</span>
-    <span>≥60%</span>
-  </div>
-</div>
-
-      <div class="kpi-sub">
-        ${Number.isFinite(total) ? `${total.toFixed(2)} جنيه / يوم` : 'إجمالي اليوم غير متاح'}
+    <div class="kpi feed" ${go}>
+      <div class="kpi-label">
+        ${label}
       </div>
-    </div>
-  `;
-}
-function feBox(value){
-  const v = Number(value);
-  const pos = Number.isFinite(v) ? metricScalePositionDirect(v, 1.0, 1.9) : 0;
 
-  return `
-    <div class="kpi feed">
-      <div class="kpi-label">كفاءة تحويل المادة الجافة إلى لبن</div>
-      <div class="kpi-value">${Number.isFinite(v) ? v.toFixed(2) : '--'}</div>
+      <div class="kpi-value">
+        ${valueText}
+      </div>
 
       <div class="metric-scale">
         <div class="metric-scale-track">
+
           <div class="metric-scale-segs">
             <div class="metric-scale-seg danger"></div>
             <div class="metric-scale-seg warn"></div>
             <div class="metric-scale-seg ok"></div>
             <div class="metric-scale-seg elite"></div>
           </div>
-          <div class="metric-scale-dot" style="left:${pos}%"></div>
+
+          ${
+            positionPct === null
+              ? ''
+              : `
+                <div
+                  class="metric-scale-dot"
+                  style="left:${positionPct}%"
+                ></div>
+              `
+          }
+
         </div>
-        <div class="metric-scale-labels">
-          <span>&lt;1.30</span>
-          <span>1.30–1.39</span>
-          <span>1.40–1.80</span>
-          <span>&gt;1.80</span>
-        </div>
       </div>
 
-      <div class="kpi-sub">ECM / كجم مادة جافة</div>
-    </div>
-  `;
-}
-function feedSmartGaugeCard(card = {}, href = ''){
-  const pointer = Number(card.pointerPct);
-  const safePointer = Number.isFinite(pointer)
-    ? Math.max(0, Math.min(100, pointer))
-    : 0;
-
-  const deg = (safePointer / 100) * 180;
-  const state = String(card.state || 'neutral');
-  const go = href ? `onclick="location.href='${href}'"` : '';
-
-  return `
-    <div class="kpi feed feed-smart-card" ${go}>
-      <div class="feed-smart-title">${card.title || 'مؤشر التغذية'}</div>
-
-      <div class="feed-smart-gauge">
-        <div class="feed-smart-arc"></div>
-        <div class="feed-smart-needle" style="--p:${deg}deg"></div>
-        <div class="feed-smart-value">${card.valueText || '—'}</div>
-      </div>
-
-      <div class="feed-smart-state ${state}">
-        ${card.stateLabel || 'غير مكتمل'}
-      </div>
-
-      <div class="feed-smart-message">${card.message || ''}</div>
-      <div class="feed-smart-sub">${card.subText || ''}</div>
-      <div class="feed-smart-scale-text">${card.scaleText || ''}</div>
-    </div>
-  `;
-}
-function feedInfoBox({ title, value, unit = '', sub = '', href = '' } = {}){
-  const n = Number(value);
-  const display = Number.isFinite(n)
-    ? n.toLocaleString('ar-EG', { maximumFractionDigits: 2 })
-    : '--';
-
-  const go = href ? `onclick="location.href='${href}'"` : '';
-
-  return `
-    <div class="kpi feed feed-info-card" ${go}>
-      <div class="kpi-label">${title}</div>
-      <div class="kpi-value">${display}</div>
-      <div class="kpi-sub">${unit}${sub ? '<br>' + sub : ''}</div>
-    </div>
-  `;
-} 
-function feedBandCard(title, band = {}) {
-  const headCount = Number(band?.headCount || 0);
-  const avgMilkKg = Number(band?.avgMilkKg || 0);
-  const feedEfficiency = Number(band?.feedEfficiency || 0);
-  const feedCostPerLiter = Number(band?.feedCostPerLiter || 0);
-  const feedCostPerHeadPerDay = Number(band?.feedCostPerHeadPerDay || 0);
-  const iofc = Number(band?.iofc || 0);
-
-  const lines = [
-    `عدد الحيوانات: ${headCount || 0}`,
-    `متوسط اللبن: ${Number.isFinite(avgMilkKg) ? avgMilkKg.toFixed(1) : '0.0'} كجم`,
-    `كفاءة التحويل: ${Number.isFinite(feedEfficiency) ? feedEfficiency.toFixed(2) : '0.00'}`,
-    `تكلفة اللتر: ${Number.isFinite(feedCostPerLiter) ? feedCostPerLiter.toFixed(2) : '0.00'} ج`,
-    `تكلفة الرأس/يوم: ${Number.isFinite(feedCostPerHeadPerDay) ? feedCostPerHeadPerDay.toFixed(2) : '0.00'} ج`,
-    `هامش لبن/علف: ${Number.isFinite(iofc) ? iofc.toFixed(2) : '0.00'} ج`
-  ];
-
-  return `
-    <div class="kpi feed">
-      <div class="kpi-label">${title}</div>
-      <div class="kpi-value">${Number.isFinite(feedEfficiency) ? feedEfficiency.toFixed(2) : '0.00'}</div>
-      <div class="kpi-sub">${lines.join('<br>')}</div>
+      ${
+        standardText
+          ? `
+            <div class="kpi-sub">
+              ${standardText}
+            </div>
+          `
+          : ''
+      }
     </div>
   `;
 }
@@ -1019,49 +981,84 @@ const heatDetectionRatePct =
     const cullProdPct   = Number(stats.cullProdPct ?? 0);
     const cullReproPct  = Number(stats.cullReproPct ?? 0);
     const cullHealthPct = Number(stats.cullHealthPct ?? 0);
-    const feedBands = stats.feedBands || {};
-    const overallFeedBand = feedBands.overall || {};
+const feedBands =
+  stats.feedBands || {};
 
-    const feedEfficiency = Number(stats.feedEfficiency ?? overallFeedBand.feedEfficiency ?? 0);
-    const dmiAvg        = Number(stats.dmiAvg ?? 0);
-    const iofc          = Number(stats.iofc ?? overallFeedBand.iofc ?? 0);
-    const fecesScore    = Number(stats.fecesScore ?? 0);
-    const bcsCamera     = Number(stats.bcsCamera ?? 0);
-    const cullTotalCount = Number(stats.cullTotal ?? 0);
-    const cullTotalPct   = Number(stats.cullTotalPct ?? 0);
+const overallFeedBand =
+  feedBands.overall || {};
 
-    const feedCostPerLiter = Number(stats.feedCostPerLiter ?? overallFeedBand.feedCostPerLiter ?? 0);
-    const feedCostPerHeadPerDay = Number(stats.feedCostPerHeadPerDay ?? overallFeedBand.feedCostPerHeadPerDay ?? 0);
-    const totalFeedCostPerDay = Number(
-  stats.totalFeedCostPerDay ??
-  overallFeedBand.totalFeedCostPerDay ??
-  overallFeedBand.totalFeedCost ??
-  0
-);
+const feedDashboard =
+  stats.feedDashboardMetrics || {};
 
-const totalMilkFeedMarginPerDay = Number(
-  stats.totalMilkFeedMarginPerDay ??
-  stats.totalIofcPerDay ??
-  overallFeedBand.totalMilkFeedMarginPerDay ??
-  overallFeedBand.totalIofc ??
-  overallFeedBand.totalMargin ??
-  0
-);
+const feedDashboardMetrics =
+  Array.isArray(
+    feedDashboard.metrics
+  )
+    ? feedDashboard.metrics
+    : [];
 
-const iofcPctOfMilkIncome = Number(
-  stats.iofcPctOfMilkIncome ??
-  overallFeedBand.iofcPctOfMilkIncome ??
-  overallFeedBand.iofcPct ??
-  0
-);
+const feedDashboardByKey =
+  new Map(
+    feedDashboardMetrics
+      .filter(
+        item =>
+          item &&
+          item.key
+      )
+      .map(
+        item => [
+          String(item.key),
+          item
+        ]
+      )
+  );
 
-const feedAdvice =
-  stats.feedAdvice ||
-  stats.feedGuidance ||
-  stats.nutritionAdvice ||
-  stats.nutritionGuidance ||
-  '';
-const feedGaugeCards = stats.feedGaugeCards || {};
+const feedCoverageCovered =
+  Number(
+    overallFeedBand
+      .coverageHeadCount ||
+    0
+  );
+
+const feedCoverageRequired =
+  Number(
+    overallFeedBand
+      .coverageRequiredHeadCount ||
+    0
+  );
+
+const feedUnavailableText =
+  feedDashboard.available === true
+    ? ''
+    : (
+        feedCoverageRequired > 0
+          ? `البيانات الحالية غير مكتملة — ${feedCoverageCovered}/${feedCoverageRequired} رأس حلاب`
+          : 'البيانات الحالية غير مكتملة'
+      );
+
+const fecesScore =
+  Number(
+    stats.fecesScore ??
+    0
+  );
+
+const bcsCamera =
+  Number(
+    stats.bcsCamera ??
+    0
+  );
+
+const cullTotalCount =
+  Number(
+    stats.cullTotal ??
+    0
+  );
+
+const cullTotalPct =
+  Number(
+    stats.cullTotalPct ??
+    0
+  );
 
  const avgHead7Days = Number(stats.avgHead7Days ?? 0);
 const totalDailyMilk = Number(stats.dailyMilkTotal ?? 0);
@@ -1289,37 +1286,86 @@ cullGrid.innerHTML =
   box('عدد الاستبعاد الإنتاجي', stats.cullProdCount ?? 0, `نسبته من القطيع ${cullProdPct}%`, 'g_cullProd', 'cull') +
   box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من القطيع ${cullReproPct}%`, 'g_cullRepro', 'cull') +
   box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من القطيع ${cullHealthPct}%`, 'g_cullHealth', 'cull');
+const feedMetricSpecs = [
+  {
+    key: 'iofcPct',
+    label: 'IOFC من دخل اللبن',
+    href:
+      links.nutritionIofc ||
+      'nutrition-report.html'
+  },
+
+  {
+    key: 'iofcPerHead',
+    label: 'IOFC / رأس / يوم',
+    href:
+      links.nutritionIofc ||
+      'nutrition-report.html'
+  },
+
+  {
+    key: 'feedCostPct',
+    label:
+      'تكلفة العلف من دخل اللبن',
+    href:
+      links.nutritionReport ||
+      'nutrition-report.html'
+  },
+
+  {
+    key: 'feedCostPerKgMilk',
+    label:
+      'تكلفة العلف / كجم لبن',
+    href:
+      links.nutritionCostLiter ||
+      'nutrition-report.html'
+  },
+
+  {
+    key: 'feedEfficiency',
+
+    label:
+      currentType === 'buffalo'
+        ? 'كفاءة اللبن المصحح / المادة الجافة'
+        : 'كفاءة تحويل ECM / المادة الجافة',
+
+    href:
+      links.nutritionFeedEfficiency ||
+      'nutrition-report.html'
+  },
+
+  {
+    key: 'totalFeedCostPerDay',
+    label:
+      'إجمالي تكلفة التغذية / يوم',
+
+    href:
+      links.nutritionTotalFeedCost ||
+      'nutrition-report.html'
+  }
+];
+
 feedGrid.innerHTML =
-  feedSmartGaugeCard(
-    feedGaugeCards.iofc,
-    links.nutritionIofc || 'nutrition-report.html'
-  ) +
-  feedSmartGaugeCard(
-    feedGaugeCards.feedEfficiency,
-    links.nutritionFeedEfficiency || 'nutrition-report.html'
-  ) +
-  feedInfoBox({
-    title: 'تكلفة كجم اللبن من التغذية',
-    value: feedCostPerLiter,
-    unit: 'جنيه / كجم لبن',
-    sub: 'رقم تشغيلي داعم يُقرأ مع IOFC وسعر اللبن.',
-    href: links.nutritionCostLiter || 'nutrition-report.html'
-  }) +
-  feedInfoBox({
-    title: 'إجمالي تكاليف التغذية / يوم',
-    value: totalFeedCostPerDay,
-    unit: 'جنيه / يوم',
-    sub: 'إجمالي تكلفة التغذية اليومية للمزرعة/القطيع.',
-    href: links.nutritionTotalFeedCost || 'nutrition-report.html'
-  }) +
-  (
-    feedAdvice
-      ? `<div class="kpi feed feed-advice-card" onclick="location.href='${links.nutritionReport || 'nutrition-report.html'}'">
-          <div class="kpi-label">توجيه مُرَبِّيك</div>
-          <div class="kpi-sub">${feedAdvice}</div>
-        </div>`
-      : ''
-  );
+  feedMetricSpecs
+    .map(
+      spec =>
+        feedDashboardMetricBox(
+          feedDashboardByKey.get(
+            spec.key
+          ),
+          {
+            label:
+              spec.label,
+
+            href:
+              spec.href,
+
+            unavailableText:
+              feedUnavailableText
+          }
+        )
+    )
+    .join('');
 const healthReportLink = healthReportHref();
 
 healthGrid.innerHTML =
