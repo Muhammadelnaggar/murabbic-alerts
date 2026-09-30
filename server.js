@@ -26620,6 +26620,7 @@ if (!isGroup && db) {
 
 nutrition: {
   mode: nutrition.mode || 'tmr_asfed',
+  concKg,
   rows,
   context: analysisContext,
   milkPrice,
@@ -77091,6 +77092,1074 @@ function murabbikMilkMirrorGroupRationEventIdSrv(
     ""
   ).trim();
 }
+function murabbikNutritionDimStageSrv(dim) {
+  const d = Number(dim);
+
+  if (!Number.isFinite(d) || d < 0) {
+    return {
+      order: 99,
+      label: "DIM غير مكتمل"
+    };
+  }
+
+  if (d <= 40) {
+    return {
+      order: 1,
+      label: "0–40 يوم"
+    };
+  }
+
+  if (d <= 100) {
+    return {
+      order: 2,
+      label: "41–100 يوم"
+    };
+  }
+
+  if (d <= 199) {
+    return {
+      order: 3,
+      label: "101–199 يوم"
+    };
+  }
+
+  if (d <= 305) {
+    return {
+      order: 4,
+      label: "200–305 يوم"
+    };
+  }
+
+  return {
+    order: 5,
+    label: "أكثر من 305 يوم"
+  };
+}
+
+
+function murabbikNutritionCurrentDimSrv(
+  doc = {},
+  dateISO = ""
+) {
+  const calvingDate =
+    String(
+      doc.lastCalvingDate ||
+      doc.calvingDate ||
+      doc.calvedAt ||
+      ""
+    ).slice(0, 10);
+
+  if (
+    !milkReportIsDateSrv(calvingDate) ||
+    !milkReportIsDateSrv(dateISO)
+  ) {
+    return null;
+  }
+
+  const dim =
+    milkReportDaysBetweenSrv(
+      calvingDate,
+      dateISO
+    );
+
+  return (
+    Number.isFinite(Number(dim)) &&
+    Number(dim) >= 0
+  )
+    ? Math.floor(Number(dim))
+    : null;
+}
+
+
+function murabbikNutritionModelReasonSrv(
+  model = null,
+  label = ""
+) {
+  if (
+    !model ||
+    typeof model !== "object"
+  ) {
+    return "";
+  }
+
+  const status =
+    String(
+      model.status ||
+      model.state ||
+      ""
+    ).toLowerCase();
+
+  const isAttention =
+    [
+      "warn",
+      "watch",
+      "danger",
+      "deficit"
+    ].some(
+      token =>
+        status.includes(token)
+    );
+
+  if (!isAttention) {
+    return "";
+  }
+
+  return [
+    String(
+      model.title ||
+      label ||
+      ""
+    ).trim(),
+
+    String(
+      model.reason ||
+      model.note ||
+      model.message ||
+      ""
+    ).trim()
+  ]
+    .filter(Boolean)
+    .join(": ");
+}
+
+
+function murabbikNutritionRecalculateGroupSrv({
+  groupData = {},
+  nutritionEvents = [],
+  weather = null,
+  rumenAcidosisPatterns = [],
+  officialGroupsMap = {},
+  historyByAnimal = new Map(),
+  animalsByNumber = new Map()
+} = {}) {
+  try {
+
+    const rows =
+      Array.isArray(groupData.rows)
+        ? groupData.rows
+        : [];
+
+    const group =
+      groupData.group ||
+      {};
+
+    const currentDate =
+      String(
+        groupData.currentDate ||
+        ""
+      ).slice(0, 10);
+
+
+    if (
+      !rows.length ||
+      !group.groupKey ||
+      !milkReportIsDateSrv(
+        currentDate
+      )
+    ) {
+      return null;
+    }
+
+
+    const officialMembers =
+      Array.isArray(
+        officialGroupsMap?.[
+          group.groupId
+        ]
+      )
+        ? officialGroupsMap[
+            group.groupId
+          ]
+        : [];
+
+
+    const currentGroupNumbers =
+      [
+        ...new Set(
+          officialMembers
+            .map(
+              member =>
+                murabbikDryOffAlertNumberSrv(
+                  member
+                )
+            )
+            .filter(Boolean)
+        )
+      ];
+
+
+    if (
+      !currentGroupNumbers.length
+    ) {
+      return null;
+    }
+
+
+    const currentGroupRows = [];
+
+
+    for (
+      const animalNumber
+      of currentGroupNumbers
+    ) {
+
+      const doc =
+        animalsByNumber.get(
+          animalNumber
+        ) ||
+        null;
+
+      const byDate =
+        historyByAnimal.get(
+          animalNumber
+        );
+
+
+      if (
+        !doc ||
+        !byDate
+      ) {
+        continue;
+      }
+
+
+      if (
+        !murabbikMilkMirrorAnimalActiveSrv(
+          doc
+        )
+      ) {
+        continue;
+      }
+
+
+      if (
+        !murabbikDryOffAlertIsMilkingSrv(
+          doc
+        )
+      ) {
+        continue;
+      }
+
+
+      if (
+        String(
+          doc.entryType ||
+          ""
+        )
+          .trim()
+          .toLowerCase() ===
+        "followers"
+      ) {
+        continue;
+      }
+
+
+      const milkRow =
+        byDate.get(
+          currentDate
+        );
+
+      const milkKg =
+        Number(
+          milkRow?.milkKg
+        );
+
+
+      if (
+        !milkRow ||
+        !Number.isFinite(
+          milkKg
+        ) ||
+        milkKg <= 0
+      ) {
+        continue;
+      }
+
+
+      currentGroupRows.push({
+        animalNumber,
+        doc,
+        milkKg
+      });
+    }
+
+
+    /*
+     * إعادة التحليل التغذوي
+     * تحتاج متوسط مجموعة حاليًا
+     * مكتملًا تقريبًا.
+     *
+     * نفس معيار اكتمال
+     * تغطية الحلاب في الداشبورد:
+     * 95%.
+     */
+    const minimumCurrentRecords =
+      Math.max(
+        MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS,
+
+        Math.round(
+          currentGroupNumbers.length *
+          0.95
+        )
+      );
+
+
+    if (
+      currentGroupRows.length <
+      minimumCurrentRecords
+    ) {
+      return null;
+    }
+
+
+    const latest =
+      milkReportLatestNutritionForGroupSrv(
+        nutritionEvents,
+
+        {
+          groupId:
+            group.groupId,
+
+          groupName:
+            group.groupName,
+
+          groupNumbers:
+            currentGroupNumbers
+        },
+
+        currentDate
+      );
+
+
+    const event =
+      latest?.event ||
+      null;
+
+    const nutrition =
+      event?.nutrition ||
+      {};
+
+    const savedRows =
+      Array.isArray(
+        nutrition.rows
+      )
+        ? nutrition.rows
+        : [];
+
+    const savedContext =
+      nutrition.context ||
+      {};
+
+
+    if (
+      !event ||
+      !savedRows.length
+    ) {
+      return null;
+    }
+
+
+    /*
+     * المرجع الحقيقي:
+     * اللبن الفعلي وقت
+     * حفظ العليقة.
+     *
+     * لو الحدث القديم
+     * معمول على Target Milk
+     * لا نستخدم الهدف
+     * كأنه إنتاج فعلي.
+     */
+    const savedWasTarget =
+      savedContext
+        .useTargetMilkForRation ===
+        true ||
+
+      savedContext
+        .useTargetMilk ===
+        true ||
+
+      savedContext
+        .useTargetMilkKg ===
+        true ||
+
+      String(
+        savedContext.milkMode ||
+        ""
+      ).toLowerCase() ===
+      "target";
+
+
+    const savedMilkKg =
+      Number(
+
+        savedContext
+          .actualMilkKg ??
+
+        savedContext
+          .observedAvgMilkKg ??
+
+        (
+          !savedWasTarget
+            ? savedContext.avgMilkKg
+            : null
+        )
+      );
+
+
+    const savedDimRaw =
+      Number(
+        savedContext.daysInMilk
+      );
+
+
+    const savedDim =
+      Number.isFinite(
+        savedDimRaw
+      ) &&
+      savedDimRaw >= 0
+
+        ? Math.round(
+            savedDimRaw
+          )
+
+        : null;
+
+
+    const currentMilkKg =
+      currentGroupRows.reduce(
+        (sum, row) =>
+          sum +
+          Number(
+            row.milkKg ||
+            0
+          ),
+        0
+      ) /
+      currentGroupRows.length;
+
+
+    /*
+     * DIM الحالي لا يؤخذ
+     * من Snapshot daysInMilk.
+     *
+     * يعاد حسابه من
+     * آخر ولادة إلى تاريخ
+     * اللبن الحالي.
+     */
+    const dims =
+      currentGroupRows
+        .map(
+          row =>
+            murabbikNutritionCurrentDimSrv(
+              row.doc || {},
+              currentDate
+            )
+        )
+        .filter(
+          value =>
+            Number.isFinite(
+              Number(value)
+            ) &&
+            Number(value) >= 0
+        );
+
+
+    if (
+      !Number.isFinite(
+        savedMilkKg
+      ) ||
+      savedMilkKg <= 0 ||
+
+      savedDim === null ||
+
+      !Number.isFinite(
+        currentMilkKg
+      ) ||
+      currentMilkKg <= 0 ||
+
+      dims.length <
+      minimumCurrentRecords
+    ) {
+      return null;
+    }
+
+
+    const currentDim =
+      Math.round(
+        dims.reduce(
+          (sum, value) =>
+            sum +
+            Number(value),
+          0
+        ) /
+        dims.length
+      );
+
+
+    const milkChangePct =
+      Number(
+        (
+          (
+            (
+              currentMilkKg -
+              savedMilkKg
+            ) /
+            savedMilkKg
+          ) *
+          100
+        ).toFixed(1)
+      );
+
+
+    /*
+     * نفس حد Milk Mirror
+     * الجماعي.
+     *
+     * فرق أقل من 5%
+     * لا ينتج عنه
+     * تنبيه تغذية.
+     */
+    if (
+      milkChangePct >
+      -5
+    ) {
+      return null;
+    }
+
+
+    const currentThi =
+      Number(
+        weather?.thi
+      );
+
+
+    const savedThiRaw =
+      savedContext.thi ??
+
+      nutrition
+        .analysis
+        ?.inputs
+        ?.thiUsed ??
+
+      null;
+
+
+    const savedThi =
+      Number.isFinite(
+        Number(savedThiRaw)
+      )
+        ? Number(savedThiRaw)
+        : null;
+
+
+    const milkPrice =
+      toNumOrNull(
+
+        nutrition.milkPrice ??
+
+        savedContext.milkPrice ??
+
+        nutrition
+          .analysis
+          ?.inputs
+          ?.milkPriceUsed
+      );
+
+
+    const mode =
+      String(
+        nutrition.mode ||
+        "tmr_asfed"
+      ).trim();
+
+
+    const concKg =
+      toNumOrNull(
+        nutrition.concKg ??
+        savedContext.concKg
+      );
+
+
+    /*
+     * split يعتمد على
+     * كمية المركزات الفعلية.
+     *
+     * لا نخمنها في
+     * الأحداث القديمة.
+     */
+    if (
+      mode === "split" &&
+
+      !(
+        Number.isFinite(
+          Number(concKg)
+        ) &&
+        Number(concKg) > 0
+      )
+    ) {
+      return null;
+    }
+
+
+    const asActual =
+      (
+        base,
+        milkKg,
+        dim,
+        thiValue = null
+      ) => ({
+
+        ...base,
+
+        daysInMilk:
+          dim,
+
+        avgMilkKg:
+          milkKg,
+
+        observedAvgMilkKg:
+          milkKg,
+
+        actualMilkKg:
+          milkKg,
+
+        targetMilkKg:
+          null,
+
+        targetAvgMilkKg:
+          null,
+
+        useTargetMilkForRation:
+          false,
+
+        useTargetMilk:
+          false,
+
+        useTargetMilkKg:
+          false,
+
+        milkMode:
+          "actual",
+
+        /*
+         * لا نسمح لـTHI
+         * قديم من سياق
+         * العليقة أن يدخل
+         * القراءة الحالية.
+         */
+        thi:
+          Number.isFinite(
+            Number(thiValue)
+          )
+            ? Number(thiValue)
+            : null
+      });
+
+
+    const baselineScenario =
+      nutritionMilkScenarioContextSrv(
+        asActual(
+          savedContext,
+          savedMilkKg,
+          savedDim,
+          savedThi
+        )
+      );
+
+
+    const currentScenario =
+      nutritionMilkScenarioContextSrv(
+        asActual(
+          savedContext,
+          currentMilkKg,
+          currentDim,
+          currentThi
+        )
+      );
+
+
+    if (
+      !baselineScenario?.ok ||
+      !currentScenario?.ok
+    ) {
+      return null;
+    }
+
+
+    if (
+      !validateNutritionRequiredInputsSrv(
+        baselineScenario.context
+      )?.ok
+    ) {
+      return null;
+    }
+
+
+    if (
+      !validateNutritionRequiredInputsSrv(
+        currentScenario.context
+      )?.ok
+    ) {
+      return null;
+    }
+
+
+    /*
+     * نفس محرك التغذية المركزي.
+     *
+     * نفس العليقة مرتين:
+     *
+     * Baseline =
+     * اللبن + DIM وقت الحفظ.
+     *
+     * Current =
+     * اللبن + DIM الحالي.
+     */
+    const baselineAnalysis =
+      buildNutritionCentralAnalysis({
+
+        rows:
+          savedRows,
+
+        context:
+          baselineScenario.context,
+
+        mode,
+
+        concKg,
+
+        milkPrice
+      });
+
+
+    nutritionAttachMilkScenarioInputsSrv(
+      baselineAnalysis,
+      baselineScenario
+    );
+
+
+    const currentAnalysis =
+      buildNutritionCentralAnalysis({
+
+        rows:
+          savedRows,
+
+        context:
+          currentScenario.context,
+
+        mode,
+
+        concKg,
+
+        milkPrice
+      });
+
+
+    nutritionAttachMilkScenarioInputsSrv(
+      currentAnalysis,
+      currentScenario
+    );
+
+
+    const baseEco =
+      baselineAnalysis
+        ?.economics ||
+      {};
+
+
+    const nowEco =
+      currentAnalysis
+        ?.economics ||
+      {};
+
+
+    const nowNut =
+      currentAnalysis
+        ?.nutrition ||
+      {};
+
+
+    const round2 =
+      value =>
+        Number.isFinite(
+          Number(value)
+        )
+          ? Number(
+              Number(value)
+                .toFixed(2)
+            )
+          : null;
+
+
+    const pickFE =
+      eco =>
+        Number.isFinite(
+          Number(
+            eco
+              ?.feedEfficiencyECM
+          )
+        )
+
+          ? Number(
+              eco.feedEfficiencyECM
+            )
+
+          : Number.isFinite(
+              Number(
+                eco
+                  ?.feedEfficiencyFPCM
+              )
+            )
+
+            ? Number(
+                eco
+                  .feedEfficiencyFPCM
+              )
+
+            : null;
+
+
+    const reasons = [];
+
+
+    const oldStage =
+      murabbikNutritionDimStageSrv(
+        savedDim
+      );
+
+
+    const newStage =
+      murabbikNutritionDimStageSrv(
+        currentDim
+      );
+
+
+    if (
+      currentDim >
+      savedDim
+    ) {
+      reasons.push(
+        `تقدم متوسط أيام الحليب من ${savedDim} إلى ${currentDim} يومًا (${oldStage.label} ← ${newStage.label}) عامل فسيولوجي محتمل وقد يفسر جزءًا من الانخفاض الطبيعي.`
+      );
+    }
+
+
+    if (
+      Number.isFinite(
+        currentThi
+      ) &&
+      currentThi >= 68
+    ) {
+      reasons.push(
+        `THI الحالي ${Math.round(currentThi)} قد يساهم في الانخفاض، لكنه لا يفسر وحده خصوصية هذه المجموعة إذا لم ينخفض باقي القطيع بالنمط نفسه.`
+      );
+    }
+
+
+    reasons.push(
+      ...[
+        murabbikNutritionModelReasonSrv(
+          nowNut.energySupplyModel,
+          "اتزان الطاقة"
+        ),
+
+        murabbikNutritionModelReasonSrv(
+          nowNut.proteinModel,
+          "اتزان البروتين"
+        ),
+
+        murabbikNutritionModelReasonSrv(
+          nowNut.rumenHealthModel,
+          "صحة الكرش"
+        ),
+
+        murabbikNutritionModelReasonSrv(
+          nowNut.carbohydrateSafetyModel,
+          "أمان الكربوهيدرات"
+        ),
+
+        murabbikNutritionModelReasonSrv(
+          nowNut.fatModel,
+          "مستوى الدهون"
+        )
+      ].filter(Boolean)
+    );
+
+
+    if (
+      (
+        rumenAcidosisPatterns ||
+        []
+      ).some(
+        pattern =>
+          pattern
+            ?.group
+            ?.groupKey ===
+          group.groupKey
+      )
+    ) {
+      reasons.push(
+        "نمط تذبذب جماعي في اللبن يدعم الاشتباه باضطراب تخمر الكرش."
+      );
+    }
+
+
+    const individualDrops =
+      rows.filter(
+        row =>
+          Number(
+            row.dropPct
+          ) >= 15
+      ).length;
+
+
+    if (
+      individualDrops
+    ) {
+      reasons.push(
+        `يوجد ${individualDrops} رأس بانخفاض فردي واضح؛ الحالات الصحية الفردية قد تكون جزءًا من الصورة.`
+      );
+    }
+
+
+    if (
+      !reasons.length
+    ) {
+      reasons.push(
+        "لم يظهر سبب عام واضح؛ راجع المأكول الفعلي والبواقي والفرز وانتظام الخلط والتوزيع والحالات الفردية قبل افتراض أن تركيب العليقة نفسه هو السبب."
+      );
+    }
+
+
+    return {
+      eventDate:
+        latest.eventDate,
+
+      eventId:
+        String(
+          event.id ||
+          event.firestoreId ||
+          ""
+        ).trim(),
+
+      savedMilkKg:
+        round2(
+          savedMilkKg
+        ),
+
+      currentMilkKg:
+        round2(
+          currentMilkKg
+        ),
+
+      milkChangePct,
+
+      savedDim,
+
+      currentDim,
+
+      savedDmiTarget:
+        round2(
+          baselineAnalysis
+            ?.targets
+            ?.dmiTarget
+        ),
+
+      currentDmiTarget:
+        round2(
+          currentAnalysis
+            ?.targets
+            ?.dmiTarget
+        ),
+
+      rationDmKg:
+        round2(
+          currentAnalysis
+            ?.totals
+            ?.dmKg
+        ),
+
+      savedFeedEfficiency:
+        round2(
+          pickFE(
+            baseEco
+          )
+        ),
+
+      currentFeedEfficiency:
+        round2(
+          pickFE(
+            nowEco
+          )
+        ),
+
+      savedFeedCostPerKgMilk:
+        round2(
+          baseEco
+            .costPerKgMilk
+        ),
+
+      currentFeedCostPerKgMilk:
+        round2(
+          nowEco
+            .costPerKgMilk
+        ),
+
+      savedIofc:
+        round2(
+          baseEco
+            .milkMargin
+        ),
+
+      currentIofc:
+        round2(
+          nowEco
+            .milkMargin
+        ),
+
+      savedIofcPct:
+        round2(
+          baseEco
+            .iofcPctOfMilkIncome
+        ),
+
+      currentIofcPct:
+        round2(
+          nowEco
+            .iofcPctOfMilkIncome
+        ),
+
+      currentRecordedCount:
+        currentGroupRows.length,
+
+      currentGroupSize:
+        currentGroupNumbers.length,
+
+      currentCoveragePct:
+        round2(
+          currentGroupNumbers.length
+            ? (
+                currentGroupRows.length *
+                100 /
+                currentGroupNumbers.length
+              )
+            : null
+        ),
+
+      reasons
+    };
+
+  } catch (e) {
+
+    console.warn(
+      "nutrition-performance-recalc failed:",
+      e.message ||
+      e
+    );
+
+    return null;
+  }
+}
 async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
  const [animals, sharedEvents] = await Promise.all([
   murabbikSmartAlertAnimalsSrv(context),
@@ -77356,38 +78425,158 @@ for (
     groupRows.get(key).push(item);
   }
 
-  const qualifyingGroups = new Map();
+    const qualifyingGroups = new Map();
 
-  for (const [key, rows] of groupRows.entries()) {
-    if (rows.length < MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS) {
+  for (
+    const [key, rows]
+    of groupRows.entries()
+  ) {
+
+    if (
+      rows.length <
+      MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS
+    ) {
       continue;
     }
 
-    const totalBaseline = rows.reduce(
-      (sum, row) => sum + Number(row.baselineKg || 0),
-      0
+
+    const groupId =
+      rows[0]
+        ?.group
+        ?.groupId ||
+      "";
+
+
+    const officialSize =
+      Array.isArray(
+        officialGroupsResult
+          ?.groupsMap
+          ?.[groupId]
+      )
+
+        ? officialGroupsResult
+            .groupsMap[
+              groupId
+            ].length
+
+        : rows.length;
+
+
+    /*
+     * التنبيه الجماعي
+     * لا يقوم على بقرة
+     * أو اثنتين.
+     *
+     * يجب أن يكون عدد
+     * الحيوانات المتأثرة
+     * >= 25% من المجموعة
+     * الرسمية، وبحد أدنى
+     * 3 رؤوس.
+     */
+    const minimumAffected =
+      Math.max(
+
+        MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS,
+
+        Math.ceil(
+          Math.max(
+            officialSize,
+            1
+          ) *
+
+          MURABBIK_MILK_MIRROR_GROUP_MIN_AFFECTED_PCT /
+
+          100
+        )
+      );
+
+
+    const affectedRows =
+      rows.filter(
+        row =>
+          Number(
+            row.dropPct
+          ) >= 5
+      );
+
+
+    if (
+      affectedRows.length <
+      minimumAffected
+    ) {
+      continue;
+    }
+
+
+    const totalBaseline =
+      rows.reduce(
+        (sum, row) =>
+          sum +
+          Number(
+            row.baselineKg ||
+            0
+          ),
+        0
+      );
+
+
+    const totalCurrent =
+      rows.reduce(
+        (sum, row) =>
+          sum +
+          Number(
+            row.currentKg ||
+            0
+          ),
+        0
+      );
+
+
+    const groupDropPct =
+      murabbikMilkMirrorDropPctSrv(
+        totalCurrent,
+        totalBaseline
+      );
+
+
+    if (
+      groupDropPct <
+      5
+    ) {
+      continue;
+    }
+
+
+    qualifyingGroups.set(
+      key,
+      {
+        rows,
+
+        groupDropPct,
+
+        affectedCount:
+          affectedRows.length,
+
+        affectedPct:
+          officialSize > 0
+
+            ? Number(
+                (
+                  affectedRows.length /
+                  officialSize *
+                  100
+                ).toFixed(1)
+              )
+
+            : null,
+
+        currentDate:
+          rows[0].currentDate,
+
+        group:
+          rows[0].group
+      }
     );
-
-    const totalCurrent = rows.reduce(
-      (sum, row) => sum + Number(row.currentKg || 0),
-      0
-    );
-
-    const groupDropPct = murabbikMilkMirrorDropPctSrv(
-      totalCurrent,
-      totalBaseline
-    );
-
-    if (groupDropPct < 5) {
-  continue;
-}
-
-qualifyingGroups.set(key, {
-  rows,
-  groupDropPct,
-  currentDate: rows[0].currentDate,
-  group: rows[0].group
-});
   }
 
   let weather = null;
@@ -77402,7 +78591,327 @@ qualifyingGroups.set(key, {
     );
   }
 
+    const nutritionEvents =
+    allEvents.filter(
+      event =>
+        isNutritionSavedEvent(
+          event
+        )
+    );
+
+
+  const thi =
+    Number(
+      weather?.thi
+    );
+
+
+  /*
+   * المجموعة تدخل مقارنة
+   * المزرعة فقط إذا كان
+   * عدد الحيوانات التي
+   * لها Baseline كافيًا
+   * للوصول إلى حد 25%
+   * من المجموعة الرسمية.
+   */
+  const comparableGroupStates =
+    [...groupRows.values()]
+      .filter(
+        rows => {
+
+          const groupId =
+            rows[0]
+              ?.group
+              ?.groupId ||
+            "";
+
+
+          const officialSize =
+            Array.isArray(
+              officialGroupsResult
+                ?.groupsMap
+                ?.[groupId]
+            )
+
+              ? officialGroupsResult
+                  .groupsMap[
+                    groupId
+                  ].length
+
+              : 0;
+
+
+          const minimumComparableRecords =
+            Math.max(
+
+              MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS,
+
+              Math.ceil(
+                officialSize *
+
+                MURABBIK_MILK_MIRROR_GROUP_MIN_AFFECTED_PCT /
+
+                100
+              )
+            );
+
+
+          return (
+            rows.length >=
+            minimumComparableRecords
+          );
+        }
+      );
+
+
+  const comparableGroupKeys =
+    new Set(
+
+      comparableGroupStates.map(
+        rows =>
+          [
+            rows[0]
+              ?.currentDate ||
+            "",
+
+            rows[0]
+              ?.group
+              ?.groupKey ||
+            ""
+          ].join("|")
+      )
+    );
+
+
+  const qualifiedComparableGroups =
+    [...qualifyingGroups.entries()]
+      .filter(
+        ([key]) =>
+          comparableGroupKeys.has(
+            key
+          )
+      );
+
+
+  const eligibleComparableGroups =
+    comparableGroupStates.length;
+
+
+  /*
+   * سبب عام:
+   *
+   * كل المجموعات القابلة
+   * للمقارنة منخفضة.
+   *
+   * وقتها لا نصدر تنبيه
+   * عليقة لكل مجموعة.
+   */
+  const farmWideDrop =
+    eligibleComparableGroups >=
+      2 &&
+
+    qualifiedComparableGroups
+      .length ===
+    eligibleComparableGroups;
+
+
+  const farmWideHeatDrop =
+    farmWideDrop &&
+
+    Number.isFinite(
+      thi
+    ) &&
+
+    thi >= 68;
+
+
   const alerts = [];
+
+
+  if (
+    farmWideDrop
+  ) {
+
+    const groupEvidence =
+      qualifiedComparableGroups
+        .map(
+          ([, groupData]) =>
+
+            `${groupData.group.groupName}: انخفاض ${groupData.groupDropPct}% — متأثر ${groupData.affectedCount} رأس${
+
+              Number.isFinite(
+                Number(
+                  groupData.affectedPct
+                )
+              )
+
+                ? ` (${groupData.affectedPct}%)`
+
+                : ""
+
+            }`
+        );
+
+
+    const currentDate =
+      [...qualifyingGroups.values()]
+        [0]
+        ?.currentDate ||
+
+      context.today;
+
+
+    alerts.push({
+
+      identityKey:
+        farmWideHeatDrop
+
+          ? "milk-mirror-farm-heat-drop"
+
+          : "milk-mirror-farm-general-drop",
+
+
+      revisionKey:
+        [
+          currentDate,
+
+          farmWideHeatDrop
+            ? Math.round(
+                thi
+              )
+            : "no-common-cause",
+
+          ...groupEvidence
+        ].join("|"),
+
+
+      kind:
+        "technical",
+
+
+      domain:
+        "production",
+
+
+      code:
+        farmWideHeatDrop
+
+          ? "milk_mirror_farm_heat_drop"
+
+          : "milk_mirror_farm_general_drop",
+
+
+      priority:
+        farmWideHeatDrop &&
+        thi >= 78
+
+          ? "high"
+
+          : "normal",
+
+
+      urgency:
+        farmWideHeatDrop &&
+        thi >= 78
+
+          ? "now"
+
+          : "today",
+
+
+      certainty:
+        farmWideHeatDrop
+
+          ? "probable"
+
+          : "suspected",
+
+
+      status:
+        "review",
+
+
+      title:
+        farmWideHeatDrop
+
+          ? "الإجهاد الحراري يؤثر على إنتاج الحلاب"
+
+          : "انخفاض عام في إنتاج الحلاب",
+
+
+      message:
+        farmWideHeatDrop
+
+          ? `ظهر انخفاض متزامن في جميع مجموعات الحلاب القابلة للمقارنة مع THI = ${Math.round(thi)}. يعامل مُرَبِّيك هذا كنمط عام على مستوى المزرعة، ولا ينسبه إلى عليقة مجموعة بعينها.`
+
+          : "ظهر انخفاض متزامن في جميع مجموعات الحلاب القابلة للمقارنة. لم يثبت سبب مشترك واحد من البيانات المتاحة، لذلك لا ينسب مُرَبِّيك الانخفاض إلى عليقة مجموعة بعينها.",
+
+
+      details: {
+
+        observation:
+          "",
+
+
+        meaning:
+          farmWideHeatDrop
+
+            ? "اتساع الانخفاض عبر المجموعات مع ارتفاع THI يرجح سببًا مشتركًا على مستوى المزرعة أكثر من مشكلة خاصة بمجموعة واحدة."
+
+            : "اتساع الانخفاض عبر كل المجموعات يرجح عاملًا عامًا في التشغيل أو البيئة أو التسجيل قبل افتراض مشكلة في عليقة مجموعة واحدة.",
+
+
+        recommendation:
+          farmWideHeatDrop
+
+            ? "ابدأ بالتبريد والتهوية ومياه الشرب وتقليل وقت الانتظار وتقديم العليقة في الأوقات الأبرد، ثم راقب اللبن قبل تعديل أي تركيبة."
+
+            : "راجع اكتمال تسجيل اللبن، انتظام الحلب، المياه، تقديم العلف، البواقي وأي تغير تشغيلي عام قبل تعديل علائق المجموعات.",
+
+
+        evidence: [
+
+          ...(
+            farmWideHeatDrop
+              ? [
+                  `THI الحالي: ${Math.round(thi)}.`
+                ]
+              : []
+          ),
+
+          ...groupEvidence
+        ]
+      },
+
+
+      dueDate:
+        currentDate,
+
+
+      affectedCount:
+        0,
+
+
+      animalNumbers:
+        [],
+
+
+      action: {
+        type:
+          "none",
+
+        label:
+          "",
+
+        url:
+          ""
+      },
+
+
+      snoozeMinutes:
+        MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
+    });
+  }
   for (
   const pattern
   of rumenAcidosisPatterns
@@ -77514,132 +79023,507 @@ action: {
   });
 }
 
-  for (const [key, groupData] of qualifyingGroups.entries()) {
-   const {
-  rows,
-  groupDropPct,
-  currentDate,
-  group
-} = groupData;
+  for (
+    const [key, groupData]
+    of qualifyingGroups.entries()
+  ) {
 
-    const thi = Number(weather?.thi);
-    const heatRelated = Number.isFinite(thi) && thi >= 68;
+    const {
+      rows,
+      groupDropPct,
+      currentDate,
+      group
+    } =
+      groupData;
 
-   
 
- const identityKey = [
-  "milk-mirror-group",
-  currentDate,
-  group.groupKey,
-  heatRelated
-    ? "heat"
-    : "management"
-].join(":");
+    /*
+     * السبب العام له الأولوية.
+     *
+     * لو كل المجموعات نازلة
+     * لا نصدر تنبيهًا خاصًا
+     * لكل مجموعة.
+     */
+    if (
+      farmWideDrop
+    ) {
+      continue;
+    }
 
-   const revisionKey = [
-  currentDate,
-  group.groupKey,
-  groupDropPct,
-  rows.length,
-  Number.isFinite(thi)
-    ? thi
-    : "no-thi"
-].join("|");
 
-    if (heatRelated) {
+    const heatRelated =
+      Number.isFinite(
+        thi
+      ) &&
+      thi >= 68;
+
+
+    const identityKey =
+      [
+        "milk-mirror-group",
+        currentDate,
+        group.groupKey,
+
+        heatRelated
+          ? "heat"
+          : "management"
+
+      ].join(":");
+
+
+    const revisionKey =
+      [
+        currentDate,
+        group.groupKey,
+        groupDropPct,
+        rows.length,
+
+        Number.isFinite(
+          thi
+        )
+          ? thi
+          : "no-thi"
+
+      ].join("|");
+
+
+    /*
+     * حتى مع THI مرتفع:
+     *
+     * طالما المشكلة ليست
+     * عامة على كل المزرعة،
+     * نعيد تحليل آخر عليقة
+     * لهذه المجموعة أولًا.
+     */
+    const perf =
+      murabbikNutritionRecalculateGroupSrv({
+
+        groupData,
+
+        nutritionEvents,
+
+        weather,
+
+        rumenAcidosisPatterns,
+
+        officialGroupsMap:
+          officialGroupsResult
+            ?.groupsMap ||
+          {},
+
+        historyByAnimal,
+
+        animalsByNumber
+      });
+
+
+    if (
+      perf
+    ) {
+
+      const rationEventId =
+        perf.eventId ||
+
+        murabbikMilkMirrorGroupRationEventIdSrv(
+          allEvents,
+          group,
+          currentDate
+        );
+
+
+      const priority =
+        perf.milkChangePct <=
+          -15 ||
+
+        (
+          Number.isFinite(
+            Number(
+              perf.currentIofcPct
+            )
+          ) &&
+
+          Number(
+            perf.currentIofcPct
+          ) < 40
+        )
+
+          ? "high"
+
+          : "normal";
+
+
       alerts.push({
-        identityKey,
-        revisionKey,
 
-        kind: "technical",
-        domain: "production",
-        code: "milk_mirror_group_heat_drop",
+        identityKey:
+          `nutrition-performance:${group.groupKey}`,
 
-        priority: thi >= 78 ? "high" : "normal",
-        urgency: thi >= 78 ? "now" : "today",
-        certainty: "probable",
-        status: "review",
 
- title: "انخفاض مجموعة مرتبط بالإجهاد الحراري",
+        revisionKey:
+          [
+            currentDate,
 
-message:
-  `انخفض متوسط إنتاج مجموعة ${group.groupName} بنسبة ${groupDropPct}% عن مستواها المتوقع، بالتزامن مع وصول مؤشر الإجهاد الحراري THI إلى ${Math.round(thi)}. راجع كفاءة التبريد، توافر المياه، توقيت تقديم العليقة، ووقت الانتظار قبل الحلب داخل المجموعة.`,
+            perf.eventDate ||
+            "no-ration-date",
 
-details: {
- observation: "",
+            perf.currentMilkKg,
 
-  meaning:
-    "تزامن انخفاض متوسط المجموعة مع ارتفاع THI يرجح وجود تأثير حراري مشترك داخل المجموعة.",
+            perf.currentDim,
 
-  recommendation:
-    "راجع كفاءة التبريد، توافر المياه، توقيت تقديم العليقة، ووقت الانتظار قبل الحلب داخل المجموعة.",
+            perf.currentFeedEfficiency,
 
-  evidence: [
-    `انخفاض متوسط المجموعة: ${groupDropPct}%.`,
-    `THI الحالي: ${Math.round(thi)}.`
-  ]
-},
+            perf.currentIofc,
 
-dueDate: currentDate,
-affectedCount: 0,
-animalNumbers: [],
-        action: {
-          type: "none",
-          label: "",
-          url: ""
+            Number.isFinite(
+              thi
+            )
+              ? thi
+              : "no-thi"
+
+          ].join("|"),
+
+
+        kind:
+          "technical",
+
+
+        domain:
+          "nutrition",
+
+
+        code:
+          "nutrition_group_performance_review",
+
+
+        priority,
+
+
+        urgency:
+          "today",
+
+
+        certainty:
+          "probable",
+
+
+        status:
+          "review",
+
+
+        title:
+          `مراجعة أداء عليقة ${group.groupName}`,
+
+
+        message:
+          `الإنتاج الحالي ${perf.currentMilkKg} كجم/رأس مقابل ${perf.savedMilkKg} كجم/رأس عند حفظ آخر عليقة (${perf.milkChangePct}%). أعاد مُرَبِّيك تحليل نفس العليقة بمحرك التغذية نفسه بعد تحديث اللبن وDIM، ثم قارن النتيجة بالـBaseline الفعلي وقت الحفظ. راجع الأسباب المحتملة قبل تغيير التركيبة.`,
+
+
+        details: {
+
+          observation:
+            `آخر عليقة ${perf.eventDate || "غير محدد"}. DIM: ${perf.savedDim} → ${perf.currentDim} يوم.`,
+
+
+          meaning:
+            "الانخفاض تحت نفس العليقة لا يثبت أن تركيبها هو السبب؛ لذلك يعيد مُرَبِّيك الحساب أولًا ثم يفسر السياق.",
+
+
+          recommendation:
+            "راجع الأسباب المحتملة والمأكول والبواقي والخلط والتوزيع والحالة الصحية قبل تعديل العليقة.",
+
+
+          evidence: [
+
+            `اللبن: ${perf.savedMilkKg} → ${perf.currentMilkKg} كجم/رأس (${perf.milkChangePct}%).`,
+
+            `DIM: ${perf.savedDim} → ${perf.currentDim} يوم.`,
+
+            `تغطية اللبن الحالية للمجموعة: ${perf.currentRecordedCount}/${perf.currentGroupSize} رأس (${perf.currentCoveragePct}%).`,
+
+            `DMI المستهدف: ${perf.savedDmiTarget ?? "—"} → ${perf.currentDmiTarget ?? "—"} كجم مادة جافة.`,
+
+            `كفاءة التحويل: ${perf.savedFeedEfficiency ?? "—"} → ${perf.currentFeedEfficiency ?? "—"}.`,
+
+            `IOFC/رأس: ${perf.savedIofc ?? "—"} → ${perf.currentIofc ?? "—"}.`,
+
+            `تكلفة العلف/كجم لبن: ${perf.savedFeedCostPerKgMilk ?? "—"} → ${perf.currentFeedCostPerKgMilk ?? "—"}.`,
+
+            ...perf.reasons.map(
+              reason =>
+                `سبب محتمل: ${reason}`
+            )
+          ]
         },
 
-        snoozeMinutes: MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
+
+        dueDate:
+          currentDate,
+
+
+        affectedCount:
+          perf.currentRecordedCount,
+
+
+        animalNumbers:
+          [],
+
+
+        action: {
+
+          type:
+            "navigate",
+
+
+          label:
+            rationEventId
+
+              ? "فتح عليقة المجموعة"
+
+              : "فتح تقرير التغذية",
+
+
+          url:
+            rationEventId
+
+              ? `nutrition.html?eventId=${encodeURIComponent(rationEventId)}`
+
+              : murabbikMilkMirrorReportUrlSrv(
+                  group.speciesKey
+                )
+        },
+
+
+        snoozeMinutes:
+          MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
       });
+
 
       continue;
     }
 
-   
 
+    /*
+     * يوجد THI مرتفع،
+     * لكن الانخفاض ليس
+     * عامًا على كل المجموعات.
+     *
+     * لذلك الحرارة سبب
+     * محتمل وليست تفسيرًا
+     * وحيدًا.
+     */
+    if (
+      heatRelated
+    ) {
+
+      alerts.push({
+
+        identityKey,
+
+        revisionKey,
+
+
+        kind:
+          "technical",
+
+
+        domain:
+          "production",
+
+
+        code:
+          "milk_mirror_group_heat_drop",
+
+
+        priority:
+          thi >= 78
+
+            ? "high"
+
+            : "normal",
+
+
+        urgency:
+          thi >= 78
+
+            ? "now"
+
+            : "today",
+
+
+        certainty:
+          "probable",
+
+
+        status:
+          "review",
+
+
+        title:
+          "انخفاض مجموعة مع إجهاد حراري",
+
+
+        message:
+          `انخفض متوسط إنتاج مجموعة ${group.groupName} بنسبة ${groupDropPct}% مع THI = ${Math.round(thi)}. لكن الانخفاض ليس عامًا في كل المجموعات القابلة للمقارنة، لذلك قد يساهم الإجهاد الحراري ولا يفسر وحده خصوصية هذه المجموعة.`,
+
+
+        details: {
+
+          observation:
+            "",
+
+
+          meaning:
+            "ارتفاع THI عامل محتمل، لكن اختلاف هذه المجموعة عن باقي المزرعة يستلزم مراجعة ظروفها أيضًا.",
+
+
+          recommendation:
+            "راجع التبريد والمياه، ثم المأكول والبواقي والخلط والتوزيع والحالات الفردية قبل تعديل التركيبة.",
+
+
+          evidence: [
+
+            `انخفاض المجموعة: ${groupDropPct}%.`,
+
+            `THI الحالي: ${Math.round(thi)}.`,
+
+            `المجموعات القابلة للمقارنة: ${eligibleComparableGroups}، والمنخفضة المؤهلة: ${qualifiedComparableGroups.length}.`
+          ]
+        },
+
+
+        dueDate:
+          currentDate,
+
+
+        affectedCount:
+          0,
+
+
+        animalNumbers:
+          [],
+
+
+        action: {
+          type:
+            "none",
+
+          label:
+            "",
+
+          url:
+            ""
+        },
+
+
+        snoozeMinutes:
+          MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
+      });
+
+
+      continue;
+    }
+
+
+    /*
+     * المجموعة منخفضة،
+     * لكن البيانات لا تسمح
+     * بإعادة تحليل العليقة.
+     *
+     * لا نخترع سببًا.
+     */
     alerts.push({
+
       identityKey,
+
       revisionKey,
 
-      kind: "technical",
-      domain: "production",
-      code: "milk_mirror_group_management_drop",
 
-      priority: "normal",
-      urgency: "today",
-      certainty: "probable",
-      status: "review",
+      kind:
+        "technical",
 
-title: "انخفاض في إنتاج مجموعة الحلاب",
 
-message:
-  `انخفض متوسط إنتاج مجموعة ${group.groupName} بنسبة ${groupDropPct}% عن مستواها المتوقع. راجع استهلاك العليقة وبقاياها، انتظام الخلط والتوزيع، توافر المياه، كفاءة الحلب، والتبريد داخل المجموعة.`,
+      domain:
+        "production",
 
-details: {
-  observation: "",
 
-  meaning:
-    "يحدد هذا الانخفاض المجموعة التي ساهمت في تراجع إنتاج اللبن الظاهر في الداشبورد.",
+      code:
+        "milk_mirror_group_management_drop",
 
-  recommendation:
-    "راجع استهلاك العليقة وبقاياها، انتظام الخلط والتوزيع، توافر المياه، كفاءة الحلب، والتبريد داخل المجموعة.",
 
-  evidence: [
-    `انخفاض متوسط المجموعة: ${groupDropPct}%.`
-  ]
-},
+      priority:
+        "normal",
 
-dueDate: currentDate,
-affectedCount: 0,
-animalNumbers: [],
 
-      action: {
-        type: "navigate",
-        label: "فتح تقرير التغذية",
-        url: murabbikMilkMirrorReportUrlSrv(group.speciesKey)
+      urgency:
+        "today",
+
+
+      certainty:
+        "probable",
+
+
+      status:
+        "review",
+
+
+      title:
+        "انخفاض في إنتاج مجموعة الحلاب",
+
+
+      message:
+        `انخفض متوسط إنتاج مجموعة ${group.groupName} بنسبة ${groupDropPct}%. لا توجد بيانات كافية لإعادة تقييم آخر عليقة على الإنتاج الحالي، لذلك لا ينسب مُرَبِّيك السبب للتغذية.`,
+
+
+      details: {
+
+        observation:
+          "",
+
+
+        meaning:
+          "الانخفاض حقيقي على مستوى المجموعة، لكن البيانات لا تكفي لقراءة تغذوية محسوبة.",
+
+
+        recommendation:
+          "راجع اكتمال بيانات العليقة ثم المأكول والبواقي والمياه والحلب والحالة الصحية.",
+
+
+        evidence: [
+          `انخفاض متوسط المجموعة: ${groupDropPct}%.`
+        ]
       },
 
-      snoozeMinutes: MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
+
+      dueDate:
+        currentDate,
+
+
+      affectedCount:
+        0,
+
+
+      animalNumbers:
+        [],
+
+
+      action: {
+
+        type:
+          "navigate",
+
+
+        label:
+          "فتح تقرير التغذية",
+
+
+        url:
+          murabbikMilkMirrorReportUrlSrv(
+            group.speciesKey
+          )
+      },
+
+
+      snoozeMinutes:
+        MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
     });
   }
 
