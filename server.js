@@ -76262,12 +76262,7 @@ const MURABBIK_MILK_MIRROR_BASELINE_MAX_DAYS = 5;
 const MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS = 3;
 const MURABBIK_MILK_MIRROR_GROUP_MIN_AFFECTED_PCT = 25;
 
-const MURABBIK_RUMEN_ACIDOSIS_MIN_DAYS = 4;
-const MURABBIK_RUMEN_ACIDOSIS_MIN_DAILY_SWING_KG = 2;
-const MURABBIK_RUMEN_ACIDOSIS_MAX_DAILY_SWING_KG = 4;
-const MURABBIK_RUMEN_ACIDOSIS_BASELINE_MIN_DAYS = 3;
-const MURABBIK_RUMEN_ACIDOSIS_BASELINE_MAX_DAYS = 5;
-const MURABBIK_RUMEN_ACIDOSIS_LOOKBACK_DAYS = 12;
+
 
 function murabbikMilkMirrorDateSrv(event = {}) {
   return murabbikSmartAlertTextSrv(
@@ -76411,503 +76406,7 @@ function murabbikMilkMirrorOfficialGroupIndexSrv(
 
   return index;
 }
-function murabbikRumenAcidosisDailyGroupsSrv({
-  historyByAnimal = new Map(),
-  animalsByNumber = new Map(),
-  officialGroupByAnimalNumber = new Map(),
-  today = ""
-} = {}) {
-  const byGroup = new Map();
 
-  for (
-    const [animalNumber, byDate]
-    of historyByAnimal.entries()
-  ) {
-    const doc =
-      animalsByNumber.get(animalNumber);
-
-    if (!doc) continue;
-    if (!murabbikMilkMirrorAnimalActiveSrv(doc)) continue;
-    if (!murabbikDryOffAlertIsMilkingSrv(doc)) continue;
-
-    if (
-      String(doc.entryType || "")
-        .trim()
-        .toLowerCase() === "followers"
-    ) {
-      continue;
-    }
-
-    const group =
-      officialGroupByAnimalNumber.get(
-        animalNumber
-      ) || null;
-
-    if (
-      !group?.groupKey ||
-      group.speciesKey !== "cow"
-    ) {
-      continue;
-    }
-
-    if (!byGroup.has(group.groupKey)) {
-      byGroup.set(group.groupKey, {
-        group,
-        byDate: new Map()
-      });
-    }
-
-    const groupState =
-      byGroup.get(group.groupKey);
-
-    for (const row of byDate.values()) {
-      const eventDate =
-        String(row?.eventDate || "")
-          .slice(0, 10);
-
-      const milkKg =
-        Number(row?.milkKg);
-
-      if (
-        !milkReportIsDateSrv(eventDate) ||
-        eventDate > today ||
-        !Number.isFinite(milkKg) ||
-        milkKg <= 0
-      ) {
-        continue;
-      }
-
-      const ageDays =
-        milkReportDaysBetweenSrv(
-          eventDate,
-          today
-        );
-
-      if (
-        !Number.isFinite(ageDays) ||
-        ageDays < 0 ||
-        ageDays >
-  MURABBIK_RUMEN_ACIDOSIS_LOOKBACK_DAYS
-      ) {
-        continue;
-      }
-
-      if (!groupState.byDate.has(eventDate)) {
-        groupState.byDate.set(
-          eventDate,
-          []
-        );
-      }
-
- groupState.byDate
-  .get(eventDate)
-  .push({
-    animalNumber,
-    milkKg
-  });
-    }
-  }
-
-  return byGroup;
-}
-
-function murabbikRumenAcidosisFluctuationSrv(
-  groupState = null,
-  today = ""
-) {
-  if (!groupState?.group?.groupKey) {
-    return null;
-  }
-
-  const rawByDate = new Map();
-
-  for (
-    const [eventDate, rows]
-    of groupState.byDate.entries()
-  ) {
-    const byAnimal = new Map();
-
-    for (
-      const row
-      of Array.isArray(rows) ? rows : []
-    ) {
-      const animalNumber =
-        calvingNormDigitsOnlySrv(
-          row?.animalNumber || ""
-        );
-
-      const milkKg =
-        Number(row?.milkKg);
-
-      if (
-        !animalNumber ||
-        !Number.isFinite(milkKg) ||
-        milkKg <= 0
-      ) {
-        continue;
-      }
-
-      byAnimal.set(
-        animalNumber,
-        milkKg
-      );
-    }
-
-    if (
-      byAnimal.size >=
-      MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS
-    ) {
-      rawByDate.set(
-        eventDate,
-        byAnimal
-      );
-    }
-  }
-
-  const availableDates =
-    [...rawByDate.keys()]
-      .sort((a, b) =>
-        String(a).localeCompare(
-          String(b)
-        )
-      );
-
-  if (
-    availableDates.length <
-    MURABBIK_RUMEN_ACIDOSIS_MIN_DAYS
-  ) {
-    return null;
-  }
-
-  const patternDates =
-    availableDates.slice(
-      -MURABBIK_RUMEN_ACIDOSIS_MIN_DAYS
-    );
-
-  const currentDate =
-    patternDates[
-      patternDates.length - 1
-    ];
-
-  const latestAgeDays =
-    milkReportDaysBetweenSrv(
-      currentDate,
-      today
-    );
-
-  if (
-    !Number.isFinite(latestAgeDays) ||
-    latestAgeDays < 0 ||
-    latestAgeDays > 1
-  ) {
-    return null;
-  }
-
-  for (
-    let i = 1;
-    i < patternDates.length;
-    i++
-  ) {
-    const gap =
-      milkReportDaysBetweenSrv(
-        patternDates[i - 1],
-        patternDates[i]
-      );
-
-    if (gap !== 1) {
-      return null;
-    }
-  }
-
-  let commonAnimals = null;
-
-  for (
-    const eventDate
-    of patternDates
-  ) {
-    const animalNumbers =
-      new Set(
-        rawByDate
-          .get(eventDate)
-          ?.keys() || []
-      );
-
-    if (commonAnimals === null) {
-      commonAnimals =
-        animalNumbers;
-
-      continue;
-    }
-
-    commonAnimals =
-      new Set(
-        [...commonAnimals]
-          .filter(animalNumber =>
-            animalNumbers.has(
-              animalNumber
-            )
-          )
-      );
-  }
-
-  if (
-    !commonAnimals ||
-    commonAnimals.size <
-      MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS
-  ) {
-    return null;
-  }
-
-  const averageForDate =
-    eventDate => {
-      const byAnimal =
-        rawByDate.get(eventDate);
-
-      if (!byAnimal) {
-        return null;
-      }
-
-      const values =
-        [...commonAnimals]
-          .map(animalNumber =>
-            Number(
-              byAnimal.get(
-                animalNumber
-              )
-            )
-          )
-          .filter(value =>
-            Number.isFinite(value) &&
-            value > 0
-          );
-
-      if (
-        values.length !==
-        commonAnimals.size
-      ) {
-        return null;
-      }
-
-      return Number(
-        (
-          values.reduce(
-            (sum, value) =>
-              sum + value,
-            0
-          ) / values.length
-        ).toFixed(2)
-      );
-    };
-
-  const days =
-    patternDates.map(
-      eventDate => ({
-        eventDate,
-
-        averageKg:
-          averageForDate(
-            eventDate
-          ),
-
-        animalCount:
-          commonAnimals.size
-      })
-    );
-
-  if (
-    days.some(day =>
-      !Number.isFinite(
-        day.averageKg
-      ) ||
-      day.averageKg <= 0
-    )
-  ) {
-    return null;
-  }
-
-  const dailyChangesKg = [];
-
-  for (
-    let i = 1;
-    i < days.length;
-    i++
-  ) {
-    dailyChangesKg.push(
-      Number(
-        (
-          days[i].averageKg -
-          days[i - 1].averageKg
-        ).toFixed(2)
-      )
-    );
-  }
-
-  const allChangesWithinRange =
-    dailyChangesKg.every(
-      changeKg => {
-        const absoluteChangeKg =
-          Math.abs(changeKg);
-
-        return (
-          absoluteChangeKg >=
-            MURABBIK_RUMEN_ACIDOSIS_MIN_DAILY_SWING_KG &&
-          absoluteChangeKg <=
-            MURABBIK_RUMEN_ACIDOSIS_MAX_DAILY_SWING_KG
-        );
-      }
-    );
-
-  const directionsAlternate =
-    dailyChangesKg.every(
-      (changeKg, index) =>
-        index === 0 ||
-        Math.sign(changeKg) !==
-          Math.sign(
-            dailyChangesKg[
-              index - 1
-            ]
-          )
-    );
-
-  if (
-    !allChangesWithinRange ||
-    !directionsAlternate
-  ) {
-    return null;
-  }
-
-  const baselineDays = [];
-
-  let expectedDate =
-    milkReportAddDaysSrv(
-      patternDates[0],
-      -1
-    );
-
-  for (
-    let i = 0;
-    i <
-      MURABBIK_RUMEN_ACIDOSIS_BASELINE_MAX_DAYS;
-    i++
-  ) {
-    if (
-      !rawByDate.has(
-        expectedDate
-      )
-    ) {
-      break;
-    }
-
-    const averageKg =
-      averageForDate(
-        expectedDate
-      );
-
-    if (
-      !Number.isFinite(
-        averageKg
-      ) ||
-      averageKg <= 0
-    ) {
-      break;
-    }
-
-    baselineDays.unshift({
-      eventDate:
-        expectedDate,
-
-      averageKg,
-
-      animalCount:
-        commonAnimals.size
-    });
-
-    expectedDate =
-      milkReportAddDaysSrv(
-        expectedDate,
-        -1
-      );
-  }
-
-  if (
-    baselineDays.length <
-    MURABBIK_RUMEN_ACIDOSIS_BASELINE_MIN_DAYS
-  ) {
-    return null;
-  }
-
-  const baselineKg =
-    murabbikMilkMirrorMedianSrv(
-      baselineDays.map(
-        day => day.averageKg
-      )
-    );
-
-  const peakKg =
-    Math.max(
-      ...days.map(
-        day => day.averageKg
-      )
-    );
-
-  if (
-    !Number.isFinite(
-      baselineKg
-    ) ||
-    baselineKg <= 0 ||
-    peakKg >= baselineKg
-  ) {
-    return null;
-  }
-
-  const absoluteChangesKg =
-    dailyChangesKg.map(
-      changeKg =>
-        Math.abs(changeKg)
-    );
-
-  return {
-    group:
-      groupState.group,
-
-    days,
-    baselineDays,
-
-    startDate:
-      patternDates[0],
-
-    currentDate,
-
-    baselineKg:
-      Number(
-        baselineKg.toFixed(2)
-      ),
-
-    peakKg:
-      Number(
-        peakKg.toFixed(2)
-      ),
-
-    minDailySwingKg:
-      Number(
-        Math.min(
-          ...absoluteChangesKg
-        ).toFixed(2)
-      ),
-
-    maxDailySwingKg:
-      Number(
-        Math.max(
-          ...absoluteChangesKg
-        ).toFixed(2)
-      ),
-
-    dailyChangesKg,
-
-    animalCount:
-      commonAnimals.size
-  };
-}
 function murabbikMilkMirrorReportUrlSrv(speciesKey = "cow") {
   const type = speciesKey === "buffalo" ? "buffalo" : "cows";
   const species = speciesKey === "buffalo" ? "buffalo" : "cow";
@@ -77092,49 +76591,6 @@ function murabbikMilkMirrorGroupRationEventIdSrv(
     ""
   ).trim();
 }
-function murabbikNutritionDimStageSrv(dim) {
-  const d = Number(dim);
-
-  if (!Number.isFinite(d) || d < 0) {
-    return {
-      order: 99,
-      label: "DIM غير مكتمل"
-    };
-  }
-
-  if (d <= 40) {
-    return {
-      order: 1,
-      label: "0–40 يوم"
-    };
-  }
-
-  if (d <= 100) {
-    return {
-      order: 2,
-      label: "41–100 يوم"
-    };
-  }
-
-  if (d <= 199) {
-    return {
-      order: 3,
-      label: "101–199 يوم"
-    };
-  }
-
-  if (d <= 305) {
-    return {
-      order: 4,
-      label: "200–305 يوم"
-    };
-  }
-
-  return {
-    order: 5,
-    label: "أكثر من 305 يوم"
-  };
-}
 
 
 function murabbikNutritionCurrentDimSrv(
@@ -77171,63 +76627,10 @@ function murabbikNutritionCurrentDimSrv(
 }
 
 
-function murabbikNutritionModelReasonSrv(
-  model = null,
-  label = ""
-) {
-  if (
-    !model ||
-    typeof model !== "object"
-  ) {
-    return "";
-  }
-
-  const status =
-    String(
-      model.status ||
-      model.state ||
-      ""
-    ).toLowerCase();
-
-  const isAttention =
-    [
-      "warn",
-      "watch",
-      "danger",
-      "deficit"
-    ].some(
-      token =>
-        status.includes(token)
-    );
-
-  if (!isAttention) {
-    return "";
-  }
-
-  return [
-    String(
-      model.title ||
-      label ||
-      ""
-    ).trim(),
-
-    String(
-      model.reason ||
-      model.note ||
-      model.message ||
-      ""
-    ).trim()
-  ]
-    .filter(Boolean)
-    .join(": ");
-}
-
-
 function murabbikNutritionRecalculateGroupSrv({
   groupData = {},
   nutritionEvents = [],
   weather = null,
-  rumenAcidosisPatterns = [],
   officialGroupsMap = {},
   historyByAnimal = new Map(),
   animalsByNumber = new Map()
@@ -77873,12 +77276,6 @@ function murabbikNutritionRecalculateGroupSrv({
       {};
 
 
-    const nowNut =
-      currentAnalysis
-        ?.nutrition ||
-      {};
-
-
     const round2 =
       value =>
         Number.isFinite(
@@ -77917,118 +77314,6 @@ function murabbikNutritionRecalculateGroupSrv({
               )
 
             : null;
-
-
-    const reasons = [];
-
-
-    const oldStage =
-      murabbikNutritionDimStageSrv(
-        savedDim
-      );
-
-
-    const newStage =
-      murabbikNutritionDimStageSrv(
-        currentDim
-      );
-
-
-    if (
-      currentDim >
-      savedDim
-    ) {
-      reasons.push(
-        `تقدم متوسط أيام الحليب من ${savedDim} إلى ${currentDim} يومًا (${oldStage.label} ← ${newStage.label}) عامل فسيولوجي محتمل وقد يفسر جزءًا من الانخفاض الطبيعي.`
-      );
-    }
-
-
-    if (
-      Number.isFinite(
-        currentThi
-      ) &&
-      currentThi >= 68
-    ) {
-      reasons.push(
-        `THI الحالي ${Math.round(currentThi)} قد يساهم في الانخفاض، لكنه لا يفسر وحده خصوصية هذه المجموعة إذا لم ينخفض باقي القطيع بالنمط نفسه.`
-      );
-    }
-
-
-    reasons.push(
-      ...[
-        murabbikNutritionModelReasonSrv(
-          nowNut.energySupplyModel,
-          "اتزان الطاقة"
-        ),
-
-        murabbikNutritionModelReasonSrv(
-          nowNut.proteinModel,
-          "اتزان البروتين"
-        ),
-
-        murabbikNutritionModelReasonSrv(
-          nowNut.rumenHealthModel,
-          "صحة الكرش"
-        ),
-
-        murabbikNutritionModelReasonSrv(
-          nowNut.carbohydrateSafetyModel,
-          "أمان الكربوهيدرات"
-        ),
-
-        murabbikNutritionModelReasonSrv(
-          nowNut.fatModel,
-          "مستوى الدهون"
-        )
-      ].filter(Boolean)
-    );
-
-
-    if (
-      (
-        rumenAcidosisPatterns ||
-        []
-      ).some(
-        pattern =>
-          pattern
-            ?.group
-            ?.groupKey ===
-          group.groupKey
-      )
-    ) {
-      reasons.push(
-        "نمط تذبذب جماعي في اللبن يدعم الاشتباه باضطراب تخمر الكرش."
-      );
-    }
-
-
-    const individualDrops =
-      rows.filter(
-        row =>
-          Number(
-            row.dropPct
-          ) >= 15
-      ).length;
-
-
-    if (
-      individualDrops
-    ) {
-      reasons.push(
-        `يوجد ${individualDrops} رأس بانخفاض فردي واضح؛ الحالات الصحية الفردية قد تكون جزءًا من الصورة.`
-      );
-    }
-
-
-    if (
-      !reasons.length
-    ) {
-      reasons.push(
-        "لم يظهر سبب عام واضح؛ راجع المأكول الفعلي والبواقي والفرز وانتظام الخلط والتوزيع والحالات الفردية قبل افتراض أن تركيب العليقة نفسه هو السبب."
-      );
-    }
 
 
     return {
@@ -78123,13 +77408,25 @@ function murabbikNutritionRecalculateGroupSrv({
             .iofcPctOfMilkIncome
         ),
 
-      currentIofcPct:
-        round2(
-          nowEco
-            .iofcPctOfMilkIncome
-        ),
+     currentIofcPct:
+  round2(
+    nowEco
+      .iofcPctOfMilkIncome
+  ),
 
-      currentRecordedCount:
+savedFeedCostPct:
+  round2(
+    baseEco
+      .feedCostPctOfMilkIncome
+  ),
+
+currentFeedCostPct:
+  round2(
+    nowEco
+      .feedCostPctOfMilkIncome
+  ),
+
+currentRecordedCount:
         currentGroupRows.length,
 
       currentGroupSize:
@@ -78146,7 +77443,6 @@ function murabbikNutritionRecalculateGroupSrv({
             : null
         ),
 
-      reasons
     };
 
   } catch (e) {
@@ -78194,10 +77490,7 @@ const allEvents = sharedEvents.rows;
 
  const earliestDate = milkReportAddDaysSrv(
   context.today,
-  -Math.max(
-    MURABBIK_MILK_MIRROR_LOOKBACK_DAYS + 2,
-    MURABBIK_RUMEN_ACIDOSIS_LOOKBACK_DAYS
-  )
+  -(MURABBIK_MILK_MIRROR_LOOKBACK_DAYS + 2)
 );
 
   const historyByAnimal = new Map();
@@ -78239,33 +77532,7 @@ const allEvents = sharedEvents.rows;
       });
     }
   }
-  const rumenAcidosisGroups =
-  murabbikRumenAcidosisDailyGroupsSrv({
-    historyByAnimal,
-    animalsByNumber,
-    officialGroupByAnimalNumber,
-    today:
-      context.today
-  });
-
-const rumenAcidosisPatterns = [];
-
-for (
-  const groupState
-  of rumenAcidosisGroups.values()
-) {
-  const pattern =
-    murabbikRumenAcidosisFluctuationSrv(
-      groupState,
-      context.today
-    );
-
-  if (pattern) {
-    rumenAcidosisPatterns.push(
-      pattern
-    );
-  }
-}
+ 
   const analyses = [];
 
   for (const [animalNumber, byDate] of historyByAnimal.entries()) {
@@ -78915,117 +78182,6 @@ for (
         MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
     });
   }
-  for (
-  const pattern
-  of rumenAcidosisPatterns
-) {
-  const {
-  group,
-  days,
-  startDate,
-  currentDate,
-  baselineKg,
-  peakKg,
-  minDailySwingKg,
-  maxDailySwingKg,
-  dailyChangesKg,
-  animalCount
-} = pattern;
-
-  const groupRationEventId =
-    murabbikMilkMirrorGroupRationEventIdSrv(
-      allEvents,
-      group,
-      currentDate
-    );
-
-  alerts.push({
-    identityKey: [
-      "milk-mirror",
-      "rumen-acidosis-suspected",
-      currentDate,
-      group.groupKey
-    ].join(":"),
-
-    revisionKey: [
-      startDate,
-      currentDate,
-      group.groupKey,
-      baselineKg,
-      peakKg,
-      dailyChangesKg.join(","),
-      days
-        .map(day =>
-          `${day.eventDate}:${day.averageKg}`
-        )
-        .join(",")
-    ].join("|"),
-
-    kind: "technical",
-    domain: "nutrition",
-    code:
-      "milk_mirror_group_rumen_acidosis_suspected",
-
-    priority: "high",
-    urgency: "today",
-    certainty: "suspected",
-    status: "review",
-
-title:
-  "اشتباه حموضة الكرش",
-
-message:
-  `متوسط إنتاج مجموعة ${group.groupName} يتذبذب صعودًا وهبوطًا يومًا بعد يوم بمقدار ${minDailySwingKg}–${maxDailySwingKg} كجم/رأس، وحتى أعلى متوسط خلال النمط (${peakKg} كجم) ظل أقل من المعتاد (${baselineKg} كجم). قراءة مُرَبِّيك: هذا النمط يرفع الاشتباه باضطراب تخمر الكرش أكثر من هبوط إنتاج عادي؛ ابدأ بمراجعة ثبات الخلط والتوزيع والمأكول الفعلي والاجترار، وراجع دهن اللبن عند توفره قبل تعديل التركيبة.`,
-
-details: {
-  observation:
-    `ظهر تذبذب يومي بين ${minDailySwingKg} و${maxDailySwingKg} كجم في متوسط إنتاج الرأس داخل مجموعة ${group.groupName} خلال أربعة أيام متتالية.`,
-
-      meaning:
-        "التذبذب المتكرر في إنتاج المجموعة قد يرتبط باضطراب تخمر الكرش، لكنه لا يثبت التشخيص.",
-
-      recommendation:
-        "راجع العليقة وجودة الخلط والتوزيع والاجترار داخل المجموعة، وتابع دهن اللبن عند توفر تحليل حديث.",
-
-     evidence: [
-  `فترة المتابعة: من ${startDate} إلى ${currentDate}.`,
-  `عدد الرؤوس المشتركة في القياس اليومي: ${animalCount}.`,
-  `متوسط الرأس المعتاد قبل التذبذب: ${baselineKg} كجم.`,
-  `أعلى متوسط للرأس أثناء التذبذب: ${peakKg} كجم، وظل أقل من المعتاد.`,
-  `التغيرات اليومية في متوسط الرأس: ${dailyChangesKg
-    .map(value =>
-      `${value > 0 ? "+" : ""}${value}`
-    )
-    .join("، ")} كجم.`,
-  "انخفاض دهن اللبن يدعم الاشتباه ويساعد في تقييم الحالة."
-]
-    },
-
-    dueDate:
-      currentDate,
-
-    affectedCount:
-  animalCount,
-    animalNumbers: [],
-
-action: {
-  type:
-    groupRationEventId
-      ? "navigate"
-      : "none",
-
-  label:
-    "فتح عليقة المجموعة",
-
-  url:
-    groupRationEventId
-      ? `nutrition.html?eventId=${encodeURIComponent(groupRationEventId)}`
-      : ""
-},
-    snoozeMinutes:
-      MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
-  });
-}
 
   for (
     const [key, groupData]
@@ -79108,8 +78264,6 @@ action: {
 
         weather,
 
-        rumenAcidosisPatterns,
-
         officialGroupsMap:
           officialGroupsResult
             ?.groupsMap ||
@@ -79121,199 +78275,225 @@ action: {
       });
 
 
-    if (
-      perf
-    ) {
+if (
+  perf
+) {
 
-      const rationEventId =
-        perf.eventId ||
+  const currentIofc =
+    Number(
+      perf.currentIofc
+    );
 
-        murabbikMilkMirrorGroupRationEventIdSrv(
-          allEvents,
-          group,
-          currentDate
-        );
+  const currentIofcPct =
+    Number(
+      perf.currentIofcPct
+    );
 
+  const currentFeedCostPct =
+    Number(
+      perf.currentFeedCostPct
+    );
 
-      const priority =
-        perf.milkChangePct <=
-          -15 ||
+  const negativeIofc =
+    Number.isFinite(
+      currentIofc
+    ) &&
+    currentIofc < 0;
 
-        (
-          Number.isFinite(
-            Number(
-              perf.currentIofcPct
-            )
-          ) &&
+  const economicDanger =
+    negativeIofc ||
+    (
+      Number.isFinite(
+        currentFeedCostPct
+      ) &&
+      currentFeedCostPct > 60
+    ) ||
+    (
+      Number.isFinite(
+        currentIofcPct
+      ) &&
+      currentIofcPct < 40
+    );
 
-          Number(
-            perf.currentIofcPct
-          ) < 40
-        )
-
-          ? "high"
-
-          : "normal";
-
-      const smartReason =
-  (perf.reasons || []).find(
-    reason =>
-      !/تقدم متوسط أيام الحليب/i.test(
-        String(reason || "")
+  const economicWarning =
+    !economicDanger &&
+    (
+      (
+        Number.isFinite(
+          currentFeedCostPct
+        ) &&
+        currentFeedCostPct > 50
+      ) ||
+      (
+        Number.isFinite(
+          currentIofcPct
+        ) &&
+        currentIofcPct < 50
       )
-  ) ||
-  "لم يظهر سبب واحد يحسم الانخفاض من البيانات الحالية.";
-      alerts.push({
+    );
 
-        identityKey:
-          `nutrition-performance:${group.groupKey}`,
+  if (
+    economicDanger ||
+    economicWarning
+  ) {
 
+    const rationEventId =
+      perf.eventId ||
 
-        revisionKey:
-          [
-            currentDate,
+      murabbikMilkMirrorGroupRationEventIdSrv(
+        allEvents,
+        group,
+        currentDate
+      );
 
-            perf.eventDate ||
-            "no-ration-date",
+    const title =
+      negativeIofc
+        ? `خطر اقتصادي — هامش اللبن بعد العلف سلبي في ${group.groupName}`
+        : economicDanger
+          ? `خطر اقتصادي في عليقة ${group.groupName}`
+          : `اقتصاد عليقة ${group.groupName} يحتاج متابعة`;
 
-            perf.currentMilkKg,
+    const message =
+      negativeIofc
 
-            perf.currentDim,
+        ? `بعد إعادة الحساب على الوضع الحالي للمجموعة، دخل اللبن لا يغطي تكلفة العلف. IOFC = ${perf.currentIofc} جنيه/رأس/يوم، وتكلفة العلف تمثل ${perf.currentFeedCostPct ?? "—"}% من دخل اللبن.`
 
-            perf.currentFeedEfficiency,
+        : `بعد إعادة الحساب على الوضع الحالي للمجموعة، IOFC = ${perf.currentIofc ?? "—"} جنيه/رأس/يوم (${perf.currentIofcPct ?? "—"}% من دخل اللبن)، وتكلفة العلف تمثل ${perf.currentFeedCostPct ?? "—"}% من دخل اللبن.`;
 
-            perf.currentIofc,
+    alerts.push({
 
-            Number.isFinite(
-              thi
-            )
-              ? thi
-              : "no-thi"
+      identityKey:
+        `nutrition-economics:${group.groupKey}`,
 
-          ].join("|"),
-
-
-        kind:
-          "technical",
-
-
-        domain:
-          "nutrition",
-
-
-        code:
-          "nutrition_group_performance_review",
-
-
-        priority,
-
-
-        urgency:
-          "today",
-
-
-        certainty:
-          "probable",
-
-
-        status:
-          "review",
-
-
-        title:
-          `مراجعة أداء عليقة ${group.groupName}`,
-
-
-        message:
-  `انخفض إنتاج مجموعة ${group.groupName} بنسبة ${Math.abs(perf.milkChangePct)}% من ${perf.savedMilkKg} إلى ${perf.currentMilkKg} كجم/رأس. قراءة مُرَبِّيك: ${smartReason} ${heatRelated ? "ابدأ بالتبريد والمياه والتهوية، ثم راجع المأكول الفعلي والبواقي قبل تعديل العليقة." : "راجع المأكول الفعلي والبواقي والخلط والتوزيع والحالات الفردية قبل تعديل العليقة."}`,
-
-
-details: {
-
-  observation:
-    `آخر عليقة ${perf.eventDate || "غير محدد"}. اللبن ${perf.savedMilkKg} → ${perf.currentMilkKg} كجم/رأس. DIM: ${perf.savedDim} → ${perf.currentDim} يوم.`,
-
-
-  meaning:
-    smartReason,
-
-
-  recommendation:
-    heatRelated
-      ? "ابدأ بالتبريد والمياه والتهوية، ثم راجع المأكول الفعلي والبواقي والخلط والتوزيع قبل تعديل العليقة."
-      : "راجع المأكول الفعلي والبواقي والخلط والتوزيع والحالات الفردية قبل تعديل العليقة.",
-
-
-          evidence: [
-
-            `اللبن: ${perf.savedMilkKg} → ${perf.currentMilkKg} كجم/رأس (${perf.milkChangePct}%).`,
-
-            `DIM: ${perf.savedDim} → ${perf.currentDim} يوم.`,
-
-            `تغطية اللبن الحالية للمجموعة: ${perf.currentRecordedCount}/${perf.currentGroupSize} رأس (${perf.currentCoveragePct}%).`,
-
-            `DMI المستهدف: ${perf.savedDmiTarget ?? "—"} → ${perf.currentDmiTarget ?? "—"} كجم مادة جافة.`,
-
-            `كفاءة التحويل: ${perf.savedFeedEfficiency ?? "—"} → ${perf.currentFeedEfficiency ?? "—"}.`,
-
-            `IOFC/رأس: ${perf.savedIofc ?? "—"} → ${perf.currentIofc ?? "—"}.`,
-
-            `تكلفة العلف/كجم لبن: ${perf.savedFeedCostPerKgMilk ?? "—"} → ${perf.currentFeedCostPerKgMilk ?? "—"}.`,
-
-            ...perf.reasons.map(
-              reason =>
-                `سبب محتمل: ${reason}`
-            )
-          ]
-        },
-
-
-        dueDate:
+      revisionKey:
+        [
           currentDate,
 
+          perf.eventDate ||
+            "no-ration-date",
 
-        affectedCount:
-  Number(
-    groupData.affectedCount ||
-    0
-  ),
+          perf.currentIofc,
 
-        animalNumbers:
-          [],
+          perf.currentIofcPct,
 
+          perf.currentFeedCostPct,
 
-        action: {
+          perf.currentFeedCostPerKgMilk,
 
-          type:
-            "navigate",
+          perf.currentFeedEfficiency
+        ].join("|"),
 
+      kind:
+        "technical",
 
-          label:
-            rationEventId
+      domain:
+        "nutrition",
 
-              ? "فتح عليقة المجموعة"
+      code:
+        "nutrition_group_economics_review",
 
-              : "فتح تقرير التغذية",
+      priority:
+        economicDanger
+          ? "high"
+          : "normal",
 
+      urgency:
+        economicDanger
+          ? "now"
+          : "today",
 
-          url:
-            rationEventId
+      certainty:
+        "confirmed",
 
-              ? `nutrition.html?eventId=${encodeURIComponent(rationEventId)}`
+      status:
+        "review",
 
-              : murabbikMilkMirrorReportUrlSrv(
-                  group.speciesKey
-                )
-        },
+      title,
 
+      message,
 
-        snoozeMinutes:
-          MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
-      });
+      details: {
 
+        observation:
+          `اقتصاديات العليقة أعيد حسابها على الوضع الحالي لمجموعة ${group.groupName}.`,
 
-      continue;
-    }
+        meaning:
+          negativeIofc
+            ? "دخل اللبن الحالي لا يغطي تكلفة العلف."
+            : economicDanger
+              ? "اقتصاد العليقة الحالي دخل نطاق الخطر."
+              : "اقتصاد العليقة الحالي يحتاج متابعة.",
+
+        recommendation:
+          "افتح عليقة المجموعة وراجع اقتصادياتها وتكلفة الخامات وكفاءة التحويل قبل اتخاذ قرار تعديل.",
+
+        evidence: [
+
+          `IOFC/رأس: ${perf.savedIofc ?? "—"} → ${perf.currentIofc ?? "—"} جنيه/يوم.`,
+
+          `IOFC من دخل اللبن: ${perf.savedIofcPct ?? "—"}% → ${perf.currentIofcPct ?? "—"}%.`,
+
+          `تكلفة العلف من دخل اللبن: ${perf.savedFeedCostPct ?? "—"}% → ${perf.currentFeedCostPct ?? "—"}%.`,
+
+          `تكلفة العلف/كجم لبن: ${perf.savedFeedCostPerKgMilk ?? "—"} → ${perf.currentFeedCostPerKgMilk ?? "—"} جنيه/كجم.`,
+
+          `كفاءة التحويل: ${perf.savedFeedEfficiency ?? "—"} → ${perf.currentFeedEfficiency ?? "—"}.`
+        ]
+      },
+
+      dueDate:
+        currentDate,
+
+      affectedCount:
+        Number(
+          groupData.affectedCount ||
+          0
+        ),
+
+      animalNumbers:
+        [],
+
+      action: {
+
+        type:
+          "navigate",
+
+        label:
+          rationEventId
+            ? "فتح عليقة المجموعة"
+            : "فتح تقرير التغذية",
+
+        url:
+          rationEventId
+            ? `nutrition.html?eventId=${encodeURIComponent(rationEventId)}`
+            : murabbikMilkMirrorReportUrlSrv(
+                group.speciesKey
+              )
+      },
+
+      snoozeMinutes:
+        MURABBIK_MILK_MIRROR_SNOOZE_MINUTES
+    });
+
+    continue;
+  }
+
+  /*
+   * إعادة الحساب نجحت
+   * والاقتصاد الحالي ليس
+   * في نطاق التحذير أو الخطر.
+   *
+   * لا نصدر تنبيه تغذية.
+   * لو الحرارة مرتفعة نترك
+   * مسار الإنتاج/المناخ يكمل.
+   */
+  if (
+    !heatRelated
+  ) {
+    continue;
+  }
+}
+    
 
 
     /*
