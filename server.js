@@ -22987,9 +22987,36 @@ function buildDashboardFeedAdviceSrv(overall = {}, species = '') {
   return 'تحتاج مؤشرات التغذية إلى متابعة؛ راجع كفاءة تحويل المادة الجافة و IOFC في تقرير التغذية.';
 }
 function buildDashboardFeedGaugeCardsSrv(overall = {}, species = '') {
-  const fe = Number(overall.feedEfficiency || 0);
-  const iofcPct = Number(overall.iofcPctOfMilkIncome || 0);
-  const marginDay = Number(overall.totalMilkFeedMarginPerDay ?? overall.totalMargin ?? 0);
+  const coverageComplete =
+    overall.coverageComplete !== false;
+
+  const fe =
+    coverageComplete &&
+    overall.feedEfficiency !== null &&
+    overall.feedEfficiency !== undefined
+      ? Number(overall.feedEfficiency)
+      : NaN;
+
+  const iofcPct =
+    coverageComplete &&
+    overall.iofcPctOfMilkIncome !== null &&
+    overall.iofcPctOfMilkIncome !== undefined
+      ? Number(overall.iofcPctOfMilkIncome)
+      : NaN;
+
+  const marginDay =
+    coverageComplete &&
+    (
+      overall.totalMilkFeedMarginPerDay !== null &&
+      overall.totalMilkFeedMarginPerDay !== undefined ||
+      overall.totalMargin !== null &&
+      overall.totalMargin !== undefined
+    )
+      ? Number(
+          overall.totalMilkFeedMarginPerDay ??
+          overall.totalMargin
+        )
+      : NaN;
 
   const hasEconomicData =
     Number.isFinite(iofcPct) &&
@@ -85247,14 +85274,25 @@ try {
       source:
         "current_server_recalculation"
     };
-  } else {
+} else {
     feedBands.overall = {
-      ...emptyFeedBand(),
-
       headCount:
         farmLactatingHeadCount ||
         coveredHeads ||
         0,
+
+      avgMilkKg: null,
+      totalMilkKg: null,
+      feedCostPerLiter: null,
+      feedEfficiency: null,
+      feedCostPerHeadPerDay: null,
+      totalFeedCost: null,
+      totalMilkRevenue: null,
+      iofc: null,
+      totalMargin: null,
+      feedCostPctOfMilkIncome: null,
+      iofcPctOfMilkIncome: null,
+      eventDate: null,
 
       scope:
         "lactating_farm",
@@ -85288,6 +85326,9 @@ try {
     e
   );
 }
+const feedOverallAvailable =
+  feedBands.overall?.coverageComplete ===
+  true;
     // --------------------------------------
     // 🔥 6) RETURN — النتيجة النهائية للداشبورد
 return res.json({
@@ -85356,16 +85397,68 @@ cullTotalPct: total
   },
 
 // ===== التغذية: إجمالي + شرائح الإنتاج =====
-feedCostPerLiter: feedBands.overall.feedCostPerLiter,
-feedEfficiency: feedBands.overall.feedEfficiency,
-feedCostPerHeadPerDay: feedBands.overall.feedCostPerHeadPerDay,
-iofc: feedBands.overall.iofc,
+feedCostPerLiter:
+  feedOverallAvailable
+    ? feedBands.overall.feedCostPerLiter
+    : null,
 
-totalFeedCostPerDay: feedBands.overall.totalFeedCostPerDay ?? feedBands.overall.totalFeedCost ?? 0,
-totalMilkFeedMarginPerDay: feedBands.overall.totalMilkFeedMarginPerDay ?? feedBands.overall.totalMargin ?? 0,
-totalIofcPerDay: feedBands.overall.totalIofc ?? feedBands.overall.totalMargin ?? 0,
-iofcPctOfMilkIncome: feedBands.overall.iofcPctOfMilkIncome ?? 0,
-feedCostPctOfMilkIncome: feedBands.overall.feedCostPctOfMilkIncome ?? 0,
+feedEfficiency:
+  feedOverallAvailable
+    ? feedBands.overall.feedEfficiency
+    : null,
+
+feedCostPerHeadPerDay:
+  feedOverallAvailable
+    ? feedBands.overall.feedCostPerHeadPerDay
+    : null,
+
+iofc:
+  feedOverallAvailable
+    ? feedBands.overall.iofc
+    : null,
+
+totalFeedCostPerDay:
+  feedOverallAvailable
+    ? (
+        feedBands.overall.totalFeedCostPerDay ??
+        feedBands.overall.totalFeedCost ??
+        null
+      )
+    : null,
+
+totalMilkFeedMarginPerDay:
+  feedOverallAvailable
+    ? (
+        feedBands.overall.totalMilkFeedMarginPerDay ??
+        feedBands.overall.totalMargin ??
+        null
+      )
+    : null,
+
+totalIofcPerDay:
+  feedOverallAvailable
+    ? (
+        feedBands.overall.totalIofc ??
+        feedBands.overall.totalMargin ??
+        null
+      )
+    : null,
+
+iofcPctOfMilkIncome:
+  feedOverallAvailable
+    ? (
+        feedBands.overall.iofcPctOfMilkIncome ??
+        null
+      )
+    : null,
+
+feedCostPctOfMilkIncome:
+  feedOverallAvailable
+    ? (
+        feedBands.overall.feedCostPctOfMilkIncome ??
+        null
+      )
+    : null,
 feedAdvice:
   buildDashboardFeedAdviceSrv(
     feedBands.overall,
