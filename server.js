@@ -22931,13 +22931,34 @@ function buildDashboardFeedMetricStandardsSrv(
 }
 function buildDashboardFeedAdviceSrv(overall = {}, species = '') {
   if (overall.coverageComplete === false) {
-    const covered = Number(overall.coverageHeadCount || 0);
-    const required = Number(overall.coverageRequiredHeadCount || 0);
+  const covered =
+    Number(
+      overall.coverageHeadCount ||
+      0
+    );
 
-    return required > 0
-      ? `بيانات التغذية غير مكتملة كمزرعة حلاب: محفوظ ${covered} من ${required} رأس حلاب. احفظ علائق كل مجموعات الحلاب ليظهر متوسط غرفة التحكم.`
-      : 'بيانات التغذية غير مكتملة كمزرعة حلاب؛ احفظ علائق الحلاب كلها لتظهر قراءة غرفة التحكم.';
-  }
+  const total =
+    Number(
+      overall.coverageRequiredHeadCount ||
+      0
+    );
+
+  const minimum =
+    Number(
+      overall.coverageMinimumHeadCount ||
+      0
+    );
+
+  const target =
+    Number(
+      overall.coverageTargetPct ||
+      90
+    );
+
+  return total > 0
+    ? `بيانات التغذية غير مكتملة على مستوى المزرعة: ${covered} من ${total} رأس حلاب مكتملة، ويلزم ${minimum} رأس على الأقل (${target}%) لعرض مؤشرات تغذية المزرعة بدقة.`
+    : 'بيانات التغذية غير مكتملة على مستوى المزرعة؛ لا توجد تغطية كافية لعرض مؤشرات التغذية بدقة.';
+}
 
   const fe = Number(overall.feedEfficiency || 0);
   const iofcPct = Number(overall.iofcPctOfMilkIncome || 0);
@@ -77179,25 +77200,32 @@ function murabbikNutritionRecalculateGroupSrv({
      * تغطية الحلاب في الداشبورد:
      * 95%.
      */
-    const minimumCurrentRecords =
-  Math.max(
-    requireMilkDrop
-      ? MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS
-      : 1,
+const minimumCurrentRecords =
+  requireMilkDrop
+    ? Math.max(
+        MURABBIK_MILK_MIRROR_GROUP_MIN_ANIMALS,
+        Math.ceil(
+          currentGroupNumbers.length *
+          0.95
+        )
+      )
+    : 0;
 
-    Math.round(
-      currentGroupNumbers.length *
-      0.95
-    )
-  );
+
+if (
+  requireMilkDrop &&
+  currentGroupRows.length <
+  minimumCurrentRecords
+) {
+  return null;
+}
 
 
-    if (
-      currentGroupRows.length <
-      minimumCurrentRecords
-    ) {
-      return null;
-    }
+if (
+  !currentGroupRows.length
+) {
+  return null;
+}
 
 
     const latest =
@@ -77313,75 +77341,83 @@ function murabbikNutritionRecalculateGroupSrv({
         : null;
 
 
-    const currentMilkKg =
-      currentGroupRows.reduce(
-        (sum, row) =>
-          sum +
-          Number(
-            row.milkKg ||
-            0
-          ),
-        0
-      ) /
-      currentGroupRows.length;
+const completeCurrentRows =
+  currentGroupRows
+    .map(
+      row => ({
+        ...row,
+
+        currentDim:
+          murabbikNutritionCurrentDimSrv(
+            row.doc || {},
+            currentDate
+          )
+      })
+    )
+    .filter(
+      row =>
+        Number.isFinite(
+          Number(row.milkKg)
+        ) &&
+        Number(row.milkKg) > 0 &&
+        Number.isFinite(
+          Number(row.currentDim)
+        ) &&
+        Number(row.currentDim) >= 0
+    );
 
 
-    /*
-     * DIM الحالي لا يؤخذ
-     * من Snapshot daysInMilk.
-     *
-     * يعاد حسابه من
-     * آخر ولادة إلى تاريخ
-     * اللبن الحالي.
-     */
-    const dims =
-      currentGroupRows
-        .map(
-          row =>
-            murabbikNutritionCurrentDimSrv(
-              row.doc || {},
-              currentDate
-            )
-        )
-        .filter(
-          value =>
-            Number.isFinite(
-              Number(value)
-            ) &&
-            Number(value) >= 0
-        );
+if (
+  (
+    requireMilkDrop &&
+    completeCurrentRows.length <
+    minimumCurrentRecords
+  ) ||
+  !completeCurrentRows.length
+) {
+  return null;
+}
 
 
-    if (
-      !Number.isFinite(
-        savedMilkKg
-      ) ||
-      savedMilkKg <= 0 ||
-
-      savedDim === null ||
-
-      !Number.isFinite(
-        currentMilkKg
-      ) ||
-      currentMilkKg <= 0 ||
-
-      dims.length <
-      minimumCurrentRecords
-    ) {
-      return null;
-    }
+const currentMilkKg =
+  completeCurrentRows.reduce(
+    (sum, row) =>
+      sum +
+      Number(row.milkKg),
+    0
+  ) /
+  completeCurrentRows.length;
 
 
-    const currentDim =
-      Math.round(
-        dims.reduce(
-          (sum, value) =>
-            sum +
-            Number(value),
-          0
-        ) /
-        dims.length
-      );
+if (
+  !Number.isFinite(
+    savedMilkKg
+  ) ||
+  savedMilkKg <= 0 ||
+
+  savedDim === null ||
+
+  !Number.isFinite(
+    currentMilkKg
+  ) ||
+  currentMilkKg <= 0
+) {
+  return null;
+}
+
+
+const currentDim =
+  Math.round(
+    completeCurrentRows.reduce(
+      (sum, row) =>
+        sum +
+        Number(
+          row.currentDim
+        ),
+      0
+    ) /
+    completeCurrentRows.length
+  );
 
 
     const milkChangePct =
@@ -77844,21 +77880,24 @@ currentMilkPrice:
   ),
 
 currentRecordedCount:
-        currentGroupRows.length,
+  completeCurrentRows.length,
 
-      currentGroupSize:
-        currentGroupNumbers.length,
+currentCalculatedHeadCount:
+  completeCurrentRows.length,
 
-      currentCoveragePct:
-        round2(
+currentGroupSize:
+  currentGroupNumbers.length,
+
+currentCoveragePct:
+  round2(
+    currentGroupNumbers.length
+      ? (
+          completeCurrentRows.length *
+          100 /
           currentGroupNumbers.length
-            ? (
-                currentGroupRows.length *
-                100 /
-                currentGroupNumbers.length
-              )
-            : null
-        ),
+        )
+      : null
+  ),
 
     };
 
@@ -85118,9 +85157,11 @@ try {
     }
 
     const headCount =
-      Number(
-        perf.currentGroupSize
-      );
+  Number(
+    perf.currentCalculatedHeadCount ??
+    perf.currentRecordedCount ??
+    0
+  );
 
     const avgMilkKg =
       Number(
@@ -85252,88 +85293,113 @@ try {
       0
     );
 
-  const minRequiredHeads =
+  const coverageTargetPct =
+  90;
+
+const minRequiredHeads =
   farmLactatingHeadCount > 0
-    ? Math.max(
-        1,
-        Math.ceil(
-          farmLactatingHeadCount *
-          0.95
-        )
+    ? Math.ceil(
+        farmLactatingHeadCount *
+        (coverageTargetPct / 100)
       )
     : 0;
 
-  const coverageComplete =
-    lactatingCards.length > 0 &&
-    (
-      !minRequiredHeads ||
-      coveredHeads >=
-      minRequiredHeads
-    );
+const coveragePct =
+  farmLactatingHeadCount > 0
+    ? Number(
+        (
+          coveredHeads *
+          100 /
+          farmLactatingHeadCount
+        ).toFixed(1)
+      )
+    : 0;
 
-  if (
-    coverageComplete
-  ) {
-    feedBands.overall = {
-      ...weightedFeedBands(
-        lactatingCards
-      ),
+const coverageComplete =
+  farmLactatingHeadCount > 0 &&
+  coveredHeads >=
+    minRequiredHeads;
 
-      scope:
-        "lactating_farm",
 
-      coverageComplete:
-        true,
+if (
+  coverageComplete
+) {
+  feedBands.overall = {
+    ...weightedFeedBands(
+      lactatingCards
+    ),
 
-      coverageHeadCount:
-        coveredHeads,
+    scope:
+      "lactating_farm",
 
-      coverageRequiredHeadCount:
-        farmLactatingHeadCount,
+    coverageComplete:
+      true,
 
-      currentDate,
+    coverageTargetPct,
 
-      source:
-        "current_server_recalculation"
-    };
+    coveragePct,
+
+    coverageHeadCount:
+      coveredHeads,
+
+    coverageMinimumHeadCount:
+      minRequiredHeads,
+
+    coverageRequiredHeadCount:
+      farmLactatingHeadCount,
+
+    currentDate,
+
+    source:
+      "current_server_recalculation"
+  };
+
 } else {
-    feedBands.overall = {
-      headCount:
-        farmLactatingHeadCount ||
-        coveredHeads ||
-        0,
 
-      avgMilkKg: null,
-      totalMilkKg: null,
-      feedCostPerLiter: null,
-      feedEfficiency: null,
-      feedCostPerHeadPerDay: null,
-      totalFeedCost: null,
-      totalMilkRevenue: null,
-      iofc: null,
-      totalMargin: null,
-      feedCostPctOfMilkIncome: null,
-      iofcPctOfMilkIncome: null,
-      eventDate: null,
+  feedBands.overall = {
+    headCount:
+      farmLactatingHeadCount ||
+      coveredHeads ||
+      0,
 
-      scope:
-        "lactating_farm",
+    avgMilkKg: null,
+    totalMilkKg: null,
+    feedCostPerLiter: null,
+    feedEfficiency: null,
+    feedCostPerHeadPerDay: null,
+    totalFeedCost: null,
+    totalMilkRevenue: null,
+    iofc: null,
+    totalMargin: null,
+    feedCostPctOfMilkIncome: null,
+    iofcPctOfMilkIncome: null,
+    eventDate: null,
 
-      coverageComplete:
-        false,
+    scope:
+      "lactating_farm",
 
-      coverageHeadCount:
-        coveredHeads,
+    coverageComplete:
+      false,
 
-      coverageRequiredHeadCount:
-        farmLactatingHeadCount,
+    coverageTargetPct,
 
-      currentDate,
+    coveragePct,
 
-      source:
-        "incomplete_current_feed_coverage"
-    };
-  }
+    coverageHeadCount:
+      coveredHeads,
+
+    coverageMinimumHeadCount:
+      minRequiredHeads,
+
+    coverageRequiredHeadCount:
+      farmLactatingHeadCount,
+
+    currentDate,
+
+    source:
+      "incomplete_current_feed_coverage"
+  };
+}
 
   feedDashboardMetrics =
     buildDashboardFeedMetricStandardsSrv(
