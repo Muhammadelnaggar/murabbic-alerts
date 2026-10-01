@@ -85253,15 +85253,15 @@ try {
     );
 
   const minRequiredHeads =
-    farmLactatingHeadCount > 0
-      ? Math.max(
-          1,
-          Math.round(
-            farmLactatingHeadCount *
-            0.95
-          )
+  farmLactatingHeadCount > 0
+    ? Math.max(
+        1,
+        Math.ceil(
+          farmLactatingHeadCount *
+          0.95
         )
-      : 0;
+      )
+    : 0;
 
   const coverageComplete =
     lactatingCards.length > 0 &&
