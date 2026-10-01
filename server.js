@@ -61505,6 +61505,30 @@ function milkReportNutritionMilkPriceSrv(e = {}) {
 function milkReportLatestNutritionForGroupSrv(nutritionEvents = [], group = {}, reportDate = "") {
   const norm = v => milkReportNormTextSrv(v);
 
+  const speciesKey = value => {
+    const s = norm(value);
+
+    if (!s) return "";
+
+    if (
+      s.includes("buffalo") ||
+      s.includes("جاموس")
+    ) {
+      return "buffalo";
+    }
+
+    if (
+      s.includes("cow") ||
+      s.includes("cows") ||
+      s.includes("بقر") ||
+      s.includes("ابقار")
+    ) {
+      return "cows";
+    }
+
+    return "";
+  };
+
   const simplifyGroupText = v => norm(v)
     .replace(/ابقار|بقر|جاموسه|جاموس|cow|cows|buffalo/g, "")
     .replace(/\s+/g, " ")
@@ -61522,11 +61546,23 @@ function milkReportLatestNutritionForGroupSrv(nutritionEvents = [], group = {}, 
     const sy = simplifyGroupText(y);
 
     if (!sx || !sy) return false;
-    return sx === sy || sx.includes(sy) || sy.includes(sx);
+
+    return (
+      sx === sy ||
+      sx.includes(sy) ||
+      sy.includes(sx)
+    );
   };
 
   const groupIdNorm = norm(group.groupId);
   const groupNameNorm = norm(group.groupName);
+
+  const groupSpecies =
+    speciesKey(group.speciesKey) ||
+    speciesKey(group.species) ||
+    speciesKey(group.kind) ||
+    speciesKey(group.groupId) ||
+    speciesKey(group.groupName);
 
   const groupNumbers = new Set(
     (group.groupNumbers || [])
@@ -61538,54 +61574,134 @@ function milkReportLatestNutritionForGroupSrv(nutritionEvents = [], group = {}, 
 
   for (const ev of nutritionEvents) {
     const d = milkReportEventDateSrv(ev);
-    if (!milkReportIsDateSrv(d) || d > reportDate) continue;
 
-    const eventGroupIdNorm = norm(milkReportNutritionGroupIdSrv(ev));
-    const eventGroupNameNorm = norm(milkReportNutritionGroupNameSrv(ev));
-    const eventNumbers = milkReportNutritionNumbersSetSrv(ev);
+    if (
+      !milkReportIsDateSrv(d) ||
+      d > reportDate
+    ) {
+      continue;
+    }
+
+    const eventGroupIdNorm =
+      norm(
+        milkReportNutritionGroupIdSrv(ev)
+      );
+
+    const eventGroupNameNorm =
+      norm(
+        milkReportNutritionGroupNameSrv(ev)
+      );
+
+    const eventSpecies =
+      speciesKey(
+        nutritionSpeciesKeyFromEvent(ev)
+      ) ||
+      speciesKey(
+        eventGroupIdNorm
+      ) ||
+      speciesKey(
+        eventGroupNameNorm
+      );
+
+    /*
+     * Species Gate:
+     * ممنوع عليقة أبقار تدخل على جاموس
+     * أو عليقة جاموس تدخل على أبقار.
+     *
+     * لو المجموعة محددة النوع،
+     * لازم حدث التغذية يكون محدد النوع نفسه.
+     */
+    if (
+      groupSpecies &&
+      (
+        !eventSpecies ||
+        eventSpecies !== groupSpecies
+      )
+    ) {
+      continue;
+    }
+
+    const eventNumbers =
+      milkReportNutritionNumbersSetSrv(ev);
 
     let matchScore = 0;
 
-    if (groupIdNorm && eventGroupIdNorm && groupIdNorm === eventGroupIdNorm) {
+    if (
+      groupIdNorm &&
+      eventGroupIdNorm &&
+      groupIdNorm === eventGroupIdNorm
+    ) {
       matchScore += 4000;
     }
 
-    if (textMatch(groupNameNorm, eventGroupNameNorm)) {
+    if (
+      textMatch(
+        groupNameNorm,
+        eventGroupNameNorm
+      )
+    ) {
       matchScore += 1500;
     }
 
     let overlap = 0;
+
     for (const n of eventNumbers) {
-      if (groupNumbers.has(n)) overlap++;
+      if (groupNumbers.has(n)) {
+        overlap++;
+      }
     }
 
     if (overlap > 0) {
-      matchScore += Math.min(800, overlap * 20);
+      matchScore +=
+        Math.min(
+          800,
+          overlap * 20
+        );
     }
 
-    if (matchScore <= 0) continue;
+    if (matchScore <= 0) {
+      continue;
+    }
 
-    const feedCostPerHeadPerDay = milkReportNutritionCostPerHeadSrv(ev);
-    if (!feedCostPerHeadPerDay) continue;
+    const feedCostPerHeadPerDay =
+      milkReportNutritionCostPerHeadSrv(ev);
+
+    if (!feedCostPerHeadPerDay) {
+      continue;
+    }
 
     candidates.push({
       event: ev,
       eventDate: d,
-      eventMs: milkReportEventTimeMsSrv(ev),
+      eventMs:
+        milkReportEventTimeMsSrv(ev),
       matchScore,
       feedCostPerHeadPerDay
     });
   }
 
   candidates.sort((a, b) => {
-    if (b.eventDate !== a.eventDate) return b.eventDate.localeCompare(a.eventDate);
-    if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
-    return b.eventMs - a.eventMs;
+    if (b.eventDate !== a.eventDate) {
+      return b.eventDate.localeCompare(
+        a.eventDate
+      );
+    }
+
+    if (b.matchScore !== a.matchScore) {
+      return (
+        b.matchScore -
+        a.matchScore
+      );
+    }
+
+    return (
+      b.eventMs -
+      a.eventMs
+    );
   });
 
   return candidates[0] || null;
 }
-
 function milkReportAddEconomicsToGroupsSrv(groupsSummary = [], nutritionEvents = [], reportDate = "", milkPriceUsed = null) {
   const OTHER_COST_RATE = 0.20;
 
