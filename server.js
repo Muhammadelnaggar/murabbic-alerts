@@ -77228,9 +77228,111 @@ if (
 }
 
 
+    const groupDefForNutrition =
+      GROUP_DEF_BY_ID_SRV[
+        group.groupId
+      ] ||
+      {};
+
+    const groupSpeciesRaw =
+      String(
+        group.speciesKey ||
+        groupDefForNutrition.species ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+    const expectedSpecies =
+      groupSpeciesRaw === "buffalo"
+        ? "buffalo"
+        : (
+            groupSpeciesRaw === "cow" ||
+            groupSpeciesRaw === "cows" ||
+            groupSpeciesRaw === "cattle"
+              ? "cows"
+              : ""
+          );
+
+    const expectedBand =
+      feedBandKey(
+        group.groupId ||
+        group.groupKey ||
+        group.groupName ||
+        ""
+      );
+
+    const compatibleNutritionEvents =
+      (
+        Array.isArray(
+          nutritionEvents
+        )
+          ? nutritionEvents
+          : []
+      )
+        .filter(
+          ev => {
+            const eventGroupId =
+              milkReportNutritionGroupIdSrv(
+                ev
+              );
+
+            const eventGroupName =
+              milkReportNutritionGroupNameSrv(
+                ev
+              );
+
+            const eventGroupText =
+              `${eventGroupId} ${eventGroupName}`;
+
+            const eventSpecies =
+              nutritionSpeciesKeyFromEvent(
+                ev
+              ) ||
+              (
+                /buffalo|جاموس/i.test(
+                  eventGroupText
+                )
+                  ? "buffalo"
+                  : (
+                      /cow|cows|cattle|بقر|ابقار|أبقار/i.test(
+                        eventGroupText
+                      )
+                        ? "cows"
+                        : ""
+                    )
+              );
+
+            const eventBand =
+              feedBandKey(
+                eventGroupId ||
+                eventGroupName ||
+                ""
+              );
+
+            if (
+              expectedSpecies &&
+              eventSpecies !==
+              expectedSpecies
+            ) {
+              return false;
+            }
+
+            if (
+              expectedBand &&
+              eventBand !==
+              expectedBand
+            ) {
+              return false;
+            }
+
+            return true;
+          }
+        );
+
     const latest =
       milkReportLatestNutritionForGroupSrv(
-        nutritionEvents,
+        compatibleNutritionEvents,
 
         {
           groupId:
@@ -77262,9 +77364,174 @@ if (
         ? nutrition.rows
         : [];
 
-    const savedContext =
+    const savedContextBase =
       nutrition.context ||
       {};
+
+    const savedAnalysisInputs =
+      nutrition
+        .analysis
+        ?.inputs ||
+      {};
+
+    const savedBodyWeight =
+      pickFirstPositiveSrv(
+        savedContextBase.bodyWeightKg,
+        savedContextBase.bodyWeight,
+        savedContextBase.cameraWeightKg,
+        savedContextBase.groupBodyWeightKg
+      );
+
+    const legacyBodyWeight =
+      pickFirstPositiveSrv(
+        savedAnalysisInputs.bodyWeightKgUsed
+      );
+
+    const legacyMilkFatPct =
+      nutritionMilkPercentInputSrv(
+        savedAnalysisInputs.milkFatPctUsed
+      )
+        ? Number(
+            savedAnalysisInputs
+              .milkFatPctUsed
+          )
+        : null;
+
+    const legacyMilkProteinPct =
+      nutritionMilkPercentInputSrv(
+        savedAnalysisInputs
+          .milkProteinPctUsed
+      )
+        ? Number(
+            savedAnalysisInputs
+              .milkProteinPctUsed
+          )
+        : null;
+
+    const legacyLactationNumber =
+      nutritionPositiveInputSrv(
+        savedAnalysisInputs
+          .lactationNumberUsed
+      )
+        ? Number(
+            savedAnalysisInputs
+              .lactationNumberUsed
+          )
+        : null;
+
+    const legacyBcs =
+      nutritionPositiveInputSrv(
+        savedAnalysisInputs.bcsUsed
+      )
+        ? Number(
+            savedAnalysisInputs.bcsUsed
+          )
+        : null;
+
+    const savedContext = {
+      ...savedContextBase,
+
+      groupMode:
+        savedContextBase.groupMode ||
+        "group",
+
+      groupId:
+        savedContextBase.groupId ||
+        group.groupId ||
+        null,
+
+      groupName:
+        savedContextBase.groupName ||
+        group.groupName ||
+        null,
+
+      headCount:
+        Number(
+          savedContextBase.headCount ||
+          0
+        ) > 0
+          ? Number(
+              savedContextBase.headCount
+            )
+          : currentGroupNumbers.length,
+
+      species:
+        savedContextBase.species ||
+        (
+          expectedSpecies ===
+          "buffalo"
+            ? "جاموس"
+            : (
+                expectedSpecies ===
+                "cows"
+                  ? "أبقار"
+                  : ""
+              )
+        ),
+
+      ...(
+        savedBodyWeight === null &&
+        legacyBodyWeight !== null
+          ? {
+              groupBodyWeightKg:
+                legacyBodyWeight
+            }
+          : {}
+      ),
+
+      ...(
+        !nutritionMilkPercentInputSrv(
+          savedContextBase.milkFatPct
+        ) &&
+        legacyMilkFatPct !== null
+          ? {
+              milkFatPct:
+                legacyMilkFatPct
+            }
+          : {}
+      ),
+
+      ...(
+        !nutritionMilkPercentInputSrv(
+          savedContextBase
+            .milkProteinPct
+        ) &&
+        legacyMilkProteinPct !== null
+          ? {
+              milkProteinPct:
+                legacyMilkProteinPct
+            }
+          : {}
+      ),
+
+      ...(
+        !nutritionPositiveInputSrv(
+          savedContextBase
+            .lactationNumber
+        ) &&
+        legacyLactationNumber !== null
+          ? {
+              lactationNumber:
+                legacyLactationNumber
+            }
+          : {}
+      ),
+
+      ...(
+        !nutritionPositiveInputSrv(
+          savedContextBase.bcs
+        ) &&
+        !nutritionPositiveInputSrv(
+          savedContextBase.groupBcs
+        ) &&
+        legacyBcs !== null
+          ? {
+              groupBcs:
+                legacyBcs
+            }
+          : {}
+      )
+    };
 
 
     if (
