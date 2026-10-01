@@ -32,6 +32,7 @@
       <option value="عشار">عشار</option>
       <option value="مفتوحة">مفتوحة</option>
       <option value="إجهاض">إجهاض</option>
+      <option value="استبعاد">استبعاد</option>
     </select>
    <button id="resetFilterBtn" type="button">عرض الكل</button>
     <button
@@ -51,6 +52,7 @@
           <th>النوع</th>
           <th>السلالة</th>
           <th>الحالة الإنتاجية</th>
+          <th>المجموعة</th>
           <th>رقم الموسم</th>
           <th>أيام الحليب</th>
           <th>الحالة التناسلية</th>
@@ -253,6 +255,7 @@ if (animal.rowClass) tr.className = animal.rowClass;
       appendTextCell(tr, animal.animalTypeAr);
       appendTextCell(tr, animal.breed);
       appendTextCell(tr, animal.productionStatus);
+      appendTextCell(tr, animal.groupName);
       appendTextCell(tr, animal.lactationNumber);
       appendTextCell(tr, animal.daysInMilk);
       appendTextCell(tr, animal.reproductiveStatus);
