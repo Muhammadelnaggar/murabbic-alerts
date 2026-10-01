@@ -100458,44 +100458,6 @@ function animalListReproductiveDisplaySrv(a = {}) {
   return raw || "---";
 }
 
-function animalListGroupStageDisplaySrv(a = {}) {
-  const rawKey =
-    animalListStrSrv(
-      a.groupKey ||
-      a.groupId
-    ).toLowerCase();
-
-  const hasKey = key =>
-    rawKey === key ||
-    rawKey.endsWith(`_${key}`);
-
-  if (hasKey("fresh")) {
-    return "حديث الولادة";
-  }
-
-  if (hasKey("high")) {
-    return "عالي";
-  }
-
-  if (hasKey("med")) {
-    return "متوسط";
-  }
-
-  if (hasKey("low")) {
-    return "منخفض";
-  }
-
-  if (hasKey("dry")) {
-    return "جاف";
-  }
-
-  if (hasKey("closeup")) {
-    return "تحضير ولادة";
-  }
-
-  return "---";
-}
-
 function animalListBuildRowSrv(
   a = {},
   todayISO = '',
@@ -100526,8 +100488,11 @@ const typeAr =
 const reproductiveStatus =
   animalListReproductiveDisplaySrv(a);
 
-const groupStage =
-  animalListGroupStageDisplaySrv(a);
+const groupName =
+  animalListStrSrv(
+    a.group ||
+    a.groupName
+  ) || '---';
 
 const birthDate = animalListIsoDateSrv(
   a.birthDate ||
@@ -100659,7 +100624,7 @@ const servicesCount = (
 
     productionStatus,
 
-    groupStage,
+    groupName,
 
 lactationNumber,
 
