@@ -100434,6 +100434,68 @@ function animalListBreedDisplaySrv(v) {
 
   return map[k] || raw;
 }
+
+function animalListReproductiveDisplaySrv(a = {}) {
+  const raw =
+    animalListStrSrv(
+      a.reproductiveStatus
+    );
+
+  const cullStatus =
+    animalListStrSrv(
+      a.cullStatus
+    ).toLowerCase();
+
+  if (
+    a.breedingBlocked === true ||
+    cullStatus === "excluded" ||
+    raw.includes("استبعاد") ||
+    raw.includes("لا تلقح")
+  ) {
+    return "استبعاد";
+  }
+
+  return raw || "---";
+}
+
+function animalListGroupStageDisplaySrv(a = {}) {
+  const rawKey =
+    animalListStrSrv(
+      a.groupKey ||
+      a.groupId
+    ).toLowerCase();
+
+  const hasKey = key =>
+    rawKey === key ||
+    rawKey.endsWith(`_${key}`);
+
+  if (hasKey("fresh")) {
+    return "حديث الولادة";
+  }
+
+  if (hasKey("high")) {
+    return "عالي";
+  }
+
+  if (hasKey("med")) {
+    return "متوسط";
+  }
+
+  if (hasKey("low")) {
+    return "منخفض";
+  }
+
+  if (hasKey("dry")) {
+    return "جاف";
+  }
+
+  if (hasKey("closeup")) {
+    return "تحضير ولادة";
+  }
+
+  return "---";
+}
+
 function animalListBuildRowSrv(
   a = {},
   todayISO = '',
@@ -100461,7 +100523,11 @@ const typeAr =
     importId ===
       animalListStrSrv(requestedImportId);
 
-  const reproductiveStatus = animalListStrSrv(a.reproductiveStatus);
+const reproductiveStatus =
+  animalListReproductiveDisplaySrv(a);
+
+const groupStage =
+  animalListGroupStageDisplaySrv(a);
 
 const birthDate = animalListIsoDateSrv(
   a.birthDate ||
@@ -100592,6 +100658,8 @@ const servicesCount = (
       ),
 
     productionStatus,
+
+    groupStage,
 
 lactationNumber,
 
