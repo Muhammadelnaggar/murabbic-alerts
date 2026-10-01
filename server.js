@@ -76022,23 +76022,27 @@ async function murabbikSmartAlertApplyUserStateSrv(
     const state =
       statesByDocId.get(docId);
 
-    if (
-      !state ||
-      state.revision !== alert.revision
-    ) {
-      visibleAlerts.push(alert);
-      continue;
-    }
+   if (!state) {
+  visibleAlerts.push(alert);
+  continue;
+}
 
-    const decision =
-      murabbikSmartAlertTextSrv(
-        state.decision
-      ).toLowerCase();
+const decision =
+  murabbikSmartAlertTextSrv(
+    state.decision
+  ).toLowerCase();
 
-    if (decision === "acknowledged") {
-      hiddenCount++;
-      continue;
-    }
+if (decision === "acknowledged") {
+  hiddenCount++;
+  continue;
+}
+
+if (
+  state.revision !== alert.revision
+) {
+  visibleAlerts.push(alert);
+  continue;
+}
 
     if (
       decision === "snoozed" &&
