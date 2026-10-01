@@ -2866,9 +2866,10 @@ function reproAutoOpenThresholdDaysSrv(a = {}) {
     t.includes("buffalo") ||
     t.includes("جاموس");
 
-  // نفس السلوك الفعلي في repro-auto القديم:
-  // جاموس: من 41 يوم، أبقار: من 50 يوم
-  return isBuffalo ? 41 : 50;
+  // «حديث الولادة» = داخل VWP.
+  // بعد انتهاء VWP تصبح الحالة التناسلية «مفتوحة».
+  // أبقار: 45 يوم، جاموس: 35 يوم.
+  return isBuffalo ? 35 : 45;
 }
 
 function buildReproAutoOpenPatchSrv(a = {}, todayISO = "") {
@@ -18420,8 +18421,12 @@ function eventsPageCorrectionProductionPatchSrv(rows = [], subjectData = {}, old
       patch.milkTodayKg = null;
       patch.daysInMilk = null;
     } else if (typeKey === "close_up") {
-      patch.productionStatus = "انتظار ولادة";
-    } else if (typeKey === "calving") {
+  patch.productionStatus = "جاف";
+  patch.inMilk = false;
+  patch.dailyMilk = null;
+  patch.milkTodayKg = null;
+  patch.daysInMilk = null;
+} else if (typeKey === "calving") {
       patch.productionStatus = "حلاب";
       patch.inMilk = true;
     }
@@ -30861,21 +30866,29 @@ if (isFollowerRecord) {
       doc.DIM
     );
 
-    function inseminationPostCalvingDecisionSrv(daysAfterCalving) {
-      const d = Math.round(Number(daysAfterCalving));
+   function inseminationPostCalvingDecisionSrv(daysAfterCalving) {
+  const d = Math.round(Number(daysAfterCalving));
 
-      if (!Number.isFinite(d) || d < 0) {
-        return "";
-      }
+  if (!Number.isFinite(d) || d < 0) {
+    return "";
+  }
 
-      if (d < recommendedDaysAfterCalving) {
-  warnings.push(
-    `⚠️ مرّ ${d} يومًا منذ الولادة. يمكن حفظ التلقيح، لكن التوقيت المفضل بعد ${recommendedDaysAfterCalving} يومًا من الولادة.`
-  );
+  if (d < hardBlockDaysAfterCalving) {
+    return (
+      `❌ مرّ ${d} يومًا فقط منذ الولادة. ` +
+      `الحيوان ما زال داخل فترة الانتظار الاختيارية بعد الولادة (VWP)، ` +
+      `ولا يمكن تسجيل التلقيح قبل اكتمال ${hardBlockDaysAfterCalving} يومًا.`
+    );
+  }
+
+  if (d < recommendedDaysAfterCalving) {
+    warnings.push(
+      `⚠️ مرّ ${d} يومًا منذ الولادة. يمكن حفظ التلقيح، لكن التوقيت المفضل بعد ${recommendedDaysAfterCalving} يومًا من الولادة.`
+    );
+  }
+
+  return "";
 }
-
-      return "";
-    }
 
     if (!lastCalving) {
       const blockReason =
@@ -71662,9 +71675,9 @@ async function updateAnimalAfterCloseupSaveSrv(
       .doc(animalId);
 
   const update = {
-    lastCloseUpDate: eventDate,
-    productionStatus: "انتظار ولادة",
-    inMilk: false,
+  lastCloseUpDate: eventDate,
+  productionStatus: "جاف",
+  inMilk: false,
     dailyMilk: null,
     milkTodayKg: null,
     daysInMilk: null,
@@ -75414,46 +75427,51 @@ app.post('/api/events', requireUserId, async (req, res) => {
       const raw    = t;
       const result = String(event.result || event.status || "").toLowerCase();
 
-      // ===== الحالة التناسلية =====
-      if (/preg|حمل/.test(raw) && /(positive|ايجاب|عشار|حامل)/.test(result)) {
-        update.reproductiveStatus = "pregnant";
-        update.lastDiagnosisDate  = evDate;
-      }
-      else if (/preg|حمل/.test(raw) && /(neg|سلب|فارغ)/.test(result)) {
-        update.reproductiveStatus = "open";
-        update.lastDiagnosisDate  = evDate;
-      }
-      else if (/insemin|تلقيح/.test(raw)) {
-        update.reproductiveStatus   = "inseminated";
-        update.lastInseminationDate = evDate;
-      }
-      else if (/calv|birth|ولادة/.test(raw)) {
-        update.reproductiveStatus = "fresh";
-        update.lastCalvingDate    = evDate;
-      }
-      else if (/abortion|اجهاض/.test(raw)) {
-        update.reproductiveStatus = "aborted";
-        update.lastAbortionDate   = evDate;
-      }
+// ===== الحالة التناسلية =====
+if (/preg|حمل/.test(raw) && /(positive|ايجاب|عشار|حامل)/.test(result)) {
+  update.reproductiveStatus = "عشار";
+  update.lastDiagnosisDate  = evDate;
+}
+else if (/preg|حمل/.test(raw) && /(neg|سلب|فارغ)/.test(result)) {
+  update.reproductiveStatus = "مفتوحة";
+  update.lastDiagnosisDate  = evDate;
+}
+else if (/insemin|تلقيح/.test(raw)) {
+  update.reproductiveStatus   = "ملقحة";
+  update.lastInseminationDate = evDate;
+}
+else if (/calv|birth|ولادة/.test(raw)) {
+  update.reproductiveStatus = "حديث الولادة";
+  update.lastCalvingDate    = evDate;
+}
+else if (/abortion|اجهاض/.test(raw)) {
+  update.reproductiveStatus = "إجهاض";
+  update.lastAbortionDate   = evDate;
+}
 
-      // ===== الحالة الإنتاجية =====
-      if (/milk|لبن/.test(raw)) {
-        update.productionStatus = "milking";
-      }
+// ===== الحالة الإنتاجية =====
+// الإنتاجية لا تحمل مرحلة الموسم: فقط حلاب / جاف.
+if (/milk|لبن/.test(raw)) {
+  update.productionStatus = "حلاب";
+  update.inMilk = true;
+}
 
-      if (/dry|تجفيف|جاف/.test(raw)) {
-        update.productionStatus = "dry";
-        update.lastDryOffDate   = evDate;
-      }
+if (/dry|تجفيف|جاف/.test(raw)) {
+  update.productionStatus = "جاف";
+  update.inMilk = false;
+  update.lastDryOffDate   = evDate;
+}
 
-      if (/calv|birth|ولادة/.test(raw)) {
-        update.productionStatus = "milking";
-      }
+if (/calv|birth|ولادة/.test(raw)) {
+  update.productionStatus = "حلاب";
+  update.inMilk = true;
+}
 
-      if (/close|تحضير/.test(raw)) {
-        update.productionStatus = "close_up";
-        update.lastCloseUpDate  = evDate;
-      }
+if (/close|تحضير/.test(raw)) {
+  update.productionStatus = "جاف";
+  update.inMilk = false;
+  update.lastCloseUpDate  = evDate;
+}
 
       // -------- 3) تطبيق التحديث على animals --------
           // -------- 3) تطبيق التحديث على animals --------
@@ -100336,9 +100354,13 @@ function animalListDisplayKeySrv(v) {
 
 function animalListProductionDisplaySrv(v) {
   const raw = animalListStrSrv(v);
-  if (!raw) return '---';
 
-  const k = animalListDisplayKeySrv(raw);
+  if (!raw) {
+    return '---';
+  }
+
+  const k =
+    animalListDisplayKeySrv(raw);
 
   const map = {
     'milking': 'حلاب',
@@ -100350,14 +100372,18 @@ function animalListProductionDisplaySrv(v) {
     'dry off': 'جاف',
     'dryoff': 'جاف',
 
-    'fresh': 'حديث الولادة',
-    'fresh cow': 'حديث الولادة',
-    'postpartum': 'حديث الولادة',
+    // مراحل الموسم لا تُعرض كحالة إنتاجية.
+    'fresh': 'حلاب',
+    'fresh cow': 'حلاب',
+    'postpartum': 'حلاب',
+    'حديث الولادة': 'حلاب',
 
-    'close up': 'تحضير ولادة',
-    'closeup': 'تحضير ولادة',
-    'close up period': 'تحضير ولادة',
-    'close up cow': 'تحضير ولادة'
+    'close up': 'جاف',
+    'closeup': 'جاف',
+    'close up period': 'جاف',
+    'close up cow': 'جاف',
+    'انتظار ولادة': 'جاف',
+    'تحضير ولادة': 'جاف'
   };
 
   return map[k] || raw;
@@ -100494,23 +100520,7 @@ const servicesCount = (
       : animalListNumDisplaySrv(
           a.daysInMilk
         );
-    if (
-    productionStatus === 'حديث الولادة' &&
-    Number.isFinite(daysInMilk)
-  ) {
-    const productionView = {
-      ...a,
-      lastCalvingDate,
-      daysInMilk
-    };
-
-    if (
-      isMilkingGroupSrv(productionView, true) &&
-      !isFreshGroupSrv(productionView)
-    ) {
-      productionStatus = 'حلاب';
-    }
-  }
+  
   const inseminatedDays = (
     (
       reproductiveStatus === 'ملقحة' ||
@@ -102272,14 +102282,6 @@ function isDryGroupSrv(an = {}) {
     an?.['الحالةُ_اللبنية'] ?? an?.['الحالة_اللبنية']
   ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
 
-  const isCloseUpStatus =
-    (joined.includes('انتظار') && joined.includes('ولاد')) ||
-    (joined.includes('تحضير') && joined.includes('ولاد')) ||
-    joined.includes('close_up') ||
-    joined.includes('close up') ||
-    joined.includes('closeup');
-
-  if (isCloseUpStatus) return false;
 
   if (
     an?.inMilk === false ||
@@ -102392,26 +102394,8 @@ function isInfantGroupSrv(an = {}) {
 }
 
 function isCloseUpGroupSrv(an = {}) {
-  const production = [
-    an?.productionStatus,
-    an?.lactationStatus,
-    an?.['الحالةُ_اللبنية'] ?? an?.['الحالة_اللبنية']
-  ].map(v => String(v ?? '').trim().toLowerCase()).join(' ');
-
-  if (
-    (production.includes('انتظار') && production.includes('ولاد')) ||
-    (production.includes('تحضير') && production.includes('ولاد')) ||
-    production.includes('close_up') ||
-    production.includes('close up') ||
-    production.includes('closeup')
-  ) {
-    return true;
-  }
-
-  if (an?._hasCloseUpEvent !== true) {
-    return false;
-  }
-
+  // Close-up مرحلة تشغيلية/موسمية، وليست productionStatus.
+  // مصدرها حدث التحضير وتاريخه فقط.
   const closeUpDate = groupDateOnlySrv(
     an?._lastCloseUpDate ||
     an?.lastCloseUpDate ||
@@ -102420,6 +102404,15 @@ function isCloseUpGroupSrv(an = {}) {
   );
 
   if (!closeUpDate) {
+    return false;
+  }
+
+  const hasCloseUpSignal =
+    an?._hasCloseUpEvent === true ||
+    Boolean(an?.lastCloseUpDate) ||
+    Boolean(an?.closeUpDate);
+
+  if (!hasCloseUpSignal) {
     return false;
   }
 
@@ -103349,62 +103342,192 @@ function groupPageStateClassesSrv(an = {}, def = {}) {
 
 function groupPageMiniRowsSrv(an = {}, def = {}) {
   const kind = groupPageKindLabelSrv(an);
-  const status = groupPageStatusLabelSrv(an, def);
-  const isDryView = status === "جاف" || String(def.baseKey || "") === "dry" || an.dry === true;
-  const milk = isDryView ? 0 : Number(an.milkKg ?? an.dailyMilk ?? 0);
-  const dim = isDryView ? "—" : (an.daysInMilk == null ? "—" : String(an.daysInMilk));
-  const ageM = an.ageMonths == null ? "—" : `${an.ageMonths} شهر`;
+  const stage = groupPageStatusLabelSrv(an, def);
+
+  const isDryView =
+    an.productionStatus === "جاف" ||
+    String(def.baseKey || "") === "dry" ||
+    an.dry === true;
+
+  const milk =
+    isDryView
+      ? 0
+      : Number(
+          an.milkKg ??
+          an.dailyMilk ??
+          0
+        );
+
+  const dim =
+    isDryView
+      ? "—"
+      : (
+          an.daysInMilk == null
+            ? "—"
+            : String(an.daysInMilk)
+        );
+
+  const ageM =
+    an.ageMonths == null
+      ? "—"
+      : `${an.ageMonths} شهر`;
 
   if (an.isCalf === true) {
     return [
-      { label: "الجنس", value: groupPageSexLabelSrv(an) },
-      { label: "العمر", value: ageM },
-      { label: "الميلاد", value: an.birthDate || "غير مسجل" },
-      { label: "النوع", value: kind }
+      {
+        label: "الجنس",
+        value: groupPageSexLabelSrv(an)
+      },
+      {
+        label: "العمر",
+        value: ageM
+      },
+      {
+        label: "الميلاد",
+        value:
+          an.birthDate ||
+          "غير مسجل"
+      },
+      {
+        label: "النوع",
+        value: kind
+      }
     ];
   }
 
   return [
-    { label: "اللبن", value: Number.isFinite(milk) && milk > 0 ? `${milk.toFixed(1)} كجم/يوم` : "—" },
-    { label: "DIM", value: dim },
-    { label: "الحالة", value: status },
-    { label: "النوع", value: kind }
+    {
+      label: "اللبن",
+      value:
+        Number.isFinite(milk) &&
+        milk > 0
+          ? `${milk.toFixed(1)} كجم/يوم`
+          : "—"
+    },
+    {
+      label: "DIM",
+      value: dim
+    },
+    {
+      label: "مرحلة المجموعة",
+      value: stage
+    },
+    {
+      label: "النوع",
+      value: kind
+    }
   ];
 }
 
 function groupAnimalViewForPageSrv(rawAn = {}, def = {}) {
   const an = groupAnimalForPageSrv(rawAn);
-  const n = String(an.animalNumber || an.number || an.id || "").trim();
-  const today = cairoTodayISO();
 
-  const kind = groupPageKindLabelSrv(an);
-  const status = groupPageStatusLabelSrv(an, def);
-  const band = groupPageBandLabelSrv(def.baseKey);
+  const n = String(
+    an.animalNumber ||
+    an.number ||
+    an.id ||
+    ""
+  ).trim();
 
- const milk = Number(an.milkKg ?? an.dailyMilk ?? 0);
- const isDryView = status === "جاف" || String(def.baseKey || "") === "dry" || an.dry === true;
- const displayMilk = isDryView ? 0 : milk;
+  const today =
+    cairoTodayISO();
+
+  const kind =
+    groupPageKindLabelSrv(an);
+
+  const stage =
+    groupPageStatusLabelSrv(
+      an,
+      def
+    );
+
+  const band =
+    groupPageBandLabelSrv(
+      def.baseKey
+    );
+
+  const milk =
+    Number(
+      an.milkKg ??
+      an.dailyMilk ??
+      0
+    );
+
+  const isDryView =
+    an.productionStatus === "جاف" ||
+    String(
+      def.baseKey ||
+      ""
+    ) === "dry" ||
+    an.dry === true;
+
+  const displayMilk =
+    isDryView
+      ? 0
+      : milk;
 
   return {
     ...an,
 
-    groupId: def.id,
-    groupName: def.label,
-    groupKey: def.baseKey,
-    groupShortLabel: groupPageShortLabelSrv(def),
+    groupId:
+      def.id,
 
-    displayTitle: groupPageAnimalTitleSrv(an),
-    badges: [kind, status, an.breed || "", band].filter(Boolean),
-    miniRows: groupPageMiniRowsSrv(an, def),
+    groupName:
+      def.label,
 
-    shapeClass: groupPageShapeClassSrv(an),
-    stateClasses: groupPageStateClassesSrv(an, def),
-   dotSub: an.isCalf === true
-  ? groupPageSexLabelSrv(an)
-  : (Number.isFinite(displayMilk) && displayMilk > 0 ? `${Math.round(displayMilk)}ك` : status),
+    groupKey:
+      def.baseKey,
 
-    cardUrl: `/cow-card.html?number=${encodeURIComponent(n)}&date=${today}`,
-    eventUrl: `/add-event.html?number=${encodeURIComponent(n)}&date=${today}`,
+    groupShortLabel:
+      groupPageShortLabelSrv(
+        def
+      ),
+
+    groupStage:
+      stage,
+
+    displayTitle:
+      groupPageAnimalTitleSrv(an),
+
+    badges: [
+      kind,
+      stage,
+      an.breed || "",
+      band
+    ].filter(Boolean),
+
+    miniRows:
+      groupPageMiniRowsSrv(
+        an,
+        def
+      ),
+
+    shapeClass:
+      groupPageShapeClassSrv(an),
+
+    stateClasses:
+      groupPageStateClassesSrv(
+        an,
+        def
+      ),
+
+    dotSub:
+      an.isCalf === true
+        ? groupPageSexLabelSrv(an)
+        : (
+            Number.isFinite(
+              displayMilk
+            ) &&
+            displayMilk > 0
+              ? `${Math.round(displayMilk)}ك`
+              : stage
+          ),
+
+    cardUrl:
+      `/cow-card.html?number=${encodeURIComponent(n)}&date=${today}`,
+
+    eventUrl:
+      `/add-event.html?number=${encodeURIComponent(n)}&date=${today}`,
 
     searchText: [
       n,
@@ -103413,10 +103536,12 @@ function groupAnimalViewForPageSrv(rawAn = {}, def = {}) {
       kind,
       an.animalTypeAr,
       an.breed,
-      status,
+      stage,
       def.label,
       band
-    ].filter(Boolean).join(" "),
+    ]
+      .filter(Boolean)
+      .join(" "),
 
     viewModelVersion: 1
   };
@@ -111281,26 +111406,6 @@ lastCheckDate:
           ? dim
           : null;
     }
-
-    if (
-      animalListProductionDisplaySrv(state.productionStatus) === 'حديث الولادة' &&
-      Number.isFinite(state.daysInMilk)
-    ) {
-      const productionView = {
-        ...animal,
-        productionStatus: state.productionStatus,
-        lastCalvingDate: state.lastCalvingDate,
-        daysInMilk: state.daysInMilk
-      };
-
-      if (
-        isMilkingGroupSrv(productionView, true) &&
-        !isFreshGroupSrv(productionView)
-      ) {
-        state.productionStatus = 'حلاب';
-      }
-    }
-
     const todayISO = cairoTodayISO();
 
     const todayMilk =
