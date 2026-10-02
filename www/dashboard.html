@@ -1041,19 +1041,44 @@ function renderDashboardMilkPrice(ui = null) {
 
   if (!input) return;
 
-  input.addEventListener(
-    'change',
-    submitDashboardMilkPrice
-  );
+  let milkPriceSaveTimer = null;
 
-  input.addEventListener(
-    'keydown',
-    event => {
-      if (event.key === 'Enter') {
-        input.blur();
-      }
+input.addEventListener(
+  'input',
+  () => {
+    clearTimeout(
+      milkPriceSaveTimer
+    );
+
+    milkPriceSaveTimer =
+      setTimeout(
+        () => {
+          submitDashboardMilkPrice();
+        },
+        900
+      );
+  }
+);
+
+input.addEventListener(
+  'blur',
+  () => {
+    clearTimeout(
+      milkPriceSaveTimer
+    );
+
+    submitDashboardMilkPrice();
+  }
+);
+
+input.addEventListener(
+  'keydown',
+  event => {
+    if (event.key === 'Enter') {
+      input.blur();
     }
-  );
+  }
+);
 }
 
 async function submitDashboardMilkPrice() {
@@ -1067,9 +1092,9 @@ async function submitDashboardMilkPrice() {
       'milkPriceTodayMessage'
     );
 
-  if (!input) return;
+  if (!input || input.disabled) return;
 
-  input.disabled = true;
+input.disabled = true;
 
   try {
     const res = await fetch(
