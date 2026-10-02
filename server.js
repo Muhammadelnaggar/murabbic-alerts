@@ -85818,6 +85818,8 @@ let feedDashboardMetrics = {
   metrics: []
 };
 let feedRecordedHeadsForCoverage = 0;
+let feedTotalDmiForEfficiency = 0;
+let feedTotalEcmForEfficiency = 0;
 
 try {
   const evNutAll =
@@ -86164,6 +86166,35 @@ feedRecordedHeadsForCoverage +=
     headCount ??
     0
   );
+  const groupDmiPerHead =
+  Number(
+    perf.rationDmKg
+  );
+
+const groupFeedEfficiency =
+  Number(
+    perf.currentFeedEfficiency
+  );
+
+if (
+  Number.isFinite(headCount) &&
+  headCount > 0 &&
+  Number.isFinite(groupDmiPerHead) &&
+  groupDmiPerHead > 0 &&
+  Number.isFinite(groupFeedEfficiency) &&
+  groupFeedEfficiency > 0
+) {
+  const groupTotalDmi =
+    groupDmiPerHead *
+    headCount;
+
+  feedTotalDmiForEfficiency +=
+    groupTotalDmi;
+
+  feedTotalEcmForEfficiency +=
+    groupFeedEfficiency *
+    groupTotalDmi;
+}
     feedBands[
       band.key
     ] = {
@@ -86301,6 +86332,16 @@ if (
     ...weightedFeedBands(
       lactatingCards
     ),
+
+    feedEfficiency:
+      feedTotalDmiForEfficiency > 0
+        ? Number(
+            (
+              feedTotalEcmForEfficiency /
+              feedTotalDmiForEfficiency
+            ).toFixed(2)
+          )
+        : null,
 
     scope:
       "lactating_farm",
