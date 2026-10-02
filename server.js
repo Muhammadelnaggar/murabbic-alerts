@@ -78091,7 +78091,7 @@ if (
         : null;
 
 
-const completeCurrentRows =
+const actualCompleteCurrentRows =
   currentGroupRows
     .map(
       row => ({
@@ -78101,7 +78101,10 @@ const completeCurrentRows =
           murabbikNutritionCurrentDimSrv(
             row.doc || {},
             currentDate
-          )
+          ),
+
+        milkEstimated:
+          false
       })
     )
     .filter(
@@ -78120,9 +78123,171 @@ const completeCurrentRows =
 if (
   (
     requireMilkDrop &&
-    completeCurrentRows.length <
+    actualCompleteCurrentRows.length <
     minimumCurrentRecords
   ) ||
+  !actualCompleteCurrentRows.length
+) {
+  return null;
+}
+
+
+/*
+ * Dashboard fallback:
+ *
+ * الحيوان الحلاب الموجود فعليًا
+ * في المجموعة ولا يوجد له لبن
+ * في يوم الحساب يأخذ متوسط اللبن
+ * الفعلي المسجل لنفس المجموعة.
+ *
+ * Milk Mirror لا يستخدم fallback.
+ */
+const actualMilkAverage =
+  actualCompleteCurrentRows.reduce(
+    (sum, row) =>
+      sum +
+      Number(row.milkKg),
+    0
+  ) /
+  actualCompleteCurrentRows.length;
+
+
+const actualNumbers =
+  new Set(
+    actualCompleteCurrentRows
+      .map(
+        row =>
+          String(
+            row.animalNumber || ""
+          ).trim()
+      )
+      .filter(Boolean)
+  );
+
+
+const estimatedCurrentRows =
+  (
+    !requireMilkDrop &&
+    Number.isFinite(
+      Number(actualMilkAverage)
+    ) &&
+    Number(actualMilkAverage) > 0
+  )
+    ? currentGroupNumbers
+        .map(
+          animalNumber => {
+
+            const number =
+              String(
+                animalNumber || ""
+              ).trim();
+
+            if (
+              !number ||
+              actualNumbers.has(
+                number
+              )
+            ) {
+              return null;
+            }
+
+
+            const doc =
+              animalsByNumber.get(
+                number
+              ) ||
+              null;
+
+
+            if (!doc) {
+              return null;
+            }
+
+
+            if (
+              !murabbikMilkMirrorAnimalActiveSrv(
+                doc
+              )
+            ) {
+              return null;
+            }
+
+
+            if (
+              !murabbikDryOffAlertIsMilkingSrv(
+                doc
+              )
+            ) {
+              return null;
+            }
+
+
+            if (
+              String(
+                doc.entryType ||
+                ""
+              )
+                .trim()
+                .toLowerCase() ===
+              "followers"
+            ) {
+              return null;
+            }
+
+
+            const currentDim =
+              murabbikNutritionCurrentDimSrv(
+                doc,
+                currentDate
+              );
+
+
+            if (
+              !Number.isFinite(
+                Number(currentDim)
+              ) ||
+              Number(currentDim) < 0
+            ) {
+              return null;
+            }
+
+
+            return {
+              animalNumber:
+                number,
+
+              doc,
+
+              milkKg:
+                Number(
+                  actualMilkAverage
+                ),
+
+              currentDim:
+                Number(
+                  currentDim
+                ),
+
+              milkEstimated:
+                true,
+
+              milkFallbackMethod:
+                "group_actual_mean"
+            };
+          }
+        )
+        .filter(Boolean)
+
+    : [];
+
+
+const completeCurrentRows = [
+  ...actualCompleteCurrentRows,
+  ...estimatedCurrentRows
+];
+
+
+if (
   !completeCurrentRows.length
 ) {
   return null;
@@ -78645,7 +78810,10 @@ currentMilkPrice:
   ),
 
 currentRecordedCount:
-  completeCurrentRows.length,
+  actualCompleteCurrentRows.length,
+
+currentEstimatedCount:
+  estimatedCurrentRows.length,
 
 currentCalculatedHeadCount:
   completeCurrentRows.length,
@@ -78657,12 +78825,20 @@ currentCoveragePct:
   round2(
     currentGroupNumbers.length
       ? (
-          completeCurrentRows.length *
+          actualCompleteCurrentRows.length *
           100 /
           currentGroupNumbers.length
         )
       : null
   ),
+
+currentMilkFallbackUsed:
+  estimatedCurrentRows.length > 0,
+
+currentMilkFallbackMethod:
+  estimatedCurrentRows.length > 0
+    ? "group_actual_mean"
+    : null,
 
     };
 
@@ -85641,6 +85817,7 @@ let feedDashboardMetrics = {
   currentDate: null,
   metrics: []
 };
+let feedRecordedHeadsForCoverage = 0;
 
 try {
   const evNutAll =
@@ -85981,13 +86158,18 @@ try {
       Number(
         perf.currentIofc
       );
-
+feedRecordedHeadsForCoverage +=
+  Number(
+    perf.currentRecordedCount ??
+    headCount ??
+    0
+  );
     feedBands[
       band.key
     ] = {
-      headCount,
+headCount,
 
-      avgMilkKg,
+avgMilkKg,
 
       totalMilkKg:
         Number(
@@ -86075,16 +86257,8 @@ try {
           ) > 0
       );
 
-  const coveredHeads =
-    lactatingCards.reduce(
-      (sum, card) =>
-        sum +
-        Number(
-          card.headCount ||
-          0
-        ),
-      0
-    );
+ const coveredHeads =
+  feedRecordedHeadsForCoverage;
 
   const farmLactatingHeadCount =
     Number(
