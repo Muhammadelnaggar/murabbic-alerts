@@ -84941,6 +84941,342 @@ const active = animalsByType.filter(a => {
   return !["dead","died","sold","archived","inactive","nafaq","نافق"].includes(st);
 });
 
+// ============================================================
+// 📋 تعداد القطيع — Inventory مباشر ومستقل
+// المصدر: animals + calves
+// لا يعتمد على Groups / التغذية / الخصوبة
+// الحيوان المرشّح للاستبعاد يظل محسوبًا ما دام لم يخرج فعليًا
+// ============================================================
+const inventoryCalvesSnap = await db
+  .collection("calves")
+  .where("userId", "==", uid)
+  .get();
+
+const inventoryNormText = (v) =>
+  String(v ?? "")
+    .trim()
+    .toLowerCase();
+
+const inventoryIsPresent = (doc = {}) => {
+  if (
+    doc.active === false ||
+    doc.isActive === false ||
+    doc.inactive === true ||
+    doc.archived === true
+  ) {
+    return false;
+  }
+
+  const stateValues = [
+    doc.status,
+    doc.lifeStatus,
+    doc.animalStatus,
+    doc.statusAr,
+    doc.saleStatus
+  ]
+    .map(inventoryNormText)
+    .filter(Boolean);
+
+  const outStatuses = new Set([
+    "dead",
+    "died",
+    "sold",
+    "archived",
+    "inactive",
+    "nafaq",
+    "نافق",
+    "نافقة",
+    "ميت",
+    "مباع",
+    "مباعة",
+    "غير نشط",
+    "خارج القطيع"
+  ]);
+
+  if (
+    stateValues.some(
+      value =>
+        outStatuses.has(value) ||
+        value.includes("خارج القطيع")
+    )
+  ) {
+    return false;
+  }
+
+  const exitReason =
+    inventoryNormText(
+      doc.exitReason
+    );
+
+  // exitReason هنا يعني خروجًا فعليًا،
+  // وليس مجرد قرار استبعاد.
+  if (
+    exitReason === "sold" ||
+    exitReason === "sale" ||
+    exitReason === "بيع" ||
+    exitReason === "dead" ||
+    exitReason === "death" ||
+    exitReason === "نفوق"
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const inventorySpeciesOf = (doc = {}) => {
+  const txt = [
+    doc.species,
+    doc.animaltype,
+    doc.animalType,
+    doc.animalTypeAr,
+    doc.kind,
+    doc.type
+  ]
+    .map(inventoryNormText)
+    .filter(Boolean)
+    .join(" ");
+
+  if (
+    txt.includes("buff") ||
+    txt.includes("جاموس")
+  ) {
+    return "buffalo";
+  }
+
+  if (
+    txt.includes("cow") ||
+    txt.includes("cattle") ||
+    txt.includes("بقار") ||
+    txt.includes("ابقار")
+  ) {
+    return "cow";
+  }
+
+  return "";
+};
+
+const inventorySexOf = (doc = {}) => {
+  const txt = [
+    doc.sex,
+    doc.gender,
+    doc.animalSex,
+    doc.sexAr,
+    doc.genderAr
+  ]
+    .map(inventoryNormText)
+    .filter(Boolean)
+    .join(" ");
+
+  if (
+    txt.includes("male") ||
+    txt.includes("bull") ||
+    txt.includes("ذكر")
+  ) {
+    return "male";
+  }
+
+  if (
+    txt.includes("female") ||
+    txt.includes("heifer") ||
+    txt.includes("انث") ||
+    txt.includes("أنث") ||
+    txt.includes("نتاي")
+  ) {
+    return "female";
+  }
+
+  return "";
+};
+
+const inventoryFollowerStage = (doc = {}) =>
+  inventoryNormText(
+    doc.followerStatus ||
+    doc.calfStatus ||
+    doc.stage ||
+    doc.currentStatus ||
+    doc.status ||
+    ""
+  );
+
+const inventoryReproStatus = (doc = {}) =>
+  inventoryNormText(
+    doc.reproductiveStatus ||
+    doc.reproStatus ||
+    doc.pregStatus ||
+    ""
+  );
+
+const inventorySpecies =
+  selectedDashboardSpecies === "buffalo"
+    ? "buffalo"
+    : "cow";
+
+// animals = الحيوانات الرئيسية / الأمهات
+const inventoryMothers = animalsAll.filter(doc =>
+  inventoryIsPresent(doc) &&
+  inventorySpeciesOf(doc) === inventorySpecies
+);
+
+// نمنع تكرار أي تابع أصبح له سجل رئيسي داخل animals.
+const inventoryMotherNumbers = new Set(
+  animalsAll
+    .map(doc =>
+      normalizeAnimalNumberForStats(
+        doc.animalNumber ??
+        doc.number ??
+        doc.calfNumber ??
+        doc.id
+      )
+    )
+    .filter(Boolean)
+);
+
+const inventoryFollowersByNumber = new Map();
+
+for (const ds of inventoryCalvesSnap.docs) {
+  const doc = {
+    id: ds.id,
+    ...(ds.data() || {})
+  };
+
+  if (!inventoryIsPresent(doc)) {
+    continue;
+  }
+
+  if (
+    inventorySpeciesOf(doc) !==
+    inventorySpecies
+  ) {
+    continue;
+  }
+
+  const animalNumber =
+    normalizeAnimalNumberForStats(
+      doc.calfNumber ??
+      doc.animalNumber ??
+      doc.number ??
+      doc.id
+    );
+
+  if (!animalNumber) {
+    continue;
+  }
+
+  if (
+    inventoryMotherNumbers.has(
+      animalNumber
+    )
+  ) {
+    continue;
+  }
+
+  inventoryFollowersByNumber.set(
+    animalNumber,
+    {
+      ...doc,
+      animalNumber
+    }
+  );
+}
+
+const inventoryFollowers =
+  [...inventoryFollowersByNumber.values()];
+
+const inventoryIsPregnantHeifer = (doc = {}) => {
+  if (inventorySexOf(doc) === "male") {
+    return false;
+  }
+
+  const stage =
+    inventoryFollowerStage(doc);
+
+  const repro =
+    inventoryReproStatus(doc);
+
+  return (
+    stage === "عشار" ||
+    repro.includes("عشار") ||
+    repro.includes("preg")
+  );
+};
+
+const inventoryIsBreedingHeifer = (doc = {}) => {
+  if (inventorySexOf(doc) === "male") {
+    return false;
+  }
+
+  if (
+    inventoryIsPregnantHeifer(doc)
+  ) {
+    return false;
+  }
+
+  const stage =
+    inventoryFollowerStage(doc);
+
+  const repro =
+    inventoryReproStatus(doc);
+
+  return (
+    stage === "تحت التلقيح" ||
+    stage === "ملقح" ||
+    stage === "ملقحة" ||
+    repro.includes("ملقح") ||
+    repro.includes("insemin")
+  );
+};
+
+const herdInventory = {
+  totalHerd:
+    inventoryMothers.length +
+    inventoryFollowers.length,
+
+  mothers:
+    inventoryMothers.length,
+
+  suckling:
+    inventoryFollowers.filter(
+      doc =>
+        inventoryFollowerStage(doc) ===
+        "رضيع"
+    ).length,
+
+  weaned:
+    inventoryFollowers.filter(
+      doc =>
+        inventoryFollowerStage(doc) ===
+        "فطام"
+    ).length,
+
+  growing:
+    inventoryFollowers.filter(
+      doc =>
+        inventoryFollowerStage(doc) ===
+        "نامي"
+    ).length,
+
+  breedingHeifers:
+    inventoryFollowers.filter(
+      inventoryIsBreedingHeifer
+    ).length,
+
+  pregnantHeifers:
+    inventoryFollowers.filter(
+      inventoryIsPregnantHeifer
+    ).length,
+
+  males:
+    [
+      ...inventoryMothers,
+      ...inventoryFollowers
+    ].filter(
+      doc =>
+        inventorySexOf(doc) ===
+        "male"
+    ).length
+};
+
 let total = active.length;
 let officialInMilkCount = null;
 let officialFeedBandCounts = null;
@@ -86440,6 +86776,8 @@ return res.json({
     totalActive: total,
     pregnant: { count: preg, pct: pregPct },
   },
+
+  herdInventory,
 
 fertility: {
   servicesPerConception,
