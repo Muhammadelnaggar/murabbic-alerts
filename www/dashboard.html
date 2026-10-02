@@ -103,7 +103,10 @@
 
   <div class="section-title">🌾كفاءة تغذية الحلاب</div>
 
-  <div id="milkPriceTodayGrid" class="kpi-grid"></div>
+  <div
+    id="milkPriceTodayGrid"
+    class="milk-price-panel"
+  ></div>
 
   <div id="feedGrid" class="kpi-grid"></div>
 
@@ -931,95 +934,68 @@ function abortionBox(count, pct){
   );
 }
 
-function renderDashboardMilkPrice(prices = {}) {
+function renderDashboardMilkPrice(ui = null) {
   const host =
-    document.getElementById('milkPriceTodayGrid');
+    document.getElementById(
+      'milkPriceTodayGrid'
+    );
 
   if (!host) return;
 
-  const isBuffalo =
-    currentType === 'buffalo';
+  host.innerHTML = '';
 
-  const speciesKey =
-    isBuffalo ? 'buffalo' : 'cow';
-
-  const fieldKey =
-    isBuffalo
-      ? 'buffaloMilkPrice'
-      : 'cowMilkPrice';
-
-  const label =
-    isBuffalo
-      ? 'سعر لبن الجاموس اليوم / كجم'
-      : 'سعر لبن الأبقار اليوم / كجم';
-
-  const numericValue =
-    Number(prices?.[fieldKey]);
-
-  const value =
-    Number.isFinite(numericValue) &&
-    numericValue > 0
-      ? String(numericValue)
-      : '';
+  if (!ui) return;
 
   host.innerHTML = `
-    <div class="kpi feed">
+    <div class="milk-price-row">
 
       <label
-        class="kpi-label"
+        class="milk-price-label"
         for="milkPriceTodayInput"
-      >${label}</label>
+      ></label>
 
       <input
         id="milkPriceTodayInput"
-        type="number"
-        min="0.01"
-        step="0.01"
+        class="milk-price-input"
+        type="text"
         inputmode="decimal"
-        value="${value}"
-        data-species="${speciesKey}"
-        placeholder="أدخل السعر الحالي"
+        autocomplete="off"
       >
 
-      <button
-        id="milkPriceTodaySaveBtn"
-        type="button"
-      >حفظ السعر</button>
+      <span class="milk-price-unit"></span>
 
-      <div
+      <span
         id="milkPriceTodayMessage"
-        class="kpi-sub"
+        class="milk-price-status"
         aria-live="polite"
-      ></div>
+      ></span>
 
-      <div class="kpi-sub">
-        حدّث أسعار الخامات في العلائق المحفوظة باستمرار.
-      </div>
+    </div>
 
+    <div class="milk-price-note">
+      <span aria-hidden="true">💡</span>
+      <span class="milk-price-note-text"></span>
     </div>
   `;
 
-  const button =
-    document.getElementById(
-      'milkPriceTodaySaveBtn'
+  const label =
+    host.querySelector(
+      '.milk-price-label'
     );
 
-  if (button) {
-    button.onclick =
-      saveDashboardMilkPrice;
-  }
-}
-
-
-async function saveDashboardMilkPrice() {
   const input =
     document.getElementById(
       'milkPriceTodayInput'
     );
 
-  const button =
-    document.getElementById(
-      'milkPriceTodaySaveBtn'
+  const unit =
+    host.querySelector(
+      '.milk-price-unit'
+    );
+
+  const note =
+    host.querySelector(
+      '.milk-price-note-text'
     );
 
   const message =
@@ -1027,30 +1003,73 @@ async function saveDashboardMilkPrice() {
       'milkPriceTodayMessage'
     );
 
-  if (!input || !button) return;
+  if (label) {
+    label.textContent =
+      ui.label || '';
+  }
 
-  const species =
-    input.dataset.species === 'buffalo'
-      ? 'buffalo'
-      : 'cow';
+  if (input) {
+    input.value =
+      ui.inputValue ?? '';
 
-  const body =
-    species === 'buffalo'
-      ? {
-          buffaloMilkPrice:
-            input.value
-        }
-      : {
-          cowMilkPrice:
-            input.value
-        };
+    input.dataset.type =
+      ui.type || '';
 
-  button.disabled = true;
+    input.setAttribute(
+      'aria-label',
+      ui.label || ''
+    );
+  }
+
+  if (unit) {
+    unit.textContent =
+      ui.unit || '';
+  }
+
+  if (note) {
+    note.textContent =
+      ui.note || '';
+  }
 
   if (message) {
+    message.dataset.state =
+      ui.statusState || '';
+
     message.textContent =
-      'جارٍ حفظ السعر...';
+      ui.statusText || '';
   }
+
+  if (!input) return;
+
+  input.addEventListener(
+    'change',
+    submitDashboardMilkPrice
+  );
+
+  input.addEventListener(
+    'keydown',
+    event => {
+      if (event.key === 'Enter') {
+        input.blur();
+      }
+    }
+  );
+}
+
+async function submitDashboardMilkPrice() {
+  const input =
+    document.getElementById(
+      'milkPriceTodayInput'
+    );
+
+  const message =
+    document.getElementById(
+      'milkPriceTodayMessage'
+    );
+
+  if (!input) return;
+
+  input.disabled = true;
 
   try {
     const res = await fetch(
@@ -1074,7 +1093,13 @@ async function saveDashboardMilkPrice() {
         cache: 'no-store',
 
         body:
-          JSON.stringify(body)
+          JSON.stringify({
+            type:
+              input.dataset.type || '',
+
+            milkPrice:
+              input.value
+          })
       }
     );
 
@@ -1088,50 +1113,46 @@ async function saveDashboardMilkPrice() {
       data.ok !== true
     ) {
       if (message) {
+        message.dataset.state =
+          'error';
+
         message.textContent =
           data.message ||
-          'تعذّر حفظ سعر اللبن الحالي.';
+          'تعذّر الاتصال بالسيرفر الآن.';
       }
 
       return;
     }
 
-    await loadHerdKPIs();
-
-    const currentInput =
-      document.getElementById(
-        'milkPriceTodayInput'
-      );
-
-    const currentMessage =
-      document.getElementById(
-        'milkPriceTodayMessage'
-      );
-
     if (
-      currentInput?.dataset.species ===
-        species &&
-      currentMessage
+      data.action ===
+      'refresh_dashboard_stats'
     ) {
-      currentMessage.textContent =
-        data.message ||
-        '✅ تم تحديث سعر اللبن الحالي بنجاح.';
+      await loadHerdKPIs();
+      return;
     }
+
+    renderDashboardMilkPrice(
+      data.ui || null
+    );
 
   } catch (e) {
     if (message) {
+      message.dataset.state =
+        'error';
+
       message.textContent =
         'تعذّر الاتصال بالسيرفر الآن.';
     }
 
   } finally {
-    const currentButton =
+    const currentInput =
       document.getElementById(
-        'milkPriceTodaySaveBtn'
+        'milkPriceTodayInput'
       );
 
-    if (currentButton) {
-      currentButton.disabled = false;
+    if (currentInput) {
+      currentInput.disabled = false;
     }
   }
 }
@@ -1213,44 +1234,21 @@ feedGrid.innerHTML = '';
 
 try{
 
-const milkPricesPromise =
-  fetchJSON(
-    '/api/nutrition/milk-prices'
-  )
-    .catch(e => {
-
-      console.warn(
-        'nutrition milk prices load failed',
-        e
-      );
-
-      return null;
-    });
-
-
 const stats =
   await fetchJSON(
     `/api/herd-stats?type=${requestedType}`
   );
-
-
-const milkPricesData =
-  await milkPricesPromise;
-
 
 if (
   requestSeq !==
   herdStatsRequestSeq
 ) return;
 
-
 currentType =
   stats.selectedType ||
   requestedType;
 
-
 setupTypeSwitch({
-
   hasCows:
     !!stats.hasCows,
 
@@ -1260,13 +1258,29 @@ setupTypeSwitch({
   singleHerdType:
     stats.singleHerdType ||
     null
-
 });
 
+const milkPriceData =
+  await fetchJSON(
+    `/api/nutrition/milk-prices?type=${encodeURIComponent(currentType)}`
+  )
+    .catch(e => {
+      console.warn(
+        'nutrition milk price load failed',
+        e
+      );
+
+      return null;
+    });
+
+if (
+  requestSeq !==
+  herdStatsRequestSeq
+) return;
 
 renderDashboardMilkPrice(
-  milkPricesData?.prices ||
-  {}
+  milkPriceData?.ui ||
+  null
 );
     const links = stats.dashboardLinks || {};
     const t     = stats.totals || {};
