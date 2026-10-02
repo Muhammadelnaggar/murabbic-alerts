@@ -76535,15 +76535,15 @@ const decision =
     state.decision
   ).toLowerCase();
 
-if (decision === "acknowledged") {
-  hiddenCount++;
-  continue;
-}
-
 if (
   state.revision !== alert.revision
 ) {
   visibleAlerts.push(alert);
+  continue;
+}
+
+if (decision === "acknowledged") {
+  hiddenCount++;
   continue;
 }
 
