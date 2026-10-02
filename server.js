@@ -76686,15 +76686,17 @@ const decision =
     state.decision
   ).toLowerCase();
 
+// «حسنًا» = إغلاق هذه الواقعة بالكامل.
+// أي تغير لاحق في revision لا يعيد فتحها.
+if (decision === "acknowledged") {
+  hiddenCount++;
+  continue;
+}
+
 if (
   state.revision !== alert.revision
 ) {
   visibleAlerts.push(alert);
-  continue;
-}
-
-if (decision === "acknowledged") {
-  hiddenCount++;
   continue;
 }
 
