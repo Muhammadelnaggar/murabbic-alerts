@@ -85426,8 +85426,17 @@ try {
       })
     );
 
+    const farmToday =
+    await dailyMilkTodaySrv(
+      req,
+      uid
+    );
+
   const currentDate =
-    cairoTodayISO();
+    milkReportAddDaysSrv(
+      farmToday,
+      -1
+    );
 
   const officialGroupsResult =
     await milkReportLoadOfficialGroupsMapFromFirestoreSrv(
