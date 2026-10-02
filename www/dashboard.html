@@ -100,8 +100,13 @@
 </div>
 
 <div class="card">
+
   <div class="section-title">🌾كفاءة تغذية الحلاب</div>
+
+  <div id="milkPriceTodayGrid" class="kpi-grid"></div>
+
   <div id="feedGrid" class="kpi-grid"></div>
+
 </div>
 
 <div class="card">
@@ -926,7 +931,210 @@ function abortionBox(count, pct){
   );
 }
 
+function renderDashboardMilkPrice(prices = {}) {
+  const host =
+    document.getElementById('milkPriceTodayGrid');
 
+  if (!host) return;
+
+  const isBuffalo =
+    currentType === 'buffalo';
+
+  const speciesKey =
+    isBuffalo ? 'buffalo' : 'cow';
+
+  const fieldKey =
+    isBuffalo
+      ? 'buffaloMilkPrice'
+      : 'cowMilkPrice';
+
+  const label =
+    isBuffalo
+      ? 'سعر لبن الجاموس اليوم / كجم'
+      : 'سعر لبن الأبقار اليوم / كجم';
+
+  const numericValue =
+    Number(prices?.[fieldKey]);
+
+  const value =
+    Number.isFinite(numericValue) &&
+    numericValue > 0
+      ? String(numericValue)
+      : '';
+
+  host.innerHTML = `
+    <div class="kpi feed">
+
+      <label
+        class="kpi-label"
+        for="milkPriceTodayInput"
+      >${label}</label>
+
+      <input
+        id="milkPriceTodayInput"
+        type="number"
+        min="0.01"
+        step="0.01"
+        inputmode="decimal"
+        value="${value}"
+        data-species="${speciesKey}"
+        placeholder="أدخل السعر الحالي"
+      >
+
+      <button
+        id="milkPriceTodaySaveBtn"
+        type="button"
+      >حفظ السعر</button>
+
+      <div
+        id="milkPriceTodayMessage"
+        class="kpi-sub"
+        aria-live="polite"
+      ></div>
+
+      <div class="kpi-sub">
+        حدّث أسعار الخامات في العلائق المحفوظة باستمرار.
+      </div>
+
+    </div>
+  `;
+
+  const button =
+    document.getElementById(
+      'milkPriceTodaySaveBtn'
+    );
+
+  if (button) {
+    button.onclick =
+      saveDashboardMilkPrice;
+  }
+}
+
+
+async function saveDashboardMilkPrice() {
+  const input =
+    document.getElementById(
+      'milkPriceTodayInput'
+    );
+
+  const button =
+    document.getElementById(
+      'milkPriceTodaySaveBtn'
+    );
+
+  const message =
+    document.getElementById(
+      'milkPriceTodayMessage'
+    );
+
+  if (!input || !button) return;
+
+  const species =
+    input.dataset.species === 'buffalo'
+      ? 'buffalo'
+      : 'cow';
+
+  const body =
+    species === 'buffalo'
+      ? {
+          buffaloMilkPrice:
+            input.value
+        }
+      : {
+          cowMilkPrice:
+            input.value
+        };
+
+  button.disabled = true;
+
+  if (message) {
+    message.textContent =
+      'جارٍ حفظ السعر...';
+  }
+
+  try {
+    const res = await fetch(
+      API_BASE +
+        '/api/nutrition/milk-prices',
+      {
+        method: 'POST',
+        credentials: 'same-origin',
+
+        headers: {
+          'Content-Type':
+            'application/json',
+
+          'Accept':
+            'application/json',
+
+          'Cache-Control':
+            'no-store'
+        },
+
+        cache: 'no-store',
+
+        body:
+          JSON.stringify(body)
+      }
+    );
+
+    const data =
+      await res
+        .json()
+        .catch(() => ({}));
+
+    if (
+      !res.ok ||
+      data.ok !== true
+    ) {
+      if (message) {
+        message.textContent =
+          data.message ||
+          'تعذّر حفظ سعر اللبن الحالي.';
+      }
+
+      return;
+    }
+
+    await loadHerdKPIs();
+
+    const currentInput =
+      document.getElementById(
+        'milkPriceTodayInput'
+      );
+
+    const currentMessage =
+      document.getElementById(
+        'milkPriceTodayMessage'
+      );
+
+    if (
+      currentInput?.dataset.species ===
+        species &&
+      currentMessage
+    ) {
+      currentMessage.textContent =
+        data.message ||
+        '✅ تم تحديث سعر اللبن الحالي بنجاح.';
+    }
+
+  } catch (e) {
+    if (message) {
+      message.textContent =
+        'تعذّر الاتصال بالسيرفر الآن.';
+    }
+
+  } finally {
+    const currentButton =
+      document.getElementById(
+        'milkPriceTodaySaveBtn'
+      );
+
+    if (currentButton) {
+      currentButton.disabled = false;
+    }
+  }
+}
 function setupTypeSwitch(meta = {}){
   const wrap = document.getElementById('typeSwitch');
   const btnCows = document.getElementById('btnCows');
@@ -974,9 +1182,19 @@ const herdGrid   = document.getElementById('herdGrid');
 const prodGrid   = document.getElementById('prodGrid');
 const prodCauseWrap = document.getElementById('prodCauseWrap');
 const reproGrid  = document.getElementById('reproGrid');
-const cullGrid   = document.getElementById('cullGrid');
-const feedGrid   = document.getElementById('feedGrid');
-const healthGrid = document.getElementById('healthGrid');
+const cullGrid =
+  document.getElementById('cullGrid');
+
+const milkPriceTodayGrid =
+  document.getElementById(
+    'milkPriceTodayGrid'
+  );
+
+const feedGrid =
+  document.getElementById('feedGrid');
+
+const healthGrid =
+  document.getElementById('healthGrid');
 
 const requestSeq = ++herdStatsRequestSeq;
 const requestedType = currentType === 'buffalo' ? 'buffalo' : 'cows';
@@ -986,21 +1204,70 @@ statusBar.textContent = `جارٍ تحميل بيانات ${requestedLabel}...`;
 
 // مهم: نمسح كروت الروابط القديمة فورًا حتى لا يضغط المستخدم على رابط أبقار بعد اختيار الجاموس
 prodGrid.innerHTML = '';
+
 prodCauseWrap.innerHTML = '';
+
+milkPriceTodayGrid.innerHTML = '';
+
 feedGrid.innerHTML = '';
 
-  try{
-const stats = await fetchJSON(`/api/herd-stats?type=${requestedType}`);
+try{
 
-if (requestSeq !== herdStatsRequestSeq) return;
+const milkPricesPromise =
+  fetchJSON(
+    '/api/nutrition/milk-prices'
+  )
+    .catch(e => {
 
-currentType = stats.selectedType || requestedType;
+      console.warn(
+        'nutrition milk prices load failed',
+        e
+      );
+
+      return null;
+    });
+
+
+const stats =
+  await fetchJSON(
+    `/api/herd-stats?type=${requestedType}`
+  );
+
+
+const milkPricesData =
+  await milkPricesPromise;
+
+
+if (
+  requestSeq !==
+  herdStatsRequestSeq
+) return;
+
+
+currentType =
+  stats.selectedType ||
+  requestedType;
+
 
 setupTypeSwitch({
-  hasCows: !!stats.hasCows,
-  hasBuffalo: !!stats.hasBuffalo,
-  singleHerdType: stats.singleHerdType || null
+
+  hasCows:
+    !!stats.hasCows,
+
+  hasBuffalo:
+    !!stats.hasBuffalo,
+
+  singleHerdType:
+    stats.singleHerdType ||
+    null
+
 });
+
+
+renderDashboardMilkPrice(
+  milkPricesData?.prices ||
+  {}
+);
     const links = stats.dashboardLinks || {};
     const t     = stats.totals || {};
     const fert  = stats.fertility || {};
