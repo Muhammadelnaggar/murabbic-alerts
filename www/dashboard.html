@@ -1509,10 +1509,73 @@ const dashboardReproductiveCullingPct =
       )
     : null;
 
-    herdGrid.innerHTML =
-      box(`عدد ${typeLabel} في القطيع`, totalActive, '', 'g_active', 'herd') +
-      box(`عدد ${typeLabel} الحلاب`, inMilk, `نسبتهم من القطيع ${inMilkPct}%`, 'g_inmilk', 'herd') +
-      box(`عدد ${typeLabel} الجافة`, dryCount, `نسبتهم من القطيع ${dryPct}%`, 'g_dry', 'herd');
+    const herdInventory =
+  stats.herdInventory || {};
+
+herdGrid.innerHTML =
+  box(
+    'إجمالي القطيع',
+    Number(herdInventory.totalHerd ?? 0),
+    '',
+    null,
+    'herd'
+  ) +
+
+  box(
+    'إجمالي الأمهات',
+    Number(herdInventory.mothers ?? 0),
+    '',
+    null,
+    'herd'
+  ) +
+
+  box(
+    'العجول الرضيعة',
+    Number(herdInventory.suckling ?? 0),
+    '',
+    null,
+    'herd'
+  ) +
+
+  box(
+    'الفطام',
+    Number(herdInventory.weaned ?? 0),
+    '',
+    null,
+    'herd'
+  ) +
+
+  box(
+    'النامي',
+    Number(herdInventory.growing ?? 0),
+    '',
+    null,
+    'herd'
+  ) +
+
+  box(
+    'عجلات تحت التلقيح',
+    Number(herdInventory.breedingHeifers ?? 0),
+    '',
+    null,
+    'herd'
+  ) +
+
+  box(
+    'عجلات عشار',
+    Number(herdInventory.pregnantHeifers ?? 0),
+    '',
+    null,
+    'herd'
+  ) +
+
+  box(
+    'ذكور',
+    Number(herdInventory.males ?? 0),
+    '',
+    null,
+    'herd'
+  );
 
 const avgHeadState = prodState(avgHeadDeltaPct);
 const dailyMilkState = prodState(dailyMilkDeltaPct);
@@ -1736,10 +1799,7 @@ healthGrid.innerHTML =
       box('تقييم الروث في القطيع', fecesScore, 'متوسط / درجة / حالة', 'g_feces', 'health', healthReportLink) +
       box('تقييم الحالة الجسمية في القطيع', bcsCamera, 'متوسط / درجة / حالة', 'g_bcs', 'health', healthReportLink);
     
-    // الجوجز
-   renderMiniGauge("g_active", totalActive ? 100 : 0);
-renderMiniGauge("g_inmilk", inMilkPct);
-renderMiniGauge("g_dry", totalActive ? Math.round((Math.max(0, totalActive - inMilk) * 100) / totalActive) : 0);
+
 
 // تم حذف جوجز اللبن
     
