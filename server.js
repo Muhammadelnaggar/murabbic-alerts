@@ -26008,36 +26008,106 @@ async function nutritionLoadCurrentMilkPricesSrv(tenant) {
   };
 }
 
-function nutritionCurrentMilkPriceForSpeciesSrv(
-  prices = {},
-  speciesKey = ''
+function nutritionMilkPriceSelectionSrv(
+  rawType = ''
 ) {
-  const species =
-    String(speciesKey || '')
+  const type =
+    String(rawType || '')
       .trim()
       .toLowerCase();
 
   if (
-    species === 'buffalo' ||
-    species.includes('جاموس')
+    type === 'buffalo' ||
+    type === 'جاموس'
   ) {
-    return nutritionCurrentMilkPriceValueSrv(
-      prices.buffaloMilkPrice
-    );
+    return {
+      type: 'buffalo',
+      field: 'buffaloMilkPrice',
+      label: 'سعر لبن الجاموس اليوم'
+    };
   }
 
   if (
-    species === 'cow' ||
-    species === 'cows' ||
-    species === 'cattle' ||
-    /بقر|ابقار|أبقار/.test(species)
+    type === 'cow' ||
+    type === 'cows' ||
+    type === 'cattle' ||
+    type === 'بقر' ||
+    type === 'ابقار' ||
+    type === 'أبقار'
   ) {
-    return nutritionCurrentMilkPriceValueSrv(
-      prices.cowMilkPrice
-    );
+    return {
+      type: 'cows',
+      field: 'cowMilkPrice',
+      label: 'سعر لبن الأبقار اليوم'
+    };
   }
 
   return null;
+}
+
+function nutritionMilkPriceUiSrv({
+  selection = null,
+  prices = {},
+  statusState = '',
+  statusText = ''
+} = {}) {
+  if (!selection) return null;
+
+  const value =
+    nutritionCurrentMilkPriceValueSrv(
+      prices?.[selection.field]
+    );
+
+  return {
+    type:
+      selection.type,
+
+    label:
+      selection.label,
+
+    inputValue:
+      value === null
+        ? ''
+        : String(value),
+
+    unit:
+      'جنيه/كجم',
+
+    note:
+      'حدّث أسعار الخامات في العلائق المحفوظة باستمرار لضمان دقة المؤشرات الاقتصادية.',
+
+    statusState:
+      statusState ||
+      (
+        value === null
+          ? ''
+          : 'saved'
+      ),
+
+    statusText:
+      statusText ||
+      (
+        value === null
+          ? ''
+          : '✓ محفوظ'
+      )
+  };
+}
+
+function nutritionCurrentMilkPriceForSpeciesSrv(
+  prices = {},
+  speciesKey = ''
+) {
+  const selection =
+    nutritionMilkPriceSelectionSrv(
+      speciesKey
+    );
+
+  if (!selection) return null;
+
+  return nutritionCurrentMilkPriceValueSrv(
+    prices?.[selection.field]
+  );
 }
 
 app.get(
@@ -26048,7 +26118,8 @@ app.get(
       if (!db) {
         return res.status(503).json({
           ok: false,
-          error: 'firestore_disabled',
+          error:
+            'firestore_disabled',
           message:
             '❌ تعذّر تحميل سعر اللبن الحالي الآن. حاول مرة أخرى.'
         });
@@ -26059,9 +26130,48 @@ app.get(
           req.userId
         );
 
+      const rawType =
+        String(
+          req.query.type ||
+          req.query.species ||
+          req.query.herdType ||
+          ''
+        ).trim();
+
+      /*
+       * توافق مؤقت مع الصفحة الحالية
+       * حتى يتم نشر النسخة الجديدة.
+       */
+      if (!rawType) {
+        return res.json({
+          ok: true,
+          prices
+        });
+      }
+
+      const selection =
+        nutritionMilkPriceSelectionSrv(
+          rawType
+        );
+
+      if (!selection) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            'nutrition_milk_price_type_invalid',
+          message:
+            '❌ تعذّر تحديد نوع القطيع لسعر اللبن.'
+        });
+      }
+
       return res.json({
         ok: true,
-        prices
+
+        ui:
+          nutritionMilkPriceUiSrv({
+            selection,
+            prices
+          })
       });
 
     } catch (e) {
@@ -26089,7 +26199,8 @@ app.post(
       if (!db) {
         return res.status(503).json({
           ok: false,
-          error: 'firestore_disabled',
+          error:
+            'firestore_disabled',
           message:
             '❌ تعذّر حفظ سعر اللبن الحالي الآن. حاول مرة أخرى.'
         });
@@ -26098,17 +26209,130 @@ app.post(
       const body =
         req.body || {};
 
+      const rawType =
+        String(
+          body.type ||
+          body.species ||
+          body.herdType ||
+          ''
+        ).trim();
+
+      /*
+       * المسار Server-first الجديد:
+       *
+       * الصفحة ترسل فقط:
+       * type + milkPrice
+       *
+       * السيرفر وحده يحدد
+       * cowMilkPrice أو buffaloMilkPrice.
+       */
+      if (rawType) {
+        const selection =
+          nutritionMilkPriceSelectionSrv(
+            rawType
+          );
+
+        if (!selection) {
+          return res.status(400).json({
+            ok: false,
+            error:
+              'nutrition_milk_price_type_invalid',
+            message:
+              '❌ تعذّر تحديد نوع القطيع لسعر اللبن.'
+          });
+        }
+
+        const milkPrice =
+          nutritionCurrentMilkPriceValueSrv(
+            body.milkPrice ??
+            body.value
+          );
+
+        if (milkPrice === null) {
+          return res.status(400).json({
+            ok: false,
+            error:
+              'nutrition_milk_price_invalid',
+
+            message:
+              `❌ أدخل سعرًا صحيحًا وموجبًا لكجم لبن ${
+                selection.type ===
+                'buffalo'
+                  ? 'الجاموس'
+                  : 'الأبقار'
+              }.`
+          });
+        }
+
+        await db
+          .collection('users')
+          .doc(req.userId)
+          .collection('settings')
+          .doc('nutrition')
+          .set(
+            {
+              userId:
+                req.userId,
+
+              [selection.field]:
+                milkPrice,
+
+              updatedAt:
+                admin.firestore
+                  .FieldValue
+                  .serverTimestamp()
+            },
+            {
+              merge: true
+            }
+          );
+
+        const prices =
+          await nutritionLoadCurrentMilkPricesSrv(
+            req.userId
+          );
+
+        return res.json({
+          ok: true,
+          saved: true,
+
+          ui:
+            nutritionMilkPriceUiSrv({
+              selection,
+              prices,
+              statusState:
+                'saved',
+              statusText:
+                '✓ محفوظ'
+            }),
+
+          action:
+            'refresh_dashboard_stats',
+
+          message:
+            '✅ تم تحديث سعر اللبن الحالي بنجاح.'
+        });
+      }
+
+      /*
+       * توافق مؤقت مع الصفحة القديمة
+       * أثناء ترتيب الدبلوي فقط.
+       */
       const hasCow =
-        Object.prototype.hasOwnProperty.call(
-          body,
-          'cowMilkPrice'
-        );
+        Object.prototype
+          .hasOwnProperty
+          .call(
+            body,
+            'cowMilkPrice'
+          );
 
       const hasBuffalo =
-        Object.prototype.hasOwnProperty.call(
-          body,
-          'buffaloMilkPrice'
-        );
+        Object.prototype
+          .hasOwnProperty
+          .call(
+            body,
+            'buffaloMilkPrice'
+          );
 
       if (!hasCow && !hasBuffalo) {
         return res.status(400).json({
@@ -26148,7 +26372,9 @@ app.post(
             body.buffaloMilkPrice
           );
 
-        if (buffaloMilkPrice === null) {
+        if (
+          buffaloMilkPrice === null
+        ) {
           return res.status(400).json({
             ok: false,
             error:
