@@ -25959,6 +25959,262 @@ async function syncAnimalGroupFieldsSrv(tenant, groups = []) {
   }
 }
 // ============================================================
+//              API: NUTRITION CURRENT MILK PRICES
+// ============================================================
+function nutritionCurrentMilkPriceValueSrv(value) {
+  const n = toNumOrNull(value);
+
+  return (
+    Number.isFinite(Number(n)) &&
+    Number(n) > 0
+  )
+    ? Number(n)
+    : null;
+}
+
+async function nutritionLoadCurrentMilkPricesSrv(tenant) {
+  const uid = String(tenant || '').trim();
+
+  if (!uid || !db) {
+    return {
+      cowMilkPrice: null,
+      buffaloMilkPrice: null
+    };
+  }
+
+  const snap =
+    await db
+      .collection('users')
+      .doc(uid)
+      .collection('settings')
+      .doc('nutrition')
+      .get();
+
+  const data =
+    snap.exists
+      ? (snap.data() || {})
+      : {};
+
+  return {
+    cowMilkPrice:
+      nutritionCurrentMilkPriceValueSrv(
+        data.cowMilkPrice
+      ),
+
+    buffaloMilkPrice:
+      nutritionCurrentMilkPriceValueSrv(
+        data.buffaloMilkPrice
+      )
+  };
+}
+
+function nutritionCurrentMilkPriceForSpeciesSrv(
+  prices = {},
+  speciesKey = ''
+) {
+  const species =
+    String(speciesKey || '')
+      .trim()
+      .toLowerCase();
+
+  if (
+    species === 'buffalo' ||
+    species.includes('جاموس')
+  ) {
+    return nutritionCurrentMilkPriceValueSrv(
+      prices.buffaloMilkPrice
+    );
+  }
+
+  if (
+    species === 'cow' ||
+    species === 'cows' ||
+    species === 'cattle' ||
+    /بقر|ابقار|أبقار/.test(species)
+  ) {
+    return nutritionCurrentMilkPriceValueSrv(
+      prices.cowMilkPrice
+    );
+  }
+
+  return null;
+}
+
+app.get(
+  '/api/nutrition/milk-prices',
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error: 'firestore_disabled',
+          message:
+            '❌ تعذّر تحميل سعر اللبن الحالي الآن. حاول مرة أخرى.'
+        });
+      }
+
+      const prices =
+        await nutritionLoadCurrentMilkPricesSrv(
+          req.userId
+        );
+
+      return res.json({
+        ok: true,
+        prices
+      });
+
+    } catch (e) {
+      console.error(
+        'nutrition.milk-prices.get',
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error:
+          'nutrition_milk_prices_get_failed',
+        message:
+          '❌ تعذّر تحميل سعر اللبن الحالي الآن. حاول مرة أخرى.'
+      });
+    }
+  }
+);
+
+app.post(
+  '/api/nutrition/milk-prices',
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          error: 'firestore_disabled',
+          message:
+            '❌ تعذّر حفظ سعر اللبن الحالي الآن. حاول مرة أخرى.'
+        });
+      }
+
+      const body =
+        req.body || {};
+
+      const hasCow =
+        Object.prototype.hasOwnProperty.call(
+          body,
+          'cowMilkPrice'
+        );
+
+      const hasBuffalo =
+        Object.prototype.hasOwnProperty.call(
+          body,
+          'buffaloMilkPrice'
+        );
+
+      if (!hasCow && !hasBuffalo) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            'nutrition_milk_price_required',
+          message:
+            '❌ أدخل سعر اللبن الحالي قبل الحفظ.'
+        });
+      }
+
+      const patch = {};
+
+      if (hasCow) {
+        const cowMilkPrice =
+          nutritionCurrentMilkPriceValueSrv(
+            body.cowMilkPrice
+          );
+
+        if (cowMilkPrice === null) {
+          return res.status(400).json({
+            ok: false,
+            error:
+              'nutrition_cow_milk_price_invalid',
+            message:
+              '❌ أدخل سعرًا صحيحًا وموجبًا لكجم لبن الأبقار.'
+          });
+        }
+
+        patch.cowMilkPrice =
+          cowMilkPrice;
+      }
+
+      if (hasBuffalo) {
+        const buffaloMilkPrice =
+          nutritionCurrentMilkPriceValueSrv(
+            body.buffaloMilkPrice
+          );
+
+        if (buffaloMilkPrice === null) {
+          return res.status(400).json({
+            ok: false,
+            error:
+              'nutrition_buffalo_milk_price_invalid',
+            message:
+              '❌ أدخل سعرًا صحيحًا وموجبًا لكجم لبن الجاموس.'
+          });
+        }
+
+        patch.buffaloMilkPrice =
+          buffaloMilkPrice;
+      }
+
+      await db
+        .collection('users')
+        .doc(req.userId)
+        .collection('settings')
+        .doc('nutrition')
+        .set(
+          {
+            userId:
+              req.userId,
+
+            ...patch,
+
+            updatedAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp()
+          },
+          {
+            merge: true
+          }
+        );
+
+      const prices =
+        await nutritionLoadCurrentMilkPricesSrv(
+          req.userId
+        );
+
+      return res.json({
+        ok: true,
+        saved: true,
+        prices,
+        message:
+          '✅ تم تحديث سعر اللبن الحالي بنجاح.'
+      });
+
+    } catch (e) {
+      console.error(
+        'nutrition.milk-prices.save',
+        e
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error:
+          'nutrition_milk_prices_save_failed',
+        message:
+          '❌ تعذّر حفظ سعر اللبن الحالي الآن. حاول مرة أخرى.'
+      });
+    }
+  }
+);
+
+// ============================================================
 //                API: NUTRITION TARGETS (CENTRAL)
 // ============================================================
 app.post('/api/nutrition/targets', requireUserId, async (req, res) => {
@@ -77034,6 +77290,7 @@ function murabbikNutritionRecalculateGroupSrv({
   officialGroupsMap = {},
   historyByAnimal = new Map(),
   animalsByNumber = new Map(),
+  currentMilkPrice = null,
   requireMilkDrop = true
 } = {}) {
   try {
@@ -77751,7 +78008,7 @@ const currentThi =
         : null;
 
 
-    const milkPrice =
+        const savedMilkPrice =
       toNumOrNull(
 
         nutrition.milkPrice ??
@@ -77763,6 +78020,19 @@ const currentThi =
           ?.inputs
           ?.milkPriceUsed
       );
+
+
+    const currentMilkPriceValue =
+      nutritionCurrentMilkPriceValueSrv(
+        currentMilkPrice
+      );
+
+
+    if (
+      currentMilkPriceValue === null
+    ) {
+      return null;
+    }
 
 
     const mode =
@@ -77917,7 +78187,7 @@ const currentThi =
      * Current =
      * اللبن + DIM الحالي.
      */
-    const baselineAnalysis =
+        const baselineAnalysis =
       buildNutritionCentralAnalysis({
 
         rows:
@@ -77930,7 +78200,8 @@ const currentThi =
 
         concKg,
 
-        milkPrice
+        milkPrice:
+          savedMilkPrice
       });
 
 
@@ -77953,7 +78224,8 @@ const currentThi =
 
         concKg,
 
-        milkPrice
+        milkPrice:
+          currentMilkPriceValue
       });
 
 
@@ -78143,7 +78415,7 @@ currentMilkPrice:
     currentAnalysis
       ?.inputs
       ?.milkPriceUsed ??
-    milkPrice
+    currentMilkPriceValue
   ),
 
 currentRecordedCount:
@@ -78587,7 +78859,15 @@ const allEvents = sharedEvents.rows;
           event
         )
     );
+  const currentMilkPrices =
+    await context.load(
+      "smart-alerts:nutrition-current-milk-prices",
 
+      async () =>
+        await nutritionLoadCurrentMilkPricesSrv(
+          context.userId
+        )
+    );
 
   const thi =
     Number(
@@ -78991,9 +79271,15 @@ const allEvents = sharedEvents.rows;
             ?.groupsMap ||
           {},
 
-        historyByAnimal,
+                historyByAnimal,
 
-        animalsByNumber
+        animalsByNumber,
+
+        currentMilkPrice:
+          nutritionCurrentMilkPriceForSpeciesSrv(
+            currentMilkPrices,
+            group.speciesKey
+          )
       });
 
 
@@ -85264,7 +85550,16 @@ try {
           event
         )
     );
+  const currentMilkPrices =
+    await nutritionLoadCurrentMilkPricesSrv(
+      uid
+    );
 
+  const currentMilkPrice =
+    nutritionCurrentMilkPriceForSpeciesSrv(
+      currentMilkPrices,
+      selectedDashboardSpecies
+    );
   let currentWeather =
     null;
 
@@ -85388,6 +85683,8 @@ try {
         historyByAnimal,
 
         animalsByNumber,
+
+        currentMilkPrice,
 
         requireMilkDrop:
           false
