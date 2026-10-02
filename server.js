@@ -3021,7 +3021,158 @@ if (isDryAnimal) {
       }
     }
 
-    if (ops > 0) await batch.commit();
+ if (ops > 0) await batch.commit();
+
+// ============================================================
+// ✅ تحديث مرحلة التابع داخل سجل calves نفسه
+// الجرد يقرأ السجل فقط — بدون Groups
+// فطام -> نامي عند 6 شهور
+// نامي -> تحت التلقيح للأنثى عند 11 شهرًا
+// ============================================================
+const followerStageSnap =
+  await db
+    .collection("calves")
+    .get();
+
+let followerStageBatch =
+  db.batch();
+
+let followerStageOps = 0;
+
+for (const doc of followerStageSnap.docs) {
+  scanned++;
+
+  const a =
+    doc.data() || {};
+
+  const lifeStatus =
+    String(a.status || "")
+      .trim()
+      .toLowerCase();
+
+  if (
+    a.active === false ||
+    a.isActive === false ||
+    a.inactive === true ||
+    a.archived === true ||
+    lifeStatus === "inactive" ||
+    lifeStatus === "archived"
+  ) {
+    continue;
+  }
+
+  const currentStage =
+    String(
+      a.followerStatus ||
+      a.status ||
+      ""
+    ).trim();
+
+  // لا نلمس الرضيع:
+  // الفطام لا يتم إلا بحدث الفطام.
+  if (
+    currentStage !== "فطام" &&
+    currentStage !== "نامي"
+  ) {
+    continue;
+  }
+
+  const ageMonths =
+    getAgeMonthsSrv(a);
+
+  if (
+    !Number.isFinite(ageMonths) ||
+    ageMonths < 6
+  ) {
+    continue;
+  }
+
+  let nextStage = "نامي";
+
+  // الإناث تدخل تحت التلقيح عند 11 شهرًا.
+  if (
+    ageMonths >= 11 &&
+    getSexTextSrv(a) === "أنثى"
+  ) {
+    const repro =
+      reproAutoNormArSrv(
+        a.reproductiveStatus
+      );
+
+    // أي حالة تناسلية أحدث لها الأولوية.
+    if (
+      repro.includes("ملقح") ||
+      repro.includes("عشار") ||
+      repro.includes("اجهاض")
+    ) {
+      continue;
+    }
+
+    nextStage =
+      "تحت التلقيح";
+  }
+
+  const currentStatus =
+    String(a.status || "").trim();
+
+  if (
+    currentStage === nextStage &&
+    currentStatus === nextStage
+  ) {
+    continue;
+  }
+
+  const stagePatch = {
+    followerStatus:
+      nextStage,
+
+    status:
+      nextStage,
+
+    followerStageAutoUpdatedAt:
+      admin.firestore.FieldValue
+        .serverTimestamp(),
+
+    followerStageAutoSource:
+      "server:daily_maintenance"
+  };
+
+  if (
+    nextStage ===
+      "تحت التلقيح"
+  ) {
+    stagePatch.reproductiveStatus =
+      "مفتوحة";
+  }
+
+  followerStageBatch.set(
+    doc.ref,
+    stagePatch,
+    { merge: true }
+  );
+
+  if (a.userId) {
+    touchedTenants.add(
+      String(a.userId).trim()
+    );
+  }
+
+  updated++;
+  followerStageOps++;
+
+  if (followerStageOps >= 400) {
+    await followerStageBatch.commit();
+
+    followerStageBatch =
+      db.batch();
+
+    followerStageOps = 0;
+  }
+}
+
+if (followerStageOps > 0) {
+  await followerStageBatch.commit();
+}
 
 // ✅ التوابع التي أجهضت:
 // تظل reproductiveStatus = "إجهاض" لمدة 40 يومًا.
