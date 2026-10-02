@@ -6307,6 +6307,174 @@ body[data-page="dashboard"] .prod-subtle{
   }
 }
 /* =========================================================
+   Dashboard — Current Milk Price
+   ========================================================= */
+
+body[data-page="dashboard"] .milk-price-panel{
+  margin:2px 0 12px;
+}
+
+body[data-page="dashboard"] .milk-price-row{
+  display:grid;
+  grid-template-columns:
+    minmax(0,1fr)
+    88px
+    auto
+    auto;
+
+  align-items:center;
+  gap:8px;
+
+  padding:9px 10px;
+
+  border:1px solid #e3ece6;
+  border-radius:14px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #f8fbf9 100%
+    );
+}
+
+body[data-page="dashboard"] .milk-price-label{
+  min-width:0;
+  margin:0;
+
+  color:#1f5136;
+
+  font-size:12px;
+  font-weight:900;
+  line-height:1.3;
+
+  white-space:nowrap;
+}
+
+body[data-page="dashboard"] .milk-price-input{
+  width:88px;
+  height:36px;
+  min-height:36px;
+
+  margin:0;
+  padding:4px 8px;
+
+  border:1px solid #cfe0d2;
+  border-radius:10px;
+
+  background:#fff;
+  color:#0f172a;
+
+  font-size:16px;
+  font-weight:900;
+
+  text-align:center;
+  direction:ltr;
+
+  outline:none;
+}
+
+body[data-page="dashboard"] .milk-price-input:focus{
+  border-color:var(--brand);
+  box-shadow:
+    0 0 0 3px
+    rgba(14,160,90,.09);
+}
+
+body[data-page="dashboard"] .milk-price-input:disabled{
+  opacity:.65;
+  background:#f8faf9;
+}
+
+body[data-page="dashboard"] .milk-price-unit{
+  color:#64748b;
+
+  font-size:10.5px;
+  font-weight:800;
+
+  white-space:nowrap;
+}
+
+body[data-page="dashboard"] .milk-price-status{
+  color:#64748b;
+
+  font-size:10.5px;
+  font-weight:900;
+
+  white-space:nowrap;
+}
+
+body[data-page="dashboard"]
+.milk-price-status[data-state="saved"]{
+  color:#0b7f47;
+}
+
+body[data-page="dashboard"]
+.milk-price-status[data-state="saving"]{
+  color:#64748b;
+}
+
+body[data-page="dashboard"]
+.milk-price-status[data-state="error"]{
+  color:#b91c1c;
+}
+
+body[data-page="dashboard"] .milk-price-note{
+  display:flex;
+  align-items:center;
+  gap:6px;
+
+  margin-top:7px;
+  padding:7px 9px;
+
+  border:1px solid #f4dfb3;
+  border-radius:11px;
+
+  background:#fffaf0;
+  color:#7a5612;
+
+  font-size:10.5px;
+  font-weight:800;
+  line-height:1.45;
+}
+
+@media (max-width:480px){
+
+  body[data-page="dashboard"] .milk-price-row{
+    grid-template-columns:
+      minmax(0,1fr)
+      72px
+      auto
+      auto;
+
+    gap:5px;
+    padding:8px;
+  }
+
+  body[data-page="dashboard"] .milk-price-label{
+    font-size:10.5px;
+  }
+
+  body[data-page="dashboard"] .milk-price-input{
+    width:72px;
+    height:34px;
+    min-height:34px;
+
+    padding:3px 5px;
+
+    font-size:15px;
+  }
+
+  body[data-page="dashboard"] .milk-price-unit,
+  body[data-page="dashboard"] .milk-price-status{
+    font-size:9.5px;
+  }
+
+  body[data-page="dashboard"] .milk-price-note{
+    font-size:10px;
+  }
+}
+/* =========================================================
    Murabbik Central Infobar Close Fix
    إصلاح مركزي لإغلاق رسائل التحقق بدون منطق داخل الصفحات
    ========================================================= */
