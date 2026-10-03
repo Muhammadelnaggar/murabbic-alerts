@@ -85878,9 +85878,22 @@ const dashboardAddDaysISO = (iso, days) => {
     .slice(0, 10);
 };
 
-const productionYesterday =
+/*
+ * اليوم التشغيلي للّبن في الداشبورد
+ * = آخر يوم مكتمل = أمس بتوقيت المزرعة.
+ *
+ * اليوم الحالي قد يكون ما زال تحت التسجيل،
+ * لذلك لا يدخل في مؤشرات الإنتاج اليومية.
+ */
+const productionDate =
   dashboardAddDaysISO(
     productionToday,
+    -1
+  );
+
+const previousProductionDate =
+  dashboardAddDaysISO(
+    productionDate,
     -1
   );
 
@@ -85994,47 +86007,74 @@ try {
     }
   }
 
-  const todayRec =
-    dayMap.get(productionToday) ||
+  /*
+   * "لبن اليوم" في الداش
+   * = أمس المكتمل.
+   */
+  const productionRec =
+    dayMap.get(productionDate) ||
     null;
 
-  const yesterdayRec =
-    dayMap.get(productionYesterday) ||
+  const previousProductionRec =
+    dayMap.get(previousProductionDate) ||
     null;
 
   dailyMilkTotal =
-    todayRec
-      ? +Number(todayRec.totalMilk || 0)
-          .toFixed(1)
+    productionRec
+      ? +Number(
+          productionRec.totalMilk ||
+          0
+        ).toFixed(1)
       : 0;
 
   prevDailyMilkTotal =
-    yesterdayRec
-      ? +Number(yesterdayRec.totalMilk || 0)
-          .toFixed(1)
+    previousProductionRec
+      ? +Number(
+          previousProductionRec.totalMilk ||
+          0
+        ).toFixed(1)
       : 0;
 
+  /*
+   * المقام = الرؤوس المسجل لها لبن
+   * في اليوم المكتمل نفسه.
+   */
   avgHeadToday =
-    todayRec && todayRec.heads.size
+    productionRec &&
+    productionRec.heads.size
       ? +(
-          Number(todayRec.totalMilk || 0) /
-          todayRec.heads.size
+          Number(
+            productionRec.totalMilk ||
+            0
+          ) /
+          productionRec.heads.size
         ).toFixed(1)
       : 0;
 
   prevAvgHeadToday =
-    yesterdayRec && yesterdayRec.heads.size
+    previousProductionRec &&
+    previousProductionRec.heads.size
       ? +(
-          Number(yesterdayRec.totalMilk || 0) /
-          yesterdayRec.heads.size
+          Number(
+            previousProductionRec.totalMilk ||
+            0
+          ) /
+          previousProductionRec.heads.size
         ).toFixed(1)
       : 0;
 
+  /*
+   * التغير اليومي:
+   * أمس المكتمل مقابل أول أمس.
+   */
   dailyMilkDeltaPct =
     prevDailyMilkTotal > 0
       ? +(
           (
-            (dailyMilkTotal - prevDailyMilkTotal) /
+            (
+              dailyMilkTotal -
+              prevDailyMilkTotal
+            ) /
             prevDailyMilkTotal
           ) *
           100
@@ -86045,7 +86085,10 @@ try {
     prevAvgHeadToday > 0
       ? +(
           (
-            (avgHeadToday - prevAvgHeadToday) /
+            (
+              avgHeadToday -
+              prevAvgHeadToday
+            ) /
             prevAvgHeadToday
           ) *
           100
@@ -86060,7 +86103,10 @@ try {
       for (
         let day = startDate;
         day && day <= endDate;
-        day = dashboardAddDaysISO(day, 1)
+        day = dashboardAddDaysISO(
+          day,
+          1
+        )
       ) {
         const rec =
           dayMap.get(day);
@@ -86073,7 +86119,10 @@ try {
         }
 
         sumDailyHeadAvg +=
-          Number(rec.totalMilk || 0) /
+          Number(
+            rec.totalMilk ||
+            0
+          ) /
           rec.heads.size;
 
         recordedDays++;
@@ -86087,28 +86136,32 @@ try {
         : 0;
     };
 
+  /*
+   * آخر 7 أيام مكتملة:
+   * تنتهي بأمس، ولا يدخل اليوم الجاري.
+   */
   const current7Start =
     dashboardAddDaysISO(
-      productionToday,
+      productionDate,
       -6
     );
 
   const previous7End =
     dashboardAddDaysISO(
-      productionToday,
+      productionDate,
       -7
     );
 
   const previous7Start =
     dashboardAddDaysISO(
-      productionToday,
+      productionDate,
       -13
     );
 
   avgHead7Days =
     averageRecordedHeadForRange(
       current7Start,
-      productionToday
+      productionDate
     );
 
   prevAvgHead7Days =
@@ -86121,26 +86174,40 @@ try {
     prevAvgHead7Days > 0
       ? +(
           (
-            (avgHead7Days - prevAvgHead7Days) /
+            (
+              avgHead7Days -
+              prevAvgHead7Days
+            ) /
             prevAvgHead7Days
           ) *
           100
         ).toFixed(1)
       : 0;
 
+  /*
+   * إجمالي الشهر:
+   * شهر اليوم المكتمل نفسه،
+   * من يوم 1 حتى أمس.
+   *
+   * لو اليوم 1 في شهر جديد،
+   * يظل الداش يعرض شهر أمس المكتمل.
+   */
   const monthStart =
-    `${String(productionToday).slice(0, 7)}-01`;
+    `${String(productionDate).slice(0, 7)}-01`;
 
   monthlyMilkTotal =
     +[...dayMap.entries()]
       .filter(([day]) =>
         day >= monthStart &&
-        day <= productionToday
+        day <= productionDate
       )
       .reduce(
         (sum, [, rec]) =>
           sum +
-          Number(rec.totalMilk || 0),
+          Number(
+            rec.totalMilk ||
+            0
+          ),
         0
       )
       .toFixed(1);
@@ -87352,8 +87419,8 @@ feedDashboardMetrics,
 
 feedBands,
 
-productionDate: productionToday,
-previousProductionDate: productionYesterday,
+productionDate,
+previousProductionDate,
 dailyMilkTotal,
 avgHeadToday,
 avgHead7Days,
