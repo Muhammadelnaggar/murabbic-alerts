@@ -85419,57 +85419,119 @@ let total = active.length;
 let officialInMilkCount = null;
 let officialFeedBandCounts = null;
 
+const productionToday =
+  await farmTodayISOSrv(
+    req.authSession?.uid ||
+    uid
+  );
+
+const officialMilkerNumbers =
+  new Set();
+
 try {
-  const groupPrefix = selectedDashboardType === 'buffalo' ? 'buffalo_' : 'cow_';
+  const groupPrefix =
+    selectedDashboardType === 'buffalo'
+      ? 'buffalo_'
+      : 'cow_';
 
-  const getOfficialGroupCount = async (baseKey) => {
-    const groupId = `${groupPrefix}${baseKey}`;
-    const doc = await db.collection('groups').doc(`${uid}_${groupId}`).get();
-    if (!doc.exists) return null;
+  const milkingBaseKeys =
+    ['fresh', 'high', 'med', 'low'];
 
-    const data = doc.data() || {};
+  const officialGroupsResult =
+    await milkReportLoadOfficialGroupsMapFromFirestoreSrv(
+      uid,
+      active,
+      false
+    );
 
-    if (Array.isArray(data.animalNumbers)) {
-      return data.animalNumbers.map(x => String(x || '').trim()).filter(Boolean).length;
-    }
+  const groupsMap =
+    officialGroupsResult?.groupsMap ||
+    milkReportEmptyOfficialGroupsMapSrv();
 
-    const n = Number(data.animalsCount ?? data.headCount ?? data.count);
-    return Number.isFinite(n) ? n : null;
+  const bandCounts = {
+    fresh: 0,
+    high: 0,
+    med: 0,
+    low: 0
   };
 
-  const [
-  allOfficial,
-  freshOfficial,
-  highOfficial,
-  medOfficial,
-  lowOfficial
-] = await Promise.all([
-  getOfficialGroupCount('all'),
-  getOfficialGroupCount('fresh'),
-  getOfficialGroupCount('high'),
-  getOfficialGroupCount('med'),
-  getOfficialGroupCount('low')
-]);
+  for (const baseKey of milkingBaseKeys) {
+    const groupId =
+      `${groupPrefix}${baseKey}`;
 
-  if (Number.isFinite(Number(allOfficial))) {
-    total = Number(allOfficial);
+    const members =
+      Array.isArray(groupsMap[groupId])
+        ? groupsMap[groupId]
+        : [];
+
+    const groupNumbers =
+      new Set();
+
+    for (const member of members) {
+      const number =
+        normalizeAnimalNumberForStats(
+          milkReportAnimalNumberFromAnimalSrv(
+            member
+          )
+        );
+
+      if (!number) continue;
+
+      groupNumbers.add(number);
+      officialMilkerNumbers.add(number);
+    }
+
+    bandCounts[baseKey] =
+      groupNumbers.size;
   }
 
-  const milkParts = [freshOfficial, highOfficial, medOfficial, lowOfficial]
-    .map(Number)
-    .filter(Number.isFinite);
+  officialInMilkCount =
+    officialMilkerNumbers.size;
 
-  if (milkParts.length) {
-    officialInMilkCount = milkParts.reduce((a, b) => a + b, 0);
-  }
   officialFeedBandCounts = {
-  fresh: Number(freshOfficial) || 0,
-  high: Number(highOfficial) || 0,
-  medium: Number(medOfficial) || 0,
-  low: Number(lowOfficial) || 0
-};
+    fresh: bandCounts.fresh,
+    high: bandCounts.high,
+    medium: bandCounts.med,
+    low: bandCounts.low
+  };
+
+  const allGroupId =
+    `${groupPrefix}all`;
+
+  const allGroupDoc =
+    await db
+      .collection('groups')
+      .doc(`${uid}_${allGroupId}`)
+      .get();
+
+  if (allGroupDoc.exists) {
+    const data =
+      allGroupDoc.data() || {};
+
+    const storedCount =
+      Number(
+        data.animalsCount ??
+        data.headCount ??
+        data.count
+      );
+
+    if (Number.isFinite(storedCount)) {
+      total = storedCount;
+    } else if (Array.isArray(data.animalNumbers)) {
+      total =
+        new Set(
+          data.animalNumbers
+            .map(normalizeAnimalNumberForStats)
+            .filter(Boolean)
+        ).size;
+    }
+  }
+
 } catch (e) {
-  console.error('HERD-STATS official groups count failed:', e.message || e);
+  console.error(
+    'HERD-STATS official groups load failed:',
+    e.message || e
+  );
 }
 
    // --------------------------------------
@@ -85528,11 +85590,73 @@ for (const a of active) {
 
   if (isInMilkDoc) inMilkCount++;
 
-  const dim = Number(a.daysInMilk || 0);
-  if (Number.isFinite(dim) && dim >= 0) {
+ const animalNumberForDim =
+  normalizeAnimalNumberForStats(
+    a.animalNumber ??
+    a.number ??
+    a.id ??
+    ''
+  );
+
+const useForProductionDim =
+  officialInMilkCount !== null
+    ? officialMilkerNumbers.has(
+        animalNumberForDim
+      )
+    : isInMilkDoc;
+
+if (useForProductionDim) {
+  const calvingDate =
+    groupDateOnlySrv(
+      a.lastCalvingDate ||
+      a.calvingDate ||
+      a.calvedAt ||
+      ''
+    );
+
+  let dim = null;
+
+  if (calvingDate && productionToday) {
+    const calculatedDim =
+      diffDaysISO(
+        calvingDate,
+        productionToday
+      );
+
+    if (
+      Number.isFinite(calculatedDim) &&
+      calculatedDim >= 0
+    ) {
+      dim = calculatedDim;
+    }
+  }
+
+  if (dim === null) {
+  const rawDim =
+    a.daysInMilk;
+
+  if (
+    rawDim !== null &&
+    rawDim !== undefined &&
+    String(rawDim).trim() !== ''
+  ) {
+    const explicitDim =
+      Number(rawDim);
+
+    if (
+      Number.isFinite(explicitDim) &&
+      explicitDim >= 0
+    ) {
+      dim = explicitDim;
+    }
+  }
+}
+
+  if (dim !== null) {
     dimSum += dim;
     dimN++;
   }
+}
 
   if (isOpen) openCount++;
   if (isBred) bredCount++;
@@ -85708,8 +85832,8 @@ try {
 
     const bcsCamera   = bcsVals.length ? +(bcsVals.reduce((a,b)=>a+b,0)/bcsVals.length).toFixed(2) : 0;
     const fecesScore  = fecesVals.length ? +(fecesVals.reduce((a,b)=>a+b,0)/fecesVals.length).toFixed(2) : 0;
- // --------------------------------------
-// 🔥 5) إنتاج اللبن من أحداث آخر 7 أيام + الشهر الحالي
+// --------------------------------------
+// 🔥 5) إنتاج اللبن — حسب توقيت المزرعة
 // --------------------------------------
 let dailyMilkTotal = 0;
 let avgHeadToday = 0;
@@ -85718,139 +85842,314 @@ let monthlyMilkTotal = 0;
 
 let prevDailyMilkTotal = 0;
 let prevAvgHeadToday = 0;
+let prevAvgHead7Days = 0;
+
 let dailyMilkDeltaPct = 0;
 let avgHeadDeltaPct = 0;
+let avgHead7DaysDeltaPct = 0;
 
-    
+const dashboardAddDaysISO = (iso, days) => {
+  const value =
+    String(iso || '')
+      .trim()
+      .slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return '';
+  }
+
+  const [y, m, d] =
+    value
+      .split('-')
+      .map(Number);
+
+  const date =
+    new Date(
+      Date.UTC(y, m - 1, d)
+    );
+
+  date.setUTCDate(
+    date.getUTCDate() +
+    Number(days || 0)
+  );
+
+  return date
+    .toISOString()
+    .slice(0, 10);
+};
+
+const productionYesterday =
+  dashboardAddDaysISO(
+    productionToday,
+    -1
+  );
+
 try {
   const evMilkAll = (
-  await loadHerdStatsEventsSrv()
-).map(e => ({ ...e }));
+    await loadHerdStatsEventsSrv()
+  ).map(e => ({ ...e }));
 
-  const animalNosSet = new Set(
-    animalsByType.map(a => String(a.animalNumber || a.number || a.id || '').trim())
-  );
-
-  const milkEvents = evMilkAll.filter(e => {
-    const txt = String(e.eventTypeNorm || e.eventType || e.type || "").toLowerCase().trim();
-    const no = String(e.animalNumber || e.number || e.animalId || '').trim();
-
-    return (
-      animalNosSet.has(no) &&
-      (
-        txt === "daily_milk" ||
-        txt === "لبن يومي"
-      )
+  const animalNosSet =
+    new Set(
+      animalsByType
+        .map(a =>
+          normalizeAnimalNumberForStats(
+            a.animalNumber ||
+            a.number ||
+            a.id ||
+            ''
+          )
+        )
+        .filter(Boolean)
     );
-  });
 
- let latestMilkDay = null;
-const dayMap = new Map();
+  const milkEvents =
+    evMilkAll.filter(e => {
+      const txt =
+        String(
+          e.eventTypeNorm ||
+          e.eventType ||
+          e.type ||
+          ''
+        )
+          .toLowerCase()
+          .trim();
 
-for (const e of milkEvents) {
-  const d = toDate(e.eventDate || e.date || e.createdAt || e.timestamp);
-  if (!d || isNaN(d.getTime())) continue;
+      const number =
+        normalizeAnimalNumberForStats(
+          e.animalNumber ||
+          e.number ||
+          e.animalId ||
+          ''
+        );
 
-  const dayOnly = new Date(d);
-  dayOnly.setHours(0,0,0,0);
+      return (
+        animalNosSet.has(number) &&
+        (
+          txt === 'daily_milk' ||
+          txt === 'لبن يومي'
+        )
+      );
+    });
 
-  const milkVal = Number(
-    e.totalMilk ??
-    e.dailyMilk ??
-    e.milkKg ??
-    e.milk ??
-    e.value ??
-    0
-  );
+  const dayMap =
+    new Map();
 
-  if (!Number.isFinite(milkVal) || milkVal <= 0) continue;
+  for (const e of milkEvents) {
+    const eventDate =
+      String(
+        computeEventDateFromDoc(e) ||
+        ''
+      )
+        .trim()
+        .slice(0, 10);
 
-  if (!latestMilkDay || dayOnly.getTime() > latestMilkDay.getTime()) {
-    latestMilkDay = new Date(dayOnly);
-  }
-
-  const key = dayOnly.toISOString().slice(0,10);
-  if (!dayMap.has(key)) {
-    dayMap.set(key, { totalMilk: 0, heads: new Set() });
-  }
-  const rec = dayMap.get(key);
-  rec.totalMilk += milkVal;
-  rec.heads.add(String(e.animalNumber || e.number || e.animalId || '').trim());
-}
-
-if (latestMilkDay) {
-  const start7 = new Date(latestMilkDay);
-  start7.setDate(start7.getDate() - 6);
-
-  const startMonth = new Date(latestMilkDay.getFullYear(), latestMilkDay.getMonth(), 1);
-
-  let sumDailyHeadAvg = 0;
-let daysWithMilk = 0;
-
-  for (const [key, rec] of dayMap.entries()) {
-    const d = new Date(key + 'T00:00:00');
-
-    if (d.getTime() === latestMilkDay.getTime()) {
-      dailyMilkTotal += rec.totalMilk;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+      continue;
     }
 
-    if (d >= startMonth && d <= latestMilkDay) {
-      monthlyMilkTotal += rec.totalMilk;
+    const milkVal =
+      Number(
+        e.totalMilk ??
+        e.dailyMilk ??
+        e.milkKg ??
+        e.milk ??
+        e.value ??
+        0
+      );
+
+    if (
+      !Number.isFinite(milkVal) ||
+      milkVal <= 0
+    ) {
+      continue;
+    }
+
+    const number =
+      normalizeAnimalNumberForStats(
+        e.animalNumber ||
+        e.number ||
+        e.animalId ||
+        ''
+      );
+
+    if (!dayMap.has(eventDate)) {
+      dayMap.set(
+        eventDate,
+        {
+          totalMilk: 0,
+          heads: new Set()
+        }
+      );
+    }
+
+    const rec =
+      dayMap.get(eventDate);
+
+    rec.totalMilk +=
+      milkVal;
+
+    if (number) {
+      rec.heads.add(number);
     }
   }
 
-for (let i = 0; i < 7; i++) {
-  const d = new Date(start7);
-  d.setDate(start7.getDate() + i);
-  const key = d.toISOString().slice(0,10);
+  const todayRec =
+    dayMap.get(productionToday) ||
+    null;
 
-  const rec = dayMap.get(key);
-  if (!rec || !rec.heads.size) continue;
+  const yesterdayRec =
+    dayMap.get(productionYesterday) ||
+    null;
 
-  sumDailyHeadAvg += rec.totalMilk / rec.heads.size;
-  daysWithMilk++;
-}
+  dailyMilkTotal =
+    todayRec
+      ? +Number(todayRec.totalMilk || 0)
+          .toFixed(1)
+      : 0;
 
-dailyMilkTotal = +dailyMilkTotal.toFixed(1);
-avgHead7Days = daysWithMilk ? +(sumDailyHeadAvg / daysWithMilk).toFixed(1) : 0;
-monthlyMilkTotal = +monthlyMilkTotal.toFixed(1);
+  prevDailyMilkTotal =
+    yesterdayRec
+      ? +Number(yesterdayRec.totalMilk || 0)
+          .toFixed(1)
+      : 0;
 
-const sortedKeys = [...dayMap.keys()].sort();
-console.log("MILK sortedKeys =", sortedKeys);
-console.log("MILK latestKey =", sortedKeys[sortedKeys.length - 1] || null);
-console.log("MILK prevKey =", sortedKeys[sortedKeys.length - 2] || null);
-const latestKey = sortedKeys.length ? sortedKeys[sortedKeys.length - 1] : null;
-const prevKey   = sortedKeys.length > 1 ? sortedKeys[sortedKeys.length - 2] : null;
+  avgHeadToday =
+    todayRec && todayRec.heads.size
+      ? +(
+          Number(todayRec.totalMilk || 0) /
+          todayRec.heads.size
+        ).toFixed(1)
+      : 0;
 
-const latestRec = latestKey ? dayMap.get(latestKey) : null;
-const prevRec   = prevKey ? dayMap.get(prevKey) : null;
-console.log("MILK latestRec =", latestRec);
-console.log("MILK prevRec =", prevRec);
-avgHeadToday = (latestRec && latestRec.heads.size)
-  ? +(latestRec.totalMilk / latestRec.heads.size).toFixed(1)
-  : 0;
+  prevAvgHeadToday =
+    yesterdayRec && yesterdayRec.heads.size
+      ? +(
+          Number(yesterdayRec.totalMilk || 0) /
+          yesterdayRec.heads.size
+        ).toFixed(1)
+      : 0;
 
-prevDailyMilkTotal = prevRec ? +Number(prevRec.totalMilk || 0).toFixed(1) : 0;
-prevAvgHeadToday = (prevRec && prevRec.heads.size)
-  ? +(prevRec.totalMilk / prevRec.heads.size).toFixed(1)
-  : 0;
+  dailyMilkDeltaPct =
+    prevDailyMilkTotal > 0
+      ? +(
+          (
+            (dailyMilkTotal - prevDailyMilkTotal) /
+            prevDailyMilkTotal
+          ) *
+          100
+        ).toFixed(1)
+      : 0;
 
-dailyMilkDeltaPct = prevDailyMilkTotal > 0
-  ? +(((dailyMilkTotal - prevDailyMilkTotal) / prevDailyMilkTotal) * 100).toFixed(1)
-  : 0;
+  avgHeadDeltaPct =
+    prevAvgHeadToday > 0
+      ? +(
+          (
+            (avgHeadToday - prevAvgHeadToday) /
+            prevAvgHeadToday
+          ) *
+          100
+        ).toFixed(1)
+      : 0;
 
-avgHeadDeltaPct = prevAvgHeadToday > 0
-  ? +(((avgHeadToday - prevAvgHeadToday) / prevAvgHeadToday) * 100).toFixed(1)
-  : 0;
-  console.log("MILK dailyMilkTotal =", dailyMilkTotal);
-console.log("MILK prevDailyMilkTotal =", prevDailyMilkTotal);
-console.log("MILK avgHeadToday =", avgHeadToday);
-console.log("MILK prevAvgHeadToday =", prevAvgHeadToday);
-console.log("MILK dailyMilkDeltaPct =", dailyMilkDeltaPct);
-console.log("MILK avgHeadDeltaPct =", avgHeadDeltaPct);
-}
+  const averageRecordedHeadForRange =
+    (startDate, endDate) => {
+      let sumDailyHeadAvg = 0;
+      let recordedDays = 0;
+
+      for (
+        let day = startDate;
+        day && day <= endDate;
+        day = dashboardAddDaysISO(day, 1)
+      ) {
+        const rec =
+          dayMap.get(day);
+
+        if (
+          !rec ||
+          !rec.heads.size
+        ) {
+          continue;
+        }
+
+        sumDailyHeadAvg +=
+          Number(rec.totalMilk || 0) /
+          rec.heads.size;
+
+        recordedDays++;
+      }
+
+      return recordedDays
+        ? +(
+            sumDailyHeadAvg /
+            recordedDays
+          ).toFixed(1)
+        : 0;
+    };
+
+  const current7Start =
+    dashboardAddDaysISO(
+      productionToday,
+      -6
+    );
+
+  const previous7End =
+    dashboardAddDaysISO(
+      productionToday,
+      -7
+    );
+
+  const previous7Start =
+    dashboardAddDaysISO(
+      productionToday,
+      -13
+    );
+
+  avgHead7Days =
+    averageRecordedHeadForRange(
+      current7Start,
+      productionToday
+    );
+
+  prevAvgHead7Days =
+    averageRecordedHeadForRange(
+      previous7Start,
+      previous7End
+    );
+
+  avgHead7DaysDeltaPct =
+    prevAvgHead7Days > 0
+      ? +(
+          (
+            (avgHead7Days - prevAvgHead7Days) /
+            prevAvgHead7Days
+          ) *
+          100
+        ).toFixed(1)
+      : 0;
+
+  const monthStart =
+    `${String(productionToday).slice(0, 7)}-01`;
+
+  monthlyMilkTotal =
+    +[...dayMap.entries()]
+      .filter(([day]) =>
+        day >= monthStart &&
+        day <= productionToday
+      )
+      .reduce(
+        (sum, [, rec]) =>
+          sum +
+          Number(rec.totalMilk || 0),
+        0
+      )
+      .toFixed(1);
+
 } catch (e) {
-  console.error("milk stats error:", e.message || e);
+  console.error(
+    'milk stats error:',
+    e.message || e
+  );
 }
     // --------------------------------------
     // 🔥 5) خصوبة 21 يوم من الأحداث (FERTILITY EVENTS)
@@ -87053,12 +87352,15 @@ feedDashboardMetrics,
 
 feedBands,
 
+productionDate: productionToday,
+previousProductionDate: productionYesterday,
 dailyMilkTotal,
 avgHeadToday,
 avgHead7Days,
 monthlyMilkTotal,
 dailyMilkDeltaPct,
 avgHeadDeltaPct,
+avgHead7DaysDeltaPct,
 bcsCamera,
 fecesScore,
 selectedType: selectedDashboardType,
