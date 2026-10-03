@@ -3026,6 +3026,12 @@ if (isDryAnimal) {
 // ============================================================
 // ✅ تحديث مرحلة التابع داخل سجل calves نفسه
 // الجرد يقرأ السجل فقط — بدون Groups
+//
+// Legacy:
+// سجل تابع بلا status / followerStatus
+// ولا توجد عليه حالة تناسلية أحدث
+// => رضيع
+//
 // فطام -> نامي عند 6 شهور
 // نامي -> تحت التلقيح للأنثى عند 11 شهرًا
 // ============================================================
@@ -3068,52 +3074,71 @@ for (const doc of followerStageSnap.docs) {
       ""
     ).trim();
 
-  // لا نلمس الرضيع:
-  // الفطام لا يتم إلا بحدث الفطام.
-  if (
-    currentStage !== "فطام" &&
-    currentStage !== "نامي"
+  const repro =
+    reproAutoNormArSrv(
+      a.reproductiveStatus
+    );
+
+  let nextStage = "";
+
+  // ==========================================================
+// تابع بلا مرحلة تشغيلية:
+// لا نخمن حالته ولا نعيد تصنيفه تلقائيًا.
+// أي إصلاح لسجل فارغ يتم من مسار البيانات الصحيح فقط.
+// ==========================================================
+if (!currentStage) {
+  continue;
+}
+
+  // ==========================================================
+  // المراحل التي يسمح العمر بتحريكها
+  // ==========================================================
+  else if (
+    currentStage === "فطام" ||
+    currentStage === "نامي"
   ) {
-    continue;
-  }
+    const ageMonths =
+      getAgeMonthsSrv(a);
 
-  const ageMonths =
-    getAgeMonthsSrv(a);
-
-  if (
-    !Number.isFinite(ageMonths) ||
-    ageMonths < 6
-  ) {
-    continue;
-  }
-
-  let nextStage = "نامي";
-
-  // الإناث تدخل تحت التلقيح عند 11 شهرًا.
-  if (
-    ageMonths >= 11 &&
-    getSexTextSrv(a) === "أنثى"
-  ) {
-    const repro =
-      reproAutoNormArSrv(
-        a.reproductiveStatus
-      );
-
-    // أي حالة تناسلية أحدث لها الأولوية.
     if (
-      repro.includes("ملقح") ||
-      repro.includes("عشار") ||
-      repro.includes("اجهاض")
+      !Number.isFinite(ageMonths) ||
+      ageMonths < 6
     ) {
       continue;
     }
 
     nextStage =
-      "تحت التلقيح";
+      "نامي";
+
+    // الإناث تدخل تحت التلقيح عند 11 شهرًا.
+    if (
+      ageMonths >= 11 &&
+      getSexTextSrv(a) === "أنثى"
+    ) {
+      // أي حالة تناسلية أحدث لها الأولوية.
+      if (
+        repro.includes("ملقح") ||
+        repro.includes("عشار") ||
+        repro.includes("اجهاض")
+      ) {
+        continue;
+      }
+
+      nextStage =
+        "تحت التلقيح";
+    }
+  }
+
+  // لا نلمس رضيع قائم أو ملقح أو عشار أو إجهاض...
+  else {
+    continue;
   }
 
   const currentStatus =
-    String(a.status || "").trim();
+    String(
+      a.status ||
+      ""
+    ).trim();
 
   if (
     currentStage === nextStage &&
@@ -3134,7 +3159,7 @@ for (const doc of followerStageSnap.docs) {
         .serverTimestamp(),
 
     followerStageAutoSource:
-      "server:daily_maintenance"
+  "server:daily_maintenance"
   };
 
   if (
@@ -85100,10 +85125,6 @@ const active = animalsByType.filter(a => {
 // لا يعتمد على Groups / التغذية / الخصوبة
 // الحيوان المرشّح للاستبعاد يظل محسوبًا ما دام لم يخرج فعليًا
 // ============================================================
-const inventoryCalvesSnap = await db
-  .collection("calves")
-  .where("userId", "==", uid)
-  .get();
 
 const inventoryNormText = (v) =>
   String(v ?? "")
@@ -85271,71 +85292,18 @@ const inventoryMothers = animalsAll.filter(doc =>
   inventorySpeciesOf(doc) === inventorySpecies
 );
 
-// نمنع تكرار أي تابع أصبح له سجل رئيسي داخل animals.
-const inventoryMotherNumbers = new Set(
-  animalsAll
-    .map(doc =>
-      normalizeAnimalNumberForStats(
-        doc.animalNumber ??
-        doc.number ??
-        doc.calfNumber ??
-        doc.id
-      )
-    )
-    .filter(Boolean)
-);
-
-const inventoryFollowersByNumber = new Map();
-
-for (const ds of inventoryCalvesSnap.docs) {
-  const doc = {
-    id: ds.id,
-    ...(ds.data() || {})
-  };
-
-  if (!inventoryIsPresent(doc)) {
-    continue;
-  }
-
-  if (
-    inventorySpeciesOf(doc) !==
-    inventorySpecies
-  ) {
-    continue;
-  }
-
-  const animalNumber =
-    normalizeAnimalNumberForStats(
-      doc.calfNumber ??
-      doc.animalNumber ??
-      doc.number ??
-      doc.id
-    );
-
-  if (!animalNumber) {
-    continue;
-  }
-
-  if (
-    inventoryMotherNumbers.has(
-      animalNumber
-    )
-  ) {
-    continue;
-  }
-
-  inventoryFollowersByNumber.set(
-    animalNumber,
-    {
-      ...doc,
-      animalNumber
-    }
-  );
-}
-
+// calves = نفس السجلات الفعلية التي تعتمد عليها قائمة التوابع.
+// لا نستبعد تابعًا لمجرد وجود نفس الرقم داخل animals.
+// الفصل هنا بالنوع، ومصدر الحقيقة للتوابع هو calves نفسه.
 const inventoryFollowers =
-  [...inventoryFollowersByNumber.values()];
-
+  (await followerListFetchFirestoreSrv(uid))
+    .filter(
+      animalListIsActiveSrv
+    )
+    .filter(doc =>
+      animalListNumberTextSrv(doc) &&
+      inventorySpeciesOf(doc) === inventorySpecies
+    );
 const inventoryIsPregnantHeifer = (doc = {}) => {
   if (inventorySexOf(doc) === "male") {
     return false;
