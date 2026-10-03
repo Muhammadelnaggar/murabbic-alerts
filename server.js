@@ -76725,13 +76725,30 @@ if (
   continue;
 }
 
-    if (
+        if (
       decision === "snoozed" &&
       murabbikSmartAlertDateMsSrv(
         state.snoozedUntil
       ) > nowMs
     ) {
       hiddenCount++;
+      continue;
+    }
+
+    const isOvsynchDayBeforeReminder =
+      decision === "snoozed" &&
+      alert.source ===
+        "ovsynch_protocol_steps" &&
+      alert.code ===
+        "ovsynch_step_due" &&
+      alert.action?.type ===
+        "none";
+
+    if (isOvsynchDayBeforeReminder) {
+      visibleAlerts.push({
+        ...alert,
+        snoozeAllowed: false
+      });
       continue;
     }
 
