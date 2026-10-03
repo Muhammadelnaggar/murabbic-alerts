@@ -1421,14 +1421,27 @@ const cullTotalPct =
     0
   );
 
- const avgHead7Days = Number(stats.avgHead7Days ?? 0);
-const totalDailyMilk = Number(stats.dailyMilkTotal ?? 0);
-const monthlyMilkTotal = Number(stats.monthlyMilkTotal ?? 0);
-const avgHeadToday = Number(stats.avgHeadToday ?? 0);
+ 
+const avgHead7Days =
+  Number(stats.avgHead7Days ?? 0);
 
-const avgHeadDeltaPct = Number(stats.avgHeadDeltaPct ?? 0);
-const dailyMilkDeltaPct = Number(stats.dailyMilkDeltaPct ?? 0);
+const totalDailyMilk =
+  Number(stats.dailyMilkTotal ?? 0);
 
+const monthlyMilkTotal =
+  Number(stats.monthlyMilkTotal ?? 0);
+
+const avgHeadToday =
+  Number(stats.avgHeadToday ?? 0);
+
+const avgHeadDeltaPct =
+  Number(stats.avgHeadDeltaPct ?? 0);
+
+const dailyMilkDeltaPct =
+  Number(stats.dailyMilkDeltaPct ?? 0);
+
+const avgHead7DaysDeltaPct =
+  Number(stats.avgHead7DaysDeltaPct ?? 0);
     // القيم التالية مؤقتًا من السيرفر فقط، وإن لم تُرجع تكون صفر
     const openCount = Number(stats.openCount ?? 0);
     const openPct   = Number(stats.openPct ?? 0);
@@ -1577,62 +1590,71 @@ herdGrid.innerHTML =
     'herd'
   );
 
-const avgHeadState = prodState(avgHeadDeltaPct);
-const dailyMilkState = prodState(dailyMilkDeltaPct);
-const showCausesCard = Math.abs(Number(dailyMilkDeltaPct || 0)) >= 3;
+const avgHeadState =
+  prodState(avgHeadDeltaPct);
 
-const causesState = prodState(dailyMilkDeltaPct);
-const causesText = buildMilkCauses({
-  thi: currentTHI,
-  mastitisPct,
-  lamenessPct
-});
+const dailyMilkState =
+  prodState(dailyMilkDeltaPct);
+
+const avgHead7DaysState =
+  prodState(avgHead7DaysDeltaPct);
+
+const inMilkLabel =
+  currentType === 'buffalo'
+    ? 'عدد الجاموس الحلاب'
+    : 'عدد الأبقار الحلاب';
 
 prodGrid.innerHTML =
+
   prodCard(
-    'متوسط اللبن اليومي / رأس / يوم',
-    avgHeadToday,
-    prodDeltaText(avgHeadDeltaPct),
-    avgHeadState,
-    links.milkDailyAvg || 'milk-reports.html'
-  ) +
-  prodCard(
-    'متوسط الرأس / 7 أيام',
-    avgHead7Days,
+    inMilkLabel,
+    inMilk,
     '',
     'ok',
-    links.milk7Days || 'milk-reports.html'
+    'groups.html'
   ) +
+
   prodCard(
-    'إجمالي إنتاج اللبن اليومي',
-    totalDailyMilk,
-    prodDeltaText(dailyMilkDeltaPct),
-    dailyMilkState,
-    links.milkDailyTotal || 'milk-reports.html'
-  ) +
-  prodCard(
-    'متوسط عدد أيام الحليب للقطيع',
+    'متوسط عدد أيام الحليب',
     avgDIM,
     '',
     'ok',
     links.milkReport || 'milk-reports.html'
   ) +
+
   prodCard(
-    'إجمالي إنتاج اللبن الشهري',
+    'إجمالي إنتاج اللبن اليوم',
+    totalDailyMilk,
+    prodDeltaText(dailyMilkDeltaPct),
+    dailyMilkState,
+    links.milkDailyTotal || 'milk-reports.html'
+  ) +
+
+  prodCard(
+    'متوسط إنتاج الرأس / يوم',
+    avgHeadToday,
+    prodDeltaText(avgHeadDeltaPct),
+    avgHeadState,
+    links.milkDailyAvg || 'milk-reports.html'
+  ) +
+
+  prodCard(
+    'متوسط إنتاج الرأس / 7 أيام',
+    avgHead7Days,
+    prodDeltaText(avgHead7DaysDeltaPct),
+    avgHead7DaysState,
+    links.milk7Days || 'milk-reports.html'
+  ) +
+
+  prodCard(
+    'إجمالي إنتاج اللبن الشهري / الشهر الجاري',
     monthlyMilkTotal,
     '',
     'ok',
     links.milkMonthly || 'milk-reports.html'
   );
-prodCauseWrap.innerHTML = showCausesCard
-  ? `
-    <div class="kpi prod prod-cause-card ${causesState === 'danger' ? 'prod-danger' : causesState === 'warn' ? 'prod-warn' : 'prod-ok'}"
-    onclick="location.href='${links.milkCauses || 'milk-reports.html'}'">
-      <div class="kpi-label">أسباب تغير إنتاج اللبن</div>
-      <div class="kpi-value">${causesText}</div>
-    </div>
-  `
-  : '';
+
+prodCauseWrap.innerHTML = '';
 
 const fertilityReportHref =
   `fertility-report.html?type=${encodeURIComponent(
