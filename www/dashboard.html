@@ -163,12 +163,7 @@ function prodCard(label, value, sub='', state='ok', href=''){
     </div>
   `;
 }
-function buildMilkCauses({ thi, mastitisPct, lamenessPct }){
-  const causes = [];
-  if (Number(thi) >= 72) causes.push('حرارة');
-  if (Number(mastitisPct) > 0 || Number(lamenessPct) > 0) causes.push('صحة');
-  return causes.length ? causes.join(' + ') : 'غير واضح';
-} 
+
 // ============ جلسة المستخدم من السيرفر ============
 let currentUser = null;
 let currentUserId = null;
@@ -721,10 +716,7 @@ function fertilityBenchmarkBox({
   `;
 }
 
-function healthReportHref(){
-  const type = currentType === 'buffalo' ? 'buffalo' : 'cows';
-  return `health-report.html?type=${encodeURIComponent(type)}&days=90`;
-}
+
 function pr21Box(value, benchmark = {}, href=''){
   return fertilityBenchmarkBox({
     label: 'معدل الحمل 21 يوم',
@@ -1415,18 +1407,18 @@ const healthDashboardMetrics =
   stats.openDaysAvg != null ? Number(stats.openDaysAvg) : 0;
 
 const pregRate21d =
-  fert.pr21 != null ? Number(fert.pr21) :
-  (stats.pregRate21d != null ? Number(stats.pregRate21d) : 0);
-
-const abortionCount =
-  stats.abortionCount != null ? Number(stats.abortionCount) : 0;
-
-const abortionRatePct =
-  stats.abortionRatePct != null ? Number(stats.abortionRatePct) : 0;
+  fert.pr21 != null
+    ? Number(fert.pr21)
+    : (
+        stats.pregRate21d != null
+          ? Number(stats.pregRate21d)
+          : 0
+      );
 
 const avgBreedIntervalDays =
-  stats.avgBreedIntervalDays != null ? Number(stats.avgBreedIntervalDays) : 0;
-
+  stats.avgBreedIntervalDays != null
+    ? Number(stats.avgBreedIntervalDays)
+    : 0;
 const heatDetectionRatePct =
   stats.heatDetectionRatePct != null ? Number(stats.heatDetectionRatePct) :
   (fert.hdr21 != null ? Number(fert.hdr21) : 0);
@@ -1519,18 +1511,6 @@ const feedUnavailableText =
           : 'البيانات الحالية غير مكتملة'
       );
 
-const fecesScore =
-  Number(
-    stats.fecesScore ??
-    0
-  );
-
-const bcsCamera =
-  Number(
-    stats.bcsCamera ??
-    0
-  );
-
 const cullTotalCount =
   Number(
     stats.cullTotal ??
@@ -1564,20 +1544,44 @@ const dailyMilkDeltaPct =
 
 const avgHead7DaysDeltaPct =
   Number(stats.avgHead7DaysDeltaPct ?? 0);
-    // القيم التالية مؤقتًا من السيرفر فقط، وإن لم تُرجع تكون صفر
-    const openCount = Number(stats.openCount ?? 0);
-    const openPct   = Number(stats.openPct ?? 0);
+    // القيم التالية تأتي من السيرفر فقط
+const openCount =
+  Number(
+    stats.openCount ??
+    0
+  );
 
-    const bredCount = Number(stats.bredCount ?? 0);
-    const bredPct   = Number(stats.bredPct ?? 0);
+const openPct =
+  Number(
+    stats.openPct ??
+    0
+  );
 
-    const mastitisCount = Number(stats.mastitisCount ?? 0);
-    const mastitisPct   = Number(stats.mastitisPct ?? 0);
+const bredCount =
+  Number(
+    stats.bredCount ??
+    0
+  );
 
-    const lamenessCount = Number(stats.lamenessCount ?? 0);
-    const lamenessPct   = Number(stats.lamenessPct ?? 0);
-    const dryCount = Math.max(0, totalActive - inMilk);
-    const dryPct = totalActive ? Math.round((dryCount * 100) / totalActive) : 0;
+const bredPct =
+  Number(
+    stats.bredPct ??
+    0
+  );
+
+const dryCount =
+  Math.max(
+    0,
+    totalActive - inMilk
+  );
+
+const dryPct =
+  totalActive
+    ? Math.round(
+        (dryCount * 100) /
+        totalActive
+      )
+    : 0;
 
 const avgDIM = Number(stats.avgDIM ?? 0);
 
@@ -2042,25 +2046,6 @@ function gaugeState(id, rawValue){
       if (v >= 45) return 'warn';
       return 'danger';
 
-    // ===== الصحة الملونة =====
-    case 'g_mastitis': // عكسي
-      if (v < 1) return 'elite';
-      if (v < 3) return 'ok';
-      if (v <= 5) return 'warn';
-      return 'danger';
-
-    case 'g_lameness': // عكسي
-      if (v <= 1) return 'elite';
-      if (v <= 1.5) return 'ok';
-      if (v <= 3) return 'warn';
-      return 'danger';
-
-    case 'g_abortRate': // عكسي
-      if (v <= 2) return 'elite';
-      if (v <= 3) return 'ok';
-      if (v <= 5) return 'warn';
-      return 'danger';
-
     // ===== التغذية الملونة =====
     case 'g_fe':
       if (v > 1.70) return 'elite';
@@ -2087,8 +2072,6 @@ function gaugeState(id, rawValue){
     case 'g_feedCostLiter':
     case 'g_feedHeadDay':
     case 'g_iofc':
-    case 'g_feces':
-    case 'g_bcs':
     default:
       return 'neutral';
   }
@@ -2106,9 +2089,7 @@ switch (id) {
     return String(Math.round(v));
 
   case 'g_fe':
-  case 'g_bcs':
-  case 'g_feces':
-    return v.toFixed(1);
+  return v.toFixed(1);
 
   default:
     return `${Math.round(v)}%`;
@@ -2130,24 +2111,6 @@ function gaugeArcPercent(id, rawValue){
       if (v <= 105) return 100;
       if (v >= 180) return 0;
       return Math.max(0, Math.min(100, ((180 - v) / (180 - 105)) * 100));
-    }
-
-    case 'g_mastitis': { // الأقل أفضل
-      if (v <= 1) return 100;
-      if (v >= 8) return 0;
-      return Math.max(0, Math.min(100, ((8 - v) / (8 - 1)) * 100));
-    }
-
-    case 'g_lameness': { // الأقل أفضل
-      if (v <= 1) return 100;
-      if (v >= 6) return 0;
-      return Math.max(0, Math.min(100, ((6 - v) / (6 - 1)) * 100));
-    }
-
-    case 'g_abortRate': { // الأقل أفضل
-      if (v <= 2) return 100;
-      if (v >= 8) return 0;
-      return Math.max(0, Math.min(100, ((8 - v) / (8 - 2)) * 100));
     }
 
     case 'g_fe': {
