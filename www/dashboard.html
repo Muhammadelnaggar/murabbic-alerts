@@ -795,14 +795,85 @@ function fertilityReportOpenBox(typeLabel, href){
     </div>
   `;
 }
-function cullTotalBox(count, pct){
-  const v = Number(pct);
-  return scaleMetricBox(
-    'إجمالي عدد الاستبعاد',
-    Number.isFinite(count) ? String(count) : '--',
-    metricScalePositionInverse(v, 22, 40),
-    'cull'
-  );
+function cullTotalBox(
+  count,
+  pct,
+  annualLimit
+){
+  const v =
+    Number(pct);
+
+  const limit =
+    Number(annualLimit);
+
+  const hasPct =
+    Number.isFinite(v);
+
+  const hasLimit =
+    Number.isFinite(limit) &&
+    limit > 0;
+
+  const pos =
+    hasPct &&
+    hasLimit
+      ? metricScalePositionInverse(
+          v,
+          limit,
+          limit * 2
+        )
+      : 0;
+
+  const sub = [
+    hasPct
+      ? `نسبته من القطيع ${Math.round(v)}%`
+      : '',
+
+    hasLimit
+      ? `السقف السنوي ≤ ${limit}%`
+      : ''
+  ]
+    .filter(Boolean)
+    .join(' • ');
+
+  return `
+    <div class="kpi cull">
+      <div class="kpi-label">
+        إجمالي عدد الاستبعاد
+      </div>
+
+      <div class="kpi-value">
+        ${
+          Number.isFinite(
+            Number(count)
+          )
+            ? String(count)
+            : '--'
+        }
+      </div>
+
+      <div class="metric-scale">
+        <div class="metric-scale-track">
+          <div class="metric-scale-segs">
+            <div class="metric-scale-seg danger"></div>
+            <div class="metric-scale-seg warn"></div>
+            <div class="metric-scale-seg ok"></div>
+            <div class="metric-scale-seg elite"></div>
+          </div>
+
+          <div
+            class="metric-scale-dot"
+            style="left:${pos}%"
+          ></div>
+        </div>
+      </div>
+
+      ${
+        sub
+          ? `<div class="kpi-sub">${sub}</div>`
+          : ''
+      }
+    </div>
+  `;
 }
 function feedDashboardMetricBox(metric = {}, fallback = {}){
   const label =
@@ -1342,6 +1413,37 @@ const heatDetectionRatePct =
     const cullProdPct   = Number(stats.cullProdPct ?? 0);
     const cullReproPct  = Number(stats.cullReproPct ?? 0);
     const cullHealthPct = Number(stats.cullHealthPct ?? 0);
+    const cullingData =
+  stats.culling || {};
+
+const cullLimits =
+  cullingData.limits || {};
+
+const cullTotalLimit =
+  Number(
+    cullLimits.total
+  );
+
+const cullProdLimit =
+  Number(
+    cullLimits.productivity
+  );
+
+const cullReproLimit =
+  Number(
+    cullLimits.reproduction
+  );
+
+const cullHealthLimit =
+  Number(
+    cullLimits.health
+  );
+
+const cullLimitSuffix =
+  value =>
+    Number.isFinite(value)
+      ? ` • السقف السنوي ≤ ${value}%`
+      : '';
 const feedBands =
   stats.feedBands || {};
 
@@ -1728,10 +1830,36 @@ reproGrid.innerHTML =
 
     
 cullGrid.innerHTML =
-  cullTotalBox(cullTotalCount, cullTotalPct) +
-  box('عدد الاستبعاد الإنتاجي', stats.cullProdCount ?? 0, `نسبته من القطيع ${cullProdPct}%`, 'g_cullProd', 'cull') +
-  box('عدد الاستبعاد التناسلي', stats.cullReproCount ?? 0, `نسبته من القطيع ${cullReproPct}%`, 'g_cullRepro', 'cull') +
-  box('عدد الاستبعاد الصحي', stats.cullHealthCount ?? 0, `نسبته من القطيع ${cullHealthPct}%`, 'g_cullHealth', 'cull');
+
+  cullTotalBox(
+    cullTotalCount,
+    cullTotalPct,
+    cullTotalLimit
+  ) +
+
+  box(
+    'عدد الاستبعاد الإنتاجي',
+    stats.cullProdCount ?? 0,
+    `نسبته من القطيع ${cullProdPct}%${cullLimitSuffix(cullProdLimit)}`,
+    'g_cullProd',
+    'cull'
+  ) +
+
+  box(
+    'عدد الاستبعاد التناسلي',
+    stats.cullReproCount ?? 0,
+    `نسبته من القطيع ${cullReproPct}%${cullLimitSuffix(cullReproLimit)}`,
+    'g_cullRepro',
+    'cull'
+  ) +
+
+  box(
+    'عدد الاستبعاد الصحي',
+    stats.cullHealthCount ?? 0,
+    `يشمل النفوق • نسبته من القطيع ${cullHealthPct}%${cullLimitSuffix(cullHealthLimit)}`,
+    'g_cullHealth',
+    'cull'
+  );
 const feedMetricSpecs = [
   {
     key: 'iofcPct',
