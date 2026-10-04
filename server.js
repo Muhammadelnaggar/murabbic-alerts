@@ -86181,8 +86181,701 @@ try {
     "cull rolling 365 error:",
     e.message || e
   );
+}// ============================================================
+// 🩺 مؤشرات الصحة في الداشبورد — Server-first
+// ضرع + عرج + إسهال عجول: آخر 90 يوم
+// إجهاض: آخر 365 يوم
+// ============================================================
+
+let healthDashboard = {
+  available: false,
+  metrics: []
+};
+
+try {
+  const healthToday =
+    await farmTodayISOSrv(
+      req.authSession?.uid ||
+      uid
+    );
+
+  const healthAddDaysISO =
+    (iso, days) => {
+      const value =
+        String(iso || '')
+          .trim()
+          .slice(0, 10);
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return '';
+      }
+
+      const [y, m, d] =
+        value
+          .split('-')
+          .map(Number);
+
+      const date =
+        new Date(
+          Date.UTC(y, m - 1, d)
+        );
+
+      date.setUTCDate(
+        date.getUTCDate() +
+        Number(days || 0)
+      );
+
+      return date
+        .toISOString()
+        .slice(0, 10);
+    };
+
+  const healthStart90 =
+    healthAddDaysISO(
+      healthToday,
+      -89
+    );
+
+  const healthStart365 =
+    healthAddDaysISO(
+      healthToday,
+      -364
+    );
+
+  const healthRatePct =
+    (part, denominator) =>
+      denominator > 0
+        ? Number(
+            (
+              (Number(part || 0) * 100) /
+              denominator
+            ).toFixed(1)
+          )
+        : 0;
+
+  /*
+   * نحتاج الأرشيف أيضًا:
+   * الحيوان الذي خرج خلال فترة المؤشر
+   * كان ضمن المعرضين أثناء الفترة،
+   * وأحداثه انتقلت إلى archived_events.
+   */
+  const healthArchivedAnimalsSnap =
+    await db
+      .collection('archived_animals')
+      .where('userId', '==', uid)
+      .get();
+
+  const healthArchivedAdults =
+    new Map();
+
+  const healthArchivedCalves =
+    new Map();
+
+  for (
+    const doc
+    of healthArchivedAnimalsSnap.docs
+  ) {
+    const row = {
+      id: doc.id,
+      ...(doc.data() || {})
+    };
+
+    if (
+      inventorySpeciesOf(row) !==
+      inventorySpecies
+    ) {
+      continue;
+    }
+
+    const number =
+      normalizeAnimalNumberForStats(
+        row.animalNumber ??
+        row.number ??
+        row.calfNumber ??
+        row.id ??
+        ''
+      );
+
+    if (!number) continue;
+
+    const originalPath =
+      String(
+        row.originalAnimalPath || ''
+      )
+        .trim()
+        .toLowerCase();
+
+    if (
+      originalPath.startsWith(
+        'calves/'
+      )
+    ) {
+      healthArchivedCalves.set(
+        number,
+        row
+      );
+    } else {
+      healthArchivedAdults.set(
+        number,
+        row
+      );
+    }
+  }
+
+  const healthCurrentAdultNumbers =
+    new Set(
+      active
+        .map(a =>
+          normalizeAnimalNumberForStats(
+            a.animalNumber ??
+            a.number ??
+            a.id ??
+            ''
+          )
+        )
+        .filter(Boolean)
+    );
+
+  const healthCurrentCalfNumbers =
+    new Set(
+      inventoryFollowers
+        .map(a =>
+          normalizeAnimalNumberForStats(
+            a.animalNumber ??
+            a.number ??
+            a.calfNumber ??
+            a.id ??
+            ''
+          )
+        )
+        .filter(Boolean)
+    );
+
+  const healthArchiveDate =
+    row =>
+      String(
+        row?.archiveDate ||
+        row?.eventDate ||
+        row?.date ||
+        ''
+      )
+        .trim()
+        .slice(0, 10);
+
+  const healthArchivedInWindow =
+    (row, startDate) => {
+      const date =
+        healthArchiveDate(row);
+
+      return (
+        /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+        date >= startDate &&
+        date <= healthToday
+      );
+    };
+
+  /*
+   * مقام مؤشرات الـ90 يوم:
+   * الموجودون حاليًا +
+   * من خرجوا فعليًا أثناء نفس الفترة.
+   */
+  const healthAdultExposure90 =
+    new Set([
+      ...healthCurrentAdultNumbers,
+
+      ...[
+        ...healthArchivedAdults.entries()
+      ]
+        .filter(([, row]) =>
+          healthArchivedInWindow(
+            row,
+            healthStart90
+          )
+        )
+        .map(([number]) => number)
+    ]);
+
+  const healthCalfExposure90 =
+    new Set([
+      ...healthCurrentCalfNumbers,
+
+      ...[
+        ...healthArchivedCalves.entries()
+      ]
+        .filter(([, row]) =>
+          healthArchivedInWindow(
+            row,
+            healthStart90
+          )
+        )
+        .map(([number]) => number)
+    ]);
+
+  /*
+   * الإجهاض يحتاج كل الأمهات التي كانت موجودة
+   * خلال التاريخ المتاح للمقارنة مع نتائج الحمل،
+   * سواء ما زالت بالقطيع أو خرجت بعد ذلك.
+   */
+  const healthAllAdultNumbers =
+    new Set([
+      ...healthCurrentAdultNumbers,
+      ...healthArchivedAdults.keys()
+    ]);
+
+  const healthEventTypes = [
+    'mastitis',
+    'lameness',
+    'abortion',
+    'calving',
+    'acute_undifferentiated_diarrhea',
+    'health'
+  ];
+
+  const healthLoadRows =
+    async collectionName => {
+      const snaps =
+        await Promise.all(
+          healthEventTypes.map(
+            eventTypeNorm =>
+              db
+                .collection(collectionName)
+                .where('userId', '==', uid)
+                .where(
+                  'eventTypeNorm',
+                  '==',
+                  eventTypeNorm
+                )
+                .get()
+          )
+        );
+
+      const rows = [];
+
+      for (
+        let i = 0;
+        i < snaps.length;
+        i++
+      ) {
+        for (
+          const doc
+          of snaps[i].docs
+        ) {
+          rows.push({
+            id: doc.id,
+            _healthSource:
+              collectionName,
+            ...(doc.data() || {})
+          });
+        }
+      }
+
+      return rows;
+    };
+
+  const [
+    healthCurrentEvents,
+    healthArchivedEvents
+  ] = await Promise.all([
+    healthLoadRows('events'),
+    healthLoadRows('archived_events')
+  ]);
+
+  const healthEvents = [
+    ...healthCurrentEvents,
+    ...healthArchivedEvents
+  ];
+
+  const healthEventDate =
+    event => {
+      const computed =
+        typeof computeEventDateFromDoc ===
+        'function'
+          ? computeEventDateFromDoc(event)
+          : '';
+
+      return String(
+        computed ||
+        event.eventDate ||
+        event.date ||
+        ''
+      )
+        .trim()
+        .slice(0, 10);
+    };
+
+  const healthEventNumber =
+    event =>
+      normalizeAnimalNumberForStats(
+        event.animalNumber ??
+        event.number ??
+        event.calfNumber ??
+        event.animalId ??
+        ''
+      );
+
+  const healthEventKey =
+    event => {
+      const id =
+        String(event.id || '').trim();
+
+      if (id) return id;
+
+      return [
+        String(
+          event.eventTypeNorm ||
+          event.eventType ||
+          event.type ||
+          ''
+        ).trim(),
+
+        healthEventNumber(event),
+
+        healthEventDate(event),
+
+        String(
+          event.diseaseCode ||
+          ''
+        ).trim()
+      ].join('|');
+    };
+
+  const mastitisCases =
+    new Set();
+
+  const mastitisAffected =
+    new Set();
+
+  const lamenessCases =
+    new Set();
+
+  const lamenessAffected =
+    new Set();
+
+  const calfDiarrheaCases =
+    new Set();
+
+  const calfDiarrheaAffected =
+    new Set();
+
+  const abortionCases =
+    new Set();
+
+  const calvingCases =
+    new Set();
+
+  for (const event of healthEvents) {
+    const type =
+      String(
+        event.eventTypeNorm ||
+        event.eventType ||
+        event.type ||
+        ''
+      )
+        .trim()
+        .toLowerCase();
+
+    const date =
+      healthEventDate(event);
+
+    const number =
+      healthEventNumber(event);
+
+    if (
+      !number ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+      date > healthToday
+    ) {
+      continue;
+    }
+
+    const eventKey =
+      healthEventKey(event);
+
+    // -----------------------------
+    // الأمهات — آخر 90 يوم
+    // -----------------------------
+    if (
+      date >= healthStart90 &&
+      healthAdultExposure90.has(number)
+    ) {
+      if (type === 'mastitis') {
+        mastitisCases.add(
+          eventKey
+        );
+
+        mastitisAffected.add(
+          number
+        );
+      }
+
+      if (type === 'lameness') {
+        lamenessCases.add(
+          eventKey
+        );
+
+        lamenessAffected.add(
+          number
+        );
+      }
+    }
+
+    // -----------------------------
+    // إسهال العجول — آخر 90 يوم
+    // يشمل:
+    // calf_scours
+    // acute_undifferentiated_diarrhea
+    // -----------------------------
+    if (
+      date >= healthStart90 &&
+      healthCalfExposure90.has(number)
+    ) {
+      const diseaseCode =
+        String(
+          event.diseaseCode ||
+          event.details?.diseaseCode ||
+          ''
+        )
+          .trim()
+          .toLowerCase();
+
+      const diseaseName =
+        String(
+          event.diseaseName ||
+          event.details?.diseaseName ||
+          ''
+        )
+          .trim();
+
+      const isCalfDiarrhea =
+        type ===
+          'acute_undifferentiated_diarrhea' ||
+        (
+          type === 'health' &&
+          (
+            diseaseCode ===
+              'calf_scours' ||
+            diseaseName ===
+              'إسهال العجول'
+          )
+        );
+
+      if (isCalfDiarrhea) {
+        calfDiarrheaCases.add(
+          eventKey
+        );
+
+        calfDiarrheaAffected.add(
+          number
+        );
+      }
+    }
+
+    // -----------------------------
+    // نتائج الحمل — آخر 365 يوم
+    // -----------------------------
+    if (
+      date >= healthStart365 &&
+      healthAllAdultNumbers.has(number)
+    ) {
+      if (type === 'abortion') {
+        abortionCases.add(
+          eventKey
+        );
+      }
+
+      if (type === 'calving') {
+        calvingCases.add(
+          eventKey
+        );
+      }
+    }
+  }
+
+const lamenessRatePct =
+  healthRatePct(
+    lamenessAffected.size,
+    healthAdultExposure90.size
+  );
+
+const pregnancyOutcomes =
+  abortionCases.size +
+  calvingCases.size;
+
+const abortionRatePct =
+  healthRatePct(
+    abortionCases.size,
+    pregnancyOutcomes
+  );
+
+const healthReport90 =
+  `health-report.html?type=${encodeURIComponent(selectedDashboardType)}&days=90`;
+
+const healthReport365 =
+  `health-report.html?type=${encodeURIComponent(selectedDashboardType)}&days=365`;
+
+healthDashboard = {
+  available: true,
+  asOf: healthToday,
+
+  metrics: [
+    {
+      key: 'mastitis',
+      label: 'التهاب الضرع',
+
+      valueText:
+        String(
+          mastitisCases.size
+        ),
+
+      caseCount:
+        mastitisCases.size,
+
+      affectedCount:
+        mastitisAffected.size,
+
+      windowDays: 90,
+
+      subText:
+        `${mastitisAffected.size} رأس متأثرة • آخر 90 يوم`,
+
+      href:
+        healthReport90
+    },
+
+    {
+      key: 'lameness',
+      label: 'العرج',
+
+      valueText:
+        String(
+          lamenessCases.size
+        ),
+
+      caseCount:
+        lamenessCases.size,
+
+      affectedCount:
+        lamenessAffected.size,
+
+      denominatorCount:
+        healthAdultExposure90.size,
+
+      ratePct:
+        lamenessRatePct,
+
+      windowDays: 90,
+
+      subText:
+        `${lamenessAffected.size} رأس متأثرة • ${lamenessRatePct}% من الأمهات المعرضة • آخر 90 يوم`,
+
+      href:
+        healthReport90
+    },
+
+    {
+      key:
+        'calf_diarrhea',
+
+      label:
+        'إسهال العجول',
+
+      valueText:
+        String(
+          calfDiarrheaCases.size
+        ),
+
+      caseCount:
+        calfDiarrheaCases.size,
+
+      affectedCount:
+        calfDiarrheaAffected.size,
+
+      windowDays: 90,
+
+      subText:
+        `${calfDiarrheaAffected.size} عجل متأثر • آخر 90 يوم`,
+
+      href:
+        healthReport90
+    },
+
+    {
+      key: 'abortion',
+      label: 'الإجهاض',
+
+      valueText:
+        String(
+          abortionCases.size
+        ),
+
+      caseCount:
+        abortionCases.size,
+
+      denominatorCount:
+        pregnancyOutcomes,
+
+      ratePct:
+        abortionRatePct,
+
+      windowDays: 365,
+
+      subText:
+        pregnancyOutcomes > 0
+          ? `${abortionRatePct}% من نتائج الحمل المسجلة • آخر 365 يوم`
+          : 'لا توجد نتائج حمل مسجلة خلال آخر 365 يوم',
+
+      href:
+        healthReport365
+    }
+  ]
+};
+
+} catch (e) {
+  console.error(
+    'health dashboard metrics failed:',
+    e.message || e
+  );
+
+  healthDashboard = {
+    available: false,
+
+    metrics: [
+      {
+        key: 'mastitis',
+        label: 'التهاب الضرع',
+        valueText: '—',
+        subText:
+          'تعذّر تحميل المؤشر الصحي الآن.'
+      },
+
+      {
+        key: 'lameness',
+        label: 'العرج',
+        valueText: '—',
+        subText:
+          'تعذّر تحميل المؤشر الصحي الآن.'
+      },
+
+      {
+        key:
+          'calf_diarrhea',
+        label:
+          'إسهال العجول',
+        valueText: '—',
+        subText:
+          'تعذّر تحميل المؤشر الصحي الآن.'
+      },
+
+      {
+        key: 'abortion',
+        label: 'الإجهاض',
+        valueText: '—',
+        subText:
+          'تعذّر تحميل المؤشر الصحي الآن.'
+      }
+    ]
+  };
 }
- 
     // --------------------------------------
     // 🔥 4) كاميرا
     // --------------------------------------
@@ -87676,6 +88369,7 @@ fertility: {
   // مصدر مؤشرات الخصوبة في الداشبورد.
   dashboard: dashboardFertility
 },
+healthDashboard,
 // ===== الحقول التي ينتظرها الداشبورد مباشرة =====
 servicesPerConception,
 conceptionRatePct: conceptionPct,
