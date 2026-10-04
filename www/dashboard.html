@@ -795,10 +795,12 @@ function fertilityReportOpenBox(typeLabel, href){
     </div>
   `;
 }
-function cullTotalBox(
+function cullMetricBox(
+  label,
   count,
   pct,
-  annualLimit
+  annualLimit,
+  prefix = ''
 ){
   const v =
     Number(pct);
@@ -824,6 +826,8 @@ function cullTotalBox(
       : 0;
 
   const sub = [
+    prefix,
+
     hasPct
       ? `نسبته من القطيع ${Math.round(v)}%`
       : '',
@@ -837,8 +841,9 @@ function cullTotalBox(
 
   return `
     <div class="kpi cull">
+
       <div class="kpi-label">
-        إجمالي عدد الاستبعاد
+        ${label}
       </div>
 
       <div class="kpi-value">
@@ -853,6 +858,7 @@ function cullTotalBox(
 
       <div class="metric-scale">
         <div class="metric-scale-track">
+
           <div class="metric-scale-segs">
             <div class="metric-scale-seg danger"></div>
             <div class="metric-scale-seg warn"></div>
@@ -864,6 +870,7 @@ function cullTotalBox(
             class="metric-scale-dot"
             style="left:${pos}%"
           ></div>
+
         </div>
       </div>
 
@@ -872,6 +879,7 @@ function cullTotalBox(
           ? `<div class="kpi-sub">${sub}</div>`
           : ''
       }
+
     </div>
   `;
 }
@@ -1831,34 +1839,33 @@ reproGrid.innerHTML =
     
 cullGrid.innerHTML =
 
-  cullTotalBox(
+  cullMetricBox(
+    'إجمالي عدد الاستبعاد',
     cullTotalCount,
     cullTotalPct,
     cullTotalLimit
   ) +
 
-  box(
+  cullMetricBox(
     'عدد الاستبعاد الإنتاجي',
     stats.cullProdCount ?? 0,
-    `نسبته من القطيع ${cullProdPct}%${cullLimitSuffix(cullProdLimit)}`,
-    'g_cullProd',
-    'cull'
+    cullProdPct,
+    cullProdLimit
   ) +
 
-  box(
+  cullMetricBox(
     'عدد الاستبعاد التناسلي',
     stats.cullReproCount ?? 0,
-    `نسبته من القطيع ${cullReproPct}%${cullLimitSuffix(cullReproLimit)}`,
-    'g_cullRepro',
-    'cull'
+    cullReproPct,
+    cullReproLimit
   ) +
 
-  box(
+  cullMetricBox(
     'عدد الاستبعاد الصحي',
     stats.cullHealthCount ?? 0,
-    `يشمل النفوق • نسبته من القطيع ${cullHealthPct}%${cullLimitSuffix(cullHealthLimit)}`,
-    'g_cullHealth',
-    'cull'
+    cullHealthPct,
+    cullHealthLimit,
+    'يشمل النفوق'
   );
 const feedMetricSpecs = [
   {
@@ -1955,10 +1962,6 @@ healthGrid.innerHTML =
     
 renderMiniGauge("g_preg", pregPct);
 renderMiniGauge("g_bred", bredPct);
-
-renderMiniGauge("g_cullProd", cullProdPct);
-renderMiniGauge("g_cullRepro", cullReproPct);
-renderMiniGauge("g_cullHealth", cullHealthPct);
 renderMiniGauge("g_feces", fecesScore);
 renderMiniGauge("g_bcs", bcsCamera);
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
