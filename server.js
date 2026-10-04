@@ -86265,8 +86265,8 @@ try {
       .where('userId', '==', uid)
       .get();
 
-  const healthArchivedAdults =
-  new Map();
+const healthArchivedAnimalNumbers =
+  new Set();
 
 for (
   const doc
@@ -86295,36 +86295,34 @@ for (
 
   if (!number) continue;
 
-  const originalPath =
-    String(
-      row.originalAnimalPath || ''
-    )
-      .trim()
-      .toLowerCase();
-
-  // الإجهاض يحتاج فقط تاريخ الأمهات.
-  // التوابع المؤرشفة لا تدخل في مقام
-  // مؤشرات الصحة الحالية.
-  if (
-    !originalPath.startsWith(
-      'calves/'
-    )
-  ) {
-    healthArchivedAdults.set(
-      number,
-      row
-    );
-  }
+  healthArchivedAnimalNumbers.add(
+    number
+  );
 }
 
 const healthCurrentAdultNumbers =
   new Set(
     active
-      .map(a =>
+      .map(row =>
         normalizeAnimalNumberForStats(
-          a.animalNumber ??
-          a.number ??
-          a.id ??
+          row.animalNumber ??
+          row.number ??
+          row.id ??
+          ''
+        )
+      )
+      .filter(Boolean)
+  );
+
+const healthCurrentFollowerNumbers =
+  new Set(
+    inventoryFollowers
+      .map(row =>
+        normalizeAnimalNumberForStats(
+          row.animalNumber ??
+          row.number ??
+          row.calfNumber ??
+          row.id ??
           ''
         )
       )
@@ -86356,25 +86354,28 @@ const healthCurrentYoungCalfNumbers =
       .filter(Boolean)
   );
 
-  /*
-   * الإجهاض يحتاج كل الأمهات التي كانت موجودة
-   * خلال التاريخ المتاح للمقارنة مع نتائج الحمل،
-   * سواء ما زالت بالقطيع أو خرجت بعد ذلك.
-   */
-  const healthAllAdultNumbers =
-    new Set([
-      ...healthCurrentAdultNumbers,
-      ...healthArchivedAdults.keys()
-    ]);
+/*
+ * الإجهاض:
+ * كل حيوان يمكن أن يحمل داخل النوع المختار،
+ * حاليًا أو في الأرشيف،
+ * لربط أحداث نفس الحمل معًا.
+ */
+const healthPregnancyAnimalNumbers =
+  new Set([
+    ...healthCurrentAdultNumbers,
+    ...healthCurrentFollowerNumbers,
+    ...healthArchivedAnimalNumbers
+  ]);
 
   const healthEventTypes = [
-    'mastitis',
-    'lameness',
-    'abortion',
-    'calving',
-    'acute_undifferentiated_diarrhea',
-    'health'
-  ];
+  'mastitis',
+  'lameness',
+  'abortion',
+  'calving',
+  'pregnancy_diagnosis',
+  'acute_undifferentiated_diarrhea',
+  'health'
+];
 
   const healthLoadRows =
     async collectionName => {
@@ -86502,12 +86503,105 @@ const healthCurrentYoungCalfNumbers =
   const calfDiarrheaAffected =
     new Set();
 
-  const abortionCases =
-    new Set();
+const abortionCases =
+  new Set();
 
-  const calvingCases =
-    new Set();
+const pregnancyEpisodes =
+  new Set();
 
+const abortionPregnancyEpisodes =
+  new Set();
+
+const healthPregnancyLinkedInseminationDate =
+  source =>
+    String(
+      source?.lastFertileInseminationDate ||
+      source?.lastInseminationDate ||
+      source?.details?.lastFertileInseminationDate ||
+      source?.details?.lastInseminationDate ||
+      source?.lastAI ||
+      source?.lastServiceDate ||
+      ''
+    )
+      .trim()
+      .slice(0, 10);
+
+const healthPregnancyEpisodeKey =
+  (number, inseminationDate) => {
+    const n =
+      normalizeAnimalNumberForStats(
+        number
+      );
+
+    const d =
+      String(
+        inseminationDate || ''
+      )
+        .trim()
+        .slice(0, 10);
+
+    if (
+      !n ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(d) ||
+      d < healthStart365 ||
+      d > healthToday
+    ) {
+      return '';
+    }
+
+    return `${n}|${d}`;
+  };
+
+/*
+ * الحمل القائم حاليًا يدخل مرة واحدة
+ * حسب الحيوان + التلقيح المخصب المرتبط بالحمل.
+ */
+for (
+  const row
+  of [
+    ...active,
+    ...inventoryFollowers
+  ]
+) {
+  const reproductiveStatus =
+    String(
+      row.reproductiveStatus ||
+      row.followerStatus ||
+      row.pregStatus ||
+      ''
+    ).trim();
+
+  if (
+    !pregnancyDiagnosisIsPregnantStatusSrv(
+      reproductiveStatus
+    )
+  ) {
+    continue;
+  }
+
+  const number =
+    normalizeAnimalNumberForStats(
+      row.animalNumber ??
+      row.number ??
+      row.calfNumber ??
+      row.id ??
+      ''
+    );
+
+  const episodeKey =
+    healthPregnancyEpisodeKey(
+      number,
+      healthPregnancyLinkedInseminationDate(
+        row
+      )
+    );
+
+  if (episodeKey) {
+    pregnancyEpisodes.add(
+      episodeKey
+    );
+  }
+}
   for (const event of healthEvents) {
     const type =
       String(
@@ -86624,26 +86718,69 @@ if (
   }
 }
 
-    // -----------------------------
-    // نتائج الحمل — آخر 365 يوم
-    // -----------------------------
-    if (
-      date >= healthStart365 &&
-      healthAllAdultNumbers.has(number)
-    ) {
-      if (type === 'abortion') {
-        abortionCases.add(
-          eventKey
-        );
-      }
+// -----------------------------
+// الإجهاض — Pregnancy Episodes
+// آخر 365 يوم حسب تاريخ التلقيح
+// المخصب المرتبط بالحمل.
+// -----------------------------
+if (
+  healthPregnancyAnimalNumbers.has(
+    number
+  )
+) {
+  const episodeKey =
+    healthPregnancyEpisodeKey(
+      number,
+      healthPregnancyLinkedInseminationDate(
+        event
+      )
+    );
 
-      if (type === 'calving') {
-        calvingCases.add(
-          eventKey
+  if (episodeKey) {
+    if (type === 'abortion') {
+      pregnancyEpisodes.add(
+        episodeKey
+      );
+
+      abortionPregnancyEpisodes.add(
+        episodeKey
+      );
+
+      abortionCases.add(
+        eventKey
+      );
+    }
+
+    if (type === 'calving') {
+      pregnancyEpisodes.add(
+        episodeKey
+      );
+    }
+
+    if (
+      type ===
+        'pregnancy_diagnosis'
+    ) {
+      const pregnancyResult =
+        event.result ||
+        event.pregnancyResult ||
+        event.details?.result ||
+        event.details?.pregnancyResult ||
+        '';
+
+      if (
+        pregnancyDiagnosisIsPregnantStatusSrv(
+          pregnancyResult
+        )
+      ) {
+        pregnancyEpisodes.add(
+          episodeKey
         );
       }
     }
   }
+}
+}
 
 const healthCeilings = {
   mastitis: 5,
@@ -86670,14 +86807,16 @@ const calfDiarrheaRatePct =
     healthCurrentYoungCalfNumbers.size
   );
 
-const pregnancyOutcomes =
-  abortionCases.size +
-  calvingCases.size;
+const pregnancyCount =
+  pregnancyEpisodes.size;
+
+const abortionCount =
+  abortionPregnancyEpisodes.size;
 
 const abortionRatePct =
   healthRatePct(
-    abortionCases.size,
-    pregnancyOutcomes
+    abortionCount,
+    pregnancyCount
   );
 
 const healthCeilingStatus =
@@ -86811,40 +86950,40 @@ healthDashboard = {
         healthReport90
     },
 
-    {
-      key: 'abortion',
-      label: 'الإجهاض',
+{
+  key: 'abortion',
+  label: 'الإجهاض',
 
-      valueText:
-        pregnancyOutcomes > 0
-          ? `${abortionRatePct}%`
-          : '—',
+  valueText:
+    pregnancyCount > 0
+      ? `${abortionRatePct}%`
+      : '—',
 
-      caseCount:
-        abortionCases.size,
+  caseCount:
+    abortionCount,
 
-      denominatorCount:
-        pregnancyOutcomes,
+  denominatorCount:
+    pregnancyCount,
 
-      ratePct:
-        abortionRatePct,
+  ratePct:
+    abortionRatePct,
 
-      ceilingPct:
-        healthCeilings.abortion,
+  ceilingPct:
+    healthCeilings.abortion,
 
-      windowDays: 365,
+  windowDays: 365,
 
-      subText:
-        pregnancyOutcomes > 0
-          ? `${abortionCases.size} من ${pregnancyOutcomes} نتيجة حمل • السقف ≤ ${healthCeilings.abortion}% • ${healthCeilingStatus(
-              abortionRatePct,
-              healthCeilings.abortion
-            )} • آخر 365 يوم`
-          : 'لا توجد نتائج حمل مسجلة لحساب المؤشر.',
+  subText:
+    pregnancyCount > 0
+      ? `${abortionCount} من ${pregnancyCount} حالة حمل مسجلة • السقف ≤ ${healthCeilings.abortion}% • ${healthCeilingStatus(
+          abortionRatePct,
+          healthCeilings.abortion
+        )} • آخر 365 يوم`
+      : 'لا توجد حالات حمل مسجلة لحساب المؤشر.',
 
-      href:
-        healthReport365
-    }
+  href:
+    healthReport365
+}
   ]
 };
 
