@@ -85765,42 +85765,423 @@ const avgBreedIntervalDays =
 
 
     // --------------------------------------
-    // 🔥 3) نفوق + استبعاد
+    // 🔥 3) الاستبعاد — آخر 365 يوم
+    // الصحي يشمل النفوق
+    // المقام = الأمهات الحالية من النوع المختار
     // --------------------------------------
-let cullProd = 0, cullRepro = 0, cullHealth = 0;
+let cullProd = 0;
+let cullRepro = 0;
+let cullHealth = 0;
+let cullTotal = 0;
+
+let cullProdPct = 0;
+let cullReproPct = 0;
+let cullHealthPct = 0;
+let cullTotalPct = 0;
+
+const cullWindowDays = 365;
+
+const cullLimits = {
+  total: 17,
+  productivity: 5,
+  reproduction: 5,
+  health: 7
+};
+
+let cullDenominatorCount =
+  active.length;
 
 try {
- const ev = (
-  await loadHerdStatsEventsSrv()
-).map(e => ({ ...e }));
+  const cullTodayISO =
+    await farmTodayISOSrv(
+      req.authSession?.uid ||
+      req.userId
+    );
 
-  const cullEvents = ev.filter(e => {
-    const txt = String(e.eventType || e.type || e.eventTypeNorm || "").toLowerCase();
-    return txt.includes("استبعاد") || txt.includes("cull");
-  });
+  const cullTodayMs =
+    isoToUtcMidnightMs(
+      cullTodayISO
+    );
 
- for (const e of cullEvents) {
-  const evAnimalNo = String(e.animalNumber || e.animalId || '').trim();
+  const cullStartMs =
+    cullTodayMs -
+    (
+      cullWindowDays *
+      86400000
+    );
 
- const matchedAnimal = animalsByType.find(a =>
-    String(a.animalNumber || a.number || a.id || '').trim() === evAnimalNo
-  );
+  const [
+    currentCullSnap,
+    archivedCullSnap,
+    archivedAnimalsSnap
+  ] = await Promise.all([
+    db.collection("events")
+      .where("userId", "==", uid)
+      .where("eventTypeNorm", "==", "cull")
+      .get(),
 
-  if (!matchedAnimal) continue;
+    db.collection("archived_events")
+      .where("userId", "==", uid)
+      .where("eventTypeNorm", "==", "cull")
+      .get(),
 
-  const main = String(e.cullMain || e.reason || "").toLowerCase();
+    db.collection("archived_animals")
+      .where("userId", "==", uid)
+      .get()
+  ]);
 
-  if (main.includes("انتاج")) cullProd++;
-  else if (main.includes("تناسل")) cullRepro++;
-  else if (main.includes("صح")) cullHealth++;
-}
+  const archivedAnimals =
+    archivedAnimalsSnap.docs.map(
+      d => ({
+        id: d.id,
+        ...(d.data() || {})
+      })
+    );
+
+  /*
+   * الحيوانات الرئيسية المؤرشفة فقط.
+   * لا تدخل التوابع في مقام/أسباب استبعاد الأمهات.
+   */
+  const archivedAdultByNumber =
+    new Map();
+
+  for (const a of archivedAnimals) {
+    if (
+      inventorySpeciesOf(a) !==
+      inventorySpecies
+    ) {
+      continue;
+    }
+
+    const originalPath =
+      String(
+        a.originalAnimalPath || ""
+      )
+        .trim()
+        .toLowerCase();
+
+    if (
+      originalPath.startsWith(
+        "calves/"
+      )
+    ) {
+      continue;
+    }
+
+    const number =
+      normalizeAnimalNumberForStats(
+        a.animalNumber ??
+        a.number ??
+        a.id ??
+        ""
+      );
+
+    if (!number) continue;
+
+    archivedAdultByNumber.set(
+      number,
+      a
+    );
+  }
+
+  const currentAdultNumbers =
+    new Set(
+      active
+        .map(a =>
+          normalizeAnimalNumberForStats(
+            a.animalNumber ??
+            a.number ??
+            a.id ??
+            ""
+          )
+        )
+        .filter(Boolean)
+    );
+
+  const eligibleAdultNumbers =
+    new Set([
+      ...currentAdultNumbers,
+      ...archivedAdultByNumber.keys()
+    ]);
+
+  /*
+   * حيوان واحد = حالة استبعاد واحدة.
+   * لو وُجد أكثر من سجل تاريخي لنفس الحيوان
+   * نحتفظ بالأحدث داخل نافذة الـ365 يوم.
+   */
+  const cullByAnimal =
+    new Map();
+
+  const registerCullEvent =
+    (e = {}) => {
+
+      const number =
+        normalizeAnimalNumberForStats(
+          e.animalNumber ??
+          e.animalId ??
+          e.number ??
+          ""
+        );
+
+      if (
+        !number ||
+        !eligibleAdultNumbers.has(
+          number
+        )
+      ) {
+        return;
+      }
+
+      const eventDate =
+        computeEventDateFromDoc(e);
+
+      if (!eventDate) return;
+
+      const eventMs =
+        isoToUtcMidnightMs(
+          eventDate
+        );
+
+      if (
+        !Number.isFinite(eventMs) ||
+        eventMs < cullStartMs ||
+        eventMs > cullTodayMs
+      ) {
+        return;
+      }
+
+      const main =
+        String(
+          e.cullMain ||
+          e.cullReason ||
+          e.reason ||
+          ""
+        )
+          .trim()
+          .toLowerCase();
+
+      let category = "";
+
+      if (
+        main.includes("انتاج")
+      ) {
+        category = "productivity";
+      } else if (
+        main.includes("تناسل")
+      ) {
+        category = "reproduction";
+      } else if (
+        main.includes("صح")
+      ) {
+        category = "health";
+      }
+
+      if (!category) return;
+
+      const previous =
+        cullByAnimal.get(
+          number
+        );
+
+      if (
+        !previous ||
+        eventMs >
+          previous.eventMs
+      ) {
+        cullByAnimal.set(
+          number,
+          {
+            category,
+            eventMs,
+            eventDate
+          }
+        );
+      }
+    };
+
+  for (
+    const d
+    of currentCullSnap.docs
+  ) {
+    registerCullEvent(
+      {
+        id: d.id,
+        ...(d.data() || {})
+      }
+    );
+  }
+
+  for (
+    const d
+    of archivedCullSnap.docs
+  ) {
+    registerCullEvent(
+      {
+        id: d.id,
+        ...(d.data() || {})
+      }
+    );
+  }
+
+  /*
+   * النفوق يدخل داخل الاستبعاد الصحي.
+   * إذا كان الحيوان له استبعاد مسجل بالفعل
+   * داخل نفس النافذة، لا نعد الرأس مرتين.
+   */
+  const deathNumbers =
+    new Set();
+
+  for (
+    const [
+      number,
+      a
+    ]
+    of archivedAdultByNumber
+  ) {
+    const archiveReason =
+      String(
+        a.archiveReason ||
+        a.archiveReasonLabel ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+    const isDeath =
+      archiveReason === "death" ||
+      archiveReason.includes(
+        "نفوق"
+      );
+
+    if (!isDeath) continue;
+
+    const deathDate =
+      String(
+        a.archiveDate ||
+        a.eventDate ||
+        a.date ||
+        ""
+      )
+        .trim()
+        .slice(0, 10);
+
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        deathDate
+      )
+    ) {
+      continue;
+    }
+
+    const deathMs =
+      isoToUtcMidnightMs(
+        deathDate
+      );
+
+    if (
+      !Number.isFinite(deathMs) ||
+      deathMs < cullStartMs ||
+      deathMs > cullTodayMs
+    ) {
+      continue;
+    }
+
+    if (
+      cullByAnimal.has(
+        number
+      )
+    ) {
+      continue;
+    }
+
+    deathNumbers.add(
+      number
+    );
+  }
+
+  for (
+    const row
+    of cullByAnimal.values()
+  ) {
+    if (
+      row.category ===
+      "productivity"
+    ) {
+      cullProd++;
+    } else if (
+      row.category ===
+      "reproduction"
+    ) {
+      cullRepro++;
+    } else if (
+      row.category ===
+      "health"
+    ) {
+      cullHealth++;
+    }
+  }
+
+  cullHealth +=
+    deathNumbers.size;
+
+  cullTotal =
+    cullProd +
+    cullRepro +
+    cullHealth;
+
+  cullDenominatorCount =
+    active.length;
+
+  cullProdPct =
+    cullDenominatorCount
+      ? Math.round(
+          (
+            cullProd *
+            100
+          ) /
+          cullDenominatorCount
+        )
+      : 0;
+
+  cullReproPct =
+    cullDenominatorCount
+      ? Math.round(
+          (
+            cullRepro *
+            100
+          ) /
+          cullDenominatorCount
+        )
+      : 0;
+
+  cullHealthPct =
+    cullDenominatorCount
+      ? Math.round(
+          (
+            cullHealth *
+            100
+          ) /
+          cullDenominatorCount
+        )
+      : 0;
+
+  cullTotalPct =
+    cullDenominatorCount
+      ? Math.round(
+          (
+            cullTotal *
+            100
+          ) /
+          cullDenominatorCount
+        )
+      : 0;
+
 } catch (e) {
-  console.error("cull events error:", e.message || e);
+  console.error(
+    "cull rolling 365 error:",
+    e.message || e
+  );
 }
-
-const cullProdPct   = total ? Math.round((cullProd * 100) / total) : 0;
-const cullReproPct  = total ? Math.round((cullRepro * 100) / total) : 0;
-const cullHealthPct = total ? Math.round((cullHealth * 100) / total) : 0;
  
     // --------------------------------------
     // 🔥 4) كاميرا
@@ -87318,28 +87699,36 @@ heatDetectionRatePct: extraFertility.hdr21,
 pregRate21d: extraFertility.pr21,
 firstServiceConceptionPct: extraFertility.firstServicePct,
 
-  cullTotal: cullProd + cullRepro + cullHealth,
-cullTotalPct: total
-  ? Math.round(
-      ((cullProd + cullRepro + cullHealth) * 100) /
-      total
-    )
-  : 0,
+cullTotal,
+cullTotalPct,
 
-  cullProdCount: cullProd,
-  cullReproCount: cullRepro,
-  cullHealthCount: cullHealth,
+cullProdCount: cullProd,
+cullReproCount: cullRepro,
+cullHealthCount: cullHealth,
 
-  cullProdPct,
-  cullReproPct,
-  cullHealthPct,
+cullProdPct,
+cullReproPct,
+cullHealthPct,
 
-  culling: {
-    productivity: cullProdPct,
-    reproduction: cullReproPct,
-    health: cullHealthPct
-  },
+culling: {
+  windowDays:
+    cullWindowDays,
 
+  denominatorCount:
+    cullDenominatorCount,
+
+  limits:
+    cullLimits,
+
+  productivity:
+    cullProdPct,
+
+  reproduction:
+    cullReproPct,
+
+  health:
+    cullHealthPct
+},
 // ===== التغذية: إجمالي + شرائح الإنتاج =====
 feedCostPerLiter:
   feedOverallAvailable
