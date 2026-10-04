@@ -86266,150 +86266,95 @@ try {
       .get();
 
   const healthArchivedAdults =
-    new Map();
+  new Map();
 
-  const healthArchivedCalves =
-    new Map();
+for (
+  const doc
+  of healthArchivedAnimalsSnap.docs
+) {
+  const row = {
+    id: doc.id,
+    ...(doc.data() || {})
+  };
 
-  for (
-    const doc
-    of healthArchivedAnimalsSnap.docs
+  if (
+    inventorySpeciesOf(row) !==
+    inventorySpecies
   ) {
-    const row = {
-      id: doc.id,
-      ...(doc.data() || {})
-    };
-
-    if (
-      inventorySpeciesOf(row) !==
-      inventorySpecies
-    ) {
-      continue;
-    }
-
-    const number =
-      normalizeAnimalNumberForStats(
-        row.animalNumber ??
-        row.number ??
-        row.calfNumber ??
-        row.id ??
-        ''
-      );
-
-    if (!number) continue;
-
-    const originalPath =
-      String(
-        row.originalAnimalPath || ''
-      )
-        .trim()
-        .toLowerCase();
-
-    if (
-      originalPath.startsWith(
-        'calves/'
-      )
-    ) {
-      healthArchivedCalves.set(
-        number,
-        row
-      );
-    } else {
-      healthArchivedAdults.set(
-        number,
-        row
-      );
-    }
+    continue;
   }
 
-  const healthCurrentAdultNumbers =
-    new Set(
-      active
-        .map(a =>
-          normalizeAnimalNumberForStats(
-            a.animalNumber ??
-            a.number ??
-            a.id ??
-            ''
-          )
-        )
-        .filter(Boolean)
+  const number =
+    normalizeAnimalNumberForStats(
+      row.animalNumber ??
+      row.number ??
+      row.calfNumber ??
+      row.id ??
+      ''
     );
 
-  const healthCurrentCalfNumbers =
-    new Set(
-      inventoryFollowers
-        .map(a =>
-          normalizeAnimalNumberForStats(
-            a.animalNumber ??
-            a.number ??
-            a.calfNumber ??
-            a.id ??
-            ''
-          )
-        )
-        .filter(Boolean)
-    );
+  if (!number) continue;
 
-  const healthArchiveDate =
-    row =>
-      String(
-        row?.archiveDate ||
-        row?.eventDate ||
-        row?.date ||
-        ''
+  const originalPath =
+    String(
+      row.originalAnimalPath || ''
+    )
+      .trim()
+      .toLowerCase();
+
+  // الإجهاض يحتاج فقط تاريخ الأمهات.
+  // التوابع المؤرشفة لا تدخل في مقام
+  // مؤشرات الصحة الحالية.
+  if (
+    !originalPath.startsWith(
+      'calves/'
+    )
+  ) {
+    healthArchivedAdults.set(
+      number,
+      row
+    );
+  }
+}
+
+const healthCurrentAdultNumbers =
+  new Set(
+    active
+      .map(a =>
+        normalizeAnimalNumberForStats(
+          a.animalNumber ??
+          a.number ??
+          a.id ??
+          ''
+        )
       )
-        .trim()
-        .slice(0, 10);
+      .filter(Boolean)
+  );
 
-  const healthArchivedInWindow =
-    (row, startDate) => {
-      const date =
-        healthArchiveDate(row);
-
-      return (
-        /^\d{4}-\d{2}-\d{2}$/.test(date) &&
-        date >= startDate &&
-        date <= healthToday
-      );
-    };
-
-  /*
-   * مقام مؤشرات الـ90 يوم:
-   * الموجودون حاليًا +
-   * من خرجوا فعليًا أثناء نفس الفترة.
-   */
-  const healthAdultExposure90 =
-    new Set([
-      ...healthCurrentAdultNumbers,
-
-      ...[
-        ...healthArchivedAdults.entries()
-      ]
-        .filter(([, row]) =>
-          healthArchivedInWindow(
-            row,
-            healthStart90
-          )
+/*
+ * العجول الحالية الداخلة في مؤشر الإسهال:
+ * رضيع + فطام + نامي + الذكور التابعة.
+ * لا تدخل عجلات التلقيح أو العشار.
+ */
+const healthCurrentYoungCalfNumbers =
+  new Set(
+    inventoryFollowers
+      .filter(
+        row =>
+          !inventoryIsBreedingHeifer(row) &&
+          !inventoryIsPregnantHeifer(row)
+      )
+      .map(row =>
+        normalizeAnimalNumberForStats(
+          row.animalNumber ??
+          row.number ??
+          row.calfNumber ??
+          row.id ??
+          ''
         )
-        .map(([number]) => number)
-    ]);
-
-  const healthCalfExposure90 =
-    new Set([
-      ...healthCurrentCalfNumbers,
-
-      ...[
-        ...healthArchivedCalves.entries()
-      ]
-        .filter(([, row]) =>
-          healthArchivedInWindow(
-            row,
-            healthStart90
-          )
-        )
-        .map(([number]) => number)
-    ]);
+      )
+      .filter(Boolean)
+  );
 
   /*
    * الإجهاض يحتاج كل الأمهات التي كانت موجودة
@@ -86592,83 +86537,92 @@ try {
       healthEventKey(event);
 
     // -----------------------------
-    // الأمهات — آخر 90 يوم
-    // -----------------------------
-    if (
-      date >= healthStart90 &&
-      healthAdultExposure90.has(number)
-    ) {
-      if (type === 'mastitis') {
-        mastitisCases.add(
-          eventKey
-        );
+// التهاب الضرع — آخر 90 يوم
+// من الحلاب الحالي فقط
+// -----------------------------
+if (
+  date >= healthStart90 &&
+  type === 'mastitis' &&
+  officialMilkerNumbers.has(number)
+) {
+  mastitisCases.add(
+    eventKey
+  );
 
-        mastitisAffected.add(
-          number
-        );
-      }
+  mastitisAffected.add(
+    number
+  );
+}
 
-      if (type === 'lameness') {
-        lamenessCases.add(
-          eventKey
-        );
+// -----------------------------
+// العرج — آخر 90 يوم
+// من الأمهات الحالية فقط
+// -----------------------------
+if (
+  date >= healthStart90 &&
+  type === 'lameness' &&
+  healthCurrentAdultNumbers.has(number)
+) {
+  lamenessCases.add(
+    eventKey
+  );
 
-        lamenessAffected.add(
-          number
-        );
-      }
-    }
+  lamenessAffected.add(
+    number
+  );
+}
 
-    // -----------------------------
-    // إسهال العجول — آخر 90 يوم
-    // يشمل:
-    // calf_scours
-    // acute_undifferentiated_diarrhea
-    // -----------------------------
-    if (
-      date >= healthStart90 &&
-      healthCalfExposure90.has(number)
-    ) {
-      const diseaseCode =
-        String(
-          event.diseaseCode ||
-          event.details?.diseaseCode ||
-          ''
-        )
-          .trim()
-          .toLowerCase();
+// -----------------------------
+// إسهال العجول — آخر 90 يوم
+// من العجول الحالية فقط
+// يشمل:
+// calf_scours
+// acute_undifferentiated_diarrhea
+// -----------------------------
+if (
+  date >= healthStart90 &&
+  healthCurrentYoungCalfNumbers.has(number)
+) {
+  const diseaseCode =
+    String(
+      event.diseaseCode ||
+      event.details?.diseaseCode ||
+      ''
+    )
+      .trim()
+      .toLowerCase();
 
-      const diseaseName =
-        String(
-          event.diseaseName ||
-          event.details?.diseaseName ||
-          ''
-        )
-          .trim();
+  const diseaseName =
+    String(
+      event.diseaseName ||
+      event.details?.diseaseName ||
+      ''
+    )
+      .trim();
 
-      const isCalfDiarrhea =
-        type ===
-          'acute_undifferentiated_diarrhea' ||
-        (
-          type === 'health' &&
-          (
-            diseaseCode ===
-              'calf_scours' ||
-            diseaseName ===
-              'إسهال العجول'
-          )
-        );
+  const isCalfDiarrhea =
+    type ===
+      'acute_undifferentiated_diarrhea' ||
+    (
+      type === 'health' &&
+      (
+        diseaseCode ===
+          'calf_scours' ||
+        diseaseName ===
+          'إسهال العجول'
+      )
+    );
 
-      if (isCalfDiarrhea) {
-        calfDiarrheaCases.add(
-          eventKey
-        );
+  if (isCalfDiarrhea) {
+    calfDiarrheaCases.add(
+      eventKey
+    );
 
-        calfDiarrheaAffected.add(
-          number
-        );
-      }
-    }
+    calfDiarrheaAffected.add(
+      number
+    );
+  }
+}
 
     // -----------------------------
     // نتائج الحمل — آخر 365 يوم
@@ -86691,10 +86645,29 @@ try {
     }
   }
 
+const healthCeilings = {
+  mastitis: 5,
+  lameness: 5,
+  calfDiarrhea: 15,
+  abortion: 5
+};
+
+const mastitisRatePct =
+  healthRatePct(
+    mastitisAffected.size,
+    officialMilkerNumbers.size
+  );
+
 const lamenessRatePct =
   healthRatePct(
     lamenessAffected.size,
-    healthAdultExposure90.size
+    healthCurrentAdultNumbers.size
+  );
+
+const calfDiarrheaRatePct =
+  healthRatePct(
+    calfDiarrheaAffected.size,
+    healthCurrentYoungCalfNumbers.size
   );
 
 const pregnancyOutcomes =
@@ -86706,6 +86679,12 @@ const abortionRatePct =
     abortionCases.size,
     pregnancyOutcomes
   );
+
+const healthCeilingStatus =
+  (value, ceiling) =>
+    Number(value) <= Number(ceiling)
+      ? 'ضمن السقف'
+      : 'تجاوز السقف';
 
 const healthReport90 =
   `health-report.html?type=${encodeURIComponent(selectedDashboardType)}&days=90`;
@@ -86723,20 +86702,34 @@ healthDashboard = {
       label: 'التهاب الضرع',
 
       valueText:
-        String(
-          mastitisCases.size
-        ),
-
-      caseCount:
-        mastitisCases.size,
+        officialMilkerNumbers.size > 0
+          ? `${mastitisRatePct}%`
+          : '—',
 
       affectedCount:
         mastitisAffected.size,
 
+      caseCount:
+        mastitisCases.size,
+
+      denominatorCount:
+        officialMilkerNumbers.size,
+
+      ratePct:
+        mastitisRatePct,
+
+      ceilingPct:
+        healthCeilings.mastitis,
+
       windowDays: 90,
 
       subText:
-        `${mastitisAffected.size} رأس متأثرة • آخر 90 يوم`,
+        officialMilkerNumbers.size > 0
+          ? `${mastitisAffected.size} من ${officialMilkerNumbers.size} رأس حلاب • السقف ≤ ${healthCeilings.mastitis}% • ${healthCeilingStatus(
+              mastitisRatePct,
+              healthCeilings.mastitis
+            )} • آخر 90 يوم`
+          : 'لا توجد رؤوس حلاب لحساب المؤشر.',
 
       href:
         healthReport90
@@ -86747,53 +86740,72 @@ healthDashboard = {
       label: 'العرج',
 
       valueText:
-        String(
-          lamenessCases.size
-        ),
-
-      caseCount:
-        lamenessCases.size,
+        healthCurrentAdultNumbers.size > 0
+          ? `${lamenessRatePct}%`
+          : '—',
 
       affectedCount:
         lamenessAffected.size,
 
+      caseCount:
+        lamenessCases.size,
+
       denominatorCount:
-        healthAdultExposure90.size,
+        healthCurrentAdultNumbers.size,
 
       ratePct:
         lamenessRatePct,
 
+      ceilingPct:
+        healthCeilings.lameness,
+
       windowDays: 90,
 
       subText:
-        `${lamenessAffected.size} رأس متأثرة • ${lamenessRatePct}% من الأمهات المعرضة • آخر 90 يوم`,
+        healthCurrentAdultNumbers.size > 0
+          ? `${lamenessAffected.size} من ${healthCurrentAdultNumbers.size} رأس • السقف ≤ ${healthCeilings.lameness}% • ${healthCeilingStatus(
+              lamenessRatePct,
+              healthCeilings.lameness
+            )} • آخر 90 يوم`
+          : 'لا توجد أمهات لحساب المؤشر.',
 
       href:
         healthReport90
     },
 
     {
-      key:
-        'calf_diarrhea',
-
-      label:
-        'إسهال العجول',
+      key: 'calf_diarrhea',
+      label: 'إسهال العجول',
 
       valueText:
-        String(
-          calfDiarrheaCases.size
-        ),
-
-      caseCount:
-        calfDiarrheaCases.size,
+        healthCurrentYoungCalfNumbers.size > 0
+          ? `${calfDiarrheaRatePct}%`
+          : '—',
 
       affectedCount:
         calfDiarrheaAffected.size,
 
+      caseCount:
+        calfDiarrheaCases.size,
+
+      denominatorCount:
+        healthCurrentYoungCalfNumbers.size,
+
+      ratePct:
+        calfDiarrheaRatePct,
+
+      ceilingPct:
+        healthCeilings.calfDiarrhea,
+
       windowDays: 90,
 
       subText:
-        `${calfDiarrheaAffected.size} عجل متأثر • آخر 90 يوم`,
+        healthCurrentYoungCalfNumbers.size > 0
+          ? `${calfDiarrheaAffected.size} من ${healthCurrentYoungCalfNumbers.size} عجل • السقف ≤ ${healthCeilings.calfDiarrhea}% • ${healthCeilingStatus(
+              calfDiarrheaRatePct,
+              healthCeilings.calfDiarrhea
+            )} • آخر 90 يوم`
+          : 'لا توجد عجول لحساب المؤشر.',
 
       href:
         healthReport90
@@ -86804,9 +86816,9 @@ healthDashboard = {
       label: 'الإجهاض',
 
       valueText:
-        String(
-          abortionCases.size
-        ),
+        pregnancyOutcomes > 0
+          ? `${abortionRatePct}%`
+          : '—',
 
       caseCount:
         abortionCases.size,
@@ -86817,12 +86829,18 @@ healthDashboard = {
       ratePct:
         abortionRatePct,
 
+      ceilingPct:
+        healthCeilings.abortion,
+
       windowDays: 365,
 
       subText:
         pregnancyOutcomes > 0
-          ? `${abortionRatePct}% من نتائج الحمل المسجلة • آخر 365 يوم`
-          : 'لا توجد نتائج حمل مسجلة خلال آخر 365 يوم',
+          ? `${abortionCases.size} من ${pregnancyOutcomes} نتيجة حمل • السقف ≤ ${healthCeilings.abortion}% • ${healthCeilingStatus(
+              abortionRatePct,
+              healthCeilings.abortion
+            )} • آخر 365 يوم`
+          : 'لا توجد نتائج حمل مسجلة لحساب المؤشر.',
 
       href:
         healthReport365
