@@ -84648,29 +84648,69 @@ const alert =
   }
 );
 // ============================================================
-//       DAILY TASKS REPORT — LIVE SMART ALERTS / PRINT SOURCE
-//       تقرير تنفيذي قابل للطباعة من التنبيهات الذكية الظاهرة
+//       DAILY TASKS REPORT — EXECUTION LIST / PRINT SOURCE
+//       قائمة تنفيذ فعلية من التنبيهات الذكية الظاهرة
 // ============================================================
 
-function dailyTasksReportDueTimeSrv(alert = {}) {
+const MURABBIK_DAILY_TASKS_REPORT_SOURCES =
+  new Set([
+    "dry_off_due",
+    "close_up_due",
+    "calving_overdue",
+    "pregnancy_diagnosis_due",
+    "pregnancy_confirmation_120_due",
+    "uterine_check_followup",
+    "postpartum_insemination_followup",
+    "vaccination_program_tasks",
+    "ovsynch_protocol_steps"
+  ]);
+
+
+function dailyTasksReportDueTimeSrv(
+  alert = {}
+) {
+  const direct =
+    murabbikSmartAlertTextSrv(
+      alert.dueTime
+    );
+
+  if (
+    /^\d{1,2}:\d{2}$/.test(
+      direct
+    )
+  ) {
+    return murabbikOvsynchAlertTimeSrv(
+      direct
+    );
+  }
+
+
   const text = [
     alert.message,
     alert.details?.observation,
     alert.details?.meaning,
     alert.details?.recommendation,
 
-    ...(Array.isArray(alert.details?.evidence)
-      ? alert.details.evidence
-      : [])
+    ...(
+      Array.isArray(
+        alert.details?.evidence
+      )
+        ? alert.details.evidence
+        : []
+    )
   ]
-    .map(murabbikSmartAlertTextSrv)
+    .map(
+      murabbikSmartAlertTextSrv
+    )
     .filter(Boolean)
     .join("\n");
+
 
   const match =
     text.match(
       /(?:الموعد|الساعة)\s*[:：]?\s*([0-2]?\d:[0-5]\d)/u
     );
+
 
   return match
     ? murabbikOvsynchAlertTimeSrv(
@@ -84679,33 +84719,538 @@ function dailyTasksReportDueTimeSrv(alert = {}) {
     : "";
 }
 
-function dailyTasksReportTaskSrv(alert = {}) {
-  const publicAlert =
-    murabbikSmartAlertPublicSrv(
-      alert
-    ) || {};
 
-  return {
-    ...publicAlert,
+function dailyTasksReportAnimalNumbersSrv(
+  alert = {}
+) {
+  const numbers =
+    (
+      Array.isArray(
+        alert.animalNumbers
+      )
+        ? alert.animalNumbers
+        : []
+    )
+      .map(
+        value =>
+          murabbikSmartAlertTextSrv(
+            value
+          )
+      )
+      .filter(Boolean);
 
-    task:
-      murabbikSmartAlertTextSrv(
-        publicAlert.title
-      ),
 
-    requiredAction:
-      murabbikSmartAlertTextSrv(
-        publicAlert.message
-      ),
-
-    dueTime:
-      dailyTasksReportDueTimeSrv(
-        publicAlert
-      ),
-
-    notes: ""
-  };
+  return [
+    ...new Set(numbers)
+  ].sort(
+    (a, b) =>
+      String(a).localeCompare(
+        String(b),
+        "ar",
+        {
+          numeric: true
+        }
+      )
+  );
 }
+
+
+function dailyTasksReportOvsynchStepSrv(
+  alert = {}
+) {
+  const message =
+    murabbikSmartAlertTextSrv(
+      alert.message
+    );
+
+
+  const match =
+    message.match(
+      /خطوة برنامج التزامن\s*:\s*([^\n\r]+)/u
+    );
+
+
+  return match
+    ? murabbikSmartAlertTextSrv(
+        match[1]
+      )
+    : "";
+}
+
+
+function dailyTasksReportEligibleSrv(
+  alert = {}
+) {
+  const source =
+    murabbikSmartAlertTextSrv(
+      alert.source
+    );
+
+
+  if (
+    !MURABBIK_DAILY_TASKS_REPORT_SOURCES
+      .has(source)
+  ) {
+    return false;
+  }
+
+
+  if (
+    alert.kind !==
+    "operational"
+  ) {
+    return false;
+  }
+
+
+  /*
+   * خطوات التزامن تدخل التقرير
+   * فقط عندما تصبح قابلة للتنفيذ فعليًا.
+   * تنبيه اليوم السابق لا يدخل ورقة العمل.
+   */
+  if (
+    source ===
+    "ovsynch_protocol_steps"
+  ) {
+    return (
+      alert.code ===
+        "ovsynch_step_due" &&
+      alert.action?.type ===
+        "navigate"
+    );
+  }
+
+
+  /*
+   * التحصينات:
+   * التقرير للتنفيذ الآن،
+   * وليس للتذكير بموعد غدٍ
+   * أو موعد مستقبلي أو نقص بيانات.
+   */
+  if (
+    source ===
+    "vaccination_program_tasks"
+  ) {
+    const status =
+      murabbikSmartAlertTextSrv(
+        alert.status
+      ).toLowerCase();
+
+
+    return ![
+      "day_before",
+      "upcoming",
+      "needs_data"
+    ].includes(status);
+  }
+
+
+  return true;
+}
+
+
+function dailyTasksReportDescriptorSrv(
+  alert = {}
+) {
+  const source =
+    murabbikSmartAlertTextSrv(
+      alert.source
+    );
+
+
+  const code =
+    murabbikSmartAlertTextSrv(
+      alert.code
+    );
+
+
+  if (
+    source ===
+    "dry_off_due"
+  ) {
+    return {
+      task:
+        "التجفيف",
+
+      requiredAction:
+        "تنفيذ التجفيف للحيوانات المدرجة وتسجيله بعد التنفيذ."
+    };
+  }
+
+
+  if (
+    source ===
+    "close_up_due"
+  ) {
+    return {
+      task:
+        "تحضير / انتظار الولادة",
+
+      requiredAction:
+        "تنفيذ تحضير الولادة للحيوانات المدرجة وتسجيله."
+    };
+  }
+
+
+  if (
+    source ===
+    "calving_overdue"
+  ) {
+    return {
+      task:
+        "فحص حالة الولادة",
+
+      requiredAction:
+        "فحص الحيوانات المدرجة؛ وإذا حدثت الولادة تُسجَّل الولادة الفعلية."
+    };
+  }
+
+
+  if (
+    source ===
+    "pregnancy_diagnosis_due"
+  ) {
+    if (
+      code ===
+      "pregnancy_diagnosis_ultrasound_due"
+    ) {
+      return {
+        task:
+          "تشخيص حمل — سونار",
+
+        requiredAction:
+          "إجراء الفحص بالسونار وتسجيل نتيجة كل حيوان."
+      };
+    }
+
+
+    if (
+      code ===
+      "pregnancy_diagnosis_manual_due"
+    ) {
+      return {
+        task:
+          "تشخيص حمل — فحص يدوي",
+
+        requiredAction:
+          "إجراء فحص الحمل اليدوي وتسجيل نتيجة كل حيوان."
+      };
+    }
+
+
+    return null;
+  }
+
+
+  if (
+    source ===
+    "pregnancy_confirmation_120_due"
+  ) {
+    return {
+      task:
+        "تأكيد الحمل",
+
+      requiredAction:
+        "فحص استمرار الحمل وتسجيل النتيجة لكل حيوان."
+    };
+  }
+
+
+  if (
+    source ===
+    "uterine_check_followup"
+  ) {
+    if (
+      code ===
+      "uterine_check_day_14_due"
+    ) {
+      return {
+        task:
+          "فحص الرحم بعد الولادة — الفحص الأول",
+
+        requiredAction:
+          "إجراء فحص الرحم الأول بعد الولادة وتسجيل النتيجة."
+      };
+    }
+
+
+    if (
+      code ===
+      "uterine_check_day_30_followup"
+    ) {
+      return {
+        task:
+          "فحص الرحم بعد الولادة — فحص المتابعة",
+
+        requiredAction:
+          "إجراء فحص المتابعة للرحم وتسجيل النتيجة."
+      };
+    }
+
+
+    return null;
+  }
+
+
+  if (
+    source ===
+    "postpartum_insemination_followup"
+  ) {
+    return {
+      task:
+        "فحص ما بعد الولادة للتلقيح",
+
+      requiredAction:
+        "فحص الحيوانات المدرجة وتحديد المناسب للتلقيح أو للدخول في برنامج التزامن."
+    };
+  }
+
+
+  if (
+    source ===
+    "vaccination_program_tasks"
+  ) {
+    const title =
+      murabbikSmartAlertTextSrv(
+        alert.title
+      ) ||
+      "تحصين مستحق";
+
+
+    return {
+      task:
+        title,
+
+      requiredAction:
+        "إعطاء التحصين أو الجرعة المستحقة للحيوانات المدرجة وتسجيل التنفيذ الفعلي."
+    };
+  }
+
+
+  if (
+    source ===
+    "ovsynch_protocol_steps"
+  ) {
+    const stepName =
+      dailyTasksReportOvsynchStepSrv(
+        alert
+      );
+
+
+    const isTai =
+      /(?:TAI|تلقيح|إجباري|اجباري)/iu
+        .test(stepName);
+
+
+    return {
+      task:
+        isTai
+          ? "تلقيح إجباري TAI"
+          : stepName
+            ? `خطوة تزامن — ${stepName}`
+            : "خطوة برنامج التزامن",
+
+      requiredAction:
+        isTai
+          ? "تنفيذ التلقيح الموقّت للحيوانات المدرجة في الموعد المحدد."
+          : stepName
+            ? `تنفيذ خطوة ${stepName} للحيوانات المدرجة في الموعد المحدد.`
+            : "تنفيذ خطوة برنامج التزامن للحيوانات المدرجة في الموعد المحدد."
+    };
+  }
+
+
+  return null;
+}
+
+
+function dailyTasksReportBuildSrv(
+  alerts = [],
+  today = ""
+) {
+  const groups =
+    new Map();
+
+
+  for (
+    const alert of
+    Array.isArray(alerts)
+      ? alerts
+      : []
+  ) {
+    if (
+      !dailyTasksReportEligibleSrv(
+        alert
+      )
+    ) {
+      continue;
+    }
+
+
+    const descriptor =
+      dailyTasksReportDescriptorSrv(
+        alert
+      );
+
+
+    if (!descriptor) {
+      continue;
+    }
+
+
+    const animalNumbers =
+      dailyTasksReportAnimalNumbersSrv(
+        alert
+      );
+
+
+    /*
+     * ورقة التنفيذ لا تقبل
+     * مهمة هلامية بلا أرقام حيوانات.
+     */
+    if (
+      !animalNumbers.length
+    ) {
+      continue;
+    }
+
+
+    const dueTime =
+      alert.source ===
+        "ovsynch_protocol_steps"
+        ? dailyTasksReportDueTimeSrv(
+            alert
+          )
+        : "";
+
+
+    const key = [
+      murabbikSmartAlertTextSrv(
+        alert.source
+      ),
+
+      descriptor.task,
+
+      descriptor.requiredAction,
+
+      dueTime
+    ].join("|");
+
+
+    if (
+      !groups.has(key)
+    ) {
+      groups.set(
+        key,
+        {
+          id:
+            murabbikSmartAlertTextSrv(
+              alert.id
+            ),
+
+          source:
+            murabbikSmartAlertTextSrv(
+              alert.source
+            ),
+
+          code:
+            murabbikSmartAlertTextSrv(
+              alert.code
+            ),
+
+          task:
+            descriptor.task,
+
+          requiredAction:
+            descriptor.requiredAction,
+
+          dueDate:
+            today,
+
+          dueTime,
+
+          animalNumbers: [],
+
+          notes: ""
+        }
+      );
+    }
+
+
+    const group =
+      groups.get(key);
+
+
+    group.animalNumbers.push(
+      ...animalNumbers
+    );
+  }
+
+
+  return [
+    ...groups.values()
+  ]
+    .map(task => {
+
+      task.animalNumbers = [
+        ...new Set(
+          task.animalNumbers
+        )
+      ].sort(
+        (a, b) =>
+          String(a).localeCompare(
+            String(b),
+            "ar",
+            {
+              numeric: true
+            }
+          )
+      );
+
+
+      task.affectedCount =
+        task.animalNumbers.length;
+
+
+      task.when =
+        task.dueTime
+          ? `اليوم — ${task.dueTime}`
+          : "اليوم";
+
+
+      return task;
+    })
+
+    .sort(
+      (a, b) => {
+
+        const aTime =
+          a.dueTime ||
+          "99:99";
+
+        const bTime =
+          b.dueTime ||
+          "99:99";
+
+
+        return (
+          aTime.localeCompare(
+            bTime
+          ) ||
+
+          String(
+            a.task
+          ).localeCompare(
+            String(
+              b.task
+            ),
+            "ar"
+          )
+        );
+      }
+    );
+}
+
 
 app.get(
   "/api/daily-tasks-report",
@@ -84724,21 +85269,21 @@ app.get(
           });
       }
 
+
       /*
-       * نفس التنبيهات الذكية الحالية.
-       * التقرير لا يحسب استحقاقًا،
-       * ولا يقرر موعدًا،
-       * ولا يعيد بناء أي منطق تشغيلي.
+       * التقرير لا يعيد حساب
+       * أي قاعدة طبية أو تشغيلية.
+       * المصدر هو Smart Alerts فقط.
        */
       const result =
         await murabbikSmartAlertCollectSrv(
           req
         );
 
+
       /*
-       * نفس حالة الظهور الفعلية:
-       * acknowledged / snoozed
-       * تُعامل تمامًا كما في Smart Alerts.
+       * نفس التنبيهات الظاهرة فعليًا
+       * بعد acknowledged / snoozed.
        */
       const stateResult =
         await murabbikSmartAlertApplyUserStateSrv(
@@ -84747,31 +85292,26 @@ app.get(
           result.context.nowMs
         );
 
+
       /*
-       * التقرير التنفيذي يطبع
-       * كل تنبيه ذكي ظاهر الآن،
-       * باستثناء التنبيهات المعلوماتية
-       * مثل التحية والطقس.
+       * نحول فقط مصادر التنفيذ المعتمدة
+       * إلى قوائم عمل فعلية بالأرقام.
        */
       const tasks =
-        stateResult.visibleAlerts
+        dailyTasksReportBuildSrv(
+          stateResult.visibleAlerts,
+          result.context.today
+        );
 
-          .filter(
-            alert =>
-              alert.kind !==
-              "informational"
-          )
-
-          .map(
-            dailyTasksReportTaskSrv
-          );
 
       const farmClock =
         await farmTimeContextSrv(
           result.context.profileUid
         );
 
+
       let issuedTime = "";
+
 
       try {
         issuedTime =
@@ -84802,6 +85342,7 @@ app.get(
 
       } catch (_) {}
 
+
       const farmName =
         murabbikSmartAlertTextSrv(
           req.authSession
@@ -84811,13 +85352,14 @@ app.get(
         ) ||
         "مزرعتك";
 
+
       return res.json({
         ok: true,
 
         product:
           "murabbik_daily_tasks_report",
 
-        version: 1,
+        version: 2,
 
         farmName,
 
@@ -84839,8 +85381,8 @@ app.get(
 
         message:
           tasks.length
-            ? `لديك ${tasks.length} مهمة تنفيذية ظاهرة الآن.`
-            : "لا توجد مهام تنفيذية ظاهرة الآن."
+            ? `لديك ${tasks.length} قائمة تنفيذ اليوم.`
+            : "لا توجد قوائم تنفيذ ظاهرة الآن."
       });
 
     } catch (e) {
@@ -84848,6 +85390,7 @@ app.get(
         "daily-tasks-report",
         e
       );
+
 
       return res
         .status(500)
