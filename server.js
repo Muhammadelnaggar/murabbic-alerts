@@ -84779,7 +84779,8 @@ function dailyTasksReportOvsynchStepSrv(
 
 
 function dailyTasksReportEligibleSrv(
-  alert = {}
+  alert = {},
+  today = ""
 ) {
   const source =
     murabbikSmartAlertTextSrv(
@@ -84823,9 +84824,9 @@ function dailyTasksReportEligibleSrv(
 
   /*
    * التحصينات:
-   * التقرير للتنفيذ الآن،
-   * وليس للتذكير بموعد غدٍ
-   * أو موعد مستقبلي أو نقص بيانات.
+   * التقرير للتنفيذ الآن فقط.
+   * نستبعد غدًا / المستقبلي / نقص البيانات،
+   * ونُبقي المستحق والمتأخر والجرعة التأسيسية الجاهزة.
    */
   if (
     source ===
@@ -84837,11 +84838,81 @@ function dailyTasksReportEligibleSrv(
       ).toLowerCase();
 
 
-    return ![
-      "day_before",
-      "upcoming",
-      "needs_data"
-    ].includes(status);
+    if (
+      status === "needs_data" ||
+      status === "day_before"
+    ) {
+      return false;
+    }
+
+
+    if (
+      status === "overdue" ||
+      status === "due" ||
+      status === "initial_age_ready"
+    ) {
+      return true;
+    }
+
+
+    if (
+      status === "upcoming"
+    ) {
+      const reportDate =
+        murabbikSmartAlertTextSrv(
+          today
+        ).slice(0, 10);
+
+      const evidence =
+        (
+          Array.isArray(
+            alert.details?.evidence
+          )
+            ? alert.details.evidence
+            : []
+        )
+          .map(
+            murabbikSmartAlertTextSrv
+          )
+          .filter(Boolean);
+
+      const evidenceDueLine =
+        evidence.find(
+          line =>
+            /^الموعد:\s*\d{4}-\d{2}-\d{2}$/u
+              .test(line)
+        ) || "";
+
+      const evidenceDueDate =
+        evidenceDueLine
+          .replace(
+            /^الموعد:\s*/u,
+            ""
+          )
+          .trim()
+          .slice(0, 10);
+
+      const directDueDate =
+        murabbikSmartAlertTextSrv(
+          alert.dueDate
+        ).slice(0, 10);
+
+      const dueDate =
+        calvingIsDateSrv(
+          directDueDate
+        )
+          ? directDueDate
+          : evidenceDueDate;
+
+      return (
+        calvingIsDateSrv(reportDate) &&
+        calvingIsDateSrv(dueDate) &&
+        dueDate === reportDate
+      );
+    }
+
+
+    return false;
   }
 
 
@@ -84858,159 +84929,61 @@ function dailyTasksReportDescriptorSrv(
     );
 
 
-  const code =
-    murabbikSmartAlertTextSrv(
-      alert.code
-    );
-
-
-  if (
-    source ===
-    "dry_off_due"
-  ) {
-    return {
-      task:
-        "التجفيف",
-
-      requiredAction:
-        "تنفيذ التجفيف للحيوانات المدرجة وتسجيله بعد التنفيذ."
-    };
-  }
-
-
-  if (
-    source ===
-    "close_up_due"
-  ) {
-    return {
-      task:
-        "تحضير / انتظار الولادة",
-
-      requiredAction:
-        "تنفيذ تحضير الولادة للحيوانات المدرجة وتسجيله."
-    };
-  }
-
-
-  if (
-    source ===
-    "calving_overdue"
-  ) {
-    return {
-      task:
-        "فحص حالة الولادة",
-
-      requiredAction:
-        "فحص الحيوانات المدرجة؛ وإذا حدثت الولادة تُسجَّل الولادة الفعلية."
-    };
-  }
-
-
-  if (
-    source ===
-    "pregnancy_diagnosis_due"
-  ) {
-    if (
-      code ===
-      "pregnancy_diagnosis_ultrasound_due"
-    ) {
-      return {
-        task:
-          "تشخيص حمل — سونار",
-
-        requiredAction:
-          "إجراء الفحص بالسونار وتسجيل نتيجة كل حيوان."
-      };
-    }
-
-
-    if (
-      code ===
-      "pregnancy_diagnosis_manual_due"
-    ) {
-      return {
-        task:
-          "تشخيص حمل — فحص يدوي",
-
-        requiredAction:
-          "إجراء فحص الحمل اليدوي وتسجيل نتيجة كل حيوان."
-      };
-    }
-
-
-    return null;
-  }
-
-
-  if (
-    source ===
-    "pregnancy_confirmation_120_due"
-  ) {
-    return {
-      task:
-        "تأكيد الحمل",
-
-      requiredAction:
-        "فحص استمرار الحمل وتسجيل النتيجة لكل حيوان."
-    };
-  }
-
-
-  if (
-    source ===
-    "uterine_check_followup"
-  ) {
-    if (
-      code ===
-      "uterine_check_day_14_due"
-    ) {
-      return {
-        task:
-          "فحص الرحم بعد الولادة — الفحص الأول",
-
-        requiredAction:
-          "إجراء فحص الرحم الأول بعد الولادة وتسجيل النتيجة."
-      };
-    }
-
-
-    if (
-      code ===
-      "uterine_check_day_30_followup"
-    ) {
-      return {
-        task:
-          "فحص الرحم بعد الولادة — فحص المتابعة",
-
-        requiredAction:
-          "إجراء فحص المتابعة للرحم وتسجيل النتيجة."
-      };
-    }
-
-
-    return null;
-  }
-
-
-  if (
-    source ===
-    "postpartum_insemination_followup"
-  ) {
-    return {
-      task:
-        "فحص ما بعد الولادة للتلقيح",
-
-      requiredAction:
-        "فحص الحيوانات المدرجة وتحديد المناسب للتلقيح أو للدخول في برنامج التزامن."
-    };
-  }
-
-
   if (
     source ===
     "vaccination_program_tasks"
   ) {
-    const title =
+    const evidence =
+      (
+        Array.isArray(
+          alert.details?.evidence
+        )
+          ? alert.details.evidence
+          : []
+      )
+        .map(
+          murabbikSmartAlertTextSrv
+        )
+        .filter(Boolean);
+
+
+    const vaccineLine =
+      evidence.find(
+        line =>
+          line.startsWith(
+            "التحصين:"
+          )
+      ) || "";
+
+
+    const doseLine =
+      evidence.find(
+        line =>
+          line.startsWith(
+            "نوع الجرعة:"
+          )
+      ) || "";
+
+
+    const vaccine =
+      vaccineLine
+        .replace(
+          /^التحصين:\s*/u,
+          ""
+        )
+        .trim();
+
+
+    const dose =
+      doseLine
+        .replace(
+          /^نوع الجرعة:\s*/u,
+          ""
+        )
+        .trim();
+
+
+    const fallbackTitle =
       murabbikSmartAlertTextSrv(
         alert.title
       ) ||
@@ -85019,10 +84992,22 @@ function dailyTasksReportDescriptorSrv(
 
     return {
       task:
-        title,
+        vaccine
+          ? (
+              dose
+                ? `تحصين ${vaccine} — ${dose}`
+                : `تحصين ${vaccine}`
+            )
+          : fallbackTitle,
 
       requiredAction:
-        "إعطاء التحصين أو الجرعة المستحقة للحيوانات المدرجة وتسجيل التنفيذ الفعلي."
+        vaccine
+          ? (
+              dose
+                ? `إعطاء ${dose} من تحصين ${vaccine} للحيوانات المدرجة وتسجيل التنفيذ الفعلي.`
+                : `إعطاء تحصين ${vaccine} للحيوانات المدرجة وتسجيل التنفيذ الفعلي.`
+            )
+          : "إعطاء التحصين أو الجرعة المستحقة للحيوانات المدرجة وتسجيل التنفيذ الفعلي."
     };
   }
 
@@ -85060,8 +85045,39 @@ function dailyTasksReportDescriptorSrv(
   }
 
 
-  return null;
+  const task =
+    murabbikSmartAlertTextSrv(
+      alert.title
+    ) ||
+    murabbikSmartAlertTextSrv(
+      alert.action?.label
+    );
+
+
+  const requiredAction =
+    murabbikSmartAlertTextSrv(
+      alert.details?.recommendation
+    ) ||
+    murabbikSmartAlertTextSrv(
+      alert.action?.label
+    );
+
+
+  if (
+    !task ||
+    !requiredAction
+  ) {
+    return null;
+  }
+
+
+  return {
+    task,
+    requiredAction
+  };
 }
+
+
 
 
 function dailyTasksReportBuildSrv(
@@ -85079,12 +85095,13 @@ function dailyTasksReportBuildSrv(
       : []
   ) {
     if (
-      !dailyTasksReportEligibleSrv(
-        alert
-      )
-    ) {
-      continue;
-    }
+  !dailyTasksReportEligibleSrv(
+    alert,
+    today
+  )
+) {
+  continue;
+}
 
 
     const descriptor =
