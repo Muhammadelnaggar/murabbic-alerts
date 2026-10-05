@@ -267,41 +267,24 @@
 
 
   function dueText(task) {
+  const when =
+    String(
+      task?.when || ''
+    ).trim();
 
-    const time =
-      String(
-        task?.dueTime || ''
-      ).trim();
-
-
-    const date =
-      dateText(
-        task?.dueDate
-      );
-
-
-    if (
-      time &&
-      date
-    ) {
-
-      return `${date} — ${time}`;
-    }
-
-
-    if (time) {
-      return time;
-    }
-
-
-    if (date) {
-      return date;
-    }
-
-
-    return '—';
+  if (when) {
+    return when;
   }
 
+  const time =
+    String(
+      task?.dueTime || ''
+    ).trim();
+
+  return time
+    ? `اليوم — ${time}`
+    : 'اليوم';
+}
 
   function renderMeta(data) {
 
