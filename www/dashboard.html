@@ -60,23 +60,65 @@
 
 <!-- اختصارات -->
 <div class="tiles">
-  <div class="tile" onclick="location.href='add-animal.html'">➕ حيوان جديد</div>
-  <div class="tile" onclick="location.href='animal-list.html'">📋 حيواناتي</div>
-  <div class="tile" onclick="location.href='follower-list.html'">📋 التوابع</div>
-  <div class="tile" onclick="location.href='add-event.html'">🗓️ حدث جديد</div>
-  <div class="tile" onclick="location.href='alerts-history.html'">🔔 أرشيف التنبيهات</div>
-  <div class="tile" onclick="location.href='cow-card.html'">🐮 البطاقة الذكية</div>
-  <div class="tile" onclick="location.href='groups.html'">👥 مجموعات مربيك</div>
-  <div class="tile" onclick="location.href='archive.html'">🗂️ أرشيف القطيع</div>
-  <div class="tile" onclick="location.href='calf-card.html'">🐄 بطاقة العجل</div>
-  <div class="tile" onclick="location.href='nutrition-eval.html'">🥗 تقييم التغذية</div>
+
+  <a class="tile" href="add-animal.html">
+    <span class="tile-icon" aria-hidden="true">➕</span>
+    <span class="tile-label">إضافة حيوان</span>
+  </a>
+
+  <a class="tile" href="add-event.html">
+    <span class="tile-icon" aria-hidden="true">🗓️</span>
+    <span class="tile-label">تسجيل الأحداث</span>
+  </a>
+
+  <a class="tile" href="groups.html">
+    <span class="tile-icon" aria-hidden="true">👥</span>
+    <span class="tile-label">مجموعات مُرَبِّيك</span>
+  </a>
+
+  <a class="tile" href="animal-list.html">
+    <span class="tile-icon" aria-hidden="true">📋</span>
+    <span class="tile-label">حيواناتي</span>
+  </a>
+
+  <a class="tile" href="follower-list.html">
+    <span class="tile-icon" aria-hidden="true">🐄</span>
+    <span class="tile-label">التوابع</span>
+  </a>
+
+  <a class="tile" href="cow-card.html">
+    <span class="tile-icon" aria-hidden="true">🐮</span>
+    <span class="tile-label">البطاقة الذكية</span>
+  </a>
+
+  <a class="tile" href="archive.html">
+    <span class="tile-icon" aria-hidden="true">🗂️</span>
+    <span class="tile-label">أرشيف القطيع</span>
+  </a>
+
+  <a class="tile" href="daily-tasks-report.html">
+    <span class="tile-icon" aria-hidden="true">✅</span>
+    <span class="tile-label">تقرير مهام اليوم</span>
+  </a>
+
+  <a class="tile" href="alerts-history.html">
+    <span class="tile-icon" aria-hidden="true">🔔</span>
+    <span class="tile-label">أرشيف التنبيهات</span>
+  </a>
+
 </div>
+
 <div class="switch-wrap">
   <div id="typeSwitch" class="type-switch">
     <button id="btnCows" class="type-btn active" type="button">أبقار</button>
     <button id="btnBuffalo" class="type-btn" type="button">جاموس</button>
   </div>
 </div>
+
+<div class="dashboard-kpi-hint">
+  اضغط على أي مؤشر لفتح التقرير المناسب
+</div>
+
 <!-- مؤشرات القطيع -->
 <div class="card">
   <div class="section-title">📌 تعداد القطيع</div>
