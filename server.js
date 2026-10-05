@@ -84647,7 +84647,220 @@ const alert =
     }
   }
 );
+// ============================================================
+//       DAILY TASKS REPORT — LIVE SMART ALERTS / PRINT SOURCE
+//       تقرير تنفيذي قابل للطباعة من التنبيهات الذكية الظاهرة
+// ============================================================
 
+function dailyTasksReportDueTimeSrv(alert = {}) {
+  const text = [
+    alert.message,
+    alert.details?.observation,
+    alert.details?.meaning,
+    alert.details?.recommendation,
+
+    ...(Array.isArray(alert.details?.evidence)
+      ? alert.details.evidence
+      : [])
+  ]
+    .map(murabbikSmartAlertTextSrv)
+    .filter(Boolean)
+    .join("\n");
+
+  const match =
+    text.match(
+      /(?:الموعد|الساعة)\s*[:：]?\s*([0-2]?\d:[0-5]\d)/u
+    );
+
+  return match
+    ? murabbikOvsynchAlertTimeSrv(
+        match[1]
+      )
+    : "";
+}
+
+function dailyTasksReportTaskSrv(alert = {}) {
+  const publicAlert =
+    murabbikSmartAlertPublicSrv(
+      alert
+    ) || {};
+
+  return {
+    ...publicAlert,
+
+    task:
+      murabbikSmartAlertTextSrv(
+        publicAlert.title
+      ),
+
+    requiredAction:
+      murabbikSmartAlertTextSrv(
+        publicAlert.message
+      ),
+
+    dueTime:
+      dailyTasksReportDueTimeSrv(
+        publicAlert
+      ),
+
+    notes: ""
+  };
+}
+
+app.get(
+  "/api/daily-tasks-report",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res
+          .status(503)
+          .json({
+            ok: false,
+            tasks: [],
+
+            message:
+              "❌ تعذّر تجهيز تقرير مهام اليوم الآن. حاول مرة أخرى."
+          });
+      }
+
+      /*
+       * نفس التنبيهات الذكية الحالية.
+       * التقرير لا يحسب استحقاقًا،
+       * ولا يقرر موعدًا،
+       * ولا يعيد بناء أي منطق تشغيلي.
+       */
+      const result =
+        await murabbikSmartAlertCollectSrv(
+          req
+        );
+
+      /*
+       * نفس حالة الظهور الفعلية:
+       * acknowledged / snoozed
+       * تُعامل تمامًا كما في Smart Alerts.
+       */
+      const stateResult =
+        await murabbikSmartAlertApplyUserStateSrv(
+          req,
+          result.alerts,
+          result.context.nowMs
+        );
+
+      /*
+       * التقرير التنفيذي يطبع
+       * كل تنبيه ذكي ظاهر الآن،
+       * باستثناء التنبيهات المعلوماتية
+       * مثل التحية والطقس.
+       */
+      const tasks =
+        stateResult.visibleAlerts
+
+          .filter(
+            alert =>
+              alert.kind !==
+              "informational"
+          )
+
+          .map(
+            dailyTasksReportTaskSrv
+          );
+
+      const farmClock =
+        await farmTimeContextSrv(
+          result.context.profileUid
+        );
+
+      let issuedTime = "";
+
+      try {
+        issuedTime =
+          new Intl.DateTimeFormat(
+            "ar-EG",
+            {
+              timeZone:
+                String(
+                  farmClock?.timeZone ||
+                  "UTC"
+                ).trim() ||
+                "UTC",
+
+              hour:
+                "2-digit",
+
+              minute:
+                "2-digit",
+
+              hour12:
+                true
+            }
+          ).format(
+            new Date(
+              result.context.nowMs
+            )
+          );
+
+      } catch (_) {}
+
+      const farmName =
+        murabbikSmartAlertTextSrv(
+          req.authSession
+            ?.user
+            ?.farmName ||
+          "مزرعتك"
+        ) ||
+        "مزرعتك";
+
+      return res.json({
+        ok: true,
+
+        product:
+          "murabbik_daily_tasks_report",
+
+        version: 1,
+
+        farmName,
+
+        date:
+          result.context.today,
+
+        issuedTime,
+
+        count:
+          tasks.length,
+
+        tasks,
+
+        degraded:
+          result.sourceErrors.length > 0,
+
+        hiddenByInteractionCount:
+          stateResult.hiddenCount,
+
+        message:
+          tasks.length
+            ? `لديك ${tasks.length} مهمة تنفيذية ظاهرة الآن.`
+            : "لا توجد مهام تنفيذية ظاهرة الآن."
+      });
+
+    } catch (e) {
+      console.error(
+        "daily-tasks-report",
+        e
+      );
+
+      return res
+        .status(500)
+        .json({
+          ok: false,
+          tasks: [],
+
+          message:
+            "❌ تعذّر تجهيز تقرير مهام اليوم الآن. حاول مرة أخرى."
+        });
+    }
+  }
+);
 // ============================================================
 //                       API: ALERTS
 // ============================================================
