@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>تقرير مهام اليوم | مُرَبِّيك</title>
+
+  <link rel="icon" type="image/svg+xml" href="/images/dashboard.svg">
+  <link rel="stylesheet" href="/css/forms.css">
+  <link rel="stylesheet" href="/css/reports.css">
+</head>
+
+<body data-page="daily-tasks-report" data-report-page>
+
+<header class="screen-top no-print">
+  <div class="screen-head">
+
+    <button
+      class="btn btn-ghost"
+      type="button"
+      onclick="location.href='dashboard.html'"
+    >
+      لوحة التحكم
+    </button>
+
+    <div>
+      <div class="screen-title">تقرير مهام اليوم</div>
+      <div class="screen-brand">مُرَبِّيك</div>
+    </div>
+
+    <img
+      class="screen-logo"
+      src="/images/logo.png"
+      alt="مُرَبِّيك"
+    >
+
+  </div>
+</header>
+
+
+<main class="page report-page">
+
+  <div id="loading" class="loading">
+    جاري تحميل مهام التنفيذ الحالية...
+  </div>
+
+
+  <section id="report" hidden>
+
+    <section class="report-cover">
+
+      <div class="report-head">
+
+        <div class="report-logo-box">
+          <img
+            src="/images/logo.png"
+            alt="مُرَبِّيك"
+          >
+        </div>
+
+
+        <div>
+
+          <div class="report-kicker">
+            مُرَبِّيك لإدارة مزارع الألبان
+          </div>
+
+          <h1 class="title">
+            تقرير مهام اليوم
+          </h1>
+
+          <div class="sub">
+            ورقة تشغيل تنفيذية من التنبيهات الذكية الظاهرة وقت إصدار التقرير.
+          </div>
+
+        </div>
+
+
+        <div class="report-stamp">
+          <b>To Do</b>
+          <span>نسخة تنفيذية قابلة للطباعة</span>
+        </div>
+
+      </div>
+
+
+      <div
+        class="report-meta"
+        id="reportMeta"
+      ></div>
+
+    </section>
+
+
+    <section class="card">
+
+      <div class="section-title">
+        مهام التنفيذ
+      </div>
+
+      <div id="tasksTable"></div>
+
+    </section>
+
+  </section>
+
+</main>
+
+
+<div class="actions report-actions no-print">
+
+  <a
+    class="ghost"
+    href="dashboard.html"
+  >
+    لوحة التحكم
+  </a>
+
+  <button
+    class="primary"
+    type="button"
+    id="printBtn"
+  >
+    طباعة / PDF
+  </button>
+
+</div>
+
+
+<script>
+(function () {
+
+  const $ =
+    (id) =>
+      document.getElementById(id);
+
+
+  function show(id, yes) {
+
+    const el = $(id);
+
+    if (!el) {
+      return;
+    }
+
+    if (yes) {
+
+      el.hidden = false;
+
+      el.removeAttribute(
+        'hidden'
+      );
+
+      el.style.display = '';
+
+    } else {
+
+      el.hidden = true;
+
+      el.setAttribute(
+        'hidden',
+        ''
+      );
+
+      el.style.display = 'none';
+    }
+  }
+
+
+  function esc(value) {
+
+    return String(
+      value ?? ''
+    )
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+
+  function multiline(value) {
+
+    return esc(value)
+      .replace(
+        /\r?\n/g,
+        '<br>'
+      );
+  }
+
+
+  function dateText(value) {
+
+    const text =
+      String(
+        value || ''
+      )
+        .trim()
+        .slice(0, 10);
+
+    if (!text) {
+      return '';
+    }
+
+    try {
+
+      return new Date(
+        text + 'T00:00:00'
+      )
+        .toLocaleDateString(
+          'ar-EG',
+          {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          }
+        );
+
+    } catch (_) {
+
+      return text;
+    }
+  }
+
+
+  function animalText(task) {
+
+    const numbers =
+      Array.isArray(
+        task?.animalNumbers
+      )
+        ? task.animalNumbers
+            .map(
+              value =>
+                String(
+                  value || ''
+                ).trim()
+            )
+            .filter(Boolean)
+
+        : [];
+
+
+    if (numbers.length) {
+
+      return numbers.join(
+        '، '
+      );
+    }
+
+
+    const count =
+      Number(
+        task?.affectedCount || 0
+      );
+
+
+    return (
+      Number.isFinite(count) &&
+      count > 0
+    )
+      ? `${count} حيوان`
+      : '—';
+  }
+
+
+  function dueText(task) {
+
+    const time =
+      String(
+        task?.dueTime || ''
+      ).trim();
+
+
+    const date =
+      dateText(
+        task?.dueDate
+      );
+
+
+    if (
+      time &&
+      date
+    ) {
+
+      return `${date} — ${time}`;
+    }
+
+
+    if (time) {
+      return time;
+    }
+
+
+    if (date) {
+      return date;
+    }
+
+
+    return '—';
+  }
+
+
+  function renderMeta(data) {
+
+    $('reportMeta').innerHTML = `
+
+      <div class="meta-pill">
+        <span>المزرعة</span>
+        <b>${esc(
+          data.farmName ||
+          'مزرعتك'
+        )}</b>
+      </div>
+
+
+      <div class="meta-pill">
+        <span>تاريخ التقرير</span>
+        <b>${esc(
+          dateText(
+            data.date
+          ) ||
+          data.date ||
+          '—'
+        )}</b>
+      </div>
+
+
+      <div class="meta-pill">
+        <span>وقت إصدار التقرير</span>
+        <b>${esc(
+          data.issuedTime ||
+          '—'
+        )}</b>
+      </div>
+
+    `;
+  }
+
+
+  function renderTasks(tasks) {
+
+    if (
+      !Array.isArray(tasks) ||
+      !tasks.length
+    ) {
+
+      $('tasksTable').innerHTML = `
+
+        <div class="empty">
+          لا توجد مهام تنفيذية ظاهرة الآن.
+        </div>
+
+      `;
+
+      return;
+    }
+
+
+    let html = `
+
+      <div class="table-wrap">
+
+        <table>
+
+          <thead>
+
+            <tr>
+              <th>المهمة</th>
+              <th>الحيوان / الحيوانات</th>
+              <th>الموعد</th>
+              <th>المطلوب تنفيذه</th>
+              <th>ملاحظات</th>
+            </tr>
+
+          </thead>
+
+
+          <tbody>
+
+    `;
+
+
+    for (const task of tasks) {
+
+      html += `
+
+        <tr>
+
+          <td>
+            ${esc(
+              task.task ||
+              task.title ||
+              '—'
+            )}
+          </td>
+
+
+          <td>
+            ${esc(
+              animalText(task)
+            )}
+          </td>
+
+
+          <td>
+            ${esc(
+              dueText(task)
+            )}
+          </td>
+
+
+          <td>
+            ${multiline(
+              task.requiredAction ||
+              task.message ||
+              '—'
+            )}
+          </td>
+
+
+          <td>
+            &nbsp;
+          </td>
+
+        </tr>
+
+      `;
+    }
+
+
+    html += `
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    `;
+
+
+    $('tasksTable').innerHTML =
+      html;
+  }
+
+
+  async function loadReport() {
+
+    show(
+      'loading',
+      true
+    );
+
+    show(
+      'report',
+      false
+    );
+
+
+    try {
+
+      const response =
+        await fetch(
+          '/api/daily-tasks-report',
+          {
+            credentials:
+              'include',
+
+            cache:
+              'no-store'
+          }
+        );
+
+
+      const data =
+        await response
+          .json()
+          .catch(
+            () => ({})
+          );
+
+
+      if (
+        !response.ok ||
+        !data.ok
+      ) {
+
+        throw new Error(
+          data.message ||
+          'تعذّر تحميل تقرير مهام اليوم.'
+        );
+      }
+
+
+      renderMeta(data);
+
+      renderTasks(
+        data.tasks || []
+      );
+
+
+      show(
+        'loading',
+        false
+      );
+
+      show(
+        'report',
+        true
+      );
+
+
+      return true;
+
+
+    } catch (error) {
+
+      $('loading').textContent =
+        error?.message ||
+        'تعذّر تحميل تقرير مهام اليوم.';
+
+
+      show(
+        'loading',
+        true
+      );
+
+      show(
+        'report',
+        false
+      );
+
+
+      return false;
+    }
+  }
+
+
+  $('printBtn')
+    .addEventListener(
+      'click',
+      async () => {
+
+        /*
+         * قبل الطباعة مباشرة
+         * نقرأ التنبيهات الحالية مرة أخرى،
+         * وبالتالي الورقة المطبوعة تعكس
+         * الحالة وقت الضغط على طباعة.
+         */
+
+        const ok =
+          await loadReport();
+
+
+        if (ok) {
+
+          window.print();
+        }
+      }
+    );
+
+
+  loadReport();
+
+})();
+</script>
+
+
+</body>
+</html>
