@@ -5360,21 +5360,98 @@ body[data-page="dashboard"] .thi-circle{
 
 body[data-page="dashboard"] .tiles{
   display:grid;
-  grid-template-columns:repeat(3,minmax(90px,1fr));
-  gap:6px;
-  margin-bottom:8px;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin-bottom:10px;
+  direction:rtl;
 }
 
 body[data-page="dashboard"] .tile{
-  background:#eafbe7;
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:6px 2px;
+  min-width:0;
+  min-height:88px;
+
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+
+  padding:10px 6px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #fbfdfb 100%
+    );
+
+  border:1px solid #cfe7d7;
+  border-radius:16px;
+
+  color:#173e2a;
+  text-decoration:none;
   text-align:center;
-  font-size:10px;
+
   cursor:pointer;
+
+  box-shadow:
+    0 5px 14px rgba(15,23,42,.045),
+    0 1px 4px rgba(14,160,90,.06);
+
+  transition:
+    transform .16s ease,
+    box-shadow .16s ease,
+    border-color .16s ease,
+    background .16s ease;
+
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
 }
 
+body[data-page="dashboard"] .tile-icon{
+  display:block;
+  font-size:25px;
+  line-height:1;
+}
+
+body[data-page="dashboard"] .tile-label{
+  display:block;
+  font-size:14px;
+  font-weight:900;
+  line-height:1.4;
+  color:#173e2a;
+}
+
+body[data-page="dashboard"] .tile:hover{
+  background:#f7fcf8;
+  border-color:#9fd1af;
+
+  box-shadow:
+    0 8px 18px rgba(15,23,42,.06),
+    0 2px 7px rgba(14,160,90,.09);
+
+  transform:translateY(-1px);
+}
+
+body[data-page="dashboard"] .tile:active{
+  transform:scale(.98);
+}
+
+body[data-page="dashboard"] .tile:focus-visible{
+  outline:3px solid rgba(14,160,90,.28);
+  outline-offset:2px;
+  border-color:var(--brand);
+}
+
+body[data-page="dashboard"] .dashboard-kpi-hint{
+  margin:0 0 12px;
+  padding:2px 8px 0;
+  text-align:center;
+  color:#173e2a;
+  font-size:16px;
+  font-weight:900;
+  line-height:1.6;
+}
 body[data-page="dashboard"] .section-title{
   font-weight:900;
   font-size:16px;
