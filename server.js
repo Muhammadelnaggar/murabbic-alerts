@@ -86236,12 +86236,6 @@ try {
       -89
     );
 
-  const healthStart365 =
-    healthAddDaysISO(
-      healthToday,
-      -364
-    );
-
   const healthRatePct =
     (part, denominator) =>
       denominator > 0
@@ -86253,12 +86247,10 @@ try {
           )
         : 0;
 
-  /*
-   * نحتاج الأرشيف أيضًا:
-   * الحيوان الذي خرج خلال فترة المؤشر
-   * كان ضمن المعرضين أثناء الفترة،
-   * وأحداثه انتقلت إلى archived_events.
-   */
+ // ============================================================
+// 🩺 مؤشرات الصحة في الداشبورد — Server-first
+// مؤشرات الصحة الأربعة: آخر 90 يوم متحركة حتى تاريخ اليوم
+// ============================================================
   const healthArchivedAnimalsSnap =
     await db
       .collection('archived_animals')
@@ -86540,14 +86532,13 @@ const healthPregnancyEpisodeKey =
         .trim()
         .slice(0, 10);
 
-    if (
-      !n ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(d) ||
-      d < healthStart365 ||
-      d > healthToday
-    ) {
-      return '';
-    }
+if (
+  !n ||
+  !/^\d{4}-\d{2}-\d{2}$/.test(d) ||
+  d > healthToday
+) {
+  return '';
+}
 
     return `${n}|${d}`;
   };
@@ -86719,9 +86710,9 @@ if (
 }
 
 // -----------------------------
-// الإجهاض — Pregnancy Episodes
-// آخر 365 يوم حسب تاريخ التلقيح
-// المخصب المرتبط بالحمل.
+// الإجهاض — آخر 90 يوم متحركة
+// المقام = حالات الحمل التي ثبت أنها كانت
+// قائمة/معرّضة داخل نافذة الـ90 يوم.
 // -----------------------------
 if (
   healthPregnancyAnimalNumbers.has(
@@ -86737,7 +86728,10 @@ if (
     );
 
   if (episodeKey) {
-    if (type === 'abortion') {
+    if (
+      date >= healthStart90 &&
+      type === 'abortion'
+    ) {
       pregnancyEpisodes.add(
         episodeKey
       );
@@ -86751,15 +86745,18 @@ if (
       );
     }
 
-    if (type === 'calving') {
+    if (
+      date >= healthStart90 &&
+      type === 'calving'
+    ) {
       pregnancyEpisodes.add(
         episodeKey
       );
     }
 
     if (
-      type ===
-        'pregnancy_diagnosis'
+      date >= healthStart90 &&
+      type === 'pregnancy_diagnosis'
     ) {
       const pregnancyResult =
         event.result ||
@@ -86781,7 +86778,6 @@ if (
   }
 }
 }
-
 const healthCeilings = {
   mastitis: 5,
   lameness: 5,
@@ -86828,8 +86824,6 @@ const healthCeilingStatus =
 const healthReport90 =
   `health-report.html?type=${encodeURIComponent(selectedDashboardType)}&days=90`;
 
-const healthReport365 =
-  `health-report.html?type=${encodeURIComponent(selectedDashboardType)}&days=365`;
 
 healthDashboard = {
   available: true,
@@ -86971,18 +86965,18 @@ healthDashboard = {
   ceilingPct:
     healthCeilings.abortion,
 
-  windowDays: 365,
+  windowDays: 90,
 
-  subText:
-    pregnancyCount > 0
-      ? `${abortionCount} من ${pregnancyCount} حالة حمل مسجلة • السقف ≤ ${healthCeilings.abortion}% • ${healthCeilingStatus(
-          abortionRatePct,
-          healthCeilings.abortion
-        )} • آخر 365 يوم`
-      : 'لا توجد حالات حمل مسجلة لحساب المؤشر.',
+subText:
+  pregnancyCount > 0
+    ? `${abortionCount} من ${pregnancyCount} حالة حمل معرّضة • السقف ≤ ${healthCeilings.abortion}% • ${healthCeilingStatus(
+        abortionRatePct,
+        healthCeilings.abortion
+      )} • آخر 90 يوم`
+    : 'لا توجد حالات حمل معرّضة لحساب المؤشر.',
 
-  href:
-    healthReport365
+href:
+  healthReport90
 }
   ]
 };
