@@ -119887,91 +119887,29 @@ const allowedPeriods = [30, 90, 180, 360];
         );
       };
 
-    const readingFor =
-      ({
-        title,
-        affectedCount,
-        caseCount,
-        denominatorCount = null,
-        ratePct = null,
-        ceilingPct = null,
-        recurrence,
-        trend,
-        concentrationText = ''
-      }) => {
-        const parts = [];
+    const HEALTH_STATUS_LABELS = {
+      ok: 'مطمئن',
+      info: 'مسجل',
+      warn: 'يحتاج متابعة',
+      danger: 'يحتاج تدخل',
+      muted: 'بيانات غير كافية'
+    };
 
-        if (
-          denominatorCount > 0 &&
-          ratePct !== null
-        ) {
-          if (
-            ceilingPct !== null
-          ) {
-            parts.push(
-              `${title}: ${ratePct}% (${affectedCount}/${denominatorCount})، ${ratePct <= ceilingPct ? 'ضمن' : 'أعلى من'} السقف المرجعي ${ceilingPct}%.`
-            );
+    const HEALTH_DISTRIBUTION_LABELS = {
+      byType: 'نوع الحالة',
+      byQuarter: 'الربع المصاب',
+      byLeg: 'الطرف المصاب',
+      byStage: 'مرحلة الحمل',
+      byAgeBand: 'العمر',
+      byDetail: 'النمط المسجل'
+    };
 
-          } else {
-            parts.push(
-              `${title}: ${ratePct}% (${affectedCount}/${denominatorCount}).`
-            );
-          }
-
-        } else {
-          parts.push(
-            `${title}: ${caseCount} حالة في ${affectedCount} حيوان.`
-          );
-        }
-
-        if (
-          recurrence
-            ?.affectedAnimals >
-          0
-        ) {
-          parts.push(
-            `${recurrence.affectedAnimals} من الحيوانات المتأثرة لها تكرار موثق لنفس المشكلة.`
-          );
-        }
-
-        if (
-          trend?.available
-        ) {
-          if (
-            trend.direction ===
-            'up'
-          ) {
-            parts.push(
-              `الحيوانات المتأثرة أعلى من الفترة السابقة (${trend.currentAffected} مقابل ${trend.previousAffected}).`
-            );
-
-          } else if (
-            trend.direction ===
-            'down'
-          ) {
-            parts.push(
-              `الحيوانات المتأثرة أقل من الفترة السابقة (${trend.currentAffected} مقابل ${trend.previousAffected}).`
-            );
-
-          } else {
-            parts.push(
-              `عدد الحيوانات المتأثرة ثابت مقارنة بالفترة السابقة (${trend.currentAffected}).`
-            );
-          }
-        }
-
-        if (
-          concentrationText
-        ) {
-          parts.push(
-            concentrationText
-          );
-        }
-
-        return parts.join(
-          ' '
-        );
-      };
+    const HEALTH_CRITICAL_ANY_CASE =
+      new Set([
+        'fmd',
+        'brucellosis',
+        'septicemia'
+      ]);
 
     const actionByKey = {
       mastitis:
@@ -120101,7 +120039,7 @@ const allowedPeriods = [30, 90, 180, 360];
     const defaultAction =
       'راجع الحالات المتكررة والتشخيص المسجل، وحدد العامل المشترك قبل تعديل خطة الوقاية أو العلاج.';
 
-    const makeProblem =
+        const makeProblem =
       ({
         key,
         title,
@@ -120137,8 +120075,7 @@ const allowedPeriods = [30, 90, 180, 360];
           );
 
         const denominatorCount =
-          denominatorSet instanceof
-            Set
+          denominatorSet instanceof Set
             ? denominatorSet.size
             : null;
 
@@ -120162,14 +120099,10 @@ const allowedPeriods = [30, 90, 180, 360];
             previous
           );
 
-        const distributionOut =
-          {};
+        const distributionOut = {};
 
         for (
-          const [
-            name,
-            getter
-          ]
+          const [name, getter]
           of Object.entries(
             distributions
           )
@@ -120178,32 +120111,8 @@ const allowedPeriods = [30, 90, 180, 360];
             countBy(
               current,
               getter
-            )
-              .slice(
-                0,
-                12
-              );
+            ).slice(0, 12);
         }
-
-        const topConcentration =
-          Object
-            .values(
-              distributionOut
-            )
-            .flat()
-            .sort(
-              (a, b) =>
-                b.count -
-                a.count
-            )[0] ||
-          null;
-
-        const concentrationText =
-          topConcentration &&
-          topConcentration.count >=
-            2
-            ? `أكثر نمط مسجل: ${topConcentration.name} (${topConcentration.count}).`
-            : '';
 
         const recent =
           current
@@ -120245,10 +120154,7 @@ const allowedPeriods = [30, 90, 180, 360];
                   a.date
                 )
             )
-            .slice(
-              0,
-              20
-            );
+            .slice(0, 20);
 
         let status =
           benchmarkStatus(
@@ -120256,30 +120162,21 @@ const allowedPeriods = [30, 90, 180, 360];
             ceilingPct
           );
 
-        if (
-          current.length ===
-          0
-        ) {
+        if (!current.length) {
           status = 'ok';
 
         } else if (
           ceilingPct === null ||
           ratePct === null
         ) {
-          status =
-            recurrence
-              .affectedAnimals >
-                0 ||
-            trend.direction ===
-              'up'
-              ? 'warn'
-              : 'info';
+          status = 'info';
         }
 
         return {
           key,
           title,
           group,
+          section,
 
           metrics: {
             affectedCount:
@@ -120296,46 +120193,14 @@ const allowedPeriods = [30, 90, 180, 360];
           status,
           recurrence,
           trend,
-
           distributions:
             distributionOut,
-
           recent,
 
           murabbik: {
             status,
-
-            reading:
-              current.length ===
-                0
-                ? `لم تُسجل حالات ${title} خلال الفترة المختارة.`
-                : readingFor({
-                    title,
-
-                    affectedCount:
-                      affected.size,
-
-                    caseCount:
-                      current.length,
-
-                    denominatorCount,
-                    ratePct,
-                    ceilingPct,
-                    recurrence,
-                    trend,
-                    concentrationText
-                  }),
-
-            action:
-              current.length ===
-                0
-                ? ''
-                : (
-                    actionByKey[
-                      key
-                    ] ||
-                    defaultAction
-                  )
+            reading: '',
+            action: ''
           }
         };
       };
@@ -120728,81 +120593,6 @@ const allowedPeriods = [30, 90, 180, 360];
     abortion.murabbik.status =
       abortion.status;
 
-    if (
-      abortion.metrics
-        .caseCount ===
-      0
-    ) {
-      abortion.murabbik.reading =
-        'لم تُسجل حالات إجهاض خلال الفترة المختارة.';
-
-      abortion.murabbik.action =
-        '';
-
-    } else if (
-      abortion.metrics
-        .ratePct ===
-      null
-    ) {
-      abortion.murabbik.reading =
-        `سُجلت ${abortion.metrics.caseCount} حالة إجهاض في ${abortion.metrics.affectedCount} حيوان، لكن ربط كل الحالات بحلقات الحمل غير مكتمل؛ لذلك لا يصدر مُرَبِّيك معدل إجهاض لهذه الفترة.`;
-
-    } else {
-      const parts = [
-        `معدل الإجهاض ${abortion.metrics.ratePct}% (${abortion.metrics.rateNumeratorCount}/${abortion.metrics.denominatorCount} حالة حمل معرّضة)، ${abortion.metrics.ratePct <= abortion.metrics.ceilingPct ? 'ضمن' : 'أعلى من'} السقف المرجعي ${abortion.metrics.ceilingPct}%.`
-      ];
-
-      if (
-        abortion.recurrence
-          .affectedAnimals >
-        0
-      ) {
-        parts.push(
-          `${abortion.recurrence.affectedAnimals} من الحيوانات المتأثرة لها إجهاض متكرر موثق.`
-        );
-      }
-
-      if (
-        abortion.trend
-          .available
-      ) {
-        if (
-          abortion.trend
-            .direction ===
-          'up'
-        ) {
-          parts.push(
-            `الحيوانات المتأثرة أعلى من الفترة السابقة (${abortion.trend.currentAffected} مقابل ${abortion.trend.previousAffected}).`
-          );
-
-        } else if (
-          abortion.trend
-            .direction ===
-          'down'
-        ) {
-          parts.push(
-            `الحيوانات المتأثرة أقل من الفترة السابقة (${abortion.trend.currentAffected} مقابل ${abortion.trend.previousAffected}).`
-          );
-        }
-      }
-
-      if (
-        abortion
-          .distributions
-          .byStage?.[0]
-          ?.count >=
-        2
-      ) {
-        parts.push(
-          `أكثر مرحلة تسجيلًا: ${abortion.distributions.byStage[0].name} (${abortion.distributions.byStage[0].count}).`
-        );
-      }
-
-      abortion.murabbik
-        .reading =
-          parts.join(' ');
-    }
-
     const embryonicLoss =
       makeProblem({
         key:
@@ -120863,8 +120653,35 @@ const allowedPeriods = [30, 90, 180, 360];
         ceilingPct:
           15,
 
-        distributions:
-          {},
+                distributions: {
+          byAgeBand:
+            event => {
+              const ageDays =
+                Number(
+                  event.ageDays ??
+                  event.calfAgeDays ??
+                  event.details?.ageDays ??
+                  event.details?.calfAgeDays
+                );
+
+              if (
+                !Number.isFinite(ageDays) ||
+                ageDays < 0
+              ) {
+                return '';
+              }
+
+              if (ageDays <= 30) {
+                return 'حتى 30 يوم';
+              }
+
+              if (ageDays <= 60) {
+                return '31–60 يوم';
+              }
+
+              return 'أكثر من 60 يوم';
+            }
+        },
 
         extraRecent:
           event => ({
@@ -121070,148 +120887,1263 @@ const allowedPeriods = [30, 90, 180, 360];
         )
     );
 
-    const sectionReading =
-      problems => {
-        const activeProblems =
-          problems.filter(
-            problem =>
-              problem.metrics
-                .caseCount >
-              0
+    const healthTopConcentration = problem => {
+      const preferred = {
+        mastitis: ['byQuarter'],
+        lameness: ['byLeg', 'byType'],
+        abortion: ['byStage'],
+        calf_scours: ['byAgeBand']
+      };
+
+      const keys =
+        preferred[problem.key] ||
+        [];
+
+      for (const key of keys) {
+        const first =
+          Array.isArray(
+            problem.distributions?.[key]
+          )
+            ? problem.distributions[key][0]
+            : null;
+
+        if (
+          first &&
+          Number(first.count || 0) >= 2
+        ) {
+          return {
+            key,
+
+            label:
+              HEALTH_DISTRIBUTION_LABELS[
+                key
+              ] ||
+              'النمط',
+
+            name:
+              text(first.name),
+
+            count:
+              Number(first.count || 0)
+          };
+        }
+      }
+
+      return null;
+    };
+
+    const healthDenominatorPair = problem => {
+      if (problem.key === 'mastitis') {
+        return {
+          current:
+            lactatingAtRisk.size,
+          previous:
+            previousLactatingAtRisk.size
+        };
+      }
+
+      if (problem.key === 'lameness') {
+        return {
+          current:
+            adultAtRisk.size,
+          previous:
+            previousAdultAtRisk.size
+        };
+      }
+
+      if (
+        problem.key ===
+        'calf_scours'
+      ) {
+        return {
+          current:
+            calfAtRisk.size,
+          previous:
+            previousCalfAtRisk.size
+        };
+      }
+
+      if (problem.key === 'abortion') {
+        return {
+          current:
+            new Set(
+              currentPregnancyEpisodes
+                .map(
+                  episode =>
+                    episode.key
+                )
+            ).size,
+
+          previous:
+            new Set(
+              previousPregnancyEpisodes
+                .map(
+                  episode =>
+                    episode.key
+                )
+            ).size
+        };
+      }
+
+      return {
+        current: null,
+        previous: null
+      };
+    };
+
+    const healthProblemTrend = problem => {
+      if (!comparisonAvailable) {
+        return {
+          available: false
+        };
+      }
+
+      const currentRows =
+        problemEvents(
+          currentEvents,
+          problem.key,
+          problem.section
+        );
+
+      const previousRows =
+        problemEvents(
+          previousEvents,
+          problem.key,
+          problem.section
+        );
+
+      const denominator =
+        healthDenominatorPair(
+          problem
+        );
+
+      if (problem.key === 'abortion') {
+        const linkedCount =
+          rows =>
+            new Set(
+              rows
+                .map(
+                  event => {
+                    const ai =
+                      linkedAiDate(
+                        event
+                      );
+
+                    return ai
+                      ? `${event._number}|${ai}`
+                      : '';
+                  }
+                )
+                .filter(Boolean)
+            ).size;
+
+        const currentLinked =
+          linkedCount(
+            currentRows
+          );
+
+        const previousLinked =
+          linkedCount(
+            previousRows
           );
 
         if (
-          !activeProblems.length
+          currentLinked !==
+            currentRows.length ||
+          previousLinked !==
+            previousRows.length ||
+          !(denominator.current > 0) ||
+          !(denominator.previous > 0)
         ) {
           return {
-            status:
-              'ok',
-
-            text:
-              'لم تُسجّل مشكلات صحية خلال الفترة المختارة.'
+            available: false
           };
         }
 
-        const ordered =
-          [
-            ...activeProblems
-          ]
-            .sort(
-              (a, b) =>
-                problemPriority(b) -
-                  problemPriority(a) ||
+        const currentRate =
+          pct(
+            currentLinked,
+            denominator.current
+          );
 
-                b.metrics
-                  .caseCount -
-                  a.metrics
-                    .caseCount
-            );
-
-        const top =
-          ordered[0];
-
-        const reason =
-          top.status ===
-            'danger'
-            ? 'لتجاوزه السقف المرجعي'
-
-            : top.recurrence
-                ?.affectedAnimals >
-              0
-              ? 'لوجود حالات متكررة'
-
-              : top.trend
-                  ?.direction ===
-                'up'
-                ? 'لارتفاع الحيوانات المتأثرة عن الفترة السابقة'
-
-                : 'لأنه الأعلى تسجيلًا خلال الفترة';
+        const previousRate =
+          pct(
+            previousLinked,
+            denominator.previous
+          );
 
         return {
-          status:
-            top.status ===
-              'muted'
-              ? 'info'
-              : top.status,
+          available: true,
+          basis: 'rate',
+          currentRate,
+          previousRate,
 
-          text:
-            `الأولوية الصحية الحالية: ${top.title} ${reason}.`
+          direction:
+            currentRate > previousRate
+              ? 'up'
+              : currentRate < previousRate
+                ? 'down'
+                : 'stable'
         };
+      }
+
+      const currentAffected =
+        new Set(
+          currentRows.map(
+            event =>
+              event._number
+          )
+        ).size;
+
+      const previousAffected =
+        new Set(
+          previousRows.map(
+            event =>
+              event._number
+          )
+        ).size;
+
+      if (
+        denominator.current > 0 &&
+        denominator.previous > 0
+      ) {
+        const currentRate =
+          pct(
+            currentAffected,
+            denominator.current
+          );
+
+        const previousRate =
+          pct(
+            previousAffected,
+            denominator.previous
+          );
+
+        return {
+          available: true,
+          basis: 'rate',
+          currentRate,
+          previousRate,
+
+          direction:
+            currentRate > previousRate
+              ? 'up'
+              : currentRate < previousRate
+                ? 'down'
+                : 'stable'
+        };
+      }
+
+      return {
+        available: true,
+        basis: 'affected',
+        currentAffected,
+        previousAffected,
+
+        direction:
+          currentAffected >
+            previousAffected
+            ? 'up'
+            : currentAffected <
+                previousAffected
+              ? 'down'
+              : 'stable'
+      };
+    };
+
+    const healthIndicatorText = problem => {
+      const m =
+        problem.metrics || {};
+
+      if (
+        m.ratePct !== null &&
+        m.ratePct !== undefined &&
+        Number(
+          m.denominatorCount
+        ) > 0
+      ) {
+        const numerator =
+          problem.key === 'abortion'
+            ? Number(
+                m.rateNumeratorCount ??
+                m.affectedCount ??
+                0
+              )
+            : Number(
+                m.affectedCount ||
+                0
+              );
+
+        return `${m.ratePct}% (${numerator}/${m.denominatorCount})`;
+      }
+
+      return `${Number(m.caseCount || 0)} حالة · ${Number(m.affectedCount || 0)} حيوان`;
+    };
+
+    const healthRecurrenceText =
+      problem => {
+        const r =
+          problem.recurrence || {};
+
+        return Number(
+          r.affectedAnimals || 0
+        ) > 0
+          ? `${r.affectedAnimals} حيوان · ${r.periodCases} حالة`
+          : 'لا يوجد';
       };
 
-    const hasTreatmentData =
-      event =>
-        Boolean(
-          text(
-            event.treatment ||
-            event.treatmentName ||
-            event.drug ||
-            event.drugName ||
-            event.medicine ||
-            event.details
-              ?.treatment ||
-            event.details
-              ?.drug ||
-            event.details
-              ?.drugName ||
-            event.details
-              ?.medicine
+    const healthTrendText = trend => {
+      if (!trend?.available) {
+        return '—';
+      }
+
+      const arrow =
+        trend.direction === 'up'
+          ? '↑'
+          : trend.direction === 'down'
+            ? '↓'
+            : '→';
+
+      return trend.basis === 'rate'
+        ? `${arrow} ${trend.currentRate}% مقابل ${trend.previousRate}%`
+        : `${arrow} ${trend.currentAffected} مقابل ${trend.previousAffected}`;
+    };
+
+    const healthBaseAction =
+      problem =>
+        actionByKey[
+          problem.key
+        ] ||
+        defaultAction;
+    const HEALTH_GENERAL_READING_PROFILES = {
+      milk_fever: {
+        recurrent:
+          'تكرار حمى اللبن في نفس الحيوانات يشير إلى عبء فردي متكرر داخل مرحلة الانتقال، وليس مجرد حالات متفرقة.',
+
+        rising:
+          'عدد الحيوانات المصابة بحمى اللبن ارتفع عن الفترة السابقة؛ الأولوية لمراجعة إدارة الانتقال وتوازن المعادن قبل الولادة.',
+
+        limited:
+          'حالات حمى اللبن المسجلة محدودة ولا يظهر تكرار فردي أو زيادة زمنية واضحة.'
+      },
+
+      ketosis: {
+        recurrent:
+          'تكرار الكيتوزيس في نفس الحيوانات يشير إلى قابلية فردية أو عبء مستمر حول الانتقال وبداية الإدرار.',
+
+        rising:
+          'عدد الحيوانات المصابة بالكيتوزيس ارتفع عن الفترة السابقة؛ النمط يستحق مراجعة توازن الطاقة واستهلاك المادة الجافة بعد الولادة.',
+
+        limited:
+          'حالات الكيتوزيس المسجلة محدودة ولا يظهر تكرار فردي أو زيادة زمنية واضحة.'
+      },
+
+      displaced_abomasum: {
+        recurrent:
+          'تكرار انزياح المنفحة في نفس الحيوانات غير معتاد ويستحق مراجعة تاريخها الانتقالي والعوامل المصاحبة لكل حالة.',
+
+        rising:
+          'زيادة حالات انزياح المنفحة عن الفترة السابقة تستحق مراجعة عوامل فترة الانتقال واستهلاك العليقة والأمراض المصاحبة.',
+
+        limited:
+          'الحالات المسجلة لانزياح المنفحة محدودة ولا يظهر اتجاه تصاعدي في الفترة الحالية.'
+      },
+
+      cecal_dilatation: {
+        recurrent:
+          'تكرار توسع الأعور في نفس الحيوانات يستوجب مراجعة التشخيص والعوامل الهضمية المصاحبة بدل اعتباره حدثًا عابرًا.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة تستحق مراجعة انتظام استهلاك العليقة وحركة الجهاز الهضمي والعوامل المصاحبة.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر نمط متكرر أو زيادة زمنية واضحة.'
+      },
+
+      rumen_acidosis: {
+        recurrent:
+          'تكرار حموضة الكرش في نفس الحيوانات يشير إلى تعرض متكرر لعوامل غذائية أو اختلاف فردي في الاستجابة للعليقة.',
+
+        rising:
+          'ارتفاع الحالات عن الفترة السابقة يرجح وجود تغير يستحق المراجعة في تركيب العليقة أو انتظام الخلط والتقديم.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر تكرار أو اتجاه تصاعدي واضح.'
+      },
+
+      bloat_tympany: {
+        recurrent:
+          'تكرار النفاخ في نفس الحيوانات يستحق فصل العوامل الفردية عن عوامل العليقة أو الإدارة المشتركة.',
+
+        rising:
+          'زيادة حالات النفاخ عن الفترة السابقة تستحق مراجعة مصدر العليقة وطريقة تقديمها قبل اعتبارها حالات فردية.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر تكرار أو زيادة زمنية واضحة.'
+      },
+
+      traumatic_reticuloperitonitis: {
+        recurrent:
+          'تكرار الاشتباه في التهاب الشبكية الرضحي في نفس الحيوان يستوجب تأكيد التشخيص ومراجعة تاريخ الحالة.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة ترفع أولوية مراجعة التعرض للأجسام المعدنية وإجراءات الوقاية القطيعية.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر اتجاه تصاعدي واضح.'
+      },
+
+      simple_indigestion_rumen_atony: {
+        recurrent:
+          'تكرار عسر الهضم أو خمول الكرش في نفس الحيوانات يستحق البحث عن عامل غذائي أو مرض ثانوي متكرر.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة تستحق مراجعة التغيرات الغذائية وانتظام الاستهلاك وحركة الكرش.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر تكرار أو زيادة زمنية واضحة.'
+      },
+
+      fatty_liver: {
+        recurrent:
+          'تكرار الكبد الدهني في نفس الحيوانات يشير إلى عبء استقلابي فردي متكرر حول فترة الانتقال.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة تستحق مراجعة حالة الجسم وتوازن الطاقة قبل الولادة وبعدها.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر نمط متكرر أو زيادة زمنية واضحة.'
+      },
+
+      phosphorus_def: {
+        recurrent:
+          'تكرار نقص الفوسفور في نفس الحيوانات يستوجب تأكيد الحالة تحليليًا قبل اعتباره مشكلة تغذية عامة.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة تستحق مراجعة الإمداد الفعلي بالفوسفور ونسبة الكالسيوم إلى الفوسفور.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا تكفي وحدها لإثبات مشكلة عامة في القطيع.'
+      },
+
+      magnesium_def: {
+        recurrent:
+          'تكرار نقص الماغنسيوم في نفس الحيوانات يستحق تقييم عوامل الخطورة الفردية وإمداد الماغنسيوم وامتصاصه.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة تستحق مراجعة إمداد الماغنسيوم والعوامل التي قد تخفض امتصاصه.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا تكفي وحدها لإثبات مشكلة عامة في القطيع.'
+      },
+
+      retained_placenta: {
+        recurrent:
+          'تكرار احتباس المشيمة في نفس الحيوانات يشير إلى نمط فردي متكرر يجب فصله عن المشكلة على مستوى القطيع.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة تستحق مراجعة إدارة الولادة وفترة الانتقال والعوامل المصاحبة بعد الولادة.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر تكرار فردي أو زيادة زمنية واضحة.'
+      },
+
+      metritis_endometritis: {
+        recurrent:
+          'تكرار التهاب الرحم في نفس الحيوانات يشير إلى عبء متكرر بعد الولادة ويستحق مراجعة تاريخ الولادة والحالات المصاحبة.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة تستحق مراجعة سلامة ما بعد الولادة واحتباس المشيمة وإدارة الولادة.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر نمط متكرر أو زيادة زمنية واضحة.'
+      },
+
+      ovarian_cysts: {
+        recurrent:
+          'تكرار أكياس المبايض في نفس الحيوانات يشير إلى مشكلة تناسلية فردية متكررة تحتاج مراجعة تاريخها التناسلي.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة تستحق مراجعة الحالة الجسمية والطاقة والتاريخ التناسلي للحيوانات المتأثرة.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر تكرار فردي أو زيادة زمنية واضحة.'
+      },
+
+      pyometra: {
+        recurrent:
+          'تكرار تقيح الرحم في نفس الحيوانات يستوجب مراجعة تاريخ الولادة والتلقيح والتهابات الرحم السابقة لكل حالة.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة تستحق مراجعة مسار ما بعد الولادة والتلقيح والتشخيص التناسلي.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر اتجاه تصاعدي واضح.'
+      },
+
+      brucellosis: {
+        recurrent:
+          'تكرار تسجيل البروسيلا لا يُعامل كنمط عادي؛ الأولوية للتأكيد والإجراءات البيطرية الرسمية.',
+
+        rising:
+          'زيادة الحالات المسجلة ترفع أولوية التحقق المعملي والعزل والإجراءات البيطرية الرسمية فورًا.',
+
+        limited:
+          'حتى الحالة المسجلة الواحدة ذات أهمية وبائية عالية وتحتاج تأكيدًا وإجراءات بيطرية رسمية.'
+      },
+
+      bovine_respiratory_disease: {
+        recurrent:
+          'تكرار المرض التنفسي في نفس الحيوانات يشير إلى استمرار عوامل خطورة أو تعافٍ غير مكتمل ويستحق مراجعة مستقلة.',
+
+        rising:
+          'زيادة الحيوانات المتأثرة عن الفترة السابقة تستحق مراجعة التهوية والكثافة والنقل والخلط وتحديد المسبب عند الحاجة.',
+
+        limited:
+          'الحالات التنفسية المسجلة محدودة ولا يظهر تكرار أو زيادة زمنية واضحة.'
+      },
+
+      johnes_disease: {
+        recurrent:
+          'تكرار تسجيل داء جونز في نفس الحيوانات يدعم أولوية تأكيد التشخيص وإدارة العزل وتقليل تعرض الصغار.',
+
+        rising:
+          'زيادة الحالات المسجلة تستحق مراجعة التشخيص وإدارة العزل ومصادر تعرض الصغار للعدوى.',
+
+        limited:
+          'الحالات المسجلة محدودة، لكن داء جونز يحتاج تأكيدًا وإدارة طويلة المدى للحالات المثبتة.'
+      },
+
+      bovine_viral_diarrhea: {
+        recurrent:
+          'تكرار تسجيل BVD في نفس الحيوانات يستحق تأكيد التشخيص وتقييم احتمال العدوى المستمرة أو التعرض المتكرر.',
+
+        rising:
+          'زيادة الحالات المسجلة تستحق مراجعة التشخيص وبرنامج الوقاية والاشتباه في الحيوانات دائمة العدوى عند وجود دليل.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا تكفي وحدها لإثبات نمط قطيعي، مع بقاء أهمية تأكيد التشخيص.'
+      },
+
+      fmd: {
+        recurrent:
+          'تكرار تسجيل الحمى القلاعية يرفع الأولوية فورًا لإجراءات العزل والإبلاغ والسيطرة الرسمية.',
+
+        rising:
+          'زيادة الحالات المسجلة تمثل إشارة وبائية عالية الأهمية وتستلزم الإجراءات البيطرية الرسمية فورًا.',
+
+        limited:
+          'حتى الاشتباه المسجل الواحد في الحمى القلاعية ذو أولوية قصوى ويستلزم التعامل وفق الإجراءات البيطرية الرسمية.'
+      },
+
+      three_day_sickness: {
+        recurrent:
+          'تكرار حمى الثلاثة أيام في نفس الحيوانات يستحق مراجعة شدة الحالات وعوامل التعرض للنواقل.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة تستحق رفع أولوية مكافحة الحشرات وسرعة اكتشاف الحالات الشديدة.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر اتجاه تصاعدي واضح.'
+      },
+
+      lumpy_skin: {
+        recurrent:
+          'تكرار تسجيل الجلد العقدي يستحق تأكيد الحالات ومراجعة التعرض للنواقل وحالة التحصين.',
+
+        rising:
+          'زيادة الحالات المسجلة ترفع أولوية مكافحة النواقل والعزل ومراجعة التحصين وفق البرنامج المعتمد.',
+
+        limited:
+          'الحالات المسجلة محدودة، مع بقاء أهمية العزل ومكافحة النواقل والتحقق من حالة التحصين.'
+      },
+
+      septicemia: {
+        recurrent:
+          'تكرار تسمم الدم يستوجب البحث عن مصدر عدوى متكرر وعدم التعامل معه كحدث منفرد.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة تمثل تصاعدًا مهمًا يستحق تشخيص مصدر العدوى والتدخل البيطري السريع.',
+
+        limited:
+          'حتى الحالة المحدودة عدديًا من تسمم الدم تظل عالية الأهمية على مستوى الحيوان المصاب.'
+      },
+
+      salmonellosis: {
+        recurrent:
+          'تكرار السالمونيلا في نفس الحيوانات يستحق مراجعة مصدر العدوى وإدارة العزل والتلوث البيئي.',
+
+        rising:
+          'زيادة الحالات المسجلة تستحق مراجعة العزل والنظافة ومصادر التلوث مع تأكيد مخبري عند الحاجة.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر اتجاه تصاعدي واضح، مع أهمية منع انتقال العدوى.'
+      },
+
+      leptospirosis: {
+        recurrent:
+          'تكرار الاشتباه في الليبتوسبيرا يستحق تأكيدًا معمليًا وربطه بمصادر المياه والقوارض ومشاكل الحمل إن وُجدت.',
+
+        rising:
+          'زيادة الحالات المسجلة تستحق مراجعة مصادر المياه والقوارض والتحصين والتأكيد المعملي.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا تكفي وحدها لإثبات نمط قطيعي دون تأكيد تشخيصي.'
+      },
+
+      ibr: {
+        recurrent:
+          'تكرار IBR في نفس الحيوانات يستحق تأكيد التشخيص ومراجعة نمط العدوى وبرنامج الوقاية.',
+
+        rising:
+          'زيادة الحالات المسجلة تستحق مراجعة العزل والتحصين وتحديد المسبب عند وجود نمط تنفسي أو تناسلي.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا تكفي وحدها لإثبات انتشار قطيعي دون تأكيد التشخيص.'
+      },
+
+      blackleg: {
+        recurrent:
+          'تكرار تسجيل الحمى الفحمية العرضية يستحق مراجعة التحصين والتعامل مع النافق وعوامل التعرض البيئية.',
+
+        rising:
+          'زيادة الحالات المسجلة ترفع أولوية مراجعة التحصين وإجراءات التعامل مع الحالات النافقة والوقاية القطيعية.',
+
+        limited:
+          'حتى الحالات المحدودة تستحق مراجعة حالة التحصين وإجراءات الوقاية بسبب شدة المرض.'
+      },
+
+      clostridial_enterotoxemia: {
+        recurrent:
+          'تكرار التسمم المعوي الكلوستريدي يستحق مراجعة التحصين والتغيرات الغذائية وعوامل الخطورة المشتركة.',
+
+        rising:
+          'زيادة الحالات المسجلة تستحق مراجعة التحصين والتغيرات الغذائية وتحديد عوامل الخطورة القطيعية.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر اتجاه تصاعدي واضح، مع أهمية مراجعة الوقاية عند أي تكرار.'
+      },
+
+      blood_parasites: {
+        recurrent:
+          'تكرار طفيليات الدم في نفس الحيوانات يشير إلى استمرار التعرض للنواقل أو عدم اكتمال السيطرة ويحتاج تحديد النوع.',
+
+        rising:
+          'زيادة الحالات المسجلة تستحق مراجعة مكافحة النواقل وتأكيد نوع الطفيل وخطة العلاج النوعي.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر اتجاه تصاعدي واضح.'
+      },
+
+      pinkeye: {
+        recurrent:
+          'تكرار التهاب العين في نفس الحيوانات يستحق مراجعة التعرض للذباب والغبار وإصابات القرنية.',
+
+        rising:
+          'زيادة الحالات عن الفترة السابقة تستحق مراجعة عوامل الانتقال والذباب والغبار وعزل الحالات النشطة عند الحاجة.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر تكرار أو زيادة زمنية واضحة.'
+      },
+
+      gastrointestinal_parasites: {
+        recurrent:
+          'تكرار الطفيليات المعوية في نفس الحيوانات يستحق تقييم العبء الطفيلي وفعالية برنامج المكافحة بدل تكرار العلاج عشوائيًا.',
+
+        rising:
+          'زيادة الحالات المسجلة تستحق تقييم العبء الطفيلي ومراجعة برنامج المكافحة وفعاليته.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا تثبت وحدها الحاجة إلى تغيير برنامج المكافحة دون تقييم العبء الطفيلي.'
+      },
+
+      mange_ectoparasites: {
+        recurrent:
+          'تكرار الجرب أو الطفيليات الخارجية يشير إلى إعادة عدوى أو عدم اكتمال السيطرة ويستحق مراجعة البيئة وبرنامج المكافحة.',
+
+        rising:
+          'زيادة الحالات المسجلة تستحق مراجعة المكافحة الجماعية والبيئة ومصادر إعادة العدوى.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر اتجاه تصاعدي واضح.'
+      },
+
+      calf_pneumonia: {
+        recurrent:
+          'تكرار الالتهاب الرئوي في نفس العجول يشير إلى استمرار عامل خطورة أو تعافٍ غير مكتمل ويستحق مراجعة مستقلة.',
+
+        rising:
+          'زيادة العجول المتأثرة عن الفترة السابقة تستحق مراجعة التهوية والكثافة والسرسوب وتحديد المسبب عند الحاجة.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر تكرار أو زيادة زمنية واضحة.'
+      },
+
+      navel_infection: {
+        recurrent:
+          'تكرار التهاب السرة يستحق مراجعة تعقيم السرة ونظافة الولادة وكفاءة السرسوب بدل اعتباره حالات منفصلة.',
+
+        rising:
+          'زيادة الحالات المسجلة تستحق مراجعة نظافة الولادة وتعقيم السرة وكفاءة السرسوب.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر اتجاه تصاعدي واضح.'
+      },
+
+      joint_ill: {
+        recurrent:
+          'تكرار التهاب المفاصل في نفس العجول يستحق البحث عن مصدر عدوى مستمر وربطه بالسرة والسرسوب عند وجود دليل.',
+
+        rising:
+          'زيادة الحالات المسجلة تستحق مراجعة مصدر العدوى والسرة وكفاءة السرسوب والتدخل المبكر.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا يظهر اتجاه تصاعدي واضح.'
+      },
+
+      calf_coccidiosis: {
+        recurrent:
+          'تكرار الكوكسيديا في نفس العجول يستحق مراجعة العمر والكثافة ونظافة البيئة وفعالية برنامج المكافحة.',
+
+        rising:
+          'زيادة الحالات المسجلة تستحق مراجعة الكثافة ونظافة البيئة وتأكيد التشخيص البرازي قبل تعديل برنامج المكافحة.',
+
+        limited:
+          'الحالات المسجلة محدودة ولا تثبت وحدها الحاجة إلى تغيير برنامج المكافحة دون تأكيد التشخيص.'
+      }
+    };
+
+    const healthGeneralScientificReading =
+      problem => {
+        const profile =
+          HEALTH_GENERAL_READING_PROFILES[
+            problem.key
+          ];
+
+        if (!profile) {
+          return '';
+        }
+
+        const recurrenceCount =
+          Number(
+            problem.recurrence
+              ?.affectedAnimals ||
+            0
+          );
+
+        if (recurrenceCount > 0) {
+          return profile.recurrent;
+        }
+
+        if (
+          problem.trend
+            ?.direction === 'up'
+        ) {
+          return profile.rising;
+        }
+
+        return profile.limited;
+      };
+    const healthScientificReading =
+      (
+        problem,
+        concentration
+      ) => {
+        const m =
+          problem.metrics || {};
+
+        const recurrenceCount =
+          Number(
+            problem.recurrence
+              ?.affectedAnimals ||
+            0
+          );
+
+        const trend =
+          problem.trend || {};
+
+        if (
+          !Number(
+            m.caseCount || 0
           )
-        );
+        ) {
+          return `لم تُسجل حالات ${problem.title} خلال الفترة المختارة.`;
+        }
 
-    const treatmentRows =
-      currentEvents
-        .filter(
-          hasTreatmentData
-        )
-        .map(
-          event => ({
-            section:
-              animalSectionForEvent(
-                event
-              ),
+        if (
+          problem.key ===
+            'abortion' &&
+          m.rateDataComplete ===
+            false
+        ) {
+          return recurrenceCount > 0
+            ? `ربط كل حالات الإجهاض بحلقات الحمل غير مكتمل، لذلك لا يصدر مُرَبِّيك معدلًا للفترة؛ ومع ذلك يوجد إجهاض متكرر موثق في ${recurrenceCount} حيوان.`
+            : 'ربط كل حالات الإجهاض بحلقات الحمل غير مكتمل، لذلك لا يصدر مُرَبِّيك معدلًا أو حكمًا على مستوى القطيع لهذه الفترة.';
+        }
 
-            animalNumber:
-              event._number,
-
-            date:
-              event._date,
-
-            diagnosis:
-              eventDiseaseName(
-                event
-              ) ||
-              text(
-                event.diagnosis ||
-                event.details
-                  ?.diagnosis ||
-                'حالة صحية'
-              ),
-
-            treatment:
-              text(
-                event.treatment ||
-                event.treatmentName ||
-                event.drugName ||
-                event.drug ||
-                event.medicine ||
-                event.details
-                  ?.treatment ||
-                event.details
-                  ?.drugName ||
-                event.details
-                  ?.drug ||
-                event.details
-                  ?.medicine
+        const benchmark =
+          (
+            m.ratePct !== null &&
+            m.ratePct !== undefined &&
+            m.ceilingPct !== null &&
+            m.ceilingPct !== undefined
+          )
+            ? (
+                Number(m.ratePct) <=
+                Number(m.ceilingPct)
+                  ? 'المعدل داخل السقف المرجعي.'
+                  : 'المعدل متجاوز للسقف المرجعي.'
               )
-          })
-        )
-        .sort(
-          (a, b) =>
-            b.date.localeCompare(
-              a.date
+            : '';
+
+        if (
+          problem.key ===
+          'mastitis'
+        ) {
+          if (recurrenceCount > 0) {
+            return `${benchmark} العبء الحالي يتأثر بتكرار التهاب الضرع في ${recurrenceCount} حيوان، وليس بعدد الحالات الجديدة فقط.`.trim();
+          }
+
+          if (
+            concentration?.key ===
+            'byQuarter'
+          ) {
+            return `${benchmark} الحالات متركزة في ${concentration.name} (${concentration.count} تسجيلات)، ما يستحق تقييم نمط الأرباع المصابة قبل اعتبار المشكلة انتشارًا عامًا.`.trim();
+          }
+
+          if (
+            trend.direction ===
+            'up'
+          ) {
+            return `${benchmark} المعدل أعلى من الفترة السابقة المكتملة؛ الزيادة الحالية تستحق مراجعة مصدر الحالات الجديدة.`.trim();
+          }
+
+          return `${benchmark} لا يظهر تكرار أو تركز مؤثر في البيانات المسجلة.`.trim();
+        }
+
+        if (
+          problem.key ===
+          'lameness'
+        ) {
+          if (recurrenceCount > 0) {
+            return `${benchmark} العرج متكرر في ${recurrenceCount} حيوان؛ العبء الحالي يرتبط بالحالات المتكررة أكثر من انتشار واسع.`.trim();
+          }
+
+          if (concentration) {
+            return `${benchmark} الحالات متركزة في ${concentration.name} (${concentration.count})؛ الأولوية لفحص العامل المشترك في هذا النمط.`.trim();
+          }
+
+          if (
+            trend.direction ===
+            'up'
+          ) {
+            return `${benchmark} المعدل أعلى من الفترة السابقة المكتملة دون تكرار واضح؛ الزيادة تبدو في حالات جديدة أكثر من كونها مشكلة مزمنة.`.trim();
+          }
+
+          return `${benchmark} لا يظهر تكرار أو تركز واضح في الحالات المسجلة.`.trim();
+        }
+
+        if (
+          problem.key ===
+          'abortion'
+        ) {
+          if (recurrenceCount > 0) {
+            return `${benchmark} يوجد إجهاض متكرر موثق في ${recurrenceCount} حيوان؛ لذلك يجب فصل العبء الفردي المتكرر عن معدل القطيع العام.`.trim();
+          }
+
+          if (
+            concentration?.key ===
+            'byStage'
+          ) {
+            return `${benchmark} الحالات متركزة في مرحلة ${concentration.name} (${concentration.count})؛ هذا نمط زمني يستحق تحقيقًا موجّهًا دون افتراض مسبب.`.trim();
+          }
+
+          if (
+            trend.direction ===
+            'up'
+          ) {
+            return `${benchmark} المعدل أعلى من الفترة السابقة المكتملة؛ الأولوية لتحديد ما إذا كانت الزيادة عامة أم مرتبطة بعامل مشترك.`.trim();
+          }
+
+          return `${benchmark} لا يظهر تكرار أو تركز زمني مؤثر في الحالات المسجلة.`.trim();
+        }
+
+        if (
+          problem.key ===
+          'embryonic_loss'
+        ) {
+          if (recurrenceCount > 0) {
+            return `فقد الأجنة متكرر في ${recurrenceCount} حيوان؛ النمط الحالي يحتاج مراجعة مستقلة للحالات المتكررة قبل اعتباره تراجعًا عامًا في القطيع.`;
+          }
+
+          if (
+            trend.direction ===
+            'up'
+          ) {
+            return 'عدد الحيوانات المتأثرة بفقد الأجنة أعلى من الفترة السابقة المكتملة، دون تكرار فردي واضح.';
+          }
+
+          return 'فقد الأجنة المسجل لا يظهر تكرارًا فرديًا أو زيادة واضحة مقارنة بالفترة السابقة المتاحة.';
+        }
+
+        if (
+          problem.key ===
+          'calf_scours'
+        ) {
+          if (recurrenceCount > 0) {
+            return `${benchmark} توجد حالات متكررة في ${recurrenceCount} عجل؛ العبء ليس ناتجًا عن حالات منفردة فقط.`.trim();
+          }
+
+          if (
+            concentration?.key ===
+            'byAgeBand'
+          ) {
+            return `${benchmark} الحالات متركزة في عمر ${concentration.name} (${concentration.count})، وهو نمط عمري واضح يستحق مراجعة عوامل التعرض في هذه المرحلة.`.trim();
+          }
+
+          if (
+            trend.direction ===
+            'up'
+          ) {
+            return `${benchmark} المعدل أعلى من الفترة السابقة المكتملة دون تكرار واضح.`.trim();
+          }
+
+          return `${benchmark} لا يظهر تكرار أو تركز عمري واضح في البيانات المسجلة.`.trim();
+        }
+
+        const generalReading =
+          healthGeneralScientificReading(
+            problem
+          );
+
+        if (generalReading) {
+          return generalReading;
+        }
+
+        if (recurrenceCount > 0) {
+          return `${problem.title} متكرر في ${recurrenceCount} حيوان؛ تُراجع الحالات المتكررة أولًا دون استنتاج سبب غير مثبت.`;
+        }
+
+        if (
+          trend.direction ===
+          'up'
+        ) {
+          return `عدد الحيوانات المتأثرة بـ${problem.title} أعلى من الفترة السابقة المكتملة؛ يلزم تقييم سبب الزيادة دون افتراض مسبب من البيانات الحالية.`;
+        }
+
+        return 'الحالات المسجلة محدودة ولا يظهر تكرار فردي أو زيادة زمنية واضحة في البيانات المتاحة.';
+      };
+
+    const healthScientificAction =
+      (
+        problem,
+        concentration
+      ) => {
+        const m =
+          problem.metrics || {};
+
+        const recurrenceCount =
+          Number(
+            problem.recurrence
+              ?.affectedAnimals ||
+            0
+          );
+
+        if (
+          !Number(
+            m.caseCount || 0
+          )
+        ) {
+          return '';
+        }
+
+        if (
+          problem.key ===
+            'abortion' &&
+          m.rateDataComplete ===
+            false
+        ) {
+          return 'استكمل ربط حالات الإجهاض بحلقات الحمل أولًا؛ وراجع الحالات المتكررة فورًا إن وُجدت.';
+        }
+
+        if (
+          problem.key ===
+          'mastitis'
+        ) {
+          if (recurrenceCount > 0) {
+            return 'ابدأ بالحيوانات والأرباع المتكررة، وقيّم الحالات المزمنة والزرع والحساسية عند الحاجة قبل تعديل إجراءات القطيع كله.';
+          }
+
+          if (
+            concentration?.key ===
+            'byQuarter'
+          ) {
+            return `ابدأ بالحالات المسجلة في ${concentration.name} وراجع نمط الحلب والمسبب المتاح قبل تعميم أي تغيير.`;
+          }
+
+          if (
+            problem.status ===
+              'danger' ||
+            problem.trend
+              ?.direction === 'up'
+          ) {
+            return 'راجع الحالات الجديدة وإجراءات الحلب ونظافة الضرع، واستخدم التشخيص المخبري للحالات المناسبة.';
+          }
+
+          return '';
+        }
+
+        if (
+          problem.key ===
+          'lameness'
+        ) {
+          if (recurrenceCount > 0) {
+            return 'افحص الحوافر للحالات المتكررة وحدد الآفة، ثم راجع التقليم والأرضيات ومسارات الحركة المرتبطة بها.';
+          }
+
+          if (concentration) {
+            return `ابدأ بفحص الحالات المتركزة في ${concentration.name} وابحث عن العامل المشترك في الحوافر أو البيئة.`;
+          }
+
+          if (
+            problem.status ===
+              'danger' ||
+            problem.trend
+              ?.direction === 'up'
+          ) {
+            return 'افحص الحالات الجديدة وحدد الآفة قبل تعديل برنامج الحوافر أو البيئة.';
+          }
+
+          return '';
+        }
+
+        if (
+          problem.key ===
+          'abortion'
+        ) {
+          if (recurrenceCount > 0) {
+            return 'ابدأ بالحالات المتكررة: راجع التاريخ التناسلي وعمر الحمل والنتائج التشخيصية، ثم وجّه التحقيق البيطري حسب النمط.';
+          }
+
+          if (concentration) {
+            return `راجع الحالات الواقعة في ${concentration.name} وابحث عن عامل مشترك زمني أو إداري أو معدٍ دون افتراض المسبب.`;
+          }
+
+          if (
+            problem.status ===
+              'danger' ||
+            problem.trend
+              ?.direction === 'up'
+          ) {
+            return 'ابدأ تحقيق إجهاض موجّهًا يشمل عمر الحمل والتاريخ التناسلي وفحص الجنين والمشيمة والاختبارات المناسبة.';
+          }
+
+          return '';
+        }
+
+        if (
+          problem.key ===
+          'embryonic_loss'
+        ) {
+          return (
+            recurrenceCount > 0 ||
+            problem.trend
+              ?.direction === 'up'
+          )
+            ? 'راجع تواريخ التلقيح والتشخيص وتأكيد الحمل، وابدأ بالحالات المتكررة لتقييم نمط الفقد المبكر.'
+            : '';
+        }
+
+        if (
+          problem.key ===
+          'calf_scours'
+        ) {
+          if (recurrenceCount > 0) {
+            return 'ابدأ بالعجول المتكررة وراجع كفاءة السرسوب ونظافة الولادة والإيواء، مع تشخيص مسبب عند الحاجة.';
+          }
+
+          if (
+            concentration?.key ===
+            'byAgeBand'
+          ) {
+            return `راجع السرسوب ونظافة الولادة والإيواء والتعرض داخل فئة ${concentration.name} أولًا.`;
+          }
+
+          if (
+            problem.status ===
+              'danger' ||
+            problem.trend
+              ?.direction === 'up'
+          ) {
+            return 'راجع السرسوب ونظافة الولادة والإيواء، واطلب تشخيصًا مسببًا عند تجمع الحالات.';
+          }
+
+          return '';
+        }
+
+        if (
+          HEALTH_CRITICAL_ANY_CASE
+            .has(
+              problem.key
             )
-        );
+        ) {
+          return healthBaseAction(
+            problem
+          );
+        }
+
+        if (
+          recurrenceCount > 0 ||
+          concentration ||
+          problem.trend
+            ?.direction === 'up'
+        ) {
+          return healthBaseAction(
+            problem
+          );
+        }
+
+        return '';
+      };
+
+    const finalizeHealthProblem =
+      problem => {
+        problem.trend =
+          healthProblemTrend(
+            problem
+          );
+
+        const concentration =
+          healthTopConcentration(
+            problem
+          );
+
+        const m =
+          problem.metrics || {};
+
+        if (
+          !Number(
+            m.caseCount || 0
+          )
+        ) {
+          problem.status = 'ok';
+
+        } else if (
+          HEALTH_CRITICAL_ANY_CASE
+            .has(
+              problem.key
+            )
+        ) {
+          problem.status =
+            'danger';
+
+        } else if (
+          problem.key ===
+            'abortion' &&
+          m.rateDataComplete ===
+            false
+        ) {
+          problem.status =
+            Number(
+              problem.recurrence
+                ?.affectedAnimals ||
+              0
+            ) > 0
+              ? 'warn'
+              : 'muted';
+
+        } else if (
+          m.ratePct !== null &&
+          m.ratePct !== undefined &&
+          m.ceilingPct !== null &&
+          m.ceilingPct !== undefined &&
+          Number(m.ratePct) >
+            Number(m.ceilingPct)
+        ) {
+          problem.status =
+            'danger';
+
+        } else if (
+          Number(
+            problem.recurrence
+              ?.affectedAnimals ||
+            0
+          ) > 0 ||
+          problem.trend
+            ?.direction === 'up' ||
+          concentration
+        ) {
+          problem.status =
+            'warn';
+
+        } else if (
+          m.ratePct !== null &&
+          m.ratePct !== undefined
+        ) {
+          problem.status =
+            'ok';
+
+        } else {
+          problem.status =
+            'info';
+        }
+
+        problem.murabbik = {
+          status:
+            problem.status,
+
+          reading:
+            healthScientificReading(
+              problem,
+              concentration
+            ),
+
+          action:
+            healthScientificAction(
+              problem,
+              concentration
+            )
+        };
+
+        problem.display = {
+          problem:
+            problem.title,
+
+          status:
+            problem.status,
+
+          statusLabel:
+            HEALTH_STATUS_LABELS[
+              problem.status
+            ] ||
+            problem.status,
+
+          indicator:
+            healthIndicatorText(
+              problem
+            ),
+
+          recurrence:
+            healthRecurrenceText(
+              problem
+            ),
+
+          trend:
+            healthTrendText(
+              problem.trend
+            ),
+
+          reading:
+            problem.murabbik
+              .reading,
+
+          action:
+            problem.murabbik
+              .action
+        };
+
+        return problem;
+      };
 
     const programContext =
       await vaccinationReadProgramContextSrv(
@@ -121899,164 +122831,352 @@ const allowedPeriods = [30, 90, 180, 360];
       );
     }
 
-    const vaccinationEvents =
-      currentEvents.filter(
-        event =>
-          eventTypeOf(
-            event
-          ) ===
-          'vaccination'
-      );
-
-    const recentVaccinations =
-      vaccinationEvents
-        .map(
-          event => ({
-            animalNumber:
-              event._number,
-
-            date:
-              event._date,
-
-            vaccine:
-              text(
-                event.vaccine ||
-                event.vaccineName ||
-                event.vaccineCode ||
-                'تحصين'
-              ),
-
-            doseType:
-              text(
-                event.doseTypeLabel ||
-                event.doseType
-              ),
-
-            programSection:
-              text(
-                event.programSection
-              ),
-
-            programMode:
-              text(
-                event.vaccinationProgramMode ||
-                event.programMode
-              )
-          })
-        )
-        .sort(
-          (a, b) =>
-            b.date.localeCompare(
-              a.date
-            )
-        )
-        .slice(
-          0,
-          50
-        );
-
-    const openTaskFlat =
+        const openTaskFlat =
       Object
         .values(
           executionGroups
         )
         .flat();
 
-    const vaccinationExecutionSummary = {
-      executedInPeriod:
-        vaccinationEvents.length,
-
-      overdue:
-        openTaskFlat
-          .filter(
-            row =>
-              row.status ===
-              'overdue'
-          )
-          .reduce(
-            (
-              sum,
-              row
-            ) =>
-              sum +
-              row.count,
-            0
-          ),
-
-      today:
-        openTaskFlat
-          .filter(
-            row =>
-              row.status ===
-              'today'
-          )
-          .reduce(
-            (
-              sum,
-              row
-            ) =>
-              sum +
-              row.count,
-            0
-          ),
-
-      needsData:
-        openTaskFlat
-          .filter(
-            row =>
-              row.status ===
-              'needs_data'
-          )
-          .reduce(
-            (
-              sum,
-              row
-            ) =>
-              sum +
-              row.count,
-            0
-          ),
-
-      upcoming:
-        openTaskFlat
-          .filter(
-            row =>
-              row.status ===
-              'upcoming'
-          )
-          .reduce(
-            (
-              sum,
-              row
-            ) =>
-              sum +
-              row.count,
-            0
-          )
-    };
-
-    const adultProblems = [
+        const adultProblems = [
       mastitis,
       lameness,
       abortion,
       embryonicLoss,
       ...adultGeneralProblems
-    ];
+    ].map(
+      finalizeHealthProblem
+    );
 
     const calfProblems = [
       calfScours,
       ...calfGeneralProblems
-    ];
+    ].map(
+      finalizeHealthProblem
+    );
+
+    const healthProblemScore =
+      problem => {
+        const rank = {
+          danger: 4,
+          warn: 3,
+          muted: 2,
+          info: 1,
+          ok: 0
+        };
+
+        return (
+          (
+            rank[
+              problem.status
+            ] || 0
+          ) * 1000 +
+
+          Number(
+            problem.recurrence
+              ?.affectedAnimals ||
+            0
+          ) * 100 +
+
+          (
+            problem.trend
+              ?.direction === 'up'
+              ? 50
+              : 0
+          ) +
+
+          Number(
+            problem.metrics
+              ?.caseCount ||
+            0
+          )
+        );
+      };
+
+    const priorityProblems = [
+      ...adultProblems.map(
+        problem => ({
+          section:
+            `صحة ${herdLabel}`,
+          problem
+        })
+      ),
+
+      ...calfProblems.map(
+        problem => ({
+          section:
+            'صحة العجول',
+          problem
+        })
+      )
+    ]
+      .filter(
+        item =>
+          [
+            'danger',
+            'warn',
+            'muted'
+          ].includes(
+            item.problem.status
+          )
+      )
+      .sort(
+        (a, b) =>
+          healthProblemScore(
+            b.problem
+          ) -
+          healthProblemScore(
+            a.problem
+          )
+      )
+      .slice(0, 3);
+
+    const executiveRows =
+      priorityProblems.length
+        ? priorityProblems.map(
+            item => ({
+              section:
+                item.section,
+
+              problem:
+                item.problem.title,
+
+              status:
+                item.problem.status,
+
+              statusLabel:
+                HEALTH_STATUS_LABELS[
+                  item.problem.status
+                ] ||
+                item.problem.status,
+
+              reading:
+                item.problem
+                  .murabbik
+                  .reading,
+
+              action:
+                item.problem
+                  .murabbik
+                  .action
+            })
+          )
+        : [
+            {
+              section:
+                'القطيع',
+
+              problem:
+                'الصحة العامة',
+
+              status:
+                'ok',
+
+              statusLabel:
+                HEALTH_STATUS_LABELS
+                  .ok,
+
+              reading:
+                'لا توجد أولوية صحية مرتفعة وفق البيانات المكتملة في الفترة المختارة.',
+
+              action:
+                ''
+            }
+          ];
+
+    const approvedProgramRows =
+      Array.isArray(
+        vaccinationProgram.rows
+      )
+        ? vaccinationProgram.rows
+        : [];
+
+    const vaccinationTaskMatchesRow =
+      (
+        task,
+        row
+      ) => {
+        const taskRowId =
+          text(
+            task.programRowId
+          );
+
+        const rowId =
+          text(
+            row.programRowId
+          );
+
+        if (
+          taskRowId &&
+          rowId
+        ) {
+          return (
+            taskRowId ===
+            rowId
+          );
+        }
+
+        const taskCode =
+          text(
+            task.vaccineCode
+          );
+
+        const rowCode =
+          text(
+            row.vaccineCode
+          );
+
+        return Boolean(
+          taskCode &&
+          rowCode &&
+          taskCode ===
+            rowCode
+        );
+      };
+
+    const vaccinationStatusLabel = {
+      overdue:
+        'متأخر',
+
+      today:
+        'مستحق اليوم',
+
+      needs_data:
+        'بيانات ناقصة',
+
+      upcoming:
+        'قادم'
+    };
+
+    const vaccinationActionLabel = {
+      overdue:
+        'تنفيذ الاستحقاق المتأخر',
+
+      today:
+        'تنفيذ استحقاق اليوم',
+
+      needs_data:
+        'استكمال البيانات المطلوبة',
+
+      upcoming:
+        'لا إجراء الآن'
+    };
+
+    const vaccinationPositionRows = [];
+
+    for (
+      const programRow
+      of approvedProgramRows
+    ) {
+      const matchingTasks =
+        openTaskFlat.filter(
+          task =>
+            vaccinationTaskMatchesRow(
+              task,
+              programRow
+            )
+        );
+
+      if (
+        !matchingTasks.length
+      ) {
+        vaccinationPositionRows
+          .push({
+            programRowId:
+              programRow.programRowId,
+
+            vaccine:
+              programRow.vaccine,
+
+            target:
+              programRow.target,
+
+            dose:
+              '—',
+
+            dueDate:
+              '—',
+
+            status:
+              'clear',
+
+            statusLabel:
+              'لا توجد استحقاقات مفتوحة',
+
+            count:
+              0,
+
+            animalNumbers:
+              [],
+
+            action:
+              ''
+          });
+
+        continue;
+      }
+
+      for (
+        const task
+        of matchingTasks
+      ) {
+        vaccinationPositionRows
+          .push({
+            programRowId:
+              programRow.programRowId,
+
+            vaccine:
+              programRow.vaccine,
+
+            target:
+              programRow.target,
+
+            dose:
+              task.doseTypeLabel ||
+              task.doseType ||
+              '—',
+
+            dueDate:
+              task.dueDate ||
+              '—',
+
+            status:
+              task.status,
+
+            statusLabel:
+              vaccinationStatusLabel[
+                task.status
+              ] ||
+              task.status,
+
+            count:
+              Number(
+                task.count ||
+                0
+              ),
+
+            animalNumbers:
+              Array.isArray(
+                task.animalNumbers
+              )
+                ? task.animalNumbers
+                : [],
+
+            action:
+              vaccinationActionLabel[
+                task.status
+              ] ||
+              ''
+          });
+      }
+    }
 
     return res.json({
       ok: true,
 
       report: {
-        version:
-          2,
-
-        status:
-          'ready',
+        version: 3,
+        status: 'ready',
 
         meta: {
           title:
@@ -122099,6 +123219,21 @@ const allowedPeriods = [30, 90, 180, 360];
               .toISOString()
         },
 
+        executive: {
+          title:
+            'قراءة مُرَبِّيك الصحية',
+
+          columns: [
+            'القسم',
+            'الأولوية',
+            'قراءة مُرَبِّيك',
+            'الإجراء الأول'
+          ],
+
+          rows:
+            executiveRows
+        },
+
         adults: {
           title:
             `صحة ${herdLabel}`,
@@ -122111,13 +123246,20 @@ const allowedPeriods = [30, 90, 180, 360];
               lactatingAtRisk.size
           },
 
-          reading:
-            sectionReading(
-              adultProblems
-            ),
+          columns: [
+            'المشكلة',
+            'المؤشر',
+            'التكرار',
+            'الاتجاه',
+            'قراءة مُرَبِّيك',
+            'الإجراء الأول'
+          ],
 
-          problems:
-            adultProblems
+          rows:
+            adultProblems.map(
+              problem =>
+                problem.display
+            )
         },
 
         calves: {
@@ -122129,55 +123271,50 @@ const allowedPeriods = [30, 90, 180, 360];
               calfAtRisk.size
           },
 
-          reading:
-            sectionReading(
-              calfProblems
-            ),
+          columns: [
+            'المشكلة',
+            'المؤشر',
+            'التكرار',
+            'الاتجاه',
+            'قراءة مُرَبِّيك',
+            'الإجراء الأول'
+          ],
 
-          problems:
-            calfProblems
+          rows:
+            calfProblems.map(
+              problem =>
+                problem.display
+            )
         },
 
         vaccinations: {
-          program:
-            vaccinationProgram,
+          title:
+            'التحصينات',
 
-          execution: {
-            summary:
-              vaccinationExecutionSummary,
+          program: {
+            ...vaccinationProgram,
 
-            groups:
-              executionGroups,
+            rows:
+              approvedProgramRows
+          },
 
-            recentExecuted:
-              recentVaccinations
+          position: {
+            title:
+              'الموقف التنفيذي للبرنامج المعتمد',
+
+            columns: [
+              'التحصين',
+              'الفئة',
+              'الجرعة',
+              'الاستحقاق',
+              'الموقف التنفيذي',
+              'العدد',
+              'المطلوب'
+            ],
+
+            rows:
+              vaccinationPositionRows
           }
-        },
-
-        treatments: {
-          adults:
-            treatmentRows
-              .filter(
-                row =>
-                  row.section ===
-                  'adult'
-              )
-              .slice(
-                0,
-                50
-              ),
-
-          calves:
-            treatmentRows
-              .filter(
-                row =>
-                  row.section ===
-                  'calf'
-              )
-              .slice(
-                0,
-                50
-              )
         }
       }
     });
