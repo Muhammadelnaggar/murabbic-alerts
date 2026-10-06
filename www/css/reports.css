@@ -1642,7 +1642,10 @@ body[data-page="fertility-report"] #fertilityPrintReport{
 /* =========================================================
    Health Report — independent A4 print document
    ========================================================= */
-
+@page healthReportFull {
+  size: A4 portrait;
+  margin: 0;
+}
 body[data-page="health-report"] #healthPrintReport{
   display:none;
 }
@@ -1661,7 +1664,16 @@ body[data-page="health-report"] #healthPrintReport{
 
 
   body[data-page="health-report"]{
-    width:auto !important;
+  page: healthReportFull;
+
+  width:auto !important;
+  max-width:none !important;
+  margin:0 !important;
+  padding:0 !important;
+  background:#fff !important;
+  color:#17231d !important;
+  overflow:visible !important;
+}
     max-width:none !important;
     margin:0 !important;
     padding:0 !important;
