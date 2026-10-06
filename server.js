@@ -86537,11 +86537,13 @@ const avgBreedIntervalDays =
   breedIntervalN ? Math.round(breedIntervalSum / breedIntervalN) : 0;
 
 
-    // --------------------------------------
-    // 🔥 3) الاستبعاد — آخر 365 يوم
-    // الصحي يشمل النفوق
-    // المقام = الأمهات الحالية من النوع المختار
-    // --------------------------------------
+ // --------------------------------------
+// 🔥 3) الاستبعاد — فترة البيانات المتاحة
+// عند اكتمال 365 يومًا: آخر 365 يوم + تقييم سنوي
+// قبل ذلك: الفترة المتاحة فقط بدون سقف سنوي
+// الصحي يشمل النفوق
+// المقام = الأمهات الحالية من النوع المختار
+// --------------------------------------
 let cullProd = 0;
 let cullRepro = 0;
 let cullHealth = 0;
@@ -86552,7 +86554,16 @@ let cullReproPct = 0;
 let cullHealthPct = 0;
 let cullTotalPct = 0;
 
-const cullWindowDays = 365;
+let cullWindowDays = 0;
+let cullCoverageStartDate = null;
+let cullCoverageDays = 0;
+let cullAnnualEvaluationAvailable = false;
+
+let cullPeriodText =
+  "لا توجد فترة بيانات تاريخية كافية.";
+
+let cullEvaluationText =
+  "لا يطبق التقييم السنوي قبل اكتمال 365 يومًا من البيانات.";
 
 const cullLimits = {
   total: 17,
@@ -86576,32 +86587,28 @@ try {
       cullTodayISO
     );
 
-  const cullStartMs =
-    cullTodayMs -
-    (
-      cullWindowDays *
-      86400000
-    );
+ const [
+  currentHistoryEvents,
+  currentCullSnap,
+  archivedCullSnap,
+  archivedAnimalsSnap
+] = await Promise.all([
+  loadHerdStatsEventsSrv(),
 
-  const [
-    currentCullSnap,
-    archivedCullSnap,
-    archivedAnimalsSnap
-  ] = await Promise.all([
-    db.collection("events")
-      .where("userId", "==", uid)
-      .where("eventTypeNorm", "==", "cull")
-      .get(),
+  db.collection("events")
+    .where("userId", "==", uid)
+    .where("eventTypeNorm", "==", "cull")
+    .get(),
 
-    db.collection("archived_events")
-      .where("userId", "==", uid)
-      .where("eventTypeNorm", "==", "cull")
-      .get(),
+  db.collection("archived_events")
+    .where("userId", "==", uid)
+    .where("eventTypeNorm", "==", "cull")
+    .get(),
 
-    db.collection("archived_animals")
-      .where("userId", "==", uid)
-      .get()
-  ]);
+  db.collection("archived_animals")
+    .where("userId", "==", uid)
+    .get()
+]);
 
   const archivedAnimals =
     archivedAnimalsSnap.docs.map(
@@ -86676,6 +86683,236 @@ try {
       ...currentAdultNumbers,
       ...archivedAdultByNumber.keys()
     ]);
+    /*
+ * بداية التغطية = أقدم دليل بيانات فعلي للقطيع المختار.
+ * تاريخ دخول الحيوان إلى مُرَبِّيك يدخل كحد أدنى،
+ * وأي تاريخ أحداث مستورد أقدم يمد التغطية للخلف.
+ */
+const cullCoverageCandidates =
+  [];
+
+const cullCoverageDateOnly =
+  value => {
+    const raw =
+      String(value ?? "")
+        .trim();
+
+    const direct =
+      raw.match(
+        /\d{4}-\d{2}-\d{2}/
+      );
+
+    if (direct) {
+      return direct[0];
+    }
+
+    const d =
+      toDate(value);
+
+    if (
+      !d ||
+      Number.isNaN(
+        d.getTime()
+      )
+    ) {
+      return "";
+    }
+
+    return d
+      .toISOString()
+      .slice(0, 10);
+  };
+
+const pushCullCoverageDate =
+  value => {
+    const iso =
+      cullCoverageDateOnly(
+        value
+      );
+
+    if (!iso) return;
+
+    const ms =
+      isoToUtcMidnightMs(
+        iso
+      );
+
+    if (
+      !Number.isFinite(ms) ||
+      ms > cullTodayMs
+    ) {
+      return;
+    }
+
+    cullCoverageCandidates.push(
+      {
+        iso,
+        ms
+      }
+    );
+  };
+
+for (const a of active) {
+  pushCullCoverageDate(
+    a.createdAt ??
+    a.importedAt ??
+    a.created_at ??
+    ""
+  );
+}
+
+for (
+  const a
+  of archivedAdultByNumber.values()
+) {
+  pushCullCoverageDate(
+    a.createdAt ??
+    a.importedAt ??
+    a.created_at ??
+    ""
+  );
+
+  pushCullCoverageDate(
+    a.archiveDate ??
+    a.eventDate ??
+    a.date ??
+    ""
+  );
+}
+
+for (
+  const e
+  of (
+    Array.isArray(
+      currentHistoryEvents
+    )
+      ? currentHistoryEvents
+      : []
+  )
+) {
+  const number =
+    normalizeAnimalNumberForStats(
+      e.animalNumber ??
+      e.animalId ??
+      e.number ??
+      ""
+    );
+
+  if (
+    !number ||
+    !eligibleAdultNumbers.has(
+      number
+    )
+  ) {
+    continue;
+  }
+
+  pushCullCoverageDate(
+    computeEventDateFromDoc(e)
+  );
+}
+
+for (
+  const d
+  of archivedCullSnap.docs
+) {
+  const e = {
+    id: d.id,
+    ...(d.data() || {})
+  };
+
+  const number =
+    normalizeAnimalNumberForStats(
+      e.animalNumber ??
+      e.animalId ??
+      e.number ??
+      ""
+    );
+
+  if (
+    !number ||
+    !eligibleAdultNumbers.has(
+      number
+    )
+  ) {
+    continue;
+  }
+
+  pushCullCoverageDate(
+    computeEventDateFromDoc(e)
+  );
+}
+
+if (
+  cullCoverageCandidates.length
+) {
+  cullCoverageCandidates.sort(
+    (a, b) =>
+      a.ms - b.ms
+  );
+
+  const first =
+    cullCoverageCandidates[0];
+
+  cullCoverageStartDate =
+    first.iso;
+
+  cullCoverageDays =
+    Math.max(
+      1,
+      Math.floor(
+        (
+          cullTodayMs -
+          first.ms
+        ) /
+        86400000
+      ) + 1
+    );
+} else if (active.length) {
+  cullCoverageStartDate =
+    cullTodayISO;
+
+  cullCoverageDays = 1;
+}
+
+cullAnnualEvaluationAvailable =
+  cullCoverageDays >= 365;
+
+cullWindowDays =
+  cullCoverageDays > 0
+    ? Math.min(
+        365,
+        cullCoverageDays
+      )
+    : 0;
+
+cullPeriodText =
+  cullAnnualEvaluationAvailable
+    ? "آخر 365 يوم"
+    : (
+        cullWindowDays > 0
+          ? `فترة البيانات المتاحة — ${cullWindowDays} يوم`
+          : "لا توجد فترة بيانات تاريخية كافية."
+      );
+
+cullEvaluationText =
+  cullAnnualEvaluationAvailable
+    ? "التقييم السنوي متاح."
+    : "لم تكتمل 365 يومًا من البيانات — لا يطبق السقف السنوي.";
+
+const cullStartMs =
+  cullWindowDays > 0
+    ? (
+        cullTodayMs -
+        (
+          (
+            cullWindowDays -
+            1
+          ) *
+          86400000
+        )
+      )
+    : cullTodayMs;
 
   /*
    * حيوان واحد = حالة استبعاد واحدة.
@@ -89329,14 +89566,31 @@ cullReproPct,
 cullHealthPct,
 
 culling: {
+  coverageStartDate:
+    cullCoverageStartDate,
+
+  coverageDays:
+    cullCoverageDays,
+
   windowDays:
     cullWindowDays,
+
+  annualEvaluationAvailable:
+    cullAnnualEvaluationAvailable,
+
+  periodText:
+    cullPeriodText,
+
+  evaluationText:
+    cullEvaluationText,
 
   denominatorCount:
     cullDenominatorCount,
 
   limits:
-    cullLimits,
+    cullAnnualEvaluationAvailable
+      ? cullLimits
+      : null,
 
   productivity:
     cullProdPct,
@@ -89470,7 +89724,7 @@ app.get(
       String(
         req.query.type ||
         req.query.species ||
-        
+
         ""
       )
         .trim();
