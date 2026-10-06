@@ -1081,23 +1081,52 @@ function renderHealthPrintTable(
           </tr>
         `;
 
-  return `
-    <table class="health-print-table">
-      <caption>
-        ${esc(title || '')}
-      </caption>
+ const columnCount =
+  Math.max(
+    1,
+    safeHeaders.length
+  );
 
-      <thead>
-        <tr>
-          ${head}
-        </tr>
-      </thead>
+const columnMarkup =
+  (
+    safeHeaders.length
+      ? safeHeaders
+      : ['']
+  )
+    .map(
+      () => '<col>'
+    )
+    .join('');
 
-      <tbody>
-        ${body}
-      </tbody>
-    </table>
-  `;
+return `
+  <table class="health-print-table">
+
+    <colgroup>
+      ${columnMarkup}
+    </colgroup>
+
+    <thead>
+
+      <tr class="health-print-section-row">
+
+        <th colspan="${columnCount}">
+          ${esc(title || '')}
+        </th>
+
+      </tr>
+
+      <tr class="health-print-columns-row">
+        ${head}
+      </tr>
+
+    </thead>
+
+    <tbody>
+      ${body}
+    </tbody>
+
+  </table>
+`;
 }
 
 
