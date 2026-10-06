@@ -10,9 +10,7 @@
     content="width=device-width, initial-scale=1.0"
   />
 
-  <title>
-    تقرير التعداد والاستبعاد - مُرَبِّيك
-  </title>
+  <title>تقرير رصيد القطيع والاستبعاد - مُرَبِّيك</title>
 
   <link
     rel="icon"
@@ -43,9 +41,7 @@
 
     <div>
 
-      <div class="screen-title">
-        تقرير التعداد والاستبعاد
-      </div>
+      <div class="screen-title" id="pageTitle">تقرير رصيد القطيع والاستبعاد</div>
 
       <div class="screen-brand">
         مُرَبِّيك
@@ -84,82 +80,26 @@
           مُرَبِّيك لإدارة مزارع الألبان
         </div>
 
-        <h1 class="title">
-          تقرير التعداد والاستبعاد
-        </h1>
-
-        <div class="sub">
-          تقرير القطيع الحالي ومؤشرات الاستبعاد
-          المسجلة داخل مُرَبِّيك.
-        </div>
+        <h1 id="reportTitle" class="title">تقرير رصيد القطيع والاستبعاد</h1>
+<div class="sub">
+  ملخص رصيد القطيع الحالي ومؤشرات الاستبعاد.
+</div>
 
       </div>
 
-      <div class="report-stamp">
-
-        <b>
-          تقرير القطيع
-        </b>
-
-        <span>
-          التعداد والاستبعاد
-        </span>
-
-      </div>
+     <div class="report-stamp">
+  <b>تقرير القطيع</b>
+  <span>الرصيد والاستبعاد</span>
+</div>
 
     </div>
 
-    <div class="report-meta">
-
-      <div class="meta-pill">
-
-        <span>
-          نوع القطيع
-        </span>
-
-        <b id="reportType">
-          --
-        </b>
-
-      </div>
-
-      <div class="meta-pill">
-
-        <span>
-          فترة الاستبعاد
-        </span>
-
-        <b id="cullWindow">
-          --
-        </b>
-
-      </div>
-
-      <div class="meta-pill">
-
-        <span>
-          مقام نسب الاستبعاد
-        </span>
-
-        <b id="cullDenominator">
-          --
-        </b>
-
-      </div>
-
-      <div class="meta-pill">
-
-        <span>
-          إعداد
-        </span>
-
-        <b>
-          مُرَبِّيك
-        </b>
-
-      </div>
-
-    </div>
+   <div class="report-meta">
+  <div class="meta-pill"><span>نوع القطيع</span><b id="reportType">--</b></div>
+  <div class="meta-pill"><span>فترة الاستبعاد</span><b id="cullPeriod">--</b></div>
+  <div class="meta-pill"><span>حالة التقييم</span><b id="cullEvaluation">--</b></div>
+  <div class="meta-pill"><span>إعداد</span><b>مُرَبِّيك</b></div>
+</div>
 
   </section>
 
@@ -167,14 +107,12 @@
     id="statusBar"
     class="card"
   >
-    جارٍ تحميل تقرير التعداد والاستبعاد...
+   جارٍ تحميل تقرير رصيد القطيع والاستبعاد...
   </div>
 
   <div class="card">
 
-    <div class="section-title">
-      📌 تعداد القطيع
-    </div>
+    <div class="section-title">📌 رصيد القطيع</div>
 
     <div
       id="inventoryGrid"
@@ -345,7 +283,7 @@ async function fetchReport(){
     throw new Error(
       data.message ||
       data.error ||
-      "تعذّر تحميل تقرير التعداد والاستبعاد."
+      "تعذّر تحميل تقرير رصيد القطيع والاستبعاد."
     );
 
   }
@@ -529,25 +467,17 @@ async function main(){
           : "أبقار"
       );
 
-    el("cullWindow").textContent =
+    el("cullPeriod").textContent =
+  String(
+    j.culling?.periodText ||
+    "--"
+  );
 
-      j.culling?.windowDays != null
-
-        ? `${fmtNum(
-            j.culling.windowDays
-          )} يوم`
-
-        : "--";
-
-    el("cullDenominator").textContent =
-
-      j.culling?.denominatorCount != null
-
-        ? `${fmtNum(
-            j.culling.denominatorCount
-          )} رأس`
-
-        : "--";
+el("cullEvaluation").textContent =
+  String(
+    j.culling?.evaluationText ||
+    "--"
+  );
 
     renderInventory(j);
 
@@ -565,7 +495,7 @@ async function main(){
 
     statusBar.textContent =
       e.message ||
-      "تعذّر تحميل تقرير التعداد والاستبعاد.";
+     "تعذّر تحميل تقرير رصيد القطيع والاستبعاد."
 
   }
 
