@@ -89457,6 +89457,36 @@ singleHerdType
 }
 });
 // ============================================================
+//       API: HERD INVENTORY + CULLING REPORT
+//       Alias لنفس بيانات الداش — بدون إعادة حساب
+// ============================================================
+
+app.get(
+  "/api/herd-inventory-culling-report",
+  requireUserId,
+  (req, res) => {
+
+    const type =
+      String(
+        req.query.type ||
+        req.query.species ||
+        
+        ""
+      )
+        .trim();
+
+    const target =
+      type
+        ? `/api/herd-stats?type=${encodeURIComponent(type)}`
+        : "/api/herd-stats";
+
+    return res.redirect(
+      307,
+      target
+    );
+  }
+);
+// ============================================================
 //                 API: FERTILITY REPORT
 //                 تقرير الخصوبة — Server-first
 // ============================================================

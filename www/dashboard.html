@@ -1925,6 +1925,27 @@ cullGrid.innerHTML =
     cullHealthLimit,
     'يشمل النفوق'
   );
+  const herdInventoryCullingReportHref =
+  `herd-inventory-culling-report.html?type=${encodeURIComponent(
+    currentType ||
+    requestedType
+  )}`;
+
+herdGrid.style.cursor =
+  'pointer';
+
+cullGrid.style.cursor =
+  'pointer';
+
+herdGrid.onclick = () => {
+  location.href =
+    herdInventoryCullingReportHref;
+};
+
+cullGrid.onclick = () => {
+  location.href =
+    herdInventoryCullingReportHref;
+};
 const feedMetricSpecs = [
   {
     key: 'iofcPct',
