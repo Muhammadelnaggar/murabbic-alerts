@@ -92673,7 +92673,7 @@ const FERTILITY_REPORT_PERIODS_SRV = Object.freeze([
   Object.freeze({ code: "monthly", label: "شهري", days: 30 }),
   Object.freeze({ code: "quarterly", label: "ربع سنوي", days: 90 }),
   Object.freeze({ code: "semiannual", label: "نصف سنوي", days: 180 }),
-  Object.freeze({ code: "annual", label: "سنوي", days: 365 })
+  Object.freeze({ code: "annual", label: "سنوي", days: 360 })
 ]);
 
 const FERTILITY_REPORT_DEFAULT_PERIOD_SRV = "semiannual";
@@ -92691,7 +92691,7 @@ function fertilityReportSelectPeriodSrv(query = {}) {
 
   const daysText = hasDays ? String(rawDays).trim() : "";
 
-  const byDays = hasDays && /^(30|90|180|365)$/.test(daysText)
+  const byDays = hasDays && /^(30|90|180|360)$/.test(daysText)
     ? FERTILITY_REPORT_PERIODS_SRV.find(
         p => String(p.days) === daysText
       )
@@ -92719,36 +92719,138 @@ app.get("/api/fertility-report", requireUserId, async (req, res) => {
       });
     }
 
-    const uid = req.userId;
-    const todayISO = cairoTodayISO();
-    const todayMs = fertilityReportMsSrv(todayISO) || Date.now();
+const uid = req.userId;
+const profileUid = req.authSession?.uid || uid;
+const todayISO = cairoTodayISO();
+const todayMs = fertilityReportMsSrv(todayISO) || Date.now();
 
-    const typeRaw = String(req.query.type || req.query.species || "").trim().toLowerCase();
-    const selectedType =
-      typeRaw === "buffalo" || typeRaw === "جاموس"
-        ? "buffalo"
-        : (
-            typeRaw === "cow" ||
-            typeRaw === "cows" ||
-            typeRaw === "cattle" ||
-            typeRaw === "أبقار" ||
-            typeRaw === "ابقار"
-              ? "cows"
-              : ""
-          );
+const typeRaw = String(
+  req.query.type ||
+  req.query.species ||
+  ""
+).trim().toLowerCase();
 
-    const selectedPeriod = fertilityReportSelectPeriodSrv(req.query);
+const selectedType =
+  typeRaw === "buffalo" || typeRaw === "جاموس"
+    ? "buffalo"
+    : (
+        typeRaw === "cow" ||
+        typeRaw === "cows" ||
+        typeRaw === "cattle" ||
+        typeRaw === "أبقار" ||
+        typeRaw === "ابقار"
+          ? "cows"
+          : ""
+      );
 
-    if (!selectedPeriod) {
-      return res.status(400).json({
-        ok: false,
-        error: "fertility_report_period_invalid",
-        message: "❌ اختر فترة تحليل صحيحة: شهري، ربع سنوي، نصف سنوي، أو سنوي."
-      });
-    }
+const requestedPeriod =
+  fertilityReportSelectPeriodSrv(req.query);
 
-    const periodDays = selectedPeriod.days;
-    const periodStartMs = todayMs - (periodDays * 86400000);
+if (!requestedPeriod) {
+  return res.status(400).json({
+    ok: false,
+    error: "fertility_report_period_invalid",
+    message:
+      "❌ اختر فترة تحليل صحيحة: شهري، ربع سنوي، نصف سنوي، أو سنوي."
+  });
+}
+
+const profileSnap = await db
+  .collection("users")
+  .doc(profileUid)
+  .get();
+
+const profile = profileSnap.exists
+  ? (profileSnap.data() || {})
+  : {};
+
+const coverageDateOnly = value => {
+  const d = toDate(value);
+
+  return d && !Number.isNaN(d.getTime())
+    ? toYYYYMMDD(d)
+    : "";
+};
+
+let coverageStartDate =
+  coverageDateOnly(profile.createdAt);
+
+if (!coverageStartDate) {
+  try {
+    const authUser =
+      await admin.auth().getUser(profileUid);
+
+    coverageStartDate =
+      coverageDateOnly(
+        authUser?.metadata?.creationTime || ""
+      );
+  } catch (_) {}
+}
+
+const coverageStartMs =
+  fertilityReportMsSrv(coverageStartDate);
+
+const availablePeriodDays =
+  Number.isFinite(coverageStartMs)
+    ? FERTILITY_REPORT_PERIODS_SRV
+        .filter(p => {
+          const periodStartMs =
+            todayMs -
+            ((p.days - 1) * 86400000);
+
+          return coverageStartMs <= periodStartMs;
+        })
+        .map(p => p.days)
+    : [];
+
+const periodOptions =
+  FERTILITY_REPORT_PERIODS_SRV.map(p => ({
+    ...p,
+    available:
+      availablePeriodDays.includes(p.days)
+  }));
+
+const selectedDays =
+  availablePeriodDays.includes(requestedPeriod.days)
+    ? requestedPeriod.days
+    : availablePeriodDays.includes(90)
+      ? 90
+      : (availablePeriodDays.at(-1) || 0);
+
+const selectedPeriod =
+  selectedDays
+    ? FERTILITY_REPORT_PERIODS_SRV.find(
+        p => p.days === selectedDays
+      )
+    : null;
+
+if (!selectedPeriod) {
+  return res.json({
+    ok: true,
+    reportName: "fertility_report",
+    title: "تقرير الخصوبة",
+    generatedAt: new Date().toISOString(),
+    today: todayISO,
+
+    periodDays: null,
+    periodOptions,
+    defaultPeriodCode:
+      FERTILITY_REPORT_DEFAULT_PERIOD_SRV,
+
+    selectedPeriod: null,
+    selectedType: selectedType || "all",
+
+    status: "waiting_for_complete_period",
+    message:
+      "لا توجد مدة تحليل مكتملة حتى الآن."
+  });
+}
+
+const periodDays = selectedPeriod.days;
+
+const periodStartMs =
+  todayMs -
+  ((periodDays - 1) * 86400000);
 
     const animalSnap = await db.collection("animals")
       .where("userId", "==", uid)
@@ -93490,7 +93592,7 @@ const reportDisplay = {
       generatedAt: new Date().toISOString(),
       today: todayISO,
       periodDays,
-      periodOptions: FERTILITY_REPORT_PERIODS_SRV,
+      periodOptions,
       defaultPeriodCode: FERTILITY_REPORT_DEFAULT_PERIOD_SRV,
       selectedPeriod,
       selectedType: selectedType || "all",
