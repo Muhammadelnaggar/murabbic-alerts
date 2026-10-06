@@ -84003,10 +84003,10 @@ const weatherLine =
 
   return [{
     identityKey:
-      "daily-farm-greeting",
+  `daily-farm-greeting:${today}`,
 
-    revisionKey:
-      today,
+revisionKey:
+  today,
 
     kind:
       "informational",
