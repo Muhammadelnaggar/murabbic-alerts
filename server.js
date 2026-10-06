@@ -117767,937 +117767,4427 @@ app.get('/api/health-report', requireUserId, async (req, res) => {
 
     const uid = req.userId;
 
-    // ------------------------------------------------------------
-    // 1) إعدادات التقرير
-    // ------------------------------------------------------------
+const profileUid =
+  req.authSession?.uid ||
+  uid;
 
-    const today = typeof cairoTodayISO === 'function'
-      ? cairoTodayISO()
-      : new Date().toISOString().slice(0, 10);
+const today =
+  await farmTodayISOSrv(
+    profileUid
+  );
 
-    const requestedDays = Number(req.query.days || 90);
-    const days = Math.min(Math.max(requestedDays, 30), 365);
+const allowedPeriods = [30, 90, 180, 360];
 
-    const start = new Date(today + 'T00:00:00');
-    start.setDate(start.getDate() - days + 1);
-    const startDate = start.toISOString().slice(0, 10);
+    const text = value => String(value ?? '').trim();
 
-    const tomorrowDateObj = new Date(today + 'T00:00:00');
-    tomorrowDateObj.setDate(tomorrowDateObj.getDate() + 1);
-    const tomorrow = tomorrowDateObj.toISOString().slice(0, 10);
-
-    const requestedType = String(req.query.type || 'cows').trim();
-
-    let herdType = 'cows';
-    if (requestedType === 'buffalo') herdType = 'buffalo';
-    if (requestedType === 'all') herdType = 'all';
-
-    let herdLabel = 'الأبقار';
-    if (herdType === 'buffalo') herdLabel = 'الجاموس';
-    if (herdType === 'all') herdLabel = 'كل القطيع';
-
-    function clean(value) {
-      return String(value || '').trim();
-    }
-
-    function simpleDate(value) {
+    const dateOnly = value => {
       if (!value) return '';
 
       if (typeof value === 'string') {
         const match = value.match(/\d{4}-\d{2}-\d{2}/);
-        return match ? match[0] : '';
+        if (match) return match[0];
+
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime())
+          ? ''
+          : parsed.toISOString().slice(0, 10);
       }
 
-      if (typeof value.toDate === 'function') {
-        return value.toDate().toISOString().slice(0, 10);
+      if (value instanceof Date) {
+        return Number.isNaN(value.getTime())
+          ? ''
+          : value.toISOString().slice(0, 10);
       }
 
-      if (typeof value._seconds === 'number') {
-        return new Date(value._seconds * 1000).toISOString().slice(0, 10);
+      if (typeof value?.toDate === 'function') {
+        const d = value.toDate();
+        return Number.isNaN(d.getTime())
+          ? ''
+          : d.toISOString().slice(0, 10);
+      }
+
+      const seconds = Number(value?._seconds ?? value?.seconds);
+      if (Number.isFinite(seconds)) {
+        return new Date(seconds * 1000)
+          .toISOString()
+          .slice(0, 10);
       }
 
       return '';
-    }
-
-    function percent(part, total) {
-      if (!total) return 0;
-      return Number(((part / total) * 100).toFixed(1));
-    }
-
-    function levelByPercent(value, warnAt, dangerAt) {
-      if (value >= dangerAt) return 'danger';
-      if (value >= warnAt) return 'warn';
-      return 'ok';
-    }
-
-    function addCount(map, name) {
-      const key = clean(name) || 'غير محدد';
-      map.set(key, (map.get(key) || 0) + 1);
-    }
-
-    function mapToTopList(map, limit) {
-      const list = [];
-
-      for (const [name, count] of map.entries()) {
-        list.push({ name, count });
-      }
-
-      list.sort((a, b) => b.count - a.count);
-      return list.slice(0, limit);
-    }
-
-// ------------------------------------------------------------
-// 2) قراءة الحيوانات النشطة + التوابع
-// ------------------------------------------------------------
-
-const activeAnimals = [];
-const activeNumbers = new Set();
-const activeSeen = new Set();
-
-function healthAnimalNumber(row = {}) {
-  return clean(
-    row.animalNumber ||
-    row.number ||
-    row.calfNumber ||
-    row.calfId ||
-    row.animalId
-  );
-}
-
-function healthSpecies(row = {}) {
-  const text = [
-    row.species,
-    row.animalType,
-    row.animaltype,
-    row.animalTypeAr,
-    row.type,
-    row.groupSpecies,
-    row.groupId,
-    row.group
-  ].filter(Boolean).join(' ').toLowerCase();
-
-  if (
-    text.includes('buffalo') ||
-    text.includes('جاموس') ||
-    text.includes('buff_')
-  ) {
-    return 'buffalo';
-  }
-
-  if (
-    text.includes('cow') ||
-    text.includes('cows') ||
-    text.includes('cattle') ||
-    text.includes('بقر') ||
-    text.includes('أبقار') ||
-    text.includes('ابقار') ||
-    text.includes('cow_')
-  ) {
-    return 'cows';
-  }
-
-  return '';
-}
-
-function healthArchived(row = {}) {
-  const status = String(row.status || row.lifeStatus || '').toLowerCase();
-  const inactiveReason = String(row.inactiveReason || row.archiveReason || '').toLowerCase();
-
-  return (
-    status.includes('archived') ||
-    status.includes('inactive') ||
-    status.includes('مؤرشف') ||
-    status.includes('مباع') ||
-    status.includes('نافق') ||
-    inactiveReason.includes('sale') ||
-    inactiveReason.includes('death') ||
-    inactiveReason.includes('بيع') ||
-    inactiveReason.includes('نفوق')
-  );
-}
-
-function healthIncludeByType(species) {
-  if (herdType === 'all') return true;
-  if (herdType === 'cows') return species === 'cows';
-  if (herdType === 'buffalo') return species === 'buffalo';
-  return true;
-}
-
-function healthAddAnimal(docId, row = {}, sourceCollection = 'animals') {
-  if (healthArchived(row)) return;
-
-  const number = healthAnimalNumber(row);
-  if (!number) return;
-
-  const species = healthSpecies(row);
-  if (!healthIncludeByType(species)) return;
-
-  const entryType = clean(row.entryType).toLowerCase();
-
-  const ageClass =
-    sourceCollection === 'calves' ||
-    entryType === 'followers' ||
-    entryType === 'calves' ||
-    clean(row.followerStatus) ||
-    clean(row.followerSex)
-      ? 'follower'
-      : 'adult';
-
-  const key = `${sourceCollection}:${number}`;
-  if (activeSeen.has(key)) return;
-
-  activeSeen.add(key);
-
-  activeAnimals.push({
-    id: docId,
-    ...row,
-    number,
-    species,
-    ageClass,
-    sourceCollection
-  });
-
-  activeNumbers.add(number);
-}
-
-const animalsSnap = await db.collection('animals')
-  .where('userId', '==', uid)
-  .limit(8000)
-  .get();
-
-animalsSnap.forEach(doc => {
-  healthAddAnimal(doc.id, doc.data() || {}, 'animals');
-});
-
-const calvesSnap = await db.collection('calves')
-  .where('userId', '==', uid)
-  .limit(8000)
-  .get();
-
-calvesSnap.forEach(doc => {
-  healthAddAnimal(doc.id, doc.data() || {}, 'calves');
-});
-    // ------------------------------------------------------------
-    // 3) قراءة أحداث الصحة داخل فترة التقرير
-    // ------------------------------------------------------------
-
-    const eventsSnap = await db.collection('events')
-      .where('userId', '==', uid)
-      .limit(15000)
-      .get();
-
-    const mastitisEvents = [];
-    const lamenessEvents = [];
-    const diseaseEvents = [];
-    const treatmentEvents = [];
-    const vaccinationEvents = [];
-    const hoofEvents = [];
-
-    eventsSnap.forEach(doc => {
-      const event = doc.data() || {};
-
-      const number = clean(
-        event.animalNumber ||
-        event.number ||
-        event.calfNumber ||
-        event.calfId ||
-        event.animalId
-     );
-      if (!number || !activeNumbers.has(number)) return;
-
-      let date = '';
-      if (typeof computeEventDateFromDoc === 'function') {
-        date = clean(computeEventDateFromDoc(event)).slice(0, 10);
-      } else {
-        date = simpleDate(event.eventDate || event.date || event.createdAt);
-      }
-
-      if (!date || date < startDate || date > today) return;
-
-      const details = event.details && typeof event.details === 'object'
-        ? event.details
-        : {};
-
-      const rawText = [
-        event.eventTypeNorm,
-        event.eventType,
-        event.type,
-        event.kind,
-        event.diseaseCode,
-        event.diseaseName,
-        event.diseaseGroup,
-        event.diagnosis,
-        event.treatment,
-        event.drug,
-        details.eventTypeNorm,
-        details.eventType,
-        details.type,
-        details.diseaseCode,
-        details.diseaseName,
-        details.diseaseGroup,
-        details.diagnosis,
-        details.treatment,
-        details.drug,
-        details.drugName
-      ].filter(Boolean).join(' ');
-
-      let normType = '';
-      if (typeof normalizeEventType === 'function') {
-        normType = normalizeEventType(rawText);
-      }
-
-      const text = rawText.toLowerCase();
-
-      const row = {
-        id: doc.id,
-        ...event,
-        number,
-        date,
-        details
-      };
-      const isPregnancyDiagnosisEvent =
-  normType === 'pregnancy_diagnosis' ||
-  text.includes('pregnancy_diagnosis') ||
-  text.includes('تشخيص حمل');
-
-if (isPregnancyDiagnosisEvent) return;
-
-      if (normType === 'mastitis' || text.includes('mastitis') || text.includes('التهاب الضرع')) {
-        mastitisEvents.push(row);
-        return;
-      }
-
-      if (normType === 'lameness' || text.includes('lameness') || text.includes('عرج')) {
-        lamenessEvents.push(row);
-        return;
-      }
-
-      if (
-        normType === 'hoof_trimming' ||
-        text.includes('hoof trimming') ||
-        text.includes('hoof_trimming') ||
-        text.includes('تقليم الحوافر')
-      ) {
-        hoofEvents.push(row);
-        return;
-      }
-
-      if (
-        normType === 'vaccination' ||
-        text.includes('vaccination') ||
-        text.includes('vaccine') ||
-        text.includes('تحصين') ||
-        text.includes('تطعيم')
-      ) {
-        vaccinationEvents.push(row);
-        return;
-      }
-
-      if (
-        text.includes('treatment') ||
-        text.includes('علاج') ||
-        text.includes('دواء') ||
-        text.includes('جرعة') ||
-        text.includes('withdrawal')
-      ) {
-        treatmentEvents.push(row);
-        return;
-      }
-
-            if (
-        normType === 'diagnosis' ||
-        normType === 'acute_undifferentiated_diarrhea' ||
-        text.includes('disease') ||
-        text.includes('health') ||
-        text.includes('diagnosis') ||
-        text.includes('مرض') ||
-        text.includes('تشخيص') ||
-        text.includes('الإسهال الحاد غير المتمايز') ||
-        text.includes('الاسهال الحاد غير المتمايز')
-      ) {
-        diseaseEvents.push(row);
-      }
-    });
-
-    const healthEvents = [
-      ...mastitisEvents,
-      ...lamenessEvents,
-      ...diseaseEvents,
-      ...treatmentEvents
-    ];
-
-    // ------------------------------------------------------------
-    // 4) بناء قسم الأمراض العامة
-    // ------------------------------------------------------------
-
-    const diseaseCount = new Map();
-    const diseaseGroupCount = new Map();
-
-    for (const event of healthEvents) {
-      const details = event.details || {};
-
-      let name = clean(
-        event.diseaseName ||
-        details.diseaseName ||
-        event.diagnosis ||
-        details.diagnosis ||
-        event.diseaseCode ||
-        details.diseaseCode ||
-        event.eventType
-      );
-
-      if (!name && mastitisEvents.includes(event)) name = 'التهاب الضرع';
-      if (!name && lamenessEvents.includes(event)) name = 'عرج';
-      if (!name) name = 'حالة صحية';
-
-      const group = clean(event.diseaseGroup || details.diseaseGroup || 'صحة عامة');
-
-      addCount(diseaseCount, name);
-      addCount(diseaseGroupCount, group);
-    }
-
-   function healthReportWithPercent(list = []) {
-  const total = healthEvents.length;
-
-  return (list || []).map(item => {
-    const count = Number(item.count || 0);
-    const pct = total ? Number(((count * 100) / total).toFixed(1)) : 0;
-
-    return {
-      ...item,
-      count,
-      pct,
-      pctText: `${pct}%`
-    };
-  });
-}
-
-const diseases = {
-  topDiseases: healthReportWithPercent(mapToTopList(diseaseCount, 12)),
-  groups: healthReportWithPercent(mapToTopList(diseaseGroupCount, 8))
-};
-
-    // ------------------------------------------------------------
-    // 5) بناء قسم التهاب الضرع
-    // ------------------------------------------------------------
-
-    const mastitisTypeCount = new Map();
-    const mastitisQuarterCount = new Map();
-    const mastitisRecent = [];
-
-    for (const event of mastitisEvents) {
-      const details = event.details || {};
-
-      const type = clean(
-        event.mastitisType ||
-        details.mastitisType ||
-        event.type ||
-        details.type ||
-        'غير محدد'
-      );
-
-      addCount(mastitisTypeCount, type);
-
-      const rawQuarters =
-        event.quarters ||
-        details.quarters ||
-        event.affectedQuarters ||
-        details.affectedQuarters ||
-        event.affectedQuarter ||
-        details.affectedQuarter ||
-        '';
-
-      const quarters = Array.isArray(rawQuarters)
-        ? rawQuarters.map(clean).filter(Boolean)
-        : String(rawQuarters).split(/[،,|]/).map(clean).filter(Boolean);
-
-      for (const quarter of quarters) {
-        addCount(mastitisQuarterCount, quarter);
-      }
-
-      mastitisRecent.push({
-        animalNumber: event.number,
-        date: event.date,
-        type,
-        quarters: quarters.join('، ') || '—'
-      });
-    }
-
-    mastitisRecent.sort((a, b) => b.date.localeCompare(a.date));
-
-    const mastitis = {
-      count: mastitisEvents.length,
-      byType: mapToTopList(mastitisTypeCount, 8),
-      byQuarter: mapToTopList(mastitisQuarterCount, 8),
-      recent: mastitisRecent.slice(0, 15)
     };
 
-    // ------------------------------------------------------------
-    // 6) بناء قسم العرج
-    // ------------------------------------------------------------
+    const addDays = (iso, days) => {
+      const value = dateOnly(iso);
+      if (!value) return '';
 
-    const lamenessTypeCount = new Map();
-    const lamenessLegCount = new Map();
-    const lamenessRecent = [];
+      const [y, m, d] =
+        value
+          .split('-')
+          .map(Number);
 
-    for (const event of lamenessEvents) {
-      const details = event.details || {};
-
-      const type = clean(
-        event.lamenessType ||
-        details.lamenessType ||
-        event.type ||
-        details.type ||
-        'غير محدد'
-      );
-
-      addCount(lamenessTypeCount, type);
-
-      const rawLegs =
-        event.affectedLegs ||
-        details.affectedLegs ||
-        event.affectedLeg ||
-        details.affectedLeg ||
-        '';
-
-      const legs = Array.isArray(rawLegs)
-        ? rawLegs.map(clean).filter(Boolean)
-        : String(rawLegs).split(/[،,|]/).map(clean).filter(Boolean);
-
-      for (const leg of legs) {
-        addCount(lamenessLegCount, leg);
-      }
-
-      lamenessRecent.push({
-        animalNumber: event.number,
-        date: event.date,
-        type,
-        leg: legs.join('، ') || '—'
-      });
-    }
-
-    lamenessRecent.sort((a, b) => b.date.localeCompare(a.date));
-
-    const lameness = {
-      count: lamenessEvents.length,
-      byType: mapToTopList(lamenessTypeCount, 8),
-      byLeg: mapToTopList(lamenessLegCount, 8),
-      recent: lamenessRecent.slice(0, 15)
-    };
-
-    // ------------------------------------------------------------
-    // 7) بناء قسم العلاجات
-    // ------------------------------------------------------------
-
-    const treatmentRows = [];
-
-    for (const event of treatmentEvents) {
-      const details = event.details || {};
-
-      const diagnosis = clean(
-        event.diseaseName ||
-        details.diseaseName ||
-        event.diagnosis ||
-        details.diagnosis ||
-        event.eventType ||
-        'حالة صحية'
-      );
-
-      const treatment = clean(
-        event.treatment ||
-        details.treatment ||
-        event.drugName ||
-        details.drugName ||
-        event.drug ||
-        details.drug ||
-        '—'
-      );
-
-      treatmentRows.push({
-        animalNumber: event.number,
-        date: event.date,
-        diagnosis,
-        treatment
-      });
-    }
-
-    treatmentRows.sort((a, b) => b.date.localeCompare(a.date));
-
-    const treatments = {
-      count: treatmentEvents.length,
-      recent: treatmentRows.slice(0, 15)
-    };
-
-    // ------------------------------------------------------------
-    // 8) قراءة مهام التحصين المفتوحة
-    // ------------------------------------------------------------
-
-    const tasksSnap = await db.collection('tasks')
-      .where('userId', '==', uid)
-      .limit(8000)
-      .get();
-
-    const vaccinationTasks = [];
-
-    tasksSnap.forEach(doc => {
-      const task = doc.data() || {};
-
-      const taskText = [
-        task.taskType,
-        task.type,
-        task.eventType,
-        task.title,
-        task.name,
-        task.source
-      ].filter(Boolean).join(' ').toLowerCase();
-
-      const isVaccination =
-        taskText.includes('vaccination') ||
-        taskText.includes('vaccine') ||
-        taskText.includes('تحصين') ||
-        taskText.includes('تطعيم');
-
-      if (!isVaccination) return;
-
-      const status = String(task.status || task.taskStatus || 'pending').toLowerCase();
-
-      const isOpen =
-        !task.done &&
-        !task.completed &&
-        (
-          status === 'pending' ||
-          status === 'open' ||
-          status.includes('معلق') ||
-          status.includes('مفتوح')
+      const dt =
+        new Date(
+          Date.UTC(
+            y,
+            m - 1,
+            d
+          )
         );
 
-      if (!isOpen) return;
-
-      const dueDate = simpleDate(task.dueDate || task.date || task.eventDate || task.windowStart);
-      if (!dueDate) return;
-
-      const number = clean(
-  task.animalNumber ||
-  task.number ||
-  task.calfNumber ||
-  task.calfId ||
-  task.animalId
-);
-
-      if (number && !activeNumbers.has(number)) return;
-
-      vaccinationTasks.push({
-        animalNumber: number || '—',
-        dueDate,
-        title: clean(task.title || task.name || task.vaccine || task.vaccineKey || 'تحصين مستحق')
-      });
-    });
-
-    const vaccinations = {
-      recordedInPeriod: vaccinationEvents.length,
-      overdue: [],
-      today: [],
-      tomorrow: []
-    };
-
-    for (const task of vaccinationTasks) {
-      if (task.dueDate < today) vaccinations.overdue.push(task);
-      if (task.dueDate === today) vaccinations.today.push(task);
-      if (task.dueDate === tomorrow) vaccinations.tomorrow.push(task);
-    }
-
-    vaccinations.overdue = vaccinations.overdue.slice(0, 30);
-    vaccinations.today = vaccinations.today.slice(0, 30);
-    vaccinations.tomorrow = vaccinations.tomorrow.slice(0, 30);
-
-    vaccinations.overdueCount = vaccinations.overdue.length;
-    vaccinations.todayCount = vaccinations.today.length;
-    vaccinations.tomorrowCount = vaccinations.tomorrow.length;
-
-    // ------------------------------------------------------------
-    // 9) الحيوانات متكررة المشاكل
-    // ------------------------------------------------------------
-
-    const repeatedMap = new Map();
-
-    for (const event of healthEvents) {
-      if (!repeatedMap.has(event.number)) {
-        repeatedMap.set(event.number, {
-          animalNumber: event.number,
-          total: 0,
-          mastitis: 0,
-          lameness: 0,
-          disease: 0,
-          treatment: 0,
-          lastDate: '',
-          problems: new Map()
-        });
-      }
-
-      const row = repeatedMap.get(event.number);
-
-      row.total += 1;
-      row.lastDate = !row.lastDate || event.date > row.lastDate
-        ? event.date
-        : row.lastDate;
-
-      if (mastitisEvents.includes(event)) row.mastitis += 1;
-      if (lamenessEvents.includes(event)) row.lameness += 1;
-      if (diseaseEvents.includes(event)) row.disease += 1;
-      if (treatmentEvents.includes(event)) row.treatment += 1;
-
-      const details = event.details || {};
-      const problemName = clean(
-        event.diseaseName ||
-        details.diseaseName ||
-        event.diagnosis ||
-        details.diagnosis ||
-        event.eventType ||
-        'حالة صحية'
+      dt.setUTCDate(
+        dt.getUTCDate() +
+        Number(days || 0)
       );
 
-      addCount(row.problems, problemName);
+      return dt
+        .toISOString()
+        .slice(0, 10);
+    };
+
+    const pct = (part, total) =>
+      total > 0
+        ? Number(
+            (
+              (
+                Number(part || 0) *
+                100
+              ) /
+              Number(total)
+            ).toFixed(1)
+          )
+        : null;
+
+    const animalNumber = row =>
+      normalizeAnimalNumberForStats(
+        row?.animalNumber ??
+        row?.number ??
+        row?.calfNumber ??
+        row?.calfId ??
+        row?.animalId ??
+        ''
+      );
+
+    const speciesOf = row => {
+      const explicit =
+        text(
+          row?.species ||
+          row?.animalType ||
+          row?.animaltype ||
+          row?.animalTypeAr ||
+          ''
+        )
+          .toLowerCase();
+
+      if (
+        explicit.includes('buffalo') ||
+        explicit.includes('جاموس')
+      ) {
+        return 'buffalo';
+      }
+
+      if (
+        explicit.includes('cow') ||
+        explicit.includes('cattle') ||
+        explicit.includes('بقر') ||
+        explicit.includes('ابقار') ||
+        explicit.includes('أبقار')
+      ) {
+        return 'cows';
+      }
+
+      if (
+        typeof inventorySpeciesOf ===
+        'function'
+      ) {
+        const value =
+          inventorySpeciesOf(
+            row || {}
+          );
+
+        if (value === 'buffalo') {
+          return 'buffalo';
+        }
+
+        if (
+          value === 'cow' ||
+          value === 'cows'
+        ) {
+          return 'cows';
+        }
+      }
+
+      return '';
+    };
+
+    const requestedType =
+      text(
+        req.query.type ||
+        'cows'
+      )
+        .toLowerCase();
+
+    const herdType =
+      requestedType === 'buffalo'
+        ? 'buffalo'
+        : 'cows';
+
+    const herdLabel =
+      herdType === 'buffalo'
+        ? 'الجاموس'
+        : 'الأبقار';
+
+    const [
+      profileSnap,
+      animalsSnap,
+      calvesSnap,
+      archivedAnimalsSnap,
+      eventsSnap,
+      archivedEventsSnap,
+      tasksSnap
+    ] =
+      await Promise.all([
+        db
+          .collection('users')
+          .doc(profileUid)
+          .get(),
+
+        db
+          .collection('animals')
+          .where(
+            'userId',
+            '==',
+            uid
+          )
+          .get(),
+
+        db
+          .collection('calves')
+          .where(
+            'userId',
+            '==',
+            uid
+          )
+          .get(),
+
+        db
+          .collection(
+            'archived_animals'
+          )
+          .where(
+            'userId',
+            '==',
+            uid
+          )
+          .get(),
+
+        db
+          .collection('events')
+          .where(
+            'userId',
+            '==',
+            uid
+          )
+          .get(),
+
+        db
+          .collection(
+            'archived_events'
+          )
+          .where(
+            'userId',
+            '==',
+            uid
+          )
+          .get(),
+
+        db
+          .collection('tasks')
+          .where(
+            'userId',
+            '==',
+            uid
+          )
+          .get()
+      ]);
+
+    const profile =
+      profileSnap.exists
+        ? (
+            profileSnap.data() ||
+            {}
+          )
+        : {};
+
+    let coverageStartDate =
+      dateOnly(
+        profile.createdAt
+      );
+
+    if (!coverageStartDate) {
+      try {
+        const authUser =
+          await admin
+            .auth()
+            .getUser(profileUid);
+
+        coverageStartDate =
+          dateOnly(
+            authUser
+              ?.metadata
+              ?.creationTime ||
+            ''
+          );
+
+      } catch (_) {}
     }
 
-    const repeatedAnimals = [];
+    const availablePeriods =
+      coverageStartDate
+        ? allowedPeriods.filter(
+            days => {
+              const periodStart =
+                addDays(
+                  today,
+                  -(days - 1)
+                );
 
-    for (const row of repeatedMap.values()) {
-      if (row.total < 2 && row.mastitis < 2 && row.lameness < 2) {
+              return Boolean(
+                periodStart &&
+                coverageStartDate <=
+                  periodStart
+              );
+            }
+          )
+        : [];
+
+    const requestedDays =
+      Number(
+        req.query.days ||
+        90
+      );
+
+    const selectedDays =
+      availablePeriods.includes(
+        requestedDays
+      )
+        ? requestedDays
+        : availablePeriods.includes(
+            90
+          )
+          ? 90
+          : (
+              availablePeriods.at(-1) ||
+              0
+            );
+
+    if (!selectedDays) {
+      return res.json({
+        ok: true,
+
+        report: {
+          version: 2,
+
+          status:
+            'waiting_for_complete_period',
+
+          meta: {
+            title:
+              'تقرير الصحة',
+
+            herdType,
+            herdLabel,
+
+            availablePeriods,
+
+            periodDays:
+              null,
+
+            startDate:
+              null,
+
+            endDate:
+              today,
+
+            coverageStartDate:
+              coverageStartDate ||
+              null,
+
+            generatedAt:
+              new Date()
+                .toISOString()
+          },
+
+          message:
+            'لا توجد مدة تحليل مكتملة حتى الآن.'
+        }
+      });
+    }
+
+    const startDate =
+      addDays(
+        today,
+        -(selectedDays - 1)
+      );
+
+    const previousEndDate =
+      addDays(
+        startDate,
+        -1
+      );
+
+    const previousStartDate =
+      addDays(
+        previousEndDate,
+        -(selectedDays - 1)
+      );
+
+    const comparisonAvailable =
+      Boolean(
+        coverageStartDate &&
+        previousStartDate &&
+        coverageStartDate <=
+          previousStartDate
+      );
+
+    const currentAnimals = [];
+    const archivedAnimals = [];
+
+    const pushAnimal = (
+      doc,
+      collection,
+      archived = false
+    ) => {
+      const raw = {
+        id: doc.id,
+        ...(doc.data() || {})
+      };
+
+      if (
+        speciesOf(raw) !==
+        herdType
+      ) {
+        return;
+      }
+
+      const number =
+        animalNumber(raw);
+
+      if (!number) return;
+
+      const row = {
+        ...raw,
+
+        _number:
+          number,
+
+        _collection:
+          collection,
+
+        _archived:
+          archived
+      };
+
+      if (archived) {
+        archivedAnimals.push(
+          row
+        );
+      } else {
+        currentAnimals.push(
+          row
+        );
+      }
+    };
+
+    animalsSnap.docs.forEach(
+      doc =>
+        pushAnimal(
+          doc,
+          'animals',
+          false
+        )
+    );
+
+    calvesSnap.docs.forEach(
+      doc =>
+        pushAnimal(
+          doc,
+          'calves',
+          false
+        )
+    );
+
+    archivedAnimalsSnap.docs.forEach(
+      doc =>
+        pushAnimal(
+          doc,
+          'archived_animals',
+          true
+        )
+    );
+
+    const normalizeStatus =
+      value =>
+        text(value)
+          .toLowerCase()
+          .replace(
+            /[أإآ]/g,
+            'ا'
+          )
+          .replace(
+            /ة/g,
+            'ه'
+          );
+
+    const isFollowerRecord =
+      row => {
+        if (
+          row._collection ===
+          'calves'
+        ) {
+          return true;
+        }
+
+        const originalPath =
+          text(
+            row.originalAnimalPath
+          )
+            .toLowerCase();
+
+        if (
+          originalPath.startsWith(
+            'calves/'
+          )
+        ) {
+          return true;
+        }
+
+        return Boolean(
+          text(
+            row.entryType
+          ).toLowerCase() ===
+            'followers' ||
+
+          text(
+            row.calfNumber
+          ) ||
+
+          text(
+            row.followerStatus
+          ) ||
+
+          text(
+            row.followerSex
+          )
+        );
+      };
+
+    const isMatureFollower =
+      row => {
+        if (
+          !isFollowerRecord(row)
+        ) {
+          return false;
+        }
+
+        const status =
+          normalizeStatus(
+            row.followerStatus ||
+            row.reproductiveStatus ||
+            row.status ||
+            ''
+          );
+
+        return [
+          'تحت التلقيح',
+          'ملقح',
+          'ملقحه',
+          'عشار',
+          'اجهاض'
+        ].includes(
+          status
+        );
+      };
+
+    const healthSectionOfAnimal =
+      row => {
+        if (
+          !isFollowerRecord(row)
+        ) {
+          return 'adult';
+        }
+
+        return isMatureFollower(
+          row
+        )
+          ? 'adult'
+          : 'calf';
+      };
+
+    const allAnimals = [
+      ...currentAnimals,
+      ...archivedAnimals
+    ];
+
+    const animalByNumber =
+      new Map();
+
+    for (
+      const row
+      of allAnimals
+    ) {
+      if (
+        !animalByNumber.has(
+          row._number
+        ) ||
+        row._archived === false
+      ) {
+        animalByNumber.set(
+          row._number,
+          row
+        );
+      }
+    }
+
+    const animalPresentInWindow =
+      (
+        row,
+        windowStart,
+        windowEnd
+      ) => {
+        const birthDate =
+          dateOnly(
+            row.birthDate ||
+            row.dateOfBirth ||
+            row.dob
+          );
+
+        const archiveDate =
+          dateOnly(
+            row.archiveDate ||
+            row.archivedAt
+          );
+
+        if (
+          birthDate &&
+          birthDate > windowEnd
+        ) {
+          return false;
+        }
+
+        if (
+          archiveDate &&
+          archiveDate < windowStart
+        ) {
+          return false;
+        }
+
+        return true;
+      };
+
+    const adultAtRiskForWindow =
+      (
+        windowStart,
+        windowEnd
+      ) =>
+        new Set(
+          allAnimals
+            .filter(
+              row =>
+                healthSectionOfAnimal(
+                  row
+                ) ===
+                  'adult' &&
+
+                animalPresentInWindow(
+                  row,
+                  windowStart,
+                  windowEnd
+                )
+            )
+            .map(
+              row =>
+                row._number
+            )
+        );
+
+    const calfAtRiskForWindow =
+      (
+        windowStart,
+        windowEnd
+      ) =>
+        new Set(
+          allAnimals
+            .filter(
+              row =>
+                healthSectionOfAnimal(
+                  row
+                ) ===
+                  'calf' &&
+
+                animalPresentInWindow(
+                  row,
+                  windowStart,
+                  windowEnd
+                )
+            )
+            .map(
+              row =>
+                row._number
+            )
+        );
+
+    const eventsById =
+      new Map();
+
+    const addEventDoc =
+      (
+        doc,
+        sourceCollection
+      ) => {
+        const raw = {
+          id: doc.id,
+          ...(doc.data() || {})
+        };
+
+        const number =
+          animalNumber(raw);
+
+        if (!number) return;
+
+        const linkedAnimal =
+          animalByNumber.get(
+            number
+          );
+
+        const eventSpecies =
+          speciesOf(raw) ||
+          speciesOf(
+            linkedAnimal || {}
+          );
+
+        if (
+          eventSpecies !==
+          herdType
+        ) {
+          return;
+        }
+
+        let date = '';
+
+        if (
+          typeof computeEventDateFromDoc ===
+          'function'
+        ) {
+          date =
+            dateOnly(
+              computeEventDateFromDoc(
+                raw
+              )
+            );
+        }
+
+        if (!date) {
+          date =
+            dateOnly(
+              raw.eventDate ||
+              raw.date ||
+              raw.createdAt
+            );
+        }
+
+        if (
+          !date ||
+          date > today
+        ) {
+          return;
+        }
+
+        const key =
+          text(
+            raw.id ||
+            doc.id
+          ) ||
+          `${number}:${date}:${sourceCollection}`;
+
+        if (
+          eventsById.has(key) &&
+          sourceCollection ===
+            'archived_events'
+        ) {
+          return;
+        }
+
+        eventsById.set(
+          key,
+          {
+            ...raw,
+
+            _number:
+              number,
+
+            _date:
+              date,
+
+            _sourceCollection:
+              sourceCollection,
+
+            _animal:
+              linkedAnimal ||
+              null
+          }
+        );
+      };
+
+    eventsSnap.docs.forEach(
+      doc =>
+        addEventDoc(
+          doc,
+          'events'
+        )
+    );
+
+    archivedEventsSnap.docs.forEach(
+      doc =>
+        addEventDoc(
+          doc,
+          'archived_events'
+        )
+    );
+
+    const allEvents = [
+      ...eventsById.values()
+    ]
+      .sort(
+        (a, b) =>
+          a._date.localeCompare(
+            b._date
+          )
+      );
+
+    const eventTypeOf =
+      event => {
+        const direct =
+          text(
+            event.eventTypeNorm ||
+            event.eventType ||
+            event.type ||
+            ''
+          )
+            .toLowerCase();
+
+        if (
+          direct === 'mastitis' ||
+          direct.includes(
+            'التهاب الضرع'
+          )
+        ) {
+          return 'mastitis';
+        }
+
+        if (
+          direct === 'lameness' ||
+          direct.includes('عرج')
+        ) {
+          return 'lameness';
+        }
+
+        if (
+          direct === 'abortion' ||
+          direct.includes(
+            'اجهاض'
+          ) ||
+          direct.includes(
+            'إجهاض'
+          )
+        ) {
+          return 'abortion';
+        }
+
+        if (
+          direct ===
+            'embryonic_loss' ||
+
+          direct.includes(
+            'فقد جنيني'
+          ) ||
+
+          direct.includes(
+            'فقد أجنه'
+          ) ||
+
+          direct.includes(
+            'فقد أجنة'
+          )
+        ) {
+          return 'embryonic_loss';
+        }
+
+        if (
+          direct ===
+            'pregnancy_diagnosis' ||
+
+          direct.includes(
+            'تشخيص حمل'
+          )
+        ) {
+          return 'pregnancy_diagnosis';
+        }
+
+        if (
+          direct === 'calving' ||
+          direct.includes(
+            'ولاده'
+          ) ||
+          direct.includes(
+            'ولادة'
+          )
+        ) {
+          return 'calving';
+        }
+
+        if (
+          direct ===
+            'insemination' ||
+
+          direct.includes(
+            'تلقيح'
+          )
+        ) {
+          return 'insemination';
+        }
+
+        if (
+          direct ===
+            'hoof_trimming' ||
+
+          direct.includes(
+            'تقليم الحوافر'
+          )
+        ) {
+          return 'hoof_trimming';
+        }
+
+        if (
+          direct ===
+            'vaccination' ||
+
+          direct ===
+            'تحصين' ||
+
+          direct.includes(
+            'vaccination'
+          )
+        ) {
+          return 'vaccination';
+        }
+
+        if (
+          direct ===
+            'acute_undifferentiated_diarrhea'
+        ) {
+          return 'calf_scours';
+        }
+
+        if (
+          direct ===
+            'daily_milk' ||
+
+          direct.includes(
+            'لبن يومي'
+          )
+        ) {
+          return 'daily_milk';
+        }
+
+        if (
+          direct ===
+            'health' ||
+
+          direct ===
+            'diagnosis' ||
+
+          direct.includes(
+            'تشخيص صحي'
+          )
+        ) {
+          return 'health';
+        }
+
+        const diseaseCode =
+          text(
+            event.diseaseCode ||
+            event.details
+              ?.diseaseCode
+          )
+            .toLowerCase();
+
+        if (
+          diseaseCode ===
+          'mastitis'
+        ) {
+          return 'mastitis';
+        }
+
+        if (
+          diseaseCode ===
+          'lameness'
+        ) {
+          return 'lameness';
+        }
+
+        if (
+          diseaseCode ===
+          'calf_scours'
+        ) {
+          return 'calf_scours';
+        }
+
+        if (
+          diseaseCode &&
+          DISEASE_CATALOG_SRV[
+            diseaseCode
+          ]
+        ) {
+          return 'health';
+        }
+
+        return direct;
+      };
+
+    const eventsInWindow =
+      (
+        windowStart,
+        windowEnd
+      ) =>
+        allEvents.filter(
+          event =>
+            event._date >=
+              windowStart &&
+
+            event._date <=
+              windowEnd
+        );
+
+    const currentEvents =
+      eventsInWindow(
+        startDate,
+        today
+      );
+
+    const previousEvents =
+      comparisonAvailable
+        ? eventsInWindow(
+            previousStartDate,
+            previousEndDate
+          )
+        : [];
+
+    const animalSectionForEvent =
+      event => {
+        const diseaseCode =
+          text(
+            event.diseaseCode ||
+            event.details
+              ?.diseaseCode
+          )
+            .toLowerCase();
+
+        const catalog =
+          diseaseCode
+            ? DISEASE_CATALOG_SRV[
+                diseaseCode
+              ]
+            : null;
+
+        if (
+          catalog?.group ===
+          'أمراض العجول'
+        ) {
+          return 'calf';
+        }
+
+        if (
+          eventTypeOf(event) ===
+          'calf_scours'
+        ) {
+          return 'calf';
+        }
+
+        const linked =
+          event._animal ||
+          animalByNumber.get(
+            event._number
+          );
+
+        return linked
+          ? healthSectionOfAnimal(
+              linked
+            )
+          : 'adult';
+      };
+
+    const adultAtRisk =
+      adultAtRiskForWindow(
+        startDate,
+        today
+      );
+
+    const calfAtRisk =
+      calfAtRiskForWindow(
+        startDate,
+        today
+      );
+
+    const previousAdultAtRisk =
+      comparisonAvailable
+        ? adultAtRiskForWindow(
+            previousStartDate,
+            previousEndDate
+          )
+        : new Set();
+
+    const previousCalfAtRisk =
+      comparisonAvailable
+        ? calfAtRiskForWindow(
+            previousStartDate,
+            previousEndDate
+          )
+        : new Set();
+
+    const buildLactatingAtRisk =
+      (
+        windowStart,
+        windowEnd,
+        windowEvents,
+        adultSet
+      ) => {
+        const result =
+          new Set();
+
+        const historyByNumber =
+          new Map();
+
+        for (
+          const event
+          of allEvents
+        ) {
+          if (
+            !adultSet.has(
+              event._number
+            )
+          ) {
+            continue;
+          }
+
+          if (
+            !historyByNumber.has(
+              event._number
+            )
+          ) {
+            historyByNumber.set(
+              event._number,
+              []
+            );
+          }
+
+          historyByNumber
+            .get(
+              event._number
+            )
+            .push(event);
+        }
+
+        for (
+          const number
+          of adultSet
+        ) {
+          const animal =
+            animalByNumber.get(
+              number
+            ) || {};
+
+          const history =
+            historyByNumber.get(
+              number
+            ) || [];
+
+          const evidenceInWindow =
+            windowEvents.some(
+              event =>
+                event._number ===
+                  number &&
+
+                [
+                  'daily_milk',
+                  'mastitis'
+                ].includes(
+                  eventTypeOf(
+                    event
+                  )
+                )
+            );
+
+          if (
+            evidenceInWindow
+          ) {
+            result.add(
+              number
+            );
+
+            continue;
+          }
+
+          const calvingDates =
+            history
+              .filter(
+                event =>
+                  eventTypeOf(
+                    event
+                  ) ===
+                    'calving' &&
+
+                  event._date <=
+                    windowEnd
+              )
+              .map(
+                event =>
+                  event._date
+              );
+
+          const docCalving =
+            dateOnly(
+              animal.lastCalvingDate ||
+              animal.calvingDate
+            );
+
+          if (
+            docCalving &&
+            docCalving <=
+              windowEnd
+          ) {
+            calvingDates.push(
+              docCalving
+            );
+          }
+
+          calvingDates.sort();
+
+          const lastCalving =
+            calvingDates.at(-1) ||
+            '';
+
+          if (lastCalving) {
+            const dryDates =
+              history
+                .filter(
+                  event =>
+                    eventTypeOf(
+                      event
+                    ) ===
+                      'dry_off' &&
+
+                    event._date >=
+                      lastCalving
+                )
+                .map(
+                  event =>
+                    event._date
+                )
+                .sort();
+
+            const docDry =
+              dateOnly(
+                animal.dryOffDate ||
+                animal.lastDryOffDate
+              );
+
+            if (
+              docDry &&
+              docDry >=
+                lastCalving
+            ) {
+              dryDates.push(
+                docDry
+              );
+            }
+
+            dryDates.sort();
+
+            const firstDryAfterCalving =
+              dryDates[0] ||
+              '';
+
+            if (
+              !firstDryAfterCalving ||
+              firstDryAfterCalving >=
+                windowStart
+            ) {
+              result.add(
+                number
+              );
+
+              continue;
+            }
+          }
+
+          if (
+            windowEnd === today &&
+            typeof isMilkingGroupSrv ===
+              'function' &&
+            isMilkingGroupSrv(
+              animal
+            )
+          ) {
+            result.add(
+              number
+            );
+          }
+        }
+
+        return result;
+      };
+
+    const lactatingAtRisk =
+      buildLactatingAtRisk(
+        startDate,
+        today,
+        currentEvents,
+        adultAtRisk
+      );
+
+    const previousLactatingAtRisk =
+      comparisonAvailable
+        ? buildLactatingAtRisk(
+            previousStartDate,
+            previousEndDate,
+            previousEvents,
+            previousAdultAtRisk
+          )
+        : new Set();
+
+    const eventDetails =
+      event =>
+        event?.details &&
+        typeof event.details ===
+          'object' &&
+        !Array.isArray(
+          event.details
+        )
+          ? event.details
+          : {};
+
+    const eventDiseaseCode =
+      event =>
+        text(
+          event.diseaseCode ||
+          eventDetails(
+            event
+          ).diseaseCode
+        )
+          .toLowerCase();
+
+    const eventDiseaseName =
+      event => {
+        const code =
+          eventDiseaseCode(
+            event
+          );
+
+        return text(
+          event.diseaseName ||
+          eventDetails(
+            event
+          ).diseaseName ||
+          DISEASE_CATALOG_SRV[
+            code
+          ]?.name ||
+          event.diagnosis ||
+          eventDetails(
+            event
+          ).diagnosis ||
+          ''
+        );
+      };
+
+    const isCalfScours =
+      event =>
+        eventTypeOf(
+          event
+        ) ===
+          'calf_scours' ||
+
+        eventDiseaseCode(
+          event
+        ) ===
+          'calf_scours' ||
+
+        eventDiseaseName(
+          event
+        ) ===
+          'إسهال العجول';
+
+    // أي حيوان سُجلت له المشكلة يدخل حتمًا
+    // في مجموعة التعرض الخاصة بها.
+    for (
+      const event
+      of currentEvents
+    ) {
+      const type =
+        eventTypeOf(
+          event
+        );
+
+      if (
+        type ===
+        'mastitis'
+      ) {
+        lactatingAtRisk.add(
+          event._number
+        );
+      }
+
+      if (
+        type ===
+          'lameness' &&
+        animalSectionForEvent(
+          event
+        ) ===
+          'adult'
+      ) {
+        adultAtRisk.add(
+          event._number
+        );
+      }
+
+      if (
+        isCalfScours(
+          event
+        )
+      ) {
+        calfAtRisk.add(
+          event._number
+        );
+      }
+    }
+
+    if (
+      comparisonAvailable
+    ) {
+      for (
+        const event
+        of previousEvents
+      ) {
+        const type =
+          eventTypeOf(
+            event
+          );
+
+        if (
+          type ===
+          'mastitis'
+        ) {
+          previousLactatingAtRisk.add(
+            event._number
+          );
+        }
+
+        if (
+          type ===
+            'lameness' &&
+          animalSectionForEvent(
+            event
+          ) ===
+            'adult'
+        ) {
+          previousAdultAtRisk.add(
+            event._number
+          );
+        }
+
+        if (
+          isCalfScours(
+            event
+          )
+        ) {
+          previousCalfAtRisk.add(
+            event._number
+          );
+        }
+      }
+    }
+
+    const problemEvents =
+      (
+        events,
+        key,
+        section = ''
+      ) =>
+        events.filter(
+          event => {
+            const type =
+              eventTypeOf(
+                event
+              );
+
+            const code =
+              eventDiseaseCode(
+                event
+              );
+
+            let matches =
+              false;
+
+            if (
+              key ===
+              'mastitis'
+            ) {
+              matches =
+                type ===
+                'mastitis';
+
+            } else if (
+              key ===
+              'lameness'
+            ) {
+              matches =
+                type ===
+                'lameness';
+
+            } else if (
+              key ===
+              'abortion'
+            ) {
+              matches =
+                type ===
+                'abortion';
+
+            } else if (
+              key ===
+              'embryonic_loss'
+            ) {
+              matches =
+                type ===
+                'embryonic_loss';
+
+            } else if (
+              key ===
+              'calf_scours'
+            ) {
+              matches =
+                isCalfScours(
+                  event
+                );
+
+            } else {
+              matches =
+                code ===
+                key;
+            }
+
+            if (!matches) {
+              return false;
+            }
+
+            if (!section) {
+              return true;
+            }
+
+            return (
+              animalSectionForEvent(
+                event
+              ) ===
+              section
+            );
+          }
+        );
+
+    const linkedAiDate =
+      event => {
+        const direct =
+          dateOnly(
+            event.lastFertileInseminationDate ||
+            event.lastInseminationDate ||
+            event.inseminationDate ||
+            event.details
+              ?.lastFertileInseminationDate ||
+            event.details
+              ?.lastInseminationDate ||
+            event.lastAI ||
+            event.lastServiceDate
+          );
+
+        if (direct) {
+          return direct;
+        }
+
+        const linkedId =
+          text(
+            event.linkedInseminationEventId
+          );
+
+        if (
+          linkedId &&
+          eventsById.has(
+            linkedId
+          )
+        ) {
+          return dateOnly(
+            eventsById.get(
+              linkedId
+            )?._date
+          );
+        }
+
+        return '';
+      };
+
+    const pregnancyEpisodes =
+      new Map();
+
+    const ensurePregnancyEpisode =
+      (
+        number,
+        aiDate
+      ) => {
+        const n =
+          normalizeAnimalNumberForStats(
+            number
+          );
+
+        const ai =
+          dateOnly(
+            aiDate
+          );
+
+        if (
+          !n ||
+          !ai ||
+          ai > today
+        ) {
+          return null;
+        }
+
+        const key =
+          `${n}|${ai}`;
+
+        if (
+          !pregnancyEpisodes.has(
+            key
+          )
+        ) {
+          pregnancyEpisodes.set(
+            key,
+            {
+              key,
+
+              animalNumber:
+                n,
+
+              startDate:
+                ai,
+
+              endDate:
+                '',
+
+              endType:
+                '',
+
+              events:
+                []
+            }
+          );
+        }
+
+        return pregnancyEpisodes.get(
+          key
+        );
+      };
+
+    for (
+      const event
+      of allEvents
+    ) {
+      const type =
+        eventTypeOf(
+          event
+        );
+
+      if (
+        ![
+          'pregnancy_diagnosis',
+          'calving',
+          'abortion',
+          'embryonic_loss'
+        ].includes(
+          type
+        )
+      ) {
         continue;
       }
 
-      repeatedAnimals.push({
-        animalNumber: row.animalNumber,
-        total: row.total,
-        mastitis: row.mastitis,
-        lameness: row.lameness,
-        disease: row.disease,
-        treatment: row.treatment,
-        lastDate: row.lastDate,
-        mainProblems: mapToTopList(row.problems, 4).map(x => x.name)
-      });
+      if (
+        type ===
+        'pregnancy_diagnosis'
+      ) {
+        const result =
+          text(
+            event.result ||
+            event.pregnancyResult ||
+            event.details
+              ?.result ||
+            event.details
+              ?.pregnancyResult
+          );
+
+        if (
+          !pregnancyDiagnosisIsPregnantStatusSrv(
+            result
+          )
+        ) {
+          continue;
+        }
+      }
+
+      const ai =
+        linkedAiDate(
+          event
+        );
+
+      const episode =
+        ensurePregnancyEpisode(
+          event._number,
+          ai
+        );
+
+      if (!episode) {
+        continue;
+      }
+
+      episode.events.push(
+        event
+      );
+
+      if (
+        [
+          'calving',
+          'abortion',
+          'embryonic_loss'
+        ].includes(
+          type
+        )
+      ) {
+        if (
+          !episode.endDate ||
+          event._date <
+            episode.endDate
+        ) {
+          episode.endDate =
+            event._date;
+
+          episode.endType =
+            type;
+        }
+      }
     }
 
-    repeatedAnimals.sort((a, b) => b.total - a.total);
+    for (
+      const animal
+      of currentAnimals
+    ) {
+      const status =
+        text(
+          animal.reproductiveStatus ||
+          animal.followerStatus ||
+          animal.pregStatus ||
+          ''
+        );
 
-    // ------------------------------------------------------------
-    // 10) الملخص والتنبيهات والتوصيات
-    // ------------------------------------------------------------
+      if (
+        !pregnancyDiagnosisIsPregnantStatusSrv(
+          status
+        )
+      ) {
+        continue;
+      }
 
-   const activeCount = activeAnimals.length;
+      ensurePregnancyEpisode(
+        animal._number,
 
-let adultAnimalsCount = 0;
-let followerAnimalsCount = 0;
-
-for (const animal of activeAnimals) {
-  if (animal.ageClass === 'follower') {
-    followerAnimalsCount += 1;
-  } else {
-    adultAnimalsCount += 1;
-  }
-}
-
-const affectedNumbers = new Set();
-
-    for (const event of healthEvents) {
-      affectedNumbers.add(event.number);
+        animal.lastFertileInseminationDate ||
+        animal.lastInseminationDate ||
+        animal.lastAI
+      );
     }
 
-    const summary = {
-      activeAnimals: activeCount,
-      adultAnimals: adultAnimalsCount,
-      followerAnimals: followerAnimalsCount,
-      healthEvents: healthEvents.length,
-      affectedAnimals: affectedNumbers.size,
-      affectedPct: percent(affectedNumbers.size, activeCount),
+    const pregnancyEpisodesForWindow =
+      (
+        windowStart,
+        windowEnd
+      ) =>
+        [
+          ...pregnancyEpisodes.values()
+        ]
+          .filter(
+            episode =>
+              episode.startDate <=
+                windowEnd &&
 
-      mastitisCases: mastitisEvents.length,
-      mastitisPct: percent(mastitisEvents.length, activeCount),
+              (
+                !episode.endDate ||
+                episode.endDate >=
+                  windowStart
+              )
+          );
 
-      lamenessCases: lamenessEvents.length,
-      lamenessPct: percent(lamenessEvents.length, activeCount),
+    const currentPregnancyEpisodes =
+      pregnancyEpisodesForWindow(
+        startDate,
+        today
+      );
 
-      diseaseCases: diseaseEvents.length,
-      treatmentEvents: treatmentEvents.length,
-      vaccinationEvents: vaccinationEvents.length,
-      hoofTrimmingEvents: hoofEvents.length,
-      repeatedAnimals: repeatedAnimals.length
+    const previousPregnancyEpisodes =
+      comparisonAvailable
+        ? pregnancyEpisodesForWindow(
+            previousStartDate,
+            previousEndDate
+          )
+        : [];
+
+    const historicalCountByProblem =
+      new Map();
+
+    const historyProblemKey =
+      event => {
+        const type =
+          eventTypeOf(
+            event
+          );
+
+        if (
+          [
+            'mastitis',
+            'lameness',
+            'abortion',
+            'embryonic_loss'
+          ].includes(
+            type
+          )
+        ) {
+          return type;
+        }
+
+        if (
+          isCalfScours(
+            event
+          )
+        ) {
+          return 'calf_scours';
+        }
+
+        return (
+          eventDiseaseCode(
+            event
+          ) ||
+          ''
+        );
+      };
+
+    for (
+      const event
+      of allEvents
+    ) {
+      const key =
+        historyProblemKey(
+          event
+        );
+
+      if (!key) continue;
+
+      const mapKey =
+        `${key}|${event._number}`;
+
+      historicalCountByProblem.set(
+        mapKey,
+
+        (
+          historicalCountByProblem.get(
+            mapKey
+          ) ||
+          0
+        ) + 1
+      );
+    }
+
+    const countBy =
+      (
+        events,
+        getter
+      ) => {
+        const map =
+          new Map();
+
+        for (
+          const event
+          of events
+        ) {
+          const raw =
+            getter(
+              event
+            );
+
+          const values =
+            Array.isArray(
+              raw
+            )
+              ? raw
+              : [raw];
+
+          for (
+            const value
+            of values
+          ) {
+            const key =
+              text(
+                value
+              );
+
+            if (!key) continue;
+
+            map.set(
+              key,
+              (
+                map.get(
+                  key
+                ) ||
+                0
+              ) + 1
+            );
+          }
+        }
+
+        return [
+          ...map.entries()
+        ]
+          .map(
+            ([
+              name,
+              count
+            ]) => ({
+              name,
+              count
+            })
+          )
+          .sort(
+            (a, b) =>
+              b.count -
+                a.count ||
+
+              a.name.localeCompare(
+                b.name,
+                'ar'
+              )
+          );
+      };
+
+    const recurrenceFor =
+      (
+        key,
+        events
+      ) => {
+        const currentByAnimal =
+          new Map();
+
+        for (
+          const event
+          of events
+        ) {
+          if (
+            !currentByAnimal.has(
+              event._number
+            )
+          ) {
+            currentByAnimal.set(
+              event._number,
+              []
+            );
+          }
+
+          currentByAnimal
+            .get(
+              event._number
+            )
+            .push(
+              event
+            );
+        }
+
+        const animals = [];
+
+        for (
+          const [
+            number,
+            rows
+          ]
+          of currentByAnimal.entries()
+        ) {
+          const historyCount =
+            historicalCountByProblem.get(
+              `${key}|${number}`
+            ) ||
+            rows.length;
+
+          if (
+            historyCount < 2
+          ) {
+            continue;
+          }
+
+          animals.push({
+            animalNumber:
+              number,
+
+            periodCases:
+              rows.length,
+
+            historyCases:
+              historyCount,
+
+            lastDate:
+              rows
+                .map(
+                  row =>
+                    row._date
+                )
+                .sort()
+                .at(-1) ||
+              ''
+          });
+        }
+
+        animals.sort(
+          (a, b) =>
+            b.historyCases -
+              a.historyCases ||
+
+            b.periodCases -
+              a.periodCases ||
+
+            b.lastDate.localeCompare(
+              a.lastDate
+            )
+        );
+
+        return {
+          affectedAnimals:
+            animals.length,
+
+          periodCases:
+            animals.reduce(
+              (
+                sum,
+                row
+              ) =>
+                sum +
+                row.periodCases,
+              0
+            ),
+
+          animals:
+            animals.slice(
+              0,
+              20
+            )
+        };
+      };
+
+    const trendFor =
+      (
+        currentProblemEvents,
+        previousProblemEvents
+      ) => {
+        if (
+          !comparisonAvailable
+        ) {
+          return {
+            available:
+              false
+          };
+        }
+
+        const currentAffected =
+          new Set(
+            currentProblemEvents
+              .map(
+                event =>
+                  event._number
+              )
+          ).size;
+
+        const previousAffected =
+          new Set(
+            previousProblemEvents
+              .map(
+                event =>
+                  event._number
+              )
+          ).size;
+
+        return {
+          available:
+            true,
+
+          currentAffected,
+          previousAffected,
+
+          deltaAffected:
+            currentAffected -
+            previousAffected,
+
+          direction:
+            currentAffected >
+              previousAffected
+              ? 'up'
+              : currentAffected <
+                  previousAffected
+                ? 'down'
+                : 'stable'
+        };
+      };
+
+    const benchmarkStatus =
+      (
+        ratePct,
+        ceilingPct
+      ) => {
+        if (
+          ratePct === null ||
+          ceilingPct === null
+        ) {
+          return 'muted';
+        }
+
+        return (
+          Number(ratePct) <=
+          Number(ceilingPct)
+            ? 'ok'
+            : 'danger'
+        );
+      };
+
+    const readingFor =
+      ({
+        title,
+        affectedCount,
+        caseCount,
+        denominatorCount = null,
+        ratePct = null,
+        ceilingPct = null,
+        recurrence,
+        trend,
+        concentrationText = ''
+      }) => {
+        const parts = [];
+
+        if (
+          denominatorCount > 0 &&
+          ratePct !== null
+        ) {
+          if (
+            ceilingPct !== null
+          ) {
+            parts.push(
+              `${title}: ${ratePct}% (${affectedCount}/${denominatorCount})، ${ratePct <= ceilingPct ? 'ضمن' : 'أعلى من'} السقف المرجعي ${ceilingPct}%.`
+            );
+
+          } else {
+            parts.push(
+              `${title}: ${ratePct}% (${affectedCount}/${denominatorCount}).`
+            );
+          }
+
+        } else {
+          parts.push(
+            `${title}: ${caseCount} حالة في ${affectedCount} حيوان.`
+          );
+        }
+
+        if (
+          recurrence
+            ?.affectedAnimals >
+          0
+        ) {
+          parts.push(
+            `${recurrence.affectedAnimals} من الحيوانات المتأثرة لها تكرار موثق لنفس المشكلة.`
+          );
+        }
+
+        if (
+          trend?.available
+        ) {
+          if (
+            trend.direction ===
+            'up'
+          ) {
+            parts.push(
+              `الحيوانات المتأثرة أعلى من الفترة السابقة (${trend.currentAffected} مقابل ${trend.previousAffected}).`
+            );
+
+          } else if (
+            trend.direction ===
+            'down'
+          ) {
+            parts.push(
+              `الحيوانات المتأثرة أقل من الفترة السابقة (${trend.currentAffected} مقابل ${trend.previousAffected}).`
+            );
+
+          } else {
+            parts.push(
+              `عدد الحيوانات المتأثرة ثابت مقارنة بالفترة السابقة (${trend.currentAffected}).`
+            );
+          }
+        }
+
+        if (
+          concentrationText
+        ) {
+          parts.push(
+            concentrationText
+          );
+        }
+
+        return parts.join(
+          ' '
+        );
+      };
+
+    const actionByKey = {
+      mastitis:
+        'ابدأ بالحالات المتكررة، وراجع الربع المصاب والتحليل البكتريولوجي واختبار الحساسية عند الحاجة، ثم راجع إجراءات ومعدات الحلب.',
+
+      lameness:
+        'ابدأ بفحص الحوافر للحالات المتكررة وتحديد الآفة، ثم راجع التقليم الوقائي والأرضيات ومسارات الحركة.',
+
+      calf_scours:
+        'راجع السرسوب ونظافة الولادة والإيواء، واطلب تشخيصًا مسببًا عند تكرر الحالات أو تجمعها.',
+
+      abortion:
+        'ابدأ بالحالات المتكررة: راجع التاريخ التناسلي وعمر الحمل، وافحص الجنين والمشيمة والمسببات المعدية عند التوفر بإشراف الطبيب.',
+
+      embryonic_loss:
+        'راجع توقيت التشخيص وتأكيد الحمل، وابدأ بالحالات المتكررة لتقييم التاريخ التناسلي والعوامل المرتبطة بفقد الحمل المبكر.',
+
+      milk_fever:
+        'راجع إدارة فترة الانتقال وتوازن الكالسيوم والماغنسيوم وDCAD قبل الولادة.',
+
+      ketosis:
+        'راجع توازن الطاقة بعد الولادة، استهلاك المادة الجافة، واستخدم BHB لتأكيد الحالات المشتبه بها.',
+
+      displaced_abomasum:
+        'راجع استهلاك العليقة بعد الولادة والكيتوزيس ونقص الكالسيوم والحالات الانتقالية المصاحبة.',
+
+      cecal_dilatation:
+        'أكّد التشخيص بيطريًا وراجع استهلاك العليقة والألياف وحركة الجهاز الهضمي.',
+
+      rumen_acidosis:
+        'راجع الألياف الفعالة، النشويات سريعة التخمر، انتظام الخلط والتقديم، وأي تغيرات مفاجئة في العليقة.',
+
+      bloat_tympany:
+        'حدد نوع النفاخ ومصدره الغذائي فورًا، وراجع العليقة وإدارة التغذية للحالات المتكررة.',
+
+      traumatic_reticuloperitonitis:
+        'أكّد التشخيص بيطريًا وراجع إجراءات الوقاية من الأجسام المعدنية ومغناطيسات الكرش عند استخدامها.',
+
+      simple_indigestion_rumen_atony:
+        'راجع التغيرات الغذائية واستهلاك المادة الجافة وحركة الكرش، واستبعد الأسباب الثانوية.',
+
+      fatty_liver:
+        'راجع حالة الجسم قبل الولادة وتوازن الطاقة واستهلاك المادة الجافة في فترة الانتقال.',
+
+      phosphorus_def:
+        'أكّد النقص تحليليًا وراجع إمداد الفوسفور ونسبة الكالسيوم إلى الفوسفور في العليقة.',
+
+      magnesium_def:
+        'راجع تركيز الماغنسيوم في العليقة وعوامل انخفاض امتصاصه، خاصة في الحيوانات عالية الخطورة.',
+
+      retained_placenta:
+        'راجع إدارة الولادة وحالات نقص الكالسيوم والأمراض الانتقالية، وابدأ بالحالات المتكررة.',
+
+      metritis_endometritis:
+        'راجع سلامة ما بعد الولادة، احتباس المشيمة، والفحص الرحمي للحالات المتكررة.',
+
+      ovarian_cysts:
+        'راجع التاريخ التناسلي والحالة الجسمية والطاقة، وأكّد التشخيص بالفحص التناسلي.',
+
+      pyometra:
+        'أكّد التشخيص التناسلي وراجع تاريخ الولادة والتلقيح والتهابات الرحم السابقة.',
+
+      brucellosis:
+        'تعامل معها كاشتباه معدٍ عالي الأهمية: اعزل الحالة واتبع الاختبارات والإجراءات الرسمية البيطرية.',
+
+      bovine_respiratory_disease:
+        'راجع التهوية والكثافة والنقل والخلط، وحدد المسبب عند تجمع الحالات أو تكرارها.',
+
+      johnes_disease:
+        'أكّد التشخيص معمليًا وراجع إدارة العزل وتقليل تعرض الصغار لمصادر العدوى.',
+
+      bovine_viral_diarrhea:
+        'أكّد التشخيص وراجع برنامج التحصين والاشتباه في الحيوانات دائمة العدوى عند وجود نمط قطيعي.',
+
+      fmd:
+        'اتبع إجراءات العزل والإبلاغ والسيطرة البيطرية الرسمية فور الاشتباه.',
+
+      three_day_sickness:
+        'راجع مكافحة الحشرات والدعم العلاجي وسرعة اكتشاف الحالات الشديدة.',
+
+      lumpy_skin:
+        'راجع مكافحة النواقل والعزل والتحصين وفق البرنامج المعتمد والتعليمات البيطرية.',
+
+      septicemia:
+        'تعامل كحالة طارئة: أكّد مصدر العدوى وابدأ التشخيص والعلاج البيطري دون تأخير.',
+
+      salmonellosis:
+        'راجع العزل والنظافة ومصادر التلوث، واستخدم التشخيص المخبري عند تجمع الحالات.',
+
+      leptospirosis:
+        'راجع مصادر المياه والقوارض والتحصين، وأكّد الاشتباه معمليًا خاصة مع مشاكل الحمل.',
+
+      ibr:
+        'راجع برنامج التحصين والعزل وحدد المسبب عند وجود نمط تنفسي أو تناسلي قطيعي.',
+
+      blackleg:
+        'راجع التحصين والتعامل مع الحالات النافقة وإجراءات الوقاية القطيعية.',
+
+      clostridial_enterotoxemia:
+        'راجع التحصين والتغيرات الغذائية وحدد عوامل الخطورة في الحالات المتجمعة.',
+
+      blood_parasites:
+        'أكّد نوع الطفيل بالفحص المناسب وراجع مكافحة النواقل وخطة العلاج النوعي.',
+
+      pinkeye:
+        'راجع الذباب والغبار والإصابات القرنية واعزل الحالات النشطة عند زيادة الانتشار.',
+
+      gastrointestinal_parasites:
+        'اعتمد على الفحص البرازي/العبء الطفيلي قبل ضبط برنامج المكافحة لتجنب العلاج العشوائي.',
+
+      mange_ectoparasites:
+        'حدد الطفيل وراجع برنامج المكافحة الجماعية والبيئة لمنع إعادة العدوى.',
+
+      calf_pneumonia:
+        'راجع التهوية والكثافة والسرسوب، وحدد المسبب عند تكرر الحالات أو تجمعها.',
+
+      navel_infection:
+        'راجع تعقيم السرة ونظافة الولادة وكفاءة السرسوب، وابدأ بالحالات المتكررة.',
+
+      joint_ill:
+        'ابحث عن مصدر العدوى وتقييم السرة والسرسوب، وابدأ العلاج المبكر للحالات النشطة.',
+
+      calf_coccidiosis:
+        'راجع العمر والكثافة ونظافة البيئة، وأكّد التشخيص البرازي قبل تعديل برنامج المكافحة.'
     };
 
-    const summaryCards = [
-     {
-  label: 'إجمالي المشمول صحيًا',
-  value: summary.activeAnimals,
-  note: herdLabel,
-  level: 'ok'
-},
-{
-  label: 'الأمهات / التشغيل',
-  value: summary.adultAnimals,
-  note: 'حيوانات كبيرة',
-  level: 'ok'
-},
-{
-  label: 'العجول / التوابع',
-  value: summary.followerAnimals,
-  note: 'داخلة في تقرير الصحة',
-  level: summary.followerAnimals ? 'ok' : 'warn'
-},
-      {
-        label: 'الأحداث الصحية',
-        value: summary.healthEvents,
-        note: `خلال ${days} يوم`,
-        level: levelByPercent(summary.affectedPct, 8, 15)
-      },
-      {
-        label: 'حيوانات متأثرة',
-        value: summary.affectedAnimals,
-        note: `${summary.affectedPct}% من القطيع`,
-        level: levelByPercent(summary.affectedPct, 8, 15)
-      },
-      {
-        label: 'التهاب الضرع',
-        value: summary.mastitisCases,
-        note: `${summary.mastitisPct}% من القطيع`,
-        level: levelByPercent(summary.mastitisPct, 5, 10)
-      },
-      {
-        label: 'العرج',
-        value: summary.lamenessCases,
-        note: `${summary.lamenessPct}% من القطيع`,
-        level: levelByPercent(summary.lamenessPct, 5, 10)
-      },
-      {
-        label: 'متكررة المشاكل',
-        value: summary.repeatedAnimals,
-        note: 'تحتاج متابعة عملية',
-        level: summary.repeatedAnimals ? 'warn' : 'ok'
+    const defaultAction =
+      'راجع الحالات المتكررة والتشخيص المسجل، وحدد العامل المشترك قبل تعديل خطة الوقاية أو العلاج.';
+
+    const makeProblem =
+      ({
+        key,
+        title,
+        group,
+        section,
+        denominatorSet = null,
+        ceilingPct = null,
+        distributions = {},
+        extraRecent = null
+      }) => {
+        const current =
+          problemEvents(
+            currentEvents,
+            key,
+            section
+          );
+
+        const previous =
+          comparisonAvailable
+            ? problemEvents(
+                previousEvents,
+                key,
+                section
+              )
+            : [];
+
+        const affected =
+          new Set(
+            current.map(
+              event =>
+                event._number
+            )
+          );
+
+        const denominatorCount =
+          denominatorSet instanceof
+            Set
+            ? denominatorSet.size
+            : null;
+
+        const ratePct =
+          denominatorCount !== null
+            ? pct(
+                affected.size,
+                denominatorCount
+              )
+            : null;
+
+        const recurrence =
+          recurrenceFor(
+            key,
+            current
+          );
+
+        const trend =
+          trendFor(
+            current,
+            previous
+          );
+
+        const distributionOut =
+          {};
+
+        for (
+          const [
+            name,
+            getter
+          ]
+          of Object.entries(
+            distributions
+          )
+        ) {
+          distributionOut[name] =
+            countBy(
+              current,
+              getter
+            )
+              .slice(
+                0,
+                12
+              );
+        }
+
+        const topConcentration =
+          Object
+            .values(
+              distributionOut
+            )
+            .flat()
+            .sort(
+              (a, b) =>
+                b.count -
+                a.count
+            )[0] ||
+          null;
+
+        const concentrationText =
+          topConcentration &&
+          topConcentration.count >=
+            2
+            ? `أكثر نمط مسجل: ${topConcentration.name} (${topConcentration.count}).`
+            : '';
+
+        const recent =
+          current
+            .map(
+              event => ({
+                animalNumber:
+                  event._number,
+
+                date:
+                  event._date,
+
+                diseaseCode:
+                  eventDiseaseCode(
+                    event
+                  ),
+
+                diseaseName:
+                  eventDiseaseName(
+                    event
+                  ) ||
+                  title,
+
+                ...(
+                  typeof extraRecent ===
+                    'function'
+                    ? (
+                        extraRecent(
+                          event
+                        ) ||
+                        {}
+                      )
+                    : {}
+                )
+              })
+            )
+            .sort(
+              (a, b) =>
+                b.date.localeCompare(
+                  a.date
+                )
+            )
+            .slice(
+              0,
+              20
+            );
+
+        let status =
+          benchmarkStatus(
+            ratePct,
+            ceilingPct
+          );
+
+        if (
+          current.length ===
+          0
+        ) {
+          status = 'ok';
+
+        } else if (
+          ceilingPct === null ||
+          ratePct === null
+        ) {
+          status =
+            recurrence
+              .affectedAnimals >
+                0 ||
+            trend.direction ===
+              'up'
+              ? 'warn'
+              : 'info';
+        }
+
+        return {
+          key,
+          title,
+          group,
+
+          metrics: {
+            affectedCount:
+              affected.size,
+
+            caseCount:
+              current.length,
+
+            denominatorCount,
+            ratePct,
+            ceilingPct
+          },
+
+          status,
+          recurrence,
+          trend,
+
+          distributions:
+            distributionOut,
+
+          recent,
+
+          murabbik: {
+            status,
+
+            reading:
+              current.length ===
+                0
+                ? `لم تُسجل حالات ${title} خلال الفترة المختارة.`
+                : readingFor({
+                    title,
+
+                    affectedCount:
+                      affected.size,
+
+                    caseCount:
+                      current.length,
+
+                    denominatorCount,
+                    ratePct,
+                    ceilingPct,
+                    recurrence,
+                    trend,
+                    concentrationText
+                  }),
+
+            action:
+              current.length ===
+                0
+                ? ''
+                : (
+                    actionByKey[
+                      key
+                    ] ||
+                    defaultAction
+                  )
+          }
+        };
+      };
+
+    const mastitis =
+      makeProblem({
+        key:
+          'mastitis',
+
+        title:
+          'التهاب الضرع',
+
+        group:
+          'صحة الضرع',
+
+        section:
+          'adult',
+
+        denominatorSet:
+          lactatingAtRisk,
+
+        ceilingPct:
+          5,
+
+        distributions: {
+          byType:
+            event =>
+              text(
+                event.mastitisType ||
+                event.details
+                  ?.mastitisType ||
+                event.diagnosis
+              ),
+
+          byQuarter:
+            event => {
+              const raw =
+                event.quarters ||
+                event.affectedQuarters ||
+                event.affectedQuarter ||
+                event.details
+                  ?.quarters ||
+                event.details
+                  ?.affectedQuarters ||
+                event.details
+                  ?.affectedQuarter ||
+                [];
+
+              return Array.isArray(
+                raw
+              )
+                ? raw
+                : text(raw)
+                    .split(
+                      /[،,|]/
+                    )
+                    .map(
+                      v =>
+                        v.trim()
+                    )
+                    .filter(
+                      Boolean
+                    );
+            }
+        },
+
+        extraRecent:
+          event => ({
+            type:
+              text(
+                event.mastitisType ||
+                event.details
+                  ?.mastitisType ||
+                event.diagnosis
+              ),
+
+            quarters:
+              Array.isArray(
+                event.quarters ||
+                event.details
+                  ?.quarters
+              )
+                ? (
+                    event.quarters ||
+                    event.details
+                      ?.quarters
+                  ).join('، ')
+                : text(
+                    event.affectedQuarter ||
+                    event.details
+                      ?.affectedQuarter ||
+                    ''
+                  )
+          })
+      });
+
+    const lameness =
+      makeProblem({
+        key:
+          'lameness',
+
+        title:
+          'العرج',
+
+        group:
+          'الحركة والحوافر',
+
+        section:
+          'adult',
+
+        denominatorSet:
+          adultAtRisk,
+
+        ceilingPct:
+          5,
+
+        distributions: {
+          byType:
+            event =>
+              text(
+                event.lamenessType ||
+                event.details
+                  ?.lamenessType ||
+                event.diagnosis
+              ),
+
+          byLeg:
+            event => {
+              const raw =
+                event.affectedLegs ||
+                event.affectedLeg ||
+                event.details
+                  ?.affectedLegs ||
+                event.details
+                  ?.affectedLeg ||
+                [];
+
+              return Array.isArray(
+                raw
+              )
+                ? raw
+                : text(raw)
+                    .split(
+                      /[،,|]/
+                    )
+                    .map(
+                      v =>
+                        v.trim()
+                    )
+                    .filter(
+                      Boolean
+                    );
+            }
+        },
+
+        extraRecent:
+          event => ({
+            type:
+              text(
+                event.lamenessType ||
+                event.details
+                  ?.lamenessType ||
+                event.diagnosis
+              ),
+
+            leg:
+              Array.isArray(
+                event.affectedLegs ||
+                event.details
+                  ?.affectedLegs
+              )
+                ? (
+                    event.affectedLegs ||
+                    event.details
+                      ?.affectedLegs
+                  ).join('، ')
+                : text(
+                    event.affectedLeg ||
+                    event.details
+                      ?.affectedLeg ||
+                    ''
+                  )
+          })
+      });
+
+    const hoofTrimmingEvents =
+      currentEvents
+        .filter(
+          event =>
+            eventTypeOf(
+              event
+            ) ===
+              'hoof_trimming' &&
+
+            animalSectionForEvent(
+              event
+            ) ===
+              'adult'
+        )
+        .map(
+          event => ({
+            animalNumber:
+              event._number,
+
+            date:
+              event._date,
+
+            details:
+              text(
+                event.lesion ||
+                event.problem ||
+                event.diagnosis ||
+                event.details
+                  ?.lesion ||
+                event.details
+                  ?.problem ||
+                ''
+              )
+          })
+        )
+        .sort(
+          (a, b) =>
+            b.date.localeCompare(
+              a.date
+            )
+        );
+
+    lameness.related = {
+      hoofTrimmingCount:
+        hoofTrimmingEvents.length,
+
+      recentHoofTrimming:
+        hoofTrimmingEvents.slice(
+          0,
+          20
+        )
+    };
+
+    const abortionCurrent =
+      problemEvents(
+        currentEvents,
+        'abortion',
+        'adult'
+      );
+
+    const abortionLinkedEpisodes =
+      new Set(
+        abortionCurrent
+          .map(
+            event => {
+              const ai =
+                linkedAiDate(
+                  event
+                );
+
+              return ai
+                ? `${event._number}|${ai}`
+                : '';
+            }
+          )
+          .filter(
+            Boolean
+          )
+      );
+
+    const abortion =
+      makeProblem({
+        key:
+          'abortion',
+
+        title:
+          'الإجهاض',
+
+        group:
+          'الصحة التناسلية',
+
+        section:
+          'adult',
+
+        denominatorSet:
+          new Set(
+            currentPregnancyEpisodes
+              .map(
+                episode =>
+                  episode.key
+              )
+          ),
+
+        ceilingPct:
+          5,
+
+        distributions: {
+          byStage:
+            event => {
+              const days =
+                Number(
+                  event.gestationDays ||
+                  event.abortionAgeDays ||
+                  event.details
+                    ?.gestationDays ||
+                  0
+                );
+
+              if (
+                !(days > 0)
+              ) {
+                return 'عمر الحمل غير محدد';
+              }
+
+              if (
+                days < 90
+              ) {
+                return 'أقل من 90 يوم';
+              }
+
+              if (
+                days < 180
+              ) {
+                return '90–179 يوم';
+              }
+
+              return '180 يوم فأكثر';
+            }
+        },
+
+        extraRecent:
+          event => ({
+            gestationDays:
+              Number(
+                event.gestationDays ||
+                event.abortionAgeDays ||
+                event.details
+                  ?.gestationDays ||
+                0
+              ) ||
+              null,
+
+            probableCause:
+              text(
+                event.probableCause ||
+                event.details
+                  ?.probableCause ||
+                ''
+              )
+          })
+      });
+
+    // معدل الإجهاض لا يصدر إلا إذا أمكن
+    // ربط كل حالات الفترة بحلقات حمل موثقة.
+    abortion.metrics
+      .rateNumeratorCount =
+        abortionLinkedEpisodes.size;
+
+    abortion.metrics
+      .rateDataComplete =
+        abortion.metrics
+          .caseCount ===
+        abortionLinkedEpisodes
+          .size;
+
+    abortion.metrics.ratePct =
+      abortion.metrics
+        .rateDataComplete
+        ? pct(
+            abortionLinkedEpisodes
+              .size,
+
+            abortion.metrics
+              .denominatorCount
+          )
+        : null;
+
+    abortion.status =
+      abortion.metrics
+        .caseCount ===
+          0
+        ? 'ok'
+        : abortion.metrics
+              .ratePct ===
+            null
+          ? 'muted'
+          : benchmarkStatus(
+              abortion.metrics
+                .ratePct,
+
+              abortion.metrics
+                .ceilingPct
+            );
+
+    abortion.murabbik.status =
+      abortion.status;
+
+    if (
+      abortion.metrics
+        .caseCount ===
+      0
+    ) {
+      abortion.murabbik.reading =
+        'لم تُسجل حالات إجهاض خلال الفترة المختارة.';
+
+      abortion.murabbik.action =
+        '';
+
+    } else if (
+      abortion.metrics
+        .ratePct ===
+      null
+    ) {
+      abortion.murabbik.reading =
+        `سُجلت ${abortion.metrics.caseCount} حالة إجهاض في ${abortion.metrics.affectedCount} حيوان، لكن ربط كل الحالات بحلقات الحمل غير مكتمل؛ لذلك لا يصدر مُرَبِّيك معدل إجهاض لهذه الفترة.`;
+
+    } else {
+      const parts = [
+        `معدل الإجهاض ${abortion.metrics.ratePct}% (${abortion.metrics.rateNumeratorCount}/${abortion.metrics.denominatorCount} حالة حمل معرّضة)، ${abortion.metrics.ratePct <= abortion.metrics.ceilingPct ? 'ضمن' : 'أعلى من'} السقف المرجعي ${abortion.metrics.ceilingPct}%.`
+      ];
+
+      if (
+        abortion.recurrence
+          .affectedAnimals >
+        0
+      ) {
+        parts.push(
+          `${abortion.recurrence.affectedAnimals} من الحيوانات المتأثرة لها إجهاض متكرر موثق.`
+        );
       }
+
+      if (
+        abortion.trend
+          .available
+      ) {
+        if (
+          abortion.trend
+            .direction ===
+          'up'
+        ) {
+          parts.push(
+            `الحيوانات المتأثرة أعلى من الفترة السابقة (${abortion.trend.currentAffected} مقابل ${abortion.trend.previousAffected}).`
+          );
+
+        } else if (
+          abortion.trend
+            .direction ===
+          'down'
+        ) {
+          parts.push(
+            `الحيوانات المتأثرة أقل من الفترة السابقة (${abortion.trend.currentAffected} مقابل ${abortion.trend.previousAffected}).`
+          );
+        }
+      }
+
+      if (
+        abortion
+          .distributions
+          .byStage?.[0]
+          ?.count >=
+        2
+      ) {
+        parts.push(
+          `أكثر مرحلة تسجيلًا: ${abortion.distributions.byStage[0].name} (${abortion.distributions.byStage[0].count}).`
+        );
+      }
+
+      abortion.murabbik
+        .reading =
+          parts.join(' ');
+    }
+
+    const embryonicLoss =
+      makeProblem({
+        key:
+          'embryonic_loss',
+
+        title:
+          'فقد الأجنة',
+
+        group:
+          'الصحة التناسلية',
+
+        section:
+          'adult',
+
+        denominatorSet:
+          null,
+
+        ceilingPct:
+          null,
+
+        distributions:
+          {},
+
+        extraRecent:
+          event => ({
+            sourceContext:
+              text(
+                event.sourceContext ||
+                ''
+              ),
+
+            daysFromLastInsemination:
+              Number(
+                event.daysFromLastInsemination ||
+                0
+              ) ||
+              null
+          })
+      });
+
+    const calfScours =
+      makeProblem({
+        key:
+          'calf_scours',
+
+        title:
+          'إسهال العجول',
+
+        group:
+          'صحة العجول',
+
+        section:
+          'calf',
+
+        denominatorSet:
+          calfAtRisk,
+
+        ceilingPct:
+          15,
+
+        distributions:
+          {},
+
+        extraRecent:
+          event => ({
+            diseaseName:
+              eventDiseaseName(
+                event
+              ) ||
+              'إسهال العجول'
+          })
+      });
+
+    const knownMajorKeys =
+      new Set([
+        'mastitis',
+        'lameness',
+        'abortion',
+        'embryonic_loss',
+        'calf_scours'
+      ]);
+
+    const generalDiseaseKeys =
+      new Map();
+
+    for (
+      const event
+      of currentEvents
+    ) {
+      const code =
+        eventDiseaseCode(
+          event
+        );
+
+      if (
+        !code ||
+        knownMajorKeys.has(
+          code
+        )
+      ) {
+        continue;
+      }
+
+      if (
+        !DISEASE_CATALOG_SRV[
+          code
+        ] &&
+        eventTypeOf(
+          event
+        ) !==
+          'health'
+      ) {
+        continue;
+      }
+
+      const section =
+        animalSectionForEvent(
+          event
+        );
+
+      const name =
+        eventDiseaseName(
+          event
+        ) ||
+        DISEASE_CATALOG_SRV[
+          code
+        ]?.name ||
+        code;
+
+      const group =
+        text(
+          event.diseaseGroup ||
+          event.details
+            ?.diseaseGroup ||
+          DISEASE_CATALOG_SRV[
+            code
+          ]?.group ||
+          'صحة عامة'
+        );
+
+      generalDiseaseKeys.set(
+        `${section}|${code}`,
+        {
+          section,
+          code,
+          name,
+          group
+        }
+      );
+    }
+
+    const adultGeneralProblems =
+      [];
+
+    const calfGeneralProblems =
+      [];
+
+    for (
+      const item
+      of generalDiseaseKeys.values()
+    ) {
+      const problem =
+        makeProblem({
+          key:
+            item.code,
+
+          title:
+            item.name,
+
+          group:
+            item.group,
+
+          section:
+            item.section,
+
+          denominatorSet:
+            null,
+
+          ceilingPct:
+            null,
+
+          distributions: {
+            byDetail:
+              event =>
+                text(
+                  event.parasiteType ||
+                  event.details
+                    ?.parasiteType ||
+                  event.diagnosisMethod ||
+                  event.details
+                    ?.diagnosisMethod ||
+                  ''
+                )
+          }
+        });
+
+      if (
+        item.section ===
+        'calf'
+      ) {
+        calfGeneralProblems.push(
+          problem
+        );
+
+      } else {
+        adultGeneralProblems.push(
+          problem
+        );
+      }
+    }
+
+    const problemPriority =
+      problem => {
+        if (
+          problem.status ===
+          'danger'
+        ) {
+          return 3;
+        }
+
+        if (
+          problem.recurrence
+            ?.affectedAnimals >
+          0
+        ) {
+          return 2;
+        }
+
+        if (
+          problem.trend
+            ?.direction ===
+          'up'
+        ) {
+          return 1;
+        }
+
+        return 0;
+      };
+
+    adultGeneralProblems.sort(
+      (a, b) =>
+        problemPriority(b) -
+          problemPriority(a) ||
+
+        b.metrics.caseCount -
+          a.metrics.caseCount ||
+
+        a.title.localeCompare(
+          b.title,
+          'ar'
+        )
+    );
+
+    calfGeneralProblems.sort(
+      (a, b) =>
+        problemPriority(b) -
+          problemPriority(a) ||
+
+        b.metrics.caseCount -
+          a.metrics.caseCount ||
+
+        a.title.localeCompare(
+          b.title,
+          'ar'
+        )
+    );
+
+    const sectionReading =
+      problems => {
+        const activeProblems =
+          problems.filter(
+            problem =>
+              problem.metrics
+                .caseCount >
+              0
+          );
+
+        if (
+          !activeProblems.length
+        ) {
+          return {
+            status:
+              'ok',
+
+            text:
+              'لم تُسجّل مشكلات صحية خلال الفترة المختارة.'
+          };
+        }
+
+        const ordered =
+          [
+            ...activeProblems
+          ]
+            .sort(
+              (a, b) =>
+                problemPriority(b) -
+                  problemPriority(a) ||
+
+                b.metrics
+                  .caseCount -
+                  a.metrics
+                    .caseCount
+            );
+
+        const top =
+          ordered[0];
+
+        const reason =
+          top.status ===
+            'danger'
+            ? 'لتجاوزه السقف المرجعي'
+
+            : top.recurrence
+                ?.affectedAnimals >
+              0
+              ? 'لوجود حالات متكررة'
+
+              : top.trend
+                  ?.direction ===
+                'up'
+                ? 'لارتفاع الحيوانات المتأثرة عن الفترة السابقة'
+
+                : 'لأنه الأعلى تسجيلًا خلال الفترة';
+
+        return {
+          status:
+            top.status ===
+              'muted'
+              ? 'info'
+              : top.status,
+
+          text:
+            `الأولوية الصحية الحالية: ${top.title} ${reason}.`
+        };
+      };
+
+    const hasTreatmentData =
+      event =>
+        Boolean(
+          text(
+            event.treatment ||
+            event.treatmentName ||
+            event.drug ||
+            event.drugName ||
+            event.medicine ||
+            event.details
+              ?.treatment ||
+            event.details
+              ?.drug ||
+            event.details
+              ?.drugName ||
+            event.details
+              ?.medicine
+          )
+        );
+
+    const treatmentRows =
+      currentEvents
+        .filter(
+          hasTreatmentData
+        )
+        .map(
+          event => ({
+            section:
+              animalSectionForEvent(
+                event
+              ),
+
+            animalNumber:
+              event._number,
+
+            date:
+              event._date,
+
+            diagnosis:
+              eventDiseaseName(
+                event
+              ) ||
+              text(
+                event.diagnosis ||
+                event.details
+                  ?.diagnosis ||
+                'حالة صحية'
+              ),
+
+            treatment:
+              text(
+                event.treatment ||
+                event.treatmentName ||
+                event.drugName ||
+                event.drug ||
+                event.medicine ||
+                event.details
+                  ?.treatment ||
+                event.details
+                  ?.drugName ||
+                event.details
+                  ?.drug ||
+                event.details
+                  ?.medicine
+              )
+          })
+        )
+        .sort(
+          (a, b) =>
+            b.date.localeCompare(
+              a.date
+            )
+        );
+
+    const programContext =
+      await vaccinationReadProgramContextSrv(
+        uid
+      );
+
+    const executionProgram =
+      programContext.programMode
+        ? await vaccinationReadExecutionProgramSrv(
+            uid,
+            programContext.programMode
+          )
+        : {
+            exists:
+              false,
+
+            version:
+              0,
+
+            rows:
+              []
+          };
+
+    const activeAlternatives =
+      executionProgram
+        .activeAlternatives ||
+      {};
+
+    const activeProgramRows =
+      (
+        Array.isArray(
+          executionProgram.rows
+        )
+          ? executionProgram.rows
+          : []
+      )
+        .filter(
+          row =>
+            row?.active !==
+            false
+        )
+        .filter(
+          row => {
+            const group =
+              text(
+                row.alternativeGroup
+              );
+
+            if (!group) {
+              return true;
+            }
+
+            return (
+              text(
+                activeAlternatives[
+                  group
+                ]
+              ) ===
+              text(
+                row.alternativePath
+              )
+            );
+          }
+        );
+
+    const unitText =
+      (
+        valueRaw,
+        unitRaw
+      ) => {
+        const value =
+          Number(
+            valueRaw ||
+            0
+          );
+
+        const unit =
+          text(
+            unitRaw
+          );
+
+        if (
+          !(value > 0) ||
+          !unit
+        ) {
+          return '';
+        }
+
+        const labels = {
+          day:
+            value === 1
+              ? 'يوم'
+              : `${value} يوم`,
+
+          week:
+            value === 1
+              ? 'أسبوع'
+              : `${value} أسبوع`,
+
+          month:
+            value === 1
+              ? 'شهر'
+              : `${value} شهر`,
+
+          year:
+            value === 1
+              ? 'سنة'
+              : `${value} سنة`
+        };
+
+        return (
+          labels[unit] ||
+          `${value} ${unit}`
+        );
+      };
+
+    const programTargetLabel =
+      row => {
+        const target =
+          text(
+            row.targetGroup
+          );
+
+        if (
+          target ===
+          'herd_all'
+        ) {
+          return 'القطيع';
+        }
+
+        if (
+          target ===
+          'calves'
+        ) {
+          return 'العجول';
+        }
+
+        if (
+          target ===
+          'heifers'
+        ) {
+          return 'العجلات';
+        }
+
+        if (
+          target ===
+          'pregnant_mothers'
+        ) {
+          return 'العشار';
+        }
+
+        if (
+          target ===
+          'mothers'
+        ) {
+          return herdLabel;
+        }
+
+        if (
+          target ===
+          'females'
+        ) {
+          return 'الإناث';
+        }
+
+        return text(
+          row.programSectionLabel ||
+          row.programSection ||
+          '—'
+        );
+      };
+
+    const scheduleText =
+      row => {
+        const schedule =
+          Array.isArray(
+            row.doseSchedule
+          )
+            ? row.doseSchedule
+            : [];
+
+        return schedule
+          .map(
+            step => {
+              const label =
+                text(
+                  step.doseTypeLabel ||
+                  vaccinationProgramDoseLabelSrv({
+                    doseType:
+                      step.doseType,
+
+                    timingBasis:
+                      step.timingBasis,
+
+                    scheduleLength:
+                      schedule.length,
+
+                    fallbackLabel:
+                      step.doseType
+                  })
+                );
+
+              const basis =
+                text(
+                  step.timingBasis
+                );
+
+              const duration =
+                unitText(
+                  step.timingValue,
+                  step.timingUnit
+                );
+
+              if (
+                basis ===
+                'any_time'
+              ) {
+                return `${label}: عند بدء البرنامج`;
+              }
+
+              if (
+                basis ===
+                'after_previous_dose'
+              ) {
+                return `${label}: بعد ${duration || 'الجرعة السابقة'}`;
+              }
+
+              if (
+                basis ===
+                'calf_age'
+              ) {
+                return `${label}: عمر ${duration || 'محدد بالبرنامج'}`;
+              }
+
+              if (
+                basis ===
+                'calf_age_window'
+              ) {
+                const min =
+                  unitText(
+                    step.ageMinValue ||
+                    row.ageMinValue,
+
+                    step.ageMinUnit ||
+                    row.ageMinUnit
+                  );
+
+                const max =
+                  unitText(
+                    step.ageMaxValue ||
+                    row.ageMaxValue,
+
+                    step.ageMaxUnit ||
+                    row.ageMaxUnit
+                  );
+
+                return `${label}: ${min && max ? `من ${min} إلى ${max}` : 'حسب نافذة العمر'}`;
+              }
+
+              if (
+                basis ===
+                'before_expected_calving'
+              ) {
+                return `${label}: قبل الولادة المتوقعة بـ ${duration || 'المدة المحددة'}`;
+              }
+
+              if (
+                basis ===
+                'repeat'
+              ) {
+                return `${label}: كل ${duration || 'الفترة المحددة'}`;
+              }
+
+              return (
+                label ||
+                'جرعة'
+              );
+            }
+          )
+          .filter(
+            Boolean
+          )
+          .join(
+            ' • '
+          );
+      };
+
+    const vaccinationProgram = {
+      selected:
+        Boolean(
+          programContext.saved &&
+          programContext.programMode
+        ),
+
+      mode:
+        text(
+          programContext.programMode
+        ),
+
+      label:
+        text(
+          programContext.programLabel
+        ),
+
+      version:
+        Number(
+          executionProgram.version ||
+          0
+        ),
+
+      columns: [
+        {
+          key:
+            'vaccine',
+
+          label:
+            'التحصين'
+        },
+
+        {
+          key:
+            'target',
+
+          label:
+            'الفئة'
+        },
+
+        {
+          key:
+            'vaccineForm',
+
+          label:
+            'طبيعة اللقاح'
+        },
+
+        {
+          key:
+            'schedule',
+
+          label:
+            'الجرعات والتوقيت'
+        }
+      ],
+
+      rows:
+        activeProgramRows.map(
+          row => ({
+            programRowId:
+              text(
+                row.programRowId ||
+                row.rowId
+              ),
+
+            vaccineCode:
+              text(
+                row.vaccineCode
+              ),
+
+            vaccine:
+              text(
+                row.vaccine ||
+                row.vaccineName ||
+                row.vaccineCode
+              ),
+
+            target:
+              programTargetLabel(
+                row
+              ),
+
+            programSection:
+              text(
+                row.programSection
+              ),
+
+            vaccineForm:
+              text(
+                row.vaccineFormLabel ||
+                row.vaccineForm
+              ),
+
+            schedule:
+              scheduleText(
+                row
+              )
+          })
+        )
+    };
+
+    const taskRows =
+      tasksSnap.docs
+        .map(
+          doc => ({
+            id:
+              doc.id,
+
+            ...(doc.data() || {})
+          })
+        )
+        .filter(
+          task =>
+            text(
+              task.taskType
+            ) ===
+              'vaccination' &&
+
+            text(
+              task.engine
+            ) ===
+              'vaccination_program_v1' &&
+
+            vaccinationTaskPendingSrv(
+              task
+            ) &&
+
+            (
+              !programContext.programMode ||
+
+              vaccinationProgramModeNormSrv(
+                task.programMode
+              ) ===
+              programContext.programMode
+            )
+        )
+        .filter(
+          task => {
+            const number =
+              normalizeAnimalNumberForStats(
+                task.animalNumber ||
+                ''
+              );
+
+            if (!number) {
+              return true;
+            }
+
+            const animal =
+              animalByNumber.get(
+                number
+              );
+
+            return (
+              !animal ||
+              speciesOf(
+                animal
+              ) ===
+                herdType
+            );
+          }
+        );
+
+    const executionGroups = {
+      herdCampaigns:
+        [],
+
+      calves:
+        [],
+
+      mothers:
+        [],
+
+      routineAdults:
+        []
+    };
+
+    const groupedTasks =
+      new Map();
+
+    for (
+      const task
+      of taskRows
+    ) {
+      const dueDate =
+        dateOnly(
+          task.dueDate
+        );
+
+      const statusRaw =
+        text(
+          task.status
+        )
+          .toLowerCase();
+
+      const status =
+        statusRaw ===
+          'needs_data'
+          ? 'needs_data'
+
+          : dueDate &&
+            dueDate < today
+            ? 'overdue'
+
+            : dueDate ===
+              today
+              ? 'today'
+
+              : 'upcoming';
+
+      const section =
+        text(
+          task.programSection
+        )
+          .toLowerCase();
+
+      const campaign =
+        Boolean(
+          text(
+            task.campaignId
+          ) ||
+
+          text(
+            task.campaignDueDate
+          )
+        );
+
+      const category =
+        campaign ||
+        section ===
+          'herd'
+          ? 'herdCampaigns'
+
+          : section ===
+            'calves'
+            ? 'calves'
+
+            : section ===
+              'mothers'
+              ? 'mothers'
+
+              : 'routineAdults';
+
+      const key = [
+        category,
+        status,
+
+        text(
+          task.programRowId
+        ),
+
+        text(
+          task.vaccineCode ||
+          task.vaccineKey
+        ),
+
+        text(
+          task.doseType
+        ),
+
+        dueDate
+      ].join('|');
+
+      if (
+        !groupedTasks.has(
+          key
+        )
+      ) {
+        groupedTasks.set(
+          key,
+          {
+            category,
+            status,
+            dueDate,
+
+            programRowId:
+              text(
+                task.programRowId
+              ),
+
+            vaccineCode:
+              text(
+                task.vaccineCode ||
+                task.vaccineKey
+              ),
+
+            vaccine:
+              text(
+                task.vaccine ||
+                task.vaccineCode ||
+                'تحصين'
+              ),
+
+            doseType:
+              text(
+                task.doseType
+              ),
+
+            doseTypeLabel:
+              text(
+                task.doseTypeLabel ||
+                task.doseType
+              ),
+
+            animalNumbers:
+              []
+          }
+        );
+      }
+
+      const number =
+        normalizeAnimalNumberForStats(
+          task.animalNumber ||
+          ''
+        );
+
+      if (number) {
+        groupedTasks
+          .get(
+            key
+          )
+          .animalNumbers
+          .push(
+            number
+          );
+      }
+    }
+
+    for (
+      const group
+      of groupedTasks.values()
+    ) {
+      group.animalNumbers = [
+        ...new Set(
+          group.animalNumbers
+        )
+      ]
+        .sort(
+          (a, b) =>
+            Number(a) -
+            Number(b)
+        );
+
+      group.count =
+        group.animalNumbers
+          .length ||
+        1;
+
+      executionGroups[
+        group.category
+      ].push(
+        group
+      );
+    }
+
+    for (
+      const list
+      of Object.values(
+        executionGroups
+      )
+    ) {
+      list.sort(
+        (a, b) => {
+          const rank = {
+            overdue:
+              0,
+
+            today:
+              1,
+
+            needs_data:
+              2,
+
+            upcoming:
+              3
+          };
+
+          return (
+            (
+              rank[a.status] ??
+              9
+            ) -
+              (
+                rank[b.status] ??
+                9
+              ) ||
+
+            text(
+              a.dueDate
+            ).localeCompare(
+              text(
+                b.dueDate
+              )
+            )
+          );
+        }
+      );
+    }
+
+    const vaccinationEvents =
+      currentEvents.filter(
+        event =>
+          eventTypeOf(
+            event
+          ) ===
+          'vaccination'
+      );
+
+    const recentVaccinations =
+      vaccinationEvents
+        .map(
+          event => ({
+            animalNumber:
+              event._number,
+
+            date:
+              event._date,
+
+            vaccine:
+              text(
+                event.vaccine ||
+                event.vaccineName ||
+                event.vaccineCode ||
+                'تحصين'
+              ),
+
+            doseType:
+              text(
+                event.doseTypeLabel ||
+                event.doseType
+              ),
+
+            programSection:
+              text(
+                event.programSection
+              ),
+
+            programMode:
+              text(
+                event.vaccinationProgramMode ||
+                event.programMode
+              )
+          })
+        )
+        .sort(
+          (a, b) =>
+            b.date.localeCompare(
+              a.date
+            )
+        )
+        .slice(
+          0,
+          50
+        );
+
+    const openTaskFlat =
+      Object
+        .values(
+          executionGroups
+        )
+        .flat();
+
+    const vaccinationExecutionSummary = {
+      executedInPeriod:
+        vaccinationEvents.length,
+
+      overdue:
+        openTaskFlat
+          .filter(
+            row =>
+              row.status ===
+              'overdue'
+          )
+          .reduce(
+            (
+              sum,
+              row
+            ) =>
+              sum +
+              row.count,
+            0
+          ),
+
+      today:
+        openTaskFlat
+          .filter(
+            row =>
+              row.status ===
+              'today'
+          )
+          .reduce(
+            (
+              sum,
+              row
+            ) =>
+              sum +
+              row.count,
+            0
+          ),
+
+      needsData:
+        openTaskFlat
+          .filter(
+            row =>
+              row.status ===
+              'needs_data'
+          )
+          .reduce(
+            (
+              sum,
+              row
+            ) =>
+              sum +
+              row.count,
+            0
+          ),
+
+      upcoming:
+        openTaskFlat
+          .filter(
+            row =>
+              row.status ===
+              'upcoming'
+          )
+          .reduce(
+            (
+              sum,
+              row
+            ) =>
+              sum +
+              row.count,
+            0
+          )
+    };
+
+    const adultProblems = [
+      mastitis,
+      lameness,
+      abortion,
+      embryonicLoss,
+      ...adultGeneralProblems
     ];
 
-    const alerts = [];
-
-    if (vaccinations.overdueCount) {
-      alerts.push({
-        level: 'danger',
-        title: 'تحصينات متأخرة',
-        text: `يوجد ${vaccinations.overdueCount} تحصين متأخر يحتاج تنفيذ.`
-      });
-    }
-
-    if (summary.mastitisCases) {
-      alerts.push({
-        level: levelByPercent(summary.mastitisPct, 5, 10),
-        title: 'التهاب الضرع',
-        text: `تم تسجيل ${summary.mastitisCases} حالة التهاب ضرع.`
-      });
-    }
-
-    if (summary.lamenessCases) {
-      alerts.push({
-        level: levelByPercent(summary.lamenessPct, 5, 10),
-        title: 'العرج',
-        text: `تم تسجيل ${summary.lamenessCases} حالة عرج.`
-      });
-    }
-
-    if (summary.repeatedAnimals) {
-      alerts.push({
-        level: 'warn',
-        title: 'حيوانات متكررة المشاكل',
-        text: `يوجد ${summary.repeatedAnimals} حيوان يحتاج قائمة متابعة صحية.`
-      });
-    }
-
-    if (!alerts.length) {
-      alerts.push({
-        level: 'ok',
-        title: 'قراءة صحية هادئة',
-        text: 'لا توجد إشارات صحية قوية خلال فترة التقرير.'
-      });
-    }
-
-    const recommendations = [];
-
-    if (summary.mastitisCases) {
-      recommendations.push({
-        level: levelByPercent(summary.mastitisPct, 5, 10),
-        title: 'صحة الضرع',
-        text: 'راجع حالات التهاب الضرع حسب الحيوان والربع المصاب، وابدأ بالحيوانات المتكررة.'
-      });
-    }
-
-    if (summary.lamenessCases) {
-      recommendations.push({
-        level: levelByPercent(summary.lamenessPct, 5, 10),
-        title: 'العرج والحوافر',
-        text: 'راجع الأرضيات ومواعيد تقليم الحوافر، وافحص الحيوانات المتكررة أولًا.'
-      });
-    }
-
-    if (vaccinations.overdueCount || vaccinations.todayCount || vaccinations.tomorrowCount) {
-      recommendations.push({
-        level: vaccinations.overdueCount ? 'danger' : 'warn',
-        title: 'برنامج التحصين',
-        text: 'نفّذ التحصينات المتأخرة والمستحقة اليوم، وجهّز تحصينات الغد.'
-      });
-    }
-
-    if (!recommendations.length) {
-      recommendations.push({
-        level: 'ok',
-        title: 'استمرار المتابعة',
-        text: 'الوضع الصحي هادئ. استمر في التسجيل المنتظم ومراجعة التحصينات.'
-      });
-    }
-
-    // ------------------------------------------------------------
-    // 11) إخراج التقرير
-    // ------------------------------------------------------------
+    const calfProblems = [
+      calfScours,
+      ...calfGeneralProblems
+    ];
 
     return res.json({
       ok: true,
+
       report: {
+        version:
+          2,
+
+        status:
+          'ready',
+
         meta: {
-          title: 'تقرير الصحة',
+          title:
+            'تقرير الصحة',
+
           herdType,
           herdLabel,
-          periodDays: days,
+
+          periodDays:
+            selectedDays,
+
+          availablePeriods,
+
+          coverageStartDate:
+            coverageStartDate ||
+            null,
+
           startDate,
-          endDate: today,
-          generatedAt: new Date().toISOString()
+
+          endDate:
+            today,
+
+          comparison: {
+            available:
+              comparisonAvailable,
+
+            startDate:
+              comparisonAvailable
+                ? previousStartDate
+                : null,
+
+            endDate:
+              comparisonAvailable
+                ? previousEndDate
+                : null
+          },
+
+          generatedAt:
+            new Date()
+              .toISOString()
         },
 
-        summary,
-        summaryCards,
+        adults: {
+          title:
+            `صحة ${herdLabel}`,
 
-        diseases,
-        mastitis,
-        lameness,
-        vaccinations,
-        treatments,
+          population: {
+            atRiskCount:
+              adultAtRisk.size,
 
-        hoofTrimming: {
-          count: hoofEvents.length
+            lactatingAtRiskCount:
+              lactatingAtRisk.size
+          },
+
+          reading:
+            sectionReading(
+              adultProblems
+            ),
+
+          problems:
+            adultProblems
         },
 
-        repeatedAnimals: repeatedAnimals.slice(0, 30),
-        alerts,
-        recommendations
+        calves: {
+          title:
+            'صحة العجول',
+
+          population: {
+            atRiskCount:
+              calfAtRisk.size
+          },
+
+          reading:
+            sectionReading(
+              calfProblems
+            ),
+
+          problems:
+            calfProblems
+        },
+
+        vaccinations: {
+          program:
+            vaccinationProgram,
+
+          execution: {
+            summary:
+              vaccinationExecutionSummary,
+
+            groups:
+              executionGroups,
+
+            recentExecuted:
+              recentVaccinations
+          }
+        },
+
+        treatments: {
+          adults:
+            treatmentRows
+              .filter(
+                row =>
+                  row.section ===
+                  'adult'
+              )
+              .slice(
+                0,
+                50
+              ),
+
+          calves:
+            treatmentRows
+              .filter(
+                row =>
+                  row.section ===
+                  'calf'
+              )
+              .slice(
+                0,
+                50
+              )
+        }
       }
     });
 
   } catch (err) {
-    console.error('health-report failed', err);
+    console.error(
+      'health-report failed',
+      err
+    );
 
-    return res.status(500).json({
-      ok: false,
-      error: 'health_report_failed',
-      message: 'تعذّر تحميل تقرير الصحة الآن.'
-    });
+    return res
+      .status(500)
+      .json({
+        ok: false,
+
+        error:
+          'health_report_failed',
+
+        message:
+          'تعذّر تحميل تقرير الصحة الآن.'
+      });
   }
-});
-// ============================================================
+});// ============================================================
 //          ADMIN PORTAL — PRIVATE SERVER-RENDERED UI
 // ============================================================
 
