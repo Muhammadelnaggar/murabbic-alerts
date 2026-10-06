@@ -115,9 +115,9 @@
           </h1>
 
           <div class="sub">
-            قراءة صحية تشغيلية للقطيع تعتمد على الحالات المسجلة،
-            التكرار، الاتجاه، برنامج التحصينات الفعلي والعلاجات المسجلة.
-          </div>
+  قراءة صحية تشغيلية للقطيع تعتمد على الحالات المسجلة،
+  التكرار، الاتجاه، والبرنامج التحصيني المعتمد.
+</div>
         </div>
 
         <div class="report-stamp">
@@ -136,112 +136,62 @@
 
     <section class="card">
 
-      <div class="section-title">
-        🧠 قراءة مُرَبِّيك الصحية
-      </div>
+  <div class="section-title">
+    🧠 قراءة مُرَبِّيك الصحية
+  </div>
 
-      <div
-        class="cards"
-        id="executiveReading"
-      ></div>
+  <div id="executiveReading"></div>
 
-    </section>
+</section>
 
-    <section class="card">
 
-      <div
-        class="section-title"
-        id="adultTitle"
-      >
-        صحة القطيع
-      </div>
+<section class="card">
 
-      <div
-        class="grid"
-        id="adultPopulation"
-      ></div>
+  <div
+    class="section-title"
+    id="adultTitle"
+  >
+    صحة القطيع
+  </div>
 
-      <div
-        class="cards"
-        id="adultProblems"
-      ></div>
+  <div id="adultProblems"></div>
 
-    </section>
+</section>
 
-    <section class="card">
 
-      <div
-        class="section-title"
-        id="calfTitle"
-      >
-        صحة العجول
-      </div>
+<section class="card">
 
-      <div
-        class="grid"
-        id="calfPopulation"
-      ></div>
+  <div
+    class="section-title"
+    id="calfTitle"
+  >
+    صحة العجول
+  </div>
 
-      <div
-        class="cards"
-        id="calfProblems"
-      ></div>
+  <div id="calfProblems"></div>
 
-    </section>
+</section>
 
-    <section class="card">
 
-      <div class="section-title">
-        💉 التحصينات
-      </div>
+<section class="card">
 
-      <div id="vaccinationProgramMeta"></div>
+  <div class="section-title">
+    💉 التحصينات
+  </div>
 
-      <div id="vaccinationProgram"></div>
+  <div id="vaccinationProgramMeta"></div>
 
-      <div class="section-title">
-        تنفيذ البرنامج
-      </div>
+  <div id="vaccinationProgram"></div>
 
-      <div
-        class="grid"
-        id="vaccinationSummary"
-      ></div>
+  <div class="section-title">
+    الموقف التنفيذي للبرنامج المعتمد
+  </div>
 
-      <div id="vaccinationGroups"></div>
+  <div id="vaccinationPosition"></div>
 
-      <div class="section-title">
-        آخر التحصينات المنفذة خلال الفترة
-      </div>
+</section>
 
-      <div id="vaccinationRecent"></div>
-
-    </section>
-
-    <section class="card">
-
-      <div class="section-title">
-        💊 العلاجات والمتابعة
-      </div>
-
-      <div
-        class="section-title"
-        id="adultTreatmentsTitle"
-      >
-        علاجات القطيع
-      </div>
-
-      <div id="adultTreatments"></div>
-
-      <div class="section-title">
-        علاجات العجول
-      </div>
-
-      <div id="calfTreatments"></div>
-
-    </section>
-
-  </section>
+</section>
 
 </main>
 
@@ -673,390 +623,185 @@
   }
 
 
-  function renderReading(
-    reading,
-    title
+  function renderExecutive(
+    executive
   ) {
 
-    if (
-      !reading?.text
-    ) {
-
-      return empty(
-        'لا توجد قراءة صحية متاحة لهذا القسم.'
-      );
-    }
-
-    return `
-      <div class="mini">
-
-        <div class="name">
-
-          <span>
-            ${esc(title)}
-          </span>
-
-          <span
-            class="${badgeClass(
-              reading.status
-            )}"
-          >
-            ${esc(
-              statusText(
-                reading.status
-              )
-            )}
-          </span>
-
-        </div>
-
-        <div class="note">
-          ${esc(
-            reading.text
-          )}
-        </div>
-
-      </div>
-    `;
-  }
-
-
-  function distributionLabel(
-    key
-  ) {
-
-    const labels = {
-
-      byType:
-        'النوع',
-
-      byQuarter:
-        'الربع',
-
-      byLeg:
-        'الطرف',
-
-      byStage:
-        'المرحلة',
-
-      byDetail:
-        'التفاصيل'
-    };
-
-    return (
-      labels[key] ||
-      'النمط'
-    );
-  }
-
-
-  function renderDistributions(
-    distributions
-  ) {
-
-    const blocks =
-      [];
-
-    for (
-      const [
-        key,
-        items
-      ]
-      of Object.entries(
-        distributions || {}
-      )
-    ) {
-
-      if (
-        !Array.isArray(
-          items
-        ) ||
-        !items.length
-      ) {
-        continue;
-      }
-
-      const top =
-        items
-          .slice(
-            0,
-            5
-          )
-          .map(
-            item =>
-              `${item.name}: ${item.count}`
-          )
-          .join(
-            ' • '
-          );
-
-      blocks.push(
-        `${distributionLabel(key)}: ${top}`
-      );
-    }
-
-    return blocks.length
-      ? `
-          <div class="note">
-            ${esc(
-              blocks.join(
-                ' | '
-              )
-            )}
-          </div>
-        `
-      : '';
-  }
-
-
-  function renderRecurrence(
-    problem
-  ) {
-
-    const recurrence =
-      problem?.recurrence ||
-      {};
-
-    const animals =
+    const rows =
       Array.isArray(
-        recurrence.animals
+        executive?.rows
       )
-        ? recurrence.animals
+        ? executive.rows
         : [];
 
-    if (
-      !recurrence
-        .affectedAnimals ||
-      !animals.length
-    ) {
-      return '';
-    }
+    $('executiveReading')
+      .innerHTML =
+        renderTable(
 
-    const text =
-      animals
-        .slice(
-          0,
-          10
-        )
-        .map(
-          row =>
-            `${row.animalNumber} (${row.historyCases})`
-        )
-        .join(
-          '، '
-        );
+          [
+            'القسم',
+            'الأولوية',
+            'قراءة مُرَبِّيك',
+            'الإجراء الأول'
+          ],
 
-    return `
-      <div class="note">
-        تكرار موثق:
-        ${esc(
-          recurrence
-            .affectedAnimals
-        )}
-        حيوان
-        —
-        ${esc(text)}
-      </div>
-    `;
-  }
+          rows.map(
+            row => `
 
+              <tr>
 
-  function renderProblem(
-    problem
-  ) {
-
-    const metrics =
-      problem?.metrics ||
-      {};
-
-    const murabbik =
-      problem?.murabbik ||
-      {};
-
-    const metricParts =
-      [
-        `${metrics.affectedCount ?? 0} حيوان متأثر`,
-        `${metrics.caseCount ?? 0} حالة`
-      ];
-
-    if (
-      metrics.denominatorCount !==
-        null &&
-      metrics.denominatorCount !==
-        undefined
-    ) {
-
-      metricParts.push(
-        `المقام ${metrics.denominatorCount}`
-      );
-    }
-
-    if (
-      metrics.ratePct !==
-        null &&
-      metrics.ratePct !==
-        undefined
-    ) {
-
-      metricParts.push(
-        `المعدل ${metrics.ratePct}%`
-      );
-    }
-
-    if (
-      metrics.ceilingPct !==
-        null &&
-      metrics.ceilingPct !==
-        undefined
-    ) {
-
-      metricParts.push(
-        `السقف المرجعي ≤ ${metrics.ceilingPct}%`
-      );
-    }
-
-    return `
-      <div class="mini">
-
-        <div class="name">
-
-          <span>
-            ${esc(
-              problem?.title ||
-              'حالة صحية'
-            )}
-          </span>
-
-          <span
-            class="${badgeClass(
-              problem?.status
-            )}"
-          >
-            ${esc(
-              statusText(
-                problem?.status
-              )
-            )}
-          </span>
-
-        </div>
-
-        <div class="note">
-          ${esc(
-            metricParts.join(
-              ' • '
-            )
-          )}
-        </div>
-
-        ${renderDistributions(
-          problem?.distributions
-        )}
-
-        ${renderRecurrence(
-          problem
-        )}
-
-        <div class="note">
-          <b>
-            قراءة مُرَبِّيك:
-          </b>
-          ${esc(
-            murabbik.reading ||
-            ''
-          )}
-        </div>
-
-        ${
-          murabbik.action
-            ? `
-                <div class="note">
-                  <b>
-                    الإجراء الأول:
-                  </b>
+                <td>
                   ${esc(
-                    murabbik.action
+                    row.section ||
+                    '—'
                   )}
-                </div>
-              `
-            : ''
-        }
+                </td>
 
-      </div>
-    `;
+                <td>
+                  <b>
+                    ${esc(
+                      row.problem ||
+                      '—'
+                    )}
+                  </b>
+
+                  <div>
+                    <span
+                      class="${badgeClass(
+                        row.status
+                      )}"
+                    >
+                      ${esc(
+                        row.statusLabel ||
+                        '—'
+                      )}
+                    </span>
+                  </div>
+                </td>
+
+                <td>
+                  ${esc(
+                    row.reading ||
+                    '—'
+                  )}
+                </td>
+
+                <td>
+                  ${esc(
+                    row.action ||
+                    '—'
+                  )}
+                </td>
+
+              </tr>
+            `
+          ),
+
+          'لا توجد قراءة صحية متاحة.'
+        );
   }
 
 
   function renderHealthSection(
     section,
     titleId,
-    populationId,
     problemsId,
-    isAdult
+    fallbackTitle
   ) {
 
     $(titleId)
       .textContent =
         section?.title ||
-        (
-          isAdult
-            ? 'صحة القطيع'
-            : 'صحة العجول'
-        );
+        fallbackTitle;
 
-    const population =
-      section?.population ||
-      {};
-
-    const populationCards =
-      [
-        renderKpi(
-          'الرؤوس ضمن التحليل',
-          population
-            .atRiskCount ??
-            0,
-          'حسب أهلية القسم خلال الفترة'
-        )
-      ];
-
-    if (
-      isAdult
-    ) {
-
-      populationCards.push(
-        renderKpi(
-          'الحلاب ضمن التحليل',
-          population
-            .lactatingAtRiskCount ??
-            0,
-          'مقام مؤشر التهاب الضرع'
-        )
-      );
-    }
-
-    $(populationId)
-      .innerHTML =
-        populationCards
-          .join('');
-
-    const problems =
+    const rows =
       Array.isArray(
-        section?.problems
+        section?.rows
       )
-        ? section.problems
+        ? section.rows
         : [];
 
     $(problemsId)
       .innerHTML =
-        problems.length
-          ? problems
-              .map(
-                renderProblem
-              )
-              .join('')
-          : empty(
-              'لا توجد مشكلات صحية مسجلة خلال الفترة المختارة.'
-            );
+        renderTable(
+
+          [
+            'المشكلة',
+            'المؤشر',
+            'التكرار',
+            'الاتجاه',
+            'قراءة مُرَبِّيك',
+            'الإجراء الأول'
+          ],
+
+          rows.map(
+            row => `
+
+              <tr>
+
+                <td>
+                  <b>
+                    ${esc(
+                      row.problem ||
+                      '—'
+                    )}
+                  </b>
+
+                  <div>
+                    <span
+                      class="${badgeClass(
+                        row.status
+                      )}"
+                    >
+                      ${esc(
+                        row.statusLabel ||
+                        '—'
+                      )}
+                    </span>
+                  </div>
+                </td>
+
+                <td>
+                  ${esc(
+                    row.indicator ||
+                    '—'
+                  )}
+                </td>
+
+                <td>
+                  ${esc(
+                    row.recurrence ||
+                    '—'
+                  )}
+                </td>
+
+                <td>
+                  ${esc(
+                    row.trend ||
+                    '—'
+                  )}
+                </td>
+
+                <td>
+                  ${esc(
+                    row.reading ||
+                    '—'
+                  )}
+                </td>
+
+                <td>
+                  ${esc(
+                    row.action ||
+                    '—'
+                  )}
+                </td>
+
+              </tr>
+            `
+          ),
+
+          'لا توجد مشكلات صحية مسجلة خلال الفترة المختارة.'
+        );
   }
 
 
@@ -1075,8 +820,7 @@
           );
 
       $('vaccinationProgram')
-        .innerHTML =
-          '';
+        .innerHTML = '';
 
       return;
     }
@@ -1139,17 +883,17 @@
                 ${
                   columns
                     .map(
-                      column =>
-                        `
-                          <td>
-                            ${esc(
-                              row[
-                                column.key
-                              ] ||
-                              '—'
-                            )}
-                          </td>
-                        `
+                      column => `
+
+                        <td>
+                          ${esc(
+                            row[
+                              column.key
+                            ] ||
+                            '—'
+                          )}
+                        </td>
+                      `
                     )
                     .join('')
                 }
@@ -1163,102 +907,90 @@
   }
 
 
-  function renderVaccinationGroup(
-    title,
-    items
+  function renderVaccinationPosition(
+    position
   ) {
 
-    const list =
+    const rows =
       Array.isArray(
-        items
+        position?.rows
       )
-        ? items
+        ? position.rows
         : [];
 
-    if (
-      !list.length
-    ) {
-      return '';
-    }
-
-    return `
-
-      <div class="section-title">
-        ${esc(title)}
-      </div>
-
-      ${
+    $('vaccinationPosition')
+      .innerHTML =
         renderTable(
 
           [
             'التحصين',
+            'الفئة',
             'الجرعة',
             'الاستحقاق',
-            'الحالة',
+            'الموقف التنفيذي',
             'العدد',
-            'الحيوانات'
+            'المطلوب'
           ],
 
-          list.map(
-            item => `
+          rows.map(
+            row => `
 
               <tr>
 
                 <td>
                   ${esc(
-                    item.vaccine ||
-                    item.vaccineCode ||
-                    'تحصين'
-                  )}
-                </td>
-
-                <td>
-                  ${esc(
-                    item.doseTypeLabel ||
-                    item.doseType ||
+                    row.vaccine ||
                     '—'
                   )}
                 </td>
 
                 <td>
                   ${esc(
-                    dateText(
-                      item.dueDate
-                    )
+                    row.target ||
+                    '—'
+                  )}
+                </td>
+
+                <td>
+                  ${esc(
+                    row.dose ||
+                    '—'
+                  )}
+                </td>
+
+                <td>
+                  ${esc(
+                    row.dueDate &&
+                    row.dueDate !== '—'
+                      ? dateText(
+                          row.dueDate
+                        )
+                      : '—'
                   )}
                 </td>
 
                 <td>
                   <span
                     class="${badgeClass(
-                      item.status
+                      row.status
                     )}"
                   >
                     ${esc(
-                      statusText(
-                        item.status
-                      )
+                      row.statusLabel ||
+                      '—'
                     )}
                   </span>
                 </td>
 
                 <td>
                   ${esc(
-                    item.count ??
-                    0
+                    row.count ?? 0
                   )}
                 </td>
 
                 <td>
                   ${esc(
-                    (
-                      item
-                        .animalNumbers ||
-                      []
-                    )
-                      .join(
-                        '، '
-                      ) ||
+                    row.action ||
                     '—'
                   )}
                 </td>
@@ -1267,10 +999,8 @@
             `
           ),
 
-          'لا توجد مهام تحصين في هذا القسم.'
-        )
-      }
-    `;
+          'لا توجد بيانات تنفيذ للبرنامج التحصيني المعتمد.'
+        );
   }
 
 
@@ -1278,272 +1008,15 @@
     vaccinations
   ) {
 
-    const program =
-      vaccinations?.program ||
-      {};
-
-    const execution =
-      vaccinations?.execution ||
-      {};
-
-    const summary =
-      execution.summary ||
-      {};
-
-    const groups =
-      execution.groups ||
-      {};
-
     renderVaccinationProgram(
-      program
+      vaccinations?.program ||
+      {}
     );
 
-    $('vaccinationSummary')
-      .innerHTML =
-        [
-
-          renderKpi(
-            'نُفّذ خلال الفترة',
-            summary
-              .executedInPeriod ??
-              0,
-            'أحداث تحصين مسجلة'
-          ),
-
-          renderKpi(
-            'متأخر',
-            summary
-              .overdue ??
-              0,
-            'مهام مفتوحة متأخرة'
-          ),
-
-          renderKpi(
-            'اليوم',
-            summary
-              .today ??
-              0,
-            'مهام مستحقة اليوم'
-          ),
-
-          renderKpi(
-            'تحتاج بيانات',
-            summary
-              .needsData ??
-              0,
-            'لا يمكن حسم التنفيذ دون بيانات'
-          ),
-
-          renderKpi(
-            'قادمة',
-            summary
-              .upcoming ??
-              0,
-            'مهام قادمة'
-          )
-
-        ]
-          .join('');
-
-    const groupsHtml =
-      [
-
-        renderVaccinationGroup(
-          'تحصينات القطيع',
-          groups
-            .herdCampaigns
-        ),
-
-        renderVaccinationGroup(
-          'تحصينات العجول',
-          groups.calves
-        ),
-
-        renderVaccinationGroup(
-          'تحصينات الأمهات',
-          groups.mothers
-        ),
-
-        renderVaccinationGroup(
-          'التحصينات الدورية للبالغات',
-          groups
-            .routineAdults
-        )
-
-      ]
-        .filter(
-          Boolean
-        )
-        .join('');
-
-    $('vaccinationGroups')
-      .innerHTML =
-        groupsHtml ||
-        empty(
-          'لا توجد مهام تحصين مفتوحة في البرنامج الحالي.'
-        );
-
-    const recent =
-      Array.isArray(
-        execution
-          .recentExecuted
-      )
-        ? execution
-            .recentExecuted
-        : [];
-
-    $('vaccinationRecent')
-      .innerHTML =
-        renderTable(
-
-          [
-            'رقم الحيوان',
-            'التاريخ',
-            'التحصين',
-            'الجرعة'
-          ],
-
-          recent.map(
-            item => `
-
-              <tr>
-
-                <td>
-                  ${esc(
-                    item.animalNumber ||
-                    '—'
-                  )}
-                </td>
-
-                <td>
-                  ${esc(
-                    dateText(
-                      item.date
-                    )
-                  )}
-                </td>
-
-                <td>
-                  ${esc(
-                    item.vaccine ||
-                    'تحصين'
-                  )}
-                </td>
-
-                <td>
-                  ${esc(
-                    item.doseType ||
-                    '—'
-                  )}
-                </td>
-
-              </tr>
-            `
-          ),
-
-          'لا توجد تحصينات منفذة مسجلة خلال فترة التقرير.'
-        );
-  }
-
-
-  function renderTreatments(
-    report
-  ) {
-
-    const treatments =
-      report.treatments ||
-      {};
-
-    const adults =
-      Array.isArray(
-        treatments.adults
-      )
-        ? treatments.adults
-        : [];
-
-    const calves =
-      Array.isArray(
-        treatments.calves
-      )
-        ? treatments.calves
-        : [];
-
-    $('adultTreatmentsTitle')
-      .textContent =
-        `علاجات ${
-          report.meta
-            ?.herdLabel ||
-          'القطيع'
-        }`;
-
-    const table =
-      (
-        items,
-        emptyMessage
-      ) =>
-        renderTable(
-
-          [
-            'رقم الحيوان',
-            'التاريخ',
-            'الحالة',
-            'العلاج'
-          ],
-
-          items.map(
-            item => `
-
-              <tr>
-
-                <td>
-                  ${esc(
-                    item.animalNumber ||
-                    '—'
-                  )}
-                </td>
-
-                <td>
-                  ${esc(
-                    dateText(
-                      item.date
-                    )
-                  )}
-                </td>
-
-                <td>
-                  ${esc(
-                    item.diagnosis ||
-                    '—'
-                  )}
-                </td>
-
-                <td>
-                  ${esc(
-                    item.treatment ||
-                    '—'
-                  )}
-                </td>
-
-              </tr>
-            `
-          ),
-
-          emptyMessage
-        );
-
-    $('adultTreatments')
-      .innerHTML =
-        table(
-          adults,
-          'لا توجد علاجات مسجلة للبالغات خلال فترة التقرير.'
-        );
-
-    $('calfTreatments')
-      .innerHTML =
-        table(
-          calves,
-          'لا توجد علاجات مسجلة للعجول خلال فترة التقرير.'
-        );
+    renderVaccinationPosition(
+      vaccinations?.position ||
+      {}
+    );
   }
 
 
@@ -1583,56 +1056,30 @@
       report
     );
 
-    $('executiveReading')
-      .innerHTML =
-        [
-
-          renderReading(
-            report.adults
-              ?.reading,
-
-            report.adults
-              ?.title ||
-              'صحة القطيع'
-          ),
-
-          renderReading(
-            report.calves
-              ?.reading,
-
-            report.calves
-              ?.title ||
-              'صحة العجول'
-          )
-
-        ]
-          .join('');
+    renderExecutive(
+      report.executive ||
+      {}
+    );
 
     renderHealthSection(
       report.adults ||
       {},
       'adultTitle',
-      'adultPopulation',
       'adultProblems',
-      true
+      'صحة القطيع'
     );
 
     renderHealthSection(
       report.calves ||
       {},
       'calfTitle',
-      'calfPopulation',
       'calfProblems',
-      false
+      'صحة العجول'
     );
 
     renderVaccinations(
       report.vaccinations ||
       {}
-    );
-
-    renderTreatments(
-      report
     );
 
     show(
