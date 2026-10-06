@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+
+  <meta charset="UTF-8" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <title>
+    تقرير التعداد والاستبعاد - مُرَبِّيك
+  </title>
+
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="/images/dashboard.svg"
+  >
+
+  <link
+    rel="stylesheet"
+    href="/css/forms.css"
+  >
+
+  <link
+    rel="stylesheet"
+    href="/css/reports.css"
+  >
+
+</head>
+
+<body
+  data-page="herd-inventory-culling-report"
+  data-report-page
+>
+
+<header class="screen-top">
+
+  <div class="screen-head">
+
+    <div>
+
+      <div class="screen-title">
+        تقرير التعداد والاستبعاد
+      </div>
+
+      <div class="screen-brand">
+        مُرَبِّيك
+      </div>
+
+    </div>
+
+    <img
+      class="screen-logo"
+      src="/images/logo.png"
+      alt="مُرَبِّيك"
+    >
+
+  </div>
+
+</header>
+
+<main class="page report-page">
+
+  <section class="report-cover">
+
+    <div class="report-head">
+
+      <div class="report-logo-box">
+
+        <img
+          src="/images/logo.png"
+          alt="مُرَبِّيك"
+        >
+
+      </div>
+
+      <div>
+
+        <div class="report-kicker">
+          مُرَبِّيك لإدارة مزارع الألبان
+        </div>
+
+        <h1 class="title">
+          تقرير التعداد والاستبعاد
+        </h1>
+
+        <div class="sub">
+          تقرير القطيع الحالي ومؤشرات الاستبعاد
+          المسجلة داخل مُرَبِّيك.
+        </div>
+
+      </div>
+
+      <div class="report-stamp">
+
+        <b>
+          تقرير القطيع
+        </b>
+
+        <span>
+          التعداد والاستبعاد
+        </span>
+
+      </div>
+
+    </div>
+
+    <div class="report-meta">
+
+      <div class="meta-pill">
+
+        <span>
+          نوع القطيع
+        </span>
+
+        <b id="reportType">
+          --
+        </b>
+
+      </div>
+
+      <div class="meta-pill">
+
+        <span>
+          فترة الاستبعاد
+        </span>
+
+        <b id="cullWindow">
+          --
+        </b>
+
+      </div>
+
+      <div class="meta-pill">
+
+        <span>
+          مقام نسب الاستبعاد
+        </span>
+
+        <b id="cullDenominator">
+          --
+        </b>
+
+      </div>
+
+      <div class="meta-pill">
+
+        <span>
+          إعداد
+        </span>
+
+        <b>
+          مُرَبِّيك
+        </b>
+
+      </div>
+
+    </div>
+
+  </section>
+
+  <div
+    id="statusBar"
+    class="card"
+  >
+    جارٍ تحميل تقرير التعداد والاستبعاد...
+  </div>
+
+  <div class="card">
+
+    <div class="section-title">
+      📌 تعداد القطيع
+    </div>
+
+    <div
+      id="inventoryGrid"
+      class="grid report-stack-mobile"
+    ></div>
+
+  </div>
+
+  <div class="card">
+
+    <div class="section-title">
+      📉 الاستبعاد بالقطيع
+    </div>
+
+    <div
+      id="cullingGrid"
+      class="grid report-stack-mobile"
+    ></div>
+
+  </div>
+
+</main>
+
+<div class="print-footer"></div>
+
+<div class="actions report-actions">
+
+  <a
+    class="ghost"
+    href="dashboard.html"
+  >
+    لوحة التحكم
+  </a>
+
+  <button
+    type="button"
+    class="primary"
+    onclick="window.print()"
+  >
+    طباعة / PDF
+  </button>
+
+</div>
+
+<script>
+
+const API_BASE = "";
+
+function qs(name){
+
+  return new URLSearchParams(
+    location.search
+  ).get(name);
+
+}
+
+const rawType =
+  String(
+    qs("type") ||
+    qs("species") ||
+    "cows"
+  )
+    .trim()
+    .toLowerCase();
+
+const reportType =
+  rawType === "buffalo" ||
+  rawType === "جاموس"
+    ? "buffalo"
+    : "cows";
+
+function el(id){
+
+  return document.getElementById(id);
+
+}
+
+function esc(v){
+
+  return String(v ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+}
+
+function fmtNum(v){
+
+  const n =
+    Number(v);
+
+  return Number.isFinite(n)
+    ? n.toLocaleString("ar-EG")
+    : "--";
+
+}
+
+function box(
+  label,
+  value,
+  sub = ""
+){
+
+  return `
+    <div class="kpi">
+
+      <span>
+        ${esc(label)}
+      </span>
+
+      <b>
+        ${esc(value ?? "--")}
+      </b>
+
+      ${
+        sub
+          ? `<span>${esc(sub)}</span>`
+          : ""
+      }
+
+    </div>
+  `;
+
+}
+
+async function fetchReport(){
+
+  const params =
+    new URLSearchParams({
+      type:
+        reportType
+    });
+
+  const res =
+    await fetch(
+      `${API_BASE}/api/herd-inventory-culling-report?${params.toString()}`,
+      {
+        method:
+          "GET",
+
+        credentials:
+          "same-origin",
+
+        cache:
+          "no-store",
+
+        headers: {
+          "Accept":
+            "application/json",
+
+          "Cache-Control":
+            "no-store"
+        }
+      }
+    );
+
+  const data =
+    await res
+      .json()
+      .catch(() => ({}));
+
+  if (
+    !res.ok ||
+    data.ok !== true
+  ) {
+
+    throw new Error(
+      data.message ||
+      data.error ||
+      "تعذّر تحميل تقرير التعداد والاستبعاد."
+    );
+
+  }
+
+  return data;
+
+}
+
+function renderInventory(j){
+
+  const inventory =
+    j.herdInventory || {};
+
+  const rows = [
+
+    [
+      "إجمالي القطيع",
+      inventory.totalHerd
+    ],
+
+    [
+      "إجمالي الأمهات",
+      inventory.mothers
+    ],
+
+    [
+      "العجول الرضيعة",
+      inventory.suckling
+    ],
+
+    [
+      "الفطام",
+      inventory.weaned
+    ],
+
+    [
+      "النامي",
+      inventory.growing
+    ],
+
+    [
+      "عجلات تحت التلقيح",
+      inventory.breedingHeifers
+    ],
+
+    [
+      "عجلات عشار",
+      inventory.pregnantHeifers
+    ],
+
+    [
+      "ذكور",
+      inventory.males
+    ]
+
+  ];
+
+  el("inventoryGrid").innerHTML =
+
+    rows
+      .map(
+        ([label, value]) =>
+          box(
+            label,
+            fmtNum(value)
+          )
+      )
+      .join("");
+
+}
+
+function renderCulling(j){
+
+  const culling =
+    j.culling || {};
+
+  const limits =
+    culling.limits || {};
+
+  const rows = [
+
+    [
+      "إجمالي عدد الاستبعاد",
+      j.cullTotal,
+      j.cullTotalPct,
+      limits.total,
+      ""
+    ],
+
+    [
+      "عدد الاستبعاد الإنتاجي",
+      j.cullProdCount,
+      j.cullProdPct,
+      limits.productivity,
+      ""
+    ],
+
+    [
+      "عدد الاستبعاد التناسلي",
+      j.cullReproCount,
+      j.cullReproPct,
+      limits.reproduction,
+      ""
+    ],
+
+    [
+      "عدد الاستبعاد الصحي",
+      j.cullHealthCount,
+      j.cullHealthPct,
+      limits.health,
+      "يشمل النفوق"
+    ]
+
+  ];
+
+  el("cullingGrid").innerHTML =
+
+    rows
+      .map(
+        (
+          [
+            label,
+            count,
+            pct,
+            limit,
+            note
+          ]
+        ) => {
+
+          const sub = [
+
+            note,
+
+            Number.isFinite(
+              Number(pct)
+            )
+              ? `نسبته من القطيع ${fmtNum(pct)}%`
+              : "",
+
+            Number.isFinite(
+              Number(limit)
+            )
+              ? `السقف السنوي ≤ ${fmtNum(limit)}%`
+              : ""
+
+          ]
+            .filter(Boolean)
+            .join(" • ");
+
+          return box(
+            label,
+            fmtNum(count),
+            sub
+          );
+
+        }
+      )
+      .join("");
+
+}
+
+async function main(){
+
+  const statusBar =
+    el("statusBar");
+
+  try {
+
+    const j =
+      await fetchReport();
+
+    el("reportType").textContent =
+
+      j.selectedTypeLabel ||
+
+      (
+        j.selectedType ===
+        "buffalo"
+
+          ? "جاموس"
+          : "أبقار"
+      );
+
+    el("cullWindow").textContent =
+
+      j.culling?.windowDays != null
+
+        ? `${fmtNum(
+            j.culling.windowDays
+          )} يوم`
+
+        : "--";
+
+    el("cullDenominator").textContent =
+
+      j.culling?.denominatorCount != null
+
+        ? `${fmtNum(
+            j.culling.denominatorCount
+          )} رأس`
+
+        : "--";
+
+    renderInventory(j);
+
+    renderCulling(j);
+
+    statusBar.style.display =
+      "none";
+
+  } catch (e) {
+
+    console.error(e);
+
+    statusBar.style.display =
+      "";
+
+    statusBar.textContent =
+      e.message ||
+      "تعذّر تحميل تقرير التعداد والاستبعاد.";
+
+  }
+
+}
+
+main();
+
+</script>
+
+</body>
+</html>
