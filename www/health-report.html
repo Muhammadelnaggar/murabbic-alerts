@@ -506,58 +506,74 @@
   }
 
 
-  function renderPeriodOptions(
-    meta
+function renderPeriodOptions(
+  meta
+) {
+
+  const select =
+    $('days');
+
+  const allPeriods =
+    [30, 90, 180, 360];
+
+  const availablePeriods =
+    Array.isArray(
+      meta?.availablePeriods
+    )
+      ? meta.availablePeriods
+          .map(Number)
+      : [];
+
+  select.innerHTML =
+    allPeriods
+      .map(
+        days => {
+
+          const available =
+            availablePeriods
+              .includes(days);
+
+          return `
+            <option
+              value="${days}"
+              ${available ? '' : 'disabled'}
+            >
+              ${esc(
+                periodLabel(days)
+              )}
+              ${available ? '' : ' — غير متاح بعد'}
+            </option>
+          `;
+        }
+      )
+      .join('');
+
+  const selectedDays =
+    Number(
+      meta?.periodDays
+    );
+
+  if (
+    availablePeriods
+      .includes(selectedDays)
   ) {
 
-    const select =
-      $('days');
+    select.value =
+      String(selectedDays);
 
-    const periods =
-      Array.isArray(
-        meta?.availablePeriods
-      )
-        ? meta.availablePeriods
-        : [];
-
-    if (
-      !periods.length
-    ) {
-
-      select.innerHTML =
-        '<option value="">لا توجد فترة مكتملة</option>';
-
-      select.disabled =
-        true;
-
-      return;
-    }
-
-    select.innerHTML =
-      periods
-        .map(
-          days =>
-            `
-              <option value="${esc(days)}">
-                ${esc(
-                  periodLabel(
-                    days
-                  )
-                )}
-              </option>
-            `
-        )
-        .join('');
+  } else if (
+    availablePeriods.length
+  ) {
 
     select.value =
       String(
-        meta.periodDays ||
-        periods[0]
+        availablePeriods[0]
       );
-
-    select.disabled =
-      false;
   }
+
+  select.disabled =
+    availablePeriods.length === 0;
+}
 
 
   function renderMeta(
