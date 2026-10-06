@@ -1674,13 +1674,6 @@ body[data-page="health-report"] #healthPrintReport{
   color:#17231d !important;
   overflow:visible !important;
 }
-    max-width:none !important;
-    margin:0 !important;
-    padding:0 !important;
-    background:#fff !important;
-    color:#17231d !important;
-    overflow:visible !important;
-  }
 
 
   /* مستند الطباعة المستقل فقط */
@@ -2021,4 +2014,139 @@ body[data-page="health-report"] #healthPrintReport{
   col:nth-child(7){
     width:14%;
   }
+}
+
+/* ============================================================
+   HERD INVENTORY + CULLING REPORT — PRINT
+   تقرير رصيد القطيع والاستبعاد
+   ============================================================ */
+
+@media print {
+
+  body[data-page="herd-inventory-culling-report"] .report-cover {
+    margin:0 0 4mm !important;
+    padding:6mm !important;
+    border:1px solid #d7e3da !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
+    background:#fff !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .report-cover::after {
+    display:none !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .report-head {
+    grid-template-columns:18mm 1fr 34mm !important;
+    gap:4mm !important;
+    align-items:center !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .report-logo-box {
+    width:16mm !important;
+    height:16mm !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .report-logo-box img {
+    width:12mm !important;
+    max-height:12mm !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .report-kicker {
+    font-size:8pt !important;
+    margin-bottom:1mm !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .title {
+    font-size:16pt !important;
+    line-height:1.2 !important;
+    margin:0 0 1mm !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .sub {
+    font-size:8pt !important;
+    line-height:1.4 !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .report-stamp {
+    min-width:0 !important;
+    padding:2.5mm !important;
+    border-radius:0 !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .report-stamp b {
+    font-size:10pt !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .report-stamp span {
+    margin-top:1mm !important;
+    font-size:7pt !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .report-meta {
+    grid-template-columns:repeat(4,1fr) !important;
+    gap:2mm !important;
+    margin-top:4mm !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .meta-pill {
+    min-height:0 !important;
+    padding:2.5mm !important;
+    border-radius:0 !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .meta-pill span {
+    font-size:7pt !important;
+    margin-bottom:1mm !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .meta-pill b {
+    font-size:9pt !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .card {
+    margin:0 0 4mm !important;
+    padding:4mm !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .section-title {
+    margin:0 0 2.5mm !important;
+    padding-bottom:2mm !important;
+    font-size:11pt !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .grid {
+    grid-template-columns:repeat(4,1fr) !important;
+    gap:2.5mm !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .kpi {
+    min-height:22mm !important;
+    padding:3mm !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .kpi b {
+    font-size:14pt !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] .kpi span {
+    margin-top:1.2mm !important;
+    font-size:7.5pt !important;
+    line-height:1.35 !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] #cullGrid .kpi {
+    min-height:28mm !important;
+  }
+
+  body[data-page="herd-inventory-culling-report"] #statusBar {
+    display:none !important;
+  }
+
 }
