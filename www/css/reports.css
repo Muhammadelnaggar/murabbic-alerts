@@ -1650,9 +1650,7 @@ body[data-page="health-report"] #healthPrintReport{
 
 @media print{
 
-  /*
-   * لا نطبع واجهة الشاشة إطلاقًا.
-   */
+  /* واجهة الشاشة لا تدخل الطباعة */
   body[data-page="health-report"] .report-page,
   body[data-page="health-report"] .screen-top,
   body[data-page="health-report"] .report-actions,
@@ -1673,9 +1671,7 @@ body[data-page="health-report"] #healthPrintReport{
   }
 
 
-  /*
-   * مستند الطباعة الوحيد.
-   */
+  /* مستند الطباعة المستقل فقط */
   body[data-page="health-report"] #healthPrintReport{
     display:block !important;
     width:100% !important;
@@ -1779,11 +1775,7 @@ body[data-page="health-report"] #healthPrintReport{
   }
 
 
-  /*
-   * كل قسم مطبوع عبارة عن Table حقيقي.
-   * العنوان Caption داخل الجدول نفسه،
-   * لذلك مستحيل يهرب وحده للهامش.
-   */
+  /* الجداول */
   body[data-page="health-report"] .health-print-table{
     width:100% !important;
     min-width:0 !important;
@@ -1798,27 +1790,37 @@ body[data-page="health-report"] #healthPrintReport{
   }
 
 
-  body[data-page="health-report"] .health-print-table caption{
-    caption-side:top;
+  /*
+   * العنوان ورؤوس الأعمدة مجموعة واحدة داخل THEAD.
+   * لا Caption ولا عنصر عنوان مستقل عند حدود الورق.
+   */
+  body[data-page="health-report"] .health-print-table thead{
+    display:table-header-group !important;
 
-    text-align:right;
-    color:#134e2f;
-
-    font-size:11pt;
-    font-weight:950;
-
-    padding:0 0 1.5mm;
-    margin:0 0 1.5mm;
-
-    border-bottom:1px solid #bacfc2;
-
-    break-after:avoid;
-    page-break-after:avoid;
+    break-inside:avoid !important;
+    page-break-inside:avoid !important;
   }
 
 
-  body[data-page="health-report"] .health-print-table thead{
-    display:table-header-group !important;
+  body[data-page="health-report"]
+  .health-print-section-row th{
+    width:auto !important;
+
+    background:#fff !important;
+    color:#134e2f !important;
+
+    border:0 !important;
+    border-bottom:1px solid #bacfc2 !important;
+    border-radius:0 !important;
+
+    padding:0 0 1.5mm !important;
+
+    font-size:11pt !important;
+    font-weight:950 !important;
+    line-height:1.4 !important;
+
+    text-align:right !important;
+    vertical-align:bottom !important;
   }
 
 
@@ -1843,129 +1845,168 @@ body[data-page="health-report"] #healthPrintReport{
   }
 
 
-  body[data-page="health-report"] .health-print-table th{
+  body[data-page="health-report"]
+  .health-print-columns-row th{
     background:#edf5ef !important;
     color:#173126 !important;
     font-weight:950 !important;
   }
 
 
-  body[data-page="health-report"] .health-print-table tr{
+  body[data-page="health-report"] .health-print-table tbody tr{
     break-inside:avoid !important;
     page-break-inside:avoid !important;
   }
 
 
-  /*
-   * قراءة مُرَبِّيك — 4 أعمدة
-   */
+  /* قراءة مُرَبِّيك */
   body[data-page="health-report"]
   .health-print-table:nth-of-type(1)
-  th:nth-child(1){
+  col:nth-child(1){
     width:12%;
   }
 
   body[data-page="health-report"]
   .health-print-table:nth-of-type(1)
-  th:nth-child(2){
+  col:nth-child(2){
     width:16%;
   }
 
   body[data-page="health-report"]
   .health-print-table:nth-of-type(1)
-  th:nth-child(3){
+  col:nth-child(3){
     width:41%;
   }
 
   body[data-page="health-report"]
   .health-print-table:nth-of-type(1)
-  th:nth-child(4){
+  col:nth-child(4){
     width:31%;
   }
 
 
-  /*
-   * صحة القطيع + صحة العجول
-   */
+  /* صحة القطيع + صحة العجول */
   body[data-page="health-report"]
   .health-print-table:nth-of-type(2)
-  th:nth-child(1),
+  col:nth-child(1),
   body[data-page="health-report"]
   .health-print-table:nth-of-type(3)
-  th:nth-child(1){
+  col:nth-child(1){
     width:13%;
   }
 
   body[data-page="health-report"]
   .health-print-table:nth-of-type(2)
-  th:nth-child(2),
+  col:nth-child(2),
   body[data-page="health-report"]
   .health-print-table:nth-of-type(3)
-  th:nth-child(2){
+  col:nth-child(2){
     width:10%;
   }
 
   body[data-page="health-report"]
   .health-print-table:nth-of-type(2)
-  th:nth-child(3),
+  col:nth-child(3),
   body[data-page="health-report"]
   .health-print-table:nth-of-type(3)
-  th:nth-child(3){
+  col:nth-child(3){
     width:9%;
   }
 
   body[data-page="health-report"]
   .health-print-table:nth-of-type(2)
-  th:nth-child(4),
+  col:nth-child(4),
   body[data-page="health-report"]
   .health-print-table:nth-of-type(3)
-  th:nth-child(4){
+  col:nth-child(4){
     width:10%;
   }
 
   body[data-page="health-report"]
   .health-print-table:nth-of-type(2)
-  th:nth-child(5),
+  col:nth-child(5),
   body[data-page="health-report"]
   .health-print-table:nth-of-type(3)
-  th:nth-child(5){
+  col:nth-child(5){
     width:33%;
   }
 
   body[data-page="health-report"]
   .health-print-table:nth-of-type(2)
-  th:nth-child(6),
+  col:nth-child(6),
   body[data-page="health-report"]
   .health-print-table:nth-of-type(3)
-  th:nth-child(6){
+  col:nth-child(6){
     width:25%;
   }
 
 
-  /*
-   * البرنامج التحصيني
-   */
+  /* برنامج التحصينات */
   body[data-page="health-report"]
   .health-print-table:nth-of-type(4)
-  th:nth-child(1){
+  col:nth-child(1){
     width:25%;
   }
 
   body[data-page="health-report"]
   .health-print-table:nth-of-type(4)
-  th:nth-child(2){
+  col:nth-child(2){
     width:13%;
   }
 
   body[data-page="health-report"]
   .health-print-table:nth-of-type(4)
-  th:nth-child(3){
+  col:nth-child(3){
     width:15%;
   }
 
   body[data-page="health-report"]
   .health-print-table:nth-of-type(4)
-  th:nth-child(4){
+  col:nth-child(4){
     width:47%;
+  }
+
+
+  /* الموقف التنفيذي للتحصينات */
+  body[data-page="health-report"]
+  .health-print-table:nth-of-type(5)
+  col:nth-child(1){
+    width:24%;
+  }
+
+  body[data-page="health-report"]
+  .health-print-table:nth-of-type(5)
+  col:nth-child(2){
+    width:11%;
+  }
+
+  body[data-page="health-report"]
+  .health-print-table:nth-of-type(5)
+  col:nth-child(3){
+    width:11%;
+  }
+
+  body[data-page="health-report"]
+  .health-print-table:nth-of-type(5)
+  col:nth-child(4){
+    width:13%;
+  }
+
+  body[data-page="health-report"]
+  .health-print-table:nth-of-type(5)
+  col:nth-child(5){
+    width:19%;
+  }
+
+  body[data-page="health-report"]
+  .health-print-table:nth-of-type(5)
+  col:nth-child(6){
+    width:8%;
+  }
+
+  body[data-page="health-report"]
+  .health-print-table:nth-of-type(5)
+  col:nth-child(7){
+    width:14%;
   }
 }
