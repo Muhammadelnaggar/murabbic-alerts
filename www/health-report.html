@@ -194,6 +194,10 @@
 </section>
 
 </main>
+<section
+  id="healthPrintReport"
+  aria-hidden="true"
+></section>
 
 <div class="actions report-actions no-print">
 
@@ -1035,7 +1039,604 @@ function renderPeriodOptions(
     );
   }
 
+function renderHealthPrintTable(
+  title,
+  headers,
+  rows,
+  emptyMessage
+) {
 
+  const safeHeaders =
+    Array.isArray(headers)
+      ? headers
+      : [];
+
+  const safeRows =
+    Array.isArray(rows)
+      ? rows
+      : [];
+
+  const head =
+    safeHeaders
+      .map(
+        header =>
+          `<th>${esc(header)}</th>`
+      )
+      .join('');
+
+  const body =
+    safeRows.length
+      ? safeRows.join('')
+      : `
+          <tr>
+            <td colspan="${Math.max(
+              1,
+              safeHeaders.length
+            )}">
+              ${esc(
+                emptyMessage ||
+                'لا توجد بيانات.'
+              )}
+            </td>
+          </tr>
+        `;
+
+  return `
+    <table class="health-print-table">
+      <caption>
+        ${esc(title || '')}
+      </caption>
+
+      <thead>
+        <tr>
+          ${head}
+        </tr>
+      </thead>
+
+      <tbody>
+        ${body}
+      </tbody>
+    </table>
+  `;
+}
+
+
+function renderHealthPrintReport(
+  report
+) {
+
+  const target =
+    $('healthPrintReport');
+
+  if (!target) return;
+
+  const meta =
+    report?.meta || {};
+
+  const executiveRows =
+    Array.isArray(
+      report?.executive?.rows
+    )
+      ? report.executive.rows
+      : [];
+
+  const adultRows =
+    Array.isArray(
+      report?.adults?.rows
+    )
+      ? report.adults.rows
+      : [];
+
+  const calfRows =
+    Array.isArray(
+      report?.calves?.rows
+    )
+      ? report.calves.rows
+      : [];
+
+  const program =
+    report?.vaccinations
+      ?.program || {};
+
+  const position =
+    report?.vaccinations
+      ?.position || {};
+
+  const programColumns =
+    Array.isArray(
+      program.columns
+    )
+      ? program.columns
+      : [];
+
+  const programRows =
+    Array.isArray(
+      program.rows
+    )
+      ? program.rows
+      : [];
+
+  const positionRows =
+    Array.isArray(
+      position.rows
+    )
+      ? position.rows
+      : [];
+
+
+  const programTable =
+    program?.selected
+      ? renderHealthPrintTable(
+
+          `برنامج التحصينات المعتمد — ${
+            program.label ||
+            'برنامج التحصينات'
+          } — الإصدار ${
+            program.version ||
+            '—'
+          }`,
+
+          programColumns.map(
+            column =>
+              column?.label ||
+              column?.key ||
+              '—'
+          ),
+
+          programRows.map(
+            row => `
+
+              <tr>
+
+                ${
+                  programColumns
+                    .map(
+                      column => `
+
+                        <td>
+                          ${esc(
+                            row?.[
+                              column?.key
+                            ] ||
+                            '—'
+                          )}
+                        </td>
+                      `
+                    )
+                    .join('')
+                }
+
+              </tr>
+            `
+          ),
+
+          'لا توجد صفوف فعالة في برنامج التحصينات الحالي.'
+        )
+
+      : renderHealthPrintTable(
+
+          'برنامج التحصينات المعتمد',
+
+          [
+            'الحالة'
+          ],
+
+          [
+            `
+              <tr>
+                <td>
+                  لم يتم اعتماد برنامج تحصينات للمزرعة حتى الآن.
+                </td>
+              </tr>
+            `
+          ],
+
+          ''
+        );
+
+
+  target.innerHTML = `
+
+    <div class="health-print-header">
+
+      <img
+        class="health-print-logo"
+        src="/images/logo.png"
+        alt="مُرَبِّيك"
+      >
+
+      <div class="health-print-heading">
+
+        <div class="health-print-brand">
+          مُرَبِّيك لإدارة مزارع الألبان
+        </div>
+
+        <h1>
+          تقرير الصحة
+        </h1>
+
+        <p>
+          قراءة صحية تشغيلية للقطيع تعتمد على الحالات المسجلة،
+          التكرار، الاتجاه، والبرنامج التحصيني المعتمد.
+        </p>
+
+      </div>
+
+    </div>
+
+
+    <div class="health-print-meta">
+
+      <div>
+        <span>
+          نوع القطيع
+        </span>
+
+        <b>
+          ${esc(
+            meta.herdLabel ||
+            '—'
+          )}
+        </b>
+      </div>
+
+
+      <div>
+        <span>
+          فترة التحليل
+        </span>
+
+        <b>
+          ${esc(
+            meta.periodDays ||
+            '—'
+          )} يوم
+        </b>
+      </div>
+
+
+      <div>
+        <span>
+          من / إلى
+        </span>
+
+        <b>
+          ${dateText(
+            meta.startDate
+          )}
+          —
+          ${dateText(
+            meta.endDate
+          )}
+        </b>
+      </div>
+
+
+      <div>
+        <span>
+          بداية التغطية
+        </span>
+
+        <b>
+          ${dateText(
+            meta.coverageStartDate
+          )}
+        </b>
+      </div>
+
+    </div>
+
+
+    ${renderHealthPrintTable(
+
+      report?.executive?.title ||
+      'قراءة مُرَبِّيك الصحية',
+
+      [
+        'القسم',
+        'الأولوية',
+        'قراءة مُرَبِّيك',
+        'الإجراء الأول'
+      ],
+
+      executiveRows.map(
+        row => `
+
+          <tr>
+
+            <td>
+              ${esc(
+                row.section ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              <b>
+                ${esc(
+                  row.problem ||
+                  '—'
+                )}
+              </b>
+
+              <br>
+
+              ${esc(
+                row.statusLabel ||
+                statusText(
+                  row.status
+                )
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.reading ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.action ||
+                '—'
+              )}
+            </td>
+
+          </tr>
+        `
+      ),
+
+      'لا توجد قراءة صحية متاحة.'
+    )}
+
+
+    ${renderHealthPrintTable(
+
+      report?.adults?.title ||
+      'صحة القطيع',
+
+      [
+        'المشكلة',
+        'المؤشر',
+        'التكرار',
+        'الاتجاه',
+        'قراءة مُرَبِّيك',
+        'الإجراء الأول'
+      ],
+
+      adultRows.map(
+        row => `
+
+          <tr>
+
+            <td>
+              <b>
+                ${esc(
+                  row.problem ||
+                  '—'
+                )}
+              </b>
+
+              <br>
+
+              ${esc(
+                row.statusLabel ||
+                statusText(
+                  row.status
+                )
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.indicator ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.recurrence ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.trend ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.reading ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.action ||
+                '—'
+              )}
+            </td>
+
+          </tr>
+        `
+      ),
+
+      'لا توجد مشكلات صحية مسجلة خلال الفترة المختارة.'
+    )}
+
+
+    ${renderHealthPrintTable(
+
+      report?.calves?.title ||
+      'صحة العجول',
+
+      [
+        'المشكلة',
+        'المؤشر',
+        'التكرار',
+        'الاتجاه',
+        'قراءة مُرَبِّيك',
+        'الإجراء الأول'
+      ],
+
+      calfRows.map(
+        row => `
+
+          <tr>
+
+            <td>
+              <b>
+                ${esc(
+                  row.problem ||
+                  '—'
+                )}
+              </b>
+
+              <br>
+
+              ${esc(
+                row.statusLabel ||
+                statusText(
+                  row.status
+                )
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.indicator ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.recurrence ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.trend ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.reading ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.action ||
+                '—'
+              )}
+            </td>
+
+          </tr>
+        `
+      ),
+
+      'لا توجد مشكلات صحية مسجلة خلال الفترة المختارة.'
+    )}
+
+
+    ${programTable}
+
+
+    ${renderHealthPrintTable(
+
+      position?.title ||
+      'الموقف التنفيذي للبرنامج المعتمد',
+
+      [
+        'التحصين',
+        'الفئة',
+        'الجرعة',
+        'الاستحقاق',
+        'الموقف التنفيذي',
+        'العدد',
+        'المطلوب'
+      ],
+
+      positionRows.map(
+        row => `
+
+          <tr>
+
+            <td>
+              ${esc(
+                row.vaccine ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.target ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.dose ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.dueDate &&
+                row.dueDate !== '—'
+                  ? dateText(
+                      row.dueDate
+                    )
+                  : '—'
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.statusLabel ||
+                statusText(
+                  row.status
+                )
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.count ?? 0
+              )}
+            </td>
+
+            <td>
+              ${esc(
+                row.action ||
+                '—'
+              )}
+            </td>
+
+          </tr>
+        `
+      ),
+
+      'لا توجد بيانات تنفيذ للبرنامج التحصيني المعتمد.'
+    )}
+
+  `;
+}
   function renderReport(
     report
   ) {
@@ -1093,15 +1694,19 @@ function renderPeriodOptions(
       'صحة العجول'
     );
 
-    renderVaccinations(
-      report.vaccinations ||
-      {}
-    );
+  renderVaccinations(
+  report.vaccinations ||
+  {}
+);
 
-    show(
-      'loading',
-      false
-    );
+renderHealthPrintReport(
+  report
+);
+
+show(
+  'loading',
+  false
+);
 
     show(
       'report',
