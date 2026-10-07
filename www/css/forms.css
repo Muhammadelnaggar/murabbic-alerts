@@ -5477,10 +5477,10 @@ body[data-page="dashboard"] .section-title{
 
 body[data-page="dashboard"] .section-title-icon{
   display:block;
-  width:30px;
-  height:30px;
+  width:36px;
+  height:36px;
   object-fit:contain;
-  flex:0 0 30px;
+  flex:0 0 36px;
 }
 
 body[data-page="dashboard"] .kpi-grid{
