@@ -2570,33 +2570,60 @@ function refreshDashboardSmartAlert() {
         'true'
       );
 
-    } else {
-      primaryButton
-        .addEventListener(
-          'click',
-          async () => {
-            primaryButton.disabled =
-              true;
+} else {
+  primaryButton
+    .addEventListener(
+      'click',
+      async () => {
+        primaryButton.disabled =
+          true;
 
-            try {
-              await respondMurabbikSmartAlert(
-                alert,
-                'acknowledged'
-              );
-            } catch (e) {
-              console.warn(
-                'murabbik smart alert action response failed',
-                e
-              );
-            }
+        try {
+          const data =
+            await respondMurabbikSmartAlert(
+              alert,
+              'acknowledged',
+              true
+            );
 
-            location.href =
-              String(
-                alert.actionUrl
-              );
+          /*
+           * السيرفر رجّع التنبيه التالي بالفعل.
+           * نسمح للمتصفح برسمه أولًا،
+           * ثم نفتح صفحة الحدث.
+           */
+          await new Promise(
+            resolve =>
+              requestAnimationFrame(
+                () =>
+                  requestAnimationFrame(
+                    resolve
+                  )
+              )
+          );
+
+          if (!data.navigateUrl) {
+            throw new Error(
+              'smart_alert_action_url_missing'
+            );
           }
-        );
-    }
+
+          location.href =
+            String(
+              data.navigateUrl
+            );
+
+        } catch (e) {
+          primaryButton.disabled =
+            false;
+
+          console.warn(
+            'murabbik smart alert action response failed',
+            e
+          );
+        }
+      }
+    );
+}
 
     actions.appendChild(
       primaryButton
@@ -2739,42 +2766,87 @@ function dashboardMurabbikUiAlert(
 
 async function respondMurabbikSmartAlert(
   alert = {},
-  decision = ''
+  decision = '',
+  actionRequested = false
 ) {
   const r = await fetch(
-    API_BASE + '/api/smart-alerts/respond',
+    API_BASE +
+      '/api/smart-alerts/respond',
     {
-      method: 'POST',
-      credentials: 'same-origin',
+      method:
+        'POST',
+
+      credentials:
+        'same-origin',
 
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Cache-Control': 'no-store'
+        'Content-Type':
+          'application/json',
+
+        'Accept':
+          'application/json',
+
+        'Cache-Control':
+          'no-store'
       },
 
-      cache: 'no-store',
+      cache:
+        'no-store',
 
-      body: JSON.stringify({
-        alertId: alert.id,
-        revision: alert.revision,
-        decision
-      })
+      body:
+        JSON.stringify({
+          alertId:
+            alert.id,
+
+          revision:
+            alert.revision,
+
+          source:
+            alert.source,
+
+          decision,
+
+          actionRequested:
+            actionRequested ===
+            true
+        })
     }
   );
 
-  const data = await r
-    .json()
-    .catch(() => ({}));
+  const data =
+    await r
+      .json()
+      .catch(
+        () => ({})
+      );
 
-  if (!r.ok || data.ok !== true) {
+  if (
+    !r.ok ||
+    data.ok !== true
+  ) {
     throw new Error(
       data.message ||
       'smart_alert_response_failed'
     );
   }
 
-  await loadMurabbikSmartAlerts();
+  /*
+   * السيرفر هو صاحب القرار.
+   * الداش يعرض فقط التنبيه التالي
+   * الذي رجعه السيرفر.
+   *
+   * لا GET كامل ثانٍ هنا.
+   */
+  dashboardAlertSources.murabbik =
+    data.currentAlert
+      ? [
+          dashboardMurabbikUiAlert(
+            data.currentAlert
+          )
+        ]
+      : [];
+
+  refreshDashboardSmartAlert();
 
   return data;
 }
