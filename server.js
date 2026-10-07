@@ -84124,11 +84124,39 @@ async function murabbikSmartAlertCollectSrv(req) {
   const entries = [...murabbikSmartAlertSourcesSrv.entries()];
 
   const settled = await Promise.allSettled(
-    entries.map(async ([sourceName, builder]) => ({
-      sourceName,
-      rows: await builder(context)
-    }))
-  );
+  entries.map(async ([sourceName, builder]) => {
+    const startedMs = Date.now();
+
+    try {
+      const rows =
+        await builder(context);
+
+      console.log(
+        "[smart-alert-timing]",
+        sourceName,
+        Date.now() - startedMs,
+        "ms",
+        req.path
+      );
+
+      return {
+        sourceName,
+        rows
+      };
+
+    } catch (e) {
+      console.log(
+        "[smart-alert-timing]",
+        sourceName,
+        Date.now() - startedMs,
+        "ms FAILED",
+        req.path
+      );
+
+      throw e;
+    }
+  })
+);
 
   const alerts = [];
   const sourceErrors = [];
@@ -84353,10 +84381,20 @@ async function murabbikSmartAlertLiveResponseAlertSrv(
       };
 
       try {
-        const rows =
-          await builder(
-            context
-          );
+        const startedMs =
+  Date.now();
+
+const rows =
+  await builder(
+    context
+  );
+
+console.log(
+  "[smart-alert-live-validation]",
+  sourceName,
+  Date.now() - startedMs,
+  "ms"
+);
 
         for (
           const raw of
