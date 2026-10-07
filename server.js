@@ -84198,10 +84198,61 @@ app.get("/api/smart-alerts", requireUserId, async (req, res) => {
       });
     }
 
-  const result =
+const result =
   await murabbikSmartAlertCollectSrv(
     req
   );
+
+const stateResult =
+  await murabbikSmartAlertApplyUserStateSrv(
+    req,
+    result.alerts,
+    result.context.nowMs
+  );
+const currentAlert =
+  stateResult.visibleAlerts[0] ||
+  null;
+
+const remaining =
+  stateResult.visibleAlerts.slice(1);
+
+res.json({
+  ok: true,
+  product: "murabbik_smart_alerts",
+  version: 1,
+  today: result.context.today,
+
+  currentAlert:
+    murabbikSmartAlertPublicSrv(
+      currentAlert
+    ),
+
+  remainingCount:
+    remaining.length,
+
+  remainingOperational:
+    remaining.filter(
+      alert =>
+        alert.kind === "operational"
+    ).length,
+
+  remainingTechnical:
+    remaining.filter(
+      alert =>
+        alert.kind === "technical"
+    ).length,
+
+  hasMore:
+    remaining.length > 0,
+
+  hiddenByInteractionCount:
+    stateResult.hiddenCount,
+
+  hiddenByMilkLimitCount: 0,
+
+  degraded:
+    result.sourceErrors.length > 0
+});
 
 try {
   await murabbikSmartAlertArchiveSyncSrv(
@@ -84216,58 +84267,7 @@ try {
   );
 }
 
-const stateResult =
-  await murabbikSmartAlertApplyUserStateSrv(
-    req,
-    result.alerts,
-    result.context.nowMs
-  );
-
-const currentAlert =
-  stateResult.visibleAlerts[0] ||
-  null;
-
-const remaining =
-  stateResult.visibleAlerts.slice(1);
-
-    return res.json({
-      ok: true,
-      product: "murabbik_smart_alerts",
-      version: 1,
-      today: result.context.today,
-
-      currentAlert:
-        murabbikSmartAlertPublicSrv(
-          currentAlert
-        ),
-
-      remainingCount:
-        remaining.length,
-
-      remainingOperational:
-        remaining.filter(
-          alert =>
-            alert.kind === "operational"
-        ).length,
-
-      remainingTechnical:
-        remaining.filter(
-          alert =>
-            alert.kind === "technical"
-        ).length,
-
-  hasMore:
-  remaining.length > 0,
-
-hiddenByInteractionCount:
-  stateResult.hiddenCount,
-
-hiddenByMilkLimitCount: 0,
-
-degraded:
-  
-  result.sourceErrors.length > 0
-    });
+return;
 
   } catch (e) {
     console.error(
@@ -84286,63 +84286,20 @@ degraded:
 async function murabbikSmartAlertLiveResponseAlertSrv(
   req,
   alertId,
-  revision
+  revision,
+  sourceHint = ""
 ) {
-  let sourceName = "";
-
-  try {
-    const archiveDocId =
-      murabbikSmartAlertArchiveDocIdSrv(
-        req,
-        {
-          id: alertId,
-          revision
-        }
-      );
-
-    if (archiveDocId) {
-      const archiveSnap =
-        await db
-          .collection(
-            MURABBIK_SMART_ALERT_ARCHIVE_COLLECTION
-          )
-          .doc(archiveDocId)
-          .get();
-
-      if (archiveSnap.exists) {
-        const archive =
-          archiveSnap.data() || {};
-
-        const archiveMatches =
-          archive.archiveType === "smart_alert" &&
-          archive.smartAlert === true &&
-          murabbikSmartAlertTextSrv(
-            archive.userId
-          ) === murabbikSmartAlertTextSrv(
-            req.userId
-          ) &&
-          murabbikSmartAlertTextSrv(
-            archive.smartAlertId
-          ) === alertId &&
-          murabbikSmartAlertTextSrv(
-            archive.revision
-          ) === revision;
-
-        if (archiveMatches) {
-          sourceName =
-            murabbikSmartAlertTextSrv(
-              archive.sourceName
-            );
-        }
-      }
-    }
-  } catch (e) {
-    console.warn(
-      "smart-alert response source lookup failed:",
-      e.message || e
+  const sourceName =
+    murabbikSmartAlertTextSrv(
+      sourceHint
     );
-  }
 
+  /*
+   * source مجرد دليل للوصول للمصدر الصحيح بسرعة.
+   * لا نعتمد عليه كحقيقة.
+   * الحقيقة تأتي من إعادة بناء المصدر حيًا
+   * ومطابقة id + revision.
+   */
   if (sourceName) {
     const builder =
       murabbikSmartAlertSourcesSrv.get(
@@ -84368,14 +84325,25 @@ async function murabbikSmartAlertLiveResponseAlertSrv(
         memo: new Map()
       };
 
-      context.load = async (key, loader) => {
+      context.load = async (
+        key,
+        loader
+      ) => {
         const memoKey =
-          murabbikSmartAlertTextSrv(key);
+          murabbikSmartAlertTextSrv(
+            key
+          );
 
-        if (!context.memo.has(memoKey)) {
+        if (
+          !context.memo.has(
+            memoKey
+          )
+        ) {
           context.memo.set(
             memoKey,
-            Promise.resolve().then(loader)
+            Promise
+              .resolve()
+              .then(loader)
           );
         }
 
@@ -84386,11 +84354,15 @@ async function murabbikSmartAlertLiveResponseAlertSrv(
 
       try {
         const rows =
-          await builder(context);
+          await builder(
+            context
+          );
 
         for (
           const raw of
-          Array.isArray(rows) ? rows : []
+          Array.isArray(rows)
+            ? rows
+            : []
         ) {
           try {
             const alert =
@@ -84401,7 +84373,8 @@ async function murabbikSmartAlertLiveResponseAlertSrv(
 
             if (
               alert.id === alertId &&
-              alert.revision === revision
+              alert.revision ===
+                revision
             ) {
               return alert;
             }
@@ -84414,8 +84387,11 @@ async function murabbikSmartAlertLiveResponseAlertSrv(
           }
         }
 
-        // أُعيد بناء المصدر حيًا،
-        // والتنبيه لم يعد موجودًا.
+        /*
+         * المصدر بُني حيًا بنجاح،
+         * والتنبيه لم يعد موجودًا
+         * بنفس الواقعة/revision.
+         */
         return null;
 
       } catch (e) {
@@ -84427,8 +84403,11 @@ async function murabbikSmartAlertLiveResponseAlertSrv(
     }
   }
 
-  // حماية للحسابات القديمة أو فشل قراءة الأرشيف:
-  // نستخدم المسار الكامل الحالي.
+  /*
+   * توافق مع أي واجهة قديمة
+   * لا ترسل source،
+   * أو fallback عند تعذر المصدر.
+   */
   const result =
     await murabbikSmartAlertCollectSrv(
       req
@@ -84452,6 +84431,7 @@ app.post(
           .status(503)
           .json({
             ok: false,
+
             message:
               "❌ تعذّر تحديث التنبيه الآن. حاول مرة أخرى."
           });
@@ -84467,10 +84447,19 @@ app.post(
           req.body?.revision
         );
 
+      const sourceHint =
+        murabbikSmartAlertTextSrv(
+          req.body?.source
+        );
+
       const decision =
         murabbikSmartAlertTextSrv(
           req.body?.decision
         ).toLowerCase();
+
+      const actionRequested =
+        req.body?.actionRequested ===
+        true;
 
       if (
         !alertId ||
@@ -84484,6 +84473,7 @@ app.post(
           .status(400)
           .json({
             ok: false,
+
             error:
               "smart_alert_response_invalid",
 
@@ -84492,18 +84482,24 @@ app.post(
           });
       }
 
-const alert =
-  await murabbikSmartAlertLiveResponseAlertSrv(
-    req,
-    alertId,
-    revision
-  );
+      /*
+       * تحقق حي من المصدر الفعلي.
+       * الأرشيف ليس جزءًا من القرار.
+       */
+      const alert =
+        await murabbikSmartAlertLiveResponseAlertSrv(
+          req,
+          alertId,
+          revision,
+          sourceHint
+        );
 
       if (!alert) {
         return res
           .status(409)
           .json({
             ok: false,
+
             error:
               "smart_alert_state_changed",
 
@@ -84512,7 +84508,39 @@ const alert =
           });
       }
 
-      const nowMs = Date.now();
+      /*
+       * رابط فتح الصفحة يأتي من
+       * التنبيه الذي تحقق منه السيرفر حيًا،
+       * وليس من نسخة قديمة في الداش.
+       */
+      const navigateUrl =
+        actionRequested &&
+        alert.action?.type ===
+          "navigate"
+          ? murabbikSmartAlertTextSrv(
+              alert.action?.url
+            )
+          : "";
+
+      if (
+        actionRequested &&
+        !navigateUrl
+      ) {
+        return res
+          .status(409)
+          .json({
+            ok: false,
+
+            error:
+              "smart_alert_action_changed",
+
+            message:
+              "ℹ️ تغير الإجراء المرتبط بالتنبيه. حمّل التنبيهات من جديد."
+          });
+      }
+
+      const nowMs =
+        Date.now();
 
       const stateRef =
         murabbikSmartAlertStateRefSrv(
@@ -84521,19 +84549,32 @@ const alert =
         );
 
       const commonState = {
-        userId: req.userId,
+        userId:
+          req.userId,
 
         actorUid:
           murabbikSmartAlertActorUidSrv(
             req
           ),
 
-        alertId: alert.id,
-        revision: alert.revision,
-        sourceName: alert.source,
-        kind: alert.kind,
-        domain: alert.domain,
-        code: alert.code,
+        alertId:
+          alert.id,
+
+        revision:
+          alert.revision,
+
+        sourceName:
+          alert.source,
+
+        kind:
+          alert.kind,
+
+        domain:
+          alert.domain,
+
+        code:
+          alert.code,
+
         decision,
 
         updatedAt:
@@ -84545,54 +84586,51 @@ const alert =
           "server:/api/smart-alerts/respond"
       };
 
+      let snoozedUntilMs =
+        null;
+
+      let statePayload =
+        null;
+
       if (
-        decision === "acknowledged"
+        decision ===
+        "acknowledged"
       ) {
-        await stateRef.set(
-          {
-            ...commonState,
-
-            acknowledgedAt:
-              admin.firestore
-                .FieldValue
-                .serverTimestamp(),
-
-            snoozedAt: null,
-            snoozedUntil: null,
-            snoozeMinutes: null
-          },
-          {
-            merge: true
-          }
-        );
-
-        return res.json({
-          ok: true,
-          decision,
-          alertId: alert.id,
-          revision: alert.revision,
-
-          message:
-            "✅ تم الاطلاع على التنبيه."
-        });
-      }
-
-      const snoozeMinutes =
-        alert._snoozeMinutes;
-
-      const snoozedUntilMs =
-        nowMs +
-        (
-          snoozeMinutes *
-          60 *
-          1000
-        );
-
-      await stateRef.set(
-        {
+        statePayload = {
           ...commonState,
 
-          acknowledgedAt: null,
+          acknowledgedAt:
+            admin.firestore
+              .FieldValue
+              .serverTimestamp(),
+
+          snoozedAt:
+            null,
+
+          snoozedUntil:
+            null,
+
+          snoozeMinutes:
+            null
+        };
+
+      } else {
+        const snoozeMinutes =
+          alert._snoozeMinutes;
+
+        snoozedUntilMs =
+          nowMs +
+          (
+            snoozeMinutes *
+            60 *
+            1000
+          );
+
+        statePayload = {
+          ...commonState,
+
+          acknowledgedAt:
+            null,
 
           snoozedAt:
             admin.firestore
@@ -84606,27 +84644,131 @@ const alert =
                 snoozedUntilMs
               ),
 
-                  snoozeMinutes
-        },
-        {
-          merge: true
-        }
-      );
+          snoozeMinutes
+        };
+      }
 
-      return res.json({
+      /*
+       * حفظ اختيار المستخدم
+       * وتجهيز المصادر الحية الجديدة
+       * يعملان بالتوازي.
+       *
+       * مصادر Smart Alerts لا تعتمد
+       * على smart_alert_states.
+       */
+      const [
+        ,
+        freshResult
+      ] =
+        await Promise.all([
+          stateRef.set(
+            statePayload,
+            {
+              merge: true
+            }
+          ),
+
+          murabbikSmartAlertCollectSrv(
+            req
+          )
+        ]);
+
+const stateResult =
+  await murabbikSmartAlertApplyUserStateSrv(
+    req,
+    freshResult.alerts,
+    freshResult.context.nowMs
+  );
+
+      const currentAlert =
+        stateResult
+          .visibleAlerts[0] ||
+        null;
+
+      const remaining =
+        stateResult
+          .visibleAlerts
+          .slice(1);
+
+      res.json({
         ok: true,
-        decision,
-        alertId: alert.id,
-        revision: alert.revision,
 
-        snoozedUntil:
-          new Date(
+        decision,
+
+        alertId:
+          alert.id,
+
+        revision:
+          alert.revision,
+
+        ...(
+          Number.isFinite(
             snoozedUntilMs
-          ).toISOString(),
+          )
+            ? {
+                snoozedUntil:
+                  new Date(
+                    snoozedUntilMs
+                  ).toISOString()
+              }
+            : {}
+        ),
+
+        currentAlert:
+          murabbikSmartAlertPublicSrv(
+            currentAlert
+          ),
+
+        remainingCount:
+          remaining.length,
+
+        remainingOperational:
+          remaining.filter(
+            item =>
+              item.kind ===
+              "operational"
+          ).length,
+
+        remainingTechnical:
+          remaining.filter(
+            item =>
+              item.kind ===
+              "technical"
+          ).length,
+
+        hasMore:
+          remaining.length > 0,
+
+        hiddenByInteractionCount:
+          stateResult.hiddenCount,
+
+        degraded:
+          freshResult
+            .sourceErrors
+            .length > 0,
+
+        navigateUrl,
 
         message:
-          "✅ سيذكّرك مُرَبِّيك بهذا التنبيه لاحقًا."
+          decision ===
+            "acknowledged"
+            ? "✅ تم الاطلاع على التنبيه."
+            : "✅ سيذكّرك مُرَبِّيك بهذا التنبيه لاحقًا."
       });
+      try {
+  await murabbikSmartAlertArchiveSyncSrv(
+    req,
+    freshResult.alerts,
+    freshResult.context.nowMs
+  );
+} catch (e) {
+  console.warn(
+    "smart-alert archive sync failed:",
+    e.message || e
+  );
+}
+
+return;
 
     } catch (e) {
       console.error(
@@ -84638,6 +84780,7 @@ const alert =
         .status(500)
         .json({
           ok: false,
+
           error:
             "smart_alert_response_failed",
 
