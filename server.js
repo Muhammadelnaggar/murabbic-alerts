@@ -85298,27 +85298,31 @@ app.get(
         );
 
 
-      /*
-       * نفس التنبيهات الظاهرة فعليًا
-       * بعد acknowledged / snoozed.
-       */
-      const stateResult =
-        await murabbikSmartAlertApplyUserStateSrv(
-          req,
-          result.alerts,
-          result.context.nowMs
-        );
+/*
+ * حالة التفاعل تخص شريط Smart Alerts فقط.
+ * نحتفظ بها هنا للإحصاء التشخيصي فقط،
+ * ولا نستخدم visibleAlerts لبناء تقرير التنفيذ.
+ */
+const stateResult =
+  await murabbikSmartAlertApplyUserStateSrv(
+    req,
+    result.alerts,
+    result.context.nowMs
+  );
 
 
-      /*
-       * نحول فقط مصادر التنفيذ المعتمدة
-       * إلى قوائم عمل فعلية بالأرقام.
-       */
-      const tasks =
-        dailyTasksReportBuildSrv(
-          stateResult.visibleAlerts,
-          result.context.today
-        );
+/*
+ * تقرير مهام اليوم مستقل عن
+ * acknowledged / snoozed.
+ *
+ * تظل المهمة التنفيذية في التقرير
+ * ما دام مصدرها التشغيلي ما زال يولدها.
+ */
+const tasks =
+  dailyTasksReportBuildSrv(
+    result.alerts,
+    result.context.today
+  );
 
 
       const farmClock =
