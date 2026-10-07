@@ -67704,7 +67704,8 @@ async function vaccinationCampaignDashboardAlertsSrv({
   uid = "",
   programContext = {},
   executionProgram = {},
-  today = ""
+  today = "",
+  taskDocs = null
 } = {}) {
   const tenant = tenantKey(uid);
   const programMode =
@@ -67726,9 +67727,15 @@ async function vaccinationCampaignDashboardAlertsSrv({
       "periodic"
     );
 
-  // الحملة لا تعتمد على أول 500 Task في الداشبورد.
-  // نقرأ كل مهام التحصين المفتوحة لهذا الحساب فقط.
-     const [
+    // لو المستدعي قرأ مهام التحصين بالفعل،
+  // نعيد استخدامها بدل قراءتها مرة ثانية.
+  let effectiveTaskDocs =
+    Array.isArray(taskDocs)
+      ? taskDocs
+      : null;
+
+  if (!effectiveTaskDocs) {
+    const [
       pendingSnap,
       needsDataSnap
     ] = await Promise.all([
@@ -67743,14 +67750,17 @@ async function vaccinationCampaignDashboardAlertsSrv({
         .get()
     ]);
 
-  const taskDocs = [
-    ...pendingSnap.docs,
-    ...needsDataSnap.docs
-  ];
+    effectiveTaskDocs = [
+      ...pendingSnap.docs,
+      ...needsDataSnap.docs
+    ];
+  }
 
   const openTaskIndex = new Map();
 
-  for (const ds of taskDocs) {
+  for (const ds of effectiveTaskDocs) {
+
+  
     const task = ds.data() || {};
 
     if (
@@ -69321,17 +69331,24 @@ const programContext =
     const existingTaskKeys =
       new Set();
 
+    const taskDocs = [
+      ...pendingSnap.docs,
+      ...needsDataSnap.docs
+    ];
+
     const activeAnimalCache =
       new Map();
 
     const vaccinationAlertAnimalIsActive =
-      async animalNumber => {
+      animalNumber => {
         const key =
           calvingNormDigitsOnlySrv(
             animalNumber
           );
 
-        if (!key) return false;
+        if (!key) {
+          return Promise.resolve(false);
+        }
 
         if (
           activeAnimalCache.has(key)
@@ -69341,43 +69358,93 @@ const programContext =
           );
         }
 
-        const animal =
-          await fetchAnimalByNumberForCalvingGateSrv(
-            uid,
-            key
-          );
+        const activePromise =
+          (
+            async () => {
+              const animal =
+                await fetchAnimalByNumberForCalvingGateSrv(
+                  uid,
+                  key
+                );
 
-        const active =
-  Boolean(animal) &&
-  shouldAppearInGroupsSrv(
-    animal.data || {}
-  );
+              return (
+                Boolean(animal) &&
+                shouldAppearInGroupsSrv(
+                  animal.data || {}
+                )
+              );
+            }
+          )();
 
-  activeAnimalCache.set(
-    key,
-    active
-  );
+        activeAnimalCache.set(
+          key,
+          activePromise
+        );
 
-  return active;
+        return activePromise;
       };
 
-    const herdCampaignAlerts =
-      await vaccinationCampaignDashboardAlertsSrv({
+    /*
+     * نفس تحقق النشاط الرسمي بلا أي تغيير.
+     * الفرق فقط أن أرقام المهام تُفحص بالتوازي
+     * بدل انتظار كل حيوان قبل بدء التالي.
+     */
+    const activeChecksPromise =
+      Promise.all(
+        taskDocs.map(ds => {
+          const t = ds.data() || {};
+
+          if (
+            String(
+              t.taskType || ""
+            ).trim() !== "vaccination" ||
+            String(
+              t.engine || ""
+            ).trim() !==
+              "vaccination_program_v1" ||
+            t.done === true ||
+            vaccinationProgramModeNormSrv(
+              t.programMode
+            ) !== activeProgramMode ||
+            !vaccinationAlertIsWeeklyIndividualDoseSrv(
+              t.doseType
+            )
+          ) {
+            return null;
+          }
+
+          const animalNumber =
+            calvingNormDigitsOnlySrv(
+              t.animalNumber || ""
+            );
+
+          return animalNumber
+            ? vaccinationAlertAnimalIsActive(
+                animalNumber
+              )
+            : null;
+        })
+      );
+
+    const herdCampaignPromise =
+      vaccinationCampaignDashboardAlertsSrv({
         uid,
         programContext,
         executionProgram,
-        taskDocs:
-          pendingSnap.docs,
-        today,
-        isAnimalActive:
-          vaccinationAlertAnimalIsActive
+        taskDocs,
+        today
       });
 
-    for (
-      const ds of [
-        ...pendingSnap.docs,
-        ...needsDataSnap.docs
-      ]
+    const [
+      ,
+      herdCampaignAlerts
+    ] = await Promise.all([
+      activeChecksPromise,
+      herdCampaignPromise
+    ]);
+
+        for (
+      const ds of taskDocs
     ) {
       const t = ds.data() || {};
 
@@ -69618,8 +69685,11 @@ const key = [
         .push(ds.id);
     }
 
-       const initialAgeGroups =
-      await vaccinationInitialAgeAlertGroupsSrv({
+          const [
+      initialAgeGroups,
+      initialMaternalGroups
+    ] = await Promise.all([
+      vaccinationInitialAgeAlertGroupsSrv({
         uid,
 
         programMode:
@@ -69629,9 +69699,22 @@ const key = [
 
         excludedTaskKeys:
           existingTaskKeys
-      });
+      }),
 
-        for (
+      vaccinationInitialMaternalAlertGroupsSrv({
+        uid,
+
+        programMode:
+          activeProgramMode,
+
+        today,
+
+        excludedTaskKeys:
+          existingTaskKeys
+      })
+    ]);
+
+    for (
       const group of
       initialAgeGroups
     ) {
@@ -69655,20 +69738,7 @@ const key = [
       }
     }
 
-    const initialMaternalGroups =
-      await vaccinationInitialMaternalAlertGroupsSrv({
-        uid,
-
-        programMode:
-          activeProgramMode,
-
-        today,
-
-        excludedTaskKeys:
-          existingTaskKeys
-      });
-
-      for (
+        for (
       const group of
       initialMaternalGroups
     ) {
