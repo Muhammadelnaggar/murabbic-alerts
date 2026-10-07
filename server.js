@@ -4933,44 +4933,315 @@ function weatherHourInTimeZoneSrv(
   }
 }
 
-function weatherGreetingCheerfulLineSrv(
+function weatherGreetingPeriodSrv(hour) {
+  const h = Number(hour);
+
+  if (!Number.isInteger(h)) {
+    return { key: "unknown", label: "الوقت الحالي" };
+  }
+
+  if (h >= 5 && h < 12) {
+    return { key: "morning", label: "الصباح" };
+  }
+
+  if (h >= 12 && h < 15) {
+    return { key: "noon", label: "الظهر" };
+  }
+
+  if (h >= 15 && h < 18) {
+    return { key: "afternoon", label: "العصر" };
+  }
+
+  if (h >= 18 && h < 23) {
+    return { key: "evening", label: "المساء" };
+  }
+
+  return { key: "night", label: "الليل" };
+}
+
+function weatherGreetingVoiceSrv(
   today = "",
-  period = "morning"
+  period = "morning",
+  farmName = "مزرعتك"
 ) {
-  const morningLines = [
-    "يوم جديد ومُرَبِّيك صاحي معاك من أوله 💚",
-    "صباح النشاط… مُرَبِّيك متابع يوم المزرعة معاك 🌿",
-    "خلّينا نبدأ اليوم وإحنا مطمّنين على القطيع 🌤️",
-    "مُرَبِّيك سبقك يطمن على جو المزرعة والقطيع 💚"
-  ];
+  const farm =
+    String(farmName || "مزرعتك").trim() ||
+    "مزرعتك";
 
-  const eveningLines = [
-    "مُرَبِّيك لسه صاحي معاك وبيطمن على القطيع 🌙",
-    "مساء هادي… ومُرَبِّيك متابع يوم المزرعة لآخره 💚",
-    "قبل ما اليوم يخلص، خلّينا نطمن على ظروف القطيع 🌿",
-    "مُرَبِّيك معاك لآخر اليوم… نطمن على الجو والقطيع 🌙"
-  ];
+  const voices = {
+    morning: [
+      {
+        title: `صباح الخير يا أهل ${farm} 🌿`,
+        opener: "أنا مُرَبِّيك، صاحي معاكم من بدري وطمنت على الجو عندكم.",
+        closer: "ربنا يجعل يومكم هادي ومثمر 💚"
+      },
+      {
+        title: `صباح النشاط يا أهل ${farm} ☀️`,
+        opener: "أنا معاكم من أول اليوم، ودي آخر قراءة لجو المزرعة.",
+        closer: "يلا نبدأ يومنا على خير 🌿"
+      },
+      {
+        title: `صباح جميل على ${farm} 💚`,
+        opener: "أنا مُرَبِّيك، بدأت يومي إني أطمن على الجو والقطيع عندكم.",
+        closer: "إن شاء الله يوم موفق والقطيع بخير."
+      },
+      {
+        title: "صباح الخير يا أهل المزرعة 🌤️",
+        opener: `طمنت على جو ${farm} قبل ما نبدأ اليوم، ودي حالته دلوقتي.`,
+        closer: "أنا معاكم طول اليوم بإذن الله 💚"
+      }
+    ],
 
-  const lines =
-    period === "evening"
-      ? eveningLines
-      : morningLines;
+    noon: [
+      {
+        title: `نهاركم سعيد يا أهل ${farm} ☀️`,
+        opener: "أنا مُرَبِّيك، رجعت أطمن على الجو معاكم وقت الظهر.",
+        closer: "نكمّل اليوم بهدوء وربنا يبارك لكم في القطيع 💚"
+      },
+      {
+        title: `أهلًا يا أهل ${farm} 🌿`,
+        opener: "وصلنا لوقت الظهر، وأنا متابع الجو عندكم لحظة بلحظة.",
+        closer: "خليكم مطمّنين وأنا معاكم."
+      },
+      {
+        title: "نهاركم طيب يا أهل المزرعة ☀️",
+        opener: `أنا مُرَبِّيك، ودي قراءة الجو الحالية في ${farm}.`,
+        closer: "إن شاء الله باقي اليوم يعدّي على خير 💚"
+      },
+      {
+        title: `وقت الظهر في ${farm} 🌤️`,
+        opener: "أنا معاكم وراجع لكم حالة الجو دلوقتي قبل ما نكمل اليوم.",
+        closer: "نطمن على القطيع ونكمل شغلنا بهدوء 🌿"
+      }
+    ],
 
-  const seed =
-    String(today || "")
-      .replace(/\D/g, "")
-      .split("")
-      .reduce(
-        (sum, digit) =>
-          sum + Number(digit || 0),
-        0
-      );
+    afternoon: [
+      {
+        title: `مساء الخير يا أهل ${farm} 🌤️`,
+        opener: "أنا مُرَبِّيك، والعصر وصل فطمنت على الجو عندكم من جديد.",
+        closer: "نكمل اليوم على خير بإذن الله 💚"
+      },
+      {
+        title: `عصر هادي على ${farm} 🌿`,
+        opener: "أنا لسه معاكم، ودي حالة الجو الحالية عند المزرعة.",
+        closer: "ربنا يبارك لكم في باقي اليوم والقطيع."
+      },
+      {
+        title: `أهلًا يا أهل ${farm} 💚`,
+        opener: "وقت العصر اهو، وأنا طمنت على الجو قبل ما اليوم يقرب يخلص.",
+        closer: "أنا متابع معاكم لآخر اليوم 🌿"
+      },
+      {
+        title: "مساء طيب على أهل المزرعة 🌤️",
+        opener: `أنا مُرَبِّيك، ودي قراءة العصر الحالية في ${farm}.`,
+        closer: "إن شاء الله ساعات هادية على القطيع 💚"
+      }
+    ],
 
-  return lines[
-    seed % lines.length
+    evening: [
+      {
+        title: `مساء الخير يا أهل ${farm} 🌙`,
+        opener: "أنا مُرَبِّيك، ولسه صاحي معاكم وبطمن على الجو والقطيع.",
+        closer: "ربنا يجعل مساءكم هادي ومطمّن 💚"
+      },
+      {
+        title: `مساء هادي على ${farm} 🌙`,
+        opener: "أنا معاكم لآخر اليوم، ودي قراءة الجو الحالية عندكم.",
+        closer: "نقفل اليوم على خير بإذن الله 🌿"
+      },
+      {
+        title: `أهلًا بالمساء يا أهل ${farm} 💚`,
+        opener: "قبل ما اليوم يخلص، طمنت على الجو عندكم مرة كمان.",
+        closer: "ليلة هادية عليكم وعلى القطيع."
+      },
+      {
+        title: "مساء طيب يا أهل المزرعة 🌿",
+        opener: `أنا مُرَبِّيك، متابع معاكم جو ${farm} لحد دلوقتي.`,
+        closer: "اطمنوا، أنا لسه معاكم 💚"
+      }
+    ],
+
+    night: [
+      {
+        title: `ليلة هادية يا أهل ${farm} 🌙`,
+        opener: "أنا مُرَبِّيك، وحتى في الليل بطمن معاكم على ظروف القطيع.",
+        closer: "ربنا يحفظ القطيع ويصبحكم على خير 💚"
+      },
+      {
+        title: `مساء الخير يا أهل ${farm} 🌙`,
+        opener: "الليل هدي، وأنا لسه متابع الجو عندكم.",
+        closer: "ليلة مطمئنة على المزرعة بإذن الله."
+      },
+      {
+        title: `أهلًا يا أهل ${farm} 💚`,
+        opener: "أنا معاكم حتى آخر اليوم، ودي قراءة الجو الحالية.",
+        closer: "تصبحوا على خير والقطيع بخير 🌿"
+      },
+      {
+        title: `ليلة طيبة على ${farm} 🌙`,
+        opener: "أنا مُرَبِّيك، طمنت على الجو قبل ما اليوم يخلص.",
+        closer: "ربنا يجعلها ليلة هادية ومريحة للقطيع 💚"
+      }
+    ],
+
+    unknown: [
+      {
+        title: `أهلًا يا أهل ${farm} 💚`,
+        opener: "أنا مُرَبِّيك، طمنت على الجو عندكم ودي القراءة الحالية.",
+        closer: "أنا معاكم خطوة بخطوة 🌿"
+      }
+    ]
+  };
+
+  const list =
+    voices[period] ||
+    voices.unknown;
+
+  const daySeed =
+    Number(
+      String(today || "")
+        .replace(/\D/g, "")
+    ) || 0;
+
+  const periodSeed = {
+    morning: 0,
+    noon: 1,
+    afternoon: 2,
+    evening: 3,
+    night: 4,
+    unknown: 5
+  }[period] ?? 0;
+
+  return list[
+    Math.abs(daySeed + periodSeed) %
+      list.length
   ];
 }
 
+function murabbikGreetingThiBandSrv(thi) {
+  const n = Number(thi);
+
+  if (!Number.isFinite(n)) {
+    return {
+      key: "unknown",
+      label: "قراءة THI غير متاحة",
+      range: "",
+      severity: 0
+    };
+  }
+
+  if (n < 68) {
+    return {
+      key: "comfort",
+      label: "لا يوجد إجهاد حراري",
+      range: "<68",
+      severity: 0
+    };
+  }
+
+  if (n < 72) {
+    return {
+      key: "light",
+      label: "إجهاد حراري خفيف",
+      range: "68–71",
+      severity: 1
+    };
+  }
+
+  if (n < 80) {
+    return {
+      key: "moderate",
+      label: "إجهاد حراري متوسط",
+      range: "72–79",
+      severity: 2
+    };
+  }
+
+  if (n < 90) {
+    return {
+      key: "heavy",
+      label: "إجهاد حراري مرتفع",
+      range: "80–89",
+      severity: 3
+    };
+  }
+
+  if (n <= 100) {
+    return {
+      key: "severe",
+      label: "إجهاد حراري شديد",
+      range: "90–100",
+      severity: 4
+    };
+  }
+
+  return {
+    key: "deadly",
+    label: "إجهاد حراري مميت",
+    range: ">100",
+    severity: 5
+  };
+}
+
+function murabbikGreetingThiCopySrv(band = {}) {
+  switch (band.key) {
+    case "comfort":
+      return {
+        climate:
+          "الجو حاليًا مريح للقطيع، ومفيش إجهاد حراري حسب قراءة THI الحالية.",
+        advice:
+          "خليك على الروتين المعتاد للمياه النظيفة والتهوية والمتابعة، والدنيا مطمّنة الحمد لله."
+      };
+
+    case "light":
+      return {
+        climate:
+          "الجو بدأ يسخن شوية، وTHI حاليًا في نطاق إجهاد حراري خفيف.",
+        advice:
+          "خلي المياه النظيفة متاحة والتهوية كويسة، وراقب المأكول والاجترار والراحة خلال الساعات الدافئة."
+      };
+
+    case "moderate":
+      return {
+        climate:
+          "THI حاليًا في نطاق إجهاد حراري متوسط، فالقطيع محتاج اهتمام أكتر خلال الساعات الدافئة.",
+        advice:
+          "زوّد الاهتمام بالمياه والظل والتهوية، وراقب اللهاث والمأكول والاجترار واللبن."
+      };
+
+    case "heavy":
+      return {
+        climate:
+          "THI حاليًا في نطاق إجهاد حراري مرتفع، ووقت التبريد الفعّال مهم للقطيع.",
+        advice:
+          "فعّل التهوية القوية والتبريد المناسب، ومع الرش أو التبليل المتقطع لازم تكون التهوية جيدة، وقلّل الانتظار والحركة وقت الحر."
+      };
+
+    case "severe":
+      return {
+        climate:
+          "THI حاليًا في نطاق إجهاد حراري شديد، والقطيع محتاج تدخل تبريد سريع ومتابعة قريبة.",
+        advice:
+          "فعّل التبريد المكثف فورًا، وراجع المياه والتهوية باستمرار، وقلّل الحركة والانتظار وراقب اللهاث والتنفس بعناية."
+      };
+
+    case "deadly":
+      return {
+        climate:
+          "THI حاليًا في نطاق إجهاد حراري مميت حسب الشارت، ودي حالة حرارية بالغة الخطورة.",
+        advice:
+          "ابدأ تبريدًا مكثفًا وفوريًا، قلّل الحركة لأدنى حد، وراقب الحيوانات عن قرب؛ أي ضيق تنفس شديد أو انهيار يحتاج تدخلًا بيطريًا عاجلًا."
+      };
+
+    default:
+      return {
+        climate:
+          "قراءة THI مش متاحة دلوقتي، وأنا مش هافترض وجود إجهاد حراري من غير قراءة صحيحة.",
+        advice:
+          "راقب القطيع والمياه والتهوية، وأنا هحدّث القراءة أول ما البيانات تتوفر."
+      };
+  }
+}
 
 // ============================================================
 //                  API: WEATHER / THI
@@ -83940,21 +84211,15 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
     );
 
   const period =
-    Number.isInteger(hour) &&
-    hour >= 5 &&
-    hour < 12
-      ? "morning"
-      : "evening";
+    weatherGreetingPeriodSrv(
+      hour
+    );
 
-  const greeting =
-    period === "morning"
-      ? "صباح الخير"
-      : "مساء الخير";
-
-  const cheerfulLine =
-    weatherGreetingCheerfulLineSrv(
+  const voice =
+    weatherGreetingVoiceSrv(
       today,
-      period
+      period.key,
+      farmName
     );
 
   const weather =
@@ -83966,117 +84231,67 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
         )
     );
 
-  const thiRaw =
-  weather?.thi;
+  const thiRaw = weather?.thi;
+  const tempRaw = weather?.tempC;
+  const humidityRaw = weather?.humidity;
 
-const tempRaw =
-  weather?.tempC;
+  const thi =
+    thiRaw === null ||
+    thiRaw === undefined ||
+    thiRaw === ""
+      ? NaN
+      : Number(thiRaw);
 
-const humidityRaw =
-  weather?.humidity;
+  const tempC =
+    tempRaw === null ||
+    tempRaw === undefined ||
+    tempRaw === ""
+      ? NaN
+      : Number(tempRaw);
 
-const thi =
-  thiRaw === null ||
-  thiRaw === undefined ||
-  thiRaw === ""
-    ? NaN
-    : Number(thiRaw);
-
-const tempC =
-  tempRaw === null ||
-  tempRaw === undefined ||
-  tempRaw === ""
-    ? NaN
-    : Number(tempRaw);
-
-const humidity =
-  humidityRaw === null ||
-  humidityRaw === undefined ||
-  humidityRaw === ""
-    ? NaN
-    : Number(humidityRaw);
+  const humidity =
+    humidityRaw === null ||
+    humidityRaw === undefined ||
+    humidityRaw === ""
+      ? NaN
+      : Number(humidityRaw);
 
   const hasThi =
     Number.isFinite(thi);
 
-  const status =
-    hasThi
-      ? (
-          weather?.status ||
-          classifyTHI(thi)
-        )
-      : {
-          level: "unknown",
-          label: "غير متاح",
-          severity: 0
-        };
-
-  const level =
-    murabbikSmartAlertTextSrv(
-      status?.level
-    ).toLowerCase();
-
-  const instructions =
-    weather?.instructions ||
-    buildThiInstructionsSrv(
-      hasThi ? thi : null,
-      status
+  const band =
+    murabbikGreetingThiBandSrv(
+      hasThi ? thi : null
     );
 
-  const climateLine =
-  !hasThi
-    ? "خلّينا نبدأ اليوم بهدوء، وهنحدّث قراءة THI أول ما تتوفر."
-    : level === "comfort"
-      ? "الجو النهارده مريح للقطيع، حافظ على الروتين الجيد للمياه والتهوية."
-      : level === "mild"
-        ? "الجو النهارده فيه إجهاد حراري بسيط، وشوية عناية بالمياه والتهوية تساعد القطيع يفضل مرتاح."
-        : level === "moderate"
-          ? "الجو النهارده فيه إجهاد حراري متوسط، والقطيع محتاج عناية إضافية."
-          : "الجو النهارده فيه إجهاد حراري عالي، والقطيع محتاج عناية إضافية.";
+  const copy =
+    murabbikGreetingThiCopySrv(
+      band
+    );
 
-const weatherLine =
-  hasThi
-    ? [
-        `THI اليوم: ${Math.round(thi)}`,
-        status?.label || "غير متاح",
+  const weatherLine =
+    hasThi
+      ? [
+          Number.isFinite(tempC)
+            ? `الحرارة الآن ${Math.round(tempC)}°م`
+            : "",
 
-        Number.isFinite(tempC)
-          ? `الحرارة: ${Math.round(tempC)}°م`
-          : "",
+          Number.isFinite(humidity)
+            ? `الرطوبة ${Math.round(humidity)}%`
+            : "",
 
-        Number.isFinite(humidity)
-          ? `الرطوبة: ${Math.round(humidity)}%`
-          : ""
-      ]
-        .filter(Boolean)
-        .join(" — ")
-    : "";
-
-  const adviceActions =
-    (
-      Array.isArray(
-        instructions?.actions
-      )
-        ? instructions.actions
-        : []
-    )
-      .map(
-        murabbikSmartAlertTextSrv
-      )
-      .filter(Boolean)
-      .slice(0, 3);
-
-  const adviceText =
-    adviceActions.length
-      ? `نصيحة مُرَبِّيك لليوم:\n• ${adviceActions.join("\n• ")}`
+          `THI ${Math.round(thi)}`
+        ]
+          .filter(Boolean)
+          .join(" — ")
       : "";
 
   return [{
     identityKey:
-  `daily-farm-greeting:${today}`,
+      `daily-farm-greeting:${today}`,
 
-revisionKey:
-  today,
+    revisionKey:
+      today,
 
     kind:
       "informational",
@@ -84099,43 +84314,50 @@ revisionKey:
         : "data_gap",
 
     status:
-      period,
+      period.key,
 
     title:
-      `${greeting} — ${farmName}`,
+      voice.title,
 
     message:
-  [
-    cheerfulLine,
-    climateLine,
-    weatherLine
-  ]
-    .filter(Boolean)
-    .join("\n"),
+      [
+        voice.opener,
+        copy.climate,
+        weatherLine,
+        copy.advice,
+        voice.closer
+      ]
+        .filter(Boolean)
+        .join("\n"),
+
     details: {
       observation:
-        adviceText,
+        "",
 
       meaning:
-        "",
+        hasThi
+          ? `تصنيف THI الحالي حسب الشارت: ${band.label} (${band.range}).`
+          : "قراءة THI الحالية غير متاحة.",
 
       recommendation:
-        "",
+        copy.advice,
 
       evidence:
         hasThi
           ? [
-    `THI=${Math.round(thi)}`,
-    `status=${status?.label || ""}`,
+              `THI=${Math.round(thi)}`,
+              `THI_band=${band.range}`,
+              `THI_label=${band.label}`,
+              `period=${period.key}`,
 
-    Number.isFinite(tempC)
-      ? `temperatureC=${Math.round(tempC)}`
-      : "",
+              Number.isFinite(tempC)
+                ? `temperatureC=${Math.round(tempC)}`
+                : "",
 
-    Number.isFinite(humidity)
-      ? `humidity=${Math.round(humidity)}`
-      : ""
-  ].filter(Boolean)
+              Number.isFinite(humidity)
+                ? `humidity=${Math.round(humidity)}`
+                : ""
+            ].filter(Boolean)
           : []
     },
 
@@ -84157,8 +84379,6 @@ revisionKey:
         ""
     },
 
-    // مطلوب داخليًا من عقد Smart Alerts فقط.
-    // تحية المستخدم لا تعرض "ذكّرني لاحقًا".
     snoozeMinutes:
       60
   }];
