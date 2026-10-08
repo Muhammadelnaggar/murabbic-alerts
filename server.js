@@ -86386,16 +86386,41 @@ const herdType =
       .where("userId", "==", uid)
       .get();
 
+
 const rawAnimalsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+// Share identical reads within this request only.
+let herdStatsEventsSnapPromise = null;
+
+const loadHerdStatsEventsSnapSrv = () => {
+  if (!herdStatsEventsSnapPromise) {
+    herdStatsEventsSnapPromise = db
+      .collection("events")
+      .where("userId", "==", uid)
+      .get();
+  }
+
+  return herdStatsEventsSnapPromise;
+};
+
+let herdStatsArchivedAnimalsSnapPromise = null;
+
+const loadHerdStatsArchivedAnimalsSnapSrv = () => {
+  if (!herdStatsArchivedAnimalsSnapPromise) {
+    herdStatsArchivedAnimalsSnapPromise = db
+      .collection("archived_animals")
+      .where("userId", "==", uid)
+      .get();
+  }
+
+  return herdStatsArchivedAnimalsSnapPromise;
+};
+
 let herdStatsEventsPromise = null;
 
 const loadHerdStatsEventsSrv = () => {
   if (!herdStatsEventsPromise) {
-    herdStatsEventsPromise = db
-      .collection("events")
-      .where("userId", "==", uid)
-      .limit(5000)
-      .get()
+    herdStatsEventsPromise = loadHerdStatsEventsSnapSrv()
       .then(eventSnap =>
         eventSnap.docs.map(d => ({
           id: d.id,
@@ -86406,6 +86431,7 @@ const loadHerdStatsEventsSrv = () => {
 
   return herdStatsEventsPromise;
 };
+
 
 const normalizeAnimalNumberForStats = (v) => String(v ?? '')
   .replace(/[٠-٩]/g, d => ({'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'}[d] || d))
@@ -87226,9 +87252,9 @@ try {
     .where("eventTypeNorm", "==", "cull")
     .get(),
 
-  db.collection("archived_animals")
-    .where("userId", "==", uid)
-    .get()
+
+  loadHerdStatsArchivedAnimalsSnapSrv()
+
 ]);
 
   const archivedAnimals =
@@ -87882,11 +87908,10 @@ try {
 // 🩺 مؤشرات الصحة في الداشبورد — Server-first
 // مؤشرات الصحة الأربعة: آخر 90 يوم متحركة حتى تاريخ اليوم
 // ============================================================
+
   const healthArchivedAnimalsSnap =
-    await db
-      .collection('archived_animals')
-      .where('userId', '==', uid)
-      .get();
+    await loadHerdStatsArchivedAnimalsSnapSrv();
+
 
 const healthArchivedAnimalNumbers =
   new Set();
@@ -89277,21 +89302,19 @@ try {
     dashboardArchivedEventsSnap,
     dashboardThresholds
   ] = await Promise.all([
-    db.collection("events")
-      .where("userId", "==", uid)
-      .get(),
+
+    loadHerdStatsEventsSnapSrv(),
 
     db.collection("calves")
       .where("userId", "==", uid)
       .get(),
 
-    db.collection("archived_animals")
-      .where("userId", "==", uid)
-      .get(),
+    loadHerdStatsArchivedAnimalsSnapSrv(),
 
     db.collection("archived_events")
       .where("userId", "==", uid)
       .get(),
+
 
     loadGroupThresholdsSrv(uid)
   ]);
@@ -106003,6 +106026,7 @@ async function followerListFetchFirestoreSrv(uid) {
     ]
   ) {
     try {
+
       const snap =
         await db
           .collection("calves")
@@ -106011,8 +106035,8 @@ async function followerListFetchFirestoreSrv(uid) {
             "==",
             uid
           )
-          .limit(3000)
           .get();
+
 
       snap.docs.forEach(d => {
         if (!byId.has(d.id)) {
