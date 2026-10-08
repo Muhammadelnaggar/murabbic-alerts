@@ -106771,15 +106771,12 @@ app.get('/', (req, res) => {
 
   res.set('Cache-Control', 'no-store');
 
-  if (host.endsWith('.onrender.com')) {
-    return res.sendFile(
-      path.join(
-        __dirname,
-        'www',
-        'index.html'
-      )
-    );
-  }
+ if (host.endsWith('.onrender.com')) {
+  return res.redirect(
+    303,
+    '/login.html'
+  );
+}
   res.set('Cache-Control', 'no-store');
 
   return res.type('html').send(`<!doctype html>
