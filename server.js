@@ -38,6 +38,14 @@ const EVENT_SYNONYMS = {
 const app  = express();
 const PORT = process.env.PORT || 3000;
 app.set('trust proxy', 1);
+
+// Disabled legacy diagnostics/claim routes: contain cross-tenant access.
+// Keep before body parsing and authorization so every caller receives 404.
+app.all([
+  '/api/debug/animals/all',
+  '/api/debug/events/all',
+  '/api/fix/animals/claim'
+], (_req, res) => res.status(404).type('text').send('Not Found'));
 // ===== Local storage (fallback) =====
 const dataDir     = path.join(__dirname, 'data');
 const usersPath   = path.join(dataDir, 'users.json');
@@ -106685,53 +106693,6 @@ app.post('/api/admin/animals/transfer-owner', ensureAdmin, async (req, res) => {
 });
 
 // ============================================================
-//                 FIX: claim numbers to current user
-// ============================================================
-app.post('/api/fix/animals/claim', requireUserId, async (req, res) => {
-  try {
-    if (!db) return res.status(503).json({ ok:false, error:'firestore_disabled' });
-    const tenant = req.userId;
-    const numsParam = String(req.query.nums || '').trim();
-    const allow = new Set(String(req.query.allow||'').split(',').map(s=>s.trim()).filter(Boolean));
-    const dry = String(req.query.dry||'') === '1';
-    if (!numsParam) return res.status(400).json({ ok:false, error:'nums required' });
-
-   const adb = db;
-
-    const wanted = numsParam.split(',').map(s=>s.trim()).filter(Boolean).slice(0,50);
-    const seen = new Map();
-    const push = d => { if (d && d.exists) seen.set(d.ref.path, d); };
-
-    async function findByNumber(v){
-      const cand=[v]; const n=Number(v); if(!Number.isNaN(n)) cand.push(n);
-      for(const x of cand){
-        try{ (await adb.collection('animals').where('number','==',x).limit(50).get()).docs.forEach(push);}catch{}
-       
-      }
-      try{ const d=await adb.collection('animals').doc(String(v)).get(); push(d);}catch{}
-    }
-
-    for(const num of wanted) await findByNumber(num);
-
-    const plan=[];
-    for(const d of seen.values()){
-      const a=d.data()||{};
-      const owner=a.userId||a.farmId||a.createdBy||a.ownerId||a.uid||null;
-      const can = !owner || allow.has(String(owner).trim());
-      plan.push({ path:d.ref.path, id:d.id, number:a.number??null, owner_before:owner??null, willUpdate:!!can });
-      if (can && !dry) await d.ref.set({ userId: tenant }, { merge:true });
-
-    }
-
-    res.json({ ok:true, dryRun:dry, tenant, found:plan.length,
-      updated: dry ? 0 : plan.filter(p=>p.willUpdate).length, plan });
-  } catch (e) {
-    console.error('claim error', e);
-    res.status(500).json({ ok:false, error:e?.message||'claim_failed' });
-  }
-});
-
-// ============================================================
 //                 DEBUG: SENSORS HEALTH (always safe)
 // ============================================================
 app.get('/api/sensors/health', async (_req, res) => {
@@ -106866,55 +106827,6 @@ app.get('/trial', (req, res) => {
       'index.html'
     )
   );
-});
-// ============================================================
-//  DEBUG: Dump animals with explicit error logging
-// ============================================================
-app.get('/api/debug/animals/all', async (req, res) => {
-  if (!db) {
-    return res.status(503).json({ ok:false, error:'firestore_disabled' });
-  }
-
-  try {
-    const ref = db.collection('animals');
-    const snap = await ref.limit(5000).get();
-
-    const animals = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data()
-    }));
-
-    return res.json({
-      ok: true,
-      count: animals.length,
-      animals
-    });
-
-  } catch (e) {
-    console.error("🔥 DUMP ERROR:", e);
-    return res.status(500).json({
-      ok: false,
-      error: e.message || 'dump_failed'
-    });
-  }
-});
-// =======================================================
-// DEBUG — طباعة جميع الأحداث Events
-// =======================================================
-app.get('/api/debug/events/all', async (req, res) => {
-  try {
-    if (!db) {
-      return res.json({ ok: false, error: "Firestore not initialized" });
-    }
-
-    const snap = await db.collection('events').limit(2000).get();
-    const out  = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
-
-    res.json({ ok: true, count: out.length, events: out });
-  } catch (e) {
-    console.error("debug/events/all", e);
-    res.status(500).json({ ok: false, error: e.message });
-  }
 });
 // =======================================================
 // ADMIN: Normalize all events (eventType / eventTypeNorm / eventDate)
