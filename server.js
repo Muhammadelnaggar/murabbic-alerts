@@ -5118,7 +5118,7 @@ function weatherGreetingVoiceSrv(
   ];
 }
 
-function murabbikGreetingThiBandSrv(thi) {
+function murabbikGreetingCowThiBandSrv(thi) {
   const n = Number(thi);
 
   if (!Number.isFinite(n)) {
@@ -5130,6 +5130,11 @@ function murabbikGreetingThiBandSrv(thi) {
     };
   }
 
+  // Dairy cows:
+  // <68 no heat stress
+  // 68–71 mild
+  // 72–78 moderate
+  // >78 severe
   if (n < 68) {
     return {
       key: "comfort",
@@ -5141,106 +5146,176 @@ function murabbikGreetingThiBandSrv(thi) {
 
   if (n < 72) {
     return {
-      key: "light",
+      key: "mild",
       label: "إجهاد حراري خفيف",
       range: "68–71",
       severity: 1
     };
   }
 
-  if (n < 80) {
+  if (n <= 78) {
     return {
       key: "moderate",
       label: "إجهاد حراري متوسط",
-      range: "72–79",
+      range: "72–78",
       severity: 2
     };
   }
 
-  if (n < 90) {
+  return {
+    key: "severe",
+    label: "إجهاد حراري شديد",
+    range: ">78",
+    severity: 3
+  };
+}
+
+function murabbikGreetingBuffaloThiBandSrv(thi) {
+  const n = Number(thi);
+
+  if (!Number.isFinite(n)) {
     return {
-      key: "heavy",
-      label: "إجهاد حراري مرتفع",
-      range: "80–89",
+      key: "unknown",
+      label: "قراءة THI غير متاحة",
+      range: "",
+      severity: 0
+    };
+  }
+
+  // Dairy buffalo:
+  // <72 no heat stress
+  // 72–78 mild
+  // 79–88 moderate
+  // 89–98 severe
+  // >98 extreme
+  if (n < 72) {
+    return {
+      key: "comfort",
+      label: "لا يوجد إجهاد حراري",
+      range: "<72",
+      severity: 0
+    };
+  }
+
+  if (n < 79) {
+    return {
+      key: "mild",
+      label: "إجهاد حراري خفيف",
+      range: "72–78",
+      severity: 1
+    };
+  }
+
+  if (n < 89) {
+    return {
+      key: "moderate",
+      label: "إجهاد حراري متوسط",
+      range: "79–88",
+      severity: 2
+    };
+  }
+
+  if (n <= 98) {
+    return {
+      key: "severe",
+      label: "إجهاد حراري شديد",
+      range: "89–98",
       severity: 3
     };
   }
 
-  if (n <= 100) {
-    return {
-      key: "severe",
-      label: "إجهاد حراري شديد",
-      range: "90–100",
-      severity: 4
-    };
-  }
-
   return {
-    key: "deadly",
-    label: "إجهاد حراري مميت",
-    range: ">100",
-    severity: 5
+    key: "extreme",
+    label: "إجهاد حراري بالغ الشدة",
+    range: ">98",
+    severity: 4
   };
 }
 
-function murabbikGreetingThiCopySrv(band = {}) {
-  switch (band.key) {
-    case "comfort":
-      return {
-        climate:
-          "الجو حاليًا مريح للقطيع، ومفيش إجهاد حراري حسب قراءة THI الحالية.",
-        advice:
-          "خليك على الروتين المعتاد للمياه النظيفة والتهوية والمتابعة، والدنيا مطمّنة الحمد لله."
-      };
+function murabbikGreetingSpeciesLineSrv(
+  speciesKey = "",
+  band = {}
+) {
+  const species =
+    String(speciesKey || "")
+      .trim()
+      .toLowerCase();
 
-    case "light":
-      return {
-        climate:
-          "الجو بدأ يسخن شوية، وTHI حاليًا في نطاق إجهاد حراري خفيف.",
-        advice:
-          "خلي المياه النظيفة متاحة والتهوية كويسة، وراقب المأكول والاجترار والراحة خلال الساعات الدافئة."
-      };
+  if (species === "cow") {
+    if (band.key === "comfort") {
+      return "🐄 الأبقار: الجو لطيف ومناسب لاستهلاك العلف والإنتاج، ومفيش إجهاد حراري حاليًا.";
+    }
 
-    case "moderate":
-      return {
-        climate:
-          "THI حاليًا في نطاق إجهاد حراري متوسط، فالقطيع محتاج اهتمام أكتر خلال الساعات الدافئة.",
-        advice:
-          "زوّد الاهتمام بالمياه والظل والتهوية، وراقب اللهاث والمأكول والاجترار واللبن."
-      };
+    if (band.key === "mild") {
+      return "🐄 الأبقار: إجهاد حراري خفيف؛ حافظ على المياه والتهوية وراقب المأكول واللبن.";
+    }
 
-    case "heavy":
-      return {
-        climate:
-          "THI حاليًا في نطاق إجهاد حراري مرتفع، ووقت التبريد الفعّال مهم للقطيع.",
-        advice:
-          "فعّل التهوية القوية والتبريد المناسب، ومع الرش أو التبليل المتقطع لازم تكون التهوية جيدة، وقلّل الانتظار والحركة وقت الحر."
-      };
+    if (band.key === "moderate") {
+      return "🐄 الأبقار: إجهاد حراري متوسط؛ زوّد التهوية والتبريد وراقب اللهاث والمأكول والاجترار واللبن.";
+    }
 
-    case "severe":
-      return {
-        climate:
-          "THI حاليًا في نطاق إجهاد حراري شديد، والقطيع محتاج تدخل تبريد سريع ومتابعة قريبة.",
-        advice:
-          "فعّل التبريد المكثف فورًا، وراجع المياه والتهوية باستمرار، وقلّل الحركة والانتظار وراقب اللهاث والتنفس بعناية."
-      };
-
-    case "deadly":
-      return {
-        climate:
-          "THI حاليًا في نطاق إجهاد حراري مميت حسب الشارت، ودي حالة حرارية بالغة الخطورة.",
-        advice:
-          "ابدأ تبريدًا مكثفًا وفوريًا، قلّل الحركة لأدنى حد، وراقب الحيوانات عن قرب؛ أي ضيق تنفس شديد أو انهيار يحتاج تدخلًا بيطريًا عاجلًا."
-      };
-
-    default:
-      return {
-        climate:
-          "قراءة THI مش متاحة دلوقتي، وأنا مش هافترض وجود إجهاد حراري من غير قراءة صحيحة.",
-        advice:
-          "راقب القطيع والمياه والتهوية، وأنا هحدّث القراءة أول ما البيانات تتوفر."
-      };
+    if (band.key === "severe") {
+      return "🐄 الأبقار: إجهاد حراري شديد؛ فعّل التبريد الفعّال وقلّل الانتظار والحركة وقت الحر، وراقب التنفس والمأكول واللبن.";
+    }
   }
+
+  if (species === "buffalo") {
+    if (band.key === "comfort") {
+      return "🐃 الجاموس: الجو لطيف ومناسب لاستهلاك العلف والإنتاج، ومفيش إجهاد حراري حاليًا.";
+    }
+
+    if (band.key === "mild") {
+      return "🐃 الجاموس: إجهاد حراري خفيف؛ حافظ على الظل والمياه والتهوية وراقب المأكول والاجترار.";
+    }
+
+    if (band.key === "moderate") {
+      return "🐃 الجاموس: إجهاد حراري متوسط؛ زوّد التهوية والتبريد وقلّل التعرض للشمس، وراقب اللهاث والمأكول.";
+    }
+
+    if (band.key === "severe") {
+      return "🐃 الجاموس: إجهاد حراري شديد؛ فعّل التبريد الفعّال وقلّل التعرض للشمس والانتظار والحركة وقت الحر.";
+    }
+
+    if (band.key === "extreme") {
+      return "🐃 الجاموس: إجهاد حراري بالغ الشدة؛ التبريد الفوري والمتابعة القريبة ضروريان، مع تقليل الحركة والتعرض للشمس لأدنى حد.";
+    }
+  }
+
+  return "";
+}
+
+async function murabbikGreetingHerdSpeciesSrv(context) {
+  const animals =
+    await murabbikSmartAlertAnimalsSrv(
+      context
+    );
+
+  let cows = 0;
+  let buffalo = 0;
+
+  for (const animal of animals) {
+    if (!animalListIsActiveSrv(animal)) {
+      continue;
+    }
+
+    const species =
+      animalListTypeEnSrv(
+        animal
+      );
+
+    if (species === "cow") {
+      cows++;
+    } else if (species === "buffalo") {
+      buffalo++;
+    }
+  }
+
+  return {
+    cows,
+    buffalo,
+    hasCows: cows > 0,
+    hasBuffalo: buffalo > 0
+  };
 }
 
 // ============================================================
@@ -84231,6 +84306,15 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
         )
     );
 
+  const herd =
+    await context.load(
+      "daily-greeting:herd-species",
+      async () =>
+        await murabbikGreetingHerdSpeciesSrv(
+          context
+        )
+    );
+
   const thiRaw = weather?.thi;
   const tempRaw = weather?.tempC;
   const humidityRaw = weather?.humidity;
@@ -84259,15 +84343,64 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
   const hasThi =
     Number.isFinite(thi);
 
-  const band =
-    murabbikGreetingThiBandSrv(
-      hasThi ? thi : null
-    );
+  const cowBand =
+    hasThi && herd.hasCows
+      ? murabbikGreetingCowThiBandSrv(
+          thi
+        )
+      : null;
 
-  const copy =
-    murabbikGreetingThiCopySrv(
-      band
+  const buffaloBand =
+    hasThi && herd.hasBuffalo
+      ? murabbikGreetingBuffaloThiBandSrv(
+          thi
+        )
+      : null;
+
+  const speciesLines = [];
+  const meaningLines = [];
+
+  if (cowBand) {
+    const line =
+      murabbikGreetingSpeciesLineSrv(
+        "cow",
+        cowBand
+      );
+
+    if (line) {
+      speciesLines.push(line);
+    }
+
+    meaningLines.push(
+      `الأبقار: ${cowBand.label} (${cowBand.range})`
     );
+  }
+
+  if (buffaloBand) {
+    const line =
+      murabbikGreetingSpeciesLineSrv(
+        "buffalo",
+        buffaloBand
+      );
+
+    if (line) {
+      speciesLines.push(line);
+    }
+
+    meaningLines.push(
+      `الجاموس: ${buffaloBand.label} (${buffaloBand.range})`
+    );
+  }
+
+  if (!hasThi) {
+    speciesLines.push(
+      "قراءة THI مش متاحة دلوقتي، وأنا مش هافترض وجود إجهاد حراري من غير قراءة صحيحة."
+    );
+  } else if (!speciesLines.length) {
+    speciesLines.push(
+      "أنا طمنت على الجو، لكن نوع القطيع النشط محتاج يكون مسجل بوضوح علشان أحدد تأثير الإجهاد الحراري بدقة."
+    );
+  }
 
   const weatherLine =
     hasThi
@@ -84285,6 +84418,10 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
           .filter(Boolean)
           .join(" — ")
       : "";
+
+  const hasKnownHerdSpecies =
+    herd.hasCows ||
+    herd.hasBuffalo;
 
   return [{
     identityKey:
@@ -84309,7 +84446,7 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
       "today",
 
     certainty:
-      hasThi
+      hasThi && hasKnownHerdSpecies
         ? "confirmed"
         : "data_gap",
 
@@ -84322,9 +84459,8 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
     message:
       [
         voice.opener,
-        copy.climate,
         weatherLine,
-        copy.advice,
+        ...speciesLines,
         voice.closer
       ]
         .filter(Boolean)
@@ -84335,27 +84471,37 @@ async function murabbikDailyFarmGreetingSmartAlertSourceSrv(
         "",
 
       meaning:
-        hasThi
-          ? `تصنيف THI الحالي حسب الشارت: ${band.label} (${band.range}).`
-          : "قراءة THI الحالية غير متاحة.",
+        meaningLines.length
+          ? meaningLines.join(" — ")
+          : hasThi
+            ? "نوع القطيع النشط غير محدد بما يكفي لتقييم الإجهاد حسب النوع."
+            : "قراءة THI الحالية غير متاحة.",
 
       recommendation:
-        copy.advice,
+        speciesLines.join(" "),
 
       evidence:
         hasThi
           ? [
               `THI=${Math.round(thi)}`,
-              `THI_band=${band.range}`,
-              `THI_label=${band.label}`,
               `period=${period.key}`,
+              `activeCows=${herd.cows}`,
+              `activeBuffalo=${herd.buffalo}`,
+
+              cowBand
+                ? `cowTHI=${cowBand.label}:${cowBand.range}`
+                : "",
+
+              buffaloBand
+                ? `buffaloTHI=${buffaloBand.label}:${buffaloBand.range}`
+                : "",
 
               Number.isFinite(tempC)
                 ? `temperatureC=${Math.round(tempC)}`
                 : "",
 
               Number.isFinite(humidity)
-                ? `humidity=${Math.round(humidity)}`
+                ? `humidity=${Math.round(humidity)}%`
                 : ""
             ].filter(Boolean)
           : []
