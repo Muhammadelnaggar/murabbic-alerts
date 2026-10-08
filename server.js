@@ -106763,7 +106763,23 @@ app.get('/timeline.html', ensureAdmin, (_req, res) => {
   res.sendFile(path.join(__dirname, 'www', 'timeline.html'));
 });
 
-app.get('/', (_req, res) => {
+app.get('/', (req, res) => {
+  const host =
+    String(req.hostname || '')
+      .trim()
+      .toLowerCase();
+
+  res.set('Cache-Control', 'no-store');
+
+  if (host.endsWith('.onrender.com')) {
+    return res.sendFile(
+      path.join(
+        __dirname,
+        'www',
+        'index.html'
+      )
+    );
+  }
   res.set('Cache-Control', 'no-store');
 
   return res.type('html').send(`<!doctype html>
