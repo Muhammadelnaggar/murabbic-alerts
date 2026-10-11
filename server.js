@@ -69610,9 +69610,38 @@ async function vaccinationDashboardAlertsDataSrv({
     throw error;
   }
 
+  const vaccinationTimingStartedMs = Date.now();
+  const vaccinationTimingRequestId =
+    crypto.randomBytes(4).toString("hex");
+
+  const vaccinationTimingLogSrv = (stage, durationMs) => {
+    console.log(
+      "[vaccination-stage-timing]",
+      vaccinationTimingRequestId,
+      stage,
+      durationMs,
+      "ms"
+    );
+  };
+
+  async function vaccinationMeasureStageSrv(stage, work) {
+    const startedMs = Date.now();
+
+    try {
+      return await work();
+    } finally {
+      vaccinationTimingLogSrv(
+        stage,
+        Date.now() - startedMs
+      );
+    }
+  }
+
+  try {
 const today =
-  await farmTodayISOSrv(
-    profileUid || uid
+  await vaccinationMeasureStageSrv(
+    "farm_today",
+    () => farmTodayISOSrv(profileUid || uid)
   );
 
 const tomorrow =
@@ -69625,7 +69654,10 @@ const reportEndDate =
   vaccinationAlertReportEndDateSrv(today);
 
 const programContext =
-      await vaccinationReadProgramContextSrv(uid);
+  await vaccinationMeasureStageSrv(
+    "program_context",
+    () => vaccinationReadProgramContextSrv(uid)
+  );
 
     const activeProgramMode =
       vaccinationProgramModeNormSrv(
@@ -69660,25 +69692,28 @@ const programContext =
     }
 
         const executionProgram =
-      await vaccinationReadExecutionProgramSrv(
-        uid,
-        activeProgramMode
+      await vaccinationMeasureStageSrv(
+        "execution_program",
+        () => vaccinationReadExecutionProgramSrv(uid, activeProgramMode)
       );
 
     const [
   pendingSnap,
   needsDataSnap
-] = await Promise.all([
-  db.collection("tasks")
-    .where("userId", "==", uid)
-    .where("status", "==", "pending")
-    .get(),
+] = await vaccinationMeasureStageSrv(
+  "tasks_read",
+  () => Promise.all([
+    db.collection("tasks")
+      .where("userId", "==", uid)
+      .where("status", "==", "pending")
+      .get(),
 
-  db.collection("tasks")
-    .where("userId", "==", uid)
-    .where("status", "==", "needs_data")
-    .get()
-]);
+    db.collection("tasks")
+      .where("userId", "==", uid)
+      .where("status", "==", "needs_data")
+      .get()
+  ])
+);
 
       const groups = new Map();
 
@@ -69744,50 +69779,56 @@ const programContext =
      * بدل انتظار كل حيوان قبل بدء التالي.
      */
     const activeChecksPromise =
-      Promise.all(
-        taskDocs.map(ds => {
-          const t = ds.data() || {};
+      vaccinationMeasureStageSrv(
+        "animal_checks",
+        () => Promise.all(
+          taskDocs.map(ds => {
+            const t = ds.data() || {};
 
-          if (
-            String(
-              t.taskType || ""
-            ).trim() !== "vaccination" ||
-            String(
-              t.engine || ""
-            ).trim() !==
-              "vaccination_program_v1" ||
-            t.done === true ||
-            vaccinationProgramModeNormSrv(
-              t.programMode
-            ) !== activeProgramMode ||
-            !vaccinationAlertIsWeeklyIndividualDoseSrv(
-              t.doseType
-            )
-          ) {
-            return null;
-          }
-
-          const animalNumber =
-            calvingNormDigitsOnlySrv(
-              t.animalNumber || ""
-            );
-
-          return animalNumber
-            ? vaccinationAlertAnimalIsActive(
-                animalNumber
+            if (
+              String(
+                t.taskType || ""
+              ).trim() !== "vaccination" ||
+              String(
+                t.engine || ""
+              ).trim() !==
+                "vaccination_program_v1" ||
+              t.done === true ||
+              vaccinationProgramModeNormSrv(
+                t.programMode
+              ) !== activeProgramMode ||
+              !vaccinationAlertIsWeeklyIndividualDoseSrv(
+                t.doseType
               )
-            : null;
-        })
+            ) {
+              return null;
+            }
+
+            const animalNumber =
+              calvingNormDigitsOnlySrv(
+                t.animalNumber || ""
+              );
+
+            return animalNumber
+              ? vaccinationAlertAnimalIsActive(
+                  animalNumber
+                )
+              : null;
+          })
+        )
       );
 
     const herdCampaignPromise =
-      vaccinationCampaignDashboardAlertsSrv({
-        uid,
-        programContext,
-        executionProgram,
-        taskDocs,
-        today
-      });
+      vaccinationMeasureStageSrv(
+        "herd_campaigns",
+        () => vaccinationCampaignDashboardAlertsSrv({
+          uid,
+          programContext,
+          executionProgram,
+          taskDocs,
+          today
+        })
+      );
 
     const [
       ,
@@ -69796,6 +69837,8 @@ const programContext =
       activeChecksPromise,
       herdCampaignPromise
     ]);
+
+    const vaccinationTaskGroupingStartedMs = Date.now();
 
         for (
       const ds of taskDocs
@@ -70039,34 +70082,37 @@ const key = [
         .push(ds.id);
     }
 
+    vaccinationTimingLogSrv(
+      "task_grouping",
+      Date.now() - vaccinationTaskGroupingStartedMs
+    );
+
           const [
       initialAgeGroups,
       initialMaternalGroups
     ] = await Promise.all([
-      vaccinationInitialAgeAlertGroupsSrv({
-        uid,
+      vaccinationMeasureStageSrv(
+        "initial_age",
+        () => vaccinationInitialAgeAlertGroupsSrv({
+          uid,
+          programMode: activeProgramMode,
+          today,
+          excludedTaskKeys: existingTaskKeys
+        })
+      ),
 
-        programMode:
-          activeProgramMode,
-
-        today,
-
-        excludedTaskKeys:
-          existingTaskKeys
-      }),
-
-      vaccinationInitialMaternalAlertGroupsSrv({
-        uid,
-
-        programMode:
-          activeProgramMode,
-
-        today,
-
-        excludedTaskKeys:
-          existingTaskKeys
-      })
+      vaccinationMeasureStageSrv(
+        "initial_maternal",
+        () => vaccinationInitialMaternalAlertGroupsSrv({
+          uid,
+          programMode: activeProgramMode,
+          today,
+          excludedTaskKeys: existingTaskKeys
+        })
+      )
     ]);
+
+    const vaccinationAlertBuildStartedMs = Date.now();
 
     for (
       const group of
@@ -70468,6 +70514,11 @@ if (
       );
     });
 
+  vaccinationTimingLogSrv(
+    "alert_build",
+    Date.now() - vaccinationAlertBuildStartedMs
+  );
+
   return {
     ok: true,
     today,
@@ -70482,6 +70533,12 @@ if (
     programContext,
     summary
   };
+  } finally {
+    vaccinationTimingLogSrv(
+      "total",
+      Date.now() - vaccinationTimingStartedMs
+    );
+  }
 }
 
 app.get(
