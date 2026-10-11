@@ -64780,9 +64780,7 @@ async function vaccinationInitialAgeAlertGroupsSrv({
   uid = "",
   programMode = "",
   today = "",
-  excludedTaskKeys = new Set(),
-  executionProgram = null,
-  readEventsSnapshot = null
+  excludedTaskKeys = new Set()
 } = {}) {
   if (
     !db ||
@@ -64794,12 +64792,12 @@ async function vaccinationInitialAgeAlertGroupsSrv({
   }
 
   const program =
-    executionProgram && typeof executionProgram === "object"
-      ? executionProgram
-      : await vaccinationReadExecutionProgramSrv(uid, programMode);
-
-  const reportEndDate =
-    vaccinationAlertReportEndDateSrv(today);
+    await vaccinationReadExecutionProgramSrv(
+      uid,
+      programMode
+    );
+    const reportEndDate =
+  vaccinationAlertReportEndDateSrv(today);
 
   const ageRows =
     (
@@ -64852,13 +64850,11 @@ async function vaccinationInitialAgeAlertGroupsSrv({
       .limit(5000)
       .get(),
 
-      typeof readEventsSnapshot === "function"
-      ? readEventsSnapshot()
-      : db
-          .collection("events")
-          .where("userId", "==", uid)
-          .limit(5000)
-          .get()
+    db
+      .collection("events")
+      .where("userId", "==", uid)
+      .limit(5000)
+      .get()
   ]);
 
   const completed =
@@ -65235,9 +65231,7 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
   uid = "",
   programMode = "",
   today = "",
-  excludedTaskKeys = new Set(),
-  executionProgram = null,
-  readEventsSnapshot = null
+  excludedTaskKeys = new Set()
 } = {}) {
   if (
     !db ||
@@ -65252,9 +65246,10 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
     vaccinationAlertReportEndDateSrv(today);
 
   const program =
-    executionProgram && typeof executionProgram === "object"
-      ? executionProgram
-      : await vaccinationReadExecutionProgramSrv(uid, programMode);
+    await vaccinationReadExecutionProgramSrv(
+      uid,
+      programMode
+    );
 
   const maternalRows =
     (
@@ -65315,13 +65310,11 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
       .limit(5000)
       .get(),
 
-    typeof readEventsSnapshot === "function"
-      ? readEventsSnapshot()
-      : db
-          .collection("events")
-          .where("userId", "==", uid)
-          .limit(5000)
-          .get()
+    db
+      .collection("events")
+      .where("userId", "==", uid)
+      .limit(5000)
+      .get()
   ]);
 
   const vaccinationEventsByAnimal =
@@ -68066,8 +68059,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
   programContext = {},
   executionProgram = {},
   today = "",
-  taskDocs = null,
-  preloadedHerdCache = null
+  taskDocs = null
 } = {}) {
   const tenant = tenantKey(uid);
   const programMode =
@@ -68217,11 +68209,10 @@ async function vaccinationCampaignDashboardAlertsSrv({
   const alerts = [];
 
   // القطيع الفعلي النشط هو مصدر أعضاء الحملة.
-  // مشاركة قراءة القطيع داخل الطلب فقط؛ والاستدعاءات الأخرى كما هي.
   const herdCache =
-    Array.isArray(preloadedHerdCache)
-      ? preloadedHerdCache
-      : await loadAnimalsForGroupsSrv(tenant);
+    await loadAnimalsForGroupsSrv(
+      tenant
+    );
 
   for (
     const [
@@ -69734,21 +69725,6 @@ const programContext =
       ...needsDataSnap.docs
     ];
 
-    // القطيع نفسه يُستخدم للتحقق من نشاط المهام ولحملات التحصين.
-    // المشاركة محصورة في هذا الطلب، من دون Cache عابر للمستخدمين.
-    const herdCachePromise = loadAnimalsForGroupsSrv(uid);
-    const activeHerdNumbersPromise = herdCachePromise.then(herd =>
-      new Set(
-        herd
-          .map(animal =>
-            calvingNormDigitsOnlySrv(
-              animal.animalNumber || animal.number || ""
-            )
-          )
-          .filter(Boolean)
-      )
-    );
-
     const activeAnimalCache =
       new Map();
 
@@ -69774,11 +69750,6 @@ const programContext =
         const activePromise =
           (
             async () => {
-              // نفس مصدر القطيع المعتمد للحملات؛
-              // البحث الرسمي يبقى للحالات غير الموجودة في القراءة المشتركة.
-              const activeHerdNumbers = await activeHerdNumbersPromise;
-              if (activeHerdNumbers.has(key)) return true;
-
               const animal =
                 await fetchAnimalByNumberForCalvingGateSrv(
                   uid,
@@ -69850,16 +69821,13 @@ const programContext =
     const herdCampaignPromise =
       vaccinationMeasureStageSrv(
         "herd_campaigns",
-        () => herdCachePromise.then(preloadedHerdCache =>
-          vaccinationCampaignDashboardAlertsSrv({
-            uid,
-            programContext,
-            executionProgram,
-            taskDocs,
-            today,
-            preloadedHerdCache
-          })
-        )
+        () => vaccinationCampaignDashboardAlertsSrv({
+          uid,
+          programContext,
+          executionProgram,
+          taskDocs,
+          today
+        })
       );
 
     const [
@@ -70119,20 +70087,6 @@ const key = [
       Date.now() - vaccinationTaskGroupingStartedMs
     );
 
-    // التحصينات العمرية والأمومة تستخدم نفس Snapshot للأحداث.
-    // القراءة Lazy: لا تُنفذ إن لم تحتجها أي منهما.
-    let sharedEventsSnapshotPromise = null;
-    const readSharedEventsSnapshotSrv = () => {
-      if (!sharedEventsSnapshotPromise) {
-        sharedEventsSnapshotPromise = db
-          .collection("events")
-          .where("userId", "==", uid)
-          .limit(5000)
-          .get();
-      }
-      return sharedEventsSnapshotPromise;
-    };
-
           const [
       initialAgeGroups,
       initialMaternalGroups
@@ -70143,9 +70097,7 @@ const key = [
           uid,
           programMode: activeProgramMode,
           today,
-          excludedTaskKeys: existingTaskKeys,
-          executionProgram,
-          readEventsSnapshot: readSharedEventsSnapshotSrv
+          excludedTaskKeys: existingTaskKeys
         })
       ),
 
@@ -70155,9 +70107,7 @@ const key = [
           uid,
           programMode: activeProgramMode,
           today,
-          excludedTaskKeys: existingTaskKeys,
-          executionProgram,
-          readEventsSnapshot: readSharedEventsSnapshotSrv
+          excludedTaskKeys: existingTaskKeys
         })
       )
     ]);
