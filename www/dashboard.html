@@ -203,6 +203,55 @@ let currentType = '';
 let currentTHI = null;
 let herdStatsRequestSeq = 0;
 
+// Server response presentation cache only: no medical or financial calculation
+// and no alert state is decided by the dashboard.
+const dashboardSnapshotPrefix = 'mbk_dash_snapshot_v1:';
+const dashboardSnapshotMaxAgeMs = 24 * 60 * 60 * 1000;
+
+function dashboardSnapshotKey(type) {
+  return dashboardSnapshotPrefix + currentUserId + ':' + type;
+}
+function dashboardSnapshotSelectionKey() {
+  return dashboardSnapshotPrefix + currentUserId + ':selected';
+}
+function readDashboardSnapshot(type) {
+  if (!currentUserId || !['cows', 'buffalo'].includes(type)) return null;
+  try {
+    const raw = sessionStorage.getItem(dashboardSnapshotKey(type));
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (!saved || saved.type !== type ||
+        !Number.isFinite(saved.savedAt) ||
+        Date.now() - saved.savedAt > dashboardSnapshotMaxAgeMs ||
+        saved.savedAt > Date.now() ||
+        !saved.stats || saved.stats.ok === false) return null;
+    return saved;
+  } catch (_) { return null; }
+}
+function storeDashboardSnapshot(type, stats, milkPriceData) {
+  if (!currentUserId || !['cows', 'buffalo'].includes(type)) return;
+  try {
+    const snapshot = JSON.stringify({
+      type, savedAt: Date.now(), stats, milkPriceData
+    });
+    // Never let a large server response fill browser session storage.
+    if (snapshot.length <= 200000) {
+      sessionStorage.setItem(dashboardSnapshotKey(type), snapshot);
+    }
+    sessionStorage.setItem(dashboardSnapshotSelectionKey(), type);
+  } catch (_) { /* Cache is optional; server remains authoritative. */ }
+}
+function clearDashboardSnapshotsForCurrentUser() {
+  if (!currentUserId) return;
+  try {
+    const prefix = dashboardSnapshotPrefix + currentUserId + ':';
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith(prefix)) sessionStorage.removeItem(key);
+    }
+  } catch (_) {}
+}
+
 function prodState(deltaPct){
   const a = Math.abs(Number(deltaPct || 0));
   if (a < 3) return 'ok';
@@ -1377,7 +1426,7 @@ function setupTypeSwitch(meta = {}){
   };
 }
 // ============ تحميل مؤشرات القطيع ============
-async function loadHerdKPIs(){
+async function loadHerdKPIs({ cachedPayload = null, preserveCards = false } = {}){
 const statusBar  = document.getElementById('statusBar');
 const herdGrid   = document.getElementById('herdGrid');
 const prodGrid   = document.getElementById('prodGrid');
@@ -1401,20 +1450,30 @@ const requestSeq = ++herdStatsRequestSeq;
 const requestedType = currentType === 'buffalo' ? 'buffalo' : 'cows';
 const requestedLabel = requestedType === 'buffalo' ? 'الجاموس' : 'الأبقار';
 
-statusBar.textContent = `جارٍ تحميل بيانات ${requestedLabel}...`;
+statusBar.textContent = preserveCards
+  ? `جارٍ تحديث بيانات ${requestedLabel} من السيرفر...`
+  : `جارٍ تحميل بيانات ${requestedLabel}...`;
 
-// مهم: نمسح كروت الروابط القديمة فورًا حتى لا يضغط المستخدم على رابط أبقار بعد اختيار الجاموس
-prodGrid.innerHTML = '';
+// Preserve already-displayed server figures while the fresh request runs.
+// Clear on a species switch so links never mix cows with buffalo.
+if (!preserveCards) {
+  prodGrid.innerHTML = '';
+  prodCauseWrap.innerHTML = '';
+  milkPriceTodayGrid.innerHTML = '';
+  feedGrid.innerHTML = '';
+}
 
-prodCauseWrap.innerHTML = '';
+try {
+const pricePrefetch = !cachedPayload && ['cows', 'buffalo'].includes(currentType)
+  ? fetchJSON(
+      `/api/nutrition/milk-prices?type=${encodeURIComponent(requestedType)}`
+    ).catch(e => {
+      console.warn('nutrition milk price preload failed', e);
+      return null;
+    })
+  : null;
 
-milkPriceTodayGrid.innerHTML = '';
-
-feedGrid.innerHTML = '';
-
-try{
-
-const stats =
+const stats = cachedPayload?.stats ||
   await fetchJSON(
     `/api/herd-stats?type=${requestedType}`
   );
@@ -1440,18 +1499,16 @@ setupTypeSwitch({
     null
 });
 
-const milkPriceData =
-  await fetchJSON(
-    `/api/nutrition/milk-prices?type=${encodeURIComponent(currentType)}`
-  )
-    .catch(e => {
-      console.warn(
-        'nutrition milk price load failed',
-        e
-      );
-
-      return null;
-    });
+const milkPriceData = cachedPayload
+  ? cachedPayload.milkPriceData
+  : pricePrefetch && currentType === requestedType
+    ? await pricePrefetch
+    : await fetchJSON(
+        `/api/nutrition/milk-prices?type=${encodeURIComponent(currentType)}`
+      ).catch(e => {
+        console.warn('nutrition milk price load failed', e);
+        return null;
+      });
 
 if (
   requestSeq !==
@@ -2097,12 +2154,18 @@ healthGrid.innerHTML =
 renderMiniGauge("g_preg", pregPct);
 renderMiniGauge("g_bred", bredPct);
 
-    statusBar.textContent = 'تم التحديث من بيانات حسابك.';
+    statusBar.textContent = cachedPayload
+      ? 'آخر مؤشرات محفوظة من السيرفر — جارٍ التحقق من أحدث البيانات.'
+      : 'تم التحديث من بيانات حسابك.';
+    if (!cachedPayload) storeDashboardSnapshot(currentType, stats, milkPriceData);
+    return true;
   }
   catch(e){
     console.error('herd stats error', e);
-    document.getElementById('statusBar').textContent =
-      'فشل تحميل بيانات القطيع. تأكد من تسجيل الدخول.';
+    document.getElementById('statusBar').textContent = preserveCards
+      ? 'تعذّر تحديث المؤشرات؛ الأرقام المعروضة من آخر استجابة ناجحة للسيرفر.'
+      : 'فشل تحميل بيانات القطيع. تأكد من تسجيل الدخول.';
+    return false;
   }
 }
 const GAUGE_COLORS = {
@@ -2904,10 +2967,23 @@ document.addEventListener(
     try {
       await loadServerSession();
 
-      loadMurabbikSmartAlerts();
+      // Restore server-provided dashboard figures immediately after session
+      // verification, then refresh them without blanking the KPI cards.
+      try {
+        const savedType = sessionStorage.getItem(dashboardSnapshotSelectionKey());
+        if (savedType === 'cows' || savedType === 'buffalo') currentType = savedType;
+      } catch (_) {}
+
+      const cached = readDashboardSnapshot(currentType || 'cows');
+      const showedSnapshot = cached
+        ? await loadHerdKPIs({ cachedPayload: cached })
+        : false;
 
       loadWeatherTHI();
-      loadHerdKPIs();
+      // Dashboard is the priority. Smart Alerts GET starts only after
+      // the fresh KPI request settles; it never blocks rendering KPIs.
+      await loadHerdKPIs({ preserveCards: showedSnapshot });
+      loadMurabbikSmartAlerts();
 
       setInterval(
 
@@ -2948,6 +3024,7 @@ document.addEventListener(
       btn.disabled = true;
       btn.textContent = "جارٍ تسجيل الخروج...";
 
+      clearDashboardSnapshotsForCurrentUser();
       try {
         await fetch(API_BASE + "/api/auth/logout", {
           method: "POST",
