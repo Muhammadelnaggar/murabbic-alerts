@@ -1412,12 +1412,25 @@ milkPriceTodayGrid.innerHTML = '';
 
 feedGrid.innerHTML = '';
 
-try{
+try {
 
-const stats =
-  await fetchJSON(
+  // يبدأ طلب المؤشرات أولًا
+  const statsPromise = fetchJSON(
     `/api/herd-stats?type=${requestedType}`
   );
+
+  // يبدأ طلب أسعار اللبن بالتوازي
+  const milkPricePromise = fetchJSON(
+    `/api/nutrition/milk-prices?type=${encodeURIComponent(requestedType)}`
+  ).catch(e => {
+    console.warn(
+      'nutrition milk price load failed',
+      e
+    );
+    return null;
+  });
+
+  const stats = await statsPromise;
 
 if (
   requestSeq !==
@@ -1440,27 +1453,39 @@ setupTypeSwitch({
     null
 });
 
-const milkPriceData =
-  await fetchJSON(
-    `/api/nutrition/milk-prices?type=${encodeURIComponent(currentType)}`
-  )
-    .catch(e => {
-      console.warn(
-        'nutrition milk price load failed',
-        e
-      );
+// أسعار اللبن تُعرض عند وصولها، دون تعطيل المؤشرات.
+// نوع القطيع معتمد من استجابة السيرفر.
 
-      return null;
-    });
+const priceType = currentType;
 
-if (
-  requestSeq !==
-  herdStatsRequestSeq
-) return;
+const effectiveMilkPricePromise =
+  priceType === requestedType
+    ? milkPricePromise
+    : fetchJSON(
+        `/api/nutrition/milk-prices?type=${encodeURIComponent(priceType)}`
+      ).catch(e => {
+        console.warn(
+          'nutrition milk price load failed',
+          e
+        );
+        return null;
+      });
 
-renderDashboardMilkPrice(
-  milkPriceData?.ui ||
-  null
+void effectiveMilkPricePromise.then(
+  milkPriceData => {
+
+    // منع عرض استجابة قديمة بعد تغيير نوع القطيع.
+    if (
+      requestSeq !== herdStatsRequestSeq ||
+      currentType !== priceType
+    ) {
+      return;
+    }
+
+    renderDashboardMilkPrice(
+      milkPriceData?.ui || null
+    );
+  }
 );
     const links = stats.dashboardLinks || {};
 const t     = stats.totals || {};
@@ -2904,10 +2929,12 @@ document.addEventListener(
     try {
       await loadServerSession();
 
-      loadMurabbikSmartAlerts();
+      // المؤشرات تبدأ أولًا، بدون انتظار التنبيهات.
+      loadHerdKPIs();
 
       loadWeatherTHI();
-      loadHerdKPIs();
+
+      loadMurabbikSmartAlerts();
 
       setInterval(
 
