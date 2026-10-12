@@ -68054,12 +68054,28 @@ async function vaccinationCampaignAdvanceIfCompleteSrv({
   };
 }
 
+// Selector extracted verbatim from the existing campaign calculation.
+// Used to avoid a redundant herd read and to share one snapshot per request.
+function vaccinationCampaignHerdRowsSrv(executionProgram = {}) {
+  const herdRows = new Map();
+  for (const row of (Array.isArray(executionProgram.rows) ? executionProgram.rows : [])) {
+    if (!row || row.active === false) continue;
+    const vaccineCode = String(row.vaccineCode || '').trim();
+    const section = String(row.programSection || '').trim().toLowerCase();
+    if (section !== 'herd' || !vaccineCode ||
+        !vaccinationCampaignPeriodicStepSrv(row)) continue;
+    if (!herdRows.has(vaccineCode)) herdRows.set(vaccineCode, row);
+  }
+  return herdRows;
+}
+
 async function vaccinationCampaignDashboardAlertsSrv({
   uid = "",
   programContext = {},
   executionProgram = {},
   today = "",
-  taskDocs = null
+  taskDocs = null,
+  herdCachePromise = null
 } = {}) {
   const tenant = tenantKey(uid);
   const programMode =
@@ -68157,62 +68173,17 @@ async function vaccinationCampaignDashboardAlertsSrv({
     }
   }
 
-  const herdRows = new Map();
+  const herdRows = vaccinationCampaignHerdRowsSrv(executionProgram);
 
-  for (
-    const row of
-    Array.isArray(
-      executionProgram.rows
-    )
-      ? executionProgram.rows
-      : []
-  ) {
-    if (
-      !row ||
-      row.active === false
-    ) {
-      continue;
-    }
-
-    const vaccineCode =
-      String(
-        row.vaccineCode || ""
-      ).trim();
-
-    const section =
-      String(
-        row.programSection || ""
-      )
-        .trim()
-        .toLowerCase();
-
-    if (
-      section !== "herd" ||
-      !vaccineCode ||
-      !vaccinationCampaignPeriodicStepSrv(
-        row
-      )
-    ) {
-      continue;
-    }
-
-    if (
-      !herdRows.has(vaccineCode)
-    ) {
-      herdRows.set(
-        vaccineCode,
-        row
-      );
-    }
-  }
+  // Nothing to calculate: do not load the entire herd for a non-herd program.
+  if (herdRows.size === 0) return [];
 
   const alerts = [];
 
-  // القطيع الفعلي النشط هو مصدر أعضاء الحملة.
-  const herdCache =
-    await loadAnimalsForGroupsSrv(
-      tenant
-    );
+  // Reuse exactly the same active-herd read already shared by this request.
+  const herdCache = herdCachePromise
+    ? await herdCachePromise
+    : await loadAnimalsForGroupsSrv(tenant);
 
   for (
     const [
@@ -69728,6 +69699,30 @@ const programContext =
     const activeAnimalCache =
       new Map();
 
+    // Bulk reading is cheaper than a long series of per-number Gate queries.
+    // The official per-number Gate remains the fallback for legacy records.
+    const individualCheckNumbers = new Set(taskDocs
+      .map(ds => ds.data() || {})
+      .filter(t => String(t.taskType || '').trim() === 'vaccination' &&
+        String(t.engine || '').trim() === 'vaccination_program_v1' &&
+        t.done !== true &&
+        vaccinationProgramModeNormSrv(t.programMode) === activeProgramMode &&
+        vaccinationAlertIsWeeklyIndividualDoseSrv(t.doseType))
+      .map(t => calvingNormDigitsOnlySrv(t.animalNumber || ''))
+      .filter(Boolean));
+
+    const campaignHerdPromise =
+      vaccinationCampaignHerdRowsSrv(executionProgram).size > 0 ||
+      individualCheckNumbers.size >= 10
+        ? loadAnimalsForGroupsSrv(uid)
+        : null;
+
+    const campaignActiveNumbersPromise = campaignHerdPromise
+      ? campaignHerdPromise.then(herd => new Set(herd.map(an =>
+          calvingNormDigitsOnlySrv(an.animalNumber || an.number || '')
+        ).filter(Boolean)))
+      : null;
+
     const vaccinationAlertAnimalIsActive =
       animalNumber => {
         const key =
@@ -69750,18 +69745,17 @@ const programContext =
         const activePromise =
           (
             async () => {
-              const animal =
-                await fetchAnimalByNumberForCalvingGateSrv(
-                  uid,
-                  key
-                );
+              // Already present in the same official active-herd snapshot:
+              // no extra per-animal query is necessary. For absent numbers,
+              // keep the original Gate lookup, including ownerUid aliases.
+              if (campaignActiveNumbersPromise &&
+                  (await campaignActiveNumbersPromise).has(key)) return true;
 
-              return (
-                Boolean(animal) &&
-                shouldAppearInGroupsSrv(
-                  animal.data || {}
-                )
-              );
+              const animal =
+                await fetchAnimalByNumberForCalvingGateSrv(uid, key);
+
+              return Boolean(animal) &&
+                shouldAppearInGroupsSrv(animal.data || {});
             }
           )();
 
@@ -69826,7 +69820,8 @@ const programContext =
           programContext,
           executionProgram,
           taskDocs,
-          today
+          today,
+          herdCachePromise: campaignHerdPromise
         })
       );
 
