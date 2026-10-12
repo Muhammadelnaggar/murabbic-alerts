@@ -64780,7 +64780,9 @@ async function vaccinationInitialAgeAlertGroupsSrv({
   uid = "",
   programMode = "",
   today = "",
-  excludedTaskKeys = new Set()
+  excludedTaskKeys = new Set(),
+  executionProgram = null,
+  loadEventsSnap = null
 } = {}) {
   if (
     !db ||
@@ -64791,7 +64793,7 @@ async function vaccinationInitialAgeAlertGroupsSrv({
     return [];
   }
 
-  const program =
+  const program = executionProgram ||
     await vaccinationReadExecutionProgramSrv(
       uid,
       programMode
@@ -64850,11 +64852,13 @@ async function vaccinationInitialAgeAlertGroupsSrv({
       .limit(5000)
       .get(),
 
-    db
-      .collection("events")
-      .where("userId", "==", uid)
-      .limit(5000)
-      .get()
+    typeof loadEventsSnap === "function"
+      ? loadEventsSnap()
+      : db
+          .collection("events")
+          .where("userId", "==", uid)
+          .limit(5000)
+          .get()
   ]);
 
   const completed =
@@ -65231,7 +65235,9 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
   uid = "",
   programMode = "",
   today = "",
-  excludedTaskKeys = new Set()
+  excludedTaskKeys = new Set(),
+  executionProgram = null,
+  loadEventsSnap = null
 } = {}) {
   if (
     !db ||
@@ -65245,7 +65251,7 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
   const reportEndDate =
     vaccinationAlertReportEndDateSrv(today);
 
-  const program =
+  const program = executionProgram ||
     await vaccinationReadExecutionProgramSrv(
       uid,
       programMode
@@ -65310,11 +65316,13 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
       .limit(5000)
       .get(),
 
-    db
-      .collection("events")
-      .where("userId", "==", uid)
-      .limit(5000)
-      .get()
+    typeof loadEventsSnap === "function"
+      ? loadEventsSnap()
+      : db
+          .collection("events")
+          .where("userId", "==", uid)
+          .limit(5000)
+          .get()
   ]);
 
   const vaccinationEventsByAnimal =
@@ -68215,6 +68223,19 @@ async function vaccinationCampaignDashboardAlertsSrv({
 
   const alerts = [];
 
+  const scheduleReads = new Map(
+    await Promise.all(
+      [...herdRows.keys()].map(async vaccineCode => [
+        vaccineCode,
+        await vaccinationCampaignReadScheduleSrv({
+          uid: tenant,
+          programMode,
+          vaccineCode
+        })
+      ])
+    )
+  );
+
   // القطيع الفعلي النشط هو مصدر أعضاء الحملة.
   let herdCache = null;
 
@@ -68224,14 +68245,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
       herdRow
     ] of herdRows
   ) {
-    let schedule =
-      await vaccinationCampaignReadScheduleSrv({
-        uid:
-          tenant,
-
-        programMode,
-        vaccineCode
-      });
+    let schedule = scheduleReads.get(vaccineCode);
 
     // Recovery فقط عند غياب Schedule:
     // لو يوجد تنفيذ دوري فعلي كامل محفوظ في Events
@@ -69899,14 +69913,7 @@ const programContext =
         })
       );
 
-    const [
-      ,
-
-      herdCampaignAlerts
-    ] = await Promise.all([
-      activeChecksPromise,
-      herdCampaignPromise
-    ]);
+    await activeChecksPromise;
 
     const vaccinationTaskGroupingStartedMs = Date.now();
 
@@ -70157,9 +70164,24 @@ const key = [
       Date.now() - vaccinationTaskGroupingStartedMs
     );
 
-          const [
+    let initialEventsPromise = null;
+
+    const loadInitialEventsSnap = () => {
+      if (!initialEventsPromise) {
+        initialEventsPromise = db
+          .collection("events")
+          .where("userId", "==", uid)
+          .limit(5000)
+          .get();
+      }
+
+      return initialEventsPromise;
+    };
+
+    const [
       initialAgeGroups,
-      initialMaternalGroups
+      initialMaternalGroups,
+      herdCampaignAlerts
     ] = await Promise.all([
       vaccinationMeasureStageSrv(
         "initial_age",
@@ -70167,7 +70189,9 @@ const key = [
           uid,
           programMode: activeProgramMode,
           today,
-          excludedTaskKeys: existingTaskKeys
+          excludedTaskKeys: existingTaskKeys,
+          executionProgram,
+          loadEventsSnap: loadInitialEventsSnap
         })
       ),
 
@@ -70177,9 +70201,13 @@ const key = [
           uid,
           programMode: activeProgramMode,
           today,
-          excludedTaskKeys: existingTaskKeys
+          excludedTaskKeys: existingTaskKeys,
+          executionProgram,
+          loadEventsSnap: loadInitialEventsSnap
         })
-      )
+      ),
+
+      herdCampaignPromise
     ]);
 
     const vaccinationAlertBuildStartedMs = Date.now();
