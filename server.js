@@ -68059,7 +68059,8 @@ async function vaccinationCampaignDashboardAlertsSrv({
   programContext = {},
   executionProgram = {},
   today = "",
-  taskDocs = null
+  taskDocs = null,
+  herdCachePromise = null
 } = {}) {
   const tenant = tenantKey(uid);
   const programMode =
@@ -68206,13 +68207,16 @@ async function vaccinationCampaignDashboardAlertsSrv({
     }
   }
 
+  // لا داعي لتحميل القطيع إذا لم توجد
+  // حملات تحصين قطيع في البرنامج الحالي.
+  if (herdRows.size === 0) {
+    return [];
+  }
+
   const alerts = [];
 
   // القطيع الفعلي النشط هو مصدر أعضاء الحملة.
-  const herdCache =
-    await loadAnimalsForGroupsSrv(
-      tenant
-    );
+  let herdCache = null;
 
   for (
     const [
@@ -68352,6 +68356,11 @@ async function vaccinationCampaignDashboardAlertsSrv({
       today < alertFromDate
     ) {
       continue;
+    }
+        if (herdCache === null) {
+      herdCache = herdCachePromise
+        ? await herdCachePromise
+        : await loadAnimalsForGroupsSrv(tenant);
     }
 
     // هنا مصدر العضوية هو القطيع الفعلي كله.
@@ -69725,6 +69734,58 @@ const programContext =
       ...needsDataSnap.docs
     ];
 
+    const individualNumbers = new Set();
+
+    for (const ds of taskDocs) {
+      const t = ds.data() || {};
+
+      if (
+        String(t.taskType || "").trim() !== "vaccination" ||
+        String(t.engine || "").trim() !== "vaccination_program_v1" ||
+        t.done === true ||
+        vaccinationProgramModeNormSrv(t.programMode) !== activeProgramMode ||
+        !vaccinationAlertIsWeeklyIndividualDoseSrv(t.doseType)
+      ) {
+        continue;
+      }
+
+      const number = calvingNormDigitsOnlySrv(
+        t.animalNumber || ""
+      );
+
+      if (number) individualNumbers.add(number);
+    }
+
+    const hasHerdCampaign = (
+      Array.isArray(executionProgram.rows)
+        ? executionProgram.rows
+        : []
+    ).some(row =>
+      row &&
+      row.active !== false &&
+      String(row.programSection || "").trim().toLowerCase() === "herd" &&
+      String(row.vaccineCode || "").trim() &&
+      vaccinationCampaignPeriodicStepSrv(row)
+    );
+
+        const sharedHerdPromise =
+      individualNumbers.size >= 10
+        ? loadAnimalsForGroupsSrv(uid)
+        : null;
+
+    const sharedActiveNumbersPromise =
+      sharedHerdPromise && individualNumbers.size > 0
+        ? sharedHerdPromise.then(herd =>
+            new Set(
+              herd.map(an =>
+                calvingNormDigitsOnlySrv(
+                  an.animalNumber || an.number || ""
+                )
+              ).filter(Boolean)
+            )
+          )
+        : null;
+
     const activeAnimalCache =
       new Map();
 
@@ -69750,6 +69811,13 @@ const programContext =
         const activePromise =
           (
             async () => {
+              if (
+                sharedActiveNumbersPromise &&
+                (await sharedActiveNumbersPromise).has(key)
+              ) {
+                return true;
+              }
+
               const animal =
                 await fetchAnimalByNumberForCalvingGateSrv(
                   uid,
@@ -69826,12 +69894,14 @@ const programContext =
           programContext,
           executionProgram,
           taskDocs,
-          today
+          today,
+          herdCachePromise: sharedHerdPromise
         })
       );
 
     const [
       ,
+
       herdCampaignAlerts
     ] = await Promise.all([
       activeChecksPromise,
@@ -86469,6 +86539,18 @@ const loadHerdStatsEventsSnapSrv = () => {
 };
 
 let herdStatsArchivedAnimalsSnapPromise = null;
+let herdStatsArchivedEventsSnapPromise = null;
+
+const loadHerdStatsArchivedEventsSnapSrv = () => {
+  if (!herdStatsArchivedEventsSnapPromise) {
+    herdStatsArchivedEventsSnapPromise = db
+      .collection("archived_events")
+      .where("userId", "==", uid)
+      .get();
+  }
+
+  return herdStatsArchivedEventsSnapPromise;
+};
 
 const loadHerdStatsArchivedAnimalsSnapSrv = () => {
   if (!herdStatsArchivedAnimalsSnapPromise) {
@@ -87307,15 +87389,17 @@ try {
 ] = await Promise.all([
   loadHerdStatsEventsSrv(),
 
-  db.collection("events")
-    .where("userId", "==", uid)
-    .where("eventTypeNorm", "==", "cull")
-    .get(),
+  loadHerdStatsEventsSnapSrv().then(snap => ({
+    docs: snap.docs.filter(ds =>
+      (ds.data() || {}).eventTypeNorm === "cull"
+    )
+  })),
 
-  db.collection("archived_events")
-    .where("userId", "==", uid)
-    .where("eventTypeNorm", "==", "cull")
-    .get(),
+  loadHerdStatsArchivedEventsSnapSrv().then(snap => ({
+    docs: snap.docs.filter(ds =>
+      (ds.data() || {}).eventTypeNorm === "cull"
+    )
+  })),
 
 
   loadHerdStatsArchivedAnimalsSnapSrv()
@@ -88090,58 +88174,46 @@ const healthPregnancyAnimalNumbers =
   'health'
 ];
 
-  const healthLoadRows =
-    async collectionName => {
-      const snaps =
-        await Promise.all(
-          healthEventTypes.map(
-            eventTypeNorm =>
-              db
-                .collection(collectionName)
-                .where('userId', '==', uid)
-                .where(
-                  'eventTypeNorm',
-                  '==',
-                  eventTypeNorm
-                )
-                .get()
-          )
-        );
+  const healthRowsFromSnapshotSrv = (snap, collectionName) => {
+    const byType = new Map(
+      healthEventTypes.map(type => [type, []])
+    );
 
-      const rows = [];
+    for (const doc of snap.docs) {
+      const data = doc.data() || {};
+      const group = byType.get(data.eventTypeNorm);
 
-      for (
-        let i = 0;
-        i < snaps.length;
-        i++
-      ) {
-        for (
-          const doc
-          of snaps[i].docs
-        ) {
-          rows.push({
-            id: doc.id,
-            _healthSource:
-              collectionName,
-            ...(doc.data() || {})
-          });
-        }
-      }
+      if (!group) continue;
 
-      return rows;
-    };
+      group.push({
+        id: doc.id,
+        _healthSource: collectionName,
+        ...data
+      });
+    }
+
+    return healthEventTypes.flatMap(
+      type => byType.get(type)
+    );
+  };
 
   const [
-    healthCurrentEvents,
-    healthArchivedEvents
+    healthCurrentSnap,
+    healthArchivedSnap
   ] = await Promise.all([
-    healthLoadRows('events'),
-    healthLoadRows('archived_events')
+    loadHerdStatsEventsSnapSrv(),
+    loadHerdStatsArchivedEventsSnapSrv()
   ]);
 
   const healthEvents = [
-    ...healthCurrentEvents,
-    ...healthArchivedEvents
+    ...healthRowsFromSnapshotSrv(
+      healthCurrentSnap,
+      'events'
+    ),
+    ...healthRowsFromSnapshotSrv(
+      healthArchivedSnap,
+      'archived_events'
+    )
   ];
 
   const healthEventDate =
@@ -89376,9 +89448,7 @@ try {
 
     loadHerdStatsArchivedAnimalsSnapSrv(),
 
-    db.collection("archived_events")
-      .where("userId", "==", uid)
-      .get(),
+        loadHerdStatsArchivedEventsSnapSrv(),
 
 
     loadGroupThresholdsSrv(uid)
@@ -89748,35 +89818,29 @@ try {
           event
         )
     );
-  const currentMilkPrices =
-    await nutritionLoadCurrentMilkPricesSrv(
-      uid
-    );
+  const [
+    currentMilkPrices,
+    currentWeather
+  ] = await Promise.all([
+    nutritionLoadCurrentMilkPricesSrv(uid),
+
+    weatherBuildFarmThiSrv(
+      req.authSession?.uid || uid
+    ).catch(e => {
+      console.warn(
+        "dashboard nutrition THI failed:",
+        e.message || e
+      );
+
+      return null;
+    })
+  ]);
 
   const currentMilkPrice =
     nutritionCurrentMilkPriceForSpeciesSrv(
       currentMilkPrices,
       selectedDashboardSpecies
     );
-  let currentWeather =
-    null;
-
-  try {
-    currentWeather =
-      await weatherBuildFarmThiSrv(
-        req.authSession?.uid ||
-        uid
-      );
-  } catch (e) {
-    console.warn(
-      "dashboard nutrition THI failed:",
-      e.message ||
-      e
-    );
-
-    currentWeather =
-      null;
-  }
 
   const groupPrefix =
     selectedDashboardType ===
