@@ -1,0 +1,40 @@
+--- dashboard_stage1.html
++++ dashboard_stage3_candidate.html
+@@ -2715,6 +2715,7 @@
+ 
+ // Smart Alerts browser coordination — no server decisions are made here.
+ let mbkSmartAlertsGetPending = false;
++let mbkSmartAlertsRefreshQueued = false;
+ let mbkSmartAlertsDecisionPending = false;
+ let mbkSmartAlertsResponseEpoch = 0;
+ 
+@@ -2868,6 +2869,13 @@
+     dashboardAlertSources.murabbik = [];
+   } finally {
+     mbkSmartAlertsGetPending = false;
++    // If a visible tab resumed during an old request, read fresh data once.
++    // Queue on the microtask boundary so that requests never overlap.
++    if (mbkSmartAlertsRefreshQueued && !mbkSmartAlertsDecisionPending &&
++        !document.hidden) {
++      mbkSmartAlertsRefreshQueued = false;
++      Promise.resolve().then(loadMurabbikSmartAlerts);
++    }
+   }
+ 
+   refreshDashboardSmartAlert();
+@@ -2891,7 +2899,14 @@
+       );
+       // Hidden tabs make no expensive request; resume refreshes once.
+       document.addEventListener('visibilitychange', () => {
+-        if (!document.hidden) loadMurabbikSmartAlerts();
++        if (document.hidden) return;
++        if (mbkSmartAlertsGetPending) {
++          // A request made before resuming could be stale after other devices changed data.
++          mbkSmartAlertsResponseEpoch += 1;
++          mbkSmartAlertsRefreshQueued = true;
++          return;
++        }
++        if (!mbkSmartAlertsDecisionPending) loadMurabbikSmartAlerts();
+       });
+ 
+     } catch (e) {

@@ -1,0 +1,102 @@
+--- main/server.js
++++ review/server_stage2.js
+@@ -85120,16 +85120,29 @@
+       }
+ 
+       /*
+-       * تحقق حي من المصدر الفعلي.
+-       * الأرشيف ليس جزءًا من القرار.
++       * طلب فتح صفحة التسجيل لا يحتاج حساب القائمة كلها.
++       * نتحقق حيًا من المصدر نفسه (id + revision) قبل الحفظ
++       * ونستخدم navigateUrl المعتمد من السيرفر فقط.
++       * حسنًا/التأجيل يحتفظان بجمع واحد وتجهيز التنبيه التالي.
+        */
+-      const alert =
+-        await murabbikSmartAlertLiveResponseAlertSrv(
+-          req,
+-          alertId,
+-          revision,
+-          sourceHint
+-        );
++      const freshResult = actionRequested
++        ? null
++        : await murabbikSmartAlertCollectSrv(req);
++
++      const hintedSourceIsKnown =
++        !!sourceHint &&
++        murabbikSmartAlertSourcesSrv.has(sourceHint);
++
++      const alert = actionRequested
++        ? await murabbikSmartAlertLiveResponseAlertSrv(
++            req, alertId, revision, sourceHint
++          )
++        : freshResult.alerts.find(
++            item =>
++              item.id === alertId &&
++              item.revision === revision &&
++              (!hintedSourceIsKnown || item.source === sourceHint)
++          ) || null;
+ 
+       if (!alert) {
+         return res
+@@ -85286,29 +85299,38 @@
+       }
+ 
+       /*
+-       * حفظ اختيار المستخدم
+-       * وتجهيز المصادر الحية الجديدة
+-       * يعملان بالتوازي.
+-       *
+-       * مصادر Smart Alerts لا تعتمد
+-       * على smart_alert_states.
++       * لا نعيد جمع المصادر: freshResult حُسبت حيًا قبل التحقق.
++       * يجب اكتمال حفظ قرار المستخدم قبل قراءة حالات التنبيهات؛
++       * حتى يعرض الرد التنبيه التالي الصحيح بعد الحفظ.
+        */
+-      const [
+-        ,
+-        freshResult
+-      ] =
+-        await Promise.all([
+-          stateRef.set(
+-            statePayload,
+-            {
+-              merge: true
+-            }
+-          ),
+-
+-          murabbikSmartAlertCollectSrv(
+-            req
+-          )
+-        ]);
++      await stateRef.set(
++        statePayload,
++        { merge: true }
++      );
++
++      // عند التنقل لا نحتاج استجابة التنبيه التالي؛ الصفحة ستُفتح.
++      // أرشفة التنبيه المحقق تتم بعد إرسال الرد، كما في المسار الأصلي.
++      if (actionRequested) {
++        res.json({
++          ok: true,
++          decision,
++          alertId: alert.id,
++          revision: alert.revision,
++          navigateUrl,
++          ...(Number.isFinite(snoozedUntilMs) ? {
++            snoozedUntil: new Date(snoozedUntilMs).toISOString()
++          } : {}),
++          message: decision === "acknowledged"
++            ? "✅ تم الاطلاع على التنبيه."
++            : "✅ سيذكّرك مُرَبِّيك بهذا التنبيه لاحقًا."
++        });
++        try {
++          await murabbikSmartAlertArchiveSyncSrv(req, [alert], nowMs);
++        } catch (e) {
++          console.warn("smart-alert archive sync failed:", e.message || e);
++        }
++        return;
++      }
+ 
+ const stateResult =
+   await murabbikSmartAlertApplyUserStateSrv(

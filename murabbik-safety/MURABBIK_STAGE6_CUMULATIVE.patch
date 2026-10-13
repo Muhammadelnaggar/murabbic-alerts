@@ -1,0 +1,337 @@
+--- stage6/server_original.js	2026-10-13 18:02:26.000000000 +0000
++++ stage6/server_stage6_candidate.js	2026-10-13 18:02:26.000000000 +0000
+@@ -22408,6 +22408,10 @@
+     { merge: true }
+   );
+ }
++      // Stage 6: correction invalidates prior results in the SAME batch.
++      require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++        batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++      });
+       await batch.commit();
+ 
+       if (
+@@ -33753,6 +33757,11 @@
+   batch.set(optionsRef, optionsPatch, { merge: true });
+ }
+ 
++// Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
+ await batch.commit();
+     if (typeof scheduleGroupsRebuildSrv === "function") {
+       scheduleGroupsRebuildSrv(uid, "insemination_save");
+@@ -35187,6 +35196,11 @@
+   );
+ }
+ 
++// Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
+ await batch.commit();
+ 
+     if (typeof scheduleGroupsRebuildSrv === "function") {
+@@ -36106,6 +36120,11 @@
+   );
+ }
+ 
++// Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
+ await batch.commit();
+ 
+       return res.json({
+@@ -37665,7 +37684,12 @@
+     const batch = db.batch();
+     batch.set(eventRef, payload);
+     batch.set(db.collection(targetCollection).doc(animal.id), animalPatch, { merge:true });
+-    await batch.commit();
++    // Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+ 
+     return res.json({
+       ok:true,
+@@ -40387,6 +40411,11 @@
+   );
+ }
+ 
++// Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
+ await batch.commit();
+ 
+ return res.json({
+@@ -40880,7 +40909,12 @@
+     const batch = db.batch();
+     batch.set(eventRef, eventPayload);
+     batch.set(db.collection(targetCollection).doc(animal.id), animalPatch, { merge: true });
+-    await batch.commit();
++    // Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+ 
+     return res.json({
+       ok: true,
+@@ -43049,7 +43083,12 @@
+     }
+ 
+     if (ops > 0) {
+-      await batch.commit();
++      // Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+     }
+   if (savedCount && typeof scheduleGroupsRebuildSrv === "function") {
+       scheduleGroupsRebuildSrv(uid, "ovsynch_save");
+@@ -55931,7 +55970,11 @@
+   }
+ 
+     try {
+-    await writeBatch.commit();
++    // Stage 6: invalidation is committed atomically with each source event.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch: writeBatch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await writeBatch.commit();
+   } catch (e) {
+     const alreadyExists =
+       Number(e?.code) === 6 ||
+@@ -59886,7 +59929,11 @@
+         }, { merge: true });
+       }
+ 
+-      await batch.commit();
++      // Stage 6: invalidation is committed atomically with each source event.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch: batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+       if (componentInput.provided) {
+   savedComponentKinds.add(kind);
+ }
+@@ -71745,7 +71792,12 @@
+         batch.set(row.ref, patch, { merge:true });
+       }
+ 
+-      await batch.commit();
++      // Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+ 
+      saved.push({
+        animalNumber,
+@@ -73644,7 +73696,11 @@
+                 tx
+               );
+ 
+-              return {
++              // Stage 6: invalidate prepared output atomically with this event transaction.
++require('./server/smart-alert-mutation-barrier').appendToTransactionIfEnabled({
++  tx, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++return {
+                 created: true
+               };
+             }
+@@ -74265,6 +74321,10 @@
+   );
+ }
+ 
++// Stage 6: invalidate prepared output atomically with this event transaction.
++require('./server/smart-alert-mutation-barrier').appendToTransactionIfEnabled({
++  tx, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
+ return {
+   created: true,
+   reason:
+@@ -76454,6 +76514,10 @@
+               );
+             }
+ 
++            // Stage 6: atomic generation bump only for successful calving.
++            require('./server/smart-alert-mutation-barrier').appendToTransactionIfEnabled({
++              tx, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++            });
+             return {
+               created:
+                 true,
+@@ -84814,6 +84878,44 @@
+   };
+ }
+ 
++// BEGIN PREPARED SMART ALERT READ CANDIDATE — disabled by default.
++async function murabbikSmartAlertReadPreparedCandidateSrv(req) {
++  // HARD STOP: incomplete write paths/deadlines and historical migration.
++  // This cannot be enabled by environment variables or Firestore data alone.
++  const ALL_SMART_ALERT_SOURCES_MIGRATED_AND_CERTIFIED = false;
++  if (!ALL_SMART_ALERT_SOURCES_MIGRATED_AND_CERTIFIED) return null;
++  if (process.env.MURABBIK_PREPARED_READ_ENABLE !== '1') return null;
++  try {
++    const model = require('./server/smart-alert-prepared-read');
++    // Registry drift must fail closed even if persisted certification is stale.
++    const liveSources = [...murabbikSmartAlertSourcesSrv.keys()].sort();
++    const certifiedSources = [...model.EXPECTED_SOURCES].sort();
++    if (liveSources.length !== certifiedSources.length ||
++        liveSources.some((name, i) => name !== certifiedSources[i])) return null;
++    const tenant = tenantKey(req.userId);
++    const actorUid = murabbikSmartAlertActorUidSrv(req);
++    if (!tenant || !actorUid) return null;
++    const farmDay = await farmTodayISOSrv(req.authSession?.uid || req.userId);
++    const nowMs = Date.now();
++    const ready = await model.readIfFresh({
++      db,
++      controlRef: db.collection('smart_alert_prepared_meta').doc(tenant),
++      preparedRef: db.collection('smart_alert_prepared_results').doc(tenant)
++        .collection('by_actor').doc(actorUid),
++      actorUid, farmDay, nowMs
++    });
++    // If the due boundary arrived during the read, never return stale data.
++    if (!ready || !Number.isSafeInteger(ready.validUntilMs) ||
++        Date.now() >= ready.validUntilMs) return null;
++    return {context: {today: farmDay, nowMs: Date.now()}, alerts: ready.alerts, sourceErrors: []};
++  } catch (error) {
++    // Never treat prepared-read errors as evidence of an empty alert list.
++    console.warn('smart-alert-prepared-fallback', Number.isInteger(error?.code) ? error.code : 'error');
++    return null;
++  }
++}
++// END PREPARED SMART ALERT READ CANDIDATE.
++
+ app.get("/api/smart-alerts", requireUserId, async (req, res) => {
+   try {
+     if (!db) {
+@@ -84825,10 +84927,11 @@
+       });
+     }
+ 
++// Prepared reads are opt-in AND require four durable, independently
++// established certifications. Without them, retain the original live collector.
+ const result =
+-  await murabbikSmartAlertCollectSrv(
+-    req
+-  );
++  await murabbikSmartAlertReadPreparedCandidateSrv(req) ||
++  await murabbikSmartAlertCollectSrv(req);
+ 
+ const stateResult =
+   await murabbikSmartAlertApplyUserStateSrv(
+@@ -85120,16 +85223,29 @@
+       }
+ 
+       /*
+-       * تحقق حي من المصدر الفعلي.
+-       * الأرشيف ليس جزءًا من القرار.
++       * طلب فتح صفحة التسجيل لا يحتاج حساب القائمة كلها.
++       * نتحقق حيًا من المصدر نفسه (id + revision) قبل الحفظ
++       * ونستخدم navigateUrl المعتمد من السيرفر فقط.
++       * حسنًا/التأجيل يحتفظان بجمع واحد وتجهيز التنبيه التالي.
+        */
+-      const alert =
+-        await murabbikSmartAlertLiveResponseAlertSrv(
+-          req,
+-          alertId,
+-          revision,
+-          sourceHint
+-        );
++      const freshResult = actionRequested
++        ? null
++        : await murabbikSmartAlertCollectSrv(req);
++
++      const hintedSourceIsKnown =
++        !!sourceHint &&
++        murabbikSmartAlertSourcesSrv.has(sourceHint);
++
++      const alert = actionRequested
++        ? await murabbikSmartAlertLiveResponseAlertSrv(
++            req, alertId, revision, sourceHint
++          )
++        : freshResult.alerts.find(
++            item =>
++              item.id === alertId &&
++              item.revision === revision &&
++              (!hintedSourceIsKnown || item.source === sourceHint)
++          ) || null;
+ 
+       if (!alert) {
+         return res
+@@ -85286,29 +85402,38 @@
+       }
+ 
+       /*
+-       * حفظ اختيار المستخدم
+-       * وتجهيز المصادر الحية الجديدة
+-       * يعملان بالتوازي.
+-       *
+-       * مصادر Smart Alerts لا تعتمد
+-       * على smart_alert_states.
++       * لا نعيد جمع المصادر: freshResult حُسبت حيًا قبل التحقق.
++       * يجب اكتمال حفظ قرار المستخدم قبل قراءة حالات التنبيهات؛
++       * حتى يعرض الرد التنبيه التالي الصحيح بعد الحفظ.
+        */
+-      const [
+-        ,
+-        freshResult
+-      ] =
+-        await Promise.all([
+-          stateRef.set(
+-            statePayload,
+-            {
+-              merge: true
+-            }
+-          ),
++      await stateRef.set(
++        statePayload,
++        { merge: true }
++      );
+ 
+-          murabbikSmartAlertCollectSrv(
+-            req
+-          )
+-        ]);
++      // عند التنقل لا نحتاج استجابة التنبيه التالي؛ الصفحة ستُفتح.
++      // أرشفة التنبيه المحقق تتم بعد إرسال الرد، كما في المسار الأصلي.
++      if (actionRequested) {
++        res.json({
++          ok: true,
++          decision,
++          alertId: alert.id,
++          revision: alert.revision,
++          navigateUrl,
++          ...(Number.isFinite(snoozedUntilMs) ? {
++            snoozedUntil: new Date(snoozedUntilMs).toISOString()
++          } : {}),
++          message: decision === "acknowledged"
++            ? "✅ تم الاطلاع على التنبيه."
++            : "✅ سيذكّرك مُرَبِّيك بهذا التنبيه لاحقًا."
++        });
++        try {
++          await murabbikSmartAlertArchiveSyncSrv(req, [alert], nowMs);
++        } catch (e) {
++          console.warn("smart-alert archive sync failed:", e.message || e);
++        }
++        return;
++      }
+ 
+ const stateResult =
+   await murabbikSmartAlertApplyUserStateSrv(

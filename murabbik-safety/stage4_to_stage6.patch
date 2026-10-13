@@ -1,0 +1,189 @@
+--- server_stage4_get_candidate.js
++++ server_stage6_candidate.js
+@@ -22408,6 +22408,10 @@
+     { merge: true }
+   );
+ }
++      // Stage 6: correction invalidates prior results in the SAME batch.
++      require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++        batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++      });
+       await batch.commit();
+ 
+       if (
+@@ -33753,6 +33757,11 @@
+   batch.set(optionsRef, optionsPatch, { merge: true });
+ }
+ 
++// Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
+ await batch.commit();
+     if (typeof scheduleGroupsRebuildSrv === "function") {
+       scheduleGroupsRebuildSrv(uid, "insemination_save");
+@@ -35187,6 +35196,11 @@
+   );
+ }
+ 
++// Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
+ await batch.commit();
+ 
+     if (typeof scheduleGroupsRebuildSrv === "function") {
+@@ -36106,6 +36120,11 @@
+   );
+ }
+ 
++// Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
+ await batch.commit();
+ 
+       return res.json({
+@@ -37665,7 +37684,12 @@
+     const batch = db.batch();
+     batch.set(eventRef, payload);
+     batch.set(db.collection(targetCollection).doc(animal.id), animalPatch, { merge:true });
+-    await batch.commit();
++    // Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+ 
+     return res.json({
+       ok:true,
+@@ -40387,6 +40411,11 @@
+   );
+ }
+ 
++// Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
+ await batch.commit();
+ 
+ return res.json({
+@@ -40880,7 +40909,12 @@
+     const batch = db.batch();
+     batch.set(eventRef, eventPayload);
+     batch.set(db.collection(targetCollection).doc(animal.id), animalPatch, { merge: true });
+-    await batch.commit();
++    // Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+ 
+     return res.json({
+       ok: true,
+@@ -43049,7 +43083,12 @@
+     }
+ 
+     if (ops > 0) {
+-      await batch.commit();
++      // Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+     }
+   if (savedCount && typeof scheduleGroupsRebuildSrv === "function") {
+       scheduleGroupsRebuildSrv(uid, "ovsynch_save");
+@@ -55931,7 +55970,11 @@
+   }
+ 
+     try {
+-    await writeBatch.commit();
++    // Stage 6: invalidation is committed atomically with each source event.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch: writeBatch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await writeBatch.commit();
+   } catch (e) {
+     const alreadyExists =
+       Number(e?.code) === 6 ||
+@@ -59886,7 +59929,11 @@
+         }, { merge: true });
+       }
+ 
+-      await batch.commit();
++      // Stage 6: invalidation is committed atomically with each source event.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch: batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+       if (componentInput.provided) {
+   savedComponentKinds.add(kind);
+ }
+@@ -71745,7 +71792,12 @@
+         batch.set(row.ref, patch, { merge:true });
+       }
+ 
+-      await batch.commit();
++      // Stage 6: write generation alongside the event and animal updates.
++// The feature flag is OFF by default; it never certifies the prepared read.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+ 
+      saved.push({
+        animalNumber,
+@@ -73644,7 +73696,11 @@
+                 tx
+               );
+ 
+-              return {
++              // Stage 6: invalidate prepared output atomically with this event transaction.
++require('./server/smart-alert-mutation-barrier').appendToTransactionIfEnabled({
++  tx, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++return {
+                 created: true
+               };
+             }
+@@ -74265,6 +74321,10 @@
+   );
+ }
+ 
++// Stage 6: invalidate prepared output atomically with this event transaction.
++require('./server/smart-alert-mutation-barrier').appendToTransactionIfEnabled({
++  tx, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
+ return {
+   created: true,
+   reason:
+@@ -76454,6 +76514,10 @@
+               );
+             }
+ 
++            // Stage 6: atomic generation bump only for successful calving.
++            require('./server/smart-alert-mutation-barrier').appendToTransactionIfEnabled({
++              tx, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++            });
+             return {
+               created:
+                 true,
+@@ -84816,6 +84880,10 @@
+ 
+ // BEGIN PREPARED SMART ALERT READ CANDIDATE — disabled by default.
+ async function murabbikSmartAlertReadPreparedCandidateSrv(req) {
++  // HARD STOP: incomplete write paths/deadlines and historical migration.
++  // This cannot be enabled by environment variables or Firestore data alone.
++  const ALL_SMART_ALERT_SOURCES_MIGRATED_AND_CERTIFIED = false;
++  if (!ALL_SMART_ALERT_SOURCES_MIGRATED_AND_CERTIFIED) return null;
+   if (process.env.MURABBIK_PREPARED_READ_ENABLE !== '1') return null;
+   try {
+     const model = require('./server/smart-alert-prepared-read');
