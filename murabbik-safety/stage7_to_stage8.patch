@@ -1,0 +1,87 @@
+--- server_stage7_candidate.js
++++ server_stage8_candidate.js
+@@ -10740,7 +10740,11 @@
+       merge: true
+     });
+ 
+-    await batch.commit();
++    // Stage 8: source writes and prepared-generation change share ONE Firestore batch.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+ 
+     return {
+       alreadyCompleted: false,
+@@ -11637,14 +11641,22 @@
+       });
+ 
+       if (ops >= 400) {
+-        await batch.commit();
++        // Stage 8: source writes and prepared-generation change share ONE Firestore batch.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+         batch = db.batch();
+         ops = 0;
+       }
+     }
+ 
+     if (ops > 0) {
+-      await batch.commit();
++      // Stage 8: source writes and prepared-generation change share ONE Firestore batch.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+     }
+     if (saved.length) {
+   await subscriptionLifecycleMarkOnceSrv({
+@@ -14859,14 +14871,22 @@
+ }
+ 
+       if (ops >= 350) {
+-        await batch.commit();
++        // Stage 8: source writes and prepared-generation change share ONE Firestore batch.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+         batch = db.batch();
+         ops = 0;
+       }
+     }
+ 
+         if (ops > 0) {
+-      await batch.commit();
++      // Stage 8: source writes and prepared-generation change share ONE Firestore batch.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
++await batch.commit();
+     }
+ 
+    if (insertedAnimalsCount > 0) {
+@@ -33924,6 +33944,10 @@
+ 
+     async function commitIfNeeded(force = false) {
+       if (ops > 0 && (force || ops >= 400)) {
++// Stage 8: source writes and prepared-generation change share ONE Firestore batch.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
+         await batch.commit();
+         batch = db.batch();
+         ops = 0;
+@@ -41084,6 +41108,10 @@
+ 
+     async function commitIfNeeded(force = false) {
+       if (ops > 0 && (force || ops >= 400)) {
++// Stage 8: source writes and prepared-generation change share ONE Firestore batch.
++require('./server/smart-alert-mutation-barrier').appendToBatchIfEnabled({
++  batch, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++});
+         await batch.commit();
+         batch = db.batch();
+         ops = 0;
