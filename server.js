@@ -64842,6 +64842,7 @@ async function vaccinationInitialAgeAlertGroupsSrv({
     return [];
   }
 
+  const diagnosticReadStartedMs = Date.now();
   const [
     calvesSnap,
     eventsSnap
@@ -64860,6 +64861,9 @@ async function vaccinationInitialAgeAlertGroupsSrv({
           .limit(5000)
           .get()
   ]);
+  console.log("[vaccination-read-diagnostic]", "initial_age_snapshots",
+    "elapsed_ms", Date.now() - diagnosticReadStartedMs,
+    "calves", calvesSnap.size, "events", eventsSnap.size);
 
   const completed =
     new Set();
@@ -65306,6 +65310,7 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
     return [];
   }
 
+  const diagnosticReadStartedMs = Date.now();
   const [
     animalsSnap,
     eventsSnap
@@ -65324,6 +65329,9 @@ async function vaccinationInitialMaternalAlertGroupsSrv({
           .limit(5000)
           .get()
   ]);
+  console.log("[vaccination-read-diagnostic]", "initial_maternal_snapshots",
+    "elapsed_ms", Date.now() - diagnosticReadStartedMs,
+    "animals", animalsSnap.size, "events", eventsSnap.size);
 
   const vaccinationEventsByAnimal =
     new Map();
@@ -68068,7 +68076,8 @@ async function vaccinationCampaignDashboardAlertsSrv({
   executionProgram = {},
   today = "",
   taskDocs = null,
-  herdCachePromise = null
+  herdCachePromise = null,
+  diagnosticId = ""
 } = {}) {
   const tenant = tenantKey(uid);
   const programMode =
@@ -68223,6 +68232,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
 
   const alerts = [];
 
+  const scheduleReadStartedMs = Date.now();
   const scheduleReads = new Map(
     await Promise.all(
       [...herdRows.keys()].map(async vaccineCode => [
@@ -68235,6 +68245,9 @@ async function vaccinationCampaignDashboardAlertsSrv({
       ])
     )
   );
+  console.log("[vaccination-read-diagnostic]", diagnosticId, "herd_schedules",
+    "elapsed_ms", Date.now() - scheduleReadStartedMs,
+    "vaccines", herdRows.size);
 
   // القطيع الفعلي النشط هو مصدر أعضاء الحملة.
   let herdCache = null;
@@ -68252,6 +68265,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
     // نعيد بناء مرجع دورة الحملة منه مرة واحدة.
     // لا ننشئ حملة من Task فردية.
     if (!schedule) {
+      const recoveryStartedMs = Date.now();
       await vaccinationCampaignReconcileScheduleFromEventsSrv({
         uid:
           tenant,
@@ -68269,6 +68283,9 @@ async function vaccinationCampaignDashboardAlertsSrv({
           programMode,
           vaccineCode
         });
+      console.log("[vaccination-read-diagnostic]", diagnosticId, "schedule_recovery",
+        "elapsed_ms", Date.now() - recoveryStartedMs,
+        "vaccine", vaccineCode, "found", Boolean(schedule));
     }
 
     if (!schedule) {
@@ -68300,6 +68317,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
       herdAllowedForms.length > 1 &&
       !campaignVaccineForm
     ) {
+      const formRecoveryStartedMs = Date.now();
       await vaccinationCampaignReconcileScheduleFromEventsSrv({
         uid:
           tenant,
@@ -68325,6 +68343,9 @@ async function vaccinationCampaignDashboardAlertsSrv({
           schedule?.task?.vaccineForm ||
           ""
         );
+      console.log("[vaccination-read-diagnostic]", diagnosticId, "form_recovery",
+        "elapsed_ms", Date.now() - formRecoveryStartedMs,
+        "vaccine", vaccineCode, "found", Boolean(campaignVaccineForm));
 
       if (!campaignVaccineForm) {
         continue;
@@ -68372,14 +68393,19 @@ async function vaccinationCampaignDashboardAlertsSrv({
       continue;
     }
         if (herdCache === null) {
+      const herdReadStartedMs = Date.now();
       herdCache = herdCachePromise
         ? await herdCachePromise
         : await loadAnimalsForGroupsSrv(tenant);
+      console.log("[vaccination-read-diagnostic]", diagnosticId, "herd_read",
+        "elapsed_ms", Date.now() - herdReadStartedMs,
+        "animals", herdCache.length);
     }
 
     // هنا مصدر العضوية هو القطيع الفعلي كله.
     const members = [];
     const writes = [];
+    const eligibilityStartedMs = Date.now();
 
     for (
       const animalDoc of
@@ -68766,6 +68792,10 @@ async function vaccinationCampaignDashboardAlertsSrv({
         programLink
       });
     }
+    console.log("[vaccination-read-diagnostic]", diagnosticId, "eligibility",
+      "elapsed_ms", Date.now() - eligibilityStartedMs,
+      "vaccine", vaccineCode, "animals", herdCache.length,
+      "members", members.length, "new_tasks", writes.length);
 
     if (!members.length) {
       try {
@@ -68793,6 +68823,7 @@ async function vaccinationCampaignDashboardAlertsSrv({
 
     // يسمح بأعداد كبيرة؛ لا يوجد سقف 500 للحملة.
     // نقسم Writes فقط لأن Firestore Batch له حد عملي.
+    const writeStartedMs = Date.now();
     let batch = db.batch();
     let operations = 0;
 
@@ -68826,6 +68857,9 @@ async function vaccinationCampaignDashboardAlertsSrv({
     ) {
       await batch.commit();
     }
+    console.log("[vaccination-read-diagnostic]", diagnosticId, "task_writes",
+      "elapsed_ms", Date.now() - writeStartedMs,
+      "vaccine", vaccineCode, "writes", writes.length);
 
     const nums = [
       ...new Set(
@@ -69907,9 +69941,10 @@ const programContext =
           uid,
           programContext,
           executionProgram,
-          taskDocs,
+           taskDocs,
           today,
-          herdCachePromise: sharedHerdPromise
+          herdCachePromise: sharedHerdPromise,
+          diagnosticId: vaccinationTimingRequestId
         })
       );
 
@@ -70168,11 +70203,18 @@ const key = [
 
     const loadInitialEventsSnap = () => {
       if (!initialEventsPromise) {
+        const eventsReadStartedMs = Date.now();
         initialEventsPromise = db
           .collection("events")
           .where("userId", "==", uid)
           .limit(5000)
-          .get();
+          .get()
+          .then(snap => {
+            console.log("[vaccination-read-diagnostic]", vaccinationTimingRequestId,
+              "shared_events_read", "elapsed_ms", Date.now() - eventsReadStartedMs,
+              "events", snap.size);
+            return snap;
+          });
       }
 
       return initialEventsPromise;
