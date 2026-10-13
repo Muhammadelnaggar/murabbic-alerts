@@ -1,0 +1,50 @@
+--- server_stage6_candidate.js
++++ server_stage7_candidate.js
+@@ -15622,6 +15622,11 @@
+           lastHoofTrimmingDate: eventDate,
+           updatedAt: admin.firestore.FieldValue.serverTimestamp()
+         }, { merge: true });
++
++        // Stage 7: invalidate the prepared result inside the successful write transaction.
++        require('./server/smart-alert-mutation-barrier').appendToTransactionIfEnabled({
++          tx, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++        });
+ 
+         created = true;
+       });
+@@ -51817,6 +51822,11 @@
+               }
+             );
+ 
++            // Stage 7: invalidate the prepared result inside the successful write transaction.
++            require('./server/smart-alert-mutation-barrier').appendToTransactionIfEnabled({
++              tx, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++            });
++
+             return {
+               version,
+ 
+@@ -61546,6 +61556,11 @@
+                   }
+                 }
+ 
++                // Stage 7: invalidate the prepared result inside the successful write transaction.
++                require('./server/smart-alert-mutation-barrier').appendToTransactionIfEnabled({
++                  tx, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++                });
++
+                 return {
+                   corrected:
+                     existingIndex >= 0,
+@@ -74966,6 +74981,11 @@
+   animal,
+   tx
+ );
++
++    // Stage 7: invalidate the prepared result inside the successful write transaction.
++    require('./server/smart-alert-mutation-barrier').appendToTransactionIfEnabled({
++      tx, db, tenant: tenantKey(uid), FieldValue: admin.firestore.FieldValue
++    });
+ 
+     return { created: true };
+   });
