@@ -107001,6 +107001,12 @@ app.get('/', (req, res) => {
     '/login.html'
   );
 }
+if (host === 'murabbik.com' || host === 'www.murabbik.com') {
+  return res.redirect(
+    302,
+    'https://www.youtube.com/watch?v=nFFXPW8eUFE'
+  );
+}
   res.set('Cache-Control', 'no-store');
 
   return res.type('html').send(`<!doctype html>
