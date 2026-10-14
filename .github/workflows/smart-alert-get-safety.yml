@@ -6,6 +6,7 @@ on:
     paths:
       - 'murabbik-safety/test_get_state_reads_20261014.cjs'
       - 'murabbik-safety/server_get_state_reads_candidate_20261014.js'
+      - 'murabbik-safety/build_get_critical_path_20261014.py'
       - '.github/workflows/smart-alert-get-safety.yml'
   workflow_dispatch:
 
@@ -16,9 +17,17 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Node version
-        run: node --version
-      - name: Full server syntax
-        run: node --check murabbik-safety/server_get_state_reads_candidate_20261014.js
-      - name: GET-only scoped state regression
-        run: node murabbik-safety/test_get_state_reads_20261014.cjs
+      - name: Existing GET safety regression
+        run: |
+          node --check murabbik-safety/server_get_state_reads_candidate_20261014.js
+          node murabbik-safety/test_get_state_reads_20261014.cjs
+      - name: Build critical path candidate on runner
+        run: |
+          python3 murabbik-safety/build_get_critical_path_20261014.py
+          node --check murabbik-safety/server_get_critical_path_candidate_20261014.js
+      - name: Save unshipped test candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-alert-get-critical-path-candidate
+          path: murabbik-safety/server_get_critical_path_candidate_20261014.js
+          retention-days: 3
