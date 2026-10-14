@@ -1,0 +1,114 @@
+--- server_stage2_navigation_candidate.js
++++ server_get_only_shared_events_candidate.js
+@@ -69617,7 +69617,10 @@
+ 
+ async function vaccinationDashboardAlertsDataSrv({
+   userId = "",
+-  profileUid = ""
++  profileUid = "",
++  // GET Smart Alerts فقط: مشاركة القراءة داخل نفس الطلب.
++  // الراوت المستقل للتحصين يظل على القراءة الأصلية.
++  loadInitialEventsSnapshot = null
+ } = {}) {
+   if (!db) {
+     const error = new Error("firestore_disabled");
+@@ -70168,11 +70171,14 @@
+ 
+     const loadInitialEventsSnap = () => {
+       if (!initialEventsPromise) {
+-        initialEventsPromise = db
+-          .collection("events")
+-          .where("userId", "==", uid)
+-          .limit(5000)
+-          .get();
++        initialEventsPromise =
++          typeof loadInitialEventsSnapshot === "function"
++            ? Promise.resolve().then(loadInitialEventsSnapshot)
++            : db
++                .collection("events")
++                .where("userId", "==", uid)
++                .limit(5000)
++                .get();
+       }
+ 
+       return initialEventsPromise;
+@@ -77499,16 +77505,52 @@
+ }
+ const MURABBIK_SMART_ALERT_EVENTS_LIMIT = 8000;
+ 
++// قراءة واحدة لكل طلب Smart Alerts، وليست Cache بين الطلبات.
++// لا تمس أحداث المزرعة ولا تاريخ التحصينات أو مسارات الحفظ.
++async function murabbikSmartAlertEventsSnapshotSrv(context) {
++  return await context.load(
++    "smart-alerts:events-raw-snapshot",
++    () => db.collection("events")
++      .where("userId", "==", context.userId)
++      .limit(MURABBIK_SMART_ALERT_EVENTS_LIMIT)
++      .get()
++  );
++}
++
++// المحرك القديم للتحصين يقرأ أول 5000 وثيقة.
++// إذا كان المشترك 8000، نمرر *نفس أول 5000*، لا جميع الـ8000.
++// عند تعذر القراءة المشتركة تعود التحصينات لاستعلامها المستقل.
++async function murabbikSmartAlertVaccinationEventsSnapshotSrv(context) {
++  let snapshot;
++  try {
++    snapshot = await murabbikSmartAlertEventsSnapshotSrv(context);
++  } catch (e) {
++    console.warn("smart-alert-shared-events-fallback", e?.message || e);
++    return db.collection("events")
++      .where("userId", "==", context.userId)
++      .limit(5000)
++      .get();
++  }
++
++  if (snapshot.docs.length <= 5000) return snapshot;
++
++  const docs = snapshot.docs.slice(0, 5000);
++  return {
++    docs,
++    size: docs.length,
++    empty: docs.length === 0,
++    forEach(callback, thisArg) {
++      docs.forEach(callback, thisArg);
++    }
++  };
++}
++
+ async function murabbikSmartAlertEventsIndexSrv(context) {
+   return await context.load(
+     "smart-alerts:events-index",
+     async () => {
+       const snap =
+-        await db
+-          .collection("events")
+-          .where("userId", "==", context.userId)
+-          .limit(MURABBIK_SMART_ALERT_EVENTS_LIMIT)
+-          .get();
++        await murabbikSmartAlertEventsSnapshotSrv(context);
+ 
+       const rows =
+         snap.docs.map(doc => ({
+@@ -83802,7 +83844,12 @@
+     async () =>
+       await vaccinationDashboardAlertsDataSrv({
+         userId: context.userId,
+-        profileUid: context.profileUid
++        profileUid: context.profileUid,
++        loadInitialEventsSnapshot:
++          context.shareLargeEventsSnapshot === true &&
++          tenantKey(context.userId) === context.userId
++            ? () => murabbikSmartAlertVaccinationEventsSnapshotSrv(context)
++            : null
+       })
+   );
+ 
+@@ -84704,6 +84751,7 @@
+     profileUid: req.authSession?.uid || req.userId,
+     today: await farmTodayISOSrv(req.authSession?.uid || req.userId),
+     nowMs: Date.now(),
++    shareLargeEventsSnapshot: true,
+     memo: new Map()
+   };
+ 
