@@ -2789,11 +2789,17 @@ function dashboardMurabbikUiAlert(
   };
 }
 
+let mbkSmartAlertsGetPending = false;
+let mbkSmartAlertsRefreshQueued = false;
+let mbkSmartAlertsResponseEpoch = 0;
+
 async function respondMurabbikSmartAlert(
   alert = {},
   decision = '',
   actionRequested = false
 ) {
+  mbkSmartAlertsResponseEpoch += 1;
+
   const r = await fetch(
     API_BASE +
       '/api/smart-alerts/respond',
@@ -2862,6 +2868,8 @@ async function respondMurabbikSmartAlert(
    *
    * لا GET كامل ثانٍ هنا.
    */
+  mbkSmartAlertsResponseEpoch += 1;
+
   dashboardAlertSources.murabbik =
     data.currentAlert
       ? [
@@ -2877,37 +2885,48 @@ async function respondMurabbikSmartAlert(
 }
 
 async function loadMurabbikSmartAlerts() {
-  try {
-    if (!currentUserId) return;
+  if (
+    !currentUserId ||
+    document.hidden ||
+    mbkSmartAlertsGetPending
+  ) return;
 
+  mbkSmartAlertsGetPending = true;
+
+  const expectedEpoch =
+    mbkSmartAlertsResponseEpoch;
+
+  const expectedUserId =
+    currentUserId;
+
+  try {
     const r = await fetch(
       API_BASE + '/api/smart-alerts',
       {
         method: 'GET',
-
         headers: {
           'Accept': 'application/json',
           'Cache-Control': 'no-store'
         },
-
         credentials: 'same-origin',
         cache: 'no-store'
       }
     );
 
-    const data = await r
-      .json()
+    const data = await r.json()
       .catch(() => null);
 
+    if (
+      expectedEpoch !== mbkSmartAlertsResponseEpoch ||
+      expectedUserId !== currentUserId
+    ) return;
+
     dashboardAlertSources.murabbik =
-      data?.ok === true &&
-      data?.currentAlert
-        ? [
-            dashboardMurabbikUiAlert(
-              data.currentAlert
-            )
-          ]
+      data?.ok === true && data?.currentAlert
+        ? [dashboardMurabbikUiAlert(data.currentAlert)]
         : [];
+
+    refreshDashboardSmartAlert();
 
   } catch (e) {
     console.warn(
@@ -2915,11 +2934,28 @@ async function loadMurabbikSmartAlerts() {
       e
     );
 
-    dashboardAlertSources.murabbik = [];
-  }
+    if (
+      expectedEpoch === mbkSmartAlertsResponseEpoch &&
+      expectedUserId === currentUserId
+    ) {
+      dashboardAlertSources.murabbik = [];
+      refreshDashboardSmartAlert();
+    }
 
- 
-  refreshDashboardSmartAlert();
+  } finally {
+    mbkSmartAlertsGetPending = false;
+
+    if (
+      mbkSmartAlertsRefreshQueued &&
+      !document.hidden
+    ) {
+      mbkSmartAlertsRefreshQueued = false;
+
+      Promise.resolve().then(
+        loadMurabbikSmartAlerts
+      );
+    }
+  }
 }
 
 // ============ تشغيل ============
@@ -2937,9 +2973,22 @@ document.addEventListener(
       loadMurabbikSmartAlerts();
 
       setInterval(
-
         loadMurabbikSmartAlerts,
         60 * 1000
+      );
+
+      document.addEventListener(
+        'visibilitychange',
+        () => {
+          if (document.hidden) return;
+
+          if (mbkSmartAlertsGetPending) {
+            mbkSmartAlertsResponseEpoch += 1;
+            mbkSmartAlertsRefreshQueued = true;
+          } else {
+            loadMurabbikSmartAlerts();
+          }
+        }
       );
 
     } catch (e) {
