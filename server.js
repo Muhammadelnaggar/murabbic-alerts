@@ -67365,7 +67365,8 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
   uid = "",
   programContext = {},
   executionProgram = {},
-  vaccineCode = ""
+  vaccineCode = "",
+  loadCompleteEventsSnapshot = null
 } = {}) {
   const tenant =
     tenantKey(uid);
@@ -67513,15 +67514,15 @@ async function vaccinationCampaignReconcileScheduleFromEventsSrv({
   // بالمفاتيح المباشرة.
   if (!docsById.size) {
     try {
+      // نستخدم القراءة المشتركة فقط إذا كانت شاملة.
+      // وإلا نرجع للاستعلام الأصلي.
       const snap =
-        await db
-          .collection("events")
-          .where(
-            "userId",
-            "==",
-            tenant
-          )
-          .get();
+        typeof loadCompleteEventsSnapshot === "function"
+          ? await loadCompleteEventsSnapshot()
+          : await db
+              .collection("events")
+              .where("userId", "==", tenant)
+              .get();
 
       collect(snap);
 
@@ -68068,7 +68069,8 @@ async function vaccinationCampaignDashboardAlertsSrv({
   executionProgram = {},
   today = "",
   taskDocs = null,
-  herdCachePromise = null
+  herdCachePromise = null,
+  loadCompleteEventsSnapshot = null
 } = {}) {
   const tenant = tenantKey(uid);
   const programMode =
@@ -68258,7 +68260,8 @@ async function vaccinationCampaignDashboardAlertsSrv({
 
         programContext,
         executionProgram,
-        vaccineCode
+        vaccineCode,
+        loadCompleteEventsSnapshot
       });
 
       schedule =
@@ -68306,7 +68309,8 @@ async function vaccinationCampaignDashboardAlertsSrv({
 
         programContext,
         executionProgram,
-        vaccineCode
+        vaccineCode,
+        loadCompleteEventsSnapshot
       });
 
       schedule =
@@ -69618,7 +69622,8 @@ if (!herdRow) {
 async function vaccinationDashboardAlertsDataSrv({
   userId = "",
   profileUid = "",
-  loadInitialEventsSnapshot = null
+  loadInitialEventsSnapshot = null,
+  loadCompleteEventsSnapshot = null
 } = {}) {
   if (!db) {
     const error = new Error("firestore_disabled");
@@ -69910,7 +69915,8 @@ const programContext =
           executionProgram,
           taskDocs,
           today,
-          herdCachePromise: sharedHerdPromise
+          herdCachePromise: sharedHerdPromise,
+          loadCompleteEventsSnapshot
         })
       );
 
@@ -77545,7 +77551,34 @@ async function murabbikSmartAlertVaccinationEventsSnapshotSrv(context) {
     }
   };
 }
+// إعادة استخدام أحداث نفس الطلب عند اكتمال القراءة.
+// لا نستخدم Snapshot محدودة في استعادة الحملات.
+// عند عدم اكتمالها أو فشلها نرجع للاستعلام الأصلي.
 
+async function murabbikSmartAlertCompleteRecoveryEventsSrv(context) {
+  try {
+    const snap =
+      await murabbikSmartAlertEventsSnapshotSrv(context);
+
+    if (
+      snap.docs.length <
+      MURABBIK_SMART_ALERT_EVENTS_LIMIT
+    ) {
+      return snap;
+    }
+
+  } catch (e) {
+    console.warn(
+      "smart-alert-recovery-events-fallback",
+      e?.message || e
+    );
+  }
+
+  return await db
+    .collection("events")
+    .where("userId", "==", context.userId)
+    .get();
+}
 async function murabbikSmartAlertEventsIndexSrv(context) {
   return await context.load(
     "smart-alerts:events-index",
@@ -83846,11 +83879,19 @@ async function murabbikVaccinationProgramAlertSourceSrv(
       await vaccinationDashboardAlertsDataSrv({
         userId: context.userId,
         profileUid: context.profileUid,
+
         loadInitialEventsSnapshot:
           context.req?.method === "GET" &&
           context.req?.path === "/api/smart-alerts" &&
           tenantKey(context.userId) === context.userId
             ? () => murabbikSmartAlertVaccinationEventsSnapshotSrv(context)
+            : null,
+
+        loadCompleteEventsSnapshot:
+          context.req?.method === "GET" &&
+          context.req?.path === "/api/smart-alerts" &&
+          tenantKey(context.userId) === context.userId
+            ? () => murabbikSmartAlertCompleteRecoveryEventsSrv(context)
             : null
       })
   );
