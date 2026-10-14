@@ -69617,7 +69617,8 @@ if (!herdRow) {
 
 async function vaccinationDashboardAlertsDataSrv({
   userId = "",
-  profileUid = ""
+  profileUid = "",
+  loadInitialEventsSnapshot = null
 } = {}) {
   if (!db) {
     const error = new Error("firestore_disabled");
@@ -70168,11 +70169,14 @@ const key = [
 
     const loadInitialEventsSnap = () => {
       if (!initialEventsPromise) {
-        initialEventsPromise = db
-          .collection("events")
-          .where("userId", "==", uid)
-          .limit(5000)
-          .get();
+        initialEventsPromise =
+          typeof loadInitialEventsSnapshot === "function"
+            ? Promise.resolve().then(loadInitialEventsSnapshot)
+            : db
+                .collection("events")
+                .where("userId", "==", uid)
+                .limit(5000)
+                .get();
       }
 
       return initialEventsPromise;
@@ -77499,16 +77503,55 @@ function murabbikSmartAlertLatestIsoDateSrv(...values) {
 }
 const MURABBIK_SMART_ALERT_EVENTS_LIMIT = 8000;
 
+async function murabbikSmartAlertEventsSnapshotSrv(context) {
+  return await context.load(
+    "smart-alerts:events-raw-snapshot",
+    () => db.collection("events")
+      .where("userId", "==", context.userId)
+      .limit(MURABBIK_SMART_ALERT_EVENTS_LIMIT)
+      .get()
+  );
+}
+
+async function murabbikSmartAlertVaccinationEventsSnapshotSrv(context) {
+  let snapshot;
+
+  try {
+    snapshot = await murabbikSmartAlertEventsSnapshotSrv(context);
+  } catch (e) {
+    console.warn(
+      "smart-alert-shared-events-fallback",
+      e?.message || e
+    );
+
+    return db.collection("events")
+      .where("userId", "==", context.userId)
+      .limit(5000)
+      .get();
+  }
+
+  if (snapshot.docs.length <= 5000) {
+    return snapshot;
+  }
+
+  const docs = snapshot.docs.slice(0, 5000);
+
+  return {
+    docs,
+    size: docs.length,
+    empty: docs.length === 0,
+    forEach(callback, thisArg) {
+      docs.forEach(callback, thisArg);
+    }
+  };
+}
+
 async function murabbikSmartAlertEventsIndexSrv(context) {
   return await context.load(
     "smart-alerts:events-index",
     async () => {
       const snap =
-        await db
-          .collection("events")
-          .where("userId", "==", context.userId)
-          .limit(MURABBIK_SMART_ALERT_EVENTS_LIMIT)
-          .get();
+        await murabbikSmartAlertEventsSnapshotSrv(context);
 
       const rows =
         snap.docs.map(doc => ({
@@ -83802,7 +83845,13 @@ async function murabbikVaccinationProgramAlertSourceSrv(
     async () =>
       await vaccinationDashboardAlertsDataSrv({
         userId: context.userId,
-        profileUid: context.profileUid
+        profileUid: context.profileUid,
+        loadInitialEventsSnapshot:
+          context.req?.method === "GET" &&
+          context.req?.path === "/api/smart-alerts" &&
+          tenantKey(context.userId) === context.userId
+            ? () => murabbikSmartAlertVaccinationEventsSnapshotSrv(context)
+            : null
       })
   );
 
