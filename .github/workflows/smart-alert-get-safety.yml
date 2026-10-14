@@ -1,0 +1,24 @@
+name: Smart Alerts GET safety checks
+on:
+  push:
+    branches:
+      - murabbik-safety-backup
+    paths:
+      - 'murabbik-safety/test_get_state_reads_20261014.cjs'
+      - 'murabbik-safety/server_get_state_reads_candidate_20261014.js'
+      - '.github/workflows/smart-alert-get-safety.yml'
+  workflow_dispatch:
+
+jobs:
+  get-only-safety:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Node version
+        run: node --version
+      - name: Full server syntax
+        run: node --check murabbik-safety/server_get_state_reads_candidate_20261014.js
+      - name: GET-only scoped state regression
+        run: node murabbik-safety/test_get_state_reads_20261014.cjs
