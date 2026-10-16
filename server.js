@@ -79766,23 +79766,36 @@ currentMilkFallbackMethod:
   }
 }
 async function murabbikMilkMirrorSmartAlertSourceSrv(context) {
- const [animals, sharedEvents] = await Promise.all([
-  murabbikSmartAlertAnimalsSrv(context),
-  murabbikSmartAlertEventsIndexSrv(context)
-]);
+  const animalsPromise =
+    murabbikSmartAlertAnimalsSrv(context);
 
-const allEvents = sharedEvents.rows;
-    const officialGroupsResult =
-    await context.load(
-      "smart-alerts:milk-mirror-official-groups",
+  const eventsPromise =
+    murabbikSmartAlertEventsIndexSrv(context);
 
-      async () =>
-        await milkReportLoadOfficialGroupsMapFromFirestoreSrv(
-          context.userId,
-          animals,
-          true
-        )
+  const groupsPromise =
+    animalsPromise.then(animals =>
+      context.load(
+        "smart-alerts:milk-mirror-official-groups",
+        () =>
+          milkReportLoadOfficialGroupsMapFromFirestoreSrv(
+            context.userId,
+            animals,
+            true
+          )
+      )
     );
+
+  const [
+    animals,
+    sharedEvents,
+    officialGroupsResult
+  ] = await Promise.all([
+    animalsPromise,
+    eventsPromise,
+    groupsPromise
+  ]);
+
+  const allEvents = sharedEvents.rows;
 
   const officialGroupByAnimalNumber =
     murabbikMilkMirrorOfficialGroupIndexSrv(
@@ -85275,13 +85288,14 @@ app.post(
        * تحقق حي من المصدر الفعلي.
        * الأرشيف ليس جزءًا من القرار.
        */
+      const freshResult =
+        await murabbikSmartAlertCollectSrv(req);
+
       const alert =
-        await murabbikSmartAlertLiveResponseAlertSrv(
-          req,
-          alertId,
-          revision,
-          sourceHint
-        );
+        freshResult.alerts.find(item =>
+          item.id === alertId &&
+          item.revision === revision
+        ) || null;
 
       if (!alert) {
         return res
@@ -85445,22 +85459,12 @@ app.post(
        * مصادر Smart Alerts لا تعتمد
        * على smart_alert_states.
        */
-      const [
-        ,
-        freshResult
-      ] =
-        await Promise.all([
-          stateRef.set(
-            statePayload,
-            {
-              merge: true
-            }
-          ),
-
-          murabbikSmartAlertCollectSrv(
-            req
-          )
-        ]);
+      await stateRef.set(
+        statePayload,
+        {
+          merge: true
+        }
+      );
 
 const stateResult =
   await murabbikSmartAlertApplyUserStateSrv(
@@ -86703,6 +86707,14 @@ const herdType =
 
 
 const rawAnimalsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+// تشغيل البيانات المستقلة بالتوازي مع حساب المؤشرات.
+const herdStatsEnvironmentPromise = Promise.allSettled([
+  nutritionLoadCurrentMilkPricesSrv(uid),
+  weatherBuildFarmThiSrv(
+    req.authSession?.uid || uid
+  )
+]);
 
 // Share identical reads within this request only.
 let herdStatsEventsSnapPromise = null;
@@ -89998,23 +90010,28 @@ try {
           event
         )
     );
-  const [
-    currentMilkPrices,
-    currentWeather
-  ] = await Promise.all([
-    nutritionLoadCurrentMilkPricesSrv(uid),
+  const [milkPricesResult, weatherResult] =
+    await herdStatsEnvironmentPromise;
 
-    weatherBuildFarmThiSrv(
-      req.authSession?.uid || uid
-    ).catch(e => {
-      console.warn(
-        "dashboard nutrition THI failed:",
-        e.message || e
-      );
+  if (milkPricesResult.status !== "fulfilled") {
+    throw milkPricesResult.reason;
+  }
 
-      return null;
-    })
-  ]);
+  const currentMilkPrices =
+    milkPricesResult.value;
+
+  const currentWeather =
+    weatherResult.status === "fulfilled"
+      ? weatherResult.value
+      : null;
+
+  if (weatherResult.status === "rejected") {
+    console.warn(
+      "dashboard nutrition THI failed:",
+      weatherResult.reason?.message ||
+        weatherResult.reason
+    );
+  }
 
   const currentMilkPrice =
     nutritionCurrentMilkPriceForSpeciesSrv(
@@ -113318,17 +113335,62 @@ async function subscriptionAccessDocumentSrv(
     await subscriptionRef.get();
 
   if (snap.exists) {
-  snap =
-    await subscriptionReconcilePrebillingGraceSrv({
-      userId,
-      source
-    });
+    const subscription = snap.data() || {};
 
-  return {
-    legacyUnmanaged: false,
-    snap
-  };
-}
+    const status =
+      String(subscription.status || "")
+        .trim()
+        .toLowerCase();
+
+    const nowMs = Date.now();
+
+    const trialEndMs =
+      subscriptionTimestampMsSrv(
+        subscription.trialEndsAt
+      );
+
+    const graceEndMs =
+      subscriptionTimestampMsSrv(
+        subscription.graceEndsAt
+      );
+
+    const prebillingGrace =
+      String(subscription.graceReason || "")
+        .trim()
+        .toLowerCase() ===
+      SUBSCRIPTION_PREBILLING_GRACE_REASON_SRV;
+
+    const needsReconciliation =
+      (
+        !SUBSCRIPTION_BILLING_READY_SRV &&
+        status === "trial" &&
+        trialEndMs !== null &&
+        nowMs + 1000 >= trialEndMs
+      ) ||
+      (
+        status === "grace" &&
+        prebillingGrace &&
+        !subscription.graceFinalizedAt &&
+        (
+          SUBSCRIPTION_BILLING_READY_SRV ||
+          graceEndMs === null ||
+          nowMs + 1000 >= graceEndMs
+        )
+      );
+
+    if (needsReconciliation) {
+      snap =
+        await subscriptionReconcilePrebillingGraceSrv({
+          userId,
+          source
+        });
+    }
+
+    return {
+      legacyUnmanaged: false,
+      snap
+    };
+  }
 
   const uid =
     String(
