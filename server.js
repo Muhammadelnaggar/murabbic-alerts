@@ -77625,6 +77625,68 @@ async function murabbikSmartAlertReproTruthSrv(
   animalNumber,
   doc = {}
 ) {
+  if (
+    context?.req?.method !== "GET" ||
+    context?.req?.path !== "/api/smart-alerts" ||
+    !doc ||
+    typeof doc !== "object"
+  ) {
+    return murabbikSmartAlertReproTruthUncachedSrv(
+      context,
+      animalNumber,
+      doc
+    );
+  }
+
+  const number =
+    calvingNormDigitsOnlySrv(
+      animalNumber || ""
+    );
+
+  if (!number) {
+    return murabbikSmartAlertReproTruthUncachedSrv(
+      context,
+      animalNumber,
+      doc
+    );
+  }
+
+  if (!context.reproTruthResultCache) {
+    context.reproTruthResultCache =
+      new WeakMap();
+  }
+
+  let byAnimalNumber =
+    context.reproTruthResultCache.get(doc);
+
+  if (!byAnimalNumber) {
+    byAnimalNumber = new Map();
+
+    context.reproTruthResultCache.set(
+      doc,
+      byAnimalNumber
+    );
+  }
+
+  if (!byAnimalNumber.has(number)) {
+    byAnimalNumber.set(
+      number,
+      murabbikSmartAlertReproTruthUncachedSrv(
+        context,
+        animalNumber,
+        doc
+      )
+    );
+  }
+
+  return byAnimalNumber.get(number);
+}
+
+async function murabbikSmartAlertReproTruthUncachedSrv(
+  context,
+  animalNumber,
+  doc = {}
+) {
   const number = calvingNormDigitsOnlySrv(animalNumber || "");
 
   if (!number) {
