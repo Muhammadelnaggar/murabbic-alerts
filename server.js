@@ -37,6 +37,17 @@ const EVENT_SYNONYMS = {
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
+
+const { createPreparedEngine } =
+  require('./server/prepared-engine.js');
+
+let murabbikPreparedEngineSrv = null;
+
+// القراءة السريعة مغلقة افتراضيًا.
+const murabbikPreparedServeSrv =
+  process.env.MURABBIK_PREPARED_VIEWS === '1' &&
+  process.env.MURABBIK_PREPARED_SERVE === '1';
+
 app.set('trust proxy', 1);
 
 // Disabled legacy diagnostics/claim routes: contain cross-tenant access.
@@ -72,6 +83,39 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+app.use((req, res, next) => {
+  const method = String(req.method || '').toUpperCase();
+  const url = String(req.path || '').toLowerCase();
+
+  if (
+    !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) ||
+    !url.startsWith('/api/') ||
+    url.startsWith('/api/auth/') ||
+    url.startsWith('/api/smart-alerts/respond') ||
+    /\/(gate|preview|analyze|resolve)$/.test(url)
+  ) {
+    return next();
+  }
+
+  res.once('finish', () => {
+    const tenant = String(req.userId || '').trim();
+
+    if (
+      !murabbikPreparedEngineSrv ||
+      !tenant ||
+      res.statusCode < 200 ||
+      res.statusCode >= 300
+    ) return;
+
+    void murabbikPreparedEngineSrv.markDirty(tenant)
+      .catch(e =>
+        console.error('prepared invalidation failed', e)
+      );
+  });
+
+  next();
+});
 
 
 
@@ -84990,10 +85034,36 @@ app.get("/api/smart-alerts", requireUserId, async (req, res) => {
       });
     }
 
-const result =
-  await murabbikSmartAlertCollectSrv(
-    req
-  );
+let result = null;
+
+if (murabbikPreparedServeSrv && murabbikPreparedEngineSrv) {
+  const uid = req.authSession?.uid || req.userId;
+
+  const prepared = await murabbikPreparedEngineSrv
+    .getReady(req.userId, uid, 'alerts')
+    .catch(e => {
+      console.warn('prepared alert read', e);
+      return null;
+    });
+
+  if (
+    prepared &&
+    prepared.today === await farmTodayISOSrv(uid)
+  ) {
+    result = {
+      alerts: prepared.alerts,
+      sourceErrors: [],
+      context: {
+        today: prepared.today,
+        nowMs: Date.now()
+      }
+    };
+  }
+}
+
+if (!result) {
+  result = await murabbikSmartAlertCollectSrv(req);
+}
 
 const stateResult =
   await murabbikSmartAlertApplyUserStateSrv(
@@ -85288,14 +85358,60 @@ app.post(
        * تحقق حي من المصدر الفعلي.
        * الأرشيف ليس جزءًا من القرار.
        */
-      const freshResult =
-        await murabbikSmartAlertCollectSrv(req);
+      let freshResult = null;
+let alert = null;
 
-      const alert =
-        freshResult.alerts.find(item =>
-          item.id === alertId &&
-          item.revision === revision
-        ) || null;
+if (murabbikPreparedServeSrv && murabbikPreparedEngineSrv) {
+  const uid = req.authSession?.uid || req.userId;
+
+  const prepared = await murabbikPreparedEngineSrv
+    .getReady(req.userId, uid, 'alerts')
+    .catch(e => {
+      console.warn('prepared POST read', e);
+      return null;
+    });
+
+  if (
+    prepared &&
+    prepared.today === await farmTodayISOSrv(uid) &&
+    Array.isArray(prepared.alerts) &&
+    prepared.alerts.some(
+      item =>
+        item.id === alertId &&
+        item.revision === revision
+    )
+  ) {
+    try {
+      alert = await murabbikSmartAlertLiveResponseAlertSrv(
+        req,
+        alertId,
+        revision,
+        sourceHint
+      );
+
+      freshResult = {
+        alerts: prepared.alerts,
+        sourceErrors: [],
+        context: {
+          today: prepared.today,
+          nowMs: Date.now()
+        }
+      };
+
+    } catch (e) {
+      console.warn('prepared POST validation failed', e);
+    }
+  }
+}
+
+if (!freshResult) {
+  freshResult = await murabbikSmartAlertCollectSrv(req);
+
+  alert = freshResult.alerts.find(item =>
+    item.id === alertId &&
+    item.revision === revision
+  ) || null;
+}
 
       if (!alert) {
         return res
@@ -86685,7 +86801,7 @@ app.get('/api/animal-timeline', async (req, res) => {
 // =============================================
 //   /api/herd-stats  —  Murabbik Full Edition
 // =============================================
-app.get("/api/herd-stats", requireUserId, async (req, res) => {
+async function murabbikHerdStatsBuildSrv(req, res) {
   try {
     const uid = req.userId;
    const herdTypeRaw = String(req.query.type || req.query.species || '').trim().toLowerCase();
@@ -90671,14 +90787,44 @@ availableTypes,
 singleHerdType
 });
   } catch (e) {
-  console.error("HERD-STATS ERROR:", e);
+    console.error("HERD-STATS ERROR:", e);
 
-  return res.json({
-    ok: false,
-    error: "herd_stats_failed",
-    message: "❌ تعذّر تحميل بيانات لوحة التحكم الآن. حاول مرة أخرى."
-  });
+    return res.json({
+      ok: false,
+      error: "herd_stats_failed",
+      message: "❌ تعذّر تحميل بيانات لوحة التحكم الآن. حاول مرة أخرى."
+    });
+  }
 }
+
+app.get('/api/herd-stats', requireUserId, async (req, res) => {
+  if (murabbikPreparedServeSrv && murabbikPreparedEngineSrv) {
+    const raw = String(req.query.type || req.query.species || '')
+      .trim().toLowerCase();
+
+    const species = ['buffalo', 'جاموس'].includes(raw)
+      ? 'buffalo'
+      : ['cow', 'cows', 'cattle', 'أبقار', 'ابقار'].includes(raw)
+        ? 'cows'
+        : null;
+
+    if (species) {
+      const uid = req.authSession?.uid || req.userId;
+
+      try {
+        const prepared = await murabbikPreparedEngineSrv
+          .getReady(req.userId, uid, 'stats:' + species);
+
+        if (prepared && prepared.ok === true) {
+          return res.json(prepared);
+        }
+      } catch (e) {
+        console.warn('prepared stats read failed', e);
+      }
+    }
+  }
+
+  return murabbikHerdStatsBuildSrv(req, res);
 });
 // ============================================================
 //       API: HERD INVENTORY + CULLING REPORT
@@ -128961,13 +129107,211 @@ app.use(async (req, res, next) => {
   );
 });
 
+// Prepared Views — off unless explicitly enabled.
+if (db && process.env.MURABBIK_PREPARED_VIEWS === '1') {
+  murabbikPreparedEngineSrv = createPreparedEngine({
+    db,
+
+    profilesForTenant: async tenant => {
+      const byUid = new Map();
+      const users = db.collection('users');
+
+      const [byUser, byTenant, byOwner, own] = await Promise.all([
+        users.where('userId', '==', tenant).get(),
+        users.where('tenantId', '==', tenant).get(),
+        users.where('ownerUid', '==', tenant).get(),
+        users.doc(tenant).get()
+      ]);
+
+      for (const snap of [
+        ...byUser.docs,
+        ...byTenant.docs,
+        ...byOwner.docs,
+        own
+      ]) {
+        if (!snap.exists) continue;
+
+        const profile = snap.data() || {};
+
+        const claimedTenant = tenantKey(
+          profile.userId ||
+          profile.tenantId ||
+          profile.ownerUid ||
+          snap.id
+        );
+
+        if (claimedTenant !== tenantKey(tenant)) continue;
+
+        byUid.set(snap.id, {
+          uid: snap.id,
+          profile
+        });
+      }
+
+      return [...byUid.values()];
+    },
+
+    calculateAlerts: async ({tenant, uid, profile}) => {
+      const req = {
+        method: 'GET',
+        path: '/api/smart-alerts',
+        userId: tenant,
+        authSession: {
+          uid,
+          userId: tenant,
+          user: authPublicUserBridgeSrv(profile, uid, tenant)
+        }
+      };
+
+      const result = await murabbikSmartAlertCollectSrv(req);
+      const nowMs = Date.now();
+
+      const farmClock = await farmTimeContextSrv(uid);
+      const timeZone = String(farmClock?.timeZone || 'UTC');
+
+      let nextPeriodAtMs = nowMs + 5 * 60000;
+
+      try {
+        const parts = new Intl.DateTimeFormat('en-GB', {
+          timeZone,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hourCycle: 'h23'
+        }).formatToParts(new Date(nowMs));
+
+        const value = type =>
+          Number(parts.find(p => p.type === type)?.value || 0);
+
+        const minuteOfDay =
+          value('hour') * 60 + value('minute');
+
+        const nextMinute =
+          [0, 300, 720, 900, 1080, 1380, 1440]
+            .find(m => m > minuteOfDay);
+
+        const seconds =
+          (nextMinute - minuteOfDay) * 60 - value('second');
+
+        if (Number.isFinite(seconds) && seconds > 0) {
+          nextPeriodAtMs = Math.min(
+            nextPeriodAtMs,
+            nowMs + seconds * 1000
+          );
+        }
+      } catch (e) {
+        console.warn('prepared period deadline', e.message);
+      }
+
+      const nearOvsynch = result.alerts.some(alert =>
+        alert.source === 'ovsynch_protocol_steps' &&
+        (
+          alert.dueDate === result.context.today ||
+          alert.dueDate === addDaysToIsoDateSrv(
+            result.context.today, 1
+          )
+        )
+      );
+
+      return {
+        today: result.context.today,
+        alerts: result.alerts,
+        degraded: result.sourceErrors.length > 0,
+        refreshAtMs: Math.max(
+          nowMs + 30000,
+          Math.min(
+            nextPeriodAtMs,
+            nearOvsynch ? nowMs + 60000 : Infinity
+          )
+        )
+      };
+    },
+
+    calculateStats: async ({tenant, uid, profile, species}) => {
+      const req = {
+        userId: tenant,
+        query: {type: species},
+        authSession: {
+          uid,
+          userId: tenant,
+          user: authPublicUserBridgeSrv(profile, uid, tenant)
+        }
+      };
+
+      let payload = null;
+
+      const res = {
+        json: data => {
+          payload = data;
+          return data;
+        }
+      };
+
+      await murabbikHerdStatsBuildSrv(req, res);
+
+      return payload;
+    },
+
+    seedTenants: async seedIfMissing => {
+      const users = db.collection('users');
+      let lastDoc = null;
+      const seen = new Set();
+
+      while (true) {
+        let query = users.orderBy(
+          admin.firestore.FieldPath.documentId()
+        ).limit(100);
+
+        if (lastDoc) {
+          query = query.startAfter(lastDoc);
+        }
+
+        const page = await query.get();
+        if (page.empty) break;
+
+        for (const doc of page.docs) {
+          const profile = doc.data() || {};
+
+          const tenant = tenantKey(
+            profile.userId ||
+            profile.tenantId ||
+            profile.ownerUid ||
+            doc.id
+          );
+
+          if (tenant && !seen.has(tenant)) {
+            seen.add(tenant);
+            await seedIfMissing(tenant);
+          }
+        }
+
+        lastDoc = page.docs[page.docs.length - 1];
+
+        if (page.size < 100) break;
+      }
+    }
+  });
+
+  if (process.env.MURABBIK_PREPARED_ROLE === 'worker') {
+    murabbikPreparedEngineSrv.start();
+  }
+}
+
 // Static last
 app.use(express.static(path.join(__dirname, 'www')));
-// ✅ DIM job
-startDailyDimJob();
-// (اختياري ومفيد) تشغيل مرة واحدة فورًا بعد كل Deploy:
-updateAllDIM();
-// Start
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-});
+// DIM and HTTP listening remain on the original Web Service.
+if (process.env.MURABBIK_PREPARED_ROLE !== 'worker') {
+  startDailyDimJob();
+  updateAllDIM();
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ Server running on http://localhost:${PORT}`);
+  });
+
+} else if (!murabbikPreparedEngineSrv) {
+  console.error(
+    'Prepared worker requires MURABBIK_PREPARED_VIEWS=1 and Firestore'
+  );
+
+  process.exitCode = 1;
+}
