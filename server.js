@@ -76962,9 +76962,12 @@ function murabbikSmartAlertNormalizeSrv(sourceName, raw = {}) {
         : []
     },
 
+
     dueDate: murabbikSmartAlertTextSrv(raw.dueDate).slice(0, 10),
+    dueTime: murabbikSmartAlertTextSrv(raw.dueTime),
     affectedCount,
     animalNumbers,
+
 
     action: {
       type: actionType,
@@ -77030,6 +77033,214 @@ function murabbikSmartAlertPublicSrv(alert) {
   } = alert;
   return publicAlert;
 }
+
+const MURABBIK_REMINDER_POLICY_VERSION_SRV = 1;
+
+function murabbikSmartAlertReminderMinutesSrv(alert = {}) {
+  const source = String(alert.source || '');
+  const status = String(alert.status || '').toLowerCase();
+  const code = String(alert.code || '');
+  const priority = String(alert.priority || '').toLowerCase();
+  const H = 60;
+  const D = 24 * H;
+
+  if (code === 'daily_farm_greeting') return 0;
+
+  switch (source) {
+    case 'ovsynch_protocol_steps':
+      return 30;
+
+    case 'vaccination_program_tasks':
+      if (status === 'needs_data') return 72 * H;
+      if (status === 'overdue') return D;
+      if (status === 'due' || status === 'initial_age_ready') {
+        return 48 * H;
+      }
+      return D;
+
+    case 'dry_off_due':
+      return D;
+
+    case 'close_up_due':
+      return status === 'overdue' ? 12 * H : D;
+
+    case 'calving_overdue':
+      return status === 'overdue' ? 6 * H : D;
+
+    case 'pregnancy_diagnosis_due':
+    case 'pregnancy_confirmation_120_due':
+    case 'uterine_check_followup':
+    case 'postpartum_insemination_followup':
+      return D;
+
+    case 'milk_mirror':
+      if (code === 'milk_mirror_individual_critical_drop') {
+        return H;
+      }
+
+      if (
+        code === 'milk_mirror_individual_clear_drop' ||
+        code === 'milk_mirror_individual_persistent_drop'
+      ) {
+        return 12 * H;
+      }
+
+      if (code.includes('heat_drop')) {
+        return priority === 'urgent' || priority === 'high'
+          ? 3 * H
+          : 12 * H;
+      }
+
+      return D;
+
+    default:
+      return D;
+  }
+}
+
+async function murabbikSmartAlertReminderUntilSrv(
+  req,
+  alert,
+  nowMs
+) {
+  const minutes =
+    murabbikSmartAlertReminderMinutesSrv(alert);
+
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return null;
+  }
+
+  let untilMs = nowMs + minutes * 60000;
+
+  const isOvsynchAdvance =
+    alert.source === 'ovsynch_protocol_steps' &&
+    alert.action?.type === 'none' &&
+    alert.dueDate &&
+    alert.dueTime;
+
+  const isVaccinationAdvance =
+    alert.source === 'vaccination_program_tasks' &&
+    ['upcoming', 'day_before'].includes(alert.status) &&
+    alert.dueDate;
+
+  if (isOvsynchAdvance || isVaccinationAdvance) {
+    const clock = await farmTimeContextSrv(
+      req.authSession?.uid || req.userId
+    );
+
+    const zone = String(clock?.timeZone || 'UTC');
+
+    const dateTimeMs =
+      murabbikOvsynchAlertDateTimeMsSrv(
+        alert.dueDate,
+        isOvsynchAdvance ? alert.dueTime : '00:00',
+        zone
+      );
+
+    const plannedMs = isOvsynchAdvance
+      ? dateTimeMs - 120 * 60000
+      : dateTimeMs;
+
+    if (
+      Number.isFinite(plannedMs) &&
+      plannedMs > nowMs
+    ) {
+      untilMs = plannedMs;
+    }
+  }
+
+  return untilMs;
+}
+
+function murabbikSmartAlertSnoozeValidSrv(
+  state,
+  alert
+) {
+  if (
+    state.reminderPolicyVersion !==
+    MURABBIK_REMINDER_POLICY_VERSION_SRV
+  ) {
+    return state.revision === alert.revision;
+  }
+
+  if (
+    state.sourceName !== alert.source ||
+    state.code !== alert.code ||
+    state.kind !== alert.kind ||
+    state.status !== alert.status ||
+    String(state.dueDate || '') !==
+      String(alert.dueDate || '') ||
+    String(state.dueTime || '') !==
+      String(alert.dueTime || '')
+  ) {
+    return false;
+  }
+
+  if (
+    alert.status === 'needs_data' &&
+    state.revision !== alert.revision
+  ) {
+    return false;
+  }
+
+  const p = {
+    urgent: 0,
+    high: 1,
+    normal: 2,
+    low: 3
+  };
+
+  const u = {
+    now: 0,
+    today: 1,
+    soon: 2,
+    review: 3
+  };
+
+  if (
+    p[alert.priority] === undefined ||
+    p[state.priority] === undefined ||
+    p[alert.priority] < p[state.priority]
+  ) {
+    return false;
+  }
+
+  if (
+    u[alert.urgency] === undefined ||
+    u[state.urgency] === undefined ||
+    u[alert.urgency] < u[state.urgency]
+  ) {
+    return false;
+  }
+
+  if (
+    !Array.isArray(state.animalNumbers) ||
+    !Array.isArray(alert.animalNumbers)
+  ) {
+    return false;
+  }
+
+  const previous =
+    new Set(state.animalNumbers.map(String));
+
+  if (
+    alert.animalNumbers.some(
+      number => !previous.has(String(number))
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    Number(alert.affectedCount || 0) >
+    Number(state.affectedCount || 0)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 const MURABBIK_SMART_ALERT_STATE_COLLECTION = "smart_alert_states";
 
 function murabbikSmartAlertActorUidSrv(req) {
@@ -77299,6 +77510,7 @@ function murabbikSmartAlertDateMsSrv(value) {
     : 0;
 }
 
+
 async function murabbikSmartAlertApplyUserStateSrv(
   req,
   alerts = [],
@@ -77312,11 +77524,10 @@ async function murabbikSmartAlertApplyUserStateSrv(
   }
 
   const refs = alerts.map(
-    alert =>
-      murabbikSmartAlertStateRefSrv(
-        req,
-        alert.id
-      )
+    alert => murabbikSmartAlertStateRefSrv(
+      req,
+      alert.id
+    )
   );
 
   const snapshots = [];
@@ -77332,9 +77543,7 @@ async function murabbikSmartAlertApplyUserStateSrv(
   const statesByDocId = new Map(
     snapshots.map(snap => [
       snap.id,
-      snap.exists
-        ? (snap.data() || {})
-        : null
+      snap.exists ? (snap.data() || {}) : null
     ])
   );
 
@@ -77342,63 +77551,48 @@ async function murabbikSmartAlertApplyUserStateSrv(
   let hiddenCount = 0;
 
   for (const alert of alerts) {
-    const docId =
-      murabbikSmartAlertStateDocIdSrv(
-        req,
-        alert.id
-      );
+    const docId = murabbikSmartAlertStateDocIdSrv(
+      req,
+      alert.id
+    );
 
-    const state =
-      statesByDocId.get(docId);
+    const state = statesByDocId.get(docId);
 
-   if (!state) {
-  visibleAlerts.push(alert);
-  continue;
-}
-
-const decision =
-  murabbikSmartAlertTextSrv(
-    state.decision
-  ).toLowerCase();
-
-// «حسنًا» = إغلاق هذه الواقعة بالكامل.
-// أي تغير لاحق في revision لا يعيد فتحها.
-if (decision === "acknowledged") {
-  hiddenCount++;
-  continue;
-}
-
-if (
-  state.revision !== alert.revision
-) {
-  visibleAlerts.push(alert);
-  continue;
-}
-
-        if (
-      decision === "snoozed" &&
-      murabbikSmartAlertDateMsSrv(
-        state.snoozedUntil
-      ) > nowMs
-    ) {
-      hiddenCount++;
+    if (!state) {
+      visibleAlerts.push(alert);
       continue;
     }
 
-    const isOvsynchDayBeforeReminder =
-      decision === "snoozed" &&
-      alert.source ===
-        "ovsynch_protocol_steps" &&
-      alert.code ===
-        "ovsynch_step_due" &&
-      alert.action?.type ===
-        "none";
+    const decision = murabbikSmartAlertTextSrv(
+      state.decision
+    ).toLowerCase();
 
-    if (isOvsynchDayBeforeReminder) {
-      visibleAlerts.push({
-        ...alert,
-        snoozeAllowed: false
-      });
+    // الاطلاع القديم لا يغلق مهمة تشغيلية
+    // أو تنبيهًا فنيًا لا يزال مصدره يولده.
+    if (decision === "acknowledged") {
+      if (
+        alert.kind === "informational" &&
+        state.revision === alert.revision
+      ) {
+        hiddenCount++;
+      } else {
+        visibleAlerts.push(alert);
+      }
+
+      continue;
+    }
+
+    if (
+      decision === "snoozed" &&
+      murabbikSmartAlertDateMsSrv(
+        state.snoozedUntil
+      ) > nowMs &&
+      murabbikSmartAlertSnoozeValidSrv(
+        state,
+        alert
+      )
+    ) {
+      hiddenCount++;
       continue;
     }
 
@@ -77410,6 +77604,7 @@ if (
     hiddenCount
   };
 }
+
 
 // ============================================================
 //       SMART ALERT SOURCE: DRY-OFF DUE — 210 DAYS
@@ -84594,8 +84789,11 @@ async function murabbikOvsynchStepSmartAlertSourceSrv(context) {
       title,
       message,
 
+
       dueDate: group.dueDate,
+      dueTime: group.plannedTime,
       affectedCount: animalNumbers.length,
+
       animalNumbers,
 
   action: {
@@ -85444,6 +85642,21 @@ if (!freshResult) {
           });
       }
 
+      
+      if (
+        decision === "acknowledged" &&
+        alert.kind !== "informational"
+      ) {
+        return res.status(409).json({
+          ok: false,
+          error: "smart_alert_ack_disabled",
+          message:
+            "هذه المهمة لا تنتهي إلا بتنفيذها أو زوال سببها."
+        });
+      }
+
+
+
       /*
        * رابط فتح الصفحة يأتي من
        * التنبيه الذي تحقق منه السيرفر حيًا،
@@ -85508,10 +85721,22 @@ if (!freshResult) {
         domain:
           alert.domain,
 
+
         code:
           alert.code,
 
+        priority: alert.priority,
+        urgency: alert.urgency,
+        status: alert.status,
+        dueDate: alert.dueDate,
+        dueTime: alert.dueTime || "",
+        affectedCount: alert.affectedCount,
+        animalNumbers: alert.animalNumbers,
+        reminderPolicyVersion:
+          MURABBIK_REMINDER_POLICY_VERSION_SRV,
+
         decision,
+
 
         updatedAt:
           admin.firestore
@@ -85551,16 +85776,35 @@ if (!freshResult) {
         };
 
       } else {
-        const snoozeMinutes =
-          alert._snoozeMinutes;
 
-        snoozedUntilMs =
-          nowMs +
-          (
-            snoozeMinutes *
-            60 *
-            1000
+        const reminderUntilMs =
+          await murabbikSmartAlertReminderUntilSrv(
+            req,
+            alert,
+            nowMs
           );
+
+        if (
+          !Number.isFinite(reminderUntilMs) ||
+          reminderUntilMs <= nowMs
+        ) {
+          return res.status(409).json({
+            ok: false,
+            error: "smart_alert_snooze_unavailable",
+            message:
+              "لا يوجد موعد تأجيل صالح لهذا التنبيه."
+          });
+        }
+
+        snoozedUntilMs = reminderUntilMs;
+
+        const snoozeMinutes = Math.max(
+          1,
+          Math.ceil(
+            (snoozedUntilMs - nowMs) / 60000
+          )
+        );
+
 
         statePayload = {
           ...commonState,
