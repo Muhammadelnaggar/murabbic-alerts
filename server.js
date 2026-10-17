@@ -28360,7 +28360,11 @@ async function fetchNutritionReportEvents(tenant, limit = 900) {
   await pull('ownerUid');
   await pull('userId');
 
-  return [...byId.values()];
+  
+
+return [...byId.values()];
+
+
 }
 
 function filterNutritionReportEvents(events, { type, stage, groupName } = {}) {
@@ -77821,10 +77825,14 @@ const settled = await Promise.allSettled([
         );
       }
 
-      return [...byId.values()];
+
+      const namingAnimals = [...byId.values()];
+      context.murabbikAlertNamingAnimalsSrv = namingAnimals;
+      return namingAnimals;
     }
   );
 }
+
 function murabbikSmartAlertLatestIsoDateSrv(...values) {
   return values
     .flat()
@@ -85191,6 +85199,198 @@ murabbikSmartAlertRegisterSourceSrv(
   MURABBIK_DAILY_GREETING_SOURCE_NAME,
   murabbikDailyFarmGreetingSmartAlertSourceSrv
 );
+
+function murabbikSmartAlertNameTextSrv(text, singleName = '', herdName = '') {
+  if (typeof text !== 'string' || !text) return text;
+
+  if (singleName) {
+    let out = text
+      .replace(/(?<![\p{L}\p{N}])الحيوان(?![\p{L}\p{N}])/gu, `ال${singleName}`)
+      .replace(/(?<![\p{L}\p{N}])حيوان(?![\p{L}\p{N}])/gu, singleName);
+
+    if (singleName === 'عجل') return out;
+
+    return out
+      .replace(/(رقم\s+\d+\s+)وصل(?=\s)/gu, '$1وصلت')
+      .replace(/(رقم\s+\d+\s+)أكمل(?=\s)/gu, '$1أكملت')
+      .replace(/(رقم\s+\d+\s+)تخطّى(?=\s)/gu, '$1تخطّت')
+      .replace(/(رقم\s+\d+\s+)تجاوز(?=\s)/gu, '$1تجاوزت')
+      .replace(/وتجاوز نهاية/g, 'وتجاوزت نهاية')
+      .replace(/لم تُسجّل له/g, 'لم تُسجّل لها')
+      .replace(/لم يُسجّل له/g, 'لم يُسجّل لها')
+      .replace(/لم يُسجّل جافًا/g, 'لم تُسجّل جافة')
+      .replace(/ثبت أنه فارغ/g, 'ثبت أنها فارغة')
+      .replace(/لم يبدأ له تلقيح/g, 'لم يبدأ لها تلقيح')
+      .replace(/ولم يُلقّح/g, 'ولم تُلقّح')
+      .replace(/يمكن فحصه يدويًا/g, 'يمكن فحصها يدويًا')
+      .replace(/سجّل الحالة الفعلية/g, 'سجّل حالتها الفعلية')
+      .replace(/(?<![\p{L}\p{N}])مستحق(?![\p{L}\p{N}])/gu, 'مستحقة')
+      .replace(/(?<![\p{L}\p{N}])مفتوح(?![\p{L}\p{N}])/gu, 'مفتوحة');
+  }
+
+  if (!herdName) return text;
+
+  const bare = herdName === 'الأبقار'
+    ? 'أبقار'
+    : herdName === 'الجاموس'
+      ? 'رؤوس من الجاموس'
+      : 'عجول';
+
+  return text
+    .replace(/(?<![\p{L}\p{N}])الحيوانات(?![\p{L}\p{N}])/gu, herdName)
+    .replace(/(?<![\p{L}\p{N}])حيوانات(?![\p{L}\p{N}])/gu, bare);
+}
+
+function murabbikSmartAlertAnimalNameSrv(doc = {}, alert = {}) {
+  const species = animalListTypeEnSrv(doc);
+  if (!species) return '';
+
+  const sex = [
+    doc.sex, doc.gender, doc.animalSex,
+    doc.sexAr, doc.genderAr
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  const male = /\bmale\b|\bbull\b|ذكر/.test(sex);
+  const female = /\bfemale\b|\bheifer\b|أنث|انث|عجلة/.test(sex);
+
+  const reproductiveAlert =
+    /calving|dry_off|close_up|pregnancy|uterine|postpartum/
+      .test(String(alert.code || ''));
+
+  const reproductiveRecord = Boolean(
+    doc.lastCalvingDate ||
+    doc.lastInseminationDate ||
+    doc.calvingDate ||
+    doc.inMilk === true
+  );
+
+  const stage = [
+    doc.entryType, doc.followerStatus,
+    doc.calfStatus, doc.stage,
+    doc.group, doc.groupId
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  const young =
+    /followers|تابع|رضيع|فطام|نامي|heifer|عجل|عجلة|تحت التلقيح/
+      .test(stage);
+
+  if (young) {
+    return male ? 'عجل' : female ? 'عجلة' : '';
+  }
+
+  if (male || !(female || reproductiveAlert || reproductiveRecord)) {
+    return '';
+  }
+
+  return species === 'buffalo' ? 'جاموسة' : 'بقرة';
+}
+
+function murabbikSmartAlertLanguageSrv(alerts, animals) {
+  if (
+    !Array.isArray(alerts) ||
+    !Array.isArray(animals) ||
+    !animals.length
+  ) return;
+
+  const byNumber = new Map();
+  const herdSpecies = new Set();
+
+  for (const animal of animals) {
+    if (
+      !animalListIsActiveSrv(animal) ||
+      animal.active === false ||
+      /sold|dead|nafaq|archived|مباع|نافق/.test(
+        String(animal.status || '').toLowerCase()
+      )
+    ) continue;
+
+    const species = animalListTypeEnSrv(animal);
+
+    if (species === 'cow' || species === 'buffalo') {
+      herdSpecies.add(species);
+    }
+
+    const num = normalizeDigitsSrv(
+      murabbikDryOffAlertNumberSrv(animal)
+    );
+
+    if (!num) continue;
+
+    // الأرقام المتكررة لا نعتمد عليها في تخمين النوع.
+    if (byNumber.has(num)) {
+      byNumber.set(num, null);
+    } else {
+      byNumber.set(num, animal);
+    }
+  }
+
+  const singleSpecies = herdSpecies.size === 1
+    ? [...herdSpecies][0]
+    : '';
+
+  for (const alert of alerts) {
+    const numbers = Array.isArray(alert.animalNumbers)
+      ? alert.animalNumbers
+      : [];
+
+    const isSingle =
+      Number(alert.affectedCount) === 1 &&
+      numbers.length === 1;
+
+    let name = '';
+    let herdName = '';
+
+    if (isSingle) {
+      const doc = byNumber.get(
+        normalizeDigitsSrv(numbers[0])
+      );
+
+      if (doc) {
+        name = murabbikSmartAlertAnimalNameSrv(doc, alert);
+      }
+
+    } else if (
+      Number(alert.affectedCount) > 1 &&
+      singleSpecies
+    ) {
+      herdName =
+        alert.code === 'vaccination_initial_age_ready'
+          ? 'العجول'
+          : singleSpecies === 'buffalo'
+            ? 'الجاموس'
+            : 'الأبقار';
+    }
+
+    if (!name && !herdName) continue;
+
+    const format = text =>
+      murabbikSmartAlertNameTextSrv(text, name, herdName);
+
+    alert.title = format(alert.title);
+    alert.message = format(alert.message);
+
+    if (alert.details) {
+      alert.details.observation =
+        format(alert.details.observation);
+
+      alert.details.meaning =
+        format(alert.details.meaning);
+
+      alert.details.recommendation =
+        format(alert.details.recommendation);
+
+      if (Array.isArray(alert.details.evidence)) {
+        alert.details.evidence =
+          alert.details.evidence.map(format);
+      }
+    }
+
+    if (alert.action) {
+      alert.action.label = format(alert.action.label);
+    }
+  }
+}
+
 async function murabbikSmartAlertCollectSrv(req) {
   const context = {
     req,
@@ -85291,7 +85491,16 @@ async function murabbikSmartAlertCollectSrv(req) {
     }
   });
 
-  const unique = new Map();
+  
+// صياغة لغوية فقط من البيانات الموجودة بالفعل.
+// لا قراءات إضافية ولا انتظار ولا تغيير لهوية التنبيه.
+murabbikSmartAlertLanguageSrv(
+  alerts,
+  context.murabbikAlertNamingAnimalsSrv
+);
+
+const unique = new Map();
+
 
   alerts
     .sort(murabbikSmartAlertCompareSrv)
