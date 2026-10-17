@@ -83,6 +83,11 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+const murabbikPreparedReadOnlyPostsSrv = new Set([
+  '/api/nutrition/targets',
+  '/api/nutrition/analyze-ration',
+  '/api/add-animal/import-preview'
+]);
 
 app.use((req, res, next) => {
   const method = String(req.method || '').toUpperCase();
@@ -91,7 +96,8 @@ app.use((req, res, next) => {
   if (
     !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) ||
     !url.startsWith('/api/') ||
-    url.startsWith('/api/auth/') ||
+        url.startsWith('/api/auth/') ||
+    murabbikPreparedReadOnlyPostsSrv.has(url) ||
     url.startsWith('/api/smart-alerts/respond') ||
     /\/(gate|preview|analyze|resolve)$/.test(url)
   ) {
@@ -1259,6 +1265,17 @@ authClearOnboardingCookieSrv(
   req,
   res
 );
+
+if (murabbikPreparedEngineSrv) {
+  void murabbikPreparedEngineSrv
+    .markDirty(uid)
+    .catch(e => {
+      console.error(
+        'prepared registration invalidation failed:',
+        e
+      );
+    });
+}
 
     return res.json({
       ok: true,
@@ -107462,6 +107479,21 @@ function scheduleGroupsRebuildSrv(tenant, reason = 'auto') {
       console.log('✅ groups auto rebuild:', { uid, reason, groups: r?.groupsCount, members: r?.membersCount });
     } catch (e) {
       console.error('❌ groups auto rebuild failed:', uid, reason, e.message || e);
+    } finally {
+      if (
+        murabbikPreparedEngineSrv &&
+        process.env.MURABBIK_PREPARED_ROLE !== 'worker'
+      ) {
+        try {
+          await murabbikPreparedEngineSrv.markDirty(uid);
+        } catch (error) {
+          console.error(
+            'prepared group invalidation failed:',
+            uid,
+            error.message || error
+          );
+        }
+      }
     }
   }, 1200);
 
