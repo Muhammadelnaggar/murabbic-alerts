@@ -94589,24 +94589,37 @@ const periodStartMs =
   todayMs -
   ((periodDays - 1) * 86400000);
 
-    const animalSnap = await db.collection("animals")
-      .where("userId", "==", uid)
-      .get();
 
-    const animalsRaw = animalSnap.docs.map(d => ({
-      id: d.id,
-      ...(d.data() || {})
-    }));
-    // بيانات PR مستقلة عن جرد الأمهات الحالي.
-const prCalvesSnap = await db
-  .collection("calves")
-  .where("userId", "==", uid)
-  .get();
+const [
+  animalSnap,
+  prCalvesSnap,
+  prArchivedSnap,
+  eventSnap,
+  prArchivedEventsSnap,
+  groupPage,
+  fertilityCurrentThiRaw,
+  fertilityPrThresholds
+] = await Promise.all([
+  db.collection("animals").where("userId", "==", uid).get(),
+  db.collection("calves").where("userId", "==", uid).get(),
+  db.collection("archived_animals").where("userId", "==", uid).get(),
+  db.collection("events").where("userId", "==", uid).get(),
+  db.collection("archived_events").where("userId", "==", uid).get(),
+  buildGroupsPageForTenantSrv(uid),
+  weatherBuildFarmThiSrv(profileUid).catch(e => {
+    console.warn("fertility current THI failed:", e.message || e);
+    return null;
+  }),
+  loadGroupThresholdsSrv(uid)
+]);
 
-const prArchivedSnap = await db
-  .collection("archived_animals")
-  .where("userId", "==", uid)
-  .get();
+const animalsRaw = animalSnap.docs.map(d => ({
+  id: d.id,
+  ...(d.data() || {})
+}));
+
+// بيانات PR مستقلة عن جرد الأمهات الحالي.
+
 
 const prAnimals = [
   ...animalsRaw.map(a => ({
@@ -94651,13 +94664,7 @@ const prAnimals = [
 
     const activeAnimals = [...animalsByNumber.values()];
 
-    const eventSnap = await db.collection("events")
-  .where("userId", "==", uid)
-  .get();
-  const prArchivedEventsSnap = await db
-  .collection("archived_events")
-  .where("userId", "==", uid)
-  .get();
+
 
 const prEvents = [
   ...eventSnap.docs,
@@ -95105,10 +95112,7 @@ const repeatBreederAnalysis = fertilityReportRepeatBreederAnalysisSrv(
         : "cow";
 
     // العجلات فقط تظل مؤقتًا على تصنيفها التناسلي الحالي.
-    const groupPage =
-      await buildGroupsPageForTenantSrv(
-        uid
-      );
+
 
     if (
       !groupPage?.ok ||
@@ -95161,13 +95165,7 @@ const repeatBreederAnalysis = fertilityReportRepeatBreederAnalysisSrv(
       heiferInseminatedCount,
       heiferOpenCount
     });
-    let fertilityCurrentThiRaw = null;
 
-try {
-  fertilityCurrentThiRaw = await weatherBuildFarmThiSrv(req.authSession?.uid || uid);
-} catch (e) {
-  console.warn("fertility current THI failed:", e.message || e);
-}
 
 const fertilityThiAdvice =
   groupSpecies === "buffalo"
@@ -95185,7 +95183,9 @@ const pr21Info = fertilityReportPregnancy21Srv({
   todayISO,
   animals: prAnimals,
   events: prEvents,
-  thresholds: await loadGroupThresholdsSrv(uid),
+  
+thresholds: fertilityPrThresholds,
+
   analysisStartMs: periodStartMs,
   audit: req.query.prAudit === "1"
 });
