@@ -83,11 +83,27 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
 const murabbikPreparedReadOnlyPostsSrv = new Set([
   '/api/nutrition/targets',
   '/api/nutrition/analyze-ration',
   '/api/add-animal/import-preview'
 ]);
+
+// A failed invalidation must never make this Web Service serve a
+// previously prepared result for the affected tenant.
+const murabbikPreparedUnsafeTenantsSrv = new Set();
+const murabbikPreparedPendingInvalidationsSrv = new Map();
+
+function murabbikPreparedCanServeSrv(req) {
+  const tenant = String(req.userId || '').trim();
+  const hasBypassCookie = /(?:^|;\s*)mbk_prepared_bypass=1(?:;|$)/
+    .test(String(req.headers?.cookie || ''));
+
+  return murabbikPreparedServeSrv &&
+    !murabbikPreparedUnsafeTenantsSrv.has(tenant) &&
+    !hasBypassCookie;
+}
 
 app.use((req, res, next) => {
   const method = String(req.method || '').toUpperCase();
@@ -96,7 +112,7 @@ app.use((req, res, next) => {
   if (
     !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) ||
     !url.startsWith('/api/') ||
-        url.startsWith('/api/auth/') ||
+    url.startsWith('/api/auth/') ||
     murabbikPreparedReadOnlyPostsSrv.has(url) ||
     url.startsWith('/api/smart-alerts/respond') ||
     /\/(gate|preview|analyze|resolve)$/.test(url)
@@ -104,7 +120,13 @@ app.use((req, res, next) => {
     return next();
   }
 
-  res.once('finish', () => {
+  const originalEnd = res.end;
+  let ending = false;
+
+  res.end = function (...args) {
+    if (ending) return this;
+    ending = true;
+    const response = this;
     const tenant = String(req.userId || '').trim();
 
     if (
@@ -112,16 +134,64 @@ app.use((req, res, next) => {
       !tenant ||
       res.statusCode < 200 ||
       res.statusCode >= 300
-    ) return;
+    ) {
+      return originalEnd.apply(response, args);
+    }
 
-    void murabbikPreparedEngineSrv.markDirty(tenant)
-      .catch(e =>
-        console.error('prepared invalidation failed', e)
-      );
-  });
+    // Serialize invalidations for this tenant. A later event cannot
+    // release an earlier, still pending invalidation's safety fence.
+    murabbikPreparedUnsafeTenantsSrv.add(tenant);
+    const previous = murabbikPreparedPendingInvalidationsSrv
+      .get(tenant) || Promise.resolve();
+    const pending = previous.catch(() => {})
+      .then(() => murabbikPreparedEngineSrv.markDirty(tenant));
+    murabbikPreparedPendingInvalidationsSrv.set(tenant, pending);
+
+    void (async () => {
+      try {
+        // The event has been committed by its existing handler.
+        // Mark the prepared views dirty before releasing HTTP success.
+        await pending;
+        if (murabbikPreparedPendingInvalidationsSrv.get(tenant) === pending) {
+          murabbikPreparedUnsafeTenantsSrv.delete(tenant);
+        }
+      } catch (error) {
+        // The real event is already saved: do NOT falsely report that
+        // saving failed or cause the user to retry the actual event.
+        console.error('prepared invalidation failed', tenant, error);
+        murabbikPreparedUnsafeTenantsSrv.add(tenant);
+
+        // Carry the live-read safety choice across any different web
+        // instance reached by this browser. Prepared data expires in
+        // at most 5 minutes, so 10 minutes is a conservative bypass.
+        try {
+          response.cookie('mbk_prepared_bypass', '1', {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: req.secure ||
+              String(req.headers?.['x-forwarded-proto'] || '')
+                .split(',')[0].trim() === 'https',
+            path: '/',
+            maxAge: 10 * 60 * 1000
+          });
+        } catch (cookieError) {
+          console.error('prepared bypass cookie failed', cookieError);
+        }
+      } finally {
+        if (murabbikPreparedPendingInvalidationsSrv.get(tenant) === pending) {
+          murabbikPreparedPendingInvalidationsSrv.delete(tenant);
+        }
+        originalEnd.apply(response, args);
+      }
+    })();
+
+    return response;
+  };
 
   next();
 });
+
+
 
 
 
@@ -85251,7 +85321,9 @@ app.get("/api/smart-alerts", requireUserId, async (req, res) => {
 
 let result = null;
 
-if (murabbikPreparedServeSrv && murabbikPreparedEngineSrv) {
+
+if (murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
+
   const uid = req.authSession?.uid || req.userId;
 
   const prepared = await murabbikPreparedEngineSrv
@@ -85576,7 +85648,9 @@ app.post(
       let freshResult = null;
 let alert = null;
 
-if (murabbikPreparedServeSrv && murabbikPreparedEngineSrv) {
+
+if (murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
+
   const uid = req.authSession?.uid || req.userId;
 
   const prepared = await murabbikPreparedEngineSrv
@@ -91059,7 +91133,9 @@ singleHerdType
 }
 
 app.get('/api/herd-stats', requireUserId, async (req, res) => {
-  if (murabbikPreparedServeSrv && murabbikPreparedEngineSrv) {
+  
+if (murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
+
     const raw = String(req.query.type || req.query.species || '')
       .trim().toLowerCase();
 
