@@ -2557,113 +2557,77 @@ function refreshDashboardSmartAlert() {
     head
   );
 
-  const actions =
-    document.createElement(
-      'div'
-    );
+
+  const actions = document.createElement('div');
 
   actions.className =
     'mbk-smart-alert-actions';
 
-  if (alert.actionText) {
-    const primaryButton =
-      document.createElement(
-        'button'
-      );
+  if (!isDailyGreeting) {
 
-    primaryButton.type =
-      'button';
+    // زر التنفيذ لا يغلق التنبيه.
+    if (
+      alert.actionDisabled !== true &&
+      alert.actionUrl
+    ) {
+      const primaryButton =
+        document.createElement('button');
 
-    primaryButton.className =
-      'mbk-smart-alert-primary';
+      primaryButton.type = 'button';
 
-    primaryButton.textContent =
-      String(
-        alert.actionText
-      );
+      primaryButton.className =
+        'mbk-smart-alert-primary';
 
-    const actionDisabled =
-      alert.actionDisabled ===
-      true;
+      primaryButton.textContent =
+        alert.status === 'needs_data'
+          ? 'مراجعة البيانات'
+          : 'اذهب للتنفيذ';
 
-    primaryButton.disabled =
-      actionDisabled;
+      primaryButton.addEventListener(
+        'click',
+        () => {
+          primaryButton.disabled = true;
 
-    if (actionDisabled) {
-      primaryButton.setAttribute(
-        'aria-disabled',
-        'true'
-      );
-
-} else {
-  primaryButton
-    .addEventListener(
-      'click',
-      async () => {
-        primaryButton.disabled =
-          true;
-
-        try {
-          const data =
-            await respondMurabbikSmartAlert(
-              alert,
-              'acknowledged',
-              true
+          try {
+            const target = new URL(
+              String(alert.actionUrl),
+              location.href
             );
 
-          /*
-           * السيرفر رجّع التنبيه التالي بالفعل.
-           * نسمح للمتصفح برسمه أولًا،
-           * ثم نفتح صفحة الحدث.
-           */
-          await new Promise(
-            resolve =>
-              requestAnimationFrame(
-                () =>
-                  requestAnimationFrame(
-                    resolve
-                  )
+            if (
+              target.origin !== location.origin ||
+              !['http:', 'https:'].includes(
+                target.protocol
               )
-          );
+            ) {
+              throw new Error(
+                'smart_alert_action_url_invalid'
+              );
+            }
 
-          if (!data.navigateUrl) {
-            throw new Error(
-              'smart_alert_action_url_missing'
+            // فتح الصفحة ليس تنفيذًا للمهمة.
+            // لا نحفظ acknowledged.
+            location.assign(target.href);
+
+          } catch (e) {
+            primaryButton.disabled = false;
+
+            console.warn(
+              'murabbik smart alert navigation failed',
+              e
             );
           }
-
-          location.href =
-            String(
-              data.navigateUrl
-            );
-
-        } catch (e) {
-          primaryButton.disabled =
-            false;
-
-          console.warn(
-            'murabbik smart alert action response failed',
-            e
-          );
         }
-      }
-    );
-}
-
-    actions.appendChild(
-      primaryButton
-    );
-  }
-
-  // تحية المستخدم = حسنًا فقط.
-  if (!isDailyGreeting) {
-    const laterButton =
-      document.createElement(
-        'button'
       );
 
-    laterButton.type =
-      'button';
+      actions.appendChild(primaryButton);
+    }
+
+    // زر التأجيل الذكي.
+    const laterButton =
+      document.createElement('button');
+
+    laterButton.type = 'button';
 
     laterButton.className =
       'mbk-smart-alert-later';
@@ -2671,56 +2635,58 @@ function refreshDashboardSmartAlert() {
     laterButton.textContent =
       'ذكّرني لاحقًا';
 
-    laterButton
-      .addEventListener(
-        'click',
-        async () => {
-          laterButton.disabled =
-            true;
-
-          try {
-            await respondMurabbikSmartAlert(
-              alert,
-              'snoozed'
-            );
-
-          } catch (e) {
-            laterButton.disabled =
-              false;
-
-            console.warn(
-              'murabbik smart alert snooze failed',
-              e
-            );
-          }
-        }
-      );
-
-    actions.appendChild(
-      laterButton
-    );
-  }
-
-  const okButton =
-    document.createElement(
-      'button'
-    );
-
-  okButton.type =
-    'button';
-
-  okButton.className =
-    'mbk-smart-alert-later mbk-smart-alert-ok';
-
-  okButton.textContent =
-    'حسنًا';
-
-  okButton
-    .addEventListener(
+    laterButton.addEventListener(
       'click',
       async () => {
-        okButton.disabled =
-          true;
+        laterButton.disabled = true;
+
+        const previousAlerts =
+          dashboardAlertSources.murabbik.slice();
+
+        // استجابة مرئية فورية.
+        dashboardAlertSources.murabbik = [];
+        refreshDashboardSmartAlert();
+
+        try {
+          await respondMurabbikSmartAlert(
+            alert,
+            'snoozed'
+          );
+
+        } catch (e) {
+          // عند فشل الحفظ يعود التنبيه.
+          dashboardAlertSources.murabbik =
+            previousAlerts;
+
+          refreshDashboardSmartAlert();
+
+          console.warn(
+            'murabbik smart alert snooze failed',
+            e
+          );
+        }
+      }
+    );
+
+    actions.appendChild(laterButton);
+
+  } else {
+
+    // التحية اليومية فقط تحتفظ بزر حسنًا.
+    const okButton =
+      document.createElement('button');
+
+    okButton.type = 'button';
+
+    okButton.className =
+      'mbk-smart-alert-later mbk-smart-alert-ok';
+
+    okButton.textContent = 'حسنًا';
+
+    okButton.addEventListener(
+      'click',
+      async () => {
+        okButton.disabled = true;
 
         try {
           await respondMurabbikSmartAlert(
@@ -2729,24 +2695,21 @@ function refreshDashboardSmartAlert() {
           );
 
         } catch (e) {
-          okButton.disabled =
-            false;
+          okButton.disabled = false;
 
           console.warn(
-            'murabbik smart alert acknowledge failed',
+            'murabbik greeting acknowledge failed',
             e
           );
         }
       }
     );
 
-  actions.appendChild(
-    okButton
-  );
+    actions.appendChild(okButton);
+  }
 
-  modal.appendChild(
-    actions
-  );
+  modal.appendChild(actions);
+
 
   host.appendChild(
     modal
