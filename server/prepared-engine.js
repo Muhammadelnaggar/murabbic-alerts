@@ -348,7 +348,15 @@ function createPreparedEngine({
         const job = await claim(doc.ref);
         if (!job?.tenant) return;
         try {
+          const startedAtMs = Date.now();
+
           await build(job);
+
+          console.log('[prepared-worker-time]', {
+            tenant: job.tenant,
+            kinds: job.kinds,
+            durationMs: Date.now() - startedAtMs
+          });
         } catch (e) {
           console.warn('prepared build retry', job.tenant, e.message);
           await db.runTransaction(async tx => {
