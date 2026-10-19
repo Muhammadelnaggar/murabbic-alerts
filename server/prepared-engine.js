@@ -8,6 +8,7 @@ const V = 'murabbikPreparedViews';
 const KINDS = Object.freeze(['alerts', 'stats:cows', 'stats:buffalo']);
 const TTL_MS = 5 * 60 * 1000;
 const LEASE_MS = 15 * 60 * 1000;
+const HOLD_RECOVERY_MS = LEASE_MS;
 const RETRY_MS = 30 * 1000;
 const REFRESH_EARLY_MS = 15 * 1000;
 const POLL_MS = 12 * 1000;
@@ -61,7 +62,8 @@ function createPreparedEngine({
   profilesForTenant,
   calculateAlerts,
   calculateStats,
-  seedTenants
+  seedTenants,
+  recoverGroups
 }) {
   if (!db || !profilesForTenant || !calculateAlerts ||
       !calculateStats || !seedTenants) {
@@ -81,32 +83,89 @@ function createPreparedEngine({
   let unsubscribe = null;
   const seenQueueGenerations = new Map();
 
-  async function markDirty(tenant, kinds = KINDS) {
+  async function markDirty(tenant, kinds = KINDS, options = {}) {
     tenant = clean(tenant);
     if (!tenant) return;
-    const selected = [...new Set(kinds)].filter(k => KINDS.includes(k));
+
+    const selected = [...new Set(kinds)]
+      .filter(k => KINDS.includes(k));
     if (!selected.length) return;
+
+    const groupToken = clean(options.groupToken);
     const ref = qref(tenant);
+
     await db.runTransaction(async tx => {
       const snap = await tx.get(ref);
       const old = snap.exists ? snap.data() || {} : {};
+
       const generations = Object.fromEntries(
         KINDS.map(kind => [kind, targetGeneration(old, kind)])
       );
+
+      const heldByKind = {...(old.heldByKind || {})};
+      const heldSinceByKind = {...(old.heldSinceByKind || {})};
+      const now = Date.now();
+
       for (const kind of selected) {
         generations[kind] = targetGeneration(old, kind) + 1;
+        if (groupToken) {
+          heldByKind[kind] = groupToken;
+          heldSinceByKind[kind] = now;
+        }
       }
-      const now = Date.now();
-      const activeLeaseUntil = numberOr(old.leaseUntilMs, 0);
+      const activeLeaseUntil =
+        numberOr(old.leaseUntilMs, 0);
+
       tx.set(ref, {
         tenant,
         generation: numberOr(old.generation, 0) + 1,
         generations,
-        // Leased work will observe the new generation and reschedule it.
-        // Do not let a leased farm block the due-queue's first page.
-        runAtMs: activeLeaseUntil > now ? activeLeaseUntil : now,
+        heldByKind,
+        heldSinceByKind,
+        runAtMs:
+         activeLeaseUntil > now
+          ? activeLeaseUntil : now,
         changedAtMs: now
       }, {merge: true});
+    });
+  }
+
+  async function releaseHeld(tenant, completedTokens = []) {
+    tenant = clean(tenant);
+
+    const tokens = new Set(
+      completedTokens.map(clean).filter(Boolean)
+    );
+    if (!tenant || !tokens.size) return 0;
+
+    return db.runTransaction(async tx => {
+      const ref = qref(tenant);
+      const snap = await tx.get(ref);
+      if (!snap.exists) return 0;
+
+      const old = snap.data() || {};
+      const heldByKind = {...(old.heldByKind || {})};
+      const heldSinceByKind = {...(old.heldSinceByKind || {})};
+      let released = 0;
+
+      for (const kind of KINDS) {
+        if (tokens.has(clean(heldByKind[kind]))) {
+          delete heldByKind[kind];
+          delete heldSinceByKind[kind];
+          released++;
+        }
+      }
+
+      if (released) {
+        const now = Date.now();
+        tx.update(ref, {
+          heldByKind,
+          heldSinceByKind,
+          runAtMs: now,
+          changedAtMs: now
+        });
+      }
+      return released;
     });
   }
 
@@ -158,7 +217,51 @@ function createPreparedEngine({
       const now = Date.now();
       if (numberOr(q.runAtMs, 0) > now ||
           numberOr(q.leaseUntilMs, 0) > now) return null;
-      const kinds = KINDS.filter(kind => needBuild(q, kind, now));
+
+      const held = KINDS.filter(
+        kind => !!q.heldByKind?.[kind]
+      );
+
+      const needsRecovery = held.some(kind =>
+        now - numberOr(
+          q.heldSinceByKind?.[kind],
+          numberOr(q.changedAtMs, now)
+        ) >= HOLD_RECOVERY_MS
+      );
+
+      if (needsRecovery) {
+        tx.update(ref, {
+          lease,
+          leaseUntilMs: now + LEASE_MS,
+          runAtMs: now + LEASE_MS
+        });
+
+        return {
+          tenant: q.tenant,
+          lease,
+          recoverGroups: true,
+          kinds: [],
+          heldTokens: Object.fromEntries(
+            held.map(kind => [
+              kind,
+              clean(q.heldByKind[kind])
+            ])
+          )
+        };
+      }
+
+      const selectable = KINDS.filter(
+        kind => !q.heldByKind?.[kind]
+      );
+
+      const dirtyKinds = selectable.filter(kind =>
+        targetGeneration(q, kind) !==
+        completedGeneration(q, kind)
+      );
+
+      const kinds = dirtyKinds.length
+        ? dirtyKinds
+        : selectable.filter(kind => needBuild(q, kind, now));
       if (!kinds.length) {
         // Legacy or concurrent queue scheduling: avoid a hot loop.
         tx.update(ref, {runAtMs: now + RETRY_MS});
@@ -228,6 +331,7 @@ function createPreparedEngine({
         await db.runTransaction(async tx => {
           const q = await tx.get(qref(tenant));
           if (!q.exists || q.data().lease !== lease ||
+              q.data().heldByKind?.[kind] ||
               targetGeneration(q.data(), kind) !== generation) {
             throw new Error('Prepared generation/lease superseded');
           }
@@ -262,6 +366,7 @@ function createPreparedEngine({
       const ref = qref(tenant);
       const snap = await tx.get(ref);
       if (!snap.exists || snap.data().lease !== lease ||
+          snap.data().heldByKind?.[kind] ||
           targetGeneration(snap.data(), kind) !== generation) {
         throw new Error('Prepared publish superseded');
       }
@@ -278,7 +383,76 @@ function createPreparedEngine({
   }
 
   async function build(job) {
-    const profiles = await profilesForTenant(job.tenant);
+    if (job.recoverGroups) {
+      if (typeof recoverGroups !== 'function') {
+        throw new Error(
+          'Held group recovery callback unavailable'
+        );
+      }
+
+      // لا نفك الحجز إلا بعد إعادة بناء ناجحة.
+      const result = await recoverGroups(job.tenant);
+
+      if (!result || result.ok !== true) {
+        throw new Error(
+          'Held groups recovery did not complete'
+        );
+      }
+
+      await db.runTransaction(async tx => {
+        const ref = qref(job.tenant);
+        const snap = await tx.get(ref);
+
+        if (
+          !snap.exists ||
+          snap.data().lease !== job.lease
+        ) {
+          throw new Error(
+            'Held groups recovery lease superseded'
+          );
+        }
+
+        const meta = snap.data() || {};
+
+        const heldByKind = {
+          ...(meta.heldByKind || {})
+        };
+
+        const heldSinceByKind = {
+          ...(meta.heldSinceByKind || {})
+        };
+
+        for (const [kind, token] of Object.entries(
+          job.heldTokens
+        )) {
+          // حفظ أحدث = رمز مختلف = لا نفك حجزه.
+          if (
+            token &&
+            clean(heldByKind[kind]) === token
+          ) {
+            delete heldByKind[kind];
+            delete heldSinceByKind[kind];
+          }
+        }
+
+        const now = Date.now();
+
+        tx.update(ref, {
+          heldByKind,
+          heldSinceByKind,
+          lease: null,
+          leaseUntilMs: 0,
+          runAtMs: now,
+          changedAtMs: now
+        });
+      });
+
+      rerun = true;
+      return;
+    }
+
+    const profiles =
+    await profilesForTenant(job.tenant);
     if (!Array.isArray(profiles)) throw new Error('Profiles must be array');
     const validProfiles = profiles.filter(p => clean(p?.uid));
     if (!validProfiles.length) {
@@ -427,7 +601,7 @@ function createPreparedEngine({
     unsubscribe = null;
   }
 
-  return {markDirty, getReady, start, stop};
+  return {markDirty, releaseHeld, getReady, start, stop};
 }
 
 module.exports = {createPreparedEngine};

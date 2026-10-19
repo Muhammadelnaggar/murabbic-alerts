@@ -202,6 +202,7 @@ const API_BASE = "";
 let currentType = '';
 let currentTHI = null;
 let herdStatsRequestSeq = 0;
+let mbkPreparedStatsRetryCount = 0;
 
 function prodState(deltaPct){
   const a = Math.abs(Number(deltaPct || 0));
@@ -1431,6 +1432,7 @@ try {
   });
 
   const stats = await statsPromise;
+  mbkPreparedStatsRetryCount = 0;
 
 if (
   requestSeq !==
@@ -2125,8 +2127,35 @@ renderMiniGauge("g_bred", bredPct);
     statusBar.textContent = 'تم التحديث من بيانات حسابك.';
   }
   catch(e){
+    if (requestSeq !== herdStatsRequestSeq) return;
+
     console.error('herd stats error', e);
-    document.getElementById('statusBar').textContent =
+
+    if (/\/api\/herd-stats.* 503$/.test(
+      String(e?.message || '')
+    )) {
+      statusBar.textContent =
+        'مؤشرات القطيع قيد التحديث.';
+
+      if (mbkPreparedStatsRetryCount < 5) {
+        mbkPreparedStatsRetryCount++;
+
+        setTimeout(() => {
+          if (
+            !document.hidden &&
+            requestSeq === herdStatsRequestSeq
+          ) {
+            loadHerdKPIs();
+          }
+        }, 1800);
+      }
+
+      return;
+    }
+
+    mbkPreparedStatsRetryCount = 0;
+
+    statusBar.textContent =
       'فشل تحميل بيانات القطيع. تأكد من تسجيل الدخول.';
   }
 }
@@ -2753,6 +2782,7 @@ function dashboardMurabbikUiAlert(
 }
 
 let mbkSmartAlertsGetPending = false;
+let mbkPreparedAlertsRetryCount = 0;
 let mbkSmartAlertsRefreshQueued = false;
 let mbkSmartAlertsResponseEpoch = 0;
 
@@ -2883,6 +2913,22 @@ async function loadMurabbikSmartAlerts() {
       expectedEpoch !== mbkSmartAlertsResponseEpoch ||
       expectedUserId !== currentUserId
     ) return;
+
+    if (r.status === 503) {
+  // الاحتفاظ بالتنبيه الحالي حتى تصل بيانات جديدة
+  if (mbkPreparedAlertsRetryCount < 5) {
+    mbkPreparedAlertsRetryCount++;
+
+    setTimeout(
+      loadMurabbikSmartAlerts,
+      1800
+    );
+  }
+
+  return;
+}
+
+    mbkPreparedAlertsRetryCount = 0;
 
     dashboardAlertSources.murabbik =
       data?.ok === true && data?.currentAlert

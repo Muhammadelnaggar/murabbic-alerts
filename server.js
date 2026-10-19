@@ -87,22 +87,272 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 const murabbikPreparedReadOnlyPostsSrv = new Set([
   '/api/nutrition/targets',
   '/api/nutrition/analyze-ration',
-  '/api/add-animal/import-preview'
+  '/api/add-animal/import-preview',
+  '/api/vaccination/campaign/prepare',
+  '/api/vaccination/farm-program/preview-row'
 ]);
+
+const murabbikPreparedKindsAllSrv = [
+  'alerts',
+  'stats:cows',
+  'stats:buffalo'
+];
+
+const murabbikPreparedFailedKindsSrv = new Map();
+const murabbikPreparedGroupTokenSrv = new Map();
+const murabbikPreparedGroupTokensSrv = new Map();
+const murabbikPreparedGroupRunSrv = new Map();
+
+function murabbikPreparedSpeciesKindSrv(row = {}) {
+  const raw = [
+    row.species,
+    row.animaltype,
+    row.animalTypeAr,
+    row.animalType,
+    row.type
+  ].map(v => String(v || '')).join(' ');
+
+  if (/buffalo|جاموس/i.test(raw)) return 'stats:buffalo';
+  if (/cow|cattle|بقر|أبقار|ابقار/i.test(raw)) {
+    return 'stats:cows';
+  }
+  return '';
+}
+
+async function murabbikPreparedKindsForSavedSrv(
+  req,
+  responseChunk
+) {
+  let result;
+
+  try {
+    const content = Buffer.isBuffer(responseChunk)
+      ? responseChunk.toString('utf8')
+      : String(responseChunk || '');
+
+    result = JSON.parse(content);
+  } catch (_) {
+    return murabbikPreparedKindsAllSrv;
+  }
+
+  if (!result || result.ok === false ||
+      result.savedCount === 0) return [];
+
+  const route = String(req.path || '').toLowerCase();
+
+  if (
+    /^\/api\/(auth|subscription|billing|admin\/billing)\//.test(route) ||
+    /\/training\/save$/.test(route) ||
+    route === '/api/subscription/first-value'
+  ) return [];
+
+  if (
+    /^\/api\/(admin\/accounts|billing\/checkout|admin\/events\/normalize)/
+      .test(route)
+  ) return [];
+
+  if (route === '/api/nutrition/milk-prices') {
+    const data = req.body || {};
+
+    const explicit = murabbikPreparedSpeciesKindSrv({
+      species: data.type || data.species || data.herdType
+    });
+
+    if (explicit) return [explicit];
+
+    const chosen = [];
+
+    if (Object.prototype.hasOwnProperty.call(
+      data, 'cowMilkPrice'
+    )) chosen.push('stats:cows');
+
+    if (Object.prototype.hasOwnProperty.call(
+      data, 'buffaloMilkPrice'
+    )) chosen.push('stats:buffalo');
+
+    return chosen;
+  }
+
+  if (
+    /^\/api\/vaccination\/(program-mode|farm-program|dam-baseline\/save)$/
+      .test(route) ||
+    route === '/api/ovsynch/confirm-step'
+  ) return ['alerts'];
+
+  if (
+    /^\/api\/(add-animal\/(save|import)|herd-import-v2\/save-operational|animals\/archive|admin\/animals\/transfer-owner)$/
+      .test(route) ||
+    /^\/api\/groups\/(rebuild|settings|sync)$/.test(route)
+  ) return murabbikPreparedKindsAllSrv;
+
+  if (route === '/api/farm-location/save') {
+    return murabbikPreparedKindsAllSrv;
+  }
+
+  const saved = Array.isArray(result.saved)
+    ? result.saved.filter(row =>
+        row &&
+        typeof row === 'object' &&
+        !row.alreadyExists
+      )
+    : null;
+
+  if (saved && !saved.length) return [];
+
+  const rows = saved || [result];
+  const kinds = new Set(['alerts']);
+  const unresolvedNumbers = new Set();
+
+  let uncertain = false;
+
+  for (const row of rows) {
+    const speciesKind =
+      murabbikPreparedSpeciesKindSrv(row);
+
+    if (speciesKind) {
+      kinds.add(speciesKind);
+      continue;
+    }
+
+    const number = calvingNormDigitsOnlySrv(
+      row.animalNumber ||
+      row.number ||
+      row.calfNumber ||
+      row.event?.animalNumber ||
+      row.event?.animalId
+    );
+
+    if (number) unresolvedNumbers.add(number);
+    else uncertain = true;
+  }
+
+  if (unresolvedNumbers.size) {
+    const target = unresolvedNumbers;
+
+    if (target.size <= 3) {
+      const found = await Promise.all(
+        [...target].map(number =>
+          fetchAnimalByNumberForCalvingGateSrv(
+            req.userId,
+            number
+          )
+        )
+      );
+
+      for (const animal of found) {
+        const speciesKind = animal
+          ? murabbikPreparedSpeciesKindSrv(animal.data)
+          : '';
+
+        if (speciesKind) kinds.add(speciesKind);
+        else uncertain = true;
+      }
+    } else {
+      const snapshots = await Promise.allSettled([
+        db.collection('animals')
+          .where('userId', '==', req.userId).get(),
+
+        db.collection('calves')
+          .where('userId', '==', req.userId).get()
+      ]);
+
+      const matched = new Set();
+
+      for (const snapshot of snapshots) {
+        if (snapshot.status !== 'fulfilled') {
+          uncertain = true;
+          continue;
+        }
+
+        for (const doc of snapshot.value.docs) {
+          const data = doc.data() || {};
+
+          const number = calvingNormDigitsOnlySrv(
+            data.animalNumber ||
+            data.number ||
+            data.calfNumber
+          );
+
+          if (!target.has(number)) continue;
+          matched.add(number);
+
+          const speciesKind =
+            murabbikPreparedSpeciesKindSrv(data);
+
+          if (speciesKind) kinds.add(speciesKind);
+          else uncertain = true;
+        }
+      }
+
+      if (matched.size !== target.size) uncertain = true;
+    }
+  }
+
+  // لا نخاطر بترك نوع متأثر دون تحديث
+  // إذا كانت هوية الحيوان غير مؤكدة.
+  return uncertain || kinds.size === 1
+    ? murabbikPreparedKindsAllSrv
+    : [...kinds];
+}
 
 // A failed invalidation must never make this Web Service serve a
 // previously prepared result for the affected tenant.
 const murabbikPreparedUnsafeTenantsSrv = new Set();
 const murabbikPreparedPendingInvalidationsSrv = new Map();
 
-function murabbikPreparedCanServeSrv(req) {
+async function murabbikPreparedCanServeSrv(req) {
   const tenant = String(req.userId || '').trim();
-  const hasBypassCookie = /(?:^|;\s*)mbk_prepared_bypass=1(?:;|$)/
-    .test(String(req.headers?.cookie || ''));
 
-  return murabbikPreparedServeSrv &&
+  if (
+    !murabbikPreparedServeSrv ||
+    !murabbikPreparedEngineSrv ||
+    !tenant
+  ) return false;
+
+  const bypass =
+    /(?:^|;\s*)mbk_prepared_bypass=1(?:;|$)/
+      .test(String(req.headers?.cookie || ''));
+
+  const pending =
+    murabbikPreparedPendingInvalidationsSrv.get(tenant);
+
+  if (pending) {
+    try {
+      await pending;
+    } catch (_) {}
+  }
+
+  if (
     !murabbikPreparedUnsafeTenantsSrv.has(tenant) &&
-    !hasBypassCookie;
+    !bypass
+  ) return true;
+
+  try {
+    await murabbikPreparedEngineSrv.markDirty(
+      tenant,
+      murabbikPreparedFailedKindsSrv.get(tenant) ||
+        murabbikPreparedKindsAllSrv
+    );
+
+    murabbikPreparedFailedKindsSrv.delete(tenant);
+    murabbikPreparedUnsafeTenantsSrv.delete(tenant);
+
+    if (bypass && req.res) {
+      req.res.clearCookie(
+        'mbk_prepared_bypass',
+        {path: '/'}
+      );
+    }
+
+    return true;
+  } catch (e) {
+    console.warn(
+      'prepared invalidation recovery failed',
+      tenant,
+      e.message
+    );
+    return false;
+  }
 }
 
 app.use((req, res, next) => {
@@ -143,8 +393,28 @@ app.use((req, res, next) => {
     murabbikPreparedUnsafeTenantsSrv.add(tenant);
     const previous = murabbikPreparedPendingInvalidationsSrv
       .get(tenant) || Promise.resolve();
+    const groupToken =
+      murabbikPreparedGroupTokenSrv.get(tenant) || '';
+
     const pending = previous.catch(() => {})
-      .then(() => murabbikPreparedEngineSrv.markDirty(tenant));
+      .then(async () => {
+        const kinds = await murabbikPreparedKindsForSavedSrv(
+          req,
+          args[0]
+        );
+
+        if (!kinds.length) return;
+
+        murabbikPreparedFailedKindsSrv.set(tenant, kinds);
+
+        await murabbikPreparedEngineSrv.markDirty(
+          tenant,
+          kinds,
+          groupToken ? {groupToken} : {}
+        );
+
+        murabbikPreparedFailedKindsSrv.delete(tenant);
+      });
     murabbikPreparedPendingInvalidationsSrv.set(tenant, pending);
 
     void (async () => {
@@ -85392,6 +85662,43 @@ function murabbikSmartAlertLanguageSrv(alerts, animals) {
 }
 
 async function murabbikSmartAlertCollectSrv(req) {
+  if (process.env.MURABBIK_PREPARED_ROLE !== 'worker') {
+    const uid = req.authSession?.uid || req.userId;
+
+    const allowed =
+      await murabbikPreparedCanServeSrv(req);
+
+    if (allowed) {
+      const prepared = await murabbikPreparedEngineSrv
+        .getReady(req.userId, uid, 'alerts');
+
+      if (
+        prepared &&
+        Array.isArray(prepared.alerts) &&
+        prepared.today === await farmTodayISOSrv(uid)
+      ) {
+        return {
+          alerts: prepared.alerts,
+          sourceErrors: [],
+          context: {
+            req,
+            userId: req.userId,
+            profileUid: uid,
+            today: prepared.today,
+            nowMs: Date.now()
+          }
+        };
+      }
+    }
+
+    const error = new Error(
+      'Prepared alerts are not ready'
+    );
+
+    error.code = 'prepared_alerts_pending';
+    throw error;
+  }
+
   const context = {
     req,
     userId: req.userId,
@@ -85531,7 +85838,7 @@ app.get("/api/smart-alerts", requireUserId, async (req, res) => {
 let result = null;
 
 
-if (murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
+if (await murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
 
   const uid = req.authSession?.uid || req.userId;
 
@@ -85558,7 +85865,11 @@ if (murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
 }
 
 if (!result) {
-  result = await murabbikSmartAlertCollectSrv(req);
+  return res.status(503).json({
+    ok: false,
+    error: 'prepared_alerts_pending',
+    message: 'التنبيهات قيد التحديث، أعد المحاولة بعد قليل.'
+  });
 }
 
 const stateResult =
@@ -85858,7 +86169,7 @@ app.post(
 let alert = null;
 
 
-if (murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
+if (await murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
 
   const uid = req.authSession?.uid || req.userId;
 
@@ -85879,36 +86190,28 @@ if (murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
         item.revision === revision
     )
   ) {
-    try {
-      alert = await murabbikSmartAlertLiveResponseAlertSrv(
-        req,
-        alertId,
-        revision,
-        sourceHint
-      );
+    alert = prepared.alerts.find(item =>
+      item.id === alertId &&
+      item.revision === revision
+    ) || null;
 
-      freshResult = {
-        alerts: prepared.alerts,
-        sourceErrors: [],
-        context: {
-          today: prepared.today,
-          nowMs: Date.now()
-        }
-      };
-
-    } catch (e) {
-      console.warn('prepared POST validation failed', e);
-    }
+    freshResult = {
+      alerts: prepared.alerts,
+      sourceErrors: [],
+      context: {
+        today: prepared.today,
+        nowMs: Date.now()
+      }
+    };
   }
 }
 
 if (!freshResult) {
-  freshResult = await murabbikSmartAlertCollectSrv(req);
-
-  alert = freshResult.alerts.find(item =>
-    item.id === alertId &&
-    item.revision === revision
-  ) || null;
+  return res.status(503).json({
+    ok: false,
+    error: 'prepared_alerts_pending',
+    message: 'التنبيهات قيد التحديث، أعد المحاولة بعد قليل.'
+  });
 }
 
       if (!alert) {
@@ -91343,7 +91646,7 @@ singleHerdType
 
 app.get('/api/herd-stats', requireUserId, async (req, res) => {
   
-if (murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
+if (await murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
 
     const raw = String(req.query.type || req.query.species || '')
       .trim().toLowerCase();
@@ -91370,7 +91673,52 @@ if (murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
     }
   }
 
-  return murabbikHerdStatsBuildSrv(req, res);
+  if (
+    !String(
+      req.query.type ||
+      req.query.species ||
+      ''
+    ).trim() &&
+    await murabbikPreparedCanServeSrv(req)
+  ) {
+    const uid = req.authSession?.uid || req.userId;
+
+    try {
+      const [cows, buffalo] = await Promise.all([
+        murabbikPreparedEngineSrv.getReady(
+          req.userId,
+          uid,
+          'stats:cows'
+        ),
+        murabbikPreparedEngineSrv.getReady(
+          req.userId,
+          uid,
+          'stats:buffalo'
+        )
+      ]);
+
+      const selected = cows?.hasCows
+        ? cows
+        : buffalo?.hasBuffalo
+          ? buffalo
+          : cows || buffalo;
+
+      if (selected?.ok === true) {
+        return res.json(selected);
+      }
+    } catch (e) {
+      console.warn(
+        'prepared stats default read failed',
+        e
+      );
+    }
+  }
+
+  return res.status(503).json({
+    ok: false,
+    error: 'prepared_stats_pending',
+    message: 'مؤشرات القطيع قيد التحديث، أعد المحاولة بعد قليل.'
+  });
 });
 // ============================================================
 //       API: HERD INVENTORY + CULLING REPORT
@@ -107994,37 +108342,126 @@ const GROUP_DEFS_SRV = [
 
 const GROUP_DEF_BY_ID_SRV = Object.fromEntries(GROUP_DEFS_SRV.map(x => [x.id, x]));
 
-function scheduleGroupsRebuildSrv(tenant, reason = 'auto') {
+function scheduleGroupsRebuildSrv(
+  tenant,
+  reason = 'auto',
+  retry = 0
+) {
   const uid = String(tenant || '').trim();
   if (!uid || !db) return;
+
+  const token = crypto.randomUUID();
+
+  murabbikPreparedGroupTokenSrv.set(uid, token);
+
+  const allTokens =
+    murabbikPreparedGroupTokensSrv.get(uid) || new Set();
+
+  allTokens.add(token);
+  murabbikPreparedGroupTokensSrv.set(uid, allTokens);
 
   const old = AUTO_GROUP_REBUILD_TIMERS.get(uid);
   if (old) clearTimeout(old);
 
   const timer = setTimeout(async () => {
     AUTO_GROUP_REBUILD_TIMERS.delete(uid);
+
+    const prior =
+      murabbikPreparedGroupRunSrv.get(uid) ||
+      Promise.resolve();
+
+    const operation = prior.catch(() => {})
+      .then(() =>
+        rebuildGroupsForTenantSrv(uid, {reason})
+      );
+
+    murabbikPreparedGroupRunSrv.set(uid, operation);
+
     try {
-      const r = await rebuildGroupsForTenantSrv(uid, { reason });
-      console.log('✅ groups auto rebuild:', { uid, reason, groups: r?.groupsCount, members: r?.membersCount });
-    } catch (e) {
-      console.error('❌ groups auto rebuild failed:', uid, reason, e.message || e);
-    } finally {
+      const result = await operation;
+
+      console.log('✅ groups auto rebuild:', {
+        uid,
+        reason,
+        groups: result?.groupsCount,
+        members: result?.membersCount
+      });
+
+      if (
+        murabbikPreparedGroupTokenSrv.get(uid) !== token ||
+        AUTO_GROUP_REBUILD_TIMERS.has(uid)
+      ) return;
+
+      const pending =
+        murabbikPreparedPendingInvalidationsSrv.get(uid);
+
+      if (pending) await pending.catch(() => {});
+
+      if (
+        murabbikPreparedGroupTokenSrv.get(uid) !== token ||
+        AUTO_GROUP_REBUILD_TIMERS.has(uid)
+      ) return;
+
       if (
         murabbikPreparedEngineSrv &&
         process.env.MURABBIK_PREPARED_ROLE !== 'worker'
       ) {
-        try {
-          await murabbikPreparedEngineSrv.markDirty(uid);
-        } catch (error) {
-          console.error(
-            'prepared group invalidation failed:',
+        const completedTokens = [
+          ...(murabbikPreparedGroupTokensSrv.get(uid) ||
+            [])
+        ];
+
+        const released =
+          await murabbikPreparedEngineSrv.releaseHeld(
             uid,
-            error.message || error
+            completedTokens
           );
+
+        if (!released) {
+          await murabbikPreparedEngineSrv.markDirty(uid);
+        }
+
+        const current =
+          murabbikPreparedGroupTokensSrv.get(uid);
+
+        if (current) {
+          completedTokens.forEach(t => current.delete(t));
+
+          if (!current.size) {
+            murabbikPreparedGroupTokensSrv.delete(uid);
+          }
         }
       }
+
+      if (murabbikPreparedGroupTokenSrv.get(uid) === token) {
+        murabbikPreparedGroupTokenSrv.delete(uid);
+      }
+    } catch (e) {
+      console.error(
+        '❌ groups auto rebuild failed:',
+        uid,
+        reason,
+        e.message || e
+      );
+
+      if (
+        retry < 2 &&
+        murabbikPreparedGroupTokenSrv.get(uid) === token
+      ) {
+        scheduleGroupsRebuildSrv(
+          uid,
+          reason,
+          retry + 1
+        );
+      }
+    } finally {
+      if (
+        murabbikPreparedGroupRunSrv.get(uid) === operation
+      ) {
+        murabbikPreparedGroupRunSrv.delete(uid);
+      }
     }
-  }, 1200);
+  }, retry ? 3000 : 1200);
 
   AUTO_GROUP_REBUILD_TIMERS.set(uid, timer);
 }
@@ -129672,6 +130109,21 @@ app.use(async (req, res, next) => {
 if (db && process.env.MURABBIK_PREPARED_VIEWS === '1') {
   murabbikPreparedEngineSrv = createPreparedEngine({
     db,
+
+    recoverGroups: async tenant => {
+      const result = await rebuildGroupsForTenantSrv(
+        tenant,
+        {reason: 'prepared_stale_hold_recovery'}
+      );
+
+      if (!result || result.ok !== true) {
+        throw new Error(
+          'Prepared group recovery failed'
+        );
+      }
+
+      return result;
+    },
 
     profilesForTenant: async tenant => {
       const byUid = new Map();
