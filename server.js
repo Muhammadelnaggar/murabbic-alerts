@@ -84,13 +84,16 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+
 const murabbikPreparedReadOnlyPostsSrv = new Set([
   '/api/nutrition/targets',
   '/api/nutrition/analyze-ration',
   '/api/add-animal/import-preview',
+  '/api/herd-import-v2/inspect-external',
   '/api/vaccination/campaign/prepare',
   '/api/vaccination/farm-program/preview-row'
 ]);
+
 
 const murabbikPreparedKindsAllSrv = [
   'alerts',
@@ -14271,6 +14274,97 @@ seedEventsConfidence: animalsInternal.length
     readyForSavePreview: animalsInternal.length > 0 && totalSeedEventsCount > 0
   };
 }
+
+ // HERD IMPORT V2 — external files: inspection only, NEVER writes
+app.post('/api/herd-import-v2/inspect-external', requireUserId, (req, res) => {
+  try {
+    const body = req.body || {};
+    const fileName = String(body.fileName || '').trim();
+    const fileBase64 = String(body.fileBase64 || '').trim();
+
+    if (!/\.(xlsx|xls|csv|txt)$/i.test(fileName) || !fileBase64) {
+      return res.status(400).json({
+        ok: false,
+        message: 'اختر ملف Excel أو CSV أو TXT صالحًا.'
+      });
+    }
+
+    const buf = addAnimalImportDecodeBase64Srv(fileBase64);
+
+    if (!buf.length || buf.length > 6 * 1024 * 1024) {
+      return res.status(400).json({
+        ok: false,
+        message: 'الملف فارغ أو أكبر من 6 ميجابايت.'
+      });
+    }
+
+    const XLSX = require('xlsx');
+    const wb = XLSX.read(buf, { type: 'buffer' });
+    const sheetNames = wb.SheetNames || [];
+
+    if (!sheetNames.length || sheetNames.length > 16) {
+      return res.status(400).json({
+        ok: false,
+        message: 'الملف بلا جداول قابلة للقراءة أو يحتوي على أكثر من 16 جدولًا.'
+      });
+    }
+
+    const sheets = sheetNames.map(name => {
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {
+        defval: '',
+        raw: false,
+        blankrows: false
+      });
+
+      const sample = addAnimalImportNormalizeSheetRowsSrv(
+        rows.slice(0, 30)
+      );
+
+      const profile = herdImportV2DetectSourceProfileSrv(sample);
+
+      const mapping = herdImportV2BuildColumnMappingInternalSrv(
+        sample,
+        profile.key
+      );
+
+      const matchedFields = Object.entries(mapping.columnMapInternal)
+        .map(([column, detail]) => ({
+          column,
+          meaning: detail.canonical
+        }));
+
+      return {
+        name,
+        rowsCount: rows.length,
+        sourceProfile: herdImportV2PublicSourceProfileSrv(profile),
+        matchedFields,
+        unmappedColumnsCount: mapping.unmappedColumnsCount,
+        hasAnimalNumber: matchedFields.some(
+          x => x.meaning === 'animalNumber'
+        )
+      };
+    });
+
+    return res.json({
+      ok: true,
+      inspectOnly: true,
+      saveEnabled: false,
+      sheets,
+      message:
+        'اكتمل فحص بنية الملف. لم تُحفظ أي بيانات؛ تحويل الأحداث والتحقق من الموسم الحالي لم يكتمل بعد.'
+    });
+
+  } catch (err) {
+    console.error('herd-import external inspection failed', err);
+
+    return res.status(400).json({
+      ok: false,
+      message:
+        'تعذّرت قراءة بنية الملف الخارجي. راجع نوع الملف وتنسيقه.'
+    });
+  }
+});
+
 app.get("/api/herd-import-v2/guide", requireUserId, (req, res) => {
   return res.json({
     ok: true,

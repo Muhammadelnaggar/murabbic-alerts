@@ -62,6 +62,37 @@
   </div>
 </section>
 
+<section class="card">
+  <h2>ملف من نظام آخر — فحص أولي دون حفظ</h2>
+
+  <label for="externalFile">
+    ملف تصدير Excel أو CSV أو TXT
+  </label>
+
+  <input
+    id="externalFile"
+    type="file"
+    accept=".xlsx,.xls,.csv,.txt"
+  />
+
+  <div class="actions-bar inline">
+    <button
+      id="btnInspectExternal"
+      type="button"
+      class="ghost"
+    >
+      تحليل بنية الملف
+    </button>
+  </div>
+
+  <div
+    id="externalInspectResult"
+    class="hint"
+    style="white-space:pre-wrap"
+    role="status"
+  ></div>
+</section>
+
 <section id="importGuideBox" class="card" style="display:none;">
   <h2 id="importGuideTitle"></h2>
   <div id="importGuideIntro" class="hint"></div>
@@ -615,6 +646,98 @@ async function callHerdImport(path){
     btnGuide.disabled = false;
   }
 });
+
+const externalFile = $('externalFile');
+const btnInspectExternal = $('btnInspectExternal');
+const externalInspectResult = $('externalInspectResult');
+
+externalFile.addEventListener('change', () => {
+  externalInspectResult.textContent = '';
+  lastFilePayload = null;
+  lastPreviewOk = false;
+  btnSave.disabled = true;
+  summaryBox.style.display = 'none';
+  resultsBox.style.display = 'none';
+});
+
+btnInspectExternal.addEventListener('click', async () => {
+  const file = externalFile.files && externalFile.files[0];
+
+  if (!file) {
+    showMessage('اختر ملف النظام الخارجي أولًا.', 'status-error');
+    return;
+  }
+
+  btnInspectExternal.disabled = true;
+  btnSave.disabled = true;
+  lastPreviewOk = false;
+  externalInspectResult.textContent = '';
+
+  try {
+    if (file.size > 6 * 1024 * 1024) {
+      throw new Error('حجم الملف أكبر من 6 ميجابايت.');
+    }
+
+    lastFilePayload = {
+      fileName: file.name,
+      fileBase64: await fileToBase64(file)
+    };
+
+    const result = await callHerdImport(
+      '/api/herd-import-v2/inspect-external'
+    );
+
+    if (result.ok !== true) {
+      throw new Error(result.message || 'فشل فحص الملف.');
+    }
+
+    const lines = [result.message];
+
+    for (const sheet of result.sheets || []) {
+      lines.push(`\n${sheet.name}: ${sheet.rowsCount} صف`);
+
+      lines.push(
+        `المصدر المحتمل: ${sheet.sourceProfile?.name || 'غير معروف'}`
+      );
+
+      lines.push(
+        `درجة المطابقة: ${sheet.sourceProfile?.confidenceLevel || 'غير معروفة'}`
+      );
+
+      lines.push(
+        `الحقول المعروفة: ${
+          (sheet.matchedFields || [])
+            .map(x => `${x.column} ← ${x.meaning}`)
+            .join('، ') || 'لا توجد'
+        }`
+      );
+
+      if (!sheet.hasAnimalNumber) {
+        lines.push(
+          'تحذير: لم يتم التعرف على عمود رقم الحيوان.'
+        );
+      }
+    }
+
+    externalInspectResult.textContent = lines.join('\n');
+
+    showMessage(
+      'انتهى فحص الملف الخارجي دون حفظ.',
+      'status-ok'
+    );
+
+  } catch (e) {
+    showMessage(
+      e.message || 'تعذّر تحليل الملف.',
+      'status-error'
+    );
+
+  } finally {
+    lastFilePayload = null;
+    btnInspectExternal.disabled = false;
+  }
+});
+
   herdFile.addEventListener("change", () => {
   lastFilePayload = null;
   lastPreviewOk = false;
