@@ -712,6 +712,35 @@ btnInspectExternal.addEventListener('click', async () => {
         }`
       );
 
+const info = sheet.semanticInspection || {};
+
+if (info.kind === 'dairycomp_event_log') {
+  lines.push(`نوع البيانات: ${info.label}`);
+  lines.push(`حيوانات مختلفة: ${info.distinctAnimals}`);
+  lines.push(
+    `حيوانات لها تاريخ ولادة معروف: ${info.animalsWithKnownCalving}`
+  );
+  lines.push(
+    `أحداث مرشحة منذ آخر ولادة معروفة: ${info.candidateSeasonEvents}`
+  );
+  lines.push(`تواريخ أحداث غير صالحة: ${info.invalidEventDates}`);
+  lines.push(
+    `الأحداث: ${(info.eventCounts || [])
+      .map(x => `${x.event}: ${x.count}`).join('، ')}`
+  );
+} else if (info.kind === 'afimilk_sessions') {
+  lines.push(`نوع البيانات: ${info.label}`);
+  lines.push(`حيوانات مختلفة: ${info.distinctAnimals}`);
+  lines.push(`أيام حليب للحيوانات: ${info.distinctAnimalDays}`);
+  lines.push(
+    `جلسات صالحة: ${info.validSessions}؛ مكررة: ${info.duplicateSessionRows}؛ غير صالحة: ${info.invalidSessions}`
+  );
+  lines.push(
+    `مجموع اللبن في الجلسات: ${info.milkKgAcrossSessions} كجم`
+  );
+  lines.push(info.note || '');
+}
+
       if (!sheet.hasAnimalNumber) {
         lines.push(
           'تحذير: لم يتم التعرف على عمود رقم الحيوان.'

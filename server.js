@@ -12332,7 +12332,7 @@ function herdImportV2MergeProfilePatchSrv(profileKey, patch = {}) {
       pregDays: ["DCC"],
       servicesCount: ["TIMES"],
 
-      lastCalvingDate: ["FRESH"],
+      lastCalvingDate: ["FRESH", "FDAT"],
       lastInseminationDate: ["BRED"],
       dryOffDate: ["DRY"],
       heatDate: ["HEAT"],
@@ -12343,12 +12343,12 @@ function herdImportV2MergeProfilePatchSrv(profileKey, patch = {}) {
   // AfiFarm
   herdImportV2MergeProfilePatchSrv("afimilk", {
     groups: {
-      animalNumber: ["Cow ID"],
+      animalNumber: ["Cow ID", "Animal_Id"],
       birthDate: ["Birth Date"],
-      lactationNumber: ["Lact"],
+      lactationNumber: ["Lact", "Lactation_Num"],
       sireNumber: ["Sire"],
       reproductiveStatus: ["Rep. Status"],
-      daysInMilk: ["DIM"],
+      daysInMilk: ["DIM", "Days_in_Milk"],
       dailyMilk: ["Daily Milk"],
       pregDays: ["Days Pregnant"],
       servicesCount: ["Ins. Number"],
@@ -14275,6 +14275,226 @@ seedEventsConfidence: animalsInternal.length
   };
 }
 
+function herdImportV2ExternalDateStrictSrv(value, order = 'mdy') {
+  const raw = String(value ?? '').trim();
+  if (!raw || /^0{8}$/.test(raw)) return '';
+
+  let yy, mm, dd;
+  let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (m) {
+    yy = Number(m[1]);
+    mm = Number(m[2]);
+    dd = Number(m[3]);
+  } else {
+    m = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+    if (!m) return '';
+
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+
+    [mm, dd] = order === 'dmy' ? [b, a] : [a, b];
+    yy = Number(m[3]);
+
+    if (yy < 100) yy += yy >= 70 ? 1900 : 2000;
+  }
+
+  if (
+    !Number.isInteger(yy) || yy < 1900 || yy > 2100 ||
+    !Number.isInteger(mm) || mm < 1 || mm > 12 ||
+    !Number.isInteger(dd) || dd < 1 || dd > 31
+  ) return '';
+
+  const dt = new Date(Date.UTC(yy, mm - 1, dd));
+
+  if (
+    dt.getUTCFullYear() !== yy ||
+    dt.getUTCMonth() !== mm - 1 ||
+    dt.getUTCDate() !== dd
+  ) return '';
+
+  return dt.toISOString().slice(0, 10);
+}
+
+function herdImportV2InspectExternalSemanticsSrv(rows = []) {
+  const headers = new Set(
+    herdImportV2UniqueHeadersSrv(rows).map(addAnimalImportNormKeySrv)
+  );
+
+  const has = name =>
+    headers.has(addAnimalImportNormKeySrv(name));
+
+  // DairyComp — event log, not one animal per row
+  if (
+    has('ID') && has('Event') && has('Date') &&
+    (has('LACT') || has('FDAT') || has('RC'))
+  ) {
+    const animals = new Set();
+    const counts = new Map();
+    const lastCalvings = new Map();
+    const parsed = [];
+
+    let invalidEventDates = 0;
+    let missingAnimalNumbers = 0;
+
+    const candidateCodes = new Set([
+      'FRESH', 'BRED', 'PREG', 'DRY', 'ABORT', 'HEAT'
+    ]);
+
+    for (const row of rows) {
+      const animal = String(
+        addAnimalImportPickAnySrv(row, ['ID']) || ''
+      ).trim();
+
+      const event = String(
+        addAnimalImportPickAnySrv(row, ['Event']) || ''
+      ).trim().toUpperCase();
+
+      const date = herdImportV2ExternalDateStrictSrv(
+        addAnimalImportPickAnySrv(row, ['Date']), 'mdy'
+      );
+
+      const fdat = herdImportV2ExternalDateStrictSrv(
+        addAnimalImportPickAnySrv(row, ['FDAT']), 'mdy'
+      );
+
+      if (!animal) {
+        missingAnimalNumbers++;
+      } else {
+        animals.add(animal);
+
+        if (fdat && fdat > (lastCalvings.get(animal) || '')) {
+          lastCalvings.set(animal, fdat);
+        }
+
+        if (
+          event === 'FRESH' && date &&
+          date > (lastCalvings.get(animal) || '')
+        ) {
+          lastCalvings.set(animal, date);
+        }
+      }
+
+      if (!date) invalidEventDates++;
+
+      if (event) {
+        counts.set(event, (counts.get(event) || 0) + 1);
+      }
+
+      parsed.push({animal, event, date});
+    }
+
+    let candidateSeasonEvents = 0;
+    let rowsWithoutVerifiedSeason = 0;
+
+    for (const item of parsed) {
+      const calving = lastCalvings.get(item.animal) || '';
+
+      if (!calving) {
+        rowsWithoutVerifiedSeason++;
+      } else if (
+        item.date &&
+        item.date >= calving &&
+        candidateCodes.has(item.event)
+      ) {
+        candidateSeasonEvents++;
+      }
+    }
+
+    return {
+      kind: 'dairycomp_event_log',
+      label: 'سجل أحداث DairyComp',
+      distinctAnimals: animals.size,
+      missingAnimalNumbers,
+      invalidEventDates,
+      animalsWithKnownCalving: lastCalvings.size,
+      rowsWithoutVerifiedSeason,
+      candidateSeasonEvents,
+      eventCounts: [...counts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 20)
+        .map(([event, count]) => ({event, count}))
+    };
+  }
+
+  // Afimilk — milking sessions in grams
+  if (
+    has('Animal_Id') && has('Date') &&
+    has('Session') && has('Yield(gr)')
+  ) {
+    const animals = new Set();
+    const animalDays = new Set();
+    const seenSessions = new Set();
+
+    let duplicateSessionRows = 0;
+    let validSessions = 0;
+    let invalidSessions = 0;
+    let milkKgAcrossSessions = 0;
+
+    for (const row of rows) {
+      const animal = String(
+        addAnimalImportPickAnySrv(row, ['Animal_Id']) || ''
+      ).trim();
+
+      const date = herdImportV2ExternalDateStrictSrv(
+        addAnimalImportPickAnySrv(row, ['Date']), 'dmy'
+      );
+
+      const yieldRaw = String(
+        addAnimalImportPickAnySrv(row, ['Yield(gr)']) ?? ''
+      ).trim();
+
+      const grams = Number(yieldRaw);
+
+      const session = String(
+        addAnimalImportPickAnySrv(row, ['Session']) ?? ''
+      ).trim();
+
+      if (
+        !animal || !date || !yieldRaw ||
+        !Number.isFinite(grams) || grams < 0 ||
+        !['0', '1', '2'].includes(session)
+      ) {
+        invalidSessions++;
+        continue;
+      }
+
+      const sessionKey = `${animal}|${date}|${session}`;
+
+      if (seenSessions.has(sessionKey)) {
+        duplicateSessionRows++;
+        continue;
+      }
+
+      seenSessions.add(sessionKey);
+      animals.add(animal);
+      animalDays.add(`${animal}|${date}`);
+
+      validSessions++;
+      milkKgAcrossSessions += grams / 1000;
+    }
+
+    return {
+      kind: 'afimilk_sessions',
+      label: 'جلسات حلب Afimilk (مخطط بحثي)',
+      distinctAnimals: animals.size,
+      distinctAnimalDays: animalDays.size,
+      validSessions,
+      duplicateSessionRows,
+      invalidSessions,
+      milkKgAcrossSessions:
+        Number(milkKgAcrossSessions.toFixed(3)),
+      note:
+        'المجموع عبر الجلسات، وليس إنتاج يوم واحد أو متوسط القطيع.'
+    };
+  }
+
+  return {
+    kind: 'unclassified',
+    label: 'لم تُحدد بنية تشغيلية مؤكدة'
+  };
+}
+
  // HERD IMPORT V2 — external files: inspection only, NEVER writes
 app.post('/api/herd-import-v2/inspect-external', requireUserId, (req, res) => {
   try {
@@ -14320,7 +14540,24 @@ app.post('/api/herd-import-v2/inspect-external', requireUserId, (req, res) => {
         rows.slice(0, 30)
       );
 
-      const profile = herdImportV2DetectSourceProfileSrv(sample);
+      
+const semantics = herdImportV2InspectExternalSemanticsSrv(rows);
+const detected = herdImportV2DetectSourceProfileSrv(sample);
+
+const sourceKey = semantics.kind === 'dairycomp_event_log'
+  ? 'dairycomp'
+  : semantics.kind === 'afimilk_sessions'
+    ? 'afimilk'
+    : detected.key;
+
+const profile = sourceKey === detected.key
+  ? detected
+  : {
+      ...detected,
+      key: sourceKey,
+      name: HERD_IMPORT_V2_SOURCE_SIGNATURES[sourceKey].name
+    };
+
 
       const mapping = herdImportV2BuildColumnMappingInternalSrv(
         sample,
@@ -14336,6 +14573,7 @@ app.post('/api/herd-import-v2/inspect-external', requireUserId, (req, res) => {
       return {
         name,
         rowsCount: rows.length,
+        semanticInspection: semantics,
         sourceProfile: herdImportV2PublicSourceProfileSrv(profile),
         matchedFields,
         unmappedColumnsCount: mapping.unmappedColumnsCount,
