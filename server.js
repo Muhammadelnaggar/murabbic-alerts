@@ -13031,6 +13031,9 @@ function herdImportV2NormalizeBreedKeyInternalSrv(v) {
 function herdImportV2InferAnimalTypeFromBreedInternalSrv(breedRaw) {
   const b = herdImportV2NormalizeBreedKeyInternalSrv(breedRaw);
   if (!b) return "";
+  const hasCowCode = b.split(" ").some(token =>
+  ["ho", "hf", "je", "bs"].includes(token)
+);
 
   const cowSignals = [
     "holstein",
@@ -13044,7 +13047,12 @@ function herdImportV2InferAnimalTypeFromBreedInternalSrv(breedRaw) {
     "fleckvieh",
     "ayrshire",
     "guernsey",
-    "shorthorn"
+    "shorthorn",
+    "هولشتاين",
+"فريزيان",
+"جيرسي",
+"براون سويس"
+
   ];
 
   const buffaloSignals = [
@@ -13058,10 +13066,17 @@ function herdImportV2InferAnimalTypeFromBreedInternalSrv(breedRaw) {
     "jaffarabadi",
     "mehsana",
     "banni",
-    "pandharpuri"
+    "pandharpuri",
+    "جاموس",
+    "مورا",
+    "نيلي رافي"
   ];
 
-  const isCow = cowSignals.some(x => b.includes(herdImportV2NormalizeBreedKeyInternalSrv(x)));
+const isCow =
+  hasCowCode ||
+  cowSignals.some(x =>
+    b.includes(herdImportV2NormalizeBreedKeyInternalSrv(x))
+  );
   const isBuffalo = buffaloSignals.some(x => b.includes(herdImportV2NormalizeBreedKeyInternalSrv(x)));
 
   if (isCow && !isBuffalo) return "بقرة";
@@ -14724,18 +14739,28 @@ function herdImportV2ParseExternalDairyCompSrv(body = {}) {
     ]);
   }
 
-  if (body.externalSpeciesConfirmed !== true) {
-    fail(["أكّد أن الملف يخص نوع القطيع المحدد"]);
-  }
+const fallbackRaw =
+  String(body.defaultAnimalType || "").trim();
 
-  const species = herdImportV2NormalizeAnimalTypeStrictInternalSrv(
-    body.defaultAnimalType
-  );
-  const breedDefault = String(body.defaultBreed || "").trim();
+const fallbackSpecies = fallbackRaw
+  ? herdImportV2NormalizeAnimalTypeStrictInternalSrv(fallbackRaw)
+  : "";
 
-  if (!["بقرة", "جاموسة"].includes(species)) {
-    fail(["اختر نوع القطيع: بقرة أو جاموسة"]);
-  }
+const breedDefault = String(body.defaultBreed || "").trim();
+
+if (
+  fallbackRaw &&
+  !["بقرة", "جاموسة"].includes(fallbackSpecies)
+) {
+  fail(["النوع الاحتياطي غير صالح"]);
+}
+
+if (
+  fallbackSpecies &&
+  body.externalSpeciesConfirmed !== true
+) {
+  fail(["أكّد النوع الاحتياطي للحيوانات غير المصنفة"]);
+}
 
   const XLSX = require("xlsx");
   const workbook = XLSX.read(
@@ -14933,9 +14958,9 @@ const calving = calvings.at(-1) || "";
       ).filter(Boolean)
     )];
 
-    if (sourceTypes.some(x => x !== species)) {
-      issues.push(`${id}: نوع الحيوان لا يطابق الاختيار`);
-    }
+    if (sourceTypes.length > 1) {
+  issues.push(`${id}: تعارض نوع الحيوان بين سجلات الملف`);
+}
 
     if (births.length !== 1) {
       issues.push(`${id}: تاريخ الميلاد مفقود أو متعارض`);
@@ -14960,9 +14985,44 @@ const calving = calvings.at(-1) || "";
 
     const breed = sourceBreed || breedDefault;
 
-    if (!breed || (breedValues.length > 1 && !breedDefault)) {
-      issues.push(`${id}: السلالة غير مؤكدة`);
-    }
+    const breedTypes = [...new Set(
+  breedValues
+    .map(herdImportV2InferAnimalTypeFromBreedInternalSrv)
+    .filter(Boolean)
+)];
+
+if (breedTypes.length > 1) {
+  issues.push(`${id}: تعارض نوع الحيوان بين السلالات`);
+}
+
+const inferredType =
+  breedTypes.length === 1
+    ? breedTypes[0]
+    : breedTypes.length === 0
+      ? herdImportV2InferAnimalTypeFromBreedInternalSrv(breed)
+      : "";
+
+const explicitType =
+  sourceTypes.length === 1 ? sourceTypes[0] : "";
+
+if (
+  inferredType &&
+  explicitType &&
+  inferredType !== explicitType
+) {
+  issues.push(`${id}: تعارض نوع الحيوان بين BREED وSPECIES`);
+}
+
+const animalType =
+  inferredType ||
+  explicitType ||
+  fallbackSpecies;
+
+if (!animalType) {
+  issues.push(
+    `${id}: نوع الحيوان غير معروف؛ يلزم تحديد احتياطي`
+  );
+}
 
     const dryDates = all
       .filter(x => x.code === "DRY" && x.d >= calving)
@@ -15021,7 +15081,7 @@ const calving = calvings.at(-1) || "";
 
     animals.push({
       "رقم الحيوان": id,
-      "نوع الحيوان": species,
+      "نوع الحيوان": animalType,
       "السلالة": breed,
       "تاريخ الميلاد": births.length === 1 ? births[0] : "",
       "رقم الموسم": lact,
