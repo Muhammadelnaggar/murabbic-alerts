@@ -14494,7 +14494,35 @@ function herdImportV2InspectExternalSemanticsSrv(rows = []) {
     label: 'لم تُحدد بنية تشغيلية مؤكدة'
   };
 }
+function herdImportV2NormalizeExternalCsvBufferSrv(buffer, fileName) {
+  if (!/\.(csv|txt)$/i.test(String(fileName || ""))) {
+    return buffer;
+  }
 
+  const bytes = Buffer.isBuffer(buffer)
+    ? buffer
+    : Buffer.from(buffer);
+
+  if (
+    bytes.length >= 3 &&
+    bytes[0] === 0xEF &&
+    bytes[1] === 0xBB &&
+    bytes[2] === 0xBF
+  ) {
+    return bytes;
+  }
+
+  try {
+    new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return bytes;
+  }
+
+  return Buffer.concat([
+    Buffer.from([0xEF, 0xBB, 0xBF]),
+    bytes
+  ]);
+}
  // HERD IMPORT V2 — external files: inspection only, NEVER writes
 app.post('/api/herd-import-v2/inspect-external', requireUserId, (req, res) => {
   try {
@@ -14519,7 +14547,10 @@ app.post('/api/herd-import-v2/inspect-external', requireUserId, (req, res) => {
     }
 
     const XLSX = require('xlsx');
-    const wb = XLSX.read(buf, { type: 'buffer' });
+    const wb = XLSX.read(
+  herdImportV2NormalizeExternalCsvBufferSrv(buf, fileName),
+  { type: 'buffer' }
+);
     const sheetNames = wb.SheetNames || [];
 
     if (!sheetNames.length || sheetNames.length > 16) {
@@ -14707,7 +14738,10 @@ function herdImportV2ParseExternalDairyCompSrv(body = {}) {
   }
 
   const XLSX = require("xlsx");
-  const workbook = XLSX.read(buffer, {type: "buffer"});
+  const workbook = XLSX.read(
+  herdImportV2NormalizeExternalCsvBufferSrv(buffer, name),
+  {type: "buffer"}
+);
 
   const records = (workbook.SheetNames || []).flatMap(name =>
     XLSX.utils.sheet_to_json(workbook.Sheets[name], {
