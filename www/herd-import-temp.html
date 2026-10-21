@@ -63,17 +63,43 @@
 </section>
 
 <section class="card">
-  <h2>ملف من نظام آخر — فحص أولي دون حفظ</h2>
-
+  <h2>ملف من نظام آخر — فحص أو معاينة استيراد DairyComp</h2>
   <label for="externalFile">
     ملف تصدير Excel أو CSV أو TXT
   </label>
+
 
   <input
     id="externalFile"
     type="file"
     accept=".xlsx,.xls,.csv,.txt"
   />
+
+  <label for="externalAsOf">
+    تاريخ تصدير الملف (خلال آخر 14 يومًا)
+  </label>
+  <input id="externalAsOf" type="date" />
+
+  <label for="externalSpecies">نوع القطيع في الملف</label>
+  <select id="externalSpecies">
+    <option value="">اختر النوع</option>
+    <option value="بقرة">أبقار</option>
+    <option value="جاموسة">جاموس</option>
+  </select>
+
+  <label for="externalBreed">
+    السلالة إذا لم تكن موجودة في الملف
+  </label>
+  <input
+    id="externalBreed"
+    type="text"
+    placeholder="سلالة القطيع"
+  />
+
+  <label>
+    <input id="externalSpeciesConfirmed" type="checkbox" />
+    أؤكد أن الملف يخص نوع القطيع المختار فقط
+  </label>
 
   <div class="actions-bar inline">
     <button
@@ -83,7 +109,12 @@
     >
       تحليل بنية الملف
     </button>
+
+    <button id="btnExternalPreview" type="button" class="ghost">
+      معاينة الاستيراد الخارجي
+    </button>
   </div>
+
 
   <div
     id="externalInspectResult"
@@ -647,18 +678,43 @@ async function callHerdImport(path){
   }
 });
 
+
 const externalFile = $('externalFile');
 const btnInspectExternal = $('btnInspectExternal');
 const externalInspectResult = $('externalInspectResult');
+const btnExternalPreview = $('btnExternalPreview');
 
-externalFile.addEventListener('change', () => {
-  externalInspectResult.textContent = '';
+let externalRevision = 0;
+
+function clearExternalPreview() {
+  externalRevision++;
   lastFilePayload = null;
   lastPreviewOk = false;
   btnSave.disabled = true;
   summaryBox.style.display = 'none';
   resultsBox.style.display = 'none';
+  rowsList.innerHTML = '';
+}
+
+externalFile.addEventListener('change', () => {
+  herdFile.value = '';
+  externalInspectResult.textContent = '';
+  clearExternalPreview();
 });
+
+for (const id of [
+  'externalAsOf',
+  'externalSpecies',
+  'externalSpeciesConfirmed'
+]) {
+  $(id).addEventListener('change', clearExternalPreview);
+}
+
+$('externalBreed').addEventListener(
+  'input',
+  clearExternalPreview
+);
+
 
 btnInspectExternal.addEventListener('click', async () => {
   const file = externalFile.files && externalFile.files[0];
@@ -767,17 +823,133 @@ if (info.kind === 'dairycomp_event_log') {
   }
 });
 
-  herdFile.addEventListener("change", () => {
-  lastFilePayload = null;
-  lastPreviewOk = false;
+btnExternalPreview.addEventListener('click', async () => {
+  if (btnInspectExternal.disabled) {
+    showMessage(
+      'انتظر انتهاء تحليل الملف أولًا.',
+      'status-warn'
+    );
+    return;
+  }
 
-  btnSave.disabled = true;
+  const file = externalFile.files && externalFile.files[0];
+  const asOf = $('externalAsOf').value;
+  const species = $('externalSpecies').value;
 
-  summaryBox.style.display = "none";
-  resultsBox.style.display = "none";
+  if (!file) {
+    showMessage('اختر ملف DairyComp أولًا.', 'status-error');
+    return;
+  }
 
-  rowsList.innerHTML = "";
+  if (
+    !asOf ||
+    !species ||
+    !$('externalSpeciesConfirmed').checked
+  ) {
+    showMessage(
+      'حدد تاريخ التصدير ونوع القطيع وأكد تجانس الملف.',
+      'status-error'
+    );
+    return;
+  }
+
+  if (file.size > 6 * 1024 * 1024) {
+    showMessage(
+      'حجم الملف أكبر من 6 ميجابايت.',
+      'status-error'
+    );
+    return;
+  }
+
+  clearExternalPreview();
+  const revision = externalRevision;
+
+  btnExternalPreview.disabled = true;
+  btnInspectExternal.disabled = true;
+
+  try {
+    const payload = {
+      fileName: file.name,
+      fileBase64: await fileToBase64(file),
+      externalSource: 'dairycomp',
+      externalAsOf: asOf,
+      defaultAnimalType: species,
+      externalSpeciesConfirmed: true,
+      defaultBreed: $('externalBreed').value.trim()
+    };
+
+    if (
+      revision !== externalRevision ||
+      externalFile.files[0] !== file
+    ) return;
+
+    lastFilePayload = payload;
+
+    const j = await callHerdImport(
+      '/api/herd-import-v2/preview'
+    );
+
+    if (
+      revision !== externalRevision ||
+      externalFile.files[0] !== file
+    ) return;
+
+    if (j.ok !== true) {
+      throw new Error(j.message || 'تعذرت المعاينة.');
+    }
+
+    setSummary(j);
+    renderRows(j.previewAnimals || [], j);
+    renderEvents(j.previewEvents || []);
+
+    const info = j.externalSummary;
+
+    externalInspectResult.textContent = info ? [
+      `حيوانات الملف: ${info.uniqueSourceAnimals}`,
+      `مرشحة للاستيراد: ${info.importedCandidates}`,
+      `مؤرشفة مستبعدة: ${info.archivedIgnored}`,
+      `أحداث مرشحة: ${info.eventsToValidate}`,
+      `أحداث أخرى خارج النطاق: ${info.otherEventRows}`,
+      info.note || ''
+    ].join('\n') : '';
+
+    lastPreviewOk =
+      j?.previewCommand?.saveEnabled === true;
+
+    btnSave.disabled = !lastPreviewOk;
+
+    const status = j?.previewCommand?.status;
+
+    showMessage(
+      j.message || 'انتهت المعاينة.',
+      status === 'ready'
+        ? 'status-ok'
+        : status === 'needs_input'
+          ? 'status-warn'
+          : 'status-error'
+    );
+
+  } catch (e) {
+    if (revision !== externalRevision) return;
+
+    clearExternalPreview();
+
+    showMessage(
+      e.message || 'تعذرت المعاينة الخارجية.',
+      'status-error'
+    );
+
+  } finally {
+    btnExternalPreview.disabled = false;
+    btnInspectExternal.disabled = false;
+  }
 });
+
+  herdFile.addEventListener("change", () => {
+    externalFile.value = '';
+    externalInspectResult.textContent = '';
+    clearExternalPreview();
+  });
   btnPreview.addEventListener("click", async () => {
     try {
       btnPreview.disabled = true;
