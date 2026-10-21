@@ -80,9 +80,14 @@
   </label>
   <input id="externalAsOf" type="date" />
 
-  <label for="externalSpecies">نوع القطيع في الملف</label>
+ <details>
+  <summary>بيانات احتياطية عند نقص معلومات الملف (اختياري)</summary>
+
+  <label for="externalSpecies">
+    نوع الحيوان الاحتياطي
+  </label>
   <select id="externalSpecies">
-    <option value="">اختر النوع</option>
+    <option value="">تحديد تلقائي من الملف</option>
     <option value="بقرة">أبقار</option>
     <option value="جاموسة">جاموس</option>
   </select>
@@ -98,8 +103,9 @@
 
   <label>
     <input id="externalSpeciesConfirmed" type="checkbox" />
-    أؤكد أن الملف يخص نوع القطيع المختار فقط
+    أؤكد النوع الاحتياطي للحيوانات غير المصنفة فقط
   </label>
+</details>
 
   <div class="actions-bar inline">
     <button
@@ -842,16 +848,15 @@ btnExternalPreview.addEventListener('click', async () => {
   }
 
   if (
-    !asOf ||
-    !species ||
-    !$('externalSpeciesConfirmed').checked
-  ) {
-    showMessage(
-      'حدد تاريخ التصدير ونوع القطيع وأكد تجانس الملف.',
-      'status-error'
-    );
-    return;
-  }
+  !asOf ||
+  (species && !$('externalSpeciesConfirmed').checked)
+) {
+  showMessage(
+    'حدد تاريخ التصدير، وأكّد النوع الاحتياطي إذا اخترته.',
+    'status-error'
+  );
+  return;
+}
 
   if (file.size > 6 * 1024 * 1024) {
     showMessage(
@@ -874,7 +879,8 @@ btnExternalPreview.addEventListener('click', async () => {
       externalSource: 'dairycomp',
       externalAsOf: asOf,
       defaultAnimalType: species,
-      externalSpeciesConfirmed: true,
+      externalSpeciesConfirmed:
+         Boolean(species) && $('externalSpeciesConfirmed').checked,
       defaultBreed: $('externalBreed').value.trim()
     };
 
