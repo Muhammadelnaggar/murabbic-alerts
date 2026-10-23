@@ -140,6 +140,7 @@ async function murabbikPreparedKindsForSavedSrv(
 
   if (!result || result.ok === false ||
       result.savedCount === 0) return [];
+      if (result.jobAccepted === true) return [];
 
   const route = String(req.path || '').toLowerCase();
 
@@ -7442,7 +7443,12 @@ function herdImportV2EventTypeInternalSrv(v) {
     abortion: ["اجهاض", "فقدحمل", "abortion", "pregnancyloss"],
     mastitis: ["التهابالضرع", "التهابضرع", "mastitis"],
     lameness: ["عرج", "مشاكل حافر", "مشاكل الحافر", "lameness"],
+    vaccination: ["تحصين", "تطعيم", "vaccination"],
     hoof_trimming: ["تقليم حوافر", "تقليم الحوافر", "تقليم حافر", "hoof trimming", "hooftrimming", "hooftrim"],
+    weaning: ["فطام", "weaning", "wean"],
+    dehorning: ["إزالة القرون", "dehorning", "dehorn"],
+    hormone_step: ["حقنة هرمونية", "hormone step"],
+    ovsynch_history: ["برنامج تزامن تاريخي", "ovsynch history"],
     health: ["تشخيص صحي", "مرض", "حالة صحية", "health diagnosis", "health", "disease", "diagnosis"]
   };
 
@@ -7462,7 +7468,12 @@ function herdImportV2EventLabelInternalSrv(type = "") {
     health: "تشخيص صحي",
     lameness: "عرج",
     mastitis: "التهاب الضرع",
-    hoof_trimming: "تقليم الحوافر"
+    vaccination: "تحصين",
+    hoof_trimming: "تقليم الحوافر",
+    weaning: "فطام",
+    dehorning: "إزالة القرون",
+    hormone_step: "حقنة هرمونية",
+    ovsynch_history: "برنامج تزامن تاريخي"
   })[type] || type || "حدث";
 }
 
@@ -7679,6 +7690,11 @@ function herdImportV2NormalizeEventRowInternalSrv(
       "notes",
       "note"
     ],
+    sourceEventCode: [
+  "كود حدث المصدر",
+  "dairycompEventCode",
+  "sourceEventCode"
+],
 
     heatTime: [
       "وقت الشياع",
@@ -7791,8 +7807,18 @@ function herdImportV2NormalizeEventRowInternalSrv(
       "الطبيب",
       "اسم الطبيب",
       "vet",
-      "doctor"
-    ]
+    "doctor"
+],
+vaccineName: ["اسم التحصين", "اسم اللقاح", "vaccine", "vaccineName"],
+vaccineCode: ["كود التحصين", "كود اللقاح", "vaccineCode"],
+vaccineForm: ["نوع اللقاح", "vaccineForm"],
+doseType: ["نوع الجرعة", "doseType"],
+performedBy: [
+  "اسم المنفذ",
+  "اسم الفني",
+  "performedBy",
+  "Technician"
+]
   };
 
   const p = name =>
@@ -7902,6 +7928,11 @@ function herdImportV2NormalizeEventRowInternalSrv(
       String(
         p("notes") || ""
       ).trim(),
+      sourceEventCode:
+  String(p("sourceEventCode") || "")
+    .trim()
+    .toUpperCase(),
+
 
     rawHeatTime,
 
@@ -7989,10 +8020,23 @@ function herdImportV2NormalizeEventRowInternalSrv(
         MASTITIS_TYPES_SRV
       ) || rawMastitisType,
 
-    vet:
-      String(
-        p("vet") || ""
-      ).trim(),
+      vet:
+      String(p("vet") || "").trim(),
+
+    performedBy:
+      String(p("performedBy") || "").trim(),
+
+    vaccineName:
+      String(p("vaccineName") || "").trim(),
+
+    vaccineCode:
+      String(p("vaccineCode") || "").trim(),
+
+    vaccineForm:
+      String(p("vaccineForm") || "").trim(),
+
+    doseType:
+      String(p("doseType") || "").trim(),
 
     warnings: [],
     derivedEvents: [],
@@ -8363,7 +8407,33 @@ function herdImportV2ValidateEventStructuralInternalSrv(
       );
     }
   }
+if (["weaning", "dehorning"].includes(item.eventType)) {
+  if (animal && animal.entryType !== "followers") {
+    add(
+      "follower_event_requires_calf",
+      "الفطام وإزالة القرون للتوابع فقط.",
+      "animalNumber"
+    );
+  }
 
+  if (item.eventType === "dehorning") {
+    if (animal && animal.followerSex !== "أنثى") {
+      add(
+        "dehorning_female_only",
+        "إزالة القرون في مُرَبِّيك للإناث فقط.",
+        "animalNumber"
+      );
+    }
+
+    if (!item.performedBy) {
+      add(
+        "dehorning_performed_by_required",
+        "أدخل اسم منفذ إزالة القرون كما ورد في المصدر.",
+        "performedBy"
+      );
+    }
+  }
+}
   if (
   item.eventType === "health"
 ) {
@@ -8594,8 +8664,9 @@ function herdImportV2CreateTemporalStateInternalSrv(
     inseminationEventsCount:
       0,
 
-    reproductiveRows:
-      []
+    reproductiveRows: [],
+importedWeaningSeen: false,
+importedDehorningSeen: false
   };
 }
 
@@ -9005,7 +9076,34 @@ function herdImportV2ApplyEventTemporalInternalSrv(
     state.lastBoundaryType =
       "إجهاض";
   }
+else if (item.eventType === "weaning") {
+  if (
+    state.entryType !== "followers" ||
+    state.importedWeaningSeen
+  ) {
+    return {
+      code: "weaning_ineligible_or_duplicate",
+      message: "الفطام مسموح مرة واحدة للتابع."
+    };
+  }
 
+  state.importedWeaningSeen = true;
+}
+
+else if (item.eventType === "dehorning") {
+  if (
+    state.entryType !== "followers" ||
+    state.importedDehorningSeen ||
+    state.animal?.followerSex !== "أنثى"
+  ) {
+    return {
+      code: "dehorning_ineligible_or_duplicate",
+      message: "إزالة القرون للتابعة الأنثى مرة واحدة فقط."
+    };
+  }
+
+  state.importedDehorningSeen = true;
+}
   else if (
     ![
       "health",
@@ -9045,11 +9143,84 @@ function herdImportV2ApplyEventTemporalInternalSrv(
 
   return null;
 }
+function herdImportV2DairyCompHistoryPreflightSrv(
+  normalized = [],
+  animalsInternal = []
+) {
+  const animalNumbers = new Set(
+    (animalsInternal || [])
+      .map(a => addAnimalDigitsSrv(a?.animalNumber || ""))
+      .filter(Boolean)
+  );
+
+  for (const item of normalized) {
+    if (
+      !item.animalNumber ||
+      !animalNumbers.has(item.animalNumber) ||
+      !item.eventDate ||
+      !addAnimalIsDateSrv(item.eventDate) ||
+      !item.eventType ||
+      !item.sourceEventCode
+    ) {
+      throw herdImportV2TemplateErrorSrv(
+        `تعذّر ربط بيانات DairyComp التاريخية بالحيوان رقم ${
+          item.animalNumber || "?"
+        } في صف ${item.row || "?"}.`
+      );
+    }
+
+    item.duplicateKey = [
+      "dairycomp",
+      item.animalNumber,
+      item.sourceEventCode,
+      item.eventDate,
+      item.sourceIndex
+    ].join("|");
+
+    item.issues = [];
+    item.derivedEvents = [];
+  }
+
+  return {
+    previewEvents: normalized.map(item => ({
+      sheetName: item.sheetName,
+      row: item.row,
+      animalNumber: item.animalNumber,
+      eventType: item.eventType,
+      eventDate: item.eventDate,
+      sourceEventCode: item.sourceEventCode,
+      ok: true,
+      status: "تاريخ مستورد",
+      errors: []
+    })),
+
+    sequenceSummaries: [],
+    normalizedEventsInternal: normalized,
+
+    totalEventsCount: normalized.length,
+    readyEventsCount: normalized.length,
+    rejectedEventsCount: 0,
+
+    structuralRejectedEventsCount: 0,
+    temporalRejectedEventsCount: 0,
+
+    sequenceAnimalsCount: 0,
+    validSequencesCount: 0,
+    rejectedSequencesCount: 0,
+
+    reasonCounts: {},
+    structuralReady: true,
+    temporalReady: true,
+    validationReady: true,
+    validationMode: "dairycomp_historical_import"
+  };
+}
 
 function herdImportV2BuildEventsPreflightInternalSrv(
   eventRows = [],
   animalsInternal = [],
-  previewAnimals = []
+  previewAnimals = [],
+  sourceSystem = ""
 ) {
   const rows =
     Array.isArray(eventRows)
@@ -9100,7 +9271,12 @@ function herdImportV2BuildEventsPreflightInternalSrv(
           i
         )
     );
-
+  if (sourceSystem === "dairycomp") {
+  return herdImportV2DairyCompHistoryPreflightSrv(
+    normalized,
+    animalsInternal
+  );
+}
   const duplicateCounts =
     new Map();
 
@@ -9978,7 +10154,8 @@ function herdImportV2BuildPersistencePlanInternalSrv({
   baselinePreview = {},
   eventsPreflight = {},
   sourceProfile = {},
-  importOptions = {}
+importOptions = {},
+archivedCandidates = []
 } = {}) {
   const animals =
     Array.isArray(
@@ -9994,13 +10171,28 @@ function herdImportV2BuildPersistencePlanInternalSrv({
       ? eventsPreflight.normalizedEventsInternal
       : [];
 
-  const ready =
-    Boolean(
-      baselinePreview.readyForSavePreview
-    ) &&
-    Boolean(
-      eventsPreflight.validationReady
-    );
+  const archivedWritesCount =
+  archivedCandidates.reduce(
+    (sum, c) =>
+      sum +
+      1 +
+      (
+        Array.isArray(c.sourceHistory)
+          ? c.sourceHistory.length
+          : 0
+      ),
+    0
+  );
+
+const ready =
+  Boolean(
+    baselinePreview.readyForSavePreview ||
+    (
+      !animals.length &&
+      archivedCandidates.length > 0
+    )
+  ) &&
+  Boolean(eventsPreflight.validationReady);
 
   const animalRefs =
     animals.map(
@@ -10064,6 +10256,10 @@ function herdImportV2BuildPersistencePlanInternalSrv({
       importOptions,
       animals,
 
+      ...(archivedCandidates.length
+        ? { archivedCandidates }
+        : {}),
+
       events:
         events.map(
           item => ({
@@ -10074,13 +10270,25 @@ function herdImportV2BuildPersistencePlanInternalSrv({
               item.eventType || "",
 
             eventDate:
-              item.eventDate || "",
+            item.eventDate || "",
+            ...(item.sourceEventCode
+  ? { sourceEventCode: item.sourceEventCode }
+  : {}),
 
-                       duplicateKey:
+                         duplicateKey:
               item.duplicateKey ||
               herdImportV2EventDuplicateKeyInternalSrv(
                 item
               ),
+
+            ...(item.eventType === "vaccination"
+              ? {
+                  vaccineName: item.vaccineName || "",
+                  vaccineCode: item.vaccineCode || "",
+                  vaccineForm: item.vaccineForm || "",
+                  doseType: item.doseType || ""
+                }
+              : {}),
 
             derivedEvents:
               (Array.isArray(item.derivedEvents)
@@ -10104,11 +10312,12 @@ function herdImportV2BuildPersistencePlanInternalSrv({
     }).slice(0, 40)}`;
 
     const atomicEligible =
-    animalRefs.length +
-    eventRefs.length +
-    derivedEventRefs.length +
-    eventOptionsWritesCount +
-    1 <= 430;
+  archivedWritesCount +
+  animalRefs.length +
+  eventRefs.length +
+  derivedEventRefs.length +
+  eventOptionsWritesCount +
+  1 <= 430;
 
   return {
     ready,
@@ -10131,7 +10340,12 @@ function herdImportV2BuildPersistencePlanInternalSrv({
 
     animalWritesCount:
       animalRefs.length,
+    archivedAnimalsCount:
+  archivedCandidates.length,
 
+archivedEventsCount:
+  archivedWritesCount -
+  archivedCandidates.length,
          eventWritesCount:
       eventRefs.length +
       derivedEventRefs.length,
@@ -10148,7 +10362,8 @@ function herdImportV2BuildPersistencePlanInternalSrv({
       2,
 
     totalPlannedWrites:
-      animalRefs.length +
+  archivedWritesCount +
+  animalRefs.length +
       eventRefs.length +
       derivedEventRefs.length +
       eventOptionsWritesCount +
@@ -10169,15 +10384,25 @@ function herdImportV2BuildPersistencePlanInternalSrv({
     atomicEligible,
 
     executionMode:
-      atomicEligible
-        ? "atomic_batch"
-        : "chunked_not_enabled_yet",
+      sourceProfile.key === "dairycomp"
+        ? "chunked_resumable"
+        : atomicEligible
+          ? "atomic_batch"
+          : "chunked_not_enabled_yet",
 
     persistenceEnabled:
-      ready && atomicEligible,
+      ready &&
+      (
+        sourceProfile.key === "dairycomp" ||
+        atomicEligible
+      ),
 
     saveEnabled:
-      ready && atomicEligible,
+      ready &&
+      (
+        sourceProfile.key === "dairycomp" ||
+        atomicEligible
+      ),
 
     semenCodes,
     inseminators,
@@ -10234,12 +10459,45 @@ function herdImportV2ImportedEventPayloadInternalSrv({
     importedBy: "herd_import_v2",
     importMode: "operational_history",
     isImportedHistory: true,
-    sourceSheet: item.sheetName || "الأحداث",
+
+...(item.sourceEventCode ? {
+  sourceSystem: "dairycomp",
+  sourceEventCode: item.sourceEventCode
+} : {}),
+
+sourceSheet: item.sheetName || "الأحداث",
     sourceRow: Number(item.row || 0) || null,
     source: "server:/api/herd-import-v2/save-operational",
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   };
+    if (item.eventType === "hormone_step") {
+    return {
+      ...common,
+      type: "حقنة هرمونية",
+      eventType: "حقنة هرمونية",
+      eventTypeNorm: "hormone_step",
+      date: eventDate,
+      hormone:
+        item.sourceEventCode === "PGF"
+          ? "PGF2α"
+          : "GnRH",
+      programStatus: "historical",
+      notes
+    };
+  }
 
+  if (item.eventType === "ovsynch_history") {
+    return {
+      ...common,
+      type: "بروتوكول تزامن تاريخي",
+      eventType: "برنامج تزامن تاريخي",
+      eventTypeNorm: "ovsynch_history",
+      date: eventDate,
+      program: "ovsynch",
+      programStatus: "historical",
+      notes
+    };
+  }
   if (item.eventType === "heat") {
     return {
       ...common,
@@ -10343,7 +10601,24 @@ function herdImportV2ImportedEventPayloadInternalSrv({
       idempotencyKey: `${uid}|${item.animalNumber}|abortion|${eventDate}`
     };
   }
+   if (item.eventType === "vaccination") {
+  return {
+    ...common,
+    type: "vaccination",
+    eventType: "تحصين",
+    eventTypeNorm: "vaccination",
+    date: eventDate,
 
+    vaccine: item.vaccineName || "",
+    vaccineCode: item.vaccineCode || "",
+    vaccineForm: item.vaccineForm || "",
+    doseType: item.doseType || "",
+
+    animalCollection: animalEntry.collectionName,
+    vaccinationProgramLinkStatus: "pending_mapping",
+    notes
+  };
+}
   if (item.eventType === "health") {
     const disease = DISEASE_CATALOG_SRV[item.diseaseCode] || {};
 
@@ -10442,7 +10717,53 @@ function herdImportV2ImportedEventPayloadInternalSrv({
       idempotencyKey: `${uid}|${item.animalNumber}|hoof_trimming|${eventDate}`
     };
   }
+if (item.eventType === "weaning") {
+  const ageDays = herdImportV2EventDaysInternalSrv(
+    animalEntry.base.birthDate,
+    eventDate
+  );
 
+  return {
+    ...common,
+    type: "weaning",
+    eventType: "فطام",
+    eventTypeNorm: "weaning",
+    date: eventDate,
+    notes,
+    animalCollection: "calves",
+    number: item.animalNumber,
+    calfNumber: item.animalNumber,
+    birthDate: animalEntry.base.birthDate || "",
+    damNumber: animalEntry.base.damNumber || "",
+    weaningDate: eventDate,
+    weaningAgeDays: ageDays,
+    ageDays
+  };
+}
+
+if (item.eventType === "dehorning") {
+  const ageDays = herdImportV2EventDaysInternalSrv(
+    animalEntry.base.birthDate,
+    eventDate
+  );
+
+  return {
+    ...common,
+    type: "dehorning",
+    eventType: "إزالة القرون",
+    eventTypeNorm: "dehorning",
+    date: eventDate,
+    notes,
+    animalCollection: "calves",
+    number: item.animalNumber,
+    calfNumber: item.animalNumber,
+    birthDate: animalEntry.base.birthDate || "",
+    sex: animalEntry.base.followerSex || "",
+    performedBy: item.performedBy,
+    ageDays,
+    dehorningAgeDays: ageDays
+  };
+}
   throw herdImportV2PersistenceErrorInternalSrv(
     "herd_import_v2_event_writer_not_supported",
     `نوع الحدث «${item.eventType || item.rawEventType || ""}» غير مدعوم في الحفظ التشغيلي.`,
@@ -10596,20 +10917,18 @@ function herdImportV2ImportedAnimalEventPatchInternalSrv(
   }
 
   if (item.eventType === "health") {
-    Object.assign(patch, {
-      lastDisease: payload.diseaseName,
-      lastDiseaseDate: item.eventDate,
-      lastDiagnosis: payload.diseaseName,
-      lastDiagnosisDate: item.eventDate,
-      healthStatus: payload.diseaseName
-    });
+  Object.assign(patch, {
+    lastDisease: payload.diseaseName,
+    lastDiseaseDate: item.eventDate,
+    lastDiagnosis: payload.diseaseName,
+    lastDiagnosisDate: item.eventDate
+  });
 
-    return;
-  }
+  return;
+}
 
   if (item.eventType === "lameness") {
     Object.assign(patch, {
-      healthStatus: "عرج",
       lastDisease: "عرج",
       lastDiseaseDate: item.eventDate,
       lastDiagnosis: `عرج - ${item.lamenessType}`,
@@ -10626,7 +10945,6 @@ function herdImportV2ImportedAnimalEventPatchInternalSrv(
     const quarters = [...(item.quarters || [])];
 
     Object.assign(patch, {
-      healthStatus: "التهاب الضرع",
       lastDisease: "التهاب الضرع",
       lastDiseaseDate: item.eventDate,
       lastDiagnosis: `التهاب الضرع - ${item.mastitisType}`,
@@ -10639,18 +10957,275 @@ function herdImportV2ImportedAnimalEventPatchInternalSrv(
 
     return;
   }
+if (item.eventType === "weaning") {
+  const ageDays = payload.weaningAgeDays;
 
+  Object.assign(patch, {
+    weaningDate: item.eventDate,
+    weaningAgeDays: ageDays,
+    ageDaysAtWeaning: ageDays,
+    lastEventDate: item.eventDate
+  });
+
+  return;
+}
+
+if (item.eventType === "dehorning") {
+  Object.assign(patch, {
+    dehorned: true,
+    dehorningDate: item.eventDate,
+    lastDehorningDate: item.eventDate,
+    lastDehorningAgeDays: payload.dehorningAgeDays,
+    lastEventDate: item.eventDate
+  });
+
+  return;
+}
   if (item.eventType === "hoof_trimming") {
     patch.lastHoofTrimmingDate = item.eventDate;
   }
 }
+function herdImportV2DairyCompArchiveWriteRowsSrv({
+  uid,
+  archivedCandidates = [],
+  persistencePlan
+}) {
+  const archivedAnimals = [];
+  const archivedEvents = [];
+  const stamped =
+    admin.firestore.FieldValue.serverTimestamp();
 
+  for (const c of archivedCandidates) {
+    const number = addAnimalDigitsSrv(c.animalNumber);
+
+    const history = Array.isArray(c.sourceHistory)
+      ? c.sourceHistory
+      : [];
+
+    const exitType =
+      c.exitCode === "SOLD" ? "sale"
+      : c.exitCode === "DIED" ? "death"
+      : "";
+
+    if (
+      !number ||
+      !exitType ||
+      !c.exitDate ||
+      !c.exitReason ||
+      !history.length
+    ) {
+      throw herdImportV2PersistenceErrorInternalSrv(
+        "dairycomp_archive_candidate_invalid",
+        `بيانات أرشفة الحيوان ${number || "غير معروف"} غير مكتملة. لم يُحفظ شيء.`,
+        400
+      );
+    }
+
+    const sourceValue = (...names) => {
+      for (const h of history) {
+        const value = addAnimalImportPickAnySrv(
+          h.sourceFields || {},
+          names
+        );
+
+        if (String(value ?? "").trim()) {
+          return String(value).trim();
+        }
+      }
+
+      return "";
+    };
+
+    const breedRaw = sourceValue("BREED", "BRD");
+    const speciesRaw = sourceValue(
+      "SPECIES",
+      "ANIMALTYPE"
+    );
+
+    const animalType =
+      herdImportV2NormalizeAnimalTypeStrictInternalSrv(
+        speciesRaw
+      ) ||
+      herdImportV2InferAnimalTypeFromBreedInternalSrv(
+        breedRaw
+      );
+
+    if (!animalType) {
+      throw herdImportV2PersistenceErrorInternalSrv(
+        "dairycomp_archived_species_missing",
+        `نوع الحيوان المستبعد ${number} غير مؤكد. لم يُحفظ شيء.`,
+        400
+      );
+    }
+
+    const breedCodes = {
+      HO: "هولشتاين",
+      HF: "هولشتاين فريزيان",
+      JE: "جيرسي",
+      BS: "براون سويس"
+    };
+
+    const breed =
+      breedCodes[breedRaw.toUpperCase()] ||
+      (
+        breedRaw
+          ? animalListBreedDisplaySrv(breedRaw)
+          : ""
+      );
+
+    const isFollower =
+      c.entryType === "followers";
+
+    const archiveId =
+      `hi2ar_${herdImportV2HashInternalSrv({
+        userId: uid,
+        animalNumber: number
+      }).slice(0, 40)}`;
+
+    archivedAnimals.push({
+      ref: db.collection("archived_animals").doc(
+        archiveId
+      ),
+
+      payload: {
+        userId: uid,
+        ownerUid: uid,
+        animalNumber: number,
+        number,
+
+        ...(isFollower
+          ? { calfNumber: number }
+          : {}),
+
+        entryType:
+          isFollower ? "followers" : "mothers",
+
+        animalType,
+        breed,
+        birthDate: c.birthDate || null,
+
+        ...(isFollower
+          ? {
+              followerSex: c.sex || "",
+              sex: c.sex || ""
+            }
+          : {}),
+
+        damNumber:
+          sourceValue("DAM", "DID", "MOTHER") ||
+          null,
+
+        archived: true,
+        active: false,
+
+        archiveReason: exitType,
+        archiveReasonLabel:
+          exitType === "sale" ? "بيع" : "نفوق",
+
+        archiveDate: c.exitDate,
+
+        saleReason:
+          exitType === "sale"
+            ? c.exitReason
+            : null,
+
+        deathReason:
+          exitType === "death"
+            ? c.exitReason
+            : null,
+
+        originalAnimalPath: null,
+        originalAnimalDocId: null,
+
+        archivedAt: stamped,
+        importId: persistencePlan.importId,
+        workbookFingerprint:
+          persistencePlan.workbookFingerprint,
+
+        sourceSystem: "dairycomp",
+        sourceRC: c.sourceRC || "",
+        importedBy: "herd_import_v2"
+      }
+    });
+
+    for (const h of history) {
+      const code = String(
+        h.sourceCode || ""
+      ).trim().toUpperCase();
+
+      const date = String(
+        h.sourceDate || ""
+      ).slice(0, 10);
+
+      if (!date || date > c.exitDate) {
+        throw herdImportV2PersistenceErrorInternalSrv(
+          "dairycomp_archive_history_invalid",
+          `تاريخ حدث في سجل الحيوان ${number} غير صحيح. لم يُحفظ شيء.`,
+          400
+        );
+      }
+
+      const eventId =
+        `hi2ae_${herdImportV2HashInternalSrv({
+          archiveId,
+          code,
+          date,
+          row: h.sourceRow,
+          fields: h.sourceFields
+        }).slice(0, 40)}`;
+
+      archivedEvents.push({
+        ref: db.collection("archived_events").doc(
+          eventId
+        ),
+
+        payload: {
+          userId: uid,
+          ownerUid: uid,
+          animalNumber: number,
+          number,
+          archivedAnimalId: archiveId,
+
+          type: "حدث مستورد",
+          eventType: "حدث مستورد",
+          eventTypeNorm: "external_history",
+
+          date,
+          eventDate: date,
+
+          sourceSystem: "dairycomp",
+          sourceEventCode: code,
+
+          sourceRow: h.sourceRow ?? null,
+          sourceFields: h.sourceFields || {},
+
+          isImportedHistory: true,
+
+          archiveDate: c.exitDate,
+          archiveReason: exitType,
+          archiveReasonLabel:
+            exitType === "sale" ? "بيع" : "نفوق",
+
+          archivedAt: stamped,
+          importId: persistencePlan.importId,
+          createdAt: stamped
+        }
+      });
+    }
+  }
+
+  return {
+    archivedAnimals,
+    archivedEvents
+  };
+}
 function herdImportV2BuildAtomicWriteSetInternalSrv({
   uid,
   baselinePreview,
   eventsPreflight,
   sourceProfile,
-  persistencePlan
+persistencePlan,
+archivedCandidates = []
 }) {
   const animals = [];
   const animalMap = new Map();
@@ -10698,8 +11273,12 @@ function herdImportV2BuildAtomicWriteSetInternalSrv({
   }
 
   const events = [];
-  const stateMap = new Map();
-  const lastHeatOrAIMap = new Map();
+
+const historicalDairyComp =
+  sourceProfile.key === "dairycomp";
+
+const stateMap = new Map();
+const lastHeatOrAIMap = new Map();
 
   const sorted = [
     ...(eventsPreflight.normalizedEventsInternal || [])
@@ -10739,13 +11318,21 @@ function herdImportV2BuildAtomicWriteSetInternalSrv({
         item
       );
 
-    const ref = db
-      .collection("events")
-      .doc(key.documentId);
+    const officialEventId =
+  item.eventType === "weaning"
+    ? ["weaning", uid, item.animalNumber].join("__")
+    : item.eventType === "dehorning"
+      ? dehorningEventIdSrv(uid, item.animalNumber)
+      : key.documentId;
+
+const ref = db
+  .collection("events")
+  .doc(officialEventId);
 
     const needsEmbryonicLoss =
-      item.eventType ===
-        "pregnancy_diagnosis" &&
+  !historicalDairyComp &&
+  item.eventType ===
+    "pregnancy_diagnosis" &&
       Array.isArray(item.derivedEvents) &&
       item.derivedEvents.includes(
         "embryonic_loss"
@@ -10785,7 +11372,26 @@ function herdImportV2BuildAtomicWriteSetInternalSrv({
         linkedEmbryonicLossEventId:
           embryonicLossRef?.id || ""
       });
-
+    if (historicalDairyComp) {
+  for (const field of [
+    "reproductiveStatusSnapshot",
+    "dimAtEvent",
+    "daysSinceLastHeatOrAI",
+    "serviceNumber",
+    "reproductiveStatusBefore",
+    "lastInseminationDate",
+    "lastFertileInseminationDate",
+    "daysFromLastInsemination",
+    "gestationDays",
+    "abortionAgeMonths",
+    "probableCause",
+    "probableCauses",
+    "abortionDiagnosticMatrix",
+    "abortionDiagnosticNote"
+  ]) {
+    delete payload[field];
+  }
+}
     const embryonicLossPayload =
       embryonicLossRef &&
       embryonicLossKey
@@ -10803,41 +11409,48 @@ function herdImportV2BuildAtomicWriteSetInternalSrv({
               embryonicLossKey
           })
         : null;
-    const temporalError =
-      herdImportV2ApplyEventTemporalInternalSrv(
-        item,
-        state
-      );
-
-    if (temporalError) {
-      throw herdImportV2PersistenceErrorInternalSrv(
-        temporalError.code ||
-          "herd_import_v2_temporal_replay_failed_during_write",
-
-        temporalError.message ||
-          `تعذّر إعادة تشغيل تسلسل الحيوان رقم ${item.animalNumber} أثناء تجهيز الحفظ.`,
-
-        400
-      );
-    }
-
-    herdImportV2ImportedAnimalEventPatchInternalSrv(
-      animalEntry.eventPatch,
+if (!historicalDairyComp) {
+  const temporalError =
+    herdImportV2ApplyEventTemporalInternalSrv(
       item,
-      payload,
-      ref.id
+      state
     );
 
-    if (
-      ["heat", "insemination"].includes(
-        item.eventType
-      )
-    ) {
-      lastHeatOrAIMap.set(
-        item.animalNumber,
-        item.eventDate
-      );
-    }
+  if (temporalError) {
+    throw herdImportV2PersistenceErrorInternalSrv(
+      temporalError.code ||
+        "herd_import_v2_temporal_replay_failed_during_write",
+      temporalError.message ||
+        `تعذّر إعادة تشغيل تسلسل الحيوان رقم ${item.animalNumber} أثناء تجهيز الحفظ.`,
+      400
+    );
+  }
+
+  herdImportV2ImportedAnimalEventPatchInternalSrv(
+    animalEntry.eventPatch,
+    item,
+    payload,
+    ref.id
+  );
+
+  if (
+    ["heat", "insemination"].includes(item.eventType)
+  ) {
+    lastHeatOrAIMap.set(
+      item.animalNumber,
+      item.eventDate
+    );
+  }
+} else if (
+  ["weaning", "dehorning"].includes(item.eventType)
+) {
+  herdImportV2ImportedAnimalEventPatchInternalSrv(
+    animalEntry.eventPatch,
+    item,
+    payload,
+    ref.id
+  );
+}
 
        events.push({
       item,
@@ -10894,7 +11507,12 @@ function herdImportV2BuildAtomicWriteSetInternalSrv({
         admin.firestore.FieldValue.serverTimestamp()
     };
   }
-
+  const archiveWriteSet =
+  herdImportV2DairyCompArchiveWriteRowsSrv({
+    uid,
+    archivedCandidates,
+    persistencePlan
+  });
   const optionsWrite =
     persistencePlan.eventOptionsWritesCount
       ? {
@@ -10934,9 +11552,16 @@ function herdImportV2BuildAtomicWriteSetInternalSrv({
       : null;
 
   return {
-    animals,
-    events,
-    optionsWrite,
+  animals,
+  events,
+
+  archivedAnimals:
+    archiveWriteSet.archivedAnimals,
+
+  archivedEvents:
+    archiveWriteSet.archivedEvents,
+
+  optionsWrite,
 
     insertedAnimalsCount:
       animals.length,
@@ -10965,18 +11590,1000 @@ function herdImportV2BuildAtomicWriteSetInternalSrv({
       ).length
   };
 }
+async function herdImportV2PrepareDairyCompVaccinationTasksSrv({
+  uid,
+  sourceProfile,
+  writeSet
+}) {
+  writeSet.vaccinationTasks = [];
 
+  if (sourceProfile.key !== "dairycomp") return;
+
+  const vaccineEvents = writeSet.events
+    .filter(row =>
+      !row.derived &&
+      row.item.eventType === "vaccination"
+    )
+    .sort((a, b) =>
+      a.item.eventDate.localeCompare(b.item.eventDate)
+    );
+
+  if (!vaccineEvents.length) return;
+
+  const animals = new Map(
+    writeSet.animals.map(row => [
+      row.animalNumber,
+      row
+    ])
+  );
+
+  // نحفظ تاريخ آخر تحصين الحقيقي حتى لو لم يُختَر برنامج بعد.
+  for (const {item} of vaccineEvents) {
+    const animal = animals.get(item.animalNumber);
+    if (!animal) continue;
+
+    if (
+      !animal.payload.lastVaccinationDate ||
+      item.eventDate >= animal.payload.lastVaccinationDate
+    ) {
+      animal.payload.lastVaccinationDate = item.eventDate;
+      animal.payload.lastVaccine =
+        item.vaccineName || item.vaccineCode || "";
+      animal.payload.lastVaccineCode =
+        item.vaccineCode || "";
+    }
+  }
+
+  const context =
+    await vaccinationReadProgramContextSrv(uid);
+
+  if (!context.saved || !context.programMode) return;
+
+  const program =
+    await vaccinationReadExecutionProgramSrv(
+      uid,
+      context.programMode
+    );
+
+  const rows = (program.rows || []).filter(
+    row => row?.active !== false
+  );
+
+  const lastTask = new Map();
+
+  for (const event of vaccineEvents) {
+    const {item, ref, payload} = event;
+    const animal = animals.get(item.animalNumber);
+
+    if (!animal) continue;
+
+    const sourceCode =
+      vaccinationTextKeySrv(item.vaccineCode);
+
+    const sourceName =
+      vaccinationTextKeySrv(item.vaccineName);
+
+    const matches = rows.filter(row =>
+      (
+        sourceCode &&
+        sourceCode ===
+          vaccinationTextKeySrv(row.vaccineCode)
+      ) ||
+      (
+        sourceName &&
+        sourceName ===
+          vaccinationTextKeySrv(
+            row.vaccine || row.vaccineName
+          )
+      )
+    );
+
+    const codes = [...new Set(
+      matches
+        .map(row => String(row.vaccineCode || "").trim())
+        .filter(Boolean)
+    )];
+
+    if (codes.length !== 1) continue;
+
+    let linked;
+
+    try {
+      linked = await vaccinationResolveProgramRowSrv({
+        uid,
+        programContext: context,
+        executionProgram: program,
+        animalDoc: animal.payload,
+        animalCollection: animal.collectionName,
+
+        body: {
+          vaccineCode: codes[0],
+          vaccineForm: item.vaccineForm || "",
+          doseType:
+            vaccinationReconcileDoseTypeSrv(
+              item.doseType
+            )
+        }
+      });
+    } catch (_) {
+      continue;
+    }
+
+    if (
+      linked?.ok !== true ||
+      linked.linked !== true
+    ) {
+      continue;
+    }
+
+    payload.vaccine =
+      linked.vaccine || payload.vaccine;
+
+    payload.vaccineCode =
+      linked.vaccineCode || payload.vaccineCode;
+
+    payload.programRowId = linked.programRowId;
+    payload.programSection = linked.programSection || "";
+    payload.vaccinationProgramMode = context.programMode;
+    payload.vaccinationProgramLabel = context.programLabel;
+    payload.vaccineForm =
+      linked.vaccineForm || payload.vaccineForm;
+
+    payload.vaccinationProgramLinkStatus = "linked";
+
+    // تاريخ تحصين الأمومة لا يتحول إلى جرعة للحمل الحالي
+    // لمجرد وجود تحصين من حمل سابق.
+    if (linked.isMaternalProgram === true) {
+      payload.vaccinationProgramLinkStatus =
+        "linked_maternal_history";
+      continue;
+    }
+
+    const doseType =
+      vaccinationReconcileDoseTypeSrv(item.doseType);
+
+    const taskId =
+      vaccinationProgramTaskIdSrv({
+        uid,
+        animalNumber: item.animalNumber,
+        programMode: context.programMode,
+        programRowId: linked.programRowId
+      });
+
+    // آخر جرعة هي المرجع، وليس جرعة أقدم منها.
+    lastTask.delete(taskId);
+
+    const doseStep =
+      Array.isArray(linked.doseSchedule)
+        ? linked.doseSchedule.find(
+            step => step.doseType === doseType
+          )
+        : null;
+
+    if (!doseType || !doseStep) {
+      payload.vaccinationProgramLinkStatus =
+        "dose_not_resolved";
+      continue;
+    }
+
+    payload.doseType = doseType;
+    payload.doseTypeLabel =
+      doseStep.doseTypeLabel || "";
+
+    const task =
+      vaccinationBuildProgramTaskWriteSrv({
+        uid,
+        animalNumber: item.animalNumber,
+        animalId: animal.ref.id,
+        animalDoc: animal.payload,
+        eventDate: item.eventDate,
+        eventId: ref.id,
+        programContext: context,
+        executionProgram: program,
+        programLink: linked,
+        doseType
+      });
+
+    if (task) lastTask.set(taskId, task);
+  }
+
+  writeSet.vaccinationTasks = [...lastTask.values()];
+}
+// DairyComp: durable one-click import queue
+const HERD_DC_ASYNC_SOURCE_SRV = "herd_import_source_jobs";
+const herdDcAsyncInFlightSrv = new Set();
+
+async function herdDcAsyncEnqueueSrv({
+  uid, body, persistencePlan
+}) {
+  const importId = persistencePlan.importId;
+  const fileBase64 = String(body.fileBase64 || "");
+  const requestBody = { ...body };
+  delete requestBody.fileBase64;
+
+  if (
+    !fileBase64 ||
+    fileBase64.length > 9 * 1024 * 1024 ||
+    Buffer.byteLength(JSON.stringify(requestBody)) > 128 * 1024
+  ) {
+    throw herdImportV2PersistenceErrorInternalSrv(
+      "dairycomp_async_source_too_large",
+      "تعذّر حفظ مصدر مهمة الاستيراد.",
+      400
+    );
+  }
+
+  const sha = crypto
+    .createHash("sha256")
+    .update(fileBase64)
+    .digest("hex");
+
+  const ref = db
+    .collection(HERD_DC_ASYNC_SOURCE_SRV)
+    .doc(importId);
+
+  const readExisting = async () => {
+    const snap = await ref.get();
+    if (!snap.exists) return null;
+
+    const old = snap.data() || {};
+
+    if (
+      old.userId !== uid ||
+      old.sourceSha !== sha ||
+      old.workbookFingerprint !==
+        persistencePlan.workbookFingerprint
+    ) {
+      throw herdImportV2PersistenceErrorInternalSrv(
+        "dairycomp_async_source_mismatch",
+        "المصدر لا يطابق عملية الاستيراد.",
+        409
+      );
+    }
+
+    return old;
+  };
+
+  let existing = await readExisting();
+
+  if (existing) {
+    return { importId, status: existing.status };
+  }
+
+  const parts =
+    fileBase64.match(/[\s\S]{1,180000}/g) || [];
+
+  const batch = db.batch();
+
+  batch.create(ref, {
+    userId: uid,
+    importId,
+    sourceSha: sha,
+    workbookFingerprint:
+      persistencePlan.workbookFingerprint,
+    sourceProfileKey: "dairycomp",
+    requestBody,
+    partCount: parts.length,
+    status: "queued",
+    attempts: 0,
+    nextAttemptAtMs: 0,
+    leaseUntilMs: 0,
+    createdAt:
+      admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt:
+      admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  parts.forEach((part, i) => {
+    batch.create(
+      ref.collection("parts")
+        .doc(String(i).padStart(4, "0")),
+      { text: part }
+    );
+  });
+
+  try {
+    await batch.commit();
+  } catch (error) {
+    existing = await readExisting();
+    if (!existing) throw error;
+  }
+
+  return {
+    importId,
+    status: existing?.status || "queued"
+  };
+}
+
+async function herdDcAsyncExecuteOneSrv(importId) {
+  if (
+    !db ||
+    herdDcAsyncInFlightSrv.has(importId)
+  ) return;
+
+  herdDcAsyncInFlightSrv.add(importId);
+
+  const ref = db
+    .collection(HERD_DC_ASYNC_SOURCE_SRV)
+    .doc(importId);
+
+  const token =
+    crypto.randomBytes(16).toString("hex");
+
+  let claimed = false;
+  let heartbeat = null;
+
+  try {
+    const task = await db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return null;
+
+      const row = snap.data() || {};
+
+      if (
+        !["queued", "retry", "running"]
+          .includes(row.status) ||
+        (
+          row.status === "running" &&
+          Number(row.leaseUntilMs || 0) > Date.now()
+        ) ||
+        Number(row.nextAttemptAtMs || 0) > Date.now()
+      ) return null;
+
+      tx.update(ref, {
+        status: "running",
+        leaseToken: token,
+        leaseUntilMs: Date.now() + 120000,
+        attempts: Number(row.attempts || 0) + 1,
+        updatedAt:
+          admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      return row;
+    });
+
+    if (!task) return;
+    claimed = true;
+
+    heartbeat = setInterval(() => {
+      void db.runTransaction(async tx => {
+        const snap = await tx.get(ref);
+
+        if (
+          snap.exists &&
+          snap.data()?.leaseToken === token &&
+          snap.data()?.status === "running"
+        ) {
+          tx.update(ref, {
+            leaseUntilMs: Date.now() + 120000
+          });
+        }
+      }).catch(e =>
+        console.error("DairyComp heartbeat:", e)
+      );
+    }, 30000);
+
+    heartbeat.unref?.();
+
+    const parts = await ref.collection("parts")
+      .orderBy(admin.firestore.FieldPath.documentId())
+      .get();
+
+    if (parts.size !== task.partCount) {
+      throw Object.assign(
+        new Error("ملف المهمة المحفوظ غير مكتمل."),
+        { statusCode: 400 }
+      );
+    }
+
+    const fileBase64 = parts.docs
+      .map(d => d.data().text || "")
+      .join("");
+
+    const sha = crypto
+      .createHash("sha256")
+      .update(fileBase64)
+      .digest("hex");
+
+    if (sha !== task.sourceSha) {
+      throw Object.assign(
+        new Error("بصمة الملف غير متطابقة."),
+        { statusCode: 400 }
+      );
+    }
+
+    // Execute the existing operational importer.
+    let responseStatus = 200;
+    let responseBody = null;
+
+    const internalRes = {
+      status(n) {
+        responseStatus = n;
+        return this;
+      },
+      json(v) {
+        responseBody = v;
+        return v;
+      }
+    };
+
+    await herdImportV2SaveOperationalHandlerSrv(
+      {
+        userId: task.userId,
+        __herdDcAsyncWorkerSrv: true,
+        body: {
+          ...task.requestBody,
+          fileBase64
+        }
+      },
+      internalRes
+    );
+
+    if (
+      responseStatus >= 400 ||
+      responseBody?.ok !== true ||
+      responseBody?.persistenceStatus !== "completed"
+    ) {
+      throw Object.assign(
+        new Error(
+          responseBody?.message ||
+          "تعذّر إكمال الاستيراد."
+        ),
+        {
+          statusCode: responseStatus,
+          code: responseBody?.error
+        }
+      );
+    }
+
+    // Background execution bypasses the HTTP invalidation.
+    murabbikPreparedUnsafeTenantsSrv.add(task.userId);
+
+    try {
+      if (murabbikPreparedEngineSrv) {
+        await murabbikPreparedEngineSrv.markDirty(
+          task.userId,
+          murabbikPreparedKindsAllSrv
+        );
+      }
+
+      murabbikPreparedUnsafeTenantsSrv.delete(
+        task.userId
+      );
+    } catch (e) {
+      console.error(
+        "DairyComp prepared invalidation:",
+        e
+      );
+    }
+
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+
+      if (
+        !snap.exists ||
+        snap.data()?.leaseToken !== token
+      ) {
+        throw new Error(
+          "dairycomp_async_lease_lost"
+        );
+      }
+
+      tx.update(ref, {
+        status: "completed",
+        result: {
+          ok: true,
+          persistenceStatus: "completed",
+          importId,
+          insertedAnimalsCount:
+            responseBody.insertedAnimalsCount || 0,
+          insertedMothersCount:
+            responseBody.insertedMothersCount || 0,
+          insertedFollowersCount:
+            responseBody.insertedFollowersCount || 0,
+          savedEventsCount:
+            responseBody.savedEventsCount || 0,
+          redirectUrl:
+            responseBody.redirectUrl || ""
+        },
+        leaseUntilMs: 0,
+        completedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt:
+          admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    // Delete temporary source after successful import.
+    const cleanup = db.batch();
+
+    parts.docs.forEach(d =>
+      cleanup.delete(d.ref)
+    );
+
+    await cleanup.commit().catch(e =>
+      console.warn(
+        "DairyComp source cleanup deferred:",
+        e.message
+      )
+    );
+
+  } catch (e) {
+    console.error(
+      "DairyComp background import:",
+      importId,
+      e
+    );
+
+    if (claimed) {
+      try {
+        await db.runTransaction(async tx => {
+          const snap = await tx.get(ref);
+
+          if (
+            !snap.exists ||
+            snap.data()?.leaseToken !== token ||
+            snap.data()?.status === "completed"
+          ) return;
+
+          const attempts =
+            Number(snap.data()?.attempts || 1);
+
+          const permanent =
+            e.statusCode === 400 ||
+            attempts >= 12;
+
+          tx.update(ref, {
+            status: permanent
+              ? "failed"
+              : "retry",
+
+            lastError:
+              String(e.message || e).slice(0, 500),
+
+            nextAttemptAtMs:
+              permanent
+                ? 0
+                : Date.now() +
+                  Math.min(
+                    300000,
+                    attempts * 30000
+                  ),
+
+            leaseUntilMs: 0,
+
+            updatedAt:
+              admin.firestore.FieldValue.serverTimestamp()
+          });
+        });
+      } catch (saveError) {
+        console.error(
+          "DairyComp retry-state error:",
+          saveError
+        );
+      }
+    }
+  } finally {
+    if (heartbeat) clearInterval(heartbeat);
+    herdDcAsyncInFlightSrv.delete(importId);
+  }
+}
+
+async function herdDcAsyncSweepSrv() {
+  if (!db) return;
+
+  for (const status of [
+    "queued",
+    "retry",
+    "running"
+  ]) {
+    const page = await db
+      .collection(HERD_DC_ASYNC_SOURCE_SRV)
+      .where("status", "==", status)
+      .limit(30)
+      .get();
+
+    for (const doc of page.docs) {
+      const task = doc.data() || {};
+
+      if (
+        Number(task.nextAttemptAtMs || 0) >
+          Date.now() ||
+        (
+          status === "running" &&
+          Number(task.leaseUntilMs || 0) >
+            Date.now()
+        )
+      ) continue;
+
+      void herdDcAsyncExecuteOneSrv(doc.id);
+    }
+  }
+}
+
+app.get(
+  "/api/herd-import-v2/job/:importId",
+  requireUserId,
+  async (req, res) => {
+    try {
+      const id =
+        String(req.params.importId || "");
+
+      if (!/^hi2_[a-f0-9]{40}$/.test(id)) {
+        return res.status(400).json({
+          ok: false,
+          error: "invalid_import_id"
+        });
+      }
+
+      const sourceRef = db
+        .collection(HERD_DC_ASYNC_SOURCE_SRV)
+        .doc(id);
+
+      const [sourceSnap, jobSnap] =
+        await Promise.all([
+          sourceRef.get(),
+          db.collection("herd_import_jobs")
+            .doc(id)
+            .get()
+        ]);
+
+      if (
+        !sourceSnap.exists ||
+        sourceSnap.data()?.userId !== req.userId
+      ) {
+        return res.status(404).json({
+          ok: false,
+          error: "job_not_found"
+        });
+      }
+
+      const task = sourceSnap.data() || {};
+      const job = jobSnap.exists
+        ? jobSnap.data() || {}
+        : {};
+
+      return res.json({
+        ok: true,
+        importId: id,
+        status: task.status,
+        completedChunks:
+          Number(job.nextChunk || 0),
+        totalChunks:
+          Number(job.chunkCount || 0),
+        message:
+          task.status === "failed"
+            ? task.lastError
+            : "",
+        result:
+          task.status === "completed"
+            ? task.result
+            : null
+      });
+
+    } catch (e) {
+      return res.status(500).json({
+        ok: false,
+        error: "job_status_unavailable"
+      });
+    }
+  }
+);
+async function herdImportV2CommitDairyCompChunksSrv({
+  uid, persistencePlan, writeSet, sourceProfile
+}) {
+  const importId = persistencePlan.importId;
+  const fingerprint = persistencePlan.workbookFingerprint;
+  const jobRef = db.collection('herd_import_jobs').doc(importId);
+  const lockRef = db.collection('herd_import_locks').doc(uid);
+  const token = crypto.randomBytes(16).toString('hex');
+  const leaseMs = 5 * 60 * 1000;
+
+  const actions = [
+    ...writeSet.animals.map(x => ({
+      kind: 'create', ref: x.ref, data: x.payload
+    })),
+    ...writeSet.events.map(x => ({
+      kind: 'create', ref: x.ref, data: x.payload
+    })),
+    ...writeSet.archivedAnimals.map(x => ({
+      kind: 'create', ref: x.ref, data: x.payload
+    })),
+    ...writeSet.archivedEvents.map(x => ({
+      kind: 'create', ref: x.ref, data: x.payload
+    })),
+    ...(writeSet.vaccinationTasks || []).map(x => ({
+      kind: 'merge', ref: x.taskRef, data: x.payload
+    })),
+    ...(writeSet.optionsWrite ? [{
+      kind: 'merge',
+      ref: writeSet.optionsWrite.ref,
+      data: writeSet.optionsWrite.payload
+    }] : [])
+  ];
+
+  const chunkSize = 150;
+  const chunkCount = Math.ceil(actions.length / chunkSize);
+  const actionFingerprint = herdImportV2HashInternalSrv(
+    actions.map(a => `${a.kind}:${a.ref.path}`)
+  );
+
+  const counts = {
+    insertedAnimalsCount: writeSet.insertedAnimalsCount,
+    insertedFollowersCount: writeSet.insertedFollowersCount,
+    insertedMothersCount: writeSet.insertedMothersCount,
+    archivedAnimalsCount: writeSet.archivedAnimals.length,
+    archivedEventsCount: writeSet.archivedEvents.length,
+    savedEventsCount: writeSet.savedEventsCount,
+    savedSourceEventsCount: writeSet.savedSourceEventsCount,
+    savedDerivedEventsCount: writeSet.savedDerivedEventsCount
+  };
+
+  const claimed = await db.runTransaction(async tx => {
+    const [jobSnap, lockSnap] = await Promise.all([
+      tx.get(jobRef),
+      tx.get(lockRef)
+    ]);
+
+    const job = jobSnap.exists ? jobSnap.data() || {} : {};
+    const lock = lockSnap.exists ? lockSnap.data() || {} : {};
+
+    if (jobSnap.exists && (
+      job.userId !== uid ||
+      job.workbookFingerprint !== fingerprint ||
+      job.sourceProfileKey !== 'dairycomp' ||
+      (
+        job.chunkCount !== undefined &&
+        job.chunkCount !== chunkCount
+      ) ||
+      (
+        job.actionCount !== undefined &&
+        job.actionCount !== actions.length
+      ) ||
+      (
+        job.actionFingerprint &&
+        job.actionFingerprint !== actionFingerprint
+      )
+    )) {
+      throw herdImportV2PersistenceErrorInternalSrv(
+        'herd_import_checkpoint_mismatch',
+        'لا تتطابق بيانات الاستكمال مع الملف الأصلي.',
+        409
+      );
+    }
+
+    if (job.status === 'completed') {
+      return { complete: true };
+    }
+
+    if (
+      lock.importId &&
+      lock.importId !== importId &&
+      lock.status !== 'completed'
+    ) {
+      throw herdImportV2PersistenceErrorInternalSrv(
+        'herd_import_another_job_pending',
+        'يوجد استيراد غير مكتمل. استكمل ملفه أولًا.',
+        409
+      );
+    }
+
+    if (
+      lock.importId === importId &&
+      lock.status === 'running' &&
+      Number(lock.leaseUntilMs || 0) > Date.now()
+    ) {
+      throw herdImportV2PersistenceErrorInternalSrv(
+        'herd_import_already_running',
+        'نفس الملف قيد الاستيراد بالفعل.',
+        409
+      );
+    }
+
+    const next = jobSnap.exists
+      ? Number(job.nextChunk || 0)
+      : 0;
+
+    if (
+      !Number.isInteger(next) ||
+      next < 0 ||
+      next > chunkCount
+    ) {
+      throw herdImportV2PersistenceErrorInternalSrv(
+        'herd_import_checkpoint_invalid',
+        'نقطة استكمال الاستيراد غير سليمة.',
+        409
+      );
+    }
+
+    tx.set(lockRef, {
+      userId: uid,
+      importId,
+      status: 'running',
+      token,
+      leaseUntilMs: Date.now() + leaseMs,
+      updatedAt:
+        admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    tx.set(jobRef, {
+      userId: uid,
+      ownerUid: uid,
+      importId,
+      workbookFingerprint: fingerprint,
+      sourceProfileKey: 'dairycomp',
+      status: 'running',
+      executionMode: 'chunked_resumable',
+      nextChunk: next,
+      chunkCount,
+      actionCount: actions.length,
+      actionFingerprint,
+      updatedAt:
+        admin.firestore.FieldValue.serverTimestamp(),
+
+      ...(!jobSnap.exists ? {
+        createdAt:
+          admin.firestore.FieldValue.serverTimestamp()
+      } : {})
+    }, { merge: true });
+
+    return { complete: false, next };
+  });
+
+  if (claimed.complete) {
+    return { ...counts, alreadyCompleted: true };
+  }
+
+  try {
+    for (
+      let i = claimed.next;
+      i < Math.max(chunkCount, 1);
+      i++
+    ) {
+      const last = i === Math.max(chunkCount, 1) - 1;
+
+      await db.runTransaction(async tx => {
+        const [jobSnap, lockSnap] = await Promise.all([
+          tx.get(jobRef),
+          tx.get(lockRef)
+        ]);
+
+        const job = jobSnap.data() || {};
+        const lock = lockSnap.data() || {};
+
+        if (
+          job.status !== 'running' ||
+          Number(job.nextChunk) !== i ||
+          lock.importId !== importId ||
+          lock.token !== token ||
+          lock.status !== 'running' ||
+          Number(lock.leaseUntilMs || 0) <= Date.now()
+        ) {
+          throw herdImportV2PersistenceErrorInternalSrv(
+            'herd_import_lease_changed',
+            'توقفت المحاولة لأن حق استكمالها تغيّر.',
+            409
+          );
+        }
+
+        const chunk = actions.slice(
+          i * chunkSize,
+          (i + 1) * chunkSize
+        );
+
+        for (const action of chunk) {
+          if (action.kind === 'create') {
+            tx.create(action.ref, action.data);
+          } else {
+            tx.set(
+              action.ref,
+              action.data,
+              { merge: true }
+            );
+          }
+        }
+
+        tx.set(jobRef, {
+          status: last ? 'completed' : 'running',
+          nextChunk: i + 1,
+
+          ...(last ? {
+            ...counts,
+            completedAt:
+              admin.firestore.FieldValue.serverTimestamp()
+          } : {}),
+
+          updatedAt:
+            admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        tx.set(lockRef, {
+          status: last ? 'completed' : 'running',
+          leaseUntilMs:
+            last ? 0 : Date.now() + leaseMs,
+          updatedAt:
+            admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      });
+    }
+
+    return { ...counts, alreadyCompleted: false };
+
+  } catch (error) {
+    try {
+      await db.runTransaction(async tx => {
+        const [jobSnap, lockSnap] = await Promise.all([
+          tx.get(jobRef),
+          tx.get(lockRef)
+        ]);
+
+        const job = jobSnap.data() || {};
+        const lock = lockSnap.data() || {};
+
+        if (job.status === 'completed') return;
+
+        if (
+          lock.importId !== importId ||
+          lock.token !== token
+        ) return;
+
+        tx.set(jobRef, {
+          status: 'paused',
+          lastErrorCode:
+            String(error.code || 'commit_failed'),
+          updatedAt:
+            admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        tx.set(lockRef, {
+          status: 'paused',
+          leaseUntilMs: 0,
+          updatedAt:
+            admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      });
+    } catch (checkpointError) {
+      console.error(
+        'herd-import checkpoint failed',
+        checkpointError
+      );
+    }
+
+    const finalJob =
+      await jobRef.get().catch(() => null);
+
+    if (
+      finalJob?.exists &&
+      finalJob.data()?.status === 'completed'
+    ) {
+      return { ...counts, alreadyCompleted: false };
+    }
+
+    throw error;
+  }
+}
 async function herdImportV2CommitAtomicWriteSetInternalSrv({
   uid,
   persistencePlan,
   writeSet,
   sourceProfile
 }) {
+    if (sourceProfile.key === "dairycomp") {
+    return herdImportV2CommitDairyCompChunksSrv({
+      uid,
+      persistencePlan,
+      writeSet,
+      sourceProfile
+    });
+  }
   const finalBatchWrites =
-    writeSet.animals.length +
-    writeSet.events.length +
-    (writeSet.optionsWrite ? 1 : 0) +
-    1;
+  writeSet.animals.length +
+  writeSet.events.length +
+  writeSet.archivedAnimals.length +
+  writeSet.archivedEvents.length +
+  (writeSet.optionsWrite ? 1 : 0) +
+(writeSet.vaccinationTasks || []).length +
+1;
 
   if (finalBatchWrites > 430) {
     throw herdImportV2PersistenceErrorInternalSrv(
@@ -11005,6 +12612,12 @@ async function herdImportV2CommitAtomicWriteSetInternalSrv({
   ) {
     return {
       alreadyCompleted: true,
+
+      archivedAnimalsCount:
+  Number(oldJob.archivedAnimalsCount || 0),
+
+archivedEventsCount:
+  Number(oldJob.archivedEventsCount || 0),
 
       insertedAnimalsCount:
         Number(oldJob.insertedAnimalsCount || 0),
@@ -11053,6 +12666,11 @@ async function herdImportV2CommitAtomicWriteSetInternalSrv({
 
     eventWritesCount:
       writeSet.events.length,
+      archivedAnimalsCount:
+  writeSet.archivedAnimals.length,
+
+archivedEventsCount:
+  writeSet.archivedEvents.length,
         sourceEventWritesCount:
       writeSet.savedSourceEventsCount,
 
@@ -11091,7 +12709,26 @@ async function herdImportV2CommitAtomicWriteSetInternalSrv({
         row.payload
       );
     }
+     for (const row of writeSet.archivedAnimals) {
+  batch.create(
+    row.ref,
+    row.payload
+  );
+}
 
+for (const row of writeSet.archivedEvents) {
+  batch.create(
+    row.ref,
+    row.payload
+  );
+}
+for (const task of writeSet.vaccinationTasks || []) {
+  batch.set(
+    task.taskRef,
+    task.payload,
+    { merge: true }
+  );
+}
     if (writeSet.optionsWrite) {
       batch.set(
         writeSet.optionsWrite.ref,
@@ -11117,6 +12754,12 @@ async function herdImportV2CommitAtomicWriteSetInternalSrv({
 
       insertedMothersCount:
         writeSet.insertedMothersCount,
+
+        archivedAnimalsCount:
+  writeSet.archivedAnimals.length,
+
+archivedEventsCount:
+  writeSet.archivedEvents.length,
 
       savedEventsCount:
         writeSet.savedEventsCount,
@@ -11148,6 +12791,12 @@ async function herdImportV2CommitAtomicWriteSetInternalSrv({
 
     return {
       alreadyCompleted: false,
+
+      archivedAnimalsCount:
+  writeSet.archivedAnimals.length,
+
+archivedEventsCount:
+  writeSet.archivedEvents.length,
 
       insertedAnimalsCount:
         writeSet.insertedAnimalsCount,
@@ -14700,7 +16349,334 @@ app.get("/api/herd-import-v2/guide", requireUserId, (req, res) => {
     ]
   });
 });
+const HERD_IMPORT_DC_SUPPORTED_HEALTH_SRV = Object.freeze({
+  METR: "metritis_endometritis",
+  RP: "retained_placenta",
+  KETO: "ketosis",
+  KETOSIS: "ketosis",
+  DA: "displaced_abomasum",
+  MF: "milk_fever",
+  MILK_FEVER: "milk_fever",
+  CYST: "ovarian_cysts",
+  CYSTIC: "ovarian_cysts",
+  PNEU: "pneumonia",
+  DIARRHEA: "diarrhea",
+  PINKEYE: "pinkeye"
+});
+const HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV = new Set([
+  "PREV", "REPRO", "RECK", "CHECK",
+  "TREAT", "CULTURE", "BLSERUM", "TEMP",
+  "CIDR", "TRANSFER"
+]);
+function herdImportV2TranslateDairyCompEventSrv(
+  e,
+  id,
+  pick,
+  issues,
+   entryType = "mothers"
+) {
+  const code = String(e.code || "")
+    .trim()
+    .toUpperCase();
+    if (HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(code)) {
+  return null;
+}
 
+  const notes = [
+    "DairyComp:" + (code || "UNKNOWN"),
+    pick(e.r, "Event_Remarks", "Remark", "REM")
+  ].filter(Boolean).join(" | ");
+
+  const base = {
+  "رقم الحيوان": id,
+  "تاريخ الحدث": e.d,
+  "كود حدث المصدر": code,
+  "ملاحظات": notes
+};
+    if (code === "PGF" || code === "GNRH") {
+    return {
+      ...base,
+      "نوع الحدث": "حقنة هرمونية"
+    };
+  }
+
+  if (code === "OVS") {
+    return {
+      ...base,
+      "نوع الحدث": "برنامج تزامن تاريخي"
+    };
+  }
+  if (code === "HEAT") {
+    return {
+      ...base,
+      "نوع الحدث": "شياع",
+      "وقت الشياع": pick(e.r, "HeatTime")
+    };
+  }
+
+  if (code === "BRED") {
+    return {
+      ...base,
+      "نوع الحدث": "تلقيح",
+      "وقت الشياع": pick(e.r, "HeatTime"),
+      "وقت التلقيح": pick(e.r, "InseminationTime"),
+      "طريقة التلقيح": pick(e.r, "InseminationMethod"),
+      "كود السائل المنوي": pick(
+        e.r, "SemenCode", "LSIR", "LastSemenCode"
+      ),
+      "اسم الملقح": pick(
+        e.r, "Technician", "TECH", "Inseminator"
+      )
+    };
+  }
+
+  if (code === "PREG" || code === "OPEN") {
+    return {
+      ...base,
+      "نوع الحدث": "تشخيص حمل",
+      "طريقة التشخيص": pick(e.r, "PregnancyMethod"),
+      "نتيجة التشخيص":
+        code === "PREG" ? "عشار" : "فارغة"
+    };
+  }
+
+  if (code === "ABORT") {
+    return {
+      ...base,
+      "نوع الحدث": "إجهاض"
+    };
+  }
+if (code === "VACC" || code === "CALFVACC") {
+  return {
+    ...base,
+    "نوع الحدث": "تحصين",
+    "اسم التحصين": pick(e.r, "Vaccine", "VaccineName"),
+    "كود التحصين": pick(e.r, "VaccineCode", "CVACC"),
+    "نوع اللقاح": pick(e.r, "VaccineForm"),
+    "نوع الجرعة": pick(e.r, "DoseType")
+  };
+}
+  if (code === "MAST") {
+    return {
+      ...base,
+      "نوع الحدث": "التهاب الضرع",
+      "نوع التهاب الضرع": pick(e.r, "MastitisType"),
+      "الربع المصاب": pick(
+        e.r, "AffectedQuarters", "Quarters"
+      )
+    };
+  }
+
+  if (code === "LAME") {
+    return {
+      ...base,
+      "نوع الحدث": "عرج",
+      "نوع العرج": pick(e.r, "LamenessType"),
+      "الحافر المصاب": pick(
+        e.r, "AffectedLegs", "AffectedHooves"
+      )
+    };
+  }
+
+  if (code === "TRIM") {
+    return {
+      ...base,
+      "نوع الحدث": "تقليم الحوافر"
+    };
+  }
+
+  if (code === "WEAN") {
+    return {
+      ...base,
+      "نوع الحدث": "فطام"
+    };
+  }
+
+  if (code === "DEHORN") {
+    return {
+      ...base,
+      "نوع الحدث": "إزالة القرون",
+      "اسم المنفذ": pick(
+        e.r, "PerformedBy", "Technician", "TECH"
+      )
+    };
+  }
+if (code === "PNEU" || code === "DIARRHEA") {
+  const diseaseCode =
+    entryType === "followers"
+      ? (
+          code === "PNEU"
+            ? "calf_pneumonia"
+            : "calf_scours"
+        )
+      : HERD_IMPORT_DC_SUPPORTED_HEALTH_SRV[code];
+
+  return {
+    ...base,
+    "نوع الحدث": "تشخيص صحي",
+    "كود المرض": diseaseCode
+  };
+}
+  if (
+    Object.prototype.hasOwnProperty.call(
+      HERD_IMPORT_DC_SUPPORTED_HEALTH_SRV,
+      code
+    )
+  ) {
+    return {
+      ...base,
+      "نوع الحدث": "تشخيص صحي",
+      "كود المرض":
+        HERD_IMPORT_DC_SUPPORTED_HEALTH_SRV[code]
+    };
+  }
+
+  // These codes are represented in the animal baseline.
+  if (["BIRTH", "FRESH", "DRY"].includes(code)) {
+    return null;
+  }
+
+  // Do not silently discard unsupported operational events.
+  const requirements = {
+    VACC: "يحتاج برنامج التحصين ومحرك الجرعات",
+    CALFVACC: "يحتاج برنامج التحصين ومحرك الجرعات",
+    SOLD: "يحتاج مسار أرشفة البيع وأسبابه",
+    DIED: "يحتاج مسار أرشفة النفوق وأسبابه"
+   
+  };
+
+  issues.push(
+    `${id}: DairyComp ${code || "(فارغ)"} بتاريخ ` +
+    `${e.d || "?"}: ` +
+    (
+      requirements[code] ||
+      "الرمز لا يملك مسار حفظ مُرَبِّيك مؤكدًا"
+    )
+  );
+
+  return null;
+}
+function herdImportV2DairyCompArchiveCandidateSrv({
+  id,
+  all,
+  rc,
+  entryType,
+  asOf,
+  pick,
+  issues
+}) {
+  const history = all
+    .filter(e => e.d && e.d <= asOf)
+    .sort((a, b) => a.d.localeCompare(b.d));
+
+  const exits = history.filter(e =>
+    e.code === "SOLD" || e.code === "DIED"
+  );
+
+  if (!exits.length) {
+    issues.push(
+      `${id}: RC=${rc} يشير للاستبعاد، ` +
+      "لكن نوع الخروج وتاريخه غير موثقين."
+    );
+    return null;
+  }
+
+  const uniqueExits = [
+    ...new Map(
+      exits.map(e => [
+        JSON.stringify([
+          e.code,
+          e.d,
+          pick(
+            e.r,
+            "ExitReason",
+            "SaleReason",
+            "DeathReason",
+            "Reason",
+            "REM"
+          )
+        ]),
+        e
+      ])
+    ).values()
+  ];
+
+  if (uniqueExits.length !== 1) {
+    issues.push(
+      `${id}: توجد أحداث خروج متعارضة تحتاج المراجعة.`
+    );
+    return null;
+  }
+
+  const exit = uniqueExits[0];
+
+  if (history.some(e => e.d > exit.d)) {
+    issues.push(
+      `${id}: توجد أحداث بعد تاريخ الاستبعاد ${exit.d}.`
+    );
+    return null;
+  }
+
+  const reason = pick(
+    exit.r,
+    "ExitReason",
+    "SaleReason",
+    "DeathReason",
+    "Reason",
+    "REM"
+  );
+
+  if (!reason) {
+    issues.push(
+      `${id}: سبب الاستبعاد ${exit.code} مفقود.`
+    );
+    return null;
+  }
+
+  const birthDates = [
+    ...new Set(all.map(e => e.bd).filter(Boolean))
+  ];
+
+  if (birthDates.length > 1) {
+    issues.push(
+      `${id}: تعارض تاريخ الميلاد.`
+    );
+    return null;
+  }
+
+  const latest = history.at(-1)?.r || exit.r;
+
+  const sex = addAnimalImportNormalizeSexSrv(
+    pick(latest, "SEX", "GENDER")
+  );
+
+  if (
+    entryType === "followers" &&
+    (!birthDates[0] || !sex)
+  ) {
+    issues.push(
+      `${id}: جنس التابع أو تاريخ ميلاده غير معروف.`
+    );
+    return null;
+  }
+
+  return {
+    animalNumber: id,
+    entryType,
+    sourceRC: rc,
+    exitCode: exit.code,
+    exitDate: exit.d,
+    exitReason: reason,
+    birthDate: birthDates[0] || "",
+    sex,
+    sourceHistory: history.map(e => ({
+      sourceRow: e.row,
+      sourceCode: e.code,
+      sourceDate: e.d,
+      sourceFields: e.r
+    }))
+  };
+}
 function herdImportV2ParseExternalDairyCompSrv(body = {}) {
   const fail = messages => {
     const err = herdImportV2TemplateErrorSrv(
@@ -14787,15 +16763,27 @@ if (
 
   const has = key => columns.has(addAnimalImportNormKeySrv(key));
 
-  if (!["ID", "Event", "Date", "BDAT", "LACT", "RC"].every(has)) {
-    fail(["ملف DairyComp لا يحتوي على أعمدة التعرف الأساسية"]);
-  }
+  const standard =
+  ["ID", "Event", "Date", "BDAT", "LACT"].every(has);
+
+const lifecycle =
+  ["Cow_ID", "Event_Name", "Event_Date", "Lactation"].every(has);
+
+if (!standard && !lifecycle) {
+  fail(["ملف DairyComp لا يحتوي على أعمدة التعرف الأساسية"]);
+}
 
   const pick = (row, ...keys) =>
     String(addAnimalImportPickAnySrv(row, keys) ?? "").trim();
 
-  const date = value =>
-    herdImportV2ExternalDateStrictSrv(value, "mdy");
+  const date = value => {
+  const raw = String(value || "").trim();
+
+  return herdImportV2ExternalDateStrictSrv(
+    raw,
+    /^\d{4}-\d{2}-\d{2}$/.test(raw) ? "ymd" : "mdy"
+  );
+};
 
   const groups = new Map();
   const issues = [];
@@ -14803,7 +16791,9 @@ if (
 
   for (let i = 0; i < records.length; i++) {
     const row = records[i];
-    const id = addAnimalDigitsSrv(pick(row, "ID"));
+   const id = addAnimalDigitsSrv(
+  pick(row, "ID", "Cow_ID")
+);
 
     if (!id) {
       issues.push(`صف ${i + 2}: رقم الحيوان مفقود`);
@@ -14812,9 +16802,17 @@ if (
 
     if (!groups.has(id)) groups.set(id, []);
 
-    const eventDate = date(pick(row, "Date"));
-    const birthDate = date(pick(row, "BDAT"));
-    const freshDate = date(pick(row, "FDAT"));
+    const eventDate = date(
+  pick(row, "Date", "Event_Date")
+);
+
+const birthDate = date(
+  pick(row, "BDAT", "BirthDate", "DOB")
+);
+
+const freshDate = date(
+  pick(row, "FDAT", "FreshDate")
+);
 
     if (
       !eventDate || eventDate > asOf ||
@@ -14830,9 +16828,9 @@ if (
       d: eventDate,
       bd: birthDate,
       fd: freshDate,
-      code: pick(row, "Event").toUpperCase(),
-      rc: pick(row, "RC"),
-      lact: pick(row, "LACT")
+      code: pick(row, "Event", "Event_Name").toUpperCase(),
+rc: pick(row, "RC", "Repro_Status", "REPRO"),
+lact: pick(row, "LACT", "Lactation")
     });
   }
 
@@ -14841,21 +16839,14 @@ if (
     .filter(Boolean)
     .sort();
 
-  if (
-    !allEventDates.length ||
-    addAnimalDiffDaysSrv(allEventDates.at(-1), asOf) > 180
-  ) {
-    issues.push(
-      "آخر حدث بالملف أقدم من 180 يومًا؛ لا يمكن تأكيد حداثته"
-    );
-  }
+  if (!allEventDates.length) {
+  issues.push("لا توجد تواريخ أحداث صحيحة داخل الملف");
+}
 
-  if (groups.size > 500) {
-    issues.push("الملف يتجاوز 500 حيوان");
-  }
-
-  const animals = [];
-  let archivedIgnored = 0;
+const animals = [];
+const followers = [];
+const archivedCandidates = [];
+let archivedIgnored = 0;
   let otherEventRows = 0;
   const seenEvents = new Set();
 
@@ -14913,11 +16904,348 @@ const calvings = all.flatMap(x => [
 
 const calving = calvings.at(-1) || "";
 
+// LACT=0 identifies youngstock, not a lactating mother.
+if (lact === "0") {
+  const sourceBirth =
+    births.length === 1 ? births[0] : "";
 
-    if (rc === "7") {
-      archivedIgnored++;
+  const datedBirths = [
+    ...new Set(
+      all
+        .filter(e => e.code === "BIRTH" && e.d)
+        .map(e => e.d)
+    )
+  ];
+
+  const birthDate =
+    sourceBirth ||
+    (datedBirths.length === 1 ? datedBirths[0] : "");
+
+  if (
+    !birthDate ||
+    births.length > 1 ||
+    datedBirths.length > 1 ||
+    (
+      sourceBirth &&
+      datedBirths.some(d => d !== sourceBirth)
+    )
+  ) {
+    issues.push(
+      `${id}: تاريخ ميلاد التابع مفقود أو متعارض`
+    );
+  }
+
+  const breedValues = [
+    ...new Set(
+      all.map(e =>
+        pick(e.r, "BREED", "BRD")
+      ).filter(Boolean)
+    )
+  ];
+
+  if (breedValues.length > 1) {
+    issues.push(`${id}: تعارض السلالة`);
+  }
+
+  const breedRaw =
+    breedValues[0] || breedDefault;
+
+  const breed = ({
+    HO: "هولشتاين",
+    HF: "هولشتاين فريزيان",
+    JE: "جيرسي",
+    BS: "براون سويس"
+  })[String(breedRaw).toUpperCase()] ||
+    animalListBreedDisplaySrv(breedRaw);
+
+  const sourceSpecies = [
+    ...new Set(
+      all.map(e =>
+        herdImportV2NormalizeAnimalTypeStrictInternalSrv(
+          pick(e.r, "SPECIES", "ANIMALTYPE")
+        )
+      ).filter(Boolean)
+    )
+  ];
+
+  const inferredSpecies =
+    herdImportV2InferAnimalTypeFromBreedInternalSrv(
+      breedRaw
+    );
+
+  const animalType =
+    inferredSpecies ||
+    sourceSpecies[0] ||
+    fallbackSpecies;
+
+  if (
+    sourceSpecies.length > 1 ||
+    (
+      inferredSpecies &&
+      sourceSpecies.length &&
+      inferredSpecies !== sourceSpecies[0]
+    )
+  ) {
+    issues.push(`${id}: تعارض نوع الحيوان`);
+  }
+
+  if (
+    !animalType ||
+    !breedRaw ||
+    /^\d+$/.test(breedRaw)
+  ) {
+    issues.push(
+      `${id}: النوع أو السلالة غير معروف`
+    );
+  }
+
+  const sexValues = [
+    ...new Set(
+      all.map(e =>
+        addAnimalImportNormalizeSexSrv(
+          pick(e.r, "SEX", "GENDER")
+        )
+      ).filter(Boolean)
+    )
+  ];
+
+  const sex =
+    sexValues.length === 1 ? sexValues[0] : "";
+
+  if (!sex || sexValues.length > 1) {
+    issues.push(
+      `${id}: الجنس غير معروف أو متعارض`
+    );
+  }
+
+  const dams = [
+    ...new Set(
+      all.map(e =>
+        addAnimalDigitsSrv(
+          pick(e.r, "DAM", "DID", "MOTHER")
+        )
+      ).filter(Boolean)
+    )
+  ];
+
+  if (dams.length > 1) {
+    issues.push(`${id}: تعارض رقم الأم`);
+  }
+
+  const dam =
+    dams.length === 1 ? dams[0] : "";
+
+  const chronological = all
+    .filter(e => e.d && e.d <= asOf)
+    .sort((a, b) => a.d.localeCompare(b.d));
+
+  const exits = chronological.filter(e =>
+  ["SOLD", "DIED"].includes(e.code)
+);
+
+const lastExit = exits.at(-1);
+
+if (rc === "7" || lastExit) {
+  const candidate =
+    herdImportV2DairyCompArchiveCandidateSrv({
+      id,
+      all,
+      rc,
+      entryType: "followers",
+      asOf,
+      pick,
+      issues
+    });
+
+  if (candidate) {
+    archivedCandidates.push(candidate);
+  }
+
+  archivedIgnored++;
+  continue;
+}
+
+  if (calving) {
+    issues.push(
+      `${id}: LACT=0 مع تاريخ ولادة أم`
+    );
+  }
+
+  const weanDate = chronological
+    .filter(e => e.code === "WEAN")
+    .at(-1)?.d || "";
+
+  const breedings = chronological
+    .filter(e => e.code === "BRED");
+
+  const lastAI =
+    breedings.at(-1)?.d || "";
+
+  const semen = pick(
+    breedings.at(-1)?.r || {},
+    "SEMENCODE",
+    "LSIR",
+    "SIRC"
+  );
+
+  const timesRaw = pick(
+    latestRows[0]?.r || {},
+    "TBRD",
+    "TIMES",
+    "SERVICES"
+  );
+
+  const times = timesRaw
+    ? Number(timesRaw)
+    : (breedings.length ? breedings.length : 0);
+
+  if (
+    !Number.isInteger(times) ||
+    times < breedings.length
+  ) {
+    issues.push(
+      `${id}: عدد التلقيحات غير صحيح`
+    );
+  }
+
+  const lastRepro = chronological
+    .filter(e =>
+      ["BRED", "PREG", "OPEN", "ABORT"]
+        .includes(e.code)
+    )
+    .at(-1)?.code || "";
+
+  const repro = rcMap[rc] || "";
+
+  const ageDays = birthDate
+  ? Number(addAnimalDiffDaysSrv(birthDate, asOf))
+  : NaN;
+
+const ageStage =
+  !Number.isFinite(ageDays) || ageDays < 0
+    ? ""
+    : ageDays < 120
+      ? "رضيع"
+      : ageDays < 240
+        ? "فطام"
+        : sex === "أنثى" && ageDays >= 330
+          ? "تحت التلقيح"
+          : "نامي";
+
+const stage =
+  lastRepro === "PREG" || repro === "عشار"
+    ? "عشار"
+    : lastRepro === "BRED" || repro === "ملقحة"
+      ? "ملقح"
+      : lastRepro === "OPEN" || lastRepro === "ABORT"
+        ? "تحت التلقيح"
+        : ageStage;
+
+  if (
+    sex === "ذكر" &&
+    ["عشار", "ملقح", "تحت التلقيح"].includes(stage)
+  ) {
+    issues.push(
+      `${id}: تابع ذكر بحالة تناسلية غير متوافقة`
+    );
+  }
+
+  followers.push({
+    "رقم الحيوان": id,
+    "نوع الحيوان": animalType,
+    "السلالة": breed,
+    "تاريخ الميلاد": birthDate,
+    "جنس التابع": sex,
+    "حالة التابع": stage,
+    "رقم الأم": dam,
+    "بيانات الأم": dam ? "معروف" : "غير معروف",
+    "رقم الأب": pick(
+      latestRows[0]?.r || {},
+      "SID",
+      "SIRE",
+      "FATHER"
+    ),
+    "تاريخ الفطام": weanDate,
+    "تاريخ آخر تلقيح": lastAI,
+    "عدد مرات التلقيح": String(times),
+    "كود سائل تلقيح التابع": semen
+  });
+
+  for (const e of chronological) {
+    if (!birthDate || e.d < birthDate) {
       continue;
     }
+
+    const eventKey = [
+      id,
+      e.code,
+      e.d,
+      JSON.stringify(e.r)
+    ].join("|");
+
+    if (seenEvents.has(eventKey)) {
+      continue;
+    }
+
+    seenEvents.add(eventKey);
+
+    if (
+      sex === "ذكر" &&
+      ["HEAT", "BRED", "PREG", "OPEN", "ABORT", "PGF", "GNRH", "OVS"]
+        .includes(e.code)
+    ) {
+      issues.push(
+        `${id}: حدث تناسلي ${e.code} ` +
+        "لا يتوافق مع ذكر تابع"
+      );
+      continue;
+    }
+
+    const translated =
+  herdImportV2TranslateDairyCompEventSrv(
+    e,
+    id,
+    pick,
+    issues,
+    "followers"
+  );
+
+    if (translated) {
+      events.push(translated);
+    }
+  }
+
+  continue;
+}
+   const exitEvents = all
+  .filter(e =>
+    e.d &&
+    e.d <= asOf &&
+    ["SOLD", "DIED"].includes(e.code)
+  )
+  .sort((a, b) => a.d.localeCompare(b.d));
+
+const lastExit = exitEvents.at(-1);
+
+if (rc === "7" || lastExit) {
+  const candidate =
+    herdImportV2DairyCompArchiveCandidateSrv({
+      id,
+      all,
+      rc,
+      entryType: "mothers",
+      asOf,
+      pick,
+      issues
+    });
+
+  if (candidate) {
+    archivedCandidates.push(candidate);
+  }
+
+  archivedIgnored++;
+  continue;
+}
 
     const declaredRepro = [...new Set(
         latestRows.map(x =>
@@ -14983,7 +17311,15 @@ const calving = calvings.at(-1) || "";
         ? breedValues[0]
         : "";
 
-    const breed = sourceBreed || breedDefault;
+    const breedRaw = sourceBreed || breedDefault;
+
+const breed = ({
+  HO: "هولشتاين",
+  HF: "هولشتاين فريزيان",
+  JE: "جيرسي",
+  BS: "براون سويس"
+})[String(breedRaw).toUpperCase()] ||
+  animalListBreedDisplaySrv(breedRaw);
 
     const breedTypes = [...new Set(
   breedValues
@@ -15039,7 +17375,7 @@ if (!animalType) {
         dryDates.at(-1) > (freshDates.at(-1) || "")
       );
 
-    const milkValues = all.map(x =>
+    const milkValues = latestRows.map(x =>
       pick(x.r, "KGMILK", "MILKKG", "DAILYMILKKG")
     ).filter(Boolean);
 
@@ -15093,80 +17429,60 @@ if (!animalType) {
       "تاريخ آخر تلقيح": lastAI,
       "كود السائل": semen,
       "عدد التلقيحات":
-        breedings.length ? String(breedings.length) : ""
+  pick(
+    latestRows[0]?.r || {},
+    "TBRD",
+    "TIMES",
+    "SERVS",
+    "SERVICES"
+  ) ||
+  (breedings.length ? String(breedings.length) : "")
     });
 
     for (const e of all) {
-      if (!e.d || e.d < calving || e.d > asOf) continue;
-
-      if (!["BRED", "PREG", "HEAT", "ABORT"].includes(e.code)) {
-        if (!["FRESH", "DRY"].includes(e.code)) {
-          otherEventRows++;
-        }
-        continue;
-      }
-
-      const eventKey = [
-        id, e.code, e.d, JSON.stringify(e.r)
-      ].join("|");
-
-      if (seenEvents.has(eventKey)) continue;
-      seenEvents.add(eventKey);
-
-      const info = {
-        BRED: [
-          "تلقيح",
-          [
-            "HeatTime",
-            "InseminationTime",
-            "SemenCode",
-            "InseminationMethod",
-            "Technician"
-          ]
-        ],
-        PREG: [
-          "تشخيص حمل",
-          ["PregnancyMethod", "PregnancyResult"]
-        ],
-        HEAT: ["شياع", ["HeatTime"]],
-        ABORT: ["إجهاض", []]
-      }[e.code];
-
-      const fields = {
-        HeatTime: "وقت الشياع",
-        InseminationTime: "وقت التلقيح",
-        SemenCode: "كود السائل المنوي",
-        InseminationMethod: "طريقة التلقيح",
-        Technician: "اسم الملقح",
-        PregnancyMethod: "طريقة التشخيص",
-        PregnancyResult: "نتيجة التشخيص"
-      };
-
-      const extra = {};
-
-      for (const key of info[1]) {
-        extra[fields[key]] = pick(e.r, key);
-      }
-
-      if (info[1].some(key => !extra[fields[key]])) {
-        issues.push(
-          `${id}: حدث ${e.code} بتاريخ ${e.d} ناقص التفاصيل`
-        );
-      }
-
-      events.push({
-        "رقم الحيوان": id,
-        "نوع الحدث": info[0],
-        "تاريخ الحدث": e.d,
-        "ملاحظات": pick(e.r, "Remark"),
-        ...extra
-      });
-    }
+  if (
+    !e.d ||
+    e.d < calving ||
+    e.d > asOf
+  ) {
+    continue;
   }
 
-  if (!animals.length) {
-    issues.push("لا توجد أمهات نشطة مؤهلة للاستيراد");
+  const eventKey = [
+    id,
+    e.code,
+    e.d,
+    JSON.stringify(e.r)
+  ].join("|");
+
+  if (seenEvents.has(eventKey)) {
+    continue;
   }
+
+  seenEvents.add(eventKey);
+
+  const translated =
+  herdImportV2TranslateDairyCompEventSrv(
+    e,
+    id,
+    pick,
+    issues,
+    "mothers"
+  );
+
+  if (translated) {
+    events.push(translated);
+  }
+}
+  }
+
+  if (
+  !animals.length &&
+  !followers.length &&
+  !archivedCandidates.length
+) {
+  issues.push("لا توجد حيوانات نشطة مؤهلة للاستيراد");
+}
 
   if (issues.length) fail(issues);
 
@@ -15183,25 +17499,51 @@ if (!animalType) {
   };
 
   return {
-    externalSummary: {
+  archivedCandidates,
+
+  externalSummary: {
       uniqueSourceAnimals: groups.size,
-      importedCandidates: animals.length,
+      importedCandidates: animals.length + followers.length,
+      importedFollowers: followers.length,
       archivedIgnored,
       eventsToValidate: events.length,
-      otherEventRows,
-      note:
-        "FRESH وDRY ممثلان في حالة الحيوان وتواريخها، ولا يُنشأ لهما حدث تاريخي بهذا المسار. الأحداث الأخرى غير المدعومة لا تُستورد."
+    otherEventRows,
+
+skippedEventCodeCounts: records.reduce((counts, row) => {
+  const code = pick(row, "Event", "Event_Name")
+    .toUpperCase();
+
+  if (HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(code)) {
+    counts[code] = (counts[code] || 0) + 1;
+  }
+
+  return counts;
+}, {}),
+
+archivedReady: archivedCandidates.length,
+
+note:
+  "الأحداث غير المستخدمة لا تنشئ سجلات تشغيلية، " +
+  "والأحداث التي يستخدمها مُرَبِّيك لا تُتخطّى."
     },
-    animalRows: animals.map(
-      (row, i) => define(row, "mothers", "الأمهات", i)
-    ),
+    animalRows: [
+  ...animals.map(
+    (row, i) => define(row, "mothers", "الأمهات", i)
+  ),
+  ...followers.map(
+    (row, i) => define(row, "followers", "التوابع", i)
+  )
+],
     eventRows: events.map(
       (row, i) => define(row, "", "الأحداث", i)
     ),
     sheetNames: ["الأمهات", "التوابع", "الأحداث"],
     sheets: {
       mothers: {exists: true, rowsCount: animals.length},
-      followers: {exists: true, rowsCount: 0},
+      followers: {
+  exists: true,
+  rowsCount: followers.length
+},
       events: {exists: true, rowsCount: events.length}
     }
   };
@@ -15222,13 +17564,24 @@ app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
     body
   );
 
+  const archivedCandidates =
+  Array.isArray(templateData.archivedCandidates)
+    ? templateData.archivedCandidates
+    : [];
+
     const rows =
       templateData.animalRows || [];
 
     const eventRows =
       templateData.eventRows || [];
 
-    if (!rows.length) {
+   if (
+  !rows.length &&
+  !(
+    body.externalSource === "dairycomp" &&
+    archivedCandidates.length > 0
+  )
+) {
       return res.status(400).json({
         ok: false,
         error: "herd_import_v2_rows_required",
@@ -15280,7 +17633,8 @@ const eventsPreflight =
   herdImportV2BuildEventsPreflightInternalSrv(
     eventRows,
     baselinePreview.animalsInternal,
-    baselinePreview.previewAnimals
+    baselinePreview.previewAnimals,
+    body.externalSource
   );
 
 const persistencePlan =
@@ -15289,7 +17643,8 @@ const persistencePlan =
     baselinePreview,
     eventsPreflight,
     sourceProfile,
-    importOptions
+    importOptions,
+    archivedCandidates
   });
 
 const readyMothersCount =
@@ -15592,7 +17947,7 @@ seedEventsSummary: {
       });
   }
 });
-app.post("/api/herd-import-v2/save-operational", requireUserId, async (req, res) => {
+const herdImportV2SaveOperationalHandlerSrv = async (req, res) => {
   try {
     if (!db) {
       return res.status(503).json({
@@ -15610,13 +17965,24 @@ app.post("/api/herd-import-v2/save-operational", requireUserId, async (req, res)
         body
       );
 
+      const archivedCandidates =
+  Array.isArray(templateData.archivedCandidates)
+    ? templateData.archivedCandidates
+    : [];
+
     const rows =
       templateData.animalRows || [];
 
     const eventRows =
       templateData.eventRows || [];
 
-    if (!rows.length) {
+    if (
+  !rows.length &&
+  !(
+    body.externalSource === "dairycomp" &&
+    archivedCandidates.length > 0
+  )
+) {
       return res.status(400).json({
         ok: false,
         error: "herd_import_v2_rows_required",
@@ -15673,11 +18039,18 @@ if (missingAnimalTypeCount > 0) {
 }
 
     if (
-      sourceProfile.key === "unknown" ||
-      !columnMapping.readyForNextStep ||
-      valueMapping.valueConfidence < 0.6 ||
-      !baselinePreview.readyForSavePreview
-    ) {
+  !(
+    body.externalSource === "dairycomp" &&
+    rows.length === 0 &&
+    archivedCandidates.length > 0
+  ) &&
+  (
+    sourceProfile.key === "unknown" ||
+    !columnMapping.readyForNextStep ||
+    valueMapping.valueConfidence < 0.6 ||
+    !baselinePreview.readyForSavePreview
+  )
+) {
       return res.status(400).json({
         ok: false,
         error: "herd_import_v2_not_operationally_ready",
@@ -15694,20 +18067,22 @@ if (missingAnimalTypeCount > 0) {
         }
       });
     }
-    const eventsPreflight =
-      herdImportV2BuildEventsPreflightInternalSrv(
-        eventRows,
-        baselinePreview.animalsInternal,
-        baselinePreview.previewAnimals
-      );
+const eventsPreflight =
+  herdImportV2BuildEventsPreflightInternalSrv(
+    eventRows,
+    baselinePreview.animalsInternal,
+    baselinePreview.previewAnimals,
+    body.externalSource
+  );
 
-    const persistencePlan =
+const persistencePlan =
   herdImportV2BuildPersistencePlanInternalSrv({
     uid,
     baselinePreview,
     eventsPreflight,
     sourceProfile,
-    importOptions
+    importOptions,
+    archivedCandidates
   });
 
 const importListQuery =
@@ -15721,10 +18096,11 @@ const importMothersListUrl =
 const importFollowersListUrl =
   `follower-list.html${importListQuery}`;
 
-    if (
-      eventRows.length > 0 &&
-      !eventsPreflight.validationReady
-    ) {
+ if (
+  (eventRows.length > 0 ||
+   archivedCandidates.length > 0) &&
+  !eventsPreflight.validationReady
+) {
       return res.status(400).json({
         ok: false,
 
@@ -15755,8 +18131,12 @@ const importFollowersListUrl =
       });
     }
 
-    if (eventRows.length > 0) {
-      const completedJobSnap =
+if (
+  eventRows.length > 0 ||
+  archivedCandidates.length > 0 ||
+  body.externalSource === "dairycomp"
+) {
+  const completedJobSnap =
         await db
           .collection("herd_import_jobs")
           .doc(persistencePlan.importId)
@@ -15857,9 +18237,10 @@ const importFollowersListUrl =
     }
 
     if (
-      eventRows.length > 0 &&
-      !persistencePlan.atomicEligible
-    ) {
+  sourceProfile.key !== "dairycomp" &&
+  eventRows.length > 0 &&
+  !persistencePlan.atomicEligible
+) {
       return res.status(409).json({
         ok: false,
 
@@ -15911,13 +18292,37 @@ const importFollowersListUrl =
         continue;
       }
 
-      const duplicate =
+          const duplicate =
         await addAnimalDuplicateCheckSrv(
           uid,
           numberStr
         );
 
-      if (!duplicate.ok) {
+      let ownedByThisImport = false;
+
+      if (
+        sourceProfile.key === "dairycomp" &&
+        !duplicate.ok &&
+        duplicate.duplicate
+      ) {
+        const key =
+          herdImportV2AnimalPersistenceKeyInternalSrv(
+            uid,
+            base
+          );
+
+        const existing = await db
+          .collection(key.collectionName)
+          .doc(key.documentId)
+          .get();
+
+        ownedByThisImport =
+          existing.exists &&
+          existing.data()?.importId ===
+            persistencePlan.importId;
+      }
+
+      if (!duplicate.ok && !ownedByThisImport) {
         gateRejected.push({
           animalNumber:
             numberStr,
@@ -15935,7 +18340,45 @@ const importFollowersListUrl =
         });
       }
     }
+     
+    // منع استيراد حيوان مستبعد برقم حيوان نشط
 
+for (const candidate of archivedCandidates) {
+  const numberStr = addAnimalDigitsSrv(
+    candidate.animalNumber
+  );
+
+  if (!numberStr) {
+    gateRejected.push({
+      animalNumber: "",
+      reason: "archive_animal_number_missing",
+      message: "رقم الحيوان المستبعد غير موجود."
+    });
+
+    continue;
+  }
+
+  const duplicate = await addAnimalDuplicateCheckSrv(
+    uid,
+    numberStr
+  );
+
+  if (!duplicate.ok) {
+    gateRejected.push({
+      animalNumber: numberStr,
+
+      reason: duplicate.duplicate
+        ? "archive_number_still_active"
+        : "archive_duplicate_check_failed",
+
+      collection: duplicate.collection || null,
+
+      message: duplicate.duplicate
+        ? `الحيوان رقم ${numberStr} موجود بالفعل في القطيع النشط. لا يمكن استيراده مباشرة إلى الأرشيف.`
+        : duplicate.message
+    });
+  }
+}
     if (gateRejected.length) {
       return res.status(400).json({
         ok: false,
@@ -15958,17 +18401,46 @@ const importFollowersListUrl =
           gateRejected
       });
     }
+if (
+  sourceProfile.key === "dairycomp" &&
+  !req.__herdDcAsyncWorkerSrv
+) {
+  const task = await herdDcAsyncEnqueueSrv({
+    uid,
+    body,
+    persistencePlan
+  });
 
-    if (eventRows.length > 0) {
-      const writeSet =
-        herdImportV2BuildAtomicWriteSetInternalSrv({
-          uid,
-          baselinePreview,
-          eventsPreflight,
-          sourceProfile,
-          persistencePlan
-        });
+  void herdDcAsyncExecuteOneSrv(task.importId);
 
+  return res.status(202).json({
+    ok: true,
+    jobAccepted: true,
+    importId: task.importId,
+    persistenceStatus: task.status,
+    message:
+      "تم استلام الملف، ويجري استيراده على السيرفر."
+  });
+}
+if (
+  eventRows.length > 0 ||
+  archivedCandidates.length > 0 ||
+  body.externalSource === "dairycomp"
+) {
+ const writeSet =
+  herdImportV2BuildAtomicWriteSetInternalSrv({
+    uid,
+    baselinePreview,
+    eventsPreflight,
+    sourceProfile,
+    persistencePlan,
+    archivedCandidates
+  });
+await herdImportV2PrepareDairyCompVaccinationTasksSrv({
+  uid,
+  sourceProfile,
+  writeSet
+});
       const saved =
         await herdImportV2CommitAtomicWriteSetInternalSrv({
           uid,
@@ -16286,8 +18758,14 @@ if (gate.formData.entryType === "followers") {
           e?.publicMessage ||
           "تعذّر استيراد القطيع تشغيليًا الآن."
       });
-  }
-});
+   }
+};
+
+app.post(
+  "/api/herd-import-v2/save-operational",
+  requireUserId,
+  herdImportV2SaveOperationalHandlerSrv
+);
 // ============================================================
 //                 EVENTS PAGE: SERVER-ONLY CONTEXT / GROUPS / RESOLVE
 //                 صفحة الأحداث تسأل السيرفر — الواجهة عرض فقط لاحقًا
@@ -37597,6 +40075,19 @@ cecal_dilatation: {
     nameEn:"Bovine Respiratory Disease",
     group:"الأمراض المعدية والجهازية"
   },
+  pneumonia: {
+  name: "التهاب رئوي (غير محدد المسبب)",
+  nameEn: "Pneumonia (unspecified cause)",
+  group: "أمراض الجهاز التنفسي",
+  eligibility: "mother_history"
+},
+
+diarrhea: {
+  name: "إسهال (غير محدد السبب)",
+  nameEn: "Diarrhea (unspecified cause)",
+  group: "أعراض الجهاز الهضمي",
+  eligibility: "mother_history"
+},
 
   johnes_disease: {
     name:"داء جون (نظير السل)",
@@ -120127,14 +122618,15 @@ function archiveViewSortMsSrv(
 }
 
 function archiveViewSubjectSrv(doc = {}) {
-  return archiveViewStrSrv(
-    doc.originalAnimalPath
-  )
-    .toLowerCase()
-    .startsWith("calves/")
-      ? "تابع"
-      : "أم";
+  const isFollower =
+    doc.entryType === "followers" ||
+    archiveViewStrSrv(
+      doc.originalAnimalPath
+    ).toLowerCase().startsWith("calves/");
+
+  return isFollower ? "تابع" : "أم";
 }
+  
 
 function archiveViewSpeciesSrv(doc = {}) {
   const raw = [
@@ -131237,7 +133729,19 @@ if (process.env.MURABBIK_PREPARED_ROLE !== 'worker') {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Server running on http://localhost:${PORT}`);
   });
+const herdDcAsyncTimerSrv = setInterval(() => {
+  void herdDcAsyncSweepSrv().catch(e =>
+    console.error("DairyComp import sweep:", e)
+  );
+}, 30000);
 
+herdDcAsyncTimerSrv.unref?.();
+
+setImmediate(() => {
+  void herdDcAsyncSweepSrv().catch(e =>
+    console.error("DairyComp initial sweep:", e)
+  );
+});
 } else if (!murabbikPreparedEngineSrv) {
   console.error(
     'Prepared worker requires MURABBIK_PREPARED_VIEWS=1 and Firestore'
