@@ -7695,6 +7695,10 @@ function herdImportV2NormalizeEventRowInternalSrv(
   "dairycompEventCode",
   "sourceEventCode"
 ],
+sourceEventDateTime: [
+  "توقيت حدث المصدر",
+  "eventDateTime"
+],
 
     heatTime: [
       "وقت الشياع",
@@ -7717,6 +7721,13 @@ function herdImportV2NormalizeEventRowInternalSrv(
       "inseminationMethod",
       "insemination method"
     ],
+
+    
+inseminationSource: [
+  "مصدر التلقيح",
+  "inseminationSource"
+],
+
 
     semenCode: [
       "كود السائل المنوي",
@@ -7932,7 +7943,8 @@ performedBy: [
   String(p("sourceEventCode") || "")
     .trim()
     .toUpperCase(),
-
+sourceEventDateTime:
+  String(p("sourceEventDateTime") || "").trim(),
 
     rawHeatTime,
 
@@ -7957,6 +7969,11 @@ performedBy: [
       String(
         p("inseminationMethod") || ""
       ).trim(),
+
+      
+inseminationSource:
+  String(p("inseminationSource") || "").trim(),
+
 
     semenCode:
       String(
@@ -8312,11 +8329,17 @@ function herdImportV2ValidateEventStructuralInternalSrv(
           "اختر وقت التلقيح."
         ],
 
-        [
-          "heatStatus",
-          item.rawHeatTime,
-          "اختر وقت الشياع."
-        ]
+        
+[
+  "heatStatus",
+  
+item.inseminationSource === "ovsynch_tai"
+
+    ? "TAI"
+    : item.rawHeatTime,
+  "اختر وقت الشياع."
+]
+
       ]
     ) {
       if (
@@ -8821,10 +8844,13 @@ function herdImportV2ApplyEventTemporalInternalSrv(
         sameDayCount,
 
       inseminationMethod:
-        item.inseminationMethod,
+  item.inseminationMethod,
 
-      semenCode:
-        item.semenCode,
+inseminationSource:
+  item.inseminationSource || "",
+
+semenCode:
+  item.semenCode,
 
       inseminator:
         item.inseminator,
@@ -10439,7 +10465,7 @@ function herdImportV2ImportedEventPayloadInternalSrv({
   item,
   state,
   animalEntry,
-    persistencePlan,
+  persistencePlan,
   lastHeatOrAIDate = "",
   linkedEmbryonicLossEventId = ""
 }) {
@@ -10462,7 +10488,10 @@ function herdImportV2ImportedEventPayloadInternalSrv({
 
 ...(item.sourceEventCode ? {
   sourceSystem: "dairycomp",
-  sourceEventCode: item.sourceEventCode
+  sourceEventCode: item.sourceEventCode,
+  ...(item.sourceEventDateTime
+    ? { sourceEventDateTime: item.sourceEventDateTime }
+    : {})
 } : {}),
 
 sourceSheet: item.sheetName || "الأحداث",
@@ -10529,7 +10558,14 @@ sourceSheet: item.sheetName || "الأحداث",
       inseminator: item.inseminator,
       inseminationTime: item.inseminationTime,
       heatStatus: item.heatStatus,
-      inseminationSource: null,
+      
+inseminationSource:
+  
+item.inseminationSource === "ovsynch_tai"
+
+    ? "ovsynch_tai"
+    : null,
+
       thiAtInsemination: null,
       thiValue: null,
       thiLevel: "",
@@ -16368,6 +16404,93 @@ const HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV = new Set([
   "TREAT", "CULTURE", "BLSERUM", "TEMP",
   "CIDR", "TRANSFER"
 ]);
+function herdImportV2DairyCompObservedDayPartSrv(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const part = herdImportV2EventDayPartInternalSrv(raw);
+  if (part) return part;
+
+  const iso = raw.match(
+    /^\d{4}-\d{2}-\d{2}[T ]([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(Z|[+-](?:0\d|1[0-4]):[0-5]\d)?$/i
+  );
+
+  if (!iso) return "";
+
+  let hour = Number(iso[1]);
+
+  if (iso[2]) {
+    const date = new Date(raw.replace(" ", "T"));
+
+    if (Number.isNaN(date.getTime())) return "";
+
+    hour = Number(
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Africa/Cairo",
+        hour: "2-digit",
+        hourCycle: "h23"
+      }).format(date)
+    );
+  }
+
+  return hour < 12 ? "صباحا" : "مساءا";
+}
+function herdImportV2DairyCompDayPartSrv(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const explicit = herdImportV2EventDayPartInternalSrv(raw);
+  if (explicit) return explicit;
+
+  if (/^am$/i.test(raw)) return "صباحا";
+  if (/^pm$/i.test(raw)) return "مساءا";
+
+  const clock = raw.match(
+    /^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?\s*(AM|PM)?$/i
+  );
+
+  if (clock) {
+    let hour = Number(clock[1]);
+    const meridiem = String(clock[3] || "").toUpperCase();
+
+    if (meridiem) {
+      if (hour < 1 || hour > 12) return "";
+      hour = (hour % 12) + (meridiem === "PM" ? 12 : 0);
+    }
+
+    return hour < 12 ? "صباحا" : "مساءا";
+  }
+
+  const iso = raw.match(
+    /^\d{4}-\d{2}-\d{2}[T ]([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(Z|[+-](?:0\d|1[0-4]):[0-5]\d)?$/i
+  );
+
+  if (!iso) return "";
+
+  if (!iso[2]) {
+    return Number(iso[1]) < 12 ? "صباحا" : "مساءا";
+  }
+
+  const parsed = new Date(raw.replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const hour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Africa/Cairo",
+      hour: "2-digit",
+      hourCycle: "h23"
+    }).format(parsed)
+  );
+
+  return hour < 12 ? "صباحا" : "مساءا";
+}
+
+function herdImportV2IsTimedAISrv(value) {
+  return /ovsynch|ovsync|timed[\s_-]*ai|ftai|\btai\b|fixed[\s_-]*time|تزامن|تلقيح إجباري|تلقيح اجباري/i.test(
+    String(value || "").trim()
+  );
+}
+
 function herdImportV2TranslateDairyCompEventSrv(
   e,
   id,
@@ -16386,11 +16509,17 @@ function herdImportV2TranslateDairyCompEventSrv(
     "DairyComp:" + (code || "UNKNOWN"),
     pick(e.r, "Event_Remarks", "Remark", "REM")
   ].filter(Boolean).join(" | ");
+  const sourceDateTime = pick(
+  e.r,
+  "eventDateTime",
+  "EventDateTime"
+);
 
   const base = {
   "رقم الحيوان": id,
   "تاريخ الحدث": e.d,
   "كود حدث المصدر": code,
+  "توقيت حدث المصدر": sourceDateTime,
   "ملاحظات": notes
 };
     if (code === "PGF" || code === "GNRH") {
@@ -16400,35 +16529,58 @@ function herdImportV2TranslateDairyCompEventSrv(
     };
   }
 
-  if (code === "OVS") {
+  if (code === "OVS" || code === "OVSYNCH") {
     return {
       ...base,
       "نوع الحدث": "برنامج تزامن تاريخي"
     };
   }
   if (code === "HEAT") {
-    return {
-      ...base,
-      "نوع الحدث": "شياع",
-      "وقت الشياع": pick(e.r, "HeatTime")
-    };
-  }
+  return {
+    ...base,
+    "نوع الحدث": "شياع",
+    "وقت الشياع":
+      pick(e.r, "HeatTime") ||
+      herdImportV2DairyCompObservedDayPartSrv(sourceDateTime)
+  };
+}
 
-  if (code === "BRED") {
-    return {
-      ...base,
-      "نوع الحدث": "تلقيح",
-      "وقت الشياع": pick(e.r, "HeatTime"),
-      "وقت التلقيح": pick(e.r, "InseminationTime"),
-      "طريقة التلقيح": pick(e.r, "InseminationMethod"),
-      "كود السائل المنوي": pick(
-        e.r, "SemenCode", "LSIR", "LastSemenCode"
-      ),
-      "اسم الملقح": pick(
-        e.r, "Technician", "TECH", "Inseminator"
-      )
-    };
-  }
+  
+if (code === "BRED") {
+  const rawMethod = pick(e.r, "InseminationMethod");
+  const rawSource = pick(
+    e.r,
+    "InseminationSource",
+    "BreedingSource",
+    "ProtocolSource",
+    "BreedingType"
+  );
+
+  const isTAI =
+    herdImportV2IsTimedAISrv(rawSource) ||
+    herdImportV2IsTimedAISrv(rawMethod);
+
+  return {
+    ...base,
+    "نوع الحدث": "تلقيح",
+    "وقت الشياع": pick(e.r, "HeatTime"),
+    "وقت التلقيح":
+      pick(e.r, "InseminationTime") ||
+      herdImportV2DairyCompObservedDayPartSrv(sourceDateTime),
+    "طريقة التلقيح":
+      herdImportV2IsTimedAISrv(rawMethod)
+        ? "اصطناعي"
+        : rawMethod || (isTAI ? "اصطناعي" : ""),
+    "مصدر التلقيح": isTAI ? "ovsynch_tai" : "",
+    "كود السائل المنوي": pick(
+      e.r, "SemenCode", "LSIR", "LastSemenCode"
+    ),
+    "اسم الملقح": pick(
+      e.r, "Technician", "TECH", "Inseminator"
+    )
+  };
+}
+
 
   if (code === "PREG" || code === "OPEN") {
     return {
@@ -17191,7 +17343,7 @@ const stage =
 
     if (
       sex === "ذكر" &&
-      ["HEAT", "BRED", "PREG", "OPEN", "ABORT", "PGF", "GNRH", "OVS"]
+      ["HEAT", "BRED", "PREG", "OPEN", "ABORT", "PGF", "GNRH", "OVS", "OVSYNCH"]
         .includes(e.code)
     ) {
       issues.push(
