@@ -76,7 +76,7 @@
   />
 
   <label for="externalAsOf">
-    تاريخ تصدير الملف (خلال آخر 14 يومًا)
+    تاريخ تصدير الملف (الملفات القديمة للمعاينة فقط؛ الحفظ للتصدير الحالي)
   </label>
   <input id="externalAsOf" type="date" />
 
@@ -689,6 +689,82 @@ const externalFile = $('externalFile');
 const btnInspectExternal = $('btnInspectExternal');
 const externalInspectResult = $('externalInspectResult');
 const btnExternalPreview = $('btnExternalPreview');
+// Place after: const btnExternalPreview = $('btnExternalPreview');
+let dcCompletionValues = Object.create(null);
+const dcCompletionBox = document.createElement('section');
+dcCompletionBox.className = 'card';
+dcCompletionBox.style.display = 'none';
+externalInspectResult.after(dcCompletionBox);
+
+const dcCompletionFields = [
+  ['animalType', 'نوع الحيوان', ['','بقرة','جاموسة']],
+  ['breed', 'السلالة'],
+  ['birthDate', 'تاريخ الميلاد', 'date'],
+  ['lastCalvingDate', 'تاريخ آخر ولادة', 'date'],
+  ['lactationNumber', 'رقم الموسم', 'number'],
+  ['sex', 'جنس التابع', ['','ذكر','أنثى']],
+  ['damNumber', 'رقم الأم'],
+  ['dailyMilk', 'الإنتاج اليومي الفعلي (كجم)', 'number'],
+  ['reproductiveStatus', 'الحالة التناسلية', ['','مفتوحة','ملقحة','عشار']],
+  ['lastInseminationDate', 'تاريخ آخر تلقيح', 'date'],
+  ['semenCode', 'كود سائل آخر تلقيح']
+];
+
+function renderDcCompletion(info = {}) {
+  const entries = Object.entries(info.sourceIssuesByAnimal || {})
+    .filter(([number]) => /^\d+$/.test(number));
+  dcCompletionBox.replaceChildren();
+  dcCompletionBox.style.display = entries.length ? '' : 'none';
+  if (!entries.length) return;
+
+  const h = document.createElement('h2');
+  h.textContent = 'استكمال معلومات DairyComp داخل مُرَبِّيك';
+  const hint = document.createElement('p');
+  hint.className = 'hint';
+  hint.textContent = 'لم يتم تغيير ملف المصدر. استكمل المعلومة المؤكدة فقط، ثم اضغط «معاينة الاستيراد الخارجي» مجددًا.';
+  dcCompletionBox.append(h, hint);
+
+  for (const [number, messages] of entries) {
+    const d = document.createElement('details');
+    const sum = document.createElement('summary');
+    sum.textContent = 'الحيوان ' + number + ' — ' + messages.length + ' ملاحظات';
+    d.append(sum);
+    const p = document.createElement('p');
+    p.className = 'hint';
+    p.textContent = messages.join(' | ');
+    d.append(p);
+
+    for (const [key, labelText, control] of dcCompletionFields) {
+      const label = document.createElement('label');
+      label.textContent = labelText;
+      const select = Array.isArray(control);
+      const input = document.createElement(select ? 'select' : 'input');
+      if (select) {
+        for (const option of control) {
+          const el = document.createElement('option');
+          el.value = option;
+          el.textContent = option || 'بدون استكمال';
+          input.appendChild(el);
+        }
+      } else {
+        input.type = control === 'date' ? 'date' :
+          control === 'number' ? 'number' : 'text';
+        if (control === 'number') input.min = '0';
+      }
+      input.value = dcCompletionValues[number]?.[key] || '';
+      input.addEventListener('change', () => {
+        if (!dcCompletionValues[number]) dcCompletionValues[number] = {};
+        dcCompletionValues[number][key] = input.value.trim();
+        lastPreviewOk = false;
+        btnSave.disabled = true;
+      });
+      label.append(input);
+      d.append(label);
+    }
+    dcCompletionBox.append(d);
+  }
+}
+
 
 let externalRevision = 0;
 
@@ -703,6 +779,8 @@ function clearExternalPreview() {
 }
 
 externalFile.addEventListener('change', () => {
+  dcCompletionValues = Object.create(null);
+  dcCompletionBox.style.display = 'none';
   herdFile.value = '';
   externalInspectResult.textContent = '';
   clearExternalPreview();
@@ -736,8 +814,8 @@ btnInspectExternal.addEventListener('click', async () => {
   externalInspectResult.textContent = '';
 
   try {
-    if (file.size > 6 * 1024 * 1024) {
-      throw new Error('حجم الملف أكبر من 6 ميجابايت.');
+    if (file.size > 12 * 1024 * 1024) {
+      throw new Error('حجم الملف أكبر من 12 ميجابايت.');
     }
 
     lastFilePayload = {
@@ -858,9 +936,9 @@ btnExternalPreview.addEventListener('click', async () => {
   return;
 }
 
-  if (file.size > 6 * 1024 * 1024) {
+  if (file.size > 12 * 1024 * 1024) {
     showMessage(
-      'حجم الملف أكبر من 6 ميجابايت.',
+      'حجم الملف أكبر من 12 ميجابايت.',
       'status-error'
     );
     return;
@@ -881,7 +959,8 @@ btnExternalPreview.addEventListener('click', async () => {
       defaultAnimalType: species,
       externalSpeciesConfirmed:
          Boolean(species) && $('externalSpeciesConfirmed').checked,
-      defaultBreed: $('externalBreed').value.trim()
+      defaultBreed: $('externalBreed').value.trim(),
+      dairycompCompletionByAnimal: JSON.parse(JSON.stringify(dcCompletionValues))
     };
 
     if (
@@ -907,6 +986,7 @@ btnExternalPreview.addEventListener('click', async () => {
     setSummary(j);
     renderRows(j.previewAnimals || [], j);
     renderEvents(j.previewEvents || []);
+    renderDcCompletion(j.externalSummary || {});
 
     const info = j.externalSummary;
 
