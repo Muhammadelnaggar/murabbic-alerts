@@ -16268,12 +16268,12 @@ app.post('/api/herd-import-v2/inspect-external', requireUserId, (req, res) => {
   });
 }
 
-    const XLSX = require('xlsx');
-    const wb = XLSX.read(
-  herdImportV2NormalizeExternalCsvBufferSrv(buf, fileName),
-  { type: 'buffer' }
-);
-    const sheetNames = wb.SheetNames || [];
+
+const isCsv = /\.(csv|txt)$/i.test(fileName);
+const XLSX = isCsv ? null : require('xlsx');
+const wb = isCsv ? null : XLSX.read(buf, { type: 'buffer' });
+const sheetNames = isCsv ? [fileName] : (wb.SheetNames || []);
+
 
     if (!sheetNames.length || sheetNames.length > 16) {
       return res.status(400).json({
@@ -16283,11 +16283,15 @@ app.post('/api/herd-import-v2/inspect-external', requireUserId, (req, res) => {
     }
 
     const sheets = sheetNames.map(name => {
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {
-        defval: '',
-        raw: false,
-        blankrows: false
-      });
+     
+const rows = isCsv
+  ? addAnimalImportParseCsvTextSrv(buf.toString('utf8'))
+  : XLSX.utils.sheet_to_json(wb.Sheets[name], {
+      defval: '',
+      raw: false,
+      blankrows: false
+    });
+
 
       const sample = addAnimalImportNormalizeSheetRowsSrv(
         rows.slice(0, 30)
@@ -16987,19 +16991,24 @@ if (
   fail(["أكّد النوع الاحتياطي للحيوانات غير المصنفة"]);
 }
 
-  const XLSX = require("xlsx");
-  const workbook = XLSX.read(
-  herdImportV2NormalizeExternalCsvBufferSrv(buffer, name),
-  {type: "buffer"}
-);
 
-  const records = (workbook.SheetNames || []).flatMap(name =>
-    XLSX.utils.sheet_to_json(workbook.Sheets[name], {
+let records;
+
+if (/\.(csv|txt)$/i.test(name)) {
+  records = addAnimalImportParseCsvTextSrv(buffer.toString("utf8"));
+} else {
+  const XLSX = require("xlsx");
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+
+  records = (workbook.SheetNames || []).flatMap(sheetName =>
+    XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
       defval: "",
       raw: false,
       blankrows: false
     })
   );
+}
+
 
   if (!records.length || records.length > 80000) {
   fail(["عدد الصفوف غير صالح (حد 80000)"]);
