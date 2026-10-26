@@ -711,14 +711,35 @@ const dcCompletionFields = [
   ['semenCode', 'كود سائل آخر تلقيح']
 ];
 
+
 function renderDcCompletion(info = {}) {
+  dcCompletionBox.replaceChildren();
+
+  const report = info.previewReport;
+
+  if (report) {
+    dcCompletionBox.style.display = '';
+
+    const heading = document.createElement('h2');
+    heading.textContent = report.title || '';
+    dcCompletionBox.appendChild(heading);
+
+    for (const line of report.lines || []) {
+      const p = document.createElement('p');
+      p.textContent = line;
+      dcCompletionBox.appendChild(p);
+    }
+
+    return;
+  }
+
   const entries = Object.entries(info.sourceIssuesByAnimal || {})
     .filter(([number]) => /^\d+$/.test(number));
 
-  dcCompletionBox.replaceChildren();
   dcCompletionBox.style.display = entries.length ? '' : 'none';
 
   if (!entries.length) return;
+
 
   const h = document.createElement('h2');
   h.textContent = 'استكمال معلومات DairyComp داخل مُرَبِّيك';
@@ -1043,9 +1064,9 @@ const info = j.externalSummary;
       j.message || 'انتهت المعاينة.',
       status === 'ready'
         ? 'status-ok'
-        : status === 'needs_input'
-          ? 'status-warn'
-          : 'status-error'
+       : status === 'needs_input' || status === 'historical_preview'
+  ? 'status-warn'
+  : 'status-error'
     );
 
   } catch (e) {
