@@ -18148,18 +18148,71 @@ const previewRejectedItems = [
   }));
 
 
+
+const dcReasonCounts = new Map();
+
+if (dcHistorical) {
+  for (const issue of dcIssues) {
+    const reason = String(issue || "")
+      .replace(/^\d+:\s*/, "")
+      .trim();
+
+    if (!reason) continue;
+
+    dcReasonCounts.set(
+      reason,
+      (dcReasonCounts.get(reason) || 0) + 1
+    );
+  }
+}
+
+const dcReasons = [...dcReasonCounts.entries()]
+  .sort((a, b) => b[1] - a[1]);
+
+const dcDisplaySummary = dcHistorical
+  ? {
+      ...templateData.externalSummary,
+      sourceIssues: [],
+      sourceIssuesByAnimal: {},
+      previewReport: {
+        title: "تقرير معاينة DairyComp التاريخي",
+        lines: [
+          `حيوانات المصدر: ${templateData.externalSummary.uniqueSourceAnimals}`,
+          `حيوانات مرشحة: ${templateData.externalSummary.importedCandidates}`,
+          `أمهات اجتازت التحقق: ${readyMothersCount}`,
+          `توابع اجتازت التحقق: ${readyFollowersCount}`,
+          `أحداث اجتازت التحقق: ${eventsPreflight.readyEventsCount || 0}`,
+          `ملاحظات المصدر: ${dcIssues.length}`,
+          `إجمالي عناصر المراجعة: ${previewRejectedItems.length}`,
+          "أسباب ملاحظات المصدر الأكثر تكرارًا:",
+          ...dcReasons.slice(0, 15).map(
+            ([reason, count]) => `${reason}: ${count}`
+          ),
+          ...(dcReasons.length > 15
+            ? [`أسباب إضافية: ${dcReasons.length - 15}`]
+            : []),
+          "الجداول تعرض عينة من أول 100 سجل بكل فئة.",
+          "الملف تاريخي للمعاينة فقط؛ الحفظ غير مسموح."
+        ]
+      }
+    }
+  : templateData.externalSummary;
+
+
 const previewCommand = {
   status:
-    requiresDefaultAnimalType
-      ? "needs_input"
-      : (
-          !dcHistorical &&
-          dcIssues.length === 0 &&
-          persistencePlan?.ready === true &&
-          persistencePlan?.saveEnabled === true
-        )
-        ? "ready"
-        : "rejected",
+    dcHistorical
+      ? "historical_preview"
+      : requiresDefaultAnimalType
+        ? "needs_input"
+        : (
+            !dcHistorical &&
+            dcIssues.length === 0 &&
+            persistencePlan?.ready === true &&
+            persistencePlan?.saveEnabled === true
+          )
+          ? "ready"
+          : "rejected",
 
   saveEnabled:
     !requiresDefaultAnimalType &&
@@ -18168,20 +18221,24 @@ const previewCommand = {
     persistencePlan?.ready === true &&
     persistencePlan?.saveEnabled === true,
 
-
   rejectedCount:
     previewRejectedItems.length,
 
   rejectedItems:
-    previewRejectedItems
+    dcHistorical ? [] : previewRejectedItems
 };
+
 return res.json({
   ok: true,
   mode: "herd_import_v2",
   importMode: "source_profile_preview_only",
-  externalSummary: templateData.externalSummary || null,
+ externalSummary: dcDisplaySummary || null,
   previewCommand,
-  message: requiresDefaultAnimalType
+  
+message: dcHistorical
+  ? "اكتملت المعاينة التاريخية دون حفظ. راجع التقرير المجمع."
+  : requiresDefaultAnimalType
+
   ? "الملف لا يحتوي على نوع الحيوان. اختر نوع القطيع ثم أعد المعاينة."
   : (
       previewCommand.status === "rejected"
@@ -18220,11 +18277,17 @@ requiredInput: requiresDefaultAnimalType
       message: "الملف لا يحتوي على نوع الحيوان. اختر نوع القطيع ثم أعد المعاينة."
     }
   : null,
- previewAnimals:
-  baselinePreview.previewAnimals,
+ 
+previewAnimals:
+  dcHistorical
+    ? baselinePreview.previewAnimals.slice(0, 100)
+    : baselinePreview.previewAnimals,
 
 previewEvents:
-  eventsPreflight.previewEvents,
+  dcHistorical
+    ? eventsPreflight.previewEvents.slice(0, 100)
+    : eventsPreflight.previewEvents,
+
 
 sourceProfile:
   herdImportV2PublicSourceProfileSrv(
