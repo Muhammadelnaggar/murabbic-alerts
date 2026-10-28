@@ -13826,7 +13826,7 @@ const HERD_IMPORT_V2_SOURCE_SIGNATURES = {
     groups: {
       animalNumber: ["COW", "COWID", "COWNO", "COW#", "ID", "ANIMALID"],
       animalType: ["TYPE", "CLASS", "SPECIES"],
-      breed: ["BREED", "BRD"],
+      breed: ["BREED", "BRD", "CBRD"],
       birthDate: ["BDAT", "BIRTH", "DOB", "BIRTHDATE"],
       lactationNumber: ["LACT", "LAC", "PARITY"],
 
@@ -14037,7 +14037,7 @@ function herdImportV2MergeProfilePatchSrv(profileKey, patch = {}) {
       daysInMilk: ["DIM"],
       dailyMilk: ["MILK"],
       pregDays: ["DCC"],
-      servicesCount: ["TIMES"],
+      servicesCount: ["TIMES", "TBRD"],
 
       lastCalvingDate: ["FRESH", "FDAT"],
       lastInseminationDate: ["BRED"],
@@ -16047,10 +16047,10 @@ function herdImportV2InspectExternalSemanticsSrv(rows = []) {
     headers.has(addAnimalImportNormKeySrv(name));
 
   // DairyComp — event log, not one animal per row
-  if (
-    has('ID') && has('Event') && has('Date') &&
-    (has('LACT') || has('FDAT') || has('RC'))
-  ) {
+ if (
+  has('ID') && has('Event') && has('Date') &&
+  (has('LACT') || has('FDAT') || has('RC'))
+) {
     const animals = new Set();
     const counts = new Map();
     const lastCalvings = new Map();
@@ -17236,7 +17236,7 @@ if (lact === "0" || rc === "8") {
   const breedValues = [
     ...new Set(
       all.map(e =>
-        pick(e.r, "BREED", "BRD")
+       pick(e.r, "BREED", "BRD", "CBRD")
       ).filter(Boolean)
     )
   ];
@@ -17245,8 +17245,12 @@ if (lact === "0" || rc === "8") {
     issues.push(`${id}: تعارض السلالة`);
   }
 
+  const sourceBreed = breedValues.length === 1 && !/^\d+$/.test(breedValues[0])
+    ? breedValues[0]
+    : "";
+
   const breedRaw =
-  breedValues[0] ||
+  sourceBreed ||
   completion(id, "breed") ||
   breedDefault;
 
@@ -17308,7 +17312,7 @@ const animalType =
     ...new Set(
       all.map(e =>
         addAnimalImportNormalizeSexSrv(
-          pick(e.r, "SEX", "GENDER")
+          pick(e.r, "CSEX", "SEX", "GENDER")
         )
       ).filter(Boolean)
     )
@@ -17318,11 +17322,9 @@ const animalType =
 const sex =
   sexValues.length === 1
     ? sexValues[0]
-    : rc === "8"
-      ? "ذكر"
-      : addAnimalImportNormalizeSexSrv(
-          completion(id, "sex")
-        );
+    : addAnimalImportNormalizeSexSrv(
+        completion(id, "sex")
+      );
 
 
   if (!sex || sexValues.length > 1) {
@@ -17662,7 +17664,7 @@ if (!motherBirth || births.length > 1) {
     }
 
     const breedValues = [...new Set(
-      all.map(x => pick(x.r, "BREED", "BRD")).filter(Boolean)
+      all.map(x => pick(x.r, "BREED", "BRD", "CBRD")).filter(Boolean)
     )];
 
     const sourceBreed =
