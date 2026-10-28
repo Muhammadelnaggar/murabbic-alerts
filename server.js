@@ -17312,7 +17312,7 @@ const animalType =
     ...new Set(
       all.map(e =>
         addAnimalImportNormalizeSexSrv(
-          pick(e.r, "CSEX", "SEX", "GENDER")
+          pick(e.r, "SEX", "GENDER")
         )
       ).filter(Boolean)
     )
