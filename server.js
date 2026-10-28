@@ -14222,7 +14222,12 @@ function herdImportV2UniqueHeadersSrv(rows = []) {
   const seen = new Set();
   const headers = [];
 
-  for (const row of rows.slice(0, 30)) {
+  for (const row of [
+  ...rows.slice(0, 30),
+  ...rows.filter(row =>
+    row?.__murabbikEntryType === "followers"
+  ).slice(0, 30)
+]) {
     for (const key of Object.keys(row || {})) {
       const raw = String(key || "").trim();
       if (!raw) continue;
