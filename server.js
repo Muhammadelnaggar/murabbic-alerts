@@ -88645,6 +88645,7 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
 
     due.push({
       animalNumber,
+      speciesKey: dryOffSpeciesKeySrv(doc),
       lastInseminationDate,
       confirmationDueDate,
       batchSaturday,
@@ -88679,6 +88680,18 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
 
   const count =
     animalNumbers.length;
+
+  const cowsCount =
+    due.filter(item => item.speciesKey === "cow").length;
+
+  const buffaloCount = count - cowsCount;
+
+  const animalsLabel =
+    buffaloCount === 0
+      ? `${count} بقرة`
+      : cowsCount === 0
+        ? `${count} جاموسة`
+        : `${cowsCount} بقرة و${buffaloCount} جاموسة`;
 
   const evidence =
     sorted
@@ -88719,7 +88732,7 @@ async function murabbikPregnancyConfirmation120AlertSourceSrv(
    message:
   count === 1
     ? `الحيوان رقم ${animalNumbers[0]} مستحق لتأكيد استمرار الحمل.`
-    : `يوجد ${count} حيوانات مستحقة لتأكيد استمرار الحمل.`,
+        : `يوجد ${animalsLabel} مستحقة لتأكيد استمرار الحمل.`,
 
     details: {
   observation:
