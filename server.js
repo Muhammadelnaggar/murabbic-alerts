@@ -124572,19 +124572,24 @@ function archiveViewReasonSrv(doc = {}) {
       doc.archiveReason
     ).toLowerCase();
 
-  if (reason === "sale") {
-    return archiveViewStrSrv(
-      doc.saleReason
-    );
-  }
+  const sourceReason =
+    reason === "sale"
+      ? archiveViewStrSrv(doc.saleReason)
+      : reason === "death"
+        ? archiveViewStrSrv(doc.deathReason)
+        : "";
 
-  if (reason === "death") {
-    return archiveViewStrSrv(
-      doc.deathReason
-    );
-  }
+  const reasonNames = {
+    LOW_PRODUCTION: "انخفاض إنتاج اللبن",
+    PNEUMONIA: "التهاب رئوي",
+    CALF_PNEUMONIA: "الالتهاب الرئوي في العجول",
+    MARKET_SALE: "بيع في السوق"
+  };
 
-  return "";
+  return (
+    reasonNames[sourceReason.toUpperCase()] ||
+    sourceReason
+  );
 }
 
 function archiveViewPriceSrv(doc = {}) {
