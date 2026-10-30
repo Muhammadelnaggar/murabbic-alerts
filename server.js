@@ -87146,9 +87146,7 @@ async function murabbikDryOffDueAlertSourceSrv(context) {
 
     if (
       !Number.isFinite(gestationDays) ||
-      gestationDays < dueGestationDay ||
-      gestationDays >= alertEndGestationDay ||
-      gestationDays >= expectedGestationDays
+      gestationDays < dueGestationDay
     ) {
       continue;
     }
@@ -87194,15 +87192,21 @@ async function murabbikDryOffDueAlertSourceSrv(context) {
 
   const count = animalNumbers.length;
 
+  const overdueCount = due.filter(item =>
+    item.gestationDays >= item.alertEndGestationDay
+  ).length;
+
   const evidence = due
     .slice(0, 12)
     .map(item =>
-      `الحيوان ${item.animalNumber}: ${item.gestationDays} يوم حمل، وتنتهي نافذة التذكير ${item.alertEndDate}`
+      item.gestationDays >= item.alertEndGestationDay
+        ? `الحيوان ${item.animalNumber}: ${item.gestationDays} يوم حمل، تجاوز نافذة التذكير المنتهية ${item.alertEndDate}`
+        : `الحيوان ${item.animalNumber}: ${item.gestationDays} يوم حمل، وتنتهي نافذة التذكير ${item.alertEndDate}`
     );
 
   if (due.length > evidence.length) {
     evidence.push(
-      `و${due.length - evidence.length} حيوان آخر داخل نافذة تذكير التجفيف.`
+      `و${due.length - evidence.length} حيوان آخر مستحق للتجفيف.`
     );
   }
 
@@ -87220,7 +87224,10 @@ async function murabbikDryOffDueAlertSourceSrv(context) {
         item.speciesKey,
         item.lastInseminationDate,
         item.dueGestationDay,
-        item.alertEndGestationDay
+        item.alertEndGestationDay,
+        item.gestationDays >= item.alertEndGestationDay
+          ? "overdue"
+          : "due"
       ].join(":")
     )
     .join("|");
@@ -87238,10 +87245,10 @@ async function murabbikDryOffDueAlertSourceSrv(context) {
     domain: "reproduction",
     code: "dry_off_due_210",
 
-    priority: "normal",
+    priority: overdueCount ? "high" : "normal",
     urgency: "today",
     certainty: "confirmed",
-    status: "due",
+    status: overdueCount ? "overdue" : "due",
 
     title:
       count === 1
@@ -87250,14 +87257,20 @@ async function murabbikDryOffDueAlertSourceSrv(context) {
 
     message:
       count === 1
-        ? `الحيوان رقم ${animalNumbers[0]} داخل نافذة تذكير التجفيف ولم يُسجّل جافًا بعد.`
-        : `يوجد ${count} حيوانات داخل نافذة تذكير التجفيف ولم يُسجّل تجفيفها بعد.`,
+        ? overdueCount
+          ? `الحيوان رقم ${animalNumbers[0]} تجاوز نافذة تذكير التجفيف ولم يُسجّل جافًا بعد.`
+          : `الحيوان رقم ${animalNumbers[0]} داخل نافذة تذكير التجفيف ولم يُسجّل جافًا بعد.`
+        : overdueCount
+          ? `يوجد ${count} حيوانًا مستحقًا للتجفيف، منها ${overdueCount} تجاوزت نافذة التذكير ولم يُسجّل تجفيفها.`
+          : `يوجد ${count} حيوانًا داخل نافذة تذكير التجفيف ولم يُسجّل تجفيفها بعد.`,
 
     details: {
       observation:
         count === 1
-          ? `عمر الحمل الحالي ${due[0].gestationDays} يومًا، وتنتهي نافذة التذكير بتاريخ ${due[0].alertEndDate}.`
-          : `أرقام الحيوانات: ${animalNumbers.join("، ")}.`,
+          ? overdueCount
+            ? `عمر الحمل الحالي ${due[0].gestationDays} يومًا، وانتهت نافذة التذكير بتاريخ ${due[0].alertEndDate}.`
+            : `عمر الحمل الحالي ${due[0].gestationDays} يومًا، وتنتهي نافذة التذكير بتاريخ ${due[0].alertEndDate}.`
+          : `أرقام الحيوانات: ${animalNumbers.join("، ")}.${overdueCount ? ` منها ${overdueCount} تجاوزت نافذة التذكير.` : ""}`,
 
       meaning:
         "التجفيف في هذه المرحلة يهيئ الحيوان لفترة الجفاف والاستعداد للولادة التالية.",
