@@ -124769,8 +124769,10 @@ function archiveViewEventFactsSrv(ev = {}) {
       : null;
 
   if (source && ev.sourceEventCode) {
-    const code = archiveViewStrSrv(ev.sourceEventCode).toUpperCase();
-    const remark = archiveViewStrSrv(source.Remark || source.REMARK);
+    const remark = archiveViewStrSrv(
+      source.Remark || source.REMARK
+    );
+
     const remarkArabic = {
       CALVED: "ولادة",
       UT_EXAM: "فحص الرحم",
@@ -124785,13 +124787,20 @@ function archiveViewEventFactsSrv(ev = {}) {
       ROUTINE: "إجراء روتيني"
     }[remark.toUpperCase()];
 
-    archiveViewAddFactSrv(facts, "كود حدث DairyComp", code);
+    const displayRemark =
+      remarkArabic ||
+      (
+        remark &&
+        !/^[A-Z0-9_]+$/.test(remark)
+          ? remark
+          : ""
+      );
 
-    if (remark && remark.toUpperCase() !== "NA") {
+    if (displayRemark) {
       archiveViewAddFactSrv(
         facts,
-        "ملاحظة المصدر",
-        remarkArabic ? `${remarkArabic} (${remark})` : remark
+        "ملاحظات",
+        displayRemark
       );
     }
 
@@ -125200,7 +125209,7 @@ app.get(
                     HERD_IMPORT_DC_VAS_EVENTS_SRV[
                       String(ev.sourceEventCode).toUpperCase()
                     ] ||
-                    `حدث DairyComp (${ev.sourceEventCode})`
+                                       "حدث مسجل"
                   )
                 : (
                     archiveViewStrSrv(
