@@ -15625,6 +15625,8 @@ const base = {
     lastCalvingDate,
     daysInMilk,
     dailyMilk,
+    dairyCompMilkReading:
+      row.__murabbikDairyCompMilk || null,
     lastInseminationDate,
     servicesCount,
     sireNumber: String(herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "sireNumber") || "").trim(),
@@ -16262,9 +16264,16 @@ function herdImportV2GateDecisionInternalSrv(base = {}) {
   const formData = herdImportV2FormDataInternalSrv(base);
   const fieldErrors = addAnimalBasicFieldsDecisionSrv(formData);
 
-  const guardMessage = Object.keys(fieldErrors).length
+  const rawGuardMessage = Object.keys(fieldErrors).length
     ? null
     : addAnimalDecisionSrv(formData);
+
+  const guardMessage =
+    base.dairyCompMilkReading?.sourceSystem === "dairycomp" &&
+    rawGuardMessage ===
+      "❌ أدخل إنتاج اللبن اليومي للحيوان الحلاب."
+      ? null
+      : rawGuardMessage;
 
   return {
     ok: !Object.keys(fieldErrors).length && !guardMessage,
@@ -16282,7 +16291,59 @@ function herdImportV2OperationalPayloadPatchInternalSrv(
     herdImportV2OperationalCollectionNameInternalSrv(base) ===
     "calves";
 
+  const sourceMilk =
+    !isFollower &&
+    sourceProfile.key === "dairycomp" &&
+    base.dairyCompMilkReading?.sourceSystem === "dairycomp"
+      ? base.dairyCompMilkReading
+      : null;
+
   return {
+    ...(sourceMilk ? {
+      dailyMilk:
+        sourceMilk.verifiedTodayMilk,
+
+      lastMilkDate:
+        sourceMilk.verifiedTodayMilk === null
+          ? null
+          : sourceMilk.testDate,
+
+      milkTodayKg:
+        sourceMilk.verifiedTodayMilk,
+
+      lastMilkKg:
+        sourceMilk.verifiedTodayMilk,
+
+      dairyCompSeasonMilkBaselineKg:
+        sourceMilk.seasonTotalKg,
+
+      dairyCompSeasonMilkRaw:
+        sourceMilk.totalMilkRaw,
+
+      dairyCompSeasonMilkAsOf:
+        sourceMilk.exportAsOf,
+
+      dairyCompSeasonLactationNumber:
+        sourceMilk.lactationNumber,
+
+      dairyCompSeasonFreshDate:
+        sourceMilk.freshDate,
+
+      dairyCompTestMilkRaw:
+        sourceMilk.testMilkRaw,
+
+      dairyCompTestMilkKg:
+        sourceMilk.testMilkKg,
+
+      dairyCompTestMilkDate:
+        sourceMilk.testDate,
+
+      dairyCompCustomKgMilkRaw:
+        sourceMilk.customKgMilkRaw,
+
+      dairyCompMilkSourceUnit:
+        sourceMilk.sourceUnit
+    } : {}),
     ...(!isFollower
       ? {
           dryOffDate:
@@ -17820,6 +17881,23 @@ if (!asOf || !Number.isFinite(age) || age < 0) {
 
 const historicalSourceOnly = age > 14;
 
+const dairyCompMilkUnit =
+  String(body.externalMilkUnit || "").trim().toLowerCase();
+
+if (!["kg", "lb"].includes(dairyCompMilkUnit)) {
+  fail([
+    "حدد وحدة وزن اللبن في DairyComp: كيلوجرام أو رطل."
+  ]);
+}
+
+const dairyCompMilkToKg = value =>
+  Number(
+    (
+      value *
+      (dairyCompMilkUnit === "lb" ? 0.45359237 : 1)
+    ).toFixed(2)
+  );
+
 
 const fallbackRaw =
   String(body.defaultAnimalType || "").trim();
@@ -17939,6 +18017,7 @@ const completion = (id, key) => {
   const groups = new Map();
   const issues = [];
   const events = [];
+  const dairyCompMilkByAnimal = new Map();
 
   for (let i = 0; i < records.length; i++) {
     const row = records[i];
@@ -18759,23 +18838,109 @@ const isDry =
   );
 
 
-    const milkValues = latestRows.map(x =>
-      pick(x.r, "KGMILK", "MILKKG", "DAILYMILKKG")
-    ).filter(Boolean);
+    // Official DairyComp items:
+    // TOTM: total milk in current lactation
+    // MILK: latest test-day milk
+    // TDAT: latest test date
+    // KGMILK: custom/source field, retained separately
 
-    const uniqueMilk = [...new Set(milkValues)];
-    
-const milk =
-  uniqueMilk.length === 1
-    ? Number(uniqueMilk[0])
-    : completion(id, "dailyMilk") !== ""
-      ? Number(completion(id, "dailyMilk"))
-      : NaN;
+    const sourceMilkValue = (field, ...names) => {
+      const values = [...new Set(
+        latestRows
+          .map(x => pick(x.r, ...names))
+          .filter(value => value !== "")
+      )];
 
+      if (values.length > 1) {
+        issues.push(
+          `${id}: تعارض بيانات ${field} في آخر سجلات المصدر`
+        );
+      }
 
-    if (!isDry && (!Number.isFinite(milk) || milk < 0)) {
-      issues.push(`${id}: إنتاج اللبن اليومي بالكيلوجرام غير مؤكد`);
+      return values.length === 1 ? values[0] : "";
+    };
+
+    const strictMilkNumber = (raw, field) => {
+      if (raw === "") return null;
+
+      const value = Number(raw);
+
+      if (!Number.isFinite(value) || value < 0) {
+        issues.push(
+          `${id}: قيمة ${field} غير صالحة في المصدر`
+        );
+        return null;
+      }
+
+      return value;
+    };
+
+    const totalMilkRaw = strictMilkNumber(
+      sourceMilkValue("TOTM", "TOTM"),
+      "TOTM"
+    );
+
+    const testMilkRaw = strictMilkNumber(
+      sourceMilkValue("MILK", "MILK"),
+      "MILK"
+    );
+
+    const customKgMilkRaw = strictMilkNumber(
+      sourceMilkValue("KGMILK", "KGMILK"),
+      "KGMILK"
+    );
+
+    const rawTestDate =
+      sourceMilkValue("TDAT", "TDAT");
+
+    const parsedTestDate =
+      rawTestDate ? date(rawTestDate) : "";
+
+    if (
+      rawTestDate &&
+      (!parsedTestDate || parsedTestDate > asOf)
+    ) {
+      issues.push(
+        `${id}: تاريخ اختبار اللبن TDAT غير صالح`
+      );
     }
+
+    const testDate =
+      parsedTestDate && parsedTestDate <= asOf
+        ? parsedTestDate
+        : null;
+
+    const testMilkKg =
+      testMilkRaw === null
+        ? null
+        : dairyCompMilkToKg(testMilkRaw);
+
+    const seasonTotalKg =
+      totalMilkRaw === null
+        ? null
+        : dairyCompMilkToKg(totalMilkRaw);
+
+    const verifiedTodayMilk =
+      !isDry &&
+      testDate === today &&
+      testMilkKg !== null
+        ? testMilkKg
+        : null;
+
+    dairyCompMilkByAnimal.set(id, {
+      sourceSystem: "dairycomp",
+      lactationNumber: Number(lact),
+      freshDate: calving,
+      exportAsOf: asOf,
+      sourceUnit: dairyCompMilkUnit,
+      totalMilkRaw,
+      seasonTotalKg,
+      testMilkRaw,
+      testMilkKg,
+      testDate,
+      customKgMilkRaw,
+      verifiedTodayMilk
+    });
 
     const breedings = all
       .filter(x =>
@@ -18828,7 +18993,9 @@ const semen =
       "تاريخ آخر ولادة": calving,
       "الحالة الإنتاجية": isDry ? "جاف" : "حلاب",
       "إنتاج اللبن":
-        isDry ? "" : Number.isFinite(milk) ? String(milk) : "",
+        verifiedTodayMilk === null
+          ? ""
+          : String(verifiedTodayMilk),
       "الحالة التناسلية": reproductiveStatus,
       "تاريخ آخر تلقيح": lastAI,
       "كود السائل": semen,
@@ -18911,7 +19078,17 @@ for (const message of sourceIssues) {
     Object.defineProperties(normalized, {
       __murabbikEntryType: {value: type},
       __murabbikSheetName: {value: sheet},
-      __murabbikRowNumber: {value: index + 2}
+      __murabbikRowNumber: {value: index + 2},
+
+      __murabbikDairyCompMilk: {
+        value: type === "mothers"
+          ? (
+              dairyCompMilkByAnimal.get(
+                addAnimalDigitsSrv(row["رقم الحيوان"])
+              ) || null
+            )
+          : null
+      }
     });
 
     return normalized;
@@ -19303,7 +19480,11 @@ const columnMapping = herdImportV2BuildColumnMappingInternalSrv(
     body.animalTypeDefault ||
     body.herdAnimalType ||
     ""
-  )
+  ),
+  externalMilkUnit:
+    body.externalSource === "dairycomp"
+      ? String(body.externalMilkUnit || "").trim().toLowerCase()
+      : ""
 };
 const baselinePreview = herdImportV2BuildAnimalBaselinePreviewInternalSrv(
   rows,
@@ -122764,6 +122945,25 @@ lastCheckDate:
             currentCycleStartDate
         );
 
+    const hasDairyCompSeasonBaseline =
+      animal.dairyCompSeasonMilkBaselineKg !== null &&
+      animal.dairyCompSeasonMilkBaselineKg !== undefined &&
+      Number.isFinite(
+        Number(animal.dairyCompSeasonMilkBaselineKg)
+      ) &&
+      Number(animal.dairyCompSeasonMilkBaselineKg) >= 0 &&
+      cardISODateSrv(animal.dairyCompSeasonMilkAsOf) &&
+      cardISODateSrv(animal.dairyCompSeasonFreshDate) ===
+        currentCycleStartDate &&
+      Number(animal.dairyCompSeasonLactationNumber) ===
+        Number(state.lactationNumber);
+
+    const dairyCompBaselineDate =
+      hasDairyCompSeasonBaseline
+        ? cardISODateSrv(animal.dairyCompSeasonMilkAsOf)
+        : "";
+
+    let milkAfterDairyCompBaseline = 0;
     let seasonMilk = 0;
 
     let derivedReproductiveStatus =
@@ -122904,6 +123104,13 @@ lastCheckDate:
 
 
           seasonMilk += kg;
+
+          if (
+            hasDairyCompSeasonBaseline &&
+            d > dairyCompBaselineDate
+          ) {
+            milkAfterDairyCompBaseline += kg;
+          }
         }
       }
     }
@@ -123154,17 +123361,28 @@ lastCheckDate:
 
     state.milkTodayKg =
       todayMilk
-        ? Number(
-            todayMilk.kg || 0
-          )
-        : null;
+        ? Number(todayMilk.kg || 0)
+        : (
+            animal.dairyCompTestMilkDate === todayISO &&
+            Number.isFinite(
+              Number(animal.dairyCompTestMilkKg)
+            ) &&
+            animal.dairyCompTestMilkKg !== null
+              ? Number(animal.dairyCompTestMilkKg)
+              : null
+          );
 
     state.seasonTotalKg =
-      state.milkSeries.length
+      hasDairyCompSeasonBaseline
         ? Math.round(
-            seasonMilk * 100
+            (
+              Number(animal.dairyCompSeasonMilkBaselineKg) +
+              milkAfterDairyCompBaseline
+            ) * 100
           ) / 100
-        : null;
+        : state.milkSeries.length
+          ? Math.round(seasonMilk * 100) / 100
+          : null;
 
     if (
       state.milkSeries.length
