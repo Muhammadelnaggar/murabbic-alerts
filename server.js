@@ -124759,8 +124759,9 @@ function archiveViewAnimalFactsSrv(doc = {}) {
   return facts;
 }
 
-function archiveViewEventFactsSrv(ev = {}) {
+function archiveViewEventFactsSrv(ev = {}, animal = {}) {
   const facts = [];
+  const isFollower = archiveViewSubjectSrv(animal) === "تابع";
   const source =
     ev.sourceFields &&
     typeof ev.sourceFields === "object" &&
@@ -124804,11 +124805,17 @@ function archiveViewEventFactsSrv(ev = {}) {
       );
     }
 
+    const vaccineName = archiveViewStrSrv(source.VaccineName);
+    const syntheticVaccine = /SYNTHETIC\s+TEST/i.test(vaccineName);
+    const displayVaccineName = syntheticVaccine
+      ? vaccineName.replace(/SYNTHETIC\s+TEST/gi, "بيانات اختبار")
+      : vaccineName;
+
     for (const [label, value] of [
-      ["رقم الموسم", source.LACT],
-      ["أيام الحليب وقت الحدث", source.DIM],
-      ["اسم التحصين", source.VaccineName],
-      ["كود التحصين", source.VaccineCode],
+      ["رقم الموسم", isFollower ? "" : source.LACT],
+      ["أيام الحليب وقت الحدث", isFollower ? "" : source.DIM],
+      ["اسم التحصين", displayVaccineName],
+      ["كود التحصين", syntheticVaccine ? "" : source.VaccineCode],
       ["نوع الجرعة", source.DoseType],
       ["نوع التهاب الضرع", source.MastitisType],
       ["طريقة تشخيص الحمل", source.PregnancyMethod],
@@ -125228,7 +125235,8 @@ app.get(
 
             facts:
               archiveViewEventFactsSrv(
-                ev
+                ev,
+                doc
               ),
 
             _sortMs:
