@@ -17996,7 +17996,16 @@ lact: pick(row, "LACT", "Lactation")
     });
   }
 
-if (dairyCompIsEventLog) {
+const dairyCompHasAnimalBaseline =
+  dairyCompIsEventLog &&
+  hasAny("LACT", "Lactation") &&
+  hasAny("RC", "Repro_Status", "REPRO") &&
+  hasAny("BDAT", "BirthDate", "DOB") &&
+  hasAny("BREED", "BRD", "CBRD") &&
+  hasAny("SEX", "GENDER") &&
+  hasAny("SPECIES", "ANIMALTYPE");
+
+if (dairyCompIsEventLog && !dairyCompHasAnimalBaseline) {
   const sourceEvents = [];
 
   for (const [id, history] of groups) {
