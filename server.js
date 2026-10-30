@@ -124761,6 +124761,59 @@ function archiveViewAnimalFactsSrv(doc = {}) {
 
 function archiveViewEventFactsSrv(ev = {}) {
   const facts = [];
+  const source =
+    ev.sourceFields &&
+    typeof ev.sourceFields === "object" &&
+    !Array.isArray(ev.sourceFields)
+      ? ev.sourceFields
+      : null;
+
+  if (source && ev.sourceEventCode) {
+    const code = archiveViewStrSrv(ev.sourceEventCode).toUpperCase();
+    const remark = archiveViewStrSrv(source.Remark || source.REMARK);
+    const remarkArabic = {
+      CALVED: "ولادة",
+      UT_EXAM: "فحص الرحم",
+      LOW_PRODUCTION: "انخفاض إنتاج اللبن",
+      PNEUMONIA: "التهاب رئوي",
+      CALF_PNEUMONIA: "الالتهاب الرئوي في العجول",
+      MARKET_SALE: "بيع في السوق",
+      WEANED_OK: "تم الفطام",
+      PASTE_OK: "استخدام معجون إزالة القرون",
+      CLINICAL: "حالة إكلينيكية",
+      POS_KET: "نتيجة إيجابية للكيتوزيس",
+      ROUTINE: "إجراء روتيني"
+    }[remark.toUpperCase()];
+
+    archiveViewAddFactSrv(facts, "كود حدث DairyComp", code);
+
+    if (remark && remark.toUpperCase() !== "NA") {
+      archiveViewAddFactSrv(
+        facts,
+        "ملاحظة المصدر",
+        remarkArabic ? `${remarkArabic} (${remark})` : remark
+      );
+    }
+
+    for (const [label, value] of [
+      ["رقم الموسم", source.LACT],
+      ["أيام الحليب وقت الحدث", source.DIM],
+      ["اسم التحصين", source.VaccineName],
+      ["كود التحصين", source.VaccineCode],
+      ["نوع الجرعة", source.DoseType],
+      ["نوع التهاب الضرع", source.MastitisType],
+      ["طريقة تشخيص الحمل", source.PregnancyMethod],
+      ["وقت الشياع", source.HeatTime],
+      ["وقت التلقيح", source.ActualInseminationTime || source.InseminationTime],
+      ["طريقة التلقيح", source.InseminationMethod],
+      ["كود السائل المنوي", source.SemenCode]
+    ]) {
+      const valueText = archiveViewStrSrv(value);
+      if (valueText && !["NA", "N/A", "NULL"].includes(valueText.toUpperCase())) {
+        archiveViewAddFactSrv(facts, label, valueText);
+      }
+    }
+  }
 
   for (const [label, value] of [
     ["النتيجة", ev.result],
@@ -125138,13 +125191,25 @@ app.get(
               ev.eventId,
 
             title:
-              archiveViewStrSrv(
-                ev.eventTypeAr ||
-                ev.eventType ||
-                ev.type ||
-                ev.name
-              ) ||
-              "حدث",
+              ev.sourceSystem === "dairycomp" && ev.sourceEventCode
+                ? (
+                    ({
+                      BIRTH: "ميلاد",
+                      FOOTRIM: "تقليم الحوافر"
+                    })[String(ev.sourceEventCode).toUpperCase()] ||
+                    HERD_IMPORT_DC_VAS_EVENTS_SRV[
+                      String(ev.sourceEventCode).toUpperCase()
+                    ] ||
+                    `حدث DairyComp (${ev.sourceEventCode})`
+                  )
+                : (
+                    archiveViewStrSrv(
+                      ev.eventTypeAr ||
+                      ev.eventType ||
+                      ev.type ||
+                      ev.name
+                    ) || "حدث"
+                  ),
 
             date:
               archiveViewDateSrv(
