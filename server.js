@@ -19060,7 +19060,42 @@ for (const e of all) {
   issues.push("لا توجد حيوانات نشطة مؤهلة للاستيراد");
 }
 
-  
+const dairyCompMilkAudit = {
+  mothers: animals.length,
+
+  withTOTM: animals.filter(row =>
+    Number.isFinite(
+      dairyCompMilkByAnimal.get(
+        addAnimalDigitsSrv(row["رقم الحيوان"])
+      )?.seasonTotalKg
+    )
+  ).length,
+
+  withMILK: animals.filter(row =>
+    Number.isFinite(
+      dairyCompMilkByAnimal.get(
+        addAnimalDigitsSrv(row["رقم الحيوان"])
+      )?.testMilkKg
+    )
+  ).length,
+
+  withTDAT: animals.filter(row =>
+    Boolean(
+      dairyCompMilkByAnimal.get(
+        addAnimalDigitsSrv(row["رقم الحيوان"])
+      )?.testDate
+    )
+  ).length
+};
+
+if (dairyCompMilkAudit.withTOTM < dairyCompMilkAudit.mothers) {
+  issues.push(
+    `إجمالي لبن الموسم TOTM غير متاح لـ ${
+      dairyCompMilkAudit.mothers - dairyCompMilkAudit.withTOTM
+    } أم؛ يلزم تصدير القيمة الأصلية من DairyComp.`
+  );
+}
+
 const sourceIssues = [...new Set(issues)];
 const sourceIssuesByAnimal = {};
 
@@ -19103,6 +19138,7 @@ externalSummary: {
   sourceIssues,
   sourceIssuesCount: sourceIssues.length,
   sourceIssuesByAnimal,
+  dairyCompMilkAudit,
   uniqueSourceAnimals: groups.size,
 
       importedCandidates: animals.length + followers.length,
