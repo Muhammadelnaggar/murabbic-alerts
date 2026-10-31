@@ -19518,6 +19518,12 @@ app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
   try {
         const body = req.body || {};
 
+    if (
+      body.externalSource === "dairycomp" &&
+      body.dairyCompImportKind === "milk"
+    ) {
+      return herdDcMilkSyncHandlerSrv(req, res);
+    }
     const templateData =
   herdImportV2ParseInputSourceSrv(
     body
@@ -20051,6 +20057,13 @@ const herdImportV2SaveOperationalHandlerSrv = async (req, res) => {
 
      const uid = req.userId;
     const body = req.body || {};
+
+    if (
+      body.externalSource === "dairycomp" &&
+      body.dairyCompImportKind === "milk"
+    ) {
+      return herdDcMilkSyncHandlerSrv(req, res);
+    }
 
     const templateData =
       herdImportV2ParseInputSourceSrv(
