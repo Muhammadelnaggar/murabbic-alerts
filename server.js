@@ -120724,6 +120724,56 @@ async function fetchCardEventsSrv(uid, subject = {}) {
   );
 }
 
+function cardImportedEventNameSrv(e = {}) {
+  const code = String(
+    e.sourceEventCode ||
+    e.sourceCode ||
+    ''
+  ).trim().toUpperCase();
+
+  const names = {
+    FRESH: 'ولادة',
+    CALVED: 'ولادة',
+    BIRTH: 'ميلاد',
+    HEAT: 'شياع',
+    BRED: 'تلقيح',
+    PREG: 'تشخيص حمل',
+    OPEN: 'تشخيص حمل',
+    PREV: 'حمل مسجل',
+    ABORT: 'إجهاض',
+    DRY: 'تجفيف',
+    WEAN: 'فطام',
+    MOVE: 'نقل مجموعة',
+    MAST: 'التهاب الضرع',
+    HOOF: 'مشكلة حافر',
+    LAME: 'عرج',
+    KETO: 'كيتوزيس',
+    DA: 'انزياح المنفحة',
+    METR: 'التهاب الرحم',
+    RP: 'احتباس المشيمة',
+    VACC: 'تحصين',
+    CALFVACC: 'تحصين',
+    DEHORN: 'إزالة القرون',
+    SOLD: 'بيع',
+    DIED: 'نفوق',
+    GNRH: 'حقنة هرمونية',
+    PGF: 'حقنة هرمونية',
+    OVS: 'برنامج تزامن',
+    OVSYNCH: 'برنامج تزامن'
+  };
+
+  return names[code] || '';
+}
+
+function cardImportedEventNoteSrv(value) {
+  return String(value || '')
+    .replace(/DairyComp\s*:\s*[A-Z0-9_]+/gi, '')
+    .replace(/\bDC305\b/gi, '')
+    .replace(/^\s*[|،;:\-]+\s*/, '')
+    .replace(/\s*[|،;:\-]+\s*$/, '')
+    .trim();
+}
+
 function cardEventTitleSrv(e = {}) {
   const direct = cardFirstSrv(e, [
     'displayName',
@@ -120746,7 +120796,10 @@ function cardEventTitleSrv(e = {}) {
     'heatStatus'
   ], '');
 
-  const raw = String(direct || '').trim();
+const importedName = cardImportedEventNameSrv(e);
+if (importedName) return importedName;
+
+const raw = String(direct || '').trim();
 
   if (raw && /[\u0600-\u06FF]/.test(raw)) return raw;
 
@@ -120768,8 +120821,21 @@ function cardEventTitleSrv(e = {}) {
 }
 
 function cardEventSummarySrv(e = {}) {
-  const existing = cardFirstSrv(e, ['summary', 'shortSummary', 'message', 'detailsText'], '');
-  if (existing) return cardTextSrv(existing, '—');
+const existing = cardFirstSrv(
+  e,
+  ['summary', 'shortSummary', 'message', 'detailsText'],
+  ''
+);
+
+if (existing) {
+  const cleaned = cardImportedEventNoteSrv(existing);
+
+  if (cleaned) return cardTextSrv(cleaned, '—');
+
+  if (!/DairyComp|DC305/i.test(String(existing))) {
+    return cardTextSrv(existing, '—');
+  }
+}
 
   const type = eventTypeForCardSrv(e);
 
@@ -121041,12 +121107,14 @@ function cardEventDetailsSrv(e = {}) {
     );
 
 
-  if (note) {
-    add(
-      'ملاحظة',
-      note
-    );
+if (note) {
+  const cleanedNote =
+    cardImportedEventNoteSrv(note);
+
+  if (cleanedNote) {
+    add('ملاحظة', cleanedNote);
   }
+}
 
 
   return details.slice(0, 8);
