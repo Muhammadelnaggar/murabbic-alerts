@@ -16300,19 +16300,15 @@ function herdImportV2OperationalPayloadPatchInternalSrv(
 
   return {
     ...(sourceMilk ? {
-      dailyMilk:
-        sourceMilk.verifiedTodayMilk,
-
-      lastMilkDate:
-        sourceMilk.verifiedTodayMilk === null
-          ? null
-          : sourceMilk.testDate,
-
-      milkTodayKg:
-        sourceMilk.verifiedTodayMilk,
-
-      lastMilkKg:
-        sourceMilk.verifiedTodayMilk,
+...(sourceMilk.verifiedTodayMilk !== null &&
+   sourceMilk.verifiedTodayMilk !== undefined
+  ? {
+      dailyMilk: sourceMilk.verifiedTodayMilk,
+      lastMilkDate: sourceMilk.testDate,
+      milkTodayKg: sourceMilk.verifiedTodayMilk,
+      lastMilkKg: sourceMilk.verifiedTodayMilk
+    }
+  : {}),
 
       dairyCompSeasonMilkBaselineKg:
         sourceMilk.seasonTotalKg,
@@ -18844,21 +18840,31 @@ const isDry =
     // TDAT: latest test date
     // KGMILK: custom/source field, retained separately
 
-    const sourceMilkValue = (field, ...names) => {
-      const values = [...new Set(
-        latestRows
-          .map(x => pick(x.r, ...names))
-          .filter(value => value !== "")
-      )];
+const sourceMilkValue = (field, ...names) => {
+  const candidates = all
+    .filter(x => x.d && x.d <= asOf)
+    .map(x => ({
+      value: pick(x.r, ...names),
+      date: x.d,
+      row: x.row
+    }))
+    .filter(x => x.value !== "");
 
-      if (values.length > 1) {
-        issues.push(
-          `${id}: تعارض بيانات ${field} في آخر سجلات المصدر`
-        );
-      }
+  if (!candidates.length) return "";
 
-      return values.length === 1 ? values[0] : "";
-    };
+  const values = [...new Set(
+    candidates.map(x => x.value)
+  )];
+
+  if (values.length !== 1) {
+    issues.push(
+      `${id}: تعارض قيم ${field} بين سجلات DairyComp؛ يلزم مصدر مؤكد.`
+    );
+    return "";
+  }
+
+  return values[0];
+};
 
     const strictMilkNumber = (raw, field) => {
       if (raw === "") return null;
@@ -18904,11 +18910,20 @@ const isDry =
         `${id}: تاريخ اختبار اللبن TDAT غير صالح`
       );
     }
-
     const testDate =
-      parsedTestDate && parsedTestDate <= asOf
-        ? parsedTestDate
-        : null;
+  parsedTestDate && parsedTestDate <= asOf
+    ? parsedTestDate
+    : null;
+
+    if (
+  testMilkRaw !== null &&
+  testMilkRaw > 0 &&
+  !testDate
+) {
+  issues.push(
+    `${id}: إنتاج اختبار اللبن MILK موجود دون تاريخ TDAT صالح؛ يلزم تصدير تاريخ الاختبار الأصلي من DairyComp.`
+  );
+}
 
     const testMilkKg =
       testMilkRaw === null
@@ -18920,12 +18935,10 @@ const isDry =
         ? null
         : dairyCompMilkToKg(totalMilkRaw);
 
-    const verifiedTodayMilk =
-      !isDry &&
-      testDate === today &&
-      testMilkKg !== null
-        ? testMilkKg
-        : null;
+    // DairyComp MILK is a test-day reading, not a
+// verified Murabbik daily milking event.
+// Keep it in dairyCompTestMilkKg / dairyCompTestMilkDate.
+const verifiedTodayMilk = null;
 
     dairyCompMilkByAnimal.set(id, {
       sourceSystem: "dairycomp",
