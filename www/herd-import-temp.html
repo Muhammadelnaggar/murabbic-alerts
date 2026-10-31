@@ -706,7 +706,6 @@ const dcCompletionFields = [
   ['lactationNumber', 'رقم الموسم', 'number'],
   ['sex', 'جنس التابع', ['', 'ذكر', 'أنثى']],
   ['damNumber', 'رقم الأم'],
-  ['dailyMilk', 'الإنتاج اليومي الفعلي (كجم)', 'number'],
   ['reproductiveStatus', 'الحالة التناسلية', ['', 'مفتوحة', 'ملقحة', 'عشار']],
   ['lastInseminationDate', 'تاريخ آخر تلقيح', 'date'],
   ['semenCode', 'كود سائل آخر تلقيح']
@@ -1028,26 +1027,6 @@ dairycompCompletionByAnimal:
       '/api/herd-import-v2/preview'
     );
 
-    // فقط ملف اختبارات اللبن الذي لا يتبع
-    // صيغة تصدير القطيع أو سجل الأحداث المعتادة.
-    if (
-      j?.ok !== true &&
-      j?.error === 'dairycomp_external_incomplete' &&
-      String(j.message || '').includes(
-        'الملف ليس تصدير حيوانات FILEOUT أو سجل أحداث EVENTS'
-      )
-    ) {
-      lastFilePayload = {
-        ...payload,
-        dairyCompImportKind: 'milk',
-        inspectOnly: true
-      };
-
-      j = await callHerdImport(
-        '/api/herd-import-v2/preview'
-      );
-    }
-
     if (
       revision !== externalRevision ||
       externalFile.files[0] !== file
@@ -1058,34 +1037,6 @@ dairycompCompletionByAnimal:
         j?.message || 'تعذرت المعاينة.'
       );
     }
-
-    if (
-      lastFilePayload?.dairyCompImportKind === 'milk'
-    ) {
-      const audit = j.audit || {};
-
-      externalInspectResult.textContent = [
-        `صفوف المصدر: ${audit.sourceRows ?? 0}`,
-        `حيوانات مطابقة: ${audit.matchedAnimals ?? 0}`,
-        `اختبارات لبن: ${audit.milkTestsCount ?? 0}`,
-        `إجماليات مواسم: ${audit.seasonBaselinesCount ?? 0}`,
-        `ملاحظات: ${audit.issuesCount ?? 0}`,
-        ...(audit.issues || []).slice(0, 30)
-      ].join('\n');
-
-      lastPreviewOk = j.saveEnabled === true;
-      btnSave.disabled = !lastPreviewOk;
-
-      showMessage(
-        lastPreviewOk
-          ? 'اكتملت معاينة بيانات اللبن ويمكن الحفظ.'
-          : 'ملف اللبن يحتاج مراجعة قبل الحفظ.',
-        lastPreviewOk ? 'status-ok' : 'status-warn'
-      );
-
-      return;
-    }
-
 
     
 setSummary(j);
@@ -1260,45 +1211,7 @@ async function waitForDairyCompJob(importId) {
 
        btnSave.disabled = true;
 
-if (
-  lastFilePayload?.dairyCompImportKind === 'milk'
-) {
-  showMessage(
-    'جاري حفظ بيانات اللبن في مُرَبِّيك...',
-    'status-warn'
-  );
 
-  lastFilePayload = {
-    ...lastFilePayload,
-    inspectOnly: false
-  };
-
-  const milkResult = await callHerdImport(
-    "/api/herd-import-v2/save-operational"
-  );
-
-  if (
-    milkResult?.ok !== true ||
-    milkResult.persistenceStatus !== 'completed'
-  ) {
-    throw new Error(
-      milkResult?.message ||
-      'لم يكتمل حفظ بيانات اللبن.'
-    );
-  }
-
-  lastPreviewOk = false;
-  lastFilePayload = null;
-
-  showMessage(
-    `تم حفظ بيانات اللبن بنجاح: ` +
-    `${milkResult.milkTestsCount || 0} اختبار، ` +
-    `${milkResult.seasonBaselinesCount || 0} إجمالي موسم.`,
-    'status-ok'
-  );
-
-  return;
-}
 
 showMessage(
   "جاري حفظ القطيع داخل مُرَبِّيك...",
