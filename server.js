@@ -16337,6 +16337,12 @@ function herdImportV2OperationalPayloadPatchInternalSrv(
       dairyCompCustomKgMilkRaw:
         sourceMilk.customKgMilkRaw,
 
+      dairyCompPeakMilkRaw:
+        sourceMilk.peakMilkRaw,
+
+      dairyCompPeakMilkKg:
+        sourceMilk.peakMilkKg,
+
       dairyCompMilkSourceUnit:
         sourceMilk.sourceUnit
     } : {}),
@@ -17838,6 +17844,62 @@ function herdImportV2DairyCompArchiveCandidateSrv({
   };
 }
 
+function herdImportV2DairyCompSourceSettingsSrv(rows = []) {
+  const units = new Set();
+  let mdyEvidence = 0;
+  let dmyEvidence = 0;
+
+  for (const row of rows) {
+    const rawUnit = String(addAnimalImportPickAnySrv(row, [
+      "MilkUnit", "MilkUnits", "Milk_Unit", "MilkUOM",
+      "MilkWeightUnit", "MilkWeightUnits", "UnitOfMilk"
+    ]) || "").trim().toLowerCase();
+
+    if (/^(?:lb|lbs|pound|pounds|رطل)$/.test(rawUnit)) {
+      units.add("lb");
+    }
+
+    if (/^(?:kg|kgs|kilogram|kilograms|كيلو|كيلوجرام|كيلوغرام)$/.test(rawUnit)) {
+      units.add("kg");
+    }
+  }
+
+  for (const row of rows.slice(0, 1000)) {
+    for (const name of [
+      "Date", "Event_Date", "FDAT",
+      "TDAT", "TestDate", "FreshDate"
+    ]) {
+      const value = String(
+        addAnimalImportPickAnySrv(row, [name]) || ""
+      ).trim();
+
+      const m = value.match(
+        /^(\d{1,2})[/-](\d{1,2})[/-]\d{2,4}$/
+      );
+
+      if (!m) continue;
+
+      const first = Number(m[1]);
+      const second = Number(m[2]);
+
+      if (first > 12 && second <= 12) {
+        dmyEvidence++;
+      } else if (second > 12 && first <= 12) {
+        mdyEvidence++;
+      }
+    }
+  }
+
+  return {
+    milkUnit:
+      units.size > 1 ? "" :
+      units.has("lb") ? "lb" : "kg",
+
+    dateOrder:
+      dmyEvidence > mdyEvidence ? "dmy" : "mdy"
+  };
+}
+
 function herdImportV2ParseExternalDairyCompSrv(body = {}) {
   const fail = messages => {
     const err = herdImportV2TemplateErrorSrv(
@@ -17877,22 +17939,7 @@ if (!asOf || !Number.isFinite(age) || age < 0) {
 
 const historicalSourceOnly = age > 14;
 
-const dairyCompMilkUnit =
-  String(body.externalMilkUnit || "").trim().toLowerCase();
 
-if (!["kg", "lb"].includes(dairyCompMilkUnit)) {
-  fail([
-    "حدد وحدة وزن اللبن في DairyComp: كيلوجرام أو رطل."
-  ]);
-}
-
-const dairyCompMilkToKg = value =>
-  Number(
-    (
-      value *
-      (dairyCompMilkUnit === "lb" ? 0.45359237 : 1)
-    ).toFixed(2)
-  );
 
 
 const fallbackRaw =
@@ -17940,6 +17987,23 @@ if (/\.(csv|txt)$/i.test(name)) {
   if (!records.length || records.length > 80000) {
   fail(["عدد الصفوف غير صالح (حد 80000)"]);
 }
+
+const dairyCompSettings =
+  herdImportV2DairyCompSourceSettingsSrv(records);
+
+const dairyCompMilkUnit = dairyCompSettings.milkUnit;
+
+if (!dairyCompMilkUnit) {
+  fail(["تعارض وحدة اللبن في المصدر"]);
+}
+
+const dairyCompMilkToKg = value =>
+  Number(
+    (
+      value *
+      (dairyCompMilkUnit === "lb" ? 0.45359237 : 1)
+    ).toFixed(2)
+  );
 
   const columns = new Set(
     herdImportV2UniqueHeadersSrv(records)
@@ -18006,7 +18070,7 @@ const completion = (id, key) => {
 
   return herdImportV2ExternalDateStrictSrv(
     raw,
-    /^\d{4}-\d{2}-\d{2}$/.test(raw) ? "ymd" : "mdy"
+    /^\d{4}-\d{2}-\d{2}$/.test(raw) ? "ymd" : dairyCompSettings.dateOrder
   );
 };
 
@@ -18951,6 +19015,11 @@ const testMilkRaw = strictMilkNumber(
       "KGMILK"
     );
 
+    const peakMilkRaw = strictMilkNumber(
+      sourceMilkValue("PEAKM", "PEAKM"),
+      "PEAKM"
+    );
+
 const rawTestDate = milkPair?.date || "";
 
     const parsedTestDate =
@@ -19002,6 +19071,11 @@ const verifiedTodayMilk = null;
       sourceUnit: dairyCompMilkUnit,
       totalMilkRaw,
       seasonTotalKg,
+      peakMilkRaw,
+      peakMilkKg:
+        peakMilkRaw === null
+          ? null
+          : dairyCompMilkToKg(peakMilkRaw),
       testMilkRaw,
       testMilkKg,
       testDate,
@@ -19583,17 +19657,13 @@ const columnMapping = herdImportV2BuildColumnMappingInternalSrv(
   rows,
   columnMapping.columnMapInternal
 );
-    const importOptions = {
+const importOptions = {
   defaultAnimalType: addAnimalStrSrv(
     body.defaultAnimalType ||
     body.animalTypeDefault ||
     body.herdAnimalType ||
     ""
-  ),
-  externalMilkUnit:
-    body.externalSource === "dairycomp"
-      ? String(body.externalMilkUnit || "").trim().toLowerCase()
-      : ""
+  )
 };
 const baselinePreview = herdImportV2BuildAnimalBaselinePreviewInternalSrv(
   rows,
@@ -20940,11 +21010,7 @@ async function herdDcMilkSyncHandlerSrv(req, res) {
     const uid = req.userId;
     const body = req.body || {};
     const fileName = String(body.fileName || "").trim();
-    const unit = String(body.externalMilkUnit || "")
-      .trim().toLowerCase();
-    const dateOrder = String(
-      body.externalDateOrder || "mdy"
-    ).trim().toLowerCase();
+
 
     const asOf = herdImportV2ExternalDateStrictSrv(
       body.externalAsOf, "ymd"
@@ -20952,8 +21018,6 @@ async function herdDcMilkSyncHandlerSrv(req, res) {
 
     if (
       !/\.(csv|txt|xls|xlsx)$/i.test(fileName) ||
-      !["kg", "lb"].includes(unit) ||
-      !["mdy", "dmy"].includes(dateOrder) ||
       !asOf ||
       asOf > addAnimalTodaySrv()
     ) {
@@ -21002,6 +21066,20 @@ async function herdDcMilkSyncHandlerSrv(req, res) {
       return res.status(400).json({
         ok: false,
         error: "dairycomp_milk_rows_invalid"
+      });
+    }
+
+    const sourceSettings =
+      herdImportV2DairyCompSourceSettingsSrv(rows);
+
+    const unit = sourceSettings.milkUnit;
+    const dateOrder = sourceSettings.dateOrder;
+
+    if (!unit) {
+      return res.status(422).json({
+        ok: false,
+        error: "dairycomp_milk_source_units_conflict",
+        message: "تعارض وحدات اللبن داخل ملف المصدر."
       });
     }
 
