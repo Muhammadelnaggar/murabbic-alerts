@@ -16316,6 +16316,21 @@ function herdImportV2OperationalPayloadPatchInternalSrv(
       dairyCompSeasonMilkRaw:
         sourceMilk.totalMilkRaw,
 
+      ...(sourceMilk.previousSeasonTotalKg !== null &&
+      sourceMilk.previousSeasonTotalKg !== undefined &&
+      Number(sourceMilk.lactationNumber) > 1
+        ? {
+            dairyCompPreviousSeasonMilkTotalKg:
+              sourceMilk.previousSeasonTotalKg,
+
+            dairyCompPreviousSeasonMilkRaw:
+              sourceMilk.previousTotalMilkRaw,
+
+            dairyCompPreviousSeasonLactationNumber:
+              Number(sourceMilk.lactationNumber) - 1
+          }
+        : {}),
+
       dairyCompSeasonMilkAsOf:
         sourceMilk.exportAsOf,
 
@@ -18962,6 +18977,19 @@ const sourceMilkValue = (field, ...names) => {
       "TOTM"
     );
 
+    const previousTotalMilkRaw =
+      Number(lact) > 1
+        ? strictMilkNumber(
+            sourceMilkValue("PTOTM", "PTOTM"),
+            "PTOTM"
+          )
+        : null;
+
+    const previousSeasonTotalKg =
+      previousTotalMilkRaw === null
+        ? null
+        : dairyCompMilkToKg(previousTotalMilkRaw);
+
 
 const milkSnapshots = all
   .filter(x =>
@@ -19071,6 +19099,8 @@ const verifiedTodayMilk = null;
       sourceUnit: dairyCompMilkUnit,
       totalMilkRaw,
       seasonTotalKg,
+      previousTotalMilkRaw,
+      previousSeasonTotalKg,
       peakMilkRaw,
       peakMilkKg:
         peakMilkRaw === null
@@ -21381,6 +21411,38 @@ async function herdDcMilkSyncHandlerSrv(req, res) {
           dairyCompSeasonFreshDate: freshDate,
           dairyCompMilkSourceUnit: unit
         };
+
+        const previousTotalText =
+          pick(source, "PTOTM");
+
+        if (
+          sourceLact > 1 &&
+          previousTotalText !== ""
+        ) {
+          const previousTotalRaw =
+            parseNumber(previousTotalText);
+
+          if (
+            !Number.isFinite(previousTotalRaw) ||
+            previousTotalRaw < 0
+          ) {
+            issues.push(
+              `${id}: إجمالي الموسم السابق PTOTM غير صالح`
+            );
+            continue;
+          }
+
+          Object.assign(payload, {
+            dairyCompPreviousSeasonMilkTotalKg:
+              toKg(previousTotalRaw),
+
+            dairyCompPreviousSeasonMilkRaw:
+              previousTotalRaw,
+
+            dairyCompPreviousSeasonLactationNumber:
+              sourceLact - 1
+          });
+        }
 
         const milkText = pick(source, "MILK");
         const dateText = pick(source, "TDAT");
