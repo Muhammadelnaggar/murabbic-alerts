@@ -120726,51 +120726,99 @@ async function fetchCardEventsSrv(uid, subject = {}) {
 
 function cardImportedEventNameSrv(e = {}) {
   const code = String(
-    e.sourceEventCode ||
-    e.sourceCode ||
-    ''
+    e.sourceEventCode || e.sourceCode || ''
   ).trim().toUpperCase();
 
-  const names = {
-    FRESH: 'ولادة',
-    CALVED: 'ولادة',
-    BIRTH: 'ميلاد',
-    HEAT: 'شياع',
-    BRED: 'تلقيح',
-    PREG: 'تشخيص حمل',
-    OPEN: 'تشخيص حمل',
-    PREV: 'حمل مسجل',
-    ABORT: 'إجهاض',
-    DRY: 'تجفيف',
-    WEAN: 'فطام',
-    MOVE: 'نقل مجموعة',
-    MAST: 'التهاب الضرع',
-    HOOF: 'مشكلة حافر',
-    LAME: 'عرج',
-    KETO: 'كيتوزيس',
-    DA: 'انزياح المنفحة',
-    METR: 'التهاب الرحم',
-    RP: 'احتباس المشيمة',
-    VACC: 'تحصين',
-    CALFVACC: 'تحصين',
-    DEHORN: 'إزالة القرون',
-    SOLD: 'بيع',
-    DIED: 'نفوق',
-    GNRH: 'حقنة هرمونية',
-    PGF: 'حقنة هرمونية',
-    OVS: 'برنامج تزامن',
-    OVSYNCH: 'برنامج تزامن'
+  if (
+    String(e.sourceSystem || '').toLowerCase() !== 'dairycomp' ||
+    String(e.eventTypeNorm || '') !== 'external_history' ||
+    !code
+  ) {
+    return '';
+  }
+
+  const officialTypes = {
+    FRESH: 'calving',
+    HEAT: 'heat',
+    BRED: 'insemination',
+    PREG: 'pregnancy_diagnosis',
+    OPEN: 'pregnancy_diagnosis',
+    ABORT: 'abortion',
+    DRY: 'dry_off',
+    WEAN: 'weaning',
+    VACC: 'vaccination',
+    CALFVACC: 'vaccination',
+    MAST: 'mastitis',
+    LAME: 'lameness',
+    FOOTRIM: 'hoof_trimming',
+    TRIM: 'hoof_trimming',
+    DEHORN: 'dehorning',
+    SOLD: 'sale',
+    DIED: 'death',
+    OVS: 'ovsynch',
+    OVSYNCH: 'ovsynch'
   };
 
-  return names[code] || '';
+  const officialType = officialTypes[code];
+
+  if (officialType) {
+    return eventsPageTypeLabelSrv({
+      eventTypeNorm: officialType
+    });
+  }
+
+  if (HERD_IMPORT_DC_SUPPORTED_HEALTH_SRV[code]) {
+    return herdImportV2EventLabelInternalSrv('health');
+  }
+
+  if (code === 'BIRTH') {
+    return 'ميلاد';
+  }
+
+  if (code === 'GNRH' || code === 'PGF') {
+    return herdImportV2EventLabelInternalSrv('hormone_step');
+  }
+
+  return HERD_IMPORT_DC_VAS_EVENTS_SRV[code] || '';
 }
 
 function cardImportedEventNoteSrv(value) {
-  return String(value || '')
-    .replace(/DairyComp\s*:\s*[A-Z0-9_]+/gi, '')
-    .replace(/\bDC305\b/gi, '')
-    .replace(/^\s*[|،;:\-]+\s*/, '')
-    .replace(/\s*[|،;:\-]+\s*$/, '')
+  const raw = String(value || '').trim();
+
+  if (!raw) return '';
+
+  const remarks = {
+    CALVED: 'ولادة',
+    CLINICAL: 'حالة إكلينيكية',
+    UT_EXAM: 'فحص الرحم',
+    LOW_PRODUCTION: 'انخفاض إنتاج اللبن',
+    PNEUMONIA: 'التهاب رئوي',
+    CALF_PNEUMONIA: 'الالتهاب الرئوي في العجول',
+    MARKET_SALE: 'بيع في السوق',
+    WEANED_OK: 'تم الفطام',
+    PASTE_OK: 'استخدام معجون إزالة القرون',
+    POS_KET: 'نتيجة إيجابية للكيتوزيس',
+    ROUTINE: 'إجراء روتيني',
+    OBS_AM: 'ملاحظة صباحًا',
+    OBS_PM: 'ملاحظة مساءً',
+    VISUAL_AM: 'ملاحظة بصرية صباحًا',
+    SONAR_POS: 'نتيجة سونار إيجابية',
+    REPRO_HIST: 'معلومة تناسلية',
+    DRYING: 'تجفيف'
+  };
+
+  return raw
+    .split('|')
+    .map(part => part.trim())
+    .filter(part =>
+      part &&
+      !/^DairyComp\s*:\s*[A-Z0-9_]+$/i.test(part) &&
+      !/^DC305$/i.test(part)
+    )
+    .map(part =>
+      remarks[part.toUpperCase()] || part
+    )
+    .join(' — ')
     .trim();
 }
 
@@ -120796,12 +120844,25 @@ function cardEventTitleSrv(e = {}) {
     'heatStatus'
   ], '');
 
-const importedName = cardImportedEventNameSrv(e);
-if (importedName) return importedName;
-
 const raw = String(direct || '').trim();
 
-  if (raw && /[\u0600-\u06FF]/.test(raw)) return raw;
+const isSourcePlaceholder =
+  /^(?:حدث\s+DairyComp\s+تاريخي|حدث مستورد|حدث تاريخي|سجل حدث مصدر)$/i
+    .test(raw);
+
+if (
+  raw &&
+  /[\u0600-\u06FF]/.test(raw) &&
+  !isSourcePlaceholder
+) {
+  return raw;
+}
+
+const importedName = cardImportedEventNameSrv(e);
+
+if (importedName) {
+  return importedName;
+}
 
   const type = eventTypeForCardSrv(e);
 
@@ -120821,6 +120882,30 @@ const raw = String(direct || '').trim();
 }
 
 function cardEventSummarySrv(e = {}) {
+  if (
+  String(e.sourceSystem || '').toLowerCase() === 'dairycomp' &&
+  e.eventTypeNorm === 'external_history'
+) {
+  const code = String(
+    e.sourceEventCode || ''
+  ).trim().toUpperCase();
+
+  const diseaseCode =
+    HERD_IMPORT_DC_SUPPORTED_HEALTH_SRV[code];
+
+  if (diseaseCode) {
+    const diseaseName =
+      DISEASE_CATALOG_SRV[diseaseCode]?.name || '';
+
+    const note =
+      cardImportedEventNoteSrv(e.notes || '');
+
+    return [
+      diseaseName ? `التشخيص: ${diseaseName}` : '',
+      note
+    ].filter(Boolean).join(' — ') || '—';
+  }
+}
 const existing = cardFirstSrv(
   e,
   ['summary', 'shortSummary', 'message', 'detailsText'],
@@ -120871,7 +120956,14 @@ if (existing) {
 
   const note = cardFirstSrv(e, ['notes', 'note', 'comment', 'reason', 'description'], '');
 
-  return note ? cardTextSrv(note, '—') : '—';
+  const visibleNote =
+  String(e.sourceSystem || '').toLowerCase() === 'dairycomp'
+    ? cardImportedEventNoteSrv(note)
+    : note;
+
+return visibleNote
+  ? cardTextSrv(visibleNote, '—')
+  : '—';
 }
 
 function cardEventDetailsSrv(e = {}) {
@@ -121109,7 +121201,9 @@ function cardEventDetailsSrv(e = {}) {
 
 if (note) {
   const cleanedNote =
-    cardImportedEventNoteSrv(note);
+  String(e.sourceSystem || '').toLowerCase() === 'dairycomp'
+    ? cardImportedEventNoteSrv(note)
+    : note;
 
   if (cleanedNote) {
     add('ملاحظة', cleanedNote);
