@@ -90,6 +90,14 @@
     <option value="lb">رطل (lb)</option>
   </select>
 
+  <label for="externalDateOrder">
+    ترتيب التاريخ في ملف اختبارات اللبن التاريخية
+  </label>
+  <select id="externalDateOrder">
+    <option value="mdy">شهر / يوم / سنة</option>
+    <option value="dmy">يوم / شهر / سنة</option>
+  </select>
+
  <details>
   <summary>بيانات احتياطية عند نقص معلومات الملف (اختياري)</summary>
 
@@ -848,6 +856,7 @@ externalFile.addEventListener('change', () => {
 for (const id of [
   'externalAsOf',
   'externalMilkUnit',
+  'externalDateOrder',
   'externalSpecies',
   'externalSpeciesConfirmed'
 ]) {
@@ -1017,9 +1026,10 @@ btnExternalPreview.addEventListener('click', async () => {
       fileName: file.name,
       fileBase64: await fileToBase64(file),
       externalSource: 'dairycomp',
-      externalAsOf: asOf,
-      externalMilkUnit: milkUnit,
-      defaultAnimalType: species,
+       externalAsOf: asOf,
+       externalMilkUnit: milkUnit,
+       externalDateOrder: $('externalDateOrder').value,
+       defaultAnimalType: species,
       externalSpeciesConfirmed:
          Boolean(species) && $('externalSpeciesConfirmed').checked,
       
@@ -1036,18 +1046,69 @@ dairycompCompletionByAnimal:
 
     lastFilePayload = payload;
 
-    const j = await callHerdImport(
+
+    let j = await callHerdImport(
       '/api/herd-import-v2/preview'
     );
+
+    // فقط ملف اختبارات اللبن الذي لا يتبع
+    // صيغة تصدير القطيع أو سجل الأحداث المعتادة.
+    if (
+      j?.ok !== true &&
+      j?.error === 'dairycomp_external_incomplete' &&
+      String(j.message || '').includes(
+        'الملف ليس تصدير حيوانات FILEOUT أو سجل أحداث EVENTS'
+      )
+    ) {
+      lastFilePayload = {
+        ...payload,
+        dairyCompImportKind: 'milk',
+        inspectOnly: true
+      };
+
+      j = await callHerdImport(
+        '/api/herd-import-v2/preview'
+      );
+    }
 
     if (
       revision !== externalRevision ||
       externalFile.files[0] !== file
     ) return;
 
-    if (j.ok !== true) {
-      throw new Error(j.message || 'تعذرت المعاينة.');
+    if (j?.ok !== true) {
+      throw new Error(
+        j?.message || 'تعذرت المعاينة.'
+      );
     }
+
+    if (
+      lastFilePayload?.dairyCompImportKind === 'milk'
+    ) {
+      const audit = j.audit || {};
+
+      externalInspectResult.textContent = [
+        `صفوف المصدر: ${audit.sourceRows ?? 0}`,
+        `حيوانات مطابقة: ${audit.matchedAnimals ?? 0}`,
+        `اختبارات لبن: ${audit.milkTestsCount ?? 0}`,
+        `إجماليات مواسم: ${audit.seasonBaselinesCount ?? 0}`,
+        `ملاحظات: ${audit.issuesCount ?? 0}`,
+        ...(audit.issues || []).slice(0, 30)
+      ].join('\n');
+
+      lastPreviewOk = j.saveEnabled === true;
+      btnSave.disabled = !lastPreviewOk;
+
+      showMessage(
+        lastPreviewOk
+          ? 'اكتملت معاينة بيانات اللبن ويمكن الحفظ.'
+          : 'ملف اللبن يحتاج مراجعة قبل الحفظ.',
+        lastPreviewOk ? 'status-ok' : 'status-warn'
+      );
+
+      return;
+    }
+
 
     
 setSummary(j);
@@ -1219,12 +1280,58 @@ async function waitForDairyCompJob(importId) {
         return;
       }
 
-      btnSave.disabled = true;
-     showMessage("جاري حفظ القطيع داخل مُرَبِّيك...", "status-warn");
+
+       btnSave.disabled = true;
+
+if (
+  lastFilePayload?.dairyCompImportKind === 'milk'
+) {
+  showMessage(
+    'جاري حفظ بيانات اللبن في مُرَبِّيك...',
+    'status-warn'
+  );
+
+  lastFilePayload = {
+    ...lastFilePayload,
+    inspectOnly: false
+  };
+
+  const milkResult = await callHerdImport(
+    "/api/herd-import-v2/save-operational"
+  );
+
+  if (
+    milkResult?.ok !== true ||
+    milkResult.persistenceStatus !== 'completed'
+  ) {
+    throw new Error(
+      milkResult?.message ||
+      'لم يكتمل حفظ بيانات اللبن.'
+    );
+  }
+
+  lastPreviewOk = false;
+  lastFilePayload = null;
+
+  showMessage(
+    `تم حفظ بيانات اللبن بنجاح: ` +
+    `${milkResult.milkTestsCount || 0} اختبار، ` +
+    `${milkResult.seasonBaselinesCount || 0} إجمالي موسم.`,
+    'status-ok'
+  );
+
+  return;
+}
+
+showMessage(
+  "جاري حفظ القطيع داخل مُرَبِّيك...",
+  "status-warn"
+);
 
 let j = await callHerdImport(
   "/api/herd-import-v2/save-operational"
 );
+
 
 if (j?.jobAccepted === true && j.importId) {
   j = await waitForDairyCompJob(j.importId);
