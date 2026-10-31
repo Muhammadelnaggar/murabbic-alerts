@@ -80,23 +80,6 @@
   </label>
     <input id="externalAsOf" type="date" />
 
-  <label for="externalMilkUnit">
-    وحدة وزن اللبن في النظام المصدر
-  </label>
-
-  <select id="externalMilkUnit" required>
-    <option value="">اختر الوحدة الفعلية في DairyComp</option>
-    <option value="kg">كيلوجرام</option>
-    <option value="lb">رطل (lb)</option>
-  </select>
-
-  <label for="externalDateOrder">
-    ترتيب التاريخ في ملف اختبارات اللبن التاريخية
-  </label>
-  <select id="externalDateOrder">
-    <option value="mdy">شهر / يوم / سنة</option>
-    <option value="dmy">يوم / شهر / سنة</option>
-  </select>
 
  <details>
   <summary>بيانات احتياطية عند نقص معلومات الملف (اختياري)</summary>
@@ -855,8 +838,6 @@ externalFile.addEventListener('change', () => {
 
 for (const id of [
   'externalAsOf',
-  'externalMilkUnit',
-  'externalDateOrder',
   'externalSpecies',
   'externalSpeciesConfirmed'
 ]) {
@@ -987,7 +968,6 @@ btnExternalPreview.addEventListener('click', async () => {
 
   const file = externalFile.files && externalFile.files[0];
   const asOf = $('externalAsOf').value;
-  const milkUnit = $('externalMilkUnit').value;
   const species = $('externalSpecies').value;
 
   if (!file) {
@@ -997,11 +977,10 @@ btnExternalPreview.addEventListener('click', async () => {
 
   if (
   !asOf ||
-  !milkUnit ||
   (species && !$('externalSpeciesConfirmed').checked)
 ) {
       showMessage(
-      'حدد تاريخ التصدير ووحدة اللبن، وأكّد النوع الاحتياطي إذا اخترته.',
+      'حدد تاريخ التصدير، وأكّد النوع الاحتياطي إذا اخترته.',
       'status-error'
     );
   return;
@@ -1027,8 +1006,6 @@ btnExternalPreview.addEventListener('click', async () => {
       fileBase64: await fileToBase64(file),
       externalSource: 'dairycomp',
        externalAsOf: asOf,
-       externalMilkUnit: milkUnit,
-       externalDateOrder: $('externalDateOrder').value,
        defaultAnimalType: species,
       externalSpeciesConfirmed:
          Boolean(species) && $('externalSpeciesConfirmed').checked,
