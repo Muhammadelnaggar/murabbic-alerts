@@ -6284,7 +6284,7 @@ if (
   return errors;
 }
 
-function addAnimalDecisionSrv(fd = {}) {
+function addAnimalDecisionSrv(fd = {}, options = {}) {
   const mode = addAnimalStrSrv(fd.entryType);
 
   if (mode === "mothers") {
@@ -6298,7 +6298,8 @@ function addAnimalDecisionSrv(fd = {}) {
 
     if (
       addAnimalStrSrv(fd.productionStatus) === "حلاب" &&
-      !addAnimalStrSrv(fd.dailyMilk)
+      !addAnimalStrSrv(fd.dailyMilk) &&
+      options.allowMissingDailyMilkOnImport !== true
     ) {
       return "❌ أدخل إنتاج اللبن اليومي للحيوان الحلاب.";
     }
@@ -14440,10 +14441,6 @@ requiredGroups: ["animalNumber"],
 
       lastCalvingDate: ["FRESH", "LASTFRESH", "FRESHDATE", "CALV", "CALVDATE", "LASTCALV"],
       daysInMilk: ["DIM"],
-     
-dailyMilk: ["KGMILK", "MILKKG", "DAILYMILKKG"],
-testDayMilk: ["MILK"],
-
 
       reproductiveStatus: ["RPRO", "REPRO", "REPROSTATUS", "BREEDSTATUS", "PREGSTATUS"],
       lastInseminationDate: ["BRED", "LASTBRED", "BREDATE", "BREDDATE", "SERVDATE", "SERVICE_DATE", "AIDATE"],
@@ -14646,7 +14643,6 @@ function herdImportV2MergeProfilePatchSrv(profileKey, patch = {}) {
       sireNumber: ["SIRE"],
       reproductiveStatus: ["RC"],
       daysInMilk: ["DIM"],
-      testDayMilk: ["MILK"],
       pregDays: ["DCC"],
       servicesCount: ["TIMES", "TBRD"],
       lastCalvingDate: ["FRESH", "FDAT"],
@@ -15625,8 +15621,6 @@ const base = {
     lastCalvingDate,
     daysInMilk,
     dailyMilk,
-    dairyCompMilkReading:
-      row.__murabbikDairyCompMilk || null,
     lastInseminationDate,
     servicesCount,
     sireNumber: String(herdImportV2FirstValueByCanonicalInternalSrv(row, columnMapInternal, "sireNumber") || "").trim(),
@@ -16260,20 +16254,16 @@ function herdImportV2FormDataInternalSrv(base = {}) {
       };
 }
 
+
 function herdImportV2GateDecisionInternalSrv(base = {}) {
   const formData = herdImportV2FormDataInternalSrv(base);
   const fieldErrors = addAnimalBasicFieldsDecisionSrv(formData);
 
-  const rawGuardMessage = Object.keys(fieldErrors).length
-    ? null
-    : addAnimalDecisionSrv(formData);
-
-  const guardMessage =
-    base.dairyCompMilkReading?.sourceSystem === "dairycomp" &&
-    rawGuardMessage ===
-      "❌ أدخل إنتاج اللبن اليومي للحيوان الحلاب."
-      ? null
-      : rawGuardMessage;
+const guardMessage = Object.keys(fieldErrors).length
+  ? null
+  : addAnimalDecisionSrv(formData, {
+      allowMissingDailyMilkOnImport: true
+    });
 
   return {
     ok: !Object.keys(fieldErrors).length && !guardMessage,
@@ -16283,6 +16273,8 @@ function herdImportV2GateDecisionInternalSrv(base = {}) {
   };
 }
 
+
+
 function herdImportV2OperationalPayloadPatchInternalSrv(
   base = {},
   sourceProfile = {}
@@ -16291,76 +16283,10 @@ function herdImportV2OperationalPayloadPatchInternalSrv(
     herdImportV2OperationalCollectionNameInternalSrv(base) ===
     "calves";
 
-  const sourceMilk =
-    !isFollower &&
-    sourceProfile.key === "dairycomp" &&
-    base.dairyCompMilkReading?.sourceSystem === "dairycomp"
-      ? base.dairyCompMilkReading
-      : null;
-
-  return {
-    ...(sourceMilk ? {
-...(sourceMilk.verifiedTodayMilk !== null &&
-   sourceMilk.verifiedTodayMilk !== undefined
-  ? {
-      dailyMilk: sourceMilk.verifiedTodayMilk,
-      lastMilkDate: sourceMilk.testDate,
-      milkTodayKg: sourceMilk.verifiedTodayMilk,
-      lastMilkKg: sourceMilk.verifiedTodayMilk
-    }
-  : {}),
-
-      dairyCompSeasonMilkBaselineKg:
-        sourceMilk.seasonTotalKg,
-
-      dairyCompSeasonMilkRaw:
-        sourceMilk.totalMilkRaw,
-
-      ...(sourceMilk.previousSeasonTotalKg !== null &&
-      sourceMilk.previousSeasonTotalKg !== undefined &&
-      Number(sourceMilk.lactationNumber) > 1
-        ? {
-            dairyCompPreviousSeasonMilkTotalKg:
-              sourceMilk.previousSeasonTotalKg,
-
-            dairyCompPreviousSeasonMilkRaw:
-              sourceMilk.previousTotalMilkRaw,
-
-            dairyCompPreviousSeasonLactationNumber:
-              Number(sourceMilk.lactationNumber) - 1
-          }
-        : {}),
-
-      dairyCompSeasonMilkAsOf:
-        sourceMilk.exportAsOf,
-
-      dairyCompSeasonLactationNumber:
-        sourceMilk.lactationNumber,
-
-      dairyCompSeasonFreshDate:
-        sourceMilk.freshDate,
-
-      dairyCompTestMilkRaw:
-        sourceMilk.testMilkRaw,
-
-      dairyCompTestMilkKg:
-        sourceMilk.testMilkKg,
-
-      dairyCompTestMilkDate:
-        sourceMilk.testDate,
-
-      dairyCompCustomKgMilkRaw:
-        sourceMilk.customKgMilkRaw,
-
-      dairyCompPeakMilkRaw:
-        sourceMilk.peakMilkRaw,
-
-      dairyCompPeakMilkKg:
-        sourceMilk.peakMilkKg,
-
-      dairyCompMilkSourceUnit:
-        sourceMilk.sourceUnit
-    } : {}),
+return {
+    ...(!isFollower && base.dailyMilk == null
+      ? { dailyMilk: null }
+      : {}),
     ...(!isFollower
       ? {
           dryOffDate:
@@ -16386,6 +16312,7 @@ function herdImportV2OperationalPayloadPatchInternalSrv(
       admin.firestore.FieldValue.serverTimestamp()
   };
 }
+
 
 function herdImportV2SeedEventDocIdInternalSrv(uid, ev = {}) {
   const crypto = require("crypto");
@@ -17860,29 +17787,12 @@ function herdImportV2DairyCompArchiveCandidateSrv({
 }
 
 function herdImportV2DairyCompSourceSettingsSrv(rows = []) {
-  const units = new Set();
   let mdyEvidence = 0;
   let dmyEvidence = 0;
 
-  for (const row of rows) {
-    const rawUnit = String(addAnimalImportPickAnySrv(row, [
-      "MilkUnit", "MilkUnits", "Milk_Unit", "MilkUOM",
-      "MilkWeightUnit", "MilkWeightUnits", "UnitOfMilk"
-    ]) || "").trim().toLowerCase();
-
-    if (/^(?:lb|lbs|pound|pounds|رطل)$/.test(rawUnit)) {
-      units.add("lb");
-    }
-
-    if (/^(?:kg|kgs|kilogram|kilograms|كيلو|كيلوجرام|كيلوغرام)$/.test(rawUnit)) {
-      units.add("kg");
-    }
-  }
-
   for (const row of rows.slice(0, 1000)) {
     for (const name of [
-      "Date", "Event_Date", "FDAT",
-      "TDAT", "TestDate", "FreshDate"
+      "Date", "Event_Date", "FDAT", "FreshDate"
     ]) {
       const value = String(
         addAnimalImportPickAnySrv(row, [name]) || ""
@@ -17897,21 +17807,13 @@ function herdImportV2DairyCompSourceSettingsSrv(rows = []) {
       const first = Number(m[1]);
       const second = Number(m[2]);
 
-      if (first > 12 && second <= 12) {
-        dmyEvidence++;
-      } else if (second > 12 && first <= 12) {
-        mdyEvidence++;
-      }
+      if (first > 12 && second <= 12) dmyEvidence++;
+      else if (second > 12 && first <= 12) mdyEvidence++;
     }
   }
 
   return {
-    milkUnit:
-      units.size > 1 ? "" :
-      units.has("lb") ? "lb" : "kg",
-
-    dateOrder:
-      dmyEvidence > mdyEvidence ? "dmy" : "mdy"
+    dateOrder: dmyEvidence > mdyEvidence ? "dmy" : "mdy"
   };
 }
 
@@ -18006,20 +17908,6 @@ if (/\.(csv|txt)$/i.test(name)) {
 const dairyCompSettings =
   herdImportV2DairyCompSourceSettingsSrv(records);
 
-const dairyCompMilkUnit = dairyCompSettings.milkUnit;
-
-if (!dairyCompMilkUnit) {
-  fail(["تعارض وحدة اللبن في المصدر"]);
-}
-
-const dairyCompMilkToKg = value =>
-  Number(
-    (
-      value *
-      (dairyCompMilkUnit === "lb" ? 0.45359237 : 1)
-    ).toFixed(2)
-  );
-
   const columns = new Set(
     herdImportV2UniqueHeadersSrv(records)
       .map(addAnimalImportNormKeySrv)
@@ -18092,7 +17980,7 @@ const completion = (id, key) => {
   const groups = new Map();
   const issues = [];
   const events = [];
-  const dairyCompMilkByAnimal = new Map();
+  
 
   for (let i = 0; i < records.length; i++) {
     const row = records[i];
@@ -18913,206 +18801,7 @@ const isDry =
   );
 
 
-    // Official DairyComp items:
-    // TOTM: total milk in current lactation
-    // MILK: latest test-day milk
-    // TDAT: latest test date
-    // KGMILK: custom/source field, retained separately
-
-
-const sourceMilkValue = (field, ...names) => {
-  const candidates = all
-    .filter(x =>
-      x.d &&
-      x.d <= asOf &&
-      (!calving || x.d >= calving)
-    )
-    .map(x => ({
-      value: pick(x.r, ...names),
-      date: x.d
-    }))
-    .filter(x => x.value !== "");
-
-  if (!candidates.length) return "";
-
-  const latestDate = candidates.reduce(
-    (last, x) => x.date > last ? x.date : last,
-    ""
-  );
-
-  const values = [...new Set(
-    candidates
-      .filter(x => x.date === latestDate)
-      .map(x => x.value)
-  )];
-
-  if (values.length !== 1) {
-    issues.push(
-      `${id}: تعارض ${field} في أحدث لقطة DairyComp`
-    );
-    return "";
-  }
-
-  return values[0];
-};
-
-
-    const strictMilkNumber = (raw, field) => {
-      if (raw === "") return null;
-
-      const value = Number(raw);
-
-      if (!Number.isFinite(value) || value < 0) {
-        issues.push(
-          `${id}: قيمة ${field} غير صالحة في المصدر`
-        );
-        return null;
-      }
-
-      return value;
-    };
-
-    const totalMilkRaw = strictMilkNumber(
-      sourceMilkValue("TOTM", "TOTM"),
-      "TOTM"
-    );
-
-    const previousTotalMilkRaw =
-      Number(lact) > 1
-        ? strictMilkNumber(
-            sourceMilkValue("PTOTM", "PTOTM"),
-            "PTOTM"
-          )
-        : null;
-
-    const previousSeasonTotalKg =
-      previousTotalMilkRaw === null
-        ? null
-        : dairyCompMilkToKg(previousTotalMilkRaw);
-
-
-const milkSnapshots = all
-  .filter(x =>
-    x.d &&
-    x.d <= asOf &&
-    (!calving || x.d >= calving) &&
-    (
-      pick(x.r, "MILK") !== "" ||
-      pick(x.r, "TDAT") !== ""
-    )
-  )
-  .sort((a, b) => b.d.localeCompare(a.d));
-
-const latestMilkSnapshotDate =
-  milkSnapshots[0]?.d || "";
-
-const latestMilkSnapshots = milkSnapshots.filter(
-  x => x.d === latestMilkSnapshotDate
-);
-
-const milkPairs = [...new Map(
-  latestMilkSnapshots.map(x => [
-    JSON.stringify([
-      pick(x.r, "MILK"),
-      pick(x.r, "TDAT")
-    ]),
-    {
-      milk: pick(x.r, "MILK"),
-      date: pick(x.r, "TDAT")
-    }
-  ])
-).values()];
-
-if (milkPairs.length > 1) {
-  issues.push(
-    `${id}: تعارض MILK/TDAT في أحدث لقطة`
-  );
-}
-
-const milkPair = milkPairs.length === 1
-  ? milkPairs[0]
-  : null;
-
-const testMilkRaw = strictMilkNumber(
-  milkPair?.milk || "",
-  "MILK"
-);
-
-    const customKgMilkRaw = strictMilkNumber(
-      sourceMilkValue("KGMILK", "KGMILK"),
-      "KGMILK"
-    );
-
-    const peakMilkRaw = strictMilkNumber(
-      sourceMilkValue("PEAKM", "PEAKM"),
-      "PEAKM"
-    );
-
-const rawTestDate = milkPair?.date || "";
-
-    const parsedTestDate =
-      rawTestDate ? date(rawTestDate) : "";
-
-    if (
-      rawTestDate &&
-      (!parsedTestDate || parsedTestDate > asOf)
-    ) {
-      issues.push(
-        `${id}: تاريخ اختبار اللبن TDAT غير صالح`
-      );
-    }
-    const testDate =
-  parsedTestDate && parsedTestDate <= asOf
-    ? parsedTestDate
-    : null;
-
-    if (
-  testMilkRaw !== null &&
-  testMilkRaw > 0 &&
-  !testDate
-) {
-  issues.push(
-    `${id}: إنتاج اختبار اللبن MILK موجود دون تاريخ TDAT صالح؛ يلزم تصدير تاريخ الاختبار الأصلي من DairyComp.`
-  );
-}
-
-    const testMilkKg =
-      testMilkRaw === null
-        ? null
-        : dairyCompMilkToKg(testMilkRaw);
-
-    const seasonTotalKg =
-      totalMilkRaw === null
-        ? null
-        : dairyCompMilkToKg(totalMilkRaw);
-
-    // DairyComp MILK is a test-day reading, not a
-// verified Murabbik daily milking event.
-// Keep it in dairyCompTestMilkKg / dairyCompTestMilkDate.
-const verifiedTodayMilk = null;
-
-    dairyCompMilkByAnimal.set(id, {
-      sourceSystem: "dairycomp",
-      lactationNumber: Number(lact),
-      freshDate: calving,
-      exportAsOf: asOf,
-      sourceUnit: dairyCompMilkUnit,
-      totalMilkRaw,
-      seasonTotalKg,
-      previousTotalMilkRaw,
-      previousSeasonTotalKg,
-      peakMilkRaw,
-      peakMilkKg:
-        peakMilkRaw === null
-          ? null
-          : dairyCompMilkToKg(peakMilkRaw),
-      testMilkRaw,
-      testMilkKg,
-      testDate,
-      customKgMilkRaw,
-      verifiedTodayMilk
-    });
-
+    
     const breedings = all
       .filter(x =>
         x.code === "BRED" &&
@@ -19163,10 +18852,6 @@ const semen =
       "رقم الموسم": lact,
       "تاريخ آخر ولادة": calving,
       "الحالة الإنتاجية": isDry ? "جاف" : "حلاب",
-      "إنتاج اللبن":
-        verifiedTodayMilk === null
-          ? ""
-          : String(verifiedTodayMilk),
       "الحالة التناسلية": reproductiveStatus,
       "تاريخ آخر تلقيح": lastAI,
       "كود السائل": semen,
@@ -19231,42 +18916,6 @@ for (const e of all) {
   issues.push("لا توجد حيوانات نشطة مؤهلة للاستيراد");
 }
 
-const dairyCompMilkAudit = {
-  mothers: animals.length,
-
-  withTOTM: animals.filter(row =>
-    Number.isFinite(
-      dairyCompMilkByAnimal.get(
-        addAnimalDigitsSrv(row["رقم الحيوان"])
-      )?.seasonTotalKg
-    )
-  ).length,
-
-  withMILK: animals.filter(row =>
-    Number.isFinite(
-      dairyCompMilkByAnimal.get(
-        addAnimalDigitsSrv(row["رقم الحيوان"])
-      )?.testMilkKg
-    )
-  ).length,
-
-  withTDAT: animals.filter(row =>
-    Boolean(
-      dairyCompMilkByAnimal.get(
-        addAnimalDigitsSrv(row["رقم الحيوان"])
-      )?.testDate
-    )
-  ).length
-};
-
-if (dairyCompMilkAudit.withTOTM < dairyCompMilkAudit.mothers) {
-  issues.push(
-    `إجمالي لبن الموسم TOTM غير متاح لـ ${
-      dairyCompMilkAudit.mothers - dairyCompMilkAudit.withTOTM
-    } أم؛ يلزم تصدير القيمة الأصلية من DairyComp.`
-  );
-}
-
 const sourceIssues = [...new Set(issues)];
 const sourceIssuesByAnimal = {};
 
@@ -19281,21 +18930,11 @@ for (const message of sourceIssues) {
   const define = (row, type, sheet, index) => {
     const normalized = addAnimalImportNormalizeSheetRowsSrv([row])[0];
 
-    Object.defineProperties(normalized, {
-      __murabbikEntryType: {value: type},
-      __murabbikSheetName: {value: sheet},
-      __murabbikRowNumber: {value: index + 2},
-
-      __murabbikDairyCompMilk: {
-        value: type === "mothers"
-          ? (
-              dairyCompMilkByAnimal.get(
-                addAnimalDigitsSrv(row["رقم الحيوان"])
-              ) || null
-            )
-          : null
-      }
-    });
+Object.defineProperties(normalized, {
+  __murabbikEntryType: { value: type },
+  __murabbikSheetName: { value: sheet },
+  __murabbikRowNumber: { value: index + 2 }
+});
 
     return normalized;
   };
@@ -19309,7 +18948,6 @@ externalSummary: {
   sourceIssues,
   sourceIssuesCount: sourceIssues.length,
   sourceIssuesByAnimal,
-  dairyCompMilkAudit,
   uniqueSourceAnimals: groups.size,
 
       importedCandidates: animals.length + followers.length,
@@ -19622,12 +19260,7 @@ app.post("/api/herd-import-v2/preview", requireUserId, async (req, res) => {
   try {
         const body = req.body || {};
 
-    if (
-      body.externalSource === "dairycomp" &&
-      body.dairyCompImportKind === "milk"
-    ) {
-      return herdDcMilkSyncHandlerSrv(req, res);
-    }
+
     const templateData =
   herdImportV2ParseInputSourceSrv(
     body
@@ -20158,12 +19791,7 @@ const herdImportV2SaveOperationalHandlerSrv = async (req, res) => {
      const uid = req.userId;
     const body = req.body || {};
 
-    if (
-      body.externalSource === "dairycomp" &&
-      body.dairyCompImportKind === "milk"
-    ) {
-      return herdDcMilkSyncHandlerSrv(req, res);
-    }
+
 
     const templateData =
       herdImportV2ParseInputSourceSrv(
@@ -21025,864 +20653,6 @@ app.post(
   "/api/herd-import-v2/save-operational",
   requireUserId,
   herdImportV2SaveOperationalHandlerSrv
-);
-
-
-async function herdDcMilkSyncHandlerSrv(req, res) {
-  try {
-    if (!db) {
-      return res.status(503).json({
-        ok: false,
-        error: "database_unavailable"
-      });
-    }
-
-    const uid = req.userId;
-    const body = req.body || {};
-    const fileName = String(body.fileName || "").trim();
-
-
-    const asOf = herdImportV2ExternalDateStrictSrv(
-      body.externalAsOf, "ymd"
-    );
-
-    if (
-      !/\.(csv|txt|xls|xlsx)$/i.test(fileName) ||
-      !asOf ||
-      asOf > addAnimalTodaySrv()
-    ) {
-      return res.status(400).json({
-        ok: false,
-        error: "dairycomp_milk_options_invalid"
-      });
-    }
-
-    const buffer = addAnimalImportDecodeBase64Srv(
-      String(body.fileBase64 || "")
-    );
-
-    if (!buffer.length || buffer.length > 12 * 1024 * 1024) {
-      return res.status(400).json({
-        ok: false,
-        error: "dairycomp_milk_file_invalid"
-      });
-    }
-
-    let rows;
-
-    if (/\.(csv|txt)$/i.test(fileName)) {
-      rows = addAnimalImportParseCsvTextSrv(
-        buffer.toString("utf8")
-      );
-    } else {
-      const XLSX = require("xlsx");
-      const workbook = XLSX.read(buffer, {
-        type: "buffer"
-      });
-
-      rows = workbook.SheetNames.flatMap(sheet =>
-        XLSX.utils.sheet_to_json(
-          workbook.Sheets[sheet],
-          {
-            defval: "",
-            raw: false,
-            blankrows: false
-          }
-        )
-      );
-    }
-
-    if (!rows.length || rows.length > 80000) {
-      return res.status(400).json({
-        ok: false,
-        error: "dairycomp_milk_rows_invalid"
-      });
-    }
-
-    const sourceSettings =
-      herdImportV2DairyCompSourceSettingsSrv(rows);
-
-    const unit = sourceSettings.milkUnit;
-    const dateOrder = sourceSettings.dateOrder;
-
-    if (!unit) {
-      return res.status(422).json({
-        ok: false,
-        error: "dairycomp_milk_source_units_conflict",
-        message: "تعارض وحدات اللبن داخل ملف المصدر."
-      });
-    }
-
-    const headers = new Set(
-      herdImportV2UniqueHeadersSrv(rows)
-        .map(addAnimalImportNormKeySrv)
-    );
-
-    const has = (...names) => names.some(name =>
-      headers.has(addAnimalImportNormKeySrv(name))
-    );
-
-    const isFileout = has("TOTM");
-
-    if (
-      !has("ID", "Cow_ID", "CowNumber", "Cow Number") ||
-      (
-        isFileout
-          ? !has("LACT", "Lactation") ||
-            !has("FDAT", "FreshDate")
-          : !has("LACT", "Lactation") ||
-            !has("MILK", "MilkWeight", "Milk Weight") ||
-            !has("TDAT", "TestDate", "Test Date", "Date")
-      )
-    ) {
-      return res.status(422).json({
-        ok: false,
-        error: "dairycomp_milk_format_unrecognized",
-        message: "تنسيق المصدر غير معروف؛ لم يتم الحفظ.",
-        headers: [...headers]
-      });
-    }
-
-    const pick = (row, ...names) =>
-      String(
-        addAnimalImportPickAnySrv(row, names) ?? ""
-      ).trim();
-
-    const parseDate = value =>
-      herdImportV2ExternalDateStrictSrv(
-        value, dateOrder
-      );
-
-    const parseNumber = value => {
-      const raw = String(value ?? "").trim();
-
-      if (!/^\d+(?:\.\d+)?$/.test(raw)) {
-        return NaN;
-      }
-
-      return Number(raw);
-    };
-
-    const toKg = value => Number((
-      value * (unit === "lb" ? 0.45359237 : 1)
-    ).toFixed(2));
-
-    const issues = [];
-    const sourceRows = [];
-    const needed = new Set();
-
-    for (let i = 0; i < rows.length; i++) {
-      const id = addAnimalDigitsSrv(
-        pick(rows[i],
-          "ID", "Cow_ID", "CowNumber", "Cow Number"
-        )
-      );
-
-      if (!id) {
-        issues.push(`صف ${i + 2}: رقم الحيوان مفقود`);
-        continue;
-      }
-
-      needed.add(id);
-
-      sourceRows.push({
-        id,
-        row: i + 2,
-        source: rows[i]
-      });
-    }
-
-    const animals = new Map();
-
-    for (const collection of [
-      "animals", "archived_animals"
-    ]) {
-      const snapshot = await db
-        .collection(collection)
-        .where("userId", "==", uid)
-        .get();
-
-      for (const doc of snapshot.docs) {
-        const data = doc.data() || {};
-
-        const id = addAnimalDigitsSrv(
-          data.animalNumber || data.number
-        );
-
-        if (!needed.has(id)) continue;
-
-        if (animals.has(id)) {
-          issues.push(
-            `${id}: هوية الحيوان مكررة في الحساب`
-          );
-          continue;
-        }
-
-        animals.set(id, {
-          ref: doc.ref,
-          data
-        });
-      }
-    }
-
-    for (const id of needed) {
-      if (!animals.has(id)) {
-        issues.push(
-          `${id}: الحيوان غير موجود في مُرَبِّيك`
-        );
-      }
-    }
-
-    const freshEvents = new Map();
-
-    if (!isFileout) {
-      for (const collection of [
-        "events", "archived_events"
-      ]) {
-        const snapshot = await db
-          .collection(collection)
-          .where("userId", "==", uid)
-          .get();
-
-        for (const doc of snapshot.docs) {
-          const e = doc.data() || {};
-
-          if (
-            e.sourceSystem !== "dairycomp" ||
-            String(e.sourceEventCode || "")
-              .toUpperCase() !== "FRESH"
-          ) continue;
-
-          const id = addAnimalDigitsSrv(e.animalNumber);
-          const date = String(
-            e.eventDate || e.date || ""
-          ).slice(0, 10);
-
-          if (
-            !needed.has(id) ||
-            !addAnimalIsDateSrv(date)
-          ) continue;
-
-          if (!freshEvents.has(id)) {
-            freshEvents.set(id, []);
-          }
-
-          freshEvents.get(id).push({
-            date,
-            lactationNumber:
-              Number(e.lactationNumber)
-          });
-        }
-      }
-    }
-
-    const actionsByKey = new Map();
-
-    const addTest = (animal, values) => {
-      const {
-        id, row, freshDate,
-        lactationNumber, testDate, milkRaw
-      } = values;
-
-      const identity = [
-        uid, id, lactationNumber,
-        freshDate, testDate
-      ].join("|");
-
-      const documentId = "dcmt_" +
-        crypto.createHash("sha256")
-          .update(identity)
-          .digest("hex")
-          .slice(0, 40);
-
-      const ref = db
-        .collection("dairycomp_milk_tests")
-        .doc(documentId);
-
-      const payload = {
-        userId: uid,
-        ownerUid: uid,
-        animalId: animal.ref.id,
-        animalNumber: id,
-        sourceSystem: "dairycomp",
-        recordType: "milk_test",
-        milkTestIdentity: identity,
-        lactationNumber,
-        freshDate,
-        testDate,
-        milkRaw,
-        milkKg: toKg(milkRaw),
-        sourceUnit: unit,
-        sourceRow: row,
-        exportAsOf: asOf,
-        animalType:
-          animal.data.animalType ||
-          animal.data.animalTypeAr || "",
-        breed: animal.data.breed || "",
-        isDailyMilking: false
-      };
-
-      const key = "test|" + ref.path;
-      const old = actionsByKey.get(key);
-
-      if (old) {
-        if (
-          old.payload.milkRaw !== payload.milkRaw ||
-          old.payload.sourceUnit !== payload.sourceUnit
-        ) {
-          issues.push(
-            `${id}: اختبار لبن متعارض بتاريخ ${testDate}`
-          );
-        }
-        return;
-      }
-
-      actionsByKey.set(key, {
-        kind: "test",
-        ref,
-        payload
-      });
-    };
-
-    for (const item of sourceRows) {
-      const { id, row, source } = item;
-      const animal = animals.get(id);
-
-      if (!animal) continue;
-
-      const currentFresh = String(
-        animal.data.lastCalvingDate || ""
-      ).slice(0, 10);
-
-      const currentLact =
-        Number(animal.data.lactationNumber);
-
-      if (
-        !addAnimalIsDateSrv(currentFresh) ||
-        !Number.isInteger(currentLact) ||
-        currentLact < 1
-      ) {
-        issues.push(
-          `${id}: الموسم الحالي غير مؤكد`
-        );
-        continue;
-      }
-
-      const sourceLact = parseNumber(
-        pick(source, "LACT", "Lactation")
-      );
-
-      if (
-        !Number.isInteger(sourceLact) ||
-        sourceLact < 1
-      ) {
-        issues.push(
-          `${id}: رقم الموسم في الصف ${row} غير صالح`
-        );
-        continue;
-      }
-
-      if (isFileout) {
-        const freshDate = parseDate(
-          pick(source, "FDAT", "FreshDate")
-        );
-
-        const totalRaw = parseNumber(
-          pick(source, "TOTM")
-        );
-
-        if (
-          freshDate !== currentFresh ||
-          sourceLact !== currentLact ||
-          asOf < freshDate ||
-          !Number.isFinite(totalRaw)
-        ) {
-          issues.push(
-            `${id}: إجمالي الموسم TOTM غير مطابق`
-          );
-          continue;
-        }
-
-        const payload = {
-          dairyCompSeasonMilkBaselineKg: toKg(totalRaw),
-          dairyCompSeasonMilkRaw: totalRaw,
-          dairyCompSeasonMilkAsOf: asOf,
-          dairyCompSeasonLactationNumber: currentLact,
-          dairyCompSeasonFreshDate: freshDate,
-          dairyCompMilkSourceUnit: unit
-        };
-
-        const previousTotalText =
-          pick(source, "PTOTM");
-
-        if (
-          sourceLact > 1 &&
-          previousTotalText !== ""
-        ) {
-          const previousTotalRaw =
-            parseNumber(previousTotalText);
-
-          if (
-            !Number.isFinite(previousTotalRaw) ||
-            previousTotalRaw < 0
-          ) {
-            issues.push(
-              `${id}: إجمالي الموسم السابق PTOTM غير صالح`
-            );
-            continue;
-          }
-
-          Object.assign(payload, {
-            dairyCompPreviousSeasonMilkTotalKg:
-              toKg(previousTotalRaw),
-
-            dairyCompPreviousSeasonMilkRaw:
-              previousTotalRaw,
-
-            dairyCompPreviousSeasonLactationNumber:
-              sourceLact - 1
-          });
-        }
-
-        const milkText = pick(source, "MILK");
-        const dateText = pick(source, "TDAT");
-
-        if (milkText || dateText) {
-          const testDate = parseDate(dateText);
-          const milkRaw = parseNumber(milkText);
-
-          if (
-            !testDate ||
-            testDate < freshDate ||
-            testDate > asOf ||
-            !Number.isFinite(milkRaw)
-          ) {
-            issues.push(
-              `${id}: MILK/TDAT غير صالح`
-            );
-            continue;
-          }
-
-          addTest(animal, {
-            id, row, freshDate,
-            lactationNumber: currentLact,
-            testDate, milkRaw
-          });
-
-          Object.assign(payload, {
-            dairyCompTestMilkRaw: milkRaw,
-            dairyCompTestMilkKg: toKg(milkRaw),
-            dairyCompTestMilkDate: testDate
-          });
-        }
-
-        const key = "baseline|" + animal.ref.path;
-        const old = actionsByKey.get(key);
-
-        if (
-          old &&
-          JSON.stringify(old.payload) !==
-            JSON.stringify(payload)
-        ) {
-          issues.push(
-            `${id}: لقطات FILEOUT متعارضة`
-          );
-          continue;
-        }
-
-        actionsByKey.set(key, {
-          kind: "baseline",
-          ref: animal.ref,
-          payload: {
-            ...payload,
-            animalNumber: id
-          }
-        });
-
-        continue;
-      }
-
-      const testDate = parseDate(
-        pick(source,
-          "TDAT", "TestDate", "Test Date", "Date"
-        )
-      );
-
-      const milkRaw = parseNumber(
-        pick(source,
-          "MILK", "MilkWeight", "Milk Weight"
-        )
-      );
-
-      if (
-        !testDate ||
-        testDate > asOf ||
-        !Number.isFinite(milkRaw)
-      ) {
-        issues.push(
-          `${id}: اختبار غير صالح في الصف ${row}`
-        );
-        continue;
-      }
-
-      const rawFresh = pick(
-        source, "FDAT", "FreshDate"
-      );
-
-      const rawDIM = pick(
-        source, "DIM", "DaysInMilk", "Days In Milk"
-      );
-
-      let freshDate = rawFresh
-        ? parseDate(rawFresh)
-        : "";
-
-      const dim = rawDIM
-        ? parseNumber(rawDIM)
-        : null;
-
-      if (rawFresh && !freshDate) {
-        issues.push(
-          `${id}: تاريخ FDAT غير صالح في الصف ${row}`
-        );
-        continue;
-      }
-
-      if (rawDIM) {
-        if (
-          !Number.isInteger(dim) ||
-          dim < 0 ||
-          dim > 1500
-        ) {
-          issues.push(
-            `${id}: DIM غير صالح في الصف ${row}`
-          );
-          continue;
-        }
-
-        const derivedFresh = new Date(
-          Date.parse(testDate + "T00:00:00Z") -
-          dim * 86400000
-        ).toISOString().slice(0, 10);
-
-        if (freshDate && freshDate !== derivedFresh) {
-          issues.push(
-            `${id}: تعارض FDAT وDIM في الصف ${row}`
-          );
-          continue;
-        }
-
-        freshDate = derivedFresh;
-      }
-
-      const knownFreshes = [
-        ...(freshEvents.get(id) || []),
-        {
-          date: currentFresh,
-          lactationNumber: currentLact
-        }
-      ].filter(x => x.date <= testDate);
-
-      const latestKnown = knownFreshes
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .at(-1);
-
-      if (
-        freshDate &&
-        latestKnown &&
-        freshDate !== latestKnown.date
-      ) {
-        issues.push(
-          `${id}: تاريخ موسم الاختبار يتعارض مع FRESH`
-        );
-        continue;
-      }
-
-      if (!freshDate && latestKnown) {
-        if (
-          latestKnown.lactationNumber === sourceLact
-        ) {
-          freshDate = latestKnown.date;
-        }
-      }
-
-      if (
-        !freshDate ||
-        freshDate > testDate ||
-        (
-          freshDate === currentFresh &&
-          sourceLact !== currentLact
-        ) ||
-        (
-          freshDate < currentFresh &&
-          sourceLact >= currentLact
-        )
-      ) {
-        issues.push(
-          `${id}: تعذّر إثبات موسم الاختبار في الصف ${row}`
-        );
-        continue;
-      }
-
-      addTest(animal, {
-        id, row, freshDate,
-        lactationNumber: sourceLact,
-        testDate, milkRaw
-      });
-    }
-
-    const issuesUnique = [...new Set(issues)];
-
-    const actions = [...actionsByKey.values()]
-      .sort((a, b) =>
-        a.ref.path.localeCompare(b.ref.path)
-      );
-
-    const audit = {
-      sourceFormat:
-        isFileout ? "fileout" : "testdays",
-      sourceRows: rows.length,
-      matchedAnimals: animals.size,
-      milkTestsCount: actions.filter(
-        x => x.kind === "test"
-      ).length,
-      seasonBaselinesCount: actions.filter(
-        x => x.kind === "baseline"
-      ).length,
-      issuesCount: issuesUnique.length,
-      issues: issuesUnique
-    };
-
-    if (
-      body.inspectOnly !== false ||
-      issuesUnique.length ||
-      !actions.length
-    ) {
-      return res.status(
-        issuesUnique.length ? 422 : 200
-      ).json({
-        ok: !issuesUnique.length,
-        inspectOnly: true,
-        saveEnabled:
-          !issuesUnique.length && actions.length > 0,
-        audit
-      });
-    }
-
-    const fingerprint = crypto
-      .createHash("sha256")
-      .update(buffer)
-      .update(JSON.stringify({
-        asOf, unit, dateOrder
-      }))
-      .digest("hex");
-
-    const jobId = "dc_milk_" +
-      crypto.createHash("sha256")
-        .update(uid + "|" + fingerprint)
-        .digest("hex")
-        .slice(0, 40);
-
-    const jobRef = db
-      .collection("dairycomp_milk_jobs")
-      .doc(jobId);
-
-    const actionFingerprint = crypto
-      .createHash("sha256")
-      .update(JSON.stringify(actions.map(a => [
-        a.kind,
-        a.ref.path,
-        a.payload.milkKg ??
-          a.payload.dairyCompSeasonMilkBaselineKg
-      ])))
-      .digest("hex");
-
-    const chunks = [];
-
-    for (let i = 0; i < actions.length; i += 100) {
-      chunks.push(actions.slice(i, i + 100));
-    }
-
-    for (let index = 0; index < chunks.length; index++) {
-      const chunk = chunks[index];
-
-      await db.runTransaction(async tx => {
-        const jobSnap = await tx.get(jobRef);
-        const job = jobSnap.exists
-          ? jobSnap.data() || {}
-          : {};
-
-        if (
-          jobSnap.exists &&
-          (
-            job.userId !== uid ||
-            job.fingerprint !== fingerprint ||
-            job.actionFingerprint !== actionFingerprint ||
-            Number(job.chunkCount) !== chunks.length
-          )
-        ) {
-          throw herdImportV2PersistenceErrorInternalSrv(
-            "dairycomp_milk_checkpoint_mismatch",
-            "نقطة استكمال اللبن لا تطابق المصدر.",
-            409
-          );
-        }
-
-        const next = Number(job.nextChunk || 0);
-
-        if (next > index) return;
-
-        if (next !== index) {
-          throw herdImportV2PersistenceErrorInternalSrv(
-            "dairycomp_milk_checkpoint_invalid",
-            "تسلسل الحفظ المجزأ غير صحيح.",
-            409
-          );
-        }
-
-        const snapshots = await Promise.all(
-          chunk.map(a => tx.get(a.ref))
-        );
-
-        for (let i = 0; i < chunk.length; i++) {
-          const action = chunk[i];
-          const snap = snapshots[i];
-          const incoming = action.payload;
-
-          if (action.kind === "test") {
-            if (snap.exists) {
-              const old = snap.data() || {};
-
-              if (
-                old.userId !== uid ||
-                old.sourceSystem !== "dairycomp" ||
-                old.milkTestIdentity !==
-                  incoming.milkTestIdentity ||
-                old.milkRaw !== incoming.milkRaw ||
-                old.sourceUnit !== incoming.sourceUnit
-              ) {
-                throw herdImportV2PersistenceErrorInternalSrv(
-                  "dairycomp_milk_test_conflict",
-                  "تعارض اختبار لبن محفوظ.",
-                  409
-                );
-              }
-            } else {
-              tx.create(action.ref, {
-                ...incoming,
-                createdAt:
-                  admin.firestore.FieldValue
-                    .serverTimestamp()
-              });
-            }
-
-            continue;
-          }
-
-          if (!snap.exists) {
-            throw herdImportV2PersistenceErrorInternalSrv(
-              "dairycomp_milk_animal_missing",
-              "الحيوان غير موجود أثناء الحفظ.",
-              409
-            );
-          }
-
-          const old = snap.data() || {};
-
-          if (
-            old.userId !== uid ||
-            addAnimalDigitsSrv(old.animalNumber) !==
-              incoming.animalNumber ||
-            Number(old.lactationNumber) !==
-              Number(incoming.dairyCompSeasonLactationNumber) ||
-            String(old.lastCalvingDate || "")
-              .slice(0, 10) !==
-              incoming.dairyCompSeasonFreshDate
-          ) {
-            throw herdImportV2PersistenceErrorInternalSrv(
-              "dairycomp_milk_lactation_conflict",
-              "الموسم لا يطابق الحيوان.",
-              409
-            );
-          }
-
-          const previousDate = String(
-            old.dairyCompSeasonMilkAsOf || ""
-          ).slice(0, 10);
-
-          const newDate =
-            incoming.dairyCompSeasonMilkAsOf;
-
-          if (previousDate > newDate) {
-            throw herdImportV2PersistenceErrorInternalSrv(
-              "dairycomp_milk_older_baseline",
-              "لا يجوز استبدال إجمالي أحدث بآخر أقدم.",
-              409
-            );
-          }
-
-          if (
-            previousDate === newDate &&
-            old.dairyCompSeasonMilkBaselineKg != null &&
-            Number(old.dairyCompSeasonMilkBaselineKg) !==
-              Number(incoming.dairyCompSeasonMilkBaselineKg)
-          ) {
-            throw herdImportV2PersistenceErrorInternalSrv(
-              "dairycomp_milk_baseline_conflict",
-              "إجماليان مختلفان لنفس تاريخ التصدير.",
-              409
-            );
-          }
-
-          tx.update(action.ref, {
-            ...incoming,
-            updatedAt:
-              admin.firestore.FieldValue.serverTimestamp()
-          });
-        }
-
-        tx.set(jobRef, {
-          userId: uid,
-          fingerprint,
-          actionFingerprint,
-          chunkCount: chunks.length,
-          nextChunk: index + 1,
-          status:
-            index === chunks.length - 1
-              ? "completed"
-              : "running",
-          updatedAt:
-            admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-      });
-    }
-
-    return res.json({
-      ok: true,
-      importId: jobId,
-      persistenceStatus: "completed",
-      ...audit,
-      isDailyMilking: false
-    });
-
-  } catch (e) {
-    console.error("DairyComp milk sync:", e);
-
-    return res.status(Number(e.status) || 500).json({
-      ok: false,
-      error:
-        e.code || "dairycomp_milk_sync_failed",
-      message:
-        e.publicMessage ||
-        "تعذّر إتمام حفظ اللبن."
-    });
-  }
-}
-
-app.post(
-  "/api/herd-import-v2/dairycomp-milk-sync",
-  requireUserId,
-  herdDcMilkSyncHandlerSrv
 );
 
 // ============================================================
@@ -70607,230 +69377,6 @@ if (watchGroups.length) {
   };
 }
 
-
-app.get(
-  "/api/milk-reports/dairycomp-testdays",
-  requireUserId,
-  async (req, res) => {
-    try {
-      if (!db) {
-        return res.status(503).json({
-          ok: false,
-          error: "database_unavailable"
-        });
-      }
-
-      const uid = req.userId;
-      const requestedNumber = req.query.animalNumber
-        ? addAnimalDigitsSrv(req.query.animalNumber)
-        : "";
-
-      const seasonsMap = new Map();
-
-      const getSeason = ({
-        animalNumber,
-        freshDate,
-        lactationNumber,
-        species = "",
-        breed = ""
-      }) => {
-        const key = [
-          animalNumber,
-          freshDate,
-          lactationNumber
-        ].join("|");
-
-        if (!seasonsMap.has(key)) {
-          seasonsMap.set(key, {
-            animalNumber,
-            freshDate,
-            lactationNumber,
-            species,
-            breed,
-            currentSeasonTOTMKg: null,
-            baselineAsOf: null,
-            tests: []
-          });
-        }
-
-        return seasonsMap.get(key);
-      };
-
-      for (const collection of [
-        "animals", "archived_animals"
-      ]) {
-        const snap = await db
-          .collection(collection)
-          .where("userId", "==", uid)
-          .get();
-
-        for (const doc of snap.docs) {
-          const a = doc.data() || {};
-
-          const animalNumber = addAnimalDigitsSrv(
-            a.animalNumber || a.number
-          );
-
-          if (
-            !animalNumber ||
-            (
-              requestedNumber &&
-              animalNumber !== requestedNumber
-            )
-          ) continue;
-
-          const freshDate = String(
-            a.dairyCompSeasonFreshDate || ""
-          ).slice(0, 10);
-
-          const currentFresh = String(
-            a.lastCalvingDate || ""
-          ).slice(0, 10);
-
-          const lactationNumber =
-            Number(a.dairyCompSeasonLactationNumber);
-
-          const total =
-            a.dairyCompSeasonMilkBaselineKg;
-
-          if (
-            !addAnimalIsDateSrv(freshDate) ||
-            freshDate !== currentFresh ||
-            lactationNumber !==
-              Number(a.lactationNumber) ||
-            total == null ||
-            !Number.isFinite(Number(total))
-          ) continue;
-
-          const season = getSeason({
-            animalNumber,
-            freshDate,
-            lactationNumber,
-            species: a.animalType || "",
-            breed: a.breed || ""
-          });
-
-          season.currentSeasonTOTMKg =
-            Number(total);
-
-          season.baselineAsOf = String(
-            a.dairyCompSeasonMilkAsOf || ""
-          ).slice(0, 10);
-        }
-      }
-
-      const testsSnap = await db
-        .collection("dairycomp_milk_tests")
-        .where("userId", "==", uid)
-        .get();
-
-      for (const doc of testsSnap.docs) {
-        const test = doc.data() || {};
-
-        if (
-          test.sourceSystem !== "dairycomp" ||
-          test.recordType !== "milk_test"
-        ) continue;
-
-        const animalNumber = addAnimalDigitsSrv(
-          test.animalNumber
-        );
-
-        if (
-          requestedNumber &&
-          animalNumber !== requestedNumber
-        ) continue;
-
-        const season = getSeason({
-          animalNumber,
-          freshDate: test.freshDate,
-          lactationNumber: test.lactationNumber,
-          species: test.animalType,
-          breed: test.breed
-        });
-
-        season.tests.push({
-          date: test.testDate,
-          milkKg: test.milkKg,
-          isDailyMilking: false
-        });
-      }
-
-      const seasons = [];
-
-      for (const season of seasonsMap.values()) {
-        season.tests.sort((a, b) =>
-          a.date.localeCompare(b.date)
-        );
-
-        const projection =
-          projectLactation305AliSchaefferSrv({
-            milkSeries: season.tests.map(t => ({
-              date: t.date,
-              kg: t.milkKg,
-              dim: addAnimalDiffDaysSrv(
-                season.freshDate,
-                t.date
-              )
-            })),
-            lastCalvingDate: season.freshDate,
-            species: season.species,
-            breed: season.breed,
-            parity: season.lactationNumber
-          });
-
-        seasons.push({
-          ...season,
-          testsCount: season.tests.length,
-          lastTest: season.tests.at(-1) || null,
-          testDay305Projection: projection
-            ? {
-                kg: projection.m305Kg,
-                model: projection.model,
-                pointsUsed: projection.pointsUsed,
-                fitQuality: projection.fitQuality,
-                source: "dairycomp_testdays"
-              }
-            : null
-        });
-      }
-
-      seasons.sort((a, b) =>
-        String(a.animalNumber).localeCompare(
-          String(b.animalNumber),
-          undefined,
-          { numeric: true }
-        ) ||
-        a.freshDate.localeCompare(b.freshDate)
-      );
-
-      return res.json({
-        ok: true,
-        sourceSystem: "dairycomp",
-        isDailyMilking: false,
-        animalsCount: new Set(
-          seasons.map(s => s.animalNumber)
-        ).size,
-        seasonsCount: seasons.length,
-        testsCount: seasons.reduce(
-          (sum, s) => sum + s.testsCount, 0
-        ),
-        seasons
-      });
-
-    } catch (e) {
-      console.error(
-        "DairyComp testdays report failed:", e
-      );
-
-      return res.status(500).json({
-        ok: false,
-        error: "dairycomp_testdays_report_failed"
-      });
-    }
-  }
-);
-
 app.get("/api/milk-reports/summary", requireUserId, async (req, res) => {
   try {
     if (!db) {
@@ -71746,10 +70292,6 @@ const latestNutrition = milkReportLatestNutritionForGroupSrv(
   return res.json({
       ok: true,
       message,
-      dairyCompTestDaysReport: {
-        endpoint: "/api/milk-reports/dairycomp-testdays",
-        separateFromDailyMilking: true
-      },
 
       meta: {
         reportDate,
@@ -124249,25 +122791,7 @@ lastCheckDate:
             currentCycleStartDate
         );
 
-    const hasDairyCompSeasonBaseline =
-      animal.dairyCompSeasonMilkBaselineKg !== null &&
-      animal.dairyCompSeasonMilkBaselineKg !== undefined &&
-      Number.isFinite(
-        Number(animal.dairyCompSeasonMilkBaselineKg)
-      ) &&
-      Number(animal.dairyCompSeasonMilkBaselineKg) >= 0 &&
-      cardISODateSrv(animal.dairyCompSeasonMilkAsOf) &&
-      cardISODateSrv(animal.dairyCompSeasonFreshDate) ===
-        currentCycleStartDate &&
-      Number(animal.dairyCompSeasonLactationNumber) ===
-        Number(state.lactationNumber);
 
-    const dairyCompBaselineDate =
-      hasDairyCompSeasonBaseline
-        ? cardISODateSrv(animal.dairyCompSeasonMilkAsOf)
-        : "";
-
-    let milkAfterDairyCompBaseline = 0;
     let seasonMilk = 0;
 
     let derivedReproductiveStatus =
@@ -124409,12 +122933,7 @@ lastCheckDate:
 
           seasonMilk += kg;
 
-          if (
-            hasDairyCompSeasonBaseline &&
-            d > dairyCompBaselineDate
-          ) {
-            milkAfterDairyCompBaseline += kg;
-          }
+
         }
       }
     }
@@ -124668,17 +123187,10 @@ state.milkTodayKg =
     ? Number(todayMilk.kg || 0)
     : null;
 
-    state.seasonTotalKg =
-      hasDairyCompSeasonBaseline
-        ? Math.round(
-            (
-              Number(animal.dairyCompSeasonMilkBaselineKg) +
-              milkAfterDairyCompBaseline
-            ) * 100
-          ) / 100
-        : state.milkSeries.length
-          ? Math.round(seasonMilk * 100) / 100
-          : null;
+
+state.seasonTotalKg = state.milkSeries.length
+  ? Math.round(seasonMilk * 100) / 100
+  : null;
 
     if (
       state.milkSeries.length
@@ -124747,52 +123259,6 @@ const alerts =
       state.lactationNumber
   });
 
-  
-const dairyCompTestsSnap = await db
-  .collection("dairycomp_milk_tests")
-  .where("userId", "==", uid)
-  .where(
-    "animalNumber", "==",
-    addAnimalDigitsSrv(state.number)
-  )
-  .get();
-
-const dairyCompHistoricalTests =
-  dairyCompTestsSnap.docs
-    .map(doc => doc.data() || {})
-    .filter(t =>
-      t.sourceSystem === "dairycomp" &&
-      t.recordType === "milk_test"
-    )
-    .sort((a, b) =>
-      String(a.testDate).localeCompare(
-        String(b.testDate)
-      )
-    );
-
-const dairyCompCurrentTests =
-  dairyCompHistoricalTests.filter(t =>
-    t.freshDate === currentCycleStartDate &&
-    Number(t.lactationNumber) ===
-      Number(state.lactationNumber)
-  );
-
-const dairyComp305Projection =
-  projectLactation305AliSchaefferSrv({
-    milkSeries: dairyCompCurrentTests.map(t => ({
-      date: t.testDate,
-      kg: t.milkKg,
-      dim: addAnimalDiffDaysSrv(
-        t.freshDate,
-        t.testDate
-      )
-    })),
-    lastCalvingDate: currentCycleStartDate,
-    species: state.kind,
-    breed: state.breed,
-    parity: state.lactationNumber
-  });
-
 
 const herdMilkCurve =
   standardMilkCurve.points;
@@ -124842,61 +123308,6 @@ const herdMilkCurve =
 
       dairyTraits,
       milkSeries: state.milkSeries,
-
-      dairyCompMilk: {
-        sourceSystem: "dairycomp",
-
-        currentSeasonTOTMKg:
-          hasDairyCompSeasonBaseline
-            ? Number(
-                animal.dairyCompSeasonMilkBaselineKg
-              )
-            : null,
-
-        baselineAsOf:
-          hasDairyCompSeasonBaseline
-            ? dairyCompBaselineDate
-            : null,
-
-        currentSeasonTotalKg:
-          state.seasonTotalKg,
-
-        lastTest:
-          dairyCompCurrentTests.at(-1)
-            ? {
-                date:
-                  dairyCompCurrentTests.at(-1)
-                    .testDate,
-                milkKg:
-                  dairyCompCurrentTests.at(-1)
-                    .milkKg
-              }
-            : null,
-
-        currentSeasonTestDays:
-          dairyCompCurrentTests.map(t => ({
-            date: t.testDate,
-            milkKg: t.milkKg,
-            isDailyMilking: false
-          })),
-
-        historicalTestDaysCount:
-          dairyCompHistoricalTests.length,
-
-        testDay305Projection:
-          dairyComp305Projection
-            ? {
-                kg:
-                  dairyComp305Projection.m305Kg,
-                model:
-                  dairyComp305Projection.model,
-                pointsUsed:
-                  dairyComp305Projection.pointsUsed,
-                fitQuality:
-                  dairyComp305Projection.fitQuality
-              }
-            : null
-      },
 
       herdMilkCurve,
 
