@@ -65,16 +65,17 @@
 <section class="card">
   <h2>ملف من نظام آخر — فحص أو معاينة استيراد DairyComp</h2>
   <label for="externalFile">
-    ملف تصدير Excel أو CSV أو TXT
+   ملفا FILEOUT وEVENTS الأصليان من DairyComp (حدّد الملفين معًا)
+
   </label>
 
 
-  <input
-    id="externalFile"
-    type="file"
-    accept=".xlsx,.xls,.csv,.txt"
-  />
-
+ <input
+  id="externalFile"
+  type="file"
+  accept=".xlsx,.xls,.csv,.txt"
+  multiple
+/>
   <label for="externalAsOf">
    تاريخ تصدير الملف (الملفات القديمة للمعاينة فقط؛ الحفظ للتصدير الحالي)
   </label>
@@ -850,8 +851,16 @@ $('externalBreed').addEventListener(
 
 
 btnInspectExternal.addEventListener('click', async () => {
-  const file = externalFile.files && externalFile.files[0];
+  const sourceFiles = Array.from(externalFile.files || []);
+const file = sourceFiles[0];
 
+if (sourceFiles.length > 2) {
+  showMessage(
+    'اختر FILEOUT وEVENTS فقط.',
+    'status-error'
+  );
+  return;
+}
   if (!file) {
     showMessage('اختر ملف النظام الخارجي أولًا.', 'status-error');
     return;
@@ -867,20 +876,28 @@ btnInspectExternal.addEventListener('click', async () => {
   throw new Error('حجم الملف أكبر من 12 ميجابايت.');
 }
 
-    lastFilePayload = {
-      fileName: file.name,
-      fileBase64: await fileToBase64(file)
-    };
+    const inspectionReports = [];
 
-    const result = await callHerdImport(
-      '/api/herd-import-v2/inspect-external'
+for (const sourceFile of sourceFiles) {
+  if (sourceFile.size > 12 * 1024 * 1024) {
+    throw new Error(
+      `حجم الملف ${sourceFile.name} أكبر من 12 ميجابايت.`
     );
+  }
 
+  lastFilePayload = {
+    fileName: sourceFile.name,
+    fileBase64: await fileToBase64(sourceFile)
+  };
+
+  const result = await callHerdImport(
+    '/api/herd-import-v2/inspect-external'
+  );
     if (result.ok !== true) {
       throw new Error(result.message || 'فشل فحص الملف.');
     }
 
-    const lines = [result.message];
+    const lines = [sourceFile.name, result.message];
 
     for (const sheet of result.sheets || []) {
       lines.push(`\n${sheet.name}: ${sheet.rowsCount} صف`);
@@ -937,7 +954,11 @@ if (info.kind === 'dairycomp_event_log') {
       }
     }
 
-    externalInspectResult.textContent = lines.join('\n');
+    inspectionReports.push(lines.join('\n'));
+}
+
+externalInspectResult.textContent =
+  inspectionReports.join('\n\n');
 
     showMessage(
       'انتهى فحص الملف الخارجي دون حفظ.',
@@ -965,14 +986,19 @@ btnExternalPreview.addEventListener('click', async () => {
     return;
   }
 
-  const file = externalFile.files && externalFile.files[0];
-  const asOf = $('externalAsOf').value;
+const sourceFiles = Array.from(externalFile.files || []);
+const file = sourceFiles[0];
+const secondFile = sourceFiles[1] || null;
+const asOf = $('externalAsOf').value;
   const species = $('externalSpecies').value;
 
-  if (!file) {
-    showMessage('اختر ملف DairyComp أولًا.', 'status-error');
-    return;
-  }
+if (!file || sourceFiles.length !== 2) {
+  showMessage(
+    'اختر ملفَي FILEOUT وEVENTS فقط.',
+    'status-error'
+  );
+  return;
+}
 
   if (
   !asOf ||
@@ -985,9 +1011,11 @@ btnExternalPreview.addEventListener('click', async () => {
   return;
 }
 
-  if (file.size > 12 * 1024 * 1024) {
+if (sourceFiles.some(
+  item => item.size > 12 * 1024 * 1024
+)) {
   showMessage(
-    'حجم الملف أكبر من 12 ميجابايت.',
+    'حجم أحد الملفين أكبر من 12 ميجابايت.',
     'status-error'
   );
   return;
@@ -1001,9 +1029,15 @@ btnExternalPreview.addEventListener('click', async () => {
 
   try {
     const payload = {
-      fileName: file.name,
-      fileBase64: await fileToBase64(file),
-      externalSource: 'dairycomp',
+    fileName: file.name,
+fileBase64: await fileToBase64(file),
+
+...(secondFile ? {
+  eventsFileName: secondFile.name,
+  eventsFileBase64: await fileToBase64(secondFile)
+} : {}),
+
+externalSource: 'dairycomp',
        externalAsOf: asOf,
        defaultAnimalType: species,
       externalSpeciesConfirmed:
@@ -1017,7 +1051,8 @@ dairycompCompletionByAnimal:
 
     if (
       revision !== externalRevision ||
-      externalFile.files[0] !== file
+      externalFile.files[0] !== file ||
+(externalFile.files[1] || null) !== secondFile
     ) return;
 
     lastFilePayload = payload;
@@ -1029,7 +1064,8 @@ dairycompCompletionByAnimal:
 
     if (
       revision !== externalRevision ||
-      externalFile.files[0] !== file
+      externalFile.files[0] !== file ||
+(externalFile.files[1] || null) !== secondFile
     ) return;
 
     if (j?.ok !== true) {
