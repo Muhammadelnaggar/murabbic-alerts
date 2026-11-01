@@ -71,7 +71,7 @@ function readJson(p, fallback = []) {
 }
 
 // ===== Middleware =====
-app.use('/api/herd-import-v2', express.json({limit: '24mb'}));
+app.use('/api/herd-import-v2', express.json({limit: '40mb'}));
 app.use(express.json({
   limit: '10mb',
   verify: (req, _res, buf) => {
@@ -11274,8 +11274,17 @@ function herdImportV2DairyCompArchiveWriteRowsSrv({
       );
     }
 
-    const sourceValue = (...names) => {
-      for (const h of history) {
+  const sourceValue = (...names) => {
+  const fromFileout = addAnimalImportPickAnySrv(
+    c.sourceBaseline || {},
+    names
+  );
+
+  if (String(fromFileout ?? "").trim()) {
+    return String(fromFileout).trim();
+  }
+
+  for (const h of history) {
         const value = addAnimalImportPickAnySrv(
           h.sourceFields || {},
           names
@@ -11289,7 +11298,7 @@ function herdImportV2DairyCompArchiveWriteRowsSrv({
       return "";
     };
 
-    const breedRaw = sourceValue("BREED", "BRD");
+    const breedRaw = sourceValue("BREED", "BRD", "CBRD");
     const speciesRaw = sourceValue(
       "SPECIES",
       "ANIMALTYPE"
@@ -12180,14 +12189,17 @@ async function herdDcAsyncEnqueueSrv({
 }) {
   const importId = persistencePlan.importId;
   const fileBase64 = String(body.fileBase64 || "");
-  const requestBody = { ...body };
-  delete requestBody.fileBase64;
+const eventsFileBase64 = String(body.eventsFileBase64 || "");
+const requestBody = { ...body };
+delete requestBody.fileBase64;
+delete requestBody.eventsFileBase64;
 
   if (
-    !fileBase64 ||
-   fileBase64.length > 18 * 1024 * 1024  ||
-    Buffer.byteLength(JSON.stringify(requestBody)) > 128 * 1024
-  ) {
+  !fileBase64 ||
+  fileBase64.length > 18 * 1024 * 1024 ||
+  eventsFileBase64.length > 18 * 1024 * 1024 ||
+  Buffer.byteLength(JSON.stringify(requestBody)) > 128 * 1024
+) {
     throw herdImportV2PersistenceErrorInternalSrv(
       "dairycomp_async_source_too_large",
       "تعذّر حفظ مصدر مهمة الاستيراد.",
@@ -12196,9 +12208,10 @@ async function herdDcAsyncEnqueueSrv({
   }
 
   const sha = crypto
-    .createHash("sha256")
-    .update(fileBase64)
-    .digest("hex");
+  .createHash("sha256")
+  .update(fileBase64)
+  .update(eventsFileBase64 ? "\n" + eventsFileBase64 : "")
+  .digest("hex");
 
   const ref = db
     .collection(HERD_DC_ASYNC_SOURCE_SRV)
@@ -12232,10 +12245,23 @@ async function herdDcAsyncEnqueueSrv({
     return { importId, status: existing.status };
   }
 
-  const parts =
-    fileBase64.match(/[\s\S]{1,180000}/g) || [];
+  const mainParts =
+  fileBase64.match(/[\s\S]{1,180000}/g) || [];
 
-  const batch = db.batch();
+const eventParts =
+  eventsFileBase64.match(/[\s\S]{1,180000}/g) || [];
+
+const parts = [...mainParts, ...eventParts];
+
+if (parts.length > 450) {
+  throw herdImportV2PersistenceErrorInternalSrv(
+    "dairycomp_async_source_too_many_parts",
+    "ملفا التصدير أكبر من الحد المسموح.",
+    400
+  );
+}
+
+const batch = db.batch();
 
   batch.create(ref, {
     userId: uid,
@@ -12245,8 +12271,10 @@ async function herdDcAsyncEnqueueSrv({
       persistencePlan.workbookFingerprint,
     sourceProfileKey: "dairycomp",
     requestBody,
-    partCount: parts.length,
-    status: "queued",
+partCount: parts.length,
+mainPartCount: mainParts.length,
+eventPartCount: eventParts.length,
+status: "queued",
     attempts: 0,
     nextAttemptAtMs: 0,
     leaseUntilMs: 0,
@@ -12358,14 +12386,44 @@ async function herdDcAsyncExecuteOneSrv(importId) {
       );
     }
 
-    const fileBase64 = parts.docs
-      .map(d => d.data().text || "")
-      .join("");
+const storedParts = parts.docs.map(
+  d => d.data().text || ""
+);
 
-    const sha = crypto
-      .createHash("sha256")
-      .update(fileBase64)
-      .digest("hex");
+const mainPartCount = Number(
+  task.mainPartCount ?? task.partCount
+);
+
+const eventPartCount = Number(
+  task.eventPartCount || 0
+);
+
+if (
+  !Number.isInteger(mainPartCount) ||
+  !Number.isInteger(eventPartCount) ||
+  mainPartCount < 1 ||
+  eventPartCount < 0 ||
+  mainPartCount + eventPartCount !== parts.size
+) {
+  throw Object.assign(
+    new Error("أجزاء تصدير DairyComp غير متطابقة."),
+    { statusCode: 400 }
+  );
+}
+
+const fileBase64 = storedParts
+  .slice(0, mainPartCount)
+  .join("");
+
+const eventsFileBase64 = storedParts
+  .slice(mainPartCount)
+  .join("");
+
+const sha = crypto
+  .createHash("sha256")
+  .update(fileBase64)
+  .update(eventsFileBase64 ? "\n" + eventsFileBase64 : "")
+  .digest("hex");
 
     if (sha !== task.sourceSha) {
       throw Object.assign(
@@ -12394,8 +12452,10 @@ async function herdDcAsyncExecuteOneSrv(importId) {
         userId: task.userId,
         __herdDcAsyncWorkerSrv: true,
         body: {
-          ...task.requestBody,
-          fileBase64
+         ...task.requestBody,
+fileBase64,
+...(eventsFileBase64 ? { eventsFileBase64 } : {})
+
         }
       },
       internalRes
@@ -17338,7 +17398,6 @@ const HERD_IMPORT_DC_SOURCE_IDENTITIES_SRV = Object.freeze({
   BIRTH: ["ميلاد", "birth"],
   HOOF: ["مشكلة حافر", "hoof_problem"],
   DRY: ["تجفيف", "dry_off"],
-  MOVE: ["نقل مجموعة", "group_move"],
   PREV: ["حمل مسجل", "pregnancy_history"],
   SOLD: ["بيع", "sale"],
   DIED: ["نفوق", "death"],
@@ -17347,7 +17406,6 @@ const HERD_IMPORT_DC_SOURCE_IDENTITIES_SRV = Object.freeze({
   VACC: ["تحصين", "vaccination_record"],
   CALFVACC: ["تحصين", "vaccination_record"],
   OK: ["تأكيد الحالة", "source_record"],
-  BULLPEN: ["دخول حظيرة الطلوق", "group_move"],
   DNB: ["عدم التلقيح", "source_record"],
   XID: ["تغيير رقم الحيوان", "source_record"],
   TBTEST: ["اختبار السل", "health_test"],
@@ -17360,11 +17418,12 @@ function herdImportV2DairyCompEventIdentitySrv(value) {
   const code = String(value || "").trim().toUpperCase();
 
   if (
-    !code ||
-    HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(code)
-  ) {
-    return null;
-  }
+  !code ||
+  HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(code) ||
+  HERD_IMPORT_DC_REPRO_REVIEW_CODES_SRV.has(code)
+) {
+  return null;
+}
 
   const explicit = HERD_IMPORT_DC_SOURCE_IDENTITIES_SRV[code];
 
@@ -17428,10 +17487,13 @@ function herdImportV2DairyCompEventIdentitySrv(value) {
   return null;
 }
 
+const HERD_IMPORT_DC_REPRO_REVIEW_CODES_SRV = new Set([
+  "REPRO", "RECK", "CHECK", "CIDR", "TRANSFER"
+]);
+
 const HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV = new Set([
-  "REPRO", "RECK", "CHECK",
   "TREAT", "CULTURE", "BLSERUM", "TEMP",
-  "CIDR", "TRANSFER"
+  "MOVE", "BULLPEN"
 ]);
 
 function herdImportV2DairyCompObservedDayPartSrv(value) {
@@ -17569,11 +17631,25 @@ function herdImportV2TranslateDairyCompEventSrv(
   issues,
    entryType = "mothers"
 ) {
-  const code = String(e.code || "")
+const code = String(e.code || "")
   .trim()
   .toUpperCase();
 
+if (e.r?.__dcNativeEventFields) {
+  e = {
+    ...e,
+    r: e.r.__dcNativeEventFields
+  };
+}
+
 if (HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(code)) {
+  return null;
+}
+
+if (HERD_IMPORT_DC_REPRO_REVIEW_CODES_SRV.has(code)) {
+  issues.push(
+    `${id}: كود الخصوبة أو الفحص ${code} ليس له تحويل تشغيلي معتمد في مُرَبِّيك بتاريخ ${e.d}. لم يتم الحفظ.`
+  );
   return null;
 }
 
@@ -17604,8 +17680,14 @@ const sourceDateTime = pick(
   "تاريخ الحدث": e.d,
   "كود حدث المصدر": code,
   "توقيت حدث المصدر": sourceDateTime,
-  "حقول المصدر JSON": JSON.stringify(e.r || {}),
-  "ملاحظات": notes
+ "حقول المصدر JSON": JSON.stringify(
+  e.r?.__dcNativeEventFields || e.r || {}
+),
+"ملاحظات": (
+  code === "BRED" &&
+  herdImportV2DairyCompSemenFromRemarkSrv(notes) &&
+  /^\d{1,4}[A-Z]{1,4}\d+[A-Z0-9_-]*(?:[_\s-]TAI)?$/i.test(notes)
+) ? "" : notes
 };
   
 if (code === "PREV") {
@@ -17695,17 +17777,11 @@ if (code === "BRED") {
         ? "اصطناعي"
         : rawMethod || (isTAI ? "اصطناعي" : ""),
     "مصدر التلقيح": isTAI ? "ovsynch_tai" : "",
-    "كود السائل المنوي":
-      pick(
-        e.r,
-        "SemenCode",
-        "SEMENCODE",
-        "LSIR",
-        "LastSemenCode"
-      ) ||
-      herdImportV2DairyCompSemenFromRemarkSrv(
-        pick(e.r, "Remark", "Event_Remarks")
-      ),
+   "كود السائل المنوي":
+  pick(e.r, "SemenCode", "SEMENCODE") ||
+  herdImportV2DairyCompSemenFromRemarkSrv(
+    pick(e.r, "Remark", "Event_Remarks", "REM")
+  ),
     "اسم الملقح": pick(
       e.r,
       "Technician",
@@ -17734,24 +17810,21 @@ if (code === "BRED") {
   }
 
 if (code === "VACC" || code === "CALFVACC") {
-  if (!pick(
-    e.r,
-    "Vaccine",
-    "VaccineName",
-    "VaccineCode",
-    "CVACC"
-  )) {
-    return {
-      ...base,
-      "نوع الحدث": "سجل حدث مصدر"
-    };
+  const vaccineName = pick(e.r, "Vaccine", "VaccineName");
+  const vaccineCode = pick(e.r, "VaccineCode", "CVACC");
+
+  if (!vaccineName && !vaccineCode) {
+    issues.push(
+      `${id}: بيانات التحصين ${code} غير محددة بتاريخ ${e.d}`
+    );
+    return null;
   }
 
   return {
     ...base,
     "نوع الحدث": "تحصين",
-    "اسم التحصين": pick(e.r, "Vaccine", "VaccineName"),
-    "كود التحصين": pick(e.r, "VaccineCode", "CVACC"),
+    "اسم التحصين": vaccineName,
+    "كود التحصين": vaccineCode,
     "نوع اللقاح": pick(e.r, "VaccineForm"),
     "نوع الجرعة": pick(e.r, "DoseType")
   };
@@ -17850,11 +17923,12 @@ function herdImportV2DairyCompArchiveCandidateSrv({
   issues
 }) {
   const history = all
-  .filter(e =>
-    e.d &&
-    e.d <= asOf &&
-    !HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(e.code)
-  )
+ .filter(e =>
+  e.code &&
+  e.d &&
+  e.d <= asOf &&
+  !HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(e.code)
+)
   .sort((a, b) => a.d.localeCompare(b.d));
 
   const unknown = history.filter(e =>
@@ -17970,8 +18044,9 @@ if (unknown.length) {
   return {
     animalNumber: id,
     entryType,
-    sourceRC: rc,
-    exitCode: exit.code,
+sourceRC: rc,
+sourceBaseline: latest,
+exitCode: exit.code,
     exitDate: exit.d,
     exitReason: reason,
     birthDate: birthDates[0] || "",
@@ -17980,7 +18055,7 @@ if (unknown.length) {
       sourceRow: e.row,
       sourceCode: e.code,
       sourceDate: e.d,
-      sourceFields: e.r
+      sourceFields: e.r?.__dcNativeEventFields || e.r
     }))
   };
 }
@@ -18014,6 +18089,134 @@ function herdImportV2DairyCompSourceSettingsSrv(rows = []) {
   return {
     dateOrder: dmyEvidence > mdyEvidence ? "dmy" : "mdy"
   };
+}
+
+function herdImportV2DairyCompMergeNativeExportsSrv(
+  fileoutRows = [],
+  eventRows = [],
+  asOf = ""
+) {
+  const pick = (row, names) =>
+    String(addAnimalImportPickAnySrv(row, names) ?? "").trim();
+
+  const headersOf = rows => new Set(
+    herdImportV2UniqueHeadersSrv(rows)
+      .map(addAnimalImportNormKeySrv)
+  );
+
+  const has = (headers, key) =>
+    headers.has(addAnimalImportNormKeySrv(key));
+
+  let baseHeads = headersOf(fileoutRows);
+  let eventHeads = headersOf(eventRows);
+
+  const isEventLog = h =>
+    (has(h, "Event") || has(h, "Event_Name")) &&
+    (has(h, "Date") || has(h, "Event_Date"));
+
+  const isFileout = h =>
+    (has(h, "ID") || has(h, "Cow_ID")) &&
+    (has(h, "LACT") || has(h, "Lactation")) &&
+    (has(h, "RC") || has(h, "Repro_Status")) &&
+    !isEventLog(h);
+
+  if (isEventLog(baseHeads) && isFileout(eventHeads)) {
+    [fileoutRows, eventRows] = [eventRows, fileoutRows];
+    [baseHeads, eventHeads] = [eventHeads, baseHeads];
+  }
+
+  if (!isFileout(baseHeads) || !isEventLog(eventHeads)) {
+    throw herdImportV2TemplateErrorSrv(
+      "الملفان يجب أن يكونا تصدير FILEOUT وتصدير EVENTS أصليين؛ دون تعديل المصدر."
+    );
+  }
+
+  if (
+    !has(baseHeads, "ID") ||
+    !has(baseHeads, "LACT") ||
+    !has(baseHeads, "RC") ||
+    !has(baseHeads, "BDAT") ||
+    !has(eventHeads, "ID") ||
+    !(
+      has(eventHeads, "Event") ||
+      has(eventHeads, "Event_Name")
+    ) ||
+    !(has(eventHeads, "Date") || has(eventHeads, "Event_Date"))
+  ) {
+    throw herdImportV2TemplateErrorSrv(
+      "يلزم ملف FILEOUT الأصلي للقطيع وملف EVENTS الأصلي للأحداث، دون تغيير حقولهما."
+    );
+  }
+
+  const baselines = new Map();
+  const combined = [];
+
+  for (let index = 0; index < fileoutRows.length; index++) {
+    const base = fileoutRows[index];
+    const id = addAnimalDigitsSrv(pick(base, ["ID", "Cow_ID"]));
+
+    if (!id || baselines.has(id)) {
+      throw herdImportV2TemplateErrorSrv(
+        `معرّف حيوان مفقود أو مكرر في FILEOUT عند الصف ${index + 2}.`
+      );
+    }
+
+    baselines.set(id, base);
+
+    const snapshot = { ...base, Event: "", Date: asOf };
+
+    Object.defineProperty(snapshot, "__dcOriginalRowNumber", {
+      value: index + 2
+    });
+
+    combined.push(snapshot);
+  }
+
+  const snapshotKeys = new Set([
+    "LACT", "RC", "RPRO", "BDAT", "FDAT", "DDAT",
+    "CBRD", "BRD", "BREED", "SPECIES", "ANIMALTYPE",
+    "SEX", "GENDER", "DID", "DAM", "SID", "TBRD",
+    "LSIR", "SIRC", "PEN", "CAR", "ARDAT"
+  ]);
+
+  for (let index = 0; index < eventRows.length; index++) {
+    const event = eventRows[index];
+    const id = addAnimalDigitsSrv(pick(event, ["ID", "Cow_ID"]));
+    const base = baselines.get(id);
+
+    if (!base) {
+      throw herdImportV2TemplateErrorSrv(
+        `الحيوان ${id || "?"} في EVENTS (صف ${index + 2}) غير موجود في FILEOUT.`
+      );
+    }
+
+    const merged = { ...base };
+
+    for (const [key, value] of Object.entries(event)) {
+      const canonical = String(key).trim().toUpperCase();
+
+      if (snapshotKeys.has(canonical)) continue;
+
+      if (
+        Object.prototype.hasOwnProperty.call(merged, key) &&
+        String(value ?? "").trim() === ""
+      ) continue;
+
+      merged[key] = value;
+    }
+
+    Object.defineProperty(merged, "__dcNativeEventFields", {
+      value: event
+    });
+
+    Object.defineProperty(merged, "__dcOriginalRowNumber", {
+      value: index + 2
+    });
+
+    combined.push(merged);
+  }
+
+  return combined;
 }
 
 function herdImportV2ParseExternalDairyCompSrv(body = {}) {
@@ -18099,6 +18302,49 @@ if (/\.(csv|txt)$/i.test(name)) {
   );
 }
 
+if (body.eventsFileName || body.eventsFileBase64) {
+  const eventsName = String(body.eventsFileName || "").trim();
+
+  if (!/\.(csv|txt|xls|xlsx)$/i.test(eventsName)) {
+    fail(["صيغة ملف EVENTS غير مدعومة"]);
+  }
+
+  const eventsBuffer = addAnimalImportDecodeBase64Srv(
+    String(body.eventsFileBase64 || "")
+  );
+
+  if (
+    !eventsBuffer.length ||
+    eventsBuffer.length > 12 * 1024 * 1024
+  ) {
+    fail(["حجم ملف EVENTS غير صالح"]);
+  }
+
+  let rawEvents;
+
+  if (/\.(csv|txt)$/i.test(eventsName)) {
+    rawEvents = addAnimalImportParseCsvTextSrv(
+      eventsBuffer.toString("utf8")
+    );
+  } else {
+    const XLSX = require("xlsx");
+    const book = XLSX.read(eventsBuffer, { type: "buffer" });
+
+    rawEvents = (book.SheetNames || []).flatMap(sheetName =>
+      XLSX.utils.sheet_to_json(book.Sheets[sheetName], {
+        defval: "",
+        raw: false,
+        blankrows: false
+      })
+    );
+  }
+
+  records = herdImportV2DairyCompMergeNativeExportsSrv(
+    records,
+    rawEvents,
+    asOf
+  );
+}
 
   if (!records.length || records.length > 80000) {
   fail(["عدد الصفوف غير صالح (حد 80000)"]);
@@ -18135,6 +18381,12 @@ const dairyCompIsFileout =
 if (!dairyCompIsEventLog && !dairyCompIsFileout) {
   fail([
     "الملف ليس تصدير حيوانات FILEOUT أو سجل أحداث EVENTS معروفًا من DairyComp"
+  ]);
+}
+
+if (dairyCompIsFileout && !body.eventsFileBase64) {
+  fail([
+    "FILEOUT يوضح حالة القطيع فقط؛ اختر معه تصدير EVENTS الأصلي لاستيراد التاريخ دون افتراضات."
   ]);
 }
 
@@ -18223,7 +18475,7 @@ const freshDate = date(
 
     groups.get(id).push({
       r: row,
-      row: i + 2,
+      row: Number(row.__dcOriginalRowNumber || i + 2),
       d: eventDate,
       bd: birthDate,
       fd: freshDate,
@@ -18242,9 +18494,7 @@ const dairyCompHasAnimalBaseline =
   hasAny("LACT", "Lactation") &&
   hasAny("RC", "Repro_Status", "REPRO") &&
   hasAny("BDAT", "BirthDate", "DOB") &&
-  hasAny("BREED", "BRD", "CBRD") &&
-  hasAny("SEX", "GENDER") &&
-  hasAny("SPECIES", "ANIMALTYPE");
+  hasAny("BREED", "BRD", "CBRD");
 
 if (dairyCompIsEventLog && !dairyCompHasAnimalBaseline) {
   const sourceEvents = [];
@@ -18532,10 +18782,10 @@ const declaredSex =
         completion(id, "sex")
       );
 
-const sex =
-  rc === "8" && !declaredSex
-    ? "ذكر"
-    : declaredSex;
+const sex = declaredSex || (
+  rc === "8" ? "ذكر" :
+  lact === "0" && ["0", "4", "5"].includes(rc) ? "أنثى" : ""
+);
 
 if (
   rc === "8" &&
@@ -18626,13 +18876,15 @@ if (rc === "7" || lastExit) {
 const lastBreeding = breedings.at(-1)?.r || {};
 
 
+const breedingSource =
+  lastBreeding.__dcNativeEventFields || lastBreeding;
+
 const semen =
-  pick(lastBreeding, "SEMENCODE", "LSIR") ||
+  pick(breedingSource, "SemenCode", "SEMENCODE") ||
   herdImportV2DairyCompSemenFromRemarkSrv(
-    pick(lastBreeding, "Remark", "Event_Remarks")
+    pick(breedingSource, "Remark", "Event_Remarks", "REM")
   ) ||
   completion(id, "semenCode");
-
 
 
   const timesRaw = pick(
@@ -19020,16 +19272,13 @@ const lastBreeding = breedings.at(-1)?.r || {};
 
 
 
+const breedingSource =
+  lastBreeding.__dcNativeEventFields || lastBreeding;
+
 const semen =
-  pick(
-    lastBreeding,
-    "SEMENCODE",
-    "LASTSEMENCODE",
-    "LSIR"
-  ) ||
-  pick(latestRows[0]?.r || {}, "LSIR") ||
+  pick(breedingSource, "SemenCode", "SEMENCODE") ||
   herdImportV2DairyCompSemenFromRemarkSrv(
-    pick(lastBreeding, "Remark", "Event_Remarks")
+    pick(breedingSource, "Remark", "Event_Remarks", "REM")
   ) ||
   completion(id, "semenCode");
 
