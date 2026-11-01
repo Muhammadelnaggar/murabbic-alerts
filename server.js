@@ -92,6 +92,7 @@ const murabbikPreparedReadOnlyPostsSrv = new Set([
   '/api/add-animal/import-preview',
   '/api/herd-import-v2/inspect-external',
   '/api/vaccination/campaign/prepare',
+  '/api/herd-import-v2/repair-dairycomp-event-names',
   '/api/vaccination/farm-program/preview-row'
 ]);
 
@@ -9220,6 +9221,42 @@ const eventsByAnimal = new Map();
       );
     }
 
+    const identity = herdImportV2DairyCompEventIdentitySrv(
+  item.sourceEventCode
+);
+
+if (!identity) {
+  throw herdImportV2TemplateErrorSrv(
+    `حدث DairyComp غير معروف أو مستبعد ${item.sourceEventCode} ` +
+    `للحيوان ${item.animalNumber}، الصف ${item.row}.`
+  );
+}
+
+const strictlyTyped = {
+  HEAT: "heat",
+  BRED: "insemination",
+  PREG: "pregnancy_diagnosis",
+  OPEN: "pregnancy_diagnosis",
+  ABORT: "abortion",
+  MAST: "mastitis",
+  LAME: "lameness",
+  TRIM: "hoof_trimming",
+  FOOTRIM: "hoof_trimming",
+  WEAN: "weaning",
+  DEHORN: "dehorning",
+  GNRH: "hormone_step",
+  PGF: "hormone_step",
+  OVS: "ovsynch_history",
+  OVSYNCH: "ovsynch_history"
+}[item.sourceEventCode];
+
+if (strictlyTyped && item.eventType !== strictlyTyped) {
+  throw herdImportV2TemplateErrorSrv(
+    `تصنيف حدث ${item.sourceEventCode} غير متوافق للحيوان ` +
+    `${item.animalNumber}، الصف ${item.row}.`
+  );
+}
+
     let sourceFields;
 
     try {
@@ -9349,11 +9386,14 @@ eventsByAnimal.get(item.animalNumber).push(item);
       sheetName: item.sheetName,
       row: item.row,
       animalNumber: item.animalNumber,
-      eventType: item.eventType,
-      eventDate: item.eventDate,
-      sourceEventCode: item.sourceEventCode,
-      ok: true,
-      status: "تاريخ مستورد",
+eventType: item.eventType,
+eventLabel: herdImportV2DairyCompEventIdentitySrv(
+  item.sourceEventCode
+)?.name || item.rawEventType,
+eventDate: item.eventDate,
+sourceEventCode: item.sourceEventCode,
+ok: true,
+status: "جاهز للحفظ",
       errors: []
     })),
     sequenceSummaries: [],
@@ -10654,12 +10694,24 @@ sourceSheet: item.sheetName || "الأحداث",
     source: "server:/api/herd-import-v2/save-operational",
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   };
-  if (item.eventType === "source_history") {
+ if (item.eventType === "source_history") {
+  const identity = herdImportV2DairyCompEventIdentitySrv(
+    item.sourceEventCode
+  );
+
+  if (!identity) {
+    throw herdImportV2PersistenceErrorInternalSrv(
+      "dairycomp_event_identity_missing",
+      `هوية حدث DairyComp غير معروفة للحيوان ${item.animalNumber}.`,
+      400
+    );
+  }
+
   return {
     ...common,
-    type: "حدث DairyComp تاريخي",
-    eventType: "حدث DairyComp تاريخي",
-    eventTypeNorm: "external_history",
+    type: identity.name,
+    eventType: identity.name,
+    eventTypeNorm: identity.type,
     date: eventDate,
     notes
   };
@@ -10683,8 +10735,8 @@ sourceSheet: item.sheetName || "الأحداث",
   if (item.eventType === "ovsynch_history") {
     return {
       ...common,
-      type: "بروتوكول تزامن تاريخي",
-      eventType: "برنامج تزامن تاريخي",
+      type: "برنامج تزامن",
+      eventType: "برنامج تزامن",
       eventTypeNorm: "ovsynch_history",
       date: eventDate,
       program: "ovsynch",
@@ -11354,6 +11406,20 @@ function herdImportV2DairyCompArchiveWriteRowsSrv({
         h.sourceCode || ""
       ).trim().toUpperCase();
 
+ if (HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(code)) {
+  continue;
+}
+
+const identity = herdImportV2DairyCompEventIdentitySrv(code);
+
+if (!identity) {
+  throw herdImportV2PersistenceErrorInternalSrv(
+    "dairycomp_archive_event_unknown",
+    `حدث ${code} غير معروف للحيوان ${number}.`,
+    400
+  );
+}     
+
       const date = String(
         h.sourceDate || ""
       ).slice(0, 10);
@@ -11387,15 +11453,22 @@ function herdImportV2DairyCompArchiveWriteRowsSrv({
           number,
           archivedAnimalId: archiveId,
 
-          type: "حدث مستورد",
-          eventType: "حدث مستورد",
-          eventTypeNorm: "external_history",
+ type: identity.name,
+eventType: identity.name,
+eventTypeNorm: identity.type,
+
 
           date,
           eventDate: date,
 
           sourceSystem: "dairycomp",
           sourceEventCode: code,
+          notes: String(
+  addAnimalImportPickAnySrv(
+    h.sourceFields || {},
+    ["Event_Remarks", "Remark", "REM"]
+  ) || ""
+).trim() || null,
 
           sourceRow: h.sourceRow ?? null,
           sourceFields: h.sourceFields || {},
@@ -17259,6 +17332,102 @@ const HERD_IMPORT_DC_SUPPORTED_HEALTH_SRV = Object.freeze({
   PINKEYE: "pinkeye"
 });
 
+const HERD_IMPORT_DC_SOURCE_IDENTITIES_SRV = Object.freeze({
+  FRESH: ["ولادة", "calving"],
+  CALVED: ["ولادة", "calving"],
+  BIRTH: ["ميلاد", "birth"],
+  HOOF: ["مشكلة حافر", "hoof_problem"],
+  DRY: ["تجفيف", "dry_off"],
+  MOVE: ["نقل مجموعة", "group_move"],
+  PREV: ["حمل مسجل", "pregnancy_history"],
+  SOLD: ["بيع", "sale"],
+  DIED: ["نفوق", "death"],
+  CLOSEUP: ["تحضير للولادة", "close_up"],
+  BCS: ["تقييم حالة الجسم", "body_condition"],
+  VACC: ["تحصين", "vaccination_record"],
+  CALFVACC: ["تحصين", "vaccination_record"],
+  OK: ["تأكيد الحالة", "source_record"],
+  BULLPEN: ["دخول حظيرة الطلوق", "group_move"],
+  DNB: ["عدم التلقيح", "source_record"],
+  XID: ["تغيير رقم الحيوان", "source_record"],
+  TBTEST: ["اختبار السل", "health_test"],
+  MEASURE: ["قياس جسم الحيوان", "body_measurement"],
+  TEATX3: ["ثلاث حلمات وظيفية", "physical_finding"],
+  OTHER: ["حدث موثق بالمصدر", "source_record"]
+});
+
+function herdImportV2DairyCompEventIdentitySrv(value) {
+  const code = String(value || "").trim().toUpperCase();
+
+  if (
+    !code ||
+    HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(code)
+  ) {
+    return null;
+  }
+
+  const explicit = HERD_IMPORT_DC_SOURCE_IDENTITIES_SRV[code];
+
+  if (explicit) {
+    return {
+      code,
+      name: explicit[0],
+      type: explicit[1]
+    };
+  }
+
+  const standard = {
+    HEAT: ["شياع", "heat"],
+    BRED: ["تلقيح", "insemination"],
+    PREG: ["تشخيص حمل", "pregnancy_diagnosis"],
+    OPEN: ["تشخيص حمل", "pregnancy_diagnosis"],
+    ABORT: ["إجهاض", "abortion"],
+    WEAN: ["فطام", "weaning"],
+    DEHORN: ["إزالة القرون", "dehorning"],
+    TRIM: ["تقليم الحوافر", "hoof_trimming"],
+    FOOTRIM: ["تقليم الحوافر", "hoof_trimming"],
+    LAME: ["عرج", "lameness"],
+    MAST: ["التهاب الضرع", "mastitis"],
+    GNRH: ["حقنة هرمونية", "hormone_step"],
+    PGF: ["حقنة هرمونية", "hormone_step"],
+    OVS: ["برنامج تزامن", "ovsynch_history"],
+    OVSYNCH: ["برنامج تزامن", "ovsynch_history"]
+  }[code];
+
+  if (standard) {
+    return {
+      code,
+      name: standard[0],
+      type: standard[1]
+    };
+  }
+
+  const disease = HERD_IMPORT_DC_SUPPORTED_HEALTH_SRV[code];
+
+  if (disease) {
+    return {
+      code,
+      name:
+        DISEASE_CATALOG_SRV[disease]?.name ||
+        HERD_IMPORT_DC_VAS_EVENTS_SRV[code] ||
+        "تشخيص صحي",
+      type: "health"
+    };
+  }
+
+  const mapped = HERD_IMPORT_DC_VAS_EVENTS_SRV[code];
+
+  if (mapped) {
+    return {
+      code,
+      name: mapped,
+      type: "source_record"
+    };
+  }
+
+  return null;
+}
+
 const HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV = new Set([
   "REPRO", "RECK", "CHECK",
   "TREAT", "CULTURE", "BLSERUM", "TEMP",
@@ -17401,13 +17570,26 @@ function herdImportV2TranslateDairyCompEventSrv(
    entryType = "mothers"
 ) {
   const code = String(e.code || "")
-    .trim()
-    .toUpperCase();
+  .trim()
+  .toUpperCase();
 
-  const notes = [
-    "DairyComp:" + (code || "UNKNOWN"),
-    pick(e.r, "Event_Remarks", "Remark", "REM")
-  ].filter(Boolean).join(" | ");
+if (HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(code)) {
+  return null;
+}
+
+if (!herdImportV2DairyCompEventIdentitySrv(code)) {
+  issues.push(
+    `${id}: رمز DairyComp غير معروف ${code || "(فارغ)"}`
+  );
+  return null;
+}
+const notes = pick(
+  e.r,
+  "Event_Remarks",
+  "Remark",
+  "REM"
+);
+
 const sourceDateTime = pick(
   e.r,
   "eventDateTime",
@@ -17429,9 +17611,7 @@ const sourceDateTime = pick(
 if (code === "PREV") {
   return {
     ...base,
-    "نوع الحدث": "سجل حدث مصدر",
-    "ملاحظات":
-      notes + " | حمل من تلقيح سابق أو غير معروف"
+    "نوع الحدث": "سجل حدث مصدر"
   };
 }
 
@@ -17670,8 +17850,27 @@ function herdImportV2DairyCompArchiveCandidateSrv({
   issues
 }) {
   const history = all
-    .filter(e => e.d && e.d <= asOf)
-    .sort((a, b) => a.d.localeCompare(b.d));
+  .filter(e =>
+    e.d &&
+    e.d <= asOf &&
+    !HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(e.code)
+  )
+  .sort((a, b) => a.d.localeCompare(b.d));
+
+  const unknown = history.filter(e =>
+  !herdImportV2DairyCompEventIdentitySrv(e.code)
+);
+
+if (unknown.length) {
+  issues.push(
+    `${id}: رمز أحداث غير معروف في الأرشيف: ` +
+    [...new Set(
+      unknown.map(e => e.code || "(فارغ)")
+    )].join(", ")
+  );
+
+  return null;
+}
 
   const exits = history.filter(e =>
     e.code === "SOLD" || e.code === "DIED"
@@ -18052,6 +18251,10 @@ if (dairyCompIsEventLog && !dairyCompHasAnimalBaseline) {
 
   for (const [id, history] of groups) {
     for (const item of history) {
+
+    if (HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(item.code)) {
+  continue;
+}
       if (!item.code || !item.d || item.d > asOf) {
         issues.push(
           `${id}: رمز الحدث أو تاريخه غير صالح`
@@ -18071,11 +18274,8 @@ if (dairyCompIsEventLog && !dairyCompHasAnimalBaseline) {
         );
 
       if (!translated) {
-        issues.push(
-          `${id}: تعذّر تفسير الحدث ${item.code}`
-        );
-        continue;
-      }
+  continue;
+}
 
       const normalized =
         addAnimalImportNormalizeSheetRowsSrv([
@@ -18526,12 +18726,13 @@ const stage =
  
 for (const e of chronological) {
   if (
-    !e.code ||
-    !birthDate ||
-    e.d < birthDate
-  ) {
-    continue;
-  }
+  !e.code ||
+  HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(e.code) ||
+  !birthDate ||
+  e.d < birthDate
+) {
+  continue;
+}
 
 
     const eventKey = [
@@ -18870,13 +19071,16 @@ const semen =
 
 for (const e of all) {
   if (
-    !e.code ||
-    !e.d ||
-    e.d > asOf ||
-    (motherBirth && e.d < motherBirth)
-  ) {
-    continue;
-  }
+  !e.code ||
+  HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(e.code) ||
+  !e.d ||
+  !calving ||
+  e.d < calving ||
+  e.d > asOf ||
+  (motherBirth && e.d < motherBirth)
+) {
+  continue;
+}
 
 
 
@@ -20653,6 +20857,226 @@ app.post(
   "/api/herd-import-v2/save-operational",
   requireUserId,
   herdImportV2SaveOperationalHandlerSrv
+);
+
+app.post(
+  "/api/herd-import-v2/repair-dairycomp-event-names",
+  requireUserId,
+  async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(503).json({
+          ok: false,
+          message: "قاعدة البيانات غير متاحة."
+        });
+      }
+
+      const uid = req.userId;
+      const apply = req.body?.apply === true;
+
+      const counters = {
+        checked: 0,
+        eligible: 0,
+        corrected: 0,
+        unknown: 0,
+        skipped: 0,
+        byCollection: {}
+      };
+
+      const samples = [];
+
+      const generic = new Set([
+        "external_history",
+        "source_history",
+        "source_record"
+      ]);
+
+      for (const collection of [
+        "events",
+        "archived_events"
+      ]) {
+        let cursor = null;
+        let changed = 0;
+
+        while (true) {
+          let query = db.collection(collection)
+            .where("userId", "==", uid)
+            .orderBy(
+              admin.firestore.FieldPath.documentId()
+            )
+            .limit(200);
+
+          if (cursor) {
+            query = query.startAfter(cursor);
+          }
+
+          const snap = await query.get();
+
+          if (snap.empty) break;
+
+          const batch = db.batch();
+          let pending = 0;
+
+          for (const doc of snap.docs) {
+            const e = doc.data() || {};
+
+            if (
+              String(e.sourceSystem || "").toLowerCase()
+                !== "dairycomp" ||
+              !e.isImportedHistory
+            ) {
+              continue;
+            }
+
+            counters.checked++;
+
+            const code = String(
+              e.sourceEventCode ||
+              e.sourceCode ||
+              ""
+            ).trim().toUpperCase();
+
+            const identity =
+              herdImportV2DairyCompEventIdentitySrv(code);
+
+            if (!identity) {
+              counters.unknown++;
+
+              if (samples.length < 12) {
+                samples.push({
+                  collection,
+                  animalNumber: e.animalNumber || "",
+                  code,
+                  issue: "unknown"
+                });
+              }
+
+              continue;
+            }
+
+            if (!generic.has(
+              String(e.eventTypeNorm || "")
+            )) {
+              counters.skipped++;
+              continue;
+            }
+
+            if (
+              e.type === identity.name &&
+              e.eventType === identity.name &&
+              e.eventTypeNorm === identity.type
+            ) {
+              continue;
+            }
+
+            counters.eligible++;
+
+            if (samples.length < 12) {
+              samples.push({
+                collection,
+                animalNumber: e.animalNumber || "",
+                code,
+                before: e.type || e.eventType || "",
+                after: identity.name
+              });
+            }
+
+            if (apply) {
+              const patch = {
+                type: identity.name,
+                eventType: identity.name,
+                eventTypeNorm: identity.type,
+                dairyCompLabelRepairedAt:
+                  admin.firestore.FieldValue.serverTimestamp()
+              };
+
+              if (
+                collection === "archived_events" &&
+                !e.notes
+              ) {
+                const remark = String(
+                  addAnimalImportPickAnySrv(
+                    e.sourceFields || {},
+                    ["Event_Remarks", "Remark", "REM"]
+                  ) || ""
+                ).trim();
+
+                if (remark) {
+                  patch.notes = remark;
+                }
+              }
+
+              batch.update(doc.ref, patch);
+              pending++;
+            }
+          }
+
+          if (apply && pending) {
+            await batch.commit();
+            changed += pending;
+            counters.corrected += pending;
+          }
+
+          cursor = snap.docs[snap.docs.length - 1];
+
+          if (snap.size < 200) {
+            break;
+          }
+        }
+
+        counters.byCollection[collection] = changed;
+      }
+
+      if (
+        apply &&
+        counters.corrected &&
+        murabbikPreparedEngineSrv
+      ) {
+        try {
+          await murabbikPreparedEngineSrv.markDirty(
+            uid,
+            murabbikPreparedKindsAllSrv
+          );
+        } catch (invalidateError) {
+          // البيانات صُحّحت بالفعل؛ لا نعلن فشل الحفظ.
+          murabbikPreparedUnsafeTenantsSrv.add(uid);
+
+          res.cookie("mbk_prepared_bypass", "1", {
+            httpOnly: true,
+            sameSite: "lax",
+            secure: authIsHttpsReqBridgeSrv(req),
+            path: "/",
+            maxAge: 10 * 60 * 1000
+          });
+
+          console.error(
+            "DairyComp repair cache invalidation failed",
+            invalidateError
+          );
+        }
+      }
+
+      return res.json({
+        ok: true,
+        applied: apply,
+        ...counters,
+        samples
+      });
+
+    } catch (err) {
+      console.error(
+        "DairyComp event-name repair failed",
+        err
+      );
+
+      return res.status(500).json({
+        ok: false,
+        message:
+          "تعذّر إكمال تصحيح سجلات DairyComp. " +
+          "يمكن إعادة المحاولة بأمان."
+      });
+    }
+  }
 );
 
 // ============================================================
@@ -120725,61 +121149,17 @@ async function fetchCardEventsSrv(uid, subject = {}) {
 }
 
 function cardImportedEventNameSrv(e = {}) {
-  const code = String(
-    e.sourceEventCode || e.sourceCode || ''
-  ).trim().toUpperCase();
-
   if (
-    String(e.sourceSystem || '').toLowerCase() !== 'dairycomp' ||
-    String(e.eventTypeNorm || '') !== 'external_history' ||
-    !code
+    String(e.sourceSystem || "").toLowerCase() !== "dairycomp"
   ) {
-    return '';
+    return "";
   }
 
-  const officialTypes = {
-    FRESH: 'calving',
-    HEAT: 'heat',
-    BRED: 'insemination',
-    PREG: 'pregnancy_diagnosis',
-    OPEN: 'pregnancy_diagnosis',
-    ABORT: 'abortion',
-    DRY: 'dry_off',
-    WEAN: 'weaning',
-    VACC: 'vaccination',
-    CALFVACC: 'vaccination',
-    MAST: 'mastitis',
-    LAME: 'lameness',
-    FOOTRIM: 'hoof_trimming',
-    TRIM: 'hoof_trimming',
-    DEHORN: 'dehorning',
-    SOLD: 'sale',
-    DIED: 'death',
-    OVS: 'ovsynch',
-    OVSYNCH: 'ovsynch'
-  };
+  const identity = herdImportV2DairyCompEventIdentitySrv(
+    e.sourceEventCode || e.sourceCode
+  );
 
-  const officialType = officialTypes[code];
-
-  if (officialType) {
-    return eventsPageTypeLabelSrv({
-      eventTypeNorm: officialType
-    });
-  }
-
-  if (HERD_IMPORT_DC_SUPPORTED_HEALTH_SRV[code]) {
-    return herdImportV2EventLabelInternalSrv('health');
-  }
-
-  if (code === 'BIRTH') {
-    return 'ميلاد';
-  }
-
-  if (code === 'GNRH' || code === 'PGF') {
-    return herdImportV2EventLabelInternalSrv('hormone_step');
-  }
-
-  return HERD_IMPORT_DC_VAS_EVENTS_SRV[code] || '';
+  return identity?.name || "";
 }
 
 function cardImportedEventNoteSrv(value) {
@@ -120822,105 +121202,47 @@ function cardImportedEventNoteSrv(value) {
     .trim();
 }
 
-function cardEventTitleSrv(e = {}) {
-  const direct = cardFirstSrv(e, [
-    'displayName',
-    'eventNameAr',
-    'pageTitleAr',
-    'nameAr',
-    'titleAr',
-    'labelAr',
-    'eventName',
-    'name',
-    'title',
-    'label',
-    'eventTypeAr',
-    'eventType',
-    'type',
-    'kind',
-    'diseaseName',
-    'diagnosis',
-    'pregnancyResult',
-    'heatStatus'
-  ], '');
-
-const raw = String(direct || '').trim();
-
-const isSourcePlaceholder =
-  /^(?:حدث\s+DairyComp\s+تاريخي|حدث مستورد|حدث تاريخي|سجل حدث مصدر)$/i
-    .test(raw);
-
-if (
-  raw &&
-  /[\u0600-\u06FF]/.test(raw) &&
-  !isSourcePlaceholder
-) {
-  return raw;
-}
-
-const importedName = cardImportedEventNameSrv(e);
-
-if (importedName) {
-  return importedName;
-}
-
-  const type = eventTypeForCardSrv(e);
-
- const map = {
-  milk: 'لبن يومي',
-  calving: 'ولادة',
-  insemination: 'تلقيح',
-  pregnancy: 'تشخيص حمل',
-  heat: 'شياع',
-  dry: 'تجفيف',
-  close_up: 'تحضير للولادة',
-  disease: 'حالة صحية',
-  other: 'حدث'
-};
-
-  return map[type] || raw || 'حدث';
-}
-
 function cardEventSummarySrv(e = {}) {
   if (
-  String(e.sourceSystem || '').toLowerCase() === 'dairycomp' &&
-  e.eventTypeNorm === 'external_history'
-) {
-  const code = String(
-    e.sourceEventCode || ''
-  ).trim().toUpperCase();
+    String(e.sourceSystem || '').toLowerCase() === 'dairycomp' &&
+    e.eventTypeNorm === 'external_history'
+  ) {
+    const code = String(
+      e.sourceEventCode || ''
+    ).trim().toUpperCase();
 
-  const diseaseCode =
-    HERD_IMPORT_DC_SUPPORTED_HEALTH_SRV[code];
+    const diseaseCode =
+      HERD_IMPORT_DC_SUPPORTED_HEALTH_SRV[code];
 
-  if (diseaseCode) {
-    const diseaseName =
-      DISEASE_CATALOG_SRV[diseaseCode]?.name || '';
+    if (diseaseCode) {
+      const diseaseName =
+        DISEASE_CATALOG_SRV[diseaseCode]?.name || '';
 
-    const note =
-      cardImportedEventNoteSrv(e.notes || '');
+      const note =
+        cardImportedEventNoteSrv(e.notes || '');
 
-    return [
-      diseaseName ? `التشخيص: ${diseaseName}` : '',
-      note
-    ].filter(Boolean).join(' — ') || '—';
+      return [
+        diseaseName ? `التشخيص: ${diseaseName}` : '',
+        note
+      ].filter(Boolean).join(' — ') || '—';
+    }
   }
-}
-const existing = cardFirstSrv(
-  e,
-  ['summary', 'shortSummary', 'message', 'detailsText'],
-  ''
-);
 
-if (existing) {
-  const cleaned = cardImportedEventNoteSrv(existing);
+  const existing = cardFirstSrv(
+    e,
+    ['summary', 'shortSummary', 'message', 'detailsText'],
+    ''
+  );
 
-  if (cleaned) return cardTextSrv(cleaned, '—');
+  if (existing) {
+    const cleaned = cardImportedEventNoteSrv(existing);
 
-  if (!/DairyComp|DC305/i.test(String(existing))) {
-    return cardTextSrv(existing, '—');
+    if (cleaned) return cardTextSrv(cleaned, '—');
+
+    if (!/DairyComp|DC305/i.test(String(existing))) {
+      return cardTextSrv(existing, '—');
+    }
   }
-}
 
   const type = eventTypeForCardSrv(e);
 
@@ -120957,13 +121279,72 @@ if (existing) {
   const note = cardFirstSrv(e, ['notes', 'note', 'comment', 'reason', 'description'], '');
 
   const visibleNote =
-  String(e.sourceSystem || '').toLowerCase() === 'dairycomp'
-    ? cardImportedEventNoteSrv(note)
-    : note;
+    String(e.sourceSystem || '').toLowerCase() === 'dairycomp'
+      ? cardImportedEventNoteSrv(note)
+      : note;
 
-return visibleNote
-  ? cardTextSrv(visibleNote, '—')
-  : '—';
+  return visibleNote
+    ? cardTextSrv(visibleNote, '—')
+    : '—';
+}
+
+function cardEventTitleSrv(e = {}) {
+  const direct = cardFirstSrv(e, [
+    'displayName',
+    'eventNameAr',
+    'pageTitleAr',
+    'nameAr',
+    'titleAr',
+    'labelAr',
+    'eventName',
+    'name',
+    'title',
+    'label',
+    'eventTypeAr',
+    'eventType',
+    'type',
+    'kind',
+    'diseaseName',
+    'diagnosis',
+    'pregnancyResult',
+    'heatStatus'
+  ], '');
+
+  const raw = String(direct || '').trim();
+
+  const isSourcePlaceholder =
+    /^(?:حدث\s+DairyComp\s+تاريخي|حدث مستورد|حدث تاريخي|سجل حدث مصدر)$/i
+      .test(raw);
+
+  const importedName = cardImportedEventNameSrv(e);
+
+  if (importedName) {
+    return importedName;
+  }
+
+  if (
+    raw &&
+    /[\u0600-\u06FF]/.test(raw) &&
+    !isSourcePlaceholder
+  ) {
+    return raw;
+  }
+
+  const type = eventTypeForCardSrv(e);
+
+  const map = {
+    milk: 'لبن يومي',
+    calving: 'ولادة',
+    insemination: 'تلقيح',
+    pregnancy: 'تشخيص حمل',
+    heat: 'شياع',
+    dry: 'تجفيف',
+    close_up: 'تحضير للولادة',
+    disease: 'حالة صحية',
+    other: 'حدث'
+  };
+
+  return map[type] || raw || 'حدث';
 }
 
 function cardEventDetailsSrv(e = {}) {
