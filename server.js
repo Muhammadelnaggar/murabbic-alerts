@@ -22112,8 +22112,20 @@ function eventsPageDetailsSrv(ev = {}) {
     eventsPagePushDetailSrv(parts, label, pick(keys, ""), unit);
   };
 
-  const note = pick(["note", "notes", "ملاحظة", "description", "reasonText"], "");
-  const result = pick(["result", "النتيجة", "statusText"], "");
+  const rawNote = pick(
+  ["note", "notes", "ملاحظة", "description", "reasonText"],
+  ""
+);
+
+const note =
+  String(ev.sourceSystem || "").trim().toLowerCase() === "dairycomp"
+    ? cardImportedEventNoteSrv(rawNote)
+    : rawNote;
+
+const result = pick(
+  ["result", "النتيجة", "statusText"],
+  ""
+);
 
   if (key === "insemination") {
     add("الوقت", ["inseminationTime", "timeOfDay", "time", "eventTime", "at", "وقت", "ساعة"]);
