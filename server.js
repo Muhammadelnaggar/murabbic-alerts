@@ -9272,6 +9272,17 @@ if (strictlyTyped && item.eventType !== strictlyTyped) {
     const animal = animalsByNumber.get(
   item.animalNumber
 );
+if (
+  animal?.entryType === "mothers" &&
+  ["FRESH", "CALVED"].includes(item.sourceEventCode) &&
+  (!animal.lastCalvingDate || item.eventDate >
+    String(animal.lastCalvingDate).slice(0, 10))
+) {
+  throw herdImportV2TemplateErrorSrv(
+    `ولادة أحدث من بيانات الأم ${item.animalNumber}؛ ` +
+    "يلزم FILEOUT محدث قبل استيراد هذه الأحداث، دون افتراض الموسم أو DIM."
+  );
+}
 
 if (
   animal?.birthDate &&
@@ -11406,10 +11417,10 @@ function herdImportV2DairyCompArchiveWriteRowsSrv({
         entryType:
           isFollower ? "followers" : "mothers",
 
-        animalType,
-        breed,
-        birthDate: c.birthDate || null,
-
+animalType,
+...addAnimalSpeciesFromTypeSrv(animalType),
+breed,
+birthDate: c.birthDate || null,
         ...(isFollower
           ? {
               followerSex: c.sex || "",
@@ -11616,6 +11627,10 @@ const historicalDairyComp =
 const stateMap = new Map();
 const lastHeatOrAIMap = new Map();
 
+// DairyComp: actual BRED history only.
+const dairyCompVerifiedBredByAnimal = new Map();
+
+
   const sorted = [
     ...(eventsPreflight.normalizedEventsInternal || [])
   ].sort(
@@ -11741,6 +11756,16 @@ const ref = db
   ]) {
     delete payload[field];
   }
+
+  // Link diagnosis only to a verified previous BRED.
+  if (item.eventType === "pregnancy_diagnosis") {
+    const verifiedBredDate =
+      dairyCompVerifiedBredByAnimal.get(item.animalNumber) || "";
+
+    if (verifiedBredDate && verifiedBredDate < item.eventDate) {
+      payload.lastInseminationDate = verifiedBredDate;
+    }
+  }
 }
     const embryonicLossPayload =
       embryonicLossRef &&
@@ -11831,6 +11856,23 @@ if (!historicalDairyComp) {
       derived: false
     });
 
+if (historicalDairyComp) {
+  const code =
+    String(item.sourceEventCode || "").toUpperCase();
+
+  if (code === "BRED") {
+    dairyCompVerifiedBredByAnimal.set(
+      item.animalNumber,
+      item.eventDate
+    );
+  } else if (
+    ["FRESH", "CALVED", "HEAT", "ABORT", "OPEN"].includes(code)
+  ) {
+    dairyCompVerifiedBredByAnimal.delete(
+      item.animalNumber
+    );
+  }
+}
     if (
       embryonicLossRef &&
       embryonicLossPayload
@@ -11869,6 +11911,8 @@ if (!historicalDairyComp) {
       );
     }
   }
+
+  
 
   const linkedUpdates = linkedExistingAnimals
   .filter(entry =>
@@ -99100,6 +99144,54 @@ function fertilityReportPregnancy21Srv({
     return "";
   };
 
+  const verifiedHistoryStartByNumber = new Map();
+
+const verifiedReproCodes = new Set([
+  "FRESH", "CALVED", "HEAT", "BRED",
+  "PREG", "OPEN", "ABORT"
+]);
+
+for (const e of events) {
+  if (
+    e?.sourceSystem !== "dairycomp" ||
+    e?.isImportedHistory !== true ||
+    !verifiedReproCodes.has(
+      String(e.sourceEventCode || "")
+        .trim()
+        .toUpperCase()
+    )
+  ) {
+    continue;
+  }
+
+  const number = fertilityReportAnimalNumberSrv(e);
+
+  const eventMs = fertilityReportMsSrv(
+    computeEventDateFromDoc(e)
+  );
+
+  if (
+    !number ||
+    !Number.isFinite(eventMs) ||
+    eventMs > todayMs
+  ) {
+    continue;
+  }
+
+  const current =
+    verifiedHistoryStartByNumber.get(number);
+
+  if (
+    !Number.isFinite(current) ||
+    eventMs < current
+  ) {
+    verifiedHistoryStartByNumber.set(
+      number,
+      eventMs
+    );
+  }
+}
+
   const byNumber = new Map();
 
   let ambiguousNumbers = false;
@@ -99139,7 +99231,27 @@ function fertilityReportPregnancy21Srv({
 
     if (!species) continue;
 
-    const registeredMs = asMs(raw.createdAt);
+    const createdMs = asMs(raw.createdAt);
+
+const isImportedDairyComp =
+  raw.importedBy === "herd_import_v2" &&
+  (
+    raw.sourceProfileKey === "dairycomp" ||
+    raw.sourceSystem === "dairycomp"
+  );
+
+const historyMs = isImportedDairyComp
+  ? verifiedHistoryStartByNumber.get(number)
+  : undefined;
+
+const registeredMs = Number.isFinite(historyMs)
+  ? Math.min(
+      Number.isFinite(createdMs)
+        ? createdMs
+        : Infinity,
+      historyMs
+    )
+  : createdMs;
 
     if (!Number.isFinite(registeredMs)) {
       missingRegistration = true;
