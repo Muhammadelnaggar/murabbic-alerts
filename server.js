@@ -125010,6 +125010,87 @@ app.get('/api/calves', requireUserId, async (req, res) => {
     return res.status(500).json({ ok:false, error:'calves_failed' });
   }
 });
+
+
+app.get('/api/import-raw-audit', requireUserId, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({
+        ok: false,
+        error: 'firestore_unavailable'
+      });
+    }
+
+    const uid = req.userId;
+
+    const allAnimals = await animalListFetchFirestoreSrv(uid);
+
+    const selected = new Map();
+
+    const take = (rows, count) => {
+      for (const a of rows.slice(0, count)) {
+        selected.set(a.id, a);
+      }
+    };
+
+    take(allAnimals.filter(a =>
+      a.reproductiveStatus === 'عشار'), 3);
+
+    take(allAnimals.filter(a =>
+      a.reproductiveStatus === 'مفتوحة'), 3);
+
+    take(allAnimals.filter(a =>
+      a.reproductiveStatus === 'ملقحة'), 3);
+
+    take(allAnimals.filter(a =>
+      a.productionStatus === 'جاف'), 3);
+
+    const calvesSnap = await db.collection('calves')
+      .where('userId', '==', uid)
+      .limit(8)
+      .get();
+
+    const animals = [...selected.values()];
+
+    const samples = [];
+
+    for (const animal of animals) {
+      const number = String(
+        animal.animalNumber || animal.number || ''
+      ).trim();
+
+      if (!number) continue;
+
+      const events = await eventsPageFetchAnimalEventsSrv(
+        uid, number
+      );
+
+      samples.push({
+        animal,
+        events
+      });
+    }
+
+    return res.json({
+      ok: true,
+      source: 'MURABBIK_FIRESTORE_RAW_AUDIT',
+      capturedAt: new Date().toISOString(),
+      animals: samples,
+      calves: calvesSnap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }))
+    });
+
+  } catch (e) {
+    console.error('import raw audit failed:', e);
+    return res.status(500).json({
+      ok: false,
+      error: 'import_raw_audit_failed'
+    });
+  }
+});
+
 // ============================================================
 //                 API: ARCHIVE ANIMAL
 //                 animals -> archived_animals
