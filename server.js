@@ -125052,6 +125052,43 @@ app.get('/api/import-raw-audit', requireUserId, async (req, res) => {
 
     const animals = [...selected.values()];
 
+    const calves = calvesSnap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }));
+
+    const calfEvents = [];
+
+    for (const calf of calves) {
+      const calfNumber = String(
+        calf.calfNumber ||
+        calf.animalNumber ||
+        calf.number ||
+        ''
+      ).trim();
+
+      if (!calfNumber) {
+        calfEvents.push({
+          calfId: calf.id,
+          calfNumber: '',
+          events: [],
+          error: 'calf_number_missing'
+        });
+        continue;
+      }
+
+      const events = await eventsPageFetchAnimalEventsSrv(
+        uid,
+        calfNumber
+      );
+
+      calfEvents.push({
+        calfId: calf.id,
+        calfNumber,
+        events
+      });
+    }
+
     const samples = [];
 
     for (const animal of animals) {
@@ -125076,10 +125113,8 @@ app.get('/api/import-raw-audit', requireUserId, async (req, res) => {
       source: 'MURABBIK_FIRESTORE_RAW_AUDIT',
       capturedAt: new Date().toISOString(),
       animals: samples,
-      calves: calvesSnap.docs.map(d => ({
-        id: d.id,
-        ...d.data()
-      }))
+      calves,
+      calfEvents
     });
 
   } catch (e) {
