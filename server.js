@@ -9235,8 +9235,9 @@ if (!identity) {
 const strictlyTyped = {
   HEAT: "heat",
   BRED: "insemination",
-  PREG: "pregnancy_diagnosis",
-  OPEN: "pregnancy_diagnosis",
+PREG: "pregnancy_diagnosis",
+PREV: "pregnancy_diagnosis",
+OPEN: "pregnancy_diagnosis",
   ABORT: "abortion",
   MAST: "mastitis",
   LAME: "lameness",
@@ -9319,23 +9320,8 @@ if (
   );
 }
 
-if (
-  item.sourceEventCode === "HEAT" &&
-  !item.heatTime
-) {
-  throw herdImportV2TemplateErrorSrv(
-    `وقت الشياع غير مؤكد للحيوان ${item.animalNumber}، الصف ${item.row}.`
-  );
-}
-
-if (
-  item.sourceEventCode === "BRED" &&
-  !item.inseminationTime
-) {
-  throw herdImportV2TemplateErrorSrv(
-    `وقت التلقيح غير مؤكد للحيوان ${item.animalNumber}، الصف ${item.row}.`
-  );
-}
+// Historical DairyComp events remain valid without AM/PM.
+// Preserve the original date; do not invent a time.
 
     item.duplicateKey = [
       "dairycomp",
@@ -9392,8 +9378,12 @@ eventsByAnimal.get(item.animalNumber).push(item);
   }
 }
 
+
+  
   return {
     previewEvents: normalized.map(item => ({
+
+
       sheetName: item.sheetName,
       row: item.row,
       animalNumber: item.animalNumber,
@@ -10706,7 +10696,9 @@ sourceSheet: item.sheetName || "الأحداث",
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   };
  if (item.eventType === "source_history") {
-  if (item.sourceEventCode === "FRESH") {
+  if (
+  ["FRESH", "CALVED"].includes(item.sourceEventCode)
+) {
   return {
     ...common,
     type: "ولادة",
@@ -10762,11 +10754,14 @@ if (item.sourceEventCode === "DRY") {
     );
   }
 
+  const sourceOnly =
+    item.rawEventType === "سجل حدث مصدر";
+
   return {
     ...common,
-    type: identity.name,
-    eventType: identity.name,
-    eventTypeNorm: identity.type,
+    type: sourceOnly ? "سجل حدث مصدر" : identity.name,
+    eventType: sourceOnly ? "سجل حدث مصدر" : identity.name,
+    eventTypeNorm: sourceOnly ? "source_record" : identity.type,
     date: eventDate,
     notes
   };
@@ -11629,6 +11624,7 @@ const lastHeatOrAIMap = new Map();
 
 // DairyComp: actual BRED history only.
 const dairyCompVerifiedBredByAnimal = new Map();
+const dairyCompSavedCalvingDays = new Set();
 
 
   const sorted = [
@@ -11655,13 +11651,19 @@ const dairyCompVerifiedBredByAnimal = new Map();
 
     let state = stateMap.get(item.animalNumber);
 
-    if (!state) {
-    state = herdImportV2CreateTemporalStateInternalSrv(
-  animalEntry.base
-);
+if (!state) {
+  state = herdImportV2CreateTemporalStateInternalSrv(
+    animalEntry.base
+  );
 
-      stateMap.set(item.animalNumber, state);
-    }
+  if (historicalDairyComp) {
+    state.lastCalvingDate = "";
+    state.lastBoundary = "";
+    state.lastBoundaryType = "";
+  }
+
+  stateMap.set(item.animalNumber, state);
+}
 
        const key =
       herdImportV2EventPersistenceKeyInternalSrv(
@@ -11721,6 +11723,21 @@ const ref = db
             )
         : null;
 
+            const sourceCalving =
+      historicalDairyComp &&
+      ["FRESH", "CALVED"].includes(item.sourceEventCode);
+
+    const calvingDayKey =
+      `${item.animalNumber}|${item.eventDate}`;
+
+    const duplicateCalving =
+      sourceCalving &&
+      dairyCompSavedCalvingDays.has(calvingDayKey);
+
+    if (sourceCalving && !duplicateCalving) {
+      dairyCompSavedCalvingDays.add(calvingDayKey);
+    }
+
     const payload =
       herdImportV2ImportedEventPayloadInternalSrv({
         uid,
@@ -11737,7 +11754,15 @@ const ref = db
         linkedEmbryonicLossEventId:
           embryonicLossRef?.id || ""
       });
-    if (historicalDairyComp) {
+
+          if (duplicateCalving) {
+      payload.type = "سجل حدث مصدر";
+      payload.eventType = "سجل حدث مصدر";
+      payload.eventTypeNorm = "source_record";
+      delete payload.calvingDate;
+      delete payload.lactationNumber;
+    }
+if (historicalDairyComp) {
   for (const field of [
     "reproductiveStatusSnapshot",
     "dimAtEvent",
@@ -11757,17 +11782,84 @@ const ref = db
     delete payload[field];
   }
 
-  // Link diagnosis only to a verified previous BRED.
-  if (item.eventType === "pregnancy_diagnosis") {
-    const verifiedBredDate =
-      dairyCompVerifiedBredByAnimal.get(item.animalNumber) || "";
+  const verifiedBred =
+    dairyCompVerifiedBredByAnimal.get(
+      item.animalNumber
+    );
 
-    if (verifiedBredDate && verifiedBredDate < item.eventDate) {
-      payload.lastInseminationDate = verifiedBredDate;
+  const pairedBred =
+    verifiedBred &&
+    verifiedBred.date < item.eventDate
+      ? verifiedBred
+      : null;
+
+  if (item.eventType === "insemination") {
+    payload.serviceNumber =
+      state.servicesCount +
+      (
+        state.sameDayInseminations.has(item.eventDate)
+          ? 0
+          : 1
+      );
+  }
+
+  if (item.eventType === "heat") {
+    payload.reproductiveStatusSnapshot =
+      state.reproductiveStatus;
+
+    payload.dimAtEvent =
+      herdImportV2EventDaysInternalSrv(
+        state.lastCalvingDate,
+        item.eventDate
+      );
+
+    payload.daysSinceLastHeatOrAI =
+      herdImportV2EventDaysInternalSrv(
+        lastHeatOrAIMap.get(item.animalNumber) || "",
+        item.eventDate
+      );
+  }
+
+  if (item.eventType === "pregnancy_diagnosis") {
+    payload.reproductiveStatusBefore =
+      state.reproductiveStatus;
+  }
+
+  if (
+    pairedBred &&
+    [
+      "pregnancy_diagnosis",
+      "abortion"
+    ].includes(item.eventType)
+  ) {
+    payload.lastInseminationDate =
+      pairedBred.date;
+
+    payload.linkedInseminationEventId =
+      pairedBred.eventId;
+
+    payload.daysFromLastInsemination =
+      herdImportV2EventDaysInternalSrv(
+        pairedBred.date,
+        item.eventDate
+      );
+
+    if (item.eventType === "abortion") {
+      payload.lastFertileInseminationDate =
+        pairedBred.date;
+
+      Object.assign(
+        payload,
+        calcAbortionAgeAndCauseSrv(
+          pairedBred.date,
+          item.eventDate
+        )
+      );
     }
   }
 }
-    const embryonicLossPayload =
+  const embryonicLossPayload =
+
       embryonicLossRef &&
       embryonicLossKey
         ? herdImportV2ImportedEmbryonicLossPayloadInternalSrv({
@@ -11816,37 +11908,54 @@ if (!historicalDairyComp) {
       item.eventDate
     );
   }
-} else if (
-  [
+} else {
+  const currentSeasonStart = String(
+    animalEntry.base.lastCalvingDate || ""
+  ).slice(0, 10);
+
+  const isCurrentSeason =
+    animalEntry.base.entryType === "mothers" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(currentSeasonStart) &&
+    item.eventDate >= currentSeasonStart;
+
+  const isReproductive = [
     "heat",
     "insemination",
     "pregnancy_diagnosis",
+    "abortion"
+  ].includes(item.eventType);
+
+  const isHistoryHealthOrCalf = [
     "health",
     "lameness",
     "mastitis",
     "hoof_trimming",
     "weaning",
     "dehorning"
-  ].includes(item.eventType)
-) {
-  if (item.eventType === "insemination") {
-    animalEntry.eventPatch.lastInseminationDate =
-      item.eventDate;
+  ].includes(item.eventType);
+
+  if (
+    (isReproductive && isCurrentSeason) ||
+    isHistoryHealthOrCalf
+  ) {
+    herdImportV2ImportedAnimalEventPatchInternalSrv(
+      animalEntry.eventPatch,
+      item,
+      payload,
+      ref.id
+    );
   }
 
-  herdImportV2ImportedAnimalEventPatchInternalSrv(
-    animalEntry.eventPatch,
-    item,
-    payload,
-    ref.id
-  );
-
-} else if (item.eventType === "abortion") {
-  animalEntry.eventPatch.lastAbortionDate =
-    item.eventDate;
-
-  animalEntry.eventPatch.lastAbortionEventId =
-    ref.id;
+  if (
+    item.eventType === "weaning" &&
+    animalEntry.collectionName === "calves" &&
+    String(
+      animalEntry.payload.followerStatus || ""
+    ) === "رضيع"
+  ) {
+    animalEntry.eventPatch.followerStatus = "فطام";
+    animalEntry.eventPatch.status = "فطام";
+  }
 }
 
        events.push({
@@ -11857,19 +11966,74 @@ if (!historicalDairyComp) {
     });
 
 if (historicalDairyComp) {
-  const code =
-    String(item.sourceEventCode || "").toUpperCase();
+  const code = String(
+    item.sourceEventCode || ""
+  ).toUpperCase();
 
-  if (code === "BRED") {
+  if (["FRESH", "CALVED"].includes(code) && !duplicateCalving) {
+    state.lastCalvingDate = item.eventDate;
+    state.lastBoundary = item.eventDate;
+    state.lastBoundaryType = "ولادة";
+    state.lastInseminationDate = "";
+    state.servicesCount = 0;
+    state.sameDayInseminations.clear();
+    state.reproductiveStatus = "مفتوحة";
+
+    lastHeatOrAIMap.delete(item.animalNumber);
+    dairyCompVerifiedBredByAnimal.delete(
+      item.animalNumber
+    );
+
+  } else if (code === "BRED") {
+    if (
+      !state.sameDayInseminations.has(
+        item.eventDate
+      )
+    ) {
+      state.servicesCount++;
+    }
+
+    state.sameDayInseminations.set(
+      item.eventDate,
+      true
+    );
+
+    state.lastInseminationDate = item.eventDate;
+    state.reproductiveStatus = "ملقحة";
+
     dairyCompVerifiedBredByAnimal.set(
+      item.animalNumber,
+      {
+        date: item.eventDate,
+        eventId: ref.id
+      }
+    );
+
+    lastHeatOrAIMap.set(
       item.animalNumber,
       item.eventDate
     );
-  } else if (
-    ["FRESH", "CALVED", "HEAT", "ABORT", "OPEN"].includes(code)
-  ) {
+
+  } else if (["PREG", "PREV"].includes(code)) {
+    state.reproductiveStatus = "عشار";
+
+  } else if (code === "OPEN") {
+    state.reproductiveStatus = "مفتوحة";
+    dairyCompVerifiedBredByAnimal.delete(item.animalNumber);
+
+  } else if (code === "ABORT") {
+    state.reproductiveStatus = "إجهاض";
+    state.lastBoundary = item.eventDate;
+    state.lastBoundaryType = "إجهاض";
     dairyCompVerifiedBredByAnimal.delete(
       item.animalNumber
+    );
+
+  } else if (code === "HEAT") {
+    state.reproductiveStatus = "مفتوحة";
+    lastHeatOrAIMap.set(
+      item.animalNumber,
+      item.eventDate
     );
   }
 }
@@ -11925,6 +12089,7 @@ if (historicalDairyComp) {
     animalNumber: entry.animalNumber,
     payload: entry.eventPatch
   }));
+
   for (const entry of animals) {
     entry.payload = {
       ...entry.payload,
@@ -11933,7 +12098,18 @@ if (historicalDairyComp) {
       updatedAt:
         admin.firestore.FieldValue.serverTimestamp()
     };
+
+    if (
+      historicalDairyComp &&
+      entry.payload.reproductiveStatus === "عشار" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(
+        String(entry.payload.lastInseminationDate || "")
+      )
+    ) {
+      delete entry.payload.pregnancyDays;
+    }
   }
+
 
   const archiveMoves = linkedExistingAnimals
     .filter(entry =>
@@ -17611,7 +17787,7 @@ const HERD_IMPORT_DC_VAS_EVENTS_SRV = Object.freeze({
   BRED: "تلقيح أو تزاوج",
   PREG: "تأكيد حمل",
   OPEN: "عدم وجود حمل",
-  PREV: "حمل من تلقيح سابق أو غير معروف",
+  PREV: "حمل من تلقيح سابق مسجل",
   MOVE: "انتقال حظيرة",
   BULLPEN: "دخول حظيرة الطلوق",
   DRY: "تجفيف",
@@ -17620,7 +17796,7 @@ const HERD_IMPORT_DC_VAS_EVENTS_SRV = Object.freeze({
   SOLD: "بيع",
   DIED: "نفوق",
   CHECK: "إدراج للفحص البيطري",
-  CALFVACC: "تحصين العجل للبروسيلا",
+  CALFVACC: "تحصين العجل",
   XID: "تغيير رقم الحيوان",
   BCS: "تقييم حالة الجسم",
   CLOSEUP: "تحضير للولادة",
@@ -17695,13 +17871,17 @@ const HERD_IMPORT_DC_SOURCE_IDENTITIES_SRV = Object.freeze({
   BIRTH: ["ميلاد", "birth"],
   HOOF: ["مشكلة حافر", "hoof_problem"],
   DRY: ["تجفيف", "dry_off"],
-  PREV: ["حمل مسجل", "pregnancy_history"],
+  PREV: ["تشخيص حمل", "pregnancy_diagnosis"],
   SOLD: ["بيع", "sale"],
   DIED: ["نفوق", "death"],
   CLOSEUP: ["تحضير للولادة", "close_up"],
   BCS: ["تقييم حالة الجسم", "body_condition"],
   VACC: ["تحصين", "vaccination_record"],
   CALFVACC: ["تحصين", "vaccination_record"],
+  BULLPEN: [
+  "تعريض للطلوق (تلقيح طبيعي)",
+  "source_record"
+],
   OK: ["تأكيد الحالة", "source_record"],
   DNB: ["عدم التلقيح", "source_record"],
   XID: ["تغيير رقم الحيوان", "source_record"],
@@ -17771,27 +17951,26 @@ function herdImportV2DairyCompEventIdentitySrv(value) {
     };
   }
 
-  const mapped = HERD_IMPORT_DC_VAS_EVENTS_SRV[code];
+const mapped = HERD_IMPORT_DC_VAS_EVENTS_SRV[code];
 
-  if (mapped) {
-    return {
-      code,
-      name: mapped,
-      type: "source_record"
-    };
-  }
-
-  return null;
+if (mapped) {
+  return {
+    code,
+    name: mapped,
+    type: "source_record"
+  };
 }
 
-const HERD_IMPORT_DC_REPRO_REVIEW_CODES_SRV = new Set([
-  "REPRO", "RECK", "CHECK", "CIDR", "TRANSFER"
-]);
+return {
+  code,
+  name: `حدث DairyComp (${code})`,
+  type: "source_record"
+};
+}
 
-const HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV = new Set([
-  "TREAT", "CULTURE", "BLSERUM", "TEMP",
-  "MOVE", "BULLPEN"
-]);
+const HERD_IMPORT_DC_REPRO_REVIEW_CODES_SRV = new Set();
+
+const HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV = new Set();
 
 function herdImportV2DairyCompObservedDayPartSrv(value) {
   const raw = String(value || "").trim();
@@ -17987,12 +18166,35 @@ const sourceDateTime = pick(
 ) ? "" : notes
 };
   
-if (code === "PREV") {
+
+const rawPregnancyMethod = String(
+  pick(e.r, "PregnancyMethod") || ""
+).trim();
+
+const pregnancyMethod =
+  !rawPregnancyMethod ||
+  /^(?:NA|N\/A|NONE|NULL|UNKNOWN|غير محدد|-)$/i.test(rawPregnancyMethod)
+    ? "جس يدوي"
+    : rawPregnancyMethod;
+
+    if (code === "BULLPEN") {
   return {
     ...base,
     "نوع الحدث": "سجل حدث مصدر"
   };
 }
+
+if (code === "PREV") {
+  return {
+    ...base,
+    "نوع الحدث": "تشخيص حمل",
+    "نتيجة التشخيص": "عشار",
+    
+"طريقة التشخيص": pregnancyMethod
+
+  };
+}
+
 
 if (code === "PGF" || code === "GNRH") {
   return {
@@ -18093,7 +18295,9 @@ if (code === "BRED") {
     return {
       ...base,
       "نوع الحدث": "تشخيص حمل",
-      "طريقة التشخيص": pick(e.r, "PregnancyMethod"),
+      
+"طريقة التشخيص": pregnancyMethod,
+
       "نتيجة التشخيص":
         code === "PREG" ? "عشار" : "فارغة"
     };
@@ -18107,14 +18311,17 @@ if (code === "BRED") {
   }
 
 if (code === "VACC" || code === "CALFVACC") {
-  const vaccineName = pick(e.r, "Vaccine", "VaccineName");
-  const vaccineCode = pick(e.r, "VaccineCode", "CVACC");
+const vaccineName =
+  pick(e.r, "Vaccine", "VaccineName");
+
+  const vaccineCode =
+    pick(e.r, "VaccineCode", "CVACC");
 
   if (!vaccineName && !vaccineCode) {
-    issues.push(
-      `${id}: بيانات التحصين ${code} غير محددة بتاريخ ${e.d}`
-    );
-    return null;
+    return {
+      ...base,
+      "نوع الحدث": "سجل حدث مصدر"
+    };
   }
 
   return {
@@ -19694,17 +19901,15 @@ const semen =
 
 for (const e of all) {
   if (
-  !e.code ||
-  HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(e.code) ||
-  !e.d ||
-  !calving ||
-  e.d < calving ||
-  e.d > asOf ||
-  (motherBirth && e.d < motherBirth)
-) {
-  continue;
-}
-
+    !e.code ||
+    HERD_IMPORT_DC_UNUSED_EVENT_CODES_SRV.has(e.code) ||
+    !e.d ||
+    !calving ||
+    e.d > asOf ||
+    (motherBirth && e.d < motherBirth)
+  ) {
+    continue;
+  }
 
 
   const eventKey = [
@@ -20234,32 +20439,9 @@ const dcHistorical =
   body.externalSource === "dairycomp" &&
   templateData.externalSummary?.historicalSourceOnly === true;
 
-if (dcIssues.length || dcHistorical) {
-  persistencePlan.ready = false;
-  persistencePlan.saveEnabled = false;
-  persistencePlan.persistenceEnabled = false;
-}
-
 
 const previewRejectedItems = [
-  ...dcIssues.map(message => ({
-    sheetName: "DairyComp",
-    row: null,
-    animalNumber: "",
-    recordKind: "مراجعة المصدر",
-    eventLabel: "",
-    message
-  })),
-
-  ...(dcHistorical ? [{
-    sheetName: "DairyComp",
-    row: null,
-    animalNumber: "",
-    recordKind: "ملف تاريخي",
-    eventLabel: "",
-    message:
-      "هذه عينة تصدير قديمة: المعاينة مسموحة، حفظ حالة قطيع تاريخية كحالية ممنوع."
-  }] : []),
+  
 
   ...(baselinePreview.previewAnimals || [])
     .filter(item => item?.ok !== true),
@@ -20306,85 +20488,28 @@ const previewRejectedItems = [
 
 
 
-const dcReasonCounts = new Map();
-
-if (dcHistorical) {
-  for (const issue of dcIssues) {
-    const reason = String(issue || "")
-      .replace(/^\d+:\s*/, "")
-      .trim();
-
-    if (!reason) continue;
-
-    dcReasonCounts.set(
-      reason,
-      (dcReasonCounts.get(reason) || 0) + 1
-    );
-  }
-}
-
-const dcReasons = [...dcReasonCounts.entries()]
-  .sort((a, b) => b[1] - a[1]);
-
-const dcDisplaySummary = dcHistorical
-  ? {
-      ...templateData.externalSummary,
-      sourceIssues: [],
-      sourceIssuesByAnimal: {},
-      previewReport: {
-        title: "تقرير معاينة DairyComp التاريخي",
-        lines: [
-          `حيوانات المصدر: ${templateData.externalSummary.uniqueSourceAnimals}`,
-          `حيوانات مرشحة: ${templateData.externalSummary.importedCandidates}`,
-          `أمهات اجتازت التحقق: ${readyMothersCount}`,
-          `توابع اجتازت التحقق: ${readyFollowersCount}`,
-          `أحداث اجتازت التحقق: ${eventsPreflight.readyEventsCount || 0}`,
-          `ملاحظات المصدر: ${dcIssues.length}`,
-          `إجمالي عناصر المراجعة: ${previewRejectedItems.length}`,
-          "أسباب ملاحظات المصدر الأكثر تكرارًا:",
-          ...dcReasons.slice(0, 15).map(
-            ([reason, count]) => `${reason}: ${count}`
-          ),
-          ...(dcReasons.length > 15
-            ? [`أسباب إضافية: ${dcReasons.length - 15}`]
-            : []),
-          "الجداول تعرض عينة من أول 100 سجل بكل فئة.",
-          "الملف تاريخي للمعاينة فقط؛ الحفظ غير مسموح."
-        ]
-      }
-    }
-  : templateData.externalSummary;
+const dcDisplaySummary =
+  templateData.externalSummary;
 
 
 const previewCommand = {
-  status:
-    dcHistorical
-      ? "historical_preview"
-      : requiresDefaultAnimalType
-        ? "needs_input"
-        : (
-            !dcHistorical &&
-            dcIssues.length === 0 &&
-            persistencePlan?.ready === true &&
-            persistencePlan?.saveEnabled === true
-          )
-          ? "ready"
-          : "rejected",
+  status: requiresDefaultAnimalType
+    ? "needs_input"
+    : (
+        persistencePlan?.ready === true &&
+        persistencePlan?.saveEnabled === true
+      )
+      ? "ready"
+      : "rejected",
 
   saveEnabled:
     !requiresDefaultAnimalType &&
-    !dcHistorical &&
-    dcIssues.length === 0 &&
     persistencePlan?.ready === true &&
     persistencePlan?.saveEnabled === true,
 
-  rejectedCount:
-    previewRejectedItems.length,
-
-  rejectedItems:
-    dcHistorical ? [] : previewRejectedItems
+  rejectedCount: previewRejectedItems.length,
+  rejectedItems: previewRejectedItems
 };
-
 return res.json({
   ok: true,
   mode: "herd_import_v2",
@@ -20392,9 +20517,7 @@ return res.json({
  externalSummary: dcDisplaySummary || null,
   previewCommand,
   
-message: dcHistorical
-  ? "اكتملت المعاينة التاريخية دون حفظ. راجع التقرير المجمع."
-  : requiresDefaultAnimalType
+message: requiresDefaultAnimalType
 
   ? "الملف لا يحتوي على نوع الحيوان. اختر نوع القطيع ثم أعد المعاينة."
   : (
@@ -20641,25 +20764,6 @@ const herdImportV2SaveOperationalHandlerSrv = async (req, res) => {
     
 const eventRows =
   templateData.eventRows || [];
-
-if (
-  body.externalSource === "dairycomp" &&
-  (
-    templateData.externalSummary?.historicalSourceOnly ||
-    templateData.externalSummary?.sourceIssuesCount > 0
-  )
-) {
-  return res.status(400).json({
-    ok: false,
-    error: "dairycomp_source_requires_review",
-    message: templateData.externalSummary?.historicalSourceOnly
-      ? "ملف تاريخي: لا يمكن حفظ قطيع قديم كأنه حالي."
-      : "توجد بيانات DairyComp تحتاج الاستكمال داخل مُرَبِّيك.",
-    sourceIssues:
-      (templateData.externalSummary?.sourceIssues || []).slice(0, 100)
-  });
-}
-
 
 if (
   !rows.length &&
@@ -99144,53 +99248,6 @@ function fertilityReportPregnancy21Srv({
     return "";
   };
 
-  const verifiedHistoryStartByNumber = new Map();
-
-const verifiedReproCodes = new Set([
-  "FRESH", "CALVED", "HEAT", "BRED",
-  "PREG", "OPEN", "ABORT"
-]);
-
-for (const e of events) {
-  if (
-    e?.sourceSystem !== "dairycomp" ||
-    e?.isImportedHistory !== true ||
-    !verifiedReproCodes.has(
-      String(e.sourceEventCode || "")
-        .trim()
-        .toUpperCase()
-    )
-  ) {
-    continue;
-  }
-
-  const number = fertilityReportAnimalNumberSrv(e);
-
-  const eventMs = fertilityReportMsSrv(
-    computeEventDateFromDoc(e)
-  );
-
-  if (
-    !number ||
-    !Number.isFinite(eventMs) ||
-    eventMs > todayMs
-  ) {
-    continue;
-  }
-
-  const current =
-    verifiedHistoryStartByNumber.get(number);
-
-  if (
-    !Number.isFinite(current) ||
-    eventMs < current
-  ) {
-    verifiedHistoryStartByNumber.set(
-      number,
-      eventMs
-    );
-  }
-}
 
   const byNumber = new Map();
 
@@ -99231,27 +99288,9 @@ for (const e of events) {
 
     if (!species) continue;
 
-    const createdMs = asMs(raw.createdAt);
 
-const isImportedDairyComp =
-  raw.importedBy === "herd_import_v2" &&
-  (
-    raw.sourceProfileKey === "dairycomp" ||
-    raw.sourceSystem === "dairycomp"
-  );
-
-const historyMs = isImportedDairyComp
-  ? verifiedHistoryStartByNumber.get(number)
-  : undefined;
-
-const registeredMs = Number.isFinite(historyMs)
-  ? Math.min(
-      Number.isFinite(createdMs)
-        ? createdMs
-        : Infinity,
-      historyMs
-    )
-  : createdMs;
+const createdMs = asMs(raw.createdAt);
+const registeredMs = createdMs;
 
     if (!Number.isFinite(registeredMs)) {
       missingRegistration = true;
@@ -101542,8 +101581,12 @@ if (!coverageStartDate) {
   } catch (_) {}
 }
 
+
+
+
 const coverageStartMs =
   fertilityReportMsSrv(coverageStartDate);
+
 
 const availablePeriodDays =
   Number.isFinite(coverageStartMs)
