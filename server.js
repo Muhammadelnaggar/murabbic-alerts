@@ -99441,8 +99441,8 @@ function fertilityReportPregnancy21Srv({
 } = {}) {
   const DAY = 86400000;
 
-  // يشمل المزارع التي تعتمد الجس اليدوي دون سونار.
-  const maturityDays = 40;
+  // ابدأ من اليوم، وارجع يومًا بيوم حتى تكتمل النافذة.
+const maturityDays = 0;
 
   const todayMs = fertilityReportMsSrv(todayISO);
   const endLimit = todayMs - maturityDays * DAY;
