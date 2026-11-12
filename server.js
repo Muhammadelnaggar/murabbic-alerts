@@ -101497,7 +101497,7 @@ function fertilityReportBuffaloCurrentThiAdviceSrv(
 }
 function fertilityReportBuildExpertReportSrv({
   overallCr = null,
-  firstServiceCr = null,
+  firstServicePregnancySharePct = null,
   pregnancyRate21d = null,
   pregnancyRate21Info = null,
   heatDetectionRatePct = null,
@@ -101538,17 +101538,32 @@ function fertilityReportBuildExpertReportSrv({
       mutedText: "لا تتوافر بيانات كافية لتقييم رصد الشياع. استكمل التسجيل."
     }),
 
-    fertilityReportExpertIndicatorSrv({
-      key: "first_service_conception",
-      title: "نسبة الحمل من أول تلقيحة",
-      value: firstServiceCr,
-      benchmark: 40,
-      meaning: "تعكس جاهزية الحيوانات للتلقيح ونجاح أول فرصة لتحقيق الحمل.",
-      goodText: "نتائج أول تلقيحة جيدة. حافظ على تقييم جاهزية الحيوانات قبل التلقيح.",
-      warnText: "نتائج أول تلقيحة تحتاج متابعة. راجع جاهزية الحيوانات وتوقيت أول تلقيحة.",
-      dangerText: "نسبة الحمل من أول تلقيحة منخفضة. راجع فحص الرحم والحالة الجسمية وتوقيت التلقيح.",
-      mutedText: "نتائج أول تلقيحة غير مكتملة. استكمل تشخيص الحمل."
-    }),
+{
+  key: "first_service_pregnancy_share",
+  title: "نسبة الأحمال الناتجة عن أول تلقيحة",
+
+  value: firstServicePregnancySharePct,
+
+  valueText: firstServicePregnancySharePct == null
+    ? "غير مكتمل"
+    : `${fertilityReportRound1Srv(firstServicePregnancySharePct)} %`,
+
+  benchmark: null,
+  benchmarkText: "لا ينطبق",
+
+  status: "muted",
+
+  rating: firstServicePregnancySharePct == null
+    ? "غير مكتمل"
+    : "مؤشر وصفي",
+
+  read:
+    "نسبة الأحمال المثبتة الناتجة عن أول تلقيحة إلى إجمالي الأحمال المثبتة خلال الفترة.",
+
+  advice: firstServicePregnancySharePct == null
+    ? "لا توجد أحمال مثبتة لحساب المؤشر."
+    : "يوضح توزيع الأحمال حسب ترتيب التلقيحة، ولا يستخدم منفردًا لتقييم كفاءة التلقيح."
+},
 
     fertilityReportExpertIndicatorSrv({
       key: "overall_conception",
@@ -101659,10 +101674,6 @@ const cr =
     ? NaN
     : Number(overallCr);
 
-const first =
-  firstServiceCr == null
-    ? NaN
-    : Number(firstServiceCr);
   const spc = Number(servicesPerConception);
 
   if (
@@ -101688,14 +101699,6 @@ const first =
     });
   }
 
-  if (Number.isFinite(first) && first < 32) {
-    bottlenecks.push({
-      key: "first_service_bottleneck",
-      title: "الخلل المرجح: جاهزية أول تلقيحة بعد الولادة",
-      read: "انخفاض الحمل من أول تلقيحة يشير إلى دخول الحيوان للتلقيح قبل الجاهزية المثلى أو وجود ضغط رحم/BCS/حرارة.",
-      weight: 80
-    });
-  }
   const thiHigh = (Array.isArray(thiGroups) ? thiGroups : []).some(g =>
     (g.level === "moderate" || g.level === "high") &&
     Number(g.judged || 0) > 0 &&
@@ -101748,8 +101751,7 @@ if (pregnancyRate21Info?.status !== "complete") {
     recommendations.push("الأولوية الفنية: تحسين كشف الشياع وانتظام التسجيل قبل تغيير السائل أو الحكم على الملقحين.");
   } else if (mainBottleneck.key === "conception_bottleneck") {
     recommendations.push("الأولوية الفنية: مراجعة توقيت التلقيح، قاعدة صباح/مساء، جودة السائل، وتوزيع النتائج حسب الملقحين وTHI.");
-  } else if (mainBottleneck.key === "first_service_bottleneck") {
-    recommendations.push("الأولوية الفنية: مراجعة جاهزية أول تلقيحة بعد الولادة، VWP، فحص الرحم، والحالة الجسمية.");
+
   } else if (mainBottleneck.key === "heat_stress_pressure") {
     recommendations.push("الأولوية الفنية: فصل قراءة الخصوبة في أيام THI المرتفع عن الأيام المريحة قبل تقييم الملقحين.");
   }
@@ -102216,8 +102218,10 @@ const outcomeForAi = (ai) =>
     const firstServiceSuccess = firstServiceRows.filter(x => x.outcome.success);
 
     const overallCr = fertilityPctSrv(successfulAi.length, judgedAi.length);
-    const firstServiceCr = fertilityPctSrv(firstServiceSuccess.length, firstServiceRows.length);
-
+    const firstServicePregnancySharePct = fertilityPctSrv(
+  firstServiceSuccess.length,
+  successfulAi.length
+);
     const inseminatorMap = new Map();
 
     for (const row of judgedAi) {
@@ -102594,7 +102598,6 @@ const fertilityThiAdvice =
         fertilityCurrentThiRaw
       );
    const overallStatus = fertilityReportKpiStatusSrv(overallCr, 35, "higher");
-const firstStatus = fertilityReportKpiStatusSrv(firstServiceCr, 40, "higher");
 
 const pr21Info = fertilityReportPregnancy21Srv({
   todayISO,
@@ -102659,7 +102662,8 @@ const buffaloSeasonContext =
 const baseExpertReport =
   fertilityReportBuildExpertReportSrv({
     overallCr,
-    firstServiceCr,
+        firstServicePregnancySharePct,
+    
 
     pregnancyRate21d:
       pregnancyRate21Report,
@@ -102753,7 +102757,6 @@ const reportDisplay = {
       display: reportDisplay,
 
       benchmarks: {
-        firstServiceConceptionRatePct: 40,
         overallConceptionRatePct: 35,
         cycleRegularMinDays: 18,
         cycleRegularMaxDays: 24,
@@ -102778,15 +102781,25 @@ herdSummary: {
 herdComposition,
 herdReproductiveComposition: herdComposition,
       conception: {
-        firstService: {
-          label: "نسبة الحمل من أول تلقيحة",
-          valuePct: firstServiceCr,
-          pregnancies: firstServiceSuccess.length,
-          judged: firstServiceRows.length,
-          benchmarkPct: 40,
-          status: firstStatus.status,
-          read: firstStatus.label
-        },
+firstService: {
+  label: "نسبة الأحمال الناتجة عن أول تلقيحة",
+
+  valuePct: firstServicePregnancySharePct,
+
+  pregnancies: firstServiceSuccess.length,
+
+  judged: successfulAi.length,
+
+  totalConfirmedPregnancies: successfulAi.length,
+
+  benchmarkPct: null,
+
+  status: "muted",
+
+  read: firstServicePregnancySharePct == null
+    ? "غير مكتمل"
+    : "مؤشر وصفي"
+},
         overallHerd: {
           label: "نسبة الحمل العامة للقطيع",
           valuePct: overallCr,
