@@ -127614,6 +127614,39 @@ const allowedPeriods = [30, 90, 180, 360];
       } catch (_) {}
     }
 
+    // تاريخ أحداث DairyComp الفعلي يثبت التغطية التاريخية.
+    // الحسابات الأصلية تظل على قواعدها دون تغيير.
+    const reportAnimalNumbers = new Set(
+      [...animalsSnap.docs, ...calvesSnap.docs, ...archivedAnimalsSnap.docs]
+        .map(doc => doc.data() || {})
+        .filter(animal => speciesOf(animal) === herdType)
+        .map(animalNumber)
+        .filter(Boolean)
+    );
+
+    const importedSourceDates = [
+      ...eventsSnap.docs,
+      ...archivedEventsSnap.docs
+    ]
+      .map(doc => doc.data() || {})
+      .filter(event =>
+        event.isImportedHistory === true &&
+        String(event.sourceSystem || "").toLowerCase() === "dairycomp" &&
+        reportAnimalNumbers.has(animalNumber(event))
+      )
+      .map(event => dateOnly(event.eventDate || event.date))
+      .filter(date => date && date <= today);
+
+    if (importedSourceDates.length) {
+      const firstSourceDate = importedSourceDates.reduce(
+        (first, date) => !first || date < first ? date : first,
+        ""
+      );
+      if (!coverageStartDate || firstSourceDate < coverageStartDate) {
+        coverageStartDate = firstSourceDate;
+      }
+    }
+
     const availablePeriods =
       coverageStartDate
         ? allowedPeriods.filter(
