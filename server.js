@@ -99510,6 +99510,22 @@ function fertilityReportPregnancy21Srv({
   };
 
 
+  // Actual imported event dates establish historical coverage, not import time.
+  const importedFirstEventMs = new Map();
+  for (const event of events) {
+    if (
+      event?.isImportedHistory !== true ||
+      String(event.sourceSystem || "").toLowerCase() !== "dairycomp"
+    ) continue;
+    const number = fertilityReportAnimalNumberSrv(event);
+    const ms = fertilityReportMsSrv(computeEventDateFromDoc(event));
+    if (!number || !Number.isFinite(ms) || ms > todayMs) continue;
+    const previous = importedFirstEventMs.get(number);
+    if (previous === undefined || ms < previous) {
+      importedFirstEventMs.set(number, ms);
+    }
+  }
+
   const byNumber = new Map();
 
   let ambiguousNumbers = false;
@@ -99551,9 +99567,37 @@ function fertilityReportPregnancy21Srv({
 
 
 const createdMs = asMs(raw.createdAt);
-const registeredMs = createdMs;
+const importedDairyComp =
+  raw.importedBy === "herd_import_v2" &&
+  (
+    raw.sourceProfileKey === "dairycomp" ||
+    raw.sourceSystem === "dairycomp"
+  );
+
+const firstEventMs = importedDairyComp
+  ? importedFirstEventMs.get(number)
+  : null;
+
+const lastSourceCalvingMs = importedDairyComp
+  ? fertilityReportMsSrv(raw.lastCalvingDate || raw.calvingDate)
+  : null;
+
+const historyStartMs = Math.min(
+  Number.isFinite(firstEventMs) ? firstEventMs : Infinity,
+  Number.isFinite(lastSourceCalvingMs) ? lastSourceCalvingMs : Infinity
+);
+
+const registeredMs =
+  importedDairyComp && Number.isFinite(historyStartMs)
+    ? Math.min(
+        Number.isFinite(createdMs) ? createdMs : Infinity,
+        historyStartMs
+      )
+    : createdMs;
 
     if (!Number.isFinite(registeredMs)) {
+      // No proven reproductive history: do not fabricate an archive start date.
+      if (importedDairyComp && isArchived) continue;
       missingRegistration = true;
       continue;
     }
@@ -101845,6 +101889,67 @@ if (!coverageStartDate) {
 
 
 
+// Reuse these same snapshots later in the report (no duplicate reads).
+const [
+  animalSnap,
+  prCalvesSnap,
+  prArchivedSnap,
+  eventSnap,
+  prArchivedEventsSnap
+] = await Promise.all([
+  db.collection("animals").where("userId", "==", uid).get(),
+  db.collection("calves").where("userId", "==", uid).get(),
+  db.collection("archived_animals").where("userId", "==", uid).get(),
+  db.collection("events").where("userId", "==", uid).get(),
+  db.collection("archived_events").where("userId", "==", uid).get()
+]);
+
+const importedAnimalsByNumber = new Map(
+  [
+    ...animalSnap.docs,
+    ...prCalvesSnap.docs,
+    ...prArchivedSnap.docs
+  ]
+    .map(doc => doc.data() || {})
+    .filter(animal =>
+      animal.importedBy === "herd_import_v2" &&
+      (
+        animal.sourceProfileKey === "dairycomp" ||
+        animal.sourceSystem === "dairycomp"
+      )
+    )
+    .map(animal => [
+      fertilityReportAnimalNumberSrv(animal),
+      fertilityReportAnimalSpeciesSrv(animal)
+    ])
+    .filter(([number, species]) =>
+      number &&
+      species &&
+      (!selectedType || species === selectedType)
+    )
+);
+
+const firstSourceDate = [
+  ...eventSnap.docs,
+  ...prArchivedEventsSnap.docs
+]
+  .map(doc => doc.data() || {})
+  .filter(event =>
+    event.isImportedHistory === true &&
+    String(event.sourceSystem || "").toLowerCase() === "dairycomp" &&
+    importedAnimalsByNumber.has(fertilityReportAnimalNumberSrv(event))
+  )
+  .map(event => fertilityReportDateSrv(computeEventDateFromDoc(event)))
+  .filter(date => date && date <= todayISO)
+  .reduce((first, date) =>
+    !first || date < first ? date : first,
+    ""
+  );
+
+if (firstSourceDate && (!coverageStartDate || firstSourceDate < coverageStartDate)) {
+  coverageStartDate = firstSourceDate;
+}
+
 const coverageStartMs =
   fertilityReportMsSrv(coverageStartDate);
 
@@ -101913,20 +102018,10 @@ const periodStartMs =
 
 
 const [
-  animalSnap,
-  prCalvesSnap,
-  prArchivedSnap,
-  eventSnap,
-  prArchivedEventsSnap,
   groupPage,
   fertilityCurrentThiRaw,
   fertilityPrThresholds
 ] = await Promise.all([
-  db.collection("animals").where("userId", "==", uid).get(),
-  db.collection("calves").where("userId", "==", uid).get(),
-  db.collection("archived_animals").where("userId", "==", uid).get(),
-  db.collection("events").where("userId", "==", uid).get(),
-  db.collection("archived_events").where("userId", "==", uid).get(),
   buildGroupsPageForTenantSrv(uid),
   weatherBuildFarmThiSrv(profileUid).catch(e => {
     console.warn("fertility current THI failed:", e.message || e);
