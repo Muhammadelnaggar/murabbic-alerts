@@ -94975,37 +94975,7 @@ try {
     low: bandCounts.low
   };
 
-  const allGroupId =
-    `${groupPrefix}all`;
-
-  const allGroupDoc =
-    await db
-      .collection('groups')
-      .doc(`${uid}_${allGroupId}`)
-      .get();
-
-  if (allGroupDoc.exists) {
-    const data =
-      allGroupDoc.data() || {};
-
-    const storedCount =
-      Number(
-        data.animalsCount ??
-        data.headCount ??
-        data.count
-      );
-
-    if (Number.isFinite(storedCount)) {
-      total = storedCount;
-    } else if (Array.isArray(data.animalNumbers)) {
-      total =
-        new Set(
-          data.animalNumbers
-            .map(normalizeAnimalNumberForStats)
-            .filter(Boolean)
-        ).size;
-    }
-  }
+ 
 
 } catch (e) {
   console.error(
