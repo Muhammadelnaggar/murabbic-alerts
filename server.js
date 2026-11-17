@@ -38,8 +38,1252 @@ const EVENT_SYNONYMS = {
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-const { createPreparedEngine } =
-  require('./server/prepared-engine.js');
+
+const createPreparedEngine = (() => {
+
+const crypto = require('node:crypto');
+
+const QUEUE = 'murabbikPreparedQueue';
+const VIEWS = 'murabbikPreparedViews';
+const KINDS = Object.freeze([
+  'alerts',
+  'stats:cows',
+  'stats:buffalo'
+]);
+
+const LEASE_MS = 10 * 60 * 1000;
+const FAILURE_DELAY_MS = 5 * 60 * 1000;
+const FAILURE_MAX_DELAY_MS = 6 * 60 * 60 * 1000;
+const COALESCE_MS = 700;
+const MAX_PAYLOAD_BYTES = 700 * 1024;
+const MAX_TIMER_MS = 0x7fffffff;
+
+const clean = value => String(value ?? '').trim();
+
+const finite = (value, fallback = 0) =>
+  Number.isFinite(Number(value))
+    ? Number(value)
+    : fallback;
+
+const hash = value =>
+  crypto.createHash('sha256')
+    .update(String(value))
+    .digest('hex');
+
+function copyPayload(value) {
+  if (value == null) {
+    throw new Error('Prepared result missing');
+  }
+
+  const raw = JSON.stringify(value);
+
+  if (
+    !raw ||
+    Buffer.byteLength(raw, 'utf8') > MAX_PAYLOAD_BYTES
+  ) {
+    throw new Error(
+      'Prepared result exceeds Firestore size allowance'
+    );
+  }
+
+  return JSON.parse(raw);
+}
+
+// Calculate the next midnight in the farm's own time zone.
+// Supports daylight-saving changes.
+function nextFarmDayMs(
+  timeZone,
+  nowMs = Date.now()
+) {
+  if (!clean(timeZone)) {
+    throw new Error(
+      'Farm time zone must be resolved from its location'
+    );
+  }
+
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: clean(timeZone),
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  });
+
+  const fields = ms =>
+    Object.fromEntries(
+      formatter.formatToParts(new Date(ms))
+        .filter(p => p.type !== 'literal')
+        .map(p => [p.type, Number(p.value)])
+    );
+
+  const current = fields(nowMs);
+
+  const tomorrow = new Date(Date.UTC(
+    current.year,
+    current.month - 1,
+    current.day + 1
+  ));
+
+  const year = tomorrow.getUTCFullYear();
+  const month = tomorrow.getUTCMonth();
+  const day = tomorrow.getUTCDate();
+
+  // 00:00:30 local, or first valid hour during a DST skip.
+  for (let hour = 0; hour < 4; hour++) {
+    const target = Date.UTC(
+      year, month, day, hour, 0, 30
+    );
+
+    let guess = target;
+
+    for (let i = 0; i < 6; i++) {
+      const local = fields(guess);
+
+      const represented = Date.UTC(
+        local.year,
+        local.month - 1,
+        local.day,
+        local.hour,
+        local.minute,
+        local.second
+      );
+
+      const delta = target - represented;
+
+      if (Math.abs(delta) < 1000) break;
+
+      guess += delta;
+    }
+
+    const found = fields(guess);
+
+    if (
+      found.year === year &&
+      found.month === month + 1 &&
+      found.day === day &&
+      found.hour === hour &&
+      found.minute === 0 &&
+      found.second === 30 &&
+      guess > nowMs + 1000
+    ) {
+      return guess;
+    }
+  }
+
+  throw new Error(
+    'Unable to schedule the next farm-local day'
+  );
+}
+
+function createPreparedEngine({
+  db,
+  profilesForTenant,
+  calculateAlerts,
+  calculateStats,
+  seedTenants,
+  recoverGroups,
+  maintainFarm,
+  timeZoneForProfile
+}) {
+  if (
+    !db ||
+    typeof profilesForTenant !== 'function' ||
+    typeof calculateAlerts !== 'function' ||
+    typeof calculateStats !== 'function' ||
+    typeof seedTenants !== 'function' ||
+    typeof timeZoneForProfile !== 'function'
+  ) {
+    throw new Error(
+      'Incomplete Murabbik worker configuration'
+    );
+  }
+
+  const queue = db.collection(QUEUE);
+  const views = db.collection(VIEWS);
+
+  const queueRef = tenant =>
+    queue.doc(hash(tenant));
+
+  const viewRef = (tenant, uid, kind) =>
+    views.doc(
+      hash(JSON.stringify([tenant, uid, kind]))
+    );
+
+  const scheduled = new Map();
+  const active = new Set();
+  const pending = new Set();
+
+  let started = false;
+  let stopping = false;
+  let draining = false;
+  let startupPromise = null;
+  let bootstrapRetry = null;
+
+  function schedule(
+    tenant,
+    whenMs = Date.now() + COALESCE_MS
+  ) {
+    tenant = clean(tenant);
+
+    if (!started || stopping || !tenant) return;
+
+    const when = Math.max(
+      Date.now(),
+      finite(whenMs, Date.now())
+    );
+
+    const old = scheduled.get(tenant);
+
+    if (old && old.when <= when) return;
+
+    if (old) clearTimeout(old.timer);
+
+    const delay = Math.min(
+      MAX_TIMER_MS,
+      Math.max(0, when - Date.now())
+    );
+
+    const timer = setTimeout(() => {
+      scheduled.delete(tenant);
+
+      if (when > Date.now() + 10) {
+        schedule(tenant, when);
+        return;
+      }
+
+      pending.add(tenant);
+      void drain();
+    }, delay);
+
+    timer.unref?.();
+
+    scheduled.set(tenant, {when, timer});
+  }
+
+  function targets(record) {
+    const generations = record?.generations || {};
+
+    return Object.fromEntries(
+      KINDS.map(kind => [
+        kind,
+        finite(
+          generations[kind],
+          finite(record?.generation, 0)
+        )
+      ])
+    );
+  }
+
+  function completed(record) {
+    const generations =
+      record?.completedByKind || {};
+
+    return Object.fromEntries(
+      KINDS.map(kind => [
+        kind,
+        finite(
+          generations[kind],
+          finite(record?.completedGeneration, 0)
+        )
+      ])
+    );
+  }
+
+  async function markDirty(
+    tenant,
+    kinds = KINDS,
+    options = {}
+  ) {
+    tenant = clean(tenant);
+
+    if (!tenant) return;
+
+    const selected = [
+      ...new Set(
+        Array.isArray(kinds) ? kinds : KINDS
+      )
+    ].filter(kind => KINDS.includes(kind));
+
+    if (!selected.length) return;
+
+    const heldToken = clean(options.groupToken);
+
+    await db.runTransaction(async tx => {
+      const ref = queueRef(tenant);
+      const snap = await tx.get(ref);
+      const old = snap.exists
+        ? snap.data() || {}
+        : {};
+
+      const generations = targets(old);
+      const heldByKind = {
+        ...(old.heldByKind || {})
+      };
+      const heldSinceByKind = {
+        ...(old.heldSinceByKind || {})
+      };
+
+      const now = Date.now();
+
+      for (const kind of selected) {
+        generations[kind]++;
+
+        if (heldToken) {
+          heldByKind[kind] = heldToken;
+          heldSinceByKind[kind] = now;
+        }
+      }
+
+      tx.set(ref, {
+        tenant,
+        generation: finite(old.generation) + 1,
+        generations,
+        heldByKind,
+        heldSinceByKind,
+        retryAtMs: 0,
+        failureCount: 0,
+        changedAtMs: now
+      }, {merge: true});
+    });
+
+    schedule(tenant);
+  }
+
+  async function releaseHeld(
+    tenant,
+    completedTokens = []
+  ) {
+    tenant = clean(tenant);
+
+    const tokens = new Set(
+      completedTokens.map(clean).filter(Boolean)
+    );
+
+    if (!tenant || !tokens.size) return 0;
+
+    const released = await db.runTransaction(
+      async tx => {
+        const ref = queueRef(tenant);
+        const snap = await tx.get(ref);
+
+        if (!snap.exists) return 0;
+
+        const old = snap.data() || {};
+
+        const heldByKind = {
+          ...(old.heldByKind || {})
+        };
+
+        const heldSinceByKind = {
+          ...(old.heldSinceByKind || {})
+        };
+
+        let count = 0;
+
+        for (const kind of KINDS) {
+          if (tokens.has(clean(heldByKind[kind]))) {
+            delete heldByKind[kind];
+            delete heldSinceByKind[kind];
+            count++;
+          }
+        }
+
+        // Replace maps so deleted tokens do not remain.
+        if (count) {
+          tx.update(ref, {
+            heldByKind,
+            heldSinceByKind,
+            changedAtMs: Date.now()
+          });
+        }
+
+        return count;
+      }
+    );
+
+    if (released) schedule(tenant);
+
+    return released;
+  }
+
+  async function getReady(
+    tenant,
+    uid,
+    kind
+  ) {
+    tenant = clean(tenant);
+    uid = clean(uid);
+
+    if (
+      !tenant ||
+      !uid ||
+      !KINDS.includes(kind)
+    ) return null;
+
+    return db.runTransaction(async tx => {
+      const q = await tx.get(queueRef(tenant));
+      const v = await tx.get(
+        viewRef(tenant, uid, kind)
+      );
+
+      if (!q.exists || !v.exists) return null;
+
+      const meta = q.data() || {};
+      const entry = v.data() || {};
+
+      if (
+        entry.status !== 'ready' ||
+        completed(meta)[kind] !== targets(meta)[kind] ||
+        entry.generation !== targets(meta)[kind] ||
+        !entry.payload ||
+        finite(entry.validUntilMs, 0) <= Date.now()
+      ) {
+        return null;
+      }
+
+      return entry.payload;
+    });
+  }
+
+  async function seedIfMissing(tenant) {
+    tenant = clean(tenant);
+
+    if (!tenant) return;
+
+    const ref = queueRef(tenant);
+
+    // Startup recovery, not recurring queue polling.
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      try {
+        await ref.create({
+          tenant,
+          generation: 1,
+          generations: Object.fromEntries(
+            KINDS.map(kind => [kind, 1])
+          ),
+          completedByKind: {},
+          changedAtMs: Date.now(),
+          nextDailyAtMs: 0
+        });
+      } catch (error) {
+        if (
+          ![
+            6,
+            'already-exists',
+            'ALREADY_EXISTS'
+          ].includes(error.code)
+        ) {
+          throw error;
+        }
+      }
+
+      schedule(tenant);
+      return;
+    }
+
+    const record = snap.data() || {};
+
+    const wanted = targets(record);
+    const done = completed(record);
+
+    const dirty = KINDS.some(
+      kind => wanted[kind] !== done[kind]
+    );
+
+    const deadline = finite(
+      record.nextDailyAtMs, 0
+    );
+
+    const desired =
+      dirty || deadline <= Date.now()
+        ? Date.now() + COALESCE_MS
+        : deadline;
+
+    schedule(
+      tenant,
+      Math.max(
+        desired,
+        finite(record.retryAtMs, 0)
+      )
+    );
+  }
+
+  async function claim(tenant) {
+    return db.runTransaction(async tx => {
+      const ref = queueRef(tenant);
+      const snap = await tx.get(ref);
+
+      if (!snap.exists) return null;
+
+      const record = snap.data() || {};
+      const now = Date.now();
+
+      if (finite(record.leaseUntilMs, 0) > now) {
+        return {
+          waitUntil: finite(record.leaseUntilMs)
+        };
+      }
+
+      if (finite(record.retryAtMs, 0) > now) {
+        return {
+          waitUntil: finite(record.retryAtMs)
+        };
+      }
+
+      const required = targets(record);
+      const done = completed(record);
+      const held = record.heldByKind || {};
+
+      const selected = KINDS.filter(kind =>
+        !held[kind] &&
+        (
+          required[kind] !== done[kind] ||
+          finite(record.nextDailyAtMs, 0) <= now
+        )
+      );
+
+      const heldKinds = KINDS.filter(
+        kind => held[kind]
+      );
+
+      if (!selected.length) {
+
+        return {
+          nextAt: finite(
+            record.nextDailyAtMs,
+            now + 86400000
+          ),
+          heldKinds,
+          heldByKind: {...held},
+          heldSinceByKind:
+            record.heldSinceByKind || {}
+        };
+      }
+
+      const lease = crypto.randomUUID();
+
+      tx.set(ref, {
+        lease,
+        leaseUntilMs: now + LEASE_MS
+      }, {merge: true});
+
+      return {
+        tenant,
+        lease,
+        selected,
+        generations: required,
+        nextDailyAtMs: finite(
+          record.nextDailyAtMs, 0
+        ),
+        heldByKind: {...held},
+        heldSinceByKind:
+          record.heldSinceByKind || {}
+      };
+    });
+  }
+
+  async function publish(
+    tenant,
+    job,
+    records,
+    nextDayAtMs,
+    failedKinds = new Set()
+  ) {
+    // Bounded transactions prevent oversized Firestore commits.
+    const CHUNK = 6;
+    const publishedKinds = new Set();
+
+    for (
+      let offset = 0;
+      offset < records.length;
+      offset += CHUNK
+    ) {
+      const chunk = records.slice(
+        offset,
+        offset + CHUNK
+      );
+
+      const committedKinds = await db.runTransaction(async tx => {
+  const q = await tx.get(queueRef(tenant));
+
+        if (
+          !q.exists ||
+          q.data()?.lease !== job.lease
+        ) {
+          throw new Error(
+            'Prepared lease superseded'
+          );
+        }
+
+        const meta = q.data() || {};
+        const generations = targets(meta);
+        const kindsInChunk = [];
+
+        for (const [kind, uid, payload] of chunk) {
+          if (
+            meta.heldByKind?.[kind] ||
+            generations[kind] !==
+              job.generations[kind]
+          ) {
+            continue;
+          }
+
+          tx.set(
+            viewRef(tenant, uid, kind),
+            {
+              tenant,
+              uid,
+              kind,
+              status: 'ready',
+              generation:
+                job.generations[kind],
+              validUntilMs: nextDayAtMs,
+              computedAtMs: Date.now(),
+              payload
+            }
+          );
+
+
+          kindsInChunk.push(kind);
+        }
+
+        return kindsInChunk;
+      });
+
+      committedKinds.forEach(kind => {
+        publishedKinds.add(kind);
+      });
+    }
+
+    return db.runTransaction(async tx => {
+
+      const ref = queueRef(tenant);
+      const snap = await tx.get(ref);
+
+      if (
+        !snap.exists ||
+        snap.data()?.lease !== job.lease
+      ) {
+        throw new Error(
+          'Worker lease superseded'
+        );
+      }
+
+      const current = snap.data() || {};
+
+      const target = targets(current);
+      const completedByKind = completed(current);
+
+      const validKinds = job.selected.filter(
+        kind =>
+          publishedKinds.has(kind) &&
+          !current.heldByKind?.[kind] &&
+          target[kind] ===
+            job.generations[kind]
+      );
+
+      validKinds.forEach(kind => {
+        completedByKind[kind] =
+          job.generations[kind];
+      });
+
+      const remaining = KINDS.some(kind =>
+        target[kind] !== completedByKind[kind] &&
+        !current.heldByKind?.[kind]
+      );
+
+      const changedDuringBuild = KINDS.some(kind =>
+        !current.heldByKind?.[kind] &&
+        target[kind] !== job.generations[kind]
+      );
+
+      const failureCount =
+        failedKinds.size && !changedDuringBuild
+          ? Math.min(
+              8,
+              finite(current.failureCount, 0) + 1
+            )
+          : 0;
+
+      const retryAtMs = failureCount
+        ? Date.now() + Math.min(
+            FAILURE_MAX_DELAY_MS,
+            FAILURE_DELAY_MS * (2 ** (failureCount - 1))
+          )
+        : 0;
+
+      tx.set(ref, {
+        completedByKind,
+        nextDailyAtMs: nextDayAtMs,
+        retryAtMs,
+        failureCount,
+        lease: null,
+        leaseUntilMs: 0,
+        builtAtMs: Date.now()
+      }, {merge: true});
+
+      const heldKinds = KINDS.filter(
+        kind => current.heldByKind?.[kind]
+      );
+
+      const holdRecoveryAt = heldKinds.length
+        ? Math.min(
+            ...heldKinds.map(kind =>
+              finite(
+                current.heldSinceByKind?.[kind],
+                Date.now()
+              ) + LEASE_MS
+            )
+          )
+        : Infinity;
+
+      return {
+        remaining,
+        holdRecoveryAt,
+        retryAtMs
+      };
+    });
+  }
+
+  async function releaseFailedLease(
+    tenant,
+    lease,
+    priorGenerations = {}
+  ) {
+    return db.runTransaction(async tx => {
+      const ref = queueRef(tenant);
+      const snap = await tx.get(ref);
+
+      if (
+        !snap.exists ||
+        snap.data()?.lease !== lease
+      ) return 0;
+
+      const current = snap.data() || {};
+      const versions = targets(current);
+
+      const changedDuringBuild = KINDS.some(kind =>
+        priorGenerations[kind] !== undefined &&
+        versions[kind] !== priorGenerations[kind]
+      );
+
+      const failures = changedDuringBuild
+        ? 0
+        : Math.min(
+            8,
+            finite(current.failureCount, 0) + 1
+          );
+
+      const delay = changedDuringBuild
+        ? COALESCE_MS
+        : Math.min(
+            FAILURE_MAX_DELAY_MS,
+            FAILURE_DELAY_MS * (2 ** (failures - 1))
+          );
+
+      const retryAtMs = Date.now() + delay;
+
+      tx.set(ref, {
+        lease: null,
+        leaseUntilMs: 0,
+        retryAtMs,
+        failureCount: failures
+      }, {merge: true});
+
+      return retryAtMs;
+    });
+  }
+
+  function keepLeaseAlive(tenant, lease) {
+    let running = true;
+    let timer = null;
+
+    const everyMs = Math.floor(LEASE_MS / 2);
+
+    const renew = async () => {
+      if (!running) return;
+
+      try {
+        const valid = await db.runTransaction(
+          async tx => {
+            const ref = queueRef(tenant);
+            const snap = await tx.get(ref);
+
+            if (
+              !snap.exists ||
+              snap.data()?.lease !== lease
+            ) {
+              return false;
+            }
+
+            tx.update(ref, {
+              leaseUntilMs: Date.now() + LEASE_MS
+            });
+
+            return true;
+          }
+        );
+
+        if (!valid) {
+          running = false;
+          return;
+        }
+      } catch (error) {
+        console.warn(
+          '[murabbik-worker] lease renewal failed',
+          tenant,
+          error
+        );
+      }
+
+      if (running) {
+        timer = setTimeout(renew, everyMs);
+        timer.unref?.();
+      }
+    };
+
+    timer = setTimeout(renew, everyMs);
+    timer.unref?.();
+
+    return () => {
+      running = false;
+      if (timer) clearTimeout(timer);
+    };
+  }
+
+  
+async function buildTenant(tenant) {
+  let job;
+
+  try {
+    job = await claim(tenant);
+  } catch (error) {
+    console.error(
+      '[murabbik-worker] claim failed',
+      tenant,
+      error
+    );
+
+    schedule(
+      tenant,
+      Date.now() + FAILURE_DELAY_MS
+    );
+
+    return;
+  }
+
+  if (!job) return;
+
+
+    if (job.waitUntil) {
+      schedule(
+        tenant,
+        job.waitUntil + 100
+      );
+      return;
+    }
+
+    if (!job.lease) {
+      if (job.heldKinds?.length) {
+        const since = Math.min(
+          ...job.heldKinds.map(kind =>
+            finite(
+              job.heldSinceByKind?.[kind],
+              Date.now()
+            )
+          )
+        );
+
+        const recoverAt = since + LEASE_MS;
+
+        if (
+          recoverAt <= Date.now() &&
+          typeof recoverGroups === 'function'
+        ) {
+          try {
+            const groups =
+              await recoverGroups(tenant);
+
+            if (
+              !groups ||
+              groups.ok !== true
+            ) {
+              throw new Error(
+                'Group recovery incomplete'
+              );
+            }
+
+            const heldTokens =
+              job.heldKinds.map(kind =>
+                clean(job.heldByKind?.[kind])
+              ).filter(Boolean);
+
+            await releaseHeld(
+              tenant,
+              heldTokens
+            );
+          } catch (error) {
+            console.error(
+              '[murabbik-worker] held-group recovery',
+              tenant,
+              error.message
+            );
+
+            schedule(
+              tenant,
+              Date.now() + FAILURE_DELAY_MS
+            );
+          }
+        } else {
+          schedule(
+            tenant,
+            Math.max(
+              Date.now() + 1000,
+              recoverAt
+            )
+          );
+        }
+      } else if (job.nextAt > Date.now()) {
+        schedule(tenant, job.nextAt);
+      }
+
+      return;
+    }
+
+    const stopLeaseRenewal =
+      keepLeaseAlive(tenant, job.lease);
+
+    try {
+      const profiles =
+        await profilesForTenant(tenant);
+
+      if (
+        !Array.isArray(profiles) ||
+        !profiles.length
+      ) {
+        throw new Error(
+          'No registered farm profile for tenant'
+        );
+      }
+
+      // Daily maintenance is executed for the current farm.
+      if (
+        job.nextDailyAtMs <= Date.now() &&
+        typeof maintainFarm === 'function'
+      ) {
+        const first = profiles.find(
+          row => clean(row?.uid) === tenant
+        ) || profiles.find(
+          row => clean(row?.uid)
+        );
+
+        if (!first) {
+          throw new Error(
+            'Farm profile UID missing'
+          );
+        }
+
+        await maintainFarm({
+          tenant,
+          uid: first.uid,
+          profile: first.profile || {}
+        });
+      }
+
+      const records = [];
+      const failedKinds = new Set();
+
+      let nextDayAtMs =
+        job.nextDailyAtMs > Date.now()
+          ? job.nextDailyAtMs
+          : Infinity;
+
+      for (const item of profiles) {
+        const uid = clean(item?.uid);
+
+        if (!uid) continue;
+
+        const profile = item.profile || {};
+
+        const timeZone =
+          await timeZoneForProfile({
+            tenant,
+            uid,
+            profile
+          });
+
+        nextDayAtMs = Math.min(
+          nextDayAtMs,
+          nextFarmDayMs(timeZone)
+        );
+
+        // Keep the original engines; isolate failures by kind.
+        if (job.selected.includes('alerts')) {
+          try {
+            const alertsResult = await calculateAlerts({
+              tenant,
+              uid,
+              profile
+            });
+
+            if (
+              !alertsResult ||
+              !Array.isArray(alertsResult.alerts) ||
+              !alertsResult.today ||
+              alertsResult.degraded
+            ) {
+              throw new Error(
+                'Incomplete smart-alert result'
+              );
+            }
+
+            records.push([
+              'alerts',
+              uid,
+              copyPayload({
+                today: alertsResult.today,
+                alerts: alertsResult.alerts
+              })
+            ]);
+          } catch (error) {
+            failedKinds.add('alerts');
+
+            console.error(
+              '[murabbik-worker] alerts failed',
+              tenant,
+              error
+            );
+          }
+        }
+
+        for (const [kind, species] of [
+          ['stats:cows', 'cows'],
+          ['stats:buffalo', 'buffalo']
+        ]) {
+          if (!job.selected.includes(kind)) {
+            continue;
+          }
+
+          try {
+            const stats = await calculateStats({
+              tenant,
+              uid,
+              profile,
+              species
+            });
+
+            if (!stats || stats.ok !== true) {
+              throw new Error(
+                'Incomplete herd statistics: ' + kind
+              );
+            }
+
+            records.push([
+              kind,
+              uid,
+              copyPayload(stats)
+            ]);
+          } catch (error) {
+            failedKinds.add(kind);
+
+            console.error(
+              '[murabbik-worker] stats failed',
+              tenant,
+              kind,
+              error
+            );
+          }
+        }
+
+      }
+
+      const healthyRecords = records.filter(
+        ([kind]) => !failedKinds.has(kind)
+      );
+
+      if (
+        !healthyRecords.length ||
+        !Number.isFinite(nextDayAtMs)
+      ) {
+        throw new Error(
+          'No complete prepared farm data'
+        );
+      }
+
+      const published = await publish(
+        tenant,
+        job,
+        healthyRecords,
+        nextDayAtMs,
+        failedKinds
+      );
+
+      const nextWake = published.remaining
+        ? (
+            published.retryAtMs ||
+            Date.now() + COALESCE_MS
+          )
+        : nextDayAtMs;
+
+      schedule(
+        tenant,
+        Math.min(
+          nextWake,
+          published.holdRecoveryAt
+        )
+      );
+
+      console.log(
+        '[murabbik-worker] prepared',
+        {
+          tenant,
+          kinds: job.selected,
+          profiles: profiles.length
+        }
+      );
+    } catch (error) {
+      console.error(
+        '[murabbik-worker] build failed',
+        tenant,
+        error
+      );
+
+      const retryAt =
+        await releaseFailedLease(
+          tenant,
+          job.lease,
+          job.generations
+        ).catch(e => {
+          console.error(
+            '[murabbik-worker] lease cleanup',
+            tenant,
+            e
+          );
+          return 0;
+        });
+
+      if (retryAt) {
+        schedule(tenant, retryAt);
+      }
+    } finally {
+      stopLeaseRenewal();
+    }
+  }
+
+  async function drain() {
+    if (
+      draining ||
+      !started ||
+      stopping
+    ) return;
+
+    draining = true;
+
+    try {
+      while (pending.size && !stopping) {
+        const group = [...pending]
+          .filter(tenant =>
+            !active.has(tenant)
+          )
+          .slice(0, 2);
+
+        if (!group.length) break;
+
+        group.forEach(tenant => {
+          pending.delete(tenant);
+          active.add(tenant);
+        });
+
+        await Promise.all(
+          group.map(async tenant => {
+            try {
+              await buildTenant(tenant);
+            } finally {
+              active.delete(tenant);
+            }
+          })
+        );
+      }
+    } finally {
+      draining = false;
+
+      if (
+        !stopping &&
+        [...pending].some(
+          tenant => !active.has(tenant)
+        )
+      ) {
+        setImmediate(() => void drain());
+      }
+    }
+  }
+
+  async function bootstrap() {
+    try {
+      await seedTenants(seedIfMissing);
+    } catch (error) {
+      console.error(
+        '[murabbik-worker] startup seed failed',
+        error
+      );
+
+      if (started && !stopping) {
+        bootstrapRetry = setTimeout(() => {
+          bootstrapRetry = null;
+          void bootstrap();
+        }, FAILURE_DELAY_MS);
+
+        bootstrapRetry.unref?.();
+      }
+    }
+  }
+
+  function start() {
+    if (started) return startupPromise;
+
+    started = true;
+    stopping = false;
+
+    startupPromise = bootstrap();
+
+    return startupPromise;
+  }
+
+  function stop() {
+    stopping = true;
+    started = false;
+
+    if (bootstrapRetry) {
+      clearTimeout(bootstrapRetry);
+    }
+
+    bootstrapRetry = null;
+
+    for (const entry of scheduled.values()) {
+      clearTimeout(entry.timer);
+    }
+
+    scheduled.clear();
+    pending.clear();
+  }
+
+  return {
+    start,
+    stop,
+    markDirty,
+    releaseHeld,
+    getReady
+  };
+}
+
+  return createPreparedEngine;
+})();
+
 
 let murabbikPreparedEngineSrv = null;
 
@@ -93,7 +1337,14 @@ const murabbikPreparedReadOnlyPostsSrv = new Set([
   '/api/herd-import-v2/inspect-external',
   '/api/vaccination/campaign/prepare',
   '/api/herd-import-v2/repair-dairycomp-event-names',
-  '/api/vaccination/farm-program/preview-row'
+  '/api/vaccination/farm-program/preview-row',
+  '/api/groups/events-enrich',
+  '/api/bcs/vision-analyze',
+  '/api/feces/vision-analyze',
+  '/api/dairy-traits/vision-analyze',
+  '/api/dairy-traits/buffalo-training/calculate',
+  '/api/dairy-traits/training/calculate'
+
 ]);
 
 
@@ -3284,7 +4535,9 @@ function reproAutoOpenThresholdDaysSrv(a = {}) {
   // «حديث الولادة» = داخل VWP.
   // بعد انتهاء VWP تصبح الحالة التناسلية «مفتوحة».
   // أبقار: 45 يوم، جاموس: 35 يوم.
-  return isBuffalo ? 35 : 45;
+  
+return isBuffalo ? 35 : 51;
+
 }
 
 function buildReproAutoOpenPatchSrv(a = {}, todayISO = "") {
@@ -3340,16 +4593,28 @@ function buildReproAutoOpenPatchSrv(a = {}, todayISO = "") {
     reproAutoSource: "server:daily_maintenance"
   };
 }
-async function updateAllDIM(){
+async function updateAllDIM(tenant = '', localDay = ''){
   try{
     if (!db) {
       console.log("⚠️ DIM skipped: Firestore disabled");
       return;
     }
 
-    const todayISO = cairoTodayISO();
+    const selectedTenant = String(tenant || '').trim();
 
-    const snap = await db.collection("animals").get();
+    const todayISO =
+      /^\d{4}-\d{2}-\d{2}$/.test(localDay)
+        ? localDay
+        : selectedTenant
+          ? await farmTodayISOSrv(selectedTenant)
+          : cairoTodayISO();
+
+    const animalsQuery = selectedTenant
+      ? db.collection("animals")
+          .where("userId", "==", selectedTenant)
+      : db.collection("animals");
+
+    const snap = await animalsQuery.get();
 
     let updated = 0;
     let scanned = 0;
@@ -3389,10 +4654,12 @@ const isDryAnimal =
   productionStatusText.includes("dry");
 
 if (isDryAnimal) {
-  const needsDryDimReset =
-    a.daysInMilk !== null ||
-    a.dailyMilk !== null ||
-    a.milkTodayKg !== null;
+  
+const needsDryDimReset =
+  a.daysInMilk != null ||
+  a.dailyMilk != null ||
+  a.milkTodayKg != null;
+
 
   if (needsDryDimReset) {
     batch.set(doc.ref, {
@@ -3422,7 +4689,12 @@ if (isDryAnimal) {
       let dim = diffDaysISO(lcd, todayISO);
       if (!Number.isFinite(dim) || dim < 0) dim = 0;
 
-      if (Number(a.daysInMilk) === dim) continue;
+      
+if (
+  a.daysInMilk != null &&
+  Number(a.daysInMilk) === dim
+) continue;
+
 
       batch.set(doc.ref, { daysInMilk: dim, _dimUpdatedAt: todayISO }, { merge:true });
       if (a.userId) touchedTenants.add(String(a.userId).trim());
@@ -3450,10 +4722,13 @@ if (isDryAnimal) {
 // فطام -> نامي عند 6 شهور
 // نامي -> تحت التلقيح للأنثى عند 11 شهرًا
 // ============================================================
+const calvesQuery = selectedTenant
+  ? db.collection("calves")
+      .where("userId", "==", selectedTenant)
+  : db.collection("calves");
+
 const followerStageSnap =
-  await db
-    .collection("calves")
-    .get();
+  await calvesQuery.get();
 
 let followerStageBatch =
   db.batch();
@@ -3617,22 +4892,19 @@ if (followerStageOps > 0) {
 // ✅ التوابع التي أجهضت:
 // تظل reproductiveStatus = "إجهاض" لمدة 40 يومًا.
 // بعد اكتمال 40 يومًا تعود «مفتوحة / تحت التلقيح».
-const abortionFollowersSnap =
-  await db
-    .collection("calves")
-    .where(
-      "reproductiveStatus",
-      "==",
-      "إجهاض"
-    )
-    .get();
+const abortionFollowerDocs =
+  followerStageSnap.docs.filter(doc =>
+    String(
+      doc.data()?.reproductiveStatus || ''
+    ).trim() === 'إجهاض'
+  );
 
 let followerBatch =
   db.batch();
 
 let followerOps = 0;
 
-for (const doc of abortionFollowersSnap.docs) {
+for (const doc of abortionFollowerDocs) {
   scanned++;
 
   const a =
@@ -3702,14 +4974,37 @@ if (followerOps > 0) {
 }
 
 for (const uid of touchedTenants) {
-      if (typeof scheduleGroupsRebuildSrv === 'function') {
-        scheduleGroupsRebuildSrv(uid, 'daily_dim_update');
-      }
-    }
+  if (
+    !selectedTenant &&
+    typeof scheduleGroupsRebuildSrv === 'function'
+  ) {
+    scheduleGroupsRebuildSrv(
+      uid,
+      'daily_dim_update'
+    );
+  }
+}
 
-    console.log("✅ DIM updated:", { todayISO, scanned, updated, groupsRebuildQueued: touchedTenants.size });
+console.log("✅ DIM updated:", {
+  todayISO,
+  scanned,
+  updated,
+  groupsRebuildQueued: touchedTenants.size
+});
+
+return {
+  todayISO,
+  scanned,
+  updated,
+  groupTenants: [...touchedTenants]
+};
   } catch (e){
-    console.error("❌ DIM update failed:", e.message || e);
+    console.error(
+      "❌ DIM update failed:",
+      e.message || e
+    );
+
+    if (tenant) throw e;
   }
 }
 
@@ -12595,6 +13890,55 @@ const animals = new Map(
 const HERD_DC_ASYNC_SOURCE_SRV = "herd_import_source_jobs";
 const herdDcAsyncInFlightSrv = new Set();
 
+const herdDcAsyncWakeTimersSrv = new Map();
+
+function herdDcAsyncScheduleSrv(
+  importId,
+  dueAtMs = Date.now()
+) {
+  const id = String(importId || '').trim();
+
+  if (!id) return;
+
+  const when = Math.max(
+    Date.now(),
+    Number(dueAtMs) || Date.now()
+  );
+
+  const previous =
+    herdDcAsyncWakeTimersSrv.get(id);
+
+  if (
+    previous &&
+    previous.when <= when
+  ) return;
+
+  if (previous) {
+    clearTimeout(previous.timer);
+  }
+
+  const timer = setTimeout(() => {
+    herdDcAsyncWakeTimersSrv.delete(id);
+
+    if (Date.now() + 10 < when) {
+      herdDcAsyncScheduleSrv(id, when);
+      return;
+    }
+
+    void herdDcAsyncExecuteOneSrv(id);
+  }, Math.min(
+    2147483647,
+    Math.max(0, when - Date.now())
+  ));
+
+  timer.unref?.();
+
+  herdDcAsyncWakeTimersSrv.set(
+    id,
+    {when, timer}
+  );
+}
+
 async function herdDcAsyncEnqueueSrv({
   uid, body, persistencePlan
 }) {
@@ -12733,6 +14077,7 @@ async function herdDcAsyncExecuteOneSrv(importId) {
 
   let claimed = false;
   let heartbeat = null;
+  let retryAtMs = 0;
 
   try {
     const task = await db.runTransaction(async tx => {
@@ -12985,6 +14330,13 @@ fileBase64,
           const permanent =
             e.statusCode === 400 ||
             attempts >= 12;
+                      const nextAttemptAtMs = permanent
+            ? 0
+            : Date.now() +
+              Math.min(
+                300000,
+                attempts * 30000
+              );
 
           tx.update(ref, {
             status: permanent
@@ -12994,20 +14346,15 @@ fileBase64,
             lastError:
               String(e.message || e).slice(0, 500),
 
-            nextAttemptAtMs:
-              permanent
-                ? 0
-                : Date.now() +
-                  Math.min(
-                    300000,
-                    attempts * 30000
-                  ),
+            nextAttemptAtMs,
 
             leaseUntilMs: 0,
 
             updatedAt:
               admin.firestore.FieldValue.serverTimestamp()
           });
+
+          retryAtMs = nextAttemptAtMs;
         });
       } catch (saveError) {
         console.error(
@@ -13017,8 +14364,18 @@ fileBase64,
       }
     }
   } finally {
-    if (heartbeat) clearInterval(heartbeat);
+    if (heartbeat) {
+      clearInterval(heartbeat);
+    }
+
     herdDcAsyncInFlightSrv.delete(importId);
+
+    if (retryAtMs) {
+      herdDcAsyncScheduleSrv(
+        importId,
+        retryAtMs
+      );
+    }
   }
 }
 
@@ -13033,23 +14390,22 @@ async function herdDcAsyncSweepSrv() {
     const page = await db
       .collection(HERD_DC_ASYNC_SOURCE_SRV)
       .where("status", "==", status)
-      .limit(30)
       .get();
 
     for (const doc of page.docs) {
       const task = doc.data() || {};
 
-      if (
-        Number(task.nextAttemptAtMs || 0) >
-          Date.now() ||
-        (
-          status === "running" &&
-          Number(task.leaseUntilMs || 0) >
-            Date.now()
-        )
-      ) continue;
+      const dueAt = Math.max(
+        Number(task.nextAttemptAtMs || 0),
+        status === "running"
+          ? Number(task.leaseUntilMs || 0)
+          : 0
+      );
 
-      void herdDcAsyncExecuteOneSrv(doc.id);
+      herdDcAsyncScheduleSrv(
+        doc.id,
+        dueAt
+      );
     }
   }
 }
@@ -92420,7 +93776,10 @@ function murabbikSmartAlertLanguageSrv(alerts, animals) {
 }
 
 async function murabbikSmartAlertCollectSrv(req) {
-  if (process.env.MURABBIK_PREPARED_ROLE !== 'worker') {
+  if (
+   murabbikPreparedServeSrv &&
+req.__murabbikPreparedBuildSrv !== true
+  ) {
     const uid = req.authSession?.uid || req.userId;
 
     const allowed =
@@ -92622,13 +93981,19 @@ if (await murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
   }
 }
 
+
 if (!result) {
-  return res.status(503).json({
-    ok: false,
-    error: 'prepared_alerts_pending',
-    message: 'التنبيهات قيد التحديث، أعد المحاولة بعد قليل.'
-  });
+  if (!murabbikPreparedServeSrv) {
+    result = await murabbikSmartAlertCollectSrv(req);
+  } else {
+    return res.status(503).json({
+      ok: false,
+      error: 'prepared_alerts_pending',
+      message: 'التنبيهات قيد التحديث، أعد المحاولة بعد قليل.'
+    });
+  }
 }
+
 
 const stateResult =
   await murabbikSmartAlertApplyUserStateSrv(
@@ -92845,10 +94210,14 @@ console.log(
    * لا ترسل source،
    * أو fallback عند تعذر المصدر.
    */
+
   const result =
     await murabbikSmartAlertCollectSrv(
-      req
+      Object.assign(Object.create(req), {
+        __murabbikPreparedBuildSrv: true
+      })
     );
+
 
   return (
     result.alerts.find(
@@ -92941,12 +94310,9 @@ if (await murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
   if (
     prepared &&
     prepared.today === await farmTodayISOSrv(uid) &&
-    Array.isArray(prepared.alerts) &&
-    prepared.alerts.some(
-      item =>
-        item.id === alertId &&
-        item.revision === revision
-    )
+
+    Array.isArray(prepared.alerts)
+
   ) {
     alert = prepared.alerts.find(item =>
       item.id === alertId &&
@@ -92963,6 +94329,26 @@ if (await murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
     };
   }
 }
+
+
+if (!murabbikPreparedServeSrv) {
+  freshResult = await murabbikSmartAlertCollectSrv(req);
+
+  alert = freshResult.alerts.find(item =>
+    item.id === alertId &&
+    item.revision === revision
+  ) || null;
+
+} else if (freshResult && alert) {
+  // تحقق حي من مصدر التنبيه قبل حفظ القرار.
+  alert = await murabbikSmartAlertLiveResponseAlertSrv(
+    req,
+    alertId,
+    revision,
+    alert.source || sourceHint
+  );
+}
+
 
 if (!freshResult) {
   return res.status(503).json({
@@ -98372,9 +99758,15 @@ singleHerdType
   }
 }
 
+
 app.get('/api/herd-stats', requireUserId, async (req, res) => {
-  
-if (await murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
+
+  if (!murabbikPreparedServeSrv) {
+    return murabbikHerdStatsBuildSrv(req, res);
+  }
+
+  if (await murabbikPreparedCanServeSrv(req) && murabbikPreparedEngineSrv) {
+
 
     const raw = String(req.query.type || req.query.species || '')
       .trim().toLowerCase();
@@ -115246,8 +116638,9 @@ function scheduleGroupsRebuildSrv(
       ) return;
 
       if (
-        murabbikPreparedEngineSrv &&
-        process.env.MURABBIK_PREPARED_ROLE !== 'worker'
+      
+        murabbikPreparedEngineSrv
+
       ) {
         const completedTokens = [
           ...(murabbikPreparedGroupTokensSrv.get(uid) ||
@@ -137308,7 +138701,9 @@ app.use(async (req, res, next) => {
 });
 
 // Prepared Views — off unless explicitly enabled.
-if (db && process.env.MURABBIK_PREPARED_VIEWS === '1') {
+
+if (db && murabbikPreparedServeSrv) {
+
   murabbikPreparedEngineSrv = createPreparedEngine({
     db,
 
@@ -137368,6 +138763,7 @@ if (db && process.env.MURABBIK_PREPARED_VIEWS === '1') {
 
     calculateAlerts: async ({tenant, uid, profile}) => {
       const req = {
+        __murabbikPreparedBuildSrv: true,
         method: 'GET',
         path: '/api/smart-alerts',
         userId: tenant,
@@ -137378,67 +138774,13 @@ if (db && process.env.MURABBIK_PREPARED_VIEWS === '1') {
         }
       };
 
-      const result = await murabbikSmartAlertCollectSrv(req);
-      const nowMs = Date.now();
-
-      const farmClock = await farmTimeContextSrv(uid);
-      const timeZone = String(farmClock?.timeZone || 'UTC');
-
-      let nextPeriodAtMs = nowMs + 5 * 60000;
-
-      try {
-        const parts = new Intl.DateTimeFormat('en-GB', {
-          timeZone,
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hourCycle: 'h23'
-        }).formatToParts(new Date(nowMs));
-
-        const value = type =>
-          Number(parts.find(p => p.type === type)?.value || 0);
-
-        const minuteOfDay =
-          value('hour') * 60 + value('minute');
-
-        const nextMinute =
-          [0, 300, 720, 900, 1080, 1380, 1440]
-            .find(m => m > minuteOfDay);
-
-        const seconds =
-          (nextMinute - minuteOfDay) * 60 - value('second');
-
-        if (Number.isFinite(seconds) && seconds > 0) {
-          nextPeriodAtMs = Math.min(
-            nextPeriodAtMs,
-            nowMs + seconds * 1000
-          );
-        }
-      } catch (e) {
-        console.warn('prepared period deadline', e.message);
-      }
-
-      const nearOvsynch = result.alerts.some(alert =>
-        alert.source === 'ovsynch_protocol_steps' &&
-        (
-          alert.dueDate === result.context.today ||
-          alert.dueDate === addDaysToIsoDateSrv(
-            result.context.today, 1
-          )
-        )
-      );
+      const result =
+        await murabbikSmartAlertCollectSrv(req);
 
       return {
         today: result.context.today,
         alerts: result.alerts,
-        degraded: result.sourceErrors.length > 0,
-        refreshAtMs: Math.max(
-          nowMs + 30000,
-          Math.min(
-            nextPeriodAtMs,
-            nearOvsynch ? nowMs + 60000 : Infinity
-          )
-        )
+        degraded: result.sourceErrors.length > 0
       };
     },
 
@@ -137465,6 +138807,108 @@ if (db && process.env.MURABBIK_PREPARED_VIEWS === '1') {
       await murabbikHerdStatsBuildSrv(req, res);
 
       return payload;
+    },
+
+    timeZoneForProfile: async ({
+      tenant,
+      uid,
+      profile
+    }) => {
+      const savedZone = String(
+        profile?.farmTimeZone ||
+        profile?.farmLocation?.timeZone ||
+        ''
+      ).trim();
+
+            if (
+        savedZone &&
+        farmDateISOInTimeZoneSrv(savedZone)
+      ) {
+        return savedZone;
+      }
+
+      const clock =
+        await farmTimeContextSrv(uid);
+
+      if (
+        clock?.source !== 'utc_fallback' &&
+        clock?.timeZone
+      ) {
+        return clock.timeZone;
+      }
+
+      if (tenant !== uid) {
+        const ownerClock =
+          await farmTimeContextSrv(tenant);
+
+        if (
+          ownerClock?.source !== 'utc_fallback' &&
+          ownerClock?.timeZone
+        ) {
+          return ownerClock.timeZone;
+        }
+      }
+
+
+      throw new Error(
+        'Farm time zone could not be resolved'
+      );
+
+    },
+
+    maintainFarm: async ({tenant, uid}) => {
+      const clock = await farmTimeContextSrv(uid);
+
+      const ownerClock =
+        clock?.source === 'utc_fallback' &&
+        tenant !== uid
+          ? await farmTimeContextSrv(tenant)
+          : null;
+
+      
+      const timeZone =
+        ownerClock &&
+        ownerClock.source !== 'utc_fallback'
+          ? ownerClock.timeZone
+          : clock?.source !== 'utc_fallback'
+            ? clock.timeZone
+            : '';
+
+      if (!timeZone) {
+        throw new Error(
+          'Farm time zone could not be resolved'
+        );
+      }
+
+
+      const localDay =
+        farmDateISOInTimeZoneSrv(timeZone);
+
+      if (!localDay) {
+        throw new Error('Invalid local farm day');
+      }
+
+      const maintenance =
+        await updateAllDIM(tenant, localDay);
+
+      if (
+        maintenance.groupTenants.includes(tenant)
+      ) {
+        const result =
+          await rebuildGroupsForTenantSrv(
+            tenant,
+            {
+              reason:
+                'prepared_daily_maintenance'
+            }
+          );
+
+        if (!result || result.ok !== true) {
+          throw new Error(
+            'Daily group rebuild incomplete'
+          );
+        }
+      }
     },
 
     seedTenants: async seedIfMissing => {
@@ -137507,38 +138951,26 @@ if (db && process.env.MURABBIK_PREPARED_VIEWS === '1') {
     }
   });
 
-  if (process.env.MURABBIK_PREPARED_ROLE === 'worker') {
-    murabbikPreparedEngineSrv.start();
-  }
+
+  void murabbikPreparedEngineSrv.start();
+
 }
 
 // Static last
 app.use(express.static(path.join(__dirname, 'www')));
 // DIM and HTTP listening remain on the original Web Service.
-if (process.env.MURABBIK_PREPARED_ROLE !== 'worker') {
-  startDailyDimJob();
-  updateAllDIM();
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ Server running on http://localhost:${PORT}`);
-  });
-const herdDcAsyncTimerSrv = setInterval(() => {
-  void herdDcAsyncSweepSrv().catch(e =>
-    console.error("DairyComp import sweep:", e)
-  );
-}, 30000);
-
-herdDcAsyncTimerSrv.unref?.();
-
-setImmediate(() => {
-  void herdDcAsyncSweepSrv().catch(e =>
-    console.error("DairyComp initial sweep:", e)
-  );
+// One Web Service: HTTP + prepared worker.
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
 });
-} else if (!murabbikPreparedEngineSrv) {
-  console.error(
-    'Prepared worker requires MURABBIK_PREPARED_VIEWS=1 and Firestore'
-  );
 
-  process.exitCode = 1;
+
+if (process.env.MURABBIK_DC_RESUME_PENDING === '1') {
+  setImmediate(() => {
+    void herdDcAsyncSweepSrv().catch(e =>
+      console.error('DairyComp initial sweep:', e)
+    );
+  });
 }
+
