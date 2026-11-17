@@ -42233,9 +42233,13 @@ if (semenOption || inseminatorOption) {
 }
 
 await batch.commit();
-    if (typeof scheduleGroupsRebuildSrv === "function") {
-      scheduleGroupsRebuildSrv(uid, "insemination_save");
-    }
+
+if (
+  animalCol === "calves" &&
+  typeof scheduleGroupsRebuildSrv === "function"
+) {
+  scheduleGroupsRebuildSrv(uid, "insemination_save");
+}
  
   return res.json({
   ok: true,
@@ -42383,6 +42387,7 @@ if (eventDate === todayISO) {
 
 const saved = [];
 const rejected = [];
+let heiferGroupRebuildNeeded = false;
 
     let batch = db.batch();
     let ops = 0;
@@ -42732,6 +42737,10 @@ if (animalCol === "calves") {
           warning: warningMessage || ""
         });
 
+        if (animalCol === "calves") {
+          heiferGroupRebuildNeeded = true;
+        }
+
         await commitIfNeeded(false);
 
       } catch (oneErr) {
@@ -42774,9 +42783,12 @@ if (animalCol === "calves") {
 
     await commitIfNeeded(true);
 
-    if (saved.length && typeof scheduleGroupsRebuildSrv === "function") {
-      scheduleGroupsRebuildSrv(uid, "insemination_bulk_save");
-    }
+    if (
+  heiferGroupRebuildNeeded &&
+  typeof scheduleGroupsRebuildSrv === "function"
+) {
+  scheduleGroupsRebuildSrv(uid, "insemination_bulk_save");
+}
 
 if (!saved.length) {
   return res.status(400).json({
@@ -117798,6 +117810,7 @@ async function rebuildGroupsForTenantSrv(tenant, opts = {}) {
     counts
   };
 }
+
 function groupPageDateIsoSrv(v) {
   const d = toDate(v);
   if (d && !Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
